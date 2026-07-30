@@ -848,8 +848,12 @@ function renderChips(entry, dice, staged = false) {
 function renderBreakdown(el, entry, hidden) {
   el.textContent = '';
   if (hidden) return;
-  const mods = (modPartsOf(entry) || (entry.modifier ? [{ label: '', value: entry.modifier }] : []))
-    .filter((p) => p.value);
+  // Exactly the log's list, unfiltered: a +0 the player deliberately named
+  // ('+0[Guidance]', which round-trips through the canonical) is attribution,
+  // not noise, and dropping it here made the two surfaces disagree about a
+  // named source. Only the unnamed fallback is conditional — that is the log's
+  // own rule (`else if (entry.modifier)`), so a bare 0 never renders.
+  const mods = modPartsOf(entry) || (entry.modifier ? [{ label: '', value: entry.modifier }] : []);
   if (entry.parts.length <= 1 && !mods.length) return;
 
   entry.parts.forEach((p, i) => {
