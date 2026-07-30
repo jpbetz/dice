@@ -3964,6 +3964,9 @@ function renderPopEcho() {
 // The whisper audience multi-select, built from the live roster (minus you —
 // the chooser is always implicitly in the audience). Duplicate names show
 // once: the server joins ALL matches to the audience (documented behavior).
+// Every chip here round-trips safely through w: notation: a roster name can
+// never contain '#' (the comment-split misdirection) because the server bans
+// it at join AND rename (server.js cleanName) — no filtering needed here.
 function renderPopAudience() {
   popVisAud.innerHTML = '';
   if (!pop || pop.vis.mode !== 'whisper') {
@@ -5112,8 +5115,21 @@ function beginRename(row, nameEl, player) {
   let done = false;
   const finish = async (commit) => {
     if (done) return;
-    done = true;
     const newName = cutText(input.value, 24);
+    if (commit && newName.includes('#')) {
+      // Refuse loudly instead of silently correcting: the server strips '#'
+      // from every name ('#' starts a comment in roll notation, so a name
+      // carrying it could misdirect a whisper — see server.js cleanName),
+      // and quietly rolling with the stripped echo would rename the player
+      // behind their back. Same surface as a server refusal: the pill.
+      handleNetRefusal({
+        path: '/api/rename', status: 400, code: 'bad_name',
+        message: 'names cannot contain # — it starts a comment in roll notation',
+      });
+      input.focus();
+      return; // stay in the rename input so it can be fixed
+    }
+    done = true;
     input.replaceWith(nameEl);
     if (!commit || !newName || newName === player.name) return;
     nameEl.textContent = newName; // optimistic; broadcast confirms
@@ -5403,13 +5419,25 @@ function promptName() {
     const modal = document.getElementById('name-modal');
     const input = document.getElementById('name-input');
     const joinBtn = document.getElementById('name-join');
+    const hint = document.querySelector('#name-panel .hint');
+    const hintText = hint.textContent;
     modal.classList.remove('hidden');
-    const update = () => { joinBtn.disabled = !input.value.trim(); };
+    // '#' is banned in names at every entry point (it starts a comment in
+    // roll notation — see server.js cleanName); say so here rather than let
+    // the server silently strip it.
+    const update = () => {
+      const hash = input.value.includes('#');
+      joinBtn.disabled = !input.value.trim() || hash;
+      hint.textContent = hash
+        ? 'names cannot contain # — it starts a comment in roll notation'
+        : hintText;
+      hint.classList.toggle('warn', hash);
+    };
     input.addEventListener('input', update);
     update();
     const submit = () => {
       const name = cutText(input.value, 24);
-      if (!name) return;
+      if (!name || name.includes('#')) return;
       modal.classList.add('hidden');
       resolve(name);
     };
@@ -5438,6 +5466,14 @@ async function initNet() {
     net = conn;
     netOnline = true;
     players = conn.players || [];
+    // The server sanitizes names ('#' stripped like control/bidi chars, then
+    // capped — server.js cleanName): adopt its answer for a stored name so
+    // localStorage and the roster agree from the first paint, instead of
+    // re-submitting the unsanitized spelling on every visit.
+    const me = players.find((p) => p.id === conn.playerId);
+    if (me && me.name && me.name !== name) {
+      try { localStorage.setItem(LS_NAME, me.name); } catch { /* ignore */ }
+    }
     renderPlayers();
     playersPanel.classList.remove('hidden');
     log = (conn.log || []).map(rollToLogEntry); // server history for late joiners

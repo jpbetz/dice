@@ -617,6 +617,7 @@ html, body {
   to   { transform: translateY(0) scale(1); opacity: 1; }
 }
 #name-panel .hint { margin-bottom: 4px; }
+#name-panel .hint.warn { color: var(--amber); } /* '#'-in-name refusal */
 .roller-name { font-weight: 700; }
 
 /* scrollbars */

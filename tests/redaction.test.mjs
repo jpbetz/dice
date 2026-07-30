@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { parseNotation } from '../js/notation.js';
-import { projectEntryFor, resolveVisibility, entryExistsFor } from '../server.js';
+import { projectEntryFor, resolveVisibility, entryExistsFor, cleanName } from '../server.js';
 
 // server.js installs a swallow-and-continue uncaughtException handler for its
 // own resilience; a test run must crash loudly instead.
@@ -269,6 +269,21 @@ await t('resolveVisibility: an unknown name rejects with unknown_audience, namin
 await t('resolveVisibility: a bogus mode is refused', () => {
   const r = resolveVisibility(fakeRoom(), chooser, { mode: 'blind', names: [] });
   assert.ok(r.error && r.error[2] === 'bad_visibility');
+});
+
+// In notation '#' starts the comment, and the comment split runs before the
+// whisper-flag scan — so a roster name carrying '#' could never survive its
+// own canonical spelling: `w:a#b` re-parses as a whisper to "a" with comment
+// "b", a silent misdelivery. The fix is a BAN at every name entry point
+// (join/rename both route through cleanName), stripped exactly the way the
+// control/bidi sanitizer strips its characters.
+await t('cleanName strips # from player names (the whisper-misdirection ban)', () => {
+  assert.equal(cleanName('a#b', 24), 'ab');
+  assert.equal(cleanName('#Ann#', 24), 'Ann');
+  assert.equal(cleanName('  a\u200b#b  ', 24), 'ab', 'strips beside the control/bidi set');
+  assert.equal(cleanName('###', 24), null, 'a name that is only # refuses as empty');
+  assert.equal(cleanName('Ann Smith', 24), 'Ann Smith', 'ordinary names pass untouched');
+  assert.equal(cleanName(42, 24), null);
 });
 
 // ---------------------------------------------------------------------------
@@ -688,6 +703,43 @@ try {
       assert.ok(Array.isArray(annEvt.data.values), 'the offerer (chooser) sees it');
       assert.ok(Array.isArray(cassEvt.data.values), 'the named audience sees it');
       assertNoValueKeys(bobEvt.data, "the claimer's own broadcast copy — they rolled it and cannot read it");
+    });
+
+    await t('a "#" name cannot exist, so a whisper can never be misdirected through one', async () => {
+      const room = 'red-hash-names';
+      const ann = await sit(room, 'Ann');
+
+      // Join-time sanitization: '#' is stripped exactly like the control/bidi
+      // set (server.js cleanName). The would-be "a#b" seats as "ab".
+      const hash = await sit(room, 'a#b');
+      const roster = hash.join.players;
+      assert.ok(roster.some((p) => p.id === hash.id && p.name === 'ab'), 'join strips # from the name');
+      assert.ok(!JSON.stringify(roster.map((p) => p.name)).includes('#'), 'no roster name carries #');
+
+      // Rename goes through the same gate…
+      const renamed = await post('/api/rename', { room, playerId: hash.id, name: 'x#y' });
+      assert.equal(renamed.status, 200);
+      const evt = await ann.sse.waitFor((e) => e.type === 'player-renamed' && e.data.playerId === hash.id, 'the rename echo');
+      assert.equal(evt.data.name, 'xy', 'rename strips # too');
+      // …and a name that is nothing but '#' refuses rather than seating empty.
+      const empty = await post('/api/rename', { room, playerId: hash.id, name: '###' });
+      assert.equal(empty.status, 400);
+      assert.equal(empty.body.code, 'bad_name');
+
+      // The misdirection this ban kills: nobody can BE "a#b", so in
+      // 'w:a#b' the '#' is just the comment split (a whisper to "a" with
+      // comment "b") — and with no player named "a" it fails CLOSED as
+      // unknown_audience instead of delivering the values to the wrong
+      // player under a silently rewritten label.
+      const mis = await post('/api/roll', { room, playerId: ann.id, notation: '1d20 w:a#b' });
+      assert.equal(mis.status, 400, 'the typo refuses the whole action');
+      assert.equal(mis.body.code, 'unknown_audience');
+      assert.ok(mis.body.error.includes('"a"'), `the unmatched fragment is named (got: ${mis.body.error})`);
+
+      // The sanitized name addresses cleanly, to exactly that player.
+      const okRoll = await post('/api/roll', { room, playerId: ann.id, notation: '1d20 w:xy' });
+      assert.equal(okRoll.status, 200);
+      assert.deepEqual([...okRoll.body.roll.visibility.audience].sort(), [ann.id, hash.id].sort());
     });
   }
 } finally {

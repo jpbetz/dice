@@ -457,6 +457,20 @@ function cleanString(value, max) {
   return cutText(stripCtl(value), max) || null;
 }
 
+// Player names additionally ban '#'. In roll notation '#' starts the comment,
+// and the comment split runs before the whisper-flag scan — so a roster name
+// containing one could never survive its own canonical spelling (`w:a#b`
+// re-parses as a whisper to "a" with the comment "b": a silent MISDELIVERY,
+// not a parse error). No name may carry it, at any entry point; that ban is
+// what makes whisper addressing total. Stripped rather than refused, exactly
+// as the control/bidi sanitizer above treats its characters (the client UIs
+// refuse loudly before it comes to this); a name that strips to nothing
+// falls out as null and the callers answer bad_name.
+function cleanName(value, max) {
+  if (typeof value !== 'string') return null;
+  return cleanString(value.replace(/#/g, ''), max);
+}
+
 // ---------------------------------------------------------------------------
 // API handlers
 // ---------------------------------------------------------------------------
@@ -466,7 +480,7 @@ async function handleJoin(req, res) {
   if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
 
   const roomName = cleanString(body.value.room, MAX_ROOM);
-  const name = cleanString(body.value.name, MAX_NAME);
+  const name = cleanName(body.value.name, MAX_NAME);
   if (!roomName) return sendError(res, 400, 'room is required', 'bad_room');
   if (!name) return sendError(res, 400, 'name is required', 'bad_name');
 
@@ -1217,7 +1231,7 @@ async function handleRename(req, res) {
   if (found.error) return sendError(res, ...found.error);
   const { room, player } = found;
 
-  const name = cleanString(body.value.name, MAX_NAME);
+  const name = cleanName(body.value.name, MAX_NAME);
   if (!name) return sendError(res, 400, 'name is required', 'bad_name');
 
   const oldName = player.name;
@@ -1618,4 +1632,4 @@ function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor };
+export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor, cleanName };
