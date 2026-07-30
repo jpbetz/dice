@@ -2104,6 +2104,7 @@ function applyReveal(rollId, full) {
   const idx = log.findIndex((e) => e.rollId === rollId);
   let entry = idx >= 0 ? log[idx] : null;
   const wasHidden = entry ? entryHidden(entry) : false;
+  const wasUnrevealed = entry ? entry.revealed === false : false;
   if (entry) {
     if (full && Array.isArray(full.values)) {
       // The redacted entry never had values: rebuild it whole from the
@@ -2124,7 +2125,12 @@ function applyReveal(rollId, full) {
     }
     return;
   }
-  if (!wasHidden) return; // already revealed: nothing to change
+  if (!wasHidden) {
+    // Nothing was hidden from THIS viewer (whisper audience / authority) —
+    // but the reveal still retires their Reveal affordances everywhere.
+    if (wasUnrevealed) refreshRevealSurfaces(rollId);
+    return;
+  }
   renderLog(); // the record flips immediately; chips/verdict ride the beat
   if (shelfClusters.has(rollId)) {
     revealShelvedRoll(rollId, entry);
