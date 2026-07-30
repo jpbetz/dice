@@ -96,7 +96,7 @@ export class Table {
   async settle({ timeout = 30000 } = {}) {
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
-      const busy = await this.dbg('(sim(120), busy)');
+      const busy = await this.page.eval('(window.__diceDebug.sim(120), window.__diceDebug.busy)');
       if (!busy) {
         // one more beat so post-roll transitions (whisk/sink) finish too
         await this.dbg('sim(240)');
@@ -129,7 +129,7 @@ export class Table {
   }
 
   // rollId of the current (most recent) roll.
-  rollId() { return this.dbg('currentRoll && currentRoll.rollId'); }
+  rollId() { return this.eval(`(window.__diceDebug.currentRoll || {}).rollId ?? null`); }
 
   diceCount() { return this.dbg('tableDice.length'); }
   shelf() { return this.dbg('shelf'); }

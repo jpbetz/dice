@@ -149,6 +149,10 @@ capability matrix across all roll surfaces · per-roll Done-clears.
 
 ## Conformances to protect (from the audit)
 
+How these are checked is governed by [TESTING.md](TESTING.md): scripted-first
+(unit + fuzz + tagged e2e per step; full sweep pre-release), and every build
+step ships with its e2e scenario.
+
 Server is the sole value authority (client-sent values ignored) · notation
 re-parsed server-side, never trusted from the client · canonical form is a
 tested byte-stable fixed point · codec fails closed on hostile input ·

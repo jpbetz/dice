@@ -81,6 +81,17 @@ For automated testing in hidden tabs (where `requestAnimationFrame` never
 fires), `window.__diceDebug` exposes `sim(frames)`, `playRoll(roll)` with
 forced values, `rollDice`, `clearTable`, and connection state.
 
+## Testing
+
+```bash
+npm test                    # unit + fuzz + e2e smoke (seconds)
+npm run test:e2e:full       # full end-to-end sweep
+```
+
+End-to-end tests drive headless Chrome over raw CDP with zero dependencies
+(`tests/e2e/` — Node ≥ 22 and a Chrome/Chromium binary required). Policy in
+[docs/TESTING.md](docs/TESTING.md).
+
 ## License
 
 Apache License 2.0 — see [LICENSE](LICENSE). Vendored third-party libraries
