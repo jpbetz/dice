@@ -725,7 +725,12 @@ function placeCluster(c, animate) {
 // and its ✕ — stacked on top, unclickable.)
 function reflowShelf(animate = true) {
   const clusters = [...shelfClusters.values()].sort((a, b) => a.seq - b.seq);
-  clusters.forEach((c, slot) => {
+  clusters.forEach((c, i) => {
+    // The cap belongs to the server (and to the solo mirror): a client's live
+    // set is only ever a subset of it, because a deferred collect withholds
+    // the NEWEST roll, never an older one. The clamp is belt and braces —
+    // never address a slot the shelf does not have.
+    const slot = Math.min(i, SHELF_SLOTS - 1);
     if (c.slot === slot && c.placed) return;
     c.slot = slot;
     c.placed = true;
