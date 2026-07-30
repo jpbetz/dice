@@ -490,9 +490,10 @@ marks, explode-children values, `mods.parts` amounts, `total`, `meaning`,
 and the `dc` verdict — and adds `redacted: true` plus
 `visMode: 'held' | 'whisper'`.
 
-**It keeps** `rollId`, roller id + name, dice types and counts, `seed`, the
-notation string, the `dc` target, the `exp`/ceremony fields, and the
-`collected`/`cleared` flags. Three of those are deliberate:
+**It keeps** `rollId`, roller id + name + `color`, dice types and counts,
+`seed`, `t`, the roll's `label`, the `dc` target, the `exp`/ceremony
+fields, the `faceDown`/`revealed`/`collected`/`cleared` flags, and
+`revealAuthority`. Four of those are deliberate:
 
 - **`seed` is safe.** Values are crypto-RNG'd *independently* of the seed;
   the seed drives poses only. Shipping it leaks nothing and buys every
@@ -500,10 +501,21 @@ notation string, the `dc` target, the `exp`/ceremony fields, and the
 - **`dc` is public on purpose.** Public stakes, held result — "she rolls
   against DC 15 and nobody can see the die" is the dramatic pairing this
   whole ladder is built around. Hidden DCs are rejected (§3.4).
-- **The notation string rides along verbatim**, so a whispered roll's
-  audience is legible to everyone who can see that the roll happened
-  (`… w:Kira`). Addressing is public, only the result is private — the
-  same as watching someone lean over and whisper at a real table.
+- **`revealAuthority` is a `playerId`, not a value.** Shrouded clients need
+  it to know whose **Reveal** button this is — on an offered roll the
+  authority sits *outside* the audience (§3.3), so it cannot be inferred
+  from the roller. The `audience` list itself is never repeated in the
+  redacted copy.
+- **Addressing is public, only the result is private** — the same as
+  watching someone lean over and whisper at a real table. *As built, this
+  is carried by `label`, not by a separate notation field:* a roll entry
+  has no `notation` key on the wire, and `label` is the notation's
+  `# comment` when it has one, falling back to the canonical string the
+  rolling surface composed. So `1d20 w:Kira` shows shrouded viewers
+  `1d20 w:Kira`, while `1d20 w:Kira # Perception` shows them `Perception`
+  and keeps the audience to itself. Both are acceptable; neither is a
+  values leak. Whether the audience should be legible *unconditionally* is
+  an open question — see ROADMAP step 4b.
 
 **Audience resolution (whisper).** Names are matched **case-insensitively
 against the current room roster at roll/offer creation**, then stored as
@@ -524,9 +536,13 @@ came up. Accepted deliberately, on the physical analogy: at a real table
 the extra dice are visible too. Suppressing them would break the
 byte-identical seeded tumble that makes shrouding free.
 
-**Not a wire path, still a surface:** the server's stdout roll log prints
-values for every roll. It is the operator's console, not a player's — but
-anyone writing new logging should treat entries the same way the wire does.
+**Not a wire path, still a surface:** the server's stdout roll log is a
+disclosure surface too, and it is redacted the same way. An open roll logs
+`values=… total=…`; a non-open roll logs its stakes and `vis=<mode>` and
+never its numbers, so an operator tailing the log cannot out-read the
+table. The rollId-bearing housekeeping lines (`collect`, `evict`) name only
+ids. Anyone writing new logging should treat entries the same way the wire
+does.
 
 ### 3.1 The shrouded die (the differentiator)
 
