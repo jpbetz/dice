@@ -418,6 +418,52 @@ t('cap slice cannot split an escape pair (caps measured on unescaped text)', () 
   assert.equal(ok(r.canonical).canonical, r.canonical);
 });
 
+// ---- surrogate-safe truncation (all three caps) ----------------------------
+// A cap landing inside a surrogate pair must drop the whole character, never
+// strand its high half: a lone surrogate renders as U+FFFD for every player
+// AND makes encodeURIComponent throw, which took the #g= codec (and the app's
+// next boot through it) down with it. Mirrors server.js cutText.
+const DIE = '\u{1F3B2}'; // one astral char = 2 UTF-16 units
+const LONE_HIGH = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/;
+const wholeChars = (r) => {
+  assert.ok(!LONE_HIGH.test(r.canonical), `lone surrogate in "${r.canonical}"`);
+  assert.doesNotThrow(() => encodeURIComponent(r.canonical));
+  assert.equal(ok(r.canonical).canonical, r.canonical); // still a fixed point
+};
+t('comment cap 64 drops a character it would split', () => {
+  const r = ok('1d20 # ' + 'z'.repeat(63) + DIE);  // 65 units, cut at 64
+  assert.equal(r.comment, 'z'.repeat(63));
+  wholeChars(r);
+  const fits = ok('1d20 # ' + 'z'.repeat(62) + DIE); // exactly 64 units
+  assert.equal(fits.comment, 'z'.repeat(62) + DIE);
+  wholeChars(fits);
+});
+t('subtitle cap 40 drops a character it would split', () => {
+  const r = ok('1d20 check # t | ' + 'z'.repeat(39) + DIE); // 41 units, cut at 40
+  assert.equal(r.exp.subtitle, 'z'.repeat(39));
+  wholeChars(r);
+  const fits = ok('1d20 check # t | ' + 'z'.repeat(38) + DIE);
+  assert.equal(fits.exp.subtitle, 'z'.repeat(38) + DIE);
+  wholeChars(fits);
+});
+t('label cap 20 drops a character it would split (and still warns)', () => {
+  const r = ok('1d20+2[' + 'z'.repeat(19) + DIE + ']'); // 21 units, cut at 20
+  assert.equal(r.spec.mods.parts[0].label, 'z'.repeat(19));
+  assert.ok(r.warnings.some((w) => w.includes('truncated')));
+  wholeChars(r);
+  const fits = ok('1d20+2[' + 'z'.repeat(18) + DIE + ']');
+  assert.equal(fits.spec.mods.parts[0].label, 'z'.repeat(18) + DIE);
+  assert.equal(fits.warnings.length, 0);
+  wholeChars(fits);
+});
+t('an astral character at every cap boundary survives the wire shape', () => {
+  const r = ok(`1d20+2[${DIE}A] check held dc15 # ${'z'.repeat(63)}${DIE} | ${'y'.repeat(39)}${DIE}`);
+  assert.equal(r.comment, 'z'.repeat(63));
+  assert.equal(r.exp.subtitle, 'y'.repeat(39));
+  assert.equal(r.faceDown, true);
+  wholeChars(r);
+});
+
 // ---- subtitle requires a kind flag -----------------------------------------
 t('subtitle without check/cinematic is invalid with the pinned message', () => {
   const r = bad('1d20 # a | b');

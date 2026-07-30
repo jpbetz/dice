@@ -84,6 +84,22 @@ const FLAG_KEYWORDS = ['check', 'cinematic', 'held'];
 // players see. Mirrored by rollspec.validateMods, which rejects them.
 const stripCtl = (t) => t.replace(/[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '');
 
+// Cut user text (labels, comments, subtitles) to at most `max` UTF-16 units:
+// trim \u2192 slice \u2192 surrogate guard \u2192 trim, so a cut landing on a space cannot
+// leave trailing whitespace and a cut landing INSIDE a surrogate pair cannot
+// strand its high half. A lone surrogate is not merely ugly \u2014 it renders as
+// U+FFFD everywhere the text is shown, and encodeURIComponent throws URIError
+// on it, which is how one emoji at the cap boundary used to take the whole
+// #g= codec (and every later app boot through it) down with it. server.js
+// cutText and js/main.js's cut helpers are the mirrors of this function; the
+// four layers must cut identically. Callers pass already-stripCtl'd text.
+export function cutText(text, max) {
+  let cut = text.trim().slice(0, max);
+  const last = cut.charCodeAt(cut.length - 1);
+  if (last >= 0xd800 && last <= 0xdbff) cut = cut.slice(0, -1); // unpaired high surrogate
+  return cut.trim();
+}
+
 function invalid(error, hint = null) {
   return { ok: false, state: 'invalid', error, hint };
 }
@@ -149,12 +165,13 @@ export function parseNotation(input) {
         break;
       }
     }
-    // normalize unescape → strip → trim → slice → trim, so the truncating cut
-    // can never leave whitespace (or a control char shield it) that a re-parse
-    // of the canonical form would strip again — the canonical must be a fixed
-    // point. Slicing runs on the unescaped text, so a cap cut can never split
-    // a '\|' escape pair.
-    const clean = (t, cap) => stripCtl(t.replace(/\\\|/g, '|')).trim().slice(0, cap).trim();
+    // normalize unescape → strip → cutText (trim → slice → surrogate guard →
+    // trim), so the truncating cut can never leave whitespace (or a control
+    // char shield it) that a re-parse of the canonical form would strip again,
+    // and can never strand half of a surrogate pair — the canonical must be a
+    // fixed point, and a lone surrogate is not even URL-encodable. Slicing
+    // runs on the unescaped text, so a cap cut can never split a '\|' pair.
+    const clean = (t, cap) => cutText(stripCtl(t.replace(/\\\|/g, '|')), cap);
     if (pipe >= 0) {
       comment = clean(rawComment.slice(0, pipe), MAX_COMMENT) || null;
       subtitle = clean(rawComment.slice(pipe + 1), MAX_SUBTITLE) || null;
@@ -236,12 +253,13 @@ export function parseNotation(input) {
       if (m) {
         let label = null;
         if (m[2] !== undefined) {
-          // same normalization order as comments: strip → trim → slice → trim
-          label = stripCtl(m[2]).trim();
-          if (label.length > MAX_LABEL) {
-            label = label.slice(0, MAX_LABEL).trim();
-            warnings.push(`label truncated to ${MAX_LABEL} characters`);
-          }
+          // same normalization as comments: strip → cutText (trim → slice →
+          // surrogate guard → trim), so an over-long label is cut without
+          // stranding half of a pair — a lone surrogate here would ride the
+          // canonical straight into the #g= codec, which cannot encode it.
+          const rawLabel = stripCtl(m[2]).trim();
+          label = cutText(rawLabel, MAX_LABEL);
+          if (label !== rawLabel) warnings.push(`label truncated to ${MAX_LABEL} characters`);
         }
         terms.push({ kind: 'int', value: sign * parseInt(m[1], 10), label: label || null });
         pos += m[0].length;

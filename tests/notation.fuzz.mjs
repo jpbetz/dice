@@ -163,6 +163,21 @@ function checkOkContract(kind, input, r) {
   tag.trailingWs = untrimmed(r.comment)
     || untrimmed(r.exp && r.exp.subtitle)
     || (Array.isArray(spec.mods && spec.mods.parts) && spec.mods.parts.some((p) => p && untrimmed(p.label)));
+  // Same class as trailing whitespace: text ending in the high half of a
+  // surrogate pair is text the next parse's cut would shorten again — and a
+  // lone surrogate also renders as U+FFFD for every player and makes
+  // encodeURIComponent (the #g= codec) throw. No ok parse may produce one.
+  const strandedHigh = (t) => {
+    if (typeof t !== 'string' || !t) return false;
+    const last = t.charCodeAt(t.length - 1);
+    return last >= 0xd800 && last <= 0xdbff;
+  };
+  if (strandedHigh(r.comment)) d('comment ends in an unpaired high surrogate');
+  if (strandedHigh(r.exp && r.exp.subtitle)) d('subtitle ends in an unpaired high surrogate');
+  if (Array.isArray(spec.mods && spec.mods.parts)
+      && spec.mods.parts.some((p) => p && strandedHigh(p.label))) {
+    d('part label ends in an unpaired high surrogate');
+  }
 
   // dice pool
   if (!Array.isArray(spec.dice)) return d('spec.dice is not an array');
@@ -271,14 +286,20 @@ const LABEL_CHARS = [
 const COMMENT_CHARS = [...LABEL_CHARS, ']', '#'];
 
 // A label/comment the parser could actually have produced: control chars
-// stripped, trimmed, capped. Generating anything else would test the generator,
-// not the parser.
+// stripped, trimmed, capped — and the cap cut is surrogate-safe, exactly as
+// js/notation.js cuts (a slice through '🎲' would strand its high half, which
+// the parser now drops, so generating one would test the generator's slice,
+// not the parser). Spelled out rather than imported: a regression in the
+// parser's own cut must not be able to teach this generator to agree with it.
 function genText(chars, cap) {
   for (let tries = 0; tries < 8; tries++) {
     let s = '';
     const n = between(1, cap);
     while (s.length < n) s += pick(chars);
-    s = s.replace(CTL, '').trim().slice(0, cap).trim();
+    s = s.replace(CTL, '').trim().slice(0, cap);
+    const last = s.charCodeAt(s.length - 1);
+    if (last >= 0xd800 && last <= 0xdbff) s = s.slice(0, -1);
+    s = s.trim();
     if (s) return s;
   }
   return 'x';
