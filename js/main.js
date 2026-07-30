@@ -819,6 +819,10 @@ function renderChips(entry, dice, staged = false) {
   }
 
   entry.parts.forEach((p, i) => {
+    // A chip is anchored to its die: with no die on the table (a reveal
+    // repaint after the dice are gone) there is nowhere to put it.
+    const die = dice && dice[i];
+    if (!die) return;
     const el = document.createElement('div');
     let cls = 'value-chip';
     if (!hidden && p.isMax && p.counts) cls += ' max';
@@ -831,7 +835,7 @@ function renderChips(entry, dice, staged = false) {
     if (staged) el.style.setProperty('--chip-delay', `${delays[i].toFixed(2)}s`);
     el.textContent = hidden ? '?' : (p.child ? '✴' : '') + p.label;
     chipsLayer.appendChild(el);
-    if (dice && dice[i]) chips.push({ el, die: dice[i] });
+    chips.push({ el, die });
   });
   positionChips();
 }
@@ -990,10 +994,12 @@ function showResults(roll) {
   addLogEntry(entry);
 }
 
-// A face-down roll got flipped (server 'reveal' event or solo action).
+// A face-down roll got flipped (server 'reveal' event, hello resync, or solo
+// action). Idempotent: replaying a reveal this client already applied only
+// repaints, so the hello resync can call it for every revealed roll in the log.
 function applyReveal(rollId) {
   const entry = log.find((e) => e.rollId === rollId);
-  if (entry) {
+  if (entry && !entry.revealed) {
     entry.revealed = true;
     if (!netOnline) save(LS_LOG, log);
     renderLog();
@@ -1002,9 +1008,10 @@ function applyReveal(rollId) {
     lastEntry.revealed = true;
     // A reveal landing while a ceremony is mid-flight must stay log-only:
     // renderRollResults would un-hide the suppressed result banner (and can
-    // replay a crit overlay) on top of the intent/verdict cards.
+    // replay a crit overlay) on top of the intent/verdict cards. A banner the
+    // viewer already dismissed stays dismissed for the same reason.
     const ceremonyActive = currentRoll && currentRoll.ceremony && !currentRoll.done;
-    if (!ceremonyActive) {
+    if (!ceremonyActive && !banner.classList.contains('hidden')) {
       const dice = currentRoll && currentRoll.rollId === rollId ? currentRoll.dice : null;
       renderRollResults(lastEntry, dice);
     }
@@ -3412,16 +3419,28 @@ function handleNetEvent(type, data) {
       renderPlayers();
       log = (data.log || []).map(rollToLogEntry);
       renderLog();
+      // The banner still holds a PRE-rebuild entry object — a stale twin of the
+      // log line it came from. Re-point it at the fresh one so the replays
+      // below (and every later repaint) act on the state the room agrees on.
+      if (lastEntry && lastEntry.rollId) {
+        const rebuilt = log.find((e) => e.rollId === lastEntry.rollId);
+        if (rebuilt) lastEntry = rebuilt;
+      }
       offers = data.offers || [];
       renderOffers();
       applyRoomSettings(data.settings); // late joiners + reconnects land on the room felt
-      // §7.5 resync: the server flags cleared rolls in the log and deliberately
-      // never re-broadcasts them, so a 'roll-cleared' missed during a stream
-      // blip must land here or this table never converges. applyClearRoll is a
-      // no-op for rolls with no dice on this table and defers for one that is
-      // still mid-playback or queued.
+      // §7.5/§3.1 resync: 'roll-cleared' and 'reveal' are one-shot broadcasts a
+      // stream blip can swallow, and the server deliberately never re-sends
+      // them — it flags the surviving state on the logged roll instead. Replay
+      // both here or this table never converges: dice would sit forever on a
+      // roll someone finished with, and a flipped roll would keep reading '?'
+      // on the banner. applyClearRoll is a no-op for rolls with no dice on this
+      // table and defers for one still mid-playback or queued; applyReveal is
+      // idempotent and repaints the banner when the roll is the one on it.
       for (const r of data.log || []) {
-        if (r && r.cleared && r.rollId) applyClearRoll(r.rollId);
+        if (!r || !r.rollId) continue;
+        if (r.faceDown && r.revealed) applyReveal(r.rollId);
+        if (r.cleared) applyClearRoll(r.rollId);
       }
       break;
     case 'player-joined':
