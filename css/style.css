@@ -761,10 +761,25 @@ body.mini #corner-controls { display: flex; }  /* corner survives mini mode */
   line-height: 1;
 }
 .sm-x:hover { color: var(--ivory); }
+/* a held roll keeps its Reveal on the marker — the shelf is where it lives */
+.sm-reveal {
+  background: none;
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  color: var(--gold-bright);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  line-height: 1.2;
+}
+.sm-reveal:hover { background: rgba(255, 214, 102, 0.16); }
 /* compact view: full shelf presence, scaled like the value chips (§7.4/§7.7) */
 body.mini .shelf-marker { font-size: 10px; padding: 2px 6px; gap: 4px; }
 body.mini .sm-total { font-size: 12px; }
 body.mini .sm-word { font-size: 9px; }
+body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
 .log-discarded { text-decoration: line-through; opacity: 0.5; }
 .log-mod { color: var(--gold-bright); font-weight: 700; }
 .log-part-label { font-variant: small-caps; color: var(--muted); font-weight: 400; letter-spacing: 0.04em; }

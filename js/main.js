@@ -97,13 +97,17 @@ let currentFeltId = DEFAULT_FELT;
 
 // The collect shelf (UX §7.7): five recessed slots along the bottom (front)
 // felt edge, part of the felt texture itself so they survive theme changes and
-// mat-text decals alike. A collected roll's dice cluster in slot `seq % 5`.
-// Geometry is shared by the texture decals, the cluster layout, and the
-// marker projection — one set of numbers, three readers.
+// mat-text decals alike. A collected roll's dice cluster in one slot, ordered
+// by collection (reflowShelf). Geometry is shared by the texture decals, the
+// cluster layout, the camera framing, and the marker projection — one set of
+// numbers, four readers. The tray is the pile's boundary, so its size is what
+// clusterPoses fits against; keep the slots inside the felt (|x| < TABLE_W/2,
+// SHELF_Z + D/2 < TABLE_D/2) and clear of each other (W < the 5.9 pitch).
 const SHELF_SLOTS = 5;
 const SHELF_Z = 6.6;                 // slot center (world z; front wall is +8.5)
-const SHELF_SLOT_W = 5.2;            // slot decal width  (x units)
+const SHELF_SLOT_W = 5.4;            // slot decal width  (x units)
 const SHELF_SLOT_D = 3.6;            // slot decal depth  (z units)
+const SHELF_MARKER_Y = 2.4;          // marker anchor height above the slot
 const shelfSlotX = (slot) => (slot - (SHELF_SLOTS - 1) / 2) * 5.9;
 
 // One 512px felt tile per base color (cached — the decal composite redraws it
@@ -520,6 +524,9 @@ function applyClearRoll(rollId) {
       if (hadDice && sinking.length) sinking[sinking.length - 1].chip = cluster.markerEl;
       else cluster.markerEl.remove();
     }
+    // The shelf closes up behind it: everything newer slides one slot left.
+    reflowShelf();
+    renderShelfMarkers();
   }
   // The moment leaves with its dice: banner and verdict card for THIS roll
   // close everywhere. Other rolls' surfaces are untouched.
@@ -554,9 +561,14 @@ function requestClearRoll(rollId) {
 // The server owns the state machine (on-felt → collected(seq) → cleared) and
 // clients only ever react to its 'roll-collected' / 'roll-cleared' bursts;
 // solo mode mirrors the same machine locally (soloCollectEntries). A shelved
-// roll's dice sit as a settled, deterministic cluster in slot (seq-1)%5 with
-// one compact marker floating above; its per-die chips, banner and verdict
-// card retire the moment it is collected.
+// roll's dice sit as a settled, deterministic cluster in its slot with one
+// compact marker floating above; its per-die chips, banner and verdict card
+// retire the moment it is collected.
+//
+// SLOTS ARE RANKS, not addresses: slot i holds the i-th lowest live collection
+// seq (reflowShelf), so the shelf always reads oldest → newest, left to right,
+// with no gaps. That is the only assignment that survives a resync — see
+// reflowShelf for why a remembered slot table cannot.
 
 const WHISK_S = 0.4;                  // collect whisk: slide + settle duration
 const shelfLayer = document.getElementById('shelf-layer');
@@ -580,6 +592,9 @@ function rollState(rollId) {
 // Canonical shelved pose for a die showing `value`: the face normal rotated
 // straight up, resting exactly on the felt (lowest rotated vertex at y=0).
 // Pure function of (type, value), so every client computes the same pose.
+// Also measures the resting die: `h` is its full height and `r` the radius of
+// its footprint, which is what lets a cluster size itself to the tray instead
+// of guessing (see clusterPoses).
 const shelfPoseCache = new Map();
 function canonicalDiePose(type, value) {
   const key = `${type}:${value}`;
@@ -591,51 +606,132 @@ function canonicalDiePose(type, value) {
   const posAttr = createDieMesh(type).geometry.attributes.position; // shared cache in js/dice.js
   const v = new THREE.Vector3();
   let minY = Infinity;
+  let maxY = -Infinity;
+  let maxR = 0;
   for (let i = 0; i < posAttr.count; i++) {
     v.fromBufferAttribute(posAttr, i).applyQuaternion(quat);
     if (v.y < minY) minY = v.y;
+    if (v.y > maxY) maxY = v.y;
+    const r = Math.hypot(v.x, v.z);
+    if (r > maxR) maxR = r;
   }
-  p = { quat, y: -minY };
+  p = { quat, y: -minY, h: maxY - minY, r: maxR };
   shelfPoseCache.set(key, p);
   return p;
 }
 
-// Deterministic tight arrangement (§7.7): rows of three from the slot's front
-// edge backward, wrapping into a second storey past a dozen dice. A pure
-// function of (slot, index, n, type, value) so a live whisk and a reload's
-// reconstruction land bit-for-bit identical clusters.
-function clusterPose(slot, index, n, type, value) {
-  const cols = Math.min(Math.max(n, 1), 3);
-  const col = index % 3;
-  const row = Math.floor(index / 3) % 4;
-  const layer = Math.floor(index / 12);
-  const p = canonicalDiePose(type, value);
-  const pos = new THREE.Vector3(
-    shelfSlotX(slot) + (col - (cols - 1) / 2) * 1.9,
-    p.y + layer * 1.7,
-    SHELF_Z + 0.9 - row * 1.8
-  );
-  return { pos, quat: p.quat };
+// Deterministic tight arrangement (§7.7) for a whole roll: a pile that FITS
+// ITS TRAY. The grid is sized from the dice actually being shelved — a slot
+// holds three d6 abreast but only two d20 — and wraps into a further storey
+// once the tray floor is full, each storey exactly one die tall.
+//
+// Staying inside the tray is not cosmetic: a shelved die keeps a STATIC body,
+// so any part of the pile left standing on the active felt silently deflects
+// every roll that follows. Pure function of (slot, parts), so a live whisk and
+// a reload's reconstruction land bit-for-bit identical clusters.
+const SHELF_PACK = 0.88;    // neighbour spacing as a share of a die's width
+const SHELF_STOREY_GAP = 0.06;
+function clusterPoses(slot, parts) {
+  const poses = parts.map((p) => canonicalDiePose(p.type, p.value));
+  const rMax = Math.max(0.5, ...poses.map((p) => p.r));
+  const hMax = Math.max(...poses.map((p) => p.h));
+  const step = 2 * rMax * SHELF_PACK;
+  const fit = (span) => Math.max(1, Math.min(3, Math.floor((span - 2 * rMax) / step) + 1));
+  const cols = fit(SHELF_SLOT_W);
+  const perStorey = cols * fit(SHELF_SLOT_D);
+  return parts.map((_, i) => {
+    const storey = Math.floor(i / perStorey);
+    const k = i % perStorey;
+    const col = k % cols;
+    const row = Math.floor(k / cols);
+    // The last storey is usually partial: center what it actually holds.
+    const n = Math.min(parts.length - storey * perStorey, perStorey);
+    const rows = Math.ceil(n / cols);
+    const inRow = Math.min(cols, n - row * cols);
+    const p = poses[i];
+    return {
+      pos: new THREE.Vector3(
+        shelfSlotX(slot) + (col - (inRow - 1) / 2) * step,
+        p.y + storey * (hMax + SHELF_STOREY_GAP),
+        SHELF_Z + ((rows - 1) / 2 - row) * step
+      ),
+      quat: p.quat,
+    };
+  });
 }
 
-// Spawn one die settled directly in its slot (hello reconstruction, or a
-// collect for an entry whose felt this client never saw). No tumble, no sound.
-function spawnShelvedDie(type, value, slot, index, n, rollId) {
+// Spawn one die settled on the shelf (hello reconstruction, or a collect for
+// an entry whose felt this client never saw). reflowShelf gives it its pose;
+// `shelfSpawn` marks it as never-having-been-on-the-felt, so it lands instantly
+// instead of whisking in from wherever the origin happens to be. No tumble, no
+// sound.
+function spawnShelvedDie(type, value, rollId) {
   const mesh = createDieMesh(type);
   const body = createDieBody(type, diceMat);
-  const { pos, quat } = clusterPose(slot, index, n, type, value);
   body.mass = 0;
   body.type = CANNON.Body.STATIC;
   body.updateMassProperties();
-  body.position.set(pos.x, pos.y, pos.z);
-  body.quaternion.set(quat.x, quat.y, quat.z, quat.w);
-  mesh.position.copy(pos);
-  mesh.quaternion.copy(quat);
   world.addBody(body);
   scene.add(mesh);
-  const die = { type, mesh, body, rollId };
+  const die = { type, mesh, body, rollId, shelfValue: value, shelfSpawn: true };
   tableDice.push(die);
   return die;
+}
+
+// Put one cluster's dice at its slot's cluster poses. The STATIC bodies are
+// parked immediately — a later fast-forward must collide with the shelf as it
+// IS, not with ghosts left at the old felt positions, and every client's
+// physics world has to match — while the meshes either whisk across (~400 ms)
+// or jump, so a reconstruction and a re-flow after an eviction cost nothing.
+function placeCluster(c, animate) {
+  const dice = tableDice.filter((d) => d.rollId === c.rollId);
+  if (!dice.length) return;
+  const poses = clusterPoses(c.slot, dice.map((d) => ({ type: d.type, value: d.shelfValue })));
+  const moving = new Set(dice);
+  whisking = whisking.filter((w) => !moving.has(w.die)); // one whisk per die
+  dice.forEach((d, i) => {
+    const { pos, quat } = poses[i];
+    d.body.position.set(pos.x, pos.y, pos.z);
+    d.body.quaternion.set(quat.x, quat.y, quat.z, quat.w);
+    if (animate && !d.shelfSpawn) {
+      whisking.push({
+        die: d,
+        t: 0,
+        fromPos: d.mesh.position.clone(),
+        fromQuat: d.mesh.quaternion.clone(),
+        toPos: pos,
+        toQuat: quat,
+      });
+    } else {
+      d.mesh.position.copy(pos);
+      d.mesh.quaternion.copy(quat);
+    }
+    d.shelfSpawn = false;
+  });
+}
+
+// Assign slots and place every cluster that moved. Slot i holds the i-th
+// LOWEST live seq — the shelf reads oldest → newest, left to right, and closes
+// up when a roll leaves.
+//
+// Rank, not a remembered address, because the assignment has to be a pure
+// function of the live set: a hello tells a joining client WHICH rolls are on
+// the shelf, never the order the departed ones left in, so any table that
+// remembers "this roll kept slot 3" reconstructs differently for whoever
+// reloaded — two clients rendering different tables with no event that can
+// reconcile them. (Keying the slot off the seq directly, seq % 5, is worse
+// still: one ✕ on a middle marker punches a hole in the live window, and the
+// next collect lands its dice inside an older roll's cluster with its marker —
+// and its ✕ — stacked on top, unclickable.)
+function reflowShelf(animate = true) {
+  const clusters = [...shelfClusters.values()].sort((a, b) => a.seq - b.seq);
+  clusters.forEach((c, slot) => {
+    if (c.slot === slot && c.placed) return;
+    c.slot = slot;
+    c.placed = true;
+    placeCluster(c, animate);
+  });
+  positionShelfMarkers();
 }
 
 // Move one roll onto the shelf. animate=true plays the ~400 ms whisk; false
@@ -645,7 +741,6 @@ function shelveRoll(rollId, seq, animate) {
   const st = rollState(rollId);
   st.collected = seq;
   if (st.cleared || shelfClusters.has(rollId)) return;
-  const slot = (seq - 1) % SHELF_SLOTS; // seq starts at 1 (server contract)
   const entry = log.find((e) => e.rollId === rollId) || null;
   let dice = tableDice.filter((d) => d.rollId === rollId);
 
@@ -659,38 +754,17 @@ function shelveRoll(rollId, seq, animate) {
   }
 
   if (dice.length) {
-    const n = dice.length;
-    dice.forEach((d, i) => {
-      // The frozen body's orientation reads the authoritative settled value.
-      const value = readValue(d.type, d.body.quaternion).value;
-      const { pos, quat } = clusterPose(slot, i, n, d.type, value);
-      // Park the STATIC body at the cluster pose immediately: a later
-      // fast-forward must collide with the shelf, not with ghosts left at
-      // the old felt positions — and every client's physics world matches.
-      d.body.position.set(pos.x, pos.y, pos.z);
-      d.body.quaternion.set(quat.x, quat.y, quat.z, quat.w);
-      if (animate) {
-        whisking.push({
-          die: d,
-          t: 0,
-          fromPos: d.mesh.position.clone(),
-          fromQuat: d.mesh.quaternion.clone(),
-          toPos: pos,
-          toQuat: quat,
-        });
-      } else {
-        d.mesh.position.copy(pos);
-        d.mesh.quaternion.copy(quat);
-      }
-    });
+    // The frozen body's orientation reads the authoritative settled value.
+    for (const d of dice) d.shelfValue = readValue(d.type, d.body.quaternion).value;
   } else if (entry) {
-    dice = entry.parts.map((p, i) =>
-      spawnShelvedDie(p.type, p.value, slot, i, entry.parts.length, rollId));
+    dice = entry.parts.map((p) => spawnShelvedDie(p.type, p.value, rollId));
   } else {
     return; // nothing to show yet; the state row reconciles on the next hello
   }
 
-  shelfClusters.set(rollId, { rollId, seq, slot, diceCount: dice.length, markerEl: null });
+  shelfClusters.set(rollId, {
+    rollId, seq, slot: -1, placed: false, diceCount: dice.length, markerEl: null,
+  });
   // The moment leaves the felt surfaces: banner and verdict card for THIS
   // roll close everywhere; the log line and the marker carry it from here.
   if (lastEntry && lastEntry.rollId === rollId) banner.classList.add('hidden');
@@ -698,6 +772,7 @@ function shelveRoll(rollId, seq, animate) {
       && !ceremonyLayer.classList.contains('hidden')) {
     dismissCeremonyUI();
   }
+  reflowShelf(animate);
   renderShelfMarkers();
 }
 
@@ -728,11 +803,19 @@ function stepWhisking(dt) {
 // lens's word ('?' while face down), plus a ✕ ANY player may use — §7.7
 // universal housekeeping. Rebuilt whole on every shelf/lens/reveal change.
 function renderShelfMarkers() {
-  shelfLayer.innerHTML = '';
+  // Markers mid-fade are NOT ours to wipe: an eviction is 'roll-cleared'
+  // immediately followed by 'roll-collected', so a wholesale innerHTML reset
+  // here would pop the departing marker out of existence a millisecond into
+  // its sink — the aging animation would never be visible on the very path
+  // that aging takes. stepSinking drops them when their dice are gone.
+  for (const el of [...shelfLayer.children]) {
+    if (!el.classList.contains('chip-clearing')) el.remove();
+  }
   const clusters = [...shelfClusters.values()].sort((a, b) => a.seq - b.seq);
   for (const c of clusters) {
     const entry = log.find((e) => e.rollId === c.rollId) || null;
     const hidden = !!entry && entry.faceDown && !entry.revealed;
+    const mine = !!entry && (!netOnline || (net && entry.playerId === net.playerId));
     const el = document.createElement('div');
     el.className = 'shelf-marker';
     const dot = document.createElement('span');
@@ -749,6 +832,18 @@ function renderShelfMarkers() {
       word.className = `sm-word tier-${meaning.tier}`;
       word.textContent = meaning.word;
       el.appendChild(word);
+    }
+    // The marker carries Reveal for a face-down roll, because the shelf is
+    // where a held roll now spends its life: auto-collect fires on ANYONE's
+    // next roll, so the banner's Reveal can be gone before the roller ever had
+    // a frame to press it. Without this the '?' is permanent.
+    if (hidden && mine) {
+      const rv = document.createElement('button');
+      rv.className = 'sm-reveal';
+      rv.textContent = 'Reveal';
+      rv.title = 'Flip this roll face up for the table';
+      rv.addEventListener('click', () => requestReveal(c.rollId));
+      el.appendChild(rv);
     }
     const x = document.createElement('button');
     x.className = 'sm-x';
@@ -768,7 +863,7 @@ function positionShelfMarkers() {
   const v = new THREE.Vector3();
   for (const c of shelfClusters.values()) {
     if (!c.markerEl) continue;
-    v.set(shelfSlotX(c.slot), 2.4, SHELF_Z);
+    v.set(shelfSlotX(c.slot), SHELF_MARKER_Y, SHELF_Z);
     v.project(camera);
     c.markerEl.style.left = `${(v.x * 0.5 + 0.5) * window.innerWidth}px`;
     c.markerEl.style.top = `${(-v.y * 0.5 + 0.5) * window.innerHeight}px`;
@@ -871,10 +966,16 @@ function flushPendingRollLog() {
   while (rollQueue.length) addLogEntry(entryFromRoll(rollQueue.shift()));
 }
 
+// The corner ✕ sweep: felt, shelf, and every surface, gone. The §7.7 state
+// rows are flagged `cleared` with them — solo has no server to remember for
+// it, and a row left on-felt would let the NEXT roll's auto-collect shelve a
+// roll this sweep just took away. Online the server flags its own log the same
+// way, so both sides of a swept table agree with a fresh join.
 function clearTable() {
   flushPendingRollLog();
   pendingClears.clear();
   pendingCollects.clear();
+  for (const st of rollStates.values()) st.cleared = true;
   resetTableSurface();
   dismissCeremonyUI();
   currentRoll = null;
@@ -2116,6 +2217,26 @@ window.__diceDebug = {
   },
   get whiskingCount() { return whisking.length; },
   get pendingCollects() { return [...pendingCollects.keys()]; },
+  // shelf geometry + the camera's own projection: how a headless check proves
+  // the trays and their markers are on screen at a given viewport (§7.7).
+  get shelfGeometry() {
+    return {
+      slots: SHELF_SLOTS,
+      z: SHELF_Z,
+      w: SHELF_SLOT_W,
+      d: SHELF_SLOT_D,
+      markerY: SHELF_MARKER_Y,
+      x: Array.from({ length: SHELF_SLOTS }, (_, i) => shelfSlotX(i)),
+      camera: camera.position.toArray(),
+    };
+  },
+  project(x, y, z) {
+    const v = new THREE.Vector3(x, y, z).project(camera);
+    return {
+      x: (v.x * 0.5 + 0.5) * window.innerWidth,
+      y: (-v.y * 0.5 + 0.5) * window.innerHeight,
+    };
+  },
   // felt composite sampling (tests): RGBA of the floor texture at world (x, z)
   // — how a headless check proves the slot decals survive theme/decal swaps.
   feltPixel(x, z) {
@@ -2133,6 +2254,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  applyCameraFraming(); // a narrower window refits the table and its shelf
   positionChips();
   positionShelfMarkers();
 });
@@ -3622,10 +3744,56 @@ function renderMiniBar() {
   }
 }
 
+// Framing: the eye sits where the view reads best on a wide window, then pulls
+// STRAIGHT BACK along its own ray until the whole table fits — the far felt
+// corners, the five shelf trays, and the marker pill each slot's roll hangs
+// above (§7.7 parity: the shelf is furniture, and furniture you cannot see is
+// a roll nobody can read or tidy away).
+//
+// Without the fit the eye was fixed and the outer trays simply left the screen
+// below ~1.3 aspect: a 4:3 desktop clipped slots 0 and 4, and an iPad portrait
+// — too big to auto-engage compact view — put two of the five markers, ✕ and
+// all, outside the viewport entirely.
+const CAM_EYE = { full: [0, 27, 15.5], mini: [0, 22, 12.5] };
+const CAM_TARGET = new THREE.Vector3(0, 0, 0.5);
+
+// What must stay on screen, each with the NDC headroom its own chrome needs.
+// A marker is a DOM pill centered on its anchor, so it needs half its width
+// (~90 px, and it is the widest thing the shelf projects) of clearance.
+function framingPoints() {
+  const outerX = shelfSlotX(SHELF_SLOTS - 1) + SHELF_SLOT_W / 2;
+  const markerX = shelfSlotX(SHELF_SLOTS - 1);
+  const pillNdc = 180 / Math.max(window.innerWidth, 1);
+  const pts = [];
+  for (const s of [-1, 1]) {
+    pts.push({ p: new THREE.Vector3(s * outerX, 0, SHELF_Z - SHELF_SLOT_D / 2), mx: 0.02, my: 0.02 });
+    pts.push({ p: new THREE.Vector3(s * outerX, 0, SHELF_Z + SHELF_SLOT_D / 2), mx: 0.02, my: 0.02 });
+    pts.push({ p: new THREE.Vector3(s * markerX, SHELF_MARKER_Y, SHELF_Z), mx: pillNdc, my: 0.06 });
+    pts.push({ p: new THREE.Vector3(s * TABLE_W / 2, 0, -TABLE_D / 2), mx: 0.02, my: 0.02 });
+  }
+  return pts;
+}
+
 function applyCameraFraming() {
-  if (document.body.classList.contains('mini')) camera.position.set(0, 22, 12.5);
-  else camera.position.set(0, 27, 15.5);
-  camera.lookAt(0, 0, 0.5);
+  const eye = new THREE.Vector3(
+    ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
+  );
+  const ray = eye.clone().sub(CAM_TARGET);
+  const pts = framingPoints();
+  const v = new THREE.Vector3();
+  // Pull back in small steps and stop at the first distance that fits — a
+  // closed form would have to invert the projection for eight points at once,
+  // and this runs only on resize and on the compact-view toggle.
+  for (let i = 0; i < 60; i++) {
+    camera.position.copy(CAM_TARGET).addScaledVector(ray, 1 + i * 0.03);
+    camera.lookAt(CAM_TARGET);
+    camera.updateMatrixWorld(true);
+    const fits = pts.every(({ p, mx, my }) => {
+      v.copy(p).project(camera);
+      return Math.abs(v.x) <= 1 - mx && Math.abs(v.y) <= 1 - my;
+    });
+    if (fits) break;
+  }
 }
 
 function setMini(on, persist = true) {

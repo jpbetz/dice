@@ -1086,6 +1086,16 @@ async function handleUnoffer(req, res) {
   sendJson(res, 200, { ok: true });
 }
 
+// The corner ✕: sweep the whole table — felt and shelf alike.
+//
+// The sweep FLAGS as it goes (§7.7). Every roll it takes off the table is
+// `cleared`, exactly as a per-roll ✕ would have left it, because since §7.7 a
+// client rebuilds both felt and shelf from these flags on hello: an unflagged
+// sweep resurrects the entire table for whoever reloads next, and the next
+// roll's auto-collect would shelve a roll the room just watched vanish. One
+// 'clear' event still carries it — a burst of per-roll 'roll-cleared' events
+// would make every client play five sink animations for dice the sweep already
+// took — so the flags are silent state, and only the one log line records it.
 async function handleClear(req, res) {
   const body = await readJsonBody(req);
   if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
@@ -1094,7 +1104,14 @@ async function handleClear(req, res) {
   if (found.error) return sendError(res, ...found.error);
   const { room, player } = found;
 
-  log(`clear   room=${room.name} name=${player.name}`);
+  let swept = 0;
+  for (const roll of room.log) {
+    if (roll.cleared) continue;
+    roll.cleared = true;
+    swept++;
+  }
+
+  log(`clear   room=${room.name} name=${player.name} swept=${swept}`);
   broadcast(room, 'clear', { playerId: player.id, playerName: player.name });
   sendJson(res, 200, { ok: true });
 }
