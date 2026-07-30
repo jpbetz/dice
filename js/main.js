@@ -19,7 +19,7 @@ limitations under the License.
 
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue } from './dice.js';
+import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie } from './dice.js';
 import { connect } from './net.js';
 import { SYSTEMS, DEFAULT_SYSTEM } from './meanings.js';
 import { groupsFromLocation, syncGroupsToLocation } from './urlgroups.js';
@@ -404,6 +404,15 @@ const CLEAR_SINK_S = 0.3;
 let sinking = [];                // {mesh, chip, t, y0}
 const pendingClears = new Set(); // rollIds whose removal is deferred
 
+// Reveal (goal 11): a reveal landing while its roll is still mid-playback or
+// queued defers exactly like pendingClears/pendingCollects (the 7f9cdf5 race
+// class) and lands from the completion paths. Value: the full entry the
+// 'reveal' event carried (null when the event was id-only — solo, or a roll
+// whose values this client already holds).
+const pendingReveals = new Map(); // rollId -> full entry | null
+const REVEAL_FLIP_S = 0.45;       // staged correction rotation on reveal
+let revealing = [];               // {die, rollId, t, fromQuat, toQuat}
+
 const FIXED_DT = 1 / 60;
 const SETTLE_STILL = 0.45; // seconds of stillness required
 const SETTLE_CAP = 9;      // hard cap on simulated seconds per roll
@@ -428,8 +437,8 @@ function dieLabel(type, value) {
   return type === 'd10x' ? String(value).padStart(2, '0') : String(value);
 }
 
-function spawnDie(type, index, count, side, rng) {
-  const mesh = createDieMesh(type);
+function spawnDie(type, index, count, side, rng, shrouded = false) {
+  const mesh = createDieMesh(type, shrouded ? 'shroud' : 'std');
   const body = createDieBody(type, diceMat);
 
   // line the throw up along the chosen edge of the table
@@ -471,6 +480,7 @@ function resetTableSurface() {
   chips.length = 0;
   chipsLayer.innerHTML = '';
   whisking = [];
+  revealing = [];
   shelfClusters.clear();
   // A peek is anchored to a cluster that no longer exists: it would float over
   // the empty table with a ✕ that clears a roll already gone. The sweep takes
@@ -548,6 +558,8 @@ function applyClearRoll(rollId) {
   // roll-collected landing later in the same burst becomes a silent no-op.
   rollState(rollId).cleared = true;
   pendingCollects.delete(rollId);
+  pendingReveals.delete(rollId);
+  revealing = revealing.filter((rv) => rv.rollId !== rollId); // dying dice stop flipping
   const inFlight = currentRoll && !currentRoll.done && currentRoll.rollId === rollId;
   if (inFlight || rollQueue.some((r) => r.rollId === rollId)) {
     pendingClears.add(rollId);
@@ -703,20 +715,28 @@ function clusterPoses(slot, parts) {
   });
 }
 
+// The POSE a shrouded die rests in: identity correction leaves a die cocked on
+// whatever the physics left, so shrouded shelf clusters (and reconstructions)
+// borrow the canonical pose of a real face — the faces are blank, so which one
+// is up leaks nothing, but the die must still sit flat.
+function shroudPoseValue(type) {
+  return type === 'd10x' ? 10 : 1;
+}
+
 // Spawn one die settled on the shelf (hello reconstruction, or a collect for
 // an entry whose felt this client never saw). reflowShelf gives it its pose;
 // `shelfSpawn` marks it as never-having-been-on-the-felt, so it lands instantly
 // instead of whisking in from wherever the origin happens to be. No tumble, no
-// sound.
-function spawnShelvedDie(type, value, rollId) {
-  const mesh = createDieMesh(type);
+// sound. `shrouded` spawns the obsidian variant for a still-hidden roll.
+function spawnShelvedDie(type, value, rollId, shrouded = false) {
+  const mesh = createDieMesh(type, shrouded ? 'shroud' : 'std');
   const body = createDieBody(type, diceMat);
   body.mass = 0;
   body.type = CANNON.Body.STATIC;
   body.updateMassProperties();
   world.addBody(body);
   scene.add(mesh);
-  const die = { type, mesh, body, rollId, shelfValue: value, shelfSpawn: true };
+  const die = { type, mesh, body, rollId, shelfValue: value, shelfSpawn: true, shrouded };
   tableDice.push(die);
   return die;
 }
@@ -732,6 +752,9 @@ function placeCluster(c, animate) {
   const poses = clusterPoses(c.slot, dice.map((d) => ({ type: d.type, value: d.shelfValue })));
   const moving = new Set(dice);
   whisking = whisking.filter((w) => !moving.has(w.die)); // one whisk per die
+  // A die can't flip and whisk at once: the whisk's target pose already shows
+  // the true face (materials were swapped when the reveal began).
+  revealing = revealing.filter((rv) => !moving.has(rv.die));
   // The under-glow belongs to a LANDED cluster (§7.7.1): a cluster ARRIVING on
   // the shelf holds its ring back until stepWhisking sees its dice land;
   // instant placements (hello reconstruction, spawned shelved dice) glow at
@@ -815,10 +838,20 @@ function shelveRoll(rollId, seq, animate) {
   }
 
   if (dice.length) {
-    // The frozen body's orientation reads the authoritative settled value.
-    for (const d of dice) d.shelfValue = readValue(d.type, d.body.quaternion).value;
+    // The frozen body's orientation reads the authoritative settled value —
+    // except for a shrouded die, whose identity correction would fabricate a
+    // plausible-but-wrong number: it takes the neutral shroud pose instead.
+    for (const d of dice) {
+      d.shelfValue = d.shrouded
+        ? shroudPoseValue(d.type)
+        : readValue(d.type, d.body.quaternion).value;
+    }
   } else if (entry) {
-    dice = entry.parts.map((p) => spawnShelvedDie(p.type, p.value, rollId));
+    const hidden = entryHidden(entry);
+    dice = entry.parts.map((p) => {
+      const shrouded = hidden || p.value == null;
+      return spawnShelvedDie(p.type, shrouded ? shroudPoseValue(p.type) : p.value, rollId, shrouded);
+    });
   } else {
     return; // nothing to show yet; the state row reconciles on the next hello
   }
@@ -885,8 +918,7 @@ function renderShelfMarkers() {
   const clusters = [...shelfClusters.values()].sort((a, b) => a.seq - b.seq);
   for (const c of clusters) {
     const entry = log.find((e) => e.rollId === c.rollId) || null;
-    const hidden = !!entry && entry.faceDown && !entry.revealed;
-    const mine = !!entry && (!netOnline || (net && entry.playerId === net.playerId));
+    const hidden = !!entry && entryHidden(entry);
     const el = document.createElement('div');
     el.className = 'shelf-marker';
     const dot = document.createElement('span');
@@ -904,11 +936,12 @@ function renderShelfMarkers() {
       word.textContent = meaning.word;
       el.appendChild(word);
     }
-    // The marker carries Reveal for a face-down roll, because the shelf is
+    // The marker carries Reveal for a hidden roll, because the shelf is
     // where a held roll now spends its life: auto-collect fires on ANYONE's
-    // next roll, so the banner's Reveal can be gone before the roller ever had
-    // a frame to press it. Without this the '?' is permanent.
-    if (hidden && mine) {
+    // next roll, so the banner's Reveal can be gone before the authority ever
+    // had a frame to press it. Without this the '?' is permanent. Rendered
+    // ONLY for the reveal authority (the server enforces it regardless).
+    if (entry && canReveal(entry)) {
       const rv = document.createElement('button');
       rv.className = 'sm-reveal';
       rv.textContent = 'Reveal';
@@ -1025,8 +1058,7 @@ function renderPeek() {
   const c = shelfClusters.get(peekRollId);
   if (!c) { closePeek(); return; }
   const entry = log.find((e) => e.rollId === peekRollId) || null;
-  const hidden = !entry || (entry.faceDown && !entry.revealed);
-  const mine = !!entry && (!netOnline || (net && entry.playerId === net.playerId));
+  const hidden = !entry || entryHidden(entry);
   peekEl.textContent = '';
 
   // header: roller dot + name (their color) + label, and the universal ✕ —
@@ -1064,10 +1096,16 @@ function renderPeek() {
 
   const verdict = document.createElement('div');
   verdict.className = 'pk-verdict';
-  if (entry && !hidden && Number.isInteger(entry.dc)) {
-    const cleared = entry.total >= entry.dc;
-    verdict.textContent = `vs DC ${entry.dc} — ${cleared ? 'Success' : 'Failure'}`;
-    verdict.classList.add(cleared ? 'verdict-success' : 'verdict-fail');
+  if (entry && Number.isInteger(entry.dc)) {
+    if (hidden) {
+      // Stakes are public even while the result is hidden (goal 11): the DC
+      // shows, the verdict does not.
+      verdict.textContent = `vs DC ${entry.dc}`;
+    } else {
+      const cleared = entry.total >= entry.dc;
+      verdict.textContent = `vs DC ${entry.dc} — ${cleared ? 'Success' : 'Failure'}`;
+      verdict.classList.add(cleared ? 'verdict-success' : 'verdict-fail');
+    }
   }
   peekEl.appendChild(verdict);
 
@@ -1086,7 +1124,7 @@ function renderPeek() {
   if (entry) renderBreakdown(bd, entry, hidden);
   peekEl.appendChild(bd);
 
-  if (entry && hidden && mine) {
+  if (entry && canReveal(entry)) {
     const actions = document.createElement('div');
     actions.className = 'pk-actions';
     const rv = document.createElement('button');
@@ -1256,6 +1294,7 @@ function clearTable() {
   flushPendingRollLog();
   pendingClears.clear();
   pendingCollects.clear();
+  pendingReveals.clear();
   for (const st of rollStates.values()) st.cleared = true;
   resetTableSurface();
   dismissCeremonyUI();
@@ -1264,11 +1303,19 @@ function clearTable() {
 }
 
 // roll = {dice: [types], values: [...], seed, label, dc?, playerName?, color?}
+// A REDACTED roll (goal 11) arrives with NO values at all (redacted: true,
+// visMode 'held'|'whisper'): it plays the identical seeded tumble with
+// numberless obsidian dice and no face correction — there is nothing to
+// correct to. A solo/legacy face-down roll keeps its values but plays
+// shrouded too, so the felt never leaks what the chips withhold.
 function playRoll(roll) {
   const types = roll && Array.isArray(roll.dice) ? roll.dice : [];
-  const values = roll && Array.isArray(roll.values) ? roll.values : [];
-  if (!types.length || types.length !== values.length) return;
+  const values = roll && Array.isArray(roll.values) ? roll.values : null;
+  if (!types.length) return;
+  if (values && types.length !== values.length) return;
+  if (!values && roll.redacted !== true) return; // valueless without the redaction flag: bad payload
   if (types.some((t) => !DIE_DEFS[t])) return;
+  const shrouded = !values || (roll.faceDown === true && roll.revealed === false);
 
   // one playback at a time; overlapping rolls queue FIFO. A queued roll
   // auto-skips the previous ceremony's remainder (pinned): skipCeremony
@@ -1294,10 +1341,13 @@ function playRoll(roll) {
   // --- spawn with seeded throw params -------------------------------------
   const rng = mulberry32(roll.seed >>> 0);
   const side = Math.floor(rng() * 4);
-  const dice = types.map((t, i) => spawnDie(t, i, types.length, side, rng));
+  const dice = types.map((t, i) => spawnDie(t, i, types.length, side, rng, shrouded));
   // Every die on the table is tagged with its roll (§7.5): a per-roll Done
   // removes exactly these dice and never touches a concurrent roll's.
-  for (const d of dice) d.rollId = roll.rollId || null;
+  for (const d of dice) {
+    d.rollId = roll.rollId || null;
+    d.shrouded = shrouded;
+  }
   tableDice.push(...dice);
 
   // --- synchronous fast-forward, recording keyframes + sound events -------
@@ -1356,15 +1406,22 @@ function playRoll(roll) {
   dice.forEach((d, i) => {
     const kf = keyframes[i];
     const qF = kf[kf.length - 1].quat;
-    const uBody = up.clone().applyQuaternion(qF.clone().invert()).normalize();
-    const nV = faceNormalForValue(d.type, values[i]);
+    // Shrouded dice keep the identity correction: blank faces have no target
+    // value, so the die lands exactly where physics left it (poses may diverge
+    // across clients — there is nothing to read, so that's fine).
     d.correction = new THREE.Quaternion();
-    if (nV) d.correction.setFromUnitVectors(nV.normalize(), uBody);
+    if (!shrouded) {
+      const uBody = up.clone().applyQuaternion(qF.clone().invert()).normalize();
+      const nV = faceNormalForValue(d.type, values[i]);
+      if (nV) d.correction.setFromUnitVectors(nV.normalize(), uBody);
+    }
     d.finalPos = kf[kf.length - 1].pos.clone();
     d.finalQuat = qF.clone().multiply(d.correction);
-    const check = readValue(d.type, d.finalQuat);
-    if (check.value !== values[i]) {
-      console.warn(`face correction mismatch on ${d.type}: expected ${values[i]}, reads ${check.value}`);
+    if (!shrouded) {
+      const check = readValue(d.type, d.finalQuat);
+      if (check.value !== values[i]) {
+        console.warn(`face correction mismatch on ${d.type}: expected ${values[i]}, reads ${check.value}`);
+      }
     }
   });
 
@@ -1394,7 +1451,7 @@ function playRoll(roll) {
     playerName: roll.playerName || null,
     color: roll.color || null,
     playerId: roll.playerId || null,
-    values: values.slice(),
+    values: values ? values.slice() : null,
     // mechanics metadata (rollspec contract); defaults preserve plain rolls
     perDie: Array.isArray(roll.perDie) && roll.perDie.length === types.length
       ? roll.perDie
@@ -1405,7 +1462,13 @@ function playRoll(roll) {
     dc: Number.isInteger(roll.dc) ? roll.dc : null, // interim dc verdict (UX §2.3 stub)
     exp: sanitizeExp(roll.exp),
     faceDown: !!roll.faceDown,
-    revealed: roll.revealed !== false,
+    revealed: values ? roll.revealed !== false : roll.revealed === true,
+    // visibility plumbing (goal 11) — present-or-absent passthroughs
+    redacted: !values,
+    visMode: roll.visMode || (roll.visibility && roll.visibility.mode) || null,
+    visibility: roll.visibility || null,
+    revealAuthority: roll.revealAuthority || null,
+    notation: typeof roll.notation === 'string' ? roll.notation : null,
     seed: roll.seed,
     dice,
     keyframes,
@@ -1419,8 +1482,11 @@ function playRoll(roll) {
   };
 
   // Roll moments (UX §2): a Check/Cinematic attachment stages the playback.
-  // Face-down rolls stay Plain — a verdict card cannot show hidden values.
-  if (currentRoll.exp && !currentRoll.faceDown) beginCeremony(currentRoll);
+  // Held rolls keep their FULL ceremony (goal 11): the stakes — declaration,
+  // dice, dc — are public; only the result is hidden, so the verdict card
+  // shows the held state (+ Reveal for the authority) instead of downgrading
+  // the whole roll to Plain.
+  if (currentRoll.exp) beginCeremony(currentRoll);
 }
 
 // Solo path: compose locally with the same shared mechanics the server uses
@@ -1510,6 +1576,7 @@ function stepPlayback(dt) {
     }
     roll.done = true;
     showResults(roll);
+    runPendingReveal(roll);  // a reveal that arrived mid-playback lands now
     runPendingCollect(roll); // a collect that arrived mid-playback lands now
     runPendingClear(roll);   // …and a clear wins over it
     if (rollQueue.length) playRoll(rollQueue.shift());
@@ -1532,8 +1599,36 @@ const chips = []; // {el, die}
 
 let currentSystemId = DEFAULT_SYSTEM;
 
+// Is this entry's RESULT hidden from this client right now? True for a
+// redacted projection (the server withheld the values — held/whisper for a
+// non-audience viewer) and for a legacy/solo face-down roll, until revealed.
+// The single gate every surface keys off (chips, banner, log, marker, peek,
+// verdict card): "values absent or withheld", never a mode check per surface.
+function entryHidden(entry) {
+  if (!entry || entry.revealed) return false;
+  return entry.redacted === true || entry.faceDown === true;
+}
+
+// May THIS client reveal the entry? Rendered-affordance gate only — the
+// server enforces revealAuthority regardless. held and whisper are revealable
+// (whisper: the authority may already SEE the values and still owns the
+// flip-for-everyone); secret has no reveal path; solo is its own authority.
+function canReveal(entry) {
+  if (!entry || !entry.rollId || entry.revealed) return false;
+  const mode = entry.visMode
+    || (entry.visibility && entry.visibility.mode)
+    || (entry.faceDown ? 'held' : null);
+  if (mode !== 'held' && mode !== 'whisper') return false;
+  if (!netOnline || !net) return true; // solo: the only player is the authority
+  const auth = (entry.visibility && entry.visibility.revealAuthority)
+    || entry.revealAuthority
+    || entry.playerId
+    || null;
+  return !!auth && auth === net.playerId;
+}
+
 function entryMeaning(entry) {
-  if (entry.faceDown && !entry.revealed) return null;
+  if (entryHidden(entry)) return null;
   return SYSTEMS[currentSystemId].meaningFor(
     entry.parts.filter((p) => p.counts && !p.child).map((p) => p.type),
     entry.total
@@ -1541,7 +1636,7 @@ function entryMeaning(entry) {
 }
 
 function entryCrit(entry) {
-  if (entry.faceDown && !entry.revealed) return null;
+  if (entryHidden(entry)) return null;
   return SYSTEMS[currentSystemId].critFor(entry);
 }
 
@@ -1555,11 +1650,21 @@ function critWord(crit, meaning) {
 // mechanics metadata, authoritative total, and reveal state.
 function entryFromRoll(roll) {
   const types = roll.dice.map((d) => (d.type ? d.type : d)); // die objects or type strings
+  const hasValues = Array.isArray(roll.values);
   const perDie = Array.isArray(roll.perDie) && roll.perDie.length === types.length
     ? roll.perDie
     : types.map(() => ({ counts: true, reason: null, childOf: null }));
   let sum = 0;
+  // A redacted roll has no values (goal 11): its parts carry types only — no
+  // value, no crit marks, no struck/child metadata — so nothing downstream
+  // can NaN its way into fabricating a number for a hidden result.
   const parts = types.map((type, i) => {
+    if (!hasValues) {
+      return {
+        type, label: '?', value: null, isMax: false, isMin: false,
+        counts: true, reason: null, child: false,
+      };
+    }
     const value = roll.values[i];
     const pd = perDie[i];
     if (pd.counts) sum += value;
@@ -1576,7 +1681,8 @@ function entryFromRoll(roll) {
     };
   });
   const modifier = roll.modifier || 0;
-  const total = typeof roll.total === 'number' ? roll.total : sum + modifier;
+  const total = typeof roll.total === 'number' ? roll.total
+    : hasValues ? sum + modifier : null;
   // No meaning field: interpretation is a render-time lens (entryMeaning /
   // entryCrit read the active system), never state a stored entry carries.
   // The experience attachment rides entry.spec so reroll-last preserves it.
@@ -1590,12 +1696,20 @@ function entryFromRoll(roll) {
     color: roll.color || undefined,
     playerId: roll.playerId || undefined,
     parts,
-    sum,
+    sum: hasValues ? sum : null,
     modifier,
     total,
     dc: Number.isInteger(roll.dc) ? roll.dc : undefined,
     faceDown: !!roll.faceDown,
-    revealed: roll.revealed !== false,
+    // A valueless entry counts as unrevealed unless the wire says otherwise —
+    // a revealed entry always carries its values.
+    revealed: hasValues ? roll.revealed !== false : roll.revealed === true,
+    // goal 11 passthroughs (present-or-absent, like exp):
+    redacted: hasValues ? undefined : true,
+    visMode: roll.visMode || (roll.visibility && roll.visibility.mode) || undefined,
+    visibility: roll.visibility || undefined,
+    revealAuthority: roll.revealAuthority || undefined,
+    notation: typeof roll.notation === 'string' ? roll.notation : undefined,
     spec,
   };
 }
@@ -1615,7 +1729,7 @@ let lastEntry = null; // the roll currently shown on the banner/chips
 function renderChips(entry, dice, staged = false) {
   chips.length = 0;
   chipsLayer.innerHTML = '';
-  const hidden = entry.faceDown && !entry.revealed;
+  const hidden = entryHidden(entry);
 
   let delays = null;
   if (staged) {
@@ -1696,7 +1810,7 @@ function renderBreakdown(el, entry, hidden) {
 // surfaces but never replays fanfare that belonged to the roll's own moment.
 function renderRollResults(entry, dice, fx = true) {
   renderChips(entry, dice);
-  const hidden = entry.faceDown && !entry.revealed;
+  const hidden = entryHidden(entry);
 
   // Names and labels are user-supplied: textContent only, never innerHTML.
   const labelEl = document.getElementById('result-label');
@@ -1715,11 +1829,18 @@ function renderRollResults(entry, dice, fx = true) {
   renderBreakdown(document.getElementById('result-breakdown'), entry, hidden);
 
   // Interim dc verdict (fixed decision): above the meaning word, gold/red.
+  // Hidden result, public stakes (goal 11): the DC still shows, the verdict
+  // waits for the reveal.
   const verdictEl = document.getElementById('result-verdict');
-  if (!hidden && Number.isInteger(entry.dc)) {
-    const cleared = entry.total >= entry.dc;
-    verdictEl.textContent = `vs DC ${entry.dc} — ${cleared ? 'Success' : 'Failure'}`;
-    verdictEl.className = cleared ? 'verdict-success' : 'verdict-fail';
+  if (Number.isInteger(entry.dc)) {
+    if (hidden) {
+      verdictEl.textContent = `vs DC ${entry.dc}`;
+      verdictEl.className = '';
+    } else {
+      const cleared = entry.total >= entry.dc;
+      verdictEl.textContent = `vs DC ${entry.dc} — ${cleared ? 'Success' : 'Failure'}`;
+      verdictEl.className = cleared ? 'verdict-success' : 'verdict-fail';
+    }
   } else {
     verdictEl.textContent = '';
     verdictEl.className = '';
@@ -1743,13 +1864,13 @@ function renderRollResults(entry, dice, fx = true) {
   }
 }
 
-// Reveal (roller of a face-down roll) and reroll-last buttons on the banner.
+// Reveal (the reveal authority of a hidden roll) and reroll-last buttons.
 function renderBannerActions(entry) {
   const holder = document.getElementById('banner-actions');
   holder.innerHTML = '';
-  const hidden = entry.faceDown && !entry.revealed;
+  const hidden = entryHidden(entry);
   const mine = !netOnline || (net && entry.playerId === net.playerId);
-  if (hidden && mine) {
+  if (canReveal(entry)) {
     const btn = document.createElement('button');
     btn.className = 'btn primary banner-btn';
     btn.textContent = 'Reveal';
@@ -1765,6 +1886,7 @@ function renderBannerActions(entry) {
       requestRoll([...entry.spec.dice], entry.label, {
         mods: entry.spec.mods || undefined,
         faceDown: entry.faceDown,
+        visibility: entryVis(entry) || undefined, // a secret reroll stays secret
         dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
         exp: entry.spec.exp || undefined, // reroll-last preserves the moment
       })
@@ -1833,48 +1955,200 @@ function showResults(roll) {
   addLogEntry(entry);
 }
 
-// A face-down roll got flipped (server 'reveal' event, hello resync, or solo
-// action). Idempotent: replaying a reveal this client already applied only
-// repaints, so the hello resync can call it for every revealed roll in the log.
-function applyReveal(rollId) {
-  // A reveal can land while its roll is still mid-playback or queued on this
-  // client — no log entry exists yet. Flip the roll object itself so the
-  // completion path builds an already-revealed entry; otherwise the '?' would
-  // stick on chips, banner and shelf marker until the next hello resync.
-  if (currentRoll && currentRoll.rollId === rollId) currentRoll.revealed = true;
-  for (const r of rollQueue) {
-    if (r.rollId === rollId) r.revealed = true;
+// Merge a reveal's authoritative values into a live roll object (currentRoll
+// or a queued roll) so any later entryFromRoll builds a revealed entry — the
+// 7f9cdf5 race fix, extended to carry the values a redacted roll never had.
+function mergeReveal(roll, full) {
+  roll.revealed = true;
+  roll.redacted = false;
+  if (full && Array.isArray(full.values)) {
+    roll.values = full.values.slice();
+    if (Array.isArray(full.perDie) && full.perDie.length === full.values.length) {
+      roll.perDie = full.perDie;
+    }
+    if (typeof full.modifier === 'number') roll.modifier = full.modifier;
+    if (typeof full.total === 'number') roll.total = full.total;
+    if (full.spec) roll.spec = full.spec;
   }
-  const entry = log.find((e) => e.rollId === rollId);
-  if (entry && !entry.revealed) {
-    entry.revealed = true;
-    if (!netOnline) save(LS_LOG, log);
-    renderLog();
-    renderShelfMarkers(); // a shelved '?' marker learns its total and word
-  }
+}
+
+// Repaint every surface that shows this roll under its (now revealed) entry.
+// Runs immediately for log-only reveals, and at the END of the staged flip
+// for a roll whose dice are on the felt — chips/verdict fill in as the dice
+// finish turning (the §3.1 beat).
+function refreshRevealSurfaces(rollId) {
+  renderLog();
+  renderShelfMarkers(); // includes renderPeek
+  const entry = log.find((e) => e.rollId === rollId) || null;
+  if (entry && lastEntry && lastEntry.rollId === rollId) lastEntry = entry;
   if (lastEntry && lastEntry.rollId === rollId) {
-    lastEntry.revealed = true;
-    // A reveal landing while a ceremony is mid-flight must stay log-only:
-    // renderRollResults would un-hide the suppressed result banner (and can
-    // replay a crit overlay) on top of the intent/verdict cards, and the
-    // ceremony repaints its own chips as it stages. A banner the viewer
-    // already dismissed stays dismissed for the same reason — but the DICE do
-    // not: their '?' chips are the shared table, and leaving them stale after
-    // a reveal makes the felt disagree with the log for good (one shared
-    // truth). So outside a ceremony the chips always repaint; only the banner
-    // respects the dismissal.
+    // A reveal landing while a ceremony is mid-flight stays log-only (the
+    // ceremony owns the stage; pendingReveals defers to its finish anyway).
+    // A banner the viewer already dismissed stays dismissed — but the DICE do
+    // not: their '?' chips are the shared table (one shared truth).
     const ceremonyActive = currentRoll && currentRoll.ceremony && !currentRoll.done;
     if (!ceremonyActive) {
       const dice = currentRoll && currentRoll.rollId === rollId ? currentRoll.dice : null;
       if (banner.classList.contains('hidden')) renderChips(lastEntry, dice);
-      else renderRollResults(lastEntry, dice);
+      else renderRollResults(lastEntry, dice); // fx: the reveal IS the moment
+    }
+  }
+  // A standing verdict card for this roll upgrades in place: held state out,
+  // total/margin/meaning in (crit styling included — styling, not fanfare).
+  if (stagedVerdict && stagedVerdict.entry && stagedVerdict.entry.rollId === rollId) {
+    if (entry) stagedVerdict.entry = entry;
+    if (!ceremonyLayer.classList.contains('hidden')) {
+      ceremonyLayer.classList.toggle('crit', !!entryCrit(stagedVerdict.entry));
+      renderVerdictCard(stagedVerdict.roll, stagedVerdict.entry);
     }
   }
 }
 
+// The staged flip for on-felt dice: materials swap to the real faces at once,
+// then each die's correction rotation slerps in over REVEAL_FLIP_S on the dt
+// clock (sim()-drivable, skippable). The frozen BODY takes the corrected pose
+// immediately — physics truth never waits on an animation.
+function beginRevealFlip(rollId, entry) {
+  const dice = tableDice.filter((d) => d.rollId === rollId);
+  const up = new THREE.Vector3(0, 1, 0);
+  let started = false;
+  dice.forEach((d, i) => {
+    if (!d.shrouded) return;
+    d.shrouded = false;
+    d.mesh.material = getDie(d.type).materials;
+    const p = entry.parts[i];
+    const value = p && p.value != null ? p.value : null;
+    const q = d.body.quaternion;
+    const qF = new THREE.Quaternion(q.x, q.y, q.z, q.w);
+    const corr = new THREE.Quaternion();
+    const nV = value == null ? null : faceNormalForValue(d.type, value);
+    if (nV) {
+      const uBody = up.clone().applyQuaternion(qF.clone().invert()).normalize();
+      corr.setFromUnitVectors(nV.normalize(), uBody);
+    }
+    const target = qF.clone().multiply(corr);
+    d.correction = corr;
+    d.finalQuat = target;
+    d.body.quaternion.set(target.x, target.y, target.z, target.w);
+    revealing.push({ die: d, rollId, t: 0, fromQuat: d.mesh.quaternion.clone(), toQuat: target });
+    started = true;
+  });
+  if (!started) refreshRevealSurfaces(rollId);
+}
+
+// A shelved cluster reveals by re-posing: shelfValues become the true values,
+// materials swap, and the cluster re-lands on its canonical poses (the same
+// whisk placeCluster always uses).
+function revealShelvedRoll(rollId, entry) {
+  const c = shelfClusters.get(rollId);
+  const dice = tableDice.filter((d) => d.rollId === rollId);
+  dice.forEach((d, i) => {
+    if (d.shrouded) {
+      d.shrouded = false;
+      d.mesh.material = getDie(d.type).materials;
+    }
+    const p = entry.parts[i];
+    if (p && p.value != null) d.shelfValue = p.value;
+  });
+  if (c) {
+    c.placed = false;
+    placeCluster(c, true);
+    recompositeFelt();
+  }
+}
+
+// Advance reveal flips; when a roll's last die lands, its surfaces fill in.
+function stepRevealing(dt) {
+  if (!revealing.length) return;
+  const finished = new Set();
+  for (const rv of revealing) {
+    rv.t += dt;
+    const p = Math.min(rv.t / REVEAL_FLIP_S, 1);
+    const e = 1 - (1 - p) ** 3; // ease-out cubic
+    rv.die.mesh.quaternion.slerpQuaternions(rv.fromQuat, rv.toQuat, e);
+    if (p >= 1) finished.add(rv.rollId);
+  }
+  if (!finished.size) return;
+  revealing = revealing.filter((rv) => {
+    if (rv.t < REVEAL_FLIP_S) return true;
+    rv.die.mesh.quaternion.copy(rv.toQuat);
+    return false;
+  });
+  for (const rollId of finished) {
+    if (!revealing.some((rv) => rv.rollId === rollId)) refreshRevealSurfaces(rollId);
+  }
+}
+
+// Jump any in-flight reveal flips to their end (skippable, like everything).
+function skipRevealFx() {
+  if (!revealing.length) return false;
+  stepRevealing(REVEAL_FLIP_S + FIXED_DT);
+  return true;
+}
+
+// A hidden roll got flipped (server 'reveal' event carrying the full entry,
+// hello resync, or solo action). Idempotent: replaying a reveal this client
+// already applied changes nothing. `full` is the complete revealed entry —
+// absent when this client already holds the values (solo / legacy face-down).
+function applyReveal(rollId, full) {
+  if (!rollId) return;
+  // Mid-playback or queued: defer until the shrouded roll settles (the same
+  // pendingClears/pendingCollects pattern — never race the playback).
+  const inFlight = currentRoll && !currentRoll.done && currentRoll.rollId === rollId;
+  if (inFlight || rollQueue.some((r) => r.rollId === rollId)) {
+    pendingReveals.set(rollId, full || pendingReveals.get(rollId) || null);
+    return;
+  }
+  if (currentRoll && currentRoll.rollId === rollId) mergeReveal(currentRoll, full);
+
+  const idx = log.findIndex((e) => e.rollId === rollId);
+  let entry = idx >= 0 ? log[idx] : null;
+  const wasHidden = entry ? entryHidden(entry) : false;
+  if (entry) {
+    if (full && Array.isArray(full.values)) {
+      // The redacted entry never had values: rebuild it whole from the
+      // revealed payload, in place, so ordering and dedupe stay stable.
+      log[idx] = rollToLogEntry({ ...full, revealed: true });
+      entry = log[idx];
+    } else {
+      entry.revealed = true;
+    }
+    if (!netOnline) save(LS_LOG, log);
+  }
+  if (entry && lastEntry && lastEntry.rollId === rollId) lastEntry = entry;
+  if (!entry) {
+    // No log entry (edge: banner-only state) — flip what we have.
+    if (lastEntry && lastEntry.rollId === rollId) {
+      lastEntry.revealed = true;
+      refreshRevealSurfaces(rollId);
+    }
+    return;
+  }
+  if (!wasHidden) return; // already revealed: nothing to change
+  renderLog(); // the record flips immediately; chips/verdict ride the beat
+  if (shelfClusters.has(rollId)) {
+    revealShelvedRoll(rollId, entry);
+    refreshRevealSurfaces(rollId);
+  } else if (tableDice.some((d) => d.rollId === rollId && d.shrouded)) {
+    beginRevealFlip(rollId, entry); // staged: surfaces fill at flip end
+  } else {
+    refreshRevealSurfaces(rollId);
+  }
+}
+
+// Completion hook, the reveal twin of runPendingClear. A pending clear wins:
+// dice about to sink have nothing left to reveal.
+function runPendingReveal(roll) {
+  if (roll.rollId && pendingReveals.has(roll.rollId)) {
+    const full = pendingReveals.get(roll.rollId);
+    pendingReveals.delete(roll.rollId);
+    if (!pendingClears.has(roll.rollId)) applyReveal(roll.rollId, full || undefined);
+  }
+}
+
 function requestReveal(rollId) {
-  if (netOnline && net) net.reveal(rollId); // 'reveal' event applies it
-  else applyReveal(rollId);
+  if (netOnline && net) net.reveal(rollId); // the 'reveal' event applies it
+  else applyReveal(rollId); // solo: this client already holds the values
 }
 
 function positionChips() {
@@ -2067,6 +2341,7 @@ function ceremonyFinish(roll) {
   roll.done = true;
   clearTimeout(ceremonyDismissTimer);
   ceremonyDismissTimer = setTimeout(dismissCeremonyUI, CEREMONY_DISMISS_MS);
+  runPendingReveal(roll);  // a reveal that arrived mid-ceremony lands now
   runPendingCollect(roll); // a collect that arrived mid-ceremony lands now
   runPendingClear(roll);   // …and a clear wins over it
   if (rollQueue.length) playRoll(rollQueue.shift());
@@ -2243,9 +2518,10 @@ let verdictFor = null; // {rollId, mine} — what the verdict card's control act
 
 function renderVerdictCard(roll, entry) {
   stagedVerdict = { roll, entry }; // the repaint target while this card is up
+  const hidden = entryHidden(entry);
   const who = entry.playerName ? `${entry.playerName} · ` : '';
   document.getElementById('verdict-eyebrow').textContent = `${who}${entry.label || ''}`;
-  document.getElementById('verdict-total').textContent = String(entry.total);
+  document.getElementById('verdict-total').textContent = hidden ? '?' : String(entry.total);
 
   // §7.7: the roller's control reads Collect and shelves the roll for
   // everyone; a spectator's reads ✕ and only dismisses locally.
@@ -2259,13 +2535,15 @@ function renderVerdictCard(roll, entry) {
   // §7.7.2: not every roll deserves shelf space — the roller also gets a ✕
   // that clears the dice outright (spectators keep the single local ✕).
   document.getElementById('verdict-x').classList.toggle('hidden', !(mine && entry.rollId));
+  // goal 11: a held ceremony's verdict card carries Reveal for the authority.
+  document.getElementById('verdict-reveal').classList.toggle('hidden', !canReveal(entry));
 
   const hasDc = Number.isInteger(entry.dc);
   const ring = document.getElementById('ring-fill');
   const CIRC = 326.7;
-  const frac = hasDc ? Math.max(0.04, Math.min(entry.total / entry.dc, 1)) : 1;
+  const frac = hasDc && !hidden ? Math.max(0.04, Math.min(entry.total / entry.dc, 1)) : 1;
   ring.style.strokeDashoffset = String(Math.round(CIRC * (1 - frac) * 10) / 10);
-  ring.classList.toggle('fail', hasDc && entry.total < entry.dc);
+  ring.classList.toggle('fail', hasDc && !hidden && entry.total < entry.dc);
 
   const marginEl = document.getElementById('verdict-margin');
   const heroEl = document.getElementById('verdict-hero');
@@ -2274,6 +2552,16 @@ function renderVerdictCard(roll, entry) {
   heroEl.className = 'verdict-hero';
   chartEl.textContent = '';
   marginEl.textContent = '';
+  const holderPre = document.getElementById('verdict-modcards');
+  if (hidden) {
+    // Public stakes, hidden result (goal 11): DC shows, verdict/margin/
+    // attribution wait for the reveal.
+    if (hasDc) marginEl.append(`vs DC ${entry.dc}`);
+    heroEl.textContent = entry.visMode === 'whisper' ? 'Whispered' : 'Face down';
+    heroEl.classList.add('held');
+    holderPre.innerHTML = '';
+    return;
+  }
   if (hasDc) {
     // §2.5: the target verdict owns the hero slot; the chart word demotes
     // to a labeled chart line. Never merged, never hidden.
@@ -2345,7 +2633,7 @@ function skipPlainPlayback() {
   stepPlayback(roll.duration - roll.time + FIXED_DT);
   return true;
 }
-container.addEventListener('click', () => { skipPlainPlayback(); });
+container.addEventListener('click', () => { skipPlainPlayback(); skipRevealFx(); });
 
 document.addEventListener('keydown', (e) => {
   if (e.code !== 'Space') return;
@@ -2362,7 +2650,8 @@ document.addEventListener('keydown', (e) => {
   }
   // A focused button owns Space (it activates it); the table's skip yields.
   if (t instanceof HTMLElement && t.closest('button')) return;
-  if (skipPlainPlayback()) e.preventDefault();
+  const skipped = skipPlainPlayback();
+  if (skipRevealFx() || skipped) e.preventDefault();
 });
 document.getElementById('verdict-done').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -2401,6 +2690,13 @@ document.getElementById('verdict-x').addEventListener('click', (e) => {
     if (!ok) showSettingsNote('couldn’t clear the roll — try again');
   });
 });
+// goal 11: the held verdict card's Reveal — same path as banner/marker/peek;
+// the card upgrades in place when the reveal comes back around.
+document.getElementById('verdict-reveal').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const v = verdictFor;
+  if (v && v.rollId) requestReveal(v.rollId);
+});
 
 // ---------------------------------------------------------------------------
 // Animation loop
@@ -2412,8 +2708,9 @@ const clock = new THREE.Clock();
 // fast-forward; the rAF loop just advances keyframe playback.
 function tick(dt, render = true) {
   stepPlayback(dt);
-  stepSinking(dt);  // per-roll Done departures (§7.5)
-  stepWhisking(dt); // collect whisks onto the shelf (§7.7)
+  stepSinking(dt);   // per-roll Done departures (§7.5)
+  stepWhisking(dt);  // collect whisks onto the shelf (§7.7)
+  stepRevealing(dt); // reveal correction flips (goal 11)
   if (chips.length) positionChips();
   if (shelfClusters.size) positionShelfMarkers();
   if (render) renderer.render(scene, camera);
@@ -2438,6 +2735,7 @@ function fastForwardPlayback() {
     if (currentRoll.ceremony) skipCeremony();
     else stepPlayback(currentRoll.duration - currentRoll.time + FIXED_DT);
   }
+  skipRevealFx(); // a reveal beat queued behind the playback lands too
 }
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) fastForwardPlayback();
@@ -2663,6 +2961,96 @@ function formula(types) {
   return canonicalNotation({ dice: types, mods: null });
 }
 
+// ---------------------------------------------------------------------------
+// Visibility (goal 11): {mode: 'held'|'secret'|'whisper', names: [...]} —
+// null means open. Visibility RIDES THE NOTATION STRING on the wire (the
+// server re-parses; there is no parallel wire field), so these helpers are
+// how every surface converts between UI state and the canonical spelling.
+// ---------------------------------------------------------------------------
+
+const VIS_MODES = ['held', 'secret', 'whisper'];
+
+// Normalize a visibility-ish object (parse result, entry field, UI state);
+// falls back to held when only the legacy faceDown boolean is known.
+function normVis(v, faceDown = false) {
+  if (v && typeof v === 'object' && VIS_MODES.includes(v.mode)) {
+    const names = Array.isArray(v.names)
+      ? v.names.filter((n) => typeof n === 'string' && n)
+      : [];
+    return { mode: v.mode, names };
+  }
+  return faceDown ? { mode: 'held', names: [] } : null;
+}
+
+// Visibility of a parseNotation result (spec.visibility once the grammar
+// slice lands; res.faceDown covers today's held-only grammar).
+function visOfParse(res) {
+  return normVis(res.visibility || (res.spec && res.spec.visibility), res.faceDown);
+}
+
+// Visibility of a log entry, for reroll paths (a secret roll must never
+// silently re-roll in the open). Whisper audiences may arrive as names or as
+// playerIds; ids resolve against the current roster.
+function entryVis(entry) {
+  const v = (entry.spec && entry.spec.visibility) || entry.visibility;
+  if (v && typeof v === 'object' && VIS_MODES.includes(v.mode)) {
+    let names = Array.isArray(v.names) ? v.names.filter((n) => typeof n === 'string' && n) : null;
+    if ((!names || !names.length) && Array.isArray(v.audience)) {
+      names = v.audience
+        .map((id) => (players.find((p) => p.id === id) || {}).name)
+        .filter(Boolean);
+    }
+    return { mode: v.mode, names: names || [] };
+  }
+  if (entry.visMode === 'whisper') {
+    return null; // a shrouded viewer can't reconstruct the audience — reroll open
+  }
+  return entry.faceDown || entry.visMode === 'held' ? { mode: 'held', names: [] } : null;
+}
+
+// The canonical flag token for the visibility slot: 'held' | 'secret' |
+// 'w:Name1,Name2'. Canonical quoting (contract): quote ONLY when the name
+// contains spaces, commas, quotes, or leading/trailing whitespace; preserve
+// case; escape an embedded quote as \".
+function visFlagToken(vis) {
+  if (!vis || vis.mode === 'open') return null;
+  if (vis.mode === 'held') return 'held';
+  if (vis.mode === 'secret') return 'secret';
+  const quote = (n) => (/[\s",]/.test(n) ? `"${n.replace(/"/g, '\\"')}"` : n);
+  return 'w:' + vis.names.map(quote).join(',');
+}
+
+// canonicalNotation, visibility included. Once the grammar slice lands the
+// renderer emits the flag itself (spec.visibility rides in); until then this
+// splices the token into the canonical visibility slot (where 'held' sits:
+// after the moment flags, before dcN / the comment) so every surface already
+// produces the final spelling.
+function canonicalWithVis(spec, extras = {}, vis = null) {
+  const v = normVis(vis, extras.faceDown);
+  const s = v ? { ...spec, visibility: { mode: v.mode, names: [...v.names] } } : spec;
+  let out = canonicalNotation(s, { ...extras, faceDown: !!(v && v.mode === 'held') });
+  if (v && v.mode !== 'held') {
+    const token = visFlagToken(v);
+    if (token && !canonicalCarriesToken(out, token)) out = spliceVisFlag(out, token);
+  }
+  return out;
+}
+
+function canonicalCarriesToken(canonical, token) {
+  const hash = canonical.indexOf(' # ');
+  const head = hash >= 0 ? canonical.slice(0, hash) : canonical;
+  return (' ' + head + ' ').includes(' ' + token + ' ');
+}
+
+function spliceVisFlag(canonical, token) {
+  const hash = canonical.indexOf(' # ');
+  let head = hash >= 0 ? canonical.slice(0, hash) : canonical;
+  const tail = hash >= 0 ? canonical.slice(hash) : '';
+  const m = /^(.*?)( dc\d{1,4})?$/.exec(head);
+  head = `${m[1]} ${token}${m[2] || ''}`;
+  return head + tail;
+}
+
 function renderTray() {
   trayEl.innerHTML = '';
   tray.forEach((type, i) => {
@@ -2705,6 +3093,7 @@ rollTrayBtn.addEventListener('click', () => {
       canonical: intent.canonical,
       mods: cmdResult.spec.mods || undefined,
       faceDown: cmdResult.faceDown,
+      visibility: visOfParse(cmdResult) || undefined,
       dc: cmdResult.dc ?? undefined,
       exp: intent.exp || undefined,
     });
@@ -2724,10 +3113,10 @@ trayModsBtn.addEventListener('click', () => {
 
 clearTrayBtn.addEventListener('click', () => {
   tray = [];
-  // Every key of the declared draft shape, including the two §7.6 added:
+  // Every key of the declared draft shape, including the §7.6/goal-11 ones:
   // canonicalNotation's defaults would absorb the missing ones today, but a
   // half-shaped boxExtras is a trap for the next reader of it.
-  boxExtras = { mods: null, dc: null, comment: null, exp: null, faceDown: false };
+  boxExtras = { mods: null, dc: null, comment: null, exp: null, visibility: null };
   cmdInput.value = '';
   renderTray();
   paintCmd();
@@ -2751,9 +3140,9 @@ const cmdCheatsheet = document.getElementById('cmd-cheatsheet');
 let cmdTimer = null;
 let cmdResult = null; // last parse result for the box's current text
 // Non-dice state of the draft, kept so tray edits preserve the whole intent:
-// mods, dc, comment, and — since UX §7.6 gave them a spelling — the moment and
-// face-down. Adding a die to the tray must not quietly undress the roll.
-let boxExtras = { mods: null, dc: null, comment: null, exp: null, faceDown: false };
+// mods, dc, comment, and — since UX §7.6/goal 11 gave them spellings — the
+// moment and visibility. Adding a die must not quietly undress the roll.
+let boxExtras = { mods: null, dc: null, comment: null, exp: null, visibility: null };
 
 let cmdHistory = load(LS_HISTORY, []);
 if (!Array.isArray(cmdHistory)) cmdHistory = [];
@@ -2848,7 +3237,7 @@ function paintCmd() {
       dc: res.dc,
       comment: res.comment,
       exp: res.exp,
-      faceDown: res.faceDown,
+      visibility: visOfParse(res),
     };
     if (tray.join(',') !== res.spec.dice.join(',')) {
       tray = [...res.spec.dice];
@@ -2874,12 +3263,11 @@ function syncBoxFromTray() {
     if (mods.keep && mods.keep.n >= tray.length) delete mods.keep;
     if (!Object.keys(mods).length) mods = null;
   }
-  cmdInput.value = canonicalNotation({ dice: [...tray], mods }, {
+  cmdInput.value = canonicalWithVis({ dice: [...tray], mods }, {
     dc: boxExtras.dc,
     comment: boxExtras.comment,
     exp: boxExtras.exp,
-    faceDown: boxExtras.faceDown,
-  });
+  }, boxExtras.visibility);
   paintCmd();
 }
 
@@ -2895,12 +3283,11 @@ function syncBoxFromTray() {
 function notationIntent(raw, res) {
   const exp = res.exp || (res.dc != null ? { kind: 'check' } : null);
   if (!exp || res.exp) return { exp, notation: raw, canonical: res.canonical };
-  const dressed = canonicalNotation(res.spec, {
+  const dressed = canonicalWithVis(res.spec, {
     dc: res.dc,
     comment: res.comment,
     exp,
-    faceDown: res.faceDown,
-  });
+  }, visOfParse(res));
   return { exp, notation: dressed, canonical: dressed };
 }
 
@@ -2917,6 +3304,7 @@ function commandRoll(input) {
     canonical: intent.canonical,
     mods: res.spec.mods || undefined,
     faceDown: res.faceDown, // 'held' and the /gmroll family both land here
+    visibility: visOfParse(res) || undefined, // secret / w: (goal 11)
     dc: res.dc ?? undefined,
     exp: intent.exp || undefined,
   });
@@ -3067,6 +3455,7 @@ function rollGroup(g) {
     canonical: intent.canonical,
     mods: res.spec.mods || undefined,
     faceDown: res.faceDown, // saved groups carry 'held' now (§7.6)
+    visibility: visOfParse(res) || undefined, // …and secret / w: (goal 11)
     dc: res.dc ?? undefined,
     exp: intent.exp || undefined,
   });
@@ -3696,7 +4085,7 @@ function renderLog() {
   logList.innerHTML = '';
   logEmpty.style.display = log.length ? 'none' : 'block';
   for (const entry of [...log].reverse()) {
-    const hidden = entry.faceDown && !entry.revealed;
+    const hidden = entryHidden(entry);
     const el = document.createElement('div');
     el.className = 'log-entry';
     const modParts = modPartsOf(entry);
@@ -3710,7 +4099,7 @@ function renderLog() {
       modHtml = ` <span class="log-mod">${entry.modifier > 0 ? '+' : '−'}${Math.abs(entry.modifier)}</span>`;
     }
     const detail = hidden
-      ? '<span class="log-hidden">face down</span>'
+      ? `<span class="log-hidden">${entry.visMode === 'whisper' ? 'whispered' : 'face down'}</span>`
       : entry.parts
           .map((p) => {
             let cls = p.isMax && p.counts ? 'crit-max' : p.isMin && p.counts ? 'crit-min' : '';
@@ -3719,10 +4108,13 @@ function renderLog() {
             return `<span class="${cls.trim()}">${star}${p.type}&thinsp;${p.label}</span>`;
           })
           .join(' + ') + modHtml;
-    // interim dc verdict (fixed decision): "vs N ✓/✗" — hidden while face down
-    const verdictHtml = !hidden && Number.isInteger(entry.dc)
-      ? `<span class="log-verdict ${entry.total >= entry.dc ? 'ok' : 'bad'}">vs ${entry.dc} ${entry.total >= entry.dc ? '✓' : '✗'}</span>`
-      : '';
+    // interim dc verdict (fixed decision): "vs N ✓/✗". Stakes stay public on
+    // a hidden roll (goal 11): the target shows, the ✓/✗ waits for the reveal.
+    const verdictHtml = !Number.isInteger(entry.dc)
+      ? ''
+      : hidden
+        ? `<span class="log-verdict">vs ${entry.dc}</span>`
+        : `<span class="log-verdict ${entry.total >= entry.dc ? 'ok' : 'bad'}">vs ${entry.dc} ${entry.total >= entry.dc ? '✓' : '✗'}</span>`;
     const meaning = entryMeaning(entry); // active-system lens; null while hidden
     const meaningHtml = meaning
       ? `<span class="log-meaning tier-${meaning.tier}"></span>`
@@ -3756,6 +4148,7 @@ function renderLog() {
         requestRoll([...entry.spec.dice], entry.label, {
           mods: entry.spec.mods || undefined,
           faceDown: entry.faceDown,
+          visibility: entryVis(entry) || undefined, // …and the privacy
           dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
           exp: entry.spec.exp || undefined, // reroll-last preserves the moment
         })
@@ -4294,6 +4687,7 @@ function rerollLast() {
   requestRoll([...entry.spec.dice], entry.label, {
     mods: entry.spec.mods || undefined,
     faceDown: entry.faceDown,
+    visibility: entryVis(entry) || undefined, // …and the privacy
     dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
     exp: entry.spec.exp || undefined, // reroll-last preserves the moment
   });
@@ -4438,6 +4832,23 @@ function modsSummary(mods) {
   return bits.join(' · ');
 }
 
+// Human text for an offer's (or entry's) visibility, roster-resolved.
+function offerVisText(vis) {
+  if (!vis) return '';
+  if (vis.mode === 'held') return 'face down';
+  if (vis.mode === 'secret') return 'secret — only the offerer sees the result';
+  if (vis.mode === 'whisper') {
+    let names = Array.isArray(vis.names) ? vis.names.filter((n) => typeof n === 'string' && n) : [];
+    if (!names.length && Array.isArray(vis.audience)) {
+      names = vis.audience
+        .map((id) => (players.find((p) => p.id === id) || {}).name)
+        .filter(Boolean);
+    }
+    return names.length ? `whisper to ${names.join(', ')}` : 'whisper';
+  }
+  return '';
+}
+
 // Offered-roll cards: anyone can execute one, once; the roll attributes to
 // whoever clicks. Names/labels are user-supplied — textContent only.
 function renderOffers() {
@@ -4464,10 +4875,14 @@ function renderOffers() {
     detail.className = 'offer-detail';
     const summary = modsSummary(o.mods);
     const exp = sanitizeExp(o.exp);
+    // The offer's visibility is part of its stakes (goal 11): show it on the
+    // card so a claimer knows they may be rolling blind.
+    const vis = normVis(o.visibility, o.faceDown);
+    const visText = offerVisText(vis);
     detail.textContent = formula(o.dice || [])
       + (summary ? `  ·  ${summary}` : '')
       + (Number.isInteger(o.dc) ? `  ·  vs ${o.dc}` : '')
-      + (o.faceDown ? '  ·  face down' : '')
+      + (visText ? `  ·  ${visText}` : '')
       + (exp ? `  ·  ${exp.kind === 'cinematic' ? 'Cinematic' : 'Check'}${exp.subtitle ? ` — ${exp.subtitle}` : ''}` : '');
 
     const actions = document.createElement('div');
@@ -4549,6 +4964,11 @@ function replaySettledRoll(r) {
     exp: null, // the moment already played for the room; reconstruct plain
     faceDown: r.faceDown,
     revealed: r.revealed,
+    redacted: r.redacted,       // goal 11: a hidden roll reconstructs shrouded
+    visMode: r.visMode,
+    visibility: r.visibility,
+    revealAuthority: r.revealAuthority,
+    notation: r.notation,
     playerId: r.playerId,
     seed: r.seed,
     label: r.label || formula(r.dice || []),
@@ -4603,7 +5023,9 @@ function handleNetEvent(type, data) {
       // idempotent and repaints the banner when the roll is the one on it.
       for (const r of data.log || []) {
         if (!r || !r.rollId) continue;
-        if (r.faceDown && r.revealed) applyReveal(r.rollId);
+        if (r.revealed && (r.faceDown || r.redacted || r.visMode || r.visibility)) {
+          applyReveal(r.rollId, r);
+        }
         if (r.cleared) applyClearRoll(r.rollId);
       }
       // §7.7 resync: the server's present-or-absent flags are the one truth
@@ -4659,6 +5081,11 @@ function handleNetEvent(type, data) {
         exp: data.exp,
         faceDown: data.faceDown,
         revealed: data.revealed,
+        redacted: data.redacted,       // goal 11: server-side projection flags
+        visMode: data.visMode,
+        visibility: data.visibility,
+        revealAuthority: data.revealAuthority,
+        notation: data.notation,
         playerId: data.playerId,
         seed: data.seed,
         label: data.label || formula(data.dice || []),
@@ -4670,7 +5097,13 @@ function handleNetEvent(type, data) {
       clearTable();
       break;
     case 'reveal':
-      applyReveal(data.rollId);
+      // Post-redaction the event carries the newly-authorized FULL entry
+      // (per recipient); a bare {rollId} still upgrades rolls whose values
+      // this client already holds (legacy face-down).
+      applyReveal(
+        (data.roll && data.roll.rollId) || data.rollId,
+        data.roll || (Array.isArray(data.values) ? data : undefined)
+      );
       break;
     case 'roll-cleared': // per-roll Done (§7.5) / shelf aging (§7.7)
       applyClearRoll(data.rollId);
@@ -4719,24 +5152,33 @@ function handleNetStatus(status) {
 // that still have it pass it in.
 function requestRoll(types, label, opts = {}) {
   if (!types.length) return;
-  const canonical = opts.canonical || canonicalNotation(
+  const vis = normVis(opts.visibility, opts.faceDown);
+  const canonical = opts.canonical || canonicalWithVis(
     { dice: types, mods: opts.mods || null },
     {
       dc: Number.isInteger(opts.dc) ? opts.dc : null,
       comment: typeof opts.comment === 'string' ? opts.comment : null,
       exp: sanitizeExp(opts.exp),
-      faceDown: !!opts.faceDown,
-    }
+    },
+    vis
   );
   // History records only rolls that actually happened: online that means the
   // server accepted it (a 400 or a network failure resolves null), solo it
   // means the spec passed the same validation rollDice applies.
   if (netOnline && net) {
+    const wireOpts = { ...opts };
+    // secret/whisper have no explicit wire field BY DESIGN: visibility rides
+    // the notation string and the server re-parses it. Paths that arrive here
+    // with no string of their own (popover, reroll-last) get the canonical.
+    // held keeps today's faceDown field on the explicit shape.
+    if (vis && vis.mode !== 'held' && !wireOpts.notation) wireOpts.notation = canonical;
     // animation waits for the SSE event
-    net.roll(types, label, opts).then((roll) => { if (roll) pushHistory(canonical); });
+    net.roll(types, label, wireOpts).then((roll) => { if (roll) pushHistory(canonical); });
   } else {
+    // Solo/offline (goal 9): there is no server to redact for anyone, so
+    // secret/whisper act as OPEN; held keeps the local face-down flow.
     if (validateMods(types, opts.mods || null)) return; // invalid spec: no roll
-    rollDice(types, label, opts);
+    rollDice(types, label, { ...opts, faceDown: !!(vis && vis.mode === 'held') });
     pushHistory(canonical);
   }
 }
