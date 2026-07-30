@@ -8,8 +8,10 @@ document. Everything here is implementable against the current
 codebase; new endpoints and SSE events are enumerated in §6.
 
 Design stance, in one line: **standard on the surface, modern in the feel.**
-Standard = Roll20-dialect notation, the industry's four visibility modes
-(open · held · secret · whisper), a conventional saved-groups panel.
+Standard = Roll20-dialect notation, a visibility ladder built out of the
+moves every VTT already has (open · held · secret · whisper — see §3.2's
+terminology note for where the *words* diverge between tools), a
+conventional saved-groups panel.
 Modern = one dressed-up roll moment, diegetic mat text in the 3D felt,
 physics-true hidden dice, and zero permission bureaucracy — the privacy is
 real (server-side redaction) and the roles are absent.
@@ -643,6 +645,40 @@ gracefully*, not fully mirrored: the rungs whose whole meaning is "someone
 else" are the rungs that flatten. A room that later gains players gets the
 real ladder back with no change to the saved notation.
 
+**Terminology note: the words are traps, the rungs are not.** A 2026 survey
+of VTT conventions confirmed the *ladder* is conventional — open is
+Foundry's Public Roll, secret is Foundry's Self Roll, whisper generalizes
+the Private-GM-Roll/`/gmroll` family, the offerer-only offer is Foundry's
+Blind GM Roll and Fantasy Grounds' dice tower, and held is closest to
+dddice's Hidden Roll with Peek/Unhide. The *vocabulary* is where tools
+contradict each other outright:
+
+- **"secret" is not portable.** Here it means *roller-only*. In Roll20 and
+  PF2e it means the opposite axis — the roller does **not** see it.
+- **"/sr" is the worst offender.** Foundry's `/selfroll` short form means
+  roller-only; Roll20's 2026 "Secret Roll" `/sr` means the roller cannot
+  see the result. Same two letters, inverted meaning.
+- **"blind" universally means the roller cannot see their own result** —
+  which is our *offered* secret roll (§3.3), never a self-roll.
+- **"GM" and "private" name a seat we do not have** (goal 10).
+
+Two consequences bind the implementation. First, **wire words stay
+`held` / `secret` / `w:` / `blind`** — the notation is a paste-compatible
+dialect and must not churn. Second, **UI labels never render "Secret",
+"Blind", "GM" or "Private" as a mode name**, because each one reads as its
+own opposite to somebody at the table; the labels are *Open* · *Face down*
+· *Only me* ("no one else sees that you rolled") · *Whisper to…* ("others
+see you rolled, not what"), and an offer's restricted mode is *Dice tower*
+("they roll — only you see the result"). *Not yet applied: the picker still
+says "Secret", and the `/gmroll` and `/sr` aliases still bind as §7.8
+documents. Both are ROADMAP step 4b.*
+
+And one thing genuinely ours: **our whisper leaves bystanders a shrouded
+roll.** Roll20 and Foundry whispers show non-recipients *nothing at all*.
+Here, existence is public on every rung but `secret` — that is the point of
+§3.1's obsidian dice, and it is the single largest behavioural difference a
+player arriving from another tool will meet.
+
 ### 3.3 Offers, reveal authority, and the GM-screen roll
 
 *(The claimable DM seat that occupied this section is **rescinded** — goal
@@ -1171,9 +1207,12 @@ back **byte-stably**: the canonical form remains a fixed point,
 - **`secret`** — the roll exists only for the roller; not revealable.
 - **`w:Name`**, **`w:Name1,Name2`** — whisper to a named audience.
 - **Mutually exclusive.** Two visibility flags in one command is a parse
-  error ("one visibility per roll — `held`, `secret` or `w:…`, not two"),
-  including a prefix that disagrees with a flag. A prefix that *agrees* is
-  accepted (`/selfroll 1d20 secret`).
+  error — `held and secret are mutually exclusive`, hinted
+  `a roll has one visibility: held, secret or w:Name` — including a prefix
+  that disagrees with a flag, where the hint names the prefix instead
+  (`the /gmroll prefix already sets held`). A prefix that *agrees* is
+  accepted (`/selfroll 1d20 secret`). The same flag written twice is a
+  typo, not an exclusion: `held specified twice`.
 
 **Prefixes normalize into the slot** and never survive into canonical
 output: `/gmroll`, `/gmr` → `held`; `/selfroll`, `/sr` → `secret`. The
