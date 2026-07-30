@@ -1437,6 +1437,14 @@ function showResults(roll) {
 // action). Idempotent: replaying a reveal this client already applied only
 // repaints, so the hello resync can call it for every revealed roll in the log.
 function applyReveal(rollId) {
+  // A reveal can land while its roll is still mid-playback or queued on this
+  // client — no log entry exists yet. Flip the roll object itself so the
+  // completion path builds an already-revealed entry; otherwise the '?' would
+  // stick on chips, banner and shelf marker until the next hello resync.
+  if (currentRoll && currentRoll.rollId === rollId) currentRoll.revealed = true;
+  for (const r of rollQueue) {
+    if (r.rollId === rollId) r.revealed = true;
+  }
   const entry = log.find((e) => e.rollId === rollId);
   if (entry && !entry.revealed) {
     entry.revealed = true;
