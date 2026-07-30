@@ -8,10 +8,11 @@ document. Everything here is implementable against the current
 codebase; new endpoints and SSE events are enumerated in §6.
 
 Design stance, in one line: **standard on the surface, modern in the feel.**
-Standard = Roll20-dialect notation, the industry's four visibility modes, a
-conventional saved-groups panel. Modern = one dressed-up roll moment,
-diegetic mat text in the 3D felt, physics-true hidden dice, and zero
-permission bureaucracy.
+Standard = Roll20-dialect notation, the industry's four visibility modes
+(open · held · secret · whisper), a conventional saved-groups panel.
+Modern = one dressed-up roll moment, diegetic mat text in the 3D felt,
+physics-true hidden dice, and zero permission bureaucracy — the privacy is
+real (server-side redaction) and the roles are absent.
 
 ---
 
@@ -113,10 +114,15 @@ threads through both mockups (`panel.html`'s ± popover and
 trailing form — glueing any of those mods inside that pool is the parse
 error defined above.
 
-Visibility is **never** in the notation string (no tool on the market puts
-it there); it travels as a field beside `mods` (§3). The `/gmroll`-family
-prefixes are accepted for paste compatibility and set the visibility field,
-then are dropped from the stored canonical string.
+Visibility **is** in the notation string, as a trailing flag in its own
+slot — `held`, `secret`, `w:Name` (§7.8). An earlier draft kept it out (no
+market tool puts it there) and the notation-totality invariant reversed
+that: a saved group whose canonical string cannot say "secret" saves a
+public roll, and links, history and `#g=` all silently downgrade privacy.
+On the wire it still travels as a field beside `mods` (§3.0), because it
+does not alter values. The `/gmroll`-family prefixes are accepted for paste
+compatibility and normalize into the slot (`/gmroll`→`held`,
+`/selfroll`→`secret`); canonical output never emits a prefix.
 
 ### 1.2 Parser API
 
@@ -124,7 +130,10 @@ then are dropped from the stored canonical string.
 parseNotation(str) →
   { ok: true, spec: { dice, mods },        // rollspec-shaped
     terms,                                  // per-term list for chip/card render
-    label, target, visibility,              // from #, dc, /prefix (or null)
+    label, target,                          // from #, dc (or null)
+    visibility,                             // {mode, names[]} from the
+                                            //   visibility flag or /prefix
+                                            //   (or null = open) — §7.8
     canonical }                             // normalized string
 | { ok: false, state: 'incomplete' | 'invalid',
     error: { code, index, len, message, fix? } }
@@ -167,8 +176,11 @@ the box so nothing jumps):
 **Enter** rolls the parsed command (identical path to the Roll button).
 **`/`** as first character opens a filtered token list (non-enforcing —
 free text always allowed): `/gmroll`, `/sr`, plus mod tokens
-`kh kl dh dl ro ! adv dis dc #`, one line of help each, arrow keys +
-Tab to accept. `/gmroll` only appears when the room has a DM seated (§3.4).
+`kh kl dh dl ro ! adv dis held secret w: dc #`, one line of help each,
+arrow keys + Tab to accept. Every token is always listed — there is no
+seat, no role, and therefore nothing to condition the list on; the
+`/gmroll` family is described as what it is, paste sugar for `held`
+(§7.8).
 
 **History:** ↑/↓ recalls the last 10 executed commands, per-room, stored in
 localStorage key `rollHistory:<room>`. This is the same store the banner's
@@ -202,9 +214,12 @@ The invariant: **spec object is truth; notation is its stable projection.**
   (names *and* comments `encodeURIComponent`-escaped since `;`/`=`/`#` are
   delimiters), then base64url as today. The v1 decoder regex is a strict
   subset of the grammar, so **every existing `#g=` link decodes unchanged**;
-  the encoder always writes v2. Group-level experience id, dice-set id and
-  visibility default ride the same string as trailing `@exp=check`,
-  `@set=ember`, `@vis=held` tokens (parser-private, never shown in chips).
+  the encoder always writes v2. The group's moment and its visibility need
+  no side-channel: both are canonical-notation flags (`check`, `held`,
+  `w:Kira` — §7.6, §7.8), so they ride the stored string for free and a
+  shared link cannot lose a group's privacy. Only a future dice-set id
+  still needs a trailing `@set=ember` token (parser-private, never shown in
+  chips); the once-planned `@exp=` / `@vis=` tokens are retired.
 - **Unnamed groups** (§1.4) encode with an empty name segment — `=4d6dl1`
   — and the v2 decoder accepts `eq === 0`, labelling the group by its
   notation. Compatibility is **one-way by design**: every v1 link decodes
@@ -259,16 +274,16 @@ modCards → verdict → flavor → actions        (+ matText, in the felt)
 { exp: 'check', title: 'Deception', subtitle: 'CHARISMA CHECK',
   matText: 'The lie leaves your lips…',
   target: { value: 15, cmp: '>=', scope: 'total',
-            label: 'DIFFICULTY CLASS', hidden: false } }
+            label: 'DIFFICULTY CLASS' } }
 ```
 
 `target.cmp` defaults `'>='` but is a real field (roll-under systems
 exist); `scope:'each'` is reserved for roadmap §8 success counting — same
 field, different verdict rendering (success-pip row instead of ring), not
-built now. `showOdds` has one visibility interaction: when the
-attachment's `target.hidden` is set (§3.4), the odds line renders for the
-**host only** — for anyone else "72% to clear it" brackets the hidden DC,
-so every non-host card suppresses it regardless of the experience record. **Do not define more layouts**; a new "experience" is a new record —
+built now. There is **no `target.hidden`**: stakes are public on every
+visibility rung (§3.0), so the target number and its odds line render the
+same for everybody — the drama comes from the held *result*, not a secret
+number. **Do not define more layouts**; a new "experience" is a new record —
 new eyebrow, readout mix, motion tier, frame, mat template — over the same
 slots. If a genuinely new slot arrangement is ever needed, that is a new
 `layout` field with a second hand-built arrangement, added then, not now.
@@ -377,9 +392,11 @@ reconciled and never merged. The card has one large readout:
 ### 2.6 Multiplayer and mini mode
 
 **Values and staging are server-authoritative; pacing is client-local.**
-The attachment (title, subtitle, mat text, target unless `hidden`,
-experience id) rides the `roll` / `offer` SSE payloads — the card *is* the
-shared moment. Every client renders the intent card and mat text; only the
+The attachment (title, subtitle, mat text, target, experience id) rides the
+`roll` / `offer` SSE payloads — the card *is* the shared moment, and it
+survives redaction intact: a held or whispered roll keeps its whole
+ceremony, only the result slot goes face-down (§3.1). Every client renders
+the intent card and mat text; only the
 roller (or offer-claimer) gets the Roll button; spectators see
 `Kira is about to roll…` in the actions slot. `motion` tier, skip, sound
 and reduced-motion are strictly local — one player's skip never truncates
@@ -842,9 +859,11 @@ specs; codec v2; `/api/roll`+`/api/offer` accept `notation`; group-row
 chips + copy-on-click. *Value: paste any Roll20-ish string and it rolls;
 every chip and URL tells the truth about mods.*
 
-**Slice 2 — Real visibility.** Server redaction + log-leak fixes;
-`visibility` wire field; shrouded-die replay + 400 ms flip reveal + Peek;
-mode picker (sticky, eye-slash badge); whisper-by-name chips.
+**Slice 2 — Real visibility.** Per-recipient `projectEntryFor` on all
+seven egress paths; `visibility` wire field (present-or-absent);
+`held`/`secret`/`w:` notation; shrouded-die replay + staged flip reveal;
+offer visibility with offerer reveal authority (the GM-screen roll); mode
+picker (sticky, eye-slash badge) + whisper name chips.
 *Value: face down becomes real privacy and the reveal becomes the
 best-looking moment in the app — before any card exists.*
 
@@ -856,31 +875,29 @@ target ring + one-hero-slot rule; Cinematic slow-mo (playback-clock
 scaling) + fanfare; mini-mode degradation; attachment on roll/offer
 events. *Value: the BG3 moment, shared across the table.*
 
-**Slice 4 — Sets & the seat.** Dice sets tier 0–1 riding roadmap §4's
-cache re-key (+ `sound`, `extends`); `POST /api/style` + `player-styled`;
-picker riding roadmap §6 thumbnails; per-die set ids on roll events +
-`@set=` in codec; then the DM seat (`host`, claim/pass/release,
-`hostToken` rejoin, `host-changed`), blind offers, hidden targets, host
-housekeeping; and the ROADMAP.md edits the visibility research calls for
-(roadmap §3's face-down bullet rewritten to the real redaction model, its
-"no DM roles" note on offered rolls softened to point here). *Value:
-identity dice for
-everyone; blind rolls and hidden DCs for tables that want a DM — and rooms
-without one never notice the feature exists.*
+**Slice 4 — Sets.** Dice sets tier 0–1 riding roadmap §4's cache re-key
+(+ `sound`, `extends`); `POST /api/style` + `player-styled`; picker riding
+roadmap §6 thumbnails; per-die set ids on roll events + `@set=` in codec.
+*Value: identity dice for everyone — and the shrouded obsidian blank
+becomes one variant of a system that already exists rather than a
+one-off.* (This slice once ended with "…and the DM seat". It does not: the
+seat is rescinded by goal 10 and its powers ship inside slice 2 as
+per-roll choices — §3.3.)
 
 ### New wire surface (complete list)
 
 | Kind | Name | Notes |
 |---|---|---|
 | field | `notation` on `/api/roll`, `/api/offer` | server re-parses, authoritative |
-| field | `visibility` beside `mods` | `open\|held\|secret\|{whisper:[…]}\|blind`; `faceDown` aliased |
+| field | `visibility` beside `mods`, on rolls **and offers** | `{mode:'held'\|'secret'\|'whisper', audience[], revealAuthority}`; **absent = open** so plain payloads stay byte-identical |
+| field | `redacted:true` + `visMode` on redacted projections | replaces the dropped `values`/`total`/`meaning`/verdict |
 | field | `exp` attachment on roll/offer payloads | title/subtitle/matText/target/expId |
 | field | per-die `set` ids on roll events; `set` in `publicPlayers` | replay fidelity |
 | endpoint | `POST /api/style` | `{set}` → `player-styled` |
-| endpoint | `POST /api/host/claim` / `pass` / `release` | returns/uses `hostToken` |
-| SSE | `player-styled`, `host-changed` | added to `SSE_EVENTS` + `hello` |
-| change | `/api/reveal` authority | roller, or host when blind |
-| change | `broadcast` / `hello` / `join` | per-recipient `redactRoll` projection |
+| error | `unknown_audience` on roll/offer | a `w:` name that no one in the room answers to (§3.0) |
+| error | `403 not_reveal_authority` on `/api/reveal` | anyone but `visibility.revealAuthority` |
+| change | `/api/reveal` authority + payload | the chooser, not always the roller; the event carries the **full entry** |
+| change | `broadcast` / `hello` / `join` / roll + claim responses / shelf resync | per-recipient `projectEntryFor` on all seven paths (§3.0) |
 
 ## 7. Addendum: physical-first input & attributed modifiers
 
@@ -947,9 +964,10 @@ Joe's call: user-created experience templates sync **room-wide**, not
 localStorage-only (§2.3's open question). They travel on the same
 room-settings channel as global settings (hello carries them; a
 `settings`-family event updates them), so the settings plumbing precedes
-the experiences slice in the build order. Hidden-DC variants of Check
-remain gated on the DM seat and arrive with the (deprioritized) visibility
-slice; until then Targets are always visible.
+the experiences slice in the build order. Targets are **always visible**:
+the hidden-DC variant of Check is rejected outright (§3.4), not deferred —
+a Check's stakes are public on every visibility rung, and the held result
+is what carries the tension.
 
 ### 7.4 Revision: compact view is immersive; the capability matrix
 
@@ -960,8 +978,10 @@ decal, staged verdict, cinematic slow-mo), responsively scaled. Only panels
 and controls hide.
 
 **Roll-declaration surfaces and the two verbs.** Every surface below must
-support the full roll intent (spec + dc + moment + face-down + label) and
-both verbs — Roll and Offer to table:
+support the full roll intent (spec + dc + moment + visibility + label) and
+both verbs — Roll and Offer to table. Visibility is part of "full intent":
+a surface that can only roll in the open is an incomplete surface, and on
+the notation surfaces it comes for free (§7.8).
 
 | Surface | Roll | Offer | Full intent editing |
 |---|---|---|---|
@@ -1054,7 +1074,9 @@ at a time; history lives on a shelf.
   DC verdict, meaning word (active lens), full per-die breakdown with
   struck dice, ✴ children, and named bonuses. One peek open at a time;
   click-away/Esc/second-tap collapses; Esc layering slots it above the
-  popover. Face-down unrevealed peeks show '?' (+ Reveal for the roller).
+  popover. A redacted roll's peek shows the held card instead — roller,
+  label, dice, DC, face-down result slot — plus **Reveal** for the reveal
+  authority alone (§3.1, §3.3).
 - **Left-to-right compaction** (shipped with the slice's fix pass): slots
   are ranks — oldest to newest, no holes; deletions slide survivors left
   with the whisk animation. Drag-to-reorder between regions is deferred to
