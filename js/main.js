@@ -416,10 +416,10 @@ function spawnDie(type, index, count, side, rng) {
   return { type, mesh, body };
 }
 
-// Remove every die, chip, and banner from view WITHOUT touching the playback
-// queue or the in-flight roll. Used by playRoll's overflow reset, where queued
-// rolls must survive (each client's table fill differs, so wiping the queue
-// here would silently drop rolls on some clients but not others).
+// Remove every die, chip, marker, and banner from view WITHOUT touching the
+// playback queue or the in-flight roll. The corner ✕ sweep (clearTable) is
+// the only caller now that the 40-dice whole-table wipe is retired (§7.7):
+// the shelf clusters and their markers go down with everything else.
 function resetTableSurface() {
   finishSinkingNow();
   for (const d of tableDice) {
@@ -429,6 +429,9 @@ function resetTableSurface() {
   tableDice = [];
   chips.length = 0;
   chipsLayer.innerHTML = '';
+  whisking = [];
+  shelfClusters.clear();
+  shelfLayer.innerHTML = '';
   banner.classList.add('hidden');
 }
 
@@ -495,12 +498,29 @@ function removeRollDice(rollId) {
 // completion paths (stepPlayback's showResults / ceremonyFinish).
 function applyClearRoll(rollId) {
   if (!rollId) return;
+  // cleared implies off-shelf (§7.7): the state row flips first so a
+  // roll-collected landing later in the same burst becomes a silent no-op.
+  rollState(rollId).cleared = true;
+  pendingCollects.delete(rollId);
   const inFlight = currentRoll && !currentRoll.done && currentRoll.rollId === rollId;
   if (inFlight || rollQueue.some((r) => r.rollId === rollId)) {
     pendingClears.add(rollId);
     return;
   }
-  removeRollDice(rollId);
+  // A whisk still in the air joins the sink from wherever it is.
+  whisking = whisking.filter((w) => w.die.rollId !== rollId);
+  const hadDice = removeRollDice(rollId);
+  // A shelved roll sinks marker and cluster together (§7.7 aging): the marker
+  // rides the last sink record so stepSinking fades and drops it dt-driven.
+  const cluster = shelfClusters.get(rollId);
+  if (cluster) {
+    shelfClusters.delete(rollId);
+    if (cluster.markerEl) {
+      cluster.markerEl.classList.add('chip-clearing');
+      if (hadDice && sinking.length) sinking[sinking.length - 1].chip = cluster.markerEl;
+      else cluster.markerEl.remove();
+    }
+  }
   // The moment leaves with its dice: banner and verdict card for THIS roll
   // close everywhere. Other rolls' surfaces are untouched.
   if (lastEntry && lastEntry.rollId === rollId) banner.classList.add('hidden');
@@ -528,6 +548,315 @@ function requestClearRoll(rollId) {
   return Promise.resolve(true);
 }
 
+// ---- the collect shelf (§7.7) ----------------------------------------------
+//
+// The main felt belongs to ONE roll at a time; history lives on the shelf.
+// The server owns the state machine (on-felt → collected(seq) → cleared) and
+// clients only ever react to its 'roll-collected' / 'roll-cleared' bursts;
+// solo mode mirrors the same machine locally (soloCollectEntries). A shelved
+// roll's dice sit as a settled, deterministic cluster in slot (seq-1)%5 with
+// one compact marker floating above; its per-die chips, banner and verdict
+// card retire the moment it is collected.
+
+const WHISK_S = 0.4;                  // collect whisk: slide + settle duration
+const shelfLayer = document.getElementById('shelf-layer');
+const rollStates = new Map();         // rollId -> {collected: seq|null, cleared}
+const shelfClusters = new Map();      // rollId -> {rollId, seq, slot, diceCount, markerEl}
+const pendingCollects = new Map();    // rollId -> seq, deferred like pendingClears
+let whisking = [];                    // {die, t, fromPos, fromQuat, toPos, toQuat}
+let soloCollectSeq = 0;               // solo mirror of the server's room counter
+
+// Every roll that ever touched this table gets a state row (playRoll seeds
+// it); the solo auto-collect walks these, never the persisted localStorage log.
+function rollState(rollId) {
+  let st = rollStates.get(rollId);
+  if (!st) {
+    st = { collected: null, cleared: false };
+    rollStates.set(rollId, st);
+  }
+  return st;
+}
+
+// Canonical shelved pose for a die showing `value`: the face normal rotated
+// straight up, resting exactly on the felt (lowest rotated vertex at y=0).
+// Pure function of (type, value), so every client computes the same pose.
+const shelfPoseCache = new Map();
+function canonicalDiePose(type, value) {
+  const key = `${type}:${value}`;
+  let p = shelfPoseCache.get(key);
+  if (p) return p;
+  const quat = new THREE.Quaternion();
+  const nV = faceNormalForValue(type, value);
+  if (nV) quat.setFromUnitVectors(nV.clone().normalize(), new THREE.Vector3(0, 1, 0));
+  const posAttr = createDieMesh(type).geometry.attributes.position; // shared cache in js/dice.js
+  const v = new THREE.Vector3();
+  let minY = Infinity;
+  for (let i = 0; i < posAttr.count; i++) {
+    v.fromBufferAttribute(posAttr, i).applyQuaternion(quat);
+    if (v.y < minY) minY = v.y;
+  }
+  p = { quat, y: -minY };
+  shelfPoseCache.set(key, p);
+  return p;
+}
+
+// Deterministic tight arrangement (§7.7): rows of three from the slot's front
+// edge backward, wrapping into a second storey past a dozen dice. A pure
+// function of (slot, index, n, type, value) so a live whisk and a reload's
+// reconstruction land bit-for-bit identical clusters.
+function clusterPose(slot, index, n, type, value) {
+  const cols = Math.min(Math.max(n, 1), 3);
+  const col = index % 3;
+  const row = Math.floor(index / 3) % 4;
+  const layer = Math.floor(index / 12);
+  const p = canonicalDiePose(type, value);
+  const pos = new THREE.Vector3(
+    shelfSlotX(slot) + (col - (cols - 1) / 2) * 1.9,
+    p.y + layer * 1.7,
+    SHELF_Z + 0.9 - row * 1.8
+  );
+  return { pos, quat: p.quat };
+}
+
+// Spawn one die settled directly in its slot (hello reconstruction, or a
+// collect for an entry whose felt this client never saw). No tumble, no sound.
+function spawnShelvedDie(type, value, slot, index, n, rollId) {
+  const mesh = createDieMesh(type);
+  const body = createDieBody(type, diceMat);
+  const { pos, quat } = clusterPose(slot, index, n, type, value);
+  body.mass = 0;
+  body.type = CANNON.Body.STATIC;
+  body.updateMassProperties();
+  body.position.set(pos.x, pos.y, pos.z);
+  body.quaternion.set(quat.x, quat.y, quat.z, quat.w);
+  mesh.position.copy(pos);
+  mesh.quaternion.copy(quat);
+  world.addBody(body);
+  scene.add(mesh);
+  const die = { type, mesh, body, rollId };
+  tableDice.push(die);
+  return die;
+}
+
+// Move one roll onto the shelf. animate=true plays the ~400 ms whisk; false
+// (hello reconstruction) lands everything instantly. Idempotent — a repeat
+// collect for a shelved or cleared roll changes nothing.
+function shelveRoll(rollId, seq, animate) {
+  const st = rollState(rollId);
+  st.collected = seq;
+  if (st.cleared || shelfClusters.has(rollId)) return;
+  const slot = (seq - 1) % SHELF_SLOTS; // seq starts at 1 (server contract)
+  const entry = log.find((e) => e.rollId === rollId) || null;
+  let dice = tableDice.filter((d) => d.rollId === rollId);
+
+  // The per-die chips retire into the one marker.
+  const going = new Set(dice);
+  for (let i = chips.length - 1; i >= 0; i--) {
+    if (going.has(chips[i].die)) {
+      chips[i].el.remove();
+      chips.splice(i, 1);
+    }
+  }
+
+  if (dice.length) {
+    const n = dice.length;
+    dice.forEach((d, i) => {
+      // The frozen body's orientation reads the authoritative settled value.
+      const value = readValue(d.type, d.body.quaternion).value;
+      const { pos, quat } = clusterPose(slot, i, n, d.type, value);
+      // Park the STATIC body at the cluster pose immediately: a later
+      // fast-forward must collide with the shelf, not with ghosts left at
+      // the old felt positions — and every client's physics world matches.
+      d.body.position.set(pos.x, pos.y, pos.z);
+      d.body.quaternion.set(quat.x, quat.y, quat.z, quat.w);
+      if (animate) {
+        whisking.push({
+          die: d,
+          t: 0,
+          fromPos: d.mesh.position.clone(),
+          fromQuat: d.mesh.quaternion.clone(),
+          toPos: pos,
+          toQuat: quat,
+        });
+      } else {
+        d.mesh.position.copy(pos);
+        d.mesh.quaternion.copy(quat);
+      }
+    });
+  } else if (entry) {
+    dice = entry.parts.map((p, i) =>
+      spawnShelvedDie(p.type, p.value, slot, i, entry.parts.length, rollId));
+  } else {
+    return; // nothing to show yet; the state row reconciles on the next hello
+  }
+
+  shelfClusters.set(rollId, { rollId, seq, slot, diceCount: dice.length, markerEl: null });
+  // The moment leaves the felt surfaces: banner and verdict card for THIS
+  // roll close everywhere; the log line and the marker carry it from here.
+  if (lastEntry && lastEntry.rollId === rollId) banner.classList.add('hidden');
+  if (stagedVerdict && stagedVerdict.entry.rollId === rollId
+      && !ceremonyLayer.classList.contains('hidden')) {
+    dismissCeremonyUI();
+  }
+  renderShelfMarkers();
+}
+
+// Advance collect whisks: dt-driven mesh slide with a small carry arc, easing
+// onto the exact cluster pose (the bodies are already parked there).
+function stepWhisking(dt) {
+  if (!whisking.length) return;
+  let anyDone = false;
+  for (const w of whisking) {
+    w.t += dt;
+    const p = Math.min(w.t / WHISK_S, 1);
+    const e = 1 - (1 - p) ** 3; // ease-out cubic
+    w.die.mesh.position.lerpVectors(w.fromPos, w.toPos, e);
+    w.die.mesh.position.y += Math.sin(p * Math.PI) * 1.4;
+    w.die.mesh.quaternion.slerpQuaternions(w.fromQuat, w.toQuat, e);
+    if (p >= 1) anyDone = true;
+  }
+  if (!anyDone) return;
+  whisking = whisking.filter((w) => {
+    if (w.t < WHISK_S) return true;
+    w.die.mesh.position.copy(w.toPos);
+    w.die.mesh.quaternion.copy(w.toQuat);
+    return false;
+  });
+}
+
+// One compact marker per shelved roll: roller color dot + total + the active
+// lens's word ('?' while face down), plus a ✕ ANY player may use — §7.7
+// universal housekeeping. Rebuilt whole on every shelf/lens/reveal change.
+function renderShelfMarkers() {
+  shelfLayer.innerHTML = '';
+  const clusters = [...shelfClusters.values()].sort((a, b) => a.seq - b.seq);
+  for (const c of clusters) {
+    const entry = log.find((e) => e.rollId === c.rollId) || null;
+    const hidden = !!entry && entry.faceDown && !entry.revealed;
+    const el = document.createElement('div');
+    el.className = 'shelf-marker';
+    const dot = document.createElement('span');
+    dot.className = 'sm-dot';
+    dot.style.background = (entry && entry.color) || '#8a7f6e';
+    el.appendChild(dot);
+    const total = document.createElement('span');
+    total.className = 'sm-total';
+    total.textContent = !entry || hidden ? '?' : String(entry.total);
+    el.appendChild(total);
+    const meaning = entry && !hidden ? entryMeaning(entry) : null;
+    if (meaning) {
+      const word = document.createElement('span');
+      word.className = `sm-word tier-${meaning.tier}`;
+      word.textContent = meaning.word;
+      el.appendChild(word);
+    }
+    const x = document.createElement('button');
+    x.className = 'sm-x';
+    x.textContent = '✕';
+    x.title = 'Clear this roll for everyone';
+    x.addEventListener('click', () => requestClearRoll(c.rollId));
+    el.appendChild(x);
+    if (entry && entry.playerName) el.title = `${entry.playerName} · ${entry.label}`;
+    else if (entry) el.title = entry.label;
+    c.markerEl = el;
+    shelfLayer.appendChild(el);
+  }
+  positionShelfMarkers();
+}
+
+function positionShelfMarkers() {
+  const v = new THREE.Vector3();
+  for (const c of shelfClusters.values()) {
+    if (!c.markerEl) continue;
+    v.set(shelfSlotX(c.slot), 2.4, SHELF_Z);
+    v.project(camera);
+    c.markerEl.style.left = `${(v.x * 0.5 + 0.5) * window.innerWidth}px`;
+    c.markerEl.style.top = `${(-v.y * 0.5 + 0.5) * window.innerHeight}px`;
+  }
+}
+
+// A roll was collected ('roll-collected' event, the solo mirror, or a hello
+// resync with animate=false). Mid-playback / queued rolls defer their whisk
+// exactly as clears defer — always-interruptible playback keeps the stage,
+// and the collect lands from the completion paths (runPendingCollect).
+function applyRollCollected(rollId, seq, animate = true) {
+  if (!rollId || !Number.isInteger(seq) || seq < 1) return;
+  const st = rollState(rollId);
+  st.collected = seq;
+  if (st.cleared) return; // evicted in the same burst: nothing to show
+  const inFlight = currentRoll && !currentRoll.done && currentRoll.rollId === rollId;
+  if (inFlight || rollQueue.some((r) => r.rollId === rollId)) {
+    pendingCollects.set(rollId, seq);
+    return;
+  }
+  shelveRoll(rollId, seq, animate);
+}
+
+// Completion hook, the collect twin of runPendingClear. A pending clear wins:
+// the roll goes straight down, never onto the shelf for one frame.
+function runPendingCollect(roll) {
+  if (roll.rollId && pendingCollects.has(roll.rollId)) {
+    const seq = pendingCollects.get(roll.rollId);
+    pendingCollects.delete(roll.rollId);
+    if (!pendingClears.has(roll.rollId)) shelveRoll(roll.rollId, seq, true);
+  }
+}
+
+// Solo mirror of the server's collectEntries: same monotonic seq, same cap,
+// same burst order — evictions sink first, then the whisks, then the caller's
+// own roll. rollIds already collected or cleared are skipped (idempotent).
+function soloCollectEntries(rollIds) {
+  const collected = [];
+  for (const rollId of rollIds) {
+    const st = rollState(rollId);
+    if (st.cleared || st.collected) continue;
+    st.collected = ++soloCollectSeq;
+    collected.push(rollId);
+  }
+  if (!collected.length) return false;
+  const active = [...rollStates.entries()]
+    .filter(([, st]) => st.collected && !st.cleared)
+    .sort((a, b) => a[1].collected - b[1].collected);
+  const evicted = active.slice(0, Math.max(0, active.length - SHELF_SLOTS));
+  for (const [rollId, st] of evicted) {
+    st.cleared = true;
+    applyClearRoll(rollId);
+  }
+  for (const rollId of collected) {
+    const st = rollStates.get(rollId);
+    if (!st.cleared) applyRollCollected(rollId, st.collected);
+  }
+  return true;
+}
+
+// Solo auto-collect: when a new roll EXECUTES, everything this session put on
+// the felt that is still uncollected goes to the shelf — the same arrival
+// beat the server drives online. Only session rolls (rollStates rows) are
+// candidates; entries restored from localStorage never grew dice here.
+function soloAutoCollect() {
+  const ids = [];
+  const seen = new Set();
+  const push = (id) => {
+    if (id && !seen.has(id) && rollStates.has(id)) {
+      seen.add(id);
+      ids.push(id);
+    }
+  };
+  for (const e of log) push(e.rollId);
+  if (currentRoll && currentRoll.rollId) push(currentRoll.rollId);
+  for (const r of rollQueue) push(r.rollId);
+  soloCollectEntries(ids);
+}
+
+// Roller-side Collect (§7.7). Online the server validates (roller only) and
+// everyone — us included — reacts to the 'roll-collected' burst; solo runs
+// the same machine locally. Resolves whether the collect actually happened.
+function requestCollectRoll(rollId) {
+  if (netOnline && net) return net.collectRoll(rollId);
+  soloCollectEntries([rollId]);
+  return Promise.resolve(true);
+}
+
 // A clear (user click or server 'clear' event) can land while a roll is
 // mid-playback or still queued. Those rolls already carry authoritative
 // values — the server logged them for everyone — so their log entries must
@@ -545,6 +874,7 @@ function flushPendingRollLog() {
 function clearTable() {
   flushPendingRollLog();
   pendingClears.clear();
+  pendingCollects.clear();
   resetTableSurface();
   dismissCeremonyUI();
   currentRoll = null;
@@ -562,12 +892,17 @@ function playRoll(roll) {
   // auto-skips the previous ceremony's remainder (pinned): skipCeremony
   // finishes the current roll instantly, which drains the queue — including
   // the roll just pushed.
+  // Seed the §7.7 state row: this roll is on the felt until collected/cleared.
+  if (roll.rollId) rollState(roll.rollId);
+
   if (currentRoll && !currentRoll.done) {
     rollQueue.push(roll);
     if (currentRoll.ceremony) skipCeremony();
     return;
   }
-  if (tableDice.length + types.length > MAX_DICE_ON_TABLE) resetTableSurface();
+  // No whole-table overflow wipe here anymore (§7.7 retires it): auto-collect
+  // keeps the felt to one roll and the shelf capped at five slots, so the
+  // table population is bounded by the state machine, not by a reset.
 
   chips.length = 0;
   chipsLayer.innerHTML = '';
@@ -711,6 +1046,9 @@ function playRoll(roll) {
 function rollDice(types, label, opts = {}) {
   if (!types.length) return;
   if (validateMods(types, opts.mods || null)) return; // invalid spec: no-op
+  // §7.7 arrival beat, mirrored locally: the new roll's execution collects
+  // everything this session still has on the felt (evictions sink first).
+  soloAutoCollect();
   const composed = composeRoll(types, opts.mods || null, Math.random);
   playRoll({
     ...composed,
@@ -790,7 +1128,8 @@ function stepPlayback(dt) {
     }
     roll.done = true;
     showResults(roll);
-    runPendingClear(roll); // a clear that arrived mid-playback lands now
+    runPendingCollect(roll); // a collect that arrived mid-playback lands now
+    runPendingClear(roll);   // …and a clear wins over it
     if (rollQueue.length) playRoll(rollQueue.shift());
   }
 }
@@ -1050,39 +1389,47 @@ function renderBannerActions(entry) {
     );
     holder.appendChild(btn);
   }
-  // Per-roll Done (§7.5): the roller's Done removes this roll's dice for
-  // everyone (server-validated; solo local) and hides the banner. Spectators
-  // get a local-only ✕ — the dice stay until the roller is done.
+  // Collect replaces Done as the roller's primary (§7.7): the roll's dice
+  // whisk to the shelf for everyone (server-validated; solo local) and the
+  // banner retires into the slot marker. Spectators keep a local-only ✕ —
+  // the dice stay until the roller collects (or clears) them.
   if (entry.rollId) {
     const btn = document.createElement('button');
-    btn.className = 'btn ghost banner-btn';
     if (mine) {
-      btn.textContent = 'Done';
-      btn.title = 'Dismiss and remove this roll’s dice for everyone';
+      // A hidden roll's Reveal keeps the primary slot; Collect steps back.
+      btn.className = hidden ? 'btn ghost banner-btn' : 'btn primary banner-btn';
+      btn.textContent = 'Collect';
+      btn.title = 'Collect this roll to the shelf for everyone';
       btn.addEventListener('click', () => {
-        // No optimistic hide: online, the 'roll-cleared' broadcast hides the
-        // banner (applyClearRoll); solo applies synchronously. A failed POST
-        // keeps the banner — and its only Done button — instead of stranding
-        // the dice on everyone's table with no per-roll affordance left.
+        // No optimistic hide: online, the 'roll-collected' broadcast retires
+        // the banner (shelveRoll); solo applies synchronously. A failed POST
+        // keeps the banner — and its only Collect button — instead of
+        // stranding the dice on everyone's felt with no affordance left.
         btn.disabled = true;
-        requestClearRoll(entry.rollId).then((ok) => {
+        requestCollectRoll(entry.rollId).then((ok) => {
           btn.disabled = false;
-          if (!ok) showSettingsNote('couldn’t clear the roll — try again');
+          if (!ok) showSettingsNote('couldn’t collect the roll — try again');
         });
       });
     } else {
+      btn.className = 'btn ghost banner-btn';
       btn.textContent = '✕';
-      btn.title = 'Dismiss for you — the dice stay until the roller is done';
+      btn.title = 'Dismiss for you — the dice stay until the roller collects';
       btn.addEventListener('click', () => banner.classList.add('hidden'));
     }
     holder.appendChild(btn);
   }
 }
 
+// True only while a hello resync fast-forwards the on-felt roll back into
+// place (§7.7): the surfaces repaint, but crit fanfare that already played
+// for the room must not replay for a reload.
+let suppressRollFx = false;
+
 function showResults(roll) {
   const entry = entryFromRoll(roll);
   lastEntry = entry;
-  renderRollResults(entry, roll.dice);
+  renderRollResults(entry, roll.dice, !suppressRollFx);
   addLogEntry(entry);
 }
 
@@ -1095,6 +1442,7 @@ function applyReveal(rollId) {
     entry.revealed = true;
     if (!netOnline) save(LS_LOG, log);
     renderLog();
+    renderShelfMarkers(); // a shelved '?' marker learns its total and word
   }
   if (lastEntry && lastEntry.rollId === rollId) {
     lastEntry.revealed = true;
@@ -1311,7 +1659,8 @@ function ceremonyFinish(roll) {
   roll.done = true;
   clearTimeout(ceremonyDismissTimer);
   ceremonyDismissTimer = setTimeout(dismissCeremonyUI, CEREMONY_DISMISS_MS);
-  runPendingClear(roll); // a clear that arrived mid-ceremony lands now
+  runPendingCollect(roll); // a collect that arrived mid-ceremony lands now
+  runPendingClear(roll);   // …and a clear wins over it
   if (rollQueue.length) playRoll(rollQueue.shift());
 }
 
@@ -1490,15 +1839,15 @@ function renderVerdictCard(roll, entry) {
   document.getElementById('verdict-eyebrow').textContent = `${who}${entry.label || ''}`;
   document.getElementById('verdict-total').textContent = String(entry.total);
 
-  // §7.5: the roller's control reads Done and clears the roll for everyone;
-  // a spectator's reads ✕ and only dismisses locally.
+  // §7.7: the roller's control reads Collect and shelves the roll for
+  // everyone; a spectator's reads ✕ and only dismisses locally.
   const mine = !netOnline || (net && entry.playerId === net.playerId);
   verdictFor = { rollId: entry.rollId || null, mine };
   const doneBtn = document.getElementById('verdict-done');
-  doneBtn.textContent = mine ? 'Done' : '✕';
+  doneBtn.textContent = mine ? 'Collect' : '✕';
   doneBtn.title = mine
-    ? 'Dismiss and remove this roll’s dice for everyone'
-    : 'Dismiss for you — the dice stay until the roller is done';
+    ? 'Collect this roll to the shelf for everyone'
+    : 'Dismiss for you — the dice stay until the roller collects';
 
   const hasDc = Number.isInteger(entry.dc);
   const ring = document.getElementById('ring-fill');
@@ -1608,16 +1957,16 @@ document.getElementById('verdict-done').addEventListener('click', (e) => {
   e.stopPropagation();
   const v = verdictFor;
   const btn = e.currentTarget;
-  // Roller: per-roll Done — the dice leave with their moment (§7.5). Not
-  // dismissed optimistically: online, the 'roll-cleared' broadcast closes the
-  // card (applyClearRoll dismisses the ceremony UI); solo applies
-  // synchronously. A failed POST keeps the card and its Done button — the
-  // dice are still on everyone's table, so the affordance must survive.
+  // Roller: Collect — the dice whisk to the shelf with their moment (§7.7).
+  // Not dismissed optimistically: online, the 'roll-collected' broadcast
+  // closes the card (shelveRoll dismisses the ceremony UI); solo applies
+  // synchronously. A failed POST keeps the card and its Collect button — the
+  // dice are still on everyone's felt, so the affordance must survive.
   if (v && v.mine && v.rollId) {
     btn.disabled = true;
-    requestClearRoll(v.rollId).then((ok) => {
+    requestCollectRoll(v.rollId).then((ok) => {
       btn.disabled = false;
-      if (!ok) showSettingsNote('couldn’t clear the roll — try again');
+      if (!ok) showSettingsNote('couldn’t collect the roll — try again');
     });
   } else {
     dismissCeremonyUI(); // spectator ✕ (or a roll with no id): local dismiss only
@@ -1638,8 +1987,10 @@ const clock = new THREE.Clock();
 // fast-forward; the rAF loop just advances keyframe playback.
 function tick(dt, render = true) {
   stepPlayback(dt);
-  stepSinking(dt); // per-roll Done departures (§7.5)
+  stepSinking(dt);  // per-roll Done departures (§7.5)
+  stepWhisking(dt); // collect whisks onto the shelf (§7.7)
   if (chips.length) positionChips();
+  if (shelfClusters.size) positionShelfMarkers();
   if (render) renderer.render(scene, camera);
 }
 
@@ -1748,6 +2099,15 @@ window.__diceDebug = {
   clearRoll(rollId) { return requestClearRoll(rollId); },
   get sinkingCount() { return sinking.length; },
   get pendingClears() { return [...pendingClears]; },
+  // the collect shelf (§7.7): entry point + cluster observability
+  collectRoll(rollId) { return requestCollectRoll(rollId); },
+  get shelf() {
+    return [...shelfClusters.values()]
+      .sort((a, b) => a.seq - b.seq)
+      .map((c) => ({ rollId: c.rollId, seq: c.seq, slot: c.slot, diceCount: c.diceCount }));
+  },
+  get whiskingCount() { return whisking.length; },
+  get pendingCollects() { return [...pendingCollects.keys()]; },
   sim(frames) { for (let i = 0; i < frames; i++) tick(1 / 60, false); },
   fastForward: fastForwardPlayback,
 };
@@ -1757,6 +2117,7 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   positionChips();
+  positionShelfMarkers();
 });
 
 // ---------------------------------------------------------------------------
@@ -2989,6 +3350,7 @@ let roomSettings = { felt: DEFAULT_FELT, system: DEFAULT_SYSTEM };
 // it gets there.
 function rerenderInterpretation() {
   renderLog();
+  renderShelfMarkers(); // the shelf markers' meaning words re-read the lens
   // The verdict card holds §2.5's hero slot for an entry the log also shows;
   // letting it age out under the old system would leave the two contradicting
   // each other for the card's whole dismiss window. Repaint it — crit frame
@@ -3257,6 +3619,7 @@ function setMini(on, persist = true) {
   if (persist) save(LS_MINI, on);
   applyCameraFraming();
   positionChips();
+  positionShelfMarkers(); // markers track the reframed camera (§7.7 parity)
   // An on-stage ceremony needs nothing: it keeps playing, re-scaled (§7.4).
   syncSettingsUI(); // the settings modal mirrors the mini preference
 }
@@ -3630,6 +3993,56 @@ function rollToLogEntry(roll) {
   return entryFromRoll({ ...roll, label: roll.label || formula(roll.dice || []) });
 }
 
+// §7.7 resync: reconstruct the newest on-felt roll after a hello with the
+// SAME seeded fast-forward playRoll runs, jumped straight to its final
+// keyframe — no tumble, no sounds, no replayed ceremony or crit fanfare.
+// Skipped when this client already has the roll (dice on the table, in
+// flight, or queued) — closing the audit's empty-felt-on-reload gap without
+// disturbing a live table.
+function replaySettledRoll(r) {
+  if (!r || !r.rollId) return;
+  if (tableDice.some((d) => d.rollId === r.rollId)) return;
+  if (currentRoll && !currentRoll.done) return; // a live playback outranks a replay
+  if (rollQueue.some((q) => q.rollId === r.rollId)) return;
+  playRoll({
+    rollId: r.rollId,
+    t: r.t,
+    dice: r.dice,
+    values: r.values,
+    perDie: r.perDie,
+    modifier: r.modifier,
+    total: r.total,
+    spec: r.spec,
+    dc: r.dc,
+    exp: null, // the moment already played for the room; reconstruct plain
+    faceDown: r.faceDown,
+    revealed: r.revealed,
+    playerId: r.playerId,
+    seed: r.seed,
+    label: r.label || formula(r.dice || []),
+    playerName: r.playerName,
+    color: r.color,
+  });
+  if (currentRoll && currentRoll.rollId === r.rollId && !currentRoll.done) {
+    currentRoll.soundIdx = currentRoll.sounds.length; // a silent landing
+    suppressRollFx = true;
+    try {
+      stepPlayback(currentRoll.duration - currentRoll.time + FIXED_DT);
+    } finally {
+      suppressRollFx = false;
+    }
+  }
+  // Re-point the banner at the room's own entry (full spec, exp included) so
+  // its ⟳ reroll carries the whole intent, and rebind the actions to it.
+  const rebuilt = log.find((e) => e.rollId === r.rollId);
+  if (rebuilt && lastEntry && lastEntry.rollId === r.rollId) {
+    lastEntry = rebuilt;
+    if (!banner.classList.contains('hidden')) {
+      renderRollResults(rebuilt, tableDice.filter((d) => d.rollId === r.rollId), false);
+    }
+  }
+}
+
 function handleNetEvent(type, data) {
   if (!data) return;
   switch (type) {
@@ -3660,6 +4073,26 @@ function handleNetEvent(type, data) {
         if (!r || !r.rollId) continue;
         if (r.faceDown && r.revealed) applyReveal(r.rollId);
         if (r.cleared) applyClearRoll(r.rollId);
+      }
+      // §7.7 resync: the server's present-or-absent flags are the one truth
+      // about where every roll lives. Adopt them, then rebuild what should be
+      // standing: collected entries settle straight into their slots (no
+      // whisk), and the newest on-felt entry fast-forwards its seeded throw
+      // to the final keyframe. Both are idempotent against dice this client
+      // already has, so a reconnect hello disturbs nothing.
+      {
+        const entries = (data.log || []).filter((r) => r && r.rollId);
+        for (const r of entries) {
+          const st = rollState(r.rollId);
+          st.cleared = !!r.cleared;
+          if (r.collected) st.collected = r.collected;
+        }
+        for (const r of entries) {
+          if (!r.cleared && r.collected) applyRollCollected(r.rollId, r.collected, false);
+        }
+        const newest = [...entries].reverse().find((r) => !r.cleared && !r.collected);
+        if (newest) replaySettledRoll(newest);
+        renderShelfMarkers();
       }
       break;
     case 'player-joined':
@@ -3707,8 +4140,11 @@ function handleNetEvent(type, data) {
     case 'reveal':
       applyReveal(data.rollId);
       break;
-    case 'roll-cleared': // per-roll Done (§7.5) — roller-validated server side
+    case 'roll-cleared': // per-roll Done (§7.5) / shelf aging (§7.7)
       applyClearRoll(data.rollId);
+      break;
+    case 'roll-collected': // §7.7 — the shelf takes the roll, everywhere at once
+      applyRollCollected(data.rollId, data.seq);
       break;
     case 'offer':
       if (data.offer && !offers.some((o) => o.offerId === data.offer.offerId)) {
