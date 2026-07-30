@@ -2108,6 +2108,15 @@ window.__diceDebug = {
   },
   get whiskingCount() { return whisking.length; },
   get pendingCollects() { return [...pendingCollects.keys()]; },
+  // felt composite sampling (tests): RGBA of the floor texture at world (x, z)
+  // — how a headless check proves the slot decals survive theme/decal swaps.
+  feltPixel(x, z) {
+    const img = floor.material.map && floor.material.map.image;
+    if (!img || !img.getContext) return null;
+    const px = Math.max(0, Math.min(DECAL_SIZE - 1, Math.round((x + 80) * DECAL_PX_PER_UNIT)));
+    const py = Math.max(0, Math.min(DECAL_SIZE - 1, Math.round((z + 80) * DECAL_PX_PER_UNIT)));
+    return [...img.getContext('2d').getImageData(px, py, 1, 1).data];
+  },
   sim(frames) { for (let i = 0; i < frames; i++) tick(1 / 60, false); },
   fastForward: fastForwardPlayback,
 };
