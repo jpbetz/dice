@@ -472,6 +472,10 @@ function resetTableSurface() {
   chipsLayer.innerHTML = '';
   whisking = [];
   shelfClusters.clear();
+  // A peek is anchored to a cluster that no longer exists: it would float over
+  // the empty table with a ✕ that clears a roll already gone. The sweep takes
+  // it too (§7.7.1 — one card, and only while its roll is on the shelf).
+  closePeek();
   recompositeFelt(); // the swept shelf takes its glow rings with it
   shelfLayer.innerHTML = '';
   banner.classList.add('hidden');
