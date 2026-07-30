@@ -1458,6 +1458,11 @@ function playRoll(roll) {
       : types.map(() => ({ counts: true, reason: null, childOf: null })),
     modifier: roll.modifier || 0,
     total: typeof roll.total === 'number' ? roll.total : null,
+    // A redacted roll has no spec of its own; the fallback stands in for the
+    // ceremony's intent card (which reads the pool it can legitimately see).
+    // It must NOT become a reroll affordance though — `types` is the EXPANDED
+    // pool and the mods are withheld, so ⟳ is gated on the entry being
+    // readable instead (renderLog / renderBannerActions).
     spec: roll.spec || { dice: types, mods: null },
     dc: Number.isInteger(roll.dc) ? roll.dc : null, // interim dc verdict (UX §2.3 stub)
     exp: sanitizeExp(roll.exp),
@@ -1625,6 +1630,17 @@ function canReveal(entry) {
     || entry.playerId
     || null;
   return !!auth && auth === net.playerId;
+}
+
+// May ⟳ offer to roll THIS again? Only from a spec the viewer may read. A
+// hidden roll either has no spec at all (the redacted projection omits it) or
+// the stand-in playRoll builds from the EXPANDED pool with no mods — so a ⟳
+// there would quietly reroll something else (an exploded 1d6 as 3d6, a 4d6kh3
+// as a flat 4d6). It also kept live viewers and reloaded ones disagreeing
+// about whether a face-down line has a button. Reveal first, then reroll.
+function canReroll(entry) {
+  return !!(entry && entry.spec && Array.isArray(entry.spec.dice) && entry.spec.dice.length
+    && !entryHidden(entry));
 }
 
 function entryMeaning(entry) {
@@ -1877,7 +1893,7 @@ function renderBannerActions(entry) {
     btn.addEventListener('click', () => requestReveal(entry.rollId));
     holder.appendChild(btn);
   }
-  if (entry.spec && entry.spec.dice && entry.spec.dice.length) {
+  if (canReroll(entry)) {
     const btn = document.createElement('button');
     btn.className = 'btn ghost banner-btn';
     btn.textContent = '⟳';
@@ -2543,6 +2559,8 @@ function renderVerdictCard(roll, entry) {
   document.getElementById('verdict-x').classList.toggle('hidden', !(mine && entry.rollId));
   // goal 11: a held ceremony's verdict card carries Reveal for the authority.
   document.getElementById('verdict-reveal').classList.toggle('hidden', !canReveal(entry));
+  // …and ⟳ waits for the reveal with everything else (canReroll).
+  document.getElementById('verdict-again').classList.toggle('hidden', !canReroll(entry));
 
   const hasDc = Number.isInteger(entry.dc);
   const ring = document.getElementById('ring-fill');
@@ -2764,6 +2782,9 @@ window.__diceDebug = {
   get queueLength() { return rollQueue.length; },
   get net() { return { online: netOnline, playerId: net ? net.playerId : null }; },
   get netReady() { return netReady; },
+  // The last thing the server refused us ({path, status, code, message}) —
+  // the same text the pill shows. Null until something is refused.
+  get lastRefusal() { return lastRefusal ? { ...lastRefusal } : null; },
   // room settings (roadmap §2): current merged object, live felt state, and
   // the same entry points the settings modal uses.
   get settings() { return { ...roomSettings }; },
@@ -4297,7 +4318,7 @@ function renderLog() {
     } else {
       groupEl.textContent = entry.label;
     }
-    if (entry.spec && entry.spec.dice && entry.spec.dice.length) {
+    if (canReroll(entry)) {
       const again = document.createElement('button');
       again.className = 'log-again';
       again.textContent = '⟳';
@@ -4841,7 +4862,7 @@ kbdOverlay.addEventListener('click', (e) => {
 // Reroll the last roll — the same spec the banner ⟳ / verdict button use.
 function rerollLast() {
   const entry = lastEntry;
-  if (!entry || !entry.spec || !entry.spec.dice || !entry.spec.dice.length) return;
+  if (!canReroll(entry)) return;
   requestRoll([...entry.spec.dice], entry.label, {
     mods: entry.spec.mods || undefined,
     faceDown: entry.faceDown,
@@ -5298,6 +5319,22 @@ function handleNetStatus(status) {
   setPill(status === 'online' ? null : 'reconnecting…', 'offline');
 }
 
+// The server refused something we asked for (a whisper to a name nobody here
+// answers to, a reveal we do not hold). The action simply not happening is not
+// an answer — the server's own message goes on the pill, which is where every
+// other transient table notice already lives.
+let lastRefusal = null;
+let refusalTimer = null;
+function handleNetRefusal(info) {
+  lastRefusal = info;
+  clearTimeout(refusalTimer);
+  setPill(info.message, 'refused');
+  statusPill.title = info.message; // the pill clips; the tooltip does not
+  refusalTimer = setTimeout(() => {
+    if (statusPill.textContent === info.message) setPill(null);
+  }, 5000);
+}
+
 // Roll/clear entry points used by the UI buttons.
 // opts: {mods, faceDown, dc, exp, comment, notation, canonical}. `notation`
 // routes the raw string to the server (its parse is authoritative);
@@ -5377,7 +5414,13 @@ async function initNet() {
     try { localStorage.setItem(LS_NAME, name); } catch { /* ignore */ }
   }
 
-  const conn = await connect({ room: ROOM, name, onEvent: handleNetEvent, onStatus: handleNetStatus });
+  const conn = await connect({
+    room: ROOM,
+    name,
+    onEvent: handleNetEvent,
+    onStatus: handleNetStatus,
+    onRefused: handleNetRefusal,
+  });
   if (conn.online) {
     net = conn;
     netOnline = true;
