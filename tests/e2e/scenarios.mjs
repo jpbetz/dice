@@ -463,6 +463,43 @@ export const scenarios = [
     },
   },
   {
+    name: 'reveal-mid-playback',
+    tags: ['visibility'],
+    // A reveal that lands while the shrouded roll is still tumbling must DEFER
+    // until it settles — never flip dice mid-throw. (The pendingClears
+    // pattern; the race this guards was fixed once already, in 7f9cdf5.)
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      // Bob's world now advances only when this scenario says so, so "the
+      // reveal arrived mid-playback" is a fact, not a race we hope to win.
+      assert.equal(await b.dbg('holdClock(true)'), true, 'Bob’s clock is held');
+      await a.roll('d20 held');
+      const rid = await a.rollId();
+      await b.waitFor(
+        `((window.__diceDebug.currentRoll || {}).rollId === ${JSON.stringify(rid)})`,
+        { desc: 'the roll starts on Bob’s tab' },
+      );
+      assert.equal(await b.dbg('busy'), true, 'and is still in flight');
+      assert.equal(await b.dbg('shroudedCount'), 1, 'tumbling shrouded');
+
+      await a.dbg(`reveal(${JSON.stringify(rid)})`);
+      await b.waitFor('window.__diceDebug.pendingReveals.length === 1',
+        { desc: 'the reveal is parked, not applied mid-throw' });
+      assert.equal(await b.dbg('revealingCount'), 0, 'no flip started mid-throw');
+      assert.equal(await b.dbg('shroudedCount'), 1, 'the dice are still shrouded');
+      assert.equal(await b.entryState(rid), null, 'and nothing landed in the log yet');
+
+      await b.dbg('holdClock(false)');
+      await b.waitFor(revealSettled(rid), { desc: 'the parked reveal runs at settle' });
+      assert.deepEqual(await b.dbg('pendingReveals'), [], 'nothing left parked');
+      const [sa, sb] = [await a.entryState(rid), await b.entryState(rid)];
+      assert.equal(sb.hidden, false, 'Bob ends up with the revealed roll');
+      assert.deepEqual(sb.values, sa.values, 'and the same values');
+      assert.equal(await a.logTop(), await b.logTop(), 'one shared record');
+    },
+  },
+  {
     name: 'raw-sse-leak',
     tags: ['visibility'],
     // THE redaction proof at this layer: a player who is only an HTTP client

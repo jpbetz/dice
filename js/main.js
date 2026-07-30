@@ -2740,9 +2740,15 @@ function tick(dt, render = true) {
   if (render) renderer.render(scene, camera);
 }
 
+// Tests only (__diceDebug.holdClock): freeze the rAF clock so the world moves
+// exactly as far as sim() says and no further. The delta is still consumed
+// every frame, so releasing the hold never dumps a saved-up dt into the sim.
+let clockHeld = false;
+
 function animate() {
   requestAnimationFrame(animate);
-  tick(Math.min(clock.getDelta(), 0.1));
+  const dt = Math.min(clock.getDelta(), 0.1);
+  tick(clockHeld ? 0 : dt);
 }
 animate();
 
@@ -2963,6 +2969,10 @@ window.__diceDebug = {
     return [...img.getContext('2d').getImageData(px, py, 1, 1).data];
   },
   sim(frames) { for (let i = 0; i < frames; i++) tick(1 / 60, false); },
+  // Freeze the rAF clock: with it held, only sim() advances playback, which is
+  // how a scenario parks a tab mid-tumble (a reveal arriving THERE must defer).
+  holdClock(on) { clockHeld = !!on; return clockHeld; },
+  get clockHeld() { return clockHeld; },
   fastForward: fastForwardPlayback,
 };
 
