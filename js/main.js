@@ -3561,15 +3561,27 @@ function handleNetStatus(status) {
 }
 
 // Roll/clear entry points used by the UI buttons.
-// opts: {mods, faceDown, dc, notation, canonical}. `notation` routes the raw
-// string to the server (its parse is authoritative); `canonical` is only the
-// history entry — every successful roll from any path lands in
-// 'dice.cmdhistory.v1' as its canonical string.
+// opts: {mods, faceDown, dc, exp, comment, notation, canonical}. `notation`
+// routes the raw string to the server (its parse is authoritative);
+// `canonical` is only the history entry — every successful roll from any path
+// lands in 'dice.cmdhistory.v1' as its canonical string.
+//
+// The fallback canonical (paths with no string of their own — reroll-last from
+// the banner, the log and the 'r' shortcut) dresses the roll with everything
+// §7.6 gave a spelling: a held roll recorded as plain '1d20' would come back
+// from ↑ as a PUBLIC roll, and a Check would come back Plain. Only the comment
+// title cannot be recovered on a reroll — it never rides the wire — so callers
+// that still have it pass it in.
 function requestRoll(types, label, opts = {}) {
   if (!types.length) return;
   const canonical = opts.canonical || canonicalNotation(
     { dice: types, mods: opts.mods || null },
-    { dc: Number.isInteger(opts.dc) ? opts.dc : null, comment: null }
+    {
+      dc: Number.isInteger(opts.dc) ? opts.dc : null,
+      comment: typeof opts.comment === 'string' ? opts.comment : null,
+      exp: sanitizeExp(opts.exp),
+      faceDown: !!opts.faceDown,
+    }
   );
   // History records only rolls that actually happened: online that means the
   // server accepted it (a 400 or a network failure resolves null), solo it
