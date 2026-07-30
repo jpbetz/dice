@@ -23,8 +23,14 @@ limitations under the License.
 // Grammar:
 //   command  := [mode SP] expr (SP flag)* [SP dc] [SP comment]
 //   mode     := /roll /r          (no effect)
-//             | /gmroll /gmr     (normalizes to the 'held' trailing flag)
-//             | /selfroll /sr    (normalizes to the 'secret' trailing flag)
+//             | /gmroll /gmr /selfroll   (normalize to the 'secret' trailing
+//               flag — Roll20's /gmroll guarantees the roller sees the result
+//               and the table learns nothing, and Foundry's /selfroll means
+//               roller-only; 'secret' matches both axes for both families.
+//               UX.md §3.2's terminology note is the authority)
+//             | /sr              (REFUSED as ambiguous: Foundry's self roll
+//               and Roll20's 2026 secret roll are opposites under the same
+//               two letters, so it must never bind silently)
 //               (accepted input only — canonical emits the flag, never a
 //               prefix; a prefix plus an AGREEING flag is fine, a prefix
 //               plus a different visibility flag is the exclusion error)
@@ -42,6 +48,11 @@ limitations under the License.
 //   vis      := "held" | "secret" | "w:" names    (mutually exclusive — two
 //               visibility flags in one command is invalid; one visibility
 //               slot in the canonical order, where 'held' has always sat)
+//             | "blind"           (accepted on an OFFER's notation only, as an
+//               alias canonicalizing to 'secret' — offerer-only, the
+//               dice-tower roll. On a self-roll it is refused with a teaching
+//               error: there is nobody else to hold the result. Callers pass
+//               {offer: true} to parseNotation for offer context.)
 //   names    := name ("," name)*           (whisper audience; NO whitespace
 //               around the commas. A name containing spaces, commas or
 //               quotes — or leading/trailing whitespace — must be quoted:
@@ -93,6 +104,11 @@ const KIND_WORDS = { check: 'check', cinematic: 'cinematic', cine: 'cinematic' }
 // at end-of-input is a prefix of it (a complete w: token never reaches the
 // keyword check; it is handled before the lowercase dispatch).
 const FLAG_KEYWORDS = ['check', 'cinematic', 'held', 'secret', 'w:'];
+// An offer's notation also accepts 'blind' (the dice-tower alias for secret),
+// so its prefixes read as mid-typing there. On a self-roll the complete word
+// is itself refused, so a prefix of it has no valid extension and stays
+// invalid — the three-state rule holds in both contexts.
+const OFFER_FLAG_KEYWORDS = [...FLAG_KEYWORDS, 'blind'];
 
 // Strip control characters plus zero-width and bidi-control characters
 // (U+200B–200F, U+202A–202E, U+2066–2069, U+FEFF): invisible in rendered
@@ -241,7 +257,11 @@ function parseWhisperFlag(raw, last, warnings) {
   return { names };
 }
 
-export function parseNotation(input) {
+export function parseNotation(input, opts = {}) {
+  // Offer context (opts.offer): the one place the grammar is context-aware —
+  // 'blind' is a dice-tower alias for 'secret' on an offer's notation and a
+  // teaching error on a self-roll. Everything else parses identically.
+  const offer = !!(opts && opts.offer === true);
   if (typeof input !== 'string') return invalid('not a string');
   if (input.length > MAX_INPUT) return invalid('command too long', `max ${MAX_INPUT} characters`);
   let s = input.trim();
@@ -252,7 +272,8 @@ export function parseNotation(input) {
   // mode are tracked separately so "prefix + agreeing flag" reads as
   // agreement while "flag twice" stays a typo and two DIFFERENT visibility
   // spellings are the exclusion error.
-  let visPrefix = null; // 'held' (/gmroll /gmr) | 'secret' (/selfroll /sr)
+  let visPrefix = null;     // 'secret' — every accepted visibility prefix
+  let visPrefixWord = null; // the prefix as typed, for error hints
   let visFlag = null;   // {mode, names} from a trailing held/secret/w: flag
 
   // ---- mode prefix ---------------------------------------------------------
@@ -260,9 +281,17 @@ export function parseNotation(input) {
     const m = /^\/([a-z]+)(?:\s+|$)/i.exec(s);
     if (!m) return invalid('bad command prefix', 'try /roll 1d20');
     const mode = m[1].toLowerCase();
-    if (['gmroll', 'gmr'].includes(mode)) visPrefix = 'held';
-    else if (['selfroll', 'sr'].includes(mode)) visPrefix = 'secret';
-    else if (!['roll', 'r'].includes(mode)) {
+    if (['gmroll', 'gmr', 'selfroll'].includes(mode)) {
+      visPrefix = 'secret';
+      visPrefixWord = '/' + mode;
+    } else if (mode === 'sr') {
+      // Never bind /sr: Foundry's /sr is a self roll (roller-only), Roll20's
+      // 2026 /sr Secret Roll is the exact opposite (the roller cannot see).
+      return invalid(
+        '/sr is ambiguous — Foundry self roll vs Roll20 secret roll (opposites)',
+        "use 'secret' (only you see it) or offer a dice-tower roll"
+      );
+    } else if (!['roll', 'r'].includes(mode)) {
       if (m[0].length === s.length && ('gmroll'.startsWith(mode) || 'selfroll'.startsWith(mode) || 'roll'.startsWith(mode))) {
         return incomplete('partial command prefix');
       }
@@ -435,7 +464,7 @@ export function parseNotation(input) {
     if (visPrefix && visPrefix !== mode) {
       return invalid(
         `${visWord(visPrefix)} and ${visWord(mode)} are mutually exclusive`,
-        `the /${visPrefix === 'held' ? 'gmroll' : 'selfroll'} prefix already sets ${visPrefix}`
+        `the ${visPrefixWord} prefix already sets ${visPrefix}`
       );
     }
     return null;
@@ -478,14 +507,27 @@ export function parseNotation(input) {
       if (expKind) return invalid('check/cinematic specified twice');
       expKind = KIND_WORDS[tok];
     } else if (tok === 'held') {
-      // 'held' = face down for everyone until revealed; what the /gmroll and
-      // /gmr prefixes normalize to (prefix + flag together agree).
+      // 'held' = face down for everyone until revealed. No prefix implies it:
+      // every cross-tool prefix that hides a roll hides it from the TABLE,
+      // never from the roller (UX.md §3.2's terminology note).
       const clash = visClash('held');
       if (clash) return clash;
       visFlag = { mode: 'held', names: [] };
     } else if (tok === 'secret') {
-      // 'secret' = the roll exists only for the roller; what the /selfroll
-      // and /sr prefixes normalize to.
+      // 'secret' = the roll exists only for the roller; what the /gmroll,
+      // /gmr and /selfroll prefixes all normalize to.
+      const clash = visClash('secret');
+      if (clash) return clash;
+      visFlag = { mode: 'secret', names: [] };
+    } else if (tok === 'blind') {
+      // 'blind' universally means the roller cannot see their own result.
+      // On an OFFER that is exactly the dice-tower roll — offerer-only —
+      // so it is accepted there as an alias canonicalizing to 'secret'
+      // (canonical never emits 'blind'). A self-roll cannot be blind:
+      // there is nobody else to hold the result.
+      if (!offer) {
+        return invalid('a blind roll needs someone else to hold the result — offer this roll instead');
+      }
       const clash = visClash('secret');
       if (clash) return clash;
       visFlag = { mode: 'secret', names: [] };
@@ -507,7 +549,7 @@ export function parseNotation(input) {
       if (v < 1 || v > 999) return invalid('dc must be 1-999');
       if (dc !== null) return invalid('dc specified twice');
       dc = v;
-    } else if (last && (couldExtend(tok) || FLAG_KEYWORDS.some((w) => w.startsWith(tok)))) {
+    } else if (last && (couldExtend(tok) || (offer ? OFFER_FLAG_KEYWORDS : FLAG_KEYWORDS).some((w) => w.startsWith(tok)))) {
       return incomplete('unfinished flag');
     } else {
       return invalid(`unknown flag "${tokens[ti].slice(0, 12)}"`, 'flags: adv, dis, kh/kl/dh/dl N, ro<=N, !, check, cinematic, held, secret, w:Name, dc N');

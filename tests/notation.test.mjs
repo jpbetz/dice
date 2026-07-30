@@ -119,16 +119,17 @@ t('r<2 normalizes inclusively to ro<=2', () => {
   assert.equal(r.canonical, '3d6ro<=2');
   assert.ok(r.warnings.some((w) => w.includes('once per die')));
 });
-// EDITED for UX.md §7.6 / roadmap step 1: face-down now round-trips through
-// the canonical 'held' flag instead of being silently dropped (the audited
-// notation-totality violation this slice closes).
-t('/gmroll sets faceDown, normalized to the held flag in canonical', () => {
+// EDITED for the terminology amendment (UX.md §3.2): /gmroll now normalizes
+// to 'secret' — Roll20's /gmroll guarantees the roller sees the result and
+// the table learns nothing, which is 'secret' on both axes ('held' inverted
+// both). Never faceDown: held has no prefix spelling.
+t('/gmroll normalizes to the secret flag in canonical, never held', () => {
   const r = ok('/gmroll 1d20');
-  assert.equal(r.faceDown, true);
-  assert.equal(r.canonical, '1d20 held');
+  assert.equal(r.faceDown, false);
+  assert.equal(r.canonical, '1d20 secret');
   const r2 = ok(r.canonical);
-  assert.equal(r2.faceDown, true);
-  assert.equal(r2.canonical, '1d20 held');
+  assert.equal(r2.faceDown, false);
+  assert.equal(r2.canonical, '1d20 secret');
 });
 t('/roll is a no-op prefix', () => {
   const r = ok('/roll 2d6+1');
@@ -316,29 +317,36 @@ t('held flag sets faceDown and round-trips', () => {
   assert.equal(r.canonical, '1d20 held');
   assert.equal(ok(r.canonical).faceDown, true);
 });
-// EDITED for the visibility contract (GOALS.md goal 11): /selfroll and /sr
-// now normalize to the 'secret' flag — they finally get real semantics —
-// while the /gmroll family keeps normalizing to 'held'.
-t('/gmroll and /gmr normalize to the held flag', () => {
-  for (const p of ['/gmroll', '/gmr']) {
-    const r = ok(`${p} 1d20`);
-    assert.equal(r.faceDown, true, p);
-    assert.equal(r.canonical, '1d20 held', p);
-    assert.deepEqual(r.spec.visibility, { mode: 'held', names: [] }, p);
-  }
-});
-t('/selfroll and /sr normalize to the secret flag', () => {
-  for (const p of ['/selfroll', '/sr']) {
+// EDITED for the terminology amendment (UX.md §3.2's cross-tool survey):
+// every accepted visibility prefix normalizes to 'secret'. Roll20's /gmroll
+// means "the roller sees it, the table learns nothing" (held inverts BOTH
+// axes); Foundry's /selfroll always meant roller-only. And /sr never binds:
+// Foundry's self roll and Roll20's 2026 Secret Roll are opposites under the
+// same two letters, so it teaches instead of guessing.
+t('/gmroll, /gmr and /selfroll all normalize to the secret flag', () => {
+  for (const p of ['/gmroll', '/gmr', '/selfroll']) {
     const r = ok(`${p} 1d20`);
     assert.equal(r.faceDown, false, `${p}: secret is not the held alias`);
     assert.equal(r.canonical, '1d20 secret', p);
     assert.deepEqual(r.spec.visibility, { mode: 'secret', names: [] }, p);
   }
 });
-t('prefix plus held flag agree, not a duplicate', () => {
-  const r = ok('/gmroll 1d20 held');
-  assert.equal(r.faceDown, true);
-  assert.equal(r.canonical, '1d20 held');
+t('/sr is refused as ambiguous, with the teaching message', () => {
+  for (const s of ['/sr 1d20', '/sr']) {
+    const r = bad(s);
+    assert.equal(r.error, '/sr is ambiguous — Foundry self roll vs Roll20 secret roll (opposites)', s);
+    assert.ok(r.hint.includes("use 'secret' (only you see it) or offer a dice-tower roll"), s);
+  }
+});
+t('prefix plus secret flag agree, not a duplicate', () => {
+  const r = ok('/gmroll 1d20 secret');
+  assert.equal(r.faceDown, false);
+  assert.equal(r.canonical, '1d20 secret');
+});
+t('prefix plus a DIFFERENT visibility flag is the exclusion error, naming the prefix', () => {
+  const r = bad('/gmroll 1d20 held');
+  assert.ok(r.error.includes('mutually exclusive'), r.error);
+  assert.ok(r.hint.includes('the /gmroll prefix already sets secret'), r.hint);
 });
 t('held twice is invalid', () => bad('1d20 held held'));
 t('held renders after the kind flag, before dc', () => {
@@ -381,7 +389,6 @@ t('secret is case-insensitive like every keyword flag', () => {
 });
 t('/selfroll prefix plus secret flag agree, not a duplicate', () => {
   assert.equal(ok('/selfroll 1d20 secret').canonical, '1d20 secret');
-  assert.equal(ok('/sr 1d20 secret').canonical, '1d20 secret');
 });
 t('whisper: single bare name', () => {
   const r = ok('1d20 w:Bob');
@@ -490,8 +497,8 @@ t('two visibility flags are mutually exclusive — every pairing', () => {
     '1d20 held secret', '1d20 secret held',
     '1d20 held w:Bob', '1d20 w:Bob held',
     '1d20 secret w:Bob', '1d20 w:Bob secret',
-    '/gmroll 1d20 secret', '/selfroll 1d20 held',
-    '/gmroll 1d20 w:Bob', '/sr 1d20 w:Bob', '/gmr 1d20 secret',
+    '/gmroll 1d20 held', '/selfroll 1d20 held',
+    '/gmroll 1d20 w:Bob', '/selfroll 1d20 w:Bob', '/gmr 1d20 held',
   ]) {
     const r = bad(s);
     assert.ok(r.error.includes('mutually exclusive'), `${s}: ${r.error}`);
@@ -501,6 +508,43 @@ t('the same visibility flag twice is a typo, named as such', () => {
   assert.equal(bad('1d20 secret secret').error, 'secret specified twice');
   assert.equal(bad('1d20 w:a w:b').error, 'w: specified twice');
   assert.equal(bad('1d20 held held').error, 'held specified twice');
+});
+
+// ---- blind: the dice-tower alias (terminology amendment, UX.md §3.2) -------
+// 'blind' universally means the roller cannot see their own result. On an
+// OFFER's notation that is the offerer-only roll, so it parses as an alias
+// canonicalizing to 'secret' (canonical never emits 'blind'). On a self-roll
+// it is refused with a teaching error — there is nobody to hold the result.
+t('blind on a self-roll is a teaching error', () => {
+  const r = bad('1d20 blind');
+  assert.equal(r.error, 'a blind roll needs someone else to hold the result — offer this roll instead');
+});
+t('blind on an offer canonicalizes to secret (case-insensitive)', () => {
+  for (const s of ['1d20 blind', '1d20 BLIND']) {
+    const r = parseNotation(s, { offer: true });
+    assert.equal(r.ok, true, `${s}: ${r.error}`);
+    assert.equal(r.canonical, '1d20 secret', s);
+    assert.deepEqual(r.spec.visibility, { mode: 'secret', names: [] }, s);
+  }
+  // …and that canonical is a fixed point in the same context.
+  assert.equal(parseNotation('1d20 secret', { offer: true }).canonical, '1d20 secret');
+});
+t('blind beside another visibility spelling is refused on an offer too', () => {
+  const twice = parseNotation('1d20 blind secret', { offer: true });
+  assert.equal(twice.ok, false);
+  assert.equal(twice.error, 'secret specified twice');
+  const clash = parseNotation('1d20 blind held', { offer: true });
+  assert.equal(clash.ok, false);
+  assert.ok(clash.error.includes('mutually exclusive'), clash.error);
+});
+t('a prefix of blind is incomplete only where blind itself is legal', () => {
+  assert.equal(parseNotation('1d20 bl', { offer: true }).state, 'incomplete');
+  assert.equal(parseNotation('1d20 bl').state, 'invalid'); // no valid extension on a self-roll
+  assert.equal(parseNotation('1d20 blinds', { offer: true }).state, 'invalid');
+});
+t('blind agrees with the /gmroll-family prefixes on an offer', () => {
+  assert.equal(parseNotation('/selfroll 1d20 blind', { offer: true }).canonical, '1d20 secret');
+  assert.equal(parseNotation('/gmroll 1d20 blind', { offer: true }).canonical, '1d20 secret');
 });
 t('whisper malformed lists are invalid with clear errors', () => {
   bad('1d20 w:""');           // empty quoted name

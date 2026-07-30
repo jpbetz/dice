@@ -662,22 +662,25 @@ function sameExp(a, b) {
 // result is authoritative — a client's own parse is preview only.
 //
 // `explicitExp` is the request's own exp field, already validated by readExp
-// (null when the client sent none).
-function parseNotationSpec(value, explicitExp = null) {
+// (null when the client sent none). `offer` marks an /api/offer parse — the
+// one context-aware corner of the grammar ('blind' is a dice-tower alias for
+// 'secret' on an offer, a teaching error on a self-roll).
+function parseNotationSpec(value, explicitExp = null, offer = false) {
   // An explicit pool cannot be reconciled with a parsed one, so refuse the
   // request rather than silently picking a winner.
   if (value.dice !== undefined || value.mods !== undefined) {
     return { error: [400, 'notation cannot be combined with dice or mods', 'notation_conflict'] };
   }
 
-  const parsed = parseNotation(value.notation);
+  const parsed = parseNotation(value.notation, { offer });
   if (!parsed.ok) {
     return { error: [400, parsed.error, 'bad_notation', { extra: { hint: parsed.hint || null } }] };
   }
 
   // dc, visibility and exp all come from the notation too: 'dc15', the
-  // 'held'/'secret'/'w:Name' visibility flags (plus the /gmroll and /selfroll
-  // prefix families they normalize from), and the 'check'/'cinematic' flag
+  // 'held'/'secret'/'w:Name' visibility flags (plus the /gmroll, /gmr and
+  // /selfroll prefixes, which all normalize to 'secret' — UX.md §3.2's
+  // terminology note), and the 'check'/'cinematic' flag
   // with its '# Title | Subtitle' pipe. A value sent alongside is ignored when
   // it agrees and refused when it does not (a disagreement means the client's
   // parse drifted from ours, and guessing which one the player meant is how
@@ -752,11 +755,11 @@ function parseNotationSpec(value, explicitExp = null) {
 // ('check'/'cinematic' + the comment's '| subtitle'), so the parsed one wins
 // and a field sent beside it only has to agree; parseNotationSpec owns that
 // reconciliation, exactly as it owns dc's and faceDown's.
-function parseRollSpec(value) {
+function parseRollSpec(value, { offer = false } = {}) {
   const exp = readExp(value.exp);
   if (exp.error) return { error: exp.error };
 
-  if (value.notation !== undefined) return parseNotationSpec(value, exp.exp);
+  if (value.notation !== undefined) return parseNotationSpec(value, exp.exp, offer);
 
   const spec = parseExplicitSpec(value);
   if (spec.error) return spec;
@@ -1233,7 +1236,9 @@ async function handleOffer(req, res) {
   if (found.error) return sendError(res, ...found.error);
   const { room, player } = found;
 
-  const spec = parseRollSpec(body.value);
+  // Offer context: the 'blind' notation alias (dice tower → secret) is legal
+  // here and only here — see parseNotationSpec.
+  const spec = parseRollSpec(body.value, { offer: true });
   if (spec.error) return sendError(res, ...spec.error);
 
   // The OFFERER is the visibility chooser for an offered roll — the audience

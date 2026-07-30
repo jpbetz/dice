@@ -58,11 +58,12 @@ limitations under the License.
             <tr><td><code>dcN</code> / <code>vs N</code></td><td>target number — result shows Success/Failure</td></tr>
             <tr><td><code>check</code> / <code>cinematic</code></td><td>roll moment — staged declaration + verdict (<code>cine</code> too)</td></tr>
             <tr><td><code>held</code></td><td>face down for everyone — hidden until the roller reveals</td></tr>
-            <tr><td><code>secret</code></td><td>only you — the table never sees the roll (<code>/selfroll</code>)</td></tr>
+            <tr><td><code>secret</code></td><td>only you — the table never sees the roll (<code>/selfroll</code>, <code>/gmroll</code>)</td></tr>
             <tr><td><code>w:Ann,"Bo B"</code></td><td>whisper — the named players see it live; everyone else sees a shrouded roll</td></tr>
+            <tr><td><code>blind</code></td><td>offers only — dice tower: they roll, only you read the result (→ <code>secret</code>)</td></tr>
             <tr><td><code># text</code></td><td>comment — roll label / mat text (≤64 chars)</td></tr>
             <tr><td><code># Title | Sub</code></td><td>moment subtitle (≤40) — needs check/cinematic; <code>\|</code> is a literal pipe</td></tr>
-            <tr><td><code>/gmroll /gmr</code></td><td>→ <code>held</code>; <code>/selfroll /sr</code> → <code>secret</code> (<code>/roll</code>, <code>/r</code>: plain)</td></tr>
+            <tr><td><code>/gmroll /gmr</code></td><td>→ <code>secret</code>, like <code>/selfroll</code> (<code>/roll</code>, <code>/r</code>: plain; <code>/sr</code>: refused as ambiguous)</td></tr>
             <tr><td colspan="2" class="cheat-note">mixed pools take trailing flags: <code>1d20+2d6 dl1</code></td></tr>
           </table>
         </div>

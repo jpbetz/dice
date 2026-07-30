@@ -3409,10 +3409,13 @@ function commandRoll(input) {
 }
 
 // Offer a notation string to the table (Shift+Enter — §7.4). Same validation
-// gates as commandRoll; online only (callers show the solo refusal).
+// gates as commandRoll; online only (callers show the solo refusal). Parsed
+// in OFFER context: 'blind' is legal here (dice tower → secret), and the box
+// paints in roll context so typing it shows the teaching error until the
+// player offers instead of rolling — which is the teaching.
 function commandOffer(input) {
   const raw = (typeof input === 'string' ? input : cmdInput.value).trim();
-  const res = parseNotation(raw);
+  const res = parseNotation(raw, { offer: true });
   if (!res.ok) return res;
   if (!netOnline || !net) return res;
   net.offer({

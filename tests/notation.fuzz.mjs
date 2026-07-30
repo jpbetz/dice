@@ -914,27 +914,29 @@ spot('d% and d100 expand to [d10x, d10] and render back as d100', () => {
   assert.ok(mustParse('1d10x!').warnings.some((w) => /never explode/.test(w)));
 });
 
-// EDITED for the goal-11 visibility contract: prefixes normalize to the
-// visibility flags — /gmroll and /gmr to 'held', /selfroll and /sr to
-// 'secret' (canonical emits a flag, never a prefix). faceDown remains
-// strictly the held alias, so a secret roll is NOT face down.
-spot('/roll family: prefixes normalize — no-op, held, or secret', () => {
+// EDITED for the terminology amendment (UX.md §3.2): every accepted
+// visibility prefix normalizes to 'secret' (canonical emits a flag, never a
+// prefix) — Roll20's /gmroll means the roller sees it and the table learns
+// nothing, both axes of 'secret'. /sr never binds: Foundry's self roll and
+// Roll20's Secret Roll are opposites under the same two letters. faceDown
+// remains strictly the held alias, so no prefix is ever face down.
+spot('/roll family: prefixes normalize — no-op or secret; /sr teaches', () => {
   for (const p of ['/roll', '/r', '/ROLL']) {
     const r = mustParse(`${p} 2d6+1`);
     assert.equal(r.faceDown, false, p);
     assert.equal(r.canonical, '2d6+1', p);
   }
-  for (const p of ['/gmroll', '/gmr', '/GMROLL']) {
-    const r = mustParse(`${p} 2d6+1`);
-    assert.equal(r.faceDown, true, p);
-    assert.equal(r.canonical, '2d6+1 held', p);
-    assert.equal(mustParse(r.canonical).faceDown, true, p);
-  }
-  for (const p of ['/selfroll', '/sr', '/SELFROLL']) {
+  for (const p of ['/gmroll', '/gmr', '/GMROLL', '/selfroll', '/SELFROLL']) {
     const r = mustParse(`${p} 2d6+1`);
     assert.equal(r.faceDown, false, `${p}: secret is not the held alias`);
     assert.equal(r.canonical, '2d6+1 secret', p);
     assert.deepEqual(mustParse(r.canonical).spec.visibility, { mode: 'secret', names: [] }, p);
+  }
+  for (const s of ['/sr 2d6+1', '/sr', '/SR 1d20']) {
+    const r = parseNotation(s);
+    assert.equal(r.ok, false, s);
+    assert.equal(r.state, 'invalid', s);
+    assert.match(r.error, /ambiguous/, s);
   }
   assert.equal(parseNotation('/xyzzy 1d20').ok, false);
 });
@@ -963,11 +965,11 @@ spot('§7.6 moment notation: kinds, held, the comment pipe', () => {
   assert.equal(mustParse('1d20 cine').canonical, '1d20 cinematic');
   assert.equal(mustParse('1d20 dc15').exp, null, 'dc must NOT imply check at parse level');
   assert.equal(parseNotation('1d20 check cine').ok, false, 'two kinds must be refused');
-  // held round-trips; the flag and the /gmroll-family prefixes are one
-  // spelling on output (/selfroll now spells 'secret' — see the goal-11 spot)
+  // held round-trips; no prefix spells it (the whole /gmroll family is
+  // 'secret' since the terminology amendment — see the /roll-family spot)
   assert.equal(mustParse('1d20 held').faceDown, true);
-  assert.equal(mustParse('/gmr 1d20').canonical, '1d20 held');
-  assert.equal(mustParse('1d20 held').canonical, mustParse('/gmroll 1d20').canonical);
+  assert.equal(mustParse('1d20 held').canonical, '1d20 held');
+  assert.equal(mustParse('/gmr 1d20').canonical, '1d20 secret');
   // canonical flag order: [adv] [keep] [reroll] [!] [kind] [held] [dc] [#]
   const r = mustParse('1d20+2d6 dc12 held cine ! ro<=2 dl1 adv # T | S');
   assert.equal(r.canonical, '2d6+1d20 adv dl1 ro<=2 ! cinematic held dc12 # T | S');
@@ -1007,15 +1009,25 @@ spot('goal-11 visibility: held/secret/w: fill one mutually-exclusive slot', () =
   assert.ok(dup.warnings.some((x) => /duplicate/.test(x)));
   assert.equal(dup.canonical, '1d20 w:Bob');
   // mutual exclusion — flags and prefixes alike; same-flag-twice is the typo
-  for (const s of ['1d20 held secret', '1d20 secret w:Ann', '1d20 w:Ann held', '/gmroll 1d20 secret', '/selfroll 1d20 held', '/sr 1d20 w:Ann']) {
+  for (const s of ['1d20 held secret', '1d20 secret w:Ann', '1d20 w:Ann held', '/gmroll 1d20 held', '/selfroll 1d20 held', '/gmr 1d20 w:Ann']) {
     const r = parseNotation(s);
     assert.equal(r.ok, false, s);
     assert.equal(r.state, 'invalid', s);
     assert.match(r.error, /mutually exclusive/, s);
   }
   assert.equal(parseNotation('1d20 w:a w:b').error, 'w: specified twice');
-  assert.equal(parseNotation('/gmroll 1d20 held').ok, true, 'prefix + agreeing flag is agreement');
-  assert.equal(parseNotation('/sr 1d20 secret').ok, true, 'prefix + agreeing flag is agreement');
+  assert.equal(parseNotation('/gmroll 1d20 secret').ok, true, 'prefix + agreeing flag is agreement');
+  assert.equal(parseNotation('/selfroll 1d20 secret').ok, true, 'prefix + agreeing flag is agreement');
+  // 'blind' (terminology amendment): a dice-tower alias for secret on an
+  // OFFER's notation; a teaching error on a self-roll. Canonical never emits
+  // it, so the offer-context fixed point is '… secret'.
+  assert.equal(parseNotation('1d20 blind').ok, false);
+  assert.match(parseNotation('1d20 blind').error, /offer this roll instead/);
+  const blind = parseNotation('1d20 blind', { offer: true });
+  assert.equal(blind.ok, true, 'blind is legal on an offer');
+  assert.equal(blind.canonical, '1d20 secret');
+  assert.equal(parseNotation('1d20 bl', { offer: true }).state, 'incomplete');
+  assert.equal(parseNotation('1d20 bl').state, 'invalid');
   // three-state classification for partial w:/secret input
   for (const s of ['1d20 w', '1d20 w:', '1d20 w:Ann,', '1d20 w:"Ann Smi', '1d20 secre']) {
     assert.equal(parseNotation(s).state, 'incomplete', s);
