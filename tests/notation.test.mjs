@@ -259,9 +259,216 @@ t('hostile junk never ok', () => {
 });
 t('10KB string rejected fast', () => bad('1d20+'.repeat(2000)));
 
+// ---- moment kind flags: check / cinematic / cine (UX.md §7.6) --------------
+t('check flag parses to exp and round-trips', () => {
+  const r = ok('1d20 check');
+  assert.deepEqual(r.exp, { kind: 'check' });
+  assert.equal(r.canonical, '1d20 check');
+  assert.equal(ok(r.canonical).canonical, '1d20 check');
+});
+t('cinematic flag parses to exp', () => {
+  const r = ok('1d20 cinematic');
+  assert.deepEqual(r.exp, { kind: 'cinematic' });
+  assert.equal(r.canonical, '1d20 cinematic');
+});
+t('cine is an input alias, normalized to cinematic', () => {
+  const r = ok('1d20 cine');
+  assert.deepEqual(r.exp, { kind: 'cinematic' });
+  assert.equal(r.canonical, '1d20 cinematic');
+});
+t('kind flags are case-insensitive', () => {
+  assert.equal(ok('1d20 CHECK').exp.kind, 'check');
+  assert.equal(ok('1d20 Cine').exp.kind, 'cinematic');
+});
+t('plain rolls have exp null', () => {
+  assert.equal(ok('1d20').exp, null);
+  assert.equal(ok('4d6dl1').exp, null);
+});
+t('NO parse-level dc→check implication', () => {
+  const r = ok('1d20 dc15');
+  assert.equal(r.exp, null);
+  assert.equal(r.dc, 15);
+  assert.equal(r.canonical, '1d20 dc15');
+});
+t('kind specified twice is invalid, including mixed spellings', () => {
+  bad('1d20 check check');
+  bad('1d20 check cinematic');
+  bad('1d20 cine check');
+  bad('1d20 cinematic cine');
+});
+t('kind renders after adv/dis and trailing mods, before dc', () => {
+  assert.equal(ok('1d20 check adv').canonical, '1d20 adv check');
+  assert.equal(ok('1d20 dc15 check').canonical, '1d20 check dc15');
+  assert.equal(ok('1d20+2d6 dl1 check').canonical, '2d6+1d20 dl1 check');
+  assert.equal(ok('1d20 check adv dc15 # Persuasion').canonical, '1d20 adv check dc15 # Persuasion');
+});
+t('flagship §7.6 example: adv check dc comment', () => {
+  const s = '1d20ro<=1+3 adv check dc15 # The lie leaves your lips';
+  const r = ok(s);
+  assert.equal(r.canonical, s);
+  assert.deepEqual(r.exp, { kind: 'check' });
+});
+
+// ---- held flag + /gmroll-family normalization ------------------------------
+t('held flag sets faceDown and round-trips', () => {
+  const r = ok('1d20 held');
+  assert.equal(r.faceDown, true);
+  assert.equal(r.canonical, '1d20 held');
+  assert.equal(ok(r.canonical).faceDown, true);
+});
+t('all four face-down prefixes normalize to the held flag', () => {
+  for (const p of ['/gmroll', '/gmr', '/selfroll', '/sr']) {
+    const r = ok(`${p} 1d20`);
+    assert.equal(r.faceDown, true, p);
+    assert.equal(r.canonical, '1d20 held', p);
+  }
+});
+t('prefix plus held flag agree, not a duplicate', () => {
+  const r = ok('/gmroll 1d20 held');
+  assert.equal(r.faceDown, true);
+  assert.equal(r.canonical, '1d20 held');
+});
+t('held twice is invalid', () => bad('1d20 held held'));
+t('held renders after the kind flag, before dc', () => {
+  assert.equal(ok('1d20 held check').canonical, '1d20 check held');
+  assert.equal(ok('1d20 held dc9').canonical, '1d20 held dc9');
+});
+t('canonical flag order: [adv] [keep] [reroll] [!] [kind] [held] [dc] [#]', () => {
+  const r = ok('1d20+2d6 dc12 held cine ! ro<=2 dl1 adv # T | S');
+  assert.equal(r.canonical, '2d6+1d20 adv dl1 ro<=2 ! cinematic held dc12 # T | S');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+t('kind/held produce no warnings', () => {
+  assert.deepEqual(ok('1d20 check held').warnings, []);
+});
+
+// ---- comment pipe: '# Title | Subtitle' ------------------------------------
+t('pipe splits title and subtitle; subtitle rides exp', () => {
+  const r = ok('1d20 check # Deception | CHARISMA CHECK');
+  assert.equal(r.comment, 'Deception');
+  assert.deepEqual(r.exp, { kind: 'check', subtitle: 'CHARISMA CHECK' });
+  assert.equal(r.canonical, '1d20 check # Deception | CHARISMA CHECK');
+});
+t('pipe spacing normalizes to " | "', () => {
+  assert.equal(ok('1d20 check # Title|Subtitle').canonical, '1d20 check # Title | Subtitle');
+  assert.equal(ok('1d20 check # Title   |   Subtitle').canonical, '1d20 check # Title | Subtitle');
+});
+t('only the FIRST unescaped pipe splits; later pipes stay in the subtitle', () => {
+  const r = ok('1d20 check # t | a|b');
+  assert.equal(r.comment, 't');
+  assert.equal(r.exp.subtitle, 'a|b');
+  assert.equal(r.canonical, '1d20 check # t | a\\|b');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+t('escaped \\| is a literal pipe in the title and round-trips', () => {
+  const r = ok('1d20 # a \\| b');
+  assert.equal(r.comment, 'a | b');
+  assert.equal(r.exp, null);
+  assert.equal(r.canonical, '1d20 # a \\| b');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+t('escaped pipe in title beside a real subtitle split', () => {
+  const r = ok('1d20 check # t \\| x | s');
+  assert.equal(r.comment, 't | x');
+  assert.equal(r.exp.subtitle, 's');
+  assert.equal(r.canonical, '1d20 check # t \\| x | s');
+});
+t('escaped pipe in the subtitle round-trips', () => {
+  const r = ok('1d20 check # t | a \\| b');
+  assert.equal(r.exp.subtitle, 'a | b');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+t('subtitle-only comment: empty title round-trips as "# | S"', () => {
+  const r = ok('1d20 check # | sub');
+  assert.equal(r.comment, null);
+  assert.deepEqual(r.exp, { kind: 'check', subtitle: 'sub' });
+  assert.equal(r.canonical, '1d20 check # | sub');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+t('pipe-only comment title of a lone literal pipe', () => {
+  const r = ok('1d20 # \\|');
+  assert.equal(r.comment, '|');
+  assert.equal(r.canonical, '1d20 # \\|');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+
+// ---- subtitle caps and sanitation ------------------------------------------
+t('subtitle cap 40, sliced and trimmed idempotently', () => {
+  const r = ok('1d20 check # t | ' + 'a'.repeat(39) + ' bbbb');
+  assert.equal(r.exp.subtitle, 'a'.repeat(39));
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+  const exact = ok('1d20 check # t | ' + 'x'.repeat(40) + 'yyy');
+  assert.equal(exact.exp.subtitle.length, 40);
+});
+t('title cap stays 64 with a pipe present', () => {
+  const r = ok('1d20 check # ' + 'a'.repeat(100) + ' | sub');
+  assert.equal(r.comment, 'a'.repeat(64));
+  assert.equal(r.exp.subtitle, 'sub');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+t('subtitle strips control, zero-width and bidi characters', () => {
+  assert.equal(ok('1d20 check # t | a​b‮c').exp.subtitle, 'abc');
+  assert.equal(ok('1d20 check # t |  hi').exp.subtitle, 'hi');
+});
+t('cap slice cannot split an escape pair (caps measured on unescaped text)', () => {
+  // 33 literal pipes = 66 escaped input chars; unescaped length 33 ≤ 40
+  const pipes = '\\|'.repeat(33);
+  const r = ok('1d20 check # t | ' + pipes);
+  assert.equal(r.exp.subtitle, '|'.repeat(33));
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+
+// ---- subtitle requires a kind flag -----------------------------------------
+t('subtitle without check/cinematic is invalid with the pinned message', () => {
+  const r = bad('1d20 # a | b');
+  assert.equal(r.error, 'a subtitle needs check or cinematic');
+  assert.ok(r.hint.includes('check'));
+});
+t('held does not rescue a kindless subtitle', () => bad('1d20 held # a | b'));
+t('dc does not rescue a kindless subtitle (no dc→check implication)', () => bad('1d20 dc15 # a | b'));
+t('/gmroll does not rescue a kindless subtitle', () => bad('/gmroll 1d20 # a | b'));
+
+// ---- incomplete states for partial new tokens ------------------------------
+// (note '1d20 cine' is absent: it is a COMPLETE command via the alias)
+for (const s of ['1d20 c', '1d20 ch', '1d20 che', '1d20 chec', '1d20 cin', '1d20 cinem', '1d20 cinemati', '1d20 h', '1d20 he', '1d20 hel']) {
+  t(`incomplete new-token prefix: "${s}"`, () => bad(s, 'incomplete'));
+}
+for (const s of ['1d20 # t |', '1d20 check # t |', '1d20 # |', '1d20 check # t |   ', '1d20 check # t | ']) {
+  t(`incomplete empty subtitle: "${s}"`, () => bad(s, 'incomplete'));
+}
+t('non-final partial keyword is invalid, not incomplete', () => {
+  bad('1d20 che adv');
+  bad('1d20 hel dc15');
+});
+t('near-miss keywords are invalid', () => {
+  for (const s of ['1d20 checked', '1d20 checkk', '1d20 helds', '1d20 cines', '1d20 cinematics']) bad(s);
+});
+
+// ---- canonicalNotation extras: {dc, comment, exp, faceDown} ----------------
+t('canonicalNotation renders the new extras directly', () => {
+  const d20 = { dice: ['d20'], mods: null };
+  assert.equal(canonicalNotation(d20, { faceDown: true }), '1d20 held');
+  assert.equal(canonicalNotation(d20, { exp: { kind: 'check' } }), '1d20 check');
+  assert.equal(canonicalNotation(d20, { exp: { kind: 'cinematic', subtitle: 'S' } }), '1d20 cinematic # | S');
+  assert.equal(
+    canonicalNotation(d20, { dc: 15, comment: 'T', exp: { kind: 'check', subtitle: 'S' }, faceDown: true }),
+    '1d20 check held dc15 # T | S'
+  );
+  // pipes in wire-supplied text are escaped so the canonical re-parses
+  assert.equal(canonicalNotation(d20, { comment: 'a|b' }), '1d20 # a\\|b');
+  assert.equal(ok('1d20 # a\\|b').comment, 'a|b');
+  // old two-key extras callers are untouched
+  assert.equal(canonicalNotation(d20, { dc: 5, comment: 'hi' }), '1d20 dc5 # hi');
+  assert.equal(canonicalNotation(d20, {}), '1d20');
+});
+
 // ---- fixed point + rollspec cross-check on random specs --------------------
+// EXTENDED for UX.md §7.6: extras now exercise dc, comment (incl. literal
+// pipes), exp {kind, subtitle?} and faceDown alongside every random spec.
 const rng = (() => { let x = 42; return () => (x = (x * 1103515245 + 12345) & 0x7fffffff) / 0x80000000; })();
 const TYPES = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20'];
+const GEN_COMMENTS = ['Firebolt', 'The lie leaves your lips', 'a|b', '|', 'to hit', 'x \\ y', 'Sneak Attack!'];
+const GEN_SUBTITLES = ['CHARISMA CHECK', 'DEX SAVE', 'a|b', '|x', 'S', 'WISDOM (PERCEPTION)'];
 for (let i = 0; i < 500; i++) {
   const single = rng() < 0.5;
   const dice = [];
@@ -279,12 +486,24 @@ for (let i = 0; i < 500; i++) {
   if (rng() < 0.3) mods.explode = true;
   if (mods.modifier === 0) delete mods.modifier;
   const spec = { dice, mods: Object.keys(mods).length ? mods : null };
+  const extras = {};
+  if (rng() < 0.35) extras.dc = 1 + Math.floor(rng() * 999);
+  if (rng() < 0.35) extras.comment = GEN_COMMENTS[Math.floor(rng() * GEN_COMMENTS.length)];
+  if (rng() < 0.4) {
+    extras.exp = { kind: rng() < 0.5 ? 'check' : 'cinematic' };
+    if (rng() < 0.6) extras.exp.subtitle = GEN_SUBTITLES[Math.floor(rng() * GEN_SUBTITLES.length)];
+  }
+  if (rng() < 0.3) extras.faceDown = true;
   t(`fixed point #${i}`, () => {
-    const c1 = canonicalNotation(spec, {});
+    const c1 = canonicalNotation(spec, extras);
     const r = parseNotation(c1);
     assert.equal(r.ok, true, `canonical "${c1}" failed to parse: ${r.error}`);
     assert.equal(r.canonical, c1, `not a fixed point: "${c1}" -> "${r.canonical}"`);
     assert.ok(specEquals(spec, r.spec), `spec drift for "${c1}"`);
+    assert.equal(r.dc, extras.dc ?? null, `dc drift through "${c1}"`);
+    assert.equal(r.comment, extras.comment ?? null, `comment drift through "${c1}"`);
+    assert.deepEqual(r.exp, extras.exp ?? null, `exp drift through "${c1}"`);
+    assert.equal(r.faceDown, extras.faceDown ?? false, `faceDown drift through "${c1}"`);
     assert.equal(validateMods(r.spec.dice, r.spec.mods), null, `validateMods rejects "${c1}"`);
     // composition must not throw
     composeRoll(r.spec.dice, r.spec.mods, rng);
