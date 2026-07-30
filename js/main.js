@@ -1112,6 +1112,11 @@ const KEEP_WORDS = { kh: 'Keep high', kl: 'Keep low', dh: 'Drop high', dl: 'Drop
 
 const ceremonyLayer = document.getElementById('ceremony-layer');
 let ceremonyDismissTimer = null;
+// The verdict card currently on screen, or null once it is gone. A system
+// change repaints it under the new lens: the card owns §2.5's hero slot for
+// the same entry the log line beneath it renders, so the two must never
+// disagree about which system is reading the table.
+let stagedVerdict = null; // {roll, entry}
 
 // Ornate corners (§5.3) — injected once per framed card; static markup only.
 {
@@ -1295,6 +1300,7 @@ function dismissCeremonyUI() {
   clearTimeout(ceremonyDismissTimer);
   ceremonyDismissTimer = null;
   ceremonyLayer.className = 'hidden';
+  stagedVerdict = null; // nothing on screen left for a lens change to repaint
   clearMatDecal();
 }
 
@@ -1419,6 +1425,7 @@ function attributionCards(roll, entry) {
 let verdictFor = null; // {rollId, mine} — what the verdict card's control acts on
 
 function renderVerdictCard(roll, entry) {
+  stagedVerdict = { roll, entry }; // the repaint target while this card is up
   const who = entry.playerName ? `${entry.playerName} · ` : '';
   document.getElementById('verdict-eyebrow').textContent = `${who}${entry.label || ''}`;
   document.getElementById('verdict-total').textContent = String(entry.total);
@@ -2914,13 +2921,24 @@ setSound(soundOn, false); // reflect the loaded preference without re-saving
 // the next slice adds keys (experiences) without reshaping this.
 let roomSettings = { felt: DEFAULT_FELT, system: DEFAULT_SYSTEM };
 
-// A system change is a lens swap over surfaces already on screen: the log and
-// the banner re-read under the new profile. Fanfare and ceremonies that
-// already played are never replayed (fx=false), a dismissed banner stays
-// dismissed, and a mid-flight ceremony keeps its stage — its own verdict
-// staging reads the new lens when it gets there.
+// A system change is a lens swap over every surface already on screen: the
+// log, the banner, and a verdict card still standing all re-read under the new
+// profile. Fanfare and ceremonies that already played are never replayed
+// (fx=false, 'relit'), a dismissed banner stays dismissed, and a mid-flight
+// ceremony keeps its stage — its own verdict staging reads the new lens when
+// it gets there.
 function rerenderInterpretation() {
   renderLog();
+  // The verdict card holds §2.5's hero slot for an entry the log also shows;
+  // letting it age out under the old system would leave the two contradicting
+  // each other for the card's whole dismiss window. Repaint it — crit frame
+  // included, since that is styling, not fanfare — and mark the layer 'relit'
+  // so the frame's one-shot gold sweep stays with the moment that planted it.
+  if (stagedVerdict) {
+    ceremonyLayer.classList.add('relit');
+    ceremonyLayer.classList.toggle('crit', !!entryCrit(stagedVerdict.entry));
+    renderVerdictCard(stagedVerdict.roll, stagedVerdict.entry);
+  }
   if (lastEntry && !banner.classList.contains('hidden')) {
     const ceremonyActive = currentRoll && currentRoll.ceremony && !currentRoll.done;
     if (!ceremonyActive) {

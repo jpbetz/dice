@@ -1138,8 +1138,9 @@ body.mini .popover { width: min(94vw, 312px); }
 /* ---------------------------------------------------------------------------
    Roll moment ceremony (UX §2.4, §5.3 ornate frame — card only).
    Phase classes on #ceremony-layer: c-declare, c-tumble, c-settle, c-verdict;
-   plus 'crit' (gold treatment), 'cinematic' (fanfare frame) and 'skip'
-   (suppress decorative motion when jumping to the verdict).
+   plus 'crit' (gold treatment), 'cinematic' (fanfare frame), 'skip'
+   (suppress decorative motion when jumping to the verdict) and 'relit'
+   (the card was repainted under a new rolling system: words change, not motion).
    z-index 10 keeps value chips (z 11) above the card — §2.4 occlusion rule.
 ---------------------------------------------------------------------------- */
 #ceremony-layer { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
@@ -1341,6 +1342,12 @@ body.mini .popover { width: min(94vw, 312px); }
   from { background-position: 200% 0; }
   to   { background-position: -100% 0; }
 }
+/* 'relit' = this card was repainted under a new rolling system while it stood.
+   The sweep belongs to the moment that planted the card, so it never re-runs:
+   a lens swap changes what the card SAYS, never what it PLAYS. !important for
+   the same reason 'skip' uses it — this is a suppression over the phase rules
+   above, which carry more classes and would otherwise win on specificity. */
+#ceremony-layer.relit #verdict-card::after { animation: none !important; }
 #ceremony-layer.crit #verdict-card,
 #ceremony-layer.cinematic #verdict-card {
   border-color: rgba(255, 215, 102, 0.65);
