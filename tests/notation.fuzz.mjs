@@ -21,9 +21,10 @@ limitations under the License.
 // Four properties, each stated as a contract the parser must never break:
 //
 //   P1 fixed point   For every spec rollspec.validateMods accepts — with any
-//                    dc / comment / exp{kind,subtitle} / faceDown extras —
-//                    canonical -> parse -> canonical is byte-identical,
-//                    specEquals holds, and no extra drifts.
+//                    dc / comment / exp{kind,subtitle} extras and any
+//                    visibility (held / secret / whisper-with-names, or the
+//                    legacy faceDown alias) — canonical -> parse -> canonical
+//                    is byte-identical, specEquals holds, and no extra drifts.
 //   P2 total safety  For ANY string, parseNotation never throws, never runs
 //                    long (ReDoS), and an ok result is always in contract:
 //                    validateMods accepts it, every cap holds, and its own
@@ -32,8 +33,10 @@ limitations under the License.
 //                    some valid command (verified by extending them).
 //   P4 dialect       Roll20 paste semantics (r<N inclusive, 2d20kh1 collapse,
 //                    glue order, d% expansion) are what UX.md Section 1.1 says,
-//                    and the Section 7.6 moment notation (check/cinematic/held
-//                    flags, '# Title | Subtitle' pipe) behaves as pinned.
+//                    the Section 7.6 moment notation (check/cinematic/held
+//                    flags, '# Title | Subtitle' pipe) behaves as pinned, and
+//                    the goal-11 visibility flags (held / secret / w:names —
+//                    one mutually-exclusive slot) match the pinned contract.
 //
 // Known live defects are listed in KNOWN below. Each one absorbs its own
 // failures (so this suite stays green) AND carries a repro that asserts the
@@ -134,10 +137,14 @@ const KNOWN = [
       '"40d6+1d" (over the 40-dice cap). The §7.6 pipe adds one pinned member: "1d20 # t |" is ' +
       'incomplete by design (UX.md §7.6 partial-token states), but appending can only grow the ' +
       'subtitle — the check/cinematic flag it needs would have to precede the "#", so no ' +
-      'extension is ever valid.',
+      'extension is ever valid. The goal-11 visibility flags add two more shapes: a keyword ' +
+      'prefix whose only completion clashes with an earlier visibility flag ("1d20 secret hel" ' +
+      'can only become the mutually-exclusive "1d20 secret held"), and a quoted w: name severed ' +
+      'by the comment split ("1d20 w:\\"a#b\\"" — the "#" starts the comment first, leaving an ' +
+      'unterminated quote that no append can close, since appends only grow the comment).',
     absorbs: (c) => c.kind === 'P3',
     repro() {
-      for (const s of ['1d20 5', '1d6 a', '1d20 dl', 'd100k', '40d6+1d', '1d20 # t |']) {
+      for (const s of ['1d20 5', '1d6 a', '1d20 dl', 'd100k', '40d6+1d', '1d20 # t |', '1d20 secret hel', '1d20 w:"a#b"']) {
         const r = parseNotation(s);
         assert.equal(r.ok, false, `D3(${s})`);
         assert.equal(r.state, 'incomplete', `D3 looks FIXED for "${s}" - update this KNOWN entry`);
@@ -224,6 +231,35 @@ function checkOkContract(kind, input, r) {
     }
   }
   if (r.faceDown !== true && r.faceDown !== false) d(`faceDown is not a boolean: ${r.faceDown}`);
+  // visibility (goal 11): absent = open (an open roll must NOT grow the key);
+  // held/secret carry an empty names array; whisper carries 1+ clean names.
+  // faceDown remains exactly the held alias, in both directions.
+  const vis = spec.visibility;
+  if (vis !== undefined) {
+    if (!vis || typeof vis !== 'object' || Array.isArray(vis)) d(`spec.visibility is not a plain object: ${String(vis)}`);
+    else {
+      for (const k of Object.keys(vis)) if (k !== 'mode' && k !== 'names') d(`unexpected visibility key: ${k}`);
+      if (!['held', 'secret', 'whisper'].includes(vis.mode)) d(`bad visibility mode: ${String(vis.mode)}`);
+      if (!Array.isArray(vis.names)) d('visibility.names is not an array');
+      else {
+        if (vis.mode === 'whisper' && vis.names.length < 1) d('whisper with an empty audience');
+        if (vis.mode !== 'whisper' && vis.names.length) d(`${vis.mode} must not carry audience names`);
+        const seen = new Set();
+        for (const nm of vis.names) {
+          if (typeof nm !== 'string' || !nm) { d('empty or non-string audience name'); continue; }
+          if (CTL.test(nm)) d('control character survived into an audience name');
+          if (nm.includes('#')) d('audience name contains # — cannot survive the comment split');
+          if (/[\s,"]/.test(nm) && nm.endsWith('\\')) d('quote-needing audience name ends in a backslash — its quoted form cannot re-close');
+          const lower = nm.toLowerCase();
+          if (seen.has(lower)) d(`audience name survives dedupe twice: ${JSON.stringify(nm)}`);
+          seen.add(lower);
+        }
+      }
+    }
+  }
+  if ((r.faceDown === true) !== !!(vis && vis.mode === 'held')) {
+    d(`faceDown (${r.faceDown}) disagrees with visibility ${JSON.stringify(vis ?? null)}`);
+  }
   // exp: null, or {kind, subtitle?} with a real kind and a clean, capped,
   // non-empty subtitle (UX.md §7.6). A subtitle key with an empty value would
   // be silently-lost intent, so it is out of contract too.
@@ -273,6 +309,9 @@ function checkOkContract(kind, input, r) {
     d(`exp lost through canonical: ${JSON.stringify(r.exp)} -> ${JSON.stringify(r2.exp)}`, { canonical: r.canonical });
   }
   if (r2.faceDown !== r.faceDown) d(`faceDown lost through canonical: ${r.faceDown} -> ${r2.faceDown}`, { canonical: r.canonical });
+  if (JSON.stringify(r2.spec.visibility ?? null) !== JSON.stringify(spec.visibility ?? null)) {
+    d(`visibility lost through canonical: ${JSON.stringify(spec.visibility ?? null)} -> ${JSON.stringify(r2.spec.visibility ?? null)}`, { canonical: r.canonical });
+  }
 }
 
 // ===========================================================================
@@ -309,6 +348,40 @@ const genComment = () => genText(COMMENT_CHARS, MAX_COMMENT);
 // Subtitles share the comment alphabet — '|' included, so the canonical
 // renderer's pipe escaping is exercised from both halves of the split.
 const genSubtitle = () => genText(COMMENT_CHARS, MAX_SUBTITLE);
+
+// Whisper audience names the parser could actually have produced: every
+// quoting trigger (spaces, commas, quotes, padding) plus backslashes, pipes
+// and unicode — but no control chars, no '#' (the comment split runs before
+// the flags, so a parsed name can never contain one), never empty, and never
+// a trailing backslash on a name that needs quoting (its quoted form could
+// not re-close: the emit would read as an escaped quote).
+const NAME_CHARS = [
+  ...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+  ' ', ' ', ',', '"', '\\', "'", '.', '-', '_', '|', 'é', 'ß', 'Ω', 'д', '中', '🎲', '★',
+];
+function genName() {
+  for (let tries = 0; tries < 8; tries++) {
+    let s = '';
+    const n = between(1, 14);
+    while (s.length < n) s += pick(NAME_CHARS);
+    if (/[\s,"]/.test(s) && s.endsWith('\\')) s = s.slice(0, -1) + 'x';
+    if (s) return s;
+  }
+  return 'Ann';
+}
+// A visibility the parser could expose: held/secret with an empty names
+// array, whisper with 1-3 case-insensitively distinct names.
+function genVisibility() {
+  const mode = pick(['held', 'secret', 'whisper', 'whisper']);
+  if (mode !== 'whisper') return { mode, names: [] };
+  const names = [];
+  const count = between(1, 3);
+  for (let i = 0; i < count; i++) {
+    const nm = genName();
+    if (!names.some((x) => x.toLowerCase() === nm.toLowerCase())) names.push(nm);
+  }
+  return { mode: 'whisper', names };
+}
 
 function genDice() {
   const shape = pick(['single', 'single', 'mixed', 'mixed', 'd100', 'd100mix', 'twod20', 'smalld20']);
@@ -383,7 +456,16 @@ for (let i = 0; i < N_SPECS; i++) {
     extras.exp = { kind: chance(0.5) ? 'check' : 'cinematic' };
     if (chance(0.5)) extras.exp.subtitle = genSubtitle();
   }
-  if (chance(0.3)) extras.faceDown = true;
+  // visibility: the legacy faceDown alias (held) or spec.visibility — never
+  // both, so the expected parse-back is unambiguous
+  let expectVis = null;
+  if (chance(0.15)) {
+    extras.faceDown = true;
+    expectVis = { mode: 'held', names: [] };
+  } else if (chance(0.35)) {
+    expectVis = genVisibility();
+    spec.visibility = expectVis;
+  }
 
   // generator sanity: only in-contract specs are interesting for P1
   if (validateMods(dice, mods) !== null) { p1Skipped++; continue; }
@@ -413,8 +495,12 @@ for (let i = 0; i < N_SPECS; i++) {
   if (JSON.stringify(r.exp ?? null) !== JSON.stringify(extras.exp ?? null)) {
     fail('P1', c1, `exp drift ${JSON.stringify(extras.exp)} -> ${JSON.stringify(r.exp)}`, { canonical: c1 });
   }
-  if (r.faceDown !== (extras.faceDown ?? false)) {
-    fail('P1', c1, `faceDown drift ${extras.faceDown ?? false} -> ${r.faceDown}`, { canonical: c1 });
+  const expectFaceDown = !!(expectVis && expectVis.mode === 'held');
+  if (r.faceDown !== expectFaceDown) {
+    fail('P1', c1, `faceDown drift ${expectFaceDown} -> ${r.faceDown}`, { canonical: c1 });
+  }
+  if (JSON.stringify(r.spec.visibility ?? null) !== JSON.stringify(expectVis)) {
+    fail('P1', c1, `visibility drift ${JSON.stringify(expectVis)} -> ${JSON.stringify(r.spec.visibility ?? null)}`, { canonical: c1 });
   }
   checkOkContract('P1', c1, r);
 }
@@ -463,6 +549,11 @@ const TOKENS = [
   // §7.6 moment tokens: kinds (+alias), held, pipes escaped and bare, partials
   'check', 'cinematic', 'cine', 'held', 'CHECK', 'HELD', 'che', 'chec', 'cinem', 'cinemati', 'hel', 'checked', 'cines',
   '|', '\\|', '||', ' | ', '# T | S', '# t \\| s', '# |', '# a |', '| sub', '#|', '\\', '# \\| | \\|',
+  // goal-11 visibility tokens: secret (+partials/near-misses), w: audiences
+  // in every malformed and well-formed shape
+  'secret', 'SECRET', 'sec', 'secre', 'secrets', 'secrete',
+  'w', 'w:', 'W:', 'w:Ann', 'W:ann', 'w:a,b', 'w:a,', 'w:,a', 'w:""', 'w:" "',
+  'w:"Ann Smith"', 'w:"a\\"b"', 'w:"unterminated', 'w:ab"c', 'w:"a"x', 'w:🎲', 'w:a\\', 'w:"a\\\\"b"',
 ];
 
 const VALID_SEEDS = [
@@ -476,10 +567,14 @@ const VALID_SEEDS = [
   '8d6! cinematic # Fireball | DEX SAVE', '1d20 cine', '1d20 held', '/gmroll 1d20 held',
   '1d20 adv check held dc15 # T | S', '2d6+1d20 dl1 cinematic held # mixed | pool',
   '1d20 # a \\| b', '1d20 check # t \\| x | s \\| t',
+  // goal-11 visibility
+  '1d20 secret', '/selfroll 1d20', '/sr 2d6+1', '1d20 adv check secret dc15 # T | S',
+  '1d20 w:Ann', '1d20 w:"Ann Smith",Bob dc15', '1d20 w:"a\\"b"', '1d20 w:Åsa,中文',
+  '2d6+1d20 dl1 cinematic w:"Ann Smith",Bob dc12 # Ambush | DEX SAVE', '1d20 w:bOb # note',
 ];
 
 const JUNK_CHARS = [
-  ...'0123456789dDkKlLhHrRoOvVsScC+-!<>=#[]%xX ',
+  ...'0123456789dDkKlLhHrRoOvVsScCwWtT:,+-!<>=#[]%xX ',
   '\t', '\n', '\0', '\x7f', '‮', '​', '🎲', 'é', '中', 'ｄ', '\\', '"', "'", '(', ')', '{', '}', ';', '*', '$', '`',
 ];
 
@@ -554,7 +649,9 @@ function junkText() {
   if (chance(0.4)) t += ' '.repeat(between(1, 4));
   // sometimes dress the roll so pipe-bearing comments hit the ok path (a
   // kindless subtitle is invalid, which would skip every contract check)
-  const kind = chance(0.5) ? ' ' + pick(['check', 'cinematic', 'cine', 'held', 'check held']) : '';
+  const kind = chance(0.5)
+    ? ' ' + pick(['check', 'cinematic', 'cine', 'held', 'check held', 'secret', 'check secret', 'w:Ann', 'w:"Ann Smith",Bob', 'cine w:Bob'])
+    : '';
   return chance(0.5) ? `1d20${kind} # ${t}` : `1d20+2[${t.slice(0, 60)}]`;
 }
 
@@ -595,6 +692,18 @@ const CORPUS = [
   '1d20 check # ' + 'a'.repeat(70) + ' | ' + 'b'.repeat(50), '1d20 check # t | ' + 'a'.repeat(39) + ' bb',
   '1d20 check # t | x', '1d20 check # t | ​', '1d20 check # t‮ | x y',
   '1d20+2[check]', '1d20 # check held cine', '1d20 check dc15 # Deception | CHARISMA CHECK',
+  // goal-11 visibility: secret + w: audiences, well-formed and hostile
+  '1d20 secret', '1d20 SECRET', '1d20 secret secret', '1d20 held secret', '1d20 secret held',
+  '/selfroll 1d20 secret', '/selfroll 1d20 held', '/gmroll 1d20 secret', '/sr 1d20 w:Ann', '/gmr 1d20 w:Ann',
+  '1d20 w:Bob', '1d20 W:Bob', '1d20 w:Ann,Bob', '1d20 w:"Ann Smith",Bob', '1d20 w:"Bob"', '1d20 w:bOb,BoB',
+  '1d20 w:"Ann \\"Ace\\" Smith"', '1d20 w:"a\\\\"b"', '1d20 w:"\\""', '1d20 w:a\\b', '1d20 w:ab\\',
+  '1d20 w', '1d20 w:', '1d20 w: Bob', '1d20 w:Ann,', '1d20 w:Ann, Bob', '1d20 w:,Bob', '1d20 w:a,,b',
+  '1d20 w:""', '1d20 w:" "', '1d20 w:"Ann', '1d20 w:"Ann Smith', '1d20 w:ab"c', '1d20 w:"a"x', '1d20 w:"a" ,b',
+  '1d20 w:a w:b', '1d20 w:Bob held', '1d20 w:Bob secret', '1d20 secret w:Bob', '1d20 held w:',
+  '1d20 secret hel', '1d20 w:"a#b"', '1d20 w:"a|b"', '1d20 check w:Ann # t | s', '1d20 secret dc15 # T',
+  '1d20 s', '1d20 se', '1d20 sec', '1d20 secr', '1d20 secre', '1d20 secrete', '1d20 secrets',
+  '1d20 w:🎲,中文', '1d20 w:"e‮vil"', '1d20 w:"​"', '1d20 w:a​b', '1d20w:Ann', '1d20secret',
+  '1d20 w:' + 'n'.repeat(400), '1d20 w:"' + 'n '.repeat(100) + '"', '1d20 w:' + 'a,'.repeat(120) + 'z',
   // truncation landing on whitespace, at and around both caps
   '1d20 # ' + 'a'.repeat(63) + ' bbbb',
   '1d20 # ' + 'a'.repeat(60) + '      bbbb',
@@ -651,9 +760,14 @@ const SUFFIX1 = [
   // §7.6 keyword completions (check/cinematic/held truncated at any offset)
   'heck', 'eck', 'ck', 'k', 'ine', 'nematic', 'ematic', 'matic', 'atic', 'tic', 'ic', 'c',
   'eld', 'ld', 'd', 'e', ' check', ' cinematic', ' held', ' cine', '| s', ' | s',
+  // goal-11 visibility completions (secret / w: truncated at any offset)
+  'ecret', 'cret', 'ret', 'et', 't', ' secret', ' w:Ann',
+  ':Ann', ':a', 'Ann', 'nn', 'n', '"', 'n"', 'a"', 'mith"', 'ith"', 'th"', 'h"', '",Bob', ',Bob', 'Bob', 'ob', 'b',
+  'r 1d20', 'elfroll 1d20', 'lfroll 1d20', 'froll 1d20', 'roll 1d20',
 ];
 const SUFFIX2 = ['1', '2', '4', '6', '0', 'd6', 'd20', '+1', '1d20', ' 1d20', ']', 'A]', ' adv', ' dc15', ' kh1', '!', 'x', '%', 'h1', '<=2', ' # hi', 'v',
-  'k', 'ck', 'eck', 'atic', 'tic', 'ic', 'c', 'd', 'ld', 'eld', 'e', ' check', ' held', '| s'];
+  'k', 'ck', 'eck', 'atic', 'tic', 'ic', 'c', 'd', 'ld', 'eld', 'e', ' check', ' held', '| s',
+  't', 'et', 'ret', 'cret', 'ecret', ':a', ':Ann', 'a', 'Ann', 'nn', 'n', '"', 'n"', ',Bob', 'ob', 'b'];
 
 function findExtension(s, depth) {
   let frontier = [''];
@@ -800,20 +914,27 @@ spot('d% and d100 expand to [d10x, d10] and render back as d100', () => {
   assert.ok(mustParse('1d10x!').warnings.some((w) => /never explode/.test(w)));
 });
 
-// EDITED for UX.md §7.6 / roadmap step 1: the /gmroll family still sets
-// faceDown, but the canonical no longer drops it — it normalizes to the
-// trailing 'held' flag (canonical emits 'held', never a prefix).
-spot('/roll family: prefixes normalize — no-op, or faceDown via the held flag', () => {
+// EDITED for the goal-11 visibility contract: prefixes normalize to the
+// visibility flags — /gmroll and /gmr to 'held', /selfroll and /sr to
+// 'secret' (canonical emits a flag, never a prefix). faceDown remains
+// strictly the held alias, so a secret roll is NOT face down.
+spot('/roll family: prefixes normalize — no-op, held, or secret', () => {
   for (const p of ['/roll', '/r', '/ROLL']) {
     const r = mustParse(`${p} 2d6+1`);
     assert.equal(r.faceDown, false, p);
     assert.equal(r.canonical, '2d6+1', p);
   }
-  for (const p of ['/gmroll', '/gmr', '/selfroll', '/sr', '/GMROLL']) {
+  for (const p of ['/gmroll', '/gmr', '/GMROLL']) {
     const r = mustParse(`${p} 2d6+1`);
     assert.equal(r.faceDown, true, p);
     assert.equal(r.canonical, '2d6+1 held', p);
     assert.equal(mustParse(r.canonical).faceDown, true, p);
+  }
+  for (const p of ['/selfroll', '/sr', '/SELFROLL']) {
+    const r = mustParse(`${p} 2d6+1`);
+    assert.equal(r.faceDown, false, `${p}: secret is not the held alias`);
+    assert.equal(r.canonical, '2d6+1 secret', p);
+    assert.deepEqual(mustParse(r.canonical).spec.visibility, { mode: 'secret', names: [] }, p);
   }
   assert.equal(parseNotation('/xyzzy 1d20').ok, false);
 });
@@ -842,10 +963,11 @@ spot('§7.6 moment notation: kinds, held, the comment pipe', () => {
   assert.equal(mustParse('1d20 cine').canonical, '1d20 cinematic');
   assert.equal(mustParse('1d20 dc15').exp, null, 'dc must NOT imply check at parse level');
   assert.equal(parseNotation('1d20 check cine').ok, false, 'two kinds must be refused');
-  // held round-trips; the flag and the prefixes are one spelling on output
+  // held round-trips; the flag and the /gmroll-family prefixes are one
+  // spelling on output (/selfroll now spells 'secret' — see the goal-11 spot)
   assert.equal(mustParse('1d20 held').faceDown, true);
   assert.equal(mustParse('/gmr 1d20').canonical, '1d20 held');
-  assert.equal(mustParse('1d20 held').canonical, mustParse('/selfroll 1d20').canonical);
+  assert.equal(mustParse('1d20 held').canonical, mustParse('/gmroll 1d20').canonical);
   // canonical flag order: [adv] [keep] [reroll] [!] [kind] [held] [dc] [#]
   const r = mustParse('1d20+2d6 dc12 held cine ! ro<=2 dl1 adv # T | S');
   assert.equal(r.canonical, '2d6+1d20 adv dl1 ro<=2 ! cinematic held dc12 # T | S');
@@ -860,6 +982,47 @@ spot('§7.6 moment notation: kinds, held, the comment pipe', () => {
   assert.equal(parseNotation('1d20 # a | b').ok, false, 'a subtitle needs check or cinematic');
   assert.equal(parseNotation('1d20 # a | b').state, 'invalid');
   assert.equal(parseNotation('1d20 check # t |').state, 'incomplete');
+});
+
+spot('goal-11 visibility: held/secret/w: fill one mutually-exclusive slot', () => {
+  // spec.visibility = {mode, names[]}, present only on non-open rolls
+  assert.equal('visibility' in mustParse('1d20').spec, false, 'open rolls must not grow a visibility key');
+  assert.deepEqual(mustParse('1d20 held').spec.visibility, { mode: 'held', names: [] });
+  assert.deepEqual(mustParse('1d20 secret').spec.visibility, { mode: 'secret', names: [] });
+  // the visibility slot is exactly where held has always rendered
+  assert.equal(mustParse('1d20 secret check adv dc9').canonical, '1d20 adv check secret dc9');
+  assert.equal(mustParse('1d20 w:Ann check adv dc9').canonical, '1d20 adv check w:Ann dc9');
+  // whisper quoting: only names that need it; \" escapes; case preserved
+  const w = mustParse('1d20 w:"Ann Smith","Bob",cAt');
+  assert.deepEqual(w.spec.visibility, { mode: 'whisper', names: ['Ann Smith', 'Bob', 'cAt'] });
+  assert.equal(w.canonical, '1d20 w:"Ann Smith",Bob,cAt');
+  assert.equal(mustParse(w.canonical).canonical, w.canonical);
+  const esc = mustParse('1d20 w:"Ann \\"Ace\\" Smith"');
+  assert.deepEqual(esc.spec.visibility.names, ['Ann "Ace" Smith']);
+  assert.equal(esc.canonical, '1d20 w:"Ann \\"Ace\\" Smith"');
+  assert.equal(mustParse(esc.canonical).canonical, esc.canonical);
+  // dedupe is case-insensitive, keeps the first spelling, and warns
+  const dup = mustParse('1d20 w:Bob,bob');
+  assert.deepEqual(dup.spec.visibility.names, ['Bob']);
+  assert.ok(dup.warnings.some((x) => /duplicate/.test(x)));
+  assert.equal(dup.canonical, '1d20 w:Bob');
+  // mutual exclusion — flags and prefixes alike; same-flag-twice is the typo
+  for (const s of ['1d20 held secret', '1d20 secret w:Ann', '1d20 w:Ann held', '/gmroll 1d20 secret', '/selfroll 1d20 held', '/sr 1d20 w:Ann']) {
+    const r = parseNotation(s);
+    assert.equal(r.ok, false, s);
+    assert.equal(r.state, 'invalid', s);
+    assert.match(r.error, /mutually exclusive/, s);
+  }
+  assert.equal(parseNotation('1d20 w:a w:b').error, 'w: specified twice');
+  assert.equal(parseNotation('/gmroll 1d20 held').ok, true, 'prefix + agreeing flag is agreement');
+  assert.equal(parseNotation('/sr 1d20 secret').ok, true, 'prefix + agreeing flag is agreement');
+  // three-state classification for partial w:/secret input
+  for (const s of ['1d20 w', '1d20 w:', '1d20 w:Ann,', '1d20 w:"Ann Smi', '1d20 secre']) {
+    assert.equal(parseNotation(s).state, 'incomplete', s);
+  }
+  for (const s of ['1d20 w: Ann', '1d20 w:Ann, Bob', '1d20 w:""', '1d20 w:ab"c', '1d20 w dc5']) {
+    assert.equal(parseNotation(s).state, 'invalid', s);
+  }
 });
 
 spot('canonical die order is d4 -> d20 with the modifier last', () => {
