@@ -735,7 +735,6 @@ body { overflow-x: hidden; }
 }
 .pchip .pdot { width: 8px; height: 8px; border-radius: 50%; }
 .pchip[aria-pressed="true"] { color: var(--ivory); border-color: rgba(212, 175, 55, 0.45); background: rgba(212, 175, 55, 0.14); }
-.pchip.dm { font-family: var(--font-display); letter-spacing: 0.06em; }
 
 .pop-preview {
   font-family: var(--font-mono);
@@ -966,7 +965,6 @@ body { overflow-x: hidden; }
             <button data-v="whisper">Whisper to…</button>
           </div>
           <div class="whisper hidden" id="whisper-row">
-            <button class="pchip dm" data-p="dm" aria-pressed="false"><span class="pdot" style="background:var(--gold)"></span>to DM</button>
             <button class="pchip" data-p="kira" aria-pressed="false"><span class="pdot" style="background:#6fb3d2"></span>Kira</button>
             <button class="pchip" data-p="nyx" aria-pressed="false"><span class="pdot" style="background:#c07ad2"></span>Nyx</button>
             <button class="pchip" data-p="joe" aria-pressed="false"><span class="pdot" style="background:#7fc98f"></span>Joe</button>
@@ -1138,7 +1136,10 @@ const DIE_MAX   = { d4: 4, d6: 6, d8: 8, d10: 10, d10x: 90, d12: 12, d20: 20 };
 const DIE_ORDER = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20'];
 const DIE_COLOR = { d4: '#b23a48', d6: '#2e6f9e', d8: '#3f8f6b', d10: '#b07d2b', d10x: '#7a5b8f', d12: '#8f3f6b', d20: '#c19a2e' };
 const FACES = { '4': 'd4', '6': 'd6', '8': 'd8', '10': 'd10', '12': 'd12', '20': 'd20', '100': 'd100', '%': 'd100', '10x': 'd10x' };
-const MODES = { roll: 'open', r: 'open', gmroll: 'dm', gmr: 'dm', selfroll: 'secret', sr: 'secret' };
+// Prefixes normalize into the visibility slot (UX §7.8). There is no seat to
+// address: /gmroll is paste sugar for held. (The rebind to secret, and /sr's
+// retirement as ambiguous, are ROADMAP step 4b.)
+const MODES = { roll: 'open', r: 'open', gmroll: 'held', gmr: 'held', selfroll: 'secret', sr: 'secret' };
 const MAX_DICE = 40;
 
 /* ---------------------------------------------------------------- parser */
@@ -1578,7 +1579,7 @@ function toast(html) {
 
 /* ------------------------------------------------------ command box */
 const TOKENS = [
-  { t: '/gmroll', h: 'whisper to the DM — only listed when a DM is seated', dm: true },
+  { t: '/gmroll', h: 'paste sugar — normalizes to the held flag' },
   { t: '/sr', h: 'secret to me — nobody else sees the values' },
   { t: '/roll', h: 'plain, open roll (the default)' },
   { t: 'kh', h: 'keep highest N — 2d20kh1' },
