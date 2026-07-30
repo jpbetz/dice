@@ -3882,11 +3882,14 @@ function popVisBlocked() {
   return pop.vis.mode === 'whisper' && !pop.vis.names.length;
 }
 
+// Sublabels for the visibility picker (UX.md §3.2's terminology note: the
+// labels are Open · Face down · Only me · Whisper to…, never "Secret"/
+// "Blind"/"GM"/"Private" — each reads as its own opposite somewhere).
 const POP_VIS_SUBS = {
   open: '',
   held: 'face down for everyone — hidden until you reveal',
-  secret: 'only you ever see this roll — the table gets nothing',
-  whisper: 'they see it live; everyone else sees a shrouded roll',
+  secret: 'no one else sees that you rolled',
+  whisper: 'others see you rolled, not what',
 };
 
 function segSet(seg, value) {
@@ -3948,7 +3951,7 @@ function renderPopEcho() {
   const visSuffix = pop.vis.mode === 'open' ? ''
     : pop.vis.mode === 'whisper'
       ? ` · whisper to ${pop.vis.names.join(', ')}`
-      : ` · ${pop.vis.mode === 'held' ? 'face down' : 'secret'}`;
+      : ` · ${pop.vis.mode === 'held' ? 'face down' : 'only me'}`;
   popPreviewEl.textContent = err
     ? `invalid spec: ${err}`
     : visBlocked
@@ -3956,9 +3959,13 @@ function renderPopEcho() {
       : fmtPreview(spec.dice, spec.mods).replace(/ (avg|max)/g, ' · $1') + visSuffix;
   popRollBtn.disabled = !!err || visBlocked;
   popOfferBtn.disabled = !!err || visBlocked || !netOnline;
-  popOfferBtn.title = netOnline
-    ? 'Post this roll for anyone at the table to take'
-    : 'Offers need a table — you are playing solo';
+  // An offer's restricted mode has its own name: the dice tower (they roll,
+  // only the offerer reads the result) — §3.2's terminology note.
+  popOfferBtn.title = !netOnline
+    ? 'Offers need a table — you are playing solo'
+    : pop.vis.mode === 'secret'
+      ? 'Dice tower — they roll, only you see the result'
+      : 'Post this roll for anyone at the table to take';
 }
 
 // The whisper audience multi-select, built from the live roster (minus you —
@@ -4043,7 +4050,7 @@ function renderPop() {
   });
   renderPopAudience();
   popVisSub.textContent = !netOnline && pop.vis.mode === 'open'
-    ? 'secret & whisper need a table — you are playing solo'
+    ? 'only-me & whisper rolls need a table — you are playing solo'
     : POP_VIS_SUBS[pop.vis.mode] || '';
 
   // Moment (UX §2.3): Plain/Check/Cinematic + subtitle; title = comment,
@@ -5030,10 +5037,12 @@ function modsSummary(mods) {
 }
 
 // Human text for an offer's (or entry's) visibility, roster-resolved.
+// A secret offer is the dice tower — never labeled "secret"/"blind" on
+// screen (§3.2's terminology note; each word inverts somewhere).
 function offerVisText(vis) {
   if (!vis) return '';
   if (vis.mode === 'held') return 'face down';
-  if (vis.mode === 'secret') return 'secret — only the offerer sees the result';
+  if (vis.mode === 'secret') return 'dice tower — you roll blind, only the offerer sees the result';
   if (vis.mode === 'whisper') {
     let names = Array.isArray(vis.names) ? vis.names.filter((n) => typeof n === 'string' && n) : [];
     if (!names.length && Array.isArray(vis.audience)) {

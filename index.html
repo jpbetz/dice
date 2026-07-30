@@ -301,11 +301,15 @@ limitations under the License.
 
     <div class="sec tight">
       <span class="plabel">Visibility</span>
+      <!-- Labels, not wire words (UX.md §3.2's terminology note): "Secret",
+           "Blind", "GM" and "Private" each read as their own opposite to a
+           player arriving from another VTT, so no mode label may use them.
+           The data-v values ARE the wire words and must not change. -->
       <div id="pop-seg-vis" class="seg">
         <button data-v="">Open</button>
         <button data-v="held">Face down</button>
-        <button data-v="secret">Secret</button>
-        <button data-v="whisper">Whisper</button>
+        <button data-v="secret">Only me</button>
+        <button data-v="whisper">Whisper to…</button>
       </div>
       <div id="pop-vis-aud" class="vis-aud hidden"></div>
       <div id="pop-vis-sub" class="prow-sub"></div>
