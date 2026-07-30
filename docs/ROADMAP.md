@@ -105,6 +105,46 @@ contract is UX.md §3 (wire, projection, audience, reveal, offers) and
   (the count was nine; the real total was ~37 lines plus the mockup token
   list in `docs/mockups/panel.html`).
 
+### 4b. Visibility refinements (future)
+
+Deferred out of step 4, each with its reason. Nothing here blocks the
+ladder; all of it is polish, vocabulary, or a new rung.
+
+- **Terminology pass (approved, not applied).** The cross-tool survey in
+  UX.md §3.2's terminology note requires three changes step 4 shipped
+  without: `/gmroll` and `/gmr` normalize to **`secret`**, not `held`
+  (Roll20's `/gmroll` guarantees the roller sees the result and the table
+  learns nothing — `secret` matches both axes, `held` inverts both);
+  `/sr` stops binding silently and parses **invalid** with a teaching
+  error, because Foundry's self-roll and Roll20's secret roll are
+  opposites under the same two letters; and `blind` joins as an accepted
+  input flag — an alias for `secret` on an **offer**'s notation (the
+  dice-tower roll), invalid on a self-roll with "a blind roll needs
+  someone else to hold the result — offer this roll instead". UI labels
+  become *Open* · *Face down* · *Only me* · *Whisper to…* · *Dice tower*
+  (offers), so no mode name is ever a word that reads as its own opposite.
+  UX.md §7.8's prefix table and `index.html`'s cheatsheet row move with
+  the bindings; the unit suite pins the new messages.
+- **Sticky mode + its badge, as one change.** A remembered per-player
+  default (Foundry's roll-mode ergonomic) is only safe alongside a
+  standing eye-slash badge on the Roll button and the mini pills — a
+  sticky non-open default with no persistent signal is the accident vector
+  §3.2 names. Ship both or neither.
+- **Silent whisper.** A whisper whose bystanders learn *nothing*, not even
+  that a roll happened. Today every rung but `secret` makes existence
+  public (§3.1's shrouded dice), and PF2e's precedent is that
+  roll-existence is itself mechanically meaningful information. This is a
+  fifth rung, not a tweak: it needs `secret`'s omit-entirely projection
+  with `whisper`'s audience.
+- **Reveal to a subset.** Fantasy Grounds reveals to one player; module
+  precedent exists for "reveal to the roller". §3.3 rejected it for step 4
+  because reveal is currently total and one-way, which is what makes it
+  auditable. Revisit only with a concrete table need.
+- **Audience legibility.** A shrouded viewer reads the audience only when
+  the roll has no `# comment` (§3.0) — `label` carries one or the other.
+  Decide whether "who was whispered to" deserves its own always-present
+  field, or whether comment-shadowing is the correct privacy default.
+
 ## Tier 4 — State capture (goal 7)
 
 ### 5. Capture mechanisms
