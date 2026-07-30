@@ -295,6 +295,14 @@ let tableDice = [];        // every die on the table; settled dice have static b
 let currentRoll = null;    // active playback state (see playRoll)
 const rollQueue = [];      // rolls waiting while a playback is in flight (FIFO)
 
+// Per-roll Done (§7.5): dice leaving the table sink/fade for ~300 ms before
+// their meshes are dropped. Bodies leave the physics world immediately —
+// a departing die must not deflect a later fast-forward. Rolls cleared while
+// still mid-playback (or queued) defer removal until their playback settles.
+const CLEAR_SINK_S = 0.3;
+let sinking = [];                // {mesh, chip, t, y0}
+const pendingClears = new Set(); // rollIds whose removal is deferred
+
 const FIXED_DT = 1 / 60;
 const SETTLE_STILL = 0.45; // seconds of stillness required
 const SETTLE_CAP = 9;      // hard cap on simulated seconds per roll
@@ -353,6 +361,7 @@ function spawnDie(type, index, count, side, rng) {
 // rolls must survive (each client's table fill differs, so wiping the queue
 // here would silently drop rolls on some clients but not others).
 function resetTableSurface() {
+  finishSinkingNow();
   for (const d of tableDice) {
     world.removeBody(d.body);
     scene.remove(d.mesh);
@@ -361,6 +370,99 @@ function resetTableSurface() {
   chips.length = 0;
   chipsLayer.innerHTML = '';
   banner.classList.add('hidden');
+}
+
+// ---- per-roll Done (§7.5) --------------------------------------------------
+
+// Advance the sink/fade of departing dice. dt-driven from tick() so
+// __diceDebug.sim() covers it; the chip fade is a CSS transition that only
+// decorates the same 300 ms window.
+function stepSinking(dt) {
+  if (!sinking.length) return;
+  let anyDone = false;
+  for (const s of sinking) {
+    s.t += dt;
+    const p = Math.min(s.t / CLEAR_SINK_S, 1);
+    s.mesh.position.y = s.y0 - p * 2.4;
+    s.mesh.scale.setScalar(1 - 0.35 * p);
+    if (s.t >= CLEAR_SINK_S) anyDone = true;
+  }
+  if (!anyDone) return;
+  sinking = sinking.filter((s) => {
+    if (s.t < CLEAR_SINK_S) return true;
+    // Geometry/materials are shared per die type (js/dice.js cache): drop the
+    // mesh from the scene and dispose nothing.
+    scene.remove(s.mesh);
+    if (s.chip) s.chip.remove();
+    return false;
+  });
+}
+
+// Instantly flush any in-flight sinks (table reset / full sweep).
+function finishSinkingNow() {
+  for (const s of sinking) {
+    scene.remove(s.mesh);
+    if (s.chip) s.chip.remove();
+  }
+  sinking = [];
+}
+
+// Remove one roll's dice + their chips with the sink/fade. Other rolls'
+// dice are untouched. Returns whether anything was on the table for it.
+function removeRollDice(rollId) {
+  const going = tableDice.filter((d) => d.rollId === rollId);
+  if (!going.length) return false;
+  tableDice = tableDice.filter((d) => d.rollId !== rollId);
+  const goingSet = new Set(going);
+  for (let i = chips.length - 1; i >= 0; i--) {
+    if (goingSet.has(chips[i].die)) {
+      const { el, die } = chips[i];
+      el.classList.add('chip-clearing');
+      die.chipEl = el; // picked up by the sink record below
+      chips.splice(i, 1);
+    }
+  }
+  for (const d of going) {
+    world.removeBody(d.body);
+    sinking.push({ mesh: d.mesh, chip: d.chipEl || null, t: 0, y0: d.mesh.position.y });
+  }
+  return true;
+}
+
+// A roll was cleared ('roll-cleared' event, or the local solo path). If this
+// client is still playing that roll back — or has it queued — removal defers
+// until its own playback settles (§7.5); the pending clear runs from the
+// completion paths (stepPlayback's showResults / ceremonyFinish).
+function applyClearRoll(rollId) {
+  if (!rollId) return;
+  const inFlight = currentRoll && !currentRoll.done && currentRoll.rollId === rollId;
+  if (inFlight || rollQueue.some((r) => r.rollId === rollId)) {
+    pendingClears.add(rollId);
+    return;
+  }
+  removeRollDice(rollId);
+  // The moment leaves with its dice: banner and verdict card for THIS roll
+  // close everywhere. Other rolls' surfaces are untouched.
+  if (lastEntry && lastEntry.rollId === rollId) banner.classList.add('hidden');
+  if (currentRoll && currentRoll.rollId === rollId && currentRoll.ceremony
+      && !ceremonyLayer.classList.contains('hidden')) {
+    dismissCeremonyUI();
+  }
+}
+
+// Completion hook: a clear that arrived mid-playback lands now.
+function runPendingClear(roll) {
+  if (roll.rollId && pendingClears.has(roll.rollId)) {
+    pendingClears.delete(roll.rollId);
+    applyClearRoll(roll.rollId);
+  }
+}
+
+// Roller-side Done. Online the server validates (roller only) and everyone —
+// us included — reacts to the 'roll-cleared' broadcast; solo applies locally.
+function requestClearRoll(rollId) {
+  if (netOnline && net) net.clearRoll(rollId);
+  else applyClearRoll(rollId);
 }
 
 // A clear (user click or server 'clear' event) can land while a roll is
@@ -379,6 +481,7 @@ function flushPendingRollLog() {
 
 function clearTable() {
   flushPendingRollLog();
+  pendingClears.clear();
   resetTableSurface();
   dismissCeremonyUI();
   currentRoll = null;
@@ -412,6 +515,9 @@ function playRoll(roll) {
   const rng = mulberry32(roll.seed >>> 0);
   const side = Math.floor(rng() * 4);
   const dice = types.map((t, i) => spawnDie(t, i, types.length, side, rng));
+  // Every die on the table is tagged with its roll (§7.5): a per-roll Done
+  // removes exactly these dice and never touches a concurrent roll's.
+  for (const d of dice) d.rollId = roll.rollId || null;
   tableDice.push(...dice);
 
   // --- synchronous fast-forward, recording keyframes + sound events -------
@@ -621,6 +727,7 @@ function stepPlayback(dt) {
     }
     roll.done = true;
     showResults(roll);
+    runPendingClear(roll); // a clear that arrived mid-playback lands now
     if (rollQueue.length) playRoll(rollQueue.shift());
   }
 }
@@ -818,6 +925,26 @@ function renderBannerActions(entry) {
         exp: entry.spec.exp || undefined, // reroll-last preserves the moment
       })
     );
+    holder.appendChild(btn);
+  }
+  // Per-roll Done (§7.5): the roller's Done removes this roll's dice for
+  // everyone (server-validated; solo local) and hides the banner. Spectators
+  // get a local-only ✕ — the dice stay until the roller is done.
+  if (entry.rollId) {
+    const btn = document.createElement('button');
+    btn.className = 'btn ghost banner-btn';
+    if (mine) {
+      btn.textContent = 'Done';
+      btn.title = 'Dismiss and remove this roll’s dice for everyone';
+      btn.addEventListener('click', () => {
+        banner.classList.add('hidden');
+        requestClearRoll(entry.rollId);
+      });
+    } else {
+      btn.textContent = '✕';
+      btn.title = 'Dismiss for you — the dice stay until the roller is done';
+      btn.addEventListener('click', () => banner.classList.add('hidden'));
+    }
     holder.appendChild(btn);
   }
 }
@@ -1038,6 +1165,7 @@ function ceremonyFinish(roll) {
   roll.done = true;
   clearTimeout(ceremonyDismissTimer);
   ceremonyDismissTimer = setTimeout(dismissCeremonyUI, CEREMONY_DISMISS_MS);
+  runPendingClear(roll); // a clear that arrived mid-ceremony lands now
   if (rollQueue.length) playRoll(rollQueue.shift());
 }
 
@@ -1207,10 +1335,22 @@ function attributionCards(roll, entry) {
   return cards;
 }
 
+let verdictFor = null; // {rollId, mine} — what the verdict card's control acts on
+
 function renderVerdictCard(roll, entry) {
   const who = entry.playerName ? `${entry.playerName} · ` : '';
   document.getElementById('verdict-eyebrow').textContent = `${who}${entry.label || ''}`;
   document.getElementById('verdict-total').textContent = String(entry.total);
+
+  // §7.5: the roller's control reads Done and clears the roll for everyone;
+  // a spectator's reads ✕ and only dismisses locally.
+  const mine = !netOnline || (net && entry.playerId === net.playerId);
+  verdictFor = { rollId: entry.rollId || null, mine };
+  const doneBtn = document.getElementById('verdict-done');
+  doneBtn.textContent = mine ? 'Done' : '✕';
+  doneBtn.title = mine
+    ? 'Dismiss and remove this roll’s dice for everyone'
+    : 'Dismiss for you — the dice stay until the roller is done';
 
   const hasDc = Number.isInteger(entry.dc);
   const ring = document.getElementById('ring-fill');
@@ -1295,7 +1435,10 @@ document.addEventListener('keydown', (e) => {
 });
 document.getElementById('verdict-done').addEventListener('click', (e) => {
   e.stopPropagation();
+  const v = verdictFor;
   dismissCeremonyUI();
+  // Roller: per-roll Done — the dice leave with their moment (§7.5).
+  if (v && v.mine && v.rollId) requestClearRoll(v.rollId);
 });
 document.getElementById('verdict-again').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -1312,6 +1455,7 @@ const clock = new THREE.Clock();
 // fast-forward; the rAF loop just advances keyframe playback.
 function tick(dt, render = true) {
   stepPlayback(dt);
+  stepSinking(dt); // per-roll Done departures (§7.5)
   if (chips.length) positionChips();
   if (render) renderer.render(scene, camera);
 }
@@ -1413,6 +1557,10 @@ window.__diceDebug = {
     };
   },
   closePopover() { closePopover(); },
+  // per-roll Done (§7.5): the roller-side entry point + sink observability
+  clearRoll(rollId) { requestClearRoll(rollId); },
+  get sinkingCount() { return sinking.length; },
+  get pendingClears() { return [...pendingClears]; },
   sim(frames) { for (let i = 0; i < frames; i++) tick(1 / 60, false); },
   fastForward: fastForwardPlayback,
 };
@@ -3185,6 +3333,9 @@ function handleNetEvent(type, data) {
       break;
     case 'reveal':
       applyReveal(data.rollId);
+      break;
+    case 'roll-cleared': // per-roll Done (§7.5) — roller-validated server side
+      applyClearRoll(data.rollId);
       break;
     case 'offer':
       if (data.offer && !offers.some((o) => o.offerId === data.offer.offerId)) {

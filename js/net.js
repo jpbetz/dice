@@ -32,7 +32,7 @@ const REOPEN_MIN_MS = 1000;
 const REOPEN_MAX_MS = 15000;
 const SSE_EVENTS = [
   'hello', 'player-joined', 'player-left', 'player-renamed',
-  'roll', 'clear', 'reveal',
+  'roll', 'clear', 'reveal', 'roll-cleared',
   'offer', 'offer-claimed', 'offer-rescinded',
   'settings-changed',
 ];
@@ -148,6 +148,13 @@ export async function connect({ room, name, onEvent, onStatus } = {}) {
     // Flip a face-down roll for the whole table (roller only).
     async reveal(rollId) {
       const res = await withPlayer('/api/reveal', { rollId });
+      return res.ok;
+    },
+
+    // Per-roll Done (UX §7.5): remove one roll's dice for everyone. Roller
+    // only, like reveal; the table reacts to the 'roll-cleared' event.
+    async clearRoll(rollId) {
+      const res = await withPlayer('/api/clear-roll', { rollId });
       return res.ok;
     },
 

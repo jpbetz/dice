@@ -699,6 +699,8 @@ body.mini #corner-controls { display: flex; }  /* corner survives mini mode */
   filter: grayscale(0.6);
 }
 .value-chip.exploded { border-style: dashed; }
+/* per-roll Done (§7.5): the chip fades over the same ~300 ms its die sinks */
+.value-chip.chip-clearing { opacity: 0 !important; transition: opacity 0.3s ease-out; }
 .log-discarded { text-decoration: line-through; opacity: 0.5; }
 .log-mod { color: var(--gold-bright); font-weight: 700; }
 .log-part-label { font-variant: small-caps; color: var(--muted); font-weight: 400; letter-spacing: 0.04em; }
