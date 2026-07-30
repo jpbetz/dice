@@ -32,7 +32,7 @@ const REOPEN_MIN_MS = 1000;
 const REOPEN_MAX_MS = 15000;
 const SSE_EVENTS = [
   'hello', 'player-joined', 'player-left', 'player-renamed',
-  'roll', 'clear', 'reveal', 'roll-cleared',
+  'roll', 'clear', 'reveal', 'roll-cleared', 'roll-collected',
   'offer', 'offer-claimed', 'offer-rescinded',
   'settings-changed',
 ];
@@ -156,9 +156,18 @@ export async function connect({ room, name, onEvent, onStatus } = {}) {
     },
 
     // Per-roll Done (UX §7.5): remove one roll's dice for everyone. Roller
-    // only, like reveal; the table reacts to the 'roll-cleared' event.
+    // only for a roll still on the felt; once it is COLLECTED anyone may tidy
+    // it away (§7.7). The table reacts to the 'roll-cleared' event.
     async clearRoll(rollId) {
       const res = await withPlayer('/api/clear-roll', { rollId });
+      return res.ok;
+    },
+
+    // Collect a roll onto the shelf (UX §7.7). Roller only, like reveal; the
+    // table reacts to the 'roll-collected' {rollId, seq} broadcast — never to
+    // this return value.
+    async collectRoll(rollId) {
+      const res = await withPlayer('/api/collect-roll', { rollId });
       return res.ok;
     },
 
