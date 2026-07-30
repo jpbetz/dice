@@ -979,6 +979,8 @@ const peekEl = document.getElementById('peek-card');
 let peekRollId = null;       // rollId of the open peek, or null
 let peekHoverTimer = null;
 let peekCloseTimer = null;
+let peekW = 0;               // card box, cached by measurePeek (see positionPeek)
+let peekH = 0;
 
 function isPeekOpen() { return peekRollId !== null; }
 
@@ -1097,12 +1099,25 @@ function renderPeek() {
   }
 
   peekEl.classList.remove('hidden');
+  measurePeek();
   positionPeek();
+}
+
+// The card's box, read exactly where it can actually change: its own content
+// (renderPeek) and the viewport (resize / compact toggle). positionPeek runs
+// from positionShelfMarkers on EVERY animation frame while a peek is open, so
+// it must not touch layout — an offsetWidth read there forces a synchronous
+// reflow per frame, immediately after the marker style writes, alongside the
+// WebGL render and the physics step.
+function measurePeek() {
+  if (peekRollId === null) return;
+  peekW = peekEl.offsetWidth;
+  peekH = peekEl.offsetHeight;
 }
 
 // Anchor the card above its slot's marker point, clamped fully on screen —
 // an edge slot at 480×360 still shows the whole card (flipping below the
-// anchor if the top would clip).
+// anchor if the top would clip). Write-only: see measurePeek.
 function positionPeek() {
   if (peekRollId === null) return;
   const c = shelfClusters.get(peekRollId);
@@ -1110,8 +1125,8 @@ function positionPeek() {
   const v = new THREE.Vector3(shelfSlotX(c.slot), SHELF_MARKER_Y, SHELF_Z).project(camera);
   const ax = (v.x * 0.5 + 0.5) * window.innerWidth;
   const ay = (-v.y * 0.5 + 0.5) * window.innerHeight;
-  const w = peekEl.offsetWidth;
-  const h = peekEl.offsetHeight;
+  const w = peekW;
+  const h = peekH;
   const left = Math.max(8, Math.min(ax - w / 2, window.innerWidth - w - 8));
   let top = ay - 16 - h;
   if (top < 8) top = ay + 16; // clipped above: sit below the marker instead
@@ -2542,6 +2557,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
   applyCameraFraming(); // a narrower window refits the table and its shelf
   positionChips();
+  measurePeek(); // the card's max-width tracks the viewport (100vw - 16px)
   positionShelfMarkers();
 });
 
@@ -4097,6 +4113,7 @@ function setMini(on, persist = true) {
   if (persist) save(LS_MINI, on);
   applyCameraFraming();
   positionChips();
+  measurePeek(); // compact view resizes the card (smaller type, tighter padding)
   positionShelfMarkers(); // markers track the reframed camera (§7.7 parity)
   // An on-stage ceremony needs nothing: it keeps playing, re-scaled (§7.4).
   syncSettingsUI(); // the settings modal mirrors the mini preference
