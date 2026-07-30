@@ -848,8 +848,9 @@ function renderChips(entry, dice, staged = false) {
 function renderBreakdown(el, entry, hidden) {
   el.textContent = '';
   if (hidden) return;
-  const modParts = modPartsOf(entry);
-  if (entry.parts.length <= 1 && !entry.modifier && !modParts) return;
+  const mods = (modPartsOf(entry) || (entry.modifier ? [{ label: '', value: entry.modifier }] : []))
+    .filter((p) => p.value);
+  if (entry.parts.length <= 1 && !mods.length) return;
 
   entry.parts.forEach((p, i) => {
     if (i) el.append(' + ');
@@ -861,12 +862,9 @@ function renderBreakdown(el, entry, hidden) {
     el.appendChild(s);
   });
 
-  const mods = modParts
-    || (entry.modifier ? [{ label: '', value: entry.modifier }] : null);
-  if (!mods) return;
+  if (!mods.length) return;
   el.append(`  =  ${entry.sum}`);
   for (const p of mods) {
-    if (!p.value) continue;
     const m = document.createElement('span');
     m.className = 'log-mod';
     m.textContent = ` ${p.value >= 0 ? '+' : '−'}${Math.abs(p.value)}`;
