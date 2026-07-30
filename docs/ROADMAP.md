@@ -3,9 +3,9 @@
 Sequenced against [GOALS.md](GOALS.md) (the authority on priorities: core
 mechanics → organization → secrecy → systems literacy → effects →
 customization) and the 2026-07-30 goals audit, which verified every gap
-below empirically. [UX.md](UX.md) holds component specs; where it still
-references the rescinded DM seat, GOALS.md's superseded-decisions note wins
-until step 4's doc sweep.
+below empirically. [UX.md](UX.md) holds component specs; its §3 is now the
+as-built role-free visibility spec and the rescinded DM seat is gone from
+the docs (step 4's sweep).
 
 ## Tier 1 — Core mechanics completion
 
@@ -63,25 +63,47 @@ The audit's six-site hardcode inventory becomes a registry:
 
 ### 4. Visibility core
 
-The §3.0 redaction architecture minus the rescinded seat:
+UX.md §3's redaction architecture, minus the rescinded seat. The full
+contract is UX.md §3 (wire, projection, audience, reveal, offers) and
+§7.8 (notation):
 
-- `visibility` field beside mods: `open` | `held` (face-down today) |
-  `secret` (roller only — `/selfroll` gets real semantics) |
-  `whisper:[names]`; notation + popover picker + palette parity.
-- **Server-side redaction**: per-recipient projection on broadcast, join,
-  and hello (the broadcast loop already iterates player-by-player — the
-  hook point exists). Today's face-down is honor-system: values ship to
-  every client.
+- `visibility` field beside mods — **absent = open** (present-or-absent,
+  like `cleared`/`exp`, so plain payloads stay byte-identical);
+  `{mode: 'held'|'secret'|'whisper', audience[], revealAuthority}`.
+  `held` = face-down for everyone *including the roller*; `secret` = the
+  roll exists only for the roller, no reveal path (`/selfroll` gets real
+  semantics); `whisper` = named audience live, everyone else shrouded.
+  Notation flags `held` / `secret` / `w:Name` + popover picker + palette
+  parity.
+- **Server-side projection**: `projectEntryFor(entry, viewerId)` on
+  *every* egress — roll broadcast, the roller's roll response, the
+  claimer's claim response, reveal, hello, `/api/join`, shelf/log resync.
+  The broadcast loop already iterates player-by-player, but four of those
+  paths do not go through it. Today's face-down is honor-system: values
+  ship to every client.
+- **Audience resolution**: `w:` names matched case-insensitively against
+  the current roster at roll/offer creation, stored as ids; an unmatched
+  name rejects the action (`unknown_audience`) rather than silently
+  widening or narrowing it.
 - **Shrouded dice**: redacted viewers get the identity-correction replay
   with numberless obsidian material (they cannot compute face corrections
   without values — the wire change forces this anyway); reveal plays a
-  flip + staged beat. Face-down rolls join ceremonies (public stakes,
-  held result) instead of silently downgrading to Plain.
-- **Offer visibility**: offers carry visibility incl. offerer-audience
-  (result visible only to the offerer, reveal authority = offerer) — the
+  flip + staged beat, deferred if it lands mid-playback (the 7f9cdf5
+  race). Held rolls keep their full ceremony (public stakes, held result)
+  instead of silently downgrading to Plain.
+- **Reveal authority is the chooser**, server-enforced
+  (`403 not_reveal_authority`), and the reveal event carries the full
+  entry because shrouded clients never had the values.
+- **Offer visibility**: offers carry visibility chosen by the offerer,
+  applied verbatim to the claimer's roll; reveal authority = offerer. The
+  claimer is not in the audience unless named — that asymmetry is the
   role-free GM-screen roll. Today's face-down offer gives the claimer sole
-  reveal authority, the exact inverse.
-- Doc sweep: purge the nine audited DM-seat references from UX.md/ROADMAP.
+  reveal authority *and* the values, the exact inverse.
+- Accepted leak, documented: an exploding roll shows its extra dice to
+  shrouded viewers (physical analogy).
+- Doc sweep: purge the audited DM-seat references from UX.md/ROADMAP
+  (the count was nine; the real total was ~37 lines plus the mockup token
+  list in `docs/mockups/panel.html`).
 
 ## Tier 4 — State capture (goal 7)
 
@@ -101,8 +123,8 @@ The §3.0 redaction architecture minus the rescinded seat:
   button; the fixed 1.35 s timer stays as the spectator fallback).
 - "Always skip roll ceremony" personal setting; crit overlay made
   skippable; Esc joins click/Space as ceremony skip.
-- Interim reveal beat for held rolls (chip chorus + verdict stagger) ahead
-  of the full §3.1 flip.
+- Reveal-beat polish on top of step 4's §3.1 flip: chip chorus + verdict
+  stagger on the revealed entry (the flip itself ships with visibility).
 
 ### 7. Initiative helper
 

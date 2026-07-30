@@ -61,7 +61,8 @@ specifies components within them. Where the three disagree, this document wins.
     control and there never will be.
 11. **Secrecy without hierarchy.** Privacy is a per-roll choice by the
     roller (or offerer), not a privilege: a roll can be entirely secret,
-    result-secret (face-down, revealable), or visible only to a selected
+    result-secret (held — face-down for everyone including the roller,
+    revealable by whoever chose it), or visible only to a selected
     audience of named players. Offered rolls may carry these visibilities
     (an offer whose result only the offerer sees reproduces the classic
     GM-screen roll — without a GM role).
@@ -104,11 +105,19 @@ working, coherent mechanical foundation.
 
 ## Superseded decisions (flagged 2026-07-30)
 
-- **The DM seat (UX.md §3.4) is rescinded** by goal 10. Its four powers
-  return as role-free per-roll capabilities under goal 11: whisper-audience
-  rolls, offers with restricted result visibility, hidden Targets on offers
-  (visible to the offerer only until reveal), and housekeeping (already
-  universal). UX.md §3's redaction architecture survives; its seat does not.
+*History, not instructions. Each entry records a decision that was
+overturned and where the replacement now lives; the replacement documents
+are authoritative, and nothing here needs to be consulted to build.*
+
+- **The DM seat (formerly UX.md §3.4) is rescinded** by goal 10.
+  *Settled:* UX.md §3 has been rewritten as the role-free visibility spec
+  and every trace of the seat is gone from it — no `room.host`, no
+  `/api/host/*`, no `host-changed`, no host-gated reveal. Three of its four
+  powers returned as per-roll choices (whisper audiences, offers with
+  restricted result visibility, universal housekeeping); the fourth,
+  hidden Targets, was rejected outright — stakes are public on every
+  visibility rung (UX.md §3.4). Its redaction architecture survived and
+  became the shipped projection model.
 - **"Physical analogy over UI" is softened** by goals 3–4: physical
   look-and-feel grounds the experience; physical interaction is optional
   delight. The build-a-tray (UX.md §7.1) moves to the delight tier.
