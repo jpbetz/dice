@@ -71,11 +71,16 @@ async function postJson(path, body, timeout) {
  * @param {string}   opts.name      display name (server trims + caps at 24)
  * @param {function} opts.onEvent   (type, data) for hello/player-joined/player-left/roll/clear
  * @param {function} opts.onStatus  ('online' | 'offline')
+ * @param {function} opts.onRefused ({path, status, code, message}) when the
+ *   server REFUSES an action we took — a whisper to nobody, a reveal we do not
+ *   hold. Every such answer used to resolve to a quiet null and the player was
+ *   left staring at a table where nothing happened.
  * @returns {Promise<object>} connection handle (see module header)
  */
-export async function connect({ room, name, onEvent, onStatus } = {}) {
+export async function connect({ room, name, onEvent, onStatus, onRefused } = {}) {
   const emit = typeof onEvent === 'function' ? onEvent : () => {};
   const report = typeof onStatus === 'function' ? onStatus : () => {};
+  const refused = typeof onRefused === 'function' ? onRefused : () => {};
 
   const joined = await postJson('/api/join', { room, name }, JOIN_TIMEOUT_MS);
   if (!joined.ok || !joined.data || !joined.data.playerId) {
@@ -361,7 +366,24 @@ export async function connect({ room, name, onEvent, onStatus } = {}) {
     }
     if (res.ok) setStatus('online');
     else if (res.status === 0) setStatus('offline');
+    else reportRefusal(path, res);
     return res;
+  }
+
+  // A refusal is the server saying "no, and here is why" — worth telling the
+  // player. A 404 is NOT one: an already-claimed offer, a roll that aged out
+  // of the log, a re-join race all answer 404 as an expected no-op, and
+  // nagging about those would be noise.
+  function reportRefusal(path, res) {
+    if (res.status === 404) return;
+    const data = res.data || {};
+    if (typeof data.error !== 'string') return;
+    refused({
+      path,
+      status: res.status,
+      code: typeof data.code === 'string' ? data.code : 'error',
+      message: data.error,
+    });
   }
 
   openStream();

@@ -354,6 +354,19 @@ html, body {
   border: 1px solid var(--panel-border);
 }
 #status-pill.offline { color: var(--red); border-color: rgba(226, 73, 59, 0.45); }
+/* A refusal carries the server's own sentence, so it drops the pill's
+   uppercase shout and clips instead of stretching the header (full text in
+   the title attribute). */
+#status-pill.refused {
+  color: var(--gold);
+  border-color: rgba(212, 175, 90, 0.45);
+  text-transform: none;
+  letter-spacing: 0;
+  max-width: min(42ch, 40vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 #status-pill.hidden { display: none; }
 
 /* ---------- log ---------- */
