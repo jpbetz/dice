@@ -1,105 +1,129 @@
 # Roadmap
 
-Implementation order reflects dependencies and effort. Items marked *(in
-progress)* are being built now.
+> **UX spec:** [UX.md](UX.md) is the authoritative design for notation, roll
+> experiences, visibility/DM seat, and dice sets, with mockups in
+> [mockups/](mockups/). Its §7 addendum (physical tray, attributed modifiers,
+> room-wide experiences) supersedes conflicting details anywhere else.
 
-## 1. Corner controls *(in progress)*
+## Design principles (from Joe, guiding all UX work)
 
-Two persistent icon buttons pinned bottom-right in **both** modes: a
-mini/expand toggle (`⤡` in full view, `⤢` in mini) and `✕` clear table.
-Mute and Log stay top-right; the mini bar keeps only group pills.
+- **Physical analogy over UI.** Prefer manipulating the world to abstract
+  widgets: build a tray by grabbing/dragging actual 3D dice into an actual
+  tray on the table. Panels and buttons are the fallback, not the default.
+- **Notation as the power-user escape hatch.** A mini-terminal accepting the
+  community-standard dice notation (Roll20/Foundry dialect) coexists with the
+  physical input — DMs paste commands; everyone else touches dice.
+- **Rolls are planned experiences.** A roll has a setup (what's being rolled
+  and why), known expectations and stakes (target number, title text on the
+  mat), a rolling phase everyone watches, and a big reveal connected back to
+  those expectations. Never just "numbers appeared".
+- **Bonuses are attributed.** Modifiers carry named sources ("+2 Proficiency",
+  "+1 Guidance") shown as labeled chips on the roll card, BG3-style.
+- **Advantage shows both dice.** Twin hero dice side by side; the discarded
+  one visibly loses.
+- **Shared first.** The table is a room-wide experience: templates, settings,
+  and moments sync to everyone; per-player privacy is the exception, added
+  late (see build order).
 
-## 2. Change player name *(in progress)*
+## Build order
 
-Click your own name in the players panel to edit inline; Enter commits.
-Updates localStorage and `POST /api/rename` → `player-renamed` broadcast.
-Past log entries keep their historical name. Solo mode edits the stored name.
+Each step is independently shippable and sets up the next. Rationale in one
+line per step.
 
-## 3. Roll mechanics core *(in progress)*
+### 1. Notation layer (UX.md §1 + §7.2)
 
-One coherent engine + UX for everything that transforms a dice pool. Clicking
-a group roll stays a plain roll; a `±` button per group opens a compact
-popover:
+`js/notation.js` (Roll20 dialect: glued mods on single-type pools,
+trailing flags on mixed, `2d20kh1`→adv collapse, inclusive-`<`
+normalization, `d100` expansion, `+N[label]` attributed parts, `dc N`,
+`# comment`), canonical renderer replacing `formula()`, command box with
+three-state validation + Monte Carlo preview + history, the ± popover per
+`mockups/panel.html`, codec v2, `rollspec.mods.parts`, server re-parse.
+*Why first: the engine already does all of this — notation is the missing
+compose surface, and every later feature describes rolls in this language.*
 
-- **Modifier** — quick chips (−3…+3) plus a stepper for bigger values.
-  Total shows as `17 = 14 + 3`; the Soul Deal meaning reads the modified
-  total (column from the counting dice).
-- **Advantage / disadvantage** — each d20 in the pool is rolled twice,
-  keep highest/lowest; the discarded die lands on the table too, shown
-  struck-through on its chip and in the log.
-- **Keep / drop** — kh/kl/dh/dl with a count, applied across the group's
-  dice ("4d6 drop lowest"). Discarded dice render like advantage discards.
-- **Reroll low** — "reroll ≤ N" once per die (Great Weapon Fighting);
-  the replacement die is physically thrown, the original struck through.
-- **Exploding dice** — a die landing on its max face throws a bonus die of
-  the same type (chain cap 3), marked ✴ on its chip.
-- **Face-down rolls** — the roles-free blind roll: dice land normally but
-  chips/banner/log show `?` to everyone; the roller clicks Reveal to flip it
-  for the table. (Values technically land face-up on the 3D dice — the
-  hidden layer is the readable UI, which is fine for friendly tables.)
-- **Offered rolls** — "Offer to table" broadcasts a prepared roll card
-  (label, dice, mods) to the room; any player can execute it once, and the
-  roll attributes to whoever clicked. No DM roles.
-- **Reroll last** — `⟳` on the banner and log entries repeats that roll's
-  full spec.
-- **Probability preview** — the popover shows the spec's min / avg / max
-  before rolling (Monte Carlo, client-side).
+### 2. Room settings channel + settings panel (UX.md §7.3; old settings item)
 
-Server: `/api/roll` accepts a `mods` spec, composes the physical dice list
-(advantage pairs, reroll replacements, explosion children), marks per-die
-metadata (discarded / exploded / rerolled-from), and returns the
-authoritative total. All value generation stays server-side.
+Server: room `settings` object in `hello` + a `settings-changed` event, any
+player may write (no roles). Client: gear → modal with "Just you" (mute,
+mini pref) and "Everyone at the table" (felt/background theme) sections;
+solo persists globals locally.
+*Why second: room-wide experiences (Joe's call) and later mats/sets ride
+this channel; background themes come along nearly free.*
 
-## 4. Dice color customization
+### 3. Roll moments / experiences (UX.md §2, room-wide per §7.3)
 
-Precedence: individual die > group > player > die-type default. Players
-inherit their assigned color and customize from the players panel; group
-rows get a swatch. dice.js material cache re-keyed to `(type, color)`; roll
-events carry resolved per-die colors so all clients match.
+Template records (Plain / Check / Cinematic) stored in room settings;
+intent card with mat text (canvas decal in the felt) and visible Target;
+staging timeline with hit-stop, chip stagger, attributed-modifier fly-ins,
+top-anchored verdict; ≤1.6s post-settle, always skippable; mini-mode
+degradation. Hidden DCs wait for step 10.
+*Why third: this is the headline experience the app is building toward,
+and steps 1–2 are exactly its prerequisites.*
 
-## 5. Settings panel: local + global scopes; background
+### 4. Physical build-a-tray (UX.md §7.1)
 
-Gear icon → modal with "Just you" (mute, mini preference, own dice color)
-and "Everyone at the table" (felt/background theme) sections. Globals ride a
-`settings` SSE event, included in `hello`. Any player may change them. Solo
-mode persists globals locally.
+Shelf of real dice at the felt edge; click/drag into a recessed tray;
+tray = draft group, two-way-bound to the notation box; rolling hurls those
+dice. Buttons remain for mini/accessibility.
+*Why here: shares step 3's raycast/decal machinery; input polish lands
+best right after the output ceremony exists.*
 
-## 6. Graphical build-a-tray
+### 5. Dice sets & colors (UX.md §4)
 
-Die-type buttons and tray chips become images of the actual dice: render
-each mesh once to transparent offscreen thumbnails at startup (regenerate on
-color changes). Stretch: slow-spinning live die on hover.
+`(type, setId)` material cache, 10 launch sets with `extends` inheritance,
+per-player identity set (synced via step 2's channel), per-group override,
+picker per `mockups/dice-sets.html` with live thumbnails.
+*Why here: pure delight layer; benefits from settings sync and the picker
+slots into the roll moment.*
 
-## 7. Per-player roll mats
+### 6. Per-player roll mats
 
-Global setting splitting the table into per-player labeled areas; throws
-target the roller's mat. Mat color/style is per-player but visible to all
-(rides #5's settings sync). Corner `✕` clears your mat; long-press clears
-all. Depends on #5.
+Table splits into labeled per-player areas; throws target the roller's
+mat; mat color/style is per-player but visible to all (step 2 channel);
+corner ✕ clears your mat, long-press clears all.
+*Why here: needs settings sync (2) + decal machinery (3); pairs naturally
+with sets (5) for per-player identity.*
 
-## 8. Success counting + special dice
+### 7. Initiative helper
 
-Dice-pool success counting ("7d10, count ≥ 8" → banner shows successes,
-Soul Deal chart skipped), Fate/Fudge dice (+/blank/−), coin flips, and a
-d100 convenience reading d10x + d10 together as 1–100. Needs dice.js custom
-face sets.
+One shared "roll initiative" action; everyone rolls once; sorted order
+list visible to the room until cleared.
+*Why here: most-requested table utility that needs nothing from the
+privacy work.*
 
-## 9. Initiative helper
+### 8. Success counting + special dice
 
-One shared "roll initiative" action; everyone's roll collects into a sorted
-order list visible to the room until cleared.
+Dice-pool success counting (`cs>=N`, banner shows successes, Soul Deal
+skipped), Fate/Fudge dice, coins, d100 paired-read (notation side shipped
+in step 1). Needs dice.js custom face sets.
 
-## 10. Roll statistics (local)
+### 9. Roll statistics (local) + log export
 
-Per-player distribution and average-vs-expected from locally retained
-history (local-only, preserving statelessness).
+Per-player distribution / average-vs-expected from locally retained
+history; copy/download the log as text/CSV.
 
-## 11. Log export
+### 10. Visibility suite + DM seat (UX.md §3) — deprioritized per Joe
 
-Copy/download the session log as text/CSV.
+Server-side redaction projections, Secret-to-me and Whisper-by-name modes,
+the shrouded-die replay (obsidian-blank material, flip on reveal —
+upgrades today's UI-only face-down), optional claimable DM seat (whisper
+default, blind offers, hidden DCs, housekeeping).
 
-## 12. Save-variant + formula codec extension
+### 11. Breakout rooms / advanced privacy (future)
 
-Groups carry modifiers/options ("Attack=1d20+3", advantage flag) in the
-formula and the `#g=` URL codec; "save as variant" in the popover.
-Follow-up to #3.
+Side tables: a subset of players splits into a linked room (same
+identities, quick switch, maybe a shared "return to main table" rail),
+for private scenes and side conversations. Design TBD when we get here.
+
+## Shipped
+
+- **Multiplayer core** — SSE rooms, server-authoritative values,
+  simulate-ahead replay with face correction, solo fallback.
+- **Soul Deal meanings** — summed total against the chart; crit effects.
+- **Mini mode** + persistent corner controls (⤡/⤢ toggle, ✕ clear).
+- **Groups in the URL** (`#g=`), copy-link.
+- **Player rename** (inline, propagated).
+- **Roll mechanics engine** — shared `js/rollspec.js` (modifier, adv/dis,
+  keep/drop, reroll-low, exploding) on server and solo; per-die metadata
+  display (struck discards, ✴ children, `17 = 14 + 3`); face-down `?` +
+  Reveal; offered-roll cards (offer/claim/withdraw); reroll-last ⟳.

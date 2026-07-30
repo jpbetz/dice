@@ -1,0 +1,2267 @@
+<!DOCTYPE html>
+<!--
+Copyright 2026 The Dice Table Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=============================================================================
+MOCKUP — redesigned left panel.  docs/UX.md §1.3 (command box), §1.4 (notation
+chips), §2.3 (attach a moment), §3.2 (visibility picker), §5 (visual language).
+
+Self-contained: no external resources, all CSS/JS inline. Nothing here is
+wired to the app; the notation parser, canonical renderer and probability
+preview are throwaway re-implementations of the shapes UX.md specifies, so
+that the states in this page are real states rather than screenshots.
+
+Live in this page (click things):
+  · command box: three-state validation, caret + "Use this", ↑/↓ history,
+    "/" token list, Enter "rolls", tray ↔ box round-tripping
+  · ± popover: every control rewrites the canonical string and the preview
+  · notation chips: click to copy
+=============================================================================
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dice Table — left panel mockup</title>
+<style>
+/* ---------------------------------------------------------------- tokens
+   Same palette as css/style.css. Additions are for the modernization:
+   --hair (hairline dividers), --well (inset field ground), --font-mono. */
+:root {
+  --bg: #14100c;
+  --panel: rgba(24, 19, 14, 0.88);
+  --panel-border: rgba(212, 175, 55, 0.25);
+  --gold: #d4af37;
+  --gold-bright: #ffd766;
+  --ivory: #f3ead7;
+  --muted: #9c8f77;
+  --red: #e2493b;
+  --amber: #d9a441;
+  --hair: rgba(255, 255, 255, 0.07);
+  --well: rgba(0, 0, 0, 0.32);
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ease-plant: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ivory);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+body { overflow-x: hidden; }
+
+/* ---------------------------------------------------------------- felt */
+.felt {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  /* green felt — matched to makeFeltTexture() (#1f3128) in js/main.js */
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.04) 0.6px, transparent 0.7px) 0 0 / 7px 7px,
+    radial-gradient(ellipse 70% 55% at 46% 34%, #2f4038 0%, #24332b 45%, #16211b 78%, #0e1612 100%);
+  pointer-events: none;
+}
+.felt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 52%, rgba(0,0,0,0.6) 100%);
+}
+/* §5.4 mat text — in the real app this is a canvas-texture decal on the table
+   plane, under the dice. This strip is the stand-in, so the popover's "Mat
+   text" field has a visible consequence. */
+.table-strip {
+  position: relative;
+  margin-top: 26px;
+  min-height: 210px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 34px 26px;
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  overflow: hidden;
+  background: radial-gradient(ellipse 80% 120% at 50% 45%, #35473d 0%, #263830 55%, #131d17 100%);
+}
+.table-strip::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.55) 100%);
+  pointer-events: none;
+}
+.mat-text {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: clamp(17px, 2.4vw, 32px);
+  text-transform: uppercase;
+  letter-spacing: 0.3em;
+  line-height: 1.5;
+  color: var(--gold-bright);
+  opacity: 0.2;
+  transition: opacity 0.6s ease;
+}
+.mat-text.off { opacity: 0; }
+.strip-cap {
+  position: absolute;
+  left: 16px;
+  bottom: 12px;
+  right: 16px;
+  z-index: 2;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: #6b6154;
+}
+.strip-cap b { color: var(--muted); font-weight: 600; }
+
+/* ---------------------------------------------------------------- page */
+.page {
+  position: relative;
+  z-index: 2;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 26px 20px 60px;
+}
+
+.page-head { margin-bottom: 22px; }
+.page-head h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  letter-spacing: 0.02em;
+  font-weight: 400;
+}
+.page-head h1 b { color: var(--gold-bright); font-weight: 400; }
+.page-head p {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  max-width: 76ch;
+  line-height: 1.55;
+}
+.refs { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+.ref {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+/* first track = panel (296) + gutter the ± popover floats in (328) */
+.stage {
+  display: grid;
+  grid-template-columns: 640px minmax(300px, 1fr);
+  gap: 26px;
+  align-items: start;
+}
+@media (max-width: 1040px) {
+  .stage { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* the panel column is the positioning context for the popover */
+.panel-col { position: relative; }
+
+/* ---------------------------------------------------------------- panels
+   css/style.css .panel, modernized: 12px radius, stronger blur, a 1px inner
+   highlight instead of a heavier border, shadow kept under 12px blur-depth
+   budget of §5.6. */
+.panel {
+  background: linear-gradient(180deg, rgba(31, 25, 18, 0.9), rgba(20, 16, 12, 0.92));
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 14px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+#left-panel {
+  width: 296px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.panel h2 {
+  margin: 0 0 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.panel h2 .grow { flex: 1; }
+.app-title {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: 21px;
+  letter-spacing: 0.03em;
+  color: var(--ivory);
+  font-weight: 400;
+}
+.hint { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
+.label {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------- buttons */
+.btn {
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--hair);
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--ivory);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s, color 0.15s;
+}
+.btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.11); border-color: var(--panel-border); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: 0.38; cursor: default; }
+.btn.primary {
+  background: linear-gradient(180deg, #caa53a, #9c7c1e);
+  border-color: #e7c968;
+  color: #221a08;
+  font-weight: 700;
+}
+.btn.primary:hover:not(:disabled) { background: linear-gradient(180deg, #e0bb4d, #b18f28); }
+.btn.ghost { background: rgba(0, 0, 0, 0.25); }
+.btn.tiny {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  color: var(--muted);
+}
+.btn.tiny:hover { color: var(--ivory); }
+.btn-row { display: flex; gap: 8px; margin-top: 10px; }
+.btn-row .btn { flex: 1; }
+.btn-row input {
+  flex: 2;
+  min-width: 0;
+  background: var(--well);
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  color: var(--ivory);
+  padding: 7px 10px;
+  font-size: 12.5px;
+  font-family: inherit;
+}
+.btn-row input::placeholder { color: #6b6154; }
+.btn-row input:focus { outline: none; border-color: rgba(212, 175, 55, 0.55); }
+
+/* ---------------------------------------------------------- die buttons */
+#die-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.die-btn {
+  position: relative;
+  padding: 8px 2px;
+  border-radius: 9px;
+  border: 1px solid var(--hair);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ivory);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.die-btn:hover { border-color: var(--die-color, var(--gold)); background: rgba(255, 255, 255, 0.1); }
+.die-btn::before {
+  content: '';
+  display: block;
+  width: 9px; height: 9px;
+  margin: 0 auto 5px;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  background: var(--die-color, #888);
+}
+
+/* --------------------------------------------------------- tray chips */
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; min-height: 28px; }
+.die-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--die-color, #888) 70%, transparent);
+  background: color-mix(in srgb, var(--die-color, #888) 20%, transparent);
+  color: var(--ivory);
+  cursor: pointer;
+}
+.die-chip:hover { background: color-mix(in srgb, var(--die-color, #888) 38%, transparent); }
+.die-chip .dot { width: 7px; height: 7px; border-radius: 2px; transform: rotate(45deg); background: var(--die-color, #888); }
+.tray-empty { font-size: 11.5px; color: #6b6154; align-self: center; }
+
+/* ------------------------------------------------ command box (§1.3) */
+.cmd { margin-top: 10px; }
+.cmd-wrap { position: relative; }
+.cmd-in {
+  width: 100%;
+  padding: 8px 62px 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--hair);
+  background: var(--well);
+  color: var(--ivory);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.cmd-in::placeholder { color: #665d50; }
+.cmd-in:focus { outline: none; }
+.cmd.is-valid .cmd-in {
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.12);
+}
+.cmd.is-invalid .cmd-in { border-color: var(--red); }
+.cmd-kbd {
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b6154;
+  border: 1px solid var(--hair);
+  border-radius: 5px;
+  padding: 2px 5px;
+  pointer-events: none;
+}
+/* caret line: same font + left inset as the input (10px padding + 1px border)
+   so column N lines up under column N of the command */
+.cmd-caret {
+  height: 13px;
+  padding-left: 11px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 12px;
+  letter-spacing: 0;
+  white-space: pre;
+  color: var(--red);
+  overflow: hidden;
+}
+/* fixed-height message slot: nothing in the panel ever jumps */
+.cmd-slot {
+  min-height: 18px;
+  font-size: 11.5px;
+  line-height: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cmd-slot .ok { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--gold); }
+.cmd-slot .muted { color: var(--muted); }
+.cmd-slot .bad { color: var(--red); }
+.cmd-slot .warn { color: var(--amber); }
+.cmd-slot .note { color: var(--muted); font-style: italic; }
+.fix-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: rgba(212, 175, 55, 0.1);
+  color: var(--gold-bright);
+  cursor: pointer;
+}
+.fix-chip:hover { background: rgba(212, 175, 55, 0.22); }
+.fix-chip b { font-weight: 400; color: var(--muted); margin-right: 5px; font-family: var(--font-ui); }
+
+/* "/" token list */
+.cmd-menu {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  margin-top: 3px;
+  padding: 4px;
+  border-radius: 9px;
+  border: 1px solid var(--panel-border);
+  background: rgba(18, 14, 10, 0.97);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+  max-height: 208px;
+  overflow-y: auto;
+}
+.cmd-menu.hidden { display: none; }
+.tok {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.tok.on { background: rgba(212, 175, 55, 0.14); }
+.tok code { font-family: var(--font-mono); font-size: 11.5px; color: var(--gold-bright); flex: none; min-width: 62px; }
+.tok span { font-size: 11px; color: var(--muted); }
+
+/* --------------------------------------------------- saved groups (§1.4) */
+#groups-list { margin: 0 -4px; }
+.group-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--hair);
+  border-radius: 8px;
+}
+.group-row:last-child { border-bottom: none; }
+.group-row.open { background: rgba(212, 175, 55, 0.06); box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.16); }
+.group-info { min-width: 0; cursor: pointer; text-align: left; background: none; border: 0; padding: 0; color: inherit; font: inherit; }
+.group-info:hover .group-name { color: var(--gold-bright); }
+.group-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.group-name {
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.15s;
+}
+/* an unnamed group is labelled by its notation, and that label is the chip */
+.group-name.as-notation {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  cursor: copy;
+}
+.badges { display: flex; align-items: center; gap: 4px; flex: none; }
+.group-meta { display: flex; align-items: center; gap: 5px; margin-top: 3px; min-width: 0; }
+.group-formula {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 1px 5px;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: copy;
+  transition: color 0.15s, border-color 0.15s;
+}
+.group-formula:hover { color: var(--ivory); border-color: var(--panel-border); }
+.badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--hair);
+  border-radius: 4px;
+  padding: 1px 4px;
+  line-height: 1.5;
+}
+.badge.exp { color: var(--gold); border-color: rgba(212, 175, 55, 0.3); }
+.badge.eye { padding: 1px 3px; }
+.badge svg { display: block; }
+.set-swatch { flex: none; width: 8px; height: 8px; border-radius: 2px; transform: rotate(45deg); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); }
+.group-mods {
+  width: 25px; height: 25px;
+  border-radius: 8px;
+  border: 1px solid var(--hair);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.group-mods:hover { color: var(--ivory); border-color: var(--panel-border); }
+.group-row.open .group-mods { color: var(--gold-bright); border-color: rgba(212, 175, 55, 0.5); background: rgba(212, 175, 55, 0.14); }
+/* seven filled gold buttons would blow the §5.1 rationing rule: row Rolls are
+   outlined, the one filled action per panel is the tray's Roll. */
+.group-roll {
+  padding: 4px 11px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  background: transparent;
+  color: var(--gold-bright);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.group-roll:hover { background: rgba(212, 175, 55, 0.16); border-color: var(--gold); }
+.group-del {
+  border: none;
+  background: none;
+  color: #5f574b;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 3px;
+}
+.group-del:hover { color: var(--red); }
+
+/* ------------------------------------------------------- ± popover */
+.popover {
+  position: absolute;
+  left: 312px;
+  width: 312px;
+  z-index: 25;
+  padding: 0;
+  animation: pop-in 0.22s var(--ease-plant);
+}
+@keyframes pop-in {
+  from { transform: translateY(6px) scale(0.985); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.popover::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: var(--arrow-top, 26px);
+  width: 9px; height: 9px;
+  transform: rotate(45deg);
+  background: rgba(28, 22, 16, 0.95);
+  border-left: 1px solid var(--panel-border);
+  border-bottom: 1px solid var(--panel-border);
+}
+@media (max-width: 1040px) {
+  .popover { position: static; width: 100%; margin-top: 12px; }
+  .popover::before { display: none; }
+}
+.pop-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--hair);
+  position: sticky;
+  top: 0;
+  background: linear-gradient(180deg, rgba(31, 25, 18, 0.98), rgba(28, 22, 16, 0.96));
+  backdrop-filter: blur(14px);
+  z-index: 2;
+}
+.pop-head .who { flex: 1; min-width: 0; }
+.pop-head .who .nm { font-family: var(--font-display); font-size: 14px; }
+.pop-echo {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: copy;
+}
+.pop-echo:hover { color: var(--gold-bright); }
+.pop-close {
+  flex: none;
+  border: 0;
+  background: none;
+  color: #6b6154;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.pop-close:hover { color: var(--ivory); }
+
+.sec { padding: 11px 14px; border-bottom: 1px solid var(--hair); }
+.sec > .label { display: block; margin-bottom: 7px; }
+.sec.tight { padding-top: 9px; padding-bottom: 9px; }
+.row { display: flex; align-items: center; gap: 8px; }
+.row + .row { margin-top: 8px; }
+.row .grow { flex: 1; min-width: 0; }
+.row-label { font-size: 12px; color: var(--ivory); }
+.row-sub { font-size: 10.5px; color: #6b6154; margin-top: 3px; }
+.sec.off { opacity: 0.5; }
+
+.seg { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--hair); border-radius: 9px; background: rgba(0, 0, 0, 0.28); }
+.seg button {
+  flex: 1;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 5px 3px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.seg button:hover { color: var(--ivory); }
+.seg button[aria-pressed="true"] {
+  background: rgba(212, 175, 55, 0.16);
+  color: var(--gold-bright);
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.32);
+}
+.seg button:disabled { opacity: 0.4; cursor: default; }
+.seg.mono button { font-family: var(--font-mono); font-size: 10.5px; }
+.seg .add { flex: 0 0 26px; }
+
+.mchips { display: flex; gap: 4px; }
+.mchip {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 4px 0;
+  border-radius: 7px;
+  border: 1px solid var(--hair);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.mchip:hover { color: var(--ivory); background: rgba(255, 255, 255, 0.1); }
+.mchip[aria-pressed="true"] {
+  color: var(--gold-bright);
+  border-color: rgba(212, 175, 55, 0.45);
+  background: rgba(212, 175, 55, 0.16);
+}
+
+.stepper { display: inline-flex; align-items: center; border: 1px solid var(--hair); border-radius: 8px; background: rgba(0, 0, 0, 0.28); flex: none; }
+.stepper button { width: 23px; height: 24px; border: 0; background: none; color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; }
+.stepper button:hover { color: var(--gold-bright); }
+.stepper output {
+  min-width: 34px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ivory);
+}
+.stepper.dim { opacity: 0.45; }
+
+.sw {
+  width: 30px; height: 17px;
+  flex: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--hair);
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.16s, border-color 0.16s;
+}
+.sw::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: left 0.16s var(--ease-plant), background 0.16s;
+}
+.sw[aria-pressed="true"] { background: rgba(212, 175, 55, 0.26); border-color: rgba(212, 175, 55, 0.5); }
+.sw[aria-pressed="true"]::after { left: 15px; background: var(--gold-bright); }
+
+.tin {
+  width: 100%;
+  min-width: 0;
+  background: var(--well);
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  color: var(--ivory);
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: inherit;
+}
+.tin::placeholder { color: #625a4e; }
+.tin:focus { outline: none; border-color: rgba(212, 175, 55, 0.55); }
+.tin.caps { text-transform: uppercase; letter-spacing: 0.12em; font-size: 10.5px; }
+.tin.num { width: 58px; flex: none; font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: center; }
+.field { margin-top: 7px; }
+.field > .label { display: block; margin-bottom: 4px; }
+.stack.hidden { display: none; }
+
+.whisper { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.whisper.hidden { display: none; }
+.pchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  cursor: pointer;
+}
+.pchip .pdot { width: 8px; height: 8px; border-radius: 50%; }
+.pchip[aria-pressed="true"] { color: var(--ivory); border-color: rgba(212, 175, 55, 0.45); background: rgba(212, 175, 55, 0.14); }
+.pchip.dm { font-family: var(--font-display); letter-spacing: 0.06em; }
+
+.pop-preview {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  padding: 10px 14px 0;
+}
+.pop-preview .odds { color: var(--ivory); }
+.pop-note { padding: 4px 14px 0; font-size: 10.5px; color: #6b6154; }
+.pop-actions { display: flex; gap: 8px; padding: 10px 14px 14px; }
+.pop-actions .btn { flex: 1; }
+.eye { display: inline-flex; vertical-align: -1px; margin-left: 5px; }
+
+/* --------------------------------------------------------- annotations */
+.notes { display: grid; gap: 14px; }
+.note-card {
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  padding: 14px 15px;
+  background: rgba(20, 16, 12, 0.55);
+  backdrop-filter: blur(8px);
+}
+.note-card h3 {
+  margin: 0 0 4px;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--gold);
+  font-weight: 600;
+}
+.note-card p { margin: 6px 0 0; font-size: 12px; line-height: 1.6; color: var(--muted); }
+.note-card p b { color: var(--ivory); font-weight: 600; }
+.note-card code { font-family: var(--font-mono); font-size: 11.5px; color: var(--gold-bright); }
+.note-card .ref { display: inline-block; margin-top: 10px; }
+.states { display: grid; gap: 12px; margin-top: 10px; }
+.state-cap {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #6b6154;
+  margin-bottom: 3px;
+}
+.state-cap b { color: var(--ivory); font-weight: 600; letter-spacing: 0.16em; }
+.states .cmd { margin-top: 0; }
+.states .cmd-kbd { display: none; }
+.states .cmd-in { padding-right: 10px; }
+
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+
+/* mini-mode pills preview */
+.mini-strip { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.mini-pill {
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: rgba(24, 19, 14, 0.9);
+  color: var(--ivory);
+  font-family: var(--font-display);
+  font-size: 12px;
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mini-pill .eye { margin-left: 0; color: var(--muted); }
+
+/* ------------------------------------------------------------- toast */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translate(-50%, 12px);
+  z-index: 50;
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: rgba(18, 14, 10, 0.95);
+  border: 1px solid var(--panel-border);
+  color: var(--ivory);
+  font-size: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s, transform 0.22s var(--ease-plant);
+}
+#toast.on { opacity: 1; transform: translate(-50%, 0); }
+#toast code { font-family: var(--font-mono); color: var(--gold-bright); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.08s !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="felt"></div>
+
+<div class="page">
+  <header class="page-head">
+    <h1>Left panel — <b>notation, moments, visibility</b></h1>
+    <p>
+      Mockup of the redesigned <code>#left-panel</code>: canonical notation on every saved group, the
+      paste-in command box with its three validation states, and the <b>±</b> popover carrying modifier,
+      advantage, keep/drop, reroll, explode, visibility, the roll experience and its Target. Everything
+      is live — the parser, canonical renderer and probability preview here are throwaway stand-ins for
+      <code>js/notation.js</code> so the states are real rather than drawn.
+    </p>
+    <div class="refs">
+      <span class="ref">UX §1.3 command box</span>
+      <span class="ref">§1.4 notation chips</span>
+      <span class="ref">§1.5 round-trip</span>
+      <span class="ref">§2.3 attach a moment</span>
+      <span class="ref">§3.2 four visibility modes</span>
+      <span class="ref">§5 visual language</span>
+    </div>
+  </header>
+
+  <div class="stage">
+    <!-- ============================ the panel ============================ -->
+    <div class="panel-col">
+      <aside id="left-panel">
+        <div class="panel" id="builder-panel">
+          <h1 class="app-title">⚄ Dice Table</h1>
+          <h2><span class="grow">Build a tray</span></h2>
+          <div id="die-buttons"></div>
+          <div id="tray" class="chip-row" title="Click a chip to remove it"></div>
+
+          <!-- §1.3 command box: below the tray chip row, above Roll/Empty -->
+          <div id="cmd-host"></div>
+
+          <div class="btn-row">
+            <button id="roll-tray" class="btn primary">Roll</button>
+            <button id="clear-tray" class="btn">Empty</button>
+          </div>
+          <div class="btn-row">
+            <input id="group-name" type="text" placeholder="Name this group…" maxlength="24">
+            <button id="save-group" class="btn">Save</button>
+          </div>
+        </div>
+
+        <div class="panel" id="groups-panel">
+          <h2>
+            <span class="grow">Saved groups</span>
+            <button class="btn tiny" title="Copy a URL that restores these groups anywhere">copy link</button>
+          </h2>
+          <div id="groups-list"></div>
+        </div>
+      </aside>
+
+      <!-- ± popover, open on "Deception" -->
+      <div class="panel popover" id="popover">
+        <div class="pop-head">
+          <div class="who">
+            <div class="nm" id="pop-name">Deception</div>
+            <button class="pop-echo" id="pop-echo" title="Copy notation"></button>
+          </div>
+          <button class="pop-close" title="Close">✕</button>
+        </div>
+
+        <!-- modifier -->
+        <div class="sec">
+          <span class="label">Modifier</span>
+          <div class="mchips" id="mod-chips"></div>
+          <div class="row" style="margin-top:8px">
+            <span class="row-label grow">Bigger</span>
+            <div class="stepper" data-step="mod">
+              <button data-d="-1" title="−1">−</button><output id="mod-out">+3</output><button data-d="1" title="+1">+</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- advantage -->
+        <div class="sec tight">
+          <span class="label">d20 pairing</span>
+          <div class="seg" id="seg-adv">
+            <button data-v="" >Normal</button>
+            <button data-v="adv">Advantage</button>
+            <button data-v="dis">Disadvantage</button>
+          </div>
+        </div>
+
+        <!-- keep / drop -->
+        <div class="sec tight" id="sec-keep">
+          <span class="label">Keep / drop</span>
+          <div class="row">
+            <div class="seg mono grow" id="seg-keep">
+              <button data-v="">off</button>
+              <button data-v="kh">kh</button>
+              <button data-v="kl">kl</button>
+              <button data-v="dh">dh</button>
+              <button data-v="dl">dl</button>
+            </div>
+            <div class="stepper dim" data-step="keep">
+              <button data-d="-1">−</button><output id="keep-out">1</output><button data-d="1">+</button>
+            </div>
+          </div>
+          <div class="row-sub" id="keep-sub">keep/drop needs 2 or more dice — this pool has 1</div>
+        </div>
+
+        <!-- reroll + explode -->
+        <div class="sec tight">
+          <div class="row">
+            <span class="grow">
+              <span class="row-label">Reroll low</span>
+              <span class="row-sub">once per die — <code style="font-family:var(--font-mono);color:var(--muted)">ro&lt;=N</code></span>
+            </span>
+            <div class="stepper" data-step="reroll">
+              <button data-d="-1">−</button><output id="rr-out">≤ 1</output><button data-d="1">+</button>
+            </div>
+            <button class="sw" id="sw-reroll" aria-pressed="true" title="Reroll low"></button>
+          </div>
+          <div class="row">
+            <span class="grow">
+              <span class="row-label">Exploding dice</span>
+              <span class="row-sub">max face only, chains 3 deep</span>
+            </span>
+            <button class="sw" id="sw-explode" aria-pressed="false" title="Exploding dice"></button>
+          </div>
+        </div>
+
+        <!-- visibility (§3.2) -->
+        <div class="sec tight">
+          <span class="label">Who sees the values</span>
+          <div class="seg" id="seg-vis">
+            <button data-v="open">Open</button>
+            <button data-v="held">Face down</button>
+            <button data-v="secret">Secret to me</button>
+            <button data-v="whisper">Whisper to…</button>
+          </div>
+          <div class="whisper hidden" id="whisper-row">
+            <button class="pchip dm" data-p="dm" aria-pressed="false"><span class="pdot" style="background:var(--gold)"></span>to DM</button>
+            <button class="pchip" data-p="kira" aria-pressed="false"><span class="pdot" style="background:#6fb3d2"></span>Kira</button>
+            <button class="pchip" data-p="nyx" aria-pressed="false"><span class="pdot" style="background:#c07ad2"></span>Nyx</button>
+            <button class="pchip" data-p="joe" aria-pressed="false"><span class="pdot" style="background:#7fc98f"></span>Joe</button>
+          </div>
+          <div class="row-sub" id="vis-sub">the table sees shrouded dice land and <code style="font-family:var(--font-mono);color:var(--muted)">?</code> chips; you get Peek + Reveal</div>
+        </div>
+
+        <!-- moment / experience (§2.3) -->
+        <div class="sec tight">
+          <span class="label">Moment</span>
+          <div class="seg" id="seg-exp">
+            <button data-v="plain">Plain</button>
+            <button data-v="check">Check</button>
+            <button data-v="cinematic">Cinematic</button>
+            <button class="add" data-v="new" title="New experience…">+</button>
+          </div>
+          <div class="stack" id="exp-fields">
+            <div class="field">
+              <span class="label">Title</span>
+              <input class="tin" id="f-title" value="Deception" maxlength="40" placeholder="group name">
+            </div>
+            <div class="field">
+              <span class="label">Subtitle</span>
+              <input class="tin caps" id="f-sub" value="Charisma check" maxlength="40" placeholder="optional">
+            </div>
+            <div class="field">
+              <span class="label">Mat text — in the felt</span>
+              <input class="tin" id="f-mat" value="The lie leaves your lips…" maxlength="64" placeholder="falls back to the title">
+            </div>
+            <div class="field">
+              <span class="label">Target</span>
+              <div class="row">
+                <input class="tin num" id="f-target" value="15" inputmode="numeric" placeholder="—">
+                <input class="tin caps grow" id="f-target-label" value="Difficulty class" maxlength="24">
+              </div>
+              <div class="row-sub">public on the card even when the roll is face down</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pop-preview" id="pop-preview"></div>
+        <div class="pop-note" id="pop-note"></div>
+        <div class="pop-actions">
+          <button class="btn primary" id="pop-roll">Roll<span class="eye" id="roll-eye"></span></button>
+          <button class="btn ghost" id="pop-offer">Offer to table</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================== annotations ========================== -->
+    <div class="notes">
+      <div class="note-card">
+        <h3>Command box — three states, never two</h3>
+        <p>
+          The live box in the panel is showing the <b>valid</b> state: the Monte&nbsp;Carlo/exact preview
+          <i>is</i> the validator, so a healthy string spends its message slot on information instead of
+          reassurance. Below, the other two states, frozen. The slot is a fixed 18&nbsp;px and the caret
+          line is always reserved, so switching states never moves the panel.
+        </p>
+        <div class="states">
+          <div>
+            <div class="state-cap"><b>Incomplete</b> — every prefix of a valid command. Border unchanged, never red.</div>
+            <div class="frozen" data-value="2d"></div>
+          </div>
+          <div>
+            <div class="state-cap"><b>Invalid</b> — caret under <code>error.index</code>, plain-language message, one-click fix.</div>
+            <div class="frozen" data-value="4d6kh5"></div>
+          </div>
+        </div>
+        <p>
+          Try it in the live box: <code>1d20 adv dc15 # a lie</code>, <code>8d6!</code>,
+          <code>3d6*2</code>, <code>4d6dl1</code>, <code>2d20kh1+5</code>, <code>1d20+2d6 ro&lt;=2 dl1</code>,
+          <code>cs&gt;=8</code>, <code>d100</code>. <b>Enter</b> rolls, <b>↑/↓</b> walks history,
+          <b>/</b> opens the token list.
+        </p>
+        <span class="ref">§1.2 · §1.3</span>
+      </div>
+
+      <div class="two">
+        <div class="note-card">
+          <h3>Chips can't lie</h3>
+          <p>
+            Group rows render <b>canonical notation including mods</b> from the stored spec through the
+            same renderer the box and the <code>#g=</code> codec use — the row cannot advertise
+            <code>1d20</code> and roll advantage. Click a chip to copy it; the copied text is pasteable
+            because chip text <i>is</i> canonical form.
+          </p>
+          <span class="ref">§1.4</span>
+        </div>
+        <div class="note-card">
+          <h3>One string, two editors</h3>
+          <p>
+            Spec object is truth; notation is its projection. Die buttons and tray chips rewrite the box;
+            popover controls rewrite it too — every control in the ± popover above re-renders the echo
+            line, the preview and the Roll button's badge.
+          </p>
+          <span class="ref">§1.5</span>
+        </div>
+      </div>
+
+      <div class="note-card">
+        <h3>Gold is rationed</h3>
+        <p>
+          §5.1 allows ornament on <b>one</b> element for a few seconds — the roll-moment card, not the
+          panel. So the panel stays flat: hairline dividers, 10&nbsp;px letterspaced small-caps section
+          labels, <b>one</b> filled gold button per panel (the tray's Roll, and the popover's Roll while
+          it is on stage). The seven per-row Roll buttons are outlined; selected states use a 16% gold
+          wash rather than a fill. Notation is monospace with <code>tabular-nums</code> everywhere so
+          numbers never reflow.
+        </p>
+        <p>
+          Panel width goes <b>268&nbsp;px → 296&nbsp;px</b>: the row now carries a notation chip, badges,
+          <b>±</b>, Roll and delete. That is the one measurement this mockup changes.
+        </p>
+        <span class="ref">§5.1 · §5.2</span>
+      </div>
+
+      <div class="note-card">
+        <h3>Non-open modes are always visible</h3>
+        <p>
+          A sticky secret default is the top accident vector, so any non-open mode paints an eye-slash on
+          the Roll button, the group row, and the mini pill. The command box is hidden in mini mode; pills
+          carry the canonical notation in their <code>title</code> and fall back to it when a group has no
+          name.
+        </p>
+        <div class="mini-strip">
+          <span class="mini-pill" title="1d20+5 adv">Attack</span>
+          <span class="mini-pill" title="1d20ro&lt;=1+3 adv dc15 # The lie leaves your lips…">Deception <span class="eye" data-eye></span></span>
+          <span class="mini-pill" title="8d6!">Fireball</span>
+          <span class="mini-pill" title="4d6dl1"><code style="font-family:var(--font-mono);font-size:11px;color:var(--muted)">4d6dl1</code></span>
+        </div>
+        <span class="ref">§3.2 · §1.4 · §2.6</span>
+      </div>
+
+      <div class="note-card">
+        <h3>Mat text belongs to the table</h3>
+        <p>
+          The Mat&nbsp;text field writes the declaration into the felt <i>under</i> the dice — a canvas
+          decal on the table plane, not a DOM heading. Edit the field in the popover and watch the felt
+          at the bottom of this page change; set the Moment to <b>Plain</b> and the words leave. That is
+          the whole reason a Check feels like an event: the room is dressed, not the sidebar.
+        </p>
+        <span class="ref">§5.4 · §2.4</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- §5.4 stand-in for the felt decal -->
+  <section class="table-strip">
+    <div class="mat-text" id="mat-text">The lie leaves your lips…</div>
+    <div class="strip-cap">
+      <b>The felt, seen from above.</b> Letterspaced Georgia, additive gold at ~20%, 600 ms fade in on
+      intent, slow fade after the verdict — and the dice land on top of the words. In the app this is a
+      canvas texture on the table plane, not an element. §5.4
+    </div>
+  </section>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ===========================================================================
+   Throwaway stand-ins for js/notation.js + js/rollspec.js. Faithful to the
+   grammar in UX.md §1.1 for the shapes this mockup shows; not production code.
+   =========================================================================== */
+
+const DIE_MAX   = { d4: 4, d6: 6, d8: 8, d10: 10, d10x: 90, d12: 12, d20: 20 };
+const DIE_ORDER = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20'];
+const DIE_COLOR = { d4: '#b23a48', d6: '#2e6f9e', d8: '#3f8f6b', d10: '#b07d2b', d10x: '#7a5b8f', d12: '#8f3f6b', d20: '#c19a2e' };
+const FACES = { '4': 'd4', '6': 'd6', '8': 'd8', '10': 'd10', '12': 'd12', '20': 'd20', '100': 'd100', '%': 'd100', '10x': 'd10x' };
+const MODES = { roll: 'open', r: 'open', gmroll: 'dm', gmr: 'dm', selfroll: 'secret', sr: 'secret' };
+const MAX_DICE = 40;
+
+/* ---------------------------------------------------------------- parser */
+function parseNotation(raw) {
+  const src = String(raw == null ? '' : raw);
+  const warnings = [];
+  const notes = [];
+  let i = 0;
+
+  const bad = (code, index, len, message, fix) =>
+    ({ ok: false, state: 'invalid', error: { code, index, len, message, fix: fix || null } });
+  const partial = (hint, slash) => ({ ok: false, state: 'incomplete', hint, slash: slash || null });
+  const ws = () => { while (i < src.length && /\s/.test(src[i])) i++; };
+  const unexpected = (idx) => {
+    const ch = src[idx];
+    if ('*/×÷'.includes(ch)) return bad('no_mul', idx, 1, 'only + and − for now');
+    if ('()'.includes(ch)) return bad('no_parens', idx, 1, 'no parentheses yet — only + and −');
+    if (ch === '>' || ch === '<' || ch === '=') return bad('no_compare', idx, 1, 'comparisons aren’t in yet — use dc 15 for a target');
+    return bad('unexpected', idx, 1, 'I can’t read “' + ch + '” here');
+  };
+
+  if (!src.trim()) return partial('type dice — 2d6+3, 4d6dl1, 1d20 adv dc15');
+  ws();
+
+  // mode prefix → visibility (never stored in the notation string, §1.1)
+  let visibility = null;
+  if (src[i] === '/') {
+    const m = /^\/([a-z]*)/i.exec(src.slice(i));
+    const word = (m ? m[1] : '').toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(MODES, word)) {
+      visibility = MODES[word];
+      i += 1 + word.length;
+      ws();
+      if (!src.slice(i).trim()) return partial('now the dice — e.g. 1d20+4');
+    } else {
+      return partial('pick a command', word);
+    }
+  }
+
+  // comment / flavor: everything after the first '#'
+  let label = null;
+  let end = src.length;
+  const hash = src.indexOf('#', i);
+  if (hash >= 0) {
+    label = src.slice(hash + 1).trim().replace(/[\u0000-\u001f]/g, '').slice(0, 64);
+    end = hash;
+  }
+
+  // ---- expression
+  const terms = [];
+  let modifier = 0;
+  let sign = 1;
+  let sawTerm = false;
+  let glued = null;          // term-glued keep/reroll/explode, for the mixed-pool rule
+  let keep = null, reroll = null, explode = false, keepIdx = -1, adv = null;
+
+  while (i < end) {
+    ws();
+    if (i >= end) break;
+    const ch = src[i];
+    if (sawTerm) {
+      if (ch === '+' || ch === '-') {
+        sign = ch === '+' ? 1 : -1;
+        i++;
+        ws();
+        if (i >= end) return partial('… and then a term');
+      } else if (/[a-z!]/i.test(ch)) {
+        break;                                  // flag region
+      } else {
+        return unexpected(i);
+      }
+    }
+
+    const start = i;
+    const csHere = /^cs(>=|<=|>|<)?\d*/i.exec(src.slice(i, end));
+    if (csHere) return bad('no_success_count', i, csHere[0].length, 'success counting isn’t in yet', null);
+    let num = '';
+    while (i < end && /[0-9]/.test(src[i])) num += src[i++];
+
+    if (i < end && (src[i] === 'd' || src[i] === 'D')) {
+      i++;
+      let faces = '';
+      if (src[i] === '%') { faces = '%'; i++; }
+      else {
+        while (i < end && /[0-9]/.test(src[i])) faces += src[i++];
+        if (faces === '10' && (src[i] === 'x' || src[i] === 'X')) { faces = '10x'; i++; }
+      }
+      if (faces === '') return partial('needs a number of faces — d4 d6 d8 d10 d12 d20 d100');
+      const type = FACES[faces];
+      if (!type) {
+        const near = ['4', '6', '8', '10', '12', '20', '100']
+          .map((f) => ({ f, gap: Math.abs(Number(f) - Number(faces)) }))
+          .sort((a, b) => a.gap - b.gap)[0].f;
+        return bad('bad_die', start, i - start, 'there’s no d' + faces + ' on this table', (num || '1') + 'd' + near);
+      }
+      const count = num === '' ? 1 : parseInt(num, 10);
+      if (count === 0) return bad('zero_count', start, i - start, 'roll at least one die', '1d' + faces);
+      if (sign < 0) return bad('neg_dice', start, i - start, 'dice can’t be subtracted — use a negative modifier');
+
+      // ---- glued term mods
+      for (;;) {
+        const rest = src.slice(i, end);
+        let m;
+        if ((m = /^(kh|kl|dh|dl|k|d)(\d+)?/i.exec(rest))) {
+          const tok = m[1].toLowerCase();
+          const mode = tok === 'k' ? 'kh' : tok === 'd' ? 'dl' : tok;
+          if (!m[2]) return partial(m[1] + ' needs a count — try ' + m[1] + '1');
+          keep = { mode, n: parseInt(m[2], 10) };
+          keepIdx = i + m[1].length;
+          glued = glued || { at: i, len: m[0].length, what: 'keep/drop' };
+          i += m[0].length;
+          continue;
+        }
+        if ((m = /^(ro|r)(<=|<)?(\d+)?/i.exec(rest))) {
+          if (!m[2]) return partial('reroll needs a threshold — ro<=2');
+          if (!m[3]) return partial('reroll below what? — ro<=2');
+          const below = parseInt(m[3], 10);
+          // Roll20's `<` is inclusive: ro<N ≡ ro<=N, same N (§1.1)
+          if (m[2] === '<') notes.push('‹ is inclusive — normalized to ro<=' + below);
+          if (m[1].toLowerCase() === 'r') notes.push('rerolled once per die');
+          if (below < 1 || below > 9) return bad('bad_reroll_below', i, m[0].length, 'reroll threshold runs 1–9', 'ro<=2');
+          reroll = { below };
+          glued = glued || { at: i, len: m[0].length, what: 'reroll' };
+          i += m[0].length;
+          continue;
+        }
+        if (rest[0] === '!') {
+          i++;
+          if (/^[<>=0-9]/.test(src.slice(i, end))) {
+            return bad('explode_cmp', i, 1, 'dice explode on their max face only', null);
+          }
+          explode = true;
+          glued = glued || { at: i - 1, len: 1, what: 'explode' };
+          continue;
+        }
+        if ((m = /^cs(>=|<=|>|<)?\d*/i.exec(rest))) {
+          return bad('no_success_count', i, m[0].length, 'success counting isn’t in yet', null);
+        }
+        break;
+      }
+
+      // §1.1 advantage sugar: the *term* 2d20kh1 / 2d20kl1 collapses to
+      // 1d20 {adv} before the mixed-pool check, so 2d20kh1+5 and even
+      // 2d20kh1+1d4 light up the paired-dice presentation.
+      let termCount = count;
+      if (type === 'd20' && count === 2 && keep && keep.n === 1 && keepIdx >= start &&
+          (keep.mode === 'kh' || keep.mode === 'kl')) {
+        adv = keep.mode === 'kh' ? 'adv' : 'dis';
+        notes.push('2d20' + keep.mode + '1 → ' + adv);
+        termCount = 1;
+        keep = null;
+        if (glued && glued.what === 'keep/drop' && glued.at >= start) glued = null;
+      }
+      terms.push({ count: termCount, type, start, len: i - start });
+    } else {
+      if (num === '') return unexpected(i);
+      modifier += sign * parseInt(num, 10);
+      if (modifier < -99 || modifier > 99) return bad('bad_modifier', start, i - start, 'modifiers run −99…+99', null);
+    }
+    sawTerm = true;
+    sign = 1;
+  }
+
+  if (!terms.length && !sawTerm) return partial('type dice — 2d6+3, 4d6dl1, 1d20 adv dc15');
+  if (!terms.length) return partial('… and some dice');
+
+  // ---- trailing flags (group-wide forms, §1.1 mixed-pool scoping)
+  let target = null;
+  while (i < end) {
+    ws();
+    if (i >= end) break;
+    const start = i;
+    const rest = src.slice(i, end);
+    let m;
+    if ((m = /^(adv|dis)(?![a-z])/i.exec(rest))) { adv = m[1].toLowerCase(); i += m[0].length; continue; }
+    if ((m = /^(dc|vs)\s*(\d+)?/i.exec(rest))) {
+      if (!m[2]) return partial('dc needs a target number — dc15');
+      target = parseInt(m[2], 10);
+      if (target > 999) return bad('bad_dc', start, m[0].length, 'targets run 1–999', null);
+      i += m[0].length;
+      continue;
+    }
+    if ((m = /^(kh|kl|dh|dl)(\d+)?/i.exec(rest))) {
+      if (!m[2]) return partial(m[1] + ' needs a count — try ' + m[1] + '1');
+      keep = { mode: m[1].toLowerCase(), n: parseInt(m[2], 10) };
+      keepIdx = start + 2;
+      i += m[0].length;
+      continue;
+    }
+    if ((m = /^(ro|r)(<=|<)(\d+)/i.exec(rest))) {
+      const below = parseInt(m[3], 10);
+      // Roll20's `<` is inclusive: ro<N ≡ ro<=N, same N (§1.1)
+      if (m[2] === '<') notes.push('‹ is inclusive — normalized to ro<=' + below);
+      if (m[1].toLowerCase() === 'r') notes.push('rerolled once per die');
+      reroll = { below };
+      i += m[0].length;
+      continue;
+    }
+    if (rest[0] === '!') { explode = true; i++; continue; }
+    if ((m = /^cs(>=|<=|>|<)?\d*/i.exec(rest))) {
+      return bad('no_success_count', start, m[0].length, 'success counting isn’t in yet', null);
+    }
+    const word = /^\S+/.exec(rest)[0];
+    if (/^a(d(v)?)?$/i.test(word)) return partial('adv or dis?');
+    return bad('unknown_flag', start, word.length, '“' + word + '” isn’t a token I know', null);
+  }
+
+  // ---- expand to a physical pool
+  const dice = [];
+  for (const t of terms) {
+    for (let n = 0; n < t.count; n++) {
+      if (t.type === 'd100') dice.push('d10x', 'd10');
+      else dice.push(t.type);
+    }
+  }
+  if (dice.length > MAX_DICE) {
+    warnings.push('capped at 40 dice');
+    dice.length = MAX_DICE;
+  }
+
+  // ---- validate (mirrors rollspec.validateMods, plus the scoping rule)
+  const distinct = new Set(terms.map((t) => t.type));
+  if (distinct.size > 1 && glued) {
+    return bad('mixed_scope', glued.at, glued.len,
+      glued.what + ' binds to one dice type — put it on a single-type pool, or trail it to apply across the whole pool',
+      canonical(dice, { modifier, adv, keep, reroll, explode }, { label, target }));
+  }
+  if (keep && keep.n >= dice.length) {
+    const verb = keep.mode[0] === 'k' ? 'keep' : 'drop';
+    const fixN = Math.max(1, dice.length - 1);
+    return bad('bad_keep_n', keepIdx, String(keep.n).length,
+      verb + ' ' + keep.n + ' of ' + dice.length + ' dice — ' + verb + ' fewer than you roll',
+      canonical(dice, { modifier, adv, keep: { mode: keep.mode, n: fixN }, reroll, explode }, { label, target }));
+  }
+  if (adv && !dice.includes('d20')) {
+    return bad('adv_needs_d20', src.toLowerCase().indexOf(adv, 0), adv.length, adv + ' needs a d20 in the pool', null);
+  }
+  if (explode && dice.length && dice.every((t) => t === 'd10x')) {
+    warnings.push('d10x never explodes');
+  }
+
+  const mods = { modifier, adv, keep, reroll, explode };
+  return {
+    ok: true,
+    spec: { dice, mods },
+    terms,
+    label: label || null,
+    target,
+    visibility,
+    warnings,
+    notes,
+    canonical: canonical(dice, mods, { label, target })
+  };
+}
+
+/* ------------------------------------------- canonical renderer (§1.1) */
+function canonical(dice, mods, extra) {
+  const m = mods || {};
+  const x = extra || {};
+  const counts = new Map();
+  for (const t of dice) counts.set(t, (counts.get(t) || 0) + 1);
+  const distinct = [...counts.keys()];
+  const single = distinct.length === 1;
+  const isPercentile = counts.size === 2 && counts.get('d10x') === 1 && counts.get('d10') === 1;
+
+  let gluedTail = '';
+  if (single || isPercentile) {
+    if (m.keep) gluedTail += m.keep.mode + m.keep.n;
+    if (m.reroll) gluedTail += 'ro<=' + m.reroll.below;
+    if (m.explode) gluedTail += '!';
+  }
+
+  let expr;
+  if (isPercentile) {
+    expr = 'd100' + gluedTail;
+  } else {
+    expr = DIE_ORDER.filter((t) => counts.has(t))
+      .map((t) => counts.get(t) + t + (single ? gluedTail : ''))
+      .join('+');
+  }
+  if (m.modifier) expr += (m.modifier > 0 ? '+' : '-') + Math.abs(m.modifier);
+
+  const out = [expr];
+  if (m.adv) out.push(m.adv);
+  if (!single && !isPercentile) {                 // group-wide trailing forms (§1.1)
+    if (m.reroll) out.push('ro<=' + m.reroll.below);
+    if (m.keep) out.push(m.keep.mode + m.keep.n);
+    if (m.explode) out.push('!');
+  }
+  if (x.target) out.push('dc' + x.target);
+  let s = out.join(' ');
+  if (x.label) s += ' # ' + x.label;
+  return s;
+}
+
+/* -------------------------------------- composeRoll (from rollspec.js) */
+function composeRoll(dice, mods, rng) {
+  const m = mods || {};
+  const modifier = m.modifier || 0;
+  const types = [...dice];
+  const meta = types.map(() => ({ counts: true, reason: null, childOf: null, rerollOf: null, pairOf: null }));
+  const rollValue = (t) => (t === 'd10x' ? Math.floor(rng() * 10) * 10 : 1 + Math.floor(rng() * DIE_MAX[t]));
+
+  if (m.adv) {
+    const baseLen = types.length;
+    for (let i = 0; i < baseLen; i++) {
+      if (types[i] === 'd20' && types.length < MAX_DICE) {
+        meta.push({ counts: true, reason: null, childOf: null, rerollOf: null, pairOf: i });
+        types.push('d20');
+      }
+    }
+  }
+  const values = types.map(rollValue);
+  if (m.adv) {
+    meta.forEach((md, i) => {
+      if (md.pairOf === null) return;
+      const j = md.pairOf;
+      const iWins = m.adv === 'adv' ? values[i] >= values[j] : values[i] <= values[j];
+      const loser = iWins ? j : i;
+      meta[loser].counts = false;
+      meta[loser].reason = 'adv';
+    });
+  }
+  if (m.reroll) {
+    const baseLen = types.length;
+    for (let i = 0; i < baseLen; i++) {
+      if (!meta[i].counts) continue;
+      if (values[i] <= m.reroll.below && types.length < MAX_DICE) {
+        meta[i].counts = false;
+        meta[i].reason = 'reroll';
+        meta.push({ counts: true, reason: null, childOf: null, rerollOf: i, pairOf: null });
+        types.push(types[i]);
+        values.push(rollValue(types[i]));
+      }
+    }
+  }
+  if (m.keep) {
+    const idxs = meta.map((md, i) => (md.counts ? i : -1)).filter((i) => i >= 0);
+    const sorted = [...idxs].sort((a, b) => values[a] - values[b]);
+    const n = Math.min(m.keep.n, idxs.length - 1);
+    let dropped = [];
+    if (m.keep.mode === 'kh') dropped = sorted.slice(0, idxs.length - n);
+    else if (m.keep.mode === 'kl') dropped = sorted.slice(n);
+    else if (m.keep.mode === 'dh') dropped = sorted.slice(idxs.length - n);
+    else dropped = sorted.slice(0, n);
+    for (const i of dropped) { meta[i].counts = false; meta[i].reason = 'drop'; }
+  }
+  if (m.explode) {
+    const queue = meta.map((md, i) => ({ i, depth: 0 })).filter(({ i }) => meta[i].counts && meta[i].childOf === null);
+    for (let q = 0; q < queue.length; q++) {
+      const { i, depth } = queue[q];
+      const t = types[i];
+      if (t === 'd10x' || depth >= 3) continue;
+      if (values[i] !== DIE_MAX[t]) continue;
+      if (types.length >= MAX_DICE) break;
+      const child = types.length;
+      meta.push({ counts: true, reason: null, childOf: i, rerollOf: null, pairOf: null });
+      types.push(t);
+      values.push(rollValue(t));
+      queue.push({ i: child, depth: depth + 1 });
+    }
+  }
+  let total = modifier;
+  meta.forEach((md, i) => { if (md.counts) total += values[i]; });
+  return { dice: types, values, perDie: meta, modifier, total };
+}
+
+/* ---------------------------------------------------- odds / preview */
+function facesOf(type) {
+  if (type === 'd10x') return [0, 10, 20, 30, 40, 50, 60, 70, 80, 90];
+  const out = [];
+  for (let v = 1; v <= DIE_MAX[type]; v++) out.push(v);
+  return out;
+}
+// exact distribution when no adv/keep/reroll/explode is in play
+function exactPreview(dice, modifier, target) {
+  let dist = [1];
+  let base = 0;
+  for (const t of dice) {
+    const faces = facesOf(t);
+    const next = new Array(dist.length + faces[faces.length - 1] - faces[0]).fill(0);
+    for (let s = 0; s < dist.length; s++) {
+      if (!dist[s]) continue;
+      for (const f of faces) next[s + f - faces[0]] += dist[s] / faces.length;
+    }
+    base += faces[0];
+    dist = next;
+  }
+  const min = base + modifier;
+  const max = min + dist.length - 1;
+  let avg = 0, above = 0;
+  for (let k = 0; k < dist.length; k++) {
+    avg += dist[k] * (min + k);
+    if (target != null && min + k >= target) above += dist[k];
+  }
+  return { min, max, avg, odds: target == null ? null : above };
+}
+function previewOf(dice, mods, target) {
+  const m = mods || {};
+  if (!dice.length) return null;
+  const trivial = !m.adv && !m.keep && !m.reroll && !m.explode;
+  if (trivial) return exactPreview(dice, m.modifier || 0, target);
+  let min = Infinity, max = -Infinity, sum = 0, above = 0;
+  const N = 4000;
+  for (let s = 0; s < N; s++) {
+    const { total } = composeRoll(dice, m, Math.random);
+    if (total < min) min = total;
+    if (total > max) max = total;
+    sum += total;
+    if (target != null && total >= target) above++;
+  }
+  return { min, max, avg: sum / N, odds: target == null ? null : above / N };
+}
+function fmtPreview(p) {
+  if (!p) return '';
+  const avg = Math.round(p.avg * 10) / 10;
+  let s = 'min ' + p.min + ' · avg ' + (Number.isInteger(avg) ? avg : avg.toFixed(1)) + ' · max ' + p.max;
+  return s;
+}
+
+/* =========================================================================
+   UI
+   ========================================================================= */
+const EYE = '<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"><path d="M1.8 8s2.5-3.5 6.2-3.5S14.2 8 14.2 8s-2.5 3.5-6.2 3.5S1.8 8 1.8 8z"/><circle cx="8" cy="8" r="1.5"/><path d="M2.6 13.4 13.4 2.6"/></svg>';
+const DIAMOND = '<svg viewBox="0 0 10 10" width="8" height="8" fill="currentColor"><path d="M5 0 10 5 5 10 0 5z"/></svg>';
+
+document.querySelectorAll('[data-eye]').forEach((el) => { el.innerHTML = EYE; });
+
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+function toast(html) {
+  toastEl.innerHTML = html;
+  toastEl.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('on'), 1900);
+}
+
+/* ------------------------------------------------------ command box */
+const TOKENS = [
+  { t: '/gmroll', h: 'whisper to the DM — only listed when a DM is seated', dm: true },
+  { t: '/sr', h: 'secret to me — nobody else sees the values' },
+  { t: '/roll', h: 'plain, open roll (the default)' },
+  { t: 'kh', h: 'keep highest N — 2d20kh1' },
+  { t: 'kl', h: 'keep lowest N — 2d20kl1' },
+  { t: 'dh', h: 'drop highest N' },
+  { t: 'dl', h: 'drop lowest N — 4d6dl1' },
+  { t: 'ro<=', h: 'reroll at or below N, once per die' },
+  { t: '!', h: 'explode on the max face, chains 3 deep' },
+  { t: 'adv', h: 'roll every d20 twice, keep the higher' },
+  { t: 'dis', h: 'roll every d20 twice, keep the lower' },
+  { t: 'dc', h: 'target number — attaches a Check moment' },
+  { t: '#', h: 'label / mat text — # the lie leaves your lips' }
+];
+
+function makeBox(host, opts) {
+  const o = opts || {};
+  host.innerHTML =
+    '<div class="cmd">' +
+      '<div class="cmd-wrap">' +
+        '<input class="cmd-in" type="text" spellcheck="false" autocomplete="off" autocapitalize="off"' +
+        ' placeholder="2d6+3, 4d6dl1, 1d20 adv dc15 …">' +
+        '<span class="cmd-kbd">⏎ roll</span>' +
+        '<div class="cmd-menu hidden"></div>' +
+      '</div>' +
+      '<div class="cmd-caret" aria-hidden="true"></div>' +
+      '<div class="cmd-slot"></div>' +
+    '</div>';
+
+  const cmd = host.querySelector('.cmd');
+  const input = host.querySelector('.cmd-in');
+  const caret = host.querySelector('.cmd-caret');
+  const slot = host.querySelector('.cmd-slot');
+  const menu = host.querySelector('.cmd-menu');
+  let menuIdx = 0;
+  let timer = null;
+  let last = null;
+
+  function paint() {
+    const res = parseNotation(input.value);
+    last = res;
+    cmd.classList.toggle('is-valid', res.ok === true);
+    cmd.classList.toggle('is-invalid', res.ok === false && res.state === 'invalid');
+    cmd.classList.toggle('is-incomplete', res.ok === false && res.state === 'incomplete');
+    caret.textContent = '';
+    slot.innerHTML = '';
+
+    if (res.ok) {
+      const p = previewOf(res.spec.dice, res.spec.mods, res.target);
+      const ok = document.createElement('span');
+      ok.className = 'ok';
+      ok.textContent = fmtPreview(p);
+      slot.appendChild(ok);
+      if (p && p.odds != null) {
+        const odds = document.createElement('span');
+        odds.className = 'muted';
+        odds.textContent = Math.round(p.odds * 100) + '% to clear ' + res.target;
+        slot.appendChild(odds);
+      }
+      for (const w of res.warnings) {
+        const el = document.createElement('span');
+        el.className = 'warn';
+        el.textContent = '⚠ ' + w;
+        slot.appendChild(el);
+      }
+      for (const n of res.notes) {
+        const el = document.createElement('span');
+        el.className = 'note';
+        el.textContent = n;
+        slot.appendChild(el);
+      }
+      if (o.onSpec) o.onSpec(res);
+    } else if (res.state === 'incomplete') {
+      const el = document.createElement('span');
+      el.className = 'muted';
+      el.textContent = '… ' + res.hint;
+      slot.appendChild(el);
+    } else {
+      const e = res.error;
+      caret.textContent = ' '.repeat(Math.max(0, e.index)) + '^';
+      const msg = document.createElement('span');
+      msg.className = 'bad';
+      msg.textContent = e.message;
+      slot.appendChild(msg);
+      if (e.fix) {
+        const fix = document.createElement('button');
+        fix.className = 'fix-chip';
+        fix.innerHTML = '<b>Use this</b>' + e.fix.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        fix.addEventListener('click', () => {
+          input.value = e.fix;
+          input.focus();
+          paint();
+        });
+        slot.appendChild(fix);
+      }
+    }
+    return res;
+  }
+
+  function closeMenu() { menu.classList.add('hidden'); }
+  function openMenu(filter) {
+    const q = (filter || '').toLowerCase();
+    const list = TOKENS.filter((t) => t.t.replace(/^\//, '').toLowerCase().startsWith(q));
+    if (!list.length) return closeMenu();
+    menuIdx = Math.min(menuIdx, list.length - 1);
+    menu.innerHTML = list.map((t, k) =>
+      '<div class="tok' + (k === menuIdx ? ' on' : '') + '" data-t="' + t.t + '">' +
+        '<code>' + t.t.replace(/</g, '&lt;') + '</code><span>' + t.h + '</span></div>').join('');
+    menu.classList.remove('hidden');
+    menu.querySelectorAll('.tok').forEach((el) => {
+      el.addEventListener('mousedown', (ev) => {
+        ev.preventDefault();
+        accept(el.dataset.t);
+      });
+    });
+  }
+  function accept(tok) {
+    input.value = tok + ' ';
+    closeMenu();
+    input.focus();
+    paint();
+  }
+
+  input.addEventListener('input', () => {
+    const v = input.value;
+    if (v[0] === '/' && !/\s/.test(v)) openMenu(v.slice(1)); else closeMenu();
+    clearTimeout(timer);
+    timer = setTimeout(paint, o.frozen ? 0 : 300);
+  });
+  input.addEventListener('blur', () => { closeMenu(); paint(); });
+  input.addEventListener('keydown', (ev) => {
+    const menuOpen = !menu.classList.contains('hidden');
+    if (menuOpen && (ev.key === 'ArrowDown' || ev.key === 'ArrowUp')) {
+      ev.preventDefault();
+      menuIdx += ev.key === 'ArrowDown' ? 1 : -1;
+      const n = menu.querySelectorAll('.tok').length;
+      menuIdx = (menuIdx + n) % n;
+      openMenu(input.value.slice(1));
+      return;
+    }
+    if (menuOpen && (ev.key === 'Tab' || ev.key === 'Enter')) {
+      ev.preventDefault();
+      const el = menu.querySelectorAll('.tok')[menuIdx];
+      if (el) accept(el.dataset.t);
+      return;
+    }
+    if (ev.key === 'Escape') { closeMenu(); return; }
+    if (ev.key === 'Enter') {
+      clearTimeout(timer);
+      const res = paint();
+      if (res.ok && o.onEnter) o.onEnter(res);
+      return;
+    }
+    if ((ev.key === 'ArrowUp' || ev.key === 'ArrowDown') && o.history) {
+      ev.preventDefault();
+      const v = o.history(ev.key === 'ArrowUp' ? -1 : 1);
+      if (v != null) { input.value = v; paint(); }
+    }
+  });
+
+  if (o.value != null) input.value = o.value;
+  paint();
+  const api = {
+    set(v) { input.value = v; paint(); },
+    get() { return input.value; },
+    focus() { input.focus(); },
+    result() { return last; }
+  };
+  BOXES.push({ api: api, init: o.value == null ? '' : o.value });
+  return api;
+}
+// browsers restore typed input values across reloads; a mockup should always
+// open in the state it documents
+const BOXES = [];
+window.addEventListener('pageshow', () => { BOXES.forEach((b) => b.api.set(b.init)); });
+
+/* -------------------------------------------------- builder / tray */
+// §1.5: the spec object is truth; the box and the tray are both projections.
+const trayState = { dice: ['d6', 'd6', 'd6'], mods: { modifier: 3 }, label: null, target: null };
+const trayEl = document.getElementById('tray');
+const dieButtonsEl = document.getElementById('die-buttons');
+const history = [];
+let historyAt = -1;
+
+const box = makeBox(document.getElementById('cmd-host'), {
+  value: canonical(trayState.dice, trayState.mods, trayState),
+  onSpec(res) {
+    trayState.dice = res.spec.dice;
+    trayState.mods = res.spec.mods;
+    trayState.label = res.label;
+    trayState.target = res.target;
+    renderTray();
+  },
+  onEnter(res) {
+    const { total } = composeRoll(res.spec.dice, res.spec.mods, Math.random);
+    history.unshift(res.canonical);
+    history.splice(10);
+    historyAt = -1;
+    toast('rolled <code>' + res.canonical.replace(/</g, '&lt;') + '</code> → <code>' + total + '</code>');
+  },
+  history(dir) {
+    if (!history.length) return null;
+    historyAt = Math.max(-1, Math.min(history.length - 1, historyAt + (dir < 0 ? 1 : -1)));
+    return historyAt < 0 ? '' : history[historyAt];
+  }
+});
+
+function syncBoxFromTray() {
+  box.set(canonical(trayState.dice, trayState.mods, trayState));
+}
+
+function renderTray() {
+  trayEl.innerHTML = '';
+  if (!trayState.dice.length) {
+    const e = document.createElement('span');
+    e.className = 'tray-empty';
+    e.textContent = 'tap a die, or type below';
+    trayEl.appendChild(e);
+    return;
+  }
+  trayState.dice.forEach((type, idx) => {
+    const chip = document.createElement('span');
+    chip.className = 'die-chip';
+    chip.style.setProperty('--die-color', DIE_COLOR[type]);
+    chip.innerHTML = '<span class="dot"></span>' + type;
+    chip.title = 'Remove';
+    chip.addEventListener('click', () => {
+      trayState.dice.splice(idx, 1);
+      if (trayState.mods.keep && trayState.mods.keep.n >= trayState.dice.length) trayState.mods.keep = null;
+      renderTray();
+      syncBoxFromTray();
+    });
+    trayEl.appendChild(chip);
+  });
+}
+
+for (const type of DIE_ORDER) {
+  const btn = document.createElement('button');
+  btn.className = 'die-btn';
+  btn.textContent = type;
+  btn.style.setProperty('--die-color', DIE_COLOR[type]);
+  btn.addEventListener('click', () => {
+    if (trayState.dice.length >= MAX_DICE) return;
+    trayState.dice.push(type);
+    renderTray();
+    syncBoxFromTray();
+  });
+  dieButtonsEl.appendChild(btn);
+}
+// eighth cell: percentile shortcut, since d100 is a pool of two dice
+(() => {
+  const btn = document.createElement('button');
+  btn.className = 'die-btn';
+  btn.textContent = 'd100';
+  btn.style.setProperty('--die-color', '#7a5b8f');
+  btn.title = 'd10x + d10';
+  btn.addEventListener('click', () => {
+    trayState.dice.push('d10x', 'd10');
+    renderTray();
+    syncBoxFromTray();
+  });
+  dieButtonsEl.appendChild(btn);
+})();
+
+renderTray();
+
+document.getElementById('clear-tray').addEventListener('click', () => {
+  trayState.dice = [];
+  trayState.mods = { modifier: 0 };
+  trayState.label = null;
+  trayState.target = null;
+  renderTray();
+  box.set('');
+});
+document.getElementById('roll-tray').addEventListener('click', () => {
+  const res = box.result();
+  if (!res || !res.ok) { toast('fix the command first'); return; }
+  const { total } = composeRoll(res.spec.dice, res.spec.mods, Math.random);
+  toast('rolled <code>' + res.canonical.replace(/</g, '&lt;') + '</code> → <code>' + total + '</code>');
+});
+document.getElementById('save-group').addEventListener('click', () => toast('saved — the row stores the spec, not just the dice'));
+
+/* -------------------------------------------------- frozen examples */
+document.querySelectorAll('.frozen').forEach((host) => {
+  makeBox(host, { value: host.dataset.value, frozen: true });
+});
+
+/* ------------------------------------------------------ saved groups */
+const GROUPS = [
+  { id: 1, name: 'Attack', dice: ['d20'], mods: { modifier: 5, adv: 'adv' } },
+  { id: 2, name: 'Sneak Damage', dice: ['d6', 'd6'], mods: { modifier: 3 } },
+  { id: 3, name: 'Deception', dice: ['d20'], mods: { modifier: 3, adv: 'adv', reroll: { below: 1 } },
+    target: 15, label: 'The lie leaves your lips…', exp: 'check', visibility: 'held' },
+  { id: 4, name: 'Fireball', dice: Array(8).fill('d6'), mods: { explode: true }, set: '#7a1f14', setName: 'Ember Pact' },
+  { id: 5, name: 'Stat Line', dice: ['d6', 'd6', 'd6', 'd6'], mods: { keep: { mode: 'dl', n: 1 } } },
+  { id: 6, name: 'Percentile', dice: ['d10x', 'd10'], mods: {} },
+  { id: 7, name: '', dice: ['d6', 'd6'], mods: { modifier: 4, reroll: { below: 2 } } }
+];
+
+const groupsListEl = document.getElementById('groups-list');
+const POPOVER_GROUP = 3;
+
+function renderGroups() {
+  groupsListEl.innerHTML = '';
+  for (const g of GROUPS) {
+    const notation = canonical(g.dice, g.mods, { label: g.label, target: g.target });
+
+    const row = document.createElement('div');
+    row.className = 'group-row' + (g.id === POPOVER_GROUP ? ' open' : '');
+    row.dataset.id = g.id;
+
+    const info = document.createElement('button');
+    info.className = 'group-info';
+    info.title = 'Load into the tray to edit';
+
+    // name line: name (or, unnamed, the notation itself) + badges
+    const head = document.createElement('span');
+    head.className = 'group-head';
+    const name = document.createElement('span');
+    name.className = 'group-name' + (g.name ? '' : ' as-notation');
+    name.textContent = g.name || notation;   // §1.4 fallback
+    head.appendChild(name);
+    const badges = document.createElement('span');
+    badges.className = 'badges';
+    if (g.exp) {
+      const b = document.createElement('span');
+      b.className = 'badge exp';
+      b.innerHTML = DIAMOND + (g.exp === 'check' ? 'Check' : 'Cine');
+      b.title = 'Moment · ' + g.exp;
+      badges.appendChild(b);
+    }
+    if (g.visibility && g.visibility !== 'open') {
+      const b = document.createElement('span');
+      b.className = 'badge eye';
+      b.innerHTML = EYE;
+      b.title = g.visibility === 'held' ? 'Face down' : 'Not open';
+      badges.appendChild(b);
+    }
+    head.appendChild(badges);
+
+    const copy = (ev) => {
+      ev.stopPropagation();
+      if (navigator.clipboard) navigator.clipboard.writeText(notation).catch(() => {});
+      box.set(notation);
+      box.focus();
+      toast('notation copied');
+    };
+
+    info.appendChild(head);
+    // second line: dice-set swatch + the canonical notation chip. An unnamed
+    // group already *is* its notation, so it does not repeat it.
+    if (g.name || g.set) {
+      const meta = document.createElement('span');
+      meta.className = 'group-meta';
+      if (g.set) {
+        const sw = document.createElement('span');
+        sw.className = 'set-swatch';
+        sw.style.background = g.set;
+        sw.title = 'Dice set · ' + g.setName;
+        meta.appendChild(sw);
+      }
+      if (g.name) {
+        const chip = document.createElement('code');
+        chip.className = 'group-formula';
+        chip.textContent = notation;
+        chip.title = notation + '  ·  click to copy';
+        chip.addEventListener('click', copy);
+        meta.appendChild(chip);
+      }
+      info.appendChild(meta);
+    } else {
+      name.title = notation + '  ·  click to copy';
+      name.addEventListener('click', copy);
+    }
+    info.addEventListener('click', () => {
+      trayState.dice = [...g.dice];
+      trayState.mods = JSON.parse(JSON.stringify(g.mods || {}));
+      trayState.label = g.label || null;
+      trayState.target = g.target || null;
+      renderTray();
+      syncBoxFromTray();
+      document.getElementById('group-name').value = g.name;
+    });
+
+    const mods = document.createElement('button');
+    mods.className = 'group-mods';
+    mods.textContent = '±';
+    mods.title = 'Modifiers, visibility, moment';
+    mods.addEventListener('click', () => {
+      if (g.id === POPOVER_GROUP) setPopoverOpen(popover.style.display === 'none');
+      else toast('this mockup wires one popover — see <code>Deception</code>');
+    });
+
+    const roll = document.createElement('button');
+    roll.className = 'group-roll';
+    roll.textContent = 'Roll';
+    roll.addEventListener('click', () => {
+      const { total } = composeRoll(g.dice, g.mods, Math.random);
+      toast('<code>' + (g.name || notation).replace(/</g, '&lt;') + '</code> → <code>' + total + '</code>');
+    });
+
+    const del = document.createElement('button');
+    del.className = 'group-del';
+    del.textContent = '✕';
+    del.title = 'Delete group';
+    del.addEventListener('click', () => toast('static in this mockup'));
+
+    row.append(info, mods, roll, del);
+    groupsListEl.appendChild(row);
+  }
+}
+renderGroups();
+
+/* ------------------------------------------------------- ± popover */
+const popover = document.getElementById('popover');
+const pop = {
+  name: 'Deception',
+  dice: ['d20'],
+  mods: { modifier: 3, adv: 'adv', keep: null, reroll: { below: 1 }, explode: false },
+  visibility: 'held',
+  whisper: [],
+  exp: 'check',
+  title: 'Deception',
+  subtitle: 'Charisma check',
+  matText: 'The lie leaves your lips…',
+  target: 15,
+  targetLabel: 'Difficulty class'
+};
+
+const el = {
+  echo: document.getElementById('pop-echo'),
+  modChips: document.getElementById('mod-chips'),
+  modOut: document.getElementById('mod-out'),
+  segAdv: document.getElementById('seg-adv'),
+  segKeep: document.getElementById('seg-keep'),
+  keepOut: document.getElementById('keep-out'),
+  keepSub: document.getElementById('keep-sub'),
+  secKeep: document.getElementById('sec-keep'),
+  rrOut: document.getElementById('rr-out'),
+  swReroll: document.getElementById('sw-reroll'),
+  swExplode: document.getElementById('sw-explode'),
+  segVis: document.getElementById('seg-vis'),
+  whisperRow: document.getElementById('whisper-row'),
+  visSub: document.getElementById('vis-sub'),
+  segExp: document.getElementById('seg-exp'),
+  expFields: document.getElementById('exp-fields'),
+  preview: document.getElementById('pop-preview'),
+  note: document.getElementById('pop-note'),
+  rollEye: document.getElementById('roll-eye'),
+  matText: document.getElementById('mat-text'),
+  fTitle: document.getElementById('f-title'),
+  fSub: document.getElementById('f-sub'),
+  fMat: document.getElementById('f-mat'),
+  fTarget: document.getElementById('f-target'),
+  fTargetLabel: document.getElementById('f-target-label')
+};
+
+// modifier quick chips
+for (const v of [-3, -2, -1, 1, 2, 3]) {
+  const b = document.createElement('button');
+  b.className = 'mchip';
+  b.dataset.v = String(v);
+  b.textContent = (v > 0 ? '+' : '−') + Math.abs(v);
+  b.addEventListener('click', () => {
+    pop.mods.modifier = pop.mods.modifier === v ? 0 : v;
+    renderPop(true);
+  });
+  el.modChips.appendChild(b);
+}
+
+function segSet(seg, value) {
+  seg.querySelectorAll('button').forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.v === value));
+  });
+}
+
+el.segAdv.addEventListener('click', (ev) => {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  pop.mods.adv = b.dataset.v || null;
+  renderPop(true);
+});
+el.segKeep.addEventListener('click', (ev) => {
+  const b = ev.target.closest('button');
+  if (!b || b.disabled) return;
+  pop.mods.keep = b.dataset.v ? { mode: b.dataset.v, n: pop.mods.keep ? pop.mods.keep.n : 1 } : null;
+  renderPop(true);
+});
+el.swReroll.addEventListener('click', () => {
+  pop.mods.reroll = pop.mods.reroll ? null : { below: 1 };
+  renderPop(true);
+});
+el.swExplode.addEventListener('click', () => {
+  pop.mods.explode = !pop.mods.explode;
+  renderPop(true);
+});
+popover.querySelectorAll('.stepper').forEach((st) => {
+  st.addEventListener('click', (ev) => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    const d = Number(b.dataset.d);
+    const kind = st.dataset.step;
+    if (kind === 'mod') pop.mods.modifier = Math.max(-99, Math.min(99, (pop.mods.modifier || 0) + d));
+    if (kind === 'keep' && pop.mods.keep) {
+      pop.mods.keep.n = Math.max(1, Math.min(Math.max(1, pop.dice.length - 1), pop.mods.keep.n + d));
+    }
+    if (kind === 'reroll') {
+      if (!pop.mods.reroll) pop.mods.reroll = { below: 1 };
+      pop.mods.reroll.below = Math.max(1, Math.min(9, pop.mods.reroll.below + d));
+    }
+    renderPop(true);
+  });
+});
+el.segVis.addEventListener('click', (ev) => {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  pop.visibility = b.dataset.v;
+  renderPop(true);
+});
+el.whisperRow.addEventListener('click', (ev) => {
+  const b = ev.target.closest('.pchip');
+  if (!b) return;
+  const p = b.dataset.p;
+  pop.whisper = pop.whisper.includes(p) ? pop.whisper.filter((x) => x !== p) : pop.whisper.concat(p);
+  renderPop(true);
+});
+el.segExp.addEventListener('click', (ev) => {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  if (b.dataset.v === 'new') { toast('experience editor — a form over the record fields'); return; }
+  pop.exp = b.dataset.v;
+  renderPop(true);
+});
+[[el.fTitle, 'title'], [el.fSub, 'subtitle'], [el.fMat, 'matText'], [el.fTargetLabel, 'targetLabel']]
+  .forEach(([input, key]) => input.addEventListener('input', () => { pop[key] = input.value; renderPop(true); }));
+el.fTarget.addEventListener('input', () => {
+  const v = el.fTarget.value.replace(/[^0-9]/g, '').slice(0, 3);
+  el.fTarget.value = v;
+  pop.target = v === '' ? null : Number(v);
+  renderPop(true);
+});
+el.echo.addEventListener('click', () => {
+  const s = canonical(pop.dice, pop.mods, { label: pop.matText || pop.title, target: pop.target });
+  if (navigator.clipboard) navigator.clipboard.writeText(s).catch(() => {});
+  box.set(s);
+  toast('notation copied');
+});
+function setPopoverOpen(open) {
+  popover.style.display = open ? '' : 'none';
+  const row = groupsListEl.querySelector('.group-row[data-id="' + POPOVER_GROUP + '"]');
+  if (row) row.classList.toggle('open', open);
+  if (open) placePopover();
+}
+popover.querySelector('.pop-close').addEventListener('click', () => {
+  setPopoverOpen(false);
+  toast('the ± popover closes back to its row');
+});
+document.getElementById('pop-roll').addEventListener('click', () => {
+  const { total } = composeRoll(pop.dice, pop.mods, Math.random);
+  const verdict = pop.target == null ? '' : (total >= pop.target ? ' · SUCCESS' : ' · FAILED');
+  const shown = pop.visibility === 'open' ? total + verdict : '? · held';
+  toast('<code>' + pop.title + '</code> → <code>' + shown + '</code>');
+});
+document.getElementById('pop-offer').addEventListener('click', () =>
+  toast('offered to the table — the offer card <i>is</i> the intent card'));
+
+const VIS_SUB = {
+  open: 'everyone sees the values as they land',
+  held: 'the table sees shrouded dice land and <code>?</code> chips; you get Peek + Reveal',
+  secret: 'yours alone — no reveal pressure, Reveal stays available forever',
+  whisper: 'pick who reads the values; none selected rolls open'
+};
+const EXP_NOTE = {
+  plain: 'ambient roll — no card, no mat text, exactly today’s behavior',
+  check: 'staged moment · ceremonial · ornate frame · post-settle budget ≤ 1.2 s',
+  cinematic: 'Check plus slow-mo, fanfare and a gold sweep · budget ≤ 2.2 s'
+};
+
+function renderPop(pushToBox) {
+  // modifier
+  el.modChips.querySelectorAll('.mchip').forEach((b) => {
+    b.setAttribute('aria-pressed', String(Number(b.dataset.v) === pop.mods.modifier));
+  });
+  el.modOut.textContent = (pop.mods.modifier > 0 ? '+' : pop.mods.modifier < 0 ? '−' : '±') + Math.abs(pop.mods.modifier || 0);
+
+  // adv
+  segSet(el.segAdv, pop.mods.adv || '');
+
+  // keep/drop — only meaningful with 2+ dice
+  const canKeep = pop.dice.length > 1;
+  el.secKeep.classList.toggle('off', !canKeep);
+  el.segKeep.querySelectorAll('button').forEach((b) => { b.disabled = !canKeep && !!b.dataset.v; });
+  segSet(el.segKeep, pop.mods.keep ? pop.mods.keep.mode : '');
+  el.keepOut.textContent = pop.mods.keep ? String(pop.mods.keep.n) : '1';
+  el.secKeep.querySelector('.stepper').classList.toggle('dim', !pop.mods.keep);
+  el.keepSub.textContent = canKeep
+    ? 'applies across the whole pool — ' + (pop.mods.keep ? 'trailing form in mixed pools' : 'pick a mode')
+    : 'keep/drop needs 2 or more dice — this pool has ' + pop.dice.length;
+
+  // reroll / explode
+  el.swReroll.setAttribute('aria-pressed', String(!!pop.mods.reroll));
+  el.rrOut.textContent = '≤ ' + (pop.mods.reroll ? pop.mods.reroll.below : 1);
+  el.secKeep.nextElementSibling.querySelector('.stepper').classList.toggle('dim', !pop.mods.reroll);
+  el.swExplode.setAttribute('aria-pressed', String(!!pop.mods.explode));
+
+  // visibility
+  segSet(el.segVis, pop.visibility);
+  el.whisperRow.classList.toggle('hidden', pop.visibility !== 'whisper');
+  el.whisperRow.querySelectorAll('.pchip').forEach((b) => {
+    b.setAttribute('aria-pressed', String(pop.whisper.includes(b.dataset.p)));
+  });
+  let visSub = VIS_SUB[pop.visibility];
+  if (pop.visibility === 'whisper' && pop.whisper.length) {
+    visSub = 'values go to you and ' + pop.whisper.length + ' other' + (pop.whisper.length > 1 ? 's' : '') +
+      '; the log tells the room a whisper happened';
+  }
+  el.visSub.innerHTML = visSub;
+  const hidden = pop.visibility !== 'whisper' ? pop.visibility !== 'open' : pop.whisper.length > 0;
+  el.rollEye.innerHTML = hidden ? EYE : '';
+
+  // moment
+  segSet(el.segExp, pop.exp);
+  const staged = pop.exp !== 'plain';
+  el.expFields.classList.toggle('hidden', !staged);
+  el.matText.textContent = staged ? (pop.matText || pop.title || '') : '';
+  el.matText.classList.toggle('off', !staged || !(pop.matText || pop.title));
+
+  // canonical echo + preview
+  const label = staged ? (pop.matText || pop.title) : null;
+  const target = staged ? pop.target : null;
+  const str = canonical(pop.dice, pop.mods, { label, target });
+  el.echo.textContent = str;
+  el.echo.title = str + '  ·  click to copy';
+
+  const p = previewOf(pop.dice, pop.mods, target);
+  let line = fmtPreview(p);
+  if (p && p.odds != null) {
+    line += ' · <span class="odds">' + Math.round(p.odds * 100) + '% to clear ' + target + '</span>';
+  }
+  el.preview.innerHTML = line;
+  el.note.textContent = EXP_NOTE[pop.exp] + (pop.mods.reroll ? ' · rerolled once per die' : '');
+
+  if (pushToBox) {
+    trayState.dice = [...pop.dice];
+    trayState.mods = JSON.parse(JSON.stringify(pop.mods));
+    trayState.label = label;
+    trayState.target = target;
+    renderTray();
+    box.set(str);
+  }
+}
+
+/* place the popover beside its row */
+function placePopover() {
+  const col = document.querySelector('.panel-col');
+  if (window.matchMedia('(max-width: 1040px)').matches) {
+    popover.style.top = '';
+    col.style.minHeight = '';
+    return;
+  }
+  const row = groupsListEl.querySelector('.group-row.open');
+  if (!row) return;
+  const host = popover.offsetParent || col;
+  const top = row.getBoundingClientRect().top - host.getBoundingClientRect().top;
+  const y = Math.max(0, Math.round(top - 46));
+  popover.style.top = y + 'px';
+  popover.style.setProperty('--arrow-top', '52px');
+  // the popover is absolutely positioned: keep the column tall enough for it
+  col.style.minHeight = (y + popover.offsetHeight + 8) + 'px';
+}
+
+renderPop(false);
+placePopover();
+window.addEventListener('resize', placePopover);
+window.addEventListener('pageshow', () => {
+  el.fTitle.value = pop.title;
+  el.fSub.value = pop.subtitle;
+  el.fMat.value = pop.matText;
+  el.fTarget.value = pop.target == null ? '' : String(pop.target);
+  el.fTargetLabel.value = pop.targetLabel;
+  document.getElementById('group-name').value = '';
+  renderPop(false);
+  placePopover();
+});
+</script>
+</body>
+</html>

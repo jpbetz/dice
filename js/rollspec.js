@@ -44,8 +44,28 @@ export function rollValue(type, rng) {
 export function validateMods(dice, mods) {
   if (mods == null) return null;
   if (typeof mods !== 'object' || Array.isArray(mods)) return 'bad_mods';
-  const { modifier, adv, keep, reroll, explode } = mods;
+  const { modifier, adv, keep, reroll, explode, parts } = mods;
   if (modifier !== undefined && (!Number.isInteger(modifier) || modifier < -99 || modifier > 99)) return 'bad_modifier';
+  if (parts !== undefined) {
+    // display-only decomposition of the modifier into named sources
+    if (!Array.isArray(parts) || parts.length < 1 || parts.length > 13) return 'bad_parts';
+    let sum = 0;
+    for (const p of parts) {
+      if (!p || typeof p !== 'object' || Array.isArray(p)) return 'bad_parts';
+      // Beyond control characters, a label may not contain ']' or '#' (they
+      // would be re-read as notation when js/notation.js canonicalNotation
+      // interpolates labels raw between brackets, breaking the round trip)
+      // nor zero-width/bidi-control characters (U+200B–200F, U+202A–202E,
+      // U+2066–2069, U+FEFF — invisible, and the bidi overrides can spoof
+      // what other players see). js/notation.js stripCtl mirrors this set.
+      // eslint-disable-next-line no-control-regex
+      if (typeof p.label !== 'string' || p.label.length > 20 ||
+          /[\x00-\x1f\x7f\]#\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/.test(p.label)) return 'bad_parts';
+      if (!Number.isInteger(p.value) || Math.abs(p.value) > 99) return 'bad_parts';
+      sum += p.value;
+    }
+    if (sum !== (modifier || 0)) return 'bad_parts_sum';
+  }
   if (adv !== undefined && adv !== 'adv' && adv !== 'dis') return 'bad_adv';
   if (adv && !dice.includes('d20')) return 'adv_needs_d20';
   if (keep !== undefined) {
@@ -156,7 +176,7 @@ export function composeRoll(dice, mods, rng) {
   let total = modifier;
   meta.forEach((md, i) => { if (md.counts) total += values[i]; });
 
-  return { dice: types, values, perDie: meta, modifier, total };
+  return { dice: types, values, perDie: meta, modifier, total, parts: m.parts || null };
 }
 
 // The dice whose types decide the meaning-chart column: counting base dice

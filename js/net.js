@@ -30,7 +30,12 @@ const POST_TIMEOUT_MS = 8000;
 const STREAM_OPEN_TIMEOUT_MS = 3000;
 const REOPEN_MIN_MS = 1000;
 const REOPEN_MAX_MS = 15000;
-const SSE_EVENTS = ['hello', 'player-joined', 'player-left', 'roll', 'clear'];
+const SSE_EVENTS = [
+  'hello', 'player-joined', 'player-left', 'player-renamed',
+  'roll', 'clear', 'reveal',
+  'offer', 'offer-claimed', 'offer-rescinded',
+  'settings-changed',
+];
 
 function apiUrl(path) {
   // Same-origin, absolute: the server mounts the API at /api/* next to the app.
@@ -102,16 +107,86 @@ export async function connect({ room, name, onEvent, onStatus } = {}) {
     color: joined.data.color,
     players: joined.data.players || [],
     log: joined.data.log || [],
+    offers: joined.data.offers || [],
+    settings: joined.data.settings || {},
 
     // Ask the server to roll. Values arrive later on the 'roll' event — the
     // caller must never animate from this return value.
-    async roll(dice, label = '') {
-      const res = await withPlayer('/api/roll', { dice: [...dice], label: label || '' });
+    // opts: {mods, faceDown, dc, notation, exp}. When notation is present it
+    // is sent ALONE (plus label): the server re-parses it with js/notation.js
+    // and derives dice/mods/dc/faceDown itself — the client's parse is preview
+    // only, and the wire contract rejects notation combined with dice/mods.
+    // exp {kind:'check'|'cinematic', subtitle?} is a sibling either way (the
+    // roll-moment attachment, UX §2) and is echoed on the roll broadcast.
+    async roll(dice, label = '', opts = {}) {
+      const body = { label: label || '' };
+      if (typeof opts.notation === 'string' && opts.notation) {
+        body.notation = opts.notation;
+      } else {
+        body.dice = [...(dice || [])];
+        if (opts.mods) body.mods = opts.mods;
+        if (opts.faceDown) body.faceDown = true;
+        if (Number.isInteger(opts.dc)) body.dc = opts.dc;
+      }
+      if (opts.exp) body.exp = opts.exp;
+      const res = await withPlayer('/api/roll', body);
       return res.ok && res.data ? res.data.roll : null;
     },
 
     async clear() {
       const res = await withPlayer('/api/clear', {});
+      return res.ok;
+    },
+
+    // Change display name; everyone learns via the 'player-renamed' event.
+    async rename(newName) {
+      const res = await withPlayer('/api/rename', { name: newName });
+      if (res.ok) name = newName; // future silent re-joins use the new name
+      return res.ok;
+    },
+
+    // Flip a face-down roll for the whole table (roller only).
+    async reveal(rollId) {
+      const res = await withPlayer('/api/reveal', { rollId });
+      return res.ok;
+    },
+
+    // Broadcast a prepared roll card anyone can execute once. Same exclusive
+    // notation-vs-dice/mods wire shape as roll(); exp rides along the same way.
+    async offer({ label, dice, mods, faceDown, dc, notation, exp } = {}) {
+      const body = { label: label || '' };
+      if (typeof notation === 'string' && notation) {
+        body.notation = notation;
+      } else {
+        body.dice = [...(dice || [])];
+        if (mods) body.mods = mods;
+        if (faceDown) body.faceDown = true;
+        if (Number.isInteger(dc)) body.dc = dc;
+      }
+      if (exp) body.exp = exp;
+      const res = await withPlayer('/api/offer', body);
+      return res.ok && res.data ? res.data.offer : null;
+    },
+
+    // Execute an offered roll as yourself. A 404 usually means someone else
+    // claimed it first — a quiet no-op, and NOT grounds for the silent
+    // re-join that withPlayer normally does on 404.
+    async claim(offerId) {
+      const res = await withPlayer('/api/claim', { offerId }, { rejoinOn404: false });
+      return res.ok;
+    },
+
+    // Withdraw your own offer.
+    async unoffer(offerId) {
+      const res = await withPlayer('/api/unoffer', { offerId });
+      return res.ok;
+    },
+
+    // Patch the room-wide settings (any player may). The merged result comes
+    // back to everyone — us included — on the 'settings-changed' event; the
+    // caller applies on that echo, never optimistically.
+    async setSettings(patch) {
+      const res = await withPlayer('/api/settings', { settings: patch });
       return res.ok;
     },
 
@@ -220,6 +295,8 @@ export async function connect({ room, name, onEvent, onStatus } = {}) {
       conn.color = res.data.color;
       conn.players = res.data.players || [];
       conn.log = res.data.log || [];
+      conn.offers = res.data.offers || [];
+      conn.settings = res.data.settings || conn.settings;
       return true;
     })();
     rejoining = pending.then(
@@ -230,12 +307,13 @@ export async function connect({ room, name, onEvent, onStatus } = {}) {
   }
 
   // POST to an endpoint that needs a live playerId; one silent re-join and one
-  // retry if the server has forgotten us (404).
-  async function withPlayer(path, extra) {
+  // retry if the server has forgotten us (404). Endpoints whose 404 is an
+  // expected outcome (claiming an already-claimed offer) opt out.
+  async function withPlayer(path, extra, { rejoinOn404 = true } = {}) {
     if (closed) return { ok: false, status: 0, data: null };
     await streamReady();
     let res = await postJson(path, { room, playerId, ...extra }, POST_TIMEOUT_MS);
-    if (res.status === 404) {
+    if (res.status === 404 && rejoinOn404) {
       const ok = await rejoin();
       if (!ok) { setStatus('offline'); return res; }
       openStream();

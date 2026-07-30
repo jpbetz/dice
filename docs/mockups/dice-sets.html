@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<!--
+Copyright 2026 The Dice Table Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+MOCKUP — "Choose your dice" set picker. Implements docs/UX.md §4.3 (picker),
+§4.4 (the ten launch sets), §4.1/§4.2 (record shape, precedence, scopes).
+Static, self-contained, no external resources. Not wired to the app.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup · Choose your dice</title>
+<style>
+/* ---------- app palette (verbatim from css/style.css) ---------- */
+:root {
+  --bg: #14100c;
+  --panel: rgba(24, 19, 14, 0.88);
+  --panel-border: rgba(212, 175, 55, 0.25);
+  --gold: #d4af37;
+  --gold-bright: #ffd766;
+  --ivory: #f3ead7;
+  --muted: #9c8f77;
+  --red: #e2493b;
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ivory);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+body { user-select: none; }
+
+/* felt + vignette, standing in for the 3D table behind the picker.
+   Colour and speckle matched to docs/screenshot.jpg. */
+#felt {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle, rgba(255,255,255,0.045) 0.6px, transparent 0.7px) 0 0 / 7px 7px,
+    radial-gradient(circle, rgba(0,0,0,0.05) 0.6px, transparent 0.7px) 3px 5px / 11px 11px,
+    radial-gradient(ellipse 90% 80% at 50% 42%, #35473d 0%, #2f4038 45%, #26332c 78%, #1c2620 100%),
+    var(--bg);
+}
+#felt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 66%, rgba(0,0,0,0.34) 100%);
+}
+#scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 5, 0.38);
+  backdrop-filter: blur(4px);
+}
+
+#stage {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 28px 16px 40px;
+}
+
+/* ---------- the picker panel ----------
+   Deliberately a PLAIN panel: per §5.1 the ornate frame is rationed to the
+   roll-moment card only. Same idiom as .panel in css/style.css. */
+#picker {
+  position: relative;
+  width: 560px;
+  max-width: 96vw;
+  padding: 18px 20px 16px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 44px rgba(0,0,0,0.6);
+  animation: panel-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes panel-in {
+  from { transform: translateY(14px) scale(0.97); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+#picker[hidden] { display: none; }
+
+.eyebrow {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.head-text { flex: 1; min-width: 0; }
+.title {
+  margin: 3px 0 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--ivory);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.group-chip {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+
+.close-btn {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255,255,255,0.06);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.close-btn:hover { color: var(--ivory); border-color: var(--gold); background: rgba(255,255,255,0.12); }
+
+/* ---------- scope toggle (per-player vs per-group) ---------- */
+.scope-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 2px;
+  flex-wrap: wrap;
+}
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  gap: 3px;
+  border: 1px solid var(--panel-border);
+  border-radius: 999px;
+  background: rgba(0,0,0,0.35);
+}
+.seg {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  padding: 5px 14px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.seg:hover { color: var(--ivory); }
+.seg[aria-pressed="true"] {
+  color: var(--ivory);
+  background: rgba(212, 175, 55, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.35);
+}
+.seg:focus-visible { outline: 1px solid var(--gold); outline-offset: 2px; }
+
+.reset-chip {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255,255,255,0.05);
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, opacity 0.15s;
+}
+.reset-chip:hover:not(:disabled) { color: var(--ivory); border-color: var(--gold); }
+.reset-chip:disabled { opacity: 0.35; cursor: default; }
+.reset-chip[hidden] { display: none; }
+
+/* fixed-height explanation slot so switching scope never reflows the grid */
+.scope-hint {
+  min-height: 30px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.25;
+}
+.scope-hint strong { color: #c9bda1; font-weight: 600; }
+
+/* ---------- the grid: 5 per row (§4.3) ---------- */
+#set-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px 12px;
+  margin: 6px 0 4px;
+  padding: 4px 0 2px;
+}
+@media (max-width: 620px) { #set-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 380px) { #set-grid { grid-template-columns: repeat(2, 1fr); } }
+
+.set-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.set-tile:focus { outline: none; }
+
+/* circular well; the badge is the preview — no preview pane (§4.3) */
+.well {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  max-width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 38%, rgba(255,255,255,0.07), rgba(0,0,0,0.42) 78%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s;
+}
+.set-tile:hover .well {
+  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.4);
+}
+.set-tile:focus-visible .well {
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.5), 0 0 0 2px rgba(212, 175, 55, 0.45);
+}
+.well svg { width: 76px; height: 76px; display: block; }
+
+/* selected = gold-ringed (§4.3). Rationed gold: a hairline, not a fill. */
+.set-tile[aria-checked="true"] .well {
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.55),
+              0 0 0 1.5px var(--gold),
+              0 0 16px rgba(212, 175, 55, 0.22);
+}
+/* group scope, no override: the group is riding your set */
+.set-tile[data-state="inherited"] .well {
+  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.3), 0 0 0 1.5px rgba(212, 175, 55, 0.45);
+  outline: 1px dashed rgba(212, 175, 55, 0.8);
+  outline-offset: 3px;
+}
+/* your personal set, while a group override is showing */
+.set-tile[data-state="yours"] .well {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06), 0 0 0 1px rgba(156, 143, 119, 0.55);
+}
+
+.set-name {
+  font-size: 11px;
+  line-height: 1.2;
+  /* two lines' worth, so captions align across a row of long and short names */
+  min-height: 27px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  text-align: center;
+  transition: color 0.15s;
+}
+.set-tile:hover .set-name,
+.set-tile[aria-checked="true"] .set-name { color: var(--ivory); }
+
+/* fixed-height caption slot: nothing jumps when state changes */
+.set-caption {
+  height: 13px;
+  margin-top: -3px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  text-align: center;
+}
+.set-tile[data-state="yours"] .set-caption { color: var(--muted); }
+
+/* hidden-roll marker: Obsidian Shroud doubles as the shrouded die (§3.1) */
+.shroud-mark {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(13, 11, 9, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(156, 143, 119, 0.45);
+  color: var(--muted);
+}
+.shroud-mark svg { width: 11px; height: 11px; }
+
+/* effects render as the thumbnail's own behavior (§4.1 effect flag) */
+.fx-ember { animation: fx-ember 3.4s ease-in-out infinite; }
+.fx-nebula { animation: fx-nebula 14s linear infinite; }
+@keyframes fx-ember {
+  0%, 100% { filter: none; }
+  50% { filter: brightness(1.13) drop-shadow(0 0 7px rgba(226, 73, 59, 0.55)); }
+}
+@keyframes fx-nebula {
+  0%   { filter: hue-rotate(-10deg); }
+  50%  { filter: hue-rotate(14deg) brightness(1.06); }
+  100% { filter: hue-rotate(-10deg); }
+}
+
+/* ---------- footer ---------- */
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  font-size: 11px;
+  color: var(--muted);
+}
+.foot .precedence { letter-spacing: 0.02em; }
+.foot .precedence b { color: #c9bda1; font-weight: 600; }
+kbd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--panel-border);
+  background: rgba(0,0,0,0.35);
+  color: var(--muted);
+}
+
+/* ---------- launcher (shown when the picker is closed) ---------- */
+.launcher {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: var(--panel);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.launcher:hover { border-color: var(--gold); transform: translateY(-1px); }
+.launcher svg { width: 26px; height: 26px; }
+.launcher.small { width: 30px; height: 30px; }
+.launcher.small svg { width: 18px; height: 18px; }
+#reopen-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+}
+#reopen-wrap[hidden] { display: none; }
+
+/* ---------- toast ---------- */
+#toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%) translateY(14px);
+  padding: 9px 18px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+  font-size: 12px;
+  color: var(--ivory);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  z-index: 30;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast .toast-sub { color: var(--muted); }
+
+/* ---------- mockup notes (annotation, not part of the design) ---------- */
+#notes {
+  position: relative;
+  width: 720px;
+  max-width: 96vw;
+  border-left: 1px solid var(--panel-border);
+  padding: 2px 0 2px 16px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  user-select: text;
+}
+#notes h2 {
+  margin: 0 0 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--gold);
+  font-weight: 600;
+  font-family: var(--font-ui);
+}
+#notes ul { margin: 0; padding-left: 18px; }
+#notes li { margin-bottom: 5px; }
+#notes li::marker { color: rgba(212, 175, 55, 0.5); }
+#notes b { color: #c9bda1; font-weight: 600; }
+#notes code, #wire-echo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #c9bda1;
+}
+.entry-demo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 12px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 9px;
+  background: rgba(0,0,0,0.25);
+  width: fit-content;
+  max-width: 100%;
+}
+.entry-demo .player-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #6fa8d8;
+  box-shadow: 0 0 6px rgba(0,0,0,0.5);
+  flex: none;
+}
+.entry-demo .who { font-size: 13px; color: var(--ivory); }
+.entry-demo .you { font-size: 11px; color: var(--muted); }
+#wire-echo {
+  display: block;
+  margin-top: 10px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  background: rgba(0,0,0,0.32);
+  border: 1px solid rgba(255,255,255,0.06);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #picker { animation: none; }
+  .fx-ember, .fx-nebula { animation: none; }
+  .well, .set-name, #toast, .launcher { transition-duration: 0.01ms; }
+}
+</style>
+</head>
+<body>
+
+<div id="felt"></div>
+<div id="scrim"></div>
+
+<div id="stage">
+
+  <!-- ================= the picker ================= -->
+  <section id="picker" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+    <div class="head">
+      <div class="head-text">
+        <div class="eyebrow">Dice sets</div>
+        <h1 class="title" id="picker-title">
+          <span id="title-text">Choose your dice</span>
+          <span class="group-chip" id="title-group" hidden>Fireball</span>
+        </h1>
+      </div>
+      <button class="close-btn" id="close-btn" title="Close (Esc)" aria-label="Close">✕</button>
+    </div>
+
+    <div class="scope-row">
+      <div class="segmented" role="group" aria-label="Which dice this changes">
+        <button class="seg" id="seg-player" aria-pressed="true">Your dice</button>
+        <button class="seg" id="seg-group" aria-pressed="false">This group</button>
+      </div>
+      <button class="reset-chip" id="reset-chip" hidden>Use my set</button>
+    </div>
+
+    <p class="scope-hint" id="scope-hint"></p>
+
+    <div id="set-grid" role="radiogroup" aria-labelledby="picker-title"></div>
+
+    <div class="foot">
+      <span class="precedence">Order of precedence: die &rsaquo; <b id="pr-group">group</b> &rsaquo; <b id="pr-player">you</b> &rsaquo; color &rsaquo; default</span>
+      <span><kbd>Esc</kbd> closes</span>
+    </div>
+  </section>
+
+  <!-- shown after Esc / ✕ so the mockup can be reopened -->
+  <div id="reopen-wrap" hidden>
+    <button class="launcher" id="reopen-btn" title="Choose your dice" aria-label="Choose your dice"></button>
+    <span class="eyebrow">Choose your dice</span>
+  </div>
+
+  <!-- ================= mockup notes ================= -->
+  <aside id="notes">
+    <h2>Mockup notes</h2>
+    <ul>
+      <li><b>Thumbnails.</b> These are flat SVG stand-ins built from a real face-on
+        icosahedron projection (front face, three mid facets, six rim slivers) tinted
+        from each set's <code>body</code> / <code>numeral</code> / <code>edge</code> and
+        shaded from its <code>material</code> metalness/roughness. Ship version renders
+        <b>live d20 thumbnails</b> off roadmap §6's offscreen pass — sequence roadmap §6 first (§4.3).</li>
+      <li><b>Entry points</b> (§4.3): a small circular control bottom-left of the intent
+        card, and beside your own row in the players panel.
+        <div class="entry-demo">
+          <span class="player-dot"></span>
+          <span class="who">Joe</span>
+          <span class="you">you</span>
+          <button class="launcher small" id="demo-launcher" title="Choose your dice" aria-label="Choose your dice"></button>
+        </div>
+      </li>
+      <li><b>Your dice</b> → <code>POST /api/style {set}</code> → SSE <code>player-styled</code>;
+        the set is player identity, so every client sees your rolls in it (§4.2).
+        <b>This group</b> is a local override serialized as <code>@set=&lt;id&gt;</code> in the
+        <code>#g=</code> codec (§1.5) — no wire call.</li>
+      <li><b>No per-roll set choice</b> by design (§4.2): an extra decision inside the
+        tension beat kills the beat. Hence exactly two scopes here.</li>
+      <li><b>Plain panel, no ornate frame</b> — §5.1 rations ornament to the roll-moment
+        card only. Gold is a hairline on the selected ring, well under the 3% budget.</li>
+      <li><b>Obsidian Shroud</b> is pickable and fully numbered (graphite numerals) — a
+        face-down regular can live in it and still roll dice the table can read. The eye-slash
+        marks kinship: its numberless <em>internal</em> twin <code>obsidian-blank</code> is the
+        shrouded-die material for hidden rolls, and reveal cross-fades that blank into the
+        roller's real set — the numerals arriving <em>is</em> the reveal beat (§3.1, §4.4).</li>
+      <li><b>Effects</b> (<code>ember</code>, <code>nebula</code>) preview as thumbnail
+        behavior since the thumbnail is the only preview; both stop under
+        <code>prefers-reduced-motion</code>. <code>sound</code> profiles cannot be shown statically.</li>
+      <li><b>No authoring at launch</b> (§4.3's resolved position): <code>extends</code> is the
+        format's inheritance key — used by the built-ins, and honored for hand-written
+        localStorage <code>diceSets</code> records. When authoring ships it arrives as a single
+        <em>New set…</em> tile appended to this same grid; none is drawn here, so the grid is
+        exactly the ten launch sets.</li>
+    </ul>
+    <code id="wire-echo">no action yet</code>
+  </aside>
+
+</div>
+
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+
+/* ------------------------------------------------------------------
+   The ten launch sets, verbatim from docs/UX.md §4.4, in the record
+   shape of §4.1 (id, name, extends, body, numeral, edge, material,
+   effect, sound). Material metalness/roughness drive the shading.
+   ------------------------------------------------------------------ */
+const SETS = [
+  { id: 'ivory-court', name: 'Ivory Court', body: '#f3ead7', numeral: '#2a2018', edge: '#d8c9a3',
+    material: { tier: 'plastic', metalness: 0.05, roughness: 0.55 }, effect: null,
+    sound: { cutoff: 2600, decay: 0.8 } },
+  { id: 'gilded-oath', name: 'Gilded Oath', extends: 'ivory-court', body: '#d4af37', numeral: '#1c150b', edge: '#ffd766',
+    material: { tier: 'metal', metalness: 0.85, roughness: 0.30 }, effect: null,
+    sound: { cutoff: 3400, decay: 1.4 } },
+  { id: 'ember', name: 'Ember Pact', extends: 'ivory-court', body: '#7a1f14', numeral: '#ffd766', edge: '#e2493b',
+    material: { tier: 'plastic', metalness: 0.05, roughness: 0.55 }, effect: 'ember',
+    sound: { cutoff: 2200, decay: 0.9 } },
+  { id: 'stormwell', name: 'Stormwell Blue', extends: 'ivory-court', body: '#1e3a5c', numeral: '#cfe6ff', edge: '#4a7fb5',
+    material: { tier: 'plastic', metalness: 0.05, roughness: 0.55 }, effect: null,
+    sound: { cutoff: 2400, decay: 0.85 } },
+  { id: 'voidwine', name: 'Voidwine', extends: 'ivory-court', body: '#3d1f4e', numeral: '#e8c8ff', edge: '#7a4a9e',
+    material: { tier: 'plastic', metalness: 0.05, roughness: 0.55 }, effect: null,
+    sound: { cutoff: 2300, decay: 0.9 } },
+  /* pale jade by design: the felt is green (#1f3128), so a dark-jade body
+     would camouflage into the table — UX.md §4.4's luminance-gap rule */
+  { id: 'serpent-jade', name: 'Serpent Jade', extends: 'ivory-court', body: '#7fb69a', numeral: '#1f3a2d', edge: '#4a8a68',
+    material: { tier: 'stone', metalness: 0.02, roughness: 0.80 }, effect: null,
+    sound: { cutoff: 1500, decay: 0.55 } },
+  { id: 'clockwork-brass', name: 'Clockwork Brass', extends: 'ivory-court', body: '#6e5323', numeral: '#f3ead7', edge: '#a8853f',
+    material: { tier: 'metal', metalness: 0.70, roughness: 0.45 }, effect: null,
+    sound: { cutoff: 3100, decay: 1.25 } },
+  { id: 'gravebone', name: 'Gravebone', extends: 'ivory-court', body: '#cfc4ac', numeral: '#4a1f14', edge: '#9c8f77',
+    material: { tier: 'stone', metalness: 0.02, roughness: 0.90 }, effect: null,
+    sound: { cutoff: 1300, decay: 0.5 } },
+  { id: 'nebula', name: 'Nightglass Nebula', extends: 'ivory-court', body: '#171226', numeral: '#ffd766', edge: '#4a3a7a',
+    material: { tier: 'plastic', metalness: 0.05, roughness: 0.55 }, effect: 'nebula',
+    sound: { cutoff: 2500, decay: 1.0 } },
+  /* pickable Obsidian is fully numbered (graphite); the numberless twin
+     `obsidian-blank` (numeral: null) is internal-only — the shrouded-die
+     material for hidden rolls — and never appears in this grid (§4.4) */
+  { id: 'obsidian-shroud', name: 'Obsidian Shroud', extends: 'ivory-court', body: '#0d0b09', numeral: '#8a8178', edge: '#2a2420',
+    material: { tier: 'glassy', metalness: 0.10, roughness: 0.20 }, effect: null,
+    sound: { cutoff: 2900, decay: 0.7 }, shroud: true }
+];
+
+/* ------------------------------------------------------------------
+   Face-on d20 geometry, projected from a real icosahedron (a face
+   normal toward the viewer, one of its vertices up). Ten visible
+   faces in three depth tiers, hexagonal silhouette. Same solid
+   dice.js builds with THREE.IcosahedronGeometry.
+   ------------------------------------------------------------------ */
+const GEO = {
+  silhouette: '10.87,27.41 50.00,4.82 89.13,27.41 89.13,72.59 50.00,95.18 10.87,72.59',
+  front: '50.00,22.08 74.18,63.96 25.82,63.96',
+  midUpRight: '50.00,22.08 74.18,63.96 89.13,27.41',
+  midUpLeft:  '50.00,22.08 25.82,63.96 10.87,27.41',
+  midLow:     '74.18,63.96 25.82,63.96 50.00,95.18',
+  rim: [
+    '50.00,22.08 10.87,27.41 50.00,4.82',
+    '50.00,22.08 89.13,27.41 50.00,4.82',
+    '74.18,63.96 89.13,72.59 89.13,27.41',
+    '74.18,63.96 89.13,72.59 50.00,95.18',
+    '25.82,63.96 10.87,72.59 10.87,27.41',
+    '25.82,63.96 10.87,72.59 50.00,95.18'
+  ]
+};
+
+/* ---------- colour helpers (shading done here, not via color-mix,
+              so every browser renders the tiles identically) ---------- */
+function hex2rgb(h) {
+  const n = parseInt(h.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgb2hex(c) {
+  return '#' + c.map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+}
+/** Perceived luminance, 0..1. */
+function lum(hex) {
+  const [r, g, b] = hex2rgb(hex);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+/** Multiplicative lighting: keeps a near-black body black instead of graying
+    it out, and keeps a light body's tint instead of clipping it to white.
+    `lift` is a tiny absolute nudge so dark sets still show facet separation. */
+function lit(hex, factor, lift) {
+  return rgb2hex(hex2rgb(hex).map(v => v * factor + (lift || 0)));
+}
+
+/** Lighting + specular profile derived from the set's own material numbers.
+    Light comes from the upper left, matching the app's key light. */
+function profile(body, mat) {
+  const amp = 0.20 + (1 - mat.roughness) * 0.30;   // rough = flat, smooth = punchy
+  const dark = 1 - lum(body);
+  return {
+    front:   { f: 1 + amp * 0.55, lift: 9 * dark },
+    upLeft:  { f: 1 + amp * 0.30, lift: 5 * dark },
+    upRight: { f: 1 - amp * 0.25, lift: 0 },
+    low:     { f: 1 - amp * 0.60, lift: 0 },
+    rim:     { f: Math.max(0.28, 1 - amp * 1.15), lift: 0 },
+    // dark bodies lean on their edge lines to show facets at all
+    edgeOpacity: (0.5 + dark * 0.32).toFixed(2),
+    gloss: Math.min(0.8, mat.metalness * 0.55 + (1 - mat.roughness) * 0.38),
+    engrave: 0.28 + mat.metalness * 0.30,
+    grain: mat.tier === 'stone'
+  };
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function el(name, attrs) {
+  const n = document.createElementNS(SVG_NS, name);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  return n;
+}
+
+/** Flat d20 badge for one set. */
+function badge(set) {
+  const p = profile(set.body, set.material);
+  const svg = el('svg', { viewBox: '0 0 100 100', 'aria-hidden': 'true' });
+
+  // seat the die on the felt with a soft contact shadow
+  svg.appendChild(el('ellipse', { cx: 50, cy: 94, rx: 27, ry: 4, fill: 'rgba(0,0,0,0.32)' }));
+
+  const facet = (points, l) => {
+    svg.appendChild(el('polygon', {
+      points,
+      fill: lit(set.body, l.f, l.lift),
+      stroke: set.edge,
+      'stroke-width': 0.7,
+      'stroke-opacity': p.edgeOpacity,
+      'stroke-linejoin': 'round'
+    }));
+  };
+
+  GEO.rim.forEach(pts => facet(pts, p.rim));
+  facet(GEO.midLow, p.low);
+  facet(GEO.midUpRight, p.upRight);
+  facet(GEO.midUpLeft, p.upLeft);
+  facet(GEO.front, p.front);
+
+  // crisp silhouette in the set's edge colour
+  svg.appendChild(el('polygon', {
+    points: GEO.silhouette, fill: 'none', stroke: set.edge,
+    'stroke-width': 1.4, 'stroke-opacity': 0.9, 'stroke-linejoin': 'round'
+  }));
+
+  // matte grain for the stone tiers
+  if (p.grain) {
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2, r = 8 + (i % 7) * 4.6;
+      svg.appendChild(el('circle', {
+        cx: (50 + Math.cos(a) * r).toFixed(1),
+        cy: (52 + Math.sin(a) * r * 0.8).toFixed(1),
+        r: (0.7 + (i % 3) * 0.35).toFixed(2),
+        fill: i % 2 ? '#000' : '#fff',
+        'fill-opacity': 0.06
+      }));
+    }
+  }
+
+  // specular: a light catch hugging the front face's upper-left edge, plus a
+  // bright top rim. Strength comes from the set's own metalness/roughness.
+  if (p.gloss > 0.05) {
+    svg.appendChild(el('polygon', {
+      points: '49.6,25.2 28.9,60.4 36.0,58.2',
+      fill: '#fff', 'fill-opacity': (p.gloss * 0.34).toFixed(3)
+    }));
+    svg.appendChild(el('polyline', {
+      points: '10.87,27.41 50.00,4.82 89.13,27.41', fill: 'none',
+      stroke: '#fff', 'stroke-opacity': (p.gloss * 0.45).toFixed(3), 'stroke-width': 0.9
+    }));
+  }
+
+  // numeral on the front face — Obsidian Shroud has none (§4.4)
+  if (set.numeral) {
+    const common = {
+      x: 50, 'text-anchor': 'middle', 'dominant-baseline': 'central',
+      'font-family': 'Georgia, "Times New Roman", serif',
+      'font-size': 21, 'font-weight': 700, 'letter-spacing': '-0.5'
+    };
+    svg.appendChild(el('text', Object.assign({}, common, {
+      y: 52.4, fill: '#000', 'fill-opacity': p.engrave.toFixed(2)
+    }))).textContent = '20';
+    svg.appendChild(el('text', Object.assign({}, common, { y: 51.4, fill: set.numeral })))
+      .textContent = '20';
+  }
+  return svg;
+}
+
+/** Small eye-slash used on the Obsidian Shroud tile and nothing else. */
+function eyeSlash() {
+  const svg = el('svg', { viewBox: '0 0 24 24', 'aria-hidden': 'true' });
+  const s = { fill: 'none', stroke: 'currentColor', 'stroke-width': 2.1, 'stroke-linecap': 'round' };
+  svg.appendChild(el('path', Object.assign({ d: 'M2 12s3.8-6 10-6 10 6 10 6-3.8 6-10 6-10-6-10-6z' }, s)));
+  svg.appendChild(el('circle', Object.assign({ cx: 12, cy: 12, r: 3 }, s)));
+  svg.appendChild(el('path', Object.assign({ d: 'M3 21 21 3' }, s)));
+  return svg;
+}
+
+/** The circular launcher glyph: a bare d20 outline. */
+function launcherGlyph() {
+  const svg = el('svg', { viewBox: '0 0 100 100', 'aria-hidden': 'true' });
+  svg.appendChild(el('polygon', {
+    points: GEO.silhouette, fill: 'none', stroke: '#d4af37',
+    'stroke-width': 4, 'stroke-linejoin': 'round', 'stroke-opacity': 0.9
+  }));
+  svg.appendChild(el('polygon', {
+    points: GEO.front, fill: 'none', stroke: '#9c8f77',
+    'stroke-width': 3.4, 'stroke-linejoin': 'round'
+  }));
+  return svg;
+}
+
+/* ------------------------------------------------------------------
+   State. playerSet is identity (§4.2); groupSet is the optional
+   override on one saved group — null means the group rides your set,
+   which is the §4.1 precedence chain made visible.
+   ------------------------------------------------------------------ */
+const state = { scope: 'player', playerSet: 'ivory-court', groupSet: 'ember', group: 'Fireball' };
+
+const grid = document.getElementById('set-grid');
+const tiles = new Map();
+
+SETS.forEach(set => {
+  const tile = document.createElement('button');
+  tile.className = 'set-tile';
+  tile.type = 'button';
+  tile.setAttribute('role', 'radio');
+  tile.dataset.id = set.id;
+
+  const well = document.createElement('span');
+  well.className = 'well';
+  const b = badge(set);
+  if (set.effect === 'ember') b.classList.add('fx-ember');
+  if (set.effect === 'nebula') b.classList.add('fx-nebula');
+  well.appendChild(b);
+
+  if (set.shroud) {
+    const mark = document.createElement('span');
+    mark.className = 'shroud-mark';
+    mark.title = 'Its numberless twin (obsidian-blank) is the shrouded-die material for hidden rolls';
+    mark.appendChild(eyeSlash());
+    well.appendChild(mark);
+  }
+
+  const name = document.createElement('span');
+  name.className = 'set-name';
+  name.textContent = set.name;
+
+  const cap = document.createElement('span');
+  cap.className = 'set-caption';
+
+  tile.append(well, name, cap);
+  tile.addEventListener('click', () => select(set));
+  grid.appendChild(tile);
+  tiles.set(set.id, { tile, cap });
+});
+
+function activeId() {
+  return state.scope === 'player' ? state.playerSet : (state.groupSet || state.playerSet);
+}
+
+function render() {
+  const isGroup = state.scope === 'group';
+  const active = activeId();
+  const inheriting = isGroup && !state.groupSet;
+
+  document.getElementById('seg-player').setAttribute('aria-pressed', String(!isGroup));
+  document.getElementById('seg-group').setAttribute('aria-pressed', String(isGroup));
+  document.getElementById('title-text').textContent = isGroup ? 'Choose dice for' : 'Choose your dice';
+  document.getElementById('title-group').hidden = !isGroup;
+  document.getElementById('title-group').textContent = state.group;
+
+  const activeName = SETS.find(s => s.id === active).name;
+  const yoursName = SETS.find(s => s.id === state.playerSet).name;
+  document.getElementById('scope-hint').innerHTML = isGroup
+    ? (inheriting
+      ? '<span><strong>' + state.group + '</strong> rides your set — ' + yoursName +
+        '. Pick one to pin it to this group only; bookmarks keep it.</span>'
+      : '<span>Pinned to <strong>' + state.group + '</strong> only. Your own dice stay ' +
+        yoursName + '.</span>')
+    : '<span>Everyone at the table sees your rolls in <strong>' + activeName +
+      '</strong> — it is how they tell your dice from theirs.</span>';
+
+  const reset = document.getElementById('reset-chip');
+  reset.hidden = !isGroup;
+  reset.disabled = inheriting;
+
+  document.getElementById('pr-group').style.color = isGroup ? 'var(--gold)' : '';
+  document.getElementById('pr-player').style.color = isGroup ? '' : 'var(--gold)';
+
+  SETS.forEach(set => {
+    const { tile, cap } = tiles.get(set.id);
+    const selected = set.id === active;
+    tile.setAttribute('aria-checked', String(selected));
+    tile.tabIndex = selected ? 0 : -1;
+
+    let st = '', caption = '';
+    if (selected && inheriting) { st = 'inherited'; caption = 'inherited'; }
+    else if (selected) { st = 'selected'; caption = isGroup ? 'pinned' : 'current'; }
+    else if (isGroup && set.id === state.playerSet) { st = 'yours'; caption = 'yours'; }
+    tile.dataset.state = st;
+    cap.textContent = caption;
+
+    const where = isGroup ? state.group : 'you';
+    tile.title = set.name + (selected ? ' — current for ' + where : ' — set for ' + where);
+  });
+}
+
+function select(set) {
+  if (state.scope === 'player') {
+    state.playerSet = set.id;
+    toast(set.name, 'the whole table sees your dice in it');
+    wire("POST /api/style {set:'" + set.id + "'}  →  SSE player-styled {playerId, set}");
+  } else {
+    state.groupSet = set.id;
+    toast(set.name, 'pinned to ' + state.group);
+    wire('group "' + state.group + '"  →  @set=' + set.id + '  (stored + #g= codec, no wire call)');
+  }
+  render();
+  const t = tiles.get(set.id).tile;
+  t.focus();
+}
+
+document.getElementById('seg-player').addEventListener('click', () => { state.scope = 'player'; render(); });
+document.getElementById('seg-group').addEventListener('click', () => { state.scope = 'group'; render(); });
+document.getElementById('reset-chip').addEventListener('click', () => {
+  state.groupSet = null;
+  toast('Override cleared', state.group + ' rides your set again');
+  wire('group "' + state.group + '"  →  @set removed (falls through to your set)');
+  render();
+});
+
+/* ---------- keyboard: roving tabindex across the real column count ---------- */
+function columnCount() {
+  return getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length || 5;
+}
+grid.addEventListener('keydown', e => {
+  const order = SETS.map(s => s.id);
+  let i = order.indexOf(document.activeElement.dataset && document.activeElement.dataset.id);
+  if (i < 0) return;
+  const cols = columnCount();
+  let next = null;
+  if (e.key === 'ArrowRight') next = Math.min(order.length - 1, i + 1);
+  else if (e.key === 'ArrowLeft') next = Math.max(0, i - 1);
+  else if (e.key === 'ArrowDown') next = Math.min(order.length - 1, i + cols);
+  else if (e.key === 'ArrowUp') next = Math.max(0, i - cols);
+  else if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = order.length - 1;
+  else if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); select(SETS[i]); return; }
+  else return;
+  e.preventDefault();
+  tiles.get(order[next]).tile.focus();
+});
+
+/* ---------- open / close (Esc closes, §4.3) ---------- */
+const picker = document.getElementById('picker');
+const reopen = document.getElementById('reopen-wrap');
+function open() {
+  picker.hidden = false;
+  reopen.hidden = true;
+  tiles.get(activeId()).tile.focus();
+}
+function close() {
+  picker.hidden = true;
+  reopen.hidden = false;
+  document.getElementById('reopen-btn').focus();
+}
+document.getElementById('close-btn').addEventListener('click', close);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !picker.hidden) { e.preventDefault(); close(); }
+});
+document.getElementById('reopen-btn').appendChild(launcherGlyph());
+document.getElementById('demo-launcher').appendChild(launcherGlyph());
+document.getElementById('reopen-btn').addEventListener('click', open);
+document.getElementById('demo-launcher').addEventListener('click', open);
+
+/* ---------- toast + wire echo ---------- */
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+function toast(main, sub) {
+  toastEl.innerHTML = '';
+  toastEl.append(document.createTextNode(main + ' '));
+  const s = document.createElement('span');
+  s.className = 'toast-sub';
+  s.textContent = '· ' + sub;
+  toastEl.appendChild(s);
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
+}
+function wire(text) { document.getElementById('wire-echo').textContent = text; }
+
+render();
+</script>
+</body>
+</html>

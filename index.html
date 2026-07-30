@@ -37,6 +37,32 @@ limitations under the License.
     <div class="panel" id="builder-panel">
       <h1 class="app-title">⚄ Dice Table</h1>
       <h2>Build a tray</h2>
+
+      <!-- Command box (UX §1.3): three-state validation, Enter rolls, ↑/↓ history -->
+      <div id="cmd" class="cmd">
+        <div class="cmd-wrap">
+          <input id="cmd-input" class="cmd-in" type="text" spellcheck="false" autocomplete="off"
+                 autocapitalize="off" placeholder="2d6+3, 4d6dl1, 1d20 adv dc15 …" maxlength="500">
+          <button id="cmd-help" class="cmd-help" title="Notation cheatsheet">?</button>
+        </div>
+        <div id="cmd-slot" class="cmd-slot"></div>
+        <div id="cmd-cheatsheet" class="cheatsheet hidden">
+          <table>
+            <tr><td><code>NdX</code></td><td>roll N dice — d4 d6 d8 d10 d12 d20, d100/d% (d10x+d10)</td></tr>
+            <tr><td><code>+N</code> / <code>−N</code></td><td>flat bonus or penalty (±99)</td></tr>
+            <tr><td><code>+2[Proficiency]</code></td><td>attributed bonus — labels show in the breakdown</td></tr>
+            <tr><td><code>khN klN dhN dlN</code></td><td>keep/drop N — <code>4d6dl1</code>; bare k→kh, d→dl</td></tr>
+            <tr><td><code>ro&lt;=N</code></td><td>reroll ≤N, once per die (<code>r&lt;N</code> accepted)</td></tr>
+            <tr><td><code>!</code></td><td>explode on the max face, chains 3 deep</td></tr>
+            <tr><td><code>adv</code> / <code>dis</code></td><td>pair every d20; <code>2d20kh1</code> reads as adv</td></tr>
+            <tr><td><code>dcN</code> / <code>vs N</code></td><td>target number — result shows Success/Failure</td></tr>
+            <tr><td><code># text</code></td><td>comment — roll label / mat text (≤64 chars)</td></tr>
+            <tr><td><code>/gmroll /sr</code></td><td>roll face down (<code>/roll</code>, <code>/r</code>: plain)</td></tr>
+            <tr><td colspan="2" class="cheat-note">mixed pools take trailing flags: <code>1d20+2d6 dl1</code></td></tr>
+          </table>
+        </div>
+      </div>
+
       <div id="die-buttons"></div>
       <div id="tray" class="chip-row" title="Click a chip to remove it"></div>
       <div class="btn-row">
@@ -59,14 +85,82 @@ limitations under the License.
   <!-- Top-right controls -->
   <div id="top-controls">
     <span id="status-pill" class="hidden"></span>
-    <button id="toggle-mini" class="btn ghost" title="Compact view: just the table and group buttons">Mini</button>
     <button id="toggle-log" class="btn ghost" title="Show/hide roll log">Log</button>
     <button id="toggle-sound" class="btn ghost" title="Toggle sound">🔊</button>
-    <button id="clear-table" class="btn ghost" title="Remove all dice from the table">Clear table</button>
+    <button id="toggle-settings" class="btn ghost" title="Settings">⚙</button>
   </div>
 
-  <!-- Mini-mode strip: group pills + clear + expand -->
+  <!-- Persistent corner controls: clear table + mini/expand toggle -->
+  <div id="corner-controls">
+    <button id="corner-clear" class="corner-btn" title="Remove all dice from the table">✕</button>
+    <button id="corner-mini" class="corner-btn" title="Compact view">⤡</button>
+  </div>
+
+  <!-- Mini-mode strip: group pills -->
   <div id="mini-bar"></div>
+
+  <!-- Mini-mode roll moment strip (UX §2.6): pulse while rolling, verdict after -->
+  <div id="mini-moment" class="hidden"></div>
+
+  <!-- Roll moment ceremony (UX §2.4/§5.3). Ornate corners are injected by JS;
+       phase classes (c-declare/c-tumble/c-settle/c-verdict) drive visibility. -->
+  <div id="ceremony-layer" class="hidden" aria-live="polite">
+    <div id="ceremony-vignette"></div>
+
+    <!-- beat 1 · the declaration -->
+    <section class="card-ornate" id="intent-card">
+      <div class="monogram" id="intent-monogram"></div>
+      <div class="eyebrow" id="intent-eyebrow"></div>
+      <div class="mtitle" id="intent-title"></div>
+      <div class="subtitle" id="intent-subtitle"></div>
+      <div class="target-badge" id="intent-target">
+        <svg viewBox="0 0 80 80" aria-hidden="true">
+          <circle cx="40" cy="40" r="33" fill="rgba(0,0,0,0.3)" stroke="currentColor" stroke-width="1.6" opacity="0.9"/>
+          <circle cx="40" cy="40" r="28.5" fill="none" stroke="currentColor" stroke-width="0.8" opacity="0.45"/>
+          <rect x="37.2" y="1.4" width="5.6" height="5.6" transform="rotate(45 40 4.2)" fill="currentColor" opacity="0.85"/>
+          <rect x="37.2" y="73" width="5.6" height="5.6" transform="rotate(45 40 75.8)" fill="currentColor" opacity="0.85"/>
+          <rect x="1.4" y="37.2" width="5.6" height="5.6" transform="rotate(45 4.2 40)" fill="currentColor" opacity="0.85"/>
+          <rect x="73" y="37.2" width="5.6" height="5.6" transform="rotate(45 75.8 40)" fill="currentColor" opacity="0.85"/>
+        </svg>
+        <div class="tnum" id="intent-target-num"></div>
+      </div>
+      <div class="target-label" id="intent-target-label">Difficulty Class</div>
+      <div class="pre-mods" id="intent-mods" title="Modifiers apply after the dice land"></div>
+      <div class="notation-line" id="intent-notation"></div>
+    </section>
+
+    <!-- beat 2 · the docked strip -->
+    <section class="card-ornate" id="dock-strip">
+      <div class="monogram" id="strip-monogram"></div>
+      <div class="strip-text">
+        <div class="strip-title" id="strip-title"></div>
+        <div class="strip-sub" id="strip-sub"></div>
+      </div>
+      <div class="strip-dc" id="strip-dc"><small>DC</small><span id="strip-dc-num"></span></div>
+    </section>
+
+    <!-- beat 3 · the verdict (the strip, unfolded — §2.4 top anchor) -->
+    <section class="card-ornate" id="verdict-card">
+      <div class="eyebrow" id="verdict-eyebrow"></div>
+      <div class="ring-wrap">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring-track" cx="60" cy="60" r="52"/>
+          <circle class="ring-fill" id="ring-fill" cx="60" cy="60" r="52"/>
+        </svg>
+        <div class="vtotal" id="verdict-total"></div>
+      </div>
+      <div class="margin-line" id="verdict-margin"></div>
+      <div class="verdict-hero" id="verdict-hero"></div>
+      <div class="chart-line" id="verdict-chart"></div>
+      <div class="mod-cards" id="verdict-modcards"></div>
+      <div class="verdict-actions">
+        <button id="verdict-again" class="ghost-btn">⟳ Roll again</button>
+        <button id="verdict-done" class="ghost-btn">Done</button>
+      </div>
+    </section>
+
+    <div id="hit-flash"></div>
+  </div>
 
   <!-- Right-side stack: players + roll log -->
   <div id="right-stack">
@@ -87,8 +181,124 @@ limitations under the License.
   <div id="result-banner" class="hidden">
     <div id="result-label"></div>
     <div id="result-total"></div>
+    <div id="result-verdict"></div>
     <div id="result-meaning"></div>
     <div id="result-breakdown"></div>
+    <div id="banner-actions"></div>
+  </div>
+
+  <!-- Offered-roll cards -->
+  <div id="offers-layer"></div>
+
+  <!-- ± popover: per-group modifiers / dc / face-down / comment (UX §1.5, panel.html) -->
+  <div id="mods-popover" class="panel popover hidden">
+    <div class="pop-head">
+      <div class="pop-who">
+        <div id="pop-name" class="pop-nm"></div>
+        <button id="pop-echo" class="pop-echo" title="Load into the command box"></button>
+      </div>
+      <button id="pop-close" class="pop-close" title="Close">✕</button>
+    </div>
+
+    <div class="sec">
+      <span class="plabel">Modifier</span>
+      <div id="pop-mchips" class="mchips"></div>
+      <div class="prow">
+        <span class="prow-label grow">Flat bonus</span>
+        <div class="stepper">
+          <button id="pop-mod-dn" title="−1">−</button><output id="pop-mod-out">±0</output><button id="pop-mod-up" title="+1">+</button>
+        </div>
+      </div>
+      <div id="pop-parts"></div>
+      <button id="pop-add-part" class="btn tiny ghost">+ named bonus</button>
+    </div>
+
+    <div class="sec tight">
+      <span class="plabel">d20 pairing</span>
+      <div id="pop-seg-adv" class="seg">
+        <button data-v="">Normal</button>
+        <button data-v="adv">Advantage</button>
+        <button data-v="dis">Disadvantage</button>
+      </div>
+      <div id="pop-adv-sub" class="prow-sub"></div>
+    </div>
+
+    <div class="sec tight">
+      <span class="plabel">Keep / drop</span>
+      <div class="prow">
+        <div id="pop-seg-keep" class="seg mono grow">
+          <button data-v="">off</button>
+          <button data-v="kh">kh</button>
+          <button data-v="kl">kl</button>
+          <button data-v="dh">dh</button>
+          <button data-v="dl">dl</button>
+        </div>
+        <div class="stepper" id="pop-keep-step">
+          <button id="pop-keep-dn">−</button><output id="pop-keep-out">1</output><button id="pop-keep-up">+</button>
+        </div>
+      </div>
+      <div id="pop-keep-sub" class="prow-sub"></div>
+    </div>
+
+    <div class="sec tight">
+      <div class="prow">
+        <span class="grow">
+          <span class="prow-label">Reroll low</span>
+          <span class="prow-sub">once per die — ro&lt;=N</span>
+        </span>
+        <div class="stepper" id="pop-rr-step">
+          <button id="pop-rr-dn">−</button><output id="pop-rr-out">≤ 1</output><button id="pop-rr-up">+</button>
+        </div>
+        <button id="pop-sw-reroll" class="sw" aria-pressed="false" title="Reroll low"></button>
+      </div>
+      <div class="prow">
+        <span class="grow">
+          <span class="prow-label">Exploding dice</span>
+          <span class="prow-sub">max face only, chains 3 deep</span>
+        </span>
+        <button id="pop-sw-explode" class="sw" aria-pressed="false" title="Exploding dice"></button>
+      </div>
+      <div class="prow">
+        <span class="grow">
+          <span class="prow-label">Face down</span>
+          <span class="prow-sub">values stay hidden until you reveal</span>
+        </span>
+        <button id="pop-sw-facedown" class="sw" aria-pressed="false" title="Face down"></button>
+      </div>
+    </div>
+
+    <div class="sec tight">
+      <div class="prow">
+        <span class="prow-label grow">Target (DC)</span>
+        <input id="pop-dc" class="tin num" inputmode="numeric" placeholder="—" maxlength="3">
+      </div>
+      <div class="pfield">
+        <span class="plabel">Comment / mat text</span>
+        <input id="pop-comment" class="tin" maxlength="64" placeholder="shows as the roll label">
+      </div>
+    </div>
+
+    <div class="sec tight">
+      <span class="plabel">Moment</span>
+      <div id="pop-seg-exp" class="seg">
+        <button data-v="">Plain</button>
+        <button data-v="check">Check</button>
+        <button data-v="cinematic">Cinematic</button>
+      </div>
+      <div class="pfield" id="pop-exp-sub-field">
+        <input id="pop-exp-subtitle" class="tin" maxlength="40" placeholder="subtitle — e.g. Charisma Check">
+      </div>
+      <div id="pop-exp-sub" class="prow-sub"></div>
+    </div>
+
+    <div id="pop-preview" class="pop-preview"></div>
+    <div class="pop-actions">
+      <button id="pop-roll" class="btn primary">Roll</button>
+      <button id="pop-offer" class="btn ghost">Offer to table</button>
+    </div>
+    <div class="pop-actions pop-actions-2nd">
+      <button id="pop-variant" class="btn">Save as variant</button>
+    </div>
   </div>
 
   <!-- Per-die floating value chips -->
@@ -97,6 +307,39 @@ limitations under the License.
   <!-- Critical effect overlay -->
   <div id="crit-overlay" class="hidden">
     <div id="crit-text"></div>
+  </div>
+
+  <!-- Settings modal (roadmap §2): "Just you" locals + room-wide table settings -->
+  <div id="settings-modal" class="hidden">
+    <div class="panel" id="settings-panel">
+      <div class="settings-head">
+        <h2>Settings</h2>
+        <button id="settings-close" class="pop-close" title="Close">✕</button>
+      </div>
+      <div class="settings-sec">
+        <span class="plabel">Just you</span>
+        <div class="prow">
+          <span class="grow">
+            <span class="prow-label">Sound</span>
+            <span class="prow-sub">dice impact clicks</span>
+          </span>
+          <button id="set-sound" class="sw" aria-pressed="true" title="Sound"></button>
+        </div>
+        <div class="prow">
+          <span class="grow">
+            <span class="prow-label">Compact view</span>
+            <span class="prow-sub">just the table and group pills</span>
+          </span>
+          <button id="set-mini" class="sw" aria-pressed="false" title="Compact view"></button>
+        </div>
+      </div>
+      <div class="settings-sec">
+        <span class="plabel">Everyone at the table</span>
+        <div id="felt-swatches"></div>
+        <p class="hint">Everyone at the table sees these</p>
+        <div id="settings-note"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Display-name modal (multiplayer identity) -->
