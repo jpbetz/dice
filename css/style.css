@@ -560,6 +560,24 @@ html, body {
   background: rgba(212, 175, 55, 0.14);
   color: var(--gold-bright);
 }
+/* rolling-system picker (goal 6): same pill language as the felt swatches */
+#system-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+.system-chip {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ivory);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.system-chip:hover { border-color: var(--panel-border); background: rgba(255, 255, 255, 0.09); }
+.system-chip[aria-pressed="true"] {
+  border-color: rgba(212, 175, 55, 0.55);
+  background: rgba(212, 175, 55, 0.14);
+  color: var(--gold-bright);
+}
 /* transient "Nyx changed the table" line; collapses when empty */
 #settings-note { margin-top: 8px; min-height: 15px; font-size: 11px; color: var(--gold); }
 #settings-note:empty { display: none; }

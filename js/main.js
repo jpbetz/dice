@@ -1628,6 +1628,9 @@ window.__diceDebug = {
     };
   },
   setFelt(id) { return selectFelt(id); },
+  // interpretation system (goal 6): active profile id + the picker's entry point
+  get system() { return currentSystemId; },
+  setSystem(id) { return selectSystem(id); },
   openSettings() { openSettingsModal(); },
   // ceremony introspection (UX §2.4): phase machine + decal state
   get ceremonyState() {
@@ -2942,6 +2945,7 @@ function applyRoomSettings(settings) {
       currentSystemId = settings.system;
       rerenderInterpretation();
     }
+    renderSystemPicker();
   }
 }
 
@@ -2969,6 +2973,45 @@ function renderFeltSwatches() {
   holder.querySelectorAll('.felt-swatch').forEach((b) => {
     b.setAttribute('aria-pressed', String(b.dataset.felt === currentFeltId));
   });
+}
+
+// Build the three system chips once, then only refresh the selected state.
+// Same lazy-element pattern as renderFeltSwatches (module-eval ordering).
+function renderSystemPicker() {
+  const holder = document.getElementById('system-picker');
+  if (!holder.childElementCount) {
+    for (const sys of Object.values(SYSTEMS)) {
+      const chip = document.createElement('button');
+      chip.className = 'system-chip';
+      chip.dataset.system = sys.id;
+      chip.textContent = sys.label;
+      chip.title = `${sys.label} — everyone at the table reads rolls this way`;
+      chip.addEventListener('click', () => selectSystem(sys.id));
+      holder.appendChild(chip);
+    }
+  }
+  holder.querySelectorAll('.system-chip').forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.system === currentSystemId));
+  });
+}
+
+// Chip click (and __diceDebug.setSystem). Online: send the patch, apply on
+// the 'settings-changed' echo like felt. Solo: apply the lens now and persist.
+function selectSystem(id) {
+  if (!SYSTEMS[id]) return false;
+  if (id === currentSystemId) return true; // already the table's system
+  if (netOnline && net) {
+    net.setSettings({ system: id }).then((ok) => {
+      if (!ok) showSettingsNote('couldn’t reach the table — system unchanged');
+    });
+    return true;
+  }
+  roomSettings.system = id;
+  save(LS_ROOMSETTINGS, roomSettings);
+  currentSystemId = id;
+  rerenderInterpretation();
+  renderSystemPicker();
+  return true;
 }
 
 // Swatch click (and __diceDebug.setFelt). Online: send the patch, wait for
@@ -3019,6 +3062,7 @@ function syncSettingsUI() {
   document.getElementById('set-sound').setAttribute('aria-pressed', String(soundOn));
   document.getElementById('set-mini')
     .setAttribute('aria-pressed', String(document.body.classList.contains('mini')));
+  renderSystemPicker();
   renderFeltSwatches();
 }
 
