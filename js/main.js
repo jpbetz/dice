@@ -3082,7 +3082,12 @@ function visFlagToken(vis) {
 // produces the final spelling.
 function canonicalWithVis(spec, extras = {}, vis = null) {
   const v = normVis(vis, extras.faceDown);
-  const s = v ? { ...spec, visibility: { mode: v.mode, names: [...v.names] } } : spec;
+  // held rides the renderer's own faceDown (the pre-existing fixed point);
+  // spec.visibility is attached only for the NEW modes, so a
+  // visibility-aware renderer can never emit the held flag twice.
+  const s = v && v.mode !== 'held'
+    ? { ...spec, visibility: { mode: v.mode, names: [...v.names] } }
+    : spec;
   let out = canonicalNotation(s, { ...extras, faceDown: !!(v && v.mode === 'held') });
   if (v && v.mode !== 'held') {
     const token = visFlagToken(v);
