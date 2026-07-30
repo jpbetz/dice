@@ -90,10 +90,42 @@ limitations under the License.
     <button id="toggle-settings" class="btn ghost" title="Settings">⚙</button>
   </div>
 
-  <!-- Persistent corner controls: clear table + mini/expand toggle -->
+  <!-- Persistent corner controls: quick palette + clear table + mini/expand toggle -->
   <div id="corner-controls">
+    <button id="corner-palette" class="corner-btn" title="Quick roll ( / )">❯</button>
     <button id="corner-clear" class="corner-btn" title="Remove all dice from the table">✕</button>
     <button id="corner-mini" class="corner-btn" title="Compact view">⤡</button>
+  </div>
+
+  <!-- Quick palette: Spotlight-style transient command strip ('/' or Ctrl/Cmd+K).
+       Same validation machinery + 'dice.cmdhistory.v1' history as the panel box. -->
+  <div id="palette-backdrop" class="hidden">
+    <div id="palette" class="cmd">
+      <input id="palette-input" class="cmd-in" type="text" spellcheck="false" autocomplete="off"
+             autocapitalize="off" placeholder="2d6+3, 4d6dl1, 1d20 adv dc15 …" maxlength="500">
+      <div id="palette-slot" class="cmd-slot"></div>
+    </div>
+  </div>
+
+  <!-- Keyboard-shortcut cheatsheet overlay ('?') -->
+  <div id="kbd-overlay" class="hidden">
+    <div class="panel" id="kbd-panel">
+      <h2>Keyboard shortcuts</h2>
+      <div class="cheatsheet">
+        <table>
+          <tr><td><code>1–9</code></td><td>roll saved group N</td></tr>
+          <tr><td><code>r</code></td><td>reroll the last roll</td></tr>
+          <tr><td><code>c</code></td><td>clear the table</td></tr>
+          <tr><td><code>m</code></td><td>compact (mini) view on/off</td></tr>
+          <tr><td><code>l</code></td><td>show/hide the roll log</td></tr>
+          <tr><td><code>s</code></td><td>sound on/off</td></tr>
+          <tr><td><code>/</code> or <code>Ctrl/Cmd K</code></td><td>quick roll palette</td></tr>
+          <tr><td><code>Space</code></td><td>skip a roll moment</td></tr>
+          <tr><td><code>?</code></td><td>this cheatsheet</td></tr>
+          <tr><td><code>Esc</code></td><td>close the topmost open layer</td></tr>
+        </table>
+      </div>
+    </div>
   </div>
 
   <!-- Mini-mode strip: group pills -->

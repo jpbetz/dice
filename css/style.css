@@ -822,6 +822,67 @@ body.mini #offers-layer { top: 8px; max-width: 260px; }
 .cheatsheet code { font-family: var(--font-mono); font-size: 10.5px; color: var(--gold-bright); white-space: nowrap; }
 .cheatsheet .cheat-note { padding-top: 5px; font-style: italic; color: #6b6154; }
 
+/* ---------- quick palette (Spotlight-style command strip) ---------- */
+/* Above every other layer except the keyboard cheatsheet: ceremony (10),
+   popover (26), modals (40) all sit underneath. Fully functional in mini. */
+#palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 58;
+  background: rgba(10, 8, 5, 0.45);
+  backdrop-filter: blur(2px);
+}
+#palette-backdrop.hidden { display: none; }
+#palette {
+  position: absolute;
+  top: 11vh;
+  left: 0;
+  right: 0;
+  margin: 0 auto;
+  width: min(90vw, 480px);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 12px;
+  padding: 12px 14px 8px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.65), 0 0 32px rgba(212, 175, 55, 0.08);
+  backdrop-filter: blur(6px);
+  animation: modal-pop 0.22s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+#palette .cmd-in { font-size: 15px; padding: 10px 12px; }
+#palette .cmd-slot { min-height: 20px; font-size: 12px; line-height: 16px; padding-top: 5px; }
+/* Enter on an INVALID command: brief refusal shake (§5.5 — transform only) */
+#palette.palette-shake { animation: palette-shake 0.28s ease-out; }
+@keyframes palette-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  45% { transform: translateX(6px); }
+  70% { transform: translateX(-4px); }
+  85% { transform: translateX(2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #palette.palette-shake { animation: none; }
+}
+
+/* ---------- keyboard cheatsheet overlay ('?') ---------- */
+#kbd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 62; /* above the palette: Esc peels cheatsheet first */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 8, 5, 0.72);
+  backdrop-filter: blur(4px);
+}
+#kbd-overlay.hidden { display: none; }
+#kbd-panel {
+  width: min(90vw, 340px);
+  animation: modal-pop 0.3s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+#kbd-panel .cheatsheet { max-height: 60vh; }
+#kbd-panel .cheatsheet td { font-size: 12px; }
+#kbd-panel .cheatsheet code { font-size: 12px; }
+
 /* ---------- interim dc verdict (fixed decision: banner + log) ---------- */
 #result-verdict {
   font-family: var(--font-display);

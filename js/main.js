@@ -1348,6 +1348,10 @@ document.addEventListener('keydown', (e) => {
   if (e.code !== 'Space') return;
   const t = e.target;
   if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
+  // The palette/cheatsheet are layers over the table: Space must not skip a
+  // ceremony hidden behind their backdrop (focus can leave the palette input
+  // via a frame click, which would otherwise pass the guard above).
+  if (isPaletteOpen() || isKbdOpen()) return;
   if (currentRoll && currentRoll.ceremony && !currentRoll.done) {
     e.preventDefault();
     skipCeremony();
@@ -1359,14 +1363,7 @@ document.getElementById('verdict-done').addEventListener('click', (e) => {
 });
 document.getElementById('verdict-again').addEventListener('click', (e) => {
   e.stopPropagation();
-  const entry = lastEntry;
-  if (!entry || !entry.spec || !entry.spec.dice || !entry.spec.dice.length) return;
-  requestRoll([...entry.spec.dice], entry.label, {
-    mods: entry.spec.mods || undefined,
-    faceDown: entry.faceDown,
-    dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
-    exp: entry.spec.exp || undefined,
-  });
+  rerollLast(); // same semantics as the 'r' shortcut
 });
 
 // ---------------------------------------------------------------------------
@@ -1449,6 +1446,9 @@ window.__diceDebug = {
     };
   },
   skipCeremony() { return skipCeremony(); },
+  // quick palette (tests): open it / observe its open state
+  openPalette() { openPalette(); },
+  get paletteOpen() { return isPaletteOpen(); },
   sim(frames) { for (let i = 0; i < frames; i++) tick(1 / 60, false); },
   fastForward: fastForwardPlayback,
 };
@@ -1595,8 +1595,43 @@ let boxExtras = { mods: null, dc: null, comment: null };
 let cmdHistory = load(LS_HISTORY, []);
 if (!Array.isArray(cmdHistory)) cmdHistory = [];
 cmdHistory = cmdHistory.filter((h) => typeof h === 'string').slice(0, HISTORY_CAP);
-let historyAt = -1;      // -1 = live draft
-let historyDraft = '';
+
+// Shell-style ↑/↓ walker over the SHARED cmdHistory store. Each command input
+// (panel box, quick palette) gets its own walk position + preserved draft;
+// pushHistory rebases every walker (restoring any mid-walk input to its
+// preserved draft) so a fresh ↑ always lands on the newest roll.
+const historyWalkers = [];
+function makeHistoryWalker(input, repaint) {
+  const w = {
+    at: -1,      // -1 = live draft
+    draft: '',
+    reset() { w.at = -1; },
+    // History changed underneath a walk (a roll landed from ANY surface): a
+    // mid-walk input still displays a stale history entry, so restore the
+    // preserved draft before resetting — otherwise the next ↑ would overwrite
+    // the draft with the displayed entry and lose it.
+    rebase() {
+      if (w.at === -1) return;
+      w.at = -1;
+      input.value = w.draft;
+      repaint();
+    },
+    arrow(e) {
+      if (!cmdHistory.length) return;
+      e.preventDefault();
+      if (e.key === 'ArrowUp') {
+        if (w.at === -1) w.draft = input.value;
+        w.at = Math.min(cmdHistory.length - 1, w.at + 1);
+      } else {
+        w.at = Math.max(-1, w.at - 1);
+      }
+      input.value = w.at === -1 ? w.draft : cmdHistory[w.at];
+      repaint();
+    },
+  };
+  historyWalkers.push(w);
+  return w;
+}
 
 // Successful rolls from ANY path land here with their canonical string:
 // most recent first, deduped, capped, shared across rooms.
@@ -1604,14 +1639,7 @@ function pushHistory(canonical) {
   if (typeof canonical !== 'string' || !canonical) return;
   cmdHistory = [canonical, ...cmdHistory.filter((h) => h !== canonical)].slice(0, HISTORY_CAP);
   save(LS_HISTORY, cmdHistory);
-  historyAt = -1;
-}
-
-function slotSpan(cls, text) {
-  const el = document.createElement('span');
-  el.className = cls;
-  el.textContent = text;
-  cmdSlot.appendChild(el);
+  for (const w of historyWalkers) w.rebase();
 }
 
 function fmtPreview(dice, mods) {
@@ -1620,27 +1648,43 @@ function fmtPreview(dice, mods) {
   return `min ${p.min} avg ${Number.isInteger(avg) ? avg : avg.toFixed(1)} max ${p.max}`;
 }
 
+// Three-state validation paint shared by the panel box and the quick palette:
+// valid (gold + canonical/Monte-Carlo preview + warnings), incomplete
+// (neutral, never red), invalid (red + error + hint). Pure presentation —
+// callers own their side effects (tray sync, buttons).
+function renderCmdState(boxEl, slotEl, res, raw) {
+  slotEl.textContent = '';
+  boxEl.classList.toggle('is-valid', res.ok === true);
+  boxEl.classList.toggle('is-invalid', !res.ok && res.state === 'invalid');
+  const span = (cls, text) => {
+    const el = document.createElement('span');
+    el.className = cls;
+    el.textContent = text;
+    slotEl.appendChild(el);
+  };
+  if (res.ok) {
+    span('ok', `${res.canonical} · ${fmtPreview(res.spec.dice, res.spec.mods)}`);
+    for (const w of res.warnings) span('warn', `⚠ ${w}`);
+  } else if (res.state === 'incomplete') {
+    if (raw.trim()) span('muted', `… ${res.error}`);
+  } else {
+    span('bad', res.error + (res.hint ? ` — ${res.hint}` : ''));
+  }
+}
+
 function paintCmd() {
   clearTimeout(cmdTimer);
   const raw = cmdInput.value;
   const res = parseNotation(raw);
   cmdResult = res;
-  cmdSlot.textContent = '';
-  cmdEl.classList.toggle('is-valid', res.ok === true);
-  cmdEl.classList.toggle('is-invalid', !res.ok && res.state === 'invalid');
   if (res.ok) {
     boxExtras = { mods: res.spec.mods, dc: res.dc, comment: res.comment };
     if (tray.join(',') !== res.spec.dice.join(',')) {
       tray = [...res.spec.dice];
       renderTray();
     }
-    slotSpan('ok', `${res.canonical} · ${fmtPreview(res.spec.dice, res.spec.mods)}`);
-    for (const w of res.warnings) slotSpan('warn', `⚠ ${w}`);
-  } else if (res.state === 'incomplete') {
-    if (raw.trim()) slotSpan('muted', `… ${res.error}`);
-  } else {
-    slotSpan('bad', res.error + (res.hint ? ` — ${res.hint}` : ''));
   }
+  renderCmdState(cmdEl, cmdSlot, res, raw);
   updateTrayButtons();
   return res;
 }
@@ -1680,27 +1724,22 @@ function commandRoll(input) {
   return res;
 }
 
+const cmdHistoryWalk = makeHistoryWalker(cmdInput, paintCmd);
+
 cmdInput.addEventListener('input', () => {
-  historyAt = -1; // typing abandons a history walk
+  cmdHistoryWalk.reset(); // typing abandons a history walk
   clearTimeout(cmdTimer);
   cmdTimer = setTimeout(paintCmd, 300);
 });
 cmdInput.addEventListener('blur', paintCmd);
 cmdInput.addEventListener('keydown', (e) => {
+  // IME composition: Enter/Esc/arrows steer the candidate list, not us.
+  if (e.isComposing) return;
   if (e.key === 'Enter') {
     const res = paintCmd();
     if (res.ok) commandRoll(cmdInput.value);
   } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-    if (!cmdHistory.length) return;
-    e.preventDefault();
-    if (e.key === 'ArrowUp') {
-      if (historyAt === -1) historyDraft = cmdInput.value;
-      historyAt = Math.min(cmdHistory.length - 1, historyAt + 1);
-    } else {
-      historyAt = Math.max(-1, historyAt - 1);
-    }
-    cmdInput.value = historyAt === -1 ? historyDraft : cmdHistory[historyAt];
-    paintCmd();
+    cmdHistoryWalk.arrow(e);
   }
   e.stopPropagation();
 });
@@ -2250,14 +2289,8 @@ popEchoEl.addEventListener('click', () => {
 });
 
 document.getElementById('pop-close').addEventListener('click', closePopover);
-document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape' || !pop) return;
-  // The settings modal can sit on top of an open popover; Esc closes only the
-  // topmost layer (the modal has its own handler), preserving popover edits.
-  const sm = document.getElementById('settings-modal');
-  if (sm && !sm.classList.contains('hidden')) return;
-  closePopover();
-});
+// Esc closes the popover only when it is the topmost layer — handled by the
+// central Esc layering in the keyboard-shortcuts section below.
 window.addEventListener('resize', placePopover);
 
 popRollBtn.addEventListener('click', () => {
@@ -2550,9 +2583,8 @@ document.getElementById('settings-close').addEventListener('click', closeSetting
 settingsModal.addEventListener('click', (e) => {
   if (e.target === settingsModal) closeSettingsModal(); // backdrop click
 });
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !settingsModal.classList.contains('hidden')) closeSettingsModal();
-});
+// Esc closes the modal only when it is the topmost layer — see the central
+// Esc layering in the keyboard-shortcuts section below.
 document.getElementById('set-sound').addEventListener('click', () => setSound(!soundOn));
 document.getElementById('set-mini').addEventListener('click', () => {
   setMini(!document.body.classList.contains('mini'));
@@ -2609,6 +2641,189 @@ document.getElementById('corner-mini').addEventListener('click', () => {
   const smallViewport = window.innerWidth < 640 || window.innerHeight < 480;
   setMini(stored ?? smallViewport, false);
 }
+
+// ---------------------------------------------------------------------------
+// Quick palette: a transient centered command strip ('/' / Ctrl/Cmd+K / the
+// ❯ corner button). Same validation machinery, roll path, and history store
+// as the panel command box (shared helpers above) — the panel box's draft is
+// never disturbed. Enter valid: roll + close; invalid: refusal shake, stays;
+// incomplete: nothing. Esc / backdrop click dismiss. Works in mini mode.
+// ---------------------------------------------------------------------------
+
+const paletteBackdrop = document.getElementById('palette-backdrop');
+const paletteEl = document.getElementById('palette');
+const paletteInput = document.getElementById('palette-input');
+const paletteSlot = document.getElementById('palette-slot');
+let paletteTimer = null;
+
+function paintPalette() {
+  clearTimeout(paletteTimer);
+  const raw = paletteInput.value;
+  const res = parseNotation(raw);
+  renderCmdState(paletteEl, paletteSlot, res, raw);
+  return res;
+}
+
+const paletteHistoryWalk = makeHistoryWalker(paletteInput, paintPalette);
+
+function isPaletteOpen() {
+  return !paletteBackdrop.classList.contains('hidden');
+}
+
+// Always opens EMPTY (the triggering '/' is swallowed, never inserted); a
+// leading '/gmroll…' typed inside works as normal notation.
+function openPalette() {
+  // The palette always opens as the topmost layer: close the keyboard
+  // cheatsheet first (reachable via __diceDebug.openPalette / future paths)
+  // so the Esc peel order 'cheatsheet > palette' can never invert.
+  closeKbd();
+  paletteBackdrop.classList.remove('hidden');
+  paletteInput.value = '';
+  paletteHistoryWalk.reset();
+  paintPalette();
+  paletteInput.focus();
+}
+
+function closePalette() {
+  if (!isPaletteOpen()) return;
+  clearTimeout(paletteTimer);
+  paletteEl.classList.remove('palette-shake');
+  paletteBackdrop.classList.add('hidden');
+  paletteInput.value = '';
+  paletteInput.blur();
+}
+
+function shakePalette() {
+  paletteEl.classList.remove('palette-shake');
+  void paletteEl.offsetWidth; // restart the animation
+  paletteEl.classList.add('palette-shake');
+}
+
+paletteInput.addEventListener('input', () => {
+  paletteHistoryWalk.reset(); // typing abandons a history walk
+  clearTimeout(paletteTimer);
+  paletteTimer = setTimeout(paintPalette, 300);
+});
+paletteInput.addEventListener('keydown', (e) => {
+  // IME composition: Enter commits a candidate and Esc dismisses the
+  // candidate list — neither may roll, shake, walk history, or close.
+  if (e.isComposing) return;
+  // Ctrl/Cmd+K toggle muscle memory: the global handler never sees this
+  // (typing guard), so intercept here or the browser focuses its omnibox.
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+    e.preventDefault();
+    e.stopPropagation();
+    closePalette();
+    return;
+  }
+  if (e.key === 'Enter') {
+    const res = paintPalette();
+    if (res.ok) {
+      commandRoll(paletteInput.value); // the normal requestRoll path
+      closePalette();
+    } else if (res.state === 'invalid') {
+      shakePalette(); // stays open
+    } // incomplete: nothing
+  } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    paletteHistoryWalk.arrow(e);
+  } else if (e.key === 'Escape') {
+    closePalette();
+  }
+  e.stopPropagation();
+});
+paletteBackdrop.addEventListener('click', (e) => {
+  if (e.target === paletteBackdrop) closePalette();
+});
+
+document.getElementById('corner-palette').addEventListener('click', () => {
+  if (isPaletteOpen()) closePalette();
+  else openPalette();
+});
+
+// ---------------------------------------------------------------------------
+// Keyboard cheatsheet overlay ('?') + global table shortcuts.
+// ---------------------------------------------------------------------------
+
+const kbdOverlay = document.getElementById('kbd-overlay');
+
+function isKbdOpen() { return !kbdOverlay.classList.contains('hidden'); }
+function toggleKbd() { kbdOverlay.classList.toggle('hidden'); }
+function closeKbd() { kbdOverlay.classList.add('hidden'); }
+
+kbdOverlay.addEventListener('click', (e) => {
+  if (e.target === kbdOverlay) closeKbd();
+});
+
+// Reroll the last roll — the same spec the banner ⟳ / verdict button use.
+function rerollLast() {
+  const entry = lastEntry;
+  if (!entry || !entry.spec || !entry.spec.dice || !entry.spec.dice.length) return;
+  requestRoll([...entry.spec.dice], entry.label, {
+    mods: entry.spec.mods || undefined,
+    faceDown: entry.faceDown,
+    dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
+    exp: entry.spec.exp || undefined, // reroll-last preserves the moment
+  });
+}
+
+// Single global keydown handler. Layer guards are checked BEFORE any handler
+// mutates state, so one Esc can never fall through two layers:
+//   Esc peels the topmost layer only — cheatsheet > palette > settings modal
+//   > ± popover (extends the earlier popover/modal layering fix).
+// Table shortcuts fire only with no text input focused and no layer open
+// (the ± popover counts as open UI). Space keeps its skip-ceremony handler.
+document.addEventListener('keydown', (e) => {
+  // Held keys auto-repeat: without this guard a held 'r'/digit floods rolls,
+  // held 'm' thrashes mini mode, and held '/' opens the palette then types
+  // literal '/' into it. No shortcut here has a hold-to-repeat use.
+  if (e.repeat) return;
+  const t = e.target;
+  const typing = t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement
+    || (t instanceof HTMLElement && t.isContentEditable);
+
+  if (e.key === 'Escape') {
+    if (typing) return; // focused inputs own Esc (palette input closes itself)
+    if (isKbdOpen()) closeKbd();
+    else if (isPaletteOpen()) closePalette();
+    else if (!settingsModal.classList.contains('hidden')) closeSettingsModal();
+    else if (pop) closePopover();
+    return;
+  }
+  if (typing) return;
+
+  const modalOpen = !settingsModal.classList.contains('hidden')
+    || !document.getElementById('name-modal').classList.contains('hidden');
+
+  // Ctrl/Cmd+K — the one allowed modifier shortcut (browser-conflict safe).
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+    if (isKbdOpen() || modalOpen || pop) return;
+    e.preventDefault();
+    if (!isPaletteOpen()) openPalette();
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+  if (isKbdOpen()) {
+    if (e.key === '?') { e.preventDefault(); closeKbd(); }
+    return; // cheatsheet open: everything else inert (Esc handled above)
+  }
+  if (isPaletteOpen() || modalOpen || pop) return; // open UI: shortcuts inert
+
+  switch (e.key) {
+    case '/': e.preventDefault(); openPalette(); return; // swallowed, not inserted
+    case '?': e.preventDefault(); toggleKbd(); return;
+    case 'r': rerollLast(); return;
+    case 'c': requestClear(); return;
+    case 'm': setMini(!document.body.classList.contains('mini')); return;
+    case 'l': logPanel.classList.toggle('hidden'); return;
+    case 's': setSound(!soundOn); return;
+    default:
+      if (e.key >= '1' && e.key <= '9') {
+        const g = groups[Number(e.key) - 1]; // 1-indexed in list order
+        if (g) rollGroup(g);
+      }
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Multiplayer
