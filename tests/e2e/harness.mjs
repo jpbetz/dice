@@ -218,6 +218,13 @@ export class Table {
   // needs to speak to the API as this player.
   playerId() { return this.dbg('net.playerId'); }
 
+  // The per-die value chips over the table, in die order ('?' while hidden).
+  chips() {
+    return this.eval(
+      `[...document.querySelectorAll('#chips-layer .value-chip')].map((e) => e.textContent)`,
+    );
+  }
+
   // Redaction/reveal projection of one log entry (the newest when no id):
   // {hidden, redacted, revealed, faceDown, visMode, total, values, dc, canReveal}.
   entryState(rollId = null) {

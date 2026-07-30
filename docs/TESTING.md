@@ -8,16 +8,23 @@ this document defines how we check them.
 
 ## The layers
 
-1. **Unit suites** (`npm run test:unit`, <1 s) — pure-module tests for
-   notation, rollspec, and the URL codec. Plain Node scripts under `tests/`,
-   no framework.
+1. **Unit suites** (`npm run test:unit`, ~1 s) — pure-module tests for
+   notation, rollspec, the URL codec, and the visibility projection
+   (`redaction.test.mjs`: the `projectEntryFor` matrix in-process, plus an
+   endpoint layer that spawns `server.js` on an ephemeral port and asserts on
+   raw SSE bytes). Plain Node scripts under `tests/`, no framework.
 2. **Fuzz** (`npm run test:fuzz`, ~1 s) — property-based notation fuzzing.
 3. **Scripted e2e** (`npm run test:e2e`, seconds) — headless Chrome driven
    over raw CDP by the zero-dependency harness in `tests/e2e/` (Node ≥ 22's
    built-in WebSocket; no puppeteer, no npm install). Scenarios exercise the
-   real client + server across two tabs on two origins (distinct
-   identities), asserting shared-truth invariants through the
-   `window.__diceDebug` surface.
+   real client + server across tabs on distinct loopback origins (`localhost`,
+   `127.0.0.1`, `127.0.0.2`, … are separate localStorage identities, which is
+   how a scenario seats three or four players), asserting shared-truth
+   invariants through the `window.__diceDebug` surface. A scenario may also
+   step outside the browser: `apiPost` speaks to the API as a bare client
+   (status + error code), and `RawPlayer` joins and holds an SSE stream open,
+   keeping every byte the server sent — that is how a redaction claim is
+   proved on the wire instead of on what a client chose to render.
 4. **Interactive browser checks** — a human (or agent) driving a live tab.
 
 ## The policy
@@ -73,18 +80,40 @@ reported but not fatal.
 | `settings` | Room settings sync (felt, system)               |
 | `notation` | Browser-side notation wiring (grammar itself is unit-tested) |
 | `resync`   | Late-join / reload reconstruction               |
+| `visibility` | The ladder (goal 11): held · secret · whisper, reveal authority, offers/dice tower, redaction on the raw wire |
 
-New areas add a tag here and scenarios in `scenarios.mjs` (step 4 adds
-`visibility`; step 5 adds `capture`; …).
+New areas add a tag here and scenarios in `scenarios.mjs` (step 5 adds
+`capture`; …).
+
+### What `visibility` covers
+
+`held-roll` (face down for everyone, the roller included → reveal → identical
+full entries, chips `?` → real face) · `secret-roll` (no event, no log line,
+no dice for anyone else; a later open roll proves the stream was live) ·
+`whisper-roll` (three seats: the audience reads it, the chooser reads their
+own, a bystander gets a shrouded roll they know happened) ·
+`whisper-unknown-audience` (an unmatched name refuses the whole action, the
+refusal is surfaced, nothing rolls) · `gm-screen-offer` (offer → claim → the
+claimer rolls blind, the offerer reads it and holds the reveal) ·
+`reveal-authority` (403 for anyone else, and asking anyway changes nothing) ·
+`raw-sse-leak` (a bytes-only player's stream and join snapshot carry no
+values/total/perDie/modifier/parts/spec for a hidden roll, and never the
+secret roll's id at all — with an open roll as the positive control) ·
+`resync-shrouded` (a late joiner rebuilds a shrouded table; one arriving after
+the reveal rebuilds a full one).
 
 ## Scenario backlog
 
 Not yet scripted (need `__diceDebug` hooks first — add them with the
 feature work per P2):
 
-- **Offers**: offer → claim → roll attribution (hook: offer/claim entry
-  points). Step 4 must add these alongside visibility scenarios.
-- **Reveal**: face-down (`held`) roll → reveal → chips appear everywhere.
-- **Solo/static fallback**: full client behavior with no server.
+- **Solo/static fallback**: full client behavior with no server (held stays a
+  local face-down flow, `secret`/`w:` parse but act open, the picker disables
+  them). Needs a static-hosting mode in the harness — every scenario today
+  boots against the room server.
 - **Ceremony phases**: declare/tumble/settle/verdict transitions via
   `ceremonyState` (partially observable today).
+
+Scripted since (were on this list): **Offers** — offer → claim → attribution
+to the claimer, in `gm-screen-offer`; **Reveal** — face down → reveal → chips
+appear everywhere, in `held-roll` and `resync-shrouded`.

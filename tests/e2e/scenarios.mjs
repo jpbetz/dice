@@ -237,6 +237,7 @@ export const scenarios = [
         assert.ok(/face down/.test(line), `${who}: log says face down (got: ${line})`);
         assert.ok(line.includes('?'), `${who}: log total is ? (got: ${line})`);
         assert.ok(line.includes('Alice'), `${who}: roller still attributed (got: ${line})`);
+        assert.deepEqual(await t.chips(), ['?'], `${who}: the chip over the die reads ?`);
       }
       assert.equal((await a.entryState(rid)).canReveal, true, 'Alice holds the reveal');
       assert.equal((await b.entryState(rid)).canReveal, false, 'Bob does not');
@@ -253,6 +254,10 @@ export const scenarios = [
       }
       const [sa, sb] = [await a.entryState(rid), await b.entryState(rid)];
       assert.equal(typeof sa.total, 'number', 'revealed total is a number');
+      for (const [t, who] of [[a, 'Alice'], [b, 'Bob']]) {
+        assert.deepEqual(await t.chips(), [String(sa.values[0])],
+          `${who}: the chip fills in with the real face`);
+      }
       assert.deepEqual(sa, sb, 'both tabs hold the identical revealed entry');
       assert.equal(await a.logTop(), await b.logTop(), 'log entries identical after reveal');
       assert.ok(!/face down/.test(await a.logTop()), 'the log line stopped saying face down');
@@ -402,6 +407,10 @@ export const scenarios = [
       const after = await b.entryState(rid);
       assert.equal(after.total, sa.total, 'Bob finally learns what he rolled');
       assert.equal(await a.logTop(), await b.logTop(), 'one shared record afterwards');
+      // Attribution follows the hand that threw the dice, not the offer.
+      const line = await a.logTop();
+      assert.ok(line.includes('Bob'), `the claimer is the roller (got: ${line})`);
+      assert.ok(line.includes('Perception'), `the offer's label survives (got: ${line})`);
     },
   },
   {
