@@ -471,11 +471,17 @@ async function handleJoin(req, res) {
   log(`join    room=${roomName} name=${name} color=${player.color} players=${room.players.size}`);
   broadcast(room, 'player-joined', { player: { id: player.id, name: player.name, color: player.color } });
 
+  // The room state here is the same snapshot the SSE `hello` opens with —
+  // players, log, offers, settings — so a client that renders from the join
+  // response shows the identical table to one that waits for the stream.
+  // Offers were the one piece missing: a player who joined a room with rolls
+  // already on the tray saw none of them until some later offer event arrived.
   sendJson(res, 200, {
     playerId: player.id,
     color: player.color,
     players: publicPlayers(room),
     log: room.log,
+    offers: room.offers,
     settings: { ...room.settings },
   });
 }
@@ -614,9 +620,20 @@ function readExp(raw) {
   return { exp };
 }
 
+// Do two experiences say the same thing? Both sides have already been through
+// readExp, which drops an empty subtitle rather than storing '', so an absent
+// subtitle and a blank one are the same absence here.
+function sameExp(a, b) {
+  if (!a || !b) return !a && !b;
+  return a.kind === b.kind && (a.subtitle || null) === (b.subtitle || null);
+}
+
 // Roll spec from a notation string. The server re-parses the text and ITS
 // result is authoritative — a client's own parse is preview only.
-function parseNotationSpec(value) {
+//
+// `explicitExp` is the request's own exp field, already validated by readExp
+// (null when the client sent none).
+function parseNotationSpec(value, explicitExp = null) {
   // An explicit pool cannot be reconciled with a parsed one, so refuse the
   // request rather than silently picking a winner.
   if (value.dice !== undefined || value.mods !== undefined) {
@@ -628,15 +645,27 @@ function parseNotationSpec(value) {
     return { error: [400, parsed.error, 'bad_notation', { extra: { hint: parsed.hint || null } }] };
   }
 
-  // dc and faceDown come from the notation too (faceDown is true for the
-  // /gmroll, /gmr, /selfroll and /sr prefixes — interim until the visibility
-  // slice). A value sent alongside is ignored when it agrees and refused when
-  // it does not (a disagreement means the client's parse drifted from ours).
+  // dc, faceDown and exp all come from the notation too: 'dc15', the 'held'
+  // flag (plus the /gmroll, /gmr, /selfroll and /sr prefixes it normalizes —
+  // interim until the visibility slice), and the 'check'/'cinematic' flag with
+  // its '# Title | Subtitle' pipe. A value sent alongside is ignored when it
+  // agrees and refused when it does not (a disagreement means the client's
+  // parse drifted from ours, and guessing which one the player meant is how
+  // two tables end up seeing different rolls).
   if (value.dc !== undefined && value.dc !== null && value.dc !== parsed.dc) {
     return { error: [400, 'dc disagrees with the notation', 'notation_conflict'] };
   }
   if (value.faceDown !== undefined && value.faceDown !== parsed.faceDown) {
     return { error: [400, 'faceDown disagrees with the notation', 'notation_conflict'] };
+  }
+  // The parsed moment goes through readExp as well, so a notation-derived exp
+  // is held to exactly the same wire contract as a sent one — one validator,
+  // no second-class path — and any future parser drift is caught here rather
+  // than broadcast to the room.
+  const notationExp = readExp(parsed.exp);
+  if (notationExp.error) return { error: notationExp.error };
+  if (explicitExp && !sameExp(explicitExp, notationExp.exp)) {
+    return { error: [400, 'exp disagrees with the notation', 'notation_conflict'] };
   }
 
   const dice = parsed.spec.dice;
@@ -651,13 +680,18 @@ function parseNotationSpec(value) {
   // An explicit label skips notation parsing, so it needs its own stripCtl —
   // the comment fallback already got one inside parseNotation.
   const rawLabel = typeof value.label === 'string' ? stripCtl(value.label) : (parsed.comment || '');
-  return {
+  const spec = {
     dice: [...dice],
     mods,
     dc: parsed.dc,
     faceDown: parsed.faceDown === true,
     label: cutText(rawLabel, MAX_LABEL),
   };
+  // Set only when the roll is dressed up — an undressed roll must not grow an
+  // `exp: null` key, or a Plain payload stops being byte-identical to what it
+  // was before experiences existed.
+  if (notationExp.exp) spec.exp = notationExp.exp;
+  return spec;
 }
 
 // Validate the roll-shaped part of a request body. Shared by /api/roll and
@@ -668,13 +702,19 @@ function parseNotationSpec(value) {
 //   {dice, mods}       — explicit pool (the original wire form)
 //   {notation: string} — re-parsed here by js/notation.js
 //
-// exp is read once, out here, because it rides ALONGSIDE either shape the way
-// label does — an experience dresses a roll up, it never describes the pool.
+// exp is validated once, out here, because on the explicit shape it rides
+// ALONGSIDE the pool the way label does — an experience dresses a roll up, it
+// never describes the dice. On the notation shape the moment is IN the string
+// ('check'/'cinematic' + the comment's '| subtitle'), so the parsed one wins
+// and a field sent beside it only has to agree; parseNotationSpec owns that
+// reconciliation, exactly as it owns dc's and faceDown's.
 function parseRollSpec(value) {
   const exp = readExp(value.exp);
   if (exp.error) return { error: exp.error };
 
-  const spec = value.notation !== undefined ? parseNotationSpec(value) : parseExplicitSpec(value);
+  if (value.notation !== undefined) return parseNotationSpec(value, exp.exp);
+
+  const spec = parseExplicitSpec(value);
   if (spec.error) return spec;
   if (exp.exp) spec.exp = exp.exp; // absent on Plain rolls, not null — see readExp
   return spec;
