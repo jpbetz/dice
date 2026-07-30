@@ -890,3 +890,36 @@ at a time; history lives on a shelf.
   collected+order). Clients reconstruct the felt (settled replay of the
   newest on-felt roll, no tumble) and the shelf identically — closing the
   audit's empty-felt-on-reload gap.
+
+### 7.7.1 Shelf refinements (play-test feedback, 2026-07-30)
+
+- **No casino markings.** The permanent slot tray decals are removed from the
+  felt composite; empty shelf space is plain felt. An OCCUPIED position gets
+  only a soft under-glow ring beneath its cluster (subtle warm gold radial,
+  arcane-circle feel, theme-aware) that appears with the whisk and sinks
+  with the roll. Nothing is drawn where nothing sits.
+- **Default felt is walnut** (server + solo fallback). Emerald remains in
+  the picker.
+- **Peek: collected rolls keep their information.** Hovering (desktop) or
+  tapping (touch) a collected marker/cluster expands a full result card
+  above the slot — the same content as the banner: roller, label, total,
+  DC verdict, meaning word (active lens), full per-die breakdown with
+  struck dice, ✴ children, and named bonuses. One peek open at a time;
+  click-away/Esc/second-tap collapses; Esc layering slots it above the
+  popover. Face-down unrevealed peeks show '?' (+ Reveal for the roller).
+- **Left-to-right compaction** (shipped with the slice's fix pass): slots
+  are ranks — oldest to newest, no holes; deletions slide survivors left
+  with the whisk animation. Drag-to-reorder between regions is deferred to
+  the physical-interaction tier.
+
+### 7.7.2 Post-roll controls (Joe, 2026-07-30)
+
+Immediately after a roll, the ROLLER's controls are ⟳ (reroll) · Collect ·
+✕ — the ✕ clears that roll's dice from everyone's table directly (the
+existing roller-only clear-roll path) without occupying a shelf slot. Not
+every roll deserves collecting. Spectator controls unchanged (local
+dismiss). Applies to both the banner and the ceremony verdict card.
+
+Amendment to §7.7.1 peek cards (Joe, play-test): the peek must NOT scale/zoom
+in — it appears in place (instant, or ≤100ms opacity fade only). Motion
+restraint: cards are chrome, not ceremony.

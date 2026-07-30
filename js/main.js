@@ -1800,6 +1800,24 @@ function renderBannerActions(entry) {
       btn.addEventListener('click', () => banner.classList.add('hidden'));
     }
     holder.appendChild(btn);
+
+    // §7.7.2: the roller also gets a ✕ — clear the dice outright, no shelf.
+    // Same non-optimistic pattern as Collect: applyClearRoll (broadcast or
+    // solo-synchronous) hides the banner; a failed POST keeps it.
+    if (mine) {
+      const x = document.createElement('button');
+      x.className = 'btn ghost banner-btn';
+      x.textContent = '✕';
+      x.title = "Clear this roll's dice from the table";
+      x.addEventListener('click', () => {
+        x.disabled = true;
+        requestClearRoll(entry.rollId).then((ok) => {
+          x.disabled = false;
+          if (!ok) showSettingsNote('couldn’t clear the roll — try again');
+        });
+      });
+      holder.appendChild(x);
+    }
   }
 }
 
@@ -2238,6 +2256,9 @@ function renderVerdictCard(roll, entry) {
   doneBtn.title = mine
     ? 'Collect this roll to the shelf for everyone'
     : 'Dismiss for you — the dice stay until the roller collects';
+  // §7.7.2: not every roll deserves shelf space — the roller also gets a ✕
+  // that clears the dice outright (spectators keep the single local ✕).
+  document.getElementById('verdict-x').classList.toggle('hidden', !(mine && entry.rollId));
 
   const hasDc = Number.isInteger(entry.dc);
   const ring = document.getElementById('ring-fill');
@@ -2365,6 +2386,20 @@ document.getElementById('verdict-done').addEventListener('click', (e) => {
 document.getElementById('verdict-again').addEventListener('click', (e) => {
   e.stopPropagation();
   rerollLast(); // same semantics as the 'r' shortcut
+});
+// §7.7.2 roller ✕: clear this roll's dice for everyone without shelving.
+// Not optimistic — the 'roll-cleared' broadcast (or the synchronous solo
+// apply) closes the card via applyClearRoll; a failed POST keeps the card.
+document.getElementById('verdict-x').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const v = verdictFor;
+  if (!v || !v.mine || !v.rollId) return;
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  requestClearRoll(v.rollId).then((ok) => {
+    btn.disabled = false;
+    if (!ok) showSettingsNote('couldn’t clear the roll — try again');
+  });
 });
 
 // ---------------------------------------------------------------------------

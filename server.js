@@ -226,7 +226,7 @@ function normalizeExperiences(raw) {
 
 const SETTING_SPECS = {
   felt: {
-    default: 'emerald',
+    default: 'walnut',
     validate: (v) => typeof v === 'string' && FELT_THEMES.includes(v),
   },
   // The room's interpretation system. Room-wide rather than personal on
