@@ -771,7 +771,7 @@ function critWord(crit, meaning) {
 }
 
 // Build the display entry for a finished playback roll: per-die parts with
-// mechanics metadata, authoritative total, meaning, and reveal state.
+// mechanics metadata, authoritative total, and reveal state.
 function entryFromRoll(roll) {
   const types = roll.dice.map((d) => (d.type ? d.type : d)); // die objects or type strings
   const perDie = Array.isArray(roll.perDie) && roll.perDie.length === types.length
