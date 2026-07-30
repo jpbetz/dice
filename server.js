@@ -110,6 +110,13 @@ const DIE_TYPES = Object.keys(DIE_MAX);
 // boolean checker has no way to hand the cleaned value back.
 const FELT_THEMES = ['emerald', 'crimson', 'midnight', 'slate', 'walnut'];
 
+// Interpretation systems (GOALS.md goal 6, docs/ROADMAP.md §2): which profile
+// in js/meanings.js reads a roll's numbers — 'soul-deal' (the meaning chart),
+// 'dnd' (natural-20/1 crits, no chart), 'none' (numbers only). The server
+// stores the id and nothing else: meaning words and crit rules are a
+// render-time lens, so switching systems re-reads the log a room already has.
+const SYSTEMS = ['soul-deal', 'dnd', 'none'];
+
 // A custom experience template, per the record shape in docs/UX.md §2.1. The
 // three launch experiences (Plain/Check/Cinematic) are built into the client
 // and are NOT stored here — this setting carries a room's user-authored
@@ -221,6 +228,13 @@ const SETTING_SPECS = {
   felt: {
     default: 'emerald',
     validate: (v) => typeof v === 'string' && FELT_THEMES.includes(v),
+  },
+  // The room's interpretation system. Room-wide rather than personal on
+  // purpose: it decides what a roll MEANS, and goal 8's one shared truth says
+  // the table reads a result the same way for everyone.
+  system: {
+    default: 'soul-deal',
+    validate: (v) => typeof v === 'string' && SYSTEMS.includes(v),
   },
   // Room-wide custom experience templates — docs/UX.md §7.3, Joe's call that
   // these sync with the table rather than living in one player's
@@ -1209,4 +1223,4 @@ function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-export { server, DIE_TYPES, PALETTE, FELT_THEMES };
+export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS };
