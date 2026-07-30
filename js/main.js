@@ -21,9 +21,9 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue } from './dice.js';
 import { connect } from './net.js';
-import { meaningFor, SYSTEMS, DEFAULT_SYSTEM } from './meanings.js';
+import { SYSTEMS, DEFAULT_SYSTEM } from './meanings.js';
 import { groupsFromLocation, syncGroupsToLocation } from './urlgroups.js';
-import { composeRoll, validateMods, countingBaseTypes, previewSpec } from './rollspec.js';
+import { composeRoll, validateMods, previewSpec } from './rollspec.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 
 // ---------------------------------------------------------------------------
@@ -796,7 +796,8 @@ function entryFromRoll(roll) {
   });
   const modifier = roll.modifier || 0;
   const total = typeof roll.total === 'number' ? roll.total : sum + modifier;
-  const meaning = meaningFor(countingBaseTypes(types, perDie), total);
+  // No meaning field: interpretation is a render-time lens (entryMeaning /
+  // entryCrit read the active system), never state a stored entry carries.
   // The experience attachment rides entry.spec so reroll-last preserves it.
   const exp = sanitizeExp(roll.exp);
   const spec = roll.spec ? (exp ? { ...roll.spec, exp } : roll.spec) : undefined;
@@ -811,7 +812,6 @@ function entryFromRoll(roll) {
     sum,
     modifier,
     total,
-    meaning: meaning || undefined,
     dc: Number.isInteger(roll.dc) ? roll.dc : undefined,
     faceDown: !!roll.faceDown,
     revealed: roll.revealed !== false,
@@ -1230,10 +1230,10 @@ function stageChips(roll) {
 
 function stageVerdict(roll) {
   const cer = roll.ceremony;
-  const m = cer.entry.meaning;
-  if (m && (m.tier === 'crit-success' || m.tier === 'crit-fail')) {
+  const crit = entryCrit(cer.entry); // active-system lens at staging time
+  if (crit) {
     ceremonyLayer.classList.add('crit');
-    playCritEffect(m.tier === 'crit-success' ? 'success' : 'fail', m.word);
+    playCritEffect(crit, critWord(crit, entryMeaning(cer.entry)));
   }
   renderVerdictCard(roll, cer.entry);
   setCeremonyPhaseClass(roll, 'c-verdict');
@@ -1443,11 +1443,12 @@ function renderVerdictCard(roll, entry) {
   const marginEl = document.getElementById('verdict-margin');
   const heroEl = document.getElementById('verdict-hero');
   const chartEl = document.getElementById('verdict-chart');
+  const meaning = entryMeaning(entry); // active-system lens (null in dnd/none)
   heroEl.className = 'verdict-hero';
   chartEl.textContent = '';
   marginEl.textContent = '';
   if (hasDc) {
-    // §2.5: the target verdict owns the hero slot; the Soul Deal word demotes
+    // §2.5: the target verdict owns the hero slot; the chart word demotes
     // to a labeled chart line. Never merged, never hidden.
     const cleared = entry.total >= entry.dc;
     marginEl.append(`vs DC ${entry.dc} · margin `);
@@ -1456,16 +1457,16 @@ function renderVerdictCard(roll, entry) {
     marginEl.appendChild(b);
     heroEl.textContent = cleared ? 'Success' : 'Failure';
     if (!cleared) heroEl.classList.add('bad');
-    if (entry.meaning) {
+    if (meaning) {
       chartEl.append('Chart · ');
       const w = document.createElement('span');
       w.className = 'chart-word';
-      w.textContent = entry.meaning.word;
+      w.textContent = meaning.word;
       chartEl.appendChild(w);
     }
-  } else if (entry.meaning) {
-    heroEl.textContent = entry.meaning.word;
-    heroEl.classList.add(`tier-${entry.meaning.tier}`);
+  } else if (meaning) {
+    heroEl.textContent = meaning.word;
+    heroEl.classList.add(`tier-${meaning.tier}`);
   } else {
     heroEl.textContent = '';
   }
