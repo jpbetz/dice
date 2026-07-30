@@ -262,6 +262,7 @@ function defaultSettings() {
  *   players: Map<playerId, {id, name, color, clients:Set<ServerResponse>, reapTimer}>,
  *   log: [roll],
  *   offers: [offer],
+ *   collectSeq: int,        // last collection sequence handed out (see §7.7)
  *   settings: {felt, ...}   // room-wide, see SETTING_SPECS
  * }
  */
@@ -276,6 +277,7 @@ function getRoom(name) {
       players: new Map(),
       log: [],
       offers: [],
+      collectSeq: 0,
       settings: defaultSettings(),
     };
     rooms.set(name, room);
@@ -758,6 +760,72 @@ function parseExplicitSpec(value) {
   return { dice: [...dice], mods, dc: dc.dc, faceDown: value.faceDown === true, label };
 }
 
+// ---------------------------------------------------------------------------
+// The collect shelf (UX §7.7)
+// ---------------------------------------------------------------------------
+//
+// A log entry moves through three states, each written as a present-or-absent
+// field so an entry an older client reads is byte-for-byte what it always was:
+//
+//   on-felt    no `collected`, no `cleared` — the main felt holds this roll
+//   collected  entry.collected = <seq> — the roll sits in a shelf slot
+//   cleared    entry.cleared = true — gone from felt and shelf alike
+//
+// `cleared` implies off-shelf: a cleared entry is never on the shelf again,
+// whether it was collected first or sent away straight from the felt.
+//
+// The sequence is per room and only ever counts up, so every client orders the
+// shelf the same way without needing the server to name slots. It starts at 1,
+// never 0: `collected` is then falsy exactly when it is absent, and a client
+// may test it the same way it tests `cleared`.
+const SHELF_CAP = 5;
+
+// Collected entries still on the shelf, oldest collection first.
+function shelf(room) {
+  return room.log
+    .filter((r) => r.collected && !r.cleared)
+    .sort((a, b) => a.collected - b.collected);
+}
+
+// Move `entries` (in log order) onto the shelf and enforce SHELF_CAP, then tell
+// the room in one ordered burst. Already-collected and cleared entries are
+// skipped, which is what makes both collect paths idempotent.
+//
+// The burst order is load-bearing: the rolls the shelf pushed off sink FIRST,
+// so no client ever has to render six clusters in five slots, not even for a
+// frame. Callers that follow this with an event of their own — a new roll —
+// send theirs last, so the felt is clear before the incoming dice land.
+//
+// Returns the entries that actually moved.
+function collectEntries(room, entries) {
+  const collected = [];
+  for (const roll of entries) {
+    if (roll.cleared || roll.collected) continue;
+    roll.collected = ++room.collectSeq;
+    collected.push(roll);
+  }
+  if (collected.length === 0) return collected;
+
+  // Past capacity the LOWEST sequences fall off — the shelf is FIFO by
+  // collection order, not by when the dice were originally rolled.
+  const over = shelf(room);
+  const evicted = over.slice(0, Math.max(0, over.length - SHELF_CAP));
+  for (const roll of evicted) roll.cleared = true;
+
+  for (const roll of evicted) {
+    log(`evict   room=${room.name} rollId=${roll.rollId} seq=${roll.collected}`);
+    // Deliberately the same event a per-roll Done sends: aging off the shelf
+    // and being dismissed are the same sink animation, so a client needs one
+    // code path for both.
+    broadcast(room, 'roll-cleared', { rollId: roll.rollId });
+  }
+  for (const roll of collected) {
+    log(`collect room=${room.name} rollId=${roll.rollId} seq=${roll.collected}`);
+    broadcast(room, 'roll-collected', { rollId: roll.rollId, seq: roll.collected });
+  }
+  return collected;
+}
+
 // Compose, log, and broadcast a roll for a player from a validated spec.
 // Shared by /api/roll and /api/claim so both take the exact same path.
 function executeRoll(room, player, spec) {
@@ -790,6 +858,15 @@ function executeRoll(room, player, spec) {
     roll.exp = spec.exp;
     roll.spec.exp = spec.exp;
   }
+
+  // Auto-collect (§7.7): the felt belongs to ONE roll, so everything already on
+  // it goes to the shelf as part of the incoming roll's arrival beat. The
+  // server decides this, not the clients, so there is no race over whose
+  // whisk-away ran first. `room.log` is still all-priors here — the new roll is
+  // pushed below — and nothing of this roll's has been broadcast yet, so the
+  // whole burst reaches the room in the order §7.7 pins: evictions, then
+  // collections, then the roll itself.
+  collectEntries(room, room.log);
 
   room.log.push(roll);
   if (room.log.length > LOG_CAP) room.log = room.log.slice(-LOG_CAP);
@@ -836,8 +913,38 @@ async function handleReveal(req, res) {
   sendJson(res, 200, { ok: true });
 }
 
-// Per-roll Done (UX §7.5). Same roller-only authorization as reveal: the dice
-// belong to the moment, and only the player who rolled them decides it is over.
+// Collect (UX §7.7). Same roller-only authorization as reveal: the dice belong
+// to the moment, and only the player who threw them says the moment is over.
+// What changes is where they go — the shelf, not away — so the roll stays
+// readable to the table instead of vanishing on the roller's say-so.
+async function handleCollectRoll(req, res) {
+  const body = await readJsonBody(req);
+  if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
+
+  const found = lookup(body.value);
+  if (found.error) return sendError(res, ...found.error);
+  const { room, player } = found;
+
+  const rollId = cleanString(body.value.rollId, 64);
+  if (!rollId) return sendError(res, 400, 'rollId is required', 'bad_request');
+
+  const roll = room.log.find((r) => r.rollId === rollId);
+  if (!roll) return sendError(res, 404, 'unknown roll', 'unknown_roll');
+  // A claimed offer's roller is the claimer, not the offer's author.
+  if (roll.playerId !== player.id) return sendError(res, 403, 'only the roller may collect their roll', 'forbidden');
+
+  // Idempotent, and deliberately silent, exactly as clear-roll is: a second
+  // Collect must not re-run the whisk at clients that already played it, and a
+  // cleared roll has no way back onto the shelf. collectEntries decides both —
+  // and logs the line — so the manual and automatic paths cannot drift.
+  collectEntries(room, [roll]);
+  sendJson(res, 200, { ok: true });
+}
+
+// Per-roll Done (UX §7.5), now also the shelf's ✕ (§7.7). Housekeeping is
+// universal once a roll is COLLECTED: it is table furniture by then, and
+// anyone may tidy it away. An uncollected roll is still the live moment on the
+// felt, so it stays the roller's to end.
 // The log entry itself is never removed — only flagged — so history and a fresh
 // join agree about which rolls have already left the table.
 async function handleClearRoll(req, res) {
@@ -854,8 +961,11 @@ async function handleClearRoll(req, res) {
   const roll = room.log.find((r) => r.rollId === rollId);
   if (!roll) return sendError(res, 404, 'unknown roll', 'unknown_roll');
   // A claimed offer's roller is the claimer, not the offer's author, so the
-  // player who actually threw the dice is the one who can send them away.
-  if (roll.playerId !== player.id) return sendError(res, 403, 'only the roller may clear their roll', 'forbidden');
+  // player who actually threw the dice is the one who can send them away —
+  // until it reaches the shelf, after which any player at the table may.
+  if (roll.playerId !== player.id && !roll.collected) {
+    return sendError(res, 403, 'only the roller may clear their roll', 'forbidden');
+  }
   // Idempotent, and deliberately silent: a second Done must not re-broadcast a
   // sink animation at clients that already ran it.
   if (roll.cleared) return sendJson(res, 200, { ok: true });
@@ -1171,6 +1281,7 @@ const server = http.createServer((req, res) => {
     if (route === '/api/claim' && req.method === 'POST') return handleClaim(req, res);
     if (route === '/api/unoffer' && req.method === 'POST') return handleUnoffer(req, res);
     if (route === '/api/clear' && req.method === 'POST') return handleClear(req, res);
+    if (route === '/api/collect-roll' && req.method === 'POST') return handleCollectRoll(req, res);
     if (route === '/api/clear-roll' && req.method === 'POST') return handleClearRoll(req, res);
     if (route === '/api/settings' && req.method === 'POST') return handleSettings(req, res);
     if (route.startsWith('/api/')) return sendError(res, 404, 'no such endpoint', 'not_found');
