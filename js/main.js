@@ -3759,11 +3759,16 @@ const CAM_TARGET = new THREE.Vector3(0, 0, 0.5);
 
 // What must stay on screen, each with the NDC headroom its own chrome needs.
 // A marker is a DOM pill centered on its anchor, so it needs half its width
-// (~90 px, and it is the widest thing the shelf projects) of clearance.
+// (~90 px, ~55 in compact, and it is the widest thing the shelf projects) of
+// clearance — capped at a tenth of the window, because on a phone five pills
+// cannot all fit side by side at any distance and the anchor being reachable
+// is what actually matters.
 function framingPoints() {
   const outerX = shelfSlotX(SHELF_SLOTS - 1) + SHELF_SLOT_W / 2;
   const markerX = shelfSlotX(SHELF_SLOTS - 1);
-  const pillNdc = 180 / Math.max(window.innerWidth, 1);
+  const w = Math.max(window.innerWidth, 1);
+  const halfPill = Math.min(document.body.classList.contains('mini') ? 55 : 90, w / 10);
+  const pillNdc = (2 * halfPill) / w;
   const pts = [];
   for (const s of [-1, 1]) {
     pts.push({ p: new THREE.Vector3(s * outerX, 0, SHELF_Z - SHELF_SLOT_D / 2), mx: 0.02, my: 0.02 });
@@ -3783,8 +3788,10 @@ function applyCameraFraming() {
   const v = new THREE.Vector3();
   // Pull back in small steps and stop at the first distance that fits — a
   // closed form would have to invert the projection for eight points at once,
-  // and this runs only on resize and on the compact-view toggle.
-  for (let i = 0; i < 60; i++) {
+  // and this runs only on resize and on the compact-view toggle. The range
+  // reaches ~3.7×, which covers a phone held upright; past that the eye stays
+  // where the last step left it rather than retreating without end.
+  for (let i = 0; i < 90; i++) {
     camera.position.copy(CAM_TARGET).addScaledVector(ray, 1 + i * 0.03);
     camera.lookAt(CAM_TARGET);
     camera.updateMatrixWorld(true);
