@@ -1149,6 +1149,13 @@ output: `/gmroll`, `/gmr` → `held`; `/selfroll`, `/sr` → `secret`. The
 `/selfroll` family finally means what its name always claimed — before the
 visibility slice both families were synonyms for face-down.
 
+**Typing states.** A partial visibility flag at end of input is
+`incomplete`, never `invalid` (§1.3's three-state rule): `1d20 sec`,
+`1d20 w:` and `1d20 w:"Ann Sm` are all mid-typing, so the box never
+flashes red while a name is being written. The client may preview a
+`w:` list against the roster it already has, but the roster check that
+counts is the server's, on its own re-parse (§1.6, §3.0).
+
 **Names and quoting.** `w:` takes a comma-separated list with no spaces
 around the commas.
 
