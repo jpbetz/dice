@@ -81,3 +81,65 @@ export function meaningFor(diceTypes, total) {
   if (!word) return null;
   return { word, tier: TIERS[word], column: `d${column}`, rank };
 }
+
+// ---------------------------------------------------------------------------
+// Interpretation system profiles (GOALS.md goal 6, ROADMAP §2). The room
+// setting `system` (server SETTING_SPECS) picks which profile reads a roll's
+// numbers. Interpretation is a render-time lens: entries and log lines store
+// raw facts only (parts, per-die metadata, totals, dc); meaning words and
+// crit fanfare are computed from the ACTIVE profile at paint time, so
+// switching systems re-reads a log the table already has. DC verdicts are
+// goal-4 arithmetic, not interpretation — they render under every profile,
+// as does per-die max/min chip styling (a per-die fact).
+//
+// A profile provides:
+//   id, label                 registry key + the settings-modal picker label
+//   meaningFor(types, total)  -> {word, tier, column, rank} | null
+//                             the chart line (null = no line in this system)
+//   critFor(entry)            -> 'success' | 'fail' | null
+//                             drives crit fanfare + banner/ceremony classes
+//
+// critFor sees a display entry; it reads entry.total and entry.parts:
+// [{type, value, counts, child}]. Discarded dice (counts=false — advantage's
+// struck die, drops, reroll originals) and explosion children never decide a
+// crit.
+
+const countingTypes = (entry) =>
+  entry.parts.filter((p) => p.counts && !p.child).map((p) => p.type);
+
+export const SYSTEMS = {
+  'soul-deal': {
+    id: 'soul-deal',
+    label: 'Your Soul Deal',
+    meaningFor,
+    critFor(entry) {
+      const m = meaningFor(countingTypes(entry), entry.total);
+      if (!m) return null;
+      return m.tier === 'crit-success' ? 'success'
+        : m.tier === 'crit-fail' ? 'fail'
+        : null;
+    },
+  },
+  dnd: {
+    id: 'dnd',
+    label: 'D&D style',
+    meaningFor: () => null,
+    // Natural-20/1 rule, read off the d20s that actually count: with
+    // advantage the discarded die never triggers (counts is false on it),
+    // and a natural 20 outranks a natural 1 when one pool lands both.
+    critFor(entry) {
+      const d20s = entry.parts.filter((p) => p.type === 'd20' && p.counts && !p.child);
+      if (d20s.some((p) => p.value === 20)) return 'success';
+      if (d20s.some((p) => p.value === 1)) return 'fail';
+      return null;
+    },
+  },
+  none: {
+    id: 'none',
+    label: 'Numbers only',
+    meaningFor: () => null,
+    critFor: () => null,
+  },
+};
+
+export const DEFAULT_SYSTEM = 'soul-deal';
