@@ -96,6 +96,10 @@ own, a bystander gets a shrouded roll they know happened) ·
 refusal is surfaced, nothing rolls) · `gm-screen-offer` (offer → claim → the
 claimer rolls blind, the offerer reads it and holds the reveal) ·
 `reveal-authority` (403 for anyone else, and asking anyway changes nothing) ·
+`reveal-mid-playback` (a reveal landing while the shrouded roll is still
+tumbling parks in `pendingReveals` and runs at settle — the 7f9cdf5 race, made
+deterministic by `__diceDebug.holdClock(true)`, which freezes a tab's rAF
+clock so only `sim()` moves it) ·
 `raw-sse-leak` (a bytes-only player's stream and join snapshot carry no
 values/total/perDie/modifier/parts/spec for a hidden roll, and never the
 secret roll's id at all — with an open roll as the positive control) ·
