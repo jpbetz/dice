@@ -582,9 +582,9 @@ function stepPlayback(dt) {
 
   // Cinematic slow-mo: playback rate eased to 0.35× over the last ~400 ms of
   // keyframes. Pure playback-clock scaling — physics is never touched.
-  // Mini renders cinematic as brisk (§2.6), so no slow-mo there either.
+  // Identical in compact view (§7.4: ceremony parity, responsive scale only).
   let step = dt;
-  if (cer && cer.exp.kind === 'cinematic' && !cer.mini) {
+  if (cer && cer.exp.kind === 'cinematic') {
     const remaining = roll.duration - roll.time;
     if (remaining > 0 && remaining < CEREMONY_SLOWMO_WINDOW) {
       step = dt * (CEREMONY_SLOWMO_RATE
@@ -887,6 +887,8 @@ function playCritEffect(kind, text) {
 // presentation: declaration (intent card + mat-text felt decal, playback
 // held) → tumble (card docked to the top strip) → settle staging (hit-stop,
 // chip chorus, attribution fly-ins, verdict on the same top anchor) → done.
+// Compact view is immersive (UX §7.4): the SAME state machine, card, decal and
+// slow-mo play in body.mini — responsive CSS scaling only, no degradation.
 // Values and staging info are identical for every viewer; pacing is local.
 // Every state transition advances on the stepPlayback clock (sim()-driven,
 // deterministic); CSS transitions only decorate. The single exception is the
@@ -903,7 +905,6 @@ const EXP_MAX_SUBTITLE = 40;
 const KEEP_WORDS = { kh: 'Keep high', kl: 'Keep low', dh: 'Drop high', dl: 'Drop low' };
 
 const ceremonyLayer = document.getElementById('ceremony-layer');
-const miniMomentEl = document.getElementById('mini-moment');
 let ceremonyDismissTimer = null;
 
 // Ornate corners (§5.3) — injected once per framed card; static markup only.
@@ -936,10 +937,8 @@ function sanitizeExp(raw) {
 const fmtNum = (v) => (v > 0 ? `+${v}` : v < 0 ? `−${Math.abs(v)}` : '+0');
 
 function beginCeremony(roll) {
-  const mini = document.body.classList.contains('mini');
   roll.ceremony = {
     exp: roll.exp,
-    mini,
     phase: 'declare',
     clock: 0,
     declareDur: CEREMONY_DECLARE_S,
@@ -948,14 +947,6 @@ function beginCeremony(roll) {
     entry: null,
   };
   clearTimeout(ceremonyDismissTimer);
-  if (mini) {
-    // §2.6 degradation: no intent card, no mat decal — a pulsing strip while
-    // the dice roll, the verdict line after.
-    miniMomentEl.className = 'rolling';
-    miniMomentEl.textContent = `${roll.label || ''} · rolling…`;
-    ceremonyEnterTumble(roll);
-    return;
-  }
   // The dice are frozen at the throw's first keyframe (mid-air); keep them
   // out of sight while the declaration holds the stage.
   for (const d of roll.dice) d.mesh.visible = false;
@@ -977,10 +968,8 @@ function ceremonyEnterTumble(roll) {
   cer.phase = 'tumble';
   cer.clock = 0;
   for (const d of roll.dice) d.mesh.visible = true;
-  if (!cer.mini) {
-    renderDockStrip(roll);
-    setCeremonyPhaseClass(roll, 'c-tumble');
-  }
+  renderDockStrip(roll);
+  setCeremonyPhaseClass(roll, 'c-tumble');
 }
 
 // Settle staging (§2.4 phases 3–7): build the entry, land the log line, and
@@ -997,10 +986,9 @@ function ceremonyEnterSettle(roll) {
 
   const n = entry.parts.length;
   const stagger = n <= 6 ? 0.07 : 0.04;
-  const brisk = cer.mini; // mini renders brisk-or-less (§2.6)
-  const tChips = brisk ? 0.05 : CEREMONY_HITSTOP_S;
-  const tVerdict = Math.min(tChips + n * stagger + (brisk ? 0.06 : 0.12), CEREMONY_BUDGET_S - 0.45);
-  const tEnd = Math.min(tVerdict + (brisk ? 0.2 : 0.45), CEREMONY_BUDGET_S);
+  const tChips = CEREMONY_HITSTOP_S;
+  const tVerdict = Math.min(tChips + n * stagger + 0.12, CEREMONY_BUDGET_S - 0.45);
+  const tEnd = Math.min(tVerdict + 0.45, CEREMONY_BUDGET_S);
   cer.stages = [
     { t: 0, fn: stageHitStop },
     { t: tChips, fn: stageChips },
@@ -1022,7 +1010,6 @@ function ceremonyStepSettle(roll, dt) {
 }
 
 function stageHitStop(roll) {
-  if (roll.ceremony.mini) return;
   const flash = document.getElementById('hit-flash');
   flash.classList.remove('flash');
   void flash.offsetWidth; // restart the animation
@@ -1035,10 +1022,6 @@ function stageChips(roll) {
 
 function stageVerdict(roll) {
   const cer = roll.ceremony;
-  if (cer.mini) {
-    renderMiniVerdict(cer.entry);
-    return;
-  }
   const m = cer.entry.meaning;
   if (m && (m.tier === 'crit-success' || m.tier === 'crit-fail')) {
     ceremonyLayer.classList.add('crit');
@@ -1095,45 +1078,14 @@ function skipCeremony() {
   return true;
 }
 
-// Mini mode toggled while a ceremony is on stage. beginCeremony froze the
-// mini/full decision at roll start while CSS routes visibility off the live
-// body class, so without this the presentation strands: full→mini hides the
-// cards while the state machine finishes invisibly; mini→full never shows a
-// verdict at all. Jump to the completed verdict, then re-land it on the
-// surface the NEW mode uses. Called from setMini; a no-op with no ceremony
-// on stage (already dismissed, or none at all).
-function ceremonyModeSwapped() {
-  const roll = currentRoll;
-  if (!roll || !roll.ceremony || !roll.ceremony.exp) return;
-  const cer = roll.ceremony;
-  const onStage = !ceremonyLayer.classList.contains('hidden')
-    || !miniMomentEl.classList.contains('hidden');
-  if (!onStage) return; // verdict already dismissed — nothing to re-home
-  if (!roll.done) skipCeremony();
-  if (cer.phase !== 'done' || !cer.entry) return;
-  const mini = document.body.classList.contains('mini');
-  if (mini === cer.mini) return;
-  cer.mini = mini;
-  if (mini) {
-    // §2.6: no cards, no mat decal in mini — the strip carries the verdict.
-    clearMatDecal();
-    renderMiniVerdict(cer.entry);
-  } else {
-    miniMomentEl.className = 'hidden';
-    miniMomentEl.textContent = '';
-    renderVerdictCard(roll, cer.entry);
-    setCeremonyPhaseClass(roll, 'c-verdict');
-  }
-}
-
-// Remove every ceremony surface (cards, decal, mini strip). Safe to call at
-// any time; playRoll and clearTable both start from a clean stage.
+// Remove every ceremony surface (cards, decal). Safe to call at any time;
+// playRoll and clearTable both start from a clean stage. Toggling compact view
+// mid-ceremony needs no special handling: the ceremony keeps playing on the
+// same surfaces, only re-scaled by CSS (§7.4).
 function dismissCeremonyUI() {
   clearTimeout(ceremonyDismissTimer);
   ceremonyDismissTimer = null;
   ceremonyLayer.className = 'hidden';
-  miniMomentEl.className = 'hidden';
-  miniMomentEl.textContent = '';
   clearMatDecal();
 }
 
@@ -1322,22 +1274,6 @@ function renderVerdictCard(roll, entry) {
   });
 }
 
-function renderMiniVerdict(entry) {
-  miniMomentEl.className = '';
-  miniMomentEl.textContent = '';
-  miniMomentEl.append(`${entry.label || ''} · ${entry.total}`);
-  if (Number.isInteger(entry.dc)) {
-    const cleared = entry.total >= entry.dc;
-    miniMomentEl.append(` vs ${entry.dc} · `);
-    const v = document.createElement('span');
-    v.className = cleared ? 'ok' : 'bad';
-    v.textContent = cleared ? 'SUCCESS' : 'FAILURE';
-    miniMomentEl.appendChild(v);
-  } else if (entry.meaning) {
-    miniMomentEl.append(` · ${entry.meaning.word}`);
-  }
-}
-
 // ---- skip + actions wiring -------------------------------------------------
 
 ceremonyLayer.addEventListener('click', (e) => {
@@ -1441,7 +1377,6 @@ window.__diceDebug = {
       phase: r.ceremony.phase,
       kind: r.ceremony.exp.kind,
       clock: r.ceremony.clock,
-      mini: r.ceremony.mini,
       decal: matDecalText,
     };
   },
@@ -2627,7 +2562,7 @@ function setMini(on, persist = true) {
   if (persist) save(LS_MINI, on);
   applyCameraFraming();
   positionChips();
-  ceremonyModeSwapped(); // re-home an on-stage ceremony verdict to the new mode
+  // An on-stage ceremony needs nothing: it keeps playing, re-scaled (§7.4).
   syncSettingsUI(); // the settings modal mirrors the mini preference
 }
 
