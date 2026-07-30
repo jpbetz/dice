@@ -1474,12 +1474,17 @@ ceremonyLayer.addEventListener('click', (e) => {
 
 // Always interruptible (GOALS) — the invariant covers a PLAIN roll's tumble
 // too, not just ceremonies: click the felt or press Space and the throw jumps
-// to its final keyframe, chips, banner and log line. fastForwardPlayback is
-// the same machinery a hidden tab uses on refocus, so anything queued behind
-// this roll lands settled as well. Ceremony rolls keep their own richer skip.
+// to its final keyframe, chips, banner and log line. Exactly ONE roll skips —
+// the one in flight. Stepping past its duration finishes it and hands the
+// stage to whatever is queued, which then plays its own presentation from the
+// top; draining the queue here (what a hidden tab's refocus catch-up does)
+// would flatten a queued ceremony's declare/tumble/verdict staging as
+// collateral for a click meant for this throw. Ceremony rolls keep their own
+// richer skip.
 function skipPlainPlayback() {
-  if (!currentRoll || currentRoll.done || currentRoll.ceremony) return false;
-  fastForwardPlayback();
+  const roll = currentRoll;
+  if (!roll || roll.done || roll.ceremony) return false;
+  stepPlayback(roll.duration - roll.time + FIXED_DT);
   return true;
 }
 container.addEventListener('click', () => { skipPlainPlayback(); });
