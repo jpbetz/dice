@@ -602,31 +602,46 @@ screen when it rides an offer (§3.3).
 **Choosing it.** Every roll surface can express every rung (the
 uniform-surfaces invariant, §7.4), through two paths that are the same
 truth: the notation flags `held` / `secret` / `w:Name` (§7.8), and a
-visibility control in the `±` popover mirrored in the offer composer —
-`Open · Held · Secret · Whisper…`, where Whisper opens a name picker over
-the current roster (recipient chips: player dot + name), shown above the
-Roll button *before* the roll.
+visibility control in the `±` popover, which doubles as the offer composer
+(its Roll and Offer buttons apply the same edited intent). The segmented
+control reads `Open · Face down · Secret · Whisper`; Whisper opens a name
+picker over the current roster (recipient chips: player dot + name), and a
+whisper with nobody named disables both verbs rather than rolling wide.
 
-**Sticky, and therefore badged.** The picker's last choice is sticky per
-player (`rollMode` in localStorage — Foundry's default-roll-mode
-ergonomic). Because a sticky non-open default is the number-one accident
-vector, **any non-open mode shows a small eye-slash badge** on the Roll
-button and on mini pills, and the composed notation says it in words.
+**Not sticky, and therefore un-badged.** The picker starts from the
+notation it was opened on, every time — there is no remembered per-player
+default. That is deliberate for now: a sticky non-open default is the
+number-one accident vector, and carrying one would require the eye-slash
+badge on the Roll button and the mini pills to be safe. Neither ships.
+What does the announcing today is the composed notation itself — the
+popover echo always spells the mode out (`… secret`, `… w:Kira`) and the
+preview line says it in words (`· face down`, `· whisper to Kira`). A
+sticky default plus its badge are a matched pair; see ROADMAP step 4b.
 
 Everyone always learns *that* a non-secret hidden roll happened: shrouded
-dice land and the log reads `Nyx rolled, held` / `Nyx whispered a roll to
-Joe` (an audience member reads "…to you"). Secret is the one rung with no
-trace, by definition — it is the only silent roll, and it can never be
+dice land, and where an open roll's log line shows a total the hidden one
+shows `face down` / `whispered` in its place. Secret is the one rung with
+no trace, by definition — it is the only silent roll, and it can never be
 un-silenced.
 
 **Solo and static parity (goal 9).** With no server there is one player and
-one client, and solo mirrors the projection locally rather than skipping
-it: `held` still hides its own result from you until you reveal it (the
-whole point of that rung — it hides from the roller too), `secret` and
-`open` are indistinguishable to an audience of one, and `w:` resolves
-against a roster of one, so naming anyone else is the same
-`unknown_audience` rejection it is online. The ladder never becomes dead
-code offline, and a room that later gains players behaves the same way.
+one client, and the ladder collapses to what one player can mean by it:
+
+- **`held` keeps its full local flow** — shrouded playback, hidden result,
+  and a local reveal. It still hides from you until you reveal it, which
+  is the whole point of that rung.
+- **`secret` and `open` are indistinguishable** to an audience of one, and
+  solo treats them as such.
+- **`w:` has nobody to whisper to.** The popover disables Secret and
+  Whisper offline (the sub line says so: *secret & whisper need a table —
+  you are playing solo*), and a `w:Name` typed into the command box parses
+  and then **rolls open** — solo has no roster to reject a name against
+  and no second client to withhold anything from.
+
+So the ladder never becomes dead code offline, but solo is *degraded
+gracefully*, not fully mirrored: the rungs whose whole meaning is "someone
+else" are the rungs that flatten. A room that later gains players gets the
+real ladder back with no change to the saved notation.
 
 ### 3.3 Offers, reveal authority, and the GM-screen roll
 
