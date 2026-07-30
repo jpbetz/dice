@@ -24,7 +24,7 @@ import { connect } from './net.js';
 import { meaningFor } from './meanings.js';
 import { groupsFromLocation, syncGroupsToLocation } from './urlgroups.js';
 import { composeRoll, validateMods, countingBaseTypes, previewSpec } from './rollspec.js';
-import { parseNotation, canonicalNotation } from './notation.js';
+import { parseNotation, canonicalNotation, cutText } from './notation.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -1094,7 +1094,9 @@ function sanitizeExp(raw) {
   if (raw.kind !== 'check' && raw.kind !== 'cinematic') return null;
   const out = { kind: raw.kind };
   if (typeof raw.subtitle === 'string') {
-    const s = raw.subtitle.replace(CTL_RE, '').trim().slice(0, EXP_MAX_SUBTITLE).trim();
+    // cutText, not a bare slice: the cap must not saw a '🎲' in half and leave
+    // a lone surrogate the canonical would carry into encodeURIComponent.
+    const s = cutText(raw.subtitle.replace(CTL_RE, ''), EXP_MAX_SUBTITLE);
     if (s) out.subtitle = s;
   }
   return out;
@@ -2037,7 +2039,7 @@ paintCmd();
 // here on load; anything unreadable is dropped rather than guessed at.
 function migrateGroup(g, i) {
   if (!g || typeof g !== 'object') return null;
-  const name = typeof g.name === 'string' ? g.name.slice(0, 24) : '';
+  const name = typeof g.name === 'string' ? cutText(g.name, 24) : '';
   if (typeof g.notation === 'string') {
     const res = parseNotation(g.notation);
     return res.ok ? { id: g.id ?? i + 1, name, notation: res.canonical } : null;
@@ -2159,7 +2161,7 @@ saveGroupBtn.addEventListener('click', () => {
   const notation = cmdResult && cmdResult.ok ? cmdResult.canonical
     : tray.length ? formula(tray) : null;
   if (!notation) return;
-  const name = groupNameInput.value.trim().slice(0, 24); // '' = unnamed group
+  const name = cutText(groupNameInput.value, 24); // '' = unnamed group
   const existing = name ? groups.find((g) => g.name === name) : null;
   if (existing) existing.notation = notation;
   else groups.push({ id: Date.now(), name, notation });
@@ -2220,13 +2222,15 @@ const popVariantBtn = document.getElementById('pop-variant');
 // ']' would close the label early and '#' starts a comment — both break the
 // canonical round-trip, so they can't live inside a part label (rollspec's
 // validateMods rejects them too). Zero-width/bidi-control characters are also
-// stripped, matching js/notation.js stripCtl. The trailing trim after the
-// truncating slice keeps the result idempotent (the parser normalizes the
-// same way: strip → trim → slice → trim).
+// stripped, matching js/notation.js stripCtl. The cut is the parser's own
+// (cutText: trim → slice → surrogate guard → trim), so the popover's text is
+// byte-identical to what a re-parse of the canonical yields — including at a
+// cap that would otherwise saw an astral character in half and strand a lone
+// surrogate no URL codec can encode.
 const cleanPartLabel = (t) =>
-  t.replace(/[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff\]#]/g, '').trim().slice(0, 20).trim();
+  cutText(t.replace(/[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff\]#]/g, ''), 20);
 const cleanComment = (t) =>
-  t.replace(/[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '').trim().slice(0, 64).trim();
+  cutText(t.replace(/[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, ''), 64);
 
 function togglePopover(g, row) {
   if (pop && pop.source === 'group' && pop.groupId === g.id) {
@@ -2678,12 +2682,12 @@ popVariantBtn.addEventListener('click', () => {
   if (pop.source === 'group') {
     const base = groups.find((g) => g.id === pop.groupId);
     const summary = modsSummary(spec.mods) || (pop.dc ? `dc${pop.dc}` : 'variant');
-    name = `${(base && base.name) || pop.name} ${summary}`.trim().slice(0, 24);
+    name = cutText(`${(base && base.name) || pop.name} ${summary}`, 24);
   } else {
     // Save-as-variant from the tray saves a NEW group (§7.4). A typed group
     // name is used as-is; otherwise the group is unnamed (its notation labels
     // it, exactly like the panel's own Save with an empty name).
-    name = groupNameInput.value.trim().slice(0, 24);
+    name = cutText(groupNameInput.value, 24);
   }
   closePopover();
   groups.push({ id: Date.now(), name, notation: canonical });
@@ -3388,7 +3392,7 @@ function beginRename(row, nameEl, player) {
   const finish = async (commit) => {
     if (done) return;
     done = true;
-    const newName = input.value.trim().slice(0, 24);
+    const newName = cutText(input.value, 24);
     input.replaceWith(nameEl);
     if (!commit || !newName || newName === player.name) return;
     nameEl.textContent = newName; // optimistic; broadcast confirms
@@ -3555,7 +3559,7 @@ function promptName() {
     input.addEventListener('input', update);
     update();
     const submit = () => {
-      const name = input.value.trim().slice(0, 24);
+      const name = cutText(input.value, 24);
       if (!name) return;
       modal.classList.add('hidden');
       resolve(name);

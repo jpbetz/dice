@@ -16,6 +16,7 @@ limitations under the License.
 
 import assert from 'node:assert/strict';
 import { encodeGroups, decodeGroups } from '../js/urlgroups.js';
+import { parseNotation } from '../js/notation.js';
 
 let n = 0;
 const t = (name, fn) => {
@@ -69,6 +70,35 @@ t('v2: unicode name and comment', () => {
   assert.ok(out);
   assert.equal(out[0].name, 'Épée ⚔');
   assert.equal(out[0].notation, '1d8+2 # coup d’éclat');
+});
+
+t('v2: astral characters at every cap boundary encode and decode', () => {
+  // The chain this guards: a cap cutting through '🎲' used to leave a lone
+  // high surrogate in the canonical, encodeURIComponent threw URIError on it,
+  // and the throw escaped saveGroups — bricking every later boot. Both halves
+  // of a segment (name and notation) go through encodeURIComponent.
+  const die = '\u{1F3B2}';
+  const groups = [{
+    id: 1,
+    name: 'Emoji night ' + die,
+    notation: parseNotation(
+      `1d20 check held dc10 # ${'z'.repeat(63)}${die} | ${'y'.repeat(39)}${die}`
+    ).canonical,
+  }];
+  const out = decodeGroups(encodeGroups(groups));
+  assert.ok(out);
+  assert.equal(out[0].name, groups[0].name);
+  assert.equal(out[0].notation, groups[0].notation);
+  assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(out[0].notation));
+});
+
+t('v2: a name cut at the 24-char cap keeps whole characters', () => {
+  const long = 'n'.repeat(23) + '\u{1F3B2}'; // 25 UTF-16 units
+  const enc = Buffer.from(`${encodeURIComponent(long)}=1d6`, 'utf8').toString('base64url');
+  const out = decodeGroups(enc);
+  assert.ok(out);
+  assert.equal(out[0].name, 'n'.repeat(23));
+  assert.doesNotThrow(() => encodeGroups(out)); // re-encodable, so a link survives
 });
 
 t('v2: non-canonical input notation normalizes on decode', () => {

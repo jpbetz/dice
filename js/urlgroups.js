@@ -29,7 +29,7 @@ limitations under the License.
 // Kept dependency-free beyond js/notation.js (itself import-free) so this
 // module still runs under Node for tests.
 
-import { parseNotation, canonicalNotation } from './notation.js';
+import { parseNotation, canonicalNotation, cutText } from './notation.js';
 
 const V1_DIE_TYPES = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20'];
 
@@ -71,7 +71,7 @@ export function decodeGroups(encoded) {
     if (eq < 0) return null;
     let name, raw;
     try {
-      name = decodeURIComponent(part.slice(0, eq)).slice(0, 24).trim();
+      name = cutText(decodeURIComponent(part.slice(0, eq)), 24);
       raw = decodeURIComponent(part.slice(eq + 1)).trim();
     } catch {
       return null;
