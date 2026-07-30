@@ -39,8 +39,12 @@ reroll    := ("ro"|"r") ("<="|"<") integer  ; ALWAYS once-per-die here
 explode   := "!"                            ; max face only, chain cap 3
 flag      := "adv" | "dis"                  ; requires a d20 in expr
            | keep | reroll | "!"            ; group-wide trailing form (see below)
+           | "check" | "cinematic" | "cine" ; moment kind (§7.6)
+           | visibility                     ; one per command (§7.8)
+visibility:= "held" | "secret" | whisper
+whisper   := "w:" name ("," name)*          ; name quoted only when it needs it
 dc        := ("dc"|"vs") integer            ; LOCAL EXTENSION (target)
-comment   := "#" text                       ; roll label / mat headline
+comment   := "#" title ["|" subtitle]       ; roll label / mat headline (§7.6)
 ```
 
 Token decisions (each chosen against a real alternative):
@@ -1093,3 +1097,77 @@ dismiss). Applies to both the banner and the ceremony verdict card.
 Amendment to §7.7.1 peek cards (Joe, play-test): the peek must NOT scale/zoom
 in — it appears in place (instant, or ≤100ms opacity fade only). Motion
 restraint: cards are chrome, not ceremony.
+
+### 7.8 Visibility notation (`held` · `secret` · `w:`)
+
+Visibility is part of a roll's intent, so it has a canonical spelling.
+Without one, a saved group, a `#g=` link or a history recall silently
+downgrades privacy — a group meant to be secret rolls in the open on the
+next machine that opens the link. That is a notation-totality violation
+(GOALS.md), and it is exactly the failure roadmap step 1 closed for
+face-down. `held` / `secret` / `w:` close it for the whole ladder.
+
+**Three flags, one slot.**
+
+```
+[adv|dis] [keep] [reroll] [!] [check|cinematic] [held|secret|w:…]
+  [dcN] [# title [| subtitle]]
+```
+
+The visibility flag sits exactly where `held` already sat — after the
+moment flag, before `dc`. `parseNotation` exposes it as
+`spec.visibility = { mode, names[] }`, and `canonicalNotation` renders it
+back **byte-stably**: the canonical form remains a fixed point,
+`parse(render(x)) ≡ x`.
+
+- **`held`** — face-down for everyone, the roller included; revealable.
+- **`secret`** — the roll exists only for the roller; not revealable.
+- **`w:Name`**, **`w:Name1,Name2`** — whisper to a named audience.
+- **Mutually exclusive.** Two visibility flags in one command is a parse
+  error ("one visibility per roll — `held`, `secret` or `w:…`, not two"),
+  including a prefix that disagrees with a flag. A prefix that *agrees* is
+  accepted (`/selfroll 1d20 secret`).
+
+**Prefixes normalize into the slot** and never survive into canonical
+output: `/gmroll`, `/gmr` → `held`; `/selfroll`, `/sr` → `secret`. The
+`/selfroll` family finally means what its name always claimed — before the
+visibility slice both families were synonyms for face-down.
+
+**Names and quoting.** `w:` takes a comma-separated list with no spaces
+around the commas.
+
+- A name is **quoted only when it must be**: it contains a space, a comma,
+  a double quote, or leading/trailing whitespace. Everything else is bare.
+  "Quote only when necessary" is what keeps the canonical form a fixed
+  point — `w:"Bob"` re-renders as `w:Bob`, so it cannot oscillate.
+- Inside a quoted name, `\"` is a literal double quote.
+- **Case is preserved as typed**; matching is case-insensitive against the
+  room roster (§3.0). `w:kira` reaches Kira and stays `w:kira`.
+- A name nobody in the room answers to **rejects the roll**
+  (`unknown_audience`, message naming it). It is never dropped, and the
+  roll never degrades to open or to secret behind your back.
+- The list is the text you wrote. The chooser is added to the audience at
+  *resolution* (§3.0), not in the string — the same string rolled by
+  someone else means a different audience, which is correct: a shared
+  group whispering `w:Kira` includes whoever rolls it, plus Kira.
+
+**Examples.**
+
+```
+1d20+5 held dc15 # Perception
+1d20 secret
+2d6+1d20 adv w:Kira dc12 # A quiet word
+1d20 check w:"Ann Smith",Bob dc15 # The lie leaves your lips | CHARISMA CHECK
+4d6dl1 w:"Bob \"Two-Axe\" Vance"
+
+/gmroll 1d20+3        →  1d20+3 held
+/selfroll 4d6dl1      →  4d6dl1 secret
+1d20 held secret      →  parse error (one visibility per roll)
+```
+
+**It rides everything for free.** `#g=` stores canonical strings
+(`js/urlgroups.js`), so a group's visibility travels in links, localStorage
+and history with no side-channel token and no extra codec version — see
+§1.5, where the once-planned `@vis=` token is retired for this reason. On
+an offer, the same string expresses the offerer's choice, which is what
+makes the GM-screen roll a one-liner (§3.3).
