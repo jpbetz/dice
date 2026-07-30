@@ -337,10 +337,18 @@ function endStream(res) {
   try { res.end(); } catch { /* already gone */ }
 }
 
-function broadcast(room, type, data) {
+// `projectFor(playerId)` is the optional per-recipient projection — the
+// visibility hook (GOALS.md goal 11). When given, it returns the payload THIS
+// player receives instead of `data`, or null to send that player nothing at
+// all (a secret roll's events simply do not exist for anyone but its roller).
+// When absent, every player receives the identical `data` — the original
+// path, byte for byte.
+function broadcast(room, type, data, projectFor = null) {
   for (const player of room.players.values()) {
+    const payload = projectFor ? projectFor(player.id) : data;
+    if (payload === null || payload === undefined) continue;
     for (const res of [...player.clients]) {
-      if (!sendEvent(res, type, data)) player.clients.delete(res);
+      if (!sendEvent(res, type, payload)) player.clients.delete(res);
     }
   }
 }
@@ -493,11 +501,13 @@ async function handleJoin(req, res) {
   // response shows the identical table to one that waits for the stream.
   // Offers were the one piece missing: a player who joined a room with rolls
   // already on the tray saw none of them until some later offer event arrived.
+  // The log is projected for THIS player, exactly as hello's is: a late
+  // joiner gets no secret entries and no held/whisper values.
   sendJson(res, 200, {
     playerId: player.id,
     color: player.color,
     players: publicPlayers(room),
-    log: room.log,
+    log: room.log.map((r) => projectEntryFor(r, player.id)).filter((r) => r !== null),
     offers: room.offers,
     settings: { ...room.settings },
   });
@@ -537,9 +547,12 @@ function handleEvents(req, res, url) {
   player.clients.add(res);
   clearTimeout(player.reapTimer);
 
+  // hello fires on EVERY stream (re)open — it is the reconnect path — so its
+  // log is projected for this player: a proxy blip must not re-leak what the
+  // live broadcast withheld.
   sendEvent(res, 'hello', {
     players: publicPlayers(room),
-    log: room.log,
+    log: room.log.map((r) => projectEntryFor(r, playerId)).filter((r) => r !== null),
     offers: room.offers,
     settings: { ...room.settings },
   });
@@ -662,18 +675,27 @@ function parseNotationSpec(value, explicitExp = null) {
     return { error: [400, parsed.error, 'bad_notation', { extra: { hint: parsed.hint || null } }] };
   }
 
-  // dc, faceDown and exp all come from the notation too: 'dc15', the 'held'
-  // flag (plus the /gmroll, /gmr, /selfroll and /sr prefixes it normalizes —
-  // interim until the visibility slice), and the 'check'/'cinematic' flag with
-  // its '# Title | Subtitle' pipe. A value sent alongside is ignored when it
-  // agrees and refused when it does not (a disagreement means the client's
+  // dc, visibility and exp all come from the notation too: 'dc15', the
+  // 'held'/'secret'/'w:Name' visibility flags (plus the /gmroll and /selfroll
+  // prefix families they normalize from), and the 'check'/'cinematic' flag
+  // with its '# Title | Subtitle' pipe. A value sent alongside is ignored when
+  // it agrees and refused when it does not (a disagreement means the client's
   // parse drifted from ours, and guessing which one the player meant is how
   // two tables end up seeing different rolls).
   if (value.dc !== undefined && value.dc !== null && value.dc !== parsed.dc) {
     return { error: [400, 'dc disagrees with the notation', 'notation_conflict'] };
   }
-  if (value.faceDown !== undefined && value.faceDown !== parsed.faceDown) {
+  const vis = readParsedVisibility(parsed);
+  // faceDown is the pre-visibility spelling of 'held'; a client may still send
+  // it beside a notation, and it must agree with what the notation says
+  // (faceDown ⇔ held), exactly as before.
+  if (value.faceDown !== undefined && value.faceDown !== (vis !== null && vis.mode === 'held')) {
     return { error: [400, 'faceDown disagrees with the notation', 'notation_conflict'] };
+  }
+  // Visibility is never trusted from the client: the notation is the sole
+  // carrier and the server's own re-parse of it is authoritative.
+  if (value.visibility !== undefined) {
+    return { error: [400, 'visibility comes from the notation; it cannot be sent as a field', 'notation_conflict'] };
   }
   // The parsed moment goes through readExp as well, so a notation-derived exp
   // is held to exactly the same wire contract as a sent one — one validator,
@@ -701,13 +723,18 @@ function parseNotationSpec(value, explicitExp = null) {
     dice: [...dice],
     mods,
     dc: parsed.dc,
-    faceDown: parsed.faceDown === true,
+    faceDown: vis !== null && vis.mode === 'held',
     label: cutText(rawLabel, MAX_LABEL),
   };
   // Set only when the roll is dressed up — an undressed roll must not grow an
   // `exp: null` key, or a Plain payload stops being byte-identical to what it
   // was before experiences existed.
   if (notationExp.exp) spec.exp = notationExp.exp;
+  // Parse-level visibility ({mode, names}) — present only on non-open rolls,
+  // for the same byte-stability reason as exp. The handler resolves names
+  // against the room roster (resolveVisibility) before the spec reaches
+  // executeRoll.
+  if (vis) spec.visibility = vis;
   return spec;
 }
 
@@ -751,13 +778,153 @@ function parseExplicitSpec(value) {
   if (value.faceDown !== undefined && typeof value.faceDown !== 'boolean') {
     return { error: [400, 'faceDown must be a boolean', 'bad_face_down'] };
   }
+  // Visibility is chosen in notation (held / secret / w:Name) and re-parsed
+  // server-side — never accepted as a client field. The explicit shape keeps
+  // its one pre-visibility spelling: faceDown, which is 'held'.
+  if (value.visibility !== undefined) {
+    return { error: [400, 'visibility is chosen in notation (held / secret / w:Name), not sent as a field', 'bad_visibility'] };
+  }
 
   const dc = readDc(value.dc);
   if (dc.error) return { error: dc.error };
 
   const label = cutText(typeof value.label === 'string' ? stripCtl(value.label) : '', MAX_LABEL);
 
-  return { dice: [...dice], mods, dc: dc.dc, faceDown: value.faceDown === true, label };
+  const spec = { dice: [...dice], mods, dc: dc.dc, faceDown: value.faceDown === true, label };
+  if (spec.faceDown) spec.visibility = { mode: 'held', names: [] };
+  return spec;
+}
+
+// ---------------------------------------------------------------------------
+// Visibility (GOALS.md goal 11)
+// ---------------------------------------------------------------------------
+//
+// A log entry's visibility lives at entry.visibility =
+//   { mode: 'held'|'secret'|'whisper', audience: [playerId...] (whisper only),
+//     revealAuthority: playerId }
+// and the field is ABSENT on open rolls — an open roll must never grow a
+// `visibility` key, or plain payloads stop being byte-identical (ROADMAP's
+// conformance list). entry.revealed = true once revealed; a revealed entry
+// projects as full to everyone.
+//
+//   held    — face down for EVERYONE, the roller included, until revealed
+//   secret  — the roll exists only for its roller: no event, no hello/join
+//             entry, nothing, for anyone else. No reveal path.
+//   whisper — the named audience sees everything live; everyone else sees a
+//             shrouded roll (existence public, result hidden)
+//
+// revealAuthority is the visibility CHOOSER: the roller for self-rolls, the
+// offerer for offered rolls — which is what makes the offered whisper the GM
+// screen (the claimer rolls blind; the offerer holds the reveal).
+
+const VIS_MODES = ['held', 'secret', 'whisper'];
+
+// Parse-level visibility from a parseNotation result: {mode, names[]}, or null
+// for open. The grammar exposes `visibility` for the secret / w:Name flags;
+// the faceDown boolean remains the 'held' spelling and maps here too, so the
+// pre-visibility notation ('1d20 held', /gmroll) takes the same path.
+function readParsedVisibility(parsed) {
+  const v = parsed.visibility || (parsed.spec && parsed.spec.visibility) || null;
+  if (v !== null && typeof v === 'object' && VIS_MODES.includes(v.mode)) {
+    const names = Array.isArray(v.names) ? v.names.filter((n) => typeof n === 'string') : [];
+    return { mode: v.mode, names };
+  }
+  return parsed.faceDown === true ? { mode: 'held', names: [] } : null;
+}
+
+// Resolve a parse-level visibility ({mode, names}) into the room-level entry
+// form for `chooser` (the roller on /api/roll, the offerer on /api/offer).
+// Whisper audience names match the CURRENT roster, case-insensitively, at
+// roll/offer creation; an unknown name refuses the action outright rather
+// than silently narrowing who hears it, and duplicate player names all join
+// (documented behavior). The chooser is always implicitly in the audience.
+// Returns { visibility } (null for open) or { error }.
+function resolveVisibility(room, chooser, vis) {
+  if (!vis) return { visibility: null };
+  if (vis.mode === 'held' || vis.mode === 'secret') {
+    return { visibility: { mode: vis.mode, revealAuthority: chooser.id } };
+  }
+  if (vis.mode === 'whisper') {
+    const audience = [];
+    const unknown = [];
+    for (const name of vis.names) {
+      const want = name.toLowerCase();
+      let matched = false;
+      for (const p of room.players.values()) {
+        if (p.name.toLowerCase() !== want) continue;
+        matched = true;
+        if (!audience.includes(p.id)) audience.push(p.id);
+      }
+      if (!matched) unknown.push(name);
+    }
+    if (unknown.length) {
+      return {
+        error: [400, `unknown audience: ${unknown.map((n) => `"${n}"`).join(', ')} — no such player at the table`, 'unknown_audience'],
+      };
+    }
+    if (!audience.includes(chooser.id)) audience.push(chooser.id);
+    return { visibility: { mode: 'whisper', audience, revealAuthority: chooser.id } };
+  }
+  return { error: [400, `unknown visibility mode: ${String(vis.mode).slice(0, 20)}`, 'bad_visibility'] };
+}
+
+// Does this entry exist at all from `viewerId`'s side of the table? Only a
+// secret entry is ever nonexistent — and only for everyone but its roller.
+// Gates every rollId-bearing event (roll-cleared, roll-collected) and the
+// rollId lookups in reveal/collect/clear, so a secret roll's housekeeping
+// leaks neither values nor existence.
+function entryExistsFor(entry, viewerId) {
+  const vis = entry.visibility;
+  return !vis || vis.mode !== 'secret' || entry.playerId === viewerId;
+}
+
+// THE projection. Applied on every path an entry leaves the server: the roll
+// broadcast, the reveal broadcast, hello, the /api/join snapshot, and the
+// roll/claim POST responses (the client's shelf is rebuilt from these same
+// payloads, so redacting here covers shelf reconstruction too). Returns:
+//   the entry itself   — open, revealed, secret-to-its-roller, or
+//                        whisper-to-its-audience (same object: an open roll's
+//                        payload stays byte-identical)
+//   null               — secret, for anyone but the roller: the entry is
+//                        OMITTED entirely
+//   a redacted copy    — held (everyone, roller included) and whisper
+//                        (non-audience): stakes without results
+function projectEntryFor(entry, viewerId) {
+  const vis = entry.visibility;
+  if (!vis) return entry;
+  if (vis.mode === 'secret') return entry.playerId === viewerId ? entry : null;
+  if (entry.revealed) return entry;
+  if (vis.mode === 'whisper' && vis.audience.includes(viewerId)) return entry;
+
+  // Redacted: the stakes are public — who rolls, which dice (the expanded
+  // pool, so exploding rolls show their extra dice: the accepted physical-
+  // table leak), the notation-level label, the dc target, the moment, the
+  // shelf flags, and the seed (poses only — values are crypto-RNG'd
+  // independently of the seed, so it leaks nothing). Everything value-bearing
+  // is OMITTED, never blanked: values, perDie, modifier, total, and spec
+  // (whose mods carry part amounts).
+  const out = {
+    rollId: entry.rollId,
+    playerId: entry.playerId,
+    playerName: entry.playerName,
+    color: entry.color,
+    label: entry.label,
+    dc: entry.dc,
+    dice: [...entry.dice],
+    faceDown: entry.faceDown,
+    revealed: entry.revealed,
+    seed: entry.seed,
+    t: entry.t,
+    redacted: true,
+    visMode: vis.mode,
+    // So every client knows whose Reveal button this is — a playerId, not a
+    // value. The audience list itself is not repeated here.
+    revealAuthority: vis.revealAuthority,
+  };
+  if (entry.exp) out.exp = entry.exp;
+  if (entry.collected) out.collected = entry.collected;
+  if (entry.cleared) out.cleared = entry.cleared;
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -812,16 +979,21 @@ function collectEntries(room, entries) {
   const evicted = over.slice(0, Math.max(0, over.length - SHELF_CAP));
   for (const roll of evicted) roll.cleared = true;
 
+  // Both events are existence-gated: a secret roll's shelf housekeeping is
+  // addressed to a rollId nobody else has ever heard of, so it goes to its
+  // roller alone.
   for (const roll of evicted) {
     log(`evict   room=${room.name} rollId=${roll.rollId} seq=${roll.collected}`);
     // Deliberately the same event a per-roll Done sends: aging off the shelf
     // and being dismissed are the same sink animation, so a client needs one
     // code path for both.
-    broadcast(room, 'roll-cleared', { rollId: roll.rollId });
+    const data = { rollId: roll.rollId };
+    broadcast(room, 'roll-cleared', data, (viewerId) => (entryExistsFor(roll, viewerId) ? data : null));
   }
   for (const roll of collected) {
     log(`collect room=${room.name} rollId=${roll.rollId} seq=${roll.collected}`);
-    broadcast(room, 'roll-collected', { rollId: roll.rollId, seq: roll.collected });
+    const data = { rollId: roll.rollId, seq: roll.collected };
+    broadcast(room, 'roll-collected', data, (viewerId) => (entryExistsFor(roll, viewerId) ? data : null));
   }
   return collected;
 }
@@ -845,7 +1017,9 @@ function executeRoll(room, player, spec) {
     total: composed.total,
     spec: { dice: [...spec.dice], mods: spec.mods }, // original request, for reroll-last
     faceDown: spec.faceDown,
-    revealed: !spec.faceDown,
+    // Open rolls are born revealed, exactly as before; every non-open mode
+    // starts unrevealed (secret stays that way — it has no reveal path).
+    revealed: !spec.visibility,
     seed: crypto.randomInt(0, 2 ** 32),
     t: Date.now(),
   };
@@ -857,6 +1031,16 @@ function executeRoll(room, player, spec) {
   if (spec.exp) {
     roll.exp = spec.exp;
     roll.spec.exp = spec.exp;
+  }
+  // Same present-or-absent rule as exp: only a non-open roll carries
+  // `visibility`. By here it must be the RESOLVED room-level form — the
+  // handlers run resolveVisibility first — and failing loudly on an
+  // unresolved one beats logging a roll whose reveal authority nobody holds.
+  if (spec.visibility) {
+    if (typeof spec.visibility.revealAuthority !== 'string') {
+      throw new Error('executeRoll: unresolved visibility spec');
+    }
+    roll.visibility = spec.visibility;
   }
 
   // Auto-collect (§7.7): the felt belongs to ONE roll, so everything already on
@@ -871,8 +1055,18 @@ function executeRoll(room, player, spec) {
   room.log.push(roll);
   if (room.log.length > LOG_CAP) room.log = room.log.slice(-LOG_CAP);
 
-  log(`roll    room=${room.name} name=${player.name} dice=${roll.dice.join(',')} values=${roll.values.join(',')} total=${roll.total}${roll.dc ? ` dc=${roll.dc}` : ''}${roll.faceDown ? ' faceDown' : ''}${roll.exp ? ` exp=${roll.exp.kind}` : ''}`);
-  broadcast(room, 'roll', roll);
+  // stdout is a disclosure surface too: a non-open roll logs its stakes and
+  // mode, never its values (an operator tailing the log must not out-read the
+  // table).
+  const tail = `${roll.dc ? ` dc=${roll.dc}` : ''}${roll.exp ? ` exp=${roll.exp.kind}` : ''}`;
+  if (roll.visibility) {
+    log(`roll    room=${room.name} name=${player.name} dice=${roll.dice.join(',')} vis=${roll.visibility.mode}${tail}`);
+  } else {
+    log(`roll    room=${room.name} name=${player.name} dice=${roll.dice.join(',')} values=${roll.values.join(',')} total=${roll.total}${tail}`);
+  }
+  // Per-recipient projection: full to those the mode allows, redacted for the
+  // shrouded, and no event at all for a secret roll's non-rollers.
+  broadcast(room, 'roll', roll, (viewerId) => projectEntryFor(roll, viewerId));
   return roll;
 }
 
@@ -887,8 +1081,18 @@ async function handleRoll(req, res) {
   const spec = parseRollSpec(body.value);
   if (spec.error) return sendError(res, ...spec.error);
 
+  // The roller is the visibility chooser on a self-roll: audience names
+  // resolve against the current roster now, and the roller becomes the
+  // reveal authority.
+  const vis = resolveVisibility(room, player, spec.visibility);
+  if (vis.error) return sendError(res, ...vis.error);
+  spec.visibility = vis.visibility;
+
   const roll = executeRoll(room, player, spec);
-  sendJson(res, 200, { roll });
+  // The roller's own response is projected like every other egress: a held
+  // roll is face down for its roller too, so even this reply carries no
+  // values.
+  sendJson(res, 200, { roll: projectEntryFor(roll, player.id) });
 }
 
 async function handleReveal(req, res) {
@@ -903,13 +1107,33 @@ async function handleReveal(req, res) {
   if (!rollId) return sendError(res, 400, 'rollId is required', 'bad_request');
 
   const roll = room.log.find((r) => r.rollId === rollId);
-  if (!roll) return sendError(res, 404, 'unknown roll', 'unknown_roll');
-  if (roll.playerId !== player.id) return sendError(res, 403, 'only the roller may reveal', 'forbidden');
+  // A secret roll does not exist for anyone but its roller — not even as a
+  // 403, which would confirm the rollId is real.
+  if (!roll || !entryExistsFor(roll, player.id)) return sendError(res, 404, 'unknown roll', 'unknown_roll');
+  // No reveal path for secret: it is the roller's alone, forever (held and
+  // whisper are the revealable modes).
+  if (roll.visibility && roll.visibility.mode === 'secret') {
+    return sendError(res, 400, 'secret rolls cannot be revealed', 'not_revealable');
+  }
+  // The reveal authority is the visibility chooser — the offerer of an
+  // offered held/whisper roll, not its roller (the GM screen); the roller on
+  // everything else.
+  const authority = roll.visibility ? roll.visibility.revealAuthority : roll.playerId;
+  if (player.id !== authority) {
+    return sendError(res, 403, 'only the reveal authority may reveal', 'not_reveal_authority');
+  }
   if (roll.revealed) return sendJson(res, 200, { ok: true }); // idempotent
 
   roll.revealed = true;
   log(`reveal  room=${room.name} name=${player.name} rollId=${rollId} total=${roll.total}`);
-  broadcast(room, 'reveal', { rollId });
+  // The reveal carries the FULL entry so every client upgrades in place — a
+  // redacted copy has no values to flip to. Once revealed the entry projects
+  // as full to everyone, but the projection still runs: one function decides
+  // what leaves the server, everywhere.
+  broadcast(room, 'reveal', { rollId }, (viewerId) => {
+    const projected = projectEntryFor(roll, viewerId);
+    return projected === null ? null : { rollId, roll: projected };
+  });
   sendJson(res, 200, { ok: true });
 }
 
@@ -929,7 +1153,8 @@ async function handleCollectRoll(req, res) {
   if (!rollId) return sendError(res, 400, 'rollId is required', 'bad_request');
 
   const roll = room.log.find((r) => r.rollId === rollId);
-  if (!roll) return sendError(res, 404, 'unknown roll', 'unknown_roll');
+  // A secret roll's existence is hidden along with its values.
+  if (!roll || !entryExistsFor(roll, player.id)) return sendError(res, 404, 'unknown roll', 'unknown_roll');
   // A claimed offer's roller is the claimer, not the offer's author.
   if (roll.playerId !== player.id) return sendError(res, 403, 'only the roller may collect their roll', 'forbidden');
 
@@ -959,7 +1184,8 @@ async function handleClearRoll(req, res) {
   if (!rollId) return sendError(res, 400, 'rollId is required', 'bad_request');
 
   const roll = room.log.find((r) => r.rollId === rollId);
-  if (!roll) return sendError(res, 404, 'unknown roll', 'unknown_roll');
+  // A secret roll's existence is hidden along with its values.
+  if (!roll || !entryExistsFor(roll, player.id)) return sendError(res, 404, 'unknown roll', 'unknown_roll');
   // A claimed offer's roller is the claimer, not the offer's author, so the
   // player who actually threw the dice is the one who can send them away —
   // until it reaches the shelf, after which any player at the table may.
@@ -974,7 +1200,9 @@ async function handleClearRoll(req, res) {
   // uncleared roll's payload byte-for-byte what it always was.
   roll.cleared = true;
   log(`clrroll room=${room.name} name=${player.name} rollId=${rollId}`);
-  broadcast(room, 'roll-cleared', { rollId });
+  // Existence-gated, like every rollId-bearing event: a secret roll's Done is
+  // its roller's business alone.
+  broadcast(room, 'roll-cleared', { rollId }, (viewerId) => (entryExistsFor(roll, viewerId) ? { rollId } : null));
   sendJson(res, 200, { ok: true });
 }
 
@@ -1008,6 +1236,12 @@ async function handleOffer(req, res) {
   const spec = parseRollSpec(body.value);
   if (spec.error) return sendError(res, ...spec.error);
 
+  // The OFFERER is the visibility chooser for an offered roll — the audience
+  // resolves against the roster now, at offer creation, and the offerer is
+  // the reveal authority the claimed roll will inherit.
+  const vis = resolveVisibility(room, player, spec.visibility);
+  if (vis.error) return sendError(res, ...vis.error);
+
   const offer = {
     offerId: crypto.randomUUID(),
     byId: player.id,
@@ -1023,6 +1257,10 @@ async function handleOffer(req, res) {
   // Same rule as a roll's: present only when the offer is dressed up, so an
   // offer card an older client wrote is indistinguishable from one it reads.
   if (spec.exp) offer.exp = spec.exp;
+  // Present-or-absent for the same reason. An offer has no values yet, so the
+  // card itself is public in full — including who the whisper is addressed to
+  // (existence is public; results are what visibility hides).
+  if (vis.visibility) offer.visibility = vis.visibility;
   room.offers.push(offer);
   if (room.offers.length > OFFER_CAP) room.offers = room.offers.slice(-OFFER_CAP);
 
@@ -1050,8 +1288,22 @@ async function handleClaim(req, res) {
   log(`claim   room=${room.name} name=${player.name} offerId=${offerId} by=${offer.byName}`);
   broadcast(room, 'offer-claimed', { offerId });
 
-  // The claimed roll inherits the offer's moment: whoever picks the card up
-  // gets the moment its author staged.
+  // The claimed roll inherits the offer's moment AND its visibility: whoever
+  // picks the card up gets the moment its author staged, seen by exactly the
+  // eyes its author chose. The reveal authority stays the OFFERER — the
+  // claimer throws the dice but does not hold the reveal. A secret offer
+  // means "only the offerer sees the result": in room-level terms that is a
+  // whisper to the offerer alone, and the claimer rolls fully blind — the GM
+  // screen.
+  let visibility = null;
+  if (offer.visibility) {
+    if (offer.visibility.mode === 'secret') {
+      visibility = { mode: 'whisper', audience: [offer.byId], revealAuthority: offer.byId };
+    } else {
+      visibility = { mode: offer.visibility.mode, revealAuthority: offer.visibility.revealAuthority };
+      if (offer.visibility.audience) visibility.audience = [...offer.visibility.audience];
+    }
+  }
   const roll = executeRoll(room, player, {
     dice: offer.dice,
     mods: offer.mods,
@@ -1059,8 +1311,11 @@ async function handleClaim(req, res) {
     dc: offer.dc === undefined ? null : offer.dc,
     faceDown: offer.faceDown,
     exp: offer.exp,
+    visibility,
   });
-  sendJson(res, 200, { roll });
+  // The claimer's response is projected like every other egress: on a held or
+  // offerer-only roll, the player who threw the dice gets no values back.
+  sendJson(res, 200, { roll: projectEntryFor(roll, player.id) });
 }
 
 async function handleUnoffer(req, res) {
@@ -1332,9 +1587,16 @@ server.headersTimeout = 30_000;
 server.requestTimeout = 300_000;
 server.keepAliveTimeout = 72_000;
 
-server.listen(PORT, () => {
-  log(`dice table listening on http://localhost:${PORT}  (root ${ROOT})`);
-});
+// Listen only when run directly (`node server.js`, which is how npm start and
+// the e2e harness both launch it). Importing this module — the unit tests
+// exercise projectEntryFor/resolveVisibility in-process — must never bind a
+// port.
+const IS_MAIN = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (IS_MAIN) {
+  server.listen(PORT, () => {
+    log(`dice table listening on http://localhost:${PORT}  (root ${ROOT})`);
+  });
+}
 
 function shutdown(signal) {
   log(`${signal} — shutting down`);
@@ -1351,4 +1613,4 @@ function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS };
+export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor };
