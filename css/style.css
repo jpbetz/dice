@@ -1166,6 +1166,20 @@ body.mini #result-verdict { font-size: 11px; }
   background: rgba(212, 175, 55, 0.16);
 }
 
+/* Whisper audience multi-select (goal 11): roster chips inside the ± popover.
+   Reuses the mchip look but sized to names, wrapping as the roster grows. */
+.vis-aud { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
+.vis-aud.hidden { display: none; }
+.aud-chip {
+  flex: none;
+  padding: 3px 9px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-ui, inherit);
+}
+
 .stepper { display: inline-flex; align-items: center; border: 1px solid var(--hair); border-radius: 8px; background: rgba(0, 0, 0, 0.28); flex: none; }
 .stepper button { width: 23px; height: 24px; border: 0; background: none; color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; }
 .stepper button:hover { color: var(--gold-bright); }
@@ -1518,6 +1532,7 @@ body.mini .popover { width: min(94vw, 312px); }
   color: var(--gold-bright);
 }
 .verdict-hero.bad { color: var(--red); }
+.verdict-hero.held { color: var(--muted); font-style: italic; letter-spacing: 0.06em; }
 .verdict-hero.tier-crit-success { color: #ffe27a; text-shadow: 0 0 18px rgba(255, 215, 102, 0.7); }
 .verdict-hero.tier-crit-fail { color: var(--red); text-shadow: 0 0 18px rgba(226, 73, 59, 0.6); }
 .verdict-hero::before, .verdict-hero::after {

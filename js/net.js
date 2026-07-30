@@ -149,7 +149,11 @@ export async function connect({ room, name, onEvent, onStatus } = {}) {
       return res.ok;
     },
 
-    // Flip a face-down roll for the whole table (roller only).
+    // Flip a hidden (held/whispered) roll for the whole table. The server
+    // enforces reveal authority and answers everyone with a per-recipient
+    // 'reveal' event carrying the newly-authorized full entry. Note there is
+    // deliberately NO visibility field on any request: visibility rides the
+    // notation string (the server re-parses it), or faceDown for plain held.
     async reveal(rollId) {
       const res = await withPlayer('/api/reveal', { rollId });
       return res.ok;

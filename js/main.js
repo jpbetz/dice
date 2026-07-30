@@ -2813,9 +2813,22 @@ window.__diceDebug = {
       groupId: pop.groupId,
       dice: [...pop.dice],
       dc: pop.dc,
-      faceDown: pop.faceDown,
+      faceDown: pop.vis.mode === 'held', // legacy mirror of the vis picker
+      visibility: { mode: pop.vis.mode, names: [...pop.vis.names] },
+      canonical: popCanonical(),
       open: !document.getElementById('mods-popover').classList.contains('hidden'),
     };
+  },
+  setPopoverVisibility(mode, names) {
+    if (!pop) return false;
+    const m = mode === 'open' || VIS_MODES.includes(mode) ? mode : null;
+    if (!m) return false;
+    pop.vis.mode = m;
+    pop.vis.names = m === 'whisper' && Array.isArray(names)
+      ? names.filter((n) => typeof n === 'string' && n)
+      : [];
+    renderPop();
+    return true;
   },
   closePopover() { closePopover(); },
   // per-roll Done (§7.5): the roller-side entry point + sink observability
@@ -2834,6 +2847,48 @@ window.__diceDebug = {
   },
   get whiskingCount() { return whisking.length; },
   get pendingCollects() { return [...pendingCollects.keys()]; },
+  // visibility (goal 11): reveal/offer/claim entry points + redaction
+  // observability. Everything returned is JSON-safe primitives.
+  reveal(rollId) { requestReveal(rollId); },
+  offerRoll(str) {
+    const r = commandOffer(str);
+    return { ok: r.ok === true, state: r.state || (r.ok ? 'ok' : 'invalid'), error: r.error || null, posted: r.ok === true && netOnline };
+  },
+  claimOffer(offerId) { return net ? net.claim(offerId) : Promise.resolve(false); },
+  unoffer(offerId) { return net ? net.unoffer(offerId) : Promise.resolve(false); },
+  get offers() {
+    return offers.map((o) => ({
+      offerId: o.offerId,
+      byId: o.byId || null,
+      byName: o.byName || null,
+      label: o.label || '',
+      dice: [...(o.dice || [])],
+      dc: Number.isInteger(o.dc) ? o.dc : null,
+      faceDown: !!o.faceDown,
+      visibility: o.visibility ? JSON.parse(JSON.stringify(o.visibility)) : null,
+      exp: o.exp ? JSON.parse(JSON.stringify(o.exp)) : null,
+    }));
+  },
+  // Projection of one entry's redaction/reveal state (lastEntry when no id).
+  entryState(rollId) {
+    const e = rollId ? log.find((x) => x.rollId === rollId) : lastEntry;
+    if (!e) return null;
+    return {
+      rollId: e.rollId || null,
+      hidden: entryHidden(e),
+      redacted: e.redacted === true,
+      revealed: e.revealed !== false,
+      faceDown: !!e.faceDown,
+      visMode: e.visMode || null,
+      total: typeof e.total === 'number' ? e.total : null,
+      values: e.parts.map((p) => (p.value == null ? null : p.value)),
+      dc: Number.isInteger(e.dc) ? e.dc : null,
+      canReveal: canReveal(e),
+    };
+  },
+  get shroudedCount() { return tableDice.filter((d) => d.shrouded).length; },
+  get revealingCount() { return revealing.length; },
+  get pendingReveals() { return [...pendingReveals.keys()]; },
   // peek cards (§7.7.1): open for a shelved rollId / close with null, plus
   // the open card's state for content assertions.
   peek(rollId) {
@@ -3576,7 +3631,9 @@ const popRrStep = document.getElementById('pop-rr-step');
 const popRrOut = document.getElementById('pop-rr-out');
 const popSwReroll = document.getElementById('pop-sw-reroll');
 const popSwExplode = document.getElementById('pop-sw-explode');
-const popSwFaceDown = document.getElementById('pop-sw-facedown');
+const popSegVis = document.getElementById('pop-seg-vis');
+const popVisAud = document.getElementById('pop-vis-aud');
+const popVisSub = document.getElementById('pop-vis-sub');
 const popDcInput = document.getElementById('pop-dc');
 const popCommentInput = document.getElementById('pop-comment');
 const popSegExp = document.getElementById('pop-seg-exp');
@@ -3621,7 +3678,8 @@ function popStateFromParse(res) {
     keep: m.keep ? { mode: m.keep.mode, n: m.keep.n } : null,
     reroll: m.reroll ? { below: m.reroll.below } : null,
     explode: !!m.explode,
-    faceDown: res.faceDown,
+    // Visibility (goal 11): one of open/held/secret/whisper + audience names.
+    vis: visOfParse(res) || { mode: 'open', names: [] },
     dc: res.dc,
     comment: res.comment,
     // Moment (UX §7.6): kind and subtitle live in the notation now, so a saved
@@ -3761,13 +3819,30 @@ function popSpec() {
 // 'cinematic' + '| subtitle') and face-down ('held') ride it too, so a variant
 // carries the FULL intent instead of silently dropping privacy and moment.
 function popCanonical() {
-  return canonicalNotation(popSpec(), {
+  return canonicalWithVis(popSpec(), {
     dc: pop.dc,
     comment: pop.comment,
     exp: popExp() || null,
-    faceDown: pop.faceDown,
-  });
+  }, pop.vis.mode === 'open' ? null : pop.vis);
 }
+
+// The popover's visibility as requestRoll/offer opts, or undefined for open.
+function popVis() {
+  if (!pop || pop.vis.mode === 'open') return undefined;
+  return { mode: pop.vis.mode, names: [...pop.vis.names] };
+}
+
+// A whisper with nobody named is unsendable (the grammar has no empty w:).
+function popVisBlocked() {
+  return pop.vis.mode === 'whisper' && !pop.vis.names.length;
+}
+
+const POP_VIS_SUBS = {
+  open: '',
+  held: 'face down for everyone — hidden until you reveal',
+  secret: 'only you ever see this roll — the table gets nothing',
+  whisper: 'they see it live; everyone else sees a shrouded roll',
+};
 
 function segSet(seg, value) {
   seg.querySelectorAll('button').forEach((b) => {
@@ -3824,14 +3899,61 @@ function renderPopEcho() {
   const canonical = popCanonical();
   popEchoEl.textContent = canonical;
   popEchoEl.title = `${canonical}  ·  click to edit in the command box`;
+  const visBlocked = popVisBlocked();
+  const visSuffix = pop.vis.mode === 'open' ? ''
+    : pop.vis.mode === 'whisper'
+      ? ` · whisper to ${pop.vis.names.join(', ')}`
+      : ` · ${pop.vis.mode === 'held' ? 'face down' : 'secret'}`;
   popPreviewEl.textContent = err
     ? `invalid spec: ${err}`
-    : fmtPreview(spec.dice, spec.mods).replace(/ (avg|max)/g, ' · $1') + (pop.faceDown ? ' · face down' : '');
-  popRollBtn.disabled = !!err;
-  popOfferBtn.disabled = !!err || !netOnline;
+    : visBlocked
+      ? 'whisper needs an audience — pick at least one player'
+      : fmtPreview(spec.dice, spec.mods).replace(/ (avg|max)/g, ' · $1') + visSuffix;
+  popRollBtn.disabled = !!err || visBlocked;
+  popOfferBtn.disabled = !!err || visBlocked || !netOnline;
   popOfferBtn.title = netOnline
     ? 'Post this roll for anyone at the table to take'
     : 'Offers need a table — you are playing solo';
+}
+
+// The whisper audience multi-select, built from the live roster (minus you —
+// the chooser is always implicitly in the audience). Duplicate names show
+// once: the server joins ALL matches to the audience (documented behavior).
+function renderPopAudience() {
+  popVisAud.innerHTML = '';
+  if (!pop || pop.vis.mode !== 'whisper') {
+    popVisAud.classList.add('hidden');
+    return;
+  }
+  popVisAud.classList.remove('hidden');
+  const you = net ? net.playerId : null;
+  const roster = players.filter((p) => p.id !== you && p.name);
+  if (!roster.length) {
+    const s = document.createElement('span');
+    s.className = 'prow-sub';
+    s.textContent = 'no one else is at the table yet';
+    popVisAud.appendChild(s);
+    return;
+  }
+  // Names picked earlier that have since left the room would be rejected by
+  // the server (unknown_audience): drop them when the roster is known.
+  pop.vis.names = pop.vis.names.filter((n) => roster.some((p) => p.name === n));
+  const seen = new Set();
+  for (const p of roster) {
+    if (seen.has(p.name)) continue;
+    seen.add(p.name);
+    const b = document.createElement('button');
+    b.className = 'mchip aud-chip';
+    b.textContent = p.name; // user-supplied: textContent only
+    b.setAttribute('aria-pressed', String(pop.vis.names.includes(p.name)));
+    b.addEventListener('click', () => {
+      const i = pop.vis.names.indexOf(p.name);
+      if (i >= 0) pop.vis.names.splice(i, 1);
+      else pop.vis.names.push(p.name);
+      renderPop();
+    });
+    popVisAud.appendChild(b);
+  }
 }
 
 function renderPop() {
@@ -3862,7 +3984,19 @@ function renderPop() {
   popRrOut.textContent = `≤ ${pop.reroll ? pop.reroll.below : 1}`;
   popRrStep.classList.toggle('dim', !pop.reroll);
   popSwExplode.setAttribute('aria-pressed', String(!!pop.explode));
-  popSwFaceDown.setAttribute('aria-pressed', String(!!pop.faceDown));
+
+  // Visibility (goal 11): Open / Face-down / Secret / Whisper + audience.
+  // Solo has no server to redact for anyone: secret/whisper are disabled and
+  // held keeps the local face-down flow (the subtle solo note lives in the
+  // sub line).
+  segSet(popSegVis, pop.vis.mode === 'open' ? '' : pop.vis.mode);
+  popSegVis.querySelectorAll('button').forEach((b) => {
+    if (b.dataset.v === 'secret' || b.dataset.v === 'whisper') b.disabled = !netOnline;
+  });
+  renderPopAudience();
+  popVisSub.textContent = !netOnline && pop.vis.mode === 'open'
+    ? 'secret & whisper need a table — you are playing solo'
+    : POP_VIS_SUBS[pop.vis.mode] || '';
 
   // Moment (UX §2.3): Plain/Check/Cinematic + subtitle; title = comment,
   // Target = the DC field above.
@@ -3962,10 +4096,13 @@ popSwExplode.addEventListener('click', () => {
   pop.explode = !pop.explode;
   renderPop();
 });
-popSwFaceDown.addEventListener('click', () => {
-  if (!pop) return;
-  pop.faceDown = !pop.faceDown;
+popSegVis.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || b.disabled || !pop) return;
+  pop.vis.mode = b.dataset.v || 'open';
+  if (pop.vis.mode !== 'whisper') pop.vis.names = [];
   renderPop();
+  placePopover(); // the audience list changes the popover's height
 });
 
 popSegExp.addEventListener('click', (e) => {
@@ -4015,9 +4152,11 @@ popRollBtn.addEventListener('click', () => {
   if (!pop) return;
   const spec = popSpec();
   if (validateMods(spec.dice, spec.mods)) return;
+  if (popVisBlocked()) return;
   requestRoll(spec.dice, pop.comment || pop.name, {
     mods: spec.mods || undefined,
-    faceDown: pop.faceDown,
+    faceDown: pop.vis.mode === 'held',
+    visibility: popVis(), // secret/whisper ride the canonical (requestRoll)
     dc: pop.dc ?? undefined,
     exp: popExp(),
     canonical: popCanonical(),
@@ -4029,14 +4168,22 @@ popOfferBtn.addEventListener('click', () => {
   if (!pop || !netOnline || !net) return;
   const spec = popSpec();
   if (validateMods(spec.dice, spec.mods)) return;
-  net.offer({
-    label: pop.comment || pop.name,
-    dice: spec.dice,
-    mods: spec.mods || undefined,
-    faceDown: pop.faceDown,
-    dc: pop.dc ?? undefined,
-    exp: popExp(),
-  });
+  if (popVisBlocked()) return;
+  const vis = popVis();
+  if (vis && vis.mode !== 'held') {
+    // secret/whisper have no explicit wire field: the offer rides the
+    // canonical string and the server re-parses it (label rides beside it).
+    net.offer({ label: pop.comment || pop.name, notation: popCanonical() });
+  } else {
+    net.offer({
+      label: pop.comment || pop.name,
+      dice: spec.dice,
+      mods: spec.mods || undefined,
+      faceDown: !!vis, // held keeps today's explicit-shape field
+      dc: pop.dc ?? undefined,
+      exp: popExp(),
+    });
+  }
   closePopover();
 });
 
@@ -4808,6 +4955,8 @@ function renderPlayers() {
     }
     playersList.appendChild(row);
   }
+  // An open whisper picker tracks the live roster (joins/leaves/renames).
+  if (pop && pop.vis && pop.vis.mode === 'whisper') renderPop();
 }
 
 // Compact human summary of a mods spec: "+3 · adv · drop low 1 · reroll ≤2 · explode"

@@ -57,10 +57,12 @@ limitations under the License.
             <tr><td><code>adv</code> / <code>dis</code></td><td>pair every d20; <code>2d20kh1</code> reads as adv</td></tr>
             <tr><td><code>dcN</code> / <code>vs N</code></td><td>target number — result shows Success/Failure</td></tr>
             <tr><td><code>check</code> / <code>cinematic</code></td><td>roll moment — staged declaration + verdict (<code>cine</code> too)</td></tr>
-            <tr><td><code>held</code></td><td>roll face down — values stay hidden until you reveal</td></tr>
+            <tr><td><code>held</code></td><td>face down for everyone — hidden until the roller reveals</td></tr>
+            <tr><td><code>secret</code></td><td>only you — the table never sees the roll (<code>/selfroll</code>)</td></tr>
+            <tr><td><code>w:Ann,"Bo B"</code></td><td>whisper — the named players see it live; everyone else sees a shrouded roll</td></tr>
             <tr><td><code># text</code></td><td>comment — roll label / mat text (≤64 chars)</td></tr>
             <tr><td><code># Title | Sub</code></td><td>moment subtitle (≤40) — needs check/cinematic; <code>\|</code> is a literal pipe</td></tr>
-            <tr><td><code>/gmroll /sr</code></td><td>face down too — normalizes to <code>held</code> (<code>/roll</code>, <code>/r</code>: plain)</td></tr>
+            <tr><td><code>/gmroll /gmr</code></td><td>→ <code>held</code>; <code>/selfroll /sr</code> → <code>secret</code> (<code>/roll</code>, <code>/r</code>: plain)</td></tr>
             <tr><td colspan="2" class="cheat-note">mixed pools take trailing flags: <code>1d20+2d6 dl1</code></td></tr>
           </table>
         </div>
@@ -294,13 +296,18 @@ limitations under the License.
         </span>
         <button id="pop-sw-explode" class="sw" aria-pressed="false" title="Exploding dice"></button>
       </div>
-      <div class="prow">
-        <span class="grow">
-          <span class="prow-label">Face down</span>
-          <span class="prow-sub">values stay hidden until you reveal</span>
-        </span>
-        <button id="pop-sw-facedown" class="sw" aria-pressed="false" title="Face down"></button>
+    </div>
+
+    <div class="sec tight">
+      <span class="plabel">Visibility</span>
+      <div id="pop-seg-vis" class="seg">
+        <button data-v="">Open</button>
+        <button data-v="held">Face down</button>
+        <button data-v="secret">Secret</button>
+        <button data-v="whisper">Whisper</button>
       </div>
+      <div id="pop-vis-aud" class="vis-aud hidden"></div>
+      <div id="pop-vis-sub" class="prow-sub"></div>
     </div>
 
     <div class="sec tight">
