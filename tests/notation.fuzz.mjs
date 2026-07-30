@@ -697,7 +697,10 @@ spot('d% and d100 expand to [d10x, d10] and render back as d100', () => {
   assert.ok(mustParse('1d10x!').warnings.some((w) => /never explode/.test(w)));
 });
 
-spot('/roll family: prefixes are no-ops or set faceDown, never survive canonical', () => {
+// EDITED for UX.md §7.6 / roadmap step 1: the /gmroll family still sets
+// faceDown, but the canonical no longer drops it — it normalizes to the
+// trailing 'held' flag (canonical emits 'held', never a prefix).
+spot('/roll family: prefixes normalize — no-op, or faceDown via the held flag', () => {
   for (const p of ['/roll', '/r', '/ROLL']) {
     const r = mustParse(`${p} 2d6+1`);
     assert.equal(r.faceDown, false, p);
@@ -706,7 +709,8 @@ spot('/roll family: prefixes are no-ops or set faceDown, never survive canonical
   for (const p of ['/gmroll', '/gmr', '/selfroll', '/sr', '/GMROLL']) {
     const r = mustParse(`${p} 2d6+1`);
     assert.equal(r.faceDown, true, p);
-    assert.equal(r.canonical, '2d6+1', p);
+    assert.equal(r.canonical, '2d6+1 held', p);
+    assert.equal(mustParse(r.canonical).faceDown, true, p);
   }
   assert.equal(parseNotation('/xyzzy 1d20').ok, false);
 });

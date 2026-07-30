@@ -23,8 +23,10 @@ limitations under the License.
 // Grammar:
 //   command  := [mode SP] expr (SP flag)* [SP dc] [SP comment]
 //   mode     := /roll /r          (no effect)
-//             | /gmroll /gmr /selfroll /sr   (interim: sets faceDown until the
-//               visibility slice lands; dropped from canonical)
+//             | /gmroll /gmr /selfroll /sr   (accepted input; normalizes to the
+//               'held' trailing flag — canonical emits 'held', never a prefix.
+//               /selfroll still maps to held; real secret semantics are
+//               roadmap step 4)
 //   expr     := term (("+"|"-") term)*
 //   term     := integer ["[" label "]"] | [count] dieType gluedMod*
 //   dieType  := d4 d6 d8 d10 d10x d12 d20 | d100 | d%   (d100/d% → d10x+d10)
@@ -33,8 +35,20 @@ limitations under the License.
 //   reroll   := (ro|r) ("<="|"<") int      (Roll20 "<" is inclusive → same N;
 //                                           always once-per-die here)
 //   flag     := adv | dis | keep | reroll | "!"   (group-wide trailing form)
+//             | kind | "held"              (docs/UX.md §7.6 moment flags)
+//   kind     := "check" | "cinematic" | "cine"    (alias cine → cinematic)
 //   dc       := ("dc"|"vs") int            (1..999; the experience Target)
-//   comment  := "#" text                   (≤64 chars; roll label / mat text)
+//   comment  := "#" title ["|" subtitle]   (title ≤64 chars, roll label / mat
+//               text; the FIRST unescaped "|" splits off the moment subtitle,
+//               ≤40 chars; "\|" is a literal pipe and round-trips. A subtitle
+//               without a check/cinematic flag is invalid — it has nowhere to
+//               render. dc does NOT imply check at parse level: "1d20 dc15"
+//               parses with exp:null; the client's dc→check dressing is a UI
+//               convenience, not grammar)
+//
+// Canonical flag order:
+//   [adv|dis] [trailing keep] [trailing reroll] [!] [check|cinematic] [held]
+//   [dcN] [# comment [| subtitle]]
 //
 // The term 2d20kh1 collapses to 1d20 + advantage (2d20kl1 → disadvantage)
 // BEFORE the mixed-pool check — but only when no trailing adv/dis flag was
@@ -55,7 +69,14 @@ const MAX_COUNT = 40;
 const MAX_MOD = 99;
 const MAX_LABEL = 20;
 const MAX_COMMENT = 64;
+const MAX_SUBTITLE = 40;
 const MAX_PARTS = 12;
+
+// Moment-kind flag words (UX.md §7.6): input aliases → normalized kind.
+const KIND_WORDS = { check: 'check', cinematic: 'cinematic', cine: 'cinematic' };
+// Full keyword flags whose prefixes read as incomplete input at end-of-string
+// ("1d20 che", "1d20 hel"), mirroring couldExtend's role for the older tokens.
+const FLAG_KEYWORDS = ['check', 'cinematic', 'held'];
 
 // Strip control characters plus zero-width and bidi-control characters
 // (U+200B–200F, U+202A–202E, U+2066–2069, U+FEFF): invisible in rendered
@@ -111,14 +132,36 @@ export function parseNotation(input) {
     if (!s) return incomplete('expected dice after the command');
   }
 
-  // ---- comment -------------------------------------------------------------
+  // ---- comment (and the "| subtitle" moment split, UX.md §7.6) -------------
   let comment = null;
+  let subtitle = null;
   const hash = s.indexOf('#');
   if (hash >= 0) {
-    // normalize strip → trim → slice → trim, so the truncating cut can never
-    // leave whitespace (or a control char shield it) that a re-parse of the
-    // canonical form would strip again — the canonical must be a fixed point
-    comment = stripCtl(s.slice(hash + 1)).trim().slice(0, MAX_COMMENT).trim() || null;
+    const rawComment = s.slice(hash + 1);
+    // The FIRST unescaped '|' splits '# Title | Subtitle'. '\|' is a literal
+    // pipe (unescaped here, re-escaped by canonicalNotation, so it
+    // round-trips); a '|' later in the subtitle needs no escape — only the
+    // first split matters — but canonical re-escapes it anyway for one rule.
+    let pipe = -1;
+    for (let i = 0; i < rawComment.length; i++) {
+      if (rawComment[i] === '|' && (i === 0 || rawComment[i - 1] !== '\\')) {
+        pipe = i;
+        break;
+      }
+    }
+    // normalize unescape → strip → trim → slice → trim, so the truncating cut
+    // can never leave whitespace (or a control char shield it) that a re-parse
+    // of the canonical form would strip again — the canonical must be a fixed
+    // point. Slicing runs on the unescaped text, so a cap cut can never split
+    // a '\|' escape pair.
+    const clean = (t, cap) => stripCtl(t.replace(/\\\|/g, '|')).trim().slice(0, cap).trim();
+    if (pipe >= 0) {
+      comment = clean(rawComment.slice(0, pipe), MAX_COMMENT) || null;
+      subtitle = clean(rawComment.slice(pipe + 1), MAX_SUBTITLE) || null;
+      if (!subtitle) return incomplete('a subtitle needs text after the |');
+    } else {
+      comment = clean(rawComment, MAX_COMMENT) || null;
+    }
     s = s.slice(0, hash).trim();
     if (!s) return incomplete('a comment needs a roll in front of it');
   }
@@ -233,6 +276,8 @@ export function parseNotation(input) {
   let flagKeep = null;
   let flagReroll = null;
   let flagExplode = false;
+  let expKind = null;
+  let flagHeld = false;
   let dc = null;
 
   const tail = src.slice(exprEnd).trim();
@@ -258,6 +303,16 @@ export function parseNotation(input) {
     } else if (tok === '!') {
       if (flagExplode) return invalid('! specified twice');
       flagExplode = true;
+    } else if (Object.hasOwn(KIND_WORDS, tok)) {
+      if (expKind) return invalid('check/cinematic specified twice');
+      expKind = KIND_WORDS[tok];
+    } else if (tok === 'held') {
+      // 'held' = face down; peer of the /gmroll-family prefixes, and the only
+      // spelling the canonical form emits. Prefix + flag together is fine
+      // (they agree); the flag twice is a typo worth flagging.
+      if (flagHeld) return invalid('held specified twice');
+      flagHeld = true;
+      faceDown = true;
     } else if ((m = /^(dc|vs)(\d{1,4})?$/.exec(tok))) {
       let n = m[2];
       if (n === undefined) {
@@ -276,12 +331,21 @@ export function parseNotation(input) {
       if (v < 1 || v > 999) return invalid('dc must be 1-999');
       if (dc !== null) return invalid('dc specified twice');
       dc = v;
-    } else if (last && couldExtend(tok)) {
+    } else if (last && (couldExtend(tok) || FLAG_KEYWORDS.some((w) => w.startsWith(tok)))) {
       return incomplete('unfinished flag');
     } else {
-      return invalid(`unknown flag "${tokens[ti].slice(0, 12)}"`, 'flags: adv, dis, kh/kl/dh/dl N, ro<=N, !, dc N');
+      return invalid(`unknown flag "${tokens[ti].slice(0, 12)}"`, 'flags: adv, dis, kh/kl/dh/dl N, ro<=N, !, check, cinematic, held, dc N');
     }
   }
+
+  // ---- moment (exp) --------------------------------------------------------
+  // A subtitle only exists on a dressed-up roll: without a kind flag it has
+  // nowhere to render, so it is an error, not silently dropped intent.
+  // NO dc→check implication here — that dressing is a client UI convenience.
+  if (subtitle && !expKind) {
+    return invalid('a subtitle needs check or cinematic', 'add a check or cinematic flag before the #');
+  }
+  const exp = expKind ? (subtitle ? { kind: expKind, subtitle } : { kind: expKind }) : null;
 
   // ---- collapse 2d20kh1 / 2d20kl1 to advantage -----------------------------
   // Only when no trailing adv/dis flag was given: with an explicit flag the
@@ -410,13 +474,20 @@ export function parseNotation(input) {
   if (explode) mods.explode = true;
   const spec = { dice, mods: Object.keys(mods).length ? mods : null };
 
+  const canonical = canonicalNotation(spec, { dc, comment, exp, faceDown });
+  // Escaping literal pipes and normalizing '|' spacing can grow the string a
+  // little; a canonical form the parser itself would refuse cannot be a fixed
+  // point, so the (pathological) inputs that overflow it are refused instead.
+  if (canonical.length > MAX_INPUT) return invalid('command too long', `max ${MAX_INPUT} characters`);
+
   return {
     ok: true,
     spec,
     dc,
     comment,
+    exp,
     faceDown,
-    canonical: canonicalNotation(spec, { dc, comment }),
+    canonical,
     warnings,
   };
 }
@@ -427,7 +498,7 @@ export function parseNotation(input) {
 // ---------------------------------------------------------------------------
 
 export function canonicalNotation(spec, extras = {}) {
-  const { dc = null, comment = null } = extras;
+  const { dc = null, comment = null, exp = null, faceDown = false } = extras;
   const m = spec.mods || {};
   const counts = new Map();
   for (const t of spec.dice) counts.set(t, (counts.get(t) || 0) + 1);
@@ -472,9 +543,20 @@ export function canonicalNotation(spec, extras = {}) {
   // glue rides as trailing flags whenever it is not glued to a single term
   // (mixed pools, the d100 pool, and the collapse-avoiding 2d20-keep-1 case)
   if (!glueInline && glue.length) flags.push(...glue);
+  if (exp && exp.kind) flags.push(exp.kind);
+  if (faceDown) flags.push('held');
   if (flags.length) out += ' ' + flags.join(' ');
   if (dc) out += ' dc' + dc;
-  if (comment) out += ' # ' + comment;
+
+  // '# Title | Subtitle' — literal pipes are escaped as '\|' (every one, in
+  // both halves, so re-parsing splits only at the emitted separator), and the
+  // separator spacing is normalized to ' | '. A subtitle can exist without a
+  // title ('# | Subtitle'); the empty-title spelling re-parses to itself.
+  const escPipes = (t) => t.replace(/\|/g, '\\|');
+  const sub = exp && exp.subtitle ? escPipes(exp.subtitle) : null;
+  if (comment && sub) out += ' # ' + escPipes(comment) + ' | ' + sub;
+  else if (comment) out += ' # ' + escPipes(comment);
+  else if (sub) out += ' # | ' + sub;
   return out;
 }
 

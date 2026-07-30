@@ -119,10 +119,16 @@ t('r<2 normalizes inclusively to ro<=2', () => {
   assert.equal(r.canonical, '3d6ro<=2');
   assert.ok(r.warnings.some((w) => w.includes('once per die')));
 });
-t('/gmroll sets faceDown, dropped from canonical', () => {
+// EDITED for UX.md §7.6 / roadmap step 1: face-down now round-trips through
+// the canonical 'held' flag instead of being silently dropped (the audited
+// notation-totality violation this slice closes).
+t('/gmroll sets faceDown, normalized to the held flag in canonical', () => {
   const r = ok('/gmroll 1d20');
   assert.equal(r.faceDown, true);
-  assert.equal(r.canonical, '1d20');
+  assert.equal(r.canonical, '1d20 held');
+  const r2 = ok(r.canonical);
+  assert.equal(r2.faceDown, true);
+  assert.equal(r2.canonical, '1d20 held');
 });
 t('/roll is a no-op prefix', () => {
   const r = ok('/roll 2d6+1');
