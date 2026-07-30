@@ -1384,6 +1384,35 @@ window.__diceDebug = {
   // quick palette (tests): open it / observe its open state
   openPalette() { openPalette(); },
   get paletteOpen() { return isPaletteOpen(); },
+  // ± popover (tests): open for a source — 'tray', a group id, or a group
+  // name — and observe the bound state (UX §7.4).
+  openPopoverFor(source) {
+    if (source === 'tray') {
+      paintCmd();
+      openPopover({ source: 'tray', row: document.getElementById('tray-actions') });
+    } else {
+      const g = groups.find((x) => x.id === source || x.name === source);
+      if (!g) return false;
+      const mini = document.body.classList.contains('mini');
+      const row = (mini
+        ? document.querySelector(`#mini-bar [data-group-id="${g.id}"]`)
+        : document.querySelector(`#groups-list [data-group-id="${g.id}"]`)) || null;
+      openPopover({ source: 'group', group: g, row });
+    }
+    return !!pop;
+  },
+  get popover() {
+    if (!pop) return null;
+    return {
+      source: pop.source,
+      groupId: pop.groupId,
+      dice: [...pop.dice],
+      dc: pop.dc,
+      faceDown: pop.faceDown,
+      open: !document.getElementById('mods-popover').classList.contains('hidden'),
+    };
+  },
+  closePopover() { closePopover(); },
   sim(frames) { for (let i = 0; i < frames; i++) tick(1 / 60, false); },
   fastForward: fastForwardPlayback,
 };
@@ -1412,9 +1441,15 @@ function save(key, value) {
 
 let tray = [];
 
+// Open ± popover state (see the popover section below). Declared this early
+// because renderGroups AND the module-evaluation paintCmd() both run before
+// the popover section is reached.
+let pop = null;
+
 const dieButtonsEl = document.getElementById('die-buttons');
 const trayEl = document.getElementById('tray');
 const rollTrayBtn = document.getElementById('roll-tray');
+const trayModsBtn = document.getElementById('tray-mods');
 const clearTrayBtn = document.getElementById('clear-tray');
 const saveGroupBtn = document.getElementById('save-group');
 const groupNameInput = document.getElementById('group-name');
@@ -1477,6 +1512,7 @@ function renderTray() {
 function updateTrayButtons() {
   const usable = (cmdResult && cmdResult.ok) || tray.length > 0;
   rollTrayBtn.disabled = !usable;
+  trayModsBtn.disabled = !usable;
   clearTrayBtn.disabled = !tray.length && !cmdInput.value;
   saveGroupBtn.disabled = !usable;
 }
@@ -1499,6 +1535,16 @@ rollTrayBtn.addEventListener('click', () => {
     requestRoll([...tray], name || formula(tray));
   }
 });
+// The ad-hoc tray's ± (§7.4): the SAME popover, bound to the tray draft.
+trayModsBtn.addEventListener('click', () => {
+  if (pop && pop.source === 'tray') {
+    closePopover();
+    return;
+  }
+  paintCmd(); // synchronous re-parse: the debounced cmdResult can be stale
+  openPopover({ source: 'tray', row: document.getElementById('tray-actions') });
+});
+
 clearTrayBtn.addEventListener('click', () => {
   tray = [];
   boxExtras = { mods: null, dc: null, comment: null };
@@ -1600,6 +1646,8 @@ function renderCmdState(boxEl, slotEl, res, raw) {
   if (res.ok) {
     span('ok', `${res.canonical} · ${fmtPreview(res.spec.dice, res.spec.mods)}`);
     for (const w of res.warnings) span('warn', `⚠ ${w}`);
+    // §7.4: both verbs are advertised wherever both are available.
+    if (netOnline) span('muted', 'Enter roll · Shift+Enter offer');
   } else if (res.state === 'incomplete') {
     if (raw.trim()) span('muted', `… ${res.error}`);
   } else {
@@ -1621,6 +1669,7 @@ function paintCmd() {
   }
   renderCmdState(cmdEl, cmdSlot, res, raw);
   updateTrayButtons();
+  resyncTrayPopover(); // an open tray-bound ± popover follows the draft (§7.4)
   return res;
 }
 
@@ -1659,6 +1708,33 @@ function commandRoll(input) {
   return res;
 }
 
+// Offer a notation string to the table (Shift+Enter — §7.4). Same validation
+// gates as commandRoll; online only (callers show the solo refusal).
+function commandOffer(input) {
+  const raw = (typeof input === 'string' ? input : cmdInput.value).trim();
+  const res = parseNotation(raw);
+  if (!res.ok) return res;
+  if (!netOnline || !net) return res;
+  net.offer({
+    label: res.comment || res.canonical,
+    notation: raw,
+    exp: res.dc != null ? { kind: 'check' } : undefined, // dc implies Check (§2.3)
+  });
+  return res;
+}
+
+// Solo Shift+Enter: refusal shake + hint in the box's helper slot (§7.4).
+function offerNeedsTable(boxEl, slotEl) {
+  boxEl.classList.remove('cmd-shake');
+  void boxEl.offsetWidth; // restart the animation
+  boxEl.classList.add('cmd-shake');
+  slotEl.textContent = '';
+  const el = document.createElement('span');
+  el.className = 'warn';
+  el.textContent = 'offers need a table — you are playing solo';
+  slotEl.appendChild(el);
+}
+
 const cmdHistoryWalk = makeHistoryWalker(cmdInput, paintCmd);
 
 cmdInput.addEventListener('input', () => {
@@ -1672,7 +1748,15 @@ cmdInput.addEventListener('keydown', (e) => {
   if (e.isComposing) return;
   if (e.key === 'Enter') {
     const res = paintCmd();
-    if (res.ok) commandRoll(cmdInput.value);
+    if (res.ok) {
+      if (e.shiftKey) {
+        // §7.4: Shift+Enter = Offer to table, same validation gates as Enter.
+        if (netOnline && net) commandOffer(cmdInput.value);
+        else offerNeedsTable(cmdEl, cmdSlot);
+      } else {
+        commandRoll(cmdInput.value);
+      }
+    }
   } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
     cmdHistoryWalk.arrow(e);
   }
@@ -1741,10 +1825,6 @@ function loadIntoBox(notation, name) {
   cmdInput.focus();
 }
 
-// Open ± popover state (see the popover section below). Declared here because
-// renderGroups runs during module evaluation and re-anchors an open popover.
-let pop = null;
-
 // Roll a saved group: parse its notation and roll the parsed spec. Online the
 // notation string itself goes up (the server's parse is authoritative).
 function rollGroup(g) {
@@ -1804,7 +1884,7 @@ function renderGroups() {
     delBtn.textContent = '✕';
     delBtn.title = 'Delete group';
     delBtn.addEventListener('click', () => {
-      if (pop && pop.groupId === g.id) closePopover();
+      if (pop && pop.source === 'group' && pop.groupId === g.id) closePopover();
       groups = groups.filter((x) => x.id !== g.id);
       saveGroups();
       renderGroups();
@@ -1814,7 +1894,7 @@ function renderGroups() {
     groupsListEl.appendChild(row);
     // renderGroups can run while this group's popover is open (e.g. after a
     // variant save) — re-anchor it to the fresh row.
-    if (pop && pop.groupId === g.id) {
+    if (pop && pop.source === 'group' && pop.groupId === g.id && !document.body.classList.contains('mini')) {
       row.classList.add('open');
       pop.row = row;
     }
@@ -1897,23 +1977,19 @@ const cleanComment = (t) =>
   t.replace(/[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '').trim().slice(0, 64).trim();
 
 function togglePopover(g, row) {
-  if (pop && pop.groupId === g.id) {
+  if (pop && pop.source === 'group' && pop.groupId === g.id) {
     closePopover();
     return;
   }
-  openPopover(g, row);
+  openPopover({ source: 'group', group: g, row });
 }
 
-function openPopover(g, row) {
-  const res = parseNotation(g.notation);
-  if (!res.ok) return;
-  closePopover();
+// The edit-state half of `pop`, parsed from a canonical notation string.
+// Shared by openPopover and the tray re-sync so the two can never drift.
+function popStateFromParse(res) {
   const m = res.spec.mods || {};
   const named = (m.parts || []).filter((p) => p.label);
-  pop = {
-    groupId: g.id,
-    name: g.name || g.notation,
-    row,
+  return {
     dice: [...res.spec.dice],
     // anonymous remainder + named parts reassemble to mods.modifier/parts
     anon: (m.modifier || 0) - named.reduce((s, p) => s + p.value, 0),
@@ -1925,12 +2001,46 @@ function openPopover(g, row) {
     faceDown: res.faceDown,
     dc: res.dc,
     comment: res.comment,
+  };
+}
+
+// The tray draft as canonical notation: the command box's parse when valid
+// (re-run synchronously by callers via paintCmd — the debounce can be stale),
+// otherwise the bare tray dice. Null when there is no draft at all.
+function trayDraftNotation() {
+  if (cmdResult && cmdResult.ok) return cmdResult.canonical;
+  if (tray.length) return formula(tray);
+  return null;
+}
+
+// Open the ± popover bound to a source (UX §7.4): {source:'group', group, row}
+// or {source:'tray', row}. Roll / Offer / Save-as-variant act on the source.
+function openPopover(binding) {
+  let notation, name, groupId = null;
+  if (binding.source === 'group') {
+    notation = binding.group.notation;
+    name = binding.group.name || binding.group.notation;
+    groupId = binding.group.id;
+  } else {
+    notation = trayDraftNotation();
+    name = groupNameInput.value.trim() || 'Tray';
+  }
+  if (!notation) return;
+  const res = parseNotation(notation);
+  if (!res.ok) return;
+  closePopover();
+  pop = {
+    source: binding.source,
+    groupId,
+    name,
+    row: binding.row || null,
+    ...popStateFromParse(res),
     // Moment (UX §2.3): per-roll only this slice — groups don't persist it.
     // A dc implies Check; the segmented control can override to Plain.
     expKind: res.dc != null ? 'check' : '',
     expSubtitle: '',
   };
-  row.classList.add('open');
+  if (pop.row) pop.row.classList.add('open');
   popNameEl.textContent = pop.name;
   popDcInput.value = pop.dc == null ? '' : String(pop.dc);
   popCommentInput.value = pop.comment || '';
@@ -1940,21 +2050,55 @@ function openPopover(g, row) {
   placePopover();
 }
 
+// Tray edits while the tray popover is open re-sync it (§7.4): the draft is
+// authoritative and in-popover edits yield to it. Called from paintCmd, which
+// every tray/box mutation funnels through.
+function resyncTrayPopover() {
+  if (!pop || pop.source !== 'tray') return;
+  const notation = trayDraftNotation();
+  if (!notation) {
+    closePopover(); // the draft is gone (tray emptied)
+    return;
+  }
+  const res = parseNotation(notation);
+  if (!res.ok) return;
+  Object.assign(pop, popStateFromParse(res));
+  if (pop.dc != null && !pop.expKind) pop.expKind = 'check';
+  pop.name = groupNameInput.value.trim() || 'Tray';
+  popNameEl.textContent = pop.name;
+  popDcInput.value = pop.dc == null ? '' : String(pop.dc);
+  popCommentInput.value = pop.comment || '';
+  renderPop();
+  placePopover();
+}
+
 function closePopover() {
   if (!pop) return;
-  pop.row.classList.remove('open');
+  if (pop.row) pop.row.classList.remove('open');
   pop = null;
   popEl.classList.add('hidden');
 }
 
-// Anchor beside the left panel, next to the group's row, clamped on-screen.
+// Anchor the popover to its source, clamped fully on-screen (§7.4: usable in
+// mini). Full view: beside the left panel, next to the source row. Mini: above
+// the anchoring pill (the panel is hidden), clamped within the viewport.
 function placePopover() {
   if (!pop) return;
-  const panelRect = document.getElementById('left-panel').getBoundingClientRect();
-  popEl.style.left = `${Math.round(panelRect.right + 10)}px`;
-  const rowTop = pop.row.getBoundingClientRect().top;
+  const w = popEl.offsetWidth;
   const h = popEl.offsetHeight;
-  popEl.style.top = `${Math.max(12, Math.min(Math.round(rowTop - 46), window.innerHeight - h - 12))}px`;
+  const anchor = pop.row ? pop.row.getBoundingClientRect() : null;
+  const mini = document.body.classList.contains('mini');
+  let left, top;
+  if (mini && anchor) {
+    left = Math.round(anchor.left);
+    top = Math.round(anchor.top - h - 8);
+  } else {
+    const panelRect = document.getElementById('left-panel').getBoundingClientRect();
+    left = Math.round(panelRect.right + 10);
+    top = anchor ? Math.round(anchor.top - 46) : 12;
+  }
+  popEl.style.left = `${Math.max(12, Math.min(left, window.innerWidth - w - 12))}px`;
+  popEl.style.top = `${Math.max(12, Math.min(top, window.innerHeight - h - 12))}px`;
 }
 
 function popModifier() {
@@ -2217,10 +2361,11 @@ popCommentInput.addEventListener('keydown', (e) => e.stopPropagation());
 
 popEchoEl.addEventListener('click', () => {
   if (!pop) return;
-  const group = groups.find((g) => g.id === pop.groupId);
+  const group = pop.source === 'group' ? groups.find((g) => g.id === pop.groupId) : null;
+  const name = group ? group.name : groupNameInput.value.trim();
   const canonical = popCanonical();
   closePopover();
-  loadIntoBox(canonical, group ? group.name : '');
+  loadIntoBox(canonical, name);
 });
 
 document.getElementById('pop-close').addEventListener('click', closePopover);
@@ -2262,9 +2407,17 @@ popVariantBtn.addEventListener('click', () => {
   const spec = popSpec();
   if (validateMods(spec.dice, spec.mods)) return;
   const canonical = popCanonical();
-  const base = groups.find((g) => g.id === pop.groupId);
-  const summary = modsSummary(spec.mods) || (pop.dc ? `dc${pop.dc}` : 'variant');
-  const name = `${(base && base.name) || pop.name} ${summary}`.trim().slice(0, 24);
+  let name;
+  if (pop.source === 'group') {
+    const base = groups.find((g) => g.id === pop.groupId);
+    const summary = modsSummary(spec.mods) || (pop.dc ? `dc${pop.dc}` : 'variant');
+    name = `${(base && base.name) || pop.name} ${summary}`.trim().slice(0, 24);
+  } else {
+    // Save-as-variant from the tray saves a NEW group (§7.4). A typed group
+    // name is used as-is; otherwise the group is unnamed (its notation labels
+    // it, exactly like the panel's own Save with an empty name).
+    name = groupNameInput.value.trim().slice(0, 24);
+  }
   closePopover();
   groups.push({ id: Date.now(), name, notation: canonical });
   saveGroups();
@@ -2535,16 +2688,57 @@ const LS_MINI = 'dice.mini.v1';
 
 // Called from renderGroups(), which runs during module evaluation — resolve
 // the element here rather than via a module-level const declared below.
+const PILL_LONGPRESS_MS = 500;
+
 function renderMiniBar() {
   const miniBar = document.getElementById('mini-bar');
   miniBar.innerHTML = '';
   for (const g of groups) {
     const pill = document.createElement('button');
     pill.className = 'mini-pill';
+    pill.dataset.groupId = String(g.id);
     pill.textContent = g.name || g.notation; // user-supplied: textContent only
     pill.title = g.notation; // UX §1.4: the pill's title is the notation
-    pill.addEventListener('click', () => rollGroup(g));
+    // §7.4 compact-pill column: tap = roll; contextmenu OR a ~500 ms pointer
+    // long-press (touch included) opens the ± popover bound to this group.
+    // A long-press must NOT also roll: the pointerup click that follows it is
+    // swallowed via the one-shot suppress flag.
+    let lpTimer = null;
+    let suppressClick = false;
+    const openPill = () => {
+      if (pop && pop.source === 'group' && pop.groupId === g.id) closePopover();
+      else openPopover({ source: 'group', group: g, row: pill });
+    };
+    pill.addEventListener('click', () => {
+      if (suppressClick) {
+        suppressClick = false;
+        return;
+      }
+      rollGroup(g);
+    });
+    pill.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      clearTimeout(lpTimer);
+      openPill();
+    });
+    pill.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      clearTimeout(lpTimer);
+      lpTimer = setTimeout(() => {
+        suppressClick = true;
+        openPill();
+      }, PILL_LONGPRESS_MS);
+    });
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) {
+      pill.addEventListener(ev, () => clearTimeout(lpTimer));
+    }
     miniBar.appendChild(pill);
+    // renderMiniBar can rebuild while this group's popover is anchored to the
+    // old pill (e.g. after a variant save in mini) — re-anchor to the new one.
+    if (pop && pop.source === 'group' && pop.groupId === g.id
+        && document.body.classList.contains('mini')) {
+      pop.row = pill;
+    }
   }
 }
 
@@ -2622,7 +2816,7 @@ function openPalette() {
 function closePalette() {
   if (!isPaletteOpen()) return;
   clearTimeout(paletteTimer);
-  paletteEl.classList.remove('palette-shake');
+  paletteEl.classList.remove('palette-shake', 'cmd-shake');
   paletteBackdrop.classList.add('hidden');
   paletteInput.value = '';
   paletteInput.blur();
@@ -2654,8 +2848,18 @@ paletteInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     const res = paintPalette();
     if (res.ok) {
-      commandRoll(paletteInput.value); // the normal requestRoll path
-      closePalette();
+      if (e.shiftKey) {
+        // §7.4: Shift+Enter = Offer to table (same gates as Enter).
+        if (netOnline && net) {
+          commandOffer(paletteInput.value);
+          closePalette();
+        } else {
+          offerNeedsTable(paletteEl, paletteSlot); // solo: shake, stays open
+        }
+      } else {
+        commandRoll(paletteInput.value); // the normal requestRoll path
+        closePalette();
+      }
     } else if (res.state === 'invalid') {
       shakePalette(); // stays open
     } // incomplete: nothing

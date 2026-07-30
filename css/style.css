@@ -277,6 +277,9 @@ html, body {
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .group-mods:hover { color: var(--ivory); border-color: var(--panel-border); }
+.group-mods:disabled { opacity: 0.4; cursor: default; }
+/* the ad-hoc tray row's ± (§7.4): same .group-mods look, sized to the row */
+#tray-mods { flex: none; width: 32px; height: auto; align-self: stretch; font-size: 14px; }
 .group-row.open .group-mods { color: var(--gold-bright); border-color: rgba(212, 175, 55, 0.5); background: rgba(212, 175, 55, 0.14); }
 .group-del {
   border: none;
@@ -635,6 +638,8 @@ body.mini #mini-bar {
   text-overflow: ellipsis;
 }
 .mini-pill:hover { border-color: var(--gold); background: rgba(212,175,55,0.18); }
+/* long-press (§7.4) needs the pointer stream: no touch scroll/callout on pills */
+.mini-pill { touch-action: none; -webkit-touch-callout: none; }
 .mini-pill.mini-util { color: var(--muted); padding: 4px 9px; margin-left: auto; }
 .mini-pill.mini-util + .mini-pill.mini-util { margin-left: 0; }
 .mini-pill.mini-util:hover { color: var(--ivory); }
@@ -850,8 +855,10 @@ body.mini #offers-layer { top: 8px; max-width: 260px; }
 }
 #palette .cmd-in { font-size: 15px; padding: 10px 12px; }
 #palette .cmd-slot { min-height: 20px; font-size: 12px; line-height: 16px; padding-top: 5px; }
-/* Enter on an INVALID command: brief refusal shake (§5.5 — transform only) */
+/* Enter on an INVALID command: brief refusal shake (§5.5 — transform only).
+   .cmd-shake is the same beat for a solo Shift+Enter offer on either box. */
 #palette.palette-shake { animation: palette-shake 0.28s ease-out; }
+.cmd.cmd-shake { animation: palette-shake 0.28s ease-out; }
 @keyframes palette-shake {
   0%, 100% { transform: translateX(0); }
   20% { transform: translateX(-8px); }
@@ -860,7 +867,7 @@ body.mini #offers-layer { top: 8px; max-width: 260px; }
   85% { transform: translateX(2px); }
 }
 @media (prefers-reduced-motion: reduce) {
-  #palette.palette-shake { animation: none; }
+  #palette.palette-shake, .cmd.cmd-shake { animation: none; }
 }
 
 /* ---------- keyboard cheatsheet overlay ('?') ---------- */
@@ -1100,7 +1107,9 @@ body.mini #result-verdict { font-size: 11px; }
 .pop-actions { display: flex; gap: 8px; padding: 10px 14px 0; }
 .pop-actions:last-child, .pop-actions-2nd { padding-bottom: 14px; }
 .pop-actions .btn { flex: 1; }
-body.mini .popover { display: none; }
+/* §7.4: the popover is fully usable in mini (long-press/right-click on a
+   pill opens it); placePopover clamps it inside small viewports. */
+body.mini .popover { width: min(94vw, 312px); }
 
 /* ---------------------------------------------------------------------------
    Roll moment ceremony (UX §2.4, §5.3 ornate frame — card only).
