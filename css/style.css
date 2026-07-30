@@ -786,6 +786,53 @@ body.mini .shelf-marker { font-size: 10px; padding: 2px 6px; gap: 4px; }
 body.mini .sm-total { font-size: 12px; }
 body.mini .sm-word { font-size: 9px; }
 body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
+
+/* ---------- peek cards (§7.7.1) ---------- */
+/* ONE expanded result card above a shelved slot: the banner's content for
+   that roll. z 30 sits above the ± popover (26) and below the settings/name
+   modals (40) — matching the Esc peel order. */
+.peek-card {
+  position: fixed;
+  z-index: 30;
+  min-width: 190px;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 10px 14px 12px;
+  background: rgba(18, 14, 9, 0.94);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65);
+  font-family: var(--font-display);
+  color: var(--ivory);
+  text-align: center;
+  animation: chip-pop 0.18s ease-out;
+}
+.peek-card.hidden { display: none; }
+.pk-head { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.pk-who {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.pk-total { font-size: 26px; font-weight: 700; color: var(--gold-bright); line-height: 1.15; }
+.pk-verdict { font-size: 12px; }
+.pk-verdict.verdict-success { color: var(--gold-bright); text-shadow: 0 0 14px rgba(255, 215, 102, 0.5); }
+.pk-verdict.verdict-fail { color: var(--red); text-shadow: 0 0 12px rgba(226, 73, 59, 0.5); }
+.pk-verdict:empty { display: none; }
+.pk-meaning { font-size: 13px; letter-spacing: 0.04em; }
+.pk-meaning:empty { display: none; }
+.pk-breakdown { font-size: 12px; opacity: 0.85; margin-top: 3px; }
+.pk-breakdown:empty { display: none; }
+.pk-breakdown .crit-max { color: var(--gold-bright); font-weight: 700; }
+.pk-breakdown .crit-min { color: var(--red); font-weight: 700; }
+.pk-actions { margin-top: 6px; }
+/* compact view keeps the full card, scaled like the markers (§7.7.1) */
+body.mini .peek-card { min-width: 150px; padding: 7px 10px 9px; }
+body.mini .pk-head { font-size: 10px; }
+body.mini .pk-total { font-size: 19px; }
+body.mini .pk-breakdown { font-size: 10px; }
 .log-discarded { text-decoration: line-through; opacity: 0.5; }
 .log-mod { color: var(--gold-bright); font-weight: 700; }
 .log-part-label { font-variant: small-caps; color: var(--muted); font-weight: 400; letter-spacing: 0.04em; }

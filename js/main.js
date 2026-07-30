@@ -915,10 +915,27 @@ function renderShelfMarkers() {
     el.appendChild(x);
     if (entry && entry.playerName) el.title = `${entry.playerName} · ${entry.label}`;
     else if (entry) el.title = entry.label;
+    // Peek (§7.7.1): hover opens after the intent delay (desktop); a tap — or
+    // a click anywhere that is not one of the marker's own buttons — toggles.
+    el.addEventListener('pointerenter', (ev) => {
+      if (ev.pointerType === 'mouse') schedulePeekOpen(c.rollId);
+    });
+    el.addEventListener('pointerleave', (ev) => {
+      if (ev.pointerType === 'mouse') schedulePeekClose();
+    });
+    el.addEventListener('click', (ev) => {
+      const t = ev.target;
+      if (t instanceof HTMLElement && t.closest('button')) return;
+      if (peekRollId === c.rollId) closePeek();
+      else openPeek(c.rollId);
+    });
     c.markerEl = el;
     shelfLayer.appendChild(el);
   }
   positionShelfMarkers();
+  // An open peek re-reads whatever changed here — a reveal, a lens toggle, a
+  // reflowed slot — or closes if its roll just left the shelf.
+  renderPeek();
 }
 
 function positionShelfMarkers() {
@@ -930,7 +947,185 @@ function positionShelfMarkers() {
     c.markerEl.style.left = `${(v.x * 0.5 + 0.5) * window.innerWidth}px`;
     c.markerEl.style.top = `${(-v.y * 0.5 + 0.5) * window.innerHeight}px`;
   }
+  positionPeek(); // the open card rides its slot through reflows and reframes
 }
+
+// ---- peek cards (§7.7.1) ----------------------------------------------------
+//
+// A collected roll keeps its information: hovering (desktop, ~150 ms intent
+// delay) or tapping a shelf marker expands ONE full result card above its
+// slot — the same content as the result banner for that roll (roller name +
+// color, label, total, DC verdict, meaning word under the ACTIVE lens, full
+// breakdown with struck dice / ✴ children / named bonuses), built with the
+// same safe helpers: textContent for user strings, renderBreakdown for the
+// math. One peek at a time; pointerleave / tap-away / second tap / Esc closes
+// (Esc peels it above the ± popover, below palette/cheatsheet/settings).
+// renderShelfMarkers already runs on every reveal, lens toggle, and shelf
+// change, so calling renderPeek from it keeps an open card honest — and
+// closes it the moment its roll leaves the shelf.
+
+const PEEK_HOVER_MS = 150;   // hover intent delay before the card opens
+const PEEK_CLOSE_MS = 220;   // grace to cross from marker into the card
+const peekEl = document.getElementById('peek-card');
+let peekRollId = null;       // rollId of the open peek, or null
+let peekHoverTimer = null;
+let peekCloseTimer = null;
+
+function isPeekOpen() { return peekRollId !== null; }
+
+function cancelPeekTimers() {
+  clearTimeout(peekHoverTimer);
+  clearTimeout(peekCloseTimer);
+  peekHoverTimer = peekCloseTimer = null;
+}
+
+function closePeek() {
+  cancelPeekTimers();
+  peekRollId = null;
+  peekEl.classList.add('hidden');
+  peekEl.textContent = '';
+}
+
+// Open (or retarget) the peek for a shelved roll. False for anything not on
+// the shelf — a peek without a cluster has no slot to anchor to.
+function openPeek(rollId) {
+  if (!shelfClusters.has(rollId)) return false;
+  cancelPeekTimers();
+  peekRollId = rollId;
+  renderPeek();
+  return peekRollId === rollId;
+}
+
+function schedulePeekOpen(rollId) {
+  cancelPeekTimers();
+  peekHoverTimer = setTimeout(() => openPeek(rollId), PEEK_HOVER_MS);
+}
+
+function schedulePeekClose() {
+  cancelPeekTimers();
+  peekCloseTimer = setTimeout(closePeek, PEEK_CLOSE_MS);
+}
+
+// Rebuild the open card's content from the log entry (the same source the
+// banner and log line read). Face-down unrevealed: '?' plus the marker's
+// Reveal affordance for the roller — no values leak.
+function renderPeek() {
+  if (peekRollId === null) return;
+  const c = shelfClusters.get(peekRollId);
+  if (!c) { closePeek(); return; }
+  const entry = log.find((e) => e.rollId === peekRollId) || null;
+  const hidden = !entry || (entry.faceDown && !entry.revealed);
+  const mine = !!entry && (!netOnline || (net && entry.playerId === net.playerId));
+  peekEl.textContent = '';
+
+  // header: roller dot + name (their color) + label, and the universal ✕ —
+  // clearing from the peek is the same path as the marker's ✕.
+  const head = document.createElement('div');
+  head.className = 'pk-head';
+  const dot = document.createElement('span');
+  dot.className = 'sm-dot';
+  dot.style.background = (entry && entry.color) || '#8a7f6e';
+  head.appendChild(dot);
+  const who = document.createElement('span');
+  who.className = 'pk-who';
+  if (entry && entry.playerName) {
+    const nm = document.createElement('span');
+    nm.className = 'roller-name';
+    if (entry.color) nm.style.color = entry.color;
+    nm.textContent = entry.playerName;
+    who.append(nm, ` · ${entry.label}`);
+  } else {
+    who.textContent = entry ? entry.label : 'collected roll';
+  }
+  head.appendChild(who);
+  const x = document.createElement('button');
+  x.className = 'sm-x';
+  x.textContent = '✕';
+  x.title = 'Clear this roll for everyone';
+  x.addEventListener('click', () => requestClearRoll(c.rollId));
+  head.appendChild(x);
+  peekEl.appendChild(head);
+
+  const total = document.createElement('div');
+  total.className = 'pk-total';
+  total.textContent = hidden ? '?' : String(entry.total);
+  peekEl.appendChild(total);
+
+  const verdict = document.createElement('div');
+  verdict.className = 'pk-verdict';
+  if (entry && !hidden && Number.isInteger(entry.dc)) {
+    const cleared = entry.total >= entry.dc;
+    verdict.textContent = `vs DC ${entry.dc} — ${cleared ? 'Success' : 'Failure'}`;
+    verdict.classList.add(cleared ? 'verdict-success' : 'verdict-fail');
+  }
+  peekEl.appendChild(verdict);
+
+  const meaningEl = document.createElement('div');
+  meaningEl.className = 'pk-meaning';
+  const meaning = entry && !hidden ? entryMeaning(entry) : null;
+  if (meaning) {
+    meaningEl.textContent = meaning.word;
+    meaningEl.classList.add(`tier-${meaning.tier}`);
+    meaningEl.title = `${meaning.rank} column (${meaning.column})`;
+  }
+  peekEl.appendChild(meaningEl);
+
+  const bd = document.createElement('div');
+  bd.className = 'pk-breakdown';
+  if (entry) renderBreakdown(bd, entry, hidden);
+  peekEl.appendChild(bd);
+
+  if (entry && hidden && mine) {
+    const actions = document.createElement('div');
+    actions.className = 'pk-actions';
+    const rv = document.createElement('button');
+    rv.className = 'sm-reveal';
+    rv.textContent = 'Reveal';
+    rv.title = 'Flip this roll face up for the table';
+    rv.addEventListener('click', () => requestReveal(c.rollId));
+    actions.appendChild(rv);
+    peekEl.appendChild(actions);
+  }
+
+  peekEl.classList.remove('hidden');
+  positionPeek();
+}
+
+// Anchor the card above its slot's marker point, clamped fully on screen —
+// an edge slot at 480×360 still shows the whole card (flipping below the
+// anchor if the top would clip).
+function positionPeek() {
+  if (peekRollId === null) return;
+  const c = shelfClusters.get(peekRollId);
+  if (!c) return;
+  const v = new THREE.Vector3(shelfSlotX(c.slot), SHELF_MARKER_Y, SHELF_Z).project(camera);
+  const ax = (v.x * 0.5 + 0.5) * window.innerWidth;
+  const ay = (-v.y * 0.5 + 0.5) * window.innerHeight;
+  const w = peekEl.offsetWidth;
+  const h = peekEl.offsetHeight;
+  const left = Math.max(8, Math.min(ax - w / 2, window.innerWidth - w - 8));
+  let top = ay - 16 - h;
+  if (top < 8) top = ay + 16; // clipped above: sit below the marker instead
+  top = Math.max(8, Math.min(top, window.innerHeight - h - 8));
+  peekEl.style.left = `${left}px`;
+  peekEl.style.top = `${top}px`;
+}
+
+// Crossing from the marker into the card must not close it (desktop).
+peekEl.addEventListener('pointerenter', (e) => {
+  if (e.pointerType === 'mouse') cancelPeekTimers();
+});
+peekEl.addEventListener('pointerleave', (e) => {
+  if (e.pointerType === 'mouse') schedulePeekClose();
+});
+
+// Tap-away (touch) and click-away (desktop) both collapse the open peek.
+document.addEventListener('pointerdown', (e) => {
+  if (peekRollId === null) return;
+  const t = e.target;
+  if (t instanceof HTMLElement && (peekEl.contains(t) || t.closest('.shelf-marker'))) return;
+  closePeek();
+});
 
 // A roll was collected ('roll-collected' event, the solo mirror, or a hello
 // resync with animate=false). Mid-playback / queued rolls defer their whisk
@@ -2282,6 +2477,23 @@ window.__diceDebug = {
   },
   get whiskingCount() { return whisking.length; },
   get pendingCollects() { return [...pendingCollects.keys()]; },
+  // peek cards (§7.7.1): open for a shelved rollId / close with null, plus
+  // the open card's state for content assertions.
+  peek(rollId) {
+    if (!rollId) { closePeek(); return null; }
+    return openPeek(rollId) ? rollId : null;
+  },
+  get peekState() {
+    if (peekRollId === null) return null;
+    return {
+      rollId: peekRollId,
+      text: peekEl.textContent,
+      breakdown: (peekEl.querySelector('.pk-breakdown') || { textContent: '' }).textContent,
+      total: (peekEl.querySelector('.pk-total') || { textContent: '' }).textContent,
+      hasReveal: !!peekEl.querySelector('.sm-reveal'),
+      rect: (() => { const r = peekEl.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; })(),
+    };
+  },
   // shelf geometry + the camera's own projection: how a headless check proves
   // the trays and their markers are on screen at a given viewport (§7.7).
   get shelfGeometry() {
@@ -4029,7 +4241,8 @@ function rerollLast() {
 // Single global keydown handler. Layer guards are checked BEFORE any handler
 // mutates state, so one Esc can never fall through two layers:
 //   Esc peels the topmost layer only — cheatsheet > palette > settings modal
-//   > ± popover (extends the earlier popover/modal layering fix).
+//   > peek card > ± popover (extends the earlier popover/modal layering fix;
+//   the peek slots in above the popover per §7.7.1).
 // Table shortcuts fire only with no text input focused and no layer open
 // (the ± popover counts as open UI). Space keeps its skip-ceremony handler.
 document.addEventListener('keydown', (e) => {
@@ -4046,6 +4259,7 @@ document.addEventListener('keydown', (e) => {
     if (isKbdOpen()) closeKbd();
     else if (isPaletteOpen()) closePalette();
     else if (!settingsModal.classList.contains('hidden')) closeSettingsModal();
+    else if (isPeekOpen()) closePeek();
     else if (pop) closePopover();
     return;
   }
