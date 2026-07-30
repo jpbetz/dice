@@ -140,6 +140,19 @@ ladder; all of it is polish, vocabulary, or a new rung.
   precedent exists for "reveal to the roller". §3.3 rejected it for step 4
   because reveal is currently total and one-way, which is what makes it
   auditable. Revisit only with a concrete table need.
+- **`#` in a player name misdirects a whisper (open defect).** The comment
+  split runs before the flag scan, so the canonical `1d20 w:a#b` re-parses
+  as a whisper to `a` with the comment `b`. The server accepts it with 200
+  and resolves the audience to the *wrong player*; the intended recipient
+  gets the shrouded projection, and the label silently becomes `b`. The
+  popover's audience picker offers `#`-bearing roster names, so this is
+  reachable without typing notation by hand. It contradicts §3.0's
+  fail-closed promise ("a typo must never quietly broadcast the roll, and
+  must never quietly narrow it either"). Fix candidates: quote names
+  containing `#` in `canonicalNotation` and teach the quoted-name scanner
+  to survive the comment split, or reject `#` in names at join. Until then
+  the round trip is not a fixed point for those names (GOALS.md,
+  notation totality).
 - **Audience legibility.** A shrouded viewer reads the audience only when
   the roll has no `# comment` (§3.0) — `label` carries one or the other.
   Decide whether "who was whispered to" deserves its own always-present

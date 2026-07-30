@@ -75,10 +75,16 @@ specifies components within them. Where the three disagree, this document wins.
 
 - **Notation totality.** Every possible roll has a text notation, and every
   notation is buildable through the UI. The canonical form is a byte-stable
-  round-trip fixed point. *(Known violations, audited 2026-07-30: roll
-  moments (`exp` kind + subtitle) have no notation, and face-down survives
-  only as an input prefix — the canonical form drops it, so groups, history,
-  and links silently lose both. Roadmap step 1 closes these.)*
+  round-trip fixed point. *(The two violations audited 2026-07-30 are
+  closed and re-verified 2026-07-30: roll moments canonicalize as
+  `check`/`cinematic` + `# Title | Subtitle`, and the whole visibility
+  ladder canonicalizes as `held` / `secret` / `w:Name`, so groups, history
+  and `#g=` links carry both. One violation remains open: a **player name
+  containing `#` breaks the round trip silently** — the comment split runs
+  before the flag scan, so `w:a#b` re-parses as a whisper to `a` with the
+  comment `b`. The result is not a parse failure but a **misdelivery**: the
+  private result goes to a different player, and the audience picker offers
+  such names. See ROADMAP step 4b.)*
 - **Uniform roll surfaces.** Every UI element that triggers a roll offers
   the same capabilities (the UX.md §7.4 matrix): full intent editing, both
   verbs (Roll / Offer), in both full and compact view.
