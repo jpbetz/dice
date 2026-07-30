@@ -393,121 +393,269 @@ strip (existing mini result) appends the verdict word:
 
 ---
 
-## 3. Visibility & roles
+## 3. Visibility, role-free
 
-Adopting the visibility research position wholesale: **four role-free
-modes now, one optional claimable DM seat after** — the seat exists only
-for the two things role-free cannot express (blind rolls, hidden DCs held
-across rejoin).
+**A four-rung ladder, chosen per roll.** Privacy here is a property of a
+*roll*, not of a person: there is no seat, no permission grid, and nothing
+is ever disabled for anybody (goal 10). Every rung is available to every
+player on every roll surface (goal 11).
 
-### 3.0 Prerequisite: make privacy real
+This section is the **as-built** spec for roadmap step 4 — §3.0 is the wire
+and server contract, §3.1 the presentation, §3.2 the modes as a player
+meets them, §3.3 offers. The notation spelling lives in §7.8.
 
-Today's face-down is honor-system — `broadcast(room,'roll',roll)` sends
-values to everyone and the client prints `?`. Before any new mode ships:
+### 3.0 Prerequisite, made real: the wire and the projection
 
-- `server.js`: `redactRoll(roll, forPlayerId)` strips `values`, `perDie`,
-  `modifier`, `total` and sets `hidden:true` unless the recipient is in
-  the audience. The audience is **roller ∪ whisper targets** — with one
-  carve-out: for `'blind'` it is the **host alone**, and the
-  roller/claimer is *excluded*. That exclusion is the entire point of a
-  blind roll (§3.4 power 2); without it the values leak to exactly the
-  person they must be hidden from. `broadcast()` gains an optional
-  per-recipient projection (it already loops player-by-player).
-- Plug the two log leaks: `/api/join`'s `log:` response and the `hello`
-  SSE payload map through `redactRoll` per recipient.
-- Wire shape: `visibility` sits **beside** `mods` (it does not alter
-  values, so it does not belong in `rollspec.js`):
-  `'open' | 'held' | 'secret' | { whisper: [playerId…] } | 'blind'`.
-  `faceDown:true` stays accepted as an alias for `'held'`.
+Face-down used to be honor-system — `broadcast(room,'roll',roll)` sent
+values to everyone and the client printed `?`. That is over. The values a
+client is not entitled to **never reach it**.
+
+**Wire shape.** `visibility` sits *beside* `mods` — it does not alter
+values, so it does not belong in `rollspec.js`. The server-side entry
+carries the full record:
+
+```js
+entry.visibility = {
+  mode: 'held' | 'secret' | 'whisper',
+  audience: [playerId, …],    // whisper only
+  revealAuthority: playerId   // the chooser (§3.3)
+}
+entry.revealed = true          // once revealed
+```
+
+**Absent means open**, and open is the default. An open roll never grows a
+`visibility:'open'` key: the field is present-or-absent exactly like
+`cleared` and `exp`, so a plain payload stays byte-identical to what it was
+before visibility existed (a protected conformance — ROADMAP.md).
+
+**The ladder, in wire terms:**
+
+- **open** — everything, to everyone. No field on the wire.
+- **held** — face-down for **everyone including the roller** until reveal.
+  Public stakes (dice, roller, notation, `dc`), hidden result.
+- **secret** — the roll exists **only for the roller**. Other players
+  receive nothing at all: no SSE event, no `hello` entry, no log line. No
+  reveal path exists (use held or whisper for revealable privacy).
+- **whisper** — a named audience sees everything live; everyone else sees a
+  **shrouded** roll: existence public, result hidden.
+
+**`projectEntryFor(entry, viewerId)` — the critical invariant.** It runs on
+**every** path an entry leaves the server:
+
+1. the `roll` broadcast,
+2. the roller's `POST /api/roll` response,
+3. the claimer's `POST /api/claim` response,
+4. the `reveal` broadcast,
+5. the `hello` SSE payload,
+6. the `/api/join` snapshot,
+7. collected-shelf reconstruction and any log resync.
+
+Missing one is a total leak, not a partial one — and `hello` fires on every
+stream reopen, so a proxy blip is enough. `broadcast()` was the easy half
+(it already loops player-by-player); paths 2, 3, 5 and 6 do not go through
+it and each project on their own.
+
+| Entry | Viewer | Projection |
+|---|---|---|
+| open, or `revealed` | anyone | **full** |
+| secret | the roller | **full** |
+| secret | anyone else | **omitted entirely** — the roll does not exist for them |
+| held | anyone, **including the roller** | **redacted** |
+| whisper | an audience member | **full** |
+| whisper | anyone else | **redacted** |
+
+**The redacted projection drops** `values`, per-die results, kept/struck
+marks, explode-children values, `mods.parts` amounts, `total`, `meaning`,
+and the `dc` verdict — and adds `redacted: true` plus
+`visMode: 'held' | 'whisper'`.
+
+**It keeps** `rollId`, roller id + name, dice types and counts, `seed`, the
+notation string, the `dc` target, the `exp`/ceremony fields, and the
+`collected`/`cleared` flags. Two of those are deliberate:
+
+- **`seed` is safe.** Values are crypto-RNG'd *independently* of the seed;
+  the seed drives poses only. Shipping it leaks nothing and buys every
+  client the identical tumble (§3.1).
+- **`dc` is public on purpose.** Public stakes, held result — "she rolls
+  against DC 15 and nobody can see the die" is the dramatic pairing this
+  whole ladder is built around. Hidden DCs are rejected (§3.4).
+
+**Audience resolution (whisper).** Names are matched **case-insensitively
+against the current room roster at roll/offer creation**, then stored as
+player ids — so a later rename never changes who may see the roll.
+
+- An unmatched name **rejects the action**: error code `unknown_audience`,
+  message naming the offender. Fail closed: a typo must never quietly
+  broadcast the roll, and must never quietly narrow it either.
+- **Duplicate player names: every match joins the audience.** With no auth
+  there is nothing to disambiguate on; this is documented behavior rather
+  than resolved behavior, and renaming is the fix.
+- **The chooser is always implicitly in the audience** — a whisper can
+  never lock out its own author.
+
+**Accepted leak: exploding dice.** An exploding roll shows its extra dice
+to shrouded viewers, so a spectator can count them and infer that max faces
+came up. Accepted deliberately, on the physical analogy: at a real table
+the extra dice are visible too. Suppressing them would break the
+byte-identical seeded tumble that makes shrouding free.
+
+**Not a wire path, still a surface:** the server's stdout roll log prints
+values for every roll. It is the operator's console, not a player's — but
+anyone writing new logging should treat entries the same way the wire does.
 
 ### 3.1 The shrouded die (the differentiator)
 
-The tumble is seeded (`mulberry32(roll.seed)`); values only enter as a
+The tumble is seeded (`mulberry32(roll.seed)`); values only ever enter as a
 final per-die correction quaternion. So a redacted client replays the
-**byte-identical throw** with `correction = identity` and the numberless
-*obsidian-blank* material (§4.4's internal twin of Obsidian Shroud) —
-true privacy, zero desync.
-`playRoll`'s `types.length !== values.length` guard relaxes to allow
-`values == null`. On reveal, `applyReveal(rollId, values)` computes
-corrections via `faceNormalForValue` and slerps each die to its final pose
-over 400 ms while cross-fading shroud → the roller's set. That flip *is*
-the reveal beat. `renderRollResults`'s hidden branch keys off **"values
-absent"**, so chips/banner/log/meaning fall out correctly for every mode
-with no further branching. Peek = applying the correction inside a
-private roller-only inspector overlay.
+**byte-identical throw** with `correction = identity` and a numberless
+*obsidian-blank* material (§4.4's internal twin of Obsidian Shroud) — true
+privacy, zero desync. Poses may diverge slightly across clients, which
+costs nothing: there is nothing written on those dice to read.
+
+- `playRoll`'s `types.length !== values.length` guard admits
+  `values == null`, and every hidden branch keys off **"values absent"**,
+  never off a boolean — so chips, banner, breakdown, log, shelf marker,
+  peek and meaning all fall out correctly for every rung with no extra
+  branching.
+- **Chrome renders a held card**, never a blank: roller name, dice,
+  notation, `dc`. The result slot shows an explicit face-down state — a
+  number never appears there, not even briefly.
+- **Reveal is a staged beat**, not a repaint: materials cross-fade obsidian
+  → the roller's set, each die's correction is computed from
+  `faceNormalForValue` and slerped into place (~400 ms), chips fill in,
+  then the verdict/meaning lands. It is dt-clock driven inside `sim()`, so
+  it is skippable like everything else (*always interruptible*).
+- **A reveal arriving mid-playback defers** until the shrouded roll
+  settles — the same pattern as `pendingClears`/`pendingCollects`. This
+  race was found and fixed once (commit `7f9cdf5`); it must not regress.
+- **Held rolls keep their full ceremony.** A held roll carrying an `exp`
+  runs declare → tumble → settle normally and its verdict card shows the
+  held state plus a **Reveal** button for the authority. A dressed roll is
+  never silently downgraded to Plain because it is private — public stakes
+  with a held result is the moment the ceremony exists for.
+- **Shelf parity:** a redacted roll collects like any other, keeps its
+  obsidian cluster, and its marker shows the held state instead of a total.
+  Settled values are never read back off a shrouded roll's frozen bodies —
+  an identity-corrected die would yield a plausible *wrong* number and bake
+  it into the marker and the peek card.
+- **Peek** on a redacted roll shows the same held card (plus Reveal for the
+  authority). A private roller-only inspector is not a thing: `held` hides
+  from the roller too, and `secret` needs no inspector because that client
+  has the values already.
 
 ### 3.2 The four modes
 
-| Mode | Who sees values | Copy in picker | Notes |
+| Mode | Who sees the result | Who knows it happened | Revealable |
 |---|---|---|---|
-| **Open** | everyone | "Open" | default, unchanged |
-| **Face down** | roller (after Peek) until Reveal | "Face down" | tension mode; table sees shrouded dice land + `?` chips; roller's banner gets **Peek** and **Reveal** buttons |
-| **Secret to me** | roller only | "Secret to me" | same wire format and code path as Face down, different social default: no reveal pressure, Reveal permanently available ("Reveal to everyone") |
-| **Whisper to…** | roller + chosen players | "Whisper to…" | dddice-style: recipient chips (player dots + names) shown above the Roll button *before* rolling; none selected = open |
+| **Open** | everyone | everyone | — (default) |
+| **Held** | nobody yet — the roller included | everyone (stakes public) | yes |
+| **Secret** | the roller alone | the roller alone | **no** |
+| **Whisper to…** | the named audience + the chooser | everyone (shrouded) | yes |
 
-Everyone always learns *that* a hidden roll happened: shrouded dice land,
-log line reads `Nyx rolled in secret` / `Nyx whispered a roll to Joe`
-(recipient sees "Nyx whispered a roll to you"). Never a silent roll.
+Held is the tension mode: the table watches shrouded dice land against a
+public DC and waits on you. Secret is the private mode: nothing about it
+exists for anyone else — no log line, no shrouded dice, no "Nyx rolled
+something". Whisper is the selective mode, and the one that builds a GM
+screen when it rides an offer (§3.3).
 
-**Picker UI:** one segmented control in the `±` popover (and mirrored in
-the offer composer). **Sticky per player** in localStorage (`rollMode`),
-Foundry's default-roll-mode ergonomic. Because a sticky secret default is
-the #1 accident vector, any non-open mode shows a small eye-slash badge on
-the Roll button and on mini pills. Hidden in mini mode; mini inherits the
-last mode.
+**Choosing it.** Every roll surface can express every rung (the
+uniform-surfaces invariant, §7.4), through two paths that are the same
+truth: the notation flags `held` / `secret` / `w:Name` (§7.8), and a
+visibility control in the `±` popover mirrored in the offer composer —
+`Open · Held · Secret · Whisper…`, where Whisper opens a name picker over
+the current roster (recipient chips: player dot + name), shown above the
+Roll button *before* the roll.
 
-**Reveal authority:** roller always; host additionally for blind rolls
-(relax `/api/reveal`'s roller-only check to "roller, or host when
-`visibility === 'blind'`"). Reveal is strictly **one-way**: an open
-roll's values already reached every client, so a "make private"
-retraction could only scrub the UI while every log projection and memory
-keeps them — honor-system cosmetics, which is exactly what §3.0 exists to
-eliminate. *Rejected: a 10-second "Make private" window after open
-rolls.* Roll it face down or not at all.
+**Sticky, and therefore badged.** The picker's last choice is sticky per
+player (`rollMode` in localStorage — Foundry's default-roll-mode
+ergonomic). Because a sticky non-open default is the number-one accident
+vector, **any non-open mode shows a small eye-slash badge** on the Roll
+button and on mini pills, and the composed notation says it in words.
 
-### 3.3 Rejected
+Everyone always learns *that* a non-secret hidden roll happened: shrouded
+dice land and the log reads `Nyx rolled, held` / `Nyx whispered a roll to
+Joe` (an audience member reads "…to you"). Secret is the one rung with no
+trace, by definition — it is the only silent roll, and it can never be
+un-silenced.
 
-Recorded so they stop coming up: role-addressed `/gmroll` semantics as the
-*model* (whisper-by-name covers it; `/gmroll` is sugar for "whisper to
-host"); per-skill/per-group visibility default grids (a `@vis=` flag on a
-saved group in the codec is the 90% substitute); permission grids, kick,
-rename-others (with no auth, kicking is theater); blind rolls without a
-host (structurally incoherent — someone else must hold the value).
+### 3.3 Offers, reveal authority, and the GM-screen roll
 
-### 3.4 The DM seat
+*(The claimable DM seat that occupied this section is **rescinded** — goal
+10, and GOALS.md's superseded-decisions note. Its powers live here, in the
+open, available to everyone.)*
 
-`room.host = playerId | null`, **null by default and fully supported
-forever** — with no host the app behaves byte-identically to today, and
-nothing that is symmetric today ever becomes gated. Code and wire say
-`host`; the badge says **DM**.
+**Reveal.** `POST /api/reveal {rollId}` is honored **only for
+`entry.visibility.revealAuthority`**; anyone else gets `403
+not_reveal_authority`, server-enforced rather than merely un-rendered.
+Revealing an already-revealed roll is a 200 no-op.
 
-- **Claim:** first claim wins. Players panel ghost line (bottom):
-  `No one is running the table · take the seat` →
-  `Joe is running the table` (+ `pass the seat` / `step down` on your own
-  row). Claim returns a `hostToken` kept in sessionStorage and replayed by
-  `net.js rejoin()` — otherwise the seat evaporates on the first proxy
-  blip. Seat released on reap or step-down; solo mode is implicitly host,
-  no UI.
-- **Badge:** small gold glyph before the player dot,
-  `title="Running the table tonight"`. No row highlight, no sort-to-top,
-  never shown in the mini bar or result banner. The word "permission"
-  never appears in the UI; nothing is ever *disabled* for non-hosts.
-- **Exactly four powers, all additive:** (1) default whisper target — a
-  one-click "to DM" chip in the whisper picker; (2) **blind offered
-  rolls** — the claimer's client never receives values, the host sees them
-  and holds Reveal; (3) **hidden Target** on offered rolls (`target.hidden`
-  → spectators see a blank gold plaque where the number would be; the
-  verdict still resolves server-side… host-side); (4) housekeeping —
-  clear everyone's dice/mats and reset the shared log (everyone keeps `✕`
-  for their own).
-- **Endpoints/events:** `POST /api/host/claim`, `/api/host/pass`
-  (`{toPlayerId}`), `/api/host/release`; SSE `host-changed
-  {hostId, hostName}` added to `SSE_EVENTS` and to `hello`.
+- **The authority is the chooser**: the roller for a self-roll, the
+  **offerer** for an offer that carried held / whisper / secret.
+- **held and whisper are revealable; secret is not.** A secret roll never
+  left the roller's client, so there is nothing anywhere to upgrade.
+- The reveal event carries the **full entry**, not just `{rollId}` — the
+  shrouded clients never had the values, so the event is what delivers
+  them, and every client upgrades in place (§3.1).
+- **Reveal is total and one-way.** It promotes the entry to full for
+  everyone; there is no reveal-to-one, and there is no retraction. An open
+  roll's values already reached every client, so "make private" could only
+  scrub UI while logs and memory keep them — honor-system cosmetics, which
+  is precisely what §3.0 exists to eliminate. *Rejected: a 10-second "make
+  private" window.* Roll it held or not at all.
 
-The default shape of a Check should exploit the dramatic pairing the
-research surfaced: **public stakes, held result** — the Target on the
-intent card is public even when the roll is face down. Hidden-DC is the
-host-only variant, not the default.
+**Offers carry visibility, chosen by the offerer.** The field rides the
+offer exactly as it rides a roll, and is applied **verbatim** to the roll
+the claimer produces. `revealAuthority` on that roll is the **offerer**
+whenever the offer carried a visibility, and the roller otherwise.
+
+**The claimer is not in the audience unless named. That asymmetry *is* the
+GM screen** — the claimer rolls blind, the offerer holds the result:
+
+- `secret` on an offer means **visible to the offerer only** (the offerer
+  is the chooser). The claimer's own client receives a redacted roll.
+  Internally this may be implemented as a whisper with audience
+  `[offererId]`; the notation and the UI present it as the offerer's
+  choice.
+- The claimer's `POST /api/claim` **response** is projected like every
+  other egress (§3.0 path 3). The leak that matters here is not the
+  broadcast — it is the direct HTTP reply to the one person who must not
+  see the number.
+
+**The recipe, with no GM anywhere in the system:** offer
+`1d20+5 secret dc15 # Perception`, someone claims it, their dice tumble
+shrouded on *every* table including their own, only you see the number, and
+you press **Reveal** when the story wants it.
+
+**Where the seat's four powers went.** (1) Default whisper target →
+`w:Name`, any name, no seat. (2) Blind offered rolls → offer visibility,
+above. (3) Hidden Targets → **not shipped**: `dc` is public on every rung
+(§3.0). (4) Housekeeping → already universal (§7.7: a collected roll can be
+cleared by anyone).
+
+### 3.4 Rejected
+
+Recorded so they stop coming up:
+
+- **The DM seat / `room.host`** — rescinded by goal 10. Nothing role-shaped
+  returns: not a badge, not a claim endpoint, not a `hostToken`, not
+  `host-changed`. Blind rolls do not need a host; an offerer already
+  exists, and §3.3 uses them.
+- **Hidden DCs.** Stakes are public on every rung. A hidden target would
+  also silently mute the odds line and the verdict ring for everyone but
+  one player — two special cases bought for one trick that `held` already
+  performs better.
+- **Role-addressed `/gmroll` semantics as the *model*.** Whisper-by-name
+  covers it; the `/gmroll` family survives only as paste sugar that
+  normalizes to `held` (§7.8).
+- **Per-skill / per-group visibility default grids.** A saved group already
+  carries its visibility inside its canonical notation (§1.5, §7.8) — the
+  90% substitute, with no new state to sync.
+- **Permission grids, kick, rename-others.** With no auth, kicking is
+  theater.
+- **Reveal to a subset**, and **un-revealing** (§3.3).
+- **Secret with a reveal path.** Reveal needs a recipient who was told
+  something existed; secret tells nobody. Wanting "secret, but revealable
+  later" means wanting `held`.
 
 ---
 
