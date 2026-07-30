@@ -444,6 +444,24 @@ t('near-miss keywords are invalid', () => {
   for (const s of ['1d20 checked', '1d20 checkk', '1d20 helds', '1d20 cines', '1d20 cinematics']) bad(s);
 });
 
+t('input whose canonical would overflow MAX_INPUT is refused, not left unstable', () => {
+  // 12 max-length labeled parts (300 chars), a 64-pipe title (escaped, 128)
+  // and a 41-pipe subtitle region (first pipe = separator, 40 kept → 80
+  // escaped): 482 input chars parse fine, but the canonical would be 524 —
+  // its own parser would refuse it, so it could never be a fixed point.
+  let parts = '';
+  for (let i = 0; i < 6; i++) parts += '+99[' + 'a'.repeat(19) + i + ']' + '-99[' + 'b'.repeat(19) + i + ']';
+  const s = '1d20' + parts + ' check # ' + '\\|'.repeat(64) + '|'.repeat(41);
+  assert.ok(s.length <= 500, `test input must fit MAX_INPUT (got ${s.length})`);
+  const r = bad(s, 'invalid');
+  assert.equal(r.error, 'command too long');
+  // the same shape under the wire cap still round-trips
+  const small = ok('1d20 check # ' + '\\|'.repeat(10) + '|' + '|'.repeat(5));
+  assert.equal(small.comment, '|'.repeat(10));
+  assert.equal(small.exp.subtitle, '|'.repeat(5));
+  assert.equal(ok(small.canonical).canonical, small.canonical);
+});
+
 // ---- canonicalNotation extras: {dc, comment, exp, faceDown} ----------------
 t('canonicalNotation renders the new extras directly', () => {
   const d20 = { dice: ['d20'], mods: null };

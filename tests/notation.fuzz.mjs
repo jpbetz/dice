@@ -20,9 +20,10 @@ limitations under the License.
 //
 // Four properties, each stated as a contract the parser must never break:
 //
-//   P1 fixed point   For every spec rollspec.validateMods accepts,
-//                    canonical -> parse -> canonical is byte-identical and
-//                    specEquals holds.
+//   P1 fixed point   For every spec rollspec.validateMods accepts — with any
+//                    dc / comment / exp{kind,subtitle} / faceDown extras —
+//                    canonical -> parse -> canonical is byte-identical,
+//                    specEquals holds, and no extra drifts.
 //   P2 total safety  For ANY string, parseNotation never throws, never runs
 //                    long (ReDoS), and an ok result is always in contract:
 //                    validateMods accepts it, every cap holds, and its own
@@ -30,7 +31,9 @@ limitations under the License.
 //   P3 incomplete    state 'incomplete' is only used for true prefixes of
 //                    some valid command (verified by extending them).
 //   P4 dialect       Roll20 paste semantics (r<N inclusive, 2d20kh1 collapse,
-//                    glue order, d% expansion) are what UX.md Section 1.1 says.
+//                    glue order, d% expansion) are what UX.md Section 1.1 says,
+//                    and the Section 7.6 moment notation (check/cinematic/held
+//                    flags, '# Title | Subtitle' pipe) behaves as pinned.
 //
 // Known live defects are listed in KNOWN below. Each one absorbs its own
 // failures (so this suite stays green) AND carries a repro that asserts the
@@ -51,6 +54,8 @@ const MAX_DICE = 40;
 const MAX_MOD = 99;
 const MAX_LABEL = 20;
 const MAX_COMMENT = 64;
+const MAX_SUBTITLE = 40;
+const EXP_KINDS = new Set(['check', 'cinematic']);
 const MOD_KEYS = new Set(['modifier', 'parts', 'adv', 'keep', 'reroll', 'explode']);
 const TYPES = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20'];
 // eslint-disable-next-line no-control-regex
@@ -126,10 +131,13 @@ const KNOWN = [
       'caps. Strings whose every extension is invalid still report incomplete, so the command box ' +
       'stays silent instead of explaining the error: "1d20 5" (a bare number is never a flag), ' +
       '"1d6 a" (adv needs a d20), "1d20 dl" (pool too small), "d100k" (no glue on d100), ' +
-      '"40d6+1d" (over the 40-dice cap).',
+      '"40d6+1d" (over the 40-dice cap). The §7.6 pipe adds one pinned member: "1d20 # t |" is ' +
+      'incomplete by design (UX.md §7.6 partial-token states), but appending can only grow the ' +
+      'subtitle — the check/cinematic flag it needs would have to precede the "#", so no ' +
+      'extension is ever valid.',
     absorbs: (c) => c.kind === 'P3',
     repro() {
-      for (const s of ['1d20 5', '1d6 a', '1d20 dl', 'd100k', '40d6+1d']) {
+      for (const s of ['1d20 5', '1d6 a', '1d20 dl', 'd100k', '40d6+1d', '1d20 # t |']) {
         const r = parseNotation(s);
         assert.equal(r.ok, false, `D3(${s})`);
         assert.equal(r.state, 'incomplete', `D3 looks FIXED for "${s}" - update this KNOWN entry`);
@@ -153,6 +161,7 @@ function checkOkContract(kind, input, r) {
   // text the NEXT parse would trim again: the canonical form cannot be stable
   const untrimmed = (t) => typeof t === 'string' && t !== t.trim();
   tag.trailingWs = untrimmed(r.comment)
+    || untrimmed(r.exp && r.exp.subtitle)
     || (Array.isArray(spec.mods && spec.mods.parts) && spec.mods.parts.some((p) => p && untrimmed(p.label)));
 
   // dice pool
@@ -200,6 +209,26 @@ function checkOkContract(kind, input, r) {
     }
   }
   if (r.faceDown !== true && r.faceDown !== false) d(`faceDown is not a boolean: ${r.faceDown}`);
+  // exp: null, or {kind, subtitle?} with a real kind and a clean, capped,
+  // non-empty subtitle (UX.md §7.6). A subtitle key with an empty value would
+  // be silently-lost intent, so it is out of contract too.
+  if (r.exp !== undefined && r.exp !== null) {
+    if (typeof r.exp !== 'object' || Array.isArray(r.exp)) d(`exp is neither null nor an object: ${String(r.exp)}`);
+    else {
+      for (const k of Object.keys(r.exp)) if (k !== 'kind' && k !== 'subtitle') d(`unexpected exp key: ${k}`);
+      if (!EXP_KINDS.has(r.exp.kind)) d(`bad exp.kind: ${String(r.exp.kind)}`);
+      if (r.exp.subtitle !== undefined) {
+        if (typeof r.exp.subtitle !== 'string' || !r.exp.subtitle) d('exp.subtitle present but empty or not a string');
+        else {
+          if (r.exp.subtitle.length > MAX_SUBTITLE) d(`exp.subtitle ${r.exp.subtitle.length} chars (cap ${MAX_SUBTITLE})`);
+          if (CTL.test(r.exp.subtitle)) d('control character survived into the subtitle');
+        }
+      }
+    }
+  }
+  if (r.exp === undefined) d('ok result is missing the exp field');
+  // (No separate unescaped-pipe check: labels may carry bare pipes legally,
+  // and a leaked comment-pipe would fail the re-parse fixed point below.)
   if (!Array.isArray(r.warnings)) d('warnings is not an array');
   if (typeof r.canonical !== 'string') return d('canonical is not a string');
   if (r.canonical.length > MAX_INPUT) d(`canonical is ${r.canonical.length} chars - longer than MAX_INPUT`);
@@ -223,6 +252,12 @@ function checkOkContract(kind, input, r) {
   if (!specEquals(spec, r2.spec)) d(`spec drifts through its own canonical form "${r.canonical}"`, { canonical: r.canonical });
   if (r2.dc !== r.dc) d(`dc lost through canonical: ${r.dc} -> ${r2.dc}`, { canonical: r.canonical });
   if (r2.comment !== r.comment) d(`comment lost through canonical: ${JSON.stringify(r.comment)} -> ${JSON.stringify(r2.comment)}`, { canonical: r.canonical });
+  // §7.6: the moment and face-down now round-trip too — losing either through
+  // the canonical form is exactly the audited notation-totality violation.
+  if (JSON.stringify(r2.exp ?? null) !== JSON.stringify(r.exp ?? null)) {
+    d(`exp lost through canonical: ${JSON.stringify(r.exp)} -> ${JSON.stringify(r2.exp)}`, { canonical: r.canonical });
+  }
+  if (r2.faceDown !== r.faceDown) d(`faceDown lost through canonical: ${r.faceDown} -> ${r2.faceDown}`, { canonical: r.canonical });
 }
 
 // ===========================================================================
@@ -250,6 +285,9 @@ function genText(chars, cap) {
 }
 const genLabel = () => genText(LABEL_CHARS, MAX_LABEL);
 const genComment = () => genText(COMMENT_CHARS, MAX_COMMENT);
+// Subtitles share the comment alphabet — '|' included, so the canonical
+// renderer's pipe escaping is exercised from both halves of the split.
+const genSubtitle = () => genText(COMMENT_CHARS, MAX_SUBTITLE);
 
 function genDice() {
   const shape = pick(['single', 'single', 'mixed', 'mixed', 'd100', 'd100mix', 'twod20', 'smalld20']);
@@ -320,11 +358,20 @@ for (let i = 0; i < N_SPECS; i++) {
   const extras = {};
   if (chance(0.3)) extras.dc = between(1, 999);
   if (chance(0.3)) extras.comment = genComment();
+  if (chance(0.35)) {
+    extras.exp = { kind: chance(0.5) ? 'check' : 'cinematic' };
+    if (chance(0.5)) extras.exp.subtitle = genSubtitle();
+  }
+  if (chance(0.3)) extras.faceDown = true;
 
   // generator sanity: only in-contract specs are interesting for P1
   if (validateMods(dice, mods) !== null) { p1Skipped++; continue; }
 
   const c1 = canonicalNotation(spec, extras);
+  // Pipe escaping + max-length parts + comment + subtitle can push a wire-fed
+  // canonical past MAX_INPUT; the parser refuses such strings by design
+  // (tested in the unit suite), so they are a generator artifact here.
+  if (c1.length > MAX_INPUT) { p1Skipped++; continue; }
   const r = parse(c1, 'P1');
   if (!r) continue;
   if (!r.ok) {
@@ -341,6 +388,12 @@ for (let i = 0; i < N_SPECS; i++) {
   if (r.dc !== (extras.dc ?? null)) fail('P1', c1, `dc drift ${extras.dc} -> ${r.dc}`, { canonical: c1 });
   if (r.comment !== (extras.comment ?? null)) {
     fail('P1', c1, `comment drift ${JSON.stringify(extras.comment)} -> ${JSON.stringify(r.comment)}`, { canonical: c1 });
+  }
+  if (JSON.stringify(r.exp ?? null) !== JSON.stringify(extras.exp ?? null)) {
+    fail('P1', c1, `exp drift ${JSON.stringify(extras.exp)} -> ${JSON.stringify(r.exp)}`, { canonical: c1 });
+  }
+  if (r.faceDown !== (extras.faceDown ?? false)) {
+    fail('P1', c1, `faceDown drift ${extras.faceDown ?? false} -> ${r.faceDown}`, { canonical: c1 });
   }
   checkOkContract('P1', c1, r);
 }
@@ -386,6 +439,9 @@ const TOKENS = [
   '__proto__', 'constructor', 'prototype', 'toString', 'valueOf', 'hasOwnProperty',
   '(', ')', '{', '}', '<', '>', '=', ';', ':', ',', '.', '*', '/', '%', '^', '&', '|', '~', '\\', '"', "'", '`', '$',
   '2d20kh1', '2d20kl1', '1d20ro<=1+3', '4d6dl1', '8d6!', 'select 1', 'DROP TABLE', '${x}', '{{x}}', '</script>',
+  // §7.6 moment tokens: kinds (+alias), held, pipes escaped and bare, partials
+  'check', 'cinematic', 'cine', 'held', 'CHECK', 'HELD', 'che', 'chec', 'cinem', 'cinemati', 'hel', 'checked', 'cines',
+  '|', '\\|', '||', ' | ', '# T | S', '# t \\| s', '# |', '# a |', '| sub', '#|', '\\', '# \\| | \\|',
 ];
 
 const VALID_SEEDS = [
@@ -393,6 +449,12 @@ const VALID_SEEDS = [
   '4d6dl1', '3d6+1d20+5 ro<=2 ! dc15 # Firebolt', '2d20kh1+5', 'd100', 'd%', '8d6!',
   '1d20+2[Proficiency]+1[Guidance]', '/gmroll 1d20', '/roll 2d6+1', '1d20+2d6 dl1', '40d6', '1d10x',
   '2d100', '1d20 vs15', '1d20 dc 15', '1d20-2[Bane]', '3d6r<2', '1d4+1d6+1d8+1d10+1d12+1d20 kh2',
+  // §7.6 moment notation
+  '1d20ro<=1+3 adv check dc15 # The lie leaves your lips',
+  '1d20 check dc15 # Deception | CHARISMA CHECK',
+  '8d6! cinematic # Fireball | DEX SAVE', '1d20 cine', '1d20 held', '/gmroll 1d20 held',
+  '1d20 adv check held dc15 # T | S', '2d6+1d20 dl1 cinematic held # mixed | pool',
+  '1d20 # a \\| b', '1d20 check # t \\| x | s \\| t',
 ];
 
 const JUNK_CHARS = [
@@ -463,12 +525,16 @@ function junkNumeric() {
 // Over-length comments and labels, so the truncating slice lands on every
 // offset including the whitespace ones the next parse would trim away.
 function junkText() {
-  const words = ['fire', 'bolt', 'a', 'the', 'Divine', 'Favor', 'x', 'blessing of', 'Ω', '🎲', 'ii'];
+  const words = ['fire', 'bolt', 'a', 'the', 'Divine', 'Favor', 'x', 'blessing of', 'Ω', '🎲', 'ii',
+    '|', '\\|', 'a|b', '||', '\\', 'x\\'];
   let t = '';
   const target = between(15, 90);
   while (t.length < target) t += (t ? ' ' : '') + pick(words);
   if (chance(0.4)) t += ' '.repeat(between(1, 4));
-  return chance(0.5) ? `1d20 # ${t}` : `1d20+2[${t.slice(0, 60)}]`;
+  // sometimes dress the roll so pipe-bearing comments hit the ok path (a
+  // kindless subtitle is invalid, which would skip every contract check)
+  const kind = chance(0.5) ? ' ' + pick(['check', 'cinematic', 'cine', 'held', 'check held']) : '';
+  return chance(0.5) ? `1d20${kind} # ${t}` : `1d20+2[${t.slice(0, 60)}]`;
 }
 
 const GENS = [junkSplice, junkSplice, junkMutate, junkMutate, junkRandom, junkBrackets, junkHuge, junkPrefix, junkNumeric, junkNumeric, junkText, junkText];
@@ -496,6 +562,18 @@ const CORPUS = [
   '1d20 5', '1d6 a', '1d20 dl', 'd100k', '40d6+1d', '4d66', 'd120', 'd1010', 'd%d%',
   '1d20-99[A]+99+99', '1d20+100[A]-1[B]', '1d20-999[A]+999+99',
   '1d20+1[a]+1[b]+1[c]+1[d]+1[e]+1[f]+1[g]+1[h]+1[i]+1[j]+1[k]+1[l]+1[m]',
+  // §7.6 moment flags and the comment pipe
+  '1d20 check', '1d20 cinematic', '1d20 cine', '1d20 held', '1d20 CHECK HELD',
+  '1d20 check check', '1d20 check cine', '1d20 cinematic check', '1d20 held held', '1d20 check adv held dc15',
+  '/gmroll 1d20 held', '/sr 1d20 check', '1d20 checked', '1d20 checkk', '1d20 cines', '1d20 helds', '1d20check',
+  '1d20 c', '1d20 ch', '1d20 che', '1d20 chec', '1d20 cinem', '1d20 cinemati', '1d20 h', '1d20 he', '1d20 hel',
+  '1d20 # a | b', '1d20 dc15 # a | b', '1d20 held # a | b', '1d20 check # a | b', '1d20 check # a|b',
+  '1d20 # t |', '1d20 check # t |', '1d20 # |', '1d20 check # |', '1d20 check # | s', '1d20 # \\|',
+  '1d20 check # \\| | \\|', '1d20 check # t | a|b|c', '1d20 check # t \\| x | s', '1d20 check # a\\ | b',
+  '1d20 check # | \\|', '1d20 # a \\| b', '1d20 cine # ' + '\\|'.repeat(40), '1d20 check # t | ' + '|'.repeat(60),
+  '1d20 check # ' + 'a'.repeat(70) + ' | ' + 'b'.repeat(50), '1d20 check # t | ' + 'a'.repeat(39) + ' bb',
+  '1d20 check # t | x', '1d20 check # t | ​', '1d20 check # t‮ | x y',
+  '1d20+2[check]', '1d20 # check held cine', '1d20 check dc15 # Deception | CHARISMA CHECK',
   // truncation landing on whitespace, at and around both caps
   '1d20 # ' + 'a'.repeat(63) + ' bbbb',
   '1d20 # ' + 'a'.repeat(60) + '      bbbb',
@@ -549,8 +627,12 @@ const SUFFIX1 = [
   ' adv', ' dis', 'dv', 'v', 'is', 's',
   ' kh1', ' dl1', 'h1', 'l1', ' ro<=2', 'o<=2', '<=2', '=2', '!', ' !',
   ' dc15', 'c15', '15', ' # hi', ' 1d20', 'oll 1d20', 'll 1d20', 'l 1d20', ' 2d6+1',
+  // §7.6 keyword completions (check/cinematic/held truncated at any offset)
+  'heck', 'eck', 'ck', 'k', 'ine', 'nematic', 'ematic', 'matic', 'atic', 'tic', 'ic', 'c',
+  'eld', 'ld', 'd', 'e', ' check', ' cinematic', ' held', ' cine', '| s', ' | s',
 ];
-const SUFFIX2 = ['1', '2', '4', '6', '0', 'd6', 'd20', '+1', '1d20', ' 1d20', ']', 'A]', ' adv', ' dc15', ' kh1', '!', 'x', '%', 'h1', '<=2', ' # hi', 'v'];
+const SUFFIX2 = ['1', '2', '4', '6', '0', 'd6', 'd20', '+1', '1d20', ' 1d20', ']', 'A]', ' adv', ' dc15', ' kh1', '!', 'x', '%', 'h1', '<=2', ' # hi', 'v',
+  'k', 'ck', 'eck', 'atic', 'tic', 'ic', 'c', 'd', 'ld', 'eld', 'e', ' check', ' held', '| s'];
 
 function findExtension(s, depth) {
   let frontier = [''];
@@ -731,6 +813,32 @@ spot('caps are enforced at the boundary, not one past it', () => {
   assert.equal(mustParse('1d20 # ' + 'x'.repeat(200)).comment.length, 64);
   assert.equal(parseNotation('1d20'.padEnd(501, ' ')).ok, false);
   assert.equal(mustParse('1d20+2[' + 'y'.repeat(50) + ']').spec.mods.parts[0].label.length, 20);
+});
+
+spot('§7.6 moment notation: kinds, held, the comment pipe', () => {
+  // kind flags, alias normalization, no dc→check implication
+  assert.deepEqual(mustParse('1d20 check').exp, { kind: 'check' });
+  assert.equal(mustParse('1d20 cine').canonical, '1d20 cinematic');
+  assert.equal(mustParse('1d20 dc15').exp, null, 'dc must NOT imply check at parse level');
+  assert.equal(parseNotation('1d20 check cine').ok, false, 'two kinds must be refused');
+  // held round-trips; the flag and the prefixes are one spelling on output
+  assert.equal(mustParse('1d20 held').faceDown, true);
+  assert.equal(mustParse('/gmr 1d20').canonical, '1d20 held');
+  assert.equal(mustParse('1d20 held').canonical, mustParse('/selfroll 1d20').canonical);
+  // canonical flag order: [adv] [keep] [reroll] [!] [kind] [held] [dc] [#]
+  const r = mustParse('1d20+2d6 dc12 held cine ! ro<=2 dl1 adv # T | S');
+  assert.equal(r.canonical, '2d6+1d20 adv dl1 ro<=2 ! cinematic held dc12 # T | S');
+  assert.equal(mustParse(r.canonical).canonical, r.canonical);
+  // the pipe: split, escape, caps, and the kindless-subtitle refusal
+  const p = mustParse('1d20 check # Deception | CHARISMA CHECK');
+  assert.equal(p.comment, 'Deception');
+  assert.deepEqual(p.exp, { kind: 'check', subtitle: 'CHARISMA CHECK' });
+  assert.equal(mustParse('1d20 # a \\| b').comment, 'a | b');
+  assert.equal(mustParse('1d20 check # t | a|b').canonical, '1d20 check # t | a\\|b');
+  assert.equal(mustParse('1d20 check # t | ' + 'x'.repeat(80)).exp.subtitle.length, MAX_SUBTITLE);
+  assert.equal(parseNotation('1d20 # a | b').ok, false, 'a subtitle needs check or cinematic');
+  assert.equal(parseNotation('1d20 # a | b').state, 'invalid');
+  assert.equal(parseNotation('1d20 check # t |').state, 'incomplete');
 });
 
 spot('canonical die order is d4 -> d20 with the modifier last', () => {
