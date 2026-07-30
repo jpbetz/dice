@@ -16,7 +16,14 @@ limitations under the License.
 
 // Dice factory: builds three.js meshes, per-face number textures, and
 // cannon-es convex hulls for each die type. All dice share cached
-// geometry/materials/shapes per type.
+// geometry/materials/shapes per (type, variant).
+//
+// Variants (goal 11): 'std' is the normal numbered die; 'shroud' is the
+// numberless obsidian die a redacted (held/whispered) roll tumbles as — dark
+// reflective faces with NO symbols, so there is nothing to read on any
+// client. Physics bodies always come from the 'std' build: the hull is
+// identical and sharing one shape keeps every client's fast-forward
+// byte-deterministic regardless of which skin it renders.
 
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
@@ -35,6 +42,11 @@ export const DIE_DEFS = {
 
 const TEX_SIZE = 256;
 const EPS = 1e-4;
+
+// The shroud skin: near-black obsidian. One color for every type — a shrouded
+// pool deliberately reads as "hidden dice", not as its member types' colors
+// gone dark (the TYPES are public; the faces are not).
+const SHROUD_COLOR = '#14141b';
 
 // ---------------------------------------------------------------------------
 // Base geometry per type
@@ -238,6 +250,22 @@ function makeFaceTexture(def, face, spec) {
   ctx.lineWidth = 10;
   ctx.stroke();
 
+  if (spec.blank) {
+    // Shroud faces carry no symbols at all — a faint specular sheen spot is
+    // the only relief, so the die reads as polished stone, not a hole.
+    const sheen = ctx.createRadialGradient(
+      TEX_SIZE * 0.38, TEX_SIZE * 0.36, 0, TEX_SIZE * 0.38, TEX_SIZE * 0.36, TEX_SIZE * 0.5
+    );
+    sheen.addColorStop(0, 'rgba(255,255,255,0.05)');
+    sheen.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+    const tex0 = new THREE.CanvasTexture(canvas);
+    tex0.colorSpace = THREE.SRGBColorSpace;
+    tex0.anisotropy = 4;
+    return tex0;
+  }
+
   const { center, r } = inradius2d(face);
   const rPx = r * face.pxScale;
 
@@ -309,8 +337,11 @@ function faceSpecs(type, faces) {
   });
 }
 
-function buildDie(type) {
+function buildDie(type, variant = 'std') {
   const def = DIE_DEFS[type];
+  const shroud = variant === 'shroud';
+  // Shroud skin: same geometry, obsidian faces, no symbols.
+  const skin = shroud ? { ...def, color: SHROUD_COLOR } : def;
   const geometry = buildBaseGeometry(type);
   const faces = extractFaces(geometry, type);
   assignUVs(geometry, faces);
@@ -327,6 +358,7 @@ function buildDie(type) {
     }
     vertexValues = uniq.map((p, i) => ({ dir: p.clone().normalize(), value: i + 1 }));
     materials = faces.map((f) => {
+      if (shroud) return materialFor(skin, f, { blank: true }, true);
       const corners = f.boundary.map((p) => ({
         text: String(vertexValues.find((v) => v.dir.clone().multiplyScalar(p.length()).distanceTo(p) < EPS * 10).value),
         corner2: project2d(f, p),
@@ -336,7 +368,9 @@ function buildDie(type) {
     faces.forEach((f) => { f.value = null; });
   } else {
     const specs = faceSpecs(type, faces);
-    materials = faces.map((f, i) => materialFor(def, f, specs[i]));
+    materials = faces.map((f, i) =>
+      shroud ? materialFor(skin, f, { blank: true }, true) : materialFor(def, f, specs[i])
+    );
     faces.forEach((f, i) => { f.value = specs[i].value; });
   }
 
@@ -344,22 +378,27 @@ function buildDie(type) {
   return { type, def, geometry, materials, shape, faces, vertexValues };
 }
 
-function materialFor(def, face, spec) {
+function materialFor(def, face, spec, shroud = false) {
   return new THREE.MeshStandardMaterial({
     map: makeFaceTexture(def, face, spec),
-    roughness: 0.3,
-    metalness: 0.1,
+    // Obsidian: darker, glossier, more metallic — reflections instead of pips.
+    roughness: shroud ? 0.16 : 0.3,
+    metalness: shroud ? 0.5 : 0.1,
   });
 }
 
+// Cache re-keyed to (type, variant) — the shared `materials` array must never
+// be mutated per-mesh, so each variant owns its own build (roadmap step 9's
+// (type, setId) re-key follows the same seam).
 const cache = new Map();
-export function getDie(type) {
-  if (!cache.has(type)) cache.set(type, buildDie(type));
-  return cache.get(type);
+export function getDie(type, variant = 'std') {
+  const key = `${type}|${variant}`;
+  if (!cache.has(key)) cache.set(key, buildDie(type, variant));
+  return cache.get(key);
 }
 
-export function createDieMesh(type) {
-  const die = getDie(type);
+export function createDieMesh(type, variant = 'std') {
+  const die = getDie(type, variant);
   const mesh = new THREE.Mesh(die.geometry, die.materials);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
