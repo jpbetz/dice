@@ -1,0 +1,14 @@
+{
+  "name": "dice-table",
+  "version": "1.0.0",
+  "description": "3D physics dice roller for tabletop RPGs — shared multiplayer tables, no database, no build step",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
