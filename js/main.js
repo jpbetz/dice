@@ -2061,9 +2061,26 @@ if (!groups) {
 }
 groups = (Array.isArray(groups) ? groups : []).map(migrateGroup).filter(Boolean);
 
+// Reflect the groups into the address bar, degrading to storage-only if the
+// codec refuses them. encodeURIComponent throws URIError on text no URL can
+// carry (a lone surrogate), and saveGroups runs at module scope: an unguarded
+// throw there killed every declaration below it — no network, no log, no
+// popover, no shortcuts — on every load until localStorage was cleared. The
+// cuts above make such text unreachable from the UI; this keeps a hostile or
+// legacy stored group from ever taking the app down with it again.
+function reflectGroupsToUrl() {
+  try {
+    syncGroupsToLocation(groups);
+    return true;
+  } catch (e) {
+    console.warn('groups could not be encoded into the URL', e);
+    return false;
+  }
+}
+
 function saveGroups() {
   save(LS_GROUPS, groups);
-  syncGroupsToLocation(groups);
+  reflectGroupsToUrl();
 }
 saveGroups();
 
@@ -2172,7 +2189,7 @@ saveGroupBtn.addEventListener('click', () => {
 
 // Copy a bookmarkable URL that carries the current groups in its hash.
 document.getElementById('copy-link').addEventListener('click', async (e) => {
-  syncGroupsToLocation(groups);
+  reflectGroupsToUrl(); // a codec refusal must not eat the click
   const btn = e.currentTarget;
   try {
     await navigator.clipboard.writeText(window.location.href);
