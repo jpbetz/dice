@@ -836,6 +836,46 @@ function renderChips(entry, dice, staged = false) {
   positionChips();
 }
 
+// Attributed math (GOALS invariant): the banner's breakdown line says the same
+// thing the log line does — EVERY die (struck when it does not count, ✴ on an
+// explosion child), then the dice subtotal and the modifier tail with its
+// named sources. Shares the log's classes so both surfaces read identically.
+// A lone die with nothing to attribute stays bare; hidden rolls say nothing.
+function renderBreakdown(el, entry, hidden) {
+  el.textContent = '';
+  if (hidden) return;
+  const modParts = modPartsOf(entry);
+  if (entry.parts.length <= 1 && !entry.modifier && !modParts) return;
+
+  entry.parts.forEach((p, i) => {
+    if (i) el.append(' + ');
+    const s = document.createElement('span');
+    let cls = p.counts && p.isMax ? 'crit-max' : p.counts && p.isMin ? 'crit-min' : '';
+    if (!p.counts) cls += ' log-discarded';
+    s.className = cls.trim();
+    s.textContent = `${p.child ? '✴' : ''}${p.type} ${p.label}`;
+    el.appendChild(s);
+  });
+
+  const mods = modParts
+    || (entry.modifier ? [{ label: '', value: entry.modifier }] : null);
+  if (!mods) return;
+  el.append(`  =  ${entry.sum}`);
+  for (const p of mods) {
+    if (!p.value) continue;
+    const m = document.createElement('span');
+    m.className = 'log-mod';
+    m.textContent = ` ${p.value >= 0 ? '+' : '−'}${Math.abs(p.value)}`;
+    if (p.label) {
+      const l = document.createElement('span');
+      l.className = 'log-part-label';
+      l.textContent = ` ${p.label}`;
+      m.appendChild(l);
+    }
+    el.appendChild(m);
+  }
+}
+
 // Chips, banner, crits — always from authoritative values, never re-read
 // from physics. Face-down unrevealed rolls render as "?" everywhere.
 function renderRollResults(entry, dice) {
@@ -856,23 +896,7 @@ function renderRollResults(entry, dice) {
   }
 
   document.getElementById('result-total').textContent = hidden ? '?' : entry.total;
-  const bd = [];
-  if (!hidden) {
-    const counting = entry.parts.filter((p) => p.counts);
-    const modParts = modPartsOf(entry);
-    if (counting.length > 1 || entry.modifier || modParts) {
-      bd.push(counting.map((p) => `${p.type} ${p.label}`).join('  ·  '));
-      if (modParts) {
-        // §7.2: "= 14 +2 Proficiency +1 Guidance"
-        bd.push(`= ${entry.sum} ` + modParts
-          .map((p) => `${p.value >= 0 ? '+' : '−'}${Math.abs(p.value)}${p.label ? ` ${p.label}` : ''}`)
-          .join(' '));
-      } else if (entry.modifier) {
-        bd.push(`= ${entry.sum} ${entry.modifier > 0 ? '+' : '−'} ${Math.abs(entry.modifier)}`);
-      }
-    }
-  }
-  document.getElementById('result-breakdown').textContent = bd.join('   ');
+  renderBreakdown(document.getElementById('result-breakdown'), entry, hidden);
 
   // Interim dc verdict (fixed decision): above the meaning word, gold/red.
   const verdictEl = document.getElementById('result-verdict');

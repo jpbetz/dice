@@ -412,6 +412,10 @@ html, body {
 #result-banner.crit-success #result-total { color: #ffe27a; text-shadow: 0 0 34px rgba(255,215,102,0.9); }
 #result-banner.crit-fail #result-total { color: var(--red); text-shadow: 0 0 30px rgba(226,73,59,0.7); }
 #result-breakdown { font-size: 13px; color: var(--ivory); opacity: 0.85; }
+/* attributed math: the banner breakdown reads like the log line (struck
+   non-counting dice, ✴ children, named modifier sources) */
+#result-breakdown .crit-max { color: var(--gold-bright); font-weight: 700; }
+#result-breakdown .crit-min { color: var(--red); font-weight: 700; }
 
 @keyframes banner-in {
   from { transform: translateX(-50%) translateY(30px) scale(0.9); opacity: 0; }
