@@ -1454,6 +1454,19 @@ ceremonyLayer.addEventListener('click', (e) => {
   if (e.target.closest('.verdict-actions')) return; // buttons act, not skip
   skipCeremony();
 });
+
+// Always interruptible (GOALS) — the invariant covers a PLAIN roll's tumble
+// too, not just ceremonies: click the felt or press Space and the throw jumps
+// to its final keyframe, chips, banner and log line. fastForwardPlayback is
+// the same machinery a hidden tab uses on refocus, so anything queued behind
+// this roll lands settled as well. Ceremony rolls keep their own richer skip.
+function skipPlainPlayback() {
+  if (!currentRoll || currentRoll.done || currentRoll.ceremony) return false;
+  fastForwardPlayback();
+  return true;
+}
+container.addEventListener('click', () => { skipPlainPlayback(); });
+
 document.addEventListener('keydown', (e) => {
   if (e.code !== 'Space') return;
   const t = e.target;
@@ -1465,7 +1478,11 @@ document.addEventListener('keydown', (e) => {
   if (currentRoll && currentRoll.ceremony && !currentRoll.done) {
     e.preventDefault();
     skipCeremony();
+    return;
   }
+  // A focused button owns Space (it activates it); the table's skip yields.
+  if (t instanceof HTMLElement && t.closest('button')) return;
+  if (skipPlainPlayback()) e.preventDefault();
 });
 document.getElementById('verdict-done').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -1571,6 +1588,7 @@ window.__diceDebug = {
     };
   },
   skipCeremony() { return skipCeremony(); },
+  skipPlain() { return skipPlainPlayback(); },
   // quick palette (tests): open it / observe its open state
   openPalette() { openPalette(); },
   get paletteOpen() { return isPaletteOpen(); },
