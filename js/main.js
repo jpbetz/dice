@@ -1010,12 +1010,18 @@ function applyReveal(rollId) {
     lastEntry.revealed = true;
     // A reveal landing while a ceremony is mid-flight must stay log-only:
     // renderRollResults would un-hide the suppressed result banner (and can
-    // replay a crit overlay) on top of the intent/verdict cards. A banner the
-    // viewer already dismissed stays dismissed for the same reason.
+    // replay a crit overlay) on top of the intent/verdict cards, and the
+    // ceremony repaints its own chips as it stages. A banner the viewer
+    // already dismissed stays dismissed for the same reason — but the DICE do
+    // not: their '?' chips are the shared table, and leaving them stale after
+    // a reveal makes the felt disagree with the log for good (one shared
+    // truth). So outside a ceremony the chips always repaint; only the banner
+    // respects the dismissal.
     const ceremonyActive = currentRoll && currentRoll.ceremony && !currentRoll.done;
-    if (!ceremonyActive && !banner.classList.contains('hidden')) {
+    if (!ceremonyActive) {
       const dice = currentRoll && currentRoll.rollId === rollId ? currentRoll.dice : null;
-      renderRollResults(lastEntry, dice);
+      if (banner.classList.contains('hidden')) renderChips(lastEntry, dice);
+      else renderRollResults(lastEntry, dice);
     }
   }
 }
