@@ -18,8 +18,9 @@ carry a roll's FULL intent:
   `# Title | Subtitle` pipe split, `exp` in parse results and canonical
   output, popover Moment round-trip.
 - Give face-down a canonical spelling that survives round-tripping
-  (recommended: a `held` trailing flag, with the `/gmroll` family
-  normalizing to it), so saved variants stop silently dropping privacy.
+  (shipped as the `held` trailing flag — the `/gmroll` family normalizes
+  to `secret` since the terminology amendment, UX.md §3.2), so saved
+  variants stop silently dropping privacy.
 - Small-batch correctness from the audit: banner breakdown shows struck
   dice and ✴ children (attributed-math invariant); plain-roll playback
   skippable (click/Space fast-forward — the machinery exists); reveal
@@ -61,70 +62,16 @@ The audit's six-site hardcode inventory becomes a registry:
 
 ## Tier 3 — Secrecy, role-free (goal 11)
 
-### 4. Visibility core
-
-UX.md §3's redaction architecture, minus the rescinded seat. The full
-contract is UX.md §3 (wire, projection, audience, reveal, offers) and
-§7.8 (notation):
-
-- `visibility` field beside mods — **absent = open** (present-or-absent,
-  like `cleared`/`exp`, so plain payloads stay byte-identical);
-  `{mode: 'held'|'secret'|'whisper', audience[], revealAuthority}`.
-  `held` = face-down for everyone *including the roller*; `secret` = the
-  roll exists only for the roller, no reveal path (`/selfroll` gets real
-  semantics); `whisper` = named audience live, everyone else shrouded.
-  Notation flags `held` / `secret` / `w:Name` + popover picker + palette
-  parity.
-- **Server-side projection**: `projectEntryFor(entry, viewerId)` on
-  *every* egress — roll broadcast, the roller's roll response, the
-  claimer's claim response, reveal, hello, `/api/join`, shelf/log resync.
-  The broadcast loop already iterates player-by-player, but four of those
-  paths do not go through it. Today's face-down is honor-system: values
-  ship to every client.
-- **Audience resolution**: `w:` names matched case-insensitively against
-  the current roster at roll/offer creation, stored as ids; an unmatched
-  name rejects the action (`unknown_audience`) rather than silently
-  widening or narrowing it.
-- **Shrouded dice**: redacted viewers get the identity-correction replay
-  with numberless obsidian material (they cannot compute face corrections
-  without values — the wire change forces this anyway); reveal plays a
-  flip + staged beat, deferred if it lands mid-playback (the 7f9cdf5
-  race). Held rolls keep their full ceremony (public stakes, held result)
-  instead of silently downgrading to Plain.
-- **Reveal authority is the chooser**, server-enforced
-  (`403 not_reveal_authority`), and the reveal event carries the full
-  entry because shrouded clients never had the values.
-- **Offer visibility**: offers carry visibility chosen by the offerer,
-  applied verbatim to the claimer's roll; reveal authority = offerer. The
-  claimer is not in the audience unless named — that asymmetry is the
-  role-free GM-screen roll. Today's face-down offer gives the claimer sole
-  reveal authority *and* the values, the exact inverse.
-- Accepted leak, documented: an exploding roll shows its extra dice to
-  shrouded viewers (physical analogy).
-- Doc sweep: purge the audited DM-seat references from UX.md/ROADMAP
-  (the count was nine; the real total was ~37 lines plus the mockup token
-  list in `docs/mockups/panel.html`).
+Step 4 — the **visibility core** — is shipped (see Shipped below): the
+ladder, server-side projection, reveal authority, offer visibility, the
+shrouded-dice playback, the cross-tool terminology pass, and the `#`-in-
+names ban. What remains in this tier is its refinement backlog.
 
 ### 4b. Visibility refinements (future)
 
 Deferred out of step 4, each with its reason. Nothing here blocks the
-ladder; all of it is polish, vocabulary, or a new rung.
+ladder; all of it is polish or a new rung.
 
-- **Terminology pass (approved, not applied).** The cross-tool survey in
-  UX.md §3.2's terminology note requires three changes step 4 shipped
-  without: `/gmroll` and `/gmr` normalize to **`secret`**, not `held`
-  (Roll20's `/gmroll` guarantees the roller sees the result and the table
-  learns nothing — `secret` matches both axes, `held` inverts both);
-  `/sr` stops binding silently and parses **invalid** with a teaching
-  error, because Foundry's self-roll and Roll20's secret roll are
-  opposites under the same two letters; and `blind` joins as an accepted
-  input flag — an alias for `secret` on an **offer**'s notation (the
-  dice-tower roll), invalid on a self-roll with "a blind roll needs
-  someone else to hold the result — offer this roll instead". UI labels
-  become *Open* · *Face down* · *Only me* · *Whisper to…* · *Dice tower*
-  (offers), so no mode name is ever a word that reads as its own opposite.
-  UX.md §7.8's prefix table and `index.html`'s cheatsheet row move with
-  the bindings; the unit suite pins the new messages.
 - **Sticky mode + its badge, as one change.** A remembered per-player
   default (Foundry's roll-mode ergonomic) is only safe alongside a
   standing eye-slash badge on the Roll button and the mini pills — a
@@ -140,19 +87,6 @@ ladder; all of it is polish, vocabulary, or a new rung.
   precedent exists for "reveal to the roller". §3.3 rejected it for step 4
   because reveal is currently total and one-way, which is what makes it
   auditable. Revisit only with a concrete table need.
-- **`#` in a player name misdirects a whisper (open defect).** The comment
-  split runs before the flag scan, so the canonical `1d20 w:a#b` re-parses
-  as a whisper to `a` with the comment `b`. The server accepts it with 200
-  and resolves the audience to the *wrong player*; the intended recipient
-  gets the shrouded projection, and the label silently becomes `b`. The
-  popover's audience picker offers `#`-bearing roster names, so this is
-  reachable without typing notation by hand. It contradicts §3.0's
-  fail-closed promise ("a typo must never quietly broadcast the roll, and
-  must never quietly narrow it either"). Fix candidates: quote names
-  containing `#` in `canonicalNotation` and teach the quoted-name scanner
-  to survive the comment split, or reject `#` in names at join. Until then
-  the round trip is not a fixed point for those names (GOALS.md,
-  notation totality).
 - **Audience legibility.** A shrouded viewer reads the audience only when
   the roll has no `# comment` (§3.0) — `label` carries one or the other.
   Decide whether "who was whispered to" deserves its own always-present
@@ -220,7 +154,16 @@ step 4) · reroll-last · notation layer (Roll20 dialect, 561 tests + fuzz,
 command box, ± popover) · room settings channel + felt themes + settings
 modal · roll ceremonies (intent card, mat-text felt decal, staged verdict,
 cinematic slow-mo, skip) · quick-roll palette + keyboard shortcuts ·
-capability matrix across all roll surfaces · per-roll Done-clears.
+capability matrix across all roll surfaces · per-roll Done-clears ·
+**visibility core (step 4, goal 11)**: the role-free ladder open · held ·
+secret · whisper riding notation (`held`/`secret`/`w:Name` + the offer-only
+`blind` alias), server-side per-recipient projection on every egress,
+server-enforced reveal authority, offer visibility incl. the dice-tower
+roll, shrouded obsidian playback with deferred mid-playback reveals, solo
+degradation, the cross-tool terminology pass (`/gmroll` family → `secret`,
+`/sr` refused as ambiguous, labels *Only me* · *Whisper to…* · *Dice
+tower*), and the `#`-in-player-names ban that keeps whisper addressing
+total.
 
 ## Conformances to protect (from the audit)
 
@@ -235,6 +178,17 @@ static-hosting solo works completely · the capability matrix is one shared
 code path, not parallel implementations · settings echo-apply with no
 optimistic divergence · `cleared`/`exp` flags are present-or-absent so
 plain payloads stay byte-identical · control/bidi stripping is mirrored
-across all four layers with surrogate-safe truncation · `playerGone()`
-rejoins only on unknown_player/room (never mints identities on expected
-404s) · broadcast already loops per-player (step 4's redaction hook).
+across all four layers with surrogate-safe truncation (and `#` is banned
+from player names at every entry point — whisper addressing must stay
+total) · `playerGone()` rejoins only on unknown_player/room (never mints
+identities on expected 404s) · broadcast already loops per-player (step
+4's redaction hook) · server-side per-recipient projection
+(`projectEntryFor`) is the ONLY path a roll entry ever leaves the server —
+every egress (roll broadcast, POST responses, reveal, hello, `/api/join`,
+shelf/log resync) goes through it · redaction is **absent data, never
+hidden data**: a redacted or omitted projection carries no values for a
+client to decline to render · whisper audiences pin `playerId`s at
+roll/offer creation (a rename never changes who may read a roll; unknown
+names fail closed as `unknown_audience`) · reveal is authority-checked
+server-side (`revealAuthority`, 403 `not_reveal_authority`), never gated
+by which client drew the button.

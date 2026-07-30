@@ -29,7 +29,9 @@ supports today; nothing more.
 
 ```
 command   := [mode SP] expr [SP flag]* [SP dc] [SP comment]
-mode      := "/roll" | "/r" | "/gmroll" | "/gmr" | "/selfroll" | "/sr"
+mode      := "/roll" | "/r" | "/gmroll" | "/gmr" | "/selfroll"
+                                            ; "/sr" is REFUSED as ambiguous
+                                            ;   (§3.2 terminology note)
 expr      := term (("+" | "-") term)*
 term      := integer | diceTerm
 diceTerm  := [count] dieType termMods*
@@ -44,7 +46,12 @@ flag      := "adv" | "dis"                  ; requires a d20 in expr
            | "check" | "cinematic" | "cine" ; moment kind (§7.6)
            | visibility                     ; one per command (§7.8)
 visibility:= "held" | "secret" | whisper
+           | "blind"                        ; OFFERS ONLY: alias → secret, the
+                                            ;   dice tower; a self-roll refuses
+                                            ;   it with a teaching error (§3.2)
 whisper   := "w:" name ("," name)*          ; name quoted only when it needs it
+                                            ;   (names never contain '#' — the
+                                            ;   server bans it at join/rename)
 dc        := ("dc"|"vs") integer            ; LOCAL EXTENSION (target)
 comment   := "#" title ["|" subtitle]       ; roll label / mat headline (§7.6)
 ```
@@ -127,8 +134,10 @@ that: a saved group whose canonical string cannot say "secret" saves a
 public roll, and links, history and `#g=` all silently downgrade privacy.
 On the wire it still travels as a field beside `mods` (§3.0), because it
 does not alter values. The `/gmroll`-family prefixes are accepted for paste
-compatibility and normalize into the slot (`/gmroll`→`held`,
-`/selfroll`→`secret`); canonical output never emits a prefix.
+compatibility and normalize into the slot — `/gmroll`, `/gmr` and
+`/selfroll` all to `secret` (§3.2's terminology note: Roll20's `/gmroll`
+means the roller sees the result and the table learns nothing), while
+`/sr` refuses to bind at all; canonical output never emits a prefix.
 
 ### 1.2 Parser API
 
@@ -181,12 +190,12 @@ the box so nothing jumps):
 
 **Enter** rolls the parsed command (identical path to the Roll button).
 **`/`** as first character opens a filtered token list (non-enforcing —
-free text always allowed): `/gmroll`, `/sr`, plus mod tokens
+free text always allowed): `/gmroll`, plus mod tokens
 `kh kl dh dl ro ! adv dis held secret w: dc #`, one line of help each,
 arrow keys + Tab to accept. Every token is always listed — there is no
 seat, no role, and therefore nothing to condition the list on; the
-`/gmroll` family is described as what it is, paste sugar for `held`
-(§7.8).
+`/gmroll` family is described as what it is, paste sugar for `secret`
+(§7.8; `/sr` is refused as ambiguous, never listed).
 
 **History:** ↑/↓ recalls the last 10 executed commands, per-room, stored in
 localStorage key `rollHistory:<room>`. This is the same store the banner's
@@ -531,6 +540,15 @@ player ids — so a later rename never changes who may see the roll.
   than resolved behavior, and renaming is the fix.
 - **The chooser is always implicitly in the audience** — a whisper can
   never lock out its own author.
+- **A player name can never contain `#`.** In notation `#` starts the
+  comment and the comment split runs before the flag scan, so a roster name
+  carrying one could never survive its own canonical spelling — `w:a#b`
+  re-parses as a whisper to `a` with the comment `b`, a silent misdelivery.
+  The server strips `#` from names at **join and rename alike**
+  (`cleanName`, beside the control/bidi sanitizer), the rename input and
+  take-a-seat modal refuse it with a message, and so `w:` addressing is
+  total over every name that can exist. This closed the last audited
+  notation-totality violation (GOALS.md).
 
 **Accepted leak: exploding dice.** An exploding roll shows its extra dice
 to shrouded viewers, so a spectator can count them and infer that max faces
@@ -606,9 +624,12 @@ uniform-surfaces invariant, §7.4), through two paths that are the same
 truth: the notation flags `held` / `secret` / `w:Name` (§7.8), and a
 visibility control in the `±` popover, which doubles as the offer composer
 (its Roll and Offer buttons apply the same edited intent). The segmented
-control reads `Open · Face down · Secret · Whisper`; Whisper opens a name
-picker over the current roster (recipient chips: player dot + name), and a
+control reads `Open · Face down · Only me · Whisper to…` (the terminology
+note below is why those words and no others); Whisper opens a name picker
+over the current roster (recipient chips: player dot + name), and a
 whisper with nobody named disables both verbs rather than rolling wide.
+With `Only me` selected the Offer button's tooltip names what an offered
+only-me roll is: *Dice tower — they roll, only you see the result*.
 
 **Not sticky, and therefore un-badged.** The picker starts from the
 notation it was opened on, every time — there is no remembered per-player
@@ -634,11 +655,11 @@ one client, and the ladder collapses to what one player can mean by it:
   is the whole point of that rung.
 - **`secret` and `open` are indistinguishable** to an audience of one, and
   solo treats them as such.
-- **`w:` has nobody to whisper to.** The popover disables Secret and
-  Whisper offline (the sub line says so: *secret & whisper need a table —
-  you are playing solo*), and a `w:Name` typed into the command box parses
-  and then **rolls open** — solo has no roster to reject a name against
-  and no second client to withhold anything from.
+- **`w:` has nobody to whisper to.** The popover disables Only me and
+  Whisper to… offline (the sub line says so: *only-me & whisper rolls need
+  a table — you are playing solo*), and a `w:Name` typed into the command
+  box parses and then **rolls open** — solo has no roster to reject a name
+  against and no second client to withhold anything from.
 
 So the ladder never becomes dead code offline, but solo is *degraded
 gracefully*, not fully mirrored: the rungs whose whole meaning is "someone
@@ -669,9 +690,10 @@ dialect and must not churn. Second, **UI labels never render "Secret",
 own opposite to somebody at the table; the labels are *Open* · *Face down*
 · *Only me* ("no one else sees that you rolled") · *Whisper to…* ("others
 see you rolled, not what"), and an offer's restricted mode is *Dice tower*
-("they roll — only you see the result"). *Not yet applied: the picker still
-says "Secret", and the `/gmroll` and `/sr` aliases still bind as §7.8
-documents. Both are ROADMAP step 4b.*
+("they roll — only you see the result"). Both consequences are applied:
+the picker and sublabels read exactly those words, `/gmroll`, `/gmr` and
+`/selfroll` all normalize to `secret`, `/sr` refuses with a teaching
+error, and `blind` is an offer-only alias for `secret` (§7.8).
 
 And one thing genuinely ours: **our whisper leaves bystanders a shrouded
 roll.** Roll20 and Foundry whispers show non-recipients *nothing at all*.
@@ -750,7 +772,7 @@ Recorded so they stop coming up:
   performs better.
 - **Role-addressed `/gmroll` semantics as the *model*.** Whisper-by-name
   covers it; the `/gmroll` family survives only as paste sugar that
-  normalizes to `held` (§7.8).
+  normalizes to `secret` (§7.8, §3.2's terminology note).
 - **Per-skill / per-group visibility default grids.** A saved group already
   carries its visibility inside its canonical notation (§1.5, §7.8) — the
   90% substitute, with no new state to sync.
@@ -1206,18 +1228,30 @@ back **byte-stably**: the canonical form remains a fixed point,
 - **`held`** — face-down for everyone, the roller included; revealable.
 - **`secret`** — the roll exists only for the roller; not revealable.
 - **`w:Name`**, **`w:Name1,Name2`** — whisper to a named audience.
+- **`blind`** — accepted on an **offer**'s notation only, as an alias
+  canonicalizing to `secret` (offerer-only: the dice-tower roll, §3.3).
+  On a self-roll it is refused with the teaching error *a blind roll needs
+  someone else to hold the result — offer this roll instead*. This is the
+  grammar's one context-aware corner: `parseNotation(str, {offer: true})`;
+  `/api/offer` and the client's offer verb parse with it. Canonical output
+  never emits `blind`, so the fixed point is `… secret`.
 - **Mutually exclusive.** Two visibility flags in one command is a parse
   error — `held and secret are mutually exclusive`, hinted
   `a roll has one visibility: held, secret or w:Name` — including a prefix
   that disagrees with a flag, where the hint names the prefix instead
-  (`the /gmroll prefix already sets held`). A prefix that *agrees* is
+  (`the /gmroll prefix already sets secret`). A prefix that *agrees* is
   accepted (`/selfroll 1d20 secret`). The same flag written twice is a
   typo, not an exclusion: `held specified twice`.
 
 **Prefixes normalize into the slot** and never survive into canonical
-output: `/gmroll`, `/gmr` → `held`; `/selfroll`, `/sr` → `secret`. The
-`/selfroll` family finally means what its name always claimed — before the
-visibility slice both families were synonyms for face-down.
+output: `/gmroll`, `/gmr`, `/selfroll` → `secret` (§3.2's terminology
+note — Roll20's `/gmroll` guarantees the roller sees the result and the
+table learns nothing, which is `secret` on both axes; the pre-amendment
+`held` binding inverted both). **`/sr` never binds**: Foundry's self roll
+and Roll20's 2026 Secret Roll are opposites under the same two letters, so
+it parses invalid with *"/sr is ambiguous — Foundry self roll vs Roll20
+secret roll (opposites)"* and the hint *use 'secret' (only you see it) or
+offer a dice-tower roll*.
 
 **Typing states.** A partial visibility flag at end of input is
 `incomplete`, never `invalid` (§1.3's three-state rule): `1d20 sec`,
@@ -1253,8 +1287,10 @@ around the commas.
 1d20 check w:"Ann Smith",Bob dc15 # The lie leaves your lips | CHARISMA CHECK
 4d6dl1 w:"Bob \"Two-Axe\" Vance"
 
-/gmroll 1d20+3        →  1d20+3 held
+/gmroll 1d20+3        →  1d20+3 secret
 /selfroll 4d6dl1      →  4d6dl1 secret
+/sr 1d20              →  parse error (ambiguous across tools — teaching hint)
+1d20 blind            →  parse error on a roll; on an OFFER → 1d20 secret
 1d20 held secret      →  parse error (one visibility per roll)
 ```
 

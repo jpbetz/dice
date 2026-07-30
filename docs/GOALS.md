@@ -79,12 +79,12 @@ specifies components within them. Where the three disagree, this document wins.
   closed and re-verified 2026-07-30: roll moments canonicalize as
   `check`/`cinematic` + `# Title | Subtitle`, and the whole visibility
   ladder canonicalizes as `held` / `secret` / `w:Name`, so groups, history
-  and `#g=` links carry both. One violation remains open: a **player name
-  containing `#` breaks the round trip silently** — the comment split runs
-  before the flag scan, so `w:a#b` re-parses as a whisper to `a` with the
-  comment `b`. The result is not a parse failure but a **misdelivery**: the
-  private result goes to a different player, and the audience picker offers
-  such names. See ROADMAP step 4b.)*
+  and `#g=` links carry both. The last audited violation — a player name
+  containing `#` silently misdirecting a whisper through the comment
+  split — is closed by **banning `#` in player names at every entry
+  point** (server `cleanName` at join/rename, loud client refusals), so
+  the round trip is total over every name that can exist. Pinned in the
+  redaction suite; see UX.md §3.0.)*
 - **Uniform roll surfaces.** Every UI element that triggers a roll offers
   the same capabilities (the UX.md §7.4 matrix): full intent editing, both
   verbs (Roll / Offer), in both full and compact view.
