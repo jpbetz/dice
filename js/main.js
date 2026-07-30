@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue } from './dice.js';
 import { connect } from './net.js';
-import { meaningFor } from './meanings.js';
+import { meaningFor, SYSTEMS, DEFAULT_SYSTEM } from './meanings.js';
 import { groupsFromLocation, syncGroupsToLocation } from './urlgroups.js';
 import { composeRoll, validateMods, countingBaseTypes, previewSpec } from './rollspec.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
@@ -743,6 +743,33 @@ const chipsLayer = document.getElementById('chips-layer');
 const banner = document.getElementById('result-banner');
 const chips = []; // {el, die}
 
+// ---------------------------------------------------------------------------
+// Interpretation lens (goal 6): the ACTIVE system profile reads meaning and
+// crit off raw entries at render time — entries and the log store facts only.
+// currentSystemId is room state (settings.system), applied like felt.
+// ---------------------------------------------------------------------------
+
+let currentSystemId = DEFAULT_SYSTEM;
+
+function entryMeaning(entry) {
+  if (entry.faceDown && !entry.revealed) return null;
+  return SYSTEMS[currentSystemId].meaningFor(
+    entry.parts.filter((p) => p.counts && !p.child).map((p) => p.type),
+    entry.total
+  );
+}
+
+function entryCrit(entry) {
+  if (entry.faceDown && !entry.revealed) return null;
+  return SYSTEMS[currentSystemId].critFor(entry);
+}
+
+// The crit overlay's word: the chart word when the system has one (soul-deal),
+// else the natural-roll callout (dnd — its meaningFor is always null).
+function critWord(crit, meaning) {
+  return meaning ? meaning.word : crit === 'success' ? 'Natural 20' : 'Natural 1';
+}
+
 // Build the display entry for a finished playback roll: per-die parts with
 // mechanics metadata, authoritative total, meaning, and reveal state.
 function entryFromRoll(roll) {
@@ -884,7 +911,9 @@ function renderBreakdown(el, entry, hidden) {
 
 // Chips, banner, crits — always from authoritative values, never re-read
 // from physics. Face-down unrevealed rolls render as "?" everywhere.
-function renderRollResults(entry, dice) {
+// fx=false is the system-toggle repaint: the lens swap restyles the static
+// surfaces but never replays fanfare that belonged to the roll's own moment.
+function renderRollResults(entry, dice, fx = true) {
   renderChips(entry, dice);
   const hidden = entry.faceDown && !entry.revealed;
 
@@ -916,19 +945,20 @@ function renderRollResults(entry, dice) {
   }
 
   const meaningEl = document.getElementById('result-meaning');
-  const meaning = hidden ? null : entry.meaning;
+  const meaning = entryMeaning(entry);
   meaningEl.textContent = meaning ? meaning.word : '';
   meaningEl.className = meaning ? `tier-${meaning.tier}` : '';
   meaningEl.title = meaning ? `${meaning.rank} column (${meaning.column})` : '';
 
   banner.classList.remove('hidden', 'crit-success', 'crit-fail');
   renderBannerActions(entry);
-  if (meaning && meaning.tier === 'crit-success') {
+  const crit = entryCrit(entry);
+  if (crit === 'success') {
     banner.classList.add('crit-success');
-    playCritEffect('success', meaning.word);
-  } else if (meaning && meaning.tier === 'crit-fail') {
+    if (fx) playCritEffect('success', critWord(crit, meaning));
+  } else if (crit === 'fail') {
     banner.classList.add('crit-fail');
-    playCritEffect('fail', meaning.word);
+    if (fx) playCritEffect('fail', critWord(crit, meaning));
   }
 }
 
@@ -2785,8 +2815,9 @@ function renderLog() {
     const verdictHtml = !hidden && Number.isInteger(entry.dc)
       ? `<span class="log-verdict ${entry.total >= entry.dc ? 'ok' : 'bad'}">vs ${entry.dc} ${entry.total >= entry.dc ? '✓' : '✗'}</span>`
       : '';
-    const meaningHtml = !hidden && entry.meaning
-      ? `<span class="log-meaning tier-${entry.meaning.tier}"></span>`
+    const meaning = entryMeaning(entry); // active-system lens; null while hidden
+    const meaningHtml = meaning
+      ? `<span class="log-meaning tier-${meaning.tier}"></span>`
       : '';
     el.innerHTML = `
       <div class="log-head">
@@ -2796,7 +2827,7 @@ function renderLog() {
       </div>
       <div class="log-detail">${detail}${verdictHtml ? '  ·  ' + verdictHtml : ''}${meaningHtml ? '  ·  ' + meaningHtml : ''}</div>
       <div class="log-time">${fmtTime(entry.t)}</div>`;
-    if (meaningHtml) el.querySelector('.log-meaning').textContent = entry.meaning.word;
+    if (meaningHtml) el.querySelector('.log-meaning').textContent = meaning.word;
     // Names and labels are user-supplied: textContent only, never innerHTML.
     const groupEl = el.querySelector('.log-group');
     if (entry.playerName) {
@@ -2877,7 +2908,23 @@ setSound(soundOn, false); // reflect the loaded preference without re-saving
 
 // Current merged room settings. Key-by-key application below is deliberate:
 // the next slice adds keys (experiences) without reshaping this.
-let roomSettings = { felt: DEFAULT_FELT };
+let roomSettings = { felt: DEFAULT_FELT, system: DEFAULT_SYSTEM };
+
+// A system change is a lens swap over surfaces already on screen: the log and
+// the banner re-read under the new profile. Fanfare and ceremonies that
+// already played are never replayed (fx=false), a dismissed banner stays
+// dismissed, and a mid-flight ceremony keeps its stage — its own verdict
+// staging reads the new lens when it gets there.
+function rerenderInterpretation() {
+  renderLog();
+  if (lastEntry && !banner.classList.contains('hidden')) {
+    const ceremonyActive = currentRoll && currentRoll.ceremony && !currentRoll.done;
+    if (!ceremonyActive) {
+      const dice = currentRoll && currentRoll.rollId === lastEntry.rollId ? currentRoll.dice : null;
+      renderRollResults(lastEntry, dice, false);
+    }
+  }
+}
 
 // Apply a full merged settings object (join response, hello, settings-changed
 // echo, or the solo localStorage copy). Unknown keys/values are ignored.
@@ -2887,6 +2934,13 @@ function applyRoomSettings(settings) {
     roomSettings.felt = settings.felt;
     if (settings.felt !== currentFeltId) applyFeltTheme(settings.felt);
     else renderFeltSwatches();
+  }
+  if (typeof settings.system === 'string' && SYSTEMS[settings.system]) {
+    roomSettings.system = settings.system;
+    if (settings.system !== currentSystemId) {
+      currentSystemId = settings.system;
+      rerenderInterpretation();
+    }
   }
 }
 
