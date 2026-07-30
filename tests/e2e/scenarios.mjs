@@ -619,4 +619,52 @@ export const scenarios = [
       assert.equal(await a.logTop(), await c.logTop(), 'same log line');
     },
   },
+  {
+    name: 'alias-bindings',
+    tags: ['visibility', 'notation'],
+    // The terminology amendment's cross-tool aliases, end to end: /gmroll is
+    // a SECRET roll (Roll20's contract — the roller sees the result, the
+    // table learns nothing), /sr refuses to guess between two tools that
+    // mean opposite things by it, and 'blind' is offer-context only (the
+    // dice tower). Grammar details are unit-tested; this pins the bindings
+    // through the real client AND the server's authoritative re-parse.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+
+      // /gmroll rolls SECRET: Alice reads her own result; Bob gets nothing.
+      await a.roll('/gmroll 1d20');
+      const rid = await a.rollId();
+      const sa = await a.entryState(rid);
+      assert.equal(sa.visMode, 'secret', '/gmroll rolled secret');
+      assert.equal(sa.hidden, false, 'the roller reads their own /gmroll result');
+      await a.roll('d6 # after'); // a later open roll proves Bob's stream was live
+      const openId = await a.rollId();
+      await b.waitFor(
+        `(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(openId)}) && !window.__diceDebug.busy)`,
+        { desc: 'the open roll reaches Bob' },
+      );
+      assert.equal(await b.entryState(rid), null, 'the table never learns a /gmroll happened');
+
+      // /sr refuses with the teaching error — in the client parse and in fact.
+      const sr = await a.dbg(`parseNotation('/sr 1d20')`);
+      assert.equal(sr.ok, false, '/sr must not bind');
+      assert.ok(sr.error.includes('ambiguous'), `teaching error (got: ${sr.error})`);
+      await a.dbg(`commandRoll('/sr 1d20')`);
+      await a.dbg('sim(240)');
+      assert.equal(await a.logCount(), 2, '/sr rolled nothing');
+
+      // blind: a teaching error as a self-roll (client parse AND the server's
+      // authoritative re-parse), a live dice-tower offer as an offer.
+      const blind = await a.dbg(`parseNotation('1d20 blind')`);
+      assert.ok(!blind.ok && blind.error.includes('offer this roll instead'), `got: ${blind.error}`);
+      const apiRoll = await ctx.api('/api/roll', { playerId: await a.playerId(), notation: '1d20 blind' });
+      assert.equal(apiRoll.status, 400, 'the server refuses a blind self-roll');
+      const posted = await a.dbg(`offerRoll('1d20 blind # Tower')`);
+      assert.equal(posted.ok, true, `blind offer accepted (got: ${JSON.stringify(posted)})`);
+      await b.waitFor('window.__diceDebug.offers.length === 1', { desc: 'the dice-tower offer reaches Bob' });
+      const offer = (await b.dbg('offers'))[0];
+      assert.equal(offer.visibility && offer.visibility.mode, 'secret', 'blind canonicalized to secret');
+    },
+  },
 ];

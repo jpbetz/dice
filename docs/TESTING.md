@@ -104,7 +104,16 @@ clock so only `sim()` moves it) ·
 values/total/perDie/modifier/parts/spec for a hidden roll, and never the
 secret roll's id at all — with an open roll as the positive control) ·
 `resync-shrouded` (a late joiner rebuilds a shrouded table; one arriving after
-the reveal rebuilds a full one).
+the reveal rebuilds a full one) ·
+`alias-bindings` (the terminology amendment end to end: `/gmroll` rolls
+secret — the roller reads it, the table learns nothing; `/sr` refuses with
+the teaching error; `blind` is refused on a self-roll by client and server
+alike and posts a dice-tower offer whose card carries mode `secret`).
+
+The `#`-in-a-name whisper-misdirection ban is pinned in the redaction suite
+(unit `cleanName` case + an endpoint case: join/rename strip `#`, `w:a#b`
+fails closed as `unknown_audience`, the sanitized name addresses exactly its
+player), which runs in `test:unit`.
 
 ## Scenario backlog
 
