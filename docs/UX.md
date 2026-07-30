@@ -492,7 +492,7 @@ and the `dc` verdict — and adds `redacted: true` plus
 
 **It keeps** `rollId`, roller id + name, dice types and counts, `seed`, the
 notation string, the `dc` target, the `exp`/ceremony fields, and the
-`collected`/`cleared` flags. Two of those are deliberate:
+`collected`/`cleared` flags. Three of those are deliberate:
 
 - **`seed` is safe.** Values are crypto-RNG'd *independently* of the seed;
   the seed drives poses only. Shipping it leaks nothing and buys every
@@ -500,6 +500,10 @@ notation string, the `dc` target, the `exp`/ceremony fields, and the
 - **`dc` is public on purpose.** Public stakes, held result — "she rolls
   against DC 15 and nobody can see the die" is the dramatic pairing this
   whole ladder is built around. Hidden DCs are rejected (§3.4).
+- **The notation string rides along verbatim**, so a whispered roll's
+  audience is legible to everyone who can see that the roll happened
+  (`… w:Kira`). Addressing is public, only the result is private — the
+  same as watching someone lean over and whisper at a real table.
 
 **Audience resolution (whisper).** Names are matched **case-insensitively
 against the current room roster at roll/offer creation**, then stored as
@@ -599,6 +603,15 @@ Joe` (an audience member reads "…to you"). Secret is the one rung with no
 trace, by definition — it is the only silent roll, and it can never be
 un-silenced.
 
+**Solo and static parity (goal 9).** With no server there is one player and
+one client, and solo mirrors the projection locally rather than skipping
+it: `held` still hides its own result from you until you reveal it (the
+whole point of that rung — it hides from the roller too), `secret` and
+`open` are indistinguishable to an audience of one, and `w:` resolves
+against a roster of one, so naming anyone else is the same
+`unknown_audience` rejection it is online. The ladder never becomes dead
+code offline, and a room that later gains players behaves the same way.
+
 ### 3.3 Offers, reveal authority, and the GM-screen roll
 
 *(The claimable DM seat that occupied this section is **rescinded** — goal
@@ -612,8 +625,11 @@ Revealing an already-revealed roll is a 200 no-op.
 
 - **The authority is the chooser**: the roller for a self-roll, the
   **offerer** for an offer that carried held / whisper / secret.
-- **held and whisper are revealable; secret is not.** A secret roll never
-  left the roller's client, so there is nothing anywhere to upgrade.
+- **held and whisper are revealable; a self-rolled `secret` is not.** That
+  roll never left the roller's client, so there is nothing anywhere to
+  upgrade. A *secret offer* is a different animal — it means
+  offerer-only, which is a whisper with an audience of one, and the
+  offerer can reveal it (below).
 - The reveal event carries the **full entry**, not just `{rollId}` — the
   shrouded clients never had the values, so the event is what delivers
   them, and every client upgrades in place (§3.1).

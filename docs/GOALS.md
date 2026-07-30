@@ -109,15 +109,15 @@ working, coherent mechanical foundation.
 overturned and where the replacement now lives; the replacement documents
 are authoritative, and nothing here needs to be consulted to build.*
 
-- **The DM seat (formerly UX.md §3.4) is rescinded** by goal 10.
-  *Settled:* UX.md §3 has been rewritten as the role-free visibility spec
-  and every trace of the seat is gone from it — no `room.host`, no
-  `/api/host/*`, no `host-changed`, no host-gated reveal. Three of its four
-  powers returned as per-roll choices (whisper audiences, offers with
-  restricted result visibility, universal housekeeping); the fourth,
-  hidden Targets, was rejected outright — stakes are public on every
-  visibility rung (UX.md §3.4). Its redaction architecture survived and
-  became the shipped projection model.
+- **The DM seat is rescinded** by goal 10. *Settled:* UX.md §3 has been
+  rewritten as the role-free visibility spec and every trace of the seat is
+  gone from it — no `room.host`, no `/api/host/*`, no `host-changed`, no
+  host-gated reveal. Three of its four powers returned as per-roll choices
+  (whisper audiences, offers with restricted result visibility, universal
+  housekeeping); the fourth, hidden Targets, was rejected outright, because
+  stakes are public on every visibility rung. Its redaction architecture
+  survived and became the shipped projection model. Read UX.md §3 for what
+  is true; this entry only explains why an older draft said otherwise.
 - **"Physical analogy over UI" is softened** by goals 3–4: physical
   look-and-feel grounds the experience; physical interaction is optional
   delight. The build-a-tray (UX.md §7.1) moves to the delight tier.
