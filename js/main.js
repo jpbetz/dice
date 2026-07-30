@@ -57,7 +57,7 @@ renderer.toneMappingExposure = 1.25;
 container.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#191512');
+scene.background = new THREE.Color('#1b1410'); // walnut sceneBg — the DEFAULT_FELT below
 
 const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 1, 200);
 camera.position.set(0, 27, 15.5);
@@ -83,8 +83,11 @@ scene.add(rimLight);
 
 // felt table surface — room-selectable themes (roadmap §2). Each theme pairs
 // the felt base color with a scene background. 'emerald' is the original look
-// and must stay byte-identical to it ('#1f3128' / '#191512'). The theme id is
-// room state (settings.felt); the 2D gold/ivory UI palette never changes.
+// and must stay byte-identical to it ('#1f3128' / '#191512'), but 'walnut' is
+// the DEFAULT for new tables — server and solo fallback alike (§7.7.1,
+// fantasy-not-casino). A stored solo choice (emerald included) is respected.
+// The theme id is room state (settings.felt); the 2D gold/ivory UI palette
+// never changes.
 const FELT_THEMES = {
   emerald:  { name: 'Emerald',  feltBase: '#1f3128', sceneBg: '#191512' },
   crimson:  { name: 'Crimson',  feltBase: '#46201e', sceneBg: '#1a1211' },
@@ -92,7 +95,7 @@ const FELT_THEMES = {
   slate:    { name: 'Slate',    feltBase: '#2c3438', sceneBg: '#161a1c' },
   walnut:   { name: 'Walnut',   feltBase: '#402e1c', sceneBg: '#1b1410' },
 };
-const DEFAULT_FELT = 'emerald';
+const DEFAULT_FELT = 'walnut';
 let currentFeltId = DEFAULT_FELT;
 
 // The collect shelf (UX §7.7, refined §7.7.1): five slot POSITIONS along the
