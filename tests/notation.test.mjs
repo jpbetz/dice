@@ -316,11 +316,23 @@ t('held flag sets faceDown and round-trips', () => {
   assert.equal(r.canonical, '1d20 held');
   assert.equal(ok(r.canonical).faceDown, true);
 });
-t('all four face-down prefixes normalize to the held flag', () => {
-  for (const p of ['/gmroll', '/gmr', '/selfroll', '/sr']) {
+// EDITED for the visibility contract (GOALS.md goal 11): /selfroll and /sr
+// now normalize to the 'secret' flag — they finally get real semantics —
+// while the /gmroll family keeps normalizing to 'held'.
+t('/gmroll and /gmr normalize to the held flag', () => {
+  for (const p of ['/gmroll', '/gmr']) {
     const r = ok(`${p} 1d20`);
     assert.equal(r.faceDown, true, p);
     assert.equal(r.canonical, '1d20 held', p);
+    assert.deepEqual(r.spec.visibility, { mode: 'held', names: [] }, p);
+  }
+});
+t('/selfroll and /sr normalize to the secret flag', () => {
+  for (const p of ['/selfroll', '/sr']) {
+    const r = ok(`${p} 1d20`);
+    assert.equal(r.faceDown, false, `${p}: secret is not the held alias`);
+    assert.equal(r.canonical, '1d20 secret', p);
+    assert.deepEqual(r.spec.visibility, { mode: 'secret', names: [] }, p);
   }
 });
 t('prefix plus held flag agree, not a duplicate', () => {
@@ -340,6 +352,237 @@ t('canonical flag order: [adv] [keep] [reroll] [!] [kind] [held] [dc] [#]', () =
 });
 t('kind/held produce no warnings', () => {
   assert.deepEqual(ok('1d20 check held').warnings, []);
+});
+
+// ---- visibility: held / secret / w: (GOALS.md goal 11 notation) ------------
+// spec.visibility = {mode, names[]} — present ONLY on non-open rolls (an open
+// roll must not grow a visibility key); faceDown stays exactly the 'held'
+// legacy alias; held/secret/w: share ONE canonical slot (where held sits).
+t('open rolls carry no visibility key at all', () => {
+  assert.equal('visibility' in ok('1d20').spec, false);
+  assert.equal('visibility' in ok('/roll 2d6+1').spec, false);
+  assert.equal('visibility' in ok('1d20 check dc15 # T | S').spec, false);
+});
+t('held exposes spec.visibility', () => {
+  assert.deepEqual(ok('1d20 held').spec.visibility, { mode: 'held', names: [] });
+  assert.equal(ok('1d20 held').faceDown, true);
+});
+t('secret flag parses, is not the held alias, round-trips', () => {
+  const r = ok('1d20 secret');
+  assert.deepEqual(r.spec.visibility, { mode: 'secret', names: [] });
+  assert.equal(r.faceDown, false);
+  assert.equal(r.canonical, '1d20 secret');
+  const r2 = ok(r.canonical);
+  assert.equal(r2.canonical, '1d20 secret');
+  assert.deepEqual(r2.spec.visibility, { mode: 'secret', names: [] });
+});
+t('secret is case-insensitive like every keyword flag', () => {
+  assert.deepEqual(ok('1d20 SECRET').spec.visibility, { mode: 'secret', names: [] });
+});
+t('/selfroll prefix plus secret flag agree, not a duplicate', () => {
+  assert.equal(ok('/selfroll 1d20 secret').canonical, '1d20 secret');
+  assert.equal(ok('/sr 1d20 secret').canonical, '1d20 secret');
+});
+t('whisper: single bare name', () => {
+  const r = ok('1d20 w:Bob');
+  assert.deepEqual(r.spec.visibility, { mode: 'whisper', names: ['Bob'] });
+  assert.equal(r.faceDown, false);
+  assert.equal(r.canonical, '1d20 w:Bob');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+t('whisper: several names, order preserved', () => {
+  const r = ok('1d20 w:Ann,Bob,Cid');
+  assert.deepEqual(r.spec.visibility.names, ['Ann', 'Bob', 'Cid']);
+  assert.equal(r.canonical, '1d20 w:Ann,Bob,Cid');
+});
+t('whisper: name case is preserved as typed', () => {
+  assert.deepEqual(ok('1d20 w:bOb').spec.visibility.names, ['bOb']);
+  assert.equal(ok('1d20 W:bOb').canonical, '1d20 w:bOb');
+});
+t('whisper: quoted name with spaces', () => {
+  const r = ok('1d20 w:"Ann Smith",Bob');
+  assert.deepEqual(r.spec.visibility.names, ['Ann Smith', 'Bob']);
+  assert.equal(r.canonical, '1d20 w:"Ann Smith",Bob');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+t('whisper: unneeded quotes are dropped in canonical', () => {
+  assert.equal(ok('1d20 w:"Bob"').canonical, '1d20 w:Bob');
+  assert.equal(ok('1d20 w:"Bob","Ann Smith"').canonical, '1d20 w:Bob,"Ann Smith"');
+});
+t('whisper: escaped quote inside a quoted name round-trips byte-stably', () => {
+  const s = '1d20 w:"Ann \\"Ace\\" Smith"';
+  const r = ok(s);
+  assert.deepEqual(r.spec.visibility.names, ['Ann "Ace" Smith']);
+  assert.equal(r.canonical, s);
+  assert.equal(ok(r.canonical).canonical, s);
+});
+t('whisper: a name that is only a quote', () => {
+  const r = ok('1d20 w:"\\""');
+  assert.deepEqual(r.spec.visibility.names, ['"']);
+  assert.equal(r.canonical, '1d20 w:"\\""');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+t('whisper: backslash before an escaped quote round-trips', () => {
+  // name = a \ " b — the emitted form is "a\\"b" where the FIRST backslash
+  // is literal and the second opens the \" escape
+  const r = ok('1d20 w:"a\\\\"b"');
+  assert.deepEqual(r.spec.visibility.names, ['a\\"b']);
+  assert.equal(r.canonical, '1d20 w:"a\\\\"b"');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+t('whisper: bare names may carry backslashes, even trailing', () => {
+  assert.deepEqual(ok('1d20 w:a\\b').spec.visibility.names, ['a\\b']);
+  assert.equal(ok('1d20 w:a\\b').canonical, '1d20 w:a\\b');
+  assert.deepEqual(ok('1d20 w:ab\\').spec.visibility.names, ['ab\\']);
+  assert.equal(ok('1d20 w:ab\\').canonical, '1d20 w:ab\\');
+});
+t('whisper: comma inside a quoted name stays one name', () => {
+  const r = ok('1d20 w:"Smith, Ann"');
+  assert.deepEqual(r.spec.visibility.names, ['Smith, Ann']);
+  assert.equal(r.canonical, '1d20 w:"Smith, Ann"');
+});
+t('whisper: leading/trailing whitespace in a quoted name is preserved and re-quoted', () => {
+  const r = ok('1d20 w:" Ann "');
+  assert.deepEqual(r.spec.visibility.names, [' Ann ']);
+  assert.equal(r.canonical, '1d20 w:" Ann "');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+t('whisper: unicode names, bare and quoted', () => {
+  const r = ok('1d20 w:Åsa,中文,🎲');
+  assert.deepEqual(r.spec.visibility.names, ['Åsa', '中文', '🎲']);
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+  const q = ok('1d20 w:"Åsa Ö",дядя');
+  assert.deepEqual(q.spec.visibility.names, ['Åsa Ö', 'дядя']);
+  assert.equal(q.canonical, '1d20 w:"Åsa Ö",дядя');
+});
+t('whisper: zero-width and bidi controls are stripped from names', () => {
+  assert.deepEqual(ok('1d20 w:a\u200bb').spec.visibility.names, ['ab']);
+  assert.deepEqual(ok('1d20 w:"e\u202evil"').spec.visibility.names, ['evil']);
+  bad('1d20 w:"\u200b"'); // a name that strips to nothing is empty, so invalid
+});
+t('whisper: duplicates dedupe case-insensitively with a warning', () => {
+  const r = ok('1d20 w:Bob,bob,BOB');
+  assert.deepEqual(r.spec.visibility.names, ['Bob']);
+  assert.equal(r.canonical, '1d20 w:Bob');
+  assert.equal(r.warnings.filter((w) => w.includes('duplicate')).length, 2);
+  // and the deduped canonical re-parses with no warnings
+  assert.deepEqual(ok(r.canonical).warnings, []);
+});
+t('plain visibility flags produce no warnings', () => {
+  assert.deepEqual(ok('1d20 secret').warnings, []);
+  assert.deepEqual(ok('1d20 w:Ann,Bob check').warnings, []);
+});
+t('visibility canonical slot: after the kind flag, before dc', () => {
+  assert.equal(ok('1d20 secret check').canonical, '1d20 check secret');
+  assert.equal(ok('1d20 dc9 secret').canonical, '1d20 secret dc9');
+  assert.equal(ok('1d20 w:Ann check').canonical, '1d20 check w:Ann');
+  assert.equal(ok('1d20 dc9 w:Ann').canonical, '1d20 w:Ann dc9');
+});
+t('canonical flag order holds for secret and w: exactly as for held', () => {
+  for (const [flag, slot] of [['secret', 'secret'], ['w:"Ann Smith",Bob', 'w:"Ann Smith",Bob']]) {
+    const r = ok(`1d20+2d6 dc12 ${flag} cine ! ro<=2 dl1 adv # T | S`);
+    assert.equal(r.canonical, `2d6+1d20 adv dl1 ro<=2 ! cinematic ${slot} dc12 # T | S`);
+    assert.equal(ok(r.canonical).canonical, r.canonical);
+  }
+});
+t('two visibility flags are mutually exclusive — every pairing', () => {
+  for (const s of [
+    '1d20 held secret', '1d20 secret held',
+    '1d20 held w:Bob', '1d20 w:Bob held',
+    '1d20 secret w:Bob', '1d20 w:Bob secret',
+    '/gmroll 1d20 secret', '/selfroll 1d20 held',
+    '/gmroll 1d20 w:Bob', '/sr 1d20 w:Bob', '/gmr 1d20 secret',
+  ]) {
+    const r = bad(s);
+    assert.ok(r.error.includes('mutually exclusive'), `${s}: ${r.error}`);
+  }
+});
+t('the same visibility flag twice is a typo, named as such', () => {
+  assert.equal(bad('1d20 secret secret').error, 'secret specified twice');
+  assert.equal(bad('1d20 w:a w:b').error, 'w: specified twice');
+  assert.equal(bad('1d20 held held').error, 'held specified twice');
+});
+t('whisper malformed lists are invalid with clear errors', () => {
+  bad('1d20 w:""');           // empty quoted name
+  bad('1d20 w:,Bob');         // leading comma
+  bad('1d20 w:a,,b');         // double comma
+  bad('1d20 w:ab"c');         // bare name with an embedded quote
+  bad('1d20 w:"a"x');         // junk after a closing quote
+  bad('1d20 w: Bob');         // space after w:
+  bad('1d20 w dc5');          // bare w mid-command
+  bad('1d20 w: dc5');         // empty w: mid-command
+  const r = bad('1d20 w:Ann, Bob');  // space after the comma
+  assert.ok(r.hint.includes('w:Ann,Bob'), r.hint);
+});
+t('whisper: a whitespace-only quoted name is legal and stable', () => {
+  const r = ok('1d20 w:" "');
+  assert.deepEqual(r.spec.visibility.names, [' ']);
+  assert.equal(r.canonical, '1d20 w:" "');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+t('partial w:/secret input is incomplete, not invalid (three-state)', () => {
+  for (const s of [
+    '1d20 w', '1d20 w:', '1d20 w:Ann,', '1d20 w:"', '1d20 w:"Ann',
+    '1d20 w:"Ann Smi', '1d20 w:"Ann\\"', '1d20 w:"Ann Smith",',
+    '1d20 s', '1d20 se', '1d20 sec', '1d20 secr', '1d20 secre',
+  ]) {
+    bad(s, 'incomplete');
+  }
+  // ...but only at end-of-input: the same fragments mid-command are invalid
+  for (const s of ['1d20 w dc5', '1d20 secre dc5', '1d20 w:Ann, dc5']) {
+    bad(s, 'invalid');
+  }
+});
+t('near-miss visibility keywords are invalid', () => {
+  for (const s of ['1d20 secrets', '1d20 secrete', '1d20 secretheld']) bad(s);
+});
+t('flags glue to a lone term exactly like check/held always have', () => {
+  // pre-existing grammar property: '1d20check' parses, so the visibility
+  // spellings behave the same when glued to the expression
+  assert.equal(ok('1d20secret').canonical, '1d20 secret');
+  assert.equal(ok('1d20w:Ann').canonical, '1d20 w:Ann');
+});
+t('an unterminated quote swallows later flags — still incomplete', () => {
+  bad('1d20 w:"Ann dc15', 'incomplete');
+  const fixed = ok('1d20 w:"Ann dc15"');
+  assert.deepEqual(fixed.spec.visibility.names, ['Ann dc15']);
+  assert.equal(fixed.dc, null, 'the dc rode inside the quoted name');
+});
+t('whisper composes with dc, comment, exp and mixed pools', () => {
+  const s = '2d6+1d20 dl1 check w:"Ann Smith",Bob dc15 # Ambush | DEX SAVE';
+  const r = ok(s);
+  assert.deepEqual(r.spec.visibility, { mode: 'whisper', names: ['Ann Smith', 'Bob'] });
+  assert.equal(r.dc, 15);
+  assert.equal(r.comment, 'Ambush');
+  assert.deepEqual(r.exp, { kind: 'check', subtitle: 'DEX SAVE' });
+  assert.equal(r.canonical, s);
+});
+t('visibility does not rescue a kindless subtitle', () => {
+  bad('1d20 secret # a | b');
+  bad('1d20 w:Ann # a | b');
+});
+t('canonicalNotation renders visibility from spec and extras', () => {
+  const d20 = { dice: ['d20'], mods: null };
+  assert.equal(canonicalNotation({ ...d20, visibility: { mode: 'secret', names: [] } }, {}), '1d20 secret');
+  assert.equal(canonicalNotation({ ...d20, visibility: { mode: 'held', names: [] } }, {}), '1d20 held');
+  assert.equal(
+    canonicalNotation({ ...d20, visibility: { mode: 'whisper', names: ['Ann Smith', 'Bob'] } }, {}),
+    '1d20 w:"Ann Smith",Bob'
+  );
+  assert.equal(canonicalNotation(d20, { visibility: { mode: 'secret', names: [] } }), '1d20 secret');
+  // legacy faceDown still spells held…
+  assert.equal(canonicalNotation(d20, { faceDown: true }), '1d20 held');
+  // …but a spec's own visibility beats it (the re-canonicalization path:
+  // canonicalNotation(res.spec, {faceDown: res.faceDown}) must not downgrade)
+  assert.equal(
+    canonicalNotation({ ...d20, visibility: { mode: 'secret', names: [] } }, { faceDown: false }),
+    '1d20 secret'
+  );
+  // an explicit extras.visibility wins over both, and null there means open
+  assert.equal(
+    canonicalNotation({ ...d20, visibility: { mode: 'held', names: [] } }, { visibility: null }),
+    '1d20'
+  );
 });
 
 // ---- comment pipe: '# Title | Subtitle' ------------------------------------
@@ -533,6 +776,9 @@ const rng = (() => { let x = 42; return () => (x = (x * 1103515245 + 12345) & 0x
 const TYPES = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20'];
 const GEN_COMMENTS = ['Firebolt', 'The lie leaves your lips', 'a|b', '|', 'to hit', 'x \\ y', 'Sneak Attack!'];
 const GEN_SUBTITLES = ['CHARISMA CHECK', 'DEX SAVE', 'a|b', '|x', 'S', 'WISDOM (PERCEPTION)'];
+// Parser-producible whisper names, including every quoting trigger: spaces,
+// commas, quotes (escaped on emit), padding, backslashes, pipes, unicode.
+const GEN_NAMES = ['Bob', 'Ann Smith', 'bOb', 'Åsa', '中文', '🎲', 'a,b', 'a"b', ' pad ', "O'Brien", 'a\\b', 'x|y', 'Ω star'];
 for (let i = 0; i < 500; i++) {
   const single = rng() < 0.5;
   const dice = [];
@@ -557,7 +803,26 @@ for (let i = 0; i < 500; i++) {
     extras.exp = { kind: rng() < 0.5 ? 'check' : 'cinematic' };
     if (rng() < 0.6) extras.exp.subtitle = GEN_SUBTITLES[Math.floor(rng() * GEN_SUBTITLES.length)];
   }
-  if (rng() < 0.3) extras.faceDown = true;
+  // visibility: either the legacy faceDown alias (held) or spec.visibility
+  // (held / secret / whisper with 1-3 deduped names) — never both
+  let expectVis = null;
+  const visRoll = rng();
+  if (visRoll < 0.15) {
+    extras.faceDown = true;
+    expectVis = { mode: 'held', names: [] };
+  } else if (visRoll < 0.45) {
+    const mode = ['held', 'secret', 'whisper', 'whisper'][Math.floor(rng() * 4)];
+    const names = [];
+    if (mode === 'whisper') {
+      const count = 1 + Math.floor(rng() * 3);
+      for (let k = 0; k < count; k++) {
+        const nm = GEN_NAMES[Math.floor(rng() * GEN_NAMES.length)];
+        if (!names.some((x) => x.toLowerCase() === nm.toLowerCase())) names.push(nm);
+      }
+    }
+    spec.visibility = { mode, names };
+    expectVis = spec.visibility;
+  }
   t(`fixed point #${i}`, () => {
     const c1 = canonicalNotation(spec, extras);
     const r = parseNotation(c1);
@@ -567,7 +832,8 @@ for (let i = 0; i < 500; i++) {
     assert.equal(r.dc, extras.dc ?? null, `dc drift through "${c1}"`);
     assert.equal(r.comment, extras.comment ?? null, `comment drift through "${c1}"`);
     assert.deepEqual(r.exp, extras.exp ?? null, `exp drift through "${c1}"`);
-    assert.equal(r.faceDown, extras.faceDown ?? false, `faceDown drift through "${c1}"`);
+    assert.deepEqual(r.spec.visibility ?? null, expectVis, `visibility drift through "${c1}"`);
+    assert.equal(r.faceDown, !!(expectVis && expectVis.mode === 'held'), `faceDown drift through "${c1}"`);
     assert.equal(validateMods(r.spec.dice, r.spec.mods), null, `validateMods rejects "${c1}"`);
     // composition must not throw
     composeRoll(r.spec.dice, r.spec.mods, rng);

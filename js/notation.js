@@ -23,10 +23,11 @@ limitations under the License.
 // Grammar:
 //   command  := [mode SP] expr (SP flag)* [SP dc] [SP comment]
 //   mode     := /roll /r          (no effect)
-//             | /gmroll /gmr /selfroll /sr   (accepted input; normalizes to the
-//               'held' trailing flag — canonical emits 'held', never a prefix.
-//               /selfroll still maps to held; real secret semantics are
-//               roadmap step 4)
+//             | /gmroll /gmr     (normalizes to the 'held' trailing flag)
+//             | /selfroll /sr    (normalizes to the 'secret' trailing flag)
+//               (accepted input only — canonical emits the flag, never a
+//               prefix; a prefix plus an AGREEING flag is fine, a prefix
+//               plus a different visibility flag is the exclusion error)
 //   expr     := term (("+"|"-") term)*
 //   term     := integer ["[" label "]"] | [count] dieType gluedMod*
 //   dieType  := d4 d6 d8 d10 d10x d12 d20 | d100 | d%   (d100/d% → d10x+d10)
@@ -35,8 +36,20 @@ limitations under the License.
 //   reroll   := (ro|r) ("<="|"<") int      (Roll20 "<" is inclusive → same N;
 //                                           always once-per-die here)
 //   flag     := adv | dis | keep | reroll | "!"   (group-wide trailing form)
-//             | kind | "held"              (docs/UX.md §7.6 moment flags)
+//             | kind                       (docs/UX.md §7.6 moment flags)
+//             | vis                        (GOALS.md goal 11 visibility)
 //   kind     := "check" | "cinematic" | "cine"    (alias cine → cinematic)
+//   vis      := "held" | "secret" | "w:" names    (mutually exclusive — two
+//               visibility flags in one command is invalid; one visibility
+//               slot in the canonical order, where 'held' has always sat)
+//   names    := name ("," name)*           (whisper audience; NO whitespace
+//               around the commas. A name containing spaces, commas or
+//               quotes — or leading/trailing whitespace — must be quoted:
+//               w:"Ann Smith",Bob. Inside quotes '\"' is a literal quote;
+//               any other backslash is literal. Name case is preserved as
+//               typed (roster matching downstream is case-insensitive);
+//               duplicate names (case-insensitive) collapse with a warning.
+//               A name cannot contain '#' — the comment split runs first)
 //   dc       := ("dc"|"vs") int            (1..999; the experience Target)
 //   comment  := "#" title ["|" subtitle]   (title ≤64 chars, roll label / mat
 //               text; the FIRST unescaped "|" splits off the moment subtitle,
@@ -47,8 +60,8 @@ limitations under the License.
 //               convenience, not grammar)
 //
 // Canonical flag order:
-//   [adv|dis] [trailing keep] [trailing reroll] [!] [check|cinematic] [held]
-//   [dcN] [# comment [| subtitle]]
+//   [adv|dis] [trailing keep] [trailing reroll] [!] [check|cinematic]
+//   [held|secret|w:names] [dcN] [# comment [| subtitle]]
 //
 // The term 2d20kh1 collapses to 1d20 + advantage (2d20kl1 → disadvantage)
 // BEFORE the mixed-pool check — but only when no trailing adv/dis flag was
@@ -75,8 +88,11 @@ const MAX_PARTS = 12;
 // Moment-kind flag words (UX.md §7.6): input aliases → normalized kind.
 const KIND_WORDS = { check: 'check', cinematic: 'cinematic', cine: 'cinematic' };
 // Full keyword flags whose prefixes read as incomplete input at end-of-string
-// ("1d20 che", "1d20 hel"), mirroring couldExtend's role for the older tokens.
-const FLAG_KEYWORDS = ['check', 'cinematic', 'held'];
+// ("1d20 che", "1d20 hel", "1d20 secre", "1d20 w"), mirroring couldExtend's
+// role for the older tokens. 'w:' is the whisper flag's opening — a bare 'w'
+// at end-of-input is a prefix of it (a complete w: token never reaches the
+// keyword check; it is handled before the lowercase dispatch).
+const FLAG_KEYWORDS = ['check', 'cinematic', 'held', 'secret', 'w:'];
 
 // Strip control characters plus zero-width and bidi-control characters
 // (U+200B–200F, U+202A–202E, U+2066–2069, U+FEFF): invisible in rendered
@@ -123,6 +139,108 @@ function couldExtend(frag) {
   );
 }
 
+// Split the trailing-flag region on whitespace — except that a w: audience
+// token may carry quoted names with spaces and commas inside, so its quoted
+// spans (with \" escapes) ride inside the single token. An unterminated quote
+// consumes the rest of the string, which is what lets end-of-input decide
+// incomplete. Junk glued after a closing quote stays in the token so
+// parseWhisperFlag can name the error instead of a bogus unknown-flag split.
+function tailTokens(tail) {
+  const out = [];
+  const ws = (ch) => /\s/.test(ch);
+  let i = 0;
+  while (i < tail.length) {
+    while (i < tail.length && ws(tail[i])) i++;
+    if (i >= tail.length) break;
+    const start = i;
+    if (/^w:/i.test(tail.slice(i, i + 2))) {
+      i += 2;
+      for (;;) {
+        if (tail[i] === '"') {
+          i++;
+          while (i < tail.length) {
+            if (tail[i] === '\\' && tail[i + 1] === '"') i += 2;
+            else if (tail[i] === '"') { i++; break; }
+            else i++;
+          }
+        }
+        while (i < tail.length && !ws(tail[i]) && tail[i] !== ',') i++;
+        if (tail[i] === ',') { i++; continue; }
+        break;
+      }
+    } else {
+      while (i < tail.length && !ws(tail[i])) i++;
+    }
+    out.push(tail.slice(start, i));
+  }
+  return out;
+}
+
+// Parse one 'w:' audience token (raw text, case preserved). Names are bare
+// (no spaces, commas or quotes) or quoted ("Ann Smith"); inside quotes '\"'
+// is a literal quote and any other backslash is literal. Case-insensitive
+// duplicates collapse with a warning (roster matching downstream is
+// case-insensitive too). `last` — this token ends the input — is what
+// separates incomplete from invalid for the partial forms.
+// Returns { names } or a failure object from invalid()/incomplete().
+function parseWhisperFlag(raw, last, warnings) {
+  const names = [];
+  let i = 2; // past 'w:'
+  if (i >= raw.length) {
+    if (last) return incomplete('w: needs a name');
+    return invalid('w: needs a name', 'no space after w: — w:Ann or w:"Ann Smith",Bob');
+  }
+  for (;;) {
+    let name;
+    let quoted = false;
+    if (raw[i] === '"') {
+      quoted = true;
+      i++;
+      let out = '';
+      let closed = false;
+      while (i < raw.length) {
+        if (raw[i] === '\\' && raw[i + 1] === '"') { out += '"'; i += 2; }
+        else if (raw[i] === '"') { i++; closed = true; break; }
+        else { out += raw[i]; i++; }
+      }
+      // an open quote swallowed the rest of the input: a true prefix
+      if (!closed) return incomplete('unfinished quoted name');
+      if (i < raw.length && raw[i] !== ',') {
+        return invalid('expected a comma after the quoted name', 'like w:"Ann Smith",Bob');
+      }
+      name = out;
+    } else {
+      const j = i;
+      while (i < raw.length && raw[i] !== ',') i++;
+      name = raw.slice(j, i);
+      // a mid-name quote cannot re-render as a bare name; require the quoted
+      // form so the canonical is always re-parseable
+      if (name.includes('"')) {
+        return invalid('a name with quotes must be fully quoted', 'like w:"Ann \\"Ace\\" Smith"');
+      }
+    }
+    name = stripCtl(name);
+    if (!name) {
+      if (quoted) return invalid('empty name in w:', 'like w:Ann or w:"Ann Smith",Bob');
+      if (i >= raw.length) {
+        // 'w:Ann,' — extendable only when nothing follows in the input
+        if (last) return incomplete(names.length ? 'expected another name after the comma' : 'w: needs a name');
+        return invalid('expected a name after the comma', 'no spaces inside the list — w:Ann,Bob');
+      }
+      return invalid('empty name in w:', 'like w:Ann or w:"Ann Smith",Bob');
+    }
+    const lower = name.toLowerCase();
+    if (names.some((n) => n.toLowerCase() === lower)) {
+      warnings.push(`duplicate w: name "${name}" dropped`);
+    } else {
+      names.push(name);
+    }
+    if (raw[i] === ',') { i++; continue; }
+    break;
+  }
+  return { names };
+}
+
 export function parseNotation(input) {
   if (typeof input !== 'string') return invalid('not a string');
   if (input.length > MAX_INPUT) return invalid('command too long', `max ${MAX_INPUT} characters`);
@@ -130,14 +248,20 @@ export function parseNotation(input) {
   if (!s) return incomplete('empty command');
 
   const warnings = [];
-  let faceDown = false;
+  // Visibility (GOALS.md goal 11): a prefix-implied mode and a trailing-flag
+  // mode are tracked separately so "prefix + agreeing flag" reads as
+  // agreement while "flag twice" stays a typo and two DIFFERENT visibility
+  // spellings are the exclusion error.
+  let visPrefix = null; // 'held' (/gmroll /gmr) | 'secret' (/selfroll /sr)
+  let visFlag = null;   // {mode, names} from a trailing held/secret/w: flag
 
   // ---- mode prefix ---------------------------------------------------------
   if (s.startsWith('/')) {
     const m = /^\/([a-z]+)(?:\s+|$)/i.exec(s);
     if (!m) return invalid('bad command prefix', 'try /roll 1d20');
     const mode = m[1].toLowerCase();
-    if (['gmroll', 'gmr', 'selfroll', 'sr'].includes(mode)) faceDown = true;
+    if (['gmroll', 'gmr'].includes(mode)) visPrefix = 'held';
+    else if (['selfroll', 'sr'].includes(mode)) visPrefix = 'secret';
     else if (!['roll', 'r'].includes(mode)) {
       if (m[0].length === s.length && ('gmroll'.startsWith(mode) || 'selfroll'.startsWith(mode) || 'roll'.startsWith(mode))) {
         return incomplete('partial command prefix');
@@ -295,14 +419,43 @@ export function parseNotation(input) {
   let flagReroll = null;
   let flagExplode = false;
   let expKind = null;
-  let flagHeld = false;
   let dc = null;
 
+  // One visibility slot: a duplicate of the SAME flag is a typo; two
+  // different visibility spellings (flag or prefix) are mutually exclusive.
+  const visWord = (mode) => (mode === 'whisper' ? 'w:' : mode);
+  const visClash = (mode) => {
+    if (visFlag) {
+      if (visFlag.mode === mode) return invalid(`${visWord(mode)} specified twice`);
+      return invalid(
+        `${visWord(visFlag.mode)} and ${visWord(mode)} are mutually exclusive`,
+        'a roll has one visibility: held, secret or w:Name'
+      );
+    }
+    if (visPrefix && visPrefix !== mode) {
+      return invalid(
+        `${visWord(visPrefix)} and ${visWord(mode)} are mutually exclusive`,
+        `the /${visPrefix === 'held' ? 'gmroll' : 'selfroll'} prefix already sets ${visPrefix}`
+      );
+    }
+    return null;
+  };
+
   const tail = src.slice(exprEnd).trim();
-  const tokens = tail ? tail.split(/\s+/) : [];
+  const tokens = tail ? tailTokens(tail) : [];
   for (let ti = 0; ti < tokens.length; ti++) {
-    const tok = tokens[ti].toLowerCase();
+    const raw = tokens[ti];
     const last = ti === tokens.length - 1;
+    // The w: flag keeps its raw case — audience names are preserved as typed.
+    if (/^w:/i.test(raw)) {
+      const clash = visClash('whisper');
+      if (clash) return clash;
+      const w = parseWhisperFlag(raw, last, warnings);
+      if (w.ok === false) return w;
+      visFlag = { mode: 'whisper', names: w.names };
+      continue;
+    }
+    const tok = raw.toLowerCase();
     let m;
     if (tok === 'adv' || tok === 'advantage') {
       if (flagAdv) return invalid('advantage/disadvantage specified twice');
@@ -325,12 +478,17 @@ export function parseNotation(input) {
       if (expKind) return invalid('check/cinematic specified twice');
       expKind = KIND_WORDS[tok];
     } else if (tok === 'held') {
-      // 'held' = face down; peer of the /gmroll-family prefixes, and the only
-      // spelling the canonical form emits. Prefix + flag together is fine
-      // (they agree); the flag twice is a typo worth flagging.
-      if (flagHeld) return invalid('held specified twice');
-      flagHeld = true;
-      faceDown = true;
+      // 'held' = face down for everyone until revealed; what the /gmroll and
+      // /gmr prefixes normalize to (prefix + flag together agree).
+      const clash = visClash('held');
+      if (clash) return clash;
+      visFlag = { mode: 'held', names: [] };
+    } else if (tok === 'secret') {
+      // 'secret' = the roll exists only for the roller; what the /selfroll
+      // and /sr prefixes normalize to.
+      const clash = visClash('secret');
+      if (clash) return clash;
+      visFlag = { mode: 'secret', names: [] };
     } else if ((m = /^(dc|vs)(\d{1,4})?$/.exec(tok))) {
       let n = m[2];
       if (n === undefined) {
@@ -352,7 +510,7 @@ export function parseNotation(input) {
     } else if (last && (couldExtend(tok) || FLAG_KEYWORDS.some((w) => w.startsWith(tok)))) {
       return incomplete('unfinished flag');
     } else {
-      return invalid(`unknown flag "${tokens[ti].slice(0, 12)}"`, 'flags: adv, dis, kh/kl/dh/dl N, ro<=N, !, check, cinematic, held, dc N');
+      return invalid(`unknown flag "${tokens[ti].slice(0, 12)}"`, 'flags: adv, dis, kh/kl/dh/dl N, ro<=N, !, check, cinematic, held, secret, w:Name, dc N');
     }
   }
 
@@ -491,6 +649,13 @@ export function parseNotation(input) {
   if (reroll) mods.reroll = reroll;
   if (explode) mods.explode = true;
   const spec = { dice, mods: Object.keys(mods).length ? mods : null };
+  // Visibility rides the spec, present-or-absent: an open roll has NO
+  // visibility key (wire-shape stability), a non-open roll carries
+  // {mode, names} with names always an array ([] outside whisper).
+  // faceDown stays exactly the legacy spelling of 'held'.
+  const visibility = visFlag || (visPrefix ? { mode: visPrefix, names: [] } : null);
+  if (visibility) spec.visibility = visibility;
+  const faceDown = visibility !== null && visibility.mode === 'held';
 
   const canonical = canonicalNotation(spec, { dc, comment, exp, faceDown });
   // Escaping literal pipes and normalizing '|' spacing can grow the string a
@@ -517,6 +682,14 @@ export function parseNotation(input) {
 
 export function canonicalNotation(spec, extras = {}) {
   const { dc = null, comment = null, exp = null, faceDown = false } = extras;
+  // Visibility (GOALS.md goal 11): an explicit extras.visibility wins (null
+  // there means open), else the spec's own visibility, else the legacy
+  // faceDown alias (= held). Spec-before-faceDown matters: old callers that
+  // re-canonicalize a parse result as (res.spec, {faceDown: res.faceDown})
+  // must not downgrade a secret/whisper spec to open.
+  const visibility = extras.visibility !== undefined
+    ? extras.visibility
+    : (spec.visibility || (faceDown ? { mode: 'held' } : null));
   const m = spec.mods || {};
   const counts = new Map();
   for (const t of spec.dice) counts.set(t, (counts.get(t) || 0) + 1);
@@ -562,7 +735,19 @@ export function canonicalNotation(spec, extras = {}) {
   // (mixed pools, the d100 pool, and the collapse-avoiding 2d20-keep-1 case)
   if (!glueInline && glue.length) flags.push(...glue);
   if (exp && exp.kind) flags.push(exp.kind);
-  if (faceDown) flags.push('held');
+  if (visibility && visibility.mode) {
+    if (visibility.mode === 'whisper') {
+      // Quote ONLY names that need it — spaces, commas, quotes, or leading/
+      // trailing whitespace (all matched by /[\s,"]/ on the name itself);
+      // '"' inside a quoted name escapes as '\"'. Names the parser can
+      // produce always re-parse (a quoted name can never end in a lone
+      // backslash — the parse would have read it as an escape and refused).
+      const fmt = (n) => (/[\s,"]/.test(n) ? '"' + n.replace(/"/g, '\\"') + '"' : n);
+      flags.push('w:' + (visibility.names || []).map(fmt).join(','));
+    } else {
+      flags.push(visibility.mode); // 'held' | 'secret'
+    }
+  }
   if (flags.length) out += ' ' + flags.join(' ');
   if (dc) out += ' dc' + dc;
 
