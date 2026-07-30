@@ -17,12 +17,15 @@ limitations under the License.
 // App-level e2e harness. One dice server + one headless Chrome per run; each
 // scenario gets a FRESH ROOM (rooms are independent in-memory worlds, so a
 // new room name is complete isolation — the server never needs restarting).
-// Two identities come from the two-origin trick: localhost and 127.0.0.1 are
-// distinct localStorage origins on the same server.
+// Separate identities come from the loopback-origin trick: localhost and every
+// address in 127.0.0.0/8 are distinct localStorage origins on the same server.
 //
 // Scenarios drive the app through window.__diceDebug (the supported headless
 // test surface — hidden/headless pages must not rely on rAF timing) and
-// assert on projected primitives, never on live app objects.
+// assert on projected primitives, never on live app objects. A scenario may
+// also step outside the browser entirely: apiPost/RawPlayer speak to the
+// server as a bare HTTP client, which is how redaction gets proved on the
+// bytes rather than on what a client chose to render.
 
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -65,6 +68,83 @@ export async function startServer(port) {
     await sleep(100);
   }
   throw new Error(`server never came up on :${port}\n${out.slice(-2000)}`);
+}
+
+// POST a JSON body straight at the server, no browser in between. Scenarios
+// use this to assert what the API itself does (status + error code) when the
+// client deliberately says nothing about a refusal.
+export async function apiPost(port, path, body) {
+  const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10000),
+  });
+  let data = null;
+  try { data = await res.json(); } catch { /* empty body */ }
+  return { status: res.status, ok: res.ok, data };
+}
+
+// A player who exists only as bytes: joins over HTTP and holds an SSE stream
+// open, keeping every character the server ever sent it. This is the redaction
+// proof at the e2e layer — no client code in the path to hide a leak by
+// declining to render it. `raw` is the exact stream text; `events()` parses it.
+export class RawPlayer {
+  constructor(port, room, name) {
+    this.port = port;
+    this.room = room;
+    this.name = name;
+    this.playerId = null;
+    this.joinPayload = null;
+    this.raw = '';
+    this.ac = new AbortController();
+  }
+
+  static async join(port, room, name) {
+    const p = new RawPlayer(port, room, name);
+    const joined = await apiPost(port, '/api/join', { room, name });
+    if (!joined.ok || !joined.data || !joined.data.playerId) {
+      throw new Error(`raw player ${name} could not join: ${joined.status}`);
+    }
+    p.playerId = joined.data.playerId;
+    p.joinPayload = joined.data;
+    const res = await fetch(
+      `http://127.0.0.1:${port}/api/events?room=${encodeURIComponent(room)}`
+      + `&playerId=${encodeURIComponent(p.playerId)}`,
+      { signal: p.ac.signal },
+    );
+    if (!res.ok || !res.body) throw new Error(`raw player ${name} stream failed: ${res.status}`);
+    p.reading = (async () => {
+      for await (const chunk of res.body) p.raw += Buffer.from(chunk).toString('utf8');
+    })().catch(() => { /* aborted on close */ });
+    return p;
+  }
+
+  // Parsed [{type, data}] — for asserting which events arrived at all.
+  events() {
+    return this.raw
+      .split('\n\n')
+      .map((block) => {
+        const type = /(?:^|\n)event: (.*)/.exec(block);
+        const data = /(?:^|\n)data: (.*)/.exec(block);
+        if (!type || !data) return null;
+        try { return { type: type[1], data: JSON.parse(data[1]) }; } catch { return null; }
+      })
+      .filter(Boolean);
+  }
+
+  // Wait until an event of `type` (optionally matching a predicate) arrives.
+  async waitForEvent(type, match = () => true, { timeout = 15000 } = {}) {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      const hit = this.events().find((e) => e.type === type && match(e.data));
+      if (hit) return hit;
+      await sleep(100);
+    }
+    throw new Error(`timeout waiting for raw '${type}' event (got: ${this.events().map((e) => e.type).join(', ')})`);
+  }
+
+  close() { try { this.ac.abort(); } catch { /* already gone */ } }
 }
 
 // A Table is one player's tab. `origin` picks the localStorage identity
@@ -134,6 +214,16 @@ export class Table {
   diceCount() { return this.dbg('tableDice.length'); }
   shelf() { return this.dbg('shelf'); }
 
+  // This tab's server identity (null offline) — the credential a scenario
+  // needs to speak to the API as this player.
+  playerId() { return this.dbg('net.playerId'); }
+
+  // Redaction/reveal projection of one log entry (the newest when no id):
+  // {hidden, redacted, revealed, faceDown, visMode, total, values, dc, canReveal}.
+  entryState(rollId = null) {
+    return this.dbg(`entryState(${rollId === null ? '' : JSON.stringify(rollId)})`);
+  }
+
   async close() { await this.page.close(); }
 }
 
@@ -143,10 +233,23 @@ export class Ctx {
     this.port = port;
     this.room = room;
     this.tables = [];
+    this.rawPlayers = [];
   }
 
-  // origin: 'localhost' | '127.0.0.1' (distinct identities); name seeds the
-  // player name before the app boots.
+  // Speak to this room's API directly (room is filled in for you).
+  api(path, body = {}) { return apiPost(this.port, path, { room: this.room, ...body }); }
+
+  // Join this room as a bytes-only player (see RawPlayer).
+  async rawPlayer(name) {
+    const p = await RawPlayer.join(this.port, this.room, name);
+    this.rawPlayers.push(p);
+    return p;
+  }
+
+  // origin picks the localStorage identity bucket: 'localhost', '127.0.0.1'
+  // and the rest of 127.0.0.0/8 ('127.0.0.2', '127.0.0.3', …) are all distinct
+  // origins on the same server, which is how a scenario seats three or four
+  // players. name seeds the player name before the app boots.
   async newTable({ origin = 'localhost', name } = {}) {
     const page = await this.browser.newPage();
     if (name) {
@@ -166,6 +269,7 @@ export class Ctx {
   }
 
   async closeAll() {
+    for (const p of this.rawPlayers.splice(0)) p.close();
     for (const t of this.tables.splice(0)) await t.close();
   }
 
