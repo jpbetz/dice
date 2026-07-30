@@ -334,6 +334,27 @@ export const scenarios = [
       const line = await c.logTop();
       assert.ok(/whispered/.test(line), `Carol’s log says whispered (got: ${line})`);
       assert.ok(line.includes('Alice'), `existence is public (got: ${line})`);
+
+      // Audience names match the roster case-insensitively…
+      await a.roll('d20 w:bob');
+      const lower = await a.rollId();
+      await b.waitFor(
+        `(window.__diceDebug.sim(120), !window.__diceDebug.busy`
+        + ` && (window.__diceDebug.entryState(${JSON.stringify(lower)}) || {}).hidden === false)`,
+        { desc: 'a lowercase name still reaches Bob' },
+      );
+      // …and a name that needs quoting survives parse → wire → roster match.
+      const renamed = await ctx.api('/api/rename', { playerId: await c.playerId(), name: 'Ann Smith' });
+      assert.equal(renamed.status, 200, 'rename accepted');
+      await a.roll('d20 w:"Ann Smith"');
+      const quoted = await a.rollId();
+      await c.waitFor(
+        `(window.__diceDebug.sim(120), !window.__diceDebug.busy`
+        + ` && (window.__diceDebug.entryState(${JSON.stringify(quoted)}) || {}).hidden === false)`,
+        { desc: 'the quoted audience name resolves' },
+      );
+      await b.waitFor(shroudSettled(quoted), { desc: 'Bob is the bystander this time' });
+      assert.equal((await b.entryState(quoted)).hidden, true, 'and reads nothing of it');
     },
   },
   {
