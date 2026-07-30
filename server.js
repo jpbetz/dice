@@ -66,12 +66,13 @@ const JOIN_GRACE_MS = 60_000;        // time to open the SSE stream after join
 // js/rollspec.js inlines for the same reason) — the three must stay identical.
 const stripCtl = (t) => t.replace(/[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, '');
 
-// Truncate user text to at most `max` UTF-16 units the way js/notation.js cuts
-// a comment (trim \u2192 slice \u2192 trim, so a cut landing on a space cannot leave
-// trailing whitespace), with one extra guard notation.js's own cut lacks: a
-// slice ending inside a surrogate pair would strand its high half, and that
-// lone surrogate renders as U+FFFD everywhere the text is shown \u2014 drop it
-// before the final trim. Callers pass already-stripCtl'd text.
+// Truncate user text to at most `max` UTF-16 units exactly the way
+// js/notation.js's exported cutText does: trim \u2192 slice \u2192 surrogate guard \u2192
+// trim, so a cut landing on a space cannot leave trailing whitespace and a
+// slice ending inside a surrogate pair cannot strand its high half (a lone
+// surrogate renders as U+FFFD everywhere the text is shown and is not even
+// URL-encodable). Deliberate copy, like stripCtl above \u2014 the layers must cut
+// identically. Callers pass already-stripCtl'd text.
 function cutText(text, max) {
   let cut = text.trim().slice(0, max);
   const last = cut.charCodeAt(cut.length - 1);
