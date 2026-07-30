@@ -1757,13 +1757,18 @@ rollTrayBtn.addEventListener('click', () => {
   paintCmd();
   const name = groupNameInput.value.trim();
   if (cmdResult && cmdResult.ok) {
+    // Same derivation as Enter (commandRoll): the moment the string DECLARES
+    // wins, and dc→check only fills the gap. Reading the dc alone dropped a
+    // 'cinematic'/'check' the player had typed (solo played it Plain) and let
+    // the online and solo paths disagree about the same text.
+    const intent = notationIntent(cmdInput.value.trim(), cmdResult);
     requestRoll(cmdResult.spec.dice, name || cmdResult.comment || cmdResult.canonical, {
-      notation: cmdInput.value.trim(),
-      canonical: cmdResult.canonical,
+      notation: intent.notation,
+      canonical: intent.canonical,
       mods: cmdResult.spec.mods || undefined,
       faceDown: cmdResult.faceDown,
       dc: cmdResult.dc ?? undefined,
-      exp: cmdResult.dc != null ? { kind: 'check' } : undefined, // dc implies Check (§2.3)
+      exp: intent.exp || undefined,
     });
   } else if (tray.length) {
     requestRoll([...tray], name || formula(tray));
@@ -1781,7 +1786,10 @@ trayModsBtn.addEventListener('click', () => {
 
 clearTrayBtn.addEventListener('click', () => {
   tray = [];
-  boxExtras = { mods: null, dc: null, comment: null };
+  // Every key of the declared draft shape, including the two §7.6 added:
+  // canonicalNotation's defaults would absorb the missing ones today, but a
+  // half-shaped boxExtras is a trap for the next reader of it.
+  boxExtras = { mods: null, dc: null, comment: null, exp: null, faceDown: false };
   cmdInput.value = '';
   renderTray();
   paintCmd();
