@@ -95,20 +95,29 @@ const FELT_THEMES = {
 const DEFAULT_FELT = 'emerald';
 let currentFeltId = DEFAULT_FELT;
 
-// The collect shelf (UX §7.7): five recessed slots along the bottom (front)
-// felt edge, part of the felt texture itself so they survive theme changes and
-// mat-text decals alike. A collected roll's dice cluster in one slot, ordered
-// by collection (reflowShelf). Geometry is shared by the texture decals, the
-// cluster layout, the camera framing, and the marker projection — one set of
-// numbers, four readers. The tray is the pile's boundary, so its size is what
-// clusterPoses fits against; keep the slots inside the felt (|x| < TABLE_W/2,
-// SHELF_Z + D/2 < TABLE_D/2) and clear of each other (W < the 5.9 pitch).
+// The collect shelf (UX §7.7, refined §7.7.1): five slot POSITIONS along the
+// bottom (front) felt edge. No permanent markings — an empty position is plain
+// felt (§7.7.1 "no casino markings"); an OCCUPIED position gets a soft warm
+// under-glow ring composited into the felt beneath its cluster, which appears
+// as the whisk lands and leaves with the roll. A collected roll's dice cluster
+// in one slot, ordered by collection (reflowShelf). Geometry is shared by the
+// glow decals, the cluster layout, the camera framing, and the marker
+// projection — one set of numbers, four readers. The slot is the pile's
+// boundary, so its size is what clusterPoses fits against; keep the slots
+// inside the felt (|x| < TABLE_W/2, SHELF_Z + D/2 < TABLE_D/2) and clear of
+// each other (W < the 5.9 pitch).
 const SHELF_SLOTS = 5;
 const SHELF_Z = 6.6;                 // slot center (world z; front wall is +8.5)
 const SHELF_SLOT_W = 5.4;            // slot decal width  (x units)
 const SHELF_SLOT_D = 3.6;            // slot decal depth  (z units)
 const SHELF_MARKER_Y = 2.4;          // marker anchor height above the slot
 const shelfSlotX = (slot) => (slot - (SHELF_SLOTS - 1) / 2) * 5.9;
+
+// rollId -> {rollId, seq, slot, diceCount, markerEl, glow}. Declared here —
+// not with the rest of the shelf machinery below — because the felt composite
+// reads it (drawShelfGlow) and the floor texture is built during module
+// evaluation, before the shelf section runs.
+const shelfClusters = new Map();
 
 // One 512px felt tile per base color (cached — the decal composite redraws it
 // 36 times per ceremony and regenerating the noise each time would visibly
@@ -133,13 +142,14 @@ function feltTileCanvas(base) {
   return c;
 }
 
-// Felt composite (UX §5.4, §7.7): the floor texture is ALWAYS a single
-// 2048-px composite covering the whole 160-unit plane once (repeat 1,1) —
-// the 6×6 felt tile pattern, the five shelf slot decals pressed into the
-// front edge, and, during a ceremony, the mat-text declaration line in
-// letterspaced gold caps. applyFeltTheme mid-ceremony recomposites onto the
-// new base; clearMatDecal drops only the text — the slots never leave. Old
-// textures are always disposed by whoever replaces them.
+// Felt composite (UX §5.4, §7.7, §7.7.1): the floor texture is ALWAYS a
+// single 2048-px composite covering the whole 160-unit plane once (repeat
+// 1,1) — the 6×6 felt tile pattern, a soft under-glow ring beneath each
+// OCCUPIED shelf position, and, during a ceremony, the mat-text declaration
+// line in letterspaced gold caps. applyFeltTheme mid-ceremony recomposites
+// onto the new base; clearMatDecal drops only the text; recompositeFelt
+// repaints on every shelf occupancy change so the rings arrive and leave with
+// their clusters. Old textures are always disposed by whoever replaces them.
 const DECAL_SIZE = 2048;                    // px across the 160-unit plane
 const DECAL_PX_PER_UNIT = DECAL_SIZE / 160;
 let matDecalText = null;                    // non-null while a decal is applied
@@ -148,40 +158,56 @@ let matDecalText = null;                    // non-null while a decal is applied
 // table center and +z (the lower felt, where the shelf lives) is +y.
 const decalPx = (v) => (v + 80) * DECAL_PX_PER_UNIT;
 
-// The five recessed slot rectangles (§7.7). Subtle on purpose: a darker pool
-// with a shadowed top edge and a faint lit lower lip, like a tray pressed
-// into the felt — visible on every theme, but never louder than the dice.
-function drawShelfSlots(ctx) {
-  const u = DECAL_PX_PER_UNIT;
-  const w = SHELF_SLOT_W * u;
-  const h = SHELF_SLOT_D * u;
-  const r = 0.55 * u;
-  const rect = (x, y, rw, rh, rr) => {
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x, y, rw, rh, rr);
-    else ctx.rect(x, y, rw, rh);
-  };
-  for (let slot = 0; slot < SHELF_SLOTS; slot++) {
-    const cx = decalPx(shelfSlotX(slot));
+// How far a cluster's glow reaches (world units): the pile's own footprint —
+// max horizontal spread of its poses plus each die's radius — with a soft
+// margin, so a lone d4's ring hugs it while a 9-die pile earns a wider halo.
+// clusterPoses is pure, so this matches the dice wherever the whisk is.
+function clusterGlowRadius(c) {
+  const dice = tableDice.filter((d) => d.rollId === c.rollId);
+  if (!dice.length) return SHELF_SLOT_W * 0.45;
+  const poses = clusterPoses(c.slot, dice.map((d) => ({ type: d.type, value: d.shelfValue })));
+  let r = 0;
+  dice.forEach((d, i) => {
+    const p = canonicalDiePose(d.type, d.shelfValue);
+    const reach = Math.hypot(poses[i].pos.x - shelfSlotX(c.slot), poses[i].pos.z - SHELF_Z) + p.r;
+    if (reach > r) r = reach;
+  });
+  return Math.min(Math.max(r * 1.35, 1.7), SHELF_SLOT_W * 0.55);
+}
+
+// §7.7.1 "no casino markings": nothing is drawn where nothing sits. An
+// OCCUPIED position gets a soft warm-gold radial under-glow — arcane circle,
+// not casino tray — slightly larger than its cluster's footprint, low alpha
+// so every theme keeps it quieter than the dice. A cluster mid-whisk
+// (glow=false) hasn't landed yet: its ring appears at whisk-end.
+function drawShelfGlow(ctx) {
+  for (const c of shelfClusters.values()) {
+    if (!c.glow || c.slot < 0) continue;
+    const cx = decalPx(shelfSlotX(c.slot));
     const cy = decalPx(SHELF_Z);
+    const r = clusterGlowRadius(c) * DECAL_PX_PER_UNIT;
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, 'rgba(255, 214, 120, 0.10)');
+    g.addColorStop(0.62, 'rgba(255, 205, 100, 0.17)');
+    g.addColorStop(0.82, 'rgba(255, 196, 88, 0.07)');
+    g.addColorStop(1, 'rgba(255, 196, 88, 0)');
     ctx.save();
-    rect(cx - w / 2, cy - h / 2, w, h, r);
-    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = 'rgba(0,0,0,0.32)';
-    ctx.stroke();
-    rect(cx - w / 2 + 3, cy - h / 2 + 3, w - 6, h - 6, Math.max(r - 3, 2));
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = 'rgba(255,246,224,0.06)';
-    ctx.stroke();
     ctx.restore();
   }
 }
 
-// One full-plane felt composite: tiles + shelf slots (+ mat text).
-function feltCanvas(base, text) {
-  const c = document.createElement('canvas');
+// The text-free TILE layer is cached per base color: theme swaps, decal
+// clears, and every shelf recomposite reuse the same canvas instead of
+// re-noising 36 tiles each time. Glow and text are painted over a copy.
+const feltCompositeCache = new Map();
+function baseFeltCanvas(base) {
+  let c = feltCompositeCache.get(base);
+  if (c) return c;
+  c = document.createElement('canvas');
   c.width = c.height = DECAL_SIZE;
   const ctx = c.getContext('2d');
   const tile = feltTileCanvas(base);
@@ -189,7 +215,17 @@ function feltCanvas(base, text) {
   for (let x = 0; x < 6; x++) {
     for (let y = 0; y < 6; y++) ctx.drawImage(tile, x * tileSize, y * tileSize, tileSize, tileSize);
   }
-  drawShelfSlots(ctx);
+  feltCompositeCache.set(base, c);
+  return c;
+}
+
+// One full-plane felt composite: tiles + occupied-slot glow (+ mat text).
+function feltCanvas(base, text) {
+  const c = document.createElement('canvas');
+  c.width = c.height = DECAL_SIZE;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(baseFeltCanvas(base), 0, 0);
+  drawShelfGlow(ctx);
   if (!text) return c;
 
   const line = text.toUpperCase();
@@ -211,19 +247,8 @@ function feltCanvas(base, text) {
   return c;
 }
 
-// The text-free composite is cached per base color: theme swaps and decal
-// clears reuse the same canvas instead of re-noising 36 tiles every time.
-const feltCompositeCache = new Map();
-
 function makeFeltTexture(base) {
-  let c = feltCompositeCache.get(base);
-  if (!c) {
-    c = feltCanvas(base, null);
-    feltCompositeCache.set(base, c);
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  return decalTexture(base, null);
 }
 
 function decalTexture(base, text) {
@@ -251,6 +276,16 @@ function clearMatDecal() {
   swapFloorMap(makeFeltTexture(FELT_THEMES[currentFeltId].feltBase));
 }
 
+// Repaint the live floor for the current shelf occupancy: same base, same mat
+// text, fresh glow rings. Called on every shelf change (reflowShelf, the
+// whisk-end landing, the corner sweep) — the same recomposite path mat text
+// already rides, so theme changes and ceremonies compose with the rings.
+function recompositeFelt() {
+  swapFloorMap(matDecalText !== null
+    ? decalTexture(FELT_THEMES[currentFeltId].feltBase, matDecalText)
+    : makeFeltTexture(FELT_THEMES[currentFeltId].feltBase));
+}
+
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(160, 160),
   new THREE.MeshStandardMaterial({
@@ -269,10 +304,9 @@ function applyFeltTheme(id) {
   const theme = FELT_THEMES[id];
   if (!theme) return false;
   currentFeltId = id;
-  // A theme change mid-ceremony keeps the mat text: recomposite on the new base.
-  swapFloorMap(matDecalText !== null
-    ? decalTexture(theme.feltBase, matDecalText)
-    : makeFeltTexture(theme.feltBase));
+  // A theme change mid-ceremony keeps the mat text (and any shelf glow):
+  // recomposite on the new base.
+  recompositeFelt();
   scene.background = new THREE.Color(theme.sceneBg);
   renderFeltSwatches(); // keep the settings-modal selection mirrored
   return true;
@@ -435,6 +469,7 @@ function resetTableSurface() {
   chipsLayer.innerHTML = '';
   whisking = [];
   shelfClusters.clear();
+  recompositeFelt(); // the swept shelf takes its glow rings with it
   shelfLayer.innerHTML = '';
   banner.classList.add('hidden');
 }
@@ -573,7 +608,8 @@ function requestClearRoll(rollId) {
 const WHISK_S = 0.4;                  // collect whisk: slide + settle duration
 const shelfLayer = document.getElementById('shelf-layer');
 const rollStates = new Map();         // rollId -> {collected: seq|null, cleared}
-const shelfClusters = new Map();      // rollId -> {rollId, seq, slot, diceCount, markerEl}
+// shelfClusters (rollId -> cluster) is declared up in the felt section: the
+// floor composite reads it before this section evaluates.
 const pendingCollects = new Map();    // rollId -> seq, deferred like pendingClears
 let whisking = [];                    // {die, t, fromPos, fromQuat, toPos, toQuat}
 let soloCollectSeq = 0;               // solo mirror of the server's room counter
@@ -689,6 +725,10 @@ function placeCluster(c, animate) {
   const poses = clusterPoses(c.slot, dice.map((d) => ({ type: d.type, value: d.shelfValue })));
   const moving = new Set(dice);
   whisking = whisking.filter((w) => !moving.has(w.die)); // one whisk per die
+  // The under-glow belongs to a LANDED cluster (§7.7.1): dice about to whisk
+  // hold their ring back until stepWhisking sees them arrive; instant
+  // placements (hello reconstruction, spawned shelved dice) glow at once.
+  c.glow = !(animate && dice.some((d) => !d.shelfSpawn));
   dice.forEach((d, i) => {
     const { pos, quat } = poses[i];
     d.body.position.set(pos.x, pos.y, pos.z);
@@ -737,6 +777,10 @@ function reflowShelf(animate = true) {
     placeCluster(c, animate);
   });
   positionShelfMarkers();
+  // Occupancy changed (a collect, an eviction, a hole closing up): the felt's
+  // glow rings follow immediately — a departed cluster's ring must never
+  // outlive it, and a landed survivor's ring moves to its new slot.
+  recompositeFelt();
 }
 
 // Move one roll onto the shelf. animate=true plays the ~400 ms whisk; false
@@ -768,7 +812,7 @@ function shelveRoll(rollId, seq, animate) {
   }
 
   shelfClusters.set(rollId, {
-    rollId, seq, slot: -1, placed: false, diceCount: dice.length, markerEl: null,
+    rollId, seq, slot: -1, placed: false, diceCount: dice.length, markerEl: null, glow: false,
   });
   // The moment leaves the felt surfaces: banner and verdict card for THIS
   // roll close everywhere; the log line and the marker carry it from here.
@@ -802,6 +846,16 @@ function stepWhisking(dt) {
     w.die.mesh.quaternion.copy(w.toQuat);
     return false;
   });
+  // Whisk-end is when a cluster's under-glow fades in (§7.7.1 "appears as the
+  // whisk lands"): light every cluster whose dice have all arrived.
+  let landed = false;
+  for (const c of shelfClusters.values()) {
+    if (!c.glow && !whisking.some((w) => w.die.rollId === c.rollId)) {
+      c.glow = true;
+      landed = true;
+    }
+  }
+  if (landed) recompositeFelt();
 }
 
 // One compact marker per shelved roll: roller color dot + total + the active
@@ -2218,7 +2272,10 @@ window.__diceDebug = {
   get shelf() {
     return [...shelfClusters.values()]
       .sort((a, b) => a.seq - b.seq)
-      .map((c) => ({ rollId: c.rollId, seq: c.seq, slot: c.slot, diceCount: c.diceCount }));
+      .map((c) => ({
+        rollId: c.rollId, seq: c.seq, slot: c.slot, diceCount: c.diceCount,
+        glow: !!c.glow, glowRadius: c.glow ? clusterGlowRadius(c) : 0,
+      }));
   },
   get whiskingCount() { return whisking.length; },
   get pendingCollects() { return [...pendingCollects.keys()]; },
