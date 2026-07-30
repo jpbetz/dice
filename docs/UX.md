@@ -863,3 +863,30 @@ structured metadata in the comment section. Adopted design (two halves):
 - Rejected alternative: `@check` tokens inside the comment — it overloads
   the one free-text field with grammar and makes the title's boundaries
   ambiguous; the flag position already exists for exactly this.
+
+### 7.7 The collect shelf (table organization — supersedes landing zones)
+
+Joe's direction (2026-07-30), synthesized: the main felt belongs to ONE roll
+at a time; history lives on a shelf.
+
+- **Shelf**: 5 recessed slots along the bottom felt edge, rendered in the 3D
+  scene (identical in compact view). A collected roll's dice sit in its slot
+  as a tight cluster; a compact marker floats above it: roller color dot +
+  total + meaning word (active-profile lens).
+- **Collect**: replaces Done as the roller's primary on verdict card and
+  banner (POST /api/collect-roll, roller-only, idempotent, broadcast
+  'roll-collected'). Dice whisk to the slot (~400ms dt-driven slide; full
+  chips retire into the marker).
+- **Auto-collect**: when a new roll EXECUTES, the server marks every prior
+  settled-uncollected roll collected (deterministic, no client races) —
+  the felt is cleared for the incoming roll as part of its arrival beat.
+- **Slots are FIFO**: the server assigns slot order by collection order;
+  collecting past capacity marks the oldest collected roll cleared (existing
+  sink/fade). The 40-dice whole-table wipe is retired.
+- **Housekeeping is universal**: a COLLECTED roll may be cleared by anyone
+  (slot ✕ or its marker); an uncollected roll's dice remain roller-only to
+  clear. Corner ✕ sweeps everything, unchanged.
+- **Resync**: hello/join carries per-roll state (uncleared rolls: on-felt |
+  collected+order). Clients reconstruct the felt (settled replay of the
+  newest on-felt roll, no tumble) and the shelf identically — closing the
+  audit's empty-felt-on-reload gap.
