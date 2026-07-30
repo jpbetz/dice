@@ -114,10 +114,14 @@ export async function connect({ room, name, onEvent, onStatus } = {}) {
     // caller must never animate from this return value.
     // opts: {mods, faceDown, dc, notation, exp}. When notation is present it
     // is sent ALONE (plus label): the server re-parses it with js/notation.js
-    // and derives dice/mods/dc/faceDown itself — the client's parse is preview
-    // only, and the wire contract rejects notation combined with dice/mods.
-    // exp {kind:'check'|'cinematic', subtitle?} is a sibling either way (the
-    // roll-moment attachment, UX §2) and is echoed on the roll broadcast.
+    // and derives dice/mods/dc/faceDown/exp itself — the client's parse is
+    // preview only, and the wire contract rejects notation combined with
+    // dice/mods. Since UX §7.6 the roll moment has a spelling too ('check' /
+    // 'cinematic' + the comment's '| subtitle'), so on the notation shape it
+    // rides IN the string and an exp field beside it is dropped rather than
+    // sent: the server refuses one that disagrees, and agreement is the
+    // string's job. On the explicit shape exp {kind, subtitle?} is a sibling
+    // of dice/mods (UX §2) and is echoed on the roll broadcast.
     async roll(dice, label = '', opts = {}) {
       const body = { label: label || '' };
       if (typeof opts.notation === 'string' && opts.notation) {
@@ -127,8 +131,8 @@ export async function connect({ room, name, onEvent, onStatus } = {}) {
         if (opts.mods) body.mods = opts.mods;
         if (opts.faceDown) body.faceDown = true;
         if (Number.isInteger(opts.dc)) body.dc = opts.dc;
+        if (opts.exp) body.exp = opts.exp;
       }
-      if (opts.exp) body.exp = opts.exp;
       const res = await withPlayer('/api/roll', body);
       return res.ok && res.data ? res.data.roll : null;
     },
@@ -159,7 +163,8 @@ export async function connect({ room, name, onEvent, onStatus } = {}) {
     },
 
     // Broadcast a prepared roll card anyone can execute once. Same exclusive
-    // notation-vs-dice/mods wire shape as roll(); exp rides along the same way.
+    // notation-vs-dice/mods wire shape as roll(), and the same rule for the
+    // moment: in the string on the notation shape, a sibling field otherwise.
     async offer({ label, dice, mods, faceDown, dc, notation, exp } = {}) {
       const body = { label: label || '' };
       if (typeof notation === 'string' && notation) {
@@ -169,8 +174,8 @@ export async function connect({ room, name, onEvent, onStatus } = {}) {
         if (mods) body.mods = mods;
         if (faceDown) body.faceDown = true;
         if (Number.isInteger(dc)) body.dc = dc;
+        if (exp) body.exp = exp;
       }
-      if (exp) body.exp = exp;
       const res = await withPlayer('/api/offer', body);
       return res.ok && res.data ? res.data.offer : null;
     },

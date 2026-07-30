@@ -1873,6 +1873,27 @@ function syncBoxFromTray() {
   paintCmd();
 }
 
+// What a notation string actually rolls: the moment it DECLARES wins, and the
+// dc→check dressing (§2.3) only fills the gap when it declares none — there is
+// no dc→check implication in the grammar (§7.6).
+//
+// When the convenience applies, the flag is baked INTO the string that goes up
+// so the server derives the same moment we do: a notation carries its own
+// dc/faceDown/exp, and an exp field that disagrees with it is refused (one
+// shared truth — nobody guesses which side the player meant). A string that
+// already declares its moment is sent RAW, untouched, prefixes and all.
+function notationIntent(raw, res) {
+  const exp = res.exp || (res.dc != null ? { kind: 'check' } : null);
+  if (!exp || res.exp) return { exp, notation: raw, canonical: res.canonical };
+  const dressed = canonicalNotation(res.spec, {
+    dc: res.dc,
+    comment: res.comment,
+    exp,
+    faceDown: res.faceDown,
+  });
+  return { exp, notation: dressed, canonical: dressed };
+}
+
 // Execute a notation string (Enter, or the __diceDebug hook). Online the RAW
 // string is sent — /gmroll-family prefixes survive to the server, which
 // re-parses and is authoritative. Solo runs our own parse.
@@ -1880,13 +1901,14 @@ function commandRoll(input) {
   const raw = (typeof input === 'string' ? input : cmdInput.value).trim();
   const res = parseNotation(raw);
   if (!res.ok) return res;
+  const intent = notationIntent(raw, res);
   requestRoll(res.spec.dice, res.comment || res.canonical, {
-    notation: raw,
-    canonical: res.canonical,
+    notation: intent.notation,
+    canonical: intent.canonical,
     mods: res.spec.mods || undefined,
-    faceDown: res.faceDown,
+    faceDown: res.faceDown, // 'held' and the /gmroll family both land here
     dc: res.dc ?? undefined,
-    exp: res.dc != null ? { kind: 'check' } : undefined, // dc implies Check (§2.3)
+    exp: intent.exp || undefined,
   });
   return res;
 }
@@ -1900,8 +1922,7 @@ function commandOffer(input) {
   if (!netOnline || !net) return res;
   net.offer({
     label: res.comment || res.canonical,
-    notation: raw,
-    exp: res.dc != null ? { kind: 'check' } : undefined, // dc implies Check (§2.3)
+    notation: notationIntent(raw, res).notation,
   });
   return res;
 }
@@ -2013,13 +2034,14 @@ function loadIntoBox(notation, name) {
 function rollGroup(g) {
   const res = parseNotation(g.notation);
   if (!res.ok) return;
+  const intent = notationIntent(g.notation, res);
   requestRoll(res.spec.dice, g.name || res.comment || res.canonical, {
-    notation: g.notation,
-    canonical: res.canonical,
+    notation: intent.notation,
+    canonical: intent.canonical,
     mods: res.spec.mods || undefined,
-    faceDown: res.faceDown,
+    faceDown: res.faceDown, // saved groups carry 'held' now (§7.6)
     dc: res.dc ?? undefined,
-    exp: res.dc != null ? { kind: 'check' } : undefined, // dc implies Check (§2.3)
+    exp: intent.exp || undefined,
   });
 }
 
