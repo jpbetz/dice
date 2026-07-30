@@ -95,6 +95,17 @@ const FELT_THEMES = {
 const DEFAULT_FELT = 'emerald';
 let currentFeltId = DEFAULT_FELT;
 
+// The collect shelf (UX §7.7): five recessed slots along the bottom (front)
+// felt edge, part of the felt texture itself so they survive theme changes and
+// mat-text decals alike. A collected roll's dice cluster in slot `seq % 5`.
+// Geometry is shared by the texture decals, the cluster layout, and the
+// marker projection — one set of numbers, three readers.
+const SHELF_SLOTS = 5;
+const SHELF_Z = 6.6;                 // slot center (world z; front wall is +8.5)
+const SHELF_SLOT_W = 5.2;            // slot decal width  (x units)
+const SHELF_SLOT_D = 3.6;            // slot decal depth  (z units)
+const shelfSlotX = (slot) => (slot - (SHELF_SLOTS - 1) / 2) * 5.9;
+
 // One 512px felt tile per base color (cached — the decal composite redraws it
 // 36 times per ceremony and regenerating the noise each time would visibly
 // "reseed" the grain under the text).
@@ -118,34 +129,65 @@ function feltTileCanvas(base) {
   return c;
 }
 
-function makeFeltTexture(base) {
-  const tex = new THREE.CanvasTexture(feltTileCanvas(base));
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(6, 6);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-// Mat text decal (UX §5.4): the ceremony's declaration line, composited INTO
-// the felt texture so dice land on top of the words. The composite covers the
-// whole 160-unit floor plane once (repeat 1,1) with the same 6×6 tile pattern
-// the plain texture repeats, plus letterspaced gold caps pressed into the
-// center-lower felt. applyFeltTheme mid-ceremony recomposites onto the new
-// base; clearMatDecal restores the clean repeating texture. Old textures are
-// always disposed by whoever replaces them.
+// Felt composite (UX §5.4, §7.7): the floor texture is ALWAYS a single
+// 2048-px composite covering the whole 160-unit plane once (repeat 1,1) —
+// the 6×6 felt tile pattern, the five shelf slot decals pressed into the
+// front edge, and, during a ceremony, the mat-text declaration line in
+// letterspaced gold caps. applyFeltTheme mid-ceremony recomposites onto the
+// new base; clearMatDecal drops only the text — the slots never leave. Old
+// textures are always disposed by whoever replaces them.
 const DECAL_SIZE = 2048;                    // px across the 160-unit plane
 const DECAL_PX_PER_UNIT = DECAL_SIZE / 160;
 let matDecalText = null;                    // non-null while a decal is applied
 
-function decalTexture(base, text) {
+// canvas x/y from world x/z: the camera looks from +z, so canvas center is the
+// table center and +z (the lower felt, where the shelf lives) is +y.
+const decalPx = (v) => (v + 80) * DECAL_PX_PER_UNIT;
+
+// The five recessed slot rectangles (§7.7). Subtle on purpose: a darker pool
+// with a shadowed top edge and a faint lit lower lip, like a tray pressed
+// into the felt — visible on every theme, but never louder than the dice.
+function drawShelfSlots(ctx) {
+  const u = DECAL_PX_PER_UNIT;
+  const w = SHELF_SLOT_W * u;
+  const h = SHELF_SLOT_D * u;
+  const r = 0.55 * u;
+  const rect = (x, y, rw, rh, rr) => {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, rw, rh, rr);
+    else ctx.rect(x, y, rw, rh);
+  };
+  for (let slot = 0; slot < SHELF_SLOTS; slot++) {
+    const cx = decalPx(shelfSlotX(slot));
+    const cy = decalPx(SHELF_Z);
+    ctx.save();
+    rect(cx - w / 2, cy - h / 2, w, h, r);
+    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    ctx.fill();
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.32)';
+    ctx.stroke();
+    rect(cx - w / 2 + 3, cy - h / 2 + 3, w - 6, h - 6, Math.max(r - 3, 2));
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(255,246,224,0.06)';
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// One full-plane felt composite: tiles + shelf slots (+ mat text).
+function feltCanvas(base, text) {
   const c = document.createElement('canvas');
   c.width = c.height = DECAL_SIZE;
   const ctx = c.getContext('2d');
   const tile = feltTileCanvas(base);
-  const tileSize = DECAL_SIZE / 6; // matches repeat(6,6) of the plain texture
+  const tileSize = DECAL_SIZE / 6; // the same 6×6 rhythm the old plain repeat had
   for (let x = 0; x < 6; x++) {
     for (let y = 0; y < 6; y++) ctx.drawImage(tile, x * tileSize, y * tileSize, tileSize, tileSize);
   }
+  drawShelfSlots(ctx);
+  if (!text) return c;
+
   const line = text.toUpperCase();
   ctx.save();
   ctx.globalAlpha = 0.28;
@@ -160,10 +202,28 @@ function decalTexture(base, text) {
     ctx.font = `${px}px Georgia, 'Times New Roman', serif`;
     if (ctx.measureText(line).width <= maxW) break;
   }
-  // camera looks from +z: canvas center = table center, +z (lower felt) = +y
   ctx.fillText(line, DECAL_SIZE / 2, DECAL_SIZE / 2 + 3.4 * DECAL_PX_PER_UNIT);
   ctx.restore();
+  return c;
+}
+
+// The text-free composite is cached per base color: theme swaps and decal
+// clears reuse the same canvas instead of re-noising 36 tiles every time.
+const feltCompositeCache = new Map();
+
+function makeFeltTexture(base) {
+  let c = feltCompositeCache.get(base);
+  if (!c) {
+    c = feltCanvas(base, null);
+    feltCompositeCache.set(base, c);
+  }
   const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function decalTexture(base, text) {
+  const tex = new THREE.CanvasTexture(feltCanvas(base, text));
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
