@@ -1740,8 +1740,10 @@ const cmdCheatsheet = document.getElementById('cmd-cheatsheet');
 
 let cmdTimer = null;
 let cmdResult = null; // last parse result for the box's current text
-// Non-dice state of the draft, kept so tray edits preserve mods/dc/comment.
-let boxExtras = { mods: null, dc: null, comment: null };
+// Non-dice state of the draft, kept so tray edits preserve the whole intent:
+// mods, dc, comment, and — since UX §7.6 gave them a spelling — the moment and
+// face-down. Adding a die to the tray must not quietly undress the roll.
+let boxExtras = { mods: null, dc: null, comment: null, exp: null, faceDown: false };
 
 let cmdHistory = load(LS_HISTORY, []);
 if (!Array.isArray(cmdHistory)) cmdHistory = [];
@@ -1831,7 +1833,13 @@ function paintCmd() {
   const res = parseNotation(raw);
   cmdResult = res;
   if (res.ok) {
-    boxExtras = { mods: res.spec.mods, dc: res.dc, comment: res.comment };
+    boxExtras = {
+      mods: res.spec.mods,
+      dc: res.dc,
+      comment: res.comment,
+      exp: res.exp,
+      faceDown: res.faceDown,
+    };
     if (tray.join(',') !== res.spec.dice.join(',')) {
       tray = [...res.spec.dice];
       renderTray();
@@ -1856,7 +1864,12 @@ function syncBoxFromTray() {
     if (mods.keep && mods.keep.n >= tray.length) delete mods.keep;
     if (!Object.keys(mods).length) mods = null;
   }
-  cmdInput.value = canonicalNotation({ dice: [...tray], mods }, { dc: boxExtras.dc, comment: boxExtras.comment });
+  cmdInput.value = canonicalNotation({ dice: [...tray], mods }, {
+    dc: boxExtras.dc,
+    comment: boxExtras.comment,
+    exp: boxExtras.exp,
+    faceDown: boxExtras.faceDown,
+  });
   paintCmd();
 }
 
@@ -2171,6 +2184,10 @@ function popStateFromParse(res) {
     faceDown: res.faceDown,
     dc: res.dc,
     comment: res.comment,
+    // Moment (UX §7.6): kind and subtitle live in the notation now, so a saved
+    // group or variant round-trips the whole intent instead of dropping it.
+    expKind: res.exp ? res.exp.kind : '',
+    expSubtitle: (res.exp && res.exp.subtitle) || '',
   };
 }
 
@@ -2205,16 +2222,16 @@ function openPopover(binding) {
     name,
     row: binding.row || null,
     ...popStateFromParse(res),
-    // Moment (UX §2.3): per-roll only this slice — groups don't persist it.
-    // A dc implies Check; the segmented control can override to Plain.
-    expKind: res.dc != null ? 'check' : '',
-    expSubtitle: '',
   };
+  // dc→check is a UI convenience, never a parse-level implication (§7.6): it
+  // only fills a moment the notation left empty, and the segmented control
+  // still overrides it back to Plain.
+  if (!pop.expKind && pop.dc != null) pop.expKind = 'check';
   if (pop.row) pop.row.classList.add('open');
   popNameEl.textContent = pop.name;
   popDcInput.value = pop.dc == null ? '' : String(pop.dc);
   popCommentInput.value = pop.comment || '';
-  popExpSubtitle.value = '';
+  popExpSubtitle.value = pop.expSubtitle;
   popEl.classList.remove('hidden');
   renderPop();
   placePopover();
@@ -2238,6 +2255,7 @@ function resyncTrayPopover() {
   popNameEl.textContent = pop.name;
   popDcInput.value = pop.dc == null ? '' : String(pop.dc);
   popCommentInput.value = pop.comment || '';
+  popExpSubtitle.value = pop.expSubtitle;
   renderPop();
   placePopover();
 }
@@ -2298,8 +2316,17 @@ function popSpec() {
   return { dice: [...pop.dice], mods: Object.keys(mods).length ? mods : null };
 }
 
+// The edited state as one canonical string — the echo, the Save-as-variant
+// notation, and the history entry. Since UX §7.6 the moment ('check'/
+// 'cinematic' + '| subtitle') and face-down ('held') ride it too, so a variant
+// carries the FULL intent instead of silently dropping privacy and moment.
 function popCanonical() {
-  return canonicalNotation(popSpec(), { dc: pop.dc, comment: pop.comment });
+  return canonicalNotation(popSpec(), {
+    dc: pop.dc,
+    comment: pop.comment,
+    exp: popExp() || null,
+    faceDown: pop.faceDown,
+  });
 }
 
 function segSet(seg, value) {
@@ -2510,6 +2537,7 @@ popSegExp.addEventListener('click', (e) => {
 popExpSubtitle.addEventListener('input', () => {
   if (!pop) return;
   pop.expSubtitle = popExpSubtitle.value;
+  renderPopEcho(); // the subtitle rides the canonical now (§7.6)
 });
 popExpSubtitle.addEventListener('keydown', (e) => e.stopPropagation());
 
