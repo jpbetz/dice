@@ -732,10 +732,15 @@ function placeCluster(c, animate) {
   const poses = clusterPoses(c.slot, dice.map((d) => ({ type: d.type, value: d.shelfValue })));
   const moving = new Set(dice);
   whisking = whisking.filter((w) => !moving.has(w.die)); // one whisk per die
-  // The under-glow belongs to a LANDED cluster (§7.7.1): dice about to whisk
-  // hold their ring back until stepWhisking sees them arrive; instant
-  // placements (hello reconstruction, spawned shelved dice) glow at once.
-  c.glow = !(animate && dice.some((d) => !d.shelfSpawn));
+  // The under-glow belongs to a LANDED cluster (§7.7.1): a cluster ARRIVING on
+  // the shelf holds its ring back until stepWhisking sees its dice land;
+  // instant placements (hello reconstruction, spawned shelved dice) glow at
+  // once. A cluster that is ALREADY lit keeps its ring through a reflow slide —
+  // its ring simply moves to the new slot with it (what reflowShelf's own
+  // recomposite promises). Dropping it would black out every surviving cluster
+  // for the whole 0.4 s whisk on each eviction or middle-marker ✕, which is
+  // exactly when the player is looking at the shelf.
+  if (!c.glow) c.glow = !(animate && dice.some((d) => !d.shelfSpawn));
   dice.forEach((d, i) => {
     const { pos, quat } = poses[i];
     d.body.position.set(pos.x, pos.y, pos.z);
