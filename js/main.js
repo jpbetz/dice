@@ -460,9 +460,12 @@ function runPendingClear(roll) {
 
 // Roller-side Done. Online the server validates (roller only) and everyone —
 // us included — reacts to the 'roll-cleared' broadcast; solo applies locally.
+// Resolves whether the clear actually happened, so callers never dismiss the
+// only Done affordance for dice that are in fact still on everyone's table.
 function requestClearRoll(rollId) {
-  if (netOnline && net) net.clearRoll(rollId);
-  else applyClearRoll(rollId);
+  if (netOnline && net) return net.clearRoll(rollId);
+  applyClearRoll(rollId);
+  return Promise.resolve(true);
 }
 
 // A clear (user click or server 'clear' event) can land while a roll is
@@ -937,8 +940,15 @@ function renderBannerActions(entry) {
       btn.textContent = 'Done';
       btn.title = 'Dismiss and remove this roll’s dice for everyone';
       btn.addEventListener('click', () => {
-        banner.classList.add('hidden');
-        requestClearRoll(entry.rollId);
+        // No optimistic hide: online, the 'roll-cleared' broadcast hides the
+        // banner (applyClearRoll); solo applies synchronously. A failed POST
+        // keeps the banner — and its only Done button — instead of stranding
+        // the dice on everyone's table with no per-roll affordance left.
+        btn.disabled = true;
+        requestClearRoll(entry.rollId).then((ok) => {
+          btn.disabled = false;
+          if (!ok) showSettingsNote('couldn’t clear the roll — try again');
+        });
       });
     } else {
       btn.textContent = '✕';
@@ -1436,9 +1446,21 @@ document.addEventListener('keydown', (e) => {
 document.getElementById('verdict-done').addEventListener('click', (e) => {
   e.stopPropagation();
   const v = verdictFor;
-  dismissCeremonyUI();
-  // Roller: per-roll Done — the dice leave with their moment (§7.5).
-  if (v && v.mine && v.rollId) requestClearRoll(v.rollId);
+  const btn = e.currentTarget;
+  // Roller: per-roll Done — the dice leave with their moment (§7.5). Not
+  // dismissed optimistically: online, the 'roll-cleared' broadcast closes the
+  // card (applyClearRoll dismisses the ceremony UI); solo applies
+  // synchronously. A failed POST keeps the card and its Done button — the
+  // dice are still on everyone's table, so the affordance must survive.
+  if (v && v.mine && v.rollId) {
+    btn.disabled = true;
+    requestClearRoll(v.rollId).then((ok) => {
+      btn.disabled = false;
+      if (!ok) showSettingsNote('couldn’t clear the roll — try again');
+    });
+  } else {
+    dismissCeremonyUI(); // spectator ✕ (or a roll with no id): local dismiss only
+  }
 });
 document.getElementById('verdict-again').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -1558,7 +1580,7 @@ window.__diceDebug = {
   },
   closePopover() { closePopover(); },
   // per-roll Done (§7.5): the roller-side entry point + sink observability
-  clearRoll(rollId) { requestClearRoll(rollId); },
+  clearRoll(rollId) { return requestClearRoll(rollId); },
   get sinkingCount() { return sinking.length; },
   get pendingClears() { return [...pendingClears]; },
   sim(frames) { for (let i = 0; i < frames; i++) tick(1 / 60, false); },
@@ -2849,10 +2871,17 @@ function renderMiniBar() {
     pill.title = g.notation; // UX §1.4: the pill's title is the notation
     // §7.4 compact-pill column: tap = roll; contextmenu OR a ~500 ms pointer
     // long-press (touch included) opens the ± popover bound to this group.
-    // A long-press must NOT also roll: the pointerup click that follows it is
-    // swallowed via the one-shot suppress flag.
+    // A long-press must NOT also roll: the click that follows it is swallowed
+    // via the suppress flag. Both flags re-arm on pointerdown — a press
+    // released off the pill fires no click, and a stale flag must not eat the
+    // NEXT tap. One touch long-press can fire BOTH the JS timer and the
+    // platform's native contextmenu (either order, e.g. Android with a long
+    // touch-and-hold delay): openPill is a toggle, so gestureHandled makes
+    // whichever lands second a no-op instead of a re-toggle that closes the
+    // popover the first one just opened.
     let lpTimer = null;
     let suppressClick = false;
+    let gestureHandled = false;
     const openPill = () => {
       if (pop && pop.source === 'group' && pop.groupId === g.id) closePopover();
       else openPopover({ source: 'group', group: g, row: pill });
@@ -2867,12 +2896,18 @@ function renderMiniBar() {
     pill.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       clearTimeout(lpTimer);
+      if (gestureHandled) return;
+      gestureHandled = true;
+      suppressClick = true; // some engines fire a click after a touch contextmenu
       openPill();
     });
     pill.addEventListener('pointerdown', (e) => {
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      gestureHandled = false;
+      suppressClick = false;
       clearTimeout(lpTimer);
+      if (e.pointerType === 'mouse' && e.button !== 0) return; // right-click: contextmenu path
       lpTimer = setTimeout(() => {
+        gestureHandled = true;
         suppressClick = true;
         openPill();
       }, PILL_LONGPRESS_MS);
@@ -3288,6 +3323,14 @@ function handleNetEvent(type, data) {
       offers = data.offers || [];
       renderOffers();
       applyRoomSettings(data.settings); // late joiners + reconnects land on the room felt
+      // §7.5 resync: the server flags cleared rolls in the log and deliberately
+      // never re-broadcasts them, so a 'roll-cleared' missed during a stream
+      // blip must land here or this table never converges. applyClearRoll is a
+      // no-op for rolls with no dice on this table and defers for one that is
+      // still mid-playback or queued.
+      for (const r of data.log || []) {
+        if (r && r.cleared && r.rollId) applyClearRoll(r.rollId);
+      }
       break;
     case 'player-joined':
       if (data.player && !players.some((p) => p.id === data.player.id)) {

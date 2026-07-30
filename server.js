@@ -422,11 +422,14 @@ function readJsonBody(req) {
   });
 }
 
+// User-supplied identifier strings (room, player name, roll/offer/player ids):
+// control and zero-width/bidi characters are stripped BEFORE the cap — a name
+// or room containing "\n" would otherwise forge whole extra lines in the
+// server log (every log() call interpolates room.name and player.name) — then
+// cut the way a roll label is (trim → slice → surrogate guard → trim).
 function cleanString(value, max) {
   if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return trimmed.slice(0, max);
+  return cutText(stripCtl(value), max) || null;
 }
 
 // ---------------------------------------------------------------------------
@@ -778,6 +781,38 @@ async function handleReveal(req, res) {
   sendJson(res, 200, { ok: true });
 }
 
+// Per-roll Done (UX §7.5). Same roller-only authorization as reveal: the dice
+// belong to the moment, and only the player who rolled them decides it is over.
+// The log entry itself is never removed — only flagged — so history and a fresh
+// join agree about which rolls have already left the table.
+async function handleClearRoll(req, res) {
+  const body = await readJsonBody(req);
+  if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
+
+  const found = lookup(body.value);
+  if (found.error) return sendError(res, ...found.error);
+  const { room, player } = found;
+
+  const rollId = cleanString(body.value.rollId, 64);
+  if (!rollId) return sendError(res, 400, 'rollId is required', 'bad_request');
+
+  const roll = room.log.find((r) => r.rollId === rollId);
+  if (!roll) return sendError(res, 404, 'unknown roll', 'unknown_roll');
+  // A claimed offer's roller is the claimer, not the offer's author, so the
+  // player who actually threw the dice is the one who can send them away.
+  if (roll.playerId !== player.id) return sendError(res, 403, 'only the roller may clear their roll', 'forbidden');
+  // Idempotent, and deliberately silent: a second Done must not re-broadcast a
+  // sink animation at clients that already ran it.
+  if (roll.cleared) return sendJson(res, 200, { ok: true });
+
+  // Set on demand, never at roll time: like `exp`, an absent field keeps an
+  // uncleared roll's payload byte-for-byte what it always was.
+  roll.cleared = true;
+  log(`clrroll room=${room.name} name=${player.name} rollId=${rollId}`);
+  broadcast(room, 'roll-cleared', { rollId });
+  sendJson(res, 200, { ok: true });
+}
+
 async function handleRename(req, res) {
   const body = await readJsonBody(req);
   if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
@@ -1081,6 +1116,7 @@ const server = http.createServer((req, res) => {
     if (route === '/api/claim' && req.method === 'POST') return handleClaim(req, res);
     if (route === '/api/unoffer' && req.method === 'POST') return handleUnoffer(req, res);
     if (route === '/api/clear' && req.method === 'POST') return handleClear(req, res);
+    if (route === '/api/clear-roll' && req.method === 'POST') return handleClearRoll(req, res);
     if (route === '/api/settings' && req.method === 'POST') return handleSettings(req, res);
     if (route.startsWith('/api/')) return sendError(res, 404, 'no such endpoint', 'not_found');
     return serveStatic(req, res, url);

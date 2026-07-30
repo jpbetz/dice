@@ -802,3 +802,64 @@ room-settings channel as global settings (hello carries them; a
 the experiences slice in the build order. Hidden-DC variants of Check
 remain gated on the DM seat and arrive with the (deprioritized) visibility
 slice; until then Targets are always visible.
+
+### 7.4 Revision: compact view is immersive; the capability matrix
+
+Joe's correction (2026-07-30): compact view exists to HIDE CHROME for
+immersion — it must never degrade the roll moment. §2.6's mini strip is
+retired: ceremonies render identically in compact view (intent card, mat
+decal, staged verdict, cinematic slow-mo), responsively scaled. Only panels
+and controls hide.
+
+**Roll-declaration surfaces and the two verbs.** Every surface below must
+support the full roll intent (spec + dc + moment + face-down + label) and
+both verbs — Roll and Offer to table:
+
+| Surface | Roll | Offer | Full intent editing |
+|---|---|---|---|
+| Panel command box | Enter | Shift+Enter | notation string |
+| Quick palette | Enter | Shift+Enter | notation string |
+| Ad-hoc tray | Roll button | via ± popover | ± button beside Roll |
+| Saved group (expanded) | Roll button | via ± popover | ± button |
+| Saved group (compact pill) | tap | via ± popover | long-press / right-click |
+| Reroll-last (⟳) | click | — (re-rolls as rolled) | inherits original intent |
+
+Offer is disabled (with tooltip) in solo mode on every surface. A surface
+gaining a new capability must fill its whole column.
+
+### 7.5 Per-roll Done: dice leave with their moment
+
+Clearing the whole table between rolls is awkward. New semantics:
+
+- Every die on the table is tagged with its roll. The verdict card and the
+  result banner gain a **Done** control for the ROLLER: it dismisses the
+  card AND removes that roll's dice from the table for **everyone**
+  (server-validated roller-only, like reveal; solo applies locally). Dice
+  sink/fade out (~300 ms); chips go with them; the log is untouched.
+- Spectators' dismissal stays local (card closes, dice remain until the
+  roller is Done or the table is swept).
+- Concurrency: removal touches only that roll's dice — concurrent rolls,
+  including ones mid-tumble, are unaffected. A client still playing back
+  the cleared roll defers removal until its own playback settles.
+- The corner ✕ remains the full-table sweep.
+
+### 7.6 Moment notation (closing the notation-totality gap)
+
+Joe's direction: supplement the notation non-invasively, possibly via
+structured metadata in the comment section. Adopted design (two halves):
+
+- **The moment kind is a trailing flag keyword**, peer of `adv`/`dis`:
+  `check` and `cinematic` (alias `cine`). The flag namespace is the
+  established home for roll-shaping keywords, and a bare word reads well:
+  `1d20ro<=1+3 adv check dc15 # The lie leaves your lips`.
+- **The subtitle rides the comment with a pipe separator**:
+  `# Title | Subtitle` — the first `|` splits mat title from subtitle;
+  no pipe means title only. Fully backward compatible (no existing comment
+  uses a pipe), readable, and round-trippable. Titles needing a literal
+  pipe escape it as `\|` (rare; documented in the cheatsheet).
+- Canonical order: flags then `dc` then comment, as today; `check` renders
+  after `adv`/`dis`. parseNotation returns exp:{kind, subtitle} and
+  canonicalNotation emits it; the popover Moment section round-trips.
+- Rejected alternative: `@check` tokens inside the comment — it overloads
+  the one free-text field with grammar and makes the title's boundaries
+  ambiguous; the flag position already exists for exactly this.

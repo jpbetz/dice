@@ -316,11 +316,25 @@ export async function connect({ room, name, onEvent, onStatus } = {}) {
   // POST to an endpoint that needs a live playerId; one silent re-join and one
   // retry if the server has forgotten us (404). Endpoints whose 404 is an
   // expected outcome (claiming an already-claimed offer) opt out.
+  //
+  // A 404 alone is NOT proof the server forgot us: reveal/clear-roll answer
+  // 404 unknown_roll for a roll that fell off the log, and unoffer answers
+  // unknown_offer for one already gone. Re-joining on those would silently
+  // mint a NEW playerId, permanently orphaning every roll the player still
+  // owns (their Done/Reveal would 403 forever). Only the lookup codes —
+  // unknown_player / unknown_room — mean "the server forgot me"; any other
+  // code is about the thing being acted on, not about us.
+  function playerGone(res) {
+    const code = res.data && res.data.code;
+    if (typeof code !== 'string') return true; // no code (proxy 404): old behavior
+    return code === 'unknown_player' || code === 'unknown_room';
+  }
+
   async function withPlayer(path, extra, { rejoinOn404 = true } = {}) {
     if (closed) return { ok: false, status: 0, data: null };
     await streamReady();
     let res = await postJson(path, { room, playerId, ...extra }, POST_TIMEOUT_MS);
-    if (res.status === 404 && rejoinOn404) {
+    if (res.status === 404 && rejoinOn404 && playerGone(res)) {
       const ok = await rejoin();
       if (!ok) { setStatus('offline'); return res; }
       openStream();

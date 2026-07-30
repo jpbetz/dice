@@ -1,0 +1,118 @@
+# Design Goals
+
+The durable statement of what this system is and how design decisions get
+made. [ROADMAP.md](ROADMAP.md) sequences work against these goals; [UX.md](UX.md)
+specifies components within them. Where the three disagree, this document wins.
+
+## The experience
+
+1. **Grounded in the physical table.** The UX looks and feels like a real
+   tabletop: actual 3D dice with real physics, a felt surface, results that
+   land where they're thrown. Prefer showing real dice whenever that does not
+   conflict with a higher goal.
+2. **Fantasy-forward.** Effects beyond what a physical table can do — the
+   roll-moment ceremony, mat inscriptions, crit fanfare, themed dice — are
+   core to the experience, not decoration. (They are, however, sequenced
+   after core mechanics; see Priorities.)
+3. **Excitement outranks physicality.** Rolls are planned experiences: stakes
+   declared, anticipation built, reveals accentuated and connected back to
+   the stakes. Where drama and realism conflict, drama wins.
+4. **Supplement the table; eliminate the toil.** Players never have to
+   emulate the tedious parts: picking up and positioning dice, summing
+   values, applying modifiers, cleaning the table. When dice settle, the
+   system computes and expresses the net result immediately. Physical
+   *interaction* (dragging dice, building trays by hand) is optional
+   delight — never a required step.
+5. **Organized over realistic.** Concurrent rolls must not become chaos. The
+   system actively keeps rolls visually separate — allocating table space
+   per roll, whisking settled dice aside or away (per-roll Done), and
+   keeping the surface legible. A clean look-and-feel beats simulation
+   fidelity.
+
+## The scope
+
+6. **Dice, not game rules.** This is a dice-rolling system. How rolls fit
+   into an RPG's mechanics is the players' business. But the system is
+   *literate* in major dice-rolling conventions: it understands
+   interpretation systems (starting with "Your Soul Deal"; D&D-style and
+   others addable) and lets the table **toggle** between them as a room
+   setting. The interpretation layer (meaning words, DC verdicts, success
+   counting) is pluggable per system — not hardcoded.
+
+## The architecture
+
+7. **Stateless server, capturable client.** The server holds no persistent
+   state — rooms live and die in memory. Anything worth keeping (groups,
+   history, logs, statistics) is captured client-side: localStorage, URLs,
+   exports. A bookmarked URL is a complete save file.
+8. **One shared truth.** Every player sees the same values, attribution, and
+   log. Presentation *pacing* is client-local (skips, ceremony timing);
+   *information* never diverges except through deliberate visibility
+   choices. Values are server-authored (crypto RNG) — no client can forge
+   or predict a roll, and no player needs to trust another's browser.
+9. **Zero-install, degrade gracefully.** Static hosting yields a fully
+   working solo table. The server adds sharing, nothing else.
+
+## The social model
+
+10. **No roles. Ever.** Like a physical table, anyone can grab dice, roll,
+    offer, clear their own roll, change table settings. Every capability a
+    DM needs exists; all of them belong to every player. There is no access
+    control and there never will be.
+11. **Secrecy without hierarchy.** Privacy is a per-roll choice by the
+    roller (or offerer), not a privilege: a roll can be entirely secret,
+    result-secret (face-down, revealable), or visible only to a selected
+    audience of named players. Offered rolls may carry these visibilities
+    (an offer whose result only the offerer sees reproduces the classic
+    GM-screen roll — without a GM role).
+12. **Interaction = the shared table.** Players interact through the shared
+    view of the tabletop plus performing rolls, offering rolls, and
+    visibility choices. This system is not a chat, a character sheet, or a
+    campaign manager.
+
+## Invariants (every feature must preserve these)
+
+- **Notation totality.** Every possible roll has a text notation, and every
+  notation is buildable through the UI. The canonical form is a byte-stable
+  round-trip fixed point. *(Known violations, audited 2026-07-30: roll
+  moments (`exp` kind + subtitle) have no notation, and face-down survives
+  only as an input prefix — the canonical form drops it, so groups, history,
+  and links silently lose both. Roadmap step 1 closes these.)*
+- **Uniform roll surfaces.** Every UI element that triggers a roll offers
+  the same capabilities (the UX.md §7.4 matrix): full intent editing, both
+  verbs (Roll / Offer), in both full and compact view.
+- **Immersion is never a downgrade.** Compact view hides chrome only; the
+  experience renders identically.
+- **Always interruptible.** Any ceremony or effect is skippable to its
+  complete result in under 150 ms. Keyboard paths exist for the common
+  actions. Excitement never costs control.
+- **Results readable on screen.** No squinting at 3D faces: chips, totals,
+  breakdowns, and interpretation are presented directly, with attribution
+  (named bonuses, kept-over-struck dice) visible.
+- **The table is never blocked.** Anyone can roll at any time; nothing
+  modal locks the shared surface; concurrent rolls are safe.
+- **Attributed math.** Bonuses carry named sources; discarded dice stay
+  visible (struck); the arithmetic of a result is always inspectable.
+
+## Priorities
+
+When sequencing work: **core mechanics** (rolling, notation, interpretation
+systems, visibility, organization/concurrency) come before **presentation
+effects** and before **customization** (dice sets, custom themes, physical
+tray delight). Fantasy-forward effects are core to the vision but follow a
+working, coherent mechanical foundation.
+
+## Superseded decisions (flagged 2026-07-30)
+
+- **The DM seat (UX.md §3.4) is rescinded** by goal 10. Its four powers
+  return as role-free per-roll capabilities under goal 11: whisper-audience
+  rolls, offers with restricted result visibility, hidden Targets on offers
+  (visible to the offerer only until reveal), and housekeeping (already
+  universal). UX.md §3's redaction architecture survives; its seat does not.
+- **"Physical analogy over UI" is softened** by goals 3–4: physical
+  look-and-feel grounds the experience; physical interaction is optional
+  delight. The build-a-tray (UX.md §7.1) moves to the delight tier.
+- **Interpretation is a system toggle** (goal 6): the always-on pairing of
+  Soul Deal words + DC verdicts becomes the "Your Soul Deal" system profile;
+  a "D&D"-style profile (DC verdicts, nat-20/1 crits, no meaning chart) and
+  a "None" profile (numbers only) join it as room settings.
