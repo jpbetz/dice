@@ -804,8 +804,15 @@ body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
   font-family: var(--font-display);
   color: var(--ivory);
   text-align: center;
-  animation: chip-pop 0.18s ease-out;
+  /* §7.7.2 amendment: the card appears IN PLACE — no scale, no travel; cards
+     are chrome, not ceremony. chip-pop is also wrong here mechanically: it
+     carries a translate(-50%, -50%) for chips that are centered on a point,
+     while positionPeek anchors this card by its top-left, so the shared
+     keyframes would offset it by half its box and snap it back on the last
+     frame. Opacity only, ≤100 ms. */
+  animation: peek-in 0.1s ease-out;
 }
+@keyframes peek-in { from { opacity: 0; } to { opacity: 1; } }
 .peek-card.hidden { display: none; }
 .pk-head { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .pk-who {
