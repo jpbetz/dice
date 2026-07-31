@@ -659,7 +659,7 @@ export const scenarios = [
         const r = document.querySelector('#groups-panel .panel-body').getBoundingClientRect();
         return r.width > 0 && r.height > 0;
       })()`), 'the flyout renders the list');
-      await a.eval(`document.querySelector('#groups-list .group-roll').click()`);
+      await a.eval(`document.querySelector('#groups-list .pool-roll').click()`);
       await a.settle();
       assert.ok(await a.rollId(), 'the row rolled');
       assert.equal(await a.dbg('groupsFlyout'), false, 'and the flyout retracted itself');
@@ -667,6 +667,66 @@ export const scenarios = [
       await a.dbg('setGroupsFlyout(true)');
       await a.dbg('setPanelState({groups: true})');
       assert.equal(await a.dbg('groupsFlyout'), false, 'a real expand retires the overlay');
+    },
+  },
+  {
+    name: 'pools-quick',
+    tags: ['smoke', 'chrome', 'groups'],
+    // P2 use-vs-manage: at rest the pools panel is READ-ONLY quick access —
+    // die-art strip buttons that roll, an always-visible ± (USE), and zero
+    // edit chrome. The header ✎ toggles manage mode: per-row ✎/✕ appear and
+    // the toolbar carries copy-link (demoted, never deleted — P4) + Done.
+    // Digits stay live in manage mode (the disable is anti-misclick, not a
+    // lock). No button ever nests inside a button (a11y sibling rule).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+
+      // Read-only rest state: no edit chrome anywhere in the panel.
+      assert.equal(await a.eval(`document.querySelectorAll('#groups-panel .group-edit, #groups-panel .group-del').length`),
+        0, 'no per-row edit chrome at rest');
+      assert.equal(await a.eval(`document.getElementById('pools-toolbar').classList.contains('hidden')`),
+        true, 'no toolbar (incl. copy-link) at rest');
+      assert.ok(await a.eval(`document.querySelectorAll('#groups-list .pool-roll').length >= 3`),
+        'every row is a strip button');
+      assert.equal(await a.eval(`document.querySelectorAll('#groups-panel button button').length`),
+        0, 'no button nests inside a button');
+
+      // The strip rolls; ± opens the popover.
+      const logBefore = await a.logCount();
+      await a.eval(`document.querySelector('#groups-list .pool-roll').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(60), document.getElementById('log-list').childElementCount > ${logBefore})`,
+        { desc: 'clicking the dice rolls the pool' },
+      );
+      await a.eval(`document.querySelector('#groups-list .pool-mods').click()`);
+      const pop = await a.dbg('popover');
+      assert.ok(pop && pop.open && pop.source === 'group', '± opens the popover on the pool');
+      await a.eval(`document.getElementById('pop-close').click()`);
+
+      // Manage mode: chrome appears, strips disarm, digits stay live.
+      assert.equal(await a.dbg('setPoolsEditMode(true)'), true, '✎ enters manage mode');
+      assert.ok(await a.eval(`document.querySelectorAll('#groups-panel .group-edit').length >= 3`),
+        'per-row pencils appear');
+      assert.equal(await a.eval(`document.getElementById('pools-toolbar').classList.contains('hidden')`),
+        false, 'the toolbar appears');
+      assert.ok(await a.eval(`!!document.querySelector('#pools-toolbar #copy-link')`),
+        'copy-link lives in the manage toolbar');
+      assert.equal(await a.eval(`document.querySelector('#groups-list .pool-roll').disabled`),
+        true, 'strips disarm in manage mode');
+      const logMid = await a.logCount();
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: '1'}))`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(60), document.getElementById('log-list').childElementCount > ${logMid})`,
+        { desc: 'digit shortcuts stay live in manage mode' },
+      );
+
+      // Done exits; collapsing the panel also exits (transience).
+      await a.eval(`document.getElementById('pools-done').click()`);
+      assert.equal(await a.dbg('poolsEditMode'), false, 'Done exits manage mode');
+      await a.dbg('setPoolsEditMode(true)');
+      await a.dbg('setPanelState({groups: false})');
+      assert.equal(await a.dbg('poolsEditMode'), false, 'collapsing the panel exits manage mode');
+      await a.dbg('setPanelState({groups: true})');
     },
   },
   {
@@ -703,7 +763,10 @@ export const scenarios = [
       assert.equal(up && up.notation, '2d8', 'an unnamed group updates in place');
       assert.equal((await a.dbg('groups')).length, before.length, 'still no duplicate');
 
-      // The inline row editor: pencil → fields → Update writes by id.
+      // The inline row editor: ✎ manage mode first (read-only at rest is
+      // pools-quick's business; here we just enter it), then pencil →
+      // fields → Update writes by id.
+      await a.dbg('setPoolsEditMode(true)');
       await a.eval(`document.querySelector('#groups-list [data-group-id="${atk.id}"] .group-edit').click()`);
       assert.equal(await a.eval(`document.querySelector('#groups-list .group-row.editing .ge-name').value`),
         'Strike', 'the editor opens on the record');
@@ -786,8 +849,12 @@ export const scenarios = [
         'Name this pool…', 'the save field names a pool');
       assert.equal(await a.eval(`document.getElementById('pop-update').textContent`),
         'Update this pool', 'the popover updates a pool');
+      // The delete affordance exists only in manage mode now (P2) — enter it
+      // so the sweep still reads the word a player would actually see.
+      await a.dbg('setPoolsEditMode(true)');
       assert.equal(await a.eval(`document.querySelector('#groups-list .group-del').title`),
         'Delete pool', 'the row ✕ deletes a pool');
+      await a.dbg('setPoolsEditMode(false)');
 
       // The sweep itself: every label, tooltip, placeholder and text node in
       // the chrome a player can read. Storage keys and class names are not

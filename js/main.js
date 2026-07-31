@@ -3093,6 +3093,10 @@ window.__diceDebug = {
     if (open) openLogFlyout(); else closeLogFlyout();
     return isLogFlyoutOpen();
   },
+  // saved-pools manage mode (P2's ✎ toggle): read-only rows at rest; the
+  // edit chrome exists only while this is on.
+  get poolsEditMode() { return poolsEdit; },
+  setPoolsEditMode(on) { setPoolsEdit(on); return poolsEdit; },
   // saved-pools flyout (roll without pinning the panel open): the hover
   // behavior, driven directly where headless tests can't hover.
   get groupsFlyout() { return groupsPanelEl.classList.contains('flyout'); },
@@ -3898,6 +3902,56 @@ function rollGroup(g) {
   });
 }
 
+// A pool's dice as a strip of real die art, capped with the roster's '+N'
+// overflow token (P5). Pure decoration: every img is pointer-events:none —
+// the BUTTON wrapping the strip is the one interactive object (P1/a11y).
+// Null art (no WebGL) falls back to the palette's colored diamond dots.
+const POOL_STRIP_CAP = 5;
+function buildDieStrip(types, cap) {
+  const frag = document.createDocumentFragment();
+  for (const type of types.slice(0, cap)) {
+    const url = dieArtURL(type);
+    if (url) {
+      const img = document.createElement('img');
+      img.className = 'die-art strip-die';
+      img.src = url;
+      img.alt = '';
+      img.draggable = false;
+      frag.appendChild(img);
+    } else {
+      const dot = document.createElement('span');
+      dot.className = 'strip-dot';
+      dot.style.background = (DIE_DEFS[type] && DIE_DEFS[type].color) || '#888';
+      frag.appendChild(dot);
+    }
+  }
+  if (types.length > cap) {
+    const more = document.createElement('span');
+    more.className = 'roster-more strip-more';
+    more.textContent = `+${types.length - cap}`;
+    more.title = types.slice(cap).join(', ');
+    frag.appendChild(more);
+  }
+  return frag;
+}
+
+// P2 use-vs-manage: manage mode is ONE explicit, transient toggle (the
+// header ✎). It never persists, and collapsing the panel exits it
+// (applyPanels) — the hover flyout and every fresh look at the panel start
+// read-only. The sanctioned exception stays: the ± popover's by-id 'Update
+// this pool' / 'Save as variant' remain reachable at rest — explicit verbs,
+// not ambient edit chrome.
+let poolsEdit = false;
+function setPoolsEdit(on) {
+  poolsEdit = !!on;
+  if (!poolsEdit) editingGroupId = null; // leaving manage mode closes any open editor
+  document.getElementById('pools-edit').setAttribute('aria-pressed', String(poolsEdit));
+  document.getElementById('pools-toolbar').classList.toggle('hidden', !poolsEdit);
+  renderGroups();
+}
+document.getElementById('pools-edit').addEventListener('click', () => setPoolsEdit(!poolsEdit));
+document.getElementById('pools-done').addEventListener('click', () => setPoolsEdit(false));
+
 function renderGroups() {
   groupsListEl.innerHTML = '';
   groupsEmptyEl.style.display = groups.length ? 'none' : 'block';
@@ -3914,13 +3968,17 @@ function renderGroups() {
       continue;
     }
 
-    const info = document.createElement('div');
-    info.className = 'group-info';
-    info.title = 'Load into the command box';
+    // Line 1 — identity: the name (click loads the box, as always) and the
+    // §1.4 canonical chip, which already carries mods/dc so no second chip
+    // can drift. Manage mode adds ✎ ✕ here and nowhere else.
+    const line1 = document.createElement('div');
+    line1.className = 'pool-line1';
     const nameEl = document.createElement('div');
     nameEl.className = 'group-name' + (g.name ? '' : ' as-notation');
     nameEl.textContent = g.name || g.notation; // unnamed: the notation is the name
-    info.appendChild(nameEl);
+    nameEl.title = 'Load into the command box';
+    nameEl.addEventListener('click', () => loadIntoBox(g.notation, g.name));
+    line1.appendChild(nameEl);
     if (g.name) {
       const chip = document.createElement('code');
       chip.className = 'group-formula';
@@ -3930,40 +3988,60 @@ function renderGroups() {
         e.stopPropagation();
         loadIntoBox(g.notation, g.name);
       });
-      info.appendChild(chip);
+      line1.appendChild(chip);
     }
-    info.addEventListener('click', () => loadIntoBox(g.notation, g.name));
+    if (poolsEdit) {
+      const editBtn = document.createElement('button');
+      editBtn.className = 'group-edit';
+      editBtn.textContent = '✎';
+      editBtn.title = 'Edit name & notation';
+      editBtn.addEventListener('click', () => beginEditGroup(g.id));
+      const delBtn = document.createElement('button');
+      delBtn.className = 'group-del';
+      delBtn.textContent = '✕';
+      delBtn.title = 'Delete pool';
+      delBtn.addEventListener('click', () => {
+        if (pop && pop.source === 'group' && pop.groupId === g.id) closePopover();
+        groups = groups.filter((x) => x.id !== g.id);
+        saveGroups();
+        renderGroups();
+      });
+      line1.append(editBtn, delBtn);
+    }
 
-    // The consistent affordance set: Roll · ± · ✎ · ✕.
+    // Line 2 — the roll: one big strip button of die art (the row IS the
+    // Roll button now, P1) beside the always-visible ± (USE, not manage).
+    // SIBLINGS, never nested — no button may live inside a button.
+    const line2 = document.createElement('div');
+    line2.className = 'pool-line2';
+    const res = parseNotation(g.notation);
+    const types = res.ok ? res.spec.dice : [];
     const rollBtn = document.createElement('button');
-    rollBtn.className = 'group-roll';
-    rollBtn.textContent = 'Roll';
+    rollBtn.className = 'pool-roll';
+    const rollName = `Roll ${g.name || g.notation} — ${g.notation}`;
+    rollBtn.title = rollName;
+    rollBtn.setAttribute('aria-label', rollName);
+    rollBtn.appendChild(buildDieStrip(types, POOL_STRIP_CAP));
     rollBtn.addEventListener('click', () => rollGroup(g));
+    // Manage mode disarms the click as anti-misclick, NOT as a lock: the
+    // digit shortcuts stay live (a keyboard roll is always deliberate).
+    rollBtn.disabled = poolsEdit;
 
     const modsBtn = document.createElement('button');
-    modsBtn.className = 'group-mods';
+    modsBtn.className = 'group-mods pool-mods';
     modsBtn.textContent = '±';
     modsBtn.title = 'Modifiers, target, face down';
     modsBtn.addEventListener('click', () => togglePopover(g, row));
+    line2.append(rollBtn, modsBtn);
 
-    const editBtn = document.createElement('button');
-    editBtn.className = 'group-edit';
-    editBtn.textContent = '✎';
-    editBtn.title = 'Edit name & notation';
-    editBtn.addEventListener('click', () => beginEditGroup(g.id));
-
-    const delBtn = document.createElement('button');
-    delBtn.className = 'group-del';
-    delBtn.textContent = '✕';
-    delBtn.title = 'Delete pool';
-    delBtn.addEventListener('click', () => {
-      if (pop && pop.source === 'group' && pop.groupId === g.id) closePopover();
-      groups = groups.filter((x) => x.id !== g.id);
-      saveGroups();
-      renderGroups();
+    // Right-click anywhere on the row = ± too (a pointer bonus, never the
+    // sole path — the visible ± button above carries touch and keyboard).
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      togglePopover(g, row);
     });
 
-    row.append(info, rollBtn, modsBtn, editBtn, delBtn);
+    row.append(line1, line2);
     groupsListEl.appendChild(row);
     // renderGroups can run while this group's popover is open (e.g. after a
     // variant save) — re-anchor it to the fresh row.
@@ -5148,6 +5226,9 @@ function applyPanels(persist = true) {
     document.getElementById(def.el).classList.toggle('collapsed', !panelsOpen[id]);
   }
   if (panelsOpen.groups) closeGroupsFlyout(); // a real expand retires the overlay
+  // Manage mode is transient (P2): collapsing the pools panel exits it, so
+  // the panel always reopens read-only.
+  if (!panelsOpen.groups && poolsEdit) setPoolsEdit(false);
   if (persist) save(LS_PANELS, panelsOpen);
   const mini = allPanelsCollapsed();
   if (mini !== document.body.classList.contains('mini')) {

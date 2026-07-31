@@ -314,17 +314,66 @@ html, body {
   background: var(--die-color, #888);
 }
 
-/* ---------- saved groups ---------- */
+/* ---------- saved pools (read-only quick access, P2) ---------- */
+/* Two lines per row: identity (name + canonical chip; manage-mode ✎ ✕) over
+   the ROLL — one big strip button of die art beside the always-visible ±.
+   The strip button and ± are SIBLINGS (never nested buttons). */
 .group-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  display: block;
   padding: 8px 4px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   border-radius: 8px;
 }
 .group-row:last-child { border-bottom: none; }
 .group-row.open { background: rgba(212, 175, 55, 0.06); box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.16); }
+.pool-line1 { display: flex; align-items: baseline; gap: 6px; }
+.pool-line1 .group-name { flex: 1 1 auto; min-width: 0; cursor: pointer; }
+.pool-line1 .group-name:hover { color: var(--gold-bright); }
+.pool-line1 .group-formula { flex: none; max-width: 45%; margin-top: 0; }
+.pool-line2 { display: flex; align-items: stretch; gap: 6px; margin-top: 4px; }
+/* The strip button — the row IS the roll (P1): quiet at rest, the gold
+   roll-glow on hover. Hovering ± never lights it (the glow must not lie). */
+.pool-roll {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 38px;
+  padding: 4px 7px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+.pool-roll:hover:not(:disabled) {
+  border-color: rgba(212, 175, 55, 0.45);
+  background: rgba(212, 175, 55, 0.07);
+  box-shadow: 0 0 14px rgba(255, 214, 102, 0.12);
+}
+.pool-roll:disabled { opacity: 0.45; cursor: default; } /* manage mode disarms it */
+.pool-roll .die-art { width: 26px; height: 26px; pointer-events: none; }
+.strip-dot {
+  width: 11px; height: 11px;
+  border-radius: 3px;
+  transform: rotate(45deg);
+  margin: 8px 5px;
+  flex: none;
+}
+.strip-more { flex: none; pointer-events: none; }
+/* ± beside the strip: small visual, FULL row-height hit area (a missed tap
+   next to ± must never be a broadcast roll) */
+.pool-mods { align-self: stretch; height: auto; min-height: 38px; width: 28px; }
+/* manage-mode toolbar: copy-link (demoted here, P4) + Done */
+#pools-toolbar { display: flex; gap: 8px; margin: 2px 0 8px; }
+#pools-toolbar.hidden { display: none; }
+#pools-toolbar .btn { margin-left: 0; }
+#pools-edit[aria-pressed="true"] {
+  color: var(--gold-bright);
+  border-color: rgba(212, 175, 55, 0.55);
+  background: rgba(212, 175, 55, 0.14);
+}
 .group-info { flex: 1; min-width: 0; cursor: pointer; }
 .group-info:hover .group-name { color: var(--gold-bright); }
 .group-name {

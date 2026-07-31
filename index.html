@@ -95,15 +95,25 @@ limitations under the License.
       </div>
     </div>
 
+    <!-- Saved pools: read-only quick access (P2 use-vs-manage). At rest a
+         row is name + notation chip over a big roll strip of real die art —
+         no edit chrome anywhere. The header ✎ toggles manage mode: per-row
+         rename/delete appear and the toolbar carries copy-link + Done.
+         (copy-link is demoted, never deleted — P4.) -->
     <div class="panel side-panel" id="groups-panel">
       <div class="panel-head" id="head-groups" title="Show/hide — key: g">
         <span class="ph-label">Saved pools</span>
-        <button id="copy-link" class="btn tiny ghost" title="Copy a URL that restores these pools anywhere">copy link</button>
+        <button id="pools-edit" class="btn tiny ghost" aria-pressed="false"
+                title="Edit pools — rename · delete · copy link">✎</button>
         <span class="ph-chev" aria-hidden="true"></span>
       </div>
       <div class="panel-body">
+        <div id="pools-toolbar" class="hidden">
+          <button id="copy-link" class="btn tiny ghost" title="Copy a URL that restores these pools anywhere">copy link</button>
+          <button id="pools-done" class="btn tiny ghost">Done</button>
+        </div>
         <div id="groups-list"></div>
-        <p id="groups-empty" class="hint">Save a pool to keep it here for quick rerolls.</p>
+        <p id="groups-empty" class="hint">Save a pool to keep it here for quick rerolls — or paste a pools link.</p>
       </div>
     </div>
   </aside>
