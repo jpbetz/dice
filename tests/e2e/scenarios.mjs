@@ -314,6 +314,141 @@ export const scenarios = [
     },
   },
 
+  // -- chrome: the persistent rail + collapsible panels + identity ----------
+  {
+    name: 'panels-collapse',
+    tags: ['smoke', 'chrome'],
+    // Four regions, each independently collapsible; collapsed = header tab
+    // only; state persists per user ('dice.panels.v1' — same origin, same
+    // identity); the keyboard parity: 'm' collapses/expands all, 'l' one.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      let st = await a.dbg('panelState');
+      assert.equal(st.compose && st.groups && st.log, true, 'panels default open on a desktop viewport');
+      assert.equal(st.playersAvailable, true, 'the Players region exists online');
+
+      st = await a.dbg('setPanelState({log: false, groups: false})');
+      assert.equal(st.log, false, 'log collapsed');
+      assert.equal(st.groups, false, 'groups collapsed');
+      assert.equal(st.compose, true, 'compose untouched — independent regions');
+      assert.equal(st.allCollapsed, false, 'not yet compact');
+      assert.equal(await a.eval(`document.querySelector('#log-panel .panel-body').offsetParent === null`),
+        true, 'a collapsed panel is its header tab only');
+      assert.equal(await a.eval(`document.querySelector('#builder-panel .panel-body').offsetParent !== null`),
+        true, 'an open panel keeps its body');
+
+      // Immersion invariant: a roll plays out exactly the same under
+      // collapsed chrome (the log records even while its panel is a tab).
+      await a.roll('2d6');
+      assert.equal(await a.diceCount(), 2, 'roll unaffected by collapsed chrome');
+
+      // Persistence: a fresh tab on the same origin restores the state.
+      const b = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const st2 = await b.dbg('panelState');
+      assert.equal(st2.log, false, 'collapsed log persisted');
+      assert.equal(st2.groups, false, 'collapsed groups persisted');
+      assert.equal(st2.compose, true, 'open compose persisted');
+
+      // Keyboard parity: 'm' = collapse/expand all; 'l' = just the log.
+      await b.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'm'}))`);
+      assert.equal((await b.dbg('panelState')).allCollapsed, true, "'m' collapses everything");
+      assert.ok(await b.eval(`document.body.classList.contains('mini')`), 'and compact view engages');
+      await b.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'l'}))`);
+      const st3 = await b.dbg('panelState');
+      assert.equal(st3.log, true, "'l' reopens the log");
+      assert.equal(st3.compose, false, 'without touching the others');
+      assert.ok(await b.eval(`!document.body.classList.contains('mini')`), 'compact view lifts');
+    },
+  },
+  {
+    name: 'control-rail',
+    tags: ['smoke', 'chrome'],
+    // The persistent control rail NEVER hides: identity chip, settings, mute,
+    // palette and collapse-all stay reachable even with every panel collapsed
+    // (the emergent compact view). The retired compact mode used to strand
+    // settings + mute off screen — this pins the fix.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const RAIL = ['rail', 'identity-chip', 'toggle-settings', 'toggle-sound', 'rail-palette', 'rail-collapse'];
+      const visible = (id) => a.eval(
+        `(() => { const el = document.getElementById('${id}'); if (!el) return false;`
+        + ` const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden'; })()`,
+      );
+      for (const id of RAIL) assert.ok(await visible(id), `#${id} visible in full view`);
+
+      const st = await a.dbg('setPanelState({compose: false, groups: false, players: false, log: false})');
+      assert.equal(st.allCollapsed, true, 'every panel collapsed');
+      assert.ok(await a.eval(`document.body.classList.contains('mini')`),
+        'compact view is the emergent all-collapsed state');
+      for (const id of RAIL) assert.ok(await visible(id), `#${id} still visible all-collapsed`);
+
+      // The old bug, dead: settings opens from the rail in compact.
+      await a.dbg('openSettings()');
+      assert.ok(await a.eval(`!document.getElementById('settings-modal').classList.contains('hidden')`),
+        'settings reachable with everything collapsed');
+      await a.eval(`document.getElementById('settings-close').click()`);
+      // Reopening one panel leaves compact view.
+      const st2 = await a.dbg('setPanelState({log: true})');
+      assert.equal(st2.allCollapsed, false, 'one open panel ends all-collapsed');
+      assert.ok(await a.eval(`!document.body.classList.contains('mini')`), 'compact view lifts');
+      // Leave the origin's persisted state all-open: panel state is per-user
+      // localStorage, which OUTLIVES this scenario's room (later scenarios on
+      // this origin read hidden-log innerText as empty if we leave it shut).
+      await a.dbg('setPanelState({compose: true, groups: true, players: true, log: true})');
+    },
+  },
+  {
+    name: 'identity-chip',
+    tags: ['smoke', 'chrome'],
+    // The rail identity chip: rename propagates to every roster and the chip
+    // itself; '#' is refused; 'Leave & switch' (the once-dead net.disconnect)
+    // drops the seat for real — the other tab sees the player leave — clears
+    // the stored name, and re-prompts 'Take a seat' for a fresh seat.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      const id0 = await a.dbg('identity');
+      assert.equal(id0.name, 'Alice', 'the chip knows the seat');
+      assert.equal(id0.online, true, 'and that it is online');
+      assert.ok(id0.inviteUrl.includes(`room=${ctx.room}`), `invite link addresses the room (got: ${id0.inviteUrl})`);
+
+      assert.equal(await a.dbg(`changeName('Al#ce')`), false, 'a # name is refused');
+      assert.equal(await a.dbg(`changeName('Alicia')`), true, 'a clean rename is accepted');
+      await b.waitFor(
+        `window.__diceDebug.players.some((p) => p.name === 'Alicia')`,
+        { desc: 'the roster follows the rename' },
+      );
+      assert.equal((await a.dbg('identity')).name, 'Alicia', 'the chip follows too');
+      assert.equal(await a.eval(`document.getElementById('identity-name').textContent`), 'Alicia');
+
+      const oldSeat = await a.playerId();
+      assert.equal(await a.dbg('leaveTable()'), true, 'leave accepted');
+      await a.waitFor(`!document.getElementById('name-modal').classList.contains('hidden')`,
+        { desc: "'Take a seat' returns" });
+      assert.equal(await a.eval(`localStorage.getItem('dice.name.v1')`), null, 'stored identity cleared');
+      assert.equal((await a.dbg('identity')).online, false, 'no seat while choosing');
+      await b.waitFor(
+        `window.__diceDebug.players.every((p) => p.name !== 'Alicia')`,
+        { desc: 'the dropped seat leaves the roster', timeout: 20000 },
+      );
+
+      // Take the new seat through the real modal.
+      await a.eval(`(() => {
+        const i = document.getElementById('name-input');
+        i.value = 'Ann';
+        i.dispatchEvent(new Event('input'));
+        document.getElementById('name-join').click();
+      })()`);
+      await a.waitFor(`window.__diceDebug.identity.online`, { desc: 'rejoined' });
+      assert.notEqual(await a.playerId(), oldSeat, 'a fresh seat, not the old one');
+      assert.equal((await a.dbg('identity')).name, 'Ann', 'under the new name');
+      await b.waitFor(
+        `window.__diceDebug.players.some((p) => p.name === 'Ann')`,
+        { desc: 'the new seat reaches the other roster' },
+      );
+    },
+  },
+
   // -- visibility (goal 11) --------------------------------------------------
   // The ladder is open (default) · held (face down for everyone, the roller
   // included) · secret (the roll exists only for the roller) · whisper (a named
