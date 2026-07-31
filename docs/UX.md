@@ -11,10 +11,20 @@ Design stance, in one line: **standard on the surface, modern in the feel.**
 Standard = Roll20-dialect notation, a visibility ladder built out of the
 moves every VTT already has (open · held · secret · whisper — see §3.2's
 terminology note for where the *words* diverge between tools), a
-conventional saved-groups panel.
+conventional saved-pools panel.
 Modern = one dressed-up roll moment, diegetic mat text in the 3D felt,
 physics-true hidden dice, and zero permission bureaucracy — the privacy is
 real (server-side redaction) and the roles are absent.
+
+**Naming (the terminology decision).** The dice you assemble to roll are a
+**pool**; the named preset you keep is a **saved pool**. Those are the only
+words a player ever reads — "tray" and "group" are retired from every
+label, tooltip and hint. They survive *only* as identifiers: the `#g=`
+codec, `dice.groups.v1`, `encodeGroups()`, `.group-row`/`.group-formula`,
+`id="tray"`. Renaming those would break saved links and stored state for
+no user-visible gain, so this spec still spells the code that way and only
+that way. (The collect shelf's internal "tray" — §7.7's slot geometry — is
+a different thing again and keeps its name.)
 
 ---
 
@@ -42,7 +52,7 @@ keep      := ("kh"|"kl"|"dh"|"dl") integer  ; bare "k"→kh, bare "d"→dl
 reroll    := ("ro"|"r") ("<="|"<") integer  ; ALWAYS once-per-die here
 explode   := "!"                            ; max face only, chain cap 3
 flag      := "adv" | "dis"                  ; requires a d20 in expr
-           | keep | reroll | "!"            ; group-wide trailing form (see below)
+           | keep | reroll | "!"            ; pool-wide trailing form (see below)
            | "check" | "cinematic" | "cine" ; moment kind (§7.6)
            | visibility                     ; one per command (§7.8)
 visibility:= "held" | "secret" | whisper
@@ -86,7 +96,7 @@ Token decisions (each chosen against a real alternative):
   chars, max 64 chars.
 
 **Mixed-pool scoping rule (the divergence fix).** `rollspec.js` applies
-`keep`, `reroll` and `explode` across the whole group, but every other
+`keep`, `reroll` and `explode` across the whole pool, but every other
 tool binds them to the attached term. This includes reroll: it *looks*
 per-die, but `reroll.below` is pool-scoped, so a glued `3d6ro<=2` beside
 a d20 would silently reroll low d20s too. Resolution, decisive and cheap
@@ -98,7 +108,7 @@ a d20 would silently reroll low d20s too. Resolution, decisive and cheap
 - **Mixed pool:** *any* term-glued mod — keep/drop, reroll, explode — is
   a **parse error** with a fix ("keep/drop binds to one dice type — try
   `4d6dl1` alone, or use a trailing ` dl1` to apply across the whole
-  pool"). The group-wide semantics this engine actually has are spelled
+  pool"). The pool-wide semantics this engine actually has are spelled
   as **trailing flags**: `1d20+2d6 ro<=2 dl1 !` — visibly nonstandard,
   therefore honest.
 - Long-term (post-launch): add term scoping to `rollspec.js` and retire the
@@ -130,7 +140,7 @@ error defined above.
 Visibility **is** in the notation string, as a trailing flag in its own
 slot — `held`, `secret`, `w:Name` (§7.8). An earlier draft kept it out (no
 market tool puts it there) and the notation-totality invariant reversed
-that: a saved group whose canonical string cannot say "secret" saves a
+that: a saved pool whose canonical string cannot say "secret" saves a
 public roll, and links, history and `#g=` all silently downgrade privacy.
 On the wire it still travels as a field beside `mods` (§3.0), because it
 does not alter values. The `/gmroll`-family prefixes are accepted for paste
@@ -168,13 +178,14 @@ dice", "explosions chain at most 3 deep".
 ### 1.3 The command box
 
 **Placement:** in `#builder-panel`, a full-width monospace input directly
-below the tray chip row and above the Roll/Empty button row.
+below the pool chip row and above the Roll/Empty button row.
 `id="notation-box"`, `placeholder="2d6+3, 4d6dl1, 1d20 adv dc15 …"`,
 `font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums`.
-Hidden in mini mode.
+It lives inside the Compose panel, so it is present whenever that panel is
+expanded and gone with it when collapsed (§7.4).
 
-**One canonical string, two editors.** Die buttons and tray chips rewrite
-the box; typing in the box rewrites the tray and the `±` popover state.
+**One canonical string, two editors.** Die buttons and pool chips rewrite
+the box; typing in the box rewrites the pool and the `±` popover state.
 There is no divergence to reconcile because the spec object is the single
 source of truth and the box is a projection of it (see §1.5).
 
@@ -201,19 +212,20 @@ seat, no role, and therefore nothing to condition the list on; the
 localStorage key `rollHistory:<room>`. This is the same store the banner's
 `⟳` Reroll-last (roadmap §3) reads — one store, two consumers.
 
-### 1.4 Notation chips on group rows and mini pills
+### 1.4 Notation chips on saved-pool rows
 
 - `.group-formula` (11px muted, exists today) shows the **full canonical
   notation** including mods: `2d20kh1+3 adv`. Monospace, tabular-nums,
   ellipsis-truncated with `title` carrying the whole string. This requires
-  groups to store the spec, not just dice — done in the same slice (§6,
+  saved pools to store the spec, not just dice — done in the same slice (§6,
   slice 1) so the chip never lies about what the button rolls.
 - Clicking `.group-formula` copies the notation to the clipboard (toast:
   "notation copied") and focuses the command box with it — chip text is
   guaranteed pasteable because chip text *is* canonical form.
-- Mini-bar pills: `title = canonical notation`; when a group has no name,
-  the pill label is the notation itself (replaces today's `formula(tray)`
-  fallback, same renderer).
+- **Unnamed pools label themselves by notation** — the row's name slot
+  renders the canonical string (replaces today's `formula(tray)` fallback,
+  same renderer). This once also fed the mini-bar pills; those are retired
+  with mini mode (§7.4).
 
 ### 1.5 Round-tripping (popover ↔ notation ↔ URL)
 
@@ -229,21 +241,21 @@ The invariant: **spec object is truth; notation is its stable projection.**
   (names *and* comments `encodeURIComponent`-escaped since `;`/`=`/`#` are
   delimiters), then base64url as today. The v1 decoder regex is a strict
   subset of the grammar, so **every existing `#g=` link decodes unchanged**;
-  the encoder always writes v2. The group's moment and its visibility need
+  the encoder always writes v2. A saved pool's moment and its visibility need
   no side-channel: both are canonical-notation flags (`check`, `held`,
   `w:Kira` — §7.6, §7.8), so they ride the stored string for free and a
-  shared link cannot lose a group's privacy. Only a future dice-set id
+  shared link cannot lose a pool's privacy. Only a future dice-set id
   still needs a trailing `@set=ember` token (parser-private, never shown in
   chips); the once-planned `@exp=` / `@vis=` tokens are retired.
-- **Unnamed groups** (§1.4) encode with an empty name segment — `=4d6dl1`
-  — and the v2 decoder accepts `eq === 0`, labelling the group by its
+- **Unnamed pools** (§1.4) encode with an empty name segment — `=4d6dl1`
+  — and the v2 decoder accepts `eq === 0`, labelling the pool by its
   notation. Compatibility is **one-way by design**: every v1 link decodes
   on a v2 client, but a v2 link using anything v1 cannot express — mods,
   flags, `dc`, comments, `@` tokens, or an empty name (v1 rejects the
   whole link on `eq < 1`, `js/urlgroups.js`) — fails *closed* on an old
   client: `decodeGroups` returns null, the app opens with defaults, and
   no half-imported list appears. Worth stating because it is silent — an
-  old client shows no error, just no groups.
+  old client shows no error, just no saved pools.
 
 ### 1.6 Server implications
 
@@ -285,7 +297,7 @@ modCards → verdict → flavor → actions        (+ matText, in the felt)
 ```
 
 ```js
-// Attachment (on a group, or on an offer)
+// Attachment (on a saved pool, or on an offer)
 { exp: 'check', title: 'Deception', subtitle: 'CHARISMA CHECK',
   matText: 'The lie leaves your lips…',
   target: { value: 15, cmp: '>=', scope: 'total',
@@ -315,7 +327,7 @@ slots. If a genuinely new slot arrangement is ever needed, that is a new
 | frame | — | ornate | ornate |
 | mat text | — | yes | yes |
 
-Plain is the default for every existing and new group; nothing changes
+Plain is the default for every existing and new pool; nothing changes
 until a human dresses a roll up. **Ceremony selectivity is load-bearing**
 (BG3 backgrounds most rolls), and it is selectivity of *dress, not
 scheduling*: `playRoll` runs one playback at a time over the one shared
@@ -328,10 +340,10 @@ scope.
 
 ### 2.3 Attaching an experience
 
-- **Group row:** the `±` popover gains a final section, "Moment", with a
+- **Saved-pool row:** the `±` popover gains a final section, "Moment", with a
   segmented control `Plain · Check · Cinematic · +` and — when non-Plain —
   three text fields (Title, Subtitle, Mat text; all optional, sensible
-  fallbacks: title ← group name, mat text ← title) and an optional Target
+  fallbacks: title ← pool name, mat text ← title) and an optional Target
   number + label. `+` opens the experience editor (a form over the record
   fields — no freeform layout editing).
 - **Offered rolls:** the offer composer includes the same "Moment" section;
@@ -341,7 +353,7 @@ scope.
 - **Command box:** `# text` fills the mat text/title for one-off rolls;
   `dc15` attaches a Check with that target (a `dc` with no experience
   implies Check — a target with no staging would be mute).
-- Serialization: attachment fields ride the group record, localStorage, and
+- Serialization: attachment fields ride the saved-pool record, localStorage, and
   the `#g=` codec (§1.5).
 
 ### 2.4 Staging timeline (Check, ceremonial)
@@ -361,15 +373,25 @@ All phases hang off the two existing hooks: keyframe playback
 | **7 Flavor** | +200 ms | Soul Deal word fades in per the readout rules (§2.5). |
 | **8 Crit** | crit only | +250 ms hold, existing `.shake`, gold sweep. Trim `playCritEffect` overlay 1700 → ~1100 ms. |
 
-**Placement — one anchor, no occlusion.** Phase 0's intent card is
+**Placement — one anchor, and the ceremony wins.** Phase 0's intent card is
 center-stage while the table is still empty; from Commit onward every
 piece of card chrome lives at the **top anchor** — the strip during the
 tumble, the verdict card (the strip, unfolded) from phase 5 — and the
-throw targets the center/lower felt, so the card never parks over the
-pool or its value chips. Large pools scatter: if a die does settle in the
-top band, the card's translucent blur ground keeps it visible and that
-die's value chip renders **above** the card. Chips are never occluded,
-whatever the pool size.
+throw targets the center/lower felt, so the card rarely shares space with
+the pool at all.
+
+*Amended (the layer-scale pass).* The original rule said the opposite of
+what shipped: a die's value chip rendered **above** the card so chips were
+"never occluded, whatever the pool size". That inverted the hierarchy — a
+stray die in the top band punched a number through the verdict. The rule
+now, from the one documented ladder in `css/style.css`
+(`--z-table-labels: 11` < `--z-ceremony: 14`): **ceremony and verdict sit
+above every ambient table label.** A chip that a scattered die parks under
+the card is simply hidden for the length of the moment; the card's own
+translucent blur ground keeps the die itself readable, and the total,
+breakdown and verdict are on the card anyway. Value chips are also **off
+by default** now (`dice.chips.v1`, §7.9's quiet-by-default principle), so
+in the default table there is nothing there to occlude.
 
 **Budget, enforced:** post-settle ≤ 700 ms for 1 die, ≤ 1.2 s for 4,
 ≤ 1.6 s worst case. **Any click or Esc during phases 1–7 jumps to final
@@ -404,7 +426,7 @@ reconciled and never merged. The card has one large readout:
   independent channel: a gold ring / red crack on that chip only. The
   three signals never repaint one another.
 
-### 2.6 Multiplayer and mini mode
+### 2.6 Multiplayer and the collapsed table
 
 **Values and staging are server-authoritative; pacing is client-local.**
 The attachment (title, subtitle, mat text, target, experience id) rides the
@@ -418,10 +440,14 @@ and reduced-motion are strictly local — one player's skip never truncates
 another's playback. Dwell (phase 0) is bounded for spectators only by the
 roller acting; an offer card persists as today until claimed or rescinded.
 
-**Mini mode degrades to brisk-or-less, no card:** intent card and mat text
-are skipped; the group pill pulses gold during the tumble; the result
-strip (existing mini result) appends the verdict word:
-`Deception · 17 vs 15 · SUCCESS`. Cinematic in mini renders as brisk.
+~~**Mini mode degrades to brisk-or-less, no card:** intent card and mat text
+are skipped; the pool pill pulses gold during the tumble; the result strip
+appends the verdict word.~~ **Retired by §7.4** (and by the chrome rebuild
+in §7.9): mini mode no longer exists as a mode, so there is nothing to
+degrade. Collapsing the panels hides chrome and *only* chrome — the intent
+card, mat decal, staged verdict and cinematic slow-mo all render
+identically, responsively scaled. That is the immersion invariant: the
+smaller the window, the more of it is table.
 
 ---
 
