@@ -661,7 +661,7 @@ only-me roll is: *Dice tower — they roll, only you see the result*.
 notation it was opened on, every time — there is no remembered per-player
 default. That is deliberate for now: a sticky non-open default is the
 number-one accident vector, and carrying one would require the eye-slash
-badge on the Roll button and the mini pills to be safe. Neither ships.
+badge on the Roll button and every saved-pool row to be safe. Neither ships.
 What does the announcing today is the composed notation itself — the
 popover echo always spells the mode out (`… secret`, `… w:Kira`) and the
 preview line says it in words (`· face down`, `· whisper to Kira`). A
@@ -799,7 +799,7 @@ Recorded so they stop coming up:
 - **Role-addressed `/gmroll` semantics as the *model*.** Whisper-by-name
   covers it; the `/gmroll` family survives only as paste sugar that
   normalizes to `secret` (§7.8, §3.2's terminology note).
-- **Per-skill / per-group visibility default grids.** A saved group already
+- **Per-skill / per-pool visibility default grids.** A saved pool already
   carries its visibility inside its canonical notation (§1.5, §7.8) — the
   90% substitute, with no new state to sync.
 - **Permission grids, kick, rename-others.** With no auth, kicking is
@@ -837,14 +837,14 @@ emissive pulse on crit, `nebula` = slow hue drift), implemented later;
 unknown flags no-op.
 
 **Precedence (extends roadmap §4's chain by one rung):** individual die >
-group override > **player set** > player color > die-type default. Five
+pool override > **player set** > player color > die-type default. Five
 rungs, **one axis**: every rung resolves to a *set id* before anything
 touches the renderer or the wire. A bare color — roadmap §4's player/die
-colors, or a group swatch — derives an **anonymous set**:
+colors, or a saved pool's swatch — derives an **anonymous set**:
 `extends: 'ivory-court'`, `body` = the color, `id` = the color literal
 (`'#7a1f14'`). So roll events always carry per-die set ids (§4.2), the
-`(type, setId)` cache needs no color code path, and roadmap §4's group
-color swatch and §4.2's group set are the **same rung and the same
+`(type, setId)` cache needs no color code path, and roadmap §4's pool
+color swatch and §4.2's pool set are the **same rung and the same
 control**, not two competing knobs — picking a swatch stores an anonymous
 set id.
 
@@ -856,9 +856,9 @@ than color alone. New endpoint `POST /api/style {set}` → SSE
 `player-styled {playerId, set}`; included in `publicPlayers()` and `hello`.
 Roll events carry **resolved per-die set ids** (subsuming roadmap §4's
 per-die colors — colors fold into anonymous sets per §4.1, so the set id
-is the *only* per-die style field on the wire) or replay diverges. Group override: a swatch+set control on the
-group row (a "Fireball" group pins Ember Pact); serialized as `@set=` in
-the codec (§1.5) so bookmarked groups keep their look. **No per-roll set
+is the *only* per-die style field on the wire) or replay diverges. Pool override: a swatch+set control on the
+saved-pool row (a "Fireball" pool pins Ember Pact); serialized as `@set=` in
+the codec (§1.5) so bookmarked pools keep their look. **No per-roll set
 choice** — an extra decision inside the tension beat kills the beat.
 
 ### 4.3 Picker
@@ -989,8 +989,8 @@ slice 1 because everything later leans on them.
 **Slice 1 — Notation (rides roadmap §3, absorbs roadmap §12).**
 `js/notation.js` (grammar, parser, canonical renderer, round-trip tests);
 command box with three-state validation, `/` token list, history store;
-`formula()` and `encodeGroups()` replaced by the one renderer; groups store
-specs; codec v2; `/api/roll`+`/api/offer` accept `notation`; group-row
+`formula()` and `encodeGroups()` replaced by the one renderer; saved pools
+store specs; codec v2; `/api/roll`+`/api/offer` accept `notation`; pool-row
 chips + copy-on-click. *Value: paste any Roll20-ish string and it rolls;
 every chip and URL tells the truth about mods.*
 
@@ -1007,7 +1007,7 @@ best-looking moment in the app — before any card exists.*
 intent card (plain frame first, ornate corners once the hierarchy is
 proven); mat-text felt decal; hit-stop/chorus/rescue/verdict timeline;
 target ring + one-hero-slot rule; Cinematic slow-mo (playback-clock
-scaling) + fanfare; mini-mode degradation; attachment on roll/offer
+scaling) + fanfare; parity in the collapsed view (§7.4); attachment on roll/offer
 events. *Value: the BG3 moment, shared across the table.*
 
 **Slice 4 — Sets.** Dice sets tier 0–1 riding roadmap §4's cache re-key
@@ -1039,28 +1039,27 @@ per-roll choices — §3.3.)
 Two principles arrived from Joe after §1–§6 were drafted. They are binding;
 where they touch earlier sections, this addendum wins.
 
-### 7.1 Physical tray building (supersedes the button grid as the primary path)
+### 7.1 Physical pool building (supersedes the button grid as the primary path)
 
-**Principle: physical analogy over UI.** The die-type buttons and tray chips
-of §1.4 become the *fallback* (kept for mini mode and accessibility). The
-primary build path is physical:
+**Principle: physical analogy over UI.** The die-type buttons and pool chips
+of §1.4 become the *fallback* (kept for a collapsed Compose panel and for
+accessibility). The primary build path is physical:
 
 - **The shelf.** One specimen of each die type rests along the front-left
   edge of the felt — real meshes from the live renderer, idle, at rest.
   Hovering one lifts it 0.3 units with a soft glow (150 ms).
 - **Click or drag to add.** Clicking a shelf die spawns a copy that hops
-  (one small physics arc, ~350 ms) into the **tray** — a shallow recessed
-  rectangle decaled into the felt beside the shelf. Dragging does the same
-  under the pointer via table-plane raycast; releasing outside the tray
+  (one small physics arc, ~350 ms) into the **pool area** — a shallow
+  recessed rectangle decaled into the felt beside the shelf. Dragging does
+  the same under the pointer via table-plane raycast; releasing outside it
   cancels (the die tumbles off the table edge and fades).
-- **The tray IS the draft group.** Dice sitting in it are the group being
-  built. Clicking a tray die plucks it out. The panel's notation box (§1.3)
-  and the tray are two views of one draft — typing `4d6dl1` re-lays the
-  tray with four physical d6s; adding a fifth by hand updates the string to
-  `5d6dl1`.
-- **Rolling the tray throws those dice.** The physical objects in the tray
-  are the ones hurled — build and roll are one continuous physical act.
-  (Saved-group rolls still spawn fresh dice as today.)
+- **That area IS the draft pool.** Dice sitting in it are the pool being
+  built. Clicking one plucks it out. The panel's notation box (§1.3) and the
+  felt are two views of one draft — typing `4d6dl1` re-lays it with four
+  physical d6s; adding a fifth by hand updates the string to `5d6dl1`.
+- **Rolling the pool throws those dice.** The physical objects in it are the
+  ones hurled — build and roll are one continuous physical act.
+  (Saved-pool rolls still spawn fresh dice as today.)
 - Mechanics that have no physical body (modifier, keep, dc, mat text) stay
   in the popover/notation — the split is: *dice are physical, intentions
   are text*.
@@ -1112,6 +1111,10 @@ retired: ceremonies render identically in compact view (intent card, mat
 decal, staged verdict, cinematic slow-mo), responsively scaled. Only panels
 and controls hide.
 
+*Followed through (§7.9):* compact view is no longer a view either. It is
+the emergent state of collapsing all four panels, and the controls that
+used to vanish with it now live on a rail that never hides.
+
 **Roll-declaration surfaces and the two verbs.** Every surface below must
 support the full roll intent (spec + dc + moment + visibility + label) and
 both verbs — Roll and Offer to table. Visibility is part of "full intent":
@@ -1122,9 +1125,9 @@ the notation surfaces it comes for free (§7.8).
 |---|---|---|---|
 | Panel command box | Enter | Shift+Enter | notation string |
 | Quick palette | Enter | Shift+Enter | notation string |
-| Ad-hoc tray | Roll button | via ± popover | ± button beside Roll |
-| Saved group (expanded) | Roll button | via ± popover | ± button |
-| Saved group (compact pill) | tap | via ± popover | long-press / right-click |
+| Ad-hoc pool (Compose) | Roll button | via ± popover | ± button beside Roll |
+| Saved-pool row | Roll button | via ± popover | ± button, and ✎ for name + notation |
+| ~~Saved pool (compact pill)~~ | — | — | retired with the mini bar (§7.9); the Saved pools panel expands from its edge tab instead |
 | Reroll-last (⟳) | click | — (re-rolls as rolled) | inherits original intent |
 
 Offer is disabled (with tooltip) in solo mode on every surface. A surface
@@ -1232,8 +1235,8 @@ restraint: cards are chrome, not ceremony.
 ### 7.8 Visibility notation (`held` · `secret` · `w:`)
 
 Visibility is part of a roll's intent, so it has a canonical spelling.
-Without one, a saved group, a `#g=` link or a history recall silently
-downgrades privacy — a group meant to be secret rolls in the open on the
+Without one, a saved pool, a `#g=` link or a history recall silently
+downgrades privacy — a pool meant to be secret rolls in the open on the
 next machine that opens the link. That is a notation-totality violation
 (GOALS.md), and it is exactly the failure roadmap step 1 closed for
 face-down. `held` / `secret` / `w:` close it for the whole ladder.
@@ -1302,7 +1305,7 @@ around the commas.
 - The list is the text you wrote. The chooser is added to the audience at
   *resolution* (§3.0), not in the string — the same string rolled by
   someone else means a different audience, which is correct: a shared
-  group whispering `w:Kira` includes whoever rolls it, plus Kira.
+  pool whispering `w:Kira` includes whoever rolls it, plus Kira.
 
 **Examples.**
 
@@ -1321,8 +1324,67 @@ around the commas.
 ```
 
 **It rides everything for free.** `#g=` stores canonical strings
-(`js/urlgroups.js`), so a group's visibility travels in links, localStorage
+(`js/urlgroups.js`), so a saved pool's visibility travels in links, localStorage
 and history with no side-channel token and no extra codec version — see
 §1.5, where the once-planned `@vis=` token is retired for this reason. On
 an offer, the same string expresses the offerer's choice, which is what
 makes the GM-screen roll a one-liner (§3.3).
+
+### 7.9 Quiet chrome (the shipped redesign, 2026-07-30)
+
+Two principles, binding, and where they touch earlier sections they win:
+
+- **P1 — quiet by default, detail on intent.** Ambient state is
+  glanceable-minimal; detail arrives on hover, focus or expand.
+- **P2 — one layer scale.** A single documented z ladder, with ceremony
+  above ambient table labels so a roll moment is never occluded.
+
+**The ladder** lives as `:root` custom properties in `css/style.css` and
+every fixed overlay reads one of them, never a bare number:
+`--z-right-stack 9` < `--z-panel 10` < `--z-table-labels 11`
+(value chips, shelf markers) < `--z-banner 12` < `--z-ceremony 14` <
+`--z-offers 16` < `--z-crit 20` < `--z-popover 26` < `--z-peek 30` <
+`--z-modal 40` < `--z-palette 58` < `--z-cheatsheet 62`. §2.4's amended
+Placement note records the bug this killed.
+
+**Value chips are off by default** (`dice.chips.v1`, "Show numbers on
+dice" in the settings *Just you* section). The readability invariant
+(GOALS) is carried by the banner, the verdict card, the log and the
+breakdown, which is where a number is legible anyway; chips become the
+opt-in for people who want them floating over the felt.
+
+**Resting shelf markers are a dot.** One roller-colored dot on a large
+round target — no always-on gold total, no tiny ✕, and a held roll shows
+the same dot rather than shouting `?`. Hover or tap explodes it into the
+existing peek card (§7.7.1) with the full total and breakdown; the peek
+carries a prominent ✕ at its base that clears the roll for everyone.
+
+**The clear gesture is one gesture.** The roller's ✕ on the post-roll
+banner, the ✕ on the verdict card and the peek's base ✕ share a class, a
+look and the label *Clear this roll for everyone*. A spectator's local
+dismiss stays visually distinct — different semantics, different affordance.
+
+**The rail never hides.** A persistent strip carries identity chip · ⚙ ·
+🔊 · ❯ palette · ⤡ collapse-all, in every state and at every viewport.
+This is the fix for a real bug: settings and mute used to live in chrome
+that compact mode hid, stranding both behind a keyboard shortcut.
+
+**Four independent regions,** each collapsing on its own header to a small
+labelled edge tab, each remembering its own state in `dice.panels.v1`:
+Compose · Saved pools · Players (online only) · Roll log. Keys `b` `g` `p`
+`l` toggle one, `m` toggles all. **Compact view is emergent**: `body.mini`
+is derived from "every available panel is collapsed" and only rescales the
+table and its labels — it is not a mode, and nothing can be reached in one
+state that cannot be reached in the other.
+
+**Identity is on the table, solo and online.** The chip (color dot + name)
+opens Change name · Leave & switch seat · Copy invite link. Solo is a
+first-class case: rename writes `dice.name.v1` with no server, and leaving
+drops the seat, forgets the name and re-prompts.
+
+**Saved pools edit in place.** The row set is Roll · ± · ✎ · ✕. The pencil
+turns the row into a name + notation editor whose Update writes back to the
+same record **by id**; the ± popover gains *Update this pool* beside the
+additive *Save as variant*. Writing by id is the fix for two bugs at once:
+renaming used to fork a duplicate, and an unnamed pool could not be updated
+at all.
