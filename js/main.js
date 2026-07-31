@@ -1141,14 +1141,15 @@ function renderPeek() {
   // clearing the shelved cluster as part of the reroll (a pool is how you
   // mint a copy; the clear goes first so the shelf never holds both).
   if (entry && canReroll(entry)) {
+    // No die art HERE (user call): the actual physical dice sit directly
+    // under this card — duplicating them in miniature reads as clutter. The
+    // button is the bare promise instead: the same ROLL ❯❯❯ cue, quiet at
+    // rest, bright on approach. Every other roll surface keeps its art.
     const strip = document.createElement('button');
-    strip.className = 'pool-roll pk-again pk-strip';
+    strip.className = 'pool-roll pk-again pk-strip pk-bare';
     strip.title = 'Roll these again — replaces this shelved roll';
     strip.setAttribute('aria-label', `Roll again — ${entry.label}`);
-    strip.appendChild(buildDieStrip(entry.spec.dice, POOL_STRIP_CAP, { grouped: true }));
     strip.appendChild(buildRollCue());
-    const units = new Set(entry.spec.dice).size;
-    strip.classList.toggle('cue-tight', cueTight(Math.min(units, POOL_STRIP_CAP) + (units > POOL_STRIP_CAP ? 1 : 0)));
     strip.addEventListener('click', () => {
       closePeek();
       requestClearRoll(c.rollId);

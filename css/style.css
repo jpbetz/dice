@@ -1217,8 +1217,21 @@ body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
   border-color: var(--red);
   background: rgba(226, 73, 59, 0.16);
 }
-/* the peek's die-strip reroll: the same roll button as everywhere else */
-.pk-strip { width: 100%; margin-top: 8px; min-height: 40px; }
+/* The peek's reroll: the same roll button as everywhere else, minus the
+   die art — the ACTUAL dice sit right under the card (no miniatures over
+   the real thing). The cue itself is the button's face: quiet at rest,
+   bright on approach. */
+.pk-strip { width: 100%; margin-top: 8px; min-height: 32px; }
+.pk-strip.pk-bare { justify-content: center; }
+.pk-strip.pk-bare .roll-cue {
+  position: static;
+  inset: auto;
+  padding: 0;
+  justify-content: center;
+  font-size: 15px;
+  opacity: 0.5;
+}
+.pk-strip.pk-bare:hover:not(:disabled) .roll-cue { opacity: 1; }
 
 /* compact view keeps the full card, scaled like the markers (§7.7.1) */
 body.mini .peek-card { min-width: 150px; padding: 7px 10px 9px; }
@@ -1263,8 +1276,17 @@ body.mini .pk-breakdown { font-size: 10px; }
 @media (pointer: coarse) { .reveal-tier { opacity: 1; } }
 /* an EMPTY revealed row must not hold a gap open at rest */
 .reveal-tier:empty { display: none; }
-.verdict-actions .reveal-tier { display: flex; gap: 8px; }
 #verdict-done.mine { font-weight: 700; border-color: rgba(212, 175, 55, 0.5); }
+/* The verdict card is TRANSIENT — it times out into the banner — so its
+   WHOLE action row is revealed-tier: at rest the card is pure result
+   (clean and shiny; the banner keeps the standing Done, it persists).
+   display:contents folds the inner tier's buttons into the one centered
+   row when the actions do appear. */
+#verdict-card .verdict-actions { opacity: 0; transition: opacity 0.15s; }
+#verdict-card:hover .verdict-actions,
+#verdict-card:focus-within .verdict-actions { opacity: 1; }
+#verdict-card .reveal-tier { display: contents; }
+@media (pointer: coarse) { #verdict-card .verdict-actions { opacity: 1; } }
 
 /* ---------- offered-roll cards ---------- */
 #offers-layer {
