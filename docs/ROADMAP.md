@@ -11,7 +11,7 @@ the docs (step 4's sweep).
 
 ### 1. Notation totality closeout
 
-Close the audited invariant violations so groups, history, and `#g=` links
+Close the audited invariant violations so saved pools, history, and `#g=` links
 carry a roll's FULL intent:
 
 - Implement UX.md §7.6: `check` / `cinematic` trailing flags,
@@ -126,14 +126,14 @@ the system-profile registry from step 2. Needs dice.js custom face sets.
 ## Tier 6 — Customization & delight
 
 ### 9. Dice sets & colors — (type,setId) material cache, launch sets,
-per-player identity set, group override, picker. A bare color derives an
+per-player identity set, saved-pool override, picker. A bare color derives an
 anonymous set.
 
 ### 10. Custom experience templates — the editor UI for the (currently
 dormant) `experiences` settings key; until this ships the key stays
 server-validated but unconsumed by design.
 
-### 11. Physical build-a-tray — the §7.1 shelf/tray delight (demoted per
+### 11. Physical pool building — the §7.1 shelf/felt delight (demoted per
 goals 3–4: physical interaction is optional delight, never required toil).
 
 ### 12. Per-player roll mats — visual skin over step 3's zone machinery;
@@ -145,8 +145,8 @@ mat color per-player, visible to all.
 ## Shipped
 
 Multiplayer core (SSE rooms, server-authoritative values, simulate-ahead
-replay with face correction, solo fallback) · Soul Deal meanings · mini
-mode + corner controls · groups in URL (#g= codec v2 carrying notation) ·
+replay with face correction, solo fallback) · Soul Deal meanings · saved
+pools in URL (#g= codec v2 carrying notation) ·
 player rename · roll mechanics engine (shared rollspec: modifier/adv/
 keep/reroll/explode, attributed parts, per-die metadata) · offers
 (offer/claim/withdraw) · face-down + reveal (UI-level; real redaction is
@@ -163,7 +163,13 @@ roll, shrouded obsidian playback with deferred mid-playback reveals, solo
 degradation, the cross-tool terminology pass (`/gmroll` family → `secret`,
 `/sr` refused as ambiguous, labels *Only me* · *Whisper to…* · *Dice
 tower*), and the `#`-in-player-names ban that keeps whisper addressing
-total.
+total · **quiet chrome (UX.md §7.9)**: the documented z ladder with ceremony
+above table labels, value chips off by default, dot-only shelf markers with
+the peek doing the talking, one clear-this-roll gesture everywhere, a
+persistent rail that no view can strand, four independently collapsible
+panels with compact view as their emergent state, the identity chip (rename
+· leave & switch · invite link) solo and online, by-id saved-pool editing,
+and the *pool / saved pool* naming.
 
 ## Conformances to protect (from the audit)
 

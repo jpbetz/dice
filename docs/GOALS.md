@@ -4,6 +4,12 @@ The durable statement of what this system is and how design decisions get
 made. [ROADMAP.md](ROADMAP.md) sequences work against these goals; [UX.md](UX.md)
 specifies components within them. Where the three disagree, this document wins.
 
+**The word is "pool."** The dice you assemble to roll are a *pool*; the named
+preset you keep is a *saved pool*. "Tray" and "group" are gone from every
+label a player reads and survive only as identifiers — the `#g=` codec,
+`dice.groups.v1`, `id="tray"` — which stay put so saved links and stored
+state keep working (UX.md's naming note).
+
 ## The experience
 
 1. **Grounded in the physical table.** The UX looks and feels like a real
@@ -21,7 +27,7 @@ specifies components within them. Where the three disagree, this document wins.
    emulate the tedious parts: picking up and positioning dice, summing
    values, applying modifiers, cleaning the table. When dice settle, the
    system computes and expresses the net result immediately. Physical
-   *interaction* (dragging dice, building trays by hand) is optional
+   *interaction* (dragging dice, building pools by hand) is optional
    delight — never a required step.
 5. **Organized over realistic.** Concurrent rolls must not become chaos. The
    system actively keeps rolls visually separate — allocating table space
@@ -42,7 +48,7 @@ specifies components within them. Where the three disagree, this document wins.
 ## The architecture
 
 7. **Stateless server, capturable client.** The server holds no persistent
-   state — rooms live and die in memory. Anything worth keeping (groups,
+   state — rooms live and die in memory. Anything worth keeping (saved pools,
    history, logs, statistics) is captured client-side: localStorage, URLs,
    exports. A bookmarked URL is a complete save file.
 8. **One shared truth.** Every player sees the same values, attribution, and
@@ -78,7 +84,7 @@ specifies components within them. Where the three disagree, this document wins.
   round-trip fixed point. *(The two violations audited 2026-07-30 are
   closed and re-verified 2026-07-30: roll moments canonicalize as
   `check`/`cinematic` + `# Title | Subtitle`, and the whole visibility
-  ladder canonicalizes as `held` / `secret` / `w:Name`, so groups, history
+  ladder canonicalizes as `held` / `secret` / `w:Name`, so saved pools, history
   and `#g=` links carry both. The last audited violation — a player name
   containing `#` silently misdirecting a whisper through the comment
   split — is closed by **banning `#` in player names at every entry
@@ -106,7 +112,7 @@ specifies components within them. Where the three disagree, this document wins.
 When sequencing work: **core mechanics** (rolling, notation, interpretation
 systems, visibility, organization/concurrency) come before **presentation
 effects** and before **customization** (dice sets, custom themes, physical
-tray delight). Fantasy-forward effects are core to the vision but follow a
+pool-building delight). Fantasy-forward effects are core to the vision but follow a
 working, coherent mechanical foundation.
 
 ## Superseded decisions (flagged 2026-07-30)
@@ -126,7 +132,7 @@ are authoritative, and nothing here needs to be consulted to build.*
   is true; this entry only explains why an older draft said otherwise.
 - **"Physical analogy over UI" is softened** by goals 3–4: physical
   look-and-feel grounds the experience; physical interaction is optional
-  delight. The build-a-tray (UX.md §7.1) moves to the delight tier.
+  delight. Building a pool by hand (UX.md §7.1) moves to the delight tier.
 - **Interpretation is a system toggle** (goal 6): the always-on pairing of
   Soul Deal words + DC verdicts becomes the "Your Soul Deal" system profile;
   a "D&D"-style profile (DC verdicts, nat-20/1 crits, no meaning chart) and
