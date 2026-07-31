@@ -168,6 +168,45 @@ export const scenarios = [
     },
   },
   {
+    name: 'shelf-actions',
+    tags: ['shelf'],
+    // A shelved roll stays actionable from its peek: ⟳ rolls the same spec
+    // again, and ± pulls it back into the compose draft (command box + tray
+    // popover) for an ad-hoc tweak — dc, mods and comment intact.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.roll('2d6+3 dc9');
+      const rid = await a.rollId();
+      await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        { desc: 'roll shelved' },
+      );
+      assert.equal(await a.dbg(`peek(${JSON.stringify(rid)})`), rid, 'peek opens');
+      const ps = await a.dbg('peekState');
+      assert.equal(ps.hasAgain, true, 'the peek carries ⟳');
+      assert.equal(ps.hasTweak, true, 'and ±');
+
+      // ⟳: the same spec rolls again — a new roll lands, the shelved one stays.
+      await a.eval(`document.querySelector('#peek-card .pk-again').click()`);
+      await a.settle();
+      const rid2 = await a.rollId();
+      assert.ok(rid2 && rid2 !== rid, 'a new roll landed from ⟳');
+      assert.ok((await a.logTop()).includes('vs 9'), 'the dc rode along');
+
+      // ±: the original roll's notation lands in the compose draft with the
+      // popover bound to it.
+      assert.equal(await a.dbg(`peek(${JSON.stringify(rid)})`), rid, 'peek reopens');
+      await a.eval(`document.querySelector('#peek-card .pk-tweak').click()`);
+      const pop = await a.dbg('popover');
+      assert.ok(pop && pop.open, '± opens the ± popover');
+      assert.equal(pop.source, 'tray', 'bound to the compose draft');
+      assert.equal(String(pop.dc), '9', 'the dc rides into the draft');
+      const box = await a.eval(`document.getElementById('cmd-input').value`);
+      assert.ok(box.includes('2d6+3'), `the box carries the notation (${box})`);
+    },
+  },
+  {
     name: 'auto-collect',
     tags: ['shelf'],
     // A new roll auto-collects the previous uncollected one — the table

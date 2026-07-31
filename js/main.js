@@ -1095,17 +1095,55 @@ function renderPeek() {
   if (entry) renderBreakdown(bd, entry, hidden);
   peekEl.appendChild(bd);
 
+  const actions = document.createElement('div');
+  actions.className = 'pk-actions';
   if (entry && canReveal(entry)) {
-    const actions = document.createElement('div');
-    actions.className = 'pk-actions';
     const rv = document.createElement('button');
-    rv.className = 'sm-reveal';
+    rv.className = 'sm-reveal pk-reveal';
     rv.textContent = 'Reveal';
     rv.title = 'Flip this roll face up for the table';
     rv.addEventListener('click', () => requestReveal(c.rollId));
     actions.appendChild(rv);
-    peekEl.appendChild(actions);
   }
+  // A shelved roll stays actionable (same readability gate as the log's ⟳):
+  // roll it again as-is, or pull it back into the compose draft to tweak.
+  if (entry && canReroll(entry)) {
+    const again = document.createElement('button');
+    again.className = 'sm-reveal pk-again';
+    again.textContent = '⟳ Roll again';
+    again.title = 'Roll this again';
+    again.addEventListener('click', () => {
+      closePeek();
+      requestRoll([...entry.spec.dice], entry.label, {
+        mods: entry.spec.mods || undefined,
+        faceDown: entry.faceDown,
+        visibility: entryVis(entry) || undefined, // the privacy rides along
+        dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
+        exp: entry.spec.exp || undefined, // reroll preserves the moment
+      });
+    });
+    actions.appendChild(again);
+    const tweak = document.createElement('button');
+    tweak.className = 'sm-reveal pk-tweak';
+    tweak.textContent = '±';
+    tweak.title = 'Load into the compose draft to modify';
+    tweak.addEventListener('click', () => {
+      // The roll's own notation (comment intact) when we have it; else the
+      // canonical reconstruction from the spec the viewer may read.
+      const raw = entry.notation && parseNotation(entry.notation).ok ? entry.notation
+        : canonicalWithVis(entry.spec, {
+          dc: Number.isInteger(entry.dc) ? entry.dc : null,
+          exp: entry.spec.exp || null,
+          faceDown: entry.faceDown,
+        }, entryVis(entry));
+      closePeek();
+      setPanel('compose', true);
+      loadIntoBox(raw, '');
+      openPopover({ source: 'tray', row: document.getElementById('tray-actions') });
+    });
+    actions.appendChild(tweak);
+  }
+  if (actions.childElementCount) peekEl.appendChild(actions);
 
   // The card's base carries the ONE prominent clear-✕ — the unified 'clear
   // this roll' gesture (same glyph, same sentence as the banner's and the
@@ -2990,7 +3028,9 @@ window.__diceDebug = {
       text: peekEl.textContent,
       breakdown: (peekEl.querySelector('.pk-breakdown') || { textContent: '' }).textContent,
       total: (peekEl.querySelector('.pk-total') || { textContent: '' }).textContent,
-      hasReveal: !!peekEl.querySelector('.sm-reveal'),
+      hasReveal: !!peekEl.querySelector('.pk-reveal'),
+      hasAgain: !!peekEl.querySelector('.pk-again'),
+      hasTweak: !!peekEl.querySelector('.pk-tweak'),
       hasClear: !!peekEl.querySelector('.pk-clear'),
       rect: (() => { const r = peekEl.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; })(),
     };

@@ -982,7 +982,8 @@ body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
 .pk-breakdown:empty { display: none; }
 .pk-breakdown .crit-max { color: var(--gold-bright); font-weight: 700; }
 .pk-breakdown .crit-min { color: var(--red); font-weight: 700; }
-.pk-actions { margin-top: 6px; }
+.pk-actions { margin-top: 6px; display: flex; justify-content: center; gap: 6px; }
+.pk-tweak { min-width: 26px; }
 
 /* ---------- the unified 'clear this roll' ✕ (P1, cross-cutting) ---------- */
 /* One gesture, one look, one sentence — the post-roll banner, the verdict
