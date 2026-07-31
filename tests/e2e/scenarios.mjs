@@ -538,16 +538,57 @@ export const scenarios = [
       assert.equal(gs.length, before.length + 1, "'Save as variant' stays additive");
       assert.ok(gs.find((g) => g.id === atk.id), 'the original survives beside its variant');
 
-      // The tray draft has no record: its popover offers variant, never Update.
+      // The ad-hoc draft has no record: its popover offers variant, never
+      // Update. (`openPopoverFor('tray')` keeps the internal source name.)
       await a.eval(`(() => {
         const box = document.getElementById('cmd-input');
         box.value = 'd6';
         box.dispatchEvent(new Event('input'));
       })()`);
-      assert.equal(await a.dbg(`openPopoverFor('tray')`), true, 'tray popover opens');
+      assert.equal(await a.dbg(`openPopoverFor('tray')`), true, 'draft popover opens');
       assert.equal(await a.eval(`document.getElementById('pop-update').classList.contains('hidden')`), true,
-        'no Update for the tray draft');
+        'no Update for the ad-hoc draft');
       await a.dbg('closePopover()');
+    },
+  },
+  {
+    name: 'terminology',
+    tags: ['smoke', 'chrome'],
+    // The vocabulary is 'pool' / 'saved pool'; 'tray' and 'group' survive only
+    // as ids, classes, storage keys and the #g= codec. This reads the chrome a
+    // player actually sees — labels, tooltips, placeholders, both cheat sheets
+    // — and fails if either retired word comes back into view.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      assert.equal(await a.eval(`document.querySelector('#head-groups .ph-label').textContent`),
+        'Saved pools', 'the panel is labelled Saved pools');
+      assert.equal(await a.eval(`document.getElementById('group-name').placeholder`),
+        'Name this pool…', 'the save field names a pool');
+      assert.equal(await a.eval(`document.getElementById('pop-update').textContent`),
+        'Update this pool', 'the popover updates a pool');
+      assert.equal(await a.eval(`document.querySelector('#groups-list .group-del').title`),
+        'Delete pool', 'the row ✕ deletes a pool');
+
+      // The sweep itself: every label, tooltip, placeholder and text node in
+      // the chrome a player can read. Storage keys and class names are not
+      // reachable this way, which is exactly the line the contract draws.
+      const stray = await a.eval(`(() => {
+        const roots = ['#left-panel', '#rail', '#kbd-overlay', '#mods-popover',
+                       '#settings-modal', '#cmd-cheatsheet', '#identity-menu'];
+        const banned = /\\btrays?\\b|\\bgroups?\\b/i;
+        const bad = [];
+        for (const sel of roots) {
+          const root = document.querySelector(sel);
+          if (!root) continue;
+          for (const el of [root, ...root.querySelectorAll('*')]) {
+            const texts = [el.title || '', el.placeholder || '', el.getAttribute('aria-label') || ''];
+            for (const kid of el.childNodes) if (kid.nodeType === 3) texts.push(kid.nodeValue);
+            for (const t of texts) if (banned.test(t)) bad.push(sel + ' → ' + t.trim());
+          }
+        }
+        return bad;
+      })()`);
+      assert.deepEqual(stray, [], `no user-facing 'tray'/'group' remains (found ${JSON.stringify(stray)})`);
     },
   },
 
