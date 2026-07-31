@@ -1341,9 +1341,12 @@ Two principles, binding, and where they touch earlier sections they win:
 
 **The ladder** lives as `:root` custom properties in `css/style.css` and
 every fixed overlay reads one of them, never a bare number:
-`--z-right-stack 9` < `--z-panel 10` < `--z-table-labels 11`
+`--z-panel 10` < `--z-table-labels 11`
 (value chips, shelf markers) < `--z-banner 12` < `--z-ceremony 14` <
-`--z-offers 16` < `--z-crit 20` < `--z-popover 26` < `--z-peek 30` <
+`--z-offers 16` < `--z-flyout 18` (the pinned roll-log flyout — above the
+offers/banner it is consulted over, below everything that must peel first;
+2026-07 amendment: `--z-right-stack 9` retired with the log panel) <
+`--z-crit 20` < `--z-popover 26` < `--z-peek 30` <
 `--z-modal 40` < `--z-palette 58` < `--z-cheatsheet 62`. §2.4's amended
 Placement note records the bug this killed.
 
@@ -1364,15 +1367,20 @@ banner, the ✕ on the verdict card and the peek's base ✕ share a class, a
 look and the label *Clear this roll for everyone*. A spectator's local
 dismiss stays visually distinct — different semantics, different affordance.
 
-**The rail never hides.** A persistent strip carries identity chip · ⚙ ·
-🔊 · ❯ palette · ⤡ collapse-all, in every state and at every viewport.
-This is the fix for a real bug: settings and mute used to live in chrome
-that compact mode hid, stranding both behind a keyboard shortcut.
+**The rail never hides.** A persistent strip carries status · roster ·
+identity chip · ❯ quick roll · ≣ roll log · 🔊 · ⚙ — presence → action →
+information → environment — in every state and at every viewport. *(2026-07
+amendment: the ⤡ collapse-all button is deleted — key `m` remains and the
+panel edge tabs are the visible replacement; the roll log left the panel
+stack for the rail's ≣, a pinned flyout with an unread badge.)* This is the
+fix for a real bug: settings and mute used to live in chrome that compact
+mode hid, stranding both behind a keyboard shortcut.
 
-**Three independent regions,** each collapsing on its own header to a small
-labelled edge tab, each remembering its own state in `dice.panels.v1`:
-Compose · Saved pools · Roll log. Keys `b` `g` `l` toggle one, `m` toggles
-all. **Compact view is emergent**: `body.mini` is derived from "every panel
+**Two independent regions** *(2026-07 amendment: was three — the roll log
+moved to the rail flyout; `l` toggles it there)*, each collapsing on its
+own header to a small labelled edge tab, each remembering its own state in
+`dice.panels.v1`: Compose · Saved pools. Keys `b` `g` toggle one, `m`
+toggles all. **Compact view is emergent**: `body.mini` is derived from "every panel
 is collapsed" and only rescales the table and its labels — it is not a
 mode, and nothing can be reached in one state that cannot be reached in the
 other. *(Amended 2026-07: the Players panel is retired — the roster is rail

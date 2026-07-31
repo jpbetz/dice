@@ -390,65 +390,81 @@ export const scenarios = [
   {
     name: 'panels-collapse',
     tags: ['smoke', 'chrome'],
-    // Three regions, each independently collapsible; collapsed = header tab
-    // only; state persists per user ('dice.panels.v1' — same origin, same
-    // identity); the keyboard parity: 'm' collapses/expands all, 'l' one.
-    // (No Players region: the roster is rail furniture.)
+    // Two regions — Compose, Saved pools — each independently collapsible;
+    // collapsed = header tab only; state persists per user ('dice.panels.v1'
+    // — same origin, same identity); keyboard parity: 'm' collapses/expands
+    // all, 'b'/'g' one. The roll log is NOT a region anymore: 'l' toggles
+    // the rail flyout and never touches a panel (stale 'log' keys in stored
+    // state are ignored — the seed iterates PANEL_DEFS).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       let st = await a.dbg('panelState');
-      assert.equal(st.compose && st.groups && st.log, true, 'panels default open on a desktop viewport');
+      assert.equal(st.compose && st.groups, true, 'panels default open on a desktop viewport');
+      assert.equal('log' in st, false, 'the log is no longer a panel region');
 
-      st = await a.dbg('setPanelState({log: false, groups: false})');
-      assert.equal(st.log, false, 'log collapsed');
+      st = await a.dbg('setPanelState({groups: false})');
       assert.equal(st.groups, false, 'groups collapsed');
       assert.equal(st.compose, true, 'compose untouched — independent regions');
       assert.equal(st.allCollapsed, false, 'not yet compact');
-      assert.equal(await a.eval(`document.querySelector('#log-panel .panel-body').offsetParent === null`),
-        true, 'a collapsed panel is its header tab only');
-      assert.equal(await a.eval(`document.querySelector('#builder-panel .panel-body').offsetParent !== null`),
-        true, 'an open panel keeps its body');
 
       // Immersion invariant: a roll plays out exactly the same under
-      // collapsed chrome (the log records even while its panel is a tab).
+      // collapsed chrome (the log records even while its flyout is closed).
       await a.roll('2d6');
       assert.equal(await a.diceCount(), 2, 'roll unaffected by collapsed chrome');
 
       // Persistence: a fresh tab on the same origin restores the state.
       const b = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const st2 = await b.dbg('panelState');
-      assert.equal(st2.log, false, 'collapsed log persisted');
       assert.equal(st2.groups, false, 'collapsed groups persisted');
       assert.equal(st2.compose, true, 'open compose persisted');
 
-      // Keyboard parity: 'm' = collapse/expand all; 'l' = just the log.
+      // Keyboard parity: 'm' = collapse/expand all; 'g' = just the pools;
+      // 'l' = the log flyout, leaving every panel exactly where it was.
       await b.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'm'}))`);
       assert.equal((await b.dbg('panelState')).allCollapsed, true, "'m' collapses everything");
       assert.ok(await b.eval(`document.body.classList.contains('mini')`), 'and compact view engages');
       await b.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'l'}))`);
+      assert.equal((await b.dbg('logFlyout')).open, true, "'l' opens the log flyout");
+      assert.equal((await b.dbg('panelState')).allCollapsed, true, 'without touching a panel — compact holds');
+      await b.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'l'}))`);
+      assert.equal((await b.dbg('logFlyout')).open, false, "'l' again closes it");
+      await b.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'g'}))`);
       const st3 = await b.dbg('panelState');
-      assert.equal(st3.log, true, "'l' reopens the log");
+      assert.equal(st3.groups, true, "'g' reopens the pools");
       assert.equal(st3.compose, false, 'without touching the others');
       assert.ok(await b.eval(`!document.body.classList.contains('mini')`), 'compact view lifts');
+      // Leave the origin's persisted state all-open: panel state is per-user
+      // localStorage, which OUTLIVES this scenario's room.
+      await b.dbg('setPanelState({compose: true, groups: true})');
     },
   },
   {
     name: 'control-rail',
     tags: ['smoke', 'chrome'],
-    // The persistent control rail NEVER hides: identity chip, settings, mute,
-    // palette and collapse-all stay reachable even with every panel collapsed
-    // (the emergent compact view). The retired compact mode used to strand
-    // settings + mute off screen — this pins the fix.
+    // The persistent control rail NEVER hides: identity chip, quick roll,
+    // roll log, mute and settings stay reachable even with every panel
+    // collapsed (the emergent compact view). The retired compact mode used
+    // to strand settings + mute off screen — this pins the fix. Order is P3:
+    // presence (status · roster · identity) → action (❯) → information (≣)
+    // → environment (🔊 · ⚙); the ⤡ collapse-all button is deleted (key 'm'
+    // remains — the panel edge tabs are the visible replacement).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
-      const RAIL = ['rail', 'identity-chip', 'toggle-settings', 'toggle-sound', 'rail-palette', 'rail-collapse'];
+      const RAIL = ['rail', 'identity-chip', 'rail-palette', 'rail-log', 'toggle-sound', 'toggle-settings'];
       const visible = (id) => a.eval(
         `(() => { const el = document.getElementById('${id}'); if (!el) return false;`
         + ` const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden'; })()`,
       );
       for (const id of RAIL) assert.ok(await visible(id), `#${id} visible in full view`);
+      assert.equal(await a.eval(`document.getElementById('rail-collapse') === null`), true,
+        'the ⤡ collapse-all button is gone');
+      assert.deepEqual(
+        await a.eval(`[...document.getElementById('rail').children].map((el) => el.id)`),
+        ['status-pill', 'rail-roster', 'identity-chip', 'rail-palette', 'rail-log', 'toggle-sound', 'toggle-settings'],
+        'rail order: presence → action → information → environment (P3)',
+      );
 
-      const st = await a.dbg('setPanelState({compose: false, groups: false, log: false})');
+      const st = await a.dbg('setPanelState({compose: false, groups: false})');
       assert.equal(st.allCollapsed, true, 'every panel collapsed');
       assert.ok(await a.eval(`document.body.classList.contains('mini')`),
         'compact view is the emergent all-collapsed state');
@@ -460,13 +476,68 @@ export const scenarios = [
         'settings reachable with everything collapsed');
       await a.eval(`document.getElementById('settings-close').click()`);
       // Reopening one panel leaves compact view.
-      const st2 = await a.dbg('setPanelState({log: true})');
+      const st2 = await a.dbg('setPanelState({groups: true})');
       assert.equal(st2.allCollapsed, false, 'one open panel ends all-collapsed');
       assert.ok(await a.eval(`!document.body.classList.contains('mini')`), 'compact view lifts');
       // Leave the origin's persisted state all-open: panel state is per-user
-      // localStorage, which OUTLIVES this scenario's room (later scenarios on
-      // this origin read hidden-log innerText as empty if we leave it shut).
-      await a.dbg('setPanelState({compose: true, groups: true, log: true})');
+      // localStorage, which OUTLIVES this scenario's room.
+      await a.dbg('setPanelState({compose: true, groups: true})');
+    },
+  },
+  {
+    name: 'log-flyout',
+    tags: ['chrome', 'smoke'],
+    // The roll log rides the rail (P3: information): ≣ / 'l' toggle a pinned
+    // flyout. Closed, arrivals count into the unread badge (which also seeds
+    // from the join backlog); open, renderLog keeps painting live. PINNED
+    // MEANS PINNED: clicking the felt never dismisses it — only the ≣
+    // toggle, its own ✕, or Esc (the END of the Esc chain) close it.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      let lf = await a.dbg('logFlyout');
+      assert.equal(lf.open, false, 'the flyout starts closed');
+      assert.equal(lf.badge, 0, 'and unread starts empty');
+
+      // A roll while closed: one unread, reflected in badge DOM + title.
+      await a.roll('d20');
+      lf = await a.dbg('logFlyout');
+      assert.equal(lf.open, false, 'a roll does not open the flyout');
+      assert.equal(lf.badge, 1, 'the closed flyout counted it unread');
+      assert.equal(await a.eval(`document.getElementById('log-badge').textContent`), '1', 'badge shows the count');
+      assert.ok((await a.eval(`document.getElementById('rail-log').title`)).includes('1 unread'),
+        'the ≣ title folds the count in (unread is never visual-only)');
+      assert.equal(await a.eval(`document.getElementById('rail-log').getAttribute('aria-pressed')`), 'false');
+
+      // Opening clears the badge and shows the entry.
+      assert.equal(await a.dbg('setLogFlyout(true)'), true, 'flyout opens');
+      lf = await a.dbg('logFlyout');
+      assert.equal(lf.badge, 0, 'opening reads the backlog — badge clears');
+      assert.equal(await a.eval(`document.getElementById('rail-log').getAttribute('aria-pressed')`), 'true',
+        'the ≣ reflects the open state');
+      assert.ok((await a.logTop()).includes('d20'), `the entry is readable in the open flyout (got: ${await a.logTop()})`);
+
+      // A roll while open lands live; the flyout stays open, nothing unread.
+      await a.roll('2d6');
+      lf = await a.dbg('logFlyout');
+      assert.equal(lf.open, true, 'the flyout stays open across a roll');
+      assert.equal(lf.badge, 0, 'an open flyout never counts unread');
+      assert.equal(await a.logCount(), 2, 'the new entry painted live');
+
+      // PINNED: clicking the felt/table does not dismiss it — the log is for
+      // watching the table while you act on it.
+      await a.eval(`document.getElementById('scene-container').dispatchEvent(new PointerEvent('pointerdown', {bubbles: true}))`);
+      await a.eval(`document.getElementById('scene-container').click()`);
+      assert.equal((await a.dbg('logFlyout')).open, true, 'outside clicks never close it — pinned means pinned');
+
+      // Esc closes it (end of the central chain).
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
+      assert.equal((await a.dbg('logFlyout')).open, false, 'Esc closes the flyout');
+
+      // A late joiner: the join backlog seeds the badge so history shows.
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await b.settle();
+      await b.waitFor(`window.__diceDebug.logFlyout.badge === 2`, { desc: 'join backlog seeds the unread badge' });
+      assert.equal((await b.dbg('logFlyout')).open, false, 'seeded badge, closed flyout');
     },
   },
   {

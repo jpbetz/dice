@@ -3081,11 +3081,18 @@ window.__diceDebug = {
   get chipsVisible() { return chipsOn; },
   setChipsVisible(on) { setChips(on); return chipsOn; },
   get chipCount() { return chips.length; },
-  // chrome (the three collapsible panel regions + emergent compact view):
+  // chrome (the two collapsible panel regions + emergent compact view):
   // open booleans per region, allCollapsed = the emergent body.mini state.
   // setPanelState applies a partial {region: bool} patch and returns the
   // resulting state. JSON-safe.
   get panelState() { return panelDebugState(); },
+  // roll-log flyout (the rail's ≣): open state + unread badge count, and
+  // the direct driver for headless tests (clicks/keys stay the real paths).
+  get logFlyout() { return { open: isLogFlyoutOpen(), badge: logUnread }; },
+  setLogFlyout(open) {
+    if (open) openLogFlyout(); else closeLogFlyout();
+    return isLogFlyoutOpen();
+  },
   // saved-pools flyout (roll without pinning the panel open): the hover
   // behavior, driven directly where headless tests can't hover.
   get groupsFlyout() { return groupsPanelEl.classList.contains('flyout'); },
@@ -4726,6 +4733,9 @@ function addLogEntry(entry) {
   if (log.length > LOG_CAP) log = log.slice(-LOG_CAP);
   if (!netOnline) save(LS_LOG, log); // online mode: the server owns the log
   renderLog();
+  // An entry landing while the flyout is closed counts as unread on the
+  // rail's ≣ badge (the dedupe above already returned for re-deliveries).
+  if (!isLogFlyoutOpen()) setLogUnread(logUnread + 1);
 }
 
 document.getElementById('clear-log').addEventListener('click', () => {
@@ -4733,6 +4743,58 @@ document.getElementById('clear-log').addEventListener('click', () => {
   if (!netOnline) save(LS_LOG, log);
   renderLog();
 });
+
+// ---------------------------------------------------------------------------
+// Roll-log flyout (rail ≣ / key 'l'). The log left the panel stack — P3: it
+// is information, not workspace — and now drops from the rail like the
+// identity menu. PINNED MEANS PINNED: the log is for watching the table
+// while you act on it, so clicking the felt/pools must NOT dismiss it; it
+// closes only via the ≣ toggle, its own header ✕, or Esc (the END of the
+// central chain — see the keyboard section). renderLog() keeps painting
+// #log-list live while it is open; while it is closed, arrivals count into
+// the ≣ unread badge, which also seeds from the join backlog ('hello') so a
+// late joiner sees at a glance that the table has history.
+// ---------------------------------------------------------------------------
+
+const logFlyoutEl = document.getElementById('log-flyout');
+const railLogBtn = document.getElementById('rail-log');
+const logBadgeEl = document.getElementById('log-badge');
+let logUnread = 0; // entries that arrived while the flyout was closed
+
+function isLogFlyoutOpen() { return !logFlyoutEl.classList.contains('hidden'); }
+
+// Badge + button title carry the same count (display capped at '9+'): the
+// title is the button's accessible name, so unread is never visual-only.
+function renderLogBadge() {
+  const shown = logUnread > 9 ? '9+' : String(logUnread);
+  logBadgeEl.textContent = shown;
+  logBadgeEl.classList.toggle('hidden', logUnread === 0);
+  railLogBtn.title = logUnread > 0 ? `Roll log — l · ${shown} unread` : 'Roll log — l';
+}
+
+function setLogUnread(n) {
+  logUnread = Math.max(0, n);
+  renderLogBadge();
+}
+
+function openLogFlyout() {
+  logFlyoutEl.classList.remove('hidden');
+  railLogBtn.setAttribute('aria-pressed', 'true');
+  setLogUnread(0); // opening reads the backlog
+}
+
+function closeLogFlyout() {
+  logFlyoutEl.classList.add('hidden');
+  railLogBtn.setAttribute('aria-pressed', 'false');
+}
+
+function toggleLogFlyout() {
+  if (isLogFlyoutOpen()) closeLogFlyout();
+  else openLogFlyout();
+}
+
+railLogBtn.addEventListener('click', toggleLogFlyout);
+document.getElementById('log-close').addEventListener('click', closeLogFlyout);
 
 // ---------------------------------------------------------------------------
 // Rail + corner controls
@@ -4966,14 +5028,16 @@ document.getElementById('set-sound').addEventListener('click', () => setSound(!s
 document.getElementById('set-chips').addEventListener('click', () => setChips(!chipsOn));
 
 // ---------------------------------------------------------------------------
-// Collapsible chrome panels: three regions — Compose (builder + command box),
-// Saved pools, Roll log — each independently collapsible from its own
-// header (plus keys b/g/l), with per-user state in 'dice.panels.v1'. (The
-// roster is rail furniture, not a region — there is no Players panel.)
-// Collapsed, a panel rests as a small labelled edge tab. Compact view is no
-// longer a mode: body.mini is the EMERGENT all-collapsed state (it scales
-// the ambient chrome and reframes the camera; it hides nothing — the rail
-// and the tabs stay, and ceremonies render identically).
+// Collapsible chrome panels: two regions — Compose (builder + command box)
+// and Saved pools — each independently collapsible from its own header
+// (plus keys b/g), with per-user state in 'dice.panels.v1'. (The roster is
+// rail furniture, not a region; the roll log is the rail's ≣ flyout, not a
+// region — stale 'log'/'players' keys in stored state are ignored because
+// the seed below iterates PANEL_DEFS.) Collapsed, a panel rests as a small
+// labelled edge tab. Compact view is no longer a mode: body.mini is the
+// EMERGENT all-collapsed state (it scales the ambient chrome and reframes
+// the camera; it hides nothing — the rail and the tabs stay, and ceremonies
+// render identically).
 // ---------------------------------------------------------------------------
 
 const LS_PANELS = 'dice.panels.v1';
@@ -4982,7 +5046,6 @@ const LS_MINI = 'dice.mini.v1'; // legacy compact-view preference — migration 
 const PANEL_DEFS = {
   compose: { el: 'builder-panel', head: 'head-compose' },
   groups: { el: 'groups-panel', head: 'head-groups' },
-  log: { el: 'log-panel', head: 'head-log' },
 };
 
 // Open/collapsed per region. Seeded once, exactly like the old mini seed: a
@@ -5087,9 +5150,6 @@ function applyPanels(persist = true) {
   if (panelsOpen.groups) closeGroupsFlyout(); // a real expand retires the overlay
   if (persist) save(LS_PANELS, panelsOpen);
   const mini = allPanelsCollapsed();
-  const railBtn = document.getElementById('rail-collapse');
-  railBtn.textContent = mini ? '⤢' : '⤡';
-  railBtn.title = mini ? 'Expand panels (m)' : 'Collapse panels (m)';
   if (mini !== document.body.classList.contains('mini')) {
     document.body.classList.toggle('mini', mini);
     applyCameraFraming();
@@ -5107,8 +5167,10 @@ function setPanel(id, open, persist = true) {
   return panelsOpen[id];
 }
 
-// The rail's ⤡ / key 'm' (old compact-view muscle memory): everything
-// collapsed reopens everything; anything open collapses everything.
+// Key 'm' (old compact-view muscle memory): everything collapsed reopens
+// everything; anything open collapses everything. The rail's ⤡ button is
+// deleted — the two panel edge tabs are the visible replacement, and the
+// cheatsheet keeps the 'm' row.
 function toggleAllPanels() {
   const open = allPanelsCollapsed();
   for (const k of Object.keys(PANEL_DEFS)) panelsOpen[k] = open;
@@ -5122,7 +5184,6 @@ for (const [id, def] of Object.entries(PANEL_DEFS)) {
     setPanel(id, !panelsOpen[id]);
   });
 }
-document.getElementById('rail-collapse').addEventListener('click', toggleAllPanels);
 
 // ---- saved-pools flyout ----------------------------------------------------
 // Rolling a saved pool used to demand expanding the panel — which then sat
@@ -5295,10 +5356,15 @@ function rerollLast() {
 // Single global keydown handler. Layer guards are checked BEFORE any handler
 // mutates state, so one Esc can never fall through two layers:
 //   Esc peels the topmost layer only — cheatsheet > palette > settings modal
-//   > peek card > ± popover (extends the earlier popover/modal layering fix;
-//   the peek slots in above the popover per §7.7.1).
+//   > peek card > ± popover > log flyout (extends the earlier popover/modal
+//   layering fix; the peek slots in above the popover per §7.7.1, and the
+//   flyout closes LAST because it sits at the BOTTOM of the overlay z-order
+//   (--z-flyout) — everything stacked above it peels first).
 // Table shortcuts fire only with no text input focused and no layer open
-// (the ± popover counts as open UI). Space keeps its skip-ceremony handler.
+// (the ± popover counts as open UI). The log flyout is deliberately NOT
+// such a layer: glancing at the log is exactly when you reroll, so 'r' and
+// the digits stay live while it is open — it captures Esc only, via the
+// chain. Space keeps its skip-ceremony handler.
 document.addEventListener('keydown', (e) => {
   // Held keys auto-repeat: without this guard a held 'r'/digit floods rolls,
   // held 'm' thrashes the panels, and held '/' opens the palette then types
@@ -5316,6 +5382,10 @@ document.addEventListener('keydown', (e) => {
     else if (isIdentityMenuOpen()) closeIdentityMenu();
     else if (isPeekOpen()) closePeek();
     else if (pop) closePopover();
+    // The pinned log flyout is the END of the chain: it rides the bottom of
+    // the overlay z-order, so every layer above it peels first. Esc is one
+    // of its only three closes (≣ toggle, header ✕, Esc — never a click-away).
+    else if (isLogFlyoutOpen()) closeLogFlyout();
     return;
   }
   if (typing) return;
@@ -5346,7 +5416,7 @@ document.addEventListener('keydown', (e) => {
     case 'm': toggleAllPanels(); return;
     case 'b': setPanel('compose', !panelsOpen.compose); return;
     case 'g': setPanel('groups', !panelsOpen.groups); return;
-    case 'l': setPanel('log', !panelsOpen.log); return;
+    case 'l': toggleLogFlyout(); return; // the roll log is a rail flyout now, not a panel
     case 's': setSound(!soundOn); return;
     default:
       if (e.key >= '1' && e.key <= '9') {
@@ -5734,6 +5804,11 @@ function handleNetEvent(type, data) {
       renderPlayers();
       log = (data.log || []).map(rollToLogEntry);
       renderLog();
+      // The join backlog seeds the ≣ unread badge (closed flyout only): a
+      // late joiner sees at a glance that the table has history. hello fires
+      // on every stream (re)open, so a reconnect re-counts what the closed
+      // flyout is holding; an open flyout is already being read — no badge.
+      if (!isLogFlyoutOpen()) setLogUnread(log.length);
       // The banner still holds a PRE-rebuild entry object — a stale twin of the
       // log line it came from. Re-point it at the fresh one so the replays
       // below (and every later repaint) act on the state the room agrees on.

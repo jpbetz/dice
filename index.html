@@ -35,9 +35,10 @@ limitations under the License.
   <!-- Left panels: Compose (pool builder + command box) + saved pools.
        ("pool" is the user-facing name for both concepts; the `tray`/`group`
        ids, classes, storage keys and the #g= codec keep their old spelling.)
-       Each is one of the four independently-collapsible chrome regions: its
+       Each is one of the two independently-collapsible chrome regions: its
        header is the toggle, and collapsed it rests as a small labelled edge
-       tab (per-user state in dice.panels.v1). -->
+       tab (per-user state in dice.panels.v1). The roll log is NOT a region
+       anymore — it rides the rail as #log-flyout. -->
   <aside id="left-panel">
     <div class="panel side-panel" id="builder-panel">
       <div class="panel-head" id="head-compose" title="Show/hide — key: b">
@@ -108,13 +109,17 @@ limitations under the License.
   </aside>
 
   <!-- The persistent control rail: NEVER hides, in any state or viewport.
-       Settings and mute live here so no view can strand them (the retired
-       compact mode hid them); ❯ opens the quick palette; ⤡ collapses or
-       expands all panels at once. The identity chip rides here too, and the
-       roster rides beside it: everyone ELSE at the table as quiet name pills
-       (you ARE the identity chip — that is the 'which one is me' signal),
-       folding into a +N pill past a handful. No Players panel: a roster is
-       presence, not a workspace. -->
+       Ordered per P3 — presence → action → information → environment: the
+       status pill, roster and identity chip say who is at the table; ❯
+       (quick roll) acts on it; ≣ (roll log, with an unread badge) informs
+       about it; sound and settings dress the room. Settings and mute live
+       here so no view can strand them (the retired compact mode hid them).
+       The roster is everyone ELSE as quiet name pills (you ARE the identity
+       chip — that is the 'which one is me' signal), folding into a +N pill
+       past a handful. No Players panel: a roster is presence, not a
+       workspace. The old ⤡ collapse-all button is deleted (key 'm' remains;
+       the two panel edge tabs are the visible replacement). The ≣ badge is
+       a SPAN, not a nested button: the whole target is the one toggle. -->
   <div id="rail">
     <span id="status-pill" class="hidden"></span>
     <div id="rail-roster"></div>
@@ -122,10 +127,10 @@ limitations under the License.
       <span id="identity-dot" class="identity-dot"></span>
       <span id="identity-name" class="identity-name">…</span>
     </button>
-    <button id="toggle-settings" class="btn ghost" title="Settings">⚙</button>
-    <button id="toggle-sound" class="btn ghost" title="Toggle sound">🔊</button>
     <button id="rail-palette" class="btn ghost" title="Quick roll ( / )">❯</button>
-    <button id="rail-collapse" class="btn ghost" title="Collapse panels (m)">⤡</button>
+    <button id="rail-log" class="btn ghost" title="Roll log — l" aria-pressed="false">≣<span id="log-badge" class="log-badge hidden"></span></button>
+    <button id="toggle-sound" class="btn ghost" title="Toggle sound">🔊</button>
+    <button id="toggle-settings" class="btn ghost" title="Settings">⚙</button>
   </div>
 
   <!-- Identity menu (rail chip): who you are + seat actions. Fully solo-capable
@@ -141,6 +146,23 @@ limitations under the License.
     </div>
     <button id="idm-leave" class="idm-item">Leave &amp; switch seat</button>
     <button id="idm-invite" class="idm-item">Copy invite link</button>
+  </div>
+
+  <!-- Roll-log flyout (rail ≣ / key 'l'): the log left the panel stack — it
+       is information, not workspace (P3), so it drops from the rail like
+       #identity-menu instead of holding a panel column open (P4: demoted,
+       nothing it held is deleted — list, clear, empty hint all ride along).
+       PINNED MEANS PINNED: outside clicks do NOT close it (the log is for
+       watching the table while you act on it); only the ≣ toggle, the ✕
+       here, or Esc close it. -->
+  <div id="log-flyout" class="panel hidden">
+    <div class="lf-head">
+      <span class="ph-label">Roll log</span>
+      <button id="clear-log" class="btn tiny ghost">clear</button>
+      <button id="log-close" class="pop-close" title="Close">✕</button>
+    </div>
+    <div id="log-list"></div>
+    <p id="log-empty" class="hint">No rolls yet.</p>
   </div>
 
   <!-- Corner control: clear the whole table. Context, not furniture — it
@@ -168,8 +190,9 @@ limitations under the License.
           <tr><td><code>1–9</code></td><td>roll saved pool N</td></tr>
           <tr><td><code>r</code></td><td>reroll the last roll</td></tr>
           <tr><td><code>c</code></td><td>clear the table</td></tr>
-          <tr><td><code>m</code></td><td>collapse / expand all panels</td></tr>
-          <tr><td><code>b</code> <code>g</code> <code>l</code></td><td>toggle one panel — compose, saved pools, log</td></tr>
+          <tr><td><code>m</code></td><td>collapse / expand all panels (the edge tabs bring one back)</td></tr>
+          <tr><td><code>b</code> <code>g</code></td><td>toggle one panel — compose, saved pools</td></tr>
+          <tr><td><code>l</code></td><td>roll log flyout</td></tr>
           <tr><td><code>s</code></td><td>sound on/off</td></tr>
           <tr><td><code>/</code> or <code>Ctrl/Cmd K</code></td><td>quick roll palette</td></tr>
           <tr><td><code>Space</code></td><td>skip the roll in flight (click the table works too)</td></tr>
@@ -243,22 +266,9 @@ limitations under the License.
     <div id="hit-flash"></div>
   </div>
 
-  <!-- Right-side stack: the roll log — the third collapsible region. (The
-       roster lives in the rail; there is no Players panel.) -->
-  <div id="right-stack">
-    <!-- Roll log -->
-    <aside id="log-panel" class="panel side-panel">
-      <div class="panel-head" id="head-log" title="Show/hide — key: l">
-        <span class="ph-label">Roll log</span>
-        <button id="clear-log" class="btn tiny ghost">clear</button>
-        <span class="ph-chev" aria-hidden="true"></span>
-      </div>
-      <div class="panel-body">
-        <div id="log-list"></div>
-        <p id="log-empty" class="hint">No rolls yet.</p>
-      </div>
-    </aside>
-  </div>
+  <!-- (No right-side stack: the roll log moved into #log-flyout above — the
+       rail's ≣. There is no Players panel either; the roster is rail
+       furniture.) -->
 
   <!-- Result banner -->
   <div id="result-banner" class="hidden">
