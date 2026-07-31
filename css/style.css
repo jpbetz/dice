@@ -1684,6 +1684,9 @@ body.mini .popover { width: min(94vw, 312px); }
   background: radial-gradient(ellipse at center, transparent 42%, rgba(0,0,0,0.38) 100%);
   opacity: 0; transition: opacity 0.6s var(--ease-plant);
 }
+/* the declare dwell dims the room too: anticipation starts at the
+   declaration, not the throw (GOALS 3 — stakes declared, tension built) */
+#ceremony-layer.c-declare #ceremony-vignette,
 #ceremony-layer.c-tumble #ceremony-vignette,
 #ceremony-layer.c-settle #ceremony-vignette,
 #ceremony-layer.c-verdict #ceremony-vignette { opacity: 1; }
@@ -1933,6 +1936,9 @@ body.mini .popover { width: min(94vw, 312px); }
   font-size: clamp(18px, 3.6vmin, 26px);
   letter-spacing: 0.22em; text-indent: 0.22em; text-transform: uppercase;
   color: var(--gold-bright);
+  /* a dark under-shadow keeps SUCCESS legible inside the crit card's own
+     gold bloom (it was washing out gold-on-gold at the triumph beat) */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 0 14px rgba(0, 0, 0, 0.35);
 }
 .verdict-hero.bad { color: var(--red); }
 .verdict-hero.held { color: var(--muted); font-style: italic; letter-spacing: 0.06em; }

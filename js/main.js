@@ -2382,7 +2382,8 @@ function beginCeremony(roll) {
   // out of sight while the declaration holds the stage.
   for (const d of roll.dice) d.mesh.visible = false;
   renderIntentCard(roll);
-  applyMatDecal(momentTitle(roll)); // the felt declares the moment, not the pool name
+  const title = momentTitle(roll); // '' for an untitled check: the felt stays bare
+  if (title) applyMatDecal(title);
   setCeremonyPhaseClass(roll, 'c-declare');
 }
 
@@ -2577,7 +2578,11 @@ function momentTitle(roll) {
     const res = parseNotation(roll.notation);
     if (res.ok && res.comment) return res.comment;
   }
-  return roll.label || '';
+  // No written moment: a pool name still reads as one ('Attack'), but raw
+  // notation must never be inscribed in ceremony capitals — an untitled
+  // check keeps the felt bare (absence beats jargon at the drama beat).
+  const label = roll.label || '';
+  return parseNotation(label).ok ? '' : label;
 }
 
 function renderIntentCard(roll) {
