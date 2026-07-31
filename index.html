@@ -119,7 +119,7 @@ limitations under the License.
                them reads as physically filling it. -->
           <p id="tray-hint" class="hint tray-ghost">tap a die button to add — then click your dice to roll</p>
         </div>
-        <button id="tray-mods" class="group-mods pool-mods" title="Modifiers, target, offer — the pool draft">±</button>
+        <button id="tray-mods" class="group-mods pool-mods" title="Tweak — modifiers, target, moment">±</button>
       </div>
       <!-- Draft management (the tier refinement, 2026-07-31): Save and
            Clear are not part of the ROLL operation, so they STAND once
@@ -132,7 +132,7 @@ limitations under the License.
       <div class="btn-row tray-save hidden" id="tray-save-row">
         <input id="group-name" type="text" placeholder="Name this pool…" maxlength="24">
         <button id="save-confirm" class="btn confirm" title="Save as a new pool">✓</button>
-        <button id="save-cancel" class="btn" title="Cancel">×</button>
+        <button id="save-cancel" class="btn" title="Cancel">✕</button>
       </div>
       </div>
       </div>
@@ -152,7 +152,7 @@ limitations under the License.
       </div>
       <div class="panel-body">
         <div id="pools-toolbar" class="hidden">
-          <button id="copy-link" class="btn tiny ghost" title="Copy a URL that restores these pools anywhere">copy link</button>
+          <button id="copy-link" class="btn tiny ghost" title="Copy a URL that restores these pools anywhere">Copy link</button>
           <button id="pools-done" class="btn tiny ghost">Done</button>
         </div>
         <div id="groups-list"></div>
@@ -201,7 +201,7 @@ limitations under the License.
       <input id="idm-name-input" class="tin" type="text" maxlength="24" autocomplete="off" placeholder="New name…">
     </div>
     <button id="idm-leave" class="idm-item">Leave &amp; switch seat</button>
-    <button id="idm-invite" class="idm-item">Copy invite link</button>
+    <button id="idm-invite" class="idm-item" title="This room’s link — invites a player. Pools travel via Saved pools → ✎ → Copy link">Copy invite link</button>
   </div>
 
   <!-- Roll-log flyout (rail ≣ / key 'l'): the log left the panel stack — it
@@ -214,7 +214,7 @@ limitations under the License.
   <div id="log-flyout" class="panel hidden">
     <div class="lf-head">
       <span class="ph-label">Roll log</span>
-      <button id="clear-log" class="btn tiny ghost">clear</button>
+      <button id="clear-log" class="btn tiny ghost">Clear</button>
       <button id="log-close" class="pop-close" title="Close">✕</button>
     </div>
     <div id="log-list"></div>
@@ -310,7 +310,6 @@ limitations under the License.
       </div>
       <div class="margin-line" id="verdict-margin"></div>
       <div class="verdict-hero" id="verdict-hero"></div>
-      <div class="chart-line" id="verdict-chart"></div>
       <div class="mod-cards" id="verdict-modcards"></div>
       <!-- Standing: Reveal (a hidden roll's completing verb) + Done. The
            revealed tier (⟳, the roller's clear-✕) appears on approach —
@@ -474,7 +473,7 @@ limitations under the License.
     <div class="pop-actions pop-save hidden" id="pop-save-row">
       <input id="pop-save-name" class="tin" maxlength="24" placeholder="Name this pool…">
       <button id="pop-save-confirm" class="btn confirm" title="Save as a new pool">✓</button>
-      <button id="pop-save-cancel" class="btn" title="Cancel">×</button>
+      <button id="pop-save-cancel" class="btn" title="Cancel">✕</button>
     </div>
   </div>
 
@@ -526,8 +525,8 @@ limitations under the License.
           </span>
         </div>
         <div id="system-picker"></div>
+        <span class="plabel">Felt</span>
         <div id="felt-swatches"></div>
-        <p class="hint">Everyone at the table sees these</p>
         <div id="settings-note"></div>
       </div>
     </div>

@@ -1192,7 +1192,7 @@ function renderPeek() {
     const tweak = document.createElement('button');
     tweak.className = 'sm-reveal pk-tweak';
     tweak.textContent = '±';
-    tweak.title = 'Tweak in New pool — modifiers, target, moment';
+    tweak.title = 'Tweak — modifiers, target, moment (opens in New pool)';
     tweak.addEventListener('click', () => {
       // The roll's own notation (comment intact) when we have it; else the
       // canonical reconstruction from the spec the viewer may read.
@@ -2732,10 +2732,8 @@ function renderVerdictCard(roll, entry) {
 
   const marginEl = document.getElementById('verdict-margin');
   const heroEl = document.getElementById('verdict-hero');
-  const chartEl = document.getElementById('verdict-chart');
   const meaning = entryMeaning(entry); // active-system lens (null in dnd/none)
   heroEl.className = 'verdict-hero';
-  chartEl.textContent = '';
   marginEl.textContent = '';
   const holderPre = document.getElementById('verdict-modcards');
   if (hidden) {
@@ -4229,7 +4227,7 @@ function renderGroups() {
     const modsBtn = document.createElement('button');
     modsBtn.className = 'group-mods pool-mods';
     modsBtn.textContent = '±';
-    modsBtn.title = 'Modifiers, target, face down';
+    modsBtn.title = 'Tweak — modifiers, target, moment';
     modsBtn.addEventListener('click', () => togglePopover(g, row));
     line2.append(rollBtn, modsBtn);
 
@@ -4310,12 +4308,12 @@ document.getElementById('copy-link').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   try {
     await navigator.clipboard.writeText(window.location.href);
-    btn.textContent = 'copied!';
+    btn.textContent = 'Copied!';
   } catch {
     window.prompt('Copy this link to save your pools:', window.location.href);
-    btn.textContent = 'link';
+    btn.textContent = 'Link';
   }
-  setTimeout(() => { btn.textContent = 'copy link'; }, 1500);
+  setTimeout(() => { btn.textContent = 'Copy link'; }, 1500);
 });
 
 // ---------------------------------------------------------------------------
@@ -6122,7 +6120,7 @@ document.getElementById('idm-invite').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   try {
     await navigator.clipboard.writeText(inviteUrl());
-    btn.textContent = 'copied!';
+    btn.textContent = 'Copied!';
   } catch {
     window.prompt('Copy this invite link:', inviteUrl());
   }

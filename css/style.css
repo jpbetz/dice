@@ -505,8 +505,6 @@ html, body {
   border-color: rgba(212, 175, 55, 0.55);
   background: rgba(212, 175, 55, 0.14);
 }
-.group-info { flex: 1; min-width: 0; cursor: pointer; }
-.group-info:hover .group-name { color: var(--gold-bright); }
 .group-name {
   font-family: var(--font-display);
   font-size: 14px;
@@ -541,20 +539,7 @@ html, body {
   transition: color 0.15s, border-color 0.15s;
 }
 .group-formula:hover { color: var(--ivory); border-color: var(--panel-border); }
-/* §5.1 rationing: row Rolls are outlined; the one filled action is the tray's */
-.group-roll {
-  flex: none;
-  padding: 4px 11px;
-  font-size: 11.5px;
-  font-weight: 600;
-  border-radius: 8px;
-  border: 1px solid rgba(212, 175, 55, 0.4);
-  background: transparent;
-  color: var(--gold-bright);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-.group-roll:hover { background: rgba(212, 175, 55, 0.16); border-color: var(--gold); }
+/* (.group-roll retired: the row IS the roll button now — .pool-roll) */
 .group-mods {
   flex: none;
   width: 25px;
@@ -1994,13 +1979,8 @@ body.mini .popover { width: min(94vw, 312px); }
 }
 .verdict-hero::after { background: linear-gradient(90deg, rgba(212,175,55,0.55), transparent); }
 
-.chart-line {
-  margin-top: 5px;
-  font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--muted);
-}
-.chart-line:empty { display: none; }
-.chart-line .chart-word { color: #cdbe8a; font-weight: 700; }
+/* (.chart-line retired: the chart is silent on checks and speaks through the
+   hero slot on bare rolls — the demoted chart line died 2026-07-31) */
 
 /* attribution fly-in cards (§2.4 phase 5, §7.2) */
 .mod-cards {
