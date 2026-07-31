@@ -790,6 +790,10 @@ html, body {
 .log-group { font-family: var(--font-display); font-size: 13px; color: var(--ivory); }
 .log-total { font-weight: 800; font-size: 15px; color: var(--gold-bright); }
 .log-detail { color: var(--muted); margin-top: 2px; }
+/* the entry's dice as tiny real tokens (grouped ×N) leading the detail */
+.log-dice { margin-right: 6px; white-space: nowrap; }
+.log-die { display: inline-block; width: 15px; height: 15px; vertical-align: -3px; margin-right: 1px; }
+.log-die-count { font-size: 10px; font-weight: 700; color: var(--muted); margin-right: 3px; }
 .log-detail .crit-max { color: var(--gold-bright); font-weight: 700; }
 .log-detail .crit-min { color: var(--red); font-weight: 700; }
 .log-time { color: #6b6154; font-size: 10px; }
