@@ -35,7 +35,7 @@ limitations under the License.
      Every fixed overlay takes its z-index from here — never a bare number.
      Bottom → top:
        right-stack   ambient chrome (players + log)
-       panel         left panel, top controls, mini bar
+       panel         the side panels + the persistent control rail
        table-labels  ambient table labels: value chips, shelf markers
                      (corner controls ride this rung too)
        banner        post-roll result banner
@@ -1411,8 +1411,8 @@ body.mini #result-verdict { font-size: 11px; }
 .pop-actions { display: flex; gap: 8px; padding: 10px 14px 0; }
 .pop-actions:last-child, .pop-actions-2nd { padding-bottom: 14px; }
 .pop-actions .btn { flex: 1; }
-/* §7.4: the popover is fully usable in mini (long-press/right-click on a
-   pill opens it); placePopover clamps it inside small viewports. */
+/* §7.4: the popover stays fully usable in compact view (opened via the
+   Saved groups tab or headless hooks); placePopover clamps it on-screen. */
 body.mini .popover { width: min(94vw, 312px); }
 
 /* ---------------------------------------------------------------------------
