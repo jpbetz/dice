@@ -817,7 +817,9 @@ html, body {
   border: 1px solid var(--panel-border);
   box-shadow: 0 8px 40px rgba(0,0,0,0.6);
   animation: banner-in 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
-  pointer-events: none;
+  /* the banner takes pointer events now: its revealed tier (⟳ · clear-✕)
+     appears on approach (P6), which needs :hover on the card itself */
+  pointer-events: auto;
 }
 #result-banner.hidden { display: none; }
 #result-label {
@@ -1206,29 +1208,17 @@ body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
 .pk-tweak { min-width: 26px; }
 
 /* ---------- the unified 'clear this roll' ✕ (P1, cross-cutting) ---------- */
-/* One gesture, one look, one sentence — the post-roll banner, the verdict
-   card and the peek card's base all carry the same ✕ with the same title:
-   'Clear this roll for everyone'. */
+/* One gesture, one look, one sentence — every result surface's revealed
+   tier carries the same ✕ with the same title: 'Clear this roll for
+   everyone'. (Its full-width base seat retired with the Done redesign.) */
 .clear-x:hover,
 .clear-x:hover:not(:disabled) {
   color: #fff;
   border-color: var(--red);
   background: rgba(226, 73, 59, 0.16);
 }
-/* the peek's base: prominent, one easy gesture wide */
-.pk-foot { margin-top: 8px; }
-.pk-foot .clear-x {
-  width: 100%;
-  padding: 5px 0;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--muted);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--panel-border);
-  border-radius: 7px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
+/* the peek's die-strip reroll: the same roll button as everywhere else */
+.pk-strip { width: 100%; margin-top: 8px; min-height: 40px; }
 
 /* compact view keeps the full card, scaled like the markers (§7.7.1) */
 body.mini .peek-card { min-width: 150px; padding: 7px 10px 9px; }
@@ -1256,14 +1246,25 @@ body.mini .pk-breakdown { font-size: 10px; }
 .log-again:hover { color: var(--gold-bright); }
 @media (pointer: coarse) { .log-again { opacity: 1; } }
 
-/* banner action buttons (banner itself is pointer-events: none) — the same
-   skeleton as the peek card: a centered row of secondary actions over one
-   full-width clear-✕ at the base */
+/* Result-surface actions (the redesign): the standing tier is Reveal + one
+   quiet Done; ⟳ and the roller's clear-✕ are the REVEALED tier — they
+   arrive with the pointer or keyboard focus (P6) and stand on coarse
+   pointers. The result serves the result. */
 #banner-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; margin-top: 8px; }
 #banner-actions:empty { display: none; }
 .banner-row { display: flex; gap: 8px; justify-content: center; }
-.banner-foot { margin-top: 0; }
+.banner-foot { display: flex; gap: 8px; justify-content: center; margin-top: 0; }
 .banner-btn { pointer-events: auto; font-size: 13px; padding: 5px 16px; }
+.reveal-tier { opacity: 0; transition: opacity 0.12s; }
+#result-banner:hover .reveal-tier,
+#result-banner:focus-within .reveal-tier,
+#verdict-card:hover .reveal-tier,
+#verdict-card:focus-within .reveal-tier { opacity: 1; }
+@media (pointer: coarse) { .reveal-tier { opacity: 1; } }
+/* an EMPTY revealed row must not hold a gap open at rest */
+.reveal-tier:empty { display: none; }
+.verdict-actions .reveal-tier { display: flex; gap: 8px; }
+#verdict-done.mine { font-weight: 700; border-color: rgba(212, 175, 55, 0.5); }
 
 /* ---------- offered-roll cards ---------- */
 #offers-layer {

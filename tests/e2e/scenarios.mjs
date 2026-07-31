@@ -329,8 +329,9 @@ export const scenarios = [
     name: 'ceremony-retire',
     tags: ['roll', 'ceremony'],
     // A check roll's verdict card times out into the plain-roll banner: the
-    // dice still on the felt keep Collect and the base clear-✕ (the card's
-    // auto-dismiss used to strand them with no affordance at all).
+    // dice still on the felt keep Done (the standing keep verb) and the
+    // revealed-tier clear-✕ (the card's auto-dismiss used to strand them
+    // with no affordance at all).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.dbg(`commandRoll('d20 check dc10')`);
@@ -340,10 +341,10 @@ export const scenarios = [
       );
       assert.equal(await a.dbg('retireCeremony()'), true, 'the card retires into the banner');
       assert.ok(await a.eval(
-        `[...document.querySelectorAll('#banner-actions .banner-btn')].some((b) => b.textContent === 'Collect')`,
-      ), 'Collect survives the ceremony');
-      assert.ok(await a.eval(`!!document.querySelector('#banner-actions .banner-foot .clear-x')`),
-        'so does the base ✕');
+        `[...document.querySelectorAll('#banner-actions .banner-btn')].some((b) => b.textContent === 'Done')`,
+      ), 'Done survives the ceremony (the standing keep verb)');
+      assert.ok(await a.eval(`!!document.querySelector('#banner-actions .reveal-tier .clear-x')`),
+        'and the clear-✕ waits in the revealed tier');
       const rid = await a.rollId();
       assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, 'collect accepted');
       await a.waitFor(

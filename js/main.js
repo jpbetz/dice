@@ -1135,31 +1135,22 @@ function renderPeek() {
   if (entry) renderBreakdown(bd, entry, hidden);
   peekEl.appendChild(bd);
 
-  const actions = document.createElement('div');
-  actions.className = 'pk-actions';
-  if (entry && canReveal(entry)) {
-    const rv = document.createElement('button');
-    rv.className = 'sm-reveal pk-reveal';
-    rv.textContent = 'Reveal';
-    rv.title = 'Flip this roll face up for the table';
-    rv.addEventListener('click', () => requestReveal(c.rollId));
-    actions.appendChild(rv);
-  }
-  // A shelved roll stays actionable (same readability gate as the log's ⟳):
-  // roll it again as-is, or pull it back into the compose draft to tweak.
+  // The reroll IS the dice (user call, 2026-07-31): the roll's own pool
+  // renders as the same die-strip button every other roll surface uses —
+  // ROLL cue, glow, the works — and clicking it rolls the SAME dice again,
+  // clearing the shelved cluster as part of the reroll (a pool is how you
+  // mint a copy; the clear goes first so the shelf never holds both).
   if (entry && canReroll(entry)) {
-    // ONE reroll affordance everywhere: the bare ⟳ glyph, titled 'Roll this
-    // again' — identical in the banner, the log, this peek, and the verdict
-    // card (consistency sweep, 2026-07).
-    const again = document.createElement('button');
-    again.className = 'sm-reveal pk-again';
-    again.textContent = '⟳';
-    again.title = 'Roll this again';
-    again.addEventListener('click', () => {
+    const strip = document.createElement('button');
+    strip.className = 'pool-roll pk-again pk-strip';
+    strip.title = 'Roll these again — replaces this shelved roll';
+    strip.setAttribute('aria-label', `Roll again — ${entry.label}`);
+    strip.appendChild(buildDieStrip(entry.spec.dice, POOL_STRIP_CAP, { grouped: true }));
+    strip.appendChild(buildRollCue());
+    const units = new Set(entry.spec.dice).size;
+    strip.classList.toggle('cue-tight', cueTight(Math.min(units, POOL_STRIP_CAP) + (units > POOL_STRIP_CAP ? 1 : 0)));
+    strip.addEventListener('click', () => {
       closePeek();
-      // Rerolling a COLLECTED roll rolls the SAME dice again: the shelved
-      // cluster clears as part of the reroll (a pool is how you mint a
-      // copy). The clear goes first so the shelf never holds both.
       requestClearRoll(c.rollId);
       requestRoll([...entry.spec.dice], entry.label, {
         mods: entry.spec.mods || undefined,
@@ -1169,7 +1160,16 @@ function renderPeek() {
         exp: entry.spec.exp || undefined, // reroll preserves the moment
       });
     });
-    actions.appendChild(again);
+    peekEl.appendChild(strip);
+  }
+
+  // The quiet action row. The peek is ALREADY the shelf's revealed tier (it
+  // only exists on approach), so these small controls stand — no double
+  // gating: ± (tweak in New pool), Reveal for the authority, and the
+  // clear-for-everyone ✕ (§7.7 universal housekeeping).
+  const actions = document.createElement('div');
+  actions.className = 'pk-actions';
+  if (entry && canReroll(entry)) {
     const tweak = document.createElement('button');
     tweak.className = 'sm-reveal pk-tweak';
     tweak.textContent = '±';
@@ -1190,21 +1190,21 @@ function renderPeek() {
     });
     actions.appendChild(tweak);
   }
-  if (actions.childElementCount) peekEl.appendChild(actions);
-
-  // The card's base carries the ONE prominent clear-✕ — the unified 'clear
-  // this roll' gesture (same glyph, same sentence as the banner's and the
-  // verdict card's). Any player may use it once a roll is shelved (§7.7
-  // universal housekeeping; the server allows it for collected rolls).
-  const foot = document.createElement('div');
-  foot.className = 'pk-foot';
+  if (entry && canReveal(entry)) {
+    const rv = document.createElement('button');
+    rv.className = 'sm-reveal pk-reveal';
+    rv.textContent = 'Reveal';
+    rv.title = 'Flip this roll face up for the table';
+    rv.addEventListener('click', () => requestReveal(c.rollId));
+    actions.appendChild(rv);
+  }
   const clear = document.createElement('button');
-  clear.className = 'clear-x pk-clear';
+  clear.className = 'sm-reveal clear-x pk-clear';
   clear.textContent = '✕';
   clear.title = 'Clear this roll for everyone';
   clear.addEventListener('click', () => requestClearRoll(c.rollId));
-  foot.appendChild(clear);
-  peekEl.appendChild(foot);
+  actions.appendChild(clear);
+  peekEl.appendChild(actions);
 
   peekEl.classList.remove('hidden');
   measurePeek();
@@ -1976,29 +1976,24 @@ function renderRollResults(entry, dice, fx = true) {
   }
 }
 
-// Reveal (the reveal authority of a hidden roll) and reroll-last buttons.
-// The banner mirrors the peek card's skeleton (they are the same result at
-// two ages, so they diverge only where the state genuinely differs): a row
-// of secondary actions — Reveal for the authority, ⟳, Collect — over ONE
-// prominent full-width ✕ at the base, the same unified 'clear this roll'
-// gesture the peek and the verdict card carry. Collect stays available but
-// steps out of the primary slot.
+// The result surface serves the RESULT (user call, 2026-07-31): at rest it
+// is content plus ONE standing verb — Done. For the roller, Done = collect
+// (dice swept to the shelf, result kept — exactly what Enter does); for a
+// spectator, Done = local dismiss (the dice stay until the roller acts).
+// Role-honest costumes: the roller's Done is a bold confirm, the
+// spectator's a quiet ghost. Everything else — Reveal for the authority,
+// ⟳, the roller's clear-for-everyone ✕ — is the revealed tier: it appears
+// when the pointer or keyboard focus arrives (P6), and stands on coarse
+// pointers.
 function renderBannerActions(entry) {
   const holder = document.getElementById('banner-actions');
   holder.innerHTML = '';
   const hidden = entryHidden(entry);
   const mine = !netOnline || (net && entry.playerId === net.playerId);
+
+  // Revealed tier: ⟳ and the roller's destructive ✕.
   const row = document.createElement('div');
-  row.className = 'banner-row';
-  if (canReveal(entry)) {
-    const btn = document.createElement('button');
-    // A hidden roll's Reveal is the one action that outranks housekeeping.
-    btn.className = hidden ? 'btn primary banner-btn' : 'btn ghost banner-btn';
-    btn.textContent = 'Reveal';
-    btn.title = 'Flip this roll face up for the table';
-    btn.addEventListener('click', () => requestReveal(entry.rollId));
-    row.appendChild(btn);
-  }
+  row.className = 'banner-row reveal-tier';
   if (canReroll(entry)) {
     const btn = document.createElement('button');
     btn.className = 'btn ghost banner-btn';
@@ -2015,54 +2010,58 @@ function renderBannerActions(entry) {
     );
     row.appendChild(btn);
   }
-  // Collect keeps the roll: its dice whisk to the shelf for everyone
-  // (server-validated; solo local) and the banner retires into the slot.
   if (entry.rollId && mine) {
-    const btn = document.createElement('button');
-    btn.className = 'btn ghost banner-btn';
-    btn.textContent = 'Collect';
-    btn.title = 'Collect this roll to the shelf for everyone';
-    btn.addEventListener('click', () => {
-      // No optimistic hide: online, the 'roll-collected' broadcast retires
-      // the banner (shelveRoll); solo applies synchronously. A failed POST
-      // keeps the banner — and its only Collect button — instead of
-      // stranding the dice on everyone's felt with no affordance left.
-      btn.disabled = true;
-      requestCollectRoll(entry.rollId).then((ok) => {
-        btn.disabled = false;
-        if (!ok) showSettingsNote('couldn’t collect the roll — try again');
+    const x = document.createElement('button');
+    x.className = 'btn ghost banner-btn clear-x';
+    x.textContent = '✕';
+    x.title = 'Clear this roll for everyone';
+    x.addEventListener('click', () => {
+      x.disabled = true;
+      requestClearRoll(entry.rollId).then((ok) => {
+        x.disabled = false;
+        if (!ok) showSettingsNote('couldn’t clear the roll — try again');
       });
     });
-    row.appendChild(btn);
+    row.appendChild(x);
   }
   if (row.childElementCount) holder.appendChild(row);
 
-  // The base ✕ (§7.7.2, unified with the peek's): the roller clears the
-  // dice outright for everyone — non-optimistic, a failed POST keeps the
-  // banner. A spectator's ✕ is the local dismiss it always was: the dice
-  // stay until the roller collects or clears them.
+  // Standing tier: Reveal (the content-completing verb of a hidden roll)
+  // and Done.
+  const foot = document.createElement('div');
+  foot.className = 'banner-foot';
+  if (canReveal(entry)) {
+    const btn = document.createElement('button');
+    btn.className = hidden ? 'btn primary banner-btn' : 'btn ghost banner-btn';
+    btn.textContent = 'Reveal';
+    btn.title = 'Flip this roll face up for the table';
+    btn.addEventListener('click', () => requestReveal(entry.rollId));
+    foot.appendChild(btn);
+  }
   if (entry.rollId) {
-    const foot = document.createElement('div');
-    foot.className = 'pk-foot banner-foot';
-    const x = document.createElement('button');
-    x.className = 'clear-x banner-btn';
-    x.textContent = '✕';
+    const done = document.createElement('button');
+    done.className = mine ? 'btn confirm banner-btn done-btn' : 'btn ghost banner-btn done-btn';
+    done.textContent = 'Done';
     if (mine) {
-      x.title = 'Clear this roll for everyone';
-      x.addEventListener('click', () => {
-        x.disabled = true;
-        requestClearRoll(entry.rollId).then((ok) => {
-          x.disabled = false;
-          if (!ok) showSettingsNote('couldn’t clear the roll — try again');
+      done.title = 'Done — keep it on the shelf (Enter)';
+      done.addEventListener('click', () => {
+        // No optimistic hide: online, the 'roll-collected' broadcast retires
+        // the banner (shelveRoll); solo applies synchronously. A failed POST
+        // keeps the banner — and its Done — instead of stranding the
+        // dice on everyone's felt with no affordance left.
+        done.disabled = true;
+        requestCollectRoll(entry.rollId).then((ok) => {
+          done.disabled = false;
+          if (!ok) showSettingsNote('couldn’t collect the roll — try again');
         });
       });
     } else {
-      x.title = 'Dismiss for you — the dice stay until the roller collects';
-      x.addEventListener('click', () => banner.classList.add('hidden'));
+      done.title = 'Done — hides this for you; the dice stay until the roller acts';
+      done.addEventListener('click', () => banner.classList.add('hidden'));
     }
-    foot.appendChild(x);
-    holder.appendChild(foot);
+    foot.appendChild(done);
   }
+  if (foot.childElementCount) holder.appendChild(foot);
 }
 
 // True only while a hello resync fast-forwards the on-felt roll back into
@@ -2686,15 +2685,17 @@ function renderVerdictCard(roll, entry) {
   document.getElementById('verdict-eyebrow').textContent = `${who}${entry.label || ''}`;
   document.getElementById('verdict-total').textContent = hidden ? '?' : String(entry.total);
 
-  // §7.7: the roller's control reads Collect and shelves the roll for
-  // everyone; a spectator's reads ✕ and only dismisses locally.
+  // Done everywhere (the result-surface redesign): the roller's Done keeps
+  // the roll — dice to the shelf for everyone, result retained; a
+  // spectator's Done dismisses locally. Same word, role-honest dress.
   const mine = !netOnline || (net && entry.playerId === net.playerId);
   verdictFor = { rollId: entry.rollId || null, mine };
   const doneBtn = document.getElementById('verdict-done');
-  doneBtn.textContent = mine ? 'Collect' : '✕';
+  doneBtn.textContent = 'Done';
+  doneBtn.classList.toggle('mine', mine); // the roller's Done acts for the table
   doneBtn.title = mine
-    ? 'Collect this roll to the shelf for everyone'
-    : 'Dismiss for you — the dice stay until the roller collects';
+    ? 'Done — keep it on the shelf (Enter)'
+    : 'Done — hides this for you; the dice stay until the roller acts';
   // §7.7.2: not every roll deserves shelf space — the roller also gets a ✕
   // that clears the dice outright (spectators keep the single local ✕).
   document.getElementById('verdict-x').classList.toggle('hidden', !(mine && entry.rollId));
@@ -3898,7 +3899,10 @@ function loadIntoBox(notation, name) {
   echoedDraft = name && cmdResult && cmdResult.ok
     ? { name, canonical: cmdResult.canonical }
     : null;
-  setInputMode('text'); // loading notation is a text intent — show the box
+  // A text INTENT shows the box for THIS visit only (persist=false): a
+  // use-tier action never rewrites the per-user view default — the audit
+  // caught the old persisting flip changing how the panel boots forever.
+  setInputMode('text', false);
   cmdInput.focus();
 }
 

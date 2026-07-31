@@ -312,11 +312,16 @@ limitations under the License.
       <div class="verdict-hero" id="verdict-hero"></div>
       <div class="chart-line" id="verdict-chart"></div>
       <div class="mod-cards" id="verdict-modcards"></div>
+      <!-- Standing: Reveal (a hidden roll's completing verb) + Done. The
+           revealed tier (⟳, the roller's clear-✕) appears on approach —
+           the same P6 treatment every result surface carries. -->
       <div class="verdict-actions">
+        <div class="banner-row reveal-tier">
+          <button id="verdict-again" class="ghost-btn" title="Roll this again">⟳</button>
+          <button id="verdict-x" class="ghost-btn clear-x hidden" title="Clear this roll for everyone">✕</button>
+        </div>
         <button id="verdict-reveal" class="ghost-btn hidden" title="Flip this roll face up for the table">Reveal</button>
-        <button id="verdict-again" class="ghost-btn" title="Roll this again">⟳</button>
         <button id="verdict-done" class="ghost-btn">Done</button>
-        <button id="verdict-x" class="ghost-btn clear-x hidden" title="Clear this roll for everyone">✕</button>
       </div>
     </section>
 
