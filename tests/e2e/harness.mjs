@@ -257,22 +257,44 @@ export class Ctx {
   // and the rest of 127.0.0.0/8 ('127.0.0.2', '127.0.0.3', …) are all distinct
   // origins on the same server, which is how a scenario seats three or four
   // players. name seeds the player name before the app boots.
+  //
+  // ONE logged boot retry: ~1–2% of fresh tabs come up broken — either the
+  // ready-wait times out, or the vendor modules double-evaluate ("Identifier
+  // 'iO' has already been declared" from three.module.js / cannon-es) and the
+  // recorded page exception fails an otherwise-green scenario at collect
+  // time. Reproduced at d106a20 (pre-chrome-cleanup), so it is the headless
+  // Chrome / CDP page churn, not the app. A single retry keeps the suite
+  // honest: a real boot regression still fails twice in a row.
   async newTable({ origin = 'localhost', name } = {}) {
-    const page = await this.browser.newPage();
-    if (name) {
-      await page.addInitScript(
-        `try { localStorage.setItem('dice.name.v1', ${JSON.stringify(name)}); } catch {}`,
-      );
+    for (let attempt = 0; ; attempt++) {
+      const page = await this.browser.newPage();
+      if (name) {
+        await page.addInitScript(
+          `try { localStorage.setItem('dice.name.v1', ${JSON.stringify(name)}); } catch {}`,
+        );
+      }
+      const url = `http://${origin}:${this.port}/?room=${encodeURIComponent(this.room)}`;
+      await page.navigate(url);
+      const t = new Table(page, url);
+      try {
+        await t.waitFor(
+          `!!window.__diceDebug && window.__diceDebug.netReady`,
+          { desc: `app ready (${origin}, ${name || 'anon'})`, timeout: 20000 },
+        );
+      } catch (e) {
+        if (attempt > 0) { this.tables.push(t); throw e; }
+        console.log(`    (boot retry: ${origin} tab never became ready)`);
+        await t.close().catch(() => {});
+        continue;
+      }
+      if (attempt === 0 && page.errors.length) {
+        console.log(`    (boot retry: page exception on load — ${String(page.errors[0]).slice(0, 120)})`);
+        await t.close().catch(() => {});
+        continue;
+      }
+      this.tables.push(t);
+      return t;
     }
-    const url = `http://${origin}:${this.port}/?room=${encodeURIComponent(this.room)}`;
-    await page.navigate(url);
-    const t = new Table(page, url);
-    await t.waitFor(
-      `!!window.__diceDebug && window.__diceDebug.netReady`,
-      { desc: `app ready (${origin}, ${name || 'anon'})`, timeout: 20000 },
-    );
-    this.tables.push(t);
-    return t;
   }
 
   async closeAll() {
