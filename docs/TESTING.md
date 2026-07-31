@@ -81,7 +81,7 @@ reported but not fatal.
 | `notation` | Browser-side notation wiring (grammar itself is unit-tested) |
 | `resync`   | Late-join / reload reconstruction               |
 | `visibility` | The ladder (goal 11): held · secret · whisper, reveal authority, offers/dice tower, redaction on the raw wire |
-| `chrome`   | The persistent rail, the four collapsible panels (`dice.panels.v1`, emergent compact view), the identity chip (rename / leave & switch), and the *pool / saved pool* vocabulary (`terminology` scans every readable label, tooltip and placeholder) |
+| `chrome`   | The persistent rail, the ONE Pools panel (`dice.panels.v1`, legacy two-region state migrates; emergent compact view), the identity chip (rename / leave & switch), and the *pool / saved pool* vocabulary (`terminology` scans every readable label, tooltip and placeholder) |
 | `groups`   | Saved pools: inline row editor and popover update write back by id, save-as-variant stays additive (the tag keeps the `groups` spelling, like the code) |
 
 New areas add a tag here and scenarios in `scenarios.mjs` (step 5 adds

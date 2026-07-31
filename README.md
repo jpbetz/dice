@@ -14,8 +14,9 @@ state anywhere.
   trapezohedron) simulated with [cannon-es](https://github.com/pmndrs/cannon-es)
   and rendered with [three.js](https://github.com/mrdoob/three).
 - **Dice pools** — build a pool (e.g. 3d4, or 1d6 + 1d10), name it, save it,
-  and reroll it with one click. Saved pools edit in place: a pencil on the row
-  opens name + notation, and Update writes back to the same pool.
+  and reroll it with one click. Saved pools edit in place: ✎ on the Pools
+  panel header enters manage mode; each row's pencil then opens name +
+  notation, and Update writes back to the same pool.
 - **Pools in the URL** — saved pools are continuously mirrored into the URL
   hash (`#g=<base64url>`). Bookmark the link and your pools are restored on
   any machine, with zero server or account state.

@@ -1003,6 +1003,19 @@ function renderShelfMarkers() {
   renderPeek();
 }
 
+// A marker fully UNDER the open Pools panel must not eat the panel's
+// clicks (table labels ride above panels in the z ladder for the edge-
+// overlap case, not for full occlusion). The panel rect is CACHED — it
+// changes only on panel toggles and resizes; positionShelfMarkers runs
+// every frame and must never force layout (see measurePeek's warning).
+let leftPanelRect = null;
+function cacheLeftPanelRect() {
+  const el = document.getElementById('builder-panel');
+  leftPanelRect = el && panelsOpen.pools && !el.classList.contains('collapsed')
+    ? el.getBoundingClientRect()
+    : null;
+}
+
 function positionShelfMarkers() {
   const v = new THREE.Vector3();
   const v2 = new THREE.Vector3();
@@ -1010,8 +1023,13 @@ function positionShelfMarkers() {
     if (!c.markerEl) continue;
     v.set(shelfSlotX(c.slot), SHELF_MARKER_Y, SHELF_Z);
     v.project(camera);
-    c.markerEl.style.left = `${(v.x * 0.5 + 0.5) * window.innerWidth}px`;
-    c.markerEl.style.top = `${(-v.y * 0.5 + 0.5) * window.innerHeight}px`;
+    const px = (v.x * 0.5 + 0.5) * window.innerWidth;
+    const py = (-v.y * 0.5 + 0.5) * window.innerHeight;
+    c.markerEl.style.left = `${px}px`;
+    c.markerEl.style.top = `${py}px`;
+    c.markerEl.classList.toggle('occluded', !!(leftPanelRect
+      && px > leftPanelRect.left && px < leftPanelRect.right
+      && py > leftPanelRect.top && py < leftPanelRect.bottom));
     // The invisible target covers what the eye reads as the cluster: the
     // same radius the under-glow paints, projected to pixels (cached — the
     // radius only changes on reflow; drawShelfGlow refreshes the cache).
@@ -1070,6 +1088,10 @@ function closePeek() {
 // the shelf — a peek without a cluster has no slot to anchor to.
 function openPeek(rollId) {
   if (!shelfClusters.has(rollId)) return false;
+  // While the shelf popover is pinned to THIS card, another marker's hover
+  // must not swap the card out from under it — the popover would keep
+  // acting on the old roll while the card showed the new one.
+  if (peekPinned() && rollId !== peekRollId) return false;
   cancelPeekTimers();
   peekRollId = rollId;
   renderPeek();
@@ -1099,7 +1121,14 @@ function peekPinned() {
 function renderPeek() {
   if (peekRollId === null) return;
   const c = shelfClusters.get(peekRollId);
-  if (!c) { closePeek(); return; }
+  if (!c) {
+    // The roll died under the card (remote clear, ⟳ replace, peek ✕): a
+    // pinned peek must not zombie — release the pin (close its popover)
+    // BEFORE closing, or closePeek's pin guard makes both immortal.
+    if (peekPinned()) closePopover();
+    closePeek();
+    return;
+  }
   const entry = log.find((e) => e.rollId === peekRollId) || null;
   const hidden = !entry || entryHidden(entry);
   peekEl.textContent = '';
@@ -1192,7 +1221,7 @@ function renderPeek() {
 
   // The quiet action row. The peek is ALREADY the shelf's revealed tier (it
   // only exists on approach), so these small controls stand — no double
-  // gating: ± (tweak in New pool), Reveal for the authority, and the
+  // gating: ± (the shelf popover), Reveal for the authority, and the
   // clear-for-everyone ✕ (§7.7 universal housekeeping).
   const actions = document.createElement('div');
   actions.className = 'pk-actions';
@@ -1200,7 +1229,7 @@ function renderPeek() {
     const tweak = document.createElement('button');
     tweak.className = 'sm-reveal pk-tweak';
     tweak.textContent = '±';
-    tweak.title = 'Tweak — modifiers, target, moment (opens in New pool)';
+    tweak.title = 'Tweak — modifiers, target, moment';
     tweak.addEventListener('click', () => {
       // The roll's own notation (comment intact) when we have it; else the
       // canonical reconstruction from the spec the viewer may read.
@@ -3157,7 +3186,7 @@ window.__diceDebug = {
     if (open) openLogFlyout(); else closeLogFlyout();
     return isLogFlyoutOpen();
   },
-  // the draft cluster (P1): what the New pool panel is showing right now.
+  // the draft cluster (P1): what the Pools panel's draft row shows now.
   get trayState() {
     return {
       dice: [...tray],
@@ -3172,8 +3201,8 @@ window.__diceDebug = {
   // edit chrome exists only while this is on.
   get poolsEditMode() { return poolsEdit; },
   setPoolsEditMode(on) { setPoolsEdit(on); return poolsEdit; },
-  // saved-pools flyout (roll without pinning the panel open): the hover
-  // behavior, driven directly where headless tests can't hover.
+  // the Pools tab flyout (the WHOLE panel body — draft + list — on hover
+  // of the collapsed tab), driven directly where headless tests can't hover.
   get groupsFlyout() { return groupsPanelEl.classList.contains('flyout'); },
   setGroupsFlyout(open) {
     if (open) openGroupsFlyout(); else closeGroupsFlyout();
@@ -3201,7 +3230,9 @@ window.__diceDebug = {
   // peek cards (§7.7.1): open for a shelved rollId / close with null, plus
   // the open card's state for content assertions.
   peek(rollId) {
-    if (!rollId) { closePeek(); return null; }
+    // null while pinned releases the pin first (close the shelf popover),
+    // so a scenario's tidy-up can never leave a zombie card.
+    if (!rollId) { if (peekPinned()) closePopover(); closePeek(); return null; }
     return openPeek(rollId) ? rollId : null;
   },
   get peekState() {
@@ -3260,6 +3291,7 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   applyCameraFraming(); // a narrower window refits the table and its shelf
+  cacheLeftPanelRect(); // marker occlusion reads this, never live layout
   positionChips();
   measurePeek(); // the card's max-width tracks the viewport (100vw - 16px)
   positionShelfMarkers();
@@ -3472,8 +3504,10 @@ function renderTray() {
     // type — 'd6 ×3' steps down to 'd6 ×2'.
     trayRollBtn.appendChild(buildDieStrip(tray, TRAY_STRIP_CAP, { grouped: true }));
     trayRollBtn.appendChild(buildRollCue()); // same promise as the pool rows (tier rule)
+    // +1: the draft runway shares its line with ± — one unit less room
+    // than a pool row before the word must yield to the trail.
     const trayUnits = new Set(tray).size;
-    trayRollBtn.classList.toggle('cue-tight', cueTight(Math.min(trayUnits, TRAY_STRIP_CAP) + (trayUnits > TRAY_STRIP_CAP ? 1 : 0)));
+    trayRollBtn.classList.toggle('cue-tight', cueTight(1 + Math.min(trayUnits, TRAY_STRIP_CAP) + (trayUnits > TRAY_STRIP_CAP ? 1 : 0)));
     const label = `Roll ${formula(tray)}`;
     trayRollBtn.title = label;
     trayRollBtn.setAttribute('aria-label', label);
@@ -3486,8 +3520,8 @@ function renderTray() {
       x.className = 'die-x';
       x.textContent = '✕';
       x.title = `Remove one ${type}`;
-      x.style.left = `${img.offsetLeft + img.offsetWidth - 9}px`;
-      x.style.top = `${img.offsetTop - 6}px`;
+      x.style.left = `${img.offsetLeft + img.offsetWidth / 2 - 10}px`;
+      x.style.top = `${img.offsetTop - 10}px`; // above the die: clear of ×N counts beside it
       x.addEventListener('click', (e) => {
         e.stopPropagation(); // a remove is never a roll
         tray.splice(tray.indexOf(type), 1);
@@ -4889,9 +4923,14 @@ popCommentInput.addEventListener('keydown', (e) => e.stopPropagation());
 popEchoEl.addEventListener('click', () => {
   if (!pop) return;
   const group = pop.source === 'group' ? groups.find((g) => g.id === pop.groupId) : null;
-  const name = group ? group.name : groupNameInput.value.trim();
+  // shelf source: the roll's own label rides the echo ('keep this roll as
+  // a pool' keeps its name); the tray reads its save-morph input as before.
+  const name = group ? group.name
+    : pop.source === 'shelf' ? (parseNotation(pop.name).ok ? '' : pop.name)
+    : groupNameInput.value.trim();
   const canonical = popCanonical();
   closePopover();
+  if (!panelsOpen.pools) setPanel('pools', true); // echoing edits the box — surface it
   loadIntoBox(canonical, name);
 });
 
@@ -5430,12 +5469,12 @@ document.getElementById('set-sound').addEventListener('click', () => setSound(!s
 document.getElementById('set-chips').addEventListener('click', () => setChips(!chipsOn));
 
 // ---------------------------------------------------------------------------
-// Collapsible chrome panels: two regions — Compose (builder + command box)
-// and Saved pools — each independently collapsible from its own header
-// (plus keys b/g), with per-user state in 'dice.panels.v1'. (The roster is
-// rail furniture, not a region; the roll log is the rail's ≣ flyout, not a
-// region — stale 'log'/'players' keys in stored state are ignored because
-// the seed below iterates PANEL_DEFS.) Collapsed, a panel rests as a small
+// Collapsible chrome: ONE region since the panel merge — Pools (the draft
+// row over the saved list) — toggled from its header (key n; b/g silent
+// aliases), per-user state in 'dice.panels.v1' (legacy two-region state
+// migrates open-if-either-was; stale keys are ignored because the seed
+// below iterates PANEL_DEFS. The roster is rail furniture; the roll log is
+// the rail's ≣ flyout.) Collapsed, a panel rests as a small
 // labelled edge tab. Compact view is no longer a mode: body.mini is the
 // EMERGENT all-collapsed state (it scales the ambient chrome and reframes
 // the camera; it hides nothing — the rail and the tabs stay, and ceremonies
@@ -5563,6 +5602,7 @@ function applyPanels(persist = true) {
   // The tray's per-die ✕ overlays anchor to laid-out die positions, which
   // are all zero while the panel is collapsed — re-anchor on expand.
   if (panelsOpen.pools) renderTray();
+  cacheLeftPanelRect(); // the marker-occlusion rect follows every panel change
   if (persist) save(LS_PANELS, panelsOpen);
   const mini = allPanelsCollapsed();
   if (mini !== document.body.classList.contains('mini')) {
@@ -5613,7 +5653,10 @@ let groupsFlyTimer = null;
 function openGroupsFlyout() {
   clearTimeout(groupsFlyTimer);
   groupsFlyTimer = null;
-  if (!panelsOpen.pools) groupsPanelEl.classList.add('flyout');
+  if (!panelsOpen.pools) {
+    groupsPanelEl.classList.add('flyout');
+    renderTray(); // ✕ overlays anchor from live layout — zero while display:none
+  }
 }
 function closeGroupsFlyout() {
   clearTimeout(groupsFlyTimer);

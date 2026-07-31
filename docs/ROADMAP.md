@@ -173,7 +173,8 @@ above table labels, value chips off by default, dot-only shelf markers with
 the peek doing the talking, one clear-this-roll gesture everywhere, a
 persistent rail that no view can strand, independently collapsible panels
 with compact view as their emergent state (the Players panel later retired
-into rail roster pills — 2026-07 cleanup), the identity chip (rename ·
+into rail roster pills, and the remaining panels merged into the ONE Pools
+panel — 2026-07 cleanup), the identity chip (rename ·
 leave & switch · invite link) solo and online, by-id saved-pool editing,
 and the *pool / saved pool* naming.
 

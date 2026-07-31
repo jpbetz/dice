@@ -82,10 +82,14 @@ export default async function run(stage) {
     await a.dbg(`openPopoverFor('Attack')`);
   });
   await step('10-banner.png', async () => {
+    // a PLAIN roll: the redesigned banner (standing Done) at rest — a dc
+    // roll routes to the verdict card and the banner never appears
     await a.dbg('closePopover()');
-    await a.roll('2d6+3 dc10');
+    await a.roll('2d6+1');
   });
+  await step('10b-banner-hover.png', () => hover('#result-banner'));
   await step('11-check-verdict.png', async () => {
+    await unhover();
     await a.dbg(`commandRoll('d20 check dc12')`);
     for (let i = 0; i < 40; i++) {
       await a.eval(`(window.__diceDebug.skipCeremony(), window.__diceDebug.sim(30))`);
@@ -132,14 +136,14 @@ export default async function run(stage) {
   });
   await step('19-compact.png', async () => {
     await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
-    await a.dbg('setPanelState({compose: false, groups: false})');
+    await a.dbg('setPanelState({pools: false})');
   });
   await step('20-tab-flyout.png', async () => {
     await a.dbg('setGroupsFlyout(true)');
   });
   await step('21-small-window.png', async () => {
     await a.dbg('setGroupsFlyout(false)');
-    await a.dbg('setPanelState({compose: true, groups: true})');
+    await a.dbg('setPanelState({pools: true})');
     await send('Emulation.setDeviceMetricsOverride',
       { width: 720, height: 480, deviceScaleFactor: 1, mobile: false });
     await a.dbg('sim(30)');

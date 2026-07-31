@@ -1125,7 +1125,7 @@ the notation surfaces it comes for free (§7.8).
 |---|---|---|---|
 | Panel command box | Enter | Shift+Enter | notation string |
 | Quick palette | Enter | Shift+Enter | notation string |
-| Ad-hoc pool (Compose) | Roll button | via ± popover | ± button beside Roll |
+| Ad-hoc pool (the Pools draft) | Roll button | via ± popover | ± button beside Roll |
 | Saved-pool row | Roll button | via ± popover | ± button, and ✎ for name + notation |
 | ~~Saved pool (compact pill)~~ | — | — | retired with the mini bar (§7.9); the Saved pools panel expands from its edge tab instead |
 | Reroll-last (⟳) | click | — (re-rolls as rolled) | inherits original intent |

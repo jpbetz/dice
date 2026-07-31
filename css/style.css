@@ -127,10 +127,10 @@ html, body {
 /* (the merged Pools panel is #builder-panel; groups-panel retired 2026-07-31) */
 
 /* ---------- collapsible chrome panels ---------- */
-/* Two regions — Compose, Saved pools — each with a header that toggles it
-   (per-user state in dice.panels.v1; the roll log left the stack for the
-   rail's #log-flyout). Collapsed, a panel rests as a small labelled tab on
-   its screen edge; expanded, it overlays the table. Compact view is
+/* One region — Pools (draft row over the saved list) — its header toggles
+   it (per-user state in dice.panels.v1; the roll log lives in the rail's
+   #log-flyout). Collapsed, the panel rests as a labelled edge tab;
+   expanded, it overlays the table. Compact view is
    EMERGENT: body.mini appears when every available panel is collapsed (see
    main.js) and only scales the ambient chrome — it never hides the rail or
    degrades a ceremony. */
@@ -384,9 +384,6 @@ html, body {
 .draft-actions { margin-top: 8px; }
 .draft-actions.hidden { display: none; }
 .draft-actions .btn { flex: 1; font-size: 12px; }
-/* the draft line's ± — same demoted .pool-mods look as the pool rows,
-   sized to sit between the Save/✕ buttons */
-.tray-line .pool-mods { flex: none; min-height: 0; width: 32px; align-self: stretch; font-size: 14px; }
 #save-confirm, #save-cancel { flex: none; width: 42px; }
 
 /* ---------- saved pools (read-only quick access, P2) ---------- */
@@ -1141,6 +1138,8 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
 }
 /* A marker on its way out keeps its place for the fade but stops taking
    clicks: the roll that replaced it is already sitting under it. */
+/* fully under the open panel: the invisible target yields its clicks */
+.shelf-marker.occluded { pointer-events: none; }
 .shelf-marker.chip-clearing {
   opacity: 0 !important;
   pointer-events: none;
