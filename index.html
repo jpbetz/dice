@@ -378,6 +378,34 @@ limitations under the License.
       <div id="pop-adv-sub" class="prow-sub"></div>
     </div>
 
+    <!-- The improviser's hot pair rides near the top (CUJ2): a target and
+         a moment are the stakes; keep/drop/reroll/visibility are the long
+         tail below. Same controls, ~500px less travel. -->
+    <div class="sec tight">
+      <div class="prow">
+        <span class="prow-label grow">Target (DC)</span>
+        <input id="pop-dc" class="tin num" inputmode="numeric" placeholder="—" maxlength="3">
+      </div>
+      <div class="pfield">
+        <span class="plabel">Comment / mat text</span>
+        <input id="pop-comment" class="tin" maxlength="64" placeholder="shows as the roll label">
+      </div>
+    </div>
+
+    <div class="sec tight">
+      <span class="plabel">Moment</span>
+      <div id="pop-seg-exp" class="seg">
+        <button data-v="">Plain</button>
+        <button data-v="check">Check</button>
+        <button data-v="cinematic">Cinematic</button>
+      </div>
+      <div class="pfield" id="pop-exp-sub-field">
+        <input id="pop-exp-subtitle" class="tin" maxlength="40" placeholder="subtitle — e.g. Charisma Check">
+      </div>
+      <div id="pop-exp-sub" class="prow-sub"></div>
+    </div>
+
+
     <div class="sec tight">
       <span class="plabel">Keep / drop</span>
       <div class="prow">
@@ -429,30 +457,6 @@ limitations under the License.
       </div>
       <div id="pop-vis-aud" class="vis-aud hidden"></div>
       <div id="pop-vis-sub" class="prow-sub"></div>
-    </div>
-
-    <div class="sec tight">
-      <div class="prow">
-        <span class="prow-label grow">Target (DC)</span>
-        <input id="pop-dc" class="tin num" inputmode="numeric" placeholder="—" maxlength="3">
-      </div>
-      <div class="pfield">
-        <span class="plabel">Comment / mat text</span>
-        <input id="pop-comment" class="tin" maxlength="64" placeholder="shows as the roll label">
-      </div>
-    </div>
-
-    <div class="sec tight">
-      <span class="plabel">Moment</span>
-      <div id="pop-seg-exp" class="seg">
-        <button data-v="">Plain</button>
-        <button data-v="check">Check</button>
-        <button data-v="cinematic">Cinematic</button>
-      </div>
-      <div class="pfield" id="pop-exp-sub-field">
-        <input id="pop-exp-subtitle" class="tin" maxlength="40" placeholder="subtitle — e.g. Charisma Check">
-      </div>
-      <div id="pop-exp-sub" class="prow-sub"></div>
     </div>
 
     <div id="pop-preview" class="pop-preview"></div>
