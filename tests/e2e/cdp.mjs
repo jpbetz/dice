@@ -190,10 +190,16 @@ export class Page {
 
   // Capture the page as a PNG. Shared by tools/drive.mjs step files (visual
   // checks) — e2e scenarios keep asserting state via __diceDebug, not pixels.
-  async screenshot(path, { width = 1920, height = 1080 } = {}) {
+  // Captures the CURRENT viewport unless dims are passed explicitly: the old
+  // unconditional 1920x1080 override silently clobbered a step's own metrics
+  // (the audit's 720x480 shot came back as a 1080p duplicate — the tool was
+  // blind to the exact breakage it existed to show).
+  async screenshot(path, { width = null, height = null } = {}) {
     const { writeFileSync } = await import('node:fs');
-    await this.browser.send('Emulation.setDeviceMetricsOverride',
-      { width, height, deviceScaleFactor: 1, mobile: false }, this.sessionId);
+    if (width && height) {
+      await this.browser.send('Emulation.setDeviceMetricsOverride',
+        { width, height, deviceScaleFactor: 1, mobile: false }, this.sessionId);
+    }
     const { data } = await this.browser.send('Page.captureScreenshot', { format: 'png' }, this.sessionId);
     writeFileSync(path, Buffer.from(data, 'base64'));
     return path;

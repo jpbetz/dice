@@ -22,6 +22,9 @@ limitations under the License.
 
 export default async function run(stage, [felt = null, prefix = 'ui']) {
   const a = await stage.tab('localhost', 'Shot');
+  // screenshot() captures the CURRENT viewport now — pin ours explicitly.
+  await a.page.browser.send('Emulation.setDeviceMetricsOverride',
+    { width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
   if (felt) await a.dbg(`setFelt(${JSON.stringify(felt)})`);
   await a.roll('2d6+1');
   const beat = () => new Promise((r) => setTimeout(r, 400)); // let imgs paint

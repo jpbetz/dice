@@ -170,6 +170,12 @@ html, body {
   min-height: 0;
   padding: 0 14px 14px;
 }
+/* EVERY panel body scrolls inside its share of the column: at 720x480 the
+   New pool panel used to paint past its border with Save unreachable under
+   the pools panel — 'the smaller the window, the more of it is table'
+   binds small windows too. */
+#left-panel .side-panel { min-height: 0; flex: 0 1 auto; }
+#builder-panel > .panel-body,
 #groups-panel > .panel-body { overflow-y: auto; }
 /* collapsed = the labelled edge tab: header only, sized to its label */
 .side-panel.collapsed { width: max-content; border-radius: 999px; }

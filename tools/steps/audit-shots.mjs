@@ -117,7 +117,9 @@ export default async function run(stage) {
     await a.eval(`document.getElementById('identity-chip').click()`);
   });
   await step('16-settings.png', async () => {
-    await a.eval(`document.body.click()`);
+    // the identity menu closes on the chip's own toggle (outside-CLICK
+    // synthetics don't reach its pointerdown listener)
+    await a.eval(`document.getElementById('identity-chip').click()`);
     await a.dbg('openSettings()');
   });
   await step('17-palette.png', async () => {
