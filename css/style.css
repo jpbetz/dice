@@ -130,10 +130,64 @@ html, body {
   z-index: var(--z-panel);
 }
 
-#groups-panel {
-  overflow-y: auto;
+#groups-panel { min-height: 0; }
+
+/* ---------- collapsible chrome panels ---------- */
+/* Four regions — Compose, Saved groups, Players, Roll log — each with a
+   header that toggles it (per-user state in dice.panels.v1). Collapsed, a
+   panel rests as a small labelled tab on its screen edge; expanded, it
+   overlays the table. Compact view is EMERGENT: body.mini appears when
+   every available panel is collapsed (see main.js) and only scales the
+   ambient chrome — it never hides the rail or degrades a ceremony. */
+.side-panel {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
 }
+.panel-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.ph-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold);
+  white-space: nowrap;
+}
+.panel-head:hover .ph-label { color: var(--gold-bright); }
+.panel-head .btn.tiny { margin-left: auto; }
+.ph-chev { margin-left: auto; color: var(--muted); font-size: 10px; line-height: 1; }
+.panel-head .btn.tiny + .ph-chev { margin-left: 0; }
+.ph-chev::after { content: '▾'; }
+.side-panel.collapsed .ph-chev::after { content: '▸'; }
+.side-panel > .panel-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0 14px 14px;
+}
+#groups-panel > .panel-body,
+#players-panel > .panel-body,
+#log-panel > .panel-body { overflow-y: auto; }
+/* collapsed = the labelled edge tab: header only, sized to its label */
+.side-panel.collapsed { width: max-content; border-radius: 999px; }
+.side-panel.collapsed > .panel-body { display: none; }
+.side-panel.collapsed .panel-head { padding: 6px 13px; }
+.side-panel.collapsed .btn.tiny { display: none; }
+#left-panel .side-panel.collapsed { align-self: flex-start; }
+#right-stack .side-panel.collapsed { align-self: flex-end; }
+/* compact view: the resting tabs slim down with the rest of the chrome */
+body.mini .side-panel.collapsed .panel-head { padding: 4px 11px; }
+body.mini .side-panel.collapsed .ph-label { font-size: 11px; }
 
 /* ---------- buttons ---------- */
 .btn {
@@ -322,12 +376,16 @@ html, body {
 }
 .group-del:hover { color: var(--red); }
 
-/* ---------- top controls ---------- */
-#top-controls {
+/* ---------- the persistent control rail ---------- */
+/* Never hidden, in any state or viewport: identity chip, settings, mute,
+   quick palette and collapse-all always stay reachable (the retired compact
+   mode used to strand settings + mute off screen). */
+#rail {
   position: fixed;
   top: 16px;
   right: 16px;
   display: flex;
+  align-items: center;
   gap: 8px;
   z-index: var(--z-panel);
 }
@@ -348,8 +406,8 @@ html, body {
 #right-stack > * { pointer-events: auto; }
 
 /* ---------- players ---------- */
-#players-panel { flex: none; max-height: 220px; overflow-y: auto; }
-#players-panel.hidden { display: none; }
+#players-panel { flex: none; max-height: 220px; }
+#players-panel.hidden { display: none; } /* solo: no roster, no tab (initNet) */
 .player-row {
   display: flex;
   align-items: center;
@@ -401,11 +459,7 @@ html, body {
 #status-pill.hidden { display: none; }
 
 /* ---------- log ---------- */
-#log-panel {
-  min-height: 0;
-  overflow-y: auto;
-}
-#log-panel.hidden { display: none; }
+#log-panel { min-height: 0; }
 .log-player { font-weight: 700; }
 .log-entry {
   padding: 8px 4px;
@@ -672,46 +726,12 @@ html, body {
 .tier-crit-fail { color: var(--red); text-shadow: 0 0 14px rgba(226,73,59,0.6); }
 .log-meaning { font-weight: 700; }
 
-/* ---------- mini mode ---------- */
-#mini-bar { display: none; }
-
-body.mini #left-panel,
-body.mini #top-controls,
-body.mini #right-stack { display: none; }
-
-body.mini #mini-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-  position: fixed;
-  left: 8px;
-  bottom: 8px;
-  right: 8px;
-  z-index: var(--z-panel);
-}
-.mini-pill {
-  padding: 4px 11px;
-  border-radius: 999px;
-  border: 1px solid var(--panel-border);
-  background: var(--panel);
-  color: var(--ivory);
-  font-family: var(--font-display);
-  font-size: 12.5px;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-  max-width: 130px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mini-pill:hover { border-color: var(--gold); background: rgba(212,175,55,0.18); }
-/* long-press (§7.4) needs the pointer stream: no touch scroll/callout on pills */
-.mini-pill { touch-action: none; -webkit-touch-callout: none; }
-.mini-pill.mini-util { color: var(--muted); padding: 4px 9px; margin-left: auto; }
-.mini-pill.mini-util + .mini-pill.mini-util { margin-left: 0; }
-.mini-pill.mini-util:hover { color: var(--ivory); }
-
-/* compact result banner in mini mode */
+/* ---------- compact view (body.mini) ---------- */
+/* No longer a mode of its own: body.mini is the EMERGENT all-panels-collapsed
+   state (main.js applyPanels). It scales the ambient chrome down — banner,
+   value chips, shelf markers, peek, crit text — and never hides anything:
+   the rail and the four edge tabs stay, and ceremonies render identically
+   (GOALS: immersion is never a downgrade). */
 body.mini #result-banner { padding: 8px 20px; bottom: 44px; }
 body.mini #result-total { font-size: 30px; }
 body.mini #result-meaning { font-size: 14px; }
@@ -742,7 +762,6 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .corner-btn:hover { color: var(--ivory); border-color: var(--gold); background: rgba(212,175,55,0.15); }
-body.mini #corner-controls { display: flex; }  /* corner survives mini mode */
 
 /* ---------- inline player rename ---------- */
 .player-self { cursor: pointer; border-radius: 6px; }

@@ -32,11 +32,18 @@ limitations under the License.
 <body>
   <div id="scene-container"></div>
 
-  <!-- Left panel: tray builder + saved groups -->
+  <!-- Left panels: Compose (tray builder + command box) + saved groups.
+       Each is one of the four independently-collapsible chrome regions: its
+       header is the toggle, and collapsed it rests as a small labelled edge
+       tab (per-user state in dice.panels.v1). -->
   <aside id="left-panel">
-    <div class="panel" id="builder-panel">
+    <div class="panel side-panel" id="builder-panel">
+      <div class="panel-head" id="head-compose" title="Show/hide — key: b">
+        <span class="ph-label">Compose</span>
+        <span class="ph-chev" aria-hidden="true"></span>
+      </div>
+      <div class="panel-body">
       <h1 class="app-title">⚄ Dice Table</h1>
-      <h2>Build a tray</h2>
 
       <!-- Command box (UX §1.3): three-state validation, Enter rolls, ↑/↓ history -->
       <div id="cmd" class="cmd">
@@ -80,28 +87,37 @@ limitations under the License.
         <input id="group-name" type="text" placeholder="Name this group…" maxlength="24">
         <button id="save-group" class="btn" disabled>Save</button>
       </div>
+      </div>
     </div>
 
-    <div class="panel" id="groups-panel">
-      <h2>Saved groups <button id="copy-link" class="btn tiny ghost" title="Copy a URL that restores these groups anywhere">copy link</button></h2>
-      <div id="groups-list"></div>
-      <p id="groups-empty" class="hint">Save a tray to keep it here for quick rerolls.</p>
+    <div class="panel side-panel" id="groups-panel">
+      <div class="panel-head" id="head-groups" title="Show/hide — key: g">
+        <span class="ph-label">Saved groups</span>
+        <button id="copy-link" class="btn tiny ghost" title="Copy a URL that restores these groups anywhere">copy link</button>
+        <span class="ph-chev" aria-hidden="true"></span>
+      </div>
+      <div class="panel-body">
+        <div id="groups-list"></div>
+        <p id="groups-empty" class="hint">Save a tray to keep it here for quick rerolls.</p>
+      </div>
     </div>
   </aside>
 
-  <!-- Top-right controls -->
-  <div id="top-controls">
+  <!-- The persistent control rail: NEVER hides, in any state or viewport.
+       Settings and mute live here so no view can strand them (the retired
+       compact mode hid them); ❯ opens the quick palette; ⤡ collapses or
+       expands all four panels at once. The identity chip rides here too. -->
+  <div id="rail">
     <span id="status-pill" class="hidden"></span>
-    <button id="toggle-log" class="btn ghost" title="Show/hide roll log">Log</button>
-    <button id="toggle-sound" class="btn ghost" title="Toggle sound">🔊</button>
     <button id="toggle-settings" class="btn ghost" title="Settings">⚙</button>
+    <button id="toggle-sound" class="btn ghost" title="Toggle sound">🔊</button>
+    <button id="rail-palette" class="btn ghost" title="Quick roll ( / )">❯</button>
+    <button id="rail-collapse" class="btn ghost" title="Collapse panels (m)">⤡</button>
   </div>
 
-  <!-- Persistent corner controls: quick palette + clear table + mini/expand toggle -->
+  <!-- Persistent corner control: clear the whole table -->
   <div id="corner-controls">
-    <button id="corner-palette" class="corner-btn" title="Quick roll ( / )">❯</button>
     <button id="corner-clear" class="corner-btn" title="Remove all dice from the table">✕</button>
-    <button id="corner-mini" class="corner-btn" title="Compact view">⤡</button>
   </div>
 
   <!-- Quick palette: Spotlight-style transient command strip ('/' or Ctrl/Cmd+K).
@@ -123,8 +139,8 @@ limitations under the License.
           <tr><td><code>1–9</code></td><td>roll saved group N</td></tr>
           <tr><td><code>r</code></td><td>reroll the last roll</td></tr>
           <tr><td><code>c</code></td><td>clear the table</td></tr>
-          <tr><td><code>m</code></td><td>compact (mini) view on/off</td></tr>
-          <tr><td><code>l</code></td><td>show/hide the roll log</td></tr>
+          <tr><td><code>m</code></td><td>collapse / expand all panels</td></tr>
+          <tr><td><code>b</code> <code>g</code> <code>p</code> <code>l</code></td><td>toggle one panel — compose, saved groups, players, log</td></tr>
           <tr><td><code>s</code></td><td>sound on/off</td></tr>
           <tr><td><code>/</code> or <code>Ctrl/Cmd K</code></td><td>quick roll palette</td></tr>
           <tr><td><code>Space</code></td><td>skip the roll in flight (click the table works too)</td></tr>
@@ -134,9 +150,6 @@ limitations under the License.
       </div>
     </div>
   </div>
-
-  <!-- Mini-mode strip: group pills -->
-  <div id="mini-bar"></div>
 
   <!-- Roll moment ceremony (UX §2.4/§5.3, identical in compact view — §7.4).
        Ornate corners are injected by JS;
@@ -201,18 +214,30 @@ limitations under the License.
     <div id="hit-flash"></div>
   </div>
 
-  <!-- Right-side stack: players + roll log -->
+  <!-- Right-side stack: players + roll log — the other two collapsible
+       regions. The players panel exists only online (solo has no roster). -->
   <div id="right-stack">
-    <div id="players-panel" class="panel hidden">
-      <h2>Players</h2>
-      <div id="players-list"></div>
+    <div id="players-panel" class="panel side-panel hidden">
+      <div class="panel-head" id="head-players" title="Show/hide — key: p">
+        <span class="ph-label">Players</span>
+        <span class="ph-chev" aria-hidden="true"></span>
+      </div>
+      <div class="panel-body">
+        <div id="players-list"></div>
+      </div>
     </div>
 
     <!-- Roll log -->
-    <aside id="log-panel" class="panel">
-      <h2>Roll log <button id="clear-log" class="btn tiny ghost">clear</button></h2>
-      <div id="log-list"></div>
-      <p id="log-empty" class="hint">No rolls yet.</p>
+    <aside id="log-panel" class="panel side-panel">
+      <div class="panel-head" id="head-log" title="Show/hide — key: l">
+        <span class="ph-label">Roll log</span>
+        <button id="clear-log" class="btn tiny ghost">clear</button>
+        <span class="ph-chev" aria-hidden="true"></span>
+      </div>
+      <div class="panel-body">
+        <div id="log-list"></div>
+        <p id="log-empty" class="hint">No rolls yet.</p>
+      </div>
     </aside>
   </div>
 
@@ -386,13 +411,6 @@ limitations under the License.
             <span class="prow-sub">floating value chips over the felt</span>
           </span>
           <button id="set-chips" class="sw" aria-pressed="false" title="Show numbers on dice"></button>
-        </div>
-        <div class="prow">
-          <span class="grow">
-            <span class="prow-label">Compact view</span>
-            <span class="prow-sub">just the table and group pills</span>
-          </span>
-          <button id="set-mini" class="sw" aria-pressed="false" title="Compact view"></button>
         </div>
       </div>
       <div class="settings-sec">

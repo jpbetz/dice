@@ -2827,10 +2827,7 @@ window.__diceDebug = {
     } else {
       const g = groups.find((x) => x.id === source || x.name === source);
       if (!g) return false;
-      const mini = document.body.classList.contains('mini');
-      const row = (mini
-        ? document.querySelector(`#mini-bar [data-group-id="${g.id}"]`)
-        : document.querySelector(`#groups-list [data-group-id="${g.id}"]`)) || null;
+      const row = document.querySelector(`#groups-list [data-group-id="${g.id}"]`) || null;
       openPopover({ source: 'group', group: g, row });
     }
     return !!pop;
@@ -2939,6 +2936,20 @@ window.__diceDebug = {
   get chipsVisible() { return chipsOn; },
   setChipsVisible(on) { setChips(on); return chipsOn; },
   get chipCount() { return chips.length; },
+  // chrome (the four collapsible panel regions + emergent compact view):
+  // open booleans per region, playersAvailable = whether the Players region
+  // exists at all right now (online only), allCollapsed = the emergent
+  // body.mini state. setPanelState applies a partial {region: bool} patch
+  // and returns the resulting state. JSON-safe.
+  get panelState() { return panelDebugState(); },
+  setPanelState(patch) {
+    if (patch && typeof patch === 'object') {
+      for (const k of Object.keys(PANEL_DEFS)) {
+        if (typeof patch[k] === 'boolean') setPanel(k, patch[k]);
+      }
+    }
+    return panelDebugState();
+  },
   get shroudedCount() { return tableDice.filter((d) => d.shrouded).length; },
   get revealingCount() { return revealing.length; },
   get pendingReveals() { return [...pendingReveals.keys()]; },
@@ -3636,12 +3647,11 @@ function renderGroups() {
     groupsListEl.appendChild(row);
     // renderGroups can run while this group's popover is open (e.g. after a
     // variant save) — re-anchor it to the fresh row.
-    if (pop && pop.source === 'group' && pop.groupId === g.id && !document.body.classList.contains('mini')) {
+    if (pop && pop.source === 'group' && pop.groupId === g.id) {
       row.classList.add('open');
       pop.row = row;
     }
   }
-  renderMiniBar();
 }
 renderGroups();
 
@@ -3832,23 +3842,18 @@ function closePopover() {
 }
 
 // Anchor the popover to its source, clamped fully on-screen (§7.4: usable in
-// mini). Full view: beside the left panel, next to the source row. Mini: above
-// the anchoring pill (the panel is hidden), clamped within the viewport.
+// compact view). Beside the left panel column, next to the source row; a row
+// inside a COLLAPSED panel has a zero rect, so it counts as no anchor and the
+// popover sits beside the tab column instead.
 function placePopover() {
   if (!pop) return;
   const w = popEl.offsetWidth;
   const h = popEl.offsetHeight;
-  const anchor = pop.row ? pop.row.getBoundingClientRect() : null;
-  const mini = document.body.classList.contains('mini');
-  let left, top;
-  if (mini && anchor) {
-    left = Math.round(anchor.left);
-    top = Math.round(anchor.top - h - 8);
-  } else {
-    const panelRect = document.getElementById('left-panel').getBoundingClientRect();
-    left = Math.round(panelRect.right + 10);
-    top = anchor ? Math.round(anchor.top - 46) : 12;
-  }
+  const rect = pop.row ? pop.row.getBoundingClientRect() : null;
+  const anchor = rect && (rect.width || rect.height) ? rect : null;
+  const panelRect = document.getElementById('left-panel').getBoundingClientRect();
+  const left = Math.round(panelRect.right + 10);
+  const top = anchor ? Math.round(anchor.top - 46) : 12;
   popEl.style.left = `${Math.max(12, Math.min(left, window.innerWidth - w - 12))}px`;
   popEl.style.top = `${Math.max(12, Math.min(top, window.innerHeight - h - 12))}px`;
 }
@@ -4290,7 +4295,6 @@ popVariantBtn.addEventListener('click', () => {
 // ---------------------------------------------------------------------------
 
 let log = load(LS_LOG, []);
-const logPanel = document.getElementById('log-panel');
 const logList = document.getElementById('log-list');
 const logEmpty = document.getElementById('log-empty');
 
@@ -4401,14 +4405,10 @@ document.getElementById('clear-log').addEventListener('click', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Top controls
+// Rail + corner controls
 // ---------------------------------------------------------------------------
 
 document.getElementById('corner-clear').addEventListener('click', () => requestClear());
-
-document.getElementById('toggle-log').addEventListener('click', () => {
-  logPanel.classList.toggle('hidden');
-});
 
 const soundBtn = document.getElementById('toggle-sound');
 // One setter for both mirrors of the sound preference (top-bar 🔊 and the
@@ -4442,7 +4442,7 @@ function setChips(on, persist = true) {
 
 // ---------------------------------------------------------------------------
 // Settings (roadmap §2): gear → modal with two scopes. "Just you" — sound and
-// the mini-mode preference, both local. "Everyone at the table" — the felt
+// the value-chip preference, both local. "Everyone at the table" — the felt
 // theme, which is room state: online a swatch click POSTs a settings patch and
 // the UI applies only on the 'settings-changed' echo (no optimistic
 // double-apply); solo applies immediately and persists LS_ROOMSETTINGS.
@@ -4611,8 +4611,6 @@ function showSettingsNote(text) {
 function syncSettingsUI() {
   document.getElementById('set-sound').setAttribute('aria-pressed', String(soundOn));
   document.getElementById('set-chips').setAttribute('aria-pressed', String(chipsOn));
-  document.getElementById('set-mini')
-    .setAttribute('aria-pressed', String(document.body.classList.contains('mini')));
   renderSystemPicker();
   renderFeltSwatches();
 }
@@ -4636,85 +4634,61 @@ settingsModal.addEventListener('click', (e) => {
 // Esc layering in the keyboard-shortcuts section below.
 document.getElementById('set-sound').addEventListener('click', () => setSound(!soundOn));
 document.getElementById('set-chips').addEventListener('click', () => setChips(!chipsOn));
-document.getElementById('set-mini').addEventListener('click', () => {
-  setMini(!document.body.classList.contains('mini'));
-});
 
 // ---------------------------------------------------------------------------
-// Mini mode: hide all chrome except a compact strip of group pills, sized to
-// live in a small corner window during a video call. The 3D table, result
-// banner, chips, and crit effects stay.
+// Collapsible chrome panels: four regions — Compose (builder + command box),
+// Saved groups, Players, Roll log — each independently collapsible from its
+// own header (plus keys b/g/p/l), with per-user state in 'dice.panels.v1'.
+// Collapsed, a panel rests as a small labelled edge tab. Compact view is no
+// longer a mode: body.mini is the EMERGENT all-collapsed state (it scales
+// the ambient chrome and reframes the camera; it hides nothing — the rail
+// and the tabs stay, and ceremonies render identically).
 // ---------------------------------------------------------------------------
 
-const LS_MINI = 'dice.mini.v1';
+const LS_PANELS = 'dice.panels.v1';
+const LS_MINI = 'dice.mini.v1'; // legacy compact-view preference — migration only
 
-// Called from renderGroups(), which runs during module evaluation — resolve
-// the element here rather than via a module-level const declared below.
-const PILL_LONGPRESS_MS = 500;
+const PANEL_DEFS = {
+  compose: { el: 'builder-panel', head: 'head-compose' },
+  groups: { el: 'groups-panel', head: 'head-groups' },
+  players: { el: 'players-panel', head: 'head-players' },
+  log: { el: 'log-panel', head: 'head-log' },
+};
 
-function renderMiniBar() {
-  const miniBar = document.getElementById('mini-bar');
-  miniBar.innerHTML = '';
-  for (const g of groups) {
-    const pill = document.createElement('button');
-    pill.className = 'mini-pill';
-    pill.dataset.groupId = String(g.id);
-    pill.textContent = g.name || g.notation; // user-supplied: textContent only
-    pill.title = g.notation; // UX §1.4: the pill's title is the notation
-    // §7.4 compact-pill column: tap = roll; contextmenu OR a ~500 ms pointer
-    // long-press (touch included) opens the ± popover bound to this group.
-    // A long-press must NOT also roll: the click that follows it is swallowed
-    // via the suppress flag. Both flags re-arm on pointerdown — a press
-    // released off the pill fires no click, and a stale flag must not eat the
-    // NEXT tap. One touch long-press can fire BOTH the JS timer and the
-    // platform's native contextmenu (either order, e.g. Android with a long
-    // touch-and-hold delay): openPill is a toggle, so gestureHandled makes
-    // whichever lands second a no-op instead of a re-toggle that closes the
-    // popover the first one just opened.
-    let lpTimer = null;
-    let suppressClick = false;
-    let gestureHandled = false;
-    const openPill = () => {
-      if (pop && pop.source === 'group' && pop.groupId === g.id) closePopover();
-      else openPopover({ source: 'group', group: g, row: pill });
-    };
-    pill.addEventListener('click', () => {
-      if (suppressClick) {
-        suppressClick = false;
-        return;
-      }
-      rollGroup(g);
-    });
-    pill.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      clearTimeout(lpTimer);
-      if (gestureHandled) return;
-      gestureHandled = true;
-      suppressClick = true; // some engines fire a click after a touch contextmenu
-      openPill();
-    });
-    pill.addEventListener('pointerdown', (e) => {
-      gestureHandled = false;
-      suppressClick = false;
-      clearTimeout(lpTimer);
-      if (e.pointerType === 'mouse' && e.button !== 0) return; // right-click: contextmenu path
-      lpTimer = setTimeout(() => {
-        gestureHandled = true;
-        suppressClick = true;
-        openPill();
-      }, PILL_LONGPRESS_MS);
-    });
-    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) {
-      pill.addEventListener(ev, () => clearTimeout(lpTimer));
-    }
-    miniBar.appendChild(pill);
-    // renderMiniBar can rebuild while this group's popover is anchored to the
-    // old pill (e.g. after a variant save in mini) — re-anchor to the new one.
-    if (pop && pop.source === 'group' && pop.groupId === g.id
-        && document.body.classList.contains('mini')) {
-      pop.row = pill;
-    }
+// Open/collapsed per region. Seeded once, exactly like the old mini seed: a
+// stored state wins; else the legacy mini preference (true = all collapsed)
+// or a small viewport starts everything collapsed.
+let panelsOpen = (() => {
+  const stored = load(LS_PANELS, null);
+  const st = {};
+  if (stored && typeof stored === 'object') {
+    for (const k of Object.keys(PANEL_DEFS)) st[k] = stored[k] !== false;
+    return st;
   }
+  const legacyMini = load(LS_MINI, null);
+  const smallViewport = window.innerWidth < 640 || window.innerHeight < 480;
+  const open = !(legacyMini ?? smallViewport);
+  for (const k of Object.keys(PANEL_DEFS)) st[k] = open;
+  return st;
+})();
+
+// The Players region only exists online (solo has no roster) — it neither
+// shows a tab nor holds compact view hostage while it is absent. Its
+// 'hidden' class (set by initNet / leaveTable) is the availability truth;
+// reading the DOM keeps this callable during module evaluation, before the
+// multiplayer section's netOnline binding exists.
+function panelAvailable(id) {
+  return id !== 'players'
+    || !document.getElementById('players-panel').classList.contains('hidden');
+}
+
+function allPanelsCollapsed() {
+  return Object.keys(PANEL_DEFS).every((k) => !panelAvailable(k) || !panelsOpen[k]);
+}
+
+// JSON-safe projection for __diceDebug.panelState.
+function panelDebugState() {
+  return { ...panelsOpen, allCollapsed: allPanelsCollapsed(), playersAvailable: panelAvailable('players') };
 }
 
 // Framing: the eye sits where the view reads best on a wide window, then pulls
@@ -4776,30 +4750,55 @@ function applyCameraFraming() {
   }
 }
 
-function setMini(on, persist = true) {
-  document.body.classList.toggle('mini', on);
-  const btn = document.getElementById('corner-mini');
-  btn.textContent = on ? '⤢' : '⤡';
-  btn.title = on ? 'Full view' : 'Compact view';
-  if (persist) save(LS_MINI, on);
-  applyCameraFraming();
-  positionChips();
-  measurePeek(); // compact view resizes the card (smaller type, tighter padding)
-  positionShelfMarkers(); // markers track the reframed camera (§7.7 parity)
-  // An on-stage ceremony needs nothing: it keeps playing, re-scaled (§7.4).
-  syncSettingsUI(); // the settings modal mirrors the mini preference
+// Reflect panelsOpen into the DOM, persist it, and derive compact view:
+// body.mini appears exactly when every available panel is collapsed. The
+// compact side effects (camera reframe, chip/marker/peek re-positioning) run
+// only when that derived state actually flips.
+function applyPanels(persist = true) {
+  for (const [id, def] of Object.entries(PANEL_DEFS)) {
+    document.getElementById(def.el).classList.toggle('collapsed', !panelsOpen[id]);
+  }
+  if (persist) save(LS_PANELS, panelsOpen);
+  const mini = allPanelsCollapsed();
+  const railBtn = document.getElementById('rail-collapse');
+  railBtn.textContent = mini ? '⤢' : '⤡';
+  railBtn.title = mini ? 'Expand panels (m)' : 'Collapse panels (m)';
+  if (mini !== document.body.classList.contains('mini')) {
+    document.body.classList.toggle('mini', mini);
+    applyCameraFraming();
+    positionChips();
+    measurePeek(); // compact view resizes the card (smaller type, tighter padding)
+    positionShelfMarkers(); // markers track the reframed camera (§7.7 parity)
+    // An on-stage ceremony needs nothing: it keeps playing, re-scaled (§7.4).
+  }
 }
 
-document.getElementById('corner-mini').addEventListener('click', () => {
-  setMini(!document.body.classList.contains('mini'));
-});
-
-// Small windows start in mini mode unless the user has expressed a preference.
-{
-  const stored = load(LS_MINI, null);
-  const smallViewport = window.innerWidth < 640 || window.innerHeight < 480;
-  setMini(stored ?? smallViewport, false);
+function setPanel(id, open, persist = true) {
+  if (!(id in PANEL_DEFS)) return false;
+  panelsOpen[id] = !!open;
+  applyPanels(persist);
+  return panelsOpen[id];
 }
+
+// The rail's ⤡ / key 'm' (old compact-view muscle memory): everything
+// collapsed reopens everything; anything open collapses everything.
+function toggleAllPanels() {
+  const open = allPanelsCollapsed();
+  for (const k of Object.keys(PANEL_DEFS)) panelsOpen[k] = open;
+  applyPanels();
+}
+
+for (const [id, def] of Object.entries(PANEL_DEFS)) {
+  document.getElementById(def.head).addEventListener('click', (e) => {
+    // Header tool buttons (copy link, clear) act without toggling the panel.
+    if (e.target.closest('.btn')) return;
+    setPanel(id, !panelsOpen[id]);
+  });
+}
+document.getElementById('rail-collapse').addEventListener('click', toggleAllPanels);
+
+applyPanels(false); // reflect the seeded state without re-saving
+applyCameraFraming(); // boot framing at the current aspect (resize keeps it)
 
 // ---------------------------------------------------------------------------
 // Quick palette: a transient centered command strip ('/' / Ctrl/Cmd+K / the
@@ -4904,7 +4903,7 @@ paletteBackdrop.addEventListener('click', (e) => {
   if (e.target === paletteBackdrop) closePalette();
 });
 
-document.getElementById('corner-palette').addEventListener('click', () => {
+document.getElementById('rail-palette').addEventListener('click', () => {
   if (isPaletteOpen()) closePalette();
   else openPalette();
 });
@@ -4945,7 +4944,7 @@ function rerollLast() {
 // (the ± popover counts as open UI). Space keeps its skip-ceremony handler.
 document.addEventListener('keydown', (e) => {
   // Held keys auto-repeat: without this guard a held 'r'/digit floods rolls,
-  // held 'm' thrashes mini mode, and held '/' opens the palette then types
+  // held 'm' thrashes the panels, and held '/' opens the palette then types
   // literal '/' into it. No shortcut here has a hold-to-repeat use.
   if (e.repeat) return;
   const t = e.target;
@@ -4986,8 +4985,11 @@ document.addEventListener('keydown', (e) => {
     case '?': e.preventDefault(); toggleKbd(); return;
     case 'r': rerollLast(); return;
     case 'c': requestClear(); return;
-    case 'm': setMini(!document.body.classList.contains('mini')); return;
-    case 'l': logPanel.classList.toggle('hidden'); return;
+    case 'm': toggleAllPanels(); return;
+    case 'b': setPanel('compose', !panelsOpen.compose); return;
+    case 'g': setPanel('groups', !panelsOpen.groups); return;
+    case 'p': if (panelAvailable('players')) setPanel('players', !panelsOpen.players); return;
+    case 'l': setPanel('log', !panelsOpen.log); return;
     case 's': setSound(!soundOn); return;
     default:
       if (e.key >= '1' && e.key <= '9') {
@@ -5526,6 +5528,7 @@ async function initNet() {
     }
     renderPlayers();
     playersPanel.classList.remove('hidden');
+    applyPanels(false); // the Players region just joined the chrome — recompute compact
     log = (conn.log || []).map(rollToLogEntry); // server history for late joiners
     renderLog();
     offers = conn.offers || [];
