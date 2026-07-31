@@ -3042,11 +3042,10 @@ window.__diceDebug = {
   get chipsVisible() { return chipsOn; },
   setChipsVisible(on) { setChips(on); return chipsOn; },
   get chipCount() { return chips.length; },
-  // chrome (the four collapsible panel regions + emergent compact view):
-  // open booleans per region, playersAvailable = whether the Players region
-  // exists at all right now (online only), allCollapsed = the emergent
-  // body.mini state. setPanelState applies a partial {region: bool} patch
-  // and returns the resulting state. JSON-safe.
+  // chrome (the three collapsible panel regions + emergent compact view):
+  // open booleans per region, allCollapsed = the emergent body.mini state.
+  // setPanelState applies a partial {region: bool} patch and returns the
+  // resulting state. JSON-safe.
   get panelState() { return panelDebugState(); },
   // saved-pools flyout (roll without pinning the panel open): the hover
   // behavior, driven directly where headless tests can't hover.
@@ -4907,9 +4906,10 @@ document.getElementById('set-sound').addEventListener('click', () => setSound(!s
 document.getElementById('set-chips').addEventListener('click', () => setChips(!chipsOn));
 
 // ---------------------------------------------------------------------------
-// Collapsible chrome panels: four regions — Compose (builder + command box),
-// Saved pools, Players, Roll log — each independently collapsible from its
-// own header (plus keys b/g/p/l), with per-user state in 'dice.panels.v1'.
+// Collapsible chrome panels: three regions — Compose (builder + command box),
+// Saved pools, Roll log — each independently collapsible from its own
+// header (plus keys b/g/l), with per-user state in 'dice.panels.v1'. (The
+// roster is rail furniture, not a region — there is no Players panel.)
 // Collapsed, a panel rests as a small labelled edge tab. Compact view is no
 // longer a mode: body.mini is the EMERGENT all-collapsed state (it scales
 // the ambient chrome and reframes the camera; it hides nothing — the rail
@@ -4922,7 +4922,6 @@ const LS_MINI = 'dice.mini.v1'; // legacy compact-view preference — migration 
 const PANEL_DEFS = {
   compose: { el: 'builder-panel', head: 'head-compose' },
   groups: { el: 'groups-panel', head: 'head-groups' },
-  players: { el: 'players-panel', head: 'head-players' },
   log: { el: 'log-panel', head: 'head-log' },
 };
 
@@ -4943,23 +4942,19 @@ let panelsOpen = (() => {
   return st;
 })();
 
-// The Players region only exists online (solo has no roster) — it neither
-// shows a tab nor holds compact view hostage while it is absent. Its
-// 'hidden' class (set by initNet / leaveTable) is the availability truth;
-// reading the DOM keeps this callable during module evaluation, before the
-// multiplayer section's netOnline binding exists.
+// Every region always exists now that the roster lives in the rail (the
+// retired Players panel was the one online-only region).
 function panelAvailable(id) {
-  return id !== 'players'
-    || !document.getElementById('players-panel').classList.contains('hidden');
+  return id in PANEL_DEFS;
 }
 
 function allPanelsCollapsed() {
-  return Object.keys(PANEL_DEFS).every((k) => !panelAvailable(k) || !panelsOpen[k]);
+  return Object.keys(PANEL_DEFS).every((k) => !panelsOpen[k]);
 }
 
 // JSON-safe projection for __diceDebug.panelState.
 function panelDebugState() {
-  return { ...panelsOpen, allCollapsed: allPanelsCollapsed(), playersAvailable: panelAvailable('players') };
+  return { ...panelsOpen, allCollapsed: allPanelsCollapsed() };
 }
 
 // Framing: the eye sits where the view reads best on a wide window, then pulls
@@ -5291,7 +5286,6 @@ document.addEventListener('keydown', (e) => {
     case 'm': toggleAllPanels(); return;
     case 'b': setPanel('compose', !panelsOpen.compose); return;
     case 'g': setPanel('groups', !panelsOpen.groups); return;
-    case 'p': if (panelAvailable('players')) setPanel('players', !panelsOpen.players); return;
     case 'l': setPanel('log', !panelsOpen.log); return;
     case 's': setSound(!soundOn); return;
     default:
@@ -5319,8 +5313,7 @@ let netOnline = false;
 let players = [];
 let offers = [];        // open offered-roll cards for this room
 
-const playersPanel = document.getElementById('players-panel');
-const playersList = document.getElementById('players-list');
+const rosterEl = document.getElementById('rail-roster');
 const statusPill = document.getElementById('status-pill');
 
 function setPill(text, cls) {
@@ -5332,29 +5325,35 @@ function setPill(text, cls) {
   statusPill.className = cls || '';
 }
 
+// The rail roster: everyone ELSE at the table as quiet name pills beside
+// the identity chip (you ARE the chip — its dress and menu are the 'which
+// one is me' signal, so no row ever needs a '(you)' tag). Past a handful
+// the tail folds into one +N pill whose title carries the names — rooms
+// admit up to 40 players (server MAX_PLAYERS_PER_ROOM) and the rail must
+// not push its own controls off screen at that count. Renaming lives in
+// the identity menu; other players' pills are presence, not controls.
+const ROSTER_MAX = 4; // name pills shown before the tail folds into +N
 function renderPlayers() {
-  playersList.innerHTML = '';
+  rosterEl.innerHTML = '';
   const you = net ? net.playerId : null;
-  for (const p of players) {
-    const row = document.createElement('div');
-    row.className = 'player-row';
+  const others = players.filter((p) => p.id !== you);
+  for (const p of others.slice(0, ROSTER_MAX)) {
+    const pill = document.createElement('span');
+    pill.className = 'roster-name';
     const dot = document.createElement('span');
-    dot.className = 'player-dot';
+    dot.className = 'roster-dot';
     dot.style.background = p.color || '#888';
-    const name = document.createElement('span');
-    name.className = 'player-name';
-    name.textContent = p.name; // user-supplied: textContent only
-    row.append(dot, name);
-    if (p.id === you) {
-      const tag = document.createElement('span');
-      tag.className = 'player-you';
-      tag.textContent = '(you)';
-      row.appendChild(tag);
-      row.classList.add('player-self');
-      row.title = 'Click to change your name';
-      row.addEventListener('click', () => beginRename(row, name, p));
-    }
-    playersList.appendChild(row);
+    pill.appendChild(dot);
+    pill.appendChild(document.createTextNode(p.name)); // user-supplied: text only
+    pill.title = p.name;
+    rosterEl.appendChild(pill);
+  }
+  if (others.length > ROSTER_MAX) {
+    const more = document.createElement('span');
+    more.className = 'roster-more';
+    more.textContent = `+${others.length - ROSTER_MAX}`;
+    more.title = others.slice(ROSTER_MAX).map((p) => p.name).join(', ');
+    rosterEl.appendChild(more);
   }
   // An open whisper picker tracks the live roster (joins/leaves/renames).
   if (pop && pop.vis && pop.vis.mode === 'whisper') renderPop();
@@ -5458,50 +5457,8 @@ function renderOffers() {
   }
 }
 
-// Inline rename: swap your name for an input; Enter/blur commits, Esc cancels.
-function beginRename(row, nameEl, player) {
-  if (row.querySelector('input')) return;
-  const input = document.createElement('input');
-  input.className = 'player-rename';
-  input.maxLength = 24;
-  input.value = player.name;
-  nameEl.replaceWith(input);
-  input.focus();
-  input.select();
-  let done = false;
-  const finish = async (commit) => {
-    if (done) return;
-    const newName = cutText(input.value, 24);
-    if (commit && newName.includes('#')) {
-      // Refuse loudly instead of silently correcting: the server strips '#'
-      // from every name ('#' starts a comment in roll notation, so a name
-      // carrying it could misdirect a whisper — see server.js cleanName),
-      // and quietly rolling with the stripped echo would rename the player
-      // behind their back. Same surface as a server refusal: the pill.
-      handleNetRefusal({
-        path: '/api/rename', status: 400, code: 'bad_name',
-        message: 'names cannot contain # — it starts a comment in roll notation',
-      });
-      input.focus();
-      return; // stay in the rename input so it can be fixed
-    }
-    done = true;
-    input.replaceWith(nameEl);
-    if (!commit || !newName || newName === player.name) return;
-    nameEl.textContent = newName; // optimistic; broadcast confirms
-    player.name = newName;
-    try { localStorage.setItem(LS_NAME, newName); } catch { /* ignore */ }
-    updateIdentityChip(); // the rail chip follows the rename immediately
-    if (netOnline && net) await net.rename(newName);
-  };
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') finish(true);
-    else if (e.key === 'Escape') finish(false);
-    e.stopPropagation();
-  });
-  input.addEventListener('blur', () => finish(true));
-  input.addEventListener('click', (e) => e.stopPropagation());
-}
+// (Inline roster rename retired with the Players panel: renaming lives in
+// the identity menu, whose applyRename path carries the same '#' refusal.)
 
 // ---------------------------------------------------------------------------
 // Identity chip + menu (the rail). Present SOLO AND ONLINE: the chip is your
@@ -5613,8 +5570,8 @@ document.getElementById('idm-name-input').addEventListener('keydown', (e) => {
 
 // Leave & switch seat: net.disconnect drops the live stream, the stored
 // identity clears, and the whole join flow runs again — 'Take a seat', then
-// re-join (or stay solo when there is no server). The Players region leaves
-// the chrome with the seat.
+// re-join (or stay solo when there is no server). The rail roster empties
+// with the seat.
 function leaveTable() {
   closeIdentityMenu();
   const old = net;
@@ -5624,10 +5581,8 @@ function leaveTable() {
   try { localStorage.removeItem(LS_NAME); } catch { /* ignore */ }
   players = [];
   offers = [];
-  renderPlayers();
+  renderPlayers(); // empties the rail roster (players = [])
   renderOffers();
-  playersPanel.classList.add('hidden');
-  applyPanels(false); // recompute emergent compact without the Players region
   setPill(null);
   updateIdentityChip();
   netReady = initNet();
@@ -5987,9 +5942,7 @@ async function initNet() {
     if (me && me.name && me.name !== name) {
       try { localStorage.setItem(LS_NAME, me.name); } catch { /* ignore */ }
     }
-    renderPlayers();
-    playersPanel.classList.remove('hidden');
-    applyPanels(false); // the Players region just joined the chrome — recompute compact
+    renderPlayers(); // the rail roster fills in (solo it is simply empty)
     log = (conn.log || []).map(rollToLogEntry); // server history for late joiners
     renderLog();
     offers = conn.offers || [];

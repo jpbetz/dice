@@ -166,9 +166,10 @@ tower*), and the `#`-in-player-names ban that keeps whisper addressing
 total · **quiet chrome (UX.md §7.9)**: the documented z ladder with ceremony
 above table labels, value chips off by default, dot-only shelf markers with
 the peek doing the talking, one clear-this-roll gesture everywhere, a
-persistent rail that no view can strand, four independently collapsible
-panels with compact view as their emergent state, the identity chip (rename
-· leave & switch · invite link) solo and online, by-id saved-pool editing,
+persistent rail that no view can strand, independently collapsible panels
+with compact view as their emergent state (the Players panel later retired
+into rail roster pills — 2026-07 cleanup), the identity chip (rename ·
+leave & switch · invite link) solo and online, by-id saved-pool editing,
 and the *pool / saved pool* naming.
 
 ## Conformances to protect (from the audit)

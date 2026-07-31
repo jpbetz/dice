@@ -390,14 +390,14 @@ export const scenarios = [
   {
     name: 'panels-collapse',
     tags: ['smoke', 'chrome'],
-    // Four regions, each independently collapsible; collapsed = header tab
+    // Three regions, each independently collapsible; collapsed = header tab
     // only; state persists per user ('dice.panels.v1' — same origin, same
     // identity); the keyboard parity: 'm' collapses/expands all, 'l' one.
+    // (No Players region: the roster is rail furniture.)
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       let st = await a.dbg('panelState');
       assert.equal(st.compose && st.groups && st.log, true, 'panels default open on a desktop viewport');
-      assert.equal(st.playersAvailable, true, 'the Players region exists online');
 
       st = await a.dbg('setPanelState({log: false, groups: false})');
       assert.equal(st.log, false, 'log collapsed');
@@ -448,7 +448,7 @@ export const scenarios = [
       );
       for (const id of RAIL) assert.ok(await visible(id), `#${id} visible in full view`);
 
-      const st = await a.dbg('setPanelState({compose: false, groups: false, players: false, log: false})');
+      const st = await a.dbg('setPanelState({compose: false, groups: false, log: false})');
       assert.equal(st.allCollapsed, true, 'every panel collapsed');
       assert.ok(await a.eval(`document.body.classList.contains('mini')`),
         'compact view is the emergent all-collapsed state');
@@ -466,7 +466,7 @@ export const scenarios = [
       // Leave the origin's persisted state all-open: panel state is per-user
       // localStorage, which OUTLIVES this scenario's room (later scenarios on
       // this origin read hidden-log innerText as empty if we leave it shut).
-      await a.dbg('setPanelState({compose: true, groups: true, players: true, log: true})');
+      await a.dbg('setPanelState({compose: true, groups: true, log: true})');
     },
   },
   {
@@ -490,6 +490,10 @@ export const scenarios = [
         `window.__diceDebug.players.some((p) => p.name === 'Alicia')`,
         { desc: 'the roster follows the rename' },
       );
+      // The rail roster shows the OTHERS only: you are the identity chip.
+      const bRoster = await b.eval(`document.getElementById('rail-roster').textContent`);
+      assert.ok(bRoster.includes('Alicia'), `B's rail shows Alicia (got: ${bRoster})`);
+      assert.ok(!bRoster.includes('Bob'), 'and never B himself');
       assert.equal((await a.dbg('identity')).name, 'Alicia', 'the chip follows too');
       assert.equal(await a.eval(`document.getElementById('identity-name').textContent`), 'Alicia');
 

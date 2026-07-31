@@ -34,7 +34,7 @@ limitations under the License.
   /* ---- the layer scale (GOALS P2: one documented z ladder) ----------------
      Every fixed overlay takes its z-index from here — never a bare number.
      Bottom → top:
-       right-stack   ambient chrome (players + log)
+       right-stack   ambient chrome (the roll log)
        panel         the side panels + the persistent control rail
        table-labels  ambient table labels: value chips, shelf markers
                      (corner controls ride this rung too)
@@ -125,7 +125,7 @@ html, body {
 #groups-panel { min-height: 0; }
 
 /* ---------- collapsible chrome panels ---------- */
-/* Four regions — Compose, Saved pools, Players, Roll log — each with a
+/* Three regions — Compose, Saved pools, Roll log — each with a
    header that toggles it (per-user state in dice.panels.v1). Collapsed, a
    panel rests as a small labelled tab on its screen edge; expanded, it
    overlays the table. Compact view is EMERGENT: body.mini appears when
@@ -168,7 +168,6 @@ html, body {
   padding: 0 14px 14px;
 }
 #groups-panel > .panel-body,
-#players-panel > .panel-body,
 #log-panel > .panel-body { overflow-y: auto; }
 /* collapsed = the labelled edge tab: header only, sized to its label */
 .side-panel.collapsed { width: max-content; border-radius: 999px; }
@@ -506,7 +505,7 @@ html, body {
 .idm-rename { padding: 2px 10px 8px; }
 .idm-rename.hidden { display: none; }
 
-/* ---------- right-side stack (players + log) ---------- */
+/* ---------- right-side stack (the roll log) ---------- */
 #right-stack {
   position: fixed;
   top: 64px;
@@ -521,30 +520,44 @@ html, body {
 }
 #right-stack > * { pointer-events: auto; }
 
-/* ---------- players ---------- */
-#players-panel { flex: none; max-height: 220px; }
-#players-panel.hidden { display: none; } /* solo: no roster, no tab (initNet) */
-.player-row {
-  display: flex;
+/* ---------- rail roster (everyone ELSE at the table) ---------- */
+/* You ARE the identity chip — its button dress and menu are the 'which one
+   is me' signal; the others rest as quiet name pills beside it, folding
+   into one +N pill past a handful (title carries the overflow names). */
+#rail-roster { display: flex; align-items: center; gap: 6px; min-width: 0; }
+#rail-roster:empty { display: none; }
+.roster-name {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 3px 2px;
-  font-size: 13px;
-}
-.player-dot {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  box-shadow: 0 0 6px rgba(0,0,0,0.5);
-}
-.player-name {
-  min-width: 0;
+  gap: 6px;
+  max-width: 120px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  background: var(--panel);
+  font-size: 12px;
+  color: var(--ivory);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.player-you { color: var(--muted); font-size: 11px; flex: none; }
+.roster-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+.roster-more {
+  flex: none;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  background: var(--panel);
+  font-size: 11px;
+  color: var(--muted);
+  cursor: default;
+}
 
 /* ---------- status pill ---------- */
 #status-pill {
@@ -879,21 +892,6 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .corner-btn:hover { color: var(--ivory); border-color: var(--gold); background: rgba(212,175,55,0.15); }
-
-/* ---------- inline player rename ---------- */
-.player-self { cursor: pointer; border-radius: 6px; }
-.player-self:hover { background: rgba(255,255,255,0.06); }
-.player-rename {
-  flex: 1;
-  min-width: 0;
-  background: rgba(0,0,0,0.4);
-  border: 1px solid var(--gold);
-  border-radius: 5px;
-  color: var(--ivory);
-  font-size: 13px;
-  padding: 2px 6px;
-}
-.player-rename:focus { outline: none; }
 
 /* ---------- roll mechanics display ---------- */
 .value-chip.discarded {

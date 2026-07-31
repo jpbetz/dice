@@ -110,9 +110,14 @@ limitations under the License.
   <!-- The persistent control rail: NEVER hides, in any state or viewport.
        Settings and mute live here so no view can strand them (the retired
        compact mode hid them); ❯ opens the quick palette; ⤡ collapses or
-       expands all four panels at once. The identity chip rides here too. -->
+       expands all panels at once. The identity chip rides here too, and the
+       roster rides beside it: everyone ELSE at the table as quiet name pills
+       (you ARE the identity chip — that is the 'which one is me' signal),
+       folding into a +N pill past a handful. No Players panel: a roster is
+       presence, not a workspace. -->
   <div id="rail">
     <span id="status-pill" class="hidden"></span>
+    <div id="rail-roster"></div>
     <button id="identity-chip" class="btn ghost" title="You — change name, leave &amp; switch, invite">
       <span id="identity-dot" class="identity-dot"></span>
       <span id="identity-name" class="identity-name">…</span>
@@ -164,7 +169,7 @@ limitations under the License.
           <tr><td><code>r</code></td><td>reroll the last roll</td></tr>
           <tr><td><code>c</code></td><td>clear the table</td></tr>
           <tr><td><code>m</code></td><td>collapse / expand all panels</td></tr>
-          <tr><td><code>b</code> <code>g</code> <code>p</code> <code>l</code></td><td>toggle one panel — compose, saved pools, players, log</td></tr>
+          <tr><td><code>b</code> <code>g</code> <code>l</code></td><td>toggle one panel — compose, saved pools, log</td></tr>
           <tr><td><code>s</code></td><td>sound on/off</td></tr>
           <tr><td><code>/</code> or <code>Ctrl/Cmd K</code></td><td>quick roll palette</td></tr>
           <tr><td><code>Space</code></td><td>skip the roll in flight (click the table works too)</td></tr>
@@ -238,19 +243,9 @@ limitations under the License.
     <div id="hit-flash"></div>
   </div>
 
-  <!-- Right-side stack: players + roll log — the other two collapsible
-       regions. The players panel exists only online (solo has no roster). -->
+  <!-- Right-side stack: the roll log — the third collapsible region. (The
+       roster lives in the rail; there is no Players panel.) -->
   <div id="right-stack">
-    <div id="players-panel" class="panel side-panel hidden">
-      <div class="panel-head" id="head-players" title="Show/hide — key: p">
-        <span class="ph-label">Players</span>
-        <span class="ph-chev" aria-hidden="true"></span>
-      </div>
-      <div class="panel-body">
-        <div id="players-list"></div>
-      </div>
-    </div>
-
     <!-- Roll log -->
     <aside id="log-panel" class="panel side-panel">
       <div class="panel-head" id="head-log" title="Show/hide — key: l">

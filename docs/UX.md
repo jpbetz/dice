@@ -1112,7 +1112,7 @@ decal, staged verdict, cinematic slow-mo), responsively scaled. Only panels
 and controls hide.
 
 *Followed through (§7.9):* compact view is no longer a view either. It is
-the emergent state of collapsing all four panels, and the controls that
+the emergent state of collapsing all the panels, and the controls that
 used to vanish with it now live on a rail that never hides.
 
 **Roll-declaration surfaces and the two verbs.** Every surface below must
@@ -1369,13 +1369,17 @@ dismiss stays visually distinct — different semantics, different affordance.
 This is the fix for a real bug: settings and mute used to live in chrome
 that compact mode hid, stranding both behind a keyboard shortcut.
 
-**Four independent regions,** each collapsing on its own header to a small
+**Three independent regions,** each collapsing on its own header to a small
 labelled edge tab, each remembering its own state in `dice.panels.v1`:
-Compose · Saved pools · Players (online only) · Roll log. Keys `b` `g` `p`
-`l` toggle one, `m` toggles all. **Compact view is emergent**: `body.mini`
-is derived from "every available panel is collapsed" and only rescales the
-table and its labels — it is not a mode, and nothing can be reached in one
-state that cannot be reached in the other.
+Compose · Saved pools · Roll log. Keys `b` `g` `l` toggle one, `m` toggles
+all. **Compact view is emergent**: `body.mini` is derived from "every panel
+is collapsed" and only rescales the table and its labels — it is not a
+mode, and nothing can be reached in one state that cannot be reached in the
+other. *(Amended 2026-07: the Players panel is retired — the roster is rail
+furniture, not a workspace. Everyone else at the table rests as quiet name
+pills beside the identity chip, folding into a `+N` pill past a handful;
+you are the identity chip itself, which is the whole "which one is me"
+signal.)*
 
 **Identity is on the table, solo and online.** The chip (color dot + name)
 opens Change name · Leave & switch seat · Copy invite link. Solo is a

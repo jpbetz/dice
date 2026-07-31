@@ -26,11 +26,11 @@ state anywhere.
   outcome chart (Blemish, Mishap, Partial Success, Success & Bonus, Advantage,
   Critical Success, …). Critical Success and Critical Fail get full-screen
   effects.
-- **Collapsible chrome** — four independent regions (Compose, Saved pools,
-  Players, Roll log), each collapsing to a small labelled edge tab, each
-  remembering its own state. Collapse them all (⤡, or `m`) and only the table
-  is left — sized for a corner window during a video call. Small windows start
-  collapsed. A persistent rail (identity · ⚙ · 🔊 · ❯) never hides.
+- **Collapsible chrome** — three independent regions (Compose, Saved pools,
+  Roll log), each collapsing to a small labelled edge tab, each remembering
+  its own state. Collapse them all (⤡, or `m`) and only the table is left —
+  sized for a corner window during a video call. Small windows start
+  collapsed. A persistent rail (roster · identity · ⚙ · 🔊 · ❯) never hides.
 - Roll log with timestamps, per-die breakdowns, and max/min highlighting;
   procedural impact sounds; solo mode persists pools and log in localStorage.
 
