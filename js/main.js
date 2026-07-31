@@ -1005,7 +1005,7 @@ function positionShelfMarkers() {
 // change, so calling renderPeek from it keeps an open card honest — and
 // closes it the moment its roll leaves the shelf.
 
-const PEEK_HOVER_MS = 150;   // hover intent delay before the card opens
+const PEEK_HOVER_MS = 60;    // hover intent delay before the card opens
 const PEEK_CLOSE_MS = 220;   // grace to cross from marker into the card
 const peekEl = document.getElementById('peek-card');
 let peekRollId = null;       // rollId of the open peek, or null
@@ -1935,17 +1935,26 @@ function renderRollResults(entry, dice, fx = true) {
 }
 
 // Reveal (the reveal authority of a hidden roll) and reroll-last buttons.
+// The banner mirrors the peek card's skeleton (they are the same result at
+// two ages, so they diverge only where the state genuinely differs): a row
+// of secondary actions — Reveal for the authority, ⟳, Collect — over ONE
+// prominent full-width ✕ at the base, the same unified 'clear this roll'
+// gesture the peek and the verdict card carry. Collect stays available but
+// steps out of the primary slot.
 function renderBannerActions(entry) {
   const holder = document.getElementById('banner-actions');
   holder.innerHTML = '';
   const hidden = entryHidden(entry);
   const mine = !netOnline || (net && entry.playerId === net.playerId);
+  const row = document.createElement('div');
+  row.className = 'banner-row';
   if (canReveal(entry)) {
     const btn = document.createElement('button');
-    btn.className = 'btn primary banner-btn';
+    // A hidden roll's Reveal is the one action that outranks housekeeping.
+    btn.className = hidden ? 'btn primary banner-btn' : 'btn ghost banner-btn';
     btn.textContent = 'Reveal';
     btn.addEventListener('click', () => requestReveal(entry.rollId));
-    holder.appendChild(btn);
+    row.appendChild(btn);
   }
   if (canReroll(entry)) {
     const btn = document.createElement('button');
@@ -1961,46 +1970,41 @@ function renderBannerActions(entry) {
         exp: entry.spec.exp || undefined, // reroll-last preserves the moment
       })
     );
-    holder.appendChild(btn);
+    row.appendChild(btn);
   }
-  // Collect replaces Done as the roller's primary (§7.7): the roll's dice
-  // whisk to the shelf for everyone (server-validated; solo local) and the
-  // banner retires into the slot marker. Spectators keep a local-only ✕ —
-  // the dice stay until the roller collects (or clears) them.
-  if (entry.rollId) {
+  // Collect keeps the roll: its dice whisk to the shelf for everyone
+  // (server-validated; solo local) and the banner retires into the slot.
+  if (entry.rollId && mine) {
     const btn = document.createElement('button');
-    if (mine) {
-      // A hidden roll's Reveal keeps the primary slot; Collect steps back.
-      btn.className = hidden ? 'btn ghost banner-btn' : 'btn primary banner-btn';
-      btn.textContent = 'Collect';
-      btn.title = 'Collect this roll to the shelf for everyone';
-      btn.addEventListener('click', () => {
-        // No optimistic hide: online, the 'roll-collected' broadcast retires
-        // the banner (shelveRoll); solo applies synchronously. A failed POST
-        // keeps the banner — and its only Collect button — instead of
-        // stranding the dice on everyone's felt with no affordance left.
-        btn.disabled = true;
-        requestCollectRoll(entry.rollId).then((ok) => {
-          btn.disabled = false;
-          if (!ok) showSettingsNote('couldn’t collect the roll — try again');
-        });
+    btn.className = 'btn ghost banner-btn';
+    btn.textContent = 'Collect';
+    btn.title = 'Collect this roll to the shelf for everyone';
+    btn.addEventListener('click', () => {
+      // No optimistic hide: online, the 'roll-collected' broadcast retires
+      // the banner (shelveRoll); solo applies synchronously. A failed POST
+      // keeps the banner — and its only Collect button — instead of
+      // stranding the dice on everyone's felt with no affordance left.
+      btn.disabled = true;
+      requestCollectRoll(entry.rollId).then((ok) => {
+        btn.disabled = false;
+        if (!ok) showSettingsNote('couldn’t collect the roll — try again');
       });
-    } else {
-      btn.className = 'btn ghost banner-btn';
-      btn.textContent = '✕';
-      btn.title = 'Dismiss for you — the dice stay until the roller collects';
-      btn.addEventListener('click', () => banner.classList.add('hidden'));
-    }
-    holder.appendChild(btn);
+    });
+    row.appendChild(btn);
+  }
+  if (row.childElementCount) holder.appendChild(row);
 
-    // §7.7.2: the roller also gets a ✕ — clear the dice outright, no shelf.
-    // Same non-optimistic pattern as Collect: applyClearRoll (broadcast or
-    // solo-synchronous) hides the banner; a failed POST keeps it. .clear-x:
-    // the unified 'clear this roll' gesture (banner · verdict card · peek).
+  // The base ✕ (§7.7.2, unified with the peek's): the roller clears the
+  // dice outright for everyone — non-optimistic, a failed POST keeps the
+  // banner. A spectator's ✕ is the local dismiss it always was: the dice
+  // stay until the roller collects or clears them.
+  if (entry.rollId) {
+    const foot = document.createElement('div');
+    foot.className = 'pk-foot banner-foot';
+    const x = document.createElement('button');
+    x.className = 'clear-x banner-btn';
+    x.textContent = '✕';
     if (mine) {
-      const x = document.createElement('button');
-      x.className = 'btn ghost banner-btn clear-x';
-      x.textContent = '✕';
       x.title = 'Clear this roll for everyone';
       x.addEventListener('click', () => {
         x.disabled = true;
@@ -2009,8 +2013,12 @@ function renderBannerActions(entry) {
           if (!ok) showSettingsNote('couldn’t clear the roll — try again');
         });
       });
-      holder.appendChild(x);
+    } else {
+      x.title = 'Dismiss for you — the dice stay until the roller collects';
+      x.addEventListener('click', () => banner.classList.add('hidden'));
     }
+    foot.appendChild(x);
+    holder.appendChild(foot);
   }
 }
 

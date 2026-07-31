@@ -916,8 +916,8 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
 .shelf-marker {
   position: absolute;
   transform: translate(-50%, -50%);
-  width: 48px;
-  height: 48px;
+  width: 76px;
+  height: 76px;
   border-radius: 50%;
   background: none;
   border: none;
@@ -954,7 +954,7 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
 }
 .sm-reveal:hover { background: rgba(255, 214, 102, 0.16); }
 /* compact view: the invisible target shrinks with the reframed clusters */
-body.mini .shelf-marker { width: 36px; height: 36px; }
+body.mini .shelf-marker { width: 56px; height: 56px; }
 body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
 
 /* ---------- peek cards (§7.7.1) ---------- */
@@ -1053,9 +1053,13 @@ body.mini .pk-breakdown { font-size: 10px; }
 }
 .log-again:hover { color: var(--gold-bright); }
 
-/* banner action buttons (banner itself is pointer-events: none) */
-#banner-actions { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+/* banner action buttons (banner itself is pointer-events: none) — the same
+   skeleton as the peek card: a centered row of secondary actions over one
+   full-width clear-✕ at the base */
+#banner-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; margin-top: 8px; }
 #banner-actions:empty { display: none; }
+.banner-row { display: flex; gap: 8px; justify-content: center; }
+.banner-foot { margin-top: 0; }
 .banner-btn { pointer-events: auto; font-size: 13px; padding: 5px 16px; }
 
 /* ---------- offered-roll cards ---------- */
