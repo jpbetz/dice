@@ -177,24 +177,8 @@ function inradius2d(face) {
   return { center: c, r: best };
 }
 
-function assignUVs(geometry, faces) {
-  const pos = geometry.getAttribute('position');
-  const uvArr = new Float32Array(pos.count * 2);
-  geometry.clearGroups();
-  faces.forEach((face, fi) => {
-    for (const t of face.tris) {
-      for (let k = 0; k < 3; k++) {
-        const idx = t * 3 + k;
-        const uv = face.toUV(project2d(face, triVertex(pos, idx)));
-        uvArr[idx * 2] = uv.x;
-        uvArr[idx * 2 + 1] = uv.y;
-      }
-      geometry.addGroup(t * 3, 3, fi);
-    }
-  });
-  geometry.setAttribute('uv', new THREE.BufferAttribute(uvArr, 2));
-  geometry.computeVertexNormals();
-}
+// (UV assignment for the flat base mesh retired with the chamfer:
+// buildBeveledGeometry maps each face's uv itself.)
 
 // ---------------------------------------------------------------------------
 // Face textures
@@ -288,6 +272,112 @@ function makeFaceTexture(def, face, spec) {
 }
 
 // ---------------------------------------------------------------------------
+// Beveled render geometry (visual only)
+// ---------------------------------------------------------------------------
+//
+// A very slight chamfer softens the die edges on screen. RENDER ONLY: the
+// physics hull (buildShape) and value reading (readValue) still use the
+// exact base polyhedron, so every client's simulate-ahead fast-forward
+// stays byte-deterministic — the chamfer can never change how a die lands.
+// Each face polygon insets toward its centroid; flat edge bands and corner
+// fans stitch the gaps under one unmapped edge material (index
+// faces.length) whose darker tone reads as the painted face outline moving
+// onto real geometry. Resting height is untouched: the bottom face's inset
+// ring stays in the bottom face's plane (canonicalDiePose reads this mesh).
+const BEVEL = 0.055; // inset share of each corner's distance to its face centroid
+
+function buildBeveledGeometry(faces) {
+  const positions = [];
+  const uvs = [];
+  const triMats = [];
+  // Outward winding by construction check: these solids are convex around
+  // the origin, so a triangle's normal must point away from it.
+  const pushTri = (a, b, c, mat, uvA, uvB, uvC) => {
+    const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a));
+    const ctr = new THREE.Vector3().add(a).add(b).add(c).multiplyScalar(1 / 3);
+    let B = b, C = c, UB = uvB, UC = uvC;
+    if (n.dot(ctr) < 0) { B = c; C = b; UB = uvC; UC = uvB; }
+    positions.push(a.x, a.y, a.z, B.x, B.y, B.z, C.x, C.y, C.z);
+    for (const uv of [uvA, UB, UC]) uvs.push(uv ? uv.x : 0.5, uv ? uv.y : 0.5);
+    triMats.push(mat);
+  };
+
+  // One inset ring per face, index-aligned with face.boundary.
+  const rings = faces.map((f) => f.boundary.map(
+    (p) => f.centroid.clone().add(p.clone().sub(f.centroid).multiplyScalar(1 - BEVEL)),
+  ));
+
+  // Face surfaces: fan over the inset polygon, keeping the face's material
+  // and its uv mapping (the inset points are in-plane, so project2d holds).
+  faces.forEach((f, fi) => {
+    const ring = rings[fi];
+    const uvOf = (q) => f.toUV(project2d(f, q));
+    for (let i = 1; i < ring.length - 1; i++) {
+      pushTri(ring[0], ring[i], ring[i + 1], fi, uvOf(ring[0]), uvOf(ring[i]), uvOf(ring[i + 1]));
+    }
+  });
+
+  // Edge bands + corner fans. Vertices are EPS-deduped into indices so the
+  // two faces meeting at an edge (and the 3+ meeting at a corner) find each
+  // other exactly, whatever float noise the generators left.
+  const verts = [];
+  const indexOf = (p) => {
+    let i = verts.findIndex((q) => q.distanceTo(p) < EPS);
+    if (i === -1) { verts.push(p); i = verts.length - 1; }
+    return i;
+  };
+  const edgeMat = faces.length;
+  const edges = new Map();   // 'lo:hi' vertex-index pair -> inset edge per face
+  const corners = new Map(); // vertex index -> that corner's inset copies
+  faces.forEach((f, fi) => {
+    const ring = rings[fi];
+    f.boundary.forEach((p, i) => {
+      const a = indexOf(p);
+      const b = indexOf(f.boundary[(i + 1) % f.boundary.length]);
+      const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+      if (!edges.has(key)) edges.set(key, []);
+      edges.get(key).push({ qa: ring[i], qb: ring[(i + 1) % ring.length] });
+      if (!corners.has(a)) corners.set(a, []);
+      corners.get(a).push(ring[i]);
+    });
+  });
+  for (const pair of edges.values()) {
+    if (pair.length !== 2) continue; // watertight solids always pair up
+    const [e1, e2] = pair;
+    pushTri(e1.qa, e1.qb, e2.qb, edgeMat);
+    pushTri(e1.qa, e2.qb, e2.qa, edgeMat);
+  }
+  for (const [vi, copies] of corners) {
+    if (copies.length < 3) continue;
+    // Fan the corner's inset copies in angular order around the vertex ray
+    // (the tangents are ⊥ to it, so the raw dots are already offsets).
+    const dir = verts[vi].clone().normalize();
+    const seed = Math.abs(dir.x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+    const t1 = new THREE.Vector3().crossVectors(dir, seed).normalize();
+    const t2 = new THREE.Vector3().crossVectors(dir, t1);
+    const sorted = [...copies].sort((p, q) =>
+      Math.atan2(p.dot(t2), p.dot(t1)) - Math.atan2(q.dot(t2), q.dot(t1)));
+    for (let i = 1; i < sorted.length - 1; i++) {
+      pushTri(sorted[0], sorted[i], sorted[i + 1], edgeMat);
+    }
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geom.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  // consecutive same-material triangles collapse into one draw group
+  let start = 0;
+  for (let t = 1; t <= triMats.length; t++) {
+    if (t === triMats.length || triMats[t] !== triMats[start]) {
+      geom.addGroup(start * 3, (t - start) * 3, triMats[start]);
+      start = t;
+    }
+  }
+  geom.computeVertexNormals(); // non-indexed → flat facets, incl. the chamfer
+  return geom;
+}
+
+// ---------------------------------------------------------------------------
 // Physics hull
 // ---------------------------------------------------------------------------
 
@@ -342,9 +432,11 @@ function buildDie(type, variant = 'std') {
   const shroud = variant === 'shroud';
   // Shroud skin: same geometry, obsidian faces, no symbols.
   const skin = shroud ? { ...def, color: SHROUD_COLOR } : def;
-  const geometry = buildBaseGeometry(type);
-  const faces = extractFaces(geometry, type);
-  assignUVs(geometry, faces);
+  // The BASE polyhedron drives faces, values and the physics hull; the mesh
+  // the player sees is its beveled twin (render only — see buildBeveledGeometry).
+  const base = buildBaseGeometry(type);
+  const faces = extractFaces(base, type);
+  const geometry = buildBeveledGeometry(faces);
 
   let materials;
   let vertexValues = null;
@@ -373,6 +465,15 @@ function buildDie(type, variant = 'std') {
     );
     faces.forEach((f, i) => { f.value = specs[i].value; });
   }
+
+  // The chamfer band's own material: the same darker tone the face textures
+  // paint along their edges, so the bevel reads as that outline made real.
+  const edgeColor = new THREE.Color(skin.color).lerp(new THREE.Color('#000000'), 0.25);
+  materials.push(new THREE.MeshStandardMaterial({
+    color: edgeColor,
+    roughness: shroud ? 0.16 : 0.3,
+    metalness: shroud ? 0.5 : 0.1,
+  }));
 
   const shape = buildShape(faces);
   return { type, def, geometry, materials, shape, faces, vertexValues };
