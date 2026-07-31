@@ -4365,6 +4365,10 @@ function stageGroup(g) {
     // only when the pool is unnamed
     traySources.push(label || (res.spec.sources ? res.spec.sources[i] || null : null));
   }
+  // Render NOW: syncBoxFromTray→paintCmd only re-renders when the parsed
+  // box DIFFERS from the tray, and we just made them equal — without this
+  // the first stage painted nothing until the next one reordered things.
+  renderTray();
   syncBoxFromTray();
   if (dropped.length) {
     showSettingsNote(`${g.name || 'pool'}: ${dropped.join(' · ')} set aside — re-add via ±`);

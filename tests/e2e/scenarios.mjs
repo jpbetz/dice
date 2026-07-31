@@ -896,6 +896,12 @@ export const scenarios = [
       let ts = await a.dbg('trayState');
       assert.ok(ts.dice.length > 0, 'the tile poured its dice into the draft');
       assert.ok(ts.sources.some(Boolean), 'staged dice carry their source pool');
+      // the DOM, not just the state: the first stage must PAINT immediately
+      // (regression: paintCmd's diff skipped the render until a second stage)
+      assert.equal(await a.eval(`document.getElementById('tray-roll').classList.contains('hidden')`),
+        false, 'the cluster shows on the FIRST stage');
+      assert.ok(await a.eval(`document.querySelectorAll('#tray-roll .src-chip').length >= 1`),
+        'the source chip painted immediately');
       assert.equal(await a.logCount(), logBefore, 'staging never broadcasts a roll');
       assert.ok((await a.eval(`document.getElementById('cmd-input').value`)).includes('['),
         'the draft notation carries the source label');
