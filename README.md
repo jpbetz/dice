@@ -13,10 +13,11 @@ state anywhere.
   as true polyhedra (the d10 is a mathematically planar pentagonal
   trapezohedron) simulated with [cannon-es](https://github.com/pmndrs/cannon-es)
   and rendered with [three.js](https://github.com/mrdoob/three).
-- **Dice groups** — build a tray (e.g. 3d4, or 1d6 + 1d10), name it, save it,
-  and reroll it with one click.
-- **Groups in the URL** — saved groups are continuously mirrored into the URL
-  hash (`#g=<base64url>`). Bookmark the link and your groups are restored on
+- **Dice pools** — build a pool (e.g. 3d4, or 1d6 + 1d10), name it, save it,
+  and reroll it with one click. Saved pools edit in place: a pencil on the row
+  opens name + notation, and Update writes back to the same pool.
+- **Pools in the URL** — saved pools are continuously mirrored into the URL
+  hash (`#g=<base64url>`). Bookmark the link and your pools are restored on
   any machine, with zero server or account state.
 - **Shared tables** — run the bundled server and everyone in a room sees the
   same dice land on the same values, with per-player attribution, a live
@@ -25,11 +26,13 @@ state anywhere.
   outcome chart (Blemish, Mishap, Partial Success, Success & Bonus, Advantage,
   Critical Success, …). Critical Success and Critical Fail get full-screen
   effects.
-- **Mini mode** — collapses all chrome to a strip of group-roll pills, sized
-  for a small corner window during a video call. Small windows start in mini
-  mode automatically.
+- **Collapsible chrome** — four independent regions (Compose, Saved pools,
+  Players, Roll log), each collapsing to a small labelled edge tab, each
+  remembering its own state. Collapse them all (⤡, or `m`) and only the table
+  is left — sized for a corner window during a video call. Small windows start
+  collapsed. A persistent rail (identity · ⚙ · 🔊 · ❯) never hides.
 - Roll log with timestamps, per-die breakdowns, and max/min highlighting;
-  procedural impact sounds; solo mode persists groups and log in localStorage.
+  procedural impact sounds; solo mode persists pools and log in localStorage.
 
 ## Quick start
 
@@ -75,7 +78,8 @@ Layout:
 - `js/dice.js` — die geometry, face textures, physics hulls, value reading
 - `js/net.js` — join/SSE/reconnect client
 - `js/meanings.js` — the *Your Soul Deal* roll-meaning chart
-- `js/urlgroups.js` — groups ⇄ URL-hash codec
+- `js/urlgroups.js` — saved pools ⇄ URL-hash codec (the `#g=` spelling, and
+  the `group` identifiers behind it, are kept for link compatibility)
 
 For automated testing in hidden tabs (where `requestAnimationFrame` never
 fires), `window.__diceDebug` exposes `sim(frames)`, `playRoll(roll)` with
