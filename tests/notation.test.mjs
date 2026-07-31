@@ -183,10 +183,50 @@ t('negative labeled part', () => {
   assert.deepEqual(r.spec.mods.parts, [{ label: 'Bane', value: -2 }]);
   assert.equal(r.canonical, '1d20-2[Bane]');
 });
-t('label on a dice term is dropped with warning', () => {
+// Dice-term labels are SOURCE POOLS since the Pools Rack (2026-08-01):
+// 2d8[Wisdom] carries where the dice came from, aligned in spec.sources.
+t('a dice-term label is its source pool, not a bonus part', () => {
   const r = ok('2d6[fire]+1');
   assert.equal(r.spec.mods.parts ?? null, null);
-  assert.ok(r.warnings.some((w) => w.includes('dropped')));
+  assert.deepEqual(r.spec.sources, ['fire', 'fire']);
+  assert.equal(r.canonical, '2d6[fire]+1');
+});
+t('sources: the Rack composition round-trips as a fixed point', () => {
+  const c = '1d4+1d6[Swords]+2d8[Wisdom]';
+  const r = ok(c);
+  assert.deepEqual(r.spec.dice, ['d4', 'd6', 'd8', 'd8']);
+  assert.deepEqual(r.spec.sources, [null, 'Swords', 'Wisdom', 'Wisdom']);
+  assert.equal(r.canonical, c);
+  assert.equal(ok(r.canonical).canonical, c, 'canonical is its own fixed point');
+});
+t('sources: same source and type merge; different sources never do', () => {
+  assert.equal(ok('1d6[A]+1d6[A]').canonical, '2d6[A]');
+  const r = ok('1d6[A]+1d6[B]');
+  assert.equal(r.canonical, '1d6[A]+1d6[B]');
+  assert.deepEqual(r.spec.sources, ['A', 'B']);
+});
+t('sources: an unlabeled pool has NO sources key (wire-shape stability)', () => {
+  assert.equal('sources' in ok('2d6+1d8').spec, false);
+});
+t('sources: d100 keeps one label across both halves', () => {
+  const r = ok('d100[Luck]');
+  assert.deepEqual(r.spec.dice, ['d10x', 'd10']);
+  assert.deepEqual(r.spec.sources, ['Luck', 'Luck']);
+  assert.equal(r.canonical, 'd100[Luck]');
+});
+t('sources: the 2d20kh1 advantage collapse keeps the label', () => {
+  const r = ok('2d20[Fate]kh1');
+  assert.equal(r.spec.mods.adv, 'adv');
+  assert.deepEqual(r.spec.sources, ['Fate']);
+  assert.equal(r.canonical, '1d20[Fate] adv');
+});
+t('sources: pool-wide glue goes trailing when sources split one type', () => {
+  const r = ok('1d6[A]+1d6[B] dl1');
+  assert.equal(r.canonical, '1d6[A]+1d6[B] dl1');
+  assert.equal(ok(r.canonical).canonical, r.canonical);
+});
+t('sources: a doubled label on one term is refused', () => {
+  assert.equal(parseNotation('2d6[A][B]').ok, false);
 });
 t('parts satisfy rollspec.validateMods', () => {
   const r = ok('1d20+2[Proficiency]+1[Guidance]');

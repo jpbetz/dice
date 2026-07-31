@@ -35,7 +35,9 @@ limitations under the License.
 //               prefix; a prefix plus an AGREEING flag is fine, a prefix
 //               plus a different visibility flag is the exclusion error)
 //   expr     := term (("+"|"-") term)*
-//   term     := integer ["[" label "]"] | [count] dieType gluedMod*
+//   term     := integer ["[" label "]"] | [count] dieType ["[" label "]"] gluedMod*
+//               (a dice-term label is its SOURCE POOL — 2d8[Wisdom]; rides
+//               spec.sources aligned to spec.dice, Pools Rack step 2b)
 //   dieType  := d4 d6 d8 d10 d10x d12 d20 | d100 | d%   (d100/d% → d10x+d10)
 //   gluedMod := keep | reroll | "!"        (single-die-type pools only)
 //   keep     := (kh|kl|dh|dl|k|d) int      (bare k→kh, bare d→dl)
@@ -367,7 +369,7 @@ export function parseNotation(input, opts = {}) {
         if (count < 1 || count > MAX_COUNT) return invalid(`dice count must be 1-${MAX_COUNT}`);
         let typeRaw = m[2].toLowerCase();
         pos += m[0].length;
-        const term = { kind: 'dice', count, type: typeRaw === '%' ? 'd100' : 'd' + typeRaw, keep: null, reroll: null, explode: false, glued: false };
+        const term = { kind: 'dice', count, type: typeRaw === '%' ? 'd100' : 'd' + typeRaw, label: null, keep: null, reroll: null, explode: false, glued: false };
         // glued mods
         for (;;) {
           const g = rest();
@@ -390,7 +392,13 @@ export function parseNotation(input, opts = {}) {
             term.glued = true;
             pos += 1;
           } else if ((gm = /^\[([^\]]*)\]/.exec(g))) {
-            warnings.push('labels apply to bonuses, not dice — dropped');
+            // the dice term's SOURCE label (2d8[Wisdom]) — same normalization
+            // as bonus labels, so the canonical survives the #g= codec
+            if (term.label) return invalid('label specified twice on one term');
+            const rawLabel = stripCtl(gm[1]).trim();
+            const label = cutText(rawLabel, MAX_LABEL);
+            if (label !== rawLabel) warnings.push(`label truncated to ${MAX_LABEL} characters`);
+            term.label = label || null;
             pos += gm[0].length;
           } else {
             break;
@@ -639,7 +647,11 @@ export function parseNotation(input, opts = {}) {
   }
 
   const dice = [];
-  for (const t of diceTerms) for (let i = 0; i < t.count; i++) dice.push(t.type);
+  const sources = [];
+  for (const t of diceTerms) for (let i = 0; i < t.count; i++) {
+    dice.push(t.type);
+    sources.push(t.label || null);
+  }
   if (dice.length > MAX_DICE) return invalid(`too many dice (max ${MAX_DICE})`);
 
   // ---- integers -> modifier + attributed parts -----------------------------
@@ -691,6 +703,9 @@ export function parseNotation(input, opts = {}) {
   if (reroll) mods.reroll = reroll;
   if (explode) mods.explode = true;
   const spec = { dice, mods: Object.keys(mods).length ? mods : null };
+  // Source labels ride present-or-absent: an unlabeled pool has NO sources
+  // key, so every pre-Rack payload and canonical stays byte-identical.
+  if (sources.some(Boolean)) spec.sources = sources;
   // Visibility rides the spec, present-or-absent: an open roll has NO
   // visibility key (wire-shape stability), a non-open roll carries
   // {mode, names} with names always an array ([] outside whisper).
@@ -736,8 +751,23 @@ export function canonicalNotation(spec, extras = {}) {
   const counts = new Map();
   for (const t of spec.dice) counts.set(t, (counts.get(t) || 0) + 1);
 
+  // Dice group by (type, source label): '2d8[Wisdom]+1d8[Bob/Wisdom]' must
+  // not merge, while same-source same-type dice always do. Group insertion
+  // order breaks ties within a type so the canonical is a fixed point.
+  const groups = new Map();
+  spec.dice.forEach((t, i) => {
+    const label = spec.sources ? (spec.sources[i] || null) : null;
+    const k = `${t}\u0000${label || ''}`;
+    if (!groups.has(k)) groups.set(k, { type: t, label, n: 0, order: groups.size });
+    groups.get(k).n += 1;
+  });
+  const groupList = [...groups.values()].sort((a, b) =>
+    DIE_ORDER.indexOf(a.type) - DIE_ORDER.indexOf(b.type) || a.order - b.order);
+
   const singleType = counts.size === 1;
-  const isD100 = counts.size === 2 && counts.get('d10x') === 1 && counts.get('d10') === 1;
+  const sameLabel = groupList.every((g) => g.label === groupList[0].label);
+  const isD100 = counts.size === 2 && counts.get('d10x') === 1 && counts.get('d10') === 1
+    && sameLabel; // a split-source pair is two dice, not a d100
 
   const glue = [];
   if (m.keep) glue.push(m.keep.mode + m.keep.n);
@@ -751,13 +781,15 @@ export function canonicalNotation(spec, extras = {}) {
   const collapsible = singleType && counts.get('d20') === 2 && m.keep &&
     m.keep.n === 1 && (m.keep.mode === 'kh' || m.keep.mode === 'kl') &&
     !m.reroll && !m.explode;
-  const glueInline = singleType && !collapsible;
+  // glue may sit inline only on a pool that renders as ONE term: a single
+  // type split across sources becomes several terms, and pool-wide glue on
+  // each would re-parse as duplication.
+  const glueInline = singleType && groupList.length === 1 && !collapsible;
 
+  const lbl = (g) => (g.label ? `[${g.label}]` : '');
   const diceStrs = isD100
-    ? ['d100']
-    : DIE_ORDER.filter((t) => counts.has(t)).map(
-        (t) => counts.get(t) + t + (glueInline ? glue.join('') : '')
-      );
+    ? [`d100${lbl(groupList[0])}`]
+    : groupList.map((g) => g.n + g.type + lbl(g) + (glueInline ? glue.join('') : ''));
 
   const intStrs = [];
   if (m.parts) {
