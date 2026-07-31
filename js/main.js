@@ -1212,6 +1212,7 @@ function renderPeek() {
       requestClearRoll(c.rollId);
       requestRoll([...entry.spec.dice], entry.label, {
         mods: entry.spec.mods || undefined,
+        sources: entry.spec.sources || undefined, // 2b-⑤: attribution rides the reroll
         faceDown: entry.faceDown,
         visibility: entryVis(entry) || undefined, // the privacy rides along
         dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
@@ -1635,10 +1636,12 @@ function rollDice(types, label, opts = {}) {
   // everything this session still has on the felt (evictions sink first).
   soloAutoCollect();
   const composed = composeRoll(types, opts.mods || null, Math.random);
+  const spec = { dice: [...types], mods: opts.mods || null };
+  if (opts.sources) spec.sources = [...opts.sources]; // 2b-⑤ attribution
   playRoll({
     ...composed,
     rollId: `solo-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
-    spec: { dice: [...types], mods: opts.mods || null },
+    spec,
     dc: Number.isInteger(opts.dc) ? opts.dc : null,
     exp: opts.exp || null,
     faceDown: !!opts.faceDown,
@@ -1814,6 +1817,40 @@ function tallyOutcomes(outcomes) {
   return [...counts.values()];
 }
 
+// Per-die SOURCE pools (ROADMAP 2b-⑤), derived render-side from the
+// entry's own notation — the wire stays untouched; the notation IS the
+// attribution. spec.sources aligns to the BASE dice (parts[0..n-1] are the
+// spec's dice in order); extras — advantage partners, rerolls, explosion
+// children — chase their part's `origin` back to a base die, so a reroll
+// of a Wisdom die still answers to Wisdom.
+const entrySourcesMemo = new WeakMap();
+function entrySources(entry) {
+  if (!entry) return null;
+  // The spec is the wire's own copy (server parseNotationSpec keeps it,
+  // solo rollDice stores it); parsing entry.notation is the fallback for
+  // entries that only carry the string.
+  const s = entry.spec && Array.isArray(entry.spec.sources) ? entry.spec.sources : null;
+  if (s && s.some(Boolean)) return s;
+  if (typeof entry.notation !== 'string') return null;
+  if (entrySourcesMemo.has(entry)) return entrySourcesMemo.get(entry);
+  const res = parseNotation(entry.notation);
+  const out = res.ok && res.spec.sources ? res.spec.sources : null;
+  entrySourcesMemo.set(entry, out);
+  return out;
+}
+function partSource(entry, i) {
+  const src = entrySources(entry);
+  if (!src) return null;
+  let idx = i;
+  for (let hops = 0; idx != null && idx >= src.length && hops < 8; hops++) {
+    const p = entry.parts[idx];
+    const origin = p && p.origin != null && p.origin !== idx ? p.origin : null;
+    if (origin === null) return null;
+    idx = origin;
+  }
+  return idx != null && idx < src.length ? src[idx] || null : null;
+}
+
 function entryCrit(entry) {
   if (entryHidden(entry)) return null;
   return activeSystem().critFor(entry);
@@ -1853,7 +1890,7 @@ function entryFromRoll(roll) {
     if (!hasValues) {
       return {
         type, label: '?', value: null, isMax: false, isMin: false,
-        counts: true, reason: null, child: false,
+        counts: true, reason: null, child: false, origin: null,
       };
     }
     const value = roll.values[i];
@@ -1869,6 +1906,10 @@ function entryFromRoll(roll) {
       counts: pd.counts,
       reason: pd.reason || null,
       child: pd.childOf !== null && pd.childOf !== undefined,
+      // provenance (2b-⑤): the base die this extra descends from — an
+      // advantage partner, a reroll replacement, or an explosion child
+      origin: [pd.pairOf, pd.rerollOf, pd.childOf]
+        .find((x) => x !== null && x !== undefined) ?? null,
     };
   });
   const modifier = roll.modifier || 0;
@@ -1952,9 +1993,12 @@ function renderChips(entry, dice, staged = false) {
     if (p.child) cls += ' exploded';
     if (staged) cls += ' staged';
     const o = oMap.get(i);
+    const src = hidden ? null : partSource(entry, i);
     if (o && o.word && !hidden) {
       cls += ` chip-${o.tier}`;
-      el.title = o.word;
+      el.title = src ? `${src} \u2014 ${o.word}` : o.word;
+    } else if (src) {
+      el.title = src; // sum systems: the chip still says which pool it serves
     }
     el.className = cls;
     el.style.setProperty('--die-color', DIE_DEFS[p.type].color);
@@ -1982,15 +2026,44 @@ function renderBreakdown(el, entry, hidden) {
   const mods = modPartsOf(entry) || (entry.modifier ? [{ label: '', value: entry.modifier }] : []);
   if (entry.parts.length <= 1 && !mods.length) return;
 
-  entry.parts.forEach((p, i) => {
-    if (i) el.append(' + ');
+  const partSpan = (p) => {
     const s = document.createElement('span');
     let cls = p.counts && p.isMax ? 'crit-max' : p.counts && p.isMin ? 'crit-min' : '';
     if (!p.counts) cls += ' log-discarded';
     s.className = cls.trim();
     s.textContent = `${p.child ? '✴' : ''}${p.type} ${p.label}`;
-    el.appendChild(s);
-  });
+    return s;
+  };
+  // Source-grouped read (2b-⑤): 'WISDOM d8 7 + d8 2 · SWORDS d6 4' — each
+  // pool's dice cluster under its label; unsourced dice stand plain.
+  const sourced = entrySources(entry);
+  if (sourced) {
+    const order = [];
+    const byKey = new Map();
+    entry.parts.forEach((p, i) => {
+      const k = partSource(entry, i) || '';
+      if (!byKey.has(k)) { byKey.set(k, []); order.push(k); }
+      byKey.get(k).push(p);
+    });
+    order.forEach((k, gi) => {
+      if (gi) el.append('  \u00b7  ');
+      if (k) {
+        const l = document.createElement('span');
+        l.className = 'log-part-label';
+        l.textContent = `${k} `;
+        el.appendChild(l);
+      }
+      byKey.get(k).forEach((p, j) => {
+        if (j) el.append(' + ');
+        el.appendChild(partSpan(p));
+      });
+    });
+  } else {
+    entry.parts.forEach((p, i) => {
+      if (i) el.append(' + ');
+      el.appendChild(partSpan(p));
+    });
+  }
 
   if (!mods.length) return;
   el.append(`  =  ${entry.sum}`);
@@ -2020,18 +2093,50 @@ function renderTally(el, entry) {
   el.textContent = '';
   const outcomes = entryOutcomes(entry);
   if (!outcomes) return false;
-  const tally = tallyOutcomes(outcomes);
-  if (!tally.length) {
+  if (!tallyOutcomes(outcomes).length) {
     el.textContent = 'a quiet roll'; // every die landed a null cell
     el.className = el.className.replace(/tier-\S+/g, '').trim();
     return true;
   }
-  tally.forEach((t, i) => {
-    if (i) el.append(' · ');
-    const s = document.createElement('span');
-    s.className = `tier-${t.tier}`;
-    s.textContent = t.n > 1 ? `${t.n}× ${t.word}` : t.word;
-    el.appendChild(s);
+  // Source-grouped read (2b-⑤): 'WISDOM Success · SWORDS 2× Fail' — each
+  // pool answers separately; a pool whose dice all landed null cells says
+  // 'quiet' rather than vanishing (its answer IS the silence).
+  const groups = [];
+  if (entrySources(entry)) {
+    const byKey = new Map();
+    for (const o of outcomes) {
+      const k = partSource(entry, o.dieIndex) || '';
+      if (!byKey.has(k)) { byKey.set(k, { label: k, os: [] }); groups.push(byKey.get(k)); }
+      byKey.get(k).os.push(o);
+    }
+  } else {
+    groups.push({ label: '', os: outcomes });
+  }
+  groups.forEach((g) => {
+    const gEl = document.createElement('span');
+    gEl.className = 'tally-group';
+    if (g.label) {
+      const l = document.createElement('span');
+      l.className = 'tally-src';
+      l.textContent = g.label;
+      gEl.appendChild(l);
+    }
+    const tally = tallyOutcomes(g.os);
+    if (!tally.length) {
+      const q = document.createElement('span');
+      q.className = 'tally-quiet';
+      q.textContent = 'quiet';
+      gEl.appendChild(q);
+    } else {
+      tally.forEach((t, i) => {
+        if (i) gEl.append(' · ');
+        const s = document.createElement('span');
+        s.className = `tier-${t.tier}`;
+        s.textContent = t.n > 1 ? `${t.n}× ${t.word}` : t.word;
+        gEl.appendChild(s);
+      });
+    }
+    el.appendChild(gEl);
   });
   return true;
 }
@@ -2128,6 +2233,7 @@ function renderBannerActions(entry) {
     btn.addEventListener('click', () =>
       requestRoll([...entry.spec.dice], entry.label, {
         mods: entry.spec.mods || undefined,
+        sources: entry.spec.sources || undefined, // 2b-⑤: attribution rides the reroll
         faceDown: entry.faceDown,
         visibility: entryVis(entry) || undefined, // a secret reroll stays secret
         dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
@@ -3733,13 +3839,16 @@ function rollDraft() {
       notation: intent.notation,
       canonical: intent.canonical,
       mods: cmdResult.spec.mods || undefined,
+      sources: cmdResult.spec.sources || undefined, // 2b-⑤ (solo keeps them too)
       faceDown: cmdResult.faceDown,
       visibility: visOfParse(cmdResult) || undefined,
       dc: cmdResult.dc ?? undefined,
       exp: intent.exp || undefined,
     });
   } else if (tray.length) {
-    requestRoll([...tray], formula(tray));
+    requestRoll([...tray], formula(tray), {
+      sources: traySources.some(Boolean) ? [...traySources] : undefined,
+    });
   }
 }
 trayRollBtn.addEventListener('click', rollDraft);
@@ -3995,6 +4104,7 @@ function commandRoll(input) {
     notation: intent.notation,
     canonical: intent.canonical,
     mods: res.spec.mods || undefined,
+    sources: res.spec.sources || undefined, // 2b-⑤ (solo keeps them too)
     faceDown: res.faceDown, // 'held' and the /gmroll family both land here
     visibility: visOfParse(res) || undefined, // secret / w: (goal 11)
     dc: res.dc ?? undefined,
@@ -5351,6 +5461,7 @@ popRollBtn.addEventListener('click', () => {
   if (replacing) requestClearRoll(replacing);
   requestRoll(spec.dice, pop.comment || pop.name, {
     mods: spec.mods || undefined,
+    sources: spec.sources || undefined, // 2b-⑤
     faceDown: pop.vis.mode === 'held',
     visibility: popVis(), // secret/whisper ride the canonical (requestRoll)
     dc: pop.dc ?? undefined,
@@ -5502,14 +5613,25 @@ function renderLog() {
     }
     const detail = hidden
       ? `<span class="log-hidden">${entry.visMode === 'whisper' ? 'whispered' : 'face down'}</span>`
-      : entry.parts
-          .map((p) => {
+      : (() => {
+          const partHtml = (p) => {
             let cls = p.isMax && p.counts ? 'crit-max' : p.isMin && p.counts ? 'crit-min' : '';
             if (!p.counts) cls += ' log-discarded';
             const star = p.child ? '✴' : '';
             return `<span class="${cls.trim()}">${star}${p.type}&thinsp;${p.label}</span>`;
-          })
-          .join(' + ') + modHtml;
+          };
+          if (!entrySources(entry)) return entry.parts.map(partHtml).join(' + ') + modHtml;
+          // source-grouped, same shape as the banner breakdown (2b-⑤)
+          const order = [];
+          const byKey = new Map();
+          entry.parts.forEach((p, i) => {
+            const k = partSource(entry, i) || '';
+            if (!byKey.has(k)) { byKey.set(k, []); order.push(k); }
+            byKey.get(k).push(p);
+          });
+          return order.map((k) => (k ? `<span class="log-part-label">${escapeHtml(k)}</span> ` : '')
+            + byKey.get(k).map(partHtml).join(' + ')).join('  \u00b7  ') + modHtml;
+        })();
     // interim dc verdict (fixed decision): "vs N ✓/✗". Stakes stay public on
     // a hidden roll (goal 11): the target shows, the ✓/✗ waits for the reveal.
     const verdictHtml = !Number.isInteger(entry.dc) || !activeSystem().usesTotal
@@ -5554,6 +5676,7 @@ function renderLog() {
       again.addEventListener('click', () =>
         requestRoll([...entry.spec.dice], entry.label, {
           mods: entry.spec.mods || undefined,
+          sources: entry.spec.sources || undefined, // 2b-⑤: attribution rides the reroll
           faceDown: entry.faceDown,
           visibility: entryVis(entry) || undefined, // …and the privacy
           dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
@@ -6210,6 +6333,7 @@ function rerollLast() {
   if (!canReroll(entry)) return;
   requestRoll([...entry.spec.dice], entry.label, {
     mods: entry.spec.mods || undefined,
+    sources: entry.spec.sources || undefined, // 2b-⑤: attribution rides the reroll
     faceDown: entry.faceDown,
     visibility: entryVis(entry) || undefined, // …and the privacy
     dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
@@ -6919,7 +7043,7 @@ function requestRoll(types, label, opts = {}) {
   if (!types.length) return;
   const vis = normVis(opts.visibility, opts.faceDown);
   const canonical = opts.canonical || canonicalWithVis(
-    { dice: types, mods: opts.mods || null },
+    { dice: types, mods: opts.mods || null, sources: opts.sources || undefined },
     {
       dc: Number.isInteger(opts.dc) ? opts.dc : null,
       comment: typeof opts.comment === 'string' ? opts.comment : null,
@@ -6936,7 +7060,11 @@ function requestRoll(types, label, opts = {}) {
     // the notation string and the server re-parses it. Paths that arrive here
     // with no string of their own (popover, reroll-last) get the canonical.
     // held keeps today's faceDown field on the explicit shape.
-    if (vis && vis.mode !== 'held' && !wireOpts.notation) wireOpts.notation = canonical;
+    if (!wireOpts.notation && ((vis && vis.mode !== 'held') || opts.sources)) {
+      // sources have no explicit wire field either — attribution rides the
+      // notation string, same single-carrier rule as visibility (2b-⑤)
+      wireOpts.notation = canonical;
+    }
     // animation waits for the SSE event
     net.roll(types, label, wireOpts).then((roll) => { if (roll) pushHistory(canonical); });
   } else {

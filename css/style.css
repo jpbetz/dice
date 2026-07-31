@@ -1257,6 +1257,17 @@ html, body {
   min-height: 0;
 }
 #result-meaning:empty { display: none; }
+/* source-grouped tallies (2b-⑤): each pool answers under its own small-caps
+   label; groups separate by space, not punctuation */
+.tally-group + .tally-group { margin-left: 12px; }
+.tally-src {
+  margin-right: 5px;
+  font-size: 0.78em;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.tally-quiet { color: var(--muted); }
 .tier-crit-success { color: #ffe27a; text-shadow: 0 0 18px rgba(255,215,102,0.7); }
 .tier-success { color: var(--gold-bright); }
 .tier-success-soft { color: #cdbe8a; }

@@ -1400,6 +1400,23 @@ real dice sit right below the card), its ± opens the SAME anchored popover
 as every ± (the peek pins while it lives; rolling a tweak REPLACES the
 shelved roll), and its Save mints 'keep this roll as a pool'.
 
+**The Rack across the table (2b-④⑤, 2026-07-31).** Racks PUBLISH: every
+player's saved pools ride the roster (name + notation + category — a
+display copy; localStorage stays each owner's truth). The Pools panel
+grows an owner-switcher row of quiet chips (You first) whenever the table
+has teammates; a teammate's rack stands behind a standing
+`ALICE'S POOLS · READ-ONLY` banner-chip that is also the way back. Foreign
+tiles are STAGE-ONLY — no ±, no manage, no ordinals; staging snapshots
+name+notation at stage time, so a later edit repaints tiles but never a
+staged chip. Digits always act on YOUR rack; entering ✎ falls home first.
+And results answer PER POOL: the breakdown, the outcome tally and the log
+line group under small-caps source labels (`WISDOM d8 7 + d8 2 · SWORDS
+d6 4`), chips carry `Pool — Word` titles, extras (advantage partners,
+rerolls, explosion children) chase their provenance back to a base die,
+and a pool whose dice all landed null cells answers `quiet` — its answer
+IS the silence. Attribution rides `spec.sources`/the notation string
+(single carrier, like visibility); redaction drops it with the spec.
+
 **The tier rule (P6, the binding sharpening).** Treatments bind CONTROL
 TIERS, not screens: content stands (dice, names, totals); roll-adjacent
 controls reveal on approach (±, per-die ✕, log ⟳, the ROLL cue, 1-9

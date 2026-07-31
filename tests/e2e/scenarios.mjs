@@ -404,6 +404,45 @@ export const scenarios = [
     },
   },
   {
+    name: 'source-read',
+    tags: ['smoke', 'meanings', 'groups'],
+    // 2b-⑤: results answer per POOL. The notation carries the attribution
+    // (`2d8[Wisdom]`); breakdown, tally and log group by those labels, and
+    // the grouping survives a lens switch — it is attribution, not
+    // interpretation.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.roll('2d8[Wisdom]+1d4[Zeal]+1d6 # Hunt');
+
+      // banner breakdown: one small-caps label per pool, unsourced dice plain
+      const bdLabels = await a.eval(
+        `[...document.querySelectorAll('#result-breakdown .log-part-label')].map((el) => el.textContent.trim())`);
+      assert.deepEqual(bdLabels, ['Wisdom', 'Zeal'], `breakdown grouped by pool (got: ${bdLabels})`);
+
+      // the hero tally answers per pool (soul-deal is the default lens)
+      const tallySrcs = await a.eval(
+        `[...document.querySelectorAll('#result-meaning .tally-src')].map((el) => el.textContent)`);
+      assert.deepEqual(tallySrcs, ['Wisdom', 'Zeal'], `tally grouped by pool (got: ${tallySrcs})`);
+      assert.equal(await a.eval(
+        `document.querySelectorAll('#result-meaning .tally-group').length`), 3,
+        'the unsourced d6 answers in its own plain group');
+
+      // the log line reads the same way
+      const logLabels = await a.eval(
+        `[...document.querySelectorAll('#log-list .log-detail .log-part-label')].map((el) => el.textContent)`);
+      assert.deepEqual(logLabels, ['Wisdom', 'Zeal'], `log grouped by pool (got: ${logLabels})`);
+
+      // a lens switch keeps the grouping and returns the total
+      await a.dbg(`setSystem('dnd')`);
+      await a.waitFor(`document.getElementById('result-total').textContent.trim().length > 0`,
+        { desc: 'total returns under dnd' });
+      const dndLabels = await a.eval(
+        `[...document.querySelectorAll('#result-breakdown .log-part-label')].map((el) => el.textContent.trim())`);
+      assert.deepEqual(dndLabels, ['Wisdom', 'Zeal'], 'attribution survives the sum world');
+      await a.dbg(`setSystem('soul-deal')`);
+    },
+  },
+  {
     name: 'notation-wiring',
     tags: ['notation'],
     // The browser-side notation path (grammar itself is unit-tested): a valid

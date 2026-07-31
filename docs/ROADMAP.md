@@ -89,7 +89,15 @@ system:
   chip line + dots-only switcher + sticky headers (720x480 e2e).
   Build order: ① dice-term attribution → ② categories+codec v3 →
   ③ staging inversion + keyboard → ④ pool publishing + switcher →
-  ⑤ source-grouped results.
+  ⑤ source-grouped results. **All five shipped 2026-07-31** (`7740f30`,
+  `d092e84`, `4d1b67a` + the source-read commit): racks publish via
+  `/api/pools` ('pools-changed', display copy — localStorage stays owner
+  truth), and attribution rides `spec.sources` on the wire (present-or-
+  absent; redaction drops spec wholesale, so hidden rolls stay hidden).
+  Breakdown, tally and log group per pool; rerolls keep their labels
+  (sources join the canonical and ride the notation shape — the same
+  single-carrier rule as visibility). Still open from the critique:
+  the 720×480 small-window e2e pass.
 
 ## Tier 2 — Organization (goal 5, the audit's biggest experience gap)
 

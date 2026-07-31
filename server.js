@@ -753,6 +753,9 @@ function parseNotationSpec(value, explicitExp = null, offer = false) {
   // `exp: null` key, or a Plain payload stops being byte-identical to what it
   // was before experiences existed.
   if (notationExp.exp) spec.exp = notationExp.exp;
+  // Dice-term attribution (2b-⑤): pool labels ride the spec so the logged
+  // entry answers per pool. Present-or-absent, like exp.
+  if (parsed.spec.sources) spec.sources = parsed.spec.sources;
   // Parse-level visibility ({mode, names}) — present only on non-open rolls,
   // for the same byte-stability reason as exp. The handler resolves names
   // against the room roster (resolveVisibility) before the spec reaches
@@ -1055,6 +1058,9 @@ function executeRoll(room, player, spec) {
     roll.exp = spec.exp;
     roll.spec.exp = spec.exp;
   }
+  // Attribution (2b-⑤): the labels ride spec too, so reroll-last and the
+  // source-grouped result surfaces survive the wire. Present-or-absent.
+  if (spec.sources) roll.spec.sources = [...spec.sources];
   // Same present-or-absent rule as exp: only a non-open roll carries
   // `visibility`. By here it must be the RESOLVED room-level form — the
   // handlers run resolveVisibility first — and failing loudly on an
