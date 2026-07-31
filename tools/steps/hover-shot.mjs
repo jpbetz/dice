@@ -19,10 +19,11 @@ limitations under the License.
 // tools/out/. For judging hover-revealed chrome (ROLL cue, tier-rule
 // controls) that a static shot can never show.
 //
-//   node tools/drive.mjs tools/steps/hover-shot.mjs ['<selector>'] [out.png]
+//   node tools/drive.mjs tools/steps/hover-shot.mjs ['<selector>'] [out.png] ['<notation to roll first>']
 
-export default async function run(stage, [selector = '#groups-list .pool-roll', out = 'hover.png']) {
+export default async function run(stage, [selector = '#groups-list .pool-roll', out = 'hover.png', roll = null]) {
   const a = await stage.tab('localhost', 'Hover');
+  if (roll) await a.roll(roll); // surfaces like the banner only exist post-roll
   await a.dbg('sim(60)');
   // Pin the viewport BEFORE measuring — the screenshot call would otherwise
   // re-lay-out after the rect was taken.
