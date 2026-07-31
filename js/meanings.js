@@ -15,12 +15,9 @@ limitations under the License.
 */
 
 // Roll-meaning chart from "Your Soul Deal" (Walter Fender) — the main Dice
-// table. Each column is a die rank (Mug/Slave d4 ... Bóaire/Cattle Lord d20);
-// the row is the roll result. For multi-die rolls the app sums the dice first,
-// then reads the smallest column whose range can hold the pool's maximum
-// possible total (3d4 → max 12 → D12 column; totals above 20 clamp into D20).
-// Percentile dice (d10x) are not part of the chart, so pools containing one
-// have no meaning.
+// table. Each column is a DIE rank (Mug/Slave d4 ... Bóaire/Cattle Lord d20)
+// and each die reads its OWN face against its own column: values never sum
+// (author-confirmed 2026-07-31). Percentile dice (d10x) have no column.
 
 // null = the doc's "-" cells: no particular meaning.
 const CHART = {
@@ -51,7 +48,6 @@ const CHART = {
 };
 
 const DIE_MAX = { d4: 4, d6: 6, d8: 8, d10: 10, d10x: 90, d12: 12, d20: 20 };
-const COLUMNS = [4, 6, 8, 10, 12, 20];
 
 // Tier drives styling: which words are celebrations vs. failures.
 const TIERS = {
@@ -69,30 +65,19 @@ const TIERS = {
   'Critical Success': 'crit-success',
 };
 
-// meaningFor(['d4','d4','d4'], 9) -> {word, tier, column, rank} or null when
-// the pool has no chart meaning (contains a d10x, or the total's cell is "-").
-//
-// diceSum (the counting dice's face sum, no modifiers) guards the chart's
-// crit rows: they are NATURAL rows. A +3 can carry a 2d6 TOTAL past the
-// column top, but the perfect/disaster words belong to dice that actually
-// landed there (GOALS: attributed math — the fanfare must match the dice).
-// When the clamped row is a crit row and the dice were not natural
-// max/min, step one row toward the middle: a great roll, not a perfect one.
-// Callers without per-die knowledge omit diceSum and keep the raw read.
-export function meaningFor(diceTypes, total, diceSum = null) {
-  if (!diceTypes.length || diceTypes.some((t) => t === 'd10x')) return null;
-  const poolMax = diceTypes.reduce((s, t) => s + DIE_MAX[t], 0);
-  const poolMin = diceTypes.length; // every chart die floors at 1
-  const column = COLUMNS.find((c) => c >= poolMax) ?? 20;
-  const { rank, rows } = CHART[column];
-  let row = Math.min(Math.max(total, 1), column);
-  if (diceSum !== null) {
-    while (row > 1 && TIERS[rows[row - 1]] === 'crit-success' && diceSum < poolMax) row--;
-    while (row < column && TIERS[rows[row - 1]] === 'crit-fail' && diceSum > poolMin) row++;
-  }
-  const word = rows[row - 1];
+// THE SOUL DEAL READ (corrected 2026-07-31, from the system's author):
+// dice values never sum. Each die is read INDIVIDUALLY — the chart's rank
+// columns (Mug ... Boaire) are DIE ranks, so a d4's face reads the d4
+// column and a d20's the d20 column. A 2d4 roll of [1, 4] is one Blemish
+// and one Minor Success: N dice, N outcomes. A null cell is a QUIET die —
+// it lands without a word. Percentile dice (d10x) have no rank column and
+// stay quiet too.
+export function outcomeForDie(type, value) {
+  const column = DIE_MAX[type];
+  if (!CHART[column]) return null; // d10x (and anything rankless)
+  const word = CHART[column].rows[value - 1] || null;
   if (!word) return null;
-  return { word, tier: TIERS[word], column: `d${column}`, rank };
+  return { word, tier: TIERS[word], rank: CHART[column].rank, column: `d${column}` };
 }
 
 // ---------------------------------------------------------------------------
@@ -101,48 +86,55 @@ export function meaningFor(diceTypes, total, diceSum = null) {
 // numbers. Interpretation is a render-time lens: entries and log lines store
 // raw facts only (parts, per-die metadata, totals, dc); meaning words and
 // crit fanfare are computed from the ACTIVE profile at paint time, so
-// switching systems re-reads a log the table already has. DC verdicts are
-// goal-4 arithmetic, not interpretation — they render under every profile,
-// as does per-die max/min chip styling (a per-die fact).
+// switching systems re-reads a log the table already has. DC verdicts and
+// the big total render only under profiles that declare usesTotal — under
+// a per-die system a sum is not a fact of play. Per-die max/min chip
+// styling stays universal (a per-die fact).
 //
-// A profile provides:
-//   id, label                 registry key + the settings-modal picker label
-//   meaningFor(types, total)  -> {word, tier, column, rank} | null
-//                             the chart line (null = no line in this system)
-//   critFor(entry)            -> 'success' | 'fail' | null
-//                             drives crit fanfare + banner/ceremony classes
-//
-// critFor sees a display entry; it reads entry.total and entry.parts:
-// [{type, value, counts, child}]. Discarded dice (counts=false — advantage's
-// struck die, drops, reroll originals) and explosion children never decide a
-// crit.
-
-const countingTypes = (entry) =>
-  entry.parts.filter((p) => p.counts && !p.child).map((p) => p.type);
-
+// Profile interface v2 (ROADMAP step 2): a profile declares its READ.
+//   aggregate   'per-die' | 'sum' — how a roll's dice become outcomes
+//   usesTotal   gates the big total, DC verdicts and margin lines
+//   usesMods    gates modifier emphasis; false = the ± popover notes that
+//               modifiers/targets do not change outcomes under this system
+//               (they stay rollable — notation totality is app-wide)
+//   outcomesFor(entry) -> [{dieIndex, type, value, word, tier}] for per-die
+//               systems (quiet dice carry word/tier null), else null
+//   meaningFor  the sum-world hero word (per-die systems return null)
+//   critFor(entry) -> 'success' | 'fail' | null
 export const SYSTEMS = {
   'soul-deal': {
     id: 'soul-deal',
     label: 'Your Soul Deal',
-    meaningFor,
+    aggregate: 'per-die',
+    usesTotal: false,
+    usesMods: false,
+    meaningFor: () => null,
+    outcomesFor(entry) {
+      if (!entry || !Array.isArray(entry.parts)) return null;
+      const out = [];
+      entry.parts.forEach((p, i) => {
+        if (!p.counts || p.child || typeof p.value !== 'number') return;
+        const o = outcomeForDie(p.type, p.value);
+        out.push({ dieIndex: i, type: p.type, value: p.value,
+          word: o ? o.word : null, tier: o ? o.tier : null });
+      });
+      return out.length ? out : null;
+    },
     critFor(entry) {
-      // The dice-only sum rides along so the chart's crit rows stay NATURAL
-      // (see meaningFor): 2d6+3 totaling 13 is a fine roll, never a crit.
-      const counting = entry.parts.filter((p) => p.counts && !p.child);
-      const diceSum = counting.length && counting.every((p) => typeof p.value === 'number')
-        ? counting.reduce((s, p) => s + p.value, 0)
-        : null;
-      const m = meaningFor(countingTypes(entry), entry.total, diceSum);
-      if (!m) return null;
-      return m.tier === 'crit-success' ? 'success'
-        : m.tier === 'crit-fail' ? 'fail'
-        : null;
+      const os = this.outcomesFor(entry) || [];
+      if (os.some((o) => o.tier === 'crit-success')) return 'success';
+      if (os.some((o) => o.tier === 'crit-fail')) return 'fail';
+      return null;
     },
   },
   dnd: {
     id: 'dnd',
     label: 'D&D style',
+    aggregate: 'sum',
+    usesTotal: true,
+    usesMods: true,
     meaningFor: () => null,
+    outcomesFor: () => null,
     // Natural-20/1 rule, read off the d20s that actually count: with
     // advantage the discarded die never triggers (counts is false on it),
     // and a natural 20 outranks a natural 1 when one pool lands both.
@@ -156,7 +148,11 @@ export const SYSTEMS = {
   none: {
     id: 'none',
     label: 'Numbers only',
+    aggregate: 'sum',
+    usesTotal: true,
+    usesMods: true,
     meaningFor: () => null,
+    outcomesFor: () => null,
     critFor: () => null,
   },
 };

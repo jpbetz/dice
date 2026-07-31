@@ -84,6 +84,10 @@ export const scenarios = [
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      // Totals are sum-world machinery; the default system reads per-die
+      // (Soul Deal). Pin the totals contract under a totals system.
+      await a.dbg(`setSystem('dnd')`);
+      await b.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'system syncs' });
       await a.roll('d20+1');
       await b.settle();
       const rid = await a.rollId();
@@ -176,6 +180,7 @@ export const scenarios = [
     // (command box + popover) for an ad-hoc tweak, dc/mods/comment intact.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setSystem('dnd')`); // dc verdicts are totals-world (solo: applies instantly)
       await a.roll('2d6+3 dc9');
       const rid = await a.rollId();
       await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
@@ -282,6 +287,7 @@ export const scenarios = [
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       assert.equal(await a.dbg('chipsVisible'), false, 'chips default off');
+      await a.dbg(`setSystem('dnd')`); // totals-world: this pins numeric readability sans chips
       await a.roll('2d6+1');
       assert.equal(await a.dbg('chipCount'), 0, 'no chip records');
       assert.deepEqual(await a.chips(), [], 'no chip DOM either');
@@ -370,6 +376,34 @@ export const scenarios = [
     },
   },
   {
+    name: 'per-die-read',
+    tags: ['smoke', 'meanings'],
+    // THE SOUL DEAL READ (author-confirmed): dice never sum. Under the
+    // default system a roll shows per-die outcome words and NO total or DC
+    // verdict; switching the room to a totals system re-reads the same log
+    // (interpretation is a render-time lens).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.roll('2d4');
+      assert.equal(await a.eval(`getComputedStyle(document.getElementById('result-total')).display`),
+        'none', 'no big total under a per-die system');
+      assert.ok((await a.eval(`document.getElementById('result-meaning').textContent`)).length > 0,
+        'the outcome tally (or a quiet roll) takes the hero slot');
+      assert.equal(await a.eval(`document.querySelector('#log-list .log-total').textContent.trim()`),
+        '', 'the log carries no total either');
+
+      // DC is totals-world: it never renders under the per-die read.
+      await a.roll('d20 dc15');
+      assert.ok(!(await a.logTop()).includes('vs 15'), 'no DC verdict under per-die');
+
+      // The lens re-reads in place: switch to a totals system, numbers return.
+      await a.dbg(`setSystem('dnd')`);
+      await a.waitFor(`document.querySelector('#log-list .log-total').textContent.trim().length > 0`,
+        { desc: 'totals return under dnd' });
+      assert.ok((await a.logTop()).includes('vs 15'), 'and the DC verdict with them');
+    },
+  },
+  {
     name: 'notation-wiring',
     tags: ['notation'],
     // The browser-side notation path (grammar itself is unit-tested): a valid
@@ -379,10 +413,11 @@ export const scenarios = [
       await a.dbg(`commandRoll('zzz###!!')`);
       await a.dbg('sim(120)');
       assert.equal(await a.logCount(), 0, 'garbage does not roll');
+      await a.dbg(`setSystem('dnd')`); // dc rendering is totals-world
       await a.roll('4d6kh3 dc 12');
       assert.equal(await a.diceCount(), 4, 'all four dice thrown (one struck)');
       const log = await a.logTop();
-      assert.ok(/dc\s*12|DC\s*12/.test(log), `dc surfaced in log (got: ${log})`);
+      assert.ok(/vs\s*12/.test(log), `dc surfaced in log (got: ${log})`);
     },
   },
   {

@@ -1157,12 +1157,14 @@ function renderPeek() {
 
   const total = document.createElement('div');
   total.className = 'pk-total';
-  total.textContent = hidden ? '?' : String(entry.total);
+  if (hidden || !entry) total.textContent = '?';
+  else if (!renderTally(total, entry)) total.textContent = String(entry.total);
+  else total.classList.add('pk-tally'); // per-die: outcomes, not a sum
   peekEl.appendChild(total);
 
   const verdict = document.createElement('div');
   verdict.className = 'pk-verdict';
-  if (entry && Number.isInteger(entry.dc)) {
+  if (entry && Number.isInteger(entry.dc) && activeSystem().usesTotal) {
     if (hidden) {
       // Stakes are public even while the result is hidden (goal 11): the DC
       // shows, the verdict does not.
@@ -1778,26 +1780,43 @@ function canReroll(entry) {
     && !entryHidden(entry));
 }
 
+// The active profile (interface v2, meanings.js): every surface reads the
+// roll through it — aggregate per-die/sum, usesTotal/usesMods gates,
+// outcomesFor. Interpretation stays a render-time lens.
+function activeSystem() { return SYSTEMS[currentSystemId]; }
+
 function entryMeaning(entry) {
   if (entryHidden(entry)) return null;
-  // A roll with a target is a CHECK: the DC verdict is its entire read, and
-  // the chart never applies (it interprets bare rolls only). One gate here
-  // silences the word on every surface — banner, log, peek, verdict card —
-  // instead of each of them printing 'Failure' beside a chart 'Success'.
-  // (Supersedes §2.5's demoted-chart-line decision.)
+  // Sum-world hero word: a roll with a target is a CHECK and the verdict is
+  // its entire read (the gate that killed 'Failure beside a chart Success').
   if (Number.isInteger(entry.dc)) return null;
-  // The dice-only sum keeps the chart's crit rows natural (meanings.js): a
-  // modifier can raise the total, never mint a perfect roll.
   const counting = entry.parts.filter((p) => p.counts && !p.child);
-  const diceSum = counting.length && counting.every((p) => typeof p.value === 'number')
-    ? counting.reduce((s, p) => s + p.value, 0)
-    : null;
-  return SYSTEMS[currentSystemId].meaningFor(counting.map((p) => p.type), entry.total, diceSum);
+  return activeSystem().meaningFor(counting.map((p) => p.type), entry.total);
+}
+
+// Per-die outcomes (Soul Deal's corrected read — meanings.js): N dice, N
+// words; quiet dice carry word null. Null under sum systems or hidden rolls.
+function entryOutcomes(entry) {
+  if (!entry || entryHidden(entry)) return null;
+  const sys = activeSystem();
+  return sys.outcomesFor ? sys.outcomesFor(entry) : null;
+}
+
+// The tally line: outcomes folded to '2× Success · Blemish', first-seen
+// order, quiet dice counted separately only when EVERY die was quiet.
+function tallyOutcomes(outcomes) {
+  const counts = new Map();
+  for (const o of outcomes) {
+    if (!o.word) continue;
+    if (!counts.has(o.word)) counts.set(o.word, { word: o.word, tier: o.tier, n: 0 });
+    counts.get(o.word).n++;
+  }
+  return [...counts.values()];
 }
 
 function entryCrit(entry) {
   if (entryHidden(entry)) return null;
-  return SYSTEMS[currentSystemId].critFor(entry);
+  return activeSystem().critFor(entry);
 }
 
 // The crit overlay's word: the chart word when the system has one (soul-deal),
@@ -1808,6 +1827,10 @@ function entryCrit(entry) {
 // painted 'Natural 20' over a 2d6 check — the worst place to be wrong.)
 function critWord(crit, meaning, entry) {
   if (meaning) return meaning.word;
+  // Per-die systems: the crit die's own chart word is the fanfare.
+  const os = entryOutcomes(entry) || [];
+  const critDie = os.find((o) => o.tier === (crit === 'success' ? 'crit-success' : 'crit-fail'));
+  if (critDie) return critDie.word;
   const hasD20 = !!(entry && entry.parts
     && entry.parts.some((p) => p.type === 'd20' && p.counts && !p.child));
   if (hasD20) return crit === 'success' ? 'Natural 20' : 'Natural 1';
@@ -1912,6 +1935,10 @@ function renderChips(entry, dice, staged = false) {
     order.forEach((j, rank) => { delays[j] = rank * stagger; });
   }
 
+  // Per-die outcomes tint the chips (Soul Deal): each die's word rides its
+  // chip's title and its tier colors the border — the read at a glance.
+  const outcomes = entryOutcomes(entry);
+  const oMap = new Map((outcomes || []).map((o) => [o.dieIndex, o]));
   entry.parts.forEach((p, i) => {
     // A chip is anchored to its die: with no die on the table (a reveal
     // repaint after the dice are gone) there is nowhere to put it.
@@ -1924,6 +1951,11 @@ function renderChips(entry, dice, staged = false) {
     if (!p.counts) cls += ' discarded';
     if (p.child) cls += ' exploded';
     if (staged) cls += ' staged';
+    const o = oMap.get(i);
+    if (o && o.word && !hidden) {
+      cls += ` chip-${o.tier}`;
+      el.title = o.word;
+    }
     el.className = cls;
     el.style.setProperty('--die-color', DIE_DEFS[p.type].color);
     if (staged) el.style.setProperty('--chip-delay', `${delays[i].toFixed(2)}s`);
@@ -1980,6 +2012,30 @@ function renderBreakdown(el, entry, hidden) {
 // from physics. Face-down unrevealed rolls render as "?" everywhere.
 // fx=false is the system-toggle repaint: the lens swap restyles the static
 // surfaces but never replays fanfare that belonged to the roll's own moment.
+// Render a per-die outcome tally into `el` as tier-colored spans:
+// '2× Success · Blemish' — the per-die hero line wherever the sum-world
+// total/meaning slots would have spoken. Empty (and hidden) when the
+// active system is a sum system or every die was quiet.
+function renderTally(el, entry) {
+  el.textContent = '';
+  const outcomes = entryOutcomes(entry);
+  if (!outcomes) return false;
+  const tally = tallyOutcomes(outcomes);
+  if (!tally.length) {
+    el.textContent = 'a quiet roll'; // every die landed a null cell
+    el.className = el.className.replace(/tier-\S+/g, '').trim();
+    return true;
+  }
+  tally.forEach((t, i) => {
+    if (i) el.append(' · ');
+    const s = document.createElement('span');
+    s.className = `tier-${t.tier}`;
+    s.textContent = t.n > 1 ? `${t.n}× ${t.word}` : t.word;
+    el.appendChild(s);
+  });
+  return true;
+}
+
 function renderRollResults(entry, dice, fx = true) {
   renderChips(entry, dice);
   const hidden = entryHidden(entry);
@@ -1997,14 +2053,19 @@ function renderRollResults(entry, dice, fx = true) {
     labelEl.textContent = entry.label;
   }
 
-  document.getElementById('result-total').textContent = hidden ? '?' : entry.total;
+  // Under a per-die system a sum is not a fact of play: the big number
+  // yields the hero slot to the outcome tally (usesTotal, meanings.js v2).
+  const sysTotals = activeSystem().usesTotal;
+  const totalEl = document.getElementById('result-total');
+  totalEl.style.display = sysTotals || hidden ? '' : 'none';
+  totalEl.textContent = hidden ? '?' : entry.total;
   renderBreakdown(document.getElementById('result-breakdown'), entry, hidden);
 
   // Interim dc verdict (fixed decision): above the meaning word, gold/red.
   // Hidden result, public stakes (goal 11): the DC still shows, the verdict
   // waits for the reveal.
   const verdictEl = document.getElementById('result-verdict');
-  if (Number.isInteger(entry.dc)) {
+  if (Number.isInteger(entry.dc) && sysTotals) {
     if (hidden) {
       verdictEl.textContent = `vs DC ${entry.dc}`;
       verdictEl.className = '';
@@ -2020,9 +2081,14 @@ function renderRollResults(entry, dice, fx = true) {
 
   const meaningEl = document.getElementById('result-meaning');
   const meaning = entryMeaning(entry);
-  meaningEl.textContent = meaning ? meaning.word : '';
-  meaningEl.className = meaning ? `tier-${meaning.tier}` : '';
-  meaningEl.title = meaning ? `${meaning.rank} column (${meaning.column})` : '';
+  if (!hidden && renderTally(meaningEl, entry)) {
+    meaningEl.className = 'result-tally';
+    meaningEl.title = 'each die reads its own outcome — Your Soul Deal';
+  } else {
+    meaningEl.textContent = meaning ? meaning.word : '';
+    meaningEl.className = meaning ? `tier-${meaning.tier}` : '';
+    meaningEl.title = meaning ? `${meaning.rank} column (${meaning.column})` : '';
+  }
 
   banner.classList.remove('hidden', 'crit-success', 'crit-fail');
   renderBannerActions(entry);
@@ -2651,14 +2717,16 @@ function renderIntentCard(roll) {
     exp.kind === 'cinematic' ? 'Reckoning' : 'Ordeal';
   document.getElementById('intent-title').textContent = momentTitle(roll);
   document.getElementById('intent-subtitle').textContent = exp.subtitle || '';
-  const hasDc = Number.isInteger(roll.dc);
+  // Stakes render only where they mean something: a per-die system reads
+  // no totals, so DC badges and modifier chips stay off its declaration.
+  const hasDc = Number.isInteger(roll.dc) && activeSystem().usesTotal;
   document.getElementById('intent-target').classList.toggle('hidden', !hasDc);
   document.getElementById('intent-target-label').classList.toggle('hidden', !hasDc);
   if (hasDc) document.getElementById('intent-target-num').textContent = String(roll.dc);
 
   const holder = document.getElementById('intent-mods');
   holder.innerHTML = '';
-  for (const chip of preModChips(roll.spec && roll.spec.mods)) {
+  for (const chip of (activeSystem().usesMods ? preModChips(roll.spec && roll.spec.mods) : [])) {
     const el = document.createElement('span');
     el.className = 'pre-mod';
     const b = document.createElement('b');
@@ -2743,7 +2811,10 @@ function renderVerdictCard(roll, entry) {
   const hidden = entryHidden(entry);
   const who = entry.playerName ? `${entry.playerName} · ` : '';
   document.getElementById('verdict-eyebrow').textContent = `${who}${entry.label || ''}`;
-  document.getElementById('verdict-total').textContent = hidden ? '?' : String(entry.total);
+  const vTotal = document.getElementById('verdict-total');
+  vTotal.textContent = hidden ? '?'
+    : activeSystem().usesTotal ? String(entry.total)
+    : String(entry.parts.filter((p) => p.counts && !p.child).length); // dice, not a sum
 
   // Done everywhere (the result-surface redesign): the roller's Done keeps
   // the roll — dice to the shelf for everyone, result retained; a
@@ -2764,7 +2835,11 @@ function renderVerdictCard(roll, entry) {
   // …and ⟳ waits for the reveal with everything else (canReroll).
   document.getElementById('verdict-again').classList.toggle('hidden', !canReroll(entry));
 
-  const hasDc = Number.isInteger(entry.dc);
+  // Per-die systems have no total: the ring shows no number and DC math
+  // never renders (usesTotal, meanings.js v2). The card's center carries
+  // the outcome count instead so the ring stays a stage, not a lie.
+  const sysTotals = activeSystem().usesTotal;
+  const hasDc = Number.isInteger(entry.dc) && sysTotals;
   const ring = document.getElementById('ring-fill');
   const CIRC = 326.7;
   const frac = hasDc && !hidden ? Math.max(0.04, Math.min(entry.total / entry.dc, 1)) : 1;
@@ -2786,7 +2861,10 @@ function renderVerdictCard(roll, entry) {
     holderPre.innerHTML = '';
     return;
   }
-  if (hasDc) {
+  if (renderTally(heroEl, entry)) {
+    // per-die read: the outcome words ARE the verdict
+    heroEl.classList.add('verdict-tally');
+  } else if (hasDc) {
     // The target verdict owns the whole read: entryMeaning is null when a dc
     // exists (the chart interprets bare rolls only), so no chart line ever
     // shares the card with Success/Failure. (Supersedes §2.5's demoted line.)
@@ -2806,7 +2884,9 @@ function renderVerdictCard(roll, entry) {
 
   const holder = document.getElementById('verdict-modcards');
   holder.innerHTML = '';
-  attributionCards(roll, entry).slice(0, 6).forEach((c, i) => {
+  // usesMods=false: modifiers/keeps do not change outcomes under this
+  // system — no attribution rescue beat to stage.
+  (activeSystem().usesMods ? attributionCards(roll, entry) : []).slice(0, 6).forEach((c, i) => {
     const card = document.createElement('div');
     card.className = 'mod-card';
     card.style.setProperty('--fly-delay', `${(0.1 + 0.12 * i).toFixed(2)}s`);
@@ -4510,6 +4590,10 @@ function openPopover(binding) {
   // 'Update this pool' needs a record to write back to — the tray draft
   // has none, so its popover offers only the additive 'Save as variant'.
   popUpdateBtn.classList.toggle('hidden', pop.source !== 'group');
+  // A per-die table reads no totals: say so where mods/targets are edited
+  // (they stay editable — notation totality is app-wide, and the room can
+  // switch systems later).
+  document.getElementById('pop-sysnote').classList.toggle('hidden', activeSystem().usesMods);
   popEl.classList.remove('hidden');
   renderPop();
   placePopover();
@@ -5111,24 +5195,29 @@ function renderLog() {
           .join(' + ') + modHtml;
     // interim dc verdict (fixed decision): "vs N ✓/✗". Stakes stay public on
     // a hidden roll (goal 11): the target shows, the ✓/✗ waits for the reveal.
-    const verdictHtml = !Number.isInteger(entry.dc)
+    const verdictHtml = !Number.isInteger(entry.dc) || !activeSystem().usesTotal
       ? ''
       : hidden
         ? `<span class="log-verdict">vs ${entry.dc}</span>`
         : `<span class="log-verdict ${entry.total >= entry.dc ? 'ok' : 'bad'}">vs ${entry.dc} ${entry.total >= entry.dc ? '✓' : '✗'}</span>`;
     const meaning = entryMeaning(entry); // active-system lens; null while hidden
-    const meaningHtml = meaning
-      ? `<span class="log-meaning tier-${meaning.tier}"></span>`
+    const outcomes = entryOutcomes(entry); // per-die lens (Soul Deal)
+    const meaningHtml = meaning || outcomes
+      ? `<span class="log-meaning${meaning ? ` tier-${meaning.tier}` : ''}"></span>`
       : '';
     el.innerHTML = `
       <div class="log-head">
         <span class="log-group"></span>
         <span class="log-actions"></span>
-        <span class="log-total">${hidden ? '?' : entry.total}</span>
+        <span class="log-total">${hidden ? '?' : activeSystem().usesTotal ? entry.total : ''}</span>
       </div>
       <div class="log-detail">${tokensHtml}${detail}${verdictHtml ? '  ·  ' + verdictHtml : ''}${meaningHtml ? '  ·  ' + meaningHtml : ''}</div>
       <div class="log-time">${fmtTime(entry.t)}</div>`;
-    if (meaningHtml) el.querySelector('.log-meaning').textContent = meaning.word;
+    if (meaningHtml) {
+      const slot = el.querySelector('.log-meaning');
+      if (outcomes) renderTally(slot, entry);
+      else slot.textContent = meaning.word;
+    }
     // Names and labels are user-supplied: textContent only, never innerHTML.
     const groupEl = el.querySelector('.log-group');
     if (entry.playerName) {

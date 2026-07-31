@@ -898,6 +898,24 @@ html, body {
   to   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }
 
+/* ---------- per-die outcomes (Soul Deal read) ---------- */
+/* Each die's tier colors its chip border; tallies replace sum-world hero
+   slots. The read is per die — the chip IS the outcome at a glance. */
+.value-chip.chip-crit-success { border-color: #ffe27a; box-shadow: 0 0 14px rgba(255, 215, 102, 0.5); }
+.value-chip.chip-success { border-color: rgba(255, 215, 102, 0.75); }
+.value-chip.chip-success-soft { border-color: #cdbe8a; }
+.value-chip.chip-fail { border-color: #e07b6e; }
+.value-chip.chip-crit-fail { border-color: var(--red); box-shadow: 0 0 12px rgba(226, 73, 59, 0.5); }
+#result-meaning.result-tally { font-size: 16px; }
+.verdict-hero.verdict-tally {
+  font-size: clamp(14px, 2.6vmin, 19px);
+  letter-spacing: 0.1em;
+  text-indent: 0.1em;
+  flex-wrap: wrap;
+}
+.pk-total.pk-tally { font-size: 14px; line-height: 1.45; }
+.pop-sysnote { margin: 8px 14px 0; font-style: italic; }
+
 /* ---------- crit overlay ---------- */
 #crit-overlay {
   position: fixed;
