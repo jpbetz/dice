@@ -185,9 +185,9 @@ html, body {
 .side-panel.collapsed .btn.tiny { display: none; }
 #left-panel .side-panel.collapsed { align-self: flex-start; }
 #right-stack .side-panel.collapsed { align-self: flex-end; }
-/* compact view: the resting tabs slim down with the rest of the chrome */
-body.mini .side-panel.collapsed .panel-head { padding: 4px 11px; }
-body.mini .side-panel.collapsed .ph-label { font-size: 11px; }
+/* The resting tabs keep ONE size in every panel state: scaling them under
+   body.mini made every collapsed tab jump the moment any one panel opened
+   (compact view is emergent, so one toggle re-dressed all its neighbours). */
 
 /* ---------- buttons ---------- */
 .btn {
