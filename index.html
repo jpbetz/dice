@@ -101,6 +101,12 @@ limitations under the License.
            absolutely-positioned SIBLINGS (never a button inside a button).
            Hover = the gold roll-glow, suppressed over a ✕ (the glow must
            not lie). Empty draft: a quiet hint line instead. -->
+      <!-- The draft zone: at rest it is JUST your dice — secondary controls
+           reveal on approach, the same tier rule the pool rows' ± follows
+           (hover/focus brings them up; coarse pointers keep them standing).
+           A treatment adopted for one surface's control tier applies to
+           that tier everywhere. -->
+      <div id="draft-zone" class="draft-zone">
       <div id="tray" class="tray-cluster">
         <button id="tray-roll" class="pool-roll tray-roll hidden"></button>
         <div id="tray-x-layer" class="tray-x-layer"></div>
@@ -119,6 +125,7 @@ limitations under the License.
         <input id="group-name" type="text" placeholder="Name this pool…" maxlength="24">
         <button id="save-confirm" class="btn primary" title="Save as a new pool">✓</button>
         <button id="save-cancel" class="btn" title="Cancel">×</button>
+      </div>
       </div>
       </div>
     </div>
