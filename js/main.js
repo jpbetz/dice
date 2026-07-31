@@ -4964,7 +4964,8 @@ applyCameraFraming(); // boot framing at the current aspect (resize keeps it)
 // ❯ corner button). Same validation machinery, roll path, and history store
 // as the panel command box (shared helpers above) — the panel box's draft is
 // never disturbed. Enter valid: roll + close; invalid: refusal shake, stays;
-// incomplete: nothing. Esc / backdrop click dismiss. Works in mini mode.
+// incomplete: nothing. Esc / backdrop click dismiss. Works with all panels
+// collapsed (the compact view — mini mode itself is retired, UX.md §7.9).
 // ---------------------------------------------------------------------------
 
 const paletteBackdrop = document.getElementById('palette-backdrop');
