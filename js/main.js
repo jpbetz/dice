@@ -40,6 +40,7 @@ const LS_LOG = 'dice.log.v1';
 const LS_HISTORY = 'dice.cmdhistory.v1'; // command-box history: shared across rooms, cap 50
 const HISTORY_CAP = 50;
 const LS_SOUND = 'dice.sound.v1';        // "Just you" scope: sound on/off
+const LS_CHIPS = 'dice.chips.v1';        // "Just you" scope: per-die value chips (default OFF — P1)
 const LS_ROOMSETTINGS = 'dice.roomsettings.v1'; // solo-mode copy of the table settings
 
 // ---------------------------------------------------------------------------
@@ -1595,6 +1596,11 @@ function stepPlayback(dt) {
 const chipsLayer = document.getElementById('chips-layer');
 const banner = document.getElementById('result-banner');
 const chips = []; // {el, die}
+// Quiet by default (P1): the floating die numbers are an opt-in ambient
+// layer ('Show numbers on dice', settings "Just you"). The result stays
+// readable without them — banner, verdict card, log line and breakdown all
+// carry the total and the per-die math (the GOALS readability invariant).
+let chipsOn = load(LS_CHIPS, false) === true;
 
 // ---------------------------------------------------------------------------
 // Interpretation lens (goal 6): the ACTIVE system profile reads meaning and
@@ -1745,6 +1751,10 @@ let lastEntry = null; // the roll currently shown on the banner/chips
 function renderChips(entry, dice, staged = false) {
   chips.length = 0;
   chipsLayer.innerHTML = '';
+  // The single gate for the chips preference: every caller (plain results,
+  // the ceremony chorus, reveal repaints) funnels through here, so 'off'
+  // means no chip is ever rendered or positioned.
+  if (!chipsOn) return;
   const hidden = entryHidden(entry);
 
   let delays = null;
@@ -2919,6 +2929,11 @@ window.__diceDebug = {
       canReveal: canReveal(e),
     };
   },
+  // die chips (P1 quiet by default): the per-user visibility preference and
+  // the live chip count. setChipsVisible returns the resulting state.
+  get chipsVisible() { return chipsOn; },
+  setChipsVisible(on) { setChips(on); return chipsOn; },
+  get chipCount() { return chips.length; },
   get shroudedCount() { return tableDice.filter((d) => d.shrouded).length; },
   get revealingCount() { return revealing.length; },
   get pendingReveals() { return [...pendingReveals.keys()]; },
@@ -4401,6 +4416,24 @@ function setSound(on, persist = true) {
 soundBtn.addEventListener('click', () => setSound(!soundOn));
 setSound(soundOn, false); // reflect the loaded preference without re-saving
 
+// One setter for the per-die value chips preference ('Show numbers on dice',
+// settings "Just you"); persists 'dice.chips.v1'. OFF by default (P1 quiet by
+// default). Flipping ON paints chips for the roll still on the felt; flipping
+// OFF clears the layer on the spot — renderChips gates every other path.
+function setChips(on, persist = true) {
+  chipsOn = !!on;
+  if (persist) save(LS_CHIPS, chipsOn);
+  if (chipsOn) {
+    const dice = currentRoll && lastEntry && currentRoll.rollId === lastEntry.rollId
+      ? currentRoll.dice : null;
+    if (lastEntry && dice) renderChips(lastEntry, dice);
+  } else {
+    chips.length = 0;
+    chipsLayer.innerHTML = '';
+  }
+  syncSettingsUI();
+}
+
 // ---------------------------------------------------------------------------
 // Settings (roadmap §2): gear → modal with two scopes. "Just you" — sound and
 // the mini-mode preference, both local. "Everyone at the table" — the felt
@@ -4571,6 +4604,7 @@ function showSettingsNote(text) {
 
 function syncSettingsUI() {
   document.getElementById('set-sound').setAttribute('aria-pressed', String(soundOn));
+  document.getElementById('set-chips').setAttribute('aria-pressed', String(chipsOn));
   document.getElementById('set-mini')
     .setAttribute('aria-pressed', String(document.body.classList.contains('mini')));
   renderSystemPicker();
@@ -4595,6 +4629,7 @@ settingsModal.addEventListener('click', (e) => {
 // Esc closes the modal only when it is the topmost layer — see the central
 // Esc layering in the keyboard-shortcuts section below.
 document.getElementById('set-sound').addEventListener('click', () => setSound(!soundOn));
+document.getElementById('set-chips').addEventListener('click', () => setChips(!chipsOn));
 document.getElementById('set-mini').addEventListener('click', () => {
   setMini(!document.body.classList.contains('mini'));
 });

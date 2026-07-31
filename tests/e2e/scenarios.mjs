@@ -150,6 +150,31 @@ export const scenarios = [
     },
   },
   {
+    name: 'chips-quiet-default',
+    tags: ['smoke', 'roll'],
+    // Quiet by default (P1): the floating die numbers are opt-in. Results
+    // stay readable without them (the log line still carries the total); the
+    // 'Show numbers on dice' preference paints chips for the roll on the felt
+    // and clears them again on the spot.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      assert.equal(await a.dbg('chipsVisible'), false, 'chips default off');
+      await a.roll('2d6+1');
+      assert.equal(await a.dbg('chipCount'), 0, 'no chip records');
+      assert.deepEqual(await a.chips(), [], 'no chip DOM either');
+      const total = (await a.entryState()).total;
+      assert.ok((await a.logTop()).includes(String(total)),
+        'the result is still readable in the log');
+      assert.ok(await a.eval(`!document.getElementById('result-banner').classList.contains('hidden')`),
+        'and on the banner');
+      assert.equal(await a.dbg('setChipsVisible(true)'), true, 'chips switch on');
+      assert.equal(await a.dbg('chipCount'), 2, 'chips appear for the roll on the felt');
+      assert.equal((await a.chips()).length, 2, 'one chip per die');
+      assert.equal(await a.dbg('setChipsVisible(false)'), false, 'and off again');
+      assert.deepEqual(await a.chips(), [], 'chips leave immediately');
+    },
+  },
+  {
     name: 'layer-scale',
     tags: ['smoke', 'roll'],
     // The one layer scale (P2): the ceremony/verdict layer renders ABOVE the
@@ -243,6 +268,9 @@ export const scenarios = [
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      // Chips are off by default (P1); this scenario asserts on their '?' →
+      // real-face flip, so both seats opt in.
+      for (const t of [a, b]) assert.equal(await t.dbg('setChipsVisible(true)'), true, 'chips on');
       await a.roll('d20 held');
       const rid = await a.rollId();
       assert.ok(rid, 'held roll has a rollId');
