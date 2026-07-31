@@ -1204,8 +1204,8 @@ at a time; history lives on a shelf.
   only a soft under-glow ring beneath its cluster (subtle warm gold radial,
   arcane-circle feel, theme-aware) that appears with the whisk and sinks
   with the roll. Nothing is drawn where nothing sits.
-- **Default felt is walnut** (server + solo fallback). Emerald remains in
-  the picker.
+- **Default felt is obsidian** (server + solo fallback; amended 2026-07 —
+  was walnut). Emerald and walnut remain in the picker.
 - **Peek: collected rolls keep their information.** Hovering (desktop) or
   tapping (touch) a collected marker/cluster expands a full result card
   above the slot — the same content as the banner: roller, label, total,

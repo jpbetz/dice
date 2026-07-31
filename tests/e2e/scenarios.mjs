@@ -304,7 +304,7 @@ export const scenarios = [
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
-      assert.equal(await b.dbg('felt.id'), 'walnut', 'walnut is the default felt');
+      assert.equal(await b.dbg('felt.id'), 'obsidian', 'obsidian is the default felt');
       await a.dbg(`setSystem('dnd')`);
       await b.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'system syncs to B' });
       await a.dbg(`setFelt('emerald')`);

@@ -58,7 +58,7 @@ renderer.toneMappingExposure = 1.25;
 container.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#1b1410'); // walnut sceneBg — the DEFAULT_FELT below
+scene.background = new THREE.Color('#0f0f13'); // obsidian sceneBg — the DEFAULT_FELT below
 
 const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 1, 200);
 camera.position.set(0, 27, 15.5);
@@ -103,7 +103,7 @@ const FELT_THEMES = {
   plum:     { name: 'Plum',     feltBase: '#3b2342', sceneBg: '#160f18' },
   sand:     { name: 'Sand',     feltBase: '#7c6a4d', sceneBg: '#211a11' },
 };
-const DEFAULT_FELT = 'walnut';
+const DEFAULT_FELT = 'obsidian';
 let currentFeltId = DEFAULT_FELT;
 
 // The collect shelf (UX §7.7, refined §7.7.1): five slot POSITIONS along the
@@ -200,11 +200,12 @@ function drawShelfGlow(ctx) {
     if (!c.glow || c.slot < 0) continue;
     const cx = decalPx(shelfSlotX(c.slot));
     const cy = decalPx(SHELF_Z);
-    const r = clusterGlowRadius(c) * DECAL_PX_PER_UNIT;
+    // refreshes the marker-size cache too: every occupancy change lands here
+    const r = (c.glowR = clusterGlowRadius(c)) * DECAL_PX_PER_UNIT;
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    g.addColorStop(0, 'rgba(255, 214, 120, 0.10)');
-    g.addColorStop(0.62, 'rgba(255, 205, 100, 0.17)');
-    g.addColorStop(0.82, 'rgba(255, 196, 88, 0.07)');
+    g.addColorStop(0, 'rgba(255, 214, 120, 0.05)');
+    g.addColorStop(0.62, 'rgba(255, 205, 100, 0.09)');
+    g.addColorStop(0.82, 'rgba(255, 196, 88, 0.04)');
     g.addColorStop(1, 'rgba(255, 196, 88, 0)');
     ctx.save();
     ctx.fillStyle = g;
@@ -985,12 +986,24 @@ function renderShelfMarkers() {
 
 function positionShelfMarkers() {
   const v = new THREE.Vector3();
+  const v2 = new THREE.Vector3();
   for (const c of shelfClusters.values()) {
     if (!c.markerEl) continue;
     v.set(shelfSlotX(c.slot), SHELF_MARKER_Y, SHELF_Z);
     v.project(camera);
     c.markerEl.style.left = `${(v.x * 0.5 + 0.5) * window.innerWidth}px`;
     c.markerEl.style.top = `${(-v.y * 0.5 + 0.5) * window.innerHeight}px`;
+    // The invisible target covers what the eye reads as the cluster: the
+    // same radius the under-glow paints, projected to pixels (cached — the
+    // radius only changes on reflow; drawShelfGlow refreshes the cache).
+    if (!c.glowR) c.glowR = clusterGlowRadius(c);
+    v2.set(shelfSlotX(c.slot) + c.glowR, SHELF_MARKER_Y, SHELF_Z).project(camera);
+    const d = Math.max(44, Math.round(Math.abs(v2.x - v.x) * window.innerWidth));
+    if (c.markerPx !== d) {
+      c.markerPx = d;
+      c.markerEl.style.width = `${d}px`;
+      c.markerEl.style.height = `${d}px`;
+    }
   }
   positionPeek(); // the open card rides its slot through reflows and reframes
 }
@@ -1009,7 +1022,7 @@ function positionShelfMarkers() {
 // change, so calling renderPeek from it keeps an open card honest — and
 // closes it the moment its roll leaves the shelf.
 
-const PEEK_HOVER_MS = 60;    // hover intent delay before the card opens
+const PEEK_HOVER_MS = 0;     // the peek opens the moment the pointer arrives
 const PEEK_CLOSE_MS = 220;   // grace to cross from marker into the card
 const peekEl = document.getElementById('peek-card');
 let peekRollId = null;       // rollId of the open peek, or null
@@ -1699,6 +1712,12 @@ function canReroll(entry) {
 
 function entryMeaning(entry) {
   if (entryHidden(entry)) return null;
+  // A roll with a target is a CHECK: the DC verdict is its entire read, and
+  // the chart never applies (it interprets bare rolls only). One gate here
+  // silences the word on every surface — banner, log, peek, verdict card —
+  // instead of each of them printing 'Failure' beside a chart 'Success'.
+  // (Supersedes §2.5's demoted-chart-line decision.)
+  if (Number.isInteger(entry.dc)) return null;
   return SYSTEMS[currentSystemId].meaningFor(
     entry.parts.filter((p) => p.counts && !p.child).map((p) => p.type),
     entry.total
@@ -2343,7 +2362,7 @@ function beginCeremony(roll) {
   // out of sight while the declaration holds the stage.
   for (const d of roll.dice) d.mesh.visible = false;
   renderIntentCard(roll);
-  applyMatDecal(roll.label);
+  applyMatDecal(momentTitle(roll)); // the felt declares the moment, not the pool name
   setCeremonyPhaseClass(roll, 'c-declare');
 }
 
@@ -2527,12 +2546,26 @@ function preModChips(mods) {
   return out;
 }
 
+// The ceremony declares the roll's MOMENT, not its bookkeeping: the title is
+// the `# comment` (mat text / §7.6 moment title) when one was written, and
+// only falls back to the label. A pool named 'Attack' rolling
+// `1d20+5 cine # The Duel | Charisma` stages 'The Duel'; 'Attack' stays the
+// log's business. Parsed from the roll's own notation so the rule is one
+// line everywhere (intent card, dock strip, mat decal).
+function momentTitle(roll) {
+  if (typeof roll.notation === 'string') {
+    const res = parseNotation(roll.notation);
+    if (res.ok && res.comment) return res.comment;
+  }
+  return roll.label || '';
+}
+
 function renderIntentCard(roll) {
   const exp = roll.exp;
   setMonogram(document.getElementById('intent-monogram'), roll);
   document.getElementById('intent-eyebrow').textContent =
     exp.kind === 'cinematic' ? 'Reckoning' : 'Ordeal';
-  document.getElementById('intent-title').textContent = roll.label || '';
+  document.getElementById('intent-title').textContent = momentTitle(roll);
   document.getElementById('intent-subtitle').textContent = exp.subtitle || '';
   const hasDc = Number.isInteger(roll.dc);
   document.getElementById('intent-target').classList.toggle('hidden', !hasDc);
@@ -2558,7 +2591,7 @@ function renderIntentCard(roll) {
 
 function renderDockStrip(roll) {
   setMonogram(document.getElementById('strip-monogram'), roll);
-  document.getElementById('strip-title').textContent = roll.label || '';
+  document.getElementById('strip-title').textContent = momentTitle(roll);
   const bits = [roll.exp.kind === 'cinematic' ? 'Reckoning' : 'Ordeal'];
   if (roll.exp.subtitle) bits.push(roll.exp.subtitle);
   document.getElementById('strip-sub').textContent = bits.join(' · ');
@@ -2670,8 +2703,9 @@ function renderVerdictCard(roll, entry) {
     return;
   }
   if (hasDc) {
-    // §2.5: the target verdict owns the hero slot; the chart word demotes
-    // to a labeled chart line. Never merged, never hidden.
+    // The target verdict owns the whole read: entryMeaning is null when a dc
+    // exists (the chart interprets bare rolls only), so no chart line ever
+    // shares the card with Success/Failure. (Supersedes §2.5's demoted line.)
     const cleared = entry.total >= entry.dc;
     marginEl.append(`vs DC ${entry.dc} · margin `);
     const b = document.createElement('b');
@@ -2679,13 +2713,6 @@ function renderVerdictCard(roll, entry) {
     marginEl.appendChild(b);
     heroEl.textContent = cleared ? 'Success' : 'Failure';
     if (!cleared) heroEl.classList.add('bad');
-    if (meaning) {
-      chartEl.append('Chart · ');
-      const w = document.createElement('span');
-      w.className = 'chart-word';
-      w.textContent = meaning.word;
-      chartEl.appendChild(w);
-    }
   } else if (meaning) {
     heroEl.textContent = meaning.word;
     heroEl.classList.add(`tier-${meaning.tier}`);

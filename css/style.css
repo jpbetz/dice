@@ -1616,8 +1616,10 @@ body.mini .popover { width: min(94vw, 312px); }
   transition: opacity 0.25s var(--ease-plant), transform 0.25s var(--ease-plant),
               visibility 0s 0.25s;
 }
-#ceremony-layer.c-tumble #dock-strip,
-#ceremony-layer.c-settle #dock-strip {
+/* The docked strip is CINEMATIC furniture only: a check just lets the dice
+   roll and then shows the verdict — no bar riding the top of the screen. */
+#ceremony-layer.cinematic.c-tumble #dock-strip,
+#ceremony-layer.cinematic.c-settle #dock-strip {
   opacity: 1; visibility: visible;
   transform: translate(-50%, 0);
   transition: opacity 0.25s var(--ease-plant), transform 0.25s var(--ease-plant);
@@ -1793,6 +1795,10 @@ body.mini .popover { width: min(94vw, 312px); }
   transition: background 0.15s, border-color 0.15s;
 }
 .ghost-btn:hover { background: rgba(255,255,255,0.11); border-color: var(--gold); }
+/* The gated verdict actions (Reveal for the authority, ⟳ behind readability,
+   the roller-only ✕) actually hide when gated — this rule was missing, so
+   every check's card grew a Reveal that could only ever refuse. */
+#verdict-reveal.hidden, #verdict-again.hidden, #verdict-x.hidden { display: none; }
 
 /* hit-stop radial flash (§2.4 phase 3) */
 #hit-flash {
