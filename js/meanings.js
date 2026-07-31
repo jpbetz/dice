@@ -71,12 +71,25 @@ const TIERS = {
 
 // meaningFor(['d4','d4','d4'], 9) -> {word, tier, column, rank} or null when
 // the pool has no chart meaning (contains a d10x, or the total's cell is "-").
-export function meaningFor(diceTypes, total) {
+//
+// diceSum (the counting dice's face sum, no modifiers) guards the chart's
+// crit rows: they are NATURAL rows. A +3 can carry a 2d6 TOTAL past the
+// column top, but the perfect/disaster words belong to dice that actually
+// landed there (GOALS: attributed math — the fanfare must match the dice).
+// When the clamped row is a crit row and the dice were not natural
+// max/min, step one row toward the middle: a great roll, not a perfect one.
+// Callers without per-die knowledge omit diceSum and keep the raw read.
+export function meaningFor(diceTypes, total, diceSum = null) {
   if (!diceTypes.length || diceTypes.some((t) => t === 'd10x')) return null;
   const poolMax = diceTypes.reduce((s, t) => s + DIE_MAX[t], 0);
+  const poolMin = diceTypes.length; // every chart die floors at 1
   const column = COLUMNS.find((c) => c >= poolMax) ?? 20;
   const { rank, rows } = CHART[column];
-  const row = Math.min(Math.max(total, 1), column);
+  let row = Math.min(Math.max(total, 1), column);
+  if (diceSum !== null) {
+    while (row > 1 && TIERS[rows[row - 1]] === 'crit-success' && diceSum < poolMax) row--;
+    while (row < column && TIERS[rows[row - 1]] === 'crit-fail' && diceSum > poolMin) row++;
+  }
   const word = rows[row - 1];
   if (!word) return null;
   return { word, tier: TIERS[word], column: `d${column}`, rank };
@@ -113,7 +126,13 @@ export const SYSTEMS = {
     label: 'Your Soul Deal',
     meaningFor,
     critFor(entry) {
-      const m = meaningFor(countingTypes(entry), entry.total);
+      // The dice-only sum rides along so the chart's crit rows stay NATURAL
+      // (see meaningFor): 2d6+3 totaling 13 is a fine roll, never a crit.
+      const counting = entry.parts.filter((p) => p.counts && !p.child);
+      const diceSum = counting.length && counting.every((p) => typeof p.value === 'number')
+        ? counting.reduce((s, p) => s + p.value, 0)
+        : null;
+      const m = meaningFor(countingTypes(entry), entry.total, diceSum);
       if (!m) return null;
       return m.tier === 'crit-success' ? 'success'
         : m.tier === 'crit-fail' ? 'fail'

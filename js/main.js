@@ -1726,10 +1726,13 @@ function entryMeaning(entry) {
   // instead of each of them printing 'Failure' beside a chart 'Success'.
   // (Supersedes §2.5's demoted-chart-line decision.)
   if (Number.isInteger(entry.dc)) return null;
-  return SYSTEMS[currentSystemId].meaningFor(
-    entry.parts.filter((p) => p.counts && !p.child).map((p) => p.type),
-    entry.total
-  );
+  // The dice-only sum keeps the chart's crit rows natural (meanings.js): a
+  // modifier can raise the total, never mint a perfect roll.
+  const counting = entry.parts.filter((p) => p.counts && !p.child);
+  const diceSum = counting.length && counting.every((p) => typeof p.value === 'number')
+    ? counting.reduce((s, p) => s + p.value, 0)
+    : null;
+  return SYSTEMS[currentSystemId].meaningFor(counting.map((p) => p.type), entry.total, diceSum);
 }
 
 function entryCrit(entry) {
@@ -1739,8 +1742,16 @@ function entryCrit(entry) {
 
 // The crit overlay's word: the chart word when the system has one (soul-deal),
 // else the natural-roll callout (dnd — its meaningFor is always null).
-function critWord(crit, meaning) {
-  return meaning ? meaning.word : crit === 'success' ? 'Natural 20' : 'Natural 1';
+// The overlay's word never claims dice that were not rolled: 'Natural 20'
+// belongs to pools whose counting dice include a d20; anything else that
+// crits naturally reads the plain truth. (The old unconditional fallback
+// painted 'Natural 20' over a 2d6 check — the worst place to be wrong.)
+function critWord(crit, meaning, entry) {
+  if (meaning) return meaning.word;
+  const hasD20 = !!(entry && entry.parts
+    && entry.parts.some((p) => p.type === 'd20' && p.counts && !p.child));
+  if (hasD20) return crit === 'success' ? 'Natural 20' : 'Natural 1';
+  return crit === 'success' ? 'Perfect Roll' : 'Worst Roll';
 }
 
 // Build the display entry for a finished playback roll: per-die parts with
@@ -1958,10 +1969,10 @@ function renderRollResults(entry, dice, fx = true) {
   const crit = entryCrit(entry);
   if (crit === 'success') {
     banner.classList.add('crit-success');
-    if (fx) playCritEffect('success', critWord(crit, meaning));
+    if (fx) playCritEffect('success', critWord(crit, meaning, entry));
   } else if (crit === 'fail') {
     banner.classList.add('crit-fail');
-    if (fx) playCritEffect('fail', critWord(crit, meaning));
+    if (fx) playCritEffect('fail', critWord(crit, meaning, entry));
   }
 }
 
@@ -2445,7 +2456,7 @@ function stageVerdict(roll) {
   const crit = entryCrit(cer.entry); // active-system lens at staging time
   if (crit) {
     ceremonyLayer.classList.add('crit');
-    playCritEffect(crit, critWord(crit, entryMeaning(cer.entry)));
+    playCritEffect(crit, critWord(crit, entryMeaning(cer.entry), cer.entry));
   }
   renderVerdictCard(roll, cer.entry);
   setCeremonyPhaseClass(roll, 'c-verdict');
