@@ -109,10 +109,29 @@ limitations under the License.
        expands all four panels at once. The identity chip rides here too. -->
   <div id="rail">
     <span id="status-pill" class="hidden"></span>
+    <button id="identity-chip" class="btn ghost" title="You — change name, leave &amp; switch, invite">
+      <span id="identity-dot" class="identity-dot"></span>
+      <span id="identity-name" class="identity-name">…</span>
+    </button>
     <button id="toggle-settings" class="btn ghost" title="Settings">⚙</button>
     <button id="toggle-sound" class="btn ghost" title="Toggle sound">🔊</button>
     <button id="rail-palette" class="btn ghost" title="Quick roll ( / )">❯</button>
     <button id="rail-collapse" class="btn ghost" title="Collapse panels (m)">⤡</button>
+  </div>
+
+  <!-- Identity menu (rail chip): who you are + seat actions. Fully solo-capable
+       (goal 9): renaming writes the stored name; Leave & switch re-prompts. -->
+  <div id="identity-menu" class="panel hidden">
+    <div class="idm-head">
+      <span id="idm-who" class="idm-name"></span>
+      <span id="idm-room" class="idm-sub"></span>
+    </div>
+    <button id="idm-rename" class="idm-item">Change name…</button>
+    <div id="idm-rename-row" class="idm-rename hidden">
+      <input id="idm-name-input" class="tin" type="text" maxlength="24" autocomplete="off" placeholder="New name…">
+    </div>
+    <button id="idm-leave" class="idm-item">Leave &amp; switch seat</button>
+    <button id="idm-invite" class="idm-item">Copy invite link</button>
   </div>
 
   <!-- Persistent corner control: clear the whole table -->

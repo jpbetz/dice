@@ -390,6 +390,67 @@ body.mini .side-panel.collapsed .ph-label { font-size: 11px; }
   z-index: var(--z-panel);
 }
 
+/* ---------- identity chip + menu (the rail) ---------- */
+#identity-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 170px;
+}
+.identity-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #9c8f77; /* solo: no seat color — the roster dot replaces it online */
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+}
+.identity-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#identity-menu {
+  position: fixed;
+  top: 56px;
+  right: 16px;
+  width: 220px;
+  padding: 8px;
+  z-index: var(--z-popover); /* a small popover — same rung as ± */
+}
+#identity-menu.hidden { display: none; }
+.idm-head {
+  padding: 4px 10px 8px;
+  border-bottom: 1px solid var(--hair);
+  margin-bottom: 6px;
+}
+.idm-name {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.idm-sub { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+.idm-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--ivory);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  cursor: pointer;
+}
+.idm-item:hover { background: rgba(255, 255, 255, 0.08); }
+.idm-rename { padding: 2px 10px 8px; }
+.idm-rename.hidden { display: none; }
+
 /* ---------- right-side stack (players + log) ---------- */
 #right-stack {
   position: fixed;

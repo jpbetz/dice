@@ -2950,6 +2950,14 @@ window.__diceDebug = {
     }
     return panelDebugState();
   },
+  // identity (the rail chip): who you are + the chip's own actions, all
+  // solo-capable. changeName refuses '#' (false) and otherwise applies
+  // everywhere; leaveTable drops the seat (net.disconnect), clears the
+  // stored name, and re-prompts 'Take a seat'. JSON-safe.
+  get identity() { return identityInfo(); },
+  get players() { return players.map((p) => ({ id: p.id, name: p.name })); },
+  changeName(name) { return applyRename(name); },
+  leaveTable() { return leaveTable(); },
   get shroudedCount() { return tableDice.filter((d) => d.shrouded).length; },
   get revealingCount() { return revealing.length; },
   get pendingReveals() { return [...pendingReveals.keys()]; },
@@ -4956,6 +4964,7 @@ document.addEventListener('keydown', (e) => {
     if (isKbdOpen()) closeKbd();
     else if (isPaletteOpen()) closePalette();
     else if (!settingsModal.classList.contains('hidden')) closeSettingsModal();
+    else if (isIdentityMenuOpen()) closeIdentityMenu();
     else if (isPeekOpen()) closePeek();
     else if (pop) closePopover();
     return;
@@ -5055,6 +5064,7 @@ function renderPlayers() {
   }
   // An open whisper picker tracks the live roster (joins/leaves/renames).
   if (pop && pop.vis && pop.vis.mode === 'whisper') renderPop();
+  updateIdentityChip(); // the rail chip mirrors the roster's name + color
 }
 
 // Compact human summary of a mods spec: "+3 · adv · drop low 1 · reroll ≤2 · explode"
@@ -5185,7 +5195,9 @@ function beginRename(row, nameEl, player) {
     input.replaceWith(nameEl);
     if (!commit || !newName || newName === player.name) return;
     nameEl.textContent = newName; // optimistic; broadcast confirms
+    player.name = newName;
     try { localStorage.setItem(LS_NAME, newName); } catch { /* ignore */ }
+    updateIdentityChip(); // the rail chip follows the rename immediately
     if (netOnline && net) await net.rename(newName);
   };
   input.addEventListener('keydown', (e) => {
@@ -5196,6 +5208,154 @@ function beginRename(row, nameEl, player) {
   input.addEventListener('blur', () => finish(true));
   input.addEventListener('click', (e) => e.stopPropagation());
 }
+
+// ---------------------------------------------------------------------------
+// Identity chip + menu (the rail). Present SOLO AND ONLINE: the chip is your
+// color dot + name; its menu offers Change name (solo writes the stored name;
+// online also net.rename), Leave & switch seat (net.disconnect — drop the
+// seat, clear the stored identity, re-prompt 'Take a seat'), and Copy invite
+// link (the room URL). None of it needs a server (goal 9).
+// ---------------------------------------------------------------------------
+
+const identityMenu = document.getElementById('identity-menu');
+
+function inviteUrl() {
+  return `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(ROOM)}`;
+}
+
+// JSON-safe projection — also __diceDebug.identity.
+function identityInfo() {
+  const me = netOnline && net ? players.find((p) => p.id === net.playerId) : null;
+  let stored = '';
+  try { stored = (localStorage.getItem(LS_NAME) || '').trim(); } catch { /* ignore */ }
+  return {
+    name: me ? me.name : stored,
+    color: (me && me.color) || (netOnline && net ? net.color : null) || null,
+    online: netOnline,
+    room: ROOM,
+    inviteUrl: inviteUrl(),
+  };
+}
+
+function updateIdentityChip() {
+  const info = identityInfo();
+  // '' falls back to the stylesheet's solo dot color
+  document.getElementById('identity-dot').style.background = info.color || '';
+  document.getElementById('identity-name').textContent = info.name || '…';
+}
+
+function isIdentityMenuOpen() { return !identityMenu.classList.contains('hidden'); }
+
+function openIdentityMenu() {
+  const info = identityInfo();
+  document.getElementById('idm-who').textContent = info.name || '…';
+  document.getElementById('idm-room').textContent = info.online
+    ? `room: ${ROOM}` : 'solo — no table joined';
+  document.getElementById('idm-rename-row').classList.add('hidden');
+  identityMenu.classList.remove('hidden');
+}
+
+function closeIdentityMenu() {
+  identityMenu.classList.add('hidden');
+  document.getElementById('idm-rename-row').classList.add('hidden');
+}
+
+document.getElementById('identity-chip').addEventListener('click', () => {
+  if (isIdentityMenuOpen()) closeIdentityMenu();
+  else openIdentityMenu();
+});
+// A press anywhere else dismisses the menu; presses on the chip fall through
+// to its click toggle above, and presses inside the menu are the menu's own.
+document.addEventListener('pointerdown', (e) => {
+  if (!isIdentityMenuOpen()) return;
+  if (e.target.closest('#identity-menu') || e.target.closest('#identity-chip')) return;
+  closeIdentityMenu();
+});
+
+// One rename for every surface (the chip menu, __diceDebug.changeName): '' is
+// a no-op, '#' is refused loudly (the server strips it — see cleanName — and
+// a quietly-stripped echo would rename the player behind their back), a clean
+// name lands in localStorage, on the chip, and online on the roster too.
+function applyRename(raw) {
+  const newName = cutText(String(raw ?? ''), 24);
+  if (!newName) return false;
+  if (newName.includes('#')) {
+    handleNetRefusal({
+      path: '/api/rename', status: 400, code: 'bad_name',
+      message: 'names cannot contain # — it starts a comment in roll notation',
+    });
+    return false;
+  }
+  try { localStorage.setItem(LS_NAME, newName); } catch { /* ignore */ }
+  if (netOnline && net) {
+    const me = players.find((p) => p.id === net.playerId);
+    if (me && me.name !== newName) {
+      me.name = newName; // optimistic; the 'player-renamed' broadcast confirms
+      renderPlayers();
+      net.rename(newName);
+    }
+  }
+  updateIdentityChip();
+  return true;
+}
+
+document.getElementById('idm-rename').addEventListener('click', () => {
+  const row = document.getElementById('idm-rename-row');
+  const input = document.getElementById('idm-name-input');
+  row.classList.remove('hidden');
+  input.value = identityInfo().name || '';
+  input.focus();
+  input.select();
+});
+document.getElementById('idm-name-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    // a refused name ('#') keeps the input open to be fixed
+    if (applyRename(e.currentTarget.value)) closeIdentityMenu();
+  } else if (e.key === 'Escape') {
+    document.getElementById('idm-rename-row').classList.add('hidden');
+  }
+  e.stopPropagation();
+});
+
+// Leave & switch seat: net.disconnect drops the live stream, the stored
+// identity clears, and the whole join flow runs again — 'Take a seat', then
+// re-join (or stay solo when there is no server). The Players region leaves
+// the chrome with the seat.
+function leaveTable() {
+  closeIdentityMenu();
+  const old = net;
+  net = null;
+  netOnline = false; // status callbacks from the dying stream are ignored
+  if (old) old.disconnect();
+  try { localStorage.removeItem(LS_NAME); } catch { /* ignore */ }
+  players = [];
+  offers = [];
+  renderPlayers();
+  renderOffers();
+  playersPanel.classList.add('hidden');
+  applyPanels(false); // recompute emergent compact without the Players region
+  setPill(null);
+  updateIdentityChip();
+  netReady = initNet();
+  return true;
+}
+document.getElementById('idm-leave').addEventListener('click', () => leaveTable());
+
+document.getElementById('idm-invite').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  try {
+    await navigator.clipboard.writeText(inviteUrl());
+    btn.textContent = 'copied!';
+  } catch {
+    window.prompt('Copy this invite link:', inviteUrl());
+  }
+  setTimeout(() => {
+    btn.textContent = 'Copy invite link';
+    closeIdentityMenu();
+  }, 900);
+});
+
+updateIdentityChip(); // seed the chip before the join resolves
 
 // Server Roll -> display log entry: same conversion showResults uses.
 function rollToLogEntry(roll) {
@@ -5472,8 +5632,9 @@ function promptName() {
     const input = document.getElementById('name-input');
     const joinBtn = document.getElementById('name-join');
     const hint = document.querySelector('#name-panel .hint');
-    const hintText = hint.textContent;
+    const hintText = 'Pick a display name for the table.';
     modal.classList.remove('hidden');
+    input.value = '';
     // '#' is banned in names at every entry point (it starts a comment in
     // roll notation — see server.js cleanName); say so here rather than let
     // the server silently strip it.
@@ -5485,16 +5646,22 @@ function promptName() {
         : hintText;
       hint.classList.toggle('warn', hash);
     };
-    input.addEventListener('input', update);
-    update();
     const submit = () => {
       const name = cutText(input.value, 24);
       if (!name || name.includes('#')) return;
+      // 'Leave & switch' re-opens this modal, so listeners must not stack
+      // across prompts: detach this round's before resolving.
+      input.removeEventListener('input', update);
+      input.removeEventListener('keydown', onKey);
+      joinBtn.removeEventListener('click', submit);
       modal.classList.add('hidden');
       resolve(name);
     };
+    const onKey = (e) => { if (e.key === 'Enter') submit(); };
+    input.addEventListener('input', update);
+    update();
     joinBtn.addEventListener('click', submit);
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+    input.addEventListener('keydown', onKey);
     input.focus();
   });
 }
@@ -5540,7 +5707,10 @@ async function initNet() {
     setPill('solo', 'solo'); // static hosting / no server: local play
     applyRoomSettings(load(LS_ROOMSETTINGS, null)); // solo keeps its own felt
   }
+  updateIdentityChip(); // the rail chip takes the seat's name + color
   return { online: netOnline };
 }
 
-const netReady = initNet();
+// let, not const: 'Leave & switch seat' (leaveTable) re-runs the join flow
+// and repoints this at the fresh promise.
+let netReady = initNet();
