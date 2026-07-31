@@ -4156,7 +4156,9 @@ document.getElementById('pools-done').addEventListener('click', () => setPoolsEd
 function renderGroups() {
   groupsListEl.innerHTML = '';
   groupsEmptyEl.style.display = groups.length ? 'none' : 'block';
+  let ord = 0;
   for (const g of groups) {
+    ord++;
     const row = document.createElement('div');
     row.className = 'group-row';
     row.dataset.groupId = String(g.id);
@@ -4227,6 +4229,15 @@ function renderGroups() {
     const rollName = `Roll ${g.name || g.notation} — ${g.notation}`;
     rollBtn.title = rollName;
     rollBtn.setAttribute('aria-label', rollName);
+    // The digit shortcut, surfaced where it acts (hover/focus only — it is
+    // a keyboard hint, not chrome; rows past 9 have no key).
+    if (ord <= 9) {
+      const ordEl = document.createElement('span');
+      ordEl.className = 'pool-ord';
+      ordEl.textContent = String(ord);
+      ordEl.setAttribute('aria-hidden', 'true');
+      rollBtn.appendChild(ordEl);
+    }
     rollBtn.appendChild(buildDieStrip(types, POOL_STRIP_CAP, { grouped: true }));
     rollBtn.appendChild(buildRollCue());
     const rowUnits = new Set(types).size;
@@ -5290,6 +5301,11 @@ function renderFeltSwatches() {
       chip.style.setProperty('--felt-color', theme.feltBase);
       const dot = document.createElement('span');
       dot.className = 'swatch-dot';
+      // The swatch shows the CLOTH, not a paint chip: the same grain tile
+      // the table itself wears (the felt exploration deserves to be seen
+      // in the picker, not guessed from a flat dot).
+      dot.style.backgroundImage = `url(${feltTileCanvas(theme.feltBase).toDataURL()})`;
+      dot.style.backgroundSize = '64px 64px';
       const nm = document.createElement('span');
       nm.textContent = theme.name;
       chip.append(dot, nm);

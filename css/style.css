@@ -319,8 +319,11 @@ html, body {
 .input-seg { margin-bottom: 10px; }
 .input-seg button { font-size: 12px; padding: 6px 4px; }
 #builder-panel.mode-dice #cmd { display: none; }
+/* Notation view hides only the PALETTE: the draft cluster stays alive under
+   the box, so typed notation visibly materializes as dice — one draft, two
+   editors, and P1 never leaves the panel. (The ghost hint yields to the
+   box's own placeholder.) */
 #builder-panel.mode-text #die-buttons,
-#builder-panel.mode-text #tray-actions,
 #builder-panel.mode-text #tray-hint { display: none; }
 
 /* ---------- the draft cluster (P1: the dice are the buttons) ---------- */
@@ -455,6 +458,22 @@ html, body {
   z-index: 0;
 }
 .pool-roll:hover:not(:disabled) .roll-cue { opacity: 1; }
+/* the row's digit shortcut, revealed with the hover like the cue — a
+   keyboard hint, not standing chrome */
+.pool-ord {
+  flex: none;
+  min-width: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+.pool-roll:hover:not(:disabled) .pool-ord,
+.pool-roll:focus-visible .pool-ord { opacity: 0.8; }
+
 /* crowded strips drop the word, keep the trail — whole or not at all */
 .pool-roll.cue-tight .cue-word { display: none; }
 .cue-word { font-weight: inherit; }
@@ -971,12 +990,12 @@ html, body {
 }
 .felt-swatch:hover { border-color: var(--panel-border); background: rgba(255, 255, 255, 0.09); }
 .felt-swatch .swatch-dot {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--felt-color, #444);
+  background: var(--felt-color, #444); /* under the cloth tile (JS sets it) */
   border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.45);
 }
 .felt-swatch[aria-pressed="true"] {
   border-color: rgba(212, 175, 55, 0.55);

@@ -758,6 +758,8 @@ export const scenarios = [
       await a.eval(`document.querySelector('#input-mode [data-v="text"]').click()`);
       assert.equal(await vis('#cmd-input'), true, 'Notation view: the box shows');
       assert.equal(await vis('#die-buttons'), false, 'Notation view: the palette hides');
+      assert.equal(await vis('#tray-roll'), true,
+        'the draft cluster stays ALIVE in Notation view — typed dice materialize');
       assert.ok((await a.eval(`document.getElementById('cmd-input').value`)).includes('1d6'),
         'the draft crossed the view switch intact');
       await a.eval(`document.querySelector('#input-mode [data-v="dice"]').click()`);
