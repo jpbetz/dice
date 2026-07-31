@@ -398,9 +398,13 @@ html, body {
   flex: none;
 }
 .strip-more { flex: none; pointer-events: none; }
-/* ± beside the strip: DEMOTED to a bare quiet glyph now that it is the only
-   button chrome on the row — full row-height hit area stays (a missed tap
-   next to ± must never be a broadcast roll); it brightens with the row. */
+/* ± beside the strip: HOVER-REVEALED (2026-07 — even the quiet glyph read
+   as standing chrome on every row). The row's hover or keyboard focus
+   brings it up; coarse pointers keep it always visible (touch has no
+   hover, and a visible path must survive — right-click on the row stays
+   the pointer bonus). Full row-height hit area stays: a missed tap next to
+   ± must never be a broadcast roll. The draft line's ± is exempt — there
+   it is a peer in a contextual button row, not per-row furniture. */
 .pool-mods {
   align-self: stretch;
   height: auto;
@@ -410,8 +414,11 @@ html, body {
   border: none;
   color: #574f43;
 }
-.group-row:hover .pool-mods { color: var(--muted); }
-.pool-mods:hover { color: var(--gold-bright); background: rgba(212, 175, 55, 0.10); border: none; }
+.pool-line2 .pool-mods { opacity: 0; transition: opacity 0.12s, color 0.12s; }
+.group-row:hover .pool-mods,
+.pool-mods:focus-visible { opacity: 1; color: var(--muted); }
+.pool-mods:hover { opacity: 1; color: var(--gold-bright); background: rgba(212, 175, 55, 0.10); border: none; }
+@media (pointer: coarse) { .pool-line2 .pool-mods { opacity: 1; } }
 /* manage-mode toolbar: copy-link (demoted here, P4) + Done */
 #pools-toolbar { display: flex; gap: 8px; margin: 2px 0 8px; }
 #pools-toolbar.hidden { display: none; }
