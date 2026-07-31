@@ -140,11 +140,11 @@ limitations under the License.
       </div>
       </div>
 
-      <!-- The saved list, directly under the draft (read-only quick access,
-           P2): rows are die-strip roll buttons; the header ✎ gates manage
-           mode (per-row rename/delete + the copy-link toolbar — demoted,
-           never deleted, P4). -->
-      <span class="plabel pools-sub">Saved pools</span>
+      <!-- The Rack (agreed 2026-08-01): category shelves of pool TILES.
+           Tiles STAGE (sources add, the pool rolls); ± rides each tile's
+           revealed corner; ✎ gates manage overlays + the copy-link toolbar
+           (P2/P4). Section headers render from categories in renderGroups —
+           sticky, so the current shelf stays named mid-scroll. -->
       <div id="pools-toolbar" class="hidden">
         <button id="copy-link" class="btn tiny ghost" title="Copy a URL that restores these pools anywhere">Copy link</button>
         <button id="pools-done" class="btn tiny ghost">Done</button>
@@ -237,7 +237,7 @@ limitations under the License.
       <h2>Keyboard shortcuts</h2>
       <div class="cheatsheet">
         <table>
-          <tr><td><code>1–9</code></td><td>roll saved pool N</td></tr>
+          <tr><td><code>1–9</code></td><td>stage pool N into the draft (then Enter rolls)</td></tr>
           <tr><td><code>r</code></td><td>reroll the last roll</td></tr>
           <tr><td><code>c</code></td><td>clear the table</td></tr>
           <tr><td><code>m</code></td><td>collapse / expand the panel (the edge tab brings it back)</td></tr>
@@ -246,8 +246,8 @@ limitations under the License.
           <tr><td><code>s</code></td><td>sound on/off</td></tr>
           <tr><td><code>/</code> or <code>Ctrl/Cmd K</code></td><td>quick roll palette</td></tr>
           <tr><td><code>Space</code></td><td>skip the roll in flight (click the table works too)</td></tr>
-          <tr><td><code>Enter</code></td><td>keep your last roll — collect it to the shelf</td></tr>
-          <tr><td><code>Esc</code></td><td>close the top layer — or clear your last roll</td></tr>
+          <tr><td><code>Enter</code></td><td>roll the staged draft — or keep your last roll (collect)</td></tr>
+          <tr><td><code>Esc</code></td><td>close the top layer — or clear the draft, then your last roll</td></tr>
           <tr><td><code>?</code></td><td>this cheatsheet</td></tr>
         </table>
       </div>

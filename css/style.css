@@ -511,8 +511,133 @@ html, body {
 .pool-mods:focus-visible { opacity: 1; color: var(--muted); }
 .pool-mods:hover { opacity: 1; color: var(--gold-bright); background: rgba(212, 175, 55, 0.10); border: none; }
 @media (pointer: coarse) { .pool-line2 .pool-mods { opacity: 1; } }
-/* the saved list's quiet sub-label inside the merged panel */
-.pools-sub { margin: 14px 0 2px; padding-top: 10px; border-top: 1px solid var(--hair); }
+/* ---------- the Rack: category shelves of pool tiles ---------- */
+/* Tiles are SOURCES (they stage; no gold, no ROLL cue — those live on the
+   draft alone). The draft zone is STICKY so the one roll button never
+   scrolls away mid-compose; shelf headers pin just beneath it. */
+.draft-zone {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: linear-gradient(180deg, rgba(24, 19, 14, 0.98), rgba(24, 19, 14, 0.94));
+  margin: 0 -14px;
+  padding: 4px 14px 10px;
+  border-bottom: 1px solid var(--hair);
+}
+.pool-sec-head {
+  position: sticky;
+  top: var(--draft-h, 0px);
+  z-index: 1;
+  margin: 12px -14px 4px;
+  padding: 6px 14px 4px;
+  background: rgba(24, 19, 14, 0.96);
+}
+.pool-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.pool-tile { position: relative; }
+.tile-editor { grid-column: 1 / -1; }
+.tile-stage {
+  width: 100%;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ivory);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.tile-stage:hover:not(:disabled) { border-color: rgba(243, 234, 215, 0.5); background: rgba(255, 255, 255, 0.1); }
+.tile-stage:disabled { opacity: 0.5; cursor: default; }
+.tile-art { display: flex; align-items: center; gap: 3px; pointer-events: none; }
+.tile-art .die-art { width: 24px; height: 24px; }
+.tile-name {
+  max-width: 100%;
+  font-family: var(--font-display);
+  font-size: 11.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.tile-name.as-notation { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+/* the stage whisper — ivory, never gold (gold = roll) */
+.tile-add {
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  font-size: 12px;
+  color: var(--ivory);
+  opacity: 0;
+  transition: opacity 0.12s;
+  pointer-events: none;
+}
+.tile-stage:hover:not(:disabled) .tile-add,
+.tile-stage:focus-visible .tile-add { opacity: 0.7; }
+.tile-stage .pool-ord { position: absolute; top: 3px; right: 6px; }
+.tile-stage:hover:not(:disabled) .pool-ord,
+.tile-stage:focus-visible .pool-ord { opacity: 0.8; }
+/* the tile's revealed-corner controls (siblings, never nested) */
+.tile-mods {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  min-height: 0 !important;
+  width: 22px;
+  height: 22px;
+  align-self: auto;
+}
+.tile-edit, .tile-del {
+  position: absolute;
+  top: 2px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 6px;
+  background: rgba(18, 14, 9, 0.9);
+  border: 1px solid var(--panel-border);
+}
+.tile-edit { right: 26px; }
+.tile-del { right: 2px; }
+/* source chips in the draft cluster: name over its grouped dice, one ✕ */
+.src-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 3px 6px 2px;
+  margin-right: 4px;
+  border: 1px solid var(--hair);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+  pointer-events: none;
+}
+.src-chip-name {
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.src-chip .die-art { width: 22px; height: 22px; }
+.loose-dice { display: inline-flex; align-items: center; pointer-events: none; }
+/* staging into an empty draft announces the next tap (touch has no hover) */
+.tray-roll.stage-pulse {
+  border-color: rgba(212, 175, 55, 0.6);
+  box-shadow: 0 0 18px rgba(255, 214, 102, 0.28);
+  transition: border-color 0.4s, box-shadow 0.4s;
+}
 
 /* manage-mode toolbar: copy-link (demoted here, P4) + Done */
 #pools-toolbar { display: flex; gap: 8px; margin: 2px 0 8px; }

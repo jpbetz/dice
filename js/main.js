@@ -3270,6 +3270,7 @@ window.__diceDebug = {
   get trayState() {
     return {
       dice: [...tray],
+      sources: [...traySources],
       rollVisible: !trayRollBtn.classList.contains('hidden'),
       hasActions: !draftActionsEl.classList.contains('hidden'), // Save · Clear stand
       saveOpen: !traySaveRow.classList.contains('hidden'),
@@ -3393,6 +3394,7 @@ function save(key, value) {
 // ---------------------------------------------------------------------------
 
 let tray = [];
+let traySources = []; // aligned to tray: the staged source-pool label per die (null = loose)
 
 // Open ± popover state (see the popover section below). Declared this early
 // because renderGroups AND the module-evaluation paintCmd() both run before
@@ -3401,6 +3403,7 @@ let pop = null;
 
 const dieButtonsEl = document.getElementById('die-buttons');
 const trayEl = document.getElementById('tray');
+const draftZoneEl = document.getElementById('draft-zone');
 const trayRollBtn = document.getElementById('tray-roll');
 const trayXLayer = document.getElementById('tray-x-layer');
 const trayHintEl = document.getElementById('tray-hint');
@@ -3441,6 +3444,7 @@ for (const type of DIE_TYPES) {
   btn.addEventListener('click', () => {
     if (tray.length < MAX_DICE_ON_TABLE) {
       tray.push(type);
+      traySources.push(null);
       renderTray();
       syncBoxFromTray();
     }
@@ -3457,6 +3461,7 @@ for (const type of DIE_TYPES) {
   btn.addEventListener('click', () => {
     if (tray.length + 2 <= MAX_DICE_ON_TABLE) {
       tray.push('d10x', 'd10');
+      traySources.push(null, null);
       renderTray();
       syncBoxFromTray();
     }
@@ -3579,38 +3584,96 @@ function renderTray() {
   trayRollBtn.classList.toggle('hidden', !hasDice);
   trayHintEl.classList.toggle('hidden', hasDice || !!cmdInput.value);
   if (hasDice) {
-    // The SAME grouped strip the pool rows draw (uniform look): repeats
-    // collapse to one die + ×N, and each group's ✕ removes ONE die of that
-    // type — 'd6 ×3' steps down to 'd6 ×2'.
-    trayRollBtn.appendChild(buildDieStrip(tray, TRAY_STRIP_CAP, { grouped: true }));
-    trayRollBtn.appendChild(buildRollCue()); // same promise as the pool rows (tier rule)
-    // +1: the draft runway shares its line with ± — one unit less room
-    // than a pool row before the word must yield to the trail.
-    const trayUnits = new Set(tray).size;
-    trayRollBtn.classList.toggle('cue-tight', cueTight(1 + Math.min(trayUnits, TRAY_STRIP_CAP) + (trayUnits > TRAY_STRIP_CAP ? 1 : 0)));
+    // The composition reads by SOURCE (the Rack): each staged pool is one
+    // chip — its name over its grouped dice — with ONE ✕ (unstage the
+    // pool); loose palette dice group ×N by type with per-type ✕. The
+    // whole cluster stays the ONE roll button.
+    const srcOrder = [];
+    const bySrc = new Map();
+    tray.forEach((t, i) => {
+      const s = traySources[i] || null;
+      const k = s || '\u0000';
+      if (!bySrc.has(k)) { bySrc.set(k, { source: s, types: [] }); srcOrder.push(k); }
+      bySrc.get(k).types.push(t);
+    });
+    // loose dice render last
+    srcOrder.sort((a, b) => (a === '\u0000' ? 1 : 0) - (b === '\u0000' ? 1 : 0));
+    const removers = []; // {el(anchor), title, onRemove}
+    for (const k of srcOrder) {
+      const grp = bySrc.get(k);
+      if (grp.source) {
+        const chip = document.createElement('span');
+        chip.className = 'src-chip';
+        const nm = document.createElement('span');
+        nm.className = 'src-chip-name';
+        nm.textContent = grp.source;
+        chip.appendChild(nm);
+        chip.appendChild(buildDieStrip(grp.types, 3, { grouped: true }));
+        trayRollBtn.appendChild(chip);
+        removers.push({
+          el: chip,
+          title: `Remove ${grp.source}`,
+          onRemove: () => {
+            const keep = tray.map((t, i) => [t, traySources[i]])
+              .filter(([, s]) => (s || null) !== grp.source);
+            tray = keep.map(([t]) => t);
+            traySources = keep.map(([, s]) => s || null);
+            renderTray();
+            syncBoxFromTray();
+          },
+        });
+      } else {
+        // loose dice: grouped ×N, one ✕ per TYPE (removes one die)
+        const strip = buildDieStrip(grp.types, TRAY_STRIP_CAP, { grouped: true });
+        const holder = document.createElement('span');
+        holder.className = 'loose-dice';
+        holder.appendChild(strip);
+        trayRollBtn.appendChild(holder);
+        const looseTypes = [...new Set(grp.types)];
+        const arts = holder.querySelectorAll('.die-art, .strip-dot');
+        arts.forEach((img, gi) => {
+          const type = looseTypes[gi];
+          if (!type) return;
+          removers.push({
+            el: img,
+            title: `Remove one ${type}`,
+            onRemove: () => {
+              const idx = tray.findIndex((t, i) => t === type && !(traySources[i] || null));
+              if (idx < 0) return;
+              tray.splice(idx, 1);
+              traySources.splice(idx, 1);
+              renderTray();
+              syncBoxFromTray();
+            },
+          });
+        });
+      }
+    }
+    trayRollBtn.appendChild(buildRollCue());
     const label = `Roll ${formula(tray)}`;
     trayRollBtn.title = label;
     trayRollBtn.setAttribute('aria-label', label);
-    const groupTypes = [...new Set(tray)];
-    const arts = trayRollBtn.querySelectorAll('.die-art, .strip-dot');
-    arts.forEach((img, i) => {
-      const type = groupTypes[i];
-      if (!type) return;
+    const units = srcOrder.length + new Set(tray.filter((t, i) => !traySources[i])).size;
+    trayRollBtn.classList.toggle('cue-tight', cueTight(1 + units));
+    // ✕ overlays: SIBLINGS in the x-layer, anchored to live layout (zero
+    // while display:none — callers re-render on reveal paths).
+    for (const r of removers) {
       const x = document.createElement('button');
       x.className = 'die-x';
       x.textContent = '✕';
-      x.title = `Remove one ${type}`;
-      x.style.left = `${img.offsetLeft + img.offsetWidth / 2 - 10}px`;
-      x.style.top = `${img.offsetTop - 10}px`; // above the die: clear of ×N counts beside it
+      x.title = r.title;
+      x.style.left = `${r.el.offsetLeft + r.el.offsetWidth - 9}px`;
+      x.style.top = `${r.el.offsetTop - 10}px`;
       x.addEventListener('click', (e) => {
         e.stopPropagation(); // a remove is never a roll
-        tray.splice(tray.indexOf(type), 1);
-        renderTray();
-        syncBoxFromTray();
+        r.onRemove();
       });
       trayXLayer.appendChild(x);
-    });
+    }
   }
+  // sticky geometry: section headers pin just below the sticky draft
+  const body = document.querySelector('#builder-panel > .panel-body');
+  if (body) body.style.setProperty('--draft-h', `${draftZoneEl.offsetHeight}px`);
   updateTrayButtons();
 }
 
@@ -3629,7 +3692,8 @@ function updateTrayButtons() {
   saveGroupBtn.disabled = !usable;
 }
 
-trayRollBtn.addEventListener('click', () => {
+// Roll the draft — the cluster click, the Enter key, and nothing else.
+function rollDraft() {
   // Re-parse the current text synchronously: the debounced cmdResult can be
   // up to 300 ms stale, and the parsed spec must match the notation we send.
   paintCmd();
@@ -3651,7 +3715,8 @@ trayRollBtn.addEventListener('click', () => {
   } else if (tray.length) {
     requestRoll([...tray], formula(tray));
   }
-});
+}
+trayRollBtn.addEventListener('click', rollDraft);
 // Right-click the cluster = ± (a pointer bonus; the visible ± button is the
 // path for touch and keyboard).
 trayEl.addEventListener('contextmenu', (e) => {
@@ -3701,8 +3766,9 @@ trayModsBtn.addEventListener('click', () => {
   openPopover({ source: 'tray', row: document.getElementById('tray-actions') });
 });
 
-clearTrayBtn.addEventListener('click', () => {
+function clearDraft() {
   tray = [];
+  traySources = [];
   // Every key of the declared draft shape, including the §7.6/goal-11 ones:
   // canonicalNotation's defaults would absorb the missing ones today, but a
   // half-shaped boxExtras is a trap for the next reader of it.
@@ -3712,7 +3778,8 @@ clearTrayBtn.addEventListener('click', () => {
   closeSaveMorph();
   renderTray();
   paintCmd();
-});
+}
+clearTrayBtn.addEventListener('click', clearDraft);
 
 // ---------------------------------------------------------------------------
 // Command box (UX §1.3): one canonical string, two editors. Three validation
@@ -3831,8 +3898,13 @@ function paintCmd() {
       exp: res.exp,
       visibility: visOfParse(res),
     };
-    if (tray.join(',') !== res.spec.dice.join(',')) {
+    const boxSources = res.spec.sources
+      ? res.spec.sources.map((s) => s || null)
+      : res.spec.dice.map(() => null);
+    if (tray.join('\u0000') !== res.spec.dice.join('\u0000')
+        || traySources.map((s) => s || '').join('\u0000') !== boxSources.map((s) => s || '').join('\u0000')) {
       tray = [...res.spec.dice];
+      traySources = boxSources;
       renderTray();
     }
   }
@@ -3855,7 +3927,9 @@ function syncBoxFromTray() {
     if (mods.keep && mods.keep.n >= tray.length) delete mods.keep;
     if (!Object.keys(mods).length) mods = null;
   }
-  cmdInput.value = canonicalWithVis({ dice: [...tray], mods }, {
+  const spec = { dice: [...tray], mods };
+  if (traySources.some(Boolean)) spec.sources = [...traySources];
+  cmdInput.value = canonicalWithVis(spec, {
     dc: boxExtras.dc,
     comment: boxExtras.comment,
     exp: boxExtras.exp,
@@ -4071,11 +4145,18 @@ function editPoolById(id, patch) {
     if (!res.ok) return false;
     notation = res.canonical;
   }
+  let category = g.category || null;
+  if (patch.category !== undefined) {
+    if (typeof patch.category !== 'string') return false;
+    category = cutText(patch.category, 24) || null; // '' clears the shelf
+  }
   g.name = name;
   g.notation = notation;
+  if (category) g.category = category;
+  else delete g.category; // present-or-absent, like the codec segment
   saveGroups();
   renderGroups();
-  return { id: g.id, name: g.name, notation: g.notation };
+  return { id: g.id, name: g.name, notation: g.notation, category: g.category || null };
 }
 
 // Which row is the inline editor right now (null = none). One at a time:
@@ -4121,6 +4202,25 @@ function buildGroupEditor(g) {
   notIn.autocomplete = 'off';
   notIn.value = g.notation;
 
+  // Category = which shelf the tile lives on (Attributes / Skills /
+  // Motivations suggested; free text; blank = the plain Pools shelf).
+  const catIn = document.createElement('input');
+  catIn.className = 'ge-category';
+  catIn.type = 'text';
+  catIn.maxLength = 24;
+  catIn.placeholder = 'Category — e.g. Attributes';
+  catIn.autocomplete = 'off';
+  catIn.setAttribute('list', 'category-options');
+  catIn.value = g.category || '';
+  const dl = document.createElement('datalist');
+  dl.id = 'category-options';
+  for (const c of [...new Set(['Attributes', 'Skills', 'Motivations',
+    ...groups.map((x) => (x.category || '').trim()).filter(Boolean)])]) {
+    const o = document.createElement('option');
+    o.value = c;
+    dl.appendChild(o);
+  }
+
   const err = document.createElement('div');
   err.className = 'ge-err';
 
@@ -4147,7 +4247,7 @@ function buildGroupEditor(g) {
   const apply = () => {
     if (!validate()) { notIn.focus(); return; }
     editingGroupId = null;
-    editPoolById(g.id, { name: nameIn.value, notation: notIn.value });
+    editPoolById(g.id, { name: nameIn.value, notation: notIn.value, category: catIn.value });
   };
   updateBtn.addEventListener('click', apply);
   cancelBtn.addEventListener('click', cancelEditGroup);
@@ -4157,29 +4257,17 @@ function buildGroupEditor(g) {
     else if (e.key === 'Escape') cancelEditGroup();
   };
   nameIn.addEventListener('keydown', onKey);
+  catIn.addEventListener('keydown', onKey);
   notIn.addEventListener('keydown', onKey);
 
-  ed.append(nameIn, notIn, err, actions);
+  ed.append(nameIn, notIn, catIn, dl, err, actions);
   return ed;
 }
 
 // Roll a saved group: parse its notation and roll the parsed spec. Online the
 // notation string itself goes up (the server's parse is authoritative).
-function rollGroup(g) {
-  const res = parseNotation(g.notation);
-  if (!res.ok) return;
-  closeGroupsFlyout(); // a roll from the flyout clears the runway itself
-  const intent = notationIntent(g.notation, res);
-  requestRoll(res.spec.dice, g.name || res.comment || res.canonical, {
-    notation: intent.notation,
-    canonical: intent.canonical,
-    mods: res.spec.mods || undefined,
-    faceDown: res.faceDown, // saved groups carry 'held' now (§7.6)
-    visibility: visOfParse(res) || undefined, // …and secret / w: (goal 11)
-    dc: res.dc ?? undefined,
-    exp: intent.exp || undefined,
-  });
-}
+// (rollGroup retired 2026-08-01: tiles STAGE — the draft cluster and the
+// popover Roll are the roll paths. See stageGroup.)
 
 // A pool's dice as a strip of real die art, capped with the roster's '+N'
 // overflow token (P5). Pure decoration: every img is pointer-events:none —
@@ -4250,6 +4338,45 @@ function buildRollCue() {
 // (dice groups + the +N pill) leave no honest room for the word.
 function cueTight(unitCount) { return unitCount >= 4; }
 
+// STAGE a pool into the draft (the Rack's one source verb): its dice pour
+// into the sticky cluster carrying the pool's name as their source label;
+// mods/dc/moment are set aside with a whisper (the draft owns its own ±).
+// A stage from the hover flyout promotes it to the pinned panel — a
+// deliberate action earns pinning.
+function sanitizeSourceLabel(name) {
+  return cleanPartLabel(name || '') || null;
+}
+function stageGroup(g) {
+  const res = parseNotation(g.notation);
+  if (!res.ok) return false;
+  if (groupsPanelEl.classList.contains('flyout')) {
+    closeGroupsFlyout();
+    setPanel('pools', true);
+  }
+  const label = sanitizeSourceLabel(g.name);
+  const wasEmpty = tray.length === 0;
+  const dropped = [];
+  if (res.spec.mods) { const s = modsSummary(res.spec.mods); if (s) dropped.push(s); }
+  if (res.dc != null) dropped.push(`dc${res.dc}`);
+  for (let i = 0; i < res.spec.dice.length; i++) {
+    if (tray.length >= MAX_DICE_ON_TABLE) break;
+    tray.push(res.spec.dice[i]);
+    // the pool's own name wins; a composed pool's inner sources survive
+    // only when the pool is unnamed
+    traySources.push(label || (res.spec.sources ? res.spec.sources[i] || null : null));
+  }
+  syncBoxFromTray();
+  if (dropped.length) {
+    showSettingsNote(`${g.name || 'pool'}: ${dropped.join(' · ')} set aside — re-add via ±`);
+  }
+  if (wasEmpty) {
+    // the cluster announces itself as the next tap (touch has no hover)
+    trayRollBtn.classList.add('stage-pulse');
+    setTimeout(() => trayRollBtn.classList.remove('stage-pulse'), 900);
+  }
+  return true;
+}
+
 // P2 use-vs-manage: manage mode is ONE explicit, transient toggle (the
 // header ✎). It never persists, and collapsing the panel exits it
 // (applyPanels) — the hover flyout and every fresh look at the panel start
@@ -4267,122 +4394,126 @@ function setPoolsEdit(on) {
 document.getElementById('pools-edit').addEventListener('click', () => setPoolsEdit(!poolsEdit));
 document.getElementById('pools-done').addEventListener('click', () => setPoolsEdit(false));
 
+// Category shelves (the Rack): fixed trio order — Attributes, Skills,
+// Motivations — then other categories alphabetically, uncategorized last
+// as plain 'Pools'. Sticky headers keep the current shelf named mid-scroll.
+const TRIO = ['attributes', 'skills', 'motivations'];
+function buildSections(list) {
+  const secs = new Map();
+  for (const g of list) {
+    const k = (g.category || '').trim().toLowerCase() || '\u0000';
+    if (!secs.has(k)) secs.set(k, { key: k, label: k === '\u0000' ? 'Pools' : g.category.trim(), pools: [] });
+    secs.get(k).pools.push(g);
+  }
+  return [...secs.values()].sort((a, b) => {
+    const rank = (s) => (s.key === '\u0000' ? 2 : TRIO.includes(s.key) ? 0 : 1);
+    return rank(a) - rank(b)
+      || (rank(a) === 0 ? TRIO.indexOf(a.key) - TRIO.indexOf(b.key) : a.label.localeCompare(b.label));
+  });
+}
+
+// The digits stage by RENDERED order (rebuilt on every paint).
+let renderedPools = [];
+
 function renderGroups() {
   groupsListEl.innerHTML = '';
   groupsEmptyEl.style.display = groups.length ? 'none' : 'block';
-  let ord = 0;
-  for (const g of groups) {
-    ord++;
-    const row = document.createElement('div');
-    row.className = 'group-row';
-    row.dataset.groupId = String(g.id);
+  renderedPools = [];
+  for (const sec of buildSections(groups)) {
+    const head = document.createElement('div');
+    head.className = 'plabel pool-sec-head';
+    head.textContent = sec.label;
+    groupsListEl.appendChild(head);
+    const grid = document.createElement('div');
+    grid.className = 'pool-grid';
+    for (const g of sec.pools) {
+      renderedPools.push(g);
+      const ord = renderedPools.length;
 
-    // This row is being edited: the editor replaces the whole affordance set.
-    if (g.id === editingGroupId) {
-      row.classList.add('editing');
-      row.appendChild(buildGroupEditor(g));
-      groupsListEl.appendChild(row);
-      continue;
-    }
+      // This tile is being edited: the editor card spans the shelf.
+      if (g.id === editingGroupId) {
+        const ed = document.createElement('div');
+        ed.className = 'group-row editing tile-editor';
+        ed.dataset.groupId = String(g.id);
+        ed.appendChild(buildGroupEditor(g));
+        grid.appendChild(ed);
+        continue;
+      }
 
-    // Line 1 — identity: the name (click loads the box, as always) and the
-    // §1.4 canonical chip, which already carries mods/dc so no second chip
-    // can drift. Manage mode adds ✎ ✕ here and nowhere else.
-    const line1 = document.createElement('div');
-    line1.className = 'pool-line1';
-    const nameEl = document.createElement('div');
-    nameEl.className = 'group-name' + (g.name ? '' : ' as-notation');
-    nameEl.textContent = g.name || g.notation; // unnamed: the notation is the name
-    nameEl.title = 'Load into the command box';
-    nameEl.addEventListener('click', () => loadIntoBox(g.notation, g.name));
-    line1.appendChild(nameEl);
-    // The canonical chip is manage-mode furniture now (the list kept reading
-    // as a spreadsheet with it always on): at rest the canonical rides the
-    // row tooltips and the name-click still loads the box — §1.4's
-    // round-trip survives, just quieter.
-    if (g.name && poolsEdit) {
-      const chip = document.createElement('code');
-      chip.className = 'group-formula';
-      chip.textContent = g.notation;
-      chip.title = `${g.notation}  ·  click to load into the command box`;
-      chip.addEventListener('click', (e) => {
-        e.stopPropagation();
-        loadIntoBox(g.notation, g.name);
+      const tile = document.createElement('div');
+      tile.className = 'pool-tile';
+      tile.dataset.groupId = String(g.id);
+
+      // ONE verb on the tile: STAGE (the sources-add grammar). No gold, no
+      // ROLL cue — those belong to the draft cluster alone.
+      const res = parseNotation(g.notation);
+      const types = res.ok ? res.spec.dice : [];
+      const stage = document.createElement('button');
+      stage.className = 'tile-stage';
+      const nm = g.name || g.notation;
+      stage.title = `Stage ${nm} — ${g.notation}`;
+      stage.setAttribute('aria-label', `Stage ${nm} — ${g.notation}`);
+      const art = document.createElement('span');
+      art.className = 'tile-art';
+      art.appendChild(buildDieStrip(types, 2, { grouped: true }));
+      const nameEl = document.createElement('span');
+      nameEl.className = 'tile-name' + (g.name ? '' : ' as-notation');
+      nameEl.textContent = nm;
+      stage.append(art, nameEl);
+      const add = document.createElement('span');
+      add.className = 'tile-add';
+      add.setAttribute('aria-hidden', 'true');
+      add.textContent = '+';
+      stage.appendChild(add);
+      if (ord <= 9) {
+        const o = document.createElement('span');
+        o.className = 'pool-ord';
+        o.setAttribute('aria-hidden', 'true');
+        o.textContent = String(ord);
+        stage.appendChild(o);
+      }
+      stage.addEventListener('click', () => stageGroup(g));
+      stage.disabled = poolsEdit;
+      tile.appendChild(stage);
+
+      // ± stays USE (revealed corner, sibling — never nested)
+      const modsBtn = document.createElement('button');
+      modsBtn.className = 'group-mods pool-mods tile-mods';
+      modsBtn.textContent = '±';
+      modsBtn.title = 'Tweak — modifiers, target, moment';
+      modsBtn.addEventListener('click', () => togglePopover(g, tile));
+      tile.appendChild(modsBtn);
+      tile.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        togglePopover(g, tile);
       });
-      line1.appendChild(chip);
-    }
-    if (g.name) nameEl.title = `${g.notation}  ·  click to load into the command box`;
-    if (poolsEdit) {
-      const editBtn = document.createElement('button');
-      editBtn.className = 'group-edit';
-      editBtn.textContent = '✎';
-      editBtn.title = 'Edit name & notation';
-      editBtn.addEventListener('click', () => beginEditGroup(g.id));
-      const delBtn = document.createElement('button');
-      delBtn.className = 'group-del';
-      delBtn.textContent = '✕';
-      delBtn.title = 'Delete pool';
-      delBtn.addEventListener('click', () => {
-        if (pop && pop.source === 'group' && pop.groupId === g.id) closePopover();
-        groups = groups.filter((x) => x.id !== g.id);
-        saveGroups();
-        renderGroups();
-      });
-      line1.append(editBtn, delBtn);
-    }
 
-    // Line 2 — the roll: one big strip button of die art (the row IS the
-    // Roll button now, P1) beside the always-visible ± (USE, not manage).
-    // SIBLINGS, never nested — no button may live inside a button.
-    const line2 = document.createElement('div');
-    line2.className = 'pool-line2';
-    const res = parseNotation(g.notation);
-    const types = res.ok ? res.spec.dice : [];
-    const rollBtn = document.createElement('button');
-    rollBtn.className = 'pool-roll';
-    const rollName = `Roll ${g.name || g.notation} — ${g.notation}`;
-    rollBtn.title = rollName;
-    rollBtn.setAttribute('aria-label', rollName);
-    // The digit shortcut, surfaced where it acts (hover/focus only — it is
-    // a keyboard hint, not chrome; rows past 9 have no key).
-    if (ord <= 9) {
-      const ordEl = document.createElement('span');
-      ordEl.className = 'pool-ord';
-      ordEl.textContent = String(ord);
-      ordEl.setAttribute('aria-hidden', 'true');
-      rollBtn.appendChild(ordEl);
+      if (poolsEdit) {
+        const editBtn = document.createElement('button');
+        editBtn.className = 'group-edit tile-edit';
+        editBtn.textContent = '✎';
+        editBtn.title = 'Edit name, notation & category';
+        editBtn.addEventListener('click', () => beginEditGroup(g.id));
+        const delBtn = document.createElement('button');
+        delBtn.className = 'group-del tile-del';
+        delBtn.textContent = '✕';
+        delBtn.title = 'Delete pool';
+        delBtn.addEventListener('click', () => {
+          if (pop && pop.source === 'group' && pop.groupId === g.id) closePopover();
+          groups = groups.filter((x) => x.id !== g.id);
+          saveGroups();
+          renderGroups();
+        });
+        tile.append(editBtn, delBtn);
+      }
+
+      grid.appendChild(tile);
+      if (pop && pop.source === 'group' && pop.groupId === g.id) {
+        tile.classList.add('open');
+        pop.row = tile;
+      }
     }
-    rollBtn.appendChild(buildDieStrip(types, POOL_STRIP_CAP, { grouped: true }));
-    rollBtn.appendChild(buildRollCue());
-    const rowUnits = new Set(types).size;
-    rollBtn.classList.toggle('cue-tight', cueTight(Math.min(rowUnits, POOL_STRIP_CAP) + (rowUnits > POOL_STRIP_CAP ? 1 : 0)));
-    rollBtn.addEventListener('click', () => rollGroup(g));
-    // Manage mode disarms the click as anti-misclick, NOT as a lock: the
-    // digit shortcuts stay live (a keyboard roll is always deliberate).
-    rollBtn.disabled = poolsEdit;
-
-    const modsBtn = document.createElement('button');
-    modsBtn.className = 'group-mods pool-mods';
-    modsBtn.textContent = '±';
-    modsBtn.title = 'Tweak — modifiers, target, moment';
-    modsBtn.addEventListener('click', () => togglePopover(g, row));
-    line2.append(rollBtn, modsBtn);
-
-    // Right-click anywhere on the row = ± too (a pointer bonus, never the
-    // sole path — the visible ± button above carries touch and keyboard).
-    row.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      togglePopover(g, row);
-    });
-
-    row.append(line1, line2);
-    groupsListEl.appendChild(row);
-    // renderGroups can run while this group's popover is open (e.g. after a
-    // variant save) — re-anchor it to the fresh row.
-    if (pop && pop.source === 'group' && pop.groupId === g.id) {
-      row.classList.add('open');
-      pop.row = row;
-    }
+    groupsListEl.appendChild(grid);
   }
 }
 renderGroups();
@@ -5951,6 +6082,9 @@ document.addEventListener('keydown', (e) => {
     // the overlay z-order, so every layer above it peels first. Esc is one
     // of its only three closes (≣ toggle, header ✕, Esc — never a click-away).
     else if (isLogFlyoutOpen()) closeLogFlyout();
+    // The staged draft empties before the table sweeps: Esc mirrors Enter's
+    // draft-first priority.
+    else if (tray.length || cmdInput.value) clearDraft();
     else {
       // Nothing left to peel: Esc SWEEPS your last settled roll (the
       // keyboard pair with Enter = keep — see lastRollActionable). A no-op
@@ -5994,17 +6128,22 @@ document.addEventListener('keydown', (e) => {
     case 'l': toggleLogFlyout(); return; // the roll log is a rail flyout now, not a panel
     case 's': setSound(!soundOn); return;
     case 'Enter': {
-      // Enter = KEEP the last roll (Esc's affirmative twin). A focused
-      // button owns Enter (it activates); the table only takes the spare.
+      // A focused button owns Enter (it activates); the table takes the
+      // spare. The staged DRAFT outranks the last roll: Enter GOES when
+      // dice are staged ('1 4 6 Enter'), else it KEEPS the last roll
+      // (Esc's affirmative twin).
       if (e.target instanceof HTMLElement && e.target.closest('button, a, [tabindex]')) return;
+      if ((cmdResult && cmdResult.ok) || tray.length > 0) { rollDraft(); return; }
       const last = lastRollActionable();
       if (last) requestCollectRoll(last.rollId);
       return;
     }
     default:
       if (e.key >= '1' && e.key <= '9') {
-        const g = groups[Number(e.key) - 1]; // 1-indexed in list order
-        if (g) rollGroup(g);
+        // Digits STAGE by rendered shelf order (the Rack): one verb with the
+        // tiles. Wisdom+Swords+Zeal → roll is '1 4 6 Enter'.
+        const g = renderedPools[Number(e.key) - 1];
+        if (g) stageGroup(g);
       }
   }
 });

@@ -154,4 +154,35 @@ t('caps: more than 40 groups truncates, never throws', () => {
   assert.equal(out.length, 40);
 });
 
+// ---- codec v3: categories (Pools Rack 2026-08-01) --------------------------
+t('v3: category rides the segment and round-trips', () => {
+  const gs = [{ id: 1, name: 'Wisdom', notation: '2d8', category: 'Attributes' }];
+  const out = decodeGroups(encodeGroups(gs));
+  assert.equal(out[0].name, 'Wisdom');
+  assert.equal(out[0].category, 'Attributes');
+  assert.equal(out[0].notation, '2d8');
+});
+t('v3: a category-less record encodes byte-identically to v2', () => {
+  const plain = [{ id: 1, name: 'Attack', notation: '1d20+5' }];
+  assert.equal(encodeGroups(plain), encodeGroups([{ ...plain[0], category: null }]));
+  assert.equal('category' in decodeGroups(encodeGroups(plain))[0], false);
+});
+t('v3: a pipe INSIDE a name is escaped, never a delimiter', () => {
+  const gs = [{ id: 1, name: 'A|B', notation: '1d6', category: 'C|D' }];
+  const out = decodeGroups(encodeGroups(gs));
+  assert.equal(out[0].name, 'A|B');
+  assert.equal(out[0].category, 'C|D');
+});
+t('v3: hostile category segments fail closed', () => {
+  // raw body 'x|%ZZ=1d6' — a malformed escape in the category half
+  const body = Buffer.from('x|%ZZ=1d6').toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  assert.equal(decodeGroups(body), null);
+});
+t('v3: sources notation survives the codec (2d8[Wisdom])', () => {
+  const gs = [{ id: 1, name: 'Cast', notation: '1d4+2d8[Wisdom]', category: 'Skills' }];
+  const out = decodeGroups(encodeGroups(gs));
+  assert.equal(out[0].notation, '1d4+2d8[Wisdom]');
+});
+
 if (process.exitCode !== 1) console.log(`all ${n} urlgroups tests pass`);

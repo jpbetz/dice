@@ -840,83 +840,108 @@ export const scenarios = [
   {
     name: 'pool-flyout',
     tags: ['smoke', 'chrome', 'groups'],
-    // Saved pools roll without pinning the panel open: with the panel
-    // collapsed, the tab flies the list out as a temporary overlay; a roll
-    // from one of its rows fires AND retracts the overlay, so the felt is
-    // unobstructed when the dice land. A real expand retires the overlay.
+    // The collapsed tab's hover flyout under the Rack: tiles STAGE from it,
+    // and a deliberate stage PROMOTES the flyout to the pinned panel (a
+    // hover surface must not host a multi-step compose); hover-and-leave
+    // stays transient.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.dbg('setPanelState({pools: false})');
       assert.equal((await a.dbg('panelState')).pools, false, 'panel collapsed');
-      assert.equal(await a.dbg('setGroupsFlyout(true)'), true, 'the tab flies the list out');
+      assert.equal(await a.dbg('setGroupsFlyout(true)'), true, 'the tab flies the rack out');
       assert.ok(await a.eval(`(() => {
         const r = document.querySelector('#builder-panel .panel-body').getBoundingClientRect();
         return r.width > 0 && r.height > 0;
-      })()`), 'the flyout renders the list');
-      await a.eval(`document.querySelector('#groups-list .pool-roll').click()`);
-      await a.settle();
-      assert.ok(await a.rollId(), 'the row rolled');
-      assert.equal(await a.dbg('groupsFlyout'), false, 'and the flyout retracted itself');
-      assert.equal((await a.dbg('panelState')).pools, false, 'the panel stayed collapsed');
+      })()`), 'the flyout renders the shelves');
+      await a.eval(`document.querySelector('#groups-list .tile-stage').click()`);
+      assert.ok((await a.dbg('trayState')).dice.length > 0, 'the tile staged from the flyout');
+      assert.equal(await a.dbg('groupsFlyout'), false, 'the flyout retired itself');
+      assert.equal((await a.dbg('panelState')).pools, true,
+        'a deliberate stage PROMOTES to the pinned panel');
+      await a.eval(`document.getElementById('clear-tray').click()`);
+      await a.dbg('setPanelState({pools: false})');
       await a.dbg('setGroupsFlyout(true)');
+      await a.dbg('setGroupsFlyout(false)');
+      assert.equal((await a.dbg('panelState')).pools, false, 'hover-and-leave stays transient');
       await a.dbg('setPanelState({pools: true})');
-      assert.equal(await a.dbg('groupsFlyout'), false, 'a real expand retires the overlay');
     },
   },
   {
     name: 'pools-quick',
     tags: ['smoke', 'chrome', 'groups'],
-    // P2 use-vs-manage: at rest the pools panel is READ-ONLY quick access —
-    // die-art strip buttons that roll, an always-visible ± (USE), and zero
-    // edit chrome. The header ✎ toggles manage mode: per-row ✎/✕ appear and
-    // the toolbar carries copy-link (demoted, never deleted — P4) + Done.
-    // Digits stay live in manage mode (the disable is anti-misclick, not a
-    // lock). No button ever nests inside a button (a11y sibling rule).
+    // THE RACK (2026-08-01): sources add, the pool rolls. At rest the panel
+    // is read-only tiles on category shelves — tapping a tile STAGES its
+    // dice into the sticky draft (never a broadcast roll); ± rides each
+    // tile's revealed corner (USE); ✎ gates manage overlays + the copy-link
+    // toolbar. Digits stage by rendered order; the draft cluster is the ONE
+    // gold roll button. No button ever nests inside a button.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
 
-      // Read-only rest state: no edit chrome anywhere in the panel.
+      // Read-only rest state: tiles, no edit chrome, no gold on the shelf.
       assert.equal(await a.eval(`document.querySelectorAll('#builder-panel .group-edit, #builder-panel .group-del').length`),
-        0, 'no per-row edit chrome at rest');
+        0, 'no per-tile edit chrome at rest');
       assert.equal(await a.eval(`document.getElementById('pools-toolbar').classList.contains('hidden')`),
         true, 'no toolbar (incl. copy-link) at rest');
-      assert.ok(await a.eval(`document.querySelectorAll('#groups-list .pool-roll').length >= 3`),
-        'every row is a strip button');
-      assert.ok(await a.eval(`(() => {
-        const c = document.querySelector('#groups-list .pool-roll .roll-cue');
-        return !!c && c.getAttribute('aria-hidden') === 'true' && c.textContent.includes('ROLL');
-      })()`), 'the hover ROLL cue rides every strip (decorative, aria-hidden)');
+      assert.ok(await a.eval(`document.querySelectorAll('#groups-list .tile-stage').length >= 3`),
+        'every pool is a stage tile');
+      assert.equal(await a.eval(`document.querySelectorAll('#groups-list .roll-cue').length`),
+        0, 'no ROLL cue on the shelf — gold belongs to the draft alone');
       assert.equal(await a.eval(`document.querySelectorAll('#builder-panel button button').length`),
         0, 'no button nests inside a button');
 
-      // The strip rolls; ± opens the popover.
+      // A tile STAGES (quiet, local); the draft cluster rolls.
       const logBefore = await a.logCount();
-      await a.eval(`document.querySelector('#groups-list .pool-roll').click()`);
+      await a.eval(`document.querySelector('#groups-list .tile-stage').click()`);
+      let ts = await a.dbg('trayState');
+      assert.ok(ts.dice.length > 0, 'the tile poured its dice into the draft');
+      assert.ok(ts.sources.some(Boolean), 'staged dice carry their source pool');
+      assert.equal(await a.logCount(), logBefore, 'staging never broadcasts a roll');
+      assert.ok((await a.eval(`document.getElementById('cmd-input').value`)).includes('['),
+        'the draft notation carries the source label');
+      await a.eval(`document.getElementById('tray-roll').click()`);
       await a.waitFor(
         `(window.__diceDebug.sim(60), document.getElementById('log-list').childElementCount > ${logBefore})`,
-        { desc: 'clicking the dice rolls the pool' },
+        { desc: 'the draft cluster rolls the staged pool' },
       );
-      await a.eval(`document.querySelector('#groups-list .pool-mods').click()`);
+      await a.eval(`document.getElementById('clear-tray').click()`);
+
+      // ± opens the popover from the tile corner.
+      await a.eval(`document.querySelector('#groups-list .tile-mods').click()`);
       const pop = await a.dbg('popover');
       assert.ok(pop && pop.open && pop.source === 'group', '± opens the popover on the pool');
       await a.eval(`document.getElementById('pop-close').click()`);
 
-      // Manage mode: chrome appears, strips disarm, digits stay live.
+      // Digits stage by rendered order; Enter rolls the composed draft.
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: '1'}))`);
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: '2'}))`);
+      ts = await a.dbg('trayState');
+      assert.ok(new Set(ts.sources.filter(Boolean)).size >= 2, 'two pools staged by digits');
+      const logMid = await a.logCount();
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}))`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(60), document.getElementById('log-list').childElementCount > ${logMid})`,
+        { desc: "Enter rolls the staged draft ('1 2 Enter')" },
+      );
+
+      // Esc empties a staged draft before it ever sweeps the table.
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: '1'}))`);
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
+      assert.deepEqual((await a.dbg('trayState')).dice, [], 'Esc clears the staged draft first');
+
+      // Manage mode: overlays appear, tiles disarm, digits still stage.
       assert.equal(await a.dbg('setPoolsEditMode(true)'), true, '✎ enters manage mode');
       assert.ok(await a.eval(`document.querySelectorAll('#builder-panel .group-edit').length >= 3`),
-        'per-row pencils appear');
+        'per-tile pencils appear');
       assert.equal(await a.eval(`document.getElementById('pools-toolbar').classList.contains('hidden')`),
         false, 'the toolbar appears');
       assert.ok(await a.eval(`!!document.querySelector('#pools-toolbar #copy-link')`),
         'copy-link lives in the manage toolbar');
-      assert.equal(await a.eval(`document.querySelector('#groups-list .pool-roll').disabled`),
-        true, 'strips disarm in manage mode');
-      const logMid = await a.logCount();
+      assert.equal(await a.eval(`document.querySelector('#groups-list .tile-stage').disabled`),
+        true, 'tiles disarm in manage mode (anti-misclick, not a lock)');
       await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: '1'}))`);
-      await a.waitFor(
-        `(window.__diceDebug.sim(60), document.getElementById('log-list').childElementCount > ${logMid})`,
-        { desc: 'digit shortcuts stay live in manage mode' },
-      );
+      assert.ok((await a.dbg('trayState')).dice.length > 0, 'digits still stage in manage mode');
+      await a.eval(`document.getElementById('clear-tray').click()`);
 
       // Done exits; collapsing the panel also exits (transience).
       await a.eval(`document.getElementById('pools-done').click()`);
@@ -1052,8 +1077,8 @@ export const scenarios = [
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       assert.equal(await a.eval(`document.querySelector('#head-compose .ph-label').textContent`),
         'Pools', 'ONE panel since the merge, labelled Pools');
-      assert.equal(await a.eval(`document.querySelector('.pools-sub').textContent`),
-        'Saved pools', 'the saved list keeps its name inside it');
+      assert.equal(await a.eval(`document.querySelector('.pool-sec-head').textContent`),
+        'Pools', 'the uncategorized shelf is plainly named');
       assert.equal(await a.eval(`document.getElementById('group-name').placeholder`),
         'Name this pool…', 'the save field names a pool');
       assert.equal(await a.eval(`document.getElementById('pop-update').textContent`),

@@ -17,14 +17,16 @@ limitations under the License.
 // Stateless group sharing: encode saved groups into the URL hash so a
 // bookmarked link restores them anywhere, no storage required.
 //
-// Codec v2 (docs/UX.md §1.5): the body before base64url is
-// "name=notation;name2=notation2" where BOTH halves are
-// encodeURIComponent-escaped (';'/'='/'#' are delimiters) and notation is the
-// canonical string from js/notation.js. An empty name segment ("=4d6dl1") is
-// legal — an unnamed group is labelled by its notation. Decoding tries the
-// notation grammar first and falls back to the v1 dice-formula ("3d4+1d6")
-// for old links; since v1 formulas are a strict subset of the grammar, every
-// existing #g= link keeps decoding. Hostile input yields null, never a throw.
+// Codec v3 (Pools Rack, 2026-08-01): the body before base64url is
+// "name|category=notation;..." — name and category each
+// encodeURIComponent-escaped, joined by a RAW '|' (encodeURIComponent always
+// escapes '|' inside values, so a raw pipe can only be the v3 delimiter).
+// Category is optional: a category-less segment is byte-identical to v2
+// ("name=notation"), so old links and old clients keep working (an old
+// client reading a v3 link degrades to a name like 'Wisdom|Attributes' —
+// ugly, never broken). An empty name segment ("=4d6dl1") stays legal.
+// Decoding tries the notation grammar first and falls back to the v1
+// dice-formula ("3d4+1d6"); hostile input yields null, never a throw.
 //
 // Kept dependency-free beyond js/notation.js (itself import-free) so this
 // module still runs under Node for tests.
@@ -40,7 +42,11 @@ const MAX_NOTATION = 500;
 export function encodeGroups(groups) {
   const body = groups
     .slice(0, MAX_GROUPS)
-    .map((g) => `${encodeURIComponent(g.name || '')}=${encodeURIComponent(g.notation || '')}`)
+    .map((g) => {
+      const name = encodeURIComponent(g.name || '');
+      const cat = g.category ? `|${encodeURIComponent(g.category)}` : '';
+      return `${name}${cat}=${encodeURIComponent(g.notation || '')}`;
+    })
     .join(';');
   return btoa(body).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -69,9 +75,16 @@ export function decodeGroups(encoded) {
     if (!part) continue;
     const eq = part.indexOf('=');
     if (eq < 0) return null;
-    let name, raw;
+    let name, category = null, raw;
     try {
-      name = cutText(decodeURIComponent(part.slice(0, eq)), 24);
+      const head = part.slice(0, eq);
+      const pipe = head.indexOf('|'); // raw '|' = the v3 category delimiter
+      if (pipe >= 0) {
+        name = cutText(decodeURIComponent(head.slice(0, pipe)), 24);
+        category = cutText(decodeURIComponent(head.slice(pipe + 1)), 24) || null;
+      } else {
+        name = cutText(decodeURIComponent(head), 24);
+      }
       raw = decodeURIComponent(part.slice(eq + 1)).trim();
     } catch {
       return null;
@@ -87,7 +100,9 @@ export function decodeGroups(encoded) {
       if (!dice) return null;
       notation = canonicalNotation({ dice, mods: null });
     }
-    groups.push({ id: groups.length + 1, name, notation });
+    const rec = { id: groups.length + 1, name, notation };
+    if (category) rec.category = category;
+    groups.push(rec);
     if (groups.length >= MAX_GROUPS) break;
   }
   return groups.length ? groups : null;
