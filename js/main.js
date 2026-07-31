@@ -904,9 +904,12 @@ function stepWhisking(dt) {
   if (landed) recompositeFelt();
 }
 
-// One compact marker per shelved roll: roller color dot + total + the active
-// lens's word ('?' while face down), plus a ✕ ANY player may use — §7.7
-// universal housekeeping. Rebuilt whole on every shelf/lens/reveal change.
+// One QUIET marker per shelved roll (P1 quiet by default): at rest, just the
+// roller's color dot on an enlarged hover/tap target — no total, no lens
+// word, no tiny ✕, and a held roll never shouts '?'. Hover/tap expands the
+// peek card (§7.7.1), which carries the full result, Reveal for the
+// authority, and the prominent clear-✕ ANY player may use (§7.7 universal
+// housekeeping). Rebuilt whole on every shelf/lens/reveal change.
 function renderShelfMarkers() {
   // Markers mid-fade are NOT ours to wipe: an eviction is 'roll-cleared'
   // immediately followed by 'roll-collected', so a wholesale innerHTML reset
@@ -919,43 +922,17 @@ function renderShelfMarkers() {
   const clusters = [...shelfClusters.values()].sort((a, b) => a.seq - b.seq);
   for (const c of clusters) {
     const entry = log.find((e) => e.rollId === c.rollId) || null;
-    const hidden = !!entry && entryHidden(entry);
     const el = document.createElement('div');
     el.className = 'shelf-marker';
+    el.dataset.rollId = c.rollId;
     const dot = document.createElement('span');
     dot.className = 'sm-dot';
     dot.style.background = (entry && entry.color) || '#8a7f6e';
     el.appendChild(dot);
-    const total = document.createElement('span');
-    total.className = 'sm-total';
-    total.textContent = !entry || hidden ? '?' : String(entry.total);
-    el.appendChild(total);
-    const meaning = entry && !hidden ? entryMeaning(entry) : null;
-    if (meaning) {
-      const word = document.createElement('span');
-      word.className = `sm-word tier-${meaning.tier}`;
-      word.textContent = meaning.word;
-      el.appendChild(word);
-    }
-    // The marker carries Reveal for a hidden roll, because the shelf is
-    // where a held roll now spends its life: auto-collect fires on ANYONE's
-    // next roll, so the banner's Reveal can be gone before the authority ever
-    // had a frame to press it. Without this the '?' is permanent. Rendered
-    // ONLY for the reveal authority (the server enforces it regardless).
-    if (entry && canReveal(entry)) {
-      const rv = document.createElement('button');
-      rv.className = 'sm-reveal';
-      rv.textContent = 'Reveal';
-      rv.title = 'Flip this roll face up for the table';
-      rv.addEventListener('click', () => requestReveal(c.rollId));
-      el.appendChild(rv);
-    }
-    const x = document.createElement('button');
-    x.className = 'sm-x';
-    x.textContent = '✕';
-    x.title = 'Clear this roll for everyone';
-    x.addEventListener('click', () => requestClearRoll(c.rollId));
-    el.appendChild(x);
+    // A held roll's Reveal lives in its peek card: the shelf is where a held
+    // roll spends its life (auto-collect fires on ANYONE's next roll), and
+    // the peek renders Reveal for the authority (the server enforces it
+    // regardless) — the resting marker stays a quiet dot either way.
     if (entry && entry.playerName) el.title = `${entry.playerName} · ${entry.label}`;
     else if (entry) el.title = entry.label;
     // Peek (§7.7.1): hover opens after the intent delay (desktop); a tap — or
@@ -1062,8 +1039,8 @@ function renderPeek() {
   const hidden = !entry || entryHidden(entry);
   peekEl.textContent = '';
 
-  // header: roller dot + name (their color) + label, and the universal ✕ —
-  // clearing from the peek is the same path as the marker's ✕.
+  // header: roller dot + name (their color) + label. The clear-✕ lives at
+  // the card's base — see the foot below.
   const head = document.createElement('div');
   head.className = 'pk-head';
   const dot = document.createElement('span');
@@ -1082,12 +1059,6 @@ function renderPeek() {
     who.textContent = entry ? entry.label : 'collected roll';
   }
   head.appendChild(who);
-  const x = document.createElement('button');
-  x.className = 'sm-x';
-  x.textContent = '✕';
-  x.title = 'Clear this roll for everyone';
-  x.addEventListener('click', () => requestClearRoll(c.rollId));
-  head.appendChild(x);
   peekEl.appendChild(head);
 
   const total = document.createElement('div');
@@ -1136,6 +1107,20 @@ function renderPeek() {
     actions.appendChild(rv);
     peekEl.appendChild(actions);
   }
+
+  // The card's base carries the ONE prominent clear-✕ — the unified 'clear
+  // this roll' gesture (same glyph, same sentence as the banner's and the
+  // verdict card's). Any player may use it once a roll is shelved (§7.7
+  // universal housekeeping; the server allows it for collected rolls).
+  const foot = document.createElement('div');
+  foot.className = 'pk-foot';
+  const clear = document.createElement('button');
+  clear.className = 'clear-x pk-clear';
+  clear.textContent = '✕';
+  clear.title = 'Clear this roll for everyone';
+  clear.addEventListener('click', () => requestClearRoll(c.rollId));
+  foot.appendChild(clear);
+  peekEl.appendChild(foot);
 
   peekEl.classList.remove('hidden');
   measurePeek();
@@ -1951,12 +1936,13 @@ function renderBannerActions(entry) {
 
     // §7.7.2: the roller also gets a ✕ — clear the dice outright, no shelf.
     // Same non-optimistic pattern as Collect: applyClearRoll (broadcast or
-    // solo-synchronous) hides the banner; a failed POST keeps it.
+    // solo-synchronous) hides the banner; a failed POST keeps it. .clear-x:
+    // the unified 'clear this roll' gesture (banner · verdict card · peek).
     if (mine) {
       const x = document.createElement('button');
-      x.className = 'btn ghost banner-btn';
+      x.className = 'btn ghost banner-btn clear-x';
       x.textContent = '✕';
-      x.title = "Clear this roll's dice from the table";
+      x.title = 'Clear this roll for everyone';
       x.addEventListener('click', () => {
         x.disabled = true;
         requestClearRoll(entry.rollId).then((ok) => {
@@ -2890,6 +2876,25 @@ window.__diceDebug = {
   },
   get whiskingCount() { return whisking.length; },
   get pendingCollects() { return [...pendingCollects.keys()]; },
+  // shelf quiet-by-default (P1): the resting markers' shape, for asserting
+  // they stay dot-only targets with no always-on total/word/✕. JSON-safe.
+  get shelfMarkers() {
+    return [...shelfLayer.querySelectorAll('.shelf-marker')]
+      .filter((el) => !el.classList.contains('chip-clearing'))
+      .map((el) => ({
+        rollId: el.dataset.rollId || null,
+        dotOnly: el.childElementCount === 1
+          && el.firstElementChild.classList.contains('sm-dot'),
+        text: el.textContent,
+        hasTotal: !!el.querySelector('.sm-total'),
+        hasX: !!el.querySelector('.sm-x'),
+        hasReveal: !!el.querySelector('.sm-reveal'),
+        // offsetWidth/Height: the layout target size, unaffected by the
+        // chip-pop scale transform still playing when a test measures.
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+      }));
+  },
   // visibility (goal 11): reveal/offer/claim entry points + redaction
   // observability. Everything returned is JSON-safe primitives.
   reveal(rollId) { requestReveal(rollId); },
@@ -2951,6 +2956,7 @@ window.__diceDebug = {
       breakdown: (peekEl.querySelector('.pk-breakdown') || { textContent: '' }).textContent,
       total: (peekEl.querySelector('.pk-total') || { textContent: '' }).textContent,
       hasReveal: !!peekEl.querySelector('.sm-reveal'),
+      hasClear: !!peekEl.querySelector('.pk-clear'),
       rect: (() => { const r = peekEl.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; })(),
     };
   },

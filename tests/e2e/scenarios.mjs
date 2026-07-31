@@ -108,6 +108,66 @@ export const scenarios = [
     },
   },
   {
+    name: 'shelf-quiet',
+    tags: ['smoke', 'shelf'],
+    // Quiet by default (P1): a resting shelf marker is just the roller's dot
+    // on an enlarged target — no total, no lens word, no tiny ✕, and a held
+    // roll never shouts '?'. The detail lives in the peek, whose base carries
+    // the one prominent clear-✕ — and that ✕ clears for everyone, from any
+    // seat (§7.7 universal housekeeping).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.roll('d20 dc 10');
+      await b.settle();
+      const rid = await a.rollId();
+      assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, 'collect accepted');
+      for (const t of [a, b]) {
+        await t.waitFor(
+          `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+          { desc: 'roll shelved' },
+        );
+      }
+      const markers = await b.dbg('shelfMarkers');
+      assert.equal(markers.length, 1, 'one resting marker');
+      const m = markers[0];
+      assert.equal(m.rollId, rid, 'marker addresses its roll');
+      assert.equal(m.dotOnly, true, 'resting marker is the roller dot only');
+      assert.equal(m.text.trim(), '', 'no text on the resting marker');
+      assert.equal(m.hasTotal, false, 'no always-on total');
+      assert.equal(m.hasX, false, 'no tiny ✕');
+      assert.ok(m.width >= 24 && m.height >= 24, `an easy target (${m.width}×${m.height})`);
+
+      // The peek recovers the detail and carries the prominent clear-✕.
+      assert.equal(await b.dbg(`peek(${JSON.stringify(rid)})`), rid, 'peek opens');
+      const ps = await b.dbg('peekState');
+      assert.ok(ps.total, 'the peek shows the total');
+      assert.equal(ps.hasClear, true, 'and the clear-✕ at its base');
+      await b.eval(`document.querySelector('#peek-card .pk-clear').click()`);
+      for (const t of [a, b]) {
+        await t.waitFor(
+          `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 0 && window.__diceDebug.tableDice.length === 0)`,
+          { desc: 'the peek ✕ clears the roll for everyone' },
+        );
+      }
+
+      // A held roll rests exactly as quiet: dot only, never '?'; its Reveal
+      // waits in the peek for the authority.
+      await a.roll('d20 held');
+      const hid = await a.rollId();
+      await a.dbg(`collectRoll(${JSON.stringify(hid)})`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        { desc: 'held roll shelved' },
+      );
+      const hm = (await a.dbg('shelfMarkers'))[0];
+      assert.equal(hm.dotOnly, true, 'a held roll rests just as quiet');
+      assert.ok(!hm.text.includes('?'), 'the marker never shouts ?');
+      assert.equal(await a.dbg(`peek(${JSON.stringify(hid)})`), hid, 'peek opens for the authority');
+      assert.equal((await a.dbg('peekState')).hasReveal, true, 'Reveal lives in the peek');
+    },
+  },
+  {
     name: 'auto-collect',
     tags: ['shelf'],
     // A new roll auto-collects the previous uncollected one — the table

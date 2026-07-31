@@ -769,29 +769,31 @@ body.mini #corner-controls { display: flex; }  /* corner survives mini mode */
 /* per-roll Done (§7.5): the chip fades over the same ~300 ms its die sinks */
 .value-chip.chip-clearing { opacity: 0 !important; transition: opacity 0.3s ease-out; }
 
-/* ---------- collect shelf markers (§7.7) ---------- */
-/* One compact marker per shelved roll, floating over its slot: roller dot +
-   total + active-lens word + a ✕ anyone may use. The layer itself never eats
-   clicks; each marker opts back in for its ✕. */
+/* ---------- collect shelf markers (§7.7, quiet by default — P1) ---------- */
+/* One QUIET marker per shelved roll, floating over its slot: at rest just
+   the roller's color dot, centered on an enlarged hover/tap target. Totals,
+   lens words, Reveal and the clear-✕ all live in the peek card (detail on
+   intent). The layer itself never eats clicks; each marker opts back in as
+   the peek's target. */
 #shelf-layer { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-table-labels); }
 .shelf-marker {
   position: absolute;
   transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 9px;
-  font-family: var(--font-display);
-  font-size: 12px;
-  color: var(--ivory);
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
   background: rgba(18, 14, 9, 0.85);
   border: 1px solid var(--panel-border);
-  border-radius: 9px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.6);
   pointer-events: auto;
-  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s;
   animation: chip-pop 0.3s cubic-bezier(0.2, 1.6, 0.4, 1);
 }
+.shelf-marker:hover { border-color: var(--gold); }
 /* A marker on its way out keeps its place for the fade but stops taking
    clicks: the roll that replaced it is already sitting under it. */
 .shelf-marker.chip-clearing {
@@ -799,20 +801,15 @@ body.mini #corner-controls { display: flex; }  /* corner survives mini mode */
   pointer-events: none;
   transition: opacity 0.3s ease-out;
 }
-.sm-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
-.sm-total { font-weight: 700; font-size: 15px; color: var(--gold-bright); }
-.sm-word { font-size: 11px; letter-spacing: 0.04em; }
-.sm-x {
-  background: none;
-  border: none;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 11px;
-  padding: 0 1px;
-  line-height: 1;
+.sm-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
 }
-.sm-x:hover { color: var(--ivory); }
-/* a held roll keeps its Reveal on the marker — the shelf is where it lives */
+/* a shelved roll's Reveal lives in its peek card (§7.7.1) — the resting
+   marker stays a quiet dot even while the roll is face down */
 .sm-reveal {
   background: none;
   border: 1px solid var(--panel-border);
@@ -827,9 +824,8 @@ body.mini #corner-controls { display: flex; }  /* corner survives mini mode */
 }
 .sm-reveal:hover { background: rgba(255, 214, 102, 0.16); }
 /* compact view: full shelf presence, scaled like the value chips (§7.4/§7.7) */
-body.mini .shelf-marker { font-size: 10px; padding: 2px 6px; gap: 4px; }
-body.mini .sm-total { font-size: 12px; }
-body.mini .sm-word { font-size: 9px; }
+body.mini .shelf-marker { width: 26px; height: 26px; }
+body.mini .sm-dot { width: 9px; height: 9px; }
 body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
 
 /* ---------- peek cards (§7.7.1) ---------- */
@@ -881,6 +877,32 @@ body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
 .pk-breakdown .crit-max { color: var(--gold-bright); font-weight: 700; }
 .pk-breakdown .crit-min { color: var(--red); font-weight: 700; }
 .pk-actions { margin-top: 6px; }
+
+/* ---------- the unified 'clear this roll' ✕ (P1, cross-cutting) ---------- */
+/* One gesture, one look, one sentence — the post-roll banner, the verdict
+   card and the peek card's base all carry the same ✕ with the same title:
+   'Clear this roll for everyone'. */
+.clear-x:hover,
+.clear-x:hover:not(:disabled) {
+  color: #fff;
+  border-color: var(--red);
+  background: rgba(226, 73, 59, 0.16);
+}
+/* the peek's base: prominent, one easy gesture wide */
+.pk-foot { margin-top: 8px; }
+.pk-foot .clear-x {
+  width: 100%;
+  padding: 5px 0;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--panel-border);
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
 /* compact view keeps the full card, scaled like the markers (§7.7.1) */
 body.mini .peek-card { min-width: 150px; padding: 7px 10px 9px; }
 body.mini .pk-head { font-size: 10px; }
