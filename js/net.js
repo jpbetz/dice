@@ -36,7 +36,7 @@ const STREAM_OPEN_TIMEOUT_MS = 3000;
 const REOPEN_MIN_MS = 1000;
 const REOPEN_MAX_MS = 15000;
 const SSE_EVENTS = [
-  'hello', 'player-joined', 'player-left', 'player-renamed',
+  'hello', 'player-joined', 'player-left', 'player-renamed', 'pools-changed',
   'roll', 'clear', 'reveal', 'roll-cleared', 'roll-collected',
   'offer', 'offer-claimed', 'offer-rescinded',
   'settings-changed',
@@ -168,6 +168,14 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     async rename(newName) {
       const res = await withPlayer('/api/rename', { name: newName });
       if (res.ok) name = newName; // future silent re-joins use the new name
+      return res.ok;
+    },
+
+    // Publish your saved pools for the owner switcher (UX §7.9 / ROADMAP
+    // 2b). A display copy only — localStorage stays the owner's truth. The
+    // table (you included) learns via the 'pools-changed' broadcast.
+    async setPools(pools) {
+      const res = await withPlayer('/api/pools', { pools });
       return res.ok;
     },
 

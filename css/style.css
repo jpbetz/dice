@@ -639,6 +639,58 @@ html, body {
   transition: border-color 0.4s, box-shadow 0.4s;
 }
 
+/* The owner switcher (ROADMAP 2b): quiet owner chips above the shelves;
+   a teammate's rack stands behind the read-only banner-chip (also the way
+   back). Small windows fold chip names away — the dots stay. */
+.pools-switcher { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 8px; }
+.owner-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 110px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--hair);
+  background: var(--panel);
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.owner-chip:hover { color: var(--ivory); border-color: rgba(255, 255, 255, 0.18); }
+.owner-chip[aria-pressed="true"] {
+  color: var(--ivory);
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.06);
+}
+.owner-chip .roster-dot { width: 7px; height: 7px; }
+.owner-chip .oc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pools-owner-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ivory);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.pools-owner-banner .pob-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pools-owner-banner .pob-tag { flex: none; color: var(--muted); }
+.pools-owner-banner .pob-x { flex: none; margin-left: auto; color: var(--muted); }
+.pools-owner-banner:hover { border-color: rgba(255, 255, 255, 0.3); }
+.pools-owner-banner:hover .pob-x { color: var(--ivory); }
+.pools-none { margin: 2px 0 8px; font-size: 12px; color: var(--muted); }
+@media (max-width: 720px) {
+  .owner-chip .oc-name { display: none; }
+  .owner-chip { padding: 3px 6px; }
+}
+
 /* manage-mode toolbar: copy-link (demoted here, P4) + Done */
 #pools-toolbar { display: flex; gap: 8px; margin: 2px 0 8px; }
 #pools-toolbar.hidden { display: none; }

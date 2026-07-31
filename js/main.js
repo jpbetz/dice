@@ -3282,6 +3282,32 @@ window.__diceDebug = {
   // edit chrome exists only while this is on.
   get poolsEditMode() { return poolsEdit; },
   setPoolsEditMode(on) { setPoolsEdit(on); return poolsEdit; },
+  // scenario seeding: replace the rack wholesale (validated + persisted).
+  // Scenarios share one browser profile per origin, so a test must never
+  // depend on the rack an earlier scenario left behind.
+  setGroups(list) {
+    if (!Array.isArray(list)) return false;
+    const next = [];
+    for (let i = 0; i < list.length; i++) {
+      const raw = list[i];
+      if (!raw || typeof raw.notation !== 'string' || !parseNotation(raw.notation).ok) return false;
+      const rec = { id: Date.now() + i, name: cutText(String(raw.name || ''), 24), notation: raw.notation };
+      if (raw.category) rec.category = cutText(String(raw.category), 24);
+      next.push(rec);
+    }
+    groups = next;
+    saveGroups();
+    renderGroups();
+    return groups.length;
+  },
+  // the owner switcher (ROADMAP 2b): whose rack the Pools panel shows
+  get poolsOwner() { return poolsOwner; },
+  setPoolsOwner(id) { setPoolsOwner(id || null); return poolsOwner; },
+  get netPlayers() {
+    return players.map((p) => ({ id: p.id, name: p.name,
+      pools: (p.pools || []).map((g) => ({ ...g })) }));
+  },
+  publishPools() { publishPools(); return true; },
   // the Pools tab flyout (the WHOLE panel body — draft + list — on hover
   // of the collapsed tab), driven directly where headless tests can't hover.
   get groupsFlyout() { return groupsPanelEl.classList.contains('flyout'); },
@@ -4096,9 +4122,21 @@ function reflectGroupsToUrl() {
   }
 }
 
+// Publish the rack to the room whenever it changes (ROADMAP 2b): a
+// debounced display copy for the owner switcher — localStorage stays the
+// owner's truth. The timer also dodges module-boot ordering: the first
+// module-scope saveGroups() runs before the net section exists; by the
+// time the timer fires, publishPools' own guard settles it.
+let poolsPublishTimer = null;
+function schedulePublishPools() {
+  clearTimeout(poolsPublishTimer);
+  poolsPublishTimer = setTimeout(() => { poolsPublishTimer = null; publishPools(); }, 250);
+}
+
 function saveGroups() {
   save(LS_GROUPS, groups);
   reflectGroupsToUrl();
+  schedulePublishPools();
 }
 saveGroups();
 
@@ -4390,6 +4428,7 @@ function stageGroup(g) {
 let poolsEdit = false;
 function setPoolsEdit(on) {
   poolsEdit = !!on;
+  if (poolsEdit) poolsOwner = null; // ✎ manages YOUR rack — fall home first
   if (!poolsEdit) editingGroupId = null; // leaving manage mode closes any open editor
   document.getElementById('pools-edit').setAttribute('aria-pressed', String(poolsEdit));
   document.getElementById('pools-toolbar').classList.toggle('hidden', !poolsEdit);
@@ -4397,6 +4436,41 @@ function setPoolsEdit(on) {
 }
 document.getElementById('pools-edit').addEventListener('click', () => setPoolsEdit(!poolsEdit));
 document.getElementById('pools-done').addEventListener('click', () => setPoolsEdit(false));
+
+// ---------------------------------------------------------------------------
+// The owner switcher (ROADMAP 2b): browse a teammate's published rack.
+// Foreign lists are STAGE-ONLY furniture — no ±, no manage, no ordinals:
+// digits always act on YOUR pools, and each player's localStorage stays
+// their own truth. The standing 'read-only' banner-chip is also the way
+// back. Net state is declared HERE (not in the net section below) because
+// the module-scope renderGroups() boot call already reads the roster.
+// ---------------------------------------------------------------------------
+let net = null;         // live connection handle from net.connect (online only)
+let netOnline = false;
+let players = [];
+let poolsOwner = null;  // a player id, or null = your own rack
+
+function poolsOwnerPlayer() {
+  return poolsOwner ? players.find((p) => p.id === poolsOwner) || null : null;
+}
+
+function setPoolsOwner(id) {
+  poolsOwner = id || null;
+  if (poolsOwner && poolsEdit) { setPoolsEdit(false); return; } // manage is yours-only; renders
+  renderGroups();
+}
+
+// Share the rack with the room: name + notation + category, capped like the
+// server caps it. Fire-and-forget — everyone (us included) hears the
+// 'pools-changed' echo, and a solo table simply has no one to tell.
+function publishPools() {
+  if (!net) return;
+  net.setPools(groups.slice(0, 40).map((g) => {
+    const rec = { name: g.name || '', notation: g.notation };
+    if (g.category) rec.category = g.category;
+    return rec;
+  }));
+}
 
 // Category shelves (the Rack): fixed trio order — Attributes, Skills,
 // Motivations — then other categories alphabetically, uncategorized last
@@ -4419,10 +4493,119 @@ function buildSections(list) {
 // The digits stage by RENDERED order (rebuilt on every paint).
 let renderedPools = [];
 
+// The switcher row: quiet owner chips (you first), only when a table has
+// teammates. Small windows fold the names away — dots stay (ROADMAP 2b).
+function renderPoolsSwitcher() {
+  const you = net ? net.playerId : null;
+  const others = netOnline ? players.filter((p) => p.id !== you) : [];
+  if (!others.length) return;
+  const row = document.createElement('div');
+  row.className = 'pools-switcher';
+  const chip = (label, color, id) => {
+    const b = document.createElement('button');
+    b.className = 'owner-chip';
+    b.setAttribute('aria-pressed', String((id || null) === poolsOwner));
+    if (color) {
+      const dot = document.createElement('span');
+      dot.className = 'roster-dot';
+      dot.style.background = color;
+      b.appendChild(dot);
+    }
+    const nm = document.createElement('span');
+    nm.className = 'oc-name';
+    nm.textContent = label;
+    b.appendChild(nm);
+    b.title = id ? `Browse ${label}'s pools` : 'Your pools';
+    b.addEventListener('click', () => setPoolsOwner(id));
+    row.appendChild(b);
+  };
+  chip('You', net ? net.color : null, null);
+  for (const p of others) chip(p.name, p.color, p.id);
+  groupsListEl.appendChild(row);
+}
+
+// A teammate's rack: the standing banner-chip (also the way back), then
+// stage-only tiles. Staging SNAPSHOTS name+notation — a later
+// pools-changed rewrites these tiles, never an already-staged chip.
+function renderForeignPools(owner) {
+  const banner = document.createElement('button');
+  banner.className = 'pools-owner-banner';
+  banner.title = 'Back to your pools';
+  const nm = document.createElement('span');
+  nm.className = 'pob-name';
+  nm.textContent = `${owner.name}'s pools`;
+  const tag = document.createElement('span');
+  tag.className = 'pob-tag';
+  tag.textContent = 'read-only';
+  const x = document.createElement('span');
+  x.className = 'pob-x';
+  x.setAttribute('aria-hidden', 'true');
+  x.textContent = '\u2715';
+  banner.append(nm, tag, x);
+  banner.addEventListener('click', () => setPoolsOwner(null));
+  groupsListEl.appendChild(banner);
+
+  // fail-closed per tile: render only what parses HERE (the server already
+  // validated; a version skew still must not paint a dead tile)
+  const pools = (Array.isArray(owner.pools) ? owner.pools : [])
+    .filter((g) => g && typeof g.notation === 'string' && parseNotation(g.notation).ok);
+  if (!pools.length) {
+    const none = document.createElement('div');
+    none.className = 'pools-none';
+    none.textContent = `${owner.name} has not shared any pools yet.`;
+    groupsListEl.appendChild(none);
+    return;
+  }
+  for (const sec of buildSections(pools)) {
+    const head = document.createElement('div');
+    head.className = 'plabel pool-sec-head';
+    head.textContent = sec.label;
+    groupsListEl.appendChild(head);
+    const grid = document.createElement('div');
+    grid.className = 'pool-grid';
+    for (const g of sec.pools) {
+      const res = parseNotation(g.notation);
+      const tile = document.createElement('div');
+      tile.className = 'pool-tile foreign';
+      const stage = document.createElement('button');
+      stage.className = 'tile-stage';
+      const label = g.name || g.notation;
+      stage.title = `Stage ${label} \u2014 ${g.notation}`;
+      stage.setAttribute('aria-label', `Stage ${label} \u2014 ${g.notation}`);
+      const art = document.createElement('span');
+      art.className = 'tile-art';
+      art.appendChild(buildDieStrip(res.spec.dice, 2, { grouped: true }));
+      const nameEl = document.createElement('span');
+      nameEl.className = 'tile-name' + (g.name ? '' : ' as-notation');
+      nameEl.textContent = label;
+      const add = document.createElement('span');
+      add.className = 'tile-add';
+      add.setAttribute('aria-hidden', 'true');
+      add.textContent = '+';
+      stage.append(art, nameEl, add);
+      stage.addEventListener('click', () => stageGroup({ name: g.name, notation: g.notation }));
+      tile.appendChild(stage);
+      grid.appendChild(tile);
+    }
+    groupsListEl.appendChild(grid);
+  }
+}
+
 function renderGroups() {
   groupsListEl.innerHTML = '';
-  groupsEmptyEl.style.display = groups.length ? 'none' : 'block';
+  // Digit targets are ALWAYS your own pools in your own rendered order —
+  // browsing a teammate's rack must never remap your keyboard.
   renderedPools = [];
+  for (const sec of buildSections(groups)) renderedPools.push(...sec.pools);
+  if (poolsOwner && !poolsOwnerPlayer()) poolsOwner = null; // the owner left; fall home
+  renderPoolsSwitcher();
+  if (poolsOwner) {
+    groupsEmptyEl.style.display = 'none';
+    renderForeignPools(poolsOwnerPlayer());
+    return;
+  }
+  groupsEmptyEl.style.display = groups.length ? 'none' : 'block';
+  let ownOrd = 0;
   for (const sec of buildSections(groups)) {
     const head = document.createElement('div');
     head.className = 'plabel pool-sec-head';
@@ -4431,8 +4614,7 @@ function renderGroups() {
     const grid = document.createElement('div');
     grid.className = 'pool-grid';
     for (const g of sec.pools) {
-      renderedPools.push(g);
-      const ord = renderedPools.length;
+      const ord = ++ownOrd;
 
       // This tile is being edited: the editor card spans the shelf.
       if (g.id === editingGroupId) {
@@ -6164,9 +6346,8 @@ document.addEventListener('keydown', (e) => {
 const LS_NAME = 'dice.name.v1';
 const ROOM = new URLSearchParams(window.location.search).get('room') || 'table';
 
-let net = null;         // live connection handle from net.connect (online only)
-let netOnline = false;
-let players = [];
+// net / netOnline / players are declared beside the owner switcher above —
+// the module-scope renderGroups() boot call reads the roster.
 let offers = [];        // open offered-roll cards for this room
 
 const rosterEl = document.getElementById('rail-roster');
@@ -6454,7 +6635,9 @@ function leaveTable() {
   try { localStorage.removeItem(LS_NAME); } catch { /* ignore */ }
   players = [];
   offers = [];
+  poolsOwner = null;
   renderPlayers(); // empties the rail roster (players = [])
+  renderGroups();  // the switcher and any foreign rack leave with the seat
   renderOffers();
   setPill(null);
   updateIdentityChip();
@@ -6545,6 +6728,7 @@ function handleNetEvent(type, data) {
     case 'hello': // initial state + re-sync after a reconnect
       players = data.players || [];
       renderPlayers();
+      renderGroups(); // roster + published pools resync (owner validity re-checked)
       log = (data.log || []).map(rollToLogEntry);
       renderLog();
       // The join backlog seeds the ≣ unread badge (closed flyout only): a
@@ -6602,18 +6786,34 @@ function handleNetEvent(type, data) {
       if (data.player && !players.some((p) => p.id === data.player.id)) {
         players.push(data.player);
         renderPlayers();
+        renderGroups(); // the owner switcher gains a chip
       }
       break;
-    case 'player-left':
+    case 'player-left': {
+      const gone = players.find((p) => p.id === data.playerId);
       players = players.filter((p) => p.id !== data.playerId);
       renderPlayers();
+      if (poolsOwner === data.playerId && gone) {
+        showSettingsNote(`${gone.name} left \u2014 back to your pools`);
+      }
+      renderGroups(); // drops their chip; falls home if we were browsing them
       break;
+    }
     case 'player-renamed': {
       const p = players.find((x) => x.id === data.playerId);
       if (p) {
         p.name = data.name;
         renderPlayers();
+        renderGroups(); // switcher chip + a standing owner banner track names
       }
+      break;
+    }
+    case 'pools-changed': {
+      const p = players.find((x) => x.id === data.playerId);
+      if (p) p.pools = data.pools || [];
+      // repaint only when the rack on screen is the one that changed —
+      // your own echo lands in `players` silently
+      if (poolsOwner === data.playerId) renderGroups();
       break;
     }
     case 'roll': // the only path that animates in online mode — ours included
@@ -6821,6 +7021,8 @@ async function initNet() {
       try { localStorage.setItem(LS_NAME, me.name); } catch { /* ignore */ }
     }
     renderPlayers(); // the rail roster fills in (solo it is simply empty)
+    renderGroups();  // the owner switcher appears once the roster is known
+    publishPools();  // share the rack (display copy; localStorage stays truth)
     log = (conn.log || []).map(rollToLogEntry); // server history for late joiners
     renderLog();
     offers = conn.offers || [];

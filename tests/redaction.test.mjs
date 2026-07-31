@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { parseNotation } from '../js/notation.js';
-import { projectEntryFor, resolveVisibility, entryExistsFor, cleanName } from '../server.js';
+import { projectEntryFor, resolveVisibility, entryExistsFor, cleanName, sanitizePools } from '../server.js';
 
 // server.js installs a swallow-and-continue uncaughtException handler for its
 // own resilience; a test run must crash loudly instead.
@@ -746,6 +746,32 @@ try {
   for (const s of streams) s.close();
   proc.kill();
 }
+
+// -- published pools (ROADMAP 2b): the display-copy sanitizer ---------------
+await t('sanitizePools: stores the CANONICAL spelling', async () => {
+  const out = sanitizePools([{ name: 'Attack', notation: ' 1D20 +2 ' }]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].notation, parseNotation(' 1D20 +2 ').canonical);
+  assert.equal(out[0].name, 'Attack');
+  assert.ok(!('category' in out[0]), 'category is present-or-absent');
+});
+await t('sanitizePools: per-entry fail-closed, list cap refused', async () => {
+  const out = sanitizePools([
+    { name: 'ok', notation: '2d6' },
+    { name: 'bad', notation: 'not dice' },        // dropped
+    { notation: 42 },                              // dropped
+    'garbage',                                     // dropped
+    { name: 'x'.repeat(99), notation: 'd4', category: 'Skills' },
+  ]);
+  assert.equal(out.length, 2);
+  assert.equal(out[1].name.length, 24, 'name takes the room cut');
+  assert.equal(out[1].category, 'Skills');
+  assert.equal(sanitizePools(Array.from({ length: 41 }, () => ({ notation: 'd6' }))), null,
+    'over the list cap is a refusal, not a trim');
+  assert.equal(sanitizePools('nope'), null);
+  assert.equal(sanitizePools([{ notation: 'd6'.padEnd(300, ' ') }]).length, 0,
+    'an overlong notation is dropped');
+});
 
 if (failed) {
   console.error(`${failed} of ${n} redaction tests FAILED${skipped ? ` (${skipped} skipped)` : ''}`);

@@ -53,6 +53,8 @@ const MAX_ROOM = 64;
 const LOG_CAP = 200;              // rolls kept per room
 const MAX_ROOMS = 500;            // live rooms across the server
 const MAX_PLAYERS_PER_ROOM = 40;
+const MAX_POOLS_PER_PLAYER = 40;
+const MAX_POOL_NOTATION = 200;
 const MAX_STREAMS_PER_PLAYER = 4; // extra SSE streams evict the oldest
 const OFFER_CAP = 20;             // offered rolls kept per room
 const HEARTBEAT_MS = 20_000;
@@ -288,7 +290,9 @@ function getRoom(name) {
 }
 
 function publicPlayers(room) {
-  return [...room.players.values()].map((p) => ({ id: p.id, name: p.name, color: p.color }));
+  return [...room.players.values()].map((p) => ({
+    id: p.id, name: p.name, color: p.color, pools: p.pools || [],
+  }));
 }
 
 function dropRoomIfEmpty(room) {
@@ -500,6 +504,7 @@ async function handleJoin(req, res) {
     id: crypto.randomUUID(),
     name,
     color: PALETTE[room.colorCursor % PALETTE.length],
+    pools: [],
     clients: new Set(),
     reapTimer: null,
   };
@@ -509,7 +514,7 @@ async function handleJoin(req, res) {
   scheduleReap(room, player, JOIN_GRACE_MS);
 
   log(`join    room=${roomName} name=${name} color=${player.color} players=${room.players.size}`);
-  broadcast(room, 'player-joined', { player: { id: player.id, name: player.name, color: player.color } });
+  broadcast(room, 'player-joined', { player: { id: player.id, name: player.name, color: player.color, pools: [] } });
 
   // The room state here is the same snapshot the SSE `hello` opens with —
   // players, log, offers, settings — so a client that renders from the join
@@ -1243,6 +1248,48 @@ async function handleRename(req, res) {
   sendJson(res, 200, { ok: true });
 }
 
+// Published pools (ROADMAP 2b, the owner switcher) are FURNITURE, not
+// authority: each player's localStorage stays the truth for their own rack;
+// the server holds a display copy so teammates can browse and stage from it.
+// Per-entry fail-closed: a record whose notation does not parse (server
+// grammar is the arbiter, same as /api/roll) or overflows its caps is
+// dropped, and what is stored is the CANONICAL spelling. The list cap is a
+// refusal, like every other entity cap. Pool names take cleanString, not
+// cleanName: they are display + stage labels, never whisper addresses —
+// and the client re-sanitizes them into [label] form at stage time anyway.
+function sanitizePools(value) {
+  if (!Array.isArray(value) || value.length > MAX_POOLS_PER_PLAYER) return null;
+  const out = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') continue;
+    if (typeof raw.notation !== 'string' || raw.notation.length > MAX_POOL_NOTATION) continue;
+    const parsed = parseNotation(raw.notation);
+    if (!parsed.ok) continue;
+    const rec = { name: cleanString(raw.name, MAX_NAME) || '', notation: parsed.canonical };
+    const cat = cleanString(raw.category, MAX_NAME);
+    if (cat) rec.category = cat;
+    out.push(rec);
+  }
+  return out;
+}
+
+async function handlePools(req, res) {
+  const body = await readJsonBody(req);
+  if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
+
+  const found = lookup(body.value);
+  if (found.error) return sendError(res, ...found.error);
+  const { room, player } = found;
+
+  const pools = sanitizePools(body.value.pools);
+  if (!pools) return sendError(res, 400, `pools must be a list of at most ${MAX_POOLS_PER_PLAYER}`, 'bad_pools');
+
+  player.pools = pools;
+  log(`pools   room=${room.name} name=${player.name} count=${pools.length}`);
+  broadcast(room, 'pools-changed', { playerId: player.id, pools });
+  sendJson(res, 200, { ok: true });
+}
+
 async function handleOffer(req, res) {
   const body = await readJsonBody(req);
   if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
@@ -1569,6 +1616,7 @@ const server = http.createServer((req, res) => {
     if (route === '/api/roll' && req.method === 'POST') return handleRoll(req, res);
     if (route === '/api/reveal' && req.method === 'POST') return handleReveal(req, res);
     if (route === '/api/rename' && req.method === 'POST') return handleRename(req, res);
+    if (route === '/api/pools' && req.method === 'POST') return handlePools(req, res);
     if (route === '/api/offer' && req.method === 'POST') return handleOffer(req, res);
     if (route === '/api/claim' && req.method === 'POST') return handleClaim(req, res);
     if (route === '/api/unoffer' && req.method === 'POST') return handleUnoffer(req, res);
@@ -1633,4 +1681,4 @@ function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor, cleanName };
+export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor, cleanName, sanitizePools };

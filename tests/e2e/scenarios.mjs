@@ -1073,6 +1073,75 @@ export const scenarios = [
     },
   },
   {
+    name: 'shared-pools',
+    tags: ['smoke', 'groups'],
+    // The owner switcher (ROADMAP 2b): racks publish to the room; a teammate
+    // can browse them read-only and STAGE from them; digits never leave your
+    // own rack; a staged chip is a snapshot a later edit cannot rewrite.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+
+      // Seed BOTH racks explicitly — origins share a profile across
+      // scenarios, so inherited state is nobody's contract.
+      await a.dbg(`setGroups([{name: 'Claws', notation: '1d20', category: 'Attributes'},
+        {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
+      await b.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}])`);
+      await b.waitFor(`window.__diceDebug.netPlayers.some((p) =>
+        p.name === 'Alice' && p.pools.some((g) => g.name === 'Claws' && g.category === 'Attributes'))`,
+        { desc: "Alice's rack reaches Bob" });
+      const alice = (await b.dbg('netPlayers')).find((p) => p.name === 'Alice');
+
+      // The switcher stands once the table has teammates: You + Alice.
+      assert.equal(await b.eval(`document.querySelectorAll('#groups-list .owner-chip').length`), 2,
+        'Bob sees two owner chips');
+
+      // Manage mode is yours-only: switching away exits it.
+      await b.dbg('setPoolsEditMode(true)');
+      await b.dbg(`setPoolsOwner(${JSON.stringify(alice.id)})`);
+      assert.equal(await b.dbg('poolsEditMode'), false, 'browsing a teammate leaves manage mode');
+
+      // The standing banner-chip + stage-only tiles (no ±, no manage, no ordinals).
+      const bannerText = await b.eval(`(document.querySelector('#groups-list .pools-owner-banner') || {}).textContent || ''`);
+      assert.ok(bannerText.includes("Alice's pools") && bannerText.includes('read-only'),
+        `the read-only banner stands (got: ${bannerText})`);
+      assert.equal(await b.eval(`document.querySelectorAll('#groups-list .pool-tile.foreign').length`), 3,
+        "Alice's three pools render as tiles");
+      assert.equal(await b.eval(`document.querySelectorAll('#groups-list .pool-tile.foreign .tile-mods, #groups-list .pool-tile.foreign .tile-edit, #groups-list .pool-tile.foreign .pool-ord').length`),
+        0, 'foreign tiles carry no ±, no manage, no ordinals');
+      assert.equal(await b.eval(`document.querySelector('#groups-list .pool-sec-head').textContent`),
+        'Attributes', "Alice's categories shelve her rack");
+
+      // Staging from a foreign tile pours into MY draft with HER pool's name.
+      await b.eval(`[...document.querySelectorAll('#groups-list .pool-tile.foreign .tile-stage')]
+        .find((t) => t.textContent.includes('Claws')).click()`);
+      let ts = await b.dbg('trayState');
+      assert.ok(ts.sources.includes('Claws'), `the foreign pool is the source (got: ${ts.sources})`);
+      const stagedLen = ts.dice.length;
+
+      // A live edit repaints her tiles — but never a chip already staged.
+      const claws = (await a.dbg('groups')).find((g) => g.name === 'Claws');
+      await a.dbg(`editPool(${JSON.stringify(claws.id)}, {name: 'Fangs'})`);
+      await b.waitFor(`[...document.querySelectorAll('#groups-list .pool-tile.foreign .tile-name')]
+        .some((el) => el.textContent === 'Fangs')`, { desc: 'pools-changed repaints the rack' });
+      ts = await b.dbg('trayState');
+      assert.ok(ts.sources.includes('Claws'), 'the staged chip keeps its stage-time snapshot');
+
+      // Digits act on BOB'S rack even while browsing Alice's.
+      await b.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: '1'}))`);
+      ts = await b.dbg('trayState');
+      assert.ok(ts.sources.includes('Attack'), `digit 1 staged Bob's own pool (got: ${ts.sources})`);
+
+      // The banner is the way back; the draft crosses the switch intact.
+      await b.eval(`document.querySelector('#groups-list .pools-owner-banner').click()`);
+      assert.equal(await b.dbg('poolsOwner'), null, 'the banner falls home');
+      ts = await b.dbg('trayState');
+      assert.ok(ts.dice.length > stagedLen, 'the draft survived the switch');
+      assert.equal(await b.eval(`document.querySelectorAll('#groups-list .pool-tile.foreign').length`), 0,
+        'home shows your own rack again');
+    },
+  },
+  {
     name: 'terminology',
     tags: ['smoke', 'chrome'],
     // The vocabulary is 'pool' / 'saved pool'; 'tray' and 'group' survive only
