@@ -305,7 +305,8 @@ html, body {
 .input-seg button { font-size: 12px; padding: 6px 4px; }
 #builder-panel.mode-dice #cmd { display: none; }
 #builder-panel.mode-text #die-buttons,
-#builder-panel.mode-text #tray { display: none; }
+#builder-panel.mode-text #tray-actions,
+#builder-panel.mode-text #tray-hint { display: none; }
 
 /* ---------- the draft cluster (P1: the dice are the buttons) ---------- */
 /* One roll button of die art; per-die ✕ removers overlay it from a SIBLING
@@ -341,22 +342,34 @@ html, body {
   background: none;
   box-shadow: none;
 }
-#tray-hint { margin: 4px 2px 0; }
+/* Ghost text in the die-fill slot: same box the dice occupy (placeholder
+   semantics — filling it with dice replaces it). */
+#tray-hint.tray-ghost {
+  margin: 0;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-style: italic;
+  color: #5f574b;
+}
 #tray-hint.hidden { display: none; }
-.tray-line.hidden, .tray-save.hidden { display: none; }
-/* The tier rule (2026-07): secondary controls reveal on approach,
-   EVERYWHERE the tier appears. Same treatment as the pool rows' ± — at
-   rest the draft is just its dice; hover or keyboard focus in the draft
-   zone brings up [Save][±][✕]; coarse pointers keep them standing (no
-   hover to lean on). The open save morph is its own row and stays put. */
-.draft-zone .tray-line { opacity: 0; transition: opacity 0.12s; }
-.draft-zone:hover .tray-line,
-.draft-zone:focus-within .tray-line { opacity: 1; }
-@media (pointer: coarse) { .draft-zone .tray-line { opacity: 1; } }
+/* an empty draft's ± never surfaces, even on hover — nothing to modify */
+.tray-line2 .pool-mods:disabled { opacity: 0; }
+.tray-save.hidden { display: none; }
+/* The roll line mirrors a pool row's line 2 exactly: [strip][±] siblings,
+   ± revealing on approach (the .pool-line2 rules carry it). The tier
+   refinement (2026-07-31): Save · Clear are draft MANAGEMENT, not part of
+   the roll operation — they stand whenever a draft exists. */
+.tray-line2 { margin-top: 10px; }
+.tray-line2.hidden { display: none; }
+.tray-line2 .tray-cluster { flex: 1; min-width: 0; margin-top: 0; }
+.draft-actions { margin-top: 8px; }
+.draft-actions.hidden { display: none; }
+.draft-actions .btn { flex: 1; font-size: 12px; }
 /* the draft line's ± — same demoted .pool-mods look as the pool rows,
    sized to sit between the Save/✕ buttons */
 .tray-line .pool-mods { flex: none; min-height: 0; width: 32px; align-self: stretch; font-size: 14px; }
-#clear-tray { flex: none; width: 38px; }
 #save-confirm, #save-cancel { flex: none; width: 42px; }
 
 /* ---------- saved pools (read-only quick access, P2) ---------- */
@@ -427,15 +440,13 @@ html, body {
   z-index: 0;
 }
 .pool-roll:hover:not(:disabled) .roll-cue { opacity: 1; }
-.roll-cue i { font-style: normal; }
-.pool-roll:hover:not(:disabled) .roll-cue i:nth-of-type(2) { animation: cue-2 0.9s steps(1) infinite; }
-.pool-roll:hover:not(:disabled) .roll-cue i:nth-of-type(3) { animation: cue-3 0.9s steps(1) infinite; }
-@keyframes cue-2 { 0%, 32% { opacity: 0; } 33%, 100% { opacity: 1; } }
-@keyframes cue-3 { 0%, 65% { opacity: 0; } 66%, 100% { opacity: 1; } }
+/* Chevrons: STATIC, shorter than the word, fading left → right — a trail
+   pointing at the click, not a blinker (animation retired 2026-07-31). */
+.roll-cue i { font-style: normal; font-size: 0.68em; margin-left: 0.12em; }
+.roll-cue i:nth-of-type(1) { opacity: 0.9; }
+.roll-cue i:nth-of-type(2) { opacity: 0.55; }
+.roll-cue i:nth-of-type(3) { opacity: 0.28; }
 .tray-cluster:has(.die-x:hover) .tray-roll .roll-cue { opacity: 0; }
-@media (prefers-reduced-motion: reduce) {
-  .roll-cue i { animation: none !important; opacity: 1 !important; }
-}
 .pool-roll .die-art { width: 28px; height: 28px; pointer-events: none; }
 .strip-dot {
   width: 11px; height: 11px;
@@ -463,6 +474,7 @@ html, body {
 }
 .pool-line2 .pool-mods { opacity: 0; transition: opacity 0.12s, color 0.12s; }
 .group-row:hover .pool-mods,
+.pool-line2:hover .pool-mods,
 .pool-mods:focus-visible { opacity: 1; color: var(--muted); }
 .pool-mods:hover { opacity: 1; color: var(--gold-bright); background: rgba(212, 175, 55, 0.10); border: none; }
 @media (pointer: coarse) { .pool-line2 .pool-mods { opacity: 1; } }

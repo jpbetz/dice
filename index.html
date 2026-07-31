@@ -107,19 +107,27 @@ limitations under the License.
            A treatment adopted for one surface's control tier applies to
            that tier everywhere. -->
       <div id="draft-zone" class="draft-zone">
-      <div id="tray" class="tray-cluster">
-        <button id="tray-roll" class="pool-roll tray-roll hidden"></button>
-        <div id="tray-x-layer" class="tray-x-layer"></div>
-        <p id="tray-hint" class="hint">tap a die button to add — then click your dice to roll</p>
-      </div>
-      <!-- Contextual controls, only while the draft is non-empty. This row
-           keeps the #tray-actions id: it anchors the ± popover. Save morphs
-           into the inline name row below (always ADDITIVE — updates stay on
-           the by-id paths: the row ✎ editor and popover 'Update this pool'). -->
-      <div class="btn-row tray-line hidden" id="tray-actions">
-        <button id="save-group" class="btn">Save</button>
+      <!-- The roll line: structurally a saved-pool row's line 2 — [dice
+           strip][±] as siblings, the ± revealing on approach exactly like
+           there. Keeps the #tray-actions id: it anchors the ± popover. -->
+      <div class="pool-line2 tray-line2" id="tray-actions">
+        <div id="tray" class="tray-cluster">
+          <button id="tray-roll" class="pool-roll tray-roll hidden"></button>
+          <div id="tray-x-layer" class="tray-x-layer"></div>
+          <!-- Ghost text IN the die-fill slot (placeholder semantics): the
+               hint occupies exactly the space the dice will fill, so adding
+               them reads as physically filling it. -->
+          <p id="tray-hint" class="hint tray-ghost">tap a die button to add — then click your dice to roll</p>
+        </div>
         <button id="tray-mods" class="group-mods pool-mods" title="Modifiers, target, offer — the pool draft">±</button>
-        <button id="clear-tray" class="btn" title="Clear draft">✕</button>
+      </div>
+      <!-- Draft management (the tier refinement, 2026-07-31): Save and
+           Clear are not part of the ROLL operation, so they STAND once
+           dice exist — no hover to find them. Save morphs into the inline
+           name row (always ADDITIVE — updates stay on the by-id paths). -->
+      <div class="btn-row draft-actions hidden" id="draft-actions">
+        <button id="save-group" class="btn">Save</button>
+        <button id="clear-tray" class="btn" title="Clear the draft">✕ Clear</button>
       </div>
       <div class="btn-row tray-save hidden" id="tray-save-row">
         <input id="group-name" type="text" placeholder="Name this pool…" maxlength="24">

@@ -3116,7 +3116,7 @@ window.__diceDebug = {
     return {
       dice: [...tray],
       rollVisible: !trayRollBtn.classList.contains('hidden'),
-      hasActions: !trayActionsEl.classList.contains('hidden'),
+      hasActions: !draftActionsEl.classList.contains('hidden'), // Save · Clear stand
       saveOpen: !traySaveRow.classList.contains('hidden'),
       hint: !trayHintEl.classList.contains('hidden'),
       xCount: trayXLayer.children.length,
@@ -3246,7 +3246,8 @@ const trayEl = document.getElementById('tray');
 const trayRollBtn = document.getElementById('tray-roll');
 const trayXLayer = document.getElementById('tray-x-layer');
 const trayHintEl = document.getElementById('tray-hint');
-const trayActionsEl = document.getElementById('tray-actions');
+const trayActionsEl = document.getElementById('tray-actions');   // the roll line: [cluster][±]
+const draftActionsEl = document.getElementById('draft-actions'); // Save · ✕ Clear — always stand
 const traySaveRow = document.getElementById('tray-save-row');
 const trayModsBtn = document.getElementById('tray-mods');
 const clearTrayBtn = document.getElementById('clear-tray');
@@ -3453,9 +3454,12 @@ function renderTray() {
 
 function updateTrayButtons() {
   const usable = (cmdResult && cmdResult.ok) || tray.length > 0;
-  // The control line exists only while there is a draft to act on; leaving
-  // the save morph open with nothing to save would strand a dead input.
-  trayActionsEl.classList.toggle('hidden', !usable || !traySaveRow.classList.contains('hidden'));
+  // The roll line always holds its slot in Dice view (empty = ghost text in
+  // the die-fill area); the draft-management row (Save · Clear) STANDS
+  // whenever there is a draft to act on — it is not part of the roll
+  // operation, so it never waits for a hover (tier refinement 2026-07-31).
+  // The save morph swaps in for the management row only.
+  draftActionsEl.classList.toggle('hidden', !usable || !traySaveRow.classList.contains('hidden'));
   if (!usable) closeSaveMorph();
   trayRollBtn.disabled = !usable;
   trayModsBtn.disabled = !usable;
@@ -4219,7 +4223,7 @@ function openSaveMorph() {
   groupNameInput.value = (echoedDraft && echoedDraft.name
     && echoedDraft.canonical === canonical) ? echoedDraft.name : '';
   traySaveRow.classList.remove('hidden');
-  trayActionsEl.classList.add('hidden');
+  draftActionsEl.classList.add('hidden'); // the morph swaps in for Save · Clear
   groupNameInput.focus();
   groupNameInput.select();
 }
@@ -4227,7 +4231,7 @@ function closeSaveMorph() {
   if (traySaveRow.classList.contains('hidden')) return;
   traySaveRow.classList.add('hidden');
   const usable = (cmdResult && cmdResult.ok) || tray.length > 0;
-  trayActionsEl.classList.toggle('hidden', !usable);
+  draftActionsEl.classList.toggle('hidden', !usable);
 }
 function saveDraftAsPool() {
   paintCmd();
