@@ -209,11 +209,25 @@ export const scenarios = [
       assert.equal(await a.dbg(`peek(${JSON.stringify(rid2)})`), rid2, 'peek opens on the reroll');
       await a.eval(`document.querySelector('#peek-card .pk-tweak').click()`);
       const pop = await a.dbg('popover');
-      assert.ok(pop && pop.open, '± opens the ± popover');
-      assert.equal(pop.source, 'tray', 'bound to the New pool draft');
-      assert.equal(String(pop.dc), '9', 'the dc rides into the draft');
-      const box = await a.eval(`document.getElementById('cmd-input').value`);
-      assert.ok(box.includes('2d6+3'), `the box carries the notation (${box})`);
+      assert.ok(pop && pop.open, '± opens the ± popover IN PLACE');
+      assert.equal(pop.source, 'shelf', 'bound to the shelved roll, no teleport');
+      assert.equal(String(pop.dc), '9', 'the dc rides in');
+      assert.ok((await a.dbg('peekState')) !== null, 'the peek pins while its popover lives');
+
+      // Esc peels the popover first, the card next (z order honored).
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
+      assert.equal(await a.dbg('popover'), null, 'Esc closes the shelf popover first');
+      assert.ok((await a.dbg('peekState')) !== null, 'the peek survives that Esc');
+
+      // Rolling a tweak from the shelf popover REPLACES the shelved roll.
+      await a.eval(`document.querySelector('#peek-card .pk-tweak').click()`);
+      const logN = await a.logCount();
+      await a.eval(`document.getElementById('pop-roll').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${logN} && window.__diceDebug.shelf.length === 0)`,
+        { desc: 'the tweak rolled and the shelved original left — replaced, not copied' },
+      );
+      assert.equal(await a.dbg('popover'), null, 'popover closed by the roll');
     },
   },
   {

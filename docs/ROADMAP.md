@@ -87,6 +87,11 @@ ladder; all of it is polish or a new rung.
   precedent exists for "reveal to the roller". §3.3 rejected it for step 4
   because reveal is currently total and one-way, which is what makes it
   auditable. Revisit only with a concrete table need.
+- **Targeted offers** *(TODO, Joe 2026-07-31)*: offer a roll claimable only
+  by a named player ("Bo, roll this save") instead of the whole table. The
+  machinery rhymes with whisper audiences — pin the claimant's `playerId`
+  at offer time, fail closed on unknown names — and the offer card shows
+  everyone the stakes while only the target gets the claim strip.
 - **Audience legibility.** A shrouded viewer reads the audience only when
   the roll has no `# comment` (§3.0) — `label` carries one or the other.
   Decide whether "who was whispered to" deserves its own always-present

@@ -1059,6 +1059,7 @@ function cancelPeekTimers() {
 }
 
 function closePeek() {
+  if (peekPinned()) return; // an open shelf popover holds the card (Esc peels it first)
   cancelPeekTimers();
   peekRollId = null;
   peekEl.classList.add('hidden');
@@ -1083,6 +1084,13 @@ function schedulePeekOpen(rollId) {
 function schedulePeekClose() {
   cancelPeekTimers();
   peekCloseTimer = setTimeout(closePeek, PEEK_CLOSE_MS);
+}
+
+// The peek PINS while its own ± popover lives: pointer-leave and click-away
+// must not sweep the card out from under an open editor. closePopover
+// releases the pin; the next leave closes the card normally.
+function peekPinned() {
+  return !!(pop && pop.source === 'shelf' && peekRollId !== null);
 }
 
 // Rebuild the open card's content from the log entry (the same source the
@@ -1202,10 +1210,13 @@ function renderPeek() {
           exp: entry.spec.exp || null,
           faceDown: entry.faceDown,
         }, entryVis(entry));
-      closePeek();
-      setPanel('compose', true);
-      loadIntoBox(raw, '');
-      openPopover({ source: 'tray', row: document.getElementById('tray-actions') });
+      openPopover({
+        source: 'shelf',
+        raw,
+        name: entry.label || '',
+        rollId: c.rollId,
+        row: peekEl, // anchored to the card; the peek pins while it lives
+      });
     });
     actions.appendChild(tweak);
   }
@@ -1275,6 +1286,7 @@ document.addEventListener('pointerdown', (e) => {
   if (peekRollId === null) return;
   const t = e.target;
   if (t instanceof HTMLElement && (peekEl.contains(t) || t.closest('.shelf-marker'))) return;
+  if (peekPinned() && t instanceof HTMLElement && t.closest('#mods-popover')) return;
   closePeek();
 });
 
@@ -4412,11 +4424,19 @@ function trayDraftNotation() {
 // Open the ± popover bound to a source (UX §7.4): {source:'group', group, row}
 // or {source:'tray', row}. Roll / Offer / Save-as-variant act on the source.
 function openPopover(binding) {
-  let notation, name, groupId = null;
+  let notation, name, groupId = null, shelfRollId = null;
   if (binding.source === 'group') {
     notation = binding.group.notation;
     name = binding.group.name || binding.group.notation;
     groupId = binding.group.id;
+  } else if (binding.source === 'shelf') {
+    // A shelved roll's ± (the peek): the SAME popover as every other ±,
+    // anchored to the peek card — no teleport into the panel. Rolling from
+    // it REPLACES the shelved roll (like the peek's bare reroll); Save
+    // mints 'keep this roll as a pool'.
+    notation = binding.raw;
+    name = binding.name || notation;
+    shelfRollId = binding.rollId || null;
   } else {
     notation = trayDraftNotation();
     name = groupNameInput.value.trim() || 'Tray';
@@ -4428,6 +4448,7 @@ function openPopover(binding) {
   pop = {
     source: binding.source,
     groupId,
+    shelfRollId,
     name,
     row: binding.row || null,
     ...popStateFromParse(res),
@@ -4873,6 +4894,10 @@ popRollBtn.addEventListener('click', () => {
   const spec = popSpec();
   if (validateMods(spec.dice, spec.mods)) return;
   if (popVisBlocked()) return;
+  // Rolling a SHELVED roll's tweak replaces it, exactly like the peek's
+  // bare reroll: the clear goes first so the shelf never holds both.
+  const replacing = pop.source === 'shelf' ? pop.shelfRollId : null;
+  if (replacing) requestClearRoll(replacing);
   requestRoll(spec.dice, pop.comment || pop.name, {
     mods: spec.mods || undefined,
     faceDown: pop.vis.mode === 'held',
@@ -4882,6 +4907,7 @@ popRollBtn.addEventListener('click', () => {
     canonical: popCanonical(),
   });
   closePopover();
+  if (replacing) closePeek();
 });
 
 popOfferBtn.addEventListener('click', () => {
@@ -4939,6 +4965,10 @@ popVariantBtn.addEventListener('click', () => {
     const base = groups.find((g) => g.id === pop.groupId);
     const summary = modsSummary(spec.mods) || (pop.dc ? `dc${pop.dc}` : 'variant');
     popSaveName.value = cutText(`${(base && base.name) || pop.name} ${summary}`, 24);
+  } else if (pop.source === 'shelf') {
+    // 'keep this roll as a pool': suggest the roll's label unless it is
+    // bookkeeping (raw notation labels itself)
+    popSaveName.value = parseNotation(pop.name).ok ? '' : cutText(pop.name, 24);
   } else {
     popSaveName.value = '';
   }
@@ -5758,6 +5788,8 @@ document.addEventListener('keydown', (e) => {
     else if (isPaletteOpen()) closePalette();
     else if (!settingsModal.classList.contains('hidden')) closeSettingsModal();
     else if (isIdentityMenuOpen()) closeIdentityMenu();
+    // a shelf-bound popover rides ON the peek: peel it first, the card next
+    else if (pop && pop.source === 'shelf') closePopover();
     else if (isPeekOpen()) closePeek();
     else if (pop) closePopover();
     // The pinned log flyout is the END of the chain: it rides the bottom of
