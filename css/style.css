@@ -30,6 +30,37 @@ limitations under the License.
   --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --ease-plant: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ---- the layer scale (GOALS P2: one documented z ladder) ----------------
+     Every fixed overlay takes its z-index from here — never a bare number.
+     Bottom → top:
+       right-stack   ambient chrome (players + log)
+       panel         left panel, top controls, mini bar
+       table-labels  ambient table labels: value chips, shelf markers
+                     (corner controls ride this rung too)
+       banner        post-roll result banner
+       ceremony      roll-moment cards — ABOVE the table labels, so a verdict
+                     or cinematic card is never occluded by a floating die
+                     number (supersedes the old §2.4 chips-above-card rule)
+       offers        offered-roll cards — claimable over a playing ceremony
+       crit          crit overlay: the top of the roll moment
+       popover       ± popover
+       peek          shelf peek card (Esc peels it above the popover)
+       modal         settings + name modals
+       palette       quick roll palette
+       cheatsheet    keyboard cheatsheet (Esc peels it before the palette) */
+  --z-right-stack: 9;
+  --z-panel: 10;
+  --z-table-labels: 11;
+  --z-banner: 12;
+  --z-ceremony: 14;
+  --z-offers: 16;
+  --z-crit: 20;
+  --z-popover: 26;
+  --z-peek: 30;
+  --z-modal: 40;
+  --z-palette: 58;
+  --z-cheatsheet: 62;
 }
 
 * { box-sizing: border-box; }
@@ -96,7 +127,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  z-index: 10;
+  z-index: var(--z-panel);
 }
 
 #groups-panel {
@@ -298,7 +329,7 @@ html, body {
   right: 16px;
   display: flex;
   gap: 8px;
-  z-index: 10;
+  z-index: var(--z-panel);
 }
 
 /* ---------- right-side stack (players + log) ---------- */
@@ -311,7 +342,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  z-index: 9;
+  z-index: var(--z-right-stack);
   pointer-events: none;
 }
 #right-stack > * { pointer-events: auto; }
@@ -397,7 +428,7 @@ html, body {
   bottom: 26px;
   transform: translateX(-50%);
   text-align: center;
-  z-index: 12;
+  z-index: var(--z-banner);
   padding: 14px 34px;
   border-radius: 14px;
   background: var(--panel);
@@ -436,7 +467,7 @@ html, body {
 }
 
 /* ---------- per-die chips ---------- */
-#chips-layer { position: fixed; inset: 0; pointer-events: none; z-index: 11; }
+#chips-layer { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-table-labels); }
 .value-chip {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -474,7 +505,7 @@ html, body {
 #crit-overlay {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: var(--z-crit);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -520,7 +551,7 @@ html, body {
 #settings-modal {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -599,7 +630,7 @@ html, body {
 #name-modal {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -656,7 +687,7 @@ body.mini #mini-bar {
   left: 8px;
   bottom: 8px;
   right: 8px;
-  z-index: 10;
+  z-index: var(--z-panel);
 }
 .mini-pill {
   padding: 4px 11px;
@@ -696,7 +727,7 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
   bottom: 10px;
   display: flex;
   gap: 6px;
-  z-index: 11;
+  z-index: var(--z-table-labels);
 }
 .corner-btn {
   width: 34px;
@@ -742,7 +773,7 @@ body.mini #corner-controls { display: flex; }  /* corner survives mini mode */
 /* One compact marker per shelved roll, floating over its slot: roller dot +
    total + active-lens word + a ✕ anyone may use. The layer itself never eats
    clicks; each marker opts back in for its ✕. */
-#shelf-layer { position: fixed; inset: 0; pointer-events: none; z-index: 11; }
+#shelf-layer { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-table-labels); }
 .shelf-marker {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -803,11 +834,12 @@ body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
 
 /* ---------- peek cards (§7.7.1) ---------- */
 /* ONE expanded result card above a shelved slot: the banner's content for
-   that roll. z 30 sits above the ± popover (26) and below the settings/name
-   modals (40) — matching the Esc peel order. */
+   that roll. The peek rung sits above the ± popover and below the
+   settings/name modals (the layer scale in :root) — matching the Esc peel
+   order. */
 .peek-card {
   position: fixed;
-  z-index: 30;
+  z-index: var(--z-peek);
   min-width: 190px;
   max-width: min(320px, calc(100vw - 16px));
   padding: 10px 14px 12px;
@@ -883,7 +915,7 @@ body.mini .pk-breakdown { font-size: 10px; }
   display: flex;
   flex-direction: column;
   gap: 10px;
-  z-index: 13;
+  z-index: var(--z-offers); /* claimable over a playing ceremony (layer scale) */
   max-width: 340px;
 }
 .offer-card {
@@ -983,12 +1015,13 @@ body.mini #offers-layer { top: 8px; max-width: 260px; }
 .cheatsheet .cheat-note { padding-top: 5px; font-style: italic; color: #6b6154; }
 
 /* ---------- quick palette (Spotlight-style command strip) ---------- */
-/* Above every other layer except the keyboard cheatsheet: ceremony (10),
-   popover (26), modals (40) all sit underneath. Fully functional in mini. */
+/* Above every other layer except the keyboard cheatsheet: ceremony, popover
+   and the modals all sit underneath (the layer scale in :root). Fully
+   functional in mini. */
 #palette-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 58;
+  z-index: var(--z-palette);
   background: rgba(10, 8, 5, 0.45);
   backdrop-filter: blur(2px);
 }
@@ -1029,7 +1062,7 @@ body.mini #offers-layer { top: 8px; max-width: 260px; }
 #kbd-overlay {
   position: fixed;
   inset: 0;
-  z-index: 62; /* above the palette: Esc peels cheatsheet first */
+  z-index: var(--z-cheatsheet); /* above the palette: Esc peels cheatsheet first */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1067,7 +1100,7 @@ body.mini #result-verdict { font-size: 11px; }
   width: 312px;
   max-height: calc(100vh - 24px);
   overflow-y: auto;
-  z-index: 26;
+  z-index: var(--z-popover);
   padding: 0;
   animation: pop-in 0.22s var(--ease-plant);
 }
@@ -1286,9 +1319,12 @@ body.mini .popover { width: min(94vw, 312px); }
    plus 'crit' (gold treatment), 'cinematic' (fanfare frame), 'skip'
    (suppress decorative motion when jumping to the verdict) and 'relit'
    (the card was repainted under a new rolling system: words change, not motion).
-   z-index 10 keeps value chips (z 11) above the card — §2.4 occlusion rule.
+   The layer rides --z-ceremony, ABOVE the ambient table labels (value chips,
+   shelf markers): the verdict/cinematic card owns the roll moment and is never
+   occluded by a floating die number. This supersedes the old §2.4 rule that
+   kept chips above the card — see the layer scale in :root.
 ---------------------------------------------------------------------------- */
-#ceremony-layer { position: fixed; inset: 0; z-index: 10; pointer-events: none; }
+#ceremony-layer { position: fixed; inset: 0; z-index: var(--z-ceremony); pointer-events: none; }
 #ceremony-layer.hidden { display: none; }
 #ceremony-layer.skip * { transition-duration: 0s !important; animation-duration: 0s !important; transition-delay: 0s !important; animation-delay: 0s !important; }
 

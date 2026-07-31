@@ -150,6 +150,29 @@ export const scenarios = [
     },
   },
   {
+    name: 'layer-scale',
+    tags: ['smoke', 'roll'],
+    // The one layer scale (P2): the ceremony/verdict layer renders ABOVE the
+    // ambient table labels (value chips, shelf markers) and the banner, and
+    // the crit overlay tops the whole roll moment — a verdict card is never
+    // occluded by a floating die number.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const z = (id) => a.eval(
+        `parseInt(getComputedStyle(document.getElementById('${id}')).zIndex, 10)`,
+      );
+      const [ceremony, chips, shelf, banner, crit, offers] = [
+        await z('ceremony-layer'), await z('chips-layer'), await z('shelf-layer'),
+        await z('result-banner'), await z('crit-overlay'), await z('offers-layer'),
+      ];
+      assert.ok(ceremony > chips, `ceremony above value chips (${ceremony} vs ${chips})`);
+      assert.ok(ceremony > shelf, `ceremony above shelf markers (${ceremony} vs ${shelf})`);
+      assert.ok(ceremony > banner, `ceremony above the banner (${ceremony} vs ${banner})`);
+      assert.ok(offers > ceremony, `offers stay claimable over a ceremony (${offers} vs ${ceremony})`);
+      assert.ok(crit > offers, `the crit overlay tops the moment (${crit} vs ${offers})`);
+    },
+  },
+  {
     name: 'settings-sync',
     tags: ['smoke', 'settings'],
     // Room settings are one shared truth: felt and interpretation system
