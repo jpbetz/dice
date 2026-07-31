@@ -58,6 +58,7 @@ export async function startServer(port) {
   let out = '';
   proc.stdout.on('data', (d) => { out += d; });
   proc.stderr.on('data', (d) => { out += d; });
+  proc.output = () => out; // the captured server log, for failure reports and tools/
   const deadline = Date.now() + 10000;
   while (Date.now() < deadline) {
     if (proc.exitCode !== null) throw new Error(`server exited early:\n${out.slice(-2000)}`);
@@ -265,7 +266,7 @@ export class Ctx {
   // time. Reproduced at d106a20 (pre-chrome-cleanup), so it is the headless
   // Chrome / CDP page churn, not the app. A single retry keeps the suite
   // honest: a real boot regression still fails twice in a row.
-  async newTable({ origin = 'localhost', name } = {}) {
+  async newTable({ origin = 'localhost', name, allowSolo = false } = {}) {
     for (let attempt = 0; ; attempt++) {
       const page = await this.browser.newPage();
       if (name) {
@@ -279,11 +280,19 @@ export class Ctx {
       try {
         await t.waitFor(
           `!!window.__diceDebug && window.__diceDebug.netReady`,
-          { desc: `app ready (${origin}, ${name || 'anon'})`, timeout: 20000 },
+          { desc: `app ready (${origin}, ${name || 'anon'})`, timeout: 30000 },
         );
+        // The ready promise resolves {online} — a tab that fell back to SOLO
+        // while a live server is right there is a broken boot (slow join,
+        // dropped stream), and every later cross-tab assertion would fail
+        // mysteriously. Say it here instead.
+        if (!allowSolo) {
+          const online = await t.eval(`window.__diceDebug.netReady.then((r) => r && r.online)`);
+          if (!online) throw new Error(`tab came up SOLO against a live server (${origin})`);
+        }
       } catch (e) {
         if (attempt > 0) { this.tables.push(t); throw e; }
-        console.log(`    (boot retry: ${origin} tab never became ready)`);
+        console.log(`    (boot retry: ${String(e.message || e).slice(0, 100)})`);
         await t.close().catch(() => {});
         continue;
       }

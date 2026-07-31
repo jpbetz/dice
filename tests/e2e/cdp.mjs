@@ -188,6 +188,17 @@ export class Page {
     return r.result.value;
   }
 
+  // Capture the page as a PNG. Shared by tools/drive.mjs step files (visual
+  // checks) — e2e scenarios keep asserting state via __diceDebug, not pixels.
+  async screenshot(path, { width = 1920, height = 1080 } = {}) {
+    const { writeFileSync } = await import('node:fs');
+    await this.browser.send('Emulation.setDeviceMetricsOverride',
+      { width, height, deviceScaleFactor: 1, mobile: false }, this.sessionId);
+    const { data } = await this.browser.send('Page.captureScreenshot', { format: 'png' }, this.sessionId);
+    writeFileSync(path, Buffer.from(data, 'base64'));
+    return path;
+  }
+
   async close() {
     try { await this.browser.send('Target.closeTarget', { targetId: this.targetId }); } catch { /* ignore */ }
   }
