@@ -263,6 +263,9 @@ html, body {
   transition: background 0.15s, border-color 0.15s;
 }
 .die-btn:hover { border-color: var(--die-color, var(--gold)); background: rgba(255,255,255,0.12); }
+/* The diamond is the NULL-ART FALLBACK only: tiles that carry real die art
+   (.has-art, set when diceart.js could render) suppress it — P1, the dice
+   are the buttons, and the die's own face beats an abstract glyph. */
 .die-btn::before {
   content: '';
   display: block;
@@ -271,6 +274,15 @@ html, body {
   border-radius: 3px;
   transform: rotate(45deg);
   background: var(--die-color, #888);
+}
+.die-btn.has-art::before { display: none; }
+.die-art {
+  display: block;
+  width: 28px; height: 28px;   /* rendered at 192px (2x+) — crisp on retina */
+  margin: 0 auto 2px;
+  pointer-events: none;         /* the BUTTON is the target; art never eats the click */
+  -webkit-touch-callout: none;  /* no long-press image sheet on iOS — it's a button */
+  user-select: none;
 }
 
 /* ---------- tray chips ---------- */

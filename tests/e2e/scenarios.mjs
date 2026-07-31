@@ -526,6 +526,53 @@ export const scenarios = [
   },
 
   {
+    name: 'die-art',
+    tags: ['chrome'],
+    // P1 — the dice are the buttons: every die type has real rendered art
+    // (a dataURL still of its beveled mesh), the types are visually distinct,
+    // and the compose palette tiles carry it as .die-art imgs (alt="",
+    // draggable=false; the ::before diamond survives only as null-art
+    // fallback, which this WebGL-capable environment must not need).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const art = await a.dbg('dieArt');
+      const types = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20'];
+      for (const t of types) {
+        assert.equal(typeof art[t], 'string', `${t} art rendered (got ${art[t]})`);
+        assert.ok(art[t].startsWith('data:image/'), `${t} art is a data URL`);
+        assert.ok(art[t].length > 100, `${t} art is non-trivial (${art[t].length} chars)`);
+      }
+      assert.ok(new Set(types.map((t) => art[t])).size >= 2, 'at least two types render distinct art');
+
+      // The palette: 8 tiles (7 types + d100), every one carrying die art —
+      // the d100 shortcut reuses the d10x still.
+      const tiles = await a.eval(`[...document.querySelectorAll('#die-buttons .die-btn')].map((b) => ({
+        hasArt: b.classList.contains('has-art'),
+        imgs: b.querySelectorAll('img.die-art').length,
+        src: (b.querySelector('img.die-art') || {}).src || null,
+        alt: (b.querySelector('img.die-art') || {}).alt ?? null,
+        draggable: (b.querySelector('img.die-art') || {}).draggable ?? null,
+        label: b.textContent.trim(),
+      }))`);
+      assert.equal(tiles.length, 8, 'eight palette tiles');
+      for (const tile of tiles) {
+        assert.equal(tile.hasArt, true, `tile ${tile.label} carries art`);
+        assert.equal(tile.imgs, 1, `tile ${tile.label} has exactly one .die-art img`);
+        assert.equal(tile.alt, '', `tile ${tile.label} art is decorative (alt="")`);
+        assert.equal(tile.draggable, false, `tile ${tile.label} art is not draggable`);
+        assert.ok(tile.label, `tile keeps its text label`);
+      }
+      assert.equal(tiles[7].label, 'd100', 'eighth tile is the percentile shortcut');
+      assert.equal(tiles[7].src, tiles[4].src, 'd100 reuses the d10x art');
+      // Art replaces the diamond, but the tile is still the button: a click
+      // still adds its die to the pool draft (#tray keeps its id — GOALS.md).
+      await a.eval(`document.querySelector('#die-buttons .die-btn').click()`);
+      assert.equal(await a.eval(`document.querySelectorAll('#tray .die-chip').length`), 1,
+        'clicking an art tile still adds its die to the pool');
+    },
+  },
+
+  {
     name: 'pool-flyout',
     tags: ['smoke', 'chrome', 'groups'],
     // Saved pools roll without pinning the panel open: with the panel

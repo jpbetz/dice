@@ -20,6 +20,7 @@ limitations under the License.
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie } from './dice.js';
+import { dieArtURL } from './diceart.js';
 import { connect } from './net.js';
 import { SYSTEMS, DEFAULT_SYSTEM } from './meanings.js';
 import { groupsFromLocation, syncGroupsToLocation } from './urlgroups.js';
@@ -2952,6 +2953,13 @@ window.__diceDebug = {
     if (currentRoll) retireCeremonyToBanner(currentRoll);
     return !banner.classList.contains('hidden');
   },
+  // die art (stage A): the palette tiles' rendered die stills — one dataURL
+  // (or null when WebGL was unavailable) per type.
+  get dieArt() {
+    const out = {};
+    for (const t of DIE_TYPES) out[t] = dieArtURL(t);
+    return out;
+  },
   // quick palette (tests): open it / observe its open state
   openPalette() { openPalette(); },
   get paletteOpen() { return isPaletteOpen(); },
@@ -3201,10 +3209,31 @@ const clearTrayBtn = document.getElementById('clear-tray');
 const saveGroupBtn = document.getElementById('save-group');
 const groupNameInput = document.getElementById('group-name');
 
+// P1 — the dice are the buttons: each palette tile shows its die's real
+// rendered art (the beveled mesh, hero-posed) above the type label. The tile
+// stays a source-object with button chrome; the art is decorative to a
+// screen reader (alt="") because the label text already names the die. When
+// dieArtURL is null (no WebGL for the offscreen pass), .has-art never lands
+// and the CSS ::before diamond keeps the tile legible — art never gates
+// function.
+function decorateDieBtn(btn, label, artType) {
+  const url = dieArtURL(artType);
+  if (url) {
+    btn.classList.add('has-art');
+    const img = document.createElement('img');
+    img.className = 'die-art';
+    img.src = url;
+    img.alt = '';          // decorative: the label carries the name (a11y)
+    img.draggable = false; // die art is clickable chrome, not a draggable image
+    btn.appendChild(img);
+  }
+  btn.appendChild(document.createTextNode(label));
+}
+
 for (const type of DIE_TYPES) {
   const btn = document.createElement('button');
   btn.className = 'die-btn';
-  btn.textContent = type;
+  decorateDieBtn(btn, type, type);
   btn.style.setProperty('--die-color', DIE_DEFS[type].color);
   btn.addEventListener('click', () => {
     if (tray.length < MAX_DICE_ON_TABLE) {
@@ -3219,7 +3248,7 @@ for (const type of DIE_TYPES) {
 {
   const btn = document.createElement('button');
   btn.className = 'die-btn';
-  btn.textContent = 'd100';
+  decorateDieBtn(btn, 'd100', 'd10x'); // no d100 solid exists: reuse the d10x art
   btn.style.setProperty('--die-color', DIE_DEFS.d10x.color);
   btn.title = 'd10x + d10';
   btn.addEventListener('click', () => {
