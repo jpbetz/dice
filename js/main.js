@@ -2996,6 +2996,13 @@ window.__diceDebug = {
   // body.mini state. setPanelState applies a partial {region: bool} patch
   // and returns the resulting state. JSON-safe.
   get panelState() { return panelDebugState(); },
+  // saved-pools flyout (roll without pinning the panel open): the hover
+  // behavior, driven directly where headless tests can't hover.
+  get groupsFlyout() { return groupsPanelEl.classList.contains('flyout'); },
+  setGroupsFlyout(open) {
+    if (open) openGroupsFlyout(); else closeGroupsFlyout();
+    return groupsPanelEl.classList.contains('flyout');
+  },
   setPanelState(patch) {
     if (patch && typeof patch === 'object') {
       for (const k of Object.keys(PANEL_DEFS)) {
@@ -3760,6 +3767,7 @@ function buildGroupEditor(g) {
 function rollGroup(g) {
   const res = parseNotation(g.notation);
   if (!res.ok) return;
+  closeGroupsFlyout(); // a roll from the flyout clears the runway itself
   const intent = notationIntent(g.notation, res);
   requestRoll(res.spec.dice, g.name || res.comment || res.canonical, {
     notation: intent.notation,
@@ -4969,6 +4977,7 @@ function applyPanels(persist = true) {
   for (const [id, def] of Object.entries(PANEL_DEFS)) {
     document.getElementById(def.el).classList.toggle('collapsed', !panelsOpen[id]);
   }
+  if (panelsOpen.groups) closeGroupsFlyout(); // a real expand retires the overlay
   if (persist) save(LS_PANELS, panelsOpen);
   const mini = allPanelsCollapsed();
   const railBtn = document.getElementById('rail-collapse');
@@ -5007,6 +5016,35 @@ for (const [id, def] of Object.entries(PANEL_DEFS)) {
   });
 }
 document.getElementById('rail-collapse').addEventListener('click', toggleAllPanels);
+
+// ---- saved-pools flyout ----------------------------------------------------
+// Rolling a saved pool used to demand expanding the panel — which then sat
+// over the table exactly when the dice landed. Hovering the COLLAPSED tab
+// (mouse only) flies the list out as a temporary overlay instead: roll from
+// a row and it retracts on its own (pointer-leave, the roll itself, or the
+// panel expanding for real). Clicking the tab still expands the panel; touch
+// keeps that path — no hover, no flyout. The close is timer-graced like the
+// peek: the 6px visual gap between tab and list must be crossable.
+const groupsPanelEl = document.getElementById('groups-panel');
+let groupsFlyTimer = null;
+function openGroupsFlyout() {
+  clearTimeout(groupsFlyTimer);
+  groupsFlyTimer = null;
+  if (!panelsOpen.groups) groupsPanelEl.classList.add('flyout');
+}
+function closeGroupsFlyout() {
+  clearTimeout(groupsFlyTimer);
+  groupsFlyTimer = null;
+  groupsPanelEl.classList.remove('flyout');
+}
+groupsPanelEl.addEventListener('pointerenter', (e) => {
+  if (e.pointerType === 'mouse') openGroupsFlyout();
+});
+groupsPanelEl.addEventListener('pointerleave', (e) => {
+  if (e.pointerType !== 'mouse') return;
+  clearTimeout(groupsFlyTimer);
+  groupsFlyTimer = setTimeout(closeGroupsFlyout, 200);
+});
 
 applyPanels(false); // reflect the seeded state without re-saving
 applyCameraFraming(); // boot framing at the current aspect (resize keeps it)

@@ -489,6 +489,32 @@ export const scenarios = [
   },
 
   {
+    name: 'pool-flyout',
+    tags: ['smoke', 'chrome', 'groups'],
+    // Saved pools roll without pinning the panel open: with the panel
+    // collapsed, the tab flies the list out as a temporary overlay; a roll
+    // from one of its rows fires AND retracts the overlay, so the felt is
+    // unobstructed when the dice land. A real expand retires the overlay.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg('setPanelState({groups: false})');
+      assert.equal((await a.dbg('panelState')).groups, false, 'panel collapsed');
+      assert.equal(await a.dbg('setGroupsFlyout(true)'), true, 'the tab flies the list out');
+      assert.ok(await a.eval(`(() => {
+        const r = document.querySelector('#groups-panel .panel-body').getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      })()`), 'the flyout renders the list');
+      await a.eval(`document.querySelector('#groups-list .group-roll').click()`);
+      await a.settle();
+      assert.ok(await a.rollId(), 'the row rolled');
+      assert.equal(await a.dbg('groupsFlyout'), false, 'and the flyout retracted itself');
+      assert.equal((await a.dbg('panelState')).groups, false, 'the panel stayed collapsed');
+      await a.dbg('setGroupsFlyout(true)');
+      await a.dbg('setPanelState({groups: true})');
+      assert.equal(await a.dbg('groupsFlyout'), false, 'a real expand retires the overlay');
+    },
+  },
+  {
     name: 'saved-group-edit',
     tags: ['smoke', 'groups'],
     // Saved-group editing writes back to the SAME record by id: renaming no
