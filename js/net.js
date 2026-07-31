@@ -25,7 +25,12 @@ limitations under the License.
 // or {online: false} when there is no server (the app is on static hosting),
 // which is the caller's cue to run in solo mode.
 
-const JOIN_TIMEOUT_MS = 4000;
+// JOIN is generous on purpose: a REAL static host answers /api/join
+// instantly with a 404 (that is the solo-detection path), so this timeout
+// only ever fires against a live-but-slow server — where silently dropping
+// the player into solo play is the worst answer. 4s proved trigger-happy:
+// a loaded machine's second tab joined in ~6s and got stranded solo.
+const JOIN_TIMEOUT_MS = 12000;
 const POST_TIMEOUT_MS = 8000;
 const STREAM_OPEN_TIMEOUT_MS = 3000;
 const REOPEN_MIN_MS = 1000;
@@ -82,9 +87,21 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
   const report = typeof onStatus === 'function' ? onStatus : () => {};
   const refused = typeof onRefused === 'function' ? onRefused : () => {};
 
-  const joined = await postJson('/api/join', { room, name }, JOIN_TIMEOUT_MS);
+  let joined = await postJson('/api/join', { room, name }, JOIN_TIMEOUT_MS);
+  // status 0 = the fetch itself died (a transient network/browser hiccup —
+  // observed in practice on a fresh origin's very first request). A real
+  // static host answers instantly with 404/405, so ONE short-backoff retry
+  // cannot meaningfully delay solo detection — and it keeps a live player
+  // from being silently stranded in solo play by a single dropped request.
+  if (!joined.ok && joined.status === 0) {
+    await new Promise((r) => setTimeout(r, 600));
+    joined = await postJson('/api/join', { room, name }, JOIN_TIMEOUT_MS);
+  }
   if (!joined.ok || !joined.data || !joined.data.playerId) {
     // No server (or it refused us): the caller falls back to solo play.
+    // Say why on the console — a silent solo fallback against a live server
+    // is otherwise undiagnosable from inside the app.
+    if (joined.status === 0) console.error('dice: /api/join failed at the network layer (twice) — falling back to solo');
     report('offline');
     return { online: false };
   }
