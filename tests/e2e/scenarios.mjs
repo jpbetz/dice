@@ -170,9 +170,10 @@ export const scenarios = [
   {
     name: 'shelf-actions',
     tags: ['shelf'],
-    // A shelved roll stays actionable from its peek: ⟳ rolls the same spec
-    // again, and ± pulls it back into the compose draft (command box + tray
-    // popover) for an ad-hoc tweak — dc, mods and comment intact.
+    // A shelved roll stays actionable from its peek: ⟳ rolls the SAME dice
+    // again — the shelved cluster clears as part of the reroll (a pool is
+    // how you mint a copy) — and ± pulls it into the New pool draft
+    // (command box + popover) for an ad-hoc tweak, dc/mods/comment intact.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.roll('2d6+3 dc9');
@@ -187,20 +188,29 @@ export const scenarios = [
       assert.equal(ps.hasAgain, true, 'the peek carries ⟳');
       assert.equal(ps.hasTweak, true, 'and ±');
 
-      // ⟳: the same spec rolls again — a new roll lands, the shelved one stays.
+      // ⟳ REPLACES: the old cluster leaves the shelf, the same spec rolls.
       await a.eval(`document.querySelector('#peek-card .pk-again').click()`);
       await a.settle();
       const rid2 = await a.rollId();
       assert.ok(rid2 && rid2 !== rid, 'a new roll landed from ⟳');
       assert.ok((await a.logTop()).includes('vs 9'), 'the dc rode along');
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 0)`,
+        { desc: 'the rerolled cluster left the shelf — same dice, not a copy' },
+      );
 
-      // ±: the original roll's notation lands in the compose draft with the
-      // popover bound to it.
-      assert.equal(await a.dbg(`peek(${JSON.stringify(rid)})`), rid, 'peek reopens');
+      // ±: a shelved roll's notation lands in the draft with the popover
+      // bound to it (collect the fresh roll to peek it).
+      await a.dbg(`collectRoll(${JSON.stringify(rid2)})`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        { desc: 'the reroll shelves for the ± leg' },
+      );
+      assert.equal(await a.dbg(`peek(${JSON.stringify(rid2)})`), rid2, 'peek opens on the reroll');
       await a.eval(`document.querySelector('#peek-card .pk-tweak').click()`);
       const pop = await a.dbg('popover');
       assert.ok(pop && pop.open, '± opens the ± popover');
-      assert.equal(pop.source, 'tray', 'bound to the compose draft');
+      assert.equal(pop.source, 'tray', 'bound to the New pool draft');
       assert.equal(String(pop.dc), '9', 'the dc rides into the draft');
       const box = await a.eval(`document.getElementById('cmd-input').value`);
       assert.ok(box.includes('2d6+3'), `the box carries the notation (${box})`);
@@ -503,9 +513,12 @@ export const scenarios = [
       lf = await a.dbg('logFlyout');
       assert.equal(lf.open, false, 'a roll does not open the flyout');
       assert.equal(lf.badge, 1, 'the closed flyout counted it unread');
-      assert.equal(await a.eval(`document.getElementById('log-badge').textContent`), '1', 'badge shows the count');
-      assert.ok((await a.eval(`document.getElementById('rail-log').title`)).includes('1 unread'),
-        'the ≣ title folds the count in (unread is never visual-only)');
+      // NO bubble in the DOM — history is reference, not notifications; the
+      // count rides only the hover title.
+      assert.equal(await a.eval(`document.getElementById('log-badge') === null`), true,
+        'no notification bubble exists');
+      assert.ok((await a.eval(`document.getElementById('rail-log').title`)).includes('1 new'),
+        'the ≣ title carries the since-you-looked count');
       assert.equal(await a.eval(`document.getElementById('rail-log').getAttribute('aria-pressed')`), 'false');
 
       // Opening clears the badge and shows the entry.
@@ -663,11 +676,14 @@ export const scenarios = [
       assert.deepEqual(ts.dice, ['d6', 'd6'], 'two d6 composed');
       assert.equal(ts.rollVisible, true, 'the cluster is the roll button');
       assert.equal(ts.hasActions, true, 'Save/±/✕ appear with content');
-      assert.equal(ts.xCount, 2, 'one ✕ overlay per die');
+      // Grouped exactly like the pool rows: one d6 with a ×2, one ✕.
+      assert.equal(ts.xCount, 1, 'repeats group — one ✕ per die TYPE');
+      assert.equal(await a.eval(`document.querySelector('#tray-roll .strip-count').textContent`),
+        '×2', 'the repeat shows as ×2, same as the pool rows');
       assert.equal(await a.eval(`document.querySelectorAll('#builder-panel button button').length`),
         0, 'no button nests inside a button');
 
-      // A ✕ removes exactly one die (and the box follows — one draft).
+      // The group's ✕ removes ONE die of the type (×2 steps down to bare).
       await a.eval(`document.querySelector('#tray-x-layer .die-x').click()`);
       ts = await a.dbg('trayState');
       assert.deepEqual(ts.dice, ['d6'], '✕ removed exactly one die');
@@ -731,6 +747,35 @@ export const scenarios = [
     },
   },
 
+  {
+    name: 'keyboard-flow',
+    tags: ['smoke', 'chrome', 'roll'],
+    // The fluid-play pair (2026-07 keyboard design): after a roll settles,
+    // Enter KEEPS it (collect to the shelf) and Esc SWEEPS it (clear) — only
+    // your own settled roll, and only when no layer holds the key first
+    // (Esc peels layers before it ever touches the table).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.roll('2d6');
+      await a.eval(`document.activeElement && document.activeElement.blur()`);
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
+      await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 0)`,
+        { desc: 'Esc sweeps the settled roll' });
+
+      await a.roll('d20');
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}))`);
+      await a.waitFor(`(window.__diceDebug.sim(160), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        { desc: 'Enter keeps it — collected to the shelf' });
+
+      // Layers own Esc first: with the log flyout open, Esc peels it and
+      // the dice stay put.
+      await a.roll('d6');
+      await a.dbg('setLogFlyout(true)');
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
+      assert.equal((await a.dbg('logFlyout')).open, false, 'Esc peels the flyout first');
+      assert.ok(await a.eval(`window.__diceDebug.tableDice.length > 0`), 'the roll survives the peel');
+    },
+  },
   {
     name: 'pool-flyout',
     tags: ['smoke', 'chrome', 'groups'],
@@ -903,11 +948,20 @@ export const scenarios = [
       assert.ok(dced.notation.includes('dc15'), `the dc landed on the record (got: ${dced.notation})`);
       assert.equal(dced.name, 'Alpha Strike', 'the name survived the popover update');
 
+      // The popover's Save: the same inline-name morph as the panel's Save
+      // (one flow), prefilled with a suggested variant name; Enter mints a
+      // NEW pool — additive, the original untouched.
       await a.dbg(`openPopoverFor(${JSON.stringify(atk.id)})`);
       await a.eval(`document.getElementById('pop-variant').click()`);
+      assert.equal(await a.eval(`document.getElementById('pop-save-row').classList.contains('hidden')`),
+        false, 'Save morphs into the name row');
+      assert.ok(await a.eval(`document.getElementById('pop-save-name').value.length > 0`),
+        'a pool-bound Save suggests a name');
+      await a.eval(`document.getElementById('pop-save-name').dispatchEvent(
+        new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}))`);
       gs = await a.dbg('groups');
-      assert.equal(gs.length, before.length + 1, "'Save as variant' stays additive");
-      assert.ok(gs.find((g) => g.id === atk.id), 'the original survives beside its variant');
+      assert.equal(gs.length, before.length + 1, 'the popover Save stays additive');
+      assert.ok(gs.find((g) => g.id === atk.id), 'the original survives beside the new pool');
 
       // The ad-hoc draft has no record: its popover offers variant, never
       // Update. (`openPopoverFor('tray')` keeps the internal source name.)

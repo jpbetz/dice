@@ -1148,12 +1148,19 @@ function renderPeek() {
   // A shelved roll stays actionable (same readability gate as the log's ⟳):
   // roll it again as-is, or pull it back into the compose draft to tweak.
   if (entry && canReroll(entry)) {
+    // ONE reroll affordance everywhere: the bare ⟳ glyph, titled 'Roll this
+    // again' — identical in the banner, the log, this peek, and the verdict
+    // card (consistency sweep, 2026-07).
     const again = document.createElement('button');
     again.className = 'sm-reveal pk-again';
-    again.textContent = '⟳ Roll again';
+    again.textContent = '⟳';
     again.title = 'Roll this again';
     again.addEventListener('click', () => {
       closePeek();
+      // Rerolling a COLLECTED roll rolls the SAME dice again: the shelved
+      // cluster clears as part of the reroll (a pool is how you mint a
+      // copy). The clear goes first so the shelf never holds both.
+      requestClearRoll(c.rollId);
       requestRoll([...entry.spec.dice], entry.label, {
         mods: entry.spec.mods || undefined,
         faceDown: entry.faceDown,
@@ -1166,7 +1173,7 @@ function renderPeek() {
     const tweak = document.createElement('button');
     tweak.className = 'sm-reveal pk-tweak';
     tweak.textContent = '±';
-    tweak.title = 'Load into the compose draft to modify';
+    tweak.title = 'Tweak in New pool — modifiers, target, moment';
     tweak.addEventListener('click', () => {
       // The roll's own notation (comment intact) when we have it; else the
       // canonical reconstruction from the spec the viewer may read.
@@ -1977,6 +1984,7 @@ function renderBannerActions(entry) {
     // A hidden roll's Reveal is the one action that outranks housekeeping.
     btn.className = hidden ? 'btn primary banner-btn' : 'btn ghost banner-btn';
     btn.textContent = 'Reveal';
+    btn.title = 'Flip this roll face up for the table';
     btn.addEventListener('click', () => requestReveal(entry.rollId));
     row.appendChild(btn);
   }
@@ -3412,25 +3420,27 @@ function renderTray() {
   trayRollBtn.classList.toggle('hidden', !hasDice);
   trayHintEl.classList.toggle('hidden', hasDice || !!cmdInput.value);
   if (hasDice) {
-    trayRollBtn.appendChild(buildDieStrip(tray, TRAY_STRIP_CAP));
+    // The SAME grouped strip the pool rows draw (uniform look): repeats
+    // collapse to one die + ×N, and each group's ✕ removes ONE die of that
+    // type — 'd6 ×3' steps down to 'd6 ×2'.
+    trayRollBtn.appendChild(buildDieStrip(tray, TRAY_STRIP_CAP, { grouped: true }));
     const label = `Roll ${formula(tray)}`;
     trayRollBtn.title = label;
     trayRollBtn.setAttribute('aria-label', label);
-    // Overlay one ✕ per VISIBLE die, anchored to its img's laid-out box
-    // (#tray is the offsetParent). Overflow dice are removed via the box —
-    // the two are one draft.
+    const groupTypes = [...new Set(tray)];
     const arts = trayRollBtn.querySelectorAll('.die-art, .strip-dot');
     arts.forEach((img, i) => {
-      if (i >= TRAY_STRIP_CAP) return;
+      const type = groupTypes[i];
+      if (!type) return;
       const x = document.createElement('button');
       x.className = 'die-x';
       x.textContent = '✕';
-      x.title = `Remove this ${tray[i]}`;
+      x.title = `Remove one ${type}`;
       x.style.left = `${img.offsetLeft + img.offsetWidth - 9}px`;
       x.style.top = `${img.offsetTop - 6}px`;
       x.addEventListener('click', (e) => {
         e.stopPropagation(); // a remove is never a roll
-        tray.splice(i, 1);
+        tray.splice(tray.indexOf(type), 1);
         renderTray();
         syncBoxFromTray();
       });
@@ -4094,7 +4104,11 @@ function renderGroups() {
     nameEl.title = 'Load into the command box';
     nameEl.addEventListener('click', () => loadIntoBox(g.notation, g.name));
     line1.appendChild(nameEl);
-    if (g.name) {
+    // The canonical chip is manage-mode furniture now (the list kept reading
+    // as a spreadsheet with it always on): at rest the canonical rides the
+    // row tooltips and the name-click still loads the box — §1.4's
+    // round-trip survives, just quieter.
+    if (g.name && poolsEdit) {
       const chip = document.createElement('code');
       chip.className = 'group-formula';
       chip.textContent = g.notation;
@@ -4105,6 +4119,7 @@ function renderGroups() {
       });
       line1.appendChild(chip);
     }
+    if (g.name) nameEl.title = `${g.notation}  ·  click to load into the command box`;
     if (poolsEdit) {
       const editBtn = document.createElement('button');
       editBtn.className = 'group-edit';
@@ -4395,6 +4410,7 @@ function closePopover() {
   if (pop.row) pop.row.classList.remove('open');
   pop = null;
   popEl.classList.add('hidden');
+  closePopSaveMorph(); // a reopened popover always starts on the buttons
 }
 
 // Anchor the popover to its source, clamped fully on-screen (§7.4: usable in
@@ -4837,26 +4853,51 @@ popUpdateBtn.addEventListener('click', () => {
   editPoolById(id, { notation: canonical });
 });
 
+// The popover's Save — the SAME quick inline-name morph as the New pool
+// panel's (one save flow everywhere, user call 2026-07), and additive like
+// it: a new pool is minted, never an overwrite (Update is the by-id write).
+// A pool-bound popover prefills a suggested name (base + mods summary);
+// Enter accepts, Esc backs out to the buttons.
+const popSaveRow = document.getElementById('pop-save-row');
+const popSaveName = document.getElementById('pop-save-name');
+function closePopSaveMorph() {
+  popSaveRow.classList.add('hidden');
+  document.querySelector('#mods-popover .pop-actions-2nd').classList.remove('hidden');
+}
 popVariantBtn.addEventListener('click', () => {
   if (!pop) return;
   const spec = popSpec();
   if (validateMods(spec.dice, spec.mods)) return;
-  const canonical = popCanonical();
-  let name;
   if (pop.source === 'group') {
     const base = groups.find((g) => g.id === pop.groupId);
     const summary = modsSummary(spec.mods) || (pop.dc ? `dc${pop.dc}` : 'variant');
-    name = cutText(`${(base && base.name) || pop.name} ${summary}`, 24);
+    popSaveName.value = cutText(`${(base && base.name) || pop.name} ${summary}`, 24);
   } else {
-    // Save-as-variant from the tray saves a NEW group (§7.4). A typed group
-    // name is used as-is; otherwise the group is unnamed (its notation labels
-    // it, exactly like the panel's own Save with an empty name).
-    name = cutText(groupNameInput.value, 24);
+    popSaveName.value = '';
   }
+  document.querySelector('#mods-popover .pop-actions-2nd').classList.add('hidden');
+  popSaveRow.classList.remove('hidden');
+  popSaveName.focus();
+  popSaveName.select();
+});
+function popSaveConfirm() {
+  if (!pop) return;
+  const spec = popSpec();
+  if (validateMods(spec.dice, spec.mods)) return;
+  const canonical = popCanonical();
+  const name = cutText(popSaveName.value, 24); // '' = unnamed pool
+  closePopSaveMorph();
   closePopover();
-  groups.push({ id: Date.now(), name, notation: canonical });
+  groups.push({ id: Date.now(), name, notation: canonical }); // additive, always
   saveGroups();
   renderGroups();
+}
+document.getElementById('pop-save-confirm').addEventListener('click', popSaveConfirm);
+document.getElementById('pop-save-cancel').addEventListener('click', closePopSaveMorph);
+popSaveName.addEventListener('keydown', (e) => {
+  e.stopPropagation(); // typing a name must not fire table shortcuts / Esc chain
+  if (e.key === 'Enter') popSaveConfirm();
+  else if (e.key === 'Escape') closePopSaveMorph();
 });
 
 // ---------------------------------------------------------------------------
@@ -4990,18 +5031,17 @@ document.getElementById('clear-log').addEventListener('click', () => {
 
 const logFlyoutEl = document.getElementById('log-flyout');
 const railLogBtn = document.getElementById('rail-log');
-const logBadgeEl = document.getElementById('log-badge');
 let logUnread = 0; // entries that arrived while the flyout was closed
 
 function isLogFlyoutOpen() { return !logFlyoutEl.classList.contains('hidden'); }
 
-// Badge + button title carry the same count (display capped at '9+'): the
-// title is the button's accessible name, so unread is never visual-only.
+// NO visual badge (user call, 2026-07): history is reference material, not
+// an inbox, and a standing count-bubble nags like one. The since-you-looked
+// count survives only in the hover title (still the accessible name), and
+// the internal counter still drives it.
 function renderLogBadge() {
   const shown = logUnread > 9 ? '9+' : String(logUnread);
-  logBadgeEl.textContent = shown;
-  logBadgeEl.classList.toggle('hidden', logUnread === 0);
-  railLogBtn.title = logUnread > 0 ? `Roll log — l · ${shown} unread` : 'Roll log — l';
+  railLogBtn.title = logUnread > 0 ? `Roll log — l · ${shown} new since you looked` : 'Roll log — l';
 }
 
 function setLogUnread(n) {
@@ -5591,6 +5631,22 @@ function rerollLast() {
   });
 }
 
+// The fluid-play pair (2026-07 keyboard design): once a roll SETTLES, Enter
+// KEEPS it (collect to the shelf) and Esc SWEEPS it (clear) — the
+// affirmative/dismissive verbs every dialog already trained, so the common
+// loop is hands-on-keyboard: type/1-9 → roll → read → Enter or Esc → next.
+// Gated hard, in this order: never while typing or over a focused control
+// (Enter must not double-fire a button), never with a layer open (Esc peels
+// those first), only YOUR roll, only settled, only still on the felt.
+function lastRollActionable() {
+  if (!lastEntry || !lastEntry.rollId) return null;
+  if (currentRoll && !currentRoll.done) return null; // in flight: Space skips
+  const st = rollStates.get(lastEntry.rollId);
+  if (st && (st.cleared || st.collected !== null)) return null; // already resolved
+  const mine = !netOnline || (net && lastEntry.playerId === net.playerId);
+  return mine ? lastEntry : null;
+}
+
 // Single global keydown handler. Layer guards are checked BEFORE any handler
 // mutates state, so one Esc can never fall through two layers:
 //   Esc peels the topmost layer only — cheatsheet > palette > settings modal
@@ -5624,6 +5680,13 @@ document.addEventListener('keydown', (e) => {
     // the overlay z-order, so every layer above it peels first. Esc is one
     // of its only three closes (≣ toggle, header ✕, Esc — never a click-away).
     else if (isLogFlyoutOpen()) closeLogFlyout();
+    else {
+      // Nothing left to peel: Esc SWEEPS your last settled roll (the
+      // keyboard pair with Enter = keep — see lastRollActionable). A no-op
+      // when the roll is not yours, already gone, or still in flight.
+      const last = lastRollActionable();
+      if (last) requestClearRoll(last.rollId);
+    }
     return;
   }
   if (typing) return;
@@ -5659,6 +5722,14 @@ document.addEventListener('keydown', (e) => {
     case 'g': setPanel('groups', !panelsOpen.groups); return;
     case 'l': toggleLogFlyout(); return; // the roll log is a rail flyout now, not a panel
     case 's': setSound(!soundOn); return;
+    case 'Enter': {
+      // Enter = KEEP the last roll (Esc's affirmative twin). A focused
+      // button owns Enter (it activates); the table only takes the spare.
+      if (e.target instanceof HTMLElement && e.target.closest('button, a, [tabindex]')) return;
+      const last = lastRollActionable();
+      if (last) requestCollectRoll(last.rollId);
+      return;
+    }
     default:
       if (e.key >= '1' && e.key <= '9') {
         const g = groups[Number(e.key) - 1]; // 1-indexed in list order

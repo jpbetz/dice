@@ -315,7 +315,7 @@ html, body {
 .tray-cluster { position: relative; margin-top: 10px; min-height: 34px; }
 .tray-roll { width: 100%; flex-wrap: wrap; }
 .tray-roll.hidden { display: none; }
-.tray-roll .die-art { width: 30px; height: 30px; }
+.tray-roll .die-art { width: 28px; height: 28px; } /* identical to the pool rows */
 .tray-x-layer { position: absolute; inset: 0; pointer-events: none; }
 .die-x {
   position: absolute;
@@ -344,7 +344,9 @@ html, body {
 #tray-hint { margin: 4px 2px 0; }
 #tray-hint.hidden { display: none; }
 .tray-line.hidden, .tray-save.hidden { display: none; }
-.tray-line .group-mods { flex: none; width: 32px; height: auto; align-self: stretch; font-size: 14px; }
+/* the draft line's ± — same demoted .pool-mods look as the pool rows,
+   sized to sit between the Save/✕ buttons */
+.tray-line .pool-mods { flex: none; min-height: 0; width: 32px; align-self: stretch; font-size: 14px; }
 #clear-tray { flex: none; width: 38px; }
 #save-confirm, #save-cancel { flex: none; width: 42px; }
 
@@ -387,7 +389,7 @@ html, body {
   box-shadow: 0 0 14px rgba(255, 214, 102, 0.12);
 }
 .pool-roll:disabled { opacity: 0.45; cursor: default; } /* manage mode disarms it */
-.pool-roll .die-art { width: 26px; height: 26px; pointer-events: none; }
+.pool-roll .die-art { width: 28px; height: 28px; pointer-events: none; }
 .strip-dot {
   width: 11px; height: 11px;
   border-radius: 3px;
@@ -396,9 +398,20 @@ html, body {
   flex: none;
 }
 .strip-more { flex: none; pointer-events: none; }
-/* ± beside the strip: small visual, FULL row-height hit area (a missed tap
-   next to ± must never be a broadcast roll) */
-.pool-mods { align-self: stretch; height: auto; min-height: 38px; width: 28px; }
+/* ± beside the strip: DEMOTED to a bare quiet glyph now that it is the only
+   button chrome on the row — full row-height hit area stays (a missed tap
+   next to ± must never be a broadcast roll); it brightens with the row. */
+.pool-mods {
+  align-self: stretch;
+  height: auto;
+  min-height: 38px;
+  width: 26px;
+  background: none;
+  border: none;
+  color: #574f43;
+}
+.group-row:hover .pool-mods { color: var(--muted); }
+.pool-mods:hover { color: var(--gold-bright); background: rgba(212, 175, 55, 0.10); border: none; }
 /* manage-mode toolbar: copy-link (demoted here, P4) + Done */
 #pools-toolbar { display: flex; gap: 8px; margin: 2px 0 8px; }
 #pools-toolbar.hidden { display: none; }
@@ -626,23 +639,8 @@ html, body {
    button stays the one target (P1 discipline: nothing pretends to be a
    control it is not, and no button ever nests in a button). */
 #rail-log { position: relative; }
-.log-badge {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  min-width: 17px;
-  padding: 2px 4px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #caa53a, #9c7c1e);
-  border: 1px solid #e7c968;
-  color: #221a08;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
-  text-align: center;
-  pointer-events: none;
-}
-.log-badge.hidden { display: none; }
+/* (the count bubble is gone — the since-you-looked tally rides the hover
+   title only; history is reference, not notifications) */
 
 /* ---------- rail roster (everyone ELSE at the table) ---------- */
 /* You ARE the identity chip — its button dress and menu are the 'which one
@@ -1587,6 +1585,9 @@ body.mini #result-verdict { font-size: 11px; }
 .pop-actions:last-child, .pop-actions-2nd { padding-bottom: 14px; }
 .pop-actions .btn { flex: 1; }
 #pop-update.hidden { display: none; } /* pool draft: no record to update */
+/* the popover's inline save morph (same flow as the New pool panel's) */
+#pop-save-row.hidden, #mods-popover .pop-actions-2nd.hidden { display: none; }
+#pop-save-row .btn { flex: none; width: 42px; }
 /* §7.4: the popover stays fully usable in compact view (opened via the
    Saved pools tab or headless hooks); placePopover clamps it on-screen. */
 body.mini .popover { width: min(94vw, 312px); }
