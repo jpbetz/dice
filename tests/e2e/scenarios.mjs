@@ -449,6 +449,108 @@ export const scenarios = [
     },
   },
 
+  {
+    name: 'saved-group-edit',
+    tags: ['smoke', 'groups'],
+    // Saved-group editing writes back to the SAME record by id: renaming no
+    // longer forks a duplicate and an unnamed group can be updated. The
+    // inline row editor (✎ → Update/Cancel) and the ± popover's 'Update this
+    // group' both land on that path; 'Save as variant' stays additive.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const before = await a.dbg('groups');
+      const atk = before.find((g) => g.name === 'Attack');
+      const dmg = before.find((g) => g.name === 'Damage');
+      assert.ok(atk && dmg, 'the seed groups exist');
+
+      // Rename + retune BY ID — same count, no forked duplicate.
+      const out = await a.dbg(`editPool(${JSON.stringify(atk.id)}, {name: 'Strike', notation: ' 1d20 + 5 '})`);
+      assert.equal(out && out.name, 'Strike', 'rename applied');
+      assert.equal(out.notation, '1d20+5', 'notation stored canonical');
+      let gs = await a.dbg('groups');
+      assert.equal(gs.length, before.length, 'rename did not fork a duplicate');
+      assert.ok(!gs.some((g) => g.name === 'Attack'), 'the old name is gone');
+
+      // Refusals leave the record untouched.
+      assert.equal(await a.dbg(`editPool(424242, {name: 'x'})`), false, 'unknown id refused');
+      assert.equal(await a.dbg(`editPool(${JSON.stringify(atk.id)}, {notation: 'not dice'})`), false, 'bad notation refused');
+      gs = await a.dbg('groups');
+      assert.equal(gs.find((g) => g.id === atk.id).notation, '1d20+5', 'refusal left the record alone');
+
+      // The unnamed-can't-update bug is dead: strip the name, then update.
+      await a.dbg(`editPool(${JSON.stringify(dmg.id)}, {name: ''})`);
+      const up = await a.dbg(`editPool(${JSON.stringify(dmg.id)}, {notation: '2d8'})`);
+      assert.equal(up && up.notation, '2d8', 'an unnamed group updates in place');
+      assert.equal((await a.dbg('groups')).length, before.length, 'still no duplicate');
+
+      // The inline row editor: pencil → fields → Update writes by id.
+      await a.eval(`document.querySelector('#groups-list [data-group-id="${atk.id}"] .group-edit').click()`);
+      assert.equal(await a.eval(`document.querySelector('#groups-list .group-row.editing .ge-name').value`),
+        'Strike', 'the editor opens on the record');
+      await a.eval(`(() => {
+        const name = document.querySelector('#groups-list .ge-name');
+        const notation = document.querySelector('#groups-list .ge-notation');
+        name.value = 'Alpha Strike';
+        notation.value = '3d8+2';
+        notation.dispatchEvent(new Event('input'));
+        document.querySelector('#groups-list .ge-update').click();
+      })()`);
+      gs = await a.dbg('groups');
+      const edited = gs.find((g) => g.id === atk.id);
+      assert.equal(edited.name, 'Alpha Strike', 'editor renamed the record in place');
+      assert.equal(edited.notation, '3d8+2', 'editor rewrote the notation');
+      assert.equal(gs.length, before.length, 'and forked nothing');
+      assert.equal(await a.eval(`!!document.querySelector('#groups-list .group-row.editing')`), false, 'editor closed');
+
+      // A notation that doesn't parse pins the editor open, Update dead;
+      // Cancel reverts.
+      await a.eval(`document.querySelector('#groups-list [data-group-id="${atk.id}"] .group-edit').click()`);
+      await a.eval(`(() => {
+        const notation = document.querySelector('#groups-list .ge-notation');
+        notation.value = 'not dice';
+        notation.dispatchEvent(new Event('input'));
+      })()`);
+      assert.equal(await a.eval(`document.querySelector('#groups-list .ge-update').disabled`), true,
+        'Update disabled on a bad notation');
+      await a.eval(`document.querySelector('#groups-list .ge-cancel').click()`);
+      assert.equal((await a.dbg('groups')).find((g) => g.id === atk.id).notation, '3d8+2', 'Cancel reverted');
+
+      // ± popover: 'Update this group' rewrites in place; variant adds.
+      assert.equal(await a.dbg(`openPopoverFor(${JSON.stringify(atk.id)})`), true, 'popover opens');
+      assert.equal(await a.eval(`document.getElementById('pop-update').classList.contains('hidden')`), false,
+        'Update offered for a saved group');
+      await a.eval(`(() => {
+        const dc = document.getElementById('pop-dc');
+        dc.value = '15';
+        dc.dispatchEvent(new Event('input'));
+      })()`);
+      await a.eval(`document.getElementById('pop-update').click()`);
+      assert.equal(await a.dbg('popover'), null, 'popover closed by Update');
+      gs = await a.dbg('groups');
+      assert.equal(gs.length, before.length, 'update-in-place added nothing');
+      const dced = gs.find((g) => g.id === atk.id);
+      assert.ok(dced.notation.includes('dc15'), `the dc landed on the record (got: ${dced.notation})`);
+      assert.equal(dced.name, 'Alpha Strike', 'the name survived the popover update');
+
+      await a.dbg(`openPopoverFor(${JSON.stringify(atk.id)})`);
+      await a.eval(`document.getElementById('pop-variant').click()`);
+      gs = await a.dbg('groups');
+      assert.equal(gs.length, before.length + 1, "'Save as variant' stays additive");
+      assert.ok(gs.find((g) => g.id === atk.id), 'the original survives beside its variant');
+
+      // The tray draft has no record: its popover offers variant, never Update.
+      await a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = 'd6';
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      assert.equal(await a.dbg(`openPopoverFor('tray')`), true, 'tray popover opens');
+      assert.equal(await a.eval(`document.getElementById('pop-update').classList.contains('hidden')`), true,
+        'no Update for the tray draft');
+      await a.dbg('closePopover()');
+    },
+  },
+
   // -- visibility (goal 11) --------------------------------------------------
   // The ladder is open (default) · held (face down for everyone, the roller
   // included) · secret (the roll exists only for the roller) · whisper (a named
