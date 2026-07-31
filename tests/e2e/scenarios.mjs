@@ -424,13 +424,14 @@ export const scenarios = [
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       let st = await a.dbg('panelState');
-      assert.equal(st.compose && st.groups, true, 'panels default open on a desktop viewport');
+      assert.equal(st.pools, true, 'the Pools panel defaults open on a desktop viewport');
       assert.equal('log' in st, false, 'the log is no longer a panel region');
+      assert.equal('compose' in st || 'groups' in st, false,
+        'one region since the merge — no compose/groups keys');
 
-      st = await a.dbg('setPanelState({groups: false})');
-      assert.equal(st.groups, false, 'groups collapsed');
-      assert.equal(st.compose, true, 'compose untouched — independent regions');
-      assert.equal(st.allCollapsed, false, 'not yet compact');
+      st = await a.dbg('setPanelState({pools: false})');
+      assert.equal(st.pools, false, 'pools collapsed');
+      assert.equal(st.allCollapsed, true, 'the one region collapsed IS compact');
 
       // Immersion invariant: a roll plays out exactly the same under
       // collapsed chrome (the log records even while its flyout is closed).
@@ -438,10 +439,12 @@ export const scenarios = [
       assert.equal(await a.diceCount(), 2, 'roll unaffected by collapsed chrome');
 
       // Persistence: a fresh tab on the same origin restores the state.
+      await a.dbg('setPanelState({pools: true})');
+      await a.dbg('setPanelState({pools: false})');
       const b = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const st2 = await b.dbg('panelState');
-      assert.equal(st2.groups, false, 'collapsed groups persisted');
-      assert.equal(st2.compose, true, 'open compose persisted');
+      assert.equal(st2.pools, false, 'collapsed pools persisted');
+      await b.dbg('setPanelState({pools: true})'); // reopen so 'm' has something to collapse
 
       // Keyboard parity: 'm' = collapse/expand all; 'g' = just the pools;
       // 'l' = the log flyout, leaving every panel exactly where it was.
@@ -453,14 +456,16 @@ export const scenarios = [
       assert.equal((await b.dbg('panelState')).allCollapsed, true, 'without touching a panel — compact holds');
       await b.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'l'}))`);
       assert.equal((await b.dbg('logFlyout')).open, false, "'l' again closes it");
+      // n is the documented key; b and g are silent aliases from the old
+      // two-panel days — all three toggle the ONE Pools panel.
       await b.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'g'}))`);
-      const st3 = await b.dbg('panelState');
-      assert.equal(st3.groups, true, "'g' reopens the pools");
-      assert.equal(st3.compose, false, 'without touching the others');
+      assert.equal((await b.dbg('panelState')).pools, true, "'g' (alias) reopens the pools");
       assert.ok(await b.eval(`!document.body.classList.contains('mini')`), 'compact view lifts');
-      // Leave the origin's persisted state all-open: panel state is per-user
+      await b.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'n'}))`);
+      assert.equal((await b.dbg('panelState')).pools, false, "'n' collapses it again");
+      // Leave the origin's persisted state open: panel state is per-user
       // localStorage, which OUTLIVES this scenario's room.
-      await b.dbg('setPanelState({compose: true, groups: true})');
+      await b.dbg('setPanelState({pools: true})');
     },
   },
   {
@@ -489,7 +494,7 @@ export const scenarios = [
         'rail order: presence → action → information → environment (P3)',
       );
 
-      const st = await a.dbg('setPanelState({compose: false, groups: false})');
+      const st = await a.dbg('setPanelState({pools: false})');
       assert.equal(st.allCollapsed, true, 'every panel collapsed');
       assert.ok(await a.eval(`document.body.classList.contains('mini')`),
         'compact view is the emergent all-collapsed state');
@@ -501,12 +506,12 @@ export const scenarios = [
         'settings reachable with everything collapsed');
       await a.eval(`document.getElementById('settings-close').click()`);
       // Reopening one panel leaves compact view.
-      const st2 = await a.dbg('setPanelState({groups: true})');
+      const st2 = await a.dbg('setPanelState({pools: true})');
       assert.equal(st2.allCollapsed, false, 'one open panel ends all-collapsed');
       assert.ok(await a.eval(`!document.body.classList.contains('mini')`), 'compact view lifts');
       // Leave the origin's persisted state all-open: panel state is per-user
       // localStorage, which OUTLIVES this scenario's room.
-      await a.dbg('setPanelState({compose: true, groups: true})');
+      await a.dbg('setPanelState({pools: true})');
     },
   },
   {
@@ -806,20 +811,20 @@ export const scenarios = [
     // unobstructed when the dice land. A real expand retires the overlay.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
-      await a.dbg('setPanelState({groups: false})');
-      assert.equal((await a.dbg('panelState')).groups, false, 'panel collapsed');
+      await a.dbg('setPanelState({pools: false})');
+      assert.equal((await a.dbg('panelState')).pools, false, 'panel collapsed');
       assert.equal(await a.dbg('setGroupsFlyout(true)'), true, 'the tab flies the list out');
       assert.ok(await a.eval(`(() => {
-        const r = document.querySelector('#groups-panel .panel-body').getBoundingClientRect();
+        const r = document.querySelector('#builder-panel .panel-body').getBoundingClientRect();
         return r.width > 0 && r.height > 0;
       })()`), 'the flyout renders the list');
       await a.eval(`document.querySelector('#groups-list .pool-roll').click()`);
       await a.settle();
       assert.ok(await a.rollId(), 'the row rolled');
       assert.equal(await a.dbg('groupsFlyout'), false, 'and the flyout retracted itself');
-      assert.equal((await a.dbg('panelState')).groups, false, 'the panel stayed collapsed');
+      assert.equal((await a.dbg('panelState')).pools, false, 'the panel stayed collapsed');
       await a.dbg('setGroupsFlyout(true)');
-      await a.dbg('setPanelState({groups: true})');
+      await a.dbg('setPanelState({pools: true})');
       assert.equal(await a.dbg('groupsFlyout'), false, 'a real expand retires the overlay');
     },
   },
@@ -836,7 +841,7 @@ export const scenarios = [
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
 
       // Read-only rest state: no edit chrome anywhere in the panel.
-      assert.equal(await a.eval(`document.querySelectorAll('#groups-panel .group-edit, #groups-panel .group-del').length`),
+      assert.equal(await a.eval(`document.querySelectorAll('#builder-panel .group-edit, #builder-panel .group-del').length`),
         0, 'no per-row edit chrome at rest');
       assert.equal(await a.eval(`document.getElementById('pools-toolbar').classList.contains('hidden')`),
         true, 'no toolbar (incl. copy-link) at rest');
@@ -846,7 +851,7 @@ export const scenarios = [
         const c = document.querySelector('#groups-list .pool-roll .roll-cue');
         return !!c && c.getAttribute('aria-hidden') === 'true' && c.textContent.includes('ROLL');
       })()`), 'the hover ROLL cue rides every strip (decorative, aria-hidden)');
-      assert.equal(await a.eval(`document.querySelectorAll('#groups-panel button button').length`),
+      assert.equal(await a.eval(`document.querySelectorAll('#builder-panel button button').length`),
         0, 'no button nests inside a button');
 
       // The strip rolls; ± opens the popover.
@@ -863,7 +868,7 @@ export const scenarios = [
 
       // Manage mode: chrome appears, strips disarm, digits stay live.
       assert.equal(await a.dbg('setPoolsEditMode(true)'), true, '✎ enters manage mode');
-      assert.ok(await a.eval(`document.querySelectorAll('#groups-panel .group-edit').length >= 3`),
+      assert.ok(await a.eval(`document.querySelectorAll('#builder-panel .group-edit').length >= 3`),
         'per-row pencils appear');
       assert.equal(await a.eval(`document.getElementById('pools-toolbar').classList.contains('hidden')`),
         false, 'the toolbar appears');
@@ -882,9 +887,9 @@ export const scenarios = [
       await a.eval(`document.getElementById('pools-done').click()`);
       assert.equal(await a.dbg('poolsEditMode'), false, 'Done exits manage mode');
       await a.dbg('setPoolsEditMode(true)');
-      await a.dbg('setPanelState({groups: false})');
+      await a.dbg('setPanelState({pools: false})');
       assert.equal(await a.dbg('poolsEditMode'), false, 'collapsing the panel exits manage mode');
-      await a.dbg('setPanelState({groups: true})');
+      await a.dbg('setPanelState({pools: true})');
     },
   },
   {
@@ -1010,10 +1015,10 @@ export const scenarios = [
     // — and fails if either retired word comes back into view.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
-      assert.equal(await a.eval(`document.querySelector('#head-groups .ph-label').textContent`),
-        'Saved pools', 'the panel is labelled Saved pools');
       assert.equal(await a.eval(`document.querySelector('#head-compose .ph-label').textContent`),
-        'New pool', "the builder is 'New pool' — 'Compose' is retired (2026-07)");
+        'Pools', 'ONE panel since the merge, labelled Pools');
+      assert.equal(await a.eval(`document.querySelector('.pools-sub').textContent`),
+        'Saved pools', 'the saved list keeps its name inside it');
       assert.equal(await a.eval(`document.getElementById('group-name').placeholder`),
         'Name this pool…', 'the save field names a pool');
       assert.equal(await a.eval(`document.getElementById('pop-update').textContent`),

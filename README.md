@@ -26,13 +26,12 @@ state anywhere.
   outcome chart (Blemish, Mishap, Partial Success, Success & Bonus, Advantage,
   Critical Success, …). Critical Success and Critical Fail get full-screen
   effects.
-- **Collapsible chrome** — two independent regions (New pool, Saved pools),
-  each collapsing to a small labelled edge tab, each remembering its own
-  state; the roll log rides the rail as a pinned flyout with an unread badge
-  (2026-07 amendment). Collapse the panels (`m`) and only the table is left —
-  sized for a corner window during a video call. Small windows start
-  collapsed. A persistent rail (roster · identity · ❯ · ≣ · 🔊 · ⚙) never
-  hides.
+- **Collapsible chrome** — ONE Pools panel (the draft pool first, saved
+  pools beneath — the dice themselves are the roll buttons), collapsing to
+  a labelled edge tab; the roll log rides the rail as a pinned flyout.
+  Collapse it (`m`/`n`) and only the table is left — sized for a corner
+  window during a video call. Small windows start collapsed. A persistent
+  rail (roster · identity · ❯ · ≣ · 🔊 · ⚙) never hides.
 - Roll log with timestamps, per-die breakdowns, and max/min highlighting;
   procedural impact sounds; solo mode persists pools and log in localStorage.
 

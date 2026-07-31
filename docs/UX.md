@@ -1376,16 +1376,36 @@ stack for the rail's ≣, a pinned flyout with an unread badge.)* This is the
 fix for a real bug: settings and mute used to live in chrome that compact
 mode hid, stranding both behind a keyboard shortcut.
 
-**Two independent regions** *(2026-07 amendment: was three — the roll log
-moved to the rail flyout; `l` toggles it there)*, each collapsing on its
-own header to a small labelled edge tab, each remembering its own state in
-`dice.panels.v1`: New pool · Saved pools *(2026-07: 'Compose' renamed — you
-build a new pool here, Saved pools keeps them; ids keep the old spelling)*.
-Keys `n` (`b` survives as a silent alias) and `g` toggle one, `m` toggles
-all. The New pool panel shows ONE input view at a time — Dice (palette +
-draft cluster) or Notation (the command box), a per-user toggle
-(`dice.inputmode.v1`); both edit the same draft, so switching never resets
-anything, and loading a pool into the box flips to Notation. **Compact view is emergent**: `body.mini` is derived from "every panel
+**ONE region since the panel merge (2026-07-31)** *(was three, then two:
+the roll log moved to the rail flyout — `l` — and then New pool and Saved
+pools merged)*: the **Pools** panel, collapsing on its header to a labelled
+edge tab (`dice.panels.v1`; legacy two-region state migrates open-if-either
+-was). The DRAFT is its first row — structurally a saved-pool row that does
+not exist yet — with the saved list directly beneath, so Save lands the new
+row in view. Keys `n` (documented) and `b`/`g` (silent aliases) toggle it;
+`m` keeps its collapse-all muscle memory. The draft shows ONE input view at
+a time — Dice (palette + cluster) or Notation (the command box), a per-user
+toggle (`dice.inputmode.v1`); both edit the same draft, the cluster stays
+alive in Notation view (typed dice materialize), and loading a pool into
+the box flips the view for that visit without rewriting the preference.
+
+**Result surfaces serve the result (2026-07-31).** At rest the banner and
+verdict card are content plus at most ONE standing verb: **Done** — the
+roller's Done collects (dice to the shelf, result kept; Enter's twin), a
+spectator's dismisses locally in quieter dress. Everything else (⟳, the
+clear-for-everyone ✕) is the revealed tier: it arrives with the pointer or
+keyboard focus and stands on coarse pointers; the transient verdict card
+reveals even its Done. The peek rerolls through a bare ROLL ❯❯❯ cue (the
+real dice sit right below the card), its ± opens the SAME anchored popover
+as every ± (the peek pins while it lives; rolling a tweak REPLACES the
+shelved roll), and its Save mints 'keep this roll as a pool'.
+
+**The tier rule (P6, the binding sharpening).** Treatments bind CONTROL
+TIERS, not screens: content stands (dice, names, totals); roll-adjacent
+controls reveal on approach (±, per-die ✕, log ⟳, the ROLL cue, 1-9
+ordinals); management stands below or behind a gate (Save · Clear, the ✎
+toolbar). A treatment adopted for a tier anywhere applies to that tier
+everywhere. The gold fill belongs to the roll verb alone. **Compact view is emergent**: `body.mini` is derived from "every panel
 is collapsed" and only rescales the table and its labels — it is not a
 mode, and nothing can be reached in one state that cannot be reached in the
 other. *(Amended 2026-07: the Players panel is retired — the roster is rail

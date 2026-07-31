@@ -124,7 +124,7 @@ html, body {
   z-index: var(--z-panel);
 }
 
-#groups-panel { min-height: 0; }
+/* (the merged Pools panel is #builder-panel; groups-panel retired 2026-07-31) */
 
 /* ---------- collapsible chrome panels ---------- */
 /* Two regions — Compose, Saved pools — each with a header that toggles it
@@ -175,8 +175,7 @@ html, body {
    the pools panel — 'the smaller the window, the more of it is table'
    binds small windows too. */
 #left-panel .side-panel { min-height: 0; flex: 0 1 auto; }
-#builder-panel > .panel-body,
-#groups-panel > .panel-body { overflow-y: auto; }
+#builder-panel > .panel-body { overflow-y: auto; }
 /* collapsed = the labelled edge tab: header only, sized to its label */
 .side-panel.collapsed { width: max-content; border-radius: 999px; }
 .side-panel.collapsed > .panel-body { display: none; }
@@ -193,8 +192,8 @@ html, body {
    pointer-leave or the roll itself — the table is unobstructed when the dice
    land. Clicking the tab still expands the panel exactly as before; touch
    (no hover) keeps that path. */
-#groups-panel.collapsed { position: relative; }
-#groups-panel.collapsed.flyout > .panel-body {
+#builder-panel.collapsed { position: relative; }
+#builder-panel.collapsed.flyout > .panel-body {
   display: flex;
   position: absolute;
   top: calc(100% + 6px);
@@ -515,6 +514,9 @@ html, body {
 .pool-mods:focus-visible { opacity: 1; color: var(--muted); }
 .pool-mods:hover { opacity: 1; color: var(--gold-bright); background: rgba(212, 175, 55, 0.10); border: none; }
 @media (pointer: coarse) { .pool-line2 .pool-mods { opacity: 1; } }
+/* the saved list's quiet sub-label inside the merged panel */
+.pools-sub { margin: 14px 0 2px; padding-top: 10px; border-top: 1px solid var(--hair); }
+
 /* manage-mode toolbar: copy-link (demoted here, P4) + Done */
 #pools-toolbar { display: flex; gap: 8px; margin: 2px 0 8px; }
 #pools-toolbar.hidden { display: none; }

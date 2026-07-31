@@ -5445,9 +5445,11 @@ document.getElementById('set-chips').addEventListener('click', () => setChips(!c
 const LS_PANELS = 'dice.panels.v1';
 const LS_MINI = 'dice.mini.v1'; // legacy compact-view preference — migration only
 
+// ONE region since the panel merge (2026-07-31): the Pools panel carries
+// the draft as its first row and the saved list beneath. The element ids
+// keep their old spellings (builder-panel / head-compose) like tray/group.
 const PANEL_DEFS = {
-  compose: { el: 'builder-panel', head: 'head-compose' },
-  groups: { el: 'groups-panel', head: 'head-groups' },
+  pools: { el: 'builder-panel', head: 'head-compose' },
 };
 
 // Open/collapsed per region. Seeded once, exactly like the old mini seed: a
@@ -5457,6 +5459,11 @@ let panelsOpen = (() => {
   const stored = load(LS_PANELS, null);
   const st = {};
   if (stored && typeof stored === 'object') {
+    // Legacy two-region state migrates: Pools is open if EITHER was.
+    if (!('pools' in stored) && ('compose' in stored || 'groups' in stored)) {
+      st.pools = stored.compose !== false || stored.groups !== false;
+      return st;
+    }
     for (const k of Object.keys(PANEL_DEFS)) st[k] = stored[k] !== false;
     return st;
   }
@@ -5549,13 +5556,13 @@ function applyPanels(persist = true) {
   for (const [id, def] of Object.entries(PANEL_DEFS)) {
     document.getElementById(def.el).classList.toggle('collapsed', !panelsOpen[id]);
   }
-  if (panelsOpen.groups) closeGroupsFlyout(); // a real expand retires the overlay
+  if (panelsOpen.pools) closeGroupsFlyout(); // a real expand retires the overlay
   // Manage mode is transient (P2): collapsing the pools panel exits it, so
   // the panel always reopens read-only.
-  if (!panelsOpen.groups && poolsEdit) setPoolsEdit(false);
+  if (!panelsOpen.pools && poolsEdit) setPoolsEdit(false);
   // The tray's per-die ✕ overlays anchor to laid-out die positions, which
   // are all zero while the panel is collapsed — re-anchor on expand.
-  if (panelsOpen.compose) renderTray();
+  if (panelsOpen.pools) renderTray();
   if (persist) save(LS_PANELS, panelsOpen);
   const mini = allPanelsCollapsed();
   if (mini !== document.body.classList.contains('mini')) {
@@ -5601,12 +5608,12 @@ for (const [id, def] of Object.entries(PANEL_DEFS)) {
 // panel expanding for real). Clicking the tab still expands the panel; touch
 // keeps that path — no hover, no flyout. The close is timer-graced like the
 // peek: the 6px visual gap between tab and list must be crossable.
-const groupsPanelEl = document.getElementById('groups-panel');
+const groupsPanelEl = document.getElementById('builder-panel'); // the merged Pools panel
 let groupsFlyTimer = null;
 function openGroupsFlyout() {
   clearTimeout(groupsFlyTimer);
   groupsFlyTimer = null;
-  if (!panelsOpen.groups) groupsPanelEl.classList.add('flyout');
+  if (!panelsOpen.pools) groupsPanelEl.classList.add('flyout');
 }
 function closeGroupsFlyout() {
   clearTimeout(groupsFlyTimer);
@@ -5847,11 +5854,11 @@ document.addEventListener('keydown', (e) => {
     case 'r': rerollLast(); return;
     case 'c': requestClear(); return;
     case 'm': toggleAllPanels(); return;
-    // 'n' for New pool (the documented key); 'b' survives as a silent alias
-    // for the old Compose muscle memory.
+    // 'n' is the documented key; 'b' and 'g' survive as silent aliases for
+    // the old two-panel muscle memory (they toggled Compose / Saved pools).
     case 'n':
-    case 'b': setPanel('compose', !panelsOpen.compose); return;
-    case 'g': setPanel('groups', !panelsOpen.groups); return;
+    case 'b':
+    case 'g': setPanel('pools', !panelsOpen.pools); return;
     case 'l': toggleLogFlyout(); return; // the roll log is a rail flyout now, not a panel
     case 's': setSound(!soundOn); return;
     case 'Enter': {

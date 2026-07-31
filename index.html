@@ -32,20 +32,24 @@ limitations under the License.
 <body>
   <div id="scene-container"></div>
 
-  <!-- Left panels: Compose (pool builder + command box) + saved pools.
-       ("pool" is the user-facing name for both concepts; the `tray`/`group`
-       ids, classes, storage keys and the #g= codec keep their old spelling.)
-       Each is one of the two independently-collapsible chrome regions: its
-       header is the toggle, and collapsed it rests as a small labelled edge
-       tab (per-user state in dice.panels.v1). The roll log is NOT a region
-       anymore — it rides the rail as #log-flyout. -->
+  <!-- The left column holds ONE panel since the merge: Pools — the draft
+       first, the saved list beneath ("pool" is the user-facing word; the
+       `tray`/`group` ids, classes, storage keys and the #g= codec keep
+       their old spelling). Its header toggles it; collapsed it rests as a
+       labelled edge tab (per-user state in dice.panels.v1). The roll log
+       rides the rail as #log-flyout. -->
   <aside id="left-panel">
-    <!-- 'New pool' (né Compose — you build a new pool here, Saved pools
-         keeps them; one vocabulary, two panels). Ids keep the old spelling
-         like tray/group do. -->
+    <!-- ONE Pools panel (2026-07-31, the panel merge): the draft is its
+         FIRST ROW — structurally a saved-pool row that does not exist yet —
+         and the saved list sits directly under it, so Save lands the new
+         row in view. One tab in compact, one flyout, one ✎ manage gate.
+         Ids keep old spellings (builder-panel survives as the element id;
+         tray/group live on in classes, storage keys and the #g= codec). -->
     <div class="panel side-panel" id="builder-panel">
       <div class="panel-head" id="head-compose" title="Show/hide — key: n">
-        <span class="ph-label">New pool</span>
+        <span class="ph-label">Pools</span>
+        <button id="pools-edit" class="btn tiny ghost" aria-pressed="false"
+                title="Edit pools — rename · delete · copy link">✎</button>
         <span class="ph-chev" aria-hidden="true"></span>
       </div>
       <div class="panel-body">
@@ -135,28 +139,18 @@ limitations under the License.
         <button id="save-cancel" class="btn" title="Cancel">✕</button>
       </div>
       </div>
-      </div>
-    </div>
 
-    <!-- Saved pools: read-only quick access (P2 use-vs-manage). At rest a
-         row is name + notation chip over a big roll strip of real die art —
-         no edit chrome anywhere. The header ✎ toggles manage mode: per-row
-         rename/delete appear and the toolbar carries copy-link + Done.
-         (copy-link is demoted, never deleted — P4.) -->
-    <div class="panel side-panel" id="groups-panel">
-      <div class="panel-head" id="head-groups" title="Show/hide — key: g">
-        <span class="ph-label">Saved pools</span>
-        <button id="pools-edit" class="btn tiny ghost" aria-pressed="false"
-                title="Edit pools — rename · delete · copy link">✎</button>
-        <span class="ph-chev" aria-hidden="true"></span>
+      <!-- The saved list, directly under the draft (read-only quick access,
+           P2): rows are die-strip roll buttons; the header ✎ gates manage
+           mode (per-row rename/delete + the copy-link toolbar — demoted,
+           never deleted, P4). -->
+      <span class="plabel pools-sub">Saved pools</span>
+      <div id="pools-toolbar" class="hidden">
+        <button id="copy-link" class="btn tiny ghost" title="Copy a URL that restores these pools anywhere">Copy link</button>
+        <button id="pools-done" class="btn tiny ghost">Done</button>
       </div>
-      <div class="panel-body">
-        <div id="pools-toolbar" class="hidden">
-          <button id="copy-link" class="btn tiny ghost" title="Copy a URL that restores these pools anywhere">Copy link</button>
-          <button id="pools-done" class="btn tiny ghost">Done</button>
-        </div>
-        <div id="groups-list"></div>
-        <p id="groups-empty" class="hint">Save a pool to keep it here for quick rerolls — or paste a pools link.</p>
+      <div id="groups-list"></div>
+      <p id="groups-empty" class="hint">Save a pool to keep it here for quick rerolls — or paste a pools link.</p>
       </div>
     </div>
   </aside>
@@ -246,8 +240,8 @@ limitations under the License.
           <tr><td><code>1–9</code></td><td>roll saved pool N</td></tr>
           <tr><td><code>r</code></td><td>reroll the last roll</td></tr>
           <tr><td><code>c</code></td><td>clear the table</td></tr>
-          <tr><td><code>m</code></td><td>collapse / expand all panels (the edge tabs bring one back)</td></tr>
-          <tr><td><code>n</code> <code>g</code></td><td>toggle one panel — new pool, saved pools</td></tr>
+          <tr><td><code>m</code></td><td>collapse / expand the panel (the edge tab brings it back)</td></tr>
+          <tr><td><code>n</code></td><td>toggle the Pools panel</td></tr>
           <tr><td><code>l</code></td><td>roll log flyout</td></tr>
           <tr><td><code>s</code></td><td>sound on/off</td></tr>
           <tr><td><code>/</code> or <code>Ctrl/Cmd K</code></td><td>quick roll palette</td></tr>
