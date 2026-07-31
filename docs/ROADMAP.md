@@ -27,19 +27,55 @@ carry a roll's FULL intent:
   state replayed on hello resync (mirrors `cleared`); `/api/join` carries
   `offers`.
 
-### 2. Interpretation system profiles (goal 6)
+### 2. Interpretation system profiles v2 (goal 6) — REVISED 2026-07-31
 
-The audit's six-site hardcode inventory becomes a registry:
+**The Soul Deal correction (from the system's author, via Joe):** dice
+values do NOT sum. Each die is read INDIVIDUALLY against the chart — the
+chart's rank columns (Mug … Bóaire) are DIE ranks, not pool sizes: a d4's
+face reads the d4 column, a d20's the d20 column. A 2d4 roll of [1, 4] is
+one Blemish and one Minor Success — N dice, N outcomes. Totals, modifiers,
+DC targets and keep/drop are mechanics of OTHER systems and simply do not
+apply under Soul Deal (they keep existing app-wide; the profile decides
+what a table reads). The shipped sum-based soul-deal profile — including
+the 2026-07-31 natural-crit gate and its unit tests — is superseded by
+this rework and gets replaced, not patched.
 
-- `js/meanings.js` → profile registry: `soul-deal` (today's chart + DC
-  pairing), `dnd` (DC verdicts + natural-20/1 crits, no chart), `none`
-  (numbers only). Profile provides `meaningFor`, a crit predicate, and its
-  readout slots.
-- `system` key in SETTING_SPECS (default `soul-deal`), room-synced like
-  felt; settings modal picker under "Everyone at the table".
-- Thread the active profile through entryFromRoll, banner, ceremony
-  verdict, verdict card, and log. §2.5's hero-slot separation is the seam.
-- Success counting (dice-pool systems) joins later as another profile.
+- **Profile interface v2**: a profile declares its READ, semi-generically —
+  `aggregate: 'sum' | 'per-die'`, `usesTotal` (gates the big total, DC
+  verdicts and margin lines), `usesMods` (the ± popover marks non-applying
+  mechanics as such under the active system), `outcomesFor(entry)` →
+  per-die `{dieIndex, word, tier}` list for per-die systems, `meaningFor`
+  (the hero word) for sum systems, plus the crit predicate.
+- **Soul Deal profile**: per-die chart read (null cells = a quiet die, no
+  outcome word); the result surfaces show OUTCOME CHIPS — each die's art
+  token beside its word, tier-colored — instead of a total; a tally line
+  summarizes ('2× Success · 1× Blemish'). Crit fanfare fires on any die
+  landing a crit row. The banner/verdict hero slot, log lines, peek and
+  per-die value chips all read through the profile (the §2.5 seam).
+- `dnd` and `none` keep their sum/total behavior unchanged.
+- Success counting (dice-pool systems) becomes trivial under this
+  interface: another per-die profile that counts outcomes.
+
+### 2b. Multi-pool rolls & pool groups (goal 6 + goal 5) — NEW 2026-07-31
+
+Soul Deal play composes a roll from SEVERAL pools (attribute + skill +
+motivation), and Joe wants this semi-generic — it is useful under every
+system:
+
+- **Dice-term attribution in notation** (the foundation; preserves
+  notation totality): `3d6[Strength]+2d8[Swords]` — attributed DICE terms,
+  mirroring the existing `+2[Proficiency]` modifier grammar. Parser,
+  canonical form, rollspec perDie `source` label, server re-parse, codec.
+- **Pool categories**: saved pools gain an optional group ('Attributes',
+  'Skills', 'Motivations'); the Pools panel renders category sections;
+  manage mode edits the category; `#g=` codec v3 carries it (backward
+  compatible).
+- **Multi-pool staging**: each pool row's revealed tier gains '+' — add
+  this pool's dice INTO the draft (the draft cluster is already the
+  composition surface). Staged dice keep their source-pool labels, the
+  cluster reads 'd6 ×3 [Strength] · d8 ×2 [Swords]', and one click rolls
+  the composed pool. Per-die outcomes then attribute back to their source
+  pools on every result surface.
 
 ## Tier 2 — Organization (goal 5, the audit's biggest experience gap)
 
