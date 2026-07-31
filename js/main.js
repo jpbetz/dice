@@ -142,21 +142,10 @@ function feltTileCanvas(base) {
   const ctx = c.getContext('2d');
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, 512, 512);
-  // Cloth, not static: a low-frequency mottle (soft wide blotches, as if the
-  // nap catches the light unevenly) under a FINE speckle. The old coarse
-  // 1.5px salt-and-pepper at higher alpha read as sensor noise.
-  for (let i = 0; i < 26; i++) {
-    const light = Math.random() > 0.5;
-    const r = 50 + Math.random() * 110;
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    const a = 0.012 + Math.random() * 0.018;
-    g.addColorStop(0, light ? `rgba(255,250,235,${a})` : `rgba(0,0,0,${a * 1.4})`);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 512, 512);
-  }
+  // The tile carries ONLY the fine uniform speckle: statistically seamless
+  // under the 6×6 repeat. Anything low-frequency must NOT live here — a
+  // blotch clipped by the tile border repeats as an obvious 6×6 seam grid
+  // (baseFeltCanvas paints the whole-plane mottle exactly once instead).
   for (let i = 0; i < 14000; i++) {
     const shade = Math.random();
     ctx.fillStyle = shade > 0.5
@@ -240,6 +229,21 @@ function baseFeltCanvas(base) {
   const tileSize = DECAL_SIZE / 6; // the same 6×6 rhythm the old plain repeat had
   for (let x = 0; x < 6; x++) {
     for (let y = 0; y < 6; y++) ctx.drawImage(tile, x * tileSize, y * tileSize, tileSize, tileSize);
+  }
+  // Cloth mottle, painted ONCE across the whole plane (it can't live in the
+  // tile: any blotch the tile border clips repeats as a 6×6 seam grid).
+  // Very soft and very wide — the nap catching light unevenly, not stains.
+  for (let i = 0; i < 18; i++) {
+    const light = Math.random() > 0.5;
+    const r = 260 + Math.random() * 420;
+    const x = Math.random() * DECAL_SIZE;
+    const y = Math.random() * DECAL_SIZE;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const a = 0.006 + Math.random() * 0.01;
+    g.addColorStop(0, light ? `rgba(255,250,235,${a})` : `rgba(0,0,0,${a * 1.3})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, DECAL_SIZE, DECAL_SIZE);
   }
   feltCompositeCache.set(base, c);
   return c;
