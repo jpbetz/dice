@@ -398,6 +398,44 @@ html, body {
   box-shadow: 0 0 14px rgba(255, 214, 102, 0.12);
 }
 .pool-roll:disabled { opacity: 0.45; cursor: default; } /* manage mode disarms it */
+/* ---- the hover ROLL cue (P1 made loud) ---- */
+/* Approach turns the strip into a promise: a heavy translucent ROLL fills
+   the button's empty side BEHIND the dice (they ride z-index 1), and the
+   chevrons drum up ❯ → ❯ ❯ → ❯ ❯ ❯ on a step loop — the click IS the roll.
+   Identical on pool rows and the draft cluster (the tier rule). Honesty:
+   over a draft ✕ the cue dies with the glow (that click removes, not rolls). */
+.pool-roll { position: relative; overflow: hidden; }
+.pool-roll .die-art, .pool-roll .strip-dot,
+.pool-roll .strip-count, .pool-roll .strip-more { position: relative; z-index: 1; }
+.roll-cue {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 12px;
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  white-space: nowrap;
+  color: rgba(255, 215, 102, 0.34);
+  text-shadow: 0 0 14px rgba(255, 215, 102, 0.18);
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+  z-index: 0;
+}
+.pool-roll:hover:not(:disabled) .roll-cue { opacity: 1; }
+.roll-cue i { font-style: normal; }
+.pool-roll:hover:not(:disabled) .roll-cue i:nth-of-type(2) { animation: cue-2 0.9s steps(1) infinite; }
+.pool-roll:hover:not(:disabled) .roll-cue i:nth-of-type(3) { animation: cue-3 0.9s steps(1) infinite; }
+@keyframes cue-2 { 0%, 32% { opacity: 0; } 33%, 100% { opacity: 1; } }
+@keyframes cue-3 { 0%, 65% { opacity: 0; } 66%, 100% { opacity: 1; } }
+.tray-cluster:has(.die-x:hover) .tray-roll .roll-cue { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .roll-cue i { animation: none !important; opacity: 1 !important; }
+}
 .pool-roll .die-art { width: 28px; height: 28px; pointer-events: none; }
 .strip-dot {
   width: 11px; height: 11px;
@@ -1178,6 +1216,8 @@ body.mini .pk-breakdown { font-size: 10px; }
 .log-part-label { font-variant: small-caps; color: var(--muted); font-weight: 400; letter-spacing: 0.04em; }
 .log-hidden { color: var(--muted); font-style: italic; }
 .log-actions { flex: 1; text-align: right; padding-right: 8px; }
+/* the tier rule: a log row's ⟳ reveals on approach like every other
+   per-row secondary control (pool ±, the draft's Save/±/✕) */
 .log-again {
   border: none;
   background: none;
@@ -1185,8 +1225,12 @@ body.mini .pk-breakdown { font-size: 10px; }
   font-size: 14px;
   cursor: pointer;
   padding: 0 4px;
+  opacity: 0;
+  transition: opacity 0.12s;
 }
+.log-entry:hover .log-again, .log-again:focus-visible { opacity: 1; }
 .log-again:hover { color: var(--gold-bright); }
+@media (pointer: coarse) { .log-again { opacity: 1; } }
 
 /* banner action buttons (banner itself is pointer-events: none) — the same
    skeleton as the peek card: a centered row of secondary actions over one

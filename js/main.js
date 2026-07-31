@@ -3424,6 +3424,7 @@ function renderTray() {
     // collapse to one die + ×N, and each group's ✕ removes ONE die of that
     // type — 'd6 ×3' steps down to 'd6 ×2'.
     trayRollBtn.appendChild(buildDieStrip(tray, TRAY_STRIP_CAP, { grouped: true }));
+    trayRollBtn.appendChild(buildRollCue()); // same promise as the pool rows (tier rule)
     const label = `Roll ${formula(tray)}`;
     trayRollBtn.title = label;
     trayRollBtn.setAttribute('aria-label', label);
@@ -4060,6 +4061,19 @@ function buildDieStrip(types, cap, { grouped = false } = {}) {
   return frag;
 }
 
+// The hover ROLL cue (P1 made loud): a heavy translucent ROLL fills the
+// strip button's empty side BEHIND the dice on hover, chevrons drumming
+// ❯ → ❯ ❯ → ❯ ❯ ❯ to telegraph that the click launches. Pure decoration:
+// aria-hidden, pointer-events none — the button stays the whole target.
+// Static markup only (no user strings ride innerHTML here).
+function buildRollCue() {
+  const cue = document.createElement('span');
+  cue.className = 'roll-cue';
+  cue.setAttribute('aria-hidden', 'true');
+  cue.innerHTML = 'ROLL&nbsp;<i>❯</i><i>❯</i><i>❯</i>';
+  return cue;
+}
+
 // P2 use-vs-manage: manage mode is ONE explicit, transient toggle (the
 // header ✎). It never persists, and collapsing the panel exits it
 // (applyPanels) — the hover flyout and every fresh look at the panel start
@@ -4152,6 +4166,7 @@ function renderGroups() {
     rollBtn.title = rollName;
     rollBtn.setAttribute('aria-label', rollName);
     rollBtn.appendChild(buildDieStrip(types, POOL_STRIP_CAP, { grouped: true }));
+    rollBtn.appendChild(buildRollCue());
     rollBtn.addEventListener('click', () => rollGroup(g));
     // Manage mode disarms the click as anti-misclick, NOT as a lock: the
     // digit shortcuts stay live (a keyboard roll is always deliberate).

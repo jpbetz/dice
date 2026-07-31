@@ -676,6 +676,10 @@ export const scenarios = [
       assert.deepEqual(ts.dice, ['d6', 'd6'], 'two d6 composed');
       assert.equal(ts.rollVisible, true, 'the cluster is the roll button');
       assert.equal(ts.hasActions, true, 'Save/±/✕ appear with content');
+      assert.ok(await a.eval(`(() => {
+        const c = document.querySelector('#tray-roll .roll-cue');
+        return !!c && c.getAttribute('aria-hidden') === 'true' && c.textContent.includes('ROLL');
+      })()`), 'the cluster carries the same ROLL cue (tier rule)');
       // Grouped exactly like the pool rows: one d6 with a ×2, one ✕.
       assert.equal(ts.xCount, 1, 'repeats group — one ✕ per die TYPE');
       assert.equal(await a.eval(`document.querySelector('#tray-roll .strip-count').textContent`),
@@ -821,6 +825,10 @@ export const scenarios = [
         true, 'no toolbar (incl. copy-link) at rest');
       assert.ok(await a.eval(`document.querySelectorAll('#groups-list .pool-roll').length >= 3`),
         'every row is a strip button');
+      assert.ok(await a.eval(`(() => {
+        const c = document.querySelector('#groups-list .pool-roll .roll-cue');
+        return !!c && c.getAttribute('aria-hidden') === 'true' && c.textContent.includes('ROLL');
+      })()`), 'the hover ROLL cue rides every strip (decorative, aria-hidden)');
       assert.equal(await a.eval(`document.querySelectorAll('#groups-panel button button').length`),
         0, 'no button nests inside a button');
 
