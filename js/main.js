@@ -904,12 +904,13 @@ function stepWhisking(dt) {
   if (landed) recompositeFelt();
 }
 
-// One QUIET marker per shelved roll (P1 quiet by default): at rest, just the
-// roller's color dot on an enlarged hover/tap target — no total, no lens
-// word, no tiny ✕, and a held roll never shouts '?'. Hover/tap expands the
-// peek card (§7.7.1), which carries the full result, Reveal for the
-// authority, and the prominent clear-✕ ANY player may use (§7.7 universal
-// housekeeping). Rebuilt whole on every shelf/lens/reveal change.
+// One INVISIBLE marker per shelved roll (P1 quiet by default, taken all the
+// way): the settled cluster is its own presence, so the target draws nothing
+// at rest — no dot, no total, no lens word, and a held roll never shouts '?'.
+// Hover/tap expands the peek card (§7.7.1), which carries the full result,
+// Reveal for the authority, and the prominent clear-✕ ANY player may use
+// (§7.7 universal housekeeping). Rebuilt whole on every shelf/lens/reveal
+// change.
 function renderShelfMarkers() {
   // Markers mid-fade are NOT ours to wipe: an eviction is 'roll-cleared'
   // immediately followed by 'roll-collected', so a wholesale innerHTML reset
@@ -925,10 +926,8 @@ function renderShelfMarkers() {
     const el = document.createElement('div');
     el.className = 'shelf-marker';
     el.dataset.rollId = c.rollId;
-    const dot = document.createElement('span');
-    dot.className = 'sm-dot';
-    dot.style.background = (entry && entry.color) || '#8a7f6e';
-    el.appendChild(dot);
+    // No visible body: the settled cluster IS the marker's presence, and the
+    // roller's color dot lives in the peek card this target opens.
     // A held roll's Reveal lives in its peek card: the shelf is where a held
     // roll spends its life (auto-collect fires on ANYONE's next roll), and
     // the peek renders Reveal for the authority (the server enforces it
@@ -2897,8 +2896,8 @@ window.__diceDebug = {
       .filter((el) => !el.classList.contains('chip-clearing'))
       .map((el) => ({
         rollId: el.dataset.rollId || null,
-        dotOnly: el.childElementCount === 1
-          && el.firstElementChild.classList.contains('sm-dot'),
+        // bare = no child chrome at all: the resting target draws nothing
+        bare: el.childElementCount === 0,
         text: el.textContent,
         hasTotal: !!el.querySelector('.sm-total'),
         hasX: !!el.querySelector('.sm-x'),

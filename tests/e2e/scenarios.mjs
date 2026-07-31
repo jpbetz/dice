@@ -110,11 +110,11 @@ export const scenarios = [
   {
     name: 'shelf-quiet',
     tags: ['smoke', 'shelf'],
-    // Quiet by default (P1): a resting shelf marker is just the roller's dot
-    // on an enlarged target — no total, no lens word, no tiny ✕, and a held
-    // roll never shouts '?'. The detail lives in the peek, whose base carries
-    // the one prominent clear-✕ — and that ✕ clears for everyone, from any
-    // seat (§7.7 universal housekeeping).
+    // Quiet by default (P1): a resting shelf marker is an INVISIBLE hover/tap
+    // target — no dot, no total, no lens word, no tiny ✕, and a held roll
+    // never shouts '?'. The settled cluster is its own presence; the detail
+    // lives in the peek, whose base carries the one prominent clear-✕ — and
+    // that ✕ clears for everyone, from any seat (§7.7 universal housekeeping).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
@@ -132,7 +132,7 @@ export const scenarios = [
       assert.equal(markers.length, 1, 'one resting marker');
       const m = markers[0];
       assert.equal(m.rollId, rid, 'marker addresses its roll');
-      assert.equal(m.dotOnly, true, 'resting marker is the roller dot only');
+      assert.equal(m.bare, true, 'resting marker draws nothing at all');
       assert.equal(m.text.trim(), '', 'no text on the resting marker');
       assert.equal(m.hasTotal, false, 'no always-on total');
       assert.equal(m.hasX, false, 'no tiny ✕');
@@ -151,8 +151,8 @@ export const scenarios = [
         );
       }
 
-      // A held roll rests exactly as quiet: dot only, never '?'; its Reveal
-      // waits in the peek for the authority.
+      // A held roll rests exactly as quiet: nothing drawn, never '?'; its
+      // Reveal waits in the peek for the authority.
       await a.roll('d20 held');
       const hid = await a.rollId();
       await a.dbg(`collectRoll(${JSON.stringify(hid)})`);
@@ -161,7 +161,7 @@ export const scenarios = [
         { desc: 'held roll shelved' },
       );
       const hm = (await a.dbg('shelfMarkers'))[0];
-      assert.equal(hm.dotOnly, true, 'a held roll rests just as quiet');
+      assert.equal(hm.bare, true, 'a held roll rests just as quiet');
       assert.ok(!hm.text.includes('?'), 'the marker never shouts ?');
       assert.equal(await a.dbg(`peek(${JSON.stringify(hid)})`), hid, 'peek opens for the authority');
       assert.equal((await a.dbg('peekState')).hasReveal, true, 'Reveal lives in the peek');
