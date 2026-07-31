@@ -4992,6 +4992,23 @@ function renderLog() {
     const hidden = entryHidden(entry);
     const el = document.createElement('div');
     el.className = 'log-entry';
+    // The log leads with the DICE (GOALS 1: prefer showing real dice) — the
+    // only roll surface that was still pure text. Tiny grouped tokens, xN
+    // per P5; die TYPES are public even on hidden rolls (goal 11), so a
+    // shrouded entry keeps its tokens. No-GL environments keep text only.
+    let tokensHtml = '';
+    {
+      const counts = new Map();
+      for (const p of entry.parts) counts.set(p.type, (counts.get(p.type) || 0) + 1);
+      const bits = [];
+      for (const [t, cnt] of counts) {
+        const u = dieArtURL(t);
+        if (!u) { bits.length = 0; break; }
+        bits.push(`<img class="die-art log-die" src="${u}" alt="" draggable="false">`
+          + (cnt > 1 ? `<span class="log-die-count">×${cnt}</span>` : ''));
+      }
+      if (bits.length) tokensHtml = `<span class="log-dice">${bits.join('')}</span>`;
+    }
     const modParts = modPartsOf(entry);
     let modHtml = '';
     if (modParts) {
@@ -5029,7 +5046,7 @@ function renderLog() {
         <span class="log-actions"></span>
         <span class="log-total">${hidden ? '?' : entry.total}</span>
       </div>
-      <div class="log-detail">${detail}${verdictHtml ? '  ·  ' + verdictHtml : ''}${meaningHtml ? '  ·  ' + meaningHtml : ''}</div>
+      <div class="log-detail">${tokensHtml}${detail}${verdictHtml ? '  ·  ' + verdictHtml : ''}${meaningHtml ? '  ·  ' + meaningHtml : ''}</div>
       <div class="log-time">${fmtTime(entry.t)}</div>`;
     if (meaningHtml) el.querySelector('.log-meaning').textContent = meaning.word;
     // Names and labels are user-supplied: textContent only, never innerHTML.
