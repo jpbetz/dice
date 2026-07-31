@@ -5910,7 +5910,7 @@ function renderOffers() {
     who.className = 'offer-by';
     if (o.color) who.style.color = o.color;
     who.textContent = o.byName || 'someone';
-    head.append(who, ' offers:');
+    head.append(who, ' offers a roll'); // one-voice: no colon-head grammar
 
     const title = document.createElement('div');
     title.className = 'offer-title';
@@ -5924,17 +5924,34 @@ function renderOffers() {
     // card so a claimer knows they may be rolling blind.
     const vis = normVis(o.visibility, o.faceDown);
     const visText = offerVisText(vis);
-    detail.textContent = formula(o.dice || [])
-      + (summary ? `  ·  ${summary}` : '')
-      + (Number.isInteger(o.dc) ? `  ·  vs ${o.dc}` : '')
-      + (visText ? `  ·  ${visText}` : '')
-      + (exp ? `  ·  ${exp.kind === 'cinematic' ? 'Cinematic' : 'Check'}${exp.subtitle ? ` — ${exp.subtitle}` : ''}` : '');
+    detail.textContent = '';
+    detail.append(formula(o.dice || []) + (summary ? `  ·  ${summary}` : ''));
+    if (Number.isInteger(o.dc)) {
+      // The stakes highlight, restored: it silently died when this line went
+      // textContent-only (the audit's dead-CSS hunt found .offer-vs orphaned).
+      detail.append('  ·  ');
+      const vsEl = document.createElement('span');
+      vsEl.className = 'offer-vs';
+      vsEl.textContent = `vs ${o.dc}`;
+      detail.appendChild(vsEl);
+    }
+    detail.append((visText ? `  ·  ${visText}` : '')
+      + (exp ? `  ·  ${exp.kind === 'cinematic' ? 'Cinematic' : 'Check'}${exp.subtitle ? ` — ${exp.subtitle}` : ''}` : ''));
 
+    // The claim is a ROLL, so it speaks P1 like every other roll surface:
+    // the offered dice as a die-art strip button wearing the ROLL cue —
+    // the last text-button roll trigger retires ('one shared code path').
     const actions = document.createElement('div');
     actions.className = 'offer-actions';
     const rollBtn = document.createElement('button');
-    rollBtn.className = 'btn primary';
-    rollBtn.textContent = 'Roll it';
+    rollBtn.className = 'pool-roll offer-roll';
+    const claimName = `Roll it — ${o.label || formula(o.dice || [])}`;
+    rollBtn.title = claimName;
+    rollBtn.setAttribute('aria-label', claimName);
+    rollBtn.appendChild(buildDieStrip(o.dice || [], POOL_STRIP_CAP, { grouped: true }));
+    rollBtn.appendChild(buildRollCue());
+    const offerUnits = new Set(o.dice || []).size;
+    rollBtn.classList.toggle('cue-tight', cueTight(Math.min(offerUnits, POOL_STRIP_CAP) + (offerUnits > POOL_STRIP_CAP ? 1 : 0)));
     rollBtn.addEventListener('click', () => { if (net) net.claim(o.offerId); });
     actions.appendChild(rollBtn);
     if (o.byId === you) {
