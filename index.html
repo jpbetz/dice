@@ -32,7 +32,9 @@ limitations under the License.
 <body>
   <div id="scene-container"></div>
 
-  <!-- Left panels: Compose (tray builder + command box) + saved groups.
+  <!-- Left panels: Compose (pool builder + command box) + saved pools.
+       ("pool" is the user-facing name for both concepts; the `tray`/`group`
+       ids, classes, storage keys and the #g= codec keep their old spelling.)
        Each is one of the four independently-collapsible chrome regions: its
        header is the toggle, and collapsed it rests as a small labelled edge
        tab (per-user state in dice.panels.v1). -->
@@ -80,11 +82,11 @@ limitations under the License.
       <div id="tray" class="chip-row" title="Click a chip to remove it"></div>
       <div class="btn-row" id="tray-actions">
         <button id="roll-tray" class="btn primary" disabled>Roll</button>
-        <button id="tray-mods" class="group-mods" title="Modifiers, target, offer — the tray draft" disabled>±</button>
+        <button id="tray-mods" class="group-mods" title="Modifiers, target, offer — the pool draft" disabled>±</button>
         <button id="clear-tray" class="btn" disabled>Empty</button>
       </div>
       <div class="btn-row">
-        <input id="group-name" type="text" placeholder="Name this group…" maxlength="24">
+        <input id="group-name" type="text" placeholder="Name this pool…" maxlength="24">
         <button id="save-group" class="btn" disabled>Save</button>
       </div>
       </div>
@@ -92,13 +94,13 @@ limitations under the License.
 
     <div class="panel side-panel" id="groups-panel">
       <div class="panel-head" id="head-groups" title="Show/hide — key: g">
-        <span class="ph-label">Saved groups</span>
-        <button id="copy-link" class="btn tiny ghost" title="Copy a URL that restores these groups anywhere">copy link</button>
+        <span class="ph-label">Saved pools</span>
+        <button id="copy-link" class="btn tiny ghost" title="Copy a URL that restores these pools anywhere">copy link</button>
         <span class="ph-chev" aria-hidden="true"></span>
       </div>
       <div class="panel-body">
         <div id="groups-list"></div>
-        <p id="groups-empty" class="hint">Save a tray to keep it here for quick rerolls.</p>
+        <p id="groups-empty" class="hint">Save a pool to keep it here for quick rerolls.</p>
       </div>
     </div>
   </aside>
@@ -155,11 +157,11 @@ limitations under the License.
       <h2>Keyboard shortcuts</h2>
       <div class="cheatsheet">
         <table>
-          <tr><td><code>1–9</code></td><td>roll saved group N</td></tr>
+          <tr><td><code>1–9</code></td><td>roll saved pool N</td></tr>
           <tr><td><code>r</code></td><td>reroll the last roll</td></tr>
           <tr><td><code>c</code></td><td>clear the table</td></tr>
           <tr><td><code>m</code></td><td>collapse / expand all panels</td></tr>
-          <tr><td><code>b</code> <code>g</code> <code>p</code> <code>l</code></td><td>toggle one panel — compose, saved groups, players, log</td></tr>
+          <tr><td><code>b</code> <code>g</code> <code>p</code> <code>l</code></td><td>toggle one panel — compose, saved pools, players, log</td></tr>
           <tr><td><code>s</code></td><td>sound on/off</td></tr>
           <tr><td><code>/</code> or <code>Ctrl/Cmd K</code></td><td>quick roll palette</td></tr>
           <tr><td><code>Space</code></td><td>skip the roll in flight (click the table works too)</td></tr>
@@ -273,7 +275,7 @@ limitations under the License.
   <!-- Offered-roll cards -->
   <div id="offers-layer"></div>
 
-  <!-- ± popover: per-group modifiers / dc / face-down / comment (UX §1.5, panel.html) -->
+  <!-- ± popover: per-pool modifiers / dc / face-down / comment (UX §1.5, panel.html) -->
   <div id="mods-popover" class="panel popover hidden">
     <div class="pop-head">
       <div class="pop-who">
@@ -389,7 +391,7 @@ limitations under the License.
       <button id="pop-offer" class="btn ghost">Offer to table</button>
     </div>
     <div class="pop-actions pop-actions-2nd">
-      <button id="pop-update" class="btn">Update this group</button>
+      <button id="pop-update" class="btn">Update this pool</button>
       <button id="pop-variant" class="btn">Save as variant</button>
     </div>
   </div>

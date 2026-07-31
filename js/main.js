@@ -3590,7 +3590,7 @@ function loadIntoBox(notation, name) {
 }
 
 // Write ONE saved group back by id — the inline editor's Update, the ±
-// popover's 'Update this group', and __diceDebug.editPool all land here.
+// popover's 'Update this pool', and __diceDebug.editPool all land here.
 // Never pushes a new record, so renaming can't fork a duplicate and an
 // unnamed group updates like any other. The notation must parse (its
 // canonical is what lands); the name takes the same 24-char cut as Save.
@@ -3649,7 +3649,7 @@ function buildGroupEditor(g) {
   nameIn.className = 'ge-name';
   nameIn.type = 'text';
   nameIn.maxLength = 24;
-  nameIn.placeholder = 'Name this group…';
+  nameIn.placeholder = 'Name this pool…';
   nameIn.autocomplete = 'off';
   nameIn.value = g.name;
 
@@ -3777,7 +3777,7 @@ function renderGroups() {
     const delBtn = document.createElement('button');
     delBtn.className = 'group-del';
     delBtn.textContent = '✕';
-    delBtn.title = 'Delete group';
+    delBtn.title = 'Delete pool';
     delBtn.addEventListener('click', () => {
       if (pop && pop.source === 'group' && pop.groupId === g.id) closePopover();
       groups = groups.filter((x) => x.id !== g.id);
@@ -3818,7 +3818,7 @@ document.getElementById('copy-link').addEventListener('click', async (e) => {
     await navigator.clipboard.writeText(window.location.href);
     btn.textContent = 'copied!';
   } catch {
-    window.prompt('Copy this link to save your groups:', window.location.href);
+    window.prompt('Copy this link to save your pools:', window.location.href);
     btn.textContent = 'link';
   }
   setTimeout(() => { btn.textContent = 'copy link'; }, 1500);
@@ -3829,7 +3829,7 @@ document.getElementById('copy-link').addEventListener('click', async (e) => {
 // adv/dis, keep/drop, reroll, explode, face down, dc and comment. Opening it
 // parses the group's notation into edit state; every edit re-renders the
 // canonical echo and Monte Carlo preview. Roll/Offer act on the edited spec;
-// 'Save as variant' appends a new group; 'Update this group' writes the
+// 'Save as variant' appends a new group; 'Update this pool' writes the
 // source record back in place by id (editPoolById — the row editor's path).
 // ---------------------------------------------------------------------------
 
@@ -3949,7 +3949,7 @@ function openPopover(binding) {
   popDcInput.value = pop.dc == null ? '' : String(pop.dc);
   popCommentInput.value = pop.comment || '';
   popExpSubtitle.value = pop.expSubtitle;
-  // 'Update this group' needs a record to write back to — the tray draft
+  // 'Update this pool' needs a record to write back to — the tray draft
   // has none, so its popover offers only the additive 'Save as variant'.
   popUpdateBtn.classList.toggle('hidden', pop.source !== 'group');
   popEl.classList.remove('hidden');
@@ -4414,7 +4414,7 @@ popOfferBtn.addEventListener('click', () => {
   closePopover();
 });
 
-// 'Update this group' (saved-group source only): the edited canonical writes
+// 'Update this pool' (saved-group source only): the edited canonical writes
 // back to the SAME record by id — editPoolById, the row editor's path. The
 // name stays; 'Save as variant' below is the additive twin.
 popUpdateBtn.addEventListener('click', () => {
@@ -4796,7 +4796,7 @@ document.getElementById('set-chips').addEventListener('click', () => setChips(!c
 
 // ---------------------------------------------------------------------------
 // Collapsible chrome panels: four regions — Compose (builder + command box),
-// Saved groups, Players, Roll log — each independently collapsible from its
+// Saved pools, Players, Roll log — each independently collapsible from its
 // own header (plus keys b/g/p/l), with per-user state in 'dice.panels.v1'.
 // Collapsed, a panel rests as a small labelled edge tab. Compact view is no
 // longer a mode: body.mini is the EMERGENT all-collapsed state (it scales

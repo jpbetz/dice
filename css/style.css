@@ -133,7 +133,7 @@ html, body {
 #groups-panel { min-height: 0; }
 
 /* ---------- collapsible chrome panels ---------- */
-/* Four regions — Compose, Saved groups, Players, Roll log — each with a
+/* Four regions — Compose, Saved pools, Players, Roll log — each with a
    header that toggles it (per-user state in dice.panels.v1). Collapsed, a
    panel rests as a small labelled tab on its screen edge; expanded, it
    overlays the table. Compact view is EMERGENT: body.mini appears when
@@ -1451,9 +1451,9 @@ body.mini #result-verdict { font-size: 11px; }
 .pop-actions { display: flex; gap: 8px; padding: 10px 14px 0; }
 .pop-actions:last-child, .pop-actions-2nd { padding-bottom: 14px; }
 .pop-actions .btn { flex: 1; }
-#pop-update.hidden { display: none; } /* tray draft: no record to update */
+#pop-update.hidden { display: none; } /* pool draft: no record to update */
 /* §7.4: the popover stays fully usable in compact view (opened via the
-   Saved groups tab or headless hooks); placePopover clamps it on-screen. */
+   Saved pools tab or headless hooks); placePopover clamps it on-screen. */
 body.mini .popover { width: min(94vw, 312px); }
 
 /* ---------------------------------------------------------------------------
