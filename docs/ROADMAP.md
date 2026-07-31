@@ -70,12 +70,26 @@ system:
   'Skills', 'Motivations'); the Pools panel renders category sections;
   manage mode edits the category; `#g=` codec v3 carries it (backward
   compatible).
-- **Multi-pool staging**: each pool row's revealed tier gains '+' — add
-  this pool's dice INTO the draft (the draft cluster is already the
-  composition surface). Staged dice keep their source-pool labels, the
-  cluster reads 'd6 ×3 [Strength] · d8 ×2 [Swords]', and one click rolls
-  the composed pool. Per-die outcomes then attribute back to their source
-  pools on every result surface.
+- **The Pools Rack (agreed with Joe 2026-08-01)** — sources add, the pool
+  rolls: pools render as TILES in category-section grids (the palette's
+  own tile idiom — art on top, name beneath; tile icons replace die art
+  later, die art is the v1 default). Tapping a tile STAGES its dice into
+  the sticky draft cluster (source chips, one ✕ each; loose palette dice
+  keep per-type ✕); ONLY the draft wears gold/the ROLL cue. Digits stage
+  by rendered order; Enter rolls the draft when one exists (else keeps
+  the last roll); Esc clears it (else sweeps). Sticky section headers,
+  fixed trio order (Attributes/Skills/Motivations, others, uncategorized).
+  Owner switcher: players' pools publish to the room (name+notation+
+  category; localStorage stays owner truth); foreign lists show a standing
+  'BOB'S POOLS · read-only' banner-chip (also the way back), stage-only
+  (no ±/manage), drafts persist across switches, chips snapshot notation
+  at stage time, digits always act on YOUR pools. Staging a modded pool
+  sets +N/dc aside with a one-line whisper on its chip. First stage from
+  the hover flyout promotes it to the pinned panel. Small windows: dense
+  chip line + dots-only switcher + sticky headers (720x480 e2e).
+  Build order: ① dice-term attribution → ② categories+codec v3 →
+  ③ staging inversion + keyboard → ④ pool publishing + switcher →
+  ⑤ source-grouped results.
 
 ## Tier 2 — Organization (goal 5, the audit's biggest experience gap)
 
