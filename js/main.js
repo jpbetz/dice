@@ -95,6 +95,13 @@ const FELT_THEMES = {
   midnight: { name: 'Midnight', feltBase: '#1e2a3f', sceneBg: '#121520' },
   slate:    { name: 'Slate',    feltBase: '#2c3438', sceneBg: '#161a1c' },
   walnut:   { name: 'Walnut',   feltBase: '#402e1c', sceneBg: '#1b1410' },
+  // The exploration batch (2026-07): more of the palette than green/brown —
+  // near-black stone, cold deep teal, wine-dark purple, and one LIGHT table
+  // (dice and gold chrome read differently on it by design).
+  obsidian: { name: 'Obsidian', feltBase: '#1c1c24', sceneBg: '#0f0f13' },
+  ocean:    { name: 'Ocean',    feltBase: '#16404a', sceneBg: '#0f181c' },
+  plum:     { name: 'Plum',     feltBase: '#3b2342', sceneBg: '#160f18' },
+  sand:     { name: 'Sand',     feltBase: '#7c6a4d', sceneBg: '#211a11' },
 };
 const DEFAULT_FELT = 'walnut';
 let currentFeltId = DEFAULT_FELT;
@@ -135,12 +142,27 @@ function feltTileCanvas(base) {
   const ctx = c.getContext('2d');
   ctx.fillStyle = base;
   ctx.fillRect(0, 0, 512, 512);
-  for (let i = 0; i < 9000; i++) {
+  // Cloth, not static: a low-frequency mottle (soft wide blotches, as if the
+  // nap catches the light unevenly) under a FINE speckle. The old coarse
+  // 1.5px salt-and-pepper at higher alpha read as sensor noise.
+  for (let i = 0; i < 26; i++) {
+    const light = Math.random() > 0.5;
+    const r = 50 + Math.random() * 110;
+    const x = Math.random() * 512;
+    const y = Math.random() * 512;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const a = 0.012 + Math.random() * 0.018;
+    g.addColorStop(0, light ? `rgba(255,250,235,${a})` : `rgba(0,0,0,${a * 1.4})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 512, 512);
+  }
+  for (let i = 0; i < 14000; i++) {
     const shade = Math.random();
     ctx.fillStyle = shade > 0.5
-      ? `rgba(255,255,240,${0.02 + Math.random() * 0.03})`
-      : `rgba(0,0,0,${0.03 + Math.random() * 0.05})`;
-    ctx.fillRect(Math.random() * 512, Math.random() * 512, 1.5, 1.5);
+      ? `rgba(255,255,240,${0.012 + Math.random() * 0.02})`
+      : `rgba(0,0,0,${0.018 + Math.random() * 0.03})`;
+    ctx.fillRect(Math.random() * 512, Math.random() * 512, 1, 1);
   }
   feltTileCache.set(base, c);
   return c;

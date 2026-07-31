@@ -309,6 +309,10 @@ export const scenarios = [
       await b.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'system syncs to B' });
       await a.dbg(`setFelt('emerald')`);
       await b.waitFor(`window.__diceDebug.felt.id === 'emerald'`, { desc: 'felt syncs to B' });
+      // The exploration themes are valid room state end-to-end (client list
+      // and the server's validator move together).
+      await a.dbg(`setFelt('ocean')`);
+      await b.waitFor(`window.__diceDebug.felt.id === 'ocean'`, { desc: 'a new theme syncs to B' });
     },
   },
   {
