@@ -40,15 +40,29 @@ limitations under the License.
        tab (per-user state in dice.panels.v1). The roll log is NOT a region
        anymore — it rides the rail as #log-flyout. -->
   <aside id="left-panel">
+    <!-- 'New pool' (né Compose — you build a new pool here, Saved pools
+         keeps them; one vocabulary, two panels). Ids keep the old spelling
+         like tray/group do. -->
     <div class="panel side-panel" id="builder-panel">
-      <div class="panel-head" id="head-compose" title="Show/hide — key: b">
-        <span class="ph-label">Compose</span>
+      <div class="panel-head" id="head-compose" title="Show/hide — key: n">
+        <span class="ph-label">New pool</span>
         <span class="ph-chev" aria-hidden="true"></span>
       </div>
       <div class="panel-body">
       <!-- No app masthead here: the panel header already names this region,
            and the panel is a tool, not a title card (the app name lives in
            the tab title and the invite link). -->
+
+      <!-- ONE draft, two editors (§1.5): the visual builder and the notation
+           box always describe the same pool, so showing both stacked was
+           redundant chrome. This toggle picks the VIEW (per-user,
+           dice.inputmode.v1); the draft state is shared and never resets on
+           a switch. Loading a pool into the box flips to Notation — that is
+           a text intent. -->
+      <div id="input-mode" class="seg input-seg">
+        <button data-v="dice" aria-pressed="true" title="Build by tapping dice">Dice</button>
+        <button data-v="text" aria-pressed="false" title="Type Roll20-style notation">Notation</button>
+      </div>
 
       <!-- Command box (UX §1.3): three-state validation, Enter rolls, ↑/↓ history -->
       <div id="cmd" class="cmd">
@@ -82,15 +96,29 @@ limitations under the License.
       </div>
 
       <div id="die-buttons"></div>
-      <div id="tray" class="chip-row" title="Click a chip to remove it"></div>
-      <div class="btn-row" id="tray-actions">
-        <button id="roll-tray" class="btn primary" disabled>Roll</button>
-        <button id="tray-mods" class="group-mods" title="Modifiers, target, offer — the pool draft" disabled>±</button>
-        <button id="clear-tray" class="btn" disabled>Empty</button>
+      <!-- The draft cluster (P1: the dice are the buttons): ONE roll button
+           holds the composed die art; per-die ✕ removers overlay it as
+           absolutely-positioned SIBLINGS (never a button inside a button).
+           Hover = the gold roll-glow, suppressed over a ✕ (the glow must
+           not lie). Empty draft: a quiet hint line instead. -->
+      <div id="tray" class="tray-cluster">
+        <button id="tray-roll" class="pool-roll tray-roll hidden"></button>
+        <div id="tray-x-layer" class="tray-x-layer"></div>
+        <p id="tray-hint" class="hint">tap a die button to add — then click your dice to roll</p>
       </div>
-      <div class="btn-row">
+      <!-- Contextual controls, only while the draft is non-empty. This row
+           keeps the #tray-actions id: it anchors the ± popover. Save morphs
+           into the inline name row below (always ADDITIVE — updates stay on
+           the by-id paths: the row ✎ editor and popover 'Update this pool'). -->
+      <div class="btn-row tray-line hidden" id="tray-actions">
+        <button id="save-group" class="btn">Save</button>
+        <button id="tray-mods" class="group-mods" title="Modifiers, target, offer — the pool draft">±</button>
+        <button id="clear-tray" class="btn" title="Clear draft">✕</button>
+      </div>
+      <div class="btn-row tray-save hidden" id="tray-save-row">
         <input id="group-name" type="text" placeholder="Name this pool…" maxlength="24">
-        <button id="save-group" class="btn" disabled>Save</button>
+        <button id="save-confirm" class="btn primary" title="Save as a new pool">✓</button>
+        <button id="save-cancel" class="btn" title="Cancel">×</button>
       </div>
       </div>
     </div>
@@ -201,7 +229,7 @@ limitations under the License.
           <tr><td><code>r</code></td><td>reroll the last roll</td></tr>
           <tr><td><code>c</code></td><td>clear the table</td></tr>
           <tr><td><code>m</code></td><td>collapse / expand all panels (the edge tabs bring one back)</td></tr>
-          <tr><td><code>b</code> <code>g</code></td><td>toggle one panel — compose, saved pools</td></tr>
+          <tr><td><code>n</code> <code>g</code></td><td>toggle one panel — new pool, saved pools</td></tr>
           <tr><td><code>l</code></td><td>roll log flyout</td></tr>
           <tr><td><code>s</code></td><td>sound on/off</td></tr>
           <tr><td><code>/</code> or <code>Ctrl/Cmd K</code></td><td>quick roll palette</td></tr>

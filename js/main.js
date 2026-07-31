@@ -2909,6 +2909,16 @@ window.__diceDebug = {
   // own path (editPoolById). patch = {name?, notation?}; returns the updated
   // {id, name, notation} or false (unknown id / notation that doesn't parse).
   editPool(id, patch) { return editPoolById(id, patch); },
+  // Delete by id — the row ✕'s path, reachable for scenario cleanup (pools
+  // live in per-origin localStorage, which OUTLIVES a scenario's room).
+  deletePool(id) {
+    const before = groups.length;
+    groups = groups.filter((x) => x.id !== id);
+    if (groups.length === before) return false;
+    saveGroups();
+    renderGroups();
+    return true;
+  },
   get cmdHistory() { return cmdHistory; },
   get tableDice() { return tableDice; },
   get currentRoll() { return currentRoll; },
@@ -3093,6 +3103,17 @@ window.__diceDebug = {
     if (open) openLogFlyout(); else closeLogFlyout();
     return isLogFlyoutOpen();
   },
+  // the draft cluster (P1): what the New pool panel is showing right now.
+  get trayState() {
+    return {
+      dice: [...tray],
+      rollVisible: !trayRollBtn.classList.contains('hidden'),
+      hasActions: !trayActionsEl.classList.contains('hidden'),
+      saveOpen: !traySaveRow.classList.contains('hidden'),
+      hint: !trayHintEl.classList.contains('hidden'),
+      xCount: trayXLayer.children.length,
+    };
+  },
   // saved-pools manage mode (P2's ✎ toggle): read-only rows at rest; the
   // edit chrome exists only while this is on.
   get poolsEditMode() { return poolsEdit; },
@@ -3214,7 +3235,11 @@ let pop = null;
 
 const dieButtonsEl = document.getElementById('die-buttons');
 const trayEl = document.getElementById('tray');
-const rollTrayBtn = document.getElementById('roll-tray');
+const trayRollBtn = document.getElementById('tray-roll');
+const trayXLayer = document.getElementById('tray-x-layer');
+const trayHintEl = document.getElementById('tray-hint');
+const trayActionsEl = document.getElementById('tray-actions');
+const traySaveRow = document.getElementById('tray-save-row');
 const trayModsBtn = document.getElementById('tray-mods');
 const clearTrayBtn = document.getElementById('clear-tray');
 const saveGroupBtn = document.getElementById('save-group');
@@ -3373,44 +3398,71 @@ function spliceVisFlag(canonical, token) {
   return head + tail;
 }
 
+// The draft cluster (P1): the composed dice ARE the roll button. One
+// <button id=tray-roll> holds the die art (capped with the '+N' token, P5);
+// each visible die gets a ✕ remover OVERLAID as an absolutely-positioned
+// sibling in #tray-x-layer — never a button inside a button. ✕s show on
+// cluster hover / keyboard focus, and are ALWAYS visible on coarse pointers
+// (touch never has to text-edit a die away). Empty draft: the hint line.
+const TRAY_STRIP_CAP = 12;
 function renderTray() {
-  trayEl.innerHTML = '';
-  tray.forEach((type, i) => {
-    const chip = document.createElement('span');
-    chip.className = 'die-chip';
-    chip.style.setProperty('--die-color', DIE_DEFS[type].color);
-    chip.innerHTML = `<span class="dot"></span>${type}`;
-    chip.title = 'Remove';
-    chip.addEventListener('click', () => {
-      tray.splice(i, 1);
-      renderTray();
-      syncBoxFromTray();
+  trayRollBtn.innerHTML = '';
+  trayXLayer.innerHTML = '';
+  const hasDice = tray.length > 0;
+  trayRollBtn.classList.toggle('hidden', !hasDice);
+  trayHintEl.classList.toggle('hidden', hasDice || !!cmdInput.value);
+  if (hasDice) {
+    trayRollBtn.appendChild(buildDieStrip(tray, TRAY_STRIP_CAP));
+    const label = `Roll ${formula(tray)}`;
+    trayRollBtn.title = label;
+    trayRollBtn.setAttribute('aria-label', label);
+    // Overlay one ✕ per VISIBLE die, anchored to its img's laid-out box
+    // (#tray is the offsetParent). Overflow dice are removed via the box —
+    // the two are one draft.
+    const arts = trayRollBtn.querySelectorAll('.die-art, .strip-dot');
+    arts.forEach((img, i) => {
+      if (i >= TRAY_STRIP_CAP) return;
+      const x = document.createElement('button');
+      x.className = 'die-x';
+      x.textContent = '✕';
+      x.title = `Remove this ${tray[i]}`;
+      x.style.left = `${img.offsetLeft + img.offsetWidth - 9}px`;
+      x.style.top = `${img.offsetTop - 6}px`;
+      x.addEventListener('click', (e) => {
+        e.stopPropagation(); // a remove is never a roll
+        tray.splice(i, 1);
+        renderTray();
+        syncBoxFromTray();
+      });
+      trayXLayer.appendChild(x);
     });
-    trayEl.appendChild(chip);
-  });
+  }
   updateTrayButtons();
 }
 
 function updateTrayButtons() {
   const usable = (cmdResult && cmdResult.ok) || tray.length > 0;
-  rollTrayBtn.disabled = !usable;
+  // The control line exists only while there is a draft to act on; leaving
+  // the save morph open with nothing to save would strand a dead input.
+  trayActionsEl.classList.toggle('hidden', !usable || !traySaveRow.classList.contains('hidden'));
+  if (!usable) closeSaveMorph();
+  trayRollBtn.disabled = !usable;
   trayModsBtn.disabled = !usable;
   clearTrayBtn.disabled = !tray.length && !cmdInput.value;
   saveGroupBtn.disabled = !usable;
 }
 
-rollTrayBtn.addEventListener('click', () => {
+trayRollBtn.addEventListener('click', () => {
   // Re-parse the current text synchronously: the debounced cmdResult can be
   // up to 300 ms stale, and the parsed spec must match the notation we send.
   paintCmd();
-  const name = groupNameInput.value.trim();
   if (cmdResult && cmdResult.ok) {
     // Same derivation as Enter (commandRoll): the moment the string DECLARES
     // wins, and dc→check only fills the gap. Reading the dc alone dropped a
     // 'cinematic'/'check' the player had typed (solo played it Plain) and let
     // the online and solo paths disagree about the same text.
     const intent = notationIntent(cmdInput.value.trim(), cmdResult);
-    requestRoll(cmdResult.spec.dice, name || cmdResult.comment || cmdResult.canonical, {
+    requestRoll(cmdResult.spec.dice, cmdResult.comment || cmdResult.canonical, {
       notation: intent.notation,
       canonical: intent.canonical,
       mods: cmdResult.spec.mods || undefined,
@@ -3420,9 +3472,48 @@ rollTrayBtn.addEventListener('click', () => {
       exp: intent.exp || undefined,
     });
   } else if (tray.length) {
-    requestRoll([...tray], name || formula(tray));
+    requestRoll([...tray], formula(tray));
   }
 });
+// Right-click the cluster = ± (a pointer bonus; the visible ± button is the
+// path for touch and keyboard).
+trayEl.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  if (trayModsBtn.disabled) return;
+  trayModsBtn.click();
+});
+
+// ---- input mode: Dice | Notation --------------------------------------------
+// One draft, two editors (§1.5) — the toggle only picks which EDITOR is on
+// screen; box⇄tray sync keeps the other honest in the background, so a
+// switch never resets or re-parses anything. Per-user, like panel state.
+const LS_INPUTMODE = 'dice.inputmode.v1';
+const builderPanelEl = document.getElementById('builder-panel');
+const inputModeSeg = document.getElementById('input-mode');
+let inputMode = load(LS_INPUTMODE, 'dice');
+if (inputMode !== 'dice' && inputMode !== 'text') inputMode = 'dice';
+function applyInputMode(persist = true) {
+  builderPanelEl.classList.toggle('mode-dice', inputMode === 'dice');
+  builderPanelEl.classList.toggle('mode-text', inputMode === 'text');
+  for (const b of inputModeSeg.querySelectorAll('button')) {
+    b.setAttribute('aria-pressed', String(b.dataset.v === inputMode));
+  }
+  if (persist) save(LS_INPUTMODE, inputMode);
+}
+function setInputMode(mode, persist = true) {
+  if (mode !== 'dice' && mode !== 'text') return;
+  const was = inputMode;
+  inputMode = mode;
+  applyInputMode(persist);
+  if (was === mode) return;
+  if (mode === 'dice') renderTray(); // ✕ overlays re-anchor (they had no layout while hidden)
+  else cmdInput.focus();
+}
+inputModeSeg.addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (btn) setInputMode(btn.dataset.v);
+});
+applyInputMode(false);
 // The ad-hoc tray's ± (§7.4): the SAME popover, bound to the tray draft.
 trayModsBtn.addEventListener('click', () => {
   if (pop && pop.source === 'tray') {
@@ -3440,6 +3531,8 @@ clearTrayBtn.addEventListener('click', () => {
   // half-shaped boxExtras is a trap for the next reader of it.
   boxExtras = { mods: null, dc: null, comment: null, exp: null, visibility: null };
   cmdInput.value = '';
+  echoedDraft = null;   // a cleared draft forgets whose echo it was
+  closeSaveMorph();
   renderTray();
   paintCmd();
 });
@@ -3765,8 +3858,14 @@ const groupsEmptyEl = document.getElementById('groups-empty');
 // changing the record itself is the inline row editor's job (✎).
 function loadIntoBox(notation, name) {
   cmdInput.value = notation;
-  groupNameInput.value = name || '';
   paintCmd();
+  // Remember the echoed identity for the save morph's prefill (see
+  // openSaveMorph's latency rule) — the name input itself only exists
+  // while the morph is open now.
+  echoedDraft = name && cmdResult && cmdResult.ok
+    ? { name, canonical: cmdResult.canonical }
+    : null;
+  setInputMode('text'); // loading notation is a text intent — show the box
   cmdInput.focus();
 }
 
@@ -3906,10 +4005,19 @@ function rollGroup(g) {
 // overflow token (P5). Pure decoration: every img is pointer-events:none —
 // the BUTTON wrapping the strip is the one interactive object (P1/a11y).
 // Null art (no WebGL) falls back to the palette's colored diamond dots.
+//
+// grouped: repeats collapse to ONE die + a ×N count — '2d8' reads as a d8
+// ×2, not two identical pictures (pool rows). The draft cluster stays
+// UNGROUPED: there every die stands alone because each carries its own ✕
+// remover. Strips pack left; they never spread across the row.
 const POOL_STRIP_CAP = 5;
-function buildDieStrip(types, cap) {
+function buildDieStrip(types, cap, { grouped = false } = {}) {
   const frag = document.createDocumentFragment();
-  for (const type of types.slice(0, cap)) {
+  const units = grouped
+    ? [...types.reduce((m, t) => m.set(t, (m.get(t) || 0) + 1), new Map())]
+    : types.map((t) => [t, 1]);
+  const shown = units.slice(0, cap);
+  for (const [type, n] of shown) {
     const url = dieArtURL(type);
     if (url) {
       const img = document.createElement('img');
@@ -3924,12 +4032,19 @@ function buildDieStrip(types, cap) {
       dot.style.background = (DIE_DEFS[type] && DIE_DEFS[type].color) || '#888';
       frag.appendChild(dot);
     }
+    if (n > 1) {
+      const count = document.createElement('span');
+      count.className = 'strip-count';
+      count.textContent = `×${n}`;
+      frag.appendChild(count);
+    }
   }
-  if (types.length > cap) {
+  if (units.length > shown.length) {
     const more = document.createElement('span');
     more.className = 'roster-more strip-more';
-    more.textContent = `+${types.length - cap}`;
-    more.title = types.slice(cap).join(', ');
+    more.textContent = `+${units.length - shown.length}`;
+    more.title = units.slice(shown.length)
+      .map(([t, n]) => (n > 1 ? `${n}×${t}` : t)).join(', ');
     frag.appendChild(more);
   }
   return frag;
@@ -4021,7 +4136,7 @@ function renderGroups() {
     const rollName = `Roll ${g.name || g.notation} — ${g.notation}`;
     rollBtn.title = rollName;
     rollBtn.setAttribute('aria-label', rollName);
-    rollBtn.appendChild(buildDieStrip(types, POOL_STRIP_CAP));
+    rollBtn.appendChild(buildDieStrip(types, POOL_STRIP_CAP, { grouped: true }));
     rollBtn.addEventListener('click', () => rollGroup(g));
     // Manage mode disarms the click as anti-misclick, NOT as a lock: the
     // digit shortcuts stay live (a keyboard roll is always deliberate).
@@ -4053,17 +4168,56 @@ function renderGroups() {
 }
 renderGroups();
 
-saveGroupBtn.addEventListener('click', () => {
+// The inline save morph: [Save] swaps the control line for
+// [name input][✓][×]; Enter saves (blank = unnamed), Esc cancels. Saving is
+// ALWAYS ADDITIVE — it mints a new pool even when the name collides.
+// Updating an existing record is exclusively the by-id paths (the row ✎
+// editor and the popover's 'Update this pool'): the old Save silently
+// overwrote whichever pool happened to share the name, the same disease the
+// §7.9 by-id fix cured for renames.
+//
+// The echoed-name latency rule: loading a pool into the box (name chip,
+// pool ✎ echo, peek ±) remembers {name, canonical}; the morph prefills that
+// name ONLY while the draft still parses to the same canonical — tweak the
+// text and the prefill lapses (a tweaked draft is a NEW pool, not a rename).
+let echoedDraft = null; // {name, canonical} from loadIntoBox
+function openSaveMorph() {
+  paintCmd();
+  const usable = (cmdResult && cmdResult.ok) || tray.length > 0;
+  if (!usable) return;
+  const canonical = cmdResult && cmdResult.ok ? cmdResult.canonical : formula(tray);
+  groupNameInput.value = (echoedDraft && echoedDraft.name
+    && echoedDraft.canonical === canonical) ? echoedDraft.name : '';
+  traySaveRow.classList.remove('hidden');
+  trayActionsEl.classList.add('hidden');
+  groupNameInput.focus();
+  groupNameInput.select();
+}
+function closeSaveMorph() {
+  if (traySaveRow.classList.contains('hidden')) return;
+  traySaveRow.classList.add('hidden');
+  const usable = (cmdResult && cmdResult.ok) || tray.length > 0;
+  trayActionsEl.classList.toggle('hidden', !usable);
+}
+function saveDraftAsPool() {
+  paintCmd();
   const notation = cmdResult && cmdResult.ok ? cmdResult.canonical
     : tray.length ? formula(tray) : null;
-  if (!notation) return;
-  const name = cutText(groupNameInput.value, 24); // '' = unnamed group
-  const existing = name ? groups.find((g) => g.name === name) : null;
-  if (existing) existing.notation = notation;
-  else groups.push({ id: Date.now(), name, notation });
+  if (!notation) { closeSaveMorph(); return; }
+  const name = cutText(groupNameInput.value, 24); // '' = unnamed pool
+  groups.push({ id: Date.now(), name, notation }); // additive, always
   saveGroups();
   renderGroups();
   groupNameInput.value = '';
+  closeSaveMorph();
+}
+saveGroupBtn.addEventListener('click', openSaveMorph);
+document.getElementById('save-confirm').addEventListener('click', saveDraftAsPool);
+document.getElementById('save-cancel').addEventListener('click', closeSaveMorph);
+groupNameInput.addEventListener('keydown', (e) => {
+  e.stopPropagation(); // typing a name must not fire table shortcuts
+  if (e.key === 'Enter') saveDraftAsPool();
+  else if (e.key === 'Escape') closeSaveMorph();
 });
 
 // Copy a bookmarkable URL that carries the current groups in its hash.
@@ -5229,6 +5383,9 @@ function applyPanels(persist = true) {
   // Manage mode is transient (P2): collapsing the pools panel exits it, so
   // the panel always reopens read-only.
   if (!panelsOpen.groups && poolsEdit) setPoolsEdit(false);
+  // The tray's per-die ✕ overlays anchor to laid-out die positions, which
+  // are all zero while the panel is collapsed — re-anchor on expand.
+  if (panelsOpen.compose) renderTray();
   if (persist) save(LS_PANELS, panelsOpen);
   const mini = allPanelsCollapsed();
   if (mini !== document.body.classList.contains('mini')) {
@@ -5495,6 +5652,9 @@ document.addEventListener('keydown', (e) => {
     case 'r': rerollLast(); return;
     case 'c': requestClear(); return;
     case 'm': toggleAllPanels(); return;
+    // 'n' for New pool (the documented key); 'b' survives as a silent alias
+    // for the old Compose muscle memory.
+    case 'n':
     case 'b': setPanel('compose', !panelsOpen.compose); return;
     case 'g': setPanel('groups', !panelsOpen.groups); return;
     case 'l': toggleLogFlyout(); return; // the roll log is a rail flyout now, not a panel

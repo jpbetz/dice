@@ -1379,8 +1379,13 @@ mode hid, stranding both behind a keyboard shortcut.
 **Two independent regions** *(2026-07 amendment: was three — the roll log
 moved to the rail flyout; `l` toggles it there)*, each collapsing on its
 own header to a small labelled edge tab, each remembering its own state in
-`dice.panels.v1`: Compose · Saved pools. Keys `b` `g` toggle one, `m`
-toggles all. **Compact view is emergent**: `body.mini` is derived from "every panel
+`dice.panels.v1`: New pool · Saved pools *(2026-07: 'Compose' renamed — you
+build a new pool here, Saved pools keeps them; ids keep the old spelling)*.
+Keys `n` (`b` survives as a silent alias) and `g` toggle one, `m` toggles
+all. The New pool panel shows ONE input view at a time — Dice (palette +
+draft cluster) or Notation (the command box), a per-user toggle
+(`dice.inputmode.v1`); both edit the same draft, so switching never resets
+anything, and loading a pool into the box flips to Notation. **Compact view is emergent**: `body.mini` is derived from "every panel
 is collapsed" and only rescales the table and its labels — it is not a
 mode, and nothing can be reached in one state that cannot be reached in the
 other. *(Amended 2026-07: the Players panel is retired — the roster is rail

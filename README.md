@@ -26,7 +26,7 @@ state anywhere.
   outcome chart (Blemish, Mishap, Partial Success, Success & Bonus, Advantage,
   Critical Success, …). Critical Success and Critical Fail get full-screen
   effects.
-- **Collapsible chrome** — two independent regions (Compose, Saved pools),
+- **Collapsible chrome** — two independent regions (New pool, Saved pools),
   each collapsing to a small labelled edge tab, each remembering its own
   state; the roll log rides the rail as a pinned flyout with an unread badge
   (2026-07 amendment). Collapse the panels (`m`) and only the table is left —

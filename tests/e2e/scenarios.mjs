@@ -636,10 +636,98 @@ export const scenarios = [
       assert.equal(tiles[7].label, 'd100', 'eighth tile is the percentile shortcut');
       assert.equal(tiles[7].src, tiles[4].src, 'd100 reuses the d10x art');
       // Art replaces the diamond, but the tile is still the button: a click
-      // still adds its die to the pool draft (#tray keeps its id — GOALS.md).
+      // still adds its die to the pool draft (the cluster shows its art).
       await a.eval(`document.querySelector('#die-buttons .die-btn').click()`);
-      assert.equal(await a.eval(`document.querySelectorAll('#tray .die-chip').length`), 1,
+      assert.deepEqual((await a.dbg('trayState')).dice, ['d4'],
         'clicking an art tile still adds its die to the pool');
+    },
+  },
+  {
+    name: 'compose-grammar',
+    tags: ['smoke', 'chrome'],
+    // The New pool panel speaks P1 end to end: composed dice render as one
+    // die-art roll button; a per-die ✕ (an overlaid SIBLING, never a nested
+    // button) removes exactly one die; the contextual line is [Save][±][✕];
+    // Save is an inline morph and ALWAYS additive (updates stay by-id);
+    // the empty draft shows the hint.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      let ts = await a.dbg('trayState');
+      assert.equal(ts.hint, true, 'empty draft shows the hint');
+      assert.equal(ts.hasActions, false, 'no contextual controls on an empty draft');
+
+      // Compose two dice from the palette; the cluster carries their art + ✕s.
+      await a.eval(`document.querySelectorAll('#die-buttons .die-btn')[1].click()`);
+      await a.eval(`document.querySelectorAll('#die-buttons .die-btn')[1].click()`);
+      ts = await a.dbg('trayState');
+      assert.deepEqual(ts.dice, ['d6', 'd6'], 'two d6 composed');
+      assert.equal(ts.rollVisible, true, 'the cluster is the roll button');
+      assert.equal(ts.hasActions, true, 'Save/±/✕ appear with content');
+      assert.equal(ts.xCount, 2, 'one ✕ overlay per die');
+      assert.equal(await a.eval(`document.querySelectorAll('#builder-panel button button').length`),
+        0, 'no button nests inside a button');
+
+      // A ✕ removes exactly one die (and the box follows — one draft).
+      await a.eval(`document.querySelector('#tray-x-layer .die-x').click()`);
+      ts = await a.dbg('trayState');
+      assert.deepEqual(ts.dice, ['d6'], '✕ removed exactly one die');
+      assert.ok((await a.eval(`document.getElementById('cmd-input').value`)).includes('1d6'),
+        'the box mirrors the removal');
+
+      // The cluster rolls the draft.
+      const logBefore = await a.logCount();
+      await a.eval(`document.getElementById('tray-roll').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(60), document.getElementById('log-list').childElementCount > ${0})`,
+        { desc: 'clicking the composed dice rolls the draft' },
+      );
+
+      // Inline save: morph, name, Enter — ADDITIVE even on a name collision.
+      await a.eval(`(() => {
+        const i = document.getElementById('cmd-input');
+        i.value = '3d6+2';
+        i.dispatchEvent(new Event('input'));
+      })()`);
+      await a.waitFor(`(window.__diceDebug.trayState.dice.length === 3)`, { desc: 'draft follows the box' });
+      const groupsBefore = (await a.dbg('groups')).length;
+      await a.eval(`document.getElementById('save-group').click()`);
+      assert.equal((await a.dbg('trayState')).saveOpen, true, 'Save morphs into the name row');
+      await a.eval(`(() => {
+        const i = document.getElementById('group-name');
+        i.value = 'Attack';  // collides with a seed pool on purpose
+        i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+      })()`);
+      const gs = await a.dbg('groups');
+      assert.equal(gs.length, groupsBefore + 1, 'save is additive — a name collision never overwrites');
+      assert.ok(gs.filter((g) => g.name === 'Attack').length >= 2, 'both Attacks exist (updates are by-id paths only)');
+      // Pools are per-origin localStorage, which outlives this room: delete
+      // the minted duplicate so later scenarios meet the seed set untouched.
+      const minted = gs.find((g) => g.name === 'Attack' && g.notation === '3d6+2');
+      assert.equal(await a.dbg(`deletePool(${JSON.stringify(minted.id)})`), true, 'cleanup: the duplicate leaves');
+
+      // ✕ clears the whole draft back to the hint.
+      await a.eval(`document.getElementById('clear-tray').click()`);
+      ts = await a.dbg('trayState');
+      assert.deepEqual(ts.dice, [], 'draft cleared');
+      assert.equal(ts.hint, true, 'the hint returns');
+      assert.equal(ts.hasActions, false, 'the contextual line retires');
+
+      // Dice | Notation: one draft, two views. Default is the visual
+      // builder (box hidden); the toggle swaps views without touching the
+      // draft; loading a pool into the box flips to Notation (text intent).
+      const vis = (sel) => a.eval(`(() => { const el = document.querySelector(${JSON.stringify(sel)});
+        return !!el && el.offsetParent !== null; })()`);
+      assert.equal(await vis('#cmd-input'), false, 'default view: the box is hidden');
+      assert.equal(await vis('#die-buttons'), true, 'default view: the palette shows');
+      await a.eval(`document.querySelectorAll('#die-buttons .die-btn')[1].click()`);
+      await a.eval(`document.querySelector('#input-mode [data-v="text"]').click()`);
+      assert.equal(await vis('#cmd-input'), true, 'Notation view: the box shows');
+      assert.equal(await vis('#die-buttons'), false, 'Notation view: the palette hides');
+      assert.ok((await a.eval(`document.getElementById('cmd-input').value`)).includes('1d6'),
+        'the draft crossed the view switch intact');
+      await a.eval(`document.querySelector('#input-mode [data-v="dice"]').click()`);
+      assert.deepEqual((await a.dbg('trayState')).dice, ['d6'], 'and back again');
+      await a.eval(`document.getElementById('clear-tray').click()`);
     },
   },
 
@@ -845,6 +933,8 @@ export const scenarios = [
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       assert.equal(await a.eval(`document.querySelector('#head-groups .ph-label').textContent`),
         'Saved pools', 'the panel is labelled Saved pools');
+      assert.equal(await a.eval(`document.querySelector('#head-compose .ph-label').textContent`),
+        'New pool', "the builder is 'New pool' — 'Compose' is retired (2026-07)");
       assert.equal(await a.eval(`document.getElementById('group-name').placeholder`),
         'Name this pool…', 'the save field names a pool');
       assert.equal(await a.eval(`document.getElementById('pop-update').textContent`),
@@ -862,7 +952,7 @@ export const scenarios = [
       const stray = await a.eval(`(() => {
         const roots = ['#left-panel', '#rail', '#kbd-overlay', '#mods-popover',
                        '#settings-modal', '#cmd-cheatsheet', '#identity-menu'];
-        const banned = /\\btrays?\\b|\\bgroups?\\b/i;
+        const banned = /\\btrays?\\b|\\bgroups?\\b|\\bcompose\\b/i;
         const bad = [];
         for (const sel of roots) {
           const root = document.querySelector(sel);
