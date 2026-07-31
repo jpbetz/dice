@@ -2777,6 +2777,10 @@ window.__diceDebug = {
   canonicalNotation,
   commandRoll(str) { return commandRoll(str); }, // execute a notation string
   get groups() { return groups; },
+  // saved groups: write back to ONE record by id — the inline row editor's
+  // own path (editPoolById). patch = {name?, notation?}; returns the updated
+  // {id, name, notation} or false (unknown id / notation that doesn't parse).
+  editPool(id, patch) { return editPoolById(id, patch); },
   get cmdHistory() { return cmdHistory; },
   get tableDice() { return tableDice; },
   get currentRoll() { return currentRoll; },
@@ -3576,12 +3580,127 @@ saveGroups();
 const groupsListEl = document.getElementById('groups-list');
 const groupsEmptyEl = document.getElementById('groups-empty');
 
-// Load a group's notation into the command box for editing (UX §1.4).
+// Load a group's notation into the command box (UX §1.4) — a compose aid;
+// changing the record itself is the inline row editor's job (✎).
 function loadIntoBox(notation, name) {
   cmdInput.value = notation;
   groupNameInput.value = name || '';
   paintCmd();
   cmdInput.focus();
+}
+
+// Write ONE saved group back by id — the inline editor's Update, the ±
+// popover's 'Update this group', and __diceDebug.editPool all land here.
+// Never pushes a new record, so renaming can't fork a duplicate and an
+// unnamed group updates like any other. The notation must parse (its
+// canonical is what lands); the name takes the same 24-char cut as Save.
+// Returns the updated JSON-safe record, or false (unknown id / bad patch /
+// notation that doesn't parse) with the record untouched.
+function editPoolById(id, patch) {
+  const g = groups.find((x) => x.id === id);
+  if (!g || !patch || typeof patch !== 'object') return false;
+  let name = g.name;
+  let notation = g.notation;
+  if (patch.name !== undefined) {
+    if (typeof patch.name !== 'string') return false;
+    name = cutText(patch.name, 24);
+  }
+  if (patch.notation !== undefined) {
+    if (typeof patch.notation !== 'string') return false;
+    const res = parseNotation(patch.notation);
+    if (!res.ok) return false;
+    notation = res.canonical;
+  }
+  g.name = name;
+  g.notation = notation;
+  saveGroups();
+  renderGroups();
+  return { id: g.id, name: g.name, notation: g.notation };
+}
+
+// Which row is the inline editor right now (null = none). One at a time:
+// opening a second editor abandons the first (renderGroups redraws it as a
+// normal row — nothing was written).
+let editingGroupId = null;
+
+function beginEditGroup(id) {
+  // an open ± popover for this group would go stale under the editor
+  if (pop && pop.source === 'group' && pop.groupId === id) closePopover();
+  editingGroupId = id;
+  renderGroups();
+  const nameIn = groupsListEl.querySelector('.ge-name');
+  if (nameIn) nameIn.focus();
+}
+
+function cancelEditGroup() {
+  editingGroupId = null;
+  renderGroups();
+}
+
+// The inline row editor: name + notation fields, Update writes back BY ID
+// via editPoolById (the fix for rename-forks-a-duplicate and
+// unnamed-can't-update), Cancel/Esc reverts. Enter applies; a notation that
+// doesn't parse pins the row open with the parse error and a dead Update.
+function buildGroupEditor(g) {
+  const ed = document.createElement('div');
+  ed.className = 'group-editor';
+
+  const nameIn = document.createElement('input');
+  nameIn.className = 'ge-name';
+  nameIn.type = 'text';
+  nameIn.maxLength = 24;
+  nameIn.placeholder = 'Name this group…';
+  nameIn.autocomplete = 'off';
+  nameIn.value = g.name;
+
+  const notIn = document.createElement('input');
+  notIn.className = 'ge-notation';
+  notIn.type = 'text';
+  notIn.maxLength = 500;
+  notIn.spellcheck = false;
+  notIn.autocomplete = 'off';
+  notIn.value = g.notation;
+
+  const err = document.createElement('div');
+  err.className = 'ge-err';
+
+  const updateBtn = document.createElement('button');
+  updateBtn.className = 'btn primary ge-update';
+  updateBtn.textContent = 'Update';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn ge-cancel';
+  cancelBtn.textContent = 'Cancel';
+  const actions = document.createElement('div');
+  actions.className = 'ge-actions';
+  actions.append(updateBtn, cancelBtn);
+
+  const validate = () => {
+    const res = parseNotation(notIn.value);
+    notIn.classList.toggle('bad', !res.ok);
+    err.textContent = res.ok ? '' : (res.error || 'invalid notation');
+    updateBtn.disabled = !res.ok;
+    return res.ok;
+  };
+  validate();
+  notIn.addEventListener('input', validate);
+
+  const apply = () => {
+    if (!validate()) { notIn.focus(); return; }
+    editingGroupId = null;
+    editPoolById(g.id, { name: nameIn.value, notation: notIn.value });
+  };
+  updateBtn.addEventListener('click', apply);
+  cancelBtn.addEventListener('click', cancelEditGroup);
+  const onKey = (e) => {
+    e.stopPropagation(); // same as every popover field: no table shortcuts
+    if (e.key === 'Enter') apply();
+    else if (e.key === 'Escape') cancelEditGroup();
+  };
+  nameIn.addEventListener('keydown', onKey);
+  notIn.addEventListener('keydown', onKey);
+
+  ed.append(nameIn, notIn, err, actions);
+  return ed;
 }
 
 // Roll a saved group: parse its notation and roll the parsed spec. Online the
@@ -3609,9 +3728,17 @@ function renderGroups() {
     row.className = 'group-row';
     row.dataset.groupId = String(g.id);
 
+    // This row is being edited: the editor replaces the whole affordance set.
+    if (g.id === editingGroupId) {
+      row.classList.add('editing');
+      row.appendChild(buildGroupEditor(g));
+      groupsListEl.appendChild(row);
+      continue;
+    }
+
     const info = document.createElement('div');
     info.className = 'group-info';
-    info.title = 'Load into the command box to edit';
+    info.title = 'Load into the command box';
     const nameEl = document.createElement('div');
     nameEl.className = 'group-name' + (g.name ? '' : ' as-notation');
     nameEl.textContent = g.name || g.notation; // unnamed: the notation is the name
@@ -3620,7 +3747,7 @@ function renderGroups() {
       const chip = document.createElement('code');
       chip.className = 'group-formula';
       chip.textContent = g.notation;
-      chip.title = `${g.notation}  ·  click to edit in the command box`;
+      chip.title = `${g.notation}  ·  click to load into the command box`;
       chip.addEventListener('click', (e) => {
         e.stopPropagation();
         loadIntoBox(g.notation, g.name);
@@ -3629,16 +3756,23 @@ function renderGroups() {
     }
     info.addEventListener('click', () => loadIntoBox(g.notation, g.name));
 
+    // The consistent affordance set: Roll · ± · ✎ · ✕.
+    const rollBtn = document.createElement('button');
+    rollBtn.className = 'group-roll';
+    rollBtn.textContent = 'Roll';
+    rollBtn.addEventListener('click', () => rollGroup(g));
+
     const modsBtn = document.createElement('button');
     modsBtn.className = 'group-mods';
     modsBtn.textContent = '±';
     modsBtn.title = 'Modifiers, target, face down';
     modsBtn.addEventListener('click', () => togglePopover(g, row));
 
-    const rollBtn = document.createElement('button');
-    rollBtn.className = 'group-roll';
-    rollBtn.textContent = 'Roll';
-    rollBtn.addEventListener('click', () => rollGroup(g));
+    const editBtn = document.createElement('button');
+    editBtn.className = 'group-edit';
+    editBtn.textContent = '✎';
+    editBtn.title = 'Edit name & notation';
+    editBtn.addEventListener('click', () => beginEditGroup(g.id));
 
     const delBtn = document.createElement('button');
     delBtn.className = 'group-del';
@@ -3651,7 +3785,7 @@ function renderGroups() {
       renderGroups();
     });
 
-    row.append(info, modsBtn, rollBtn, delBtn);
+    row.append(info, rollBtn, modsBtn, editBtn, delBtn);
     groupsListEl.appendChild(row);
     // renderGroups can run while this group's popover is open (e.g. after a
     // variant save) — re-anchor it to the fresh row.
