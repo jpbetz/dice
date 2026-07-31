@@ -3829,8 +3829,8 @@ document.getElementById('copy-link').addEventListener('click', async (e) => {
 // adv/dis, keep/drop, reroll, explode, face down, dc and comment. Opening it
 // parses the group's notation into edit state; every edit re-renders the
 // canonical echo and Monte Carlo preview. Roll/Offer act on the edited spec;
-// 'Save as variant' appends a new group — the original group is only changed
-// through the command box + Save.
+// 'Save as variant' appends a new group; 'Update this group' writes the
+// source record back in place by id (editPoolById — the row editor's path).
 // ---------------------------------------------------------------------------
 
 const popEl = document.getElementById('mods-popover');
@@ -3859,6 +3859,7 @@ const popExpSubtitle = document.getElementById('pop-exp-subtitle');
 const popPreviewEl = document.getElementById('pop-preview');
 const popRollBtn = document.getElementById('pop-roll');
 const popOfferBtn = document.getElementById('pop-offer');
+const popUpdateBtn = document.getElementById('pop-update');
 const popVariantBtn = document.getElementById('pop-variant');
 
 // ']' would close the label early and '#' starts a comment — both break the
@@ -3948,6 +3949,9 @@ function openPopover(binding) {
   popDcInput.value = pop.dc == null ? '' : String(pop.dc);
   popCommentInput.value = pop.comment || '';
   popExpSubtitle.value = pop.expSubtitle;
+  // 'Update this group' needs a record to write back to — the tray draft
+  // has none, so its popover offers only the additive 'Save as variant'.
+  popUpdateBtn.classList.toggle('hidden', pop.source !== 'group');
   popEl.classList.remove('hidden');
   renderPop();
   placePopover();
@@ -4408,6 +4412,19 @@ popOfferBtn.addEventListener('click', () => {
     });
   }
   closePopover();
+});
+
+// 'Update this group' (saved-group source only): the edited canonical writes
+// back to the SAME record by id — editPoolById, the row editor's path. The
+// name stays; 'Save as variant' below is the additive twin.
+popUpdateBtn.addEventListener('click', () => {
+  if (!pop || pop.source !== 'group') return;
+  const spec = popSpec();
+  if (validateMods(spec.dice, spec.mods)) return;
+  const canonical = popCanonical();
+  const id = pop.groupId;
+  closePopover();
+  editPoolById(id, { notation: canonical });
 });
 
 popVariantBtn.addEventListener('click', () => {
