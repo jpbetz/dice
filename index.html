@@ -138,9 +138,10 @@ limitations under the License.
     <button id="idm-invite" class="idm-item">Copy invite link</button>
   </div>
 
-  <!-- Persistent corner control: clear the whole table -->
-  <div id="corner-controls">
-    <button id="corner-clear" class="corner-btn" title="Remove all dice from the table">✕</button>
+  <!-- Corner control: clear the whole table. Context, not furniture — it
+       exists only while dice are actually on the table (felt or shelf). -->
+  <div id="corner-controls" class="hidden">
+    <button id="corner-clear" class="corner-btn" title="Remove all dice from the table">✕ Clear table</button>
   </div>
 
   <!-- Quick palette: Spotlight-style transient command strip ('/' or Ctrl/Cmd+K).

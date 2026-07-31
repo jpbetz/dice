@@ -2733,7 +2733,20 @@ function tick(dt, render = true) {
   stepRevealing(dt); // reveal correction flips (goal 11)
   if (chips.length) positionChips();
   if (shelfClusters.size) positionShelfMarkers();
+  updateCornerClear();
   if (render) renderer.render(scene, camera);
+}
+
+// 'Clear table' exists only while there is a table to clear: dice on the
+// felt or the shelf (tableDice covers both). Checked every tick — dice
+// arrive and leave on many paths — but the DOM write is state-guarded.
+const cornerControlsEl = document.getElementById('corner-controls');
+let cornerShown = false;
+function updateCornerClear() {
+  const show = tableDice.length > 0;
+  if (show === cornerShown) return;
+  cornerShown = show;
+  cornerControlsEl.classList.toggle('hidden', !show);
 }
 
 // Tests only (__diceDebug.holdClock): freeze the rAF clock so the world moves

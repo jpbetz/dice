@@ -833,7 +833,7 @@ body.mini #result-breakdown { font-size: 10px; }
 body.mini .value-chip { font-size: 14px; min-width: 26px; padding: 2px 6px; }
 body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
 
-/* ---------- persistent corner controls ---------- */
+/* ---------- corner controls (shown only while dice are on the table) ---------- */
 #corner-controls {
   position: fixed;
   right: 10px;
@@ -842,15 +842,16 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
   gap: 6px;
   z-index: var(--z-table-labels);
 }
+#corner-controls.hidden { display: none; }
 .corner-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
+  padding: 7px 14px;
+  border-radius: 999px;
   border: 1px solid var(--panel-border);
   background: var(--panel);
   color: var(--muted);
-  font-size: 15px;
+  font-size: 12px;
   line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
