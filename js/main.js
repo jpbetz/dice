@@ -3442,6 +3442,8 @@ function renderTray() {
     // type — 'd6 ×3' steps down to 'd6 ×2'.
     trayRollBtn.appendChild(buildDieStrip(tray, TRAY_STRIP_CAP, { grouped: true }));
     trayRollBtn.appendChild(buildRollCue()); // same promise as the pool rows (tier rule)
+    const trayUnits = new Set(tray).size;
+    trayRollBtn.classList.toggle('cue-tight', cueTight(Math.min(trayUnits, TRAY_STRIP_CAP) + (trayUnits > TRAY_STRIP_CAP ? 1 : 0)));
     const label = `Roll ${formula(tray)}`;
     trayRollBtn.title = label;
     trayRollBtn.setAttribute('aria-label', label);
@@ -4086,13 +4088,20 @@ function buildDieStrip(types, cap, { grouped = false } = {}) {
 // ❯ → ❯ ❯ → ❯ ❯ ❯ to telegraph that the click launches. Pure decoration:
 // aria-hidden, pointer-events none — the button stays the whole target.
 // Static markup only (no user strings ride innerHTML here).
+// The word renders whole or not at all: past cueTight() units the strip
+// keeps only the chevron trail (the trail alone still carries the meaning).
+// 'OLL ❯❯❯' peeking from under a die broke the promise exactly where the
+// roll was biggest.
 function buildRollCue() {
   const cue = document.createElement('span');
   cue.className = 'roll-cue';
   cue.setAttribute('aria-hidden', 'true');
-  cue.innerHTML = 'ROLL&nbsp;<i>❯</i><i>❯</i><i>❯</i>';
+  cue.innerHTML = '<b class="cue-word">ROLL&nbsp;</b><i>❯</i><i>❯</i><i>❯</i>';
   return cue;
 }
+// Units known at build time (the 296px column is fixed): ≥4 rendered units
+// (dice groups + the +N pill) leave no honest room for the word.
+function cueTight(unitCount) { return unitCount >= 4; }
 
 // P2 use-vs-manage: manage mode is ONE explicit, transient toggle (the
 // header ✎). It never persists, and collapsing the panel exits it
@@ -4187,6 +4196,8 @@ function renderGroups() {
     rollBtn.setAttribute('aria-label', rollName);
     rollBtn.appendChild(buildDieStrip(types, POOL_STRIP_CAP, { grouped: true }));
     rollBtn.appendChild(buildRollCue());
+    const rowUnits = new Set(types).size;
+    rollBtn.classList.toggle('cue-tight', cueTight(Math.min(rowUnits, POOL_STRIP_CAP) + (rowUnits > POOL_STRIP_CAP ? 1 : 0)));
     rollBtn.addEventListener('click', () => rollGroup(g));
     // Manage mode disarms the click as anti-misclick, NOT as a lock: the
     // digit shortcuts stay live (a keyboard roll is always deliberate).

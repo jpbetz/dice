@@ -440,6 +440,9 @@ html, body {
   z-index: 0;
 }
 .pool-roll:hover:not(:disabled) .roll-cue { opacity: 1; }
+/* crowded strips drop the word, keep the trail — whole or not at all */
+.pool-roll.cue-tight .cue-word { display: none; }
+.cue-word { font-weight: inherit; }
 /* Chevrons: STATIC, shorter than the word, fading left → right — a trail
    pointing at the click, not a blinker (animation retired 2026-07-31). */
 .roll-cue i { font-style: normal; font-size: 0.68em; margin-left: 0.12em; }
