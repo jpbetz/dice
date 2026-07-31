@@ -196,6 +196,23 @@ function clusterGlowRadius(c) {
 // not casino tray — slightly larger than its cluster's footprint, low alpha
 // so every theme keeps it quieter than the dice. A cluster mid-whisk
 // (glow=false) hasn't landed yet: its ring appears at whisk-end.
+// Each cluster's ring is tinted with its ROLLER's color, warmed toward the
+// table's gold so every tint reads as candlelight rather than neon — the
+// joiner's at-a-glance attribution (CUJ5), restored to the shelf at zero
+// chrome cost after the resting markers went invisible.
+function glowTint(rollId) {
+  const entry = log.find((e) => e.rollId === rollId);
+  const hex = entry && typeof entry.color === 'string' && /^#[0-9a-f]{6}$/i.test(entry.color)
+    ? entry.color : '#ffcd64';
+  const n = parseInt(hex.slice(1), 16);
+  const W = 0.45; // warm blend share
+  return [
+    Math.round(((n >> 16) & 255) * (1 - W) + 255 * W),
+    Math.round(((n >> 8) & 255) * (1 - W) + 205 * W),
+    Math.round((n & 255) * (1 - W) + 100 * W),
+  ];
+}
+
 function drawShelfGlow(ctx) {
   for (const c of shelfClusters.values()) {
     if (!c.glow || c.slot < 0) continue;
@@ -203,11 +220,12 @@ function drawShelfGlow(ctx) {
     const cy = decalPx(SHELF_Z);
     // refreshes the marker-size cache too: every occupancy change lands here
     const r = (c.glowR = clusterGlowRadius(c)) * DECAL_PX_PER_UNIT;
+    const [tr, tg, tb] = glowTint(c.rollId);
     const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    g.addColorStop(0, 'rgba(255, 214, 120, 0.05)');
-    g.addColorStop(0.62, 'rgba(255, 205, 100, 0.09)');
-    g.addColorStop(0.82, 'rgba(255, 196, 88, 0.04)');
-    g.addColorStop(1, 'rgba(255, 196, 88, 0)');
+    g.addColorStop(0, `rgba(${tr}, ${tg}, ${tb}, 0.06)`);
+    g.addColorStop(0.62, `rgba(${tr}, ${tg}, ${tb}, 0.10)`);
+    g.addColorStop(0.82, `rgba(${tr}, ${tg}, ${tb}, 0.05)`);
+    g.addColorStop(1, `rgba(${tr}, ${tg}, ${tb}, 0)`);
     ctx.save();
     ctx.fillStyle = g;
     ctx.beginPath();
