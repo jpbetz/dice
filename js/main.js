@@ -3978,7 +3978,7 @@ function buildGroupEditor(g) {
   err.className = 'ge-err';
 
   const updateBtn = document.createElement('button');
-  updateBtn.className = 'btn primary ge-update';
+  updateBtn.className = 'btn confirm ge-update';
   updateBtn.textContent = 'Update';
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'btn ge-cancel';
