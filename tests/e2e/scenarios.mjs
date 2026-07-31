@@ -316,6 +316,35 @@ export const scenarios = [
     },
   },
   {
+    name: 'ceremony-retire',
+    tags: ['roll', 'ceremony'],
+    // A check roll's verdict card times out into the plain-roll banner: the
+    // dice still on the felt keep Collect and the base clear-✕ (the card's
+    // auto-dismiss used to strand them with no affordance at all).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`commandRoll('d20 check dc10')`);
+      await a.waitFor(
+        `(window.__diceDebug.skipCeremony(), window.__diceDebug.sim(30), (window.__diceDebug.ceremonyState || {}).phase === 'done')`,
+        { desc: 'verdict staged' },
+      );
+      assert.equal(await a.dbg('retireCeremony()'), true, 'the card retires into the banner');
+      assert.ok(await a.eval(
+        `[...document.querySelectorAll('#banner-actions .banner-btn')].some((b) => b.textContent === 'Collect')`,
+      ), 'Collect survives the ceremony');
+      assert.ok(await a.eval(`!!document.querySelector('#banner-actions .banner-foot .clear-x')`),
+        'so does the base ✕');
+      const rid = await a.rollId();
+      assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, 'collect accepted');
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1)`,
+        { desc: 'collected from the retired-banner state' },
+      );
+      assert.ok(await a.eval(`document.getElementById('result-banner').classList.contains('hidden')`),
+        'the banner retires into the slot');
+    },
+  },
+  {
     name: 'notation-wiring',
     tags: ['notation'],
     // The browser-side notation path (grammar itself is unit-tested): a valid

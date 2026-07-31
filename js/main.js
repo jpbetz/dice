@@ -2419,13 +2419,29 @@ function stageVerdict(roll) {
   setCeremonyPhaseClass(roll, 'c-verdict');
 }
 
+// The auto-dismiss handoff: the moment ends, the roll does not. The verdict
+// card retires into the same quiet banner a plain roll leaves, so Collect
+// and the base ✕ survive the ceremony — a check roll used to strand its
+// dice on the felt with no affordance at all once the card timed out. A
+// roll already collected/cleared (or upstaged by a newer roll) hands off to
+// nothing, exactly as before.
+function retireCeremonyToBanner(roll) {
+  const sv = stagedVerdict;
+  dismissCeremonyUI();
+  if (!sv || !sv.entry) return;
+  const st = sv.entry.rollId ? rollStates.get(sv.entry.rollId) : null;
+  if (st && (st.cleared || st.collected !== null)) return; // already off the felt
+  lastEntry = sv.entry;
+  renderRollResults(sv.entry, roll.dice, false); // no fx: the moment already played
+}
+
 function ceremonyFinish(roll) {
   const cer = roll.ceremony;
   if (cer.phase === 'done') return;
   cer.phase = 'done';
   roll.done = true;
   clearTimeout(ceremonyDismissTimer);
-  ceremonyDismissTimer = setTimeout(dismissCeremonyUI, CEREMONY_DISMISS_MS);
+  ceremonyDismissTimer = setTimeout(() => retireCeremonyToBanner(roll), CEREMONY_DISMISS_MS);
   runPendingReveal(roll);  // a reveal that arrived mid-ceremony lands now
   runPendingCollect(roll); // a collect that arrived mid-ceremony lands now
   runPendingClear(roll);   // …and a clear wins over it
@@ -2899,6 +2915,12 @@ window.__diceDebug = {
   },
   skipCeremony() { return skipCeremony(); },
   skipPlain() { return skipPlainPlayback(); },
+  // The CEREMONY_DISMISS_MS handoff, driven directly (tests can't wait out a
+  // real 7 s timer): the verdict card retires into the plain-roll banner.
+  retireCeremony() {
+    if (currentRoll) retireCeremonyToBanner(currentRoll);
+    return !banner.classList.contains('hidden');
+  },
   // quick palette (tests): open it / observe its open state
   openPalette() { openPalette(); },
   get paletteOpen() { return isPaletteOpen(); },
