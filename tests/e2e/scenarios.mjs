@@ -978,10 +978,14 @@ export const scenarios = [
       );
       await a.eval(`document.getElementById('clear-tray').click()`);
 
-      // ± opens the popover from the tile corner.
-      await a.eval(`document.querySelector('#groups-list .tile-mods').click()`);
+      // The tile's ± corner is retired: right-click is the per-tile popover
+      // path now (tweaking otherwise lives on the staged draft's ±).
+      assert.equal(await a.eval(`document.querySelectorAll('#groups-list .tile-mods').length`), 0,
+        'no ± corner on tiles');
+      await a.eval(`document.querySelector('#groups-list .pool-tile')
+        .dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true}))`);
       const pop = await a.dbg('popover');
-      assert.ok(pop && pop.open && pop.source === 'group', '± opens the popover on the pool');
+      assert.ok(pop && pop.open && pop.source === 'group', 'right-click opens the popover on the pool');
       await a.eval(`document.getElementById('pop-close').click()`);
 
       // Digits stage by rendered order; Enter rolls the composed draft.
@@ -1141,6 +1145,35 @@ export const scenarios = [
     },
   },
   {
+    name: 'auto-collect',
+    tags: ['shelf'],
+    // The tidy-away clock (2026-08-01): a finished OPEN roll of yours
+    // collects itself after a quiet moment; the shelf cluster's quick ✕
+    // clears it in one click (no peek transit); a hidden roll stands until
+    // its reveal. Tests opt in — the harness boots with the clock off.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      assert.equal(await a.dbg('autoCollectMs'), 0, 'the harness boots with the clock off');
+      await a.dbg('setAutoCollectMs(250)');
+      await a.roll('2d6');
+      await a.waitFor(`(window.__diceDebug.sim(60), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        { desc: 'the roll collected itself' });
+
+      // the quick ✕ rides the cluster itself
+      await a.eval(`document.querySelector('.shelf-marker .shelf-x').click()`);
+      await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 0 && window.__diceDebug.shelf.length === 0)`,
+        { desc: 'one click cleared it' });
+
+      // a held roll does NOT tidy itself — the standing tension is the point
+      await a.dbg('setAutoCollectMs(120)');
+      await a.roll('1d20 held');
+      await new Promise((r) => setTimeout(r, 500));
+      await a.dbg('sim(60)');
+      assert.equal((await a.dbg('shelf')).length, 0, 'a hidden roll stays on the felt');
+      assert.ok(await a.diceCount() > 0, 'its dice stand until the reveal');
+    },
+  },
+  {
     name: 'shared-pools',
     tags: ['smoke', 'groups'],
     // The owner switcher (ROADMAP 2b): racks publish to the room; a teammate
@@ -1211,6 +1244,15 @@ export const scenarios = [
       assert.ok(ts.dice.length > stagedLen, 'the draft survived the switch');
       assert.equal(await b.eval(`document.querySelectorAll('#groups-list .pool-tile.foreign').length`), 0,
         'home shows your own rack again');
+
+      // Categories survive a REBOOT: a fresh tab on the same origin loads
+      // the stored rack through migrateGroup, which silently dropped
+      // category until 2026-08-01. The shelf must still say Attributes.
+      const a2 = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const g2 = (await a2.dbg('groups')).find((g) => g.name === 'Fangs');
+      assert.equal(g2 && g2.category, 'Attributes', 'category survives the reload');
+      assert.equal(await a2.eval(`document.querySelector('#groups-list .pool-sec-head').textContent`),
+        'Attributes', 'the shelf keeps its name after a reboot');
     },
   },
   {
@@ -1222,6 +1264,9 @@ export const scenarios = [
     // — and fails if either retired word comes back into view.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      // seed uncategorized pools: the plain-shelf name is what this reads
+      // (the DEFAULT rack is the categorized Soul Deal set now)
+      await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}])`);
       assert.equal(await a.eval(`document.querySelector('#head-compose .ph-label').textContent`),
         'Pools', 'ONE panel since the merge, labelled Pools');
       assert.equal(await a.eval(`document.querySelector('.pool-sec-head').textContent`),

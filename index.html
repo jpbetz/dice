@@ -125,10 +125,11 @@ limitations under the License.
         </div>
         <button id="tray-mods" class="group-mods pool-mods" title="Tweak — modifiers, target, moment">±</button>
       </div>
-      <!-- Draft management (the tier refinement, 2026-07-31): Save and
-           Clear are not part of the ROLL operation, so they STAND once
-           dice exist — no hover to find them. Save morphs into the inline
-           name row (always ADDITIVE — updates stay on the by-id paths). -->
+      <!-- Draft management (demoted 2026-08-01): Save and Clear are not
+           part of the ROLL operation — at rest the row is quiet air under
+           the cluster; hover/focus (or a coarse pointer) brings the ghost
+           verbs up. Save morphs into the inline name row (always ADDITIVE
+           — updates stay on the by-id paths). -->
       <div class="btn-row draft-actions hidden" id="draft-actions">
         <button id="save-group" class="btn">Save</button>
         <button id="clear-tray" class="btn" title="Clear the draft">✕ Clear</button>
@@ -141,8 +142,9 @@ limitations under the License.
       </div>
 
       <!-- The Rack (agreed 2026-08-01): category shelves of pool TILES.
-           Tiles STAGE (sources add, the pool rolls); ± rides each tile's
-           revealed corner; ✎ gates manage overlays + the copy-link toolbar
+           Tiles STAGE (sources add, the pool rolls); right-click a tile
+           for its ± popover (the corner ± retired 2026-08-01 — tweaking
+           lives at the roll moment); ✎ gates manage overlays + the toolbar
            (P2/P4). Section headers render from categories in renderGroups —
            sticky, so the current shelf stays named mid-scroll. -->
       <div id="pools-toolbar" class="hidden">

@@ -600,6 +600,7 @@ function removeRollDice(rollId) {
 // until its own playback settles (§7.5); the pending clear runs from the
 // completion paths (stepPlayback's showResults / ceremonyFinish).
 function applyClearRoll(rollId) {
+  cancelAutoCollect(rollId);
   if (!rollId) return;
   // cleared implies off-shelf (§7.7): the state row flips first so a
   // roll-collected landing later in the same burst becomes a silent no-op.
@@ -994,6 +995,16 @@ function renderShelfMarkers() {
       if (peekRollId === c.rollId) closePeek();
       else openPeek(c.rollId);
     });
+    // The quick ✕ (2026-08-01, Joe): clearing a collected roll is one hover
+    // + one click on the cluster itself — no peek transit. Bottom corner,
+    // away from where the peek card unfolds; §7.7 lets ANYONE tidy a
+    // collected roll, and the server still enforces that.
+    const x = document.createElement('button');
+    x.className = 'shelf-x';
+    x.textContent = '✕';
+    x.title = 'Clear this roll for everyone';
+    x.addEventListener('click', () => requestClearRoll(c.rollId));
+    el.appendChild(x);
     c.markerEl = el;
     shelfLayer.appendChild(el);
   }
@@ -1327,6 +1338,7 @@ document.addEventListener('pointerdown', (e) => {
 // exactly as clears defer — always-interruptible playback keeps the stage,
 // and the collect lands from the completion paths (runPendingCollect).
 function applyRollCollected(rollId, seq, animate = true) {
+  cancelAutoCollect(rollId);
   if (!rollId || !Number.isInteger(seq) || seq < 1) return;
   const st = rollState(rollId);
   st.collected = seq;
@@ -1424,6 +1436,7 @@ function flushPendingRollLog() {
 // roll this sweep just took away. Online the server flags its own log the same
 // way, so both sides of a swept table agree with a fresh join.
 function clearTable() {
+  cancelAutoCollect();
   flushPendingRollLog();
   pendingClears.clear();
   pendingCollects.clear();
@@ -1729,6 +1742,40 @@ function stepPlayback(dt) {
 
 const chipsLayer = document.getElementById('chips-layer');
 const banner = document.getElementById('result-banner');
+
+// Auto-collect (2026-08-01, Joe): a finished roll of YOURS tidies itself to
+// the shelf after a quiet moment — roll, read, and it moves aside on its
+// own; Enter (keep now) and Esc (sweep) stay the fast paths. Hidden rolls
+// wait for their reveal (standing tension is the point), spectators never
+// collect for the roller, and hovering the banner holds the timer — you
+// are reading. Tests run with it off (__diceTestMode) and opt in via the
+// setAutoCollectMs hook; 0 disables.
+let autoCollectMs = (typeof window !== 'undefined' && window.__diceTestMode) ? 0 : 6000;
+let autoCollect = { rollId: null, timer: null };
+function cancelAutoCollect(rollId = null) {
+  if (rollId && autoCollect.rollId !== rollId) return;
+  clearTimeout(autoCollect.timer);
+  autoCollect = { rollId: null, timer: null };
+}
+function armAutoCollect(entry) {
+  if (!autoCollectMs || !entry || !entry.rollId) return;
+  if (entry.revealed === false || entryHidden(entry)) return; // reveal re-arms
+  const mine = !netOnline || (net && entry.playerId === net.playerId);
+  if (!mine) return;
+  cancelAutoCollect();
+  autoCollect.rollId = entry.rollId;
+  autoCollect.timer = setTimeout(() => {
+    const rid = autoCollect.rollId;
+    autoCollect = { rollId: null, timer: null };
+    const last = lastRollActionable(); // re-checks mine + settled + still on felt
+    if (last && last.rollId === rid) requestCollectRoll(rid);
+  }, autoCollectMs);
+}
+// Reading holds the clock; leaving restarts it whole.
+banner.addEventListener('mouseenter', () => clearTimeout(autoCollect.timer));
+banner.addEventListener('mouseleave', () => { if (lastEntry) armAutoCollect(lastEntry); });
+banner.addEventListener('focusin', () => clearTimeout(autoCollect.timer));
+banner.addEventListener('focusout', () => { if (lastEntry) armAutoCollect(lastEntry); });
 const chips = []; // {el, die}
 // Quiet by default (P1): the floating die numbers are an opt-in ambient
 // layer ('Show numbers on dice', settings "Just you"). The result stays
@@ -2198,6 +2245,7 @@ function renderRollResults(entry, dice, fx = true) {
 
   banner.classList.remove('hidden', 'crit-success', 'crit-fail');
   renderBannerActions(entry);
+  armAutoCollect(entry); // every banner paint restarts the tidy-away clock
   const crit = entryCrit(entry);
   if (crit === 'success') {
     banner.classList.add('crit-success');
@@ -2259,8 +2307,11 @@ function renderBannerActions(entry) {
   }
   if (row.childElementCount) holder.appendChild(row);
 
-  // Standing tier: Reveal (the content-completing verb of a hidden roll)
-  // and Done.
+  // Standing tier: Reveal alone — the content-completing verb of a hidden
+  // roll must stay findable. Done moved DOWN to the revealed tier
+  // (2026-08-01): auto-collect owns the idle path now, so at rest the
+  // banner is pure result; approach brings the verbs up (P6), and coarse
+  // pointers keep them standing.
   const foot = document.createElement('div');
   foot.className = 'banner-foot';
   if (canReveal(entry)) {
@@ -2271,7 +2322,10 @@ function renderBannerActions(entry) {
     btn.addEventListener('click', () => requestReveal(entry.rollId));
     foot.appendChild(btn);
   }
+  if (foot.childElementCount) holder.appendChild(foot);
   if (entry.rollId) {
+    const doneRow = document.createElement('div');
+    doneRow.className = 'banner-foot reveal-tier';
     const done = document.createElement('button');
     done.className = mine ? 'btn confirm banner-btn done-btn' : 'btn ghost banner-btn done-btn';
     done.textContent = 'Done';
@@ -2292,9 +2346,9 @@ function renderBannerActions(entry) {
       done.title = 'Done — hides this for you; the dice stay until the roller acts';
       done.addEventListener('click', () => banner.classList.add('hidden'));
     }
-    foot.appendChild(done);
+    doneRow.appendChild(done);
+    holder.appendChild(doneRow);
   }
-  if (foot.childElementCount) holder.appendChild(foot);
 }
 
 // True only while a hello resync fast-forwards the on-felt roll back into
@@ -3305,9 +3359,11 @@ window.__diceDebug = {
       .filter((el) => !el.classList.contains('chip-clearing'))
       .map((el) => ({
         rollId: el.dataset.rollId || null,
-        // bare = no child chrome at all: the resting target draws nothing
-        bare: el.childElementCount === 0,
-        text: el.textContent,
+        // bare = nothing VISIBLE at rest: the quick ✕ is hover-revealed
+        // chrome (opacity 0 until approach, same tier as every .die-x),
+        // so it does not count against the quiet-marker contract.
+        bare: [...el.children].every((ch) => ch.classList.contains('shelf-x')),
+        text: [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(''),
         hasTotal: !!el.querySelector('.sm-total'),
         hasX: !!el.querySelector('.sm-x'),
         hasReveal: !!el.querySelector('.sm-reveal'),
@@ -3407,6 +3463,9 @@ window.__diceDebug = {
     renderGroups();
     return groups.length;
   },
+  // auto-collect (2026-08-01): tests opt in with a short clock; 0 = off
+  get autoCollectMs() { return autoCollectMs; },
+  setAutoCollectMs(ms) { autoCollectMs = Math.max(0, ms | 0); return autoCollectMs; },
   // the owner switcher (ROADMAP 2b): whose rack the Pools panel shows
   get poolsOwner() { return poolsOwner; },
   setPoolsOwner(id) { setPoolsOwner(id || null); return poolsOwner; },
@@ -4203,23 +4262,41 @@ paintCmd();
 function migrateGroup(g, i) {
   if (!g || typeof g !== 'object') return null;
   const name = typeof g.name === 'string' ? cutText(g.name, 24) : '';
+  // category rides every shape, present-or-absent (2b-②; the rebuild here
+  // silently DROPPED it on every boot until 2026-08-01 — localStorage and
+  // #g= links both funnel through this function)
+  const cat = typeof g.category === 'string' && g.category.trim() ? cutText(g.category, 24) : null;
+  const dress = (rec) => (cat ? { ...rec, category: cat } : rec);
   if (typeof g.notation === 'string') {
     const res = parseNotation(g.notation);
-    return res.ok ? { id: g.id ?? i + 1, name, notation: res.canonical } : null;
+    return res.ok ? dress({ id: g.id ?? i + 1, name, notation: res.canonical }) : null;
   }
   if (Array.isArray(g.dice) && g.dice.length && g.dice.length <= MAX_DICE_ON_TABLE
       && g.dice.every((t) => DIE_DEFS[t])) {
-    return { id: g.id ?? i + 1, name, notation: formula(g.dice) };
+    return dress({ id: g.id ?? i + 1, name, notation: formula(g.dice) });
   }
   return null;
 }
 
 let groups = groupsFromLocation() || load(LS_GROUPS, null);
 if (!groups) {
+  // The Soul Deal starting rack (Joe, 2026-08-01): the nine attributes in
+  // their Physical/Mental/Social triads (offense/defense/utility), one
+  // skill, one motivation — a fresh seat can stage attribute+skill+
+  // motivation and roll ('1 2 3 Enter' territory). Everything starts at
+  // d6 (Senchléithe); the ✎ editor is the advancement path.
   groups = [
-    { id: 1, name: 'Attack', notation: '1d20' },
-    { id: 2, name: 'Damage', notation: '3d4' },
-    { id: 3, name: 'Percentile', notation: 'd100' },
+    { id: 1, name: 'Strength', notation: '1d6', category: 'Attributes' },
+    { id: 2, name: 'Toughness', notation: '1d6', category: 'Attributes' },
+    { id: 3, name: 'Agility', notation: '1d6', category: 'Attributes' },
+    { id: 4, name: 'Wit', notation: '1d6', category: 'Attributes' },
+    { id: 5, name: 'Wisdom', notation: '1d6', category: 'Attributes' },
+    { id: 6, name: 'Intelligence', notation: '1d6', category: 'Attributes' },
+    { id: 7, name: 'Charm', notation: '1d6', category: 'Attributes' },
+    { id: 8, name: 'Will', notation: '1d6', category: 'Attributes' },
+    { id: 9, name: 'Empathy', notation: '1d6', category: 'Attributes' },
+    { id: 10, name: 'Sword', notation: '1d6', category: 'Skills' },
+    { id: 11, name: 'Peer Respect', notation: '1d6', category: 'Motivations' },
   ];
 }
 groups = (Array.isArray(groups) ? groups : []).map(migrateGroup).filter(Boolean);
@@ -4801,13 +4878,10 @@ function renderGroups() {
       stage.disabled = poolsEdit;
       tile.appendChild(stage);
 
-      // ± stays USE (revealed corner, sibling — never nested)
-      const modsBtn = document.createElement('button');
-      modsBtn.className = 'group-mods pool-mods tile-mods';
-      modsBtn.textContent = '±';
-      modsBtn.title = 'Tweak — modifiers, target, moment';
-      modsBtn.addEventListener('click', () => togglePopover(g, tile));
-      tile.appendChild(modsBtn);
+      // Tile ± retired (2026-08-01, Joe): tweaking belongs to the ROLL
+      // moment — stage the pool and the draft's ± is right there. The
+      // right-click stays as the quiet per-tile path to the popover
+      // (Update-this-pool / variants), same pointer bonus as the cluster.
       tile.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         togglePopover(g, tile);

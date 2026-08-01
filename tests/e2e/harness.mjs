@@ -269,6 +269,9 @@ export class Ctx {
   async newTable({ origin = 'localhost', name, allowSolo = false } = {}) {
     for (let attempt = 0; ; attempt++) {
       const page = await this.browser.newPage();
+      // Deterministic clocks: wall-time features (auto-collect) stay OFF in
+      // scenarios unless one opts in via the setAutoCollectMs debug hook.
+      await page.addInitScript('window.__diceTestMode = true;');
       if (name) {
         await page.addInitScript(
           `try { localStorage.setItem('dice.name.v1', ${JSON.stringify(name)}); } catch {}`,

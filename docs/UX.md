@@ -1417,6 +1417,28 @@ and a pool whose dice all landed null cells answers `quiet` — its answer
 IS the silence. Attribution rides `spec.sources`/the notation string
 (single carrier, like visibility); redaction drops it with the spec.
 
+**The quiet-table pass (2026-08-01, Joe's cleanup).** Four bindings:
+(1) Tile ± is retired — tweaking belongs to the ROLL moment (stage the
+pool; the draft's ± is right there); right-click on a tile remains the
+quiet per-pool popover path (Update / variants). (2) The draft breathes:
+the cluster stands taller and its gold promise now RESTS on it whenever
+dice are staged (a quiet chevron whisper, loud on hover), while Save ·
+Clear demote to ghost text that surfaces on the zone's hover/focus (and
+stands on coarse pointers) — draft management is not part of the roll.
+(3) The tidy-away clock: a finished OPEN roll of YOURS auto-collects to
+the shelf ~6s after it settles (hovering the banner holds the clock — you
+are reading; Enter keeps it now, Esc sweeps; hidden rolls stand until
+their reveal — the tension is the point; spectators never collect for the
+roller). The banner's Done joins the revealed tier — at rest the banner
+is pure result. The shelf cluster answers with a hover ✕ on the marker
+itself: one click clears a collected roll, no peek transit. (4) The
+default rack is the Soul Deal starting set: nine attributes in their
+Physical/Mental/Social triads (Strength/Toughness/Agility ·
+Wit/Wisdom/Intelligence · Charm/Will/Empathy), one skill (Sword), one
+motivation (Peer Respect), all at d6 — attribute+skill+motivation is
+'1 2 3 Enter' from a fresh seat. (Fixed underneath: migrateGroup dropped
+pool categories on every boot — localStorage and #g= links both.)
+
 **The tier rule (P6, the binding sharpening).** Treatments bind CONTROL
 TIERS, not screens: content stands (dice, names, totals); roll-adjacent
 controls reveal on approach (±, per-die ✕, log ⟳, the ROLL cue, 1-9

@@ -330,8 +330,12 @@ html, body {
    layer (never a button in a button). ✕s appear on cluster hover and
    keyboard focus, and are always visible on coarse pointers. While a ✕ is
    hovered the roll-glow is suppressed: the glow must never lie. */
-.tray-cluster { position: relative; margin-top: 10px; min-height: 34px; }
-.tray-roll { width: 100%; flex-wrap: wrap; }
+.tray-cluster { position: relative; margin-top: 10px; min-height: 46px; }
+.tray-roll { width: 100%; flex-wrap: wrap; min-height: 46px; padding: 8px 10px; }
+/* The draft's promise STANDS (2026-08-01): a quiet gold ROLL whisper rests
+   on the cluster whenever dice are staged — hover turns it loud. Pool
+   tiles never wear it (they stage); this is the one roll button. */
+.tray-roll .roll-cue { opacity: 0.3; }
 .tray-roll.hidden { display: none; }
 .tray-roll .die-art { width: 28px; height: 28px; } /* identical to the pool rows */
 .tray-x-layer { position: absolute; inset: 0; pointer-events: none; }
@@ -363,7 +367,7 @@ html, body {
    semantics — filling it with dice replaces it). */
 #tray-hint.tray-ghost {
   margin: 0;
-  min-height: 38px;
+  min-height: 46px;
   display: flex;
   align-items: center;
   padding: 4px 8px;
@@ -381,9 +385,32 @@ html, body {
 .tray-line2 { margin-top: 10px; }
 .tray-line2.hidden { display: none; }
 .tray-line2 .tray-cluster { flex: 1; min-width: 0; margin-top: 0; }
-.draft-actions { margin-top: 8px; }
+/* Save · Clear demoted (2026-08-01): draft management is not part of the
+   ROLL, so at rest the row is empty air under the cluster — approach (or
+   keyboard focus, or a coarse pointer) brings the quiet verbs up. The row
+   keeps its height so nothing jumps. Esc already clears; Save is rare. */
+.draft-actions { margin-top: 4px; justify-content: flex-end; gap: 12px; }
 .draft-actions.hidden { display: none; }
-.draft-actions .btn { flex: 1; font-size: 12px; }
+.draft-actions .btn {
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 3px 10px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s, color 0.12s;
+}
+.draft-zone:hover .draft-actions .btn,
+.draft-zone:focus-within .draft-actions .btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+.draft-actions .btn:hover { color: var(--ivory); border-color: var(--hair); }
+@media (pointer: coarse) {
+  .draft-actions .btn { opacity: 0.85; pointer-events: auto; }
+}
 #save-confirm, #save-cancel { flex: none; width: 42px; }
 
 /* ---------- saved pools (read-only quick access, P2) ---------- */
@@ -585,16 +612,8 @@ html, body {
 .tile-stage .pool-ord { position: absolute; top: 3px; right: 6px; }
 .tile-stage:hover:not(:disabled) .pool-ord,
 .tile-stage:focus-visible .pool-ord { opacity: 0.8; }
-/* the tile's revealed-corner controls (siblings, never nested) */
-.tile-mods {
-  position: absolute;
-  right: 2px;
-  bottom: 2px;
-  min-height: 0 !important;
-  width: 22px;
-  height: 22px;
-  align-self: auto;
-}
+/* tile ± retired (2026-08-01): tweaking lives at the ROLL moment (the
+   draft's ±); right-click on a tile remains the quiet popover path */
 .tile-edit, .tile-del {
   position: absolute;
   top: 2px;
@@ -1342,6 +1361,30 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
   pointer-events: auto;
   cursor: pointer;
 }
+/* The quick ✕ (2026-08-01): one hover + one click clears a collected roll
+   — no peek transit. Bottom corner, clear of where the card unfolds. */
+.shelf-marker .shelf-x {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: rgba(18, 14, 9, 0.92);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s, border-color 0.12s;
+}
+.shelf-marker:hover .shelf-x, .shelf-marker .shelf-x:focus-visible { opacity: 1; }
+.shelf-marker .shelf-x:hover { color: #fff; border-color: var(--red); background: rgba(226, 73, 59, 0.3); }
+@media (pointer: coarse) { .shelf-marker .shelf-x { opacity: 0.85; } }
+.shelf-marker.chip-clearing .shelf-x { opacity: 0; }
+
 /* A marker on its way out keeps its place for the fade but stops taking
    clicks: the roll that replaced it is already sitting under it. */
 /* fully under the open panel: the invisible target yields its clicks */
