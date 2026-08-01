@@ -1258,8 +1258,8 @@ html, body {
 }
 #result-meaning:empty { display: none; }
 /* source-grouped tallies (2b-⑤): each pool answers under its own small-caps
-   label; groups separate by space, not punctuation */
-.tally-group + .tally-group { margin-left: 12px; }
+   label; the '  ·  ' group separators are REAL text nodes (renderTally), so
+   the grouping survives copy/paste and screen readers */
 .tally-src {
   margin-right: 5px;
   font-size: 0.78em;

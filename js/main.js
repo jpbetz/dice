@@ -2112,13 +2112,14 @@ function renderTally(el, entry) {
   } else {
     groups.push({ label: '', os: outcomes });
   }
-  groups.forEach((g) => {
+  groups.forEach((g, gi) => {
+    if (gi) el.append('  ·  '); // text-layer separator, same as the breakdown
     const gEl = document.createElement('span');
     gEl.className = 'tally-group';
     if (g.label) {
       const l = document.createElement('span');
       l.className = 'tally-src';
-      l.textContent = g.label;
+      l.textContent = `${g.label} `; // real space: the grouping must survive copy/paste
       gEl.appendChild(l);
     }
     const tally = tallyOutcomes(g.os);
@@ -4175,6 +4176,14 @@ cmdHelpBtn.addEventListener('click', () => {
   cmdHelpBtn.classList.toggle('on', !cmdCheatsheet.classList.contains('hidden'));
 });
 
+// Net state, declared before the first module-scope render calls: paintCmd →
+// renderCmdState reads netOnline whenever the box parses, and renderGroups
+// (further down) reads the roster. Assigned by initNet at the bottom.
+let net = null;         // live connection handle from net.connect (online only)
+let netOnline = false;
+let players = [];
+let poolsOwner = null;  // a player id, or null = your own rack
+
 renderTray();
 paintCmd();
 
@@ -4555,10 +4564,10 @@ document.getElementById('pools-done').addEventListener('click', () => setPoolsEd
 // back. Net state is declared HERE (not in the net section below) because
 // the module-scope renderGroups() boot call already reads the roster.
 // ---------------------------------------------------------------------------
-let net = null;         // live connection handle from net.connect (online only)
-let netOnline = false;
-let players = [];
-let poolsOwner = null;  // a player id, or null = your own rack
+// (net/netOnline/players/poolsOwner are declared further up, before the
+// module-scope renderTray()/paintCmd() boot calls — renderCmdState reads
+// netOnline when the box parses, and a browser restoring the input's text
+// across reload would otherwise hit the TDZ and kill the whole module.)
 
 function poolsOwnerPlayer() {
   return poolsOwner ? players.find((p) => p.id === poolsOwner) || null : null;
@@ -4605,12 +4614,14 @@ let renderedPools = [];
 
 // The switcher row: quiet owner chips (you first), only when a table has
 // teammates. Small windows fold the names away — dots stay (ROADMAP 2b).
-function renderPoolsSwitcher() {
+function buildPoolsSwitcher() {
   const you = net ? net.playerId : null;
   const others = netOnline ? players.filter((p) => p.id !== you) : [];
-  if (!others.length) return;
+  if (!others.length) return null;
   const row = document.createElement('div');
   row.className = 'pools-switcher';
+  row.setAttribute('role', 'group');
+  row.setAttribute('aria-label', 'Whose pools');
   const chip = (label, color, id) => {
     const b = document.createElement('button');
     b.className = 'owner-chip';
@@ -4626,12 +4637,28 @@ function renderPoolsSwitcher() {
     nm.textContent = label;
     b.appendChild(nm);
     b.title = id ? `Browse ${label}'s pools` : 'Your pools';
+    // P2: browsing is a USE verb — gated out of manage mode exactly like
+    // tile staging, so a chip can never silently discard an open editor.
+    b.disabled = poolsEdit;
     b.addEventListener('click', () => setPoolsOwner(id));
     row.appendChild(b);
   };
   chip('You', net ? net.color : null, null);
   for (const p of others) chip(p.name, p.color, p.id);
-  groupsListEl.appendChild(row);
+  return row;
+}
+
+// Roster churn refreshes the SWITCHER without repainting the shelves — a
+// full renderGroups would discard an open tile editor's unsaved text and
+// drop keyboard focus. Only a foreign view (where no editor can exist)
+// re-renders fully, because its banner/validity may have changed.
+function refreshPoolsPresence() {
+  if (poolsOwner) { renderGroups(); return; }
+  const fresh = buildPoolsSwitcher();
+  const old = groupsListEl.querySelector('.pools-switcher');
+  if (old && fresh) old.replaceWith(fresh);
+  else if (old) old.remove();
+  else if (fresh) groupsListEl.insertBefore(fresh, groupsListEl.firstChild);
 }
 
 // A teammate's rack: the standing banner-chip (also the way back), then
@@ -4641,6 +4668,7 @@ function renderForeignPools(owner) {
   const banner = document.createElement('button');
   banner.className = 'pools-owner-banner';
   banner.title = 'Back to your pools';
+  banner.setAttribute('aria-label', `${owner.name}'s pools, read-only — back to your pools`);
   const nm = document.createElement('span');
   nm.className = 'pob-name';
   nm.textContent = `${owner.name}'s pools`;
@@ -4662,7 +4690,7 @@ function renderForeignPools(owner) {
   if (!pools.length) {
     const none = document.createElement('div');
     none.className = 'pools-none';
-    none.textContent = `${owner.name} has not shared any pools yet.`;
+    none.textContent = `${owner.name} has no saved pools yet.`;
     groupsListEl.appendChild(none);
     return;
   }
@@ -4708,7 +4736,8 @@ function renderGroups() {
   renderedPools = [];
   for (const sec of buildSections(groups)) renderedPools.push(...sec.pools);
   if (poolsOwner && !poolsOwnerPlayer()) poolsOwner = null; // the owner left; fall home
-  renderPoolsSwitcher();
+  const switcher = buildPoolsSwitcher();
+  if (switcher) groupsListEl.appendChild(switcher);
   if (poolsOwner) {
     groupsEmptyEl.style.display = 'none';
     renderForeignPools(poolsOwnerPlayer());
@@ -4946,6 +4975,10 @@ function popStateFromParse(res) {
   const named = (m.parts || []).filter((p) => p.label);
   return {
     dice: [...res.spec.dice],
+    // 2b-⑤: pool labels ride the pop state too (parallel to dice, which the
+    // popover never edits) — without this, ± 'Update this pool' silently
+    // STRIPPED [labels] out of a saved pool's own notation.
+    sources: res.spec.sources ? [...res.spec.sources] : null,
     // anonymous remainder + named parts reassemble to mods.modifier/parts
     anon: (m.modifier || 0) - named.reduce((s, p) => s + p.value, 0),
     parts: named.map((p) => ({ ...p })),
@@ -5098,7 +5131,9 @@ function popSpec() {
   if (pop.keep) mods.keep = { mode: pop.keep.mode, n: pop.keep.n };
   if (pop.reroll) mods.reroll = { below: pop.reroll.below, once: true };
   if (pop.explode) mods.explode = true;
-  return { dice: [...pop.dice], mods: Object.keys(mods).length ? mods : null };
+  const spec = { dice: [...pop.dice], mods: Object.keys(mods).length ? mods : null };
+  if (pop.sources) spec.sources = [...pop.sources]; // 2b-⑤ attribution survives ±
+  return spec;
 }
 
 // The edited state as one canonical string — the echo, the Save-as-variant
@@ -6852,7 +6887,8 @@ function handleNetEvent(type, data) {
     case 'hello': // initial state + re-sync after a reconnect
       players = data.players || [];
       renderPlayers();
-      renderGroups(); // roster + published pools resync (owner validity re-checked)
+      refreshPoolsPresence(); // switcher resync; never clobbers an open editor
+      publishPools(); // a silent rejoin minted a fresh (pool-less) seat: re-share
       log = (data.log || []).map(rollToLogEntry);
       renderLog();
       // The join backlog seeds the ≣ unread badge (closed flyout only): a
@@ -6910,7 +6946,7 @@ function handleNetEvent(type, data) {
       if (data.player && !players.some((p) => p.id === data.player.id)) {
         players.push(data.player);
         renderPlayers();
-        renderGroups(); // the owner switcher gains a chip
+        refreshPoolsPresence(); // the owner switcher gains a chip
       }
       break;
     case 'player-left': {
@@ -6920,7 +6956,7 @@ function handleNetEvent(type, data) {
       if (poolsOwner === data.playerId && gone) {
         showSettingsNote(`${gone.name} left \u2014 back to your pools`);
       }
-      renderGroups(); // drops their chip; falls home if we were browsing them
+      refreshPoolsPresence(); // drops their chip; falls home if we were browsing them
       break;
     }
     case 'player-renamed': {
@@ -6928,7 +6964,7 @@ function handleNetEvent(type, data) {
       if (p) {
         p.name = data.name;
         renderPlayers();
-        renderGroups(); // switcher chip + a standing owner banner track names
+        refreshPoolsPresence(); // switcher chip + a standing owner banner track names
       }
       break;
     }

@@ -1271,6 +1271,10 @@ function sanitizePools(value) {
     if (typeof raw.notation !== 'string' || raw.notation.length > MAX_POOL_NOTATION) continue;
     const parsed = parseNotation(raw.notation);
     if (!parsed.ok) continue;
+    // The cap must hold for what is STORED and broadcast: canonicalizing can
+    // grow the string (d% splits into 1d10x[label]+1d10[label] per term), so
+    // a 199-char raw could otherwise store ~440 chars.
+    if (parsed.canonical.length > MAX_POOL_NOTATION) continue;
     const rec = { name: cleanString(raw.name, MAX_NAME) || '', notation: parsed.canonical };
     const cat = cleanString(raw.category, MAX_NAME);
     if (cat) rec.category = cat;
@@ -1290,6 +1294,11 @@ async function handlePools(req, res) {
   const pools = sanitizePools(body.value.pools);
   if (!pools) return sendError(res, 400, `pools must be a list of at most ${MAX_POOLS_PER_PLAYER}`, 'bad_pools');
 
+  // A no-op publish answers ok without re-broadcasting: the client re-shares
+  // on every hello (rejoin safety), and 40 streams need not hear about it.
+  if (JSON.stringify(player.pools) === JSON.stringify(pools)) {
+    return sendJson(res, 200, { ok: true });
+  }
   player.pools = pools;
   log(`pools   room=${room.name} name=${player.name} count=${pools.length}`);
   broadcast(room, 'pools-changed', { playerId: player.id, pools });
@@ -1330,6 +1339,9 @@ async function handleOffer(req, res) {
   // Same rule as a roll's: present only when the offer is dressed up, so an
   // offer card an older client wrote is indistinguishable from one it reads.
   if (spec.exp) offer.exp = spec.exp;
+  // Attribution (2b-⑤) rides the offer too — without this the claimed roll
+  // rendered ungrouped while the same notation rolled directly kept it.
+  if (spec.sources) offer.sources = spec.sources;
   // Present-or-absent for the same reason. An offer has no values yet, so the
   // card itself is public in full — including who the whisper is addressed to
   // (existence is public; results are what visibility hides).
@@ -1380,6 +1392,7 @@ async function handleClaim(req, res) {
   const roll = executeRoll(room, player, {
     dice: offer.dice,
     mods: offer.mods,
+    sources: offer.sources, // 2b-⑤ (undefined when the offer carried none)
     label: offer.label,
     dc: offer.dc === undefined ? null : offer.dc,
     faceDown: offer.faceDown,

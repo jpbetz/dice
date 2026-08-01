@@ -742,6 +742,40 @@ try {
       assert.deepEqual([...okRoll.body.roll.visibility.audience].sort(), [ann.id, hash.id].sort());
     });
   }
+  await t('attribution survives the offer/claim leg (2b-\u2464)', async () => {
+    const room = 'r-sources';
+    const ann = await sit(room, 'Ann');
+    const bob = await sit(room, 'Bob');
+    const direct = await post('/api/roll', { room, playerId: ann.id, notation: '2d8[Wisdom]+1d6[Swords]' });
+    assert.equal(direct.status, 200);
+    assert.deepEqual(direct.body.roll.spec.sources, ['Wisdom', 'Wisdom', 'Swords'],
+      'a direct roll carries its sources');
+    const offer = await post('/api/offer', { room, playerId: ann.id, notation: '2d8[Wisdom]+1d6[Swords]' });
+    assert.equal(offer.status, 200);
+    const claim = await post('/api/claim', { room, playerId: bob.id, offerId: offer.body.offer.offerId });
+    assert.equal(claim.status, 200);
+    assert.deepEqual(claim.body.roll.spec.sources, ['Wisdom', 'Wisdom', 'Swords'],
+      'the claimed roll keeps the same attribution the direct roll had');
+  });
+
+  await t('an unchanged pools publish answers ok without re-broadcasting', async () => {
+    const room = 'r-poolnoop';
+    const ann = await sit(room, 'Ann');
+    const bob = await sit(room, 'Bob');
+    const pools = [{ name: 'Attack', notation: '1d20' }];
+    assert.equal((await post('/api/pools', { room, playerId: ann.id, pools })).status, 200);
+    await bob.sse.waitFor((e) => e.type === 'pools-changed' && e.data.playerId === ann.id,
+      'first publish broadcasts');
+    const before = bob.sse.events.filter((e) => e.type === 'pools-changed').length;
+    assert.equal((await post('/api/pools', { room, playerId: ann.id, pools })).status, 200);
+    // a real change still lands (and proves the no-op above sent nothing first)
+    assert.equal((await post('/api/pools', { room, playerId: ann.id,
+      pools: [{ name: 'Attack', notation: '2d20' }] })).status, 200);
+    await bob.sse.waitFor((e) => e.type === 'pools-changed'
+      && e.data.pools.some((g) => g.notation === '2d20'), 'the real change broadcasts');
+    const after = bob.sse.events.filter((e) => e.type === 'pools-changed').length;
+    assert.equal(after, before + 1, 'the identical re-post broadcast nothing');
+  });
 } finally {
   for (const s of streams) s.close();
   proc.kill();
@@ -771,6 +805,16 @@ await t('sanitizePools: per-entry fail-closed, list cap refused', async () => {
   assert.equal(sanitizePools('nope'), null);
   assert.equal(sanitizePools([{ notation: 'd6'.padEnd(300, ' ') }]).length, 0,
     'an overlong notation is dropped');
+});
+await t('sanitizePools: the cap holds against the STORED canonical too', async () => {
+  // d% with per-term labels canonicalizes to 1d10x[l]+1d10[l] — the string
+  // GROWS. A raw under the cap whose canonical overflows it must drop.
+  const raw = Array.from({ length: 14 }, (_, i) => `d%[aaa${i}]`).join('+');
+  assert.ok(raw.length <= 200, `fixture stays under the raw cap (${raw.length})`);
+  assert.ok(parseNotation(raw).ok && parseNotation(raw).canonical.length > 200,
+    'fixture canonical overflows');
+  assert.equal(sanitizePools([{ name: 'x', notation: raw }]).length, 0,
+    'the growing spelling is dropped, not stored');
 });
 
 if (failed) {

@@ -421,7 +421,7 @@ export const scenarios = [
 
       // the hero tally answers per pool (soul-deal is the default lens)
       const tallySrcs = await a.eval(
-        `[...document.querySelectorAll('#result-meaning .tally-src')].map((el) => el.textContent)`);
+        `[...document.querySelectorAll('#result-meaning .tally-src')].map((el) => el.textContent.trim())`);
       assert.deepEqual(tallySrcs, ['Wisdom', 'Zeal'], `tally grouped by pool (got: ${tallySrcs})`);
       assert.equal(await a.eval(
         `document.querySelectorAll('#result-meaning .tally-group').length`), 3,
@@ -431,6 +431,28 @@ export const scenarios = [
       const logLabels = await a.eval(
         `[...document.querySelectorAll('#log-list .log-detail .log-part-label')].map((el) => el.textContent)`);
       assert.deepEqual(logLabels, ['Wisdom', 'Zeal'], `log grouped by pool (got: ${logLabels})`);
+
+      // the grouping lives in the TEXT layer, not just margins: copy/paste
+      // and screen readers keep the per-pool read
+      const tallyText = await a.eval(`document.getElementById('result-meaning').textContent`);
+      assert.ok(tallyText.includes('Wisdom ') && tallyText.includes('  \u00b7  '),
+        `real separators in the tally text (got: ${JSON.stringify(tallyText)})`);
+
+      // ± Update rewrites a composed pool WITHOUT stripping its [labels]
+      // (regression: popSpec dropped sources, so Update destroyed them)
+      await a.dbg(`setGroups([{name: 'Hunt', notation: '2d8[Wisdom]+1d4[Zeal]'}])`);
+      const hunt = (await a.dbg('groups'))[0];
+      await a.dbg(`openPopoverFor(${JSON.stringify(hunt.id)})`);
+      await a.eval(`(() => {
+        const dc = document.getElementById('pop-dc');
+        dc.value = '12';
+        dc.dispatchEvent(new Event('input'));
+      })()`);
+      await a.eval(`document.getElementById('pop-update').click()`);
+      const upd = (await a.dbg('groups'))[0];
+      assert.ok(upd.notation.includes('[Wisdom]') && upd.notation.includes('[Zeal]')
+        && upd.notation.includes('dc12'),
+        `Update kept the labels beside the tweak (got: ${upd.notation})`);
 
       // a lens switch keeps the grouping and returns the total
       await a.dbg(`setSystem('dnd')`);
@@ -759,6 +781,9 @@ export const scenarios = [
     // the empty draft shows the hint.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      // origins share a profile across scenarios: seed the rack explicitly
+      // (the Save below collides with the seed 'Attack' on purpose)
+      await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
       let ts = await a.dbg('trayState');
       assert.equal(ts.hint, true, 'empty draft shows the hint');
       assert.equal(ts.hasActions, false, 'no contextual controls on an empty draft');
@@ -916,6 +941,8 @@ export const scenarios = [
     // gold roll button. No button ever nests inside a button.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      // origins share a profile across scenarios: seed the rack explicitly
+      await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
 
       // Read-only rest state: tiles, no edit chrome, no gold on the shelf.
       assert.equal(await a.eval(`document.querySelectorAll('#builder-panel .group-edit, #builder-panel .group-del').length`),
@@ -1006,6 +1033,8 @@ export const scenarios = [
     // group' both land on that path; 'Save as variant' stays additive.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      // origins share a profile across scenarios: seed the rack explicitly
+      await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
       const before = await a.dbg('groups');
       const atk = before.find((g) => g.name === 'Attack');
       const dmg = before.find((g) => g.name === 'Damage');
@@ -1135,8 +1164,12 @@ export const scenarios = [
       assert.equal(await b.eval(`document.querySelectorAll('#groups-list .owner-chip').length`), 2,
         'Bob sees two owner chips');
 
-      // Manage mode is yours-only: switching away exits it.
+      // Manage mode is yours-only: the switcher chips gate out (P2, same as
+      // tile staging) so a stray click can never discard an open editor, and
+      // switching away (debug path) exits manage.
       await b.dbg('setPoolsEditMode(true)');
+      assert.equal(await b.eval(`[...document.querySelectorAll('#groups-list .owner-chip')]
+        .every((c) => c.disabled)`), true, 'owner chips are inert inside \u270e');
       await b.dbg(`setPoolsOwner(${JSON.stringify(alice.id)})`);
       assert.equal(await b.dbg('poolsEditMode'), false, 'browsing a teammate leaves manage mode');
 
