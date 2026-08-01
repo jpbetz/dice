@@ -1159,10 +1159,12 @@ export const scenarios = [
       await a.waitFor(`(window.__diceDebug.sim(60), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
         { desc: 'the roll collected itself' });
 
-      // the quick ✕ rides the cluster itself
-      await a.eval(`document.querySelector('.shelf-marker .shelf-x').click()`);
+      // the WHOLE cluster is the one clear target: a plain click sweeps
+      assert.equal(await a.eval(`!!document.querySelector('.shelf-marker .shelf-sweep')`), true,
+        'the sweep dress rides the marker');
+      await a.eval(`document.querySelector('.shelf-marker').click()`);
       await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 0 && window.__diceDebug.shelf.length === 0)`,
-        { desc: 'one click cleared it' });
+        { desc: 'one click on the cluster cleared it' });
 
       // a held roll does NOT tidy itself — the standing tension is the point
       await a.dbg('setAutoCollectMs(120)');
@@ -1171,6 +1173,28 @@ export const scenarios = [
       await a.dbg('sim(60)');
       assert.equal((await a.dbg('shelf')).length, 0, 'a hidden roll stays on the felt');
       assert.ok(await a.diceCount() > 0, 'its dice stand until the reveal');
+    },
+  },
+  {
+    name: 'soul-seed',
+    tags: ['groups'],
+    // The pre-Soul-Deal starter trio (Attack/Damage/Percentile, untouched)
+    // upgrades to the Soul Deal rack on the next boot — it was never the
+    // player's own work. One edit and the rack is theirs: no swap.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
+      const b = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const gs = await b.dbg('groups');
+      assert.equal(gs.length, 11, `the old trio upgraded (got ${gs.length})`);
+      assert.equal(gs[0].name, 'Strength', 'attributes lead the rack');
+      assert.equal(await b.eval(`document.querySelector('#groups-list .pool-sec-head').textContent`),
+        'Attributes', 'the shelves are live');
+
+      // a touched rack is the player's: rename one pool, reboot — no swap
+      await b.dbg(`setGroups([{name: 'MyAttack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
+      const c2 = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      assert.equal((await c2.dbg('groups')).length, 3, 'an edited rack never swaps');
     },
   },
   {

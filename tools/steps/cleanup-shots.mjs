@@ -26,6 +26,8 @@ import { OUT_DIR } from '../stage.mjs';
 export default async function run(stage) {
   const a = await stage.tab('localhost', 'Alice');
   const send = (m, p) => a.page.browser.send(m, p, a.page.sessionId);
+  await send('Emulation.setDeviceMetricsOverride',
+    { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
   const hover = async (sel) => {
     const p = await a.eval(`(() => { const el = document.querySelector(${JSON.stringify(sel)});
       if (!el) return null; const r = el.getBoundingClientRect();

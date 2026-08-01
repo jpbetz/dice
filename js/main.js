@@ -979,8 +979,9 @@ function renderShelfMarkers() {
     // roll spends its life (auto-collect fires on ANYONE's next roll), and
     // the peek renders Reveal for the authority (the server enforces it
     // regardless) — the resting marker stays a quiet dot either way.
-    if (entry && entry.playerName) el.title = `${entry.playerName} · ${entry.label}`;
-    else if (entry) el.title = entry.label;
+    if (entry && entry.playerName) el.title = `${entry.playerName} · ${entry.label} — click to clear`;
+    else if (entry) el.title = `${entry.label} — click to clear`;
+    else el.title = 'Click to clear this roll for everyone';
     // Peek (§7.7.1): hover opens after the intent delay (desktop); a tap — or
     // a click anywhere that is not one of the marker's own buttons — toggles.
     el.addEventListener('pointerenter', (ev) => {
@@ -989,22 +990,30 @@ function renderShelfMarkers() {
     el.addEventListener('pointerleave', (ev) => {
       if (ev.pointerType === 'mouse') schedulePeekClose();
     });
+    // ONE big clear target (2026-08-01, take two): the WHOLE cluster is
+    // the removal click — hover dresses it with a full-size ✕ promise
+    // while the peek card opens alongside for the detail (its own buttons
+    // keep the non-destructive verbs). Touch has no hover to announce the
+    // sweep, so a tap keeps its reading verb: it toggles the peek, whose
+    // front-and-center ✕ is the big clear target there. §7.7 lets ANYONE
+    // tidy a collected roll; the server still enforces that.
+    let ptrType = 'mouse';
+    el.addEventListener('pointerdown', (ev) => { ptrType = ev.pointerType || 'mouse'; });
     el.addEventListener('click', (ev) => {
       const t = ev.target;
       if (t instanceof HTMLElement && t.closest('button')) return;
-      if (peekRollId === c.rollId) closePeek();
-      else openPeek(c.rollId);
+      if (ptrType === 'touch') {
+        if (peekRollId === c.rollId) closePeek();
+        else openPeek(c.rollId);
+        return;
+      }
+      requestClearRoll(c.rollId);
     });
-    // The quick ✕ (2026-08-01, Joe): clearing a collected roll is one hover
-    // + one click on the cluster itself — no peek transit. Bottom corner,
-    // away from where the peek card unfolds; §7.7 lets ANYONE tidy a
-    // collected roll, and the server still enforces that.
-    const x = document.createElement('button');
-    x.className = 'shelf-x';
-    x.textContent = '✕';
-    x.title = 'Clear this roll for everyone';
-    x.addEventListener('click', () => requestClearRoll(c.rollId));
-    el.appendChild(x);
+    const sweep = document.createElement('span');
+    sweep.className = 'shelf-sweep';
+    sweep.setAttribute('aria-hidden', 'true');
+    sweep.textContent = '✕';
+    el.appendChild(sweep);
     c.markerEl = el;
     shelfLayer.appendChild(el);
   }
@@ -3359,10 +3368,10 @@ window.__diceDebug = {
       .filter((el) => !el.classList.contains('chip-clearing'))
       .map((el) => ({
         rollId: el.dataset.rollId || null,
-        // bare = nothing VISIBLE at rest: the quick ✕ is hover-revealed
-        // chrome (opacity 0 until approach, same tier as every .die-x),
-        // so it does not count against the quiet-marker contract.
-        bare: [...el.children].every((ch) => ch.classList.contains('shelf-x')),
+        // bare = nothing VISIBLE at rest: the sweep dress is hover-revealed
+        // chrome (opacity 0 until approach), so it does not count against
+        // the quiet-marker contract.
+        bare: [...el.children].every((ch) => ch.classList.contains('shelf-sweep')),
         text: [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(''),
         hasTotal: !!el.querySelector('.sm-total'),
         hasX: !!el.querySelector('.sm-x'),
@@ -4279,13 +4288,13 @@ function migrateGroup(g, i) {
 }
 
 let groups = groupsFromLocation() || load(LS_GROUPS, null);
-if (!groups) {
-  // The Soul Deal starting rack (Joe, 2026-08-01): the nine attributes in
-  // their Physical/Mental/Social triads (offense/defense/utility), one
-  // skill, one motivation — a fresh seat can stage attribute+skill+
-  // motivation and roll ('1 2 3 Enter' territory). Everything starts at
-  // d6 (Senchléithe); the ✎ editor is the advancement path.
-  groups = [
+// The Soul Deal starting rack (Joe, 2026-08-01): the nine attributes in
+// their Physical/Mental/Social triads (offense/defense/utility), one
+// skill, one motivation — a fresh seat can stage attribute+skill+
+// motivation and roll ('1 2 3 Enter' territory). Everything starts at
+// d6 (Senchléithe); the ✎ editor is the advancement path.
+function defaultGroups() {
+  return [
     { id: 1, name: 'Strength', notation: '1d6', category: 'Attributes' },
     { id: 2, name: 'Toughness', notation: '1d6', category: 'Attributes' },
     { id: 3, name: 'Agility', notation: '1d6', category: 'Attributes' },
@@ -4299,7 +4308,22 @@ if (!groups) {
     { id: 11, name: 'Peer Respect', notation: '1d6', category: 'Motivations' },
   ];
 }
+if (!groups) groups = defaultGroups();
 groups = (Array.isArray(groups) ? groups : []).map(migrateGroup).filter(Boolean);
+
+// Seed upgrade (2026-08-01): a rack that is EXACTLY the pre-Soul-Deal
+// starter set — Attack/Damage/Percentile, untouched, uncategorized — was
+// never the player's own work, so it swaps for the Soul Deal starting rack
+// instead of blocking it forever (defaults otherwise only seed EMPTY
+// storage, and the address bar's #g= re-persists the old trio on every
+// visit). One edit to any of the three and the rack is theirs: no swap.
+// (Runs after migrate so it catches the storage AND the #g= link path.)
+{
+  const oldSeed = [['Attack', '1d20'], ['Damage', '3d4'], ['Percentile', 'd100']];
+  const untouched = groups.length === 3 && groups.every((g, i) =>
+    g.name === oldSeed[i][0] && g.notation === oldSeed[i][1] && !g.category);
+  if (untouched) groups = defaultGroups();
+}
 
 // Reflect the groups into the address bar, degrading to storage-only if the
 // codec refuses them. encodeURIComponent throws URIError on text no URL can
