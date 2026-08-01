@@ -174,10 +174,10 @@ export const scenarios = [
   {
     name: 'shelf-actions',
     tags: ['shelf'],
-    // A shelved roll stays actionable from its peek: ⟳ rolls the SAME dice
-    // again — the shelved cluster clears as part of the reroll (a pool is
-    // how you mint a copy) — and ± pulls it into the New pool draft
-    // (command box + popover) for an ad-hoc tweak, dc/mods/comment intact.
+    // A shelved roll stays actionable: the peek's ROLL strip rolls the SAME
+    // dice again — the shelved cluster clears as part of the reroll (a pool
+    // is how you mint a copy) — and RIGHT-CLICK on the cluster opens the
+    // tweak popover, dc/mods/comment intact (the card ± retired 2026-08-01).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.dbg(`setSystem('dnd')`); // dc verdicts are totals-world (solo: applies instantly)
@@ -190,8 +190,9 @@ export const scenarios = [
       );
       assert.equal(await a.dbg(`peek(${JSON.stringify(rid)})`), rid, 'peek opens');
       const ps = await a.dbg('peekState');
-      assert.equal(ps.hasAgain, true, 'the peek carries ⟳');
-      assert.equal(ps.hasTweak, true, 'and ±');
+      assert.equal(ps.hasAgain, true, 'the peek carries the ROLL strip');
+      assert.equal(ps.hasTweak, false, 'the card ± is retired');
+      assert.equal(ps.hasClear, true, 'the ✕ matches the banner card');
 
       // ⟳ REPLACES: the old cluster leaves the shelf, the same spec rolls.
       await a.eval(`document.querySelector('#peek-card .pk-again').click()`);
@@ -212,7 +213,8 @@ export const scenarios = [
         { desc: 'the reroll shelves for the ± leg' },
       );
       assert.equal(await a.dbg(`peek(${JSON.stringify(rid2)})`), rid2, 'peek opens on the reroll');
-      await a.eval(`document.querySelector('#peek-card .pk-tweak').click()`);
+      await a.eval(`document.querySelector('.shelf-marker')
+        .dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true}))`);
       const pop = await a.dbg('popover');
       assert.ok(pop && pop.open, '± opens the ± popover IN PLACE');
       assert.equal(pop.source, 'shelf', 'bound to the shelved roll, no teleport');
@@ -225,7 +227,8 @@ export const scenarios = [
       assert.ok((await a.dbg('peekState')) !== null, 'the peek survives that Esc');
 
       // Rolling a tweak from the shelf popover REPLACES the shelved roll.
-      await a.eval(`document.querySelector('#peek-card .pk-tweak').click()`);
+      await a.eval(`document.querySelector('.shelf-marker')
+        .dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true}))`);
       const logN = await a.logCount();
       await a.eval(`document.getElementById('pop-roll').click()`);
       await a.waitFor(
@@ -349,9 +352,10 @@ export const scenarios = [
     name: 'ceremony-retire',
     tags: ['roll', 'ceremony'],
     // A check roll's verdict card times out into the plain-roll banner: the
-    // dice still on the felt keep Done (the standing keep verb) and the
-    // revealed-tier clear-✕ (the card's auto-dismiss used to strand them
-    // with no affordance at all).
+    // dice still on the felt keep the ONE card action set — the ROLL ❯❯❯
+    // strip and the clear-✕, both revealed-tier (the card's auto-dismiss
+    // used to strand them with no affordance at all; Done itself retired
+    // 2026-08-01 — auto-collect owns the idle path).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.dbg(`commandRoll('d20 check dc10')`);
@@ -360,11 +364,13 @@ export const scenarios = [
         { desc: 'verdict staged' },
       );
       assert.equal(await a.dbg('retireCeremony()'), true, 'the card retires into the banner');
-      assert.ok(await a.eval(
-        `[...document.querySelectorAll('#banner-actions .banner-btn')].some((b) => b.textContent === 'Done')`,
-      ), 'Done survives the ceremony (the standing keep verb)');
+      assert.ok(!(await a.eval(
+        `[...document.querySelectorAll('#banner-actions button')].some((b) => b.textContent === 'Done')`,
+      )), 'Done is retired — auto-collect owns the idle path');
+      assert.ok(await a.eval(`!!document.querySelector('#banner-actions .pk-strip.reveal-tier')`),
+        'the ROLL strip waits in the revealed tier');
       assert.ok(await a.eval(`!!document.querySelector('#banner-actions .reveal-tier .clear-x')`),
-        'and the clear-✕ waits in the revealed tier');
+        'and the clear-✕ beside it');
       const rid = await a.rollId();
       assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, 'collect accepted');
       await a.waitFor(

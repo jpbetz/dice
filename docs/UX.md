@@ -1429,9 +1429,21 @@ stands on coarse pointers) — draft management is not part of the roll.
 the shelf ~6s after it settles (hovering the banner holds the clock — you
 are reading; Enter keeps it now, Esc sweeps; hidden rolls stand until
 their reveal — the tension is the point; spectators never collect for the
-roller). The banner's Done joins the revealed tier — at rest the banner
-is pure result. The shelf cluster answers with a hover ✕ on the marker
-itself: one click clears a collected roll, no peek transit. (4) The
+roller). ONE RESULT CARD (Joe: 'why are the options any different at
+all?'): the banner and the shelf peek offer the identical action set via
+one builder (appendCardActions) — at rest pure result; approach reveals
+the bare ROLL ❯❯❯ strip and ✕, standing on coarse pointers; Reveal alone
+stands, only while a hidden roll awaits its authority; Done is RETIRED
+(auto-collect owns the idle path) and the card ± with it — the tweak
+popover is right-click on the cluster, its marker, or the card, the same
+pointer bonus as tiles. Deliberate asymmetries: the peek's reroll REPLACES
+its shelved cluster while the banner's lets the old roll shelve itself on
+arrival, and the banner ✕ role-splits (roller clears for everyone, a
+spectator dismisses their own card) where the peek's ✕ is §7.7
+housekeeping for anyone. The collected cluster itself stays the ONE big
+felt-side clear target — click sweeps it, hover dresses the whole circle
+with the ✕ promise (never a second smaller target for the same verb).
+(4) The
 default rack is the Soul Deal starting set: nine attributes in their
 Physical/Mental/Social triads (Strength/Toughness/Agility ·
 Wit/Wisdom/Intelligence · Charm/Will/Empathy), one skill (Sword), one

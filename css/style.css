@@ -1471,7 +1471,7 @@ body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
 .pk-breakdown .crit-max { color: var(--gold-bright); font-weight: 700; }
 .pk-breakdown .crit-min { color: var(--red); font-weight: 700; }
 .pk-actions { margin-top: 6px; display: flex; justify-content: center; gap: 6px; }
-.pk-tweak { min-width: 26px; }
+/* .pk-tweak retired 2026-08-01 — the tweak path is right-click (cluster/card) */
 
 /* ---------- the unified 'clear this roll' ✕ (P1, cross-cutting) ---------- */
 /* One gesture, one look, one sentence — every result surface's revealed
@@ -1534,12 +1534,18 @@ body.mini .pk-breakdown { font-size: 10px; }
 .banner-row { display: flex; gap: 8px; justify-content: center; }
 .banner-foot { display: flex; gap: 8px; justify-content: center; margin-top: 0; }
 .banner-btn { pointer-events: auto; font-size: 13px; padding: 5px 16px; }
-.reveal-tier { opacity: 0; transition: opacity 0.12s; }
+/* One tier, every result card (2026-08-01): the banner, the verdict card
+   and the shelf peek reveal the SAME options on approach. Invisible must
+   mean inert — pointer-events gates with the opacity so a rest-state card
+   can never be clicked into rolling or clearing by accident. */
+.reveal-tier { opacity: 0; pointer-events: none; transition: opacity 0.12s; }
 #result-banner:hover .reveal-tier,
 #result-banner:focus-within .reveal-tier,
 #verdict-card:hover .reveal-tier,
-#verdict-card:focus-within .reveal-tier { opacity: 1; }
-@media (pointer: coarse) { .reveal-tier { opacity: 1; } }
+#verdict-card:focus-within .reveal-tier,
+#peek-card:hover .reveal-tier,
+#peek-card:focus-within .reveal-tier { opacity: 1; pointer-events: auto; }
+@media (pointer: coarse) { .reveal-tier { opacity: 1; pointer-events: auto; } }
 /* an EMPTY revealed row must not hold a gap open at rest */
 .reveal-tier:empty { display: none; }
 #verdict-done.mine { font-weight: 700; border-color: rgba(212, 175, 55, 0.5); }
