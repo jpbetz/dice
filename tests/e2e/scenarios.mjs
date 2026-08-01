@@ -1309,6 +1309,55 @@ export const scenarios = [
       assert.equal((await a.dbg('groups')).length, gs.length, 'Esc minted nothing');
       assert.equal(await a.dbg('creatingShelf'), null, 'the card closed');
 
+      // a rank tap must NOT wipe the draft below the hairline (regression:
+      // stripCommit reseeded pop wholesale and blanked a mid-typed dc)
+      await a.dbg(`poolPopoverOpen(${JSON.stringify(damage.id)})`);
+      await a.eval(`(() => {
+        const dc = document.getElementById('pop-dc');
+        dc.value = '15';
+        dc.dispatchEvent(new Event('input'));
+      })()`);
+      await a.eval(`document.querySelector('#pop-identity .pid-rank[data-die="d12"]').click()`);
+      assert.equal(await a.eval(`document.getElementById('pop-dc').value`), '15',
+        'the mid-typed dc survives a rank tap');
+      assert.equal((await a.dbg('groups')).find((g) => g.id === damage.id).notation, '3d12',
+        'and the rank still landed');
+      await a.dbg('closePopover()');
+
+      // the ghost's REAL click path (not just the hook): card opens, typed
+      // name survives an unrelated repaint, click-away keeps a typed card
+      await a.eval(`[...document.querySelectorAll('#groups-list .pool-grid')]
+        .map((g) => g.querySelector('.ghost-add')).filter(Boolean)[1].click()`);
+      assert.ok(await a.dbg('creatingShelf'), 'the ghost click opens its card');
+      await a.eval(`(() => {
+        const i = document.querySelector('#groups-list .cc-name');
+        i.value = 'Stealth';
+        i.dispatchEvent(new Event('input'));
+      })()`);
+      await a.dbg('renderGroups()'); // any repaint (pools-changed, manage toggle…)
+      assert.equal(await a.eval(`document.querySelector('#groups-list .cc-name').value`), 'Stealth',
+        'a typed name survives a repaint');
+      await a.eval(`document.getElementById('scene-container').dispatchEvent(
+        new PointerEvent('pointerdown', {bubbles: true}))`);
+      await new Promise((r) => setTimeout(r, 50));
+      assert.ok(await a.dbg('creatingShelf'), 'click-away KEEPS a typed card (commit stays explicit)');
+      await a.eval(`document.querySelector('#groups-list .cc-cancel').click()`);
+
+      // click-away DISCARDS an untouched card silently
+      await a.dbg(`openCreation('motivations')`);
+      await a.eval(`document.getElementById('scene-container').dispatchEvent(
+        new PointerEvent('pointerdown', {bubbles: true}))`);
+      await new Promise((r) => setTimeout(r, 50));
+      assert.equal(await a.dbg('creatingShelf'), null, 'an untouched card discards on click-away');
+
+      // deleting a pool in manage mode closes its open strip
+      await a.dbg(`poolPopoverOpen(${JSON.stringify(claws.id)})`);
+      await a.dbg('setPoolsEditMode(true)');
+      await a.dbg(`poolPopoverOpen(${JSON.stringify(claws.id)})`);
+      await a.eval(`document.querySelector('#groups-list [data-group-id="${claws.id}"] .tile-del').click()`);
+      assert.equal(await a.dbg('popover'), null, 'the strip closes with its pool');
+      await a.dbg('setPoolsEditMode(false)');
+
       // the save morph lands a composed draft on a shelf via chips
       await a.eval(`document.querySelectorAll('#die-buttons .die-btn')[1].click()`);
       await a.eval(`document.getElementById('save-group').click()`);
@@ -1322,6 +1371,38 @@ export const scenarios = [
       const glory = (await a.dbg('groups')).find((g) => g.name === 'Glory');
       assert.equal(glory && glory.category, 'Motivations', 'the save morph chips set the shelf');
       await a.eval(`document.getElementById('clear-tray').click()`);
+    },
+  },
+  {
+    name: 'sheet-touch',
+    tags: ['groups'],
+    // The 500ms hold door: a touch hold opens the pool popover and the
+    // synthetic click that follows is suppressed (never a stage); a hold
+    // over an already-open popover suppresses too (regression: it staged).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setGroups([{name: 'Claws', notation: '1d6', category: 'Attributes'}])`);
+      const press = async () => {
+        await a.eval(`(() => {
+          const t = document.querySelector('#groups-list .pool-tile:not(.ghost) .tile-stage');
+          t.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, pointerType: 'touch', clientX: 10, clientY: 10}));
+        })()`);
+        await new Promise((r) => setTimeout(r, 620));
+        await a.eval(`(() => {
+          const t = document.querySelector('#groups-list .pool-tile:not(.ghost) .tile-stage');
+          t.dispatchEvent(new PointerEvent('pointerup', {bubbles: true, pointerType: 'touch', clientX: 10, clientY: 10}));
+          t.click();
+        })()`);
+      };
+      await press();
+      assert.ok(await a.dbg('stripState'), 'the hold opened the strip');
+      assert.deepEqual((await a.dbg('trayState')).dice, [], 'and the synthetic click never staged');
+      await press(); // popover already open: still no stage-through
+      assert.deepEqual((await a.dbg('trayState')).dice, [], 'a hold over the open popover stays a no-op');
+      await a.dbg('closePopover()');
+      // a real tap (no hold) still stages
+      await a.eval(`document.querySelector('#groups-list .pool-tile:not(.ghost) .tile-stage').click()`);
+      assert.ok((await a.dbg('trayState')).dice.length > 0, 'a plain tap still stages');
     },
   },
   {

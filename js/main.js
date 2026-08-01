@@ -3434,6 +3434,7 @@ window.__diceDebug = {
   get autoCollectMs() { return autoCollectMs; },
   setAutoCollectMs(ms) { autoCollectMs = Math.max(0, ms | 0); return autoCollectMs; },
   // the Sheet Pass (2026-08-01): drive the identity strip + ghost tiles
+  renderGroups() { renderGroups(); return true; }, // an arbitrary repaint, for repaint-survival checks
   poolPopoverOpen(id) {
     const g = groups.find((x) => x.id === id);
     if (!g) return false;
@@ -4348,7 +4349,7 @@ function saveGroups() {
 saveGroups();
 
 const groupsListEl = document.getElementById('groups-list');
-const groupsEmptyEl = document.getElementById('groups-empty');
+// #groups-empty retired with the Sheet Pass: ghost tiles ARE the empty state.
 
 // Load a group's notation into the command box (UX §1.4) — a compose aid;
 // changing the record itself is the inline row editor's job (✎).
@@ -4635,6 +4636,7 @@ function poolsOwnerPlayer() {
 
 function setPoolsOwner(id) {
   poolsOwner = id || null;
+  if (poolsOwner) { creatingShelf = null; creationDraft = { name: '', chosen: 'd6', touched: false }; }
   if (poolsOwner && poolsEdit) { setPoolsEdit(false); return; } // manage is yours-only; renders
   renderGroups();
 }
@@ -4683,6 +4685,10 @@ let renderedPools = [];
 // The Sheet Pass ghost tiles: which shelf's creation card is open (a
 // section KEY, one at a time — like editingGroupId for the notation card).
 let creatingShelf = null;
+// the card's fields live HERE, not in the closure: any renderGroups (a
+// pools-changed, a manage toggle, a strip write) rebuilds the card and a
+// typed name must survive the repaint (fleet catch)
+let creationDraft = { name: '', chosen: 'd6', touched: false };
 const SHELF_NOUN = { attributes: 'attribute', skills: 'skill', motivations: 'motivation' };
 
 // A ghost '+' cell ends every shelf on YOUR rack: creation happens where
@@ -4707,7 +4713,15 @@ function buildGhostTile(sec) {
   nounEl.textContent = noun;
   b.append(plus, nounEl);
   b.addEventListener('click', () => {
+    // a ghost tapped in the transient hover flyout PROMOTES to the pinned
+    // panel, exactly like a stage from it — a hover surface is not a
+    // place to type a name (fleet catch)
+    if (groupsPanelEl.classList.contains('flyout')) {
+      closeGroupsFlyout();
+      setPanel('pools', true);
+    }
     creatingShelf = sec.key;
+    creationDraft = { name: '', chosen: 'd6', touched: false };
     renderGroups();
     const input = groupsListEl.querySelector('.cc-name');
     if (input) input.focus();
@@ -4724,8 +4738,6 @@ function buildCreationCard(sec) {
   const card = document.createElement('div');
   card.className = 'group-row editing tile-editor creation-card';
   const noun = SHELF_NOUN[sec.key] || 'pool';
-  let chosen = 'd6';
-  let touched = false;
 
   const input = document.createElement('input');
   input.className = 'cc-name';
@@ -4733,6 +4745,8 @@ function buildCreationCard(sec) {
   input.maxLength = 24;
   input.autocomplete = 'off';
   input.placeholder = `Name this ${noun}…`;
+  input.value = creationDraft.name; // survives repaints
+  input.addEventListener('input', () => { creationDraft.name = input.value; });
 
   const ladder = document.createElement('div');
   ladder.className = 'pid-die cc-die';
@@ -4742,12 +4756,12 @@ function buildCreationCard(sec) {
       const b = document.createElement('button');
       b.className = 'pid-rank';
       b.dataset.die = type;
-      b.setAttribute('aria-pressed', String(type === chosen));
+      b.setAttribute('aria-pressed', String(type === creationDraft.chosen));
       b.title = `1${type}`;
       b.appendChild(buildDieStrip([type], 1));
       b.addEventListener('click', () => {
-        chosen = type;
-        touched = true;
+        creationDraft.chosen = type;
+        creationDraft.touched = true;
         paintLadder();
       });
       ladder.appendChild(b);
@@ -4756,15 +4770,18 @@ function buildCreationCard(sec) {
   paintLadder();
 
   const mint = () => {
-    const rec = { id: Date.now(), name: cutText(input.value, 24), notation: `1${chosen}` };
+    if (groups.length >= 40) { discard(); return; } // the ghost's cap, re-checked at commit
+    const rec = { id: Date.now(), name: cutText(input.value, 24), notation: `1${creationDraft.chosen}` };
     if (sec.key !== '\u0000') rec.category = sec.label;
     groups.push(rec);
     creatingShelf = null;
+    creationDraft = { name: '', chosen: 'd6', touched: false };
     saveGroups();
     renderGroups();
   };
   const discard = () => {
     creatingShelf = null;
+    creationDraft = { name: '', chosen: 'd6', touched: false };
     renderGroups();
   };
 
@@ -4797,9 +4814,14 @@ function buildCreationCard(sec) {
         return;
       }
       if (card.contains(ev.target)) return;
-      if (!input.value.trim() && !touched) {
+      if (!input.value.trim() && !creationDraft.touched) {
         document.removeEventListener('pointerdown', away, true);
-        discard();
+        // deferred: the pointer may be landing on ANOTHER shelf's ghost —
+        // discarding synchronously would detach it before its click
+        // dispatches (fleet catch); the re-check keeps one discard honest
+        setTimeout(() => {
+          if (creatingShelf === sec.key && !creationDraft.name.trim() && !creationDraft.touched) discard();
+        }, 0);
       }
     };
     document.addEventListener('pointerdown', away, true);
@@ -4939,11 +4961,9 @@ function renderGroups() {
   const switcher = buildPoolsSwitcher();
   if (switcher) groupsListEl.appendChild(switcher);
   if (poolsOwner) {
-    groupsEmptyEl.style.display = 'none';
     renderForeignPools(poolsOwnerPlayer());
     return;
   }
-  groupsEmptyEl.style.display = 'none'; // ghosts are the empty-state affordance
   let ownOrd = 0;
   for (const sec of buildSections(groups, { ensureTrio: true })) {
     const head = document.createElement('div');
@@ -5016,11 +5036,11 @@ function renderGroups() {
       let lpTimer = null;
       let lpFired = false;
       stage.addEventListener('pointerdown', (ev) => {
+        lpFired = false; // ANY new press resets the suppressor (touch→mouse handoff)
+        clearTimeout(lpTimer);
         if (ev.pointerType !== 'touch') return;
         const x0 = ev.clientX;
         const y0 = ev.clientY;
-        lpFired = false;
-        clearTimeout(lpTimer);
         const cancel = () => {
           clearTimeout(lpTimer);
           stage.removeEventListener('pointermove', onMove);
@@ -5030,8 +5050,10 @@ function renderGroups() {
         };
         lpTimer = setTimeout(() => {
           cancel();
+          lpFired = true; // the synthetic click is suppressed EITHER way —
+          // a long-press over an already-open popover must not fall
+          // through to staging (fleet catch)
           if (pop && pop.source === 'group' && pop.groupId === g.id) return;
-          lpFired = true;
           togglePopover(g, tile);
         }, 500);
         stage.addEventListener('pointermove', onMove);
@@ -5046,6 +5068,7 @@ function renderGroups() {
       // (Update-this-pool / variants), same pointer bonus as the cluster.
       tile.addEventListener('contextmenu', (e) => {
         e.preventDefault();
+        clearTimeout(lpTimer); // Android fires this first — one door wins
         if (pop && pop.source === 'group' && pop.groupId === g.id) return; // long-press won
         togglePopover(g, tile);
       });
@@ -5379,14 +5402,14 @@ function stripCommit(patch) {
   pop.name = updated.name || updated.notation;
   popNameEl.textContent = pop.name;
   if (patch.notation !== undefined) {
+    // A rank tap changes THE DICE and nothing else: the roll-tweak draft
+    // below the hairline (a dc mid-typed, a comment, adv) is the user's
+    // uncommitted work — reseeding pop wholesale silently wiped it (the
+    // review fleet caught it). The ladder only exists for pure NdX pools,
+    // so swapping pop.dice is the whole truthful delta.
     const res = parseNotation(updated.notation);
     if (res.ok) {
-      const keep = { source: pop.source, groupId: pop.groupId, shelfRollId: pop.shelfRollId, name: pop.name, row: pop.row };
-      pop = { ...keep, ...popStateFromParse(res) };
-      if (pop.dc != null && !pop.expKind) pop.expKind = 'check';
-      popDcInput.value = pop.dc == null ? '' : String(pop.dc);
-      popCommentInput.value = pop.comment || '';
-      popExpSubtitle.value = pop.expSubtitle;
+      pop.dice = [...res.spec.dice];
       renderPop();
     }
   }
@@ -5405,7 +5428,6 @@ function renderPopIdentity() {
   document.getElementById('pop-name').classList.toggle('hidden', !!g); // the strip's name row takes over
   popIdentityEl.textContent = '';
   if (!g) return;
-  const stop = (el) => el.addEventListener('keydown', (e) => e.stopPropagation());
 
   // Row 1 — NAME: display type; click morphs to the save-morph input
   // grammar (Enter commits, Esc reverts, blur commits a CHANGED name).
@@ -5432,7 +5454,10 @@ function renderPopIdentity() {
       else if (e.key === 'Escape') revert();
     });
     input.addEventListener('blur', () => {
-      (input.value !== (g.name || '') ? commit : revert)();
+      // deferred one tick: the pointerdown that blurred us may be a chip or
+      // ladder tap — rebuilding the strip synchronously would detach its
+      // target before the click dispatches (fleet catch). Both writes land.
+      setTimeout(() => { (input.value !== (g.name || '') ? commit : revert)(); }, 0);
     });
     nameRow.replaceChild(input, nameBtn);
     input.focus();
@@ -5485,7 +5510,7 @@ function renderPopIdentity() {
       if (e.key === 'Enter') commit();
       else if (e.key === 'Escape') { done = true; renderPopIdentity(); }
     });
-    input.addEventListener('blur', commit);
+    input.addEventListener('blur', () => setTimeout(commit, 0));
     cats.replaceChild(input, plus);
     input.focus();
   });
@@ -5541,7 +5566,6 @@ function renderPopIdentity() {
     dieRow.append(editBtn, draftBtn);
   }
   popIdentityEl.appendChild(dieRow);
-  stop(popIdentityEl);
 }
 
 function closePopover() {
@@ -6042,9 +6066,13 @@ function popSaveConfirm() {
   if (validateMods(spec.dice, spec.mods)) return;
   const canonical = popCanonical();
   const name = cutText(popSaveName.value, 24); // '' = unnamed pool
+  const vbase = groups.find((x) => x.id === pop.groupId); // before closePopover nulls pop
   closePopSaveMorph();
   closePopover();
-  groups.push({ id: Date.now(), name, notation: canonical }); // additive, always
+  // one save flow: a variant lands on ITS pool's shelf (the compose morph's
+  // chips do the same job; dropping the category was drift — fleet catch)
+  groups.push({ id: Date.now(), name, notation: canonical,
+    ...(vbase && vbase.category ? { category: vbase.category } : {}) }); // additive, always
   saveGroups();
   renderGroups();
 }

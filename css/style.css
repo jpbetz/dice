@@ -867,10 +867,12 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* manage is NEVER gold (gold = the roll verb alone): the pressed ✎
+   matches its own ivory 'editing your rack' bar */
 #pools-edit[aria-pressed="true"] {
-  color: var(--gold-bright);
-  border-color: rgba(212, 175, 55, 0.55);
-  background: rgba(212, 175, 55, 0.14);
+  color: var(--ivory);
+  border-color: rgba(243, 234, 215, 0.45);
+  background: rgba(243, 234, 215, 0.1);
 }
 .group-name {
   font-family: var(--font-display);
