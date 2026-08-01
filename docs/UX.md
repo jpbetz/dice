@@ -1465,16 +1465,27 @@ ring never gold, fail-closed to pure NdX notations so a dc12 can never be
 dropped); below the hairline the unchanged roll-tweak draft. Complex
 pools swap the ladder for their canonical echo plus two quiet doors:
 'Edit notation…' (the card, slimmed to notation-only) and 'Open in
-draft'. (2) A GHOST '+' tile ends every shelf on YOUR rack (trio shelves
-stand even empty); tapping it opens a creation card in place — name, d6
-pre-lit ladder, ✓/✕ — and the NEWBORN CONTRACT holds: nothing exists
-until Enter/✓, so a stray tap is provably free; the shelf you tapped IS
-the category, never typed. The save morph gains the same shelf chips.
-Manage mode slims to the DESTRUCTIVE gate it always wanted to be: a
-full-width standing 'EDITING YOUR RACK' bar, grown 24px ✕ overlays, the
-per-tile ✎ retired. CUJ arithmetic: add a skill = ghost tap + type +
-Enter; advance Wisdom = right-click + face tap; rename = right-click +
-name tap + type. No CUJ touches manage mode.
+draft'. (2) Creation is an EDITING verb (amended same day, Joe): at rest the
+panel is pure play — populated shelves only, zero edit chrome. Inside ✎
+every shelf (the trio always, plus any session shelf) ends in a GHOST
+'+' tile; tapping it opens a creation card in place that COMPOSES like
+the palette — the six faces ADD a die per tap (d6 pre-staged), the
+growing pool previews as grouped units, tapping a unit removes one, and
+the NEWBORN CONTRACT holds: nothing exists until Enter/✓; the shelf you
+tapped IS the category, never typed. '＋ New shelf…' below the last shelf
+mints a session shelf that materializes when its first pool lands and
+evaporates on Done otherwise. (3-amended) THE GATE ITSELF GREW (Joe: the
+tiny header ✎ was the real complaint): the toggle is now a full-width
+quiet '✎ Edit pools' row at the rack's FOOT — P6 verbatim, management
+stands BELOW — which morphs into the ivory 'EDITING POOLS · Done' bar
+when on; the header ✎ is retired, and so is Copy link (the address bar
+IS the pools link; reflectGroupsToUrl keeps #g= current). The save morph
+keeps its shelf chips. Manage mode remains the destructive gate: grown
+24px ✕ overlays, whole-tile-opens-editor, per-tile ✎ retired. CUJ
+arithmetic: advance Wisdom = right-click + face tap; rename = right-click
++ name tap + type (both at REST); add a skill = Edit pools + ghost tap +
+type + Enter. The chrome word is 'pools', never 'rack' (terminology-
+pinned).
 
 **The tier rule (P6, the binding sharpening).** Treatments bind CONTROL
 TIERS, not screens: content stands (dice, names, totals); roll-adjacent

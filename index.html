@@ -48,8 +48,6 @@ limitations under the License.
     <div class="panel side-panel" id="builder-panel">
       <div class="panel-head" id="head-compose" title="Show/hide — key: n">
         <span class="ph-label">Pools</span>
-        <button id="pools-edit" class="btn tiny ghost" aria-pressed="false"
-                title="Edit pools — rename · delete · copy link">✎</button>
         <span class="ph-chev" aria-hidden="true"></span>
       </div>
       <div class="panel-body">
@@ -150,12 +148,17 @@ limitations under the License.
            lives at the roll moment); ✎ gates manage overlays + the toolbar
            (P2/P4). Section headers render from categories in renderGroups —
            sticky, so the current shelf stays named mid-scroll. -->
-      <div id="pools-toolbar" class="hidden">
-        <span class="pt-label">Editing your rack</span>
-        <button id="copy-link" class="btn tiny ghost" title="Copy a URL that restores these pools anywhere">Copy link</button>
+      <div id="groups-list"></div>
+      <!-- ONE morphing bar at the rack's FOOT (P6: management stands
+           BELOW; the too-small header ✎ is retired — grow the target,
+           never hide it in chrome). At rest: the full-width quiet
+           '✎ Edit rack' toggle. Active: the ivory EDITING bar. -->
+      <div id="pools-toolbar">
+        <button id="pools-edit" class="pt-toggle" aria-pressed="false"
+                title="Edit pools — add · edit · delete">✎ Edit pools</button>
+        <span class="pt-label">Editing pools</span>
         <button id="pools-done" class="btn tiny ghost">Done</button>
       </div>
-      <div id="groups-list"></div>
       </div>
     </div>
   </aside>

@@ -953,8 +953,10 @@ export const scenarios = [
       // Read-only rest state: tiles, no edit chrome, no gold on the shelf.
       assert.equal(await a.eval(`document.querySelectorAll('#builder-panel .group-edit, #builder-panel .group-del').length`),
         0, 'no per-tile edit chrome at rest');
-      assert.equal(await a.eval(`document.getElementById('pools-toolbar').classList.contains('hidden')`),
-        true, 'no toolbar (incl. copy-link) at rest');
+      assert.equal(await a.eval(`!!document.getElementById('copy-link')`), false,
+        'copy-link is retired — the address bar IS the pools link');
+      assert.ok(await a.eval(`document.getElementById('pools-edit').offsetHeight > 20`),
+        'the Edit pools toggle stands full-width at the rack foot');
       assert.ok(await a.eval(`document.querySelectorAll('#groups-list .tile-stage').length >= 3`),
         'every pool is a stage tile');
       assert.equal(await a.eval(`document.querySelectorAll('#groups-list .roll-cue').length`),
@@ -1020,10 +1022,10 @@ export const scenarios = [
         0, 'no per-tile pencils anywhere');
       assert.ok(await a.eval(`document.querySelectorAll('#builder-panel .tile-del').length >= 3`),
         'the destructive ✕ overlays stand');
-      assert.equal(await a.eval(`document.getElementById('pools-toolbar').classList.contains('hidden')`),
-        false, 'the standing bar appears');
-      assert.ok(await a.eval(`!!document.querySelector('#pools-toolbar #copy-link')`),
-        'copy-link lives in the manage bar');
+      assert.equal(await a.eval(`document.getElementById('pools-toolbar').classList.contains('on')`),
+        true, 'the bar morphs into its EDITING dress');
+      assert.equal(await a.eval(`getComputedStyle(document.getElementById('pools-edit')).display`),
+        'none', 'the toggle yields to the bar');
       await a.eval(`document.querySelector('#groups-list .pool-tile:not(.ghost) .tile-stage').click()`);
       assert.deepEqual((await a.dbg('trayState')).dice, [], 'a manage-mode tile tap never stages');
       assert.ok(await a.dbg('stripState'), 'it opens the identity strip instead');
@@ -1236,13 +1238,73 @@ export const scenarios = [
       const damage = gs0.find((g) => g.name === 'Damage');
       const hunt = gs0.find((g) => g.name === 'Hunt');
 
-      // trio shelves stand even when empty — each with its ghost tile
-      const heads = await a.eval(`[...document.querySelectorAll('.pool-sec-head')].map((h) => h.textContent)`);
+      // rest state is pure play: only populated shelves, no ghosts
+      let heads = await a.eval(`[...document.querySelectorAll('.pool-sec-head')].map((h) => h.textContent)`);
+      assert.deepEqual(heads, ['Attributes', 'Pools'], `rest shows populated shelves only (got: ${heads})`);
+      assert.equal(await a.eval(`document.querySelectorAll('#groups-list .pool-tile.ghost').length`),
+        0, 'no ghost tiles at rest');
+
+      // ✎ opens the sheet: trio shelves stand (even empty), each with its ghost
+      await a.dbg('setPoolsEditMode(true)');
+      heads = await a.eval(`[...document.querySelectorAll('.pool-sec-head')].map((h) => h.textContent)`);
       for (const want of ['Attributes', 'Skills', 'Motivations', 'Pools']) {
-        assert.ok(heads.includes(want), `the ${want} shelf stands (got: ${heads})`);
+        assert.ok(heads.includes(want), `editing shows the ${want} shelf (got: ${heads})`);
       }
       assert.ok(await a.eval(`document.querySelectorAll('#groups-list .pool-tile.ghost').length >= 4`),
         'every shelf ends in a ghost + tile');
+
+      // '＋ New shelf…' mints a session shelf; its ghost mints the pool that
+      // makes it real; unused shelves evaporate on Done
+      await a.eval(`document.querySelector('.new-shelf-row .new-shelf').click()`);
+      await a.eval(`(() => {
+        const i = document.querySelector('.new-shelf-input');
+        i.value = 'Spells';
+        i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+      })()`);
+      heads = await a.eval(`[...document.querySelectorAll('.pool-sec-head')].map((h) => h.textContent)`);
+      assert.ok(heads.includes('Spells'), `the new shelf stands (got: ${heads})`);
+      await a.dbg(`openCreation('spells')`);
+      await a.eval(`(() => {
+        const i = document.querySelector('#groups-list .cc-name');
+        i.value = 'Firebolt';
+        i.dispatchEvent(new Event('input'));
+        i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+      })()`);
+      const firebolt = (await a.dbg('groups')).find((g) => g.name === 'Firebolt');
+      assert.equal(firebolt && firebolt.category, 'Spells', 'the shelf ghost minted onto the new shelf');
+
+      // the card COMPOSES like the palette: taps add, the preview removes
+      await a.dbg(`openCreation('spells')`);
+      await a.eval(`document.querySelector('#groups-list .cc-die .pid-rank[data-die="d6"]').click()`);
+      await a.eval(`document.querySelector('#groups-list .cc-die .pid-rank[data-die="d8"]').click()`);
+      await a.eval(`(() => {
+        const i = document.querySelector('#groups-list .cc-name');
+        i.value = 'Blast';
+        i.dispatchEvent(new Event('input'));
+        i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+      })()`);
+      const blast = (await a.dbg('groups')).find((g) => g.name === 'Blast');
+      assert.equal(blast && blast.notation, '2d6+1d8',
+        `taps ADD dice — a multi-die pool mints in one card (got: ${blast && blast.notation})`);
+      await a.dbg('setPoolsEditMode(true)'); // minting exits nothing — but the Done below expects ✎ on
+      await a.dbg(`openCreation('spells')`);
+      await a.eval(`document.querySelector('#groups-list .cc-pool .cc-unit').click()`);
+      assert.equal(await a.eval(`document.querySelectorAll('#groups-list .cc-pool .cc-unit').length`), 0,
+        'tapping a preview unit removes it (empty pools cannot mint)');
+      await a.eval(`document.querySelector('#groups-list .cc-cancel').click()`);
+      await a.dbg('setPoolsEditMode(false)');
+      heads = await a.eval(`[...document.querySelectorAll('.pool-sec-head')].map((h) => h.textContent)`);
+      assert.ok(heads.includes('Spells'), 'a shelf with a pool persists past Done');
+      await a.dbg('setPoolsEditMode(true)');
+      await a.eval(`document.querySelector('.new-shelf-row .new-shelf').click()`);
+      await a.eval(`(() => {
+        const i = document.querySelector('.new-shelf-input');
+        i.value = 'Empty';
+        i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+      })()`);
+      await a.dbg('setPoolsEditMode(false)');
+      heads = await a.eval(`[...document.querySelectorAll('.pool-sec-head')].map((h) => h.textContent)`);
+      assert.ok(!heads.includes('Empty'), 'an unused session shelf evaporates on Done');
 
       // CUJ rename: two gestures — open the strip, click the name, type.
       assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify(claws.id)})`), true, 'the strip opens');
@@ -1253,8 +1315,9 @@ export const scenarios = [
         i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
       })()`);
       let gs = await a.dbg('groups');
+      const nBefore = gs.length;
       assert.equal(gs.find((g) => g.id === claws.id).name, 'Fangs', 'renamed in place');
-      assert.equal(gs.length, 3, 'no fork');
+      assert.equal(gs.length, nBefore, 'no fork');
       assert.ok(await a.dbg('stripState'), 'the popover survives the rename');
 
       // CUJ advancement: tap the next die face — count preserved, popover
@@ -1290,7 +1353,8 @@ export const scenarios = [
         'tapping the pressed chip demotes to the plain shelf');
       await a.dbg('closePopover()');
 
-      // CUJ add-a-skill: ghost tap + type + Enter; the shelf IS the category
+      // CUJ add-a-skill: ✎ → ghost tap + type + Enter; the shelf IS the category
+      await a.dbg('setPoolsEditMode(true)');
       await a.dbg(`openCreation('skills')`);
       await a.eval(`(() => {
         const i = document.querySelector('#groups-list .cc-name');
@@ -1308,6 +1372,7 @@ export const scenarios = [
         .dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))`);
       assert.equal((await a.dbg('groups')).length, gs.length, 'Esc minted nothing');
       assert.equal(await a.dbg('creatingShelf'), null, 'the card closed');
+      await a.dbg('setPoolsEditMode(false)');
 
       // a rank tap must NOT wipe the draft below the hairline (regression:
       // stripCommit reseeded pop wholesale and blanked a mid-typed dc)
@@ -1326,6 +1391,7 @@ export const scenarios = [
 
       // the ghost's REAL click path (not just the hook): card opens, typed
       // name survives an unrelated repaint, click-away keeps a typed card
+      await a.dbg('setPoolsEditMode(true)');
       await a.eval(`[...document.querySelectorAll('#groups-list .pool-grid')]
         .map((g) => g.querySelector('.ghost-add')).filter(Boolean)[1].click()`);
       assert.ok(await a.dbg('creatingShelf'), 'the ghost click opens its card');
@@ -1349,6 +1415,7 @@ export const scenarios = [
         new PointerEvent('pointerdown', {bubbles: true}))`);
       await new Promise((r) => setTimeout(r, 50));
       assert.equal(await a.dbg('creatingShelf'), null, 'an untouched card discards on click-away');
+      await a.dbg('setPoolsEditMode(false)');
 
       // deleting a pool in manage mode closes its open strip
       await a.dbg(`poolPopoverOpen(${JSON.stringify(claws.id)})`);
@@ -1507,6 +1574,10 @@ export const scenarios = [
         'Name this pool…', 'the save field names a pool');
       assert.equal(await a.eval(`document.getElementById('pop-update').textContent`),
         'Update this pool', 'the popover updates a pool');
+      assert.equal(await a.eval(`document.getElementById('pools-edit').textContent.trim()`),
+        '✎ Edit pools', "the manage toggle speaks 'pools' (never 'rack')");
+      assert.ok(!(await a.eval(`document.body.innerText.toLowerCase().includes('rack')`)),
+        "no visible chrome says 'rack'");
       // The delete affordance exists only in manage mode now (P2) — enter it
       // so the sweep still reads the word a player would actually see.
       await a.dbg('setPoolsEditMode(true)');

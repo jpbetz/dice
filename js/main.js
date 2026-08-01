@@ -4609,9 +4609,14 @@ let poolsEdit = false;
 function setPoolsEdit(on) {
   poolsEdit = !!on;
   if (poolsEdit) poolsOwner = null; // ✎ manages YOUR rack — fall home first
-  if (!poolsEdit) editingGroupId = null; // leaving manage mode closes any open editor
+  if (!poolsEdit) {
+    editingGroupId = null; // leaving manage mode closes any open editor
+    creatingShelf = null;  // …and the creation card
+    creationDraft = { name: '', dice: ['d6'], touched: false };
+    draftShelves = [];     // unused session shelves evaporate (pools persist theirs)
+  }
   document.getElementById('pools-edit').setAttribute('aria-pressed', String(poolsEdit));
-  document.getElementById('pools-toolbar').classList.toggle('hidden', !poolsEdit);
+  document.getElementById('pools-toolbar').classList.toggle('on', poolsEdit);
   renderGroups();
 }
 document.getElementById('pools-edit').addEventListener('click', () => setPoolsEdit(!poolsEdit));
@@ -4636,7 +4641,7 @@ function poolsOwnerPlayer() {
 
 function setPoolsOwner(id) {
   poolsOwner = id || null;
-  if (poolsOwner) { creatingShelf = null; creationDraft = { name: '', chosen: 'd6', touched: false }; }
+  if (poolsOwner) { creatingShelf = null; creationDraft = { name: '', dice: ['d6'], touched: false }; }
   if (poolsOwner && poolsEdit) { setPoolsEdit(false); return; } // manage is yours-only; renders
   renderGroups();
 }
@@ -4671,6 +4676,10 @@ function buildSections(list, { ensureTrio = false } = {}) {
     for (const k of TRIO) {
       if (!secs.has(k)) secs.set(k, { key: k, label: TRIO_LABELS[k], pools: [] });
     }
+    for (const name of draftShelves) {
+      const k = name.trim().toLowerCase();
+      if (k && !secs.has(k)) secs.set(k, { key: k, label: name.trim(), pools: [] });
+    }
   }
   return [...secs.values()].sort((a, b) => {
     const rank = (s) => (s.key === '\u0000' ? 2 : TRIO.includes(s.key) ? 0 : 1);
@@ -4685,10 +4694,15 @@ let renderedPools = [];
 // The Sheet Pass ghost tiles: which shelf's creation card is open (a
 // section KEY, one at a time — like editingGroupId for the notation card).
 let creatingShelf = null;
+// Shelves minted this editing session ('＋ New shelf'): they render empty
+// (with their ghost tile) while ✎ is on, materialize for real when a pool
+// lands on them, and evaporate on Done otherwise — shelves-with-pools stay
+// the only persistent truth (the codec's present-or-absent category model).
+let draftShelves = [];
 // the card's fields live HERE, not in the closure: any renderGroups (a
 // pools-changed, a manage toggle, a strip write) rebuilds the card and a
 // typed name must survive the repaint (fleet catch)
-let creationDraft = { name: '', chosen: 'd6', touched: false };
+let creationDraft = { name: '', dice: ['d6'], touched: false };
 const SHELF_NOUN = { attributes: 'attribute', skills: 'skill', motivations: 'motivation' };
 
 // A ghost '+' cell ends every shelf on YOUR rack: creation happens where
@@ -4721,7 +4735,7 @@ function buildGhostTile(sec) {
       setPanel('pools', true);
     }
     creatingShelf = sec.key;
-    creationDraft = { name: '', chosen: 'd6', touched: false };
+    creationDraft = { name: '', dice: ['d6'], touched: false };
     renderGroups();
     const input = groupsListEl.querySelector('.cc-name');
     if (input) input.focus();
@@ -4748,40 +4762,83 @@ function buildCreationCard(sec) {
   input.value = creationDraft.name; // survives repaints
   input.addEventListener('input', () => { creationDraft.name = input.value; });
 
+  // The card composes like the palette (Joe, 2026-08-01: multi-die pools
+  // are common): the six faces ADD a die per tap; the growing pool renders
+  // as grouped units, and tapping a unit removes one of that type. d6
+  // comes pre-staged — the common case stays name+Enter.
   const ladder = document.createElement('div');
   ladder.className = 'pid-die cc-die';
+  const pool = document.createElement('div');
+  pool.className = 'cc-pool';
+  const paintPool = () => {
+    pool.textContent = '';
+    const counts = new Map();
+    for (const t of creationDraft.dice) counts.set(t, (counts.get(t) || 0) + 1);
+    for (const type of RANK_LADDER) {
+      if (!counts.has(type)) continue;
+      const n = counts.get(type);
+      const u = document.createElement('button');
+      u.className = 'cc-unit';
+      u.title = `Remove one ${type}`;
+      u.appendChild(buildDieStrip([type], 1));
+      if (n > 1) {
+        const x = document.createElement('span');
+        x.className = 'pid-count';
+        x.textContent = `×${n}`;
+        u.appendChild(x);
+      }
+      u.addEventListener('click', () => {
+        const i = creationDraft.dice.indexOf(type);
+        if (i >= 0) creationDraft.dice.splice(i, 1);
+        creationDraft.touched = true;
+        paintPool();
+      });
+      pool.appendChild(u);
+    }
+    if (!creationDraft.dice.length) {
+      const hint = document.createElement('span');
+      hint.className = 'cc-empty';
+      hint.textContent = 'add dice below';
+      pool.appendChild(hint);
+    }
+  };
   const paintLadder = () => {
     ladder.textContent = '';
     for (const type of RANK_LADDER) {
       const b = document.createElement('button');
       b.className = 'pid-rank';
       b.dataset.die = type;
-      b.setAttribute('aria-pressed', String(type === creationDraft.chosen));
-      b.title = `1${type}`;
+      b.title = `Add a ${type}`;
       b.appendChild(buildDieStrip([type], 1));
       b.addEventListener('click', () => {
-        creationDraft.chosen = type;
+        if (creationDraft.dice.length >= MAX_DICE_ON_TABLE) return;
+        creationDraft.dice.push(type);
         creationDraft.touched = true;
-        paintLadder();
+        paintPool();
       });
       ladder.appendChild(b);
     }
   };
+  paintPool();
   paintLadder();
 
   const mint = () => {
-    if (groups.length >= 40) { discard(); return; } // the ghost's cap, re-checked at commit
-    const rec = { id: Date.now(), name: cutText(input.value, 24), notation: `1${creationDraft.chosen}` };
+    if (groups.length >= 40 || !creationDraft.dice.length) return; // cap + an empty pool cannot mint
+    const counts = new Map();
+    for (const t of creationDraft.dice) counts.set(t, (counts.get(t) || 0) + 1);
+    const notation = RANK_LADDER.filter((t) => counts.has(t))
+      .map((t) => `${counts.get(t)}${t}`).join('+'); // die order = the canonical spelling
+    const rec = { id: Date.now(), name: cutText(input.value, 24), notation };
     if (sec.key !== '\u0000') rec.category = sec.label;
     groups.push(rec);
     creatingShelf = null;
-    creationDraft = { name: '', chosen: 'd6', touched: false };
+    creationDraft = { name: '', dice: ['d6'], touched: false };
     saveGroups();
     renderGroups();
   };
   const discard = () => {
     creatingShelf = null;
-    creationDraft = { name: '', chosen: 'd6', touched: false };
+    creationDraft = { name: '', dice: ['d6'], touched: false };
     renderGroups();
   };
 
@@ -4830,7 +4887,7 @@ function buildCreationCard(sec) {
   const row = document.createElement('div');
   row.className = 'cc-row';
   row.append(input, ok, no);
-  card.append(row, ladder);
+  card.append(row, pool, ladder);
   return card;
 }
 
@@ -4960,12 +5017,13 @@ function renderGroups() {
   if (poolsOwner && !poolsOwnerPlayer()) poolsOwner = null; // the owner left; fall home
   const switcher = buildPoolsSwitcher();
   if (switcher) groupsListEl.appendChild(switcher);
+  document.getElementById('pools-toolbar').classList.toggle('hidden', !!poolsOwner);
   if (poolsOwner) {
     renderForeignPools(poolsOwnerPlayer());
     return;
   }
   let ownOrd = 0;
-  for (const sec of buildSections(groups, { ensureTrio: true })) {
+  for (const sec of buildSections(groups, { ensureTrio: poolsEdit })) {
     const head = document.createElement('div');
     head.className = 'plabel pool-sec-head';
     head.textContent = sec.label;
@@ -5095,10 +5153,55 @@ function renderGroups() {
         pop.row = tile;
       }
     }
-    if (creatingShelf === sec.key) grid.appendChild(buildCreationCard(sec));
-    else grid.appendChild(buildGhostTile(sec));
+    if (poolsEdit) {
+      // creation is an EDITING verb (Joe, 2026-08-01): ghosts and the
+      // card render only inside ✎ — the rest state is pure play
+      if (creatingShelf === sec.key) grid.appendChild(buildCreationCard(sec));
+      else grid.appendChild(buildGhostTile(sec));
+    }
     groupsListEl.appendChild(grid);
   }
+  if (poolsEdit) groupsListEl.appendChild(buildNewShelfRow());
+}
+
+// '＋ New shelf…' — the rack-level twin of the strip's ＋ chip: a full-width
+// dashed row after the last shelf, edit mode only. Enter mints a session
+// shelf (see draftShelves); its ghost tile then mints the first pool.
+function buildNewShelfRow() {
+  const row = document.createElement('div');
+  row.className = 'new-shelf-row';
+  const b = document.createElement('button');
+  b.className = 'pt-toggle new-shelf';
+  b.textContent = '＋ New shelf…';
+  b.title = 'Add a category of pools';
+  b.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.className = 'new-shelf-input';
+    input.type = 'text';
+    input.maxLength = 24;
+    input.autocomplete = 'off';
+    input.placeholder = 'Name the shelf…';
+    let done = false;
+    const commit = () => {
+      if (done) return; done = true;
+      const name = cutText(input.value, 24);
+      const k = name.toLowerCase();
+      const taken = TRIO.includes(k) || draftShelves.some((n) => n.toLowerCase() === k)
+        || groups.some((g) => (g.category || '').trim().toLowerCase() === k);
+      if (name && !taken) draftShelves.push(name);
+      renderGroups();
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') commit();
+      else if (e.key === 'Escape') { done = true; renderGroups(); }
+    });
+    input.addEventListener('blur', () => setTimeout(commit, 0));
+    row.replaceChild(input, b);
+    input.focus();
+  });
+  row.appendChild(b);
+  return row;
 }
 renderGroups();
 
@@ -5185,19 +5288,9 @@ groupNameInput.addEventListener('keydown', (e) => {
   else if (e.key === 'Escape') closeSaveMorph();
 });
 
-// Copy a bookmarkable URL that carries the current groups in its hash.
-document.getElementById('copy-link').addEventListener('click', async (e) => {
-  reflectGroupsToUrl(); // a codec refusal must not eat the click
-  const btn = e.currentTarget;
-  try {
-    await navigator.clipboard.writeText(window.location.href);
-    btn.textContent = 'Copied!';
-  } catch {
-    window.prompt('Copy this link to save your pools:', window.location.href);
-    btn.textContent = 'Link';
-  }
-  setTimeout(() => { btn.textContent = 'Copy link'; }, 1500);
-});
+// Copy-link retired (2026-08-01, Joe: too much going on): the address bar
+// IS the pools link — reflectGroupsToUrl keeps #g= current on every save,
+// so sharing a rack is copying the URL, same as sharing anything else.
 
 // ---------------------------------------------------------------------------
 // ± popover (docs/mockups/panel.html): per-group modifier + attributed parts,

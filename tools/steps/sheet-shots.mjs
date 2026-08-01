@@ -40,17 +40,17 @@ export default async function run(stage) {
   await beat();
   console.log(await stage.shot(a, join(OUT_DIR, 'sheet-strip.png')));
 
-  // the creation card on the Skills shelf
+  // editing mode: ghosts on every shelf, the EDITING bar, ＋ New shelf row
   await a.dbg('closePopover()');
-  await a.dbg(`openCreation('skills')`);
-  await a.eval(`(() => { const i = document.querySelector('#groups-list .cc-name');
-    i.value = 'Archery'; })()`);
-  await beat();
-  console.log(await stage.shot(a, join(OUT_DIR, 'sheet-create.png')));
-
-  // manage mode: the standing bar + grown ✕s, no pencils
-  await a.eval(`document.querySelector('#groups-list .cc-cancel').click()`);
   await a.dbg('setPoolsEditMode(true)');
   await beat();
   console.log(await stage.shot(a, join(OUT_DIR, 'sheet-manage.png')));
+
+  // the creation card on the Skills shelf (compose: taps add dice)
+  await a.dbg(`openCreation('skills')`);
+  await a.eval(`(() => { const i = document.querySelector('#groups-list .cc-name');
+    i.value = 'Archery'; i.dispatchEvent(new Event('input')); })()`);
+  await a.eval(`document.querySelector('#groups-list .cc-die .pid-rank[data-die="d8"]').click()`);
+  await beat();
+  console.log(await stage.shot(a, join(OUT_DIR, 'sheet-create.png')));
 }

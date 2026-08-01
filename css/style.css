@@ -744,7 +744,29 @@ html, body {
   .ghost-add .ghost-plus { opacity: 0.6; }
   .ghost-add .ghost-noun { opacity: 0.7; }
 }
-/* the creation card spans its shelf; the ladder reuses .pid-rank */
+/* the creation card spans its shelf; adders reuse .pid-rank and the
+   growing pool previews as removable grouped units */
+.creation-card .cc-pool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+  margin-top: 6px;
+}
+.cc-unit {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 5px;
+  border: 1px solid rgba(243, 234, 215, 0.35);
+  border-radius: 8px;
+  background: rgba(243, 234, 215, 0.05);
+  cursor: pointer;
+}
+.cc-unit .die-art { width: 24px; height: 24px; }
+.cc-unit:hover { border-color: var(--red); background: rgba(226, 73, 59, 0.12); }
+.cc-empty { font-size: 11px; font-style: italic; color: var(--muted); }
 .creation-card .cc-row { display: flex; gap: 6px; align-items: center; }
 .creation-card .cc-name { flex: 1; min-width: 0; }
 .creation-card .cc-ok, .creation-card .cc-cancel { flex: none; width: 38px; }
@@ -843,20 +865,54 @@ html, body {
 }
 
 /* manage-mode toolbar: copy-link (demoted here, P4) + Done */
-/* manage mode's standing bar (the Sheet Pass): full-width, ivory, never
-   gold — the unmissable frame that says the rack is in its editing state */
-#pools-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 2px 0 8px;
+/* ONE morphing bar at the rack's foot (P6: management stands BELOW; Joe:
+   the tiny header ✎ was too small to even notice — grow the target). At
+   rest it IS the full-width quiet '✎ Edit pools' toggle; active it is the
+   ivory EDITING bar. Never gold. */
+#pools-toolbar { display: flex; align-items: center; gap: 8px; margin: 10px 0 2px; }
+#pools-toolbar.hidden { display: none; }
+#pools-toolbar .btn { margin-left: 0; }
+/* .pt-toggle is the quiet dashed row dress — the Edit pools toggle AND the
+   '＋ New shelf…' row wear it (the latter lives inside #groups-list, so the
+   class is global; scoping it under the toolbar left that row unstyled) */
+.pt-toggle {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px dashed var(--hair);
+  border-radius: 8px;
+  background: none;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: center;
+}
+.pt-toggle:hover {
+  color: var(--ivory);
+  border-color: rgba(243, 234, 215, 0.35);
+  background: rgba(243, 234, 215, 0.04);
+}
+#pools-toolbar.on {
   padding: 5px 8px;
   border: 1px solid rgba(243, 234, 215, 0.28);
   border-radius: 8px;
   background: rgba(243, 234, 215, 0.05);
 }
-#pools-toolbar.hidden { display: none; }
-#pools-toolbar .btn { margin-left: 0; }
+#pools-toolbar.on .pt-toggle,
+#pools-toolbar:not(.on) .pt-label,
+#pools-toolbar:not(.on) #pools-done { display: none; }
+/* '＋ New shelf…' reuses the toggle's quiet dashed dress, inside the list */
+.new-shelf-row { margin: 10px 0 2px; display: flex; }
+.new-shelf-row .new-shelf { flex: 1; }
+.new-shelf-input {
+  flex: 1;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  color: var(--ivory);
+  font-size: 12px;
+}
 #pools-toolbar .pt-label {
   flex: 1;
   font-size: 10px;
@@ -867,13 +923,8 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* manage is NEVER gold (gold = the roll verb alone): the pressed ✎
-   matches its own ivory 'editing your rack' bar */
-#pools-edit[aria-pressed="true"] {
-  color: var(--ivory);
-  border-color: rgba(243, 234, 215, 0.45);
-  background: rgba(243, 234, 215, 0.1);
-}
+/* (the pressed-✎ dress retired with the header ✎: the bar's .on state IS
+   the pressed look — 'Editing pools', ivory, never gold) */
 .group-name {
   font-family: var(--font-display);
   font-size: 14px;
