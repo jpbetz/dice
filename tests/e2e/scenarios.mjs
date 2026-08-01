@@ -923,7 +923,7 @@ export const scenarios = [
         const r = document.querySelector('#builder-panel .panel-body').getBoundingClientRect();
         return r.width > 0 && r.height > 0;
       })()`), 'the flyout renders the shelves');
-      await a.eval(`document.querySelector('#groups-list .tile-stage').click()`);
+      await a.eval(`document.querySelector('#groups-list .pool-tile:not(.ghost) .tile-stage').click()`);
       assert.ok((await a.dbg('trayState')).dice.length > 0, 'the tile staged from the flyout');
       assert.equal(await a.dbg('groupsFlyout'), false, 'the flyout retired itself');
       assert.equal((await a.dbg('panelState')).pools, true,
@@ -964,7 +964,7 @@ export const scenarios = [
 
       // A tile STAGES (quiet, local); the draft cluster rolls.
       const logBefore = await a.logCount();
-      await a.eval(`document.querySelector('#groups-list .tile-stage').click()`);
+      await a.eval(`document.querySelector('#groups-list .pool-tile:not(.ghost) .tile-stage').click()`);
       let ts = await a.dbg('trayState');
       assert.ok(ts.dice.length > 0, 'the tile poured its dice into the draft');
       assert.ok(ts.sources.some(Boolean), 'staged dice carry their source pool');
@@ -988,7 +988,7 @@ export const scenarios = [
       // path now (tweaking otherwise lives on the staged draft's ±).
       assert.equal(await a.eval(`document.querySelectorAll('#groups-list .tile-mods').length`), 0,
         'no ± corner on tiles');
-      await a.eval(`document.querySelector('#groups-list .pool-tile')
+      await a.eval(`document.querySelector('#groups-list .pool-tile:not(.ghost)')
         .dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true}))`);
       const pop = await a.dbg('popover');
       assert.ok(pop && pop.open && pop.source === 'group', 'right-click opens the popover on the pool');
@@ -1011,16 +1011,23 @@ export const scenarios = [
       await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
       assert.deepEqual((await a.dbg('trayState')).dice, [], 'Esc clears the staged draft first');
 
-      // Manage mode: overlays appear, tiles disarm, digits still stage.
+      // Manage mode (the Sheet Pass): the ✎ pencils are RETIRED — the ✕
+      // stands (what the gate is for), the standing bar frames the state,
+      // and tapping a whole tile opens its editor popover instead of
+      // staging. Digits still stage.
       assert.equal(await a.dbg('setPoolsEditMode(true)'), true, '✎ enters manage mode');
-      assert.ok(await a.eval(`document.querySelectorAll('#builder-panel .group-edit').length >= 3`),
-        'per-tile pencils appear');
+      assert.equal(await a.eval(`document.querySelectorAll('#builder-panel .group-edit, #builder-panel .tile-edit').length`),
+        0, 'no per-tile pencils anywhere');
+      assert.ok(await a.eval(`document.querySelectorAll('#builder-panel .tile-del').length >= 3`),
+        'the destructive ✕ overlays stand');
       assert.equal(await a.eval(`document.getElementById('pools-toolbar').classList.contains('hidden')`),
-        false, 'the toolbar appears');
+        false, 'the standing bar appears');
       assert.ok(await a.eval(`!!document.querySelector('#pools-toolbar #copy-link')`),
-        'copy-link lives in the manage toolbar');
-      assert.equal(await a.eval(`document.querySelector('#groups-list .tile-stage').disabled`),
-        true, 'tiles disarm in manage mode (anti-misclick, not a lock)');
+        'copy-link lives in the manage bar');
+      await a.eval(`document.querySelector('#groups-list .pool-tile:not(.ghost) .tile-stage').click()`);
+      assert.deepEqual((await a.dbg('trayState')).dice, [], 'a manage-mode tile tap never stages');
+      assert.ok(await a.dbg('stripState'), 'it opens the identity strip instead');
+      await a.dbg('closePopover()');
       await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: '1'}))`);
       assert.ok((await a.dbg('trayState')).dice.length > 0, 'digits still stage in manage mode');
       await a.eval(`document.getElementById('clear-tray').click()`);
@@ -1070,31 +1077,39 @@ export const scenarios = [
       assert.equal(up && up.notation, '2d8', 'an unnamed group updates in place');
       assert.equal((await a.dbg('groups')).length, before.length, 'still no duplicate');
 
-      // The inline row editor: ✎ manage mode first (read-only at rest is
-      // pools-quick's business; here we just enter it), then pencil →
-      // fields → Update writes by id.
-      await a.dbg('setPoolsEditMode(true)');
-      await a.eval(`document.querySelector('#groups-list [data-group-id="${atk.id}"] .group-edit').click()`);
-      assert.equal(await a.eval(`document.querySelector('#groups-list .group-row.editing .ge-name').value`),
-        'Strike', 'the editor opens on the record');
+      // The Sheet Pass: renaming lives on the popover's identity strip;
+      // the slimmed card owns NOTATION only, reached via 'Edit notation…'.
+      assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify(atk.id)})`), true, 'strip opens');
+      await a.eval(`document.querySelector('#pop-identity .pid-name').click()`);
       await a.eval(`(() => {
-        const name = document.querySelector('#groups-list .ge-name');
+        const i = document.querySelector('#pop-identity .pid-name-input');
+        i.value = 'Alpha Strike';
+        i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+      })()`);
+      gs = await a.dbg('groups');
+      assert.equal(gs.find((g) => g.id === atk.id).name, 'Alpha Strike', 'the strip renamed in place');
+      assert.equal(gs.length, before.length, 'and forked nothing');
+      // 'Strike' is 1d20+5 — complex, so the strip offers the notation door
+      await a.eval(`[...document.querySelectorAll('#pop-identity .pid-ghost-verb')]
+        .find((b) => b.textContent.startsWith('Edit notation')).click()`);
+      await a.eval(`(() => {
         const notation = document.querySelector('#groups-list .ge-notation');
-        name.value = 'Alpha Strike';
         notation.value = '3d8+2';
         notation.dispatchEvent(new Event('input'));
         document.querySelector('#groups-list .ge-update').click();
       })()`);
       gs = await a.dbg('groups');
       const edited = gs.find((g) => g.id === atk.id);
-      assert.equal(edited.name, 'Alpha Strike', 'editor renamed the record in place');
-      assert.equal(edited.notation, '3d8+2', 'editor rewrote the notation');
-      assert.equal(gs.length, before.length, 'and forked nothing');
-      assert.equal(await a.eval(`!!document.querySelector('#groups-list .group-row.editing')`), false, 'editor closed');
+      assert.equal(edited.name, 'Alpha Strike', 'the rename survived');
+      assert.equal(edited.notation, '3d8+2', 'the card rewrote the notation');
+      assert.equal(gs.length, before.length, 'still no fork');
+      assert.equal(await a.eval(`!!document.querySelector('#groups-list .group-row.editing')`), false, 'card closed');
 
-      // A notation that doesn't parse pins the editor open, Update dead;
+      // A notation that doesn't parse pins the card open, Update dead;
       // Cancel reverts.
-      await a.eval(`document.querySelector('#groups-list [data-group-id="${atk.id}"] .group-edit').click()`);
+      await a.dbg(`poolPopoverOpen(${JSON.stringify(atk.id)})`);
+      await a.eval(`[...document.querySelectorAll('#pop-identity .pid-ghost-verb')]
+        .find((b) => b.textContent.startsWith('Edit notation')).click()`);
       await a.eval(`(() => {
         const notation = document.querySelector('#groups-list .ge-notation');
         notation.value = 'not dice';
@@ -1204,6 +1219,112 @@ export const scenarios = [
     },
   },
   {
+    name: 'sheet-pass',
+    tags: ['smoke', 'groups'],
+    // THE SHEET PASS (2026-08-01): the rack is the character sheet. The
+    // pool popover's identity strip renames, re-shelves and re-ranks in
+    // place (by id, instantly); ghost '+' tiles mint pools ON their shelf;
+    // the rank ladder fails closed for complex notations; the save morph
+    // lands a draft on a shelf via chips.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setGroups([{name: 'Claws', notation: '1d6', category: 'Attributes'},
+        {name: 'Damage', notation: '3d4'},
+        {name: 'Hunt', notation: '2d8[Wisdom]+1d4[Zeal] dc12'}])`);
+      const gs0 = await a.dbg('groups');
+      const claws = gs0.find((g) => g.name === 'Claws');
+      const damage = gs0.find((g) => g.name === 'Damage');
+      const hunt = gs0.find((g) => g.name === 'Hunt');
+
+      // trio shelves stand even when empty — each with its ghost tile
+      const heads = await a.eval(`[...document.querySelectorAll('.pool-sec-head')].map((h) => h.textContent)`);
+      for (const want of ['Attributes', 'Skills', 'Motivations', 'Pools']) {
+        assert.ok(heads.includes(want), `the ${want} shelf stands (got: ${heads})`);
+      }
+      assert.ok(await a.eval(`document.querySelectorAll('#groups-list .pool-tile.ghost').length >= 4`),
+        'every shelf ends in a ghost + tile');
+
+      // CUJ rename: two gestures — open the strip, click the name, type.
+      assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify(claws.id)})`), true, 'the strip opens');
+      await a.eval(`document.querySelector('#pop-identity .pid-name').click()`);
+      await a.eval(`(() => {
+        const i = document.querySelector('#pop-identity .pid-name-input');
+        i.value = 'Fangs';
+        i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+      })()`);
+      let gs = await a.dbg('groups');
+      assert.equal(gs.find((g) => g.id === claws.id).name, 'Fangs', 'renamed in place');
+      assert.equal(gs.length, 3, 'no fork');
+      assert.ok(await a.dbg('stripState'), 'the popover survives the rename');
+
+      // CUJ advancement: tap the next die face — count preserved, popover
+      // stays open for chained edits, tile pulses on its shelf.
+      await a.eval(`document.querySelector('#pop-identity .pid-rank[data-die="d10"]').click()`);
+      gs = await a.dbg('groups');
+      assert.equal(gs.find((g) => g.id === claws.id).notation, '1d10', 'rank stepped d6 → d10');
+      assert.equal((await a.dbg('stripState')).rank, 'd10', 'the ladder tracks the record');
+      await a.dbg('closePopover()');
+
+      await a.dbg(`poolPopoverOpen(${JSON.stringify(damage.id)})`);
+      await a.eval(`document.querySelector('#pop-identity .pid-rank[data-die="d8"]').click()`);
+      assert.equal((await a.dbg('groups')).find((g) => g.id === damage.id).notation, '3d8',
+        'the count rides the rank change (3d4 → 3d8)');
+      await a.dbg('closePopover()');
+
+      // fail-closed: a complex pool gets no ladder — its doors instead
+      await a.dbg(`poolPopoverOpen(${JSON.stringify(hunt.id)})`);
+      const hs = await a.dbg('stripState');
+      assert.equal(hs.simple, false, 'complex notation fails the ladder closed');
+      assert.equal(hs.ranks, 0, 'no rank buttons rendered');
+      assert.ok(await a.eval(`document.querySelectorAll('#pop-identity .pid-ghost-verb').length === 2`),
+        'Edit notation… and Open in draft stand instead');
+
+      // CUJ re-shelve: category is a chip, never typed
+      await a.eval(`[...document.querySelectorAll('#pop-identity .pid-cat')]
+        .find((b) => b.textContent.trim() === 'Skills').click()`);
+      assert.equal((await a.dbg('groups')).find((g) => g.id === hunt.id).category, 'Skills',
+        'a chip tap moves the pool to Skills');
+      await a.eval(`[...document.querySelectorAll('#pop-identity .pid-cat')]
+        .find((b) => b.getAttribute('aria-pressed') === 'true').click()`);
+      assert.equal((await a.dbg('groups')).find((g) => g.id === hunt.id).category ?? null, null,
+        'tapping the pressed chip demotes to the plain shelf');
+      await a.dbg('closePopover()');
+
+      // CUJ add-a-skill: ghost tap + type + Enter; the shelf IS the category
+      await a.dbg(`openCreation('skills')`);
+      await a.eval(`(() => {
+        const i = document.querySelector('#groups-list .cc-name');
+        i.value = 'Archery';
+        i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+      })()`);
+      gs = await a.dbg('groups');
+      const archery = gs.find((g) => g.name === 'Archery');
+      assert.ok(archery && archery.notation === '1d6' && archery.category === 'Skills',
+        `the ghost minted {Archery, 1d6, Skills} (got: ${JSON.stringify(archery)})`);
+
+      // the newborn contract: Esc discards, nothing minted
+      await a.dbg(`openCreation('motivations')`);
+      await a.eval(`document.querySelector('#groups-list .cc-name')
+        .dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}))`);
+      assert.equal((await a.dbg('groups')).length, gs.length, 'Esc minted nothing');
+      assert.equal(await a.dbg('creatingShelf'), null, 'the card closed');
+
+      // the save morph lands a composed draft on a shelf via chips
+      await a.eval(`document.querySelectorAll('#die-buttons .die-btn')[1].click()`);
+      await a.eval(`document.getElementById('save-group').click()`);
+      await a.eval(`[...document.querySelectorAll('#save-cat-row .pid-cat')]
+        .find((b) => b.textContent.trim() === 'Motivations').click()`);
+      await a.eval(`(() => {
+        const i = document.getElementById('group-name');
+        i.value = 'Glory';
+        i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+      })()`);
+      const glory = (await a.dbg('groups')).find((g) => g.name === 'Glory');
+      assert.equal(glory && glory.category, 'Motivations', 'the save morph chips set the shelf');
+      await a.eval(`document.getElementById('clear-tray').click()`);
+    },
+  },
+  {
     name: 'shared-pools',
     tags: ['smoke', 'groups'],
     // The owner switcher (ROADMAP 2b): racks publish to the room; a teammate
@@ -1299,8 +1420,8 @@ export const scenarios = [
       await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}])`);
       assert.equal(await a.eval(`document.querySelector('#head-compose .ph-label').textContent`),
         'Pools', 'ONE panel since the merge, labelled Pools');
-      assert.equal(await a.eval(`document.querySelector('.pool-sec-head').textContent`),
-        'Pools', 'the uncategorized shelf is plainly named');
+      assert.ok(await a.eval(`[...document.querySelectorAll('.pool-sec-head')].some((h) => h.textContent === 'Pools')`),
+        'the uncategorized shelf is plainly named (trio shelves stand above it)');
       assert.equal(await a.eval(`document.getElementById('group-name').placeholder`),
         'Name this pool…', 'the save field names a pool');
       assert.equal(await a.eval(`document.getElementById('pop-update').textContent`),

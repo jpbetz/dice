@@ -139,6 +139,9 @@ limitations under the License.
         <button id="save-confirm" class="btn confirm" title="Save as a new pool">✓</button>
         <button id="save-cancel" class="btn" title="Cancel">✕</button>
       </div>
+      <!-- shelf chips for the save morph: saving a composed draft lands it
+           on a shelf in one breath (none pressed = the plain Pools shelf) -->
+      <div id="save-cat-row" class="pid-cats hidden"></div>
       </div>
 
       <!-- The Rack (agreed 2026-08-01): category shelves of pool TILES.
@@ -148,6 +151,7 @@ limitations under the License.
            (P2/P4). Section headers render from categories in renderGroups —
            sticky, so the current shelf stays named mid-scroll. -->
       <div id="pools-toolbar" class="hidden">
+        <span class="pt-label">Editing your rack</span>
         <button id="copy-link" class="btn tiny ghost" title="Copy a URL that restores these pools anywhere">Copy link</button>
         <button id="pools-done" class="btn tiny ghost">Done</button>
       </div>
@@ -349,6 +353,11 @@ limitations under the License.
       </div>
       <button id="pop-close" class="pop-close" title="Close">✕</button>
     </div>
+    <!-- THE SHEET PASS (2026-08-01): a pool popover's IDENTITY STRIP — the
+         rack is the character sheet, so identity (name · shelf · die rank)
+         edits here, instantly, by id. Everything below the hairline stays
+         the roll-tweak draft. Built by renderPopIdentity; group source only. -->
+    <div id="pop-identity" class="hidden"></div>
     <p id="pop-sysnote" class="hint pop-sysnote hidden">This table reads each
       die on its own — modifiers and targets don’t change outcomes here.</p>
 

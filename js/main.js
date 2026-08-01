@@ -3433,6 +3433,35 @@ window.__diceDebug = {
   // auto-collect (2026-08-01): tests opt in with a short clock; 0 = off
   get autoCollectMs() { return autoCollectMs; },
   setAutoCollectMs(ms) { autoCollectMs = Math.max(0, ms | 0); return autoCollectMs; },
+  // the Sheet Pass (2026-08-01): drive the identity strip + ghost tiles
+  poolPopoverOpen(id) {
+    const g = groups.find((x) => x.id === id);
+    if (!g) return false;
+    const tile = groupsListEl.querySelector(`[data-group-id="${CSS.escape(String(id))}"]`);
+    openPopover({ source: 'group', group: g, row: tile });
+    return !!(pop && pop.groupId === id);
+  },
+  get stripState() {
+    const g = stripGroup();
+    if (!g) return null;
+    return {
+      groupId: g.id,
+      name: g.name,
+      category: g.category || null,
+      simple: SIMPLE_POOL_RE.test(g.notation),
+      rank: (() => {
+        const b = popIdentityEl.querySelector('.pid-rank[aria-pressed="true"]');
+        return b ? b.dataset.die : null;
+      })(),
+      ranks: popIdentityEl.querySelectorAll('.pid-rank').length,
+    };
+  },
+  get creatingShelf() { return creatingShelf; },
+  openCreation(key) {
+    creatingShelf = key;
+    renderGroups();
+    return creatingShelf;
+  },
   // the owner switcher (ROADMAP 2b): whose rack the Pools panel shows
   get poolsOwner() { return poolsOwner; },
   setPoolsOwner(id) { setPoolsOwner(id || null); return poolsOwner; },
@@ -4385,8 +4414,8 @@ function beginEditGroup(id) {
   if (pop && pop.source === 'group' && pop.groupId === id) closePopover();
   editingGroupId = id;
   renderGroups();
-  const nameIn = groupsListEl.querySelector('.ge-name');
-  if (nameIn) nameIn.focus();
+  const notIn = groupsListEl.querySelector('.ge-notation');
+  if (notIn) notIn.focus();
 }
 
 function cancelEditGroup() {
@@ -4394,21 +4423,14 @@ function cancelEditGroup() {
   renderGroups();
 }
 
-// The inline row editor: name + notation fields, Update writes back BY ID
-// via editPoolById (the fix for rename-forks-a-duplicate and
-// unnamed-can't-update), Cancel/Esc reverts. Enter applies; a notation that
-// doesn't parse pins the row open with the parse error and a dead Update.
+// The notation card, slimmed (the Sheet Pass): name and shelf edit in the
+// popover's identity strip now, so this card is the NOTATION escape hatch
+// for complex pools — one field, Update writes back BY ID via editPoolById,
+// Cancel/Esc reverts. A notation that doesn't parse pins the card open
+// with the parse error and a dead Update.
 function buildGroupEditor(g) {
   const ed = document.createElement('div');
   ed.className = 'group-editor';
-
-  const nameIn = document.createElement('input');
-  nameIn.className = 'ge-name';
-  nameIn.type = 'text';
-  nameIn.maxLength = 24;
-  nameIn.placeholder = 'Name this pool…';
-  nameIn.autocomplete = 'off';
-  nameIn.value = g.name;
 
   const notIn = document.createElement('input');
   notIn.className = 'ge-notation';
@@ -4417,25 +4439,6 @@ function buildGroupEditor(g) {
   notIn.spellcheck = false;
   notIn.autocomplete = 'off';
   notIn.value = g.notation;
-
-  // Category = which shelf the tile lives on (Attributes / Skills /
-  // Motivations suggested; free text; blank = the plain Pools shelf).
-  const catIn = document.createElement('input');
-  catIn.className = 'ge-category';
-  catIn.type = 'text';
-  catIn.maxLength = 24;
-  catIn.placeholder = 'Category — e.g. Attributes';
-  catIn.autocomplete = 'off';
-  catIn.setAttribute('list', 'category-options');
-  catIn.value = g.category || '';
-  const dl = document.createElement('datalist');
-  dl.id = 'category-options';
-  for (const c of [...new Set(['Attributes', 'Skills', 'Motivations',
-    ...groups.map((x) => (x.category || '').trim()).filter(Boolean)])]) {
-    const o = document.createElement('option');
-    o.value = c;
-    dl.appendChild(o);
-  }
 
   const err = document.createElement('div');
   err.className = 'ge-err';
@@ -4463,7 +4466,7 @@ function buildGroupEditor(g) {
   const apply = () => {
     if (!validate()) { notIn.focus(); return; }
     editingGroupId = null;
-    editPoolById(g.id, { name: nameIn.value, notation: notIn.value, category: catIn.value });
+    editPoolById(g.id, { notation: notIn.value }); // name/shelf live in the strip
   };
   updateBtn.addEventListener('click', apply);
   cancelBtn.addEventListener('click', cancelEditGroup);
@@ -4472,11 +4475,9 @@ function buildGroupEditor(g) {
     if (e.key === 'Enter') apply();
     else if (e.key === 'Escape') cancelEditGroup();
   };
-  nameIn.addEventListener('keydown', onKey);
-  catIn.addEventListener('keydown', onKey);
   notIn.addEventListener('keydown', onKey);
 
-  ed.append(nameIn, notIn, catIn, dl, err, actions);
+  ed.append(notIn, err, actions);
   return ed;
 }
 
@@ -4654,12 +4655,20 @@ function publishPools() {
 // Motivations — then other categories alphabetically, uncategorized last
 // as plain 'Pools'. Sticky headers keep the current shelf named mid-scroll.
 const TRIO = ['attributes', 'skills', 'motivations'];
-function buildSections(list) {
+const TRIO_LABELS = { attributes: 'Attributes', skills: 'Skills', motivations: 'Motivations' };
+function buildSections(list, { ensureTrio = false } = {}) {
   const secs = new Map();
   for (const g of list) {
     const k = (g.category || '').trim().toLowerCase() || '\u0000';
     if (!secs.has(k)) secs.set(k, { key: k, label: k === '\u0000' ? 'Pools' : g.category.trim(), pools: [] });
     secs.get(k).pools.push(g);
+  }
+  // Your own rack is the character sheet: the trio shelves stand even when
+  // empty, each ending in its ghost '+' tile (the Sheet Pass).
+  if (ensureTrio) {
+    for (const k of TRIO) {
+      if (!secs.has(k)) secs.set(k, { key: k, label: TRIO_LABELS[k], pools: [] });
+    }
   }
   return [...secs.values()].sort((a, b) => {
     const rank = (s) => (s.key === '\u0000' ? 2 : TRIO.includes(s.key) ? 0 : 1);
@@ -4670,6 +4679,138 @@ function buildSections(list) {
 
 // The digits stage by RENDERED order (rebuilt on every paint).
 let renderedPools = [];
+
+// The Sheet Pass ghost tiles: which shelf's creation card is open (a
+// section KEY, one at a time — like editingGroupId for the notation card).
+let creatingShelf = null;
+const SHELF_NOUN = { attributes: 'attribute', skills: 'skill', motivations: 'motivation' };
+
+// A ghost '+' cell ends every shelf on YOUR rack: creation happens where
+// the thing will live, so category is never typed. A stray tap is free —
+// it opens a card that mints nothing until Enter/✓ (the newborn contract).
+function buildGhostTile(sec) {
+  const tile = document.createElement('div');
+  tile.className = 'pool-tile ghost';
+  const noun = SHELF_NOUN[sec.key] || 'pool';
+  const full = groups.length >= 40;
+  const b = document.createElement('button');
+  b.className = 'tile-stage ghost-add';
+  b.disabled = full;
+  b.title = full ? 'Rack is full (40 pools)' : `New ${noun}…`;
+  b.setAttribute('aria-label', b.title);
+  const plus = document.createElement('span');
+  plus.className = 'ghost-plus';
+  plus.setAttribute('aria-hidden', 'true');
+  plus.textContent = '＋';
+  const nounEl = document.createElement('span');
+  nounEl.className = 'ghost-noun';
+  nounEl.textContent = noun;
+  b.append(plus, nounEl);
+  b.addEventListener('click', () => {
+    creatingShelf = sec.key;
+    renderGroups();
+    const input = groupsListEl.querySelector('.cc-name');
+    if (input) input.focus();
+  });
+  tile.appendChild(b);
+  return tile;
+}
+
+// The creation card, in place of its shelf's ghost: name + rank ladder
+// (d6 pre-lit) + ✓ ✕. Ladder taps only move the ring; nothing exists until
+// Enter/✓ mints {name, 1dN, category: this shelf}. Esc — or clicking away
+// with an empty name and an untouched ring — discards silently.
+function buildCreationCard(sec) {
+  const card = document.createElement('div');
+  card.className = 'group-row editing tile-editor creation-card';
+  const noun = SHELF_NOUN[sec.key] || 'pool';
+  let chosen = 'd6';
+  let touched = false;
+
+  const input = document.createElement('input');
+  input.className = 'cc-name';
+  input.type = 'text';
+  input.maxLength = 24;
+  input.autocomplete = 'off';
+  input.placeholder = `Name this ${noun}…`;
+
+  const ladder = document.createElement('div');
+  ladder.className = 'pid-die cc-die';
+  const paintLadder = () => {
+    ladder.textContent = '';
+    for (const type of RANK_LADDER) {
+      const b = document.createElement('button');
+      b.className = 'pid-rank';
+      b.dataset.die = type;
+      b.setAttribute('aria-pressed', String(type === chosen));
+      b.title = `1${type}`;
+      b.appendChild(buildDieStrip([type], 1));
+      b.addEventListener('click', () => {
+        chosen = type;
+        touched = true;
+        paintLadder();
+      });
+      ladder.appendChild(b);
+    }
+  };
+  paintLadder();
+
+  const mint = () => {
+    const rec = { id: Date.now(), name: cutText(input.value, 24), notation: `1${chosen}` };
+    if (sec.key !== '\u0000') rec.category = sec.label;
+    groups.push(rec);
+    creatingShelf = null;
+    saveGroups();
+    renderGroups();
+  };
+  const discard = () => {
+    creatingShelf = null;
+    renderGroups();
+  };
+
+  const ok = document.createElement('button');
+  ok.className = 'btn confirm cc-ok';
+  ok.textContent = '✓';
+  ok.title = `Add this ${noun}`;
+  ok.addEventListener('click', mint);
+  const no = document.createElement('button');
+  no.className = 'btn cc-cancel';
+  no.textContent = '✕';
+  no.title = 'Cancel';
+  no.addEventListener('click', discard);
+
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') mint();
+    else if (e.key === 'Escape') discard();
+  });
+  card.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Escape') discard();
+  });
+  // click-away with nothing entered discards silently (stray tap = free);
+  // typed-or-touched cards stay open — commit is always explicit.
+  setTimeout(() => {
+    const away = (ev) => {
+      if (creatingShelf !== sec.key || !card.isConnected) {
+        document.removeEventListener('pointerdown', away, true);
+        return;
+      }
+      if (card.contains(ev.target)) return;
+      if (!input.value.trim() && !touched) {
+        document.removeEventListener('pointerdown', away, true);
+        discard();
+      }
+    };
+    document.addEventListener('pointerdown', away, true);
+  }, 0);
+
+  const row = document.createElement('div');
+  row.className = 'cc-row';
+  row.append(input, ok, no);
+  card.append(row, ladder);
+  return card;
+}
 
 // The switcher row: quiet owner chips (you first), only when a table has
 // teammates. Small windows fold the names away — dots stay (ROADMAP 2b).
@@ -4802,9 +4943,9 @@ function renderGroups() {
     renderForeignPools(poolsOwnerPlayer());
     return;
   }
-  groupsEmptyEl.style.display = groups.length ? 'none' : 'block';
+  groupsEmptyEl.style.display = 'none'; // ghosts are the empty-state affordance
   let ownOrd = 0;
-  for (const sec of buildSections(groups)) {
+  for (const sec of buildSections(groups, { ensureTrio: true })) {
     const head = document.createElement('div');
     head.className = 'plabel pool-sec-head';
     head.textContent = sec.label;
@@ -4856,8 +4997,47 @@ function renderGroups() {
         o.textContent = String(ord);
         stage.appendChild(o);
       }
-      stage.addEventListener('click', () => stageGroup(g));
-      stage.disabled = poolsEdit;
+      // In manage mode the whole 64px tile is the editor door (the retired
+      // per-tile ✎'s verb) — staging stays gated off; at rest it stages.
+      stage.addEventListener('click', () => {
+        if (lpFired) { lpFired = false; return; } // a long-press already opened the popover
+        if (poolsEdit) togglePopover(g, tile);
+        else stageGroup(g);
+      });
+      if (poolsEdit) {
+        stage.title = `Edit ${nm} — name, shelf, die`;
+        stage.setAttribute('aria-label', `Edit ${nm}`);
+      }
+      // Touch door without manage mode: 500ms hold (10px move-cancel) opens
+      // the same popover the desktop right-click does; the synthetic click
+      // that follows is suppressed. Android fires native contextmenu too —
+      // the contextmenu handler clears this timer so the doors never
+      // double-toggle.
+      let lpTimer = null;
+      let lpFired = false;
+      stage.addEventListener('pointerdown', (ev) => {
+        if (ev.pointerType !== 'touch') return;
+        const x0 = ev.clientX;
+        const y0 = ev.clientY;
+        lpFired = false;
+        clearTimeout(lpTimer);
+        const cancel = () => {
+          clearTimeout(lpTimer);
+          stage.removeEventListener('pointermove', onMove);
+        };
+        const onMove = (e2) => {
+          if (Math.hypot(e2.clientX - x0, e2.clientY - y0) > 10) cancel();
+        };
+        lpTimer = setTimeout(() => {
+          cancel();
+          if (pop && pop.source === 'group' && pop.groupId === g.id) return;
+          lpFired = true;
+          togglePopover(g, tile);
+        }, 500);
+        stage.addEventListener('pointermove', onMove);
+        stage.addEventListener('pointerup', cancel, { once: true });
+        stage.addEventListener('pointercancel', cancel, { once: true });
+      });
       tile.appendChild(stage);
 
       // Tile ± retired (2026-08-01, Joe): tweaking belongs to the ROLL
@@ -4866,15 +5046,13 @@ function renderGroups() {
       // (Update-this-pool / variants), same pointer bonus as the cluster.
       tile.addEventListener('contextmenu', (e) => {
         e.preventDefault();
+        if (pop && pop.source === 'group' && pop.groupId === g.id) return; // long-press won
         togglePopover(g, tile);
       });
 
       if (poolsEdit) {
-        const editBtn = document.createElement('button');
-        editBtn.className = 'group-edit tile-edit';
-        editBtn.textContent = '✎';
-        editBtn.title = 'Edit name, notation & category';
-        editBtn.addEventListener('click', () => beginEditGroup(g.id));
+        // ✎-per-tile retired (the Sheet Pass): the whole tile opens the
+        // editor popover now. The destructive ✕ is what the gate is FOR.
         const delBtn = document.createElement('button');
         delBtn.className = 'group-del tile-del';
         delBtn.textContent = '✕';
@@ -4885,7 +5063,7 @@ function renderGroups() {
           saveGroups();
           renderGroups();
         });
-        tile.append(editBtn, delBtn);
+        tile.append(delBtn);
       }
 
       grid.appendChild(tile);
@@ -4894,6 +5072,8 @@ function renderGroups() {
         pop.row = tile;
       }
     }
+    if (creatingShelf === sec.key) grid.appendChild(buildCreationCard(sec));
+    else grid.appendChild(buildGhostTile(sec));
     groupsListEl.appendChild(grid);
   }
 }
@@ -4912,6 +5092,31 @@ renderGroups();
 // name ONLY while the draft still parses to the same canonical — tweak the
 // text and the prefill lapses (a tweaked draft is a NEW pool, not a rename).
 let echoedDraft = null; // {name, canonical} from loadIntoBox
+// The save morph's shelf chips: saving a composed draft lands it on a
+// shelf in one breath (none pressed = the plain Pools shelf).
+let saveMorphCat = null;
+function renderSaveCatRow() {
+  const row = document.getElementById('save-cat-row');
+  row.textContent = '';
+  const known = [...new Map([['attributes', 'Attributes'], ['skills', 'Skills'], ['motivations', 'Motivations'],
+    ...groups.map((x) => (x.category || '').trim()).filter(Boolean).map((c) => [c.toLowerCase(), c]),
+  ]).values()];
+  for (const c of known) {
+    const b = document.createElement('button');
+    b.className = 'owner-chip pid-cat';
+    b.setAttribute('aria-pressed', String(saveMorphCat === c));
+    const nm = document.createElement('span');
+    nm.className = 'oc-name';
+    nm.textContent = c;
+    b.appendChild(nm);
+    b.addEventListener('click', () => {
+      saveMorphCat = saveMorphCat === c ? null : c;
+      renderSaveCatRow();
+    });
+    row.appendChild(b);
+  }
+}
+
 function openSaveMorph() {
   paintCmd();
   const usable = (cmdResult && cmdResult.ok) || tray.length > 0;
@@ -4920,6 +5125,9 @@ function openSaveMorph() {
   groupNameInput.value = (echoedDraft && echoedDraft.name
     && echoedDraft.canonical === canonical) ? echoedDraft.name : '';
   traySaveRow.classList.remove('hidden');
+  saveMorphCat = null;
+  renderSaveCatRow();
+  document.getElementById('save-cat-row').classList.remove('hidden');
   draftActionsEl.classList.add('hidden'); // the morph swaps in for Save · Clear
   groupNameInput.focus();
   groupNameInput.select();
@@ -4927,6 +5135,8 @@ function openSaveMorph() {
 function closeSaveMorph() {
   if (traySaveRow.classList.contains('hidden')) return;
   traySaveRow.classList.add('hidden');
+  document.getElementById('save-cat-row').classList.add('hidden');
+  saveMorphCat = null;
   const usable = (cmdResult && cmdResult.ok) || tray.length > 0;
   draftActionsEl.classList.toggle('hidden', !usable);
 }
@@ -4936,7 +5146,8 @@ function saveDraftAsPool() {
     : tray.length ? formula(tray) : null;
   if (!notation) { closeSaveMorph(); return; }
   const name = cutText(groupNameInput.value, 24); // '' = unnamed pool
-  groups.push({ id: Date.now(), name, notation }); // additive, always
+  const cat = saveMorphCat; // read before closeSaveMorph resets the chips
+  groups.push({ id: Date.now(), name, notation, ...(cat ? { category: cat } : {}) }); // additive, always
   saveGroups();
   renderGroups();
   groupNameInput.value = '';
@@ -5111,6 +5322,7 @@ function openPopover(binding) {
   // switch systems later).
   document.getElementById('pop-sysnote').classList.toggle('hidden', activeSystem().usesMods);
   popEl.classList.remove('hidden');
+  renderPopIdentity(); // the Sheet Pass strip (group popovers only)
   renderPop();
   placePopover();
 }
@@ -5136,6 +5348,200 @@ function resyncTrayPopover() {
   popExpSubtitle.value = pop.expSubtitle;
   renderPop();
   placePopover();
+}
+
+// ---------------------------------------------------------------------------
+// THE SHEET PASS (2026-08-01, designed by panel): the pool popover's
+// IDENTITY STRIP. The rack is the character sheet, so a pool's IDENTITY —
+// name, shelf, die rank — edits here, instantly, by id (advancement is
+// play); the hairline under the strip is the commit-model line, and
+// everything below it stays the unchanged roll-tweak draft. Group popovers
+// only; every write funnels editPoolById (the one writer).
+// ---------------------------------------------------------------------------
+const popIdentityEl = document.getElementById('pop-identity');
+const SIMPLE_POOL_RE = /^(\d+)d(4|6|8|10|12|20)$/;
+const RANK_LADDER = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
+
+function stripGroup() {
+  return pop && pop.source === 'group'
+    ? groups.find((x) => x.id === pop.groupId) || null : null;
+}
+
+// After a strip write: re-read the record, reseed the popover's draft state
+// (so echo/preview/Update stay truthful — a follow-up Update is a no-op),
+// pulse the tile on its shelf (the sheet itself is the feedback; never
+// gold), and re-clamp the popover.
+function stripCommit(patch) {
+  const g = stripGroup();
+  if (!g) return;
+  const updated = editPoolById(g.id, patch);
+  if (!updated) return;
+  pop.name = updated.name || updated.notation;
+  popNameEl.textContent = pop.name;
+  if (patch.notation !== undefined) {
+    const res = parseNotation(updated.notation);
+    if (res.ok) {
+      const keep = { source: pop.source, groupId: pop.groupId, shelfRollId: pop.shelfRollId, name: pop.name, row: pop.row };
+      pop = { ...keep, ...popStateFromParse(res) };
+      if (pop.dc != null && !pop.expKind) pop.expKind = 'check';
+      popDcInput.value = pop.dc == null ? '' : String(pop.dc);
+      popCommentInput.value = pop.comment || '';
+      popExpSubtitle.value = pop.expSubtitle;
+      renderPop();
+    }
+  }
+  const tile = groupsListEl.querySelector(`[data-group-id="${CSS.escape(String(g.id))}"] .tile-stage`);
+  if (tile) {
+    tile.classList.add('tile-pulse');
+    setTimeout(() => tile.classList.remove('tile-pulse'), 350);
+  }
+  renderPopIdentity();
+  placePopover();
+}
+
+function renderPopIdentity() {
+  const g = stripGroup();
+  popIdentityEl.classList.toggle('hidden', !g);
+  document.getElementById('pop-name').classList.toggle('hidden', !!g); // the strip's name row takes over
+  popIdentityEl.textContent = '';
+  if (!g) return;
+  const stop = (el) => el.addEventListener('keydown', (e) => e.stopPropagation());
+
+  // Row 1 — NAME: display type; click morphs to the save-morph input
+  // grammar (Enter commits, Esc reverts, blur commits a CHANGED name).
+  const nameRow = document.createElement('div');
+  nameRow.className = 'pid-row';
+  const nameBtn = document.createElement('button');
+  nameBtn.className = 'pid-name' + (g.name ? '' : ' as-notation');
+  nameBtn.textContent = g.name || g.notation;
+  nameBtn.title = 'Rename';
+  nameBtn.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.className = 'pid-name-input';
+    input.type = 'text';
+    input.maxLength = 24;
+    input.autocomplete = 'off';
+    input.placeholder = 'Name this pool…';
+    input.value = g.name || '';
+    let done = false;
+    const commit = () => { if (done) return; done = true; stripCommit({ name: input.value }); };
+    const revert = () => { if (done) return; done = true; renderPopIdentity(); };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') commit();
+      else if (e.key === 'Escape') revert();
+    });
+    input.addEventListener('blur', () => {
+      (input.value !== (g.name || '') ? commit : revert)();
+    });
+    nameRow.replaceChild(input, nameBtn);
+    input.focus();
+    input.select();
+  });
+  nameRow.appendChild(nameBtn);
+  popIdentityEl.appendChild(nameRow);
+
+  // Row 2 — SHELF chips (owner-chip dress): tap moves the pool; tapping the
+  // pressed chip demotes to the plain Pools shelf (P4); trailing ＋ mints a
+  // new shelf name.
+  const cats = document.createElement('div');
+  cats.className = 'pid-row pid-cats';
+  const cur = (g.category || '').trim().toLowerCase();
+  const known = [...new Map([['attributes', 'Attributes'], ['skills', 'Skills'], ['motivations', 'Motivations'],
+    ...groups.map((x) => (x.category || '').trim()).filter(Boolean).map((c) => [c.toLowerCase(), c]),
+  ]).values()];
+  for (const c of known) {
+    const b = document.createElement('button');
+    b.className = 'owner-chip pid-cat';
+    const pressed = c.toLowerCase() === cur;
+    b.setAttribute('aria-pressed', String(pressed));
+    const nm = document.createElement('span');
+    nm.className = 'oc-name';
+    nm.textContent = c;
+    b.appendChild(nm);
+    b.title = pressed ? 'Back to the plain Pools shelf' : `Move to ${c}`;
+    b.addEventListener('click', () => stripCommit({ category: pressed ? '' : c }));
+    cats.appendChild(b);
+  }
+  const plus = document.createElement('button');
+  plus.className = 'owner-chip pid-cat pid-cat-new';
+  plus.textContent = '＋';
+  plus.title = 'New shelf…';
+  plus.addEventListener('click', () => {
+    const input = document.createElement('input');
+    input.className = 'pid-cat-input';
+    input.type = 'text';
+    input.maxLength = 24;
+    input.autocomplete = 'off';
+    input.placeholder = 'New shelf…';
+    let done = false;
+    const commit = () => {
+      if (done) return; done = true;
+      if (input.value.trim()) stripCommit({ category: input.value });
+      else renderPopIdentity();
+    };
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') commit();
+      else if (e.key === 'Escape') { done = true; renderPopIdentity(); }
+    });
+    input.addEventListener('blur', commit);
+    cats.replaceChild(input, plus);
+    input.focus();
+  });
+  cats.appendChild(plus);
+  popIdentityEl.appendChild(cats);
+
+  // Row 3 — DIE RANK, fail-closed: only a pure `NdX` pool gets the ladder
+  // (one die type, no mods/dc/flags — the regex runs on the CANONICAL, so a
+  // dc12 can never be dropped by a rank tap). Anything else keeps its
+  // canonical echo plus the two quiet doors to the full grammar.
+  const dieRow = document.createElement('div');
+  dieRow.className = 'pid-row pid-die';
+  const simple = SIMPLE_POOL_RE.exec(g.notation);
+  if (simple) {
+    const count = Number(simple[1]);
+    for (const type of RANK_LADDER) {
+      const b = document.createElement('button');
+      b.className = 'pid-rank';
+      b.dataset.die = type;
+      const pressed = type === `d${simple[2]}`;
+      b.setAttribute('aria-pressed', String(pressed));
+      b.title = `${count}${type}`;
+      b.appendChild(buildDieStrip([type], 1));
+      if (count > 1 && pressed) {
+        const n = document.createElement('span');
+        n.className = 'pid-count';
+        n.textContent = `×${count}`;
+        b.appendChild(n);
+      }
+      b.addEventListener('click', () => {
+        if (type === `d${simple[2]}`) return;
+        stripCommit({ notation: `${count}${type}` }); // count preserved
+      });
+      dieRow.appendChild(b);
+    }
+  } else {
+    const echo = document.createElement('code');
+    echo.className = 'pid-echo';
+    echo.textContent = g.notation;
+    dieRow.appendChild(echo);
+    const editBtn = document.createElement('button');
+    editBtn.className = 'pid-ghost-verb';
+    editBtn.textContent = 'Edit notation…';
+    editBtn.addEventListener('click', () => beginEditGroup(g.id)); // closes this popover itself
+    const draftBtn = document.createElement('button');
+    draftBtn.className = 'pid-ghost-verb';
+    draftBtn.textContent = 'Open in draft';
+    draftBtn.title = 'Load into the command box for heavy recomposition';
+    draftBtn.addEventListener('click', () => {
+      loadIntoBox(g.notation, g.name);
+      closePopover();
+    });
+    dieRow.append(editBtn, draftBtn);
+  }
+  popIdentityEl.appendChild(dieRow);
+  stop(popIdentityEl);
 }
 
 function closePopover() {

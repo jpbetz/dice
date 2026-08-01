@@ -1451,6 +1451,31 @@ motivation (Peer Respect), all at d6 — attribute+skill+motivation is
 '1 2 3 Enter' from a fresh seat. (Fixed underneath: migrateGroup dropped
 pool categories on every boot — localStorage and #g= links both.)
 
+**THE SHEET PASS (2026-08-01, panel-designed).** The rack is the
+CHARACTER SHEET, so a pool's IDENTITY — name, shelf, die rank — edits like
+one: instantly, by id, where you already are. Two surfaces carry all five
+editing CUJs. (1) The pool popover (right-click a tile; in ✎ the whole
+tile opens it; 500ms hold on touch) grows an IDENTITY STRIP above a
+hairline — the visible commit-model line: above it identity writes
+through editPoolById on every tap (renaming is the save-morph input
+grammar; the shelf is owner-chip dress chips, tap to move, tap the
+pressed chip to demote to plain Pools, ＋ mints a shelf; die rank is a
+ladder of six real die faces, tap to advance — count preserved, ivory
+ring never gold, fail-closed to pure NdX notations so a dc12 can never be
+dropped); below the hairline the unchanged roll-tweak draft. Complex
+pools swap the ladder for their canonical echo plus two quiet doors:
+'Edit notation…' (the card, slimmed to notation-only) and 'Open in
+draft'. (2) A GHOST '+' tile ends every shelf on YOUR rack (trio shelves
+stand even empty); tapping it opens a creation card in place — name, d6
+pre-lit ladder, ✓/✕ — and the NEWBORN CONTRACT holds: nothing exists
+until Enter/✓, so a stray tap is provably free; the shelf you tapped IS
+the category, never typed. The save morph gains the same shelf chips.
+Manage mode slims to the DESTRUCTIVE gate it always wanted to be: a
+full-width standing 'EDITING YOUR RACK' bar, grown 24px ✕ overlays, the
+per-tile ✎ retired. CUJ arithmetic: add a skill = ghost tap + type +
+Enter; advance Wisdom = right-click + face tap; rename = right-click +
+name tap + type. No CUJ touches manage mode.
+
 **The tier rule (P6, the binding sharpening).** Treatments bind CONTROL
 TIERS, not screens: content stands (dice, names, totals); roll-adjacent
 controls reveal on approach (±, per-die ✕, log ⟳, the ROLL cue, 1-9

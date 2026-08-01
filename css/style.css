@@ -614,18 +614,150 @@ html, body {
 .tile-stage:focus-visible .pool-ord { opacity: 0.8; }
 /* tile ± retired (2026-08-01): tweaking lives at the ROLL moment (the
    draft's ±); right-click on a tile remains the quiet popover path */
-.tile-edit, .tile-del {
+/* .tile-edit retired (the Sheet Pass, 2026-08-01): in manage mode the
+   whole tile opens the editor popover. The ✕ — what the gate is FOR —
+   stays, grown to 24px (grow the target, never multiply it). */
+.tile-del {
   position: absolute;
   top: 2px;
-  width: 20px;
-  height: 20px;
+  right: 2px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: 6px;
   background: rgba(18, 14, 9, 0.9);
   border: 1px solid var(--panel-border);
 }
-.tile-edit { right: 26px; }
-.tile-del { right: 2px; }
+/* ---- THE SHEET PASS (2026-08-01): identity strip + ghost tiles ---- */
+/* The strip sits above a hairline inside the pool popover: above it,
+   identity (writes instantly by id); below it, the roll-tweak draft. */
+#pop-identity {
+  margin: 2px 0 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--hair);
+}
+#pop-identity.hidden { display: none; }
+.pid-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.pid-row:first-child { margin-top: 0; }
+.pid-name {
+  padding: 2px 4px;
+  border: none;
+  background: none;
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--ivory);
+  cursor: text;
+  text-align: left;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pid-name:hover { text-decoration: underline dotted rgba(243, 234, 215, 0.4); }
+.pid-name.as-notation { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.pid-name-input, .pid-cat-input {
+  width: 100%;
+  max-width: 200px;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  color: var(--ivory);
+  font-size: 13px;
+}
+.pid-cat-input { max-width: 110px; font-size: 11px; }
+.pid-cats { gap: 4px; }
+.pid-cat .oc-name { max-width: 90px; }
+.pid-cat-new { padding: 3px 7px; }
+/* the rank ladder: six real die faces, ivory ring on the current rank —
+   never gold (a rank tap edits the sheet; it does not roll) */
+.pid-die { gap: 3px; align-items: center; }
+.pid-rank {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+}
+.pid-rank .die-art { width: 26px; height: 26px; }
+.pid-rank .strip-dot { margin: 7px; }
+.pid-rank:hover { border-color: var(--hair); background: rgba(255, 255, 255, 0.04); }
+.pid-rank[aria-pressed="true"] {
+  border-color: rgba(243, 234, 215, 0.55);
+  background: rgba(243, 234, 215, 0.07);
+}
+.pid-count {
+  position: absolute;
+  right: 1px;
+  bottom: 0;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+.pid-echo {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pid-ghost-verb {
+  padding: 2px 6px;
+  border: none;
+  background: none;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.pid-ghost-verb:hover { color: var(--ivory); text-decoration: underline dotted; }
+/* ghost '+' tiles: creation lives where the thing will live */
+.pool-tile.ghost .tile-stage,
+.tile-stage.ghost-add {
+  flex-direction: column;
+  gap: 2px;
+  border-style: dashed;
+  border-color: var(--hair);
+  background: none;
+}
+.ghost-add .ghost-plus { font-size: 18px; line-height: 1; color: var(--ivory); opacity: 0.4; }
+.ghost-add .ghost-noun {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.5;
+}
+.ghost-add:hover:not(:disabled) .ghost-plus,
+.ghost-add:focus-visible .ghost-plus { opacity: 0.85; }
+.ghost-add:hover:not(:disabled) .ghost-noun,
+.ghost-add:focus-visible .ghost-noun { opacity: 0.9; }
+.ghost-add:disabled { opacity: 0.35; cursor: default; }
+@media (pointer: coarse) {
+  .ghost-add .ghost-plus { opacity: 0.6; }
+  .ghost-add .ghost-noun { opacity: 0.7; }
+}
+/* the creation card spans its shelf; the ladder reuses .pid-rank */
+.creation-card .cc-row { display: flex; gap: 6px; align-items: center; }
+.creation-card .cc-name { flex: 1; min-width: 0; }
+.creation-card .cc-ok, .creation-card .cc-cancel { flex: none; width: 38px; }
+.creation-card .cc-die { margin-top: 6px; display: flex; flex-wrap: wrap; }
+/* a strip write pulses the tile on its shelf — the sheet is the feedback */
+.tile-stage.tile-pulse {
+  border-color: rgba(243, 234, 215, 0.6);
+  box-shadow: 0 0 14px rgba(243, 234, 215, 0.25);
+  transition: border-color 0.1s, box-shadow 0.1s;
+}
+#save-cat-row { margin-top: 6px; }
+#save-cat-row.hidden { display: none; }
+
 /* source chips in the draft cluster: name over its grouped dice, one ✕ */
 .src-chip {
   display: inline-flex;
@@ -711,9 +843,30 @@ html, body {
 }
 
 /* manage-mode toolbar: copy-link (demoted here, P4) + Done */
-#pools-toolbar { display: flex; gap: 8px; margin: 2px 0 8px; }
+/* manage mode's standing bar (the Sheet Pass): full-width, ivory, never
+   gold — the unmissable frame that says the rack is in its editing state */
+#pools-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 8px;
+  padding: 5px 8px;
+  border: 1px solid rgba(243, 234, 215, 0.28);
+  border-radius: 8px;
+  background: rgba(243, 234, 215, 0.05);
+}
 #pools-toolbar.hidden { display: none; }
 #pools-toolbar .btn { margin-left: 0; }
+#pools-toolbar .pt-label {
+  flex: 1;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ivory);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 #pools-edit[aria-pressed="true"] {
   color: var(--gold-bright);
   border-color: rgba(212, 175, 55, 0.55);
