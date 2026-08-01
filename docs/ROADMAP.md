@@ -99,6 +99,16 @@ system:
   single-carrier rule as visibility). Still open from the critique:
   the 720×480 small-window e2e pass.
 
+### 2c. The Sheet Pass (2026-08-01) — SHIPPED
+
+Editing un-bolted (designed by a 4-design judge panel; docs/UX.md §7.9
+records the full contract): the pool popover grows an identity strip
+(rename in place, shelf chips, die-rank ladder fail-closed to NdX); ghost
+'+' tiles end every shelf (creation card, newborn contract, the shelf IS
+the category); the save morph gains shelf chips; manage mode slims to the
+destructive gate (standing bar + grown ✕, per-tile ✎ retired); the
+notation card slims to the complex-pool escape hatch.
+
 ## Tier 2 — Organization (goal 5, the audit's biggest experience gap)
 
 ### 3. Table organization & concurrency
