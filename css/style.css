@@ -346,7 +346,8 @@ html, body {
 .draft-zone.heat-3 .tray-roll .roll-cue { opacity: 0.46; }
 .draft-zone.heat-4 .tray-roll .roll-cue { opacity: 0.55; }
 .tray-roll.hidden { display: none; }
-.tray-roll .die-art { width: 28px; height: 28px; } /* identical to the pool rows */
+/* (the well's die size lives with the beacon block below — 34px, larger
+   than the pool rows' 28: the draft is the star) */
 .tray-x-layer { position: absolute; inset: 0; pointer-events: none; }
 .die-x {
   position: absolute;
@@ -386,7 +387,12 @@ html, body {
 #tray-hint.hidden { display: none; }
 .tray-save.hidden { display: none; }
 .tray-line2.hidden { display: none; }
-.tray-line2 .tray-cluster { flex: 1; min-width: 0; margin-top: 0; }
+.tray-line2 .tray-cluster { flex: 1; min-width: 0; margin-top: 0; min-height: 64px; }
+.tray-line2 .tray-roll { min-height: 64px; }
+/* larger dice in the WELL only — the draft is the star; pool rows keep 28
+   (three classes deep: .pool-roll .die-art's later 28px must lose here) */
+.tray-line2 .tray-roll .die-art { width: 34px; height: 34px; }
+.tray-roll .roll-cue { font-size: 23px; }
 /* THE WELL (§7.14). The draft is a FIELD — the same --well token as
    .cmd-in, because the box and the cluster are two editors of ONE draft
    (§7.9). The padding sits OUTSIDE .tray-cluster so the x-layer's offset
@@ -395,9 +401,12 @@ html, body {
    weight and the loser's margin silently died — the well never re-enters
    that fight. */
 #tray-actions {
-  margin-top: 0;               /* the zone's 16px owns the air */
+  /* the beacon, take two (Joe 2026-08-03: the funnels fought the rail —
+     'just give more space and make it taller'): presence by SIZE and AIR.
+     A taller well, larger dice inside it, real margins above and below. */
+  margin: 12px 0 10px;
   gap: 4px;
-  padding: 6px;
+  padding: 9px 8px;
   background: var(--well);
   border: 1px solid var(--hair);
   border-radius: 11px;         /* concentric: 8px roll button + ~3px lip */
@@ -414,29 +423,6 @@ html, body {
 .draft-zone.heat-2 #tray-actions { box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35), 0 0 12px rgba(255, 215, 102, 0.08); }
 .draft-zone.heat-3 #tray-actions { box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35), 0 0 16px rgba(255, 215, 102, 0.11); }
 .draft-zone.heat-4 #tray-actions { box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35), 0 0 20px rgba(255, 215, 102, 0.14); }
-/* THE FEED (shapes, no words): converging gold funnels — the one above
-   narrows DOWN into the well, the one below narrows UP into it — so the
-   palette above and the saved pools below visibly pour toward the bench.
-   Faint at rest; --draft-heat brightens them as the pool grows. */
-.feed {
-  height: 8px;
-  margin: 1px 26px;
-  pointer-events: none;
-  opacity: 0.3;
-  transition: opacity 0.35s;
-}
-.draft-zone.heat-1 .feed { opacity: 0.48; }
-.draft-zone.heat-2 .feed { opacity: 0.62; }
-.draft-zone.heat-3 .feed { opacity: 0.76; }
-.draft-zone.heat-4 .feed { opacity: 0.9; }
-.feed-above {
-  background: linear-gradient(to bottom, rgba(212, 175, 55, 0.02), rgba(212, 175, 55, 0.34));
-  clip-path: polygon(0 0, 100% 0, 58% 100%, 42% 100%);
-}
-.feed-below {
-  background: linear-gradient(to top, rgba(212, 175, 55, 0.02), rgba(212, 175, 55, 0.34));
-  clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
-}
 /* The ± editor open → the field it edits is the one lit. openPopover
    toggles 'open' on pop.row; on the draft that class had been inert since
    the tile pass — this closes the dangling wire. */
@@ -1786,31 +1772,6 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
   pointer-events: auto;
   cursor: pointer;
 }
-/* ONE big clear target (2026-08-01, take two): the whole cluster IS the
-   removal click. Hover dresses the full marker circle with the ✕ promise —
-   a scrim + centered glyph the size of the cluster itself — while the peek
-   card opens alongside for detail. Touch keeps tap = read (the peek's own
-   front-and-center ✕ is the big target there), so the dress never shows
-   on coarse pointers. */
-.shelf-marker .shelf-sweep {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(20, 12, 9, 0.55) 0%, rgba(20, 12, 9, 0.28) 60%, transparent 100%);
-  color: rgba(236, 120, 104, 0.95);
-  font-size: 30px;
-  line-height: 1;
-  text-shadow: 0 0 12px rgba(226, 73, 59, 0.5);
-  opacity: 0;
-  transition: opacity 0.14s;
-  pointer-events: none;
-}
-.shelf-marker:hover .shelf-sweep { opacity: 1; }
-@media (pointer: coarse) { .shelf-marker .shelf-sweep { display: none; } }
-.shelf-marker.chip-clearing .shelf-sweep { opacity: 0; }
 
 /* A marker on its way out keeps its place for the fade but stops taking
    clicks: the roll that replaced it is already sitting under it. */
@@ -1896,6 +1857,42 @@ body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
 .pk-breakdown .crit-max { color: var(--gold-bright); font-weight: 700; }
 .pk-breakdown .crit-min { color: var(--red); font-weight: 700; }
 .pk-actions { margin-top: 6px; display: flex; justify-content: center; gap: 6px; }
+/* the folded card, shelf edition (Joe 2026-08-03): the card BODY is the
+   one big clear target — same red removal dress as the banner's, always
+   red here (clearing a collected roll is anyone's housekeeping, §7.7) —
+   and the fold below keeps REROLL/Reveal untinted. */
+.pk-main {
+  position: relative;
+  border-radius: 8px;
+  padding: 3px 6px 5px;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.pk-main::after {
+  content: '✕';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44px;
+  font-weight: 700;
+  color: transparent;
+  pointer-events: none;
+  transition: color 0.15s;
+}
+.pk-main:hover,
+.pk-main:focus-visible {
+  background: rgba(226, 73, 59, 0.10);
+  box-shadow: inset 0 0 0 1px rgba(226, 73, 59, 0.55);
+}
+.pk-main:hover::after,
+.pk-main:focus-visible::after { color: rgba(226, 73, 59, 0.20); }
+.pk-fold {
+  border-top: 1px solid var(--hair);
+  margin-top: 8px;
+  padding-top: 6px;
+}
 /* .pk-tweak retired 2026-08-01 — the tweak path is right-click (cluster/card) */
 
 /* ---------- the unified 'clear this roll' ✕ (P1, cross-cutting) ---------- */

@@ -980,47 +980,30 @@ function renderShelfMarkers() {
     // roll spends its life (auto-collect fires on ANYONE's next roll), and
     // the peek renders Reveal for the authority (the server enforces it
     // regardless) — the resting marker stays a quiet dot either way.
-    if (entry && entry.playerName) el.title = `${entry.playerName} · ${entry.label} — click to clear`;
-    else if (entry) el.title = `${entry.label} — click to clear`;
-    else el.title = 'Click to clear this roll for everyone';
-    // Peek (§7.7.1): hover opens after the intent delay (desktop); a tap — or
-    // a click anywhere that is not one of the marker's own buttons — toggles.
+    if (entry && entry.playerName) el.title = `${entry.playerName} · ${entry.label}`;
+    else if (entry) el.title = `${entry.label}`;
+    else el.title = 'Collected roll';
+    // ONE grammar with the reveal card (Joe 2026-08-03, take three): the
+    // marker only OPENS the card — hover peeks it (desktop), a click/tap
+    // toggles it pinned-open — and the CARD's body is the one big clear
+    // target, exactly like the banner. The ✕-over-the-dice sweep dress
+    // retires, and with it the whole gesture-tracked one-✕ machinery.
     el.addEventListener('pointerenter', (ev) => {
       if (ev.pointerType === 'mouse') schedulePeekOpen(c.rollId);
     });
     el.addEventListener('pointerleave', (ev) => {
       if (ev.pointerType === 'mouse') schedulePeekClose();
     });
-    // ONE big clear target (2026-08-01, take two): the WHOLE cluster is
-    // the removal click — hover dresses it with a full-size ✕ promise
-    // while the peek card opens alongside for the detail (its own buttons
-    // keep the non-destructive verbs). Touch has no hover to announce the
-    // sweep, so a tap keeps its reading verb: it toggles the peek, whose
-    // front-and-center ✕ is the big clear target there. §7.7 lets ANYONE
-    // tidy a collected roll; the server still enforces that.
-    let ptrType = 'mouse';
-    el.addEventListener('pointerdown', (ev) => { ptrType = ev.pointerType || 'mouse'; });
     el.addEventListener('click', (ev) => {
       const t = ev.target;
       if (t instanceof HTMLElement && t.closest('button')) return;
-      if (ptrType === 'touch') {
-        if (peekRollId === c.rollId) closePeek();
-        // 'tap' hands the card the big red ✕ (one-✕ rule): touch has no
-        // hover to dress the sweep, so the card's base ✕ is the one target.
-        else openPeek(c.rollId, 'tap');
-        return;
-      }
-      requestClearRoll(c.rollId);
+      if (peekRollId === c.rollId) closePeek();
+      else openPeek(c.rollId);
     });
     el.addEventListener('contextmenu', (ev) => {
       ev.preventDefault();
       if (entry && canReroll(entry)) openShelfPopover(entry, c.rollId);
     });
-    const sweep = document.createElement('span');
-    sweep.className = 'shelf-sweep';
-    sweep.setAttribute('aria-hidden', 'true');
-    sweep.textContent = '✕';
-    el.appendChild(sweep);
     c.markerEl = el;
     shelfLayer.appendChild(el);
   }
@@ -1118,18 +1101,9 @@ let peekRollId = null;       // rollId of the open peek, or null
 // coarse pointers anyway). Before this, PEEK_HOVER_MS=0 opened the peek on
 // the same pointer beat that dressed the sweep — two targets for one verb,
 // the exact thing §7.9's 'never a second smaller target' contract bans.
-let peekVia = null;          // 'hover' | 'tap' — the gesture that opened it
-// The rule's COMPLEMENT, read from the same media query that hides the sweep
-// (css .shelf-marker .shelf-sweep, @media (pointer: coarse)): where the sweep
-// cannot be dressed, the card's ✕ is the only possible target no matter which
-// gesture opened the card. Without this the gesture alone decided, and a
-// touch LONG-PRESS — which fires contextmenu → openShelfPopover → openPeek
-// with the default 'hover' — left a collected roll with ZERO clear
-// affordances (no sweep, no ✕). Live, not cached: a hybrid device can change
-// its primary pointer under a running page.
-function sweepUnavailable() {
-  return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
-}
+// (peekVia / sweepUnavailable retired 2026-08-03: the card's BODY is the
+// one clear target in every modality — the folded-card grammar — so no
+// gesture tracking decides which affordance exists.)
 let peekHoverTimer = null;
 let peekCloseTimer = null;
 let peekW = 0;               // card box, cached by measurePeek (see positionPeek)
@@ -1147,25 +1121,19 @@ function closePeek() {
   if (peekPinned()) return; // an open shelf popover holds the card (Esc peels it first)
   cancelPeekTimers();
   peekRollId = null;
-  peekVia = null;
   peekEl.classList.add('hidden');
   peekEl.textContent = '';
 }
 
 // Open (or retarget) the peek for a shelved roll. False for anything not on
-// the shelf — a peek without a cluster has no slot to anchor to. `via` is
-// the opening gesture (the one-✕ rule): only the marker's touch branch
-// passes 'tap'; every other path — hover, pins, debug — is 'hover'.
-function openPeek(rollId, via = 'hover') {
+// the shelf — a peek without a cluster has no slot to anchor to.
+function openPeek(rollId) {
   if (!shelfClusters.has(rollId)) return false;
   // While the shelf popover is pinned to THIS card, another marker's hover
   // must not swap the card out from under it — the popover would keep
   // acting on the old roll while the card showed the new one.
   if (peekPinned() && rollId !== peekRollId) return false;
   cancelPeekTimers();
-  // Only an actual (re)open takes the gesture: a mouse pointerenter over an
-  // already-tap-opened card must not steal its ✕ mid-interaction.
-  if (rollId !== peekRollId) peekVia = via;
   peekRollId = rollId;
   renderPeek();
   return peekRollId === rollId;
@@ -1206,8 +1174,35 @@ function renderPeek() {
   const hidden = !entry || entryHidden(entry);
   peekEl.textContent = '';
 
-  // header: roller dot + name (their color) + label. The clear-✕ lives at
-  // the card's base — see the foot below.
+  // THE FOLDED CARD, shelf edition (Joe 2026-08-03: 'roughly the same as
+  // the roll reveal panel'): the card's BODY is the one big clear target —
+  // hover arms the red removal dress, click clears for everyone (§7.7:
+  // tidying a collected roll is anyone's housekeeping; the server still
+  // enforces it) — and the fold below keeps REROLL/Reveal untinted. The
+  // ✕-over-the-dice sweep is retired.
+  const main = document.createElement('div');
+  main.className = 'pk-main';
+  main.setAttribute('role', 'button');
+  main.tabIndex = 0;
+  main.title = 'Clear this roll for everyone';
+  main.setAttribute('aria-label', main.title);
+  const rid = c.rollId;
+  main.addEventListener('click', () => {
+    if (peekPinned()) closePopover(); // release the pin before the roll dies
+    requestClearRoll(rid).then((ok) => {
+      if (ok) closePeek();
+      else showSettingsNote('couldn’t clear the roll — try again');
+    });
+  });
+  main.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      main.click();
+    }
+  });
+
+  // header: roller dot + name (their color) + label
   const head = document.createElement('div');
   head.className = 'pk-head';
   const dot = document.createElement('span');
@@ -1226,7 +1221,7 @@ function renderPeek() {
     who.textContent = entry ? entry.label : 'collected roll';
   }
   head.appendChild(who);
-  peekEl.appendChild(head);
+  main.appendChild(head);
 
   const total = document.createElement('div');
   total.className = 'pk-total';
@@ -1236,7 +1231,7 @@ function renderPeek() {
     peekRows = true;
     total.classList.add('pk-tally', 'pk-outcomes'); // per-die: outcomes, not a sum
   } else total.textContent = String(entry.total);
-  peekEl.appendChild(total);
+  main.appendChild(total);
 
   const verdict = document.createElement('div');
   verdict.className = 'pk-verdict';
@@ -1251,7 +1246,7 @@ function renderPeek() {
       verdict.classList.add(cleared ? 'verdict-success' : 'verdict-fail');
     }
   }
-  peekEl.appendChild(verdict);
+  main.appendChild(verdict);
 
   const meaningEl = document.createElement('div');
   meaningEl.className = 'pk-meaning';
@@ -1261,31 +1256,32 @@ function renderPeek() {
     meaningEl.classList.add(`tier-${meaning.tier}`);
     meaningEl.title = `${meaning.rank} column (${meaning.column})`;
   }
-  peekEl.appendChild(meaningEl);
+  main.appendChild(meaningEl);
 
   const bd = document.createElement('div');
   bd.className = 'pk-breakdown';
   // 2e: the rows already carry every source and face — the breakdown line
   // only renders where the rows don't (sum systems, hidden rolls).
   if (entry && !peekRows) renderBreakdown(bd, entry, hidden);
-  peekEl.appendChild(bd);
+  main.appendChild(bd);
+  peekEl.appendChild(main);
 
-  // The banner's action set (appendCardActions): REROLL ❯❯❯ on approach,
-  // Reveal standing for a hidden roll. No die art on the strip (user call,
-  // 2026-07-31: the actual dice sit right under this card) and the reroll
-  // REPLACES the shelved cluster. The card ± is retired — right-click the
-  // cluster (or this card) for the tweak popover. The ✕ asymmetry is
-  // DELIBERATE (the one-✕ rule, Joe 2026-08-03): tap-opened cards carry
-  // the big red ✕ (touch has no hover); hover-opened cards carry none —
-  // the marker's sweep dress is the one clear target there.
+  // The FOLD: the banner's action set below a hairline crease — REROLL ❯❯❯
+  // on approach, Reveal standing for a hidden roll. No die art on the
+  // strip (user call, 2026-07-31: the actual dice sit right under this
+  // card); the reroll REPLACES the shelved cluster. The card ± stays on
+  // right-click. No ✕ anywhere: the body above IS the clear target.
   if (entry) {
-    appendCardActions(peekEl, entry, {
+    const fold = document.createElement('div');
+    fold.className = 'pk-fold';
+    appendCardActions(fold, entry, {
       revealClass: 'sm-reveal pk-reveal',
       rowClass: 'pk-actions',
       xClass: 'sm-reveal clear-x pk-clear',
       replaceShelfId: c.rollId,
-      clearX: 'tap-only',
+      clearX: 'none',
     });
+    if (fold.childElementCount) peekEl.appendChild(fold);
   }
   peekEl.oncontextmenu = entry && canReroll(entry) ? (ev) => {
     ev.preventDefault();
@@ -2425,14 +2421,11 @@ function renderRollResults(entry, dice, fx = true) {
 // The deliberate asymmetries (surface truth, not drift):
 //   · the peek's reroll REPLACES its shelved cluster (Joe's rule: reroll,
 //     not a copy); the banner's lets the old roll shelve itself on arrival
-//   · the banner's ✕ role-splits: the roller clears for everyone, a
-//     spectator merely dismisses their own card (dice stay); a COLLECTED
-//     roll is §7.7 housekeeping — clearing it belongs to anyone
-//   · opts.clearX ('always' | 'tap-only') — the ONE-✕ RULE: the banner's ✕
-//     is unconditional (an uncollected roll has no marker to sweep), but
-//     the peek builds its ✕ only when a TAP opened it; a hover-opened peek
-//     defers to the marker's sweep dress — one clear affordance at a time,
-//     on every device, never two targets for one verb (§7.9).
+//   · clearing is the CARD BODY's job on both surfaces (the folded card,
+//     Joe 2026-08-03) — the banner's body role-splits (roller clears for
+//     everyone, a spectator dismisses locally) while the peek's always
+//     clears (§7.7: a collected roll is anyone's housekeeping). No ✕ is
+//     built here at all; this holder is the FOLD's verbs only.
 function appendCardActions(holder, entry, opts) {
   if (canReveal(entry)) {
     const foot = document.createElement('div');
@@ -2465,35 +2458,6 @@ function appendCardActions(holder, entry, opts) {
     });
     holder.appendChild(strip);
   }
-  // The one-✕ rule: a hover-opened peek builds NO ✕ row at all (not an
-  // empty node — a vestigial row invites 'fixing') — the marker's sweep is
-  // the clear target while a hover exists to dress it. EXACTLY one, never
-  // zero: where the sweep is display:none (coarse) the card keeps its ✕
-  // whatever gesture opened it (sweepUnavailable — see the one-✕ block).
-  // The BANNER passes 'none' (the folded card): its whole body is the
-  // clear target, so a ✕ would be the second-smaller-target §7.9 forbids.
-  if (opts.clearX === 'none') return;
-  if (opts.clearX === 'tap-only' && peekVia !== 'tap' && !sweepUnavailable()) return;
-  const row = document.createElement('div');
-  row.className = `${opts.rowClass} reveal-tier`;
-  const x = document.createElement('button');
-  x.className = opts.xClass;
-  x.textContent = '✕';
-  if (opts.localDismiss) {
-    x.title = 'Dismiss — hides this for you; the dice stay until the roller acts';
-    x.addEventListener('click', () => banner.classList.add('hidden'));
-  } else {
-    x.title = 'Clear this roll for everyone';
-    x.addEventListener('click', () => {
-      x.disabled = true;
-      requestClearRoll(entry.rollId).then((ok) => {
-        x.disabled = false;
-        if (!ok) showSettingsNote('couldn’t clear the roll — try again');
-      });
-    });
-  }
-  row.appendChild(x);
-  holder.appendChild(row);
 }
 
 // The folded card's BODY act: 'clear' (the roller — for everyone) or
@@ -3565,16 +3529,14 @@ window.__diceDebug = {
       .filter((el) => !el.classList.contains('chip-clearing'))
       .map((el) => ({
         rollId: el.dataset.rollId || null,
-        // bare = nothing VISIBLE at rest: the sweep dress is hover-revealed
-        // chrome (opacity 0 until approach), so it does not count against
-        // the quiet-marker contract.
-        bare: [...el.children].every((ch) => ch.classList.contains('shelf-sweep')),
+        // bare = nothing at rest: the marker is a quiet dot that only
+        // OPENS the card (the folded-card grammar — the sweep retired
+        // 2026-08-03; the card's body is the clear target).
+        bare: el.children.length === 0,
         text: [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(''),
         hasTotal: !!el.querySelector('.sm-total'),
         hasX: !!el.querySelector('.sm-x'),
-        // the sweep dress (the big red clear promise) — the complement the
-        // one-✕ rule leans on when a hover-opened peek builds no card ✕
-        hasSweep: !!el.querySelector('.shelf-sweep'),
+        hasSweep: !!el.querySelector('.shelf-sweep'), // always false since the retire — kept as a regression pin
         hasReveal: !!el.querySelector('.sm-reveal'),
         // offsetWidth/Height: the layout target size, unaffected by the
         // chip-pop scale transform still playing when a test measures.
@@ -3752,19 +3714,18 @@ window.__diceDebug = {
   get pendingReveals() { return [...pendingReveals.keys()]; },
   // peek cards (§7.7.1): open for a shelved rollId / close with null, plus
   // the open card's state for content assertions.
-  peek(rollId, via) {
+  peek(rollId) {
     // null while pinned releases the pin first (close the shelf popover),
-    // so a scenario's tidy-up can never leave a zombie card. `via` drives
-    // the one-✕ rule the way the real gestures do: 'tap' is the marker's
-    // touch branch, anything else opens as a hover.
+    // so a scenario's tidy-up can never leave a zombie card. (`via` retired
+    // with the sweep — the card's body is the clear target in every
+    // modality, whatever gesture opened it.)
     if (!rollId) { if (peekPinned()) closePopover(); closePeek(); return null; }
-    return openPeek(rollId, via || 'hover') ? rollId : null;
+    return openPeek(rollId) ? rollId : null;
   },
   get peekState() {
     if (peekRollId === null) return null;
     return {
       rollId: peekRollId,
-      via: peekVia, // the gesture that opened the card (the one-✕ rule)
       // the strip's cue word ('REROLL' here — the draft's reads ROLL): the
       // closed CUE_WORDS vocabulary, asserted by tag, never scraped loosely
       cueWord: (peekEl.querySelector('.pk-again .cue-word') || { textContent: '' }).textContent.trim(),
@@ -3774,7 +3735,9 @@ window.__diceDebug = {
       hasReveal: !!peekEl.querySelector('.pk-reveal'),
       hasAgain: !!peekEl.querySelector('.pk-again'),
       hasTweak: !!peekEl.querySelector('.pk-tweak'),
-      hasClear: !!peekEl.querySelector('.pk-clear'),
+      hasClear: !!peekEl.querySelector('.pk-clear'), // always false since the folded card — a regression pin
+      hasMain: !!peekEl.querySelector('.pk-main'),   // the body clear target (folded card)
+      hasFold: !!peekEl.querySelector('.pk-fold'),
       rect: (() => { const r = peekEl.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; })(),
     };
   },

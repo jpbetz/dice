@@ -112,12 +112,19 @@ export const scenarios = [
       assert.ok(!(await a.eval(`document.getElementById('result-banner').classList.contains('hidden')`)),
         "the roller's card stands");
 
-      // the feed frames the well and warms with the draft
-      assert.equal(await a.eval(`document.querySelectorAll('#draft-zone .feed').length`), 2,
-        'a funnel above and its mirror below');
+      // the beacon, take two (the funnels retired — they fought the rail):
+      // presence by SIZE and AIR, plus heat-driven light. The well stands
+      // tall with margins; dice land larger inside it than in pool rows.
+      assert.equal(await a.eval(`document.querySelectorAll('#draft-zone .feed').length`), 0,
+        'the funnels are gone');
+      assert.ok((await a.eval(
+        `parseFloat(getComputedStyle(document.querySelector('.tray-line2 .tray-cluster')).minHeight)`)) >= 64,
+        'the well stands tall');
+      assert.ok((await a.eval(
+        `parseFloat(getComputedStyle(document.getElementById('tray-actions')).marginTop)`)) >= 10,
+        'and breathes above');
       const heatOf = `parseFloat(getComputedStyle(document.getElementById('draft-zone')).getPropertyValue('--draft-heat')) || 0`;
       const cold = await a.eval(heatOf);
-      const coldFeed = await a.eval(`parseFloat(getComputedStyle(document.querySelector('#draft-zone .feed')).opacity)`);
       await a.eval(`(() => {
         const box = document.getElementById('cmd-input');
         box.value = '8d6';
@@ -126,24 +133,21 @@ export const scenarios = [
       await a.waitFor(`(${heatOf}) > ${cold}`, { desc: 'the well warms as dice land in the draft' });
       assert.ok(await a.eval(`document.getElementById('draft-zone').classList.contains('heat-4')`),
         'eight dice = full heat');
-      // the VISUALS ride the heat classes (stepped — Chrome would not
-      // re-resolve calc(var()) on standing elements): feed brightens, the
-      // well glows gold, the standing ROLL cue gathers
       // Headless renders no compositor frames, so CSS transitions FREEZE at
       // their start value — strip them before reading, so these assert the
       // cascade's TARGET (what a live browser animates to), not a frame
       // of an animation that cannot advance here.
-      await a.eval(`document.querySelectorAll('#draft-zone .feed, .tray-roll .roll-cue, #tray-actions')
+      await a.eval(`document.querySelectorAll('.tray-roll .roll-cue, #tray-actions')
         .forEach((el) => { el.style.transition = 'none'; })`);
-      assert.ok((await a.eval(
-        `parseFloat(getComputedStyle(document.querySelector('#draft-zone .feed')).opacity)`)) > coldFeed,
-        'the feed brightens with the pool');
       assert.ok(await a.eval(
         `getComputedStyle(document.getElementById('tray-actions')).boxShadow.includes('255, 215, 102')`),
         'the well wears its gold under-glow at heat');
       assert.ok(await a.eval(
         `parseFloat(getComputedStyle(document.querySelector('.tray-roll .roll-cue')).opacity) > 0.5`),
         'the standing ROLL whisper gathers to a promise');
+      assert.ok((await a.eval(
+        `parseFloat(getComputedStyle(document.querySelector('.tray-roll .die-art')).width)`)) >= 34,
+        'dice land LARGER in the well than in pool rows');
       await a.eval(`(() => {
         const box = document.getElementById('cmd-input');
         box.value = '';
@@ -228,86 +232,33 @@ export const scenarios = [
       assert.equal(m.hasX, false, 'no tiny ✕');
       assert.ok(m.width >= 24 && m.height >= 24, `an easy target (${m.width}×${m.height})`);
 
-      // Hover leg: the peek recovers the detail but carries NO ✕ — the
-      // marker's sweep dress is the one clear target while a hover exists.
+      // THE FOLDED CARD, shelf edition (2026-08-03 — supersedes the three-
+      // leg one-✕ walk): ONE grammar in every modality. The marker only
+      // OPENS the card; the card's BODY is the one big clear target; the
+      // fold below holds the other verbs; no ✕ and no sweep exist at all.
       assert.equal(await b.dbg(`peek(${JSON.stringify(rid)})`), rid, 'peek opens');
       const ps = await b.dbg('peekState');
       assert.ok(ps.total, 'the peek shows the total');
-      assert.equal(ps.via, 'hover', 'opened as a hover');
-      assert.equal(ps.hasClear, false, 'a hover-opened peek defers its ✕ to the sweep');
-      assert.equal((await b.dbg('shelfMarkers'))[0].hasSweep, true,
-        'the sweep dress stands ready on the marker');
-      // The clear IS the cluster click (a synthetic click has no pointerdown,
-      // so the handler's recorded ptrType stays 'mouse' — the sweep branch).
+      assert.equal(ps.hasMain, true, 'the body clear target stands');
+      assert.equal(ps.hasFold, true, 'the fold stands under it');
+      assert.equal(ps.hasClear, false, 'no card ✕ anywhere — the body is the target');
+      assert.equal((await b.dbg('shelfMarkers'))[0].hasSweep, false,
+        'no ✕ over the dice — the sweep dress is retired');
+      await b.dbg('peek(null)');
+
+      // The marker's click OPENS the card now (it never clears directly).
       await b.eval(`document.querySelector('#shelf-layer .shelf-marker').click()`);
-      for (const t of [a, b]) {
-        await t.waitFor(
-          `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 0 && window.__diceDebug.tableDice.length === 0)`,
-          { desc: 'the sweep clears the roll for everyone' },
-        );
-      }
+      assert.equal((await b.dbg('peekState') || {}).rollId, rid, 'a marker click opens its card');
+      assert.equal((await b.dbg('shelf')).length, 1, 'and clears nothing by itself');
 
-      // Tap leg: no hover exists to dress the sweep, so the tap-opened card
-      // carries the big red ✕ at its base — and it clears for everyone too.
-      await a.roll('d6+1');
-      await b.settle();
-      const rid2 = await a.rollId();
-      assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid2)})`), true, 'second collect accepted');
-      for (const t of [a, b]) {
-        await t.waitFor(
-          `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
-          { desc: 'second roll shelved' },
-        );
-      }
-      assert.equal(await b.dbg(`peek(${JSON.stringify(rid2)}, 'tap')`), rid2, 'peek opens by tap');
-      const ts = await b.dbg('peekState');
-      assert.equal(ts.via, 'tap', 'opened as a tap');
-      assert.equal(ts.hasClear, true, 'a tap-opened peek carries the base ✕');
-      await b.eval(`document.querySelector('#peek-card .pk-clear').click()`);
+      // The BODY click clears for everyone.
+      await b.eval(`document.querySelector('#peek-card .pk-main').click()`);
       for (const t of [a, b]) {
         await t.waitFor(
           `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 0 && window.__diceDebug.tableDice.length === 0)`,
-          { desc: 'the tap-card ✕ clears the roll for everyone' },
+          { desc: 'the body click clears the roll for everyone' },
         );
       }
-
-      // COARSE leg — the rule is exactly one, never ZERO. On a coarse
-      // pointer the sweep is display:none, so the card must keep its ✕
-      // whatever gesture opened it. This is not hypothetical: a touch
-      // LONG-PRESS fires contextmenu → openShelfPopover → openPeek with the
-      // default 'hover', and the gesture-only gate left that card with no
-      // sweep AND no ✕ — a collected roll nobody could tidy.
-      await a.roll('d8+2');
-      await b.settle();
-      const rid3 = await a.rollId();
-      assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid3)})`), true, 'third collect accepted');
-      for (const t of [a, b]) {
-        await t.waitFor(
-          `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
-          { desc: 'third roll shelved' },
-        );
-      }
-      await b.emulateCoarsePointer();
-      assert.equal(await b.eval(`matchMedia('(pointer: coarse)').matches`), true,
-        'the tab really is a coarse pointer now');
-      assert.equal(
-        await b.eval(`getComputedStyle(document.querySelector('.shelf-marker .shelf-sweep')).display`),
-        'none', 'the sweep really is gone on a coarse pointer (the rule\'s complement)');
-      assert.equal(await b.dbg(`peek(${JSON.stringify(rid3)})`), rid3, 'peek opens as a hover');
-      const cs = await b.dbg('peekState');
-      assert.equal(cs.via, 'hover', 'opened as a hover — the long-press path');
-      assert.equal(cs.hasClear, true,
-        'coarse + hover-opened: the card keeps the ✕ (no sweep to defer to)');
-      await b.eval(`document.querySelector('#peek-card .pk-clear').click()`);
-      for (const t of [a, b]) {
-        await t.waitFor(
-          `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 0 && window.__diceDebug.tableDice.length === 0)`,
-          { desc: 'and it clears for everyone' },
-        );
-      }
-      await b.emulateCoarsePointer(false); // release it for anything after
-      assert.equal(await b.eval(`matchMedia('(pointer: coarse)').matches`), false,
-        'the emulation is released');
 
       // A held roll rests exactly as quiet: nothing drawn, never '?'; its
       // Reveal waits in the peek for the authority.
@@ -348,9 +299,9 @@ export const scenarios = [
       assert.equal(ps.hasAgain, true, 'the peek carries the reroll strip');
       assert.equal(ps.cueWord, 'REROLL', 'and its cue word SAYS reroll (never plain ROLL)');
       assert.equal(ps.hasTweak, false, 'the card ± is retired');
-      // The one-✕ rule: this peek opened as a hover, so the clear target is
-      // the marker's sweep — the card builds no ✕ of its own.
-      assert.equal(ps.hasClear, false, 'a hover-opened peek defers its ✕ to the sweep');
+      // The folded card: no ✕ exists in any modality — the body clears.
+      assert.equal(ps.hasClear, false, 'no card ✕ — the body is the clear target');
+      assert.equal(ps.hasMain && ps.hasFold, true, 'body over fold, like the banner');
 
       // ⟳ REPLACES: the old cluster leaves the shelf, the same spec rolls.
       await a.eval(`document.querySelector('#peek-card .pk-again').click()`);
@@ -1410,12 +1361,15 @@ export const scenarios = [
       await a.waitFor(`(window.__diceDebug.sim(60), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
         { desc: 'the roll collected itself' });
 
-      // the WHOLE cluster is the one clear target: a plain click sweeps
-      assert.equal(await a.eval(`!!document.querySelector('.shelf-marker .shelf-sweep')`), true,
-        'the sweep dress rides the marker');
+      // the folded card (2026-08-03): the marker OPENS the card; the card's
+      // BODY is the one big clear target (the sweep-over-the-dice retired)
+      assert.equal(await a.eval(`!!document.querySelector('.shelf-marker .shelf-sweep')`), false,
+        'no ✕ over the dice');
       await a.eval(`document.querySelector('.shelf-marker').click()`);
+      assert.ok(await a.dbg('peekState'), 'the marker click opens the card');
+      await a.eval(`document.querySelector('#peek-card .pk-main').click()`);
       await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 0 && window.__diceDebug.shelf.length === 0)`,
-        { desc: 'one click on the cluster cleared it' });
+        { desc: 'the card body click cleared it' });
 
       // a held roll does NOT tidy itself — the standing tension is the point
       await a.dbg('setAutoCollectMs(120)');

@@ -1636,14 +1636,27 @@ verb's) and red (removal's); unsourced dice wear quiet ivory. A hidden
 roll's sources are withheld with its spec, so its outlines are all
 ivory and leak nothing.
 
-**The feed.** Two converging gold funnels frame the workbench — shapes,
-no words: the one above narrows down into the well, the one below
-narrows up into it, so the palette above and the saved pools below
-visibly pour toward the draft. Heat rides stepped classes (heat-1…4,
-two dice per step): the funnels brighten, the well gains a gold
-under-glow, and the standing ROLL whisper gathers from 0.3 toward 0.55
-— light and depth only, geometry never moves (§7.10). An empty well
+**The beacon, take two — size and air.** *(The first take's converging
+funnels looked right over an empty well but fought the rail once
+Save · Offer · Clear stood — Joe, same day. Retired.)* The well earns
+its presence by SIZE and AIR instead: real margins above and below,
+a 64px-tall well, and dice that land **larger inside it (34px) than in
+any pool row (28px)** — the draft is the star. Heat stays: stepped
+classes (heat-1…4, two dice per step) brighten the well's gold
+under-glow and gather the standing ROLL whisper from 0.3 toward 0.55.
+Light, depth and scale — never geometry jitter (§7.10). An empty well
 stays quiet; auto-collect runs at 3 s with a hover-hold.
+
+**The folded card, shelf edition** *(same day: 'make the collect panel
+roughly the same as the roll reveal panel')*: the peek's BODY is the one
+big clear target — the same red removal dress and ✕ watermark as the
+banner's, always red here because clearing a collected roll is anyone's
+housekeeping (§7.7) — with REROLL/Reveal in the fold below. The
+✕-over-the-dice sweep dress is fully retired, and with it the whole
+gesture-tracked one-✕ machinery (`peekVia`/`sweepUnavailable`, §7.15's
+modality rule): the marker is now a quiet dot that only OPENS the card
+(hover peeks, click pins) in every modality, and the card clears. One
+removal grammar on both result surfaces.
 
 ### 7.12 The organized per-die read (shipped 2026-08-03)
 
