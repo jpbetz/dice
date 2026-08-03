@@ -130,6 +130,11 @@ limitations under the License.
            — updates stay on the by-id paths). -->
       <div class="btn-row draft-actions hidden" id="draft-actions">
         <button id="save-group" class="btn">Save</button>
+        <!-- Offer lives on the DRAFT now (Trigger Pass): the popover's
+             'Offer to table' retired with its Roll — one composing surface
+             owns both verbs. Hidden solo (offers need a table); targeted
+             offers grow their audience picker here later (ROADMAP 4b). -->
+        <button id="offer-draft" class="btn hidden" title="Post this roll for anyone at the table to take">Offer to table</button>
         <button id="clear-tray" class="btn" title="Clear the draft">✕ Clear</button>
       </div>
       <div class="btn-row tray-save hidden" id="tray-save-row">
@@ -468,16 +473,17 @@ limitations under the License.
     </div>
 
     <div id="pop-preview" class="pop-preview"></div>
-    <div class="pop-actions">
-      <button id="pop-roll" class="btn primary">Roll</button>
-      <button id="pop-offer" class="btn ghost">Offer to table</button>
-    </div>
-    <!-- Save = the SAME quick inline-name morph the Pools draft uses
-         (one save flow everywhere); always additive. Update stays the by-id
-         write for pool-bound popovers. -->
+    <!-- THE TRIGGER PASS (2026-08-03, Joe): the popover is a pure EDITOR —
+         its Roll and Offer are retired; every roll fires from a ROLL ❯❯❯
+         trigger (the draft cluster, a card's strip) and offers from the
+         draft's own row. A tray-bound popover live-syncs into the draft
+         (no commit chrome at all); a pool commits with ONE verb (Save,
+         by id) and Duplicate… is the additive twin; a shelved roll's
+         tweak goes back through the draft (Open in draft). -->
     <div class="pop-actions pop-actions-2nd">
-      <button id="pop-update" class="btn">Update this pool</button>
-      <button id="pop-variant" class="btn">Save</button>
+      <button id="pop-save" class="btn primary">Save</button>
+      <button id="pop-todraft" class="btn ghost">Open in draft</button>
+      <button id="pop-variant" class="btn">Duplicate…</button>
     </div>
     <div class="pop-actions pop-save hidden" id="pop-save-row">
       <input id="pop-save-name" class="tin" maxlength="24" placeholder="Name this pool…">

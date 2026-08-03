@@ -226,16 +226,23 @@ export const scenarios = [
       assert.equal(await a.dbg('popover'), null, 'Esc closes the shelf popover first');
       assert.ok((await a.dbg('peekState')) !== null, 'the peek survives that Esc');
 
-      // Rolling a tweak from the shelf popover REPLACES the shelved roll.
+      // Trigger Pass: the shelf popover never rolls — its tweak travels to
+      // the draft ('Open in draft') and rolls from ROLL ❯❯❯ like everything.
       await a.eval(`document.querySelector('.shelf-marker')
         .dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true}))`);
+      assert.equal(await a.eval(`!!document.getElementById('pop-roll')`), false,
+        'the popover has no Roll button (pure editor)');
+      const tweakCanon = (await a.dbg('popover')).canonical;
+      await a.eval(`document.getElementById('pop-todraft').click()`);
+      assert.equal(await a.dbg('popover'), null, 'Open in draft closes the popover');
+      assert.equal(await a.eval(`document.getElementById('cmd-input').value`), tweakCanon,
+        'the tweak landed in the draft as its canonical');
       const logN = await a.logCount();
-      await a.eval(`document.getElementById('pop-roll').click()`);
+      await a.eval(`window.__diceDebug.commandRoll(document.getElementById('cmd-input').value)`);
       await a.waitFor(
-        `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${logN} && window.__diceDebug.shelf.length === 0)`,
-        { desc: 'the tweak rolled and the shelved original left — replaced, not copied' },
+        `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${logN})`,
+        { desc: 'the tweak rolled from the draft trigger' },
       );
-      assert.equal(await a.dbg('popover'), null, 'popover closed by the roll');
     },
   },
   {
@@ -444,8 +451,9 @@ export const scenarios = [
       assert.ok(tallyText.includes('Wisdom ') && tallyText.includes('  \u00b7  '),
         `real separators in the tally text (got: ${JSON.stringify(tallyText)})`);
 
-      // ± Update rewrites a composed pool WITHOUT stripping its [labels]
-      // (regression: popSpec dropped sources, so Update destroyed them)
+      // ± Save rewrites a composed pool WITHOUT stripping its [labels]
+      // (regression: popSpec dropped sources, so the by-id write destroyed
+      // them). Save = the one commit verb since the Trigger Pass.
       await a.dbg(`setGroups([{name: 'Hunt', notation: '2d8[Wisdom]+1d4[Zeal]'}])`);
       const hunt = (await a.dbg('groups'))[0];
       await a.dbg(`openPopoverFor(${JSON.stringify(hunt.id)})`);
@@ -454,11 +462,11 @@ export const scenarios = [
         dc.value = '12';
         dc.dispatchEvent(new Event('input'));
       })()`);
-      await a.eval(`document.getElementById('pop-update').click()`);
+      await a.eval(`document.getElementById('pop-save').click()`);
       const upd = (await a.dbg('groups'))[0];
       assert.ok(upd.notation.includes('[Wisdom]') && upd.notation.includes('[Zeal]')
         && upd.notation.includes('dc12'),
-        `Update kept the labels beside the tweak (got: ${upd.notation})`);
+        `Save kept the labels beside the tweak (got: ${upd.notation})`);
 
       // a lens switch keeps the grouping and returns the total
       await a.dbg(`setSystem('dnd')`);
@@ -1122,49 +1130,62 @@ export const scenarios = [
       await a.eval(`document.querySelector('#groups-list .ge-cancel').click()`);
       assert.equal((await a.dbg('groups')).find((g) => g.id === atk.id).notation, '3d8+2', 'Cancel reverted');
 
-      // ± popover: 'Update this group' rewrites in place; variant adds.
+      // ± popover: ONE commit verb (Trigger Pass) — Save rewrites in place
+      // by id; Duplicate… adds. Roll/Offer are gone from the popover.
       assert.equal(await a.dbg(`openPopoverFor(${JSON.stringify(atk.id)})`), true, 'popover opens');
-      assert.equal(await a.eval(`document.getElementById('pop-update').classList.contains('hidden')`), false,
-        'Update offered for a saved group');
+      assert.equal(await a.eval(`!!document.getElementById('pop-roll') || !!document.getElementById('pop-offer')`),
+        false, 'the popover neither rolls nor offers (pure editor)');
+      assert.equal(await a.eval(`document.getElementById('pop-save').classList.contains('hidden')`), false,
+        'Save offered for a saved group');
       await a.eval(`(() => {
         const dc = document.getElementById('pop-dc');
         dc.value = '15';
         dc.dispatchEvent(new Event('input'));
       })()`);
-      await a.eval(`document.getElementById('pop-update').click()`);
-      assert.equal(await a.dbg('popover'), null, 'popover closed by Update');
+      await a.eval(`document.getElementById('pop-save').click()`);
+      assert.equal(await a.dbg('popover'), null, 'popover closed by Save');
       gs = await a.dbg('groups');
-      assert.equal(gs.length, before.length, 'update-in-place added nothing');
+      assert.equal(gs.length, before.length, 'save-in-place added nothing');
       const dced = gs.find((g) => g.id === atk.id);
       assert.ok(dced.notation.includes('dc15'), `the dc landed on the record (got: ${dced.notation})`);
-      assert.equal(dced.name, 'Alpha Strike', 'the name survived the popover update');
+      assert.equal(dced.name, 'Alpha Strike', 'the name survived the popover save');
 
-      // The popover's Save: the same inline-name morph as the panel's Save
-      // (one flow), prefilled with a suggested variant name; Enter mints a
-      // NEW pool — additive, the original untouched.
+      // Duplicate…: the same inline-name morph as the panel's Save (one
+      // flow), prefilled with a suggested variant name; Enter mints a NEW
+      // pool — additive, the original untouched.
       await a.dbg(`openPopoverFor(${JSON.stringify(atk.id)})`);
       await a.eval(`document.getElementById('pop-variant').click()`);
       assert.equal(await a.eval(`document.getElementById('pop-save-row').classList.contains('hidden')`),
-        false, 'Save morphs into the name row');
+        false, 'Duplicate morphs into the name row');
       assert.ok(await a.eval(`document.getElementById('pop-save-name').value.length > 0`),
-        'a pool-bound Save suggests a name');
+        'a pool-bound Duplicate suggests a name');
       await a.eval(`document.getElementById('pop-save-name').dispatchEvent(
         new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}))`);
       gs = await a.dbg('groups');
-      assert.equal(gs.length, before.length + 1, 'the popover Save stays additive');
+      assert.equal(gs.length, before.length + 1, 'Duplicate stays additive');
       assert.ok(gs.find((g) => g.id === atk.id), 'the original survives beside the new pool');
 
-      // The ad-hoc draft has no record: its popover offers variant, never
-      // Update. (`openPopoverFor('tray')` keeps the internal source name.)
+      // The ad-hoc draft is a LIVE editor (no commit chrome at all): its
+      // edits land straight in the box as the canonical, and the actions
+      // row stays hidden. (`openPopoverFor('tray')` keeps the source name.)
       await a.eval(`(() => {
         const box = document.getElementById('cmd-input');
         box.value = 'd6';
         box.dispatchEvent(new Event('input'));
       })()`);
       assert.equal(await a.dbg(`openPopoverFor('tray')`), true, 'draft popover opens');
-      assert.equal(await a.eval(`document.getElementById('pop-update').classList.contains('hidden')`), true,
-        'no Update for the ad-hoc draft');
+      assert.equal(await a.eval(`document.querySelector('#mods-popover .pop-actions-2nd').classList.contains('hidden')`),
+        true, 'no commit chrome for the ad-hoc draft');
+      await a.eval(`(() => {
+        const dc = document.getElementById('pop-dc');
+        dc.value = '7';
+        dc.dispatchEvent(new Event('input'));
+      })()`);
+      assert.equal(await a.eval(`document.getElementById('cmd-input').value`), '1d6 dc7',
+        'a popover edit live-syncs into the draft box');
       await a.dbg('closePopover()');
+      assert.equal(await a.eval(`document.getElementById('cmd-input').value`), '1d6 dc7',
+        'the synced draft survives the popover closing');
     },
   },
   {
@@ -1487,9 +1508,14 @@ export const scenarios = [
       await a.dbg(`setGroups([{name: 'Claws', notation: '1d20', category: 'Attributes'},
         {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
       await b.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}])`);
+      // The predicate demands the FULL 3-pool rack: origins share a profile
+      // across scenarios, and sheet-touch leaves a 1-pool Claws/Attributes
+      // rack behind — Alice's join-time publish of THAT stale rack satisfied
+      // a some()-only check and raced ahead of the debounced seed publish.
       await b.waitFor(`window.__diceDebug.netPlayers.some((p) =>
-        p.name === 'Alice' && p.pools.some((g) => g.name === 'Claws' && g.category === 'Attributes'))`,
-        { desc: "Alice's rack reaches Bob" });
+        p.name === 'Alice' && p.pools.length === 3
+        && p.pools.some((g) => g.name === 'Claws' && g.category === 'Attributes'))`,
+        { desc: "Alice's full seeded rack reaches Bob" });
       const alice = (await b.dbg('netPlayers')).find((p) => p.name === 'Alice');
 
       // The switcher stands once the table has teammates: You + Alice.

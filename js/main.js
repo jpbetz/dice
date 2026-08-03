@@ -3597,11 +3597,12 @@ const trayRollBtn = document.getElementById('tray-roll');
 const trayXLayer = document.getElementById('tray-x-layer');
 const trayHintEl = document.getElementById('tray-hint');
 const trayActionsEl = document.getElementById('tray-actions');   // the roll line: [cluster][±]
-const draftActionsEl = document.getElementById('draft-actions'); // Save · ✕ Clear — always stand
+const draftActionsEl = document.getElementById('draft-actions'); // Save · Offer · ✕ Clear — always stand
 const traySaveRow = document.getElementById('tray-save-row');
 const trayModsBtn = document.getElementById('tray-mods');
 const clearTrayBtn = document.getElementById('clear-tray');
 const saveGroupBtn = document.getElementById('save-group');
+const offerDraftBtn = document.getElementById('offer-draft');
 const groupNameInput = document.getElementById('group-name');
 
 // P1 — the dice are the buttons: each palette tile shows its die's real
@@ -3879,6 +3880,10 @@ function updateTrayButtons() {
   trayModsBtn.disabled = !usable;
   clearTrayBtn.disabled = !tray.length && !cmdInput.value;
   saveGroupBtn.disabled = !usable;
+  // Offers need a table: the verb HIDES solo (quiet chrome — a standing
+  // disabled button would be noise a solo table can never use).
+  offerDraftBtn.classList.toggle('hidden', !netOnline);
+  offerDraftBtn.disabled = !usable;
 }
 
 // Roll the draft — the cluster click, the Enter key, and nothing else.
@@ -3909,6 +3914,19 @@ function rollDraft() {
   }
 }
 trayRollBtn.addEventListener('click', rollDraft);
+
+// Offer the draft to the table (Trigger Pass): the popover's 'Offer to
+// table' retired with its Roll, so the draft row is where offers fire —
+// same full-intent carrier as rollDraft (the box canonical), same
+// validation gates as Shift+Enter in the box.
+function offerDraft() {
+  if (!netOnline || !net) return;
+  paintCmd();
+  if (cmdResult && cmdResult.ok) commandOffer(cmdInput.value);
+  else if (tray.length) net.offer({ label: formula(tray), dice: [...tray] });
+}
+offerDraftBtn.addEventListener('click', offerDraft);
+
 // Right-click the cluster = ± (a pointer bonus; the visible ± button is the
 // path for touch and keyboard).
 trayEl.addEventListener('contextmenu', (e) => {
@@ -5294,11 +5312,19 @@ groupNameInput.addEventListener('keydown', (e) => {
 
 // ---------------------------------------------------------------------------
 // ± popover (docs/mockups/panel.html): per-group modifier + attributed parts,
-// adv/dis, keep/drop, reroll, explode, face down, dc and comment. Opening it
-// parses the group's notation into edit state; every edit re-renders the
-// canonical echo and Monte Carlo preview. Roll/Offer act on the edited spec;
-// 'Save as variant' appends a new group; 'Update this pool' writes the
-// source record back in place by id (editPoolById — the row editor's path).
+// adv/dis, keep/drop, reroll, explode, visibility, dc and comment. Opening it
+// parses the source's notation into edit state; every edit re-renders the
+// canonical echo and Monte Carlo preview.
+//
+// THE TRIGGER PASS (2026-08-03): the popover is a pure EDITOR — it never
+// rolls or offers (those verbs live on ROLL ❯❯❯ triggers and the draft row).
+// Where an edit lands depends on the source:
+//   tray  — LIVE-SYNCS into the draft (the box canonical is the carrier);
+//           no commit chrome at all, the draft's own row stands beside it
+//   group — a working draft that commits with ONE verb (Save → editPoolById,
+//           the by-id write); 'Duplicate…' is the additive twin
+//   shelf — inspect/tweak; 'Open in draft' carries the tweak to the one
+//           composing surface, 'Duplicate…' keeps it as a pool
 // ---------------------------------------------------------------------------
 
 const popEl = document.getElementById('mods-popover');
@@ -5325,10 +5351,10 @@ const popCommentInput = document.getElementById('pop-comment');
 const popSegExp = document.getElementById('pop-seg-exp');
 const popExpSubtitle = document.getElementById('pop-exp-subtitle');
 const popPreviewEl = document.getElementById('pop-preview');
-const popRollBtn = document.getElementById('pop-roll');
-const popOfferBtn = document.getElementById('pop-offer');
-const popUpdateBtn = document.getElementById('pop-update');
+const popSaveBtn = document.getElementById('pop-save');
+const popToDraftBtn = document.getElementById('pop-todraft');
 const popVariantBtn = document.getElementById('pop-variant');
+const popActions2nd = document.querySelector('#mods-popover .pop-actions-2nd');
 
 // ']' would close the label early and '#' starts a comment — both break the
 // canonical round-trip, so they can't live inside a part label (rollspec's
@@ -5390,21 +5416,20 @@ function trayDraftNotation() {
 }
 
 // Open the ± popover bound to a source (UX §7.4): {source:'group', group, row}
-// or {source:'tray', row}. Roll / Offer / Save-as-variant act on the source.
+// or {source:'tray', row}. The popover only EDITS (Trigger Pass) — commits
+// per source are wired below; rolling is always a ROLL ❯❯❯ trigger's job.
 function openPopover(binding) {
-  let notation, name, groupId = null, shelfRollId = null;
+  let notation, name, groupId = null;
   if (binding.source === 'group') {
     notation = binding.group.notation;
     name = binding.group.name || binding.group.notation;
     groupId = binding.group.id;
   } else if (binding.source === 'shelf') {
     // A shelved roll's ± (the peek): the SAME popover as every other ±,
-    // anchored to the peek card — no teleport into the panel. Rolling from
-    // it REPLACES the shelved roll (like the peek's bare reroll); Save
-    // mints 'keep this roll as a pool'.
+    // anchored to the peek card — no teleport into the panel. Its tweak
+    // travels via 'Open in draft'; 'Duplicate…' keeps it as a pool.
     notation = binding.raw;
     name = binding.name || notation;
-    shelfRollId = binding.rollId || null;
   } else {
     notation = trayDraftNotation();
     name = groupNameInput.value.trim() || 'Tray';
@@ -5416,7 +5441,6 @@ function openPopover(binding) {
   pop = {
     source: binding.source,
     groupId,
-    shelfRollId,
     name,
     row: binding.row || null,
     ...popStateFromParse(res),
@@ -5430,9 +5454,16 @@ function openPopover(binding) {
   popDcInput.value = pop.dc == null ? '' : String(pop.dc);
   popCommentInput.value = pop.comment || '';
   popExpSubtitle.value = pop.expSubtitle;
-  // 'Update this pool' needs a record to write back to — the tray draft
-  // has none, so its popover offers only the additive 'Save as variant'.
-  popUpdateBtn.classList.toggle('hidden', pop.source !== 'group');
+  // Commit chrome per source (Trigger Pass): a pool commits with ONE verb
+  // (Save, by id) + Duplicate…; a shelved roll offers the two doors out
+  // (Open in draft / Duplicate…); the tray draft shows NO buttons — its
+  // live-sync IS the commit, and the draft's own row stands right there.
+  popSaveBtn.classList.toggle('hidden', pop.source !== 'group');
+  popToDraftBtn.classList.toggle('hidden', pop.source !== 'shelf');
+  popActions2nd.classList.toggle('hidden', pop.source === 'tray');
+  // One additive verb, two readings: beside a pool's Save it duplicates;
+  // on a shelved roll it is 'keep this roll as a pool'.
+  popVariantBtn.textContent = pop.source === 'group' ? 'Duplicate…' : 'Save as pool…';
   // A per-die table reads no totals: say so where mods/targets are edited
   // (they stay editable — notation totality is app-wide, and the room can
   // switch systems later).
@@ -5453,15 +5484,24 @@ function resyncTrayPopover() {
     closePopover(); // the draft is gone (tray emptied)
     return;
   }
+  // The echo of our own live-sync (Trigger Pass): the box now carries
+  // exactly what this popover already holds. Re-seeding pop from a
+  // re-parse here would REPLACE pop.parts and orphan the part-label input
+  // closures mid-word — state matches, so there is nothing to do.
+  if (notation === popCanonical()) return;
   const res = parseNotation(notation);
   if (!res.ok) return;
   Object.assign(pop, popStateFromParse(res));
   if (pop.dc != null && !pop.expKind) pop.expKind = 'check';
   pop.name = groupNameInput.value.trim() || 'Tray';
   popNameEl.textContent = pop.name;
-  popDcInput.value = pop.dc == null ? '' : String(pop.dc);
-  popCommentInput.value = pop.comment || '';
-  popExpSubtitle.value = pop.expSubtitle;
+  // Never clobber the input the user is TYPING in: since the Trigger Pass
+  // every popover edit round-trips through the box (live-sync → paintCmd →
+  // here), and rewriting the focused field would eat a trailing space or
+  // an un-normalized keystroke mid-word. The canonical catches up on blur.
+  if (document.activeElement !== popDcInput) popDcInput.value = pop.dc == null ? '' : String(pop.dc);
+  if (document.activeElement !== popCommentInput) popCommentInput.value = pop.comment || '';
+  if (document.activeElement !== popExpSubtitle) popExpSubtitle.value = pop.expSubtitle;
   renderPop();
   placePopover();
 }
@@ -5727,11 +5767,8 @@ function popCanonical() {
   }, pop.vis.mode === 'open' ? null : pop.vis);
 }
 
-// The popover's visibility as requestRoll/offer opts, or undefined for open.
-function popVis() {
-  if (!pop || pop.vis.mode === 'open') return undefined;
-  return { mode: pop.vis.mode, names: [...pop.vis.names] };
-}
+// (popVis retired with the popover's Roll/Offer — visibility now travels
+// exclusively inside the canonical string the editor emits.)
 
 // A whisper with nobody named is unsendable (the grammar has no empty w:).
 function popVisBlocked() {
@@ -5813,15 +5850,23 @@ function renderPopEcho() {
     : visBlocked
       ? 'whisper needs an audience — pick at least one player'
       : fmtPreview(spec.dice, spec.mods).replace(/ (avg|max)/g, ' · $1') + visSuffix;
-  popRollBtn.disabled = !!err || visBlocked;
-  popOfferBtn.disabled = !!err || visBlocked || !netOnline;
-  // An offer's restricted mode has its own name: the dice tower (they roll,
-  // only the offerer reads the result) — §3.2's terminology note.
-  popOfferBtn.title = !netOnline
-    ? 'Offers need a table — you are playing solo'
-    : pop.vis.mode === 'secret'
-      ? 'Dice tower — they roll, only you see the result'
-      : 'Post this roll for anyone at the table to take';
+  popSaveBtn.disabled = !!err || visBlocked;
+  popToDraftBtn.disabled = !!err || visBlocked;
+  popVariantBtn.disabled = !!err || visBlocked;
+  // THE TRIGGER PASS: a tray-bound popover is a live EDITOR of the draft —
+  // every edit lands in the command box as the canonical (the box is the
+  // draft's one carrier; ROLL ❯❯❯ rolls it). Parse-to-parse compare so
+  // opening ± never rewrites a hand-typed spelling of the same roll, and
+  // the paintCmd → resyncTrayPopover echo terminates (see its guard). An
+  // audience-less whisper stays popover-local (unsendable by design): the
+  // preview line explains, and the draft keeps its last good state.
+  if (pop.source === 'tray' && !err && !visBlocked) {
+    const cur = cmdResult && cmdResult.ok ? cmdResult.canonical : null;
+    if (cur !== canonical) {
+      cmdInput.value = canonical;
+      paintCmd();
+    }
+  }
 }
 
 // The whisper audience multi-select, built from the live roster (minus you —
@@ -6064,55 +6109,10 @@ document.getElementById('pop-close').addEventListener('click', closePopover);
 // central Esc layering in the keyboard-shortcuts section below.
 window.addEventListener('resize', placePopover);
 
-popRollBtn.addEventListener('click', () => {
-  if (!pop) return;
-  const spec = popSpec();
-  if (validateMods(spec.dice, spec.mods)) return;
-  if (popVisBlocked()) return;
-  // Rolling a SHELVED roll's tweak replaces it, exactly like the peek's
-  // bare reroll: the clear goes first so the shelf never holds both.
-  const replacing = pop.source === 'shelf' ? pop.shelfRollId : null;
-  if (replacing) requestClearRoll(replacing);
-  requestRoll(spec.dice, pop.comment || pop.name, {
-    mods: spec.mods || undefined,
-    sources: spec.sources || undefined, // 2b-⑤
-    faceDown: pop.vis.mode === 'held',
-    visibility: popVis(), // secret/whisper ride the canonical (requestRoll)
-    dc: pop.dc ?? undefined,
-    exp: popExp(),
-    canonical: popCanonical(),
-  });
-  closePopover();
-  if (replacing) closePeek();
-});
-
-popOfferBtn.addEventListener('click', () => {
-  if (!pop || !netOnline || !net) return;
-  const spec = popSpec();
-  if (validateMods(spec.dice, spec.mods)) return;
-  if (popVisBlocked()) return;
-  const vis = popVis();
-  if (vis && vis.mode !== 'held') {
-    // secret/whisper have no explicit wire field: the offer rides the
-    // canonical string and the server re-parses it (label rides beside it).
-    net.offer({ label: pop.comment || pop.name, notation: popCanonical() });
-  } else {
-    net.offer({
-      label: pop.comment || pop.name,
-      dice: spec.dice,
-      mods: spec.mods || undefined,
-      faceDown: !!vis, // held keeps today's explicit-shape field
-      dc: pop.dc ?? undefined,
-      exp: popExp(),
-    });
-  }
-  closePopover();
-});
-
-// 'Update this pool' (saved-group source only): the edited canonical writes
-// back to the SAME record by id — editPoolById, the row editor's path. The
-// name stays; 'Save as variant' below is the additive twin.
-popUpdateBtn.addEventListener('click', () => {
+// 'Save' — the ONE commit verb of a pool-bound popover (Trigger Pass):
+// the edited canonical writes back to the SAME record by id (editPoolById,
+// the row editor's path). The name stays; 'Duplicate…' is the additive twin.
+popSaveBtn.addEventListener('click', () => {
   if (!pop || pop.source !== 'group') return;
   const spec = popSpec();
   if (validateMods(spec.dice, spec.mods)) return;
@@ -6122,16 +6122,32 @@ popUpdateBtn.addEventListener('click', () => {
   editPoolById(id, { notation: canonical });
 });
 
-// The popover's Save — the SAME quick inline-name morph as the New pool
-// panel's (one save flow everywhere, user call 2026-07), and additive like
-// it: a new pool is minted, never an overwrite (Update is the by-id write).
-// A pool-bound popover prefills a suggested name (base + mods summary);
-// Enter accepts, Esc backs out to the buttons.
+// 'Open in draft' (shelf source): a shelved roll's tweak travels to the ONE
+// composing surface — same landing as the echo click — and rolls from the
+// draft's ROLL ❯❯❯ like everything else. (The popover-roll that used to
+// REPLACE the shelved roll retired with the Trigger Pass; the peek's bare
+// reroll strip still replaces, unchanged.)
+popToDraftBtn.addEventListener('click', () => {
+  if (!pop) return;
+  const name = parseNotation(pop.name).ok ? '' : pop.name; // notation labels itself
+  const canonical = popCanonical();
+  closePopover();
+  if (!panelsOpen.pools) setPanel('pools', true); // the draft edits the box — surface it
+  loadIntoBox(canonical, name);
+});
+
+// 'Duplicate…' / 'Save as pool…' — the SAME quick inline-name morph as the
+// New pool panel's (one save flow everywhere, user call 2026-07), and
+// additive like it: a new pool is minted, never an overwrite (Save is the
+// by-id write). A pool-bound popover prefills a suggested name (base +
+// mods summary); Enter accepts, Esc backs out to the buttons.
 const popSaveRow = document.getElementById('pop-save-row');
 const popSaveName = document.getElementById('pop-save-name');
 function closePopSaveMorph() {
   popSaveRow.classList.add('hidden');
-  document.querySelector('#mods-popover .pop-actions-2nd').classList.remove('hidden');
+  // restore the buttons the morph swapped out — except for a tray-bound
+  // popover, whose actions row stays hidden by design (pure editor).
+  popActions2nd.classList.toggle('hidden', !!pop && pop.source === 'tray');
 }
 popVariantBtn.addEventListener('click', () => {
   if (!pop) return;
@@ -6148,7 +6164,7 @@ popVariantBtn.addEventListener('click', () => {
   } else {
     popSaveName.value = '';
   }
-  document.querySelector('#mods-popover .pop-actions-2nd').classList.add('hidden');
+  popActions2nd.classList.add('hidden');
   popSaveRow.classList.remove('hidden');
   popSaveName.focus();
   popSaveName.select();
@@ -7383,6 +7399,7 @@ function leaveTable() {
   renderOffers();
   setPill(null);
   updateIdentityChip();
+  updateTrayButtons(); // the draft's Offer verb leaves with the table
   netReady = initNet();
   return true;
 }
@@ -7782,6 +7799,7 @@ async function initNet() {
     applyRoomSettings(load(LS_ROOMSETTINGS, null)); // solo keeps its own felt
   }
   updateIdentityChip(); // the rail chip takes the seat's name + color
+  updateTrayButtons();  // the draft's Offer verb appears only at a table
   return { online: netOnline };
 }
 
