@@ -97,7 +97,10 @@ system:
   Breakdown, tally and log group per pool; rerolls keep their labels
   (sources join the canonical and ride the notation shape — the same
   single-carrier rule as visibility). Still open from the critique:
-  the 720×480 small-window e2e pass.
+  the 720×480 small-window e2e pass. Also open (Joe's 2026-08-03 play
+  notes): tap-to-stage was hard to discover — consider drag-and-drop
+  from tile to draft/felt as an *additive* affordance (tap stays the
+  primary; DnD is the intuition players arrive with).
 
 ### 2c. The Sheet Pass (2026-08-01) — SHIPPED
 
@@ -108,6 +111,43 @@ records the full contract): the pool popover grows an identity strip
 the category); the save morph gains shelf chips; manage mode slims to the
 destructive gate (standing bar + grown ✕, per-tile ✎ retired); the
 notation card slims to the complex-pool escape hatch.
+
+### 2d. The Trigger Pass — one way to roll (proposed 2026-08-03)
+
+From Joe's 2026-08-03 play notes; refines the 2b/2c surfaces while they
+are fresh, and settles where offers live *before* targeted offers (4b)
+builds on that surface:
+
+- **One roll trigger.** The ± popover loses `Roll` and `Offer to table`;
+  every roll and offer fires from the draft's ROLL ❯❯❯ strip. The
+  popover becomes a pure editor — tweaks land in the draft (or write to
+  the saved pool), never roll directly. This extends the staging
+  inversion (sources add, the pool rolls) to its last holdout.
+- **One commit verb.** Editing a pool shows both 'Update this pool' and
+  the save morph side by side — confusing. One primary Save that writes
+  by id; the additive twin demotes to an explicit 'Duplicate…' or leaves
+  the edit flow entirely.
+- **Count editing composes.** The identity strip's die-rank ladder swaps
+  rank only; Joe expected the creation card's idiom (tap palette dice to
+  add, tap preview units to remove). Give pool editing the same
+  composer — one idiom for building dice everywhere.
+- **Hide non-applying mechanics.** Under a per-die system (Soul Deal)
+  the ± popover still renders sum-world controls (keep/drop, DC, mods)
+  with a note; hide them instead, behind a small disclosure so they stay
+  reachable. Supersedes step 2's 'marks non-applying mechanics as such'.
+- **Layout stability.** Tiles change height with long names, and the
+  ROLL ❯❯❯ strip resizes when a ×2 chip appears. Fixed tile geometry
+  (clamped two-line names), reserved multiplier space, constant-width
+  action strips — ambient chrome never jumps under state changes.
+
+### 2e. Result-card IA under per-die systems (proposed 2026-08-03)
+
+The reveal/result surface accumulated per-die outcome chips, the tally,
+the hero word, and the action strip — nearly all of it *needed* under
+Soul Deal, but muddled as a layout (Joe, 2026-08-03). A design pass
+(judge panel, like the Sheet Pass) to give the card an information
+architecture: hierarchy, grouping, what earns the resting tier vs
+hover-reveal.
 
 ## Tier 2 — Organization (goal 5, the audit's biggest experience gap)
 
@@ -155,11 +195,14 @@ ladder; all of it is polish or a new rung.
   precedent exists for "reveal to the roller". §3.3 rejected it for step 4
   because reveal is currently total and one-way, which is what makes it
   auditable. Revisit only with a concrete table need.
-- **Targeted offers** *(TODO, Joe 2026-07-31)*: offer a roll claimable only
-  by a named player ("Bo, roll this save") instead of the whole table. The
-  machinery rhymes with whisper audiences — pin the claimant's `playerId`
-  at offer time, fail closed on unknown names — and the offer card shows
-  everyone the stakes while only the target gets the claim strip.
+- **Targeted offers** *(TODO Joe 2026-07-31; PROMOTED 2026-08-03 — Joe
+  wants multi-player CUJs next; first feature in line after the Trigger
+  Pass, which decides the one surface offers fire from)*: offer a roll
+  claimable only by a named player ("Bo, roll this save") instead of the
+  whole table. The machinery rhymes with whisper audiences — pin the
+  claimant's `playerId` at offer time, fail closed on unknown names — and
+  the offer card shows everyone the stakes while only the target gets the
+  claim strip.
 - **Audience legibility.** A shrouded viewer reads the audience only when
   the roll has no `# comment` (§3.0) — `label` carries one or the other.
   Decide whether "who was whispered to" deserves its own always-present
@@ -171,6 +214,13 @@ ladder; all of it is polish or a new rung.
 
 - Roll-log export (copy/download text + CSV) — the online log is currently
   uncapturable.
+- **Pools & settings export/import** *(Joe 2026-08-03)*: a human-editable
+  YAML view of the rack (shelves; pools as name + notation — the
+  canonical string is already the full carrier) plus just-you settings,
+  exported from and pasted back into the settings modal. Zero-dep rule
+  applies: a hand-rolled emitter and a strict YAML-*subset* parser that
+  fails closed exactly like the `#g=` codec (no npm YAML library).
+  Import merges by name with a preview, never a silent overwrite.
 - Local roll statistics (per-player distribution, average-vs-expected).
 - Room settings snapshot into the copy-link URL (felt/system ride `#g=`'s
   neighbor) so a bookmarked table restores its look and rules.
