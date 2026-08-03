@@ -47,6 +47,7 @@ export const THEMES = {
         body: '#0e3a3f', text: '#7fd1c3', accent: '#8a6f3c',
         glow: { color: '#58e6d9', intensity: 0.07 },
         feel: { rough: 0.15, metal: 0.1 },
+        shader: { fresnel: { color: '#58e6d9', power: 2.4, intensity: 0.9 } }, // biolume rim
       },
     },
   },
@@ -85,6 +86,8 @@ export const THEMES = {
         body: '#3a4150', text: '#f2f6ff', accent: '#8f7fe8',
         glow: { color: '#8f7fe8', intensity: 0.09 },
         feel: { rough: 0.22, metal: 0.2 },
+        // static crawl: the interior charge flickers along the surface
+        shader: { flow: { speed: 1.3, scale: 6.0, floor: 0.4, amp: 1.4 } },
       },
     },
   },
@@ -101,6 +104,7 @@ export const THEMES = {
           relief: { pattern: 'ferns', strength: 0.85, digitDepth: 0.3 },
           roughPattern: 'ferns',
         },
+        shader: { fresnel: { color: '#8fe3c0', power: 3.2, intensity: 0.75 } }, // aurora at grazing
       },
       firstfrost: {
         label: 'First Frost',
@@ -129,6 +133,8 @@ export const THEMES = {
           digitGlow: { color: '#ffd166', intensity: 1.1 },
           relief: { pattern: 'hammer', strength: 1.1, digitDepth: 0.45 },
         },
+        // the digits FLOW: molten metal moves (emissive × scrolling noise)
+        shader: { flow: { speed: 0.45, scale: 4.0, floor: 0.55, amp: 1.0 } },
       },
     },
   },
@@ -142,6 +148,11 @@ export const THEMES = {
         glow: { color: '#7fd9e8', intensity: 0.08 },
         feel: { rough: 0.2, metal: 0.15 },
         maps: { digitGlow: { color: '#c9a6ff', intensity: 0.95 } },
+        // containment hum (the idle pulse) + a faint rune-cyan rim
+        shader: {
+          pulse: { speed: 1.6, min: 0.6, max: 1.3 },
+          fresnel: { color: '#7fd9e8', power: 3.0, intensity: 0.45 },
+        },
       },
     },
   },
@@ -155,6 +166,11 @@ export const THEMES = {
         glow: { color: '#43265b', intensity: 0.05 },
         feel: { rough: 1.0, metal: 0.0 },
         maps: { digitGlow: { color: '#cfe98c', intensity: 0.85 } },
+        // the wrong halo, and the unmaking (dissolve — witchlight edge)
+        shader: {
+          fresnel: { color: '#43265b', power: 2.0, intensity: 1.1 },
+          dissolve: { edge: '#cfe98c' },
+        },
       },
     },
   },

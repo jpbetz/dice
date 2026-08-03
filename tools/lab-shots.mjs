@@ -78,6 +78,7 @@ try {
     ['umbra.voidgrain', 'dim', 140],
     ['tidewrack.seaglass', 'swell', 500],
     ['gildhall.oxblood', 'slam', 70],
+    ['umbra.voidgrain', 'unmake', 750],
   ];
   for (const [theme, fx, atMs] of actions) {
     await page.eval(`window.__lab.effect(${JSON.stringify(theme)}, ${JSON.stringify(fx)})`);

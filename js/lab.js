@@ -21,7 +21,7 @@
 // material and transform animation only; no particles yet).
 
 import * as THREE from 'three';
-import { DIE_TYPES, createDieMesh, valueRange, faceNormalForValue } from './dice.js';
+import { DIE_TYPES, createDieMesh, valueRange, faceNormalForValue, SHADER_TIME } from './dice.js';
 import { THEMES, SETS, SET_IDS } from './themes.js';
 
 const ROWS = ['std', ...SET_IDS];
@@ -210,6 +210,20 @@ const EFFECTS = {
       }
     });
   },
+  // it was never fully here: noise-threshold dissolve with a burning
+  // edge — out over ~1s, a beat of absence, then re-knit (lab loop)
+  unmake(row) {
+    const mats = rowMaterials(row).filter((m) => m.userData.uDissolve);
+    if (!mats.length) return;
+    run(2600, (k) => {
+      const v = k < 0.38 ? easeOut(k / 0.38)
+        : k < 0.58 ? 1
+        : 1 - easeOut((k - 0.58) / 0.42);
+      for (const m of mats) m.userData.uDissolve.value = Math.min(v, 0.999);
+    }, () => {
+      for (const m of mats) m.userData.uDissolve.value = 0;
+    });
+  },
   // it eats light: the ENVIRONMENT dims instead of the die flashing
   dim() {
     const a0 = ambient.intensity;
@@ -285,8 +299,10 @@ for (const row of rows) {
   }
   const fx = document.createElement('div');
   fx.className = 'fx';
-  for (const [id, label] of [['flash', '⚡ pop'], ['slam', '🔨 slam'], ['glow', '✨ glow'],
-    ['freeze', '❄ freeze'], ['dim', '🌑 recoil'], ['swell', '🌊 swell']]) {
+  const fxList = [['flash', '⚡ pop'], ['slam', '🔨 slam'], ['glow', '✨ glow'],
+    ['freeze', '❄ freeze'], ['dim', '🌑 recoil'], ['swell', '🌊 swell']];
+  if (row.recipe && row.recipe.shader && row.recipe.shader.dissolve) fxList.push(['unmake', '💀 unmake']);
+  for (const [id, label] of fxList) {
     const b = document.createElement('button');
     b.textContent = label;
     b.addEventListener('click', () => EFFECTS[id](row));
@@ -321,6 +337,7 @@ let last = performance.now();
 function tick(now) {
   const dt = Math.min((now - last) / 1000, 0.1);
   last = now;
+  SHADER_TIME.value = now / 1000; // Level 2's shared clock
   if (rotate) {
     for (const row of rows) {
       if (row.spinHold > now) continue; // a frozen row holds its pose

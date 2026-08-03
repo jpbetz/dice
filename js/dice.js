@@ -418,6 +418,65 @@ function heightToNormal(heightCanvas, strength) {
   return tex;
 }
 
+// ---------------------------------------------------------------------------
+// Level 2 — shader injection (docs/THEMES.md ladder): onBeforeCompile
+// patches over the standard material. No postprocessing stack — fresnel
+// rims, time-driven emissive (flow/pulse) and the dissolve live INSIDE
+// the material's own program. The clock is shared: whoever renders
+// advances SHADER_TIME (the lab's tick does; the main table will when
+// sets graduate).
+// ---------------------------------------------------------------------------
+
+export const SHADER_TIME = { value: 0 };
+
+function patchShader(m, cfg) {
+  m.userData.uDissolve = { value: 0 }; // the unmaking's dial (0 = whole)
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uTime = SHADER_TIME;
+    sh.uniforms.uDissolve = m.userData.uDissolve;
+    const decl = '\nuniform float uTime;\nuniform float uDissolve;\n'
+      + 'float fxHash( vec2 p ) { return fract( sin( dot( p, vec2( 127.1, 311.7 ) ) ) * 43758.5453123 ); }\n'
+      + 'float fxNoise( vec2 p ) { vec2 i = floor( p ); vec2 f = fract( p ); f = f * f * ( 3.0 - 2.0 * f );\n'
+      + '\treturn mix( mix( fxHash( i ), fxHash( i + vec2( 1.0, 0.0 ) ), f.x ), mix( fxHash( i + vec2( 0.0, 1.0 ) ), fxHash( i + vec2( 1.0, 1.0 ) ), f.x ), f.y ); }\n';
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>' + decl);
+    let fx = '';
+    if (cfg.flow) {
+      // molten seams / static crawl: emissive modulated by scrolling noise
+      const f = cfg.flow;
+      fx += `\n\ttotalEmissiveRadiance *= ${(f.floor ?? 0.6).toFixed(2)} + ${(f.amp ?? 0.8).toFixed(2)} * fxNoise( vMapUv * ${(f.scale ?? 3).toFixed(1)} + vec2( uTime * ${(f.speed ?? 0.3).toFixed(2)}, uTime * ${((f.speed ?? 0.3) * 0.7).toFixed(2)} ) );`;
+    }
+    if (cfg.pulse) {
+      // containment hum: the whole emissive breathes on a slow sine
+      const pz = cfg.pulse;
+      fx += `\n\ttotalEmissiveRadiance *= ${pz.min.toFixed(2)} + ${(pz.max - pz.min).toFixed(2)} * ( 0.5 + 0.5 * sin( uTime * ${pz.speed.toFixed(2)} ) );`;
+    }
+    if (cfg.fresnel) {
+      // the rim: internal light concentrated at grazing angles
+      const c = hexToRgb(cfg.fresnel.color);
+      fx += `\n\t{ float fxFr = pow( 1.0 - saturate( dot( normalize( vViewPosition ), normal ) ), ${(cfg.fresnel.power ?? 2.5).toFixed(1)} );`
+        + `\n\ttotalEmissiveRadiance += vec3( ${c} ) * fxFr * ${(cfg.fresnel.intensity ?? 0.8).toFixed(2)}; }`;
+    }
+    if (fx) sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>' + fx);
+    if (cfg.dissolve) {
+      // the unmaking: noise-threshold discard with a burning edge
+      const e = hexToRgb(cfg.dissolve.edge || '#ffffff');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <opaque_fragment>',
+        `{ float fxN = fxNoise( vMapUv * 9.0 );\n`
+        + `\tif ( fxN < uDissolve ) discard;\n`
+        + `\telse if ( uDissolve > 0.0 && fxN < uDissolve + 0.10 ) outgoingLight += vec3( ${e} ) * ( 1.0 - ( fxN - uDissolve ) / 0.10 ) * 2.5; }\n`
+        + `\t#include <opaque_fragment>`);
+    }
+  };
+  // the cfg is baked into the program text — key the program cache by it
+  m.customProgramCacheKey = () => 'fx:' + JSON.stringify(cfg);
+}
+
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]
+    .map((v) => v.toFixed(3)).join(', ');
+}
+
 // Bake every channel a skin asks for (def.maps — themes.js Level 1):
 // always the color map; optionally an emissiveMap of the digits alone, a
 // normal map from the relief sketch, a roughness map from a pattern.
@@ -645,8 +704,12 @@ function buildDie(type, variant = 'std') {
   const theme = !shroud && variant !== 'std' ? SETS[variant] || null : null;
   // Shroud skin: same geometry, obsidian faces, no symbols. A theme skin:
   // same geometry, the theme's colors + finish + glow (docs/THEMES.md).
+  // Spread the WHOLE recipe over the def, then re-map the two renamed
+  // fields. (Cherry-picking recipe fields here bit twice: .maps and then
+  // .shader were silently dropped and their features no-opped while
+  // looking implemented.)
   const skin = shroud ? { ...def, color: SHROUD_COLOR }
-    : theme ? { ...def, color: theme.body, text: theme.text, feel: theme.feel, glow: theme.glow, maps: theme.maps }
+    : theme ? { ...def, ...theme, color: theme.body, text: theme.text }
     : def;
   // The BASE polyhedron drives faces, values and the physics hull; the mesh
   // the player sees is its beveled twin (render only — see buildBeveledGeometry).
@@ -725,6 +788,7 @@ function materialFor(def, face, spec, shroud = false, seed = 1) {
     m.emissive = new THREE.Color(def.glow.color);
     m.emissiveIntensity = def.glow.intensity;
   }
+  if (!shroud && def.shader) patchShader(m, def.shader); // Level 2
   return m;
 }
 
