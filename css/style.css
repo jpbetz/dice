@@ -310,6 +310,7 @@ html, body {
   font-weight: 700;
   color: var(--muted);
   pointer-events: none;
+  font-variant-numeric: tabular-nums; /* ×2 → ×12 never re-kerns the strip */
 }
 
 /* (the tray chip-row died with the draft cluster: composed dice are die-art
@@ -1231,6 +1232,12 @@ html, body {
   transform: translateX(-50%);
   text-align: center;
   z-index: var(--z-banner);
+  /* stable geometry (Trigger Pass, Joe 2026-08-03: result cards jumped
+     size dramatically with every title) — a floor and a ceiling instead
+     of pure content width; long titles wrap inside the card */
+  min-width: 320px;
+  max-width: min(520px, calc(100vw - 24px));
+  overflow-wrap: break-word;
   padding: 14px 34px;
   border-radius: 14px;
   background: var(--panel);
@@ -1517,7 +1524,7 @@ html, body {
    value chips, shelf markers, peek, crit text — and never hides anything:
    the rail and the four edge tabs stay, and ceremonies render identically
    (GOALS: immersion is never a downgrade). */
-body.mini #result-banner { padding: 8px 20px; bottom: 44px; }
+body.mini #result-banner { padding: 8px 20px; bottom: 44px; min-width: 220px; }
 body.mini #result-total { font-size: 30px; }
 body.mini #result-meaning { font-size: 14px; }
 body.mini #result-label { font-size: 10px; }
@@ -1787,9 +1794,12 @@ body.mini .pk-breakdown { font-size: 10px; }
   flex-direction: column;
   gap: 10px;
   z-index: var(--z-offers); /* claimable over a playing ceremony (layer scale) */
-  max-width: 340px;
+  /* one fixed column width (Trigger Pass): every offer card is the same
+     size regardless of its title — cards are chrome, they don't jiggle */
+  width: min(340px, calc(100vw - 24px));
 }
 .offer-card {
+  width: 100%; /* the layer owns the width — titles never resize a card */
   background: var(--panel);
   border: 1px solid var(--gold);
   border-radius: 12px;
@@ -1808,15 +1818,18 @@ body.mini .pk-breakdown { font-size: 10px; }
   font-size: 18px;
   color: var(--ivory);
   margin: 2px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.offer-detail { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.offer-detail { font-size: 12px; color: var(--muted); margin-bottom: 8px; overflow-wrap: break-word; }
 .offer-detail .offer-vs { color: var(--gold); font-weight: 700; }
 .offer-actions { display: flex; gap: 8px; align-items: stretch; }
 .offer-actions .btn { font-size: 13px; }
 /* the claim strip: the offered dice ARE the button (P1), same as every
    other roll surface — glow, cue and all */
 .offer-roll { flex: 1; min-width: 0; }
-body.mini #offers-layer { top: 8px; max-width: 260px; }
+body.mini #offers-layer { top: 8px; width: min(260px, calc(100vw - 16px)); }
 
 /* ---------- command box (UX §1.3, panel.html) ---------- */
 .cmd { margin-top: 2px; margin-bottom: 10px; }
