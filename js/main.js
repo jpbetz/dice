@@ -2353,10 +2353,13 @@ function appendCardActions(holder, entry, opts) {
     const strip = document.createElement('button');
     strip.className = 'pool-roll pk-again pk-strip pk-bare reveal-tier';
     strip.title = opts.replaceShelfId
-      ? 'Roll these again — replaces this shelved roll'
-      : 'Roll these again';
-    strip.setAttribute('aria-label', `Roll again — ${entry.label}`);
-    strip.appendChild(buildRollCue());
+      ? 'Reroll these dice — replaces this shelved roll'
+      : 'Reroll these dice';
+    strip.setAttribute('aria-label', `Reroll — ${entry.label}`);
+    // The one strip that REROLLS (both the banner's and the peek's are
+    // replays of an existing roll) — the cue word must say so; the draft
+    // and the offer claim keep the plain ROLL (B2, Joe 2026-08-03).
+    strip.appendChild(buildRollCue('reroll'));
     strip.addEventListener('click', () => {
       if (opts.replaceShelfId) {
         closePeek();
@@ -3611,6 +3614,9 @@ window.__diceDebug = {
     if (peekRollId === null) return null;
     return {
       rollId: peekRollId,
+      // the strip's cue word ('REROLL' here — the draft's reads ROLL): the
+      // closed CUE_WORDS vocabulary, asserted by tag, never scraped loosely
+      cueWord: (peekEl.querySelector('.pk-again .cue-word') || { textContent: '' }).textContent.trim(),
       text: peekEl.textContent,
       breakdown: (peekEl.querySelector('.pk-breakdown') || { textContent: '' }).textContent,
       total: (peekEl.querySelector('.pk-total') || { textContent: '' }).textContent,
@@ -4728,20 +4734,35 @@ function buildDieStrip(types, cap, { grouped = false } = {}) {
   return frag;
 }
 
-// The hover ROLL cue (P1 made loud): a heavy translucent ROLL fills the
+// The hover roll cue (P1 made loud): a heavy translucent word fills the
 // strip button's empty side BEHIND the dice on hover, chevrons drumming
 // ❯ → ❯ ❯ → ❯ ❯ ❯ to telegraph that the click launches. Pure decoration:
 // aria-hidden, pointer-events none — the button stays the whole target.
-// Static markup only (no user strings ride innerHTML here).
 // The word renders whole or not at all: past cueTight() units the strip
 // keeps only the chevron trail (the trail alone still carries the meaning).
 // 'OLL ❯❯❯' peeking from under a die broke the promise exactly where the
 // roll was biggest.
-function buildRollCue() {
+//
+// The cue's word is a CLOSED set — never user text (which is why this
+// builds nodes instead of innerHTML: a varying word behind innerHTML is
+// how user text eventually gets there). The draft and an offer's claim
+// ROLL a fresh pool; a result card's strip REROLLS an existing one — the
+// two verbs must not share a word (Joe, 2026-08-03). The \u00a0 keeps the
+// shipped word–chevron spacing.
+const CUE_WORDS = { roll: 'ROLL\u00a0', reroll: 'REROLL\u00a0' };
+function buildRollCue(kind = 'roll') {
   const cue = document.createElement('span');
   cue.className = 'roll-cue';
   cue.setAttribute('aria-hidden', 'true');
-  cue.innerHTML = '<b class="cue-word">ROLL&nbsp;</b><i>❯</i><i>❯</i><i>❯</i>';
+  const w = document.createElement('b');
+  w.className = 'cue-word';
+  w.textContent = CUE_WORDS[kind] || CUE_WORDS.roll;
+  cue.appendChild(w);
+  for (let i = 0; i < 3; i++) {
+    const c = document.createElement('i');
+    c.textContent = '❯';
+    cue.appendChild(c);
+  }
   return cue;
 }
 // Units known at build time (the 296px column is fixed): ≥4 rendered units
@@ -6541,7 +6562,7 @@ function renderLog() {
       const again = document.createElement('button');
       again.className = 'log-again';
       again.textContent = '⟳';
-      again.title = 'Roll this again';
+      again.title = 'Reroll this';
       again.addEventListener('click', () =>
         requestRoll([...entry.spec.dice], entry.label, {
           mods: entry.spec.mods || undefined,
