@@ -103,15 +103,16 @@ limitations under the License.
            absolutely-positioned SIBLINGS (never a button inside a button).
            Hover = the gold roll-glow, suppressed over a ✕ (the glow must
            not lie). Empty draft: a quiet hint line instead. -->
-      <!-- The draft zone: at rest it is JUST your dice — secondary controls
-           reveal on approach, the same tier rule the pool rows' ± follows
-           (hover/focus brings them up; coarse pointers keep them standing).
-           A treatment adopted for one surface's control tier applies to
-           that tier everywhere. -->
+      <!-- THE WORKBENCH (§7.14): the zone is a well over a rail. In the
+           well: the pool and the one tool that shapes it (±), revealed on
+           approach. On the rail below: the verbs that dispose of it
+           (Save · Offer · ✕ Clear), STANDING while a draft exists.
+           Everything aligns to the well's 7px interior grid. -->
       <div id="draft-zone" class="draft-zone">
-      <!-- The roll line: structurally a saved-pool row's line 2 — [dice
-           strip][±] as siblings, the ± revealing on approach exactly like
-           there. Keeps the #tray-actions id: it anchors the ± popover. -->
+      <!-- The WELL: the draft's second editor, peer to #cmd — same --well
+           dress (§7.9: one draft, two editors; only one of them looked
+           like an editor before this). [cluster][±] as siblings. Keeps the
+           #tray-actions id: it anchors the ± popover. -->
       <div class="pool-line2 tray-line2" id="tray-actions">
         <div id="tray" class="tray-cluster">
           <button id="tray-roll" class="pool-roll tray-roll hidden"></button>
@@ -121,12 +122,12 @@ limitations under the License.
                them reads as physically filling it. -->
           <p id="tray-hint" class="hint tray-ghost">tap a die button to add — then click your dice to roll</p>
         </div>
-        <button id="tray-mods" class="group-mods pool-mods" title="Tweak — modifiers, target, moment">±</button>
+        <button id="tray-mods" title="Tweak — modifiers, target, moment">±</button>
       </div>
-      <!-- Draft management (demoted 2026-08-01): Save and Clear are not
-           part of the ROLL operation — at rest the row is quiet air under
-           the cluster; hover/focus (or a coarse pointer) brings the ghost
-           verbs up. Save morphs into the inline name row (always ADDITIVE
+      <!-- The RAIL (P6: management STANDS — supersedes the 2026-08-01
+           ghost-text demotion): it appears only while a draft exists
+           (that is the contextual signal) and then stands — no hover
+           reveal. Save morphs into the inline name row (always ADDITIVE
            — updates stay on the by-id paths). -->
       <div class="btn-row draft-actions hidden" id="draft-actions">
         <button id="save-group" class="btn">Save</button>
@@ -148,7 +149,7 @@ limitations under the License.
       </div>
       <!-- shelf chips for the save morph: saving a composed draft lands it
            on a shelf in one breath (none pressed = the plain Pools shelf) -->
-      <div id="save-cat-row" class="pid-cats hidden"></div>
+      <div id="save-cat-row" class="pid-row pid-cats hidden"></div>
       </div>
 
       <!-- The Rack (agreed 2026-08-01): category shelves of pool TILES.

@@ -376,42 +376,99 @@ html, body {
   color: #5f574b;
 }
 #tray-hint.hidden { display: none; }
-/* an empty draft's ± never surfaces, even on hover — nothing to modify */
-.tray-line2 .pool-mods:disabled { opacity: 0; }
 .tray-save.hidden { display: none; }
-/* The roll line mirrors a pool row's line 2 exactly: [strip][±] siblings,
-   ± revealing on approach (the .pool-line2 rules carry it). The tier
-   refinement (2026-07-31): Save · Clear are draft MANAGEMENT, not part of
-   the roll operation — they stand whenever a draft exists. */
-.tray-line2 { margin-top: 10px; }
 .tray-line2.hidden { display: none; }
 .tray-line2 .tray-cluster { flex: 1; min-width: 0; margin-top: 0; }
-/* Save · Clear demoted (2026-08-01): draft management is not part of the
-   ROLL, so at rest the row is empty air under the cluster — approach (or
-   keyboard focus, or a coarse pointer) brings the quiet verbs up. The row
-   keeps its height so nothing jumps. Esc already clears; Save is rare. */
-.draft-actions { margin-top: 4px; justify-content: flex-end; gap: 12px; }
+/* THE WELL (§7.14). The draft is a FIELD — the same --well token as
+   .cmd-in, because the box and the cluster are two editors of ONE draft
+   (§7.9). The padding sits OUTSIDE .tray-cluster so the x-layer's offset
+   math (per-die ✕s anchored to cluster-relative offsets) is untouched.
+   Id specificity on purpose: .tray-line2/.pool-line2 once fought at equal
+   weight and the loser's margin silently died — the well never re-enters
+   that fight. */
+#tray-actions {
+  margin-top: 0;               /* the zone's 16px owns the air */
+  gap: 4px;
+  padding: 6px;
+  background: var(--well);
+  border: 1px solid var(--hair);
+  border-radius: 11px;         /* concentric: 8px roll button + ~3px lip */
+}
+/* The ± editor open → the field it edits is the one lit. openPopover
+   toggles 'open' on pop.row; on the draft that class had been inert since
+   the tile pass — this closes the dangling wire. */
+#tray-actions.open {
+  border-color: rgba(212, 175, 55, 0.38);
+  background: rgba(212, 175, 55, 0.05);
+}
+#tray-actions.open #tray-mods { opacity: 1; color: var(--gold-bright); }
+/* The ± — the full-height borderless gutter tool the old .pool-mods
+   intended (the shipped 25×38 bordered chip was a .pool-mods/.group-mods
+   cascade accident; both families retire with this, their only element).
+   Reveal scope: the WELL's approach (roll-adjacent tier); a disabled ±
+   (empty draft) never surfaces, even on coarse pointers. gold-bright on
+   hover is the pre-existing ± signature. */
+#tray-mods {
+  flex: none;
+  align-self: stretch;
+  width: 30px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: #574f43;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s, background 0.15s;
+}
+#tray-actions:hover #tray-mods:not(:disabled),
+#tray-actions:focus-within #tray-mods:not(:disabled) { opacity: 1; color: var(--muted); }
+#tray-mods:hover:not(:disabled) { color: var(--gold-bright); background: rgba(212, 175, 55, 0.10); }
+@media (pointer: coarse) { #tray-mods:not(:disabled) { opacity: 1; } }
+/* THE RAIL (P6: management STANDS — supersedes the 2026-08-01 ghost-text
+   demotion; §7.14). Appearing only while a draft exists is the contextual
+   signal; while it exists the verbs stand — no hover reveal for
+   management. Inset 7px = well border 1 + well padding 6: Save's left
+   edge and ✕ Clear's right edge sit exactly on the well's interior grid,
+   and ✕ Clear shares one vertical rail with the ± above it. Fixed
+   min-height: the save morph swaps in without a jump. */
+.draft-actions {
+  margin-top: 8px;
+  padding: 0 7px;
+  gap: 6px;
+  justify-content: flex-start;
+  align-items: center;
+  min-height: 26px;
+}
 .draft-actions.hidden { display: none; }
 .draft-actions .btn {
   flex: 0 0 auto;
-  font-size: 11px;
-  padding: 3px 10px;
+  font-size: 11.5px;
+  padding: 4px 10px;
   background: transparent;
-  border-color: transparent;
+  border: 1px solid var(--hair);
+  border-radius: 7px;
   color: var(--muted);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s, color 0.12s;
+  transition: color 0.12s, border-color 0.12s, background 0.15s;
 }
-.draft-zone:hover .draft-actions .btn,
-.draft-zone:focus-within .draft-actions .btn {
-  opacity: 1;
-  pointer-events: auto;
+.draft-actions .btn:hover:not(:disabled),
+.draft-actions .btn:focus-visible {
+  color: var(--ivory);
+  border-color: rgba(243, 234, 215, 0.35);
+  background: rgba(243, 234, 215, 0.04);
 }
-.draft-actions .btn:hover { color: var(--ivory); border-color: var(--hair); }
-@media (pointer: coarse) {
-  .draft-actions .btn { opacity: 0.85; pointer-events: auto; }
-}
+/* D2 FIX — no bare `.hidden` rule exists in this codebase, so the solo
+   'Offer to table' had been a live-looking dead verb (updateTrayButtons's
+   toggle had no visual effect while offerDraft() dead-ends offline). */
+.draft-actions .btn.hidden { display: none; }
+#clear-tray { margin-left: auto; }         /* the right rail, under ± */
+/* The split verb reads as ONE verb with a chooser. */
+#offer-draft { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+#offer-pick  { margin-left: -7px; padding: 4px 6px;
+               border-top-left-radius: 0; border-bottom-left-radius: 0; }
+@media (pointer: coarse) { .draft-actions .btn { padding: 8px 12px; } }
+/* Morph rows join the same interior grid (.btn-row's 10px overridden). */
+#tray-save-row { margin-top: 8px; padding: 0 7px; }
 #save-confirm, #save-cancel { flex: none; width: 42px; }
 
 /* ---------- saved pools (read-only quick access, P2) ---------- */
@@ -517,28 +574,8 @@ html, body {
   flex: none;
 }
 .strip-more { flex: none; pointer-events: none; }
-/* ± beside the strip: HOVER-REVEALED (2026-07 — even the quiet glyph read
-   as standing chrome on every row). The row's hover or keyboard focus
-   brings it up; coarse pointers keep it always visible (touch has no
-   hover, and a visible path must survive — right-click on the row stays
-   the pointer bonus). Full row-height hit area stays: a missed tap next to
-   ± must never be a broadcast roll. The draft line's ± is exempt — there
-   it is a peer in a contextual button row, not per-row furniture. */
-.pool-mods {
-  align-self: stretch;
-  height: auto;
-  min-height: 38px;
-  width: 26px;
-  background: none;
-  border: none;
-  color: #574f43;
-}
-.pool-line2 .pool-mods { opacity: 0; transition: opacity 0.12s, color 0.12s; }
-.group-row:hover .pool-mods,
-.pool-line2:hover .pool-mods,
-.pool-mods:focus-visible { opacity: 1; color: var(--muted); }
-.pool-mods:hover { opacity: 1; color: var(--gold-bright); background: rgba(212, 175, 55, 0.10); border: none; }
-@media (pointer: coarse) { .pool-line2 .pool-mods { opacity: 1; } }
+/* (the .pool-mods rule family retired 2026-08-03 with its only element:
+   the draft ± is #tray-mods now, dressed in the WELL block above) */
 /* ---------- the Rack: category shelves of pool tiles ---------- */
 /* Tiles are SOURCES (they stage; no gold, no ROLL cue — those live on the
    draft alone). The draft zone is STICKY so the one roll button never
@@ -549,7 +586,11 @@ html, body {
   z-index: 2;
   background: linear-gradient(180deg, rgba(24, 19, 14, 0.98), rgba(24, 19, 14, 0.94));
   margin: 0 -14px;
-  padding: 4px 14px 10px;
+  /* 16px top vs the palette's internal 6px grid gap is the region-vs-item
+     grouping signal (§7.14 — the zone was "a really tight little box");
+     the air is the zone's own opaque padding, so scrolled palette rows
+     slide cleanly under it. */
+  padding: 16px 14px 10px;
   border-bottom: 1px solid var(--hair);
 }
 .pool-sec-head {
@@ -783,7 +824,7 @@ html, body {
   box-shadow: 0 0 14px rgba(243, 234, 215, 0.25);
   transition: border-color 0.1s, box-shadow 0.1s;
 }
-#save-cat-row { margin-top: 6px; }
+#save-cat-row { margin-top: 8px; padding: 0 7px; } /* the well's interior grid */
 #save-cat-row.hidden { display: none; }
 
 /* source chips in the draft cluster: name over its grouped dice, one ✕ */
@@ -965,24 +1006,10 @@ html, body {
   transition: color 0.15s, border-color 0.15s;
 }
 .group-formula:hover { color: var(--ivory); border-color: var(--panel-border); }
-/* (.group-roll retired: the row IS the roll button now — .pool-roll) */
-.group-mods {
-  flex: none;
-  width: 25px;
-  height: 25px;
-  border-radius: 8px;
-  border: 1px solid var(--hair);
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-}
-.group-mods:hover { color: var(--ivory); border-color: var(--panel-border); }
-.group-mods:disabled { opacity: 0.4; cursor: default; }
-/* (the draft line's ± is sized by .tray-line .group-mods now) */
-.group-row.open .group-mods { color: var(--gold-bright); border-color: rgba(212, 175, 55, 0.5); background: rgba(212, 175, 55, 0.14); }
+/* (.group-roll retired: the row IS the roll button now — .pool-roll)
+   (.group-mods retired 2026-08-03 with its only element — the draft ± is
+   #tray-mods, dressed in the WELL block; the 25×25 chip was a cascade
+   accident this family caused) */
 .group-del {
   border: none;
   background: none;
@@ -1923,7 +1950,9 @@ body.mini .pk-breakdown { font-size: 10px; }
 body.mini #offers-layer { top: 8px; width: min(260px, calc(100vw - 16px)); }
 
 /* ---------- command box (UX §1.3, panel.html) ---------- */
-.cmd { margin-top: 2px; margin-bottom: 10px; }
+/* View-rhythm parity (§7.14): in Notation view the draft zone's 16px owns
+   the gap below the box too — no stacking with a bottom margin here. */
+.cmd { margin: 2px 0 0; }
 .cmd-wrap { position: relative; }
 .cmd-in {
   width: 100%;

@@ -1425,6 +1425,9 @@ the cluster stands taller and its gold promise now RESTS on it whenever
 dice are staged (a quiet chevron whisper, loud on hover), while Save ·
 Clear demote to ghost text that surfaces on the zone's hover/focus (and
 stands on coarse pointers) — draft management is not part of the roll.
+*(The ghost-text demotion is superseded by §7.14: the rail STANDS — P6's
+tier rule lists draft management under "stands"; the quietness is the
+rail's contextual appearance, only while a draft exists.)*
 (3) The tidy-away clock: a finished OPEN roll of YOURS auto-collects to
 the shelf ~6s after it settles (hovering the banner holds the clock — you
 are reading; Enter keeps it now, Esc sweeps; hidden rolls stand until
@@ -1633,3 +1636,52 @@ subset that fails closed like the `#g=` codec: tabs, unknown keys, bad
 indent, bad notation, over-cap counts and unterminated quotes are all
 line-numbered errors, never guesses. Notations normalize to their
 canonical on import — the string remains the one carrier.
+
+### 7.14 The workbench draft zone (shipped 2026-08-03)
+
+From Joe's play notes: the draft's controls were incoherently placed (the
+± beside the box, Save/Offer/Clear below it) and the zone sat "pressed up
+against" the palette — "a really tight little box." §7.9 declares ONE
+draft, two editors — the command box and the dice cluster — but only the
+box *looked* like an editor. This pass dresses the cluster's line as the
+second well, and derives every placement from one law:
+
+- **The well** (`#tray-actions`, dressed in the same `--well` token as
+  `.cmd-in`): the pool plus the ONE tool that shapes it — ± — revealed on
+  the well's approach (roll-adjacent tier; a disabled ± never surfaces).
+  While the ± popover is open the well lights via the `.open` row class —
+  the wire `openPopover` always toggled but the draft never styled.
+- **The rail** (`#draft-actions`, below the well): the three verbs that
+  dispose of the draft — Save · Offer to table (+ ▾, joined as one split
+  verb) · ✕ Clear — **standing**, inset to the well's 7px interior grid
+  (1px border + 6px padding), ✕ Clear right-aligned into the ±'s vertical
+  gutter. Appearing only while a draft exists is the contextual signal;
+  while it exists, management stands. **This supersedes the 2026-08-01
+  "Save · Clear demote to hover-revealed ghost text"** (§7.9's quiet-table
+  pass, binding 2): the tier rule — P6, the later, binding sharpening —
+  lists draft management under "stands," and the code's own comment had
+  asserted it all along. The rail keeps a fixed min-height, so the save
+  morph swaps in without a jump (§7.10: cards are chrome, they don't
+  jiggle).
+- **The zone breathes**: the sticky zone owns 16px of its own opaque
+  padding above the well — the region-vs-item signal against the
+  palette's internal 6px grid in Dice view, and the same 16px below the
+  box in Notation view (the box's old 10px bottom margin retired, so the
+  rhythm no longer differs across views). Scrolled palette rows slide
+  under the zone's padding, so the air survives scroll.
+- **An unparseable typed draft still shows the rail** — a half-typed `2d`
+  is exactly when ✕ Clear matters; Save and Offer stay disabled through
+  the parse gate. (Before, the row hid while ✕ Clear stayed enabled — a
+  mouse had no path to it.)
+- **`.hidden` on rail buttons is real now**: this codebase has no bare
+  `.hidden` rule, so the solo-hidden *Offer to table* had been a
+  live-looking dead verb; `.draft-actions .btn.hidden` closes it.
+- **`--draft-h` is observed, never hand-written**: a `ResizeObserver` on
+  the zone (via `borderBoxSize`) keeps the shelf headers' sticky pin
+  fresh through every height change — the save morph, the rail arriving,
+  wrapping source chips — with `renderTray`'s synchronous write kept for
+  first paint.
+- Retired with the pass: the `.pool-mods` / `.group-mods` rule families
+  (the draft ± was their only remaining element; the shipped 25×38
+  bordered chip was their cascade accident — the ± is `#tray-mods` now, a
+  full-height borderless gutter tool).

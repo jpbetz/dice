@@ -3498,10 +3498,17 @@ window.__diceDebug = {
       dice: [...tray],
       sources: [...traySources],
       rollVisible: !trayRollBtn.classList.contains('hidden'),
-      hasActions: !draftActionsEl.classList.contains('hidden'), // Save · Clear stand
+      hasActions: !draftActionsEl.classList.contains('hidden'), // the rail stands
       saveOpen: !traySaveRow.classList.contains('hidden'),
       hint: !trayHintEl.classList.contains('hidden'),
       xCount: trayXLayer.children.length,
+      // §7.14 layout pins (computed, not class — the class lied once, D2):
+      // the rail STANDS (visible with no pointer anywhere near), Offer's
+      // real visibility, and the zone height the shelf headers pin under.
+      railStanding: !draftActionsEl.classList.contains('hidden')
+        && getComputedStyle(saveGroupBtn).opacity === '1',
+      offerVisible: getComputedStyle(offerDraftBtn).display !== 'none',
+      draftH: draftZoneEl.offsetHeight,
     };
   },
   // saved-pools manage mode (P2's ✎ toggle): read-only rows at rest; the
@@ -3691,14 +3698,31 @@ const draftZoneEl = document.getElementById('draft-zone');
 const trayRollBtn = document.getElementById('tray-roll');
 const trayXLayer = document.getElementById('tray-x-layer');
 const trayHintEl = document.getElementById('tray-hint');
-const trayActionsEl = document.getElementById('tray-actions');   // the roll line: [cluster][±]
-const draftActionsEl = document.getElementById('draft-actions'); // Save · Offer · ✕ Clear — always stand
+const draftActionsEl = document.getElementById('draft-actions'); // the RAIL: Save · Offer · ✕ Clear
 const traySaveRow = document.getElementById('tray-save-row');
 const trayModsBtn = document.getElementById('tray-mods');
 const clearTrayBtn = document.getElementById('clear-tray');
 const saveGroupBtn = document.getElementById('save-group');
 const offerDraftBtn = document.getElementById('offer-draft');
 const groupNameInput = document.getElementById('group-name');
+
+// The section headers pin under the sticky draft (--draft-h feeds
+// .pool-sec-head's top), so the value must track EVERY height change — the
+// save morph, the rail appearing/leaving, wrapping source chips — not just
+// renderTray's (which keeps its synchronous write for first paint).
+// borderBoxSize, not offsetHeight, inside the callback: no forced reflow,
+// no RO-loop warning. No feedback loop: --draft-h only moves the section
+// headers, which cannot resize #draft-zone.
+{
+  const draftBody = document.querySelector('#builder-panel > .panel-body');
+  if (draftBody && window.ResizeObserver) {
+    new ResizeObserver((entries) => {
+      const box = entries[0].borderBoxSize && entries[0].borderBoxSize[0];
+      const h = box ? box.blockSize : entries[0].target.offsetHeight;
+      draftBody.style.setProperty('--draft-h', `${Math.round(h)}px`);
+    }).observe(draftZoneEl);
+  }
+}
 
 // P1 — the dice are the buttons: each palette tile shows its die's real
 // rendered art (the beveled mesh, hero-posed) above the type label. The tile
@@ -3965,11 +3989,15 @@ function renderTray() {
 function updateTrayButtons() {
   const usable = (cmdResult && cmdResult.ok) || tray.length > 0;
   // The roll line always holds its slot in Dice view (empty = ghost text in
-  // the die-fill area); the draft-management row (Save · Clear) STANDS
+  // the die-fill area); the management RAIL (Save · Offer · ✕ Clear) STANDS
   // whenever there is a draft to act on — it is not part of the roll
-  // operation, so it never waits for a hover (tier refinement 2026-07-31).
-  // The save morph swaps in for the management row only.
-  draftActionsEl.classList.toggle('hidden', !usable || !traySaveRow.classList.contains('hidden'));
+  // operation, so it never waits for a hover (tier refinement 2026-07-31;
+  // §7.14). It shows whenever there is ANYTHING to act on — including an
+  // unparseable half-typed draft, which is exactly when ✕ Clear matters
+  // (Save/Offer stay disabled through `usable` below). The save morph
+  // swaps in for the rail only.
+  const showRail = usable || !!cmdInput.value;
+  draftActionsEl.classList.toggle('hidden', !showRail || !traySaveRow.classList.contains('hidden'));
   if (!usable) closeSaveMorph();
   trayRollBtn.disabled = !usable;
   trayModsBtn.disabled = !usable;
@@ -5427,8 +5455,11 @@ function closeSaveMorph() {
   traySaveRow.classList.add('hidden');
   document.getElementById('save-cat-row').classList.add('hidden');
   saveMorphCat = null;
-  const usable = (cmdResult && cmdResult.ok) || tray.length > 0;
-  draftActionsEl.classList.toggle('hidden', !usable);
+  // ONE owner for the rail's visibility rule (§7.14): a hand-rolled toggle
+  // here once dropped the half-typed-draft case updateTrayButtons carries
+  // (✕ Clear must stay reachable). Recursion is safe: by now the morph is
+  // hidden, so updateTrayButtons's closeSaveMorph call early-returns.
+  updateTrayButtons();
 }
 function saveDraftAsPool() {
   paintCmd();
