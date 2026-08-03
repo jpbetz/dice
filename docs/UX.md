@@ -1595,6 +1595,21 @@ surface.
   click-away close it; a roster change closes it (never target a ghost).
   Shift+Enter stays table-wide.
 
+*(Amended same day — whisper-offer auto-targeting, Joe: "a whisper roll
+is already assigned to someone, so the offer should always be to that
+person.")* An offered **whisper** derives its `to` FROM its audience,
+server-side: `w:Bo` offered is claimable by Bo alone, and table-wide
+whisper offers cease to exist by construction. Multi-name whispers are
+claimable by any audience member; the ▾ may still narrow WITHIN the
+audience, while a target outside it refuses (400 `target_not_in_audience`
+— a teaching error, never a silent override) and a whisper whose only
+audience is the offerer refuses at offer time (400
+`whisper_needs_audience`). The ▾ hides while the draft carries whisper
+visibility — there is nothing to choose. `secret` (dice tower — open
+claiming is its point) and `held` offers are untouched. This supersedes
+the bystander-claims-blind reading of an offered whisper: that property
+lives on only in the dice tower.
+
 ### 7.12 The organized per-die read (shipped 2026-08-03)
 
 ROADMAP 2e — Joe: the reveal surfaces got muddled under Soul Deal. The

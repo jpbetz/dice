@@ -323,8 +323,11 @@ html, body {
    the box, so typed notation visibly materializes as dice — one draft, two
    editors, and P1 never leaves the panel. (The ghost hint yields to the
    box's own placeholder.) */
-#builder-panel.mode-text #die-buttons,
-#builder-panel.mode-text #tray-hint { display: none; }
+/* Notation view hides only the PALETTE. The ghost hint SURVIVES with
+   view-appropriate wording (applyInputMode swaps it): without it the
+   empty well is a bordered box of literally nothing under the command
+   box — the adversarial pass measured a 60px sunken void (2026-08-03). */
+#builder-panel.mode-text #die-buttons { display: none; }
 
 /* ---------- the draft cluster (P1: the dice are the buttons) ---------- */
 /* One roll button of die art; per-die ✕ removers overlay it from a SIBLING

@@ -1803,9 +1803,13 @@ function armAutoCollect(entry) {
     const st = rollStates.get(rid);
     const gone = !lastEntry || lastEntry.rollId !== rid
       || !!(st && (st.cleared || st.collected !== null));
-    if (gone) { autoCollect = { rollId: null, timer: null }; return; }
+    // Bounded (adversarial catch): physics that never settles must not
+    // retry forever — ~9s past due covers any real tumble; past it the
+    // roll simply stays for the player to tidy (the pre-retry behavior).
+    if (gone || ++fire.tries > 60) { autoCollect = { rollId: null, timer: null }; return; }
     autoCollect.timer = setTimeout(fire, 150);
   };
+  fire.tries = 0;
   autoCollect.timer = setTimeout(fire, autoCollectMs);
 }
 // Reading holds the clock; leaving restarts it whole.
@@ -4077,9 +4081,14 @@ function updateTrayButtons() {
   offerDraftBtn.classList.toggle('hidden', !netOnline);
   offerDraftBtn.disabled = !usable;
   const hasTargets = netOnline && net && players.some((p) => p.id !== net.playerId && p.name);
-  offerPickBtn.classList.toggle('hidden', !hasTargets);
+  // A whisper draft is already ADDRESSED (Joe 2026-08-03): the server
+  // derives the claim gate from its audience, so the ▾ has nothing to
+  // choose — it hides rather than offering a picker whose off-audience
+  // answers would all refuse.
+  const whisperDraft = !!(boxExtras && boxExtras.visibility && boxExtras.visibility.mode === 'whisper');
+  offerPickBtn.classList.toggle('hidden', !hasTargets || whisperDraft);
   offerPickBtn.disabled = !usable;
-  if (!hasTargets) closeOfferMenu();
+  if (!hasTargets || whisperDraft) closeOfferMenu();
 }
 
 // Roll the draft — the cluster click, the Enter key, and nothing else.
@@ -4131,7 +4140,10 @@ offerDraftBtn.addEventListener('click', () => offerDraft());
 const offerPickBtn = document.getElementById('offer-pick');
 const offerMenu = document.getElementById('offer-menu');
 function isOfferMenuOpen() { return !offerMenu.classList.contains('hidden'); }
-function closeOfferMenu() { offerMenu.classList.add('hidden'); }
+function closeOfferMenu() {
+  offerMenu.classList.add('hidden');
+  offerPickBtn.setAttribute('aria-expanded', 'false');
+}
 function openOfferMenu() {
   const you = net ? net.playerId : null;
   // duplicate names collapse to one row — the server pins ALL matching ids,
@@ -4152,6 +4164,7 @@ function openOfferMenu() {
     offerMenu.appendChild(b);
   }
   offerMenu.classList.remove('hidden');
+  offerPickBtn.setAttribute('aria-expanded', 'true');
   const r = offerPickBtn.getBoundingClientRect();
   offerMenu.style.left = `${Math.round(Math.max(12, Math.min(r.left, window.innerWidth - offerMenu.offsetWidth - 12)))}px`;
   offerMenu.style.top = `${Math.round(Math.min(r.bottom + 6, window.innerHeight - offerMenu.offsetHeight - 12))}px`;
@@ -4191,6 +4204,12 @@ function applyInputMode(persist = true) {
   for (const b of inputModeSeg.querySelectorAll('button')) {
     b.setAttribute('aria-pressed', String(b.dataset.v === inputMode));
   }
+  // The well's ghost hint survives BOTH views (adversarial catch: hiding
+  // it in Notation view left a sunken box of literally nothing) — it just
+  // speaks the active editor's language.
+  trayHintEl.textContent = inputMode === 'text'
+    ? 'dice you type appear here — Enter rolls them'
+    : 'tap a die button to add — then click your dice to roll';
   if (persist) save(LS_INPUTMODE, inputMode);
 }
 function setInputMode(mode, persist = true) {

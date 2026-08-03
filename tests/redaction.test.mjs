@@ -702,7 +702,13 @@ try {
       assert.ok(badName.body.error.includes('Zed'));
     });
 
-    await t('whisper offer: the claimer is NOT in the audience unless named', async () => {
+    // SUPERSEDED CONTRACT (2026-08-03, Joe): this test used to pin that a
+    // bystander COULD claim a whispered offer and roll it blind. A whisper
+    // is already ADDRESSED — the offer now derives its claim gate from the
+    // audience, so the bystander's claim refuses and the card stands. The
+    // blind-claimer property lives on in the dice-tower (secret) offer,
+    // pinned by its own test and the gm-screen-offer e2e.
+    await t('whisper offer: the audience IS the claim gate (auto-target)', async () => {
       const room = 'red-offer-whisper';
       const ann = await sit(room, 'Ann');
       const bob = await sit(room, 'Bob');
@@ -711,11 +717,20 @@ try {
       const off = await post('/api/offer', { room, playerId: ann.id, notation: '1d20 w:Cass' });
       assert.equal(off.status, 200);
       assert.deepEqual([...off.body.offer.visibility.audience].sort(), [ann.id, cass.id].sort());
+      assert.deepEqual(off.body.offer.to, { name: 'Cass', playerIds: [cass.id] },
+        'the claim gate derives from the audience, offerer excluded');
 
-      const claim = await post('/api/claim', { room, playerId: bob.id, offerId: off.body.offer.offerId });
+      // A bystander cannot take a roll whispered to someone else.
+      const stolen = await post('/api/claim', { room, playerId: bob.id, offerId: off.body.offer.offerId });
+      assert.equal(stolen.status, 403);
+      assert.equal(stolen.body.code, 'not_offer_target');
+
+      // The named player claims; the whisper's read holds around them.
+      // (visMode rides only the REDACTED projection — Cass's full copy is
+      // asserted by its values, Bob's shrouded copy by its visMode below.)
+      const claim = await post('/api/claim', { room, playerId: cass.id, offerId: off.body.offer.offerId });
       assert.equal(claim.status, 200);
-      assertNoValueKeys(claim.body.roll, "unnamed claimer's POST response");
-      assert.equal(claim.body.roll.visMode, 'whisper');
+      assert.ok(Array.isArray(claim.body.roll.values), 'the claimer is IN the audience and reads their own roll');
       const rollId = claim.body.roll.rollId;
 
       const annEvt = await ann.sse.waitFor((e) => e.type === 'roll' && e.data.rollId === rollId, "Ann's roll event");
@@ -723,7 +738,8 @@ try {
       const bobEvt = await bob.sse.waitFor((e) => e.type === 'roll' && e.data.rollId === rollId, "Bob's roll event");
       assert.ok(Array.isArray(annEvt.data.values), 'the offerer (chooser) sees it');
       assert.ok(Array.isArray(cassEvt.data.values), 'the named audience sees it');
-      assertNoValueKeys(bobEvt.data, "the claimer's own broadcast copy — they rolled it and cannot read it");
+      assertNoValueKeys(bobEvt.data, 'the bystander sees a shrouded roll');
+      assert.equal(bobEvt.data.visMode, 'whisper', "and the shroud names its mode");
     });
 
     await t('a "#" name cannot exist, so a whisper can never be misdirected through one', async () => {

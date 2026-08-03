@@ -2344,6 +2344,93 @@ export const scenarios = [
     },
   },
   {
+    name: 'whisper-offer',
+    tags: ['visibility'],
+    // Whisper-offer auto-targeting (Joe 2026-08-03): a whisper is already
+    // ADDRESSED, so its offer derives the claim gate from the audience —
+    // table-wide whisper offers cease to exist by construction. Conflicting
+    // explicit targets refuse; an offerer-only audience refuses; the
+    // claimed roll keeps the whisper's read (audience + offerer see,
+    // bystanders shrouded).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      const c = await ctx.newTable({ origin: '127.0.0.2', name: 'Carol' });
+
+      // The ▾ has nothing to choose under a whisper draft — it hides.
+      // (First wait for it to STAND — teammates exist — so the later
+      // hidden-check can't pass on the trivial initial state.)
+      await a.waitFor(`!document.getElementById('offer-pick').classList.contains('hidden')`,
+        { desc: 'the ▾ stands once teammates exist' });
+      await a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = 'd20 w:Bob # Save';
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      await a.waitFor(`document.getElementById('offer-pick').classList.contains('hidden')`,
+        { desc: 'the ▾ hides under a whisper draft' });
+      await a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = '';
+        box.dispatchEvent(new Event('input'));
+      })()`);
+
+      // A conflicting explicit target refuses — never a silent override.
+      const clash = await ctx.api('/api/offer', {
+        playerId: await a.playerId(), notation: '1d20 w:Bob', label: 'x', to: 'Carol',
+      });
+      assert.equal(clash.status, 400, 'off-audience target refused');
+      assert.equal(clash.data && clash.data.code, 'target_not_in_audience', 'and names the rule');
+
+      // A whisper to only yourself has nobody to offer to.
+      const selfish = await ctx.api('/api/offer', {
+        playerId: await a.playerId(), notation: '1d20 w:Alice', label: 'x',
+      });
+      assert.equal(selfish.status, 400, 'offerer-only audience refused');
+      assert.equal(selfish.data && selfish.data.code, 'whisper_needs_audience', 'with its own code');
+
+      // The plain table-wide verb now auto-targets the audience.
+      const posted = await a.dbg(`offerRoll('d20 w:Bob # Save vs fear')`);
+      assert.equal(posted.ok, true, `offer accepted (got: ${JSON.stringify(posted)})`);
+      for (const t of [a, b, c]) {
+        await t.waitFor('window.__diceDebug.offers.length === 1', { desc: 'offer lands' });
+      }
+      const offer = (await c.dbg('offers'))[0];
+      assert.equal(offer.to && offer.to.name, 'Bob', 'the audience IS the target');
+      assert.equal(await c.eval(`!!document.querySelector('.offer-card .offer-roll')`), false,
+        'no claim strip for a bystander');
+      assert.equal(await b.eval(`!!document.querySelector('.offer-card .offer-roll')`), true,
+        'the whispered player gets the claim strip');
+
+      // The server holds the gate: Carol's forced claim bounces, card stands.
+      const stolen = await ctx.api('/api/claim', {
+        playerId: await c.playerId(), offerId: offer.offerId,
+      });
+      assert.equal(stolen.status, 403, 'a forced foreign claim is refused');
+      assert.equal((await b.dbg('offers')).length, 1, 'the offer still stands for Bob');
+
+      // Bob claims; the whisper's read holds — Bob (audience) sees his
+      // result, Carol sees a shrouded roll.
+      await b.eval(`document.querySelector('.offer-card .offer-roll').click()`);
+      const rid = await b.waitFor(
+        `(window.__diceDebug.sim(120), (window.__diceDebug.currentRoll || {}).rollId || null)`,
+        { desc: 'the claimed roll starts on Bob’s tab' },
+      );
+      await b.waitFor(
+        `(window.__diceDebug.sim(160), !window.__diceDebug.busy && !!window.__diceDebug.entryState(${JSON.stringify(rid)}))`,
+        { desc: 'Bob’s roll settles' },
+      );
+      const sb = await b.entryState(rid);
+      assert.equal(sb.hidden, false, 'the audience member reads his own result');
+      await c.waitFor(
+        `(window.__diceDebug.sim(160), !!window.__diceDebug.entryState(${JSON.stringify(rid)}))`,
+        { desc: 'the roll reaches Carol' },
+      );
+      const sc = await c.entryState(rid);
+      assert.equal(sc.hidden, true, 'the bystander sees a shrouded roll');
+    },
+  },
+  {
     name: 'reveal-authority',
     tags: ['visibility'],
     // Only the visibility chooser may flip a hidden roll — enforced by the

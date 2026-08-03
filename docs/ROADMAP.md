@@ -257,9 +257,12 @@ ladder; all of it is polish or a new rung.
   wears the claim strip (bystanders read 'waiting on Bo'). UI: a ▾ split
   button beside the draft row's *Offer to table* (plain click keeps its
   one-click table-wide muscle memory; the ▾ waits for a teammate).
-- **Whisper-offer auto-targeting** *(NEXT — Joe 2026-08-03: "a whisper
-  roll is already assigned to someone, so the offer should always be to
-  that person"; design agreed same day)*: an offered `whisper` roll
+- **Whisper-offer auto-targeting** *(Joe 2026-08-03: "a whisper roll is
+  already assigned to someone, so the offer should always be to that
+  person"; SHIPPED same day, as designed below — the superseded
+  bystander-can-claim-blind contract left tests/redaction.test.mjs with
+  a supersession note; `whisper-offer` e2e + the rewritten redaction
+  test pin the new one)*: an offered `whisper` roll
   derives its claim gate FROM its audience, server-side in `handleOffer` —
   `w:Bo` offered is claimable by Bo, full stop; table-wide whisper offers
   cease to exist by construction (Joe: weird, arguably not useful).

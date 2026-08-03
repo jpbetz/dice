@@ -1404,6 +1404,37 @@ async function handleOffer(req, res) {
     to = { name: display, playerIds };
   }
 
+  // Whisper-offer auto-targeting (Joe 2026-08-03): a whisper is already
+  // ADDRESSED — "the offer should always be to that person" — so the claim
+  // gate DERIVES from the whisper's audience and table-wide whisper offers
+  // cease to exist by construction. An explicit ▾ target may still NARROW
+  // to one audience member; one outside the audience refuses (a teaching
+  // error, never a silent override), and a whisper whose only audience is
+  // the offerer has nobody to offer to. secret (the dice tower — open
+  // claiming is its point) and held offers are untouched.
+  if (vis.visibility && vis.visibility.mode === 'whisper') {
+    const audienceIds = vis.visibility.audience.filter((id) => id !== player.id);
+    if (!audienceIds.length) {
+      return sendError(res, 400, 'a whisper to only yourself has nobody to offer to', 'whisper_needs_audience');
+    }
+    if (to) {
+      if (to.playerIds.some((id) => !audienceIds.includes(id))) {
+        return sendError(res, 400,
+          `"${to.name}" is not in this whisper's audience — a whispered offer goes to the players named after w:`,
+          'target_not_in_audience');
+      }
+      // an explicit narrowing WITHIN the audience stands as given
+    } else {
+      const names = [];
+      for (const id of audienceIds) {
+        for (const p of room.players.values()) {
+          if (p.id === id && !names.includes(p.name)) names.push(p.name);
+        }
+      }
+      to = { name: names.join(', '), playerIds: audienceIds };
+    }
+  }
+
   const offer = {
     offerId: crypto.randomUUID(),
     byId: player.id,
