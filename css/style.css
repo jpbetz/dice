@@ -700,6 +700,11 @@ html, body {
   font-family: var(--font-mono);
   color: var(--muted);
 }
+/* the identity strip's composer (Trigger Pass): a pure-dice pool edits
+   exactly like the creation card — units remove one die, rank faces add */
+.pid-pool { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 30px; }
+.cc-unit:disabled { cursor: default; opacity: 0.55; }
+.cc-unit:disabled:hover { border-color: rgba(243, 234, 215, 0.35); background: rgba(243, 234, 215, 0.05); }
 .pid-echo {
   font-family: var(--font-mono);
   font-size: 11px;

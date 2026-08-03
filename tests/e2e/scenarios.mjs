@@ -1372,24 +1372,35 @@ export const scenarios = [
       assert.equal(gs.length, nBefore, 'no fork');
       assert.ok(await a.dbg('stripState'), 'the popover survives the rename');
 
-      // CUJ advancement: tap the next die face — count preserved, popover
-      // stays open for chained edits, tile pulses on its shelf.
+      // CUJ advancement, composer idiom (Trigger Pass — 'the same behavior
+      // as + pool for dice'): rank faces ADD a die, units REMOVE one; a
+      // swap is remove + add. The popover stays open for chained edits.
       await a.eval(`document.querySelector('#pop-identity .pid-rank[data-die="d10"]').click()`);
       gs = await a.dbg('groups');
-      assert.equal(gs.find((g) => g.id === claws.id).notation, '1d10', 'rank stepped d6 → d10');
-      assert.equal((await a.dbg('stripState')).rank, 'd10', 'the ladder tracks the record');
+      assert.equal(gs.find((g) => g.id === claws.id).notation, '1d6+1d10', 'a face tap ADDS a die');
+      await a.eval(`[...document.querySelectorAll('#pop-identity .pid-pool .cc-unit')]
+        .find((u) => u.title.includes('d6')).click()`);
+      gs = await a.dbg('groups');
+      assert.equal(gs.find((g) => g.id === claws.id).notation, '1d10', 'removing the d6 completes the swap');
+      assert.equal((await a.dbg('stripState')).units.length, 1, 'the composer tracks the record');
+      assert.equal((await a.dbg('stripState')).units[0].disabled, true,
+        'the last die cannot be removed — a pool is never empty');
       await a.dbg('closePopover()');
 
+      // count edits are first-class: 3d4 + a d4 tap → 4d4; a unit tap → 3d4
       await a.dbg(`poolPopoverOpen(${JSON.stringify(damage.id)})`);
-      await a.eval(`document.querySelector('#pop-identity .pid-rank[data-die="d8"]').click()`);
-      assert.equal((await a.dbg('groups')).find((g) => g.id === damage.id).notation, '3d8',
-        'the count rides the rank change (3d4 → 3d8)');
+      await a.eval(`document.querySelector('#pop-identity .pid-rank[data-die="d4"]').click()`);
+      assert.equal((await a.dbg('groups')).find((g) => g.id === damage.id).notation, '4d4',
+        'a face tap grows the count (3d4 → 4d4)');
+      await a.eval(`document.querySelector('#pop-identity .pid-pool .cc-unit').click()`);
+      assert.equal((await a.dbg('groups')).find((g) => g.id === damage.id).notation, '3d4',
+        'a unit tap removes one (4d4 → 3d4)');
       await a.dbg('closePopover()');
 
-      // fail-closed: a complex pool gets no ladder — its doors instead
+      // fail-closed: a complex pool gets no composer — its doors instead
       await a.dbg(`poolPopoverOpen(${JSON.stringify(hunt.id)})`);
       const hs = await a.dbg('stripState');
-      assert.equal(hs.simple, false, 'complex notation fails the ladder closed');
+      assert.equal(hs.composer, false, 'complex notation fails the composer closed');
       assert.equal(hs.ranks, 0, 'no rank buttons rendered');
       assert.ok(await a.eval(`document.querySelectorAll('#pop-identity .pid-ghost-verb').length === 2`),
         'Edit notation… and Open in draft stand instead');
@@ -1426,8 +1437,9 @@ export const scenarios = [
       assert.equal(await a.dbg('creatingShelf'), null, 'the card closed');
       await a.dbg('setPoolsEditMode(false)');
 
-      // a rank tap must NOT wipe the draft below the hairline (regression:
-      // stripCommit reseeded pop wholesale and blanked a mid-typed dc)
+      // a composer tap must NOT wipe the draft below the hairline
+      // (regression: stripCommit reseeded pop wholesale and blanked a
+      // mid-typed dc — the composer keeps the old rank-swap's contract)
       await a.dbg(`poolPopoverOpen(${JSON.stringify(damage.id)})`);
       await a.eval(`(() => {
         const dc = document.getElementById('pop-dc');
@@ -1436,9 +1448,9 @@ export const scenarios = [
       })()`);
       await a.eval(`document.querySelector('#pop-identity .pid-rank[data-die="d12"]').click()`);
       assert.equal(await a.eval(`document.getElementById('pop-dc').value`), '15',
-        'the mid-typed dc survives a rank tap');
-      assert.equal((await a.dbg('groups')).find((g) => g.id === damage.id).notation, '3d12',
-        'and the rank still landed');
+        'the mid-typed dc survives a composer tap');
+      assert.equal((await a.dbg('groups')).find((g) => g.id === damage.id).notation, '3d4+1d12',
+        'and the die still landed');
       await a.dbg('closePopover()');
 
       // the ghost's REAL click path (not just the hook): card opens, typed

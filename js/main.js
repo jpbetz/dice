@@ -3449,11 +3449,10 @@ window.__diceDebug = {
       groupId: g.id,
       name: g.name,
       category: g.category || null,
-      simple: SIMPLE_POOL_RE.test(g.notation),
-      rank: (() => {
-        const b = popIdentityEl.querySelector('.pid-rank[aria-pressed="true"]');
-        return b ? b.dataset.die : null;
-      })(),
+      // the composer (Trigger Pass): units remove, rank faces add
+      composer: !!popIdentityEl.querySelector('.pid-pool'),
+      units: [...popIdentityEl.querySelectorAll('.pid-pool .cc-unit')]
+        .map((u) => ({ title: u.title, disabled: u.disabled })),
       ranks: popIdentityEl.querySelectorAll('.pid-rank').length,
     };
   },
@@ -5521,7 +5520,6 @@ function resyncTrayPopover() {
 // only; every write funnels editPoolById (the one writer).
 // ---------------------------------------------------------------------------
 const popIdentityEl = document.getElementById('pop-identity');
-const SIMPLE_POOL_RE = /^(\d+)d(4|6|8|10|12|20)$/;
 const RANK_LADDER = ['d4', 'd6', 'd8', 'd10', 'd12', 'd20'];
 
 function stripGroup() {
@@ -5656,36 +5654,79 @@ function renderPopIdentity() {
   cats.appendChild(plus);
   popIdentityEl.appendChild(cats);
 
-  // Row 3 — DIE RANK, fail-closed: only a pure `NdX` pool gets the ladder
-  // (one die type, no mods/dc/flags — the regex runs on the CANONICAL, so a
-  // dc12 can never be dropped by a rank tap). Anything else keeps its
+  // Row 3 — THE DICE, composing like the creation card (Trigger Pass; Joe:
+  // 'the same behavior as + pool for dice'). A PURE dice pool — nothing but
+  // ladder dice in its canonical (no mods/dc/flags/sources; the parse runs
+  // on the CANONICAL, so a dc12 can never be dropped by a tap) — renders
+  // its dice as removable grouped UNITS over the six rank faces as ADDERS.
+  // Every tap commits through stripCommit, which swaps pop.dice ONLY: a
+  // mid-typed dc below the hairline survives, the same contract the old
+  // one-tap rank swap kept. (The swap itself retires — swap = remove +
+  // add, one idiom for building dice everywhere.) Anything else keeps its
   // canonical echo plus the two quiet doors to the full grammar.
   const dieRow = document.createElement('div');
   dieRow.className = 'pid-row pid-die';
-  const simple = SIMPLE_POOL_RE.exec(g.notation);
-  if (simple) {
-    const count = Number(simple[1]);
+  const poolRes = parseNotation(g.notation);
+  const pure = poolRes.ok && !poolRes.spec.mods && poolRes.dc == null
+    && !poolRes.comment && !poolRes.exp && !poolRes.faceDown
+    && !visOfParse(poolRes) && !poolRes.spec.sources
+    && poolRes.spec.dice.length > 0
+    && poolRes.spec.dice.every((t) => RANK_LADDER.includes(t));
+  if (pure) {
+    const dice = poolRes.spec.dice;
+    const commitDice = (next) => {
+      const counts = new Map();
+      for (const t of next) counts.set(t, (counts.get(t) || 0) + 1);
+      const notation = RANK_LADDER.filter((t) => counts.has(t))
+        .map((t) => `${counts.get(t)}${t}`).join('+'); // die order = the canonical spelling
+      stripCommit({ notation });
+    };
+    const counts = new Map();
+    for (const t of dice) counts.set(t, (counts.get(t) || 0) + 1);
+    const units = document.createElement('div');
+    units.className = 'pid-pool';
+    for (const type of RANK_LADDER) {
+      if (!counts.has(type)) continue;
+      const n = counts.get(type);
+      const u = document.createElement('button');
+      u.className = 'cc-unit';
+      const last = dice.length === 1;
+      u.disabled = last;
+      u.title = last ? 'a pool needs at least one die' : `Remove one ${type}`;
+      u.appendChild(buildDieStrip([type], 1));
+      if (n > 1) {
+        const x = document.createElement('span');
+        x.className = 'pid-count';
+        x.textContent = `×${n}`;
+        u.appendChild(x);
+      }
+      u.addEventListener('click', () => {
+        const next = [...dice];
+        const i = next.indexOf(type);
+        if (i >= 0) next.splice(i, 1);
+        if (next.length) commitDice(next);
+      });
+      units.appendChild(u);
+    }
+    dieRow.appendChild(units);
+    popIdentityEl.appendChild(dieRow);
+    const ladderRow = document.createElement('div');
+    ladderRow.className = 'pid-row pid-die';
+    const full = dice.length >= MAX_DICE_ON_TABLE;
     for (const type of RANK_LADDER) {
       const b = document.createElement('button');
       b.className = 'pid-rank';
       b.dataset.die = type;
-      const pressed = type === `d${simple[2]}`;
-      b.setAttribute('aria-pressed', String(pressed));
-      b.title = `${count}${type}`;
+      b.disabled = full;
+      b.title = full ? `a pool caps at ${MAX_DICE_ON_TABLE} dice` : `Add a ${type}`;
       b.appendChild(buildDieStrip([type], 1));
-      if (count > 1 && pressed) {
-        const n = document.createElement('span');
-        n.className = 'pid-count';
-        n.textContent = `×${count}`;
-        b.appendChild(n);
-      }
-      b.addEventListener('click', () => {
-        if (type === `d${simple[2]}`) return;
-        stripCommit({ notation: `${count}${type}` }); // count preserved
-      });
-      dieRow.appendChild(b);
+      b.addEventListener('click', () => commitDice([...dice, type]));
+      ladderRow.appendChild(b);
     }
-  } else {
+    popIdentityEl.appendChild(ladderRow);
+    return;
+  }
+  {
     const echo = document.createElement('code');
     echo.className = 'pid-echo';
     echo.textContent = g.notation;
