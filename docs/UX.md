@@ -1669,7 +1669,12 @@ second well, and derives every placement from one law:
   lists draft management under "stands," and the code's own comment had
   asserted it all along. The rail keeps a fixed min-height, so the save
   morph swaps in without a jump (§7.10: cards are chrome, they don't
-  jiggle).
+  jiggle). **Esc peels the morph, it never eats the draft** (amended
+  2026-08-03, adversarial pass): the name input's own handler always did
+  this, but pressing a shelf chip moves focus off the input and Esc then
+  fell through the global chain to `clearDraft()` — the composed pool
+  vanished mid-naming. The morph is a layer, so it joins the peel chain
+  just above the draft.
 - **The zone breathes**: the sticky zone owns 16px of its own opaque
   padding above the well — the region-vs-item signal against the
   palette's internal 6px grid in Dice view, and the same 16px below the
@@ -1715,6 +1720,14 @@ that opened the card**:
   included, where the coarse media query can be false — the card ✕ is the
   only clear path. The coarse `display:none` on the sweep is load-bearing
   as the rule's complement.
+- **Exactly one, never zero** (amended 2026-08-03, adversarial pass): the
+  gesture alone cannot decide, because not every open on a touch device
+  is a tap. A long-press fires `contextmenu` → `openShelfPopover` →
+  `openPeek` with the default `'hover'`, and on a coarse pointer that
+  card had *no sweep and no ✕* — a collected roll nobody could tidy. So
+  the card also keeps its ✕ wherever the sweep cannot be dressed, read
+  live from the same media query that hides it (`sweepUnavailable`). The
+  complement is now enforced in code, not merely relied upon in prose.
 
 Mechanism: `peekVia` ('hover' | 'tap') rides `openPeek`; only the
 marker's touch branch passes 'tap', and a mouse `pointerenter` over an

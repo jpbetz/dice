@@ -1119,6 +1119,17 @@ let peekRollId = null;       // rollId of the open peek, or null
 // the same pointer beat that dressed the sweep — two targets for one verb,
 // the exact thing §7.9's 'never a second smaller target' contract bans.
 let peekVia = null;          // 'hover' | 'tap' — the gesture that opened it
+// The rule's COMPLEMENT, read from the same media query that hides the sweep
+// (css .shelf-marker .shelf-sweep, @media (pointer: coarse)): where the sweep
+// cannot be dressed, the card's ✕ is the only possible target no matter which
+// gesture opened the card. Without this the gesture alone decided, and a
+// touch LONG-PRESS — which fires contextmenu → openShelfPopover → openPeek
+// with the default 'hover' — left a collected roll with ZERO clear
+// affordances (no sweep, no ✕). Live, not cached: a hybrid device can change
+// its primary pointer under a running page.
+function sweepUnavailable() {
+  return !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+}
 let peekHoverTimer = null;
 let peekCloseTimer = null;
 let peekW = 0;               // card box, cached by measurePeek (see positionPeek)
@@ -2408,8 +2419,10 @@ function appendCardActions(holder, entry, opts) {
   }
   // The one-✕ rule: a hover-opened peek builds NO ✕ row at all (not an
   // empty node — a vestigial row invites 'fixing') — the marker's sweep is
-  // the clear target while a hover exists to dress it.
-  if (opts.clearX === 'tap-only' && peekVia !== 'tap') return;
+  // the clear target while a hover exists to dress it. EXACTLY one, never
+  // zero: where the sweep is display:none (coarse) the card keeps its ✕
+  // whatever gesture opened it (sweepUnavailable — see the one-✕ block).
+  if (opts.clearX === 'tap-only' && peekVia !== 'tap' && !sweepUnavailable()) return;
   const row = document.createElement('div');
   row.className = `${opts.rowClass} reveal-tier`;
   const x = document.createElement('button');
@@ -7457,6 +7470,12 @@ document.addEventListener('keydown', (e) => {
     // the overlay z-order, so every layer above it peels first. Esc is one
     // of its only three closes (≣ toggle, header ✕, Esc — never a click-away).
     else if (isLogFlyoutOpen()) closeLogFlyout();
+    // The save morph is a layer too, and Esc peels layers: naming a pool is
+    // cancelled, the draft it was naming survives. The name input's own
+    // handler already did exactly this — but focus leaves the input the
+    // moment you press a shelf chip, and from there Esc fell through and
+    // DESTROYED the composed draft instead of closing the morph over it.
+    else if (!traySaveRow.classList.contains('hidden')) closeSaveMorph();
     // The staged draft empties before the table sweeps: Esc mirrors Enter's
     // draft-first priority.
     else if (tray.length || cmdInput.value) clearDraft();

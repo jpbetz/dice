@@ -189,6 +189,44 @@ export const scenarios = [
         );
       }
 
+      // COARSE leg — the rule is exactly one, never ZERO. On a coarse
+      // pointer the sweep is display:none, so the card must keep its ✕
+      // whatever gesture opened it. This is not hypothetical: a touch
+      // LONG-PRESS fires contextmenu → openShelfPopover → openPeek with the
+      // default 'hover', and the gesture-only gate left that card with no
+      // sweep AND no ✕ — a collected roll nobody could tidy.
+      await a.roll('d8+2');
+      await b.settle();
+      const rid3 = await a.rollId();
+      assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid3)})`), true, 'third collect accepted');
+      for (const t of [a, b]) {
+        await t.waitFor(
+          `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+          { desc: 'third roll shelved' },
+        );
+      }
+      await b.emulateCoarsePointer();
+      assert.equal(await b.eval(`matchMedia('(pointer: coarse)').matches`), true,
+        'the tab really is a coarse pointer now');
+      assert.equal(
+        await b.eval(`getComputedStyle(document.querySelector('.shelf-marker .shelf-sweep')).display`),
+        'none', 'the sweep really is gone on a coarse pointer (the rule\'s complement)');
+      assert.equal(await b.dbg(`peek(${JSON.stringify(rid3)})`), rid3, 'peek opens as a hover');
+      const cs = await b.dbg('peekState');
+      assert.equal(cs.via, 'hover', 'opened as a hover — the long-press path');
+      assert.equal(cs.hasClear, true,
+        'coarse + hover-opened: the card keeps the ✕ (no sweep to defer to)');
+      await b.eval(`document.querySelector('#peek-card .pk-clear').click()`);
+      for (const t of [a, b]) {
+        await t.waitFor(
+          `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 0 && window.__diceDebug.tableDice.length === 0)`,
+          { desc: 'and it clears for everyone' },
+        );
+      }
+      await b.emulateCoarsePointer(false); // release it for anything after
+      assert.equal(await b.eval(`matchMedia('(pointer: coarse)').matches`), false,
+        'the emulation is released');
+
       // A held roll rests exactly as quiet: nothing drawn, never '?'; its
       // Reveal waits in the peek for the authority.
       await a.roll('d20 held');
@@ -1865,6 +1903,27 @@ export const scenarios = [
         return window.__diceDebug.trayState.saveOpen === false
           && Math.abs(v - window.__diceDebug.trayState.draftH) <= 1;
       })()`, { desc: 'and tracks back when the morph leaves' });
+
+      // (viii) Esc PEELS the morph, it does not destroy the draft. The name
+      // input's own handler already closed just the morph — but pressing a
+      // shelf chip moves focus off the input, and from there Esc fell
+      // through the global chain to clearDraft() and wiped the composed
+      // pool the user was in the middle of naming.
+      const before = (await a.dbg('trayState')).dice.length;
+      assert.ok(before > 0, 'a draft to protect');
+      await a.eval(`document.getElementById('save-group').click()`);
+      assert.equal((await a.dbg('trayState')).saveOpen, true, 'morph open again');
+      await a.eval(`(() => {
+        // exactly what pressing a shelf chip does: focus leaves the input
+        const chip = document.querySelector('#save-cat-row button');
+        if (chip) chip.focus(); else document.getElementById('group-name').blur();
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      })()`);
+      await a.waitFor(`window.__diceDebug.trayState.saveOpen === false`,
+        { desc: 'Esc closes the morph' });
+      assert.equal((await a.dbg('trayState')).dice.length, before,
+        'and the draft it was naming SURVIVES');
+      assert.equal((await a.dbg('trayState')).hasActions, true, 'the rail comes back');
 
       // (vii) The x-layer pin: the well's padding sits OUTSIDE the
       // cluster, so the per-die ✕ overlays still land on their dice.

@@ -232,6 +232,22 @@ export class Table {
     return this.dbg(`entryState(${rollId === null ? '' : JSON.stringify(rollId)})`);
   }
 
+  // Make this tab a TOUCH device: `(pointer: coarse)` starts matching, which
+  // is the only way to exercise a contract whose complement is a coarse
+  // media rule (the one-✕ rule's sweep, §7.15). Emulation.setEmulatedMedia
+  // deliberately does NOT do this — its `features` list ignores `pointer`;
+  // touch emulation is what Chrome derives the pointer type from. (Headless
+  // at rest is `pointer: none` — neither coarse nor fine — so every coarse
+  // rule is OFF unless a scenario asks for it.) The override is per-tab and
+  // outlives the scenario's own assertions: turn it back off.
+  emulateCoarsePointer(on = true) {
+    return this.page.browser.send(
+      'Emulation.setTouchEmulationEnabled',
+      on ? { enabled: true, maxTouchPoints: 5 } : { enabled: false },
+      this.page.sessionId,
+    );
+  }
+
   async close() { await this.page.close(); }
 }
 
