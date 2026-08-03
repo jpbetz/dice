@@ -21,12 +21,17 @@ limitations under the License.
 // Variants (goal 11): 'std' is the normal numbered die; 'shroud' is the
 // numberless obsidian die a redacted (held/whispered) roll tumbles as — dark
 // reflective faces with NO symbols, so there is nothing to read on any
-// client. Physics bodies always come from the 'std' build: the hull is
+// client. A THEME id (js/themes.js — Tier 6 §9) is also a variant: same
+// geometry and values, the theme's body/number colors baked into the face
+// textures and its finish (rough/metal) + internal glow (emissive) on the
+// materials. Physics bodies always come from the 'std' build: the hull is
 // identical and sharing one shape keeps every client's fast-forward
-// byte-deterministic regardless of which skin it renders.
+// byte-deterministic regardless of which skin it renders — a theme can
+// never change how a die lands.
 
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
+import { THEMES } from './themes.js';
 
 export const DIE_TYPES = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20'];
 
@@ -430,8 +435,12 @@ function faceSpecs(type, faces) {
 function buildDie(type, variant = 'std') {
   const def = DIE_DEFS[type];
   const shroud = variant === 'shroud';
-  // Shroud skin: same geometry, obsidian faces, no symbols.
-  const skin = shroud ? { ...def, color: SHROUD_COLOR } : def;
+  const theme = !shroud && variant !== 'std' ? THEMES[variant] || null : null;
+  // Shroud skin: same geometry, obsidian faces, no symbols. A theme skin:
+  // same geometry, the theme's colors + finish + glow (docs/THEMES.md).
+  const skin = shroud ? { ...def, color: SHROUD_COLOR }
+    : theme ? { ...def, color: theme.body, text: theme.text, feel: theme.feel, glow: theme.glow }
+    : def;
   // The BASE polyhedron drives faces, values and the physics hull; the mesh
   // the player sees is its beveled twin (render only — see buildBeveledGeometry).
   const base = buildBaseGeometry(type);
@@ -455,13 +464,13 @@ function buildDie(type, variant = 'std') {
         text: String(vertexValues.find((v) => v.dir.clone().multiplyScalar(p.length()).distanceTo(p) < EPS * 10).value),
         corner2: project2d(f, p),
       }));
-      return materialFor(def, f, { corners });
+      return materialFor(skin, f, { corners });
     });
     faces.forEach((f) => { f.value = null; });
   } else {
     const specs = faceSpecs(type, faces);
     materials = faces.map((f, i) =>
-      shroud ? materialFor(skin, f, { blank: true }, true) : materialFor(def, f, specs[i])
+      shroud ? materialFor(skin, f, { blank: true }, true) : materialFor(skin, f, specs[i])
     );
     faces.forEach((f, i) => { f.value = specs[i].value; });
   }
@@ -471,8 +480,8 @@ function buildDie(type, variant = 'std') {
   const edgeColor = new THREE.Color(skin.color).lerp(new THREE.Color('#000000'), 0.25);
   materials.push(new THREE.MeshStandardMaterial({
     color: edgeColor,
-    roughness: shroud ? 0.16 : 0.3,
-    metalness: shroud ? 0.5 : 0.1,
+    roughness: shroud ? 0.16 : (skin.feel ? skin.feel.rough : 0.3),
+    metalness: shroud ? 0.5 : (skin.feel ? skin.feel.metal : 0.1),
   }));
 
   const shape = buildShape(faces);
@@ -480,12 +489,19 @@ function buildDie(type, variant = 'std') {
 }
 
 function materialFor(def, face, spec, shroud = false) {
-  return new THREE.MeshStandardMaterial({
+  const m = new THREE.MeshStandardMaterial({
     map: makeFaceTexture(def, face, spec),
-    // Obsidian: darker, glossier, more metallic — reflections instead of pips.
-    roughness: shroud ? 0.16 : 0.3,
-    metalness: shroud ? 0.5 : 0.1,
+    // Obsidian: darker, glossier, more metallic — reflections instead of
+    // pips. Themed skins bring their own finish (docs/THEMES.md).
+    roughness: shroud ? 0.16 : (def.feel ? def.feel.rough : 0.3),
+    metalness: shroud ? 0.5 : (def.feel ? def.feel.metal : 0.1),
   });
+  if (!shroud && def.glow) {
+    // the theme's INTERNAL light — subtle at rest, surged by effects
+    m.emissive = new THREE.Color(def.glow.color);
+    m.emissiveIntensity = def.glow.intensity;
+  }
+  return m;
 }
 
 // Cache re-keyed to (type, variant) — the shared `materials` array must never
