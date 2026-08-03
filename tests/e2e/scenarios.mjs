@@ -1709,11 +1709,168 @@ export const scenarios = [
       await a.waitFor(`!document.getElementById('offer-draft').classList.contains('hidden')
         && !document.getElementById('offer-draft').disabled`,
         { desc: 'the Offer verb stands on the draft row at a table' });
+      // Computed display, not class: the class alone passed even while a
+      // solo table showed a dead Offer (D2 — no bare .hidden rule existed).
+      // The solo/offline false case is pinned in draft-bench.
+      assert.equal((await a.dbg('trayState')).offerVisible, true,
+        'Offer is COMPUTEDLY visible at a table');
       await a.eval(`document.getElementById('offer-draft').click()`);
       await b.waitFor(`document.querySelectorAll('.offer-card').length === 1`,
         { desc: 'the offer reaches Bob' });
       const detail = await b.eval(`document.querySelector('.offer-card .offer-detail').textContent`);
       assert.ok(detail.includes('vs 8'), `the dc rode the offer (got: ${detail})`);
+    },
+  },
+  {
+    name: 'draft-bench',
+    tags: ['groups', 'chrome'],
+    // THE WORKBENCH (§7.14): the draft line is a field dressed in the
+    // command box's --well; the management rail (Save · Offer · ✕ Clear)
+    // STANDS below it while a draft exists — P6, superseding the
+    // 2026-08-01 ghost-text demotion. These pins hold the layout contract:
+    // the contextual rail (incl. the unparseable-draft ✕ Clear papercut),
+    // the standing (no-hover) reveal, the region air in both views, the ±
+    // popover anchor the well dress must not zero, the per-die ✕ offset
+    // math the well's padding must not disturb, the observed --draft-h,
+    // and Offer's REAL hidden state offline.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+
+      // (i) The contextual rail: empty → gone; content → standing; an
+      // UNPARSEABLE half-typed draft → still standing, ✕ Clear enabled
+      // (before this pass the row hid while Clear stayed enabled — a
+      // mouse had no path to the one verb that mattered).
+      assert.equal((await a.dbg('trayState')).hasActions, false, 'empty draft: no rail');
+      await a.eval(`document.querySelector('#die-buttons .die-btn').click()`);
+      assert.equal((await a.dbg('trayState')).hasActions, true, 'a staged die raises the rail');
+      await a.eval(`document.getElementById('clear-tray').click()`);
+      await a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = '2d';
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      await a.waitFor(`window.__diceDebug.trayState.hasActions === true`,
+        { desc: 'a half-typed draft still raises the rail (✕ Clear must be reachable)' });
+      assert.equal(await a.eval(`document.getElementById('clear-tray').disabled`), false,
+        '✕ Clear is enabled on the unparseable draft');
+      assert.equal(await a.eval(`document.getElementById('save-group').disabled`), true,
+        'Save stays parse-gated');
+
+      // (ii) The standing pin: NO pointer synthesis anywhere in this
+      // scenario — the rail's verbs are at full opacity purely because a
+      // draft exists. This is the regression that would silently revert.
+      await a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = '2d6';
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      await a.waitFor(`window.__diceDebug.trayState.dice.length === 2`, { desc: 'draft follows the box' });
+      assert.equal((await a.dbg('trayState')).railStanding, true,
+        'the rail STANDS — visible with no hover (P6: management stands)');
+
+      // (vi) The air pins: the zone's own padding owns the region gap in
+      // BOTH views, so a future pass cannot silently re-tighten it.
+      const airDice = await a.eval(`(() => {
+        const t = document.getElementById('tray-actions').getBoundingClientRect();
+        const pal = document.getElementById('die-buttons').getBoundingClientRect();
+        return Math.round(t.top - pal.bottom);
+      })()`);
+      assert.ok(airDice >= 14, `Dice view: palette → well air >= 14px (got ${airDice})`);
+      await a.eval(`document.querySelector('#input-mode [data-v="text"]').click()`);
+      const airText = await a.eval(`(() => {
+        const t = document.getElementById('tray-actions').getBoundingClientRect();
+        const c = document.getElementById('cmd').getBoundingClientRect();
+        return Math.round(t.top - c.bottom);
+      })()`);
+      assert.ok(airText >= 14, `Notation view: box → well air >= 14px (got ${airText})`);
+      await a.eval(`document.querySelector('#input-mode [data-v="dice"]').click()`);
+
+      // (v) The anchor pin: the well dress must not zero the ± popover's
+      // anchor rect. Expected top mirrors placePopover's clamp exactly.
+      assert.equal(await a.dbg(`openPopoverFor('tray')`), true, 'the tray ± popover opens');
+      assert.equal((await a.dbg('popover')).open, true, 'and reports open');
+      const geo = await a.eval(`(() => {
+        // re-place against the popover's CURRENT height first (its preview
+        // grows async after open; the resize listener runs placePopover
+        // synchronously), then read the AUTHORED style.top — the entrance
+        // animation (pop-in translateY) skews a bounding-rect read
+        window.dispatchEvent(new Event('resize'));
+        const r = document.getElementById('tray-actions').getBoundingClientRect();
+        const p = document.getElementById('mods-popover');
+        const expected = Math.max(12, Math.min(Math.round(r.top - 46),
+          window.innerHeight - p.offsetHeight - 12));
+        return { anchored: r.height > 0, top: parseFloat(p.style.top),
+          expected, wellLit: document.getElementById('tray-actions').classList.contains('open') };
+      })()`);
+      assert.ok(geo.anchored, 'the anchor rect is nonzero');
+      assert.ok(Math.abs(geo.top - geo.expected) <= 2,
+        `the popover rides its anchor (top ${geo.top}, expected ${geo.expected})`);
+      assert.equal(geo.wellLit, true, 'the well lights (.open) while its editor lives');
+      await a.dbg('closePopover()');
+      assert.equal(await a.eval(`document.getElementById('tray-actions').classList.contains('open')`),
+        false, 'and dims when it closes');
+
+      // (iv) The observed --draft-h: the save morph changes the zone's
+      // height WITHOUT a renderTray, so only the ResizeObserver keeps the
+      // shelf headers' pin fresh (±1px: RO rounds border-box fractions).
+      await a.eval(`document.getElementById('save-group').click()`);
+      assert.equal((await a.dbg('trayState')).saveOpen, true, 'the save morph swapped in');
+      await a.waitFor(`(() => {
+        const body = document.querySelector('#builder-panel > .panel-body');
+        const v = parseFloat(getComputedStyle(body).getPropertyValue('--draft-h'));
+        return Math.abs(v - window.__diceDebug.trayState.draftH) <= 1;
+      })()`, { desc: 'the observed --draft-h tracks the morph height' });
+      await a.eval(`document.getElementById('save-cancel').click()`);
+      await a.waitFor(`(() => {
+        const body = document.querySelector('#builder-panel > .panel-body');
+        const v = parseFloat(getComputedStyle(body).getPropertyValue('--draft-h'));
+        return window.__diceDebug.trayState.saveOpen === false
+          && Math.abs(v - window.__diceDebug.trayState.draftH) <= 1;
+      })()`, { desc: 'and tracks back when the morph leaves' });
+
+      // (vii) The x-layer pin: the well's padding sits OUTSIDE the
+      // cluster, so the per-die ✕ overlays still land on their dice.
+      await a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = '2d6+1d8';
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      await a.waitFor(`window.__diceDebug.trayState.xCount === 2`,
+        { desc: 'one ✕ per loose type (d6 group, d8)' });
+      const xs = await a.eval(`(() => {
+        const c = document.getElementById('tray').getBoundingClientRect();
+        return [...document.querySelectorAll('#tray-x-layer .die-x')].map((x) => {
+          const r = x.getBoundingClientRect();
+          return { w: Math.round(r.width), h: Math.round(r.height),
+            onCluster: r.right > c.left && r.left < c.right && r.bottom > c.top && r.top < c.bottom };
+        });
+      })()`);
+      assert.equal(xs.length, 2, 'two ✕ overlays');
+      for (const x of xs) {
+        assert.ok(x.w > 0 && x.h > 0 && x.onCluster,
+          `each ✕ lands on the cluster (got ${JSON.stringify(x)})`);
+      }
+
+      // (iii) The D2 pin, both ways: Offer is computedly visible at a
+      // table, and REALLY hidden off it (before .draft-actions .btn.hidden
+      // existed, the class toggled with no visual effect while offerDraft()
+      // dead-ends offline). Leave & switch is the one scripted door to a
+      // netOnline=false state; re-seat after so the tab ends sane.
+      assert.equal((await a.dbg('trayState')).offerVisible, true,
+        'Offer computedly visible at a table');
+      await a.eval(`document.getElementById('idm-leave').click()`);
+      await a.waitFor(`window.__diceDebug.net.online === false`, { desc: 'the seat drops' });
+      const off = await a.dbg('trayState');
+      assert.equal(off.hasActions, true, 'the draft (and its rail) survive the seat change');
+      assert.equal(off.offerVisible, false, 'offline, Offer is REALLY display:none');
+      await a.eval(`(() => {
+        const i = document.getElementById('name-input');
+        i.value = 'Alice';
+        i.dispatchEvent(new Event('input'));
+        document.getElementById('name-join').click();
+      })()`);
+      await a.waitFor(`window.__diceDebug.net.online === true`, { desc: 're-seated' });
+      await a.eval(`document.getElementById('clear-tray').click()`);
     },
   },
   {
