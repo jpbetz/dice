@@ -148,11 +148,29 @@ export const scenarios = [
       assert.ok((await a.eval(
         `parseFloat(getComputedStyle(document.querySelector('.tray-roll .die-art')).width)`)) >= 34,
         'dice land LARGER in the well than in pool rows');
+      // GHOST DICE: emptying the DRAFT (the Clear verb — box text alone
+      // never unstages dice) reveals the ghost sockets + caption
+      await a.eval(`document.getElementById('clear-tray').click()`);
+      await a.waitFor(`!document.getElementById('tray-hint').classList.contains('hidden')`,
+        { desc: 'the empty well shows its ghost' });
+      assert.equal(await a.eval(`document.querySelectorAll('#tray-hint .wg-die').length`), 3,
+        'three ghost dice rest in the empty well');
+      assert.ok((await a.eval(`document.getElementById('tray-hint-text').textContent`)).length > 0,
+        'with a whisper of caption');
+
+      // …and they REAPPEAR when the last die leaves by its ✕ (Joe: the
+      // remove path re-renders before the box empties — the ghost's
+      // visibility must read live state, not renderTray's snapshot)
       await a.eval(`(() => {
         const box = document.getElementById('cmd-input');
-        box.value = '';
+        box.value = '1d6';
         box.dispatchEvent(new Event('input'));
       })()`);
+      await a.waitFor(`document.getElementById('tray-hint').classList.contains('hidden')`,
+        { desc: 'a staged die hides the ghost' });
+      await a.eval(`document.querySelector('#tray-x-layer .die-x').click()`);
+      await a.waitFor(`!document.getElementById('tray-hint').classList.contains('hidden')`,
+        { desc: 'removing the last die brings the ghost back' });
 
       // the roller's body click clears for EVERYONE
       await a.eval(`document.getElementById('banner-main').click()`);
@@ -735,15 +753,14 @@ export const scenarios = [
     name: 'control-rail',
     tags: ['smoke', 'chrome'],
     // The persistent control rail NEVER hides: identity chip, quick roll,
-    // roll log, mute and settings stay reachable even with every panel
-    // collapsed (the emergent compact view). The retired compact mode used
-    // to strand settings + mute off screen — this pins the fix. Order is P3:
-    // presence (status · roster · identity) → action (❯) → information (≣)
-    // → environment (🔊 · ⚙); the ⤡ collapse-all button is deleted (key 'm'
-    // remains — the panel edge tabs are the visible replacement).
+    // roll log and settings stay reachable even with every panel collapsed
+    // (the emergent compact view). Order is P3: presence (status · roster ·
+    // identity) → action (❯) → information (≣) → environment (⚙). The ⤡
+    // collapse-all button is deleted (key 'm' remains), and the rail's 🔊
+    // retired 2026-08-03 (Joe: the setting is sufficient; 's' stays).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
-      const RAIL = ['rail', 'identity-chip', 'rail-palette', 'rail-log', 'toggle-sound', 'toggle-settings'];
+      const RAIL = ['rail', 'identity-chip', 'rail-palette', 'rail-log', 'toggle-settings'];
       const visible = (id) => a.eval(
         `(() => { const el = document.getElementById('${id}'); if (!el) return false;`
         + ` const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden'; })()`,
@@ -751,9 +768,11 @@ export const scenarios = [
       for (const id of RAIL) assert.ok(await visible(id), `#${id} visible in full view`);
       assert.equal(await a.eval(`document.getElementById('rail-collapse') === null`), true,
         'the ⤡ collapse-all button is gone');
+      assert.equal(await a.eval(`document.getElementById('toggle-sound') === null`), true,
+        'the rail 🔊 is gone — sound lives in Settings');
       assert.deepEqual(
         await a.eval(`[...document.getElementById('rail').children].map((el) => el.id)`),
-        ['status-pill', 'rail-roster', 'identity-chip', 'rail-palette', 'rail-log', 'toggle-sound', 'toggle-settings'],
+        ['status-pill', 'rail-roster', 'identity-chip', 'rail-palette', 'rail-log', 'toggle-settings'],
         'rail order: presence → action → information → environment (P3)',
       );
 

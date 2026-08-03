@@ -120,7 +120,14 @@ limitations under the License.
           <!-- Ghost text IN the die-fill slot (placeholder semantics): the
                hint occupies exactly the space the dice will fill, so adding
                them reads as physically filling it. -->
-          <p id="tray-hint" class="hint tray-ghost">tap a die button to add — then click your dice to roll</p>
+          <!-- GHOST DICE (Joe 2026-08-03): the empty well shows faint real
+               die art resting where dice will land — empty sockets in a
+               dice tray — over a whisper of caption. Filled from
+               dieArtURL at boot; no-GL keeps the caption alone. -->
+          <div id="tray-hint" class="hint tray-ghost">
+            <span class="wg-dice" aria-hidden="true"></span>
+            <span id="tray-hint-text">tap a die — it lands here</span>
+          </div>
         </div>
         <button id="tray-mods" title="Tweak — modifiers, target, moment">±</button>
       </div>
@@ -197,7 +204,6 @@ limitations under the License.
          reference material, not an inbox — the since-you-looked count rides
          only the hover title. -->
     <button id="rail-log" class="btn ghost" title="Roll log — l" aria-pressed="false">≣</button>
-    <button id="toggle-sound" class="btn ghost" title="Toggle sound">🔊</button>
     <button id="toggle-settings" class="btn ghost" title="Settings">⚙</button>
   </div>
 

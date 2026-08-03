@@ -373,17 +373,34 @@ html, body {
   background: none;
   box-shadow: none;
 }
-/* Ghost text in the die-fill slot: same box the dice occupy (placeholder
-   semantics — filling it with dice replaces it). */
+/* GHOST DICE in the die-fill slot: same box the dice occupy (placeholder
+   semantics — filling it with real dice replaces the sockets). Faint,
+   desaturated real die art over a whisper of caption; approaching the
+   well warms the sockets slightly. */
 #tray-hint.tray-ghost {
   margin: 0;
-  min-height: 46px;
+  min-height: 64px;
+  flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: 3px;
   padding: 4px 8px;
   font-style: italic;
+  text-align: center;
   color: #5f574b;
 }
+#tray-hint-text { font-size: 11px; }
+.wg-dice { display: flex; gap: 12px; }
+.wg-die {
+  width: 30px;
+  height: 30px;
+  filter: grayscale(1);
+  opacity: 0.15;
+  transition: opacity 0.25s;
+}
+#tray-actions:hover .wg-die { opacity: 0.28; }
 #tray-hint.hidden { display: none; }
 .tray-save.hidden { display: none; }
 .tray-line2.hidden { display: none; }
@@ -567,7 +584,28 @@ html, body {
   pointer-events: none;
   z-index: 0;
 }
-.pool-roll:hover:not(:disabled) .roll-cue { opacity: 1; }
+.pool-roll:hover:not(:disabled) .roll-cue {
+  opacity: 1;
+  /* legibility over a full pool (Joe 2026-08-03): on approach the cue
+     BRIGHTENS well past its resting translucency and the dice lower
+     themselves under it — the promise reads over any content */
+  color: rgba(255, 225, 130, 0.95);
+  text-shadow: 0 0 16px rgba(255, 215, 102, 0.5), 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+/* the content lowers UNDER the loud cue — dice, counts and source chips
+   go translucent while the roll promise stands over them */
+.pool-roll .die-art, .pool-roll .strip-dot, .pool-roll .strip-count,
+.pool-roll .src-chip, .pool-roll .strip-more { transition: opacity 0.15s; }
+.pool-roll:hover:not(:disabled) .die-art,
+.pool-roll:hover:not(:disabled) .strip-dot,
+.pool-roll:hover:not(:disabled) .strip-count,
+.pool-roll:hover:not(:disabled) .src-chip,
+.pool-roll:hover:not(:disabled) .strip-more { opacity: 0.35; }
+/* …but never while a ✕ remover is the target (that click removes, not
+   rolls — the cue already yields there; the dice must stay readable) */
+.tray-cluster:has(.die-x:hover) .tray-roll .die-art,
+.tray-cluster:has(.die-x:hover) .tray-roll .strip-count,
+.tray-cluster:has(.die-x:hover) .tray-roll .src-chip { opacity: 1; }
 /* the row's digit shortcut, revealed with the hover like the cue — a
    keyboard hint, not standing chrome */
 .pool-ord {

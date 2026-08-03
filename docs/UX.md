@@ -1647,6 +1647,17 @@ under-glow and gather the standing ROLL whisper from 0.3 toward 0.55.
 Light, depth and scale — never geometry jitter (§7.10). An empty well
 stays quiet; auto-collect runs at 3 s with a hover-hold.
 
+**Ghost dice, the loud cue, and the one-home mute** *(same day)*: the
+empty well shows GHOST DICE — three faint desaturated die-art sockets
+(d20 · d6 · d8) over a whisper of caption that speaks the active view's
+language ('tap a die — it lands here' / 'dice you type land here');
+approach warms them; real dice replace them (placeholder semantics). On
+a full pool, hovering the roll button BRIGHTENS the cue well past its
+resting translucency while the dice lower to 35% under it — the promise
+reads over any content, except while a ✕ remover is the target (dice
+stay readable; that click removes). The rail's 🔊 retired — sound's one
+home is Settings ('s' stays the shortcut).
+
 **The folded card, shelf edition** *(same day: 'make the collect panel
 roughly the same as the roll reveal panel')*: the peek's BODY is the one
 big clear target — the same red removal dress and ✕ watermark as the

@@ -3818,6 +3818,20 @@ const draftZoneEl = document.getElementById('draft-zone');
 const trayRollBtn = document.getElementById('tray-roll');
 const trayXLayer = document.getElementById('tray-x-layer');
 const trayHintEl = document.getElementById('tray-hint');
+// The empty well's GHOST DICE (Joe 2026-08-03): faint real die art resting
+// where dice will land — the molded sockets of a dice tray. Built once at
+// boot (dieArtURL warms synchronously); a no-GL environment adds no imgs
+// and the caption stands alone.
+for (const t of ['d20', 'd6', 'd8']) {
+  const u = dieArtURL(t);
+  if (!u) continue;
+  const img = document.createElement('img');
+  img.className = 'die-art wg-die';
+  img.src = u;
+  img.alt = '';
+  img.draggable = false;
+  trayHintEl.querySelector('.wg-dice').appendChild(img);
+}
 const draftActionsEl = document.getElementById('draft-actions'); // the RAIL: Save · Offer · ✕ Clear
 const traySaveRow = document.getElementById('tray-save-row');
 const trayModsBtn = document.getElementById('tray-mods');
@@ -4011,7 +4025,9 @@ function renderTray() {
   trayXLayer.innerHTML = '';
   const hasDice = tray.length > 0;
   trayRollBtn.classList.toggle('hidden', !hasDice);
-  trayHintEl.classList.toggle('hidden', hasDice || !!cmdInput.value);
+  // (the ghost's visibility lives in updateTrayButtons — every mutation
+  // funnels there; toggling it here missed the remove-last-die path, whose
+  // renderTray runs BEFORE syncBoxFromTray empties the box)
   if (hasDice) {
     // The composition reads by SOURCE (the Rack): each staged pool is one
     // chip — its name over its grouped dice — with ONE ✕ (unstage the
@@ -4120,6 +4136,10 @@ function renderTray() {
 
 function updateTrayButtons() {
   const usable = (cmdResult && cmdResult.ok) || tray.length > 0;
+  // The ghost dice REAPPEAR whenever the well truly empties (Joe: removing
+  // the last die must bring them back) — read live state, not renderTray's
+  // snapshot: the ✕-remover path re-renders before the box catches up.
+  trayHintEl.classList.toggle('hidden', tray.length > 0 || !!cmdInput.value);
   // The roll line always holds its slot in Dice view (empty = ghost text in
   // the die-fill area); the management RAIL (Save · Offer · ✕ Clear) STANDS
   // whenever there is a draft to act on — it is not part of the roll
@@ -4266,10 +4286,11 @@ function applyInputMode(persist = true) {
   }
   // The well's ghost hint survives BOTH views (adversarial catch: hiding
   // it in Notation view left a sunken box of literally nothing) — it just
-  // speaks the active editor's language.
-  trayHintEl.textContent = inputMode === 'text'
-    ? 'dice you type appear here — Enter rolls them'
-    : 'tap a die button to add — then click your dice to roll';
+  // speaks the active editor's language. The caption span only: the ghost
+  // dice beside it are view-agnostic.
+  document.getElementById('tray-hint-text').textContent = inputMode === 'text'
+    ? 'dice you type land here'
+    : 'tap a die — it lands here';
   if (persist) save(LS_INPUTMODE, inputMode);
 }
 function setInputMode(mode, persist = true) {
@@ -6819,16 +6840,14 @@ document.getElementById('log-close').addEventListener('click', closeLogFlyout);
 
 document.getElementById('corner-clear').addEventListener('click', () => requestClear());
 
-const soundBtn = document.getElementById('toggle-sound');
-// One setter for both mirrors of the sound preference (top-bar 🔊 and the
-// settings-modal switch); persists 'dice.sound.v1'.
+// The sound preference's ONE home is the settings modal (Joe 2026-08-03:
+// the rail's 🔊 retired — the setting is sufficient; 's' stays the
+// shortcut). Persists 'dice.sound.v1'.
 function setSound(on, persist = true) {
   soundOn = !!on;
-  soundBtn.textContent = soundOn ? '🔊' : '🔇';
   if (persist) save(LS_SOUND, soundOn);
   syncSettingsUI();
 }
-soundBtn.addEventListener('click', () => setSound(!soundOn));
 setSound(soundOn, false); // reflect the loaded preference without re-saving
 
 // One setter for the per-die value chips preference ('Show numbers on dice',
