@@ -162,8 +162,7 @@ verdict ring stops showing the dice-count-as-total (the exact confusion);
 under per-die its center is empty and the rows are the verdict. The text
 layer keeps the whole story row by row for copy/paste and screen readers.
 
-### 2f. The Workbench + reroll clarity (2026-08-03) — SHIPPED, verify in
-flight
+### 2f. The Workbench + reroll clarity (2026-08-03) — SHIPPED
 
 The ultracode draft-zone pass (judged 3-way design panel): the draft
 became a WELL over a RAIL — the well wears the same recessed dress as
@@ -176,8 +175,9 @@ every replay trigger says REROLL ❯❯❯ (the draft keeps plain ROLL), and
 the log carries server-substantiated reroll provenance — `rerollOfId`
 gated AT BIRTH by `entryExistsForAll`, so a reroll of a secret roll is
 recorded as a plain roll and no existence oracle forms; the newest row
-wears a quiet 'reroll' chip, the superseded row 'rerolled'. Adversarial
-+ full-suite verification was still running when this entry was written.
+wears a quiet 'reroll' chip, the superseded row 'rerolled'. Verified same day: the
+two-lens fleet (suite runner 47/47 ×3 + adversarial, 3 confirmed findings
+fixed) and the pre-release sweeps after (49/49).
 
 ### 2g. The beacon pass — the draft well goes further (2026-08-03) —
 SHIPPED
