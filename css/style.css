@@ -366,7 +366,12 @@ html, body {
   transition: opacity 0.12s, color 0.12s, border-color 0.12s;
 }
 .die-x:hover { color: #fff; border-color: var(--red); background: rgba(226, 73, 59, 0.3); }
-.tray-cluster:hover .die-x, .die-x:focus-visible { opacity: 1; }
+/* PROXIMITY reveal (Joe 2026-08-03: every ✕ lighting on cluster hover was
+   distracting): a ✕ shows only while the pointer is over ITS die or pool
+   chip — .show is set by the cluster's pointermove hit-test (the art is
+   pointer-events:none, so CSS alone cannot scope this). Touch keeps them
+   all standing (no hover exists to aim with). */
+.die-x.show, .die-x:hover, .die-x:focus-visible { opacity: 1; }
 @media (pointer: coarse) { .die-x { opacity: 1; } }
 .tray-cluster:has(.die-x:hover) .tray-roll:hover:not(:disabled) {
   border-color: transparent;
@@ -623,7 +628,9 @@ html, body {
 .pool-roll:focus-visible .pool-ord { opacity: 0.8; }
 
 /* crowded strips drop the word, keep the trail — whole or not at all */
-.pool-roll.cue-tight .cue-word { display: none; }
+/* (cue-tight retired 2026-08-03: the ROLL/REROLL word always renders —
+   on hover the dice dim under the brightened cue, so crowding never
+   costs the promise its word) */
 .cue-word { font-weight: inherit; }
 /* Chevrons: STATIC, shorter than the word, fading left → right — a trail
    pointing at the click, not a blinker (animation retired 2026-07-31). */

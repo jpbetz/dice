@@ -4099,9 +4099,10 @@ function renderTray() {
     trayRollBtn.title = label;
     trayRollBtn.setAttribute('aria-label', label);
     const units = srcOrder.length + new Set(tray.filter((t, i) => !traySources[i])).size;
-    trayRollBtn.classList.toggle('cue-tight', cueTight(1 + units));
     // ✕ overlays: SIBLINGS in the x-layer, anchored to live layout (zero
-    // while display:none — callers re-render on reveal paths).
+    // while display:none — callers re-render on reveal paths). Each ✕
+    // registers its anchor for the cluster's proximity hit-test below.
+    trayRemovers.length = 0;
     for (const r of removers) {
       const x = document.createElement('button');
       x.className = 'die-x';
@@ -4114,7 +4115,10 @@ function renderTray() {
         r.onRemove();
       });
       trayXLayer.appendChild(x);
+      trayRemovers.push({ anchorEl: r.el, xEl: x });
     }
+  } else {
+    trayRemovers.length = 0;
   }
   // updateTrayButtons FIRST: it is what raises and drops the rail, and the
   // rail is 34px of the zone's height. Measuring before it ran wrote a
@@ -4140,16 +4144,12 @@ function updateTrayButtons() {
   // the last die must bring them back) — read live state, not renderTray's
   // snapshot: the ✕-remover path re-renders before the box catches up.
   trayHintEl.classList.toggle('hidden', tray.length > 0 || !!cmdInput.value);
-  // The roll line always holds its slot in Dice view (empty = ghost text in
-  // the die-fill area); the management RAIL (Save · Offer · ✕ Clear) STANDS
-  // whenever there is a draft to act on — it is not part of the roll
-  // operation, so it never waits for a hover (tier refinement 2026-07-31;
-  // §7.14). It shows whenever there is ANYTHING to act on — including an
-  // unparseable half-typed draft, which is exactly when ✕ Clear matters
-  // (Save/Offer stay disabled through `usable` below). The save morph
-  // swaps in for the rail only.
-  const showRail = usable || !!cmdInput.value;
-  draftActionsEl.classList.toggle('hidden', !showRail || !traySaveRow.classList.contains('hidden'));
+  // The management RAIL (Save · Offer · ✕ Clear) is STANDING FURNITURE
+  // (Joe 2026-08-03: appearing/disappearing verbs resized the zone — keep
+  // them on screen, gray them out): always rendered, buttons disabled
+  // until a draft exists, so the workbench's geometry never moves. The
+  // save morph still swaps in for the rail (same slot, no resize).
+  draftActionsEl.classList.toggle('hidden', !traySaveRow.classList.contains('hidden'));
   if (!usable) closeSaveMorph();
   trayRollBtn.disabled = !usable;
   trayModsBtn.disabled = !usable;
@@ -4263,6 +4263,27 @@ document.addEventListener('pointerdown', (e) => {
 
 // Right-click the cluster = ± (a pointer bonus; the visible ± button is the
 // path for touch and keyboard).
+// PROXIMITY ✕ reveal (Joe 2026-08-03: every remover lighting on cluster
+// hover was distracting): only the ✕ whose die or pool chip the pointer
+// is actually over shows. Hit-tested here because the art is
+// pointer-events:none (the button owns the click) — CSS cannot scope a
+// sibling overlay to its anchor. One static handler; renderTray refills
+// trayRemovers. The pad reaches to the ✕'s own corner so the reveal
+// survives the travel from die to ✕.
+const trayRemovers = []; // {anchorEl, xEl}, rebuilt by renderTray
+trayEl.addEventListener('pointermove', (e) => {
+  if (e.pointerType && e.pointerType !== 'mouse') return; // touch keeps all ✕s standing
+  for (const r of trayRemovers) {
+    const b = r.anchorEl.getBoundingClientRect();
+    const over = e.clientX >= b.left - 4 && e.clientX <= b.right + 12
+      && e.clientY >= b.top - 12 && e.clientY <= b.bottom + 4;
+    r.xEl.classList.toggle('show', over);
+  }
+});
+trayEl.addEventListener('pointerleave', () => {
+  for (const r of trayRemovers) r.xEl.classList.remove('show');
+});
+
 trayEl.addEventListener('contextmenu', (e) => {
   e.preventDefault();
   if (trayModsBtn.disabled) return;
@@ -4900,10 +4921,10 @@ function buildDieStrip(types, cap, { grouped = false } = {}) {
 // strip button's empty side BEHIND the dice on hover, chevrons drumming
 // ❯ → ❯ ❯ → ❯ ❯ ❯ to telegraph that the click launches. Pure decoration:
 // aria-hidden, pointer-events none — the button stays the whole target.
-// The word renders whole or not at all: past cueTight() units the strip
-// keeps only the chevron trail (the trail alone still carries the meaning).
-// 'OLL ❯❯❯' peeking from under a die broke the promise exactly where the
-// roll was biggest.
+// The word ALWAYS renders (Joe 2026-08-03: hiding ROLL on a crowded strip
+// — the old cueTight rule — hid the promise exactly where the roll was
+// biggest; the hover treatment now dims the dice UNDER the brightened cue,
+// so the word stays legible over any pool).
 //
 // The cue's word is a CLOSED set — never user text (which is why this
 // builds nodes instead of innerHTML: a varying word behind innerHTML is
@@ -4927,9 +4948,7 @@ function buildRollCue(kind = 'roll') {
   }
   return cue;
 }
-// Units known at build time (the 296px column is fixed): ≥4 rendered units
-// (dice groups + the +N pill) leave no honest room for the word.
-function cueTight(unitCount) { return unitCount >= 4; }
+// (cueTight retired 2026-08-03 — see the cue comment above.)
 
 // STAGE a pool into the draft (the Rack's one source verb): its dice pour
 // into the sticky cluster carrying the pool's name as their source label;
@@ -7821,7 +7840,6 @@ function renderOffers() {
       rollBtn.appendChild(buildDieStrip(o.dice || [], POOL_STRIP_CAP, { grouped: true }));
       rollBtn.appendChild(buildRollCue());
       const offerUnits = new Set(o.dice || []).size;
-      rollBtn.classList.toggle('cue-tight', cueTight(Math.min(offerUnits, POOL_STRIP_CAP) + (offerUnits > POOL_STRIP_CAP ? 1 : 0)));
       rollBtn.addEventListener('click', () => { if (net) net.claim(o.offerId); });
       actions.appendChild(rollBtn);
     } else {

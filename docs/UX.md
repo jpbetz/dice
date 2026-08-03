@@ -1658,6 +1658,19 @@ reads over any content, except while a ✕ remover is the target (dice
 stay readable; that click removes). The rail's 🔊 retired — sound's one
 home is Settings ('s' stays the shortcut).
 
+**Standing furniture, the whole word, and quiet ✕s** *(same day, Joe's
+pre-release notes)*: the rail (Save · Offer · ✕ Clear) is STANDING
+FURNITURE — always rendered, verbs grayed until a draft exists, so the
+workbench's geometry never moves (supersedes §7.14's contextual rail;
+Offer keeps its solo-hide — a solo table can never use it and it never
+toggles after join). The ROLL/REROLL cue word ALWAYS renders — cue-tight
+retired: hiding the word on a crowded strip hid the promise exactly
+where the roll was biggest, and the dim-under-hover keeps it legible
+over any pool. The draft's ✕ removers reveal by PROXIMITY — only the ✕
+whose die or pool chip the pointer is over shows (hit-tested; the art is
+pointer-events:none), never the whole cluster's worth at once; touch
+keeps them all standing.
+
 **The folded card, shelf edition** *(same day: 'make the collect panel
 roughly the same as the roll reveal panel')*: the peek's BODY is the one
 big clear target — the same red removal dress and ✕ watermark as the

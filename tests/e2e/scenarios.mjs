@@ -972,7 +972,11 @@ export const scenarios = [
       await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
       let ts = await a.dbg('trayState');
       assert.equal(ts.hint, true, 'empty draft shows the hint');
-      assert.equal(ts.hasActions, false, 'no contextual controls on an empty draft');
+      // standing furniture (Joe 2026-08-03): the rail never leaves — its
+      // verbs GRAY on an empty draft, so the zone's geometry never moves
+      assert.equal(ts.hasActions, true, 'the rail stands on an empty draft');
+      assert.equal(await a.eval(`document.getElementById('save-group').disabled`), true,
+        'grayed until a draft exists');
 
       // Compose two dice from the palette; the cluster carries their art + ✕s.
       await a.eval(`document.querySelectorAll('#die-buttons .die-btn')[1].click()`);
@@ -980,13 +984,31 @@ export const scenarios = [
       ts = await a.dbg('trayState');
       assert.deepEqual(ts.dice, ['d6', 'd6'], 'two d6 composed');
       assert.equal(ts.rollVisible, true, 'the cluster is the roll button');
-      assert.equal(ts.hasActions, true, 'Save/±/✕ appear with content');
+      assert.equal(ts.hasActions, true, 'the rail stands with content too');
+      assert.equal(await a.eval(`document.getElementById('save-group').disabled`), false,
+        'and its verbs arm with the draft');
       assert.ok(await a.eval(`(() => {
         const c = document.querySelector('#tray-roll .roll-cue');
         return !!c && c.getAttribute('aria-hidden') === 'true' && c.textContent.includes('ROLL');
       })()`), 'the cluster carries the same ROLL cue (tier rule)');
       // Grouped exactly like the pool rows: one d6 with a ×2, one ✕.
       assert.equal(ts.xCount, 1, 'repeats group — one ✕ per die TYPE');
+      // PROXIMITY reveal (Joe 2026-08-03): the ✕ shows only while the
+      // pointer is over ITS anchor — never on mere cluster hover.
+      assert.equal(await a.eval(`(() => {
+        const tray = document.getElementById('tray');
+        const die = document.querySelector('#tray-roll .die-art');
+        const b = die.getBoundingClientRect();
+        tray.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse',
+          clientX: b.left + b.width / 2, clientY: b.top + b.height / 2 }));
+        const overDie = document.querySelector('.die-x').classList.contains('show');
+        const r = tray.getBoundingClientRect();
+        tray.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerType: 'mouse',
+          clientX: r.right - 2, clientY: r.bottom - 2 }));
+        const offDie = document.querySelector('.die-x').classList.contains('show');
+        return JSON.stringify({ overDie, offDie });
+      })()`), JSON.stringify({ overDie: true, offDie: false }),
+        'the ✕ follows its die, not the whole cluster');
       assert.equal(await a.eval(`document.querySelector('#tray-roll .strip-count').textContent`),
         '×2', 'the repeat shows as ×2, same as the pool rows');
       assert.equal(await a.eval(`document.querySelectorAll('#builder-panel button button').length`),
@@ -1035,7 +1057,9 @@ export const scenarios = [
       ts = await a.dbg('trayState');
       assert.deepEqual(ts.dice, [], 'draft cleared');
       assert.equal(ts.hint, true, 'the hint returns');
-      assert.equal(ts.hasActions, false, 'the contextual line retires');
+      assert.equal(ts.hasActions, true, 'the rail stands on — its verbs just gray');
+      assert.equal(await a.eval(`document.getElementById('save-group').disabled`), true,
+        'Save grayed with the draft gone');
 
       // Dice | Notation: one draft, two views. Default is the visual
       // builder (box hidden); the toggle swaps views without touching the
@@ -1871,21 +1895,25 @@ export const scenarios = [
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
 
-      // (i) The contextual rail: empty → gone; content → standing; an
-      // UNPARSEABLE half-typed draft → still standing, ✕ Clear enabled
-      // (before this pass the row hid while Clear stayed enabled — a
-      // mouse had no path to the one verb that mattered).
-      assert.equal((await a.dbg('trayState')).hasActions, false, 'empty draft: no rail');
+      // (i) STANDING FURNITURE (Joe 2026-08-03, supersedes the contextual
+      // rail): the rail never leaves — its verbs gray on an empty draft
+      // and arm with content, so the workbench's geometry never moves.
+      assert.equal((await a.dbg('trayState')).hasActions, true, 'empty draft: the rail stands');
+      assert.equal(await a.eval(`document.getElementById('save-group').disabled`), true,
+        'its verbs gray without a draft');
       await a.eval(`document.querySelector('#die-buttons .die-btn').click()`);
-      assert.equal((await a.dbg('trayState')).hasActions, true, 'a staged die raises the rail');
+      assert.equal(await a.eval(`document.getElementById('save-group').disabled`), false,
+        'a staged die arms the rail');
       await a.eval(`document.getElementById('clear-tray').click()`);
       await a.eval(`(() => {
         const box = document.getElementById('cmd-input');
         box.value = '2d';
         box.dispatchEvent(new Event('input'));
       })()`);
-      await a.waitFor(`window.__diceDebug.trayState.hasActions === true`,
-        { desc: 'a half-typed draft still raises the rail (✕ Clear must be reachable)' });
+      // (the rail is always standing now — the meaningful gate is the VERB
+      // arming once the debounced parse sees the half-typed text)
+      await a.waitFor(`!document.getElementById('clear-tray').disabled`,
+        { desc: '✕ Clear arms on the half-typed draft' });
       assert.equal(await a.eval(`document.getElementById('clear-tray').disabled`), false,
         '✕ Clear is enabled on the unparseable draft');
       assert.equal(await a.eval(`document.getElementById('save-group').disabled`), true,
