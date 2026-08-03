@@ -1886,6 +1886,21 @@ export const scenarios = [
       assert.equal(await a.eval(`document.getElementById('tray-actions').classList.contains('open')`),
         false, 'and dims when it closes');
 
+      // (ix) --draft-h is right IN THE SAME TASK as the edit, not one RO
+      // frame later: renderTray must measure AFTER updateTrayButtons, which
+      // is what raises and drops the 34px rail. (It measured first, so every
+      // transition wrote a value stale by exactly the rail — the RO papered
+      // over it a frame later, and a browser without RO never would.)
+      await a.eval(`document.getElementById('clear-tray').click()`);
+      const ordering = await a.eval(`(() => {
+        const body = document.querySelector('#builder-panel > .panel-body');
+        const z = document.getElementById('draft-zone');
+        document.querySelector('#die-buttons .die-btn').click(); // renderTray, synchronously
+        return { h: z.offsetHeight, v: parseFloat(body.style.getPropertyValue('--draft-h')) };
+      })()`);
+      assert.equal(ordering.v, ordering.h,
+        `--draft-h is fresh in the same task (got ${ordering.v} for a ${ordering.h}px zone)`);
+
       // (iv) The observed --draft-h: the save morph changes the zone's
       // height WITHOUT a renderTray, so only the ResizeObserver keeps the
       // shelf headers' pin fresh (±1px: RO rounds border-box fractions).

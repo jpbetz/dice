@@ -4043,10 +4043,15 @@ function renderTray() {
       trayXLayer.appendChild(x);
     }
   }
+  // updateTrayButtons FIRST: it is what raises and drops the rail, and the
+  // rail is 34px of the zone's height. Measuring before it ran wrote a
+  // value stale by exactly that on every transition — the headers pinned
+  // 34px too high until the ResizeObserver's next frame caught it, and on
+  // a browser without RO (the guarded fallback below) they stayed there.
+  updateTrayButtons();
   // sticky geometry: section headers pin just below the sticky draft
   const body = document.querySelector('#builder-panel > .panel-body');
   if (body) body.style.setProperty('--draft-h', `${draftZoneEl.offsetHeight}px`);
-  updateTrayButtons();
 }
 
 function updateTrayButtons() {
