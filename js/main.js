@@ -5464,9 +5464,15 @@ function openPopover(binding) {
   // One additive verb, two readings: beside a pool's Save it duplicates;
   // on a shelved roll it is 'keep this roll as a pool'.
   popVariantBtn.textContent = pop.source === 'group' ? 'Duplicate…' : 'Save as pool…';
-  // A per-die table reads no totals: say so where mods/targets are edited
-  // (they stay editable — notation totality is app-wide, and the room can
-  // switch systems later).
+  // A per-die table reads no totals (Soul Deal): the sum-world sections —
+  // modifiers, d20 pairing, Target (DC), keep/drop — HIDE instead of just
+  // carrying a note (Joe 2026-08-03; supersedes step 2's 'mark as such').
+  // The note is the disclosure ('Show anyway'); every open starts folded.
+  // Values a pool already carries stay in its canonical either way —
+  // notation totality is app-wide, and the room can switch systems later.
+  popEl.classList.toggle('pop-perdie', !activeSystem().usesMods);
+  popEl.classList.remove('pop-sum-shown');
+  popSumToggle.textContent = 'Show anyway';
   document.getElementById('pop-sysnote').classList.toggle('hidden', activeSystem().usesMods);
   popEl.classList.remove('hidden');
   renderPopIdentity(); // the Sheet Pass strip (group popovers only)
@@ -6102,6 +6108,16 @@ popEchoEl.addEventListener('click', () => {
   closePopover();
   if (!panelsOpen.pools) setPanel('pools', true); // echoing edits the box — surface it
   loadIntoBox(canonical, name);
+});
+
+// The per-die disclosure: unfold/refold the sum-world sections for THIS
+// popover-open (openPopover refolds — a fold is a reading default, not a
+// setting). The popover re-clamps: four sections change its height.
+const popSumToggle = document.getElementById('pop-sum-toggle');
+popSumToggle.addEventListener('click', () => {
+  const shown = popEl.classList.toggle('pop-sum-shown');
+  popSumToggle.textContent = shown ? 'Hide again' : 'Show anyway';
+  placePopover();
 });
 
 document.getElementById('pop-close').addEventListener('click', closePopover);

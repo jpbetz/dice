@@ -365,10 +365,17 @@ limitations under the License.
          edits here, instantly, by id. Everything below the hairline stays
          the roll-tweak draft. Built by renderPopIdentity; group source only. -->
     <div id="pop-identity" class="hidden"></div>
+    <!-- Per-die tables (Soul Deal) HIDE the sum-world sections below
+         (.sec-sum/.prow-sum — modifiers, d20 pairing, Target, keep/drop)
+         instead of just noting them (Joe 2026-08-03; supersedes 'mark as
+         such'). The note is the disclosure: 'Show anyway' unfolds them for
+         one popover-open; a pool's stored values ride its canonical either
+         way (notation totality is app-wide). -->
     <p id="pop-sysnote" class="hint pop-sysnote hidden">This table reads each
-      die on its own — modifiers and targets don’t change outcomes here.</p>
+      die on its own — modifiers and targets don’t change outcomes here.
+      <button id="pop-sum-toggle" class="pid-ghost-verb">Show anyway</button></p>
 
-    <div class="sec">
+    <div class="sec sec-sum">
       <span class="plabel">Modifier</span>
       <div id="pop-mchips" class="mchips"></div>
       <div class="prow">
@@ -381,7 +388,7 @@ limitations under the License.
       <button id="pop-add-part" class="btn tiny ghost">+ named bonus</button>
     </div>
 
-    <div class="sec tight">
+    <div class="sec tight sec-sum">
       <span class="plabel">d20 pairing</span>
       <div id="pop-seg-adv" class="seg">
         <button data-v="">Normal</button>
@@ -395,7 +402,7 @@ limitations under the License.
          a moment are the stakes; keep/drop/reroll/visibility are the long
          tail below. Same controls, ~500px less travel. -->
     <div class="sec tight">
-      <div class="prow">
+      <div class="prow prow-sum">
         <span class="prow-label grow">Target (DC)</span>
         <input id="pop-dc" class="tin num" inputmode="numeric" placeholder="—" maxlength="3">
       </div>
@@ -419,7 +426,7 @@ limitations under the License.
     </div>
 
 
-    <div class="sec tight">
+    <div class="sec tight sec-sum">
       <span class="plabel">Keep / drop</span>
       <div class="prow">
         <div id="pop-seg-keep" class="seg mono grow">

@@ -1317,6 +1317,12 @@ html, body {
 }
 .pk-total.pk-tally { font-size: 14px; line-height: 1.45; }
 .pop-sysnote { margin: 8px 14px 0; font-style: italic; }
+/* Per-die tables (Soul Deal) fold the sum-world sections away — modifiers,
+   d20 pairing, Target (DC), keep/drop don't change outcomes there (Joe
+   2026-08-03). The sysnote's 'Show anyway' unfolds them per popover-open. */
+.popover.pop-perdie:not(.pop-sum-shown) .sec-sum,
+.popover.pop-perdie:not(.pop-sum-shown) .prow-sum { display: none; }
+.pop-sysnote .pid-ghost-verb { font-style: normal; }
 
 /* ---------- crit overlay ---------- */
 #crit-overlay {
@@ -2172,7 +2178,9 @@ body.mini #result-verdict { font-size: 11px; }
 .pop-actions { display: flex; gap: 8px; padding: 10px 14px 0; }
 .pop-actions:last-child, .pop-actions-2nd { padding-bottom: 14px; }
 .pop-actions .btn { flex: 1; }
-#pop-update.hidden { display: none; } /* pool draft: no record to update */
+/* per-source commit chrome (Trigger Pass): Save is pool-only, Open in
+   draft is shelf-only; the per-die sysnote hides under totals systems */
+#pop-save.hidden, #pop-todraft.hidden, .pop-sysnote.hidden { display: none; }
 /* the popover's inline save morph (same flow as the New pool panel's) */
 #pop-save-row.hidden, #mods-popover .pop-actions-2nd.hidden { display: none; }
 #pop-save-row .btn { flex: none; width: 42px; }

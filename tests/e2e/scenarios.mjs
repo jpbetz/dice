@@ -414,6 +414,37 @@ export const scenarios = [
       await a.waitFor(`document.querySelector('#log-list .log-total').textContent.trim().length > 0`,
         { desc: 'totals return under dnd' });
       assert.ok((await a.logTop()).includes('vs 15'), 'and the DC verdict with them');
+
+      // The ± popover folds the sum-world sections under a per-die system
+      // (Trigger Pass): modifiers/pairing/Target/keep-drop hide; the
+      // sysnote's 'Show anyway' unfolds them for this open only.
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.waitFor(`window.__diceDebug.system === 'soul-deal'`, { desc: 'per-die lens back' });
+      await a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = '2d6';
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      await a.dbg(`openPopoverFor('tray')`);
+      const secVisible = `[...document.querySelectorAll('#mods-popover .sec-sum, #mods-popover .prow-sum')]
+        .some((el) => el.offsetParent !== null)`;
+      assert.equal(await a.eval(secVisible), false, 'sum-world sections fold under per-die');
+      await a.eval(`document.getElementById('pop-sum-toggle').click()`);
+      assert.equal(await a.eval(secVisible), true, "'Show anyway' unfolds them");
+      await a.dbg('closePopover()');
+      await a.dbg(`setSystem('dnd')`);
+      // the system echo-applies (settings round-trip) — wait before opening
+      await a.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'dnd lens applied' });
+      await a.dbg(`openPopoverFor('tray')`);
+      assert.equal(await a.eval(secVisible), true, 'a totals system shows them by default');
+      assert.equal(await a.eval(`document.getElementById('pop-sysnote').offsetParent !== null`),
+        false, 'and carries no per-die note');
+      // per-source commit chrome has real display rules (no global .hidden
+      // here): a pool popover shows Save but never Open in draft
+      assert.equal(await a.eval(`document.getElementById('pop-todraft').offsetParent !== null`),
+        false, 'Open in draft stays shelf-only');
+      await a.dbg('closePopover()');
+      await a.dbg(`setSystem('soul-deal')`);
     },
   },
   {
