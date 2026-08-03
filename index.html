@@ -109,6 +109,11 @@ limitations under the License.
            (Save · Offer · ✕ Clear), STANDING while a draft exists.
            Everything aligns to the well's 7px interior grid. -->
       <div id="draft-zone" class="draft-zone">
+      <!-- THE FEED (Joe 2026-08-03, no words, shapes only): a gold funnel
+           above and its mirror below frame the bench — everything above
+           (the palette) and below (the saved pools) pours INTO the well.
+           Faint at rest, warming with --draft-heat as dice land. -->
+      <div class="feed feed-above" aria-hidden="true"></div>
       <!-- The WELL: the draft's second editor, peer to #cmd — same --well
            dress (§7.9: one draft, two editors; only one of them looked
            like an editor before this). [cluster][±] as siblings. Keeps the
@@ -150,6 +155,7 @@ limitations under the License.
       <!-- shelf chips for the save morph: saving a composed draft lands it
            on a shelf in one breath (none pressed = the plain Pools shelf) -->
       <div id="save-cat-row" class="pid-row pid-cats hidden"></div>
+      <div class="feed feed-below" aria-hidden="true"></div>
       </div>
 
       <!-- The Rack (agreed 2026-08-01): category shelves of pool TILES.
@@ -350,13 +356,24 @@ limitations under the License.
        furniture.) -->
 
   <!-- Result banner -->
+  <!-- THE FOLDED CARD (Joe 2026-08-03): the card's BODY is the one big
+       clear target — the most likely act after reading a result is
+       removing it, and the collected cluster already taught that grammar
+       (the sweep). The dice on the felt are scattered, so here the PANEL
+       is the target: hovering the body arms an unmistakable removal
+       dress (red wash + hairline + ✕ watermark; a spectator's dismiss
+       wears the muted slate variant). Below a horizontal fold line sit
+       the verbs that do anything ELSE — REROLL ❯❯❯, Reveal — so they
+       never light up red under the removal hover. -->
   <div id="result-banner" class="hidden">
-    <div id="result-label"></div>
-    <div id="result-total"></div>
-    <div id="result-verdict"></div>
-    <div id="result-meaning"></div>
-    <div id="result-breakdown"></div>
-    <div id="banner-actions"></div>
+    <div id="banner-main" role="button" tabindex="0">
+      <div id="result-label"></div>
+      <div id="result-total"></div>
+      <div id="result-verdict"></div>
+      <div id="result-meaning"></div>
+      <div id="result-breakdown"></div>
+    </div>
+    <div id="banner-actions" class="banner-fold"></div>
   </div>
 
   <!-- Offered-roll cards -->

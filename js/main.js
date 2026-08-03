@@ -1815,6 +1815,49 @@ function armAutoCollect(entry) {
 // Reading holds the clock; leaving restarts it whole.
 banner.addEventListener('mouseenter', () => clearTimeout(autoCollect.timer));
 banner.addEventListener('mouseleave', () => { if (lastEntry) armAutoCollect(lastEntry); });
+
+// ---------------------------------------------------------------------------
+// Roll outlines (Joe 2026-08-03): the card's removal highlight doubles as a
+// READ — hovering the result card outlines THAT roll's dice on the felt,
+// one color per source pool, so the highlight teaches which scattered dice
+// belong to the roll and which pool each came from. Inverted-hull outlines:
+// a back-face shell 7% larger than the die, sharing its geometry (never
+// dispose the geometry — only the shell's own material), riding as a child
+// so every transform is inherited. Colors avoid gold (the roll verb's) and
+// red (removal's); unsourced dice wear quiet ivory. A hidden roll's spec is
+// withheld, so its sources are unknowable here — every die outlines ivory,
+// and the outline leaks nothing (which dice belong to a roll is public).
+// ---------------------------------------------------------------------------
+const OUTLINE_COLORS = ['#7fd1c3', '#b48ede', '#e0a458', '#8fc97f', '#6fa8dc', '#d97fa8'];
+let outlined = []; // [{mesh, shell}] — cleared on unhover and every repaint
+function outlineRollDice(on) {
+  for (const o of outlined) {
+    o.mesh.remove(o.shell);
+    o.shell.material.dispose();
+  }
+  outlined = [];
+  if (!on || !lastEntry || !currentRoll || currentRoll.rollId !== lastEntry.rollId) return;
+  const entry = lastEntry;
+  const srcColor = new Map();
+  const colorFor = (i) => {
+    const s = partSource(entry, i);
+    if (!s) return '#f3ead7';
+    if (!srcColor.has(s)) srcColor.set(s, OUTLINE_COLORS[srcColor.size % OUTLINE_COLORS.length]);
+    return srcColor.get(s);
+  };
+  currentRoll.dice.forEach((d, i) => {
+    if (!d.mesh || !entry.parts[i]) return;
+    const shell = new THREE.Mesh(
+      d.mesh.geometry,
+      new THREE.MeshBasicMaterial({ color: colorFor(i), side: THREE.BackSide }),
+    );
+    shell.scale.setScalar(1.07);
+    d.mesh.add(shell);
+    outlined.push({ mesh: d.mesh, shell });
+  });
+}
+banner.addEventListener('mouseenter', () => outlineRollDice(true));
+banner.addEventListener('mouseleave', () => outlineRollDice(false));
 banner.addEventListener('focusin', () => clearTimeout(autoCollect.timer));
 banner.addEventListener('focusout', () => { if (lastEntry) armAutoCollect(lastEntry); });
 const chips = []; // {el, die}
@@ -2297,6 +2340,7 @@ function renderOutcomeRows(el, entry) {
 
 function renderRollResults(entry, dice, fx = true) {
   renderChips(entry, dice);
+  outlineRollDice(false); // a repaint resets the hover read (re-enter restores)
   const hidden = entryHidden(entry);
 
   // Names and labels are user-supplied: textContent only, never innerHTML.
@@ -2426,6 +2470,9 @@ function appendCardActions(holder, entry, opts) {
   // the clear target while a hover exists to dress it. EXACTLY one, never
   // zero: where the sweep is display:none (coarse) the card keeps its ✕
   // whatever gesture opened it (sweepUnavailable — see the one-✕ block).
+  // The BANNER passes 'none' (the folded card): its whole body is the
+  // clear target, so a ✕ would be the second-smaller-target §7.9 forbids.
+  if (opts.clearX === 'none') return;
   if (opts.clearX === 'tap-only' && peekVia !== 'tap' && !sweepUnavailable()) return;
   const row = document.createElement('div');
   row.className = `${opts.rowClass} reveal-tier`;
@@ -2449,20 +2496,60 @@ function appendCardActions(holder, entry, opts) {
   holder.appendChild(row);
 }
 
+// The folded card's BODY act: 'clear' (the roller — for everyone) or
+// 'dismiss' (a spectator — locally; the dice stay). Set on every banner
+// paint; the static click handler below reads it.
+let bannerAct = { mode: 'dismiss', rollId: null };
+
 function renderBannerActions(entry) {
   const holder = document.getElementById('banner-actions');
   holder.innerHTML = '';
   const hidden = entryHidden(entry);
   const mine = !netOnline || (net && entry.playerId === net.playerId);
+  // The body-as-target dress + act (the folded card): red removal for the
+  // roller's clear, muted slate for a spectator's dismiss — the highlight
+  // must say WHICH removal it is.
+  bannerAct = { mode: entry.rollId && mine ? 'clear' : 'dismiss', rollId: entry.rollId || null };
+  banner.dataset.act = bannerAct.mode;
+  const main = document.getElementById('banner-main');
+  main.title = bannerAct.mode === 'clear'
+    ? 'Clear this roll for everyone'
+    : 'Dismiss — hides this for you; the dice stay until the roller acts';
+  main.setAttribute('aria-label', main.title);
   if (!entry.rollId && !canReroll(entry)) return;
   appendCardActions(holder, entry, {
     revealClass: hidden ? 'btn primary banner-btn' : 'btn ghost banner-btn',
     rowClass: 'banner-foot',
     xClass: 'btn ghost banner-btn clear-x',
     localDismiss: !(entry.rollId && mine),
-    // Unconditional: an uncollected roll has no shelf marker, so the banner
-    // ✕ can never defer to a sweep (one-✕ rule applies to the PEEK only).
-    clearX: 'always',
+    clearX: 'none', // the folded card: the body IS the ✕
+  });
+}
+
+// The body's click — one press, the likeliest act. Static wiring; the act
+// itself is repainted state (bannerAct). A pending clear disarms the body
+// so a double-click cannot double-POST.
+{
+  const main = document.getElementById('banner-main');
+  let clearing = false;
+  main.addEventListener('click', () => {
+    if (bannerAct.mode === 'clear' && bannerAct.rollId) {
+      if (clearing) return;
+      clearing = true;
+      requestClearRoll(bannerAct.rollId).then((ok) => {
+        clearing = false;
+        if (!ok) showSettingsNote('couldn’t clear the roll — try again');
+      });
+    } else {
+      banner.classList.add('hidden');
+    }
+  });
+  main.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation(); // the table's Enter (roll) must not also fire
+      main.click();
+    }
   });
 }
 
@@ -3539,6 +3626,9 @@ window.__diceDebug = {
   // die chips (P1 quiet by default): the per-user visibility preference and
   // the live chip count. setChipsVisible returns the resulting state.
   get chipsVisible() { return chipsOn; },
+  // roll outlines (the card-hover read): shell colors, in die order
+  get outlineState() { return outlined.map((o) => `#${o.shell.material.color.getHexString()}`); },
+  hoverBanner(on) { outlineRollDice(on !== false); return outlined.length; },
   setChipsVisible(on) { setChips(on); return chipsOn; },
   get chipCount() { return chips.length; },
   // chrome (the two collapsible panel regions + emergent compact view):
@@ -4053,6 +4143,13 @@ function renderTray() {
   // 34px too high until the ResizeObserver's next frame caught it, and on
   // a browser without RO (the guarded fallback below) they stayed there.
   updateTrayButtons();
+  // The beacon's heat (Joe 2026-08-03): 0 empty → 4 at eight-plus dice,
+  // as STEPPED classes the CSS transitions smooth. The --draft-heat var
+  // rides alongside for introspection/tests; visuals key off the classes.
+  // Light only; the geometry never moves with it (§7.10).
+  const heat = Math.min(Math.ceil(tray.length / 2), 4);
+  draftZoneEl.style.setProperty('--draft-heat', String(heat / 4));
+  for (let h = 1; h <= 4; h++) draftZoneEl.classList.toggle(`heat-${h}`, heat === h);
   // sticky geometry: section headers pin just below the sticky draft
   const body = document.querySelector('#builder-panel > .panel-body');
   if (body) body.style.setProperty('--draft-h', `${draftZoneEl.offsetHeight}px`);

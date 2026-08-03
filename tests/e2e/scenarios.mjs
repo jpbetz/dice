@@ -77,6 +77,88 @@ export const scenarios = [
     },
   },
   {
+    name: 'folded-card',
+    tags: ['smoke', 'roll', 'chrome'],
+    // The folded card + the hover read + the feed (Joe 2026-08-03): the
+    // banner's BODY is the one big removal target (role-split: the roller
+    // clears for everyone, a spectator dismisses locally), the fold below
+    // holds REROLL/Reveal, hovering the card outlines the roll's dice per
+    // source pool on the felt, and the draft well's feed warms with dice.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.roll('2d8[Wisdom]+1d4');
+      await b.settle();
+
+      // role split rides data-act; the fold exists on both
+      assert.equal(await a.eval(`document.getElementById('result-banner').dataset.act`), 'clear',
+        "the roller's body clears for everyone");
+      assert.equal(await b.eval(`document.getElementById('result-banner').dataset.act`), 'dismiss',
+        "a spectator's body dismisses locally");
+
+      // the hover read: outlines per source pool, ivory for unsourced
+      assert.equal(await a.dbg('hoverBanner(true)'), 3, 'three dice outline on hover');
+      const colors = await a.dbg('outlineState');
+      assert.equal(new Set(colors).size, 2, `Wisdom's color + ivory for the loose d4 (got: ${colors})`);
+      assert.equal(colors[0], colors[1], 'the two Wisdom dice share their pool color');
+      await a.dbg('hoverBanner(false)');
+      assert.deepEqual(await a.dbg('outlineState'), [], 'outlines leave with the hover');
+
+      // Bob's dismiss hides HIS card only; the dice stay for everyone
+      await b.eval(`document.getElementById('banner-main').click()`);
+      assert.ok(await b.eval(`document.getElementById('result-banner').classList.contains('hidden')`),
+        'dismiss hides the spectator card');
+      assert.ok((await b.eval(`window.__diceDebug.tableDice.length`)) > 0, 'the dice stay');
+      assert.ok(!(await a.eval(`document.getElementById('result-banner').classList.contains('hidden')`)),
+        "the roller's card stands");
+
+      // the feed frames the well and warms with the draft
+      assert.equal(await a.eval(`document.querySelectorAll('#draft-zone .feed').length`), 2,
+        'a funnel above and its mirror below');
+      const heatOf = `parseFloat(getComputedStyle(document.getElementById('draft-zone')).getPropertyValue('--draft-heat')) || 0`;
+      const cold = await a.eval(heatOf);
+      const coldFeed = await a.eval(`parseFloat(getComputedStyle(document.querySelector('#draft-zone .feed')).opacity)`);
+      await a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = '8d6';
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      await a.waitFor(`(${heatOf}) > ${cold}`, { desc: 'the well warms as dice land in the draft' });
+      assert.ok(await a.eval(`document.getElementById('draft-zone').classList.contains('heat-4')`),
+        'eight dice = full heat');
+      // the VISUALS ride the heat classes (stepped — Chrome would not
+      // re-resolve calc(var()) on standing elements): feed brightens, the
+      // well glows gold, the standing ROLL cue gathers
+      // Headless renders no compositor frames, so CSS transitions FREEZE at
+      // their start value — strip them before reading, so these assert the
+      // cascade's TARGET (what a live browser animates to), not a frame
+      // of an animation that cannot advance here.
+      await a.eval(`document.querySelectorAll('#draft-zone .feed, .tray-roll .roll-cue, #tray-actions')
+        .forEach((el) => { el.style.transition = 'none'; })`);
+      assert.ok((await a.eval(
+        `parseFloat(getComputedStyle(document.querySelector('#draft-zone .feed')).opacity)`)) > coldFeed,
+        'the feed brightens with the pool');
+      assert.ok(await a.eval(
+        `getComputedStyle(document.getElementById('tray-actions')).boxShadow.includes('255, 215, 102')`),
+        'the well wears its gold under-glow at heat');
+      assert.ok(await a.eval(
+        `parseFloat(getComputedStyle(document.querySelector('.tray-roll .roll-cue')).opacity) > 0.5`),
+        'the standing ROLL whisper gathers to a promise');
+      await a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = '';
+        box.dispatchEvent(new Event('input'));
+      })()`);
+
+      // the roller's body click clears for EVERYONE
+      await a.eval(`document.getElementById('banner-main').click()`);
+      for (const t of [a, b]) {
+        await t.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 0)`,
+          { desc: 'the body click cleared the table' });
+      }
+    },
+  },
+  {
     name: 'collect-peek',
     tags: ['smoke', 'shelf'],
     // Collect moves a roll to the shelf on every table; peek recovers the
@@ -451,9 +533,13 @@ export const scenarios = [
         `[...document.querySelectorAll('#banner-actions button')].some((b) => b.textContent === 'Done')`,
       )), 'Done is retired — auto-collect owns the idle path');
       assert.ok(await a.eval(`!!document.querySelector('#banner-actions .pk-strip.reveal-tier')`),
-        'the ROLL strip waits in the revealed tier');
-      assert.ok(await a.eval(`!!document.querySelector('#banner-actions .reveal-tier .clear-x')`),
-        'and the clear-✕ beside it');
+        'the REROLL strip waits in the fold');
+      // The folded card (2026-08-03): the ✕ retired from the banner — the
+      // BODY is the one big clear target, and the fold never wears red.
+      assert.equal(await a.eval(`!!document.querySelector('#result-banner .clear-x')`), false,
+        'no ✕ on the folded card — the body is the target');
+      assert.equal(await a.eval(`document.getElementById('result-banner').dataset.act`), 'clear',
+        "the roller's body act is CLEAR");
       const rid = await a.rollId();
       assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, 'collect accepted');
       await a.waitFor(

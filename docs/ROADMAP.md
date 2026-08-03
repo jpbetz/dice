@@ -179,8 +179,19 @@ recorded as a plain roll and no existence oracle forms; the newest row
 wears a quiet 'reroll' chip, the superseded row 'rerolled'. Adversarial
 + full-suite verification was still running when this entry was written.
 
-### 2g. The beacon pass — the draft well goes further (proposed
-2026-08-03)
+### 2g. The beacon pass — the draft well goes further (2026-08-03) —
+SHIPPED
+
+Delivered same day as Joe's cleanup batch (UX.md §7.11b records all
+three): the FEED (two converging gold funnels, shapes not words, framing
+the workbench so the palette above and pools below visibly pour into the
+well), stepped heat (the funnels brighten, the well gains its gold
+under-glow, the standing ROLL whisper gathers toward 0.55 as dice land —
+light and depth, never size), the FOLDED CARD (the banner's body is the
+one big removal target with a red ✕-watermark dress — slate for a
+spectator's dismiss — and the fold below holds REROLL/Reveal untinted),
+and the HOVER READ (inverted-hull WebGL outlines on the roll's dice,
+one color per source pool). The original sketch:
 
 Joe, after the Workbench (§7.14) landed: "the Roll ❯❯❯ looks a LOT
 better. What if we were to take it further? … make the UI around it even

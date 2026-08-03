@@ -339,7 +339,12 @@ html, body {
 /* The draft's promise STANDS (2026-08-01): a quiet gold ROLL whisper rests
    on the cluster whenever dice are staged — hover turns it loud. Pool
    tiles never wear it (they stage); this is the one roll button. */
+/* the standing ROLL whisper gathers gold with the pool (heat classes):
+   a one-die draft whispers at 0.3; a heavy pool promises at 0.55 */
 .tray-roll .roll-cue { opacity: 0.3; }
+.draft-zone.heat-2 .tray-roll .roll-cue { opacity: 0.38; }
+.draft-zone.heat-3 .tray-roll .roll-cue { opacity: 0.46; }
+.draft-zone.heat-4 .tray-roll .roll-cue { opacity: 0.55; }
 .tray-roll.hidden { display: none; }
 .tray-roll .die-art { width: 28px; height: 28px; } /* identical to the pool rows */
 .tray-x-layer { position: absolute; inset: 0; pointer-events: none; }
@@ -396,6 +401,41 @@ html, body {
   background: var(--well);
   border: 1px solid var(--hair);
   border-radius: 11px;         /* concentric: 8px roll button + ~3px lip */
+  /* the beacon (Joe 2026-08-03): the well warms as dice land. Heat rides
+     STEPPED classes (.heat-1…4 on #draft-zone, renderTray): discrete
+     states the transitions smooth, simple to reason about and to test
+     (frame-starved renderers freeze transitions mid-flight — the e2e
+     strips them before asserting the cascade target). Light and depth,
+     never size (§7.10); an empty well is quiet. */
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35);
+  transition: box-shadow 0.35s;
+}
+.draft-zone.heat-1 #tray-actions { box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35), 0 0 8px rgba(255, 215, 102, 0.05); }
+.draft-zone.heat-2 #tray-actions { box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35), 0 0 12px rgba(255, 215, 102, 0.08); }
+.draft-zone.heat-3 #tray-actions { box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35), 0 0 16px rgba(255, 215, 102, 0.11); }
+.draft-zone.heat-4 #tray-actions { box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35), 0 0 20px rgba(255, 215, 102, 0.14); }
+/* THE FEED (shapes, no words): converging gold funnels — the one above
+   narrows DOWN into the well, the one below narrows UP into it — so the
+   palette above and the saved pools below visibly pour toward the bench.
+   Faint at rest; --draft-heat brightens them as the pool grows. */
+.feed {
+  height: 8px;
+  margin: 1px 26px;
+  pointer-events: none;
+  opacity: 0.3;
+  transition: opacity 0.35s;
+}
+.draft-zone.heat-1 .feed { opacity: 0.48; }
+.draft-zone.heat-2 .feed { opacity: 0.62; }
+.draft-zone.heat-3 .feed { opacity: 0.76; }
+.draft-zone.heat-4 .feed { opacity: 0.9; }
+.feed-above {
+  background: linear-gradient(to bottom, rgba(212, 175, 55, 0.02), rgba(212, 175, 55, 0.34));
+  clip-path: polygon(0 0, 100% 0, 58% 100%, 42% 100%);
+}
+.feed-below {
+  background: linear-gradient(to top, rgba(212, 175, 55, 0.02), rgba(212, 175, 55, 0.34));
+  clip-path: polygon(42% 0, 58% 0, 100% 100%, 0 100%);
 }
 /* The ± editor open → the field it edits is the one lit. openPopover
    toggles 'open' on pop.row; on the draft that class had been inert since
@@ -1283,17 +1323,68 @@ html, body {
   min-width: 320px;
   max-width: min(520px, calc(100vw - 24px));
   overflow-wrap: break-word;
-  padding: 14px 34px;
+  /* the folded card: the horizontal padding moved INTO #banner-main so
+     the removal target reads edge to edge; the fold sits flush below */
+  padding: 8px 8px 6px;
   border-radius: 14px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   box-shadow: 0 8px 40px rgba(0,0,0,0.6);
   animation: banner-in 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
-  /* the banner takes pointer events now: its revealed tier (⟳ · clear-✕)
-     appears on approach (P6), which needs :hover on the card itself */
+  /* the banner takes pointer events now: its revealed tier (the fold's
+     REROLL) appears on approach (P6), which needs :hover on the card */
   pointer-events: auto;
 }
 #result-banner.hidden { display: none; }
+/* ---- the folded card (Joe 2026-08-03): body = the one big clear target.
+   The removal dress must SAY removal: the roller's clear wears the red
+   wash + hairline + a quiet ✕ watermark rising behind the content; a
+   spectator's dismiss wears the muted slate variant (their click hides,
+   never deletes — red would lie). The fold below never lights up. ---- */
+#banner-main {
+  position: relative;
+  padding: 6px 26px 8px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+#banner-main::after {
+  content: '✕';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 72px;
+  font-weight: 700;
+  color: transparent;
+  pointer-events: none;
+  transition: color 0.15s;
+}
+#result-banner[data-act="clear"] #banner-main:hover,
+#result-banner[data-act="clear"] #banner-main:focus-visible {
+  background: rgba(226, 73, 59, 0.10);
+  box-shadow: inset 0 0 0 1px rgba(226, 73, 59, 0.55);
+}
+#result-banner[data-act="clear"] #banner-main:hover::after,
+#result-banner[data-act="clear"] #banner-main:focus-visible::after {
+  color: rgba(226, 73, 59, 0.20);
+}
+#result-banner[data-act="dismiss"] #banner-main:hover,
+#result-banner[data-act="dismiss"] #banner-main:focus-visible {
+  background: rgba(156, 143, 119, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(156, 143, 119, 0.45);
+}
+#result-banner[data-act="dismiss"] #banner-main:hover::after,
+#result-banner[data-act="dismiss"] #banner-main:focus-visible::after {
+  color: rgba(156, 143, 119, 0.18);
+}
+/* the fold: a hairline crease; the verbs below never wear the removal wash */
+#banner-actions.banner-fold:not(:empty) {
+  border-top: 1px solid var(--hair);
+  margin: 6px 4px 0;
+  padding-top: 6px;
+}
 #result-label {
   font-family: var(--font-display);
   font-size: 13px;

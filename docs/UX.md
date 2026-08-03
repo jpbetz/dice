@@ -1610,6 +1610,41 @@ claiming is its point) and `held` offers are untouched. This supersedes
 the bystander-claims-blind reading of an offered whisper: that property
 lives on only in the dice tower.
 
+### 7.11b The folded card, the hover read, and the feed (shipped
+2026-08-03)
+
+Joe's cleanup pass, unifying the reveal and collect grammars around ONE
+idea: the likeliest act after reading a result is removing it, so the
+removal target should be huge.
+
+**The folded card.** The result banner's BODY is the one big clear
+target (the collected cluster already taught this — its sweep; here the
+dice are scattered, so the PANEL is the target). Hovering the body arms
+an unmistakable removal dress — red wash, red hairline, a quiet ✕
+watermark rising behind the content — and a click clears for everyone.
+The role split survives: a spectator's body wears the muted slate
+variant (their click dismisses locally; red would lie — the dice stay).
+Below a hairline FOLD sit the verbs that do anything else — REROLL ❯❯❯,
+Reveal — which never light up under the removal hover. The banner's own
+✕ retired (§7.9's "never a second smaller target for one verb").
+
+**The hover read.** The removal highlight doubles as a read: hovering
+the card outlines that roll's dice on the felt — inverted-hull WebGL
+shells (a back-face copy 7% larger, riding each die as a child), one
+color per source pool from a six-hue cycle that avoids gold (the roll
+verb's) and red (removal's); unsourced dice wear quiet ivory. A hidden
+roll's sources are withheld with its spec, so its outlines are all
+ivory and leak nothing.
+
+**The feed.** Two converging gold funnels frame the workbench — shapes,
+no words: the one above narrows down into the well, the one below
+narrows up into it, so the palette above and the saved pools below
+visibly pour toward the draft. Heat rides stepped classes (heat-1…4,
+two dice per step): the funnels brighten, the well gains a gold
+under-glow, and the standing ROLL whisper gathers from 0.3 toward 0.55
+— light and depth only, geometry never moves (§7.10). An empty well
+stays quiet; auto-collect runs at 3 s with a hover-hold.
+
 ### 7.12 The organized per-die read (shipped 2026-08-03)
 
 ROADMAP 2e — Joe: the reveal surfaces got muddled under Soul Deal. The
