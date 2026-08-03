@@ -1633,6 +1633,61 @@ export const scenarios = [
     },
   },
   {
+    name: 'portable',
+    tags: ['smoke', 'settings', 'groups'],
+    // Tier 4 §5 — pools & just-you settings as portable YAML: export fills
+    // the textarea, edits re-parse LIVE into a preview, Apply merges by
+    // name (never deletes), refusals name their line, and the '#'-in-
+    // notation trap survives the round trip (quoted scalars).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setGroups([{name: 'Body', notation: '3d6', category: 'Attributes'},
+        {name: 'Damage', notation: '3d4'},
+        {name: 'Hunt', notation: '2d6 # To the death'}])`);
+      await a.dbg('openSettings()');
+      await a.eval(`document.getElementById('portable-open').click()`);
+      assert.equal(await a.eval(`document.getElementById('portable-zone').classList.contains('hidden')`),
+        false, 'the zone unfolds');
+      const text = await a.eval(`document.getElementById('portable-text').value`);
+      assert.ok(text.includes("- 'Body': '3d6'") && text.includes("'2d6 # To the death'"),
+        `export quotes every scalar — the # comment survives (got: ${JSON.stringify(text.slice(0, 200))})`);
+      assert.ok((await a.eval(`document.getElementById('portable-status').textContent`))
+        .includes('matches'), 'a fresh export previews as a no-op');
+      assert.equal(await a.eval(`document.getElementById('portable-apply').disabled`), true,
+        'nothing to apply on a no-op');
+
+      // Edit: bump Damage, add a pool, flip the numbers setting → preview.
+      await a.eval(`(() => {
+        const t = document.getElementById('portable-text');
+        t.value = t.value.replace("- 'Damage': '3d4'", "- 'Damage': '4d4'")
+          .replace('settings:', "    - 'Fresh': '2d10'\\nsettings:")
+          .replace('numbers: false', 'numbers: true');
+        t.dispatchEvent(new Event('input'));
+      })()`);
+      const preview = await a.eval(`document.getElementById('portable-status').textContent`);
+      assert.ok(preview.includes('1 new') && preview.includes('1 update') && preview.includes('numbers on'),
+        `the preview counts the plan (got: ${preview})`);
+      await a.eval(`document.getElementById('portable-apply').click()`);
+      const gs = await a.dbg('groups');
+      assert.equal(gs.find((g) => g.name === 'Damage').notation, '4d4', 'the update landed by name');
+      assert.ok(gs.find((g) => g.name === 'Fresh' && g.notation === '2d10'), 'the add landed');
+      assert.equal(gs.length, 4, 'nothing was deleted');
+      assert.equal(await a.dbg('chipsVisible'), true, 'the settings flip applied');
+
+      // A bad paste refuses with its line; Apply stays disabled.
+      await a.eval(`(() => {
+        const t = document.getElementById('portable-text');
+        t.value = 'pools:\\n  P:\\n    - Broken: not dice\\n';
+        t.dispatchEvent(new Event('input'));
+      })()`);
+      const bad = await a.eval(`document.getElementById('portable-status').textContent`);
+      assert.ok(bad.startsWith('✗') && bad.includes('line 3'), `refusal names its line (got: ${bad})`);
+      assert.equal(await a.eval(`document.getElementById('portable-apply').disabled`), true,
+        'no Apply on a refusal');
+      await a.eval(`document.getElementById('settings-close').click()`);
+    },
+  },
+  {
     name: 'draft-offer',
     tags: ['smoke', 'groups', 'roll'],
     // The Trigger Pass moved Offer onto the draft row (the popover's

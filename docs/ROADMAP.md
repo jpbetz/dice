@@ -231,13 +231,17 @@ ladder; all of it is polish or a new rung.
 
 - Roll-log export (copy/download text + CSV) — the online log is currently
   uncapturable.
-- **Pools & settings export/import** *(Joe 2026-08-03)*: a human-editable
-  YAML view of the rack (shelves; pools as name + notation — the
-  canonical string is already the full carrier) plus just-you settings,
-  exported from and pasted back into the settings modal. Zero-dep rule
-  applies: a hand-rolled emitter and a strict YAML-*subset* parser that
-  fails closed exactly like the `#g=` codec (no npm YAML library).
-  Import merges by name with a preview, never a silent overwrite.
+- **Pools & settings export/import** *(Joe 2026-08-03; SHIPPED same day —
+  UX.md §7.13)*: a human-editable YAML view of the rack (shelves; pools as
+  name + canonical notation) plus the just-you settings (sound, numbers),
+  in Settings → *Your data* — ONE textarea, two directions: Export fills
+  it, pasting/editing re-parses live into a preview line (`✓ 1 new ·
+  1 update · 2 unchanged — Apply takes them`), and Apply merges by name
+  through the by-id writer, deleting nothing. `js/portable.js` is the
+  zero-dep emitter + strict YAML-subset parser (fails closed with a line
+  number, like the codec); every scalar is single-quoted on export because
+  notation carries `#` (YAML's comment) and names may carry `: `. 20 unit
+  tests + the `portable` e2e scenario.
 - Local roll statistics (per-player distribution, average-vs-expected).
 - Room settings snapshot into the copy-link URL (felt/system ride `#g=`'s
   neighbor) so a bookmarked table restores its look and rules.

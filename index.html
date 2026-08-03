@@ -548,6 +548,31 @@ limitations under the License.
           <button id="set-chips" class="sw" aria-pressed="false" title="Show numbers on dice"></button>
         </div>
       </div>
+      <!-- Your data (Tier 4 §5): pools + just-you settings as portable YAML.
+           ONE textarea, two directions — Export fills it (copy it anywhere);
+           pasting/editing re-parses live and the status line previews what
+           Apply would do. Apply is explicit, merges by name, deletes
+           nothing. Strict subset parser (js/portable.js), fail-closed. -->
+      <div class="settings-sec">
+        <span class="plabel">Your data</span>
+        <div class="prow">
+          <span class="grow">
+            <span class="prow-label">Pools &amp; settings as text</span>
+            <span class="prow-sub">copy it out, keep it anywhere, paste one back</span>
+          </span>
+          <button id="portable-open" class="btn tiny">Export / import…</button>
+        </div>
+        <div id="portable-zone" class="portable-zone hidden">
+          <textarea id="portable-text" class="portable-text" rows="9" spellcheck="false"
+            placeholder="paste an export here to import…"></textarea>
+          <div class="btn-row portable-row">
+            <button id="portable-export" class="btn tiny">Fill with my data</button>
+            <button id="portable-copy" class="btn tiny">Copy</button>
+            <button id="portable-apply" class="btn tiny confirm" disabled>Apply import</button>
+          </div>
+          <p id="portable-status" class="hint portable-status"></p>
+        </div>
+      </div>
       <div class="settings-sec">
         <span class="plabel">Everyone at the table</span>
         <div class="prow">

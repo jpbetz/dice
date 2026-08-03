@@ -1453,6 +1453,10 @@ html, body {
 #settings-panel {
   width: 340px;
   padding: 0;
+  /* the Your-data zone can make the modal taller than a short window —
+     the panel scrolls inside itself rather than clipping its foot */
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   animation: modal-pop 0.3s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 .settings-head {
@@ -1465,6 +1469,26 @@ html, body {
 .settings-head h2 { margin: 0; }
 .settings-sec { padding: 12px 14px; }
 .settings-sec + .settings-sec { border-top: 1px solid var(--hair); }
+/* Your data (Tier 4 §5): the portable-YAML zone — one textarea, two
+   directions; the status line is the import preview */
+.portable-zone { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.portable-zone.hidden { display: none; }
+.portable-text {
+  width: 100%;
+  resize: vertical;
+  min-height: 120px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--ivory);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.portable-row { display: flex; gap: 6px; }
+.portable-status { min-height: 16px; margin: 0; }
+.portable-status.warn { color: var(--amber); }
 .settings-sec .prow + .prow { margin-top: 10px; }
 .settings-sec > .hint { margin-top: 8px; }
 #felt-swatches { display: flex; flex-wrap: wrap; gap: 6px; }

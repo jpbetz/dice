@@ -26,6 +26,7 @@ import { SYSTEMS, DEFAULT_SYSTEM } from './meanings.js';
 import { groupsFromLocation, syncGroupsToLocation } from './urlgroups.js';
 import { composeRoll, validateMods, previewSpec } from './rollspec.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
+import { exportYaml, parsePortable, planImport } from './portable.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -6818,6 +6819,104 @@ settingsModal.addEventListener('click', (e) => {
 // Esc layering in the keyboard-shortcuts section below.
 document.getElementById('set-sound').addEventListener('click', () => setSound(!soundOn));
 document.getElementById('set-chips').addEventListener('click', () => setChips(!chipsOn));
+
+// ---------------------------------------------------------------------------
+// Your data (Tier 4 §5): pools + just-you settings as portable YAML — one
+// textarea, two directions. 'Fill with my data' exports; pasting/editing
+// re-parses LIVE and the status line previews exactly what Apply would do
+// (adds · updates · unchanged · setting flips). Apply is explicit, merges
+// by name through the by-id writer, and deletes nothing. The parser is
+// js/portable.js's strict subset — refusals name their line.
+// ---------------------------------------------------------------------------
+
+const portableZone = document.getElementById('portable-zone');
+const portableText = document.getElementById('portable-text');
+const portableStatus = document.getElementById('portable-status');
+const portableApplyBtn = document.getElementById('portable-apply');
+let portablePlan = null; // the previewed plan Apply commits (null = nothing valid)
+
+function portableSnapshot() {
+  return exportYaml({ groups, settings: { sound: soundOn, numbers: chipsOn } });
+}
+
+function portablePreview() {
+  const text = portableText.value;
+  portablePlan = null;
+  portableApplyBtn.disabled = true;
+  portableStatus.classList.remove('warn');
+  if (!text.trim()) { portableStatus.textContent = ''; return; }
+  const parsed = parsePortable(text);
+  if (!parsed.ok) {
+    portableStatus.textContent = `✗ ${parsed.line ? `line ${parsed.line}: ` : ''}${parsed.error}`;
+    portableStatus.classList.add('warn');
+    return;
+  }
+  const plan = planImport(groups, parsed);
+  if (groups.length + plan.adds.length > 40) {
+    portableStatus.textContent = `✗ would exceed 40 pools (you have ${groups.length}, this adds ${plan.adds.length})`;
+    portableStatus.classList.add('warn');
+    return;
+  }
+  const flips = [];
+  if ('sound' in plan.settings && plan.settings.sound !== soundOn) flips.push(`sound ${plan.settings.sound ? 'on' : 'off'}`);
+  if ('numbers' in plan.settings && plan.settings.numbers !== chipsOn) flips.push(`numbers ${plan.settings.numbers ? 'on' : 'off'}`);
+  const bits = [];
+  if (plan.adds.length) bits.push(`${plan.adds.length} new`);
+  if (plan.updates.length) bits.push(`${plan.updates.length} update${plan.updates.length > 1 ? 's' : ''}`);
+  if (plan.unchanged) bits.push(`${plan.unchanged} unchanged`);
+  bits.push(...flips);
+  if (plan.adds.length || plan.updates.length || flips.length) {
+    portablePlan = { ...plan, flips };
+    portableApplyBtn.disabled = false;
+    portableStatus.textContent = `✓ ${bits.join(' · ')} — Apply takes them`;
+  } else {
+    portableStatus.textContent = '✓ matches what you have — nothing to apply';
+  }
+}
+
+document.getElementById('portable-open').addEventListener('click', () => {
+  const opening = portableZone.classList.toggle('hidden') === false;
+  if (opening && !portableText.value) {
+    portableText.value = portableSnapshot();
+    portablePreview();
+  }
+});
+document.getElementById('portable-export').addEventListener('click', () => {
+  portableText.value = portableSnapshot();
+  portablePreview();
+});
+document.getElementById('portable-copy').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  try {
+    await navigator.clipboard.writeText(portableText.value);
+    btn.textContent = 'Copied!';
+  } catch {
+    portableText.select(); // clipboard refused (permissions): hand it over selected
+  }
+  setTimeout(() => { btn.textContent = 'Copy'; }, 900);
+});
+portableText.addEventListener('input', portablePreview);
+portableApplyBtn.addEventListener('click', () => {
+  if (!portablePlan) return;
+  const plan = portablePlan;
+  for (const u of plan.updates) {
+    editPoolById(u.id, { notation: u.notation, category: u.category || '' });
+  }
+  plan.adds.forEach((a, i) => {
+    groups.push({ id: Date.now() + i, name: a.name, notation: a.notation,
+      ...(a.category ? { category: a.category } : {}) });
+  });
+  if (plan.adds.length) { saveGroups(); renderGroups(); }
+  if ('sound' in plan.settings) setSound(plan.settings.sound);
+  if ('numbers' in plan.settings) setChips(plan.settings.numbers);
+  const done = [];
+  if (plan.adds.length) done.push(`${plan.adds.length} added`);
+  if (plan.updates.length) done.push(`${plan.updates.length} updated`);
+  done.push(...plan.flips);
+  portableStatus.textContent = `✓ applied — ${done.join(' · ') || 'settings'}`;
+  portablePlan = null;
+  portableApplyBtn.disabled = true;
+});
 
 // ---------------------------------------------------------------------------
 // Collapsible chrome: ONE region since the panel merge — Pools (the draft

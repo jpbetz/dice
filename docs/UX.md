@@ -1611,3 +1611,25 @@ are untouched: total hero + breakdown pair as before.
 The text layer keeps the read (the audit rule): every chip carries real
 text ('d8 7 Success'), every row leads with its pool — copy/paste and
 screen readers get the per-pool, per-die story line by line.
+
+### 7.13 Your data — portable YAML (shipped 2026-08-03)
+
+Tier 4 §5: pools + just-you settings as human-editable text, in
+Settings → *Your data*. One textarea, two directions — *Fill with my
+data* exports; pasting or editing re-parses LIVE and the status line
+previews exactly what *Apply* would do ('✓ 1 new · 1 update · 2 unchanged
+· numbers on — Apply takes them'). Apply is explicit, matches by NAME
+(first match; duplicate names pair off in order), writes through
+`editPoolById`, appends the rest, and **deletes nothing**. Refusals name
+their line ('✗ line 3: notation "nope": …') and disable Apply.
+
+The format (`js/portable.js`, zero-dep): two top-level maps — `pools:`
+with shelves as keys (the shelf named `Pools` is the plain one) and pools
+as `- 'Name': 'notation'` lines; `settings:` with `sound` / `numbers`
+booleans. Every scalar is single-quoted on export because notation
+carries `#` (YAML's comment marker) and names may carry `: ` (the key
+split); hand-written bare lines still parse. The parser is a strict
+subset that fails closed like the `#g=` codec: tabs, unknown keys, bad
+indent, bad notation, over-cap counts and unterminated quotes are all
+line-numbered errors, never guesses. Notations normalize to their
+canonical on import — the string remains the one carrier.
