@@ -1665,8 +1665,10 @@ export const scenarios = [
         'the uncategorized shelf is plainly named (trio shelves stand above it)');
       assert.equal(await a.eval(`document.getElementById('group-name').placeholder`),
         'Name this pool…', 'the save field names a pool');
-      assert.equal(await a.eval(`document.getElementById('pop-update').textContent`),
-        'Update this pool', 'the popover updates a pool');
+      assert.equal(await a.eval(`document.getElementById('pop-save').textContent`),
+        'Save', 'the popover commits with one verb (Trigger Pass)');
+      assert.equal(await a.eval(`document.getElementById('pop-save-name').placeholder`),
+        'Name this pool…', 'the duplicate morph names a pool');
       assert.equal(await a.eval(`document.getElementById('pools-edit').textContent.trim()`),
         '✎ Edit pools', "the manage toggle speaks 'pools' (never 'rack')");
       assert.ok(!(await a.eval(`document.body.innerText.toLowerCase().includes('rack')`)),

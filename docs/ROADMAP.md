@@ -112,11 +112,17 @@ the category); the save morph gains shelf chips; manage mode slims to the
 destructive gate (standing bar + grown ✕, per-tile ✎ retired); the
 notation card slims to the complex-pool escape hatch.
 
-### 2d. The Trigger Pass — one way to roll (proposed 2026-08-03)
+### 2d. The Trigger Pass — one way to roll (2026-08-03) — SHIPPED
 
 From Joe's 2026-08-03 play notes; refines the 2b/2c surfaces while they
 are fresh, and settles where offers live *before* targeted offers (4b)
-builds on that surface:
+builds on that surface. **Shipped same day** (docs/UX.md §7.10 records the
+contract): popover = pure editor (tray live-syncs into the box canonical;
+group commits with ONE Save by id + Duplicate…; shelf goes Open in draft);
+Offer lives on the draft row, hidden solo; the identity strip composes
+counts like the creation card (pure-dice pools, last-die guarded, 40-cap);
+per-die tables fold the sum-world sections behind 'Show anyway'; the
+result banner and offer cards hold fixed geometry. The original brief:
 
 - **One roll trigger.** The ± popover loses `Roll` and `Offer to table`;
   every roll and offer fires from the draft's ROLL ❯❯❯ strip. The

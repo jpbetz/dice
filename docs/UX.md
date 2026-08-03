@@ -1511,4 +1511,48 @@ turns the row into a name + notation editor whose Update writes back to the
 same record **by id**; the ± popover gains *Update this pool* beside the
 additive *Save as variant*. Writing by id is the fix for two bugs at once:
 renaming used to fork a duplicate, and an unnamed pool could not be updated
-at all.
+at all. *(The two-verb row is superseded by §7.10's one commit verb.)*
+
+### 7.10 The Trigger Pass (shipped 2026-08-03)
+
+From Joe's play notes; ROADMAP 2d. **One way to roll:** the ± popover is a
+pure EDITOR — its Roll and Offer to table are retired; every roll fires
+from a ROLL ❯❯❯ trigger (the draft cluster, a card's reroll strip) and
+offers fire from the draft row's *Offer to table* (hidden solo; targeted
+offers will grow their audience picker there). Where a popover edit lands
+depends on its source:
+
+- **tray** — a live editor of the draft: every edit re-lands in the command
+  box as the canonical (the box is the draft's one carrier; parse-to-parse
+  compare keeps a hand-typed spelling until an actual edit, and the
+  resync loop short-circuits on canonical equality so part-label input
+  closures survive). No commit chrome at all — the draft's own
+  Save · Offer · Clear row stands beside it. An audience-less whisper is
+  unsendable and stays popover-local.
+- **group** — a working draft that commits with **one verb**: *Save*
+  (editPoolById, the by-id write; replaces the confusing *Update this
+  pool* + second *Save* pair). *Duplicate…* is the additive twin (the old
+  variant morph, same inline-name flow).
+- **shelf** — inspect/tweak; *Open in draft* carries the tweak to the one
+  composing surface (the popover-roll that REPLACED the shelved roll is
+  retired; the peek's bare ⟳ strip still replaces). *Save as pool…* keeps
+  the roll.
+
+**Count editing composes (the identity strip).** Any PURE dice pool —
+nothing but ladder dice in its canonical — renders its dice as removable
+grouped units (the last die refuses: a pool is never empty) over the six
+rank faces as adders (40-cap guarded); a swap is remove + add. One idiom
+for building dice everywhere (creation card, draft palette, strip). Taps
+commit through stripCommit, so a mid-typed dc below the hairline survives.
+Complex pools keep the fail-closed echo + the two doors.
+
+**Per-die tables fold the sum world.** Under a per-die system (Soul Deal)
+the popover hides Modifier / d20 pairing / Target (DC) / keep-drop —
+reroll and explode stay, they read per die — behind the sysnote's *Show
+anyway* disclosure (per-open, never persisted; supersedes step 2's "mark
+as such"). Stored values keep riding the canonical either way.
+
+**Cards are chrome; they don't jiggle.** The result banner holds a width
+floor and ceiling (titles wrap inside), the offers layer owns one fixed
+column width (titles ellipsize), ×N strip counts are tabular. The draft's
+source-chip names were already capped at 90px.
