@@ -59,14 +59,14 @@ export const THEMES = {
         body: '#5a4326', text: '#e9b54a', accent: '#6f8f4f',
         glow: { color: '#ffe9a3', intensity: 0.04 },
         feel: { rough: 0.72, metal: 0.05 },
-        maps: { relief: { pattern: 'grain', strength: 0.55, digitDepth: 0.4 } },
+        maps: { relief: { pattern: 'grain', strength: 0.9, digitDepth: 0.4 } },
       },
       mosstone: {
         label: 'Mosstone',
         body: '#46543c', text: '#e7e0c4', accent: '#8fae6f',
         glow: null,
         feel: { rough: 0.85, metal: 0.02 },
-        maps: { relief: { pattern: 'hammer', strength: 0.5, digitDepth: 0.6 } },
+        maps: { relief: { pattern: 'hammer', strength: 0.85, digitDepth: 0.6 } },
       },
       sapamber: {
         label: 'Sap Amber',
@@ -98,7 +98,7 @@ export const THEMES = {
         glow: { color: '#a8d8f0', intensity: 0.06 },
         feel: { rough: 0.12, metal: 0.05 },
         maps: {
-          relief: { pattern: 'ferns', strength: 0.5, digitDepth: 0.3 },
+          relief: { pattern: 'ferns', strength: 0.85, digitDepth: 0.3 },
           roughPattern: 'ferns',
         },
       },
@@ -108,7 +108,7 @@ export const THEMES = {
         glow: null,
         feel: { rough: 0.3, metal: 0.02 },
         maps: {
-          relief: { pattern: 'ferns', strength: 0.35, digitDepth: 0.25 },
+          relief: { pattern: 'ferns', strength: 0.6, digitDepth: 0.25 },
           roughPattern: 'ferns',
         },
       },
@@ -127,7 +127,7 @@ export const THEMES = {
         feel: { rough: 0.85, metal: 0.55 },
         maps: {
           digitGlow: { color: '#ffd166', intensity: 1.1 },
-          relief: { pattern: 'hammer', strength: 0.7, digitDepth: 0.45 },
+          relief: { pattern: 'hammer', strength: 1.1, digitDepth: 0.45 },
         },
       },
     },
@@ -167,7 +167,7 @@ export const THEMES = {
         body: '#e8dcc0', text: '#6b543a', accent: '#5f8f7a',
         glow: null,
         feel: { rough: 0.6, metal: 0.05 },
-        maps: { relief: { pattern: 'scrimshaw', strength: 0.6, digitDepth: 0.75 } },
+        maps: { relief: { pattern: 'scrimshaw', strength: 0.95, digitDepth: 0.75 } },
       },
     },
   },

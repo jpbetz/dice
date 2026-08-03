@@ -310,7 +310,7 @@ const PATTERNS = {
       const x = rnd() * TEX_SIZE;
       const y = rnd() * TEX_SIZE;
       const r = TEX_SIZE * (0.05 + rnd() * 0.1);
-      const d = 0.3 + rnd() * 0.3;
+      const d = 0.4 + rnd() * 0.35;
       const g = ctx.createRadialGradient(x, y, 0, x, y, r);
       g.addColorStop(0, `rgba(0,0,0,${d})`);
       g.addColorStop(0.75, `rgba(255,255,255,${d * 0.5})`);
@@ -328,8 +328,8 @@ const PATTERNS = {
       const amp = 4 + rnd() * 10;
       const dark = rnd() < 0.5;
       ctx.strokeStyle = dark
-        ? `rgba(0,0,0,${0.2 + rnd() * 0.2})`
-        : `rgba(255,255,255,${0.12 + rnd() * 0.14})`;
+        ? `rgba(0,0,0,${0.18 + rnd() * 0.16})`
+        : `rgba(255,255,255,${0.06 + rnd() * 0.07})`;
       ctx.lineWidth = 1 + rnd() * 2.5;
       ctx.beginPath();
       for (let y = 0; y <= TEX_SIZE; y += 8) {
@@ -346,7 +346,7 @@ const PATTERNS = {
       if (depth <= 0 || len < 3) return;
       const x2 = x + Math.cos(ang) * len;
       const y2 = y + Math.sin(ang) * len;
-      ctx.lineWidth = Math.max(0.6, depth * 0.7);
+      ctx.lineWidth = Math.max(1.1, depth * 1.0);
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x2, y2);
@@ -363,7 +363,7 @@ const PATTERNS = {
     // sits in the center ~60% of the canvas (extractFaces' 1.3 fit margin),
     // so canvas-edge origins landed outside the die and only branch tips
     // reached it (lab rev: bare faces with edge nibs).
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 13; i++) {
       const ang0 = rnd() * Math.PI * 2;
       const r0 = TEX_SIZE * (0.3 + rnd() * 0.16);
       const x = TEX_SIZE / 2 + Math.cos(ang0) * r0;
@@ -379,9 +379,9 @@ const PATTERNS = {
       const len = 6 + rnd() * 30;
       const ang = rnd() * Math.PI;
       ctx.strokeStyle = rnd() < 0.6
-        ? `rgba(0,0,0,${0.12 + rnd() * 0.12})`
-        : `rgba(255,255,255,${0.08 + rnd() * 0.08})`;
-      ctx.lineWidth = 0.7;
+        ? `rgba(0,0,0,${0.2 + rnd() * 0.18})`
+        : `rgba(255,255,255,${0.12 + rnd() * 0.1})`;
+      ctx.lineWidth = rnd() < 0.2 ? 1.8 : 0.8; // a few deep gouges among hairlines
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
@@ -445,6 +445,17 @@ function makeFaceBundle(def, face, spec, seed) {
     ctx.fillStyle = '#808080';
     ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
     (PATTERNS[maps.relief.pattern] || (() => {}))(ctx, mulberry32(seed));
+    // The pattern also TINTS the color map (overlay: grey is neutral,
+    // ridges lighten, furrows darken) — relief reads face-on, not only
+    // when the light rakes (Joe: too subtle). Before the digit engrave,
+    // so the numbers stay crisp ink in the color layer.
+    const cc = bundle.map.image.getContext('2d');
+    cc.save();
+    cc.globalCompositeOperation = 'overlay';
+    cc.globalAlpha = maps.relief.tint ?? 0.4;
+    cc.drawImage(c, 0, 0);
+    cc.restore();
+    bundle.map.needsUpdate = true;
     if (maps.relief.digitDepth) {
       const g = Math.round(128 - 128 * maps.relief.digitDepth);
       paintDigits(ctx, face, spec, `rgb(${g},${g},${g})`); // engraved digits
