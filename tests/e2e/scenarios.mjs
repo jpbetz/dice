@@ -2502,4 +2502,182 @@ export const scenarios = [
       assert.equal(offer.visibility && offer.visibility.mode, 'secret', 'blind canonicalized to secret');
     },
   },
+  {
+    name: 'reroll-history',
+    tags: ['roll', 'shelf'],
+    // B2+B3 end to end: the reroll VERB says reroll (the card strip's cue
+    // word vs the draft's plain ROLL), and history TRACKS rolls vs rerolls —
+    // rerollOfId is server-substantiated, shared by every tab (late joiners
+    // included), one hop only; an unsubstantiated claim is dropped while the
+    // dice still roll, and a malformed one refuses loudly.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+
+      // 1 · Wording: a shelved card's strip reads REROLL; the draft reads ROLL.
+      await a.roll('2d6 # Warmup');
+      const wid = await a.rollId();
+      await a.dbg(`collectRoll(${JSON.stringify(wid)})`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        { desc: 'warmup shelved' },
+      );
+      assert.equal(await a.dbg(`peek(${JSON.stringify(wid)})`), wid, 'peek opens');
+      assert.equal((await a.dbg('peekState')).cueWord, 'REROLL', 'the card strip SAYS reroll');
+      await a.dbg('peek(null)');
+      await a.eval(`document.querySelector('#die-buttons .die-btn').click()`);
+      assert.equal(await a.eval(`document.querySelector('#tray-roll .cue-word').textContent.trim()`),
+        'ROLL', 'the draft trigger keeps the plain ROLL — a fresh pool is not a reroll');
+      await a.eval(`document.getElementById('clear-tray').click()`);
+
+      // 2 · The mark, shared: the log ⟳ replays rid1; both tabs hold the
+      // same provenance, and the log wears exactly one qualifier per row.
+      await a.roll('1d20 # Attack');
+      const rid1 = await a.rollId();
+      const n1 = await a.logCount();
+      await a.eval(`document.querySelector('#log-list .log-again').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${n1} && !window.__diceDebug.busy)`,
+        { desc: 'the reroll lands' },
+      );
+      await a.dbg('sim(240)');
+      const rid2 = await a.rollId();
+      assert.ok(rid2 && rid2 !== rid1, 'a new roll landed from the log ⟳');
+      for (const [t, who] of [[a, 'Alice'], [b, 'Bob']]) {
+        await t.waitFor(
+          `(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(rid2)}) && !window.__diceDebug.busy)`,
+          { desc: `the reroll reaches ${who}` },
+        );
+        assert.equal((await t.entryState(rid2)).rerollOfId, rid1, `${who}: the reroll marks its parent`);
+        assert.equal((await t.entryState(rid1)).rerollOfId, null, `${who}: the parent carries no mark of its own`);
+      }
+      const rows = await a.eval(`[...document.querySelectorAll('#log-list .log-entry')].map((r) => ({
+        reroll: !!r.querySelector('.log-reroll'),
+        rerolled: !!r.querySelector('.log-rerolled'),
+        lane: r.classList.contains('is-reroll'),
+      }))`);
+      assert.equal(rows[0].reroll, true, "the newest row wears the 'reroll' qualifier");
+      assert.equal(rows[0].lane, true, 'and the is-reroll lane');
+      assert.equal(rows[1].rerolled, true, "the superseded row wears 'rerolled'");
+      assert.equal(rows[1].reroll, false, 'at most one qualifier per row');
+
+      // 3 · One hop only: rerolling the reroll marks rid2, never the root.
+      const n2 = await a.logCount();
+      await a.eval(`document.querySelector('#log-list .log-again').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${n2} && !window.__diceDebug.busy)`,
+        { desc: 'the second reroll lands' },
+      );
+      await a.dbg('sim(240)');
+      const rid3 = await a.rollId();
+      assert.equal((await a.entryState(rid3)).rerollOfId, rid2, 'one hop up, not a chain-root walk');
+
+      // 4 · Resync: a late joiner's hello-built log carries the mark.
+      const c = await ctx.newTable({ origin: '127.0.0.2', name: 'Carol' });
+      await c.settle();
+      await c.waitFor(
+        `(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(rid2)}) && !window.__diceDebug.busy)`,
+        { desc: 'Carol rebuilds the log' },
+      );
+      assert.equal((await c.entryState(rid2)).rerollOfId, rid1, 'the mark survives the hello rebuild');
+
+      // 5 · An unsubstantiated claim is DROPPED — the dice are not the
+      // questionable part, so the roll itself proceeds unmarked.
+      const aid = await a.playerId();
+      const nA = await a.logCount();
+      const forged = await ctx.api('/api/roll',
+        { playerId: aid, dice: ['d6'], label: 'forged', rerollOfId: 'no-such-roll' });
+      assert.equal(forged.status, 200, 'the roll proceeds');
+      assert.ok(!('rerollOfId' in (forged.data.roll || {})), 'the unverifiable claim is dropped');
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${nA} && !window.__diceDebug.busy)`,
+        { desc: 'the dropped-claim roll still lands' },
+      );
+
+      // 6 · A malformed claim is a client bug: 400, nothing rolls.
+      const bad = await ctx.api('/api/roll',
+        { playerId: aid, dice: ['d6'], label: 'malformed', rerollOfId: {} });
+      assert.equal(bad.status, 400, 'a non-string rerollOfId refuses');
+      assert.equal(bad.data.code, 'bad_reroll_of', 'with its own code');
+    },
+  },
+  {
+    name: 'reroll-provenance-gate',
+    tags: ['visibility'],
+    // THE SECURITY TRAP, at full strength (B3): a reroll of a SECRET roll
+    // must not leak the parent's existence via rerollOfId — not to a
+    // bytes-only stream, not to a client, NOT EVEN FOR THE ROLLER of the
+    // secret parent (the payload is broadcast; a broadcast has no single
+    // asker). Proven on raw SSE bytes with an open-parent positive control
+    // so the leak walk cannot pass vacuously; the redacted copy keeps the
+    // mark (a public stake, goal 11); and the unknown-parent response is
+    // indistinguishable from the secret-parent one (no existence oracle).
+    timeout: 120000,
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      const eve = await ctx.rawPlayer('Eve');
+      await eve.waitForEvent('hello');
+      const aid = await a.playerId();
+
+      // The trap: Alice — authorized to SEE her secret roll — claims it on
+      // an OPEN roll. 200, and the claim is dropped even for her.
+      await a.roll('1d20 secret');
+      const secretId = await a.rollId();
+      const forged = await ctx.api('/api/roll',
+        { playerId: aid, dice: ['d6'], label: 'about that', rerollOfId: secretId });
+      assert.equal(forged.status, 200, 'the roll itself proceeds');
+      assert.ok(!('rerollOfId' in (forged.data.roll || {})),
+        'DROPPED even when the roller of the secret parent is the requester');
+      const newId = forged.data.roll.rollId;
+
+      // Eve's wire: once the open roll's event has arrived, anything about
+      // the secret would have arrived before it — and nothing did.
+      await eve.waitForEvent('roll', (d) => d.rollId === newId, { timeout: 20000 });
+      assert.ok(!eve.raw.includes(secretId), 'the secret rollId never touched Eve’s stream');
+      assert.ok(!eve.raw.includes('"rerollOfId"'), 'no event Eve holds carries a rerollOfId key yet');
+
+      // A real client agrees: unmarked roll, nonexistent parent.
+      await b.waitFor(
+        `(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(newId)}) && !window.__diceDebug.busy)`,
+        { desc: 'the open roll reaches Bob' },
+      );
+      assert.equal((await b.entryState(newId)).rerollOfId, null, 'unmarked for Bob');
+      assert.equal(await b.entryState(secretId), null, 'and the secret parent does not exist for him');
+
+      // Positive control: an OPEN parent's mark DOES ride Eve's wire — the
+      // leak asserts above could not have passed vacuously.
+      await a.roll('1d20 # open parent');
+      const pid = await a.rollId();
+      const marked = await ctx.api('/api/roll',
+        { playerId: aid, dice: ['d6'], label: 'take two', rerollOfId: pid });
+      assert.equal(marked.status, 200);
+      assert.equal(marked.data.roll.rerollOfId, pid, 'an open parent is recorded');
+      await eve.waitForEvent('roll', (d) => d.rollId === marked.data.roll.rollId, { timeout: 20000 });
+      assert.ok(eve.raw.includes(`"rerollOfId":"${pid}"`), 'the substantiated mark crosses the raw wire');
+
+      // The mark survives redaction: a HELD reroll keeps the public stake
+      // while every value stays omitted (the projectEntryFor whitelist line).
+      const held = await ctx.api('/api/roll',
+        { playerId: aid, notation: '1d20 held', rerollOfId: pid });
+      assert.equal(held.status, 200);
+      const heldId = held.data.roll.rollId;
+      assert.equal(held.data.roll.rerollOfId, pid, 'the redacted POST response keeps the mark');
+      await b.waitFor(
+        `(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(heldId)}) && !window.__diceDebug.busy)`,
+        { desc: 'the held reroll reaches Bob' },
+      );
+      const sb = await b.entryState(heldId);
+      assert.equal(sb.redacted, true, 'redacted for Bob');
+      assert.equal(sb.rerollOfId, pid, 'a public stake, kept while the values stay omitted');
+
+      // Indistinguishability: unknown-parent and secret-parent answers share
+      // one shape — 200, unmarked — so neither confirms an id is real.
+      const unknown = await ctx.api('/api/roll',
+        { playerId: aid, dice: ['d6'], label: 'about nothing', rerollOfId: 'no-such-roll' });
+      assert.equal(unknown.status, forged.status, 'same status either way');
+      assert.equal('rerollOfId' in (unknown.data.roll || {}), 'rerollOfId' in (forged.data.roll || {}),
+        'same absent mark — no existence oracle');
+    },
+  },
 ];

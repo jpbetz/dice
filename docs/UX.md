@@ -1361,6 +1361,9 @@ round target — no always-on gold total, no tiny ✕, and a held roll shows
 the same dot rather than shouting `?`. Hover or tap explodes it into the
 existing peek card (§7.7.1) with the full total and breakdown; the peek
 carries a prominent ✕ at its base that clears the roll for everyone.
+*(Amended by §7.15's one-✕ rule: the peek's base ✕ now exists only when a
+TAP opened the card; a hover-opened peek defers the clear to the marker's
+sweep dress — one affordance at a time.)*
 
 **The clear gesture is one gesture.** The roller's ✕ on the post-roll
 banner, the ✕ on the verdict card and the peek's base ✕ share a class, a
@@ -1446,6 +1449,10 @@ spectator dismisses their own card) where the peek's ✕ is §7.7
 housekeeping for anyone. The collected cluster itself stays the ONE big
 felt-side clear target — click sweeps it, hover dresses the whole circle
 with the ✕ promise (never a second smaller target for the same verb).
+*(That "never a second target" clause was violated in the shipped build —
+the zero-delay peek carried its ✕ on the same pointer beat that dressed
+the sweep; §7.15's one-✕ rule closes it: the peek builds a ✕ only when a
+tap opened it.)*
 (4) The
 default rack is the Soul Deal starting set: nine attributes in their
 Physical/Mental/Social triads (Strength/Toughness/Agility ·
@@ -1685,3 +1692,80 @@ second well, and derives every placement from one law:
   (the draft ± was their only remaining element; the shipped 25×38
   bordered chip was their cascade accident — the ± is `#tray-mods` now, a
   full-height borderless gutter tool).
+
+### 7.15 Reroll speaks its name (shipped 2026-08-03)
+
+Stage B of Joe's play notes: one clear affordance per collected roll, the
+reroll verb named everywhere it fires, and history that tells rolls and
+rerolls apart — server-substantiated.
+
+**The one-✕ rule (Joe's decision: keep the big red one).** A collected
+roll has exactly ONE reachable clear affordance, **chosen by the gesture
+that opened the card**:
+
+- Peek opened by hover (or a pin) → the marker's sweep dress — the whole
+  76px circle with the 30px salmon ✕ promise — is the clear target; the
+  card builds **no ✕ row at all** (not a hidden node: a vestigial node
+  invites "fixing").
+- Peek opened by tap → there is no hover to dress the circle, so the
+  card's base ✕ **is** the big red one. This is why `.pk-clear` could not
+  simply be deleted: the sweep is `display:none` on coarse pointers *and*
+  the marker's click handler branches on the recorded pointer type (a tap
+  toggles the peek instead of clearing), so on touch — hybrid laptops
+  included, where the coarse media query can be false — the card ✕ is the
+  only clear path. The coarse `display:none` on the sweep is load-bearing
+  as the rule's complement.
+
+Mechanism: `peekVia` ('hover' | 'tap') rides `openPeek`; only the
+marker's touch branch passes 'tap', and a mouse `pointerenter` over an
+already-tap-opened card never steals its ✕ mid-interaction (the gesture
+is taken only on an actual open). The banner ✕ stays unconditional — an
+uncollected roll has no marker to sweep — and the verdict ✕ is untouched.
+Keyboard users clear as before (Esc's sweep, the log/corner paths): no
+regression, no new path this pass.
+
+**The reroll cue vocabulary.** `buildRollCue` draws from a CLOSED set —
+`ROLL` for fresh pools (the draft cluster, an offer's claim strip),
+`REROLL` for replays (the one result-card strip that serves both the
+banner and the peek) — built as nodes, never innerHTML: a varying word
+behind innerHTML is how user text eventually gets there. Titles follow
+("Reroll these dice", the log/verdict ⟳ "Reroll this", aria
+"Reroll — <label>"). **Register rule:** "reroll" the *action* is always
+the bare verb with the dice as object; "reroll" the *mechanic* (`ro<=N`,
+"Reroll low") is always qualified. Never unify them.
+
+**History provenance (`rerollOfId`).** Every reroll trigger sends one
+shared payload (`rerollOpts`) that stamps the parent's rollId as a CLAIM;
+the server is the only party that can substantiate one, and it does so
+**at birth, never at projection**:
+
+> A reroll records its parent only when the parent exists for the whole
+> table — enforced in `handleRoll` via `entryExistsForAll` (the
+> whole-room form of `entryExistsFor`, roller exemption removed). A
+> reroll of a *secret* roll is recorded as a plain roll — no marker, not
+> even for its own roller: the payload is broadcast, and a broadcast has
+> no single asker.
+
+Malformed claims 400 (`bad_reroll_of`); unsubstantiated ones are dropped
+while the dice still roll (a status split would rebuild the existence
+oracle the reveal path's 404 already refuses to be). The field is read in
+`handleRoll` only — offers/claims are fresh rolls and their parser never
+sees the key. It rides the ROLL, not `roll.spec` (spec is what
+reroll-last replays; an inherited id would claim the same ancestor
+forever): provenance points **one hop up**, never a chain root. The
+redacted projection keeps it unconditionally — by the birth gate it only
+ever names a whole-room-visible parent, so "she rerolled that check, face
+down" is a public stake (goal 11), never a value. Solo substantiates the
+same claim against the local log.
+
+**The log says so.** At most one quiet small-caps qualifier per row —
+`reroll` (bordered chip + an inset-shadow lane: zero layout cost, history
+never reflows) or `rerolled` on the superseded parent, derived one-pass
+from what this client holds (leak-free by construction). Content, so it
+stands (the tier rule binds controls); muted, never gold — gold belongs
+to the roll verb alone. The tooltip resolves the parent only through the
+client-side hidden gate: non-secret ≠ readable, so a held/whispered
+parent never surrenders its total to a tooltip, and an aged-out parent
+keeps the generic "Reroll of an earlier roll". The banner and verdict
+card stay unmarked (§7.10 fixed geometry; their *action* already says
+REROLL — the record is the log's job).
