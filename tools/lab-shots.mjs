@@ -57,16 +57,27 @@ try {
     await shot(`grid-${env}.png`);
   }
 
-  // action frames: each signature effect mid-flight, on its home theme
+  // detail rows: the Level 1 craftsmanship close-ups (relief + digit glow)
   await page.eval(`window.__lab.setEnv('table')`);
   await sleep(150);
+  for (const id of ['emberforge.blackanvil', 'rimehold.deepglacier', 'rimehold.firstfrost',
+    'wildwood.heartwood', 'wildwood.mosstone', 'wildwood.sapamber', 'umbra.voidgrain',
+    'arcanum.focuscrystal', 'reliquary.scrimshaw']) {
+    await page.eval(`window.__lab.zoomRow(${JSON.stringify(id)})`);
+    await sleep(150);
+    await shot(`row-${id}.png`);
+  }
+  await page.eval('window.__lab.zoomRow(null)');
+  await sleep(150);
+
+  // action frames: each signature effect mid-flight, on its home theme
   const actions = [
-    ['stormcall', 'flash', 60],
-    ['emberforge', 'glow', 240],
-    ['rimehold', 'freeze', 420],
-    ['umbra', 'dim', 140],
-    ['tidewrack', 'swell', 500],
-    ['gildhall', 'slam', 70],
+    ['stormcall.boltglass', 'flash', 60],
+    ['emberforge.blackanvil', 'glow', 240],
+    ['rimehold.deepglacier', 'freeze', 420],
+    ['umbra.voidgrain', 'dim', 140],
+    ['tidewrack.seaglass', 'swell', 500],
+    ['gildhall.oxblood', 'slam', 70],
   ];
   for (const [theme, fx, atMs] of actions) {
     await page.eval(`window.__lab.effect(${JSON.stringify(theme)}, ${JSON.stringify(fx)})`);

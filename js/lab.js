@@ -22,9 +22,9 @@
 
 import * as THREE from 'three';
 import { DIE_TYPES, createDieMesh, valueRange, faceNormalForValue } from './dice.js';
-import { THEMES, THEME_IDS } from './themes.js';
+import { THEMES, SETS, SET_IDS } from './themes.js';
 
-const ROWS = ['std', ...THEME_IDS];
+const ROWS = ['std', ...SET_IDS];
 const COL_STEP = 2.5;
 const ROW_STEP = 2.5;
 
@@ -84,11 +84,13 @@ ROWS.forEach((id, r) => {
     // artifact, not canvas blanking): skip mipmap generation entirely and
     // pin each texture to the GPU at build time.
     mesh.material.forEach((m) => {
-      if (!m.map) return;
-      m.map.generateMipmaps = false;
-      m.map.minFilter = THREE.LinearFilter;
-      m.map.needsUpdate = true;
-      renderer.initTexture(m.map);
+      for (const t of [m.map, m.emissiveMap, m.normalMap, m.roughnessMap]) {
+        if (!t) continue;
+        t.generateMipmaps = false;
+        t.minFilter = THREE.LinearFilter;
+        t.needsUpdate = true;
+        renderer.initTexture(t);
+      }
     });
     const [, max] = valueRange(type);
     const n = faceNormalForValue(type, max);
@@ -109,7 +111,9 @@ ROWS.forEach((id, r) => {
     scene.add(mesh);
     meshes.push({ mesh, baseX: x, baseY: y, phase: c * 0.7 });
   });
-  rows.push({ id, label: id === 'std' ? 'Standard (today)' : THEMES[id].label, meshes, spin: true, spinHold: 0 });
+  rows.push({ id, recipe: id === 'std' ? null : SETS[id],
+    label: id === 'std' ? 'Standard (today)' : `${SETS[id].houseLabel} · ${SETS[id].label}`,
+    meshes, spin: true, spinHold: 0 });
   // Warm-up render per ROW: pushing ~550 canvas-texture uploads through
   // SwiftShader in one first frame deterministically dropped two of them
   // (the material's default WHITE base color showed — probe2). Spreading
@@ -172,9 +176,9 @@ const EFFECTS = {
   // agitation feeds the fire / the charge releases: internal glow surges
   glow(row) {
     const mats = rowMaterials(row);
-    const accent = row.id !== 'std' && THEMES[row.id].glow
-      ? null // themed glow: surge what the theme already carries
-      : new THREE.Color(row.id !== 'std' ? THEMES[row.id].accent : '#ffd766');
+    const accent = row.recipe && (row.recipe.glow || (row.recipe.maps && row.recipe.maps.digitGlow))
+      ? null // themed glow: surge what the set already carries
+      : new THREE.Color(row.recipe ? row.recipe.accent : '#ffd766');
     run(900, (k) => {
       const s = k < 0.25 ? easeOut(k / 0.25) : 1 - (k - 0.25) / 0.75;
       for (const m of mats) {
@@ -233,20 +237,28 @@ const EFFECTS = {
 // ---------------------------------------------------------------------------
 
 const side = document.getElementById('side');
+let lastHouse = null;
 for (const row of rows) {
   const box = document.createElement('div');
   box.className = 'theme';
+  // house header once per house (a THEME is a HOUSE holding several SETS)
+  if (row.recipe && row.recipe.house !== lastHouse) {
+    lastHouse = row.recipe.house;
+    const hh = document.createElement('div');
+    hh.className = 't-house';
+    hh.textContent = THEMES[row.recipe.house].label;
+    const hl = document.createElement('div');
+    hl.className = 't-line';
+    hl.textContent = THEMES[row.recipe.house].line;
+    side.append(hh, hl);
+  }
   const name = document.createElement('div');
   name.className = 't-name';
-  name.textContent = row.label;
+  name.textContent = row.recipe ? row.recipe.label : row.label;
   box.appendChild(name);
-  if (row.id !== 'std') {
-    const t = THEMES[row.id];
+  if (row.recipe) {
+    const t = row.recipe;
     name.style.color = t.text;
-    const line = document.createElement('div');
-    line.className = 't-line';
-    line.textContent = t.line;
-    box.appendChild(line);
     const sw = document.createElement('div');
     sw.className = 'swatches';
     for (const c of [t.body, t.text, t.accent, t.glow ? t.glow.color : null]) {
@@ -345,6 +357,22 @@ window.__lab = {
   rows: rows.map((r) => r.id),
   setRotate(on) { rotate = !!on; },
   setEnv(name) { applyEnv(name); },
+  // Frame ONE row close (null = the full grid) — the detail view where
+  // Level 1 relief and digit glow get judged.
+  zoomRow(id) {
+    if (!id) { frameCamera(); return true; }
+    const row = rows.find((r) => r.id === id);
+    if (!row) return false;
+    // CLOSE: ~3 dice fill the frame (relief and digit glow are judged at
+    // reading distance, not from across the table) — centered on the
+    // d10x/d12/d20 end where the faces are biggest.
+    const y = row.meshes[0].baseY;
+    const cx = row.meshes[4].baseX;
+    camera.position.set(cx, y, 7.2);
+    camera.lookAt(cx, y, 0);
+    camera.updateProjectionMatrix();
+    return true;
+  },
   effect(rowId, fxId) {
     const row = rows.find((r) => r.id === rowId);
     if (!row || !EFFECTS[fxId]) return false;

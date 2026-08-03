@@ -188,6 +188,20 @@ must still whisper it).
 
 ---
 
+## Houses hold SETS (Joe 2026-08-03)
+
+A theme is a HOUSE — the browsing category with an identity — and every
+house holds multiple SETS, the concrete dice styles a player actually
+picks. Wildwood is one house; **Heartwood** (living wood, sap-amber
+digits), **Mosstone** (weathered standing-stone, carved lichen-pale
+digits) and **Sap Amber** (polished resin, dark inclusion digits) are
+three of its sets. Rimehold splits into **Deep Glacier** (dark ice,
+frost-white digits) and **First Frost** (pale morning ice, dark digits).
+js/themes.js is two-level to match: `THEMES[house].sets[set]`, flattened
+to `SETS['house.set']` — the dice.js variant key and the future picker's
+unit. New styles join as sets of an existing house first; a new HOUSE has
+to earn its place by not fitting any of the nine.
+
 ## Expansion directions (not in the core nine)
 
 Starfall (night-sky bodies, constellation pips, aurora — split from
@@ -196,6 +210,44 @@ gears, escapement ticks) · Carnival (trickster lacquer, confetti pop) ·
 Plaguewild (Umbra-adjacent rot/bloom). The taxonomy holds nine so each
 grouping stays BROAD; sub-sets live inside a grouping (Rimehold hosts
 "first frost" and "deep glacier" variants, not new houses).
+
+## The effects sophistication ladder (agreed with Joe 2026-08-03)
+
+The v1 lab used only UNIFORM knobs — body/number color, whole-material
+finish and glow, transforms, light dimming. The climb from there, in
+leverage order for this zero-dep codebase:
+
+1. **Texture-space authoring** — the face baker gains per-CHANNEL maps,
+   all authored in the 2D canvas we already draw with: `emissiveMap`
+   (molten DIGITS on black iron — glow where the theme means it, not a
+   body tint), `normalMap` baked from a canvas height sketch via Sobel
+   (engraved scrimshaw, wood grain, hammered iron, frost ferns — light
+   rakes real-feeling relief at zero geometry cost), `roughnessMap` /
+   `metalnessMap` (matte frost ferns over glassy ice; gold leaf worn
+   through at corners). Craftsmanship level: where "theme merged subtly
+   into the die itself" actually lives. **← STARTED first.**
+2. **Shader injection** (`onBeforeCompile`, core Three, no post stack) —
+   fresnel rim glow (biolume edges, aurora sheen, Umbra's wrong halo),
+   time-driven uniforms (flowing molten seams, runes charging in
+   sequence, frost creeping via an expanding mask), view-angle hue shift
+   (sea-glass iridescence), and the dissolve shader (noise-threshold
+   alpha + glowing edge) that IS Umbra's unmaking.
+3. **Particles & trails** — a tiny instanced system (~100 lines): sparks,
+   firefly motes, rising ash, dust, breath fog, bubbles. Keyed off REAL
+   impacts: the physics already reports collision strength to the sound
+   system, so "the reason behind the effect" is literal physics.
+4. **The environment joins the theme** — felt decals from the landing
+   point (frost crackle, droplet rings, scorch; the mat-text decal
+   machinery is the seam) and a colored light PARENTED to the die (a
+   biolume die casts teal on its patch of felt; Umbra pools local
+   shadow instead of dimming the world).
+5. **Hand-rolled postprocessing** — selective bloom, shock rings, heat
+   shimmer (~150 lines each, no examples/jsm). Ranked LAST on purpose:
+   it amplifies identity the other levels create, it creates none.
+
+Side-channel: render-only child meshes (the bevel already works this
+way) can change the SILHOUETTE — verdigris corner caps, crystal spurs,
+vine loops — while the physics hull stays canonical.
 
 ## The lab
 

@@ -21,7 +21,7 @@ limitations under the License.
 // Variants (goal 11): 'std' is the normal numbered die; 'shroud' is the
 // numberless obsidian die a redacted (held/whispered) roll tumbles as — dark
 // reflective faces with NO symbols, so there is nothing to read on any
-// client. A THEME id (js/themes.js — Tier 6 §9) is also a variant: same
+// client. A SET id ('house.set', js/themes.js — Tier 6 §9) is also a variant: same
 // geometry and values, the theme's body/number colors baked into the face
 // textures and its finish (rough/metal) + internal glow (emissive) on the
 // materials. Physics bodies always come from the 'std' build: the hull is
@@ -31,7 +31,7 @@ limitations under the License.
 
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { THEMES } from './themes.js';
+import { SETS } from './themes.js';
 
 export const DIE_TYPES = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20'];
 
@@ -255,25 +255,213 @@ function makeFaceTexture(def, face, spec) {
     return tex0;
   }
 
-  const { center, r } = inradius2d(face);
-  const rPx = r * face.pxScale;
-
-  if (spec.corners) {
-    // d4: one number per corner, top of each number pointing at its corner
-    for (const { text, corner2 } of spec.corners) {
-      const dir = new THREE.Vector2().subVectors(corner2, center);
-      const pos = new THREE.Vector2().addVectors(center, dir.clone().multiplyScalar(0.52));
-      drawLabel(ctx, face, text, pos, dir, rPx * 0.7, def.text, false);
-    }
-  } else {
-    const fontPx = rPx * (spec.text.length > 1 ? 1.05 : 1.4);
-    drawLabel(ctx, face, spec.text, center, spec.upDir, fontPx, def.text, spec.underline);
-  }
+  paintDigits(ctx, face, spec, def.text);
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   return tex;
+}
+
+// The digit pass, extracted so every baked CHANNEL can reuse it in its own
+// color: the color map paints def.text, an emissiveMap paints white (the
+// material's emissive color tints it), a height sketch paints grey at the
+// engrave depth. Layout identical in all channels by construction.
+function paintDigits(ctx, face, spec, color) {
+  const { center, r } = inradius2d(face);
+  const rPx = r * face.pxScale;
+  if (spec.corners) {
+    // d4: one number per corner, top of each number pointing at its corner
+    for (const { text, corner2 } of spec.corners) {
+      const dir = new THREE.Vector2().subVectors(corner2, center);
+      const pos = new THREE.Vector2().addVectors(center, dir.clone().multiplyScalar(0.52));
+      drawLabel(ctx, face, text, pos, dir, rPx * 0.7, color, false);
+    }
+  } else {
+    const fontPx = rPx * (spec.text.length > 1 ? 1.05 : 1.4);
+    drawLabel(ctx, face, spec.text, center, spec.upDir, fontPx, color, spec.underline);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Level 1 map baking (docs/THEMES.md, the sophistication ladder): height
+// sketches, per-channel canvases, and the Sobel that turns painted relief
+// into a tangent-space normal map. All deterministic — the PRNG seeds from
+// (type, face), so every client and every screenshot bakes identical dice.
+// ---------------------------------------------------------------------------
+
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Height-sketch painters: grey = flat, white = raised, black = recessed.
+// Each covers the whole canvas; the face UVs sample only their region.
+const PATTERNS = {
+  // struck iron: soft dents with a faintly raised rim
+  hammer(ctx, rnd) {
+    for (let i = 0; i < 26; i++) {
+      const x = rnd() * TEX_SIZE;
+      const y = rnd() * TEX_SIZE;
+      const r = TEX_SIZE * (0.05 + rnd() * 0.1);
+      const d = 0.3 + rnd() * 0.3;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, `rgba(0,0,0,${d})`);
+      g.addColorStop(0.75, `rgba(255,255,255,${d * 0.5})`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, 7);
+      ctx.fill();
+    }
+  },
+  // living wood: wavering grain lines, ridge and furrow alternating
+  grain(ctx, rnd) {
+    for (let i = 0; i < 42; i++) {
+      const x0 = rnd() * TEX_SIZE;
+      const amp = 4 + rnd() * 10;
+      const dark = rnd() < 0.5;
+      ctx.strokeStyle = dark
+        ? `rgba(0,0,0,${0.2 + rnd() * 0.2})`
+        : `rgba(255,255,255,${0.12 + rnd() * 0.14})`;
+      ctx.lineWidth = 1 + rnd() * 2.5;
+      ctx.beginPath();
+      for (let y = 0; y <= TEX_SIZE; y += 8) {
+        const x = x0 + Math.sin(y / 37 + i) * amp;
+        y === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
+  },
+  // frost ferns: branching raised crystals creeping in from the edges
+  ferns(ctx, rnd) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    const branch = (x, y, ang, len, depth) => {
+      if (depth <= 0 || len < 3) return;
+      const x2 = x + Math.cos(ang) * len;
+      const y2 = y + Math.sin(ang) * len;
+      ctx.lineWidth = Math.max(0.6, depth * 0.7);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      const n = 2 + Math.floor(rnd() * 2);
+      for (let i = 1; i <= n; i++) {
+        const t = i / (n + 1);
+        branch(x + (x2 - x) * t, y + (y2 - y) * t,
+          ang + (rnd() < 0.5 ? 1 : -1) * (0.5 + rnd() * 0.5),
+          len * (0.45 + rnd() * 0.2), depth - 1);
+      }
+    };
+    // Creep inward from the FACE'S rim, not the canvas's: the face polygon
+    // sits in the center ~60% of the canvas (extractFaces' 1.3 fit margin),
+    // so canvas-edge origins landed outside the die and only branch tips
+    // reached it (lab rev: bare faces with edge nibs).
+    for (let i = 0; i < 10; i++) {
+      const ang0 = rnd() * Math.PI * 2;
+      const r0 = TEX_SIZE * (0.3 + rnd() * 0.16);
+      const x = TEX_SIZE / 2 + Math.cos(ang0) * r0;
+      const y = TEX_SIZE / 2 + Math.sin(ang0) * r0;
+      branch(x, y, ang0 + Math.PI + (rnd() - 0.5) * 0.8, TEX_SIZE * (0.2 + rnd() * 0.14), 5);
+    }
+  },
+  // museum ivory: fine hairline scratches in both tones
+  scrimshaw(ctx, rnd) {
+    for (let i = 0; i < 70; i++) {
+      const x = rnd() * TEX_SIZE;
+      const y = rnd() * TEX_SIZE;
+      const len = 6 + rnd() * 30;
+      const ang = rnd() * Math.PI;
+      ctx.strokeStyle = rnd() < 0.6
+        ? `rgba(0,0,0,${0.12 + rnd() * 0.12})`
+        : `rgba(255,255,255,${0.08 + rnd() * 0.08})`;
+      ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(ang) * len, y + Math.sin(ang) * len);
+      ctx.stroke();
+    }
+  },
+};
+
+// Sobel a height sketch into a tangent-space normal map. LINEAR data — no
+// sRGB tag (that would bend the vectors).
+function heightToNormal(heightCanvas, strength) {
+  const s = heightCanvas.width;
+  const src = heightCanvas.getContext('2d').getImageData(0, 0, s, s).data;
+  const out = document.createElement('canvas');
+  out.width = out.height = s;
+  const octx = out.getContext('2d');
+  const img = octx.createImageData(s, s);
+  const h = (x, y) => src[(((y + s) % s) * s + ((x + s) % s)) * 4] / 255;
+  for (let y = 0; y < s; y++) {
+    for (let x = 0; x < s; x++) {
+      const dx = (h(x + 1, y) - h(x - 1, y)) * strength * 2;
+      const dy = (h(x, y + 1) - h(x, y - 1)) * strength * 2;
+      const inv = 1 / Math.hypot(dx, dy, 1);
+      const i = (y * s + x) * 4;
+      img.data[i] = (-dx * inv * 0.5 + 0.5) * 255;
+      img.data[i + 1] = (dy * inv * 0.5 + 0.5) * 255;
+      img.data[i + 2] = (inv * 0.5 + 0.5) * 255;
+      img.data[i + 3] = 255;
+    }
+  }
+  octx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(out);
+  tex.anisotropy = 4;
+  return tex;
+}
+
+// Bake every channel a skin asks for (def.maps — themes.js Level 1):
+// always the color map; optionally an emissiveMap of the digits alone, a
+// normal map from the relief sketch, a roughness map from a pattern.
+function makeFaceBundle(def, face, spec, seed) {
+  const bundle = { map: makeFaceTexture(def, face, spec) };
+  const maps = !spec.blank && def.maps ? def.maps : null;
+  if (!maps) return bundle;
+  const mk = () => {
+    const c = document.createElement('canvas');
+    c.width = c.height = TEX_SIZE;
+    return [c, c.getContext('2d')];
+  };
+  if (maps.digitGlow) {
+    const [c, ctx] = mk();
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+    paintDigits(ctx, face, spec, '#ffffff'); // material.emissive supplies the color
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    bundle.emissiveMap = t;
+  }
+  if (maps.relief) {
+    const [c, ctx] = mk();
+    ctx.fillStyle = '#808080';
+    ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+    (PATTERNS[maps.relief.pattern] || (() => {}))(ctx, mulberry32(seed));
+    if (maps.relief.digitDepth) {
+      const g = Math.round(128 - 128 * maps.relief.digitDepth);
+      paintDigits(ctx, face, spec, `rgb(${g},${g},${g})`); // engraved digits
+    }
+    bundle.normalMap = heightToNormal(c, 1.0);
+  }
+  if (maps.roughPattern && PATTERNS[maps.roughPattern]) {
+    const [c, ctx] = mk();
+    const base = Math.round((def.feel ? def.feel.rough : 0.3) * 255);
+    ctx.fillStyle = `rgb(${base},${base},${base})`;
+    ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+    PATTERNS[maps.roughPattern](ctx, mulberry32(seed ^ 0x9e3779b9)); // white strokes = rough
+    const t = new THREE.CanvasTexture(c); // linear data
+    t.anisotropy = 4;
+    bundle.roughnessMap = t;
+  }
+  return bundle;
 }
 
 // ---------------------------------------------------------------------------
@@ -432,14 +620,22 @@ function faceSpecs(type, faces) {
   });
 }
 
+// Deterministic per-(type, face) seed for the pattern painters: every
+// client — and every screenshot — bakes identical grain, dents and ferns.
+function faceSeed(type, faceIndex) {
+  let a = 7;
+  for (const ch of type) a = (Math.imul(a, 31) + ch.charCodeAt(0)) | 0;
+  return (a ^ Math.imul(faceIndex + 1, 0x85ebca6b)) >>> 0;
+}
+
 function buildDie(type, variant = 'std') {
   const def = DIE_DEFS[type];
   const shroud = variant === 'shroud';
-  const theme = !shroud && variant !== 'std' ? THEMES[variant] || null : null;
+  const theme = !shroud && variant !== 'std' ? SETS[variant] || null : null;
   // Shroud skin: same geometry, obsidian faces, no symbols. A theme skin:
   // same geometry, the theme's colors + finish + glow (docs/THEMES.md).
   const skin = shroud ? { ...def, color: SHROUD_COLOR }
-    : theme ? { ...def, color: theme.body, text: theme.text, feel: theme.feel, glow: theme.glow }
+    : theme ? { ...def, color: theme.body, text: theme.text, feel: theme.feel, glow: theme.glow, maps: theme.maps }
     : def;
   // The BASE polyhedron drives faces, values and the physics hull; the mesh
   // the player sees is its beveled twin (render only — see buildBeveledGeometry).
@@ -458,19 +654,20 @@ function buildDie(type, variant = 'std') {
       if (!uniq.some((q) => q.distanceTo(p) < EPS)) uniq.push(p);
     }
     vertexValues = uniq.map((p, i) => ({ dir: p.clone().normalize(), value: i + 1 }));
-    materials = faces.map((f) => {
+    materials = faces.map((f, fi) => {
       if (shroud) return materialFor(skin, f, { blank: true }, true);
       const corners = f.boundary.map((p) => ({
         text: String(vertexValues.find((v) => v.dir.clone().multiplyScalar(p.length()).distanceTo(p) < EPS * 10).value),
         corner2: project2d(f, p),
       }));
-      return materialFor(skin, f, { corners });
+      return materialFor(skin, f, { corners }, false, faceSeed(type, fi));
     });
     faces.forEach((f) => { f.value = null; });
   } else {
     const specs = faceSpecs(type, faces);
     materials = faces.map((f, i) =>
-      shroud ? materialFor(skin, f, { blank: true }, true) : materialFor(skin, f, specs[i])
+      shroud ? materialFor(skin, f, { blank: true }, true)
+        : materialFor(skin, f, specs[i], false, faceSeed(type, i))
     );
     faces.forEach((f, i) => { f.value = specs[i].value; });
   }
@@ -488,15 +685,31 @@ function buildDie(type, variant = 'std') {
   return { type, def, geometry, materials, shape, faces, vertexValues };
 }
 
-function materialFor(def, face, spec, shroud = false) {
+function materialFor(def, face, spec, shroud = false, seed = 1) {
+  const bundle = shroud
+    ? { map: makeFaceTexture(def, face, spec) }
+    : makeFaceBundle(def, face, spec, seed);
   const m = new THREE.MeshStandardMaterial({
-    map: makeFaceTexture(def, face, spec),
+    map: bundle.map,
     // Obsidian: darker, glossier, more metallic — reflections instead of
-    // pips. Themed skins bring their own finish (docs/THEMES.md).
-    roughness: shroud ? 0.16 : (def.feel ? def.feel.rough : 0.3),
+    // pips. Themed skins bring their own finish (docs/THEMES.md). A
+    // roughnessMap carries per-pixel values, so the scalar goes to 1
+    // (three multiplies the two).
+    roughness: bundle.roughnessMap ? 1.0 : shroud ? 0.16 : (def.feel ? def.feel.rough : 0.3),
     metalness: shroud ? 0.5 : (def.feel ? def.feel.metal : 0.1),
   });
-  if (!shroud && def.glow) {
+  if (bundle.roughnessMap) m.roughnessMap = bundle.roughnessMap;
+  if (bundle.normalMap) {
+    m.normalMap = bundle.normalMap;
+    const k = (def.maps && def.maps.relief && def.maps.relief.strength) || 0.5;
+    m.normalScale.set(k * 2, k * 2); // recipe-dialed relief depth
+  }
+  if (!shroud && bundle.emissiveMap && def.maps && def.maps.digitGlow) {
+    // Level 1: the DIGITS alone glow — the map masks, emissive colors it
+    m.emissiveMap = bundle.emissiveMap;
+    m.emissive = new THREE.Color(def.maps.digitGlow.color);
+    m.emissiveIntensity = def.maps.digitGlow.intensity;
+  } else if (!shroud && def.glow) {
     // the theme's INTERNAL light — subtle at rest, surged by effects
     m.emissive = new THREE.Color(def.glow.color);
     m.emissiveIntensity = def.glow.intensity;
