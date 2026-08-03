@@ -146,6 +146,13 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     // of dice/mods (UX §2) and is echoed on the roll broadcast.
     async roll(dice, label = '', opts = {}) {
       const body = { label: label || '' };
+      // Reroll provenance — OUTSIDE the notation/explicit split below: the
+      // reroll paths ride the notation shape whenever visibility or sources
+      // are present and the explicit shape otherwise, so a field inside
+      // either branch would mark only half the rerolls. A claim, not a
+      // fact: the server substantiates it (and silently drops what it
+      // cannot), so this never gates on anything client-side.
+      if (typeof opts.rerollOfId === 'string' && opts.rerollOfId) body.rerollOfId = opts.rerollOfId;
       if (typeof opts.notation === 'string' && opts.notation) {
         body.notation = opts.notation;
       } else {

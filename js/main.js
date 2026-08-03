@@ -1622,6 +1622,9 @@ function playRoll(roll) {
     visibility: roll.visibility || null,
     revealAuthority: roll.revealAuthority || null,
     notation: typeof roll.notation === 'string' ? roll.notation : null,
+    // reroll provenance (B3): server-substantiated; entryFromRoll reads it
+    // off currentRoll at completion, so dropping it here unmarks the roll
+    rerollOfId: typeof roll.rerollOfId === 'string' ? roll.rerollOfId : null,
     seed: roll.seed,
     dice,
     keyframes,
@@ -1653,6 +1656,11 @@ function rollDice(types, label, opts = {}) {
   const composed = composeRoll(types, opts.mods || null, Math.random);
   const spec = { dice: [...types], mods: opts.mods || null };
   if (opts.sources) spec.sources = [...opts.sources]; // 2b-⑤ attribution
+  // Reroll provenance (B3), the same substantiation the server does,
+  // against the only history we have. Solo has no secret (requestRoll:
+  // secret/whisper act as OPEN), so existence is the whole gate.
+  const rerollOfId = typeof opts.rerollOfId === 'string'
+    && log.some((e) => e.rollId === opts.rerollOfId) ? opts.rerollOfId : null;
   playRoll({
     ...composed,
     rollId: `solo-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
@@ -1661,6 +1669,7 @@ function rollDice(types, label, opts = {}) {
     exp: opts.exp || null,
     faceDown: !!opts.faceDown,
     revealed: !opts.faceDown,
+    rerollOfId,
     seed: randomSeed(),
     label: label || formula(types),
   });
@@ -2006,6 +2015,8 @@ function entryFromRoll(roll) {
     visibility: roll.visibility || undefined,
     revealAuthority: roll.revealAuthority || undefined,
     notation: typeof roll.notation === 'string' ? roll.notation : undefined,
+    // reroll provenance (B3): present-or-absent, the notation idiom above
+    rerollOfId: typeof roll.rerollOfId === 'string' ? roll.rerollOfId : undefined,
     spec,
   };
 }
@@ -2391,14 +2402,7 @@ function appendCardActions(holder, entry, opts) {
         closePeek();
         requestClearRoll(opts.replaceShelfId);
       }
-      requestRoll([...entry.spec.dice], entry.label, {
-        mods: entry.spec.mods || undefined,
-        sources: entry.spec.sources || undefined, // 2b-⑤: attribution rides the reroll
-        faceDown: entry.faceDown,
-        visibility: entryVis(entry) || undefined, // the privacy rides along
-        dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
-        exp: entry.spec.exp || undefined, // reroll preserves the moment
-      });
+      requestRoll([...entry.spec.dice], entry.label, rerollOpts(entry));
     });
     holder.appendChild(strip);
   }
@@ -3512,6 +3516,7 @@ window.__diceDebug = {
       values: e.parts.map((p) => (p.value == null ? null : p.value)),
       dc: Number.isInteger(e.dc) ? e.dc : null,
       canReveal: canReveal(e),
+      rerollOfId: e.rerollOfId || null, // B3: server-substantiated provenance
     };
   },
   // die chips (P1 quiet by default): the per-user visibility preference and
@@ -6509,6 +6514,11 @@ function escapeHtml(t) {
 function renderLog() {
   logList.innerHTML = '';
   logEmpty.style.display = log.length ? 'none' : 'block';
+  // Rows whose result was superseded by a reroll — derived from what THIS
+  // client holds, so it can never name a roll the viewer does not have (a
+  // secret reroll projects to null for others, so their logs never contain
+  // the reference; the birth gate keeps a secret PARENT unnamed entirely).
+  const supersededIds = new Set(log.map((e) => e.rerollOfId).filter(Boolean));
   for (const entry of [...log].reverse()) {
     const hidden = entryHidden(entry);
     const el = document.createElement('div');
@@ -6597,20 +6607,36 @@ function renderLog() {
     } else {
       groupEl.textContent = entry.label;
     }
+    // Provenance qualifiers (B3): at most ONE per row, both words static
+    // text. 'reroll' = this row replays a parent (server-substantiated;
+    // the chip stands even when the parent aged past the cap — THAT it is
+    // a reroll is substantiated regardless); 'rerolled' = a later row
+    // replays this one. The tooltip's second, client-side hidden gate is
+    // required: non-secret ≠ readable — a held/whispered parent must not
+    // surrender its total to a tooltip.
+    if (entry.rerollOfId) {
+      const q = document.createElement('span');
+      q.className = 'log-reroll';
+      q.textContent = 'reroll';
+      const parent = log.find((e) => e.rollId === entry.rerollOfId);
+      q.title = parent && !entryHidden(parent)
+        ? `Reroll of ${parent.label}${activeSystem().usesTotal && typeof parent.total === 'number' ? ` (${parent.total})` : ''}`
+        : 'Reroll of an earlier roll';
+      groupEl.appendChild(q);
+      el.classList.add('is-reroll');
+    } else if (supersededIds.has(entry.rollId)) {
+      const q = document.createElement('span');
+      q.className = 'log-rerolled';
+      q.textContent = 'rerolled';
+      groupEl.appendChild(q);
+    }
     if (canReroll(entry)) {
       const again = document.createElement('button');
       again.className = 'log-again';
       again.textContent = '⟳';
       again.title = 'Reroll this';
       again.addEventListener('click', () =>
-        requestRoll([...entry.spec.dice], entry.label, {
-          mods: entry.spec.mods || undefined,
-          sources: entry.spec.sources || undefined, // 2b-⑤: attribution rides the reroll
-          faceDown: entry.faceDown,
-          visibility: entryVis(entry) || undefined, // …and the privacy
-          dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
-          exp: entry.spec.exp || undefined, // reroll-last preserves the moment
-        })
+        requestRoll([...entry.spec.dice], entry.label, rerollOpts(entry))
       );
       el.querySelector('.log-actions').appendChild(again);
     }
@@ -7354,18 +7380,29 @@ kbdOverlay.addEventListener('click', (e) => {
   if (e.target === kbdOverlay) closeKbd();
 });
 
-// Reroll the last roll — the same spec the banner ⟳ / verdict button use.
-function rerollLast() {
-  const entry = lastEntry;
-  if (!canReroll(entry)) return;
-  requestRoll([...entry.spec.dice], entry.label, {
+// The ONE reroll payload. Every reroll trigger — the card strip
+// (appendCardActions), the log ⟳, the 'r' shortcut / verdict ⟳
+// (rerollLast) — replays the same intent: dice ride the call, and this
+// carries mods, attribution, privacy, target, moment, and provenance. A
+// site building its own would drift into an unmarked reroll (the payload
+// was duplicated verbatim at three sites before rerollOfId arrived).
+function rerollOpts(entry) {
+  return {
     mods: entry.spec.mods || undefined,
     sources: entry.spec.sources || undefined, // 2b-⑤: attribution rides the reroll
     faceDown: entry.faceDown,
     visibility: entryVis(entry) || undefined, // …and the privacy
     dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
-    exp: entry.spec.exp || undefined, // reroll-last preserves the moment
-  });
+    exp: entry.spec.exp || undefined, // a rerolled Check comes back a Check
+    rerollOfId: entry.rollId || undefined, // a CLAIM; the server substantiates it
+  };
+}
+
+// Reroll the last roll — the same spec the banner ⟳ / verdict button use.
+function rerollLast() {
+  const entry = lastEntry;
+  if (!canReroll(entry)) return;
+  requestRoll([...entry.spec.dice], entry.label, rerollOpts(entry));
 }
 
 // The fluid-play pair (2026-07 keyboard design): once a roll SETTLES, Enter
@@ -7870,6 +7907,7 @@ function replaySettledRoll(r) {
     visibility: r.visibility,
     revealAuthority: r.revealAuthority,
     notation: r.notation,
+    rerollOfId: r.rerollOfId,   // B3: a reload's on-felt roll keeps its mark
     playerId: r.playerId,
     seed: r.seed,
     label: r.label || formula(r.dice || []),
@@ -8010,6 +8048,7 @@ function handleNetEvent(type, data) {
         visibility: data.visibility,
         revealAuthority: data.revealAuthority,
         notation: data.notation,
+        rerollOfId: data.rerollOfId,   // B3: server-substantiated provenance
         playerId: data.playerId,
         seed: data.seed,
         label: data.label || formula(data.dice || []),

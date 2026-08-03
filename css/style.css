@@ -1839,6 +1839,21 @@ body.mini .pk-breakdown { font-size: 10px; }
 .log-mod { color: var(--gold-bright); font-weight: 700; }
 .log-part-label { font-variant: small-caps; color: var(--muted); font-weight: 400; letter-spacing: 0.04em; }
 .log-hidden { color: var(--muted); font-style: italic; }
+/* Provenance (B3): a reroll SAYS so. A quiet small-caps qualifier in the
+   head — standing, not revealed-tier: the tier rule binds CONTROLS and
+   this is content. NOT gold — gold belongs to the roll verb alone. */
+.log-reroll {
+  font-variant: small-caps; letter-spacing: 0.06em; font-size: 10px;
+  color: var(--muted); border: 1px solid var(--hair);
+  border-radius: 5px; padding: 0 4px; margin-left: 6px; vertical-align: 1px;
+}
+.log-rerolled {
+  font-variant: small-caps; letter-spacing: 0.06em; font-size: 10px;
+  color: var(--muted); opacity: 0.7; margin-left: 6px;
+}
+/* Glance signal with ZERO layout cost — inset shadow, not a border:
+   history must not reflow when a reroll lands. */
+.log-entry.is-reroll { box-shadow: inset 2px 0 0 var(--hair); }
 .log-actions { flex: 1; text-align: right; padding-right: 8px; }
 /* the tier rule: a log row's ⟳ reveals on approach like every other
    per-row secondary control (pool ±, the draft's Save/±/✕) */
