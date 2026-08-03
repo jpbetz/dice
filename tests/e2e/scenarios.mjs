@@ -117,8 +117,12 @@ export const scenarios = [
     // Quiet by default (P1): a resting shelf marker is an INVISIBLE hover/tap
     // target — no dot, no total, no lens word, no tiny ✕, and a held roll
     // never shouts '?'. The settled cluster is its own presence; the detail
-    // lives in the peek, whose base carries the one prominent clear-✕ — and
-    // that ✕ clears for everyone, from any seat (§7.7 universal housekeeping).
+    // lives in the peek. THE ONE-✕ RULE (Joe, 2026-08-03): the clear target
+    // is chosen by the gesture that opened the card — a hover-opened peek
+    // carries NO ✕ (the marker's sweep dress is the big red one; clicking
+    // the cluster clears), a tap-opened peek carries the base ✕ (touch has
+    // no hover to dress the circle). Exactly one affordance at a time; both
+    // paths clear for everyone, from any seat (§7.7 universal housekeeping).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
@@ -142,16 +146,46 @@ export const scenarios = [
       assert.equal(m.hasX, false, 'no tiny ✕');
       assert.ok(m.width >= 24 && m.height >= 24, `an easy target (${m.width}×${m.height})`);
 
-      // The peek recovers the detail and carries the prominent clear-✕.
+      // Hover leg: the peek recovers the detail but carries NO ✕ — the
+      // marker's sweep dress is the one clear target while a hover exists.
       assert.equal(await b.dbg(`peek(${JSON.stringify(rid)})`), rid, 'peek opens');
       const ps = await b.dbg('peekState');
       assert.ok(ps.total, 'the peek shows the total');
-      assert.equal(ps.hasClear, true, 'and the clear-✕ at its base');
+      assert.equal(ps.via, 'hover', 'opened as a hover');
+      assert.equal(ps.hasClear, false, 'a hover-opened peek defers its ✕ to the sweep');
+      assert.equal((await b.dbg('shelfMarkers'))[0].hasSweep, true,
+        'the sweep dress stands ready on the marker');
+      // The clear IS the cluster click (a synthetic click has no pointerdown,
+      // so the handler's recorded ptrType stays 'mouse' — the sweep branch).
+      await b.eval(`document.querySelector('#shelf-layer .shelf-marker').click()`);
+      for (const t of [a, b]) {
+        await t.waitFor(
+          `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 0 && window.__diceDebug.tableDice.length === 0)`,
+          { desc: 'the sweep clears the roll for everyone' },
+        );
+      }
+
+      // Tap leg: no hover exists to dress the sweep, so the tap-opened card
+      // carries the big red ✕ at its base — and it clears for everyone too.
+      await a.roll('d6+1');
+      await b.settle();
+      const rid2 = await a.rollId();
+      assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid2)})`), true, 'second collect accepted');
+      for (const t of [a, b]) {
+        await t.waitFor(
+          `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+          { desc: 'second roll shelved' },
+        );
+      }
+      assert.equal(await b.dbg(`peek(${JSON.stringify(rid2)}, 'tap')`), rid2, 'peek opens by tap');
+      const ts = await b.dbg('peekState');
+      assert.equal(ts.via, 'tap', 'opened as a tap');
+      assert.equal(ts.hasClear, true, 'a tap-opened peek carries the base ✕');
       await b.eval(`document.querySelector('#peek-card .pk-clear').click()`);
       for (const t of [a, b]) {
         await t.waitFor(
           `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 0 && window.__diceDebug.tableDice.length === 0)`,
-          { desc: 'the peek ✕ clears the roll for everyone' },
+          { desc: 'the tap-card ✕ clears the roll for everyone' },
         );
       }
 
@@ -174,10 +208,11 @@ export const scenarios = [
   {
     name: 'shelf-actions',
     tags: ['shelf'],
-    // A shelved roll stays actionable: the peek's ROLL strip rolls the SAME
-    // dice again — the shelved cluster clears as part of the reroll (a pool
-    // is how you mint a copy) — and RIGHT-CLICK on the cluster opens the
-    // tweak popover, dc/mods/comment intact (the card ± retired 2026-08-01).
+    // A shelved roll stays actionable: the peek's REROLL strip (the cue
+    // SAYS reroll — B2) rolls the SAME dice again — the shelved cluster
+    // clears as part of the reroll (a pool is how you mint a copy) — and
+    // RIGHT-CLICK on the cluster opens the tweak popover, dc/mods/comment
+    // intact (the card ± retired 2026-08-01).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.dbg(`setSystem('dnd')`); // dc verdicts are totals-world (solo: applies instantly)
@@ -190,9 +225,12 @@ export const scenarios = [
       );
       assert.equal(await a.dbg(`peek(${JSON.stringify(rid)})`), rid, 'peek opens');
       const ps = await a.dbg('peekState');
-      assert.equal(ps.hasAgain, true, 'the peek carries the ROLL strip');
+      assert.equal(ps.hasAgain, true, 'the peek carries the reroll strip');
+      assert.equal(ps.cueWord, 'REROLL', 'and its cue word SAYS reroll (never plain ROLL)');
       assert.equal(ps.hasTweak, false, 'the card ± is retired');
-      assert.equal(ps.hasClear, true, 'the ✕ matches the banner card');
+      // The one-✕ rule: this peek opened as a hover, so the clear target is
+      // the marker's sweep — the card builds no ✕ of its own.
+      assert.equal(ps.hasClear, false, 'a hover-opened peek defers its ✕ to the sweep');
 
       // ⟳ REPLACES: the old cluster leaves the shelf, the same spec rolls.
       await a.eval(`document.querySelector('#peek-card .pk-again').click()`);
