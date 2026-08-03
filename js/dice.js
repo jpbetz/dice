@@ -441,9 +441,20 @@ function patchShader(m, cfg) {
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>' + decl);
     let fx = '';
     if (cfg.flow) {
-      // molten seams / static crawl: emissive modulated by scrolling noise
+      // molten seams / static crawl: two octaves of scrolling noise, high
+      // spatial frequency (bands must TRAVEL THROUGH a digit's strokes —
+      // at low scale the whole digit breathed as one and read as a
+      // twinkle, Joe's catch). With cool/hot set, the modulation is a
+      // COLOR RAMP (dark ember → white-hot), not just brightness.
       const f = cfg.flow;
-      fx += `\n\ttotalEmissiveRadiance *= ${(f.floor ?? 0.6).toFixed(2)} + ${(f.amp ?? 0.8).toFixed(2)} * fxNoise( vMapUv * ${(f.scale ?? 3).toFixed(1)} + vec2( uTime * ${(f.speed ?? 0.3).toFixed(2)}, uTime * ${((f.speed ?? 0.3) * 0.7).toFixed(2)} ) );`;
+      const sp = (f.speed ?? 0.3);
+      fx += `\n\t{ float fxF = fxNoise( vMapUv * ${(f.scale ?? 10).toFixed(1)} + vec2( uTime * ${sp.toFixed(2)}, uTime * ${(sp * 0.7).toFixed(2)} ) );`
+        + `\n\tfxF = 0.65 * fxF + 0.35 * fxNoise( vMapUv * ${((f.scale ?? 10) * 2.3).toFixed(1)} - vec2( uTime * ${(sp * 1.6).toFixed(2)}, 0.0 ) );`;
+      if (f.cool && f.hot) {
+        fx += `\n\ttotalEmissiveRadiance *= mix( vec3( ${hexToRgb(f.cool)} ), vec3( ${hexToRgb(f.hot)} ), fxF ) * ${(f.gain ?? 2.0).toFixed(2)}; }`;
+      } else {
+        fx += `\n\ttotalEmissiveRadiance *= ${(f.floor ?? 0.3).toFixed(2)} + ${(f.amp ?? 1.8).toFixed(2)} * fxF; }`;
+      }
     }
     if (cfg.pulse) {
       // containment hum: the whole emissive breathes on a slow sine

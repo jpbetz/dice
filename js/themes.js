@@ -87,7 +87,7 @@ export const THEMES = {
         glow: { color: '#8f7fe8', intensity: 0.09 },
         feel: { rough: 0.22, metal: 0.2 },
         // static crawl: the interior charge flickers along the surface
-        shader: { flow: { speed: 1.3, scale: 6.0, floor: 0.4, amp: 1.4 } },
+        shader: { flow: { speed: 2.0, scale: 12.0, floor: 0.2, amp: 2.4 } },
       },
     },
   },
@@ -130,11 +130,12 @@ export const THEMES = {
         glow: null,
         feel: { rough: 0.85, metal: 0.55 },
         maps: {
-          digitGlow: { color: '#ffd166', intensity: 1.1 },
+          digitGlow: { color: '#ffd166', intensity: 1.35 },
           relief: { pattern: 'hammer', strength: 1.1, digitDepth: 0.45 },
         },
-        // the digits FLOW: molten metal moves (emissive × scrolling noise)
-        shader: { flow: { speed: 0.45, scale: 4.0, floor: 0.55, amp: 1.0 } },
+        // the digits FLOW: high-frequency bands of white-hot travel
+        // through dark-ember strokes — visible at table distance
+        shader: { flow: { speed: 0.9, scale: 12.0, cool: '#5a1c06', hot: '#fff2c8', gain: 2.6 } },
       },
     },
   },
