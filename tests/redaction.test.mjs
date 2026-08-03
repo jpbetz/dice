@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { parseNotation } from '../js/notation.js';
-import { projectEntryFor, resolveVisibility, entryExistsFor, cleanName, sanitizePools } from '../server.js';
+import { projectEntryFor, resolveVisibility, entryExistsFor, entryExistsForAll, cleanName, sanitizePools } from '../server.js';
 
 // server.js installs a swallow-and-continue uncaughtException handler for its
 // own resilience; a test run must crash loudly instead.
@@ -151,6 +151,10 @@ await t('open entries project as the SAME object for every viewer (byte stabilit
   for (const viewer of ['A', 'B', 'C']) {
     assert.equal(projectEntryFor(e, viewer), e);
   }
+  // …with reroll provenance present too: the field never forces a copy on
+  // the open path (identity, not deepEqual — the byte-identity contract).
+  const r = makeEntry({ rerollOfId: 'parent-1' });
+  assert.equal(projectEntryFor(r, 'someone'), r);
 });
 
 await t('exhaustive mode × viewer × revealed matrix', () => {
@@ -178,16 +182,21 @@ await t('exhaustive mode × viewer × revealed matrix', () => {
   }
 });
 
-await t('redaction carries exp, collected and cleared through', () => {
+await t('redaction carries exp, collected, cleared and rerollOfId through', () => {
   const e = entryWith(heldVis, false);
   e.exp = { kind: 'check', subtitle: 'hold fast' };
   e.collected = 4;
   e.cleared = true;
+  // A public stake, never a value: by the birth gate (handleRoll ×
+  // entryExistsForAll) this only ever names a whole-room-visible parent,
+  // so the redacted copy keeps it — "she rerolled that check, face down".
+  e.rerollOfId = 'parent-1';
   const p = projectEntryFor(e, 'B');
   assert.deepEqual(p.exp, e.exp);
   assert.equal(p.collected, 4);
   assert.equal(p.cleared, true);
-  assertNoValueKeys(p, 'redacted entry with exp/shelf flags');
+  assert.equal(p.rerollOfId, 'parent-1');
+  assertNoValueKeys(p, 'redacted entry with exp/shelf/provenance flags');
 });
 
 await t('redaction omits absent flags rather than blanking them', () => {
@@ -195,6 +204,7 @@ await t('redaction omits absent flags rather than blanking them', () => {
   assert.ok(!('exp' in p), 'no exp key');
   assert.ok(!('collected' in p), 'no collected key');
   assert.ok(!('cleared' in p), 'no cleared key');
+  assert.ok(!('rerollOfId' in p), 'no rerollOfId key');
   assert.ok(!('visibility' in p), 'the raw visibility object is not repeated');
   assert.ok(!keysDeep(p).has('audience'), 'no audience leak');
 });
@@ -212,6 +222,17 @@ await t('entryExistsFor: only secret hides existence, only from non-rollers', ()
   assert.equal(entryExistsFor(entryWith(whisperVis, false), 'B'), true);
   assert.equal(entryExistsFor(entryWith(secretVis, false), 'A'), true);
   assert.equal(entryExistsFor(entryWith(secretVis, false), 'B'), false);
+});
+
+await t('entryExistsForAll: the whole-room gate — secret is nonexistent, roller included', () => {
+  assert.equal(entryExistsForAll(makeEntry()), true, 'open exists for all');
+  assert.equal(entryExistsForAll(entryWith(heldVis, false)), true, 'held exists for all (shrouded, not absent)');
+  assert.equal(entryExistsForAll(entryWith(whisperVis, false)), true, 'whisper exists for all');
+  assert.equal(entryExistsForAll(entryWith(secretVis, false)), false,
+    'secret exists for NO whole-room purpose — there is no viewer argument to exempt the roller');
+  // Fail-closed on mode, not revealed: a (never-produced) "revealed" secret
+  // still refuses — the gate must not soften if reveal semantics ever move.
+  assert.equal(entryExistsForAll(entryWith(secretVis, true)), false);
 });
 
 // ---------------------------------------------------------------------------

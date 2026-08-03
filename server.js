@@ -894,14 +894,25 @@ function resolveVisibility(room, chooser, vis) {
   return { error: [400, `unknown visibility mode: ${String(vis.mode).slice(0, 20)}`, 'bad_visibility'] };
 }
 
+// Does this entry exist for EVERYONE at the table — not just its roller?
+// The whole-room form of entryExistsFor, with the roller exemption removed.
+// ANYTHING derived from one entry and published on another (today: a
+// reroll's parent id, handleRoll's birth gate) must clear THIS gate, never
+// the per-viewer one: a broadcast field has no single asker. Deliberately
+// checks `mode`, not `revealed` — secret has no reveal path (executeRoll),
+// so mode-only stays fail-closed even if that ever changed.
+function entryExistsForAll(entry) {
+  const vis = entry.visibility;
+  return !vis || vis.mode !== 'secret';
+}
+
 // Does this entry exist at all from `viewerId`'s side of the table? Only a
 // secret entry is ever nonexistent — and only for everyone but its roller.
 // Gates every rollId-bearing event (roll-cleared, roll-collected) and the
 // rollId lookups in reveal/collect/clear, so a secret roll's housekeeping
 // leaks neither values nor existence.
 function entryExistsFor(entry, viewerId) {
-  const vis = entry.visibility;
-  return !vis || vis.mode !== 'secret' || entry.playerId === viewerId;
+  return entryExistsForAll(entry) || entry.playerId === viewerId;
 }
 
 // THE projection. Applied on every path an entry leaves the server: the roll
@@ -950,6 +961,11 @@ function projectEntryFor(entry, viewerId) {
   if (entry.exp) out.exp = entry.exp;
   if (entry.collected) out.collected = entry.collected;
   if (entry.cleared) out.cleared = entry.cleared;
+  // Unconditional because the field is only ever BORN pointing at a whole-
+  // room-visible parent (handleRoll's entryExistsForAll birth gate) — a
+  // shrouded viewer already knows that parent exists; "she rerolled that
+  // check, face down" is a public stake (goal 11), never a value.
+  if (entry.rerollOfId) out.rerollOfId = entry.rerollOfId;
   return out;
 }
 
@@ -1071,6 +1087,16 @@ function executeRoll(room, player, spec) {
     }
     roll.visibility = spec.visibility;
   }
+  // Provenance: this roll REPLAYS an earlier one (substantiated by handleRoll
+  // — only ever a whole-room-visible parent's id reaches here). Present-or-
+  // absent like exp, so a fresh roll's payload stays byte-for-byte what it
+  // always was. It does NOT ride roll.spec, and that is the point: spec IS
+  // the request that reroll-last replays, so an inherited rerollOfId would
+  // make every future reroll claim the same ancestor forever. (exp rides
+  // spec because a rerolled Check must come back a Check; provenance must
+  // come back pointing one hop up instead — the client stamps each reroll
+  // with ITS parent's id.)
+  if (spec.rerollOfId) roll.rerollOfId = spec.rerollOfId;
 
   // Auto-collect (§7.7): the felt belongs to ONE roll, so everything already on
   // it goes to the shelf as part of the incoming roll's arrival beat. The
@@ -1087,7 +1113,9 @@ function executeRoll(room, player, spec) {
   // stdout is a disclosure surface too: a non-open roll logs its stakes and
   // mode, never its values (an operator tailing the log must not out-read the
   // table).
-  const tail = `${roll.dc ? ` dc=${roll.dc}` : ''}${roll.exp ? ` exp=${roll.exp.kind}` : ''}`;
+  // reroll= is safe on the disclosure surface: by the birth rule the id is
+  // never a secret roll's.
+  const tail = `${roll.dc ? ` dc=${roll.dc}` : ''}${roll.exp ? ` exp=${roll.exp.kind}` : ''}${roll.rerollOfId ? ` reroll=${roll.rerollOfId}` : ''}`;
   if (roll.visibility) {
     log(`roll    room=${room.name} name=${player.name} dice=${roll.dice.join(',')} vis=${roll.visibility.mode}${tail}`);
   } else {
@@ -1116,6 +1144,33 @@ async function handleRoll(req, res) {
   const vis = resolveVisibility(room, player, spec.visibility);
   if (vis.error) return sendError(res, ...vis.error);
   spec.visibility = vis.visibility;
+
+  // Reroll provenance (rerollOfId) — read HERE and only here: offers/claims
+  // are fresh rolls and their parser must never see this key. It is a CLAIM
+  // ABOUT HISTORY and the server is the only party that can substantiate one.
+  // Malformed → 400 (a client bug, leaks nothing). Unsubstantiated → the
+  // claim is DROPPED and the roll proceeds: the dice are not the questionable
+  // part, and a status-code split here would rebuild exactly the existence
+  // oracle handleReveal's 404 comment forbids — "no such roll", "aged past
+  // LOG_CAP" and "secret, not yours" must be indistinguishable from outside.
+  // The gate is the WHOLE-ROOM one (entryExistsForAll), deliberately
+  // stricter than the per-viewer entryExistsFor this file's rollId lookups
+  // use: this id gets BROADCAST, and a broadcast has no single asker — it is
+  // dropped even when the ROLLER of the secret parent is the requester.
+  // Deliberate properties (do not "harden" these away): no ownership check —
+  // rerolling someone else's VISIBLE roll is a legitimate table action; one
+  // hop only, never a chain-root walk; the room-scoped log.find means a
+  // cross-room id can never resolve; and the new UUID is minted afterward,
+  // so a candidate can never be self-referential.
+  if (body.value.rerollOfId !== undefined && body.value.rerollOfId !== null) {
+    if (typeof body.value.rerollOfId !== 'string') {
+      return sendError(res, 400, 'rerollOfId must be a string', 'bad_reroll_of');
+    }
+    const rid = cleanString(body.value.rerollOfId, 64); // same read as handleClearRoll's rollId
+    if (!rid) return sendError(res, 400, 'rerollOfId must be a non-empty rollId', 'bad_reroll_of');
+    const parent = room.log.find((r) => r.rollId === rid);
+    if (parent && entryExistsForAll(parent)) spec.rerollOfId = rid;
+  }
 
   const roll = executeRoll(room, player, spec);
   // The roller's own response is projected like every other egress: a held
@@ -1736,4 +1791,4 @@ function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor, cleanName, sanitizePools };
+export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor, entryExistsForAll, cleanName, sanitizePools };
