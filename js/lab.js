@@ -47,6 +47,33 @@ const fill = new THREE.PointLight(0xfff2d0, 0.35, 0, 2);
 fill.position.set(-6, -4, 8);
 scene.add(ambient, key, fill);
 
+// A procedural reflection environment (PMREM from a painted equirect):
+// without one, glossy sets had NOTHING to reflect but three analytic
+// lights — lacquer, ice and crystal read flat. A soft graded sky, a dark
+// floor and two bright strip-lights give speculars something to grab.
+{
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, '#3a3630');
+  g.addColorStop(0.55, '#171310');
+  g.addColorStop(0.62, '#0a0806');
+  g.addColorStop(1, '#050403');
+  x.fillStyle = g; x.fillRect(0, 0, 512, 256);
+  x.fillStyle = '#fff3d8';
+  x.fillRect(70, 28, 120, 18);   // key strip
+  x.fillStyle = '#8fb4d8';
+  x.fillRect(330, 44, 80, 12);   // cool counter-strip
+  const tex = new THREE.CanvasTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromEquirectangular(tex).texture;
+  tex.dispose();
+  pmrem.dispose();
+}
+
 const ENVS = {
   table: { label: '☀ env: table', amb: 0.55, key: 1.15, bg: 0x14100c },
   dusk:  { label: '🌆 env: dusk',  amb: 0.28, key: 0.7,  bg: 0x0d0a08 },

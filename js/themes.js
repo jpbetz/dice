@@ -48,6 +48,7 @@ export const THEMES = {
         glow: { color: '#58e6d9', intensity: 0.07 },
         feel: { rough: 0.15, metal: 0.1 },
         shader: { fresnel: { color: '#58e6d9', power: 2.4, intensity: 0.9 } }, // biolume rim
+        spec: { iridescence: 0.55, iridescenceIOR: 1.3, envMapIntensity: 1.15 }, // wet glass sheen
       },
     },
   },
@@ -74,6 +75,7 @@ export const THEMES = {
         body: '#96601f', text: '#38240e', accent: '#ffd166',
         glow: { color: '#ffb54d', intensity: 0.09 },
         feel: { rough: 0.08, metal: 0.0 },
+        spec: { clearcoat: 0.85, clearcoatRoughness: 0.22, ior: 1.55, envMapIntensity: 1.1 }, // polished resin
       },
     },
   },
@@ -88,6 +90,7 @@ export const THEMES = {
         feel: { rough: 0.22, metal: 0.2 },
         // static crawl: the interior charge flickers along the surface
         shader: { flow: { speed: 2.0, scale: 12.0, floor: 0.2, amp: 2.4 } },
+        spec: { iridescence: 0.35, envMapIntensity: 1.05 }, // storm-oil shimmer
       },
     },
   },
@@ -105,6 +108,7 @@ export const THEMES = {
           roughPattern: 'ferns',
         },
         shader: { fresnel: { color: '#8fe3c0', power: 3.2, intensity: 0.75 } }, // aurora at grazing
+        spec: { envMapIntensity: 1.2, specularIntensity: 1.1 }, // wet ice mirror
       },
       firstfrost: {
         label: 'First Frost',
@@ -136,6 +140,7 @@ export const THEMES = {
         // the digits FLOW: high-frequency bands of white-hot travel
         // through dark-ember strokes — visible at table distance
         shader: { flow: { speed: 0.9, scale: 12.0, cool: '#5a1c06', hot: '#fff2c8', gain: 2.6 } },
+        spec: { specularColor: '#ffb073', specularIntensity: 0.9, envMapIntensity: 0.6 }, // warm iron spark
       },
     },
   },
@@ -154,6 +159,7 @@ export const THEMES = {
           pulse: { speed: 1.6, min: 0.6, max: 1.3 },
           fresnel: { color: '#7fd9e8', power: 3.0, intensity: 0.45 },
         },
+        spec: { ior: 1.75, specularIntensity: 1.25, envMapIntensity: 1.2 }, // cut crystal
       },
     },
   },
@@ -197,6 +203,7 @@ export const THEMES = {
         body: '#4a1f1a', text: '#d4af37', accent: '#f3ead7',
         glow: null,
         feel: { rough: 0.18, metal: 0.4 },
+        spec: { clearcoat: 1.0, clearcoatRoughness: 0.12, envMapIntensity: 1.25 }, // lacquer over gold
       },
     },
   },

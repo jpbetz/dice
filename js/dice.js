@@ -774,7 +774,11 @@ function materialFor(def, face, spec, shroud = false, seed = 1) {
   const bundle = shroud
     ? { map: makeFaceTexture(def, face, spec) }
     : makeFaceBundle(def, face, spec, seed);
-  const m = new THREE.MeshStandardMaterial({
+  // Themed sets ride MeshPhysicalMaterial (same shader family, more
+  // specular levers — clearcoat, iridescence, IOR, tinted specular; the
+  // per-set `spec` recipe drives them). std/shroud keep Standard.
+  const M = !shroud && def.spec ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+  const m = new M({
     map: bundle.map,
     // Obsidian: darker, glossier, more metallic — reflections instead of
     // pips. Themed skins bring their own finish (docs/THEMES.md). A
@@ -798,6 +802,18 @@ function materialFor(def, face, spec, shroud = false, seed = 1) {
     // the theme's INTERNAL light — subtle at rest, surged by effects
     m.emissive = new THREE.Color(def.glow.color);
     m.emissiveIntensity = def.glow.intensity;
+  }
+  if (!shroud && def.spec) {
+    // specular identity (Joe 2026-08-03): each set's reflection character
+    const sp = def.spec;
+    if (sp.clearcoat !== undefined) m.clearcoat = sp.clearcoat;
+    if (sp.clearcoatRoughness !== undefined) m.clearcoatRoughness = sp.clearcoatRoughness;
+    if (sp.iridescence !== undefined) m.iridescence = sp.iridescence;
+    if (sp.iridescenceIOR !== undefined) m.iridescenceIOR = sp.iridescenceIOR;
+    if (sp.ior !== undefined) m.ior = sp.ior;
+    if (sp.specularIntensity !== undefined) m.specularIntensity = sp.specularIntensity;
+    if (sp.specularColor) m.specularColor = new THREE.Color(sp.specularColor);
+    if (sp.envMapIntensity !== undefined) m.envMapIntensity = sp.envMapIntensity;
   }
   if (!shroud && def.shader) patchShader(m, def.shader); // Level 2
   return m;
