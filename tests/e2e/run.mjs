@@ -23,6 +23,21 @@ limitations under the License.
 import { runScenarios } from './harness.mjs';
 import { scenarios } from './scenarios.mjs';
 
+// Scenario names must be unique: the harness keys each scenario's ROOM by
+// its name, so a duplicate silently shares a room and its residue makes
+// both scenarios scheduling-dependent (found 2026-08-03: two 'auto-collect'
+// scenarios flipped a shelf-count assertion for days). Fail closed.
+{
+  const seen = new Set();
+  for (const s of scenarios) {
+    if (seen.has(s.name)) {
+      console.error(`duplicate scenario name: '${s.name}' — names key rooms; rename one`);
+      process.exit(2);
+    }
+    seen.add(s.name);
+  }
+}
+
 const args = process.argv.slice(2);
 const opt = { only: null, full: false };
 for (let i = 0; i < args.length; i++) {

@@ -1229,7 +1229,12 @@ export const scenarios = [
     },
   },
   {
-    name: 'auto-collect',
+    // RENAMED from 'auto-collect' (2026-08-03): it shared its name — and
+    // therefore its ROOM, which the harness keys by scenario name — with
+    // the displacement scenario above, whose shelf residue made this one's
+    // shelf-count assertions a scheduling coin flip. run.mjs now refuses
+    // duplicate names outright.
+    name: 'tidy-away',
     tags: ['shelf'],
     // The tidy-away clock (2026-08-01): a finished OPEN roll of yours
     // collects itself after a quiet moment; the shelf cluster's quick ✕

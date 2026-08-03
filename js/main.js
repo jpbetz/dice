@@ -1730,8 +1730,9 @@ const banner = document.getElementById('result-banner');
 // wait for their reveal (standing tension is the point), spectators never
 // collect for the roller, and hovering the banner holds the timer — you
 // are reading. Tests run with it off (__diceTestMode) and opt in via the
-// setAutoCollectMs hook; 0 disables.
-let autoCollectMs = (typeof window !== 'undefined' && window.__diceTestMode) ? 0 : 6000;
+// setAutoCollectMs hook; 0 disables. 3 s since 2026-08-03 (Joe: 6 felt
+// far too slow; the hover-hold covers the long reads).
+let autoCollectMs = (typeof window !== 'undefined' && window.__diceTestMode) ? 0 : 3000;
 let autoCollect = { rollId: null, timer: null };
 function cancelAutoCollect(rollId = null) {
   if (rollId && autoCollect.rollId !== rollId) return;
@@ -1745,12 +1746,26 @@ function armAutoCollect(entry) {
   if (!mine) return;
   cancelAutoCollect();
   autoCollect.rollId = entry.rollId;
-  autoCollect.timer = setTimeout(() => {
+  const fire = () => {
     const rid = autoCollect.rollId;
-    autoCollect = { rollId: null, timer: null };
+    if (rid !== entry.rollId) return; // cancelled or superseded while queued
     const last = lastRollActionable(); // re-checks mine + settled + still on felt
-    if (last && last.rollId === rid) requestCollectRoll(rid);
-  }, autoCollectMs);
+    if (last && last.rollId === rid) {
+      autoCollect = { rollId: null, timer: null };
+      requestCollectRoll(rid);
+      return;
+    }
+    // Not actionable YET vs never again: a clock that fired while the dice
+    // were still landing (slow frame pump, an early banner repaint) used to
+    // give up FOREVER and strand the roll on the felt — the timing decided.
+    // Only a resolved/superseded roll stops the clock; in-flight retries.
+    const st = rollStates.get(rid);
+    const gone = !lastEntry || lastEntry.rollId !== rid
+      || !!(st && (st.cleared || st.collected !== null));
+    if (gone) { autoCollect = { rollId: null, timer: null }; return; }
+    autoCollect.timer = setTimeout(fire, 150);
+  };
+  autoCollect.timer = setTimeout(fire, autoCollectMs);
 }
 // Reading holds the clock; leaving restarts it whole.
 banner.addEventListener('mouseenter', () => clearTimeout(autoCollect.timer));
