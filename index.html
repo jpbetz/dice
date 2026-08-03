@@ -113,23 +113,24 @@ limitations under the License.
            dress (§7.9: one draft, two editors; only one of them looked
            like an editor before this). [cluster][±] as siblings. Keeps the
            #tray-actions id: it anchors the ± popover. -->
+      <!-- ± rides the LEFT gutter (Joe 2026-08-03: on the right it sat in
+           the chevrons' path — the cue points at the roll, and nothing
+           may stand where it points). -->
       <div class="pool-line2 tray-line2" id="tray-actions">
+        <button id="tray-mods" title="Tweak — modifiers, target, moment">±</button>
         <div id="tray" class="tray-cluster">
           <button id="tray-roll" class="pool-roll tray-roll hidden"></button>
           <div id="tray-x-layer" class="tray-x-layer"></div>
-          <!-- Ghost text IN the die-fill slot (placeholder semantics): the
-               hint occupies exactly the space the dice will fill, so adding
-               them reads as physically filling it. -->
           <!-- GHOST DICE (Joe 2026-08-03): the empty well shows faint real
                die art resting where dice will land — empty sockets in a
-               dice tray — over a whisper of caption. Filled from
-               dieArtURL at boot; no-GL keeps the caption alone. -->
+               dice tray — under a ghost ROLL ❯❯❯ (the empty well previews
+               the full one; no caption to wear out on a second read).
+               Filled from dieArtURL + buildRollCue at boot; placeholder
+               semantics — real dice replace the sockets in the same slot. -->
           <div id="tray-hint" class="hint tray-ghost">
             <span class="wg-dice" aria-hidden="true"></span>
-            <span id="tray-hint-text">tap a die — it lands here</span>
           </div>
         </div>
-        <button id="tray-mods" title="Tweak — modifiers, target, moment">±</button>
       </div>
       <!-- The RAIL (P6: management STANDS — supersedes the 2026-08-01
            ghost-text demotion): it appears only while a draft exists

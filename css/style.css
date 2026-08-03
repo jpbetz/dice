@@ -384,19 +384,27 @@ html, body {
    well warms the sockets slightly. */
 #tray-hint.tray-ghost {
   margin: 0;
-  min-height: 64px;
+  min-height: 84px;
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
   padding: 4px 8px;
-  font-style: italic;
   text-align: center;
   color: #5f574b;
 }
-#tray-hint-text { font-size: 11px; }
+/* the ghost ROLL ❯❯❯: the empty well previews the full one — the cue's
+   base is an absolute overlay, so re-flow it here, quieter than the
+   armed whisper (0.22 vs 0.3) */
+#tray-hint .roll-cue {
+  position: static;
+  opacity: 0.22;
+  padding: 0;
+  justify-content: center;
+  font-size: 21px;
+}
 .wg-dice { display: flex; gap: 12px; }
 .wg-die {
   width: 30px;
@@ -409,8 +417,10 @@ html, body {
 #tray-hint.hidden { display: none; }
 .tray-save.hidden { display: none; }
 .tray-line2.hidden { display: none; }
-.tray-line2 .tray-cluster { flex: 1; min-width: 0; margin-top: 0; min-height: 64px; }
-.tray-line2 .tray-roll { min-height: 64px; }
+/* EVEN taller (Joe 2026-08-03: '+20-30%' — and a floor that absorbs a
+   single-line pool chip, so staging pools stops nudging the height) */
+.tray-line2 .tray-cluster { flex: 1; min-width: 0; margin-top: 0; min-height: 84px; }
+.tray-line2 .tray-roll { min-height: 84px; align-items: center; align-content: center; }
 /* larger dice in the WELL only — the draft is the star; pool rows keep 28
    (three classes deep: .pool-roll .die-art's later 28px must lose here) */
 .tray-line2 .tray-roll .die-art { width: 34px; height: 34px; }

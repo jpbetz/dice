@@ -3818,20 +3818,6 @@ const draftZoneEl = document.getElementById('draft-zone');
 const trayRollBtn = document.getElementById('tray-roll');
 const trayXLayer = document.getElementById('tray-x-layer');
 const trayHintEl = document.getElementById('tray-hint');
-// The empty well's GHOST DICE (Joe 2026-08-03): faint real die art resting
-// where dice will land — the molded sockets of a dice tray. Built once at
-// boot (dieArtURL warms synchronously); a no-GL environment adds no imgs
-// and the caption stands alone.
-for (const t of ['d20', 'd6', 'd8']) {
-  const u = dieArtURL(t);
-  if (!u) continue;
-  const img = document.createElement('img');
-  img.className = 'die-art wg-die';
-  img.src = u;
-  img.alt = '';
-  img.draggable = false;
-  trayHintEl.querySelector('.wg-dice').appendChild(img);
-}
 const draftActionsEl = document.getElementById('draft-actions'); // the RAIL: Save · Offer · ✕ Clear
 const traySaveRow = document.getElementById('tray-save-row');
 const trayModsBtn = document.getElementById('tray-mods');
@@ -4305,13 +4291,10 @@ function applyInputMode(persist = true) {
   for (const b of inputModeSeg.querySelectorAll('button')) {
     b.setAttribute('aria-pressed', String(b.dataset.v === inputMode));
   }
-  // The well's ghost hint survives BOTH views (adversarial catch: hiding
-  // it in Notation view left a sunken box of literally nothing) — it just
-  // speaks the active editor's language. The caption span only: the ghost
-  // dice beside it are view-agnostic.
-  document.getElementById('tray-hint-text').textContent = inputMode === 'text'
-    ? 'dice you type land here'
-    : 'tap a die — it lands here';
+  // The well's ghost survives BOTH views (adversarial catch: hiding it in
+  // Notation view left a sunken box of literally nothing). No per-view
+  // caption anymore — the ghost dice + ghost ROLL ❯❯❯ are view-agnostic
+  // (Joe: nothing to wear out on a second read).
   if (persist) save(LS_INPUTMODE, inputMode);
 }
 function setInputMode(mode, persist = true) {
@@ -4949,6 +4932,24 @@ function buildRollCue(kind = 'roll') {
   return cue;
 }
 // (cueTight retired 2026-08-03 — see the cue comment above.)
+
+// The empty well's GHOST DICE (Joe 2026-08-03): faint real die art resting
+// where dice will land — the molded sockets of a dice tray. Built once at
+// boot (dieArtURL warms synchronously); a no-GL environment adds no imgs
+// and the sockets simply stay empty.
+for (const t of ['d20', 'd6', 'd8']) {
+  const u = dieArtURL(t);
+  if (!u) continue;
+  const img = document.createElement('img');
+  img.className = 'die-art wg-die';
+  img.src = u;
+  img.alt = '';
+  img.draggable = false;
+  trayHintEl.querySelector('.wg-dice').appendChild(img);
+}
+// …under a ghost ROLL ❯❯❯ (Joe: no caption to wear out — the empty well
+// simply previews the full one, quiet cue and all).
+trayHintEl.appendChild(buildRollCue('roll'));
 
 // STAGE a pool into the draft (the Rack's one source verb): its dice pour
 // into the sticky cluster carrying the pool's name as their source label;
