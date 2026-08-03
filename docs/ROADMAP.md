@@ -220,6 +220,23 @@ ladder; all of it is polish or a new rung.
   wears the claim strip (bystanders read 'waiting on Bo'). UI: a ▾ split
   button beside the draft row's *Offer to table* (plain click keeps its
   one-click table-wide muscle memory; the ▾ waits for a teammate).
+- **Whisper-offer auto-targeting** *(NEXT — Joe 2026-08-03: "a whisper
+  roll is already assigned to someone, so the offer should always be to
+  that person"; design agreed same day)*: an offered `whisper` roll
+  derives its claim gate FROM its audience, server-side in `handleOffer` —
+  `w:Bo` offered is claimable by Bo, full stop; table-wide whisper offers
+  cease to exist by construction (Joe: weird, arguably not useful).
+  Multi-name whispers are claimable by any audience member, and the ▾ may
+  still NARROW to one of them; a target outside the audience refuses
+  (400 `target_not_in_audience`, a teaching message — never a silent
+  override). A whisper whose only audience is the offerer has nobody to
+  offer to: refused at offer time. `secret` (dice tower — open claiming
+  is the point) and `held` offers are untouched. UI: the ▾ picker hides
+  while the draft carries whisper visibility (the target is already
+  decided); the card reads 'for Bo' through the existing `to` machinery.
+  Ships with a `whisper-offer` e2e: the 403 + surviving card, the
+  conflict refusal, and the claimed roll keeping the whisper's read
+  (audience + offerer see, bystanders shrouded).
 - **Audience legibility.** A shrouded viewer reads the audience only when
   the roll has no `# comment` (§3.0) — `label` carries one or the other.
   Decide whether "who was whispered to" deserves its own always-present
