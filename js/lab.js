@@ -237,6 +237,7 @@ const EFFECTS = {
 // ---------------------------------------------------------------------------
 
 const side = document.getElementById('side');
+const sideNames = []; // every set's clickable name (zoom toggles)
 let lastHouse = null;
 for (const row of rows) {
   const box = document.createElement('div');
@@ -255,6 +256,18 @@ for (const row of rows) {
   const name = document.createElement('div');
   name.className = 't-name';
   name.textContent = row.recipe ? row.recipe.label : row.label;
+  name.title = 'Click: zoom this set close (click again for the full grid)';
+  let zoomed = false;
+  name.addEventListener('click', () => {
+    // one zoomed row at a time; the name is the toggle
+    document.querySelectorAll('.t-name.zoomed').forEach((el) => el.classList.remove('zoomed'));
+    zoomed = !zoomed && window.__lab.zoomRow(row.id) !== false;
+    if (zoomed) name.classList.add('zoomed');
+    else window.__lab.zoomRow(null);
+    for (const other of sideNames) if (other !== name) other.zoomedReset && other.zoomedReset();
+    name.zoomedReset = () => { zoomed = false; };
+  });
+  sideNames.push(name);
   box.appendChild(name);
   if (row.recipe) {
     const t = row.recipe;
