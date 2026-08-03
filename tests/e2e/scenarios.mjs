@@ -1581,6 +1581,30 @@ export const scenarios = [
     },
   },
   {
+    name: 'draft-offer',
+    tags: ['smoke', 'groups', 'roll'],
+    // The Trigger Pass moved Offer onto the draft row (the popover's
+    // 'Offer to table' retired): visible at a table, and it posts the box
+    // canonical — the draft's FULL intent — as the offer.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = '2d6 dc8';
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      await a.waitFor(`!document.getElementById('offer-draft').classList.contains('hidden')
+        && !document.getElementById('offer-draft').disabled`,
+        { desc: 'the Offer verb stands on the draft row at a table' });
+      await a.eval(`document.getElementById('offer-draft').click()`);
+      await b.waitFor(`document.querySelectorAll('.offer-card').length === 1`,
+        { desc: 'the offer reaches Bob' });
+      const detail = await b.eval(`document.querySelector('.offer-card .offer-detail').textContent`);
+      assert.ok(detail.includes('vs 8'), `the dc rode the offer (got: ${detail})`);
+    },
+  },
+  {
     name: 'terminology',
     tags: ['smoke', 'chrome'],
     // The vocabulary is 'pool' / 'saved pool'; 'tray' and 'group' survive only
