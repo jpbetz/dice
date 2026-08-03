@@ -162,6 +162,43 @@ verdict ring stops showing the dice-count-as-total (the exact confusion);
 under per-die its center is empty and the rows are the verdict. The text
 layer keeps the whole story row by row for copy/paste and screen readers.
 
+### 2f. The Workbench + reroll clarity (2026-08-03) — SHIPPED, verify in
+flight
+
+The ultracode draft-zone pass (judged 3-way design panel): the draft
+became a WELL over a RAIL — the well wears the same recessed dress as
+the notation box (one draft, two editors, both finally looking like
+editors) and holds the ± inside it; the rail's verbs (Save · Offer ·
+✕ Clear) STAND while a draft exists instead of hiding behind hover
+(UX.md §7.14). Reroll clarity rode the same pass: exactly ONE clear
+affordance per collected roll chosen by the opening gesture (§7.15),
+every replay trigger says REROLL ❯❯❯ (the draft keeps plain ROLL), and
+the log carries server-substantiated reroll provenance — `rerollOfId`
+gated AT BIRTH by `entryExistsForAll`, so a reroll of a secret roll is
+recorded as a plain roll and no existence oracle forms; the newest row
+wears a quiet 'reroll' chip, the superseded row 'rerolled'. Adversarial
++ full-suite verification was still running when this entry was written.
+
+### 2g. The beacon pass — the draft well goes further (proposed
+2026-08-03)
+
+Joe, after the Workbench (§7.14) landed: "the Roll ❯❯❯ looks a LOT
+better. What if we were to take it further? … make the UI around it even
+more eye catching, and the Roll ❯❯❯ overlay even stronger and more
+compelling." A design-first pass (small panel, like the Sheet Pass) to
+escalate the draft well's stage presence: the well as the panel's
+unmistakable center of gravity, and the ROLL cue as a promise you can
+feel — treatments to explore include gold that gathers as the pool
+grows, a deeper well, a cue that breathes on approach. Constraints that
+make it interesting: P1 still holds (an EMPTY well stays quiet — the
+escalation keys on a draft existing, intent already shown), gold stays
+the roll verb's alone (this pass spends that budget deliberately), fixed
+geometry (§7.10 — presence from light and depth, never from size
+jitter), and the tier rule (the rail's verbs don't get louder just
+because the well does). Naming note: the chrome never says "tray" — the
+thing is the DRAFT in its well; any new visible label speaks that
+vocabulary.
+
 ## Tier 2 — Organization (goal 5, the audit's biggest experience gap)
 
 ### 3. Table organization & concurrency
@@ -286,9 +323,29 @@ the system-profile registry from step 2. Needs dice.js custom face sets.
 
 ## Tier 6 — Customization & delight
 
-### 9. Dice sets & colors — (type,setId) material cache, launch sets,
-per-player identity set, saved-pool override, picker. A bare color derives an
-anonymous set.
+### 9. Dice sets, colors & THEMES — (type,setId) material cache, launch
+sets, per-player identity set, saved-pool override, picker. A bare color
+derives an anonymous set. **Creative brief (Joe 2026-08-03, promoted for
+experimentation):** cool-looking dice of different materials and types,
+natural AND supernatural — imagine what *faerie* dice, *dryadic* dice,
+*wizard* dice, *warrior* dice might look like. Special effects and strong
+themes **merged subtly into the dice themselves** — theme lives in
+material, edge, glow and face treatment, never as noise on top; the
+numbers stay readable (GOALS legibility invariant) and the physics/face
+correction machinery is untouched (a theme is a skin over dice.js
+geometry + materials). Start with a small experimental set to find the
+bar before building the full picker.
+
+### 9b. Pool icons — an icon on a pool's tile where die art stands today
+(the Rack anticipated this: "tile icons replace die art later"). **Joe
+2026-08-03:** a default icon set for Your Soul Deal's attributes
+(Strength and kin) plus a library players pick from for custom pools.
+Zero-dep: hand-drawn inline SVG sprites, no icon fonts or CDNs. The icon
+is pool identity, so it rides everywhere the pool does: the tile, the
+draft's source chips, the popover identity strip (picker lives there,
+beside name/shelf), published racks (display copy), and the `#g=` codec
+(v4, present-or-absent — old links stay valid, unknown icon ids fail
+closed to die art). Die art remains the default for icon-less pools.
 
 ### 10. Custom experience templates — the editor UI for the (currently
 dormant) `experiences` settings key; until this ships the key stays
