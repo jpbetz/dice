@@ -1107,6 +1107,21 @@ html, body {
   cursor: pointer;
 }
 .idm-item:hover { background: rgba(255, 255, 255, 0.08); }
+/* targeted offers (4b): the ▾ split button + its one-name menu (idm dress) */
+.offer-pick { flex: none; padding-left: 8px; padding-right: 8px; }
+#offer-menu {
+  position: fixed;
+  z-index: var(--z-popover); /* a small popover — same rung as ± */
+  min-width: 150px;
+  max-width: 240px;
+  padding: 6px;
+}
+#offer-menu.hidden { display: none; }
+.offer-menu-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap; /* names cap; the menu never jiggles the layout */
+}
 .idm-rename { padding: 2px 10px 8px; }
 .idm-rename.hidden { display: none; }
 
@@ -1813,6 +1828,17 @@ body.mini .pk-breakdown { font-size: 10px; }
 }
 .offer-head { font-size: 12px; color: var(--muted); }
 .offer-by { font-weight: 700; }
+.offer-to { font-weight: 700; color: var(--ivory); } /* the named claimant is stakes */
+.offer-waiting {
+  flex: 1;
+  align-self: center;
+  min-height: 38px; /* the claim strip's slot — a targeted card holds its size */
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--muted);
+}
 .offer-title {
   font-family: var(--font-display);
   font-size: 18px;

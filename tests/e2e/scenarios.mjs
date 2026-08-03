@@ -1935,6 +1935,77 @@ export const scenarios = [
     },
   },
   {
+    name: 'targeted-offer',
+    tags: ['visibility'],
+    // ROADMAP 4b — "Bo, roll this save": an offer claimable only by a named
+    // player. The card shows EVERYONE the stakes (including who it's for);
+    // only the target gets the claim strip, and the server enforces the
+    // gate (403 not_offer_target) no matter which client drew the button.
+    // Unknown names fail closed at offer time (400 unknown_target).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      const c = await ctx.newTable({ origin: '127.0.0.2', name: 'Carol' });
+
+      // Unknown target refuses the offer outright — fail closed, no card.
+      const bad = await ctx.api('/api/offer', {
+        playerId: await a.playerId(), notation: '1d20', label: 'stray', to: 'Nobody',
+      });
+      assert.equal(bad.status, 400, 'unknown target refused');
+      assert.equal(bad.data && bad.data.code, 'unknown_target', `code names it (got: ${JSON.stringify(bad.data)})`);
+
+      // The UI path: draft + the ▾ picker → 'Offer to Bob'.
+      await a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = 'd20 dc12 # Save vs fear';
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      await a.waitFor(`!document.getElementById('offer-pick').classList.contains('hidden')
+        && !document.getElementById('offer-pick').disabled`,
+        { desc: 'the ▾ picker stands once teammates exist' });
+      await a.eval(`document.getElementById('offer-pick').click()`);
+      await a.eval(`[...document.querySelectorAll('#offer-menu .offer-menu-item')]
+        .find((i) => i.textContent === 'Offer to Bob').click()`);
+
+      // Everyone sees the card and who it is for; only Bob can take it.
+      for (const [t, name] of [[a, 'Alice'], [b, 'Bob'], [c, 'Carol']]) {
+        await t.waitFor('window.__diceDebug.offers.length === 1', { desc: `offer reaches ${name}` });
+      }
+      const offer = (await c.dbg('offers'))[0];
+      assert.equal(offer.to && offer.to.name, 'Bob', 'the card carries its claimant');
+      assert.ok(await c.eval(`document.querySelector('.offer-card .offer-to').textContent === 'Bob'`),
+        "Carol reads who it's for");
+      assert.equal(await c.eval(`!!document.querySelector('.offer-card .offer-roll')`), false,
+        'no claim strip for a bystander');
+      assert.ok(await c.eval(`(document.querySelector('.offer-card .offer-waiting') || {}).textContent === 'waiting on Bob'`),
+        'the bystander reads the wait');
+      assert.equal(await b.eval(`!!document.querySelector('.offer-card .offer-roll')`), true,
+        'the target gets the claim strip');
+
+      // The gate is the SERVER's: Carol forcing a claim over the wire is
+      // refused and the offer survives for Bob.
+      const stolen = await ctx.api('/api/claim', {
+        playerId: await c.playerId(), offerId: offer.offerId,
+      });
+      assert.equal(stolen.status, 403, 'a forced foreign claim is refused');
+      assert.equal(stolen.data && stolen.data.code, 'not_offer_target', 'and names the rule');
+      assert.equal((await b.dbg('offers')).length, 1, 'the offer still stands for Bob');
+
+      // Bob claims through the card; the roll lands as HIS, dc riding.
+      await b.eval(`document.querySelector('.offer-card .offer-roll').click()`);
+      const rid = await b.waitFor(
+        `(window.__diceDebug.sim(120), (window.__diceDebug.currentRoll || {}).rollId || null)`,
+        { desc: 'the claimed roll starts on Bob’s tab' },
+      );
+      await b.waitFor(
+        `(window.__diceDebug.sim(160), !window.__diceDebug.busy && window.__diceDebug.offers.length === 0)`,
+        { desc: 'the card leaves every table' },
+      );
+      assert.ok((await b.logTop()).includes('Bob'), 'the claimer is the roller');
+      assert.ok(rid, 'a real roll landed from the targeted claim');
+    },
+  },
+  {
     name: 'reveal-authority',
     tags: ['visibility'],
     // Only the visibility chooser may flip a hidden roll — enforced by the

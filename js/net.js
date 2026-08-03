@@ -208,8 +208,12 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     // Broadcast a prepared roll card anyone can execute once. Same exclusive
     // notation-vs-dice/mods wire shape as roll(), and the same rule for the
     // moment: in the string on the notation shape, a sibling field otherwise.
-    async offer({ label, dice, mods, faceDown, dc, notation, exp } = {}) {
+    // `to` (a player name) makes it a TARGETED offer — only that player may
+    // claim (ROADMAP 4b); it rides beside either shape, and the server
+    // resolves it against the roster (400 unknown_target on no match).
+    async offer({ label, dice, mods, faceDown, dc, notation, exp, to } = {}) {
       const body = { label: label || '' };
+      if (typeof to === 'string' && to) body.to = to;
       if (typeof notation === 'string' && notation) {
         body.notation = notation;
       } else {

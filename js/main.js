@@ -3343,8 +3343,8 @@ window.__diceDebug = {
   // visibility (goal 11): reveal/offer/claim entry points + redaction
   // observability. Everything returned is JSON-safe primitives.
   reveal(rollId) { requestReveal(rollId); },
-  offerRoll(str) {
-    const r = commandOffer(str);
+  offerRoll(str, to = null) {
+    const r = commandOffer(str, to); // to: targeted offer (4b)
     return { ok: r.ok === true, state: r.state || (r.ok ? 'ok' : 'invalid'), error: r.error || null, posted: r.ok === true && netOnline };
   },
   claimOffer(offerId) { return net ? net.claim(offerId) : Promise.resolve(false); },
@@ -3360,6 +3360,7 @@ window.__diceDebug = {
       faceDown: !!o.faceDown,
       visibility: o.visibility ? JSON.parse(JSON.stringify(o.visibility)) : null,
       exp: o.exp ? JSON.parse(JSON.stringify(o.exp)) : null,
+      to: o.to ? JSON.parse(JSON.stringify(o.to)) : null, // targeted (4b)
     }));
   },
   // Projection of one entry's redaction/reveal state (lastEntry when no id).
@@ -3880,9 +3881,14 @@ function updateTrayButtons() {
   clearTrayBtn.disabled = !tray.length && !cmdInput.value;
   saveGroupBtn.disabled = !usable;
   // Offers need a table: the verb HIDES solo (quiet chrome — a standing
-  // disabled button would be noise a solo table can never use).
+  // disabled button would be noise a solo table can never use). The ▾
+  // additionally needs someone to target — it waits for a teammate.
   offerDraftBtn.classList.toggle('hidden', !netOnline);
   offerDraftBtn.disabled = !usable;
+  const hasTargets = netOnline && net && players.some((p) => p.id !== net.playerId && p.name);
+  offerPickBtn.classList.toggle('hidden', !hasTargets);
+  offerPickBtn.disabled = !usable;
+  if (!hasTargets) closeOfferMenu();
 }
 
 // Roll the draft — the cluster click, the Enter key, and nothing else.
@@ -3917,14 +3923,59 @@ trayRollBtn.addEventListener('click', rollDraft);
 // Offer the draft to the table (Trigger Pass): the popover's 'Offer to
 // table' retired with its Roll, so the draft row is where offers fire —
 // same full-intent carrier as rollDraft (the box canonical), same
-// validation gates as Shift+Enter in the box.
-function offerDraft() {
+// validation gates as Shift+Enter in the box. `to` (a player name) makes
+// it a TARGETED offer (4b) — the ▾ menu's path; the server resolves the
+// name against the roster and pins the claimant ids fail-closed.
+function offerDraft(to = null) {
   if (!netOnline || !net) return;
   paintCmd();
-  if (cmdResult && cmdResult.ok) commandOffer(cmdInput.value);
-  else if (tray.length) net.offer({ label: formula(tray), dice: [...tray] });
+  if (cmdResult && cmdResult.ok) commandOffer(cmdInput.value, to);
+  else if (tray.length) net.offer({ label: formula(tray), dice: [...tray], ...(to ? { to } : {}) });
 }
-offerDraftBtn.addEventListener('click', offerDraft);
+offerDraftBtn.addEventListener('click', () => offerDraft());
+
+// The ▾ picker: a split button beside the plain verb (one-click table-wide
+// muscle memory stays). The menu is rebuilt from the live roster on every
+// open — names are presence, and a stale menu could target a ghost.
+const offerPickBtn = document.getElementById('offer-pick');
+const offerMenu = document.getElementById('offer-menu');
+function isOfferMenuOpen() { return !offerMenu.classList.contains('hidden'); }
+function closeOfferMenu() { offerMenu.classList.add('hidden'); }
+function openOfferMenu() {
+  const you = net ? net.playerId : null;
+  // duplicate names collapse to one row — the server pins ALL matching ids,
+  // the same join rule whisper audiences document
+  const names = [...new Map(players.filter((p) => p.id !== you && p.name)
+    .map((p) => [p.name.toLowerCase(), p.name])).values()];
+  if (!names.length) return;
+  offerMenu.textContent = '';
+  for (const n of names) {
+    const b = document.createElement('button');
+    b.className = 'idm-item offer-menu-item';
+    b.setAttribute('role', 'menuitem');
+    b.textContent = `Offer to ${n}`; // user-supplied: textContent only
+    b.addEventListener('click', () => {
+      closeOfferMenu();
+      offerDraft(n);
+    });
+    offerMenu.appendChild(b);
+  }
+  offerMenu.classList.remove('hidden');
+  const r = offerPickBtn.getBoundingClientRect();
+  offerMenu.style.left = `${Math.round(Math.max(12, Math.min(r.left, window.innerWidth - offerMenu.offsetWidth - 12)))}px`;
+  offerMenu.style.top = `${Math.round(Math.min(r.bottom + 6, window.innerHeight - offerMenu.offsetHeight - 12))}px`;
+}
+offerPickBtn.addEventListener('click', () => {
+  if (isOfferMenuOpen()) closeOfferMenu();
+  else openOfferMenu();
+});
+// click-away closes (capture phase, like the creation card's away rule);
+// clicks on the ▾ itself fall through to its toggle handler above
+document.addEventListener('pointerdown', (e) => {
+  if (!isOfferMenuOpen()) return;
+  if (offerMenu.contains(e.target) || offerPickBtn.contains(e.target)) return;
+  closeOfferMenu();
+}, true);
 
 // Right-click the cluster = ± (a pointer bonus; the visible ± button is the
 // path for touch and keyboard).
@@ -4192,7 +4243,7 @@ function commandRoll(input) {
 // in OFFER context: 'blind' is legal here (dice tower → secret), and the box
 // paints in roll context so typing it shows the teaching error until the
 // player offers instead of rolling — which is the teaching.
-function commandOffer(input) {
+function commandOffer(input, to = null) {
   const raw = (typeof input === 'string' ? input : cmdInput.value).trim();
   const res = parseNotation(raw, { offer: true });
   if (!res.ok) return res;
@@ -4200,6 +4251,7 @@ function commandOffer(input) {
   net.offer({
     label: res.comment || res.canonical,
     notation: notationIntent(raw, res).notation,
+    ...(to ? { to } : {}), // targeted offer (4b): one named claimant
   });
   return res;
 }
@@ -7075,6 +7127,7 @@ document.addEventListener('keydown', (e) => {
     else if (isPaletteOpen()) closePalette();
     else if (!settingsModal.classList.contains('hidden')) closeSettingsModal();
     else if (isIdentityMenuOpen()) closeIdentityMenu();
+    else if (isOfferMenuOpen()) closeOfferMenu();
     // a shelf-bound popover rides ON the peek: peel it first, the card next
     else if (pop && pop.source === 'shelf') closePopover();
     else if (isPeekOpen()) closePeek();
@@ -7210,6 +7263,8 @@ function renderPlayers() {
   // An open whisper picker tracks the live roster (joins/leaves/renames).
   if (pop && pop.vis && pop.vis.mode === 'whisper') renderPop();
   updateIdentityChip(); // the rail chip mirrors the roster's name + color
+  updateTrayButtons(); // the ▾ offer picker appears/leaves with teammates
+  if (isOfferMenuOpen()) closeOfferMenu(); // never target a stale roster
 }
 
 // Compact human summary of a mods spec: "+3 · adv · drop low 1 · reroll ≤2 · explode"
@@ -7270,6 +7325,13 @@ function renderOffers() {
     if (o.color) who.style.color = o.color;
     who.textContent = o.byName || 'someone';
     head.append(who, ' offers a roll'); // one-voice: no colon-head grammar
+    // Targeted (4b): WHO it is for is part of the stakes — everyone reads it.
+    if (o.to && o.to.name) {
+      const toEl = document.createElement('span');
+      toEl.className = 'offer-to';
+      toEl.textContent = o.to.name; // user-supplied: textContent only
+      head.append(' for ', toEl);
+    }
 
     const title = document.createElement('div');
     title.className = 'offer-title';
@@ -7300,19 +7362,31 @@ function renderOffers() {
     // The claim is a ROLL, so it speaks P1 like every other roll surface:
     // the offered dice as a die-art strip button wearing the ROLL cue —
     // the last text-button roll trigger retires ('one shared code path').
+    // A TARGETED offer (4b) shows that strip only to its named claimant —
+    // the server enforces the same gate (403 not_offer_target), the card
+    // just tells the truth about it; bystanders read who the table waits on.
     const actions = document.createElement('div');
     actions.className = 'offer-actions';
-    const rollBtn = document.createElement('button');
-    rollBtn.className = 'pool-roll offer-roll';
-    const claimName = `Roll it — ${o.label || formula(o.dice || [])}`;
-    rollBtn.title = claimName;
-    rollBtn.setAttribute('aria-label', claimName);
-    rollBtn.appendChild(buildDieStrip(o.dice || [], POOL_STRIP_CAP, { grouped: true }));
-    rollBtn.appendChild(buildRollCue());
-    const offerUnits = new Set(o.dice || []).size;
-    rollBtn.classList.toggle('cue-tight', cueTight(Math.min(offerUnits, POOL_STRIP_CAP) + (offerUnits > POOL_STRIP_CAP ? 1 : 0)));
-    rollBtn.addEventListener('click', () => { if (net) net.claim(o.offerId); });
-    actions.appendChild(rollBtn);
+    const mayTake = !o.to
+      || (net && Array.isArray(o.to.playerIds) && o.to.playerIds.includes(net.playerId));
+    if (mayTake) {
+      const rollBtn = document.createElement('button');
+      rollBtn.className = 'pool-roll offer-roll';
+      const claimName = `Roll it — ${o.label || formula(o.dice || [])}`;
+      rollBtn.title = claimName;
+      rollBtn.setAttribute('aria-label', claimName);
+      rollBtn.appendChild(buildDieStrip(o.dice || [], POOL_STRIP_CAP, { grouped: true }));
+      rollBtn.appendChild(buildRollCue());
+      const offerUnits = new Set(o.dice || []).size;
+      rollBtn.classList.toggle('cue-tight', cueTight(Math.min(offerUnits, POOL_STRIP_CAP) + (offerUnits > POOL_STRIP_CAP ? 1 : 0)));
+      rollBtn.addEventListener('click', () => { if (net) net.claim(o.offerId); });
+      actions.appendChild(rollBtn);
+    } else {
+      const waiting = document.createElement('span');
+      waiting.className = 'offer-waiting';
+      waiting.textContent = `waiting on ${o.to.name}`;
+      actions.appendChild(waiting);
+    }
     if (o.byId === you) {
       const del = document.createElement('button');
       del.className = 'btn ghost';

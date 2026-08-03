@@ -1556,3 +1556,31 @@ as such"). Stored values keep riding the canonical either way.
 floor and ceiling (titles wrap inside), the offers layer owns one fixed
 column width (titles ellipsize), ×N strip counts are tabular. The draft's
 source-chip names were already capped at 90px.
+
+### 7.11 Targeted offers (shipped 2026-08-03)
+
+ROADMAP 4b — "Bo, roll this save": an offer claimable only by a named
+player, the first multi-player CUJ on the Trigger Pass's single offer
+surface.
+
+- **Wire**: `to` (a player name) rides `/api/offer` beside either shape.
+  The server resolves it against the CURRENT roster at offer creation,
+  exactly like a whisper audience — case-insensitive, duplicate names all
+  join, unknown names refuse the offer outright (400 `unknown_target`;
+  fail closed, never a card nobody can take). The pinned ids are the
+  claim gate: 403 `not_offer_target` for anyone else, server-enforced —
+  the same authority rule as reveal. A rename or rejoin never widens or
+  moves the gate (whisper's identity rule). The offer stays on the table
+  for its named player; Withdraw remains the offerer's out.
+- **Card**: public in full — the head reads "Alice offers a roll **for
+  Bob**"; the stakes (dice, dc, visibility, moment) show to everyone.
+  Only a pinned claimant wears the ROLL ❯❯❯ claim strip; bystanders get
+  a quiet *waiting on Bob* line in the strip's reserved slot (the card
+  holds its size). Composes with offer visibility unchanged (a targeted
+  dice-tower offer = only Bob may claim, only the offerer reads).
+- **Picker**: a ▾ split button beside the draft row's *Offer to table* —
+  the plain verb keeps its one-click table-wide muscle memory; the ▾
+  opens a one-name menu (identity-menu dress) rebuilt from the live
+  roster on every open, and hides until a teammate exists. Esc and
+  click-away close it; a roster change closes it (never target a ghost).
+  Shift+Enter stays table-wide.

@@ -201,14 +201,18 @@ ladder; all of it is polish or a new rung.
   precedent exists for "reveal to the roller". §3.3 rejected it for step 4
   because reveal is currently total and one-way, which is what makes it
   auditable. Revisit only with a concrete table need.
-- **Targeted offers** *(TODO Joe 2026-07-31; PROMOTED 2026-08-03 — Joe
-  wants multi-player CUJs next; first feature in line after the Trigger
-  Pass, which decides the one surface offers fire from)*: offer a roll
-  claimable only by a named player ("Bo, roll this save") instead of the
-  whole table. The machinery rhymes with whisper audiences — pin the
-  claimant's `playerId` at offer time, fail closed on unknown names — and
-  the offer card shows everyone the stakes while only the target gets the
-  claim strip.
+- **Targeted offers** *(TODO Joe 2026-07-31; SHIPPED 2026-08-03 — the
+  first multi-player CUJ, landing right on the Trigger Pass's single
+  offer surface; UX.md §7.11)*: offer a roll claimable only by a named
+  player ("Bo, roll this save"). As designed: the name resolves against
+  the roster at offer creation exactly like a whisper audience
+  (case-insensitive, duplicates all join, 400 `unknown_target` fail-closed)
+  and the pinned `playerId`s ARE the claim gate — server-enforced
+  (403 `not_offer_target`), never just which client drew the button. The
+  card shows everyone the stakes including who it's for; only the target
+  wears the claim strip (bystanders read 'waiting on Bo'). UI: a ▾ split
+  button beside the draft row's *Offer to table* (plain click keeps its
+  one-click table-wide muscle memory; the ▾ waits for a teammate).
 - **Audience legibility.** A shrouded viewer reads the audience only when
   the roll has no `# comment` (§3.0) — `label` carries one or the other.
   Decide whether "who was whispered to" deserves its own always-present

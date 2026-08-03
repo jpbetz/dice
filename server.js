@@ -1324,6 +1324,31 @@ async function handleOffer(req, res) {
   const vis = resolveVisibility(room, player, spec.visibility);
   if (vis.error) return sendError(res, ...vis.error);
 
+  // Targeted offer (ROADMAP 4b): `to` names the ONE player who may claim
+  // ("Bo, roll this save"). The name resolves against the CURRENT roster at
+  // offer creation, exactly like a whisper audience — case-insensitive,
+  // duplicate names all join — and an unknown name refuses the offer
+  // outright (fail closed: never a card nobody can take). The pinned ids
+  // ARE the claim gate; a later rename or a rejoin never widens or moves it
+  // (the same identity rule whisper audiences follow).
+  let to = null;
+  if (body.value.to !== undefined && body.value.to !== null) {
+    const want = typeof body.value.to === 'string' ? cleanString(body.value.to, 40) : '';
+    if (!want) return sendError(res, 400, 'to must be a player name', 'bad_request');
+    const wantLc = want.toLowerCase();
+    const playerIds = [];
+    let display = null;
+    for (const p of room.players.values()) {
+      if (p.name.toLowerCase() !== wantLc) continue;
+      if (display === null) display = p.name; // the roster's own spelling
+      if (!playerIds.includes(p.id)) playerIds.push(p.id);
+    }
+    if (!playerIds.length) {
+      return sendError(res, 400, `unknown target: "${want}" — no such player at the table`, 'unknown_target');
+    }
+    to = { name: display, playerIds };
+  }
+
   const offer = {
     offerId: crypto.randomUUID(),
     byId: player.id,
@@ -1346,10 +1371,14 @@ async function handleOffer(req, res) {
   // card itself is public in full — including who the whisper is addressed to
   // (existence is public; results are what visibility hides).
   if (vis.visibility) offer.visibility = vis.visibility;
+  // Present-or-absent, like every dressed-up field: only a targeted offer
+  // carries `to`. The card itself stays public in full — WHO it is for is
+  // part of the stakes everyone reads.
+  if (to) offer.to = to;
   room.offers.push(offer);
   if (room.offers.length > OFFER_CAP) room.offers = room.offers.slice(-OFFER_CAP);
 
-  log(`offer   room=${room.name} name=${player.name} dice=${offer.dice.join(',')}${offer.dc ? ` dc=${offer.dc}` : ''} offers=${room.offers.length}`);
+  log(`offer   room=${room.name} name=${player.name} dice=${offer.dice.join(',')}${offer.dc ? ` dc=${offer.dc}` : ''}${to ? ` to=${to.name}` : ''} offers=${room.offers.length}`);
   broadcast(room, 'offer', { offer });
   sendJson(res, 200, { offer });
 }
@@ -1368,7 +1397,14 @@ async function handleClaim(req, res) {
   const idx = room.offers.findIndex((o) => o.offerId === offerId);
   // Losing the claim race lands here too; 404 is the expected answer.
   if (idx < 0) return sendError(res, 404, 'unknown offer', 'unknown_offer');
-  const [offer] = room.offers.splice(idx, 1);
+  const offer = room.offers[idx];
+  // A targeted offer's claim gate (4b): enforced HERE, never by which
+  // client drew the button — the same authority rule as reveal. The offer
+  // stays on the table for its named player.
+  if (offer.to && Array.isArray(offer.to.playerIds) && !offer.to.playerIds.includes(player.id)) {
+    return sendError(res, 403, `this offer is for ${offer.to.name}`, 'not_offer_target');
+  }
+  room.offers.splice(idx, 1);
 
   log(`claim   room=${room.name} name=${player.name} offerId=${offerId} by=${offer.byName}`);
   broadcast(room, 'offer-claimed', { offerId });
