@@ -4933,22 +4933,10 @@ function buildRollCue(kind = 'roll') {
 }
 // (cueTight retired 2026-08-03 — see the cue comment above.)
 
-// The empty well's GHOST DICE (Joe 2026-08-03): faint real die art resting
-// where dice will land — the molded sockets of a dice tray. Built once at
-// boot (dieArtURL warms synchronously); a no-GL environment adds no imgs
-// and the sockets simply stay empty.
-for (const t of ['d20', 'd6', 'd8']) {
-  const u = dieArtURL(t);
-  if (!u) continue;
-  const img = document.createElement('img');
-  img.className = 'die-art wg-die';
-  img.src = u;
-  img.alt = '';
-  img.draggable = false;
-  trayHintEl.querySelector('.wg-dice').appendChild(img);
-}
-// …under a ghost ROLL ❯❯❯ (Joe: no caption to wear out — the empty well
-// simply previews the full one, quiet cue and all).
+// The empty well's GHOST (Joe 2026-08-03, simpler won): ONLY the quiet
+// ROLL ❯❯❯ — the empty well previews the full one, nothing else. (The
+// ghost-dice sockets were tried the same day and cut: dice images plus
+// the cue read as clutter, not invitation.)
 trayHintEl.appendChild(buildRollCue('roll'));
 
 // STAGE a pool into the draft (the Rack's one source verb): its dice pour

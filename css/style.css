@@ -386,34 +386,19 @@ html, body {
   margin: 0;
   min-height: 84px;
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 4px 8px;
-  text-align: center;
-  color: #5f574b;
+  position: relative; /* the ghost cue anchors HERE — the same box the
+                         roll button occupies, so the cue never moves */
 }
-/* the ghost ROLL ❯❯❯: the empty well previews the full one — the cue's
-   base is an absolute overlay, so re-flow it here, quieter than the
-   armed whisper (0.22 vs 0.3) */
+/* ONE cue geometry in the well, every state (Joe 2026-08-03: 'exact font
+   size, weight and location — effects may differ, no glitching'): the
+   ghost inherits the base .roll-cue box (absolute, right-aligned) and
+   ONLY opacity distinguishes empty · standing · hover. */
+.tray-line2 .roll-cue { font-size: 23px; }
 #tray-hint .roll-cue {
-  position: static;
   opacity: 0.22;
-  padding: 0;
-  justify-content: center;
-  font-size: 21px;
-}
-.wg-dice { display: flex; gap: 12px; }
-.wg-die {
-  width: 30px;
-  height: 30px;
-  filter: grayscale(1);
-  opacity: 0.15;
   transition: opacity 0.25s;
 }
-#tray-actions:hover .wg-die { opacity: 0.28; }
+#tray-actions:hover #tray-hint .roll-cue { opacity: 0.34; }
 #tray-hint.hidden { display: none; }
 .tray-save.hidden { display: none; }
 .tray-line2.hidden { display: none; }
@@ -424,7 +409,8 @@ html, body {
 /* larger dice in the WELL only — the draft is the star; pool rows keep 28
    (three classes deep: .pool-roll .die-art's later 28px must lose here) */
 .tray-line2 .tray-roll .die-art { width: 34px; height: 34px; }
-.tray-roll .roll-cue { font-size: 23px; }
+/* (the well's cue size lives on .tray-line2 .roll-cue — ONE rule covers
+   the ghost and the button so the states can never disagree) */
 /* THE WELL (§7.14). The draft is a FIELD — the same --well token as
    .cmd-in, because the box and the cluster are two editors of ONE draft
    (§7.9). The padding sits OUTSIDE .tray-cluster so the x-layer's offset

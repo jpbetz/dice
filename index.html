@@ -121,15 +121,11 @@ limitations under the License.
         <div id="tray" class="tray-cluster">
           <button id="tray-roll" class="pool-roll tray-roll hidden"></button>
           <div id="tray-x-layer" class="tray-x-layer"></div>
-          <!-- GHOST DICE (Joe 2026-08-03): the empty well shows faint real
-               die art resting where dice will land — empty sockets in a
-               dice tray — under a ghost ROLL ❯❯❯ (the empty well previews
-               the full one; no caption to wear out on a second read).
-               Filled from dieArtURL + buildRollCue at boot; placeholder
-               semantics — real dice replace the sockets in the same slot. -->
-          <div id="tray-hint" class="hint tray-ghost">
-            <span class="wg-dice" aria-hidden="true"></span>
-          </div>
+          <!-- THE GHOST (Joe 2026-08-03, simpler won): the empty well shows
+               ONLY a quiet ROLL ❯❯❯ — a preview of the full well, filled by
+               buildRollCue at boot. Placeholder semantics: real dice take
+               the same slot. -->
+          <div id="tray-hint" class="hint tray-ghost"></div>
         </div>
       </div>
       <!-- The RAIL (P6: management STANDS — supersedes the 2026-08-01

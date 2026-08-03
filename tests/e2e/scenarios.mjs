@@ -153,12 +153,14 @@ export const scenarios = [
       await a.eval(`document.getElementById('clear-tray').click()`);
       await a.waitFor(`!document.getElementById('tray-hint').classList.contains('hidden')`,
         { desc: 'the empty well shows its ghost' });
-      assert.equal(await a.eval(`document.querySelectorAll('#tray-hint .wg-die').length`), 3,
-        'three ghost dice rest in the empty well');
+      // simpler won (Joe): the ghost is ONLY the quiet ROLL ❯❯❯ — the
+      // dice-socket images were cut the same day (clutter, not invitation)
+      assert.equal(await a.eval(`document.querySelectorAll('#tray-hint .wg-die').length`), 0,
+        'no ghost dice images — the cue is the whole ghost');
       assert.ok(await a.eval(`(() => {
         const c = document.querySelector('#tray-hint .roll-cue');
         return !!c && c.textContent.includes('ROLL');
-      })()`), 'under a ghost ROLL ❯❯❯ (the empty well previews the full one)');
+      })()`), 'the ghost ROLL ❯❯❯ previews the full well');
 
       // …and they REAPPEAR when the last die leaves by its ✕ (Joe: the
       // remove path re-renders before the box empties — the ghost's
