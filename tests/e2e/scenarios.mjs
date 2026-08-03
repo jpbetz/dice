@@ -458,29 +458,33 @@ export const scenarios = [
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.roll('2d8[Wisdom]+1d4[Zeal]+1d6 # Hunt');
 
-      // banner breakdown: one small-caps label per pool, unsourced dice plain
-      const bdLabels = await a.eval(
-        `[...document.querySelectorAll('#result-breakdown .log-part-label')].map((el) => el.textContent.trim())`);
-      assert.deepEqual(bdLabels, ['Wisdom', 'Zeal'], `breakdown grouped by pool (got: ${bdLabels})`);
+      // 2e: the breakdown line FOLDS under per-die \u2014 the outcome rows carry
+      // every source and face, so the old duplicate line must NOT render.
+      assert.equal(await a.eval(`document.getElementById('result-breakdown').textContent`), '',
+        'no duplicate breakdown line under per-die');
 
-      // the hero tally answers per pool (soul-deal is the default lens)
+      // the hero answers per pool as ROWS (2e; soul-deal is the default lens)
       const tallySrcs = await a.eval(
         `[...document.querySelectorAll('#result-meaning .tally-src')].map((el) => el.textContent.trim())`);
-      assert.deepEqual(tallySrcs, ['Wisdom', 'Zeal'], `tally grouped by pool (got: ${tallySrcs})`);
+      assert.deepEqual(tallySrcs, ['Wisdom', 'Zeal'], `rows grouped by pool (got: ${tallySrcs})`);
       assert.equal(await a.eval(
         `document.querySelectorAll('#result-meaning .tally-group').length`), 3,
-        'the unsourced d6 answers in its own plain group');
+        'the unsourced d6 answers in its own plain row');
 
       // the log line reads the same way
       const logLabels = await a.eval(
         `[...document.querySelectorAll('#log-list .log-detail .log-part-label')].map((el) => el.textContent)`);
       assert.deepEqual(logLabels, ['Wisdom', 'Zeal'], `log grouped by pool (got: ${logLabels})`);
 
-      // the grouping lives in the TEXT layer, not just margins: copy/paste
-      // and screen readers keep the per-pool read
-      const tallyText = await a.eval(`document.getElementById('result-meaning').textContent`);
-      assert.ok(tallyText.includes('Wisdom ') && tallyText.includes('  \u00b7  '),
-        `real separators in the tally text (got: ${JSON.stringify(tallyText)})`);
+      // the read lives in the TEXT layer, row by row: each pool row leads
+      // with its label and carries the die evidence beside each word \u2014
+      // copy/paste and screen readers keep the whole per-die story
+      const rows = await a.eval(
+        `[...document.querySelectorAll('#result-meaning .outcome-row')].map((el) => el.textContent.trim())`);
+      assert.equal(rows.length, 3, 'one row per pool');
+      assert.ok(rows[0].startsWith('Wisdom') && /d8 \d/.test(rows[0]),
+        `the row leads with its pool and carries evidence (got: ${JSON.stringify(rows)})`);
+      assert.ok(/d6 \d/.test(rows[2]), 'the plain row still shows its die and face');
 
       // ± Save rewrites a composed pool WITHOUT stripping its [labels]
       // (regression: popSpec dropped sources, so the by-id write destroyed
@@ -499,10 +503,15 @@ export const scenarios = [
         && upd.notation.includes('dc12'),
         `Save kept the labels beside the tweak (got: ${upd.notation})`);
 
-      // a lens switch keeps the grouping and returns the total
+      // a lens switch keeps the grouping and returns the total. The gate is
+      // the SYSTEM id — the old total-text wait passed trivially (textContent
+      // is set even while display:none), so the assertion used to read
+      // stale soul-deal paint; the 2e fold exposed it.
       await a.dbg(`setSystem('dnd')`);
-      await a.waitFor(`document.getElementById('result-total').textContent.trim().length > 0`,
-        { desc: 'total returns under dnd' });
+      await a.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'dnd lens applied' });
+      assert.equal(await a.eval(
+        `getComputedStyle(document.getElementById('result-total')).display !== 'none'`), true,
+        'the big total returns under dnd');
       const dndLabels = await a.eval(
         `[...document.querySelectorAll('#result-breakdown .log-part-label')].map((el) => el.textContent.trim())`);
       assert.deepEqual(dndLabels, ['Wisdom', 'Zeal'], 'attribution survives the sum world');

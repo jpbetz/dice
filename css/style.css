@@ -1343,6 +1343,47 @@ html, body {
   flex-wrap: wrap;
 }
 .pk-total.pk-tally { font-size: 14px; line-height: 1.45; }
+/* 2e — the organized per-die read: pools are ROWS, dice are CHIPS.
+   [dX face → word] — the word answers, the face is evidence beside it;
+   the separate breakdown line folds wherever these rows stand. */
+.result-outcomes, .verdict-outcomes, .pk-outcomes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  letter-spacing: normal;
+  text-indent: 0;
+}
+#result-meaning.result-outcomes { margin: 6px 0 2px; }
+.outcome-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  max-width: 100%;
+}
+.outcome-row .tally-src { flex: none; }
+.oc-chip {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 2px 9px 3px;
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+.oc-die {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.oc-word { font-family: var(--font-display); font-size: 15px; font-weight: 700; }
+.oc-quiet { opacity: 0.55; }
+.verdict-outcomes .oc-word { font-size: clamp(15px, 2.4vmin, 18px); }
+.pk-outcomes .oc-word { font-size: 13px; }
+.pk-outcomes .oc-chip { padding: 1px 7px 2px; }
 .pop-sysnote { margin: 8px 14px 0; font-style: italic; }
 /* Per-die tables (Soul Deal) fold the sum-world sections away — modifiers,
    d20 pairing, Target (DC), keep/drop don't change outcomes there (Joe

@@ -1584,3 +1584,30 @@ surface.
   roster on every open, and hides until a teammate exists. Esc and
   click-away close it; a roster change closes it (never target a ghost).
   Shift+Enter stays table-wide.
+
+### 7.12 The organized per-die read (shipped 2026-08-03)
+
+ROADMAP 2e — Joe: the reveal surfaces got muddled under Soul Deal. The
+diagnosis: **duplication at equal weight**. The tally line ('WISDOM
+Success · 2× Fail') and the breakdown line ('WISDOM d8 7 + d8 2') both
+repeated every source label, at similar size, and learning WHICH die said
+WHAT meant cross-referencing the two — while dnd's 52px total had no
+per-die counterpart, so the card had no hero at all.
+
+**The fix is one structure — outcome ROWS.** Each pool is a row: its
+label leading, then one CHIP per die: `[d8 7 → Success]` — the die+face
+in small mono (the evidence), the outcome word in the display face,
+tier-colored (the answer). A quiet die keeps its evidence chip, dimmed;
+an all-quiet pool says *quiet*. Where the rows stand, the separate
+breakdown line FOLDS — it carried nothing the rows don't.
+
+Surfaces: the result banner (hero slot), the ceremony verdict card (the
+rows are the verdict; the ring's center goes empty under per-die — the
+old dice-count there read as a total, the exact confusion), and the shelf
+peek (smaller dress, same structure). The LOG keeps its compact grouped
+words — a list line is the right density there. Sum systems (dnd, none)
+are untouched: total hero + breakdown pair as before.
+
+The text layer keeps the read (the audit rule): every chip carries real
+text ('d8 7 Success'), every row leads with its pool — copy/paste and
+screen readers get the per-pool, per-die story line by line.

@@ -146,14 +146,21 @@ result banner and offer cards hold fixed geometry. The original brief:
   (clamped two-line names), reserved multiplier space, constant-width
   action strips — ambient chrome never jumps under state changes.
 
-### 2e. Result-card IA under per-die systems (proposed 2026-08-03)
+### 2e. Result-card IA under per-die systems (2026-08-03) — SHIPPED
 
 The reveal/result surface accumulated per-die outcome chips, the tally,
 the hero word, and the action strip — nearly all of it *needed* under
-Soul Deal, but muddled as a layout (Joe, 2026-08-03). A design pass
-(judge panel, like the Sheet Pass) to give the card an information
-architecture: hierarchy, grouping, what earns the resting tier vs
-hover-reveal.
+Soul Deal, but muddled as a layout (Joe, 2026-08-03). **Shipped same day**
+(UX.md §7.12): the diagnosis was DUPLICATION at equal weight — the tally
+line and the breakdown line repeated the same source labels, and reading
+which die said what meant cross-referencing the two. The fix is ONE
+structure: each pool is a ROW — label leading, then one chip per die
+[dX face → tier-colored outcome word]. The word answers, the face is
+evidence beside it; the separate breakdown line folds wherever rows stand
+(banner, verdict card, peek — the log keeps its compact line). The
+verdict ring stops showing the dice-count-as-total (the exact confusion);
+under per-die its center is empty and the rows are the verdict. The text
+layer keeps the whole story row by row for copy/paste and screen readers.
 
 ## Tier 2 — Organization (goal 5, the audit's biggest experience gap)
 

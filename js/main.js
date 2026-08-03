@@ -1201,9 +1201,12 @@ function renderPeek() {
 
   const total = document.createElement('div');
   total.className = 'pk-total';
+  let peekRows = false; // per-die rows rendered (2e) — the breakdown folds
   if (hidden || !entry) total.textContent = '?';
-  else if (!renderTally(total, entry)) total.textContent = String(entry.total);
-  else total.classList.add('pk-tally'); // per-die: outcomes, not a sum
+  else if (renderOutcomeRows(total, entry)) {
+    peekRows = true;
+    total.classList.add('pk-tally', 'pk-outcomes'); // per-die: outcomes, not a sum
+  } else total.textContent = String(entry.total);
   peekEl.appendChild(total);
 
   const verdict = document.createElement('div');
@@ -1233,7 +1236,9 @@ function renderPeek() {
 
   const bd = document.createElement('div');
   bd.className = 'pk-breakdown';
-  if (entry) renderBreakdown(bd, entry, hidden);
+  // 2e: the rows already carry every source and face — the breakdown line
+  // only renders where the rows don't (sum systems, hidden rolls).
+  if (entry && !peekRows) renderBreakdown(bd, entry, hidden);
   peekEl.appendChild(bd);
 
   // The SAME action set as the banner (appendCardActions): ROLL ❯❯❯ and ✕
@@ -2164,6 +2169,69 @@ function renderTally(el, entry) {
   return true;
 }
 
+// 2e — THE ORGANIZED PER-DIE READ (Joe 2026-08-03: the reveal surfaces got
+// muddled — the tally line and the breakdown line repeated the same source
+// labels at the same weight, and reading WHICH die said WHAT meant
+// cross-referencing the two). One structure instead of two: each pool is a
+// ROW — its label leading, then one CHIP per die [dX face → outcome word,
+// tier-colored]. The word is the answer, the die+face is the evidence
+// beside it, and the separate breakdown line folds away wherever the rows
+// stand. The text layer keeps the read (audit rule): every chip carries
+// real text ('d8 7 Success'), every row leads with its pool, so copy/paste
+// and screen readers get the per-pool, per-die story line by line.
+// A quiet die keeps its evidence chip, dimmed; an all-quiet pool says so.
+function renderOutcomeRows(el, entry) {
+  el.textContent = '';
+  const outcomes = entryOutcomes(entry);
+  if (!outcomes) return false;
+  const groups = [];
+  if (entrySources(entry)) {
+    const byKey = new Map();
+    for (const o of outcomes) {
+      const k = partSource(entry, o.dieIndex) || '';
+      if (!byKey.has(k)) { byKey.set(k, { label: k, os: [] }); groups.push(byKey.get(k)); }
+      byKey.get(k).os.push(o);
+    }
+  } else {
+    groups.push({ label: '', os: outcomes });
+  }
+  for (const g of groups) {
+    const row = document.createElement('div');
+    row.className = 'tally-group outcome-row';
+    if (g.label) {
+      const l = document.createElement('span');
+      l.className = 'tally-src';
+      l.textContent = `${g.label} `; // real space: the grouping survives copy/paste
+      row.appendChild(l);
+    }
+    for (const o of g.os) {
+      const chip = document.createElement('span');
+      chip.className = 'oc-chip' + (o.word ? '' : ' oc-quiet');
+      const ev = document.createElement('span');
+      ev.className = 'oc-die';
+      ev.textContent = `${o.type} ${o.value}`; // the evidence, in the text layer
+      chip.appendChild(ev);
+      if (o.word) {
+        chip.append(' ');
+        const w = document.createElement('span');
+        w.className = `oc-word tier-${o.tier}`;
+        w.textContent = o.word;
+        chip.appendChild(w);
+      }
+      row.appendChild(chip);
+      row.append(' '); // copyable separator (flex ignores whitespace boxes)
+    }
+    if (!tallyOutcomes(g.os).length) {
+      const q = document.createElement('span');
+      q.className = 'tally-quiet';
+      q.textContent = 'quiet'; // the pool's answer IS the silence
+      row.appendChild(q);
+    }
+    el.appendChild(row);
+  }
+  return true;
+}
+
 function renderRollResults(entry, dice, fx = true) {
   renderChips(entry, dice);
   const hidden = entryHidden(entry);
@@ -2182,12 +2250,30 @@ function renderRollResults(entry, dice, fx = true) {
   }
 
   // Under a per-die system a sum is not a fact of play: the big number
-  // yields the hero slot to the outcome tally (usesTotal, meanings.js v2).
+  // yields the hero slot to the outcome ROWS (usesTotal, meanings.js v2).
   const sysTotals = activeSystem().usesTotal;
   const totalEl = document.getElementById('result-total');
   totalEl.style.display = sysTotals || hidden ? '' : 'none';
   totalEl.textContent = hidden ? '?' : entry.total;
-  renderBreakdown(document.getElementById('result-breakdown'), entry, hidden);
+
+  // The hero slot (2e): per-die systems render the outcome ROWS — pool by
+  // pool, die by die — and the separate breakdown line folds away (it
+  // repeated every source and face the rows already carry; that duplication
+  // was the muddle). Sum systems keep the meaning word + breakdown pair.
+  const meaningEl = document.getElementById('result-meaning');
+  const meaning = entryMeaning(entry);
+  const perDieRows = !hidden && renderOutcomeRows(meaningEl, entry);
+  if (perDieRows) {
+    meaningEl.className = 'result-tally result-outcomes';
+    meaningEl.title = 'each die reads its own outcome — the die and face beside each word';
+  } else {
+    meaningEl.textContent = meaning ? meaning.word : '';
+    meaningEl.className = meaning ? `tier-${meaning.tier}` : '';
+    meaningEl.title = meaning ? `${meaning.rank} column (${meaning.column})` : '';
+  }
+  const breakdownEl = document.getElementById('result-breakdown');
+  if (perDieRows) breakdownEl.textContent = '';
+  else renderBreakdown(breakdownEl, entry, hidden);
 
   // Interim dc verdict (fixed decision): above the meaning word, gold/red.
   // Hidden result, public stakes (goal 11): the DC still shows, the verdict
@@ -2205,17 +2291,6 @@ function renderRollResults(entry, dice, fx = true) {
   } else {
     verdictEl.textContent = '';
     verdictEl.className = '';
-  }
-
-  const meaningEl = document.getElementById('result-meaning');
-  const meaning = entryMeaning(entry);
-  if (!hidden && renderTally(meaningEl, entry)) {
-    meaningEl.className = 'result-tally';
-    meaningEl.title = 'each die reads its own outcome — Your Soul Deal';
-  } else {
-    meaningEl.textContent = meaning ? meaning.word : '';
-    meaningEl.className = meaning ? `tier-${meaning.tier}` : '';
-    meaningEl.title = meaning ? `${meaning.rank} column (${meaning.column})` : '';
   }
 
   banner.classList.remove('hidden', 'crit-success', 'crit-fail');
@@ -2940,9 +3015,12 @@ function renderVerdictCard(roll, entry) {
   const who = entry.playerName ? `${entry.playerName} · ` : '';
   document.getElementById('verdict-eyebrow').textContent = `${who}${entry.label || ''}`;
   const vTotal = document.getElementById('verdict-total');
+  // Per-die systems put NO number in the ring (2e): the old dice-count
+  // read as a total — the exact confusion Joe named. The ring stays a
+  // stage; the outcome rows below are the verdict.
   vTotal.textContent = hidden ? '?'
     : activeSystem().usesTotal ? String(entry.total)
-    : String(entry.parts.filter((p) => p.counts && !p.child).length); // dice, not a sum
+    : '';
 
   // Done everywhere (the result-surface redesign): the roller's Done keeps
   // the roll — dice to the shelf for everyone, result retained; a
@@ -2989,9 +3067,10 @@ function renderVerdictCard(roll, entry) {
     holderPre.innerHTML = '';
     return;
   }
-  if (renderTally(heroEl, entry)) {
-    // per-die read: the outcome words ARE the verdict
-    heroEl.classList.add('verdict-tally');
+  if (renderOutcomeRows(heroEl, entry)) {
+    // per-die read (2e): the outcome ROWS are the verdict — pool by pool,
+    // each die's face beside its word, same structure as the banner.
+    heroEl.classList.add('verdict-tally', 'verdict-outcomes');
   } else if (hasDc) {
     // The target verdict owns the whole read: entryMeaning is null when a dc
     // exists (the chart interprets bare rolls only), so no chart line ever
