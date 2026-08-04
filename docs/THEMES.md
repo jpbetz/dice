@@ -494,9 +494,13 @@ default re-publishes on every setDiceSet (debounced) and on hello, the
 no-op guard compares BOTH pools and set, and it relays through
 pools-changed + the roster projection so late joiners see it too — the
 pools-changed ingress carrying it forward was the third leg of the
-same whitelist lesson. Staging any rack's pool still carries only the
-POOL's identity; the owner's default never rides a staged chip — a
-borrowed unmarked recipe rolls the borrower's skin.
+same whitelist lesson. Staging a FOREIGN pool SNAPSHOTS what the tile
+showed (Joe's same-day correction: the tray "switched to the local
+players default" — superseding the first cut's borrower-skin rule):
+the resolved skin rides as a pin, explicit set or owner default alike,
+and an std-world pool pins 'std' rather than following the borrower.
+Your OWN rack stages unpinned — tile and tray both follow you, so
+they agree without pinning and keep repainting when you re-skin.
 The
 override rides every identity vehicle: the #g= codec grew a v4 third
 field (`name|category|set=` — set-less segments stay byte-identical to

@@ -5845,9 +5845,11 @@ function renderForeignPools(owner) {
       add.setAttribute('aria-hidden', 'true');
       add.textContent = '+';
       stage.append(art, nameEl, add);
-      // staging carries only the POOL's set: borrow an unmarked recipe and
-      // the dice you throw are yours — the owner's default never rides
-      stage.addEventListener('click', () => stageGroup({ name: g.name, notation: g.notation, set: g.set }));
+      // staging SNAPSHOTS what the tile showed (Joe 2026-08-04: the tray
+      // must not switch a staged foreign pool to the local default) — the
+      // resolved skin rides as a pin, 'std' included. Your OWN rack stages
+      // unpinned: tile and tray both follow you, so they already agree.
+      stage.addEventListener('click', () => stageGroup({ name: g.name, notation: g.notation, set: g.set || ownerSet }));
       tile.appendChild(stage);
       grid.appendChild(tile);
     }

@@ -419,9 +419,11 @@ DEFAULT set rides the pools publish too (top-level present-or-absent
 `set` on /api/pools, roster + pools-changed relay, republish on every
 set switch), so a foreign rack resolves explicit pool set → owner
 default → classics with every strip pinned — "if you look at another
-player's pools, they look identical to what that player sees."
-Staging still carries pool identity only: a borrowed unmarked recipe
-rolls the borrower's skin. What remains in §9 is art direction, not
+player's pools, they look identical to what that player sees." And
+staging a foreign pool snapshots that resolved skin as a pin (Joe's
+same-day correction — the tray had switched staged foreign pools to
+the borrower's default; 'std' worlds pin std): what you saw is what
+you stage. Your own rack still stages unpinned, following you. What remains in §9 is art direction, not
 plumbing: the creative-brief experiments continue, and 9b pool icons
 stands as its own item. **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
 natural AND supernatural — imagine what *faerie* dice, *dryadic* dice,

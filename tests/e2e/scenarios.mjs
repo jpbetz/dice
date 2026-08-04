@@ -3300,12 +3300,35 @@ export const scenarios = [
       const stillPinned = JSON.parse(await b.eval(`JSON.stringify(
         [...document.querySelectorAll('#groups-list .pool-tile.foreign img.die-art')].some((i) => i.dataset.artSet === 'emberforge.blackanvil'))`));
       assert.ok(stillPinned, 'the explicit pool pin outranks the owner default');
+
+      // staging SNAPSHOTS what the tile showed (Joe: a staged foreign pool
+      // must not switch to the local default) — the resolved skin rides
+      await b.eval(`[...document.querySelectorAll('#groups-list .pool-tile.foreign')]
+        .find((t) => { const i = t.querySelector('img.die-art'); return i && i.dataset.artSet === 'stormcall.boltglass'; })
+        .querySelector('.tile-stage').click()`);
+      const borrowed = await b.dbg('draftSets');
+      assert.ok(borrowed && borrowed.sets && borrowed.sets.includes('stormcall.boltglass'),
+        `staging an unmarked foreign pool keeps the OWNER's default (got ${JSON.stringify(borrowed)})`);
+      await b.eval(`document.getElementById('clear-tray').click()`);
+
       // back to std (the steps below expect Alice unthemed) — B follows too
       await a.eval(`window.__diceDebug.setDiceSet('std')`);
       await b.waitFor(
         `![...document.querySelectorAll('#groups-list .pool-tile.foreign img.die-art')].some((i) => i.dataset.artSet === 'stormcall.boltglass')`,
         { desc: "clearing the default clears B's view of the rack" },
       );
+      // the std flavor of the same rule: Alice-on-std stages as a 'std'
+      // PIN, not as null-following-the-borrower — B wears anvil to prove it
+      await b.eval(`window.__diceDebug.setDiceSet('emberforge.blackanvil')`);
+      await b.eval(`[...document.querySelectorAll('#groups-list .pool-tile.foreign')]
+        .find((t) => { const i = t.querySelector('img.die-art'); return i && i.dataset.artSet === 'std'; })
+        .querySelector('.tile-stage').click()`);
+      const borrowedStd = await b.dbg('draftSets');
+      assert.ok(borrowedStd && borrowedStd.sets && borrowedStd.sets.includes('std')
+        && !borrowedStd.sets.includes('emberforge.blackanvil'),
+        `an std-world pool stages PINNED to std under the borrower's house set (got ${JSON.stringify(borrowedStd)})`);
+      await b.eval(`document.getElementById('clear-tray').click()`);
+      await b.eval(`window.__diceDebug.setDiceSet('std')`);
       await b.eval(`[...document.querySelectorAll('#groups-list .pools-switcher .owner-chip')][0].click()`);
 
       // a MIXED draft: EACH die wears its own pool's set — pool B takes
