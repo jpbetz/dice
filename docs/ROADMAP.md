@@ -368,7 +368,10 @@ A. Staging itself confirmed good.)
   ADJUSTED: any standing mark must respect the quiet-chrome shelf
   contract (dot-only markers, the peek does the talking) — explore
   within it, e.g. the peek's identity line made worth the hover (E's
-  truncation finding compounds this).
+  truncation finding compounds this). Joe's same-day seated-shelf idea
+  (Tier 5 §6b: the cluster seated ON a visible card until cleared)
+  would answer this wholesale, at the price of reopening the
+  quiet-chrome contract — the §6b decision list owns that call.
 - S2 `no-newcomer-path-to-first-stage` — nothing teaches "tap a pool,
   then ROLL"; the cut ghost text (Joe 2026-08-03) left the compose loop
   undiscoverable by inspection. Joe owns the replacement direction;
@@ -510,6 +513,91 @@ ladder; all of it is polish or a new rung.
   skippable; Esc joins click/Space as ceremony skip.
 - Reveal-beat polish on top of step 4's §3.1 flip: chip chorus + verdict
   stagger on the revealed entry (the flip itself ships with visibility).
+
+### 6b. Dice-on-card — BG3-style card cinematics & the seated shelf
+(Joe 2026-08-04) — IDEAS + RESEARCH, decisions pending
+
+Two ideas from Joe, sharing one technical question ("can WebGL dice sit
+on top of an HTML panel?"):
+
+1. **Card cinematics.** Baldur's Gate 3 rolls its skill-check die ON an
+   ornate card — the card is the stage, the die drops onto it, bounces,
+   settles in its center, and the tally dresses around it. "It looks
+   super cool. I was wondering if we could achieve that for our
+   cinematics" — i.e., the check/cinematic ceremony's dice tumble on
+   the card instead of on open felt below a floating card.
+2. **The seated shelf.** Collected dice REMAIN physically on the table,
+   "with the card more clearly shown until cleared, and maybe placing
+   the dice on the card" — the cluster seated on a visible card/plaque
+   that carries its identity, instead of today's anonymous whisked pile
+   (see §2i E `shelf-clusters-anonymous-at-rest`, which this would
+   answer wholesale).
+
+**The research (2026-08-04, preserved).** A single WebGL canvas is ONE
+rectangle in the DOM stacking order: the browser composites whole
+elements, so HTML can sit entirely above or entirely below the canvas,
+never between two meshes. Four ways to get dice "on" a card:
+
+- **(i) The sandwich** — a second `alpha:true` canvas above the HTML
+  panel, `pointer-events:none`, camera-synced, rendering only the dice
+  that ride the card. Standard technique; real. Cost HERE: GL contexts
+  share nothing, so the top canvas re-instantiates dice geometry, the
+  themed materials, PMREM env, shader clocks, and its own post chain
+  (js/post.js) or the dice visibly lose their §9 dress mid-ceremony —
+  worst exactly where fidelity matters most. Extra-context precedent
+  exists (diceart bakery, lab rig), but "pixel-identical dice in a
+  second context" is a project, not a trick.
+- **(ii) Fully diegetic panel** — the card as a textured quad in-scene,
+  text rasterized into it. Correct depth/lighting/shadows, but the
+  panel's text becomes pixels: violates the text-layer audit rule
+  (copy/paste + screen readers keep the read) unless a parallel DOM is
+  maintained. Rejected as the general mechanism.
+- **(iii) The bakery illusion** — no live dice at all: bake THIS roll's
+  dice at settled orientation, rolled face up, via the diceart (type,
+  set) bakery seam, and place the images IN the HTML panel (the ledger
+  rows' evidence slot — composes with §2i A). Perfect compositing,
+  works on every surface incl. peek and log. The right answer for
+  "the panel shows the actual dice"; it cannot give tumble-on-card.
+- **(iv) IN-SCENE CARD SURFACE, DOM TYPOGRAPHY — the recommended shape
+  for both ideas.** The card's SURFACE is a textured plane mesh in the
+  3D scene (parchment/bronze plaque, slightly proud of the felt, a
+  static physics box so dice really land, bounce, and rest on it with
+  true shadows/effects); the card's TEXT stays HTML floating over the
+  canvas — exactly how chips, the mat-text decal, and every overlay
+  already work. No second context, no rasterized text, and the §9
+  effects ladder applies to the dice untouched. The ceremony already
+  controls the throw, and every projection went felt-rect-relative in
+  2h, so aiming the tumble at a card-shaped zone (screen rect → felt
+  coords) is existing machinery. BG3's look decomposes into: in-scene
+  stage + overlay type + a throw aimed at the stage.
+
+**Tradeoffs & decisions pending before either ships:**
+
+- **Quiet-chrome tension (the seated shelf).** The shipped shelf
+  contract is dot-only markers, the peek does the talking; a standing
+  card per collected roll is louder standing chrome. Decide: new
+  contract (the card IS the marker, identity at rest) vs. a middle
+  state (card fades in on approach, seats the dice always). This is a
+  doctrine change, Joe's call, not a drive-by.
+- **Felt real estate & Tier 2 interplay.** Seated cards occupy zones;
+  step 3 (landing zones, ordered eviction, resync) should probably land
+  first or together — a seated card is a natural zone visualization,
+  and eviction must know how to retire one.
+- **Ceremony surface ownership.** Does the in-scene card REPLACE the
+  HTML intent/verdict cards (one stage, §2.4 rewritten) or sit beneath
+  them as the landing stage while the HTML cards keep the typography?
+  Recommendation: keep HTML cards as the type layer (a11y unchanged,
+  aria-live intact), let the plane be pure stage.
+- **Effects budget.** A card plane wants shadows, maybe a decal edge,
+  maybe a die-light catch — cheap; but if the ceremony camera moves in
+  (BG3 frames tight), the felt LOD/vignette and post tuning need a
+  pass. Camera choreography is its own design decision.
+- **Physics honesty.** Dice must genuinely land on the raised card box
+  (face correction untouched — the correction happens before the
+  visual settle), and a card must never trap a die half-on/half-off
+  illegibly: the zone aim + a low lip, or a settle-nudge, decides this.
+- **Solo/static parity.** All of it is client render machinery — works
+  offline; nothing rides the wire except what already does.
 
 ### 7. Initiative helper
 
