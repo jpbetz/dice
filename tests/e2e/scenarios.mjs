@@ -3191,14 +3191,16 @@ export const scenarios = [
   {
     name: 'pool-set-override',
     tags: ['themes', 'groups'],
-    // §9 saved-pool set override: a pool can pin the dice set its rolls
-    // wear. The override rides staging — the draft wears it only when
-    // EVERY die shares it — and the wire (both tabs see the pool's skin);
-    // a mixed draft dilutes back to the roller's own set; 'std' PINS the
-    // classics even when the roller wears a house set; '' clears back to
-    // following the roller. The tile strip previews the override (art by
-    // contract, never pixels), and BOTH pickers — settings row and the
-    // popover identity strip — drive the same state.
+    // §9 saved-pool set override, PER DIE (Joe: physical dice): every die
+    // wears its own pool's set — a mixed draft rolls anvil + seaglass +
+    // the roller's std side by side, on every screen, and the wire carries
+    // per-die `sets` (uniform drafts keep the old singular field). 'std'
+    // PINS the classics even when the roller wears a house set; '' clears
+    // back to following the roller. A teammate's rack shows THEIR pool
+    // skins (the pools broadcast carries set — never the viewer's own).
+    // Tile strips preview overrides by contract (img src === the bakery's
+    // answer), and BOTH pickers — settings row and the popover identity
+    // strip — drive the same state.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
@@ -3259,14 +3261,44 @@ export const scenarios = [
           `${who}: the pool's roll wears the pool's set (got ${dice.map((d) => d.variant).join(',') || 'none'})`);
       }
 
-      // a MIXED draft dilutes to the roller's own set
+      // the rack relay: B browses ALICE's rack and sees the pool in
+      // ALICE's skin — pool identity rode the pools broadcast; it must
+      // never switch to the viewer's own set (the information-loss bug)
+      await b.waitFor(
+        `document.querySelectorAll('#groups-list .pools-switcher .owner-chip').length >= 2`,
+        { desc: "B's switcher shows Alice" },
+      );
+      await b.eval(`[...document.querySelectorAll('#groups-list .pools-switcher .owner-chip')].find((c) => c.textContent.includes('Alice')).click()`);
+      await b.waitFor(
+        `!!document.querySelector('#groups-list .pool-tile.foreign img.die-art[data-art-set]')`,
+        { desc: "Alice's rack renders with pinned skins" },
+      );
+      const foreignPin = JSON.parse(await b.eval(
+        `JSON.stringify(document.querySelector('#groups-list .pool-tile.foreign img.die-art[data-art-set]').dataset.artSet)`));
+      assert.equal(foreignPin, 'emberforge.blackanvil', "B sees Alice's pool in ALICE's skin, not B's");
+      await b.eval(`[...document.querySelectorAll('#groups-list .pools-switcher .owner-chip')][0].click()`);
+
+      // a MIXED draft: EACH die wears its own pool's set — pool B takes
+      // seaglass on a d8, a loose palette d6 stays the roller's std, and
+      // the anvil probe keeps its iron. One roll, three skins, both tabs.
+      assert.ok(pools.length >= 2, 'the rack has a second pool to probe');
+      const gid2 = pools[1].id;
+      await a.eval(`window.__diceDebug.editPool(${JSON.stringify(gid2)}, { name: 'OverrideProbeB', notation: '1d8', category: '', set: 'tidewrack.seaglass' })`);
       await a.eval(`document.getElementById('clear-tray').click()`);
       await a.eval(`document.querySelector('[data-group-id="${gid}"] .tile-stage').click()`);
+      await a.eval(`document.querySelector('[data-group-id="${gid2}"] .tile-stage').click()`);
       await a.eval(`document.querySelector('.die-btn img[data-art-type="d6"]').closest('button').click()`);
       const rid2 = await rollTheDraft();
-      const mixed = await diceOf(a, rid2);
-      assert.ok(mixed.length === 2 && mixed.every((d) => d.variant === 'std'),
-        `a mixed draft rolls the roller's own set (got ${mixed.map((d) => d.variant).join(',')})`);
+      await b.waitFor(
+        `(window.__diceDebug.sim(120), window.__diceDebug.tableDiceInfo().some((d) => d.rollId === ${JSON.stringify(rid2)}) && !window.__diceDebug.busy)`,
+        { desc: 'the mixed roll lands on B' },
+      );
+      for (const [tab, who] of [[a, 'A'], [b, 'B']]) {
+        const mixed = await diceOf(tab, rid2);
+        const kinds = mixed.map((d) => `${d.type}:${d.variant}`).sort().join(' ');
+        assert.equal(kinds, 'd6:emberforge.blackanvil d6:std d8:tidewrack.seaglass',
+          `${who}: each die wears its own pool's set (got ${kinds})`);
+      }
 
       // 'std' PINS the classics even when the roller wears a house set
       await a.eval(`window.__diceDebug.setDiceSet('emberforge.blackanvil')`);

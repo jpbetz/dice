@@ -156,6 +156,9 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
       // Dice-set identity (Tier 6 §9) — also outside the split, for the same
       // reason: cosmetic, rides beside either shape. Validated server-side.
       if (typeof opts.set === 'string' && opts.set) body.set = opts.set;
+      // Per-die sets (§9 mixed pools): aligned to the BASE dice; null entries
+      // wear the roll-level set. Also cosmetic, also server-validated.
+      if (Array.isArray(opts.sets) && opts.sets.some(Boolean)) body.sets = opts.sets.map((s) => s || null);
       if (typeof opts.notation === 'string' && opts.notation) {
         body.notation = opts.notation;
       } else {

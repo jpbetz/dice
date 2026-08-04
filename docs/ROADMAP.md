@@ -401,11 +401,19 @@ obsidian (shroud > set > std, same as the felt). e2e: themed-chrome
 seams are all closed**: a pool can pin the set its rolls wear (absent /
 'std'-pinned / house set), chosen through one compact select shared by
 the settings row and the popover identity strip ('Your set' default).
-The draft wears an override only when UNANIMOUS (traySets, aligned
-with traySources; box edits reset it); codec v4 and a YAML @-suffix
-carry it through every share shape, both failing closed on unknown
-ids. Save/variant flows inherit; rerolls and claims keep shipped
-semantics. e2e: pool-set-override (tags `themes`, `groups`); units in
+Same evening, PER-DIE (Joe: a mixed draft collapsing to one set read
+as broken, and a teammate's rack wore the VIEWER's skin — information
+loss at the whitelists): every die wears its own pool's set — wire
+`sets` aligned to the base dice (server-validated,
+redaction-preserved), provenance-chasing rollDieSet/entryDieSet for
+explosion/adv/reroll extras, per-die impact effects off sounds[].di
+(each recorded contact knows its die), per-die lights / bloom /
+reveals / shelf / log chips, and the pools broadcast carries pool sets
+so foreign racks show the OWNER's skins and staging them carries pool
+identity. Codec v4 and a YAML @-suffix carry the override through
+every share shape, failing closed on unknown ids. Save/variant flows
+inherit; rerolls keep per-die sets; claims keep shipped semantics.
+e2e: pool-set-override (tags `themes`, `groups`); units in
 urlgroups/portable tests. What remains in §9 is art direction, not
 plumbing: the creative-brief experiments continue, and 9b pool icons
 stands as its own item. **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,

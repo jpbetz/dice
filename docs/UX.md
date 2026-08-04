@@ -1486,9 +1486,11 @@ grammar; the shelf is owner-chip dress chips, tap to move, tap the
 pressed chip to demote to plain Pools, ＋ mints a shelf; the DICE SET
 row (§9 override, 2026-08-03) is the settings picker's own compact
 select with a 'Your set — <name>' default: an override makes the pool
-roll AS ITSELF — its dice wear that set for everyone whenever the pool
-rolls alone or with same-set company, 'Standard' pins the classics
-under any house set, and the tile strip previews the override; die rank is a
+roll AS ITSELF — its dice wear that set for everyone, DIE BY DIE (a
+mixed draft rolls each pool's skin side by side; loose dice wear the
+roller's), 'Standard' pins the classics under any house set, and the
+tile strip previews the override — on your rack and on a teammate's
+view of it alike; die rank is a
 ladder of six real die faces, tap to advance — count preserved, ivory
 ring never gold, fail-closed to pure NdX notations so a dc12 can never be
 dropped); below the hairline the unchanged roll-tweak draft. Complex

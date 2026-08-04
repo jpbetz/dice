@@ -966,6 +966,7 @@ function projectEntryFor(entry, viewerId) {
   // wear is table-public (like their name and color), so it survives
   // redaction. Values never ride it.
   if (entry.set) out.set = entry.set;
+  if (entry.sets) out.sets = entry.sets; // per-die skins are identity, not values
   // Unconditional because the field is only ever BORN pointing at a whole-
   // room-visible parent (handleRoll's entryExistsForAll birth gate) — a
   // shrouded viewer already knows that parent exists; "she rerolled that
@@ -1108,6 +1109,9 @@ function executeRoll(room, player, spec) {
   // offer wear the actual roller's set, stamped fresh on each request),
   // never to the request being replayed.
   if (spec.set) roll.set = spec.set;
+  // Per-die sets (§9 mixed pools): the same cosmetic present-or-absent ride,
+  // aligned to the base dice — each die keeps the skin of the pool it left.
+  if (spec.sets) roll.sets = spec.sets;
 
   // Auto-collect (§7.7): the felt belongs to ONE roll, so everything already on
   // it goes to the shelf as part of the incoming roll's arrival beat. The
@@ -1147,6 +1151,32 @@ function readSetField(value) {
   const id = cleanString(value.set, 64);
   if (!id || !SET_IDS.includes(id)) return { error: [400, `unknown dice set: ${id}`, 'unknown_set'] };
   return { id };
+}
+
+// Per-die dice sets (§9: a MIXED draft of pools, each with its own skin):
+// aligned to the request's BASE dice; elements are null (wear the roll-level
+// set) or a set id. 'std' is legal HERE, unlike the singular field, because
+// it PINS one die to Standard while the roll-level set may be a house set.
+// Absent or all-null ⇒ no field at all — the singular rule stands alone and
+// a plain roll's payload stays byte-for-byte what it always was.
+function readSetsField(value, diceCount) {
+  const raw = value.sets;
+  if (raw === undefined || raw === null) return { sets: null };
+  if (!Array.isArray(raw) || raw.length !== diceCount) {
+    return { error: [400, 'sets must be a list aligned to the dice', 'bad_sets'] };
+  }
+  let any = false;
+  const out = [];
+  for (const s of raw) {
+    if (s === undefined || s === null) { out.push(null); continue; }
+    const id = typeof s === 'string' ? cleanString(s, 64) : '';
+    if (!id || (id !== 'std' && !SET_IDS.includes(id))) {
+      return { error: [400, `unknown dice set: ${id || '?'}`, 'unknown_set'] };
+    }
+    out.push(id);
+    any = true;
+  }
+  return { sets: any ? out : null };
 }
 
 async function handleRoll(req, res) {
@@ -1197,6 +1227,10 @@ async function handleRoll(req, res) {
   const set = readSetField(body.value);
   if (set.error) return sendError(res, ...set.error);
   if (set.id) spec.set = set.id;
+
+  const sets = readSetsField(body.value, spec.dice.length);
+  if (sets.error) return sendError(res, ...sets.error);
+  if (sets.sets) spec.sets = sets.sets;
 
   const roll = executeRoll(room, player, spec);
   // The roller's own response is projected like every other egress: a held
@@ -1359,6 +1393,11 @@ function sanitizePools(value) {
     const rec = { name: cleanString(raw.name, MAX_NAME) || '', notation: parsed.canonical };
     const cat = cleanString(raw.category, MAX_NAME);
     if (cat) rec.category = cat;
+    // §9 set override: pool identity, so it rides the rack broadcast — a
+    // teammate's Ember pool shows ITS iron, not the viewer's skin. Unknown
+    // ids fall closed to no override; the pool survives.
+    const set = cleanString(raw.set, 64);
+    if (set && (set === 'std' || SET_IDS.includes(set))) rec.set = set;
     out.push(rec);
   }
   return out;

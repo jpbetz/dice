@@ -459,16 +459,33 @@ Saved pools carry a set override (shipped 2026-08-03 — §9's last open
 engineering seam): `g.set` on the group record — absent (follow the
 roller), 'std' (PIN the classics even under a house set; it resolves
 through the wire's present-or-absent rule at roll time), or any SETS
-id. One rule keeps the singular roll.set honest against a composable
-draft: staging stamps each die's override into traySets (aligned with
-traySources), and the draft wears an override only when it is
-UNANIMOUS — a loose palette die or a second pool's different skin
-dilutes the roll back to the roller's own set, and hand-editing the
-command box resets the array (notation carries no set; the box is the
-notation escape hatch). Save-morph and Save-as-variant inherit a
-uniform draft's set; rerolls, claims and offers keep their shipped
-semantics (the reroller's / claimer's set); a teammate's rack shows
-their overrides but staging from it never dresses YOUR hand. The
+id. EVERY DIE WEARS ITS OWN POOL'S SET (Joe, same evening: physical
+dice — the first cut collapsed a mixed draft to one set and that read
+as broken): staging stamps each die's override into traySets (aligned
+with traySources); a uniform draft rides the old singular `set` field
+and a mixed one sends per-die `sets` — aligned to the BASE dice, null
+= the roll-level set, 'std' legal per-die as a pin; server-validated
+(bad_sets / unknown_set), redaction-preserved (skins are identity, not
+values), and carried by all three client ingress whitelists. Consumers
+resolve through rollDieSet / entryDieSet, which chase perDie/origin
+provenance so explosion children, advantage partners and reroll
+replacements wear their base die's skin. The impact seam records WHICH
+die hit (sounds[].di, from the contact body — client-side, never wire
+data), so bursts, marks and the shock ring fire each die's own recipe:
+an iron die sparks beside a glass one in the same roll, and the ring
+pre-pick takes the hardest landing AMONG ring-set dice. Die lights,
+bloom flags, shimmer, the shelf, reveals and log chips (grouped by
+skin × type) are all per-die. Hand-editing the command box still
+resets overrides (notation carries no set; the box is the notation
+escape hatch). Save-morph and Save-as-variant inherit a uniform
+draft's set; rerolls carry the entry's per-die sets — the pool's die
+stays the pool's die — while the roll-level set stays the RE-roller's
+own; claims and offers keep shipped semantics. A teammate's rack shows
+THEIR pool skins (`set` rides the pools broadcast — sanitizePools
+keeps it; the first cut dropped it there, which is exactly how a
+whitelist loses identity silently), and staging any rack's pool
+carries the pool's own identity; the owner's PLAYER set never rides.
+The
 override rides every identity vehicle: the #g= codec grew a v4 third
 field (`name|category|set=` — set-less segments stay byte-identical to
 v3, old clients degrade gracefully), the portable YAML gained an

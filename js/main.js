@@ -589,6 +589,36 @@ function dieLabel(type, value) {
 // `set` is the roll's dice-set id (Tier 6 §9) — secrecy outranks identity:
 // a shrouded die is obsidian no matter whose it is. Unknown ids fall back
 // to std (an old log entry can outlive a renamed set).
+// Which set a given die of a ROLL wears (§9 mixed pools): per-die `sets`
+// (aligned to the BASE dice) outranks the roll-level `set`; explosion /
+// advantage / reroll extras chase perDie provenance to their base die — the
+// child of an iron die is iron. 'std' pins Standard for that die.
+function rollDieSet(roll, i) {
+  let j = typeof i === 'number' && i >= 0 ? i : -1;
+  let guard = 0;
+  while (j >= 0 && roll.perDie && roll.perDie[j] && guard++ < 8) {
+    const pd = roll.perDie[j];
+    const p = [pd.childOf, pd.pairOf, pd.rerollOf].find((x) => x !== null && x !== undefined);
+    if (p === undefined || p === null || p === j) break;
+    j = p;
+  }
+  const v = j >= 0 && roll.sets && typeof roll.sets[j] === 'string' ? roll.sets[j] : null;
+  return v || (typeof roll.set === 'string' ? roll.set : null);
+}
+
+// The entry-side twin: log entries carry provenance as parts[i].origin.
+function entryDieSet(entry, i) {
+  let j = typeof i === 'number' && i >= 0 ? i : -1;
+  let guard = 0;
+  while (j >= 0 && entry.parts && entry.parts[j]
+    && entry.parts[j].origin !== null && entry.parts[j].origin !== undefined
+    && entry.parts[j].origin !== j && guard++ < 8) {
+    j = entry.parts[j].origin;
+  }
+  const v = j >= 0 && entry.sets && typeof entry.sets[j] === 'string' ? entry.sets[j] : null;
+  return v || (typeof entry.set === 'string' ? entry.set : null);
+}
+
 function dieVariant(shrouded, set) {
   if (shrouded) return 'shroud';
   return set && SETS[set] ? set : 'std';
@@ -1014,9 +1044,9 @@ function shelveRoll(rollId, seq, animate) {
     }
   } else if (entry) {
     const hidden = entryHidden(entry);
-    dice = entry.parts.map((p) => {
+    dice = entry.parts.map((p, i) => {
       const shrouded = hidden || p.value == null;
-      return spawnShelvedDie(p.type, shrouded ? shroudPoseValue(p.type) : p.value, rollId, shrouded, entry.set);
+      return spawnShelvedDie(p.type, shrouded ? shroudPoseValue(p.type) : p.value, rollId, shrouded, entryDieSet(entry, i));
     });
   } else {
     return; // nothing to show yet; the state row reconciles on the next hello
@@ -1613,7 +1643,7 @@ function playRoll(roll) {
   // --- spawn with seeded throw params -------------------------------------
   const rng = mulberry32(roll.seed >>> 0);
   const side = Math.floor(rng() * 4);
-  const dice = types.map((t, i) => spawnDie(t, i, types.length, side, rng, shrouded, roll.set));
+  const dice = types.map((t, i) => spawnDie(t, i, types.length, side, rng, shrouded, rollDieSet(roll, i)));
   // Every die on the table is tagged with its roll (§7.5): a per-roll Done
   // removes exactly these dice and never touches a concurrent roll's.
   for (const d of dice) {
@@ -1626,26 +1656,36 @@ function playRoll(roll) {
   // outranks identity (an obsidian die casts nothing), and the phases use
   // their OWN seeded stream — every client flickers identically without
   // perturbing the throw physics' draws.
-  const lightRecipe = !shrouded && roll.set && SETS[roll.set] ? SETS[roll.set].light : null;
-  if (lightRecipe) {
+  if (!shrouded) {
     const lightRng = mulberry32((roll.seed ^ 0x9e3779b9) >>> 0);
-    for (const d of dice) dieLights.attach(d.mesh, lightRecipe, lightRng);
+    dice.forEach((d, i) => {
+      // per die (§9 mixed pools): each die carries ITS set's glow; the rng
+      // stream stays shared, and identical sets arrays on every client
+      // keep the draws — and therefore the phases — in lockstep
+      const ds = rollDieSet(roll, i);
+      const rec = ds && SETS[ds] ? SETS[ds].light : null;
+      if (rec) dieLights.attach(d.mesh, rec, lightRng);
+    });
   }
 
   // --- synchronous fast-forward, recording keyframes + sound events -------
-  const sounds = []; // {time, strength}
+  const sounds = []; // {time, strength, at, di}
+  const bodyDie = new Map(dice.map((d, i) => [d.body, i]));
   let simTime = 0;
   const recordCollision = (e) => {
     const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
     if (v > 2 && sounds.length < 400) {
       // The contact point rides along (Level 3): playback fires the set's
-      // particle burst exactly where the click sound says the die hit.
+      // particle burst exactly where the click sound says the die hit —
+      // and WHICH die (§9 mixed pools: the burst wears that die's set;
+      // die-die contacts credit bi, deterministically, on every client).
       const c = e.contact;
       const s = c.bi.type === CANNON.Body.DYNAMIC ? { b: c.bi, r: c.ri } : { b: c.bj, r: c.rj };
       sounds.push({
         time: simTime,
         strength: v,
         at: [s.b.position.x + s.r.x, s.b.position.y + s.r.y, s.b.position.z + s.r.z],
+        di: bodyDie.get(s.b) ?? null,
       });
     }
   };
@@ -1740,11 +1780,15 @@ function playRoll(roll) {
   // recorded landing (never a gentle one — the pop needs a slam), at the
   // moment the drain replays that impact.
   let ringIdx = null;
-  const postSet = !shrouded && roll.set && SETS[roll.set] ? SETS[roll.set].post : null;
-  if (postSet && postSet.ring) {
+  if (!shrouded) {
+    // per die (§9): the hardest landing AMONG ring-set dice — a std die's
+    // slam can't pop a bolt-glass discharge
     let best = 10;
     sounds.forEach((s, i) => {
-      if (s.at && s.strength > best) { best = s.strength; ringIdx = i; }
+      if (!s.at || s.strength <= best) return;
+      const ds = rollDieSet(roll, s.di);
+      const post = ds && SETS[ds] ? SETS[ds].post : null;
+      if (post && post.ring) { best = s.strength; ringIdx = i; }
     });
   }
 
@@ -1783,6 +1827,7 @@ function playRoll(roll) {
     rerollOfId: typeof roll.rerollOfId === 'string' ? roll.rerollOfId : null,
     // dice-set identity (Tier 6 §9): the burst drain and entryFromRoll read it
     set: typeof roll.set === 'string' ? roll.set : null,
+    sets: Array.isArray(roll.sets) && roll.sets.length ? roll.sets : null, // per-die (§9 mixed pools)
     seed: roll.seed,
     dice,
     keyframes,
@@ -1831,6 +1876,7 @@ function rollDice(types, label, opts = {}) {
     revealed: !opts.faceDown,
     rerollOfId,
     set: rollSetOf(opts) || null, // solo throws wear your set — or the pool's own (§9)
+    sets: Array.isArray(opts.sets) && opts.sets.some(Boolean) ? opts.sets.map((s) => s || null) : null,
     seed: randomSeed(),
     label: label || formula(types),
   });
@@ -1891,21 +1937,23 @@ function stepPlayback(dt) {
   // point, same strength. A shrouded roll stays silent on identity:
   // obsidian sheds nothing, marks nothing, casts nothing.
   const rollShrouded = roll.dice.length > 0 && roll.dice[0].shrouded === true;
-  const fxSet = !rollShrouded && roll.set && SETS[roll.set] ? SETS[roll.set] : null;
-  const burstRecipe = fxSet ? fxSet.particles : null;
-  const decalRecipe = fxSet ? fxSet.decal : null;
   while (roll.soundIdx < roll.sounds.length && roll.sounds[roll.soundIdx].time <= roll.time) {
     const sIdx = roll.soundIdx;
     const s = roll.sounds[roll.soundIdx++];
     playClick(s.strength);
-    if (burstRecipe && s.at) particleField.burst(burstRecipe, s.at, s.strength);
+    // Effects resolve per SOUND now (§9 mixed pools): each recorded contact
+    // knows which die hit (s.di), so an iron die sparks while its glass
+    // companion doesn't — in the same roll.
+    const ds = rollShrouded ? null : rollDieSet(roll, s.di);
+    const fxSet = ds && SETS[ds] ? SETS[ds] : null;
+    if (fxSet && fxSet.particles && s.at) particleField.burst(fxSet.particles, s.at, s.strength);
     // Marks want floor contacts with real force, and only so many per
     // roll — the felt remembers the landing, not every tremble.
-    if (decalRecipe && s.at && s.at[1] < DECAL_MAX_CONTACT_Y
+    if (fxSet && fxSet.decal && s.at && s.at[1] < DECAL_MAX_CONTACT_Y
       && s.strength >= DECAL_MIN_STRENGTH && roll.decalsStamped < DECAL_CAP_PER_ROLL) {
-      roll.decalsStamped += decalField.stamp(decalRecipe, [s.at[0], DECAL_Y, s.at[2]], s.strength);
+      roll.decalsStamped += decalField.stamp(fxSet.decal, [s.at[0], DECAL_Y, s.at[2]], s.strength);
     }
-    // Level 5: the pre-picked hardest landing pops its shock ring
+    // Level 5: the pre-picked hardest RINGING landing pops ITS die's ring
     if (sIdx === roll.ringIdx && fxSet && fxSet.post && fxSet.post.ring) {
       postStack.ring(s.at, camera, fxSet.post.ring);
     }
@@ -2248,6 +2296,7 @@ function entryFromRoll(roll) {
     rerollOfId: typeof roll.rerollOfId === 'string' ? roll.rerollOfId : undefined,
     // dice-set identity (Tier 6 §9): shelf reconstruction re-skins from this
     set: typeof roll.set === 'string' ? roll.set : undefined,
+    sets: Array.isArray(roll.sets) && roll.sets.length ? roll.sets : undefined, // per-die (§9)
     spec,
   };
 }
@@ -2762,26 +2811,29 @@ function refreshRevealSurfaces(rollId) {
 function beginRevealFlip(rollId, entry) {
   const dice = tableDice.filter((d) => d.rollId === rollId);
   const up = new THREE.Vector3(0, 1, 0);
-  // A felt reveal restores the set's LIGHT too (the shroud had smothered
-  // it); phases seed off the rollId so every client flickers alike.
-  const lightRecipe = entry.set && SETS[entry.set] ? SETS[entry.set].light : null;
+  // A felt reveal restores each die's LIGHT too (the shroud had smothered
+  // it); phases seed off the rollId so every client flickers alike (the
+  // shared rng draws in dice order — identical sets arrays keep lockstep).
   let seed = 5381;
-  if (lightRecipe) for (const ch of rollId) seed = ((seed * 33) ^ ch.charCodeAt(0)) >>> 0;
-  const lightRng = lightRecipe ? mulberry32(seed) : null;
+  for (const ch of rollId) seed = ((seed * 33) ^ ch.charCodeAt(0)) >>> 0;
+  const lightRng = mulberry32(seed);
   let started = false;
   dice.forEach((d, i) => {
     if (!d.shrouded) return;
     d.shrouded = false;
-    // Reveal restores the roller's SET, not bare std (Tier 6 §9): geometry
-    // swaps too — a themed set may wear its own bevel and tumble.
-    const die = getDie(d.type, dieVariant(false, entry.set));
+    // Reveal restores each die's OWN set, not bare std (Tier 6 §9, per-die
+    // since mixed pools): geometry swaps too — a themed set may wear its
+    // own bevel and tumble.
+    const ds = entryDieSet(entry, i);
+    const die = getDie(d.type, dieVariant(false, ds));
     d.mesh.geometry = die.geometry;
     d.mesh.material = die.materials;
-    d.variant = dieVariant(false, entry.set);
+    d.variant = dieVariant(false, ds);
     // the mesh was born shrouded (unflagged): the reveal restores the
     // set's bloom right along with its materials
-    const revealSet = SETS[entry.set];
+    const revealSet = ds ? SETS[ds] : null;
     if (revealSet && revealSet.post && revealSet.post.bloom) d.mesh.userData.bloom = true;
+    const lightRecipe = revealSet ? revealSet.light : null;
     if (lightRecipe) dieLights.attach(d.mesh, lightRecipe, lightRng);
     const p = entry.parts[i];
     const value = p && p.value != null ? p.value : null;
@@ -2812,12 +2864,13 @@ function revealShelvedRoll(rollId, entry) {
   dice.forEach((d, i) => {
     if (d.shrouded) {
       d.shrouded = false;
-      // same rule as beginRevealFlip: the reveal restores the roller's set
-      const die = getDie(d.type, dieVariant(false, entry.set));
+      // same rule as beginRevealFlip: the reveal restores each die's OWN set
+      const ds = entryDieSet(entry, i);
+      const die = getDie(d.type, dieVariant(false, ds));
       d.mesh.geometry = die.geometry;
       d.mesh.material = die.materials;
-      d.variant = dieVariant(false, entry.set);
-      const revealSet = SETS[entry.set];
+      d.variant = dieVariant(false, ds);
+      const revealSet = ds ? SETS[ds] : null;
       if (revealSet && revealSet.post && revealSet.post.bloom) d.mesh.userData.bloom = true;
     }
     const p = entry.parts[i];
@@ -3844,6 +3897,10 @@ window.__diceDebug = {
   fxInfo() {
     return { decals: decalField.count(), stamped: decalField.stampedTotal, decalsEnabled: decalField.enabled, lights: dieLights.info() };
   },
+  // §9 draft state: the per-die override bookkeeping behind mixed rolls.
+  get draftSets() {
+    return { dice: [...tray], sources: [...traySources], sets: [...traySets] };
+  },
   // Felt marks ship dark (2026-08-03) — this re-arms stamping for THIS
   // page only (trials, tests). The lasting switch is
   // DECALS_DEFAULT_ENABLED in decals.js.
@@ -4101,6 +4158,25 @@ function trayRollSet() {
   const s0 = traySets[0];
   if (!s0) return null;
   return traySets.every((s) => s === s0) ? s0 : null;
+}
+// Per-die sets for the OUTGOING draft roll (§9 mixed pools: EACH die wears
+// its own pool's skin — physical dice, Joe 2026-08-03), aligned to the dice
+// actually sent. The tray branch sends tray order (traySets aligns 1:1);
+// the box branch sends the canonical order, so entries map back through
+// (source label, type) — one stage call shares one override, which makes
+// the pair a stable key. Returns null when no die carries an override.
+function draftDieSets(dice, sources) {
+  if (!traySets.some(Boolean) || traySets.length !== tray.length) return null;
+  const byKey = new Map();
+  tray.forEach((t, i) => {
+    const k = `${traySources[i] || ''}|${t}`;
+    if (!byKey.has(k)) byKey.set(k, traySets[i] || null);
+  });
+  const out = dice.map((t, i) => {
+    const src = (sources && sources[i]) || '';
+    return byKey.get(`${src}|${t}`) ?? null;
+  });
+  return out.some(Boolean) ? out : null;
 }
 
 // Open ± popover state (see the popover section below). Declared this early
@@ -4490,9 +4566,12 @@ function rollDraft() {
     // the online and solo paths disagree about the same text.
     const intent = notationIntent(cmdInput.value.trim(), cmdResult);
     // §9: the box branch is the STAGED draft's own roll path (staging syncs
-    // the box), so the pool override rides here too. traySets makes this
-    // honest — a hand-edited box already reset it (paintCmd's tray resync).
-    const draftSet = trayRollSet();
+    // the box), so pool overrides ride here too — PER DIE (mixed pools):
+    // uniform drafts keep the old singular field, mixed ones send `sets`.
+    // traySets keeps this honest — a hand-edited box already reset it
+    // (paintCmd's tray resync).
+    const perDie = draftDieSets(cmdResult.spec.dice, cmdResult.spec.sources || null);
+    const uniform = perDie && perDie.every((s) => s && s === perDie[0]) ? perDie[0] : null;
     requestRoll(cmdResult.spec.dice, cmdResult.comment || cmdResult.canonical, {
       notation: intent.notation,
       canonical: intent.canonical,
@@ -4502,13 +4581,14 @@ function rollDraft() {
       visibility: visOfParse(cmdResult) || undefined,
       dc: cmdResult.dc ?? undefined,
       exp: intent.exp || undefined,
-      ...(draftSet ? { set: draftSet } : {}),
+      ...(uniform ? { set: uniform } : perDie ? { sets: perDie } : {}),
     });
   } else if (tray.length) {
-    const draftSet = trayRollSet();
+    const perDie = draftDieSets(tray, traySources);
+    const uniform = perDie && perDie.every((s) => s && s === perDie[0]) ? perDie[0] : null;
     requestRoll([...tray], formula(tray), {
       sources: traySources.some(Boolean) ? [...traySources] : undefined,
-      ...(draftSet ? { set: draftSet } : {}),
+      ...(uniform ? { set: uniform } : perDie ? { sets: perDie } : {}),
     });
   }
 }
@@ -4787,11 +4867,21 @@ function paintCmd() {
       : res.spec.dice.map(() => null);
     if (tray.join('\u0000') !== res.spec.dice.join('\u0000')
         || traySources.map((s) => s || '').join('\u0000') !== boxSources.map((s) => s || '').join('\u0000')) {
+      // §9: remap per-die overrides through (source, type) BEFORE the
+      // arrays swap. The canonical REORDERS dice (grouped spelling), and a
+      // reorder must not cost identity — the first cut reset here and
+      // silently stripped every mixed draft the moment a palette die
+      // joined. Only dice with no staged (source, type) partner reset:
+      // notation carries no set, so a hand-typed stranger is YOUR hand —
+      // but a die still wearing its pool's attribution keeps its skin.
+      const stagedSet = new Map();
+      tray.forEach((t, i) => {
+        const k = `${traySources[i] || ''}|${t}`;
+        if (!stagedSet.has(k)) stagedSet.set(k, traySets[i] || null);
+      });
       tray = [...res.spec.dice];
       traySources = boxSources;
-      // notation carries no set override — a box-driven draft is YOUR hand
-      // (§9: the override survives staging, not hand-editing)
-      traySets = tray.map(() => null);
+      traySets = tray.map((t, i) => stagedSet.get(`${boxSources[i] || ''}|${t}`) ?? null);
       renderTray();
     }
   }
@@ -4853,9 +4943,10 @@ function commandRoll(input) {
   if (!res.ok) return res;
   const intent = notationIntent(raw, res);
   // §9: Enter on a box the STAGING itself filled is the same roll as the
-  // cluster click — the pool override rides. Any hand-typed divergence
+  // cluster click — pool overrides ride, per die. Any hand-typed divergence
   // already reset traySets via paintCmd, so this stays truthful.
-  const draftSet = trayRollSet();
+  const perDie = draftDieSets(res.spec.dice, res.spec.sources || null);
+  const uniform = perDie && perDie.every((s) => s && s === perDie[0]) ? perDie[0] : null;
   requestRoll(res.spec.dice, res.comment || res.canonical, {
     notation: intent.notation,
     canonical: intent.canonical,
@@ -4865,7 +4956,7 @@ function commandRoll(input) {
     visibility: visOfParse(res) || undefined, // secret / w: (goal 11)
     dc: res.dc ?? undefined,
     exp: intent.exp || undefined,
-    ...(draftSet ? { set: draftSet } : {}),
+    ...(uniform ? { set: uniform } : perDie ? { sets: perDie } : {}),
   });
   return res;
 }
@@ -5313,8 +5404,9 @@ function stageGroup(g) {
     setPanel('pools', true);
   }
   const label = sanitizeSourceLabel(g.name);
-  // §9: the pool's set override rides each staged die (foreign racks pass
-  // {name, notation} only — a teammate's override never dresses YOUR hand)
+  // §9: the pool's set override rides each staged die — from YOUR rack or a
+  // teammate's alike (identity belongs to the POOL; their player-set never
+  // rides, only what the pool itself pinned)
   const gSet = typeof g.set === 'string' && (g.set === 'std' || SETS[g.set]) ? g.set : null;
   const wasEmpty = tray.length === 0;
   const dropped = [];
@@ -5399,6 +5491,7 @@ function publishPools() {
   net.setPools(groups.slice(0, 40).map((g) => {
     const rec = { name: g.name || '', notation: g.notation };
     if (g.category) rec.category = g.category;
+    if (g.set) rec.set = g.set; // §9: pool identity rides the rack broadcast
     return rec;
   }));
 }
@@ -5736,7 +5829,10 @@ function renderForeignPools(owner) {
       stage.setAttribute('aria-label', `Stage ${label} \u2014 ${g.notation}`);
       const art = document.createElement('span');
       art.className = 'tile-art';
-      art.appendChild(buildDieStrip(res.spec.dice, 2, { grouped: true }));
+      // §9: a teammate's pool shows ITS skin, never the viewer's — the set
+      // rode the rack broadcast, and staging carries it too (pool identity
+      // belongs to the pool, whoever's rack it stands on)
+      art.appendChild(buildDieStrip(res.spec.dice, 2, { grouped: true, set: g.set || null }));
       const nameEl = document.createElement('span');
       nameEl.className = 'tile-name' + (g.name ? '' : ' as-notation');
       nameEl.textContent = label;
@@ -5745,7 +5841,7 @@ function renderForeignPools(owner) {
       add.setAttribute('aria-hidden', 'true');
       add.textContent = '+';
       stage.append(art, nameEl, add);
-      stage.addEventListener('click', () => stageGroup({ name: g.name, notation: g.notation }));
+      stage.addEventListener('click', () => stageGroup({ name: g.name, notation: g.notation, set: g.set }));
       tile.appendChild(stage);
       grid.appendChild(tile);
     }
@@ -7036,15 +7132,20 @@ function renderLog() {
     // shrouded entry keeps its tokens. No-GL environments keep text only.
     let tokensHtml = '';
     {
-      const counts = new Map();
-      for (const p of entry.parts) counts.set(p.type, (counts.get(p.type) || 0) + 1);
+      // Chips wear each DIE's own set (§9 mixed pools) — the log is a
+      // record of whose dice landed, not what I'd throw next — grouped by
+      // (skin, type): anvil ×2 then seaglass ×1, never one homogenized
+      // strip. A hidden entry wears the obsidian shroud, same precedence
+      // as the felt: die TYPES are public (goal 11), identity is not.
+      const counts = new Map(); // 'variant|type' -> count (ids never carry '|')
+      entry.parts.forEach((p, i) => {
+        const v = hidden ? 'shroud' : (entryDieSet(entry, i) || 'std');
+        const k = `${v}|${p.type}`;
+        counts.set(k, (counts.get(k) || 0) + 1);
+      });
       const bits = [];
-      // Chips wear the ROLL's set (§9 chrome) — the log is a record of
-      // whose dice landed, not what I'd throw next. A hidden entry wears
-      // the obsidian shroud, same precedence as the felt: die TYPES are
-      // public (goal 11), identity is not.
-      const chipVariant = hidden ? 'shroud' : (entry.set || 'std');
-      for (const [t, cnt] of counts) {
+      for (const [k, cnt] of counts) {
+        const [chipVariant, t] = k.split('|');
         const u = dieArtURL(t, chipVariant);
         if (!u) { bits.length = 0; break; }
         bits.push(`<img class="die-art log-die" src="${u}" alt="" draggable="false">`
@@ -8084,6 +8185,10 @@ function rerollOpts(entry) {
     dc: Number.isInteger(entry.dc) ? entry.dc : undefined,
     exp: entry.spec.exp || undefined, // a rerolled Check comes back a Check
     rerollOfId: entry.rollId || undefined, // a CLAIM; the server substantiates it
+    // §9: per-die pool skins are part of the spec being rerolled — the
+    // pool's die stays the pool's die; the roll-level set stays the
+    // RE-roller's own (the shipped stamped-fresh rule).
+    sets: Array.isArray(entry.sets) && entry.sets.length ? entry.sets : undefined,
   };
 }
 
@@ -8603,6 +8708,7 @@ function replaySettledRoll(r) {
     notation: r.notation,
     rerollOfId: r.rerollOfId,   // B3: a reload's on-felt roll keeps its mark
     set: r.set,                 // Tier 6 §9: a reload keeps the roller's skin
+    sets: r.sets,               // §9 per-die (mixed pools survive a reload)
     playerId: r.playerId,
     seed: r.seed,
     label: r.label || formula(r.dice || []),
@@ -8745,6 +8851,7 @@ function handleNetEvent(type, data) {
         notation: data.notation,
         rerollOfId: data.rerollOfId,   // B3: server-substantiated provenance
         set: data.set,                 // Tier 6 §9: the roller's dice-set skin
+        sets: data.sets,               // §9 per-die (mixed pools)
         playerId: data.playerId,
         seed: data.seed,
         label: data.label || formula(data.dice || []),
