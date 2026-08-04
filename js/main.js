@@ -607,20 +607,14 @@ function playClick(strength) { playImpact(strength, null); }
 // ---------------------------------------------------------------------------
 // Roll engine: simulate-ahead + keyframe playback + face correction
 //
-// playRoll(roll) sets up the cannon world for the roll's dice (all randomness
-// seeded via mulberry32(roll.seed)), hoists the settle loop's state onto
-// currentRoll.simState, and returns immediately. tick() then runs the
-// producer in ≤ PHYSICS_SLICE_BUDGET_MS wall-clock slices via
-// stepPhysicsSlice, and finalizeProducer applies the per-die corrective
+// playRoll(roll) synchronously fast-forwards the cannon world for the roll's
+// dice (all randomness seeded via mulberry32(roll.seed)), recording per-die
+// keyframes and collision-sound events. It then computes a per-die corrective
 // body-frame rotation R so each die lands showing roll.values[i] (the
 // authoritative value — locally generated in solo mode, server-generated in
-// online mode). stepPlayback plays the keyframes back in tick(dt), holding
-// for a 3-frame warmup buffer and capping time at (frames-2)*FIXED_DT while
-// the producer is still going. Settled dice keep frozen mass-0 static bodies
-// in the world so later fast-forwards collide with them. The replaySettled
-// path (hello resync) and the four sync callers (skipCeremony,
-// skipPlainPlayback, fastForwardPlayback) call finishProducerSync to
-// exhaust the producer in one call when they need a settled world at hand.
+// online mode), and plays the keyframes back in tick(dt). Settled dice keep
+// frozen mass-0 static bodies in the world so later fast-forwards collide
+// with them.
 // ---------------------------------------------------------------------------
 
 let tableDice = [];        // every die on the table; settled dice have static bodies
@@ -1758,46 +1752,21 @@ function playRoll(roll) {
     });
   }
 
-  // --- sliced producer setup (Commit C — sliced fast-forward) --------------
-  // The sim loop no longer runs synchronously inside playRoll. Its state is
-  // hoisted onto currentRoll.simState; `stepPhysicsSlice` pumps it in ≤8 ms
-  // wall-clock slices from tick() (one slice per rAF), and `finalizeProducer`
-  // does the face-correction / body-freeze / ringIdx work that used to sit
-  // below the sync loop. This closes the roll-arrival long-task budget
-  // (perf-baseline §0a): 40d6's 460-1450 ms sync burst becomes a producer
-  // running behind the consumer, invisible on the main thread. Every escape
-  // path that needed the old sync-loop invariant (skipCeremony,
-  // skipPlainPlayback, fastForwardPlayback, replaySettledRoll) calls
-  // `finishProducerSync` first so total sim wall stays where it was.
+  // --- synchronous fast-forward, recording keyframes + sound events -------
   const sounds = []; // {time, strength, at, di}
   const bodyDie = new Map(dice.map((d, i) => [d.body, i]));
-  const snapshot = (d) => ({
-    pos: new THREE.Vector3().copy(d.body.position),
-    quat: new THREE.Quaternion().copy(d.body.quaternion),
-  });
-  const keyframes = dice.map((d) => [snapshot(d)]);
-
-  // Identity correction lives on every die so a consumer tick that runs while
-  // the producer is still warming (before finalizeProducer replaces it with
-  // the real face-alignment rotation) can safely do `q.multiply(d.correction)`.
-  // The 3-frame warmup buffer means this identity is only visible for the
-  // spawn-pose held frame; finalize replaces it before playback advances.
-  for (const d of dice) {
-    d.correction = new THREE.Quaternion();
-    d.finalPos = null;
-    d.finalQuat = null;
-    d.stillTime = 0;
-    d.frozen = false;
-    d.frozenPose = null;
-  }
-
+  let simTime = 0;
   const recordCollision = (e) => {
     const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
     if (v > 2 && sounds.length < 400) {
+      // The contact point rides along (Level 3): playback fires the set's
+      // particle burst exactly where the click sound says the die hit —
+      // and WHICH die (§9 mixed pools: the burst wears that die's set;
+      // die-die contacts credit bi, deterministically, on every client).
       const c = e.contact;
       const s = c.bi.type === CANNON.Body.DYNAMIC ? { b: c.bi, r: c.ri } : { b: c.bj, r: c.rj };
       sounds.push({
-        time: currentRoll ? currentRoll.simState.simTime : 0,
+        time: simTime,
         strength: v,
         at: [s.b.position.x + s.r.x, s.b.position.y + s.r.y, s.b.position.z + s.r.z],
         di: bodyDie.get(s.b) ?? null,
@@ -1806,87 +1775,21 @@ function playRoll(roll) {
   };
   for (const d of dice) d.body.addEventListener('collide', recordCollision);
 
-  // Meshes rest at the spawn pose while the producer warms up (design's
-  // "warming" state — invisible under ≤ 3 rAF ticks). Ceremony 'declare'
-  // hides them anyway; plain rolls flash the launch pose briefly.
-  dice.forEach((d, i) => {
-    d.mesh.position.copy(keyframes[i][0].pos);
-    d.mesh.quaternion.copy(keyframes[i][0].quat).multiply(d.correction);
+  const snapshot = (d) => ({
+    pos: new THREE.Vector3().copy(d.body.position),
+    quat: new THREE.Quaternion().copy(d.body.quaternion),
   });
+  const keyframes = dice.map((d) => [snapshot(d)]);
 
-  currentRoll = {
-    rollId: roll.rollId || null,
-    t: roll.t || null,
-    label: roll.label || formula(types),
-    playerName: roll.playerName || null,
-    color: roll.color || null,
-    playerId: roll.playerId || null,
-    values: values ? values.slice() : null,
-    perDie: Array.isArray(roll.perDie) && roll.perDie.length === types.length
-      ? roll.perDie
-      : types.map(() => ({ counts: true, reason: null, childOf: null })),
-    modifier: roll.modifier || 0,
-    total: typeof roll.total === 'number' ? roll.total : null,
-    spec: roll.spec || { dice: types, mods: null },
-    dc: Number.isInteger(roll.dc) ? roll.dc : null,
-    exp: sanitizeExp(roll.exp),
-    faceDown: !!roll.faceDown,
-    revealed: values ? roll.revealed !== false : roll.revealed === true,
-    redacted: !values,
-    visMode: roll.visMode || (roll.visibility && roll.visibility.mode) || null,
-    visibility: roll.visibility || null,
-    revealAuthority: roll.revealAuthority || null,
-    notation: typeof roll.notation === 'string' ? roll.notation : null,
-    rerollOfId: typeof roll.rerollOfId === 'string' ? roll.rerollOfId : null,
-    set: typeof roll.set === 'string' ? roll.set : null,
-    sets: Array.isArray(roll.sets) && roll.sets.length ? roll.sets : null,
-    seed: roll.seed,
-    dice,
-    keyframes,
-    sounds,
-    // Producer state (Commit C): frames/duration grow as slices run and
-    // freeze when finalizeProducer stamps them. `producerDone` is the
-    // gate every consumer path checks; `simState` is the hoisted sync-loop
-    // locals so a slice can pause/resume without losing progress.
-    frames: 1,
-    duration: Infinity,
-    producerDone: false,
-    simState: {
-      rng, values, shrouded, srcRoll: roll,
-      bodyDie, recordCollision, snapshot,
-      simTime: 0,
-      nudges: 0,
-    },
-    time: 0,
-    soundIdx: 0,
-    decalsStamped: 0,
-    ringIdx: null,
-    ceremony: null,
-    done: false,
-    replaySettled: !!roll.replaySettled,
-  };
-
-  if (currentRoll.exp) beginCeremony(currentRoll);
-
-  // A replaySettled roll (hello resync) must jump straight to its final
-  // keyframe — never slice, never play sound. Exhaust the producer here so
-  // the caller's fast-forward `stepPlayback(duration - time)` sees a real
-  // duration and lands on finalPos/finalQuat.
-  if (currentRoll.replaySettled) finishProducerSync(currentRoll);
-}
-
-// One budgeted slice of the producer. Runs the seeded settle loop in
-// ≤ `budgetMs` wall-clock, then hands the rAF back so playback and the
-// rest of tick() get their share of the frame. When settle criteria fire
-// (or SETTLE_CAP), calls finalizeProducer and returns.
-function stepPhysicsSlice(roll, budgetMs) {
-  if (!roll || roll.producerDone) return;
-  const s = roll.simState;
-  const dice = roll.dice;
-  const keyframes = roll.keyframes;
-  const rng = s.rng;
-  const budget = Number.isFinite(budgetMs) ? budgetMs : Infinity;
-  const start = performance.now();
+  // Perf pass §0a (Commit A — per-die settle): each die freezes into a STATIC
+  // mass-0 body the moment it lands clean, so a group of 40 dice no longer
+  // waits on the slowest tumbler and its keyframe array stops allocating.
+  // The cached `frozenPose` is shared BY REFERENCE across every subsequent
+  // push, preserving the invariant that `keyframes[i].length` is uniform and
+  // `kf[kf.length - 1]` is the final pose — face correction runs unchanged.
+  // Cocked dice stay dynamic (their `stillTime` triggers the same nudge
+  // branch); SETTLE_CAP is retained as last-resort safety at the group level.
+  dice.forEach((d) => { d.stillTime = 0; d.frozen = false; d.frozenPose = null; });
 
   const freezeInPlace = (d) => {
     d.body.velocity.setZero();
@@ -1894,15 +1797,20 @@ function stepPhysicsSlice(roll, budgetMs) {
     d.body.mass = 0;
     d.body.type = CANNON.Body.STATIC;
     d.body.updateMassProperties();
-    d.body.sleep();
+    d.body.sleep(); // belt + suspenders; SAP-friendly
     d.frozen = true;
-    d.frozenPose = s.snapshot(d);
+    d.frozenPose = snapshot(d); // reused every subsequent step; no alloc
   };
 
-  while (performance.now() - start < budget) {
+  let nudges = 0;
+  for (;;) {
     world.step(FIXED_DT);
-    s.simTime += FIXED_DT;
+    simTime += FIXED_DT;
 
+    // Per-die stillness accumulator + freeze test. Thresholds match the old
+    // group predicate verbatim (do NOT tune here). Cocked dice never freeze —
+    // they stay dynamic until the nudge branch below lands them clean or
+    // SETTLE_CAP fires.
     for (const d of dice) {
       if (d.frozen) continue;
       const stillNow =
@@ -1916,58 +1824,46 @@ function stepPhysicsSlice(roll, budgetMs) {
       }
     }
 
-    for (let i = 0; i < dice.length; i++) {
-      keyframes[i].push(dice[i].frozen ? dice[i].frozenPose : s.snapshot(dice[i]));
-    }
-    roll.frames = keyframes[0].length;
+    dice.forEach((d, i) => keyframes[i].push(d.frozen ? d.frozenPose : snapshot(d)));
 
     const allSettled = dice.every((d) => d.frozen);
-    if (allSettled) { finalizeProducer(roll); return; }
-    if (s.simTime >= SETTLE_CAP) {
-      for (const d of dice) if (!d.frozen) freezeInPlace(d);
-      finalizeProducer(roll);
-      return;
-    }
-    // Cocked nudge branch (unfrozen dice stuck against a wall/other die).
-    const cocked = dice.filter((d) => !d.frozen && d.stillTime >= SETTLE_STILL);
-    if (cocked.length && s.nudges < 3) {
-      s.nudges++;
-      for (const d of cocked) {
-        d.body.wakeUp();
-        d.body.velocity.set((rng() - 0.5) * 4, 7, (rng() - 0.5) * 4);
-        d.body.angularVelocity.set((rng() - 0.5) * 14, (rng() - 0.5) * 14, (rng() - 0.5) * 14);
-        d.stillTime = 0;
+    if (!allSettled && simTime < SETTLE_CAP) {
+      // Nudge cocked dice that have accumulated enough stillTime to be judged
+      // stuck. Frozen bodies are STATIC — filter them out (waking a static is
+      // a no-op at best, a determinism hazard at worst).
+      const cocked = dice.filter((d) => !d.frozen && d.stillTime >= SETTLE_STILL);
+      if (cocked.length && nudges < 3) {
+        nudges++;
+        for (const d of cocked) {
+          d.body.wakeUp();
+          d.body.velocity.set((rng() - 0.5) * 4, 7, (rng() - 0.5) * 4);
+          d.body.angularVelocity.set((rng() - 0.5) * 14, (rng() - 0.5) * 14, (rng() - 0.5) * 14);
+          d.stillTime = 0;
+        }
       }
+      continue;
     }
+    // SETTLE_CAP fired with dice still dynamic → force-freeze so the block
+    // below has a stable pose to correct. Same STATIC/mass=0 transition the
+    // clean-landing branch uses; face correction rotates each to its
+    // server-declared value regardless of the pre-freeze orientation.
+    for (const d of dice) if (!d.frozen) freezeInPlace(d);
+    break;
   }
-}
+  for (const d of dice) d.body.removeEventListener('collide', recordCollision);
 
-// Slice-agnostic escape hatch: run the producer to completion right now.
-// Used by paths that historically had a settled world at hand (visibility
-// catch-up, ceremony skip, plain-playback skip, replaySettledRoll).
-function finishProducerSync(roll) {
-  if (!roll || roll.producerDone) return;
-  stepPhysicsSlice(roll, Infinity);
-}
-
-// The old sync-loop tail: face correction + body freeze + ringIdx + initRest,
-// with the collide-listener teardown that ends the recorded sound window.
-// Sets roll.duration, marks producerDone, freezes bodies at the corrected
-// pose so later rolls collide with real STATIC bodies.
-function finalizeProducer(roll) {
-  const s = roll.simState;
-  const dice = roll.dice;
-  const keyframes = roll.keyframes;
-  const values = s.values;
-  const shrouded = s.shrouded;
-  const srcRoll = s.srcRoll;
-
-  for (const d of dice) d.body.removeEventListener('collide', s.recordCollision);
-
+  // --- face correction: body-frame pre-rotation R per die ------------------
+  // qF = final body orientation. u_body = qF^-1 * up (landed "up" in body
+  // frame). n_v = body-frame normal of the face showing the target value.
+  // R rotates n_v -> u_body, so rendering q * R for the whole tumble makes
+  // the die settle with the target face up.
   const up = new THREE.Vector3(0, 1, 0);
   dice.forEach((d, i) => {
     const kf = keyframes[i];
     const qF = kf[kf.length - 1].quat;
+    // Shrouded dice keep the identity correction: blank faces have no target
+    // value, so the die lands exactly where physics left it (poses may diverge
+    // across clients — there is nothing to read, so that's fine).
     d.correction = new THREE.Quaternion();
     if (!shrouded) {
       const uBody = up.clone().applyQuaternion(qF.clone().invert()).normalize();
@@ -1982,9 +1878,15 @@ function finalizeProducer(roll) {
         console.warn(`face correction mismatch on ${d.type}: expected ${values[i]}, reads ${check.value}`);
       }
     }
-    initRest(d, srcRoll, i);
+    // Slice 3: seed the settled-die cadence off the FINAL pose (stepResting
+    // reads d.finalPos/d.finalQuat live, so a later reveal correction at
+    // beginRevealFlip becomes the new baseline for free — no re-init).
+    initRest(d, roll, i);
   });
 
+  // --- freeze bodies at the corrected final pose ---------------------------
+  // Settled dice no longer need live physics, but later fast-forwards must
+  // still collide with them, so keep static mass-0 bodies in the world.
   for (const d of dice) {
     d.body.velocity.setZero();
     d.body.angularVelocity.setZero();
@@ -1995,29 +1897,84 @@ function finalizeProducer(roll) {
     d.body.quaternion.copy(d.finalQuat);
   }
 
-  // Re-stamp meshes on frame 0 with the corrected correction so the very
-  // first playback tick doesn't pop between spawn.quat and spawn.quat*R.
+  // --- start playback ------------------------------------------------------
   dice.forEach((d, i) => {
     d.mesh.position.copy(keyframes[i][0].pos);
     d.mesh.quaternion.copy(keyframes[i][0].quat).multiply(d.correction);
   });
 
-  // Level 5: hardest ring-set landing wins the shock wave. Deterministic
-  // scan over the completed sounds array — index survives the producer.
+  // Level 5: a ring set's shock wave fires ONCE, from the roll's hardest
+  // recorded landing (never a gentle one — the pop needs a slam), at the
+  // moment the drain replays that impact.
   let ringIdx = null;
   if (!shrouded) {
+    // per die (§9): the hardest landing AMONG ring-set dice — a std die's
+    // slam can't pop a bolt-glass discharge
     let best = 10;
-    roll.sounds.forEach((snd, i) => {
-      if (!snd.at || snd.strength <= best) return;
-      const ds = rollDieSet(srcRoll, snd.di);
+    sounds.forEach((s, i) => {
+      if (!s.at || s.strength <= best) return;
+      const ds = rollDieSet(roll, s.di);
       const post = ds && SETS[ds] ? SETS[ds].post : null;
-      if (post && post.ring) { best = snd.strength; ringIdx = i; }
+      if (post && post.ring) { best = s.strength; ringIdx = i; }
     });
   }
-  roll.ringIdx = ringIdx;
-  roll.frames = keyframes[0].length;
-  roll.duration = (keyframes[0].length - 1) * FIXED_DT;
-  roll.producerDone = true;
+
+  currentRoll = {
+    rollId: roll.rollId || null,
+    t: roll.t || null,
+    label: roll.label || formula(types),
+    playerName: roll.playerName || null,
+    color: roll.color || null,
+    playerId: roll.playerId || null,
+    values: values ? values.slice() : null,
+    // mechanics metadata (rollspec contract); defaults preserve plain rolls
+    perDie: Array.isArray(roll.perDie) && roll.perDie.length === types.length
+      ? roll.perDie
+      : types.map(() => ({ counts: true, reason: null, childOf: null })),
+    modifier: roll.modifier || 0,
+    total: typeof roll.total === 'number' ? roll.total : null,
+    // A redacted roll has no spec of its own; the fallback stands in for the
+    // ceremony's intent card (which reads the pool it can legitimately see).
+    // It must NOT become a reroll affordance though — `types` is the EXPANDED
+    // pool and the mods are withheld, so ⟳ is gated on the entry being
+    // readable instead (renderLog / renderBannerActions).
+    spec: roll.spec || { dice: types, mods: null },
+    dc: Number.isInteger(roll.dc) ? roll.dc : null, // interim dc verdict (UX §2.3 stub)
+    exp: sanitizeExp(roll.exp),
+    faceDown: !!roll.faceDown,
+    revealed: values ? roll.revealed !== false : roll.revealed === true,
+    // visibility plumbing (goal 11) — present-or-absent passthroughs
+    redacted: !values,
+    visMode: roll.visMode || (roll.visibility && roll.visibility.mode) || null,
+    visibility: roll.visibility || null,
+    revealAuthority: roll.revealAuthority || null,
+    notation: typeof roll.notation === 'string' ? roll.notation : null,
+    // reroll provenance (B3): server-substantiated; entryFromRoll reads it
+    // off currentRoll at completion, so dropping it here unmarks the roll
+    rerollOfId: typeof roll.rerollOfId === 'string' ? roll.rerollOfId : null,
+    // dice-set identity (Tier 6 §9): the burst drain and entryFromRoll read it
+    set: typeof roll.set === 'string' ? roll.set : null,
+    sets: Array.isArray(roll.sets) && roll.sets.length ? roll.sets : null, // per-die (§9 mixed pools)
+    seed: roll.seed,
+    dice,
+    keyframes,
+    sounds,
+    frames: keyframes[0].length,
+    duration: (keyframes[0].length - 1) * FIXED_DT,
+    time: 0,
+    soundIdx: 0,
+    decalsStamped: 0, // Level 4a per-roll cap counter (the drain reads it)
+    ringIdx,          // Level 5: which sound event carries the shock ring
+    ceremony: null,
+    done: false,
+  };
+
+  // Roll moments (UX §2): a Check/Cinematic attachment stages the playback.
+  // Held rolls keep their FULL ceremony (goal 11): the stakes — declaration,
+  // dice, dc — are public; only the result is hidden, so the verdict card
+  // shows the held state (+ Reveal for the authority) instead of downgrading
+  // the whole roll to Plain.
+  if (currentRoll.exp) beginCeremony(currentRoll);
 }
 
 // Solo path: compose locally with the same shared mechanics the server uses
@@ -2076,19 +2033,11 @@ function stepPlayback(dt) {
     return;
   }
 
-  // Warmup buffer (Commit C): playback holds until the producer has stamped
-  // at least 3 keyframes — the smallest count that guarantees (i0, i1)
-  // interpolation stays in-bounds even if the consumer advances two frames
-  // on a slow tick. Under ordinary load the producer clears this bar in the
-  // first slice; the held spawn-pose frame is imperceptible (≤ 50 ms).
-  if (roll.frames < 3 && !roll.producerDone) return;
-
   // Cinematic slow-mo: playback rate eased to 0.35× over the last ~400 ms of
   // keyframes. Pure playback-clock scaling — physics is never touched.
-  // Slow-mo only makes sense once the producer knows the real duration; the
-  // Infinity sentinel skips this branch until finalize lands.
+  // Identical in compact view (§7.4: ceremony parity, responsive scale only).
   let step = dt;
-  if (cer && cer.exp.kind === 'cinematic' && Number.isFinite(roll.duration)) {
+  if (cer && cer.exp.kind === 'cinematic') {
     const remaining = roll.duration - roll.time;
     if (remaining > 0 && remaining < CEREMONY_SLOWMO_WINDOW) {
       step = dt * (CEREMONY_SLOWMO_RATE
@@ -2109,28 +2058,17 @@ function stepPlayback(dt) {
   // same "uniformly overridden" rule that gated singular vs per-die set
   // decisions elsewhere in the file.
   const rate = uniformRollRate(roll);
-  if (rate && Number.isFinite(roll.duration) && roll.duration > 0) {
+  if (rate && roll.duration > 0) {
     const remainingFrac = 1 - roll.time / roll.duration;
     if (remainingFrac > 0 && remainingFrac < rate.window) {
       const t = remainingFrac / rate.window; // 0 at settle, 1 at window entry
       step *= rate.rate + (1 - rate.rate) * t;
     }
   }
-  // Consumer playCap (Commit C): hold on the last-produced-but-one frame
-  // while the producer is still going, so interpolation always has both
-  // endpoints in-bounds. When the producer finishes, cap becomes the real
-  // duration and the completion branch below fires normally. Never
-  // extrapolate (reintroduces the sync stall) and never snap to finalPos
-  // mid-tumble (loudest possible desync).
-  const playCap = roll.producerDone
-    ? roll.duration
-    : Math.max(0, (roll.frames - 1 - 1) * FIXED_DT);
-  if (roll.time + step > playCap) roll.time = playCap;
-  else roll.time += step;
+  roll.time += step;
 
   const last = roll.frames - 1;
-  const timeCap = Number.isFinite(roll.duration) ? roll.duration : (last * FIXED_DT);
-  const f = Math.min(roll.time, timeCap) * 60;
+  const f = Math.min(roll.time, roll.duration) * 60;
   const i0 = Math.min(Math.floor(f), last);
   const i1 = Math.min(i0 + 1, last);
   const frac = Math.min(Math.max(f - i0, 0), 1);
@@ -2173,7 +2111,7 @@ function stepPlayback(dt) {
     }
   }
 
-  if (roll.producerDone && roll.time >= roll.duration) {
+  if (roll.time >= roll.duration) {
     for (const d of roll.dice) {
       d.mesh.position.copy(d.finalPos);
       d.mesh.quaternion.copy(d.finalQuat);
@@ -3473,10 +3411,6 @@ function skipCeremony() {
   if (!roll || roll.done || !roll.ceremony) return false;
   const cer = roll.ceremony;
   ceremonyLayer.classList.add('skip'); // suppress decorative motion this jump
-  // Commit C: producer must know duration before the tumble branch can jump
-  // roll.time to it. `finishProducerSync` is a no-op if the producer has
-  // already finalized (the common case for anything not fresh off playRoll).
-  if (!roll.producerDone) finishProducerSync(roll);
   if (cer.phase === 'declare') ceremonyEnterTumble(roll);
   if (cer.phase === 'tumble') {
     roll.time = roll.duration;
@@ -3794,9 +3728,6 @@ ceremonyLayer.addEventListener('click', (e) => {
 function skipPlainPlayback() {
   const roll = currentRoll;
   if (!roll || roll.done || roll.ceremony) return false;
-  // Commit C: sync-finalize the producer so duration is a real number, then
-  // stepPlayback can jump to the end in one call.
-  if (!roll.producerDone) finishProducerSync(roll);
   stepPlayback(roll.duration - roll.time + FIXED_DT);
   return true;
 }
@@ -4009,13 +3940,8 @@ function stepResting() {
 }
 
 
-// The physics world is stepped in ≤ 8 ms slices from tick() (Commit C —
-// sliced fast-forward); the rest of tick() advances keyframe playback,
-// particles, etc. The producer only runs when a roll is in flight and
-// hasn't finalized — the escape hatches (skipCeremony, skipPlainPlayback,
-// fastForwardPlayback, replaySettledRoll) call finishProducerSync when a
-// caller needs the settled world at hand instead of on the next rAF.
-const PHYSICS_SLICE_BUDGET_MS = 8;
+// The physics world is only stepped inside playRoll's synchronous
+// fast-forward; the rAF loop just advances keyframe playback.
 function tick(dt, render = true) {
   // Themed-set clocks (Tier 6 §9): the Level 2 shader uniform and the
   // Level 3 particle field advance with the same dt discipline as
@@ -4024,7 +3950,6 @@ function tick(dt, render = true) {
   particleField.tick(dt, SHADER_TIME.value);
   decalField.tick(dt);
   dieLights.tick(dt, SHADER_TIME.value);
-  if (currentRoll && !currentRoll.producerDone) stepPhysicsSlice(currentRoll, PHYSICS_SLICE_BUDGET_MS);
   stepPlayback(dt);
   stepSinking(dt);   // per-roll Done departures (§7.5)
   stepWhisking(dt);  // collect whisks onto the shelf (§7.7)
@@ -4098,11 +4023,6 @@ animate();
 function fastForwardPlayback() {
   let guard = 0;
   while (currentRoll && !currentRoll.done && guard++ < 500) {
-    // Commit C: exhaust the sliced producer before the sync fast-jump so
-    // stepPlayback sees a real duration + a fully-populated keyframe array
-    // (a hidden tab's catch-up is inherently synchronous — the whole point
-    // of the visibilitychange handler).
-    if (!currentRoll.producerDone) finishProducerSync(currentRoll);
     // A ceremony roll jumps straight to its completed verdict (also covers
     // post-settle staging, where duration - time would be ≤ 0).
     if (currentRoll.ceremony) skipCeremony();
@@ -9320,9 +9240,6 @@ function replaySettledRoll(r) {
     label: r.label || formula(r.dice || []),
     playerName: r.playerName,
     color: r.color,
-    replaySettled: true,        // Commit C: force the sync-then-jump path;
-                                // producer finishes inside playRoll so the
-                                // stepPlayback jump below sees a real duration
   });
   if (currentRoll && currentRoll.rollId === r.rollId && !currentRoll.done) {
     currentRoll.soundIdx = currentRoll.sounds.length; // a silent landing
