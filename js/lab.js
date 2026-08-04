@@ -266,7 +266,16 @@ function frameCamera() {
   const px = renderer.getDrawingBufferSize(new THREE.Vector2());
   post.setSize(px.x, px.y);
 }
-window.addEventListener('resize', frameCamera);
+// Resize refits aspect/pixels via frameCamera, then RE-APPLIES whatever
+// framing the user was in — a window drag must not silently unzoom while
+// the sidebar highlight still claims otherwise. (zoomedId/focusCol/
+// spanned live below; resize events can only fire after load.)
+window.addEventListener('resize', () => {
+  frameCamera();
+  if (spanned) window.__lab.zoomRows('std', 'lab.builder');
+  else if (zoomedId != null && focusCol != null) window.__lab.zoomDie(zoomedId, focusCol);
+  else if (zoomedId != null) window.__lab.zoomRow(zoomedId);
+});
 frameCamera();
 
 // ---------------------------------------------------------------------------
@@ -292,20 +301,25 @@ const EFFECTS = {
     const y = row.meshes[0].baseY;
     light.position.set(0, y, 3);
     scene.add(light);
+    // jolt RELATIVE to wherever the camera is parked — zoomed framings
+    // (zoomRow/zoomDie/zoomRows) live off-origin, and an absolute write
+    // would teleport them to grid center
+    const bx = camera.position.x;
     run(180, (k) => {
       light.intensity = 10 * (1 - k);
-      camera.position.x = (Math.random() - 0.5) * 0.06 * (1 - k);
-    }, () => { scene.remove(light); camera.position.x = 0; });
+      camera.position.x = bx + (Math.random() - 0.5) * 0.06 * (1 - k);
+    }, () => { scene.remove(light); camera.position.x = bx; });
   },
   // mass arrives: one decisive drop-and-stop, no elastic wobble
   slam(row) {
+    const by = camera.position.y; // relative, same reason as flash
     run(200, (k) => {
       const dip = k < 0.3 ? (k / 0.3) : 1 - easeOut((k - 0.3) / 0.7);
       for (const c of row.meshes) c.mesh.position.y = c.baseY - 0.3 * dip;
-      camera.position.y = -0.08 * dip;
+      camera.position.y = by - 0.08 * dip;
     }, () => {
       for (const c of row.meshes) c.mesh.position.y = c.baseY;
-      camera.position.y = 0;
+      camera.position.y = by;
     });
   },
   // agitation feeds the fire / the charge releases: internal glow surges
@@ -429,6 +443,10 @@ function ensureWorld() {
   world.addContactMaterial(new CANNON.ContactMaterial(dieMat, floorMat, { friction: 0.25, restitution: 0.42 }));
 }
 
+// The endDrop(true) fade window: `drop` is already null but the mesh is
+// still in the scene wearing its variant's cached materials — the builder
+// rebuild must know (bustDie's contract: drop every mesh BEFORE busting).
+let fadingDrop = null;
 function endDrop(fade) {
   if (!drop) return;
   const d = drop;
@@ -440,9 +458,16 @@ function endDrop(fade) {
   decals.clear(); // the coupon takes its marks with it
   const cleanup = () => {
     scene.remove(d.mesh);
-    if (d.coupon) scene.remove(d.coupon);
+    if (d.coupon) {
+      scene.remove(d.coupon);
+      // per-drop resources (the die's geometry/materials are the shared cache)
+      d.coupon.geometry.dispose();
+      d.coupon.material.dispose();
+    }
+    if (fadingDrop === d) fadingDrop = null;
   };
   if (fade) {
+    fadingDrop = d;
     run(260, (k) => {
       d.mesh.scale.setScalar(1 - easeOut(k));
       if (d.coupon) d.coupon.material.opacity = 0.94 * (1 - k);
@@ -586,12 +611,21 @@ function refreshReadout(row) {
 const nameEls = new Map(); // row.id -> sidebar name element
 let zoomedId = null;  // row id when zoomed
 let focusCol = null;  // column index when a SINGLE die is framed
+let spanned = false;  // the bench header's std→builder span framing
 function setZoom(id, col = null) {
+  const prevHero = focusCol != null;
+  const prevDist = camera.position.distanceTo(camTarget);
+  spanned = false;
   zoomedId = id;
   focusCol = id == null ? null : col;
   if (id == null) window.__lab.zoomRow(null); // refits the full grid
   else if (col == null) window.__lab.zoomRow(id);
-  else window.__lab.zoomDie(id, col);
+  else {
+    window.__lab.zoomDie(id, col);
+    // surfing hero-to-hero keeps the user's wheel-dolled distance — the
+    // A/B flip must not snap the framing they just chose
+    if (prevHero) camera.position.z = camTarget.z + Math.min(Math.max(prevDist, 1.6), 12);
+  }
   for (const [rid, el] of nameEls) el.classList.toggle('zoomed', rid === id);
 }
 // Surf while zoomed — the A/B flip the GEO BENCH is for: ↑/↓ hold the
@@ -599,7 +633,7 @@ function setZoom(id, col = null) {
 // die is framed); ←/→ walk the die types; Esc refits the grid.
 window.addEventListener('keydown', (e) => {
   if (e.target && /^(input|select|textarea)$/i.test(e.target.tagName)) return;
-  if (e.key === 'Escape') { if (zoomedId) { setZoom(null); e.preventDefault(); } return; }
+  if (e.key === 'Escape') { if (zoomedId || spanned) { setZoom(null); e.preventDefault(); } return; }
   const dir = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key];
   if (!dir || !zoomedId) return;
   if (dir[0]) {
@@ -627,7 +661,7 @@ renderer.domElement.addEventListener('click', (ev) => {
   while (obj && !cells.some((c) => c.mesh === obj)) obj = obj.parent;
   const cell = obj && cells.find((c) => c.mesh === obj);
   if (cell) setZoom(cell.row.id, cell.ci);
-  else if (zoomedId) setZoom(null);
+  else if (zoomedId || spanned) setZoom(null);
 });
 // Scroll dollies toward whatever the camera is studying (esp. hero dice —
 // edge reads want a HAIR closer than any fixed framing guesses).
@@ -643,9 +677,9 @@ renderer.domElement.addEventListener('wheel', (e) => {
 // read, click again for the full grid.
 const SECTIONS = {
   'lab.cut030': ['The Geo Bench', '↑/↓ surf rows zoomed · click header: frame the sweep', () => {
-    setZoom(null);
-    if (side.dataset.spanned === '1') { delete side.dataset.spanned; frameCamera(); }
-    else { side.dataset.spanned = '1'; window.__lab.zoomRows('std', 'lab.builder'); }
+    const was = spanned;
+    setZoom(null); // clears row zoom AND spanned, refits the grid
+    if (!was) { spanned = true; window.__lab.zoomRows('std', 'lab.builder'); }
   }],
   'lab.builder': ['The Set Builder', 'every knob live in the ⚗ panel — copy the recipe out when it sings'],
 };
@@ -707,7 +741,9 @@ for (const row of rows) {
   fx.className = 'fx';
   const fxList = [['flash', '⚡ pop'], ['slam', '🔨 slam'], ['glow', '✨ glow'],
     ['freeze', '❄ freeze'], ['dim', '🌑 recoil'], ['swell', '🌊 swell']];
-  if (row.recipe && row.recipe.shader && row.recipe.shader.dissolve) fxList.push(['unmake', '💀 unmake']);
+  // the builder's recipe changes live (a seeded dissolve set must keep its
+  // button); unmake itself no-ops on rows without dissolve materials
+  if (row.id === 'lab.builder' || (row.recipe && row.recipe.shader && row.recipe.shader.dissolve)) fxList.push(['unmake', '💀 unmake']);
   for (const [id, label] of fxList) {
     const b = document.createElement('button');
     b.textContent = label;
@@ -738,13 +774,24 @@ const bSyncs = []; // control -> state resync fns (seed loads, builderSet)
 const syncControls = () => bSyncs.forEach((f) => f());
 
 function rebuildBuilderRow() {
+  clearTimeout(bTimer); // a pending touch() must not fire a second rebuild
   const row = rows.find((r) => r.id === 'lab.builder');
   if (drop && drop.row === row) endDrop(false); // its rig d6 wears these materials
+  if (fadingDrop && fadingDrop.row === row) {
+    // …and so does a mesh still in its 260ms fade-out — bustDie's contract
+    scene.remove(fadingDrop.mesh); // the fade's own cleanup still handles the coupon
+    fadingDrop = null;
+  }
   const y = row.meshes[0].baseY;
+  // keep rotational lockstep with the neighbors (spin accumulates since
+  // boot; a fresh pose would leave this row permanently phase-offset —
+  // the side-by-side edge read is the whole point)
+  const spin = row.meshes.map((c) => c.mesh.rotation.clone());
   for (const c of row.meshes) scene.remove(c.mesh);
   bustDie('lab.builder');
   row.recipe = registerSet('lab.builder', assembleRecipe(bState));
   row.meshes = DIE_TYPES.map((type, c) => makeDie(type, 'lab.builder', -gridW / 2 + c * COL_STEP, y, c));
+  row.meshes.forEach((c, i) => c.mesh.rotation.copy(spin[i]));
   renderer.render(scene, camera); // pin the fresh uploads (boot's warm-up defense)
   refreshReadout(row);
   const pre = document.getElementById('b-recipe');
@@ -917,9 +964,12 @@ function loadSeed(id) {
       digitGlow: t.maps && t.maps.digitGlow ? { ...t.maps.digitGlow } : d.digitGlow,
       glyph: t.glyph || 'none',
       carry: (() => {
+        // DEEP COPIES: carry rides into the builder recipe and builderSet
+        // deep-merges patches into it — an alias would corrupt the seed's
+        // published SETS entry page-wide
         const c = {};
         for (const k of ['shader', 'particles', 'decal', 'light', 'post', 'sound', 'rate']) {
-          if (t[k] != null) c[k] = t[k];
+          if (t[k] != null) c[k] = JSON.parse(JSON.stringify(t[k]));
         }
         return c;
       })(),

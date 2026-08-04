@@ -3953,16 +3953,32 @@ export const scenarios = [
     // table — adopt it into ctx.tables so closeAll and the page-exception
     // collector still see it.
     async fn(ctx) {
-      const page = await ctx.browser.newPage();
+      // ONE logged boot retry, same defense newTable carries: ~1–2% of
+      // fresh headless tabs come up broken (vendor double-evaluation),
+      // and the lab pushes ~2000 canvas textures through that boot.
       const url = `http://localhost:${ctx.port}/lab.html`;
-      await page.navigate(url);
-      const t = new Table(page, url);
+      let t;
+      for (let attempt = 0; ; attempt++) {
+        const page = await ctx.browser.newPage();
+        await page.navigate(url);
+        t = new Table(page, url);
+        try {
+          await t.waitFor('!!(window.__lab && window.__lab.ready)', { desc: 'lab ready', timeout: 90000 });
+          if (attempt === 0 && page.errors.length) {
+            throw new Error(`page exception on load — ${String(page.errors[0]).slice(0, 120)}`);
+          }
+          break;
+        } catch (e) {
+          if (attempt > 0) { ctx.tables.push(t); throw e; }
+          console.log(`    (lab boot retry: ${String(e.message || e).slice(0, 100)})`);
+          await t.close().catch(() => {});
+        }
+      }
       ctx.tables.push(t);
-      await t.waitFor('!!(window.__lab && window.__lab.ready)', { desc: 'lab ready', timeout: 90000 });
 
       const rows = JSON.parse(await t.eval('JSON.stringify(window.__lab.rows)'));
       const bench = JSON.parse(await t.eval('JSON.stringify(window.__lab.benchIds)'));
-      assert.ok(bench.length >= 6, `bench sweep registered (got ${bench.length})`);
+      assert.equal(bench.length, 8, `the full bench sweep registered (got ${bench.length})`);
       for (const id of [...bench, 'lab.builder']) {
         assert.ok(rows.includes(id), `${id} seated in the grid`);
       }
@@ -3981,6 +3997,14 @@ export const scenarios = [
         `.090 bevel trims past std (${stats['std'].r} vs ${stats['lab.round090'].r})`);
       assert.ok(stats['lab.round090'].r > stats['lab.round130'].r,
         `.130 trims past .090 (${stats['lab.round090'].r} vs ${stats['lab.round130'].r})`);
+      assert.ok(stats['lab.cut090'].r < stats['lab.cut030'].r,
+        `.090 cut trims past .030 (${stats['lab.cut090'].r} vs ${stats['lab.cut030'].r})`);
+      // profile/pillow are SHADING-ONLY recipes: same bevel → the exact
+      // same vertex positions, so the radii must match to float noise
+      assert.ok(Math.abs(stats['lab.round055'].r - stats['std'].r) < 1e-3,
+        `round .055 shares std's silhouette (${stats['lab.round055'].r} vs ${stats['std'].r})`);
+      assert.ok(Math.abs(stats['lab.pillow'].r - stats['lab.round090'].r) < 1e-3,
+        `pillow shares round .090's silhouette (${stats['lab.pillow'].r} vs ${stats['lab.round090'].r})`);
       // (No cross-bevel wear ordering: a wider plain fillet can out-trim a
       // narrower worn one. The character rows just have to shrink vs std.)
       assert.ok(stats['lab.tumbled'].r < stats['std'].r,
