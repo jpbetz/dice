@@ -373,9 +373,18 @@ Umbra pools shadow with NEGATIVE intensity; felt-only — collect
 extinguishes, reveal ignites, shroud smothers). Restraint recipes: six
 sets mark, five glow, four leave the table untouched on purpose. The
 lab drop rig gained the coupon/rails/linger/dropView furniture to
-review it at table pitch. e2e: themed-fx (tag `themes`). Still open:
-postprocessing (ladder L5 — deliberately last), 2D chrome art
-(tray/pool/log chips stay std), saved-pool set override. **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
+review it at table pitch. e2e: themed-fx (tag `themes`).
+**LADDER L5 SHIPPED 2026-08-03 — THE EFFECTS LADDER IS COMPLETE**:
+hand-rolled postprocessing (js/post.js, core three only): selective
+bloom via a blacked-out mask render (a std/shrouded die cannot bloom by
+construction; no strength knob — whatever L1-2 made bright is what
+burns), impact-keyed shock rings off the roll's hardest landing
+(negative amp = Umbra implodes), heat shimmer above settled iron, and a
+strict bypass: a std table renders the released direct path, proven
+equivalent at 61.8 dB PSNR (the tone-mapping-on-render-targets lesson
+lives in THEMES.md). e2e: themed-post (tag `themes`). Still open in §9:
+2D chrome art (tray/pool/log chips stay std — 9b pool icons is the
+natural home), saved-pool set override. **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
 natural AND supernatural — imagine what *faerie* dice, *dryadic* dice,
 *wizard* dice, *warrior* dice might look like. Special effects and strong
 themes **merged subtly into the dice themselves** — theme lives in

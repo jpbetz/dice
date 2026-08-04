@@ -111,6 +111,13 @@ const COMPOSITE_FRAG = `
     vec3 base = texture2D(tBase, clamp((px + off) / uRes, 0.0, 1.0)).rgb;
     vec3 bloom = texture2D(tBloom, vUv).rgb;
     gl_FragColor = vec4(base + bloom * uBloom, 1.0);
+    // three applies tone mapping ONLY on the null target (r160
+    // WebGLPrograms: currentRenderTarget === null), so every scene value
+    // reached us LINEAR and un-tonemapped — bloom adds where light adds,
+    // before the camera curve — and this one screen pass runs ACES +
+    // sRGB exactly as a direct render would. (Skipping this was a 29 dB
+    // washout against the bypass path.)
+    #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }`;
 
@@ -150,9 +157,10 @@ export class PostStack {
     this.quadScene.add(this.quad);
 
     this.matThresh = new THREE.ShaderMaterial({
-      // 0.62: emissive digits and fresnel rims clear it; a lit body face
-      // shouldn't (sap amber taught this — its corona ate the digits)
-      uniforms: { tSrc: { value: null }, uThresh: { value: 0.62 } },
+      // Thresholds LINEAR pre-tonemap luminance (see the composite note):
+      // emissive digits and fresnel rims run well over 1.0 there; a
+      // key-lit body face shouldn't clear 0.9.
+      uniforms: { tSrc: { value: null }, uThresh: { value: 0.9 } },
       vertexShader: QUAD_VERT,
       fragmentShader: THRESH_FRAG,
       depthTest: false,

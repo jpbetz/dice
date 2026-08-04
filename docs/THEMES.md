@@ -336,8 +336,55 @@ leverage order for this zero-dep codebase:
    the assertion surface is `stampedTotal` (monotonic marks-ever-laid,
    via `__diceDebug.fxInfo()`), never the live count.
 5. **Hand-rolled postprocessing** — selective bloom, shock rings, heat
-   shimmer (~150 lines each, no examples/jsm). Ranked LAST on purpose:
-   it amplifies identity the other levels create, it creates none.
+   shimmer. Ranked LAST on purpose: it amplifies identity the other
+   levels create, it creates none. **← SHIPPED 2026-08-03 — the ladder
+   is complete.** `js/post.js` (PostStack), core three only — no
+   examples/jsm, no EffectComposer:
+   - **Selective bloom, by construction not by tuning**: the scene
+     renders a second time with every non-glowing object BLACKED OUT
+     (custom-shader meshes hidden — a basic-material swap would ignore
+     their instanced attributes), so only flagged glow sources
+     (mesh.userData.bloom: themed dice with emissive identity, set at
+     createDieMesh from the recipe's `post.bloom`; the particle pool)
+     reach the threshold → half-res separable blur → composite chain.
+     A std or shrouded die CANNOT bloom, and occlusion stays honest — a
+     std die in front of a molten one blacks out its halo. There is
+     deliberately no per-set strength knob: whatever Levels 1-2 made
+     bright is exactly what burns.
+   - **Shock rings**: ONE screen-space displacement wave per roll, from
+     the roll's HARDEST recorded landing (pre-picked from roll.sounds at
+     playback build; never fires under strength 10 — a pop needs a
+     slam), plus a ~120 ms frame jolt. NEGATIVE amplitude runs the wave
+     inward: Umbra's discharge is an implosion.
+   - **Heat shimmer**: world-projected wobble sources over shimmer-set
+     dice on the felt, biased UPWARD (hot air lives above the iron; the
+     first pass wrapped the whole die and read as glass, not heat).
+   - **The tone-mapping lesson (do not relearn)**: three r160 applies
+     renderer.toneMapping ONLY when rendering to the null target
+     (WebGLPrograms checks currentRenderTarget === null), so every
+     scene value reaches the stack LINEAR and un-tonemapped. That is
+     the RIGHT place for bloom to add — light sums before the camera
+     curve — and the composite's `#include <tonemapping_fragment>` +
+     `<colorspace_fragment>` then encode exactly as a direct render
+     would. Skipping that was a visible 29 dB washout; with it, a
+     frozen std frame measures 61.8 dB PSNR against the direct path
+     (imperceptible) and the felt is byte-identical region-sampled.
+     All intermediates are HalfFloat (8-bit linear bands on dark felt);
+     rtBase carries MSAA 4. The threshold (0.9) disciplines LINEAR
+     luminance — emissive digits run well past 1.0, key-lit body faces
+     don't (Sap Amber stays unflagged regardless: a corona would argue
+     with the house's stillness).
+   - **The bypass**: the main table renders the released direct path
+     unless a bloom-flagged die exists anywhere, particles are alive, or
+     a ring/shimmer is running — a std table never pays for the stack
+     and never risks it. `__diceDebug.postForce(true)` pins the two
+     paths against each other; `postInfo()` is computed LIVE from sim
+     state, never from the last painted frame (a backgrounded tab stops
+     painting but keeps simulating — a render-gated flag froze at
+     stale-false while rings fired; e2e reads must be sim-stable).
+     Scenario gotcha, recorded twice now: dice.diceset.v1 is per-origin
+     localStorage and OUTLIVES a scenario's room — a scenario that
+     asserts std behavior must SET std first.
 
 Side-channel: render-only child meshes (the bevel already works this
 way) can change the SILHOUETTE — verdigris corner caps, crystal spurs,
@@ -401,6 +448,15 @@ client, zero draws stolen from the throw physics). Releases: sink
 sweep (resetTableSurface), plus the rig's parentless-mesh self-heal;
 reveal on the felt re-attaches. Shrouded rolls stamp and cast nothing —
 the drain gate and the attach gate both read the shroud flag.
+
+Level 5 closes the ladder (shipped 2026-08-03): the tick render path
+gains the PostStack bypass (see the ladder entry for the architecture
+and the tone-mapping lesson), the drain pops the pre-picked hardest
+landing's shock ring, collectShimmerSources feeds the heat wobble from
+unshrouded shimmer-set dice still on the felt, and both reveal paths
+restore mesh.userData.bloom right along with the materials (the mesh
+was born shrouded — without the flag restore, a revealed molten die
+never burned). e2e: themed-post (tag `themes`).
 `tools/lab-shots.mjs` drives it headless over CDP and drops PNGs for
 side-by-side review. Themes land in `js/themes.js` as material recipes;
 the main app consumes NOTHING from the lab until a set graduates

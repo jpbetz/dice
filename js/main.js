@@ -31,6 +31,7 @@ import { THEMES, SETS } from './themes.js';
 import { ParticleField } from './particles.js';
 import { DecalField } from './decals.js';
 import { DieLightRig } from './dielights.js';
+import { PostStack } from './post.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -132,6 +133,15 @@ particleField.setProjection(window.innerHeight, camera.fov);
 // restraint: the newest throw steals from the oldest.
 const decalField = new DecalField(scene);
 const dieLights = new DieLightRig(scene, { max: 4 });
+
+// Level 5 (js/post.js): selective bloom / shock rings / heat shimmer.
+// The table BYPASSES the whole stack unless something on it glows — a
+// std table renders exactly the direct path it always did; the stack
+// only exists in frames where a bloom-flagged die, live particles, or a
+// running ring/shimmer would be visible. (postForced is the test hook
+// that pins the two paths against each other.)
+const postStack = new PostStack(renderer);
+let postForced = false;
 const DECAL_Y = 0.021;            // marks sit a hair above the felt plane
 const DECAL_MIN_STRENGTH = 6;     // a mark needs a real hit, not a settling tremble
 const DECAL_MAX_CONTACT_Y = 0.6;  // floor contacts only: a wall click leaves no felt mark
@@ -1709,6 +1719,18 @@ function playRoll(roll) {
     d.mesh.quaternion.copy(keyframes[i][0].quat).multiply(d.correction);
   });
 
+  // Level 5: a ring set's shock wave fires ONCE, from the roll's hardest
+  // recorded landing (never a gentle one — the pop needs a slam), at the
+  // moment the drain replays that impact.
+  let ringIdx = null;
+  const postSet = !shrouded && roll.set && SETS[roll.set] ? SETS[roll.set].post : null;
+  if (postSet && postSet.ring) {
+    let best = 10;
+    sounds.forEach((s, i) => {
+      if (s.at && s.strength > best) { best = s.strength; ringIdx = i; }
+    });
+  }
+
   currentRoll = {
     rollId: roll.rollId || null,
     t: roll.t || null,
@@ -1753,6 +1775,7 @@ function playRoll(roll) {
     time: 0,
     soundIdx: 0,
     decalsStamped: 0, // Level 4a per-roll cap counter (the drain reads it)
+    ringIdx,          // Level 5: which sound event carries the shock ring
     ceremony: null,
     done: false,
   };
@@ -1855,6 +1878,7 @@ function stepPlayback(dt) {
   const burstRecipe = fxSet ? fxSet.particles : null;
   const decalRecipe = fxSet ? fxSet.decal : null;
   while (roll.soundIdx < roll.sounds.length && roll.sounds[roll.soundIdx].time <= roll.time) {
+    const sIdx = roll.soundIdx;
     const s = roll.sounds[roll.soundIdx++];
     playClick(s.strength);
     if (burstRecipe && s.at) particleField.burst(burstRecipe, s.at, s.strength);
@@ -1863,6 +1887,10 @@ function stepPlayback(dt) {
     if (decalRecipe && s.at && s.at[1] < DECAL_MAX_CONTACT_Y
       && s.strength >= DECAL_MIN_STRENGTH && roll.decalsStamped < DECAL_CAP_PER_ROLL) {
       roll.decalsStamped += decalField.stamp(decalRecipe, [s.at[0], DECAL_Y, s.at[2]], s.strength);
+    }
+    // Level 5: the pre-picked hardest landing pops its shock ring
+    if (sIdx === roll.ringIdx && fxSet && fxSet.post && fxSet.post.ring) {
+      postStack.ring(s.at, camera, fxSet.post.ring);
     }
   }
 
@@ -2733,6 +2761,10 @@ function beginRevealFlip(rollId, entry) {
     d.mesh.geometry = die.geometry;
     d.mesh.material = die.materials;
     d.variant = dieVariant(false, entry.set);
+    // the mesh was born shrouded (unflagged): the reveal restores the
+    // set's bloom right along with its materials
+    const revealSet = SETS[entry.set];
+    if (revealSet && revealSet.post && revealSet.post.bloom) d.mesh.userData.bloom = true;
     if (lightRecipe) dieLights.attach(d.mesh, lightRecipe, lightRng);
     const p = entry.parts[i];
     const value = p && p.value != null ? p.value : null;
@@ -2768,6 +2800,8 @@ function revealShelvedRoll(rollId, entry) {
       d.mesh.geometry = die.geometry;
       d.mesh.material = die.materials;
       d.variant = dieVariant(false, entry.set);
+      const revealSet = SETS[entry.set];
+      if (revealSet && revealSet.post && revealSet.post.bloom) d.mesh.userData.bloom = true;
     }
     const p = entry.parts[i];
     if (p && p.value != null) d.shelfValue = p.value;
@@ -3498,7 +3532,35 @@ function tick(dt, render = true) {
   if (chips.length) positionChips();
   if (shelfClusters.size) positionShelfMarkers();
   updateCornerClear();
-  if (render) renderer.render(scene, camera);
+  if (render) {
+    // Level 5 bypass: the stack runs only in frames where it could show
+    // something — a bloom-flagged die anywhere (felt or shelf), live
+    // particles, a running ring/shimmer, or the test force. Otherwise
+    // the released direct path renders untouched.
+    const need = postForced || postStack.busy() || particleField.count() > 0
+      || tableDice.some((d) => d.mesh.userData.bloom);
+    if (need) {
+      postStack.setShimmer(collectShimmerSources(), camera);
+      postStack.render(scene, camera, dt);
+    } else {
+      renderer.render(scene, camera);
+    }
+  }
+}
+
+// Heat shimmer sources (Level 5): unshrouded dice of a shimmer set that
+// still live on the FELT — the shelf is the archive, its iron has cooled.
+function collectShimmerSources() {
+  const out = [];
+  for (const d of tableDice) {
+    if (d.shrouded || shelfClusters.has(d.rollId)) continue;
+    const set = d.variant && SETS[d.variant];
+    const s = set && set.post && set.post.shimmer;
+    if (!s) continue;
+    out.push({ at: [d.mesh.position.x, d.mesh.position.y, d.mesh.position.z], radius: s.radius, strength: s.strength });
+    if (out.length >= 6) break;
+  }
+  return out;
 }
 
 // 'Clear table' exists only while there is a table to clear: dice on the
@@ -3760,6 +3822,23 @@ window.__diceDebug = {
   fxInfo() {
     return { decals: decalField.count(), stamped: decalField.stampedTotal, lights: dieLights.info() };
   },
+  // Level 5 assertion surface. Computed LIVE from sim state, never from
+  // the last painted frame — a backgrounded tab stops painting but its
+  // sim keeps running, and a stale render-gated flag reads as whatever
+  // the tab last showed (found the hard way: 'active' frozen false while
+  // rings fired). lastBloomSources stays as painted-frame curiosity.
+  postInfo() {
+    const bloomDice = tableDice.filter((d) => d.mesh.userData.bloom).length;
+    return {
+      active: postForced || postStack.busy() || particleField.count() > 0 || bloomDice > 0,
+      forced: postForced,
+      bloomDice,
+      lastBloomSources: postStack.lastBloomSources,
+      rings: postStack.ringsFired,
+      shimmer: postStack.shimmer.length,
+    };
+  },
+  postForce(on) { postForced = on !== false; return postForced; },
   // roll outlines (the card-hover read): shell colors, in die order
   get outlineState() { return outlined.map((o) => `#${o.shell.material.color.getHexString()}`); },
   hoverBanner(on) { outlineRollDice(on !== false); return outlined.length; },
@@ -3955,6 +4034,8 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
   particleField.setProjection(window.innerHeight, camera.fov);
+  const px = renderer.getDrawingBufferSize(new THREE.Vector2());
+  postStack.setSize(px.x, px.y);
   applyCameraFraming(); // a narrower window refits the table and its shelf
   cacheLeftPanelRect(); // marker occlusion reads this, never live layout
   positionChips();

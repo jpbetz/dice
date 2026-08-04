@@ -3047,4 +3047,57 @@ export const scenarios = [
       assert.equal(fx3.lights.length, 1, 'the reveal ignites the anvil glow');
     },
   },
+  {
+    name: 'themed-post',
+    tags: ['themes'],
+    // Ladder Level 5 (selective bloom / shock rings / bypass): a std
+    // table renders the released direct path — the stack only engages
+    // when something glows. A bolt-glass roll blooms and pops its
+    // discharge on every screen; a shrouded roll adds neither; the
+    // reveal restores the bloom flag along with the materials.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      const post = async (tab) => JSON.parse(await tab.eval(`JSON.stringify(window.__diceDebug.postInfo())`));
+
+      // std table: bypass. Pin the set to std FIRST — dice.diceset.v1 is
+      // per-origin localStorage and an earlier scenario's choice leaks in.
+      await a.eval(`window.__diceDebug.setDiceSet('std')`);
+      await a.roll('2d6 # plain');
+      await a.settle();
+      let p = await post(a);
+      assert.equal(p.active, false, 'a std table bypasses the stack');
+      assert.equal(p.rings, 0, 'no ring without a ring set');
+
+      // bolt-glass: stack engages, dice bloom, the discharge pops — on BOTH tabs
+      await a.eval(`window.__diceDebug.setDiceSet('stormcall.boltglass')`);
+      await a.roll('2d6 # pop');
+      await a.settle();
+      await b.settle();
+      for (const [tab, who] of [[a, 'A'], [b, 'B']]) {
+        p = await post(tab);
+        assert.equal(p.active, true, `${who}: the stack engages for bolt-glass`);
+        assert.ok(p.bloomDice >= 2, `${who}: the bolt dice bloom (got ${p.bloomDice})`);
+        assert.ok(p.rings >= 1, `${who}: the discharge popped`);
+      }
+
+      // a held roll wears obsidian: no pop, no new bloom flag
+      const ringsBefore = (await post(a)).rings;
+      const diceBefore = (await post(a)).bloomDice;
+      await a.roll('d20 held');
+      const hid = await a.rollId();
+      await a.waitFor(shroudSettled(hid), { desc: 'held roll settles' });
+      p = await post(a);
+      assert.equal(p.rings, ringsBefore, 'a shrouded roll never pops');
+      assert.equal(p.bloomDice, diceBefore, 'a shrouded die never joins the bloom mask');
+
+      // the reveal restores the set's bloom right along with its materials
+      await a.eval(`window.__diceDebug.reveal(${JSON.stringify(hid)})`);
+      await a.waitFor(revealSettled(hid), { desc: 'reveal lands' });
+      await a.waitFor(
+        `window.__diceDebug.postInfo().bloomDice >= ${diceBefore + 1}`,
+        { desc: 'the revealed die joins the bloom mask' },
+      );
+    },
+  },
 ];
