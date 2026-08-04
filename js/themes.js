@@ -42,6 +42,13 @@
 //   Kinds live in js/particles.js; each is a claim about why matter
 //   leaves a die. Sets without `particles` shed nothing ON PURPOSE —
 //   sealed resin and lacquer don't crumble; restraint is also identity.
+// · `geo` (Level 3.5, geometry identity): the die the player SEES —
+//   physics hull, values and reading stay canonical (dice.js).
+//   bevel    edge-cut share (std 0.055): 0.02 machined-crisp, 0.13 tumbled
+//   profile  'cut' flat chamfer facets · 'round' fillet-shaded band
+//   wear     0..1 tumbled erosion, corners first (deterministic per set)
+//   nicks    0..5 discrete chips at seeded corner sites
+//   pillow   0..1 cushion-shaded faces (silhouette + digit plane stay flat)
 
 export const THEMES = {
   tidewrack: {
@@ -56,6 +63,7 @@ export const THEMES = {
         shader: { fresnel: { color: '#58e6d9', power: 2.4, intensity: 0.9 } }, // biolume rim
         spec: { iridescence: 0.55, iridescenceIOR: 1.3, envMapIntensity: 1.15 }, // wet glass sheen
         particles: { kind: 'bubbles', colors: ['#d8f4f0', '#8fe3d9'] }, // trapped sea-air escapes on impact
+        geo: { bevel: 0.13, profile: 'round', wear: 0.6, pillow: 0.3 }, // decades in the surf: fully tumbled
       },
     },
   },
@@ -70,6 +78,7 @@ export const THEMES = {
         feel: { rough: 0.72, metal: 0.05 },
         maps: { relief: { pattern: 'grain', strength: 0.9, digitDepth: 0.4 } },
         particles: { kind: 'motes', colors: ['#ffe9a3', '#d8e8a0'] }, // a knock shakes pollen loose
+        geo: { bevel: 0.09, profile: 'round', wear: 0.25, pillow: 0.35 }, // hand-carved, long handled
       },
       mosstone: {
         label: 'Mosstone',
@@ -78,6 +87,7 @@ export const THEMES = {
         feel: { rough: 0.85, metal: 0.02 },
         maps: { relief: { pattern: 'hammer', strength: 0.85, digitDepth: 0.6 } },
         particles: { kind: 'motes', colors: ['#c9e8a0', '#8fae6f'], scale: 0.7 }, // spores off damp moss
+        geo: { bevel: 0.12, profile: 'round', wear: 0.5 }, // river stone
       },
       sapamber: {
         label: 'Sap Amber',
@@ -86,6 +96,7 @@ export const THEMES = {
         feel: { rough: 0.08, metal: 0.0 },
         spec: { clearcoat: 0.85, clearcoatRoughness: 0.22, ior: 1.55, envMapIntensity: 1.1 }, // polished resin
         // no particles: sealed resin sheds nothing — the stillness reads as polish
+        geo: { bevel: 0.1, profile: 'round', pillow: 0.5 }, // poured, never cut: a soft lozenge
       },
     },
   },
@@ -102,6 +113,7 @@ export const THEMES = {
         shader: { flow: { speed: 2.0, scale: 12.0, floor: 0.2, amp: 2.4 } },
         spec: { iridescence: 0.35, envMapIntensity: 1.05 }, // storm-oil shimmer
         particles: { kind: 'static', colors: ['#f2f6ff', '#b8a8ff'] }, // the charge grounds through the contact
+        geo: { bevel: 0.03, nicks: 2 }, // fulgurite: razor facets, fracture chips
       },
     },
   },
@@ -121,6 +133,7 @@ export const THEMES = {
         shader: { fresnel: { color: '#8fe3c0', power: 3.2, intensity: 0.75 } }, // aurora at grazing
         spec: { envMapIntensity: 1.2, specularIntensity: 1.1 }, // wet ice mirror
         particles: { kind: 'fog', colors: ['#dceefc', '#a8d8f0'] }, // impact knocks a breath of cold off the ice
+        geo: { bevel: 0.075, profile: 'round', wear: 0.15 }, // melt-softened edges
       },
       firstfrost: {
         label: 'First Frost',
@@ -132,6 +145,7 @@ export const THEMES = {
           roughPattern: 'ferns',
         },
         particles: { kind: 'fog', colors: ['#eef4fa', '#c8e4f4'], scale: 0.7 }, // a thinner frost-breath
+        geo: { bevel: 0.045 }, // fresh-cut ice, still crisp
       },
     },
   },
@@ -156,6 +170,7 @@ export const THEMES = {
         spec: { specularColor: '#ffb073', specularIntensity: 0.9, envMapIntensity: 0.6 }, // warm iron spark
         // struck iron sheds sparks — they cool from white-hot to dark ember
         particles: { kind: 'sparks', colors: ['#fff2c8', '#ffd166', '#ff9a3c'], fadeTo: '#571b05' },
+        geo: { bevel: 0.1, wear: 0.2, nicks: 3 }, // forged: wide flat chamfers, hammer-marked
       },
     },
   },
@@ -177,6 +192,7 @@ export const THEMES = {
         spec: { ior: 1.75, specularIntensity: 1.25, envMapIntensity: 1.2 }, // cut crystal
         // the casting grounds itself: rune-embers drift off the contact
         particles: { kind: 'motes', colors: ['#c9a6ff', '#7fd9e8'], scale: 0.8 },
+        geo: { bevel: 0.02 }, // lapidary-cut: the facets ARE the discipline
       },
     },
   },
@@ -198,6 +214,7 @@ export const THEMES = {
         // what it touches, it unmakes a little: dim ash, a rare live ember.
         // The unmake burn feeds the same palette out as wisps (lab.js).
         particles: { kind: 'ash', colors: ['#5a4a6a', '#cfe98c'] },
+        geo: { bevel: 0.015 }, // UNNATURALLY perfect — nothing has ever worn it
       },
     },
   },
@@ -212,6 +229,7 @@ export const THEMES = {
         feel: { rough: 0.6, metal: 0.05 },
         maps: { relief: { pattern: 'scrimshaw', strength: 0.95, digitDepth: 0.75 } },
         particles: { kind: 'dust', colors: ['#e8dcc0', '#c9b896'] }, // old bone gives up its dust
+        geo: { bevel: 0.1, profile: 'round', wear: 0.45, pillow: 0.25, nicks: 4 }, // a century of hands
       },
     },
   },
@@ -226,6 +244,7 @@ export const THEMES = {
         feel: { rough: 0.18, metal: 0.4 },
         spec: { clearcoat: 1.0, clearcoatRoughness: 0.12, envMapIntensity: 1.25 }, // lacquer over gold
         // no particles: lacquer sheds nothing — the house's dignity is stillness
+        geo: { bevel: 0.025 }, // casino-crisp machining under the lacquer
       },
     },
   },

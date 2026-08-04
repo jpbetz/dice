@@ -62,7 +62,8 @@ try {
   await sleep(150);
   for (const id of ['emberforge.blackanvil', 'rimehold.deepglacier', 'rimehold.firstfrost',
     'wildwood.heartwood', 'wildwood.mosstone', 'wildwood.sapamber', 'umbra.voidgrain',
-    'arcanum.focuscrystal', 'reliquary.scrimshaw']) {
+    'arcanum.focuscrystal', 'reliquary.scrimshaw', 'tidewrack.seaglass',
+    'stormcall.boltglass', 'gildhall.oxblood']) {
     await page.eval(`window.__lab.zoomRow(${JSON.stringify(id)})`);
     await sleep(150);
     await shot(`row-${id}.png`);

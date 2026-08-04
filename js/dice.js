@@ -560,7 +560,16 @@ function makeFaceBundle(def, face, spec, seed) {
 // ring stays in the bottom face's plane (canonicalDiePose reads this mesh).
 const BEVEL = 0.055; // inset share of each corner's distance to its face centroid
 
-function buildBeveledGeometry(faces) {
+// Level 3.5 (docs/THEMES.md): GEOMETRY IDENTITY. A set may reshape the
+// die the player SEES — edge width and profile, tumbled wear, chips,
+// pillowed faces — while the physics hull, face values and read logic
+// stay canonical (createDieBody/readValue always use the std entry, so a
+// skin can never change how a die lands or reads). Recipe (themes.js
+// `geo`): { bevel 0..~0.14, profile 'cut'|'round', wear 0..1, nicks 0..5,
+// pillow 0..1 }.
+
+function buildBeveledGeometry(faces, geo) {
+  const BEVEL_W = geo && geo.bevel != null ? geo.bevel : BEVEL;
   const positions = [];
   const uvs = [];
   const triMats = [];
@@ -578,7 +587,7 @@ function buildBeveledGeometry(faces) {
 
   // One inset ring per face, index-aligned with face.boundary.
   const rings = faces.map((f) => f.boundary.map(
-    (p) => f.centroid.clone().add(p.clone().sub(f.centroid).multiplyScalar(1 - BEVEL)),
+    (p) => f.centroid.clone().add(p.clone().sub(f.centroid).multiplyScalar(1 - BEVEL_W)),
   ));
 
   // Face surfaces: fan over the inset polygon, keeping the face's material
@@ -649,6 +658,134 @@ function buildBeveledGeometry(faces) {
   }
   geom.computeVertexNormals(); // non-indexed → flat facets, incl. the chamfer
   return geom;
+}
+
+// The geometry-identity post-pass (render mesh only). Wear and nicks are
+// POSITION-KEYED: the soup shares exact Vector3 floats wherever triangles
+// meet, so hashing the quantized position gives coincident vertices the
+// identical offset and the mesh stays watertight. Deterministic per
+// (type, variant) — every client and every screenshot shows the same die.
+function geoHash(x, y, z, grid, seed) {
+  let h = seed | 0;
+  h = Math.imul(h ^ Math.round(x / grid), 0x85ebca6b);
+  h = Math.imul(h ^ Math.round(y / grid), 0xc2b2ae35);
+  h = Math.imul(h ^ Math.round(z / grid), 0x27d4eb2f);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x2c1b3c6d);
+  return ((h ^ (h >>> 12)) >>> 0) / 4294967296;
+}
+
+function applyGeoCharacter(geom, faces, geo, seed) {
+  const wear = geo.wear || 0;
+  const nicks = geo.nicks || 0;
+  const pillow = geo.pillow || 0;
+  const round = geo.profile === 'round';
+  if (!wear && !nicks && !pillow && !round) return;
+
+  const pos = geom.getAttribute('position');
+  const p = new THREE.Vector3();
+
+  // radial span: which vertices are "exposed" (corners wear before faces)
+  let minR = Infinity;
+  let maxR = 0;
+  for (let i = 0; i < pos.count; i++) {
+    const r = p.fromBufferAttribute(pos, i).length();
+    if (r < minR) minR = r;
+    if (r > maxR) maxR = r;
+  }
+
+  // seeded chip sites: real dice chip at corners and edges, so candidates
+  // are the canonical boundary vertices (dedup not needed to pick)
+  const sites = [];
+  if (nicks > 0) {
+    const corners = [];
+    for (const f of faces) for (const b of f.boundary) corners.push(b);
+    let a = seed >>> 0;
+    const rng = () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    for (let k = 0; k < nicks; k++) {
+      const c = corners[Math.floor(rng() * corners.length)];
+      // wide + shallow: a chip is a scoop that catches light, not a crack
+      sites.push({ c: c.clone(), r: maxR * (0.15 + rng() * 0.1), d: maxR * (0.022 + rng() * 0.02) });
+    }
+  }
+
+  if (wear || sites.length) {
+    for (let i = 0; i < pos.count; i++) {
+      p.fromBufferAttribute(pos, i);
+      const r = p.length();
+      let pull = 0;
+      if (wear) {
+        // tumbled erosion: lumpy (coarse cell) + crinkled (fine cell),
+        // biased hard toward exposed corners
+        const exposure = (r - minR) / (maxR - minR || 1);
+        const lump = geoHash(p.x, p.y, p.z, maxR * 0.3, seed);
+        const grain = geoHash(p.x, p.y, p.z, maxR * 0.012, seed ^ 0x9e3779b9);
+        pull += wear * maxR * 0.05 * (0.6 * lump + 0.4 * grain) * (0.3 + 0.7 * exposure * exposure);
+      }
+      for (const s of sites) {
+        const d = p.distanceTo(s.c);
+        if (d < s.r) {
+          const t = 1 - d / s.r;
+          pull += s.d * t * t * (3 - 2 * t); // smooth chip crater
+        }
+      }
+      if (pull > 0) {
+        const k = Math.max(r - pull, minR * 0.5) / r;
+        pos.setXYZ(i, p.x * k, p.y * k, p.z * k);
+      }
+    }
+    pos.needsUpdate = true;
+    geom.computeVertexNormals();
+  }
+
+  const nrm = geom.getAttribute('normal');
+  const n = new THREE.Vector3();
+
+  // 'round' profile: the chamfer band and corner fans SHADE as a fillet —
+  // sphere-direction normals BLENDED over the recomputed facet normals.
+  // (A full replacement erased the wear/chip craters' honest shading and
+  // dents went black; the blend keeps the fillet while dents stay lit as
+  // the displaced surface actually faces.) Groups after the face count
+  // are the band (buildBeveledGeometry's material layout).
+  if (round) {
+    for (const g of geom.groups) {
+      if (g.materialIndex < faces.length) continue;
+      for (let i = g.start; i < g.start + g.count; i++) {
+        p.fromBufferAttribute(pos, i).normalize();
+        n.fromBufferAttribute(nrm, i).lerp(p, 0.65).normalize();
+        nrm.setXYZ(i, n.x, n.y, n.z);
+      }
+    }
+    nrm.needsUpdate = true;
+  }
+
+  // pillowed faces: normals tilt outward toward each face's rim, so flat
+  // geometry shades as a cushion (silhouette unchanged — legibility keeps
+  // its dead-flat digit plane)
+  if (pillow) {
+    const rad = new THREE.Vector3();
+    for (const g of geom.groups) {
+      if (g.materialIndex >= faces.length) continue;
+      const f = faces[g.materialIndex];
+      let radMax = 0;
+      for (const b of f.boundary) radMax = Math.max(radMax, b.distanceTo(f.centroid));
+      for (let i = g.start; i < g.start + g.count; i++) {
+        p.fromBufferAttribute(pos, i);
+        rad.subVectors(p, f.centroid);
+        rad.addScaledVector(f.normal, -rad.dot(f.normal)); // in-plane component
+        n.fromBufferAttribute(nrm, i).addScaledVector(rad, (pillow * 0.55) / radMax).normalize();
+        nrm.setXYZ(i, n.x, n.y, n.z);
+      }
+    }
+    nrm.needsUpdate = true;
+  }
+
+  geom.computeBoundingSphere();
 }
 
 // ---------------------------------------------------------------------------
@@ -724,9 +861,16 @@ function buildDie(type, variant = 'std') {
     : def;
   // The BASE polyhedron drives faces, values and the physics hull; the mesh
   // the player sees is its beveled twin (render only — see buildBeveledGeometry).
+  // A set's `geo` recipe reshapes ONLY that twin (Level 3.5): edge width,
+  // fillet shading, tumbled wear, chips, pillowed faces.
   const base = buildBaseGeometry(type);
   const faces = extractFaces(base, type);
-  const geometry = buildBeveledGeometry(faces);
+  const geometry = buildBeveledGeometry(faces, skin.geo);
+  if (skin.geo) {
+    let gseed = 5381;
+    for (const ch of `${type}|${variant}`) gseed = (Math.imul(gseed, 33) + ch.charCodeAt(0)) | 0;
+    applyGeoCharacter(geometry, faces, skin.geo, gseed >>> 0);
+  }
 
   let materials;
   let vertexValues = null;
@@ -759,7 +903,11 @@ function buildDie(type, variant = 'std') {
 
   // The chamfer band's own material: the same darker tone the face textures
   // paint along their edges, so the bevel reads as that outline made real.
-  const edgeColor = new THREE.Color(skin.color).lerp(new THREE.Color('#000000'), 0.25);
+  // Round-profile (tumbled) sets darken HALF as much — a worn edge is the
+  // same material frosted soft, not an inked outline; the wide dark seams
+  // were fighting the sea-tumbled look.
+  const edgeDark = skin.geo && skin.geo.profile === 'round' ? 0.12 : 0.25;
+  const edgeColor = new THREE.Color(skin.color).lerp(new THREE.Color('#000000'), edgeDark);
   materials.push(new THREE.MeshStandardMaterial({
     color: edgeColor,
     roughness: shroud ? 0.16 : (skin.feel ? skin.feel.rough : 0.3),

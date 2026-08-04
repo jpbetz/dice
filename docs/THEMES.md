@@ -261,6 +261,28 @@ leverage order for this zero-dep codebase:
    timer of its own. Gotcha for later integrations: cannon-es worlds
    default `allowSleep` to FALSE — without `world.allowSleep = true` the
    settled die never sleeps and cleanup waits on the hard timeout.
+3.5. **Geometry identity** — the die the player SEES gets a shape
+   character while the physics hull, values and reading stay canonical
+   (createDieBody/readValue always use the std entry — a skin can never
+   change how a die lands). **← SHIPPED 2026-08-03.** Per-set `geo`
+   recipe: `bevel` (edge-cut share — 0.015 razor to 0.13 tumbled; std is
+   0.055), `profile` ('cut' flat chamfer facets vs 'round' fillet-shaded
+   band — sphere normals BLENDED 0.65 over recomputed facet normals; a
+   full replacement erased wear-crater shading and dents went black),
+   `wear` (0..1 tumbled erosion: coarse lumps + fine crinkle, biased
+   exposure² toward corners, POSITION-KEYED hashing so the triangle soup
+   stays watertight), `nicks` (seeded chip scoops at corner sites — wide
+   and shallow; narrow+deep read as cracks), `pillow` (0..1
+   cushion-SHADED faces: normals tilt toward the rim, silhouette and the
+   digit plane stay flat — legibility invariant). Round-profile sets
+   darken their edge band half as much (a worn edge is frosted, not
+   inked). Deterministic per (type, variant); geometry cache is per
+   variant so std/shroud are untouched. Fingerprint: bounding radius
+   orders exactly by character — Void Grain 1.158 (nothing has ever worn
+   it) > Focus Crystal > Oxblood > Bolt-glass > First Frost > std 1.127 >
+   Deep Glacier > Heartwood > Sap Amber > Black Anvil > Scrimshaw >
+   Mosstone > Sea-glass 1.069 (decades in the surf). `__lab.geoStats()`
+   asserts the ordering headlessly.
 4. **The environment joins the theme** — felt decals from the landing
    point (frost crackle, droplet rings, scorch; the mat-text decal
    machinery is the seam) and a colored light PARENTED to the die (a

@@ -577,6 +577,18 @@ window.__lab = {
       : { active: false };
   },
   particleCount() { return field.count(); },
+  // Level 3.5 diagnostics: per-set render-geometry fingerprints. Bevel
+  // and wear move the bounding radius (crisp Umbra > std > tumbled
+  // Sea-glass); the probe asserts that ordering without a screenshot.
+  geoStats() {
+    const out = {};
+    for (const row of rows) {
+      const g = row.meshes[1].mesh.geometry; // the d6 column
+      if (!g.boundingSphere) g.computeBoundingSphere();
+      out[row.id] = { verts: g.attributes.position.count, r: +g.boundingSphere.radius.toFixed(4) };
+    }
+    return out;
+  },
   // diagnostic: average RGB of each face texture's SOURCE canvas for one
   // die — separates "the canvas was drawn wrong" from "the GPU upload
   // went wrong" when a face renders solid white.
