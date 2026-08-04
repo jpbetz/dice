@@ -5575,6 +5575,7 @@ function setPoolsEdit(on) {
   document.getElementById('pools-edit').setAttribute('aria-pressed', String(poolsEdit));
   document.getElementById('pools-toolbar').classList.toggle('on', poolsEdit);
   renderGroups();
+  renderPlayers(); // rail pills disable in manage mode (teammate consolidation 2026-08-04)
 }
 document.getElementById('pools-edit').addEventListener('click', () => setPoolsEdit(!poolsEdit));
 document.getElementById('pools-done').addEventListener('click', () => setPoolsEdit(false));
@@ -5599,8 +5600,9 @@ function poolsOwnerPlayer() {
 function setPoolsOwner(id) {
   poolsOwner = id || null;
   if (poolsOwner) { creatingShelf = null; creationDraft = { name: '', dice: ['d6'], touched: false }; }
-  if (poolsOwner && poolsEdit) { setPoolsEdit(false); return; } // manage is yours-only; renders
+  if (poolsOwner && poolsEdit) { setPoolsEdit(false); return; } // manage is yours-only; renders both
   renderGroups();
+  renderPlayers(); // rail pills reflect the pressed state (teammate consolidation 2026-08-04)
 }
 
 // Share the rack with the room: name + notation + category, capped like the
@@ -5842,77 +5844,27 @@ function buildCreationCard(sec) {
   return card;
 }
 
-// The switcher row: quiet owner chips (you first), only when a table has
-// teammates. Small windows fold the names away — dots stay (ROADMAP 2b).
-function buildPoolsSwitcher() {
-  const you = net ? net.playerId : null;
-  const others = netOnline ? players.filter((p) => p.id !== you) : [];
-  if (!others.length) return null;
-  const row = document.createElement('div');
-  row.className = 'pools-switcher';
-  row.setAttribute('role', 'group');
-  row.setAttribute('aria-label', 'Whose pools');
-  const chip = (label, color, id) => {
-    const b = document.createElement('button');
-    b.className = 'owner-chip';
-    b.setAttribute('aria-pressed', String((id || null) === poolsOwner));
-    if (color) {
-      const dot = document.createElement('span');
-      dot.className = 'roster-dot';
-      dot.style.background = color;
-      b.appendChild(dot);
-    }
-    const nm = document.createElement('span');
-    nm.className = 'oc-name';
-    nm.textContent = label;
-    b.appendChild(nm);
-    b.title = id ? `Browse ${label}'s pools` : 'Your pools';
-    // P2: browsing is a USE verb — gated out of manage mode exactly like
-    // tile staging, so a chip can never silently discard an open editor.
-    b.disabled = poolsEdit;
-    b.addEventListener('click', () => setPoolsOwner(id));
-    row.appendChild(b);
-  };
-  chip('You', net ? net.color : null, null);
-  for (const p of others) chip(p.name, p.color, p.id);
-  return row;
-}
+// (buildPoolsSwitcher retired 2026-08-04 — the roster pill in the rail IS
+// the browse verb now; teammate identity had two visual grammars and only
+// one carried the click. renderPlayers builds the pills; setPoolsOwner
+// refreshes the rail to reflect the pressed state.)
 
-// Roster churn refreshes the SWITCHER without repainting the shelves — a
-// full renderGroups would discard an open tile editor's unsaved text and
-// drop keyboard focus. Only a foreign view (where no editor can exist)
-// re-renders fully, because its banner/validity may have changed.
+// Roster churn refreshes the RAIL PILLS without repainting the shelves —
+// a full renderGroups would discard an open tile editor's unsaved text
+// and drop keyboard focus. A foreign view (where no editor can exist)
+// re-renders fully because its head may have swapped identity.
 function refreshPoolsPresence() {
   if (poolsOwner) { renderGroups(); return; }
-  const fresh = buildPoolsSwitcher();
-  const old = groupsListEl.querySelector('.pools-switcher');
-  if (old && fresh) old.replaceWith(fresh);
-  else if (old) old.remove();
-  else if (fresh) groupsListEl.insertBefore(fresh, groupsListEl.firstChild);
+  renderPlayers(); // rebuilds pills; aria-pressed reflects poolsOwner
 }
 
 // A teammate's rack: the standing banner-chip (also the way back), then
 // stage-only tiles. Staging SNAPSHOTS name+notation — a later
 // pools-changed rewrites these tiles, never an already-staged chip.
 function renderForeignPools(owner) {
-  const banner = document.createElement('button');
-  banner.className = 'pools-owner-banner';
-  banner.title = 'Back to your pools';
-  banner.setAttribute('aria-label', `${owner.name}'s pools, read-only — back to your pools`);
-  const nm = document.createElement('span');
-  nm.className = 'pob-name';
-  nm.textContent = `${owner.name}'s pools`;
-  const tag = document.createElement('span');
-  tag.className = 'pob-tag';
-  tag.textContent = 'read-only';
-  const x = document.createElement('span');
-  x.className = 'pob-x';
-  x.setAttribute('aria-hidden', 'true');
-  x.textContent = '\u2715';
-  banner.append(nm, tag, x);
-  banner.addEventListener('click', () => setPoolsOwner(null));
-  groupsListEl.appendChild(banner);
-
+  // The identity ("ALICE'S POOLS · READ-ONLY") lives in the swapped
+  // #pools-head now (teammate consolidation 2026-08-04) — the standing
+  // banner-chip is gone; the RAIL PILL IS the way back (press it again).
   // fail-closed per tile: render only what parses HERE (the server already
   // validated; a version skew still must not paint a dead tile)
   const pools = (Array.isArray(owner.pools) ? owner.pools : [])
@@ -5976,14 +5928,21 @@ function renderGroups() {
   renderedPools = [];
   for (const sec of buildSections(groups)) renderedPools.push(...sec.pools);
   if (poolsOwner && !poolsOwnerPlayer()) poolsOwner = null; // the owner left; fall home
-  const switcher = buildPoolsSwitcher();
-  if (switcher) groupsListEl.appendChild(switcher);
   document.getElementById('pools-toolbar').classList.toggle('hidden', !!poolsOwner);
-  // THE REGION HEAD (anatomy pass): SAVED POOLS stands over YOUR rack;
-  // browsing a teammate hides it — the standing owner banner IS that
-  // state's region head (one head per state, never two).
-  document.getElementById('pools-head').classList.toggle('hidden', !!poolsOwner);
-  if (poolsOwner) {
+  // THE REGION HEAD (anatomy pass; teammate consolidation 2026-08-04): the
+  // SAME element names both states — YOUR rack reads 'SAVED POOLS'; a
+  // foreign rack reads "<owner>'s pools · read-only" in the same dress
+  // (one head, one dress, two states). Rack list mirrors the class so
+  // its category heads yield sticky in foreign (ownership > category
+  // naming when browsing a teammate — one sticky pin per state).
+  const poolsHead = document.getElementById('pools-head');
+  const foreign = !!poolsOwner;
+  const owner = foreign ? poolsOwnerPlayer() : null;
+  poolsHead.classList.toggle('foreign', foreign);
+  groupsListEl.classList.toggle('foreign', foreign);
+  poolsHead.querySelector('.ph-word').textContent = foreign ? `${owner.name}'s pools` : 'Saved pools';
+  poolsHead.classList.remove('hidden'); // one region head, always shown online-with-content
+  if (foreign) {
     renderForeignPools(poolsOwnerPlayer());
     return;
   }
@@ -8509,23 +8468,41 @@ function setPill(text, cls) {
 // admit up to 40 players (server MAX_PLAYERS_PER_ROOM) and the rail must
 // not push its own controls off screen at that count. Renaming lives in
 // the identity menu; other players' pills are presence, not controls.
-const ROSTER_MAX = 4; // name pills shown before the tail folds into +N
+const ROSTER_MAX = 6; // pills shown before the tail folds into +N — raised
+// 2026-08-04 when pills became functional (browse teammates' pools). Real
+// table sizes are ≤6 for Soul Deal / D&D; overflow past 6 is a documented
+// gap in ROADMAP §2k.
 function renderPlayers() {
   rosterEl.innerHTML = '';
   const you = net ? net.playerId : null;
   const others = players.filter((p) => p.id !== you);
   for (const p of others.slice(0, ROSTER_MAX)) {
-    const pill = document.createElement('span');
+    // TEAMMATE PILL, functional (2026-08-04): the rail pill IS the browse
+    // verb — click loads their pools; press again to fall home. Toggle
+    // semantics + aria-pressed reflect the poolsOwner state, so the pill
+    // says visibly which teammate you are viewing. Disabled in manage mode:
+    // browsing is a USE verb and must never silently discard an open editor
+    // (mirrors the retired owner-chip's own gate).
+    const pill = document.createElement('button');
     pill.className = 'roster-name';
+    pill.setAttribute('aria-pressed', String(p.id === poolsOwner));
+    pill.disabled = poolsEdit;
     const dot = document.createElement('span');
     dot.className = 'roster-dot';
     dot.style.background = p.color || '#888';
     pill.appendChild(dot);
     pill.appendChild(document.createTextNode(p.name)); // user-supplied: text only
-    pill.title = p.name;
+    pill.title = p.id === poolsOwner ? `Back to your pools` : `Browse ${p.name}'s pools`;
+    pill.addEventListener('click', () => {
+      setPoolsOwner(p.id === poolsOwner ? null : p.id);
+    });
     rosterEl.appendChild(pill);
   }
   if (others.length > ROSTER_MAX) {
+    // Overflow past ROSTER_MAX (6): the fold is inert on purpose (no click)
+    // — pill browsing past the fold is a real hole (recorded in ROADMAP §2k
+    // as a standing follow-up); the count is at least still legible via
+    // hover. Practical tables never hit this at 6.
     const more = document.createElement('span');
     more.className = 'roster-more';
     more.textContent = `+${others.length - ROSTER_MAX}`;

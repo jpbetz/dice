@@ -951,8 +951,40 @@ html, body {
   text-transform: uppercase;
   color: var(--muted);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+/* the read-only tag rides the head in foreign state ONLY — dress is the
+   retired banner's .pob-tag verbatim, just docked into the shared head */
+#pools-head .ph-tag {
+  display: none;
+  flex: none;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
 }
 #pools-head .ph-rule { flex: 1; border-top: 1px solid var(--hair); }
+/* THE FOREIGN STATE: the head becomes the sticky ownership signal (mid-
+   scroll ownership must never vanish — the completeness critic caught
+   the shipped rack going pixel-identical to yours). The word promotes to
+   ivory to read as identity, the tag surfaces, and category heads yield
+   their sticky pin so only ONE thing pins at once. Same coordinates as
+   the (non-sticky) SAVED POOLS head above the shelves — same head, one
+   dress, two states. */
+#pools-head.foreign {
+  position: sticky;
+  top: var(--draft-h, 0px);
+  z-index: 2;
+  background: #191b1e; /* matches the column so scrolled tiles cannot bleed through */
+  padding: 6px 0 2px;
+  margin: 8px 0 0;
+}
+#pools-head.foreign .ph-word { color: var(--ivory); }
+#pools-head.foreign .ph-tag { display: inline; }
+#groups-list.foreign .pool-sec-head { position: static; }
 
 .pool-sec-head {
   position: sticky;
@@ -1240,60 +1272,13 @@ html, body {
   transition: border-color 0.4s, box-shadow 0.4s;
 }
 
-/* The owner switcher (ROADMAP 2b): quiet owner chips above the shelves;
-   a teammate's rack stands behind the read-only banner-chip (also the way
-   back). Small windows fold chip names away — the dots stay. */
-/* AIR above the owner row (Joe 2026-08-04: glued under the draft zone's
-   hairline, 'You' read as part of the draft — the gap makes it the rack's
-   own header) */
-.pools-switcher { display: flex; flex-wrap: wrap; gap: 4px; margin: 16px 0 8px; }
-.owner-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  max-width: 110px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  border: 1px solid var(--hair);
-  background: var(--panel);
-  font-size: 11px;
-  color: var(--muted);
-  cursor: pointer;
-}
-.owner-chip:hover { color: var(--ivory); border-color: rgba(255, 255, 255, 0.18); }
-.owner-chip[aria-pressed="true"] {
-  color: var(--ivory);
-  border-color: rgba(255, 255, 255, 0.28);
-  background: rgba(255, 255, 255, 0.06);
-}
-.owner-chip .roster-dot { width: 7px; height: 7px; }
-.owner-chip .oc-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pools-owner-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  margin: 0 0 8px;
-  padding: 5px 10px;
-  border-radius: 8px;
-  border: 1px dashed rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--ivory);
-  font-size: 10.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-.pools-owner-banner .pob-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pools-owner-banner .pob-tag { flex: none; color: var(--muted); }
-.pools-owner-banner .pob-x { flex: none; margin-left: auto; color: var(--muted); }
-.pools-owner-banner:hover { border-color: rgba(255, 255, 255, 0.3); }
-.pools-owner-banner:hover .pob-x { color: var(--ivory); }
+/* (Teammate consolidation 2026-08-04: the switcher chip row and the
+   owner banner both retired. The RAIL PILL (.roster-name, below) IS the
+   browse verb — one visual per teammate, one pattern per verb. The
+   region head (#pools-head, below) swaps identity in the foreign state,
+   so ownership rides the same one-head-per-state contract §7.17
+   established. .pools-none stays: it names an empty foreign rack.) */
 .pools-none { margin: 2px 0 8px; font-size: 12px; color: var(--muted); }
-@media (max-width: 720px) {
-  .owner-chip .oc-name { display: none; }
-  .owner-chip { padding: 3px 6px; }
-}
 
 /* manage-mode toolbar: copy-link (demoted here, P4) + Done */
 /* ONE morphing bar at the rack's foot (P6: management stands BELOW; Joe:
@@ -1643,6 +1628,12 @@ html, body {
    into one +N pill past a handful (title carries the overflow names). */
 #rail-roster { display: flex; align-items: center; gap: 6px; min-width: 0; }
 #rail-roster:empty { display: none; }
+/* THE TEAMMATE PILL (2026-08-04): the ONE per-player surface — presence
+   AND the browse verb (click → their pools; press again → back). Wears
+   the shared aria-pressed steel dress the panel's seg controls already
+   use — HUE = ACT (§7.16 2i-C: no gold, gold stays the roll act's).
+   Disabled in manage mode (P2: use verbs cannot silently discard an
+   open editor). */
 .roster-name {
   display: inline-flex;
   align-items: center;
@@ -1652,12 +1643,25 @@ html, body {
   border-radius: 999px;
   border: 1px solid var(--hair);
   background: var(--panel);
-  font-size: 12px;
   color: var(--ivory);
+  font-family: var(--font-ui);
+  font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
 }
+.roster-name:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.roster-name[aria-pressed="true"] {
+  background: rgba(243, 234, 215, 0.10);
+  border-color: rgba(243, 234, 215, 0.42);
+  box-shadow: inset 0 0 0 1px rgba(243, 234, 215, 0.14);
+}
+.roster-name:disabled { opacity: 0.4; cursor: default; filter: grayscale(0.7); }
 .roster-dot {
   flex: none;
   width: 8px;

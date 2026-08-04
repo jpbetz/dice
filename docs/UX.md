@@ -2211,3 +2211,33 @@ confusion). The tray gets nothing: the one warm bronze surface in a cool
 column is the strongest structural signal in the panel, and §7.14.1's
 cut hint stands. The judged panel's rule survives as doctrine: **every
 standing word must name the confusion it kills.**
+
+**THE TEAMMATE PILL, functional (2026-08-04 same day, the completeness
+critic's follow-up).** Every teammate used to render TWICE — an inert
+`.roster-name` span in the rail, and a clickable `.owner-chip` inside
+`buildPoolsSwitcher` above the shelves — same person, two visual
+grammars, only one carried the browse verb. Consolidated: the RAIL PILL
+is the one per-player surface. Click Alice → browse Alice's pools;
+press her pill again → back home (press-again-to-close, matching
+`#edge-toggle`, `#log-flyout`). The pill wears the shared
+`aria-pressed` steel dress the panel's `.seg` controls already use
+(HUE = ACT — no gold, gold stays the roll act's), disables in manage
+mode (P2: browsing is a USE verb, cannot silently discard an editor —
+mirrors the retired owner-chip's gate). `buildPoolsSwitcher` and
+`.pools-owner-banner` retired; the head+rail bracket the identity —
+head names the state, pill toggles it.
+
+**THE HEAD, one dress, two states.** The same `#pools-head` element
+that reads `SAVED POOLS` on your rack reads `ALICE'S POOLS · READ-ONLY`
+in foreign state (`.foreign` class swaps the word and shows the
+`.ph-tag`). And it JOINS THE STICKY STACK in foreign state — the
+completeness critic caught scrolled foreign racks looking pixel-
+identical to yours, because the retired banner wasn't sticky. Fixed by
+the same swap: category shelf heads yield sticky in foreign
+(`#groups-list.foreign .pool-sec-head { position: static }`), so
+ownership > category naming when browsing a teammate. One sticky pin
+per state, mid-scroll ownership never vanishes.
+
+`ROSTER_MAX` raised 4 → 6 (pills are functional now; real table sizes
+are ≤6 for Soul Deal / D&D). Overflow past 6 folds into `+N` as
+before, inert — a rare edge case, documented in ROADMAP §2k.

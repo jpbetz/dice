@@ -664,10 +664,17 @@ rack with a rule-to-edge rank mark, yielding to the owner banner on
 foreign racks; the dice and tray regions get deliberate NOTHING (the
 pressed Dice segment and the bronze well already speak). e2e:
 `panel-anatomy` (chrome, settings); stills in tools/out/anatomy/.
-Follow-ups surfaced by the critic, standing open: the roster-pill ↔
-owner-chip duplication (one per-player surface could carry both
-presence and pool-browsing), ownership legibility mid-scroll on foreign
-racks, and the join modal's inability to show the table name pre-join.
+Follow-ups surfaced by the critic:
+- roster-pill ↔ owner-chip duplication (one per-player surface for
+  presence + pool-browsing) — **SHIPPED same day**: rail pill is the
+  browse verb, `buildPoolsSwitcher` retired, aria-pressed steel dress,
+  press-again-to-close, disabled in manage mode, `ROSTER_MAX` 4→6.
+- ownership legibility mid-scroll on foreign racks — **SHIPPED same day**:
+  `#pools-head.foreign` joins the sticky stack; category heads yield
+  sticky in foreign state. One head, one dress, two states.
+- the join modal's inability to show the table name pre-join —
+  **still open**: settings arrive in the join response, so a pre-join
+  peek needs a new endpoint or a name-in-URL surface. Not urgent.
 
 ## Tier 2 — Organization (goal 5, the audit's biggest experience gap)
 

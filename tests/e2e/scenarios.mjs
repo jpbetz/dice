@@ -860,21 +860,37 @@ export const scenarios = [
         'flex', 'SAVED POOLS heads your rack');
       assert.equal(await a.eval(
         `document.querySelector('#pools-head .ph-word').textContent`), 'Saved pools');
-      // …and it yields to the owner banner on a foreign rack (one head
-      // per state, never two)
+      // …and it SWAPS identity on a foreign rack — one head, one dress,
+      // two states (teammate consolidation 2026-08-04; supersedes the
+      // retired .pools-owner-banner which was a second surface for the
+      // same fact). The rail's teammate pill IS the way back — press again.
       const bobId = await b.playerId();
       await a.dbg(`setPoolsOwner(${JSON.stringify(bobId)})`);
       await a.waitFor(
-        `getComputedStyle(document.getElementById('pools-head')).display === 'none'`,
-        { desc: 'the head yields to the owner banner' },
+        `document.getElementById('pools-head').classList.contains('foreign')`,
+        { desc: 'the head enters foreign state' },
       );
-      assert.ok(await a.eval(`!!document.querySelector('.pools-owner-banner')`),
-        "the owner banner IS that state's region head");
-      await a.dbg('setPoolsOwner(null)');
+      assert.equal(await a.eval(
+        `document.querySelector('#pools-head .ph-word').textContent`), "Bob's pools",
+        'the region head names the teammate');
+      assert.equal(await a.eval(
+        `getComputedStyle(document.querySelector('#pools-head .ph-tag')).display !== 'none'`),
+        true, 'the read-only tag stands in foreign state');
+      assert.equal(await a.eval(
+        `getComputedStyle(document.getElementById('pools-head')).position`),
+        'sticky', 'the head becomes sticky so mid-scroll ownership survives');
+      assert.equal(await a.eval(`!!document.querySelector('.pools-owner-banner')`),
+        false, 'the standalone banner is retired');
+      // the rail pill is the toggle — press-again-to-close falls home
+      await a.eval(`[...document.querySelectorAll('#rail-roster .roster-name')]
+        .find((p) => p.textContent.includes('Bob')).click()`);
       await a.waitFor(
-        `getComputedStyle(document.getElementById('pools-head')).display === 'flex'`,
-        { desc: 'the head returns home' },
+        `!document.getElementById('pools-head').classList.contains('foreign')`,
+        { desc: 'the head returns home via the pill toggle' },
       );
+      assert.equal(await a.eval(
+        `document.querySelector('#pools-head .ph-word').textContent`), 'Saved pools',
+        'and the head is your rack again');
 
       // collapsed: both leave with the panel — the icon rail stays clean.
       // (try/finally: dice.panels.v1 persists per origin, and an aborted
@@ -2086,23 +2102,30 @@ export const scenarios = [
         { desc: "Alice's full seeded rack reaches Bob" });
       const alice = (await b.dbg('netPlayers')).find((p) => p.name === 'Alice');
 
-      // The switcher stands once the table has teammates: You + Alice.
-      assert.equal(await b.eval(`document.querySelectorAll('#groups-list .owner-chip').length`), 2,
-        'Bob sees two owner chips');
+      // The RAIL PILL is the browse verb (teammate consolidation
+      // 2026-08-04): one per teammate, aria-pressed reflects poolsOwner.
+      assert.equal(await b.eval(`document.querySelectorAll('#rail-roster .roster-name').length`), 1,
+        'Bob sees one teammate pill (Alice)');
 
-      // Manage mode is yours-only: the switcher chips gate out (P2, same as
-      // tile staging) so a stray click can never discard an open editor, and
-      // switching away (debug path) exits manage.
+      // Manage mode is yours-only: the pill gates out (P2, same as tile
+      // staging) so a stray click can never discard an open editor.
       await b.dbg('setPoolsEditMode(true)');
-      assert.equal(await b.eval(`[...document.querySelectorAll('#groups-list .owner-chip')]
-        .every((c) => c.disabled)`), true, 'owner chips are inert inside \u270e');
-      await b.dbg(`setPoolsOwner(${JSON.stringify(alice.id)})`);
-      assert.equal(await b.dbg('poolsEditMode'), false, 'browsing a teammate leaves manage mode');
+      assert.equal(await b.eval(`document.querySelector('#rail-roster .roster-name').disabled`),
+        true, 'teammate pills are inert inside edit mode');
+      await b.dbg('setPoolsEditMode(false)');
+      // pill click via the real path (not the debug hook — the CUJ
+      // this consolidation exists for)
+      await b.eval(`[...document.querySelectorAll('#rail-roster .roster-name')]
+        .find((p) => p.textContent.includes('Alice')).click()`);
+      assert.equal(await b.dbg('poolsOwner'), alice.id, 'the pill browsed her rack');
+      assert.equal(await b.eval(
+        `document.querySelector('#rail-roster .roster-name').getAttribute('aria-pressed')`),
+        'true', 'the pill is visibly pressed while viewing');
 
-      // The standing banner-chip + stage-only tiles (no ±, no manage, no ordinals).
-      const bannerText = await b.eval(`(document.querySelector('#groups-list .pools-owner-banner') || {}).textContent || ''`);
-      assert.ok(bannerText.includes("Alice's pools") && bannerText.includes('read-only'),
-        `the read-only banner stands (got: ${bannerText})`);
+      // The swapped region head + stage-only tiles (no ±, no manage, no ordinals).
+      const headText = await b.eval(`document.getElementById('pools-head').textContent`);
+      assert.ok(headText.includes("Alice's pools") && headText.includes('read-only'),
+        `the region head names the teammate (got: ${headText})`);
       assert.equal(await b.eval(`document.querySelectorAll('#groups-list .pool-tile.foreign').length`), 3,
         "Alice's three pools render as tiles");
       assert.equal(await b.eval(`document.querySelectorAll('#groups-list .pool-tile.foreign .tile-mods, #groups-list .pool-tile.foreign .tile-edit, #groups-list .pool-tile.foreign .pool-ord').length`),
@@ -2130,9 +2153,11 @@ export const scenarios = [
       ts = await b.dbg('trayState');
       assert.ok(ts.sources.includes('Attack'), `digit 1 staged Bob's own pool (got: ${ts.sources})`);
 
-      // The banner is the way back; the draft crosses the switch intact.
-      await b.eval(`document.querySelector('#groups-list .pools-owner-banner').click()`);
-      assert.equal(await b.dbg('poolsOwner'), null, 'the banner falls home');
+      // The pill is the way back (press-again-to-close); the draft crosses
+      // the switch intact.
+      await b.eval(`[...document.querySelectorAll('#rail-roster .roster-name')]
+        .find((p) => p.textContent.includes('Alice')).click()`);
+      assert.equal(await b.dbg('poolsOwner'), null, 'the pill toggles back home');
       ts = await b.dbg('trayState');
       assert.ok(ts.dice.length > stagedLen, 'the draft survived the switch');
       assert.equal(await b.eval(`document.querySelectorAll('#groups-list .pool-tile.foreign').length`), 0,
@@ -3613,10 +3638,10 @@ export const scenarios = [
       // and EVERY strip is pinned so nothing can fall to the viewer's own
       // set (the information-loss bug, both layers of it)
       await b.waitFor(
-        `document.querySelectorAll('#groups-list .pools-switcher .owner-chip').length >= 2`,
-        { desc: "B's switcher shows Alice" },
+        `document.querySelectorAll('#rail-roster .roster-name').length >= 1`,
+        { desc: "B's rail shows Alice" },
       );
-      await b.eval(`[...document.querySelectorAll('#groups-list .pools-switcher .owner-chip')].find((c) => c.textContent.includes('Alice')).click()`);
+      await b.eval(`[...document.querySelectorAll('#rail-roster .roster-name')].find((p) => p.textContent.includes('Alice')).click()`);
       await b.waitFor(
         `document.querySelectorAll('#groups-list .pool-tile.foreign img.die-art').length >= 1`,
         { desc: "Alice's rack renders" },
@@ -3675,7 +3700,8 @@ export const scenarios = [
         `an std-world pool stages PINNED to std under the borrower's house set (got ${JSON.stringify(borrowedStd)})`);
       await b.eval(`document.getElementById('clear-tray').click()`);
       await b.eval(`window.__diceDebug.setDiceSet('std')`);
-      await b.eval(`[...document.querySelectorAll('#groups-list .pools-switcher .owner-chip')][0].click()`);
+      // Pill-press-again to fall home (the You chip is retired with the switcher)
+      await b.eval(`[...document.querySelectorAll('#rail-roster .roster-name')].find((p) => p.textContent.includes('Alice')).click()`);
 
       // a MIXED draft: EACH die wears its own pool's set — pool B takes
       // seaglass on a d8, a loose palette d6 stays the roller's std, and
