@@ -2241,3 +2241,22 @@ per state, mid-scroll ownership never vanishes.
 `ROSTER_MAX` raised 4 → 6 (pills are functional now; real table sizes
 are ≤6 for Soul Deal / D&D). Overflow past 6 folds into `+N` as
 before, inert — a rare edge case, documented in ROADMAP §2k.
+
+**THE IDENTITY CHIP JOINS THE GRAMMAR (Joe 2026-08-04 same day).** The
+rail became a "whose pools" segmented control when the teammate pill
+grew the browse verb — the identity chip joins it: **left-click is the
+toggle** (falls home from a foreign rack; no-op when already home, and
+the chip is `aria-pressed` to say so), **right-click / long-press
+opens the identity menu** (rename · leave & switch · invite —
+following the tile popover's right-click-for-context pattern already
+established for the rack). At any moment exactly ONE chip in the rail
+is pressed: yours (default) or the teammate you're browsing.
+
+The chip's own dress: `aria-pressed="true"` at home is the default
+`.btn.ghost` look; `aria-pressed="false"` dims it a touch — subtle,
+because the chip is the corner anchor and never moves; only its state
+signal changes. This deliberately supersedes the pre-2026-08-04
+left-click-opens-menu wiring — the menu still exists at the same
+coordinates, only its entry gesture changed. Solo users access
+rename/leave/invite via right-click (mouse) or long-press (touch);
+the chip's tooltip teaches the new gesture explicitly.

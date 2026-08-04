@@ -1526,6 +1526,21 @@ html, body {
   gap: 7px;
   max-width: 170px;
 }
+/* THE WHOSE-RACK STATE (Joe 2026-08-04): the identity chip joins the
+   rail's aria-pressed toggle grammar — pressed=true when you are at
+   your own rack (the default, and the .btn.ghost dress ALREADY reads
+   as pressed), pressed=false when you have navigated to a teammate.
+   Not-pressed just dims the chip a touch — it's still the corner
+   anchor and never moves, only its state signal changes. Left-click
+   toggles the state; right-click / long-press opens the menu. */
+#identity-chip[aria-pressed="false"] {
+  opacity: 0.68;
+  border-color: var(--hair);
+}
+#identity-chip[aria-pressed="false"]:hover {
+  opacity: 1;
+  border-color: rgba(255, 255, 255, 0.32);
+}
 .identity-dot {
   flex: none;
   width: 10px;

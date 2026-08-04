@@ -8684,6 +8684,18 @@ function updateIdentityChip() {
   // '' falls back to the stylesheet's solo dot color
   document.getElementById('identity-dot').style.background = info.color || '';
   document.getElementById('identity-name').textContent = info.name || '…';
+  // ONE grammar for whose-rack (Joe 2026-08-04): teammate consolidation
+  // grew the rail into a "whose pools" segmented control — pill click
+  // browses, press-again falls home. The identity chip joins that
+  // grammar: aria-pressed=true when you're at your own rack (the
+  // default), false while browsing a teammate. Exactly one chip in the
+  // rail is pressed at any time.
+  const chip = document.getElementById('identity-chip');
+  const atHome = poolsOwner === null;
+  chip.setAttribute('aria-pressed', String(atHome));
+  chip.title = atHome
+    ? 'You — right-click for name, leave, invite'
+    : 'Back to your pools — right-click for name, leave, invite';
 }
 
 function isIdentityMenuOpen() { return !identityMenu.classList.contains('hidden'); }
@@ -8702,12 +8714,49 @@ function closeIdentityMenu() {
   document.getElementById('idm-rename-row').classList.add('hidden');
 }
 
+// THE IDENTITY CHIP, gesture-split (Joe 2026-08-04): left-click IS the
+// "whose pools" toggle — falls home from a foreign rack, matching the
+// teammate pills' toggle grammar (one rail, one gesture, one gesture
+// grammar). Right-click / long-press opens the identity menu — the
+// same right-click-for-context pattern the pool tiles already speak.
+// Solo/at-home: left-click is a no-op (you're already home; the chip
+// is aria-pressed to say so); right-click is the way in to rename /
+// leave / invite. This deliberately supersedes the pre-2026-08-04
+// left-click-opens-menu wiring — recorded in UX.md §7.17.
 document.getElementById('identity-chip').addEventListener('click', () => {
+  if (isIdentityMenuOpen()) closeIdentityMenu(); // menu is open (from right-click): let click-away close it
+  else setPoolsOwner(null); // fall home; no-op if already home
+});
+// Right-click (mouse) → menu. preventDefault so the browser's context
+// menu never shows over the rail; the app's own menu is the answer.
+document.getElementById('identity-chip').addEventListener('contextmenu', (e) => {
+  e.preventDefault();
   if (isIdentityMenuOpen()) closeIdentityMenu();
   else openIdentityMenu();
 });
-// A press anywhere else dismisses the menu; presses on the chip fall through
-// to its click toggle above, and presses inside the menu are the menu's own.
+// Touch long-press (500ms — matches the pool-tile popover contract):
+// pointerdown starts a timer, pointerup/leave/cancel/scroll all cancel
+// it. The click above still runs on a normal tap; the timer only fires
+// if the finger stays put.
+{
+  const chip = document.getElementById('identity-chip');
+  let holdTimer = null;
+  const armed = new WeakSet();
+  chip.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse') return; // right-click owns mouse
+    armed.add(e);
+    holdTimer = setTimeout(() => {
+      holdTimer = null;
+      if (armed.has(e)) openIdentityMenu();
+    }, 500);
+  });
+  const cancel = () => { if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; } };
+  chip.addEventListener('pointerup', cancel);
+  chip.addEventListener('pointerleave', cancel);
+  chip.addEventListener('pointercancel', cancel);
+}
+// A press anywhere else dismisses the menu; presses inside the menu or
+// on the chip fall through to their own handlers.
 document.addEventListener('pointerdown', (e) => {
   if (!isIdentityMenuOpen()) return;
   if (e.target.closest('#identity-menu') || e.target.closest('#identity-chip')) return;

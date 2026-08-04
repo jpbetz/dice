@@ -881,16 +881,64 @@ export const scenarios = [
         'sticky', 'the head becomes sticky so mid-scroll ownership survives');
       assert.equal(await a.eval(`!!document.querySelector('.pools-owner-banner')`),
         false, 'the standalone banner is retired');
-      // the rail pill is the toggle — press-again-to-close falls home
+      // ONE grammar for whose-rack (Joe 2026-08-04): the identity chip
+      // joins the rail's aria-pressed toggle grammar. Pressed=true at
+      // home, false while browsing a teammate — exactly one chip in the
+      // rail is pressed at any time.
+      assert.equal(await a.eval(
+        `document.getElementById('identity-chip').getAttribute('aria-pressed')`),
+        'false', 'the identity chip un-presses while you are browsing a teammate');
+      assert.equal(await a.eval(
+        `document.querySelector('#rail-roster .roster-name').getAttribute('aria-pressed')`),
+        'true', "and the teammate's pill is pressed instead");
+
+      // LEFT-CLICK on your identity chip falls home (Joe 2026-08-04:
+      // "switching back to yourself isn't possible by just clicking on
+      // your name. Maybe make that possible…"). No menu opens; the
+      // chip's own toggle grammar mirrors the teammate pill's.
+      await a.eval(`document.getElementById('identity-chip').click()`);
+      await a.waitFor(
+        `!document.getElementById('pools-head').classList.contains('foreign')`,
+        { desc: 'left-click on identity chip falls home' },
+      );
+      assert.equal(await a.eval(
+        `document.querySelector('#pools-head .ph-word').textContent`), 'Saved pools',
+        'and the head is your rack again');
+      assert.equal(await a.eval(
+        `document.getElementById('identity-menu').classList.contains('hidden')`), true,
+        'the identity menu does NOT open on left-click (moved to right-click)');
+      assert.equal(await a.eval(
+        `document.getElementById('identity-chip').getAttribute('aria-pressed')`),
+        'true', 'the identity chip is pressed again at home');
+
+      // RIGHT-CLICK on your identity chip opens the identity menu
+      // ("…make access to player details accessible via right click").
+      // Matches the right-click-for-popover pattern the pool tiles
+      // already speak (§7.9 the Sheet Pass: "right-click a tile for its
+      // ± popover"). Left-click while the menu is open closes it.
+      await a.eval(`document.getElementById('identity-chip')
+        .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`);
+      assert.equal(await a.eval(
+        `document.getElementById('identity-menu').classList.contains('hidden')`), false,
+        'right-click opens the identity menu');
+      await a.eval(`document.getElementById('identity-chip').click()`);
+      assert.equal(await a.eval(
+        `document.getElementById('identity-menu').classList.contains('hidden')`), true,
+        'left-click while the menu is open closes it (via the chip handler)');
+
+      // and press-again on the teammate pill ALSO falls home — both
+      // paths back must work; consistency-first, one gesture grammar.
+      await a.dbg(`setPoolsOwner(${JSON.stringify(bobId)})`);
+      await a.waitFor(
+        `document.getElementById('pools-head').classList.contains('foreign')`,
+        { desc: 'foreign again for the pill-toggle check' },
+      );
       await a.eval(`[...document.querySelectorAll('#rail-roster .roster-name')]
         .find((p) => p.textContent.includes('Bob')).click()`);
       await a.waitFor(
         `!document.getElementById('pools-head').classList.contains('foreign')`,
         { desc: 'the head returns home via the pill toggle' },
       );
-      assert.equal(await a.eval(
-        `document.querySelector('#pools-head .ph-word').textContent`), 'Saved pools',
-        'and the head is your rack again');
 
       // collapsed: both leave with the panel — the icon rail stays clean.
       // (try/finally: dice.panels.v1 persists per origin, and an aborted
