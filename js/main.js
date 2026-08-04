@@ -1351,13 +1351,11 @@ function renderPeek() {
     }
   });
 
-  // header: roller dot + name (their color) + label
+  // header: the BANNER's identity treatment (Joe 2026-08-04, panel
+  // parity) — the roller's name in their color carries the who; the old
+  // color dot was redundant beside it
   const head = document.createElement('div');
   head.className = 'pk-head';
-  const dot = document.createElement('span');
-  dot.className = 'sm-dot';
-  dot.style.background = (entry && entry.color) || '#8a7f6e';
-  head.appendChild(dot);
   const who = document.createElement('span');
   who.className = 'pk-who';
   if (entry && entry.playerName) {
@@ -1467,8 +1465,8 @@ function positionPeek() {
   const w = peekW;
   const h = peekH;
   const left = Math.max(8, Math.min(ax - w / 2, window.innerWidth - w - 8));
-  let top = ay - 16 - h;
-  if (top < 8) top = ay + 16; // clipped above: sit below the marker instead
+  let top = ay - 24 - h; // clear air over the cluster (panel-parity pass)
+  if (top < 8) top = ay + 24; // clipped above: sit below the marker instead
   top = Math.max(8, Math.min(top, window.innerHeight - h - 8));
   peekEl.style.left = `${left}px`;
   peekEl.style.top = `${top}px`;

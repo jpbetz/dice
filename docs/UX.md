@@ -1232,6 +1232,17 @@ Amendment to §7.7.1 peek cards (Joe, play-test): the peek must NOT scale/zoom
 in — it appears in place (instant, or ≤100ms opacity fade only). Motion
 restraint: cards are chrome, not ceremony.
 
+Amendment (Joe 2026-08-04, panel parity — 'the collected panels are a
+mess; make them more like the reveal panels'): the peek wears the
+BANNER's dress — same small-caps centered identity line (the roller's
+name in their color; the redundant color dot retired), banner-family
+width (300–460px, wide enough to seat an outcome row whole), a larger
+gold total — and rides 24px clear of its cluster. And on BOTH panels
+(banner, peek — verdict card too) the fold's reveal-tier verbs now rest
+DIM (0.45) instead of invisible: the reserved fold read as a dead void
+at rest. Quiet → loud on approach, never invisible → visible (the P6
+standing-furniture grammar, applied to the fold).
+
 ### 7.8 Visibility notation (`held` · `secret` · `w:`)
 
 Visibility is part of a roll's intent, so it has a canonical spelling.
