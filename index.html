@@ -47,13 +47,20 @@ limitations under the License.
          #rail-foot bar at the panel's foot. Their transient drops
          (#identity-menu, #log-flyout, settings) still overlay — menus may;
          the panel's own content may not. -->
+    <!-- YOU FIRST (Joe 2026-08-04: 'the player should have their name to the
+         left of other players at the table — that way their name location is
+         stable'). Your chip anchors the column's top-left corner and never
+         moves: the roster grows rightward from it, and the transient status
+         pill comes LAST so that when it appears it wraps to its own line
+         BELOW you instead of pushing you down (it led the rail before, which
+         is exactly the drift this ordering exists to kill). -->
     <div id="rail">
-      <span id="status-pill" class="hidden"></span>
-      <div id="rail-roster"></div>
       <button id="identity-chip" class="btn ghost" title="You — change name, leave &amp; switch, invite">
         <span id="identity-dot" class="identity-dot"></span>
         <span id="identity-name" class="identity-name">…</span>
       </button>
+      <div id="rail-roster"></div>
+      <span id="status-pill" class="hidden"></span>
     </div>
 
     <!-- Collapsed-only quick list (super minimal, Joe 2026-08-04): your
@@ -121,45 +128,51 @@ limitations under the License.
            absolutely-positioned SIBLINGS (never a button inside a button).
            Hover = the gold roll-glow, suppressed over a ✕ (the glow must
            not lie). Empty draft: a quiet hint line instead. -->
-      <!-- THE WORKBENCH (§7.14): the zone is a well over a rail. In the
-           well: the pool and the one tool that shapes it (±), revealed on
-           approach. On the rail below: the verbs that dispose of it
-           (Save · Offer · ✕ Clear), STANDING while a draft exists.
-           Everything aligns to the well's 7px interior grid. -->
+      <!-- THE WORKBENCH (§7.14, re-cut 2026-08-04): the zone is a well
+           over a RIM. The well has two decks — the deck holds what you
+           staged, and the ROLL cue owns a reserved band along its floor
+           (before this they shared one box and the tokens sat ON the
+           word). The rim below carries every tool that acts on the well's
+           contents: ± shapes it, Save · Offer · ✕ Clear dispose of it.
+           All four arm together, so they are ONE row, not a bronze bar
+           over a steel row. Everything aligns to the well's 7px grid. -->
       <div id="draft-zone" class="draft-zone">
       <!-- The WELL: the draft's second editor, peer to #cmd — same warm
            dress (§7.9: one draft, two editors; only one of them looked
            like an editor before this). The cluster stands ALONE in the
-           well (Joe 2026-08-04: the ± gutter pushed the cue off-center)
-           — ± is the drawer-pull bar directly below. Keeps the
+           well — every tool lives on the rim below. Keeps the
            #tray-actions id: it anchors the ± popover. -->
       <div class="pool-line2 tray-line2" id="tray-actions">
         <div id="tray" class="tray-cluster">
           <button id="tray-roll" class="pool-roll tray-roll hidden"></button>
           <div id="tray-x-layer" class="tray-x-layer"></div>
-          <!-- THE GHOST (Joe 2026-08-03, simpler won): the empty well shows
-               ONLY a quiet ROLL ❯❯❯ — a preview of the full well, filled by
-               buildRollCue at boot. Placeholder semantics: real dice take
-               the same slot. -->
+          <!-- THE EMPTY WELL: the quiet ROLL ❯❯❯ in its floor band, and in
+               the deck above it the one line of orientation this app owes a
+               newcomer — where dice come from (Joe 2026-08-04). Both filled
+               by JS at boot; staging replaces the invitation in place
+               (placeholder semantics) and never moves the cue. -->
           <div id="tray-hint" class="hint tray-ghost"></div>
         </div>
       </div>
-      <!-- symbol only (Joe 2026-08-04: no 'Tweak' in the interface) — the
-           ± is the app-wide sign for the modifier drawer; the title says
-           the rest on hover -->
-      <button id="tray-mods" title="Modifiers, target, moment">±</button>
-      <!-- The RAIL (P6: management STANDS — supersedes the 2026-08-01
-           ghost-text demotion): it appears only while a draft exists
-           (that is the contextual signal) and then stands — no hover
-           reveal. Save morphs into the inline name row (always ADDITIVE
-           — updates stay on the by-id paths). -->
+      <!-- THE RIM (P6: management STANDS — supersedes the 2026-08-01
+           ghost-text demotion): standing furniture whose tools gray on an
+           empty well, so the workbench's geometry never moves. Save morphs
+           into the inline name row (always ADDITIVE — updates stay on the
+           by-id paths). -->
       <div class="btn-row draft-actions hidden" id="draft-actions">
+        <!-- symbol only (Joe 2026-08-04: no 'Tweak' in the interface) — the
+             ± is the app-wide sign for the modifier drawer. It leads the rim
+             because it SHAPES the draft; the verbs after it dispose of it.
+             Bronze-tinted: it belongs to the roll world (gold stays reserved
+             for the roll act itself). -->
+        <button id="tray-mods" title="Modifiers, target, moment">±</button>
         <button id="save-group" class="btn">Save</button>
         <!-- Offer lives on the DRAFT now (Trigger Pass): the popover's
              'Offer to table' retired with its Roll — one composing surface
              owns both verbs. Hidden solo (offers need a table); targeted
-             offers grow their audience picker here later (ROADMAP 4b). -->
-        <button id="offer-draft" class="btn hidden" title="Post this roll for anyone at the table to take">Offer to table</button>
+             offers grow their audience picker here later (ROADMAP 4b).
+             One word on the rim — the ▾ beside it carries "or pick one". -->
+        <button id="offer-draft" class="btn hidden" title="Offer this roll to the table — anyone can take it">Offer</button>
         <!-- Targeted offers (4b): the ▾ names ONE claimant ("Bo, roll this
              save"). Split button — the plain verb keeps its one-click
              table-wide muscle memory. Hidden until a teammate exists. -->
@@ -196,15 +209,24 @@ limitations under the License.
       </div>
     </div>
 
-    <!-- The utility bar at the panel's foot (Joe 2026-08-04): quick roll,
-         log, settings — and the contextual ✕ Clear table at its end. -->
+    <!-- The utility bar at the panel's foot. ORDERED BY WHAT THEY TOUCH
+         (Joe 2026-08-04: 'settings should be far left… think about positions
+         of all UI elements carefully'): left to right the foot runs
+         configure → consult → act — ⚙ Settings, ≣ Log, ❯ Quick roll — and
+         then the gap, with ✕ Clear table alone in the right corner.
+         That corner is the same one ✕ Clear owns on the workbench rim
+         directly above, so the panel has ONE rule for where a clearing verb
+         lives; and because the three permanent icons are the LEFT cluster,
+         none of them shifts when the contextual ✕ comes and goes. (This is
+         why ❯ is not itself right-aligned: pinned to that edge it would be
+         the thing the ✕ pushed around.) -->
     <div id="rail-foot">
-      <button id="rail-palette" class="btn ghost" title="Quick roll ( / )">❯</button>
+      <button id="toggle-settings" class="btn ghost" title="Settings">⚙</button>
       <!-- No notification bubble on the log (user call, 2026-07): history is
            reference material, not an inbox — the since-you-looked count rides
            only the hover title. -->
       <button id="rail-log" class="btn ghost" title="Roll log — l" aria-pressed="false">≣</button>
-      <button id="toggle-settings" class="btn ghost" title="Settings">⚙</button>
+      <button id="rail-palette" class="btn ghost" title="Quick roll ( / )">❯</button>
       <div id="corner-controls" class="hidden">
         <button id="corner-clear" class="corner-btn" title="Remove all dice from the table — c"><span class="cb-x">✕</span><span class="cb-label"> Clear table</span></button>
       </div>
@@ -532,6 +554,13 @@ limitations under the License.
       <button id="pop-save" class="btn primary">Save</button>
       <button id="pop-todraft" class="btn ghost">Open in draft</button>
       <button id="pop-variant" class="btn">Duplicate…</button>
+      <!-- DONE (Joe 2026-08-04: 'that panel can only be closed with the ✕,
+           there is no apply'). Not an Apply — every edit here is already
+           live in the thing it edits (the Trigger Pass made this a pure
+           editor). Done is the DISMISSAL, standing on every source so the
+           tray's popover is never a room with one small door: the ✕, Esc,
+           a click outside, and this. -->
+      <button id="pop-done" class="btn ghost">Done</button>
     </div>
     <div class="pop-actions pop-save hidden" id="pop-save-row">
       <input id="pop-save-name" class="tin" maxlength="24" placeholder="Name this pool…">

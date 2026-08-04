@@ -407,11 +407,15 @@ html, body {
    well warms the sockets slightly. */
 #tray-hint.tray-ghost {
   margin: 0;
-  min-height: 84px;
+  min-height: 113px;
   flex: 1;
   position: relative; /* the ghost cue anchors HERE — the same box the
                          roll button occupies, so the cue never moves */
 }
+/* (.tray-invite retired the day it shipped — Joe 2026-08-04: a one-line
+   "Tap a die above…" in the empty deck was 'aesthetically distracting'.
+   The deck stays empty when the draft is; orientation gets a different
+   answer later.) */
 /* ONE cue geometry in the well, every state (Joe 2026-08-03: 'exact font
    size, weight and location — effects may differ, no glitching'): the
    ghost inherits the base .roll-cue box (absolute, right-aligned) and
@@ -420,8 +424,108 @@ html, body {
    2026-08-04: 'the roll word is too small… needs chevrons on the other
    side to balance the space') — card strips keep the compact right form.
    26px/0.18em is the largest dress that fits the well's width whole: the
-   cue must never widen the panel into a horizontal scrollbar. */
-.tray-line2 .roll-cue { font-size: 26px; letter-spacing: 0.18em; justify-content: center; padding-right: 0; }
+   cue must never widen the panel into a horizontal scrollbar.
+   TWO DECKS (Joe 2026-08-04, the review pass): the centered cue and the
+   staged tokens were sharing one box, so a pool chip sat ON the word —
+   '❯❯[SNEAK][ATTACK]OLL ❯❯'. The cue now owns a reserved band along the
+   well's FLOOR and the deck above it holds the tokens. Card strips keep
+   the overlay form (there the cue fills empty space beside small dice).
+   This is what finally makes 'ONE cue geometry in the well, every state'
+   literally true: empty, filled and hovered, the band never moves. */
+.tray-line2 .roll-cue {
+  inset: auto 0 0 0;
+  height: var(--cue-band);
+  /* engraved proportions: a struck plate tracks its caps WIDE and sets
+     them a little smaller than a shouting label would (24/0.3em reads
+     larger than the old 26/0.18em because the rules give it room) */
+  font-size: 24px;
+  letter-spacing: 0.3em;
+  justify-content: center;
+  padding-right: 0;
+  z-index: 1; /* the lettering rides ON the plate below */
+}
+/* letter-spacing trails AFTER the last letter, so an equal margin on both
+   sides is not an equal gap — the right one gives that tracking back */
+.cue-engraved .cue-word { margin-left: 14px; margin-right: calc(14px - 0.3em); }
+/* THE ENGRAVING: a hairline that fades out of the plate and lands in a
+   lozenge beside the word — the same rotated square the ceremony's ornate
+   corners are cut from, so the app has ONE ornament, not two. Both rules
+   inherit the cue's color, so they light with the word on approach and
+   dim with it at rest — no separate state to keep in sync. */
+.cue-rule {
+  flex: 0 1 46px;
+  align-self: center;
+  position: relative;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, currentColor);
+  opacity: 0.6;
+}
+.cue-rule.trail { background: linear-gradient(90deg, currentColor, transparent); }
+.cue-rule::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  width: 5px;
+  height: 5px;
+  transform: rotate(45deg);
+  background: currentColor;
+}
+.cue-rule.lead::after { right: -2px; }
+.cue-rule.trail::after { left: -2px; }
+/* THE BUTTON (Joe 2026-08-04: 'the roll button below that a more physical
+   button, not just text in the tray with an invisible separation from the
+   dice' — then: 'no margin below and to the sides, and a single, clean
+   horizontal line splitting it from the rest of the tray').
+   So: ONE object, two zones. The tray's upper zone is a recessed pocket
+   holding your dice; its lower zone is the button, running the full width
+   edge to edge, meeting the tray's own bottom corners. Between them, one
+   hairline — the whole separation, no gap, no second edge, no inset box.
+   Drawn on the WELL (not the roll button, which is inset by the pocket's
+   padding), so 'flush' is structural: the plate's edges ARE the tray's. */
+#tray-actions::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--cue-band);
+  border-radius: 0 0 10px 10px; /* 11px outer − the 1px border */
+  border-top: 1px solid rgba(212, 175, 55, 0.3); /* THE line */
+  background: linear-gradient(180deg, #4b3919 0%, #38290f 55%, #2a1e0d 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 228, 158, 0.12);
+  z-index: 0;
+  /* The plate is a SURFACE, never a target: it paints above the button it
+     dresses, so without this it swallowed the tray's own clicks and hover
+     (the plate is generated content of the well, not of the button). */
+  pointer-events: none;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+/* the EMPTY tray's button: the same object, unpowered — no roll to make */
+#tray-actions:has(#tray-hint:not(.hidden))::after {
+  border-top-color: rgba(212, 175, 55, 0.14);
+  background: linear-gradient(180deg, #322611 0%, #251b0c 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 228, 158, 0.05);
+}
+/* approach lights the BUTTON, not just its lettering — the pocket above
+   warms with it (Joe's 'highlight the whole tray') */
+#tray-actions:has(.tray-roll:hover:not(:disabled))::after {
+  border-top-color: rgba(255, 214, 102, 0.55);
+  background: linear-gradient(180deg, #6e5222 0%, #4c3715 55%, #382809 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 240, 196, 0.26), 0 0 15px rgba(255, 214, 102, 0.18);
+}
+/* PRESS: the face sinks — the bevel inverts and the lettering rides down */
+#tray-actions:has(.tray-roll:active:not(:disabled))::after {
+  background: linear-gradient(180deg, #33250f 0%, #543f1c 100%);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+.tray-line2 .tray-roll:active:not(:disabled) .roll-cue { transform: translateY(1px); }
+/* honesty (the standing rule): over a ✕ the click REMOVES, so the button
+   must not sit there looking pressable */
+#tray-actions:has(.die-x:hover)::after {
+  border-top-color: rgba(212, 175, 55, 0.14);
+  background: linear-gradient(180deg, #322611 0%, #251b0c 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 228, 158, 0.05);
+}
 /* the roll-hover lights the WHOLE well, never an inset box (Joe
    2026-08-04: the button's own hover rect read as a margined region
    inside the tray) — the button sheds its box dress in the well and the
@@ -445,9 +549,34 @@ html, body {
 .tray-save.hidden { display: none; }
 .tray-line2.hidden { display: none; }
 /* EVEN taller (Joe 2026-08-03: '+20-30%' — and a floor that absorbs a
-   single-line pool chip, so staging pools stops nudging the height) */
-.tray-line2 .tray-cluster { flex: 1; min-width: 0; margin-top: 0; min-height: 84px; }
-.tray-line2 .tray-roll { min-height: 84px; align-items: center; align-content: center; }
+   single-line pool chip, so staging pools stops nudging the height).
+   The height splits: --cue-band along the floor for the ROLL cue, the
+   rest is the deck the tokens sit in (padding-bottom keeps them out of
+   the band — the ✕ overlays' offsetTop math is untouched by it). */
+.tray-line2 .tray-cluster { flex: 1; min-width: 0; margin-top: 0; min-height: 113px; }
+.tray-line2 .tray-roll {
+  min-height: 113px;
+  /* The button owns the whole tray, so ITS padding is the pocket's air:
+     the sides and top space the dice, and the bottom is the cue band PLUS
+     real clearance (Joe 2026-08-04: 'you're missing padding between tiles
+     and the roll button') — a staged plate must never crowd the seam. */
+  padding: 17px 18px calc(var(--cue-band) + 10px);
+  align-items: center;
+  align-content: center;
+  /* the tray's dress is the WELL's; the button inside it is never boxed */
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+}
+/* …and with nothing overlapping any more, the well's tokens NEVER dim
+   under the cue (the card strips still do — see .pool-roll:hover). Your
+   staged pool staying solid while the gold rises over the floor is the
+   whole point of the split. */
+.tray-line2 .tray-roll:hover:not(:disabled) .die-art,
+.tray-line2 .tray-roll:hover:not(:disabled) .strip-dot,
+.tray-line2 .tray-roll:hover:not(:disabled) .strip-count,
+.tray-line2 .tray-roll:hover:not(:disabled) .src-chip,
+.tray-line2 .tray-roll:hover:not(:disabled) .strip-more { opacity: 1; }
 /* larger dice in the WELL only — the draft is the star; pool rows keep 28
    (three classes deep: .pool-roll .die-art's later 28px must lose here) */
 .tray-line2 .tray-roll .die-art { width: 34px; height: 34px; }
@@ -464,13 +593,28 @@ html, body {
   /* the beacon, take two (Joe 2026-08-03: the funnels fought the rail —
      'just give more space and make it taller'): presence by SIZE and AIR.
      A taller well, larger dice inside it, real margins above and below. */
-  margin: 12px 0 6px; /* the ± drawer-pull snugs directly beneath */
+  --cue-band: 34px; /* the well's floor, reserved for the ROLL button */
+  /* THE POCKET (Joe 2026-08-04: 'make the tray a two part entity with the
+     top a normal recessed area, but the roll button below that a more
+     physical button, not just text with an invisible separation'). Light
+     falls from above, so a recess is DARK at its top lip and catches a
+     thin highlight on its floor — the inverse of the raised plate seated
+     in it. The dice sit in the pocket; the button is an object. */
+  --pocket: inset 0 2px 7px rgba(0, 0, 0, 0.62), inset 0 -1px 0 rgba(255, 215, 102, 0.05);
+  position: relative; /* the button's plate is this element's ::after */
+  margin: 12px 0 7px; /* the rim's tools snug directly beneath */
   gap: 4px;
-  padding: 9px 8px;
+  /* ZERO padding: the roll button fills the tray corner to corner, so
+     every pixel of the tray — pocket AND plate — is the same click target
+     (Joe 2026-08-04: 'the roll button should be part of the tray click
+     target. It's not for me right now'). The dice get their air from the
+     button's own padding instead, which is what keeps the plate's edges
+     and the button's edges the same edges. */
+  padding: 0;
   /* the ONE warm surface in the graphite column (Joe 2026-08-04): the
      roll world wears bronze inside the well — everything around it is
      neutral, so the tray reads distinct instead of the panel reading brown */
-  background: linear-gradient(180deg, rgba(42, 31, 16, 0.9), rgba(29, 22, 12, 0.94));
+  background: linear-gradient(180deg, rgba(23, 17, 9, 0.96), rgba(37, 28, 14, 0.92));
   border: 1px solid rgba(212, 175, 55, 0.22);
   border-radius: 11px;         /* concentric: 8px roll button + ~3px lip */
   /* the beacon (Joe 2026-08-03): the well warms as dice land. Heat rides
@@ -479,73 +623,99 @@ html, body {
      (frame-starved renderers freeze transitions mid-flight — the e2e
      strips them before asserting the cascade target). Light and depth,
      never size (§7.10); an empty well is quiet. */
-  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--pocket);
   transition: box-shadow 0.35s;
 }
-.draft-zone.heat-1 #tray-actions { box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35), 0 0 8px rgba(255, 215, 102, 0.05); }
-.draft-zone.heat-2 #tray-actions { box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35), 0 0 12px rgba(255, 215, 102, 0.08); }
-.draft-zone.heat-3 #tray-actions { box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35), 0 0 16px rgba(255, 215, 102, 0.11); }
-.draft-zone.heat-4 #tray-actions { box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35), 0 0 20px rgba(255, 215, 102, 0.14); }
+.draft-zone.heat-1 #tray-actions { box-shadow: var(--pocket), 0 0 8px rgba(255, 215, 102, 0.05); }
+.draft-zone.heat-2 #tray-actions { box-shadow: var(--pocket), 0 0 12px rgba(255, 215, 102, 0.08); }
+.draft-zone.heat-3 #tray-actions { box-shadow: var(--pocket), 0 0 16px rgba(255, 215, 102, 0.11); }
+.draft-zone.heat-4 #tray-actions { box-shadow: var(--pocket), 0 0 20px rgba(255, 215, 102, 0.14); }
 /* The ± editor open → the field it edits is the one lit. openPopover
-   toggles 'open' on pop.row; on the draft that class had been inert since
-   the tile pass — this closes the dangling wire. */
+   toggles 'open' on pop.row. The lit state is a RING, never a repaint
+   (Joe 2026-08-04: a flat translucent wash here replaced the pocket's
+   whole gradient — 'the tray is mis-colored when the panel is open'). */
 #tray-actions.open {
-  border-color: rgba(212, 175, 55, 0.38);
-  background: rgba(212, 175, 55, 0.05);
+  border-color: rgba(212, 175, 55, 0.55);
+  box-shadow: var(--pocket), 0 0 0 1px rgba(212, 175, 55, 0.22), 0 0 16px rgba(255, 215, 102, 0.1);
 }
-/* The ± — a short FULL-WIDTH bronze drawer-pull directly below the well
-   (Joe 2026-08-04: in the well's gutter it pushed the centered cue
-   sideways and crowded a full draft). Same warm world, quieter voice:
-   standing while a draft exists (P6), dim when the well is empty,
-   gold-bright while its popover is open (sibling selector — .open still
-   lands on #tray-actions, the popover's anchor). */
-#tray-mods {
-  width: 100%;
-  margin: 0 0 10px;
-  padding: 4px 0 5px;
-  border: 1px solid rgba(212, 175, 55, 0.16);
-  border-radius: 9px;
-  background: linear-gradient(180deg, rgba(36, 27, 14, 0.7), rgba(28, 21, 11, 0.78));
-  color: rgba(255, 215, 102, 0.55);
-  font-size: 13px; /* a lone ± — the app-wide modifier sign, no words */
-  line-height: 1;
-  cursor: pointer;
-  transition: color 0.12s, border-color 0.15s, background 0.15s;
-}
-#tray-mods:disabled { opacity: 0.35; color: #574f43; cursor: default; }
-#tray-mods:hover:not(:disabled) { color: var(--gold-bright); border-color: rgba(212, 175, 55, 0.4); background: rgba(212, 175, 55, 0.1); }
-#tray-actions.open + #tray-mods { color: var(--gold-bright); border-color: rgba(212, 175, 55, 0.45); }
-/* THE RAIL (P6: management STANDS — supersedes the 2026-08-01 ghost-text
-   demotion; §7.14). Appearing only while a draft exists is the contextual
-   signal; while it exists the verbs stand — no hover reveal for
-   management. Inset 7px = well border 1 + well padding 6: Save's left
-   edge and ✕ Clear's right edge sit exactly on the well's interior grid,
-   and ✕ Clear shares one vertical rail with the ± above it. Fixed
-   min-height: the save morph swaps in without a jump. */
+/* THE RIM (P6: management STANDS — supersedes the 2026-08-01 ghost-text
+   demotion; §7.14). ONE row of tools under the well (Joe 2026-08-04: the
+   ± as a full-width bronze bar read as a second, weaker roll button
+   directly under the real one). Every tool here acts on the well's
+   contents and every one of them arms on the same condition, so they are
+   one group: ± shapes the draft, Save · Offer · ✕ Clear dispose of it.
+   Standing furniture is untouched — the rim never leaves, its tools gray
+   on an empty well, and the geometry never moves. Inset 7px = well
+   border 1 + well padding 6: the rim's outer edges sit exactly on the
+   well's interior grid. Fixed min-height: the save morph swaps in
+   without a jump. */
 .draft-actions {
-  margin-top: 8px;
-  padding: 0 7px;
+  margin-top: 0;
+  padding: 0 7px 10px;
   gap: 6px;
   justify-content: flex-start;
-  align-items: center;
-  min-height: 26px;
+  align-items: stretch;
+  min-height: 36px;
 }
 .draft-actions.hidden { display: none; }
-.draft-actions .btn {
+/* Tool plates — machined steel: a bevel hairline along the top edge, a
+   seated shadow beneath. The metal vocabulary the panel already speaks
+   (Joe: 'the metal (bronze, steel) theme is really great… lean into all
+   that'), at the quiet end of it. */
+.draft-actions .btn,
+#tray-mods {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 11.5px;
-  padding: 4px 10px;
-  background: transparent;
-  border: 1px solid var(--hair);
+  padding: 5px 11px;
   border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   color: var(--muted);
-  transition: color 0.12s, border-color 0.12s, background 0.15s;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.15s, box-shadow 0.15s;
 }
 .draft-actions .btn:hover:not(:disabled),
 .draft-actions .btn:focus-visible {
   color: var(--ivory);
-  border-color: rgba(243, 234, 215, 0.35);
-  background: rgba(243, 234, 215, 0.04);
+  border-color: rgba(243, 234, 215, 0.38);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+/* unlit, not absent: an empty well's tools recede but hold their place */
+.draft-actions .btn:disabled,
+#tray-mods:disabled {
+  opacity: 0.42;
+  box-shadow: none;
+  cursor: default;
+}
+/* The ± leads the rim — the one tool that SHAPES rather than disposes, so
+   it wears the warm metal instead of the cold (gold stays reserved for
+   the roll act itself). Gold-bright while its popover is open: the field
+   being edited and the tool editing it light together. */
+#tray-mods {
+  width: 34px;
+  padding: 5px 0;
+  border-color: rgba(212, 175, 55, 0.28);
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.11), rgba(212, 175, 55, 0.035));
+  box-shadow: inset 0 1px 0 rgba(255, 215, 102, 0.08);
+  color: rgba(255, 215, 102, 0.7);
+  font-size: 14px; /* a lone ± — the app-wide modifier sign, no words */
+  line-height: 1;
+}
+#tray-mods:hover:not(:disabled) {
+  color: var(--gold-bright);
+  border-color: rgba(212, 175, 55, 0.5);
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.2), rgba(212, 175, 55, 0.07));
+  box-shadow: inset 0 1px 0 rgba(255, 215, 102, 0.14);
+}
+#tray-actions.open ~ .draft-actions #tray-mods {
+  color: var(--gold-bright);
+  border-color: rgba(212, 175, 55, 0.55);
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.22), rgba(212, 175, 55, 0.08));
 }
 /* D2 FIX — no bare `.hidden` rule exists in this codebase, so the solo
    'Offer to table' had been a live-looking dead verb (updateTrayButtons's
@@ -670,7 +840,8 @@ html, body {
 /* (cue-tight retired 2026-08-03: the ROLL/REROLL word always renders —
    on hover the dice dim under the brightened cue, so crowding never
    costs the promise its word) */
-.cue-word { font-weight: inherit; }
+/* the gap the word's trailing nbsp used to carry, as layout (see CUE_WORDS) */
+.cue-word { font-weight: inherit; margin-right: 0.24em; }
 /* Chevrons: STATIC, shorter than the word, fading left → right — a trail
    pointing at the click, not a blinker (animation retired 2026-07-31). */
 /* chevron fades are CLASS-driven — leading crescendo INTO the word,
@@ -951,7 +1122,13 @@ html, body {
 #save-cat-row { margin-top: 8px; padding: 0 7px; } /* the well's interior grid */
 #save-cat-row.hidden { display: none; }
 
-/* source chips in the draft cluster: name over its grouped dice, one ✕ */
+/* Source chips in the draft cluster: name over its grouped dice, one ✕.
+   A staged pool is a PLATE seated in the well (Joe 2026-08-04: 'make the
+   tile backgrounds less transparent or non-transparent') — near-opaque
+   steel with a bevel hairline on top and a shadow under it, so the token
+   sits IN the bronze tray instead of ghosting over it. This is also what
+   makes a foreign pool's borrowed skin readable: the dice have a surface
+   to sit on. */
 .src-chip {
   display: inline-flex;
   flex-direction: column;
@@ -959,27 +1136,35 @@ html, body {
   gap: 1px;
   padding: 3px 6px 2px;
   margin-right: 4px;
-  border: 1px solid var(--hair);
+  border: 1px solid rgba(255, 255, 255, 0.17);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.04);
+  background: linear-gradient(180deg, #2d2a25, #1f1d1a);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.5);
   pointer-events: none;
 }
 .src-chip-name {
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: rgba(243, 234, 215, 0.62);
   max-width: 90px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sc-dice { display: inline-flex; align-items: center; gap: 2px; }
 .src-chip .die-art { width: 22px; height: 22px; }
 .loose-dice { display: inline-flex; align-items: center; pointer-events: none; }
-/* staging into an empty draft announces the next tap (touch has no hover) */
-.tray-roll.stage-pulse {
+/* Staging into an empty draft announces the next tap (touch has no hover).
+   It lights the WELL, never the roll button inside it (Joe 2026-08-04: 'a
+   weird highlight glitch when first adding a saved pool — the highlight
+   lines have a weird margin'): the button is inset by the pocket's
+   padding, so a border drawn on it traced a rectangle floating inside the
+   tray. Same rule as the hover, and for the same reason. */
+.tray-roll.stage-pulse { border-color: transparent; box-shadow: none; }
+#tray-actions:has(.tray-roll.stage-pulse) {
   border-color: rgba(212, 175, 55, 0.6);
-  box-shadow: 0 0 18px rgba(255, 214, 102, 0.28);
+  box-shadow: var(--pocket), 0 0 18px rgba(255, 214, 102, 0.28);
   transition: border-color 0.4s, box-shadow 0.4s;
 }
 
@@ -2698,6 +2883,12 @@ body.mini #result-verdict { font-size: 11px; }
 #pop-save.hidden, #pop-todraft.hidden, .pop-sysnote.hidden { display: none; }
 /* the popover's inline save morph (same flow as the New pool panel's) */
 #pop-save-row.hidden, #mods-popover .pop-actions-2nd.hidden { display: none; }
+/* D2 AGAIN (2026-08-04): no bare `.hidden` rule exists in this codebase, so
+   the per-source verbs inside the actions row were only ever hidden by the
+   ROW hiding. Now that the row STANDS on every source (it carries Done),
+   each verb needs its own real hide — without this the tray's ± offered a
+   live-looking 'Save as pool…' beside Done. */
+#mods-popover .pop-actions .btn.hidden { display: none; }
 #pop-save-row .btn { flex: none; width: 42px; }
 /* §7.4: the popover stays fully usable in compact view (opened via the
    Saved pools tab or headless hooks); placePopover clamps it on-screen. */

@@ -1397,11 +1397,31 @@ dismiss stays visually distinct — different semantics, different affordance.
 
 **The rail never hides — and it rides the panel now.** *(2026-08-04, Joe:
 zero overlays on the tabletop.)* The rail split in two inside the side
-panel: `#rail` at the TOP is presence alone — status · roster · identity
-chip — and `#rail-foot` at the panel's FOOT carries the utility verbs — ❯
-quick roll · ≣ roll log · ⚙ settings · the contextual ✕ Clear table
-(which left the felt corner). Collapsed, both become centered icon
+panel: `#rail` at the TOP is presence alone — identity chip · roster ·
+status pill — and `#rail-foot` at the panel's FOOT carries the utility
+verbs — ⚙ settings · ≣ roll log · ❯ quick roll · the contextual ✕ Clear
+table (which left the felt corner). Collapsed, both become centered icon
 stacks; nothing is ever stranded (the old compact-mode bug stays fixed).
+
+**ORDER IS THE CONTRACT** *(amended 2026-08-04, Joe: "the player should
+have their name to the left of other players — that way their name
+location is stable", and "settings should be far left… think about
+positions of all UI elements carefully")*. Both bars are ordered so that
+nothing permanent ever moves:
+
+- **Top rail — YOU first.** Your chip anchors the column's top-left corner
+  and never shifts; the roster grows rightward from it, and the transient
+  status pill comes LAST so that when it appears it wraps to its own line
+  *below* you. (It used to LEAD the rail, which pushed your own name down
+  the moment anything had to be announced — exactly the drift this
+  ordering kills.)
+- **Foot — configure → consult → act, then the corner.** ⚙ · ≣ · ❯ form a
+  fixed LEFT cluster; the contextual ✕ Clear table sits alone in the right
+  corner (`margin-left: auto`) — the same corner ✕ Clear owns on the
+  workbench rim directly above it, so the panel has ONE rule for where a
+  clearing verb lives. ❯ is deliberately *not* right-aligned: pinned to
+  that edge it would be the thing the ✕ shoved around every time dice
+  landed or left.
 Their drops still overlay (menus may — the identity menu falls from the
 top, the log flyout rises from the foot); the panel's own content never
 does. *(Historical: the rail was a top-right felt overlay; the ⤡
@@ -1799,6 +1819,9 @@ second well, and derives every placement from one law:
   the well's approach (roll-adjacent tier; a disabled ± never surfaces).
   While the ± popover is open the well lights via the `.open` row class —
   the wire `openPopover` always toggled but the draft never styled.
+  *(Amended 2026-08-04 — see **THE TRAY** below: the ± left the well for
+  the rim, the well became a two-zone object, and the `.open` light became
+  a ring rather than a repaint.)*
 - **The rail** (`#draft-actions`, below the well): the three verbs that
   dispose of the draft — Save · Offer to table (+ ▾, joined as one split
   verb) · ✕ Clear — **standing**, inset to the well's 7px interior grid
@@ -1837,11 +1860,118 @@ second well, and derives every placement from one law:
 - Retired with the pass: the `.pool-mods` / `.group-mods` rule families
   (the draft ± was their only remaining element; the shipped 25×38
   bordered chip was their cascade accident). *(2026-08-04: `#tray-mods`
-  left the well's gutter too — it pushed the centered cue sideways — and
-  is now the short full-width bronze DRAWER-PULL directly below the well —
-  a lone ±, no words (Joe: no 'Tweak' in the interface) — standing while
-  a draft exists and gold-lit while its popover is open. The roll-hover
-  lights the WHOLE well via :has(), never the button's inset box.)*
+  left the well's gutter too — it pushed the centered cue sideways. It
+  spent one build as a full-width bronze drawer-pull below the well and
+  then joined the rim — see below.)*
+
+#### 7.14.1 THE TRAY, re-cut (2026-08-04, Joe live-directed)
+
+A review pass over the side panel. Findings and the law each one settled:
+
+- **The tray is ONE object with TWO zones.** *(Joe: "make the tray a two
+  part entity with the top a normal recessed area, but the roll button
+  below that a more physical button, not just text in the tray with an
+  invisible separation from the dice"; then "no margin below and to the
+  sides, and a single, clean horizontal line splitting it from the rest of
+  the tray".)* The upper zone is a **recessed pocket** holding your dice —
+  dark at its top lip, a thin highlight on its floor, because light falls
+  from above. The lower zone is the **button**: a raised bronze plate
+  drawn as `#tray-actions::after`, running the tray's full width to its own
+  bottom corners, with exactly ONE hairline between the two. Drawing it on
+  the WELL rather than on the roll button is what makes "flush" structural
+  — the plate's edges *are* the tray's edges. Press sinks the face and
+  drops the lettering 1px; the pocket above lights with it, because the
+  whole tray is one target (Joe, 2026-08-03: "it should highlight the
+  whole tray").
+  - **The plate must not eat its own clicks.** Generated content paints
+    above the button it dresses, so `pointer-events: none` on the ::after
+    is load-bearing, not tidiness (Joe: "the roll button should be part of
+    the tray click target. It's not for me right now"). The well carries
+    **zero padding** so the button reaches both far edges; the dice get
+    their air from the button's own padding instead. Pinned in e2e by
+    `elementFromPoint` at the plate's centre, both far edges, and up in
+    the pocket.
+- **The cue owns a reserved band; the dice never enter it.** Before this,
+  a centered 26px cue and the staged tokens shared one box, so a pool chip
+  sat *on* the word — `❯❯[SNEAK][ATTACK]OLL ❯❯`. The band is
+  `--cue-band` along the tray's floor and the deck above it holds the
+  tokens. Only now is "ONE cue geometry in the well, every state"
+  literally true. Card strips keep the overlay form (there the cue fills
+  empty space beside small dice) — **and only there do the dice dim under
+  the cue**; in the tray they stay solid, which is the point of the split.
+- **The chevrons gave way to ENGRAVING.** *(Joe: "consider upgrading the
+  chevrons with something nicer to match the bronze. Scrollwork?")* Six
+  chevrons at 26px were compensating for the absence of a button; there is
+  a real raised plate now, so the trail was doing a job the object already
+  does. The balanced cue is a hairline rule fading into a **lozenge** on
+  each side of the word — the same rotated square the ceremony's ornate
+  corners are cut from, so the app has ONE ornament, not two. The rules
+  inherit the cue's `currentColor`, so they light and dim with the word
+  with no second state to keep in sync. Card strips keep their chevrons.
+- **A gap belongs to the layout, never to the string.** `CUE_WORDS` had a
+  trailing ` ` (spacing against the old chevrons), so the centered cue
+  was centering FIVE glyphs while the eye read four — ~13px of invisible
+  tail shoved ROLL visibly left. Joe called it by eye; two of my
+  measurements "proved" it centered because both assumed four. **When a
+  measurement contradicts the eye on something this simple, the
+  measurement's model is the thing to doubt.**
+- **The rim replaces the bronze bar.** *(Joe: "I'm not convinced the
+  bronze tweak (+/-) under roll was a good choice. We have
+  save/offer/clear/tweak buttons that activate for a non-empty tray. Maybe
+  rethink that?")* A full-width bronze bar under the real button read as a
+  second, weaker roll button. Every tool that acts on the tray's contents
+  arms on the *same* condition, so they are ONE row: `±` shapes the draft,
+  Save · Offer · ✕ Clear dispose of it. Steel tool plates (bevel hairline,
+  seated shadow); ± keeps a bronze tint because it belongs to the roll
+  world — **gold stays reserved for the roll act itself**. Standing
+  furniture is untouched: the rim never leaves, its tools gray on an empty
+  tray, the geometry never moves. *Offer to table* shortened to *Offer*
+  (the ▾ beside it carries "or pick one").
+- **A staged pool is a PLATE.** *(Joe: "make the tile backgrounds less
+  transparent or non-transparent".)* Near-opaque steel, bevel on top,
+  shadow beneath — a token sitting *in* the tray instead of ghosting over
+  it, which is also what gives a borrowed pool's skin a surface to sit on.
+  Its dice ride their own row (`.sc-dice`): `buildDieStrip` returns a
+  *fragment*, so in the plate's column flex its `×N` counts had been
+  stacking under the die and plates came out different heights.
+- **Feedback lights the WELL, never the inset button** — the stage-pulse
+  joined the hover rule here (Joe: "a weird highlight glitch when first
+  adding a saved pool — the highlight lines have a weird margin"): a
+  border drawn on the button traced a rectangle floating inside the tray.
+- **Cut the day it shipped:** a one-line "Tap a die above, or a saved pool
+  below" invitation in the empty deck. It answered a real question Joe
+  raised (what orients a newcomer here?) but he judged it "aesthetically
+  distracting… I'll find another way to hint that later." The empty deck
+  stays empty; **orientation is an open question, not this element.**
+
+#### 7.14.2 The ± popover has more than one door (2026-08-04)
+
+*(Joe: "that panel can only be closed with the ✕, there is no apply and no
+support for clicking outside the panel to close it. Also the tray is
+mis-colored when the panel is open.")*
+
+- **Done, not Apply.** The Trigger Pass made this a pure editor whose
+  edits are already live in the thing they edit — there is nothing pending
+  to apply, and an *Apply* button would lie about that. `#pop-done` is the
+  **dismissal**, standing on every source, so `pop-actions-2nd` no longer
+  hides wholesale for the tray.
+- **Click-away closes it.** Leaving *is* committing, which is the only
+  reason this was ever missing. Excluded from the away-handler: the
+  popover, its floating `.set-menu` (a body-level child, not a DOM
+  descendant), the `#tray-mods` anchor (without it a ± click would close
+  on `pointerdown` and re-open on `click`, so the toggle could never
+  close), and `#peek-card` for a shelf-bound popover.
+- **The tray's lit state is a RING, not a repaint.** `.open` had replaced
+  the well's whole gradient with a flat translucent wash — the
+  mis-coloring Joe saw. It now adds a gold ring over the pocket's own
+  dress.
+- **D2, a third time.** With the actions row standing on every source, the
+  per-source verbs needed a REAL hide: no bare `.hidden` rule exists in
+  this codebase, so `#pop-variant.hidden` was inert and the tray's ±
+  offered a live-looking *Save as pool…* beside Done. *(Joe: "the 'save as
+  pool' on the tweak on the roll tray is confusing. Only offer 'done' in
+  that context.")* `#mods-popover .pop-actions .btn.hidden` closes it —
+  and the e2e now asserts these **computed**, never by class.
 
 ### 7.15 Reroll speaks its name (shipped 2026-08-03)
 

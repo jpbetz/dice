@@ -776,16 +776,32 @@ export const scenarios = [
         'the ⤡ collapse-all button is gone');
       assert.equal(await a.eval(`document.getElementById('toggle-sound') === null`), true,
         'the rail 🔊 is gone — sound lives in Settings');
+      // ORDER IS THE CONTRACT (Joe 2026-08-04). Top rail: YOU first, so your
+      // own name anchors the corner and never moves — the roster grows to
+      // your right and the transient status pill trails, wrapping to its own
+      // line BELOW you instead of shoving you down.
       assert.deepEqual(
         await a.eval(`[...document.getElementById('rail').children].map((el) => el.id)`),
-        ['status-pill', 'rail-roster', 'identity-chip'],
-        'the top rail is PRESENCE alone (status · roster · you)',
+        ['identity-chip', 'rail-roster', 'status-pill'],
+        'the top rail is PRESENCE, anchored on you (you · roster · status)',
       );
+      // Foot: configure → consult → act, then the gap, then the contextual
+      // ✕ alone in the right corner (the same corner ✕ Clear owns on the
+      // workbench rim). The three permanent icons are the LEFT cluster
+      // precisely so the ✕ coming and going never shifts any of them.
       assert.deepEqual(
         await a.eval(`[...document.getElementById('rail-foot').children].map((el) => el.id)`),
-        ['rail-palette', 'rail-log', 'toggle-settings', 'corner-controls'],
-        'the foot bar holds the utility verbs: ❯ → ≣ → ⚙ → contextual ✕',
+        ['toggle-settings', 'rail-log', 'rail-palette', 'corner-controls'],
+        'the foot bar runs ⚙ → ≣ → ❯, with the contextual ✕ in the far corner',
       );
+      // …and that corner is REAL, not just source order: the ✕ is pushed to
+      // the panel's right edge while ❯ stays put beside the log.
+      const footGeo = await a.eval(`(() => {
+        const foot = document.getElementById('rail-foot').getBoundingClientRect();
+        const pal = document.getElementById('rail-palette').getBoundingClientRect();
+        return { palLeftOfCentre: pal.right < foot.left + foot.width / 2 };
+      })()`);
+      assert.equal(footGeo.palLeftOfCentre, true, '❯ sits in the left cluster, not on the right edge');
       assert.equal(await a.eval(`!!document.querySelector('#left-panel #rail') && !!document.querySelector('#left-panel #rail-foot')`), true,
         'both bars ride the panel — the felt owns no standing chrome');
 
@@ -1430,17 +1446,25 @@ export const scenarios = [
       assert.equal(gs.length, before.length + 1, 'Duplicate stays additive');
       assert.ok(gs.find((g) => g.id === atk.id), 'the original survives beside the new pool');
 
-      // The ad-hoc draft is a LIVE editor (no commit chrome at all): its
-      // edits land straight in the box as the canonical, and the actions
-      // row stays hidden. (`openPopoverFor('tray')` keeps the source name.)
+      // The ad-hoc draft is a LIVE editor: its edits land straight in the
+      // box as the canonical, so it carries NO commit verb — only Done
+      // (Joe 2026-08-04: the row stands on every source now, and 'save as
+      // pool on the tray's ± is confusing — only offer Done in that
+      // context'). Asserted COMPUTED, not by class: the row's own hide was
+      // what used to conceal these, and a class alone hid nothing (D2).
       await a.eval(`(() => {
         const box = document.getElementById('cmd-input');
         box.value = 'd6';
         box.dispatchEvent(new Event('input'));
       })()`);
       assert.equal(await a.dbg(`openPopoverFor('tray')`), true, 'draft popover opens');
-      assert.equal(await a.eval(`document.querySelector('#mods-popover .pop-actions-2nd').classList.contains('hidden')`),
-        true, 'no commit chrome for the ad-hoc draft');
+      const trayVerbs = await a.eval(`(() => {
+        const vis = (id) => getComputedStyle(document.getElementById(id)).display !== 'none';
+        return { done: vis('pop-done'), save: vis('pop-save'),
+                 variant: vis('pop-variant'), toDraft: vis('pop-todraft') };
+      })()`);
+      assert.deepEqual(trayVerbs, { done: true, save: false, variant: false, toDraft: false },
+        `the ad-hoc draft offers Done alone (got ${JSON.stringify(trayVerbs)})`);
       await a.eval(`(() => {
         const dc = document.getElementById('pop-dc');
         dc.value = '7';
@@ -2119,7 +2143,36 @@ export const scenarios = [
           `each ✕ lands on the cluster (got ${JSON.stringify(x)})`);
       }
 
-      // (iii) The D2 pin, both ways: Offer is computedly visible at a
+      // (iii) THE TRAY IS ONE TARGET (Joe 2026-08-04: 'the roll button
+      // should be part of the tray click target. It's not for me right
+      // now'). The tray's floor band is a ::after on the WELL — generated
+      // content paints above the button it dresses, so without
+      // pointer-events:none it silently swallowed every click and hover
+      // that landed on the button's own face. Probe the real hit target at
+      // the plate's centre, at both far edges (the well carries no padding
+      // precisely so those reach), and up in the pocket: all four must be
+      // the roll button. Also pin that the dice never enter the band —
+      // the collision this whole split exists to prevent.
+      const zones = await a.eval(`(() => {
+        const well = document.getElementById('tray-actions');
+        const r = well.getBoundingClientRect();
+        const band = parseFloat(getComputedStyle(well).getPropertyValue('--cue-band'));
+        const hit = (x, y) => { const e = document.elementFromPoint(x, y); return e && e.id; };
+        const art = document.querySelector('#tray-roll .die-art, #tray-roll .strip-dot');
+        return {
+          plate: hit(r.left + r.width / 2, r.bottom - band / 2),
+          plateLeft: hit(r.left + 3, r.bottom - band / 2),
+          plateRight: hit(r.right - 3, r.bottom - band / 2),
+          pocket: hit(r.left + r.width / 2, r.top + 20),
+          diceClearBand: art ? art.getBoundingClientRect().bottom <= r.bottom - band : null,
+        };
+      })()`);
+      assert.deepEqual(zones, {
+        plate: 'tray-roll', plateLeft: 'tray-roll', plateRight: 'tray-roll',
+        pocket: 'tray-roll', diceClearBand: true,
+      }, `every zone of the tray is the roll button (got ${JSON.stringify(zones)})`);
+
+      // (iv) The D2 pin, both ways: Offer is computedly visible at a
       // table, and REALLY hidden off it (before .draft-actions .btn.hidden
       // existed, the class toggled with no visual effect while offerDraft()
       // dead-ends offline). Leave & switch is the one scripted door to a

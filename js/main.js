@@ -4441,7 +4441,14 @@ function renderTray() {
         nm.className = 'src-chip-name';
         nm.textContent = grp.source;
         chip.appendChild(nm);
-        chip.appendChild(buildDieStrip(grp.types, 3, { grouped: true, set: grp.set }));
+        // The strip rides its OWN row inside the plate: buildDieStrip returns
+        // a fragment, so its ×N counts became column children of the plate
+        // and stacked under the die (a d6 with '×4' beneath it, plates of
+        // two different heights side by side).
+        const row = document.createElement('span');
+        row.className = 'sc-dice';
+        row.appendChild(buildDieStrip(grp.types, 3, { grouped: true, set: grp.set }));
+        chip.appendChild(row);
         trayRollBtn.appendChild(chip);
         removers.push({
           el: chip,
@@ -4708,8 +4715,8 @@ function applyInputMode(persist = true) {
   }
   // The well's ghost survives BOTH views (adversarial catch: hiding it in
   // Notation view left a sunken box of literally nothing). No per-view
-  // caption anymore — the ghost dice + ghost ROLL ❯❯❯ are view-agnostic
-  // (Joe: nothing to wear out on a second read).
+  // caption anymore — the ghost ROLL ❯❯❯ is view-agnostic (Joe: nothing
+  // to wear out on a second read).
   if (persist) save(LS_INPUTMODE, inputMode);
 }
 function setInputMode(mode, persist = true) {
@@ -5371,28 +5378,41 @@ function buildDieStrip(types, cap, { grouped = false, set = null } = {}) {
 // ROLL a fresh pool; a result card's strip REROLLS an existing one — the
 // two verbs must not share a word (Joe, 2026-08-03). The \u00a0 keeps the
 // shipped word–chevron spacing.
-const CUE_WORDS = { roll: 'ROLL\u00a0', reroll: 'REROLL\u00a0' };
+// NO trailing nbsp (Joe 2026-08-04: 'when I see ROLL in the UI now, it
+// looks left-of-centered' \u2014 he was right and my first two measurements
+// were wrong). The nbsp was gap-to-the-chevrons baked into the WORD, so
+// the centered well cue was centering five glyphs while the eye read
+// four: ~13px of invisible tail on the right shoved ROLL that far left.
+// Separation is the neighbours' margin now \u2014 a gap belongs to the layout,
+// never to the string.
+const CUE_WORDS = { roll: 'ROLL', reroll: 'REROLL' };
 // `balanced` (Joe 2026-08-04): the WELL's cue gains a leading ❯❯❯ so the
 // word sits centered with motion flowing through it — the compact card
 // strips keep the trailing-only form. Chevron fades are CLASS-driven
 // (l1..l3 crescendo in, t1..t3 decrescendo out): nth-of-type would
 // miscount the moment a leading set exists.
+// Two dresses, one word. On a narrow card strip the cue is a right-aligned
+// trail of chevrons — there is no button there, so the arrows ARE the
+// affordance, pointing at the click. In the WELL (balanced) there is now a
+// real raised plate to press, so the arrows were doing a job the button
+// already does, six-deep, in 26px. They give way to ENGRAVING: a hairline
+// rule into a lozenge on each side of the word — the ornament the ceremony
+// cards already cut into their corners, and the one that reads as struck
+// metal rather than as UI (Joe 2026-08-04: 'upgrade the chevrons with
+// something nicer to match the bronze… scrollwork?').
 function buildRollCue(kind = 'roll', balanced = false) {
   const cue = document.createElement('span');
-  cue.className = 'roll-cue';
+  cue.className = balanced ? 'roll-cue cue-engraved' : 'roll-cue';
   cue.setAttribute('aria-hidden', 'true');
-  if (balanced) {
-    for (let i = 0; i < 3; i++) {
-      const c = document.createElement('i');
-      c.className = `lead l${i + 1}`;
-      c.textContent = '❯';
-      cue.appendChild(c);
-    }
-  }
+  if (balanced) cue.appendChild(rule('lead'));
   const w = document.createElement('b');
   w.className = 'cue-word';
   w.textContent = CUE_WORDS[kind] || CUE_WORDS.roll;
   cue.appendChild(w);
+  if (balanced) {
+    cue.appendChild(rule('trail'));
+    return cue;
+  }
   for (let i = 0; i < 3; i++) {
     const c = document.createElement('i');
     c.className = `t${i + 1}`;
@@ -5401,12 +5421,19 @@ function buildRollCue(kind = 'roll', balanced = false) {
   }
   return cue;
 }
+function rule(side) {
+  const r = document.createElement('span');
+  r.className = `cue-rule ${side}`;
+  return r;
+}
 // (cueTight retired 2026-08-03 — see the cue comment above.)
 
 // The empty well's GHOST (Joe 2026-08-03, simpler won): ONLY the quiet
-// ROLL ❯❯❯ — the empty well previews the full one, nothing else. (The
-// ghost-dice sockets were tried the same day and cut: dice images plus
-// the cue read as clutter, not invitation.)
+// ROLL ❯❯❯ — the empty well previews the full one, nothing else. (Ghost
+// DICE were tried and cut that day; a one-line "Tap a die above…"
+// invitation was tried 2026-08-04 and cut too — Joe: 'aesthetically
+// distracting… I'll find another way to hint that later'. The empty deck
+// stays empty; orientation is an open question, not this element.)
 trayHintEl.appendChild(buildRollCue('roll', true)); // the ghost previews the SAME balanced cue
 
 // STAGE a pool into the draft (the Rack's one source verb): its dice pour
@@ -6369,7 +6396,12 @@ function openPopover(binding) {
   // live-sync IS the commit, and the draft's own row stands right there.
   popSaveBtn.classList.toggle('hidden', pop.source !== 'group');
   popToDraftBtn.classList.toggle('hidden', pop.source !== 'shelf');
-  popActions2nd.classList.toggle('hidden', pop.source === 'tray');
+  // The row itself always STANDS now: it carries Done, which every source
+  // needs (Joe 2026-08-04 — the tray's popover had no button at all, so the
+  // header ✕ was its only door). The tray keeps no commit verbs: its
+  // live-sync is the commit and Save sits on the rim two inches away.
+  popActions2nd.classList.remove('hidden');
+  popVariantBtn.classList.toggle('hidden', pop.source === 'tray');
   // One additive verb, two readings: beside a pool's Save it duplicates;
   // on a shelved roll it is 'keep this roll as a pool'.
   popVariantBtn.textContent = pop.source === 'group' ? 'Duplicate…' : 'Save as pool…';
@@ -7088,6 +7120,26 @@ popSumToggle.addEventListener('click', () => {
 });
 
 document.getElementById('pop-close').addEventListener('click', closePopover);
+document.getElementById('pop-done').addEventListener('click', () => closePopover());
+// CLICK AWAY closes the ± editor (Joe 2026-08-04). Every edit is already
+// live in its target, so leaving IS committing — the only reason this was
+// ever missing. Excluded: the popover itself, its floating set menu (a
+// body-level child, not a DOM descendant), and the ANCHOR that toggles it
+// — without that last one a ± click would close here on pointerdown and
+// re-open on click, making the toggle button unable to ever close it.
+// (The peek is excluded for a shelf-bound popover: the card is the thing
+// the editor is anchored to, not an elsewhere.)
+document.addEventListener('pointerdown', (e) => {
+  if (!pop) return;
+  const t = e.target;
+  if (!(t instanceof Node)) return;
+  if (t instanceof HTMLElement) {
+    if (t.closest('#mods-popover') || t.closest('.set-menu')) return;
+    if (t.closest('#tray-mods')) return;
+    if (pop.source === 'shelf' && t.closest('#peek-card')) return;
+  }
+  closePopover();
+});
 // Esc closes the popover only when it is the topmost layer — handled by the
 // central Esc layering in the keyboard-shortcuts section below.
 window.addEventListener('resize', placePopover);
