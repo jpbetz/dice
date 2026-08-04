@@ -654,6 +654,21 @@ html, body {
 .draft-zone.heat-2 #tray-actions { box-shadow: var(--pocket), 0 0 12px rgba(255, 215, 102, 0.08); }
 .draft-zone.heat-3 #tray-actions { box-shadow: var(--pocket), 0 0 16px rgba(255, 215, 102, 0.11); }
 .draft-zone.heat-4 #tray-actions { box-shadow: var(--pocket), 0 0 20px rgba(255, 215, 102, 0.14); }
+/* THE SPENT DRAFT (2i-E): a rolled draft STAYS — Enter-again is the
+   deliberate repeat, never an auto-clear — but it visibly COOLS until
+   its next edit: the heat glow drains, the staged dice rest dimmer, the
+   cue falls back to its resting whisper. Approach re-warms everything
+   (the hover rules outrank these on :hover), and any edit clears the
+   state (renderTray / setTraySpent). Light and depth only, geometry
+   untouched (§7.10). This cue is what separates 'roll it again' from
+   'compose the NEXT roll on top of it by accident' — the silent
+   Wisdom-×4 accretion the audit named. AFTER the heat rules on purpose:
+   equal specificity, spent must win the glow. */
+.draft-zone.spent #tray-actions { box-shadow: var(--pocket); }
+.draft-zone.spent .tray-roll:not(:hover) .die-art,
+.draft-zone.spent .tray-roll:not(:hover) .src-chip,
+.draft-zone.spent .tray-roll:not(:hover) .strip-count { opacity: 0.6; }
+.draft-zone.spent .tray-roll:not(:hover) .roll-cue { opacity: 0.3; }
 /* The ± editor open → the field it edits is the one lit. openPopover
    toggles 'open' on pop.row. The lit state is a RING, never a repaint
    (Joe 2026-08-04: a flat translucent wash here replaced the pocket's

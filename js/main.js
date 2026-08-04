@@ -3980,6 +3980,7 @@ window.__diceDebug = {
         && getComputedStyle(saveGroupBtn).opacity === '1',
       offerVisible: getComputedStyle(offerDraftBtn).display !== 'none',
       draftH: draftZoneEl.offsetHeight,
+      spent: traySpent, // 2i-E: rolled and untouched since
     };
   },
   // saved-pools manage mode (P2's ✎ toggle): read-only rows at rest; the
@@ -4175,6 +4176,12 @@ function save(key, value) {
 let tray = [];
 let traySources = []; // aligned to tray: the staged source-pool label per die (null = loose)
 let traySets = [];    // aligned to tray: the staged pool's set OVERRIDE per die (§9; null = none)
+// THE SPENT DRAFT (2i-E): true from the moment the draft ROLLS until its
+// next edit. The draft itself always survives its roll — Enter-again is
+// the deliberate repeat (never auto-cleared) — but a spent draft COOLS
+// visibly, which is what separates "roll it again" from "compose the next
+// roll on top of it by accident" (the silent-accretion trap: Wisdom ×4).
+let traySpent = false;
 // A roll has ONE set (the wire field is singular — spawn, reveal and chips
 // all lean on that), so the draft wears an override only when it is
 // UNANIMOUS: every die staged from pools that share one override. A loose
@@ -4513,7 +4520,8 @@ function renderTray() {
       }
     }
     trayRollBtn.appendChild(buildRollCue('roll', true)); // the well: balanced cue
-    const label = `Roll ${formula(tray)}`;
+    const label = `Roll ${formula(tray)}`
+      + (traySpent ? ' again — this draft already rolled' : '');
     trayRollBtn.title = label;
     trayRollBtn.setAttribute('aria-label', label);
     const units = srcOrder.length + new Set(tray.filter((t, i) => !traySources[i])).size;
@@ -4555,6 +4563,7 @@ function renderTray() {
   const heat = Math.min(Math.ceil(tray.length / 2), 4);
   draftZoneEl.style.setProperty('--draft-heat', String(heat / 4));
   for (let h = 1; h <= 4; h++) draftZoneEl.classList.toggle(`heat-${h}`, heat === h);
+  draftZoneEl.classList.toggle('spent', traySpent && tray.length > 0); // 2i-E
   // sticky geometry: section headers pin just below the sticky draft
   const body = document.querySelector('#builder-panel > .panel-body');
   if (body) body.style.setProperty('--draft-h', `${draftZoneEl.offsetHeight}px`);
@@ -4629,9 +4638,27 @@ function rollDraft() {
       sources: traySources.some(Boolean) ? [...traySources] : undefined,
       ...(uniform ? { set: uniform } : perDie ? { sets: perDie } : {}),
     });
+  } else {
+    return; // nothing fired — nothing to mark spent
   }
+  setTraySpent(true); // 2i-E: the draft survives, wearing its cool-down
 }
 trayRollBtn.addEventListener('click', rollDraft);
+
+// 2i-E: flip the spent state without a full re-render (mutations that
+// clear it already re-render on their own paths).
+function setTraySpent(on) {
+  const next = !!on && tray.length > 0;
+  if (traySpent === next) return;
+  traySpent = next;
+  draftZoneEl.classList.toggle('spent', next);
+  if (tray.length) {
+    const label = `Roll ${formula(tray)}`
+      + (next ? ' again — this draft already rolled' : '');
+    trayRollBtn.title = label;
+    trayRollBtn.setAttribute('aria-label', label);
+  }
+}
 
 // Offer the draft to the table (Trigger Pass): the popover's 'Offer to
 // table' retired with its Roll, so the draft row is where offers fire —
@@ -4932,6 +4959,7 @@ function paintCmd() {
 
 // Tray edits regenerate the draft string; mods the new pool can't carry drop.
 function syncBoxFromTray() {
+  setTraySpent(false); // 2i-E: every structural edit re-warms the draft
   if (!tray.length) {
     cmdInput.value = '';
     paintCmd();
@@ -5034,6 +5062,7 @@ const cmdHistoryWalk = makeHistoryWalker(cmdInput, paintCmd);
 
 cmdInput.addEventListener('input', () => {
   cmdHistoryWalk.reset(); // typing abandons a history walk
+  setTraySpent(false); // 2i-E: typing is an edit — the draft re-warms
   clearTimeout(cmdTimer);
   cmdTimer = setTimeout(paintCmd, 300);
 });

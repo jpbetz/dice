@@ -757,6 +757,49 @@ export const scenarios = [
     },
   },
   {
+    name: 'spent-draft',
+    tags: ['smoke', 'groups'],
+    // 2i-E: a rolled draft SURVIVES (the deliberate repeat-roll muscle
+    // memory — never auto-cleared) but wears the spent cool-down until
+    // its next edit — the cue that separates 'roll it again' from
+    // 'accidentally compose the next roll on top of it' (Wisdom ×4).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      // seed a known rack: localStorage persists per origin across
+      // scenarios, so the default rack cannot be assumed here
+      await a.dbg(`setGroups([{name: 'Wisdom', notation: '2d8'}, {name: 'Sword', notation: '1d10'}])`);
+      await a.waitFor(`document.querySelectorAll('#groups-list .tile-stage').length >= 2`,
+        { desc: 'rack seeded' });
+      await a.eval(`document.querySelector('#groups-list .tile-stage').click()`);
+      await a.waitFor(`window.__diceDebug.trayState.dice.length > 0`, { desc: 'staged' });
+      assert.equal((await a.dbg('trayState')).spent, false, 'a fresh draft is not spent');
+
+      await a.eval(`document.getElementById('tray-roll').click()`);
+      await a.settle();
+      const st = await a.dbg('trayState');
+      assert.equal(st.spent, true, 'the rolled draft wears the spent state');
+      assert.ok(st.dice.length > 0, 'and SURVIVES its roll — never auto-cleared');
+      assert.ok(await a.eval(
+        `document.getElementById('draft-zone').classList.contains('spent')`),
+        'the zone carries the cool-down dress');
+      assert.ok((await a.eval(`document.getElementById('tray-roll').title`)).includes('again'),
+        'the roll button says the truth');
+
+      // any edit re-warms: staging another pool clears the state
+      await a.eval(`document.querySelectorAll('#groups-list .tile-stage')[1].click()`);
+      await a.waitFor(`window.__diceDebug.trayState.spent === false`,
+        { desc: 'an edit clears spent' });
+      assert.ok(!(await a.eval(
+        `document.getElementById('draft-zone').classList.contains('spent')`)),
+        'the dress lifts with it');
+
+      // …and rolling again re-spends (Enter-again stays a first-class path)
+      await a.eval(`document.getElementById('tray-roll').click()`);
+      await a.settle();
+      assert.equal((await a.dbg('trayState')).spent, true, 'a re-roll re-spends');
+    },
+  },
+  {
     name: 'notation-wiring',
     tags: ['notation'],
     // The browser-side notation path (grammar itself is unit-tested): a valid
