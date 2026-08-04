@@ -912,6 +912,8 @@ function buildDie(type, variant = 'std') {
     color: edgeColor,
     roughness: shroud ? 0.16 : (skin.feel ? skin.feel.rough : 0.3),
     metalness: shroud ? 0.5 : (skin.feel ? skin.feel.metal : 0.1),
+    // same environment rule as the faces: std/shroud stay a whisper
+    envMapIntensity: theme ? (theme.spec && theme.spec.envMapIntensity) ?? 1 : 0.35,
   }));
 
   const shape = buildShape(faces);
@@ -963,6 +965,10 @@ function materialFor(def, face, spec, shroud = false, seed = 1) {
     if (sp.specularColor) m.specularColor = new THREE.Color(sp.specularColor);
     if (sp.envMapIntensity !== undefined) m.envMapIntensity = sp.envMapIntensity;
   }
+  // Under the main table's scene.environment (Tier 6 §9): standard and
+  // shrouded dice keep their released look — reflections stay a whisper.
+  // Themed sets ride their spec recipe (or three's default 1, lab-judged).
+  if (shroud || !def.house) m.envMapIntensity = 0.35;
   if (!shroud && def.shader) patchShader(m, def.shader); // Level 2
   return m;
 }

@@ -19,7 +19,7 @@ limitations under the License.
 
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie } from './dice.js';
+import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, SHADER_TIME } from './dice.js';
 import { dieArtURL } from './diceart.js';
 import { connect } from './net.js';
 import { SYSTEMS, DEFAULT_SYSTEM } from './meanings.js';
@@ -27,6 +27,8 @@ import { groupsFromLocation, syncGroupsToLocation } from './urlgroups.js';
 import { composeRoll, validateMods, previewSpec } from './rollspec.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { exportYaml, parsePortable, planImport } from './portable.js';
+import { THEMES, SETS } from './themes.js';
+import { ParticleField } from './particles.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -44,6 +46,7 @@ const HISTORY_CAP = 50;
 const LS_SOUND = 'dice.sound.v1';        // "Just you" scope: sound on/off
 const LS_CHIPS = 'dice.chips.v1';        // "Just you" scope: per-die value chips (default OFF — P1)
 const LS_ROOMSETTINGS = 'dice.roomsettings.v1'; // solo-mode copy of the table settings
+const LS_DICESET = 'dice.diceset.v1';    // "Just you" scope: dice-set identity (Tier 6 §9)
 
 // ---------------------------------------------------------------------------
 // Renderer / scene
@@ -83,6 +86,40 @@ scene.add(keyLight);
 const rimLight = new THREE.DirectionalLight('#8fb4ff', 0.7);
 rimLight.position.set(-12, 18, -14);
 scene.add(rimLight);
+
+// A reflection environment (Tier 6 §9, same technique the lab proved):
+// glossy themed sets — lacquer, ice, resin — need a WORLD to mirror, not
+// just analytic lights. A painted equirect (warm key strip echoing
+// keyLight, cool counter echoing rimLight, dark floor) through core
+// PMREM. Standard dice barely change: dice.js pins their
+// envMapIntensity low, and the felt's roughness swallows the rest.
+{
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, '#2e2820');
+  g.addColorStop(0.55, '#141110');
+  g.addColorStop(0.62, '#0a0807');
+  g.addColorStop(1, '#050403');
+  x.fillStyle = g; x.fillRect(0, 0, 512, 256);
+  x.fillStyle = '#fff0d0';
+  x.fillRect(60, 24, 130, 20);  // warm key strip
+  x.fillStyle = '#8fb4d8';
+  x.fillRect(330, 40, 80, 12);  // cool counter-strip
+  const tex = new THREE.CanvasTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromEquirectangular(tex).texture;
+  tex.dispose();
+  pmrem.dispose();
+}
+
+// Level 3's field on the live table: bursts fire from the impacts the
+// fast-forward already records for the click sounds (never on a timer).
+const particleField = new ParticleField(scene);
+particleField.setProjection(window.innerHeight, camera.fov);
 
 // felt table surface — room-selectable themes (roadmap §2). Each theme pairs
 // the felt base color with a scene background. 'emerald' is the original look
@@ -399,6 +436,27 @@ let audioCtx = null;
 // Persisted "Just you" preference ('dice.sound.v1'), honored on load. load()
 // is a hoisted function declaration, so calling it here is safe.
 let soundOn = load(LS_SOUND, true) !== false;
+
+// "Just you": the dice-set identity you throw with (Tier 6 §9). It rides
+// every roll and claim request — everyone at the table sees YOUR dice in
+// it — and applies from the next roll (dice already on the felt keep the
+// skin they landed with; a roll is a record). Initialized HERE, above the
+// settings boot calls, because syncSettingsUI renders the picker.
+let diceSet = (() => {
+  const v = load(LS_DICESET, 'std');
+  return typeof v === 'string' && (v === 'std' || SETS[v]) ? v : 'std';
+})();
+function setDiceSet(id, persist = true) {
+  diceSet = id === 'std' || SETS[id] ? id : 'std';
+  if (persist) save(LS_DICESET, diceSet);
+  renderDiceSetPicker();
+  return diceSet;
+}
+// What rides the wire: absent for standard (a plain roll's payload stays
+// byte-for-byte what it always was — the server's present-or-absent rule).
+function wireSet() {
+  return diceSet !== 'std' ? diceSet : undefined;
+}
 let lastSoundAt = 0;
 
 function playClick(strength) {
@@ -485,8 +543,17 @@ function dieLabel(type, value) {
   return type === 'd10x' ? String(value).padStart(2, '0') : String(value);
 }
 
-function spawnDie(type, index, count, side, rng, shrouded = false) {
-  const mesh = createDieMesh(type, shrouded ? 'shroud' : 'std');
+// `set` is the roll's dice-set id (Tier 6 §9) — secrecy outranks identity:
+// a shrouded die is obsidian no matter whose it is. Unknown ids fall back
+// to std (an old log entry can outlive a renamed set).
+function dieVariant(shrouded, set) {
+  if (shrouded) return 'shroud';
+  return set && SETS[set] ? set : 'std';
+}
+
+function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
+  const variant = dieVariant(shrouded, set);
+  const mesh = createDieMesh(type, variant);
   const body = createDieBody(type, diceMat);
 
   // line the throw up along the chosen edge of the table
@@ -511,7 +578,7 @@ function spawnDie(type, index, count, side, rng, shrouded = false) {
 
   world.addBody(body);
   scene.add(mesh);
-  return { type, mesh, body };
+  return { type, mesh, body, variant };
 }
 
 // Remove every die, chip, marker, and banner from view WITHOUT touching the
@@ -777,15 +844,16 @@ function shroudPoseValue(type) {
 // `shelfSpawn` marks it as never-having-been-on-the-felt, so it lands instantly
 // instead of whisking in from wherever the origin happens to be. No tumble, no
 // sound. `shrouded` spawns the obsidian variant for a still-hidden roll.
-function spawnShelvedDie(type, value, rollId, shrouded = false) {
-  const mesh = createDieMesh(type, shrouded ? 'shroud' : 'std');
+function spawnShelvedDie(type, value, rollId, shrouded = false, set = null) {
+  const variant = dieVariant(shrouded, set);
+  const mesh = createDieMesh(type, variant);
   const body = createDieBody(type, diceMat);
   body.mass = 0;
   body.type = CANNON.Body.STATIC;
   body.updateMassProperties();
   world.addBody(body);
   scene.add(mesh);
-  const die = { type, mesh, body, rollId, shelfValue: value, shelfSpawn: true, shrouded };
+  const die = { type, mesh, body, rollId, shelfValue: value, shelfSpawn: true, shrouded, variant };
   tableDice.push(die);
   return die;
 }
@@ -899,7 +967,7 @@ function shelveRoll(rollId, seq, animate) {
     const hidden = entryHidden(entry);
     dice = entry.parts.map((p) => {
       const shrouded = hidden || p.value == null;
-      return spawnShelvedDie(p.type, shrouded ? shroudPoseValue(p.type) : p.value, rollId, shrouded);
+      return spawnShelvedDie(p.type, shrouded ? shroudPoseValue(p.type) : p.value, rollId, shrouded, entry.set);
     });
   } else {
     return; // nothing to show yet; the state row reconciles on the next hello
@@ -1496,7 +1564,7 @@ function playRoll(roll) {
   // --- spawn with seeded throw params -------------------------------------
   const rng = mulberry32(roll.seed >>> 0);
   const side = Math.floor(rng() * 4);
-  const dice = types.map((t, i) => spawnDie(t, i, types.length, side, rng, shrouded));
+  const dice = types.map((t, i) => spawnDie(t, i, types.length, side, rng, shrouded, roll.set));
   // Every die on the table is tagged with its roll (§7.5): a per-roll Done
   // removes exactly these dice and never touches a concurrent roll's.
   for (const d of dice) {
@@ -1510,7 +1578,17 @@ function playRoll(roll) {
   let simTime = 0;
   const recordCollision = (e) => {
     const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
-    if (v > 2 && sounds.length < 400) sounds.push({ time: simTime, strength: v });
+    if (v > 2 && sounds.length < 400) {
+      // The contact point rides along (Level 3): playback fires the set's
+      // particle burst exactly where the click sound says the die hit.
+      const c = e.contact;
+      const s = c.bi.type === CANNON.Body.DYNAMIC ? { b: c.bi, r: c.ri } : { b: c.bj, r: c.rj };
+      sounds.push({
+        time: simTime,
+        strength: v,
+        at: [s.b.position.x + s.r.x, s.b.position.y + s.r.y, s.b.position.z + s.r.z],
+      });
+    }
   };
   for (const d of dice) d.body.addEventListener('collide', recordCollision);
 
@@ -1632,6 +1710,8 @@ function playRoll(roll) {
     // reroll provenance (B3): server-substantiated; entryFromRoll reads it
     // off currentRoll at completion, so dropping it here unmarks the roll
     rerollOfId: typeof roll.rerollOfId === 'string' ? roll.rerollOfId : null,
+    // dice-set identity (Tier 6 §9): the burst drain and entryFromRoll read it
+    set: typeof roll.set === 'string' ? roll.set : null,
     seed: roll.seed,
     dice,
     keyframes,
@@ -1677,6 +1757,7 @@ function rollDice(types, label, opts = {}) {
     faceDown: !!opts.faceDown,
     revealed: !opts.faceDown,
     rerollOfId,
+    set: wireSet() || null, // solo throws wear your set too
     seed: randomSeed(),
     label: label || formula(types),
   });
@@ -1732,8 +1813,15 @@ function stepPlayback(dt) {
     d.mesh.quaternion.copy(a.quat).slerp(b.quat, frac).multiply(d.correction);
   });
 
+  // Impact drain: sounds and (for a themed roll) the set's particle bursts
+  // ride the same recorded events — same moment, same point, same strength.
+  // A shrouded roll stays silent on identity: obsidian sheds nothing.
+  const rollShrouded = roll.dice.length > 0 && roll.dice[0].shrouded === true;
+  const burstRecipe = !rollShrouded && roll.set && SETS[roll.set] ? SETS[roll.set].particles : null;
   while (roll.soundIdx < roll.sounds.length && roll.sounds[roll.soundIdx].time <= roll.time) {
-    playClick(roll.sounds[roll.soundIdx++].strength);
+    const s = roll.sounds[roll.soundIdx++];
+    playClick(s.strength);
+    if (burstRecipe && s.at) particleField.burst(burstRecipe, s.at, s.strength);
   }
 
   if (roll.time >= roll.duration) {
@@ -2071,6 +2159,8 @@ function entryFromRoll(roll) {
     notation: typeof roll.notation === 'string' ? roll.notation : undefined,
     // reroll provenance (B3): present-or-absent, the notation idiom above
     rerollOfId: typeof roll.rerollOfId === 'string' ? roll.rerollOfId : undefined,
+    // dice-set identity (Tier 6 §9): shelf reconstruction re-skins from this
+    set: typeof roll.set === 'string' ? roll.set : undefined,
     spec,
   };
 }
@@ -2589,7 +2679,12 @@ function beginRevealFlip(rollId, entry) {
   dice.forEach((d, i) => {
     if (!d.shrouded) return;
     d.shrouded = false;
-    d.mesh.material = getDie(d.type).materials;
+    // Reveal restores the roller's SET, not bare std (Tier 6 §9): geometry
+    // swaps too — a themed set may wear its own bevel and tumble.
+    const die = getDie(d.type, dieVariant(false, entry.set));
+    d.mesh.geometry = die.geometry;
+    d.mesh.material = die.materials;
+    d.variant = dieVariant(false, entry.set);
     const p = entry.parts[i];
     const value = p && p.value != null ? p.value : null;
     const q = d.body.quaternion;
@@ -2619,7 +2714,11 @@ function revealShelvedRoll(rollId, entry) {
   dice.forEach((d, i) => {
     if (d.shrouded) {
       d.shrouded = false;
-      d.mesh.material = getDie(d.type).materials;
+      // same rule as beginRevealFlip: the reveal restores the roller's set
+      const die = getDie(d.type, dieVariant(false, entry.set));
+      d.mesh.geometry = die.geometry;
+      d.mesh.material = die.materials;
+      d.variant = dieVariant(false, entry.set);
     }
     const p = entry.parts[i];
     if (p && p.value != null) d.shelfValue = p.value;
@@ -3336,6 +3435,11 @@ const clock = new THREE.Clock();
 // The physics world is only stepped inside playRoll's synchronous
 // fast-forward; the rAF loop just advances keyframe playback.
 function tick(dt, render = true) {
+  // Themed-set clocks (Tier 6 §9): the Level 2 shader uniform and the
+  // Level 3 particle field advance with the same dt discipline as
+  // everything else (holdClock freezes both — deterministic screenshots).
+  SHADER_TIME.value += dt;
+  particleField.tick(dt, SHADER_TIME.value);
   stepPlayback(dt);
   stepSinking(dt);   // per-roll Done departures (§7.5)
   stepWhisking(dt);  // collect whisks onto the shelf (§7.7)
@@ -3551,7 +3655,7 @@ window.__diceDebug = {
     const r = commandOffer(str, to); // to: targeted offer (4b)
     return { ok: r.ok === true, state: r.state || (r.ok ? 'ok' : 'invalid'), error: r.error || null, posted: r.ok === true && netOnline };
   },
-  claimOffer(offerId) { return net ? net.claim(offerId) : Promise.resolve(false); },
+  claimOffer(offerId) { return net ? net.claim(offerId, { set: wireSet() }) : Promise.resolve(false); },
   unoffer(offerId) { return net ? net.unoffer(offerId) : Promise.resolve(false); },
   get offers() {
     return offers.map((o) => ({
@@ -3588,6 +3692,18 @@ window.__diceDebug = {
   // die chips (P1 quiet by default): the per-user visibility preference and
   // the live chip count. setChipsVisible returns the resulting state.
   get chipsVisible() { return chipsOn; },
+  // Dice-set identity (Tier 6 §9): read/choose the local set, and read
+  // which skin each die on the table actually wears (e2e's assertion
+  // surface — never scrape the canvas).
+  get diceSet() { return diceSet; },
+  setDiceSet(id) { return setDiceSet(id); },
+  tableDiceInfo() {
+    return tableDice.map((d) => ({
+      type: d.type,
+      variant: d.variant || (d.shrouded ? 'shroud' : 'std'),
+      rollId: d.rollId || null,
+    }));
+  },
   // roll outlines (the card-hover read): shell colors, in die order
   get outlineState() { return outlined.map((o) => `#${o.shell.material.color.getHexString()}`); },
   hoverBanner(on) { outlineRollDice(on !== false); return outlined.length; },
@@ -3782,6 +3898,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  particleField.setProjection(window.innerHeight, camera.fov);
   applyCameraFraming(); // a narrower window refits the table and its shelf
   cacheLeftPanelRect(); // marker occlusion reads this, never live layout
   positionChips();
@@ -6876,6 +6993,7 @@ function setChips(on, persist = true) {
   syncSettingsUI();
 }
 
+
 // ---------------------------------------------------------------------------
 // Settings (roadmap §2): gear → modal with two scopes. "Just you" — sound and
 // the value-chip preference, both local. "Everyone at the table" — the felt
@@ -6966,6 +7084,54 @@ function renderFeltSwatches() {
   });
 }
 
+// The dice-set picker ("Just you"): Standard first, then every house's
+// sets under its house name — the same build-once/refresh-selection
+// pattern as the felt swatches. The dot previews body + digit color.
+function renderDiceSetPicker() {
+  const holder = document.getElementById('diceset-picker');
+  if (!holder) return;
+  if (!holder.childElementCount) {
+    const addChip = (parent, id, label, body, text, title) => {
+      const chip = document.createElement('button');
+      chip.className = 'set-swatch';
+      chip.dataset.set = id;
+      const dot = document.createElement('span');
+      dot.className = 'set-dot';
+      dot.style.background = body;
+      dot.style.color = text;
+      dot.textContent = '6';
+      const nm = document.createElement('span');
+      nm.textContent = label;
+      chip.append(dot, nm);
+      chip.title = title;
+      chip.addEventListener('click', () => setDiceSet(id));
+      parent.appendChild(chip);
+    };
+    const stdRow = document.createElement('div');
+    stdRow.className = 'set-house';
+    addChip(stdRow, 'std', 'Standard', DIE_DEFS.d6.color, DIE_DEFS.d6.text,
+      'The table classics — one color per die type');
+    holder.appendChild(stdRow);
+    for (const [houseId, house] of Object.entries(THEMES)) {
+      const head = document.createElement('div');
+      head.className = 'set-house-head';
+      head.textContent = house.label;
+      head.title = house.line;
+      holder.appendChild(head);
+      const row = document.createElement('div');
+      row.className = 'set-house';
+      for (const [setId, recipe] of Object.entries(house.sets)) {
+        addChip(row, `${houseId}.${setId}`, recipe.label, recipe.body, recipe.text,
+          `${house.label} · ${recipe.label} — everyone sees your rolls in these dice`);
+      }
+      holder.appendChild(row);
+    }
+  }
+  holder.querySelectorAll('.set-swatch').forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.set === diceSet));
+  });
+}
+
 // Build the three system chips once, then only refresh the selected state.
 // Same lazy-element pattern as renderFeltSwatches (module-eval ordering).
 function renderSystemPicker() {
@@ -7052,6 +7218,7 @@ function showSettingsNote(text) {
 function syncSettingsUI() {
   document.getElementById('set-sound').setAttribute('aria-pressed', String(soundOn));
   document.getElementById('set-chips').setAttribute('aria-pressed', String(chipsOn));
+  renderDiceSetPicker();
   renderSystemPicker();
   renderFeltSwatches();
 }
@@ -7829,7 +7996,7 @@ function renderOffers() {
       rollBtn.appendChild(buildDieStrip(o.dice || [], POOL_STRIP_CAP, { grouped: true }));
       rollBtn.appendChild(buildRollCue());
       const offerUnits = new Set(o.dice || []).size;
-      rollBtn.addEventListener('click', () => { if (net) net.claim(o.offerId); });
+      rollBtn.addEventListener('click', () => { if (net) net.claim(o.offerId, { set: wireSet() }); });
       actions.appendChild(rollBtn);
     } else {
       const waiting = document.createElement('span');
@@ -8037,6 +8204,7 @@ function replaySettledRoll(r) {
     revealAuthority: r.revealAuthority,
     notation: r.notation,
     rerollOfId: r.rerollOfId,   // B3: a reload's on-felt roll keeps its mark
+    set: r.set,                 // Tier 6 §9: a reload keeps the roller's skin
     playerId: r.playerId,
     seed: r.seed,
     label: r.label || formula(r.dice || []),
@@ -8178,6 +8346,7 @@ function handleNetEvent(type, data) {
         revealAuthority: data.revealAuthority,
         notation: data.notation,
         rerollOfId: data.rerollOfId,   // B3: server-substantiated provenance
+        set: data.set,                 // Tier 6 §9: the roller's dice-set skin
         playerId: data.playerId,
         seed: data.seed,
         label: data.label || formula(data.dice || []),
@@ -8274,7 +8443,7 @@ function requestRoll(types, label, opts = {}) {
   // server accepted it (a 400 or a network failure resolves null), solo it
   // means the spec passed the same validation rollDice applies.
   if (netOnline && net) {
-    const wireOpts = { ...opts };
+    const wireOpts = { ...opts, set: wireSet() };
     // secret/whisper have no explicit wire field BY DESIGN: visibility rides
     // the notation string and the server re-parses it. Paths that arrive here
     // with no string of their own (popover, reroll-last) get the canonical.

@@ -153,6 +153,9 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
       // fact: the server substantiates it (and silently drops what it
       // cannot), so this never gates on anything client-side.
       if (typeof opts.rerollOfId === 'string' && opts.rerollOfId) body.rerollOfId = opts.rerollOfId;
+      // Dice-set identity (Tier 6 §9) — also outside the split, for the same
+      // reason: cosmetic, rides beside either shape. Validated server-side.
+      if (typeof opts.set === 'string' && opts.set) body.set = opts.set;
       if (typeof opts.notation === 'string' && opts.notation) {
         body.notation = opts.notation;
       } else {
@@ -237,8 +240,11 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     // Execute an offered roll as yourself. A 404 usually means someone else
     // claimed it first — a quiet no-op, and NOT grounds for the silent
     // re-join that withPlayer normally does on 404.
-    async claim(offerId) {
-      const res = await withPlayer('/api/claim', { offerId }, { rejoinOn404: false });
+    async claim(offerId, opts = {}) {
+      const body = { offerId };
+      // The claimer throws their OWN dice: their set rides the claim.
+      if (typeof opts.set === 'string' && opts.set) body.set = opts.set;
+      const res = await withPlayer('/api/claim', body, { rejoinOn404: false });
       return res.ok;
     },
 

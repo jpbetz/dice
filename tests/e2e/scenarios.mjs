@@ -2932,4 +2932,56 @@ export const scenarios = [
         'same absent mark — no existence oracle');
     },
   },
+  {
+    name: 'themed-dice',
+    tags: ['themes'],
+    // Dice-set identity (Tier 6 §9): chosen in settings ("Just you"), the
+    // set rides each roll request and lands for EVERYONE at the table; a
+    // player who never chose stays std (identity is per-player, not room
+    // state); the shelf keeps a collected roll's skin; the wire rejects an
+    // unknown id loudly instead of inventing a skin.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.eval(`window.__diceDebug.setDiceSet('emberforge.blackanvil')`);
+      await a.roll('2d6 # By the anvil');
+      await a.settle();
+      await b.settle();
+      await b.waitFor(`document.getElementById('log-list').childElementCount >= 1`, { desc: 'roll reaches tab B' });
+      for (const [tab, who] of [[a, 'A'], [b, 'B']]) {
+        const info = JSON.parse(await tab.eval(`JSON.stringify(window.__diceDebug.tableDiceInfo())`));
+        assert.equal(info.length, 2, `two dice on ${who}`);
+        assert.ok(info.every((d) => d.variant === 'emberforge.blackanvil'),
+          `the roller's set everywhere on ${who} (got: ${info.map((d) => d.variant).join(',')})`);
+      }
+
+      // Bob never picked a set: his roll is std on every screen, while
+      // Alice's auto-collected dice keep their skin on the shelf.
+      await b.roll('1d20 # plain');
+      await b.settle();
+      const rid = await b.rollId();
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), !window.__diceDebug.busy`
+        + ` && window.__diceDebug.tableDiceInfo().some((d) => d.rollId === ${JSON.stringify(rid)}))`,
+        { desc: 'the plain roll lands on A' },
+      );
+      const infoA = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.tableDiceInfo())`));
+      const plain = infoA.filter((d) => d.rollId === rid);
+      assert.equal(plain.length, 1, 'one plain die on the felt');
+      assert.equal(plain[0].variant, 'std', 'no set chosen ⇒ std');
+      const shelved = infoA.filter((d) => d.rollId !== rid);
+      assert.equal(shelved.length, 2, 'the anvil roll sits on the shelf');
+      assert.ok(shelved.every((d) => d.variant === 'emberforge.blackanvil'), 'the shelf keeps the skin');
+
+      // The choice persists locally, and the wire refuses an invented skin.
+      assert.equal(await a.eval(`localStorage.getItem('dice.diceset.v1')`),
+        '"emberforge.blackanvil"', 'the choice persists');
+      const aid = await a.playerId();
+      const bad = await ctx.api('/api/roll', { playerId: aid, dice: ['d6'], set: 'umbra.nonsense' });
+      assert.equal(bad.status, 400, 'unknown set is a loud 400');
+      const good = await ctx.api('/api/roll', { playerId: aid, dice: ['d6'], set: 'umbra.voidgrain' });
+      assert.equal(good.status, 200);
+      assert.equal(good.data.roll.set, 'umbra.voidgrain', 'the set rides the entry');
+    },
+  },
 ];

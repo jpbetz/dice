@@ -33,6 +33,7 @@ import { fileURLToPath } from 'node:url';
 
 import { composeRoll, validateMods, DIE_MAX } from './js/rollspec.js';
 import { parseNotation } from './js/notation.js';
+import { SET_IDS } from './js/themes.js';
 
 const PORT = Number(process.env.PORT) || 8123;
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -961,6 +962,10 @@ function projectEntryFor(entry, viewerId) {
   if (entry.exp) out.exp = entry.exp;
   if (entry.collected) out.collected = entry.collected;
   if (entry.cleared) out.cleared = entry.cleared;
+  // Cosmetic identity, not content: which dice-set skin the roller's dice
+  // wear is table-public (like their name and color), so it survives
+  // redaction. Values never ride it.
+  if (entry.set) out.set = entry.set;
   // Unconditional because the field is only ever BORN pointing at a whole-
   // room-visible parent (handleRoll's entryExistsForAll birth gate) — a
   // shrouded viewer already knows that parent exists; "she rerolled that
@@ -1097,6 +1102,12 @@ function executeRoll(room, player, spec) {
   // come back pointing one hop up instead — the client stamps each reroll
   // with ITS parent's id.)
   if (spec.rerollOfId) roll.rerollOfId = spec.rerollOfId;
+  // Dice-set identity (Tier 6 §9): cosmetic, present-or-absent — a plain
+  // roll's payload stays byte-for-byte what it always was. It does NOT ride
+  // roll.spec: the set belongs to whoever THROWS (reroll-last and a claimed
+  // offer wear the actual roller's set, stamped fresh on each request),
+  // never to the request being replayed.
+  if (spec.set) roll.set = spec.set;
 
   // Auto-collect (§7.7): the felt belongs to ONE roll, so everything already on
   // it goes to the shelf as part of the incoming roll's arrival beat. The
@@ -1125,6 +1136,17 @@ function executeRoll(room, player, spec) {
   // shrouded, and no event at all for a secret roll's non-rollers.
   broadcast(room, 'roll', roll, (viewerId) => projectEntryFor(roll, viewerId));
   return roll;
+}
+
+// The dice-set field, shared by every path that throws (roll, claim): a
+// client bug sends a malformed or unknown id and gets a loud 400 — same
+// stance as unknown_target. Absent/null ⇒ standard dice, no field at all.
+function readSetField(value) {
+  if (value.set === undefined || value.set === null) return { id: null };
+  if (typeof value.set !== 'string') return { error: [400, 'set must be a string', 'bad_set'] };
+  const id = cleanString(value.set, 64);
+  if (!id || !SET_IDS.includes(id)) return { error: [400, `unknown dice set: ${id}`, 'unknown_set'] };
+  return { id };
 }
 
 async function handleRoll(req, res) {
@@ -1171,6 +1193,10 @@ async function handleRoll(req, res) {
     const parent = room.log.find((r) => r.rollId === rid);
     if (parent && entryExistsForAll(parent)) spec.rerollOfId = rid;
   }
+
+  const set = readSetField(body.value);
+  if (set.error) return sendError(res, ...set.error);
+  if (set.id) spec.set = set.id;
 
   const roll = executeRoll(room, player, spec);
   // The roller's own response is projected like every other egress: a held
@@ -1490,6 +1516,11 @@ async function handleClaim(req, res) {
   if (offer.to && Array.isArray(offer.to.playerIds) && !offer.to.playerIds.includes(player.id)) {
     return sendError(res, 403, `this offer is for ${offer.to.name}`, 'not_offer_target');
   }
+  // Validate BEFORE the splice: a bad set field must reject the request,
+  // not consume the offer. (The claimer's set, not the offerer's — the
+  // offer stages the moment, but whoever picks it up throws their own dice.)
+  const set = readSetField(body.value);
+  if (set.error) return sendError(res, ...set.error);
   room.offers.splice(idx, 1);
 
   log(`claim   room=${room.name} name=${player.name} offerId=${offerId} by=${offer.byName}`);
@@ -1520,6 +1551,7 @@ async function handleClaim(req, res) {
     faceDown: offer.faceDown,
     exp: offer.exp,
     visibility,
+    set: set.id || undefined,
   });
   // The claimer's response is projected like every other egress: on a held or
   // offerer-only roll, the player who threw the dice gets no values back.

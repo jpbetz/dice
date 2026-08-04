@@ -352,8 +352,20 @@ headless for review stills. Ladder Levels 1-3.5 shipped (texture-space
 maps, shader injection, impact-keyed particles — js/particles.js + the
 lab's cannon-es drop rig — and geometry identity: per-set bevel/profile/
 wear/nicks/pillow on the render mesh only, physics hull canonical; see
-THEMES.md). Still open: felt decals (frost/ripple/scorch — ladder L4),
-the picker + wire. **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
+THEMES.md). **PICKER + WIRE SHIPPED 2026-08-03**: "Dice set" in settings
+("Just you" — grouped by house, felt-swatch language, localStorage);
+`set` rides every roll AND claim request (present-or-absent like exp;
+server validates against SET_IDS, 400 unknown_set; the CLAIMER's set —
+whoever throws wears their own dice), survives redaction (cosmetic
+identity like name/color), lands for everyone, and the shelf, reveal
+flips (geometry + materials restore the set, shroud outranks identity)
+and reload replay all keep the skin. Main table gained the lab's PMREM
+reflection environment (std/shroud pinned to envMapIntensity 0.35 — the
+released look holds), the SHADER_TIME clock, and the particle field
+fed by the fast-forward's recorded contacts ({time, strength, at} — the
+roll.sounds seam, realized). e2e: themed-dice (tag `themes`). Still
+open: felt decals (frost/ripple/scorch — ladder L4), 2D chrome art
+(tray/pool/log chips stay std), saved-pool set override. **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
 natural AND supernatural — imagine what *faerie* dice, *dryadic* dice,
 *wizard* dice, *warrior* dice might look like. Special effects and strong
 themes **merged subtly into the dice themselves** — theme lives in

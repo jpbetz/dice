@@ -1356,6 +1356,16 @@ dice" in the settings *Just you* section). The readability invariant
 breakdown, which is where a number is legible anyway; chips become the
 opt-in for people who want them floating over the felt.
 
+**Dice set is a *Just you* setting** (`dice.diceset.v1`, Tier 6 §9): a
+picker under Sound/chips — Standard first, then each house's sets under
+a small-caps house header, in the felt swatches' pill language (the dot
+is a die face: body color + a "6" in the digit color). Your choice rides
+every roll and claim you make and everyone sees it; it applies FROM THE
+NEXT ROLL (dice already on the felt keep the skin they landed with — a
+roll is a record). Not room state: two players wear two sets. Shroud
+outranks identity everywhere (a hidden roll is obsidian, sheds no
+particles, and reveals INTO the roller's set).
+
 **Resting shelf markers are a dot.** One roller-colored dot on a large
 round target — no always-on gold total, no tiny ✕, and a held roll shows
 the same dot rather than shouting `?`. Hover or tap explodes it into the

@@ -303,6 +303,29 @@ theme × every die type in one grid, idle-rotation toggle, per-theme
 effect trigger buttons, a ⬇ drop button per set (the Level 3 rig — a
 real physics die whose measured contacts fire the set's bursts; sets
 without particles prove the restraint), and one-click PNG capture.
+
+## On the main table (shipped 2026-08-03)
+
+Sets graduated: "Dice set" in settings ("Just you") picks a per-player
+identity that rides every roll/claim request as `set` — present-or-
+absent like exp, validated server-side (400 unknown_set), stamped by
+whoever THROWS (a claimed offer wears the claimer's set; rerolls the
+reroller's), and kept through redaction (cosmetic identity, like name
+and color — values never ride it). Precedence: shroud > set > std —
+a hidden roll is obsidian, sheds no particles, and reveal restores the
+set (geometry AND materials — a set may wear its own bevel and wear).
+The table scene gained the lab's painted-equirect PMREM environment
+(std/shroud materials pin envMapIntensity 0.35 so the released look
+holds), the SHADER_TIME clock in tick() (holdClock freezes Level 2/3
+alike), and a ParticleField fed by the fast-forward's recorded contacts
+— roll.sounds grew a contact point: {time, strength, at} — exactly the
+integration seam Level 3 was designed around. Client ingress note for
+future fields: the SSE 'roll' case, replaySettledRoll and the playback-
+object build in playRoll are explicit whitelists — a new entry field
+must be added to all three or it silently vanishes (set was dropped by
+the first two on the first pass). 2D chrome (tray, pool tiles, log die
+chips) deliberately stays std for now — 9b pool icons is the natural
+home for that pass.
 `tools/lab-shots.mjs` drives it headless over CDP and drops PNGs for
 side-by-side review. Themes land in `js/themes.js` as material recipes;
 the main app consumes NOTHING from the lab until a set graduates
