@@ -2507,7 +2507,18 @@ function renderTally(el, entry) {
 // stand. The text layer keeps the read (audit rule): every chip carries
 // real text ('d8 7 Success'), every row leads with its pool, so copy/paste
 // and screen readers get the per-pool, per-die story line by line.
-// A quiet die keeps its evidence chip, dimmed; an all-quiet pool says so.
+//
+// THE LEDGER (2i-A, the Soul Deal audit): sourced reads share ONE label
+// column — the container turns grid (`oc-ledger`), the label spine
+// right-aligned beside left-aligned dice cells, and each row's chips live
+// in their own `.oc-cell`, so a wrapped chip wraps INSIDE its pool's cell
+// (the hanging indent is structural; an orphan chip can never float free
+// of its label). Unlabeled rolls keep the centered read. Quiet grammar:
+// beside worded dice a quiet die's answer slot carries an explicit dash —
+// in the DOM, so copy and screen readers read the silence too; an
+// ALL-quiet pool says 'quiet' once instead and its chips stay bare (dash
+// and word together would mark the same silence twice). One-die rolls
+// wear `oc-solo`: the single answer word IS the verdict, at hero scale.
 function renderOutcomeRows(el, entry) {
   el.textContent = '';
   const outcomes = entryOutcomes(entry);
@@ -2523,18 +2534,25 @@ function renderOutcomeRows(el, entry) {
   } else {
     groups.push({ label: '', os: outcomes });
   }
+  // Callers add their surface classes AFTER this render (classList.add,
+  // never className =), so the ledger mark set here survives.
+  el.classList.toggle('oc-ledger', groups.some((g) => g.label));
   for (const g of groups) {
     const row = document.createElement('div');
     row.className = 'tally-group outcome-row';
+    if (outcomes.length === 1) row.classList.add('oc-solo');
     if (g.label) {
       const l = document.createElement('span');
       l.className = 'tally-src';
       l.textContent = `${g.label} `; // real space: the grouping survives copy/paste
       row.appendChild(l);
     }
+    const cell = document.createElement('span');
+    cell.className = 'oc-cell';
+    const worded = tallyOutcomes(g.os).length > 0;
     for (const o of g.os) {
       const chip = document.createElement('span');
-      chip.className = 'oc-chip' + (o.word ? '' : ' oc-quiet');
+      chip.className = 'oc-chip' + (o.word ? ` oc-b-${o.tier}` : ' oc-quiet');
       const ev = document.createElement('span');
       ev.className = 'oc-die';
       ev.textContent = `${o.type} ${o.value}`; // the evidence, in the text layer
@@ -2545,16 +2563,23 @@ function renderOutcomeRows(el, entry) {
         w.className = `oc-word tier-${o.tier}`;
         w.textContent = o.word;
         chip.appendChild(w);
+      } else if (worded) {
+        chip.append(' ');
+        const dash = document.createElement('span');
+        dash.className = 'oc-dash';
+        dash.textContent = '—'; // the silence, in the text layer
+        chip.appendChild(dash);
       }
-      row.appendChild(chip);
-      row.append(' '); // copyable separator (flex ignores whitespace boxes)
+      cell.appendChild(chip);
+      cell.append(' '); // copyable separator (flex ignores whitespace boxes)
     }
-    if (!tallyOutcomes(g.os).length) {
+    if (!worded) {
       const q = document.createElement('span');
       q.className = 'tally-quiet';
-      q.textContent = 'quiet'; // the pool's answer IS the silence
-      row.appendChild(q);
+      q.textContent = 'quiet'; // the pool's answer IS the silence (§7.9)
+      cell.appendChild(q);
     }
+    row.appendChild(cell);
     el.appendChild(row);
   }
   return true;
@@ -2591,9 +2616,10 @@ function renderRollResults(entry, dice, fx = true) {
   // was the muddle). Sum systems keep the meaning word + breakdown pair.
   const meaningEl = document.getElementById('result-meaning');
   const meaning = entryMeaning(entry);
+  meaningEl.className = ''; // reset FIRST: renderOutcomeRows marks oc-ledger
   const perDieRows = !hidden && renderOutcomeRows(meaningEl, entry);
   if (perDieRows) {
-    meaningEl.className = 'result-tally result-outcomes';
+    meaningEl.classList.add('result-tally', 'result-outcomes');
     meaningEl.title = 'each die reads its own outcome — the die and face beside each word';
   } else {
     meaningEl.textContent = meaning ? meaning.word : '';
@@ -3392,11 +3418,15 @@ function renderVerdictCard(roll, entry) {
   document.getElementById('verdict-eyebrow').textContent = `${who}${entry.label || ''}`;
   const vTotal = document.getElementById('verdict-total');
   // Per-die systems put NO number in the ring (2e): the old dice-count
-  // read as a total — the exact confusion Joe named. The ring stays a
-  // stage; the outcome rows below are the verdict.
+  // read as a total — the exact confusion Joe named. And an empty ring is
+  // no stage either (2i-B: a giant gold circle around nothing) — under a
+  // per-die read the ring FOLDS and the outcome rows below are the card's
+  // whole verdict. A hidden roll keeps the ring as its face-down stage.
   vTotal.textContent = hidden ? '?'
     : activeSystem().usesTotal ? String(entry.total)
     : '';
+  document.querySelector('#verdict-card .ring-wrap')
+    .classList.toggle('hidden', !hidden && !activeSystem().usesTotal);
 
   // Done everywhere (the result-surface redesign): the roller's Done keeps
   // the roll — dice to the shelf for everyone, result retained; a

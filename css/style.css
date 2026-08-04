@@ -1732,10 +1732,14 @@ html, body {
 }
 #result-label {
   font-family: var(--font-display);
-  font-size: 13px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  /* a quiet identity caption (2i-A): the rows are the data — the loud
+     tracked caps repeated the rows' labels and wrapped mid-pool-name on
+     multi-pool rolls. Identity, not a second data row. */
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-transform: none;
   color: var(--muted);
+  opacity: 0.85;
 }
 #result-total {
   font-family: var(--font-display);
@@ -1821,6 +1825,32 @@ html, body {
   text-indent: 0;
 }
 #result-meaning.result-outcomes { margin: 6px 0 2px; }
+/* THE LEDGER (2i-A): sourced reads share ONE label column. The container
+   turns grid — a right-aligned label spine beside left-aligned dice
+   cells — and the whole block centers as a unit (fit-content). Rows are
+   display:contents, so grid auto-placement pairs each label with its own
+   cell row by row, and a wrapped chip wraps INSIDE its pool's cell: the
+   hanging indent is structural, an orphan chip can never float free of
+   its label. Unlabeled rolls keep the centered flex read above. */
+.oc-ledger {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 11px;
+  row-gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
+}
+.oc-ledger .outcome-row { display: contents; }
+.oc-ledger .tally-src {
+  grid-column: 1;
+  justify-self: end;
+  align-self: center;
+  text-align: right;
+  white-space: nowrap;
+  margin-right: 0; /* the grid's column-gap carries the gutter */
+}
+.oc-ledger .oc-cell { grid-column: 2; justify-content: flex-start; }
 .outcome-row {
   display: flex;
   flex-wrap: wrap;
@@ -1830,9 +1860,21 @@ html, body {
   max-width: 100%;
 }
 .outcome-row .tally-src { flex: none; }
+.oc-cell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+}
 .oc-chip {
   display: inline-flex;
   align-items: baseline;
+  /* the evidence/word gap lives in LAYOUT (2i-A chip-fusion: flex eats the
+     whitespace box, so 'd6 1Fail' fused on screen while copy stayed right —
+     the nbsp lesson's sibling; the string keeps its real space for copy) */
+  gap: 5px;
   padding: 2px 9px 3px;
   border: 1px solid var(--hair);
   border-radius: 999px;
@@ -1847,9 +1889,25 @@ html, body {
 }
 .oc-word { font-family: var(--font-display); font-size: 15px; font-weight: 700; }
 .oc-quiet { opacity: 0.55; }
+/* a quiet die beside worded ones: an explicit dash in the answer slot
+   (2i-A quiet grammar — the mark is REAL text, so copy reads the silence) */
+.oc-dash { color: var(--muted); opacity: 0.8; }
+/* tier rides the chip border too, at reduced strength — the felt's value
+   chips taught the pattern; the word stays the loud channel (2i-A, adj.) */
+.oc-chip.oc-b-crit-success, .oc-chip.oc-b-success { border-color: rgba(255, 214, 102, 0.45); }
+.oc-chip.oc-b-success-soft { border-color: rgba(255, 214, 102, 0.22); }
+.oc-chip.oc-b-fail, .oc-chip.oc-b-crit-fail { border-color: rgba(226, 73, 59, 0.5); }
 .verdict-outcomes .oc-word { font-size: clamp(15px, 2.4vmin, 18px); }
 .pk-outcomes .oc-word { font-size: 13px; }
 .pk-outcomes .oc-chip { padding: 1px 7px 2px; }
+/* one-die rolls read at HERO scale (2i-A): the single answer word IS the
+   verdict — dnd's 52px gold total finally has a per-die counterpart */
+.oc-solo .oc-chip { padding: 5px 16px 6px; }
+.oc-solo .oc-word { font-size: 26px; }
+.oc-solo .oc-die { font-size: 12px; }
+.verdict-outcomes .oc-solo .oc-word { font-size: clamp(22px, 4.4vmin, 32px); }
+.pk-outcomes .oc-solo .oc-word { font-size: 19px; }
+.pk-outcomes .oc-solo .oc-chip { padding: 3px 12px 4px; }
 .pop-sysnote { margin: 8px 14px 0; font-style: italic; }
 /* Per-die tables (Soul Deal) fold the sum-world sections away — modifiers,
    d20 pairing, Target (DC), keep/drop don't change outcomes there (Joe
@@ -2134,7 +2192,16 @@ html, body {
   text-transform: uppercase;
   color: var(--muted);
 }
-.tally-quiet { color: var(--muted); }
+/* 'quiet' is an all-quiet pool's answer (§7.9 — the answer IS the
+   silence), styled as ABSENCE: it must never weigh what an outcome word
+   weighs (2i-A quiet grammar). */
+.tally-quiet {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: 0.04em;
+}
 .tier-crit-success { color: #ffe27a; text-shadow: 0 0 18px rgba(255,215,102,0.7); }
 .tier-success { color: var(--gold-bright); }
 .tier-success-soft { color: #cdbe8a; }
@@ -2285,17 +2352,21 @@ body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
   align-items: center;
   justify-content: center;
   gap: 6px;
+  /* the banner's demoted identity caption (2i-A), same dress here */
   font-size: 12px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-transform: none;
   color: var(--muted);
+  opacity: 0.85;
 }
 .pk-who {
   flex: 0 1 auto;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* the peek's identity WRAPS instead of truncating (2i-A / 2i-E: a
+     shelved roll's name is what the hover is for — never ellipsize the
+     one line that says which roll this is) */
+  overflow-wrap: break-word;
+  white-space: normal;
   text-align: center;
 }
 .pk-total { font-size: 30px; font-weight: 700; color: var(--gold-bright); line-height: 1.15; text-shadow: 0 0 18px rgba(255, 215, 102, 0.25); }
@@ -3126,6 +3197,10 @@ body.mini .popover { width: min(94vw, 312px); }
 }
 
 .ring-wrap { position: relative; width: clamp(108px, 22vmin, 156px); margin: 2px auto 0; }
+/* the ring FOLDS under a per-die read (2i-B): an empty gold circle is not
+   a stage — the outcome rows are the card's whole verdict. (No bare
+   .hidden rule exists in this codebase; every hide is explicit.) */
+#verdict-card .ring-wrap.hidden { display: none; }
 .ring-wrap svg { display: block; width: 100%; height: auto; transform: rotate(-90deg); }
 .ring-track { fill: none; stroke: rgba(212, 175, 55, 0.16); stroke-width: 3.5; }
 .ring-fill {

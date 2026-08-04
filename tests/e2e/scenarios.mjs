@@ -654,6 +654,85 @@ export const scenarios = [
     },
   },
   {
+    name: 'ledger-read',
+    tags: ['smoke', 'meanings'],
+    // 2i-A THE LEDGER: sourced per-die reads share ONE label column (the
+    // grid), each row's chips live in their own cell (structural hanging
+    // indent), the evidence/word gap is layout while the string keeps its
+    // space, silence is marked exactly once (dash beside worded dice XOR
+    // the pool's 'quiet'), one-die rolls read at hero scale, and the empty
+    // verdict ring folds under per-die.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.roll('2d8[Wisdom]+1d10[Sword]+1d6[Peer Respect]');
+
+      // the shared column: a sourced read turns the container to the grid
+      assert.ok(await a.eval(
+        `document.getElementById('result-meaning').classList.contains('oc-ledger')`),
+        'sourced rows share the ledger grid');
+      assert.equal(await a.eval(
+        `getComputedStyle(document.getElementById('result-meaning')).display`), 'grid');
+      assert.equal(await a.eval(
+        `document.querySelectorAll('#result-meaning .outcome-row').length`), 3,
+        'one row per pool (the unsourced d6 keeps its own)');
+      assert.equal(await a.eval(
+        `[...document.querySelectorAll('#result-meaning .outcome-row')]
+          .every((r) => r.querySelectorAll(':scope > .oc-cell').length === 1)`), true,
+        'each row seats its chips in ONE cell — the hanging indent is structural');
+
+      // chip fusion (S5): the gap is layout; the copyable space survives
+      assert.equal(await a.eval(
+        `getComputedStyle(document.querySelector('#result-meaning .oc-chip')).columnGap`),
+        '5px', 'the evidence/word gap lives in layout, never in the string');
+      const wordChipText = await a.eval(`(() => {
+        const c = [...document.querySelectorAll('#result-meaning .oc-chip')]
+          .find((el) => el.querySelector('.oc-word'));
+        return c ? c.textContent : null;
+      })()`);
+      if (wordChipText) {
+        assert.ok(/^d\d+ \d+ \S/.test(wordChipText),
+          `the chip's text layer keeps its spaces (got: ${JSON.stringify(wordChipText)})`);
+      }
+
+      // quiet grammar (S4, adjusted): dash and 'quiet' never mark together
+      assert.equal(await a.eval(
+        `[...document.querySelectorAll('#result-meaning .outcome-row')].every((r) => {
+          const quietWord = r.querySelectorAll('.tally-quiet').length;
+          if (quietWord) return !r.querySelector('.oc-dash') && !r.querySelector('.oc-word');
+          return [...r.querySelectorAll('.oc-chip')].every((c) =>
+            c.querySelector('.oc-word') ? !c.querySelector('.oc-dash')
+              : c.textContent.includes('—'));
+        })`), true, 'silence is marked exactly once — dash per die XOR quiet per pool');
+
+      // one-die rolls read at hero scale (S3)
+      await a.roll('1d8[Omen]');
+      assert.ok(await a.eval(
+        `!!document.querySelector('#result-meaning .outcome-row.oc-solo')`),
+        'a one-die roll wears the hero dress');
+
+      // the empty verdict ring folds under per-die (2i-B); a totals lens
+      // brings it back on the standing card (the relit repaint)
+      await a.dbg(`commandRoll('2d8[Wisdom]+1d10[Sword] check # Steady the Rope | crossing')`);
+      await a.waitFor(
+        `(window.__diceDebug.skipCeremony(), window.__diceDebug.sim(30), (window.__diceDebug.ceremonyState || {}).phase === 'done')`,
+        { desc: 'verdict staged' },
+      );
+      assert.equal(await a.eval(
+        `getComputedStyle(document.querySelector('#verdict-card .ring-wrap')).display`),
+        'none', 'the empty ring folds — the rows are the verdict');
+      assert.ok(await a.eval(
+        `document.getElementById('verdict-hero').classList.contains('verdict-outcomes')`),
+        'the outcome rows hold the card’s center');
+      await a.dbg(`setSystem('dnd')`);
+      await a.waitFor(
+        `getComputedStyle(document.querySelector('#verdict-card .ring-wrap')).display !== 'none'`,
+        { desc: 'the ring returns under a totals lens' },
+      );
+      await a.dbg('retireCeremony()');
+      await a.dbg(`setSystem('soul-deal')`);
+    },
+  },
+  {
     name: 'notation-wiring',
     tags: ['notation'],
     // The browser-side notation path (grammar itself is unit-tested): a valid
