@@ -60,12 +60,19 @@ Deploy from source (no Dockerfile): the Node buildpack runs `npm start` →
 
 ## One-time setup (your side)
 
+Your settings (project id, billing account, domain) live in
+`deploy/config.mk` — **gitignored**, so they stay local. `make init` creates
+it by asking four questions; every other target tells you exactly that if
+the file is missing. **Whenever you're unsure where you left off, run
+`make status`** — it checks real state top to bottom and prints the exact
+next command.
+
 ```sh
-gcloud auth login                       # once, in a browser
-gcloud billing accounts list            # grab the account ID
-make setup BILLING_ACCOUNT=XXXXXX-XXXXXX-XXXXXX
-make deploy                             # first deploy; prints the *.run.app URL
-make cleanup-policy                     # once, after that first deploy
+gcloud auth login    # once, in a browser
+make init            # asks: billing account, project id, region, domain
+make setup           # creates project, links billing, enables APIs, $5 budget alert
+make deploy          # builds + deploys; prints the *.run.app URL
+make cleanup-policy  # once, after that first deploy
 ```
 
 That's it — the app is public at the printed `https://dice-….run.app` URL and
@@ -89,18 +96,20 @@ Cloud Run records stay grey-cloud/DNS-only). Avoid Namecheap teaser pricing
 and the `.fun`/`.live` $2.57 teasers (renew at $26–31/yr). **Prepay several
 years before Nov 1, 2026** — .com wholesale rises ~7%/yr through 2030.
 
-Wiring (once, ~20 minutes end to end):
+Wiring (once, ~20 minutes end to end). After buying, set `DOMAIN` in
+`deploy/config.mk` (or accept the default `make init` wrote), then:
 
 ```sh
-gcloud domains verify thedicetable.com   # opens Search Console → add the TXT
-                                         # record it shows at your registrar
-make domain DOMAIN=thedicetable.com      # prints A + AAAA records for the apex
+make verify-domain   # opens Search Console → add the TXT record it shows
+                     # at your registrar, complete the check there
+make domain          # creates the mapping; prints A + AAAA records to add
+make status          # re-run until it says: live — walks you through the rest
 ```
 
 Add the printed records at the registrar (DNS-only — never proxy them:
 Google's cert issuance fails behind Cloudflare's orange cloud, whose Host
 override is Enterprise-only anyway). The managed cert lands in ~15 min
-(worst case 24 h); check with `make domain-status DOMAIN=…`.
+(worst case 24 h); `make domain-status` shows certificate detail.
 
 Domain mapping is free but officially still **pre-GA** ("latency issues" per
 Google's own docs — fine for a friends' table; supported in us-central1). If

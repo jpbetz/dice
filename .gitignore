@@ -21,3 +21,6 @@ tools/out/
 # Local tool state (keep .claude/launch.json tracked)
 .claude/settings.local.json
 .claude/*.local.json
+
+# Local deployment settings (make init) — billing/project ids stay local
+deploy/config.mk
