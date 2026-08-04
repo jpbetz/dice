@@ -1829,6 +1829,10 @@ function playRoll(roll) {
         console.warn(`face correction mismatch on ${d.type}: expected ${values[i]}, reads ${check.value}`);
       }
     }
+    // Slice 3: seed the settled-die cadence off the FINAL pose (stepResting
+    // reads d.finalPos/d.finalQuat live, so a later reveal correction at
+    // beginRevealFlip becomes the new baseline for free — no re-init).
+    initRest(d, roll, i);
   });
 
   // --- freeze bodies at the corrected final pose ---------------------------
@@ -3747,6 +3751,134 @@ document.addEventListener('keydown', (e) => {
 
 const clock = new THREE.Clock();
 
+// ---- Slice 3: REST CADENCE (Joe 2026-08-04) --------------------------------
+// Sub-mm continuous motion on SETTLED-on-felt dice — "sea-glass swells /
+// heartwood creaks / sap-amber is sealed / scrimshaw remembers" IN MOTION,
+// without any new textures or lights. Doctrine: quiet at rest (P1); the die
+// never tilts far enough to misread; physics untouched; the shelf is the
+// archive (excluded, same predicate as the S3 bloom leak fix).
+//
+// Scratch quaternion + axis reused every frame for every cadencing die —
+// the whole point of allocating once at module scope is that a full felt
+// (40 dice, the app-wide cap) writes zero new objects per frame.
+const TMP_QUAT = new THREE.Quaternion();
+const TMP_AXIS = new THREE.Vector3();
+const TWO_PI = Math.PI * 2;
+
+// Deterministic 32-bit hash → [0, 1). Same input on every client → same phase.
+// FNV-1a with a salt so one key can feed multiple independent seeds.
+function restHash(str, salt) {
+  let h = (2166136261 ^ salt) >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0)) / 4294967296;
+}
+
+// One-shot at playRoll's face-correction seam. Runs for every die (shrouded
+// too — obsidian looks up as no-recipe and short-circuits to still). settleAt
+// stays sentinel 0 here; stepResting stamps it lazily on the first frame it
+// sees the die AND the roll is done, which is what closes the ceremony gap
+// without any coordination code.
+function initRest(d, roll, i) {
+  const setId = d.variant;
+  const recipe = setId && SETS[setId] ? SETS[setId].rest : null;
+  if (!recipe || recipe.kind === 'still') {
+    // { kind: 'still', done: true } short-circuits inside stepResting's hot
+    // loop — one pointer check per die per frame.
+    d.rest = { kind: 'still', done: true };
+    return;
+  }
+  const key = `${roll.rollId || 'local'}:${i}`;
+  d.rest = {
+    recipe,
+    kind: recipe.kind,
+    seedA: restHash(key, 0xA1) * TWO_PI,
+    seedB: restHash(key, 0xB2) * TWO_PI,
+    seedC: restHash(key, 0xC3) * TWO_PI,
+    settleAt: 0,   // sentinel; stamped on first stepResting frame we see
+    tickAt: 0,     // settle-tick only
+    done: false,
+  };
+}
+
+// Rest-cadence step — one line inside tick(), runs after stepWhisking so it
+// shares locality with the other rest-adjacent peers, and before stepRevealing
+// so the reveal's freshly-corrected quat overrides any cadence write on the
+// same frame. Reads d.finalPos / d.finalQuat LIVE so a reveal repaint is
+// automatically the new baseline the very next frame.
+function stepResting() {
+  if (!tableDice.length) return;
+  // Same clock as SHADER_TIME (dt-driven, holdClock-frozen) so a headless
+  // sim() drives cadence deterministically — never performance.now(), or
+  // holdClock could not freeze it.
+  const now = SHADER_TIME.value * 1000; // ms
+  for (const d of tableDice) {
+    const r = d.rest;
+    if (!r || r.done || r.kind === 'still') continue;
+    // Shelf gate — the archive is quiet (same predicate as the S3 fix,
+    // and shelfClusters.set fires BEFORE placeCluster whisks, so whisk
+    // is covered here too).
+    if (shelfClusters.has(d.rollId)) continue;
+    // In-flight gate — playback owns the mesh transform while its own
+    // roll is still animating. Sinking dice are already dropped from
+    // tableDice by removeRollDice, so no separate gate is needed.
+    if (currentRoll && !currentRoll.done && d.rollId === currentRoll.rollId) continue;
+    // Lazy settleAt — a die whose ceremony is still running has roll.done
+    // false; the gate above skips it, so settleAt stays 0 and cadence
+    // begins from t=0 the frame AFTER ceremonyFinish flips roll.done.
+    if (r.settleAt === 0) r.settleAt = now;
+    const t = (now - r.settleAt) / 1000; // seconds
+    const rec = r.recipe;
+    if (r.kind === 'swell') {
+      const wy = TWO_PI / rec.yPeriodS;
+      const wr = TWO_PI / rec.rollPeriodS;
+      d.mesh.position.copy(d.finalPos);
+      d.mesh.position.y += rec.yAmpM * Math.sin(t * wy + r.seedA);
+      const angle = rec.rollAmpRad * Math.sin(t * wr + r.seedB);
+      TMP_AXIS.set(1, 0, 0);
+      TMP_QUAT.setFromAxisAngle(TMP_AXIS, angle);
+      d.mesh.quaternion.copy(d.finalQuat).premultiply(TMP_QUAT);
+    } else if (r.kind === 'creak') {
+      const wa = TWO_PI / rec.periodAS;
+      const wb = TWO_PI / rec.periodBS;
+      const ax = rec.ampRad * Math.sin(t * wa + r.seedA);
+      const ay = rec.ampRad * Math.sin(t * wb + r.seedB);
+      d.mesh.position.copy(d.finalPos); // creak is orientation only
+      TMP_AXIS.set(1, 0, 0);
+      TMP_QUAT.setFromAxisAngle(TMP_AXIS, ax);
+      d.mesh.quaternion.copy(d.finalQuat).premultiply(TMP_QUAT);
+      TMP_AXIS.set(0, 0, 1);
+      TMP_QUAT.setFromAxisAngle(TMP_AXIS, ay);
+      d.mesh.quaternion.premultiply(TMP_QUAT);
+    } else if (r.kind === 'settle-tick') {
+      if (r.tickAt === 0) {
+        const frac = r.seedA / TWO_PI; // reuse phase seed as [0,1) delay
+        r.tickAt = r.settleAt + rec.delayMinMs + frac * (rec.delayMaxMs - rec.delayMinMs);
+      }
+      const elapsed = now - r.tickAt;
+      if (elapsed < 0) continue; // still waiting for our moment
+      if (elapsed > rec.tailMs) {
+        // Snap authoritatively back to the archive pose and go dark
+        // forever — a later whisk/sink reads a known-clean transform.
+        r.done = true;
+        d.mesh.position.copy(d.finalPos);
+        d.mesh.quaternion.copy(d.finalQuat);
+        continue;
+      }
+      const u = elapsed / rec.tailMs;
+      const env = Math.sin((1 - u) * (Math.PI / 2)); // 1 at tick, 0 at tail end
+      d.mesh.position.copy(d.finalPos);
+      d.mesh.position.y += rec.posBumpM * env;
+      TMP_AXIS.set(0, 1, 0);
+      TMP_QUAT.setFromAxisAngle(TMP_AXIS, rec.yawRad * env);
+      d.mesh.quaternion.copy(d.finalQuat).premultiply(TMP_QUAT);
+    }
+  }
+}
+
+
 // The physics world is only stepped inside playRoll's synchronous
 // fast-forward; the rAF loop just advances keyframe playback.
 function tick(dt, render = true) {
@@ -3760,6 +3892,7 @@ function tick(dt, render = true) {
   stepPlayback(dt);
   stepSinking(dt);   // per-roll Done departures (§7.5)
   stepWhisking(dt);  // collect whisks onto the shelf (§7.7)
+  stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
   stepRevealing(dt); // reveal correction flips (goal 11)
   if (chips.length) positionChips();
   if (shelfClusters.size) positionShelfMarkers();
@@ -4056,6 +4189,36 @@ window.__diceDebug = {
       variant: d.variant || (d.shrouded ? 'shroud' : 'std'),
       rollId: d.rollId || null,
     }));
+  },
+  // Slice 3 assertion surface: per-die cadence state + the LIVE deltas
+  // (mesh pose minus the frozen archive pose) that let a scenario prove
+  // "sea-glass swells", "sap-amber does not shift", "scrimshaw settles
+  // once then never again". No RNG — deterministic across clients.
+  restInfo(rollId = null) {
+    const dice = rollId ? tableDice.filter((d) => d.rollId === rollId) : tableDice;
+    return dice.map((d) => {
+      const r = d.rest || null;
+      const fp = d.finalPos;
+      const fq = d.finalQuat;
+      const deltaY = fp ? d.mesh.position.y - fp.y : 0;
+      let tiltRad = 0;
+      if (fq) {
+        // tiny quat delta from finalQuat, expressed as absolute rotation
+        // angle. |dot| clamped to [0,1] to guard against slerp round-off.
+        const q = d.mesh.quaternion;
+        const dot = Math.abs(q.x * fq.x + q.y * fq.y + q.z * fq.z + q.w * fq.w);
+        tiltRad = 2 * Math.acos(Math.min(1, Math.max(0, dot)));
+      }
+      return {
+        rollId: d.rollId || null,
+        variant: d.variant || null,
+        kind: r ? r.kind : null,
+        settleAt: r ? r.settleAt : 0,
+        done: r ? !!r.done : true,
+        deltaY,
+        tiltRad,
+      };
+    });
   },
   // Level 4 assertion surface: live felt marks, marks ever laid (the
   // sim() clock can age live ones out mid-test), the kill-switch

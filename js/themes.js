@@ -82,6 +82,27 @@
 //   `ring` {amp, jolt?, speed?} fires ONE screen-space shock wave from a
 //   roll's hardest recorded impact (negative amp implodes — Umbra);
 //   `shimmer` {radius, strength} wobbles the air above the settled die.
+// · `rest` — the settled-die cadence (Slice 3, Joe 2026-08-04): sub-mm
+//   motion at rest on the FELT that says "this material is buoyant /
+//   creaking / sealed / remembering" without any new textures or lights.
+//   Mesh transforms only (physics untouched, face-correction untouched;
+//   number always reads). Shelved dice never cadence — the shelf is the
+//   archive. Kinds:
+//     'swell'       {yAmpM, yPeriodS, rollAmpRad, rollPeriodS} — sine
+//                   Y drift + tiny world-X roll on incommensurate periods
+//                   (seaglass: nothing under water sits still).
+//     'creak'       {ampRad, periodAS, periodBS} — two-axis Lissajous
+//                   orientation drift; both return to origin at LCM
+//                   (heartwood: living wood relaxes).
+//     'still'       IDENTITY assertion — the set explicitly declares
+//                   stillness (sapamber: sealed resin does not shift).
+//                   Reject `rest: null` for the same slot — the sentinel
+//                   makes "this quiet is on purpose" visible.
+//     'settle-tick' {delayMinMs, delayMaxMs, posBumpM, yawRad, tailMs} —
+//                   one small kinematic adjustment ~200-400 ms after
+//                   landing, then genuinely still forever (scrimshaw:
+//                   it remembers).
+//   Sets without `rest` do not cadence — same channel as decal defaults.
 
 export const THEMES = {
   // THE CLASSICS — the honest option (Joe 2026-08-04). Unadorned dice for
@@ -168,6 +189,17 @@ export const THEMES = {
         decal: { kind: 'ring', colors: ['#071e22', '#a8dcd2'] }, // machinery only — kill-switch off
         post: { bloom: true }, // the biolume rim burns soft in the dark
         sound: { body: 'chime', weight: 0.15, sustain: 40 },
+        // swell (Slice 3, 2026-08-04): a settled die drifts a slow
+        // ±1.5 mm Y sine with a paired ±0.3° world-X roll on
+        // incommensurate periods — nothing under water sits still, and
+        // the number never leaves readable.
+        rest: {
+          kind: 'swell',
+          yAmpM: 0.0015,
+          yPeriodS: 2.6,
+          rollAmpRad: 0.00524,
+          rollPeriodS: 3.1,
+        },
       },
     },
   },
@@ -192,6 +224,16 @@ export const THEMES = {
         // vine catch: the last 15% of the roll retimes to 0.55× — the die
         // decelerates unnaturally and settles soft, as if the forest caught it
         rate: { rate: 0.55, window: 0.15 },
+        // creak (Slice 3, 2026-08-04): ≤0.4° per-axis drift on two
+        // incommensurate periods; both sin terms hit zero together
+        // every LCM(2, 3) = 6 s so the die visibly relaxes through
+        // its origin — living wood is never quite done settling.
+        rest: {
+          kind: 'creak',
+          ampRad: 0.00698,
+          periodAS: 2.0,
+          periodBS: 3.0,
+        },
       },
       sapamber: {
         label: 'Sap Amber',
@@ -205,6 +247,12 @@ export const THEMES = {
         // no particles: sealed resin sheds nothing — the stillness reads as polish
         geo: { bevel: 0.1, profile: 'round', pillow: 0.5 }, // poured, never cut: a soft lozenge
         sound: { body: 'chime', weight: 0.2, sustain: 12 }, // shorter/drier chime — sealed
+        // still (Slice 3, 2026-08-04): IDENTITY assertion — sealed
+        // resin does not shift, and its silence is meaningful only in
+        // contrast to heartwood's creak in the same house. The 'still'
+        // sentinel (not a missing key) is what makes the declaration
+        // visible to a code reader and to restInfo().
+        rest: { kind: 'still' },
       },
     },
   },
@@ -395,6 +443,18 @@ export const THEMES = {
         geo: { bevel: 0.1, profile: 'round', wear: 0.45, pillow: 0.25, nicks: 4 }, // a century of hands
         decal: { kind: 'smudge', colors: ['#e8dcc0', '#c9b896'], scale: 0.85 }, // machinery only — kill-switch off
         sound: { body: 'clack', weight: 0.55, sustain: 25 }, // hollow bone
+        // settle-tick (Slice 3, 2026-08-04): one small kinematic
+        // adjustment ~200-400 ms after landing — a brief lift + yaw
+        // that decays back to the archive pose in 80 ms and never
+        // returns. "It remembers, then is genuinely still forever."
+        rest: {
+          kind: 'settle-tick',
+          delayMinMs: 200,
+          delayMaxMs: 400,
+          posBumpM: 0.0003,
+          yawRad: 0.00698,
+          tailMs: 80,
+        },
       },
     },
   },

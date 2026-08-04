@@ -3578,6 +3578,80 @@ export const scenarios = [
     },
   },
   {
+    name: 'rest-cadence',
+    tags: ['themes'],
+    // Slice 3: settled-on-felt dice cadence per set — sea-glass swells,
+    // sap-amber declares stillness (identity, not omission), and shelved
+    // dice never cadence (the shelf is the archive, mirroring the S3
+    // bloom leak fix).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+
+      // Sap-amber: 'still' is a declared identity — no drift, no tilt,
+      // even after seconds of settled time.
+      await a.eval(`window.__diceDebug.setDiceSet('wildwood.sapamber')`);
+      await a.roll('1d20 # still');
+      await a.settle();
+      await a.dbg('sim(180)'); // 3 s of settled time
+      const stillInfo = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.restInfo())`));
+      assert.equal(stillInfo.length, 1, 'one die at rest');
+      assert.equal(stillInfo[0].kind, 'still', 'sapamber declares still on purpose');
+      assert.equal(stillInfo[0].deltaY, 0, 'sapamber does not drift');
+      assert.equal(stillInfo[0].tiltRad, 0, 'sapamber does not tilt');
+
+      // Sea-glass: SWELLS — motion must appear in the sample window, and
+      // the tilt must stay within the readable envelope (< 0.006 rad,
+      // ~0.34°) so the number never leaves readable.
+      await a.dbg('clearTable()');
+      await a.waitFor(`window.__diceDebug.tableDice.length === 0`, { desc: 'felt clears' });
+      await a.eval(`window.__diceDebug.setDiceSet('tidewrack.seaglass')`);
+      await a.roll('1d20 # swell');
+      await a.settle();
+      let sawDrift = false;
+      let maxTilt = 0;
+      // Sample across ~3.4 s (covers the 2.6 s Y period AND the 3.1 s
+      // roll period, so a die caught at a zero crossing on one axis
+      // still shows motion on the other).
+      for (let i = 0; i < 20; i++) {
+        await a.dbg('sim(10)'); // 1/6 s per sample
+        const info = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.restInfo())`));
+        if (!info.length) continue;
+        if (info[0].kind !== 'swell') continue;
+        if (Math.abs(info[0].deltaY) > 1e-5) sawDrift = true;
+        if (info[0].tiltRad > maxTilt) maxTilt = info[0].tiltRad;
+      }
+      assert.ok(sawDrift, 'sea-glass swells (measurable Y drift)');
+      assert.ok(maxTilt < 0.006, `sea-glass stays readable (max tilt ${maxTilt} rad < 0.006)`);
+
+      // Shelf gate: a collected sea-glass die goes STILL (the shelf is
+      // the archive — same predicate as the S3 bloom leak fix).
+      const rid = await a.rollId();
+      await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        { desc: 'roll shelved, whisk done' },
+      );
+      await a.dbg('sim(60)'); // 1 s of shelf-side "rest"
+      const shelfBefore = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.restInfo(${JSON.stringify(rid)}))`));
+      assert.ok(shelfBefore.length >= 1, 'the shelved die is still tracked');
+      await a.dbg('sim(60)'); // another 1 s
+      const shelfAfter = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.restInfo(${JSON.stringify(rid)}))`));
+      // Cadence writes mesh.position.y every frame; if the shelf gate
+      // holds, deltaY (mesh minus finalPos) is a fixed whisk-to-shelf
+      // offset that does not move between two samples 1 s apart. Sea-
+      // glass's Y period is 2.6 s, so a running swell would shift Y
+      // by up to ~1 mm across that window.
+      for (let i = 0; i < shelfAfter.length; i++) {
+        assert.equal(shelfAfter[i].kind, 'swell', 'shelved die keeps its recipe kind');
+        assert.equal(
+          shelfAfter[i].deltaY,
+          shelfBefore[i].deltaY,
+          'shelf gate holds — cadence never wrote to the mesh',
+        );
+      }
+    },
+  },
+  {
     name: 'themed-chrome',
     tags: ['themes'],
     // §9 chrome art: 2D die chips are baked portraits of the real meshes
