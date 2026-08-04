@@ -2962,6 +2962,13 @@ function beginRevealFlip(rollId, entry) {
     if (revealSet && revealSet.post && revealSet.post.bloom) d.mesh.userData.bloom = true;
     const lightRecipe = revealSet ? revealSet.light : null;
     if (lightRecipe) dieLights.attach(d.mesh, lightRecipe, lightRng);
+    // Rest cadence follows the SET, and reveal changed the set — a shrouded
+    // die's cadence was locked to shroud (no recipe → still forever). Re-init
+    // so a hidden-then-revealed felt die actually breathes with its true
+    // set's cadence (seaglass swells, heartwood creaks). Caught by the Slice
+    // 3 adversarial pass. Uses the roll's own dice index so seeds match
+    // every client rendering this reveal.
+    initRest(d, { rollId }, i);
     const p = entry.parts[i];
     const value = p && p.value != null ? p.value : null;
     const q = d.body.quaternion;
@@ -3786,8 +3793,13 @@ function initRest(d, roll, i) {
   const recipe = setId && SETS[setId] ? SETS[setId].rest : null;
   if (!recipe || recipe.kind === 'still') {
     // { kind: 'still', done: true } short-circuits inside stepResting's hot
-    // loop — one pointer check per die per frame.
-    d.rest = { kind: 'still', done: true };
+    // loop — one pointer check per die per frame. `declared` distinguishes
+    // sapamber's explicit rest:{kind:'still'} (identity assertion — sealed
+    // resin does not shift, sibling heartwood cadences) from a set with no
+    // rest recipe at all (classics, deepglacier, shroud). Only the
+    // sentinel-carrying case reads through restInfo — code review and
+    // debug dumps see WHICH still it is.
+    d.rest = { kind: 'still', done: true, declared: !!(recipe && recipe.kind === 'still') };
     return;
   }
   const key = `${roll.rollId || 'local'}:${i}`;
@@ -4213,6 +4225,12 @@ window.__diceDebug = {
         rollId: d.rollId || null,
         variant: d.variant || null,
         kind: r ? r.kind : null,
+        // declared: true when the set's recipe explicitly said rest:{kind:
+        // 'still'} (sapamber's identity assertion). false when the set has
+        // no rest recipe at all (classics, deepglacier, shroud) and the
+        // runtime collapsed to the same sentinel. Both render identically;
+        // only this flag distinguishes them for tests + debug dumps.
+        declared: r ? !!r.declared : false,
         settleAt: r ? r.settleAt : 0,
         done: r ? !!r.done : true,
         deltaY,
