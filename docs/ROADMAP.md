@@ -232,7 +232,7 @@ gained air so 'You' reads as the rack's header. e2e: side-panel (tags
 the split; stills in tools/out/side-panel/.
 
 ### 2i. THE SOUL DEAL AUDIT — reveal read, chrome consistency, material,
-labs (2026-08-04) — FINDINGS BACKLOG, nothing shipped
+labs (2026-08-04) — families A+B SHIPPED same day; C–F open
 
 Joe asked for a UI audit of the left panel, the reveal panel, the collect
 peek, and the check/cinematic screens under Your Soul Deal, with
@@ -245,8 +245,14 @@ is runtime CSS injection only; full findings JSON sits beside the
 stills). Severity S1–S5; each finding keeps its audit id.
 
 **A · The reveal read (banner · peek · verdict share renderOutcomeRows)
-— the LEDGER family.** The 2e pool-row structure is right; the layout
-strangles it:
+— the LEDGER family. SHIPPED 2026-08-04 (`2631702`)**: the grid ledger
+(oc-ledger label spine, per-pool .oc-cell hanging indent), layout-owned
+chip gap with the copyable space kept, the exactly-once silence rule
+(in-chip dash beside worded dice, one restyled 'quiet' for an all-quiet
+pool), header demoted to a wrapping identity caption, oc-solo hero
+scale for one-die rolls, reduced-strength tier borders, and B's ring
+fold rode along (a hidden roll keeps the ring as its face-down stage).
+Pinned by the `ledger-read` e2e. The findings as audited:
 
 - S5 `chip-fusion` — `.oc-chip` is inline-flex, so the whitespace box
   between die evidence and word collapses: "d6 1Fail", "d10 10Critical
@@ -284,7 +290,13 @@ strangles it:
   (the CSS-table prototype centers them), and an all-quiet pool must
   not double-mark (dash + word).
 
-**B · The ceremony cards.**
+**B · The ceremony cards. SHIPPED 2026-08-04 (`0ef95d5`; the ring fold
+in `2631702`)**: intent card speaks its pools (spec.sources through
+canonicalNotation), the verdict action row joins the rest-dim grammar
+(the last invisible→visible holdout), chips keep lowercase mono under
+the hero dress, and the hero's flanking hairlines fold under rows (as
+generated content they'd have joined the ledger grid as stray items and
+sheared the label column). The findings as audited:
 
 - S4 `empty-verdict-ring` (lead b) — under Soul Deal the verdict ring is
   a giant empty gold circle: main.js ~L3397 sets the center to `''`
