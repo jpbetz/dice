@@ -435,6 +435,10 @@ const PATTERNS = {
   },
 };
 
+// The painter names, for the lab's set builder selects (dev chrome only —
+// nothing in the app enumerates painters at runtime).
+export const PATTERN_IDS = Object.keys(PATTERNS);
+
 // Sobel a height sketch into a tangent-space normal map. LINEAR data — no
 // sRGB tag (that would bend the vectors).
 function heightToNormal(heightCanvas, strength) {
@@ -901,8 +905,10 @@ function buildDie(type, variant = 'std') {
   // fields. (Cherry-picking recipe fields here bit twice: .maps and then
   // .shader were silently dropped and their features no-opped while
   // looking implemented.)
+  // A set may omit body/text to inherit the std per-type colors (the lab's
+  // GEO BENCH judges edge recipes on otherwise-standard dice).
   const skin = shroud ? { ...def, color: SHROUD_COLOR }
-    : theme ? { ...def, ...theme, color: theme.body, text: theme.text }
+    : theme ? { ...def, ...theme, color: theme.body ?? def.color, text: theme.text ?? def.text }
     : def;
   // The BASE polyhedron drives faces, values and the physics hull; the mesh
   // the player sees is its beveled twin (render only — see buildBeveledGeometry).
@@ -963,8 +969,9 @@ function buildDie(type, variant = 'std') {
     color: edgeColor,
     roughness: shroud ? 0.16 : (skin.feel ? skin.feel.rough : 0.3),
     metalness: shroud ? 0.5 : (skin.feel ? skin.feel.metal : 0.1),
-    // same environment rule as the faces: std/shroud stay a whisper
-    envMapIntensity: theme ? (theme.spec && theme.spec.envMapIntensity) ?? 1 : 0.35,
+    // same environment rule as the faces (materialFor's house clamp):
+    // std/shroud AND house-less lab sets stay a whisper
+    envMapIntensity: skin.house ? ((skin.spec && skin.spec.envMapIntensity) ?? 1) : 0.35,
   }));
 
   const shape = buildShape(faces);
@@ -1032,6 +1039,24 @@ export function getDie(type, variant = 'std') {
   const key = `${type}|${variant}`;
   if (!cache.has(key)) cache.set(key, buildDie(type, variant));
   return cache.get(key);
+}
+
+// Evict one variant's cached builds and free their GPU resources — the lab's
+// SET BUILDER re-registers its recipe and rebuilds live. Callers must drop
+// every mesh wearing the variant BEFORE busting (disposed textures render
+// blank). The app itself never edits a recipe in place, so nothing outside
+// the lab calls this.
+export function bustDie(variant) {
+  for (const type of DIE_TYPES) {
+    const entry = cache.get(`${type}|${variant}`);
+    if (!entry) continue;
+    cache.delete(`${type}|${variant}`);
+    entry.geometry.dispose();
+    for (const m of entry.materials) {
+      for (const t of [m.map, m.emissiveMap, m.normalMap, m.roughnessMap]) t && t.dispose();
+      m.dispose();
+    }
+  }
 }
 
 export function createDieMesh(type, variant = 'std') {

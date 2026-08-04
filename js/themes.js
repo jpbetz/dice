@@ -494,3 +494,12 @@ for (const [houseId, house] of Object.entries(THEMES)) {
   }
 }
 export const SET_IDS = Object.keys(SETS);
+
+// Lab-only seam: the DICE LAB registers its GEO BENCH rows and the live
+// SET BUILDER into THIS page's registry at load (module state is
+// per-page, so the main table never sees them). SET_IDS — the published
+// picker list — is frozen above and deliberately not extended here.
+export function registerSet(id, recipe) {
+  SETS[id] = recipe;
+  return SETS[id];
+}
