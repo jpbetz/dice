@@ -1771,34 +1771,73 @@ function playRoll(roll) {
   });
   const keyframes = dice.map((d) => [snapshot(d)]);
 
-  let stillTime = 0;
+  // Perf pass §0a (Commit A — per-die settle): each die freezes into a STATIC
+  // mass-0 body the moment it lands clean, so a group of 40 dice no longer
+  // waits on the slowest tumbler and its keyframe array stops allocating.
+  // The cached `frozenPose` is shared BY REFERENCE across every subsequent
+  // push, preserving the invariant that `keyframes[i].length` is uniform and
+  // `kf[kf.length - 1]` is the final pose — face correction runs unchanged.
+  // Cocked dice stay dynamic (their `stillTime` triggers the same nudge
+  // branch); SETTLE_CAP is retained as last-resort safety at the group level.
+  dice.forEach((d) => { d.stillTime = 0; d.frozen = false; d.frozenPose = null; });
+
+  const freezeInPlace = (d) => {
+    d.body.velocity.setZero();
+    d.body.angularVelocity.setZero();
+    d.body.mass = 0;
+    d.body.type = CANNON.Body.STATIC;
+    d.body.updateMassProperties();
+    d.body.sleep(); // belt + suspenders; SAP-friendly
+    d.frozen = true;
+    d.frozenPose = snapshot(d); // reused every subsequent step; no alloc
+  };
+
   let nudges = 0;
   for (;;) {
     world.step(FIXED_DT);
     simTime += FIXED_DT;
-    dice.forEach((d, i) => keyframes[i].push(snapshot(d)));
 
-    const still = dice.every(
-      (d) => d.body.velocity.lengthSquared() < 0.05 && d.body.angularVelocity.lengthSquared() < 0.05
-    );
-    stillTime = still ? stillTime + FIXED_DT : 0;
-    if (stillTime < SETTLE_STILL && simTime < SETTLE_CAP) continue;
+    // Per-die stillness accumulator + freeze test. Thresholds match the old
+    // group predicate verbatim (do NOT tune here). Cocked dice never freeze —
+    // they stay dynamic until the nudge branch below lands them clean or
+    // SETTLE_CAP fires.
+    for (const d of dice) {
+      if (d.frozen) continue;
+      const stillNow =
+        d.body.velocity.lengthSquared() < 0.05 &&
+        d.body.angularVelocity.lengthSquared() < 0.05;
+      d.stillTime = stillNow ? d.stillTime + FIXED_DT : 0;
+      if (d.stillTime >= SETTLE_STILL) {
+        const r = readValue(d.type, d.body.quaternion);
+        const cocked = r.dot < (d.type === 'd4' ? 0.9 : 0.82);
+        if (!cocked) freezeInPlace(d);
+      }
+    }
 
-    // cocked dice (leaning on a wall or another die): nudge and keep going
-    const cocked = dice.filter((d) => {
-      const r = readValue(d.type, d.body.quaternion);
-      return r.dot < (d.type === 'd4' ? 0.9 : 0.82);
-    });
-    if (cocked.length && nudges < 3 && simTime < SETTLE_CAP) {
-      nudges++;
-      stillTime = 0;
-      for (const d of cocked) {
-        d.body.wakeUp();
-        d.body.velocity.set((rng() - 0.5) * 4, 7, (rng() - 0.5) * 4);
-        d.body.angularVelocity.set((rng() - 0.5) * 14, (rng() - 0.5) * 14, (rng() - 0.5) * 14);
+    dice.forEach((d, i) => keyframes[i].push(d.frozen ? d.frozenPose : snapshot(d)));
+
+    const allSettled = dice.every((d) => d.frozen);
+    if (!allSettled && simTime < SETTLE_CAP) {
+      // Nudge cocked dice that have accumulated enough stillTime to be judged
+      // stuck. Frozen bodies are STATIC — filter them out (waking a static is
+      // a no-op at best, a determinism hazard at worst).
+      const cocked = dice.filter((d) => !d.frozen && d.stillTime >= SETTLE_STILL);
+      if (cocked.length && nudges < 3) {
+        nudges++;
+        for (const d of cocked) {
+          d.body.wakeUp();
+          d.body.velocity.set((rng() - 0.5) * 4, 7, (rng() - 0.5) * 4);
+          d.body.angularVelocity.set((rng() - 0.5) * 14, (rng() - 0.5) * 14, (rng() - 0.5) * 14);
+          d.stillTime = 0;
+        }
       }
       continue;
     }
+    // SETTLE_CAP fired with dice still dynamic → force-freeze so the block
+    // below has a stable pose to correct. Same STATIC/mass=0 transition the
+    // clean-landing branch uses; face correction rotates each to its
+    // server-declared value regardless of the pre-freeze orientation.
+    for (const d of dice) if (!d.frozen) freezeInPlace(d);
     break;
   }
   for (const d of dice) d.body.removeEventListener('collide', recordCollision);
