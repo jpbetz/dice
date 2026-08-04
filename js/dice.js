@@ -988,6 +988,11 @@ export function createDieMesh(type, variant = 'std') {
   const mesh = new THREE.Mesh(die.geometry, die.materials);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
+  // Level 5 (js/post.js): sets with emissive identity are bloom SOURCES —
+  // the selective-bloom mask renders only flagged meshes, so a std or
+  // shrouded die can never bloom by construction.
+  const skin = variant !== 'std' && variant !== 'shroud' ? SETS[variant] : null;
+  if (skin && skin.post && skin.post.bloom) mesh.userData.bloom = true;
   return mesh;
 }
 

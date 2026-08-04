@@ -115,6 +115,9 @@ export class ParticleField {
     });
     this.points = new THREE.Points(g, this.material);
     this.points.frustumCulled = false; // one pool spans the whole scene
+    // Level 5: particles are additive glow by nature, so the pool is a
+    // bloom source; the threshold pass trims the dim kinds (dust, fog).
+    this.points.userData.bloom = true;
     scene.add(this.points);
   }
 

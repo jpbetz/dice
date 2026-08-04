@@ -58,6 +58,12 @@
 //   range, mode: 'wave'|'breathe'|'flicker'|'steady'}. Fixed budget of 4
 //   table-wide (js/dielights.js steals oldest); negative intensity pools
 //   shadow instead. Sets without either shed and cast NOTHING on purpose.
+// · `post` (Level 5, js/post.js — amplification only): `bloom: true`
+//   marks the set's dice as bloom SOURCES (whatever Levels 1-2 made
+//   bright is exactly what burns — there is no strength knob here);
+//   `ring` {amp, jolt?, speed?} fires ONE screen-space shock wave from a
+//   roll's hardest recorded impact (negative amp implodes — Umbra);
+//   `shimmer` {radius, strength} wobbles the air above the settled die.
 
 export const THEMES = {
   tidewrack: {
@@ -75,6 +81,7 @@ export const THEMES = {
         geo: { bevel: 0.13, profile: 'round', wear: 0.6, pillow: 0.3 }, // decades in the surf: fully tumbled
         decal: { kind: 'ring', colors: ['#071e22', '#a8dcd2'] }, // sea-wet glass: the felt darkens, dries to a tide-line
         light: { color: '#58e6d9', intensity: 14, range: 7, mode: 'wave' }, // biolume: teal on its patch of felt
+        post: { bloom: true }, // the biolume rim burns soft in the dark
       },
     },
   },
@@ -110,6 +117,8 @@ export const THEMES = {
         spec: { clearcoat: 0.85, clearcoatRoughness: 0.22, ior: 1.55, envMapIntensity: 1.1 }, // polished resin
         // no particles: sealed resin sheds nothing — the stillness reads as polish
         geo: { bevel: 0.1, profile: 'round', pillow: 0.5 }, // poured, never cut: a soft lozenge
+        // no post: its 0.09 glow sits under the bloom threshold anyway, and
+        // a corona would argue with the house claim — stillness IS the polish
       },
     },
   },
@@ -129,6 +138,7 @@ export const THEMES = {
         geo: { bevel: 0.03, nicks: 2 }, // fulgurite: razor facets, fracture chips
         // no decal: glass leaves no residue — the LIGHT is its mark
         light: { color: '#b8a8ff', intensity: 20, range: 8, mode: 'flicker' }, // charge seeking a path
+        post: { bloom: true, ring: { amp: 9, jolt: 2 } }, // DISCHARGE POP: the bottled storm grounds through the table
       },
     },
   },
@@ -151,6 +161,7 @@ export const THEMES = {
         geo: { bevel: 0.075, profile: 'round', wear: 0.15 }, // melt-softened edges
         // glacial mass: the bloom is WIDE and slow to leave. No light — ice does not emit.
         decal: { kind: 'frost', colors: ['#dceefc', '#7fb4d8'], scale: 1.35, life: 10 },
+        post: { bloom: true }, // the aurora sheen carries at grazing angles
       },
       firstfrost: {
         label: 'First Frost',
@@ -191,6 +202,9 @@ export const THEMES = {
         geo: { bevel: 0.1, wear: 0.2, nicks: 3 }, // forged: wide flat chamfers, hammer-marked
         decal: { kind: 'scorch', colors: ['#070402', '#ff8c42'] }, // hot iron kisses the felt: ember rim cooling to soot
         light: { color: '#ff8c42', intensity: 16, range: 6.5, mode: 'breathe' }, // the molten interior, breathing
+        // ANVIL SLAM: one decisive table jolt off the hardest landing, then
+        // the air above the settled iron keeps wobbling — mass and heat
+        post: { bloom: true, ring: { amp: 6, jolt: 2.5, speed: 1100 }, shimmer: { radius: 2.2, strength: 1.5 } },
       },
     },
   },
@@ -215,6 +229,7 @@ export const THEMES = {
         geo: { bevel: 0.02 }, // lapidary-cut: the facets ARE the discipline
         // no decal: a focus leaves no residue — containment is the point
         light: { color: '#7fd9e8', intensity: 10, range: 5, mode: 'steady' }, // the containment hum, held
+        post: { bloom: true }, // contained power reads as a clean corona
       },
     },
   },
@@ -240,6 +255,9 @@ export const THEMES = {
         // no decal: what it unmakes is GONE, not marked. The light is
         // negative — Umbra pools local shadow instead of dimming the world.
         light: { color: '#ffffff', intensity: -8, range: 4.8, mode: 'breathe' },
+        // the discharge runs BACKWARD: an implosion ring (negative amp) —
+        // the witchlight digits bloom, the body gives nothing
+        post: { bloom: true, ring: { amp: -7 } },
       },
     },
   },

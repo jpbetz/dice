@@ -29,6 +29,7 @@ import { THEMES, SETS, SET_IDS } from './themes.js';
 import { ParticleField } from './particles.js';
 import { DecalField } from './decals.js';
 import { DieLightRig } from './dielights.js';
+import { PostStack } from './post.js';
 
 const ROWS = ['std', ...SET_IDS];
 const COL_STEP = 2.5;
@@ -89,6 +90,10 @@ const field = new ParticleField(scene);
 // rig's coupon is the felt they act on. Budget of 2 lights: it's a rig.
 const decals = new DecalField(scene);
 const dieLights = new DieLightRig(scene, { max: 2 });
+
+// Level 5: the lab renders through the post stack ALWAYS (the main table
+// bypasses when nothing glows; here the stack itself is under review).
+const post = new PostStack(renderer);
 
 const ENVS = {
   table: { label: '☀ env: table', amb: 0.55, key: 1.15, bg: 0x14100c },
@@ -174,6 +179,8 @@ function frameCamera() {
   camera.lookAt(0, 0, 0);
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  const px = renderer.getDrawingBufferSize(new THREE.Vector2());
+  post.setSize(px.x, px.y);
 }
 window.addEventListener('resize', frameCamera);
 frameCamera();
@@ -431,11 +438,17 @@ function startDrop(row) {
     if (decalRecipe && v >= 4) {
       drop.stamps += decals.stamp(decalRecipe, [at[0], floor.position.y + 0.012, at[2]], v, rng);
     }
+    // Level 5: ONE shock ring per drop, off the first hard landing
+    const postRec = row.recipe && row.recipe.post;
+    if (postRec && postRec.ring && v >= 10 && !drop.rang) {
+      drop.rang = true;
+      post.ring(at, camera, postRec.ring);
+    }
   });
   body.addEventListener('sleep', () => {
     if (drop && drop.body === body) drop.sleepAt = performance.now();
   });
-  drop = { mesh, body, floor, rails, coupon, row, born: performance.now(), sleepAt: 0, contacts: 0, bursts: 0, stamps: 0 };
+  drop = { mesh, body, floor, rails, coupon, row, born: performance.now(), sleepAt: 0, contacts: 0, bursts: 0, stamps: 0, rang: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -563,7 +576,13 @@ function tick(now) {
   field.tick(dt, now / 1000);
   decals.tick(dt);
   dieLights.tick(dt, now / 1000);
-  renderer.render(scene, camera);
+  // Level 5: heat shimmer follows the drop die of a shimmer set (air
+  // wobbles over hot iron); everything renders through the stack.
+  const shim = drop && drop.row.recipe && drop.row.recipe.post && drop.row.recipe.post.shimmer;
+  post.setShimmer(shim
+    ? [{ at: drop.mesh.position.toArray(), radius: shim.radius, strength: shim.strength }]
+    : [], camera);
+  post.render(scene, camera, dt);
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
@@ -642,6 +661,10 @@ window.__lab = {
   decalCount() { return decals.count(); },
   decalDump() { return decals.dump(); },
   lightInfo() { return dieLights.info(); },
+  // Level 5 diagnostics: what the stack did last frame + monotonic rings.
+  postInfo() {
+    return { bloomSources: post.lastBloomSources, rings: post.ringsFired, shimmer: post.shimmer.length };
+  },
   // Average framebuffer RGB around a projected WORLD point (the decal
   // cousin of __labSample): pins "what color IS that mark" to numbers.
   sampleWorld(p, half = 6) {
