@@ -489,38 +489,81 @@ export const scenarios = [
   {
     name: 'ceremony-retire',
     tags: ['roll', 'ceremony'],
-    // A check roll's verdict card times out into the plain-roll banner: the
-    // dice still on the felt keep the ONE card action set — the ROLL ❯❯❯
-    // strip and the clear-✕, both revealed-tier (the card's auto-dismiss
-    // used to strand them with no affordance at all; Done itself retired
-    // 2026-08-01 — auto-collect owns the idle path).
+    // THE FLOW TO COLLECTED (Joe 2026-08-04: 'cinematics have too many
+    // stages… no ✕ and Done — just flow to collected'): the ceremony's
+    // verdict card is a FOLDED CARD — its BODY is the role-split clear
+    // target (the normal-reveal grammar), the fold holds REROLL/Reveal —
+    // and its clock hands the roll STRAIGHT to the shelf. The banner
+    // stage between card and shelf is gone; a hidden card stands until
+    // its reveal.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      // Race-proof staging: back-to-back ceremonies can read the PREVIOUS
+      // roll's phase:'done' before the new roll's SSE arrives — gate on
+      // the roll id changing first, then skip the new moment through.
+      const staged = async (prev) => {
+        await a.waitFor(
+          `((window.__diceDebug.currentRoll || {}).rollId || null) !== ${JSON.stringify(prev)}`
+          + ` && !!(window.__diceDebug.currentRoll || {}).ceremony`,
+          { desc: 'the new ceremony arrived' },
+        );
+        await a.waitFor(
+          `(window.__diceDebug.skipCeremony(), window.__diceDebug.sim(30), (window.__diceDebug.ceremonyState || {}).phase === 'done')`,
+          { desc: 'verdict staged' },
+        );
+      };
+
       await a.dbg(`commandRoll('d20 check dc10')`);
-      await a.waitFor(
-        `(window.__diceDebug.skipCeremony(), window.__diceDebug.sim(30), (window.__diceDebug.ceremonyState || {}).phase === 'done')`,
-        { desc: 'verdict staged' },
-      );
-      assert.equal(await a.dbg('retireCeremony()'), true, 'the card retires into the banner');
+      await staged(null);
+      const rid1 = await a.rollId();
+      // the card family: no Done, no ✕ — the body is the one big target
+      assert.equal(await a.eval(`!!document.querySelector('#verdict-card .clear-x')`), false,
+        'no ✕ on the ceremony card');
       assert.ok(!(await a.eval(
-        `[...document.querySelectorAll('#banner-actions button')].some((b) => b.textContent === 'Done')`,
-      )), 'Done is retired — auto-collect owns the idle path');
-      assert.ok(await a.eval(`!!document.querySelector('#banner-actions .pk-strip.reveal-tier')`),
-        'the REROLL strip waits in the fold');
-      // The folded card (2026-08-03): the ✕ retired from the banner — the
-      // BODY is the one big clear target, and the fold never wears red.
-      assert.equal(await a.eval(`!!document.querySelector('#result-banner .clear-x')`), false,
-        'no ✕ on the folded card — the body is the target');
-      assert.equal(await a.eval(`document.getElementById('result-banner').dataset.act`), 'clear',
+        `[...document.querySelectorAll('#verdict-card button')].some((b) => b.textContent === 'Done')`,
+      )), 'no Done either — the clock owns the idle path');
+      assert.equal(await a.eval(`document.getElementById('verdict-card').dataset.act`), 'clear',
         "the roller's body act is CLEAR");
-      const rid = await a.rollId();
-      assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, 'collect accepted');
+      assert.ok(await a.eval(`!!document.querySelector('#verdict-fold .pk-strip')`),
+        'the REROLL strip waits in the fold');
+      // the handoff flows to COLLECTED — never through the banner
+      assert.equal(await a.dbg('retireCeremony()'), true, 'the handoff fires');
       await a.waitFor(
-        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1)`,
-        { desc: 'collected from the retired-banner state' },
+        `(window.__diceDebug.sim(160), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        { desc: 'flowed straight to the shelf' },
       );
       assert.ok(await a.eval(`document.getElementById('result-banner').classList.contains('hidden')`),
-        'the banner retires into the slot');
+        'no banner stage in between');
+      assert.ok(await a.eval(`document.getElementById('ceremony-layer').classList.contains('hidden')`),
+        'the card retired with the flow');
+
+      // the early out: the BODY clears for everyone (normal-reveal grammar)
+      await a.dbg(`commandRoll('d20 check dc10')`);
+      await staged(rid1);
+      const rid2 = await a.rollId();
+      await a.eval(`document.getElementById('verdict-main').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(160), window.__diceDebug.tableDice.filter((d) => d.rollId === ${JSON.stringify(rid2)}).length === 0)`,
+        { desc: 'cleared from the card body' },
+      );
+      assert.equal(await a.dbg('shelf.length'), 1, 'a body-cleared roll never shelves');
+
+      // a HIDDEN card stands — the flow waits on the reveal (tension rule)
+      await a.dbg(`commandRoll('d20 check held')`);
+      await staged(rid2);
+      assert.equal(await a.dbg('retireCeremony()'), false, 'a hidden card stands');
+      assert.ok(!(await a.eval(`document.getElementById('ceremony-layer').classList.contains('hidden')`)),
+        'still standing');
+      await a.eval(`document.querySelector('#verdict-fold .reveal-verb').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(160), !!(window.__diceDebug.entryState() || {}).revealed)`,
+        { desc: 'revealed' },
+      );
+      assert.equal(await a.dbg('retireCeremony()'), true, 'the revealed card flows');
+      await a.waitFor(
+        `(window.__diceDebug.sim(160), window.__diceDebug.shelf.length === 2 && window.__diceDebug.whiskingCount === 0)`,
+        { desc: 'the revealed roll shelved' },
+      );
     },
   },
   {

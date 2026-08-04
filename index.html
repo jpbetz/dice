@@ -357,32 +357,33 @@ limitations under the License.
       <div class="strip-dc" id="strip-dc"><small>DC</small><span id="strip-dc-num"></span></div>
     </section>
 
-    <!-- beat 3 · the verdict (the strip, unfolded — §2.4 top anchor) -->
+    <!-- beat 3 · the verdict (the strip, unfolded — §2.4 top anchor).
+         THE FLOW TO COLLECTED (Joe 2026-08-04: 'cinematics have too many
+         stages… no ✕ and Done button — just flow to collected'): the card
+         is a FOLDED CARD now, same grammar as the banner and peek — the
+         BODY (#verdict-main) is the one big clear target (red for the
+         roller's clear-for-everyone, slate for a spectator's local
+         dismiss), the fold below holds the built verbs (REROLL ❯❯❯,
+         Reveal — appendCardActions, one codepath, 2i-C), and when its
+         clock runs out the roll flows STRAIGHT to the shelf. The banner
+         stage between card and shelf is gone; hover holds the clock; a
+         hidden card stands until its reveal. -->
     <section class="card-ornate" id="verdict-card">
-      <div class="eyebrow" id="verdict-eyebrow"></div>
-      <div class="ring-wrap">
-        <svg viewBox="0 0 120 120" aria-hidden="true">
-          <circle class="ring-track" cx="60" cy="60" r="52"/>
-          <circle class="ring-fill" id="ring-fill" cx="60" cy="60" r="52"/>
-        </svg>
-        <div class="vtotal" id="verdict-total"></div>
+      <div id="verdict-main" role="button" tabindex="0">
+        <div class="eyebrow" id="verdict-eyebrow"></div>
+        <div class="ring-wrap">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="ring-track" cx="60" cy="60" r="52"/>
+            <circle class="ring-fill" id="ring-fill" cx="60" cy="60" r="52"/>
+          </svg>
+          <div class="vtotal" id="verdict-total"></div>
+        </div>
+        <div class="margin-line" id="verdict-margin"></div>
+        <div class="verdict-hero" id="verdict-hero"></div>
+        <div class="mod-cards" id="verdict-modcards"></div>
       </div>
-      <div class="margin-line" id="verdict-margin"></div>
-      <div class="verdict-hero" id="verdict-hero"></div>
-      <div class="mod-cards" id="verdict-modcards"></div>
-      <!-- ONE card family (2i-C): the shared fold verbs — REROLL ❯❯❯ and
-           Reveal — are BUILT by appendCardActions into #verdict-fold, the
-           same builder the banner and peek use (the old static ⟳/Reveal
-           row was a design split that was also a code split). The card's
-           own verbs stay static: ✕ (§7.7.2 roller clear) and Done (the
-           settled collect-or-dismiss role split). The whole row rests DIM
-           and brightens on approach (2i-B). -->
       <div class="verdict-actions">
         <div id="verdict-fold" class="verdict-fold"></div>
-        <div class="banner-row">
-          <button id="verdict-x" class="ghost-btn clear-x hidden" title="Clear this roll for everyone">✕</button>
-          <button id="verdict-done" class="ghost-btn">Done</button>
-        </div>
       </div>
     </section>
 

@@ -2818,6 +2818,9 @@ function refreshRevealSurfaces(rollId) {
     if (!ceremonyLayer.classList.contains('hidden')) {
       ceremonyLayer.classList.toggle('crit', !!entryCrit(stagedVerdict.entry));
       renderVerdictCard(stagedVerdict.roll, stagedVerdict.entry);
+      // The reveal is what a hidden card was standing FOR: now readable,
+      // it joins the flow to collected (Joe 2026-08-04).
+      armCeremonyRetire(stagedVerdict.roll);
     }
   }
 }
@@ -3046,7 +3049,7 @@ const CEREMONY_HITSTOP_S = 0.11;   // §2.4 phase 3
 const CEREMONY_BUDGET_S = 1.6;     // post-settle ceiling (§2.4)
 const CEREMONY_SLOWMO_WINDOW = 0.4; // cinematic: last ~400 ms of keyframes
 const CEREMONY_SLOWMO_RATE = 0.35;
-const CEREMONY_DISMISS_MS = 7000;  // final auto-dismiss (the one allowed timer)
+const CEREMONY_DISMISS_MS = 7000;  // the flow-to-collected clock (hover holds it)
 const EXP_MAX_SUBTITLE = 40;
 const KEEP_WORDS = { kh: 'Keep high', kl: 'Keep low', dh: 'Drop high', dl: 'Drop low' };
 
@@ -3185,20 +3188,43 @@ function stageVerdict(roll) {
   setCeremonyPhaseClass(roll, 'c-verdict');
 }
 
-// The auto-dismiss handoff: the moment ends, the roll does not. The verdict
-// card retires into the same quiet banner a plain roll leaves, so Collect
-// and the base ✕ survive the ceremony — a check roll used to strand its
-// dice on the felt with no affordance at all once the card timed out. A
-// roll already collected/cleared (or upstaged by a newer roll) hands off to
-// nothing, exactly as before.
-function retireCeremonyToBanner(roll) {
+// THE FLOW TO COLLECTED (Joe 2026-08-04: 'cinematics have too many
+// stages… the normal reveal is unnecessary — just flow to collected').
+// When the card's clock runs out, the roll goes STRAIGHT to the shelf:
+// the roller's client collects (server-marked, broadcast — shelveRoll
+// closes every client's card), a spectator's card just retires locally
+// (the roller's collect will move the dice they see). The old handoff
+// into the standing banner — a whole extra stage to dismiss — is gone.
+// A HIDDEN roll never flows: the card stands until its reveal re-arms
+// the clock (the tension is the point — §7.9's tidy-away rule).
+// Returns whether a handoff happened (the debug hook reads it).
+function retireCeremonyFlow(roll) {
   const sv = stagedVerdict;
-  dismissCeremonyUI();
-  if (!sv || !sv.entry) return;
-  const st = sv.entry.rollId ? rollStates.get(sv.entry.rollId) : null;
-  if (st && (st.cleared || st.collected !== null)) return; // already off the felt
-  lastEntry = sv.entry;
-  renderRollResults(sv.entry, roll.dice, false); // no fx: the moment already played
+  if (!sv || !sv.entry) { dismissCeremonyUI(); return true; }
+  const entry = sv.entry;
+  const st = entry.rollId ? rollStates.get(entry.rollId) : null;
+  if (st && (st.cleared || st.collected !== null)) { dismissCeremonyUI(); return true; }
+  if (entryHidden(entry)) return false; // stands until the reveal
+  const mine = !netOnline || (net && entry.playerId === net.playerId);
+  lastEntry = entry; // Enter/Esc act on this roll while (and after) it flows
+  if (entry.rollId && mine) {
+    requestCollectRoll(entry.rollId); // shelveRoll dismisses the card on echo
+    return true;
+  }
+  dismissCeremonyUI(); // spectator: local retire only — the dice stay
+  return true;
+}
+
+// Arm (or re-arm) the flow clock for a standing verdict card. Hidden rolls
+// never arm — the reveal repaint re-arms them; hovering the card holds the
+// clock exactly like hovering the banner holds the tidy-away.
+function armCeremonyRetire(roll) {
+  clearTimeout(ceremonyDismissTimer);
+  ceremonyDismissTimer = null;
+  if (!roll || !roll.ceremony || roll.ceremony.phase !== 'done') return;
+  if (!stagedVerdict || !stagedVerdict.entry) return;
+  if (entryHidden(stagedVerdict.entry)) return;
+  ceremonyDismissTimer = setTimeout(() => retireCeremonyFlow(roll), CEREMONY_DISMISS_MS);
 }
 
 function ceremonyFinish(roll) {
@@ -3206,11 +3232,13 @@ function ceremonyFinish(roll) {
   if (cer.phase === 'done') return;
   cer.phase = 'done';
   roll.done = true;
-  clearTimeout(ceremonyDismissTimer);
-  ceremonyDismissTimer = setTimeout(() => retireCeremonyToBanner(roll), CEREMONY_DISMISS_MS);
   runPendingReveal(roll);  // a reveal that arrived mid-ceremony lands now
   runPendingCollect(roll); // a collect that arrived mid-ceremony lands now
   runPendingClear(roll);   // …and a clear wins over it
+  // AFTER the pendings: a collect/clear that just landed dismissed the card
+  // (stagedVerdict null → the arm no-ops), and a landed reveal means the
+  // clock arms against the readable entry.
+  armCeremonyRetire(roll);
   if (rollQueue.length) playRoll(rollQueue.shift());
 }
 
@@ -3423,20 +3451,20 @@ function renderVerdictCard(roll, entry) {
   document.querySelector('#verdict-card .ring-wrap')
     .classList.toggle('hidden', !hidden && !activeSystem().usesTotal);
 
-  // Done everywhere (the result-surface redesign): the roller's Done keeps
-  // the roll — dice to the shelf for everyone, result retained; a
-  // spectator's Done dismisses locally. Same word, role-honest dress.
+  // THE FOLDED CARD, ceremony edition (Joe 2026-08-04: no ✕, no Done —
+  // 'just flow to collected'): the BODY is the one big clear target with
+  // the same role split as the banner's — the roller's click clears for
+  // everyone, a spectator's dismisses locally (the dice stay until the
+  // roller acts). Idle flow is armCeremonyRetire's clock, not a button.
   const mine = !netOnline || (net && entry.playerId === net.playerId);
   verdictFor = { rollId: entry.rollId || null, mine };
-  const doneBtn = document.getElementById('verdict-done');
-  doneBtn.textContent = 'Done';
-  doneBtn.classList.toggle('mine', mine); // the roller's Done acts for the table
-  doneBtn.title = mine
-    ? 'Done — keep it on the shelf (Enter)'
-    : 'Done — hides this for you; the dice stay until the roller acts';
-  // §7.7.2: not every roll deserves shelf space — the roller also gets a ✕
-  // that clears the dice outright (spectators keep the single local ✕).
-  document.getElementById('verdict-x').classList.toggle('hidden', !(mine && entry.rollId));
+  const card = document.getElementById('verdict-card');
+  card.dataset.act = entry.rollId && mine ? 'clear' : 'dismiss';
+  const vMain = document.getElementById('verdict-main');
+  vMain.title = entry.rollId && mine
+    ? 'Clear this roll for everyone'
+    : 'Dismiss — hides this for you; the dice stay until the roller acts';
+  vMain.setAttribute('aria-label', vMain.title);
   // ONE card family (2i-C): the fold's shared verbs — Reveal for the
   // authority (goal 11), the REROLL ❯❯❯ strip once the values are
   // readable — come from the same builder the banner and peek use.
@@ -3561,44 +3589,55 @@ document.addEventListener('keydown', (e) => {
   const skipped = skipPlainPlayback();
   if (skipRevealFx() || skipped) e.preventDefault();
 });
-document.getElementById('verdict-done').addEventListener('click', (e) => {
-  e.stopPropagation();
-  const v = verdictFor;
-  const btn = e.currentTarget;
-  // Roller: Collect — the dice whisk to the shelf with their moment (§7.7).
-  // Not dismissed optimistically: online, the 'roll-collected' broadcast
-  // closes the card (shelveRoll dismisses the ceremony UI); solo applies
-  // synchronously. A failed POST keeps the card and its Collect button — the
-  // dice are still on everyone's felt, so the affordance must survive.
-  if (v && v.mine && v.rollId) {
-    btn.disabled = true;
-    requestCollectRoll(v.rollId).then((ok) => {
-      btn.disabled = false;
-      if (!ok) showSettingsNote('couldn’t collect the roll — try again');
-    });
-  } else {
-    dismissCeremonyUI(); // spectator ✕ (or a roll with no id): local dismiss only
-  }
-});
+// THE FOLDED CARD's body act (Joe 2026-08-04 — no ✕, no Done): one press
+// on the card body, the likeliest act. Role split like the banner's: the
+// roller clears for everyone (server-validated; the 'roll-cleared'
+// broadcast closes the card via applyClearRoll — never optimistic), a
+// spectator dismisses locally. A click while the moment is still playing
+// SKIPS first (always interruptible) — completing the beat and clearing
+// the roll are never one gesture.
+{
+  const vMain = document.getElementById('verdict-main');
+  let clearing = false;
+  vMain.addEventListener('click', (e) => {
+    e.stopPropagation(); // the layer's skip listener must not double-handle
+    if (currentRoll && currentRoll.ceremony && !currentRoll.done) {
+      skipCeremony();
+      return;
+    }
+    const v = verdictFor;
+    if (v && v.mine && v.rollId) {
+      if (clearing) return;
+      clearing = true;
+      requestClearRoll(v.rollId).then((ok) => {
+        clearing = false;
+        if (!ok) showSettingsNote('couldn’t clear the roll — try again');
+      });
+    } else {
+      dismissCeremonyUI(); // spectator: local dismiss only — the dice stay
+    }
+  });
+  vMain.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      vMain.click();
+    }
+  });
+  // Reading holds the flow clock, exactly like hovering the banner holds
+  // the tidy-away; leaving re-arms it whole (hidden cards stay standing —
+  // armCeremonyRetire's own guards).
+  const card = document.getElementById('verdict-card');
+  card.addEventListener('mouseenter', () => clearTimeout(ceremonyDismissTimer));
+  card.addEventListener('mouseleave', () => {
+    if (currentRoll && currentRoll.ceremony) armCeremonyRetire(currentRoll);
+  });
+}
 // (verdict ⟳ and Reveal wiring retired 2i-C: appendCardActions builds and
 // wires both into #verdict-fold — the strip rerolls THIS card's entry, one
-// hop truer than the old rerollLast, and the 'r' shortcut is unchanged.)
-// §7.7.2 roller ✕: clear this roll's dice for everyone without shelving.
-// Not optimistic — the 'roll-cleared' broadcast (or the synchronous solo
-// apply) closes the card via applyClearRoll; a failed POST keeps the card.
-document.getElementById('verdict-x').addEventListener('click', (e) => {
-  e.stopPropagation();
-  const v = verdictFor;
-  if (!v || !v.mine || !v.rollId) return;
-  const btn = e.currentTarget;
-  btn.disabled = true;
-  requestClearRoll(v.rollId).then((ok) => {
-    btn.disabled = false;
-    if (!ok) showSettingsNote('couldn’t clear the roll — try again');
-  });
-});
-// (goal 11's verdict Reveal rides #verdict-fold now — built and wired by
-// appendCardActions, upgrading in place when the reveal comes around.)
+// hop truer than the old rerollLast, and the 'r' shortcut is unchanged.
+// The §7.7.2 verdict ✕ and Done retired 2026-08-04 with the flow to
+// collected: the body clears, the clock collects.)
 
 // ---------------------------------------------------------------------------
 // Animation loop
@@ -3759,11 +3798,13 @@ window.__diceDebug = {
   },
   skipCeremony() { return skipCeremony(); },
   skipPlain() { return skipPlainPlayback(); },
-  // The CEREMONY_DISMISS_MS handoff, driven directly (tests can't wait out a
-  // real 7 s timer): the verdict card retires into the plain-roll banner.
+  // The CEREMONY_DISMISS_MS handoff, driven directly (tests can't wait out
+  // a real 7 s timer): the card FLOWS TO COLLECTED (Joe 2026-08-04) — the
+  // roller's collect fires, a spectator's card retires locally. Returns
+  // false when the card stands instead (a hidden roll awaiting its reveal).
   retireCeremony() {
-    if (currentRoll) retireCeremonyToBanner(currentRoll);
-    return !banner.classList.contains('hidden');
+    if (!currentRoll) return false;
+    return retireCeremonyFlow(currentRoll);
   },
   // die art (stage A): the palette tiles' rendered die stills — one dataURL
   // (or null when WebGL was unavailable) per type.
