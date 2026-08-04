@@ -106,31 +106,36 @@ half-day of work.
   the last mutation. Not urgent, but the biggest bandwidth cut once
   the LOG_CAP alignment lands.
 
-### 0c. GPU idle discipline — permanent cost for any player with a glowing set
+### 0c. GPU idle discipline — SHIPPED 2026-08-04 (`84c1074`)
 
-**S3, ~a day.** After collect the table's resting state has 40+ dice
-sitting on the shelf. `js/main.js:3671` gates the post pipeline on
-`tableDice.some((d) => d.mesh.userData.bloom)` — and `tableDice`
-includes shelved dice (compare `js/main.js:3687` where shimmer
-explicitly excludes the shelf). So any of the six glowing sets
-(tidewrack, stormcall, rimehold, emberforge, arcanum, umbra) keeps the
+**S3, closed.** The gate now mirrors `collectShimmerSources` and
+excludes shelved bloom dice from the wake predicate;
+`PostStack.render` brackets `renderer.shadowMap.autoUpdate = false`
+between the base and glow renders (one shadow-map pass saved per
+stack frame). Bench after fix (same headless reproducer as the
+audit): 4 bloom dice shelved on an empty felt drops from ~905 µs/frame
+to ~538 µs/frame — ~370 µs saved per frame, `postInfo.active`
+observable flips false. Level 5 bypass equivalence held (empty table
+renders the released direct path before roll AND after clear). New
+`postInfo().bloomDiceLive` (felt-only) drives the gate; `bloomDice`
+(felt+shelf) kept for pin compat. Extended `themed-post` e2e pins the
+observable. Verified adversarially — reveal, whisk, hello-resync and
+shelved-die reveal-in-place all funnel through `shelveRoll`, and the
+gate exemption keys on `shelfClusters.has(d.rollId)` (race-free —
+`shelveRoll` sets the cluster before any tick could read the state).
+
+The findings, for the record: after collect the table's resting state
+has 40+ dice sitting on the shelf. `js/main.js:3671` gated the post
+pipeline on `tableDice.some((d) => d.mesh.userData.bloom)` — and
+`tableDice` includes shelved dice (compare `js/main.js:3687` where
+shimmer explicitly excludes the shelf). Any of the six glowing sets
+(tidewrack, stormcall, rimehold, emberforge, arcanum, umbra) kept the
 full bloom stack — mask render + threshold + 4 blur passes + composite,
 plus a second full 2048² PCFSoft shadow-map render — running every
-frame the archive is on screen. Headless: 1658 µs/frame with 4 bloom
+frame the archive was on screen. Headless: 1658 µs/frame with 4 bloom
 dice on the felt vs 1104 µs stripped (+50%); 1199 µs with all four
 shelved. Felt as fan noise / battery drain on laptops, dropped frames
-on integrated GPUs — never a hitch, hides forever. Two independent
-pieces:
-
-- **Exclude shelved dice from the bloom gate** (design call for Joe:
-  the felt should keep its glow; the archive should cool — mirror the
-  shimmer contract, `js/main.js:3687`). Flip `userData.bloom` off in
-  `shelveRoll` and back on if any un-shelve path exists.
-- **Skip the double shadow pass** in `PostStack.render`
-  (`js/post.js:289-353`): set `renderer.shadowMap.autoUpdate = false`
-  between the base and glow renders, restore after — the glow pass
-  renders a blacked scene against maps the base pass just refreshed;
-  output identical, one shadow pass saved per stack frame.
+on integrated GPUs — never a hitch, hid forever.
 
 ### 0d. Server hygiene — operator-side risk, silent room retention
 
