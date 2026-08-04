@@ -481,10 +481,22 @@ escape hatch). Save-morph and Save-as-variant inherit a uniform
 draft's set; rerolls carry the entry's per-die sets — the pool's die
 stays the pool's die — while the roll-level set stays the RE-roller's
 own; claims and offers keep shipped semantics. A teammate's rack shows
-THEIR pool skins (`set` rides the pools broadcast — sanitizePools
-keeps it; the first cut dropped it there, which is exactly how a
-whitelist loses identity silently), and staging any rack's pool
-carries the pool's own identity; the owner's PLAYER set never rides.
+THEIR WORLD (Joe 2026-08-04: "identical to what that player sees"):
+each tile resolves explicit pool `set` → the owner's published DEFAULT
+→ the classics, and every foreign strip is PINNED (data-art-set always
+present) so the viewer's own skin can never leak in at paint. Both
+layers ride the same `/api/pools` publish — the pool's `set` per
+record (sanitizePools keeps it; the first cut dropped it there, which
+is exactly how a whitelist loses identity silently) and the owner's
+default as a top-level present-or-absent `set` (wireSet(): absent =
+standard; 'std' and unknown ids normalize to absent server-side). The
+default re-publishes on every setDiceSet (debounced) and on hello, the
+no-op guard compares BOTH pools and set, and it relays through
+pools-changed + the roster projection so late joiners see it too — the
+pools-changed ingress carrying it forward was the third leg of the
+same whitelist lesson. Staging any rack's pool still carries only the
+POOL's identity; the owner's default never rides a staged chip — a
+borrowed unmarked recipe rolls the borrower's skin.
 The
 override rides every identity vehicle: the #g= codec grew a v4 third
 field (`name|category|set=` — set-less segments stay byte-identical to

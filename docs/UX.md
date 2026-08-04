@@ -1490,7 +1490,9 @@ roll AS ITSELF — its dice wear that set for everyone, DIE BY DIE (a
 mixed draft rolls each pool's skin side by side; loose dice wear the
 roller's), 'Standard' pins the classics under any house set, and the
 tile strip previews the override — on your rack and on a teammate's
-view of it alike; die rank is a
+view of it alike, where unmarked pools resolve to the OWNER's default
+set (published with the rack, 2026-08-04) so a rack looks identical
+on every screen; die rank is a
 ladder of six real die faces, tap to advance — count preserved, ivory
 ring never gold, fail-closed to pure NdX notations so a dc12 can never be
 dropped); below the hairline the unchanged roll-tweak draft. Complex

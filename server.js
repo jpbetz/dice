@@ -293,6 +293,10 @@ function getRoom(name) {
 function publicPlayers(room) {
   return [...room.players.values()].map((p) => ({
     id: p.id, name: p.name, color: p.color, pools: p.pools || [],
+    // §9: the player's DEFAULT set (present-or-absent, absent = standard)
+    // rides the roster so a foreign rack's unmarked pools can resolve to
+    // the owner's skin — Alice's rack looks the same on every screen.
+    ...(p.set ? { set: p.set } : {}),
   }));
 }
 
@@ -1414,14 +1418,22 @@ async function handlePools(req, res) {
   const pools = sanitizePools(body.value.pools);
   if (!pools) return sendError(res, 400, `pools must be a list of at most ${MAX_POOLS_PER_PLAYER}`, 'bad_pools');
 
+  // §9: the owner's DEFAULT set rides the same publish, so viewers can
+  // resolve unmarked pools to the owner's skin. 'std' and unknown ids both
+  // normalize to absent — for a player default they mean the same thing
+  // (the classics), and an id this server can't validate must not relay.
+  const rawSet = cleanString(body.value.set, 64);
+  const set = rawSet && rawSet !== 'std' && SET_IDS.includes(rawSet) ? rawSet : null;
+
   // A no-op publish answers ok without re-broadcasting: the client re-shares
   // on every hello (rejoin safety), and 40 streams need not hear about it.
-  if (JSON.stringify(player.pools) === JSON.stringify(pools)) {
+  if ((player.set || null) === set && JSON.stringify(player.pools) === JSON.stringify(pools)) {
     return sendJson(res, 200, { ok: true });
   }
   player.pools = pools;
+  if (set) player.set = set; else delete player.set;
   log(`pools   room=${room.name} name=${player.name} count=${pools.length}`);
-  broadcast(room, 'pools-changed', { playerId: player.id, pools });
+  broadcast(room, 'pools-changed', { playerId: player.id, pools, ...(set ? { set } : {}) });
   sendJson(res, 200, { ok: true });
 }
 

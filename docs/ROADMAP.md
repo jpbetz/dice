@@ -414,7 +414,14 @@ identity. Codec v4 and a YAML @-suffix carry the override through
 every share shape, failing closed on unknown ids. Save/variant flows
 inherit; rerolls keep per-die sets; claims keep shipped semantics.
 e2e: pool-set-override (tags `themes`, `groups`); units in
-urlgroups/portable tests. What remains in §9 is art direction, not
+urlgroups/portable tests. Next morning (Joe 2026-08-04): the OWNER'S
+DEFAULT set rides the pools publish too (top-level present-or-absent
+`set` on /api/pools, roster + pools-changed relay, republish on every
+set switch), so a foreign rack resolves explicit pool set → owner
+default → classics with every strip pinned — "if you look at another
+player's pools, they look identical to what that player sees."
+Staging still carries pool identity only: a borrowed unmarked recipe
+rolls the borrower's skin. What remains in §9 is art direction, not
 plumbing: the creative-brief experiments continue, and 9b pool icons
 stands as its own item. **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
 natural AND supernatural — imagine what *faerie* dice, *dryadic* dice,

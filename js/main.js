@@ -482,6 +482,7 @@ function setDiceSet(id, persist = true) {
   if (persist) save(LS_DICESET, diceSet);
   renderDiceSetPicker();
   refreshDieArt(); // palette + strips wear the new set immediately
+  schedulePublishPools(); // teammates' view of your rack wears your default (§9)
   return diceSet;
 }
 // What rides the wire: absent for standard (a plain roll's payload stays
@@ -5493,7 +5494,7 @@ function publishPools() {
     if (g.category) rec.category = g.category;
     if (g.set) rec.set = g.set; // §9: pool identity rides the rack broadcast
     return rec;
-  }));
+  }), wireSet()); // §9: your default set rides too — foreign racks show YOUR world
 }
 
 // Category shelves (the Rack): fixed trio order — Attributes, Skills,
@@ -5804,6 +5805,9 @@ function renderForeignPools(owner) {
   // validated; a version skew still must not paint a dead tile)
   const pools = (Array.isArray(owner.pools) ? owner.pools : [])
     .filter((g) => g && typeof g.notation === 'string' && parseNotation(g.notation).ok);
+  // §9: the owner's default set rode the roster/pools broadcast; unknown or
+  // absent falls closed to the classics — never to the viewer's own set.
+  const ownerSet = typeof owner.set === 'string' && (owner.set === 'std' || SETS[owner.set]) ? owner.set : 'std';
   if (!pools.length) {
     const none = document.createElement('div');
     none.className = 'pools-none';
@@ -5829,10 +5833,10 @@ function renderForeignPools(owner) {
       stage.setAttribute('aria-label', `Stage ${label} \u2014 ${g.notation}`);
       const art = document.createElement('span');
       art.className = 'tile-art';
-      // §9: a teammate's pool shows ITS skin, never the viewer's — the set
-      // rode the rack broadcast, and staging carries it too (pool identity
-      // belongs to the pool, whoever's rack it stands on)
-      art.appendChild(buildDieStrip(res.spec.dice, 2, { grouped: true, set: g.set || null }));
+      // §9: a teammate's rack shows the OWNER's world — an explicit pool
+      // set wins, else the owner's published default, else the classics.
+      // Never null here: null would fall back to the VIEWER's set at paint.
+      art.appendChild(buildDieStrip(res.spec.dice, 2, { grouped: true, set: g.set || ownerSet }));
       const nameEl = document.createElement('span');
       nameEl.className = 'tile-name' + (g.name ? '' : ' as-notation');
       nameEl.textContent = label;
@@ -5841,6 +5845,8 @@ function renderForeignPools(owner) {
       add.setAttribute('aria-hidden', 'true');
       add.textContent = '+';
       stage.append(art, nameEl, add);
+      // staging carries only the POOL's set: borrow an unmarked recipe and
+      // the dice you throw are yours — the owner's default never rides
       stage.addEventListener('click', () => stageGroup({ name: g.name, notation: g.notation, set: g.set }));
       tile.appendChild(stage);
       grid.appendChild(tile);
@@ -8824,7 +8830,10 @@ function handleNetEvent(type, data) {
     }
     case 'pools-changed': {
       const p = players.find((x) => x.id === data.playerId);
-      if (p) p.pools = data.pools || [];
+      // §9: carry the owner's default set alongside the rack (absent =
+      // standard) — dropping it here was exactly the whitelist information
+      // loss that made foreign racks wear the viewer's skin.
+      if (p) { p.pools = data.pools || []; p.set = typeof data.set === 'string' ? data.set : null; }
       // repaint only when the rack on screen is the one that changed —
       // your own echo lands in `players` silently
       if (poolsOwner === data.playerId) renderGroups();

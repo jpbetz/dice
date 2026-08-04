@@ -3196,8 +3196,9 @@ export const scenarios = [
     // the roller's std side by side, on every screen, and the wire carries
     // per-die `sets` (uniform drafts keep the old singular field). 'std'
     // PINS the classics even when the roller wears a house set; '' clears
-    // back to following the roller. A teammate's rack shows THEIR pool
-    // skins (the pools broadcast carries set — never the viewer's own).
+    // back to following the roller. A teammate's rack shows THEIR world:
+    // explicit pool sets AND the owner's default ride the pools broadcast,
+    // so the rack looks identical on every screen — never the viewer's own.
     // Tile strips preview overrides by contract (img src === the bakery's
     // answer), and BOTH pickers — settings row and the popover identity
     // strip — drive the same state.
@@ -3261,21 +3262,50 @@ export const scenarios = [
           `${who}: the pool's roll wears the pool's set (got ${dice.map((d) => d.variant).join(',') || 'none'})`);
       }
 
-      // the rack relay: B browses ALICE's rack and sees the pool in
-      // ALICE's skin — pool identity rode the pools broadcast; it must
-      // never switch to the viewer's own set (the information-loss bug)
+      // the rack relay: B browses ALICE's rack and sees ALICE's world —
+      // an explicit pool set wins, unmarked pools wear ALICE's default,
+      // and EVERY strip is pinned so nothing can fall to the viewer's own
+      // set (the information-loss bug, both layers of it)
       await b.waitFor(
         `document.querySelectorAll('#groups-list .pools-switcher .owner-chip').length >= 2`,
         { desc: "B's switcher shows Alice" },
       );
       await b.eval(`[...document.querySelectorAll('#groups-list .pools-switcher .owner-chip')].find((c) => c.textContent.includes('Alice')).click()`);
       await b.waitFor(
-        `!!document.querySelector('#groups-list .pool-tile.foreign img.die-art[data-art-set]')`,
-        { desc: "Alice's rack renders with pinned skins" },
+        `document.querySelectorAll('#groups-list .pool-tile.foreign img.die-art').length >= 1`,
+        { desc: "Alice's rack renders" },
       );
-      const foreignPin = JSON.parse(await b.eval(
-        `JSON.stringify(document.querySelector('#groups-list .pool-tile.foreign img.die-art[data-art-set]').dataset.artSet)`));
-      assert.equal(foreignPin, 'emberforge.blackanvil', "B sees Alice's pool in ALICE's skin, not B's");
+      const foreign = JSON.parse(await b.eval(`JSON.stringify((() => {
+        const imgs = [...document.querySelectorAll('#groups-list .pool-tile.foreign img.die-art')];
+        return {
+          pins: imgs.map((i) => i.dataset.artSet || null),
+          anvilWears: imgs.some((i) => i.dataset.artSet === 'emberforge.blackanvil'
+            && i.src === window.__diceDebug.dieArtFor('d6', 'emberforge.blackanvil')),
+        };
+      })())`));
+      assert.ok(foreign.pins.every(Boolean),
+        `every foreign strip is pinned, none falls to the viewer (got ${foreign.pins.join(',')})`);
+      assert.ok(foreign.anvilWears, "B sees Alice's pinned pool in ALICE's skin, not B's");
+      assert.ok(foreign.pins.includes('std'),
+        "an unmarked pool wears Alice's DEFAULT (std here), pinned against B's own skin");
+
+      // the owner's DEFAULT relays live: Alice re-skins herself and B's
+      // view of her rack follows — unmarked pools take her new default,
+      // while the explicit anvil pin stands (explicit beats default)
+      await a.eval(`window.__diceDebug.setDiceSet('stormcall.boltglass')`);
+      await b.waitFor(
+        `[...document.querySelectorAll('#groups-list .pool-tile.foreign img.die-art')].some((i) => i.dataset.artSet === 'stormcall.boltglass')`,
+        { desc: "Alice's new default reaches B's view of her rack" },
+      );
+      const stillPinned = JSON.parse(await b.eval(`JSON.stringify(
+        [...document.querySelectorAll('#groups-list .pool-tile.foreign img.die-art')].some((i) => i.dataset.artSet === 'emberforge.blackanvil'))`));
+      assert.ok(stillPinned, 'the explicit pool pin outranks the owner default');
+      // back to std (the steps below expect Alice unthemed) — B follows too
+      await a.eval(`window.__diceDebug.setDiceSet('std')`);
+      await b.waitFor(
+        `![...document.querySelectorAll('#groups-list .pool-tile.foreign img.die-art')].some((i) => i.dataset.artSet === 'stormcall.boltglass')`,
+        { desc: "clearing the default clears B's view of the rack" },
+      );
       await b.eval(`[...document.querySelectorAll('#groups-list .pools-switcher .owner-chip')][0].click()`);
 
       // a MIXED draft: EACH die wears its own pool's set — pool B takes

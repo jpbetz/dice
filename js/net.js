@@ -187,8 +187,11 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     // Publish your saved pools for the owner switcher (UX §7.9 / ROADMAP
     // 2b). A display copy only — localStorage stays the owner's truth. The
     // table (you included) learns via the 'pools-changed' broadcast.
-    async setPools(pools) {
-      const res = await withPlayer('/api/pools', { pools });
+    // §9: your default dice set rides the same publish (present-or-absent,
+    // absent = standard) so foreign racks resolve unmarked pools to YOUR
+    // skin, not the viewer's.
+    async setPools(pools, set) {
+      const res = await withPlayer('/api/pools', { pools, ...(set ? { set } : {}) });
       return res.ok;
     },
 

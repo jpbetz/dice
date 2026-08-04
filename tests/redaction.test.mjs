@@ -813,6 +813,47 @@ try {
     const after = bob.sse.events.filter((e) => e.type === 'pools-changed').length;
     assert.equal(after, before + 1, 'the identical re-post broadcast nothing');
   });
+
+  await t('§9: the owner default set rides the pools publish, roster, and no-op guard', async () => {
+    const room = 'r-poolset';
+    const ann = await sit(room, 'Ann');
+    const bob = await sit(room, 'Bob');
+    const pools = [{ name: 'Plain', notation: '3d6' }];
+    assert.equal((await post('/api/pools',
+      { room, playerId: ann.id, pools, set: 'emberforge.blackanvil' })).status, 200);
+    await bob.sse.waitFor((e) => e.type === 'pools-changed' && e.data.playerId === ann.id
+      && e.data.set === 'emberforge.blackanvil', 'the default set rides the broadcast');
+    const late = await sit(room, 'Late');
+    const annSeat = late.sse.events.find((e) => e.type === 'hello').data.players
+      .find((p) => p.id === ann.id);
+    assert.equal(annSeat.set, 'emberforge.blackanvil', 'a late joiner sees the owner default');
+    // a set-only change (identical pools) is a REAL change: the no-op guard
+    // must compare both, or a re-skinned owner never reaches the table
+    assert.equal((await post('/api/pools',
+      { room, playerId: ann.id, pools, set: 'tidewrack.seaglass' })).status, 200);
+    await bob.sse.waitFor((e) => e.type === 'pools-changed' && e.data.playerId === ann.id
+      && e.data.set === 'tidewrack.seaglass', 'a set-only change broadcasts');
+    // 'std' normalizes to ABSENT (player default: std and unset mean the same
+    // thing) and clears the stored default for later joiners
+    assert.equal((await post('/api/pools', { room, playerId: ann.id, pools, set: 'std' })).status, 200);
+    await bob.sse.waitFor((e) => e.type === 'pools-changed' && e.data.playerId === ann.id
+      && !('set' in e.data), 'std rides as absent');
+    const late2 = await sit(room, 'Late2');
+    assert.ok(!('set' in late2.sse.events.find((e) => e.type === 'hello').data.players
+      .find((p) => p.id === ann.id)), 'the cleared default leaves the roster');
+    // an unknown id falls closed to absent — and absent-to-absent with the
+    // same pools is a no-op, so nothing broadcasts
+    const before = bob.sse.events.filter((e) => e.type === 'pools-changed').length;
+    assert.equal((await post('/api/pools',
+      { room, playerId: ann.id, pools, set: 'not.a.set' })).status, 200);
+    assert.equal((await post('/api/pools', { room, playerId: ann.id,
+      pools: [{ name: 'Plain', notation: '4d6' }] })).status, 200);
+    const real = await bob.sse.waitFor((e) => e.type === 'pools-changed'
+      && e.data.pools.some((g) => g.notation === '4d6'), 'the pools change still lands');
+    assert.ok(!('set' in real.data), 'the junk id fell closed to absent');
+    const after = bob.sse.events.filter((e) => e.type === 'pools-changed').length;
+    assert.equal(after, before + 1, 'the junk-set re-post broadcast nothing');
+  });
 } finally {
   for (const s of streams) s.close();
   proc.kill();
