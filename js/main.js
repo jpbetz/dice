@@ -56,9 +56,17 @@ const LS_DICESET = 'dice.diceset.v1';    // "Just you" scope: dice-set identity 
 // ---------------------------------------------------------------------------
 
 const container = document.getElementById('scene-container');
+// The felt is a LAYOUT REGION, not the viewport (2026-08-04: the side panel
+// is a real column beside it). `view` is the cached felt rect — every
+// world→screen projection reads it, never window.innerWidth — and refitView
+// (further down, also the resize handler) owns refreshing it.
+const view = (() => {
+  const r = container.getBoundingClientRect();
+  return { left: r.left, width: Math.max(1, r.width), height: Math.max(1, r.height) };
+})();
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(view.width, view.height);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -68,7 +76,7 @@ container.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#0f0f13'); // obsidian sceneBg — the DEFAULT_FELT below
 
-const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 1, 200);
+const camera = new THREE.PerspectiveCamera(42, view.width / view.height, 1, 200);
 camera.position.set(0, 27, 15.5);
 camera.lookAt(0, 0, 0.5);
 
@@ -122,7 +130,7 @@ scene.add(rimLight);
 // Level 3's field on the live table: bursts fire from the impacts the
 // fast-forward already records for the click sounds (never on a timer).
 const particleField = new ParticleField(scene);
-particleField.setProjection(window.innerHeight, camera.fov);
+particleField.setProjection(view.height, camera.fov);
 
 // Level 4 on the live table. Decals: transient marks stamped from the
 // same recorded impacts (floor-height ones only — walls don't scorch),
@@ -1186,13 +1194,9 @@ function openShelfPopover(entry, rollId) {
 // overlap case, not for full occlusion). The panel rect is CACHED — it
 // changes only on panel toggles and resizes; positionShelfMarkers runs
 // every frame and must never force layout (see measurePeek's warning).
-let leftPanelRect = null;
-function cacheLeftPanelRect() {
-  const el = document.getElementById('builder-panel');
-  leftPanelRect = el && panelsOpen.pools && !el.classList.contains('collapsed')
-    ? el.getBoundingClientRect()
-    : null;
-}
+// (The old marker-vs-panel occlusion rect is GONE, 2026-08-04: the side
+// panel is layout, not overlay — nothing panel-shaped can stand over the
+// felt, so a marker can never be under it.)
 
 function positionShelfMarkers() {
   const v = new THREE.Vector3();
@@ -1201,19 +1205,16 @@ function positionShelfMarkers() {
     if (!c.markerEl) continue;
     v.set(shelfSlotX(c.slot), SHELF_MARKER_Y, SHELF_Z);
     v.project(camera);
-    const px = (v.x * 0.5 + 0.5) * window.innerWidth;
-    const py = (-v.y * 0.5 + 0.5) * window.innerHeight;
+    const px = view.left + (v.x * 0.5 + 0.5) * view.width;
+    const py = (-v.y * 0.5 + 0.5) * view.height;
     c.markerEl.style.left = `${px}px`;
     c.markerEl.style.top = `${py}px`;
-    c.markerEl.classList.toggle('occluded', !!(leftPanelRect
-      && px > leftPanelRect.left && px < leftPanelRect.right
-      && py > leftPanelRect.top && py < leftPanelRect.bottom));
     // The invisible target covers what the eye reads as the cluster: the
     // same radius the under-glow paints, projected to pixels (cached — the
     // radius only changes on reflow; drawShelfGlow refreshes the cache).
     if (!c.glowR) c.glowR = clusterGlowRadius(c);
     v2.set(shelfSlotX(c.slot) + c.glowR, SHELF_MARKER_Y, SHELF_Z).project(camera);
-    const d = Math.max(44, Math.round(Math.abs(v2.x - v.x) * window.innerWidth));
+    const d = Math.max(44, Math.round(Math.abs(v2.x - v.x) * view.width));
     if (c.markerPx !== d) {
       c.markerPx = d;
       c.markerEl.style.width = `${d}px`;
@@ -1461,8 +1462,8 @@ function positionPeek() {
   const c = shelfClusters.get(peekRollId);
   if (!c) return;
   const v = new THREE.Vector3(shelfSlotX(c.slot), SHELF_MARKER_Y, SHELF_Z).project(camera);
-  const ax = (v.x * 0.5 + 0.5) * window.innerWidth;
-  const ay = (-v.y * 0.5 + 0.5) * window.innerHeight;
+  const ax = view.left + (v.x * 0.5 + 0.5) * view.width;
+  const ay = (-v.y * 0.5 + 0.5) * view.height;
   const w = peekW;
   const h = peekH;
   const left = Math.max(8, Math.min(ax - w / 2, window.innerWidth - w - 8));
@@ -2990,8 +2991,8 @@ function positionChips() {
     v.copy(die.mesh.position);
     v.y += 2.2;
     v.project(camera);
-    el.style.left = `${(v.x * 0.5 + 0.5) * window.innerWidth}px`;
-    el.style.top = `${(-v.y * 0.5 + 0.5) * window.innerHeight}px`;
+    el.style.left = `${view.left + (v.x * 0.5 + 0.5) * view.width}px`;
+    el.style.top = `${(-v.y * 0.5 + 0.5) * view.height}px`;
   }
 }
 
@@ -4026,11 +4027,6 @@ window.__diceDebug = {
   publishPools() { publishPools(); return true; },
   // the Pools tab flyout (the WHOLE panel body — draft + list — on hover
   // of the collapsed tab), driven directly where headless tests can't hover.
-  get groupsFlyout() { return groupsPanelEl.classList.contains('flyout'); },
-  setGroupsFlyout(open) {
-    if (open) openGroupsFlyout(); else closeGroupsFlyout();
-    return groupsPanelEl.classList.contains('flyout');
-  },
   setPanelState(patch) {
     if (patch && typeof patch === 'object') {
       for (const k of Object.keys(PANEL_DEFS)) {
@@ -4095,8 +4091,8 @@ window.__diceDebug = {
   project(x, y, z) {
     const v = new THREE.Vector3(x, y, z).project(camera);
     return {
-      x: (v.x * 0.5 + 0.5) * window.innerWidth,
-      y: (-v.y * 0.5 + 0.5) * window.innerHeight,
+      x: view.left + (v.x * 0.5 + 0.5) * view.width,
+      y: (-v.y * 0.5 + 0.5) * view.height,
     };
   },
   // felt composite sampling (tests): RGBA of the floor texture at world (x, z)
@@ -4116,19 +4112,31 @@ window.__diceDebug = {
   fastForward: fastForwardPlayback,
 };
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+// ONE refit for every felt-geometry change — window resizes AND side-panel
+// toggles (the panel is layout now; collapsing it widens the canvas). It
+// measures the panel, publishes --table-left (the CSS seam every
+// felt-anchored overlay reads), recaches `view`, and re-derives everything
+// that hangs off the camera.
+const leftPanelEl = document.getElementById('left-panel');
+function refitView() {
+  const pw = Math.round(leftPanelEl.getBoundingClientRect().width);
+  document.documentElement.style.setProperty('--table-left', `${pw}px`);
+  const r = container.getBoundingClientRect();
+  view.left = r.left;
+  view.width = Math.max(1, r.width);
+  view.height = Math.max(1, r.height);
+  camera.aspect = view.width / view.height;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  particleField.setProjection(window.innerHeight, camera.fov);
+  renderer.setSize(view.width, view.height);
+  particleField.setProjection(view.height, camera.fov);
   const px = renderer.getDrawingBufferSize(new THREE.Vector2());
   postStack.setSize(px.x, px.y);
-  applyCameraFraming(); // a narrower window refits the table and its shelf
-  cacheLeftPanelRect(); // marker occlusion reads this, never live layout
+  applyCameraFraming(); // a narrower felt refits the table and its shelf
   positionChips();
   measurePeek(); // the card's max-width tracks the viewport (100vw - 16px)
   positionShelfMarkers();
-});
+}
+window.addEventListener('resize', refitView);
 
 // ---------------------------------------------------------------------------
 // Storage helpers
@@ -4478,7 +4486,7 @@ function renderTray() {
         });
       }
     }
-    trayRollBtn.appendChild(buildRollCue());
+    trayRollBtn.appendChild(buildRollCue('roll', true)); // the well: balanced cue
     const label = `Roll ${formula(tray)}`;
     trayRollBtn.title = label;
     trayRollBtn.setAttribute('aria-label', label);
@@ -5366,16 +5374,30 @@ function buildDieStrip(types, cap, { grouped = false, set = null } = {}) {
 // two verbs must not share a word (Joe, 2026-08-03). The \u00a0 keeps the
 // shipped word–chevron spacing.
 const CUE_WORDS = { roll: 'ROLL\u00a0', reroll: 'REROLL\u00a0' };
-function buildRollCue(kind = 'roll') {
+// `balanced` (Joe 2026-08-04): the WELL's cue gains a leading ❯❯❯ so the
+// word sits centered with motion flowing through it — the compact card
+// strips keep the trailing-only form. Chevron fades are CLASS-driven
+// (l1..l3 crescendo in, t1..t3 decrescendo out): nth-of-type would
+// miscount the moment a leading set exists.
+function buildRollCue(kind = 'roll', balanced = false) {
   const cue = document.createElement('span');
   cue.className = 'roll-cue';
   cue.setAttribute('aria-hidden', 'true');
+  if (balanced) {
+    for (let i = 0; i < 3; i++) {
+      const c = document.createElement('i');
+      c.className = `lead l${i + 1}`;
+      c.textContent = '❯';
+      cue.appendChild(c);
+    }
+  }
   const w = document.createElement('b');
   w.className = 'cue-word';
   w.textContent = CUE_WORDS[kind] || CUE_WORDS.roll;
   cue.appendChild(w);
   for (let i = 0; i < 3; i++) {
     const c = document.createElement('i');
+    c.className = `t${i + 1}`;
     c.textContent = '❯';
     cue.appendChild(c);
   }
@@ -5387,23 +5409,21 @@ function buildRollCue(kind = 'roll') {
 // ROLL ❯❯❯ — the empty well previews the full one, nothing else. (The
 // ghost-dice sockets were tried the same day and cut: dice images plus
 // the cue read as clutter, not invitation.)
-trayHintEl.appendChild(buildRollCue('roll'));
+trayHintEl.appendChild(buildRollCue('roll', true)); // the ghost previews the SAME balanced cue
 
 // STAGE a pool into the draft (the Rack's one source verb): its dice pour
 // into the sticky cluster carrying the pool's name as their source label;
 // mods/dc/moment are set aside with a whisper (the draft owns its own ±).
-// A stage from the hover flyout promotes it to the pinned panel — a
-// deliberate action earns pinning.
+// A stage is a COMPOSING act: it surfaces the panel if collapsed — the
+// draft it builds must be visible (the hover-flyout promotion this replaced
+// followed the same rule).
 function sanitizeSourceLabel(name) {
   return cleanPartLabel(name || '') || null;
 }
 function stageGroup(g) {
   const res = parseNotation(g.notation);
   if (!res.ok) return false;
-  if (groupsPanelEl.classList.contains('flyout')) {
-    closeGroupsFlyout();
-    setPanel('pools', true);
-  }
+  if (!panelsOpen.pools) setPanel('pools', true);
   const label = sanitizeSourceLabel(g.name);
   // §9: the pool's set override rides each staged die — from YOUR rack or a
   // teammate's alike (identity belongs to the POOL; their player-set never
@@ -5566,13 +5586,6 @@ function buildGhostTile(sec) {
   nounEl.textContent = noun;
   b.append(plus, nounEl);
   b.addEventListener('click', () => {
-    // a ghost tapped in the transient hover flyout PROMOTES to the pinned
-    // panel, exactly like a stage from it — a hover surface is not a
-    // place to type a name (fleet catch)
-    if (groupsPanelEl.classList.contains('flyout')) {
-      closeGroupsFlyout();
-      setPanel('pools', true);
-    }
     creatingShelf = sec.key;
     creationDraft = { name: '', dice: ['d6'], touched: false };
     renderGroups();
@@ -6011,6 +6024,68 @@ function renderGroups() {
     groupsListEl.appendChild(grid);
   }
   if (poolsEdit) groupsListEl.appendChild(buildNewShelfRow());
+  renderRailPools(); // the collapsed rail's quick list tracks the same truth
+}
+
+// The collapsed rail's pools, SUPER MINIMAL (Joe 2026-08-04): your own
+// pools only, flat (no shelves), zero edit/save/notation chrome. A named
+// pool is its name alone (vertical, the rail is 56px); an unnamed pool is
+// its die chips alone. A tap ROLLS it directly — the draft is untouched
+// and the panel stays collapsed: the rail is a launcher, not a composer.
+function renderRailPools() {
+  const el = document.getElementById('rail-pools');
+  if (!el || !document.getElementById('left-panel').classList.contains('collapsed')) return;
+  el.innerHTML = '';
+  for (const g of groups) {
+    const res = parseNotation(g.notation);
+    if (!res.ok) continue;
+    const b = document.createElement('button');
+    b.className = 'rp-item';
+    b.title = `Roll ${g.name || res.canonical} — ${res.canonical}`;
+    if (g.name) {
+      b.classList.add('rp-name');
+      b.textContent = g.name;
+    } else {
+      b.classList.add('rp-dice');
+      b.appendChild(buildDieStrip(res.spec.dice, 2, { grouped: true, set: g.set || null }));
+    }
+    b.addEventListener('click', () => rollRailPool(g));
+    el.appendChild(b);
+  }
+}
+
+// Roll a pool AS ITSELF from the rail: the same request the staged-alone
+// pool sends, built by round-tripping the pool through the one grammar —
+// its name becomes each die's source, its set override rides (rollSetOf
+// semantics at requestRoll: 'std' pins the classics), and any dc/moment/
+// visibility the notation carries plays exactly as it would from the box.
+function rollRailPool(g) {
+  const res = parseNotation(g.notation);
+  if (!res.ok) return;
+  const label = sanitizeSourceLabel(g.name);
+  const spec = { dice: [...res.spec.dice], mods: res.spec.mods || null };
+  const srcs = label ? res.spec.dice.map(() => label) : res.spec.sources || null;
+  if (srcs && srcs.some(Boolean)) spec.sources = [...srcs];
+  const labeled = canonicalWithVis(spec, {
+    dc: res.dc,
+    comment: res.comment,
+    exp: res.exp,
+  }, visOfParse(res));
+  const res2 = parseNotation(labeled);
+  if (!res2.ok) return;
+  const intent = notationIntent(labeled, res2);
+  const gSet = typeof g.set === 'string' && (g.set === 'std' || SETS[g.set]) ? g.set : null;
+  requestRoll([...res2.spec.dice], res2.comment || res2.canonical, {
+    notation: intent.notation,
+    canonical: intent.canonical,
+    mods: res2.spec.mods || undefined,
+    sources: res2.spec.sources || undefined,
+    faceDown: res2.faceDown,
+    visibility: visOfParse(res2) || undefined,
+    dc: res2.dc ?? undefined,
+    exp: intent.exp || undefined,
+    ...(gSet ? { set: gSet } : {}),
+  });
 }
 
 // '＋ New shelf…' — the rack-level twin of the strip's ＋ chip: a full-width
@@ -7865,10 +7940,12 @@ const LS_PANELS = 'dice.panels.v1';
 const LS_MINI = 'dice.mini.v1'; // legacy compact-view preference — migration only
 
 // ONE region since the panel merge (2026-07-31): the Pools panel carries
-// the draft as its first row and the saved list beneath. The element ids
-// keep their old spellings (builder-panel / head-compose) like tray/group.
+// the draft as its first row and the saved list beneath. Since 2026-08-04
+// the region IS the side-panel column: collapsed rides #left-panel (the
+// slim icon rail), and the divider strip #edge-toggle is the click target
+// (the old head-compose title row is gone).
 const PANEL_DEFS = {
-  pools: { el: 'builder-panel', head: 'head-compose' },
+  pools: { el: 'left-panel' },
 };
 
 // Open/collapsed per region. Seeded once, exactly like the old mini seed: a
@@ -7930,7 +8007,7 @@ const CAM_TARGET = new THREE.Vector3(0, 0, 0.5);
 function framingPoints() {
   const outerX = shelfSlotX(SHELF_SLOTS - 1) + SHELF_SLOT_W / 2;
   const markerX = shelfSlotX(SHELF_SLOTS - 1);
-  const w = Math.max(window.innerWidth, 1);
+  const w = Math.max(view.width, 1); // pills live over the FELT, not the window
   const halfPill = Math.min(document.body.classList.contains('mini') ? 55 : 90, w / 10);
   const pillNdc = (2 * halfPill) / w;
   const pts = [];
@@ -7975,24 +8052,24 @@ function applyPanels(persist = true) {
   for (const [id, def] of Object.entries(PANEL_DEFS)) {
     document.getElementById(def.el).classList.toggle('collapsed', !panelsOpen[id]);
   }
-  if (panelsOpen.pools) closeGroupsFlyout(); // a real expand retires the overlay
   // Manage mode is transient (P2): collapsing the pools panel exits it, so
   // the panel always reopens read-only.
   if (!panelsOpen.pools && poolsEdit) setPoolsEdit(false);
   // The tray's per-die ✕ overlays anchor to laid-out die positions, which
   // are all zero while the panel is collapsed — re-anchor on expand.
   if (panelsOpen.pools) renderTray();
-  cacheLeftPanelRect(); // the marker-occlusion rect follows every panel change
+  else renderRailPools(); // the collapsed rail carries the quick list
+  const et = document.getElementById('edge-toggle');
+  et.setAttribute('aria-expanded', String(!!panelsOpen.pools));
+  et.title = panelsOpen.pools ? 'Collapse the panel — n' : 'Expand the panel — n';
   if (persist) save(LS_PANELS, panelsOpen);
-  const mini = allPanelsCollapsed();
-  if (mini !== document.body.classList.contains('mini')) {
-    document.body.classList.toggle('mini', mini);
-    applyCameraFraming();
-    positionChips();
-    measurePeek(); // compact view resizes the card (smaller type, tighter padding)
-    positionShelfMarkers(); // markers track the reframed camera (§7.7 parity)
-    // An on-stage ceremony needs nothing: it keeps playing, re-scaled (§7.4).
-  }
+  // Compact view stays EMERGENT (body.mini = everything collapsed) and must
+  // flip BEFORE the refit: applyCameraFraming reads it for the eye preset.
+  document.body.classList.toggle('mini', allPanelsCollapsed());
+  // The panel is LAYOUT: any toggle moves the felt's edge, so every toggle
+  // refits the camera, renderer and all screen-anchored furniture.
+  // An on-stage ceremony needs nothing: it keeps playing, re-scaled (§7.4).
+  refitView();
 }
 
 function setPanel(id, open, persist = true) {
@@ -8012,48 +8089,17 @@ function toggleAllPanels() {
   applyPanels();
 }
 
-for (const [id, def] of Object.entries(PANEL_DEFS)) {
-  document.getElementById(def.head).addEventListener('click', (e) => {
-    // Header tool buttons (copy link, clear) act without toggling the panel.
-    if (e.target.closest('.btn')) return;
-    setPanel(id, !panelsOpen[id]);
-  });
-}
-
-// ---- saved-pools flyout ----------------------------------------------------
-// Rolling a saved pool used to demand expanding the panel — which then sat
-// over the table exactly when the dice landed. Hovering the COLLAPSED tab
-// (mouse only) flies the list out as a temporary overlay instead: roll from
-// a row and it retracts on its own (pointer-leave, the roll itself, or the
-// panel expanding for real). Clicking the tab still expands the panel; touch
-// keeps that path — no hover, no flyout. The close is timer-graced like the
-// peek: the 6px visual gap between tab and list must be crossable.
-const groupsPanelEl = document.getElementById('builder-panel'); // the merged Pools panel
-let groupsFlyTimer = null;
-function openGroupsFlyout() {
-  clearTimeout(groupsFlyTimer);
-  groupsFlyTimer = null;
-  if (!panelsOpen.pools) {
-    groupsPanelEl.classList.add('flyout');
-    renderTray(); // ✕ overlays anchor from live layout — zero while display:none
-  }
-}
-function closeGroupsFlyout() {
-  clearTimeout(groupsFlyTimer);
-  groupsFlyTimer = null;
-  groupsPanelEl.classList.remove('flyout');
-}
-groupsPanelEl.addEventListener('pointerenter', (e) => {
-  if (e.pointerType === 'mouse') openGroupsFlyout();
-});
-groupsPanelEl.addEventListener('pointerleave', (e) => {
-  if (e.pointerType !== 'mouse') return;
-  clearTimeout(groupsFlyTimer);
-  groupsFlyTimer = setTimeout(closeGroupsFlyout, 200);
+// The divider strip is the one pointer target for collapse/expand (the
+// title row died with the overlay; keys n/m keep their muscle memory).
+document.getElementById('edge-toggle').addEventListener('click', () => {
+  setPanel('pools', !panelsOpen.pools);
 });
 
-applyPanels(false); // reflect the seeded state without re-saving
-applyCameraFraming(); // boot framing at the current aspect (resize keeps it)
+// (The collapsed-tab hover flyout retired 2026-08-04 with the overlay
+// panel: expanding the column is cheap now — the felt resizes instead of
+// being covered — and the collapsed rail carries its own quick list.)
+
+applyPanels(false); // reflect the seeded state without re-saving (refits too)
 
 // ---------------------------------------------------------------------------
 // Quick palette: a transient centered command strip ('/' / Ctrl/Cmd+K / the

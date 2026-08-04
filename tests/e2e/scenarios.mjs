@@ -758,7 +758,9 @@ export const scenarios = [
     tags: ['smoke', 'chrome'],
     // The persistent control rail NEVER hides: identity chip, quick roll,
     // roll log and settings stay reachable even with every panel collapsed
-    // (the emergent compact view). Order is P3: presence (status · roster ·
+    // (the emergent compact view). Since 2026-08-04 it lives at the TOP of
+    // the side panel (zero felt overlays), with the contextual ✕ Clear
+    // table docked at its end. Order is P3: presence (status · roster ·
     // identity) → action (❯) → information (≣) → environment (⚙). The ⤡
     // collapse-all button is deleted (key 'm' remains), and the rail's 🔊
     // retired 2026-08-03 (Joe: the setting is sufficient; 's' stays).
@@ -776,9 +778,16 @@ export const scenarios = [
         'the rail 🔊 is gone — sound lives in Settings');
       assert.deepEqual(
         await a.eval(`[...document.getElementById('rail').children].map((el) => el.id)`),
-        ['status-pill', 'rail-roster', 'identity-chip', 'rail-palette', 'rail-log', 'toggle-settings'],
-        'rail order: presence → action → information → environment (P3)',
+        ['status-pill', 'rail-roster', 'identity-chip'],
+        'the top rail is PRESENCE alone (status · roster · you)',
       );
+      assert.deepEqual(
+        await a.eval(`[...document.getElementById('rail-foot').children].map((el) => el.id)`),
+        ['rail-palette', 'rail-log', 'toggle-settings', 'corner-controls'],
+        'the foot bar holds the utility verbs: ❯ → ≣ → ⚙ → contextual ✕',
+      );
+      assert.equal(await a.eval(`!!document.querySelector('#left-panel #rail') && !!document.querySelector('#left-panel #rail-foot')`), true,
+        'both bars ride the panel — the felt owns no standing chrome');
 
       const st = await a.dbg('setPanelState({pools: false})');
       assert.equal(st.allCollapsed, true, 'every panel collapsed');
@@ -1116,32 +1125,88 @@ export const scenarios = [
     },
   },
   {
-    name: 'pool-flyout',
+    name: 'side-panel',
     tags: ['smoke', 'chrome', 'groups'],
-    // The collapsed tab's hover flyout under the Rack: tiles STAGE from it,
-    // and a deliberate stage PROMOTES the flyout to the pinned panel (a
-    // hover surface must not host a multi-step compose); hover-and-leave
-    // stays transient.
+    // THE SIDE PANEL (2026-08-04): a real layout column, never an overlay —
+    // the felt (canvas) is sized beside it and resizes on toggle. The
+    // divider strip collapses it to a slim icon rail carrying the menu
+    // buttons and a SUPER-MINIMAL pool list: names alone / die chips
+    // alone, zero edit chrome, tap = roll (draft untouched, panel stays
+    // collapsed). The hover flyout is retired.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
-      await a.dbg('setPanelState({pools: false})');
-      assert.equal((await a.dbg('panelState')).pools, false, 'panel collapsed');
-      assert.equal(await a.dbg('setGroupsFlyout(true)'), true, 'the tab flies the rack out');
-      assert.ok(await a.eval(`(() => {
-        const r = document.querySelector('#builder-panel .panel-body').getBoundingClientRect();
-        return r.width > 0 && r.height > 0;
-      })()`), 'the flyout renders the shelves');
-      await a.eval(`document.querySelector('#groups-list .pool-tile:not(.ghost) .tile-stage').click()`);
-      assert.ok((await a.dbg('trayState')).dice.length > 0, 'the tile staged from the flyout');
-      assert.equal(await a.dbg('groupsFlyout'), false, 'the flyout retired itself');
-      assert.equal((await a.dbg('panelState')).pools, true,
-        'a deliberate stage PROMOTES to the pinned panel');
-      await a.eval(`document.getElementById('clear-tray').click()`);
-      await a.dbg('setPanelState({pools: false})');
-      await a.dbg('setGroupsFlyout(true)');
-      await a.dbg('setGroupsFlyout(false)');
-      assert.equal((await a.dbg('panelState')).pools, false, 'hover-and-leave stays transient');
+      await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {notation: '2d6'}])`);
       await a.dbg('setPanelState({pools: true})');
+
+      // expanded: the column is layout — the felt starts where it ends
+      const geo = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const p = document.getElementById('left-panel').getBoundingClientRect();
+        const c = document.getElementById('scene-container').getBoundingClientRect();
+        const cv = document.querySelector('#scene-container canvas');
+        return { panelW: p.width, feltLeft: c.left, feltW: c.width,
+                 canvasW: cv ? cv.getBoundingClientRect().width : 0,
+                 vw: window.innerWidth,
+                 title: !!document.getElementById('head-compose'),
+                 railInPanel: !!document.querySelector('#left-panel #rail') };
+      })())`));
+      assert.ok(Math.abs(geo.feltLeft - geo.panelW) <= 1, 'the felt begins at the panel edge');
+      assert.ok(Math.abs(geo.panelW + geo.feltW - geo.vw) <= 1, 'panel + felt tile the window');
+      assert.ok(Math.abs(geo.canvasW - geo.feltW) <= 1, 'the canvas fills exactly the felt');
+      assert.equal(geo.title, false, 'no Pools title row');
+      assert.equal(geo.railInPanel, true, 'the control rail lives at the panel top');
+      assert.equal(await a.dbg('setGroupsFlyout') , undefined, 'the hover flyout is retired');
+
+      // collapse via the divider strip: slim rail, wider felt, same window
+      await a.eval(`document.getElementById('edge-toggle').click()`);
+      assert.equal((await a.dbg('panelState')).pools, false, 'the strip collapses the panel');
+      const geo2 = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const p = document.getElementById('left-panel').getBoundingClientRect();
+        const c = document.getElementById('scene-container').getBoundingClientRect();
+        return { panelW: p.width, feltW: c.width, vw: window.innerWidth,
+                 builder: document.getElementById('builder-panel').offsetParent !== null,
+                 expanded: document.getElementById('edge-toggle').getAttribute('aria-expanded') };
+      })())`));
+      assert.ok(geo2.panelW < 80, `collapsed is a slim rail (got ${geo2.panelW})`);
+      assert.ok(Math.abs(geo2.panelW + geo2.feltW - geo2.vw) <= 1, 'the felt took the difference');
+      assert.equal(geo2.builder, false, 'the workbench leaves entirely');
+      assert.equal(geo2.expanded, 'false', 'the strip reports collapsed');
+
+      // the super-minimal quick list: a named pool is text alone, an
+      // unnamed pool is chips alone, and NO edit/save/notation chrome
+      const rail = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const items = [...document.querySelectorAll('#rail-pools .rp-item')];
+        return {
+          named: items.filter((b) => b.classList.contains('rp-name'))
+            .map((b) => ({ text: b.textContent, imgs: b.querySelectorAll('img').length })),
+          dice: items.filter((b) => b.classList.contains('rp-dice'))
+            .map((b) => ({ text: b.textContent.replace(/[×x]\\d+/g, '').trim(), imgs: b.querySelectorAll('img').length })),
+          editChrome: document.querySelectorAll('#rail-pools .btn, #rail-pools input').length,
+        };
+      })())`));
+      assert.ok(rail.named.some((i) => i.text === 'Attack' && i.imgs === 0),
+        'a named pool is its name alone — no dice images');
+      assert.ok(rail.dice.some((i) => i.imgs >= 1 && i.text === ''),
+        'an unnamed pool is die chips alone — no text');
+      assert.equal(rail.editChrome, 0, 'zero edit/save chrome in the rail');
+
+      // tap = ROLL: dice fly, the draft stays untouched, the panel stays
+      // collapsed, and the roll carries the pool's name as its source
+      const logBefore = await a.logCount();
+      await a.eval(`[...document.querySelectorAll('#rail-pools .rp-item.rp-name')]
+        .find((b) => b.textContent === 'Attack').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${logBefore} && !window.__diceDebug.busy)`,
+        { desc: 'the rail item rolls' },
+      );
+      assert.equal((await a.dbg('trayState')).dice.length, 0, 'the draft was never touched');
+      assert.equal((await a.dbg('panelState')).pools, false, 'the panel stays collapsed');
+      assert.ok((await a.logTop()).includes('Attack'), 'the roll carries the pool identity');
+
+      // expand again: the quick list yields to the full workbench
+      await a.eval(`document.getElementById('edge-toggle').click()`);
+      assert.equal((await a.dbg('panelState')).pools, true, 'the strip expands it back');
+      assert.equal(await a.eval(`document.getElementById('rail-pools').offsetParent !== null`),
+        false, 'the quick list is collapsed-only');
     },
   },
   {
@@ -2088,8 +2153,8 @@ export const scenarios = [
       // seed uncategorized pools: the plain-shelf name is what this reads
       // (the DEFAULT rack is the categorized Soul Deal set now)
       await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}])`);
-      assert.equal(await a.eval(`document.querySelector('#head-compose .ph-label').textContent`),
-        'Pools', 'ONE panel since the merge, labelled Pools');
+      assert.equal(await a.eval(`document.getElementById('head-compose')`), null,
+        'the Pools title row is gone (2026-08-04: the column needs no name)');
       assert.ok(await a.eval(`[...document.querySelectorAll('.pool-sec-head')].some((h) => h.textContent === 'Pools')`),
         'the uncategorized shelf is plainly named (trio shelves stand above it)');
       assert.equal(await a.eval(`document.getElementById('group-name').placeholder`),

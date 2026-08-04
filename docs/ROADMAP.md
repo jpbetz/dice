@@ -210,6 +210,27 @@ because the well does). Naming note: the chrome never says "tray" — the
 thing is the DRAFT in its well; any new visible label speaks that
 vocabulary.
 
+### 2h. THE SIDE PANEL — the felt owns zero standing chrome (2026-08-04)
+— SHIPPED
+
+Joe's call, iterated live: the Pools panel is a dedicated layout COLUMN,
+not an overlay — one vertical divider (also the collapse control), the
+canvas sized beside it (refitView / `--table-left`; every projection
+went felt-rect-relative and felt-anchored overlays re-center over the
+felt), no "Pools" title. The rail split into the panel: presence on top
+(status · roster · you), utility verbs at the foot (❯ ≣ ⚙ + contextual
+✕ Clear table, which left the felt corner); their menus still drop as
+overlays. Collapsed = a slim icon rail with a SUPER-MINIMAL quick list
+(named pools as vertical names alone, unnamed as die chips alone, tap =
+roll directly, zero edit chrome); the hover flyout retired. NEUTRAL
+graphite dress — the dice themes carry the color, gold survives only on
+roll verbs, and the draft well wears the one warm bronze surface with a
+larger balanced ❯❯❯ ROLL ❯❯❯ cue (Joe: the outer brown looked like a
+dirt hole; brown/gold lives inside the tray only). The rack's owner row
+gained air so 'You' reads as the rack's header. e2e: side-panel (tags
+`smoke`,`chrome`,`groups`) replaces pool-flyout; control-rail asserts
+the split; stills in tools/out/side-panel/.
+
 ## Tier 2 — Organization (goal 5, the audit's biggest experience gap)
 
 ### 3. Table organization & concurrency

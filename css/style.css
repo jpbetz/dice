@@ -31,6 +31,14 @@ limitations under the License.
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --ease-plant: cubic-bezier(0.22, 1, 0.36, 1);
 
+  /* THE SIDE PANEL (2026-08-04): a real layout column, never an overlay.
+     --table-left is the felt's left edge = the panel's current width; JS
+     keeps it in sync (refitView) and the canvas + felt-anchored overlays
+     read it. The CSS default matches the expanded desktop first paint. */
+  --sidebar-w: 316px;
+  --sidebar-rail-w: 56px;
+  --table-left: 316px;
+
   /* ---- the layer scale (GOALS P2: one documented z ladder) ----------------
      Every fixed overlay takes its z-index from here — never a bare number.
      Bottom → top:
@@ -80,7 +88,10 @@ html, body {
 
 #scene-container {
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: var(--table-left); /* the felt lives BESIDE the panel, full height */
 }
 #scene-container canvas { display: block; }
 #scene-container::after {
@@ -113,43 +124,39 @@ html, body {
 
 .hint { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
 
+/* ---------- THE SIDE PANEL: a dedicated column, not an overlay ---------- */
+/* Joe 2026-08-04: the felt owns zero standing chrome. The panel is opaque,
+   NEUTRAL graphite (the dice themes carry the color — gold survives only
+   on roll verbs), full height, separated from the table by ONE vertical
+   divider (#edge-toggle, also the collapse control). Collapsed it is a
+   slim icon rail. Compact view stays EMERGENT: body.mini appears when the
+   panel is collapsed and only scales the ambient chrome. */
 #left-panel {
   position: fixed;
-  top: 16px;
-  left: 16px;
-  width: 296px; /* was 268px — the row now carries a notation chip and ± (panel.html) */
-  max-height: calc(100vh - 32px);
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-w);
   display: flex;
   flex-direction: column;
-  gap: 12px;
   z-index: var(--z-panel);
+  background: #191b1e;
+  padding-right: 14px; /* clears the #edge-toggle divider strip */
+  /* the neutral re-dress, scoped: every var(--panel)/var(--panel-border)
+     consumer inside the column resolves to graphite instead of tavern
+     brown + gold — one override, whole column */
+  --panel: #202226;
+  --panel-border: rgba(255, 255, 255, 0.11);
+  --hair: rgba(255, 255, 255, 0.08);
+}
+#left-panel.collapsed { width: var(--sidebar-rail-w); }
+/* On a phone the expanded column yields a felt sliver instead of none */
+@media (max-width: 640px) {
+  #left-panel:not(.collapsed) { width: min(var(--sidebar-w), calc(100vw - 56px)); }
 }
 
-/* (the merged Pools panel is #builder-panel; groups-panel retired 2026-07-31) */
-
-/* ---------- collapsible chrome panels ---------- */
-/* One region — Pools (draft row over the saved list) — its header toggles
-   it (per-user state in dice.panels.v1; the roll log lives in the rail's
-   #log-flyout). Collapsed, the panel rests as a labelled edge tab;
-   expanded, it overlays the table. Compact view is
-   EMERGENT: body.mini appears when every available panel is collapsed (see
-   main.js) and only scales the ambient chrome — it never hides the rail or
-   degrades a ceremony. */
-.side-panel {
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.panel-head {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  cursor: pointer;
-  user-select: none;
-}
+/* the label dress survives in the log flyout head; inside the neutral
+   column the shelf heads wear quiet steel instead of gold */
 .ph-label {
   font-family: var(--font-display);
   font-size: 13px;
@@ -159,56 +166,69 @@ html, body {
   color: var(--gold);
   white-space: nowrap;
 }
-.panel-head:hover .ph-label { color: var(--gold-bright); }
-.panel-head .btn.tiny { margin-left: auto; }
-.ph-chev { margin-left: auto; color: var(--muted); font-size: 10px; line-height: 1; }
-.panel-head .btn.tiny + .ph-chev { margin-left: 0; }
-.ph-chev::after { content: '▾'; }
-.side-panel.collapsed .ph-chev::after { content: '▸'; }
+
+.side-panel {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* in the column the panel sheds its floating-card dress: the column IS
+   the surface (opaque, square, undecorated) */
+#left-panel .side-panel {
+  min-height: 0;
+  flex: 1 1 auto;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
 .side-panel > .panel-body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 0 14px 14px;
+  padding: 4px 14px 14px;
 }
-/* EVERY panel body scrolls inside its share of the column: at 720x480 the
-   New pool panel used to paint past its border with Save unreachable under
-   the pools panel — 'the smaller the window, the more of it is table'
-   binds small windows too. */
-#left-panel .side-panel { min-height: 0; flex: 0 1 auto; }
-#builder-panel > .panel-body { overflow-y: auto; }
-/* collapsed = the labelled edge tab: header only, sized to its label */
-.side-panel.collapsed { width: max-content; border-radius: 999px; }
-.side-panel.collapsed > .panel-body { display: none; }
-.side-panel.collapsed .panel-head { padding: 6px 13px; }
-.side-panel.collapsed .btn.tiny { display: none; }
-#left-panel .side-panel.collapsed { align-self: flex-start; }
-/* The resting tabs keep ONE size in every panel state: scaling them under
-   body.mini made every collapsed tab jump the moment any one panel opened
-   (compact view is emergent, so one toggle re-dressed all its neighbours). */
+/* EVERY panel body scrolls inside its share of the column: 'the smaller
+   the window, the more of it is table' binds small windows too. */
+#builder-panel > .panel-body { overflow-y: auto; overflow-x: hidden; } /* the column never scrolls sideways */
+/* collapsed rail: the workbench + rack leave entirely (the rail-pools
+   quick list stands in); expanded, the quick list is absent */
+#left-panel.collapsed #builder-panel { display: none; }
+#left-panel:not(.collapsed) #rail-pools { display: none; }
 
-/* ---------- saved-pools flyout (roll without pinning the panel open) ------- */
-/* Hovering the COLLAPSED Saved pools tab flies the list out under it as a
-   temporary overlay: roll straight from a row, and the list retracts on
-   pointer-leave or the roll itself — the table is unobstructed when the dice
-   land. Clicking the tab still expands the panel exactly as before; touch
-   (no hover) keeps that path. */
-#builder-panel.collapsed { position: relative; }
-#builder-panel.collapsed.flyout > .panel-body {
-  display: flex;
+/* ---------- the one divider (also the collapse control) ---------- */
+#edge-toggle {
   position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  width: 296px;
-  max-height: 60vh;
-  overflow-y: auto;
-  padding: 10px 14px 14px;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.12); /* THE divider */
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
 }
+#edge-toggle:hover { border-right-color: rgba(255, 255, 255, 0.3); color: var(--ivory); }
+#edge-toggle:focus-visible { outline: 1px solid var(--ivory); outline-offset: -2px; }
+.et-chev { position: absolute; top: 14px; left: 0; right: 0; font-size: 11px; line-height: 1; text-align: center; }
+#left-panel.collapsed .et-chev { transform: scaleX(-1); }
+
+/* ---------- neutral accents inside the column ---------- */
+/* Joe 2026-08-04: gold survives ONLY where it means roll (the tray cue and
+   its glow keep their dress untouched); ambient chrome — hover borders,
+   pressed segments, sticky shelf heads — reads steel over graphite. */
+#left-panel .btn:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.32); }
+#left-panel .btn.confirm:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.4); }
+#left-panel .seg button[aria-pressed="true"] {
+  background: rgba(243, 234, 215, 0.13);
+  color: var(--ivory);
+  box-shadow: inset 0 0 0 1px rgba(243, 234, 215, 0.28);
+}
+#left-panel .pool-sec-head { background: rgba(25, 27, 30, 0.96); }
 
 /* ---------- buttons ---------- */
 .btn {
@@ -342,10 +362,12 @@ html, body {
    tiles never wear it (they stage); this is the one roll button. */
 /* the standing ROLL whisper gathers gold with the pool (heat classes):
    a one-die draft whispers at 0.3; a heavy pool promises at 0.55 */
-.tray-roll .roll-cue { opacity: 0.3; }
-.draft-zone.heat-2 .tray-roll .roll-cue { opacity: 0.38; }
-.draft-zone.heat-3 .tray-roll .roll-cue { opacity: 0.46; }
-.draft-zone.heat-4 .tray-roll .roll-cue { opacity: 0.55; }
+/* resting presence up a step (Joe 2026-08-04: it 'looks better when
+   activated' — let it rest closer to that) */
+.tray-roll .roll-cue { opacity: 0.4; }
+.draft-zone.heat-2 .tray-roll .roll-cue { opacity: 0.48; }
+.draft-zone.heat-3 .tray-roll .roll-cue { opacity: 0.56; }
+.draft-zone.heat-4 .tray-roll .roll-cue { opacity: 0.65; }
 .tray-roll.hidden { display: none; }
 /* (the well's die size lives with the beacon block below — 34px, larger
    than the pool rows' 28: the draft is the star) */
@@ -394,12 +416,31 @@ html, body {
    size, weight and location — effects may differ, no glitching'): the
    ghost inherits the base .roll-cue box (absolute, right-aligned) and
    ONLY opacity distinguishes empty · standing · hover. */
-.tray-line2 .roll-cue { font-size: 23px; }
+/* the WELL's cue: larger and CENTERED, chevrons both sides (Joe
+   2026-08-04: 'the roll word is too small… needs chevrons on the other
+   side to balance the space') — card strips keep the compact right form.
+   26px/0.18em is the largest dress that fits the well's width whole: the
+   cue must never widen the panel into a horizontal scrollbar. */
+.tray-line2 .roll-cue { font-size: 26px; letter-spacing: 0.18em; justify-content: center; padding-right: 0; }
+/* the roll-hover lights the WHOLE well, never an inset box (Joe
+   2026-08-04: the button's own hover rect read as a margined region
+   inside the tray) — the button sheds its box dress in the well and the
+   well itself takes the gold */
+.tray-line2 .tray-roll:hover:not(:disabled) {
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+}
+#tray-actions:has(.tray-roll:hover:not(:disabled)) {
+  border-color: rgba(212, 175, 55, 0.5);
+  background: linear-gradient(180deg, rgba(50, 38, 19, 0.92), rgba(36, 27, 14, 0.94));
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35), 0 0 16px rgba(255, 214, 102, 0.14);
+}
 #tray-hint .roll-cue {
-  opacity: 0.22;
+  opacity: 0.3;
   transition: opacity 0.25s;
 }
-#tray-actions:hover #tray-hint .roll-cue { opacity: 0.34; }
+#tray-actions:hover #tray-hint .roll-cue { opacity: 0.45; }
 #tray-hint.hidden { display: none; }
 .tray-save.hidden { display: none; }
 .tray-line2.hidden { display: none; }
@@ -423,11 +464,14 @@ html, body {
   /* the beacon, take two (Joe 2026-08-03: the funnels fought the rail —
      'just give more space and make it taller'): presence by SIZE and AIR.
      A taller well, larger dice inside it, real margins above and below. */
-  margin: 12px 0 10px;
+  margin: 12px 0 6px; /* the ± drawer-pull snugs directly beneath */
   gap: 4px;
   padding: 9px 8px;
-  background: var(--well);
-  border: 1px solid var(--hair);
+  /* the ONE warm surface in the graphite column (Joe 2026-08-04): the
+     roll world wears bronze inside the well — everything around it is
+     neutral, so the tray reads distinct instead of the panel reading brown */
+  background: linear-gradient(180deg, rgba(42, 31, 16, 0.9), rgba(29, 22, 12, 0.94));
+  border: 1px solid rgba(212, 175, 55, 0.22);
   border-radius: 11px;         /* concentric: 8px roll button + ~3px lip */
   /* the beacon (Joe 2026-08-03): the well warms as dice land. Heat rides
      STEPPED classes (.heat-1…4 on #draft-zone, renderTray): discrete
@@ -449,30 +493,28 @@ html, body {
   border-color: rgba(212, 175, 55, 0.38);
   background: rgba(212, 175, 55, 0.05);
 }
-#tray-actions.open #tray-mods { opacity: 1; color: var(--gold-bright); }
-/* The ± — the full-height borderless gutter tool the old .pool-mods
-   intended (the shipped 25×38 bordered chip was a .pool-mods/.group-mods
-   cascade accident; both families retire with this, their only element).
-   Reveal scope: the WELL's approach (roll-adjacent tier); a disabled ±
-   (empty draft) never surfaces, even on coarse pointers. gold-bright on
-   hover is the pre-existing ± signature. */
+/* The ± — a short FULL-WIDTH bronze drawer-pull directly below the well
+   (Joe 2026-08-04: in the well's gutter it pushed the centered cue
+   sideways and crowded a full draft). Same warm world, quieter voice:
+   standing while a draft exists (P6), dim when the well is empty,
+   gold-bright while its popover is open (sibling selector — .open still
+   lands on #tray-actions, the popover's anchor). */
 #tray-mods {
-  flex: none;
-  align-self: stretch;
-  width: 30px;
-  border: none;
-  border-radius: 8px;
-  background: none;
-  color: #574f43;
-  font-size: 14px;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 4px 0 5px;
+  border: 1px solid rgba(212, 175, 55, 0.16);
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(36, 27, 14, 0.7), rgba(28, 21, 11, 0.78));
+  color: rgba(255, 215, 102, 0.55);
+  font-size: 13px; /* a lone ± — the app-wide modifier sign, no words */
+  line-height: 1;
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.12s, color 0.12s, background 0.15s;
+  transition: color 0.12s, border-color 0.15s, background 0.15s;
 }
-#tray-actions:hover #tray-mods:not(:disabled),
-#tray-actions:focus-within #tray-mods:not(:disabled) { opacity: 1; color: var(--muted); }
-#tray-mods:hover:not(:disabled) { color: var(--gold-bright); background: rgba(212, 175, 55, 0.10); }
-@media (pointer: coarse) { #tray-mods:not(:disabled) { opacity: 1; } }
+#tray-mods:disabled { opacity: 0.35; color: #574f43; cursor: default; }
+#tray-mods:hover:not(:disabled) { color: var(--gold-bright); border-color: rgba(212, 175, 55, 0.4); background: rgba(212, 175, 55, 0.1); }
+#tray-actions.open + #tray-mods { color: var(--gold-bright); border-color: rgba(212, 175, 55, 0.45); }
 /* THE RAIL (P6: management STANDS — supersedes the 2026-08-01 ghost-text
    demotion; §7.14). Appearing only while a draft exists is the contextual
    signal; while it exists the verbs stand — no hover reveal for
@@ -631,10 +673,17 @@ html, body {
 .cue-word { font-weight: inherit; }
 /* Chevrons: STATIC, shorter than the word, fading left → right — a trail
    pointing at the click, not a blinker (animation retired 2026-07-31). */
+/* chevron fades are CLASS-driven — leading crescendo INTO the word,
+   trailing decrescendo out, so the motion flows through ROLL. (nth-of-type
+   miscounts once a balanced cue carries a leading set.) */
 .roll-cue i { font-style: normal; font-size: 0.68em; margin-left: 0.12em; }
-.roll-cue i:nth-of-type(1) { opacity: 0.9; }
-.roll-cue i:nth-of-type(2) { opacity: 0.55; }
-.roll-cue i:nth-of-type(3) { opacity: 0.28; }
+.roll-cue i.lead { margin-left: 0; margin-right: 0.12em; }
+.roll-cue i.t1 { opacity: 0.9; }
+.roll-cue i.t2 { opacity: 0.55; }
+.roll-cue i.t3 { opacity: 0.28; }
+.roll-cue i.l1 { opacity: 0.28; }
+.roll-cue i.l2 { opacity: 0.55; }
+.roll-cue i.l3 { opacity: 0.9; }
 .tray-cluster:has(.die-x:hover) .tray-roll .roll-cue { opacity: 0; }
 .pool-roll .die-art { width: 28px; height: 28px; pointer-events: none; }
 .strip-dot {
@@ -655,7 +704,11 @@ html, body {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: linear-gradient(180deg, rgba(24, 19, 14, 0.98), rgba(24, 19, 14, 0.94));
+  /* The zone wears the COLUMN's exact color (Joe 2026-08-04: a lighter
+     wash read as a stray band that never reached the divider). It stays
+     opaque for its real job — the sticky draft masks shelves scrolling
+     under it — while the warm well + ± bar do the visual grouping. */
+  background: #191b1e;
   margin: 0 -14px;
   /* 16px top vs the palette's internal 6px grid gap is the region-vs-item
      grouping signal (§7.14 — the zone was "a really tight little box");
@@ -933,7 +986,10 @@ html, body {
 /* The owner switcher (ROADMAP 2b): quiet owner chips above the shelves;
    a teammate's rack stands behind the read-only banner-chip (also the way
    back). Small windows fold chip names away — the dots stay. */
-.pools-switcher { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 8px; }
+/* AIR above the owner row (Joe 2026-08-04: glued under the draft zone's
+   hairline, 'You' read as part of the draft — the gap makes it the rack's
+   own header) */
+.pools-switcher { display: flex; flex-wrap: wrap; gap: 4px; margin: 16px 0 8px; }
 .owner-chip {
   display: inline-flex;
   align-items: center;
@@ -1137,15 +1193,89 @@ html, body {
    mode used to strand settings + mute off screen). Order is P3: presence
    (status · roster · identity) → action (❯) → information (≣) →
    environment (🔊 · ⚙). */
+/* The control rail, split (Joe 2026-08-04): #rail at the top is PRESENCE
+   — status, roster, you — and #rail-foot at the panel's foot carries the
+   utility verbs (❯ ≣ ⚙, contextual ✕ Clear). Collapsed, both become
+   centered icon stacks: identity dot up top, tools pinned at the bottom. */
 #rail {
-  position: fixed;
-  top: 16px;
-  right: 16px;
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
-  z-index: var(--z-panel);
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 10px 8px;
+  border-bottom: 1px solid var(--hair);
 }
+#rail-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--hair);
+}
+#left-panel.collapsed #rail,
+#left-panel.collapsed #rail-foot {
+  flex-direction: column;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  border-width: 0;
+}
+#left-panel.collapsed #rail { padding: 34px 6px 8px; } /* below the chevron's reach */
+#left-panel.collapsed #rail-foot { padding: 8px 6px 12px; border-top-width: 1px; }
+#left-panel.collapsed #rail-roster,
+#left-panel.collapsed .identity-name { display: none; }
+#left-panel.collapsed #identity-chip { padding: 8px; }
+#left-panel.collapsed #status-pill:not(.hidden) {
+  overflow: hidden;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border-radius: 50%;
+  color: transparent; /* the pill folds to its dot; the color still signals */
+}
+
+/* collapsed-only pools quick list (super minimal): filled by renderRailPools */
+#rail-pools {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px;
+  scrollbar-width: none;
+}
+/* one pool, one tap, one roll — a name alone (vertical: the rail is 56px)
+   or die chips alone; every word of edit/save chrome stays expanded-only */
+.rp-item {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  max-width: 36px;
+  padding: 7px 5px;
+  border: 1px solid var(--panel-border);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ivory);
+  cursor: pointer;
+}
+.rp-item:hover { background: rgba(255, 255, 255, 0.11); border-color: rgba(255, 255, 255, 0.32); }
+.rp-name {
+  writing-mode: vertical-rl;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  max-height: 128px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rp-dice .die-art { width: 18px; height: 18px; }
+.rp-dice .strip-count { font-size: 9px; }
 
 /* ---------- identity chip + menu (the rail) ---------- */
 #identity-chip {
@@ -1170,8 +1300,8 @@ html, body {
 }
 #identity-menu {
   position: fixed;
-  top: 56px;
-  right: 16px;
+  top: 12px;
+  left: calc(var(--table-left) + 12px); /* drops beside the panel's toolbar */
   width: 220px;
   padding: 8px;
   z-index: var(--z-popover); /* a small popover — same rung as ± */
@@ -1231,8 +1361,8 @@ html, body {
    layer stacked over it peels first (matching the Esc chain in main.js). */
 #log-flyout {
   position: fixed;
-  top: 56px;
-  right: 16px;
+  bottom: 12px; /* the ≣ lives in the panel's FOOT bar now — rise from it */
+  left: calc(var(--table-left) + 12px);
   width: 300px;
   max-height: 60vh;
   overflow-y: auto;
@@ -1340,7 +1470,9 @@ html, body {
 /* ---------- result banner ---------- */
 #result-banner {
   position: fixed;
-  left: 50%;
+  /* centered over the FELT, not the viewport: felt-center = 50% + half the
+     panel width (the same shift every felt-anchored overlay carries) */
+  left: calc(50% + var(--table-left) / 2);
   bottom: 26px;
   transform: translateX(-50%);
   text-align: center;
@@ -1544,7 +1676,7 @@ html, body {
 /* ---------- crit overlay ---------- */
 #crit-overlay {
   position: fixed;
-  inset: 0;
+  inset: 0 0 0 var(--table-left); /* the flash centers over the felt */
   z-index: var(--z-crit);
   display: flex;
   align-items: center;
@@ -1840,15 +1972,15 @@ body.mini .value-chip { font-size: 14px; min-width: 26px; padding: 2px 6px; }
 body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
 
 /* ---------- corner controls (shown only while dice are on the table) ---------- */
-#corner-controls {
-  position: fixed;
-  right: 10px;
-  bottom: 10px;
-  display: flex;
-  gap: 6px;
-  z-index: var(--z-table-labels);
-}
+/* Docked in the foot bar (2026-08-04, zero felt overlays): still context,
+   not furniture — it renders only while dice are on the table. Sits at
+   the bar's far end so its coming and going never shifts its neighbours;
+   collapsed it joins the icon stack as a bare ✕. */
+#corner-controls { display: flex; gap: 6px; margin-left: auto; }
 #corner-controls.hidden { display: none; }
+#left-panel.collapsed #corner-controls { margin-left: 0; }
+#left-panel.collapsed .cb-label { display: none; }
+#left-panel.collapsed .corner-btn { padding: 8px 10px; }
 .corner-btn {
   padding: 7px 14px;
   border-radius: 999px;
@@ -1896,7 +2028,8 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
 /* A marker on its way out keeps its place for the fade but stops taking
    clicks: the roll that replaced it is already sitting under it. */
 /* fully under the open panel: the invisible target yields its clicks */
-.shelf-marker.occluded { pointer-events: none; }
+/* (.shelf-marker.occluded retired 2026-08-04: the panel is layout, not
+   overlay — no marker can sit under it anymore) */
 .shelf-marker.chip-clearing {
   opacity: 0 !important;
   pointer-events: none;
@@ -2121,7 +2254,7 @@ body.mini .pk-breakdown { font-size: 10px; }
 #offers-layer {
   position: fixed;
   top: 64px;
-  left: 50%;
+  left: calc(50% + var(--table-left) / 2); /* felt-centered, like the banner */
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -2563,7 +2696,7 @@ body.mini .popover { width: min(94vw, 312px); }
    occluded by a floating die number. This supersedes the old §2.4 rule that
    kept chips above the card — see the layer scale in :root.
 ---------------------------------------------------------------------------- */
-#ceremony-layer { position: fixed; inset: 0; z-index: var(--z-ceremony); pointer-events: none; }
+#ceremony-layer { position: fixed; inset: 0 0 0 var(--table-left); z-index: var(--z-ceremony); pointer-events: none; } /* cards center over the felt */
 #ceremony-layer.hidden { display: none; }
 #ceremony-layer.skip * { transition-duration: 0s !important; animation-duration: 0s !important; transition-delay: 0s !important; animation-delay: 0s !important; }
 

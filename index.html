@@ -32,24 +32,42 @@ limitations under the License.
 <body>
   <div id="scene-container"></div>
 
-  <!-- The left column holds ONE panel since the merge: Pools — the draft
-       first, the saved list beneath ("pool" is the user-facing word; the
-       `tray`/`group` ids, classes, storage keys and the #g= codec keep
-       their old spelling). Its header toggles it; collapsed it rests as a
-       labelled edge tab (per-user state in dice.panels.v1). The roll log
-       rides the rail as #log-flyout. -->
+  <!-- THE SIDE PANEL (Joe 2026-08-04): a dedicated layout column, NOT an
+       overlay — the felt (canvas) is sized beside it and owns zero standing
+       chrome. One vertical divider (#edge-toggle, also the collapse control)
+       separates panel from table. Collapsed it is a slim icon rail: the menu
+       buttons stacked, then the pools super-minimal. Neutral graphite dress —
+       the dice themes carry the color. Per-user state in dice.panels.v1
+       ("pool" is the user-facing word; tray/group ids, classes, storage keys
+       and the #g= codec keep their old spelling). -->
   <aside id="left-panel">
+    <!-- The control rail split top/bottom (Joe 2026-08-04): PRESENCE heads
+         the column — status, roster, you — and the utility verbs (❯ quick
+         roll, ≣ log, ⚙ settings, contextual ✕ Clear table) sit in the
+         #rail-foot bar at the panel's foot. Their transient drops
+         (#identity-menu, #log-flyout, settings) still overlay — menus may;
+         the panel's own content may not. -->
+    <div id="rail">
+      <span id="status-pill" class="hidden"></span>
+      <div id="rail-roster"></div>
+      <button id="identity-chip" class="btn ghost" title="You — change name, leave &amp; switch, invite">
+        <span id="identity-dot" class="identity-dot"></span>
+        <span id="identity-name" class="identity-name">…</span>
+      </button>
+    </div>
+
+    <!-- Collapsed-only quick list (super minimal, Joe 2026-08-04): your
+         pools with zero edit/save/notation chrome — named pools are a name
+         alone, unnamed pools are their die chips alone; a tap rolls it. -->
+    <div id="rail-pools"></div>
+
     <!-- ONE Pools panel (2026-07-31, the panel merge): the draft is its
          FIRST ROW — structurally a saved-pool row that does not exist yet —
          and the saved list sits directly under it, so Save lands the new
-         row in view. One tab in compact, one flyout, one ✎ manage gate.
-         Ids keep old spellings (builder-panel survives as the element id;
-         tray/group live on in classes, storage keys and the #g= codec). -->
+         row in view. The "Pools" title row is gone (Joe 2026-08-04): the
+         column needs no name, the divider chevron collapses it. Ids keep
+         old spellings (builder-panel survives as the element id). -->
     <div class="panel side-panel" id="builder-panel">
-      <div class="panel-head" id="head-compose" title="Show/hide — key: n">
-        <span class="ph-label">Pools</span>
-        <span class="ph-chev" aria-hidden="true"></span>
-      </div>
       <div class="panel-body">
       <!-- No app masthead here: the panel header already names this region,
            and the panel is a tool, not a title card (the app name lives in
@@ -109,15 +127,13 @@ limitations under the License.
            (Save · Offer · ✕ Clear), STANDING while a draft exists.
            Everything aligns to the well's 7px interior grid. -->
       <div id="draft-zone" class="draft-zone">
-      <!-- The WELL: the draft's second editor, peer to #cmd — same --well
+      <!-- The WELL: the draft's second editor, peer to #cmd — same warm
            dress (§7.9: one draft, two editors; only one of them looked
-           like an editor before this). [cluster][±] as siblings. Keeps the
+           like an editor before this). The cluster stands ALONE in the
+           well (Joe 2026-08-04: the ± gutter pushed the cue off-center)
+           — ± is the drawer-pull bar directly below. Keeps the
            #tray-actions id: it anchors the ± popover. -->
-      <!-- ± rides the LEFT gutter (Joe 2026-08-03: on the right it sat in
-           the chevrons' path — the cue points at the roll, and nothing
-           may stand where it points). -->
       <div class="pool-line2 tray-line2" id="tray-actions">
-        <button id="tray-mods" title="Tweak — modifiers, target, moment">±</button>
         <div id="tray" class="tray-cluster">
           <button id="tray-roll" class="pool-roll tray-roll hidden"></button>
           <div id="tray-x-layer" class="tray-x-layer"></div>
@@ -128,6 +144,10 @@ limitations under the License.
           <div id="tray-hint" class="hint tray-ghost"></div>
         </div>
       </div>
+      <!-- symbol only (Joe 2026-08-04: no 'Tweak' in the interface) — the
+           ± is the app-wide sign for the modifier drawer; the title says
+           the rest on hover -->
+      <button id="tray-mods" title="Modifiers, target, moment">±</button>
       <!-- The RAIL (P6: management STANDS — supersedes the 2026-08-01
            ghost-text demotion): it appears only while a draft exists
            (that is the contextual signal) and then stands — no hover
@@ -175,34 +195,34 @@ limitations under the License.
       </div>
       </div>
     </div>
+
+    <!-- The utility bar at the panel's foot (Joe 2026-08-04): quick roll,
+         log, settings — and the contextual ✕ Clear table at its end. -->
+    <div id="rail-foot">
+      <button id="rail-palette" class="btn ghost" title="Quick roll ( / )">❯</button>
+      <!-- No notification bubble on the log (user call, 2026-07): history is
+           reference material, not an inbox — the since-you-looked count rides
+           only the hover title. -->
+      <button id="rail-log" class="btn ghost" title="Roll log — l" aria-pressed="false">≣</button>
+      <button id="toggle-settings" class="btn ghost" title="Settings">⚙</button>
+      <div id="corner-controls" class="hidden">
+        <button id="corner-clear" class="corner-btn" title="Remove all dice from the table — c"><span class="cb-x">✕</span><span class="cb-label"> Clear table</span></button>
+      </div>
+    </div>
+
+    <!-- THE ONE DIVIDER: a full-height strip on the panel's felt edge — its
+         right border is the single vertical line separating panel from
+         table, and the whole strip is the collapse/expand control (key n).
+         The chevron rides near the top. -->
+    <button id="edge-toggle" aria-expanded="true" title="Collapse the panel — n">
+      <span class="et-chev" aria-hidden="true">⟨</span>
+    </button>
   </aside>
 
-  <!-- The persistent control rail: NEVER hides, in any state or viewport.
-       Ordered per P3 — presence → action → information → environment: the
-       status pill, roster and identity chip say who is at the table; ❯
-       (quick roll) acts on it; ≣ (roll log, with an unread badge) informs
-       about it; sound and settings dress the room. Settings and mute live
-       here so no view can strand them (the retired compact mode hid them).
-       The roster is everyone ELSE as quiet name pills (you ARE the identity
-       chip — that is the 'which one is me' signal), folding into a +N pill
-       past a handful. No Players panel: a roster is presence, not a
-       workspace. The old ⤡ collapse-all button is deleted (key 'm' remains;
-       the two panel edge tabs are the visible replacement). The ≣ badge is
-       a SPAN, not a nested button: the whole target is the one toggle. -->
-  <div id="rail">
-    <span id="status-pill" class="hidden"></span>
-    <div id="rail-roster"></div>
-    <button id="identity-chip" class="btn ghost" title="You — change name, leave &amp; switch, invite">
-      <span id="identity-dot" class="identity-dot"></span>
-      <span id="identity-name" class="identity-name">…</span>
-    </button>
-    <button id="rail-palette" class="btn ghost" title="Quick roll ( / )">❯</button>
-    <!-- No notification bubble on the log (user call, 2026-07): history is
-         reference material, not an inbox — the since-you-looked count rides
-         only the hover title. -->
-    <button id="rail-log" class="btn ghost" title="Roll log — l" aria-pressed="false">≣</button>
-    <button id="toggle-settings" class="btn ghost" title="Settings">⚙</button>
-  </div>
+  <!-- (The persistent control rail lives at the TOP of #left-panel now —
+       2026-08-04, zero felt overlays. It still never hides: the collapsed
+       panel keeps it as a vertical icon stack. Roster folds into +N pills;
+       the ≣ badge stays a SPAN, not a nested button.) -->
 
   <!-- Identity menu (rail chip): who you are + seat actions. Fully solo-capable
        (goal 9): renaming writes the stored name; Leave & switch re-prompts. -->
@@ -242,11 +262,8 @@ limitations under the License.
     <p id="log-empty" class="hint">No rolls yet.</p>
   </div>
 
-  <!-- Corner control: clear the whole table. Context, not furniture — it
-       exists only while dice are actually on the table (felt or shelf). -->
-  <div id="corner-controls" class="hidden">
-    <button id="corner-clear" class="corner-btn" title="Remove all dice from the table">✕ Clear table</button>
-  </div>
+  <!-- (#corner-controls docked into the rail, 2026-08-04 — the felt keeps
+       zero standing chrome.) -->
 
   <!-- Quick palette: Spotlight-style transient command strip ('/' or Ctrl/Cmd+K).
        Same validation machinery + 'dice.cmdhistory.v1' history as the panel box. -->
@@ -267,8 +284,7 @@ limitations under the License.
           <tr><td><code>1–9</code></td><td>stage pool N into the draft (then Enter rolls)</td></tr>
           <tr><td><code>r</code></td><td>reroll the last roll</td></tr>
           <tr><td><code>c</code></td><td>clear the table</td></tr>
-          <tr><td><code>m</code></td><td>collapse / expand the panel (the edge tab brings it back)</td></tr>
-          <tr><td><code>n</code></td><td>toggle the Pools panel</td></tr>
+          <tr><td><code>n</code> or <code>m</code></td><td>collapse / expand the side panel (the divider chevron too)</td></tr>
           <tr><td><code>l</code></td><td>roll log flyout</td></tr>
           <tr><td><code>s</code></td><td>sound on/off</td></tr>
           <tr><td><code>/</code> or <code>Ctrl/Cmd K</code></td><td>quick roll palette</td></tr>

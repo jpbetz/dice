@@ -1384,20 +1384,40 @@ banner, the ✕ on the verdict card and the peek's base ✕ share a class, a
 look and the label *Clear this roll for everyone*. A spectator's local
 dismiss stays visually distinct — different semantics, different affordance.
 
-**The rail never hides.** A persistent strip carries status · roster ·
-identity chip · ❯ quick roll · ≣ roll log · 🔊 · ⚙ — presence → action →
-information → environment — in every state and at every viewport. *(2026-07
-amendment: the ⤡ collapse-all button is deleted — key `m` remains and the
-panel edge tabs are the visible replacement; the roll log left the panel
-stack for the rail's ≣, a pinned flyout with an unread badge.)* This is the
-fix for a real bug: settings and mute used to live in chrome that compact
-mode hid, stranding both behind a keyboard shortcut.
+**The rail never hides — and it rides the panel now.** *(2026-08-04, Joe:
+zero overlays on the tabletop.)* The rail split in two inside the side
+panel: `#rail` at the TOP is presence alone — status · roster · identity
+chip — and `#rail-foot` at the panel's FOOT carries the utility verbs — ❯
+quick roll · ≣ roll log · ⚙ settings · the contextual ✕ Clear table
+(which left the felt corner). Collapsed, both become centered icon
+stacks; nothing is ever stranded (the old compact-mode bug stays fixed).
+Their drops still overlay (menus may — the identity menu falls from the
+top, the log flyout rises from the foot); the panel's own content never
+does. *(Historical: the rail was a top-right felt overlay; the ⤡
+collapse-all button deleted 2026-07 — key `m` remains; 🔊 retired
+2026-08-03.)*
+
+**THE SIDE PANEL (2026-08-04)** *(supersedes the overlay panel + labelled
+edge tab)*: the ONE Pools region is a dedicated layout COLUMN — opaque
+neutral graphite (the dice themes carry the color; gold survives only on
+roll verbs, and the draft well wears the one warm bronze surface),
+separated from the felt by a single vertical divider that IS the collapse
+control (`#edge-toggle`, chevron at top). The canvas is sized BESIDE it
+(refitView: `--table-left` = live panel width; camera, renderer and every
+felt-anchored overlay re-derive on toggle), so expanding never covers a
+landed roll — the felt resizes instead. There is no "Pools" title row.
+Collapsed = a slim icon rail (~56px): identity dot up top, the utility
+stack at the foot, and between them a SUPER-MINIMAL pool quick list —
+named pools as vertical names alone, unnamed pools as die chips alone,
+zero edit/save/notation chrome — where a tap ROLLS the pool directly
+(the draft untouched, the panel staying slim; rollRailPool round-trips
+the pool through the one grammar so name/set/dc all ride exactly as a
+staged roll). The collapsed-tab hover flyout is retired. State stays in
+`dice.panels.v1`.
 
 **ONE region since the panel merge (2026-07-31)** *(was three, then two:
 the roll log moved to the rail flyout — `l` — and then New pool and Saved
-pools merged)*: the **Pools** panel, collapsing on its header to a labelled
-edge tab (`dice.panels.v1`; legacy two-region state migrates open-if-either
--was). The DRAFT is its first row — structurally a saved-pool row that does
+pools merged)*. The DRAFT is its first row — structurally a saved-pool row that does
 not exist yet — with the saved list directly beneath, so Save lands the new
 row in view. Keys `n` (documented) and `b`/`g` (silent aliases) toggle it;
 `m` keeps its collapse-all muscle memory. The draft shows ONE input view at
@@ -1805,8 +1825,12 @@ second well, and derives every placement from one law:
   first paint.
 - Retired with the pass: the `.pool-mods` / `.group-mods` rule families
   (the draft ± was their only remaining element; the shipped 25×38
-  bordered chip was their cascade accident — the ± is `#tray-mods` now, a
-  full-height borderless gutter tool).
+  bordered chip was their cascade accident). *(2026-08-04: `#tray-mods`
+  left the well's gutter too — it pushed the centered cue sideways — and
+  is now the short full-width bronze DRAWER-PULL directly below the well —
+  a lone ±, no words (Joe: no 'Tweak' in the interface) — standing while
+  a draft exists and gold-lit while its popover is open. The roll-hover
+  lights the WHOLE well via :has(), never the button's inset box.)*
 
 ### 7.15 Reroll speaks its name (shipped 2026-08-03)
 
