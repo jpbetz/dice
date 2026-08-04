@@ -3341,7 +3341,10 @@ function renderIntentCard(roll) {
     holder.appendChild(el);
   }
   document.getElementById('intent-notation').textContent = canonicalNotation(
-    { dice: roll.spec.dice, mods: roll.spec.mods },
+    // The stake declares its POOLS (2i-B): sources ride the notation line —
+    // '2d8[Wisdom]+1d10[Sword]', never bare dice math where the pool names
+    // are the stake being read aloud.
+    { dice: roll.spec.dice, mods: roll.spec.mods, sources: roll.spec.sources },
     { dc: roll.dc, comment: null }
   );
 }

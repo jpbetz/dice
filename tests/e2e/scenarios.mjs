@@ -714,6 +714,13 @@ export const scenarios = [
       // brings it back on the standing card (the relit repaint)
       await a.dbg(`commandRoll('2d8[Wisdom]+1d10[Sword] check # Steady the Rope | crossing')`);
       await a.waitFor(
+        `(window.__diceDebug.sim(30), ['declare','tumble'].includes((window.__diceDebug.ceremonyState || {}).phase))`,
+        { desc: 'ceremony declared' },
+      );
+      // 2i-B: the declaration reads its POOLS — sources ride the intent line
+      assert.ok((await a.eval(`document.getElementById('intent-notation').textContent`))
+        .includes('[Wisdom]'), 'the intent card declares the pool names');
+      await a.waitFor(
         `(window.__diceDebug.skipCeremony(), window.__diceDebug.sim(30), (window.__diceDebug.ceremonyState || {}).phase === 'done')`,
         { desc: 'verdict staged' },
       );
@@ -723,6 +730,14 @@ export const scenarios = [
       assert.ok(await a.eval(
         `document.getElementById('verdict-hero').classList.contains('verdict-outcomes')`),
         'the outcome rows hold the card’s center');
+      // 2i-B: the card's chips never SHOUT (no inherited uppercase), and
+      // its action row rests DIM — quiet, never invisible-interactive
+      assert.equal(await a.eval(
+        `getComputedStyle(document.getElementById('verdict-hero')).textTransform`),
+        'none', 'the shared chips keep their lowercase evidence identity');
+      assert.equal(await a.eval(
+        `getComputedStyle(document.querySelector('#verdict-card .verdict-actions')).opacity`),
+        '0.45', 'the verdict actions rest dim, never invisible');
       await a.dbg(`setSystem('dnd')`);
       await a.waitFor(
         `getComputedStyle(document.querySelector('#verdict-card .ring-wrap')).display !== 'none'`,

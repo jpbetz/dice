@@ -1898,6 +1898,19 @@ html, body {
 .oc-chip.oc-b-success-soft { border-color: rgba(255, 214, 102, 0.22); }
 .oc-chip.oc-b-fail, .oc-chip.oc-b-crit-fail { border-color: rgba(226, 73, 59, 0.5); }
 .verdict-outcomes .oc-word { font-size: clamp(15px, 2.4vmin, 18px); }
+/* the verdict card must not SHOUT its chips (2i-B): the hero dress's
+   uppercase + tracking stop at the rows — the chips keep the lowercase
+   mono evidence identity every other surface reads. (Specificity beats
+   .verdict-hero/.verdict-tally on purpose.) And the hero word's flanking
+   hairlines fold: as ::before/::after they would join the ledger GRID as
+   stray first/last items and shear the label column off its rows. */
+.verdict-hero.verdict-outcomes {
+  text-transform: none;
+  letter-spacing: normal;
+  text-indent: 0;
+}
+.verdict-hero.verdict-outcomes::before,
+.verdict-hero.verdict-outcomes::after { content: none; }
 .pk-outcomes .oc-word { font-size: 13px; }
 .pk-outcomes .oc-chip { padding: 1px 7px 2px; }
 /* one-die rolls read at HERO scale (2i-A): the single answer word IS the
@@ -2514,11 +2527,12 @@ body.mini .pk-breakdown { font-size: 10px; }
 .reveal-tier:empty { display: none; }
 #verdict-done.mine { font-weight: 700; border-color: rgba(212, 175, 55, 0.5); }
 /* The verdict card is TRANSIENT — it times out into the banner — so its
-   WHOLE action row is revealed-tier: at rest the card is pure result
-   (clean and shiny; the banner keeps the standing Done, it persists).
-   display:contents folds the inner tier's buttons into the one centered
-   row when the actions do appear. */
-#verdict-card .verdict-actions { opacity: 0; transition: opacity 0.15s; }
+   WHOLE action row rides the reveal tier. REST-DIM, never invisible
+   (2i-B: the card was the last surface on the retired invisible→visible
+   grammar — quiet → loud on approach, the same P6 fold rule the banner
+   and peek carry). display:contents folds the inner tier's buttons into
+   the one centered row. */
+#verdict-card .verdict-actions { opacity: 0.45; transition: opacity 0.15s; }
 #verdict-card:hover .verdict-actions,
 #verdict-card:focus-within .verdict-actions { opacity: 1; }
 #verdict-card .reveal-tier { display: contents; }
