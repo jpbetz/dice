@@ -1180,20 +1180,19 @@ export const scenarios = [
     tags: ['smoke', 'chrome'],
     // The New pool panel speaks P1 end to end: composed dice render as one
     // die-art roll button; a per-die ✕ (an overlaid SIBLING, never a nested
-    // button) removes exactly one die; the contextual line is [Save][±][✕];
-    // Save is an inline morph and ALWAYS additive (updates stay by-id);
-    // the empty draft shows the hint.
+    // button) removes exactly one die; the rim is [± Modify][Offer][✕ Clear]
+    // (the Save retired 2026-08-04 — pool editing owns creation); the empty
+    // draft shows the hint.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       // origins share a profile across scenarios: seed the rack explicitly
-      // (the Save below collides with the seed 'Attack' on purpose)
       await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
       let ts = await a.dbg('trayState');
       assert.equal(ts.hint, true, 'empty draft shows the hint');
       // standing furniture (Joe 2026-08-03): the rail never leaves — its
       // verbs GRAY on an empty draft, so the zone's geometry never moves
       assert.equal(ts.hasActions, true, 'the rail stands on an empty draft');
-      assert.equal(await a.eval(`document.getElementById('save-group').disabled`), true,
+      assert.equal(await a.eval(`document.getElementById('tray-mods').disabled`), true,
         'grayed until a draft exists');
 
       // Compose two dice from the palette; the cluster carries their art + ✕s.
@@ -1203,8 +1202,12 @@ export const scenarios = [
       assert.deepEqual(ts.dice, ['d6', 'd6'], 'two d6 composed');
       assert.equal(ts.rollVisible, true, 'the cluster is the roll button');
       assert.equal(ts.hasActions, true, 'the rail stands with content too');
-      assert.equal(await a.eval(`document.getElementById('save-group').disabled`), false,
+      assert.equal(await a.eval(`document.getElementById('tray-mods').disabled`), false,
         'and its verbs arm with the draft');
+      assert.ok((await a.eval(`document.getElementById('tray-mods').textContent`)).includes('Modify'),
+        "the modifier tool wears its word — '± Modify', never 'Tweak'");
+      assert.equal(await a.eval(`!!document.getElementById('save-group')`), false,
+        'the rim carries no Save — pool editing owns creation (Joe 2026-08-04)');
       assert.ok(await a.eval(`(() => {
         const c = document.querySelector('#tray-roll .roll-cue');
         return !!c && c.getAttribute('aria-hidden') === 'true' && c.textContent.includes('ROLL');
@@ -1247,28 +1250,10 @@ export const scenarios = [
         { desc: 'clicking the composed dice rolls the draft' },
       );
 
-      // Inline save: morph, name, Enter — ADDITIVE even on a name collision.
-      await a.eval(`(() => {
-        const i = document.getElementById('cmd-input');
-        i.value = '3d6+2';
-        i.dispatchEvent(new Event('input'));
-      })()`);
-      await a.waitFor(`(window.__diceDebug.trayState.dice.length === 3)`, { desc: 'draft follows the box' });
-      const groupsBefore = (await a.dbg('groups')).length;
-      await a.eval(`document.getElementById('save-group').click()`);
-      assert.equal((await a.dbg('trayState')).saveOpen, true, 'Save morphs into the name row');
-      await a.eval(`(() => {
-        const i = document.getElementById('group-name');
-        i.value = 'Attack';  // collides with a seed pool on purpose
-        i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
-      })()`);
-      const gs = await a.dbg('groups');
-      assert.equal(gs.length, groupsBefore + 1, 'save is additive — a name collision never overwrites');
-      assert.ok(gs.filter((g) => g.name === 'Attack').length >= 2, 'both Attacks exist (updates are by-id paths only)');
-      // Pools are per-origin localStorage, which outlives this room: delete
-      // the minted duplicate so later scenarios meet the seed set untouched.
-      const minted = gs.find((g) => g.name === 'Attack' && g.notation === '3d6+2');
-      assert.equal(await a.dbg(`deletePool(${JSON.stringify(minted.id)})`), true, 'cleanup: the duplicate leaves');
+      // (the inline save morph retired 2026-08-04 with the rim's Save —
+      // creation is pool editing's job: the ✎ ghost tiles' newborn
+      // contract is pinned in sheet-pass, and by-id-only updates in
+      // saved-group-edit.)
 
       // ✕ clears the whole draft back to the hint.
       await a.eval(`document.getElementById('clear-tray').click()`);
@@ -1276,8 +1261,8 @@ export const scenarios = [
       assert.deepEqual(ts.dice, [], 'draft cleared');
       assert.equal(ts.hint, true, 'the hint returns');
       assert.equal(ts.hasActions, true, 'the rail stands on — its verbs just gray');
-      assert.equal(await a.eval(`document.getElementById('save-group').disabled`), true,
-        'Save grayed with the draft gone');
+      assert.equal(await a.eval(`document.getElementById('tray-mods').disabled`), true,
+        '± Modify grayed with the draft gone');
 
       // Dice | Notation: one draft, two views. Default is the visual
       // builder (box hidden); the toggle swaps views without touching the
@@ -1944,19 +1929,9 @@ export const scenarios = [
       assert.equal(await a.dbg('popover'), null, 'the strip closes with its pool');
       await a.dbg('setPoolsEditMode(false)');
 
-      // the save morph lands a composed draft on a shelf via chips
-      await a.eval(`document.querySelectorAll('#die-buttons .die-btn')[1].click()`);
-      await a.eval(`document.getElementById('save-group').click()`);
-      await a.eval(`[...document.querySelectorAll('#save-cat-row .pid-cat')]
-        .find((b) => b.textContent.trim() === 'Motivations').click()`);
-      await a.eval(`(() => {
-        const i = document.getElementById('group-name');
-        i.value = 'Glory';
-        i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
-      })()`);
-      const glory = (await a.dbg('groups')).find((g) => g.name === 'Glory');
-      assert.equal(glory && glory.category, 'Motivations', 'the save morph chips set the shelf');
-      await a.eval(`document.getElementById('clear-tray').click()`);
+      // (the save-morph shelf-chips case retired 2026-08-04 with the rim's
+      // Save — the shelf-at-birth contract lives in the ✎ ghost tiles,
+      // pinned by sheet-pass: 'the shelf you tapped IS the category'.)
     },
   },
   {
@@ -2181,10 +2156,10 @@ export const scenarios = [
       // rail): the rail never leaves — its verbs gray on an empty draft
       // and arm with content, so the workbench's geometry never moves.
       assert.equal((await a.dbg('trayState')).hasActions, true, 'empty draft: the rail stands');
-      assert.equal(await a.eval(`document.getElementById('save-group').disabled`), true,
+      assert.equal(await a.eval(`document.getElementById('tray-mods').disabled`), true,
         'its verbs gray without a draft');
       await a.eval(`document.querySelector('#die-buttons .die-btn').click()`);
-      assert.equal(await a.eval(`document.getElementById('save-group').disabled`), false,
+      assert.equal(await a.eval(`document.getElementById('tray-mods').disabled`), false,
         'a staged die arms the rail');
       await a.eval(`document.getElementById('clear-tray').click()`);
       await a.eval(`(() => {
@@ -2198,8 +2173,8 @@ export const scenarios = [
         { desc: '✕ Clear arms on the half-typed draft' });
       assert.equal(await a.eval(`document.getElementById('clear-tray').disabled`), false,
         '✕ Clear is enabled on the unparseable draft');
-      assert.equal(await a.eval(`document.getElementById('save-group').disabled`), true,
-        'Save stays parse-gated');
+      assert.equal(await a.eval(`document.getElementById('tray-mods').disabled`), true,
+        '± Modify stays parse-gated');
 
       // (ii) The standing pin: NO pointer synthesis anywhere in this
       // scenario — the rail's verbs are at full opacity purely because a
@@ -2270,44 +2245,24 @@ export const scenarios = [
       assert.equal(ordering.v, ordering.h,
         `--draft-h is fresh in the same task (got ${ordering.v} for a ${ordering.h}px zone)`);
 
-      // (iv) The observed --draft-h: the save morph changes the zone's
-      // height WITHOUT a renderTray, so only the ResizeObserver keeps the
-      // shelf headers' pin fresh (±1px: RO rounds border-box fractions).
-      await a.eval(`document.getElementById('save-group').click()`);
-      assert.equal((await a.dbg('trayState')).saveOpen, true, 'the save morph swapped in');
+      // (iv) The observed --draft-h: any zone height change WITHOUT a
+      // renderTray must still refresh the shelf headers' pin — only the
+      // ResizeObserver covers that path (±1px: RO rounds border-box
+      // fractions). The old fixture was the save morph (retired
+      // 2026-08-04); a direct padding change exercises the same observer.
+      await a.eval(`document.getElementById('draft-zone').style.paddingBottom = '42px'`);
+      await a.waitFor(`(() => {
+        const body = document.querySelector('#builder-panel > .panel-body');
+        const v = parseFloat(getComputedStyle(body).getPropertyValue('--draft-h'));
+        return Math.abs(v - window.__diceDebug.trayState.draftH) <= 1
+          && v >= 42;
+      })()`, { desc: 'the observed --draft-h tracks a non-renderTray height change' });
+      await a.eval(`document.getElementById('draft-zone').style.paddingBottom = ''`);
       await a.waitFor(`(() => {
         const body = document.querySelector('#builder-panel > .panel-body');
         const v = parseFloat(getComputedStyle(body).getPropertyValue('--draft-h'));
         return Math.abs(v - window.__diceDebug.trayState.draftH) <= 1;
-      })()`, { desc: 'the observed --draft-h tracks the morph height' });
-      await a.eval(`document.getElementById('save-cancel').click()`);
-      await a.waitFor(`(() => {
-        const body = document.querySelector('#builder-panel > .panel-body');
-        const v = parseFloat(getComputedStyle(body).getPropertyValue('--draft-h'));
-        return window.__diceDebug.trayState.saveOpen === false
-          && Math.abs(v - window.__diceDebug.trayState.draftH) <= 1;
-      })()`, { desc: 'and tracks back when the morph leaves' });
-
-      // (viii) Esc PEELS the morph, it does not destroy the draft. The name
-      // input's own handler already closed just the morph — but pressing a
-      // shelf chip moves focus off the input, and from there Esc fell
-      // through the global chain to clearDraft() and wiped the composed
-      // pool the user was in the middle of naming.
-      const before = (await a.dbg('trayState')).dice.length;
-      assert.ok(before > 0, 'a draft to protect');
-      await a.eval(`document.getElementById('save-group').click()`);
-      assert.equal((await a.dbg('trayState')).saveOpen, true, 'morph open again');
-      await a.eval(`(() => {
-        // exactly what pressing a shelf chip does: focus leaves the input
-        const chip = document.querySelector('#save-cat-row button');
-        if (chip) chip.focus(); else document.getElementById('group-name').blur();
-        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      })()`);
-      await a.waitFor(`window.__diceDebug.trayState.saveOpen === false`,
-        { desc: 'Esc closes the morph' });
-      assert.equal((await a.dbg('trayState')).dice.length, before,
-        'and the draft it was naming SURVIVES');
-      assert.equal((await a.dbg('trayState')).hasActions, true, 'the rail comes back');
+      })()`, { desc: 'and tracks back' });
 
       // (vii) The x-layer pin: the well's padding sits OUTSIDE the
       // cluster, so the per-die ✕ overlays still land on their dice.
@@ -2399,10 +2354,10 @@ export const scenarios = [
         'the Pools title row is gone (2026-08-04: the column needs no name)');
       assert.ok(await a.eval(`[...document.querySelectorAll('.pool-sec-head')].some((h) => h.textContent === 'Pools')`),
         'the uncategorized shelf is plainly named (trio shelves stand above it)');
-      assert.equal(await a.eval(`document.getElementById('group-name').placeholder`),
-        'Name this pool…', 'the save field names a pool');
       assert.equal(await a.eval(`document.getElementById('pop-save').textContent`),
         'Save', 'the popover commits with one verb (Trigger Pass)');
+      assert.ok((await a.eval(`document.getElementById('tray-mods').textContent`)).includes('Modify'),
+        "the rim's modifier tool says 'Modify' (Joe 2026-08-04 — never 'Tweak')");
       assert.equal(await a.eval(`document.getElementById('pop-save-name').placeholder`),
         'Name this pool…', 'the duplicate morph names a pool');
       assert.equal(await a.eval(`document.getElementById('pools-edit').textContent.trim()`),

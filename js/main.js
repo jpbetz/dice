@@ -501,7 +501,8 @@ function wireSet() {
 // The set a ROLL wears (§9 saved-pool override): an explicit opts.set wins —
 // 'std' pins the classics by RESOLVING to absent (the wire rule holds even
 // when your own set is a house set) — otherwise your set rides as always.
-// Callers only pass opts.set when a pool rolls as itself (see trayRollSet);
+// Callers only pass opts.set when a pool rolls as itself (the rail quick
+// list; a staged draft rides per-die `sets` via draftDieSets instead);
 // rerolls, claims and plain notation stay on wireSet.
 function rollSetOf(opts) {
   const s = opts && opts.set;
@@ -4011,14 +4012,14 @@ window.__diceDebug = {
       sources: [...traySources],
       rollVisible: !trayRollBtn.classList.contains('hidden'),
       hasActions: !draftActionsEl.classList.contains('hidden'), // the rail stands
-      saveOpen: !traySaveRow.classList.contains('hidden'),
+
       hint: !trayHintEl.classList.contains('hidden'),
       xCount: trayXLayer.children.length,
       // §7.14 layout pins (computed, not class — the class lied once, D2):
       // the rail STANDS (visible with no pointer anywhere near), Offer's
       // real visibility, and the zone height the shelf headers pin under.
       railStanding: !draftActionsEl.classList.contains('hidden')
-        && getComputedStyle(saveGroupBtn).opacity === '1',
+        && getComputedStyle(trayModsBtn).opacity === '1',
       offerVisible: getComputedStyle(offerDraftBtn).display !== 'none',
       draftH: draftZoneEl.offsetHeight,
       spent: traySpent, // 2i-E: rolled and untouched since
@@ -4223,18 +4224,6 @@ let traySets = [];    // aligned to tray: the staged pool's set OVERRIDE per die
 // visibly, which is what separates "roll it again" from "compose the next
 // roll on top of it by accident" (the silent-accretion trap: Wisdom ×4).
 let traySpent = false;
-// A roll has ONE set (the wire field is singular — spawn, reveal and chips
-// all lean on that), so the draft wears an override only when it is
-// UNANIMOUS: every die staged from pools that share one override. A loose
-// palette die or a second opinion dilutes it back to your own set. Editing
-// the command box resets the array (notation carries no set — the box is
-// the notation escape hatch), which makes this honest by construction.
-function trayRollSet() {
-  if (!tray.length || traySets.length !== tray.length) return null;
-  const s0 = traySets[0];
-  if (!s0) return null;
-  return traySets.every((s) => s === s0) ? s0 : null;
-}
 // Per-die sets for the OUTGOING draft roll (§9 mixed pools: EACH die wears
 // its own pool's skin — physical dice, Joe 2026-08-03), aligned to the dice
 // actually sent. The tray branch sends tray order (traySets aligns 1:1);
@@ -4271,12 +4260,12 @@ const trayRollBtn = document.getElementById('tray-roll');
 const trayXLayer = document.getElementById('tray-x-layer');
 const trayHintEl = document.getElementById('tray-hint');
 const draftActionsEl = document.getElementById('draft-actions'); // the RAIL: Save · Offer · ✕ Clear
-const traySaveRow = document.getElementById('tray-save-row');
+
 const trayModsBtn = document.getElementById('tray-mods');
 const clearTrayBtn = document.getElementById('clear-tray');
-const saveGroupBtn = document.getElementById('save-group');
+
 const offerDraftBtn = document.getElementById('offer-draft');
-const groupNameInput = document.getElementById('group-name');
+
 
 // The section headers pin under the sticky draft (--draft-h feeds
 // .pool-sec-head's top), so the value must track EVERY height change — the
@@ -4621,12 +4610,10 @@ function updateTrayButtons() {
   // them on screen, gray them out): always rendered, buttons disabled
   // until a draft exists, so the workbench's geometry never moves. The
   // save morph still swaps in for the rail (same slot, no resize).
-  draftActionsEl.classList.toggle('hidden', !traySaveRow.classList.contains('hidden'));
-  if (!usable) closeSaveMorph();
+  draftActionsEl.classList.remove('hidden'); // standing furniture, always
   trayRollBtn.disabled = !usable;
   trayModsBtn.disabled = !usable;
   clearTrayBtn.disabled = !tray.length && !cmdInput.value;
-  saveGroupBtn.disabled = !usable;
   // Offers need a table: the verb HIDES solo (quiet chrome — a standing
   // disabled button would be noise a solo table can never use). The ▾
   // additionally needs someone to target — it waits for a teammate.
@@ -4845,8 +4832,6 @@ function clearDraft() {
   // half-shaped boxExtras is a trap for the next reader of it.
   boxExtras = { mods: null, dc: null, comment: null, exp: null, visibility: null };
   cmdInput.value = '';
-  echoedDraft = null;   // a cleared draft forgets whose echo it was
-  closeSaveMorph();
   renderTray();
   paintCmd();
 }
@@ -5261,12 +5246,6 @@ const groupsListEl = document.getElementById('groups-list');
 function loadIntoBox(notation, name) {
   cmdInput.value = notation;
   paintCmd();
-  // Remember the echoed identity for the save morph's prefill (see
-  // openSaveMorph's latency rule) — the name input itself only exists
-  // while the morph is open now.
-  echoedDraft = name && cmdResult && cmdResult.ok
-    ? { name, canonical: cmdResult.canonical }
-    : null;
   // A text INTENT shows the box for THIS visit only (persist=false): a
   // use-tier action never rewrites the per-user view default — the audit
   // caught the old persisting flip changing how the panel boots forever.
@@ -6249,93 +6228,11 @@ function buildNewShelfRow() {
 }
 renderGroups();
 
-// The inline save morph: [Save] swaps the control line for
-// [name input][✓][×]; Enter saves (blank = unnamed), Esc cancels. Saving is
-// ALWAYS ADDITIVE — it mints a new pool even when the name collides.
-// Updating an existing record is exclusively the by-id paths (the row ✎
-// editor and the popover's 'Update this pool'): the old Save silently
-// overwrote whichever pool happened to share the name, the same disease the
-// §7.9 by-id fix cured for renames.
-//
-// The echoed-name latency rule: loading a pool into the box (name chip,
-// pool ✎ echo, peek ±) remembers {name, canonical}; the morph prefills that
-// name ONLY while the draft still parses to the same canonical — tweak the
-// text and the prefill lapses (a tweaked draft is a NEW pool, not a rename).
-let echoedDraft = null; // {name, canonical} from loadIntoBox
-// The save morph's shelf chips: saving a composed draft lands it on a
-// shelf in one breath (none pressed = the plain Pools shelf).
-let saveMorphCat = null;
-function renderSaveCatRow() {
-  const row = document.getElementById('save-cat-row');
-  row.textContent = '';
-  const known = [...new Map([['attributes', 'Attributes'], ['skills', 'Skills'], ['motivations', 'Motivations'],
-    ...groups.map((x) => (x.category || '').trim()).filter(Boolean).map((c) => [c.toLowerCase(), c]),
-  ]).values()];
-  for (const c of known) {
-    const b = document.createElement('button');
-    b.className = 'owner-chip pid-cat';
-    b.setAttribute('aria-pressed', String(saveMorphCat === c));
-    const nm = document.createElement('span');
-    nm.className = 'oc-name';
-    nm.textContent = c;
-    b.appendChild(nm);
-    b.addEventListener('click', () => {
-      saveMorphCat = saveMorphCat === c ? null : c;
-      renderSaveCatRow();
-    });
-    row.appendChild(b);
-  }
-}
-
-function openSaveMorph() {
-  paintCmd();
-  const usable = (cmdResult && cmdResult.ok) || tray.length > 0;
-  if (!usable) return;
-  const canonical = cmdResult && cmdResult.ok ? cmdResult.canonical : formula(tray);
-  groupNameInput.value = (echoedDraft && echoedDraft.name
-    && echoedDraft.canonical === canonical) ? echoedDraft.name : '';
-  traySaveRow.classList.remove('hidden');
-  saveMorphCat = null;
-  renderSaveCatRow();
-  document.getElementById('save-cat-row').classList.remove('hidden');
-  draftActionsEl.classList.add('hidden'); // the morph swaps in for Save · Clear
-  groupNameInput.focus();
-  groupNameInput.select();
-}
-function closeSaveMorph() {
-  if (traySaveRow.classList.contains('hidden')) return;
-  traySaveRow.classList.add('hidden');
-  document.getElementById('save-cat-row').classList.add('hidden');
-  saveMorphCat = null;
-  // ONE owner for the rail's visibility rule (§7.14): a hand-rolled toggle
-  // here once dropped the half-typed-draft case updateTrayButtons carries
-  // (✕ Clear must stay reachable). Recursion is safe: by now the morph is
-  // hidden, so updateTrayButtons's closeSaveMorph call early-returns.
-  updateTrayButtons();
-}
-function saveDraftAsPool() {
-  paintCmd();
-  const notation = cmdResult && cmdResult.ok ? cmdResult.canonical
-    : tray.length ? formula(tray) : null;
-  if (!notation) { closeSaveMorph(); return; }
-  const name = cutText(groupNameInput.value, 24); // '' = unnamed pool
-  const cat = saveMorphCat; // read before closeSaveMorph resets the chips
-  const draftSet = trayRollSet(); // §9: a uniformly-overridden draft saves its set
-  groups.push({ id: Date.now(), name, notation, ...(cat ? { category: cat } : {}),
-    ...(draftSet ? { set: draftSet } : {}) }); // additive, always
-  saveGroups();
-  renderGroups();
-  groupNameInput.value = '';
-  closeSaveMorph();
-}
-saveGroupBtn.addEventListener('click', openSaveMorph);
-document.getElementById('save-confirm').addEventListener('click', saveDraftAsPool);
-document.getElementById('save-cancel').addEventListener('click', closeSaveMorph);
-groupNameInput.addEventListener('keydown', (e) => {
-  e.stopPropagation(); // typing a name must not fire table shortcuts
-  if (e.key === 'Enter') saveDraftAsPool();
-  else if (e.key === 'Escape') closeSaveMorph();
-});
+// (The tray save morph retired 2026-08-04 — Joe: the rim's Save was a
+// second way to do what pool editing already owns. Keeping a draft is the
+// rack's job now: ✎ ghost tiles mint, the popover's Duplicate… copies,
+// the peek's 'Save as pool…' keeps a rolled result. Saved-pool WRITES
+// remain exclusively the by-id paths.)
 
 // Copy-link retired (2026-08-01, Joe: too much going on): the address bar
 // IS the pools link — reflectGroupsToUrl keeps #g= current on every save,
@@ -6463,7 +6360,7 @@ function openPopover(binding) {
     name = binding.name || notation;
   } else {
     notation = trayDraftNotation();
-    name = groupNameInput.value.trim() || 'Tray';
+    name = 'Draft'; // the draft popover's standing title (the vocabulary word)
   }
   if (!notation) return;
   const res = parseNotation(notation);
@@ -6535,7 +6432,7 @@ function resyncTrayPopover() {
   if (!res.ok) return;
   Object.assign(pop, popStateFromParse(res));
   if (pop.dc != null && !pop.expKind) pop.expKind = 'check';
-  pop.name = groupNameInput.value.trim() || 'Tray';
+  pop.name = 'Draft';
   popNameEl.textContent = pop.name;
   // Never clobber the input the user is TYPING in: since the Trigger Pass
   // every popover edit round-trips through the box (live-sync → paintCmd →
@@ -7197,7 +7094,7 @@ popEchoEl.addEventListener('click', () => {
   // a pool' keeps its name); the tray reads its save-morph input as before.
   const name = group ? group.name
     : pop.source === 'shelf' ? (parseNotation(pop.name).ok ? '' : pop.name)
-    : groupNameInput.value.trim();
+    : '';
   const canonical = popCanonical();
   closePopover();
   if (!panelsOpen.pools) setPanel('pools', true); // echoing edits the box — surface it
@@ -8450,12 +8347,6 @@ document.addEventListener('keydown', (e) => {
     // the overlay z-order, so every layer above it peels first. Esc is one
     // of its only three closes (≣ toggle, header ✕, Esc — never a click-away).
     else if (isLogFlyoutOpen()) closeLogFlyout();
-    // The save morph is a layer too, and Esc peels layers: naming a pool is
-    // cancelled, the draft it was naming survives. The name input's own
-    // handler already did exactly this — but focus leaves the input the
-    // moment you press a shelf chip, and from there Esc fell through and
-    // DESTROYED the composed draft instead of closing the morph over it.
-    else if (!traySaveRow.classList.contains('hidden')) closeSaveMorph();
     // The staged draft empties before the table sweeps: Esc mirrors Enter's
     // draft-first priority.
     else if (tray.length || cmdInput.value) clearDraft();

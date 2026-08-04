@@ -570,7 +570,6 @@ html, body {
 }
 #tray-actions:hover #tray-hint .roll-cue { opacity: 0.45; }
 #tray-hint.hidden { display: none; }
-.tray-save.hidden { display: none; }
 .tray-line2.hidden { display: none; }
 /* EVEN taller (Joe 2026-08-03: '+20-30%' — and a floor that absorbs a
    single-line pool chip, so staging pools stops nudging the height).
@@ -735,19 +734,20 @@ html, body {
   cursor: default;
   filter: grayscale(0.7);
 }
-/* The ± leads the rim — the one tool that SHAPES rather than disposes, so
-   it wears the warm metal instead of the cold (gold stays reserved for
-   the roll act itself). Gold-bright while its popover is open: the field
-   being edited and the tool editing it light together. */
+/* '± Modify' leads the rim (Joe 2026-08-04: the rim's Save retired, the
+   freed room lets the modifier tool wear its word) — the one tool that
+   SHAPES rather than disposes, so it wears the warm metal instead of the
+   cold (gold stays reserved for the roll act itself). Gold-bright while
+   its popover is open: the field being edited and the tool editing it
+   light together. */
 #tray-mods {
-  width: 34px;
-  padding: 5px 0;
+  padding: 5px 13px;
   border-color: rgba(212, 175, 55, 0.28);
   background: linear-gradient(180deg, rgba(212, 175, 55, 0.11), rgba(212, 175, 55, 0.035));
   box-shadow: inset 0 1px 0 rgba(255, 215, 102, 0.08);
   color: rgba(255, 215, 102, 0.7);
-  font-size: 14px; /* a lone ± — the app-wide modifier sign, no words */
-  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.03em;
 }
 #tray-mods:hover:not(:disabled) {
   color: var(--gold-bright);
@@ -770,9 +770,7 @@ html, body {
 #offer-pick  { margin-left: -7px; padding: 4px 6px;
                border-top-left-radius: 0; border-bottom-left-radius: 0; }
 @media (pointer: coarse) { .draft-actions .btn { padding: 8px 12px; } }
-/* Morph rows join the same interior grid (.btn-row's 10px overridden). */
-#tray-save-row { margin-top: 8px; padding: 0 7px; }
-#save-confirm, #save-cancel { flex: none; width: 42px; }
+/* (the tray save morph's rules retired 2026-08-04 with the rim's Save) */
 
 /* ---------- saved pools (read-only quick access, P2) ---------- */
 /* Two lines per row: identity (name + canonical chip; manage-mode ✎ ✕) over
