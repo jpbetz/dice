@@ -137,3 +137,9 @@ are authoritative, and nothing here needs to be consulted to build.*
   Soul Deal words + DC verdicts becomes the "Your Soul Deal" system profile;
   a "D&D"-style profile (DC verdicts, nat-20/1 crits, no meaning chart) and
   a "None" profile (numbers only) join it as room settings.
+- **The felt keeps no marks (2026-08-03)**: Level 4's impact decals
+  (frost / drying ring / scorch / smudge) shipped and were switched off
+  the same evening — the ladder stayed, the residue went. The machinery is
+  whole behind `DECALS_DEFAULT_ENABLED` in js/decals.js (per-page re-arm:
+  `__diceDebug.decalsEnable(true)`); die lights and the Level 5 stack are
+  untouched. THEMES.md ladder entry 4 is authoritative.

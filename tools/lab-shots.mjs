@@ -128,7 +128,11 @@ try {
 
   // Level 4, at table pitch: the same drop viewed from above — felt marks
   // (stamps) and the die's own light on the coupon. Shot late enough that
-  // the die has settled and the mark is doing its slow work.
+  // the die has settled and the mark is doing its slow work. Marks ship
+  // dark (kill switch, 2026-08-03) — the review rig arms them on purpose:
+  // these stills exist to judge the shelved look.
+  await page.eval('window.__lab.decalsEnable(true)');
+  console.log('  (decals armed for review — they ship OFF by default)');
   const l4 = [
     ['emberforge.blackanvil', 'scorch + breathe glow'],
     ['rimehold.firstfrost', 'hoarfrost crackle'],

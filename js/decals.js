@@ -39,6 +39,15 @@ const MAX = 64;
 const CELLS = 4; // atlas is CELLS × CELLS
 const STRENGTH_REF = 28; // same normalization as particles.js
 
+// KILL SWITCH (Joe, 2026-08-03): the marks are OFF by default — table
+// and lab both. He loved the ladder, not the residue. Everything else
+// Level 4/5 built (die lights, bloom, rings, shimmer) stays live, and
+// the sets keep their `decal:` recipes — inert while this is false.
+// Per-page trial: __diceDebug.decalsEnable(true) (table) or
+// __lab.decalsEnable(true) (lab). To bring the marks back for good,
+// flip this constant.
+export const DECALS_DEFAULT_ENABLED = false;
+
 function hexRGB(hex) {
   const n = parseInt(hex.replace('#', ''), 16);
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
@@ -217,6 +226,7 @@ const KINDS = {
 
 export class DecalField {
   constructor(scene) {
+    this.enabled = DECALS_DEFAULT_ENABLED; // the kill switch, per field
     // ---- atlas ----
     const cell = 256; // marks span multiple die-widths; 128 went blocky
     const canvas = document.createElement('canvas');
@@ -321,9 +331,10 @@ export class DecalField {
   // Stamp the recipe's mark at a measured contact. `at` is [x, y, z] in
   // world units — the caller supplies the surface height (main table:
   // felt + ε; lab: the drop coupon). Returns how many marks were laid
-  // (the lab's honesty counter). Recipe: {kind, colors: [A, B], scale?,
-  // life?}.
+  // (the lab's honesty counter — always 0 while the kill switch is
+  // off). Recipe: {kind, colors: [A, B], scale?, life?}.
   stamp(recipe, at, strength, rng = Math.random) {
+    if (!this.enabled) return 0; // no mark, no count — the felt stays clean
     const kind = KINDS[recipe.kind];
     if (!kind) return 0;
     const row = KIND_ROW[recipe.kind];

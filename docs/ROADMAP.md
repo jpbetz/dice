@@ -373,7 +373,12 @@ Umbra pools shadow with NEGATIVE intensity; felt-only — collect
 extinguishes, reveal ignites, shroud smothers). Restraint recipes: six
 sets mark, five glow, four leave the table untouched on purpose. The
 lab drop rig gained the coupon/rails/linger/dropView furniture to
-review it at table pitch. e2e: themed-fx (tag `themes`).
+review it at table pitch. e2e: themed-fx (tag `themes`). **The marks
+half was retired to a kill switch the same evening** (Joe kept the
+whole ladder except the felt residue): `DECALS_DEFAULT_ENABLED = false`
+in js/decals.js gates stamping everywhere — table and lab —
+`decalsEnable(true)` re-arms one page, and recipes, die lights and the
+toggle-proving themed-fx all stay.
 **LADDER L5 SHIPPED 2026-08-03 — THE EFFECTS LADDER IS COMPLETE**:
 hand-rolled postprocessing (js/post.js, core three only): selective
 bloom via a blacked-out mask render (a std/shrouded die cannot bloom by

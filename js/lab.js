@@ -88,6 +88,8 @@ const field = new ParticleField(scene);
 // Level 4: the marks a set leaves on the felt (js/decals.js) and the glow
 // a die carries (js/dielights.js). Both demo through the drop rig — the
 // rig's coupon is the felt they act on. Budget of 2 lights: it's a rig.
+// Marks ship dark everywhere (the decals.js kill switch, 2026-08-03) —
+// the lab included; __lab.decalsEnable(true) arms this page for review.
 const decals = new DecalField(scene);
 const dieLights = new DieLightRig(scene, { max: 2 });
 
@@ -660,6 +662,8 @@ window.__lab = {
   // Level 4 diagnostics: live felt marks and attached die-lights.
   decalCount() { return decals.count(); },
   decalDump() { return decals.dump(); },
+  // marks ship dark (2026-08-03) — arm this page to review them
+  decalsEnable(on) { decals.enabled = !!on; return decals.enabled; },
   lightInfo() { return dieLights.info(); },
   // Level 5 diagnostics: what the stack did last frame + monotonic rings.
   postInfo() {

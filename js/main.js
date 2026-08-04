@@ -126,7 +126,12 @@ particleField.setProjection(window.innerHeight, camera.fov);
 
 // Level 4 on the live table. Decals: transient marks stamped from the
 // same recorded impacts (floor-height ones only — walls don't scorch),
-// living just above the felt plane. Lights: four pooled PointLights that
+// living just above the felt plane — DISABLED BY DEFAULT since
+// 2026-08-03 (Joe's call: the ladder stays, the residue goes). The
+// wiring below stays live; DecalField.stamp itself is the gate. Flip
+// DECALS_DEFAULT_ENABLED in decals.js to bring the marks back, or
+// __diceDebug.decalsEnable(true) to trial them on one screen.
+// Lights: four pooled PointLights that
 // exist from boot at intensity zero — three.js recompiles every lit
 // program when the light COUNT changes, and a recompile stutter
 // mid-tumble is worse than any glow is good. Budget of 4 is also the
@@ -3818,9 +3823,17 @@ window.__diceDebug = {
     }));
   },
   // Level 4 assertion surface: live felt marks, marks ever laid (the
-  // sim() clock can age live ones out mid-test), + attached die-lights.
+  // sim() clock can age live ones out mid-test), the kill-switch
+  // state, + attached die-lights.
   fxInfo() {
-    return { decals: decalField.count(), stamped: decalField.stampedTotal, lights: dieLights.info() };
+    return { decals: decalField.count(), stamped: decalField.stampedTotal, decalsEnabled: decalField.enabled, lights: dieLights.info() };
+  },
+  // Felt marks ship dark (2026-08-03) — this re-arms stamping for THIS
+  // page only (trials, tests). The lasting switch is
+  // DECALS_DEFAULT_ENABLED in decals.js.
+  decalsEnable(on) {
+    decalField.enabled = !!on;
+    return decalField.enabled;
   },
   // Level 5 assertion surface. Computed LIVE from sim state, never from
   // the last painted frame — a backgrounded tab stops painting but its

@@ -2987,14 +2987,19 @@ export const scenarios = [
   {
     name: 'themed-fx',
     tags: ['themes'],
-    // Ladder Level 4 (felt decals + die lights): a lit set's roll marks
-    // the felt and glows on EVERY screen; the 4-light budget holds; a
-    // collect puts the flame out (the shelf is the archive); a shrouded
-    // roll marks and casts NOTHING (obsidian sheds no identity) — and the
-    // reveal ignites the set's glow.
+    // Ladder Level 4 (felt decals + die lights): a lit set's roll glows
+    // on EVERY screen; the 4-light budget holds; a collect puts the
+    // flame out (the shelf is the archive); a shrouded roll marks and
+    // casts NOTHING (obsidian sheds no identity) — and the reveal
+    // ignites the set's glow. The MARKS ship dark (the decals.js kill
+    // switch, 2026-08-03): A arms its own screen up front — proving the
+    // toggle and the machinery idling behind it — while B stays
+    // factory-dark and proves the shipped default: same rolls, same
+    // room, clean felt end to end.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.eval(`window.__diceDebug.decalsEnable(true)`); // B stays factory-dark
       await a.eval(`window.__diceDebug.setDiceSet('emberforge.blackanvil')`);
       await a.roll('3d6 # slam');
       await a.settle();
@@ -3006,7 +3011,12 @@ export const scenarios = [
         assert.ok(fx.lights.every((l) => l.mode === 'breathe'), `${who}: the anvil breathes`);
         // stamped (ever), not live count: settle()'s sim() clock runs
         // simulated SECONDS, long enough for a live mark to fade honestly
-        assert.ok(fx.stamped > 0, `${who}: the landing scorched the felt`);
+        if (who === 'A') {
+          assert.ok(fx.stamped > 0, 'A (armed): the landing scorched the felt');
+        } else {
+          assert.equal(fx.decalsEnabled, false, 'B: marks ship dark');
+          assert.equal(fx.stamped, 0, 'B (factory): the felt stays clean');
+        }
       }
 
       // Six lit dice into a pool of four: the budget holds (newest win).
@@ -3023,9 +3033,10 @@ export const scenarios = [
         { desc: 'collect puts the flames out' },
       );
 
-      // A held roll wears obsidian: no glow, no new marks, on any screen.
-      // (Quiesce B first: its budget-roll playback still queues stamps of
-      // its own, and the baseline must be read from an idle table.)
+      // A held roll wears obsidian: no glow, no new marks, on any screen
+      // (armed A gains none; factory B holds its 0). Quiesce B first:
+      // its budget-roll playback may still be mid-flight, and baselines
+      // must be read from an idle table.
       await b.settle();
       const marksBefore = {};
       for (const [tab, who] of [[a, 'A'], [b, 'B']]) {
@@ -3045,6 +3056,12 @@ export const scenarios = [
       await a.waitFor(revealSettled(hid), { desc: 'reveal lands on A' });
       const fx3 = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.fxInfo())`));
       assert.equal(fx3.lights.length, 1, 'the reveal ignites the anvil glow');
+
+      // The whole scenario later: B was never armed and never marked.
+      // The shipped default holds on an untouched screen.
+      const fxB = JSON.parse(await b.eval(`JSON.stringify(window.__diceDebug.fxInfo())`));
+      assert.equal(fxB.decalsEnabled, false, 'B is still factory-dark');
+      assert.equal(fxB.stamped, 0, 'B: the felt never took a single mark');
     },
   },
   {

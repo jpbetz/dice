@@ -286,8 +286,16 @@ leverage order for this zero-dep codebase:
 4. **The environment joins the theme** — felt decals from the landing
    point and a colored light PARENTED to the die (a biolume die casts
    teal on its patch of felt; Umbra pools local shadow instead of
-   dimming the world). **← SHIPPED 2026-08-03.** Two modules, both
-   impact-honest like Level 3:
+   dimming the world). **← SHIPPED 2026-08-03 — and the MARKS half was
+   RETIRED TO A KILL SWITCH the same evening** (Joe: loved everything
+   but the residue on the table). `DECALS_DEFAULT_ENABLED = false` in
+   js/decals.js gates DecalField.stamp for table and lab alike;
+   `__diceDebug.decalsEnable(true)` / `__lab.decalsEnable(true)` re-arm
+   one page for trials, and flipping the constant brings the marks back
+   for good. Recipes keep their `decal:` fields (inert while off), die
+   lights are untouched, and themed-fx locks the clean-felt default
+   while proving the machinery behind the toggle still works. Two
+   modules, both impact-honest like Level 3:
    - `js/decals.js` (DecalField): transient marks the felt keeps for a
      few seconds after a measured floor contact. NOT the mat-text felt
      composite (that texture is event-driven; animating it would
@@ -437,8 +445,10 @@ the first two on the first pass). 2D chrome (tray, pool tiles, log die
 chips) deliberately stays std for now — 9b pool icons is the natural
 home for that pass.
 
-Level 4 rides the same seams (shipped 2026-08-03): the impact drain in
-stepPlayback stamps `decal` recipes from the recorded contacts — gated
+Level 4 rides the same seams (shipped 2026-08-03; the marks are DARK BY
+DEFAULT since the same evening — the decals.js kill switch): the impact
+drain in stepPlayback stamps `decal` recipes from the recorded contacts
+— gated
 to floor-height contacts (`at[1] < 0.6`; a wall click leaves no felt
 mark), real hits (strength ≥ 6), and ≤ 6 marks per roll (drama, not
 mud) — and playRoll attaches `light` recipes to a lit set's dice at
