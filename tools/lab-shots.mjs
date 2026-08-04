@@ -86,6 +86,44 @@ try {
     await shot(`fx-${theme}-${fx}.png`);
     await sleep(1800); // let the effect fully restore before the next
   }
+
+  // Level 3, the drop rig: a real cannon-es die falls into the zoomed row;
+  // every measured contact fires the set's burst. First contact lands
+  // ~250ms after the drop (g=-110). The contacts/bursts log is the honesty
+  // check — bursts without contacts (or sparks from a set that should
+  // shed nothing) would both be bugs.
+  const drops = [
+    ['emberforge.blackanvil', [300, 460]],   // sparks cool white→ember
+    ['tidewrack.seaglass', [460, 950]],      // bubbles rise and pop
+    ['reliquary.scrimshaw', [340]],          // bone dust puffs
+    ['stormcall.boltglass', [290]],          // static grounds instantly
+    ['rimehold.deepglacier', [380]],         // cold breath spreads low
+    ['wildwood.heartwood', [700]],           // pollen motes drift
+    ['gildhall.oxblood', [340]],             // CONTROL: sheds nothing, on purpose
+  ];
+  for (const [id, times] of drops) {
+    await page.eval(`window.__lab.zoomRow(${JSON.stringify(id)})`);
+    await sleep(120);
+    await page.eval(`window.__lab.drop(${JSON.stringify(id)})`);
+    let t = 0;
+    for (const at of times) {
+      await sleep(at - t);
+      t = at;
+      await shot(`drop-${id}-${at}ms.png`);
+    }
+    // the honesty numbers come from the live drop, then wait it out so
+    // the next row starts clean
+    const mid = JSON.parse(await page.eval('JSON.stringify(window.__lab.dropState())'));
+    const dDeadline = Date.now() + 9000;
+    for (;;) {
+      const st = JSON.parse(await page.eval('JSON.stringify(window.__lab.dropState())'));
+      if (!st.active) break;
+      if (Date.now() > dDeadline) { console.log(`  (drop ${id} timed out)`); break; }
+      await sleep(250);
+    }
+    console.log(`  drop ${id}: ${mid.contacts ?? 0} contacts → ${mid.bursts ?? 0} particles`);
+  }
+  await page.eval('window.__lab.zoomRow(null)');
   console.log(`done → ${out}/`);
 } finally {
   await browser.close().catch(() => {});

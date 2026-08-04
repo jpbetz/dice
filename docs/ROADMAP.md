@@ -348,9 +348,10 @@ effects. js/themes.js carries the material recipes; dice.js's
 internal glow applied — geometry/physics untouched). lab.html is the
 review rig (grid of every theme × die, effect prototype buttons, env
 cycle for glow judging, PNG capture); tools/lab-shots.mjs drives it
-headless for review stills. Still open: molten-numbers emissiveMap,
-particle effects (sparks/motes/ash), felt decals (frost/ripple/scorch),
-the picker + wire. **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
+headless for review stills. Ladder Levels 1-3 shipped (texture-space
+maps, shader injection, and impact-keyed particles — js/particles.js +
+the lab's cannon-es drop rig; see THEMES.md). Still open: felt decals
+(frost/ripple/scorch — ladder L4), the picker + wire. **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
 natural AND supernatural — imagine what *faerie* dice, *dryadic* dice,
 *wizard* dice, *warrior* dice might look like. Special effects and strong
 themes **merged subtly into the dice themselves** — theme lives in

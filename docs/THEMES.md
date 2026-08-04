@@ -236,6 +236,31 @@ leverage order for this zero-dep codebase:
    firefly motes, rising ash, dust, breath fog, bubbles. Keyed off REAL
    impacts: the physics already reports collision strength to the sound
    system, so "the reason behind the effect" is literal physics.
+   **← SHIPPED 2026-08-03.** `js/particles.js`: one `THREE.Points` ring
+   pool (1024), procedural soft-dot sprite, additive blending; CPU
+   integration with per-particle gravity/drag/wobble, size + color lerps,
+   and a per-particle fade-out knee (a bubble POPS at 0.94; fog has been
+   fading since 0.35). Kinds — each a claim about why matter leaves a
+   die: `sparks` (struck iron; cool white→ember, gravity wins), `static`
+   (charge grounds; no weight, gone in 0.2s), `motes` (knocked-loose
+   pollen/spores/rune-embers; buoyant, wandering), `fog` (a breath of
+   cold off the ice, spreading low), `bubbles` (trapped sea-air; rises,
+   sways, POPS), `dust` (old bone; puffs then settles), `ash` (the
+   unmaking; dim violet-grey, one in five a live witchlight ember).
+   Recipes live per-set in themes.js (`particles: {kind, colors,
+   fadeTo?, scale?}`); Sap Amber and Oxblood have NONE on purpose —
+   sealed resin and lacquer shed nothing, restraint is identity.
+   `ParticleField.burst(recipe, at, strength)` is stateless about WHEN:
+   the lab's DROP RIG (a real cannon-es d6, main-table gravity -110 and
+   contact params, one at a time into the zoomed row) fires it from live
+   `collide` events at the measured contact point; the main table will
+   fire it from its fast-forward recording by extending roll.sounds'
+   {time, strength} events with the contact position — same playback
+   clock, same seam. The unmake burn also feeds `field.wisp()` per frame
+   while uDissolve rises, so Umbra's ash rides the dissolve clock, not a
+   timer of its own. Gotcha for later integrations: cannon-es worlds
+   default `allowSleep` to FALSE — without `world.allowSleep = true` the
+   settled die never sleeps and cleanup waits on the hard timeout.
 4. **The environment joins the theme** — felt decals from the landing
    point (frost crackle, droplet rings, scorch; the mat-text decal
    machinery is the seam) and a colored light PARENTED to the die (a
@@ -253,7 +278,9 @@ vine loops — while the physics hull stays canonical.
 
 `lab.html` is the experimentation rig (dev chrome, not player UI): every
 theme × every die type in one grid, idle-rotation toggle, per-theme
-effect trigger buttons, and one-click PNG capture for review.
+effect trigger buttons, a ⬇ drop button per set (the Level 3 rig — a
+real physics die whose measured contacts fire the set's bursts; sets
+without particles prove the restraint), and one-click PNG capture.
 `tools/lab-shots.mjs` drives it headless over CDP and drops PNGs for
 side-by-side review. Themes land in `js/themes.js` as material recipes;
 the main app consumes NOTHING from the lab until a set graduates

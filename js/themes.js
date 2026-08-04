@@ -36,6 +36,12 @@
 //                                 'scrimshaw'; digits engrave at depth
 //   roughPattern                  roughnessMap: pattern = ROUGH over the
 //                                 set's base finish
+// · `particles` (Level 3, impact-keyed): {kind, colors, fadeTo?, scale?}.
+//   A burst fires ONLY from a measured physics contact (strength = impact
+//   velocity along the normal — the number the click sounds key off).
+//   Kinds live in js/particles.js; each is a claim about why matter
+//   leaves a die. Sets without `particles` shed nothing ON PURPOSE —
+//   sealed resin and lacquer don't crumble; restraint is also identity.
 
 export const THEMES = {
   tidewrack: {
@@ -49,6 +55,7 @@ export const THEMES = {
         feel: { rough: 0.15, metal: 0.1 },
         shader: { fresnel: { color: '#58e6d9', power: 2.4, intensity: 0.9 } }, // biolume rim
         spec: { iridescence: 0.55, iridescenceIOR: 1.3, envMapIntensity: 1.15 }, // wet glass sheen
+        particles: { kind: 'bubbles', colors: ['#d8f4f0', '#8fe3d9'] }, // trapped sea-air escapes on impact
       },
     },
   },
@@ -62,6 +69,7 @@ export const THEMES = {
         glow: { color: '#ffe9a3', intensity: 0.04 },
         feel: { rough: 0.72, metal: 0.05 },
         maps: { relief: { pattern: 'grain', strength: 0.9, digitDepth: 0.4 } },
+        particles: { kind: 'motes', colors: ['#ffe9a3', '#d8e8a0'] }, // a knock shakes pollen loose
       },
       mosstone: {
         label: 'Mosstone',
@@ -69,6 +77,7 @@ export const THEMES = {
         glow: null,
         feel: { rough: 0.85, metal: 0.02 },
         maps: { relief: { pattern: 'hammer', strength: 0.85, digitDepth: 0.6 } },
+        particles: { kind: 'motes', colors: ['#c9e8a0', '#8fae6f'], scale: 0.7 }, // spores off damp moss
       },
       sapamber: {
         label: 'Sap Amber',
@@ -76,6 +85,7 @@ export const THEMES = {
         glow: { color: '#ffb54d', intensity: 0.09 },
         feel: { rough: 0.08, metal: 0.0 },
         spec: { clearcoat: 0.85, clearcoatRoughness: 0.22, ior: 1.55, envMapIntensity: 1.1 }, // polished resin
+        // no particles: sealed resin sheds nothing — the stillness reads as polish
       },
     },
   },
@@ -91,6 +101,7 @@ export const THEMES = {
         // static crawl: the interior charge flickers along the surface
         shader: { flow: { speed: 2.0, scale: 12.0, floor: 0.2, amp: 2.4 } },
         spec: { iridescence: 0.35, envMapIntensity: 1.05 }, // storm-oil shimmer
+        particles: { kind: 'static', colors: ['#f2f6ff', '#b8a8ff'] }, // the charge grounds through the contact
       },
     },
   },
@@ -109,6 +120,7 @@ export const THEMES = {
         },
         shader: { fresnel: { color: '#8fe3c0', power: 3.2, intensity: 0.75 } }, // aurora at grazing
         spec: { envMapIntensity: 1.2, specularIntensity: 1.1 }, // wet ice mirror
+        particles: { kind: 'fog', colors: ['#dceefc', '#a8d8f0'] }, // impact knocks a breath of cold off the ice
       },
       firstfrost: {
         label: 'First Frost',
@@ -119,6 +131,7 @@ export const THEMES = {
           relief: { pattern: 'ferns', strength: 0.6, digitDepth: 0.25 },
           roughPattern: 'ferns',
         },
+        particles: { kind: 'fog', colors: ['#eef4fa', '#c8e4f4'], scale: 0.7 }, // a thinner frost-breath
       },
     },
   },
@@ -141,6 +154,8 @@ export const THEMES = {
         // through dark-ember strokes — visible at table distance
         shader: { flow: { speed: 0.9, scale: 12.0, cool: '#5a1c06', hot: '#fff2c8', gain: 2.6 } },
         spec: { specularColor: '#ffb073', specularIntensity: 0.9, envMapIntensity: 0.6 }, // warm iron spark
+        // struck iron sheds sparks — they cool from white-hot to dark ember
+        particles: { kind: 'sparks', colors: ['#fff2c8', '#ffd166', '#ff9a3c'], fadeTo: '#571b05' },
       },
     },
   },
@@ -160,6 +175,8 @@ export const THEMES = {
           fresnel: { color: '#7fd9e8', power: 3.0, intensity: 0.45 },
         },
         spec: { ior: 1.75, specularIntensity: 1.25, envMapIntensity: 1.2 }, // cut crystal
+        // the casting grounds itself: rune-embers drift off the contact
+        particles: { kind: 'motes', colors: ['#c9a6ff', '#7fd9e8'], scale: 0.8 },
       },
     },
   },
@@ -178,6 +195,9 @@ export const THEMES = {
           fresnel: { color: '#43265b', power: 2.0, intensity: 1.1 },
           dissolve: { edge: '#cfe98c' },
         },
+        // what it touches, it unmakes a little: dim ash, a rare live ember.
+        // The unmake burn feeds the same palette out as wisps (lab.js).
+        particles: { kind: 'ash', colors: ['#5a4a6a', '#cfe98c'] },
       },
     },
   },
@@ -191,6 +211,7 @@ export const THEMES = {
         glow: null,
         feel: { rough: 0.6, metal: 0.05 },
         maps: { relief: { pattern: 'scrimshaw', strength: 0.95, digitDepth: 0.75 } },
+        particles: { kind: 'dust', colors: ['#e8dcc0', '#c9b896'] }, // old bone gives up its dust
       },
     },
   },
@@ -204,6 +225,7 @@ export const THEMES = {
         glow: null,
         feel: { rough: 0.18, metal: 0.4 },
         spec: { clearcoat: 1.0, clearcoatRoughness: 0.12, envMapIntensity: 1.25 }, // lacquer over gold
+        // no particles: lacquer sheds nothing — the house's dignity is stillness
       },
     },
   },

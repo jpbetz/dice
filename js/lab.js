@@ -17,12 +17,16 @@
 // js/lab.js — THE DICE LAB (Tier 6 §9): every theme × every die type in
 // one grid, with per-theme effect triggers. Dev chrome only; the main app
 // imports nothing from here. Effects are PROTOTYPES of the signature
-// effects in docs/THEMES.md — each names its cause — kept cheap (light,
-// material and transform animation only; no particles yet).
+// effects in docs/THEMES.md — each names its cause: light, material and
+// transform animation (Levels 1-2) plus Level 3's impact-keyed particles,
+// proven honest by the DROP RIG — a real cannon-es die whose measured
+// contacts fire the set's bursts.
 
 import * as THREE from 'three';
-import { DIE_TYPES, createDieMesh, valueRange, faceNormalForValue, SHADER_TIME } from './dice.js';
+import * as CANNON from 'cannon-es';
+import { DIE_TYPES, createDieMesh, createDieBody, valueRange, faceNormalForValue, SHADER_TIME } from './dice.js';
 import { THEMES, SETS, SET_IDS } from './themes.js';
+import { ParticleField } from './particles.js';
 
 const ROWS = ['std', ...SET_IDS];
 const COL_STEP = 2.5;
@@ -73,6 +77,10 @@ scene.add(ambient, key, fill);
   tex.dispose();
   pmrem.dispose();
 }
+
+// Level 3: one particle pool for the whole lab (js/particles.js). Bursts
+// come from the drop rig's measured contacts and the unmake burn's wisps.
+const field = new ParticleField(scene);
 
 const ENVS = {
   table: { label: '☀ env: table', amb: 0.55, key: 1.15, bg: 0x14100c },
@@ -151,6 +159,7 @@ ROWS.forEach((id, r) => {
 function frameCamera() {
   const aspect = window.innerWidth / window.innerHeight;
   camera.aspect = aspect;
+  field.setProjection(window.innerHeight, camera.fov);
   const fitH = (gridH / 2 + 2.2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   const fitW = (gridW / 2 + 3.4) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / aspect;
   camera.position.set(0, 0, Math.max(fitH, fitW));
@@ -238,15 +247,29 @@ const EFFECTS = {
     });
   },
   // it was never fully here: noise-threshold dissolve with a burning
-  // edge — out over ~1s, a beat of absence, then re-knit (lab loop)
+  // edge — out over ~1s, a beat of absence, then re-knit (lab loop).
+  // While the burn eats the die, ash wisps rise off it (Level 3): the
+  // emission rides the same clock as uDissolve, not a timer of its own.
   unmake(row) {
     const mats = rowMaterials(row).filter((m) => m.userData.uDissolve);
     if (!mats.length) return;
+    const recipe = row.recipe && row.recipe.particles;
     run(2600, (k) => {
       const v = k < 0.38 ? easeOut(k / 0.38)
         : k < 0.58 ? 1
         : 1 - easeOut((k - 0.58) / 0.42);
       for (const m of mats) m.userData.uDissolve.value = Math.min(v, 0.999);
+      if (recipe && k < 0.38) {
+        for (const c of row.meshes) {
+          if (Math.random() < 0.35) {
+            field.wisp(recipe, [
+              c.mesh.position.x + (Math.random() - 0.5) * 1.3,
+              c.mesh.position.y + (Math.random() - 0.5) * 1.3,
+              c.mesh.position.z + 0.5,
+            ]);
+          }
+        }
+      }
     }, () => {
       for (const m of mats) m.userData.uDissolve.value = 0;
     });
@@ -272,6 +295,92 @@ const EFFECTS = {
     });
   },
 };
+
+// ---------------------------------------------------------------------------
+// The drop rig — Level 3's honesty check. A REAL cannon-es d6 (main-table
+// gravity and contact params) falls into the row; every `collide` whose
+// impact velocity clears the floor fires the set's burst AT the measured
+// contact point, scaled by the measured strength. No impact, no particles.
+// One drop at a time; the die fades out after it sleeps.
+// ---------------------------------------------------------------------------
+
+const DROP_Z = 2.4; // in front of the display grid; clear of its meshes
+const dieMat = new CANNON.Material('labDie');
+const floorMat = new CANNON.Material('labFloor');
+let world = null;
+let drop = null; // {mesh, body, floor, row, born, sleepAt, contacts, bursts}
+let dropCount = 0;
+
+// mulberry32 (local copy): the FIRST drop after load is fully seeded, so
+// headless shots replay the identical trajectory run after run.
+function labRng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function ensureWorld() {
+  if (world) return;
+  world = new CANNON.World({ gravity: new CANNON.Vec3(0, -110, 0) }); // main.js's GRAVITY
+  world.allowSleep = true; // worlds default to false — without this the die never sleeps
+  world.addContactMaterial(new CANNON.ContactMaterial(dieMat, floorMat, { friction: 0.25, restitution: 0.42 }));
+}
+
+function endDrop(fade) {
+  if (!drop) return;
+  const d = drop;
+  drop = null;
+  world.removeBody(d.body);
+  world.removeBody(d.floor);
+  if (fade) run(260, (k) => d.mesh.scale.setScalar(1 - easeOut(k)), () => scene.remove(d.mesh));
+  else scene.remove(d.mesh);
+}
+
+function startDrop(row) {
+  ensureWorld();
+  endDrop(false);
+  const rng = labRng(0xd1ce + dropCount++);
+  const y = row.meshes[0].baseY;
+  const cx = row.meshes[4].baseX; // the zoom view's center column
+  const floor = new CANNON.Body({ mass: 0, shape: new CANNON.Plane(), material: floorMat });
+  floor.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+  floor.position.set(0, y - 1.15, 0); // settle just below the row line, inside the zoom frame
+  world.addBody(floor);
+  const body = createDieBody('d6', dieMat);
+  body.position.set(cx + (rng() - 0.5) * 0.5, y + 3.1, DROP_Z + (rng() - 0.5) * 0.3);
+  body.velocity.set((rng() - 0.5) * 1.1, -2, (rng() - 0.5) * 1.1);
+  body.angularVelocity.set((rng() - 0.5) * 16, (rng() - 0.5) * 16, (rng() - 0.5) * 16);
+  body.quaternion.setFromEuler(rng() * 6.28, rng() * 6.28, rng() * 6.28);
+  body.linearDamping = 0.22; // stands in for felt + walls: keeps the die in the zoom frame
+  body.angularDamping = 0.1;
+  world.addBody(body);
+  const mesh = createDieMesh('d6', row.id === 'std' ? 'std' : row.id);
+  scene.add(mesh);
+  const recipe = row.recipe && row.recipe.particles;
+  body.addEventListener('collide', (e) => {
+    if (!drop || drop.body !== body) return;
+    const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
+    if (v < 1.6) return; // same idea as the click-sound floor
+    drop.contacts++;
+    if (!recipe) return; // a set may shed nothing — that IS the demo
+    const c = e.contact;
+    const side = c.bi === body ? { b: c.bi, r: c.ri } : { b: c.bj, r: c.rj };
+    drop.bursts += field.burst(
+      recipe,
+      [side.b.position.x + side.r.x, side.b.position.y + side.r.y, side.b.position.z + side.r.z],
+      v,
+      rng
+    );
+  });
+  body.addEventListener('sleep', () => {
+    if (drop && drop.body === body) drop.sleepAt = performance.now();
+  });
+  drop = { mesh, body, floor, row, born: performance.now(), sleepAt: 0, contacts: 0, bursts: 0 };
+}
 
 // ---------------------------------------------------------------------------
 // Sidebar + toolbar
@@ -335,6 +444,15 @@ for (const row of rows) {
     b.addEventListener('click', () => EFFECTS[id](row));
     fx.appendChild(b);
   }
+  {
+    const b = document.createElement('button');
+    b.textContent = '⬇ drop';
+    b.title = row.recipe && row.recipe.particles
+      ? 'A real physics die: every measured contact fires this set\'s burst'
+      : 'A real physics die: this set sheds nothing on impact (on purpose)';
+    b.addEventListener('click', () => startDrop(row));
+    fx.appendChild(b);
+  }
   box.appendChild(fx);
   side.appendChild(box);
 }
@@ -377,6 +495,13 @@ function tick(now) {
     fx.step(k);
     if (k >= 1) { fx.done && fx.done(); active.splice(i, 1); }
   }
+  if (drop) {
+    world.step(1 / 60, dt, 4); // main-table FIXED_DT
+    drop.mesh.position.copy(drop.body.position);
+    drop.mesh.quaternion.copy(drop.body.quaternion);
+    if ((drop.sleepAt && now - drop.sleepAt > 900) || now - drop.born > 9000) endDrop(true);
+  }
+  field.tick(dt, now / 1000);
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
@@ -437,6 +562,21 @@ window.__lab = {
     return true;
   },
   effectsActive() { return active.length; },
+  // Level 3's rig, scriptable: drop a physics die into a row, then poll
+  // the contact/burst counters to assert particles really keyed off
+  // measured impacts (tools/lab-shots.mjs does exactly this).
+  drop(rowId) {
+    const row = rows.find((r) => r.id === rowId);
+    if (!row) return false;
+    startDrop(row);
+    return true;
+  },
+  dropState() {
+    return drop
+      ? { active: true, contacts: drop.contacts, bursts: drop.bursts, sleeping: !!drop.sleepAt }
+      : { active: false };
+  },
+  particleCount() { return field.count(); },
   // diagnostic: average RGB of each face texture's SOURCE canvas for one
   // die — separates "the canvas was drawn wrong" from "the GPU upload
   // went wrong" when a face renders solid white.
