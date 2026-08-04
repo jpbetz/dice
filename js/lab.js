@@ -24,14 +24,86 @@
 
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { DIE_TYPES, createDieMesh, createDieBody, valueRange, faceNormalForValue, SHADER_TIME } from './dice.js';
-import { THEMES, SETS, SET_IDS } from './themes.js';
+import { DIE_TYPES, createDieMesh, createDieBody, valueRange, faceNormalForValue, SHADER_TIME, PATTERN_IDS, bustDie } from './dice.js';
+import { THEMES, SETS, SET_IDS, registerSet } from './themes.js';
 import { ParticleField } from './particles.js';
 import { DecalField } from './decals.js';
 import { DieLightRig } from './dielights.js';
 import { PostStack } from './post.js';
 
-const ROWS = ['std', ...SET_IDS];
+// ---------------------------------------------------------------------------
+// THE GEO BENCH + THE SET BUILDER (softer edges Tier 0, Joe 2026-08-04)
+// ---------------------------------------------------------------------------
+// Bench rows sweep the Level 3.5 `geo` space over OTHERWISE-STANDARD dice
+// (no body/text → std per-type colors; no house → std finish), seated right
+// under the std row so edge treatments are judged side by side. 'lab.*'
+// ids are page-local (themes.js registerSet): the published picker list
+// never sees them.
+const BENCH = [
+  ['lab.cut030',   'Cut .030 — machined',                 { bevel: 0.03 }],
+  ['lab.cut090',   'Cut .090 — wide chamfer',             { bevel: 0.09 }],
+  ['lab.round055', 'Round .055 — today\'s width, filleted', { bevel: 0.055, profile: 'round' }],
+  ['lab.round090', 'Round .090 — the soft candidate',     { bevel: 0.09, profile: 'round' }],
+  ['lab.round130', 'Round .130 — the recipe ceiling',     { bevel: 0.13, profile: 'round' }],
+  ['lab.pillow',   'Round .090 + pillow .35',             { bevel: 0.09, profile: 'round', pillow: 0.35 }],
+  ['lab.tumbled',  'Round .110 + wear .25 + pillow .20',  { bevel: 0.11, profile: 'round', wear: 0.25, pillow: 0.2 }],
+  ['lab.pocked',   'Round .120 + wear .45 + nicks 3',     { bevel: 0.12, profile: 'round', wear: 0.45, pillow: 0.3, nicks: 3 }],
+];
+for (const [id, label, geo] of BENCH) registerSet(id, { label, geo });
+const BENCH_IDS = BENCH.map(([id]) => id);
+
+// The builder's working state: a superset of a themes.js recipe with
+// explicit enables, so a knob keeps its last value while toggled off.
+const B_DEFAULTS = () => ({
+  stdColors: true, body: '#2e6f9e', text: '#f7edda', accent: '#ffd766',
+  geo: { bevel: 0.055, profile: 'cut', wear: 0, pillow: 0, nicks: 0 },
+  feel: { rough: 0.3, metal: 0.1 },
+  spec: { envMapIntensity: 0.35, clearcoat: 0, clearcoatRoughness: 0.5, ior: 1.5,
+    iridescence: 0, iridescenceIOR: 1.3, specularIntensity: 1, specularColor: '#ffffff' },
+  glowOn: false, glow: { color: '#ffd766', intensity: 0.15 },
+  relief: { pattern: 'none', strength: 0.5, tint: 0.4, digitDepth: 0 },
+  roughPattern: 'none',
+  digitGlowOn: false, digitGlow: { color: '#9ce0ff', intensity: 0.8 },
+  glyph: 'none',
+  carry: {}, // non-tunable sections a seed brought along (shader, particles, …)
+});
+let bState = B_DEFAULTS();
+
+// Collapse the state into a themes.js-shaped recipe: knobs at their
+// defaults are OMITTED, so the copy-out JSON reads like a real entry.
+function assembleRecipe(s) {
+  const r = { label: 'Builder', house: 'lab', accent: s.accent };
+  if (!s.stdColors) { r.body = s.body; r.text = s.text; }
+  const g = { bevel: s.geo.bevel };
+  if (s.geo.profile === 'round') g.profile = 'round';
+  if (s.geo.wear > 0) g.wear = s.geo.wear;
+  if (s.geo.pillow > 0) g.pillow = s.geo.pillow;
+  if (s.geo.nicks > 0) g.nicks = s.geo.nicks;
+  r.geo = g;
+  r.feel = { rough: s.feel.rough, metal: s.feel.metal };
+  const sp = { envMapIntensity: s.spec.envMapIntensity };
+  if (s.spec.clearcoat > 0) { sp.clearcoat = s.spec.clearcoat; sp.clearcoatRoughness = s.spec.clearcoatRoughness; }
+  if (s.spec.ior !== 1.5) sp.ior = s.spec.ior;
+  if (s.spec.iridescence > 0) { sp.iridescence = s.spec.iridescence; sp.iridescenceIOR = s.spec.iridescenceIOR; }
+  if (s.spec.specularIntensity !== 1) sp.specularIntensity = s.spec.specularIntensity;
+  if (s.spec.specularColor !== '#ffffff') sp.specularColor = s.spec.specularColor;
+  r.spec = sp;
+  if (s.glowOn) r.glow = { color: s.glow.color, intensity: s.glow.intensity };
+  const maps = {};
+  if (s.relief.pattern !== 'none') {
+    maps.relief = { pattern: s.relief.pattern, strength: s.relief.strength, tint: s.relief.tint };
+    if (s.relief.digitDepth > 0) maps.relief.digitDepth = s.relief.digitDepth;
+  }
+  if (s.roughPattern !== 'none') maps.roughPattern = s.roughPattern;
+  if (s.digitGlowOn) maps.digitGlow = { color: s.digitGlow.color, intensity: s.digitGlow.intensity };
+  if (Object.keys(maps).length) r.maps = maps;
+  if (s.glyph !== 'none') r.glyph = s.glyph;
+  Object.assign(r, s.carry); // shader/particles/… ride along from a seed
+  return r;
+}
+registerSet('lab.builder', assembleRecipe(bState));
+
+const ROWS = ['std', ...BENCH_IDS, 'lab.builder', ...SET_IDS];
 const COL_STEP = 2.5;
 const ROW_STEP = 2.5;
 
@@ -46,6 +118,9 @@ stage.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 200);
+// Every framing helper aims here, so the wheel can dolly toward whatever
+// the camera is currently studying.
+const camTarget = new THREE.Vector3();
 
 const ambient = new THREE.AmbientLight(0xffffff, 0.55);
 const key = new THREE.DirectionalLight(0xffffff, 1.15);
@@ -121,48 +196,54 @@ const rows = []; // {id, label, meshes: [{mesh, baseY, baseX}], spin: true}
 const gridW = (DIE_TYPES.length - 1) * COL_STEP;
 const gridH = (ROWS.length - 1) * ROW_STEP;
 
+// One posed grid die. Shared by the boot loop and the builder's live
+// rebuild — the pose, the texture pinning and the effects' base-state
+// cache must match exactly or a rebuilt row drifts from its neighbors.
+function makeDie(type, variant, x, y, c) {
+  const mesh = createDieMesh(type, variant);
+  mesh.position.set(x, y, 0);
+  // Two headless-renderer defenses (the lab builds ~800 canvas textures;
+  // the probe proved every SOURCE canvas correct while some faces still
+  // rendered solid white — deterministic, so a SwiftShader upload/mipmap
+  // artifact, not canvas blanking): skip mipmap generation entirely and
+  // pin each texture to the GPU at build time.
+  mesh.material.forEach((m) => {
+    for (const t of [m.map, m.emissiveMap, m.normalMap, m.roughnessMap]) {
+      if (!t) continue;
+      t.generateMipmaps = false;
+      t.minFilter = THREE.LinearFilter;
+      t.needsUpdate = true;
+      renderer.initTexture(t);
+    }
+  });
+  const [, max] = valueRange(type);
+  const n = faceNormalForValue(type, max);
+  if (n) mesh.quaternion.setFromUnitVectors(n.normalize(), new THREE.Vector3(0.25, 0.35, 1).normalize());
+  // Break the mirror: the pure hero pose points every max face at the
+  // SAME direction, and for glossy themes that direction mirrored the
+  // key light into the camera — flat d6/d8 faces speculared to solid
+  // white (probe4: physics, not corruption; unlit renders were fine).
+  mesh.rotateY(0.22);
+  mesh.rotateX(-0.12);
+  // remember the resting emissive so effects can always find home
+  mesh.material.forEach((m) => {
+    m.userData.baseEmissive = m.emissive ? m.emissive.clone() : new THREE.Color(0x000000);
+    m.userData.baseEmissiveIntensity = m.emissiveIntensity ?? 0;
+    m.userData.baseColor = m.color.clone();
+    m.userData.baseRough = m.roughness;
+  });
+  scene.add(mesh);
+  return { mesh, baseX: x, baseY: y, phase: c * 0.7 };
+}
+
 ROWS.forEach((id, r) => {
   const y = gridH / 2 - r * ROW_STEP;
-  const meshes = [];
-  DIE_TYPES.forEach((type, c) => {
-    const mesh = createDieMesh(type, id === 'std' ? 'std' : id);
-    const x = -gridW / 2 + c * COL_STEP;
-    mesh.position.set(x, y, 0);
-    // Two headless-renderer defenses (the lab builds ~800 canvas textures;
-    // the probe proved every SOURCE canvas correct while some faces still
-    // rendered solid white — deterministic, so a SwiftShader upload/mipmap
-    // artifact, not canvas blanking): skip mipmap generation entirely and
-    // pin each texture to the GPU at build time.
-    mesh.material.forEach((m) => {
-      for (const t of [m.map, m.emissiveMap, m.normalMap, m.roughnessMap]) {
-        if (!t) continue;
-        t.generateMipmaps = false;
-        t.minFilter = THREE.LinearFilter;
-        t.needsUpdate = true;
-        renderer.initTexture(t);
-      }
-    });
-    const [, max] = valueRange(type);
-    const n = faceNormalForValue(type, max);
-    if (n) mesh.quaternion.setFromUnitVectors(n.normalize(), new THREE.Vector3(0.25, 0.35, 1).normalize());
-    // Break the mirror: the pure hero pose points every max face at the
-    // SAME direction, and for glossy themes that direction mirrored the
-    // key light into the camera — flat d6/d8 faces speculared to solid
-    // white (probe4: physics, not corruption; unlit renders were fine).
-    mesh.rotateY(0.22);
-    mesh.rotateX(-0.12);
-    // remember the resting emissive so effects can always find home
-    mesh.material.forEach((m) => {
-      m.userData.baseEmissive = m.emissive ? m.emissive.clone() : new THREE.Color(0x000000);
-      m.userData.baseEmissiveIntensity = m.emissiveIntensity ?? 0;
-      m.userData.baseColor = m.color.clone();
-      m.userData.baseRough = m.roughness;
-    });
-    scene.add(mesh);
-    meshes.push({ mesh, baseX: x, baseY: y, phase: c * 0.7 });
-  });
-  rows.push({ id, recipe: id === 'std' ? null : SETS[id],
-    label: id === 'std' ? 'Standard (today)' : `${SETS[id].houseLabel} · ${SETS[id].label}`,
+  const meshes = DIE_TYPES.map((type, c) =>
+    makeDie(type, id === 'std' ? 'std' : id, -gridW / 2 + c * COL_STEP, y, c));
+  const recipe = id === 'std' ? null : SETS[id];
+  rows.push({ id, recipe,
+    label: id === 'std' ? 'Standard (today)'
+      : recipe.houseLabel ? `${recipe.houseLabel} · ${recipe.label}` : recipe.label,
     meshes, spin: true, spinHold: 0 });
   // Warm-up render per ROW: pushing ~550 canvas-texture uploads through
   // SwiftShader in one first frame deterministically dropped two of them
@@ -177,6 +258,7 @@ function frameCamera() {
   field.setProjection(window.innerHeight, camera.fov);
   const fitH = (gridH / 2 + 2.2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
   const fitW = (gridW / 2 + 3.4) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / aspect;
+  camTarget.set(0, 0, 0);
   camera.position.set(0, 0, Math.max(fitH, fitW));
   camera.lookAt(0, 0, 0);
   camera.updateProjectionMatrix();
@@ -231,7 +313,7 @@ const EFFECTS = {
     const mats = rowMaterials(row);
     const accent = row.recipe && (row.recipe.glow || (row.recipe.maps && row.recipe.maps.digitGlow))
       ? null // themed glow: surge what the set already carries
-      : new THREE.Color(row.recipe ? row.recipe.accent : '#ffd766');
+      : new THREE.Color((row.recipe && row.recipe.accent) || '#ffd766');
     run(900, (k) => {
       const s = k < 0.25 ? easeOut(k / 0.25) : 1 - (k - 0.25) / 0.75;
       for (const m of mats) {
@@ -458,13 +540,134 @@ function startDrop(row) {
 // ---------------------------------------------------------------------------
 
 const side = document.getElementById('side');
-const sideNames = []; // every set's clickable name (zoom toggles)
+
+// ---- the recipe readout: every knob a set carries, in one glance --------
+const fmtNum = (v) => {
+  const s = String(Math.round(v * 1000) / 1000);
+  return s.startsWith('0.') ? s.slice(1) : s.startsWith('-0.') ? `-${s.slice(2)}` : s;
+};
+function fmtVal(v) {
+  if (typeof v === 'number') return fmtNum(v);
+  if (v === true) return 'on';
+  if (v == null || v === false) return 'off';
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) return v.map(fmtVal).join(' ');
+  return Object.entries(v).map(([k, x]) => `${k} ${fmtVal(x)}`).join(' · ');
+}
+// One [key, value] line per recipe section; absent geo/feel spell out the
+// std defaults — the whole point is VISIBILITY into what each row runs on.
+function recipeLines(recipe) {
+  const r = recipe || {};
+  const lines = [];
+  const cols = ['body', 'text', 'accent'].filter((k) => r[k]).map((k) => `${k} ${r[k]}`).join(' · ');
+  lines.push(['color', cols || 'std per-type']);
+  lines.push(['geo', r.geo ? fmtVal(r.geo) : 'bevel .055 · cut (std)']);
+  lines.push(['feel', r.feel ? fmtVal(r.feel) : 'rough .3 · metal .1 (std)']);
+  for (const k of ['spec', 'glow', 'maps', 'shader', 'glyph', 'particles', 'decal', 'light', 'post', 'sound', 'rate']) {
+    if (r[k] != null) lines.push([k, fmtVal(r[k])]);
+  }
+  return lines;
+}
+const readoutEls = new Map(); // row.id -> .t-recipe container
+function refreshReadout(row) {
+  const el = readoutEls.get(row.id);
+  if (!el) return;
+  el.textContent = '';
+  for (const [k, v] of recipeLines(row.recipe)) {
+    const d = document.createElement('div');
+    const b = document.createElement('b');
+    b.textContent = k;
+    d.append(b, ` ${v}`);
+    el.appendChild(d);
+  }
+}
+
+// ---- zoom state: one place, so clicks, keys and the canvas agree --------
+const nameEls = new Map(); // row.id -> sidebar name element
+let zoomedId = null;  // row id when zoomed
+let focusCol = null;  // column index when a SINGLE die is framed
+function setZoom(id, col = null) {
+  zoomedId = id;
+  focusCol = id == null ? null : col;
+  if (id == null) window.__lab.zoomRow(null); // refits the full grid
+  else if (col == null) window.__lab.zoomRow(id);
+  else window.__lab.zoomDie(id, col);
+  for (const [rid, el] of nameEls) el.classList.toggle('zoomed', rid === id);
+}
+// Surf while zoomed — the A/B flip the GEO BENCH is for: ↑/↓ hold the
+// framing and swap the recipe (the SAME die type across sets when a single
+// die is framed); ←/→ walk the die types; Esc refits the grid.
+window.addEventListener('keydown', (e) => {
+  if (e.target && /^(input|select|textarea)$/i.test(e.target.tagName)) return;
+  if (e.key === 'Escape') { if (zoomedId) { setZoom(null); e.preventDefault(); } return; }
+  const dir = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key];
+  if (!dir || !zoomedId) return;
+  if (dir[0]) {
+    const next = rows[rows.findIndex((r) => r.id === zoomedId) + dir[0]];
+    if (next) setZoom(next.id, focusCol);
+  } else if (focusCol != null) {
+    const nc = focusCol + dir[1];
+    if (nc >= 0 && nc < DIE_TYPES.length) setZoom(zoomedId, nc);
+  }
+  e.preventDefault();
+});
+// Click a die on the felt to frame it hero-close; empty felt refits the
+// grid. (Row zoom stays on the sidebar names.)
+const caster = new THREE.Raycaster();
+renderer.domElement.addEventListener('click', (ev) => {
+  const r = renderer.domElement.getBoundingClientRect();
+  caster.setFromCamera(new THREE.Vector2(
+    ((ev.clientX - r.left) / r.width) * 2 - 1,
+    -((ev.clientY - r.top) / r.height) * 2 + 1,
+  ), camera);
+  const cells = [];
+  for (const row of rows) row.meshes.forEach((c, ci) => cells.push({ row, ci, mesh: c.mesh }));
+  const hits = caster.intersectObjects(cells.map((c) => c.mesh), true);
+  let obj = hits.length ? hits[0].object : null;
+  while (obj && !cells.some((c) => c.mesh === obj)) obj = obj.parent;
+  const cell = obj && cells.find((c) => c.mesh === obj);
+  if (cell) setZoom(cell.row.id, cell.ci);
+  else if (zoomedId) setZoom(null);
+});
+// Scroll dollies toward whatever the camera is studying (esp. hero dice —
+// edge reads want a HAIR closer than any fixed framing guesses).
+renderer.domElement.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const dir = camera.position.clone().sub(camTarget);
+  const dist = Math.min(Math.max(dir.length() * (1 + e.deltaY * 0.0012), 1.6), 90);
+  camera.position.copy(camTarget).addScaledVector(dir.normalize(), dist);
+}, { passive: false });
+
+// Lab-local section headers (these rows have no THEMES house). The bench
+// header is a toggle: frame the whole std→builder span for the side-by-side
+// read, click again for the full grid.
+const SECTIONS = {
+  'lab.cut030': ['The Geo Bench', '↑/↓ surf rows zoomed · click header: frame the sweep', () => {
+    setZoom(null);
+    if (side.dataset.spanned === '1') { delete side.dataset.spanned; frameCamera(); }
+    else { side.dataset.spanned = '1'; window.__lab.zoomRows('std', 'lab.builder'); }
+  }],
+  'lab.builder': ['The Set Builder', 'every knob live in the ⚗ panel — copy the recipe out when it sings'],
+};
+
 let lastHouse = null;
 for (const row of rows) {
   const box = document.createElement('div');
   box.className = 'theme';
+  if (SECTIONS[row.id]) {
+    const [label, line, onClick] = SECTIONS[row.id];
+    const hh = document.createElement('div');
+    hh.className = 't-house';
+    hh.textContent = label;
+    const hl = document.createElement('div');
+    hl.className = 't-line';
+    hl.textContent = line;
+    if (onClick) { hh.style.cursor = 'pointer'; hh.addEventListener('click', onClick); }
+    side.append(hh, hl);
+    lastHouse = null;
+  }
   // house header once per house (a THEME is a HOUSE holding several SETS)
-  if (row.recipe && row.recipe.house !== lastHouse) {
+  if (row.recipe && row.recipe.house && THEMES[row.recipe.house] && row.recipe.house !== lastHouse) {
     lastHouse = row.recipe.house;
     const hh = document.createElement('div');
     hh.className = 't-house';
@@ -477,22 +680,13 @@ for (const row of rows) {
   const name = document.createElement('div');
   name.className = 't-name';
   name.textContent = row.recipe ? row.recipe.label : row.label;
-  name.title = 'Click: zoom this set close (click again for the full grid)';
-  let zoomed = false;
-  name.addEventListener('click', () => {
-    // one zoomed row at a time; the name is the toggle
-    document.querySelectorAll('.t-name.zoomed').forEach((el) => el.classList.remove('zoomed'));
-    zoomed = !zoomed && window.__lab.zoomRow(row.id) !== false;
-    if (zoomed) name.classList.add('zoomed');
-    else window.__lab.zoomRow(null);
-    for (const other of sideNames) if (other !== name) other.zoomedReset && other.zoomedReset();
-    name.zoomedReset = () => { zoomed = false; };
-  });
-  sideNames.push(name);
+  name.title = 'Click: zoom this row (click a die on the felt for the hero view; ↑↓←→ surf; esc = grid)';
+  name.addEventListener('click', () => setZoom(zoomedId === row.id && focusCol == null ? null : row.id));
+  nameEls.set(row.id, name);
   box.appendChild(name);
   if (row.recipe) {
     const t = row.recipe;
-    name.style.color = t.text;
+    if (t.text) name.style.color = t.text;
     const sw = document.createElement('div');
     sw.className = 'swatches';
     for (const c of [t.body, t.text, t.accent, t.glow ? t.glow.color : null]) {
@@ -502,8 +696,13 @@ for (const row of rows) {
       i.title = c;
       sw.appendChild(i);
     }
-    box.appendChild(sw);
+    if (sw.childElementCount) box.appendChild(sw);
   }
+  const ro = document.createElement('div');
+  ro.className = 't-recipe';
+  readoutEls.set(row.id, ro);
+  box.appendChild(ro);
+  refreshReadout(row);
   const fx = document.createElement('div');
   fx.className = 'fx';
   const fxList = [['flash', '⚡ pop'], ['slam', '🔨 slam'], ['glow', '✨ glow'],
@@ -526,6 +725,210 @@ for (const row of rows) {
   }
   box.appendChild(fx);
   side.appendChild(box);
+}
+
+// ---------------------------------------------------------------------------
+// The SET BUILDER panel — every recipe knob live. Controls write into
+// bState; a short debounce collapses slider streams into one rebuild
+// (each rebuild re-bakes ~60 face canvases — cheap, but not per-pixel
+// cheap). The copy-out prints a themes.js-shaped recipe.
+// ---------------------------------------------------------------------------
+
+const bSyncs = []; // control -> state resync fns (seed loads, builderSet)
+const syncControls = () => bSyncs.forEach((f) => f());
+
+function rebuildBuilderRow() {
+  const row = rows.find((r) => r.id === 'lab.builder');
+  if (drop && drop.row === row) endDrop(false); // its rig d6 wears these materials
+  const y = row.meshes[0].baseY;
+  for (const c of row.meshes) scene.remove(c.mesh);
+  bustDie('lab.builder');
+  row.recipe = registerSet('lab.builder', assembleRecipe(bState));
+  row.meshes = DIE_TYPES.map((type, c) => makeDie(type, 'lab.builder', -gridW / 2 + c * COL_STEP, y, c));
+  renderer.render(scene, camera); // pin the fresh uploads (boot's warm-up defense)
+  refreshReadout(row);
+  const pre = document.getElementById('b-recipe');
+  if (pre) pre.textContent = recipeText();
+}
+let bTimer = 0;
+function touch() { clearTimeout(bTimer); bTimer = setTimeout(rebuildBuilderRow, 140); }
+
+// The paste-into-themes.js text: label/house come from the tree location,
+// so the print is the body alone, JS-style keys and quotes.
+function recipeText() {
+  const { label, house, ...body } = assembleRecipe(bState);
+  return JSON.stringify(body, null, 2)
+    .replace(/"([A-Za-z_][A-Za-z0-9_]*)":/g, '$1:')
+    .replace(/"/g, "'");
+}
+
+{
+  const bc = document.getElementById('b-controls');
+  const section = (title, open = false) => {
+    const d = document.createElement('details');
+    d.open = open;
+    const s = document.createElement('summary');
+    s.textContent = title;
+    d.appendChild(s);
+    bc.appendChild(d);
+    return d;
+  };
+  const rowEl = (parent, labelText) => {
+    const r = document.createElement('div');
+    r.className = 'b-row';
+    const l = document.createElement('label');
+    l.textContent = labelText;
+    r.appendChild(l);
+    parent.appendChild(r);
+    return r;
+  };
+  const slider = (parent, label, get, set, min, max, step) => {
+    const r = rowEl(parent, label);
+    const i = document.createElement('input');
+    i.type = 'range'; i.min = min; i.max = max; i.step = step; i.value = get();
+    const v = document.createElement('span');
+    v.className = 'b-val';
+    v.textContent = fmtNum(get());
+    i.addEventListener('input', () => { set(parseFloat(i.value)); v.textContent = fmtNum(parseFloat(i.value)); touch(); });
+    r.append(i, v);
+    bSyncs.push(() => { i.value = get(); v.textContent = fmtNum(get()); });
+  };
+  const color = (parent, label, get, set) => {
+    const r = rowEl(parent, label);
+    const i = document.createElement('input');
+    i.type = 'color'; i.value = get();
+    i.addEventListener('input', () => { set(i.value); touch(); });
+    r.appendChild(i);
+    bSyncs.push(() => { i.value = get(); });
+  };
+  const select = (parent, label, get, set, options) => {
+    const r = rowEl(parent, label);
+    const s = document.createElement('select');
+    for (const o of options) {
+      const opt = document.createElement('option');
+      opt.value = o; opt.textContent = o;
+      s.appendChild(opt);
+    }
+    s.value = get();
+    s.addEventListener('change', () => { set(s.value); touch(); });
+    r.appendChild(s);
+    bSyncs.push(() => { s.value = get(); });
+  };
+  const check = (parent, label, get, set) => {
+    const r = rowEl(parent, label);
+    const i = document.createElement('input');
+    i.type = 'checkbox'; i.checked = get();
+    i.addEventListener('change', () => { set(i.checked); touch(); });
+    r.appendChild(i);
+    bSyncs.push(() => { i.checked = get(); });
+  };
+
+  // seed: start from std defaults, a bench recipe, or any house set
+  {
+    const r = rowEl(bc, 'seed');
+    const s = document.createElement('select');
+    for (const id of ['std', ...BENCH_IDS, ...SET_IDS]) {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = id === 'std' ? 'std (defaults)' : id;
+      s.appendChild(opt);
+    }
+    s.addEventListener('change', () => loadSeed(s.value));
+    r.appendChild(s);
+  }
+
+  const gGeo = section('geometry (Level 3.5)', true);
+  slider(gGeo, 'bevel', () => bState.geo.bevel, (v) => { bState.geo.bevel = v; }, 0, 0.14, 0.005);
+  select(gGeo, 'profile', () => bState.geo.profile, (v) => { bState.geo.profile = v; }, ['cut', 'round']);
+  slider(gGeo, 'wear', () => bState.geo.wear, (v) => { bState.geo.wear = v; }, 0, 1, 0.05);
+  slider(gGeo, 'pillow', () => bState.geo.pillow, (v) => { bState.geo.pillow = v; }, 0, 1, 0.05);
+  slider(gGeo, 'nicks', () => bState.geo.nicks, (v) => { bState.geo.nicks = v; }, 0, 5, 1);
+
+  const gCol = section('color', true);
+  check(gCol, 'std per-type colors', () => bState.stdColors, (v) => { bState.stdColors = v; });
+  color(gCol, 'body', () => bState.body, (v) => { bState.body = v; bState.stdColors = false; syncControls(); });
+  color(gCol, 'text', () => bState.text, (v) => { bState.text = v; bState.stdColors = false; syncControls(); });
+  color(gCol, 'accent', () => bState.accent, (v) => { bState.accent = v; });
+
+  const gFeel = section('feel & finish');
+  slider(gFeel, 'rough', () => bState.feel.rough, (v) => { bState.feel.rough = v; }, 0, 1, 0.02);
+  slider(gFeel, 'metal', () => bState.feel.metal, (v) => { bState.feel.metal = v; }, 0, 1, 0.02);
+  slider(gFeel, 'env reflect', () => bState.spec.envMapIntensity, (v) => { bState.spec.envMapIntensity = v; }, 0, 2, 0.05);
+
+  const gSpec = section('specular identity');
+  slider(gSpec, 'clearcoat', () => bState.spec.clearcoat, (v) => { bState.spec.clearcoat = v; }, 0, 1, 0.05);
+  slider(gSpec, 'coat rough', () => bState.spec.clearcoatRoughness, (v) => { bState.spec.clearcoatRoughness = v; }, 0, 1, 0.05);
+  slider(gSpec, 'ior', () => bState.spec.ior, (v) => { bState.spec.ior = v; }, 1, 2.33, 0.01);
+  slider(gSpec, 'iridescence', () => bState.spec.iridescence, (v) => { bState.spec.iridescence = v; }, 0, 1, 0.05);
+  slider(gSpec, 'irid. ior', () => bState.spec.iridescenceIOR, (v) => { bState.spec.iridescenceIOR = v; }, 1, 2.5, 0.05);
+  slider(gSpec, 'spec inten.', () => bState.spec.specularIntensity, (v) => { bState.spec.specularIntensity = v; }, 0, 2, 0.05);
+  color(gSpec, 'spec color', () => bState.spec.specularColor, (v) => { bState.spec.specularColor = v; });
+
+  const gGlow = section('internal glow');
+  check(gGlow, 'glow', () => bState.glowOn, (v) => { bState.glowOn = v; });
+  color(gGlow, 'color', () => bState.glow.color, (v) => { bState.glow.color = v; bState.glowOn = true; syncControls(); });
+  slider(gGlow, 'intensity', () => bState.glow.intensity, (v) => { bState.glow.intensity = v; }, 0, 1.2, 0.05);
+
+  const gMaps = section('surface maps');
+  select(gMaps, 'relief', () => bState.relief.pattern, (v) => { bState.relief.pattern = v; }, ['none', ...PATTERN_IDS]);
+  slider(gMaps, 'strength', () => bState.relief.strength, (v) => { bState.relief.strength = v; }, 0, 1, 0.05);
+  slider(gMaps, 'tint', () => bState.relief.tint, (v) => { bState.relief.tint = v; }, 0, 1, 0.05);
+  slider(gMaps, 'digit depth', () => bState.relief.digitDepth, (v) => { bState.relief.digitDepth = v; }, 0, 1, 0.05);
+  select(gMaps, 'rough map', () => bState.roughPattern, (v) => { bState.roughPattern = v; }, ['none', ...PATTERN_IDS]);
+  check(gMaps, 'digit glow', () => bState.digitGlowOn, (v) => { bState.digitGlowOn = v; });
+  color(gMaps, 'digit color', () => bState.digitGlow.color, (v) => { bState.digitGlow.color = v; bState.digitGlowOn = true; syncControls(); });
+  slider(gMaps, 'digit inten.', () => bState.digitGlow.intensity, (v) => { bState.digitGlow.intensity = v; }, 0, 1.5, 0.05);
+
+  const gGlyph = section('glyphs');
+  select(gGlyph, 'glyph', () => bState.glyph, (v) => { bState.glyph = v; }, ['none', 'pip']);
+
+  document.getElementById('b-recipe').textContent = recipeText();
+  document.getElementById('b-copy').addEventListener('click', () => {
+    const btn = document.getElementById('b-copy');
+    navigator.clipboard.writeText(recipeText()).then(
+      () => { btn.textContent = '✓ copied'; setTimeout(() => { btn.textContent = '⧉ copy recipe'; }, 1200); },
+      () => { btn.textContent = '✕ copy failed'; setTimeout(() => { btn.textContent = '⧉ copy recipe'; }, 1200); },
+    );
+  });
+  document.getElementById('bpanel').addEventListener('click', () => {
+    const p = document.getElementById('builder');
+    p.style.display = p.style.display === 'none' ? '' : 'none';
+  });
+}
+
+function loadSeed(id) {
+  const d = B_DEFAULTS();
+  if (id !== 'std' && SETS[id]) {
+    const t = SETS[id];
+    bState = {
+      ...d,
+      stdColors: !t.body,
+      body: t.body || d.body, text: t.text || d.text, accent: t.accent || d.accent,
+      geo: { ...d.geo, ...(t.geo || {}) },
+      feel: { ...d.feel, ...(t.feel || {}) },
+      // a house set without spec rides three's env default (1), not std's whisper
+      spec: { ...d.spec, envMapIntensity: t.house ? 1 : 0.35, ...(t.spec || {}) },
+      glowOn: !!t.glow, glow: t.glow ? { ...t.glow } : d.glow,
+      relief: t.maps && t.maps.relief
+        ? { pattern: t.maps.relief.pattern, strength: t.maps.relief.strength ?? 0.5, tint: t.maps.relief.tint ?? 0.4, digitDepth: t.maps.relief.digitDepth ?? 0 }
+        : d.relief,
+      roughPattern: (t.maps && t.maps.roughPattern) || 'none',
+      digitGlowOn: !!(t.maps && t.maps.digitGlow),
+      digitGlow: t.maps && t.maps.digitGlow ? { ...t.maps.digitGlow } : d.digitGlow,
+      glyph: t.glyph || 'none',
+      carry: (() => {
+        const c = {};
+        for (const k of ['shader', 'particles', 'decal', 'light', 'post', 'sound', 'rate']) {
+          if (t[k] != null) c[k] = t[k];
+        }
+        return c;
+      })(),
+    };
+  } else {
+    bState = d;
+  }
+  syncControls();
+  rebuildBuilderRow();
 }
 
 let rotate = true;
@@ -619,8 +1022,26 @@ window.__labSample = (idx) => {
 window.__lab = {
   ready: true,
   rows: rows.map((r) => r.id),
+  benchIds: BENCH_IDS,
   setRotate(on) { rotate = !!on; },
   setEnv(name) { applyEnv(name); },
+  // The builder, scriptable: deep-merge a patch into the working state
+  // (bState shape: geo/feel/spec sections, stdColors, body/text/accent,
+  // glowOn/glow, relief/roughPattern, digitGlowOn/digitGlow, glyph),
+  // rebuild synchronously, return the assembled recipe.
+  builderSet(patch) {
+    const merge = (dst, src) => {
+      for (const [k, v] of Object.entries(src || {})) {
+        if (v && typeof v === 'object' && !Array.isArray(v) && dst[k] && typeof dst[k] === 'object') merge(dst[k], v);
+        else dst[k] = v;
+      }
+    };
+    merge(bState, patch);
+    syncControls();
+    rebuildBuilderRow();
+    return this.builderRecipe();
+  },
+  builderRecipe() { return JSON.parse(JSON.stringify(assembleRecipe(bState))); },
   // Frame ONE row close (null = the full grid) — the detail view where
   // Level 1 relief and digit glow get judged.
   zoomRow(id) {
@@ -632,8 +1053,41 @@ window.__lab = {
     // d10x/d12/d20 end where the faces are biggest.
     const y = row.meshes[0].baseY;
     const cx = row.meshes[4].baseX;
+    camTarget.set(cx, y, 0);
     camera.position.set(cx, y, 7.2);
     camera.lookAt(cx, y, 0);
+    camera.updateProjectionMatrix();
+    return true;
+  },
+  // Frame ONE die hero-close (a die type like 'd6', or a column index) —
+  // edge profiles and surface character are judged at THIS distance.
+  // Canvas clicks land here too; ↑/↓ then flip the same die across sets.
+  zoomDie(rowId, typeOrIdx) {
+    const row = rows.find((r) => r.id === rowId);
+    const c = typeof typeOrIdx === 'number' ? typeOrIdx : DIE_TYPES.indexOf(typeOrIdx);
+    if (!row || c < 0 || c >= DIE_TYPES.length) return false;
+    const cell = row.meshes[c];
+    camTarget.set(cell.baseX, cell.baseY, 0);
+    camera.position.set(cell.baseX, cell.baseY, 4.1);
+    camera.lookAt(camTarget);
+    camera.updateProjectionMatrix();
+    return true;
+  },
+  // Frame a SPAN of rows (inclusive) — the GEO BENCH's side-by-side read.
+  zoomRows(fromId, toId) {
+    const i1 = rows.findIndex((r) => r.id === fromId);
+    const i2 = rows.findIndex((r) => r.id === toId);
+    if (i1 === -1 || i2 === -1) return false;
+    const yTop = gridH / 2 - Math.min(i1, i2) * ROW_STEP;
+    const yBot = gridH / 2 - Math.max(i1, i2) * ROW_STEP;
+    const cy = (yTop + yBot) / 2;
+    const half = (yTop - yBot) / 2 + 1.6;
+    const aspect = window.innerWidth / window.innerHeight;
+    const fitH = half / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const fitW = (gridW / 2 + 3.4) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / aspect;
+    camTarget.set(0, cy, 0);
+    camera.position.set(0, cy, Math.max(fitH, fitW));
+    camera.lookAt(0, cy, 0);
     camera.updateProjectionMatrix();
     return true;
   },
@@ -695,6 +1149,7 @@ window.__lab = {
     if (!row) return false;
     const y = row.meshes[0].baseY;
     const cx = row.meshes[4].baseX;
+    camTarget.set(cx, y - 1.15, DROP_Z - 0.4);
     camera.position.set(cx, y + 6.2, DROP_Z + 4.8);
     camera.lookAt(cx, y - 1.15, DROP_Z - 0.4);
     camera.updateProjectionMatrix();

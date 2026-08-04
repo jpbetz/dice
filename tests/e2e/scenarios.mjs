@@ -22,7 +22,7 @@ limitations under the License.
 // fits). If a scenario needs app state a script can't reach, add a hook to
 // window.__diceDebug rather than scraping fragile DOM.
 
-import { assert } from './harness.mjs';
+import { assert, Table } from './harness.mjs';
 
 // Wait for a hidden roll's shrouded playback to land on a tab: the log line
 // exists, the dice are on the felt, and nothing is still animating.
@@ -3939,6 +3939,82 @@ export const scenarios = [
       const g2 = (await a.dbg('groups')).find((g) => g.id === gid);
       assert.equal(g2.set, 'emberforge.blackanvil', 'the strip picker commits through editPool');
       await a.eval(`window.__diceDebug.closePopover()`);
+    },
+  },
+  {
+    name: 'lab-geo-bench',
+    tags: ['lab'],
+    timeout: 150000,
+    // The GEO BENCH + SET BUILDER (softer edges Tier 0): lab-only rows sweep
+    // the Level 3.5 geo space on otherwise-standard dice, and the builder
+    // rebuilds a live row from any recipe patch. Assertions ride
+    // __lab.geoStats (bevel/wear eat the bounding radius) and faceDump
+    // (source canvases), not screenshots. The lab is a raw page, not a
+    // table — adopt it into ctx.tables so closeAll and the page-exception
+    // collector still see it.
+    async fn(ctx) {
+      const page = await ctx.browser.newPage();
+      const url = `http://localhost:${ctx.port}/lab.html`;
+      await page.navigate(url);
+      const t = new Table(page, url);
+      ctx.tables.push(t);
+      await t.waitFor('!!(window.__lab && window.__lab.ready)', { desc: 'lab ready', timeout: 90000 });
+
+      const rows = JSON.parse(await t.eval('JSON.stringify(window.__lab.rows)'));
+      const bench = JSON.parse(await t.eval('JSON.stringify(window.__lab.benchIds)'));
+      assert.ok(bench.length >= 6, `bench sweep registered (got ${bench.length})`);
+      for (const id of [...bench, 'lab.builder']) {
+        assert.ok(rows.includes(id), `${id} seated in the grid`);
+      }
+      // lab-only ids must never leak into the published picker list
+      const published = JSON.parse(await t.eval(
+        `import('./js/themes.js').then((m) => JSON.stringify(m.SET_IDS))`));
+      assert.ok(!published.some((id) => id.startsWith('lab.')), 'SET_IDS stays free of lab rows');
+
+      // The bench's physical claim: bevel eats the corner, so the render
+      // mesh's bounding radius strictly shrinks as the recipe widens, and
+      // wear gnaws past what its bevel alone removes.
+      const stats = JSON.parse(await t.eval('JSON.stringify(window.__lab.geoStats())'));
+      assert.ok(stats['lab.cut030'].r > stats['std'].r,
+        `narrow cut keeps more corner than std (${stats['lab.cut030'].r} vs ${stats['std'].r})`);
+      assert.ok(stats['std'].r > stats['lab.round090'].r,
+        `.090 bevel trims past std (${stats['std'].r} vs ${stats['lab.round090'].r})`);
+      assert.ok(stats['lab.round090'].r > stats['lab.round130'].r,
+        `.130 trims past .090 (${stats['lab.round090'].r} vs ${stats['lab.round130'].r})`);
+      // (No cross-bevel wear ordering: a wider plain fillet can out-trim a
+      // narrower worn one. The character rows just have to shrink vs std.)
+      assert.ok(stats['lab.tumbled'].r < stats['std'].r,
+        `tumbled row trims past std (${stats['lab.tumbled'].r} vs ${stats['std'].r})`);
+      assert.ok(stats['lab.pocked'].r < stats['std'].r,
+        `pocked row trims past std (${stats['lab.pocked'].r} vs ${stats['std'].r})`);
+
+      // Hero-die framing (the detail view): a die type or column index
+      const hero = await t.eval(`window.__lab.zoomDie('lab.round090', 'd6')`);
+      assert.equal(hero, true, 'zoomDie frames a bench die by type');
+      assert.equal(await t.eval(`window.__lab.zoomDie('lab.round090', 'd99')`), false,
+        'zoomDie rejects an unknown type');
+
+      // The builder: a geo patch reshapes the live row's render mesh…
+      const r0 = stats['lab.builder'].r;
+      await t.eval(`window.__lab.builderSet({ geo: { bevel: 0.12, profile: 'round' } })`);
+      const s2 = JSON.parse(await t.eval('JSON.stringify(window.__lab.geoStats())'));
+      assert.ok(s2['lab.builder'].r < r0,
+        `builder bevel edit reshaped the mesh (${s2['lab.builder'].r} vs ${r0})`);
+
+      // …a body-color patch reaches the freshly baked face canvases…
+      await t.eval(`window.__lab.builderSet({ stdColors: false, body: '#ff2222', text: '#ffffff' })`);
+      const dump = JSON.parse(await t.eval(`JSON.stringify(window.__lab.faceDump('lab.builder', 1))`));
+      const faces = dump.filter((f) => f.map);
+      assert.ok(faces.length >= 6, 'builder d6 faces carry canvas textures');
+      const avg = (i) => faces.reduce((s, f) => s + f.avg[i], 0) / faces.length;
+      assert.ok(avg(0) > avg(1) + 40, `red body reaches the face bakes (rgb ${avg(0).toFixed(0)},${avg(1).toFixed(0)},${avg(2).toFixed(0)})`);
+
+      // …and the assembled recipe carries both edits, themes.js-shaped.
+      const rec = JSON.parse(await t.eval('JSON.stringify(window.__lab.builderRecipe())'));
+      assert.equal(rec.geo.profile, 'round', 'recipe keeps the profile');
+      assert.equal(rec.geo.bevel, 0.12, 'recipe keeps the bevel');
+      assert.equal(rec.body, '#ff2222', 'recipe keeps the body color');
+      assert.ok(rec.feel && typeof rec.feel.rough === 'number', 'recipe carries feel');
     },
   },
 ];
