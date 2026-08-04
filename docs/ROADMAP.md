@@ -396,8 +396,19 @@ Palette tiles and tray/pool/offer strips wear MY set and re-dress in
 place on a set change (refreshDieArt walks data-art-type imgs); log
 chips wear each ROLL's set on every screen, and hidden entries wear
 obsidian (shroud > set > std, same as the felt). e2e: themed-chrome
-(tag `themes`). Still open in §9: saved-pool set override (9b pool
-icons remains its own item). **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
+(tag `themes`).
+**SAVED-POOL SET OVERRIDE SHIPPED (2026-08-03) — §9's engineering
+seams are all closed**: a pool can pin the set its rolls wear (absent /
+'std'-pinned / house set), chosen through one compact select shared by
+the settings row and the popover identity strip ('Your set' default).
+The draft wears an override only when UNANIMOUS (traySets, aligned
+with traySources; box edits reset it); codec v4 and a YAML @-suffix
+carry it through every share shape, both failing closed on unknown
+ids. Save/variant flows inherit; rerolls and claims keep shipped
+semantics. e2e: pool-set-override (tags `themes`, `groups`); units in
+urlgroups/portable tests. What remains in §9 is art direction, not
+plumbing: the creative-brief experiments continue, and 9b pool icons
+stands as its own item. **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
 natural AND supernatural — imagine what *faerie* dice, *dryadic* dice,
 *wizard* dice, *warrior* dice might look like. Special effects and strong
 themes **merged subtly into the dice themselves** — theme lives in

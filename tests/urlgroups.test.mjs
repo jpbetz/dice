@@ -185,4 +185,37 @@ t('v3: sources notation survives the codec (2d8[Wisdom])', () => {
   assert.equal(out[0].notation, '1d4+2d8[Wisdom]');
 });
 
+// ---- v4: the saved-pool set override rides the codec (§9) ------------------
+
+t('v4 round-trip: set with, without, and instead of a category', () => {
+  const gs = [
+    { id: 1, name: 'Ember', notation: '3d6', category: 'Attributes', set: 'emberforge.blackanvil' },
+    { id: 2, name: 'Plain', notation: '1d20', set: 'std' },
+    { id: 3, name: 'Bare', notation: '2d8' },
+  ];
+  const out = decodeGroups(encodeGroups(gs));
+  assert.equal(out[0].set, 'emberforge.blackanvil');
+  assert.equal(out[0].category, 'Attributes');
+  assert.equal(out[1].set, 'std');
+  assert.equal(out[1].category ?? null, null);
+  assert.equal(out[2].set ?? null, null);
+});
+t('v4: a set-less encode stays byte-identical to v3', () => {
+  const gs = [{ id: 1, name: 'Wis', notation: '2d8', category: 'Attributes' }];
+  const body = Buffer.from('Wis|Attributes=2d8').toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  assert.equal(encodeGroups(gs), body);
+});
+t('v4: the codec carries unknown set ids verbatim (the loader validates)', () => {
+  const out = decodeGroups(encodeGroups([{ id: 1, name: 'X', notation: '1d6', set: 'no.such' }]));
+  assert.equal(out[0].set, 'no.such');
+});
+t('v4: pipes inside every field still escape; only raw pipes delimit', () => {
+  const gs = [{ id: 1, name: 'A|B', notation: '1d6', category: 'C|D', set: 'std' }];
+  const out = decodeGroups(encodeGroups(gs));
+  assert.equal(out[0].name, 'A|B');
+  assert.equal(out[0].category, 'C|D');
+  assert.equal(out[0].set, 'std');
+});
+
 if (process.exitCode !== 1) console.log(`all ${n} urlgroups tests pass`);

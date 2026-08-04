@@ -1357,9 +1357,13 @@ breakdown, which is where a number is legible anyway; chips become the
 opt-in for people who want them floating over the felt.
 
 **Dice set is a *Just you* setting** (`dice.diceset.v1`, Tier 6 §9): a
-picker under Sound/chips — Standard first, then each house's sets under
-a small-caps house header, in the felt swatches' pill language (the dot
-is a die face: body color + a "6" in the digit color). Your choice rides
+COMPACT SELECT under Sound/chips — one pill button wearing the current
+choice (the dot is a die face: body color + a "6" in the digit color)
+that opens a body-level floating menu: Standard first, then each house's
+sets under a small-caps house header, keyboard-driven, one open menu
+app-wide. The same control is the pool popover's set-override picker
+(the identity strip) — one picker language everywhere a set is chosen
+(Joe 2026-08-03: consistency). Your choice rides
 every roll and claim you make and everyone sees it; it applies FROM THE
 NEXT ROLL (dice already on the felt keep the skin they landed with — a
 roll is a record). Not room state: two players wear two sets. Shroud
@@ -1479,7 +1483,12 @@ tile opens it; 500ms hold on touch) grows an IDENTITY STRIP above a
 hairline — the visible commit-model line: above it identity writes
 through editPoolById on every tap (renaming is the save-morph input
 grammar; the shelf is owner-chip dress chips, tap to move, tap the
-pressed chip to demote to plain Pools, ＋ mints a shelf; die rank is a
+pressed chip to demote to plain Pools, ＋ mints a shelf; the DICE SET
+row (§9 override, 2026-08-03) is the settings picker's own compact
+select with a 'Your set — <name>' default: an override makes the pool
+roll AS ITSELF — its dice wear that set for everyone whenever the pool
+rolls alone or with same-set company, 'Standard' pins the classics
+under any house set, and the tile strip previews the override; die rank is a
 ladder of six real die faces, tap to advance — count preserved, ivory
 ring never gold, fail-closed to pure NdX notations so a dc12 can never be
 dropped); below the hairline the unchanged roll-tweak draft. Complex

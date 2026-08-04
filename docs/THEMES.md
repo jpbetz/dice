@@ -455,6 +455,33 @@ roll's own set on every screen — the log is a record, not a preview —
 and a hidden entry wears obsidian chips: shroud > set > std, the
 felt's precedence, in 2D. e2e: themed-chrome (tag `themes`).
 
+Saved pools carry a set override (shipped 2026-08-03 — §9's last open
+engineering seam): `g.set` on the group record — absent (follow the
+roller), 'std' (PIN the classics even under a house set; it resolves
+through the wire's present-or-absent rule at roll time), or any SETS
+id. One rule keeps the singular roll.set honest against a composable
+draft: staging stamps each die's override into traySets (aligned with
+traySources), and the draft wears an override only when it is
+UNANIMOUS — a loose palette die or a second pool's different skin
+dilutes the roll back to the roller's own set, and hand-editing the
+command box resets the array (notation carries no set; the box is the
+notation escape hatch). Save-morph and Save-as-variant inherit a
+uniform draft's set; rerolls, claims and offers keep their shipped
+semantics (the reroller's / claimer's set); a teammate's rack shows
+their overrides but staging from it never dresses YOUR hand. The
+override rides every identity vehicle: the #g= codec grew a v4 third
+field (`name|category|set=` — set-less segments stay byte-identical to
+v3, old clients degrade gracefully), the portable YAML gained an
+`@ 'set-id'` suffix after the quoted notation, and both fail closed on
+unknown ids (migrateGroup and the parser drop the override, never the
+pool). Chosen through ONE control everywhere (Joe: consistency): a
+compact select — pill button + body-level floating menu, house-grouped,
+keyboard-driven, one open menu app-wide — in the settings row AND the
+popover identity strip (which adds a 'Your set — <name>' default row).
+The tile strip previews the override via data-art-set, pinned against
+refreshDieArt. e2e: pool-set-override (tags `themes`, `groups`); codec
+and YAML shapes unit-tested in urlgroups.test.mjs / portable.test.mjs.
+
 Level 4 rides the same seams (shipped 2026-08-03; the marks are DARK BY
 DEFAULT since the same evening — the decals.js kill switch): the impact
 drain in stepPlayback stamps `decal` recipes from the recorded contacts

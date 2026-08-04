@@ -3188,4 +3188,137 @@ export const scenarios = [
       assert.equal(back, true, 'switching back re-dresses the palette');
     },
   },
+  {
+    name: 'pool-set-override',
+    tags: ['themes', 'groups'],
+    // §9 saved-pool set override: a pool can pin the dice set its rolls
+    // wear. The override rides staging — the draft wears it only when
+    // EVERY die shares it — and the wire (both tabs see the pool's skin);
+    // a mixed draft dilutes back to the roller's own set; 'std' PINS the
+    // classics even when the roller wears a house set; '' clears back to
+    // following the roller. The tile strip previews the override (art by
+    // contract, never pixels), and BOTH pickers — settings row and the
+    // popover identity strip — drive the same state.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.eval(`window.__diceDebug.setDiceSet('std')`);
+      await b.eval(`window.__diceDebug.setDiceSet('std')`);
+      // click → wait like harness roll(): the click's server round-trip
+      // means the table can still be QUIET when settle() looks (the race
+      // that read "got none" on the first run)
+      const rollTheDraft = async () => {
+        const before = await a.logCount();
+        await a.eval(`document.getElementById('tray-roll').click()`);
+        await a.waitFor(
+          `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${before} && !window.__diceDebug.busy)`,
+          { desc: 'draft roll completes' },
+        );
+        await a.dbg('sim(240)');
+        return a.rollId();
+      };
+      const diceOf = async (tab, rid) => JSON.parse(await tab.eval(
+        `JSON.stringify(window.__diceDebug.tableDiceInfo())`)).filter((d) => d.rollId === rid);
+
+      // Reshape pools[0] into a known probe (the rack drifts across
+      // scenarios — same-origin localStorage — so hunting a seeded name
+      // is a trap), then arm it with the anvil override; junk is refused.
+      const pools = await a.dbg('groups');
+      assert.ok(pools.length >= 1, 'the rack has at least one pool to probe');
+      const gid = pools[0].id;
+      await a.eval(`window.__diceDebug.editPool(${JSON.stringify(gid)}, { name: 'OverrideProbe', notation: '1d6', category: '' })`);
+      const upd = JSON.parse(await a.eval(
+        `JSON.stringify(window.__diceDebug.editPool(${JSON.stringify(gid)}, { set: 'emberforge.blackanvil' }))`));
+      assert.equal(upd.set, 'emberforge.blackanvil', 'the override lands on the record');
+      const junk = JSON.parse(await a.eval(
+        `JSON.stringify(window.__diceDebug.editPool(${JSON.stringify(gid)}, { set: 'not.a.set' }))`));
+      assert.equal(junk, false, 'an unknown set id is refused');
+
+      // the tile strip previews the pool's own skin, pinned against refresh
+      const tile = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const img = document.querySelector('[data-group-id="${gid}"] img.die-art');
+        return img ? {
+          pinned: img.dataset.artSet || null,
+          wears: img.src === window.__diceDebug.dieArtFor('d6', 'emberforge.blackanvil'),
+        } : null;
+      })())`));
+      assert.equal(tile && tile.pinned, 'emberforge.blackanvil', 'the tile strip pins the override');
+      assert.equal(tile.wears, true, 'the tile strip wears the anvil art');
+
+      // stage the pool alone and roll: the roll wears the POOL's set on
+      // every screen, while Alice herself still wears std
+      await a.eval(`document.querySelector('[data-group-id="${gid}"] .tile-stage').click()`);
+      const rid1 = await rollTheDraft();
+      await b.waitFor(
+        `(window.__diceDebug.sim(120), window.__diceDebug.tableDiceInfo().some((d) => d.rollId === ${JSON.stringify(rid1)}) && !window.__diceDebug.busy)`,
+        { desc: "the pool roll lands on B's felt" },
+      );
+      for (const [tab, who] of [[a, 'A'], [b, 'B']]) {
+        const dice = await diceOf(tab, rid1);
+        assert.ok(dice.length >= 1 && dice.every((d) => d.variant === 'emberforge.blackanvil'),
+          `${who}: the pool's roll wears the pool's set (got ${dice.map((d) => d.variant).join(',') || 'none'})`);
+      }
+
+      // a MIXED draft dilutes to the roller's own set
+      await a.eval(`document.getElementById('clear-tray').click()`);
+      await a.eval(`document.querySelector('[data-group-id="${gid}"] .tile-stage').click()`);
+      await a.eval(`document.querySelector('.die-btn img[data-art-type="d6"]').closest('button').click()`);
+      const rid2 = await rollTheDraft();
+      const mixed = await diceOf(a, rid2);
+      assert.ok(mixed.length === 2 && mixed.every((d) => d.variant === 'std'),
+        `a mixed draft rolls the roller's own set (got ${mixed.map((d) => d.variant).join(',')})`);
+
+      // 'std' PINS the classics even when the roller wears a house set
+      await a.eval(`window.__diceDebug.setDiceSet('emberforge.blackanvil')`);
+      await a.eval(`window.__diceDebug.editPool(${JSON.stringify(gid)}, { set: 'std' })`);
+      await a.eval(`document.getElementById('clear-tray').click()`);
+      await a.eval(`document.querySelector('[data-group-id="${gid}"] .tile-stage').click()`);
+      const rid3 = await rollTheDraft();
+      const pinned = await diceOf(a, rid3);
+      assert.ok(pinned.length === 1 && pinned[0].variant === 'std',
+        `a std-pinned pool rolls Standard under a house set (got ${pinned.map((d) => d.variant).join(',')})`);
+
+      // '' clears the override — the pool follows the roller again
+      const cleared = JSON.parse(await a.eval(
+        `JSON.stringify(window.__diceDebug.editPool(${JSON.stringify(gid)}, { set: '' }))`));
+      assert.equal(cleared.set, null, 'an empty patch clears the override');
+      await a.eval(`document.getElementById('clear-tray').click()`);
+      await a.eval(`document.querySelector('[data-group-id="${gid}"] .tile-stage').click()`);
+      const rid4 = await rollTheDraft();
+      const follows = await diceOf(a, rid4);
+      assert.ok(follows.length === 1 && follows[0].variant === 'emberforge.blackanvil',
+        `an override-free pool follows the roller's set (got ${follows.map((d) => d.variant).join(',')})`);
+
+      // the settings row wears the compact select; a pick commits and closes
+      await a.eval(`window.__diceDebug.openSettings()`);
+      await a.eval(`document.querySelector('#diceset-picker .set-select').click()`);
+      const menu = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const m = document.querySelector('.set-menu');
+        if (!m) return null;
+        const sel = m.querySelector('[aria-selected="true"]');
+        return { rows: m.querySelectorAll('.set-swatch').length, selected: sel ? sel.dataset.set : null };
+      })())`));
+      assert.ok(menu && menu.rows >= 13, `the menu lists Standard + every house set (got ${menu && menu.rows})`);
+      assert.equal(menu.selected, 'emberforge.blackanvil', 'the current set is marked selected');
+      await a.eval(`document.querySelector('.set-menu [data-set="tidewrack.seaglass"]').click()`);
+      assert.equal(await a.dbg('diceSet'), 'tidewrack.seaglass', 'picking a row commits the set');
+      const menuGone = JSON.parse(await a.eval(`JSON.stringify(!document.querySelector('.set-menu'))`));
+      assert.equal(menuGone, true, 'the menu closes on pick');
+      await a.eval(`document.getElementById('settings-close').click()`);
+
+      // the popover identity strip drives the SAME control by pool id
+      await a.eval(`window.__diceDebug.openPopoverFor(${JSON.stringify(gid)})`);
+      const stripSel = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const s = document.querySelector('#pop-identity .set-select');
+        return s ? { value: s.dataset.value || null } : null;
+      })())`));
+      assert.ok(stripSel, 'the identity strip carries the set select');
+      assert.equal(stripSel.value, null, 'a cleared pool shows the your-set default');
+      await a.eval(`document.querySelector('#pop-identity .set-select').click()`);
+      await a.eval(`document.querySelector('.set-menu [data-set="emberforge.blackanvil"]').click()`);
+      const g2 = (await a.dbg('groups')).find((g) => g.id === gid);
+      assert.equal(g2.set, 'emberforge.blackanvil', 'the strip picker commits through editPool');
+      await a.eval(`window.__diceDebug.closePopover()`);
+    },
+  },
 ];

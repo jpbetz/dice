@@ -489,6 +489,17 @@ function setDiceSet(id, persist = true) {
 function wireSet() {
   return diceSet !== 'std' ? diceSet : undefined;
 }
+// The set a ROLL wears (§9 saved-pool override): an explicit opts.set wins —
+// 'std' pins the classics by RESOLVING to absent (the wire rule holds even
+// when your own set is a house set) — otherwise your set rides as always.
+// Callers only pass opts.set when a pool rolls as itself (see trayRollSet);
+// rerolls, claims and plain notation stay on wireSet.
+function rollSetOf(opts) {
+  const s = opts && opts.set;
+  if (s === 'std') return undefined;
+  if (typeof s === 'string' && SETS[s]) return s;
+  return wireSet();
+}
 let lastSoundAt = 0;
 
 function playClick(strength) {
@@ -1819,7 +1830,7 @@ function rollDice(types, label, opts = {}) {
     faceDown: !!opts.faceDown,
     revealed: !opts.faceDown,
     rerollOfId,
-    set: wireSet() || null, // solo throws wear your set too
+    set: rollSetOf(opts) || null, // solo throws wear your set — or the pool's own (§9)
     seed: randomSeed(),
     label: label || formula(types),
   });
@@ -4078,11 +4089,28 @@ function save(key, value) {
 
 let tray = [];
 let traySources = []; // aligned to tray: the staged source-pool label per die (null = loose)
+let traySets = [];    // aligned to tray: the staged pool's set OVERRIDE per die (§9; null = none)
+// A roll has ONE set (the wire field is singular — spawn, reveal and chips
+// all lean on that), so the draft wears an override only when it is
+// UNANIMOUS: every die staged from pools that share one override. A loose
+// palette die or a second opinion dilutes it back to your own set. Editing
+// the command box resets the array (notation carries no set — the box is
+// the notation escape hatch), which makes this honest by construction.
+function trayRollSet() {
+  if (!tray.length || traySets.length !== tray.length) return null;
+  const s0 = traySets[0];
+  if (!s0) return null;
+  return traySets.every((s) => s === s0) ? s0 : null;
+}
 
 // Open ± popover state (see the popover section below). Declared this early
 // because renderGroups AND the module-evaluation paintCmd() both run before
 // the popover section is reached.
 let pop = null;
+// The floating dice-set menu's state (§9 compact select) — early for the
+// same reason: closePopover (which closes any strip menu with it) is
+// reachable from paths that run long before the select section.
+let setMenuState = null; // { el, anchor } — one open menu app-wide
 
 const dieButtonsEl = document.getElementById('die-buttons');
 const trayEl = document.getElementById('tray');
@@ -4145,7 +4173,9 @@ function decorateDieBtn(btn, label, artType) {
 // record, and each entry keeps the set it was rolled with.
 function refreshDieArt() {
   for (const img of document.querySelectorAll('img.die-art[data-art-type]')) {
-    const u = dieArtURL(img.dataset.artType, diceSet);
+    // data-art-set pins a chip to a POOL's own set (§9 override) — it
+    // re-dresses only when its pool re-renders, never with your set.
+    const u = dieArtURL(img.dataset.artType, img.dataset.artSet || diceSet);
     if (u) img.src = u;
   }
 }
@@ -4159,6 +4189,7 @@ for (const type of DIE_TYPES) {
     if (tray.length < MAX_DICE_ON_TABLE) {
       tray.push(type);
       traySources.push(null);
+      traySets.push(null); // a loose die carries no override
       renderTray();
       syncBoxFromTray();
     }
@@ -4176,6 +4207,7 @@ for (const type of DIE_TYPES) {
     if (tray.length + 2 <= MAX_DICE_ON_TABLE) {
       tray.push('d10x', 'd10');
       traySources.push(null, null);
+      traySets.push(null, null);
       renderTray();
       syncBoxFromTray();
     }
@@ -4309,7 +4341,9 @@ function renderTray() {
     tray.forEach((t, i) => {
       const s = traySources[i] || null;
       const k = s || '\u0000';
-      if (!bySrc.has(k)) { bySrc.set(k, { source: s, types: [] }); srcOrder.push(k); }
+      // one stageGroup call = one chip, so the chip's set is its first
+      // die's (§9): the chip previews the skin those dice will wear
+      if (!bySrc.has(k)) { bySrc.set(k, { source: s, types: [], set: traySets[i] || null }); srcOrder.push(k); }
       bySrc.get(k).types.push(t);
     });
     // loose dice render last
@@ -4324,16 +4358,17 @@ function renderTray() {
         nm.className = 'src-chip-name';
         nm.textContent = grp.source;
         chip.appendChild(nm);
-        chip.appendChild(buildDieStrip(grp.types, 3, { grouped: true }));
+        chip.appendChild(buildDieStrip(grp.types, 3, { grouped: true, set: grp.set }));
         trayRollBtn.appendChild(chip);
         removers.push({
           el: chip,
           title: `Remove ${grp.source}`,
           onRemove: () => {
-            const keep = tray.map((t, i) => [t, traySources[i]])
+            const keep = tray.map((t, i) => [t, traySources[i], traySets[i]])
               .filter(([, s]) => (s || null) !== grp.source);
             tray = keep.map(([t]) => t);
             traySources = keep.map(([, s]) => s || null);
+            traySets = keep.map(([, , v]) => v || null);
             renderTray();
             syncBoxFromTray();
           },
@@ -4358,6 +4393,7 @@ function renderTray() {
               if (idx < 0) return;
               tray.splice(idx, 1);
               traySources.splice(idx, 1);
+              traySets.splice(idx, 1);
               renderTray();
               syncBoxFromTray();
             },
@@ -4453,6 +4489,10 @@ function rollDraft() {
     // 'cinematic'/'check' the player had typed (solo played it Plain) and let
     // the online and solo paths disagree about the same text.
     const intent = notationIntent(cmdInput.value.trim(), cmdResult);
+    // §9: the box branch is the STAGED draft's own roll path (staging syncs
+    // the box), so the pool override rides here too. traySets makes this
+    // honest — a hand-edited box already reset it (paintCmd's tray resync).
+    const draftSet = trayRollSet();
     requestRoll(cmdResult.spec.dice, cmdResult.comment || cmdResult.canonical, {
       notation: intent.notation,
       canonical: intent.canonical,
@@ -4462,10 +4502,13 @@ function rollDraft() {
       visibility: visOfParse(cmdResult) || undefined,
       dc: cmdResult.dc ?? undefined,
       exp: intent.exp || undefined,
+      ...(draftSet ? { set: draftSet } : {}),
     });
   } else if (tray.length) {
+    const draftSet = trayRollSet();
     requestRoll([...tray], formula(tray), {
       sources: traySources.some(Boolean) ? [...traySources] : undefined,
+      ...(draftSet ? { set: draftSet } : {}),
     });
   }
 }
@@ -4609,6 +4652,7 @@ trayModsBtn.addEventListener('click', () => {
 function clearDraft() {
   tray = [];
   traySources = [];
+  traySets = [];
   // Every key of the declared draft shape, including the §7.6/goal-11 ones:
   // canonicalNotation's defaults would absorb the missing ones today, but a
   // half-shaped boxExtras is a trap for the next reader of it.
@@ -4745,6 +4789,9 @@ function paintCmd() {
         || traySources.map((s) => s || '').join('\u0000') !== boxSources.map((s) => s || '').join('\u0000')) {
       tray = [...res.spec.dice];
       traySources = boxSources;
+      // notation carries no set override — a box-driven draft is YOUR hand
+      // (§9: the override survives staging, not hand-editing)
+      traySets = tray.map(() => null);
       renderTray();
     }
   }
@@ -4805,6 +4852,10 @@ function commandRoll(input) {
   const res = parseNotation(raw);
   if (!res.ok) return res;
   const intent = notationIntent(raw, res);
+  // §9: Enter on a box the STAGING itself filled is the same roll as the
+  // cluster click — the pool override rides. Any hand-typed divergence
+  // already reset traySets via paintCmd, so this stays truthful.
+  const draftSet = trayRollSet();
   requestRoll(res.spec.dice, res.comment || res.canonical, {
     notation: intent.notation,
     canonical: intent.canonical,
@@ -4814,6 +4865,7 @@ function commandRoll(input) {
     visibility: visOfParse(res) || undefined, // secret / w: (goal 11)
     dc: res.dc ?? undefined,
     exp: intent.exp || undefined,
+    ...(draftSet ? { set: draftSet } : {}),
   });
   return res;
 }
@@ -4912,7 +4964,11 @@ function migrateGroup(g, i) {
   // silently DROPPED it on every boot until 2026-08-01 — localStorage and
   // #g= links both funnel through this function)
   const cat = typeof g.category === 'string' && g.category.trim() ? cutText(g.category, 24) : null;
-  const dress = (rec) => (cat ? { ...rec, category: cat } : rec);
+  // set override (§9): same present-or-absent ride; ids the SETS registry
+  // doesn't know fall closed to no override — the pool survives (codec and
+  // storage both funnel through here, so hostile/stale ids die at this door)
+  const set = typeof g.set === 'string' && (g.set === 'std' || SETS[g.set]) ? g.set : null;
+  const dress = (rec) => ({ ...rec, ...(cat ? { category: cat } : {}), ...(set ? { set } : {}) });
   if (typeof g.notation === 'string') {
     const res = parseNotation(g.notation);
     return res.ok ? dress({ id: g.id ?? i + 1, name, notation: res.canonical }) : null;
@@ -5045,13 +5101,24 @@ function editPoolById(id, patch) {
     if (typeof patch.category !== 'string') return false;
     category = cutText(patch.category, 24) || null; // '' clears the shelf
   }
+  let set = g.set || null;
+  if (patch.set !== undefined) {
+    // '' clears the override (like category); 'std' PINS Standard; anything
+    // else must be a registry id — an unknown id is a caller bug, refuse it
+    if (typeof patch.set !== 'string') return false;
+    const v = patch.set.trim();
+    if (v && v !== 'std' && !SETS[v]) return false;
+    set = v || null;
+  }
   g.name = name;
   g.notation = notation;
   if (category) g.category = category;
   else delete g.category; // present-or-absent, like the codec segment
+  if (set) g.set = set;
+  else delete g.set; // present-or-absent, like the codec segment
   saveGroups();
   renderGroups();
-  return { id: g.id, name: g.name, notation: g.notation, category: g.category || null };
+  return { id: g.id, name: g.name, notation: g.notation, category: g.category || null, set: g.set || null };
 }
 
 // Which row is the inline editor right now (null = none). One at a time:
@@ -5146,18 +5213,23 @@ function buildGroupEditor(g) {
 // UNGROUPED: there every die stands alone because each carries its own ✕
 // remover. Strips pack left; they never spread across the row.
 const POOL_STRIP_CAP = 5;
-function buildDieStrip(types, cap, { grouped = false } = {}) {
+function buildDieStrip(types, cap, { grouped = false, set = null } = {}) {
   const frag = document.createDocumentFragment();
+  // §9: a strip belonging to a pool WITH an override wears that set and
+  // pins it (data-art-set) so refreshDieArt leaves it alone; every other
+  // strip follows your own set as before.
+  const variant = set && (set === 'std' || SETS[set]) ? set : null;
   const units = grouped
     ? [...types.reduce((m, t) => m.set(t, (m.get(t) || 0) + 1), new Map())]
     : types.map((t) => [t, 1]);
   const shown = units.slice(0, cap);
   for (const [type, n] of shown) {
-    const url = dieArtURL(type, diceSet);
+    const url = dieArtURL(type, variant || diceSet);
     if (url) {
       const img = document.createElement('img');
       img.className = 'die-art strip-die';
       img.dataset.artType = type; // refreshDieArt re-dresses it on set change
+      if (variant) img.dataset.artSet = variant;
       img.src = url;
       img.alt = '';
       img.draggable = false;
@@ -5241,6 +5313,9 @@ function stageGroup(g) {
     setPanel('pools', true);
   }
   const label = sanitizeSourceLabel(g.name);
+  // §9: the pool's set override rides each staged die (foreign racks pass
+  // {name, notation} only — a teammate's override never dresses YOUR hand)
+  const gSet = typeof g.set === 'string' && (g.set === 'std' || SETS[g.set]) ? g.set : null;
   const wasEmpty = tray.length === 0;
   const dropped = [];
   if (res.spec.mods) { const s = modsSummary(res.spec.mods); if (s) dropped.push(s); }
@@ -5251,6 +5326,7 @@ function stageGroup(g) {
     // the pool's own name wins; a composed pool's inner sources survive
     // only when the pool is unnamed
     traySources.push(label || (res.spec.sources ? res.spec.sources[i] || null : null));
+    traySets.push(gSet);
   }
   // Render NOW: syncBoxFromTray→paintCmd only re-renders when the parsed
   // box DIFFERS from the tray, and we just made them equal — without this
@@ -5727,7 +5803,7 @@ function renderGroups() {
       stage.setAttribute('aria-label', `Stage ${nm} — ${g.notation}`);
       const art = document.createElement('span');
       art.className = 'tile-art';
-      art.appendChild(buildDieStrip(types, 2, { grouped: true }));
+      art.appendChild(buildDieStrip(types, 2, { grouped: true, set: g.set || null }));
       const nameEl = document.createElement('span');
       nameEl.className = 'tile-name' + (g.name ? '' : ' as-notation');
       nameEl.textContent = nm;
@@ -5945,7 +6021,9 @@ function saveDraftAsPool() {
   if (!notation) { closeSaveMorph(); return; }
   const name = cutText(groupNameInput.value, 24); // '' = unnamed pool
   const cat = saveMorphCat; // read before closeSaveMorph resets the chips
-  groups.push({ id: Date.now(), name, notation, ...(cat ? { category: cat } : {}) }); // additive, always
+  const draftSet = trayRollSet(); // §9: a uniformly-overridden draft saves its set
+  groups.push({ id: Date.now(), name, notation, ...(cat ? { category: cat } : {}),
+    ...(draftSet ? { set: draftSet } : {}) }); // additive, always
   saveGroups();
   renderGroups();
   groupNameInput.value = '';
@@ -6309,7 +6387,22 @@ function renderPopIdentity() {
   cats.appendChild(plus);
   popIdentityEl.appendChild(cats);
 
-  // Row 3 — THE DICE, composing like the creation card (Trigger Pass; Joe:
+  // Row 3 — DICE SET (§9 override): this pool rolls as itself. The same
+  // compact select the settings row uses; the default choice follows your
+  // own set, and 'Standard' PINS the classics even when you wear a house
+  // set (the wire keeps its present-or-absent rule — std resolves to
+  // absent at roll time).
+  const setRow = document.createElement('div');
+  setRow.className = 'pid-row pid-set';
+  setRow.appendChild(buildSetSelect({
+    value: g.set || null,
+    allowDefault: true,
+    onPick: (v) => stripCommit({ set: v || '' }),
+    title: 'Dice set for this pool — its rolls wear these dice',
+  }));
+  popIdentityEl.appendChild(setRow);
+
+  // Row 4 — THE DICE, composing like the creation card (Trigger Pass; Joe:
   // 'the same behavior as + pool for dice'). A PURE dice pool — nothing but
   // ladder dice in its canonical (no mods/dc/flags/sources; the parse runs
   // on the CANONICAL, so a dc12 can never be dropped by a tap) — renders
@@ -6348,7 +6441,7 @@ function renderPopIdentity() {
       const last = dice.length === 1;
       u.disabled = last;
       u.title = last ? 'a pool needs at least one die' : `Remove one ${type}`;
-      u.appendChild(buildDieStrip([type], 1));
+      u.appendChild(buildDieStrip([type], 1, { set: g.set || null }));
       if (n > 1) {
         const x = document.createElement('span');
         x.className = 'pid-count';
@@ -6409,6 +6502,7 @@ function closePopover() {
   pop = null;
   popEl.classList.add('hidden');
   closePopSaveMorph(); // a reopened popover always starts on the buttons
+  closeSetMenu(); // an identity-strip set menu must not outlive its anchor
 }
 
 // Anchor the popover to its source, clamped fully on-screen (§7.4: usable in
@@ -6893,7 +6987,8 @@ function popSaveConfirm() {
   // one save flow: a variant lands on ITS pool's shelf (the compose morph's
   // chips do the same job; dropping the category was drift — fleet catch)
   groups.push({ id: Date.now(), name, notation: canonical,
-    ...(vbase && vbase.category ? { category: vbase.category } : {}) }); // additive, always
+    ...(vbase && vbase.category ? { category: vbase.category } : {}),
+    ...(vbase && vbase.set ? { set: vbase.set } : {}) }); // additive, always — a variant keeps its pool's skin
   saveGroups();
   renderGroups();
 }
@@ -7258,52 +7353,179 @@ function renderFeltSwatches() {
   });
 }
 
-// The dice-set picker ("Just you"): Standard first, then every house's
-// sets under its house name — the same build-once/refresh-selection
-// pattern as the felt swatches. The dot previews body + digit color.
+// ---------------------------------------------------------------------------
+// The compact dice-set select (§9): ONE control for every space-tight
+// surface — the settings row and the pool popover's identity strip (Joe:
+// same thing in both places, for consistency). A button wears the current
+// choice (set-dot + label + caret) and opens a body-level floating menu of
+// Standard + every house's sets — the same grouping the old settings grid
+// taught, now scrollable and anchored. The menu lives on document.body so
+// nothing clips it; no click-away guards were needed anywhere (the ±
+// popover has no outside-click closer, and the settings backdrop only
+// closes on a DIRECT backdrop hit). One open menu app-wide; arrows/Home/
+// End move, Enter picks, Esc returns focus to the button.
+// ---------------------------------------------------------------------------
+
+// {label, body, text} for a set id ('std' included) — the swatch language.
+function setSwatchInfo(id) {
+  if (!id || id === 'std') {
+    return { label: 'Standard', body: DIE_DEFS.d6.color, text: DIE_DEFS.d6.text };
+  }
+  const r = SETS[id];
+  return r ? { label: r.label, body: r.body, text: r.text } : null;
+}
+
+function setDotEl(info) {
+  const dot = document.createElement('span');
+  dot.className = 'set-dot';
+  dot.style.background = info.body;
+  dot.style.color = info.text;
+  dot.textContent = '6';
+  return dot;
+}
+
+// (setMenuState is declared with the early popover state — closePopover
+// runs from boot-adjacent paths and must never trip a TDZ here.)
+function closeSetMenu(refocus = false) {
+  if (!setMenuState) return;
+  const { el, anchor } = setMenuState;
+  setMenuState = null;
+  el.remove();
+  document.removeEventListener('pointerdown', setMenuAway, true);
+  if (anchor.isConnected) {
+    anchor.setAttribute('aria-expanded', 'false');
+    if (refocus) anchor.focus();
+  }
+}
+
+function setMenuAway(e) {
+  if (!setMenuState) return;
+  const t = e.target;
+  if (t instanceof Node && (setMenuState.el.contains(t) || setMenuState.anchor.contains(t))) return;
+  closeSetMenu();
+}
+
+function openSetMenuFor(anchor, { value, allowDefault, pick }) {
+  closeSetMenu();
+  const menu = document.createElement('div');
+  menu.className = 'set-menu';
+  menu.setAttribute('role', 'listbox');
+  const rows = [];
+  const addRow = (v, label, info, title) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'set-swatch';
+    b.setAttribute('role', 'option');
+    b.dataset.set = v || '';
+    b.setAttribute('aria-selected', String((v || '') === (value || '')));
+    const nm = document.createElement('span');
+    nm.textContent = label;
+    b.append(setDotEl(info), nm);
+    b.title = title;
+    b.addEventListener('click', () => { closeSetMenu(true); pick(v); });
+    menu.appendChild(b);
+    rows.push(b);
+  };
+  if (allowDefault) {
+    const mine = setSwatchInfo(diceSet);
+    addRow(null, `Your set — ${mine.label}`, mine,
+      'No override: this pool follows whatever set YOU wear');
+  }
+  addRow('std', 'Standard', setSwatchInfo('std'),
+    allowDefault ? 'Pin the table classics — even when you wear a house set'
+      : 'The table classics — one color per die type');
+  for (const [houseId, house] of Object.entries(THEMES)) {
+    const head = document.createElement('div');
+    head.className = 'set-house-head';
+    head.textContent = house.label;
+    head.title = house.line;
+    menu.appendChild(head);
+    for (const [setId, recipe] of Object.entries(house.sets)) {
+      const id = `${houseId}.${setId}`;
+      addRow(id, recipe.label, setSwatchInfo(id), `${house.label} · ${recipe.label}`);
+    }
+  }
+  menu.addEventListener('keydown', (e) => {
+    e.stopPropagation(); // the popover fields' rule: no table shortcuts underneath
+    const at = rows.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      rows[Math.max(0, Math.min(rows.length - 1, at + (e.key === 'ArrowDown' ? 1 : -1)))].focus();
+    } else if (e.key === 'Home') { e.preventDefault(); rows[0].focus(); }
+    else if (e.key === 'End') { e.preventDefault(); rows[rows.length - 1].focus(); }
+    else if (e.key === 'Escape') closeSetMenu(true);
+    else if (e.key === 'Tab') closeSetMenu();
+  });
+  document.body.appendChild(menu);
+  // place below the anchor, clamped to the viewport; flip above when the
+  // room runs out (the menu itself scrolls past ~340px)
+  const r = anchor.getBoundingClientRect();
+  let top = r.bottom + 6;
+  if (top + menu.offsetHeight > window.innerHeight - 12) {
+    top = Math.max(12, r.top - menu.offsetHeight - 6);
+  }
+  menu.style.left = `${Math.max(12, Math.min(Math.round(r.left), window.innerWidth - menu.offsetWidth - 12))}px`;
+  menu.style.top = `${Math.round(top)}px`;
+  anchor.setAttribute('aria-expanded', 'true');
+  setMenuState = { el: menu, anchor };
+  document.addEventListener('pointerdown', setMenuAway, true);
+  (rows.find((b) => b.getAttribute('aria-selected') === 'true') || rows[0]).focus();
+}
+
+// value: null = "Your set" (allowDefault surfaces only), 'std', or a SETS
+// id; onPick receives the same shape. The button re-paints itself on pick;
+// external state changes re-paint via .refreshSetSelect(value).
+function buildSetSelect({ value = null, allowDefault = false, onPick, title }) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'set-swatch set-select';
+  btn.setAttribute('aria-haspopup', 'listbox');
+  btn.setAttribute('aria-expanded', 'false');
+  if (title) btn.title = title;
+  const paint = (v) => {
+    btn.dataset.value = v || '';
+    btn.textContent = '';
+    const info = setSwatchInfo(v || diceSet) || setSwatchInfo('std');
+    const nm = document.createElement('span');
+    nm.className = 'ss-label';
+    nm.textContent = v ? info.label : (allowDefault ? `Your set — ${info.label}` : info.label);
+    const caret = document.createElement('span');
+    caret.className = 'ss-caret';
+    caret.setAttribute('aria-hidden', 'true');
+    caret.textContent = '▾';
+    btn.append(setDotEl(info), nm, caret);
+  };
+  paint(value);
+  btn.addEventListener('click', () => {
+    if (setMenuState && setMenuState.anchor === btn) { closeSetMenu(); return; }
+    openSetMenuFor(btn, {
+      value: btn.dataset.value || null,
+      allowDefault,
+      pick: (v) => { paint(v); onPick(v); },
+    });
+  });
+  btn.refreshSetSelect = paint;
+  return btn;
+}
+
+// The settings row wears the SAME control. Value here is always concrete —
+// there is no default above your own set. The instance lives in the DOM,
+// not a module let: settings boot calls run at module scope ABOVE this
+// line (the renderFeltSwatches lazy-element lesson — module-eval ordering).
 function renderDiceSetPicker() {
   const holder = document.getElementById('diceset-picker');
   if (!holder) return;
-  if (!holder.childElementCount) {
-    const addChip = (parent, id, label, body, text, title) => {
-      const chip = document.createElement('button');
-      chip.className = 'set-swatch';
-      chip.dataset.set = id;
-      const dot = document.createElement('span');
-      dot.className = 'set-dot';
-      dot.style.background = body;
-      dot.style.color = text;
-      dot.textContent = '6';
-      const nm = document.createElement('span');
-      nm.textContent = label;
-      chip.append(dot, nm);
-      chip.title = title;
-      chip.addEventListener('click', () => setDiceSet(id));
-      parent.appendChild(chip);
-    };
-    const stdRow = document.createElement('div');
-    stdRow.className = 'set-house';
-    addChip(stdRow, 'std', 'Standard', DIE_DEFS.d6.color, DIE_DEFS.d6.text,
-      'The table classics — one color per die type');
-    holder.appendChild(stdRow);
-    for (const [houseId, house] of Object.entries(THEMES)) {
-      const head = document.createElement('div');
-      head.className = 'set-house-head';
-      head.textContent = house.label;
-      head.title = house.line;
-      holder.appendChild(head);
-      const row = document.createElement('div');
-      row.className = 'set-house';
-      for (const [setId, recipe] of Object.entries(house.sets)) {
-        addChip(row, `${houseId}.${setId}`, recipe.label, recipe.body, recipe.text,
-          `${house.label} · ${recipe.label} — everyone sees your rolls in these dice`);
-      }
-      holder.appendChild(row);
-    }
+  let btn = holder.querySelector('.set-select');
+  if (!btn) {
+    btn = buildSetSelect({
+      value: diceSet,
+      allowDefault: false,
+      onPick: (v) => setDiceSet(v || 'std'),
+      title: 'Dice set — everyone sees your rolls in these dice',
+    });
+    holder.appendChild(btn);
   }
-  holder.querySelectorAll('.set-swatch').forEach((b) => {
-    b.setAttribute('aria-pressed', String(b.dataset.set === diceSet));
-  });
+  btn.refreshSetSelect(diceSet);
 }
 
 // Build the three system chips once, then only refresh the selected state.
@@ -7405,6 +7627,7 @@ function openSettingsModal() {
 function closeSettingsModal() {
   settingsModal.classList.add('hidden');
   document.getElementById('settings-note').textContent = '';
+  closeSetMenu(); // the dice-set menu must not outlive its anchor
 }
 
 document.getElementById('toggle-settings').addEventListener('click', openSettingsModal);
@@ -7497,11 +7720,12 @@ portableApplyBtn.addEventListener('click', () => {
   if (!portablePlan) return;
   const plan = portablePlan;
   for (const u of plan.updates) {
-    editPoolById(u.id, { notation: u.notation, category: u.category || '' });
+    editPoolById(u.id, { notation: u.notation, category: u.category || '', set: u.set || '' });
   }
   plan.adds.forEach((a, i) => {
     groups.push({ id: Date.now() + i, name: a.name, notation: a.notation,
-      ...(a.category ? { category: a.category } : {}) });
+      ...(a.category ? { category: a.category } : {}),
+      ...(a.set ? { set: a.set } : {}) });
   });
   if (plan.adds.length) { saveGroups(); renderGroups(); }
   if ('sound' in plan.settings) setSound(plan.settings.sound);
@@ -8617,7 +8841,7 @@ function requestRoll(types, label, opts = {}) {
   // server accepted it (a 400 or a network failure resolves null), solo it
   // means the spec passed the same validation rollDice applies.
   if (netOnline && net) {
-    const wireOpts = { ...opts, set: wireSet() };
+    const wireOpts = { ...opts, set: rollSetOf(opts) };
     // secret/whisper have no explicit wire field BY DESIGN: visibility rides
     // the notation string and the server re-parses it. Paths that arrive here
     // with no string of their own (popover, reroll-last) get the canonical.

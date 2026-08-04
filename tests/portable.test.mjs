@@ -176,5 +176,58 @@ t('planImport: duplicate names pair off in order, extras add', () => {
   assert.equal(plan.adds.length, 1);
 });
 
+// ---- §9: the set override rides the YAML -----------------------------------
+
+t('set override round-trips as the @ suffix', () => {
+  const groups = [
+    { id: 1, name: 'Ember', notation: '3d6', category: 'Attributes', set: 'emberforge.blackanvil' },
+    { id: 2, name: 'Plain', notation: '1d20' },
+  ];
+  const text = exportYaml({ groups });
+  assert.ok(text.includes("'3d6' @ 'emberforge.blackanvil'"));
+  const parsed = parsePortable(text);
+  assert.ok(parsed.ok);
+  const pools = flat(parsed);
+  assert.equal(pools[0].set, 'emberforge.blackanvil');
+  assert.equal(pools[1].set ?? null, null);
+});
+t('unknown set ids fall closed to no override — the pool survives', () => {
+  const parsed = parsePortable([
+    'pools:', '  Pools:', "    - 'X': '1d6' @ 'no.such'",
+  ].join('\n'));
+  assert.ok(parsed.ok);
+  assert.equal(flat(parsed)[0].set ?? null, null);
+});
+t('a bare hand-written notation keeps its @ inside the comment', () => {
+  const parsed = parsePortable([
+    'pools:', '  Pools:', "    - 'X': 3d6 # struck @ dawn",
+  ].join('\n'));
+  assert.ok(parsed.ok);
+  const p = flat(parsed)[0];
+  assert.equal(p.set ?? null, null);
+  assert.ok(p.notation.includes('struck @ dawn'));
+});
+t('trailing garbage after the set id fails with a line number', () => {
+  const parsed = parsePortable([
+    'pools:', '  Pools:', "    - 'X': '1d6' @ 'std' extra",
+  ].join('\n'));
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.line, 3);
+});
+t('planImport: a set change alone is an update; the same set is unchanged', () => {
+  const current = [
+    { id: 1, name: 'A', notation: '1d6', set: 'std' },
+    { id: 2, name: 'B', notation: '1d6' },
+  ];
+  const parsed = parsePortable([
+    'pools:', '  Pools:',
+    "    - 'A': '1d6' @ 'std'",
+    "    - 'B': '1d6' @ 'emberforge.blackanvil'",
+  ].join('\n'));
+  const plan = planImport(current, parsed);
+  assert.equal(plan.unchanged, 1);
+  assert.deepEqual(plan.updates.map((u) => [u.id, u.set]), [[2, 'emberforge.blackanvil']]);
+});
+
 if (process.exitCode) process.exit(process.exitCode);
 console.log(`all ${n} portable tests pass`);

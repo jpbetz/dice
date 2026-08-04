@@ -61,6 +61,7 @@ limitations under the License.
   --z-popover: 26;
   --z-peek: 30;
   --z-modal: 40;
+  --z-set-menu: 44; /* the floating dice-set menu — above its anchors (popover 26, modal 40) */
   --z-palette: 58;
   --z-cheatsheet: 62;
 }
@@ -1667,10 +1668,46 @@ html, body {
   background: rgba(212, 175, 55, 0.14);
   color: var(--gold-bright);
 }
-/* dice-set picker (Tier 6 §9): the felt swatches' pill language, grouped
-   by house; the dot previews the set's body + digit colors */
+/* dice-set select (Tier 6 §9): ONE compact control everywhere a set is
+   picked — the settings row and the pool popover's identity strip. The
+   button wears the current choice in the swatch pill language; the menu
+   floats on document.body (nothing clips it) and scrolls past ~340px. */
 #diceset-picker { margin: 2px 0 4px; }
-#diceset-picker .set-house { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.set-select { padding-right: 8px; }
+.set-select .ss-label {
+  max-width: 168px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.set-select .ss-caret { opacity: 0.55; font-size: 10px; margin-left: 1px; }
+.set-select[aria-expanded="true"] {
+  border-color: rgba(212, 175, 55, 0.55);
+  background: rgba(212, 175, 55, 0.14);
+}
+.pid-set .set-select { max-width: 100%; }
+.set-menu {
+  position: fixed;
+  z-index: var(--z-set-menu);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 190px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg, rgba(24, 22, 19, 0.97));
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
+}
+.set-menu .set-swatch { border-radius: 8px; width: 100%; justify-content: flex-start; }
+.set-menu .set-swatch[aria-selected="true"] {
+  border-color: rgba(212, 175, 55, 0.55);
+  background: rgba(212, 175, 55, 0.14);
+  color: var(--gold-bright);
+}
+.set-menu .set-house-head { margin: 6px 4px 2px; }
 .set-house-head {
   font-size: 10.5px;
   letter-spacing: 0.08em;

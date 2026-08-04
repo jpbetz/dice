@@ -25,6 +25,17 @@ limitations under the License.
 // ("name=notation"), so old links and old clients keep working (an old
 // client reading a v3 link degrades to a name like 'Wisdom|Attributes' —
 // ugly, never broken). An empty name segment ("=4d6dl1") stays legal.
+//
+// Codec v4 (§9 saved-pool set override, 2026-08-03): an optional THIRD
+// field carries the pool's dice-set id — "name|category|set=notation",
+// with the category slot left empty when only the set is present
+// ("name||emberforge.blackanvil=3d6"). Set-less segments stay
+// byte-identical to v3, so old links and old clients keep working (a v3
+// client folds the extra field into its category — ugly, never broken).
+// The codec carries the id VERBATIM; validation belongs to the loader
+// (main's migrateGroup drops ids no SETS registry knows — fail closed,
+// the pool survives).
+//
 // Decoding tries the notation grammar first and falls back to the v1
 // dice-formula ("3d4+1d6"); hostile input yields null, never a throw.
 //
@@ -44,8 +55,9 @@ export function encodeGroups(groups) {
     .slice(0, MAX_GROUPS)
     .map((g) => {
       const name = encodeURIComponent(g.name || '');
-      const cat = g.category ? `|${encodeURIComponent(g.category)}` : '';
-      return `${name}${cat}=${encodeURIComponent(g.notation || '')}`;
+      const cat = g.category || g.set ? `|${encodeURIComponent(g.category || '')}` : '';
+      const set = g.set ? `|${encodeURIComponent(g.set)}` : '';
+      return `${name}${cat}${set}=${encodeURIComponent(g.notation || '')}`;
     })
     .join(';');
   return btoa(body).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -75,16 +87,13 @@ export function decodeGroups(encoded) {
     if (!part) continue;
     const eq = part.indexOf('=');
     if (eq < 0) return null;
-    let name, category = null, raw;
+    let name, category = null, set = null, raw;
     try {
-      const head = part.slice(0, eq);
-      const pipe = head.indexOf('|'); // raw '|' = the v3 category delimiter
-      if (pipe >= 0) {
-        name = cutText(decodeURIComponent(head.slice(0, pipe)), 24);
-        category = cutText(decodeURIComponent(head.slice(pipe + 1)), 24) || null;
-      } else {
-        name = cutText(decodeURIComponent(head), 24);
-      }
+      // raw '|' delimits the optional fields: name|category|set (v3/v4)
+      const segs = part.slice(0, eq).split('|');
+      name = cutText(decodeURIComponent(segs[0]), 24);
+      if (segs.length > 1) category = cutText(decodeURIComponent(segs[1]), 24) || null;
+      if (segs.length > 2) set = cutText(decodeURIComponent(segs[2]), 48) || null;
       raw = decodeURIComponent(part.slice(eq + 1)).trim();
     } catch {
       return null;
@@ -102,6 +111,7 @@ export function decodeGroups(encoded) {
     }
     const rec = { id: groups.length + 1, name, notation };
     if (category) rec.category = category;
+    if (set) rec.set = set; // verbatim — the loader validates against SETS
     groups.push(rec);
     if (groups.length >= MAX_GROUPS) break;
   }

@@ -30,8 +30,16 @@
 //
 // The shelf labeled exactly 'Pools' is the plain (uncategorized) shelf —
 // the same present-or-absent category model as the codec.
+//
+// A pool's dice-set override (§9) rides as a quoted suffix after the
+// notation: "- 'Ember': '3d6' @ 'emberforge.blackanvil'". Present-or-
+// absent like category; unknown ids fall closed to no override (the pool
+// survives — same rule as the #g= codec). The '@' form only follows a
+// QUOTED notation, so a bare hand-written '3d6 # struck @ dawn' can never
+// be misread.
 
 import { parseNotation, cutText } from './notation.js';
+import { SETS } from './themes.js'; // import-free data — still runs under Node
 
 const TRIO = ['attributes', 'skills', 'motivations'];
 const TRIO_LABELS = { attributes: 'Attributes', skills: 'Skills', motivations: 'Motivations' };
@@ -52,7 +60,7 @@ function shelfKey(label) {
 // Emit
 // ---------------------------------------------------------------------------
 
-// groups: [{name, notation, category?}] · settings: {sound?, numbers?}
+// groups: [{name, notation, category?, set?}] · settings: {sound?, numbers?}
 export function exportYaml({ groups = [], settings = {} } = {}) {
   const shelves = [];
   const byKey = new Map();
@@ -63,7 +71,7 @@ export function exportYaml({ groups = [], settings = {} } = {}) {
       byKey.set(k, { key: k, label: TRIO_LABELS[k] || label, pools: [] });
       shelves.push(byKey.get(k));
     }
-    byKey.get(k).pools.push({ name: g.name || '', notation: g.notation });
+    byKey.get(k).pools.push({ name: g.name || '', notation: g.notation, set: g.set || null });
   }
   // trio order first, customs alphabetically, the plain shelf last — the
   // rack's own reading order
@@ -80,7 +88,7 @@ export function exportYaml({ groups = [], settings = {} } = {}) {
   ];
   for (const s of shelves) {
     lines.push(`  ${shelfKey(s.label)}:`);
-    for (const p of s.pools) lines.push(`    - ${quote(p.name)}: ${quote(p.notation)}`);
+    for (const p of s.pools) lines.push(`    - ${quote(p.name)}: ${quote(p.notation)}${p.set ? ` @ ${quote(p.set)}` : ''}`);
   }
   if (!shelves.length) lines.push(`  ${PLAIN_LABEL}:`);
   lines.push('settings:');
@@ -117,7 +125,7 @@ function readScalar(s, stop) {
 
 const fail = (line, error) => ({ ok: false, line, error });
 
-// → { ok:true, shelves:[{label, plain, pools:[{name, notation}]}],
+// → { ok:true, shelves:[{label, plain, pools:[{name, notation, set?}]}],
 //     settings:{sound, numbers} (each present only when the text set it) }
 // or { ok:false, line, error }.
 export function parsePortable(text) {
@@ -179,13 +187,26 @@ export function parsePortable(text) {
       if (!rest.startsWith(': ')) return fail(lineNo, 'expected ": " between name and notation');
       rest = rest.slice(2);
       const val = readScalar(rest);
-      if (!val || val.rest.trim() !== '') return fail(lineNo, 'trailing text after the notation');
+      if (!val) return fail(lineNo, 'expected a notation scalar');
+      let set = null;
+      let tail = val.rest.trim();
+      if (tail.startsWith('@')) {
+        // "- 'Name': 'notation' @ 'set-id'" — the §9 override suffix. Only
+        // reachable after a QUOTED notation (a bare scalar consumes the line).
+        const sv = readScalar(tail.slice(1).trim());
+        if (!sv || sv.rest.trim() !== '') return fail(lineNo, 'trailing text after the dice-set id');
+        const id = sv.value.trim();
+        // unknown ids fall closed to no override — the pool survives
+        set = id === 'std' || SETS[id] ? id : null;
+        tail = '';
+      }
+      if (tail !== '') return fail(lineNo, 'trailing text after the notation');
       const name = cutText(key.value, MAX_NAME + 1);
       if (name.length > MAX_NAME) return fail(lineNo, `name over ${MAX_NAME} characters`);
       const res = parseNotation(val.value);
       if (!res.ok) return fail(lineNo, `notation ${JSON.stringify(val.value.slice(0, 40))}: ${res.error}`);
       if (++poolCount > MAX_POOLS) return fail(lineNo, `more than ${MAX_POOLS} pools`);
-      shelf.pools.push({ name, notation: res.canonical });
+      shelf.pools.push({ name, notation: res.canonical, ...(set ? { set } : {}) });
       continue;
     }
 
@@ -202,10 +223,10 @@ export function parsePortable(text) {
 // Merge plan — by NAME, never a silent overwrite (the preview is the point)
 // ---------------------------------------------------------------------------
 
-// current: [{id, name, notation, category?}] · parsed: parsePortable's ok
-// shape. A named pool matches the FIRST current pool with the same name
-// (exact); a match with identical notation+shelf counts unchanged, else it
-// becomes an update. Unnamed or unmatched pools are adds. Nothing is ever
+// current: [{id, name, notation, category?, set?}] · parsed: parsePortable's
+// ok shape. A named pool matches the FIRST current pool with the same name
+// (exact); a match with identical notation+shelf+set counts unchanged, else
+// it becomes an update. Unnamed or unmatched pools are adds. Nothing is ever
 // deleted — an import narrows nothing.
 export function planImport(current, parsed) {
   const adds = [];
@@ -218,13 +239,17 @@ export function planImport(current, parsed) {
       const match = p.name
         ? current.find((g) => g.name === p.name && !taken.has(g.id))
         : null;
+      const set = p.set || null;
       if (!match) {
-        adds.push({ name: p.name, notation: p.notation, category });
+        adds.push({ name: p.name, notation: p.notation, category, ...(set ? { set } : {}) });
       } else {
         taken.add(match.id);
         const sameCat = (match.category || null) === category;
-        if (match.notation === p.notation && sameCat) unchanged++;
-        else updates.push({ id: match.id, name: p.name, notation: p.notation, category });
+        const sameSet = (match.set || null) === set;
+        if (match.notation === p.notation && sameCat && sameSet) unchanged++;
+        // present-or-absent like adds: the apply site patches `u.set || ''`,
+        // so an absent set still CLEARS a stale override on the match
+        else updates.push({ id: match.id, name: p.name, notation: p.notation, category, ...(set ? { set } : {}) });
       }
     }
   }
