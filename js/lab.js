@@ -27,6 +27,8 @@ import * as CANNON from 'cannon-es';
 import { DIE_TYPES, createDieMesh, createDieBody, valueRange, faceNormalForValue, SHADER_TIME } from './dice.js';
 import { THEMES, SETS, SET_IDS } from './themes.js';
 import { ParticleField } from './particles.js';
+import { DecalField } from './decals.js';
+import { DieLightRig } from './dielights.js';
 
 const ROWS = ['std', ...SET_IDS];
 const COL_STEP = 2.5;
@@ -81,6 +83,12 @@ scene.add(ambient, key, fill);
 // Level 3: one particle pool for the whole lab (js/particles.js). Bursts
 // come from the drop rig's measured contacts and the unmake burn's wisps.
 const field = new ParticleField(scene);
+
+// Level 4: the marks a set leaves on the felt (js/decals.js) and the glow
+// a die carries (js/dielights.js). Both demo through the drop rig — the
+// rig's coupon is the felt they act on. Budget of 2 lights: it's a rig.
+const decals = new DecalField(scene);
+const dieLights = new DieLightRig(scene, { max: 2 });
 
 const ENVS = {
   table: { label: '☀ env: table', amb: 0.55, key: 1.15, bg: 0x14100c },
@@ -336,8 +344,19 @@ function endDrop(fade) {
   drop = null;
   world.removeBody(d.body);
   world.removeBody(d.floor);
-  if (fade) run(260, (k) => d.mesh.scale.setScalar(1 - easeOut(k)), () => scene.remove(d.mesh));
-  else scene.remove(d.mesh);
+  if (d.rails) for (const w of d.rails) world.removeBody(w);
+  dieLights.release(d.mesh);
+  decals.clear(); // the coupon takes its marks with it
+  const cleanup = () => {
+    scene.remove(d.mesh);
+    if (d.coupon) scene.remove(d.coupon);
+  };
+  if (fade) {
+    run(260, (k) => {
+      d.mesh.scale.setScalar(1 - easeOut(k));
+      if (d.coupon) d.coupon.material.opacity = 0.94 * (1 - k);
+    }, cleanup);
+  } else cleanup();
 }
 
 function startDrop(row) {
@@ -360,26 +379,63 @@ function startDrop(row) {
   world.addBody(body);
   const mesh = createDieMesh('d6', row.id === 'std' ? 'std' : row.id);
   scene.add(mesh);
+  // Level 4 acts ON THE TABLE, and the rig floats over a void — so the
+  // drop brings a coupon of felt with it: the decal's page, the glow's
+  // pool, faded in under the die and gone with it.
+  const coupon = new THREE.Mesh(
+    new THREE.PlaneGeometry(8.5, 5.6),
+    new THREE.MeshStandardMaterial({
+      // brighter than the table's obsidian felt on purpose: the lab's
+      // lights are a fraction of the table's, and a coupon that matches
+      // the void teaches nothing
+      color: '#30303a', roughness: 0.96, metalness: 0,
+      transparent: true, opacity: 0, envMapIntensity: 0.2,
+    })
+  );
+  coupon.rotation.x = -Math.PI / 2;
+  coupon.position.set(cx, floor.position.y + 0.001, DROP_Z);
+  scene.add(coupon);
+  run(200, (k) => { coupon.material.opacity = 0.94 * k; });
+  // Rails at the coupon's edges (the table has walls; a tumbling die
+  // walks sideways off an unfenced floor and takes the framing with it).
+  const rails = [];
+  const railDefs = [
+    // hugging the dropView frustum: a die pinned at a rail still shows
+    [cx - 2.9, DROP_Z, 0, Math.PI / 2],
+    [cx + 2.9, DROP_Z, 0, -Math.PI / 2],
+    [cx, DROP_Z - 2.1, 0, 0],
+    [cx, DROP_Z + 2.1, 0, Math.PI],
+  ];
+  for (const [wx, wz, rx, ry] of railDefs) {
+    const wall = new CANNON.Body({ mass: 0, shape: new CANNON.Plane(), material: floorMat });
+    wall.quaternion.setFromEuler(rx, ry, 0);
+    wall.position.set(wx, floor.position.y, wz);
+    world.addBody(wall);
+    rails.push(wall);
+  }
+  if (row.recipe && row.recipe.light) dieLights.attach(mesh, row.recipe.light, rng);
   const recipe = row.recipe && row.recipe.particles;
+  const decalRecipe = row.recipe && row.recipe.decal;
   body.addEventListener('collide', (e) => {
     if (!drop || drop.body !== body) return;
     const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
     if (v < 1.6) return; // same idea as the click-sound floor
     drop.contacts++;
-    if (!recipe) return; // a set may shed nothing — that IS the demo
     const c = e.contact;
     const side = c.bi === body ? { b: c.bi, r: c.ri } : { b: c.bj, r: c.rj };
-    drop.bursts += field.burst(
-      recipe,
-      [side.b.position.x + side.r.x, side.b.position.y + side.r.y, side.b.position.z + side.r.z],
-      v,
-      rng
-    );
+    const at = [side.b.position.x + side.r.x, side.b.position.y + side.r.y, side.b.position.z + side.r.z];
+    // a set may shed nothing, mark nothing, or both — that IS the demo
+    if (recipe) drop.bursts += field.burst(recipe, at, v, rng);
+    // marks want a REAL hit (higher floor than a click), and they stamp at
+    // coupon height — the contact x/z projected onto the felt sample
+    if (decalRecipe && v >= 4) {
+      drop.stamps += decals.stamp(decalRecipe, [at[0], floor.position.y + 0.012, at[2]], v, rng);
+    }
   });
   body.addEventListener('sleep', () => {
     if (drop && drop.body === body) drop.sleepAt = performance.now();
   });
-  drop = { mesh, body, floor, row, born: performance.now(), sleepAt: 0, contacts: 0, bursts: 0 };
+  drop = { mesh, body, floor, rails, coupon, row, born: performance.now(), sleepAt: 0, contacts: 0, bursts: 0, stamps: 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -499,9 +555,14 @@ function tick(now) {
     world.step(1 / 60, dt, 4); // main-table FIXED_DT
     drop.mesh.position.copy(drop.body.position);
     drop.mesh.quaternion.copy(drop.body.quaternion);
-    if ((drop.sleepAt && now - drop.sleepAt > 900) || now - drop.born > 9000) endDrop(true);
+    // Linger well past settle: Level 4's whole point is the mark that
+    // REMAINS — a rig that sweeps the felt 1 s after the die stops would
+    // never show it (900 ms suited Level 3's fast-dying bursts).
+    if ((drop.sleepAt && now - drop.sleepAt > 3500) || now - drop.born > 12000) endDrop(true);
   }
   field.tick(dt, now / 1000);
+  decals.tick(dt);
+  dieLights.tick(dt, now / 1000);
   renderer.render(scene, camera);
   requestAnimationFrame(tick);
 }
@@ -573,10 +634,45 @@ window.__lab = {
   },
   dropState() {
     return drop
-      ? { active: true, contacts: drop.contacts, bursts: drop.bursts, sleeping: !!drop.sleepAt }
+      ? { active: true, contacts: drop.contacts, bursts: drop.bursts, stamps: drop.stamps, sleeping: !!drop.sleepAt }
       : { active: false };
   },
   particleCount() { return field.count(); },
+  // Level 4 diagnostics: live felt marks and attached die-lights.
+  decalCount() { return decals.count(); },
+  decalDump() { return decals.dump(); },
+  lightInfo() { return dieLights.info(); },
+  // Average framebuffer RGB around a projected WORLD point (the decal
+  // cousin of __labSample): pins "what color IS that mark" to numbers.
+  sampleWorld(p, half = 6) {
+    renderer.render(scene, camera);
+    const v = new THREE.Vector3(p[0], p[1], p[2]).project(camera);
+    const src = renderer.domElement;
+    const px = Math.round((v.x * 0.5 + 0.5) * src.width);
+    const py = Math.round((-v.y * 0.5 + 0.5) * src.height);
+    const c2 = document.createElement('canvas');
+    c2.width = src.width; c2.height = src.height;
+    const ctx = c2.getContext('2d');
+    ctx.drawImage(src, 0, 0);
+    const d = ctx.getImageData(px - half, py - half, half * 2, half * 2).data;
+    let r = 0, g = 0, b = 0;
+    const n = d.length / 4;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+    return [Math.round(r / n), Math.round(g / n), Math.round(b / n)];
+  },
+  // Frame a row's DROP AREA at main-table pitch (~57° down). The zoom
+  // view reads the felt edge-on, which is exactly the angle a flat decal
+  // vanishes at — marks are judged the way the table shows them.
+  dropView(id) {
+    const row = rows.find((r) => r.id === id);
+    if (!row) return false;
+    const y = row.meshes[0].baseY;
+    const cx = row.meshes[4].baseX;
+    camera.position.set(cx, y + 6.2, DROP_Z + 4.8);
+    camera.lookAt(cx, y - 1.15, DROP_Z - 0.4);
+    camera.updateProjectionMatrix();
+    return true;
+  },
   // Level 3.5 diagnostics: per-set render-geometry fingerprints. Bevel
   // and wear move the bounding radius (crisp Umbra > std > tumbled
   // Sea-glass); the probe asserts that ordering without a screenshot.

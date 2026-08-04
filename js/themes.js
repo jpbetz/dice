@@ -49,6 +49,15 @@
 //   wear     0..1 tumbled erosion, corners first (deterministic per set)
 //   nicks    0..5 discrete chips at seeded corner sites
 //   pillow   0..1 cushion-shaded faces (silhouette + digit plane stay flat)
+// · `decal` (Level 4a, impact marks on the felt): {kind, colors: [A, B],
+//   scale?, life?}. Stamped only from a measured floor-height contact
+//   (js/decals.js) and always transient — the felt recovers. Each kind is
+//   a claim about what the die DID to the table: 'frost' (cold spreads),
+//   'ring' (water dries), 'scorch' (heat kisses), 'smudge' (dust settles).
+// · `light` (Level 4b, a glow parented to the die): {color, intensity,
+//   range, mode: 'wave'|'breathe'|'flicker'|'steady'}. Fixed budget of 4
+//   table-wide (js/dielights.js steals oldest); negative intensity pools
+//   shadow instead. Sets without either shed and cast NOTHING on purpose.
 
 export const THEMES = {
   tidewrack: {
@@ -64,6 +73,8 @@ export const THEMES = {
         spec: { iridescence: 0.55, iridescenceIOR: 1.3, envMapIntensity: 1.15 }, // wet glass sheen
         particles: { kind: 'bubbles', colors: ['#d8f4f0', '#8fe3d9'] }, // trapped sea-air escapes on impact
         geo: { bevel: 0.13, profile: 'round', wear: 0.6, pillow: 0.3 }, // decades in the surf: fully tumbled
+        decal: { kind: 'ring', colors: ['#071e22', '#a8dcd2'] }, // sea-wet glass: the felt darkens, dries to a tide-line
+        light: { color: '#58e6d9', intensity: 14, range: 7, mode: 'wave' }, // biolume: teal on its patch of felt
       },
     },
   },
@@ -79,6 +90,7 @@ export const THEMES = {
         maps: { relief: { pattern: 'grain', strength: 0.9, digitDepth: 0.4 } },
         particles: { kind: 'motes', colors: ['#ffe9a3', '#d8e8a0'] }, // a knock shakes pollen loose
         geo: { bevel: 0.09, profile: 'round', wear: 0.25, pillow: 0.35 }, // hand-carved, long handled
+        // no decal, no light: pollen drifts, it doesn't stain — and wood neither scorches the felt nor glows
       },
       mosstone: {
         label: 'Mosstone',
@@ -88,6 +100,7 @@ export const THEMES = {
         maps: { relief: { pattern: 'hammer', strength: 0.85, digitDepth: 0.6 } },
         particles: { kind: 'motes', colors: ['#c9e8a0', '#8fae6f'], scale: 0.7 }, // spores off damp moss
         geo: { bevel: 0.12, profile: 'round', wear: 0.5 }, // river stone
+        decal: { kind: 'smudge', colors: ['#10150c', '#42573a'], scale: 1.1 }, // a damp moss-print — dark water, green flecks
       },
       sapamber: {
         label: 'Sap Amber',
@@ -114,6 +127,8 @@ export const THEMES = {
         spec: { iridescence: 0.35, envMapIntensity: 1.05 }, // storm-oil shimmer
         particles: { kind: 'static', colors: ['#f2f6ff', '#b8a8ff'] }, // the charge grounds through the contact
         geo: { bevel: 0.03, nicks: 2 }, // fulgurite: razor facets, fracture chips
+        // no decal: glass leaves no residue — the LIGHT is its mark
+        light: { color: '#b8a8ff', intensity: 20, range: 8, mode: 'flicker' }, // charge seeking a path
       },
     },
   },
@@ -134,6 +149,8 @@ export const THEMES = {
         spec: { envMapIntensity: 1.2, specularIntensity: 1.1 }, // wet ice mirror
         particles: { kind: 'fog', colors: ['#dceefc', '#a8d8f0'] }, // impact knocks a breath of cold off the ice
         geo: { bevel: 0.075, profile: 'round', wear: 0.15 }, // melt-softened edges
+        // glacial mass: the bloom is WIDE and slow to leave. No light — ice does not emit.
+        decal: { kind: 'frost', colors: ['#dceefc', '#7fb4d8'], scale: 1.35, life: 10 },
       },
       firstfrost: {
         label: 'First Frost',
@@ -146,6 +163,7 @@ export const THEMES = {
         },
         particles: { kind: 'fog', colors: ['#eef4fa', '#c8e4f4'], scale: 0.7 }, // a thinner frost-breath
         geo: { bevel: 0.045 }, // fresh-cut ice, still crisp
+        decal: { kind: 'frost', colors: ['#eef4fa', '#a8cce4'], scale: 0.85 }, // first frost: a crisp, quick crackle
       },
     },
   },
@@ -171,6 +189,8 @@ export const THEMES = {
         // struck iron sheds sparks — they cool from white-hot to dark ember
         particles: { kind: 'sparks', colors: ['#fff2c8', '#ffd166', '#ff9a3c'], fadeTo: '#571b05' },
         geo: { bevel: 0.1, wear: 0.2, nicks: 3 }, // forged: wide flat chamfers, hammer-marked
+        decal: { kind: 'scorch', colors: ['#070402', '#ff8c42'] }, // hot iron kisses the felt: ember rim cooling to soot
+        light: { color: '#ff8c42', intensity: 16, range: 6.5, mode: 'breathe' }, // the molten interior, breathing
       },
     },
   },
@@ -193,6 +213,8 @@ export const THEMES = {
         // the casting grounds itself: rune-embers drift off the contact
         particles: { kind: 'motes', colors: ['#c9a6ff', '#7fd9e8'], scale: 0.8 },
         geo: { bevel: 0.02 }, // lapidary-cut: the facets ARE the discipline
+        // no decal: a focus leaves no residue — containment is the point
+        light: { color: '#7fd9e8', intensity: 10, range: 5, mode: 'steady' }, // the containment hum, held
       },
     },
   },
@@ -215,6 +237,9 @@ export const THEMES = {
         // The unmake burn feeds the same palette out as wisps (lab.js).
         particles: { kind: 'ash', colors: ['#5a4a6a', '#cfe98c'] },
         geo: { bevel: 0.015 }, // UNNATURALLY perfect — nothing has ever worn it
+        // no decal: what it unmakes is GONE, not marked. The light is
+        // negative — Umbra pools local shadow instead of dimming the world.
+        light: { color: '#ffffff', intensity: -8, range: 4.8, mode: 'breathe' },
       },
     },
   },
@@ -230,6 +255,7 @@ export const THEMES = {
         maps: { relief: { pattern: 'scrimshaw', strength: 0.95, digitDepth: 0.75 } },
         particles: { kind: 'dust', colors: ['#e8dcc0', '#c9b896'] }, // old bone gives up its dust
         geo: { bevel: 0.1, profile: 'round', wear: 0.45, pillow: 0.25, nicks: 4 }, // a century of hands
+        decal: { kind: 'smudge', colors: ['#e8dcc0', '#c9b896'], scale: 0.85 }, // where the shed dust settles
       },
     },
   },
