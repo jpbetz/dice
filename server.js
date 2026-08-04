@@ -240,6 +240,18 @@ const SETTING_SPECS = {
     default: 'soul-deal',
     validate: (v) => typeof v === 'string' && SYSTEMS.includes(v),
   },
+  // The table's display name (the anatomy pass, Joe 2026-08-04: "does it
+  // have a name? It should"). Cosmetic identity, room-wide like felt; the
+  // ?room= KEY stays the durable identity (goal 7: the URL is the save
+  // file) — this name dies with the in-memory room by design. '' = unnamed
+  // (clients render no plate — never a placeholder). Sanitized like every
+  // user string (control/bidi strip + surrogate-safe cut); '#' is allowed:
+  // table names are never whisper-addressed, so the player-name ban does
+  // not apply here.
+  tableName: {
+    default: '',
+    normalize: (v) => (typeof v === 'string' ? (cleanString(v, 28) || '') : null),
+  },
   // Room-wide custom experience templates — docs/UX.md §7.3, Joe's call that
   // these sync with the table rather than living in one player's
   // localStorage. Empty until a client ships the editor; the three built-ins

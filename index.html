@@ -60,6 +60,17 @@ limitations under the License.
         <span id="identity-name" class="identity-name">…</span>
       </button>
       <div id="rail-roster"></div>
+      <!-- THE QUIET NAMEPLATE (anatomy pass, Joe 2026-08-04: "does it have
+           a name? It should"): the table's name rides the rail's RIGHT
+           edge — the mirror of YOU top-left, so row one reads "these
+           people, at this table". Renders the room-wide tableName setting,
+           else the ?room= key when someone chose one, else NOTHING: an
+           unnamed table wears no placeholder (a standing generic word is
+           the chrome the removed 'Pools' title taught us to kill).
+           Content, not chrome — as-typed case, never a button (renaming
+           lives in Settings; the invite link keeps its one home in the
+           identity menu). -->
+      <span id="table-name" class="table-name hidden"></span>
       <span id="status-pill" class="hidden"></span>
     </div>
 
@@ -185,6 +196,20 @@ limitations under the License.
            keeps a rolled result.) -->
       </div>
 
+      <!-- THE REGION HEAD (anatomy pass 2026-08-04): names the saved-pools
+           region — the one region a newcomer genuinely misreads, because
+           its steel tile grid wears the dice palette's exact grammar. The
+           hairline running to the panel edge is the region-rank mark; the
+           category shelf heads below stay the subordinate rank. Hides
+           while browsing a teammate — the standing ALICE'S POOLS banner
+           IS that state's region head (one head per state). This
+           deliberately supersedes §7.9's "no Pools title row" FOR THE
+           REGION (Joe's 2026-08-04 explicit-anatomy ask); the COLUMN
+           still has no title. -->
+      <div id="pools-head" class="hidden">
+        <span class="ph-word">Saved pools</span>
+        <span class="ph-rule"></span>
+      </div>
       <!-- The Rack (agreed 2026-08-01): category shelves of pool TILES.
            Tiles STAGE (sources add, the pool rolls); right-click a tile
            for its ± popover (the corner ± retired 2026-08-01 — tweaking
@@ -644,6 +669,16 @@ limitations under the License.
       </div>
       <div class="settings-sec">
         <span class="plabel">Everyone at the table</span>
+        <!-- Table name (anatomy pass): the rail nameplate's rename path —
+             management stands behind the settings gate (P6), room-wide
+             like felt/system. Empty = unnamed (no plate). -->
+        <div class="prow">
+          <span class="grow">
+            <span class="prow-label">Table name</span>
+            <span class="prow-sub">shows at the top of everyone’s panel</span>
+          </span>
+          <input id="set-table-name" class="tin" maxlength="28" placeholder="unnamed">
+        </div>
         <div class="prow">
           <span class="grow">
             <span class="prow-label">Rolling system</span>

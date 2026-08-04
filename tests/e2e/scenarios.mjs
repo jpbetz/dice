@@ -803,6 +803,97 @@ export const scenarios = [
     },
   },
   {
+    name: 'panel-anatomy',
+    tags: ['chrome', 'settings'],
+    // THE QUIET NAMEPLATE + THE REGION HEAD (the anatomy pass, Joe
+    // 2026-08-04): the table is nameable room-wide (settings channel);
+    // the rail plate renders the name AS TYPED (content, not chrome),
+    // falls back to a chosen ?room= key, and NEVER shows a placeholder;
+    // document.title carries the name; SAVED POOLS heads the pools
+    // region on YOUR rack and yields to the owner banner on a foreign
+    // one — one head per state.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+
+      // the fallback: this room's key is non-default, so the plate shows
+      // it (a chosen key IS a chosen name) — never the word 'table'
+      const plate = () => a.eval(`(() => {
+        const el = document.getElementById('table-name');
+        return { text: el.textContent, shown: getComputedStyle(el).display !== 'none' };
+      })()`);
+      assert.equal((await plate()).shown, true, 'a chosen room key shows as the name');
+
+      // Bob names the table through the real settings input; Alice sees
+      // it — room-wide, echo-applied, AS TYPED (never uppercased by JS)
+      await b.eval(`(() => {
+        const i = document.getElementById('set-table-name');
+        i.value = 'Friday Crew';
+        i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      })()`);
+      await a.waitFor(
+        `document.getElementById('table-name').textContent === 'Friday Crew'`,
+        { desc: 'the name reaches the other seat' },
+      );
+      assert.equal(await a.eval(
+        `getComputedStyle(document.getElementById('table-name')).textTransform`),
+        'none', 'the name is content — rendered as typed');
+      assert.equal(await a.eval(`document.title`), 'Friday Crew — Dice Table',
+        'the tab title carries the identity');
+
+      // clearing the name falls back to the key — the plate never goes
+      // placeholder, and the title returns to the app name
+      await b.eval(`(() => {
+        const i = document.getElementById('set-table-name');
+        i.value = '';
+        i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      })()`);
+      await a.waitFor(
+        `document.getElementById('table-name').textContent !== 'Friday Crew'`,
+        { desc: 'the name clears' },
+      );
+      assert.equal((await plate()).shown, true, 'the chosen key stands back in');
+
+      // the pools region head: SAVED POOLS on YOUR rack…
+      assert.equal(await a.eval(
+        `getComputedStyle(document.getElementById('pools-head')).display`),
+        'flex', 'SAVED POOLS heads your rack');
+      assert.equal(await a.eval(
+        `document.querySelector('#pools-head .ph-word').textContent`), 'Saved pools');
+      // …and it yields to the owner banner on a foreign rack (one head
+      // per state, never two)
+      const bobId = await b.playerId();
+      await a.dbg(`setPoolsOwner(${JSON.stringify(bobId)})`);
+      await a.waitFor(
+        `getComputedStyle(document.getElementById('pools-head')).display === 'none'`,
+        { desc: 'the head yields to the owner banner' },
+      );
+      assert.ok(await a.eval(`!!document.querySelector('.pools-owner-banner')`),
+        "the owner banner IS that state's region head");
+      await a.dbg('setPoolsOwner(null)');
+      await a.waitFor(
+        `getComputedStyle(document.getElementById('pools-head')).display === 'flex'`,
+        { desc: 'the head returns home' },
+      );
+
+      // collapsed: both leave with the panel — the icon rail stays clean.
+      // (try/finally: dice.panels.v1 persists per origin, and an aborted
+      // collapse here would strand every later localhost scenario in a
+      // zero-rect panel — the leak class this suite met once already.)
+      try {
+        await a.dbg(`setPanelState({pools: false})`);
+        assert.equal(await a.eval(
+          `document.getElementById('table-name').offsetParent === null`),
+          true, 'the plate leaves the collapsed rail');
+        assert.equal(await a.eval(
+          `document.getElementById('pools-head').offsetParent === null`),
+          true, 'the head leaves with the panel');
+      } finally {
+        await a.dbg(`setPanelState({pools: true})`);
+      }
+    },
+  },
+  {
     name: 'spent-draft',
     tags: ['smoke', 'groups'],
     // 2i-E: a rolled draft SURVIVES (the deliberate repeat-roll muscle
@@ -970,12 +1061,13 @@ export const scenarios = [
         'the rail 🔊 is gone — sound lives in Settings');
       // ORDER IS THE CONTRACT (Joe 2026-08-04). Top rail: YOU first, so your
       // own name anchors the corner and never moves — the roster grows to
-      // your right and the transient status pill trails, wrapping to its own
-      // line BELOW you instead of shoving you down.
+      // your right, the table's nameplate rides the right edge (the mirror
+      // of you — the anatomy pass), and the transient status pill trails,
+      // wrapping to its own line BELOW you instead of shoving you down.
       assert.deepEqual(
         await a.eval(`[...document.getElementById('rail').children].map((el) => el.id)`),
-        ['identity-chip', 'rail-roster', 'status-pill'],
-        'the top rail is PRESENCE, anchored on you (you · roster · status)',
+        ['identity-chip', 'rail-roster', 'table-name', 'status-pill'],
+        'the top rail is PRESENCE, anchored on you (you · roster · table · status)',
       );
       // Foot: configure → consult → act, then the gap, then the contextual
       // ✕ alone in the right corner (the same corner ✕ Clear owns on the

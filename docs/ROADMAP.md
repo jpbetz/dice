@@ -463,6 +463,27 @@ Two directives landing on the audit pass's fresh surfaces (`30289fd`,
   pick list was Modify/Customize, never "Tweak"). The tray popover's
   standing title says *Draft* now, the vocabulary word.
 
+### 2k. The panel anatomy pass — the quiet nameplate + the region head
+(2026-08-04, Joe: "this all feels under defined") — SHIPPED
+
+Joe asked for the panel's four regions (table & users · dice · roll
+tray · pools) to read explicitly, unobtrusively, text allowed, "best UX
+should win." Run as a four-entrant judged design panel (typographic ·
+structural · identity-first · minimal, three adversarial lenses each +
+a completeness critic); UX.md §7.17 records the shipped synthesis: the
+table is NAMEABLE (room-wide `tableName` on the settings channel,
+renamed from Settings → Everyone at the table), the rail wears the name
+at its right edge (name → chosen ?room= key → NOTHING — never a
+placeholder) and document.title carries it; `SAVED POOLS` heads the
+rack with a rule-to-edge rank mark, yielding to the owner banner on
+foreign racks; the dice and tray regions get deliberate NOTHING (the
+pressed Dice segment and the bronze well already speak). e2e:
+`panel-anatomy` (chrome, settings); stills in tools/out/anatomy/.
+Follow-ups surfaced by the critic, standing open: the roster-pill ↔
+owner-chip duplication (one per-player surface could carry both
+presence and pool-browsing), ownership legibility mid-scroll on foreign
+racks, and the join modal's inability to show the table name pre-join.
+
 ## Tier 2 — Organization (goal 5, the audit's biggest experience gap)
 
 ### 3. Table organization & concurrency

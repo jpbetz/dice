@@ -929,6 +929,31 @@ html, body {
   padding: 16px 14px 10px;
   border-bottom: 1px solid var(--hair);
 }
+/* THE REGION HEAD (anatomy pass 2026-08-04): SAVED POOLS names the one
+   region a newcomer misreads — its steel tiles wear the dice palette's
+   exact grammar. Same 10px ambient tier as the category heads; the RANK
+   difference is structural, not typographic: the hairline running from
+   the word to the panel edge marks a REGION head, category heads carry
+   none. Not sticky (the category heads keep the mid-scroll naming job
+   under --draft-h; a second pinned band would steal tray-adjacent
+   pixels). Hidden while browsing a teammate — the owner banner is that
+   state's region head. Collapsed it leaves with #builder-panel free. */
+#pools-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 -4px;
+}
+#pools-head.hidden { display: none; }
+#pools-head .ph-word {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+#pools-head .ph-rule { flex: 1; border-top: 1px solid var(--hair); }
+
 .pool-sec-head {
   position: sticky;
   top: var(--draft-h, 0px);
@@ -1650,6 +1675,33 @@ html, body {
   color: var(--muted);
   cursor: default;
 }
+
+/* the settings rename row: the input takes a bounded seat beside its
+   label — .tin's block width would crush the prow's label column */
+#set-table-name { flex: 0 0 150px; width: 150px; min-width: 0; }
+
+/* ---------- the table nameplate (anatomy pass 2026-08-04) ---------- */
+/* The table's name rides the rail's right edge — the mirror of YOU
+   top-left (ORDER IS THE CONTRACT: the you-chip keeps its corner; past
+   four players the name wraps below exactly like the status pill always
+   has). Content, not chrome: as-typed case in the display face, ambient
+   muted, non-interactive — renaming lives behind the Settings gate (P6),
+   and the invite link keeps its one home in the identity menu. ABSENT
+   when the table is unnamed: no placeholder ever stands here. */
+.table-name {
+  margin-left: auto;
+  align-self: center;
+  max-width: 118px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.table-name.hidden { display: none; }
+#left-panel.collapsed .table-name { display: none; }
 
 /* ---------- status pill ---------- */
 #status-pill {

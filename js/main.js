@@ -5979,6 +5979,10 @@ function renderGroups() {
   const switcher = buildPoolsSwitcher();
   if (switcher) groupsListEl.appendChild(switcher);
   document.getElementById('pools-toolbar').classList.toggle('hidden', !!poolsOwner);
+  // THE REGION HEAD (anatomy pass): SAVED POOLS stands over YOUR rack;
+  // browsing a teammate hides it — the standing owner banner IS that
+  // state's region head (one head per state, never two).
+  document.getElementById('pools-head').classList.toggle('hidden', !!poolsOwner);
   if (poolsOwner) {
     renderForeignPools(poolsOwnerPlayer());
     return;
@@ -7499,7 +7503,7 @@ function setChips(on, persist = true) {
 
 // Current merged room settings. Key-by-key application below is deliberate:
 // the next slice adds keys (experiences) without reshaping this.
-let roomSettings = { felt: DEFAULT_FELT, system: DEFAULT_SYSTEM };
+let roomSettings = { felt: DEFAULT_FELT, system: DEFAULT_SYSTEM, tableName: '' };
 
 // A system change is a lens swap over every surface already on screen: the
 // log, the banner, and a verdict card still standing all re-read under the new
@@ -7529,10 +7533,36 @@ function rerenderInterpretation() {
   }
 }
 
+// THE QUIET NAMEPLATE (anatomy pass, Joe 2026-08-04): the table's name,
+// top-right of the rail — the mirror of YOU top-left. Renders the
+// room-wide tableName, else the ?room= key when someone CHOSE one (a
+// non-default key is a chosen name), else NOTHING: an unnamed table
+// wears no placeholder — a standing generic word is the chrome the
+// removed 'Pools' title taught us to kill. Content, not chrome: renders
+// as typed, never uppercased. The name also rides document.title (the
+// cheapest identity surface in the app — tabs, history, link previews).
+function renderTableName() {
+  const el = document.getElementById('table-name');
+  const key = netOnline && ROOM !== 'table' ? ROOM.replace(/[-_]+/g, ' ') : '';
+  const name = roomSettings.tableName || key;
+  el.textContent = name;
+  el.title = netOnline ? `room: ${ROOM}` : 'this table, solo';
+  el.classList.toggle('hidden', !name);
+  document.title = name ? `${name} — Dice Table` : 'Dice Table';
+}
+
 // Apply a full merged settings object (join response, hello, settings-changed
 // echo, or the solo localStorage copy). Unknown keys/values are ignored.
 function applyRoomSettings(settings) {
   if (!settings || typeof settings !== 'object') return;
+  if (typeof settings.tableName === 'string') {
+    roomSettings.tableName = cutText(settings.tableName, 28); // mirror the server cap
+    renderTableName();
+    // the settings modal's rename field follows the echo — unless the
+    // player is mid-typing in it (never clobber a focused input)
+    const input = document.getElementById('set-table-name');
+    if (document.activeElement !== input) input.value = roomSettings.tableName;
+  }
   if (typeof settings.felt === 'string' && FELT_THEMES[settings.felt]) {
     roomSettings.felt = settings.felt;
     if (settings.felt !== currentFeltId) applyFeltTheme(settings.felt);
@@ -7846,6 +7876,12 @@ function syncSettingsUI() {
 }
 
 function openSettingsModal() {
+  // The table-name prefill lives HERE, not in syncSettingsUI: setSound()
+  // calls syncSettingsUI during module evaluation, before roomSettings'
+  // let initializes — the exact eval-order trap the felt-swatch comment
+  // below records. A modal can only open long after eval.
+  const nameInput = document.getElementById('set-table-name');
+  if (document.activeElement !== nameInput) nameInput.value = roomSettings.tableName || '';
   syncSettingsUI();
   settingsModal.classList.remove('hidden');
 }
@@ -7864,6 +7900,31 @@ settingsModal.addEventListener('click', (e) => {
 // Esc closes the modal only when it is the topmost layer — see the central
 // Esc layering in the keyboard-shortcuts section below.
 document.getElementById('set-sound').addEventListener('click', () => setSound(!soundOn));
+// Table name (anatomy pass): commit on Enter/blur, room-wide like felt —
+// online the UI applies only on the settings-changed echo (no optimistic
+// divergence); solo applies now and persists the LS copy. Same-value
+// commits are dropped client-side (the server would 200 a no-op anyway).
+{
+  const nameInput = document.getElementById('set-table-name');
+  const commitTableName = () => {
+    const v = nameInput.value.trim();
+    if (v === (roomSettings.tableName || '')) return;
+    if (netOnline && net) {
+      net.setSettings({ tableName: v }).then((ok) => {
+        if (!ok) showSettingsNote('couldn’t rename the table — try again');
+      });
+    } else {
+      roomSettings.tableName = cutText(v, 28);
+      save(LS_ROOMSETTINGS, roomSettings);
+      renderTableName();
+    }
+  };
+  nameInput.addEventListener('keydown', (e) => {
+    e.stopPropagation(); // typing a name must not fire table shortcuts
+    if (e.key === 'Enter') { commitTableName(); nameInput.blur(); }
+  });
+  nameInput.addEventListener('blur', commitTableName);
+}
 document.getElementById('set-chips').addEventListener('click', () => setChips(!chipsOn));
 
 // ---------------------------------------------------------------------------

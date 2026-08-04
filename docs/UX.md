@@ -2158,3 +2158,56 @@ The modifier tool wears its word at rim scale — "Modify", never "Tweak"
 (unsurprising over cute), bronze dress unchanged (it belongs to the roll
 world; gold stays the roll act's). The tray popover's standing title
 reads *Draft* — the vocabulary word.
+
+### 7.17 The panel anatomy — the quiet nameplate and the region head
+(2026-08-04)
+
+Joe: the panel's four regions — the table & its people · the dice · the
+roll tray · the pools — "feel under defined… make this organization a
+bit more explicit, unobtrusively. It's okay to use text. You make the
+call." Designed by a four-entrant judged panel (typographic · structural
+· identity-first · minimal, three adversarial lenses each); the shipped
+synthesis grafts the survivors of all four:
+
+**THE QUIET NAMEPLATE.** The table is NAMEABLE: a room-wide `tableName`
+setting rides the settings channel beside felt/system (SETTING_SPECS,
+normalized like every user string, ≤28, `''` = unnamed), edited from
+Settings → *Everyone at the table* → "Table name" (management stands
+behind its gate — P6). The rail renders it at the RIGHT edge of row one
+— the mirror of YOU top-left, so the row reads "these people, at this
+table" — falling back to the `?room=` key when someone chose one (a
+non-default key IS a chosen name, and surfacing it teaches the URL as
+the save-file grammar — goal 7), and to NOTHING otherwise: **an unnamed
+table wears no placeholder** (every judge killed the standing
+`TABLE`/`SOLO` fallback as the same species as the deleted 'Pools'
+title). The plate is CONTENT, not chrome: display face, as-typed case
+(labels are uppercase; identity is not), ambient muted, non-interactive
+(the invite link keeps its one home in the identity menu), ellipsized at
+~118px with the room key in its tooltip, hidden collapsed. The name also
+rides `document.title` ("Friday Crew — Dice Table") — the cheapest
+identity surface in the app. The ORDER contract holds: the you-chip
+keeps its corner; past four players the plate wraps below exactly like
+the status pill always has.
+
+**THE REGION HEAD.** `SAVED POOLS` stands over the rack — the one region
+a newcomer genuinely misreads, because its steel tiles wear the dice
+palette's exact grammar two regions up. Same 10px ambient tier as the
+category heads; the RANK difference is structural, not typographic: a
+hairline runs from the word to the panel edge (region rank), category
+heads carry none (shelf rank). Head at entry + '✎ Edit pools' at exit
+bracket the region. Not sticky (the category heads keep the mid-scroll
+naming job; a second pinned band would steal tray-adjacent pixels).
+Browsing a teammate HIDES it — the standing `ALICE'S POOLS · read-only`
+banner is that state's region head: one head per state, never two.
+*This deliberately supersedes §7.9's "There is no 'Pools' title row" FOR
+THE REGION under Joe's explicit 2026-08-04 ask — the COLUMN still has no
+title, and what died in §7.9 (a name floating over the whole panel)
+stays dead.*
+
+**THE REFUSALS (as load-bearing as the additions).** The dice region
+gets nothing: the pressed *Dice* segment already names it and eight
+tiles reading d4–d100 self-label (a DICE caption would kill no
+confusion). The tray gets nothing: the one warm bronze surface in a cool
+column is the strongest structural signal in the panel, and §7.14.1's
+cut hint stands. The judged panel's rule survives as doctrine: **every
+standing word must name the confusion it kills.**
