@@ -148,7 +148,13 @@ html, body {
   --panel: #202226;
   --panel-border: rgba(255, 255, 255, 0.11);
   --hair: rgba(255, 255, 255, 0.08);
+  /* …and the re-dress finishes (2i-D temperature-schism): the column's
+     muted tier — section heads, hints, formulas, ordinals — reads COOL
+     steel over the cool graphite, not the tavern's warm khaki. The tray
+     re-warms its own token below: it is the one warm surface on purpose. */
+  --muted: #99a1a9;
 }
+#tray-actions { --muted: #9c8f77; } /* the bronze world keeps its warmth */
 #left-panel.collapsed { width: var(--sidebar-rail-w); }
 /* On a phone the expanded column yields a felt sliver instead of none */
 @media (max-width: 640px) {
@@ -302,14 +308,21 @@ html, body {
   padding: 8px 2px;
   border-radius: 8px;
   border: 1px solid var(--panel-border);
-  background: rgba(255,255,255,0.05);
+  /* steel with a BODY (2i-D): gradient, top bevel, seat shadow — the
+     machined recipe the rim's tool plates already wear; flat translucent
+     white read as unfinished chrome over the graphite */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.35);
   color: var(--ivory);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
-.die-btn:hover { border-color: var(--die-color, var(--gold)); background: rgba(255,255,255,0.12); }
+.die-btn:hover {
+  border-color: var(--die-color, var(--gold));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.06));
+}
 /* The diamond is the NULL-ART FALLBACK only: tiles that carry real die art
    (.has-art, set when diceart.js could render) suppress it — P1, the dice
    are the buttons, and the die's own face beats an abstract glyph. */
@@ -684,7 +697,8 @@ html, body {
   border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.13);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.015));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  /* the full machined recipe (2i-D): bevel AND seat shadow */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 1px 2px rgba(0, 0, 0, 0.35);
   color: var(--muted);
   cursor: pointer;
   transition: color 0.12s, border-color 0.12s, background 0.15s, box-shadow 0.15s;
@@ -694,7 +708,7 @@ html, body {
   color: var(--ivory);
   border-color: rgba(243, 234, 215, 0.38);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 /* unlit, not absent: an empty well's tools recede but hold their place —
    and wear the disabled CODE (grayscale) so recede never reads as the
@@ -759,7 +773,7 @@ html, body {
 .group-row.open { background: rgba(212, 175, 55, 0.06); box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.16); }
 .pool-line1 { display: flex; align-items: baseline; gap: 6px; }
 .pool-line1 .group-name { flex: 1 1 auto; min-width: 0; cursor: pointer; }
-.pool-line1 .group-name:hover { color: var(--gold-bright); }
+.pool-line1 .group-name:hover { color: var(--ivory); } /* a tool hover, not a roll (2i-D bronze-bleed sweep) */
 .pool-line1 .group-formula { flex: none; max-width: 45%; margin-top: 0; }
 .pool-line2 { display: flex; align-items: stretch; gap: 6px; margin-top: 4px; }
 /* The strip button — the row IS the roll (P1): quiet at rest, the gold
@@ -928,12 +942,18 @@ html, body {
   padding: 7px 4px 6px;
   border-radius: 8px;
   border: 1px solid var(--panel-border);
-  background: rgba(255, 255, 255, 0.05);
+  /* steel with a BODY (2i-D) — same machined recipe as the palette tiles
+     and the rim: gradient, top bevel, seat shadow */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 2px rgba(0, 0, 0, 0.35);
   color: var(--ivory);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.tile-stage:hover:not(:disabled) { border-color: rgba(243, 234, 215, 0.5); background: rgba(255, 255, 255, 0.1); }
+.tile-stage:hover:not(:disabled) {
+  border-color: rgba(243, 234, 215, 0.5);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.055));
+}
 .tile-stage:disabled { opacity: 0.5; cursor: default; }
 .tile-art { display: flex; align-items: center; gap: 3px; pointer-events: none; }
 .tile-art .die-art { width: 24px; height: 24px; }
