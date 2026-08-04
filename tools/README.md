@@ -26,3 +26,23 @@ Canned steps:
 
 Add new step files here (Apache header, like everything first-party) rather
 than writing one-off inline scripts — repeatable work belongs in the repo.
+
+## Contact sheets (2i-F)
+
+```bash
+node tools/contact-sheet.mjs            # stitch tools/out/ and each subdir
+node tools/contact-sheet.mjs <dir> …    # only the named dirs
+```
+
+Writes a `contact.html` captioned-thumbnail grid into every directory
+that holds PNGs (plus a top-level `tools/out/index.html`), so a drive
+run is reviewable at a glance and two runs are comparable. Regenerate
+freely — the sheets live inside the gitignored `out/` tree.
+
+## The chrome lab
+
+`/chrome-lab.html` (served by `node server.js`, any port) is the 2D
+counterpart to `lab.html`: it embeds the REAL app in an iframe and poses
+result-read states (staged draft, banners, peek, check/cinematic
+verdicts, held rolls) through `__diceDebug` — real CSS, real hovers,
+zero forked markup, so it cannot rot the way docs/mockups did.

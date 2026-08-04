@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<!--
+Copyright 2026 The Dice Table Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+<!--
+  THE CHROME LAB (2i-F, the Soul Deal audit). lab.html reviews 3D die
+  materials; this page reviews the 2D CHROME — the panel, the result
+  banner, the peek, the ceremony cards — side by side with itself in
+  every state that matters, so cross-surface drift is visible while you
+  work instead of in an after-the-fact still audit.
+
+  The shape is a POSE DRIVER: the REAL app runs in the iframe below and
+  the rail's buttons pose states through window.__diceDebug (the
+  supported headless surface) plus real DOM clicks. Real CSS, real
+  hovers (hover things yourself — nothing here fakes a pointer), zero
+  forked markup, so this page can never rot the way a static mockup does
+  (docs/mockups learned that the hard way). Upgrade path: direct-import
+  card builders once they extract from main.js.
+
+  Run:  node server.js   →   http://localhost:8123/chrome-lab.html
+  (Any port works; the lab drives only its OWN iframe/room.)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chrome Lab — Dice Table</title>
+<style>
+  :root { --bg: #101214; --ink: #e8e2d2; --mut: #99a1a9; --line: rgba(255,255,255,0.12); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font-family: system-ui, sans-serif; }
+  #lab { display: flex; height: 100%; }
+  #rail { width: 220px; flex: none; padding: 12px; border-right: 1px solid var(--line);
+    overflow-y: auto; }
+  #rail h1 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--mut); margin: 0 0 10px; }
+  #rail h2 { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--mut); margin: 14px 0 4px; }
+  #rail button { display: block; width: 100%; margin: 4px 0; padding: 7px 9px;
+    text-align: left; font-size: 12px; color: var(--ink); cursor: pointer;
+    border: 1px solid var(--line); border-radius: 7px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); }
+  #rail button:hover { border-color: rgba(255,255,255,0.32); }
+  #rail button:disabled { opacity: 0.4; cursor: default; filter: grayscale(0.7); }
+  #status { font-size: 11px; color: var(--mut); min-height: 28px; margin-top: 10px;
+    white-space: pre-wrap; }
+  #stage { flex: 1; min-width: 0; }
+  #app { width: 100%; height: 100%; border: 0; display: block; }
+  .hint { font-size: 10px; color: var(--mut); line-height: 1.4; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div id="lab">
+  <div id="rail">
+    <h1>Chrome lab</h1>
+    <div class="hint">The real app, posed. Hover the posed chrome yourself —
+      hovers here are real, never faked.</div>
+
+    <h2>Seat</h2>
+    <button data-pose="reset">Fresh seat (reload)</button>
+    <button data-pose="rack">Seed Soul Deal rack</button>
+    <button data-pose="lens-dnd">Lens: D&amp;D (totals)</button>
+    <button data-pose="lens-sd">Lens: Your Soul Deal</button>
+
+    <h2>Draft</h2>
+    <button data-pose="staged">Stage 3 pools</button>
+    <button data-pose="spent">Rolled draft (spent)</button>
+
+    <h2>Reveal read</h2>
+    <button data-pose="banner">Banner · 3-pool roll</button>
+    <button data-pose="banner-big">Banner · 5-pool stress</button>
+    <button data-pose="banner-solo">Banner · one-die hero</button>
+    <button data-pose="peek">Collect + peek</button>
+
+    <h2>Ceremony</h2>
+    <button data-pose="check">Check verdict</button>
+    <button data-pose="cine">Cinematic verdict</button>
+
+    <h2>Visibility</h2>
+    <button data-pose="held">Held roll (Reveal dress)</button>
+
+    <div id="status"></div>
+  </div>
+  <div id="stage"><iframe id="app" src="index.html" title="the app"></iframe></div>
+</div>
+
+<script type="module">
+  const frame = document.getElementById('app');
+  const status = document.getElementById('status');
+  const say = (m) => { status.textContent = m; };
+
+  const win = () => frame.contentWindow;
+  const doc = () => frame.contentDocument;
+  const dbg = () => win() && win().__diceDebug;
+
+  // Wait for a condition inside the live iframe (the app's own rAF clock
+  // runs — this lab never fakes time the way the headless harness does).
+  function until(fn, { timeout = 15000, every = 120, desc = 'condition' } = {}) {
+    return new Promise((resolve, reject) => {
+      const t0 = Date.now();
+      const tick = () => {
+        let v = null;
+        try { v = fn(); } catch { /* mid-navigation */ }
+        if (v) return resolve(v);
+        if (Date.now() - t0 > timeout) return reject(new Error(`timed out: ${desc}`));
+        setTimeout(tick, every);
+      };
+      tick();
+    });
+  }
+
+  const ready = () => until(() => dbg(), { desc: 'app boot' });
+
+  async function seedRack() {
+    await ready();
+    dbg().setGroups([
+      { name: 'Wisdom', notation: '2d8', category: 'Attributes' },
+      { name: 'Strength', notation: '1d6', category: 'Attributes' },
+      { name: 'Sword', notation: '1d10', category: 'Skills' },
+      { name: 'Peer Respect', notation: '1d6', category: 'Motivations' },
+    ]);
+    await until(() => doc().querySelectorAll('#groups-list .tile-stage').length >= 4,
+      { desc: 'rack rendered' });
+  }
+
+  function stageByName(name) {
+    const pools = dbg().groups;
+    const g = pools.find((p) => p.name === name);
+    if (!g) throw new Error(`no pool ${name}`);
+    doc().querySelector(`[data-group-id="${g.id}"] .tile-stage`).click();
+  }
+
+  async function stageThree() {
+    await seedRack();
+    stageByName('Wisdom');
+    stageByName('Sword');
+    stageByName('Peer Respect');
+  }
+
+  // A roll in a LIVE tab: fire it, let the real playback run, wait for the
+  // banner. (No sim() here — this rig reviews the real motion too.)
+  async function rollAndLand(notation) {
+    await ready();
+    dbg().commandRoll(notation);
+    await until(() => !doc().getElementById('result-banner').classList.contains('hidden'),
+      { desc: 'banner up', timeout: 20000 });
+  }
+
+  async function ceremony(notation) {
+    await seedRack();
+    dbg().commandRoll(notation);
+    await until(() => {
+      const st = dbg().ceremonyState || {};
+      return st.phase === 'done'
+        || (['declare', 'tumble', 'settle'].includes(st.phase) && (dbg().skipCeremony(), false));
+    }, { desc: 'verdict staged', timeout: 25000 });
+  }
+
+  const POSES = {
+    async reset() { frame.src = 'index.html'; await ready(); say('fresh seat.'); },
+    async rack() { await seedRack(); say('Soul Deal rack seeded (4 pools, 3 shelves).'); },
+    async 'lens-dnd'() { await ready(); dbg().setSystem('dnd'); say('lens: dnd — totals return.'); },
+    async 'lens-sd'() { await ready(); dbg().setSystem('soul-deal'); say('lens: Your Soul Deal.'); },
+    async staged() {
+      await stageThree();
+      say('3 pools staged. Hover the well, the ✕s, the rim tools.');
+    },
+    async spent() {
+      await stageThree();
+      doc().getElementById('tray-roll').click();
+      await until(() => dbg().trayState.spent, { desc: 'spent' });
+      say('the draft rolled and COOLED (2i-E). Edit it to re-warm.');
+    },
+    async banner() {
+      await rollAndLand('2d8[Wisdom] + 1d10[Sword] + 1d6[Peer Respect]');
+      say('the LEDGER read (2i-A): label spine, dice cells, quiet dashes. Hover the body (red) and the fold (REROLL).');
+    },
+    async 'banner-big'() {
+      await rollAndLand('2d8[Wisdom] + 1d10[Sword] + 1d6[Peer Respect] + 2d6[Sneak] + 1d4[Omen]');
+      say('the 5-pool stress roll — wrap inside a cell, never an orphan.');
+    },
+    async 'banner-solo'() {
+      await rollAndLand('1d8[Omen]');
+      say('one die, hero scale (2i-A oc-solo).');
+    },
+    async peek() {
+      await rollAndLand('2d8[Wisdom] + 1d10[Sword] + 1d6[Peer Respect]');
+      const rid = (dbg().currentRoll || {}).rollId; // the harness's own read
+      dbg().collectRoll(rid);
+      await until(() => dbg().shelf.length >= 1 && dbg().whiskingCount === 0,
+        { desc: 'shelved' });
+      dbg().peek(rid);
+      say('the peek wears the banner dress; identity wraps, never truncates.');
+    },
+    async check() {
+      await ceremony('2d8[Wisdom] + 1d10[Sword] check # Steady the Rope | crossing the gorge');
+      say('check verdict: ring folded under per-die, rows are the verdict, fold rests dim.');
+    },
+    async cine() {
+      await ceremony('1d10[Sword] + 1d6[Strength] cinematic # Leap of Faith | across the chasm');
+      say('cinematic verdict.');
+    },
+    async held() {
+      await ready();
+      dbg().commandRoll('2d8[Wisdom] + 1d10[Sword] held # A quiet stake');
+      await until(() => !doc().getElementById('result-banner').classList.contains('hidden'),
+        { desc: 'held banner', timeout: 20000 });
+      say('held roll: obsidian dice, the ONE Reveal dress (2i-C) standing.');
+    },
+  };
+
+  document.getElementById('rail').addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-pose]');
+    if (!b) return;
+    const pose = POSES[b.dataset.pose];
+    if (!pose) return;
+    b.disabled = true;
+    say('posing…');
+    try { await pose(); } catch (err) { say(`pose failed: ${err.message}`); }
+    b.disabled = false;
+  });
+
+  ready().then(() => say('app booted — pose away.'));
+</script>
+</body>
+</html>
