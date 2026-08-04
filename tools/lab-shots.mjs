@@ -60,8 +60,8 @@ try {
   // detail rows: the Level 1 craftsmanship close-ups (relief + digit glow)
   await page.eval(`window.__lab.setEnv('table')`);
   await sleep(150);
-  for (const id of ['emberforge.blackanvil', 'rimehold.deepglacier', 'rimehold.firstfrost',
-    'wildwood.heartwood', 'wildwood.mosstone', 'wildwood.sapamber', 'umbra.voidgrain',
+  for (const id of ['emberforge.blackanvil', 'rimehold.deepglacier', 
+    'wildwood.heartwood', 'wildwood.sapamber', 'umbra.voidgrain',
     'arcanum.focuscrystal', 'reliquary.scrimshaw', 'tidewrack.seaglass',
     'stormcall.boltglass', 'gildhall.oxblood']) {
     await page.eval(`window.__lab.zoomRow(${JSON.stringify(id)})`);
@@ -135,9 +135,9 @@ try {
   console.log('  (decals armed for review — they ship OFF by default)');
   const l4 = [
     ['emberforge.blackanvil', 'scorch + breathe glow'],
-    ['rimehold.firstfrost', 'hoarfrost crackle'],
+    [ 'hoarfrost crackle'],
     ['tidewrack.seaglass', 'drying rings + biolume'],
-    ['wildwood.mosstone', 'damp moss-print'],
+    ['damp moss-print'],
     ['stormcall.boltglass', 'charge flicker (no mark: glass leaves no residue)'],
     ['umbra.voidgrain', 'NEGATIVE light — Umbra pools shadow'],
     ['gildhall.oxblood', 'CONTROL: no mark, no glow, on purpose'],

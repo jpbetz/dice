@@ -976,7 +976,24 @@ same-day correction — the tray had switched staged foreign pools to
 the borrower's default; 'std' worlds pin std): what you saw is what
 you stage. Your own rack still stages unpinned, following you. What remains in §9 is art direction, not
 plumbing: the creative-brief experiments continue, and 9b pool icons
-stands as its own item. **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
+stands as its own item. **SLICE 0+1+2 SHIPPED (2026-08-04)** — deep aesthetic pass, judged
+workflow: turn-downs across nine themes (stormcall flicker light out,
+blackanvil neon digits halved, seaglass flashlight removed, umbra
+violet halo halved, arcanum breathing pulse cut, plus six more),
+retired eight cheap effects the critics named (heartwood firefly
+motes, seaglass Mario bubbles, scrimshaw dust puff, four
+proposed-but-unshipped screamers), retired two derivative sub-sets
+(`rimehold.firstfrost`, `wildwood.mosstone`), added THE CLASSICS
+house (8 unadorned matte variants incl. Vegas-pipped Ivory — the
+honest option every RPG dice bag has), added the `glyph` field (pips
+are the first family; roman + runes queue behind a glyph library),
+the `sound` field with 5-body impact voice replacing the single
+hard-coded click, and the `rate` field for per-set playback retiming
+(vine catch · glacial arrest · ceremonial hover). Full contract in
+docs/THEMES.md §0. Perf-guardrail: Slice 3 (rest cadence) waits on
+the S3 shelf-bloom fix (memory/perf-baseline.md).
+
+**Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
 natural AND supernatural — imagine what *faerie* dice, *dryadic* dice,
 *wizard* dice, *warrior* dice might look like. Special effects and strong
 themes **merged subtly into the dice themselves** — theme lives in

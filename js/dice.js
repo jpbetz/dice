@@ -266,8 +266,15 @@ function makeFaceTexture(def, face, spec) {
 // The digit pass, extracted so every baked CHANNEL can reuse it in its own
 // color: the color map paints def.text, an emissiveMap paints white (the
 // material's emissive color tints it), a height sketch paints grey at the
-// engrave depth. Layout identical in all channels by construction.
+// engrave depth. Layout identical in all channels by construction. A set
+// may set spec.glyph='pip' (via def.glyph — see classics.ivorypips) —
+// d6 draws canonical Vegas pips instead of digits; other die types fall
+// back to digits since pips are the traditional d6 idiom only.
 function paintDigits(ctx, face, spec, color) {
+  if (spec.glyph === 'pip' && spec.value >= 1 && spec.value <= 6 && !spec.corners) {
+    paintPips(ctx, face, spec, color);
+    return;
+  }
   const { center, r } = inradius2d(face);
   const rPx = r * face.pxScale;
   if (spec.corners) {
@@ -280,6 +287,44 @@ function paintDigits(ctx, face, spec, color) {
   } else {
     const fontPx = rPx * (spec.text.length > 1 ? 1.05 : 1.4);
     drawLabel(ctx, face, spec.text, center, spec.upDir, fontPx, color, spec.underline);
+  }
+}
+
+// Vegas-standard d6 pip layouts, in units of inscribed-radius:
+//   1  center
+//   2  top-left + bottom-right diagonal
+//   3  top-left + center + bottom-right
+//   4  four corners
+//   5  four corners + center
+//   6  two columns of three
+// Same drawLabel projection so the pips ride the face UV correctly, and
+// same `color` argument so every baked channel (color map, emissiveMap,
+// relief height) draws pips in its own tone — layout identical by
+// construction (the digit-glow / relief coupling already assumes this).
+const PIP_OFFSETS = [
+  null, // no 0
+  [[0, 0]],
+  [[-0.44, -0.44], [0.44, 0.44]],
+  [[-0.44, -0.44], [0, 0], [0.44, 0.44]],
+  [[-0.44, -0.44], [0.44, -0.44], [-0.44, 0.44], [0.44, 0.44]],
+  [[-0.44, -0.44], [0.44, -0.44], [0, 0], [-0.44, 0.44], [0.44, 0.44]],
+  [[-0.44, -0.44], [0.44, -0.44], [-0.44, 0], [0.44, 0], [-0.44, 0.44], [0.44, 0.44]],
+];
+function paintPips(ctx, face, spec, color) {
+  const { center, r } = inradius2d(face);
+  const rPx = r * face.pxScale;
+  const pipR = rPx * 0.13; // Vegas-precision pip: ~13% of inscribed radius
+  const layout = PIP_OFFSETS[spec.value];
+  if (!layout) return;
+  for (const [ox, oy] of layout) {
+    const pos = new THREE.Vector2(center.x + ox * r, center.y + oy * r);
+    const [px, py] = canvasPoint(face, pos);
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(px, py, pipR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 }
 
@@ -894,6 +939,12 @@ function buildDie(type, variant = 'std') {
     faces.forEach((f) => { f.value = null; });
   } else {
     const specs = faceSpecs(type, faces);
+    // Glyph family (Joe 2026-08-04): the classics.ivorypips set carries
+    // glyph='pip' so its d6 renders Vegas pips; on any other die type the
+    // pip renderer falls back to digits (pips are the traditional d6
+    // idiom only). Decorate here so all three paint channels (color,
+    // digit-glow emissive, relief engrave) see the same dispatch.
+    if (skin.glyph) for (const s of specs) s.glyph = skin.glyph;
     materials = faces.map((f, i) =>
       shroud ? materialFor(skin, f, { blank: true }, true)
         : materialFor(skin, f, specs[i], false, faceSeed(type, i))

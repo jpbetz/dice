@@ -1,5 +1,91 @@
 # Themed Dice — the taxonomy (Tier 6 §9)
 
+*Latest: 2026-08-04 aesthetic pass (Slice 0+1+2). See §0 below.*
+
+## §0 — The 2026-08-04 aesthetic pass (slice 0+1+2)
+
+Joe: "look for tacky and cheap effects, or overdone effects. Each
+effect should be subtle and tasteful and combine to produce a
+consistent atmosphere and feel. Try to expand the language used…
+combinations of subtle effects instead of one super turned up effect."
+Ran as a judged workflow (audit × 3 · vocabulary × 4 · redesign ·
+critique × 3). Landed as three slices in one commit:
+
+**Slice 0 — turn-downs, retirements, new house.**
+- The audit's cheap-reads: boltglass parented flicker light REMOVED
+  (was Joe's own "always-drawing-eye" pattern); seaglass parented
+  light REMOVED, iridescence 0.55→0.15; blackanvil digitGlow
+  1.35→0.7, flow.gain 2.6→1.4, shimmer 1.5→0.7, light 16→10;
+  voidgrain fresnel 1.1→0.45 and light range 4.8→2.5; arcanum shader
+  pulse REMOVED, light range 5→2, fresnel 0.45→0.3; deepglacier
+  fresnel 0.75→0.55; sapamber clearcoat 0.85→0.55.
+- Retired the eight "cut-before-shipping" effects the critics agreed
+  on: heartwood firefly motes (Pinterest cliché), seaglass bubble
+  particles (aquarium-decor "die farts bubbles"), scrimshaw dust
+  particles ("old = dust" is the medium's oldest cliché); the four
+  proposed-but-not-shipped additions (arcanum rune-charge digit
+  cursor, oxblood arrival lacquer bloom, blackanvil hit-punch on
+  every landing, boltglass white-hot flash) never got added.
+- Retired two derivative sub-sets: `rimehold.firstfrost`
+  ("deepglacier at brightness+1") and `wildwood.mosstone`
+  ("heartwood at 0.5") — the workflow's redesign couldn't
+  differentiate them without inflating the primitive count.
+- Added THE CLASSICS house (Joe: "I'm personally a bit bummed we
+  don't have simple things like basic color die sets"): 8 unadorned
+  variants — Ivory, Ivory (pips), Onyx, Slate, Crimson, Cobalt,
+  Emerald, Brass. Palette + matte material only. No particles, no
+  lights, no post, no shaders, no glow, no wear. The honest option —
+  the civilian house — the control against which themed sets read as
+  themes. Ships at the TOP of the picker.
+
+**Slice 0.5 — the `glyph` field.** First glyph-family variation:
+`glyph: 'pip'` on `classics.ivorypips` draws canonical Vegas d6 pips
+(1 center · 2 corners · 3 diagonal · 4 corners · 5 corners+center · 6
+two columns of three). Other die types fall back to digits — pips are
+the traditional d6 idiom only. Roman numerals and rune-glyph sets are
+a later slice (need legibility work + a glyph library).
+
+**Slice 1 — the `sound` field: IMPACT VOICE.** The single hard-coded
+click (bandpass over white noise, 45ms) becomes five bodies: `chime`
+(glass/crystal — bandpass + decaying sine partial), `thud`
+(iron/stone — lowpass, long tail), `crackle` (storm charge — sharp
+attack), `clack` (dry bone/lacquer — narrow bandpass), `hush` (umbra
+— barely-audible filtered breath). Every themed set carries a
+`sound: {body, weight, sustain}`; Classics use the default click.
+Weight 0..1 shifts frequency down (heavier = lower); sustain ms
+extends the tail. On the mixed-pool wire, every recorded contact
+knows which die hit — so an iron die THUDS while its glass companion
+CHIMES in the same roll (§9 mixed pools carried through).
+
+**Slice 2 — the `rate` field: PLAYBACK RETIMING.** A per-set curve
+retimes the LAST `window` fraction of the roll's playback to `rate`
+playback speed. Physics untouched; face correction untouched — pure
+playback-clock scaling like cinematic slow-mo. Three sets earn a
+curve today: `heartwood` (vine catch, last 15% → 0.55× — the forest
+cushions), `deepglacier` (glacial arrest, last 25% → 0.4× — cold
+arrests motion), `oxblood` (ceremonial hover, last 30% → 0.65× —
+state moves slowly). Set-identity for a mixed pool is undefined
+(heartwood cannot cushion just half a pool) — mixed rolls ride the
+default cadence, same rule as singular-set gating for spawn.
+
+**What lands next (from the workflow's ship-order):** Slice 3 — the
+`rest` cadence hook (settled dice breathe/creak/settle-tick per set,
+sapamber explicitly held at zero as identity). Requires the S3 perf
+finding to land first (shelf-bloom leak — see memory/perf-baseline).
+Slice 4+ (arrival/departure beats, env-light-shift, mass rumble
+tail, geo.wear → digit-map coupling) queued behind that.
+
+**Roster after the pass:** 10 houses, 17 sets. Classics (8) leads;
+the themed houses hold 1-2 sets each (Wildwood keeps heartwood +
+sapamber as its two poles: living and preserved). The full workflow
+output — audits, vocabulary explorations, per-theme stacks, critique
+rounds — lives in the session transcript.
+
+---
+
+# The taxonomy (original brief)
+
+
 Joe's brief (2026-08-03): *cool-looking dice of different materials and
 types, natural AND supernatural — faerie dice, dryadic dice, wizard dice,
 warrior dice. Special effects and strong themes merged subtly into the

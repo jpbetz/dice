@@ -512,7 +512,34 @@ function rollSetOf(opts) {
 }
 let lastSoundAt = 0;
 
-function playClick(strength) {
+// IMPACT VOICE (Slice 1, Joe 2026-08-04 aesthetic pass): the per-set
+// sound identity — one function replaces the single hard-coded click
+// with five voices (chime / thud / crackle / clack / hush) modulated by
+// weight (heavier = lower + longer) and sustain (ms of tail). Sets
+// without a `sound` recipe field fall back to the legacy click, so the
+// Classics house — the "just dice" honest option — keeps the original
+// tone and every non-themed roll stays exactly as it sounded before.
+//
+// The bodies are shaped to sound like the material they claim:
+//   click   default — the original 45ms filtered white noise
+//   chime   glass/crystal — bright bandpass + a decaying sine partial
+//   thud    heavy iron/stone — lowpass, long noise tail
+//   crackle storm charge — sharp attack, jagged mid-noise
+//   clack   dry bone/lacquered wood — narrow bandpass, brief
+//   hush    umbra — barely-audible filtered breath (subtracted click)
+// Weight 0..1 shifts the center frequency down; sustain ms extends the
+// decay envelope. Every voice reads on top of the impact strength gain,
+// so a heavy die still needs a hard contact to be loud.
+const IMPACT_VOICES = {
+  click:   { filter: 'bandpass', baseFreq: 2500, freqSpread: 1800, q: 1.2, decayShape: 0.25, gainScale: 0.06 },
+  chime:   { filter: 'bandpass', baseFreq: 3400, freqSpread:  700, q: 2.8, decayShape: 0.42, gainScale: 0.045, partial: true },
+  thud:    { filter: 'lowpass',  baseFreq:  420, freqSpread:  200, q: 1.4, decayShape: 0.15, gainScale: 0.075 },
+  crackle: { filter: 'bandpass', baseFreq: 2200, freqSpread: 1400, q: 0.8, decayShape: 0.10, gainScale: 0.06 },
+  clack:   { filter: 'bandpass', baseFreq: 1150, freqSpread:  400, q: 2.2, decayShape: 0.22, gainScale: 0.055 },
+  hush:    { filter: 'lowpass',  baseFreq:  700, freqSpread:  200, q: 0.9, decayShape: 0.35, gainScale: 0.018 },
+};
+
+function playImpact(strength, voice) {
   if (!soundOn) return;
   const now = performance.now();
   if (now - lastSoundAt < 35) return;
@@ -520,23 +547,52 @@ function playClick(strength) {
   if (!audioCtx) {
     try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
   }
-  const dur = 0.045;
-  const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * dur, audioCtx.sampleRate);
+  const v = voice || null;
+  const body = (v && IMPACT_VOICES[v.body]) ? v.body : 'click';
+  const preset = IMPACT_VOICES[body];
+  const weight = v ? Math.max(0, Math.min(1, v.weight || 0)) : 0;
+  const sustainMs = v ? Math.max(0, v.sustain || 0) : 0;
+  const durSec = (45 + sustainMs) / 1000;
+  const buf = audioCtx.createBuffer(1, Math.max(1, Math.floor(audioCtx.sampleRate * durSec)), audioCtx.sampleRate);
   const data = buf.getChannelData(0);
+  // Envelope: exponential decay whose steepness comes from decayShape.
+  // A brief attack transient sharpens crackle without pinning peak gain.
   for (let i = 0; i < data.length; i++) {
-    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (data.length * 0.25));
+    let s = (Math.random() * 2 - 1) * Math.exp(-i / (data.length * preset.decayShape));
+    if (body === 'crackle' && i < 40) s *= 1.6; // sharp attack transient
+    data[i] = s;
   }
   const src = audioCtx.createBufferSource();
   src.buffer = buf;
   const filter = audioCtx.createBiquadFilter();
-  filter.type = 'bandpass';
-  filter.frequency.value = 1600 + Math.random() * 1800;
-  filter.Q.value = 1.2;
+  filter.type = preset.filter;
+  // Heavier = lower center; the spread is randomized per hit for texture.
+  const freqDown = 1 - 0.5 * weight;
+  filter.frequency.value = Math.max(80, (preset.baseFreq + Math.random() * preset.freqSpread) * freqDown);
+  filter.Q.value = preset.q;
   const gain = audioCtx.createGain();
-  gain.gain.value = Math.min(0.35, strength * 0.06);
+  gain.gain.value = Math.min(0.35, strength * preset.gainScale);
   src.connect(filter).connect(gain).connect(audioCtx.destination);
   src.start();
+  // Chime bodies (glass, crystal, sealed resin) layer a decaying sine
+  // partial ~an octave below the filter center — the resonance that
+  // separates "glass rings" from "wood knocks" without recording samples.
+  if (preset.partial) {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = filter.frequency.value * 0.55;
+    const oscGain = audioCtx.createGain();
+    const startAt = audioCtx.currentTime;
+    oscGain.gain.setValueAtTime(gain.gain.value * 0.4, startAt);
+    oscGain.gain.exponentialRampToValueAtTime(0.0005, startAt + durSec);
+    osc.connect(oscGain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(startAt + durSec);
+  }
 }
+// Back-compat alias — every legacy call site still passes just strength;
+// the drain in stepPlayback below is the one that resolves the voice.
+function playClick(strength) { playImpact(strength, null); }
 
 // ---------------------------------------------------------------------------
 // Roll engine: simulate-ahead + keyframe playback + face correction
@@ -632,6 +688,26 @@ function entryDieSet(entry, i) {
 function dieVariant(shrouded, set) {
   if (shrouded) return 'shroud';
   return set && SETS[set] ? set : 'std';
+}
+
+// The RATE GRAPH is set-identity, and set-identity for a mixed pool is
+// undefined (heartwood cushions the fall — but a heartwood die tumbling
+// beside a boltglass die cannot cushion just half the pool). Same rule
+// as the singular vs per-die `set` field: only a uniformly-overridden
+// roll wins its set's rate curve; anything mixed rides the default
+// cadence. Shrouded rolls never do — obsidian has no identity to
+// broadcast, and playback stays exactly what it was pre-slice.
+function uniformRollRate(roll) {
+  if (!roll || !roll.dice || !roll.dice.length) return null;
+  if (roll.dice[0].shrouded) return null;
+  const first = rollDieSet(roll, 0);
+  if (!first) return null;
+  for (let i = 1; i < roll.dice.length; i++) {
+    if (rollDieSet(roll, i) !== first) return null;
+  }
+  const set = SETS[first];
+  return set && set.rate && typeof set.rate.rate === 'number' && typeof set.rate.window === 'number'
+    ? set.rate : null;
 }
 
 function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
@@ -1915,6 +1991,27 @@ function stepPlayback(dt) {
         + (1 - CEREMONY_SLOWMO_RATE) * (remaining / CEREMONY_SLOWMO_WINDOW));
     }
   }
+  // RATE GRAPH (Slice 2, Joe 2026-08-04): a per-set retiming curve for
+  // the LAST `window` fraction of the roll. Same seat as cinematic
+  // slow-mo — pure playback-clock scaling, physics untouched, face
+  // correction untouched. The die decelerates into its final pose so
+  // "living wood cushions the fall" (heartwood: vine-catch), "cold
+  // arrests motion" (deepglacier: glacial), "state moves slowly"
+  // (oxblood: ceremonial) read AS MOTION — not just as material.
+  //
+  // Mixed pools: use the roll's OWN dice — if every die shares one set,
+  // that set's rate wins; a mixed roll rides the default cadence (a
+  // rate curve is set-identity, and a mixed pool has none). This is the
+  // same "uniformly overridden" rule that gated singular vs per-die set
+  // decisions elsewhere in the file.
+  const rate = uniformRollRate(roll);
+  if (rate && roll.duration > 0) {
+    const remainingFrac = 1 - roll.time / roll.duration;
+    if (remainingFrac > 0 && remainingFrac < rate.window) {
+      const t = remainingFrac / rate.window; // 0 at settle, 1 at window entry
+      step *= rate.rate + (1 - rate.rate) * t;
+    }
+  }
   roll.time += step;
 
   const last = roll.frames - 1;
@@ -1938,12 +2035,16 @@ function stepPlayback(dt) {
   while (roll.soundIdx < roll.sounds.length && roll.sounds[roll.soundIdx].time <= roll.time) {
     const sIdx = roll.soundIdx;
     const s = roll.sounds[roll.soundIdx++];
-    playClick(s.strength);
     // Effects resolve per SOUND now (§9 mixed pools): each recorded contact
     // knows which die hit (s.di), so an iron die sparks while its glass
     // companion doesn't — in the same roll.
     const ds = rollShrouded ? null : rollDieSet(roll, s.di);
     const fxSet = ds && SETS[ds] ? SETS[ds] : null;
+    // IMPACT VOICE (Slice 1): a set may declare a per-impact voice that
+    // replaces the default click. A shrouded roll stays silent on
+    // identity — obsidian rings like the legacy click (fxSet is null for
+    // shrouded above, so voice falls back to the default).
+    playImpact(s.strength, fxSet && fxSet.sound ? fxSet.sound : null);
     if (fxSet && fxSet.particles && s.at) particleField.burst(fxSet.particles, s.at, s.strength);
     // Marks want floor contacts with real force, and only so many per
     // roll — the felt remembers the landing, not every tremble.
