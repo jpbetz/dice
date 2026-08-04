@@ -2984,4 +2984,67 @@ export const scenarios = [
       assert.equal(good.data.roll.set, 'umbra.voidgrain', 'the set rides the entry');
     },
   },
+  {
+    name: 'themed-fx',
+    tags: ['themes'],
+    // Ladder Level 4 (felt decals + die lights): a lit set's roll marks
+    // the felt and glows on EVERY screen; the 4-light budget holds; a
+    // collect puts the flame out (the shelf is the archive); a shrouded
+    // roll marks and casts NOTHING (obsidian sheds no identity) — and the
+    // reveal ignites the set's glow.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.eval(`window.__diceDebug.setDiceSet('emberforge.blackanvil')`);
+      await a.roll('3d6 # slam');
+      await a.settle();
+      await b.settle();
+      await b.waitFor(`document.getElementById('log-list').childElementCount >= 1`, { desc: 'roll reaches tab B' });
+      for (const [tab, who] of [[a, 'A'], [b, 'B']]) {
+        const fx = JSON.parse(await tab.eval(`JSON.stringify(window.__diceDebug.fxInfo())`));
+        assert.equal(fx.lights.length, 3, `all three anvil dice glow on ${who} (got ${fx.lights.length})`);
+        assert.ok(fx.lights.every((l) => l.mode === 'breathe'), `${who}: the anvil breathes`);
+        // stamped (ever), not live count: settle()'s sim() clock runs
+        // simulated SECONDS, long enough for a live mark to fade honestly
+        assert.ok(fx.stamped > 0, `${who}: the landing scorched the felt`);
+      }
+
+      // Six lit dice into a pool of four: the budget holds (newest win).
+      await a.roll('6d6 # budget');
+      await a.settle();
+      const fx2 = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.fxInfo())`));
+      assert.equal(fx2.lights.length, 4, 'the light budget caps at four');
+
+      // Collect the roll: the shelf is the archive — the flame goes out.
+      const rid = await a.rollId();
+      await a.eval(`window.__diceDebug.collectRoll(${JSON.stringify(rid)})`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), window.__diceDebug.fxInfo().lights.length === 0)`,
+        { desc: 'collect puts the flames out' },
+      );
+
+      // A held roll wears obsidian: no glow, no new marks, on any screen.
+      // (Quiesce B first: its budget-roll playback still queues stamps of
+      // its own, and the baseline must be read from an idle table.)
+      await b.settle();
+      const marksBefore = {};
+      for (const [tab, who] of [[a, 'A'], [b, 'B']]) {
+        marksBefore[who] = JSON.parse(await tab.eval(`JSON.stringify(window.__diceDebug.fxInfo())`)).stamped;
+      }
+      await a.roll('d20 held');
+      const hid = await a.rollId();
+      for (const [tab, who] of [[a, 'A'], [b, 'B']]) {
+        await tab.waitFor(shroudSettled(hid), { desc: `held roll settles for ${who}` });
+        const fx = JSON.parse(await tab.eval(`JSON.stringify(window.__diceDebug.fxInfo())`));
+        assert.equal(fx.lights.length, 0, `${who}: a shrouded roll casts nothing`);
+        assert.equal(fx.stamped, marksBefore[who], `${who}: a shrouded roll marks nothing new`);
+      }
+
+      // The reveal restores the set — and ignites its glow.
+      await a.eval(`window.__diceDebug.reveal(${JSON.stringify(hid)})`);
+      await a.waitFor(revealSettled(hid), { desc: 'reveal lands on A' });
+      const fx3 = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.fxInfo())`));
+      assert.equal(fx3.lights.length, 1, 'the reveal ignites the anvil glow');
+    },
+  },
 ];

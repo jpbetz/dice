@@ -29,6 +29,8 @@ import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { exportYaml, parsePortable, planImport } from './portable.js';
 import { THEMES, SETS } from './themes.js';
 import { ParticleField } from './particles.js';
+import { DecalField } from './decals.js';
+import { DieLightRig } from './dielights.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -120,6 +122,20 @@ scene.add(rimLight);
 // fast-forward already records for the click sounds (never on a timer).
 const particleField = new ParticleField(scene);
 particleField.setProjection(window.innerHeight, camera.fov);
+
+// Level 4 on the live table. Decals: transient marks stamped from the
+// same recorded impacts (floor-height ones only — walls don't scorch),
+// living just above the felt plane. Lights: four pooled PointLights that
+// exist from boot at intensity zero — three.js recompiles every lit
+// program when the light COUNT changes, and a recompile stutter
+// mid-tumble is worse than any glow is good. Budget of 4 is also the
+// restraint: the newest throw steals from the oldest.
+const decalField = new DecalField(scene);
+const dieLights = new DieLightRig(scene, { max: 4 });
+const DECAL_Y = 0.021;            // marks sit a hair above the felt plane
+const DECAL_MIN_STRENGTH = 6;     // a mark needs a real hit, not a settling tremble
+const DECAL_MAX_CONTACT_Y = 0.6;  // floor contacts only: a wall click leaves no felt mark
+const DECAL_CAP_PER_ROLL = 6;     // drama, not mud
 
 // felt table surface — room-selectable themes (roadmap §2). Each theme pairs
 // the felt base color with a scene background. 'emerald' is the original look
@@ -591,6 +607,7 @@ function resetTableSurface() {
     world.removeBody(d.body);
     scene.remove(d.mesh);
   }
+  dieLights.releaseAll(); // the sweep takes every glow with it
   tableDice = [];
   chips.length = 0;
   chipsLayer.innerHTML = '';
@@ -658,6 +675,7 @@ function removeRollDice(rollId) {
   }
   for (const d of going) {
     world.removeBody(d.body);
+    dieLights.release(d.mesh); // a departing die takes its glow with it
     sinking.push({ mesh: d.mesh, chip: d.chipEl || null, t: 0, y0: d.mesh.position.y });
   }
   return true;
@@ -882,6 +900,10 @@ function placeCluster(c, animate) {
   // exactly when the player is looking at the shelf.
   if (!c.glow) c.glow = !(animate && dice.some((d) => !d.shelfSpawn));
   dice.forEach((d, i) => {
+    // The shelf is the archive: lights live on FELT dice only, so a
+    // collect puts the flame out (release is a no-op for unlit dice —
+    // reflows and reconstructions pass through here too).
+    dieLights.release(d.mesh);
     const { pos, quat } = poses[i];
     d.body.position.set(pos.x, pos.y, pos.z);
     d.body.quaternion.set(quat.x, quat.y, quat.z, quat.w);
@@ -1573,6 +1595,16 @@ function playRoll(roll) {
   }
   tableDice.push(...dice);
 
+  // Level 4b: a lit set's dice carry their glow from the throw. Shroud
+  // outranks identity (an obsidian die casts nothing), and the phases use
+  // their OWN seeded stream — every client flickers identically without
+  // perturbing the throw physics' draws.
+  const lightRecipe = !shrouded && roll.set && SETS[roll.set] ? SETS[roll.set].light : null;
+  if (lightRecipe) {
+    const lightRng = mulberry32((roll.seed ^ 0x9e3779b9) >>> 0);
+    for (const d of dice) dieLights.attach(d.mesh, lightRecipe, lightRng);
+  }
+
   // --- synchronous fast-forward, recording keyframes + sound events -------
   const sounds = []; // {time, strength}
   let simTime = 0;
@@ -1720,6 +1752,7 @@ function playRoll(roll) {
     duration: (keyframes[0].length - 1) * FIXED_DT,
     time: 0,
     soundIdx: 0,
+    decalsStamped: 0, // Level 4a per-roll cap counter (the drain reads it)
     ceremony: null,
     done: false,
   };
@@ -1814,14 +1847,23 @@ function stepPlayback(dt) {
   });
 
   // Impact drain: sounds and (for a themed roll) the set's particle bursts
-  // ride the same recorded events — same moment, same point, same strength.
-  // A shrouded roll stays silent on identity: obsidian sheds nothing.
+  // and felt marks ride the same recorded events — same moment, same
+  // point, same strength. A shrouded roll stays silent on identity:
+  // obsidian sheds nothing, marks nothing, casts nothing.
   const rollShrouded = roll.dice.length > 0 && roll.dice[0].shrouded === true;
-  const burstRecipe = !rollShrouded && roll.set && SETS[roll.set] ? SETS[roll.set].particles : null;
+  const fxSet = !rollShrouded && roll.set && SETS[roll.set] ? SETS[roll.set] : null;
+  const burstRecipe = fxSet ? fxSet.particles : null;
+  const decalRecipe = fxSet ? fxSet.decal : null;
   while (roll.soundIdx < roll.sounds.length && roll.sounds[roll.soundIdx].time <= roll.time) {
     const s = roll.sounds[roll.soundIdx++];
     playClick(s.strength);
     if (burstRecipe && s.at) particleField.burst(burstRecipe, s.at, s.strength);
+    // Marks want floor contacts with real force, and only so many per
+    // roll — the felt remembers the landing, not every tremble.
+    if (decalRecipe && s.at && s.at[1] < DECAL_MAX_CONTACT_Y
+      && s.strength >= DECAL_MIN_STRENGTH && roll.decalsStamped < DECAL_CAP_PER_ROLL) {
+      roll.decalsStamped += decalField.stamp(decalRecipe, [s.at[0], DECAL_Y, s.at[2]], s.strength);
+    }
   }
 
   if (roll.time >= roll.duration) {
@@ -2675,6 +2717,12 @@ function refreshRevealSurfaces(rollId) {
 function beginRevealFlip(rollId, entry) {
   const dice = tableDice.filter((d) => d.rollId === rollId);
   const up = new THREE.Vector3(0, 1, 0);
+  // A felt reveal restores the set's LIGHT too (the shroud had smothered
+  // it); phases seed off the rollId so every client flickers alike.
+  const lightRecipe = entry.set && SETS[entry.set] ? SETS[entry.set].light : null;
+  let seed = 5381;
+  if (lightRecipe) for (const ch of rollId) seed = ((seed * 33) ^ ch.charCodeAt(0)) >>> 0;
+  const lightRng = lightRecipe ? mulberry32(seed) : null;
   let started = false;
   dice.forEach((d, i) => {
     if (!d.shrouded) return;
@@ -2685,6 +2733,7 @@ function beginRevealFlip(rollId, entry) {
     d.mesh.geometry = die.geometry;
     d.mesh.material = die.materials;
     d.variant = dieVariant(false, entry.set);
+    if (lightRecipe) dieLights.attach(d.mesh, lightRecipe, lightRng);
     const p = entry.parts[i];
     const value = p && p.value != null ? p.value : null;
     const q = d.body.quaternion;
@@ -3440,6 +3489,8 @@ function tick(dt, render = true) {
   // everything else (holdClock freezes both — deterministic screenshots).
   SHADER_TIME.value += dt;
   particleField.tick(dt, SHADER_TIME.value);
+  decalField.tick(dt);
+  dieLights.tick(dt, SHADER_TIME.value);
   stepPlayback(dt);
   stepSinking(dt);   // per-roll Done departures (§7.5)
   stepWhisking(dt);  // collect whisks onto the shelf (§7.7)
@@ -3703,6 +3754,11 @@ window.__diceDebug = {
       variant: d.variant || (d.shrouded ? 'shroud' : 'std'),
       rollId: d.rollId || null,
     }));
+  },
+  // Level 4 assertion surface: live felt marks, marks ever laid (the
+  // sim() clock can age live ones out mid-test), + attached die-lights.
+  fxInfo() {
+    return { decals: decalField.count(), stamped: decalField.stampedTotal, lights: dieLights.info() };
   },
   // roll outlines (the card-hover read): shell colors, in die order
   get outlineState() { return outlined.map((o) => `#${o.shell.material.color.getHexString()}`); },

@@ -284,10 +284,57 @@ leverage order for this zero-dep codebase:
    Mosstone > Sea-glass 1.069 (decades in the surf). `__lab.geoStats()`
    asserts the ordering headlessly.
 4. **The environment joins the theme** — felt decals from the landing
-   point (frost crackle, droplet rings, scorch; the mat-text decal
-   machinery is the seam) and a colored light PARENTED to the die (a
-   biolume die casts teal on its patch of felt; Umbra pools local
-   shadow instead of dimming the world).
+   point and a colored light PARENTED to the die (a biolume die casts
+   teal on its patch of felt; Umbra pools local shadow instead of
+   dimming the world). **← SHIPPED 2026-08-03.** Two modules, both
+   impact-honest like Level 3:
+   - `js/decals.js` (DecalField): transient marks the felt keeps for a
+     few seconds after a measured floor contact. NOT the mat-text felt
+     composite (that texture is event-driven; animating it would
+     re-upload 16 MB a frame) — one instanced quad draw just above the
+     felt plane, fixed pool of 64, dead slots collapse to degenerate
+     quads. The procedural atlas is TWO-TONE: R channel picks between
+     the recipe's two colors, A is coverage — one shared atlas serves
+     soot-dark scorch and frost-pale bloom alike. CPU envelopes (grow,
+     hold, fade; scorch's ember rim COOLS to soot over the first 2 s).
+     Kinds, each a claim about what the die DID to the table: `frost`
+     (cold spreads — hoarfrost needles, not a snowflake), `ring` (water
+     dries to a wobbling tide-line + dark wet disc), `scorch` (heat
+     kisses: soot core, ember rim), `smudge` (dust settles — the grains
+     carry the read, not the wash). Per-kind `minGap` suppresses a
+     fresh same-kind stamp landing on top of one younger than 1.2 s —
+     a die bouncing in place deepens ONE mark, it doesn't pile donuts
+     (rings keep a small gap on purpose: overlapping tide-lines read
+     true). Marks are transient BY CONTRACT: reload/replay never
+     reconstructs them (replaySettledRoll's silent landing skips the
+     drain), and the felt always recovers.
+   - `js/dielights.js` (DieLightRig): a PointLight at the die's CENTER
+     — no shadow casting, so the glow passes through the body and pools
+     on the felt beneath: lit from within, which is the claim every
+     glowing set makes. The pool is FIXED SIZE and lives in the scene
+     from boot at intensity 0, because three.js recompiles every lit
+     program when the light COUNT changes and a recompile stutter
+     mid-tumble is worse than any glow is good; attach/steal only ever
+     touch uniforms. Budget of 4 doubles as restraint; a full pool
+     steals from the OLDEST attachment (the fresh throw is where the
+     eyes are). Envelope modes: `wave` (biolume, tidal), `breathe`
+     (molten iron), `flicker` (charge seeking a path — stepped value
+     noise), `steady` (containment hum) — and NEGATIVE intensity for
+     Umbra: white light at −8 subtracts evenly, which is exactly what
+     a shadow does. Phases are seeded (roll.seed ⊕ constant, or a
+     rollId hash at reveal) so every client flickers identically.
+   Recipes per set (`decal:` / `light:` in themes.js), with restraint:
+   six sets mark the felt, five glow (Umbra darkly); Oxblood, Sap
+   Amber, Heartwood and Focus-crystal leave the table untouched on
+   purpose — and Bolt-glass marks nothing because glass leaves no
+   residue; the LIGHT is its mark. Lights live on FELT dice only: a
+   collect puts the flame out (placeCluster releases), a reveal ignites
+   it (beginRevealFlip attaches), a shroud smothers it from the start,
+   and the rig self-heals any mesh that left the scene by a path that
+   forgot to call release. Testing lesson: `sim()` runs simulated
+   SECONDS, long enough for a live mark to fade honestly mid-test — so
+   the assertion surface is `stampedTotal` (monotonic marks-ever-laid,
+   via `__diceDebug.fxInfo()`), never the live count.
 5. **Hand-rolled postprocessing** — selective bloom, shock rings, heat
    shimmer (~150 lines each, no examples/jsm). Ranked LAST on purpose:
    it amplifies identity the other levels create, it creates none.
@@ -303,6 +350,22 @@ theme × every die type in one grid, idle-rotation toggle, per-theme
 effect trigger buttons, a ⬇ drop button per set (the Level 3 rig — a
 real physics die whose measured contacts fire the set's bursts; sets
 without particles prove the restraint), and one-click PNG capture.
+
+For Level 4 the drop rig grew table furniture: a COUPON of felt fades in
+under the die (marks and glow act on a table; the rig floats over a
+void — the coupon is deliberately brighter than the table's felt, since
+the lab's lights are a fraction of the table's), rails at the coupon's
+edges (a tumbling die converts spin to lateral walk and drifts off an
+unfenced floor — the rails hug the dropView frustum so a pinned die
+still shows), a post-settle linger of 3.5 s (Level 4's point is the mark
+that REMAINS; the old 900 ms cleanup suited Level 3's fast-dying bursts
+and swept the felt before a mark could be seen), and `dropView(id)` — a
+~57°-down framing, because the zoom view reads the felt edge-on, which
+is exactly the angle a flat decal vanishes at. Diagnostics: `stamps` in
+dropState, `decalCount/decalDump`, `lightInfo`, and `sampleWorld(p)` —
+average framebuffer RGB around a projected world point, which settled
+"is that mark pale or dark" with numbers when review-distance eyeballs
+couldn't (answer: pale, +8 RGB — the dark blobs were something else).
 
 ## On the main table (shipped 2026-08-03)
 
@@ -326,6 +389,18 @@ must be added to all three or it silently vanishes (set was dropped by
 the first two on the first pass). 2D chrome (tray, pool tiles, log die
 chips) deliberately stays std for now — 9b pool icons is the natural
 home for that pass.
+
+Level 4 rides the same seams (shipped 2026-08-03): the impact drain in
+stepPlayback stamps `decal` recipes from the recorded contacts — gated
+to floor-height contacts (`at[1] < 0.6`; a wall click leaves no felt
+mark), real hits (strength ≥ 6), and ≤ 6 marks per roll (drama, not
+mud) — and playRoll attaches `light` recipes to a lit set's dice at
+spawn with a separate seeded rng stream (identical flicker on every
+client, zero draws stolen from the throw physics). Releases: sink
+(removeRollDice), collect (placeCluster — the shelf is the archive),
+sweep (resetTableSurface), plus the rig's parentless-mesh self-heal;
+reveal on the felt re-attaches. Shrouded rolls stamp and cast nothing —
+the drain gate and the attach gate both read the shroud flag.
 `tools/lab-shots.mjs` drives it headless over CDP and drops PNGs for
 side-by-side review. Themes land in `js/themes.js` as material recipes;
 the main app consumes NOTHING from the lab until a set graduates

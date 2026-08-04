@@ -113,9 +113,9 @@ try {
       await shot(`drop-${id}-${at}ms.png`);
     }
     // the honesty numbers come from the live drop, then wait it out so
-    // the next row starts clean
+    // the next row starts clean (the Level 4 linger holds ~3.5s past sleep)
     const mid = JSON.parse(await page.eval('JSON.stringify(window.__lab.dropState())'));
-    const dDeadline = Date.now() + 9000;
+    const dDeadline = Date.now() + 13000;
     for (;;) {
       const st = JSON.parse(await page.eval('JSON.stringify(window.__lab.dropState())'));
       if (!st.active) break;
@@ -123,6 +123,36 @@ try {
       await sleep(250);
     }
     console.log(`  drop ${id}: ${mid.contacts ?? 0} contacts → ${mid.bursts ?? 0} particles`);
+  }
+  await page.eval('window.__lab.zoomRow(null)');
+
+  // Level 4, at table pitch: the same drop viewed from above — felt marks
+  // (stamps) and the die's own light on the coupon. Shot late enough that
+  // the die has settled and the mark is doing its slow work.
+  const l4 = [
+    ['emberforge.blackanvil', 'scorch + breathe glow'],
+    ['rimehold.firstfrost', 'hoarfrost crackle'],
+    ['tidewrack.seaglass', 'drying rings + biolume'],
+    ['wildwood.mosstone', 'damp moss-print'],
+    ['stormcall.boltglass', 'charge flicker (no mark: glass leaves no residue)'],
+    ['umbra.voidgrain', 'NEGATIVE light — Umbra pools shadow'],
+    ['gildhall.oxblood', 'CONTROL: no mark, no glow, on purpose'],
+  ];
+  for (const [id, what] of l4) {
+    await page.eval(`window.__lab.drop(${JSON.stringify(id)})`);
+    await page.eval(`window.__lab.dropView(${JSON.stringify(id)})`);
+    await sleep(2800);
+    await shot(`l4-${id}-2800ms.png`);
+    const st = JSON.parse(await page.eval('JSON.stringify(window.__lab.dropState())'));
+    const li = JSON.parse(await page.eval('JSON.stringify(window.__lab.lightInfo())'));
+    console.log(`  l4 ${id}: ${st.stamps ?? 0} marks, ${li.length} light(s) — ${what}`);
+    const dDeadline = Date.now() + 13000;
+    for (;;) {
+      const s2 = JSON.parse(await page.eval('JSON.stringify(window.__lab.dropState())'));
+      if (!s2.active) break;
+      if (Date.now() > dDeadline) { console.log(`  (drop ${id} timed out)`); break; }
+      await sleep(250);
+    }
   }
   await page.eval('window.__lab.zoomRow(null)');
   console.log(`done → ${out}/`);

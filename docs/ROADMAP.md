@@ -363,8 +363,18 @@ and reload replay all keep the skin. Main table gained the lab's PMREM
 reflection environment (std/shroud pinned to envMapIntensity 0.35 — the
 released look holds), the SHADER_TIME clock, and the particle field
 fed by the fast-forward's recorded contacts ({time, strength, at} — the
-roll.sounds seam, realized). e2e: themed-dice (tag `themes`). Still
-open: felt decals (frost/ripple/scorch — ladder L4), 2D chrome art
+roll.sounds seam, realized). e2e: themed-dice (tag `themes`).
+**LADDER L4 SHIPPED 2026-08-03**: felt decals (js/decals.js — frost
+crackle, drying rings, scorch with a cooling ember rim, dust smudge;
+instanced quads over a two-tone procedural atlas, stamped from the same
+recorded impacts, transient by contract) and die-parented lights
+(js/dielights.js — fixed pool of 4, wave/breathe/flicker/steady modes,
+Umbra pools shadow with NEGATIVE intensity; felt-only — collect
+extinguishes, reveal ignites, shroud smothers). Restraint recipes: six
+sets mark, five glow, four leave the table untouched on purpose. The
+lab drop rig gained the coupon/rails/linger/dropView furniture to
+review it at table pitch. e2e: themed-fx (tag `themes`). Still open:
+postprocessing (ladder L5 — deliberately last), 2D chrome art
 (tray/pool/log chips stay std), saved-pool set override. **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
 natural AND supernatural — imagine what *faerie* dice, *dryadic* dice,
 *wizard* dice, *warrior* dice might look like. Special effects and strong

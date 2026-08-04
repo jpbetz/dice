@@ -205,11 +205,14 @@ const PAINTERS = [drawFrost, drawRing, drawScorch, drawSmudge];
 // delay: seconds after the impact before the mark exists (dust hangs in
 // the air first). in/fadeAt are shares of `life`. shift: how far into
 // life colorB cools to colorA (scorch's ember → soot; 0 = never).
+// minGap: a fresh same-kind mark inside this radius suppresses the stamp
+// — a die bouncing in place deepens ONE mark, it doesn't pile donuts
+// (rings keep a small gap on purpose: overlapping tide-lines read true).
 const KINDS = {
-  frost:  { size: 3.1, life: 7,  delay: 0,    in: 0.035, growFrom: 0.3,  growT: 0.06, fadeAt: 0.45, shift: 0,    emit: 1 },
-  ring:   { size: 2.5, life: 6,  delay: 0.05, in: 0.03,  growFrom: 0.5,  growT: 0.1,  fadeAt: 0.5,  shift: 0,    emit: 2 },
-  scorch: { size: 2.2, life: 7,  delay: 0,    in: 0.012, growFrom: 0.85, growT: 0.04, fadeAt: 0.4,  shift: 0.3,  emit: 1 },
-  smudge: { size: 2.6, life: 8,  delay: 0.12, in: 0.08,  growFrom: 0.92, growT: 0.1,  fadeAt: 0.5,  shift: 0,    emit: 1 },
+  frost:  { size: 3.1,  life: 7,  delay: 0,    in: 0.035, growFrom: 0.3,  growT: 0.06, fadeAt: 0.45, shift: 0,    emit: 1, minGap: 1.0 },
+  ring:   { size: 2.5,  life: 6,  delay: 0.05, in: 0.03,  growFrom: 0.5,  growT: 0.1,  fadeAt: 0.5,  shift: 0,    emit: 2, minGap: 0.4 },
+  scorch: { size: 1.95, life: 7,  delay: 0,    in: 0.012, growFrom: 0.85, growT: 0.04, fadeAt: 0.4,  shift: 0.3,  emit: 1, minGap: 0.9 },
+  smudge: { size: 2.6,  life: 8,  delay: 0.12, in: 0.08,  growFrom: 0.92, growT: 0.1,  fadeAt: 0.5,  shift: 0,    emit: 1, minGap: 0.7 },
 };
 
 export class DecalField {
@@ -266,6 +269,10 @@ export class DecalField {
     this.b0 = new Float32Array(MAX * 3); // colorB at birth (ember)
     this.cursor = 0;
     this.alive = 0;
+    this.kindR = new Int8Array(MAX); // atlas row per slot (minGap checks)
+    this.stampedTotal = 0; // monotonic: how many marks have EVER been laid
+    // (assertion surface — a fast-forwarded test clock ages live marks
+    // to death before a count can be read; the total never lies)
 
     this.material = new THREE.ShaderMaterial({
       uniforms: { uAtlas: { value: atlas } },
@@ -319,6 +326,17 @@ export class DecalField {
   stamp(recipe, at, strength, rng = Math.random) {
     const kind = KINDS[recipe.kind];
     if (!kind) return 0;
+    const row = KIND_ROW[recipe.kind];
+    // A fresh same-kind mark already here? The bounce deepens that one.
+    if (kind.minGap > 0) {
+      const g2 = kind.minGap * kind.minGap;
+      for (let i = 0; i < MAX; i++) {
+        if (this.life[i] <= 0 || this.kindR[i] !== row || this.age[i] > 1.2) continue;
+        const dx = this.posA[i * 3] - at[0];
+        const dz = this.posA[i * 3 + 2] - at[2];
+        if (dx * dx + dz * dz < g2) return 0;
+      }
+    }
     const [ca, cb] = [hexRGB(recipe.colors[0]), hexRGB(recipe.colors[1] || recipe.colors[0])];
     const sK = 0.75 + 0.45 * Math.min(strength / STRENGTH_REF, 1.3);
     let n = 0;
@@ -346,7 +364,7 @@ export class DecalField {
       this.cA[i * 3] = ca[0]; this.cA[i * 3 + 1] = ca[1]; this.cA[i * 3 + 2] = ca[2];
       this.cB[i * 3] = cb[0]; this.cB[i * 3 + 1] = cb[1]; this.cB[i * 3 + 2] = cb[2];
       this.b0[i * 3] = cb[0]; this.b0[i * 3 + 1] = cb[1]; this.b0[i * 3 + 2] = cb[2];
-      const row = KIND_ROW[recipe.kind];
+      this.kindR[i] = row;
       this.cellA[i * 2] = Math.floor(rng() * CELLS);
       this.cellA[i * 2 + 1] = CELLS - 1 - row; // uv v runs bottom-up
       n++;
@@ -355,6 +373,7 @@ export class DecalField {
     this.geometry.getAttribute('iRot').needsUpdate = true;
     this.geometry.getAttribute('iColorA').needsUpdate = true;
     this.geometry.getAttribute('iCell').needsUpdate = true;
+    this.stampedTotal += n;
     return n;
   }
 
