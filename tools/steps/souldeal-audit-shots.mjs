@@ -160,8 +160,8 @@ export default async function run(stage) {
   await cropShot('#verdict-card', '16-check-verdict.png');
   await hover('#verdict-fold .pk-strip');
   await cropShot('#verdict-card', '17-check-reroll-hover.png'); // (2i-C: the fold's REROLL strip)
-  await hover('#verdict-done');
-  await cropShot('#verdict-card', '18-check-done-hover.png');
+  await hover('#verdict-main');
+  await cropShot('#verdict-card', '18-check-body-hover.png'); // the folded card: body = clear
   await parkMouse();
   await a.dbg('retireCeremony()');
   const rid3 = await a.rollId();

@@ -232,7 +232,9 @@ gained air so 'You' reads as the rack's header. e2e: side-panel (tags
 the split; stills in tools/out/side-panel/.
 
 ### 2i. THE SOUL DEAL AUDIT — reveal read, chrome consistency, material,
-labs (2026-08-04) — families A+B SHIPPED same day; C–F open
+labs (2026-08-04) — **ALL SIX FAMILIES SHIPPED same day** (UX.md §7.16
+records the as-built laws; only E's `no-newcomer-path` stands open, by
+design — Joe owns the orientation direction)
 
 Joe asked for a UI audit of the left panel, the reveal panel, the collect
 peek, and the check/cinematic screens under Your Soul Deal, with
@@ -314,7 +316,16 @@ sheared the label column). The findings as audited:
   lowercase-mono evidence identity the other surfaces keep.
 
 **C · Action grammar & control consistency ("deepen consistency across
-buttons on all surfaces").**
+buttons on all surfaces"). SHIPPED 2026-08-04 (`d8673b1`)** under the
+proposed rule set verbatim: the verdict fold builds through
+appendCardActions (one codepath; the strip rerolls THIS card's entry),
+one confirm-weight Reveal dress sized by surface, three visibility CODES
+(disabled = grayscale drain; rest stays 0.45; absent = explicit
+display:none — the fold strip's triple dim collapsed), destruction
+hovers RED everywhere (✕ Clear table's gold hover gone), the steel-hover
+law unscoped app-wide with the log ⟳'s gold written down as the density
+exemption (reroll IS a roll act), and the draft ✕ anchored inside its
+chip. The findings as audited:
 
 - S4 `three-button-families-two-codepaths` (lead d, deepened) — the
   verdict card's icon row (⟳ / ✕ / Done, static markup in index.html)
@@ -348,7 +359,14 @@ buttons on all surfaces").**
   interactive · HUE = ACT globally (gold rolls, red destroys, steel
   tools).
 
-**D · Panel material — the stone/bronze vs steel/silver answer.**
+**D · Panel material — the stone/bronze vs steel/silver answer.
+SHIPPED 2026-08-04 (`531360d`)**: Scheme C as recommended — the steel
+got its body (gradient + bevel + seat shadow on palette tiles, pool
+tiles, the rim), the column's muted tier re-tokened cool (#99a1a9, the
+tray re-warms its own token on purpose), and the bronze-bleed balance
+swept with C's hover-law pass (confirm borders ivory, pool-name hover
+ivory; the ± editor-open rings stay bronze — the ± belongs to the roll
+world, §7.14.1). The findings as audited:
 
 - S3 `material-scheme-recommendation` — neither temperature swap:
   stone/bronze narrows the tray-vs-column contrast 2h just built;
@@ -365,9 +383,14 @@ buttons on all surfaces").**
   inside the neutral column through unscoped globals. ADJUSTED: sweep
   alongside the hover-law unscoping, one pass.
 
-**E · Multi-pool flow.** (The chain rack → tray → reveal rows keeps
-staged order faithfully — only the canonical header breaks it, filed in
-A. Staging itself confirmed good.)
+**E · Multi-pool flow. SHIPPED 2026-08-04 (`70bc4d8`) where it was
+ours to ship**: the spent draft (survives its roll, cools until the next
+edit — `spent-draft` e2e), and A's peek-identity wrap serves the
+shelf-anonymity finding within the quiet-chrome contract until §6b's
+seated-shelf decision reopens it. `no-newcomer-path` stands — Joe's.
+(The chain rack → tray → reveal rows keeps staged order faithfully —
+only the canonical header broke it, fixed in A. Staging itself
+confirmed good.)
 
 - S3 `rolled-draft-accretes-on-restage` — the draft survives its roll
   with no spent state: tapping pools for the NEXT roll silently doubles
@@ -389,7 +412,12 @@ A. Staging itself confirmed good.)
   undiscoverable by inspection. Joe owns the replacement direction;
   standing, not new.
 
-**F · Labs ("do we need more labs?") — yes, one, plus an index.**
+**F · Labs ("do we need more labs?") — yes, one, plus an index.
+SHIPPED 2026-08-04 (`ccbca1f`)**: chrome-lab.html (the recommended
+pose-driver shape exactly — the real app in an iframe, posed through
+__diceDebug), tools/contact-sheet.mjs (per-directory captioned grids +
+a top index), and docs/mockups marked ROTTED (README + per-file
+banners). The findings as audited:
 
 - S4 `no-chrome-lab` — lab.html covers 3D die materials; nothing shows
   the 2D chrome side by side, so cross-surface drift is only visible in
@@ -410,6 +438,30 @@ worded "Collect" on the banner/peek fold (re-litigates §7.9's retired
 Done — auto-collect owns the idle path); unifying the card strips'
 chevrons with the tray's engraved lozenge (re-litigates §7.14.1's
 same-day boundary: the cue overlay form belongs to card strips).
+
+### 2j. The flow to collected + the one-way rim (2026-08-04, Joe's
+same-day play notes) — SHIPPED
+
+Two directives landing on the audit pass's fresh surfaces (`30289fd`,
+`d2c7b30`; UX.md §7.16 holds both contracts):
+
+- **"Cinematics have too many stages."** The ceremony's handoff into the
+  standing banner is GONE: the verdict card is a folded card — body =
+  the role-split clear target wearing the banner's removal grammar (a
+  click mid-moment SKIPS first; always interruptible), fold = the built
+  REROLL/Reveal, no ✕, no Done — and its clock (hover holds it) flows
+  the roll STRAIGHT to the shelf. A hidden card stands until its reveal
+  re-arms the clock. Check and cinematic alike: one card family. e2e:
+  `ceremony-retire` rewritten to the new contract (flow lands on the
+  shelf with no banner between; the body clears early; a held card
+  stands then flows after reveal).
+- **"One way to do most things."** The rim's Save and its whole inline
+  morph retired — keeping a draft is pool editing's job (✎ ghost tiles
+  mint with shelf-at-birth, the popover's Duplicate… copies, the peek's
+  Save-as-pool keeps a rolled result; writes stay by-id only) — and the
+  freed room lets the modifier tool wear its word: **± Modify** (Joe's
+  pick list was Modify/Customize, never "Tweak"). The tray popover's
+  standing title says *Draft* now, the vocabulary word.
 
 ## Tier 2 — Organization (goal 5, the audit's biggest experience gap)
 

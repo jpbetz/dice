@@ -1948,13 +1948,29 @@ html, body {
 /* the verdict card must not SHOUT its chips (2i-B): the hero dress's
    uppercase + tracking stop at the rows — the chips keep the lowercase
    mono evidence identity every other surface reads. (Specificity beats
-   .verdict-hero/.verdict-tally on purpose.) And the hero word's flanking
-   hairlines fold: as ::before/::after they would join the ledger GRID as
-   stray first/last items and shear the label column off its rows. */
+   .verdict-hero/.verdict-tally on purpose — including DISPLAY: the hero
+   slot's own row-flex sits LATER in the file than the per-die block, so
+   without these the ledger grid never engaged on the ceremony card and
+   its labels stacked centered over their chips.) And the hero word's
+   flanking hairlines fold: as ::before/::after they would join the
+   ledger GRID as stray first/last items and shear the label column. */
 .verdict-hero.verdict-outcomes {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
   text-transform: none;
   letter-spacing: normal;
   text-indent: 0;
+}
+.verdict-hero.verdict-outcomes.oc-ledger {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 11px;
+  row-gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
 }
 .verdict-hero.verdict-outcomes::before,
 .verdict-hero.verdict-outcomes::after { content: none; }

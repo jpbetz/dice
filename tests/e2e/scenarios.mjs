@@ -773,6 +773,9 @@ export const scenarios = [
       assert.ok(await a.eval(
         `document.getElementById('verdict-hero').classList.contains('verdict-outcomes')`),
         'the outcome rows hold the card’s center');
+      assert.equal(await a.eval(
+        `getComputedStyle(document.getElementById('verdict-hero')).display`), 'grid',
+        'the ledger grid ENGAGES on the ceremony card (computed display is the contract — the hero slot’s own flex once silently won)');
       // 2i-B: the card's chips never SHOUT (no inherited uppercase), and
       // its action row rests DIM — quiet, never invisible-interactive
       assert.equal(await a.eval(

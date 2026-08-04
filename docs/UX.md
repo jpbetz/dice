@@ -1,5 +1,9 @@
 # UX Design: Notation, Roll Moments, Visibility, Dice Sets
 
+*(Latest addendum: §7.16 — the Soul Deal audit fix pass, the ceremony's
+flow to collected, and the one-way rim, all 2026-08-04. Where it touches
+earlier sections it wins; superseded spots carry pointers.)*
+
 Authoritative UX spec for the next evolution. This is a spec, not a survey:
 where alternatives existed, the decision is recorded here and the alternative
 is listed under *Rejected*. Companion to `ROADMAP.md`; a reference into it
@@ -1227,6 +1231,9 @@ Immediately after a roll, the ROLLER's controls are ⟳ (reroll) · Collect ·
 existing roller-only clear-roll path) without occupying a shelf slot. Not
 every roll deserves collecting. Spectator controls unchanged (local
 dismiss). Applies to both the banner and the ceremony verdict card.
+*(The verdict-card half is superseded 2026-08-04 — §7.16: the ceremony
+card is a folded card that FLOWS TO COLLECTED; its body clears, its
+clock collects, and the per-card ⟳/✕/Done buttons are gone.)*
 
 Amendment to §7.7.1 peek cards (Joe, play-test): the peek must NOT scale/zoom
 in — it appears in place (instant, or ≤100ms opacity fade only). Motion
@@ -1824,7 +1831,9 @@ second well, and derives every placement from one law:
   a ring rather than a repaint.)*
 - **The rail** (`#draft-actions`, below the well): the three verbs that
   dispose of the draft — Save · Offer to table (+ ▾, joined as one split
-  verb) · ✕ Clear — **standing**, inset to the well's 7px interior grid
+  verb) · ✕ Clear *(Save retired 2026-08-04 — §7.16: pool editing owns
+  creation; the rim reads ± Modify · Offer ▾ · ✕ Clear)* — **standing**,
+  inset to the well's 7px interior grid
   (1px border + 6px padding), ✕ Clear right-aligned into the ±'s vertical
   gutter. Appearing only while a draft exists is the contextual signal;
   while it exists, management stands. **This supersedes the 2026-08-01
@@ -2008,9 +2017,10 @@ Mechanism: `peekVia` ('hover' | 'tap') rides `openPeek`; only the
 marker's touch branch passes 'tap', and a mouse `pointerenter` over an
 already-tap-opened card never steals its ✕ mid-interaction (the gesture
 is taken only on an actual open). The banner ✕ stays unconditional — an
-uncollected roll has no marker to sweep — and the verdict ✕ is untouched.
-Keyboard users clear as before (Esc's sweep, the log/corner paths): no
-regression, no new path this pass.
+uncollected roll has no marker to sweep — and the verdict ✕ is untouched
+*(later retired with the card's Done — §7.16's flow to collected; the
+card BODY is its clear affordance now)*. Keyboard users clear as before
+(Esc's sweep, the log/corner paths): no regression, no new path this pass.
 
 **The reroll cue vocabulary.** `buildRollCue` draws from a CLOSED set —
 `ROLL` for fresh pools (the draft cluster, an offer's claim strip),
@@ -2057,3 +2067,94 @@ parent never surrenders its total to a tooltip, and an aged-out parent
 keeps the generic "Reroll of an earlier roll". The banner and verdict
 card stay unmarked (§7.10 fixed geometry; their *action* already says
 REROLL — the record is the log's job).
+
+### 7.16 The audit fix pass, the flow to collected, and the one-way rim
+(2026-08-04)
+
+The Soul Deal audit's 33 findings (ROADMAP §2i) shipped as six passes,
+and Joe's same-day play notes added two more contracts on top. The laws,
+as built:
+
+**THE LEDGER (2i-A).** A sourced per-die read shares ONE label column:
+`renderOutcomeRows` renders a grid (`oc-ledger`) — right-aligned label
+spine, left-aligned dice cells, the block centered as a unit — and each
+row's chips live in their own `.oc-cell`, so a wrapped chip wraps inside
+its pool's cell (the hanging indent is structural; an answer can never
+float unattributed). The evidence/word gap lives in LAYOUT (`.oc-chip`
+gap) while the string keeps its real space for copy — the nbsp lesson's
+sibling. Quiet grammar, exactly once: a quiet die beside worded ones
+carries a DOM dash (`d6 3 —` — copy reads the silence); an all-quiet
+pool says `quiet` once (styled as absence, never outcome weight) and its
+chips stay bare — dash + word would mark one silence twice. One-die
+rolls read at hero scale (`oc-solo` — the common Soul Deal roll finally
+has dnd's 52px counterpart). Tier rides the chip border at reduced
+strength (the felt chips' lesson; the word stays the loud channel). The
+banner and peek headers demote to quiet identity captions — the rows are
+the data — and the peek's identity WRAPS instead of truncating (the
+hover is worth taking, 2i-E). The empty verdict ring FOLDS under a
+per-die read; a hidden roll keeps it as the face-down stage.
+
+**Ceremony cards (2i-B).** The intent card declares its POOLS —
+`spec.sources` rides `canonicalNotation`, so the stake reads
+`2d8[Wisdom]+1d10[Sword]`, never bare dice math. The verdict card's
+chips keep the lowercase mono evidence identity (the hero dress's
+uppercase stops at the rows), and its action row rests DIM — the
+invisible→visible grammar is fully retired.
+
+**Action grammar (2i-C).** ONE DRESS PER VERB sized by surface · THREE
+VISIBILITY STATES with three CODES (disabled drains hue via grayscale;
+resting-dim is 0.45; absent is a real display:none) · HUE = ACT globally
+— gold rolls (the log's per-row ⟳ keeps gold as the written-down density
+exemption: reroll IS a roll act), red destroys (✕ Clear table included —
+it hovered GOLD before), steel tools (the hover law unscoped past the
+panel edge; confirm borders went ivory as their comment always claimed).
+Reveal wears ONE dress: confirm weight — bold ivory, "decisive, not
+royal" — `.reveal-verb` full, `.sm-reveal` small. The fold's verbs come
+from ONE builder (`appendCardActions`) on banner, peek AND the ceremony
+card. The draft's ✕ removers anchor INSIDE their chip's corner, never
+the gutter between neighbours.
+
+**Material (2i-D, Scheme C).** Keep graphite/bronze; the steel got a
+BODY — gradient, top bevel, seat shadow on palette tiles, pool tiles and
+the rim. The column's muted tier re-tokened COOL (`--muted: #99a1a9`
+inside `#left-panel`); the tray re-warms its own token — the bronze well
+is the one warm surface on purpose.
+
+**The spent draft (2i-E).** A rolled draft SURVIVES (Enter-again is the
+deliberate repeat — never auto-cleared) but visibly COOLS until its next
+edit: heat drains, dice rest dimmer, the cue falls to its whisper, the
+title says "again — this draft already rolled". Any edit re-warms it.
+This separates "roll it again" from the silent Wisdom-×4 accretion, and
+disambiguates the tray's ROLL from the banner's REROLL standing lit
+together. `no-newcomer-path` stays open by design — Joe owns the
+orientation direction (§7.14.1).
+
+**Labs (2i-F).** `chrome-lab.html` is lab.html's 2D counterpart — the
+REAL app in an iframe, posed through `__diceDebug`: real CSS, real
+hovers, zero forked markup, cannot rot. `tools/contact-sheet.mjs`
+stitches captioned thumbnail grids per out/ directory. docs/mockups are
+marked ROTTED in a README and per-file banners — design history, never
+build authority; the static-mockup shape is disqualified in writing.
+
+**THE FLOW TO COLLECTED (Joe: "cinematics have too many stages").** The
+ceremony verdict card is a FOLDED CARD — body = the role-split clear
+target wearing the banner's exact removal grammar (red for the roller's
+clear-for-everyone, slate for a spectator's local dismiss; a click while
+the moment still plays SKIPS first — completing the beat and clearing
+the roll are never one gesture), fold = the built REROLL ❯❯❯ / Reveal —
+and when its clock (`CEREMONY_DISMISS_MS`, hover holds it) runs out the
+roll goes STRAIGHT to the shelf. The banner stage between card and shelf
+is gone; `#verdict-done`, `#verdict-x` and `.ghost-btn` retired. A
+HIDDEN card never flows — it stands until its reveal re-arms the clock
+(the tidy-away tension rule, inherited). Applies to check and cinematic
+alike: they share the one card family.
+
+**THE ONE-WAY RIM (Joe: "one way to do most things").** The rim is
+**± Modify · Offer ▾ · ✕ Clear**. Save and its inline morph retired:
+keeping a draft is pool editing's job — the ✎ ghost tiles mint
+(shelf-at-birth), the popover's *Duplicate…* copies, the peek's *Save as
+pool…* keeps a rolled result; saved-pool writes stay exclusively by-id.
+The modifier tool wears its word at rim scale — "Modify", never "Tweak"
+(unsurprising over cute), bronze dress unchanged (it belongs to the roll
+world; gold stays the roll act's). The tray popover's standing title
+reads *Draft* — the vocabulary word.
