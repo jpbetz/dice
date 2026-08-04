@@ -7,6 +7,191 @@ below empirically. [UX.md](UX.md) holds component specs; its §3 is now the
 as-built role-free visibility spec and the rescinded DM seat is gone from
 the docs (step 4's sweep).
 
+## Tier 0 — Performance & foundation (2026-08-04 audit)
+
+*Sits above Tier 1 on purpose: a broken invariant outranks a new feature.
+GOALS.md pins `always interruptible` (skip to complete result in
+`<150ms`) as an invariant, and the audit found it broken on any lived-in
+table.*
+
+Bench + review pass 2026-08-04 (perf-audit workflow, 4 empirical benches
+under `tools/drive.mjs` × 4 hot-path code reviews × adversarial
+verification; the measured baseline is pinned in
+`.claude/…/memory/perf-baseline.md`, so future changes have a
+before/after). Findings are sequenced by **impact** — player-felt
+magnitude × frequency — not by fix cost; the cost gradient is called out
+inside each section so the ship order remains visible. Numbers below
+were measured on headless SwiftShader; JS wall-clock inside a function
+transfers to real CPUs (rAF throttling only affects render fps, not JS
+execution), so the roll-arrival milliseconds are real. Reported ms are
+capped at what benches proved; anything softer is called out.
+
+### 0a. The roll-arrival pass — every roll, every player, breaks the invariant
+
+The prime finding. `playRoll`'s synchronous physics fast-forward runs
+unbounded on the main thread (`js/main.js:1699`, the `for (;;) {
+world.step(FIXED_DT) … }` inside `playRoll`), called from the SSE roll
+handler AND `hello` resync — so **spectators pay the freeze too**.
+Measured in-page wall-clock: 1d20 ~6 ms, 8d6 empty ~20 ms, **8d6 on a
+loaded felt 139–349 ms**, 40 dice **460–1450 ms**; corroborated by real
+SSE arrivals emitting 1336 ms and 2248 ms long tasks vs a 153 ms idle
+noise floor. Ordinary rolls on any lived-in table already exceed the
+150 ms interruptibility budget, and `skipCeremony()` can't reach a
+main-thread block. Ship the pass as three commits, hardest last:
+
+- **Per-die settle (S3, cheap, ~half a day).** SETTLE_STILL is a
+  group-wide `dice.every()` (js/main.js:1705); one twitching die zeroes
+  the group timer, so 3–6/6 benched 40d6 rolls hit the 9s `SETTLE_CAP`
+  the moment shelf statics exist, giving the player a nine-second
+  tumble to watch and inflating keyframe memory ~3.4×. Freeze
+  individually-still dice to STATIC mid-sim, stop resetting the group
+  clock on them, and stop appending their keyframes. `allowSleep` is
+  already set on the bodies (`js/dice.js:1002`) — the mechanism is
+  there.
+- **SAP broadphase (S3, one line, needs a determinism check).**
+  `js/main.js:446` constructs `new CANNON.World({ gravity })` with no
+  broadphase — cannon-es defaults to `NaiveBroadphase`, O(N²) pair
+  test, so every settled shelf die taxes every subsequent roll (1d20
+  with 200 statics = 106 ms sync). Vendored `cannon-es.js` ships
+  `SAPBroadphase`; one line at world construction fixes it. Broadphase
+  order can shift solver order — run the seeded-throw fuzz + e2e suite
+  to confirm identical keyframes across clients before shipping. If a
+  hash diverges, keep naive and group shelf clusters into per-cluster
+  compound bodies instead (secondary path).
+- **Sliced fast-forward (S4, the real work, day or two).** Hoist the
+  step loop into a resumable stepper that runs ≤8 ms wall-clock per
+  rAF slice, dice held at the spawn keyframe until the producer runs
+  ahead of the consumer (~3 sliced frames). Playback starts on the
+  first slice; the physics chases. **Success is measurable**: no
+  long task >50 ms attributable to roll arrival, total sim wall
+  unchanged (honesty check that work moved, not vanished).
+
+Together these three take arrival from "freeze every table for a
+second" to "no perceptible hitch, ceremony pacing unchanged."
+
+### 0b. Boot & bandwidth — every visit, every reconnect, remote-player-felt
+
+Small changes, huge win for anyone not on localhost. **Ship this pass
+first if optimizing for user-facing wins per line changed** — it's a
+half-day of work.
+
+- **Server `LOG_CAP=100` (S3, ONE LINE, immediate 50% reduction).**
+  `server.js:54` caps the log at 200, `js/main.js:44` caps the client
+  at 100 — every hello ships ~50% dead weight the client discards on
+  arrival. `server.js:54` from 200 → 100 halves the payload with zero
+  protocol change and no consequence. This lands before any
+  Last-Event-ID work.
+- **Vendor `if-modified-since` handling (S3, ~6 lines).**
+  `server.js:1821-1834` `streamFile` always answers 200 with the full
+  body under `Cache-Control: no-cache` and emits `Last-Modified`, but
+  grep of the file finds **zero readers of `if-modified-since`** — the
+  revalidation the headers invite can never succeed. Browser reload
+  measurement: 1,619,828 bytes re-transferred, status 200 both loads,
+  for immutable-by-project-rule files. ~6 lines: compare
+  `req.headers['if-modified-since']` to `stat.mtime`, answer 304. For
+  `/vendor/` specifically go further: `Cache-Control: public,
+  max-age=31536000, immutable` — those files are never edited by rule.
+- **Last-Event-ID delta hello (S3, half a day, protocol work).**
+  Hello and `/api/join` reship the whole log on every stream (re)open
+  (`server.js:590-595, 543-550`); no `id:` field is written, no
+  `Last-Event-ID` is read, so EventSource's native resume is unusable.
+  Realistic mixed 200-roll table = 108 KB per hello; heavy 40d6 =
+  765 KB — every proxy blip pays that. Stamp broadcasts with `id:
+  <room-scoped seq>` in `sendEvent`, honor `Last-Event-ID` in
+  `handleEvents`: when the client's last id is still inside `room.log`,
+  send only the newer entries plus current players/offers/settings.
+  Care needed: entries mutate in place after broadcast
+  (`revealed`/`cleared`), so a naive resume can miss a flag flip — the
+  delta must carry those state deltas separately or replay from before
+  the last mutation. Not urgent, but the biggest bandwidth cut once
+  the LOG_CAP alignment lands.
+
+### 0c. GPU idle discipline — permanent cost for any player with a glowing set
+
+**S3, ~a day.** After collect the table's resting state has 40+ dice
+sitting on the shelf. `js/main.js:3671` gates the post pipeline on
+`tableDice.some((d) => d.mesh.userData.bloom)` — and `tableDice`
+includes shelved dice (compare `js/main.js:3687` where shimmer
+explicitly excludes the shelf). So any of the six glowing sets
+(tidewrack, stormcall, rimehold, emberforge, arcanum, umbra) keeps the
+full bloom stack — mask render + threshold + 4 blur passes + composite,
+plus a second full 2048² PCFSoft shadow-map render — running every
+frame the archive is on screen. Headless: 1658 µs/frame with 4 bloom
+dice on the felt vs 1104 µs stripped (+50%); 1199 µs with all four
+shelved. Felt as fan noise / battery drain on laptops, dropped frames
+on integrated GPUs — never a hitch, hides forever. Two independent
+pieces:
+
+- **Exclude shelved dice from the bloom gate** (design call for Joe:
+  the felt should keep its glow; the archive should cool — mirror the
+  shimmer contract, `js/main.js:3687`). Flip `userData.bloom` off in
+  `shelveRoll` and back on if any un-shelve path exists.
+- **Skip the double shadow pass** in `PostStack.render`
+  (`js/post.js:289-353`): set `renderer.shadowMap.autoUpdate = false`
+  between the base and glow renders, restore after — the glow pass
+  renders a blacked scene against maps the base pass just refreshed;
+  output identical, one shadow pass saved per stack frame.
+
+### 0d. Server hygiene — operator-side risk, silent room retention
+
+- **SSE write backpressure (S4 operational, unbounded server memory).**
+  `sendEvent` (`server.js:350`) ignores `res.write()`'s return value,
+  and the heartbeat (`server.js:378-392`) only checks
+  `res.writableEnded/destroyed` — a stalled-but-established socket
+  buffers forever. Grep confirms `writableLength/drain/highWaterMark`
+  appear nowhere. Measured: **50 SSE streams opened and never read =
+  +10,984 kB server RSS**, and the zombie non-reading client keeps
+  `player.clients` non-empty, so `scheduleReap`
+  (`server.js:597-602`) never fires and the room + its log are
+  retained indefinitely — "last player leaves, room dies" silently
+  stops being true. Fix: in `sendEvent` and the heartbeat, treat
+  `res.writableLength > cap` as a dead stream (endStream + destroy);
+  change `endStream` on eviction/dead paths to `res.destroy()`
+  instead of `res.end()` so buffered data frees immediately.
+- **Broadcast serialization dedup (S2, small).** `server.js:368-376`
+  loops players × streams calling `sendEvent`, which
+  `JSON.stringify`s inside the loop — one payload is serialized up to
+  P × 4 times (160 caps). Measured 0.89 ms per broadcast at cap;
+  imperceptible today, first bite if room caps ever grow. Memoize
+  serialization per distinct payload; cache the shared redacted copy
+  in the `projectFor` closure. Note only; not urgent.
+
+### 0e. Endurance — the roller-side node/listener leak
+
+**S3, needs numbers before touching.** After 60 rolls, the roller's tab
+holds **15,141 nodes / 634 listeners** vs a late joiner rendering the
+identical room state at **7,585 / 414** — a ~2× gap that doesn't come
+back on collect. ~7 extra listeners per roll, monotonic. Not measured
+under normal-length sessions; the trajectory says "hours of play, real
+memory pressure." **Do heap-snapshot detached-node hunting first** to
+name what's retained (chips? shelf markers? ceremony strips? popover
+closures?), then a targeted fix. Do not blind-refactor.
+
+### Refuted, recorded so they stay dead
+
+- **`renderTray` layout thrash.** Real (16 forced reflows per palette
+  tap, +18 recalc, ~20 ms wall) but the fix-attributable share is only
+  ~5 ms of a ~20 ms tap; the full tap is under the 150 ms budget and
+  the loose-die overlay cap holds ✕ count at 7 regardless of dice
+  count. Skip.
+- **`projectEntryFor` per-recipient allocation.** Measurable
+  (~1 ms/broadcast at 40-player caps) but not player-felt; folded into
+  the S2 "serialization dedup" note in §0d — not standalone work.
+
+### Healthy patterns to protect (verified by the same pass)
+
+- Level 5 post bypass **is** bypassing when idle (empty table renders
+  the released direct path, proven at 61.8 dB PSNR — the audit
+  reconfirmed it).
+- The `(type, set)` material cache is doing its job — no per-roll
+  material rebuild.
+- `measurePeek`/`positionPeek`'s write-only rAF discipline holds (no
+  forced reflow per animation frame).
+- The `--draft-h` ResizeObserver keeps the shelf-head pin fresh under
+  every non-`renderTray` height change.
+- Server projection is honest: every egress path runs
+  `projectEntryFor`, and the pass found no leak of hidden values.
+
 ## Tier 1 — Core mechanics completion
 
 ### 1. Notation totality closeout
