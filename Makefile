@@ -165,11 +165,20 @@ require-domain: require-config
 # tripwire. Safe to re-run (a duplicate budget alert is the worst outcome).
 setup: require-config
 	@test -n "$(BILLING_ACCOUNT)" || { echo "BILLING_ACCOUNT is empty in $(CONFIG) — run make init or edit the file."; exit 1; }
-	gcloud projects create $(PROJECT) || echo "project $(PROJECT) already exists — continuing"
+	@echo "$(PROJECT)" | grep -Eq '^[a-z][a-z0-9-]{5,29}$$' || { \
+	  echo "PROJECT '$(PROJECT)' is not a valid GCP project id"; \
+	  echo "(6-30 chars: a lowercase letter first, then lowercase/digits/hyphens)."; \
+	  echo "A console project's ID is not its display name — find the real id with:"; \
+	  echo "  gcloud projects list"; \
+	  exit 1; }
+	@if gcloud projects describe $(PROJECT) >/dev/null 2>&1; then \
+	  echo "project $(PROJECT) already exists — continuing"; \
+	else gcloud projects create $(PROJECT); fi
 	gcloud billing projects link $(PROJECT) --billing-account=$(BILLING_ACCOUNT)
 	$(GCLOUD) services enable run.googleapis.com cloudbuild.googleapis.com \
 	  artifactregistry.googleapis.com billingbudgets.googleapis.com
 	gcloud billing budgets create --billing-account=$(BILLING_ACCOUNT) \
+	  --billing-project=$(PROJECT) \
 	  --display-name="dice-table tripwire" --budget-amount=5USD \
 	  --filter-projects=projects/$(PROJECT) \
 	  --threshold-rule=percent=0.5 --threshold-rule=percent=0.9 \
