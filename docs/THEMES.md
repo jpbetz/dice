@@ -441,9 +441,19 @@ integration seam Level 3 was designed around. Client ingress note for
 future fields: the SSE 'roll' case, replaySettledRoll and the playback-
 object build in playRoll are explicit whitelists — a new entry field
 must be added to all three or it silently vanishes (set was dropped by
-the first two on the first pass). 2D chrome (tray, pool tiles, log die
-chips) deliberately stays std for now — 9b pool icons is the natural
-home for that pass.
+the first two on the first pass). 2D chrome wears the set too (shipped
+2026-08-03): diceart.js bakes per (type, variant) — a chip is a
+portrait of the die in its skin, not a tint (identity is material, not
+hue: a flat tint can't tell Bolt-glass from Focus Crystal at 30px).
+One lazy warm per variant (all seven types, ~tens of ms, GL context
+released after each), unknown ids normalize to std, failed slots fall
+back to std art — art still never gates function. Prospective surfaces
+(palette tiles, tray/pool/offer strips) wear MY set and re-dress in
+place on a set change via refreshDieArt (their chips carry
+data-art-type; log chips deliberately don't). The LOG wears each
+roll's own set on every screen — the log is a record, not a preview —
+and a hidden entry wears obsidian chips: shroud > set > std, the
+felt's precedence, in 2D. e2e: themed-chrome (tag `themes`).
 
 Level 4 rides the same seams (shipped 2026-08-03; the marks are DARK BY
 DEFAULT since the same evening — the decals.js kill switch): the impact

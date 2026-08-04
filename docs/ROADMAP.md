@@ -387,9 +387,17 @@ burns), impact-keyed shock rings off the roll's hardest landing
 (negative amp = Umbra implodes), heat shimmer above settled iron, and a
 strict bypass: a std table renders the released direct path, proven
 equivalent at 61.8 dB PSNR (the tone-mapping-on-render-targets lesson
-lives in THEMES.md). e2e: themed-post (tag `themes`). Still open in §9:
-2D chrome art (tray/pool/log chips stay std — 9b pool icons is the
-natural home), saved-pool set override. **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
+lives in THEMES.md). e2e: themed-post (tag `themes`).
+**CHROME WEARS THE SET (2026-08-03)**: the diceart.js bakery — baking
+std chips from the real meshes since P1 — went (type, variant): one
+lazy warm per set (all seven types, GL context released after),
+unknown ids normalize to std, failed slots fall back to std art.
+Palette tiles and tray/pool/offer strips wear MY set and re-dress in
+place on a set change (refreshDieArt walks data-art-type imgs); log
+chips wear each ROLL's set on every screen, and hidden entries wear
+obsidian (shroud > set > std, same as the felt). e2e: themed-chrome
+(tag `themes`). Still open in §9: saved-pool set override (9b pool
+icons remains its own item). **Creative brief (Joe 2026-08-03):** cool-looking dice of different materials and types,
 natural AND supernatural — imagine what *faerie* dice, *dryadic* dice,
 *wizard* dice, *warrior* dice might look like. Special effects and strong
 themes **merged subtly into the dice themselves** — theme lives in

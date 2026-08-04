@@ -481,6 +481,7 @@ function setDiceSet(id, persist = true) {
   diceSet = id === 'std' || SETS[id] ? id : 'std';
   if (persist) save(LS_DICESET, diceSet);
   renderDiceSetPicker();
+  refreshDieArt(); // palette + strips wear the new set immediately
   return diceSet;
 }
 // What rides the wire: absent for standard (a plain roll's payload stays
@@ -3686,6 +3687,10 @@ window.__diceDebug = {
     for (const t of DIE_TYPES) out[t] = dieArtURL(t);
     return out;
   },
+  // §9 chrome: the bakery's (type, variant) surface — what a chip for
+  // this die in this skin looks like (themed-chrome asserts DOM img
+  // srcs against it, so chips are checked by contract, not by pixels).
+  dieArtFor(type, variant) { return dieArtURL(type, variant); },
   // quick palette (tests): open it / observe its open state
   openPalette() { openPalette(); },
   get paletteOpen() { return isPaletteOpen(); },
@@ -4119,17 +4124,30 @@ const groupNameInput = document.getElementById('group-name');
 // and the CSS ::before diamond keeps the tile legible — art never gates
 // function.
 function decorateDieBtn(btn, label, artType) {
-  const url = dieArtURL(artType);
+  const url = dieArtURL(artType, diceSet);
   if (url) {
     btn.classList.add('has-art');
     const img = document.createElement('img');
     img.className = 'die-art';
+    img.dataset.artType = artType; // refreshDieArt re-dresses it on set change
     img.src = url;
     img.alt = '';          // decorative: the label carries the name (a11y)
     img.draggable = false; // die art is clickable chrome, not a draggable image
     btn.appendChild(img);
   }
   btn.appendChild(document.createTextNode(label));
+}
+
+// A set change re-dresses every PROSPECTIVE die chip in place — palette
+// tiles, tray/pool/offer strips — without re-running their renderers:
+// every chip decorateDieBtn/buildDieStrip builds carries its die type in
+// data-art-type. Log chips deliberately lack the attribute: the log is a
+// record, and each entry keeps the set it was rolled with.
+function refreshDieArt() {
+  for (const img of document.querySelectorAll('img.die-art[data-art-type]')) {
+    const u = dieArtURL(img.dataset.artType, diceSet);
+    if (u) img.src = u;
+  }
 }
 
 for (const type of DIE_TYPES) {
@@ -5135,10 +5153,11 @@ function buildDieStrip(types, cap, { grouped = false } = {}) {
     : types.map((t) => [t, 1]);
   const shown = units.slice(0, cap);
   for (const [type, n] of shown) {
-    const url = dieArtURL(type);
+    const url = dieArtURL(type, diceSet);
     if (url) {
       const img = document.createElement('img');
       img.className = 'die-art strip-die';
+      img.dataset.artType = type; // refreshDieArt re-dresses it on set change
       img.src = url;
       img.alt = '';
       img.draggable = false;
@@ -6925,8 +6944,13 @@ function renderLog() {
       const counts = new Map();
       for (const p of entry.parts) counts.set(p.type, (counts.get(p.type) || 0) + 1);
       const bits = [];
+      // Chips wear the ROLL's set (§9 chrome) — the log is a record of
+      // whose dice landed, not what I'd throw next. A hidden entry wears
+      // the obsidian shroud, same precedence as the felt: die TYPES are
+      // public (goal 11), identity is not.
+      const chipVariant = hidden ? 'shroud' : (entry.set || 'std');
       for (const [t, cnt] of counts) {
-        const u = dieArtURL(t);
+        const u = dieArtURL(t, chipVariant);
         if (!u) { bits.length = 0; break; }
         bits.push(`<img class="die-art log-die" src="${u}" alt="" draggable="false">`
           + (cnt > 1 ? `<span class="log-die-count">×${cnt}</span>` : ''));

@@ -16,16 +16,25 @@ limitations under the License.
 
 // Die art: still renders of each die type's real beveled mesh, as dataURLs,
 // for chrome that shows *the dice themselves* as clickable objects (P1 — the
-// dice are the buttons; a tile is die art, not an abstract diamond).
+// dice are the buttons; a tile is die art, not an abstract diamond). Since
+// Tier 6 §9 the bakery is themed: art is keyed (type, variant), so a chip is
+// a portrait of the die IN ITS SET — molten digits, glass, bone wear — not a
+// tint of a generic die. Identity here is material, not hue; the mesh
+// factory already knows how to dress a die, so the bakery just asks it.
 //
-// One shared offscreen WebGLRenderer paints all seven types in a single
-// synchronous warm on first call, then releases its GL context — the app's
-// table renderer keeps the browser's context budget to itself. Art can never
-// gate function: if context creation fails (headless without GL, exhausted
-// contexts), dieArtURL returns null and callers keep their non-art look.
+// One offscreen WebGLRenderer per VARIANT warm: the first request for a
+// variant bakes all seven types synchronously (~tens of ms), then releases
+// its GL context — set changes are rare, and the app's table renderer keeps
+// the browser's context budget to itself between warms. Art can never gate
+// function: if context creation fails (headless without GL, exhausted
+// contexts), dieArtURL returns null and callers keep their non-art look, and
+// a themed slot that failed to bake falls back to std art rather than none.
+// (No reflection environment in the bake — std always shipped env-free, all
+// variants stay consistent, and at 26-34px CSS the material read survives.)
 
 import * as THREE from 'three';
 import { createDieMesh, DIE_TYPES, faceNormalForValue, valueRange, getDie } from './dice.js';
+import { SETS } from './themes.js';
 
 // 2x the ~26-30px CSS display size, so tiles stay crisp on retina.
 const SIZE = 192;
@@ -34,8 +43,8 @@ const SIZE = 192;
 // stays readable, which is what tells d10/d12/d20 apart at tile size.
 const HERO_DIR = new THREE.Vector3(0.25, 0.55, 1).normalize();
 
-const cache = new Map(); // type -> dataURL string | null
-let warmed = false;
+const cache = new Map(); // `${variant}/${type}` -> dataURL string | null
+const warmedVariants = new Set();
 
 // The numeral's "up" direction in body space for the max-value FACE (null for
 // d4, whose values sit on vertices, three numerals per face). Mirrors the
@@ -64,21 +73,24 @@ function numeralUpForMax(type) {
     .normalize();
 }
 
-// Cached dataURL of `type`'s beveled mesh (192x192, transparent background),
-// or null when WebGL was unavailable. Warms the whole cache synchronously on
-// first call.
-export function dieArtURL(type) {
-  if (!warmed) warmCache();
-  return cache.get(type) ?? null;
+// Cached dataURL of `type`'s beveled mesh wearing `variant` (192x192,
+// transparent background), or null when WebGL was unavailable. Warms the
+// whole variant synchronously on first request. Unknown variants normalize
+// to std — a stale saved set id must not cost a GL context — and 'shroud'
+// is legal: the log dresses hidden entries in obsidian.
+export function dieArtURL(type, variant = 'std') {
+  const v = variant === 'shroud' || (typeof variant === 'string' && SETS[variant]) ? variant : 'std';
+  if (!warmedVariants.has(v)) warmVariant(v);
+  return cache.get(`${v}/${type}`) ?? cache.get(`std/${type}`) ?? null;
 }
 
-function warmCache() {
-  warmed = true;
+function warmVariant(variant) {
+  warmedVariants.add(variant);
   let renderer;
   try {
     renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   } catch {
-    for (const t of DIE_TYPES) cache.set(t, null); // no GL — callers fall back
+    for (const t of DIE_TYPES) cache.set(`${variant}/${t}`, null); // no GL — callers fall back
     return;
   }
   try {
@@ -101,7 +113,7 @@ function warmCache() {
 
     for (const type of DIE_TYPES) {
       try {
-        const mesh = createDieMesh(type); // shared cached geometry/materials — never disposed here
+        const mesh = createDieMesh(type, variant); // shared cached geometry/materials — never disposed here
         // Pose: rotate the die so its max-value face normal points along
         // HERO_DIR (for d4, the max-value vertex direction — same intent:
         // the biggest numeral faces the viewer).
@@ -132,16 +144,16 @@ function warmCache() {
         renderer.render(scene, camera);
         // Read back IN THE SAME TASK as the render: preserveDrawingBuffer is
         // false, so the buffer is only guaranteed until this task yields.
-        cache.set(type, renderer.domElement.toDataURL());
+        cache.set(`${variant}/${type}`, renderer.domElement.toDataURL());
         scene.remove(mesh);
       } catch {
-        cache.set(type, null);
+        cache.set(`${variant}/${type}`, null);
       }
     }
   } catch {
     /* fall through to the null fill below */
   } finally {
-    for (const t of DIE_TYPES) if (!cache.has(t)) cache.set(t, null);
+    for (const t of DIE_TYPES) if (!cache.has(`${variant}/${t}`)) cache.set(`${variant}/${t}`, null);
     // Give the context back — the art now lives entirely in the dataURLs.
     try { renderer.dispose(); renderer.forceContextLoss(); } catch { /* already lost */ }
   }

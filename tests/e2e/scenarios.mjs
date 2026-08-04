@@ -3117,4 +3117,75 @@ export const scenarios = [
       );
     },
   },
+  {
+    name: 'themed-chrome',
+    tags: ['themes'],
+    // §9 chrome art: 2D die chips are baked portraits of the real meshes
+    // (diceart.js, per (type, variant)). Prospective chrome — palette
+    // tiles, strips — wears MY set and follows a set change live; the
+    // LOG wears each roll's own set on every screen (B sees Alice's
+    // anvil), and a hidden entry wears obsidian (shroud > set > std,
+    // same precedence as the felt). Chips are asserted by contract (img
+    // src === the bakery's answer), never by pixels.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      // pin BOTH tabs' sets — dice.diceset.v1 leaks from earlier scenarios
+      await a.eval(`window.__diceDebug.setDiceSet('std')`);
+      await b.eval(`window.__diceDebug.setDiceSet('std')`);
+
+      // the bakery: themed art exists, differs from std, junk falls back
+      const facts = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const d = window.__diceDebug;
+        const std = d.dieArtFor('d6', 'std');
+        const anvil = d.dieArtFor('d6', 'emberforge.blackanvil');
+        return {
+          hasStd: !!std,
+          hasAnvil: !!anvil,
+          differs: anvil !== std,
+          junkFallsBack: d.dieArtFor('d6', 'no.such') === std,
+        };
+      })())`));
+      assert.ok(facts.hasStd, 'std art bakes');
+      assert.ok(facts.hasAnvil, 'themed art bakes');
+      assert.ok(facts.differs, 'a themed chip is not the std chip');
+      assert.ok(facts.junkFallsBack, 'an unknown set id falls back to std art');
+
+      // palette tiles follow MY set, in place, on the switch
+      await a.eval(`window.__diceDebug.setDiceSet('emberforge.blackanvil')`);
+      const tile = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const img = document.querySelector('.die-btn img.die-art[data-art-type="d6"]');
+        return img ? img.src === window.__diceDebug.dieArtFor('d6', 'emberforge.blackanvil') : null;
+      })())`));
+      assert.equal(tile, true, 'the d6 palette tile wears the anvil skin after the switch');
+
+      // the log wears the ROLL's set on the OTHER screen
+      await a.roll('3d6 # forged');
+      await a.settle();
+      await b.settle();
+      await b.waitFor(`document.getElementById('log-list').childElementCount >= 1`, { desc: 'roll reaches tab B' });
+      const logChip = JSON.parse(await b.eval(`JSON.stringify((() => {
+        const img = document.querySelector('#log-list img.log-die');
+        return img ? img.src === window.__diceDebug.dieArtFor('d6', 'emberforge.blackanvil') : null;
+      })())`));
+      assert.equal(logChip, true, "B's log chip wears ALICE's set, not B's");
+
+      // a hidden entry wears obsidian: die types public, identity not
+      await a.roll('d20 held');
+      await b.waitFor(`document.getElementById('log-list').childElementCount >= 2`, { desc: 'held entry reaches tab B' });
+      const heldChip = JSON.parse(await b.eval(`JSON.stringify((() => {
+        const img = document.querySelector('#log-list img.log-die'); // newest entry first
+        return img ? img.src === window.__diceDebug.dieArtFor('d20', 'shroud') : null;
+      })())`));
+      assert.equal(heldChip, true, 'a hidden entry wears obsidian chips');
+
+      // switching back re-dresses the palette
+      await a.eval(`window.__diceDebug.setDiceSet('std')`);
+      const back = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const img = document.querySelector('.die-btn img.die-art[data-art-type="d6"]');
+        return img ? img.src === window.__diceDebug.dieArtFor('d6', 'std') : null;
+      })())`));
+      assert.equal(back, true, 'switching back re-dresses the palette');
+    },
+  },
 ];
