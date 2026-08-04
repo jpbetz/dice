@@ -26,48 +26,54 @@ transfers to real CPUs (rAF throttling only affects render fps, not JS
 execution), so the roll-arrival milliseconds are real. Reported ms are
 capped at what benches proved; anything softer is called out.
 
-### 0a. The roll-arrival pass — every roll, every player, breaks the invariant
+### 0a. The roll-arrival pass — SHIPPED A+B 2026-08-04; C reverted, redesign pending
 
-The prime finding. `playRoll`'s synchronous physics fast-forward runs
-unbounded on the main thread (`js/main.js:1699`, the `for (;;) {
-world.step(FIXED_DT) … }` inside `playRoll`), called from the SSE roll
-handler AND `hello` resync — so **spectators pay the freeze too**.
-Measured in-page wall-clock: 1d20 ~6 ms, 8d6 empty ~20 ms, **8d6 on a
-loaded felt 139–349 ms**, 40 dice **460–1450 ms**; corroborated by real
-SSE arrivals emitting 1336 ms and 2248 ms long tasks vs a 153 ms idle
-noise floor. Ordinary rolls on any lived-in table already exceed the
-150 ms interruptibility budget, and `skipCeremony()` can't reach a
-main-thread block. Ship the pass as three commits, hardest last:
+**Shipped (2036b9b, 3ed606d):** Per-die settle + SAP broadphase. A
+landed die now freezes to STATIC mid-sim without waiting for the
+group's slowest sibling — kills the group-clock reset that made one
+twitching die drive the whole roll to the 9 s cap. SAP broadphase
+retires the O(N²) shelf tax (`js/main.js:446`); verified against a
+new `perf-determinism` cross-client keyframe-hash e2e (1d20, 8d6,
+20d6 — bit-identical across clients under seeded throws). Bench
+after A+B: `8d6-loaded` collapses from ~139–349 ms baseline to ~117 ms
+max longtask (under the 150 ms budget); large mixed-die rolls (10d20
++ 10d12 + 10d10 + 10d8) still hit the SETTLE_CAP at 540 frames and
+report ~1 s of longtasks in the arrival window — Commit C is still
+needed to close the invariant for that class.
 
-- **Per-die settle (S3, cheap, ~half a day).** SETTLE_STILL is a
-  group-wide `dice.every()` (js/main.js:1705); one twitching die zeroes
-  the group timer, so 3–6/6 benched 40d6 rolls hit the 9s `SETTLE_CAP`
-  the moment shelf statics exist, giving the player a nine-second
-  tumble to watch and inflating keyframe memory ~3.4×. Freeze
-  individually-still dice to STATIC mid-sim, stop resetting the group
-  clock on them, and stop appending their keyframes. `allowSleep` is
-  already set on the bodies (`js/dice.js:1002`) — the mechanism is
-  there.
-- **SAP broadphase (S3, one line, needs a determinism check).**
-  `js/main.js:446` constructs `new CANNON.World({ gravity })` with no
-  broadphase — cannon-es defaults to `NaiveBroadphase`, O(N²) pair
-  test, so every settled shelf die taxes every subsequent roll (1d20
-  with 200 statics = 106 ms sync). Vendored `cannon-es.js` ships
-  `SAPBroadphase`; one line at world construction fixes it. Broadphase
-  order can shift solver order — run the seeded-throw fuzz + e2e suite
-  to confirm identical keyframes across clients before shipping. If a
-  hash diverges, keep naive and group shelf clusters into per-cluster
-  compound bodies instead (secondary path).
-- **Sliced fast-forward (S4, the real work, day or two).** Hoist the
-  step loop into a resumable stepper that runs ≤8 ms wall-clock per
-  rAF slice, dice held at the spawn keyframe until the producer runs
-  ahead of the consumer (~3 sliced frames). Playback starts on the
-  first slice; the physics chases. **Success is measurable**: no
-  long task >50 ms attributable to roll arrival, total sim wall
-  unchanged (honesty check that work moved, not vanished).
+**Reverted (Commit C, sliced fast-forward, `1fbb2c9` → `e612d25`).**
+The workflow's implementer shipped a sliced producer/consumer that
+correctly kills the sync burst (≤ 0.4 ms `commandRoll` wall for every
+case). But the adversarial verifier caught two real defects on the
+exact code path C targets — large plain rolls:
 
-Together these three take arrival from "freeze every table for a
-second" to "no perceptible hitch, ceremony pacing unchanged."
+- **Face-correction pop.** `d.correction` starts identity; playback
+  starts at frame 3 with identity in effect; `finalizeProducer`
+  doesn't run until all dice settle (many slices later); every die
+  visibly pops by up to 180° when finalize fires. Ceremony rolls
+  hide it via the 1.35 s declare hold; plain rolls do not. The
+  `perf-determinism` scenario hashes raw keyframes, not the applied
+  correction — the pop passes tests undetected.
+- **`ringIdx` race.** `roll.ringIdx` is null until finalize; a
+  loud ringing landing consumed before finalize consumes `sIdx ===
+  null`, and when finalize later stamps `ringIdx` to that
+  already-consumed index, `postStack.ring()` is silently dropped.
+
+**Next design for C** (candidate — needs Joe's sign-off): hold
+playback until `finalizeProducer` completes, and slice the producer
+across rAF frames. Arrival returns immediately (no sync burst); dice
+hold at spawn poses while the sim slices; playback begins with
+correction already computed (no pop). Cost: brief hold at spawn for
+large rolls (~150–300 ms for 40 mixed dice at the current 8 ms slice
+budget). Under the invariant, and eliminates the pop by construction.
+Compute `ringIdx` eagerly (max-so-far during production; unlock the
+firing only after `producerDone`, with a retroactive fire at the
+current playback time if it points at an already-consumed sound).
+
+**Also standing open** (§0a stretch): the `perf-slicing` scenario
+the design named — direct sync-vs-sliced bit-identity — was skipped
+in the workflow. When Commit C reships it should include that scenario
+so the equivalence claim is checked, not inferred.
 
 ### 0b. Boot & bandwidth — every visit, every reconnect, remote-player-felt
 
