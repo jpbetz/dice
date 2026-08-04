@@ -1008,6 +1008,69 @@ correction machinery is untouched (a theme is a skin over dice.js
 geometry + materials). Start with a small experimental set to find the
 bar before building the full picker.
 
+### 9c. THE SOFTER EDGE — real fillets on the render mesh (Joe 2026-08-04:
+"all the edges are crazy looking hard lines… a lot [of real dice] don't
+have such perfect flat surfaces and perfectly chamfered edges")
+
+**Diagnosis** (research preserved): the hard look is structural.
+`buildBeveledGeometry` stitches each edge with ONE flat band and each
+corner with a flat fan, then `computeVertexNormals` on the non-indexed
+soup gives flat facet shading — a narrow 45° mirror strip whose bounding
+creases each carry a hard shading discontinuity. `profile:'round'` only
+LERPS band normals 65% toward the sphere direction: it softens the color
+gradient but the band is still one flat strip — polygonal silhouette,
+straight specular. Real dice have a *curved* transition, so the highlight
+smears and rolls as the die moves.
+
+**The ladder** (each tier subsumes the one before):
+
+- **Tier 0 — data only. SHIPPED 2026-08-04** (`f220ef1` + seams
+  `64941de`): THE GEO BENCH in the lab — eight `geo` recipes swept over
+  otherwise-standard dice (sets may now omit body/text to inherit std
+  per-type colors; house-less sets read std finish) — plus THE SET
+  BUILDER (every recipe knob live, themes.js-shaped copy-out) and hero
+  die framing (canvas click, ↑/↓ same-die-across-sets surfing). e2e:
+  lab-geo-bench (tag `lab`); stills: tools/geo-bench-shots.mjs.
+  **Bench verdict from the stills:** even `round .130` still reads as
+  dark grooves at hero distance — Tier 0 chooses the least-bad recipe;
+  it cannot manufacture roundness. Joe picks a std recipe from the
+  bench (or builds one) while Tiers 1–2 wait.
+- **Tier 1 — analytic fillet normals** (small code, big return): band
+  rim vertices take the adjacent face's exact normal (zero crease at
+  the face↔band junction), interpolating face-A→face-B across the band;
+  corner fans blend toward the vertex ray. Correct cylinder-fillet
+  shading over today's triangle count. Kills the crease lines; the
+  silhouette stays faceted (a few pixels at table distance).
+- **Tier 2 — true rounded edges, Minkowski-style** (the right answer):
+  rounded convex polyhedron = the solid shrunk by r, re-inflated by a
+  sphere. Faces stay in their ORIGINAL planes (resting height untouched
+  — canonicalDiePose reads the same bottom plane), each edge becomes a
+  real N-segment cylindrical band, each corner a spherical patch, with
+  EXACT normals free (radial from axis/center). Shading AND silhouette
+  genuinely curve — the highlight rolls around the edge as the die
+  tumbles, which is the thing the eye misses. Slots into
+  buildBeveledGeometry as N arc rings per edge, N=1 degenerating to
+  today's mesh (strict superset; every house recipe keeps working; new
+  `geo` knob `segments` or `radius`). Cost trivial (d6 ≈ +500 tris at
+  N=4). One real workhorse: per-edge inset `r / tan(dihedral/2)` — the
+  d10's kite faces carry two dihedrals, so the uniform toward-centroid
+  inset share must become per-edge polygon offsetting.
+- **Tier 3 — tumbled resin** (composes with Tier 2): subdivide faces,
+  blend toward a superellipsoid for the no-flat-anywhere pocket-dice
+  look; today's `wear` displacement is a crude version. Constraint:
+  the dead-flat digit plane (legibility) — face bulge stays subtle or
+  shading-only, as `pillow` already is.
+
+**Rejected:** normal-map edge rounding (edge bands are deliberately
+UV-less; silhouette stays hard; falls apart close-up — inferior to
+Tier 2 at similar effort) · SDF raymarched dice (perfect rounding, but
+a custom-shader universe that forfeits the three.js lighting/shadow/
+post pipeline — a rewrite, not a feature).
+
+**Invariant, restated:** all tiers are RENDER ONLY. The physics hull,
+face values and read logic stay canonical — a soft edge can never
+change how a die lands (the §9 Level 3.5 contract).
+
 ### 9b. Pool icons — an icon on a pool's tile where die art stands today
 (the Rack anticipated this: "tile icons replace die art later"). **Joe
 2026-08-03:** a default icon set for Your Soul Deal's attributes

@@ -492,6 +492,33 @@ effect trigger buttons, a ⬇ drop button per set (the Level 3 rig — a
 real physics die whose measured contacts fire the set's bursts; sets
 without particles prove the restraint), and one-click PNG capture.
 
+THE GEO BENCH (2026-08-04, softer edges Tier 0 — ROADMAP §9c): eight
+lab-only rows sweep the Level 3.5 `geo` space over otherwise-standard
+dice, seated under the std row. Two seams make them honest: a set may
+omit body/text to inherit the std per-type colors, and house-less sets
+clamp to the std envMapIntensity whisper — so a bench row differs from
+std by its geo recipe ALONE. They register through themes.js
+`registerSet` into the page's own SETS instance; SET_IDS (the published
+picker) never sees a `lab.*` id.
+
+THE SET BUILDER (same date): the ⚗ panel makes every recipe knob live —
+geometry, colors (or inherit-std), feel, specular identity, internal
+glow, surface maps, glyphs — rebuilding a dedicated grid row on change
+(`bustDie` evicts the variant's cached builds, then the row remakes its
+meshes). Seeds load from std, any bench row, or any house set; sections
+the panel can't tune (shader, particles, decal, light, post, sound,
+rate) ride along and print. The copy-out is a themes.js-shaped recipe
+body, omit-at-default, paste-ready. Scriptable: `__lab.builderSet(patch)`
+/ `__lab.builderRecipe()`.
+
+Every sidebar row carries THE READOUT — its full recipe in one glance,
+std defaults spelled out where a section is absent. Detail navigation:
+click a die on the felt for a HERO frame (`__lab.zoomDie(rowId, type)`),
+↑/↓ flip the SAME die type across sets while framed, ←/→ walk the die
+types, scroll dollies, esc refits the grid; the bench section header
+frames the whole std→builder span (`__lab.zoomRows`). e2e:
+lab-geo-bench (tag `lab`); stills: `tools/geo-bench-shots.mjs`.
+
 For Level 4 the drop rig grew table furniture: a COUPON of felt fades in
 under the die (marks and glow act on a table; the rig floats over a
 void — the coupon is deliberately brighter than the table's felt, since
