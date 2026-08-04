@@ -4077,4 +4077,58 @@ export const scenarios = [
       assert.ok(rec.feel && typeof rec.feel.rough === 'number', 'recipe carries feel');
     },
   },
+  {
+    name: 'perf-determinism',
+    tags: ['smoke', 'perf', 'resync'],
+    // Perf pass §0a (Commit B — SAP broadphase guard): the SAP broadphase
+    // reorders collision-pair enumeration by axis, which is a determinism
+    // hazard if the physics diverges between clients on the same seed.
+    // Face-correction masks trajectory drift (both dice land on the same
+    // value), so values-only assertions can't catch this — we need the
+    // keyframes themselves to be bit-identical across tabs. Also gates
+    // Commit A (per-die freeze) against unnoticed order-of-freeze drift.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+
+      // Canonicalize keyframes to a stable hash: 9-decimal fixed strings for
+      // each (pos, quat) tuple in every die's keyframe array, joined per die
+      // and across dice. Any float drift in the last decimal fails the check.
+      const HASH = `(() => {
+        const r = window.__diceDebug.currentRoll;
+        if (!r || !r.keyframes) return null;
+        const per = r.keyframes.map((arr) => arr.map((s) =>
+          [s.pos.x, s.pos.y, s.pos.z, s.quat.x, s.quat.y, s.quat.z, s.quat.w]
+            .map((f) => f.toFixed(9)).join(',')
+        ).join('|'));
+        return { frames: r.frames, seed: r.seed, dice: r.dice.length, hash: per.join('||') };
+      })()`;
+
+      const cases = [
+        { notation: '1d20', desc: 'smoke — single die' },
+        { notation: '8d6',  desc: 'target — small pool' },
+        { notation: '20d6', desc: 'target — large pool (SAP-sensitive)' },
+      ];
+      for (const c of cases) {
+        await a.roll(c.notation);
+        await b.settle();
+        const ha = await a.eval(HASH);
+        const hb = await b.eval(HASH);
+        assert.ok(ha && hb, `${c.desc}: both tabs captured keyframes`);
+        assert.equal(ha.seed, hb.seed, `${c.desc}: same seed on both tabs`);
+        assert.equal(ha.frames, hb.frames, `${c.desc}: same frame count (A=${ha.frames}, B=${hb.frames})`);
+        assert.equal(ha.dice, hb.dice, `${c.desc}: same die count`);
+        assert.equal(ha.hash, hb.hash, `${c.desc}: keyframes bit-identical across clients`);
+        // Sweep the felt so the next case rolls onto a clean world (each
+        // roll must be measured in isolation — a leftover shelf changes
+        // the broadphase's static population).
+        const rid = await a.rollId();
+        await a.dbg(`clearRoll(${JSON.stringify(rid)})`);
+        for (const t of [a, b]) {
+          await t.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 0)`,
+            { desc: `${c.desc}: table cleared` });
+        }
+      }
+    },
+  },
 ];

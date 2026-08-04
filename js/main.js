@@ -446,6 +446,16 @@ function applyFeltTheme(id) {
 const world = new CANNON.World({ gravity: new CANNON.Vec3(0, GRAVITY, 0) });
 world.allowSleep = true;
 world.solver.iterations = 14;
+// Perf pass §0a (Commit B — SAP broadphase): the default NaiveBroadphase is
+// O(N²) — a 1d20 rolled onto a shelf of 200 static settled dice takes ~106 ms
+// of synchronous physics just to enumerate collision pairs. SAPBroadphase
+// insertion-sorts by axis (x here — the table's long dimension) and skips
+// pairs whose AABBs don't overlap on that axis. The constructor's setWorld
+// seeds axisList from the six static planes already added above and installs
+// add/remove listeners so every subsequent die enters the list correctly.
+// Determinism is asserted by the perf-determinism e2e scenario (cross-client
+// keyframe hash) — mandatory before this ships.
+world.broadphase = new CANNON.SAPBroadphase(world); // axisIndex=0 (x); do NOT autoDetectAxis
 
 const diceMat = new CANNON.Material('dice');
 const floorMat = new CANNON.Material('floor');
