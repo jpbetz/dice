@@ -158,8 +158,8 @@ export default async function run(stage) {
   await parkMouse();
   await fullShot('15-check-verdict-window.png');
   await cropShot('#verdict-card', '16-check-verdict.png');
-  await hover('#verdict-again');
-  await cropShot('#verdict-card', '17-check-reroll-hover.png');
+  await hover('#verdict-fold .pk-strip');
+  await cropShot('#verdict-card', '17-check-reroll-hover.png'); // (2i-C: the fold's REROLL strip)
   await hover('#verdict-done');
   await cropShot('#verdict-card', '18-check-done-hover.png');
   await parkMouse();
@@ -181,7 +181,7 @@ export default async function run(stage) {
   );
   await parkMouse();
   await cropShot('#verdict-card', '20-cine-verdict.png');
-  await hover('#verdict-again');
+  await hover('#verdict-fold .pk-strip');
   await cropShot('#verdict-card', '21-cine-reroll-hover.png');
   await parkMouse();
 }

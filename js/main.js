@@ -1422,11 +1422,8 @@ function renderPeek() {
     const fold = document.createElement('div');
     fold.className = 'pk-fold';
     appendCardActions(fold, entry, {
-      revealClass: 'sm-reveal pk-reveal',
-      rowClass: 'pk-actions',
-      xClass: 'sm-reveal clear-x pk-clear',
+      revealClass: 'sm-reveal pk-reveal', // the one Reveal dress, small size
       replaceShelfId: c.rollId,
-      clearX: 'none',
     });
     if (fold.childElementCount) peekEl.appendChild(fold);
   }
@@ -2663,21 +2660,20 @@ function renderRollResults(entry, dice, fx = true) {
 
 // THE result card's one action set (2026-08-01, Joe: 'why are the options
 // any different at all?'). Every result surface — the banner over the felt,
-// the peek over the shelf — offers the SAME two verbs on approach: the bare
-// REROLL ❯❯❯ strip (again) and ✕ (away), both revealed-tier (standing on
-// coarse pointers). Reveal alone stands, and only while a hidden roll
-// awaits its authority — it completes the content, it is not an option.
-// Done is retired: auto-collect owns the idle path; Enter/Esc stay the
-// keyboard verbs; ± lives on the draft and behind right-click.
+// the peek over the shelf, and since 2i-C the ceremony verdict card too —
+// builds its FOLD verbs here: the bare REROLL ❯❯❯ strip (again) and Reveal
+// (a hidden roll's completing verb, standing for the authority alone). One
+// builder, one dress per verb; the old static verdict ⟳/Reveal row was a
+// design split that was also a code split.
 //
 // The deliberate asymmetries (surface truth, not drift):
 //   · the peek's reroll REPLACES its shelved cluster (Joe's rule: reroll,
-//     not a copy); the banner's lets the old roll shelve itself on arrival
-//   · clearing is the CARD BODY's job on both surfaces (the folded card,
-//     Joe 2026-08-03) — the banner's body role-splits (roller clears for
-//     everyone, a spectator dismisses locally) while the peek's always
-//     clears (§7.7: a collected roll is anyone's housekeeping). No ✕ is
-//     built here at all; this holder is the FOLD's verbs only.
+//     not a copy); the banner's and the verdict's let the old roll shelve
+//     itself on arrival
+//   · clearing is the CARD BODY's job on the banner and peek (the folded
+//     card, Joe 2026-08-03) while the verdict card — whose body is the
+//     ceremony stage, not a removal target — keeps its static §7.7.2
+//     roller-✕. No ✕ is built here; this holder is the fold's verbs only.
 function appendCardActions(holder, entry, opts) {
   if (canReveal(entry)) {
     const foot = document.createElement('div');
@@ -2733,13 +2729,9 @@ function renderBannerActions(entry) {
     : 'Dismiss — hides this for you; the dice stay until the roller acts';
   main.setAttribute('aria-label', main.title);
   if (!entry.rollId && !canReroll(entry)) return;
-  appendCardActions(holder, entry, {
-    revealClass: hidden ? 'btn primary banner-btn' : 'btn ghost banner-btn',
-    rowClass: 'banner-foot',
-    xClass: 'btn ghost banner-btn clear-x',
-    localDismiss: !(entry.rollId && mine),
-    clearX: 'none', // the folded card: the body IS the ✕
-  });
+  // ONE Reveal dress (2i-C): confirm weight, sized by surface — the gold
+  // primary it wore here was the roll verb's hue on a non-roll act.
+  appendCardActions(holder, entry, { revealClass: 'reveal-verb banner-btn' });
 }
 
 // The body's click — one press, the likeliest act. Static wiring; the act
@@ -3445,10 +3437,12 @@ function renderVerdictCard(roll, entry) {
   // §7.7.2: not every roll deserves shelf space — the roller also gets a ✕
   // that clears the dice outright (spectators keep the single local ✕).
   document.getElementById('verdict-x').classList.toggle('hidden', !(mine && entry.rollId));
-  // goal 11: a held ceremony's verdict card carries Reveal for the authority.
-  document.getElementById('verdict-reveal').classList.toggle('hidden', !canReveal(entry));
-  // …and ⟳ waits for the reveal with everything else (canReroll).
-  document.getElementById('verdict-again').classList.toggle('hidden', !canReroll(entry));
+  // ONE card family (2i-C): the fold's shared verbs — Reveal for the
+  // authority (goal 11), the REROLL ❯❯❯ strip once the values are
+  // readable — come from the same builder the banner and peek use.
+  const vFold = document.getElementById('verdict-fold');
+  vFold.textContent = '';
+  appendCardActions(vFold, entry, { revealClass: 'reveal-verb' });
 
   // Per-die systems have no total: the ring shows no number and DC math
   // never renders (usesTotal, meanings.js v2). The card's center carries
@@ -3586,10 +3580,9 @@ document.getElementById('verdict-done').addEventListener('click', (e) => {
     dismissCeremonyUI(); // spectator ✕ (or a roll with no id): local dismiss only
   }
 });
-document.getElementById('verdict-again').addEventListener('click', (e) => {
-  e.stopPropagation();
-  rerollLast(); // same semantics as the 'r' shortcut
-});
+// (verdict ⟳ and Reveal wiring retired 2i-C: appendCardActions builds and
+// wires both into #verdict-fold — the strip rerolls THIS card's entry, one
+// hop truer than the old rerollLast, and the 'r' shortcut is unchanged.)
 // §7.7.2 roller ✕: clear this roll's dice for everyone without shelving.
 // Not optimistic — the 'roll-cleared' broadcast (or the synchronous solo
 // apply) closes the card via applyClearRoll; a failed POST keeps the card.
@@ -3604,13 +3597,8 @@ document.getElementById('verdict-x').addEventListener('click', (e) => {
     if (!ok) showSettingsNote('couldn’t clear the roll — try again');
   });
 });
-// goal 11: the held verdict card's Reveal — same path as banner/marker/peek;
-// the card upgrades in place when the reveal comes back around.
-document.getElementById('verdict-reveal').addEventListener('click', (e) => {
-  e.stopPropagation();
-  const v = verdictFor;
-  if (v && v.rollId) requestReveal(v.rollId);
-});
+// (goal 11's verdict Reveal rides #verdict-fold now — built and wired by
+// appendCardActions, upgrading in place when the reveal comes around.)
 
 // ---------------------------------------------------------------------------
 // Animation loop
@@ -4538,8 +4526,12 @@ function renderTray() {
       x.className = 'die-x';
       x.textContent = '✕';
       x.title = r.title;
-      x.style.left = `${r.el.offsetLeft + r.el.offsetWidth - 9}px`;
-      x.style.top = `${r.el.offsetTop - 10}px`;
+      // INSIDE its chip's top-right corner (2i-C S1): straddling the edge
+      // put the ✕ in the gutter between neighbouring pool chips, ambiguous
+      // about which one it removes. Overlapping the chip's own art is safe
+      // — the proximity reveal shows exactly one ✕ at a time.
+      x.style.left = `${r.el.offsetLeft + r.el.offsetWidth - 18}px`;
+      x.style.top = `${r.el.offsetTop - 4}px`;
       x.addEventListener('click', (e) => {
         e.stopPropagation(); // a remove is never a roll
         r.onRemove();

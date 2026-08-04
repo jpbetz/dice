@@ -738,6 +738,15 @@ export const scenarios = [
       assert.equal(await a.eval(
         `getComputedStyle(document.querySelector('#verdict-card .verdict-actions')).opacity`),
         '0.45', 'the verdict actions rest dim, never invisible');
+      // 2i-C ONE card family: the fold's REROLL strip comes from the same
+      // builder as the banner's/peek's; the static ⟳ is gone for good
+      assert.ok(await a.eval(`!!document.querySelector('#verdict-fold .pk-strip')`),
+        'the verdict card rerolls through the one built strip');
+      assert.ok((await a.eval(
+        `document.querySelector('#verdict-fold .pk-strip').textContent`)).includes('REROLL'),
+        'and the strip speaks the reroll vocabulary');
+      assert.equal(await a.eval(`document.getElementById('verdict-again')`), null,
+        'the static verdict ⟳ is retired');
       await a.dbg(`setSystem('dnd')`);
       await a.waitFor(
         `getComputedStyle(document.querySelector('#verdict-card .ring-wrap')).display !== 'none'`,

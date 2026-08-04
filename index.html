@@ -370,16 +370,19 @@ limitations under the License.
       <div class="margin-line" id="verdict-margin"></div>
       <div class="verdict-hero" id="verdict-hero"></div>
       <div class="mod-cards" id="verdict-modcards"></div>
-      <!-- Standing: Reveal (a hidden roll's completing verb) + Done. The
-           revealed tier (⟳, the roller's clear-✕) appears on approach —
-           the same P6 treatment every result surface carries. -->
+      <!-- ONE card family (2i-C): the shared fold verbs — REROLL ❯❯❯ and
+           Reveal — are BUILT by appendCardActions into #verdict-fold, the
+           same builder the banner and peek use (the old static ⟳/Reveal
+           row was a design split that was also a code split). The card's
+           own verbs stay static: ✕ (§7.7.2 roller clear) and Done (the
+           settled collect-or-dismiss role split). The whole row rests DIM
+           and brightens on approach (2i-B). -->
       <div class="verdict-actions">
-        <div class="banner-row reveal-tier">
-          <button id="verdict-again" class="ghost-btn" title="Reroll this">⟳</button>
+        <div id="verdict-fold" class="verdict-fold"></div>
+        <div class="banner-row">
           <button id="verdict-x" class="ghost-btn clear-x hidden" title="Clear this roll for everyone">✕</button>
+          <button id="verdict-done" class="ghost-btn">Done</button>
         </div>
-        <button id="verdict-reveal" class="ghost-btn hidden" title="Flip this roll face up for the table">Reveal</button>
-        <button id="verdict-done" class="ghost-btn">Done</button>
       </div>
     </section>
 

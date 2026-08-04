@@ -220,9 +220,9 @@ html, body {
 /* ---------- neutral accents inside the column ---------- */
 /* Joe 2026-08-04: gold survives ONLY where it means roll (the tray cue and
    its glow keep their dress untouched); ambient chrome — hover borders,
-   pressed segments, sticky shelf heads — reads steel over graphite. */
-#left-panel .btn:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.32); }
-#left-panel .btn.confirm:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.4); }
+   pressed segments, sticky shelf heads — reads steel over graphite.
+   (2i-C unscoped the hover half of this law app-wide — the global .btn /
+   .ghost-btn hovers are steel now, so the per-panel overrides retired.) */
 #left-panel .seg button[aria-pressed="true"] {
   background: rgba(243, 234, 215, 0.13);
   color: var(--ivory);
@@ -242,9 +242,18 @@ html, body {
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, transform 0.05s;
 }
-.btn:hover:not(:disabled) { background: rgba(255,255,255,0.12); border-color: var(--gold); }
+/* HUE = ACT, unscoped (2i-C: the steel-hover law used to stop at the
+   panel's edge). Tools hover STEEL everywhere; gold survives only where
+   the verb is roll (pool strips, the tray, the log's per-row ⟳ — reroll
+   IS a roll act, written down as the density exemption); red is
+   destruction's alone. */
+.btn:hover:not(:disabled) { background: rgba(255,255,255,0.12); border-color: rgba(255, 255, 255, 0.32); }
 .btn:active:not(:disabled) { transform: translateY(1px); }
-.btn:disabled { opacity: 0.4; cursor: default; }
+/* THREE visibility codes (2i-C): disabled drains hue (grayscale) so it can
+   never be mistaken for the reveal tier's resting dim; absent is a real
+   display:none (this codebase has no bare .hidden — every hide is
+   explicit). */
+.btn:disabled { opacity: 0.4; cursor: default; filter: grayscale(0.7); }
 
 .btn.primary {
   background: linear-gradient(180deg, #caa53a, #9c7c1e);
@@ -257,13 +266,15 @@ html, body {
 .btn.ghost { background: var(--panel); }
 /* Confirms (save ✓, Update, Join) keep their weight WITHOUT the gold fill:
    the gold gradient belongs to the roll verb alone (P1 economy — §5.1's
-   rationing). Bold ivory on a brightened border reads decisive, not royal. */
+   rationing). Bold ivory on a brightened border reads decisive, not royal
+   — and the border IS ivory now (2i-C/D: the gold-tinted rest border was
+   bronze bleeding onto a non-roll verb; the comment said ivory all along). */
 .btn.confirm {
   font-weight: 700;
-  border-color: rgba(212, 175, 55, 0.5);
+  border-color: rgba(243, 234, 215, 0.4);
   background: rgba(255, 255, 255, 0.09);
 }
-.btn.confirm:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); border-color: var(--gold); }
+.btn.confirm:hover:not(:disabled) { background: rgba(255, 255, 255, 0.16); border-color: rgba(243, 234, 215, 0.65); }
 .btn.tiny { font-size: 11px; padding: 2px 8px; margin-left: 6px; vertical-align: 2px; }
 
 .btn-row { display: flex; gap: 8px; margin-top: 10px; }
@@ -278,7 +289,7 @@ html, body {
   padding: 7px 10px;
   font-size: 13px;
 }
-.btn-row input:focus { outline: none; border-color: var(--gold); }
+.btn-row input:focus { outline: none; border-color: rgba(243, 234, 215, 0.5); } /* focus is a tool state, not a roll */
 
 /* ---------- die-type buttons ---------- */
 #die-buttons {
@@ -685,12 +696,15 @@ html, body {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.04));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
 }
-/* unlit, not absent: an empty well's tools recede but hold their place */
+/* unlit, not absent: an empty well's tools recede but hold their place —
+   and wear the disabled CODE (grayscale) so recede never reads as the
+   reveal tier's resting dim (2i-C, three states three codes) */
 .draft-actions .btn:disabled,
 #tray-mods:disabled {
   opacity: 0.42;
   box-shadow: none;
   cursor: default;
+  filter: grayscale(0.7);
 }
 /* The ± leads the rim — the one tool that SHAPES rather than disposes, so
    it wears the warm metal instead of the cold (gold stays reserved for
@@ -1359,7 +1373,7 @@ html, body {
   padding: 6px 9px;
   font-size: 12.5px;
 }
-.group-editor input:focus { outline: none; border-color: var(--gold); }
+.group-editor input:focus { outline: none; border-color: rgba(243, 234, 215, 0.5); } /* focus = tool state (2i-C) */
 .group-editor .ge-notation {
   font-family: var(--font-mono);
   font-size: 11.5px;
@@ -2258,7 +2272,18 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.corner-btn:hover { color: var(--ivory); border-color: var(--gold); background: rgba(212,175,55,0.15); }
+/* HUE = ACT (2i-C): the most destructive control in the app must never
+   invite with the roll verb's gold — destruction hovers RED, one family
+   with .clear-x/.die-x. The #left-panel-prefixed pair outguns the
+   column's neutral .btn hover on specificity. */
+.corner-btn:hover,
+#clear-log:hover,
+#left-panel #clear-tray:hover:not(:disabled),
+#left-panel .tile-del:hover {
+  color: #fff;
+  border-color: var(--red);
+  background: rgba(226, 73, 59, 0.16);
+}
 
 /* ---------- roll mechanics display ---------- */
 .value-chip.discarded {
@@ -2307,21 +2332,31 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
   flex: none;
   box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
 }
-/* a shelved roll's Reveal lives in its peek card (§7.7.1) — the resting
-   marker stays a quiet dot even while the roll is face down */
-.sm-reveal {
-  background: none;
-  border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  color: var(--gold-bright);
+/* ONE Reveal dress (2i-C): the completing act for a hidden roll wears
+   CONFIRM weight — bold ivory on a brightened border, "decisive, not
+   royal" — sized by surface. It wore three dresses before (gold primary
+   on the banner, a 10px gold chip on the peek, plain ghost on the
+   verdict); gold stays the roll verb's (HUE = ACT). .sm-reveal is the
+   small size of the same dress (a shelved roll's Reveal lives in its
+   peek card, §7.7.1 — the resting marker stays a quiet dot). */
+.reveal-verb, .sm-reveal {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 5px 16px;
+  border: 1px solid rgba(243, 234, 215, 0.4);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.09);
+  color: var(--ivory);
   cursor: pointer;
-  font-family: inherit;
-  font-size: 10px;
-  letter-spacing: 0.04em;
-  padding: 1px 5px;
   line-height: 1.2;
+  transition: background 0.15s, border-color 0.15s;
 }
-.sm-reveal:hover { background: rgba(255, 214, 102, 0.16); }
+.reveal-verb:hover, .sm-reveal:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(243, 234, 215, 0.65);
+}
+.sm-reveal { font-size: 11px; padding: 2px 9px; border-radius: 6px; }
 /* compact view: the invisible target shrinks with the reframed clusters */
 body.mini .shelf-marker { width: 56px; height: 56px; }
 body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
@@ -2457,6 +2492,11 @@ body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
   opacity: 0.5;
 }
 .pk-strip.pk-bare:hover:not(:disabled) .roll-cue { opacity: 1; }
+/* the TIER carries the rest-dim (2i-C): a reveal-tier strip's cue was
+   stacking a second element dim on the tier's 0.45 and a third in its
+   color alpha — three layers deep it read as disabled, which is exactly
+   the state it is not */
+.reveal-tier.pk-strip .roll-cue { opacity: 1; }
 
 /* compact view keeps the full card, scaled like the markers (§7.7.1) */
 body.mini .peek-card { min-width: 150px; padding: 7px 10px 9px; }
@@ -2535,7 +2575,9 @@ body.mini .pk-breakdown { font-size: 10px; }
 #verdict-card .verdict-actions { opacity: 0.45; transition: opacity 0.15s; }
 #verdict-card:hover .verdict-actions,
 #verdict-card:focus-within .verdict-actions { opacity: 1; }
-#verdict-card .reveal-tier { display: contents; }
+/* the row itself carries the card's rest-dim — the builder's reveal-tier
+   strip inside it must not stack a second one (2i-C) */
+#verdict-card .verdict-actions .reveal-tier { opacity: 1; }
 @media (pointer: coarse) { #verdict-card .verdict-actions { opacity: 1; } }
 
 /* ---------- offered-roll cards ---------- */
@@ -3298,10 +3340,17 @@ body.mini .popover { width: min(94vw, 312px); }
 }
 .mod-card .ml s { opacity: 0.7; }
 
+/* the fold anatomy, card family edition (2i-C): the builder's verbs stack
+   over the card's own ✕/Done row — same shape as the banner's fold */
 .verdict-actions {
-  display: flex; justify-content: center; gap: 8px;
+  display: flex; flex-direction: column; align-items: stretch; gap: 6px;
   margin-top: clamp(10px, 2vmin, 16px);
 }
+.verdict-actions .banner-row { justify-content: center; gap: 8px; }
+.verdict-fold { display: flex; flex-direction: column; gap: 6px; }
+.verdict-fold:empty { display: none; }
+.verdict-fold .pk-strip { margin-top: 0; }
+.verdict-fold .banner-foot { margin-top: 0; }
 .ghost-btn {
   cursor: pointer;
   font-family: var(--font-ui);
@@ -3310,7 +3359,8 @@ body.mini .popover { width: min(94vw, 312px); }
   background: rgba(255,255,255,0.05); color: var(--ivory);
   transition: background 0.15s, border-color 0.15s;
 }
-.ghost-btn:hover { background: rgba(255,255,255,0.11); border-color: var(--gold); }
+.ghost-btn:hover { background: rgba(255,255,255,0.11); border-color: rgba(255, 255, 255, 0.32); } /* steel — HUE = ACT (2i-C) */
+.ghost-btn:disabled { opacity: 0.4; cursor: default; filter: grayscale(0.7); } /* the disabled code (2i-C) */
 /* The gated verdict actions (Reveal for the authority, ⟳ behind readability,
    the roller-only ✕) actually hide when gated — this rule was missing, so
    every check's card grew a Reveal that could only ever refuse. */
