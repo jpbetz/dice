@@ -3534,6 +3534,47 @@ export const scenarios = [
         `window.__diceDebug.postInfo().bloomDice >= ${diceBefore + 1}`,
         { desc: 'the revealed die joins the bloom mask' },
       );
+
+      // S3 (2026-08-04): the shelf is the archive — a collected bolt
+      // roll must NOT keep the stack hot on an otherwise-empty felt.
+      // Fresh table so the assertion isn't muddied by held/revealed
+      // survivors from the prior steps.
+      await a.dbg('clearTable()');
+      await a.waitFor(`window.__diceDebug.tableDice.length === 0`, { desc: 'felt goes empty' });
+      // Rings age inside postStack.render and sim() ticks render=false —
+      // drain the transient effects then let particles fall away with
+      // sim(). Sanity: an empty felt with drained effects MUST bypass.
+      await a.dbg('postDrain()');
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), window.__diceDebug.postInfo().active === false)`,
+        { desc: 'empty felt bypasses the stack' },
+      );
+      await a.eval(`window.__diceDebug.setDiceSet('stormcall.boltglass')`);
+      await a.roll('2d6 # to shelf');
+      await a.settle();
+      const srid = await a.rollId();
+      p = await post(a);
+      assert.equal(p.active, true, 'felt bolt-glass wakes the stack');
+      assert.ok(p.bloomDiceLive >= 2, `felt bolt dice count as live bloom (got ${p.bloomDiceLive})`);
+      assert.equal(await a.dbg(`collectRoll(${JSON.stringify(srid)})`), true, 'collect accepted');
+      await a.waitFor(
+        `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0 && window.__diceDebug.pendingCollects.length === 0)`,
+        { desc: 'roll shelved, whisk finished' },
+      );
+      // Drain rings/shimmer (transient wake reasons live outside sim()'s
+      // reach) and sim particles to zero — what's LEFT is exactly the
+      // bloom-flag gate we fixed. Before the fix, this predicate stayed
+      // true forever because shelved bloom dice woke the pipeline; after,
+      // it flips false as soon as the felt goes empty.
+      await a.dbg('postDrain()');
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), window.__diceDebug.postInfo().active === false)`,
+        { desc: 'S3: shelf-only bloom leaves the stack IDLE' },
+      );
+      p = await post(a);
+      assert.equal(p.active, false, 'S3: pipeline reports IDLE with bloom dice on the shelf');
+      assert.ok(p.bloomDice >= 2, 'shelved dice still carry the bloom flag on their mesh');
+      assert.equal(p.bloomDiceLive, 0, 'no bloom-flagged dice are on the felt');
     },
   },
   {

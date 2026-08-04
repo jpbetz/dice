@@ -3766,11 +3766,13 @@ function tick(dt, render = true) {
   updateCornerClear();
   if (render) {
     // Level 5 bypass: the stack runs only in frames where it could show
-    // something — a bloom-flagged die anywhere (felt or shelf), live
-    // particles, a running ring/shimmer, or the test force. Otherwise
-    // the released direct path renders untouched.
+    // something — a bloom-flagged die on the FELT, live particles, a
+    // running ring/shimmer, or the test force. Shelved dice are the
+    // archive — their iron has cooled (mirrors collectShimmerSources'
+    // shelf test below) so a shelf full of bolt-glass no longer keeps
+    // the pipeline hot forever (S3 fix, 2026-08-04).
     const need = postForced || postStack.busy() || particleField.count() > 0
-      || tableDice.some((d) => d.mesh.userData.bloom);
+      || tableDice.some((d) => d.mesh.userData.bloom && !shelfClusters.has(d.rollId));
     if (need) {
       postStack.setShimmer(collectShimmerSources(), camera);
       postStack.render(scene, camera, dt);
@@ -4078,17 +4080,33 @@ window.__diceDebug = {
   // the tab last showed (found the hard way: 'active' frozen false while
   // rings fired). lastBloomSources stays as painted-frame curiosity.
   postInfo() {
+    // bloomDice = every bloom-flagged mesh on the table (felt + shelf) —
+    // long-standing surface, kept for existing pins. bloomDiceLive is
+    // the felt-only count that drives the gate after the S3 fix (shelved
+    // bloom dice no longer wake the pipeline).
     const bloomDice = tableDice.filter((d) => d.mesh.userData.bloom).length;
+    const bloomDiceLive = tableDice.filter((d) => d.mesh.userData.bloom && !shelfClusters.has(d.rollId)).length;
     return {
-      active: postForced || postStack.busy() || particleField.count() > 0 || bloomDice > 0,
+      active: postForced || postStack.busy() || particleField.count() > 0 || bloomDiceLive > 0,
       forced: postForced,
       bloomDice,
+      bloomDiceLive,
       lastBloomSources: postStack.lastBloomSources,
       rings: postStack.ringsFired,
       shimmer: postStack.shimmer.length,
     };
   },
   postForce(on) { postForced = on !== false; return postForced; },
+  // Test-only: clear the postStack's transient timed effects (rings +
+  // shimmer). Rings age inside PostStack.render, which sim() skips
+  // (render=false), so a test that fast-forwards via sim() cannot make
+  // a live ring naturally decay — this drain is that lever. Particles
+  // are already sim()-drainable via particleField.tick.
+  postDrain() {
+    postStack.rings.length = 0;
+    postStack.shimmer.length = 0;
+    return true;
+  },
   // roll outlines (the card-hover read): shell colors, in die order
   get outlineState() { return outlined.map((o) => `#${o.shell.material.color.getHexString()}`); },
   hoverBanner(on) { outlineRollDice(on !== false); return outlined.length; },

@@ -295,12 +295,23 @@ export class PostStack {
     renderer.render(scene, camera);
 
     // ---- glow mask → threshold → blur ----
+    // Shadow-map dedup (S3 fix, 2026-08-04): the base render just
+    // refreshed the 2048² PCFSoft shadow map for this frame; the glow
+    // pass renders the same scene (masked to black) against the exact
+    // same lights, so re-running the shadow pass produces identical
+    // depth output for double the GPU cost. Bracket the disable across
+    // just the pair of scene renders — the fullscreen quad passes in
+    // _pass() carry no shadow-casting geometry so autoUpdate is moot
+    // for them; restore whatever the caller had before we touched it.
     const bg = scene.background;
     scene.background = null;
     const sources = (this.lastBloomSources = this._maskOn(scene));
+    const prevShadowAuto = renderer.shadowMap.autoUpdate;
     if (sources > 0) {
+      renderer.shadowMap.autoUpdate = false;
       renderer.setRenderTarget(this.rtGlow);
       renderer.render(scene, camera);
+      renderer.shadowMap.autoUpdate = prevShadowAuto;
     }
     this._maskOff();
     scene.background = bg;
