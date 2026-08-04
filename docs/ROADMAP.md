@@ -231,6 +231,171 @@ gained air so 'You' reads as the rack's header. e2e: side-panel (tags
 `smoke`,`chrome`,`groups`) replaces pool-flyout; control-rail asserts
 the split; stills in tools/out/side-panel/.
 
+### 2i. THE SOUL DEAL AUDIT — reveal read, chrome consistency, material,
+labs (2026-08-04) — FINDINGS BACKLOG, nothing shipped
+
+Joe asked for a UI audit of the left panel, the reveal panel, the collect
+peek, and the check/cinematic screens under Your Soul Deal, with
+multi-pool flow ("I find some of the presentation difficult to parse…
+consider a table?"). 21 stills + a 5-lens adversarially-verified review
+(33 findings survived, 2 refuted). Stills + the ledger prototype pairs in
+`tools/out/souldeal-audit/` (scripts committed 943a949:
+`souldeal-audit-shots.mjs`, `souldeal-ledger-proto.mjs` — the prototype
+is runtime CSS injection only; full findings JSON sits beside the
+stills). Severity S1–S5; each finding keeps its audit id.
+
+**A · The reveal read (banner · peek · verdict share renderOutcomeRows)
+— the LEDGER family.** The 2e pool-row structure is right; the layout
+strangles it:
+
+- S5 `chip-fusion` — `.oc-chip` is inline-flex, so the whitespace box
+  between die evidence and word collapses: "d6 1Fail", "d10 10Critical
+  Success". The pixels lie while copy/paste stays correct (the nbsp
+  lesson's sibling: a gap belongs to the layout, never to a text node).
+- S4 `rows-center-independently-no-shared-column` — every outcome row
+  centers itself, so five pools give five left edges; the label column
+  exists in intent, not geometry.
+- S4 `row-wrap-orphans-worded-chip` — a wrapped chip carries no label
+  and no hanging indent; the orphan can be the pool's ONLY worded die
+  (still 16: WISDOM's answer floated unattributed). Worst on the verdict
+  card, whose larger uppercase type wraps earliest.
+- S4 `quiet-grammar-three-ways` — silence renders three ways (dim chip
+  alone · serif "quiet" at outcome weight · nothing in the copyable
+  text). ADJUSTED by the doctrine verifier: the in-chip mark ("d6 3 —")
+  is mandated by the text-layer rule, but "quiet" STAYS in the answer
+  slot (§7.9: a pool's answer IS the silence) — fix its weight only.
+- S3 `notation-header-duplicates-rows` (+ `banner-header-wraps-mid-pool-
+  name`, `peek-header-truncates-roll-identity`) — the loudest line on
+  the card repeats what the rows say, wraps inside `[PEER RESPECT]`,
+  ellipsizes on the peek, and orders terms canonically while rows keep
+  staged order (the two lines on one card disagree — the lead's finding
+  c). Demote to a quiet identity caption; the rows are the data.
+- S3 `one-die-answer-not-hero-scale` — the layout ignores roll size: a
+  one-die Soul Deal roll (the common case) renders its whole verdict as
+  one 15px word where dnd shows a 52px gold total.
+- S2 `card-chips-ignore-tier-border-felt-teaches` — the felt's value
+  chips tier-color their borders; the card chips directly above them
+  don't. ADJUSTED: apply at reduced strength so tier stays subordinate
+  to the word.
+- The ledger prototype (A05/A11/A12/A16 stills) is the proposed shape:
+  two-column grid, right-aligned label spine, left-aligned dice cells,
+  hanging indent free, quiet-dash, tier borders, demoted header. Two
+  reconciliations for the real pass: chips left-align to the gutter
+  (the CSS-table prototype centers them), and an all-quiet pool must
+  not double-mark (dash + word).
+
+**B · The ceremony cards.**
+
+- S4 `empty-verdict-ring` (lead b) — under Soul Deal the verdict ring is
+  a giant empty gold circle: main.js ~L3397 sets the center to `''`
+  while its own comment promises "the outcome count… so the ring stays
+  a stage, not a lie". Comment/code drift; the A16 still shows the card
+  with the ring folded and the ledger as its center.
+- S4 `intent-card-drops-pool-names` — renderIntentCard (~L3317) omits
+  `spec.sources` from its canonicalNotation call, so the declaration
+  reads "2d8+1d10" exactly where "Wisdom + Sword" is the stake.
+- S3 `verdict-actions-invisible-at-rest` — the verdict card still uses
+  the invisible→visible grammar (opacity 0 action row) that the folded
+  card retired everywhere else; banner/peek rest-dim instead.
+- S2 `verdict-uppercases-shared-chips` — inherited text-transform makes
+  the shared chips shout ("D8 5 PARTIAL SUCCESS"), breaking the
+  lowercase-mono evidence identity the other surfaces keep.
+
+**C · Action grammar & control consistency ("deepen consistency across
+buttons on all surfaces").**
+
+- S4 `three-button-families-two-codepaths` (lead d, deepened) — the
+  verdict card's icon row (⟳ / ✕ / Done, static markup in index.html)
+  vs banner/peek's body-click-to-clear + REROLL strip (built by
+  appendCardActions): a design split that is also a code split.
+- S4 `reveal-verb-three-dresses` — Reveal (the completing act for a
+  hidden roll) wears gold primary on the banner, a 10px chip on the
+  peek, plain ghost on the verdict card.
+- S4 `rest-dim-reads-as-disabled` — the resting reveal-tier opacity is
+  numerically the disabled dress, and the fold's REROLL strip stacks
+  three dim layers. ADJUSTED: fix by giving the three states three
+  codes (disabled / resting-dim / absent), not by brightening rest.
+- S3 `clear-family-five-dresses-gold-hover` — clear/destroy wears five
+  dresses, and ✕ Clear table (the most destructive control in the app)
+  invites with a GOLD hover — the color the language reserves for the
+  roll act.
+- S2 `done-word-three-meanings` — Done is three controls in three
+  dresses (popover close-editor · pools exit-manage · verdict
+  collect-or-dismiss role split). ADJUSTED: unify dress and hover; the
+  role-split semantics are settled and stay.
+- S2 `steel-hover-law-stops-at-panel-edge` — the "gold survives only
+  where it means roll" neutralization is scoped to #left-panel; verdict
+  Done/⟳, banner Reveal-ghost, log Clear and the corner pill still
+  hover gold. ADJUSTED: unscope the law, with the log's per-row ⟳
+  written down as the density exemption.
+- S1 `tray-x-floats-between-chips` — the proximity ✕ renders in the
+  gutter between adjacent pool chips, ambiguous about which pool it
+  removes.
+- Proposed rule set (the smallest that unifies): ONE DRESS PER VERB
+  sized by surface · THREE VISIBILITY STATES, never invisible-
+  interactive · HUE = ACT globally (gold rolls, red destroys, steel
+  tools).
+
+**D · Panel material — the stone/bronze vs steel/silver answer.**
+
+- S3 `material-scheme-recommendation` — neither temperature swap:
+  stone/bronze narrows the tray-vs-column contrast 2h just built;
+  steel/silver splits the app into two temperature worlds and fights
+  the ivory type. Scheme C wins: keep graphite/bronze, make the steel
+  REAL (all three schemes with concrete CSS values live in the
+  findings JSON).
+- S3 `steel-has-no-body` — outside the tray, "steel" is flat
+  translucent white over graphite: no gradient body, no bevel, no seat
+  shadow, on palette tiles, pool tiles and the rim.
+- S2 `temperature-schism-khaki-on-graphite` — the neutral re-dress is
+  half-done: cool graphite panel tokens under warm khaki section heads.
+- S1 `bronze-bleed-ambient-chrome` — bronze leaks onto non-roll chrome
+  inside the neutral column through unscoped globals. ADJUSTED: sweep
+  alongside the hover-law unscoping, one pass.
+
+**E · Multi-pool flow.** (The chain rack → tray → reveal rows keeps
+staged order faithfully — only the canonical header breaks it, filed in
+A. Staging itself confirmed good.)
+
+- S3 `rolled-draft-accretes-on-restage` — the draft survives its roll
+  with no spent state: tapping pools for the NEXT roll silently doubles
+  a pool (Wisdom becomes ×4), and tray ROLL + banner REROLL stand lit
+  together as near-duplicate repeat verbs. ADJUSTED: any fix must keep
+  the deliberate repeat-roll muscle memory — a spent/refresh cue, not
+  an auto-clear.
+- S3 `shelf-clusters-anonymous-at-rest` — collected rolls rest as
+  unlabeled dice piles; identity requires hovering each in turn.
+  ADJUSTED: any standing mark must respect the quiet-chrome shelf
+  contract (dot-only markers, the peek does the talking) — explore
+  within it, e.g. the peek's identity line made worth the hover (E's
+  truncation finding compounds this).
+- S2 `no-newcomer-path-to-first-stage` — nothing teaches "tap a pool,
+  then ROLL"; the cut ghost text (Joe 2026-08-03) left the compose loop
+  undiscoverable by inspection. Joe owns the replacement direction;
+  standing, not new.
+
+**F · Labs ("do we need more labs?") — yes, one, plus an index.**
+
+- S4 `no-chrome-lab` — lab.html covers 3D die materials; nothing shows
+  the 2D chrome side by side, so cross-surface drift is only visible in
+  after-the-fact still audits. RECOMMENDED SHAPE: a pose-driver —
+  chrome-lab.html embeds the real app and poses states through
+  __diceDebug (every hook this audit needed already exists): real CSS,
+  real hovers, zero forked markup. Upgrade path to direct-import once
+  the card builders extract from main.js (the C code-split fix).
+- S3 `mockups-rotted` — docs/mockups/*.html have already drifted from
+  the shipped app (<1 week); disqualifies the static-mockup shape and
+  is a trap for agents told the mockups are load-bearing.
+- S2 `contact-sheets-have-no-index` — each drive suite drops 20+ loose
+  PNGs; a stitched index page per run would make runs reviewable and
+  comparable at a glance.
+
+**Refuted by the doctrine verifier (recorded so they stay dead):** a
+worded "Collect" on the banner/peek fold (re-litigates §7.9's retired
+Done — auto-collect owns the idle path); unifying the card strips'
+chevrons with the tray's engraved lozenge (re-litigates §7.14.1's
+same-day boundary: the cue overlay form belongs to card strips).
+
 ## Tier 2 — Organization (goal 5, the audit's biggest experience gap)
 
 ### 3. Table organization & concurrency
