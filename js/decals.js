@@ -227,6 +227,24 @@ const KINDS = {
 export class DecalField {
   constructor(scene) {
     this.enabled = DECALS_DEFAULT_ENABLED; // the kill switch, per field
+    // Lazy construction (Tier 0 build-time-vs-runtime): while the kill
+    // switch is dark AND nothing has ever stamped, we pay ZERO atlas paint
+    // (a 1024² canvas + procedural draws), ZERO VRAM upload (texture +
+    // shader + instanced attributes), ZERO scene.add. Everything below
+    // moves into _ensureBuilt(); tick/count/dump/clear guard on `built`.
+    this._scene = scene;
+    this.built = false;
+    this.alive = 0;
+    this.stampedTotal = 0; // monotonic; always readable
+    if (this.enabled) this._ensureBuilt();
+  }
+
+  // Idempotent build: called from stamp() (first mark of the session) and
+  // from enable(true). Everything the old constructor did lives here.
+  _ensureBuilt() {
+    if (this.built) return;
+    this.built = true;
+    const scene = this._scene;
     // ---- atlas ----
     const cell = 256; // marks span multiple die-widths; 128 went blocky
     const canvas = document.createElement('canvas');
@@ -278,11 +296,9 @@ export class DecalField {
     this.shiftT = new Float32Array(MAX);
     this.b0 = new Float32Array(MAX * 3); // colorB at birth (ember)
     this.cursor = 0;
-    this.alive = 0;
     this.kindR = new Int8Array(MAX); // atlas row per slot (minGap checks)
-    this.stampedTotal = 0; // monotonic: how many marks have EVER been laid
-    // (assertion surface — a fast-forwarded test clock ages live marks
-    // to death before a count can be read; the total never lies)
+    // `alive` / `stampedTotal` were pre-initialised in the constructor so
+    // count()/fxInfo() work in the unbuilt state; leave them alone here.
 
     this.material = new THREE.ShaderMaterial({
       uniforms: { uAtlas: { value: atlas } },
@@ -328,6 +344,16 @@ export class DecalField {
     scene.add(this.mesh);
   }
 
+  // Arming path: flipping the switch ON eagerly builds so the FIRST stamp
+  // doesn't pay atlas paint + shader compile + texture upload as a one-off
+  // hitch. Direct writes to .enabled still work (stamp() calls
+  // _ensureBuilt), but callers that route through enable() get no jank.
+  enable(v) {
+    this.enabled = !!v;
+    if (this.enabled) this._ensureBuilt();
+    return this.enabled;
+  }
+
   // Stamp the recipe's mark at a measured contact. `at` is [x, y, z] in
   // world units — the caller supplies the surface height (main table:
   // felt + ε; lab: the drop coupon). Returns how many marks were laid
@@ -337,6 +363,8 @@ export class DecalField {
     if (!this.enabled) return 0; // no mark, no count — the felt stays clean
     const kind = KINDS[recipe.kind];
     if (!kind) return 0;
+    this._ensureBuilt(); // idempotent — first stamp of the session pays the atlas
+
     const row = KIND_ROW[recipe.kind];
     // A fresh same-kind mark already here? The bounce deepens that one.
     if (kind.minGap > 0) {
@@ -389,7 +417,7 @@ export class DecalField {
   }
 
   tick(dt) {
-    if (!this.alive || dt <= 0) return;
+    if (!this.built || !this.alive || dt <= 0) return;
     for (let i = 0; i < MAX; i++) {
       if (this.life[i] <= 0) continue;
       this.age[i] += dt;
@@ -433,6 +461,7 @@ export class DecalField {
   // Slot-level truth for diagnostics (lab's decalDump): every slot that
   // has ever lived, with its clock.
   dump() {
+    if (!this.built) return { alive: 0, slots: [] };
     const slots = [];
     for (let i = 0; i < MAX; i++) {
       if (this.life[i] > 0 || this.age[i] !== 0) {
@@ -455,6 +484,7 @@ export class DecalField {
   // leaves). The main table never needs this — its felt is permanent and
   // marks fade on their own clock.
   clear() {
+    if (!this.built) return;
     for (let i = 0; i < MAX; i++) {
       this.life[i] = 0;
       this.alphaA[i] = 0;

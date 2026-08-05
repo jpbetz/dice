@@ -4388,7 +4388,7 @@ window.__diceDebug = {
   // sim() clock can age live ones out mid-test), the kill-switch
   // state, + attached die-lights.
   fxInfo() {
-    return { decals: decalField.count(), stamped: decalField.stampedTotal, decalsEnabled: decalField.enabled, lights: dieLights.info() };
+    return { decals: decalField.count(), stamped: decalField.stampedTotal, decalsEnabled: decalField.enabled, decalsBuilt: decalField.built, lights: dieLights.info() };
   },
   // §9 draft state: the per-die override bookkeeping behind mixed rolls.
   get draftSets() {
@@ -4398,8 +4398,9 @@ window.__diceDebug = {
   // page only (trials, tests). The lasting switch is
   // DECALS_DEFAULT_ENABLED in decals.js.
   decalsEnable(on) {
-    decalField.enabled = !!on;
-    return decalField.enabled;
+    // Route through enable() so arming eagerly builds the atlas + mesh —
+    // no first-stamp hitch when Joe flips the switch on a live table.
+    return decalField.enable(on);
   },
   // Level 5 assertion surface. Computed LIVE from sim state, never from
   // the last painted frame — a backgrounded tab stops painting but its

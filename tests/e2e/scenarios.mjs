@@ -3576,7 +3576,19 @@ export const scenarios = [
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      // Tier 0 lazy DecalField: with the kill switch dark, boot pays no
+      // atlas paint, no VRAM upload, no scene.add. Both tabs start
+      // factory-dark, so decalsBuilt must read false on both up front.
+      for (const [tab, who] of [[a, 'A'], [b, 'B']]) {
+        const pre = JSON.parse(await tab.eval(`JSON.stringify(window.__diceDebug.fxInfo())`));
+        assert.equal(pre.decalsEnabled, false, `${who}: factory-dark at boot`);
+        assert.equal(pre.decalsBuilt, false, `${who}: lazy — nothing built at boot`);
+      }
       await a.eval(`window.__diceDebug.decalsEnable(true)`); // B stays factory-dark
+      // Arming through decalsEnable() eagerly builds — no first-stamp jank.
+      const armed = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.fxInfo())`));
+      assert.equal(armed.decalsBuilt, true, 'A: arming eagerly builds atlas + mesh');
+      assert.equal(armed.stamped, 0, 'A: arming alone stamps nothing');
       await a.eval(`window.__diceDebug.setDiceSet('emberforge.blackanvil')`);
       await a.roll('3d6 # slam');
       await a.settle();
@@ -3638,6 +3650,7 @@ export const scenarios = [
       // The shipped default holds on an untouched screen.
       const fxB = JSON.parse(await b.eval(`JSON.stringify(window.__diceDebug.fxInfo())`));
       assert.equal(fxB.decalsEnabled, false, 'B is still factory-dark');
+      assert.equal(fxB.decalsBuilt, false, 'B: lazy path held end-to-end — atlas/mesh never built');
       assert.equal(fxB.stamped, 0, 'B: the felt never took a single mark');
     },
   },

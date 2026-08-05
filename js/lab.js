@@ -1208,7 +1208,7 @@ window.__lab = {
   decalCount() { return decals.count(); },
   decalDump() { return decals.dump(); },
   // marks ship dark (2026-08-03) — arm this page to review them
-  decalsEnable(on) { decals.enabled = !!on; return decals.enabled; },
+  decalsEnable(on) { return decals.enable(on); },
   lightInfo() { return dieLights.info(); },
   // Level 5 diagnostics: what the stack did last frame + monotonic rings.
   postInfo() {
