@@ -23,6 +23,15 @@ limitations under the License.
 // All state is in memory. Rooms are created on first join and deleted when the
 // last player leaves. The server is the sole authority on rolled values: a
 // client never displays a locally generated value while online.
+//
+// Log volume: PORT and DICE_LOG_LEVEL are the two knobs. DICE_LOG_LEVEL is an
+// ordered ladder — debug < info (default) < warn < error < silent — and
+// suppresses anything below the threshold. Per-roll lines (roll, evict,
+// collect, offer, claim, pools, setting, clrroll) log at debug; join/leave/
+// resume/reveal/rename/clear/unoffer/uncaught log at info. That keeps a busy
+// room from filling disk on the default setting, but it also means a user
+// report of "my roll didn't happen" leaves no server-side breadcrumb until
+// DICE_LOG_LEVEL=debug is flipped on for triage.
 
 import http from 'node:http';
 import crypto from 'node:crypto';
@@ -463,9 +472,23 @@ if (heartbeat.unref) heartbeat.unref();
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
-function log(msg) {
+// DICE_LOG_LEVEL is a real syslog-shaped ladder — anything at or above the
+// threshold prints, anything below is dropped. The current call sites only
+// use info (via log()) and debug (via logDebug()); warn/error/silent are
+// forward-compat so future higher-severity calls slot in without a rename.
+const LOG_LEVELS = { debug: 10, info: 20, warn: 30, error: 40, silent: 100 };
+const LOG_THRESHOLD = LOG_LEVELS[String(process.env.DICE_LOG_LEVEL || 'info').toLowerCase()] ?? LOG_LEVELS.info;
+const LOG_INFO = LOG_THRESHOLD <= LOG_LEVELS.info;
+const LOG_DEBUG = LOG_THRESHOLD <= LOG_LEVELS.debug;
+
+function writeLog(msg) {
   process.stdout.write(`[dice ${new Date().toISOString()}] ${msg}\n`);
 }
+function log(msg) { if (LOG_INFO) writeLog(msg); }
+// Per-roll and per-pool-broadcast lines: default-off (info threshold), on with
+// DICE_LOG_LEVEL=debug. Callers pass a thunk so the interpolation itself is
+// skipped at info level — the ~40-die join() would otherwise still fire.
+function logDebug(build) { if (LOG_DEBUG) writeLog(typeof build === 'function' ? build() : build); }
 
 function sendJson(res, status, payload, { close = false } = {}) {
   const body = Buffer.from(JSON.stringify(payload));
@@ -1181,7 +1204,7 @@ function collectEntries(room, entries) {
   // addressed to a rollId nobody else has ever heard of, so it goes to its
   // roller alone.
   for (const roll of evicted) {
-    log(`evict   room=${room.name} rollId=${roll.rollId} seq=${roll.collected}`);
+    logDebug(() => `evict   room=${room.name} rollId=${roll.rollId} seq=${roll.collected}`);
     // Deliberately the same event a per-roll Done sends: aging off the shelf
     // and being dismissed are the same sink animation, so a client needs one
     // code path for both.
@@ -1189,7 +1212,7 @@ function collectEntries(room, entries) {
     broadcast(room, 'roll-cleared', data, (viewerId) => (entryExistsFor(roll, viewerId) ? data : null));
   }
   for (const roll of collected) {
-    log(`collect room=${room.name} rollId=${roll.rollId} seq=${roll.collected}`);
+    logDebug(() => `collect room=${room.name} rollId=${roll.rollId} seq=${roll.collected}`);
     const data = { rollId: roll.rollId, seq: roll.collected };
     broadcast(room, 'roll-collected', data, (viewerId) => (entryExistsFor(roll, viewerId) ? data : null));
   }
@@ -1282,9 +1305,9 @@ function executeRoll(room, player, spec) {
   // never a secret roll's.
   const tail = `${roll.dc ? ` dc=${roll.dc}` : ''}${roll.exp ? ` exp=${roll.exp.kind}` : ''}${roll.rerollOfId ? ` reroll=${roll.rerollOfId}` : ''}`;
   if (roll.visibility) {
-    log(`roll    room=${room.name} name=${player.name} dice=${roll.dice.join(',')} vis=${roll.visibility.mode}${tail}`);
+    logDebug(() => `roll    room=${room.name} name=${player.name} dice=${roll.dice.join(',')} vis=${roll.visibility.mode}${tail}`);
   } else {
-    log(`roll    room=${room.name} name=${player.name} dice=${roll.dice.join(',')} values=${roll.values.join(',')} total=${roll.total}${tail}`);
+    logDebug(() => `roll    room=${room.name} name=${player.name} dice=${roll.dice.join(',')} values=${roll.values.join(',')} total=${roll.total}${tail}`);
   }
   // Per-recipient projection: full to those the mode allows, redacted for the
   // shrouded, and no event at all for a secret roll's non-rollers.
@@ -1493,7 +1516,7 @@ async function handleClearRoll(req, res) {
   // Set on demand, never at roll time: like `exp`, an absent field keeps an
   // uncleared roll's payload byte-for-byte what it always was.
   roll.cleared = true;
-  log(`clrroll room=${room.name} name=${player.name} rollId=${rollId}`);
+  logDebug(() => `clrroll room=${room.name} name=${player.name} rollId=${rollId}`);
   // Existence-gated, like every rollId-bearing event: a secret roll's Done is
   // its roller's business alone.
   broadcast(room, 'roll-cleared', { rollId }, (viewerId) => (entryExistsFor(roll, viewerId) ? { rollId } : null));
@@ -1578,7 +1601,7 @@ async function handlePools(req, res) {
   }
   player.pools = pools;
   if (set) player.set = set; else delete player.set;
-  log(`pools   room=${room.name} name=${player.name} count=${pools.length}`);
+  logDebug(() => `pools   room=${room.name} name=${player.name} count=${pools.length}`);
   broadcast(room, 'pools-changed', { playerId: player.id, pools, ...(set ? { set } : {}) });
   sendJson(res, 200, { ok: true });
 }
@@ -1687,7 +1710,7 @@ async function handleOffer(req, res) {
   room.offers.push(offer);
   if (room.offers.length > OFFER_CAP) room.offers = room.offers.slice(-OFFER_CAP);
 
-  log(`offer   room=${room.name} name=${player.name} dice=${offer.dice.join(',')}${offer.dc ? ` dc=${offer.dc}` : ''}${to ? ` to=${to.name}` : ''} offers=${room.offers.length}`);
+  logDebug(() => `offer   room=${room.name} name=${player.name} dice=${offer.dice.join(',')}${offer.dc ? ` dc=${offer.dc}` : ''}${to ? ` to=${to.name}` : ''} offers=${room.offers.length}`);
   broadcast(room, 'offer', { offer });
   sendJson(res, 200, { offer });
 }
@@ -1720,7 +1743,7 @@ async function handleClaim(req, res) {
   if (set.error) return sendError(res, ...set.error);
   room.offers.splice(idx, 1);
 
-  log(`claim   room=${room.name} name=${player.name} offerId=${offerId} by=${offer.byName}`);
+  logDebug(() => `claim   room=${room.name} name=${player.name} offerId=${offerId} by=${offer.byName}`);
   broadcast(room, 'offer-claimed', { offerId });
 
   // The claimed roll inherits the offer's moment AND its visibility: whoever
@@ -1888,7 +1911,7 @@ async function handleSettings(req, res) {
   const applied = Object.keys(patch)
     .map((k) => `${k}=${Array.isArray(patch[k]) ? `[${patch[k].length}]` : patch[k]}`)
     .join(' ');
-  log(`setting room=${room.name} name=${player.name} ${applied}`);
+  logDebug(() => `setting room=${room.name} name=${player.name} ${applied}`);
   broadcast(room, 'settings-changed', { settings, byId: player.id, byName: player.name });
   sendJson(res, 200, { settings });
 }
@@ -2086,4 +2109,4 @@ function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
-export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor, entryExistsForAll, cleanName, sanitizePools };
+export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor, entryExistsForAll, cleanName, sanitizePools, LOG_DEBUG, LOG_INFO, LOG_THRESHOLD };
