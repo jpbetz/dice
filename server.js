@@ -1910,6 +1910,18 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
+// /vendor/ is the frozen third-party tree (three.js, cannon-es) — CLAUDE.md
+// forbids editing it, so it is safe to serve with a year-long immutable
+// Cache-Control and let repeat visits skip the round-trip entirely. The
+// escape hatch for an emergency vendor hotfix (CVE, physics-truth regression)
+// is to bump a query string on the importer in js/main.js OR rename the file;
+// a plain server-side revert alone will NOT recover already-cached clients
+// for up to a year. See ROADMAP.md §0b.
+const VENDOR_DIR = path.join(ROOT, 'vendor');
+function isVendor(absPath) {
+  return absPath === VENDOR_DIR || absPath.startsWith(VENDOR_DIR + path.sep);
+}
+
 // Resolve a URL path to a file inside ROOT, or null if it escapes.
 function safeResolve(urlPath) {
   let decoded;
@@ -1947,11 +1959,34 @@ async function serveStatic(req, res, url) {
 
 function streamFile(req, res, file, stat) {
   const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
+  // /vendor/ is immutable (see VENDOR_DIR comment above); the app tree stays
+  // no-cache so the browser always revalidates — the win there is answering
+  // that revalidation with a body-less 304 instead of a full 200. The gate
+  // rides the RESOLVED absolute path (not the URL) so %2f / non-canonical
+  // smuggling can't reach the vendor bucket.
+  const cacheControl = isVendor(file) ? 'public, max-age=31536000, immutable' : 'no-cache';
+  // HTTP-date has 1-second precision; round the truth to match before
+  // comparing. NOTE: a client that fetched a file mid-write and revalidates
+  // within the same wall-clock second can pin a stale copy via 304 — real
+  // but rare, and re-check happens on the next request because the app tree
+  // stays no-cache.
+  const mtimeSec = Math.floor(stat.mtimeMs / 1000);
+  const ims = req.headers['if-modified-since'];
+  if (ims) {
+    const parsed = Date.parse(ims);
+    if (Number.isFinite(parsed) && Math.floor(parsed / 1000) >= mtimeSec) {
+      res.writeHead(304, {
+        'Last-Modified': stat.mtime.toUTCString(),
+        'Cache-Control': cacheControl,
+      });
+      return res.end();
+    }
+  }
   res.writeHead(200, {
     'Content-Type': type,
     'Content-Length': stat.size,
     'Last-Modified': stat.mtime.toUTCString(),
-    'Cache-Control': 'no-cache',
+    'Cache-Control': cacheControl,
   });
   if (req.method === 'HEAD') return res.end();
   const stream = fs.createReadStream(file);
