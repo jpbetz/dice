@@ -122,9 +122,9 @@ const stripCtl = (t) => t.replace(/[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u206
 // trim \u2192 slice \u2192 surrogate guard \u2192 trim, so a cut landing on a space cannot
 // leave trailing whitespace and a cut landing INSIDE a surrogate pair cannot
 // strand its high half. A lone surrogate is not merely ugly \u2014 it renders as
-// U+FFFD everywhere the text is shown, and encodeURIComponent throws URIError
-// on it, which is how one emoji at the cap boundary used to take the whole
-// #g= codec (and every later app boot through it) down with it. server.js
+// U+FFFD everywhere the text is shown, and it is a live hazard in every
+// encoder downstream (encodeURIComponent throws URIError on one: an emoji at
+// the cap boundary once took the whole app's boot down with it). server.js
 // cutText and js/main.js's cut helpers are the mirrors of this function; the
 // four layers must cut identically. Callers pass already-stripCtl'd text.
 export function cutText(text, max) {
@@ -393,7 +393,8 @@ export function parseNotation(input, opts = {}) {
             pos += 1;
           } else if ((gm = /^\[([^\]]*)\]/.exec(g))) {
             // the dice term's SOURCE label (2d8[Wisdom]) — same normalization
-            // as bonus labels, so the canonical survives the #g= codec
+            // as bonus labels, so the canonical survives every round trip
+            // (storage, the YAML export, the wire)
             if (term.label) return invalid('label specified twice on one term');
             const rawLabel = stripCtl(gm[1]).trim();
             const label = cutText(rawLabel, MAX_LABEL);
@@ -417,7 +418,7 @@ export function parseNotation(input, opts = {}) {
           // same normalization as comments: strip → cutText (trim → slice →
           // surrogate guard → trim), so an over-long label is cut without
           // stranding half of a pair — a lone surrogate here would ride the
-          // canonical straight into the #g= codec, which cannot encode it.
+          // canonical into every encoder downstream (see cutText).
           const rawLabel = stripCtl(m[2]).trim();
           label = cutText(rawLabel, MAX_LABEL);
           if (label !== rawLabel) warnings.push(`label truncated to ${MAX_LABEL} characters`);

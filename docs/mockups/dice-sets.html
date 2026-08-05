@@ -551,8 +551,8 @@ kbd {
       </li>
       <li><b>Your dice</b> → <code>POST /api/style {set}</code> → SSE <code>player-styled</code>;
         the set is player identity, so every client sees your rolls in it (§4.2).
-        <b>This group</b> is a local override serialized as <code>@set=&lt;id&gt;</code> in the
-        <code>#g=</code> codec (§1.5) — no wire call.</li>
+        <b>This group</b> is a local override serialized with the stored pool and its
+        YAML export (§1.5) — no wire call.</li>
       <li><b>No per-roll set choice</b> by design (§4.2): an extra decision inside the
         tension beat kills the beat. Hence exactly two scopes here.</li>
       <li><b>Plain panel, no ornate frame</b> — §5.1 rations ornament to the roll-moment
@@ -895,7 +895,7 @@ function select(set) {
   } else {
     state.groupSet = set.id;
     toast(set.name, 'pinned to ' + state.group);
-    wire('group "' + state.group + '"  →  @set=' + set.id + '  (stored + #g= codec, no wire call)');
+    wire('group "' + state.group + '"  →  @set=' + set.id + '  (stored locally, no wire call)');
   }
   render();
   const t = tiles.get(set.id).tile;

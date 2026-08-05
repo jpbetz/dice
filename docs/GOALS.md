@@ -6,9 +6,9 @@ specifies components within them. Where the three disagree, this document wins.
 
 **The word is "pool."** The dice you assemble to roll are a *pool*; the named
 preset you keep is a *saved pool*. "Tray" and "group" are gone from every
-label a player reads and survive only as identifiers — the `#g=` codec,
-`dice.groups.v1`, `id="tray"` — which stay put so saved links and stored
-state keep working (UX.md's naming note).
+label a player reads and survive only as identifiers — `dice.groups.v1`,
+`id="tray"` — which stay put so stored state keeps working (UX.md's naming
+note).
 
 ## The experience
 
@@ -49,8 +49,19 @@ state keep working (UX.md's naming note).
 
 7. **Stateless server, capturable client.** The server holds no persistent
    state — rooms live and die in memory. Anything worth keeping (saved pools,
-   history, logs, statistics) is captured client-side: localStorage, URLs,
-   exports. A bookmarked URL is a complete save file.
+   history, logs, statistics) is captured client-side: localStorage plus
+   **explicit** export/import (`js/portable.js`). Capture is a thing the
+   player *does*, not a side effect of where they are.
+
+   *(Superseded 2026-08-04, Joe: "we have no production use, nor any
+   backward compatibility needs — hard drop it." The URL used to BE the save
+   file: the whole saved-pool rack rode the address bar as `#g=<base64url>`,
+   rewritten on every edit and read at boot ahead of localStorage. Measured
+   consequence: opening someone else's pools link silently replaced the
+   visitor's own rack, no preview, no undo — the opposite of the YAML
+   import's preview-and-merge. The codec, its module, its tests and its
+   links are gone. The URL addresses a TABLE — `?room=` — and carries no
+   user state at all. Persistent identity and saves are a later pass.)*
 8. **One shared truth.** Every player sees the same values, attribution, and
    log. Presentation *pacing* is client-local (skips, ceremony timing);
    *information* never diverges except through deliberate visibility
@@ -85,7 +96,7 @@ state keep working (UX.md's naming note).
   closed and re-verified 2026-07-30: roll moments canonicalize as
   `check`/`cinematic` + `# Title | Subtitle`, and the whole visibility
   ladder canonicalizes as `held` / `secret` / `w:Name`, so saved pools, history
-  and `#g=` links carry both. The last audited violation — a player name
+  and exports carry both. The last audited violation — a player name
   containing `#` silently misdirecting a whisper through the comment
   split — is closed by **banning `#` in player names at every entry
   point** (server `cleanName` at join/rename, loud client refusals), so

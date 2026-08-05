@@ -1378,6 +1378,42 @@ export const scenarios = [
   },
 
   {
+    name: 'url-carries-nothing',
+    tags: ['smoke', 'groups'],
+    // THE URL IS NOT STORAGE (Joe 2026-08-04). The saved-pool rack used to
+    // ride the address bar as '#g=<base64url>', rewritten on every edit and
+    // read at boot AHEAD of localStorage — so opening someone else's pools
+    // link silently replaced your own rack. The codec is gone: editing a pool
+    // never touches the URL, a stale '#g=' decodes nothing and is swept out
+    // of the address bar, and the only rack transport is the YAML in
+    // Settings → Your data (the `portable` scenario covers that path).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.4', name: 'Alice' });
+      const first = (await a.dbg('groups'))[0];
+      assert.ok(first && first.id, 'the rack seeded');
+
+      // A save writes storage — and nothing else.
+      assert.ok(await a.dbg(`editPool(${first.id}, { notation: '2d12' })`), 'pool edited');
+      assert.equal(await a.eval('location.hash'), '', 'a save never writes the address bar');
+      assert.ok(
+        (await a.eval(`localStorage.getItem('dice.groups.v1')`)).includes('2d12'),
+        'the edit landed in storage',
+      );
+
+      // A link someone shares from before the drop is INERT: it neither
+      // replaces the rack nor survives in the address bar.
+      const stale = '#g=' + Buffer.from('Shared%20Thing|Attributes=1d4').toString('base64url');
+      await a.reload({ hash: stale });
+      const after = await a.dbg('groups');
+      assert.ok(after.every((g) => g.name !== 'Shared Thing'),
+        `a stale #g= link decodes nothing (got: ${after.map((g) => g.name).join(', ')})`);
+      assert.equal((await a.dbg('groups')).find((g) => g.id === first.id).notation, '2d12',
+        'and the visitor keeps their own rack');
+      assert.equal(await a.eval('location.hash'), '', 'the corpse is swept out of the URL');
+    },
+  },
+
+  {
     name: 'die-art',
     tags: ['chrome'],
     // P1 — the dice are the buttons: every die type has real rendered art
@@ -2588,7 +2624,7 @@ export const scenarios = [
     name: 'terminology',
     tags: ['smoke', 'chrome'],
     // The vocabulary is 'pool' / 'saved pool'; 'tray' and 'group' survive only
-    // as ids, classes, storage keys and the #g= codec. This reads the chrome a
+    // as ids, classes and storage keys. This reads the chrome a
     // player actually sees — labels, tooltips, placeholders, both cheat sheets
     // — and fails if either retired word comes back into view.
     async fn(ctx) {

@@ -19,8 +19,13 @@
 // A HAND-ROLLED emitter and a STRICT YAML-subset parser (the zero-dep rule:
 // no npm YAML library). The subset is exactly the shape exportYaml emits —
 // two top-level maps, shelves as keys, pools as a list of one-pair maps,
-// scalars single-quoted — and the parser FAILS CLOSED like the #g= codec:
-// anything outside the subset is an error naming its line, never a guess.
+// scalars single-quoted — and the parser FAILS CLOSED: anything outside the
+// subset is an error naming its line, never a guess.
+//
+// Since 2026-08-04 this is the ONLY way a rack travels between browsers: the
+// address-bar codec that used to carry it (`#g=`) is retired, because a
+// shared link overwrote the receiver's own rack sight-unseen. Every import
+// here is previewed and merged by name, deleting nothing.
 //
 // Why quoting is mandatory on export: dice notation carries '#' (YAML's
 // comment marker — '3d6 # Hunt' would silently lose its title) and names
@@ -29,14 +34,14 @@
 // bare scalars for hand-written lines, split on the FIRST ': '.
 //
 // The shelf labeled exactly 'Pools' is the plain (uncategorized) shelf —
-// the same present-or-absent category model as the codec.
+// category is present-or-absent, exactly as it is in storage.
 //
 // A pool's dice-set override (§9) rides as a quoted suffix after the
 // notation: "- 'Ember': '3d6' @ 'emberforge.blackanvil'". Present-or-
 // absent like category; unknown ids fall closed to no override (the pool
-// survives — same rule as the #g= codec). The '@' form only follows a
-// QUOTED notation, so a bare hand-written '3d6 # struck @ dawn' can never
-// be misread.
+// survives — main's migrateGroup is the door they die at). The '@' form
+// only follows a QUOTED notation, so a bare hand-written
+// '3d6 # struck @ dawn' can never be misread.
 
 import { parseNotation, cutText } from './notation.js';
 import { SETS } from './themes.js'; // import-free data — still runs under Node

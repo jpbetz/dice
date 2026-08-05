@@ -17,9 +17,10 @@ state anywhere.
   and reroll it with one click. Saved pools edit in place: ✎ on the Pools
   panel header enters manage mode; each row's pencil then opens name +
   notation, and Update writes back to the same pool.
-- **Pools in the URL** — saved pools are continuously mirrored into the URL
-  hash (`#g=<base64url>`). Bookmark the link and your pools are restored on
-  any machine, with zero server or account state.
+- **Portable pools** — Settings → *Your data* exports your rack and just-you
+  settings as human-editable YAML, and takes it back: pasting re-parses live
+  into a preview (`✓ 1 new · 1 update · 2 unchanged`) and Apply merges by
+  name, deleting nothing. Zero server or account state.
 - **Shared tables** — run the bundled server and everyone in a room sees the
   same dice land on the same values, with per-player attribution, a live
   player list, and a shared roll log.
@@ -80,8 +81,7 @@ Layout:
 - `js/dice.js` — die geometry, face textures, physics hulls, value reading
 - `js/net.js` — join/SSE/reconnect client
 - `js/meanings.js` — the *Your Soul Deal* roll-meaning chart
-- `js/urlgroups.js` — saved pools ⇄ URL-hash codec (the `#g=` spelling, and
-  the `group` identifiers behind it, are kept for link compatibility)
+- `js/portable.js` — pools + settings ⇄ portable YAML (export/import)
 
 For automated testing in hidden tabs (where `requestAnimationFrame` never
 fires), `window.__diceDebug` exposes `sim(frames)`, `playRoll(roll)` with

@@ -226,16 +226,38 @@ export class Table {
   // (where the seat lives) survives exactly as it does for a real F5. Waits
   // for the app to boot and re-join before returning. No boot retry here: a
   // retry would open a NEW tab and silently lose the very state under test.
-  async reload({ timeout = 30000 } = {}) {
-    await this.page.navigate(this.url);
-    await this.waitFor(
-      `!!window.__diceDebug && window.__diceDebug.netReady`,
-      { desc: 'app ready after reload', timeout },
-    );
-    await this.waitFor(
-      `!!window.__diceDebug && window.__diceDebug.netReady.then((r) => r && r.online)`,
-      { desc: 'rejoined after reload', timeout },
-    );
+  // `hash` appends a fragment (e.g. a stale '#g=…'), for asserting that the
+  // URL carries no user state.
+  async reload({ timeout = 30000, hash = '' } = {}) {
+    // Driven from inside the page, exactly as a player's F5 is: a CDP
+    // Page.navigate + Page.reload pair races the in-flight navigation and
+    // intermittently answers "Not attached to an active page". The sentinel
+    // on the OUTGOING document is what keeps the readiness poll below from
+    // answering out of the page we are replacing; the replace() puts the
+    // requested url (hash and all) in place, and reload() forces the
+    // document to actually re-run — a url differing only by fragment is a
+    // same-document jump that never re-executes anything.
+    try {
+      await this.page.eval(`(() => {
+        window.__reloading = true;
+        location.replace(${JSON.stringify(this.url + hash)});
+        location.reload();
+      })()`);
+    } catch { /* the context can die inside the call — that IS the reload */ }
+    const deadline = Date.now() + timeout;
+    let last = null;
+    while (Date.now() < deadline) {
+      try {
+        last = await this.page.eval(
+          `(!window.__reloading && !!window.__diceDebug)
+             ? window.__diceDebug.netReady.then((r) => !!(r && r.online))
+             : false`,
+        );
+        if (last) return;
+      } catch { /* execution context torn down mid-navigation — poll again */ }
+      await sleep(100);
+    }
+    throw new Error(`timeout waiting for the reload to settle (last value: ${JSON.stringify(last)})`);
   }
 
   // The per-die value chips over the table, in die order ('?' while hidden).

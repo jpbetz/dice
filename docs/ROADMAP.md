@@ -256,7 +256,7 @@ preference honored when free / refused when worn.
 
 ### 1. Notation totality closeout
 
-Close the audited invariant violations so saved pools, history, and `#g=` links
+Close the audited invariant violations so saved pools, history, and exports
 carry a roll's FULL intent:
 
 - Implement UX.md §7.6: `check` / `cinematic` trailing flags,
@@ -313,8 +313,7 @@ system:
   canonical form, rollspec perDie `source` label, server re-parse, codec.
 - **Pool categories**: saved pools gain an optional group ('Attributes',
   'Skills', 'Motivations'); the Pools panel renders category sections;
-  manage mode edits the category; `#g=` codec v3 carries it (backward
-  compatible).
+  manage mode edits the category; every carrier takes it present-or-absent.
 - **The Pools Rack (agreed with Joe 2026-08-01)** — sources add, the pool
   rolls: pools render as TILES in category-section grids (the palette's
   own tile idiom — art on top, name beneath; tile icons replace die art
@@ -837,8 +836,12 @@ ladder; all of it is polish or a new rung.
   notation carries `#` (YAML's comment) and names may carry `: `. 20 unit
   tests + the `portable` e2e scenario.
 - Local roll statistics (per-player distribution, average-vs-expected).
-- Room settings snapshot into the copy-link URL (felt/system ride `#g=`'s
-  neighbor) so a bookmarked table restores its look and rules.
+- Room settings (felt/system) in the portable YAML, so a table's look and
+  rules travel with the rack. *(Was "snapshot them into the copy-link URL
+  beside `#g=`" — dead with the URL codec, 2026-08-04. The URL carries no
+  user state; export is where capture lives.)*
+- **Persistent identity and saves** *(Joe 2026-08-04, next pass)* — the
+  thing the URL was pretending to be.
 
 ## Tier 5 — Effects & ceremony polish
 
@@ -1021,11 +1024,12 @@ explosion/adv/reroll extras, per-die impact effects off sounds[].di
 (each recorded contact knows its die), per-die lights / bloom /
 reveals / shelf / log chips, and the pools broadcast carries pool sets
 so foreign racks show the OWNER's skins and staging them carries pool
-identity. Codec v4 and a YAML @-suffix carry the override through
-every share shape, failing closed on unknown ids. Save/variant flows
-inherit; rerolls keep per-die sets; claims keep shipped semantics.
-e2e: pool-set-override (tags `themes`, `groups`); units in
-urlgroups/portable tests. Next morning (Joe 2026-08-04): the OWNER'S
+identity. A YAML @-suffix carries the override through export/import,
+failing closed on unknown ids (the URL codec's v4 field carried it too
+until the codec was dropped, 2026-08-04). Save/variant flows inherit;
+rerolls keep per-die sets; claims keep shipped semantics.
+e2e: pool-set-override (tags `themes`, `groups`); units in the
+portable tests. Next morning (Joe 2026-08-04): the OWNER'S
 DEFAULT set rides the pools publish too (top-level present-or-absent
 `set` on /api/pools, roster + pools-changed relay, republish on every
 set switch), so a foreign rack resolves explicit pool set → owner
@@ -1157,9 +1161,9 @@ change how a die lands (the §9 Level 3.5 contract).
 Zero-dep: hand-drawn inline SVG sprites, no icon fonts or CDNs. The icon
 is pool identity, so it rides everywhere the pool does: the tile, the
 draft's source chips, the popover identity strip (picker lives there,
-beside name/shelf), published racks (display copy), and the `#g=` codec
-(v4, present-or-absent — old links stay valid, unknown icon ids fail
-closed to die art). Die art remains the default for icon-less pools.
+beside name/shelf), published racks (display copy), and the portable
+YAML (present-or-absent — unknown icon ids fail closed to die art).
+Die art remains the default for icon-less pools.
 
 ### 10. Custom experience templates — the editor UI for the (currently
 dormant) `experiences` settings key; until this ships the key stays
@@ -1178,7 +1182,8 @@ mat color per-player, visible to all.
 
 Multiplayer core (SSE rooms, server-authoritative values, simulate-ahead
 replay with face correction, solo fallback) · Soul Deal meanings · saved
-pools in URL (#g= codec v2 carrying notation) ·
+pools (localStorage; the `#g=` URL codec that once carried them shipped
+2026-07 and was dropped 2026-08-04 — GOALS §7) ·
 player rename · roll mechanics engine (shared rollspec: modifier/adv/
 keep/reroll/explode, attributed parts, per-die metadata) · offers
 (offer/claim/withdraw) · face-down + reveal (UI-level; real redaction is

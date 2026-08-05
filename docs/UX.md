@@ -23,11 +23,10 @@ real (server-side redaction) and the roles are absent.
 **Naming (the terminology decision).** The dice you assemble to roll are a
 **pool**; the named preset you keep is a **saved pool**. Those are the only
 words a player ever reads — "tray" and "group" are retired from every
-label, tooltip and hint. They survive *only* as identifiers: the `#g=`
-codec, `dice.groups.v1`, `encodeGroups()`, `.group-row`/`.group-formula`,
-`id="tray"`. Renaming those would break saved links and stored state for
-no user-visible gain, so this spec still spells the code that way and only
-that way. (The collect shelf's internal "tray" — §7.7's slot geometry — is
+label, tooltip and hint. They survive *only* as identifiers:
+`dice.groups.v1`, `.group-row`/`.group-formula`, `id="tray"`. Renaming
+those would break stored state for no user-visible gain, so this spec
+still spells the code that way and only that way. (The collect shelf's internal "tray" — §7.7's slot geometry — is
 a different thing again and keeps its name.)
 
 ---
@@ -91,7 +90,7 @@ Token decisions (each chosen against a real alternative):
   works for multi-d20 pools, since `mods.adv` pairs *every* d20).
 - **`d100` / `d%`** expand to the pool `[d10x, d10]`; a pool that is exactly
   one `d10x` + one `d10` renders back as `d100`. `Nd10x` stays a legal
-  input/output for anything else (old `#g=` links keep working).
+  input/output for anything else.
 - **`dc N` (alias `vs N`)** is an admitted local extension that sets the
   experience Target (§2.4). It is *not* spelled `>=N` — that spelling is
   reserved for roadmap §8 per-die success counting (`cs>=N`, future).
@@ -123,8 +122,8 @@ a d20 would silently reroll low d20s too. Resolution, decisive and cheap
 that RPG Dice Roller explodes *before* keep/drop, so `4d6!dl1` can differ
 from that reference.
 
-**Canonical form** (one renderer, replacing both `main.js formula()` and
-the formula half of `urlgroups.js encodeGroups()`): no interior spaces in
+**Canonical form** (one renderer, replacing `main.js formula()` and every
+other ad-hoc speller): no interior spaces in
 `expr`, mods glued (single-type) or trailing (mixed), terms in fixed
 die-size order (d4→d20, integer modifier last with explicit sign), flags
 then `dc` then `# comment` separated by single spaces:
@@ -145,7 +144,7 @@ Visibility **is** in the notation string, as a trailing flag in its own
 slot — `held`, `secret`, `w:Name` (§7.8). An earlier draft kept it out (no
 market tool puts it there) and the notation-totality invariant reversed
 that: a saved pool whose canonical string cannot say "secret" saves a
-public roll, and links, history and `#g=` all silently downgrade privacy.
+public roll, and storage, history and exports all silently downgrade privacy.
 On the wire it still travels as a field beside `mods` (§3.0), because it
 does not alter values. The `/gmroll`-family prefixes are accepted for paste
 compatibility and normalize into the slot — `/gmroll`, `/gmr` and
@@ -240,26 +239,22 @@ The invariant: **spec object is truth; notation is its stable projection.**
   Guaranteed lossless because grammar and `validateMods` cover the same
   space (enforced by a round-trip unit test: `parse(render(spec)) ≡ spec`
   for generated specs).
-- **URL codec v2** (`urlgroups.js`): body becomes
-  `name=canonicalNotation;…` — e.g. `Attack=1d20kh1+3 adv dc12 %23to hit`
-  (names *and* comments `encodeURIComponent`-escaped since `;`/`=`/`#` are
-  delimiters), then base64url as today. The v1 decoder regex is a strict
-  subset of the grammar, so **every existing `#g=` link decodes unchanged**;
-  the encoder always writes v2. A saved pool's moment and its visibility need
-  no side-channel: both are canonical-notation flags (`check`, `held`,
-  `w:Kira` — §7.6, §7.8), so they ride the stored string for free and a
-  shared link cannot lose a pool's privacy. Only a future dice-set id
-  still needs a trailing `@set=ember` token (parser-private, never shown in
-  chips); the once-planned `@exp=` / `@vis=` tokens are retired.
-- **Unnamed pools** (§1.4) encode with an empty name segment — `=4d6dl1`
-  — and the v2 decoder accepts `eq === 0`, labelling the pool by its
-  notation. Compatibility is **one-way by design**: every v1 link decodes
-  on a v2 client, but a v2 link using anything v1 cannot express — mods,
-  flags, `dc`, comments, `@` tokens, or an empty name (v1 rejects the
-  whole link on `eq < 1`, `js/urlgroups.js`) — fails *closed* on an old
-  client: `decodeGroups` returns null, the app opens with defaults, and
-  no half-imported list appears. Worth stating because it is silent — an
-  old client shows no error, just no saved pools.
+- **Storage carries canonical strings.** A saved pool's moment and its
+  visibility need no side-channel: both are canonical-notation flags
+  (`check`, `held`, `w:Kira` — §7.6, §7.8), so they ride the stored string
+  for free, in `dice.groups.v1` and in the YAML export alike. A pool's
+  dice-set id is the one thing outside the string (a `set` field in
+  storage, a quoted `@` suffix in YAML); the once-planned `@exp=` / `@vis=`
+  tokens are retired.
+- **Unnamed pools** (§1.4) are stored and exported with an empty name,
+  labelled by their notation — no shape needs a name to be legal.
+
+  *(Superseded 2026-08-04: this section specified a **URL codec** — the
+  rack encoded as `#g=<base64url>` in the address bar, v1→v4, with a
+  one-way compatibility contract for old links. All of it is retired with
+  the codec itself; see GOALS §7. The one durable lesson survives above:
+  because visibility and moment live IN the canonical string, no transport
+  can silently lose a pool's privacy.)*
 
 ### 1.6 Server implications
 
@@ -357,8 +352,8 @@ scope.
 - **Command box:** `# text` fills the mat text/title for one-off rolls;
   `dc15` attaches a Check with that target (a `dc` with no experience
   implies Check — a target with no staging would be mute).
-- Serialization: attachment fields ride the saved-pool record, localStorage, and
-  the `#g=` codec (§1.5).
+- Serialization: attachment fields ride the saved-pool record, localStorage,
+  and the YAML export (§1.5) — all three carry the canonical string.
 
 ### 2.4 Staging timeline (Check, ceremonial)
 
@@ -993,10 +988,10 @@ slice 1 because everything later leans on them.
 **Slice 1 — Notation (rides roadmap §3, absorbs roadmap §12).**
 `js/notation.js` (grammar, parser, canonical renderer, round-trip tests);
 command box with three-state validation, `/` token list, history store;
-`formula()` and `encodeGroups()` replaced by the one renderer; saved pools
-store specs; codec v2; `/api/roll`+`/api/offer` accept `notation`; pool-row
-chips + copy-on-click. *Value: paste any Roll20-ish string and it rolls;
-every chip and URL tells the truth about mods.*
+every ad-hoc speller (`formula()` and the codec's own) replaced by the one
+renderer; saved pools store specs; `/api/roll`+`/api/offer` accept
+`notation`; pool-row chips + copy-on-click. *Value: paste any Roll20-ish
+string and it rolls; every chip tells the truth about mods.*
 
 **Slice 2 — Real visibility.** Per-recipient `projectEntryFor` on all
 seven egress paths; `visibility` wire field (present-or-absent);
@@ -1253,9 +1248,9 @@ standing-furniture grammar, applied to the fold).
 ### 7.8 Visibility notation (`held` · `secret` · `w:`)
 
 Visibility is part of a roll's intent, so it has a canonical spelling.
-Without one, a saved pool, a `#g=` link or a history recall silently
+Without one, a saved pool, an exported rack or a history recall silently
 downgrades privacy — a pool meant to be secret rolls in the open on the
-next machine that opens the link. That is a notation-totality violation
+next machine that opens it. That is a notation-totality violation
 (GOALS.md), and it is exactly the failure roadmap step 1 closed for
 face-down. `held` / `secret` / `w:` close it for the whole ladder.
 
@@ -1341,10 +1336,10 @@ around the commas.
 1d20 held secret      →  parse error (one visibility per roll)
 ```
 
-**It rides everything for free.** `#g=` stores canonical strings
-(`js/urlgroups.js`), so a saved pool's visibility travels in links, localStorage
-and history with no side-channel token and no extra codec version — see
-§1.5, where the once-planned `@vis=` token is retired for this reason. On
+**It rides everything for free.** Every carrier stores canonical strings, so
+a saved pool's visibility travels through localStorage, history and the YAML
+export with no side-channel token — see §1.5, where the once-planned `@vis=`
+token is retired for this reason. On
 an offer, the same string expresses the offerer's choice, which is what
 makes the GM-screen roll a one-liner (§3.3).
 
@@ -1531,7 +1526,7 @@ Physical/Mental/Social triads (Strength/Toughness/Agility ·
 Wit/Wisdom/Intelligence · Charm/Will/Empathy), one skill (Sword), one
 motivation (Peer Respect), all at d6 — attribute+skill+motivation is
 '1 2 3 Enter' from a fresh seat. (Fixed underneath: migrateGroup dropped
-pool categories on every boot — localStorage and #g= links both.)
+pool categories on every boot, on every path into the rack.)
 
 **THE SHEET PASS (2026-08-01, panel-designed).** The rack is the
 CHARACTER SHEET, so a pool's IDENTITY — name, shelf, die rank — edits like
@@ -1569,8 +1564,8 @@ evaporates on Done otherwise. (3-amended) THE GATE ITSELF GREW (Joe: the
 tiny header ✎ was the real complaint): the toggle is now a full-width
 quiet '✎ Edit pools' row at the rack's FOOT — P6 verbatim, management
 stands BELOW — which morphs into the ivory 'EDITING POOLS · Done' bar
-when on; the header ✎ is retired, and so is Copy link (the address bar
-IS the pools link; reflectGroupsToUrl keeps #g= current). The save morph
+when on; the header ✎ is retired, and so is Copy link (sharing a rack is
+Settings → Your data → Export — §7.13). The save morph
 keeps its shelf chips. Manage mode remains the destructive gate: grown
 24px ✕ overlays, whole-tile-opens-editor, per-tile ✎ retired. CUJ
 arithmetic: advance Wisdom = right-click + face tap; rename = right-click
@@ -1814,10 +1809,16 @@ as `- 'Name': 'notation'` lines; `settings:` with `sound` / `numbers`
 booleans. Every scalar is single-quoted on export because notation
 carries `#` (YAML's comment marker) and names may carry `: ` (the key
 split); hand-written bare lines still parse. The parser is a strict
-subset that fails closed like the `#g=` codec: tabs, unknown keys, bad
-indent, bad notation, over-cap counts and unterminated quotes are all
-line-numbered errors, never guesses. Notations normalize to their
-canonical on import — the string remains the one carrier.
+subset that fails closed: tabs, unknown keys, bad indent, bad notation,
+over-cap counts and unterminated quotes are all line-numbered errors, never
+guesses. Notations normalize to their canonical on import — the string
+remains the one carrier.
+
+*(Since 2026-08-04 this is the ONLY way a rack travels between browsers.
+The address-bar codec that used to carry it is retired — GOALS §7 — because
+a shared link replaced the receiver's rack sight-unseen. Everything here
+previews first and merges by name, deleting nothing: that difference is
+the whole reason the codec lost.)*
 
 ### 7.14 The workbench draft zone (shipped 2026-08-03)
 

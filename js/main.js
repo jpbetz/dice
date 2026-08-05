@@ -23,7 +23,6 @@ import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRang
 import { dieArtURL } from './diceart.js';
 import { connect, forgetSeat } from './net.js';
 import { SYSTEMS, DEFAULT_SYSTEM } from './meanings.js';
-import { groupsFromLocation, syncGroupsToLocation } from './urlgroups.js';
 import { composeRoll, validateMods, previewSpec } from './rollspec.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { exportYaml, parsePortable, planImport } from './portable.js';
@@ -5549,10 +5548,15 @@ paintCmd();
 // Saved groups
 // ---------------------------------------------------------------------------
 
-// Groups come from the URL hash when one is present (a bookmarked #g=… link
-// restores them anywhere — stateless), otherwise from localStorage, otherwise
-// starter defaults. Every change is written back to BOTH localStorage and the
-// URL hash, so the address bar is always a saveable snapshot.
+// Groups come from localStorage, otherwise starter defaults.
+//
+// THE URL IS NOT STORAGE (Joe 2026-08-04). Until today the whole rack rode
+// the address bar as `#g=<base64url>`, rewritten on every edit and read at
+// boot AHEAD of localStorage — which meant opening someone else's pools link
+// silently overwrote your own rack, with no preview and no undo (measured,
+// not theorized). Explicit export/import owns that job now (js/portable.js:
+// preview the plan, merge by name, delete nothing), so the codec is gone
+// rather than patched. The URL addresses a TABLE (?room=) and nothing else.
 //
 // A group is {id, name, notation} — notation is the canonical string from
 // js/notation.js and is what the Roll button actually parses and rolls. Old
@@ -5562,12 +5566,12 @@ function migrateGroup(g, i) {
   if (!g || typeof g !== 'object') return null;
   const name = typeof g.name === 'string' ? cutText(g.name, 24) : '';
   // category rides every shape, present-or-absent (2b-②; the rebuild here
-  // silently DROPPED it on every boot until 2026-08-01 — localStorage and
-  // #g= links both funnel through this function)
+  // silently DROPPED it on every boot until 2026-08-01 — stored racks and
+  // imported ones both funnel through this function)
   const cat = typeof g.category === 'string' && g.category.trim() ? cutText(g.category, 24) : null;
   // set override (§9): same present-or-absent ride; ids the SETS registry
-  // doesn't know fall closed to no override — the pool survives (codec and
-  // storage both funnel through here, so hostile/stale ids die at this door)
+  // doesn't know fall closed to no override — the pool survives (storage and
+  // import both funnel through here, so hostile/stale ids die at this door)
   const set = typeof g.set === 'string' && (g.set === 'std' || SETS[g.set]) ? g.set : null;
   const dress = (rec) => ({ ...rec, ...(cat ? { category: cat } : {}), ...(set ? { set } : {}) });
   if (typeof g.notation === 'string') {
@@ -5581,7 +5585,15 @@ function migrateGroup(g, i) {
   return null;
 }
 
-let groups = groupsFromLocation() || load(LS_GROUPS, null);
+// Sweep up after the codec: an address bar left holding a `#g=` from before
+// the drop would carry it forever, since nothing rewrites the hash any more.
+// This ignores what it says — the rack above is already loaded from storage —
+// and just takes the corpse out of the URL.
+if (/[#&]g=/.test(location.hash)) {
+  try { history.replaceState(null, '', location.pathname + location.search); } catch { /* ignore */ }
+}
+
+let groups = load(LS_GROUPS, null);
 // The Soul Deal starting rack (Joe, 2026-08-01): the nine attributes in
 // their Physical/Mental/Social triads (offense/defense/utility), one
 // skill, one motivation — a fresh seat can stage attribute+skill+
@@ -5609,31 +5621,14 @@ groups = (Array.isArray(groups) ? groups : []).map(migrateGroup).filter(Boolean)
 // starter set — Attack/Damage/Percentile, untouched, uncategorized — was
 // never the player's own work, so it swaps for the Soul Deal starting rack
 // instead of blocking it forever (defaults otherwise only seed EMPTY
-// storage, and the address bar's #g= re-persists the old trio on every
-// visit). One edit to any of the three and the rack is theirs: no swap.
-// (Runs after migrate so it catches the storage AND the #g= link path.)
+// storage, and the stored trio would sit there forever). One edit to any of
+// the three and the rack is theirs: no swap. (Runs after migrate so it sees
+// the rack in its canonical shape.)
 {
   const oldSeed = [['Attack', '1d20'], ['Damage', '3d4'], ['Percentile', 'd100']];
   const untouched = groups.length === 3 && groups.every((g, i) =>
     g.name === oldSeed[i][0] && g.notation === oldSeed[i][1] && !g.category);
   if (untouched) groups = defaultGroups();
-}
-
-// Reflect the groups into the address bar, degrading to storage-only if the
-// codec refuses them. encodeURIComponent throws URIError on text no URL can
-// carry (a lone surrogate), and saveGroups runs at module scope: an unguarded
-// throw there killed every declaration below it — no network, no log, no
-// popover, no shortcuts — on every load until localStorage was cleared. The
-// cuts above make such text unreachable from the UI; this keeps a hostile or
-// legacy stored group from ever taking the app down with it again.
-function reflectGroupsToUrl() {
-  try {
-    syncGroupsToLocation(groups);
-    return true;
-  } catch (e) {
-    console.warn('groups could not be encoded into the URL', e);
-    return false;
-  }
 }
 
 // Publish the rack to the room whenever it changes (ROADMAP 2b): a
@@ -5649,7 +5644,6 @@ function schedulePublishPools() {
 
 function saveGroups() {
   save(LS_GROUPS, groups);
-  reflectGroupsToUrl();
   schedulePublishPools();
 }
 saveGroups();
@@ -6613,9 +6607,10 @@ renderGroups();
 // the peek's 'Save as pool…' keeps a rolled result. Saved-pool WRITES
 // remain exclusively the by-id paths.)
 
-// Copy-link retired (2026-08-01, Joe: too much going on): the address bar
-// IS the pools link — reflectGroupsToUrl keeps #g= current on every save,
-// so sharing a rack is copying the URL, same as sharing anything else.
+// Copy-link retired (2026-08-01, Joe: too much going on), and the URL codec
+// behind it retired with the rest of the address-bar rack (2026-08-04):
+// sharing a rack is Settings → Your data → Export, which is the only path
+// that shows the receiver what they are about to take.
 
 // ---------------------------------------------------------------------------
 // ± popover (docs/mockups/panel.html): per-group modifier + attributed parts,

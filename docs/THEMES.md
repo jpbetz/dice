@@ -627,18 +627,17 @@ and an std-world pool pins 'std' rather than following the borrower.
 Your OWN rack stages unpinned — tile and tray both follow you, so
 they agree without pinning and keep repainting when you re-skin.
 The
-override rides every identity vehicle: the #g= codec grew a v4 third
-field (`name|category|set=` — set-less segments stay byte-identical to
-v3, old clients degrade gracefully), the portable YAML gained an
-`@ 'set-id'` suffix after the quoted notation, and both fail closed on
-unknown ids (migrateGroup and the parser drop the override, never the
-pool). Chosen through ONE control everywhere (Joe: consistency): a
+override rides every identity vehicle: a `set` field on the stored
+record and an `@ 'set-id'` suffix after the quoted notation in the
+portable YAML, both failing closed on unknown ids (migrateGroup and
+the parser drop the override, never the pool). *(The URL codec grew a
+v4 field for it too; the codec was dropped 2026-08-04 — GOALS §7.)* Chosen through ONE control everywhere (Joe: consistency): a
 compact select — pill button + body-level floating menu, house-grouped,
 keyboard-driven, one open menu app-wide — in the settings row AND the
 popover identity strip (which adds a 'Your set — <name>' default row).
 The tile strip previews the override via data-art-set, pinned against
-refreshDieArt. e2e: pool-set-override (tags `themes`, `groups`); codec
-and YAML shapes unit-tested in urlgroups.test.mjs / portable.test.mjs.
+refreshDieArt. e2e: pool-set-override (tags `themes`, `groups`); the
+YAML shape unit-tested in portable.test.mjs.
 
 Level 4 rides the same seams (shipped 2026-08-03; the marks are DARK BY
 DEFAULT since the same evening — the decals.js kill switch): the impact
