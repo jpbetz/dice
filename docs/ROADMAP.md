@@ -1218,7 +1218,9 @@ step ships with its e2e scenario.
 
 Server is the sole value authority (client-sent values ignored) · notation
 re-parsed server-side, never trusted from the client · canonical form is a
-tested byte-stable fixed point · codec fails closed on hostile input ·
+tested byte-stable fixed point · every rack transport fails closed on
+hostile input (the YAML parser names the line; migrateGroup drops what
+it cannot read, never the pool) ·
 static-hosting solo works completely · the capability matrix is one shared
 code path, not parallel implementations · settings echo-apply with no
 optimistic divergence · `cleared`/`exp` flags are present-or-absent so

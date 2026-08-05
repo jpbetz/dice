@@ -5759,9 +5759,9 @@ function editPoolById(id, patch) {
   g.name = name;
   g.notation = notation;
   if (category) g.category = category;
-  else delete g.category; // present-or-absent, like the codec segment
+  else delete g.category; // present-or-absent, in storage and the YAML alike
   if (set) g.set = set;
-  else delete g.set; // present-or-absent, like the codec segment
+  else delete g.set; // present-or-absent, in storage and the YAML alike
   saveGroups();
   renderGroups();
   return { id: g.id, name: g.name, notation: g.notation, category: g.category || null, set: g.set || null };
@@ -6124,7 +6124,7 @@ let creatingShelf = null;
 // Shelves minted this editing session ('＋ New shelf'): they render empty
 // (with their ghost tile) while ✎ is on, materialize for real when a pool
 // lands on them, and evaporate on Done otherwise — shelves-with-pools stay
-// the only persistent truth (the codec's present-or-absent category model).
+// the only persistent truth (category is present-or-absent everywhere).
 let draftShelves = [];
 // the card's fields live HERE, not in the closure: any renderGroups (a
 // pools-changed, a manage toggle, a strip write) rebuilds the card and a
@@ -6722,7 +6722,7 @@ const popActions2nd = document.querySelector('#mods-popover .pop-actions-2nd');
 // (cutText: trim → slice → surrogate guard → trim), so the popover's text is
 // byte-identical to what a re-parse of the canonical yields — including at a
 // cap that would otherwise saw an astral character in half and strand a lone
-// surrogate no URL codec can encode.
+// surrogate that would poison every encoder downstream.
 const cleanPartLabel = (t) =>
   cutText(t.replace(/[\x00-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff\]#]/g, ''), 20);
 const cleanComment = (t) =>

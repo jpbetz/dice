@@ -1734,7 +1734,7 @@ export const scenarios = [
       assert.equal(await a.eval(`document.querySelectorAll('#builder-panel .group-edit, #builder-panel .group-del').length`),
         0, 'no per-tile edit chrome at rest');
       assert.equal(await a.eval(`!!document.getElementById('copy-link')`), false,
-        'copy-link is retired — the address bar IS the pools link');
+        'copy-link is retired — sharing a rack is Settings → Your data → Export');
       assert.ok(await a.eval(`document.getElementById('pools-edit').offsetHeight > 20`),
         'the Edit pools toggle stands full-width at the rack foot');
       assert.ok(await a.eval(`document.querySelectorAll('#groups-list .tile-stage').length >= 3`),

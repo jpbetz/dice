@@ -1011,7 +1011,8 @@ events. *Value: the BG3 moment, shared across the table.*
 
 **Slice 4 — Sets.** Dice sets tier 0–1 riding roadmap §4's cache re-key
 (+ `sound`, `extends`); `POST /api/style` + `player-styled`; picker riding
-roadmap §6 thumbnails; per-die set ids on roll events + `@set=` in codec.
+roadmap §6 thumbnails; per-die set ids on roll events + a `set` field on
+the stored pool (and the YAML's `@` suffix).
 *Value: identity dice for everyone — and the shrouded obsidian blank
 becomes one variant of a system that already exists rather than a
 one-off.* (This slice once ended with "…and the DM seat". It does not: the

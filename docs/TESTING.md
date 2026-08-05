@@ -9,7 +9,8 @@ this document defines how we check them.
 ## The layers
 
 1. **Unit suites** (`npm run test:unit`, ~1 s) — pure-module tests for
-   notation, rollspec, the URL codec, and the visibility projection
+   notation, rollspec, meanings, the portable YAML, and the visibility
+   projection
    (`redaction.test.mjs`: the `projectEntryFor` matrix in-process, plus an
    endpoint layer that spawns `server.js` on an ephemeral port and asserts on
    raw SSE bytes). Plain Node scripts under `tests/`, no framework.

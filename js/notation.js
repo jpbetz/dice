@@ -734,7 +734,8 @@ export function parseNotation(input, opts = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Canonical renderer — the single source for group chips, codec v2, history.
+// Canonical renderer — the single source for group chips, storage, the YAML
+// export, history and the wire.
 // parseNotation(canonicalNotation(x)) is a byte-identical fixed point.
 // ---------------------------------------------------------------------------
 
