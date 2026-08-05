@@ -2121,12 +2121,16 @@ function stepPlayback(dt) {
   const i1 = Math.min(i0 + 1, last);
   const frac = Math.min(Math.max(f - i0, 0), 1);
 
-  roll.dice.forEach((d, di) => {
-    const a = roll.keyframes[di][i0];
-    const b = roll.keyframes[di][i1];
+  const dArr = roll.dice;
+  const kfs = roll.keyframes;
+  for (let di = 0; di < dArr.length; di++) {
+    const kf = kfs[di];
+    const a = kf[i0];
+    const b = kf[i1];
+    const d = dArr[di];
     d.mesh.position.copy(a.pos).lerp(b.pos, frac);
     d.mesh.quaternion.copy(a.quat).slerp(b.quat, frac).multiply(d.correction);
-  });
+  }
 
   // Impact drain: sounds and (for a themed roll) the set's particle bursts
   // and felt marks ride the same recorded events — same moment, same
