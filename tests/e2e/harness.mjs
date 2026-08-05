@@ -219,6 +219,25 @@ export class Table {
   // needs to speak to the API as this player.
   playerId() { return this.dbg('net.playerId'); }
 
+  // This tab's seat color, as the roster shows it (the identity chip's hue).
+  color() { return this.dbg('identity.color'); }
+
+  // Refresh THIS tab — same URL, same browsing context, so sessionStorage
+  // (where the seat lives) survives exactly as it does for a real F5. Waits
+  // for the app to boot and re-join before returning. No boot retry here: a
+  // retry would open a NEW tab and silently lose the very state under test.
+  async reload({ timeout = 30000 } = {}) {
+    await this.page.navigate(this.url);
+    await this.waitFor(
+      `!!window.__diceDebug && window.__diceDebug.netReady`,
+      { desc: 'app ready after reload', timeout },
+    );
+    await this.waitFor(
+      `!!window.__diceDebug && window.__diceDebug.netReady.then((r) => r && r.online)`,
+      { desc: 'rejoined after reload', timeout },
+    );
+  }
+
   // The per-die value chips over the table, in die order ('?' while hidden).
   chips() {
     return this.eval(

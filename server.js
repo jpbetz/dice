@@ -287,7 +287,8 @@ function defaultSettings() {
 /**
  * room = {
  *   name, colorCursor,
- *   players: Map<playerId, {id, name, color, clients:Set<ServerResponse>, reapTimer}>,
+ *   players: Map<playerId, {id, name, color, clients:Set<ServerResponse>,
+ *                           reapTimer, reapAt}>,
  *   log: [roll],
  *   offers: [offer],
  *   collectSeq: int,        // last collection sequence handed out (see §7.7)
@@ -333,7 +334,7 @@ function dropRoomIfEmpty(room) {
 
 function removePlayer(room, player, why) {
   if (room.players.get(player.id) !== player) return;
-  clearTimeout(player.reapTimer);
+  holdPlayer(player);
   room.players.delete(player.id);
   for (const res of player.clients) endStream(res);
   player.clients.clear();
@@ -342,9 +343,25 @@ function removePlayer(room, player, why) {
   dropRoomIfEmpty(room);
 }
 
-function scheduleReap(room, player, delay) {
+// Cancel any pending reap: a live stream is here, or the seat is gone.
+function holdPlayer(player) {
   clearTimeout(player.reapTimer);
+  player.reapTimer = null;
+  player.reapAt = 0;
+}
+
+function scheduleReap(room, player, delay) {
+  // Never SHORTEN a pending grace. A refresh races two timers: the dying
+  // tab's stream close (DISCONNECT_GRACE_MS) can land AFTER the new tab's
+  // join has already asked for the full JOIN_GRACE_MS to open its stream,
+  // and the shorter one would reap a seat that is mid-resume.
+  const until = Date.now() + delay;
+  if (player.reapTimer && player.reapAt >= until) return;
+  clearTimeout(player.reapTimer);
+  player.reapAt = until;
   player.reapTimer = setTimeout(() => {
+    player.reapTimer = null;
+    player.reapAt = 0;
     if (player.clients.size === 0) removePlayer(room, player, 'disconnected');
   }, delay);
   // Do not hold the event loop open just for a reap timer.
@@ -509,6 +526,40 @@ function cleanName(value, max) {
 // API handlers
 // ---------------------------------------------------------------------------
 
+// The room state /api/join answers with is the same snapshot the SSE `hello`
+// opens with — players, log, offers, settings — so a client that renders from
+// the join response shows the identical table to one that waits for the
+// stream. Offers were the one piece missing: a player who joined a room with
+// rolls already on the tray saw none of them until some later offer event
+// arrived. The log is projected for THIS player, exactly as hello's is: a
+// late joiner gets no secret entries and no held/whisper values.
+function joinSnapshot(room, player) {
+  return {
+    playerId: player.id,
+    color: player.color,
+    players: publicPlayers(room),
+    log: room.log.map((r) => projectEntryFor(r, player.id)).filter((r) => r !== null),
+    offers: room.offers,
+    settings: { ...room.settings },
+  };
+}
+
+// The hue for a NEW seat. A client whose seat lapsed (grace expired, or the
+// server restarted and forgot the room) asks for the color it was wearing;
+// honor it when it is a real palette hue and nobody in the room has it, so a
+// slow reload still looks like the same player. Otherwise the round-robin
+// cursor hands out the next one — and only then does the cursor advance, so
+// an honored request never burns a hue nobody wore.
+function keepColor(room, wanted) {
+  if (PALETTE.includes(wanted)) {
+    const taken = new Set([...room.players.values()].map((p) => p.color));
+    if (!taken.has(wanted)) return wanted;
+  }
+  const next = PALETTE[room.colorCursor % PALETTE.length];
+  room.colorCursor++;
+  return next;
+}
+
 async function handleJoin(req, res) {
   const body = await readJsonBody(req);
   if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
@@ -517,6 +568,35 @@ async function handleJoin(req, res) {
   const name = cleanName(body.value.name, MAX_NAME);
   if (!roomName) return sendError(res, 400, 'room is required', 'bad_room');
   if (!name) return sendError(res, 400, 'name is required', 'bad_name');
+
+  // RESUME — a refresh is the same player, not a new one.
+  //
+  // The client remembers its seat per TAB (js/net.js, sessionStorage) and
+  // offers it back here. The id IS the credential: every mutating POST
+  // already carries it alone, so holding it is authority enough to sit back
+  // down. Before this, every reload minted a fresh seat — two same-name pills
+  // until the abandoned one reaped DISCONNECT_GRACE_MS later, and a new
+  // palette color each time.
+  //
+  // Ahead of the caps below on purpose: resuming adds no player, so a FULL
+  // room must still let the players already in it reload.
+  const seatId = cleanString(body.value.playerId, 64);
+  const seatRoom = rooms.get(roomName);
+  const seat = seatId && seatRoom ? seatRoom.players.get(seatId) : null;
+  if (seat) {
+    // The JOIN grace, not the disconnect one: this client has not opened its
+    // stream yet. scheduleReap never shortens, so the dying tab's late close
+    // cannot cut this window down to 5s.
+    scheduleReap(seatRoom, seat, JOIN_GRACE_MS);
+    if (seat.name !== name) {
+      // The owner's stored name is the truth (js/main.js keeps it in
+      // localStorage); a rename that raced the reload lands here.
+      seat.name = name;
+      broadcast(seatRoom, 'player-renamed', { playerId: seat.id, name });
+    }
+    log(`resume  room=${roomName} name=${name} color=${seat.color} players=${seatRoom.players.size}`);
+    return sendJson(res, 200, joinSnapshot(seatRoom, seat));
+  }
 
   // Entity caps: an unauthenticated client must not be able to allocate
   // unbounded rooms/players.
@@ -532,12 +612,12 @@ async function handleJoin(req, res) {
   const player = {
     id: crypto.randomUUID(),
     name,
-    color: PALETTE[room.colorCursor % PALETTE.length],
+    color: keepColor(room, cleanString(body.value.color, 16)),
     pools: [],
     clients: new Set(),
     reapTimer: null,
+    reapAt: 0,
   };
-  room.colorCursor++;
   room.players.set(player.id, player);
   // If the client never opens an event stream, forget it again eventually.
   scheduleReap(room, player, JOIN_GRACE_MS);
@@ -545,21 +625,7 @@ async function handleJoin(req, res) {
   log(`join    room=${roomName} name=${name} color=${player.color} players=${room.players.size}`);
   broadcast(room, 'player-joined', { player: { id: player.id, name: player.name, color: player.color, pools: [] } });
 
-  // The room state here is the same snapshot the SSE `hello` opens with —
-  // players, log, offers, settings — so a client that renders from the join
-  // response shows the identical table to one that waits for the stream.
-  // Offers were the one piece missing: a player who joined a room with rolls
-  // already on the tray saw none of them until some later offer event arrived.
-  // The log is projected for THIS player, exactly as hello's is: a late
-  // joiner gets no secret entries and no held/whisper values.
-  sendJson(res, 200, {
-    playerId: player.id,
-    color: player.color,
-    players: publicPlayers(room),
-    log: room.log.map((r) => projectEntryFor(r, player.id)).filter((r) => r !== null),
-    offers: room.offers,
-    settings: { ...room.settings },
-  });
+  sendJson(res, 200, joinSnapshot(room, player));
 }
 
 function handleEvents(req, res, url) {
@@ -594,7 +660,7 @@ function handleEvents(req, res, url) {
     endStream(oldest);
   }
   player.clients.add(res);
-  clearTimeout(player.reapTimer);
+  holdPlayer(player);
 
   // hello fires on EVERY stream (re)open — it is the reconnect path — so its
   // log is projected for this player: a proxy blip must not re-leak what the
@@ -1919,7 +1985,7 @@ function shutdown(signal) {
   clearInterval(heartbeat);
   for (const room of rooms.values()) {
     for (const player of room.players.values()) {
-      clearTimeout(player.reapTimer);
+      holdPlayer(player);
       for (const res of player.clients) endStream(res);
     }
   }

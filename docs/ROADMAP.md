@@ -178,6 +178,55 @@ memory pressure." **Do heap-snapshot detached-node hunting first** to
 name what's retained (chips? shelf markers? ceremony strips? popover
 closures?), then a targeted fix. Do not blind-refactor.
 
+### 0f. The seat survives a refresh — SHIPPED 2026-08-04 (Joe's report)
+
+**Closed.** "When I refresh my browser, the player pills show two
+players with my name briefly… my color changes on the reload instead
+of being preserved." One cause, both symptoms: `/api/join` minted a
+new `crypto.randomUUID()` seat on **every** page load and took the
+next `colorCursor` hue, while the abandoned seat lived on until its
+stream close reaped it `DISCONNECT_GRACE_MS` (5s) later. Every
+refresh was a *stranger joining* as far as the room was concerned.
+
+- **The tab remembers its seat** (`js/net.js`,
+  `sessionStorage['dice.seat.v1:<room>'] = {id, color}`) and offers it
+  back on join. `sessionStorage`, not `localStorage`, is the whole
+  design: it is scoped to the browsing context, so a reload resumes
+  while a SECOND TAB is genuinely a second player — which is what a
+  shared screen expects, and what the e2e harness relies on when it
+  seats several tables against one origin.
+- **`/api/join` RESUME** (`server.js handleJoin`): a known seat id in
+  a live room sits back down — same `playerId`, same color, same
+  snapshot, and **no `player-joined` broadcast**, so no other screen
+  blinks. The id IS the credential (every mutating POST already
+  carries it alone), so holding it is authority enough; an id the
+  server has no record of is never adopted, it falls through to a
+  fresh seat. Resume runs AHEAD of the entity caps: it adds no
+  player, so a FULL room must still let its own players reload.
+- **`scheduleReap` never shortens a pending grace.** A refresh races
+  two timers — the dying tab's stream close (5s) can land after the
+  new tab's join has asked for the full `JOIN_GRACE_MS` (60s), and
+  the shorter one would reap a seat that is mid-resume.
+- **Color is a preference, not a claim.** A seat that lapsed
+  entirely (grace expired, server restarted, room recycled) asks for
+  the hue it wore; `keepColor` honors it when it is a real palette
+  entry and nobody in the room is wearing it, otherwise the
+  round-robin cursor answers — and the cursor only advances when it
+  is the one that answered, so an honored request never burns a hue.
+  The silent re-join path carries the preference too, which is what
+  keeps a color across a server restart.
+- **`forgetSeat`** is the difference between LEAVING and reloading:
+  'Leave & switch seat' drops the remembered seat (by room name, so
+  it also clears one left by a solo boot) or the fresh join would
+  resume the player who just left.
+
+Covered by `seat-resume` (tag `seat`): same id + color across a real
+`Page.navigate` reload, a watcher's raw SSE stream seeing **zero**
+join/leave/rename events across it, exactly one Alice on every roster,
+the resumed seat still rolling under its own name, a second same-origin
+tab still a separate player, leave clearing the seat, and the color
+preference honored when free / refused when worn.
+
 ### Refuted, recorded so they stay dead
 
 - **`renderTray` layout thrash.** Real (16 forced reflows per palette

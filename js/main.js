@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, SHADER_TIME } from './dice.js';
 import { dieArtURL } from './diceart.js';
-import { connect } from './net.js';
+import { connect, forgetSeat } from './net.js';
 import { SYSTEMS, DEFAULT_SYSTEM } from './meanings.js';
 import { groupsFromLocation, syncGroupsToLocation } from './urlgroups.js';
 import { composeRoll, validateMods, previewSpec } from './rollspec.js';
@@ -9358,12 +9358,19 @@ document.getElementById('idm-name-input').addEventListener('keydown', (e) => {
 // identity clears, and the whole join flow runs again — 'Take a seat', then
 // re-join (or stay solo when there is no server). The rail roster empties
 // with the seat.
+//
+// forgetSeat is the difference between LEAVING and reloading: the tab's
+// remembered seat (net.js, sessionStorage) is what a refresh sits back down
+// in, so switching seats has to drop it or the fresh join would resume the
+// old player. Called by room name, not through `net`, so it also clears a
+// seat left behind by a solo/offline boot.
 function leaveTable() {
   closeIdentityMenu();
   const old = net;
   net = null;
   netOnline = false; // status callbacks from the dying stream are ignored
   if (old) old.disconnect();
+  forgetSeat(ROOM);
   try { localStorage.removeItem(LS_NAME); } catch { /* ignore */ }
   players = [];
   offers = [];

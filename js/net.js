@@ -21,7 +21,8 @@ limitations under the License.
 // type lists up and hands server-authored roll events back to the caller.
 //
 // connect() resolves to either
-//   {online: true, playerId, color, players, log, roll, clear, disconnect}
+//   {online: true, playerId, color, players, log, roll, clear, forgetSeat,
+//    disconnect}
 // or {online: false} when there is no server (the app is on static hosting),
 // which is the caller's cue to run in solo mode.
 
@@ -68,6 +69,39 @@ async function postJson(path, body, timeout) {
   }
 }
 
+// -- the seat, remembered ----------------------------------------------------
+//
+// A refresh used to mint a whole new player: the roster showed two pills with
+// your name until the abandoned seat reaped 5s later, and the palette handed
+// you a different color. So the tab remembers which seat it is sitting in and
+// offers it back to /api/join (see server.js handleJoin's RESUME path).
+//
+// sessionStorage, NOT localStorage, is the right drawer: it is scoped to the
+// TAB, so a reload sits back down while a SECOND tab is genuinely a second
+// player — which is what a shared screen expects, and what the e2e harness
+// relies on when it seats several tables against one origin.
+//
+// The stored color is only a PREFERENCE, honored for a seat that has already
+// lapsed (a slow reload, a restarted server); the server refuses it if
+// someone else is wearing that hue.
+const seatKey = (room) => `dice.seat.v1:${room}`;
+
+function readSeat(room) {
+  try {
+    const seat = JSON.parse(sessionStorage.getItem(seatKey(room)) || 'null');
+    return seat && typeof seat.id === 'string' ? seat : null;
+  } catch { return null; }
+}
+
+function writeSeat(room, id, color) {
+  try { sessionStorage.setItem(seatKey(room), JSON.stringify({ id, color })); } catch { /* ignore */ }
+}
+
+/** Give up the seat: the next join takes a fresh one ('Leave & switch seat'). */
+export function forgetSeat(room) {
+  try { sessionStorage.removeItem(seatKey(room)); } catch { /* ignore */ }
+}
+
 /**
  * Join a room and stream its events.
  *
@@ -87,7 +121,14 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
   const report = typeof onStatus === 'function' ? onStatus : () => {};
   const refused = typeof onRefused === 'function' ? onRefused : () => {};
 
-  let joined = await postJson('/api/join', { room, name }, JOIN_TIMEOUT_MS);
+  // The seat this tab last sat in (if any) rides the join: the server hands
+  // the same playerId and color back instead of minting a new player.
+  const seat = readSeat(room);
+  const joinBody = seat
+    ? { room, name, playerId: seat.id, color: seat.color }
+    : { room, name };
+
+  let joined = await postJson('/api/join', joinBody, JOIN_TIMEOUT_MS);
   // status 0 = the fetch itself died (a transient network/browser hiccup —
   // observed in practice on a fresh origin's very first request). A real
   // static host answers instantly with 404/405, so ONE short-backoff retry
@@ -95,7 +136,7 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
   // from being silently stranded in solo play by a single dropped request.
   if (!joined.ok && joined.status === 0) {
     await new Promise((r) => setTimeout(r, 600));
-    joined = await postJson('/api/join', { room, name }, JOIN_TIMEOUT_MS);
+    joined = await postJson('/api/join', joinBody, JOIN_TIMEOUT_MS);
   }
   if (!joined.ok || !joined.data || !joined.data.playerId) {
     // No server (or it refused us): the caller falls back to solo play.
@@ -107,6 +148,7 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
   }
 
   let playerId = joined.data.playerId;
+  writeSeat(room, playerId, joined.data.color);   // survive this tab's next reload
   let source = null;
   let closed = false;
   let rejoining = null;         // in-flight silent re-join
@@ -268,6 +310,9 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
       return res.ok;
     },
 
+    // Give up the seat for good — 'Leave & switch seat', never a reload.
+    forgetSeat() { forgetSeat(room); },
+
     disconnect() {
       if (closed) return;
       closed = true;
@@ -366,9 +411,15 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     if (closed) return Promise.resolve(false);
     if (rejoining) return rejoining;
     const pending = (async () => {
-      const res = await postJson('/api/join', { room, name }, JOIN_TIMEOUT_MS);
+      // The seat we hold was just REFUSED (that is what brought us here), so
+      // this is a fresh join — but the color still rides along as a
+      // preference, and a restarted server hands it straight back.
+      const res = await postJson(
+        '/api/join', { room, name, color: conn.color }, JOIN_TIMEOUT_MS,
+      );
       if (!res.ok || !res.data || !res.data.playerId) return false;
       playerId = res.data.playerId;
+      writeSeat(room, playerId, res.data.color);
       conn.playerId = res.data.playerId;
       conn.color = res.data.color;
       conn.players = res.data.players || [];

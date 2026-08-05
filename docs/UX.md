@@ -1597,6 +1597,13 @@ opens Change name · Leave & switch seat · Copy invite link. Solo is a
 first-class case: rename writes `dice.name.v1` with no server, and leaving
 drops the seat, forgets the name and re-prompts.
 
+**A refresh is the same player** *(2026-08-04)*. Reloading keeps your seat:
+same name, same color, and nobody else's roster so much as blinks — no
+ghost pill of you beside you while the abandoned seat times out. **Leave &
+switch seat** is the one gesture that gives a seat up. The memory is per
+TAB, so a second tab on the same screen is still a second player at the
+table. (Mechanics: ROADMAP §0f.)
+
 **Saved pools edit in place.** The row set is Roll · ± · ✎ · ✕. The pencil
 turns the row into a name + notation editor whose Update writes back to the
 same record **by id**; the ± popover gains *Update this pool* beside the

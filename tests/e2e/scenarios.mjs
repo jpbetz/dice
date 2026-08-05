@@ -1234,7 +1234,7 @@ export const scenarios = [
   },
   {
     name: 'identity-chip',
-    tags: ['smoke', 'chrome'],
+    tags: ['smoke', 'chrome', 'seat'],
     // The rail identity chip: rename propagates to every roster and the chip
     // itself; '#' is refused; 'Leave & switch' (the once-dead net.disconnect)
     // drops the seat for real — the other tab sees the player leave — clears
@@ -1285,6 +1285,95 @@ export const scenarios = [
         `window.__diceDebug.players.some((p) => p.name === 'Ann')`,
         { desc: 'the new seat reaches the other roster' },
       );
+    },
+  },
+
+  {
+    name: 'seat-resume',
+    tags: ['smoke', 'chrome', 'seat'],
+    // A REFRESH IS THE SAME PLAYER (Joe 2026-08-04). The tab remembers its
+    // seat and offers it back to /api/join; the server sits it down again
+    // instead of minting a new one. Before this, every reload flashed two
+    // same-name pills on every other screen until the abandoned seat reaped
+    // 5s later, and took a fresh palette color on the way in.
+    //
+    // The memory is sessionStorage, so it is per TAB: a reload resumes, a
+    // SECOND tab is still a second player, and 'Leave & switch seat' drops
+    // the seat for good.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      const watcher = await ctx.rawPlayer('Watcher'); // event-level proof
+      await b.waitFor(`window.__diceDebug.players.length === 3`,
+        { desc: 'the room is seated' });
+
+      const seat = await a.playerId();
+      const color = await a.color();
+      const key = `dice.seat.v1:${ctx.room}`;
+      assert.equal(await a.eval(`localStorage.getItem(${JSON.stringify(key)})`), null,
+        'the seat never lands in localStorage — that would make a second tab the same player');
+      const stored = JSON.parse(await a.eval(`sessionStorage.getItem(${JSON.stringify(key)})`) || 'null');
+      assert.equal(stored && stored.id, seat, 'the tab remembers the seat it is sitting in');
+
+      const seen = watcher.events().length;
+      await a.reload();
+
+      assert.equal(await a.playerId(), seat, 'the same seat after a refresh');
+      assert.equal(await a.color(), color, 'wearing the same color');
+
+      // Nobody else's table so much as blinks: no join, no leave, no rename,
+      // and never two Alices.
+      const churn = watcher.events().slice(seen)
+        .filter((e) => ['player-joined', 'player-left', 'player-renamed'].includes(e.type));
+      assert.deepEqual(churn, [],
+        `a reload is invisible to the room (got: ${JSON.stringify(churn)})`);
+      assert.equal(
+        await b.eval(`window.__diceDebug.players.filter((p) => p.name === 'Alice').length`), 1,
+        'exactly one Alice on the roster',
+      );
+      assert.equal(await b.eval(`window.__diceDebug.players.length`), 3,
+        'and the roster never grew');
+
+      // The resumed seat is a live player, not a husk: it rolls, and the
+      // roll lands on everyone's log under the same name.
+      await a.roll('d20');
+      await b.waitFor(`document.getElementById('log-list').childElementCount > 0`,
+        { desc: "the resumed seat's roll reaches the table" });
+      assert.ok((await b.logTop()).includes('Alice'),
+        `attributed to Alice (got: ${await b.logTop()})`);
+
+      // A SECOND tab on the same origin is a DIFFERENT player — the seat is
+      // per tab, which is what a shared screen expects.
+      const a2 = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      assert.notEqual(await a2.playerId(), seat, 'a new tab takes a new seat');
+      await b.waitFor(`window.__diceDebug.players.length === 4`,
+        { desc: 'the second tab is a fourth player' });
+
+      // 'Leave & switch seat' is the one gesture that gives the seat up: the
+      // join that follows must not resume the player who just left.
+      const a2Color = await a2.color();
+      assert.equal(await a2.dbg('leaveTable()'), true, 'leave accepted');
+      assert.equal(await a2.eval(`sessionStorage.getItem(${JSON.stringify(key)})`), null,
+        'leaving forgets the seat');
+      await b.waitFor(`window.__diceDebug.players.length === 3`,
+        { desc: 'the dropped seat leaves the roster', timeout: 20000 });
+
+      // The color is a PREFERENCE, not a claim. A seat that lapsed entirely
+      // (grace expired, server restarted) asks for the hue it wore and gets
+      // it back when it is free — and is refused when someone is wearing it.
+      const reseat = await ctx.api('/api/join', { name: 'Reseat', color: a2Color });
+      assert.ok(reseat.ok, `re-join accepted (got ${reseat.status})`);
+      assert.equal(reseat.data.color, a2Color, 'a freed hue comes back to whoever asks');
+      const clash = await ctx.api('/api/join', { name: 'Clash', color });
+      assert.ok(clash.ok, `clashing join still accepted (got ${clash.status})`);
+      assert.notEqual(clash.data.color, color, "a hue someone is wearing is not handed out twice");
+
+      // An unknown seat id is not adopted — it mints a fresh seat. The id is
+      // the credential, so the server must never take the client's word for
+      // one it has no record of.
+      const bogus = await ctx.api('/api/join', { name: 'Nobody', playerId: 'not-a-seat' });
+      assert.ok(bogus.ok, `unknown seat still joins (got ${bogus.status})`);
+      assert.notEqual(bogus.data.playerId, 'not-a-seat', 'the offered id is never adopted');
     },
   },
 
