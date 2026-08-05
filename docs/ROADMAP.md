@@ -1012,15 +1012,21 @@ bar before building the full picker.
 "all the edges are crazy looking hard lines… a lot [of real dice] don't
 have such perfect flat surfaces and perfectly chamfered edges")
 
-**Diagnosis** (research preserved): the hard look is structural.
-`buildBeveledGeometry` stitches each edge with ONE flat band and each
-corner with a flat fan, then `computeVertexNormals` on the non-indexed
-soup gives flat facet shading — a narrow 45° mirror strip whose bounding
-creases each carry a hard shading discontinuity. `profile:'round'` only
-LERPS band normals 65% toward the sphere direction: it softens the color
-gradient but the band is still one flat strip — polygonal silhouette,
-straight specular. Real dice have a *curved* transition, so the highlight
-smears and rolls as the die moves.
+**Diagnosis** (research preserved): the hard look had TWO causes, and
+the dominant one was a bug. (1) **THE HOLE (found by Joe, fixed
+2026-08-04):** the edge stitcher paired each edge's two inset segments
+order-blind, but consistently wound faces traverse a shared edge in
+OPPOSITE orders — every band quad was a bowtie: one triangle doubled,
+the other half a triangular hole showing the scene background as a
+pure-black wedge. Every edge of every die, shipped since the bevel
+landed; confirmed by an unpaired-directed-edge probe (4 per die edge),
+fixed by endpoint-aligned pairing, and the e2e scenario now asserts
+every render mesh is watertight — including through the builder's
+wear/nicks displacement. (2) Structural: `buildBeveledGeometry`
+stitches each edge with ONE flat band, flat-shaded — a narrow 45°
+strip whose bounding creases carry hard shading discontinuities.
+`profile:'round'` LERPS band normals 65% toward the sphere direction —
+a shading approximation over a single strip, polygonal silhouette.
 
 **The ladder** (each tier subsumes the one before):
 
@@ -1031,10 +1037,15 @@ smears and rolls as the die moves.
   BUILDER (every recipe knob live, themes.js-shaped copy-out) and hero
   die framing (canvas click, ↑/↓ same-die-across-sets surfing). e2e:
   lab-geo-bench (tag `lab`); stills: tools/geo-bench-shots.mjs.
-  **Bench verdict from the stills:** even `round .130` still reads as
-  dark grooves at hero distance — Tier 0 chooses the least-bad recipe;
-  it cannot manufacture roundness. Joe picks a std recipe from the
-  bench (or builds one) while Tiers 1–2 wait.
+  **Bench verdict, post-hole-fix** (the first verdict — "even round
+  .130 reads as dark grooves" — was measuring the hole, not the
+  recipes; retracted): with whole bands, cut recipes read as clean
+  machined chamfers and `round .090` reads GENUINELY soft at hero
+  distance — the fillet shading rolls a smooth highlight along the
+  edge. Tier 0 is now a real choice, not a least-bad one; Joe picks
+  from the bench. Tiers 1–2 remain as refinements (exact fillet
+  normals; true curved silhouette) rather than the rescue they looked
+  like before the fix.
 - **Tier 1 — analytic fillet normals** (small code, big return): band
   rim vertices take the adjacent face's exact normal (zero crease at
   the face↔band junction), interpolating face-A→face-B across the band;

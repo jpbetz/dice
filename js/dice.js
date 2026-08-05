@@ -668,7 +668,7 @@ function buildBeveledGeometry(faces, geo) {
       const b = indexOf(f.boundary[(i + 1) % f.boundary.length]);
       const key = a < b ? `${a}:${b}` : `${b}:${a}`;
       if (!edges.has(key)) edges.set(key, []);
-      edges.get(key).push({ qa: ring[i], qb: ring[(i + 1) % ring.length] });
+      edges.get(key).push({ va: a, vb: b, qa: ring[i], qb: ring[(i + 1) % ring.length] });
       if (!corners.has(a)) corners.set(a, []);
       corners.get(a).push(ring[i]);
     });
@@ -676,8 +676,15 @@ function buildBeveledGeometry(faces, geo) {
   for (const pair of edges.values()) {
     if (pair.length !== 2) continue; // watertight solids always pair up
     const [e1, e2] = pair;
-    pushTri(e1.qa, e1.qb, e2.qb, edgeMat);
-    pushTri(e1.qa, e2.qb, e2.qa, edgeMat);
+    // Align the second segment to the first BY ENDPOINT before quadding:
+    // consistently wound faces traverse a shared edge in OPPOSITE orders,
+    // and the old order-blind quad built a bowtie there — one band
+    // triangle doubled, the other half a triangular HOLE (the pure-black
+    // wedge on every beveled edge; found by Joe 2026-08-04, confirmed by
+    // the unpaired-directed-edge probe: 4 per die edge, every die).
+    const [a2, b2] = e2.va === e1.va ? [e2.qa, e2.qb] : [e2.qb, e2.qa];
+    pushTri(e1.qa, e1.qb, b2, edgeMat);
+    pushTri(e1.qa, b2, a2, edgeMat);
   }
   for (const [vi, copies] of corners) {
     if (copies.length < 3) continue;

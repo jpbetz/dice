@@ -4012,6 +4012,37 @@ export const scenarios = [
       assert.ok(stats['lab.pocked'].r < stats['std'].r,
         `pocked row trims past std (${stats['lab.pocked'].r} vs ${stats['std'].r})`);
 
+      // THE WATERTIGHT CLAIM (Joe found the hole, 2026-08-04): every render
+      // mesh must be a CLOSED surface — each directed edge paired by its
+      // reverse. The pre-fix bowtie stitch left 4 unpaired per die edge:
+      // one doubled band triangle + one pure-black HOLE on every beveled
+      // edge of every die.
+      const leakProbe = (only) => `JSON.stringify((() => {
+        const bad = [];
+        for (const row of window.__labRows) {
+          if (${only ? `row.id !== ${JSON.stringify(only)}` : 'false'}) continue;
+          row.meshes.forEach((c, i) => {
+            const pos = c.mesh.geometry.attributes.position;
+            const key = (j) => [0, 1, 2].map((k) => Math.round(pos.array[j * 3 + k] * 1000)).join(',');
+            const m = new Map();
+            for (let tI = 0; tI < pos.count; tI += 3) {
+              for (let e = 0; e < 3; e++) {
+                const a = key(tI + e), b = key(tI + (e + 1) % 3);
+                const rev = b + '|' + a;
+                if (m.get(rev)) m.set(rev, m.get(rev) - 1);
+                else { const fwd = a + '|' + b; m.set(fwd, (m.get(fwd) || 0) + 1); }
+              }
+            }
+            let un = 0;
+            for (const v of m.values()) un += Math.abs(v);
+            if (un) bad.push(row.id + '[' + i + ']=' + un);
+          });
+        }
+        return bad;
+      })())`;
+      const leaks = JSON.parse(await t.eval(leakProbe(null)));
+      assert.equal(leaks.length, 0, `every render mesh is watertight (leaks: ${leaks.join(' ')})`);
+
       // Hero-die framing (the detail view): a die type or column index
       const hero = await t.eval(`window.__lab.zoomDie('lab.round090', 'd6')`);
       assert.equal(hero, true, 'zoomDie frames a bench die by type');
@@ -4019,11 +4050,16 @@ export const scenarios = [
         'zoomDie rejects an unknown type');
 
       // The builder: a geo patch reshapes the live row's render mesh…
+      // (wear + nicks on purpose: the displacement pass must keep the
+      // surface closed too — coincident vertices share the position hash)
       const r0 = stats['lab.builder'].r;
-      await t.eval(`window.__lab.builderSet({ geo: { bevel: 0.12, profile: 'round' } })`);
+      await t.eval(`window.__lab.builderSet({ geo: { bevel: 0.12, profile: 'round', wear: 0.3, nicks: 2 } })`);
       const s2 = JSON.parse(await t.eval('JSON.stringify(window.__lab.geoStats())'));
       assert.ok(s2['lab.builder'].r < r0,
         `builder bevel edit reshaped the mesh (${s2['lab.builder'].r} vs ${r0})`);
+      const builderLeaks = JSON.parse(await t.eval(leakProbe('lab.builder')));
+      assert.equal(builderLeaks.length, 0,
+        `the rebuilt worn builder row stays watertight (${builderLeaks.join(' ')})`);
 
       // …a body-color patch reaches the freshly baked face canvases…
       await t.eval(`window.__lab.builderSet({ stdColors: false, body: '#ff2222', text: '#ffffff' })`);
