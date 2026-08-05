@@ -386,6 +386,14 @@ function sendEvent(res, type, data) {
 
 function endStream(res) {
   try { res.end(); } catch { /* already gone */ }
+  // res.end() only enqueues a FIN and waits for the peer's ACK to emit
+  // 'close'. Against a stalled or backpressured peer that ACK never comes,
+  // 'close' never fires, onClose never runs, and the seat never reaps —
+  // the whole reason we called endStream to begin with (eviction, error,
+  // shutdown). Force teardown so onClose runs on the next tick. Every
+  // caller is already an error/eviction/shutdown decision; the RST vs FIN
+  // swap is invisible to the client (its EventSource reconnects).
+  try { res.socket && res.socket.destroy(); } catch { /* already gone */ }
 }
 
 // `projectFor(playerId)` is the optional per-recipient projection — the

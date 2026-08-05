@@ -854,6 +854,70 @@ try {
     const after = bob.sse.events.filter((e) => e.type === 'pools-changed').length;
     assert.equal(after, before + 1, 'the junk-set re-post broadcast nothing');
   });
+
+  // -- SSE lifecycle (ROADMAP 0d): endStream must actually tear the socket
+  // down, not just enqueue a FIN. Without socket.destroy() after res.end(),
+  // 'close' would wait on the peer's ACK — a stalled peer would keep the
+  // stream in player.clients forever and the seat would never reap.
+  await t('MAX_STREAMS eviction tears the evicted stream down immediately (§0d)', async () => {
+    const room = 'sse-eviction';
+    const ann = await sit(room, 'Ann');
+    // The stream we already opened via sit() is the eviction target: it is
+    // the oldest in player.clients. MAX_STREAMS_PER_PLAYER=4, so the 4th
+    // ADDITIONAL open (5th overall) trips the eviction loop against it.
+    const first = ann.sse;
+    const extras = [];
+    for (let i = 0; i < 4; i++) {
+      const s = await new Sse().open(base, room, ann.id);
+      streams.push(s);
+      extras.push(s);
+      await s.waitFor((e) => e.type === 'hello', `extra hello ${i}`);
+    }
+    // With the socket.destroy() in endStream, the evicted stream's fetch
+    // body iteration terminates promptly — pump resolves rather than hanging
+    // waiting for a peer-driven close.
+    await Promise.race([
+      first.pump,
+      new Promise((_, rej) => setTimeout(
+        () => rej(new Error('evicted stream did not close within 3s')), 3000,
+      )),
+    ]);
+    // The surviving four streams still deliver: player was NOT reaped.
+    const roll = await post('/api/roll', { room, playerId: ann.id, notation: '1d6' });
+    assert.equal(roll.status, 200, 'a roll still succeeds — the seat survived eviction');
+    for (const [i, s] of extras.entries()) {
+      await s.waitFor(
+        (e) => e.type === 'roll' && e.data.rollId === roll.body.roll.rollId,
+        `extra stream ${i} still receiving broadcasts`,
+      );
+    }
+  });
+
+  await t('server-side stream teardown lets the seat reap after DISCONNECT_GRACE_MS (§0d)', async () => {
+    const room = 'sse-reap';
+    const ann = await sit(room, 'Ann');
+    const bob = await sit(room, 'Bob');
+    // Fill Ann's cap, evicting the sit()-opened stream via endStream.
+    const kept = [];
+    for (let i = 0; i < 4; i++) {
+      const s = await new Sse().open(base, room, ann.id);
+      streams.push(s);
+      kept.push(s);
+      await s.waitFor((e) => e.type === 'hello', `filler hello ${i}`);
+    }
+    // Now client-abort all remaining streams — this is the closest a raw
+    // test gets to "the peer went away without a graceful FIN". With the
+    // fix, every abort triggers 'close' immediately on the server side, so
+    // player.clients drains to zero and scheduleReap(DISCONNECT_GRACE_MS)
+    // arms exactly once. After the grace, Bob sees Ann leave.
+    for (const s of kept) s.close();
+    // DISCONNECT_GRACE_MS is 5s in server.js; grant one HEARTBEAT interval
+    // of slop but bound the wait so a broken reap fails loud.
+    await bob.sse.waitFor(
+      (e) => e.type === 'player-left' && e.data.playerId === ann.id,
+      "Bob sees Ann's seat reap", 8000,
+    );
+  });
 } finally {
   for (const s of streams) s.close();
   proc.kill();
