@@ -4395,4 +4395,121 @@ export const scenarios = [
       }
     },
   },
+  {
+    name: 'endurance-log',
+    tags: ['perf', 'roll', 'log', 'endurance-log'],
+    // Tier 0 §0e: addLogEntry used to full-rebuild #log-list on every
+    // arrival, rebinding one closure per entry. This scenario proves the
+    // append+prune path is:
+    //   (1) length-correct — after N rolls the DOM holds min(N, LOG_CAP)
+    //       rows AND the newest row's data-roll-id matches currentRoll,
+    //   (2) reroll-correct — the delegated ⟳ on a row that is NOT the
+    //       newest still dispatches with THAT entry's spec (a stale
+    //       per-entry closure was the pre-fix bug),
+    //   (3) chip-correct — a reroll-of-a-reroll chain (A → B → C) leaves
+    //       both A and B carrying exactly one `.log-rerolled` chip, and C
+    //       carries `.is-reroll` — the same state a full renderLog() would
+    //       produce.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+
+      // (1) 60 back-to-back rolls. Solo is fine here — the fix is a pure
+      // client-side render change and solo exercises the same addLogEntry
+      // path with a synthetic 'solo-<ts>-<rand>' rollId per entry.
+      const N = 60;
+      for (let i = 0; i < N; i++) await a.roll(`d6 # r${i + 1}`);
+
+      const logLen = await a.eval(`document.getElementById('log-list').childElementCount`);
+      // LOG_CAP is 100; 60 rolls stay under it, so DOM == push count.
+      assert.equal(logLen, Math.min(N, 100), `log-list holds min(N, LOG_CAP) rows (got ${logLen})`);
+
+      // The newest row (renders reversed, so DOM index 0) IS the last roll.
+      const newestRid = await a.eval(
+        `document.getElementById('log-list').firstElementChild.dataset.rollId`);
+      const lastRid = await a.rollId();
+      assert.equal(newestRid, lastRid, 'the newest row stamps the last roll id');
+
+      // (2) Click ⟳ on the 30th roll (1-indexed) — DOM index N - 30 = 30
+      // since the list renders newest-first.
+      const targetIdx = N - 30; // 30
+      const clicked = await a.eval(`(() => {
+        const row = document.getElementById('log-list').children[${targetIdx}];
+        if (!row) return null;
+        const btn = row.querySelector('.log-again');
+        if (!btn) return null;
+        btn.click();
+        return { rid: row.dataset.rollId, label: row.innerText.match(/r(\\d+)/)[0] };
+      })()`);
+      assert.ok(clicked, `row ${targetIdx} exists with a ⟳ button`);
+      assert.equal(clicked.label, 'r30', 'the 30th DOM row from the top is r30');
+
+      // The delegated handler routes to requestRoll with THIS entry's spec.
+      // __diceDebug.lastRequestedRoll captures the ask; the label must be
+      // the r30 entry's label (proves the closure was not stale).
+      const asked = await a.dbg('lastRequestedRoll');
+      assert.ok(asked, 'requestRoll fired');
+      assert.equal(asked.label, 'r30', `requestRoll saw the r30 entry (got ${asked.label})`);
+      assert.equal(asked.rerollOfId, clicked.rid, 'reroll provenance names the parent');
+
+      // Wait for the reroll itself to complete so C's arrival lands.
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), !window.__diceDebug.busy`
+        + ` && document.getElementById('log-list').childElementCount === ${N + 1})`,
+        { desc: 'the ⟳ reroll appended a row' });
+
+      // The parent row (r30, `clicked.rid`) is now superseded — markSuperseded
+      // must have added exactly one `.log-rerolled` chip in place, without a
+      // full rebuild. B is our new reroll of A (r30).
+      const bRid = await a.rollId();
+      const parentChips = await a.eval(`(() => {
+        const row = document.querySelector('#log-list .log-entry[data-roll-id=' + JSON.stringify(${JSON.stringify(clicked.rid)}) + ']');
+        return row ? {
+          rerolledChips: row.querySelectorAll('.log-rerolled').length,
+          hasIsReroll: row.classList.contains('is-reroll'),
+        } : null;
+      })()`);
+      assert.ok(parentChips, 'the parent row still exists');
+      assert.equal(parentChips.rerolledChips, 1, 'exactly one `rerolled` chip on the parent');
+      assert.equal(parentChips.hasIsReroll, false, 'the parent is not itself a reroll');
+
+      // (3) Reroll-of-reroll chain: reroll B — the freshly-appended row —
+      // and observe that A stays with its single chip (chip idempotence) and
+      // B (which is itself a reroll of A) gains its own `.log-rerolled`
+      // WITHOUT dropping `.is-reroll`. C wears `.is-reroll` only (else-if).
+      await a.eval(`(() => {
+        const row = document.querySelector('#log-list .log-entry[data-roll-id=' + JSON.stringify(${JSON.stringify(bRid)}) + ']');
+        row.querySelector('.log-again').click();
+      })()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), !window.__diceDebug.busy`
+        + ` && document.getElementById('log-list').childElementCount === ${N + 2})`,
+        { desc: 'the second ⟳ reroll appended a row' });
+      const cRid = await a.rollId();
+
+      const chain = await a.eval(`(() => {
+        const q = (rid) => document.querySelector('#log-list .log-entry[data-roll-id=' + JSON.stringify(rid) + ']');
+        const shape = (rid) => {
+          const row = q(rid);
+          return row ? {
+            rerolled: row.querySelectorAll('.log-rerolled').length,
+            reroll: row.querySelectorAll('.log-reroll').length,
+            isReroll: row.classList.contains('is-reroll'),
+          } : null;
+        };
+        return { a: shape(${JSON.stringify(clicked.rid)}), b: shape(${JSON.stringify(bRid)}), c: shape(${JSON.stringify(cRid)}) };
+      })()`);
+      // A: still one `rerolled` chip (idempotence — the second reroll
+      // targets B, not A; A's chip must not stack).
+      assert.deepEqual(chain.a, { rerolled: 1, reroll: 0, isReroll: false },
+        `A stays chip-idempotent (got ${JSON.stringify(chain.a)})`);
+      // B: itself a reroll (of A) AND now rerolled (by C). The full-render
+      // else-if suppresses the `rerolled` chip when `.is-reroll` is set —
+      // markSuperseded mirrors that; expect zero `rerolled` chips on B.
+      assert.deepEqual(chain.b, { rerolled: 0, reroll: 1, isReroll: true },
+        `B keeps 'reroll' only, matching renderLog's else-if (got ${JSON.stringify(chain.b)})`);
+      // C: the newest — a reroll of B, not yet rerolled itself.
+      assert.deepEqual(chain.c, { rerolled: 0, reroll: 1, isReroll: true },
+        `C wears 'reroll' only (got ${JSON.stringify(chain.c)})`);
+    },
+  },
 ];

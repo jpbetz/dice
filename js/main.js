@@ -4104,6 +4104,10 @@ window.__diceDebug = {
   get currentRoll() { return currentRoll; },
   get busy() { return !!(currentRoll && !currentRoll.done) || rollQueue.length > 0; },
   get queueLength() { return rollQueue.length; },
+  // Tier 0 §0e endurance: the delegated ⟳ handler resolves the entry by
+  // rollId — this hook lets the scenario prove requestRoll fires with the
+  // right entry AFTER many rebuilds (a stale closure was the pre-fix bug).
+  get lastRequestedRoll() { return lastRequestedRoll ? { ...lastRequestedRoll } : null; },
   get net() { return { online: netOnline, playerId: net ? net.playerId : null }; },
   get netReady() { return netReady; },
   // The last thing the server refused us ({path, status, code, message}) —
@@ -7613,18 +7617,18 @@ function escapeHtml(t) {
   return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function renderLog() {
-  logList.innerHTML = '';
-  logEmpty.style.display = log.length ? 'none' : 'block';
-  // Rows whose result was superseded by a reroll — derived from what THIS
-  // client holds, so it can never name a roll the viewer does not have (a
-  // secret reroll projects to null for others, so their logs never contain
-  // the reference; the birth gate keeps a secret PARENT unnamed entirely).
-  const supersededIds = new Set(log.map((e) => e.rerollOfId).filter(Boolean));
-  for (const entry of [...log].reverse()) {
+// Build the row DOM for a single log entry. Extracted from renderLog() so
+// addLogEntry can append incrementally (Tier 0 §0e endurance — the full
+// list rebuild was O(N) per arrival and dominated a saturated table). Both
+// paths call THIS builder — a single source of truth keeps the incremental
+// row identical to the full-render row on any future markup edit.
+function buildLogEntryEl(entry, { supersededIds }) {
     const hidden = entryHidden(entry);
     const el = document.createElement('div');
     el.className = 'log-entry';
+    // The delegated ⟳ handler on #log-list resolves the entry by rollId,
+    // so the row stamps its identity here (never a closure).
+    el.dataset.rollId = entry.rollId || '';
     // The log leads with the DICE (GOALS 1: prefer showing real dice) — the
     // only roll surface that was still pure text. Tiny grouped tokens, xN
     // per P5; die TYPES are public even on hidden rolls (goal 11), so a
@@ -7742,30 +7746,102 @@ function renderLog() {
       q.textContent = 'rerolled';
       groupEl.appendChild(q);
     }
-    if (canReroll(entry)) {
+    // The ⟳ button is markup-only: the delegated handler on #log-list
+    // resolves the entry via el.dataset.rollId. A rollId-less entry would
+    // make the button inert — an invisible dead button is worse than the
+    // pre-delegation behavior, so skip it and rely on the caller's fallback
+    // (addLogEntry drops to a full renderLog() when rollId is missing).
+    if (canReroll(entry) && entry.rollId) {
       const again = document.createElement('button');
       again.className = 'log-again';
       again.textContent = '⟳';
       again.title = 'Reroll this';
-      again.addEventListener('click', () =>
-        requestRoll([...entry.spec.dice], entry.label, rerollOpts(entry))
-      );
       el.querySelector('.log-actions').appendChild(again);
     }
-    logList.appendChild(el);
+    return el;
+}
+
+function renderLog() {
+  logList.innerHTML = '';
+  logEmpty.style.display = log.length ? 'none' : 'block';
+  // Rows whose result was superseded by a reroll — derived from what THIS
+  // client holds, so it can never name a roll the viewer does not have (a
+  // secret reroll projects to null for others, so their logs never contain
+  // the reference; the birth gate keeps a secret PARENT unnamed entirely).
+  const supersededIds = new Set(log.map((e) => e.rerollOfId).filter(Boolean));
+  for (const entry of [...log].reverse()) {
+    logList.appendChild(buildLogEntryEl(entry, { supersededIds }));
   }
 }
 renderLog();
 
+// One delegated ⟳ listener on #log-list — the per-entry closure that used
+// to bind on every renderLog() rebuild was the dominant cost on a saturated
+// table (Tier 0 §0e). Resolve the entry via row.dataset.rollId.
+logList.addEventListener('click', (ev) => {
+  const btn = ev.target instanceof HTMLElement ? ev.target.closest('.log-again') : null;
+  if (!btn) return;
+  const row = btn.closest('.log-entry');
+  const rid = row && row.dataset.rollId;
+  const entry = rid ? log.find((e) => e.rollId === rid) : null;
+  if (entry && canReroll(entry)) {
+    requestRoll([...entry.spec.dice], entry.label, rerollOpts(entry));
+  }
+});
+
+// Mark the PARENT of a fresh reroll as superseded without a full rebuild.
+// Idempotent: guarded by the existing chip so a double-reroll on the same
+// parent does not stack duplicates. Only the `.log-rerolled` chip is added
+// — `.is-reroll` at buildLogEntryEl is set when the row ITSELF is a reroll,
+// which markSuperseded's target is not; touching it here would drift the
+// CSS class state away from what full renderLog() produces.
+function markSuperseded(parentRollId) {
+  if (!parentRollId) return;
+  const row = logList.querySelector(`.log-entry[data-roll-id="${CSS.escape(parentRollId)}"]`);
+  if (!row) return;
+  // Full renderLog uses an if/else-if: a row that is ITSELF a reroll
+  // (`.is-reroll`) only wears the 'reroll' chip, never 'rerolled' — even
+  // in a reroll-of-a-reroll chain. Mirror that here so append+prune stays
+  // byte-identical with the full rebuild.
+  if (row.classList.contains('is-reroll')) return;
+  const groupEl = row.querySelector('.log-group');
+  if (!groupEl || groupEl.querySelector('.log-rerolled')) return;
+  const q = document.createElement('span');
+  q.className = 'log-rerolled';
+  q.textContent = 'rerolled';
+  groupEl.appendChild(q);
+}
+
 function addLogEntry(entry) {
-  // Dedupe by server rollId: a reconnect 'hello' can rebuild the log with a
-  // roll whose playback is still running; its completion must not append the
-  // same roll twice. (Solo entries have no rollId and are never deduped.)
+  // Dedupe by rollId: a reconnect 'hello' can rebuild the log with a roll
+  // whose playback is still running; its completion must not append the
+  // same roll twice. (Solo entries carry a synthetic 'solo-<ts>-<rand>'
+  // rollId from rollDice, so this gate applies to every arrival path.)
   if (entry.rollId && log.some((e) => e.rollId === entry.rollId)) return;
   log.push(entry);
-  if (log.length > LOG_CAP) log = log.slice(-LOG_CAP);
+  const dropped = log.length > LOG_CAP ? log.length - LOG_CAP : 0;
+  if (dropped) log = log.slice(-LOG_CAP);
   if (!netOnline) save(LS_LOG, log); // online mode: the server owns the log
-  renderLog();
+  logEmpty.style.display = 'none';
+  // Defensive fallback: a rollId-less entry would make the delegated ⟳
+  // handler inert (dataset lookup returns null). Should not happen — every
+  // production path assigns one — but if it does, redraw the whole list so
+  // no state diverges (behavior matches the pre-delegation build).
+  if (!entry.rollId) {
+    renderLog();
+  } else {
+    const supersededIds = new Set(log.map((e) => e.rerollOfId).filter(Boolean));
+    const el = buildLogEntryEl(entry, { supersededIds });
+    // The list renders reversed (newest first): prepend the new row; the
+    // scrollTop is preserved incidentally, so a user scrolled back into
+    // history is no longer jerked to the top when a new roll lands.
+    logList.prepend(el);
+    // Refresh the parent row's chip in place, then prune from the tail.
+    if (entry.rerollOfId) markSuperseded(entry.rerollOfId);
+    for (let i = 0; i < dropped && logList.lastElementChild; i++) {
+      logList.lastElementChild.remove();
+    }
+  }
   // An entry landing while the flyout is closed counts as unread on the
   // rail's ≣ badge (the dedupe above already returned for re-deliveries).
   if (!isLogFlyoutOpen()) setLogUnread(logUnread + 1);
@@ -9663,8 +9739,20 @@ function handleNetRefusal(info) {
 // from ↑ as a PUBLIC roll, and a Check would come back Plain. Only the comment
 // title cannot be recovered on a reroll — it never rides the wire — so callers
 // that still have it pass it in.
+// Test observability: the last spec we asked the pipeline to roll. The
+// endurance-log scenario asserts the delegated ⟳ dispatches to the RIGHT
+// entry after 60 back-to-back rolls (a per-entry closure was the pre-fix
+// bug: rebuilding the list every add re-bound N buttons every arrival).
+let lastRequestedRoll = null;
+
 function requestRoll(types, label, opts = {}) {
   if (!types.length) return;
+  lastRequestedRoll = {
+    dice: [...types],
+    label: label || null,
+    rerollOfId: typeof opts.rerollOfId === 'string' ? opts.rerollOfId : null,
+    at: Date.now(),
+  };
   const vis = normVis(opts.visibility, opts.faceDown);
   const canonical = opts.canonical || canonicalWithVis(
     { dice: types, mods: opts.mods || null, sources: opts.sources || undefined },
