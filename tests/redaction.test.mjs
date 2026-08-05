@@ -918,6 +918,52 @@ try {
       "Bob sees Ann's seat reap", 8000,
     );
   });
+
+  // dropStream + onClose are intentionally redundant (§0d). Opening WELL over
+  // the cap makes every excess-open invoke dropStream directly (the eviction
+  // loop's path), while the survivors reap via onClose when the client
+  // aborts. The two paths interleave; scheduleReap must still land the reap
+  // exactly once within DISCONNECT_GRACE_MS + slop, without ever shortening
+  // it (which would race a still-live survivor into an early reap).
+  await t('open > MAX_STREAMS then drain: seat reaps once, on time, no early reap (§0d)', async () => {
+    const room = 'sse-overcap';
+    const ann = await sit(room, 'Ann');
+    const bob = await sit(room, 'Bob');
+    // Open 8 streams on top of sit()'s one — the eviction loop fires 5 times,
+    // routing through dropStream. The last 4 survive as player.clients.
+    const kept = [];
+    for (let i = 0; i < 8; i++) {
+      const s = await new Sse().open(base, room, ann.id);
+      streams.push(s);
+      kept.push(s);
+      await s.waitFor((e) => e.type === 'hello', `overcap hello ${i}`);
+    }
+    // Only the last 4 should be alive; the earlier ones got evicted via
+    // dropStream. Broadcast a roll and check every survivor still receives.
+    const roll = await post('/api/roll', { room, playerId: ann.id, notation: '1d6' });
+    assert.equal(roll.status, 200, 'seat survived the flurry of evictions');
+    for (const [i, s] of kept.slice(-4).entries()) {
+      await s.waitFor(
+        (e) => e.type === 'roll' && e.data.rollId === roll.body.roll.rollId,
+        `survivor ${i} still receiving broadcasts`,
+      );
+    }
+    // No early reap: Bob has NOT seen Ann leave despite the eviction storm.
+    const early = bob.sse.events.find(
+      (e) => e.type === 'player-left' && e.data.playerId === ann.id,
+    );
+    assert.ok(!early, `no premature reap during over-cap evictions (got: ${early ? JSON.stringify(early) : 'nothing'})`);
+    // Drain the survivors; reap arrives on the grace, once.
+    for (const s of kept.slice(-4)) s.close();
+    await bob.sse.waitFor(
+      (e) => e.type === 'player-left' && e.data.playerId === ann.id,
+      "Bob sees Ann's seat reap after over-cap drain", 8000,
+    );
+    const leaves = bob.sse.events.filter(
+      (e) => e.type === 'player-left' && e.data.playerId === ann.id,
+    );
+    assert.equal(leaves.length, 1, 'exactly one reap, not one-per-dropStream');
+  });
 } finally {
   for (const s of streams) s.close();
   proc.kill();

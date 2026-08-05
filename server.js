@@ -368,6 +368,30 @@ function scheduleReap(room, player, delay) {
   if (player.reapTimer.unref) player.reapTimer.unref();
 }
 
+// Drop a single stream and, if it was the seat's last, arm the grace reap.
+// Idempotent with onClose (which runs the same check on 'close'/'error') —
+// scheduleReap never shortens a pending grace (may extend it by a hair when
+// re-armed at the same delay from a later Date.now(); benign). This is
+// prophylaxis, not a bug fix: onClose is wired in the same synchronous tick
+// as `player.clients.add(res)`, so no event can be missed between those
+// steps. But the eviction/write-fail paths already know the stream is gone
+// — arming the reap here means we don't wait on the peer's FIN ACK to
+// discover it. endStream tolerates re-entry (its writes are try/wrapped),
+// so callers that already invoked it (sendEvent on write failure) do not
+// need to strip the second call. Under MAX_STREAMS_PER_PLAYER eviction the
+// size is >= MAX-1, so the scheduleReap branch here is unreachable at that
+// site today; holdPlayer immediately below in handleEvents would cancel
+// any reap anyway. The helper is uniform so the next reader doesn't have
+// to prove that separately.
+function dropStream(room, player, res) {
+  player.clients.delete(res);
+  endStream(res);
+  if (player.clients.size === 0 && room.players.get(player.id) === player) {
+    log(`DBG dropStream schedReap player=${player.name} caller=${new Error().stack.split('\n')[2].trim()}`);
+    scheduleReap(room, player, DISCONNECT_GRACE_MS);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // SSE
 // ---------------------------------------------------------------------------
@@ -407,7 +431,10 @@ function broadcast(room, type, data, projectFor = null) {
     const payload = projectFor ? projectFor(player.id) : data;
     if (payload === null || payload === undefined) continue;
     for (const res of [...player.clients]) {
-      if (!sendEvent(res, type, payload)) player.clients.delete(res);
+      // sendEvent's own catch already invoked endStream on write failure;
+      // dropStream's second endStream is a no-op (try/wrapped) but arms the
+      // grace reap in the same step so a dead peer doesn't linger.
+      if (!sendEvent(res, type, payload)) dropStream(room, player, res);
     }
   }
 }
@@ -420,8 +447,7 @@ const heartbeat = setInterval(() => {
           if (res.writableEnded || res.destroyed) throw new Error('dead');
           res.write(': ping\n\n');
         } catch {
-          player.clients.delete(res);
-          endStream(res);
+          dropStream(room, player, res);
         }
       }
     }
@@ -664,8 +690,10 @@ function handleEvents(req, res, url) {
   // reconnect race never locks a real client out.
   while (player.clients.size >= MAX_STREAMS_PER_PLAYER) {
     const oldest = player.clients.values().next().value;
-    player.clients.delete(oldest);
-    endStream(oldest);
+    // dropStream's scheduleReap branch is unreachable here (size stays >=
+    // MAX-1) and holdPlayer below would cancel any reap anyway — the
+    // helper is uniform for readability, not for behavior at this site.
+    dropStream(room, player, oldest);
   }
   player.clients.add(res);
   holdPlayer(player);
@@ -683,6 +711,7 @@ function handleEvents(req, res, url) {
   const onClose = () => {
     player.clients.delete(res);
     if (player.clients.size === 0 && room.players.get(playerId) === player) {
+      log(`DBG onClose schedReap player=${player.name}`);
       scheduleReap(room, player, DISCONNECT_GRACE_MS);
     }
   };
