@@ -812,7 +812,7 @@ function resetTableSurface() {
   closePeek();
   recompositeFelt(); // the swept shelf takes its glow rings with it
   shelfLayer.innerHTML = '';
-  banner.classList.add('hidden');
+  hideBanner();
 }
 
 // ---- per-roll Done (§7.5) --------------------------------------------------
@@ -910,7 +910,7 @@ function applyClearRoll(rollId) {
   }
   // The moment leaves with its dice: banner and verdict card for THIS roll
   // close everywhere. Other rolls' surfaces are untouched.
-  if (lastEntry && lastEntry.rollId === rollId) banner.classList.add('hidden');
+  if (lastEntry && lastEntry.rollId === rollId) hideBanner();
   if (currentRoll && currentRoll.rollId === rollId && currentRoll.ceremony
       && !ceremonyLayer.classList.contains('hidden')) {
     dismissCeremonyUI();
@@ -1192,7 +1192,7 @@ function shelveRoll(rollId, seq, animate) {
   });
   // The moment leaves the felt surfaces: banner and verdict card for THIS
   // roll close everywhere; the log line and the marker carry it from here.
-  if (lastEntry && lastEntry.rollId === rollId) banner.classList.add('hidden');
+  if (lastEntry && lastEntry.rollId === rollId) hideBanner();
   if (stagedVerdict && stagedVerdict.entry.rollId === rollId
       && !ceremonyLayer.classList.contains('hidden')) {
     dismissCeremonyUI();
@@ -1761,7 +1761,7 @@ function playRoll(roll) {
 
   chips.length = 0;
   chipsLayer.innerHTML = '';
-  banner.classList.add('hidden');
+  hideBanner();
   dismissCeremonyUI(); // a lingering verdict card/decal yields to the new roll
 
   // --- spawn with seeded throw params -------------------------------------
@@ -2177,6 +2177,19 @@ function stepPlayback(dt) {
 const chipsLayer = document.getElementById('chips-layer');
 const banner = document.getElementById('result-banner');
 
+// One clean way to hide the banner (Tier 0 §0e endurance leak): the roll-dice
+// outline is anchored to the banner (mouseenter paints it, mouseleave clears
+// it), so any code path that yanks the banner out from under a hovering
+// pointer used to leave the outline meshes attached to the felt dice — no
+// mouseleave ever fires. Every site that hides the banner now routes through
+// here, and outlineRollDice(false) runs FIRST (idempotent on empty outlined,
+// so a stray call is harmless). Callers work whether or not the class was
+// already set — classList.add is idempotent too.
+function hideBanner() {
+  outlineRollDice(false);
+  banner.classList.add('hidden');
+}
+
 // Auto-collect (2026-08-01, Joe): a finished roll of YOURS tidies itself to
 // the shelf after a quiet moment — roll, read, and it moves aside on its
 // own; Enter (keep now) and Esc (sweep) stay the fast paths. Hidden rolls
@@ -2248,7 +2261,13 @@ function outlineRollDice(on) {
     o.shell.material.dispose();
   }
   outlined = [];
-  if (!on || !lastEntry || !currentRoll || currentRoll.rollId !== lastEntry.rollId) return;
+  // A hidden banner cannot own the outline (Tier 0 §0e endurance leak): a
+  // mouseenter that raced with a banner hide used to strand shell meshes on
+  // the dice. The clear loop above always runs first, so a stray on=true
+  // after the banner is already down still wipes anything present — then we
+  // decline to paint fresh outlines against a card the reader cannot see.
+  if (!on || !lastEntry || !currentRoll || currentRoll.rollId !== lastEntry.rollId
+      || banner.classList.contains('hidden')) return;
   const entry = lastEntry;
   const srcColor = new Map();
   const colorFor = (i) => {
@@ -2945,7 +2964,7 @@ function renderBannerActions(entry) {
         if (!ok) showSettingsNote('couldn’t clear the roll — try again');
       });
     } else {
-      banner.classList.add('hidden');
+      hideBanner();
     }
   });
   main.addEventListener('keydown', (e) => {
@@ -4409,6 +4428,10 @@ window.__diceDebug = {
   },
   // roll outlines (the card-hover read): shell colors, in die order
   get outlineState() { return outlined.map((o) => `#${o.shell.material.color.getHexString()}`); },
+  // Endurance probe (Tier 0 §0e): after a stress loop of hover-then-hide,
+  // outlined must land at exactly zero — a stray shell mesh riding a die
+  // is a memory + GPU leak the hideBanner helper closes.
+  get outlinedCount() { return outlined.length; },
   hoverBanner(on) { outlineRollDice(on !== false); return outlined.length; },
   setChipsVisible(on) { setChips(on); return chipsOn; },
   get chipCount() { return chips.length; },

@@ -4512,4 +4512,57 @@ export const scenarios = [
         `C wears 'reroll' only (got ${JSON.stringify(chain.c)})`);
     },
   },
+  {
+    name: 'endurance-outline',
+    tags: ['perf', 'roll', 'endurance-outline'],
+    // Tier 0 §0e: the roll-dice outline is anchored to banner hover — a
+    // mouseenter paints an inverted-hull shell on each die, mouseleave clears
+    // them. Any code path that HID the banner without a mouseleave (a new
+    // roll spawning, auto-collect, clearRoll, resetTableSurface, the
+    // banner-main click) used to strand those shells on the felt — a per-die
+    // BackSide MeshBasicMaterial + a scene-graph child that never got freed.
+    // hideBanner() now routes every hide through outlineRollDice(false) first,
+    // and outlineRollDice(true) declines to paint against a hidden card, so a
+    // hover-then-hide pattern lands at zero every time. This scenario stresses
+    // that path 60 rolls deep.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+
+      // 60 back-to-back rolls, each one: roll → hover the banner (paint the
+      // outline) → the NEXT roll's spawn hides the banner via hideBanner. In
+      // the pre-fix world the outline shells piled up across iterations; the
+      // fix guarantees each hide clears them before the next paint.
+      const N = 60;
+      for (let i = 0; i < N; i++) {
+        await a.roll('d6');
+        // hoverBanner returns the current outlined.length; asserting > 0 keeps
+        // the test honest — if the paint no-ops for any reason, the leak
+        // assertion below could pass vacuously.
+        const painted = await a.dbg('hoverBanner(true)');
+        assert.equal(painted, 1, `iter ${i}: the hover paints one shell (got ${painted})`);
+      }
+
+      // The last iteration left an outline standing. The banner-main click
+      // (roller side → dismisses this roll's card via requestClearRoll →
+      // hideBanner) is the hide path we assert against here.
+      const bRid = await a.rollId();
+      await a.eval(`document.getElementById('banner-main').click()`);
+      await a.waitFor(
+        `document.getElementById('result-banner').classList.contains('hidden')`,
+        { desc: 'banner hides after the clear click' });
+      await a.settle();
+
+      assert.equal(await a.dbg('outlinedCount'), 0,
+        'the hide clears every outline shell — no strays on the felt');
+
+      // And the guard: a stray hoverBanner(true) after a hide is a no-op
+      // (the banner cannot own an outline the reader cannot see).
+      await a.dbg('hoverBanner(true)');
+      assert.equal(await a.dbg('outlinedCount'), 0,
+        'hoverBanner against a hidden card paints nothing');
+
+      // sanity: the last cleared roll is really gone from the felt view
+      assert.ok(bRid, 'the endurance loop actually produced a roll id');
+    },
+  },
 ];
