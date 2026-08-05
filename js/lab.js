@@ -61,7 +61,7 @@ const BENCH_IDS = BENCH.map(([id]) => id);
 const INK_DEFAULT = (profile) => (profile === 'round' ? 0.12 : 0.25);
 const B_DEFAULTS = () => ({
   stdColors: true, body: '#2e6f9e', text: '#f7edda', accent: '#ffd766',
-  geo: { bevel: 0.055, profile: 'cut', segments: 3, ink: 0.25, wear: 0, pillow: 0, nicks: 0 },
+  geo: { bevel: 0.055, profile: 'cut', segments: 3, ink: 0.25, tint: '#000000', wear: 0, pillow: 0, nicks: 0 },
   feel: { rough: 0.3, metal: 0.1 },
   spec: { envMapIntensity: 0.35, clearcoat: 0, clearcoatRoughness: 0.5, ior: 1.5,
     iridescence: 0, iridescenceIOR: 1.3, specularIntensity: 1, specularColor: '#ffffff' },
@@ -85,6 +85,7 @@ function assembleRecipe(s) {
     if (s.geo.segments !== 3) g.segments = s.geo.segments;
   }
   if (s.geo.ink !== INK_DEFAULT(s.geo.profile)) g.ink = s.geo.ink;
+  if (s.geo.tint && s.geo.tint !== '#000000') g.tint = s.geo.tint;
   if (s.geo.wear > 0) g.wear = s.geo.wear;
   if (s.geo.pillow > 0) g.pillow = s.geo.pillow;
   if (s.geo.nicks > 0) g.nicks = s.geo.nicks;
@@ -902,7 +903,15 @@ function recipeText() {
     syncControls();
   }, ['cut', 'round']);
   slider(gGeo, 'segments', () => bState.geo.segments, (v) => { bState.geo.segments = v; }, 1, 6, 1);
-  slider(gGeo, 'edge ink', () => bState.geo.ink, (v) => { bState.geo.ink = v; }, 0, 0.5, 0.01);
+  // edge ink: 0 = self-colored edges (no dimming), 1 = fully the tint color.
+  // Range widened to the full lerp domain (was 0-0.5) so a theme can push
+  // an edge all the way to its tint if the material calls for it.
+  slider(gGeo, 'edge ink', () => bState.geo.ink, (v) => { bState.geo.ink = v; }, 0, 1, 0.01);
+  // edge tint: the color the body lerps toward. Default black is the
+  // classical inked outline; a per-set tint claims an edge palette —
+  // sepia on aged ivory, patina on brass, deep abyssal blue on ice,
+  // or an ivory highlight on onyx (tint LIGHTER than body = highlight).
+  color(gGeo, 'edge tint', () => bState.geo.tint || '#000000', (v) => { bState.geo.tint = v; });
   slider(gGeo, 'wear', () => bState.geo.wear, (v) => { bState.geo.wear = v; }, 0, 1, 0.05);
   slider(gGeo, 'pillow', () => bState.geo.pillow, (v) => { bState.geo.pillow = v; }, 0, 1, 0.05);
   slider(gGeo, 'nicks', () => bState.geo.nicks, (v) => { bState.geo.nicks = v; }, 0, 5, 1);

@@ -222,9 +222,15 @@ function makeFaceTexture(def, face, spec) {
   const base = new THREE.Color(def.color);
   const light = base.clone().lerp(new THREE.Color('#ffffff'), 0.18);
   // geo.ink dials the painted outline (and, in buildDie, the matching band
-  // material) — the two are ONE visual system, "the outline made real"
+  // material) — the two are ONE visual system, "the outline made real".
+  // geo.tint is the color the body lerps TOWARD — default pure black
+  // (the classical inked outline); a per-set override lets a theme claim
+  // its own edge palette (sepia on aged ivory, patina on brass, deep
+  // abyssal blue on ice, ivory highlight on onyx, etc.). tint LIGHTER
+  // than the body reads as a highlight; DARKER as an ink.
   const ink = def.geo && def.geo.ink != null ? def.geo.ink : 0.25;
-  const dark = base.clone().lerp(new THREE.Color('#000000'), ink);
+  const tint = def.geo && def.geo.tint || '#000000';
+  const dark = base.clone().lerp(new THREE.Color(tint), ink);
   const grad = ctx.createRadialGradient(TEX_SIZE / 2, TEX_SIZE / 2, TEX_SIZE * 0.1, TEX_SIZE / 2, TEX_SIZE / 2, TEX_SIZE * 0.7);
   grad.addColorStop(0, `#${light.getHexString()}`);
   grad.addColorStop(1, `#${base.getHexString()}`);
@@ -1052,10 +1058,12 @@ function buildDie(type, variant = 'std') {
   // Round-profile (tumbled) sets darken HALF as much — a worn edge is the
   // same material frosted soft, not an inked outline; the wide dark seams
   // were fighting the sea-tumbled look. geo.ink overrides both this and
-  // the painted outline (0 = fully self-colored edges).
+  // the painted outline (0 = fully self-colored edges); geo.tint sets the
+  // color the edge lerps toward (default black — the classic inked look).
   const edgeDark = skin.geo && skin.geo.ink != null ? skin.geo.ink
     : skin.geo && skin.geo.profile === 'round' ? 0.12 : 0.25;
-  const edgeColor = new THREE.Color(skin.color).lerp(new THREE.Color('#000000'), edgeDark);
+  const edgeTint = skin.geo && skin.geo.tint || '#000000';
+  const edgeColor = new THREE.Color(skin.color).lerp(new THREE.Color(edgeTint), edgeDark);
   materials.push(new THREE.MeshStandardMaterial({
     color: edgeColor,
     roughness: shroud ? 0.16 : (skin.feel ? skin.feel.rough : 0.3),

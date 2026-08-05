@@ -140,6 +140,11 @@ export const THEMES = {
         label: 'Onyx',
         body: '#141416', text: '#e8e2d2', accent: '#3a3a3f',
         feel: { rough: 0.48, metal: 0.03 },
+        // Onyx-on-black would render the geometry invisible with the
+        // default black-toward-black lerp. Tint LIGHTER (toward the
+        // die's own ivory numerals) so the bevel reads back — 14% is
+        // a whisper, enough to see the edges without shouting.
+        geo: { tint: '#e8e2d2', ink: 0.14 },
       },
       slate: {
         label: 'Slate',
@@ -165,6 +170,11 @@ export const THEMES = {
         label: 'Brass',
         body: '#9b7a2a', text: '#221807', accent: '#c9a54a',
         feel: { rough: 0.32, metal: 0.72 },
+        // Brass with a pure-black edge reads too stark for a metallic
+        // body — real brass ages to a dark warm patina at the seams,
+        // not soot. Bronze-brown tint at 0.55 gives the die the honest
+        // "handled and aged" look every classic brass object has.
+        geo: { tint: '#3a2708', ink: 0.55 },
       },
     },
   },
@@ -225,7 +235,11 @@ export const THEMES = {
         // rest cadence + thud voice carry "living wood" without the literal
         // illustration. Fireflies belong to a later post-settle slice if at
         // all, and only after Joe reads a still without them.
-        geo: { bevel: 0.09, profile: 'round', wear: 0.25, pillow: 0.35 }, // hand-carved, long handled
+        // Living wood + pure-black edges reads as a burn scar; a warm
+        // dark-bark tint keeps the die in-material at its seams — the
+        // color grain deepens into, not the color it never had.
+        geo: { bevel: 0.09, profile: 'round', wear: 0.25, pillow: 0.35,
+          tint: '#1a0a05', ink: 0.35 }, // hand-carved, long handled
         sound: { body: 'thud', weight: 0.5, sustain: 20 },
         // vine catch: the last 15% of the roll retimes to 0.55× — the die
         // decelerates unnaturally and settles soft, as if the forest caught it
@@ -446,7 +460,12 @@ export const THEMES = {
         // digits (from the scrimshaw relief) + hollow clack voice + wear
         // geometry carry "century-old ivory" without the die literally
         // puffing dust on every landing.
-        geo: { bevel: 0.1, profile: 'round', wear: 0.45, pillow: 0.25, nicks: 4 }, // a century of hands
+        // Aged ivory takes SEPIA into its creases, never black — the
+        // etch-brown text and this warm edge tint pull the whole die
+        // into one coherent aged-bone palette (currently the only warm
+        // note was the text ink; the bevel argued against it).
+        geo: { bevel: 0.1, profile: 'round', wear: 0.45, pillow: 0.25, nicks: 4,
+          tint: '#4a3520', ink: 0.5 }, // a century of hands
         decal: { kind: 'smudge', colors: ['#e8dcc0', '#c9b896'], scale: 0.85 }, // machinery only — kill-switch off
         sound: { body: 'clack', weight: 0.55, sustain: 25 }, // hollow bone
         // settle-tick (Slice 3, 2026-08-04): one small kinematic
