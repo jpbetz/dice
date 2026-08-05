@@ -209,6 +209,20 @@ await t('redaction omits absent flags rather than blanking them', () => {
   assert.ok(!keysDeep(p).has('audience'), 'no audience leak');
 });
 
+// The shrouded projection aliases entry.dice instead of cloning it — proves
+// F5's per-viewer array-clone allocation is gone. Byte-identical wire output
+// is protected by the invariant that entry.dice is written once at composeRoll
+// and never mutated after birth (see the comment at the projection site); the
+// open-roll branch already aliases it via `return entry`.
+await t('redaction aliases entry.dice (no per-viewer clone)', () => {
+  const e = entryWith(heldVis, false);
+  const pB = projectEntryFor(e, 'B');
+  const pC = projectEntryFor(e, 'C');
+  assert.equal(pB.dice, e.dice, 'shrouded projection aliases the source dice array');
+  assert.equal(pC.dice, e.dice, 'every shrouded viewer sees the same reference');
+  assert.equal(pB.dice, pC.dice, 'two shrouded viewers share the identical array');
+});
+
 await t('whisper redaction does not leak the audience list', () => {
   const p = projectEntryFor(entryWith(whisperVis, false), 'B');
   assert.equal(p.visMode, 'whisper');

@@ -1091,7 +1091,14 @@ function projectEntryFor(entry, viewerId) {
     color: entry.color,
     label: entry.label,
     dc: entry.dc,
-    dice: [...entry.dice],
+    // Aliased, not cloned: entry.dice is set once at composeRoll (executeRoll)
+    // and never mutated after birth — the open-roll branch above already
+    // returns `entry` whole, so its dice array is shared identically. Every
+    // sink JSON-serializes the projection immediately, so shared references
+    // stay wire-invisible. If a future editor introduces a post-birth mutation
+    // of entry.dice, restore the clone here AND on the open path, or freeze
+    // roll.dice at birth.
+    dice: entry.dice,
     faceDown: entry.faceDown,
     revealed: entry.revealed,
     seed: entry.seed,
