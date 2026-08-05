@@ -55,7 +55,7 @@ const MAX_ROOM = 64;
 // ceiling composeRoll enforces once explosion children are counted; the
 // per-starting-die EXPLODE_CHAIN_CAP=3 only bounds depth). Multiplied by
 // LOG_CAP that gives the worst-case log footprint per room.
-const LOG_CAP = 200;              // rolls kept per room
+const LOG_CAP = 100;              // rolls kept per room (client also caps at 100; keep in lockstep — ROADMAP §0b)
 const MAX_ROOMS = 500;            // live rooms across the server
 const MAX_PLAYERS_PER_ROOM = 40;
 const MAX_POOLS_PER_PLAYER = 40;
