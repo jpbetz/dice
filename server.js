@@ -51,6 +51,10 @@ const MAX_EXPERIENCES = 12;       // custom experience templates per room
 const MAX_DC = 999;
 const MAX_NAME = 24;
 const MAX_ROOM = 64;
+// Per-entry size is bounded by rollspec.js MAX_PHYSICAL_DICE=40 (the hard
+// ceiling composeRoll enforces once explosion children are counted; the
+// per-starting-die EXPLODE_CHAIN_CAP=3 only bounds depth). Multiplied by
+// LOG_CAP that gives the worst-case log footprint per room.
 const LOG_CAP = 200;              // rolls kept per room
 const MAX_ROOMS = 500;            // live rooms across the server
 const MAX_PLAYERS_PER_ROOM = 40;
