@@ -221,7 +221,10 @@ function makeFaceTexture(def, face, spec) {
   // base: subtle radial shading of the die color
   const base = new THREE.Color(def.color);
   const light = base.clone().lerp(new THREE.Color('#ffffff'), 0.18);
-  const dark = base.clone().lerp(new THREE.Color('#000000'), 0.25);
+  // geo.ink dials the painted outline (and, in buildDie, the matching band
+  // material) — the two are ONE visual system, "the outline made real"
+  const ink = def.geo && def.geo.ink != null ? def.geo.ink : 0.25;
+  const dark = base.clone().lerp(new THREE.Color('#000000'), ink);
   const grad = ctx.createRadialGradient(TEX_SIZE / 2, TEX_SIZE / 2, TEX_SIZE * 0.1, TEX_SIZE / 2, TEX_SIZE / 2, TEX_SIZE * 0.7);
   grad.addColorStop(0, `#${light.getHexString()}`);
   grad.addColorStop(1, `#${base.getHexString()}`);
@@ -614,23 +617,32 @@ const BEVEL = 0.055; // inset share of each corner's distance to its face centro
 // pillowed faces — while the physics hull, face values and read logic
 // stay canonical (createDieBody/readValue always use the std entry, so a
 // skin can never change how a die lands or reads). Recipe (themes.js
-// `geo`): { bevel 0..~0.14, profile 'cut'|'round', wear 0..1, nicks 0..5,
-// pillow 0..1 }.
+// `geo`): { bevel 0..~0.14, profile 'cut'|'round', segments 1..6 (round
+// only; default 3 — the fillet's arc strips), ink 0..1 (darkness of the
+// painted face outline AND the band material; default .25 cut / .12
+// round band), wear 0..1, nicks 0..5, pillow 0..1 }.
 
 function buildBeveledGeometry(faces, geo) {
   const BEVEL_W = geo && geo.bevel != null ? geo.bevel : BEVEL;
+  const round = !!(geo && geo.profile === 'round');
+  // ROADMAP §9c Tier 2: a round edge is SEGS real arc strips (a quadratic
+  // Bézier bulged toward the original sharp edge), not one shaded chord;
+  // cut chamfers stay a single flat strip.
+  const SEGS = round ? Math.max(1, Math.min(6, Math.round((geo && geo.segments) ?? 3))) : 1;
   const positions = [];
   const uvs = [];
   const triMats = [];
+  const anNormals = []; // analytic normals (round bands/domes); NaN = facet
   // Outward winding by construction check: these solids are convex around
   // the origin, so a triangle's normal must point away from it.
-  const pushTri = (a, b, c, mat, uvA, uvB, uvC) => {
+  const pushTri = (a, b, c, mat, uvA, uvB, uvC, nA, nB, nC) => {
     const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a));
     const ctr = new THREE.Vector3().add(a).add(b).add(c).multiplyScalar(1 / 3);
-    let B = b, C = c, UB = uvB, UC = uvC;
-    if (n.dot(ctr) < 0) { B = c; C = b; UB = uvC; UC = uvB; }
+    let B = b, C = c, UB = uvB, UC = uvC, NB = nB, NC = nC;
+    if (n.dot(ctr) < 0) { B = c; C = b; UB = uvC; UC = uvB; NB = nC; NC = nB; }
     positions.push(a.x, a.y, a.z, B.x, B.y, B.z, C.x, C.y, C.z);
     for (const uv of [uvA, UB, UC]) uvs.push(uv ? uv.x : 0.5, uv ? uv.y : 0.5);
+    for (const an of [nA, NB, NC]) anNormals.push(an ? an.x : NaN, an ? an.y : NaN, an ? an.z : NaN);
     triMats.push(mat);
   };
 
@@ -668,11 +680,31 @@ function buildBeveledGeometry(faces, geo) {
       const b = indexOf(f.boundary[(i + 1) % f.boundary.length]);
       const key = a < b ? `${a}:${b}` : `${b}:${a}`;
       if (!edges.has(key)) edges.set(key, []);
-      edges.get(key).push({ va: a, vb: b, qa: ring[i], qb: ring[(i + 1) % ring.length] });
+      edges.get(key).push({ va: a, vb: b, qa: ring[i], qb: ring[(i + 1) % ring.length], n: f.normal });
       if (!corners.has(a)) corners.set(a, []);
       corners.get(a).push(ring[i]);
     });
   });
+
+  // Round profile machinery. The fillet's cross-section is a quadratic
+  // Bézier from one face's rim to the other, control point = the ORIGINAL
+  // sharp edge/corner: tangent to both faces by construction (q→ctrl lies
+  // in q's face plane), never outside the base solid (the curve stays in
+  // hull(q1, ctrl, q2)), and never below the resting plane (the bottom
+  // edge's ctrl lies IN the bottom plane) — canonicalDiePose still holds.
+  // Arc endpoints reuse the ring INSTANCES so face fans, bands and corner
+  // domes stay watertight (the lab's unpaired-edge probe asserts it).
+  const bez = (q1, ctrl, q2, t) => q1.clone().multiplyScalar((1 - t) * (1 - t))
+    .addScaledVector(ctrl, 2 * t * (1 - t))
+    .addScaledVector(q2, t * t);
+  const arcOf = (q1, ctrl, q2) => {
+    const pts = [q1];
+    for (let k = 1; k < SEGS; k++) pts.push(bez(q1, ctrl, q2, k / SEGS));
+    pts.push(q2);
+    return pts;
+  };
+
+  const cornerArcs = new Map(); // corner idx -> [{pts, nrm}] for the domes
   for (const pair of edges.values()) {
     if (pair.length !== 2) continue; // watertight solids always pair up
     const [e1, e2] = pair;
@@ -682,22 +714,60 @@ function buildBeveledGeometry(faces, geo) {
     // triangle doubled, the other half a triangular HOLE (the pure-black
     // wedge on every beveled edge; found by Joe 2026-08-04, confirmed by
     // the unpaired-directed-edge probe: 4 per die edge, every die).
-    const [a2, b2] = e2.va === e1.va ? [e2.qa, e2.qb] : [e2.qb, e2.qa];
-    pushTri(e1.qa, e1.qb, b2, edgeMat);
-    pushTri(e1.qa, b2, a2, edgeMat);
+    const flip = e2.va !== e1.va;
+    const a2 = flip ? e2.qb : e2.qa;
+    const b2 = flip ? e2.qa : e2.qb;
+    if (!round) {
+      pushTri(e1.qa, e1.qb, b2, edgeMat);
+      pushTri(e1.qa, b2, a2, edgeMat);
+      continue;
+    }
+    // per-t normals: face-exact at each rim (ZERO crease at the face↔band
+    // junction), blending across the arc — Gouraud does the fillet
+    const nrm = [];
+    for (let k = 0; k <= SEGS; k++) nrm.push(e1.n.clone().lerp(e2.n, k / SEGS).normalize());
+    const arcA = arcOf(e1.qa, verts[e1.va], a2); // cross-section at the va end
+    const arcB = arcOf(e1.qb, verts[e1.vb], b2); // …and at the vb end
+    for (let k = 0; k < SEGS; k++) {
+      pushTri(arcA[k], arcB[k], arcB[k + 1], edgeMat, null, null, null, nrm[k], nrm[k], nrm[k + 1]);
+      pushTri(arcA[k], arcB[k + 1], arcA[k + 1], edgeMat, null, null, null, nrm[k], nrm[k + 1], nrm[k + 1]);
+    }
+    if (!cornerArcs.has(e1.va)) cornerArcs.set(e1.va, []);
+    cornerArcs.get(e1.va).push({ pts: arcA, nrm });
+    if (!cornerArcs.has(e1.vb)) cornerArcs.set(e1.vb, []);
+    cornerArcs.get(e1.vb).push({ pts: arcB, nrm });
   }
-  for (const [vi, copies] of corners) {
-    if (copies.length < 3) continue;
-    // Fan the corner's inset copies in angular order around the vertex ray
-    // (the tangents are ⊥ to it, so the raw dots are already offsets).
-    const dir = verts[vi].clone().normalize();
-    const seed = Math.abs(dir.x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
-    const t1 = new THREE.Vector3().crossVectors(dir, seed).normalize();
-    const t2 = new THREE.Vector3().crossVectors(dir, t1);
-    const sorted = [...copies].sort((p, q) =>
-      Math.atan2(p.dot(t2), p.dot(t1)) - Math.atan2(q.dot(t2), q.dot(t1)));
-    for (let i = 1; i < sorted.length - 1; i++) {
-      pushTri(sorted[0], sorted[i], sorted[i + 1], edgeMat);
+  if (!round) {
+    for (const [vi, copies] of corners) {
+      if (copies.length < 3) continue;
+      // Fan the corner's inset copies in angular order around the vertex ray
+      // (the tangents are ⊥ to it, so the raw dots are already offsets).
+      const dir = verts[vi].clone().normalize();
+      const seed = Math.abs(dir.x) < 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+      const t1 = new THREE.Vector3().crossVectors(dir, seed).normalize();
+      const t2 = new THREE.Vector3().crossVectors(dir, t1);
+      const sorted = [...copies].sort((p, q) =>
+        Math.atan2(p.dot(t2), p.dot(t1)) - Math.atan2(q.dot(t2), q.dot(t1)));
+      for (let i = 1; i < sorted.length - 1; i++) {
+        pushTri(sorted[0], sorted[i], sorted[i + 1], edgeMat);
+      }
+    }
+  } else {
+    // Corner DOMES: fan every incident arc to one apex on the corner ray.
+    // Consecutive arcs share ring-point instances, so the fans close the
+    // loop with no angular sort; the apex rides at the arcs' own bulge
+    // height (their mid-sample radius), giving a sphere-cap read.
+    for (const [vi, arcs] of cornerArcs) {
+      const apexN = verts[vi].clone().normalize();
+      let apexLen = 0;
+      for (const a of arcs) apexLen += a.pts[Math.floor(SEGS / 2)].length();
+      apexLen /= arcs.length;
+      const apex = apexN.clone().multiplyScalar(apexLen);
+      for (const a of arcs) {
+        for (let k = 0; k < SEGS; k++) {
+          pushTri(apex, a.pts[k], a.pts[k + 1], edgeMat, null, null, null, apexN, a.nrm[k], a.nrm[k + 1]);
+        }
+      }
     }
   }
 
@@ -712,7 +782,17 @@ function buildBeveledGeometry(faces, geo) {
       start = t;
     }
   }
-  geom.computeVertexNormals(); // non-indexed → flat facets, incl. the chamfer
+  geom.computeVertexNormals(); // non-indexed → flat facets (faces + cut chamfers)
+  if (round) {
+    // Overwrite facet normals with the analytic fillet normals wherever the
+    // builder recorded one (bands + domes). Faces keep their flat facets.
+    const nAttr = geom.getAttribute('normal');
+    for (let i = 0; i < anNormals.length; i += 3) {
+      if (Number.isNaN(anNormals[i])) continue;
+      nAttr.setXYZ(i / 3, anNormals[i], anNormals[i + 1], anNormals[i + 2]);
+    }
+    nAttr.needsUpdate = true;
+  }
   return geom;
 }
 
@@ -802,13 +882,15 @@ function applyGeoCharacter(geom, faces, geo, seed) {
   const nrm = geom.getAttribute('normal');
   const n = new THREE.Vector3();
 
-  // 'round' profile: the chamfer band and corner fans SHADE as a fillet —
-  // sphere-direction normals BLENDED over the recomputed facet normals.
+  // 'round' + DISPLACED only: wear/chips forced a computeVertexNormals
+  // that wiped the builder's analytic fillet normals — restore roundness
+  // with sphere-direction normals BLENDED over the recomputed facets.
   // (A full replacement erased the wear/chip craters' honest shading and
   // dents went black; the blend keeps the fillet while dents stay lit as
-  // the displaced surface actually faces.) Groups after the face count
-  // are the band (buildBeveledGeometry's material layout).
-  if (round) {
+  // the displaced surface actually faces. Pristine round sets skip this:
+  // their analytic normals from build are exact.) Groups after the face
+  // count are the band (buildBeveledGeometry's material layout).
+  if (round && (wear || sites.length)) {
     for (const g of geom.groups) {
       if (g.materialIndex < faces.length) continue;
       for (let i = g.start; i < g.start + g.count; i++) {
@@ -969,8 +1051,10 @@ function buildDie(type, variant = 'std') {
   // paint along their edges, so the bevel reads as that outline made real.
   // Round-profile (tumbled) sets darken HALF as much — a worn edge is the
   // same material frosted soft, not an inked outline; the wide dark seams
-  // were fighting the sea-tumbled look.
-  const edgeDark = skin.geo && skin.geo.profile === 'round' ? 0.12 : 0.25;
+  // were fighting the sea-tumbled look. geo.ink overrides both this and
+  // the painted outline (0 = fully self-colored edges).
+  const edgeDark = skin.geo && skin.geo.ink != null ? skin.geo.ink
+    : skin.geo && skin.geo.profile === 'round' ? 0.12 : 0.25;
   const edgeColor = new THREE.Color(skin.color).lerp(new THREE.Color('#000000'), edgeDark);
   materials.push(new THREE.MeshStandardMaterial({
     color: edgeColor,

@@ -44,6 +44,7 @@ const BENCH = [
   ['lab.cut090',   'Cut .090 — wide chamfer',             { bevel: 0.09 }],
   ['lab.round055', 'Round .055 — today\'s width, filleted', { bevel: 0.055, profile: 'round' }],
   ['lab.round090', 'Round .090 — the soft candidate',     { bevel: 0.09, profile: 'round' }],
+  ['lab.selfink',  'Round .090 · ink .04 — self-colored', { bevel: 0.09, profile: 'round', ink: 0.04 }],
   ['lab.round130', 'Round .130 — the recipe ceiling',     { bevel: 0.13, profile: 'round' }],
   ['lab.pillow',   'Round .090 + pillow .35',             { bevel: 0.09, profile: 'round', pillow: 0.35 }],
   ['lab.tumbled',  'Round .110 + wear .25 + pillow .20',  { bevel: 0.11, profile: 'round', wear: 0.25, pillow: 0.2 }],
@@ -54,9 +55,13 @@ const BENCH_IDS = BENCH.map(([id]) => id);
 
 // The builder's working state: a superset of a themes.js recipe with
 // explicit enables, so a knob keeps its last value while toggled off.
+// The band-ink default rides the profile (.25 cut / .12 round) — the
+// builder snaps the ink slider between them when the profile flips, so a
+// recipe stays omit-at-default unless the user actually moved it.
+const INK_DEFAULT = (profile) => (profile === 'round' ? 0.12 : 0.25);
 const B_DEFAULTS = () => ({
   stdColors: true, body: '#2e6f9e', text: '#f7edda', accent: '#ffd766',
-  geo: { bevel: 0.055, profile: 'cut', wear: 0, pillow: 0, nicks: 0 },
+  geo: { bevel: 0.055, profile: 'cut', segments: 3, ink: 0.25, wear: 0, pillow: 0, nicks: 0 },
   feel: { rough: 0.3, metal: 0.1 },
   spec: { envMapIntensity: 0.35, clearcoat: 0, clearcoatRoughness: 0.5, ior: 1.5,
     iridescence: 0, iridescenceIOR: 1.3, specularIntensity: 1, specularColor: '#ffffff' },
@@ -75,7 +80,11 @@ function assembleRecipe(s) {
   const r = { label: 'Builder', house: 'lab', accent: s.accent };
   if (!s.stdColors) { r.body = s.body; r.text = s.text; }
   const g = { bevel: s.geo.bevel };
-  if (s.geo.profile === 'round') g.profile = 'round';
+  if (s.geo.profile === 'round') {
+    g.profile = 'round';
+    if (s.geo.segments !== 3) g.segments = s.geo.segments;
+  }
+  if (s.geo.ink !== INK_DEFAULT(s.geo.profile)) g.ink = s.geo.ink;
   if (s.geo.wear > 0) g.wear = s.geo.wear;
   if (s.geo.pillow > 0) g.pillow = s.geo.pillow;
   if (s.geo.nicks > 0) g.nicks = s.geo.nicks;
@@ -886,7 +895,14 @@ function recipeText() {
 
   const gGeo = section('geometry (Level 3.5)', true);
   slider(gGeo, 'bevel', () => bState.geo.bevel, (v) => { bState.geo.bevel = v; }, 0, 0.14, 0.005);
-  select(gGeo, 'profile', () => bState.geo.profile, (v) => { bState.geo.profile = v; }, ['cut', 'round']);
+  select(gGeo, 'profile', () => bState.geo.profile, (v) => {
+    // untouched ink follows the profile default so recipes stay clean
+    if (bState.geo.ink === INK_DEFAULT(bState.geo.profile)) bState.geo.ink = INK_DEFAULT(v);
+    bState.geo.profile = v;
+    syncControls();
+  }, ['cut', 'round']);
+  slider(gGeo, 'segments', () => bState.geo.segments, (v) => { bState.geo.segments = v; }, 1, 6, 1);
+  slider(gGeo, 'edge ink', () => bState.geo.ink, (v) => { bState.geo.ink = v; }, 0, 0.5, 0.01);
   slider(gGeo, 'wear', () => bState.geo.wear, (v) => { bState.geo.wear = v; }, 0, 1, 0.05);
   slider(gGeo, 'pillow', () => bState.geo.pillow, (v) => { bState.geo.pillow = v; }, 0, 1, 0.05);
   slider(gGeo, 'nicks', () => bState.geo.nicks, (v) => { bState.geo.nicks = v; }, 0, 5, 1);
@@ -951,7 +967,13 @@ function loadSeed(id) {
       ...d,
       stdColors: !t.body,
       body: t.body || d.body, text: t.text || d.text, accent: t.accent || d.accent,
-      geo: { ...d.geo, ...(t.geo || {}) },
+      geo: (() => {
+        const g = { ...d.geo, ...(t.geo || {}) };
+        // a seed without explicit ink means "profile default", which for
+        // round bands is .12 — reflect that in the slider, not cut's .25
+        if (!t.geo || t.geo.ink == null) g.ink = INK_DEFAULT(g.profile);
+        return g;
+      })(),
       feel: { ...d.feel, ...(t.feel || {}) },
       // a house set without spec rides three's env default (1), not std's whisper
       spec: { ...d.spec, envMapIntensity: t.house ? 1 : 0.35, ...(t.spec || {}) },

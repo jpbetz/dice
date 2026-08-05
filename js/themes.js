@@ -68,7 +68,13 @@
 // · `geo` (Level 3.5, geometry identity): the die the player SEES —
 //   physics hull, values and reading stay canonical (dice.js).
 //   bevel    edge-cut share (std 0.055): 0.02 machined-crisp, 0.13 tumbled
-//   profile  'cut' flat chamfer facets · 'round' fillet-shaded band
+//   profile  'cut' flat chamfer facets · 'round' TRUE fillet arcs (§9c
+//            Tier 2): Bézier strips bulged to the sharp edge, corner
+//            domes, analytic normals — curved shading AND silhouette
+//   segments 1..6 arc strips per round edge (default 3; 1 = flat strip
+//            with fillet shading — the old look)
+//   ink      0..1 darkness of the painted face outline + band material
+//            (default .25, round band .12; 0 = self-colored edges)
 //   wear     0..1 tumbled erosion, corners first (deterministic per set)
 //   nicks    0..5 discrete chips at seeded corner sites
 //   pillow   0..1 cushion-shaded faces (silhouette + digit plane stay flat)

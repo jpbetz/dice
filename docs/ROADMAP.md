@@ -1052,26 +1052,24 @@ a shading approximation over a single strip, polygonal silhouette.
   from the bench. Tiers 1–2 remain as refinements (exact fillet
   normals; true curved silhouette) rather than the rescue they looked
   like before the fix.
-- **Tier 1 — analytic fillet normals** (small code, big return): band
-  rim vertices take the adjacent face's exact normal (zero crease at
-  the face↔band junction), interpolating face-A→face-B across the band;
-  corner fans blend toward the vertex ray. Correct cylinder-fillet
-  shading over today's triangle count. Kills the crease lines; the
-  silhouette stays faceted (a few pixels at table distance).
-- **Tier 2 — true rounded edges, Minkowski-style** (the right answer):
-  rounded convex polyhedron = the solid shrunk by r, re-inflated by a
-  sphere. Faces stay in their ORIGINAL planes (resting height untouched
-  — canonicalDiePose reads the same bottom plane), each edge becomes a
-  real N-segment cylindrical band, each corner a spherical patch, with
-  EXACT normals free (radial from axis/center). Shading AND silhouette
-  genuinely curve — the highlight rolls around the edge as the die
-  tumbles, which is the thing the eye misses. Slots into
-  buildBeveledGeometry as N arc rings per edge, N=1 degenerating to
-  today's mesh (strict superset; every house recipe keeps working; new
-  `geo` knob `segments` or `radius`). Cost trivial (d6 ≈ +500 tris at
-  N=4). One real workhorse: per-edge inset `r / tan(dihedral/2)` — the
-  d10's kite faces carry two dihedrals, so the uniform toward-centroid
-  inset share must become per-edge polygon offsetting.
+- **Tiers 1+2 — true fillets. SHIPPED 2026-08-04** (with the `ink`
+  knob, Joe's ask: "turn down the darker color on the beveled edges").
+  Every `round` edge is now `segments` (default 3) quadratic-Bézier arc
+  strips, control point = the ORIGINAL sharp edge — tangent to both
+  faces by construction (q→ctrl lies in q's plane), never outside the
+  base solid, never below the resting plane (the bottom edge's ctrl
+  lies IN the bottom plane, so canonicalDiePose holds). Corners are
+  domes fanned over shared arc instances (watertight with no angular
+  sort — consecutive arcs share ring endpoints); normals are ANALYTIC:
+  face-exact at rims (zero crease), blended across the arc, corner-ray
+  at apexes. Worn sets keep the 0.65 sphere-blend after displacement
+  (the dents-went-black lesson). `geo.ink` (0..1) dials the painted
+  face outline + band material together (they are one visual system);
+  bench row `lab.selfink` shows .04. House round sets upgraded free.
+  Deliberately NOT done: metric-radius insets (`r / tan(dihedral/2)`
+  per edge — the d10's kites carry two dihedrals, so fillet widths are
+  slightly uneven there; share-based insets keep today's proportions).
+  Pick that up only if the d10/d10x reads unevenly on the bench.
 - **Tier 3 — tumbled resin** (composes with Tier 2): subdivide faces,
   blend toward a superellipsoid for the no-flat-anywhere pocket-dice
   look; today's `wear` displacement is a crude version. Constraint:

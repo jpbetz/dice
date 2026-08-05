@@ -3978,7 +3978,7 @@ export const scenarios = [
 
       const rows = JSON.parse(await t.eval('JSON.stringify(window.__lab.rows)'));
       const bench = JSON.parse(await t.eval('JSON.stringify(window.__lab.benchIds)'));
-      assert.equal(bench.length, 8, `the full bench sweep registered (got ${bench.length})`);
+      assert.equal(bench.length, 9, `the full bench sweep registered (got ${bench.length})`);
       for (const id of [...bench, 'lab.builder']) {
         assert.ok(rows.includes(id), `${id} seated in the grid`);
       }
@@ -3987,30 +3987,33 @@ export const scenarios = [
         `import('./js/themes.js').then((m) => JSON.stringify(m.SET_IDS))`));
       assert.ok(!published.some((id) => id.startsWith('lab.')), 'SET_IDS stays free of lab rows');
 
-      // The bench's physical claim: bevel eats the corner, so the render
-      // mesh's bounding radius strictly shrinks as the recipe widens, and
-      // wear gnaws past what its bevel alone removes.
+      // The bench's physical claims, post-§9c-Tier-2 (true fillet arcs):
+      // cut radii shrink as the bevel widens; a ROUND edge bulges back
+      // toward the sharp edge, so it sits ABOVE its cut twin but below
+      // the sharp corner; round radii still shrink with bevel.
       const stats = JSON.parse(await t.eval('JSON.stringify(window.__lab.geoStats())'));
       assert.ok(stats['lab.cut030'].r > stats['std'].r,
         `narrow cut keeps more corner than std (${stats['lab.cut030'].r} vs ${stats['std'].r})`);
-      assert.ok(stats['std'].r > stats['lab.round090'].r,
-        `.090 bevel trims past std (${stats['std'].r} vs ${stats['lab.round090'].r})`);
-      assert.ok(stats['lab.round090'].r > stats['lab.round130'].r,
-        `.130 trims past .090 (${stats['lab.round090'].r} vs ${stats['lab.round130'].r})`);
       assert.ok(stats['lab.cut090'].r < stats['lab.cut030'].r,
         `.090 cut trims past .030 (${stats['lab.cut090'].r} vs ${stats['lab.cut030'].r})`);
-      // profile/pillow are SHADING-ONLY recipes: same bevel → the exact
-      // same vertex positions, so the radii must match to float noise
-      assert.ok(Math.abs(stats['lab.round055'].r - stats['std'].r) < 1e-3,
-        `round .055 shares std's silhouette (${stats['lab.round055'].r} vs ${stats['std'].r})`);
-      assert.ok(Math.abs(stats['lab.pillow'].r - stats['lab.round090'].r) < 1e-3,
-        `pillow shares round .090's silhouette (${stats['lab.pillow'].r} vs ${stats['lab.round090'].r})`);
-      // (No cross-bevel wear ordering: a wider plain fillet can out-trim a
-      // narrower worn one. The character rows just have to shrink vs std.)
-      assert.ok(stats['lab.tumbled'].r < stats['std'].r,
-        `tumbled row trims past std (${stats['lab.tumbled'].r} vs ${stats['std'].r})`);
-      assert.ok(stats['lab.pocked'].r < stats['std'].r,
-        `pocked row trims past std (${stats['lab.pocked'].r} vs ${stats['std'].r})`);
+      assert.ok(stats['lab.round090'].r > stats['lab.round130'].r,
+        `.130 fillet trims past .090 (${stats['lab.round090'].r} vs ${stats['lab.round130'].r})`);
+      assert.ok(stats['lab.round055'].r > stats['std'].r && stats['lab.round055'].r < stats['std'].r * 1.05,
+        `the .055 fillet bulges past its cut twin, inside the sharp corner (${stats['lab.round055'].r} vs ${stats['std'].r})`);
+      assert.ok(stats['lab.round090'].r > stats['lab.cut090'].r,
+        `the .090 fillet bulges past its cut twin (${stats['lab.round090'].r} vs ${stats['lab.cut090'].r})`);
+      // material-only knobs leave the silhouette bit-identical: ink
+      // (selfink vs round090) and pillow/shading (pillow vs round090)
+      assert.ok(Math.abs(stats['lab.selfink'].r - stats['lab.round090'].r) < 1e-4,
+        `ink is material-only (${stats['lab.selfink'].r} vs ${stats['lab.round090'].r})`);
+      assert.ok(Math.abs(stats['lab.pillow'].r - stats['lab.round090'].r) < 1e-4,
+        `pillow is shading-only (${stats['lab.pillow'].r} vs ${stats['lab.round090'].r})`);
+      // (No cross-bevel wear ordering. The character rows must just sit
+      // below the tallest fillet, proving wear pulls inward.)
+      assert.ok(stats['lab.tumbled'].r < stats['lab.round055'].r,
+        `tumbled row trims below the .055 fillet (${stats['lab.tumbled'].r} vs ${stats['lab.round055'].r})`);
+      assert.ok(stats['lab.pocked'].r < stats['lab.round055'].r,
+        `pocked row trims below the .055 fillet (${stats['lab.pocked'].r} vs ${stats['lab.round055'].r})`);
 
       // THE WATERTIGHT CLAIM (Joe found the hole, 2026-08-04): every render
       // mesh must be a CLOSED surface — each directed edge paired by its

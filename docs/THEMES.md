@@ -352,9 +352,17 @@ leverage order for this zero-dep codebase:
    (createDieBody/readValue always use the std entry — a skin can never
    change how a die lands). **← SHIPPED 2026-08-03.** Per-set `geo`
    recipe: `bevel` (edge-cut share — 0.015 razor to 0.13 tumbled; std is
-   0.055), `profile` ('cut' flat chamfer facets vs 'round' fillet-shaded
-   band — sphere normals BLENDED 0.65 over recomputed facet normals; a
-   full replacement erased wear-crater shading and dents went black),
+   0.055), `profile` ('cut' flat chamfer facets vs 'round' TRUE fillet
+   arcs since 2026-08-04, ROADMAP §9c Tier 2: each edge becomes
+   `segments` (1..6, default 3) quadratic-Bézier strips bulged toward
+   the original sharp edge — tangent to both faces by construction,
+   never below the resting plane — with corner DOMES fanned over shared
+   arc instances and ANALYTIC normals, face-exact at the rims; on WORN
+   sets the displacement pass recomputes facets and restores roundness
+   with the 0.65 sphere-normal blend — a full replacement erased
+   wear-crater shading and dents went black), `ink` (0..1 darkness of
+   the painted face outline + the matching band material; defaults .25,
+   round bands .12; 0 = self-colored edges),
    `wear` (0..1 tumbled erosion: coarse lumps + fine crinkle, biased
    exposure² toward corners, POSITION-KEYED hashing so the triangle soup
    stays watertight), `nicks` (seeded chip scoops at corner sites — wide
@@ -363,12 +371,15 @@ leverage order for this zero-dep codebase:
    digit plane stay flat — legibility invariant). Round-profile sets
    darken their edge band half as much (a worn edge is frosted, not
    inked). Deterministic per (type, variant); geometry cache is per
-   variant so std/shroud are untouched. Fingerprint: bounding radius
-   orders exactly by character — Void Grain 1.158 (nothing has ever worn
-   it) > Focus Crystal > Oxblood > Bolt-glass > First Frost > std 1.127 >
-   Deep Glacier > Heartwood > Sap Amber > Black Anvil > Scrimshaw >
-   Mosstone > Sea-glass 1.069 (decades in the surf). `__lab.geoStats()`
-   asserts the ordering headlessly.
+   variant so std/shroud are untouched. Fingerprints re-based by the
+   §9c fillet arcs (2026-08-04): a round set now BULGES past its cut
+   twin (the arc reaches back toward the sharp edge), so the old
+   strictly-by-character radius ladder no longer holds numerically —
+   the lab-geo-bench scenario asserts the current invariants instead
+   via `__lab.geoStats()`: cut radii monotone in bevel, fillets above
+   their cut twins but inside the sharp corner, ink/pillow
+   silhouette-neutral, wear pulling inward, and every render mesh
+   WATERTIGHT (the unpaired-directed-edge probe).
 4. **The environment joins the theme** — felt decals from the landing
    point and a colored light PARENTED to the die (a biolume die casts
    teal on its patch of felt; Umbra pools local shadow instead of
@@ -492,9 +503,10 @@ effect trigger buttons, a ⬇ drop button per set (the Level 3 rig — a
 real physics die whose measured contacts fire the set's bursts; sets
 without particles prove the restraint), and one-click PNG capture.
 
-THE GEO BENCH (2026-08-04, softer edges Tier 0 — ROADMAP §9c): eight
+THE GEO BENCH (2026-08-04, softer edges Tier 0 — ROADMAP §9c): nine
 lab-only rows sweep the Level 3.5 `geo` space over otherwise-standard
-dice, seated under the std row. Two seams make them honest: a set may
+dice, seated under the std row (cut and fillet widths, an ink-.04
+self-colored row, pillow, and two worn-character rows). Two seams make them honest: a set may
 omit body/text to inherit the std per-type colors, and house-less sets
 clamp to the std envMapIntensity whisper — so a bench row differs from
 std by its geo recipe ALONE. They register through themes.js
