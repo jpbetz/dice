@@ -7675,7 +7675,7 @@ function escapeHtml(t) {
 // list rebuild was O(N) per arrival and dominated a saturated table). Both
 // paths call THIS builder — a single source of truth keeps the incremental
 // row identical to the full-render row on any future markup edit.
-function buildLogEntryEl(entry, { supersededIds }) {
+function buildLogEntryEl(entry, { supersededIds, byId }) {
     const hidden = entryHidden(entry);
     const el = document.createElement('div');
     el.className = 'log-entry';
@@ -7787,7 +7787,7 @@ function buildLogEntryEl(entry, { supersededIds }) {
       const q = document.createElement('span');
       q.className = 'log-reroll';
       q.textContent = 'reroll';
-      const parent = log.find((e) => e.rollId === entry.rerollOfId);
+      const parent = byId.get(entry.rerollOfId);
       q.title = parent && !entryHidden(parent)
         ? `Reroll of ${parent.label}${activeSystem().usesTotal && typeof parent.total === 'number' ? ` (${parent.total})` : ''}`
         : 'Reroll of an earlier roll';
@@ -7817,13 +7817,22 @@ function buildLogEntryEl(entry, { supersededIds }) {
 function renderLog() {
   logList.innerHTML = '';
   logEmpty.style.display = log.length ? 'none' : 'block';
-  // Rows whose result was superseded by a reroll — derived from what THIS
-  // client holds, so it can never name a roll the viewer does not have (a
-  // secret reroll projects to null for others, so their logs never contain
-  // the reference; the birth gate keeps a secret PARENT unnamed entirely).
-  const supersededIds = new Set(log.map((e) => e.rerollOfId).filter(Boolean));
-  for (const entry of [...log].reverse()) {
-    logList.appendChild(buildLogEntryEl(entry, { supersededIds }));
+  // One pass builds both indexes we need per row: the id→entry map (parent
+  // tooltip lookup, was an O(N) log.find per row) and the superseded set —
+  // derived from what THIS client holds, so it can never name a roll the
+  // viewer does not have (a secret reroll projects to null for others, so
+  // their logs never contain the reference; the birth gate keeps a secret
+  // PARENT unnamed entirely).
+  const byId = new Map();
+  const supersededIds = new Set();
+  for (const e of log) {
+    if (e.rollId) byId.set(e.rollId, e);
+    if (e.rerollOfId) supersededIds.add(e.rerollOfId);
+  }
+  // Reverse index loop — the log renders newest-first without the [...log]
+  // copy that used to allocate a whole array per render.
+  for (let i = log.length - 1; i >= 0; i--) {
+    logList.appendChild(buildLogEntryEl(log[i], { supersededIds, byId }));
   }
 }
 renderLog();
@@ -7883,8 +7892,16 @@ function addLogEntry(entry) {
   if (!entry.rollId) {
     renderLog();
   } else {
-    const supersededIds = new Set(log.map((e) => e.rerollOfId).filter(Boolean));
-    const el = buildLogEntryEl(entry, { supersededIds });
+    // Same one-pass build as renderLog so the incremental append stays
+    // byte-identical to a full rebuild (parent-tooltip lookup + supersede
+    // set both derived from the client's log).
+    const byId = new Map();
+    const supersededIds = new Set();
+    for (const e of log) {
+      if (e.rollId) byId.set(e.rollId, e);
+      if (e.rerollOfId) supersededIds.add(e.rerollOfId);
+    }
+    const el = buildLogEntryEl(entry, { supersededIds, byId });
     // The list renders reversed (newest first): prepend the new row; the
     // scrollTop is preserved incidentally, so a user scrolled back into
     // history is no longer jerked to the top when a new roll lands.
