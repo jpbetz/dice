@@ -2188,6 +2188,17 @@ function stepPlayback(dt) {
 
 const chipsLayer = document.getElementById('chips-layer');
 const banner = document.getElementById('result-banner');
+// Banner cells hoisted alongside `banner` — same pattern as chipsLayer/peekEl.
+// renderRollResults and renderBannerActions repaint on every roll arrival; the
+// static banner-main click wiring below reuses bannerMainEl too so the whole
+// banner surface is one place, one lookup (Tier 0 §0a hot-paths consistency).
+const resultLabelEl     = document.getElementById('result-label');
+const resultTotalEl     = document.getElementById('result-total');
+const resultMeaningEl   = document.getElementById('result-meaning');
+const resultBreakdownEl = document.getElementById('result-breakdown');
+const resultVerdictEl   = document.getElementById('result-verdict');
+const bannerActionsEl   = document.getElementById('banner-actions');
+const bannerMainEl      = document.getElementById('banner-main');
 
 // One clean way to hide the banner (Tier 0 §0e endurance leak): the roll-dice
 // outline is anchored to the banner (mouseenter paints it, mouseleave clears
@@ -2815,61 +2826,56 @@ function renderRollResults(entry, dice, fx = true) {
   const hidden = entryHidden(entry);
 
   // Names and labels are user-supplied: textContent only, never innerHTML.
-  const labelEl = document.getElementById('result-label');
-  labelEl.textContent = '';
+  resultLabelEl.textContent = '';
   if (entry.playerName) {
     const who = document.createElement('span');
     who.className = 'roller-name';
     if (entry.color) who.style.color = entry.color;
     who.textContent = entry.playerName;
-    labelEl.append(who, ` · ${entry.label}`);
+    resultLabelEl.append(who, ` · ${entry.label}`);
   } else {
-    labelEl.textContent = entry.label;
+    resultLabelEl.textContent = entry.label;
   }
 
   // Under a per-die system a sum is not a fact of play: the big number
   // yields the hero slot to the outcome ROWS (usesTotal, meanings.js v2).
   const sysTotals = activeSystem().usesTotal;
-  const totalEl = document.getElementById('result-total');
-  totalEl.style.display = sysTotals || hidden ? '' : 'none';
-  totalEl.textContent = hidden ? '?' : entry.total;
+  resultTotalEl.style.display = sysTotals || hidden ? '' : 'none';
+  resultTotalEl.textContent = hidden ? '?' : entry.total;
 
   // The hero slot (2e): per-die systems render the outcome ROWS — pool by
   // pool, die by die — and the separate breakdown line folds away (it
   // repeated every source and face the rows already carry; that duplication
   // was the muddle). Sum systems keep the meaning word + breakdown pair.
-  const meaningEl = document.getElementById('result-meaning');
   const meaning = entryMeaning(entry);
-  meaningEl.className = ''; // reset FIRST: renderOutcomeRows marks oc-ledger
-  const perDieRows = !hidden && renderOutcomeRows(meaningEl, entry);
+  resultMeaningEl.className = ''; // reset FIRST: renderOutcomeRows marks oc-ledger
+  const perDieRows = !hidden && renderOutcomeRows(resultMeaningEl, entry);
   if (perDieRows) {
-    meaningEl.classList.add('result-tally', 'result-outcomes');
-    meaningEl.title = 'each die reads its own outcome — the die and face beside each word';
+    resultMeaningEl.classList.add('result-tally', 'result-outcomes');
+    resultMeaningEl.title = 'each die reads its own outcome — the die and face beside each word';
   } else {
-    meaningEl.textContent = meaning ? meaning.word : '';
-    meaningEl.className = meaning ? `tier-${meaning.tier}` : '';
-    meaningEl.title = meaning ? `${meaning.rank} column (${meaning.column})` : '';
+    resultMeaningEl.textContent = meaning ? meaning.word : '';
+    resultMeaningEl.className = meaning ? `tier-${meaning.tier}` : '';
+    resultMeaningEl.title = meaning ? `${meaning.rank} column (${meaning.column})` : '';
   }
-  const breakdownEl = document.getElementById('result-breakdown');
-  if (perDieRows) breakdownEl.textContent = '';
-  else renderBreakdown(breakdownEl, entry, hidden);
+  if (perDieRows) resultBreakdownEl.textContent = '';
+  else renderBreakdown(resultBreakdownEl, entry, hidden);
 
   // Interim dc verdict (fixed decision): above the meaning word, gold/red.
   // Hidden result, public stakes (goal 11): the DC still shows, the verdict
   // waits for the reveal.
-  const verdictEl = document.getElementById('result-verdict');
   if (Number.isInteger(entry.dc) && sysTotals) {
     if (hidden) {
-      verdictEl.textContent = `vs DC ${entry.dc}`;
-      verdictEl.className = '';
+      resultVerdictEl.textContent = `vs DC ${entry.dc}`;
+      resultVerdictEl.className = '';
     } else {
       const cleared = entry.total >= entry.dc;
-      verdictEl.textContent = `vs DC ${entry.dc} — ${cleared ? 'Success' : 'Failure'}`;
-      verdictEl.className = cleared ? 'verdict-success' : 'verdict-fail';
+      resultVerdictEl.textContent = `vs DC ${entry.dc} — ${cleared ? 'Success' : 'Failure'}`;
+      resultVerdictEl.className = cleared ? 'verdict-success' : 'verdict-fail';
     }
   } else {
-    verdictEl.textContent = '';
-    verdictEl.className = '';
+    resultVerdictEl.textContent = '';
+    resultVerdictEl.className = '';
   }
 
   banner.classList.remove('hidden', 'crit-success', 'crit-fail');
@@ -2941,8 +2947,7 @@ function appendCardActions(holder, entry, opts) {
 let bannerAct = { mode: 'dismiss', rollId: null };
 
 function renderBannerActions(entry) {
-  const holder = document.getElementById('banner-actions');
-  holder.innerHTML = '';
+  bannerActionsEl.innerHTML = '';
   const hidden = entryHidden(entry);
   const mine = !netOnline || (net && entry.playerId === net.playerId);
   // The body-as-target dress + act (the folded card): red removal for the
@@ -2950,24 +2955,22 @@ function renderBannerActions(entry) {
   // must say WHICH removal it is.
   bannerAct = { mode: entry.rollId && mine ? 'clear' : 'dismiss', rollId: entry.rollId || null };
   banner.dataset.act = bannerAct.mode;
-  const main = document.getElementById('banner-main');
-  main.title = bannerAct.mode === 'clear'
+  bannerMainEl.title = bannerAct.mode === 'clear'
     ? 'Clear this roll for everyone'
     : 'Dismiss — hides this for you; the dice stay until the roller acts';
-  main.setAttribute('aria-label', main.title);
+  bannerMainEl.setAttribute('aria-label', bannerMainEl.title);
   if (!entry.rollId && !canReroll(entry)) return;
   // ONE Reveal dress (2i-C): confirm weight, sized by surface — the gold
   // primary it wore here was the roll verb's hue on a non-roll act.
-  appendCardActions(holder, entry, { revealClass: 'reveal-verb banner-btn' });
+  appendCardActions(bannerActionsEl, entry, { revealClass: 'reveal-verb banner-btn' });
 }
 
 // The body's click — one press, the likeliest act. Static wiring; the act
 // itself is repainted state (bannerAct). A pending clear disarms the body
 // so a double-click cannot double-POST.
 {
-  const main = document.getElementById('banner-main');
   let clearing = false;
-  main.addEventListener('click', () => {
+  bannerMainEl.addEventListener('click', () => {
     if (bannerAct.mode === 'clear' && bannerAct.rollId) {
       if (clearing) return;
       clearing = true;
@@ -2979,11 +2982,11 @@ function renderBannerActions(entry) {
       hideBanner();
     }
   });
-  main.addEventListener('keydown', (e) => {
+  bannerMainEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       e.stopPropagation(); // the table's Enter (roll) must not also fire
-      main.click();
+      bannerMainEl.click();
     }
   });
 }
