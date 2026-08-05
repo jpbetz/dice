@@ -913,17 +913,43 @@ function applyGeoCharacter(geom, faces, geo, seed) {
   // its dead-flat digit plane)
   if (pillow) {
     const rad = new THREE.Vector3();
+    const radMaxOf = faces.map((f) => {
+      let m = 0;
+      for (const b of f.boundary) m = Math.max(m, b.distanceTo(f.centroid));
+      return m;
+    });
+    const tilt = (i, f, radMax) => {
+      p.fromBufferAttribute(pos, i);
+      rad.subVectors(p, f.centroid);
+      rad.addScaledVector(f.normal, -rad.dot(f.normal)); // in-plane component
+      n.fromBufferAttribute(nrm, i).addScaledVector(rad, (pillow * 0.55) / radMax).normalize();
+      nrm.setXYZ(i, n.x, n.y, n.z);
+    };
     for (const g of geom.groups) {
-      if (g.materialIndex >= faces.length) continue;
-      const f = faces[g.materialIndex];
-      let radMax = 0;
-      for (const b of f.boundary) radMax = Math.max(radMax, b.distanceTo(f.centroid));
-      for (let i = g.start; i < g.start + g.count; i++) {
-        p.fromBufferAttribute(pos, i);
-        rad.subVectors(p, f.centroid);
-        rad.addScaledVector(f.normal, -rad.dot(f.normal)); // in-plane component
-        n.fromBufferAttribute(nrm, i).addScaledVector(rad, (pillow * 0.55) / radMax).normalize();
-        nrm.setXYZ(i, n.x, n.y, n.z);
+      if (g.materialIndex < faces.length) {
+        const f = faces[g.materialIndex];
+        for (let i = g.start; i < g.start + g.count; i++) tilt(i, f, radMaxOf[g.materialIndex]);
+      } else if (round) {
+        // Band RIM vertices carry a face-exact analytic normal and lie in
+        // that face's plane — tilt them by the SAME formula, or pillow
+        // re-opens the zero-crease guarantee at every face↔band junction
+        // (the fillet review caught this on pristine pillowed sets:
+        // heartwood/sapamber/scrimshaw rang a ~14° normal step around
+        // each face). Arc interiors and dome apexes carry blended/ray
+        // normals and skip; worn sets never reach here pristine —
+        // displacement already re-blended their bands.
+        for (let i = g.start; i < g.start + g.count; i++) {
+          p.fromBufferAttribute(pos, i);
+          n.fromBufferAttribute(nrm, i);
+          for (let fi = 0; fi < faces.length; fi++) {
+            const f = faces[fi];
+            rad.subVectors(p, f.centroid);
+            if (Math.abs(rad.dot(f.normal)) > EPS * 10) continue; // not in this face's plane
+            if (n.dot(f.normal) < 0.9999) continue; // not a rim vertex of this face
+            tilt(i, f, radMaxOf[fi]);
+            break;
+          }
+        }
       }
     }
     nrm.needsUpdate = true;

@@ -1070,6 +1070,21 @@ a shading approximation over a single strip, polygonal silhouette.
   per edge — the d10's kites carry two dihedrals, so fillet widths are
   slightly uneven there; share-based insets keep today's proportions).
   Pick that up only if the d10/d10x reads unevenly on the bench.
+
+  **Fillet review outcomes (2026-08-04, 7 confirmed):** fixed — pillow
+  re-opened the zero-crease guarantee at band rims on pristine round
+  sets (~14° step ringing every face on heartwood/sapamber/scrimshaw;
+  the pillow pass now tilts rim vertices identically), builderSet
+  bypassed the profile-flip ink snap (recipes fossilized the old
+  default), the e2e "inside the sharp corner" bound was looser than
+  the corner itself (now bounded by the base solid's actual radius),
+  and ink/tint/segments had zero positive coverage (now asserted off
+  the live band material + vertex counts). ACCEPTED, not fixed: the
+  builder's ink slider pops the face outline one step off the round
+  default — inherent to the coupled ink semantics (`cac1fa2`: outline
+  and band ride ONE value; only OMITTED ink yields the .25/.12 round
+  pair). A split knob would betray the one-visual-system rule; revisit
+  only if tuning round sets in the builder proves painful.
 - **Tier 3 — tumbled resin** (composes with Tier 2): subdivide faces,
   blend toward a superellipsoid for the no-flat-anywhere pocket-dice
   look; today's `wear` displacement is a crude version. Constraint:

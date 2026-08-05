@@ -3998,8 +3998,14 @@ export const scenarios = [
         `.090 cut trims past .030 (${stats['lab.cut090'].r} vs ${stats['lab.cut030'].r})`);
       assert.ok(stats['lab.round090'].r > stats['lab.round130'].r,
         `.130 fillet trims past .090 (${stats['lab.round090'].r} vs ${stats['lab.round130'].r})`);
-      assert.ok(stats['lab.round055'].r > stats['std'].r && stats['lab.round055'].r < stats['std'].r * 1.05,
-        `the .055 fillet bulges past its cut twin, inside the sharp corner (${stats['lab.round055'].r} vs ${stats['std'].r})`);
+      // the d6's ACTUAL sharp-corner radius — the bound the fillet must
+      // stay inside is the base solid itself, not a loose percentage
+      // (the fillet review caught 1.05·std sitting ~1.2% OUTSIDE it)
+      const D6_SHARP = (1.35 / 2) * Math.sqrt(3);
+      assert.ok(stats['lab.round055'].r > stats['std'].r && stats['lab.round055'].r < D6_SHARP,
+        `the .055 fillet bulges past its cut twin, inside the sharp corner (${stats['lab.round055'].r} vs ${stats['std'].r}..${D6_SHARP.toFixed(4)})`);
+      assert.ok(stats['lab.round130'].r < D6_SHARP,
+        `the widest fillet stays inside the base solid (${stats['lab.round130'].r} < ${D6_SHARP.toFixed(4)})`);
       assert.ok(stats['lab.round090'].r > stats['lab.cut090'].r,
         `the .090 fillet bulges past its cut twin (${stats['lab.round090'].r} vs ${stats['lab.cut090'].r})`);
       // material-only knobs leave the silhouette bit-identical: ink
@@ -4078,6 +4084,40 @@ export const scenarios = [
       assert.equal(rec.geo.bevel, 0.12, 'recipe keeps the bevel');
       assert.equal(rec.body, '#ff2222', 'recipe keeps the body color');
       assert.ok(rec.feel && typeof rec.feel.rough === 'number', 'recipe carries feel');
+
+      // INK + TINT reach the live band material (read it directly — no
+      // screenshots): a low-ink bench row sits closer to its body color
+      // than the inked default; ink 0 IS the body; tint pulls toward it.
+      const bandHex = (id, di) => `window.__labRows.find((r) => r.id === ${JSON.stringify(id)})`
+        + `.meshes[${di}].mesh.material.at(-1).color.getHexString()`;
+      const lum = (h) => parseInt(h.slice(0, 2), 16) + parseInt(h.slice(2, 4), 16) + parseInt(h.slice(4, 6), 16);
+      const selfBand = await t.eval(bandHex('lab.selfink', 1));
+      const inkedBand = await t.eval(bandHex('lab.round090', 1));
+      assert.ok(lum(selfBand) > lum(inkedBand),
+        `ink .04 leaves the band lighter than the inked default (${selfBand} vs ${inkedBand})`);
+      await t.eval(`window.__lab.builderSet({ body: '#2e6f9e', geo: { ink: 0 } })`);
+      assert.equal(await t.eval(bandHex('lab.builder', 1)), '2e6f9e',
+        'ink 0 = fully self-colored band');
+      await t.eval(`window.__lab.builderSet({ geo: { ink: 0.5, tint: '#ff0000' } })`);
+      const tinted = await t.eval(bandHex('lab.builder', 1));
+      assert.ok(parseInt(tinted.slice(0, 2), 16) > 0x2e,
+        `tint pulls the band toward red (${tinted})`);
+
+      // SEGMENTS reshape the fillet: more arc strips, more vertices
+      await t.eval(`window.__lab.builderSet({ geo: { segments: 1 } })`);
+      const v1 = JSON.parse(await t.eval('JSON.stringify(window.__lab.geoStats())'))['lab.builder'].verts;
+      await t.eval(`window.__lab.builderSet({ geo: { segments: 5 } })`);
+      const v5 = JSON.parse(await t.eval('JSON.stringify(window.__lab.geoStats())'))['lab.builder'].verts;
+      assert.ok(v5 > v1, `segments grow the fillet mesh (${v5} > ${v1})`);
+
+      // A scripted profile flip keeps recipes omit-at-default: untouched
+      // ink snaps between profile defaults (explicitly patched ink wins).
+      await t.eval(`window.__lab.builderSet({ geo: { ink: 0.12, tint: '#000000' } })`);
+      await t.eval(`window.__lab.builderSet({ geo: { profile: 'cut' } })`);
+      const recCut = JSON.parse(await t.eval('JSON.stringify(window.__lab.builderRecipe())'));
+      assert.equal(recCut.geo.profile, undefined, 'cut is the default profile — omitted');
+      assert.equal(recCut.geo.ink, undefined,
+        `the flip snapped untouched ink to cut's default (got ${recCut.geo.ink})`);
     },
   },
   {

@@ -1117,7 +1117,17 @@ window.__lab = {
         else dst[k] = v;
       }
     };
+    const oldProfile = bState.geo.profile;
     merge(bState, patch);
+    // The same untouched-ink snap the profile SELECT applies: a scripted
+    // profile flip must not fossilize the old profile's default as an
+    // explicit recipe value (the fillet review caught builderSet emitting
+    // ink .25 on every cut→round flip). An explicitly patched ink wins.
+    if (bState.geo.profile !== oldProfile
+        && !(patch && patch.geo && patch.geo.ink != null)
+        && bState.geo.ink === INK_DEFAULT(oldProfile)) {
+      bState.geo.ink = INK_DEFAULT(bState.geo.profile);
+    }
     syncControls();
     rebuildBuilderRow();
     return this.builderRecipe();
