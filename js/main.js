@@ -1334,8 +1334,8 @@ function openShelfPopover(entry, rollId) {
 // felt, so a marker can never be under it.)
 
 function positionShelfMarkers() {
-  const v = new THREE.Vector3();
-  const v2 = new THREE.Vector3();
+  const v = TMP_V1;
+  const v2 = TMP_V2;
   for (const c of shelfClusters.values()) {
     if (!c.markerEl) continue;
     v.set(shelfSlotX(c.slot), SHELF_MARKER_Y, SHELF_Z);
@@ -3235,7 +3235,7 @@ function requestReveal(rollId) {
 }
 
 function positionChips() {
-  const v = new THREE.Vector3();
+  const v = TMP_V1;
   for (const { el, die } of chips) {
     v.copy(die.mesh.position);
     v.y += 2.2;
@@ -3887,6 +3887,12 @@ const clock = new THREE.Clock();
 // (40 dice, the app-wide cap) writes zero new objects per frame.
 const TMP_QUAT = new THREE.Quaternion();
 const TMP_AXIS = new THREE.Vector3();
+// Same doctrine for the per-frame HUD projectors (positionChips /
+// positionShelfMarkers): one scratch pair reused every frame, zero
+// per-die allocations. Callers own the vectors between .set/.copy and
+// the pixel write — they never survive across function calls.
+const TMP_V1 = new THREE.Vector3();
+const TMP_V2 = new THREE.Vector3();
 const TWO_PI = Math.PI * 2;
 
 // Deterministic 32-bit hash → [0, 1). Same input on every client → same phase.
