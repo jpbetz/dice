@@ -37,8 +37,21 @@ import { PostStack } from './post.js';
 // Constants
 // ---------------------------------------------------------------------------
 
-const TABLE_W = 30;          // playable width (x)
-const TABLE_D = 17;          // playable depth (z)
+// Mat extents — LET, not const: the room-wide zoom setting resizes the mat
+// live (walls, shelf pitch, camera framing all follow). The base values here
+// are the 'wide' preset; ZOOM_PRESETS below owns the alternatives, and
+// applyZoom mutates these + the wall body positions in place.
+let TABLE_W = 30;            // playable width (x)
+let TABLE_D = 17;            // playable depth (z)
+// Zoom picker labels — declared here (not next to renderZoomPicker) because
+// setSound() → syncSettingsUI() → renderZoomPicker() runs during module
+// evaluation, and the picker's early build must not read this in TDZ.
+const ZOOM_LEVELS = [
+  { id: 'wide',   label: 'Wide',   title: 'Wide — the default table' },
+  { id: 'medium', label: 'Medium', title: 'Medium — closer, still roomy' },
+  { id: 'close',  label: 'Close',  title: 'Close — larger dice, better on small screens' },
+];
+const DEFAULT_ZOOM = 'wide';
 const MAX_DICE_ON_TABLE = 40;
 const GRAVITY = -110;
 const LOG_CAP = 100;
@@ -86,10 +99,17 @@ const keyLight = new THREE.DirectionalLight('#ffeecc', 2.9);
 keyLight.position.set(8, 30, 10);
 keyLight.castShadow = true;
 keyLight.shadow.mapSize.set(2048, 2048);
-keyLight.shadow.camera.left = -TABLE_W / 2 - 4;
-keyLight.shadow.camera.right = TABLE_W / 2 + 4;
-keyLight.shadow.camera.top = TABLE_D / 2 + 6;
-keyLight.shadow.camera.bottom = -TABLE_D / 2 - 6;
+// Shadow frustum tracks the mat: zoom shrinks TABLE_W/D, and the ortho
+// bounds shrink with it (a bigger frustum than the mat just wastes shadow
+// map). updateShadowFrustum runs at boot and again from applyZoom.
+function updateShadowFrustum() {
+  keyLight.shadow.camera.left = -TABLE_W / 2 - 4;
+  keyLight.shadow.camera.right = TABLE_W / 2 + 4;
+  keyLight.shadow.camera.top = TABLE_D / 2 + 6;
+  keyLight.shadow.camera.bottom = -TABLE_D / 2 - 6;
+  keyLight.shadow.camera.updateProjectionMatrix();
+}
+updateShadowFrustum();
 keyLight.shadow.camera.far = 60;
 keyLight.shadow.bias = -0.0004;
 scene.add(keyLight);
@@ -184,6 +204,12 @@ const FELT_THEMES = {
 const DEFAULT_FELT = 'obsidian';
 let currentFeltId = DEFAULT_FELT;
 
+// Current merged room settings — initialized HERE, not next to
+// applyRoomSettings below, because setSound()'s module-eval call chain
+// (syncSettingsUI → renderZoomPicker) reads roomSettings.zoom. Adding a new
+// key requires only adding it to defaults.
+let roomSettings = { felt: DEFAULT_FELT, system: DEFAULT_SYSTEM, tableName: '', zoom: DEFAULT_ZOOM };
+
 // The collect shelf (UX §7.7, refined §7.7.1): five slot POSITIONS along the
 // bottom (front) felt edge. No permanent markings — an empty position is plain
 // felt (§7.7.1 "no casino markings"); an OCCUPIED position gets a soft warm
@@ -194,13 +220,18 @@ let currentFeltId = DEFAULT_FELT;
 // projection — one set of numbers, four readers. The slot is the pile's
 // boundary, so its size is what clusterPoses fits against; keep the slots
 // inside the felt (|x| < TABLE_W/2, SHELF_Z + D/2 < TABLE_D/2) and clear of
-// each other (W < the 5.9 pitch).
+// each other (W < SHELF_PITCH).
 const SHELF_SLOTS = 5;
-const SHELF_Z = 6.6;                 // slot center (world z; front wall is +8.5)
+// SHELF_Z and the pitch between slot centers are DERIVED from TABLE_W/D — a
+// zoom preset resizes the mat and the shelf slides with it (the 1.9-unit
+// clearance from the front wall is the invariant). SHELF_SLOT_W/D stay fixed:
+// a slot holds ~3 dice abreast; sized by die-radius, not felt-fraction.
+let SHELF_Z = TABLE_D / 2 - 1.9;     // slot center (world z; wide: 6.6)
 const SHELF_SLOT_W = 5.4;            // slot decal width  (x units)
 const SHELF_SLOT_D = 3.6;            // slot decal depth  (z units)
 const SHELF_MARKER_Y = 2.4;          // marker anchor height above the slot
-const shelfSlotX = (slot) => (slot - (SHELF_SLOTS - 1) / 2) * 5.9;
+let SHELF_PITCH = (TABLE_W - SHELF_SLOT_W) / (SHELF_SLOTS - 1); // wide: 6.15
+const shelfSlotX = (slot) => (slot - (SHELF_SLOTS - 1) / 2) * SHELF_PITCH;
 
 // rollId -> {rollId, seq, slot, diceCount, markerEl, glow}. Declared here —
 // not with the rest of the shelf machinery below — because the felt composite
@@ -469,12 +500,19 @@ function addStaticPlane(material, position, euler) {
   body.position.set(...position);
   body.quaternion.setFromEuler(...euler);
   world.addBody(body);
+  return body;
 }
 addStaticPlane(floorMat, [0, 0, 0], [-Math.PI / 2, 0, 0]);                   // floor
-addStaticPlane(wallMat, [0, 0, -TABLE_D / 2], [0, 0, 0]);                    // back
-addStaticPlane(wallMat, [0, 0, TABLE_D / 2], [0, Math.PI, 0]);               // front
-addStaticPlane(wallMat, [-TABLE_W / 2, 0, 0], [0, Math.PI / 2, 0]);          // left
-addStaticPlane(wallMat, [TABLE_W / 2, 0, 0], [0, -Math.PI / 2, 0]);          // right
+// Wall refs — applyZoom mutates their positions in place (cannon's SAP
+// broadphase is safe with in-place moves on static bodies; removing + adding
+// would shuffle body ordering and reseed collision-pair enumeration, which is
+// the perf-determinism scenario's exact regression pin).
+const walls = {
+  back:  addStaticPlane(wallMat, [0, 0, -TABLE_D / 2], [0, 0, 0]),
+  front: addStaticPlane(wallMat, [0, 0,  TABLE_D / 2], [0, Math.PI, 0]),
+  left:  addStaticPlane(wallMat, [-TABLE_W / 2, 0, 0], [0, Math.PI / 2, 0]),
+  right: addStaticPlane(wallMat, [ TABLE_W / 2, 0, 0], [0, -Math.PI / 2, 0]),
+};
 addStaticPlane(wallMat, [0, 22, 0], [Math.PI / 2, 0, 0]);                    // ceiling
 
 // ---------------------------------------------------------------------------
@@ -725,8 +763,10 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
   const mesh = createDieMesh(type, variant);
   const body = createDieBody(type, diceMat);
 
-  // line the throw up along the chosen edge of the table
-  const spread = Math.min(TABLE_W - 6, count * 2.6);
+  // line the throw up along the chosen edge of the table. The clamp is
+  // tighter than TABLE_W so the outer dice never spawn inside a wall at
+  // the CLOSE preset (TABLE_W=18: TABLE_W-4.4=13.6, still ample).
+  const spread = Math.min(TABLE_W - 4.4, count * 2.6);
   const offset = count === 1 ? 0 : -spread / 2 + (spread * index) / (count - 1);
   const jitter = () => (rng() - 0.5) * 1.2;
 
@@ -1160,6 +1200,7 @@ function shelveRoll(rollId, seq, animate) {
   }
   reflowShelf(animate);
   renderShelfMarkers();
+  tryFlushZoom(); // a deferred zoom rides the shelf boundary too
 }
 
 // Advance collect whisks: dt-driven mesh slide with a small carry arc, easing
@@ -2126,6 +2167,7 @@ function stepPlayback(dt) {
     runPendingCollect(roll); // a collect that arrived mid-playback lands now
     runPendingClear(roll);   // …and a clear wins over it
     if (rollQueue.length) playRoll(rollQueue.shift());
+    else tryFlushZoom();     // a room-wide zoom that arrived mid-roll lands here
   }
 }
 
@@ -4082,6 +4124,31 @@ window.__diceDebug = {
   // interpretation system (goal 6): active profile id + the picker's entry point
   get system() { return currentSystemId; },
   setSystem(id) { return selectSystem(id); },
+  // mat-zoom (Joe 2026-08-04): the room-wide preset + world extents for the
+  // e2e assertion surface (never scrape the felt).
+  get zoom() { return currentZoom; },
+  get pendingZoom() { return pendingZoom; },
+  setZoom(id) { return selectZoom(id); },
+  wallPositions() {
+    return {
+      back:  { x: walls.back.position.x,  y: walls.back.position.y,  z: walls.back.position.z  },
+      front: { x: walls.front.position.x, y: walls.front.position.y, z: walls.front.position.z },
+      left:  { x: walls.left.position.x,  y: walls.left.position.y,  z: walls.left.position.z  },
+      right: { x: walls.right.position.x, y: walls.right.position.y, z: walls.right.position.z },
+    };
+  },
+  shelfPitch() { return SHELF_PITCH; },
+  shelfZ() { return SHELF_Z; },
+  tableExtents() { return { w: TABLE_W, d: TABLE_D }; },
+  // World X of the first die in the first shelf cluster — the reflow proof.
+  // Null when no shelf cluster has been dice-populated yet.
+  firstShelfDieWorldX() {
+    const c = [...shelfClusters.values()].sort((a, b) => a.seq - b.seq)[0];
+    if (!c) return null;
+    const dice = tableDice.filter((d) => d.rollId === c.rollId);
+    if (!dice.length) return null;
+    return dice[0].mesh.position.x;
+  },
   openSettings() { openSettingsModal(); },
   // ceremony introspection (UX §2.4): phase machine + decal state
   get ceremonyState() {
@@ -7811,7 +7878,8 @@ function setChips(on, persist = true) {
 
 // Current merged room settings. Key-by-key application below is deliberate:
 // the next slice adds keys (experiences) without reshaping this.
-let roomSettings = { felt: DEFAULT_FELT, system: DEFAULT_SYSTEM, tableName: '' };
+// (roomSettings is initialized near the top of the file — the setSound()
+// module-eval call chain reads it via renderZoomPicker.)
 
 // A system change is a lens swap over every surface already on screen: the
 // log, the banner, and a verdict card still standing all re-read under the new
@@ -7859,6 +7927,79 @@ function renderTableName() {
   document.title = name ? `${name} — Dice Table` : 'Dice Table';
 }
 
+// Mat-zoom presets (Joe 2026-08-04: small screens need a smaller mat).
+// Three levels — the physics-mat shrinks, dice occupy a bigger fraction of
+// it, the camera pulls in with matching angle. Physics-truth is untouched:
+// die size is fixed in world units, face correction runs on the final quat,
+// and the seeded throw bakes keyframes against the walls at spawn time
+// (which is why the interaction rule DEFERS a mid-flight change — see
+// queueZoom below). 'wide' matches the pre-zoom mat byte-for-byte apart
+// from the shelf pitch, which is now derived from TABLE_W (formula was
+// implicit before; now it's the same formula the e2e scenario asserts).
+const ZOOM_PRESETS = {
+  wide:   { w: 30, d: 17, eyeFull: [0, 27, 15.5], eyeMini: [0, 22, 12.5] },
+  medium: { w: 24, d: 14, eyeFull: [0, 22, 12.6], eyeMini: [0, 18, 10.2] },
+  close:  { w: 18, d: 11, eyeFull: [0, 17,  9.8], eyeMini: [0, 14,  7.9] },
+};
+
+let pendingZoom = null; // set by queueZoom when a change arrives mid-roll
+let currentZoom = 'wide';
+
+function tableIsBusyForZoom() {
+  // A zoom must not land on a client whose physics is currently baking
+  // keyframes against the OLD walls (would render the same seeded roll
+  // against a different wall on different clients — the visual bump the
+  // 'DEFER to next roll boundary' rule exists to kill). Whisks and reveals
+  // are also live pose-drives that read the shelf slot X.
+  if (currentRoll && !currentRoll.done) return true;
+  if (rollQueue.length) return true;
+  if (whisking.length || revealing.length) return true;
+  return false;
+}
+
+function queueZoom(level) {
+  if (!ZOOM_PRESETS[level]) return;
+  pendingZoom = level;
+  if (tableIsBusyForZoom()) {
+    // A quiet 'later' note only when the wait was actually forced — a same-
+    // frame flush is invisible and never needs to say so. Uses the modal's
+    // own note surface when the modal is open, otherwise the status pill.
+    if (level !== currentZoom) showSettingsNote('zoom applies after this roll');
+    return;
+  }
+  tryFlushZoom();
+}
+
+function tryFlushZoom() {
+  if (!pendingZoom || tableIsBusyForZoom()) return;
+  const level = pendingZoom;
+  pendingZoom = null;
+  applyZoom(level);
+}
+
+function applyZoom(level) {
+  const p = ZOOM_PRESETS[level];
+  if (!p) return;
+  TABLE_W = p.w;
+  TABLE_D = p.d;
+  // Move the wall bodies in place (no remove/add — SAP body-order matters).
+  walls.back.position.set(0, 0, -TABLE_D / 2);
+  walls.front.position.set(0, 0,  TABLE_D / 2);
+  walls.left.position.set(-TABLE_W / 2, 0, 0);
+  walls.right.position.set( TABLE_W / 2, 0, 0);
+  SHELF_Z = TABLE_D / 2 - 1.9;
+  SHELF_PITCH = (TABLE_W - SHELF_SLOT_W) / (SHELF_SLOTS - 1);
+  updateShadowFrustum();
+  CAM_EYE = { full: [...p.eyeFull], mini: [...p.eyeMini] };
+  currentZoom = level;
+  // Invalidate every cluster's cached slot pose + glow radius so reflowShelf
+  // re-places to the new pitch and recompositeFelt draws rings at the new Z.
+  for (const c of shelfClusters.values()) { c.placed = false; c.glowR = 0; }
+  reflowShelf(true);   // reflows every cluster to new slot X (animated)
+  recompositeFelt();   // glows land on new SHELF_Z / pitch
+  refitView();         // camera framing + particle/post + chip/marker anchors
+}
+
 // Apply a full merged settings object (join response, hello, settings-changed
 // echo, or the solo localStorage copy). Unknown keys/values are ignored.
 function applyRoomSettings(settings) {
@@ -7883,6 +8024,11 @@ function applyRoomSettings(settings) {
       rerenderInterpretation();
     }
     renderSystemPicker();
+  }
+  if (typeof settings.zoom === 'string' && ZOOM_PRESETS[settings.zoom]) {
+    roomSettings.zoom = settings.zoom;
+    if (settings.zoom !== currentZoom) queueZoom(settings.zoom);
+    renderZoomPicker();
   }
 }
 
@@ -8131,6 +8277,53 @@ function selectSystem(id) {
   return true;
 }
 
+// Mat-zoom picker (Joe 2026-08-04: small screens need a closer mat).
+// Same segmented-pill grammar as the system picker — three text labels, no
+// photo swatches (the differences are proprioceptive, not aesthetic).
+// ZOOM_LEVELS is declared at module top (near TABLE_W/D) so setSound's
+// module-eval call chain (syncSettingsUI → renderZoomPicker) never hits it
+// in the TDZ; this reference just documents where the numbers live.
+function renderZoomPicker() {
+  const holder = document.getElementById('zoom-picker');
+  if (!holder) return;
+  if (!holder.childElementCount) {
+    for (const z of ZOOM_LEVELS) {
+      const chip = document.createElement('button');
+      chip.className = 'system-chip';
+      chip.dataset.zoom = z.id;
+      chip.textContent = z.label;
+      chip.title = z.title;
+      chip.setAttribute('role', 'radio');
+      chip.addEventListener('click', () => selectZoom(z.id));
+      holder.appendChild(chip);
+    }
+  }
+  const active = roomSettings.zoom || DEFAULT_ZOOM;
+  holder.querySelectorAll('[data-zoom]').forEach((b) => {
+    b.setAttribute('aria-pressed', String(b.dataset.zoom === active));
+    b.setAttribute('aria-checked', String(b.dataset.zoom === active));
+  });
+}
+
+// Chip click (and __diceDebug.setZoom). Online: send the patch, apply on
+// the 'settings-changed' echo like felt/system. Solo: apply the mat now and
+// persist. A mid-flight change DEFERS via queueZoom (see applyRoomSettings).
+function selectZoom(id) {
+  if (!ZOOM_PRESETS[id]) return false;
+  if (id === roomSettings.zoom && id === currentZoom) return true;
+  if (netOnline && net) {
+    net.setSettings({ zoom: id }).then((ok) => {
+      if (!ok) showSettingsNote('couldn’t reach the table — zoom unchanged');
+    });
+    return true;
+  }
+  roomSettings.zoom = id;
+  save(LS_ROOMSETTINGS, roomSettings);
+  queueZoom(id);
+  renderZoomPicker();
+  return true;
+}
+
 // Swatch click (and __diceDebug.setFelt). Online: send the patch, wait for
 // the echo. Solo: apply now and persist so the table looks the same tomorrow.
 function selectFelt(id) {
@@ -8180,6 +8373,7 @@ function syncSettingsUI() {
   document.getElementById('set-chips').setAttribute('aria-pressed', String(chipsOn));
   renderDiceSetPicker();
   renderSystemPicker();
+  renderZoomPicker();
   renderFeltSwatches();
 }
 
@@ -8406,7 +8600,10 @@ function panelDebugState() {
 // below ~1.3 aspect: a 4:3 desktop clipped slots 0 and 4, and an iPad portrait
 // — too big to auto-engage compact view — put two of the five markers, ✕ and
 // all, outside the viewport entirely.
-const CAM_EYE = { full: [0, 27, 15.5], mini: [0, 22, 12.5] };
+// LET, not const: zoom rewrites the eye preset so the walker's angle stays
+// fixed (every entry keeps y/z ≈ 1.74). applyCameraFraming's step-back still
+// runs after — it just starts from the closer eye at 'medium'/'close'.
+let CAM_EYE = { full: [0, 27, 15.5], mini: [0, 22, 12.5] };
 const CAM_TARGET = new THREE.Vector3(0, 0, 0.5);
 
 // What must stay on screen, each with the NDC headroom its own chrome needs.
@@ -9259,6 +9456,9 @@ function replaySettledRoll(r) {
       renderRollResults(rebuilt, tableDice.filter((d) => d.rollId === r.rollId), false);
     }
   }
+  tryFlushZoom(); // late-joiner path: hello.settings.zoom already applied
+                  // before this replay, so this is idempotent; the hook stays
+                  // to catch a settings-changed that lost the race with hello
 }
 
 function handleNetEvent(type, data) {

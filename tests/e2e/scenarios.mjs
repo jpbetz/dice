@@ -4121,6 +4121,102 @@ export const scenarios = [
     },
   },
   {
+    name: 'zoom-syncs',
+    tags: ['smoke', 'settings', 'zoom'],
+    // Mat-zoom (Joe 2026-08-04): the room-wide preset resizes the physics
+    // mat (walls move, shelf pitch derives from TABLE_W) and reflows every
+    // shelved cluster to the new slot X. All clients agree — the setting
+    // rides the same 'settings-changed' echo as felt/system, and applyZoom
+    // is deterministic from the preset name alone.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+
+      // Default is 'wide' on both, room-wide.
+      assert.equal(await a.dbg('zoom'), 'wide', 'wide is the default');
+      assert.equal(await b.dbg('zoom'), 'wide', 'B sees the same default');
+
+      // Shelve a die at wide zoom, capture its world X on both tabs.
+      await a.roll('1d6');
+      await a.dbg(`collectRoll(${JSON.stringify(await a.rollId())})`);
+      for (const t of [a, b]) {
+        await t.waitFor(
+          `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1`
+          + ` && window.__diceDebug.whiskingCount === 0)`,
+          { desc: 'die on shelf' },
+        );
+      }
+      const beforeA = await a.dbg('firstShelfDieWorldX()');
+      const beforeB = await b.dbg('firstShelfDieWorldX()');
+      assert.ok(Number.isFinite(beforeA) && Number.isFinite(beforeB),
+        'both tabs have a shelved die');
+      assert.ok(Math.abs(beforeA - beforeB) < 0.01,
+        `shelf X deterministic across clients (A=${beforeA}, B=${beforeB})`);
+
+      // A sets zoom to 'close'; wait for the echo on BOTH.
+      await a.dbg(`setZoom('close')`);
+      for (const t of [a, b]) {
+        await t.waitFor(`window.__diceDebug.zoom === 'close'`,
+          { desc: 'zoom syncs to close' });
+      }
+
+      // Wall positions changed to the close preset (TABLE_W=18, TABLE_D=11).
+      for (const [t, tag] of [[a, 'A'], [b, 'B']]) {
+        const wp = await t.dbg('wallPositions()');
+        assert.ok(Math.abs(wp.right.x - 9) < 1e-6,
+          `${tag}: right wall at +TABLE_W/2 = 9 (got ${wp.right.x})`);
+        assert.ok(Math.abs(wp.left.x + 9) < 1e-6,
+          `${tag}: left wall at -9 (got ${wp.left.x})`);
+        assert.ok(Math.abs(wp.front.z - 5.5) < 1e-6,
+          `${tag}: front wall at +TABLE_D/2 = 5.5 (got ${wp.front.z})`);
+        assert.ok(Math.abs(wp.back.z + 5.5) < 1e-6,
+          `${tag}: back wall at -5.5 (got ${wp.back.z})`);
+      }
+
+      // Shelf pitch is derived from TABLE_W: (18 - 5.4) / 4 ≈ 3.15.
+      const pitchA = await a.dbg('shelfPitch()');
+      const pitchB = await b.dbg('shelfPitch()');
+      const expectedPitch = (18 - 5.4) / 4;
+      assert.ok(Math.abs(pitchA - expectedPitch) < 0.01,
+        `A: shelf pitch ≈ ${expectedPitch} (got ${pitchA})`);
+      assert.ok(Math.abs(pitchB - expectedPitch) < 0.01,
+        `B: shelf pitch ≈ ${expectedPitch} (got ${pitchB})`);
+
+      // Let the whisk settle after reflowShelf's animated re-place.
+      for (const t of [a, b]) await t.dbg('sim(600)');
+
+      // The previously-shelved die moved with the new pitch.
+      const afterA = await a.dbg('firstShelfDieWorldX()');
+      const afterB = await b.dbg('firstShelfDieWorldX()');
+      assert.ok(Math.abs(afterA - afterB) < 0.01,
+        `after: shelf X still deterministic (A=${afterA}, B=${afterB})`);
+      // With one cluster at slot 0 of 5 the slot X is (0 - 2) * pitch =
+      // -2 * pitch. At wide pitch=6.15 the die sits near x=-12.3; at close
+      // pitch=3.15 it sits near x=-6.3 — a real move, not a rounding blip.
+      assert.ok(Math.abs(afterA - beforeA) > 0.5,
+        `the die actually reflowed (before=${beforeA}, after=${afterA})`);
+
+      // Determinism still holds with a non-default mat: keyframes bit-
+      // identical across tabs when both are at 'close'.
+      const HASH = `(() => {
+        const r = window.__diceDebug.currentRoll;
+        if (!r || !r.keyframes) return null;
+        const per = r.keyframes.map((arr) => arr.map((s) =>
+          [s.pos.x, s.pos.y, s.pos.z, s.quat.x, s.quat.y, s.quat.z, s.quat.w]
+            .map((f) => f.toFixed(9)).join(',')
+        ).join('|'));
+        return { hash: per.join('||'), seed: r.seed, dice: r.dice.length };
+      })()`;
+      await a.roll('4d6');
+      await b.settle();
+      const ha = await a.eval(HASH);
+      const hb = await b.eval(HASH);
+      assert.ok(ha && hb, 'both tabs captured keyframes at close');
+      assert.equal(ha.seed, hb.seed, 'same seed on both tabs at close');
+      assert.equal(ha.hash, hb.hash, 'keyframes bit-identical at close zoom');
+    },
+  },
+  {
     name: 'perf-determinism',
     tags: ['smoke', 'perf', 'resync'],
     // Perf pass §0a (Commit B — SAP broadphase guard): the SAP broadphase

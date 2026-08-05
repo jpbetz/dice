@@ -260,6 +260,18 @@ const SETTING_SPECS = {
     default: [],
     normalize: normalizeExperiences,
   },
+  // Mat-zoom (Joe 2026-08-04: the physics-mat needs a smaller region on small
+  // screens). Room-wide, three presets. The client owns the numbers per
+  // preset; the wire only carries the name. Late joiners land on the room's
+  // current level via hello.settings, which lets applyZoom fire BEFORE any
+  // replay bakes keyframes — the mat width the dice bake against is the mat
+  // width every client renders. Interaction rule (see main.js queueZoom): a
+  // change made while a roll is in flight defers to the next roll boundary,
+  // so no client sees dice bake against one wall and settle against another.
+  zoom: {
+    default: 'wide',
+    validate: (v) => typeof v === 'string' && ['wide', 'medium', 'close'].includes(v),
+  },
 };
 
 function defaultSettings() {

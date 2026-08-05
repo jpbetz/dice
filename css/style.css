@@ -2269,7 +2269,8 @@ html, body {
   color: var(--gold-bright);
 }
 /* rolling-system picker (goal 6): same pill language as the felt swatches */
-#system-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+#system-picker,
+#zoom-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
 .system-chip {
   padding: 5px 12px;
   border-radius: 999px;

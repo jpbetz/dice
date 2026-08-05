@@ -690,6 +690,17 @@ limitations under the License.
           </span>
         </div>
         <div id="system-picker"></div>
+        <!-- Mat zoom (Joe 2026-08-04): three presets — Wide (default),
+             Medium, Close — the closer levels shrink the physics mat so
+             dice occupy a bigger fraction of a small screen. A mid-flight
+             change defers to the next roll boundary (queueZoom). -->
+        <div class="prow">
+          <span class="grow">
+            <span class="prow-label">Mat zoom</span>
+            <span class="prow-sub">smaller mat, larger dice — better on small screens</span>
+          </span>
+        </div>
+        <div id="zoom-picker" role="radiogroup" aria-label="Mat zoom"></div>
         <span class="plabel">Felt</span>
         <div id="felt-swatches"></div>
         <div id="settings-note"></div>
