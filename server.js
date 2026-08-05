@@ -323,7 +323,7 @@ function getRoom(name) {
       settings: defaultSettings(),
     };
     rooms.set(name, room);
-    log(`room created: ${name}`);
+    log(`room created: ${logField('room', name)}`);
   }
   return room;
 }
@@ -341,7 +341,7 @@ function publicPlayers(room) {
 function dropRoomIfEmpty(room) {
   if (room.players.size === 0 && rooms.get(room.name) === room) {
     rooms.delete(room.name);
-    log(`room deleted: ${room.name}`);
+    log(`room deleted: ${logField('room', room.name)}`);
   }
 }
 
@@ -351,7 +351,7 @@ function removePlayer(room, player, why) {
   room.players.delete(player.id);
   for (const res of player.clients) endStream(res);
   player.clients.clear();
-  log(`left    room=${room.name} name=${player.name} (${why})`);
+  log(`left    ${logField('room', room.name)} ${logField('name', player.name)} (${why})`);
   broadcast(room, 'player-left', { playerId: player.id });
   dropRoomIfEmpty(room);
 }
@@ -400,7 +400,7 @@ function dropStream(room, player, res) {
   player.clients.delete(res);
   endStream(res);
   if (player.clients.size === 0 && room.players.get(player.id) === player) {
-    log(`DBG dropStream schedReap player=${player.name} caller=${new Error().stack.split('\n')[2].trim()}`);
+    log(`DBG dropStream schedReap ${logField('player', player.name)} caller=${new Error().stack.split('\n')[2].trim()}`);
     scheduleReap(room, player, DISCONNECT_GRACE_MS);
   }
 }
@@ -489,6 +489,25 @@ function log(msg) { if (LOG_INFO) writeLog(msg); }
 // DICE_LOG_LEVEL=debug. Callers pass a thunk so the interpolation itself is
 // skipped at info level — the ~40-die join() would otherwise still fire.
 function logDebug(build) { if (LOG_DEBUG) writeLog(typeof build === 'function' ? build() : build); }
+
+// Format one key=value pair for the operator log. User-derived strings are
+// wrapped in double quotes with backslash-escaped interior quotes/backslashes
+// so a rename like tableName='foo felt=crimson' can never forge adjacent
+// key=value tokens for a log-scraper (an operator grepping for
+// `felt=crimson` must not surface someone's table name). Arrays log their
+// length only — a per-line trace is not the place to dump twelve experience
+// records. Anything else prints raw (numbers, booleans, palette hues,
+// server-minted UUIDs, and enumerated values like vis.mode/exp.kind whose
+// grammars refuse the injection alphabet up front).
+//
+// Kept next to stripCtl/cutText because the same discipline applies: one
+// helper decides how untrusted text becomes a log token, so no future site
+// re-derives its own quoting rule.
+function logField(k, v) {
+  if (Array.isArray(v)) return `${k}=[${v.length}]`;
+  if (typeof v === 'string') return `${k}="${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  return `${k}=${v}`;
+}
 
 function sendJson(res, status, payload, { close = false } = {}) {
   const body = Buffer.from(JSON.stringify(payload));
@@ -655,7 +674,7 @@ async function handleJoin(req, res) {
       seat.name = name;
       broadcast(seatRoom, 'player-renamed', { playerId: seat.id, name });
     }
-    log(`resume  room=${roomName} name=${name} color=${seat.color} players=${seatRoom.players.size}`);
+    log(`resume  ${logField('room', roomName)} ${logField('name', name)} color=${seat.color} players=${seatRoom.players.size}`);
     return sendJson(res, 200, joinSnapshot(seatRoom, seat));
   }
 
@@ -683,7 +702,7 @@ async function handleJoin(req, res) {
   // If the client never opens an event stream, forget it again eventually.
   scheduleReap(room, player, JOIN_GRACE_MS);
 
-  log(`join    room=${roomName} name=${name} color=${player.color} players=${room.players.size}`);
+  log(`join    ${logField('room', roomName)} ${logField('name', name)} color=${player.color} players=${room.players.size}`);
   broadcast(room, 'player-joined', { player: { id: player.id, name: player.name, color: player.color, pools: [] } });
 
   sendJson(res, 200, joinSnapshot(room, player));
@@ -746,7 +765,7 @@ function handleEvents(req, res, url) {
   const onClose = () => {
     player.clients.delete(res);
     if (player.clients.size === 0 && room.players.get(playerId) === player) {
-      log(`DBG onClose schedReap player=${player.name}`);
+      log(`DBG onClose schedReap ${logField('player', player.name)}`);
       scheduleReap(room, player, DISCONNECT_GRACE_MS);
     }
   };
@@ -1204,7 +1223,7 @@ function collectEntries(room, entries) {
   // addressed to a rollId nobody else has ever heard of, so it goes to its
   // roller alone.
   for (const roll of evicted) {
-    logDebug(() => `evict   room=${room.name} rollId=${roll.rollId} seq=${roll.collected}`);
+    logDebug(() => `evict   ${logField('room', room.name)} rollId=${roll.rollId} seq=${roll.collected}`);
     // Deliberately the same event a per-roll Done sends: aging off the shelf
     // and being dismissed are the same sink animation, so a client needs one
     // code path for both.
@@ -1212,7 +1231,7 @@ function collectEntries(room, entries) {
     broadcast(room, 'roll-cleared', data, (viewerId) => (entryExistsFor(roll, viewerId) ? data : null));
   }
   for (const roll of collected) {
-    logDebug(() => `collect room=${room.name} rollId=${roll.rollId} seq=${roll.collected}`);
+    logDebug(() => `collect ${logField('room', room.name)} rollId=${roll.rollId} seq=${roll.collected}`);
     const data = { rollId: roll.rollId, seq: roll.collected };
     broadcast(room, 'roll-collected', data, (viewerId) => (entryExistsFor(roll, viewerId) ? data : null));
   }
@@ -1305,9 +1324,9 @@ function executeRoll(room, player, spec) {
   // never a secret roll's.
   const tail = `${roll.dc ? ` dc=${roll.dc}` : ''}${roll.exp ? ` exp=${roll.exp.kind}` : ''}${roll.rerollOfId ? ` reroll=${roll.rerollOfId}` : ''}`;
   if (roll.visibility) {
-    logDebug(() => `roll    room=${room.name} name=${player.name} dice=${roll.dice.join(',')} vis=${roll.visibility.mode}${tail}`);
+    logDebug(() => `roll    ${logField('room', room.name)} ${logField('name', player.name)} dice=${roll.dice.join(',')} vis=${roll.visibility.mode}${tail}`);
   } else {
-    logDebug(() => `roll    room=${room.name} name=${player.name} dice=${roll.dice.join(',')} values=${roll.values.join(',')} total=${roll.total}${tail}`);
+    logDebug(() => `roll    ${logField('room', room.name)} ${logField('name', player.name)} dice=${roll.dice.join(',')} values=${roll.values.join(',')} total=${roll.total}${tail}`);
   }
   // Per-recipient projection: full to those the mode allows, redacted for the
   // shrouded, and no event at all for a secret roll's non-rollers.
@@ -1442,7 +1461,7 @@ async function handleReveal(req, res) {
   if (roll.revealed) return sendJson(res, 200, { ok: true }); // idempotent
 
   roll.revealed = true;
-  log(`reveal  room=${room.name} name=${player.name} rollId=${rollId} total=${roll.total}`);
+  log(`reveal  ${logField('room', room.name)} ${logField('name', player.name)} rollId=${rollId} total=${roll.total}`);
   // The reveal carries the FULL entry so every client upgrades in place — a
   // redacted copy has no values to flip to. Once revealed the entry projects
   // as full to everyone, but the projection still runs: one function decides
@@ -1516,7 +1535,7 @@ async function handleClearRoll(req, res) {
   // Set on demand, never at roll time: like `exp`, an absent field keeps an
   // uncleared roll's payload byte-for-byte what it always was.
   roll.cleared = true;
-  logDebug(() => `clrroll room=${room.name} name=${player.name} rollId=${rollId}`);
+  logDebug(() => `clrroll ${logField('room', room.name)} ${logField('name', player.name)} rollId=${rollId}`);
   // Existence-gated, like every rollId-bearing event: a secret roll's Done is
   // its roller's business alone.
   broadcast(room, 'roll-cleared', { rollId }, (viewerId) => (entryExistsFor(roll, viewerId) ? { rollId } : null));
@@ -1537,7 +1556,7 @@ async function handleRename(req, res) {
   const oldName = player.name;
   player.name = name;
   // Past log entries keep the name they were rolled under.
-  log(`rename  room=${room.name} name=${oldName} -> ${name}`);
+  log(`rename  ${logField('room', room.name)} ${logField('name', oldName)} -> ${logField('newName', name)}`);
   broadcast(room, 'player-renamed', { playerId: player.id, name });
   sendJson(res, 200, { ok: true });
 }
@@ -1601,7 +1620,7 @@ async function handlePools(req, res) {
   }
   player.pools = pools;
   if (set) player.set = set; else delete player.set;
-  logDebug(() => `pools   room=${room.name} name=${player.name} count=${pools.length}`);
+  logDebug(() => `pools   ${logField('room', room.name)} ${logField('name', player.name)} count=${pools.length}`);
   broadcast(room, 'pools-changed', { playerId: player.id, pools, ...(set ? { set } : {}) });
   sendJson(res, 200, { ok: true });
 }
@@ -1710,7 +1729,7 @@ async function handleOffer(req, res) {
   room.offers.push(offer);
   if (room.offers.length > OFFER_CAP) room.offers = room.offers.slice(-OFFER_CAP);
 
-  logDebug(() => `offer   room=${room.name} name=${player.name} dice=${offer.dice.join(',')}${offer.dc ? ` dc=${offer.dc}` : ''}${to ? ` to=${to.name}` : ''} offers=${room.offers.length}`);
+  logDebug(() => `offer   ${logField('room', room.name)} ${logField('name', player.name)} dice=${offer.dice.join(',')}${offer.dc ? ` dc=${offer.dc}` : ''}${to ? ` ${logField('to', to.name)}` : ''} offers=${room.offers.length}`);
   broadcast(room, 'offer', { offer });
   sendJson(res, 200, { offer });
 }
@@ -1743,7 +1762,7 @@ async function handleClaim(req, res) {
   if (set.error) return sendError(res, ...set.error);
   room.offers.splice(idx, 1);
 
-  logDebug(() => `claim   room=${room.name} name=${player.name} offerId=${offerId} by=${offer.byName}`);
+  logDebug(() => `claim   ${logField('room', room.name)} ${logField('name', player.name)} offerId=${offerId} ${logField('by', offer.byName)}`);
   broadcast(room, 'offer-claimed', { offerId });
 
   // The claimed roll inherits the offer's moment AND its visibility: whoever
@@ -1796,7 +1815,7 @@ async function handleUnoffer(req, res) {
   }
   room.offers.splice(idx, 1);
 
-  log(`unoffer room=${room.name} name=${player.name} offerId=${offerId}`);
+  log(`unoffer ${logField('room', room.name)} ${logField('name', player.name)} offerId=${offerId}`);
   broadcast(room, 'offer-rescinded', { offerId });
   sendJson(res, 200, { ok: true });
 }
@@ -1826,7 +1845,7 @@ async function handleClear(req, res) {
     swept++;
   }
 
-  log(`clear   room=${room.name} name=${player.name} swept=${swept}`);
+  log(`clear   ${logField('room', room.name)} ${logField('name', player.name)} swept=${swept}`);
   broadcast(room, 'clear', { playerId: player.id, playerName: player.name });
   sendJson(res, 200, { ok: true });
 }
@@ -1908,10 +1927,11 @@ async function handleSettings(req, res) {
 
   // A container-valued setting logs its size, not its contents — the server
   // log is an operator's trace, not a dump of every template in the room.
-  const applied = Object.keys(patch)
-    .map((k) => `${k}=${Array.isArray(patch[k]) ? `[${patch[k].length}]` : patch[k]}`)
-    .join(' ');
-  logDebug(() => `setting room=${room.name} name=${player.name} ${applied}`);
+  // logField also quotes string-valued settings (tableName is user text): a
+  // rename like tableName='foo felt=crimson' must not look like two settings
+  // in the same line.
+  const applied = Object.keys(patch).map((k) => logField(k, patch[k])).join(' ');
+  logDebug(() => `setting ${logField('room', room.name)} ${logField('name', player.name)} ${applied}`);
   broadcast(room, 'settings-changed', { settings, byId: player.id, byName: player.name });
   sendJson(res, 200, { settings });
 }

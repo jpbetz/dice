@@ -134,14 +134,14 @@ async function runOneRoll({ level }) {
 // Default env: `join` line lands (info) but `roll ` line does not (debug off).
 {
   const out = await runOneRoll({ level: null });
-  assert.match(out, /join\s+room=log-level-test/, `default env must still log join lines\n---\n${out}\n---`);
+  assert.match(out, /join\s+room="log-level-test"/, `default env must still log join lines\n---\n${out}\n---`);
   assert.doesNotMatch(out, /^\[dice [^\]]+\] roll\s/m, `default env must NOT log per-roll lines\n---\n${out}\n---`);
 }
 
 // DICE_LOG_LEVEL=debug: the roll line appears.
 {
   const out = await runOneRoll({ level: 'debug' });
-  assert.match(out, /roll\s+room=log-level-test/, `debug env must log per-roll lines\n---\n${out}\n---`);
+  assert.match(out, /roll\s+room="log-level-test"/, `debug env must log per-roll lines\n---\n${out}\n---`);
 }
 
 console.log('log-level.test: ok');
