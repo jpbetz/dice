@@ -856,8 +856,8 @@ than color alone. New endpoint `POST /api/style {set}` → SSE
 Roll events carry **resolved per-die set ids** (subsuming roadmap §4's
 per-die colors — colors fold into anonymous sets per §4.1, so the set id
 is the *only* per-die style field on the wire) or replay diverges. Pool override: a swatch+set control on the
-saved-pool row (a "Fireball" pool pins Ember Pact); serialized as `@set=` in
-the codec (§1.5) so bookmarked pools keep their look. **No per-roll set
+saved-pool row (a "Fireball" pool pins Ember Pact); stored with the pool and
+carried by the YAML export (§1.5) so a pool keeps its look wherever it lands. **No per-roll set
 choice** — an extra decision inside the tension beat kills the beat.
 
 ### 4.3 Picker

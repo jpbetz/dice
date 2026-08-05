@@ -246,8 +246,8 @@ const SETTING_SPECS = {
   },
   // The table's display name (the anatomy pass, Joe 2026-08-04: "does it
   // have a name? It should"). Cosmetic identity, room-wide like felt; the
-  // ?room= KEY stays the durable identity (goal 7: the URL is the save
-  // file) — this name dies with the in-memory room by design. '' = unnamed
+  // ?room= KEY stays the durable identity (it is what an invite link
+  // addresses) — this name dies with the in-memory room by design. '' = unnamed
   // (clients render no plate — never a placeholder). Sanitized like every
   // user string (control/bidi strip + surrogate-safe cut); '#' is allowed:
   // table names are never whisper-addressed, so the player-name ban does
