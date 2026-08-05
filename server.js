@@ -683,7 +683,15 @@ function handleEvents(req, res, url) {
 
   if (res.socket) {
     res.socket.setNoDelay(true);
-    res.socket.setKeepAlive(true);
+    // Start TCP keepalive probes after 30s idle instead of the OS default
+    // (Linux 7200s / 2h). Linux tcp_keepalive_intvl=75s × tcp_keepalive_probes=9
+    // then catches a truly-dead peer in ~11 min. The 20s app-level heartbeat
+    // (broadcast to open streams) already surfaces most cable-yanks via TCP
+    // RTO exhaustion in ~15 min under Linux defaults, and the writableLength
+    // backpressure guard handles suspended-tab peers in <5s; this closes the
+    // rarer window where writes still succeed at the TCP layer but the peer
+    // is gone.
+    res.socket.setKeepAlive(true, 30_000);
   }
 
   // Cap streams per player: evict the oldest rather than reject, so a
