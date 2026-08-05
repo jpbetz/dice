@@ -30,7 +30,7 @@ import { THEMES, SETS } from './themes.js';
 import { ParticleField } from './particles.js';
 import { DecalField } from './decals.js';
 import { DieLightRig } from './dielights.js';
-import { PostStack } from './post.js';
+import { PostStack, MAX_SHIMMER } from './post.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -4052,17 +4052,32 @@ function tick(dt, render = true) {
 
 // Heat shimmer sources (Level 5): unshrouded dice of a shimmer set that
 // still live on the FELT — the shelf is the archive, its iron has cooled.
+//
+// Allocation shape (Tier 0 §0d hot-paths, 2026-08-05): the pool of
+// MAX_SHIMMER records + the outer array are hoisted to module scope and
+// reused every frame. collectShimmerSources fills slots by index and trims
+// SHIMMER_OUT.length; PostStack.setShimmer reads within that window. The
+// records ALIAS across frames by design — callers must not stash slots.
+const SHIMMER_POOL = Array.from({ length: MAX_SHIMMER }, () => ({ at: [0, 0, 0], radius: 0, strength: 0 }));
+const SHIMMER_OUT = [];
 function collectShimmerSources() {
-  const out = [];
+  let n = 0;
   for (const d of tableDice) {
+    if (n >= MAX_SHIMMER) break;
     if (d.shrouded || shelfClusters.has(d.rollId)) continue;
     const set = d.variant && SETS[d.variant];
     const s = set && set.post && set.post.shimmer;
     if (!s) continue;
-    out.push({ at: [d.mesh.position.x, d.mesh.position.y, d.mesh.position.z], radius: s.radius, strength: s.strength });
-    if (out.length >= 6) break;
+    const slot = SHIMMER_POOL[n];
+    slot.at[0] = d.mesh.position.x;
+    slot.at[1] = d.mesh.position.y;
+    slot.at[2] = d.mesh.position.z;
+    slot.radius = s.radius;
+    slot.strength = s.strength;
+    SHIMMER_OUT[n++] = slot;
   }
-  return out;
+  SHIMMER_OUT.length = n;
+  return SHIMMER_OUT;
 }
 
 // 'Clear table' exists only while there is a table to clear: dice on the

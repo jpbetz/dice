@@ -51,7 +51,9 @@
 import * as THREE from 'three';
 
 const MAX_RINGS = 4;
-const MAX_SHIMMER = 6;
+// Exported so main.js's SHIMMER_POOL sizing tracks this cap without a
+// hand-maintained magic number in two files (Tier 0 §0d hot-paths, 2026-08-05).
+export const MAX_SHIMMER = 6;
 
 const BLUR_FRAG = `
   uniform sampler2D tSrc;
@@ -196,7 +198,20 @@ export class PostStack {
 
     this.time = 0;
     this.rings = []; // {x, y, age, dur, amp, speed, width, jolt, phase}
-    this.shimmer = []; // vec4-shaped [x, y, radius, strength]
+    // vec4-shaped [x, y, radius, strength]. Fixed pool of MAX_SHIMMER
+    // pre-allocated 4-slot arrays reused across frames (Tier 0 §0d hot-paths,
+    // 2026-08-05): setShimmer mutates in place and trims `.length`; readers
+    // still see `this.shimmer.length` as the live count. Do NOT stash slots
+    // between frames — the pool aliases across ticks by design.
+    this._shimmerPool = Array.from({ length: MAX_SHIMMER }, () => [0, 0, 0, 0]);
+    this.shimmer = [];
+    // Scratches reused inside setShimmer — a Vector2 for each of the two
+    // projected points, plus a 3-slot tuple for the [x, y+radius, z] world
+    // probe that used to be a fresh array literal per source per frame. Do
+    // NOT hold references outside setShimmer.
+    this._shimPx = new THREE.Vector2();
+    this._shimPx2 = new THREE.Vector2();
+    this._shimAt = [0, 0, 0];
     this.ringsFired = 0; // monotonic (assertion surface — sim clocks outrun live state)
     this.lastBloomSources = 0;
   }
@@ -229,18 +244,31 @@ export class PostStack {
   }
 
   // Replace this frame's shimmer sources: [{at: [x,y,z], radius, strength}]
-  // — radius in world units, strength in px of wobble.
+  // — radius in world units, strength in px of wobble. Reuses the pool of
+  // MAX_SHIMMER vec4 slots + two Vector2 scratches + a 3-slot world-probe
+  // tuple; no per-frame allocations in this path (Tier 0 §0d, 2026-08-05).
   setShimmer(list, camera) {
-    this.shimmer.length = 0;
-    for (const s of list.slice(0, MAX_SHIMMER)) {
-      const p = this._toPx(s.at, camera, new THREE.Vector2());
-      // world radius → px: project a point one radius up and measure
-      const q = this._toPx([s.at[0], s.at[1] + s.radius, s.at[2]], camera, new THREE.Vector2());
+    const n = Math.min(list.length, MAX_SHIMMER);
+    for (let i = 0; i < n; i++) {
+      const s = list[i];
+      const p = this._toPx(s.at, camera, this._shimPx);
+      // world radius → px: project a point one radius up and measure.
+      // Reuse the scratch tuple so this branch stays alloc-free.
+      this._shimAt[0] = s.at[0];
+      this._shimAt[1] = s.at[1] + s.radius;
+      this._shimAt[2] = s.at[2];
+      const q = this._toPx(this._shimAt, camera, this._shimPx2);
       const rPx = Math.max(Math.hypot(q.x - p.x, q.y - p.y), 24);
       // biased well above the die: hot air wobbles the world BEHIND and
       // OVER the iron; the die's own base stays believable
-      this.shimmer.push([p.x, p.y - rPx * 0.85, rPx * 1.25, s.strength]);
+      const slot = this._shimmerPool[i];
+      slot[0] = p.x;
+      slot[1] = p.y - rPx * 0.85;
+      slot[2] = rPx * 1.25;
+      slot[3] = s.strength;
+      this.shimmer[i] = slot;
     }
+    this.shimmer.length = n;
   }
 
   busy() {
