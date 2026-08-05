@@ -663,7 +663,10 @@ const rollQueue = [];      // rolls waiting while a playback is in flight (FIFO)
 // a departing die must not deflect a later fast-forward. Rolls cleared while
 // still mid-playback (or queued) defer removal until their playback settles.
 const CLEAR_SINK_S = 0.3;
-let sinking = [];                // {mesh, chip, t, y0}
+// {mesh, chip, t, y0}. `mesh` MAY be null — a marker-only record (a shelf
+// cluster with no dice left on the felt) rides the same sink timer to keep
+// its chip fade dt-driven without stealing another record's mesh ref.
+let sinking = [];
 const pendingClears = new Set(); // rollIds whose removal is deferred
 
 // Reveal (goal 11): a reveal landing while its roll is still mid-playback or
@@ -826,16 +829,19 @@ function stepSinking(dt) {
   for (const s of sinking) {
     s.t += dt;
     const p = Math.min(s.t / CLEAR_SINK_S, 1);
-    s.mesh.position.y = s.y0 - p * 2.4;
-    s.mesh.scale.setScalar(1 - 0.35 * p);
+    if (s.mesh) {
+      s.mesh.position.y = s.y0 - p * 2.4;
+      s.mesh.scale.setScalar(1 - 0.35 * p);
+    }
     if (s.t >= CLEAR_SINK_S) anyDone = true;
   }
   if (!anyDone) return;
   sinking = sinking.filter((s) => {
     if (s.t < CLEAR_SINK_S) return true;
     // Geometry/materials are shared per die type (js/dice.js cache): drop the
-    // mesh from the scene and dispose nothing.
-    scene.remove(s.mesh);
+    // mesh from the scene and dispose nothing. `mesh` may be null for a
+    // marker-only sink record — skip it in that case.
+    if (s.mesh) scene.remove(s.mesh);
     if (s.chip) s.chip.remove();
     return false;
   });
@@ -844,7 +850,7 @@ function stepSinking(dt) {
 // Instantly flush any in-flight sinks (table reset / full sweep).
 function finishSinkingNow() {
   for (const s of sinking) {
-    scene.remove(s.mesh);
+    if (s.mesh) scene.remove(s.mesh);
     if (s.chip) s.chip.remove();
   }
   sinking = [];
@@ -895,13 +901,15 @@ function applyClearRoll(rollId) {
   whisking = whisking.filter((w) => w.die.rollId !== rollId);
   const hadDice = removeRollDice(rollId);
   // A shelved roll sinks marker and cluster together (§7.7 aging): the marker
-  // rides the last sink record so stepSinking fades and drops it dt-driven.
+  // rides its OWN sink record so stepSinking fades and drops it dt-driven —
+  // never overwrite a die's chip ref (that stranded the die's chip in the
+  // DOM, growing #chips-layer forever on endurance runs, Tier 0e).
   const cluster = shelfClusters.get(rollId);
   if (cluster) {
     shelfClusters.delete(rollId);
     if (cluster.markerEl) {
       cluster.markerEl.classList.add('chip-clearing');
-      if (hadDice && sinking.length) sinking[sinking.length - 1].chip = cluster.markerEl;
+      if (hadDice) sinking.push({ mesh: null, chip: cluster.markerEl, t: 0, y0: 0 });
       else cluster.markerEl.remove();
     }
     // The shelf closes up behind it: everything newer slides one slot left.

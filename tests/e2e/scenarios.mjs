@@ -419,6 +419,39 @@ export const scenarios = [
     },
   },
   {
+    name: 'shelve-clear-no-chip-leak',
+    tags: ['shelf', 'perf'],
+    // Tier 0e endurance: the shelf marker sinks on its OWN record — it must
+    // not overwrite a die's chip ref, or the die's chip leaks into
+    // #chips-layer forever. Two full shelve+clear cycles catch the per-cycle
+    // accumulation the old ternary would have hidden on a single pass.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      assert.equal(await a.dbg('setChipsVisible(true)'), true, 'chips visible for the leak surface');
+      for (let cycle = 0; cycle < 2; cycle++) {
+        await a.roll('2d6');
+        const rid = await a.rollId();
+        assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, `collect #${cycle + 1}`);
+        await a.waitFor(
+          `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+          { desc: `shelve cycle ${cycle + 1}` },
+        );
+        assert.equal(await a.dbg(`clearRoll(${JSON.stringify(rid)})`), true, `clear #${cycle + 1}`);
+        // CLEAR_SINK_S = 0.3 s (main.js §7.5); sim generously past that to
+        // let stepSinking's filter drop every finished record.
+        await a.waitFor(
+          `(window.__diceDebug.sim(600), window.__diceDebug.shelf.length === 0`
+            + ` && window.__diceDebug.tableDice.length === 0`
+            + ` && window.__diceDebug.sinkingCount === 0)`,
+          { desc: `cycle ${cycle + 1} sinks drained` },
+        );
+        const chipDom = await a.eval(`document.getElementById('chips-layer').childElementCount`);
+        assert.equal(chipDom, 0,
+          `#chips-layer emptied after cycle ${cycle + 1} (got ${chipDom} stranded — the shelf marker stole a die's chip ref)`);
+      }
+    },
+  },
+  {
     name: 'chips-quiet-default',
     tags: ['smoke', 'roll'],
     // Quiet by default (P1): the floating die numbers are opt-in. Results
