@@ -377,6 +377,15 @@ export class Ctx {
         await page.addInitScript(
           `try { localStorage.setItem('dice.name.v1', ${JSON.stringify(name)}); } catch {}`,
         );
+      } else if (anon) {
+        // Anonymous means anonymous. Names live in per-origin localStorage,
+        // which OUTLIVES a scenario's room — so merely declining to seed one
+        // leaves whatever an earlier scenario stored on this origin, the tab
+        // joins straight through, and the seat modal never opens. That failed
+        // only in a full sweep, which is the worst way to find out.
+        await page.addInitScript(
+          `try { localStorage.removeItem('dice.name.v1'); } catch {}`,
+        );
       }
       const url = `http://${origin}:${this.port}/?room=${encodeURIComponent(this.room)}${query}`;
       await page.navigate(url);

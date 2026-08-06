@@ -2627,6 +2627,12 @@ export const scenarios = [
     // notation trap survives the round trip (quoted scalars).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      // Establish the precondition rather than inherit it: 'dice.chips.v1'
+      // lives in per-origin localStorage, which OUTLIVES a scenario's room,
+      // and earlier localhost scenarios (shelve-clear-no-chip-leak) leave it
+      // ON. Without this the 'numbers on' flip below is invisible and the
+      // scenario fails only in a full sweep — the worst kind of failure.
+      await a.dbg('setChipsVisible(false)');
       await a.dbg(`setGroups([{name: 'Body', notation: '3d6', category: 'Attributes'},
         {name: 'Damage', notation: '3d4'},
         {name: 'Hunt', notation: '2d6 # To the death'}])`);
@@ -4008,7 +4014,13 @@ export const scenarios = [
       assert.equal(stillInfo.length, 1, 'one die at rest');
       assert.equal(stillInfo[0].kind, 'still', 'sapamber declares still on purpose');
       assert.equal(stillInfo[0].deltaY, 0, 'sapamber does not drift');
-      assert.equal(stillInfo[0].tiltRad, 0, 'sapamber does not tilt');
+      // Near-zero, not bit-zero: tiltRad is DERIVED from the die's resting
+      // orientation rather than assigned by the cadence, so it carries float
+      // noise from wherever the die happened to settle (seen: 2.98e-8, one
+      // float32 ulp). 1e-6 rad is 6e-5 degrees — indistinguishable from still
+      // by any measure that matters, and still 30x tighter than the noise.
+      assert.ok(Math.abs(stillInfo[0].tiltRad) < 1e-6,
+        `sapamber does not tilt (got ${stillInfo[0].tiltRad})`);
 
       // Sea-glass: SWELLS — motion must appear in the sample window, and
       // the tilt must stay within the readable envelope (< 0.006 rad,

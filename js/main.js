@@ -9392,7 +9392,7 @@ function portableSaveToProfile(name) {
   const prof = portableFindProfile(name);
   if (!prof) return portableRefuse(`✗ no player ${JSON.stringify(String(name == null ? '' : name).trim())} in this file — Save as new profile adds one`);
   if (groups.length > PORTABLE_MAX_POOLS_PER_PLAYER) {
-    return portableRefuse(`✗ your rack holds ${groups.length} pools — a profile carries at most ${PORTABLE_MAX_POOLS_PER_PLAYER}`);
+    return portableRefuse(`✗ you have ${groups.length} pools — a profile carries at most ${PORTABLE_MAX_POOLS_PER_PLAYER}`);
   }
   const others = portableParsed.profiles.reduce((n, p) => n + (p === prof ? 0 : profilePoolCount(p)), 0);
   const top = portableParsed.shelves.reduce((n, s) => n + s.pools.length, 0);
@@ -9425,7 +9425,7 @@ function portableAddProfile(rawName) {
     return portableRefuse(`✗ the file already holds ${PORTABLE_MAX_PROFILES} players`);
   }
   if (groups.length > PORTABLE_MAX_POOLS_PER_PLAYER) {
-    return portableRefuse(`✗ your rack holds ${groups.length} pools — a profile carries at most ${PORTABLE_MAX_POOLS_PER_PLAYER}`);
+    return portableRefuse(`✗ you have ${groups.length} pools — a profile carries at most ${PORTABLE_MAX_POOLS_PER_PLAYER}`);
   }
   const others = portableParsed.profiles.reduce((n, p) => n + profilePoolCount(p), 0);
   const top = portableParsed.shelves.reduce((n, s) => n + s.pools.length, 0);
@@ -9572,12 +9572,12 @@ function renderPortableProfiles() {
     const editBtn = document.createElement('button');
     editBtn.className = 'btn tiny';
     editBtn.textContent = 'Edit';
-    editBtn.title = `Load ${p.name}’s pools into your rack to edit and price — your own pools are set aside first`;
+    editBtn.title = `Load ${p.name}’s pools in to edit and price — your own pools are set aside first`;
     editBtn.addEventListener('click', () => portableEditProfile(p.name));
     const saveBtn = document.createElement('button');
     saveBtn.className = 'btn tiny';
     saveBtn.textContent = 'Save to';
-    saveBtn.title = `Overwrite ${p.name} in the text with the pools now on your rack`;
+    saveBtn.title = `Overwrite ${p.name} in the text with the pools you have now`;
     saveBtn.addEventListener('click', () => portableSaveToProfile(p.name));
     row.append(editBtn, saveBtn);
     rows.appendChild(row);
