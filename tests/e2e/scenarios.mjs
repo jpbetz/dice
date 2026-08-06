@@ -2447,9 +2447,6 @@ export const scenarios = [
         .includes('3×d6'), 'the bar is labeled with count and rank');
       assert.equal(await a.eval(`document.querySelectorAll('#pop-preview .fc-seg').length`), 5,
         'five segments in the chart’s own row order');
-      assert.equal(await a.eval(
-        `[...document.querySelectorAll('#pop-preview .fc-mark')].map((m) => m.textContent).join(' ')`),
-        'F P S S+', 'marks ride the segments that fit; quiet is unmarked');
       // hovering a segment names it in the fixed readout below the bar
       await a.eval(`document.querySelectorAll('#pop-preview .fc-seg')[3]
         .dispatchEvent(new MouseEvent('mouseenter'))`);

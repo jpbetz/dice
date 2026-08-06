@@ -22,7 +22,7 @@ import * as CANNON from 'cannon-es';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, SHADER_TIME } from './dice.js';
 import { dieArtURL } from './diceart.js';
 import { connect, forgetSeat } from './net.js';
-import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_MARKS, OUTCOME_SLUGS } from './meanings.js';
+import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, validateMods, budgetOf } from './rollspec.js';
 import { previewOf, countingPmfs } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
@@ -7522,12 +7522,6 @@ function buildForecast(fcast, visSuffix) {
         const seg = document.createElement('i');
         seg.className = 'fc-seg ' + (s.word ? `fc-w-${OUTCOME_SLUGS[s.word]}` : 'fc-quiet');
         seg.style.width = `${s.p * 100}%`;
-        if (s.word && s.p >= 0.08) {
-          const m = document.createElement('b');
-          m.className = 'fc-mark';
-          m.textContent = OUTCOME_MARKS[s.word] || '';
-          seg.appendChild(m);
-        }
         const mid = at + s.p / 2;
         seg.addEventListener('mouseenter', () => {
           readText.textContent = `${s.word || 'quiet'} · ${Math.round(s.p * 100) || '<1'}%`;

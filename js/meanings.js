@@ -65,25 +65,6 @@ const TIERS = {
   'Critical Success': 'crit-success',
 };
 
-// Segment marks for the spectrum bars (§2l ④, Joe 2026-08-06): small
-// letters on the bar itself, a hover legend spelling them out. Quiet is
-// deliberately unmarked — the silence needs no initial. Every worded row
-// must have a distinct mark (the unit suite pins totality).
-export const OUTCOME_MARKS = {
-  'Critical Fail': 'CF',
-  'Fail': 'F',
-  'Mishap': 'MH',
-  'Blemish': 'B',
-  'Minimal Success': 'Mn',
-  'Minor Success': 'Mi',
-  'Partial Success': 'P',
-  'Success': 'S',
-  'Success & Bonus': 'S+',
-  'Advantage': 'A',
-  'Success & Perm Bonus': 'SP',
-  'Critical Success': 'CS',
-};
-
 // The one worst→best ladder every rank column embeds as a subsequence
 // (pinned by unit test) — the collapsed forecast lays its mixture out in
 // this order, so the average never contradicts any die's own order.

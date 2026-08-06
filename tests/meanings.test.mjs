@@ -21,7 +21,7 @@ limitations under the License.
 // gate wholesale.
 
 import assert from 'node:assert/strict';
-import { outcomeForDie, SYSTEMS, OUTCOME_MARKS, OUTCOME_LADDER } from '../js/meanings.js';
+import { outcomeForDie, SYSTEMS, OUTCOME_LADDER } from '../js/meanings.js';
 import { countingPmfs } from '../js/odds.js';
 import { composeRoll } from '../js/rollspec.js';
 
@@ -204,19 +204,6 @@ t('cap-truncated rerolls refuse rather than print an untruncated transform', () 
   const voided = fc(Array(40).fill('d6'), { reroll: { below: 3 } });
   assert.equal(voided.kind, 'per-die');
   assert.deepEqual(voided.bars, fc(Array(40).fill('d6')).bars);
-});
-
-t('every worded chart row has a distinct segment mark', () => {
-  const words = new Set();
-  for (const dice of [['d4'], ['d6'], ['d8'], ['d10'], ['d12'], ['d20']]) {
-    for (const s of fc(dice).bars[0].segments) if (s.word) words.add(s.word);
-  }
-  const marks = new Set();
-  for (const w of words) {
-    assert.ok(OUTCOME_MARKS[w], `mark missing for ${w}`);
-    marks.add(OUTCOME_MARKS[w]);
-  }
-  assert.equal(marks.size, words.size, 'no two words share a mark');
 });
 
 t('every column embeds OUTCOME_LADDER as a subsequence', () => {

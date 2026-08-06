@@ -3192,11 +3192,6 @@ body.mini #result-verdict { font-size: 11px; }
 .pop-preview .fc-seg { display: block; height: 100%; position: relative; min-width: 2px; }
 .pop-preview .fc-seg + .fc-seg { border-left: 1px solid rgba(12, 10, 8, 0.7); }
 .pop-preview .fc-quiet + .fc-seg, .pop-preview .fc-seg + .fc-quiet { border-left-color: rgba(12, 10, 8, 0.45); }
-.pop-preview .fc-mark {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-  font-size: 8px; font-weight: 600; font-style: normal; letter-spacing: 0.02em;
-  color: rgba(243, 234, 215, 0.8); pointer-events: none;
-}
 .pop-preview .fc-read {
   display: block; position: relative; height: 17px; margin-top: 6px;
   border: 1px solid var(--hair); border-radius: 3px;
