@@ -11,6 +11,119 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Tier G — Game night: the prepared table (2026-08-06)
+
+Design authority: [PROFILES.md](PROFILES.md). Built in one pass against a
+fixed date — Joe's *Your Soul Deal* game on 2026-08-13 — so the sequence
+was chosen for "playable if we stop here" rather than for tidiness. The
+shape the whole tier rests on: **the file is the truth, the room is a
+convenience, the link is an address**, which is what let it land without
+amending goal 7.
+
+### G0. Pre-flight — SHIPPED 2026-08-06 (`6c7ca9f`)
+
+The two ROADMAP §0i/§0j patches that only cost anything if they are
+missing on game day. `package.json` engines went from `>=18` to
+`>=22 <25`: the old range let the Cloud Run buildpack pick a new major
+silently, *on the deploy itself*. A bare `24.x` was rejected as the fix —
+it converts a missing runtime on the buildpack into a deploy-day failure,
+whereas the range blocks the silent jump while still landing on 24 (what
+the tree is actually tested against) or falling back to 22. Node >=22 was
+already a hard floor: the e2e harness drives CDP over Node's built-in
+WebSocket.
+
+`uncaughtException` now logs the stack and exits 1 instead of limping on
+with half-torn-down streams. Armed under `IS_MAIN` only — the redaction
+suite imports server.js in-process and its own failures must not become a
+process exit.
+
+### G1. The file door — SHIPPED 2026-08-06 (`e2a3b9d`)
+
+Settings → *Your data* can finally put the rack on disk and take it back:
+`#portable-download` (Blob + `a[download]`, reserializing a fresh
+snapshot rather than the textarea's scratch text) and `#portable-openfile`
+→ hidden `#portable-file`, read with `File.text()`. **Open only fills the
+textarea and calls the existing `portablePreview()`** — there is
+deliberately no second import path, because preview-then-apply is the
+whole safety contract (GOALS §7's `#g=` post-mortem).
+
+Filename is `<slug>-YYYY-MM-DD.dice.yaml`, slug from the table name, else
+the `?room=` key, else `dice-table`. Oversize (>512 KB) refuses by name
+and size and **disarms Apply**, so a refusal can never leave a stale plan
+armed. `__diceDebug.portable = {snapshot, filename, loadText, acceptFile,
+maxBytes}`; e2e `file-door` (`bbd69ce`) drives the real picked-file path
+through `DataTransfer` because Chrome forbids assigning `input.files`.
+
+### G2. The table file — SHIPPED 2026-08-06 (`b6a0828`)
+
+`js/portable.js` grew `table:` and `players:`, both present-or-absent so
+every file that parsed before still parses byte-identically. A player
+block **nests `pools:`** rather than putting shelves at the name's depth:
+shelf labels are user-authored, so a shelf named `set` or `pools` is
+legal, and nesting puts the reserved keys where a shelf can never appear.
+The inner block is the same grammar as the top-level one — one shelf/pool
+parser, called at two base indents.
+
+Caps: `MAX_POOLS_PER_PLAYER = 40` (top level *and* per profile),
+`MAX_POOLS_PER_FILE = 300`, `MAX_PROFILES = 12`. The document cap could
+not be both derived and reachable — 12×40+40 = 520, so anything ≥520 is
+dead code — so 300 was chosen as a genuine second constraint that names
+itself in its error.
+
+**Unknown top-level sections now skip and warn** instead of aborting the
+document, closing the forward-compatibility question POOL-ANALYSIS §9 left
+open; a top-level line that is not *section-shaped* still refuses, and a
+known section's contents stay strict. An unknown section's body is not
+examined at all, so a future section written with tabs cannot break the
+document the skip exists to save. `#` in a profile name is a line-numbered
+refusal (a profile name becomes a display name, and display names are
+whisper addresses) while `#` in `tableName` stays legal — the asymmetry
+the server already had, now matched rather than quietly diverged from.
+Tests 25 → 57.
+
+### G4. The room setup key — SHIPPED 2026-08-06 (`326f1cd`)
+
+`POST /api/table` → `room.setup = {rev, table, profiles, at}`, echoed
+present-or-absent in `/api/join` and `hello` (so unprepared rooms stay
+byte-identical on the wire) and broadcast as `table-setup`. Settings ride
+the **existing** validator and echo — `validateSettingsPatch` +
+`commitSettings` were factored out of `/api/settings` and shared, so a
+setup push fires the same `settings-changed` every other settings write
+fires. Profiles go through the existing `sanitizePools` and `cleanName`.
+
+**Anyone may push it** (goal 10); last write wins, guarded by a monotonic
+`rev`. A stale push is a *silent no-op returning the winning rev*, not a
+409 — `net.js` turns every non-404 into a player-visible toast, and the
+loser of a two-tab race (or of §G6's re-push-on-hello, which races by
+design) did nothing wrong. Caps refuse (`bad_profiles`, `bad_pools`);
+unusable records drop (empty `cleanName`, duplicate names, unparseable
+notation). e2e `table-setup-wire` (`f0ba179`) drives it over raw HTTP+SSE
+with no client in the path and checks the setup **bytes** for `values` /
+`rollId` / `total` / `visibility`, because `projectEntryFor` must remain
+the only egress a roll entry ever takes.
+
+### G6 (server half). The room TTL — SHIPPED 2026-08-06 (`2802197`)
+
+`dropRoomIfEmpty` deleted a room the instant its last player left — so an
+organizer who set the felt, named the table and built six seats lost all
+of it by **walking away**, no restart required. That was the most
+surprising gap in the audit and the one this tier most exists to close.
+
+A room holding a `setup` now lingers: `log`, `offers`, `collectSeq` and
+`colorCursor` clear (per-session), `setup` and `settings` survive
+(per-preparation — the organizer chose that felt deliberately), and an
+`unref()`'d timer deletes it for real at `SETUP_TTL_MS` (12 h, overridable
+by `DICE_SETUP_TTL_MS` at boot, which is how the e2e tests it in seconds).
+A join cancels the timer through `getRoom`.
+
+**At `MAX_ROOMS` a new room evicts the oldest linger** — a
+prepared-but-empty room must never be why a group can't sit down, and
+without it a join-push-leave loop over 500 names could squat every slot
+for 12 hours. e2e `room-linger` (`8d5a001`) polls the server's own log,
+since a room lingering has no wire surface by definition.
+
+---
+
 ## Tier 0 — Performance & foundation (2026-08-04 audit)
 
 Bench + review pass 2026-08-04 (perf-audit workflow, 4 empirical benches
