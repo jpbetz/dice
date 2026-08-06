@@ -2429,7 +2429,7 @@ export const scenarios = [
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.dbg(`setSystem('soul-deal')`);
       await a.dbg(`setGroups([{name: 'Grit', notation: '3d6', category: 'Attributes'},
-        {name: 'Mixed', notation: '1d4+2d6'},
+        {name: 'Mixed', notation: '1d4+2d6'}, {name: 'Sliver', notation: '1d4+8d6'},
         {name: 'Kept', notation: '4d6dl1'}, {name: 'Fate', notation: '2d10x'}])`);
       await a.dbg('setPoolsEditMode(true)'); // the group door opens inside ✎
       const pool = async (name) => (await a.dbg('groups')).find((g) => g.name === name);
@@ -2469,6 +2469,15 @@ export const scenarios = [
       assert.equal(await a.eval(`document.querySelectorAll('#pop-preview .fc-row').length`), 2,
         "'per die' expands to the true rows");
       await a.eval(`document.querySelector('#pop-preview .fc-toggle').click()`);
+
+      // a sliver never disappears: too thin for an inside mark, its letter
+      // drops to the tick lane at the true midpoint (1d4+8d6 → Blemish 2.8%)
+      assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify((await pool('Sliver')).id)})`), true);
+      assert.equal(await a.eval(
+        `[...document.querySelectorAll('#pop-preview .fc-omark')].map((m) => m.textContent).join(' ')`),
+        'B Mn Mi', 'thin outcomes annotate below the bar');
+      assert.ok(await a.eval(`document.querySelectorAll('#pop-preview .fc-tick').length >= 3`),
+        'ticks anchor the true midpoints');
 
       assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify((await pool('Kept')).id)})`), true);
       assert.ok(/keep\/drop/.test(await a.eval(`document.getElementById('pop-preview').textContent`)),

@@ -110,6 +110,16 @@ function collapseBars(bars) {
   return { mixed: true, count: total, allQuiet: bars.every((b) => b.allQuiet), segments };
 }
 
+// CSS hooks for the per-word fills (the spectrum's sequential-within-tier
+// palette): tier = hue family, word = lightness step, so adjacent words
+// of one tier stay distinguishable.
+export const OUTCOME_SLUGS = {
+  'Critical Fail': 'cf', 'Fail': 'fail', 'Mishap': 'mishap', 'Blemish': 'blemish',
+  'Minimal Success': 'minimal', 'Minor Success': 'minor', 'Partial Success': 'partial',
+  'Success': 'success', 'Success & Bonus': 'bonus', 'Advantage': 'adv',
+  'Success & Perm Bonus': 'perm', 'Critical Success': 'crit',
+};
+
 // THE SOUL DEAL READ (corrected 2026-07-31, from the system's author):
 // dice values never sum. Each die is read INDIVIDUALLY — the chart's rank
 // columns (Mug ... Boaire) are DIE ranks, so a d4's face reads the d4

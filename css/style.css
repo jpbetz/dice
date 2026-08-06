@@ -3189,11 +3189,23 @@ body.mini #result-verdict { font-size: 11px; }
   display: flex; height: 13px; border-radius: 3px; overflow: hidden;
   border: 1px solid var(--hair); background: rgba(0, 0, 0, 0.25);
 }
-.pop-preview .fc-seg { display: block; height: 100%; position: relative; }
+.pop-preview .fc-seg { display: block; height: 100%; position: relative; min-width: 2px; }
+.pop-preview .fc-seg + .fc-seg { border-left: 1px solid rgba(12, 10, 8, 0.7); }
+.pop-preview .fc-quiet + .fc-seg, .pop-preview .fc-seg + .fc-quiet { border-left-color: rgba(12, 10, 8, 0.45); }
 .pop-preview .fc-mark {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font-size: 8px; font-weight: 600; font-style: normal; letter-spacing: 0.02em;
   color: rgba(243, 234, 215, 0.8); pointer-events: none;
+}
+.pop-preview .fc-lane { display: block; position: relative; height: 11px; }
+.pop-preview .fc-tick {
+  position: absolute; top: 0; width: 1px; height: 3px;
+  background: rgba(243, 234, 215, 0.5);
+}
+.pop-preview .fc-omark {
+  position: absolute; top: 2px; transform: translateX(-50%);
+  font-size: 8px; font-weight: 600; font-style: normal;
+  color: rgba(243, 234, 215, 0.7);
 }
 .pop-preview .fc-toggle { display: block; margin-top: 4px; font-size: 10px; }
 .pop-preview .fc-legend {
@@ -3203,11 +3215,21 @@ body.mini #result-verdict { font-size: 11px; }
 .pop-preview.fc:hover .fc-legend,
 .pop-preview.fc:focus-within .fc-legend { display: block; }
 .pop-preview .fc-quiet { background: rgba(243, 234, 215, 0.07); }
-.pop-preview .fc-crit-fail { background: rgba(226, 73, 59, 0.6); }
-.pop-preview .fc-fail { background: rgba(224, 123, 110, 0.42); }
-.pop-preview .fc-success-soft { background: rgba(205, 190, 138, 0.38); }
-.pop-preview .fc-success { background: rgba(255, 215, 102, 0.45); }
-.pop-preview .fc-crit-success { background: rgba(255, 226, 122, 0.65); }
+/* sequential within-tier fills (ColorBrewer discipline): tier = hue
+   family, word = a distinct lightness step, so Fail · Mishap · Blemish
+   never read as one band */
+.pop-preview .fc-w-cf      { background: rgba(226, 73, 59, 0.72); }
+.pop-preview .fc-w-fail    { background: rgba(217, 105, 92, 0.48); }
+.pop-preview .fc-w-mishap  { background: rgba(172, 74, 64, 0.60); }
+.pop-preview .fc-w-blemish { background: rgba(240, 158, 143, 0.42); }
+.pop-preview .fc-w-minimal { background: rgba(205, 190, 138, 0.26); }
+.pop-preview .fc-w-minor   { background: rgba(205, 190, 138, 0.40); }
+.pop-preview .fc-w-partial { background: rgba(214, 197, 142, 0.55); }
+.pop-preview .fc-w-success { background: rgba(255, 215, 102, 0.42); }
+.pop-preview .fc-w-bonus   { background: rgba(255, 215, 102, 0.58); }
+.pop-preview .fc-w-adv     { background: rgba(240, 182, 77, 0.55); }
+.pop-preview .fc-w-perm    { background: rgba(232, 168, 62, 0.68); }
+.pop-preview .fc-w-crit    { background: rgba(255, 226, 122, 0.78); }
 .pop-preview .fc-allquiet { font-style: italic; color: var(--muted); }
 .pop-preview .fc-vis { display: block; margin-top: 6px; color: var(--muted); }
 .pop-actions { display: flex; gap: 8px; padding: 10px 14px 0; }

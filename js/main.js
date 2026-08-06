@@ -22,7 +22,7 @@ import * as CANNON from 'cannon-es';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, SHADER_TIME } from './dice.js';
 import { dieArtURL } from './diceart.js';
 import { connect, forgetSeat } from './net.js';
-import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_MARKS } from './meanings.js';
+import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_MARKS, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, validateMods, budgetOf } from './rollspec.js';
 import { previewOf, countingPmfs } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
@@ -7504,22 +7504,50 @@ function buildForecast(fcast, visSuffix) {
       const geo = document.createElement('span');
       geo.className = 'fc-geo';
       geo.setAttribute('aria-hidden', 'true');
+      // Slivers stay honest the way mosaic plots keep them honest: true
+      // widths (2px minimum stroke, 1px rules between segments — CSS), and
+      // marks that cannot fit INSIDE drop to a tick lane below at their
+      // real midpoint. Never a stretched segment.
+      const lane = [];
+      let at = 0;
       for (const s of bar.segments) {
         const seg = document.createElement('i');
-        seg.className = 'fc-seg' + (s.tier ? ` fc-${s.tier}` : ' fc-quiet');
+        seg.className = 'fc-seg ' + (s.word ? `fc-w-${OUTCOME_SLUGS[s.word]}` : 'fc-quiet');
         seg.style.width = `${s.p * 100}%`;
         seg.title = `${s.word || 'quiet'} — ${Math.round(s.p * 100)}%`;
-        // marks only where they fit (~8% of the track); the hover legend
-        // and the title carry the narrow ones. quiet stays unmarked.
         if (s.word && s.p >= 0.08) {
           const m = document.createElement('b');
           m.className = 'fc-mark';
           m.textContent = OUTCOME_MARKS[s.word] || '';
           seg.appendChild(m);
+        } else if (s.word && s.p > 0) {
+          lane.push({ mid: at + s.p / 2, mark: OUTCOME_MARKS[s.word] || '' });
         }
         geo.appendChild(seg);
+        at += s.p;
       }
       row.append(text, geo);
+      if (lane.length) {
+        const lr = document.createElement('span');
+        lr.className = 'fc-lane';
+        lr.setAttribute('aria-hidden', 'true');
+        let edge = -Infinity;
+        for (const o of lane) {
+          const tick = document.createElement('i');
+          tick.className = 'fc-tick';
+          tick.style.left = `${o.mid * 100}%`;
+          lr.appendChild(tick);
+          const m = document.createElement('b');
+          m.className = 'fc-omark';
+          m.textContent = o.mark;
+          // labels dodge each other; the tick keeps the true position
+          const x = Math.min(Math.max(o.mid * 100, edge + 5.5), 98);
+          edge = x;
+          m.style.left = `${x}%`;
+          lr.appendChild(m);
+        }
+        row.appendChild(lr);
+      }
     }
     frag.appendChild(row);
   }
