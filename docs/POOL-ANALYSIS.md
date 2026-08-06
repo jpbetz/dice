@@ -492,6 +492,11 @@ label or a "composed pool" tooltip fails `npm test`.
   session-only. Note the gap that leaves — gating on `poolsEdit` forces
   `poolsOwner = null`, so the budget read is **your own rack only** and does
   not serve PROFILES CUJ1, the organizer arranging *someone else's* character.
+  *(Closed 2026-08-06 without touching §2l: [PROFILES.md](PROFILES.md) §4
+  makes authoring a **rack swap** — the organizer loads a profile into their
+  own rack, so the ledger, the bars and manage mode read it unmodified. The
+  alternative, parameterizing every management surface off `poolsOwner`, is
+  recorded there as rejected.)*
 
 ## 12. Goals served
 
