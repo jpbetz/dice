@@ -302,7 +302,11 @@ only number in the app that diverges per browser.
 - Every bar's segments sum to exactly 1.
 - `p(Success) === p(Success & Bonus)` at **every rank** — d4 0/0, d6 1/6, d8
   1/8, d10 1/10, d12 1/12, d20 2/20. A spectrum that ever draws those two
-  segments at different widths has a bug.
+  segments at different widths has a bug. *(Scope corrected during the ②
+  build, 2026-08-06: this holds for PLAIN spectra — equal face counts ×
+  uniform pmf. Advantage legitimately skews it, 52/400 vs 60/400, and a
+  reroll threshold at or above a Success face would too; the shipped unit
+  test pins the invariant on plain ranks only.)*
 
 ### 6.5 The aggregate reads, preserved but not shipped
 

@@ -143,6 +143,44 @@ function keptAtMax(mode, n, L, m) {
   return 0;
 }
 
+// Per-original-die counting pmf plus the cap facts it depends on. variant
+// records the advantage split ('adv'/'dis' on paired d20s, 'plain' on the
+// unpaired remainder of an adv pool) so per-die consumers can keep mixture
+// bars apart — above 20 d20s only some dice get partners.
+function buildCounting(dice, m) {
+  const len0 = dice.length;
+  const d20s = dice.reduce((s, t) => s + (t === 'd20' ? 1 : 0), 0);
+  const pairs = m.adv ? Math.min(d20s, Math.max(0, MAX_PHYSICAL_DICE - len0)) : 0;
+  const lenA = len0 + pairs;
+  let rerollTier = 'absent';
+  if (m.reroll) {
+    const slots = MAX_PHYSICAL_DICE - lenA;
+    rerollTier = slots <= 0 ? 'void' : len0 <= slots ? 'free' : 'binding';
+  }
+  let advLeft = pairs;
+  const entries = dice.map((t) => {
+    let q = plainPmf(t);
+    let variant = null;
+    if (m.adv && t === 'd20') {
+      if (advLeft > 0) { advLeft--; q = advPairPmf(m.adv); variant = m.adv; } else variant = 'plain';
+    }
+    if (rerollTier === 'free') q = rerollOnce(q, t, m.reroll.below);
+    return { q, variant };
+  });
+  return { pairs, lenA, rerollTier, entries };
+}
+
+// The per-die substrate for forecast reads (meanings.js gets this injected
+// as a tool — it stays dependency-free). Keep is NOT applied: whether a die
+// counts under keep is decided by the landing, so per-die consumers refuse
+// on mods.keep before calling. exact:false = the cap truncates rerolls
+// value-dependently (BINDING); the pmfs are then the untruncated transform
+// and callers must refuse rather than print them.
+export function countingPmfs(dice, mods) {
+  const { rerollTier, entries } = buildCounting(dice, mods || {});
+  return { pmfs: entries, exact: rerollTier !== 'binding' };
+}
+
 function hashStr(str) {
   let h = 1779033703 ^ str.length;
   for (let i = 0; i < str.length; i++) {
@@ -177,15 +215,7 @@ export function previewOf(dice, mods) {
   const min = composeRoll(dice, m, () => 0).total;
   const simMax = composeRoll(dice, m, () => 1 - Number.EPSILON).total;
 
-  const d20s = dice.reduce((s, t) => s + (t === 'd20' ? 1 : 0), 0);
-  const pairs = m.adv ? Math.min(d20s, Math.max(0, MAX_PHYSICAL_DICE - len0)) : 0;
-  const lenA = len0 + pairs;
-
-  let rerollTier = 'absent';
-  if (m.reroll) {
-    const slots = MAX_PHYSICAL_DICE - lenA;
-    rerollTier = slots <= 0 ? 'void' : len0 <= slots ? 'free' : 'binding';
-  }
+  const { lenA, rerollTier, entries } = buildCounting(dice, m);
 
   let keepN = 0;
   let keptCount = len0;
@@ -221,16 +251,9 @@ export function previewOf(dice, mods) {
     return { min, avg: sum / SAMPLES, max: Math.max(simMax, smax), exact: false };
   }
 
-  // Per-original-die counting pmf: composeRoll pairs the first d20s in list
-  // order, resolves each pair to one counting value, then rerolls counting
-  // dice — winners included.
-  let advLeft = pairs;
-  const qs = dice.map((t) => {
-    let q;
-    if (t === 'd20' && advLeft > 0) { advLeft--; q = advPairPmf(m.adv); } else q = plainPmf(t);
-    if (rerollTier === 'free') q = rerollOnce(q, t, m.reroll.below);
-    return q;
-  });
+  // composeRoll pairs the first d20s in list order, resolves each pair to
+  // one counting value, then rerolls counting dice — winners included.
+  const qs = entries.map((e) => e.q);
 
   let avg;
   if (m.keep) {

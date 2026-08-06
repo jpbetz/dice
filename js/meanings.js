@@ -80,6 +80,25 @@ export function outcomeForDie(type, value) {
   return { word, tier: TIERS[word], rank: CHART[column].rank, column: `d${column}` };
 }
 
+// A die's whole probability mass in its column's own row order (ROADMAP
+// §2l): one tier-colored segment per word run, the null run rendered as one
+// quiet segment — quiet is a designed answer, not missing data. Rankless
+// dice (d10x) are a single quiet segment. q maps value → probability
+// (Map#get), injected by the caller so this module stays dependency-free.
+function segmentsFor(type, q) {
+  const column = CHART[DIE_MAX[type]];
+  if (!column) return [{ word: null, tier: null, p: 1 }];
+  const segs = [];
+  column.rows.forEach((word, idx) => {
+    const w = word || null;
+    const p = q.get(idx + 1) || 0;
+    const last = segs[segs.length - 1];
+    if (last && last.word === w) last.p += p;
+    else segs.push({ word: w, tier: w ? TIERS[w] : null, p });
+  });
+  return segs;
+}
+
 // ---------------------------------------------------------------------------
 // Interpretation system profiles (GOALS.md goal 6, ROADMAP §2). The room
 // setting `system` (server SETTING_SPECS) picks which profile reads a roll's
@@ -101,6 +120,13 @@ export function outcomeForDie(type, value) {
 //               systems (quiet dice carry word/tier null), else null
 //   meaningFor  the sum-world hero word (per-die systems return null)
 //   critFor(entry) -> 'success' | 'fail' | null
+//   forecastFor(spec, tools) -> the pre-roll read of a spec (ROADMAP §2l),
+//               or null when the profile has none (sum profiles until the
+//               sum read ships). tools injects the math — countingPmfs from
+//               js/odds.js — so this module stays dependency-free. Returns
+//               {kind:'per-die', bars:[{source, type, rank, count, variant,
+//               allQuiet, segments:[{word, tier, p}]}]} with segments in
+//               chart row order, or {kind:'refusal', reason}.
 export const SYSTEMS = {
   'soul-deal': {
     id: 'soul-deal',
@@ -126,6 +152,42 @@ export const SYSTEMS = {
       if (os.some((o) => o.tier === 'crit-fail')) return 'fail';
       return null;
     },
+    // THE NO-AGGREGATION LAW (docs/POOL-ANALYSIS.md §2, Joe 2026-08-05):
+    // every number describes exactly one die — the joint distribution
+    // factorizes, so the per-die spectrum IS the distribution, not a
+    // summary. Identical (source, rank, transform) dice share one bar:
+    // deduplication, not aggregation. Keep/drop decides which dice count
+    // only after they land, so it has no per-die forecast (naive 4d6dl1
+    // would print Fail 0.500 where the truth is 0.151) — refused in the
+    // sysnote's voice. Explosion changes nothing here: children are
+    // filtered from outcomesFor and base dice keep counting.
+    forecastFor(spec, tools) {
+      if (!spec || !Array.isArray(spec.dice) || !spec.dice.length) return null;
+      const mods = spec.mods || null;
+      if (mods && mods.keep) {
+        return { kind: 'refusal', reason: 'keep/drop picks which dice count after they land — no per-die read before the roll' };
+      }
+      const built = tools.countingPmfs(spec.dice, mods);
+      if (!built.exact) {
+        return { kind: 'refusal', reason: 'more rerolls than the 40-die cap can hold — which dice reroll depends on the landing' };
+      }
+      const bars = new Map();
+      spec.dice.forEach((t, i) => {
+        const source = spec.sources ? (spec.sources[i] || null) : null;
+        const { q, variant } = built.pmfs[i];
+        // '#' is banned from source labels at every entry point, so this
+        // key cannot collide however a label is spelled.
+        const key = `${source ?? ''}#${t}#${variant ?? ''}`;
+        const seen = bars.get(key);
+        if (seen) { seen.count++; return; }
+        const column = CHART[DIE_MAX[t]] || null;
+        bars.set(key, {
+          source, type: t, rank: column ? column.rank : null, count: 1, variant,
+          allQuiet: !column, segments: segmentsFor(t, q),
+        });
+      });
+      return { kind: 'per-die', bars: [...bars.values()] };
+    },
   },
   dnd: {
     id: 'dnd',
@@ -144,6 +206,7 @@ export const SYSTEMS = {
       if (d20s.some((p) => p.value === 1)) return 'fail';
       return null;
     },
+    forecastFor: () => null, // the sum read ships in §2l ⑥
   },
   none: {
     id: 'none',
@@ -154,6 +217,7 @@ export const SYSTEMS = {
     meaningFor: () => null,
     outcomesFor: () => null,
     critFor: () => null,
+    forecastFor: () => null, // the sum read ships in §2l ⑥
   },
 };
 
