@@ -7210,6 +7210,10 @@ function renderPopIdentity() {
   // own set, and 'Standard' PINS the classics even when you wear a house
   // set (the wire keeps its present-or-absent rule — std resolves to
   // absent at roll time).
+  const setLabel = document.createElement('span');
+  setLabel.className = 'plabel pid-set-label';
+  setLabel.textContent = 'Set';
+  popIdentityEl.appendChild(setLabel);
   const setRow = document.createElement('div');
   setRow.className = 'pid-row pid-set';
   setRow.appendChild(buildSetSelect({
@@ -7671,7 +7675,10 @@ function renderPop() {
   // Target = the DC field above.
   segSet(popSegExp, pop.expKind || '');
   popExpSubtitle.disabled = !pop.expKind;
-  document.getElementById('pop-exp-sub-field').classList.toggle('dim', !pop.expKind);
+  // subtitle and comment/mat text exist only inside a moment (Joe
+  // 2026-08-06); a stored comment still rides the canonical while hidden
+  document.getElementById('pop-exp-sub-field').classList.toggle('hidden', !pop.expKind);
+  document.getElementById('pop-comment-field').classList.toggle('hidden', !pop.expKind);
   document.getElementById('pop-exp-sub').textContent = pop.expKind
     ? 'title = comment · target = the DC above'
     : '';

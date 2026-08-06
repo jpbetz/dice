@@ -3214,8 +3214,13 @@ body.mini #result-verdict { font-size: 11px; }
 .pop-actions:last-child, .pop-actions-2nd { padding-bottom: 14px; }
 .pop-actions .btn { flex: 1; }
 /* per-source commit chrome (Trigger Pass): Save is pool-only, Open in
-   draft is shelf-only */
-#pop-save.hidden, #pop-todraft.hidden { display: none; }
+   draft is shelf-only. The head name yields to the identity strip's
+   editable name on pool popovers (it toggled 'hidden' since the Sheet
+   Pass but no rule ever hid it — the double-title bug). Subtitle and
+   comment exist only inside a Check/Cinematic moment (Joe 2026-08-06). */
+#pop-save.hidden, #pop-todraft.hidden, #pop-name.hidden,
+#pop-exp-sub-field.hidden, #pop-comment-field.hidden { display: none; }
+#pop-identity .pid-set-label { margin: 10px 0 4px; }
 /* the popover's inline save morph (same flow as the New pool panel's) */
 #pop-save-row.hidden, #mods-popover .pop-actions-2nd.hidden { display: none; }
 /* D2 AGAIN (2026-08-04): no bare `.hidden` rule exists in this codebase, so
