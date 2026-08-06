@@ -5118,4 +5118,117 @@ export const scenarios = [
         'and comes back at the defaults, not the old table dressed as new');
     },
   },
+  {
+    name: 'profile-swap',
+    tags: ['table-file', 'groups'],
+    // ROADMAP §G3, the MVP: an organizer builds someone else's character by
+    // loading it into their OWN rack, so the ledger and the spectrum bars
+    // (§2l) read it unmodified. Everything worth testing here is a
+    // guardrail — the swap puts another person's pools where yours live, so
+    // each assertion below is one way that could have gone wrong.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const watcher = await ctx.rawPlayer('Watcher');
+
+      const mineBefore = (await a.dbg('groups')).map((g) => g.name).sort();
+      assert.ok(mineBefore.length, 'the operator starts with a rack of their own');
+
+      const file = [
+        'table:',
+        "  name: 'Session 3'",
+        "  felt: 'plum'",
+        'players:',
+        "  'Rill':",
+        '    pools:',
+        '      Attributes:',
+        "        - 'Strength': '3d6'",
+        "        - 'Agility': '2d8'",
+        "  'Wren':",
+        '    pools:',
+        '      Skills:',
+        "        - 'Larceny': '1d20'",
+        'pools:',
+        '  Pools:',
+        "    - 'Doorbell': '2d6'",
+        '',
+      ].join('\n');
+      const v = await a.dbg(`portable.loadText(${JSON.stringify(file)})`);
+      assert.equal(v.ok, true, `the table file parses (got ${v.status})`);
+      assert.deepEqual(await a.dbg('portable.profiles()'), ['Rill', 'Wren'],
+        'both prepared seats are offered');
+
+      // The swap. Yours goes to the stash; theirs takes the rack.
+      const ed = await a.dbg(`portable.editProfile('Rill')`);
+      assert.equal(ed.ok, true, `editing starts (got ${ed.status})`);
+      assert.equal(await a.dbg('portable.editingProfile'), 'Rill', 'the banner has a name to show');
+      const onRack = (await a.dbg('groups')).map((g) => g.name).sort();
+      assert.deepEqual(onRack, ['Agility', 'Strength'], "Rill's pools are on the rack");
+      const stashed = await a.eval(
+        `JSON.parse(localStorage.getItem('dice.groups.mine.v1') || 'null').map((g) => g.name).sort()`);
+      assert.deepEqual(stashed, mineBefore, 'and yours is stashed, intact, before anything moved');
+
+      // GUARDRAIL 3: publishing is "here is MY rack". While a profile is
+      // loaded it must go silent, or every teammate's owner switcher would
+      // show Rill's pools under Alice's name.
+      const seen = watcher.events().filter((e) => e.type === 'pools-changed');
+      const leaked = seen.some((e) => JSON.stringify(e.data.pools).includes('Agility'));
+      assert.equal(leaked, false, "no teammate is told Alice's rack became Rill's");
+
+      // Editing the loaded profile and saving writes the TEXT, not the disk,
+      // and must not disturb the rest of the file.
+      const gid = (await a.dbg('groups')).find((g) => g.name === 'Strength').id;
+      await a.dbg(`editPool(${JSON.stringify(gid)}, {notation: '5d6'})`);
+      const saved = await a.dbg(`portable.saveToProfile('Rill')`);
+      assert.equal(saved.ok, true, `save writes back (got ${saved.status})`);
+      assert.ok(saved.text.includes('5d6'), 'the edit reached the text');
+      assert.ok(saved.text.includes('Wren'), 'the OTHER profile survived the rewrite');
+      assert.ok(saved.text.includes('Larceny'), "and so did that profile's pools");
+      assert.ok(saved.text.includes('Session 3'), 'the table: section survived');
+      assert.ok(saved.text.includes('Doorbell'), 'the top-level rack in the file survived');
+
+      // The exit puts you back. This is the one that matters: if it ever
+      // fails, the operator has lost their own pools to a click.
+      const done = await a.dbg('portable.doneEditing()');
+      assert.equal(done.ok, true, `Done succeeds (got ${done.status})`);
+      assert.equal(await a.dbg('portable.editingProfile'), null, 'editing is over');
+      assert.deepEqual((await a.dbg('groups')).map((g) => g.name).sort(), mineBefore,
+        'your own rack is back, exactly as it was');
+      assert.equal(await a.eval(`localStorage.getItem('dice.groups.mine.v1')`), null,
+        'and the stash is spent, so the next boot has nothing to undo');
+    },
+  },
+  {
+    name: 'profile-swap-reload',
+    tags: ['table-file', 'groups'],
+    // ROADMAP §G3 guardrail 4, split out because it needs its own tab: the
+    // banner and the file text do NOT survive a reload, so booting with a
+    // profile still in dice.groups.v1 would be someone else's rack under your
+    // name with nothing on screen saying so — the `#g=` codec's exact failure
+    // (GOALS §7). The boot guard restores yours instead.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.2', name: 'Solo' });
+      const mineBefore = (await a.dbg('groups')).map((g) => g.name).sort();
+      const file = [
+        'players:',
+        "  'Rill':",
+        '    pools:',
+        '      Attributes:',
+        "        - 'Strength': '3d6'",
+        '',
+      ].join('\n');
+      await a.dbg(`portable.loadText(${JSON.stringify(file)})`);
+      await a.dbg(`portable.editProfile('Rill')`);
+      assert.deepEqual((await a.dbg('groups')).map((g) => g.name), ['Strength'],
+        'mid-edit: the profile is on the rack');
+
+      await a.reload();
+
+      assert.equal(await a.dbg('portable.editingProfile'), null,
+        'a reload does not resurrect the editing state');
+      assert.deepEqual((await a.dbg('groups')).map((g) => g.name).sort(), mineBefore,
+        'the boot guard restored your own rack');
+      assert.equal(await a.eval(`localStorage.getItem('dice.groups.mine.v1')`), null,
+        'and cleared the stash, so a later boot cannot undo you twice');
+    },
+  },
 ];
