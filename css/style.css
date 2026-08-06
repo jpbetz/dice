@@ -2477,6 +2477,16 @@ html, body {
 .seat-someone { margin-top: 10px; }
 #seat-preview { margin-top: 6px; }
 #seat-preview .btn-row { margin-top: 10px; }
+/* The two phase panes. There is NO global `.hidden` utility in this
+   stylesheet — every element that hides carries its own `#id.hidden` rule
+   (see #pools-head, #pop-identity, #profile-banner, …), so a bare
+   class="hidden" in the markup styles nothing at all. Without these the
+   modal renders BOTH panes at once: Apply/Not now sit under the seat list
+   while you are still choosing, and the seat list stays up behind the
+   preview. Caught in the interactive pass — the e2e drives the debug hooks
+   and asserts phase state, which was correct the whole time. */
+#seat-pick.hidden,
+#seat-preview.hidden { display: none; }
 .roller-name { font-weight: 700; }
 
 /* scrollbars */

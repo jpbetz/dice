@@ -5293,6 +5293,16 @@ export const scenarios = [
       assert.equal(picker.open, true, 'the modal is up');
       assert.equal(picker.preselect, 'Alice', '&as= pre-selects, case-insensitively');
       assert.equal(picker.chosen, null, 'but nothing is chosen for the player');
+      // The two phase panes are exclusive ON SCREEN, not just in state. This
+      // asserts computed display because there is no global `.hidden` utility
+      // in the stylesheet — a bare class="hidden" styles nothing, and the
+      // first cut of this modal showed Apply/Not now under the seat list
+      // while you were still choosing. State was correct throughout, so only
+      // a visibility assertion can catch it.
+      const shown = (id) => `getComputedStyle(document.getElementById('${id}')).display`;
+      assert.equal(await p.eval(shown('seat-preview')), 'none',
+        'the preview pane is not on screen while choosing a seat');
+      assert.notEqual(await p.eval(shown('seat-pick')), 'none', 'the seat list is');
 
       const groupsBefore = (await p.dbg('groups')).map((g) => g.name).sort();
       await p.dbg(`chooseSeat('Alice')`);
@@ -5303,6 +5313,9 @@ export const scenarios = [
       const v = await p.waitFor(`window.__diceDebug.seatPicker.verdict.canApply === true`,
         { desc: 'the import previews' }) && await p.dbg('seatPicker.verdict');
       assert.ok(/^✓ /.test(v.status), `preview uses the shared verdict grammar (got ${v.status})`);
+      assert.equal(await p.eval(shown('seat-pick')), 'none',
+        'and the seat list steps aside once the preview is up');
+      assert.notEqual(await p.eval(shown('seat-preview')), 'none', 'the preview pane is');
 
       await p.dbg('applySeatImport()');
       await p.waitFor(`window.__diceDebug.groups.some((g) => g.name === 'Larceny')`,
