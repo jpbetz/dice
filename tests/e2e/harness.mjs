@@ -172,6 +172,18 @@ export class Table {
     throw new Error(`timeout waiting for: ${desc} (last value: ${JSON.stringify(last)})`);
   }
 
+  // For a tab opened with `anon: true`: the seat has now been taken (by the
+  // picker or the free-text prompt), so wait out the join the constructor
+  // deliberately did not wait for, and insist it landed ONLINE. Same SOLO
+  // guard newTable applies, for the same reason — a silent solo fallback
+  // makes every later cross-tab assertion fail somewhere else.
+  async waitOnline({ timeout = 30000 } = {}) {
+    await this.waitFor(`!!window.__diceDebug && window.__diceDebug.netReady`,
+      { desc: 'joined after taking a seat', timeout });
+    const online = await this.eval(`window.__diceDebug.netReady.then((r) => r && r.online)`);
+    if (!online) throw new Error('took a seat but came up SOLO against a live server');
+  }
+
   // Drive the dt-clock forward until the table is idle. Ceremonies, playback,
   // whisks, and sinks all run on this clock, so sim() fast-forwards them.
   async settle({ timeout = 30000 } = {}) {
@@ -316,6 +328,14 @@ export class Ctx {
   // origins on the same server, which is how a scenario seats three or four
   // players. name seeds the player name before the app boots.
   //
+  // `anon: true` seeds NO name, so the app stops at the 'Take a seat' modal
+  // instead of joining — the only way to exercise the seat picker (ROADMAP
+  // §G5), which is exactly the surface a name-seeded tab skips. The ready-wait
+  // becomes the modal rather than netReady, because netReady does not settle
+  // until a seat is taken; the caller drives the modal and then awaits
+  // `takeSeat()`/`netReady` itself. `query` appends extra search params (the
+  // `&as=` pre-select) — always after `?room=`, never replacing it.
+  //
   // ONE logged boot retry: ~1–2% of fresh tabs come up broken — either the
   // ready-wait times out, or the vendor modules double-evaluate ("Identifier
   // 'iO' has already been declared" from three.module.js / cannon-es) and the
@@ -323,7 +343,7 @@ export class Ctx {
   // time. Reproduced at d106a20 (pre-chrome-cleanup), so it is the headless
   // Chrome / CDP page churn, not the app. A single retry keeps the suite
   // honest: a real boot regression still fails twice in a row.
-  async newTable({ origin = 'localhost', name, allowSolo = false } = {}) {
+  async newTable({ origin = 'localhost', name, allowSolo = false, anon = false, query = '' } = {}) {
     for (let attempt = 0; ; attempt++) {
       const page = await this.browser.newPage();
       // Deterministic clocks: wall-time features (auto-collect) stay OFF in
@@ -334,21 +354,31 @@ export class Ctx {
           `try { localStorage.setItem('dice.name.v1', ${JSON.stringify(name)}); } catch {}`,
         );
       }
-      const url = `http://${origin}:${this.port}/?room=${encodeURIComponent(this.room)}`;
+      const url = `http://${origin}:${this.port}/?room=${encodeURIComponent(this.room)}${query}`;
       await page.navigate(url);
       const t = new Table(page, url);
       try {
-        await t.waitFor(
-          `!!window.__diceDebug && window.__diceDebug.netReady`,
-          { desc: `app ready (${origin}, ${name || 'anon'})`, timeout: 30000 },
-        );
-        // The ready promise resolves {online} — a tab that fell back to SOLO
-        // while a live server is right there is a broken boot (slow join,
-        // dropped stream), and every later cross-tab assertion would fail
-        // mysteriously. Say it here instead.
-        if (!allowSolo) {
-          const online = await t.eval(`window.__diceDebug.netReady.then((r) => r && r.online)`);
-          if (!online) throw new Error(`tab came up SOLO against a live server (${origin})`);
+        if (anon) {
+          // No seeded name: the app is sitting at 'Take a seat'. Waiting on
+          // netReady here would hang until something takes the seat, which is
+          // the caller's job — so the readiness bar is the modal being up.
+          await t.waitFor(
+            `!document.getElementById('name-modal').classList.contains('hidden')`,
+            { desc: `seat modal up (${origin})`, timeout: 30000 },
+          );
+        } else {
+          await t.waitFor(
+            `!!window.__diceDebug && window.__diceDebug.netReady`,
+            { desc: `app ready (${origin}, ${name || 'anon'})`, timeout: 30000 },
+          );
+          // The ready promise resolves {online} — a tab that fell back to SOLO
+          // while a live server is right there is a broken boot (slow join,
+          // dropped stream), and every later cross-tab assertion would fail
+          // mysteriously. Say it here instead.
+          if (!allowSolo) {
+            const online = await t.eval(`window.__diceDebug.netReady.then((r) => r && r.online)`);
+            if (!online) throw new Error(`tab came up SOLO against a live server (${origin})`);
+          }
         }
       } catch (e) {
         if (attempt > 0) { this.tables.push(t); throw e; }
