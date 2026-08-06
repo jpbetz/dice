@@ -9,210 +9,26 @@ organization → secrecy → systems literacy → effects → customization).
 [UX.md](UX.md) holds component specs; [TESTING.md](TESTING.md) governs
 how each step is checked. A broken invariant outranks a new feature.
 
-**2026-08-06 — the ladder is interrupted by a date.** Joe is running a
-*Your Soul Deal* game the week of 2026-08-10 and the system cannot yet
-be *set up* for one: nobody can prepare another player's pools, nothing
-survives the room evaporating, and the link carries only a room name.
-**Tier G below is the burn-down and it outranks everything**, including
-§0a's invariant work — not because §0a stopped mattering, but because a
-roll-arrival stall is a performance defect on a table that exists, and
-Tier G is what makes the table exist. Tier G is scoped to *shippable in
-a week*: two of Joe's asks (server-side persistence, Google sign-in) are
-deliberately **out**, with the reasoning recorded in
-[PROFILES.md](PROFILES.md) §5–§6. Normal sequencing resumes at Tier 0
-the day after game night.
-
----
-
-## Tier G — Game night: the prepared table — TOP PRIORITY
-
-*Joe 2026-08-06. **Design authority: [PROFILES.md](PROFILES.md)** — the
-two CUJs, the file format, the wire, what was rejected and why. This
-section is the sequence only.*
-
-**The two jobs.** **CUJ1** — one person (Joe or Walter) builds six
-characters ahead of time (named profiles, Attribute/Skill/Motivation
-shelves, priced against the 100-point creation budget) plus the table's
-felt, system, name and zoom, and puts it somewhere it cannot be lost.
-**CUJ2** — one link in Discord; six people open it and each lands at the
-right table, under their own name, with their own pools, without typing
-notation and without a stranger's rack silently replacing theirs.
-
-**The shape, in one line:** *the file is the truth, the room is a
-convenience, the link is an address.* That is what lets this ship
-without amending goal 7 — the organizer's `.dice.yaml` is the durable
-artifact; the server's copy is furniture like the felt colour, pushable
-by anyone (goal 10), authoritative over nothing.
-
-**Most of it already exists** — portable YAML with shelves and per-pool
-sets, `planImport`'s preview-and-merge, `POST /api/pools` publishing a
-rack the whole room can browse, validated room settings, seat resume,
-`?room=` links, and §2l's dice-value ledger for the 100-point read. The
-gaps are narrow (PROFILES.md §2): no file door, a file that holds one
-rack rather than a table, room config that dies when the **last player
-leaves** (`dropRoomIfEmpty`, server.js:341 — not merely on restart), a
-link that carries nothing but the room, and a ledger that reads your own
-rack only.
-
-**⟨MVP⟩ is G3.** G0 is pre-flight (do it first, it is not feature work).
-G1–G3 are client-only, cannot break a running table, and make the game
-playable by handing each player a file. G4–G6 are ergonomics — cut them
-first if the date moves in.
-
-### G0. Pre-flight — the things that ruin a game night
-
-Cheap, unglamorous, and worth more than any feature if one of them
-bites. Do these first; none is more than a small patch.
-
-- **Confirm the deployment is actually live** and note the URL
-  (`make status`, `make url`). `deploy/config.mk` exists locally, so
-  the setup was at least started.
-- **Leave a room open >60 minutes and watch one reconnect.**
-  DEPLOY.md "Operating it" calls for exactly this before the first real
-  game: Cloud Run force-closes every SSE stream at the 3600 s timeout
-  and the browser silently re-opens. It should be invisible. A 4-hour
-  session is four of these.
-- **Pin the Node major** in `package.json` (§0j) — currently `>=18`, so
-  the buildpack can silently upgrade **on deploy day**. One-line edit.
-- **Exit on `uncaughtException`** (§0i, already signed off) — a
-  half-dead process mid-session is worse than a restart, and `js/net.js`
-  already re-joins silently across one.
-- **Deploy between sessions, never mid-game** (DEPLOY.md): `max-instances
-  1` is soft during a rollout and a room can briefly split across two
-  revisions. Ship Tier G, deploy, *then* play.
-
-### G1. The file door — Download + Open
-
-"Your data" (UX §7.13) is one textarea and a clipboard Copy: the durable
-copy Joe asked for does not exist, and a six-character setup travels as
-a paste blob. Add **Download** (`Blob` + `a[download]`) and **Open
-file…** (`<input type="file">` + `.text()`), both zero-dep, both feeding
-the existing live-preview path. Filename from the table name or room key
-plus the date. No format change — this ships against today's two-section
-file.
-
-### G2. The table file — `table:` + `players:`
-
-Two new top-level sections in `js/portable.js`, both present-or-absent
-so every file that parses today still parses. Player blocks **nest
-`pools:`** (a shelf may legally be named `set` or `pools`; nesting puts
-the reserved keys where a shelf can never appear, and makes the inner
-block the same grammar as the top-level one — one parser, two base
-indents). Named consequences, so none is discovered late:
-
-- the shelf/pool matchers hardcode indent (`/^ {2}\S/`, `/^ {4}- /`,
-  `raw.slice(6)`) — parameterize the base indent. Refactor, not rewrite.
-- `MAX_POOLS = 40` is a **document** cap today; it becomes per-profile
-  with a separate document cap (6 × 20 must not be a refusal).
-- profile names become display names, which are **whisper addresses** —
-  `cleanName`, not `cleanString`, so the `#` ban holds. This is the one
-  place the new format could silently misdirect a whisper.
-- `table:` keys map 1:1 onto `SETTING_SPECS` (`name` → `tableName`);
-  `experiences` stays out — §10's editor doesn't exist.
-- **unknown top-level sections skip and warn** instead of aborting the
-  document. Closes the forward-compatibility question POOL-ANALYSIS §9
-  left open; the skip must find the block's end (next zero-indent line)
-  and the warning must reach the status line.
-
-### G3. Profile authoring — the rack swap ⟨MVP⟩
-
-The organizer needs the pool editor *and* the ledger pointed at someone
-else's rack. Don't build a second editor — **load a profile into your
-own rack, edit it, save it back.** `Edit ⟨name⟩` swaps `groups`;
-manage mode, the popover, the spectrum bars and the dice-value ledger
-all work **unmodified**, because as far as they know it is your rack.
-`Save to ⟨name⟩` writes back to the file.
-
-This closes POOL-ANALYSIS §11's stated gap (manage mode forces
-`poolsOwner = null`, so the ledger reads your own rack only and cannot
-price Alice's character) **at no cost to §2l**. *Rejected:*
-parameterizing every management surface — `✎`, drag reorder, the shelf
-popover, `editPoolById` all assume they write your own
-`dice.groups.v1`; wide blast radius to save one click.
-
-**The game is playable from here**, offline, by handing each player
-their file.
-
-### G4. The room setup key — `POST /api/table`
-
-`{room, playerId, rev, table:{…}, profiles:[…]}` → `room.setup`, echoed
-in `hello` and `/api/join`, broadcast as `table-setup`. Settings go
-through the **existing** settings path (no second felt validator); pools
-through the existing `sanitizePools`; names through `cleanName`;
-profiles capped at 12. **Anyone may push it** — last write wins, guarded
-by a monotonic `rev` so two organizer tabs can't ping-pong. Furniture,
-not authority: a player's localStorage stays the truth for their rack.
-
-### G5. The seat picker — the URL ask
-
-When the room has a setup, "Take a seat" lists the prepared profiles as
-choosable seats beside *Someone else…* (today's free text). Choosing one
-takes the name, then shows the **existing** import preview
-(`✓ 8 new — Apply takes them`) and applies on an explicit click through
-`planImport`, deleting nothing.
-
-**Step 2 is not negotiable.** GOALS §7 records why the `#g=` codec was
-killed: opening someone else's link replaced the visitor's rack, no
-preview, no undo. A prepared seat that overwrites on arrival re-commits
-that with better manners.
-
-`?room=` stays the primary form — **one link for everyone** is what
-actually gets shared. `&as=Alice` is a shortcut that pre-selects a seat,
-never a requirement, never an auto-apply. Degrades to today's free-text
-prompt with no server (goal 9).
-
-### G6. Durability — restart and Tuesday
-
-Two mechanisms, neither of which amends goal 7:
-
-- **Client re-push.** The pushing client keeps the setup in
-  `dice.table.v1:<room>` with its `rev` and re-pushes on `hello` when
-  the room's `rev` is lower or absent. A restart self-heals the moment
-  an organizer tab reconnects.
-- **Room lifetime.** A room holding a setup gets a TTL instead of
-  instant deletion on last-player-leaves; log and offers still clear,
-  only the small setup lingers, reaped by timer. This is what makes
-  "prep Tuesday, play Thursday" work.
-
-**Explicitly out of scope, with reasons in PROFILES.md §5–§6:**
-*server-side persistence* (a `DICE_STATE_FILE` snapshot is real
-durability locally but useless on Cloud Run's ephemeral FS with
-`--min-instances 0`; genuine durability there means GCS/Firestore, a
-network dependency in the request path and an amendment to "the server
-holds no persistent state") and *Google sign-in* (serves neither CUJ
-better than the file does; the cost is OAuth + RS256/JWKS verification +
-a per-user store — i.e. exactly the goal-7 amendment just avoided — plus
-an account concept in an app whose help text correctly says there are
-none, and a login wall on the one night that must not have friction).
-Both are post-game passes if wanted.
-
-### Verification
-
-Unit coverage for the format in `tests/portable.test.mjs` (round-trip,
-per-profile caps, the `#` refusal, skip-and-warn). New e2e tags
-`table-file` (G1–G3) and `prepared-seat` (G4–G6), reached through
-`window.__diceDebug`, never DOM scraping. G3 and G5 each earn ONE
-interactive pass on an ephemeral port — **never 8123**. Conformances
-this pass must not break are enumerated in PROFILES.md §8; the sharp
-ones are the `#` ban on profile names, fail-closed parsing (skipping a
-*section* is not tolerating garbage *inside* a section), and
-`projectEntryFor` remaining the only egress for roll entries — the setup
-carries pools and settings, never anything roll-shaped.
-
-**GOALS: 5** (organization — the prepared table is the biggest
-organization gap left) · **7** (held whole by the file-is-truth rule;
-the two amendments it would have needed are the two things cut) ·
-**9** (G1–G3 are client-only; G5 degrades) · **10** (anyone may push a
-setup; it grants no power) · **12** (a profile is a name and a rack —
-nothing the dice don't read).
+**2026-08-06 — the ladder was interrupted by a date, and the interruption
+is over.** Joe's *Your Soul Deal* game is Thursday 2026-08-13, and the
+system could not be *set up* for one: nobody could prepare another
+player's pools, nothing survived the room evaporating, and the link
+carried only a room name. **Tier G shipped whole the same day** —
+G0–G6, seven slices, detail in [SHIPPED.md](SHIPPED.md#tier-g--game-night-the-prepared-table-2026-08-06),
+design in [PROFILES.md](PROFILES.md). Two of Joe's asks (server-side
+persistence, Google sign-in) were deliberately left out with the
+reasoning recorded in PROFILES.md §5–§6; what remains of them is
+[§5b](#5b-persistence-beyond-the-file-deferred-2026-08-06) below.
+**Normal sequencing resumes at Tier 0.**
 
 ---
 
 ## Tier 0 — Performance & foundation
 
-*Sequenced behind Tier G as of 2026-08-06 (see the note at the top).
-§0a keeps its invariant standing; it resumes the top slot the day after
-game night.*
+*Back at the top as of 2026-08-06: Tier G shipped and §0a resumes its
+invariant standing. §0i (exit on `uncaughtException`) and §0j's Node pin
+left this tier early — Tier G's G0 pre-flight shipped both, since they
+only cost anything if they are missing on game day.*
 
 *2026-08-05 big-pass update (workflow `wf_707277c0-0ee`): 20 commits
 shipped across §0b/0d/0e/0g (details in SHIPPED.md); 31 designs killed
@@ -421,22 +237,24 @@ discovery pass would surface.
 follow-up when someone re-audits with the missing seams accounted
 for.
 
-### 0i. Server production hygiene — AWAITING SIGN-OFF (1 item)
+### 0i. Server production hygiene — CLOSED 2026-08-06
 
-**Exit + restart on `uncaughtException`** — the other item that
-survived verify. Currently the process might limp along after an
-unhandled error. `process.exit(1)` inside an `uncaughtException`
-handler lets Cloud Run's auto-restart do its job cleanly. Small
-patch, medium risk (any exception handler swallowing failures would
-now visibly restart). Ship as a small follow-up.
+**Exit + restart on `uncaughtException`** shipped in Tier G's G0
+pre-flight (`6c7ca9f`, SHIPPED.md §G0) — armed under `IS_MAIN` only, so
+the redaction suite's in-process import can't turn its own failures into
+a process exit. Nothing else stands in this section.
 
 ### 0j. Operational going-online (deploy-side, 2026-08-05 audit)
 
 Three important items surfaced by a complementary operational audit
-(not covered by the in-code Tier 0 workflow):
+(not covered by the in-code Tier 0 workflow); the Node pin shipped with
+G0 and the other two remain:
 
-- **Pin Node major** in `package.json` (currently `>=18`; Cloud Run
-  buildpack can silently upgrade). One-line edit + DEPLOY note.
+- ~~**Pin Node major**~~ — SHIPPED 2026-08-06 (`6c7ca9f`) as `>=22 <25`
+  rather than a bare major: the range blocks the buildpack's silent jump
+  while still landing on 24 (what the tree is tested against) or falling
+  back to 22, where `24.x` would have turned a missing runtime into a
+  deploy-day failure.
 - **Add `/health` + bake `GIT_SHA` into deploy** — no way to confirm
   which commit is live without triggering known behavior. Small code
   + Makefile change (`--set-env-vars GIT_SHA=$(git rev-parse HEAD)`).
@@ -730,8 +548,9 @@ does not need.*
 ### 5. Capture mechanisms
 
 - Roll-log export (copy/download text + CSV) — the online log is
-  currently uncapturable. *(Tier G's `Blob`/`a[download]` helper lands
-  first; this reuses it.)*
+  currently uncapturable. *(Tier G's `Blob`/`a[download]` helper shipped
+  in G1 — `portableDownload()` in main.js; this reuses it rather than
+  inventing a second save path.)*
 - Local roll statistics (per-player distribution, average-vs-
   expected) — the OBSERVED half, and a **dependent of §2l**, not
   its sibling: §2l's engine is the only source of an *expected*
@@ -747,7 +566,32 @@ does not need.*
   the URL was pretending to be. **Answered by Tier G**: the table file
   is the durable copy ([PROFILES.md](PROFILES.md) §5), and the two
   heavier readings of "persistent" — a server-side store and Google
-  sign-in — are recorded there as deliberately deferred, with cost.
+  sign-in — are recorded there as deliberately deferred, with cost, and
+  restated as §5b below.
+
+### 5b. Persistence beyond the file — DEFERRED (2026-08-06)
+
+Joe asked for both of these in the game-night brief; both were cut from
+Tier G with reasons, and they are here so the cut stays a decision
+rather than an omission. **Neither is needed for game night** — the
+table file plus G6's re-push cover it (PROFILES.md §5).
+
+- **Server-side persistence.** A `DICE_STATE_FILE` snapshot of room
+  setups (never logs, never seats) gives real durability *locally* and
+  **nothing on Cloud Run**: the filesystem is ephemeral and
+  `--min-instances 0` means the instance goes away between sessions
+  (DEPLOY.md). Genuine durability there means GCS or Firestore — a
+  network dependency in the request path and an explicit amendment to
+  goal 7's "the server holds no persistent state." Revisit only with a
+  reason the file cannot serve.
+- **Google sign-in.** Serves neither CUJ better than the file does: it
+  does nothing for CUJ1 (the organizer *is* the durable store) and helps
+  CUJ2 only for a player who wants their pools on a second device and
+  kept no file. The cost is not the button — it is OAuth redirect
+  handling, RS256/JWKS ID-token verification, **a real per-user server
+  store** (i.e. exactly the goal-7 amendment above), a consent surface,
+  and an account concept in an app whose help text currently says,
+  correctly, that there are none. Revisit if players actually ask.
 
 ---
 

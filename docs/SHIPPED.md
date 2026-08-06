@@ -81,6 +81,46 @@ whisper addresses) while `#` in `tableName` stays legal — the asymmetry
 the server already had, now matched rather than quietly diverged from.
 Tests 25 → 57.
 
+### G3. Profile authoring — the rack swap — SHIPPED 2026-08-06 (`6adf2d4`)
+
+**The MVP.** An organizer builds someone else's character by loading it
+into their OWN rack, so the editor, the ± popover, the spectrum bars and
+the §2l dice-value ledger read it **unmodified** — closing the gap
+POOL-ANALYSIS §11 named (manage mode forces `poolsOwner = null`, so the
+budget read was your-own-rack-only and could not price Alice). Verified
+interactively: with Alice's profile loaded, the Attributes head reads
+**34** (3d6 + 2d8) and the region figure agrees. *Rejected:*
+parameterizing every management surface off `poolsOwner` — wide blast
+radius to save one click.
+
+`#portable-profiles` lists the file's `players:` with **Edit** and **Save
+to** per row, plus *Save as new profile*. `#profile-banner` is sticky
+above the pools head for exactly as long as a swap is live, and the
+category heads yield their sticky pin to it (`#groups-list.profile-editing`
+makes the same call `#pools-head.foreign` already makes).
+
+The guardrails are the feature:
+
+- the operator's rack goes to `dice.groups.mine.v1` and **the write is
+  read back and verified before `groups` moves** — unverifiable storage
+  refuses the swap rather than proceeding;
+- `publishPools()` no-ops while a profile is loaded (one egress, so it
+  covers the debounce, hello-join, silent-rejoin and debug paths) —
+  otherwise every teammate's owner switcher would show Rill's pools under
+  Alice's name;
+- a **reload restores the operator's own rack** and drops the editing
+  state. Deliberate, of the two the design allowed: the banner and the
+  file text do not survive a reload, so booting with a profile still in
+  `dice.groups.v1` would be someone else's rack under your name with
+  nothing on screen saying so — the `#g=` codec's exact failure;
+- `Save to` rewrites the **text**, never the disk, and files carrying
+  skip-and-warn'd unknown sections are read-only to both verbs, because a
+  rewrite would drop what the parser deliberately did not read.
+
+e2e `profile-swap` + `profile-swap-reload` (`76c5e55`). A second tab
+booting mid-edit consumes the localStorage stash, which is safe:
+`portableDoneEditing` prefers the in-memory copy.
+
 ### G4. The room setup key — SHIPPED 2026-08-06 (`326f1cd`)
 
 `POST /api/table` → `room.setup = {rev, table, profiles, at}`, echoed
@@ -102,6 +142,38 @@ with no client in the path and checks the setup **bytes** for `values` /
 `rollId` / `total` / `visibility`, because `projectEntryFor` must remain
 the only egress a roll entry ever takes.
 
+### G5. The seat picker — SHIPPED 2026-08-06 (`8f89fd4`, `71b5d53`)
+
+CUJ2: one link, six people, each at the right table under their own name
+with their own pools.
+
+**The ordering problem, and §2k closed as a side effect.** `initNet()`
+awaits `promptName()` *before* `connect()`, so when the modal is on
+screen the client has not joined and cannot know the room's setup. Solved
+with **`GET /api/table?room=`** — public, read-only, no `playerId`,
+returning `{name?, seats?:[{name, pools}]}` and `200 {}` for an unknown or
+unprepared room. Projected field by field: no roster, log, offers,
+notations, `rev`, or settings beyond the table name; uses `rooms.get`, so
+a peek never creates a room and never disturbs a linger TTL. That is
+exactly the pre-join peek ROADMAP §2k wanted for showing a table's name.
+
+Prepared seats render in `#seat-list` above *Someone else…*, which keeps
+today's free-text path verbatim. Choosing one takes the name and joins,
+then shows the **existing** preview (`✓ 1 new · 2 updates — Apply takes
+them`, the shared verdict grammar) with `#seat-apply` / `#seat-skip` — and
+**applies nothing until that click**, which is the assertion the whole
+design turns on. `&as=Name` pre-selects case-insensitively and does
+nothing else; an `as=` naming no profile is ignored silently, so a stale
+link cannot break a join. `inviteUrl()` is unchanged: one link for
+everyone stays the primary form.
+
+**Fixed in the interactive pass (`71b5d53`):** both phase panes rendered
+at once. This stylesheet has no global `.hidden` utility — every element
+carries its own `#id.hidden` rule — so the markup's bare `class="hidden"`
+styled nothing, and Apply/Not now sat under the seat list while you were
+still choosing. The logic was correct throughout, which is why the e2e
+missed it; `prepared-seat` now asserts computed display in both phases.
+
 ### G6 (server half). The room TTL — SHIPPED 2026-08-06 (`2802197`)
 
 `dropRoomIfEmpty` deleted a room the instant its last player left — so an
@@ -121,6 +193,27 @@ prepared-but-empty room must never be why a group can't sit down, and
 without it a join-push-leave loop over 500 names could squat every slot
 for 12 hours. e2e `room-linger` (`8d5a001`) polls the server's own log,
 since a room lingering has no wire surface by definition.
+
+### G6 (client half). Re-push on hello — SHIPPED 2026-08-06 (`0de9873`)
+
+The organizer's browser is the durable copy, so a room that has lost its
+setup heals as soon as an authoring tab reconnects. `dice.table.v1:<room>`
+is written in exactly **one** place — a push the server *applied* — and
+re-pushed on every hello (plus once post-join) when the room's `rev` is
+absent or lower. G4's silent-no-op-on-stale rule is what makes this safe
+to fire unconditionally.
+
+The counterpart is what keeps it honest: **a player who merely joined
+holds no authorship record** (`stored: 0`) and can never re-push a setup
+they did not author. G4 landed no client push origin, so this slice also
+added `#portable-push` ("Apply to table") as the one place a setup is
+pushed from.
+
+e2e `setup-repush` (`77c20a0`) tests the real path rather than a
+synthetic one: everyone leaves, the room lingers, the TTL expires it, and
+the organizer's tab reopens on the same origin — which is what a server
+restart looks like from the client's side. It pins that the heal restores
+the felt as well as the seats.
 
 ---
 
