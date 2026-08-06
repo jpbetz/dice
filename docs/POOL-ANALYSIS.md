@@ -14,8 +14,10 @@ node tools/pool-analysis-data.mjs
 It derives each figure from `js/meanings.js`, `js/notation.js` and
 `js/rollspec.js` directly and exits non-zero if the chart's invariants break.
 This is not ceremony — the design pass that produced this doc ran on numbers,
-and **two of them turned out to be fabricated** by the agents that produced
-them (§7). A figure you cannot regenerate is a figure you should not trust.
+and **three of its claims did not survive checking**, two of them fabricated
+outright by the agents that produced them (§7). A figure you cannot regenerate
+is a figure you should not trust; §13 does the same for the non-numeric
+claims, listing the command that re-checks each one.
 
 ## 1. The ask
 
@@ -346,8 +348,8 @@ than any lens, and the per-die half of the design is his, not the panel's.
   and §7.16's rule is "unsurprising over cute". The surface stays nameless, as
   the ± popover is.
 
-**Two fabricated numbers, caught before they shipped** — the reason
-`tools/pool-analysis-data.mjs` exists:
+**Three unverified claims, caught before they shipped** — the reason
+`tools/pool-analysis-data.mjs` and §13 exist:
 
 - THE ASSAY printed a `3d6` success-or-better ladder of 35.2 / 42.2 / 18.7 /
   3.9. That implies p ≈ 0.29; the real p is exactly 3/6, giving
@@ -356,6 +358,11 @@ than any lens, and the per-die half of the design is his, not the panel's.
   pool is "majority-quiet". It has **six** (faces 4–9) = 30%, nowhere near a
   majority — and quiet is a flat band across every rank (§3.4). Two designs
   built self-critiques on the bad number.
+- The verification pass claimed **four smoke scenarios** break on
+  `.pool-sec-head`, naming `portable` — which does not assert on it at all.
+  The real answer is **two assertions in one scenario** (§10), and the
+  difference matters: it is the gap between "this feature destabilizes the
+  test gate" and "the design already contains its own blast radius".
 
 ## 8. Decisions taken **[JOE, 2026-08-05]**
 
@@ -402,14 +409,38 @@ than any lens, and the per-die half of the design is his, not the panel's.
 
 ## 10. Verification the build must carry
 
-**Existing scenarios this BREAKS.** Appending a figure makes
-`.pool-sec-head`'s textContent `'Attributes54'` — flex `gap` is CSS,
-textContent concatenates raw. Four are in the `npm test` smoke gate and no
-design named any of them: `sheet-pass` (six assertions), `terminology`,
-`shared-pools` (the *foreign* path), `portable`, plus `soul-seed` outside the
-gate. Re-point them at `.psh-word`. **The figure must be *not built* at rest**
-rather than CSS-hidden — `display:none` still concatenates into textContent, so
-hiding it breaks the rest-state assertions too.
+**Existing scenarios this BREAKS — exactly two assertions, in one scenario.**
+Appending a figure makes `.pool-sec-head`'s textContent `'Attributes54'`: flex
+`gap` is CSS, textContent concatenates raw. There are **nine** assertions on
+`.pool-sec-head` text across four scenarios, and the design's own
+manage-mode-only rule protects seven of them by construction:
+
+| Scenario | Line | State when read | Verdict |
+|---|---|---|---|
+| `sheet-pass` (smoke) | 2104 | manage ON (`setPoolsEditMode(true)` @2101) | **BREAKS** |
+| `sheet-pass` (smoke) | 2118 | manage ON (still) | **BREAKS** |
+| `sheet-pass` (smoke) | 2096 | rest — "rest shows populated shelves only" | safe |
+| `sheet-pass` (smoke) | 2150 | rest (`setPoolsEditMode(false)` @2148) | safe |
+| `sheet-pass` (smoke) | 2160 | rest (`setPoolsEditMode(false)` @2158) | safe |
+| `shared-pools` (smoke) | 2383, 2422 | foreign rack — no figure there | safe |
+| `terminology` (smoke) | 2714 | rest | safe |
+| `soul-seed` (`groups`) | 2067 | rest | safe |
+
+Re-point the two breakers at `.psh-word`. **This is a design property, not
+luck**: the figure is *built in manage mode only*, so every rest-state and
+foreign-rack assertion is untouched. **Build it CSS-hidden instead and all nine
+break** — `display:none` still concatenates into `textContent`. That is the
+whole reason §5 says *not built*, rather than hidden.
+
+Regenerate the table rather than trusting it — line numbers move:
+
+```bash
+grep -n "pool-sec-head" tests/e2e/scenarios.mjs
+```
+
+*(Corrected 2026-08-05: an earlier draft claimed "four smoke scenarios" and
+named `portable`, which does not assert on `.pool-sec-head` at all. Verified
+against the tree; same class of error as the two fabricated numbers in §7.)*
 
 **New scenarios.** `pool-forecast` (tags `groups`, `meanings`) — the exact d6
 spectrum, three identical d6s rendering **one** bar not three, a mixed pool
@@ -468,3 +499,24 @@ figure is `DIE_MAX` arithmetic, identical under `soul-deal`, `dnd` and `none`.
 **7** — render-time client analysis: no endpoint, no wire key, no room setting,
 no URL state, no new `dice.*.v1` key, no `portable.js` change, no build step.
 **12** — was the one exposure, closed by the session-only ruling (§5).
+
+## 13. Claims verified against the tree
+
+Every load-bearing factual claim above, with the command that re-checks it.
+Verified 2026-08-05 at `1457c50`. Line numbers move; the commands do not.
+
+| Claim | Check | Result |
+|---|---|---|
+| No e2e asserts `#pop-preview`, so rewriting it regresses silently | `grep -c pop-preview tests/e2e/scenarios.mjs` | **0** |
+| `renderCmdState` is shared by the command box *and* the quick palette | `grep -n renderCmdState js/main.js` | called at **5578** and **8998** |
+| `rerenderInterpretation` never repaints the popover | `grep -n -A20 'function rerenderInterpretation' js/main.js` | log · shelf markers · verdict · banner **only** |
+| The `terminology` sweep bans the words a forecast might reach for | `grep -n 'banned = ' tests/e2e/scenarios.mjs` | `/\btrays?\b\|\bgroups?\b\|\bcompose\b/i` over `#left-panel`, `#mods-popover`, … |
+| `test:unit` is a literal `&&` chain with no glob | `grep -n 'test:unit' package.json` | **8** files, hand-listed (grew by 2 in `2549c79`) |
+| `MAX_PHYSICAL_DICE` / `EXPLODE_CHAIN_CAP` are module-private | `grep -n 'MAX_PHYSICAL_DICE\|EXPLODE_CHAIN_CAP' js/rollspec.js` | plain `const`, **not exported** (:33, :34) |
+| `DIE_MAX` already exists three times — do not mint a fourth | `grep -rn 'DIE_MAX = ' js/` | exported `rollspec.js:30`; private `meanings.js:50`, `notation.js:89` |
+| `shelfValue` is already a live concept (a die's face on the collect shelf) | `grep -c shelfValue js/main.js` | **7** uses — hence `rackDiceValue` for the debug hook |
+| `stageGroup` drops mods/dc, so a staged pool ≠ the saved spec | `grep -n 'set aside' js/main.js` | `:6142` — "set aside — re-add via ±" |
+| Advantage partners are deterministic; reroll replacements are not | read `js/rollspec.js` `composeRoll` | partners pushed **before** `values` is computed (~:100–110); rerolls **after**, gated on a rolled value (~:127–140) |
+| `.ph-rule` is the region-rank hairline that the figure appends after | `grep -n ph-rule css/style.css` | `:969  #pools-head .ph-rule { flex: 1; … }` |
+| Online, the client persists no log — §5's second blocker | `grep -n LS_LOG js/main.js` | 3 writes, each guarded `if (!netOnline)` |
+| `migrateGroup` fails closed, so your own rack has no unparseable pools | `grep -n -A6 'function migrateGroup' js/main.js` | `return null` on a non-object |

@@ -431,13 +431,16 @@ session-only target) · ⑥ the sum read · ⑦ verification + docs.
 Slices ③ and ④ each earn ONE interactive pass (ephemeral port —
 never 8123).
 
-**Verification — this BREAKS four smoke scenarios**, and no
-design named them: appending a figure makes `.pool-sec-head`'s
-textContent `'Attributes54'`, failing `sheet-pass`,
-`terminology`, `shared-pools` (the *foreign* path) and
-`portable`, plus `soul-seed` outside the gate. Re-point at
-`.psh-word`, and the figure must be **not built** at rest —
-`display:none` still concatenates. New: `pool-forecast`
+**Verification — this breaks exactly TWO assertions, both in
+`sheet-pass`** (lines 2104 and 2118, the two read while manage
+mode is on): appending a figure makes `.pool-sec-head`'s
+textContent `'Attributes54'`. Re-point them at `.psh-word`.
+Nine assertions read that text across four scenarios and the
+manage-mode-only rule protects the other seven **by
+construction** — rest-state reads and the foreign rack never see
+a figure. **Build it CSS-hidden instead and all nine break**
+(`display:none` still concatenates), which is why the figure must
+be *not built* rather than hidden. New: `pool-forecast`
 (`groups`, `meanings`) and `rack-dice-value` (`groups`,
 `chrome`). Units hand-appended to `package.json`'s literal `&&`
 chain — there is no glob. `rerenderInterpretation()` must gain
