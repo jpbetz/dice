@@ -310,6 +310,154 @@ exports carry a roll's FULL intent:
   in the join response, so a pre-join peek needs a new endpoint or
   a name-in-URL surface. Not urgent.
 
+### 2l. Pool analysis — the die spectrum and the dice-value ledger
+(2026-08-05, Joe: "I want to support analysis of dice pools") —
+**DESIGN, four decisions taken. Nothing is built.**
+
+**Full detail: [POOL-ANALYSIS.md](POOL-ANALYSIS.md)** — the
+reasoning, the generated data, and the record of what was killed
+and why. Every figure in it is reproducible:
+`node tools/pool-analysis-data.mjs`.
+
+Two reads, serving one CUJ — setting up a *Your Soul Deal*
+player whose attribute and skill shelves want dice summing to
+100. **(1)** the outcome distribution, read *by outcome* not by
+value. **(2)** the summed die **maximums** of a shelf — a
+character-creation point budget, not a roll total. Unobtrusive
+by Joe's own constraint: *"I don't need to see this all the
+time… maybe only when editing the saved pools?"*
+
+Designed as a three-entrant judged panel (three adversarial
+lenses + a completeness critic); eleven claims that had survived
+into all three designs were refuted, including two of the
+survey's own numbers. **Then Joe's ruling cut deeper than any
+lens**, and the per-die half of the design is his:
+
+> *"We never fold together results in this system. Each die has
+> a result. We track those results."* — and, asked whether that
+> also forbids counting across the dice in a pool: **per-die
+> only, no aggregation.**
+
+**THE NO-AGGREGATION LAW.** Every cross-die device the panel
+built dies: the Poisson-binomial count ladder, the per-word "at
+least one" line, the chart-order cumulative read, the
+combination list Joe himself floated, and the whole *"what does
+2× success fold together"* question. **It costs nothing**,
+because the joint distribution **factorizes** — dice are
+independent and each reads its own column, so a per-die spectrum
+is not a summary of the distribution, it **is** the distribution
+in its only compact form. Any combination is recoverable by
+multiplying. And the alternative was unreadable anyway:
+enumerated exactly, `3d6` has 35 combinations topping out at
+**5.6%** (nine needed for half the mass) and `1d20+1d8` has 63
+topping out at 7.5%. **Recorded consequence:** the forecast
+never prints "2× Success" — Joe's own opening phrase — because
+that counts across dice. The math is preserved so revisiting
+costs a decision, not a re-derivation.
+
+**Ask 1 — THE SPECTRUM BAR.** One bar per die: that die's whole
+probability mass in the chart's **own row order** (already
+written worst→best, so it reads as a ladder), one tier-colored
+segment per word, quiet included. Identical ranks share a bar —
+deduplication, not aggregation; mixed pools get one bar per rank
+**under its source label**, which lands §2b's requirement for
+free (the forecast now mirrors the result row for row, where the
+panel's flat list would have forecast one line against a three-
+row result). Exact by construction, and **nearly free**: at most
+20 lookups per distinct rank, measured 1.3 µs for a d20 and 3.6
+µs for `40d20`. No DP, no convolution, no combinatorics —
+`pmf()` and `js/odds.js` exist **only for the sum profiles**.
+
+*Why it earns its place:* rank is not a magnitude knob but a
+different outcome space. A `d4` **can never** produce a Success,
+an Advantage or either Critical — its column runs Blemish →
+Minor Success and stops. Five `d4` and one `d20` cost the same
+20 points and are not the same purchase in any respect, which is
+invisible to a player adding maximums by hand.
+
+**Ask 2 — THE DICE-VALUE LEDGER. [JOE: count physical dice.]**
+Sum `DIE_MAX` over the dice guaranteed to hit the felt — base
+list plus **advantage partners**, capped at 40; reroll and
+explosion excluded as *value-conditional* (`composeRoll` pushes
+those only after seeing a value). Verified: `2d20` → 40 ·
+`1d20+1d4` → 24 · `d100` → 100 · the seeded nine `1d6` → 54.
+**This is what kills the spelling bug:** `2d20kh1` canonicalizes
+to `1d20 adv` and the canonical is what gets *stored*, so a
+`spec.dice` count would silently price it 20 against
+`2d20 kh1`'s 40, undiscoverably. Counting physical dice makes
+both read **40** — removed, not documented. **The word is
+`dice value`, never "ceiling"** (false in both directions: `4d6dl1`
+values 24 and caps at 18; `1d6!` values 6 and reaches 24).
+
+**Where it lives. [JOE: on with `✎ Edit pools`]** — one gate, no
+new control; manage mode becomes **manage-and-measure** and
+§7.18 must say so rather than let the gate widen by accident.
+**[JOE: the target is session-only]** — no localStorage, no
+YAML, no `dice.*.v1` key, so goal 12 stays unexposed and
+PROFILES [JOE-2] stays unmade; `100` appears nowhere in code.
+Shelf and region figures form **one right-flush ledger column**,
+steel and ivory, no gold in the management column; `.ph-rule`
+keeps its hairline (promoting it to a data track would regrade
+§7.17). **Both render paths build `.pool-sec-head`** — the
+foreign path needs the same wrapper with no figure, or foreign
+heads silently lose their dress.
+
+**THE HONESTY PASS ships first, and is not optional.**
+`fmtPreview` → `previewSpec(dice, mods, 800)` is a live bug in
+two rendered surfaces: measured over 200 trials, P(printed
+min/max equals the true min/max) is 3d6 98%/97% · 3d20 9%/8% ·
+**9d6 0%/0%** · 40d20 0%/0%. For every pool bigger than three d6
+— *including the nine-attribute Soul Deal seed rack* — the line
+the app prints as the pool's range is essentially always wrong
+at both ends. `renderCmdState` is shared by the command box
+**and the quick palette**; §1.3 makes that string load-bearing
+("the preview *is* the validator") in a fixed-height slot, so
+the per-die branch must **replace** it, never blank it; and the
+success branch ends in `visSuffix`, so a naive rewrite drops the
+visibility echo — and **no e2e asserts `#pop-preview`**, so it
+would ship silently.
+
+**BUILD ORDER — seven slices, each independently shippable.** ①
+the math floor + the honest preview (`js/odds.js`, `budgetOf`
+beside `DIE_MAX`, export
+`MAX_PHYSICAL_DICE`/`EXPLODE_CHAIN_CAP`, `fmtPreview` re-pointed
+in box *and* palette, `tests/odds.test.mjs`) · ② the profile
+seam (`forecastFor(spec, tools)` with `pmf` injected so
+meanings.js stays dependency-free) · ③ the dice-value ledger —
+**ask (2) usable here** · ④ the spectrum bars — **ask (1) ships
+here**, now the *smallest* UI slice · ⑤ the ledger sheet
+(`placeAnchored` extracted from `openSetMenuFor`, not ported;
+session-only target) · ⑥ the sum read · ⑦ verification + docs.
+Slices ③ and ④ each earn ONE interactive pass (ephemeral port —
+never 8123).
+
+**Verification — this BREAKS four smoke scenarios**, and no
+design named them: appending a figure makes `.pool-sec-head`'s
+textContent `'Attributes54'`, failing `sheet-pass`,
+`terminology`, `shared-pools` (the *foreign* path) and
+`portable`, plus `soul-seed` outside the gate. Re-point at
+`.psh-word`, and the figure must be **not built** at rest —
+`display:none` still concatenates. New: `pool-forecast`
+(`groups`, `meanings`) and `rack-dice-value` (`groups`,
+`chrome`). Units hand-appended to `package.json`'s literal `&&`
+chain — there is no glob. `rerenderInterpretation()` must gain
+the popover, or a teammate flipping the room's system leaves a
+stale forecast with no visible cause.
+
+**Decisions still open** (POOL-ANALYSIS.md §9): whether the
+parser stops collapsing `2d20kh1` · portable-YAML forward
+compatibility · which popover doors forecast · what a pool-scope
+forecast forecasts, given `stageGroup` drops mods while the rail
+rolls them · the offer card · the e2e tag · where the rack
+figure lives, given `#pools-head` is deliberately non-sticky.
+
+**GOALS: 4** (goal 4 names *summing values* as toil the system
+owes the player — this is that sentence applied to character
+creation) · **5** · **6** (profile-produced; no Soul Deal rule
+and no `100` outside meanings.js) · **7** (render-time, client-
+side: no endpoint, no wire key, no stored field, no build step)
+· **12** closed by the session-only ruling.
+
 ---
 
 ## Tier 2 — Organization (goal 5, the biggest experience gap)
@@ -376,7 +524,12 @@ ladder; all of it is polish or a new rung.
 - Roll-log export (copy/download text + CSV) — the online log is
   currently uncapturable.
 - Local roll statistics (per-player distribution, average-vs-
-  expected).
+  expected) — the OBSERVED half, and a **dependent of §2l**, not
+  its sibling: §2l's engine is the only source of an *expected*
+  value in the tree. Second blocker, unnamed until the §2l pass
+  found it: online the client persists no log at all
+  (`if (!netOnline) save(LS_LOG, log)`), so there is no durable
+  substrate for a per-player distribution yet.
 - Room settings (felt/system) in the portable YAML, so a table's
   look and rules travel with the rack. *(Was "snapshot them into
   the copy-link URL beside `#g=`" — dead with the URL codec,

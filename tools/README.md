@@ -46,3 +46,20 @@ counterpart to `lab.html`: it embeds the REAL app in an iframe and poses
 result-read states (staged draft, banners, peek, check/cinematic
 verdicts, held rolls) through `__diceDebug` — real CSS, real hovers,
 zero forked markup, so it cannot rot the way docs/mockups did.
+
+## Pool-analysis data (§2l)
+
+```bash
+node tools/pool-analysis-data.mjs           # human-readable report
+node tools/pool-analysis-data.mjs --json    # machine-readable
+```
+
+No browser, no server, no port — pure computation over `js/meanings.js`,
+`js/notation.js` and `js/rollspec.js`. Regenerates **every number** in
+[docs/POOL-ANALYSIS.md](../docs/POOL-ANALYSIS.md): the six per-die
+spectra, the dice-value cases, the combination enumerations, the
+(ruled-out but preserved) aggregate ladders, and the chart invariants —
+exiting non-zero if `p(Success) === p(Success & Bonus)` or unit mass ever
+breaks. It exists because the design pass behind §2l ran on numbers and
+**two of them were fabricated** by the agents that produced them; a
+figure you cannot regenerate is a figure you should not trust.
