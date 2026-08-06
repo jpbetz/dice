@@ -1095,6 +1095,29 @@ export const scenarios = [
     },
   },
   {
+    name: 'preview-honest',
+    tags: ['notation', 'smoke'],
+    // The command-box preview is exact (ROADMAP §2l ①, js/odds.js) — literal
+    // min/avg/max text is assertable, which the Monte-Carlo preview never
+    // was. The cap-truncation corners drop to seeded sampling and say so.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const type = (s) => a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = ${JSON.stringify(s)};
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      const slotOk = `(document.querySelector('#cmd-slot .ok') || {}).textContent || ''`;
+      await type('3d6+5');
+      await a.waitFor(`(${slotOk}).includes('min 8 avg 15.5 max 23')`,
+        { desc: 'exact preview for 3d6+5' });
+      assert.ok(!(await a.eval(slotOk)).includes('sampled'), 'exact line carries no label');
+      await type('30d6 ro<=3'); // 10 reroll slots for 30 candidates — BINDING
+      await a.waitFor(`(${slotOk}).includes('sampled — 4,000 rolls')`,
+        { desc: 'cap-truncation corner is labeled as sampled' });
+    },
+  },
+  {
     name: 'resync',
     tags: ['smoke', 'resync'],
     // A late joiner reconstructs the world: shelved rolls, live table dice,
@@ -2097,9 +2120,11 @@ export const scenarios = [
       assert.equal(await a.eval(`document.querySelectorAll('#groups-list .pool-tile.ghost').length`),
         0, 'no ghost tiles at rest');
 
-      // ✎ opens the sheet: trio shelves stand (even empty), each with its ghost
+      // ✎ opens the sheet: trio shelves stand (even empty), each with its
+      // ghost. Manage mode appends the dice-value figure to each head
+      // (§2l ③), so these two manage-state reads target .psh-word.
       await a.dbg('setPoolsEditMode(true)');
-      heads = await a.eval(`[...document.querySelectorAll('.pool-sec-head')].map((h) => h.textContent)`);
+      heads = await a.eval(`[...document.querySelectorAll('.pool-sec-head .psh-word')].map((h) => h.textContent)`);
       for (const want of ['Attributes', 'Skills', 'Motivations', 'Pools']) {
         assert.ok(heads.includes(want), `editing shows the ${want} shelf (got: ${heads})`);
       }
@@ -2114,7 +2139,7 @@ export const scenarios = [
         i.value = 'Spells';
         i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
       })()`);
-      heads = await a.eval(`[...document.querySelectorAll('.pool-sec-head')].map((h) => h.textContent)`);
+      heads = await a.eval(`[...document.querySelectorAll('.pool-sec-head .psh-word')].map((h) => h.textContent)`);
       assert.ok(heads.includes('Spells'), `the new shelf stands (got: ${heads})`);
       await a.dbg(`openCreation('spells')`);
       await a.eval(`(() => {
@@ -2325,6 +2350,68 @@ export const scenarios = [
       // a real tap (no hold) still stages
       await a.eval(`document.querySelector('#groups-list .pool-tile:not(.ghost) .tile-stage').click()`);
       assert.ok((await a.dbg('trayState')).dice.length > 0, 'a plain tap still stages');
+    },
+  },
+  {
+    name: 'rack-dice-value',
+    tags: ['groups', 'chrome'],
+    // THE DICE-VALUE LEDGER (§2l ③): manage-and-measure — figures exist
+    // only while ✎ is on (BUILT, not hidden), one right-flush column, never
+    // on a foreign rack. Both spellings of 2d20-keep-1 price 40: the ledger
+    // counts physical dice, so canonicalization cannot split the price.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.dbg(`setGroups([
+        {name: 'Claws', notation: '1d6', category: 'Attributes'},
+        {name: 'Fangs', notation: '2d8', category: 'Attributes'},
+        {name: 'Edge', notation: '1d20 adv', category: 'Skills'},
+        {name: 'Kept', notation: '2d20 kh1', category: 'Skills'}])`);
+
+      assert.equal(await a.eval(
+        `document.querySelectorAll('.psh-fig, #pools-head .ph-fig').length`), 0,
+        'no figures at rest');
+
+      await a.dbg('setPoolsEditMode(true)');
+      const led = await a.dbg('rackDiceValue');
+      assert.equal(led.total, 102, `rack total: 6+16+40+40 (got ${led.total})`);
+      const shelf = (l) => led.shelves.find((s) => s.label === l).value;
+      assert.equal(shelf('Attributes'), 22, 'Attributes shelf value');
+      assert.equal(shelf('Skills'), 80, "'1d20 adv' and '2d20 kh1' both read 40");
+      assert.equal(shelf('Motivations'), 0, 'an empty trio shelf reads 0');
+      const figs = await a.eval(
+        `[...document.querySelectorAll('.pool-sec-head .psh-fig')].map((f) => f.textContent)`);
+      assert.ok(figs.includes('22') && figs.includes('80'), `shelf figures render (got: ${figs})`);
+      assert.equal(await a.eval(`document.querySelector('#pools-head .ph-fig b').textContent`),
+        '102', 'the rack total rides the region head');
+      assert.ok((await a.eval(`document.querySelector('#pools-head .ph-fig').textContent`))
+        .includes('dice value'), 'the standing word is paid once at the top');
+
+      // editing a pool moves shelf and rack together
+      const claws = (await a.dbg('groups')).find((g) => g.name === 'Claws');
+      await a.dbg(`editPool(${JSON.stringify(claws.id)}, {notation: '1d20'})`);
+      assert.equal((await a.dbg('rackDiceValue')).total, 116, 'd6 → d20 moves the rack total');
+      assert.equal(await a.eval(
+        `[...document.querySelectorAll('.pool-sec-head .psh-fig')][0].textContent`), '36',
+        'and the shelf figure with it');
+
+      // Done: the instruments leave with the manage chrome
+      await a.dbg('setPoolsEditMode(false)');
+      assert.equal(await a.eval(
+        `document.querySelectorAll('.psh-fig, #pools-head .ph-fig').length`), 0,
+        'figures are gone at Done — built only in manage mode');
+
+      // a foreign rack never carries a figure (the ledger measures YOUR rack)
+      await b.waitFor(`window.__diceDebug.netPlayers.some((p) =>
+        p.name === 'Alice' && p.pools.length === 4)`, { desc: "Alice's rack reaches Bob" });
+      const alice = (await b.dbg('netPlayers')).find((p) => p.name === 'Alice');
+      await b.dbg(`setPoolsOwner(${JSON.stringify(alice.id)})`);
+      assert.ok(await b.eval(`document.querySelectorAll('#groups-list .pool-sec-head .psh-word').length >= 1`),
+        'foreign shelf heads keep the wrapper dress');
+      assert.equal(await b.eval(
+        `document.querySelectorAll('.psh-fig, #pools-head .ph-fig').length`), 0,
+        'no figures on a foreign rack');
+      await b.dbg('setPoolsOwner(null)');
     },
   },
   {

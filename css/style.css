@@ -993,6 +993,34 @@ html, body {
   margin: 12px -14px 4px;
   padding: 6px 14px 4px;
   background: rgba(24, 19, 14, 0.96);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.pool-sec-head .psh-word { min-width: 0; }
+/* THE DICE-VALUE LEDGER (§2l ③): shelf and rack figures share one
+   right-flush column — steel word, ivory figure, no gold (HUE = ACT:
+   nothing here is an action). Figures are BUILT only in manage mode,
+   never styled into hiding. */
+.pool-sec-head .psh-fig,
+#pools-head .ph-fig b {
+  color: var(--ivory);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+.pool-sec-head .psh-fig { margin-left: auto; }
+#pools-head .ph-fig {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+#pools-head .ph-fig .phf-word {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 .pool-grid {
   display: grid;

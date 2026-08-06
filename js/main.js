@@ -23,7 +23,7 @@ import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRang
 import { dieArtURL } from './diceart.js';
 import { connect, forgetSeat } from './net.js';
 import { SYSTEMS, DEFAULT_SYSTEM } from './meanings.js';
-import { composeRoll, validateMods } from './rollspec.js';
+import { composeRoll, validateMods, budgetOf } from './rollspec.js';
 import { previewOf } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { exportYaml, parsePortable, planImport } from './portable.js';
@@ -4623,6 +4623,15 @@ window.__diceDebug = {
   // edit chrome exists only while this is on.
   get poolsEditMode() { return poolsEdit; },
   setPoolsEditMode(on) { setPoolsEdit(on); return poolsEdit; },
+  // §2l ③ — named rackDiceValue: shelfValue is already a live concept
+  // (a die's face on the collect shelf).
+  get rackDiceValue() {
+    return {
+      total: shelfDiceValue(groups),
+      shelves: buildSections(groups, { ensureTrio: poolsEdit })
+        .map((sec) => ({ label: sec.label, value: shelfDiceValue(sec.pools) })),
+    };
+  },
   // scenario seeding: replace the rack wholesale (validated + persisted).
   // Scenarios share one browser profile per origin, so a test must never
   // depend on the rack an earlier scenario left behind.
@@ -6481,7 +6490,12 @@ function renderForeignPools(owner) {
   for (const sec of buildSections(pools)) {
     const head = document.createElement('div');
     head.className = 'plabel pool-sec-head';
-    head.textContent = sec.label;
+    // Same wrapper as the own rack, no figure ever — the ledger measures
+    // YOUR rack only (manage is yours-only; §2l ③).
+    const word = document.createElement('span');
+    word.className = 'psh-word';
+    word.textContent = sec.label;
+    head.appendChild(word);
     groupsListEl.appendChild(head);
     const grid = document.createElement('div');
     grid.className = 'pool-grid';
@@ -6520,6 +6534,22 @@ function renderForeignPools(owner) {
   }
 }
 
+// THE DICE-VALUE LEDGER (ROADMAP §2l ③): manage-and-measure — the figures
+// exist only while ✎ is on, BUILT rather than hidden (display:none would
+// still concatenate into every textContent read), and never on a foreign
+// rack. The word is 'dice value', never "ceiling" — false in both
+// directions: 4d6dl1 values 24 and caps at 18, 1d6! values 6 and reaches
+// 24. The one legend sentence rides as the title.
+const DICE_VALUE_LEGEND = 'dice value — the sum of every die’s highest face; modifiers, drops and explosions are not counted';
+function shelfDiceValue(pools) {
+  let sum = 0;
+  for (const g of pools) {
+    const res = parseNotation(g.notation);
+    if (res.ok) sum += budgetOf(res.spec.dice, res.spec.mods);
+  }
+  return sum;
+}
+
 function renderGroups() {
   groupsListEl.innerHTML = '';
   // Digit targets are ALWAYS your own pools in your own rendered order —
@@ -6541,6 +6571,23 @@ function renderGroups() {
   groupsListEl.classList.toggle('foreign', foreign);
   poolsHead.querySelector('.ph-word').textContent = foreign ? `${owner.name}'s pools` : 'Saved pools';
   poolsHead.classList.remove('hidden'); // one region head, always shown online-with-content
+  // The rack total rides the region head's slack (.ph-rule flex:1) — one
+  // right-flush ledger column with the shelf figures, its standing word
+  // paid once here. Rebuilt fresh per render; absent outside manage.
+  const oldFig = poolsHead.querySelector('.ph-fig');
+  if (oldFig) oldFig.remove();
+  if (!foreign && poolsEdit) {
+    const fig = document.createElement('span');
+    fig.className = 'ph-fig';
+    fig.title = DICE_VALUE_LEGEND;
+    const w = document.createElement('span');
+    w.className = 'phf-word';
+    w.textContent = 'dice value';
+    const num = document.createElement('b');
+    num.textContent = String(shelfDiceValue(groups));
+    fig.append(w, num);
+    poolsHead.appendChild(fig);
+  }
   if (foreign) {
     renderForeignPools(poolsOwnerPlayer());
     return;
@@ -6549,7 +6596,17 @@ function renderGroups() {
   for (const sec of buildSections(groups, { ensureTrio: poolsEdit })) {
     const head = document.createElement('div');
     head.className = 'plabel pool-sec-head';
-    head.textContent = sec.label;
+    const word = document.createElement('span');
+    word.className = 'psh-word';
+    word.textContent = sec.label;
+    head.appendChild(word);
+    if (poolsEdit) {
+      const fig = document.createElement('span');
+      fig.className = 'psh-fig';
+      fig.title = DICE_VALUE_LEGEND;
+      fig.textContent = String(shelfDiceValue(sec.pools));
+      head.appendChild(fig);
+    }
     groupsListEl.appendChild(head);
     const grid = document.createElement('div');
     grid.className = 'pool-grid';
