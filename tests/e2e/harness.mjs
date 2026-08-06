@@ -385,7 +385,7 @@ export class Ctx {
 
 export async function runScenarios(scenarios, { only = null, full = false } = {}) {
   const selected = scenarios.filter((s) => {
-    if (only) return s.tags.some((t) => only.includes(t));
+    if (only) return only.includes(s.name) || s.tags.some((t) => only.includes(t));
     if (full) return true;
     return s.tags.includes('smoke');
   });

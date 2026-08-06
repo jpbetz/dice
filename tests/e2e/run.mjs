@@ -16,7 +16,7 @@ limitations under the License.
 
 // e2e entry point (see docs/TESTING.md for the policy):
 //   node tests/e2e/run.mjs                 # smoke set (default)
-//   node tests/e2e/run.mjs --only shelf    # targeted: scenarios tagged 'shelf'
+//   node tests/e2e/run.mjs --only shelf    # targeted: tag or scenario name
 //   node tests/e2e/run.mjs --full          # everything (pre-release sweep)
 //   node tests/e2e/run.mjs --list          # show scenarios and tags
 
