@@ -449,6 +449,12 @@ export const scenarios = [
         assert.equal(chipDom, 0,
           `#chips-layer emptied after cycle ${cycle + 1} (got ${chipDom} stranded — the shelf marker stole a die's chip ref)`);
       }
+      // Put the preference back. 'dice.chips.v1' is per-origin localStorage
+      // and OUTLIVES this room, so leaving chips on hands the next localhost
+      // scenario a table it did not ask for — chips-quiet-default is the very
+      // next one and asserts the default is OFF. A scenario that flips a
+      // stored preference owns restoring it.
+      assert.equal(await a.dbg('setChipsVisible(false)'), false, 'the preference is restored');
     },
   },
   {
