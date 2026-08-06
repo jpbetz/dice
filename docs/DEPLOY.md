@@ -54,6 +54,37 @@ without re-reading this:
 | `--allow-unauthenticated` | It's a public table for friends. Server-side caps (rooms/players/body sizes) already bound abuse; billing is bounded by max-instances. |
 | Request-based billing (default) | Cheaper than instance-based at this usage and skips the paid idle tail. Background timers (heartbeat, reaps) stall only when *zero* streams are open — harmless here, since with no players there is nothing to time. |
 
+### The front end hides departures (2026-08-06)
+
+**A closed tab does not close the stream the container sees.** Cloud Run
+terminates the client connection at its front end, so when a browser goes away
+the container's request stays open and its writes keep succeeding into the
+proxy. `'close'` never fires and no write ever throws — which were the app's
+only two ways of noticing a player had left. Seats accumulated on the roster
+until the platform force-closed the request at `--timeout 3600`, an hour later.
+
+It is visible in the logs whenever it recurs: `/api/events` request latencies
+of exactly **3601 s** are abandoned streams running to the ceiling, and
+
+```sh
+gcloud run services logs read dice --region us-central1 --limit 200
+```
+
+showing `players=N` climbing with no matching `left` lines is the same fact
+from the other side.
+
+The app no longer trusts the transport for this (`server.js`
+`LIVENESS_TIMEOUT_MS`): a `pagehide` beacon says so on the way out, and the
+heartbeat is a question the client answers with `POST /api/pong`, so a stream
+that stops answering is dropped whatever the socket claims. **Anything added
+here that infers presence from a socket will be wrong in production and right
+on your laptop** — that asymmetry is what made this expensive to find.
+
+Nothing about the flag set causes it; lowering `--timeout` would only shorten
+the ghosts, at the price of more reconnects for everyone. Any proxying platform
+behaves this way, so the escape hatches in the table below inherit the problem
+and the fix alike.
+
 Deploy from source (no Dockerfile): the Node buildpack runs `npm start` →
 `node server.js`, honors `engines.node`, and installs nothing (zero deps).
 `.gcloudignore` keeps tests/docs/tools out of the upload.

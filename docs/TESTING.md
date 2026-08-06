@@ -14,6 +14,12 @@ this document defines how we check them.
    (`redaction.test.mjs`: the `projectEntryFor` matrix in-process, plus an
    endpoint layer that spawns `server.js` on an ephemeral port and asserts on
    raw SSE bytes). Plain Node scripts under `tests/`, no framework.
+   `presence.test.mjs` is the other spawned-server suite: how a seat LEAVES
+   (`/api/leave`, `/api/pong`, the staleness sweep), shrinking the server's
+   clocks through `DICE_HEARTBEAT_MS` / `DICE_LIVENESS_TIMEOUT_MS` because a
+   browser cannot wait out three 20 s heartbeats. It lives here rather than in
+   e2e for that reason alone — the browser half is the `seat-closed-tab`
+   scenario.
 2. **Fuzz** (`npm run test:fuzz`, ~1 s) — property-based notation fuzzing.
 3. **Scripted e2e** (`npm run test:e2e`, seconds) — headless Chrome driven
    over raw CDP by the zero-dependency harness in `tests/e2e/` (Node ≥ 22's

@@ -217,6 +217,52 @@ the felt as well as the seats.
 
 ---
 
+## Presence: departure is said out loud (2026-08-06)
+
+**Shipped (`5888a87`).** Reported from the live table: "when players leave
+their names are staying around forever." They were — but only in
+production, which is why nothing caught it. Locally a closed tab reaps in
+5 s and the e2e suite proves it. Behind Cloud Run's front end the
+container never sees the close, its writes keep succeeding into the proxy,
+and `clients.size` never reaches 0 — so no grace was ever armed and the
+seat sat there until the platform force-closed the request an hour later.
+The deployed logs said it plainly: `players=4` with one real window open,
+no `left` lines since instance start, and `/api/events` latencies of
+exactly 3601 s. [DEPLOY.md](DEPLOY.md#the-front-end-hides-departures-2026-08-06)
+carries the operator's version.
+
+The defect underneath was a design one, not a Cloud Run one: **presence
+was inferred from a socket**, and every socket signal we had describes our
+connection to a proxy, not the player's to us. Two layers replace it:
+
+- **`POST /api/leave`** — a `pagehide` beacon, so the common case costs
+  seconds instead of an hour. It names the stream it is leaving, which is
+  the whole reason a reload survives it: a refresh fires the *identical*
+  event, and only the id distinguishes the beacon of a dying page from the
+  stream its successor already opened. `seat-resume` (no `player-left`
+  churn across a refresh) is the standing guard on that. 'Leave & switch
+  seat' passes `immediate: true` and gives the seat up at once.
+- **`POST /api/pong`** — the heartbeat became a *question*. `': ping'` was
+  an SSE comment no client could ever see, let alone answer; it is now an
+  event the client answers, and a stream that stops answering is dropped
+  regardless of what the socket claims. A pong for a stream the server no
+  longer holds answers `unknown_stream` — the one way a deaf client
+  (swept, evicted, or restored from bfcache holding a connection the proxy
+  kept warm) is ever told to reopen.
+
+Best-effort and backstop, deliberately layered: a beacon cannot be
+awaited, confirmed, or relied on (crashes, killed tabs, dead networks skip
+it), so the sweep is what actually closes the hole. Streams that carry no
+`streamId` are exempt from staleness — a client cached from before this
+cannot pong, and reaping it would loop it through a new seat and colour
+every liveness window; it keeps today's behavior and heals on its next
+reload.
+
+Covered by `tests/presence.test.mjs` (11 protocol cases, clocks shrunk via
+`DICE_HEARTBEAT_MS` / `DICE_LIVENESS_TIMEOUT_MS`) and the
+`seat-closed-tab` e2e (a real tab closes, a real roster empties, and the
+log still carries the departed player's roll — history is not presence).
+
 ## Tier 0 — Performance & foundation (2026-08-04 audit)
 
 Bench + review pass 2026-08-04 (perf-audit workflow, 4 empirical benches

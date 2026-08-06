@@ -117,6 +117,16 @@ note).
   modal locks the shared surface; concurrent rolls are safe.
 - **Attributed math.** Bonuses carry named sources; discarded dice stay
   visible (struck); the arithmetic of a result is always inspectable.
+- **Presence is asserted, never inferred.** A seat on the roster means a
+  client said it was there — a beacon on the way out, an answered heartbeat
+  while it stays. Socket-level signals (a `close` event, a write that
+  throws) describe our connection to whatever proxy is in front of us, not
+  the player's connection to us; on a deployed table they can stay healthy
+  for an hour after the browser is gone, and taking them for presence is
+  what put four ghosts on the roster (2026-08-06, see
+  [SHIPPED.md](SHIPPED.md#presence-departure-is-said-out-loud-2026-08-06)).
+  The roster is live state and answers to this; the roll log is history and
+  does not — a departed player's name stays on the rolls they made.
 
 ## Priorities
 
