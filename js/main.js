@@ -56,6 +56,11 @@ const MAX_DICE_ON_TABLE = 40;
 const GRAVITY = -110;
 const LOG_CAP = 100;
 const LS_GROUPS = 'dice.groups.v1';
+// G3 (ROADMAP §G3): the operator's OWN rack, stashed while a table-file
+// profile is swapped into dice.groups.v1 for editing. Present in storage
+// ⇔ a swap is live; boot treats a leftover stash as "the tab died
+// mid-edit" and restores it (see the reload guard by the groups load).
+const LS_GROUPS_MINE = 'dice.groups.mine.v1';
 const LS_LOG = 'dice.log.v1';
 const LS_HISTORY = 'dice.cmdhistory.v1'; // command-box history: shared across rooms, cap 50
 const HISTORY_CAP = 50;
@@ -4318,6 +4323,17 @@ window.__diceDebug = {
     loadText(text) { return portableLoadText(text); },
     acceptFile(file) { return portableAcceptFile(file); },
     get maxBytes() { return PORTABLE_MAX_BYTES; },
+    // G3 profile authoring (§G3) — the rack swap, minus the clicks. All of
+    // these return the pane's own verdict ({ok, status, canApply}); the two
+    // that rewrite the box add {text}. editingProfile is the name whose
+    // pools are swapped into the rack right now, or null = the rack is
+    // yours (the banner shows exactly when this is non-null).
+    profiles() { return portableParsed ? portableParsed.profiles.map((p) => p.name) : []; },
+    editProfile(name) { return portableEditProfile(name); },
+    saveToProfile(name) { return portableSaveToProfile(name); },
+    addProfile(name) { return portableAddProfile(name); },
+    doneEditing() { return portableDoneEditing(); },
+    get editingProfile() { return portableEditing; },
   },
   // ceremony introspection (UX §2.4): phase machine + decal state
   get ceremonyState() {
@@ -5753,6 +5769,12 @@ let net = null;         // live connection handle from net.connect (online only)
 let netOnline = false;
 let players = [];
 let poolsOwner = null;  // a player id, or null = your own rack
+// G3 profile authoring (declared here with poolsOwner because publishPools
+// and renderGroups both read it, and both can run before the portable pane's
+// own section evaluates): the display name of the table-file profile whose
+// pools are currently swapped into `groups`, or null = the rack is yours.
+let portableEditing = null;
+let portableMine = null; // the pre-swap rack (same records), for a same-session restore
 
 renderTray();
 paintCmd();
@@ -5807,6 +5829,24 @@ if (/[#&]g=/.test(location.hash)) {
 }
 
 let groups = load(LS_GROUPS, null);
+// G3 RELOAD GUARD: a stash under dice.groups.mine.v1 means the last session
+// ended while a table-file profile was swapped into the rack (Edit ⟨name⟩,
+// PROFILES §4). DELIBERATE CHOICE of the two the design allows: restore the
+// operator's OWN rack and drop the editing state, rather than resurrecting
+// the swap. The banner and the file text do not survive a reload, so booting
+// with the profile's pools still in dice.groups.v1 would be someone else's
+// rack under your name with nothing on screen saying so — the `#g=` codec's
+// exact failure (GOALS §7). The profile itself is safe wherever it was last
+// saved (the text, the downloaded file); unsaved profile edits from the dead
+// session are the one thing lost, and losing those is the honest outcome —
+// the file is the truth, and nothing was ever truer than its last Save.
+{
+  const mine = load(LS_GROUPS_MINE, null);
+  if (Array.isArray(mine)) {
+    groups = mine; // re-persisted under LS_GROUPS by the saveGroups() below
+    try { localStorage.removeItem(LS_GROUPS_MINE); } catch { /* ignore */ }
+  }
+}
 // The Soul Deal starting rack (Joe, 2026-08-01): the nine attributes in
 // their Physical/Mental/Social triads (offense/defense/utility), one
 // skill, one motivation — a fresh seat can stage attribute+skill+
@@ -6233,6 +6273,14 @@ function setPoolsOwner(id) {
 // 'pools-changed' echo, and a solo table simply has no one to tell.
 function publishPools() {
   if (!net) return;
+  // G3: while a table-file profile is swapped into the rack, the rack is not
+  // ours to claim — publishing is "here is MY rack" to the whole room, and
+  // pushing Alice's pools under our own name would lie to every teammate and
+  // corrupt the owner switcher. EVERY publish funnels through here (the
+  // saveGroups debounce, the join at hello, the silent-rejoin re-share, the
+  // debug hook), so this one gate covers them all; Done's saveGroups()
+  // re-publishes the restored rack the moment the gate lifts.
+  if (portableEditing) return;
   net.setPools(groups.slice(0, 40).map((g) => {
     const rec = { name: g.name || '', notation: g.notation };
     if (g.category) rec.category = g.category;
@@ -8931,6 +8979,7 @@ const portableText = document.getElementById('portable-text');
 const portableStatus = document.getElementById('portable-status');
 const portableApplyBtn = document.getElementById('portable-apply');
 let portablePlan = null; // the previewed plan Apply commits (null = nothing valid)
+let portableParsed = null; // the last GOOD parse of the box (drives the G3 profile list)
 
 function portableSnapshot() {
   return exportYaml({ groups, settings: { sound: soundOn, numbers: chipsOn } });
@@ -8939,15 +8988,21 @@ function portableSnapshot() {
 function portablePreview() {
   const text = portableText.value;
   portablePlan = null;
+  portableParsed = null;
   portableApplyBtn.disabled = true;
   portableStatus.classList.remove('warn');
-  if (!text.trim()) { portableStatus.textContent = ''; return; }
+  if (!text.trim()) { portableStatus.textContent = ''; renderPortableProfiles(); return; }
   const parsed = parsePortable(text);
   if (!parsed.ok) {
     portableStatus.textContent = `✗ ${parsed.line ? `line ${parsed.line}: ` : ''}${parsed.error}`;
     portableStatus.classList.add('warn');
+    renderPortableProfiles();
     return;
   }
+  // The parse stands even when the IMPORT plan below is refused: the profile
+  // list (G3) is about what the file holds, not what would merge into you.
+  portableParsed = parsed;
+  renderPortableProfiles();
   const plan = planImport(groups, parsed);
   if (groups.length + plan.adds.length > 40) {
     portableStatus.textContent = `✗ would exceed 40 pools (you have ${groups.length}, this adds ${plan.adds.length})`;
@@ -9083,6 +9138,324 @@ portableFileInput.addEventListener('change', () => {
   const file = portableFileInput.files && portableFileInput.files[0];
   portableFileInput.value = ''; // re-picking the SAME file must fire change again
   portableAcceptFile(file);
+});
+
+// ---------------------------------------------------------------------------
+// Profile authoring — the rack swap (ROADMAP §G3 ⟨MVP⟩, PROFILES §4).
+//
+// The organizer needs the pool editor AND the dice-value ledger pointed at
+// someone else's rack, and every management surface (✎, the popover, drag,
+// editPoolById) assumes it writes YOUR dice.groups.v1. So there is no second
+// editor: Edit ⟨name⟩ swaps that profile's pools INTO `groups`, and manage
+// mode, the spectrum bars and the ledger all work unmodified because as far
+// as they know it is your rack. Save to ⟨name⟩ writes the rack back into the
+// BOX TEXT only — the file door (G1) stays the one explicit way to disk.
+//
+// The guardrails, because this is the slice with real data-loss risk:
+//   1. The stash. Entering a swap writes the pre-swap rack to
+//      dice.groups.mine.v1 BEFORE touching `groups`, and verifies the write
+//      landed (a full/backless localStorage refuses the whole swap — nothing
+//      moves). Losing your own pools because you clicked "Edit Alice" would
+//      be the `#g=` codec all over again (GOALS §7).
+//   2. The banner. A sticky bar over the rack names whose pools are on
+//      screen the whole time, wearing the #pools-toolbar.on editing dress
+//      and holding the only two exits: Save to ⟨name⟩ and Done.
+//   3. The publish gate. publishPools() no-ops while a swap is live (see the
+//      gate there) — the room never hears Alice's rack under your name.
+//   4. The reload guard, by the groups load at boot: a leftover stash
+//      restores YOUR rack and drops the editing state, deliberately.
+//   5. Commits spend the preview. Every verb that changes `groups` or the
+//      box text ends in portableReceipt(), which drops the previewed plan
+//      the way Apply's own commit does — a plan computed against one rack is
+//      never left armed against another.
+//
+// A file whose parse carried warnings (sections a later version wrote) is
+// READ-ONLY to these verbs: a rewrite would silently drop what the skip
+// skipped, so both doors refuse it — skip-and-warn is an import tolerance,
+// not a license to emit a file minus the parts we didn't understand.
+// ---------------------------------------------------------------------------
+
+// Caps, MIRRORED from js/portable.js (like its own SETTING_SPECS mirror:
+// portable.js does not export them, and the pre-check keeps a refusable
+// Save from ever replacing good box text with an over-cap file).
+const PORTABLE_MAX_PROFILES = 12;
+const PORTABLE_MAX_POOLS_PER_PLAYER = 40;
+const PORTABLE_MAX_POOLS_PER_FILE = 300;
+
+// One parsed rack (parsePortable's shelves) → flat group records, ids minted
+// fresh. Fresh ids are safe: the swap replaces the whole rack, and Apply's
+// added ids are Date.now()-scale so they never collide with these.
+function profileShelvesToGroups(shelves) {
+  const out = [];
+  for (const s of shelves || []) {
+    for (const p of s.pools) {
+      out.push({
+        id: out.length + 1, name: p.name, notation: p.notation,
+        ...(s.plain ? {} : { category: s.label }),
+        ...(p.set ? { set: p.set } : {}),
+      });
+    }
+  }
+  return out;
+}
+
+const profilePoolCount = (p) => p.shelves.reduce((n, s) => n + s.pools.length, 0);
+
+// The rack as exportYaml's flat profile shape (ids stripped — they are
+// rack-local and mean nothing in a file).
+function groupsToProfileGroups() {
+  return groups.map((g) => ({
+    name: g.name || '', notation: g.notation,
+    ...(g.category ? { category: g.category } : {}),
+    ...(g.set ? { set: g.set } : {}),
+  }));
+}
+
+function portableFindProfile(name) {
+  const k = String(name == null ? '' : name).trim().toLowerCase();
+  return (portableParsed ? portableParsed.profiles : []).find((p) => p.name.toLowerCase() === k) || null;
+}
+
+// The shared door check for every profile verb. null = clear to proceed.
+function portableProfileGuard() {
+  if (!portableParsed) return portableRefuse('✗ nothing usable in the box — open a table file or Fill with my data first');
+  const n = portableParsed.warnings.length;
+  if (n) {
+    return portableRefuse(`✗ ${n} unknown section${n > 1 ? 's' : ''} in this file — a rewrite would drop ${n > 1 ? 'them' : 'it'}, so profile editing is off here`);
+  }
+  return null;
+}
+
+// A commit receipt in the pane's voice: the previewed plan is SPENT (Apply's
+// own post-commit grammar) — a plan computed against the pre-commit rack or
+// text must never stay armed after either has changed. Any new input, Fill,
+// Open or load re-arms through the live preview.
+function portableReceipt(msg) {
+  portablePlan = null;
+  portableApplyBtn.disabled = true;
+  portableStatus.classList.remove('warn');
+  portableStatus.textContent = msg;
+  return portableVerdict();
+}
+
+// Re-emit the box's parsed model with `profilesOut` as the players section —
+// table and top-level pools ride through untouched; settings ride through
+// with exportYaml's defaults filling any the text left unsaid (the emitter
+// always writes the section — one Save normalizes to canonical form, the
+// same way notations normalize on import).
+function portableEmitWith(profilesOut) {
+  return exportYaml({
+    groups: profileShelvesToGroups(portableParsed.shelves),
+    settings: portableParsed.settings,
+    table: portableParsed.table || null,
+    profiles: profilesOut,
+  });
+}
+
+// Enter the swap: guardrails 1 (stash, verified) and 2 (banner), publish
+// gate armed by the portableEditing assignment. Manage mode comes on and the
+// panel opens — the ledger pointed at this rack is the whole point (CUJ1).
+function portableEditProfile(name) {
+  const guard = portableProfileGuard();
+  if (guard) return guard;
+  const prof = portableFindProfile(name);
+  if (!prof) return portableRefuse(`✗ no player ${JSON.stringify(String(name == null ? '' : name).trim())} in this file`);
+  if (portableEditing && prof.name === portableEditing) {
+    // Idempotent on purpose: a re-swap here would silently discard unsaved
+    // edits and reload the profile from the text — that is Done's job to do
+    // loudly, never a repeated click's to do quietly.
+    return portableReceipt(`✓ already editing '${prof.name}' — Save to writes it back, Done restores your pools`);
+  }
+  if (portableEditing) {
+    return portableRefuse(`✗ still editing '${portableEditing}' — Save to it first, or Done to set it aside`);
+  }
+  // GUARDRAIL 1 — the stash, written and VERIFIED before groups is touched.
+  // If localStorage can't hold it (quota, private mode with storage dead),
+  // the swap refuses entirely: "nothing was swapped" must stay literally true.
+  save(LS_GROUPS_MINE, groups);
+  const stashed = load(LS_GROUPS_MINE, null);
+  if (!Array.isArray(stashed) || stashed.length !== groups.length) {
+    try { localStorage.removeItem(LS_GROUPS_MINE); } catch { /* ignore */ }
+    return portableRefuse('✗ couldn’t set your own pools aside (storage unavailable?) — nothing was swapped');
+  }
+  portableMine = groups;
+  portableEditing = prof.name; // arms the publish gate from here on
+  poolsOwner = null;
+  editingGroupId = null; // no open tile editor may survive into another rack
+  creatingShelf = null;
+  if (pop && pop.source === 'group') closePopover();
+  groups = profileShelvesToGroups(prof.shelves);
+  saveGroups(); // persists under LS_GROUPS (the reload guard covers it); publish stays gated
+  if (!panelsOpen.pools) setPanel('pools', true); // the banner must be somewhere it can be seen
+  setPoolsEdit(true); // manage + ledger on; renders groups and players
+  updateProfileBanner();
+  renderPortableProfiles();
+  return portableReceipt(`✓ editing '${prof.name}' — your own pools are set aside; Save to '${prof.name}' writes back, Done restores yours`);
+}
+
+// Write the CURRENT rack into ⟨name⟩'s block in the box text (guardrail 5's
+// receipt spends the plan). Works while editing that profile — the round
+// trip — but also cold: overwriting a seat with your own rack is a legal,
+// explicit, text-only act the operator can read before Downloading.
+function portableSaveToProfile(name) {
+  const guard = portableProfileGuard();
+  if (guard) return guard;
+  const prof = portableFindProfile(name);
+  if (!prof) return portableRefuse(`✗ no player ${JSON.stringify(String(name == null ? '' : name).trim())} in this file — Save as new profile adds one`);
+  if (groups.length > PORTABLE_MAX_POOLS_PER_PLAYER) {
+    return portableRefuse(`✗ your rack holds ${groups.length} pools — a profile carries at most ${PORTABLE_MAX_POOLS_PER_PLAYER}`);
+  }
+  const others = portableParsed.profiles.reduce((n, p) => n + (p === prof ? 0 : profilePoolCount(p)), 0);
+  const top = portableParsed.shelves.reduce((n, s) => n + s.pools.length, 0);
+  if (others + top + groups.length > PORTABLE_MAX_POOLS_PER_FILE) {
+    return portableRefuse(`✗ would put the file over ${PORTABLE_MAX_POOLS_PER_FILE} pools`);
+  }
+  const profilesOut = portableParsed.profiles.map((p) => ({
+    name: p.name,
+    ...(p.set ? { set: p.set } : {}), // the seat's dice identity is not the rack's to clobber
+    groups: p === prof ? groupsToProfileGroups() : profileShelvesToGroups(p.shelves),
+  }));
+  const text = portableEmitWith(profilesOut);
+  const v = portableLoadText(text); // the one door text enters; re-previews and re-lists
+  if (!v.ok) return { ...v, text }; // emit that refuses its own parse would be a bug — surface it, never hide it
+  return { ...portableReceipt(`✓ saved to '${prof.name}' — Download writes the file`), text };
+}
+
+// Save as new profile: the current rack becomes a NEW seat in the text —
+// six characters have to start somewhere, and this is where (CUJ1: Fill
+// with my data, then add 'Alice' and Edit her into shape).
+function portableAddProfile(rawName) {
+  const guard = portableProfileGuard();
+  if (guard) return guard;
+  const nm = String(rawName == null ? '' : rawName).trim();
+  if (!nm) return portableRefuse('✗ a profile needs a name');
+  if (nm.includes('#')) return portableRefuse('✗ profile names can’t carry \'#\' — it starts a comment in dice notation, so the name would misdirect whispers');
+  if (nm.length > 24) return portableRefuse('✗ profile name over 24 characters');
+  if (portableFindProfile(nm)) return portableRefuse(`✗ '${portableFindProfile(nm).name}' is already in this file — its Save to overwrites it`);
+  if (portableParsed.profiles.length >= PORTABLE_MAX_PROFILES) {
+    return portableRefuse(`✗ the file already holds ${PORTABLE_MAX_PROFILES} players`);
+  }
+  if (groups.length > PORTABLE_MAX_POOLS_PER_PLAYER) {
+    return portableRefuse(`✗ your rack holds ${groups.length} pools — a profile carries at most ${PORTABLE_MAX_POOLS_PER_PLAYER}`);
+  }
+  const others = portableParsed.profiles.reduce((n, p) => n + profilePoolCount(p), 0);
+  const top = portableParsed.shelves.reduce((n, s) => n + s.pools.length, 0);
+  if (others + top + groups.length > PORTABLE_MAX_POOLS_PER_FILE) {
+    return portableRefuse(`✗ would put the file over ${PORTABLE_MAX_POOLS_PER_FILE} pools`);
+  }
+  const profilesOut = portableParsed.profiles.map((p) => ({
+    name: p.name,
+    ...(p.set ? { set: p.set } : {}),
+    groups: profileShelvesToGroups(p.shelves),
+  }));
+  profilesOut.push({ name: nm, groups: groupsToProfileGroups() }); // no set: the seat's identity is the file author's call
+  const text = portableEmitWith(profilesOut);
+  const v = portableLoadText(text);
+  if (!v.ok) return { ...v, text };
+  return { ...portableReceipt(`✓ added '${nm}' — Download writes the file`), text };
+}
+
+// The other exit: the operator's own rack comes back, the stash clears, and
+// the publish gate lifts BEFORE saveGroups so the restored rack re-shares.
+// The profile keeps whatever was last saved to the text — unsaved edits are
+// discarded here exactly like closing a file without saving, which is what
+// the banner's Save button exists to make hard to do by accident.
+function portableDoneEditing() {
+  if (!portableEditing) return portableVerdict(); // nothing to do; the screen already says so
+  const name = portableEditing;
+  portableEditing = null;
+  const mine = Array.isArray(portableMine) ? portableMine : load(LS_GROUPS_MINE, []);
+  portableMine = null;
+  // Belt and braces: the stash re-enters through the same door storage does,
+  // so a hand-damaged stash drops bad records instead of seating them.
+  groups = (Array.isArray(mine) ? mine : []).map(migrateGroup).filter(Boolean);
+  try { localStorage.removeItem(LS_GROUPS_MINE); } catch { /* ignore */ }
+  editingGroupId = null;
+  creatingShelf = null;
+  if (pop && pop.source === 'group') closePopover();
+  saveGroups(); // persists yours back and re-publishes now the gate is open
+  setPoolsEdit(false); // renders groups and players
+  updateProfileBanner();
+  renderPortableProfiles();
+  return portableReceipt(`✓ your own pools are back — '${name}' keeps what was last saved to the text`);
+}
+
+// GUARDRAIL 2 — the banner. One sticky bar over the rack, wearing the
+// pools-toolbar's editing dress, present exactly while a swap is live. Its
+// two buttons are the only exits; #groups-list.profile-editing releases the
+// category heads' sticky pin so ownership is the one thing pinned
+// (#pools-head.foreign makes the identical call for the identical reason).
+function updateProfileBanner() {
+  const on = !!portableEditing;
+  document.getElementById('profile-banner').classList.toggle('hidden', !on);
+  groupsListEl.classList.toggle('profile-editing', on);
+  if (on) {
+    document.getElementById('profile-banner-name').textContent = portableEditing;
+    const saveBtn = document.getElementById('profile-save');
+    saveBtn.textContent = `Save to ${portableEditing}`;
+    saveBtn.title = `Write these pools back into '${portableEditing}' in Your data — then Download keeps the file`;
+  }
+}
+
+// The profile list under the status line: what the box's players: section
+// holds, one row per seat, Edit and Save to on each. Rebuilt on every
+// preview (the box is live), so the rows carry no state of their own; the
+// add-a-profile row is static HTML so a half-typed name survives a repaint.
+function renderPortableProfiles() {
+  const zone = document.getElementById('portable-profiles');
+  const rows = document.getElementById('portable-profile-rows');
+  const show = !!portableParsed;
+  zone.classList.toggle('hidden', !show);
+  rows.textContent = '';
+  if (!show) return;
+  for (const p of portableParsed.profiles) {
+    const row = document.createElement('div');
+    row.className = 'pp-row';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'pp-name';
+    nameEl.textContent = p.name;
+    const n = profilePoolCount(p);
+    const countEl = document.createElement('span');
+    countEl.className = 'pp-count';
+    countEl.textContent = `${n} pool${n === 1 ? '' : 's'}`;
+    row.append(nameEl, countEl);
+    if (portableEditing === p.name) {
+      const tag = document.createElement('span');
+      tag.className = 'pp-tag';
+      tag.textContent = 'editing';
+      row.append(tag);
+      row.classList.add('editing');
+    }
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn tiny';
+    editBtn.textContent = 'Edit';
+    editBtn.title = `Load ${p.name}’s pools into your rack to edit and price — your own pools are set aside first`;
+    editBtn.addEventListener('click', () => portableEditProfile(p.name));
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'btn tiny';
+    saveBtn.textContent = 'Save to';
+    saveBtn.title = `Overwrite ${p.name} in the text with the pools now on your rack`;
+    saveBtn.addEventListener('click', () => portableSaveToProfile(p.name));
+    row.append(editBtn, saveBtn);
+    rows.appendChild(row);
+  }
+}
+
+// The banner's two exits. Save's receipt is a button morph (G1 Download's
+// pattern): the banner works with the settings modal closed, where the
+// status line can't be seen.
+document.getElementById('profile-save').addEventListener('click', (e) => {
+  if (!portableEditing) return;
+  const btn = e.currentTarget;
+  const r = portableSaveToProfile(portableEditing);
+  btn.textContent = r.ok ? 'Saved ✓' : '✗ couldn’t save — see Your data';
+  setTimeout(() => updateProfileBanner(), r.ok ? 900 : 2200); // restores the label
+});
+document.getElementById('profile-done').addEventListener('click', () => portableDoneEditing());
+document.getElementById('portable-addprofile').addEventListener('click', () => {
+  const input = document.getElementById('portable-newname');
+  const r = portableAddProfile(input.value);
+  if (r.ok) input.value = '';
 });
 
 document.getElementById('portable-open').addEventListener('click', () => {

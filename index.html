@@ -209,6 +209,18 @@ limitations under the License.
            deliberately supersedes §7.9's "no Pools title row" FOR THE
            REGION (Joe's 2026-08-04 explicit-anatomy ask); the COLUMN
            still has no title. -->
+      <!-- G3 profile editing (ROADMAP §G3): while a table-file profile is
+           swapped into the rack, this bar names whose pools are on screen
+           and holds the only two exits — Save to ⟨name⟩ and Done. It wears
+           #pools-toolbar.on's ivory editing dress and pins sticky over the
+           rack, so ownership can never scroll away (the same call
+           #pools-head.foreign makes for a teammate's rack). -->
+      <div id="profile-banner" class="hidden">
+        <span class="pb-label">Editing <b id="profile-banner-name"></b></span>
+        <button id="profile-save" class="btn tiny confirm">Save to …</button>
+        <button id="profile-done" class="btn tiny ghost"
+                title="Restore your own pools — the profile keeps what was last saved to the text">Done</button>
+      </div>
       <div id="pools-head" class="hidden">
         <span class="ph-word">Saved pools</span>
         <span class="ph-tag">read-only</span>
@@ -797,6 +809,23 @@ limitations under the License.
               accept=".yaml,.yml,.txt,text/plain">
           </div>
           <p id="portable-status" class="hint portable-status"></p>
+          <!-- G3 profile authoring (ROADMAP §G3): when the box holds a table
+               file, its players: section lists here — Edit swaps a profile's
+               pools into YOUR rack (own pools stashed first, banner over the
+               rack, publish suppressed), Save to writes the rack back into
+               the TEXT (Download above stays the one door to disk). Rows are
+               rebuilt per preview; the add-row is static so a half-typed
+               name survives the repaint. -->
+          <div id="portable-profiles" class="portable-profiles hidden">
+            <span class="pp-head">Players in this file</span>
+            <div id="portable-profile-rows"></div>
+            <div class="pp-new">
+              <input id="portable-newname" type="text" maxlength="24"
+                     placeholder="new profile name…" spellcheck="false">
+              <button id="portable-addprofile" class="btn tiny"
+                      title="Add a new profile to the text, holding the pools now on your rack">Save as new profile</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="settings-sec">

@@ -1387,6 +1387,44 @@ html, body {
 }
 /* (the pressed-✎ dress retired with the header ✎: the bar's .on state IS
    the pressed look — 'Editing pools', ivory, never gold) */
+
+/* G3 profile editing (ROADMAP §G3): the banner over the rack while a
+   table-file profile is swapped in. The dress is #pools-toolbar.on's ivory
+   editing bar; the stickiness is #pools-head.foreign's ownership pin —
+   whose pools are on screen must never scroll away. Opaque background
+   (the .on tint flattened over the column) because scrolled tiles must
+   not bleed through a pinned bar. Never gold. */
+#profile-banner {
+  position: sticky;
+  top: var(--draft-h, 0px);
+  z-index: 3; /* over the category heads (1) and the foreign head (2) */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 -4px;
+  padding: 5px 8px;
+  border: 1px solid rgba(243, 234, 215, 0.28);
+  border-radius: 8px;
+  background: #242527;
+}
+#profile-banner.hidden { display: none; }
+#profile-banner .pb-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#profile-banner .pb-label b { color: var(--ivory); font-weight: 400; }
+#profile-banner .btn { margin-left: 0; flex: none; }
+/* Ownership is the ONE sticky pin while a profile is on the rack — the
+   category heads yield exactly as they do under a foreign head
+   (ownership > category naming, the 2026-08-04 call, same reason). */
+#groups-list.profile-editing .pool-sec-head { position: static; }
 .group-name {
   font-family: var(--font-display);
   font-size: 14px;
@@ -2215,6 +2253,47 @@ html, body {
 .portable-file { display: none; } /* the native picker never renders; its button does */
 .portable-status { min-height: 16px; margin: 0; }
 .portable-status.warn { color: var(--amber); }
+/* G3 profile authoring: the players list under the preview — same quiet
+   grammar as the rows above (.btn.tiny verbs, muted words, no new colour,
+   no new weight). The count takes the slack so the verbs right-align. */
+.portable-profiles { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
+.portable-profiles.hidden { display: none; }
+.portable-profiles .pp-head {
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+#portable-profile-rows { display: flex; flex-direction: column; gap: 4px; }
+.pp-row { display: flex; align-items: center; gap: 6px; }
+.pp-row .pp-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ivory);
+}
+.pp-row .pp-count { flex: 1; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.pp-row .pp-tag {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ivory);
+  white-space: nowrap;
+}
+.pp-row .btn { margin-left: 0; flex: none; }
+.pp-new { display: flex; gap: 6px; }
+.pp-new input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  color: var(--ivory);
+  font-size: 12px;
+}
 .settings-sec .prow + .prow { margin-top: 10px; }
 .settings-sec > .hint { margin-top: 8px; }
 #felt-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
