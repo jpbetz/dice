@@ -2129,4 +2129,20 @@ function shutdown(signal) {
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
+// ROADMAP §0i: die loudly rather than limp. An unhandled exception leaves the
+// process in an unknown state — half-torn-down streams, a room mutated
+// mid-write — and Node's default for an unhandled rejection is already to
+// terminate. Exiting non-zero lets Cloud Run's supervisor restart us cleanly,
+// and js/net.js re-joins every client silently across a restart (DEPLOY.md),
+// so the visible cost is one blip. The log line is the whole diagnostic, so it
+// prints the stack before the exit. Only armed when we own the process: the
+// redaction suite imports this module in-process (IS_MAIN false) and must not
+// have its own test failures turned into a process exit.
+if (IS_MAIN) {
+  process.on('uncaughtException', (err) => {
+    try { log(`FATAL uncaughtException — exiting: ${err && err.stack ? err.stack : err}`); } catch { /* ignore */ }
+    process.exit(1);
+  });
+}
+
 export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor, entryExistsForAll, cleanName, sanitizePools, LOG_DEBUG, LOG_INFO, LOG_THRESHOLD };
