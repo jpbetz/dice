@@ -4985,4 +4985,84 @@ export const scenarios = [
         're-picking the same file must re-fire, so the input clears itself');
     },
   },
+  {
+    name: 'table-setup-wire',
+    tags: ['prepared-seat', 'settings'],
+    // ROADMAP §G4: the room setup key. Driven entirely over HTTP + raw SSE —
+    // no client code in the path, which is the point: `setup` is furniture
+    // any player may push (GOALS goal 10), and it must carry nothing
+    // roll-shaped, because projectEntryFor is the ONLY egress a roll entry
+    // ever takes (PROFILES.md §8).
+    async fn(ctx) {
+      const alice = await ctx.rawPlayer('Alice');
+      assert.equal(alice.joinPayload.setup ?? null, null,
+        'an unprepared room carries no setup — present-or-absent, so plain rooms stay byte-identical');
+      await alice.waitForEvent('hello');
+      const hello = alice.events().find((e) => e.type === 'hello');
+      assert.equal(hello.data.setup ?? null, null, 'hello agrees there is no setup yet');
+
+      // The organizer pushes: the table's look plus two prepared seats. '#'
+      // is banned in player names at every entry point (it starts a comment
+      // in roll notation) and a profile name BECOMES a display name, so the
+      // server must clean it here exactly as it does at join.
+      const push = await ctx.api('/api/table', {
+        playerId: alice.playerId,
+        rev: 2,
+        table: { felt: 'crimson', tableName: 'Session 3' },
+        profiles: [
+          { name: 'Rill', pools: [{ name: 'Strength', notation: '3d6', category: 'Attributes' }] },
+          { name: 'Bo#b', pools: [{ name: 'Larceny', notation: '1d20' }] },
+        ],
+      });
+      assert.equal(push.status, 200, `push accepted (got ${push.status})`);
+      assert.equal(push.data.applied, true, 'a fresh rev applies');
+      assert.equal(push.data.rev, 2, 'the winning rev comes back');
+
+      const evt = await alice.waitForEvent('table-setup');
+      const names = evt.data.setup.profiles.map((p) => p.name);
+      assert.deepEqual(names, ['Rill', 'Bob'], `'#' is stripped from a profile name (got ${names.join(',')})`);
+
+      // A push carrying settings fires the SAME settings-changed every other
+      // settings write fires — one validator, one echo, no parallel path.
+      const settings = await alice.waitForEvent('settings-changed');
+      assert.equal(settings.data.settings.felt, 'crimson', 'the felt actually moved');
+
+      // Stale rev: a silent no-op, not a refusal. The loser of a two-tab race
+      // (or of §G6's re-push-on-hello) did nothing wrong, and net.js toasts
+      // every non-404 error at the player.
+      const before = alice.events().filter((e) => e.type === 'table-setup').length;
+      const stale = await ctx.api('/api/table', { playerId: alice.playerId, rev: 2, profiles: [] });
+      assert.equal(stale.status, 200, 'a stale push is not an error');
+      assert.equal(stale.data.applied, false, 'a stale push does not apply');
+      assert.equal(stale.data.rev, 2, 'the winning rev comes back to the loser');
+      const after = alice.events().filter((e) => e.type === 'table-setup').length;
+      assert.equal(after, before, 'a stale push broadcasts nothing');
+
+      // A later rev wins.
+      const win = await ctx.api('/api/table', {
+        playerId: alice.playerId, rev: 3,
+        profiles: [{ name: 'Rill', pools: [{ name: 'Strength', notation: '4d6' }] }],
+      });
+      assert.equal(win.data.applied, true, 'a greater rev applies');
+
+      // Someone arriving later finds the table prepared — this is the whole
+      // point of the key existing at all.
+      const bob = await ctx.rawPlayer('Bob');
+      assert.ok(bob.joinPayload.setup, 'a late joiner’s snapshot carries the setup');
+      assert.equal(bob.joinPayload.setup.rev, 3, 'and carries the winning rev');
+
+      // Caps refuse at the door, with a machine-readable code.
+      const many = Array.from({ length: 13 }, (_, i) => ({ name: `P${i}`, pools: [] }));
+      const over = await ctx.api('/api/table', { playerId: alice.playerId, rev: 4, profiles: many });
+      assert.equal(over.status, 400, 'a 13th profile is refused');
+      assert.equal(over.data.code, 'bad_profiles', `refusal names itself (got ${JSON.stringify(over.data)})`);
+
+      // Nothing roll-shaped may ride this key. Checked as bytes, not by
+      // trusting the shape we think we stored.
+      const blob = JSON.stringify(bob.joinPayload.setup);
+      for (const leak of ['values', 'rollId', 'total', 'visibility']) {
+        assert.equal(blob.includes(leak), false, `setup carries no '${leak}'`);
+      }
+    },
+  },
 ];
