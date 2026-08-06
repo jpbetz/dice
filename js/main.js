@@ -4307,6 +4307,18 @@ window.__diceDebug = {
     return dice[0].mesh.position.x;
   },
   openSettings() { openSettingsModal(); },
+  // Your data → the file door (§G1), minus the native picker no headless run
+  // can ever click. loadText() is exactly what a chosen file does once read;
+  // acceptFile() takes a real File so the size and read refusals are assertable
+  // too. Both return the live preview's verdict ({ok, status, canApply}) — the
+  // import still lands only through the existing Apply.
+  portable: {
+    snapshot() { return portableSnapshot(); },
+    filename() { return portableFilename(); },
+    loadText(text) { return portableLoadText(text); },
+    acceptFile(file) { return portableAcceptFile(file); },
+    get maxBytes() { return PORTABLE_MAX_BYTES; },
+  },
   // ceremony introspection (UX §2.4): phase machine + decal state
   get ceremonyState() {
     const r = currentRoll;
@@ -8958,6 +8970,120 @@ function portablePreview() {
     portableStatus.textContent = '✓ matches what you have — nothing to apply';
   }
 }
+
+// ---------------------------------------------------------------------------
+// The file door (ROADMAP §G1, PROFILES §7): the same box, two more directions,
+// aimed at disk. A room evaporates when its last player leaves and a paste blob
+// is not a backup — 'never lose it' needs a file. Zero-dep by construction: a
+// Blob object URL out, File.text() in.
+//
+// Download writes a FRESH snapshot rather than the box's text. The box is a
+// scratch surface that may be holding someone else's file mid-preview, and a
+// button under 'Your data' must never write a stranger's rack to a file named
+// after your table. Copy stays the box's own verb; these two are your data's.
+//
+// Open only FILLS the box and re-runs the live preview — deliberately NOT a
+// second import path. GOALS §7 retired the '#g=' URL codec precisely because it
+// replaced a rack sight-unseen; a file picked from disk is no more trusted than
+// a link was, so it arrives in front of the same preview-then-Apply gate.
+// ---------------------------------------------------------------------------
+
+const PORTABLE_MAX_BYTES = 512 * 1024; // a text format; MB-scale means wrong file, not big rack
+
+// '<slug>-<YYYY-MM-DD>.dice.yaml' — named for the TABLE so six characters'
+// files don't all land in Downloads as 'export (3)'. The table name wins; a
+// chosen ?room= key is the fallback (the default 'table' key is nobody's word
+// for their table — renderTableName makes the same call). The date is LOCAL:
+// UTC would rename an evening save to tomorrow.
+function portableFilename() {
+  const slug = String(roomSettings.tableName || (ROOM !== 'table' ? ROOM : ''))
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/, '') // the cut can land mid-separator
+    || 'dice-table';
+  const d = new Date();
+  const p2 = (n) => String(n).padStart(2, '0');
+  return `${slug}-${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}.dice.yaml`;
+}
+
+function portableDownload() {
+  const name = portableFilename();
+  const url = URL.createObjectURL(new Blob([portableSnapshot()], { type: 'text/yaml;charset=utf-8' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a); // a detached anchor's click() is a no-op in some browsers
+  a.click();
+  a.remove();
+  // Revoke LATE, never synchronously: click only queues the save, and pulling
+  // the URL out from under an in-flight download cancels it.
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  return name;
+}
+
+// The preview's own verdict, in primitives — what the status line says, and
+// whether Apply is armed. Lets a scenario read the outcome of a load without
+// scraping the status element.
+function portableVerdict() {
+  return {
+    ok: !portableStatus.classList.contains('warn'),
+    status: portableStatus.textContent,
+    canApply: !portableApplyBtn.disabled,
+  };
+}
+
+// A refusal the parser never saw (the file itself was wrong), spoken in the
+// pane's existing failure grammar: '✗ …' with .warn, and any previewed plan
+// dropped so Apply can't fire against what's no longer on screen.
+function portableRefuse(msg) {
+  portablePlan = null;
+  portableApplyBtn.disabled = true;
+  portableStatus.textContent = msg;
+  portableStatus.classList.add('warn');
+  return portableVerdict();
+}
+
+// The ONE place file text enters: fill the box, re-run the SAME live preview.
+function portableLoadText(text) {
+  portableText.value = String(text == null ? '' : text);
+  portablePreview();
+  return portableVerdict();
+}
+
+// A file the browser can't read (moved, permission-denied) or shouldn't (a
+// multi-megabyte 'yaml' that is really something else) lands as a refusal in
+// the status line, never as an exception in the console.
+async function portableAcceptFile(file) {
+  if (!file) return portableVerdict();
+  if (file.size > PORTABLE_MAX_BYTES) {
+    return portableRefuse(`✗ ${file.name || 'that file'} is ${Math.ceil(file.size / 1024)} KB — this is a text format, ${PORTABLE_MAX_BYTES / 1024} KB max`);
+  }
+  let text;
+  try {
+    text = await file.text();
+  } catch {
+    return portableRefuse(`✗ couldn’t read ${file.name || 'that file'}`);
+  }
+  return portableLoadText(text);
+}
+
+document.getElementById('portable-download').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  portableDownload();
+  // The morph is the receipt (Copy's pattern) — the status line belongs to the
+  // import preview, and saving must not blank a plan you were about to Apply.
+  btn.textContent = 'Saved!';
+  setTimeout(() => { btn.textContent = 'Download'; }, 900);
+});
+const portableFileInput = document.getElementById('portable-file');
+document.getElementById('portable-openfile').addEventListener('click', () => portableFileInput.click());
+portableFileInput.addEventListener('change', () => {
+  const file = portableFileInput.files && portableFileInput.files[0];
+  portableFileInput.value = ''; // re-picking the SAME file must fire change again
+  portableAcceptFile(file);
+});
 
 document.getElementById('portable-open').addEventListener('click', () => {
   const opening = portableZone.classList.toggle('hidden') === false;

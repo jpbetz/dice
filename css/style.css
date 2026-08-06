@@ -2207,6 +2207,12 @@ html, body {
   padding: 8px 10px;
 }
 .portable-row { display: flex; gap: 6px; }
+/* The file door (§G1) is a second row of the same grammar — five verbs on one
+   line would starve 'Fill with my data' at this panel width. The zone's own
+   6px gap is the rhythm between them, so the row doesn't re-add .btn-row's
+   top margin; the 16px under the textarea stays the section's only breath. */
+.portable-row + .portable-row { margin-top: 0; }
+.portable-file { display: none; } /* the native picker never renders; its button does */
 .portable-status { min-height: 16px; margin: 0; }
 .portable-status.warn { color: var(--amber); }
 .settings-sec .prow + .prow { margin-top: 10px; }

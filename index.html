@@ -785,6 +785,17 @@ limitations under the License.
             <button id="portable-copy" class="btn tiny">Copy</button>
             <button id="portable-apply" class="btn tiny confirm" disabled>Apply import</button>
           </div>
+          <!-- The file door (ROADMAP §G1): the same two directions aimed at
+               disk instead of the clipboard, because a room evaporates and a
+               paste blob is not a backup. Open only FILLS the box above — the
+               preview-then-Apply gate still decides what lands (GOALS §7). The
+               picker itself is a mechanism, hidden; the button is the control. -->
+          <div class="btn-row portable-row">
+            <button id="portable-download" class="btn tiny">Download</button>
+            <button id="portable-openfile" class="btn tiny">Open file…</button>
+            <input id="portable-file" class="portable-file" type="file"
+              accept=".yaml,.yml,.txt,text/plain">
+          </div>
           <p id="portable-status" class="hint portable-status"></p>
         </div>
       </div>
