@@ -2435,6 +2435,8 @@ export const scenarios = [
 
       assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify((await pool('Grit')).id)})`),
         true, 'the ± opens on a saved pool');
+      assert.equal(await a.eval(`document.querySelector('#pop-preview .pop-stats-label').textContent`),
+        'Pool stats', 'the section is labeled as such');
       assert.equal(await a.eval(`document.querySelectorAll('#pop-preview .fc-row').length`), 1,
         'three identical d6 share ONE bar — deduplication, not aggregation');
       const sentence = await a.eval(`document.querySelector('#pop-preview .fc-text').textContent`);

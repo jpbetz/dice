@@ -7517,17 +7517,29 @@ function renderPopEcho() {
   const fcast = !err && !visBlocked && activeSystem().forecastFor
     ? activeSystem().forecastFor(spec, { countingPmfs }) : null;
   popPreviewEl.classList.toggle('fc', !!(fcast && fcast.kind === 'per-die'));
+  // 'Pool stats' heads every stats state (bars, refusal, sum line) so the
+  // section reads like its siblings (Joe 2026-08-06); validation states
+  // (bad spec, audience-less whisper) are not stats and stay bare.
+  const statsLabel = () => {
+    const l = document.createElement('span');
+    l.className = 'plabel pop-stats-label';
+    l.textContent = 'Pool stats';
+    return l;
+  };
   if (err) {
     popPreviewEl.textContent = `invalid spec: ${err}`;
   } else if (visBlocked) {
     popPreviewEl.textContent = 'whisper needs an audience — pick at least one player';
   } else if (fcast && fcast.kind === 'per-die') {
     popPreviewEl.textContent = '';
-    popPreviewEl.appendChild(buildForecast(fcast, visSuffix));
+    popPreviewEl.append(statsLabel(), buildForecast(fcast, visSuffix));
   } else if (fcast && fcast.kind === 'refusal') {
-    popPreviewEl.textContent = fcast.reason + visSuffix;
+    popPreviewEl.textContent = '';
+    popPreviewEl.append(statsLabel(), document.createTextNode(fcast.reason + visSuffix));
   } else {
-    popPreviewEl.textContent = fmtPreview(spec.dice, spec.mods).replace(/ (avg|max)/g, ' · $1') + visSuffix;
+    popPreviewEl.textContent = '';
+    popPreviewEl.append(statsLabel(),
+      document.createTextNode(fmtPreview(spec.dice, spec.mods).replace(/ (avg|max)/g, ' · $1') + visSuffix));
   }
   popSaveBtn.disabled = !!err || visBlocked;
   popToDraftBtn.disabled = !!err || visBlocked;

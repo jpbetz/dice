@@ -3179,6 +3179,7 @@ body.mini #result-verdict { font-size: 11px; }
    of a management popover. Quiet is a designed answer, so its segment is
    visible, just dim. Gold is the sum world's word: forecast labels are
    steel. */
+.pop-preview .pop-stats-label { font-family: var(--font-ui); margin-bottom: 5px; }
 .pop-preview .fc-row { position: relative; display: flex; flex-direction: column; gap: 3px; margin: 7px 0; }
 .pop-preview .fc-label { font-family: var(--font-ui, inherit); font-size: 10px; color: var(--muted); letter-spacing: 0.04em; }
 .pop-preview .fc-text {
