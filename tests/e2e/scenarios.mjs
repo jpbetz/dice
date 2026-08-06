@@ -1492,6 +1492,55 @@ export const scenarios = [
   },
 
   {
+    name: 'seat-closed-tab',
+    tags: ['seat', 'presence'],
+    // A CLOSED TAB LEAVES THE TABLE (Joe 2026-08-06). It always did locally —
+    // the socket closes, the grace runs, the seat goes. On the DEPLOYED table
+    // it did not: behind Cloud Run's front end the container never sees the
+    // close and its writes keep succeeding, so the seat sat on the roster for
+    // the hour it took the platform to time the request out. Four ghosts on
+    // one table with one real window open is what that looks like.
+    //
+    // The fix's two halves are proved at the protocol level in
+    // tests/presence.test.mjs (they need clocks a browser cannot shrink).
+    // What only a browser can prove is the part in the middle: that a real
+    // tab really does fire the beacon on its way out, and that the roster
+    // everyone is looking at empties because of it.
+    //
+    // The RELOAD half of this bargain — the identical beacon that must NOT
+    // cost a seat — is asserted by `seat-resume`, which fails on any
+    // player-left churn across a refresh.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await b.waitFor(`window.__diceDebug.players.length === 2`,
+        { desc: 'both seated' });
+
+      // A roll first: it is what makes the difference between the seat and
+      // the LOG visible below.
+      await a.roll('d20');
+      await b.waitFor(`document.getElementById('log-list').childElementCount > 0`,
+        { desc: "Alice's roll reaches the table" });
+
+      await a.close();
+
+      // The beacon covers the closing tab; the 5s grace covers the beacon.
+      // Generous, because the assertion worth making is "in seconds, not in
+      // an hour" — a tighter bound would only buy flakes.
+      await b.waitFor(
+        `!window.__diceDebug.players.some((p) => p.name === 'Alice')`,
+        { desc: 'the closed tab leaves the roster', timeout: 20000 },
+      );
+
+      // The seat goes; the HISTORY stays. A name on a past roll is a record
+      // of who rolled it, not a presence claim — the log snapshots it at roll
+      // time precisely so leaving cannot rewrite it.
+      assert.ok((await b.logTop()).includes('Alice'),
+        `Alice's roll is still hers (got: ${await b.logTop()})`);
+    },
+  },
+
+  {
     name: 'url-carries-nothing',
     tags: ['smoke', 'groups'],
     // THE URL IS NOT STORAGE (Joe 2026-08-04). The saved-pool rack used to

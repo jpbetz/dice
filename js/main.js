@@ -10538,6 +10538,11 @@ function leaveTable() {
   const old = net;
   net = null;
   netOnline = false; // status callbacks from the dying stream are ignored
+  // Announce it BEFORE the stream goes: this is the one departure that is a
+  // deliberate gesture rather than a tab closing, so the room loses the seat
+  // now instead of on the grace. The POST is already in flight by the time
+  // disconnect() runs — it does not ride the stream.
+  if (old) old.leave({ immediate: true });
   if (old) old.disconnect();
   forgetSeat(ROOM);
   try { localStorage.removeItem(LS_NAME); } catch { /* ignore */ }
@@ -10554,6 +10559,24 @@ function leaveTable() {
   return true;
 }
 document.getElementById('idm-leave').addEventListener('click', () => leaveTable());
+
+// Closing the tab is the ordinary way to leave a table, and until now it was
+// the one the server could not see: behind a proxy the stream stays open and
+// the seat sits on the roster for an hour (server.js LIVENESS_TIMEOUT_MS has
+// the whole story). One beacon on the way out turns that into the same five
+// seconds a local disconnect has always taken.
+//
+// A RELOAD fires this identical event — the browser will not tell us which
+// this is — so the beacon is deliberately the soft kind: it drops the stream
+// this page is on, not the seat. The reload's fresh stream carries a new id,
+// so even a beacon that arrives after it cannot touch it, and the seat is
+// still there to sit back down in. `persisted` is the exception: that page is
+// going into the back/forward cache and may be restored, so leave it alone
+// and let the liveness sweep decide if it never comes back.
+window.addEventListener('pagehide', (e) => {
+  if (e.persisted || !net || !netOnline) return;
+  net.leave();
+});
 
 document.getElementById('idm-invite').addEventListener('click', async (e) => {
   const btn = e.currentTarget;

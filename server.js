@@ -79,9 +79,41 @@ const MAX_POOL_NOTATION = 200;
 const MAX_PROFILES = 12;
 const MAX_STREAMS_PER_PLAYER = 4; // extra SSE streams evict the oldest
 const OFFER_CAP = 20;             // offered rolls kept per room
-const HEARTBEAT_MS = 20_000;
+// How often every open stream is pinged — and, since the ping now expects an
+// answer, how often staleness is checked. DICE_HEARTBEAT_MS overrides it at
+// boot exactly as DICE_SETUP_TTL_MS does, and for the same reason: a test
+// cannot wait out three 20s ticks to watch a stream go stale.
+const HEARTBEAT_MS = (() => {
+  const raw = Number(process.env.DICE_HEARTBEAT_MS);
+  if (!Number.isFinite(raw) || raw <= 0) return 20_000;
+  return Math.min(raw, 2 ** 31 - 1);
+})();
 const DISCONNECT_GRACE_MS = 5_000;   // survive an EventSource reconnect
 const JOIN_GRACE_MS = 60_000;        // time to open the SSE stream after join
+
+// How long a stream may go without answering a heartbeat before we stop
+// believing the transport and drop it.
+//
+// Every other liveness signal here is transport-level: 'close' fires, or a
+// write throws. Behind a proxy that terminates the client connection —
+// Cloud Run's front end is ours — NEITHER happens when a tab closes. The
+// container's request stays open and its writes keep succeeding into the
+// proxy, so `clients.size` never reaches 0, no grace is ever armed, and the
+// seat sits on the roster until the platform's 3600 s request timeout tears
+// the request down an hour later. That was observed, not theorized: four
+// seats on one table with one real window open, and `/api/events` request
+// latencies of exactly 3601 s.
+//
+// So the client proves it is alive at the APPLICATION layer: the heartbeat
+// below is an event the client answers with POST /api/pong, and a stream
+// that stops answering is dropped here regardless of what the socket claims.
+// Three missed heartbeats plus slack — long enough that a slow round trip or
+// a briefly-throttled background tab is never mistaken for a closed one.
+const LIVENESS_TIMEOUT_MS = (() => {
+  const raw = Number(process.env.DICE_LIVENESS_TIMEOUT_MS);
+  if (!Number.isFinite(raw) || raw <= 0) return 70_000;
+  return Math.min(raw, 2 ** 31 - 1);
+})();
 
 // How long a room holding a prepared table (§G4) outlives its last player
 // before it is really deleted — docs/PROFILES.md §5 mechanism 3, ROADMAP §G6.
@@ -617,14 +649,35 @@ function broadcast(room, type, data, projectFor = null) {
   }
 }
 
+// The heartbeat is now a QUESTION, not an announcement: every open stream is
+// asked to prove it is alive, and one that has stopped answering is dropped
+// even though the socket still accepts writes (see LIVENESS_TIMEOUT_MS).
+//
+// Dropping a stale stream deliberately does no more than dropStream: when it
+// was the seat's last, the ordinary DISCONNECT_GRACE_MS reap takes it from
+// here. One departure path, whatever noticed the departure.
+//
+// Streams that carry no `streamId` are EXEMPT from the staleness check. That
+// is a client cached from before this shipped — it cannot pong, and reaping
+// it would put it in a rejoin loop, taking a new seat and colour every
+// LIVENESS_TIMEOUT_MS. It keeps exactly the behavior it has today (a zombie
+// stream that clears at the platform timeout) and heals on its next reload.
 const heartbeat = setInterval(() => {
+  const now = Date.now();
   for (const room of rooms.values()) {
     for (const player of room.players.values()) {
       for (const res of [...player.clients]) {
-        try {
-          if (res.writableEnded || res.destroyed) throw new Error('dead');
-          res.write(': ping\n\n');
-        } catch {
+        const stream = res.diceStream;
+        if (stream && stream.id && now - stream.lastPong > LIVENESS_TIMEOUT_MS) {
+          logDebug(() => `stream stale ${logField('player', player.name)} stream=${stream.id}`);
+          dropStream(room, player, res);
+          continue;
+        }
+        // A ping the client can SEE: an SSE comment (': ping') never reaches
+        // EventSource handlers, so it could never be answered. The stream's
+        // own id rides along so the answer names the stream the server knows,
+        // not the one the client believes it is on.
+        if (!sendEvent(res, 'ping', { streamId: stream ? stream.id : null })) {
           dropStream(room, player, res);
         }
       }
@@ -908,14 +961,23 @@ function handleEvents(req, res, url) {
     res.socket.setNoDelay(true);
     // Start TCP keepalive probes after 30s idle instead of the OS default
     // (Linux 7200s / 2h). Linux tcp_keepalive_intvl=75s × tcp_keepalive_probes=9
-    // then catches a truly-dead peer in ~11 min. The 20s app-level heartbeat
-    // (broadcast to open streams) already surfaces most cable-yanks via TCP
-    // RTO exhaustion in ~15 min under Linux defaults, and the writableLength
-    // backpressure guard handles suspended-tab peers in <5s; this closes the
-    // rarer window where writes still succeed at the TCP layer but the peer
-    // is gone.
+    // then catches a truly-dead peer in ~11 min.
+    //
+    // Every bound in that sentence is about OUR socket, which is why none of
+    // it saved us: behind a proxy the socket's peer is the front end, and the
+    // front end is alive and well after the browser has gone. The heartbeat's
+    // LIVENESS_TIMEOUT_MS check is what actually covers that case; this stays
+    // for the direct-connection deployment, where a cable-yank IS a dead peer.
     res.socket.setKeepAlive(true, 30_000);
   }
+
+  // The stream's identity, minted by the client (net.js openStream). It is
+  // what lets POST /api/leave and POST /api/pong name ONE stream: a beacon
+  // fired by a closing tab must never be able to drop the stream a reload
+  // has already opened, and the two are told apart only by this id. Absent
+  // for a pre-liveness cached client — every path that reads it tolerates
+  // null and falls back to today's behavior.
+  res.diceStream = { id: cleanString(url.searchParams.get('streamId'), 64), lastPong: Date.now() };
 
   // Cap streams per player: evict the oldest rather than reject, so a
   // reconnect race never locks a real client out.
@@ -964,6 +1026,88 @@ function lookup(body) {
   const player = room.players.get(playerId);
   if (!player) return { error: [404, 'unknown player', 'unknown_player'] };
   return { room, player };
+}
+
+// Find one of a player's open streams by the id its client minted.
+const findStream = (player, streamId) =>
+  [...player.clients].find((res) => res.diceStream && res.diceStream.id === streamId) || null;
+
+// POST /api/pong {room, playerId, streamId} — the client's half of the
+// heartbeat (see LIVENESS_TIMEOUT_MS). Answering is the ONLY thing that keeps
+// a stream out of the staleness sweep.
+//
+// Deliberately the cheapest authenticated endpoint on the server: it moves one
+// timestamp and answers 204. It is also the only one that must never make the
+// client work harder on failure — an unknown player here means the stream is
+// about to fail on its own and the client's existing rejoin path owns that, so
+// the honest answer is the error and no side effect. 404 is not retried by
+// net.js's pong; nothing here should ever start a rejoin storm.
+async function handlePong(req, res) {
+  const body = await readJsonBody(req);
+  if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
+
+  const found = lookup(body.value);
+  if (found.error) return sendError(res, ...found.error);
+  const { player } = found;
+
+  const streamId = cleanString(body.value.streamId, 64);
+  if (!streamId) return sendError(res, 400, 'streamId is required', 'bad_request');
+  const stream = findStream(player, streamId);
+  // A pong for a stream we no longer hold means the client is DEAF: it thinks
+  // it is streaming, and we will never send it another event. The sweep can
+  // create exactly that (so can MAX_STREAMS_PER_PLAYER eviction, and so can a
+  // page restored from the back/forward cache holding a connection the proxy
+  // kept warm) — and none of those make the client's EventSource error, so
+  // nothing else would ever tell it. Saying so here is what closes the loop:
+  // net.js reopens the stream on this code. Answering a cheerful 200 would
+  // strand the very clients this endpoint exists to keep honest.
+  if (!stream) return sendError(res, 404, 'unknown stream', 'unknown_stream');
+  stream.diceStream.lastPong = Date.now();
+  sendJson(res, 200, { ok: true });
+}
+
+// POST /api/leave {room, playerId, streamId?, immediate?} — "I am going", said
+// out loud instead of inferred from a socket.
+//
+// Two callers, two shapes:
+//
+//   The BEACON (js/main.js pagehide) is soft and names its stream. A closing
+//     tab and a reloading tab fire the identical beacon — the browser cannot
+//     tell us which it is — so this must never do anything a reload would
+//     regret. Dropping the one named stream is exactly right: the reload's
+//     fresh stream carries a DIFFERENT id, so a beacon that loses the race and
+//     lands after it cannot touch it, and the seat survives on the ordinary
+//     grace that a reconnect cancels. Without the id this would be a coin flip
+//     between a fast roster and a seat that drops out from under a refresh.
+//
+//   The GESTURE ('Leave & switch seat', immediate) means it: the seat goes now.
+//     Its client has already forgotten the seat, so nothing will resume it, and
+//     making the room wait 5 s to watch someone walk away reads as a bug.
+//
+// A leave for an unknown player/room 404s like any other lookup, which the
+// beacon ignores — it is fire-and-forget by construction.
+async function handleLeave(req, res) {
+  const body = await readJsonBody(req);
+  if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
+
+  const found = lookup(body.value);
+  if (found.error) return sendError(res, ...found.error);
+  const { room, player } = found;
+
+  if (body.value.immediate === true) {
+    removePlayer(room, player, 'left');
+    return sendJson(res, 200, { ok: true });
+  }
+
+  const streamId = cleanString(body.value.streamId, 64);
+  // No id (a client that cannot name its stream) falls back to dropping them
+  // all: that is this endpoint's pre-id behavior and still strictly better
+  // than waiting on a proxy, because the grace reap a reload cancels is the
+  // only thing standing between the two cases.
+  const doomed = streamId ? [findStream(player, streamId)] : [...player.clients];
+  for (const stream of doomed) if (stream) dropStream(room, player, stream);
+  logDebug(() => `leave   ${logField('room', room.name)} ${logField('name', player.name)} (beacon)`);
+  sendJson(res, 200, { ok: true });
 }
 
 // Die list check, shared by the explicit-dice and notation paths.
@@ -2476,6 +2620,8 @@ const server = http.createServer((req, res) => {
   const handle = async () => {
     if (route === '/api/join' && req.method === 'POST') return handleJoin(req, res);
     if (route === '/api/events' && req.method === 'GET') return handleEvents(req, res, url);
+    if (route === '/api/pong' && req.method === 'POST') return handlePong(req, res);
+    if (route === '/api/leave' && req.method === 'POST') return handleLeave(req, res);
     if (route === '/api/roll' && req.method === 'POST') return handleRoll(req, res);
     if (route === '/api/reveal' && req.method === 'POST') return handleReveal(req, res);
     if (route === '/api/rename' && req.method === 'POST') return handleRename(req, res);

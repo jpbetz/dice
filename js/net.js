@@ -48,6 +48,15 @@ function apiUrl(path) {
   return new URL(path, window.location.origin).toString();
 }
 
+// An id for one SSE stream. Only ever compared for equality against the id
+// this same client sent, so any collision-free-enough string will do —
+// randomUUID is unavailable over plain http on a LAN address, which is a
+// perfectly ordinary way to run this for a table in one room.
+function newStreamId() {
+  try { return crypto.randomUUID(); } catch { /* insecure context */ }
+  return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 async function postJson(path, body, timeout) {
   const controller = timeout > 0 ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), timeout) : null;
@@ -190,6 +199,11 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
   let lastStatus = null;
   let streamOpen = null;        // resolves once the current stream is live
   let settleStream = null;
+  // The id of the stream we are on now. The server treats each open stream as
+  // separately alive (server.js findStream), and both the leave beacon and the
+  // pong name one — a beacon from a closing tab must not be able to drop the
+  // stream a RELOAD has already opened, and the id is what tells them apart.
+  let streamId = null;
 
   function setStatus(next) {
     if (next === lastStatus) return;
@@ -376,6 +390,45 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     // Give up the seat for good — 'Leave & switch seat', never a reload.
     forgetSeat() { forgetSeat(room); },
 
+    /**
+     * Say we are going instead of letting the server infer it (server.js
+     * handleLeave). Two shapes, and the difference is not politeness:
+     *
+     *   leave()                  — the pagehide beacon. Drops THIS stream and
+     *                              leaves the seat on the ordinary grace, so a
+     *                              reload (which fires the identical beacon)
+     *                              sits back down untouched.
+     *   leave({immediate: true}) — 'Leave & switch seat'. The seat goes now.
+     *
+     * sendBeacon, not fetch, for the beacon: a page being torn down does not
+     * live long enough to own a response, and it is the one transport the
+     * browser promises to deliver anyway. It cannot be awaited or checked —
+     * which is exactly why the server's liveness sweep still has to exist.
+     */
+    leave({ immediate = false } = {}) {
+      if (closed) return Promise.resolve(false);
+      const body = { room, playerId, streamId, ...(immediate ? { immediate: true } : {}) };
+      // The gesture is a normal POST: the page is staying, so we can wait for
+      // the answer and the caller can act on the room being rid of us.
+      if (immediate) return postJson('/api/leave', body, POST_TIMEOUT_MS).then((res) => res.ok);
+      try {
+        // A plain string beacon is sent as text/plain — CORS-safelisted, so it
+        // never needs a preflight the dying page could not complete. The
+        // server parses the body by content, not by its content type.
+        if (navigator.sendBeacon(apiUrl('/api/leave'), JSON.stringify(body))) {
+          return Promise.resolve(true);
+        }
+      } catch { /* fall through to keepalive */ }
+      // sendBeacon refused (over quota, or unavailable). keepalive: true is
+      // the same promise in fetch's clothing — the request outlives the page.
+      try {
+        fetch(apiUrl('/api/leave'), {
+          method: 'POST', body: JSON.stringify(body), keepalive: true, cache: 'no-store',
+        }).catch(() => {});
+      } catch { /* nothing left to try; the sweep covers us */ }
+      return Promise.resolve(true);
+    },
+
     disconnect() {
       if (closed) return;
       closed = true;
@@ -408,8 +461,10 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
   function openStream() {
     if (closed) return;
     closeStream();
+    streamId = newStreamId();
     const url = apiUrl(
       `/api/events?room=${encodeURIComponent(room)}&playerId=${encodeURIComponent(playerId)}`
+      + `&streamId=${encodeURIComponent(streamId)}`
     );
     // Anything waiting on the previous stream is released; a new gate opens.
     if (settleStream) settleStream(false);
@@ -437,6 +492,38 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
         emit(type, data);
       });
     }
+
+    // The server's liveness question, answered (server.js LIVENESS_TIMEOUT_MS).
+    // Deliberately NOT in SSE_EVENTS: the app has no business seeing a
+    // heartbeat, and net.js owning it keeps the whole mechanism in the one
+    // module that owns the stream.
+    //
+    // Fire-and-forget. A pong that fails tells us nothing the stream's own
+    // error handling does not already own, and retrying it would pile load
+    // onto a server we have just failed to reach. Missing one is safe by
+    // design: the server allows three.
+    es.addEventListener('ping', (ev) => {
+      if (source !== es || closed) return;
+      setStatus('online');
+      // Answer with the id the SERVER named, falling back to ours — they
+      // differ only if a stream outlived the variable, and the server's
+      // is the one that identifies the stream it is asking about.
+      let id = streamId;
+      try {
+        const data = ev.data ? JSON.parse(ev.data) : null;
+        if (data && typeof data.streamId === 'string') id = data.streamId;
+      } catch { /* keep ours */ }
+      if (!id) return;
+      postJson('/api/pong', { room, playerId, streamId: id }, POST_TIMEOUT_MS).then((res) => {
+        // 'unknown_stream' means the server is no longer holding this stream —
+        // we are listening to a connection nothing will ever be sent down
+        // (server.js handlePong says why). It is the ONE answer worth acting
+        // on: reopen, and the next ping confirms it. Anything else, including
+        // a network failure, is the stream's own business.
+        if (source !== es || closed) return;
+        if (res.data && res.data.code === 'unknown_stream') openStream();
+      });
+    });
 
     es.onerror = () => {
       if (source !== es || closed) return;
