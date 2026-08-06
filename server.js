@@ -21,8 +21,10 @@ limitations under the License.
 // can talk to it with plain relative fetch/EventSource calls.
 //
 // All state is in memory. Rooms are created on first join and deleted when the
-// last player leaves. The server is the sole authority on rolled values: a
-// client never displays a locally generated value while online.
+// last player leaves — unless the room holds a prepared table (§G4), which
+// buys it SETUP_TTL_MS of lingering instead (§G6). The server is the sole
+// authority on rolled values: a client never displays a locally generated
+// value while online.
 //
 // Log volume: PORT and DICE_LOG_LEVEL are the two knobs. DICE_LOG_LEVEL is an
 // ordered ladder — debug < info (default) < warn < error < silent — and
@@ -80,6 +82,46 @@ const OFFER_CAP = 20;             // offered rolls kept per room
 const HEARTBEAT_MS = 20_000;
 const DISCONNECT_GRACE_MS = 5_000;   // survive an EventSource reconnect
 const JOIN_GRACE_MS = 60_000;        // time to open the SSE stream after join
+
+// How long a room holding a prepared table (§G4) outlives its last player
+// before it is really deleted — docs/PROFILES.md §5 mechanism 3, ROADMAP §G6.
+// Without it dropRoomIfEmpty takes the felt, the system, the table name and
+// six prepared seats the instant the organizer closes the tab, which is the
+// most surprising loss in this whole pass: not a restart, a walk away.
+//
+// TWELVE HOURS is sized to one prep session, deliberately, not to durability
+// this mechanism cannot deliver. It covers "set the table after dinner, the
+// first player arrives at eight" and "prepped last night, we play tonight" —
+// and it stops well short of pretending to cross a restart, because it can't:
+// on Cloud Run with --min-instances 0 the instance itself goes away between
+// sessions (DEPLOY.md). The file (mechanism 1) and the client's re-push on
+// hello (mechanism 2) are what actually survive that, and this is the third,
+// cheapest mechanism, not a substitute for either.
+//
+// MEMORY. A lingering room is small BY CONSTRUCTION, and that is the whole
+// argument for letting 500 of them exist. lingerRoom clears the log — the only
+// part of a room that is big (LOG_CAP=100 entries × up to MAX_PHYSICAL_DICE=40
+// dice each) — and the offers, leaving settings plus setup. The setup came in
+// through MAX_BODY (64 KiB) at the door and is capped after it by G4's caps:
+// MAX_PROFILES=12 profiles × MAX_POOLS_PER_PLAYER=40 pools × MAX_POOL_NOTATION
+// =200 chars of canonical notation. Tens of KiB per room at the absolute
+// ceiling, so MAX_ROOMS=500 lingering rooms is tens of MiB. An UNPREPARED
+// empty room still dies instantly (dropRoomIfEmpty gates on room.setup): there
+// is nothing in it worth keeping, and letting one linger would hand any client
+// that joins and leaves a free twelve-hour reservation on a room name.
+//
+// DICE_SETUP_TTL_MS overrides it, read once at boot exactly the way
+// DICE_LOG_LEVEL is. An e2e scenario cannot wait twelve hours, and the
+// alternative — a test-only route or query parameter — would put a lever on
+// the live HTTP surface that exists for nobody but the tests. Junk or a
+// non-positive value falls back to the default; the clamp matters because past
+// 2**31-1 ms Node fires a timer IMMEDIATELY, turning "linger longer" into
+// "never linger at all".
+const SETUP_TTL_MS = (() => {
+  const raw = Number(process.env.DICE_SETUP_TTL_MS);
+  if (!Number.isFinite(raw) || raw <= 0) return 12 * 60 * 60 * 1_000;
+  return Math.min(raw, 2 ** 31 - 1);
+})();
 
 // Strip control characters plus the zero-width and bidi-control ranges
 // (U+200B–200F, U+202A–202E, U+2066–2069, U+FEFF): invisible in rendered text,
@@ -312,7 +354,8 @@ function defaultSettings() {
  *   offers: [offer],
  *   collectSeq: int,        // last collection sequence handed out (see §7.7)
  *   settings: {felt, ...},  // room-wide, see SETTING_SPECS
- *   setup: null | {rev, table, profiles, at}  // the prepared table (§G4)
+ *   setup: null | {rev, table, profiles, at},  // the prepared table (§G4)
+ *   lingerTimer, lingerAt   // set only while empty-but-prepared (§G6)
  * }
  */
 const rooms = new Map();
@@ -332,9 +375,27 @@ function getRoom(name) {
       // pushes one — a fresh room's hello and /api/join carry no `setup`
       // key at all, so their payloads stay byte-identical to today's.
       setup: null,
+      // Armed only while the room is empty AND prepared (§G6). Null on a
+      // live room, so `lingerTimer` doubles as "is this room lingering?"
+      // — the one predicate evictLingeringRoom scans for.
+      lingerTimer: null,
+      lingerAt: 0,
     };
     rooms.set(name, room);
     log(`room created: ${logField('room', name)}`);
+    return room;
+  }
+  // Someone walked up to a room that may have been lingering on its setup TTL
+  // (§G6). The TTL only ever measured "nobody is here", so it ends now and the
+  // room resumes exactly as prepared — same settings, same setup, same rev, so
+  // the arriving client's re-push (mechanism 2) correctly stands down instead
+  // of healing a gap that isn't there. This is the ONLY cancel site because
+  // getRoom is the only door a player enters a room through; every other
+  // rooms.get() caller (handleEvents, lookup) needs a live PLAYER, and a
+  // lingering room has none.
+  if (room.lingerTimer) {
+    holdRoom(room);
+    log(`room resumed: ${logField('room', name)} rev=${room.setup ? room.setup.rev : 0}`);
   }
   return room;
 }
@@ -349,11 +410,104 @@ function publicPlayers(room) {
   }));
 }
 
+// The last player left. An ordinary room dies here, as it always has; a room
+// that holds a prepared table (§G4) LINGERS instead — see lingerRoom and
+// SETUP_TTL_MS. The gate is `room.setup` and nothing else, so an unprepared
+// room can never take the lingering branch: there is nothing in it worth a
+// MAX_ROOMS slot, and a room name must not become a free reservation.
 function dropRoomIfEmpty(room) {
-  if (room.players.size === 0 && rooms.get(room.name) === room) {
+  if (room.players.size !== 0 || rooms.get(room.name) !== room) return;
+  if (room.setup) return lingerRoom(room);
+  rooms.delete(room.name);
+  log(`room deleted: ${logField('room', room.name)}`);
+}
+
+// Empty and prepared: keep the PREPARATION, drop the SESSION, arm the reaper
+// (docs/PROFILES.md §5 mechanism 3, ROADMAP §G6 — "the log and offers still
+// clear; only the small setup lingers, and a timer reaps it").
+//
+// The split is per-preparation vs per-session, not "small vs large":
+//   KEPT — `setup`, obviously, and `settings`. The organizer chose the felt,
+//     the system, the table name and the mat zoom deliberately; they ARE the
+//     prepared table, and a room that came back with the setup intact but the
+//     felt reset to default would read as half-remembering. §G4 stores the
+//     setup as PUSHED rather than as merged for the same reason: intent is
+//     worth keeping separately from what the table currently looks like.
+//   CLEARED — `log` (last night's rolls are nobody's furniture, and it is the
+//     one field big enough to matter — see SETUP_TTL_MS's memory note),
+//     `offers` (an offered roll is addressed to players who have all left; a
+//     claim needs a live roller), `collectSeq` (a sequence over a log that no
+//     longer exists) and `colorCursor` (so Thursday's first arrival gets the
+//     first palette colour, exactly as in a room created fresh). The result is
+//     indistinguishable from a brand-new room that was immediately prepared,
+//     which is the property that keeps this from being a second kind of room
+//     with its own rules.
+//
+// Nothing is broadcast: there is nobody left to hear it, and the room's next
+// occupant learns the whole state from hello.
+function lingerRoom(room) {
+  room.log.length = 0;
+  room.offers.length = 0;
+  room.collectSeq = 0;
+  room.colorCursor = 0;
+  // Not reachable today (removePlayer is the only caller's caller, and it
+  // needs a seated player, which a lingering room has none of), but if it ever
+  // were: the TTL measures "empty since", so re-entry must not push it back.
+  if (room.lingerTimer) return;
+  room.lingerAt = Date.now() + SETUP_TTL_MS;
+  room.lingerTimer = setTimeout(() => {
+    room.lingerTimer = null;
+    room.lingerAt = 0;
+    // Re-check both conditions dropRoomIfEmpty tested. holdRoom cancels this
+    // timer on any arrival, so reaching here with players is not expected —
+    // but "delete a room somebody is sitting in" is the one outcome worth
+    // spending a branch to make impossible.
+    if (room.players.size !== 0 || rooms.get(room.name) !== room) return;
     rooms.delete(room.name);
-    log(`room deleted: ${logField('room', room.name)}`);
+    log(`room expired: ${logField('room', room.name)}`);
+  }, SETUP_TTL_MS);
+  // Never hold the event loop open for a room nobody is in. Same reasoning as
+  // scheduleReap's unref, and it matters more here: on Cloud Run a referenced
+  // twelve-hour timer would keep the instance from idling out, so the cheapest
+  // durability mechanism would quietly become the most expensive one.
+  if (room.lingerTimer.unref) room.lingerTimer.unref();
+  log(`room lingering: ${logField('room', room.name)} ttl=${SETUP_TTL_MS}ms`);
+}
+
+// Cancel a pending linger: the room is alive again, or it is being deleted now.
+// Mirrors holdPlayer.
+function holdRoom(room) {
+  clearTimeout(room.lingerTimer);
+  room.lingerTimer = null;
+  room.lingerAt = 0;
+}
+
+// At MAX_ROOMS, a lingering room yields to a live one. Returns true if a slot
+// was freed.
+//
+// A prepared-but-empty room must never be the reason a real table cannot be
+// created. It holds nobody's session — its worst case is that one organizer
+// re-pushes a setup they still have in localStorage and in a file (mechanisms
+// 1 and 2), which is the cheapest loss on the board — while the alternative is
+// a 503 to a group of players trying to sit down. That asymmetry decides it.
+//
+// It is also what keeps §G6 from being a resource hole: without eviction,
+// anyone could join-push-leave 500 room names and hold every slot for twelve
+// hours. With it, that attack degrades to "prepared rooms get evicted sooner",
+// and a live join always succeeds. The oldest linger goes first — smallest
+// lingerAt, i.e. nearest its own expiry anyway, since every linger is armed
+// for the same TTL. The scan is O(rooms) ≤ 500 and only runs at the cap.
+function evictLingeringRoom() {
+  let victim = null;
+  for (const room of rooms.values()) {
+    if (!room.lingerTimer) continue;
+    if (!victim || room.lingerAt < victim.lingerAt) victim = room;
   }
+  if (!victim) return false;
+  holdRoom(victim);
+  rooms.delete(victim.name);
+  log(`room evicted: ${logField('room', victim.name)} (room cap)`);
+  return true;
 }
 
 function removePlayer(room, player, why) {
@@ -699,8 +853,11 @@ async function handleJoin(req, res) {
   }
 
   // Entity caps: an unauthenticated client must not be able to allocate
-  // unbounded rooms/players.
-  if (!rooms.has(roomName) && rooms.size >= MAX_ROOMS) {
+  // unbounded rooms/players. Lingering rooms (§G6) occupy slots like any
+  // other, and give one up rather than let a live table be refused — see
+  // evictLingeringRoom. Note the cap is not consulted at all when the room
+  // already exists, so REJOINING a lingering room never risks a 503.
+  if (!rooms.has(roomName) && rooms.size >= MAX_ROOMS && !evictLingeringRoom()) {
     return sendError(res, 503, 'too many rooms', 'server_full');
   }
   const existing = rooms.get(roomName);
@@ -2053,8 +2210,10 @@ async function handleSettings(req, res) {
 // configured and the seats waiting. "The file is the truth, the room is a
 // convenience, the link is an address" — this is the convenience, and it is
 // deliberately the weakest of the three. It lives and dies with the in-memory
-// room (§G6 gives a room holding a setup a TTL so prep-Tuesday/play-Thursday
-// works; today dropRoomIfEmpty still takes it when the last player leaves).
+// room — though pushing one now buys that room SETUP_TTL_MS of life after its
+// last player leaves (§G6, dropRoomIfEmpty), so closing the tab no longer
+// costs the preparation. A restart still does; the file and the client's
+// re-push on hello are what cross that.
 //
 // ANYONE may push it. That is goal 10 compliance ("no roles, ever"), not an
 // oversight: a setup is furniture, exactly like the felt colour any player can
