@@ -2963,6 +2963,25 @@ body.mini #offers-layer { top: 8px; width: min(260px, calc(100vw - 16px)); }
 }
 #help-panel .help-head { display: flex; align-items: center; justify-content: space-between; }
 #help-body { max-height: 62vh; overflow: auto; padding-right: 6px; }
+#help-nav {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 0 8px;
+  background: var(--panel-bg, rgba(25, 22, 18, 0.98));
+}
+#help-nav button {
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+#help-nav button:hover { color: var(--ivory); }
 #help-body section { margin: 0 0 16px; }
 #help-body section.lit h3 { color: var(--gold-bright); }
 #help-body h3 { font-size: 13px; margin: 12px 0 6px; color: var(--ivory); }

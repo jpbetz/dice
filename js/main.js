@@ -9329,6 +9329,11 @@ helpOverlay.addEventListener('click', (e) => {
   if (e.target === helpOverlay) closeHelpDialog();
 });
 document.getElementById('help-close').addEventListener('click', closeHelpDialog);
+document.getElementById('rail-help').addEventListener('click', () => openHelpDialog(null));
+document.getElementById('help-nav').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-topic]');
+  if (b) openHelpDialog(b.dataset.topic);
+});
 
 // The ONE reroll payload. Every reroll trigger — the card strip
 // (appendCardActions), the log ⟳, the 'r' shortcut / verdict ⟳

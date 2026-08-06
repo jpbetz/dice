@@ -1217,7 +1217,7 @@ export const scenarios = [
     // retired 2026-08-03 (Joe: the setting is sufficient; 's' stays).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
-      const RAIL = ['rail', 'identity-chip', 'rail-palette', 'rail-log', 'toggle-settings'];
+      const RAIL = ['rail', 'identity-chip', 'rail-palette', 'rail-log', 'rail-help', 'toggle-settings'];
       const visible = (id) => a.eval(
         `(() => { const el = document.getElementById('${id}'); if (!el) return false;`
         + ` const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden'; })()`,
@@ -1239,21 +1239,25 @@ export const scenarios = [
       );
       // Foot: configure → consult → act, then the gap, then the contextual
       // ✕ alone in the right corner (the same corner ✕ Clear owns on the
-      // workbench rim). The three permanent icons are the LEFT cluster
-      // precisely so the ✕ coming and going never shifts any of them.
+      // workbench rim). The permanent icons are the LEFT cluster precisely
+      // so the ✕ coming and going never shifts any of them.
       assert.deepEqual(
         await a.eval(`[...document.getElementById('rail-foot').children].map((el) => el.id)`),
-        ['toggle-settings', 'rail-log', 'rail-palette', 'corner-controls'],
+        ['toggle-settings', 'rail-log', 'rail-help', 'rail-palette', 'corner-controls'],
         'the foot bar runs ⚙ → ≣ → ❯, with the contextual ✕ in the far corner',
       );
-      // …and that corner is REAL, not just source order: the ✕ is pushed to
-      // the panel's right edge while ❯ stays put beside the log.
+      // …and that corner is REAL, not just source order: the ✕ is pushed
+      // to the panel's right edge while ❯ stays clustered. (The old
+      // midpoint proxy died when ? made the cluster four wide — measure
+      // the contract itself: ❯ hugs its neighbor, far from the corner.)
       const footGeo = await a.eval(`(() => {
         const foot = document.getElementById('rail-foot').getBoundingClientRect();
         const pal = document.getElementById('rail-palette').getBoundingClientRect();
-        return { palLeftOfCentre: pal.right < foot.left + foot.width / 2 };
+        const help = document.getElementById('rail-help').getBoundingClientRect();
+        return { clustered: pal.left - help.right < 12, offEdge: foot.right - pal.right > 60 };
       })()`);
-      assert.equal(footGeo.palLeftOfCentre, true, '❯ sits in the left cluster, not on the right edge');
+      assert.ok(footGeo.clustered, '❯ hugs the consult pair — one left cluster');
+      assert.ok(footGeo.offEdge, '❯ is not pushed to the ✕ corner');
       assert.equal(await a.eval(`!!document.querySelector('#left-panel #rail') && !!document.querySelector('#left-panel #rail-foot')`), true,
         'both bars ride the panel — the felt owns no standing chrome');
 
@@ -2449,6 +2453,17 @@ export const scenarios = [
       assert.equal(await a.eval(`location.hash`), '', 'the URL still carries nothing');
       await a.eval(`document.getElementById('help-overlay').click()`);
       assert.equal(await a.dbg('helpOpen'), false, 'the backdrop closes help');
+      // the rail ? opens help un-anchored, and the nav reaches every section
+      await a.eval(`document.getElementById('rail-help').click()`);
+      assert.equal(await a.dbg('helpOpen'), true, 'the rail ? opens help');
+      assert.equal(await a.eval(`document.querySelectorAll('#help-body section.lit').length`), 0,
+        'no section pre-lit from the top-level door');
+      await a.eval(`document.querySelector('#help-nav [data-topic="rolls"]').click()`);
+      assert.ok(await a.eval(`document.querySelector('#help-rolls').classList.contains('lit')`),
+        'the nav lights the rolls section');
+      assert.ok((await a.eval(`document.querySelector('#help-rolls').textContent`))
+        .includes('pose seed'), 'the fairness story names the mechanism');
+      await a.dbg('closeHelp()');
       assert.equal(await a.eval(`document.querySelectorAll('#pop-preview .fc-row').length`), 1,
         'three identical d6 share ONE bar — deduplication, not aggregation');
       const sentence = await a.eval(`document.querySelector('#pop-preview .fc-text').textContent`);
@@ -2915,8 +2930,9 @@ export const scenarios = [
       // reachable this way, which is exactly the line the contract draws.
       const stray = await a.eval(`(() => {
         const roots = ['#left-panel', '#rail', '#kbd-overlay', '#mods-popover',
-                       '#settings-modal', '#cmd-cheatsheet', '#identity-menu'];
-        const banned = /\\btrays?\\b|\\bgroups?\\b|\\bcompose\\b/i;
+                       '#settings-modal', '#cmd-cheatsheet', '#identity-menu',
+                       '#help-overlay'];
+        const banned = /\\btrays?\\b|\\bgroups?\\b|\\bracks?\\b|\\bcompose\\b/i;
         const bad = [];
         for (const sel of roots) {
           const root = document.querySelector(sel);

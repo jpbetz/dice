@@ -242,15 +242,18 @@ limitations under the License.
          That corner is the same one ✕ Clear owns on the workbench rim
          directly above, so the panel has ONE rule for where a clearing verb
          lives; and because the three permanent icons are the LEFT cluster,
-         none of them shifts when the contextual ✕ comes and goes. (This is
+         none of them shifts when the contextual ✕ comes and goes — the
+         left cluster is permanent, the corner contextual. (This is
          why ❯ is not itself right-aligned: pinned to that edge it would be
-         the thing the ✕ pushed around.) -->
+         the thing the ✕ pushed around.) ? Help sits with ≣ in the consult
+         pair (Joe 2026-08-06). -->
     <div id="rail-foot">
       <button id="toggle-settings" class="btn ghost" title="Settings">⚙</button>
       <!-- No notification bubble on the log (user call, 2026-07): history is
            reference material, not an inbox — the since-you-looked count rides
            only the hover title. -->
       <button id="rail-log" class="btn ghost" title="Roll log — l" aria-pressed="false">≣</button>
+      <button id="rail-help" class="btn ghost" title="Help">?</button>
       <button id="rail-palette" class="btn ghost" title="Quick roll ( / )">❯</button>
       <div id="corner-controls" class="hidden">
         <button id="corner-clear" class="corner-btn" title="Remove all dice from the table — c"><span class="cb-x">✕</span><span class="cb-label"> Clear table</span></button>
@@ -355,31 +358,42 @@ limitations under the License.
         <button id="help-close" class="pop-close" title="Close">✕</button>
       </div>
       <div id="help-body">
-        <section id="help-pool-stats">
-          <h3>Pool stats — how dice combine</h3>
-          <p>Under <b>Your Soul Deal</b>, dice never sum. Each die reads its
-            own face against its own rank column, so a pool forecasts as
-            per-rank spectra: every segment is that die's exact chance of
-            landing that outcome — matching faces ÷ total faces.</p>
-          <p>The one-line view is the <b>count-weighted average</b> of those
-            spectra. For an outcome O in a pool of N dice, where the pool
-            holds n₁ dice with chance p₁(O), n₂ with p₂(O), and so on:</p>
-          <p class="help-math">P(O) = (n₁·p₁(O) + n₂·p₂(O) + …) ÷ N</p>
-          <p>— the chance that one die drawn at random from this pool lands
-            O. It is a view over the same per-die math, not a new read:
-            <b>per die</b> expands the exact rows, and landed results are
-            never merged.</p>
-          <p>Keep/drop (<code>kh kl dh dl</code>) shows no per-die forecast:
-            which dice count is decided by the landing itself.</p>
-          <p>Under the totals systems (D&amp;D style, Numbers only) the line
-            is the exact min / average / max of the summed roll. In rare
-            pools where the 40-die cap can cut rerolls or explosions short,
-            exact math is impossible before the landing — the line is then
-            estimated from 4,000 seeded sample rolls, and says so.</p>
-          <p><b>Dice value</b> (the ✎ ledger figures) sums every physical
-            die's highest face — advantage partners included; reroll
-            replacements and explosion children excluded, since those dice
-            only exist after a value lands. Modifiers are not counted.</p>
+        <nav id="help-nav" aria-label="Help sections">
+          <button data-topic="rolls">Rolls</button>
+          <button data-topic="systems">Systems</button>
+          <button data-topic="notation">Notation</button>
+          <button data-topic="visibility">Visibility</button>
+          <button data-topic="pool-stats">Pool stats</button>
+          <button data-topic="pools">Your pools</button>
+          <button data-topic="data">Your data</button>
+        </nav>
+        <section id="help-rolls">
+          <h3>Fair rolls, one table</h3>
+          <p>Online, the server does the rolling. Values come from
+            cryptographically strong randomness on the server; your notation
+            is re-read there, and nothing a device sends can pick or nudge a
+            result — the roller has no more influence over the dice than
+            anyone watching.</p>
+          <p>Every screen watches the same throw. A roll travels as its
+            landed values plus a small pose seed; each device replays the
+            identical tumble from that seed, and every die is corrected to
+            land exactly on the server's value. The motion is presentation —
+            synchronized theater. The values are the record. The pose seed
+            is drawn independently of the values, so it reveals nothing.</p>
+          <p>Hidden rolls are absent, not covered: values a seat is not
+            meant to see never reach that seat's device at all.</p>
+          <p>Solo tables run entirely in your browser with local
+            randomness — the same dice, no wire.</p>
+        </section>
+        <section id="help-systems">
+          <h3>Systems are a lens</h3>
+          <p>A roll stores raw facts: which dice, which faces, what was
+            asked of them. The room's system decides how those facts
+            <i>read</i> — <b>Your Soul Deal</b> reads each die against its
+            own rank column and never sums; the totals systems read the
+            summed value, with targets and modifiers. Switching the system
+            re-reads the whole log in place: history does not change, its
+            meaning does.</p>
         </section>
         <section id="help-notation">
           <h3>Roll notation</h3>
@@ -400,13 +414,50 @@ limitations under the License.
             values. <b>Whisper to…</b> — you pick the audience; the rest of
             the table sees that a roll happened, not what it said.</p>
         </section>
+        <section id="help-pool-stats">
+          <h3>Pool stats — how dice combine</h3>
+          <p>Under <b>Your Soul Deal</b>, dice never sum. Each die reads its
+            own face against its own rank column, so a pool forecasts as
+            per-rank spectra: every segment is that die's exact chance of
+            landing that outcome — matching faces ÷ total faces.</p>
+          <p>The one-line view is the <b>count-weighted average</b> of those
+            spectra. For an outcome O in a pool of N dice, where the pool
+            holds n₁ dice with chance p₁(O), n₂ with p₂(O), and so on:</p>
+          <p class="help-math">P(O) = (n₁·p₁(O) + n₂·p₂(O) + …) ÷ N</p>
+          <p>— the chance that one die drawn at random from this pool lands
+            O. It is a view over the same per-die math, not a new read: the
+            expanded view shows the exact rows, and landed results are never
+            merged.</p>
+          <p>Keep/drop (<code>kh kl dh dl</code>) shows no per-die forecast:
+            which dice count is decided by the landing itself.</p>
+          <p>Under the totals systems the line is the exact min / average /
+            max of the summed roll. In rare pools where the 40-die cap can
+            cut rerolls or explosions short, exact math is impossible before
+            the landing — the line is then estimated from 4,000 seeded
+            sample rolls, and says so.</p>
+        </section>
         <section id="help-pools">
-          <h3>Saved pools</h3>
-          <p>Pools live on shelves — Attributes, Skills, Motivations, or
-            shelves you mint. Tap a tile to stage it into the draft; digits
-            1–9 stage by position. <b>✎ Edit pools</b> is
-            manage-and-measure: the editing chrome plus the dice-value
-            figures for each shelf and the whole rack.</p>
+          <h3>Your pools</h3>
+          <p>Saved pools are named dice on shelves — Attributes, Skills,
+            Motivations, or shelves you make. A pool stores its
+            full spelling — dice, modifiers, target, privacy — and that
+            whole intent travels together wherever the pool is rolled or
+            shared.</p>
+          <p><b>Dice value</b> is a build-time measure of a pool or shelf:
+            the sum of every physical die's highest face. Advantage partners
+            count (they always hit the felt); reroll replacements and
+            explosion children do not (they only exist after a value lands);
+            modifiers are ignored. Two spellings of the same physical dice
+            always price the same.</p>
+        </section>
+        <section id="help-data">
+          <h3>Your data</h3>
+          <p>Your pools live in your browser, per site — there are no
+            accounts. A room lives in server memory while the table stands
+            and evaporates afterwards; its log is the room's record for as
+            long as it lasts. Pools travel by export and import: a small
+            portable text file you hand around yourself. Links carry a room
+            name and nothing else about you.</p>
         </section>
       </div>
     </div>
