@@ -30,8 +30,25 @@ limitations under the License.
 export const DIE_MAX = { d4: 4, d6: 6, d8: 8, d10: 10, d10x: 90, d12: 12, d20: 20 };
 export const KEEP_MODES = ['kh', 'kl', 'dh', 'dl'];
 
-const MAX_PHYSICAL_DICE = 40;
-const EXPLODE_CHAIN_CAP = 3;
+export const MAX_PHYSICAL_DICE = 40;
+export const EXPLODE_CHAIN_CAP = 3;
+
+// Dice value of a pool: the sum of DIE_MAX over the physical dice guaranteed
+// to hit the felt (base list post-d100 expansion + advantage partners, capped
+// exactly as composeRoll caps them). Reroll replacements and explosion
+// children are value-conditional, so they are not counted. See
+// docs/POOL-ANALYSIS.md §4 — the word is "dice value", never "ceiling".
+export function budgetOf(dice, mods) {
+  let sum = 0;
+  for (const t of dice) sum += DIE_MAX[t] || 0;
+  if (mods && mods.adv) {
+    let len = dice.length;
+    for (let i = 0; i < dice.length && len < MAX_PHYSICAL_DICE; i++) {
+      if (dice[i] === 'd20') { sum += DIE_MAX.d20; len++; }
+    }
+  }
+  return sum;
+}
 
 // Roll one value for a die type using rng() -> [0,1).
 export function rollValue(type, rng) {
