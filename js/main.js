@@ -24,7 +24,7 @@ import { dieArtURL } from './diceart.js';
 import { connect, forgetSeat } from './net.js';
 import { SYSTEMS, DEFAULT_SYSTEM } from './meanings.js';
 import { composeRoll, validateMods, budgetOf } from './rollspec.js';
-import { previewOf } from './odds.js';
+import { previewOf, countingPmfs } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { exportYaml, parsePortable, planImport } from './portable.js';
 import { THEMES, SETS } from './themes.js';
@@ -7449,6 +7449,58 @@ function renderPopParts() {
   });
 }
 
+// THE SPECTRUM BARS (ROADMAP §2l ④): one bar per die — that die's whole
+// probability mass in its chart column's own row order, tier-colored,
+// quiet included as a real segment. Identical (source, rank, transform)
+// dice share a bar. The text layer IS the content — the full 'word %'
+// sentence per bar, selectable and read by AT — and the geometry is
+// aria-hidden (the shipped audit rule). A wholly quiet die (d10x) renders
+// the single italic word, never a 100%-wide dim bar (§3.4: dash AND word
+// would mark one silence twice).
+function buildForecast(fcast, visSuffix) {
+  const frag = document.createDocumentFragment();
+  for (const bar of fcast.bars) {
+    const row = document.createElement('div');
+    row.className = 'fc-row';
+    const label = document.createElement('span');
+    label.className = 'fc-label';
+    label.textContent = (bar.source ? `${bar.source} · ` : '')
+      + (bar.count > 1 ? `${bar.count}×` : '') + bar.type
+      + (bar.variant === 'plain' ? ' (unpaired)' : '');
+    row.appendChild(label);
+    if (bar.allQuiet) {
+      const q = document.createElement('span');
+      q.className = 'fc-allquiet';
+      q.textContent = 'quiet';
+      row.appendChild(q);
+    } else {
+      const text = document.createElement('span');
+      text.className = 'fc-text';
+      text.textContent = bar.segments
+        .map((s) => `${s.word || 'quiet'} ${Math.round(s.p * 100)}%`).join(' · ');
+      const geo = document.createElement('span');
+      geo.className = 'fc-geo';
+      geo.setAttribute('aria-hidden', 'true');
+      for (const s of bar.segments) {
+        const seg = document.createElement('i');
+        seg.className = 'fc-seg' + (s.tier ? ` fc-${s.tier}` : ' fc-quiet');
+        seg.style.width = `${s.p * 100}%`;
+        seg.title = `${s.word || 'quiet'} — ${Math.round(s.p * 100)}%`;
+        geo.appendChild(seg);
+      }
+      row.append(text, geo);
+    }
+    frag.appendChild(row);
+  }
+  if (visSuffix) {
+    const vis = document.createElement('span');
+    vis.className = 'fc-vis';
+    vis.textContent = visSuffix.replace(/^ · /, '');
+    frag.appendChild(vis);
+  }
+  return frag;
+}
+
 // Echo, preview and action buttons — the cheap half of a re-render.
 function renderPopEcho() {
   if (!pop) return;
@@ -7462,11 +7514,24 @@ function renderPopEcho() {
     : pop.vis.mode === 'whisper'
       ? ` · whisper to ${pop.vis.names.join(', ')}`
       : ` · ${pop.vis.mode === 'held' ? 'face down' : 'only me'}`;
-  popPreviewEl.textContent = err
-    ? `invalid spec: ${err}`
-    : visBlocked
-      ? 'whisper needs an audience — pick at least one player'
-      : fmtPreview(spec.dice, spec.mods).replace(/ (avg|max)/g, ' · $1') + visSuffix;
+  // Per-die systems forecast per die (§2l ④, every ± door alike); sum
+  // systems keep the exact min/avg/max line until the sum read (§2l ⑥).
+  // The slot never blanks — §1.3 makes this line the validator.
+  const fcast = !err && !visBlocked && activeSystem().forecastFor
+    ? activeSystem().forecastFor(spec, { countingPmfs }) : null;
+  popPreviewEl.classList.toggle('fc', !!(fcast && fcast.kind === 'per-die'));
+  if (err) {
+    popPreviewEl.textContent = `invalid spec: ${err}`;
+  } else if (visBlocked) {
+    popPreviewEl.textContent = 'whisper needs an audience — pick at least one player';
+  } else if (fcast && fcast.kind === 'per-die') {
+    popPreviewEl.textContent = '';
+    popPreviewEl.appendChild(buildForecast(fcast, visSuffix));
+  } else if (fcast && fcast.kind === 'refusal') {
+    popPreviewEl.textContent = fcast.reason + visSuffix;
+  } else {
+    popPreviewEl.textContent = fmtPreview(spec.dice, spec.mods).replace(/ (avg|max)/g, ' · $1') + visSuffix;
+  }
   popSaveBtn.disabled = !!err || visBlocked;
   popToDraftBtn.disabled = !!err || visBlocked;
   popVariantBtn.disabled = !!err || visBlocked;
@@ -8220,6 +8285,10 @@ function setChips(on, persist = true) {
 function rerenderInterpretation() {
   renderLog();
   renderShelfMarkers(); // the shelf markers' meaning words re-read the lens
+  // An open ± popover carries the forecast, which reads the lens too — a
+  // teammate flipping the room's system must not leave a stale spectrum
+  // with no visible cause (§2l ④).
+  if (pop) renderPopEcho();
   // The verdict card holds §2.5's hero slot for an entry the log also shows;
   // letting it age out under the old system would leave the two contradicting
   // each other for the card's whole dismiss window. Repaint it — crit frame

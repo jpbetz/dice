@@ -2415,6 +2415,49 @@ export const scenarios = [
     },
   },
   {
+    name: 'pool-forecast',
+    tags: ['groups', 'meanings'],
+    // THE SPECTRUM BARS (§2l ④): per-die forecast in the ± popover — exact
+    // by construction, deduplicated never aggregated, keep/drop refused,
+    // d10x is the single italic quiet, and a system flip repaints the OPEN
+    // popover rather than leaving a stale spectrum.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.dbg(`setGroups([{name: 'Grit', notation: '3d6', category: 'Attributes'},
+        {name: 'Kept', notation: '4d6dl1'}, {name: 'Fate', notation: '2d10x'}])`);
+      await a.dbg('setPoolsEditMode(true)'); // the group door opens inside ✎
+      const pool = async (name) => (await a.dbg('groups')).find((g) => g.name === name);
+
+      assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify((await pool('Grit')).id)})`),
+        true, 'the ± opens on a saved pool');
+      assert.equal(await a.eval(`document.querySelectorAll('#pop-preview .fc-row').length`), 1,
+        'three identical d6 share ONE bar — deduplication, not aggregation');
+      const sentence = await a.eval(`document.querySelector('#pop-preview .fc-text').textContent`);
+      assert.ok(sentence.includes('Fail 17%') && sentence.includes('quiet 33%')
+        && sentence.includes('Success & Bonus 17%'), `the d6 spectrum sentence (got: ${sentence})`);
+      assert.ok((await a.eval(`document.querySelector('#pop-preview .fc-label').textContent`))
+        .includes('3×d6'), 'the bar is labeled with count and rank');
+      assert.equal(await a.eval(`document.querySelectorAll('#pop-preview .fc-seg').length`), 5,
+        'five segments in the chart’s own row order');
+
+      assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify((await pool('Kept')).id)})`), true);
+      assert.ok(/keep\/drop/.test(await a.eval(`document.getElementById('pop-preview').textContent`)),
+        'keep/drop refuses — no per-die read before the roll');
+
+      assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify((await pool('Fate')).id)})`), true);
+      assert.equal(await a.eval(`document.querySelectorAll('#pop-preview .fc-geo').length`), 0,
+        'a wholly quiet die draws no bar geometry');
+      assert.equal(await a.eval(`document.querySelector('#pop-preview .fc-allquiet').textContent`),
+        'quiet', 'the single italic word (§3.4: never a 100%-wide dim bar)');
+
+      await a.dbg(`setSystem('dnd')`); // online: applies on the settings echo
+      await a.waitFor(`document.getElementById('pop-preview').textContent.includes('min ')`,
+        { desc: 'system flip repaints the open popover into the sum world' });
+      await a.dbg(`setSystem('soul-deal')`);
+    },
+  },
+  {
     name: 'shared-pools',
     tags: ['smoke', 'groups'],
     // The owner switcher (ROADMAP 2b): racks publish to the room; a teammate

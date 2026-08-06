@@ -3154,6 +3154,30 @@ body.mini #result-verdict { font-size: 11px; }
   color: var(--gold);
   padding: 10px 14px 0;
 }
+/* THE SPECTRUM BARS (§2l ④): the tier PALETTE is semantic dress shared
+   with chips and log words, but flat — no glow; ceremony light stays out
+   of a management popover. Quiet is a designed answer, so its segment is
+   visible, just dim. Gold is the sum world's word: forecast labels are
+   steel. */
+.pop-preview .fc-row { position: relative; display: flex; flex-direction: column; gap: 3px; margin: 7px 0; }
+.pop-preview .fc-label { font-family: var(--font-ui, inherit); font-size: 10px; color: var(--muted); letter-spacing: 0.04em; }
+.pop-preview .fc-text {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+.pop-preview .fc-geo {
+  display: flex; height: 8px; border-radius: 3px; overflow: hidden;
+  border: 1px solid var(--hair); background: rgba(0, 0, 0, 0.25);
+}
+.pop-preview .fc-seg { display: block; height: 100%; }
+.pop-preview .fc-quiet { background: rgba(243, 234, 215, 0.07); }
+.pop-preview .fc-crit-fail { background: rgba(226, 73, 59, 0.6); }
+.pop-preview .fc-fail { background: rgba(224, 123, 110, 0.42); }
+.pop-preview .fc-success-soft { background: rgba(205, 190, 138, 0.38); }
+.pop-preview .fc-success { background: rgba(255, 215, 102, 0.45); }
+.pop-preview .fc-crit-success { background: rgba(255, 226, 122, 0.65); }
+.pop-preview .fc-allquiet { font-style: italic; color: var(--muted); }
+.pop-preview .fc-vis { display: block; margin-top: 6px; color: var(--muted); }
 .pop-actions { display: flex; gap: 8px; padding: 10px 14px 0; }
 .pop-actions:last-child, .pop-actions-2nd { padding-bottom: 14px; }
 .pop-actions .btn { flex: 1; }

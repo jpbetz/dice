@@ -312,8 +312,8 @@ exports carry a roll's FULL intent:
 
 ### 2l. Pool analysis — the die spectrum and the dice-value ledger
 (2026-08-05, Joe: "I want to support analysis of dice pools") —
-**DESIGN, four decisions taken. Slice ① SHIPPED 2026-08-06
-(SHIPPED.md §2l); ②–⑦ open.**
+**DESIGN, four decisions taken. Slices ①–④ SHIPPED 2026-08-06
+(SHIPPED.md §2l); ⑤–⑦ open.**
 
 **Full detail: [POOL-ANALYSIS.md](POOL-ANALYSIS.md)** — the
 reasoning, the generated data, and the record of what was killed
@@ -416,7 +416,8 @@ validator") in a fixed-height slot, so the per-die branch must
 still has no assertion.
 
 **BUILD ORDER — seven slices, each independently shippable.** ①
-the math floor + the honest preview — **SHIPPED 2026-08-06** · ② the profile
+the math floor + the honest preview — **SHIPPED 2026-08-06** · ② ③ ④
+— **SHIPPED 2026-08-06** (seam `755808f` · ledger `25012c6` · bars) · the profile
 seam (`forecastFor(spec, tools)` with `pmf` injected so
 meanings.js stays dependency-free) · ③ the dice-value ledger —
 **ask (2) usable here** · ④ the spectrum bars — **ask (1) ships
