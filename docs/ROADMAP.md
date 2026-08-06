@@ -312,7 +312,8 @@ exports carry a roll's FULL intent:
 
 ### 2l. Pool analysis — the die spectrum and the dice-value ledger
 (2026-08-05, Joe: "I want to support analysis of dice pools") —
-**DESIGN, four decisions taken. Nothing is built.**
+**DESIGN, four decisions taken. Slice ① SHIPPED 2026-08-06
+(SHIPPED.md §2l); ②–⑦ open.**
 
 **Full detail: [POOL-ANALYSIS.md](POOL-ANALYSIS.md)** — the
 reasoning, the generated data, and the record of what was killed
@@ -402,26 +403,20 @@ keeps its hairline (promoting it to a data track would regrade
 foreign path needs the same wrapper with no figure, or foreign
 heads silently lose their dress.
 
-**THE HONESTY PASS ships first, and is not optional.**
-`fmtPreview` → `previewSpec(dice, mods, 800)` is a live bug in
-two rendered surfaces: measured over 200 trials, P(printed
-min/max equals the true min/max) is 3d6 98%/97% · 3d20 9%/8% ·
-**9d6 0%/0%** · 40d20 0%/0%. For every pool bigger than three d6
-— *including the nine-attribute Soul Deal seed rack* — the line
-the app prints as the pool's range is essentially always wrong
-at both ends. `renderCmdState` is shared by the command box
-**and the quick palette**; §1.3 makes that string load-bearing
-("the preview *is* the validator") in a fixed-height slot, so
-the per-die branch must **replace** it, never blank it; and the
-success branch ends in `visSuffix`, so a naive rewrite drops the
-visibility echo — and **no e2e asserts `#pop-preview`**, so it
-would ship silently.
+**THE HONESTY PASS — SHIPPED 2026-08-06** (`b91a32b`,
+`4c92ae6`, detail in SHIPPED.md §2l): every rendered preview now
+prints exact min/avg/max from `js/odds.js`, with the rare
+cap-truncation corners seeded-sampled and labeled. Two warnings
+from the audit still govern slice ④'s per-die branch: §1.3 makes
+the preview string load-bearing ("the preview *is* the
+validator") in a fixed-height slot, so the per-die branch must
+**replace** it, never blank it; and the success branch ends in
+`visSuffix`, so a naive rewrite drops the visibility echo — the
+`preview-honest` e2e now pins the box surface, but `#pop-preview`
+still has no assertion.
 
 **BUILD ORDER — seven slices, each independently shippable.** ①
-the math floor + the honest preview (`js/odds.js`, `budgetOf`
-beside `DIE_MAX`, export
-`MAX_PHYSICAL_DICE`/`EXPLODE_CHAIN_CAP`, `fmtPreview` re-pointed
-in box *and* palette, `tests/odds.test.mjs`) · ② the profile
+the math floor + the honest preview — **SHIPPED 2026-08-06** · ② the profile
 seam (`forecastFor(spec, tools)` with `pmf` injected so
 meanings.js stays dependency-free) · ③ the dice-value ledger —
 **ask (2) usable here** · ④ the spectrum bars — **ask (1) ships

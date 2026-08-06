@@ -634,6 +634,30 @@ Follow-ups from the critic that shipped same day:
   foreign` joins the sticky stack; category heads yield sticky in
   foreign state.
 
+### 2l partial — slice ① the honesty pass — SHIPPED 2026-08-06
+
+The math floor under pool analysis (`b91a32b`, `4c92ae6`); slices ②–⑦
+remain open in ROADMAP §2l. `js/odds.js` `previewOf(dice, mods)` →
+`{min, avg, max, exact}`: each capped mechanic is classified per spec —
+VOID (the 40-die cap zeroes it: `40d20!`, `40d6 ro<=3` — exact with the
+mechanic ignored), FREE (the cap can never bind — exact via per-die
+pmfs, a tie-proof top-k threshold identity that handles mixed-type
+keep/drop, and closed-form explosion chains), BINDING (truncation
+depends on rolled values, which breaks per-die independence — seeded
+4,000-roll sampling, and the preview line SAYS so: `· sampled — 4,000
+rolls`, never a bare ≈). min is the provable floor in every tier.
+`budgetOf` (dice value, POOL-ANALYSIS §4) landed beside `DIE_MAX` in
+rollspec.js with the caps exported; both adv spellings of 2d20-keep-1
+read 40. `fmtPreview` re-pointed in all rendered surfaces (command box +
+quick palette via `renderCmdState`, ± popover echo) — the old
+`previewSpec(…, 800)` Monte-Carlo line was wrong at both ends for any
+pool past 3d6 (9d6: never right) and jittered per repaint. Verification:
+`tests/odds.test.mjs` (53 tests) cross-checks the exact tier against
+exhaustive enumeration of composeRoll's own rng-draw tree — caps, ties
+and sort stability captured mechanically; e2e `preview-honest`
+(`notation`, `smoke`) pins the literal preview text, an assertion that
+was impossible under Monte Carlo.
+
 ---
 
 ## Tier 3 — Secrecy landings
