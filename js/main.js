@@ -4623,6 +4623,9 @@ window.__diceDebug = {
   // edit chrome exists only while this is on.
   get poolsEditMode() { return poolsEdit; },
   setPoolsEditMode(on) { setPoolsEdit(on); return poolsEdit; },
+  openHelp(topic) { openHelpDialog(topic || null); return isHelpOpen(); },
+  closeHelp() { closeHelpDialog(); return !isHelpOpen(); },
+  get helpOpen() { return isHelpOpen(); },
   // §2l ③ — named rackDiceValue: shelfValue is already a live concept
   // (a die's face on the collect shelf).
   get rackDiceValue() {
@@ -7580,10 +7583,19 @@ function renderPopEcho() {
   // section reads like its siblings (Joe 2026-08-06); validation states
   // (bad spec, audience-less whisper) are not stats and stay bare.
   const statsLabel = () => {
+    const wrap = document.createElement('span');
+    wrap.className = 'pop-stats-row';
     const l = document.createElement('span');
     l.className = 'plabel pop-stats-label';
     l.textContent = 'Pool stats';
-    return l;
+    const q = document.createElement('button');
+    q.className = 'help-bubble';
+    q.textContent = '?';
+    q.title = 'How these numbers combine';
+    q.setAttribute('aria-label', 'Help: pool stats');
+    q.addEventListener('click', () => openHelpDialog('pool-stats'));
+    wrap.append(l, q);
+    return wrap;
   };
   if (err) {
     popPreviewEl.textContent = `invalid spec: ${err}`;
@@ -9296,6 +9308,28 @@ kbdOverlay.addEventListener('click', (e) => {
   if (e.target === kbdOverlay) closeKbd();
 });
 
+// HELP (Joe 2026-08-06): one dialog, sectioned; openers pass a topic and
+// the section lights + scrolls. In-dialog anchors only — the URL carries
+// nothing beyond ?room= (GOALS §7).
+const helpOverlay = document.getElementById('help-overlay');
+function isHelpOpen() { return !helpOverlay.classList.contains('hidden'); }
+function closeHelpDialog() { helpOverlay.classList.add('hidden'); }
+function openHelpDialog(topic) {
+  helpOverlay.classList.remove('hidden');
+  helpOverlay.querySelectorAll('#help-body section').forEach((el) => el.classList.remove('lit'));
+  const sec = topic ? document.getElementById(`help-${topic}`) : null;
+  if (sec) {
+    sec.classList.add('lit');
+    sec.scrollIntoView({ block: 'start' });
+  } else {
+    document.getElementById('help-body').scrollTop = 0;
+  }
+}
+helpOverlay.addEventListener('click', (e) => {
+  if (e.target === helpOverlay) closeHelpDialog();
+});
+document.getElementById('help-close').addEventListener('click', closeHelpDialog);
+
 // The ONE reroll payload. Every reroll trigger — the card strip
 // (appendCardActions), the log ⟳, the 'r' shortcut / verdict ⟳
 // (rerollLast) — replays the same intent: dice ride the call, and this
@@ -9364,7 +9398,8 @@ document.addEventListener('keydown', (e) => {
 
   if (e.key === 'Escape') {
     if (typing) return; // focused inputs own Esc (palette input closes itself)
-    if (isKbdOpen()) closeKbd();
+    if (isHelpOpen()) closeHelpDialog(); // help rides above its opener
+    else if (isKbdOpen()) closeKbd();
     else if (isPaletteOpen()) closePalette();
     else if (!settingsModal.classList.contains('hidden')) closeSettingsModal();
     else if (isIdentityMenuOpen()) closeIdentityMenu();

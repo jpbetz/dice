@@ -2438,6 +2438,17 @@ export const scenarios = [
         true, 'the ± opens on a saved pool');
       assert.equal(await a.eval(`document.querySelector('#pop-preview .pop-stats-label').textContent`),
         'Pool stats', 'the section is labeled as such');
+      // (?) opens the sectioned help anchored at pool-stats — in-dialog
+      // anchors only; the URL keeps carrying nothing
+      await a.eval(`document.querySelector('#pop-preview .help-bubble').click()`);
+      assert.equal(await a.dbg('helpOpen'), true, 'the bubble opens help');
+      assert.ok(await a.eval(`document.querySelector('#help-pool-stats').classList.contains('lit')`),
+        'anchored at the stats section');
+      assert.ok((await a.eval(`document.querySelector('#help-pool-stats .help-math').textContent`))
+        .includes('÷ N'), 'the mixture formula is stated');
+      assert.equal(await a.eval(`location.hash`), '', 'the URL still carries nothing');
+      await a.eval(`document.getElementById('help-overlay').click()`);
+      assert.equal(await a.dbg('helpOpen'), false, 'the backdrop closes help');
       assert.equal(await a.eval(`document.querySelectorAll('#pop-preview .fc-row').length`), 1,
         'three identical d6 share ONE bar — deduplication, not aggregation');
       const sentence = await a.eval(`document.querySelector('#pop-preview .fc-text').textContent`);

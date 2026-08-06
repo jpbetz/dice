@@ -2945,6 +2945,51 @@ body.mini #offers-layer { top: 8px; width: min(260px, calc(100vw - 16px)); }
 #kbd-panel .cheatsheet td { font-size: 12px; }
 #kbd-panel .cheatsheet code { font-size: 12px; }
 
+/* ---------- help dialog (Joe 2026-08-06) ---------- */
+#help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-cheatsheet);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 8, 5, 0.72);
+  backdrop-filter: blur(4px);
+}
+#help-overlay.hidden { display: none; }
+#help-panel {
+  width: min(92vw, 470px);
+  animation: modal-pop 0.3s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+#help-panel .help-head { display: flex; align-items: center; justify-content: space-between; }
+#help-body { max-height: 62vh; overflow: auto; padding-right: 6px; }
+#help-body section { margin: 0 0 16px; }
+#help-body section.lit h3 { color: var(--gold-bright); }
+#help-body h3 { font-size: 13px; margin: 12px 0 6px; color: var(--ivory); }
+#help-body p { font-size: 12px; line-height: 1.5; color: var(--ivory); margin: 6px 0; }
+#help-body .help-math {
+  font-family: var(--font-mono);
+  color: var(--gold);
+  text-align: center;
+  padding: 7px 0;
+}
+.pop-stats-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.pop-stats-row .plabel { margin-bottom: 0; }
+.help-bubble {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 12px;
+  text-align: center;
+  padding: 0;
+  cursor: pointer;
+}
+.help-bubble:hover { color: var(--ivory); }
+
 /* ---------- interim dc verdict (fixed decision: banner + log) ---------- */
 #result-verdict {
   font-family: var(--font-display);

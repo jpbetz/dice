@@ -344,6 +344,74 @@ limitations under the License.
     </div>
   </div>
 
+  <!-- Help (Joe 2026-08-06): ONE dialog, sectioned; openers pass a topic
+       and the section lights + scrolls (openHelpDialog('pool-stats') →
+       #help-pool-stats). IN-DIALOG anchors only — the URL carries nothing
+       beyond ?room= (GOALS §7, pinned by url-carries-nothing). -->
+  <div id="help-overlay" class="hidden" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="panel" id="help-panel">
+      <div class="help-head">
+        <h2 id="help-title">Help</h2>
+        <button id="help-close" class="pop-close" title="Close">✕</button>
+      </div>
+      <div id="help-body">
+        <section id="help-pool-stats">
+          <h3>Pool stats — how dice combine</h3>
+          <p>Under <b>Your Soul Deal</b>, dice never sum. Each die reads its
+            own face against its own rank column, so a pool forecasts as
+            per-rank spectra: every segment is that die's exact chance of
+            landing that outcome — matching faces ÷ total faces.</p>
+          <p>The one-line view is the <b>count-weighted average</b> of those
+            spectra. For an outcome O in a pool of N dice, where the pool
+            holds n₁ dice with chance p₁(O), n₂ with p₂(O), and so on:</p>
+          <p class="help-math">P(O) = (n₁·p₁(O) + n₂·p₂(O) + …) ÷ N</p>
+          <p>— the chance that one die drawn at random from this pool lands
+            O. It is a view over the same per-die math, not a new read:
+            <b>per die</b> expands the exact rows, and landed results are
+            never merged.</p>
+          <p>Keep/drop (<code>kh kl dh dl</code>) shows no per-die forecast:
+            which dice count is decided by the landing itself.</p>
+          <p>Under the totals systems (D&amp;D style, Numbers only) the line
+            is the exact min / average / max of the summed roll. In rare
+            pools where the 40-die cap can cut rerolls or explosions short,
+            exact math is impossible before the landing — the line is then
+            estimated from 4,000 seeded sample rolls, and says so.</p>
+          <p><b>Dice value</b> (the ✎ ledger figures) sums every physical
+            die's highest face — advantage partners included; reroll
+            replacements and explosion children excluded, since those dice
+            only exist after a value lands. Modifiers are not counted.</p>
+        </section>
+        <section id="help-notation">
+          <h3>Roll notation</h3>
+          <p><code>3d6+2</code> — three d6 plus a flat bonus.
+            <code>adv</code> / <code>dis</code> — pair every d20, keep the
+            better / worse. <code>kh2 kl2 dh1 dl1</code> — keep or drop by
+            landed value. <code>ro&lt;=2</code> — reroll low faces, once per
+            die. <code>!</code> — max faces explode, up to three deep.
+            <code>dc 15</code> — a target to beat. <code># words</code> —
+            label the roll. <code>check</code> / <code>cinematic</code> —
+            stage the moment.</p>
+        </section>
+        <section id="help-visibility">
+          <h3>Visibility</h3>
+          <p><b>Open</b> — everyone sees the roll and the result.
+            <b>Face down</b> — the table sees dice land; the values stay
+            yours until you reveal. <b>Only me</b> — nobody else learns the
+            values. <b>Whisper to…</b> — you pick the audience; the rest of
+            the table sees that a roll happened, not what it said.</p>
+        </section>
+        <section id="help-pools">
+          <h3>Saved pools</h3>
+          <p>Pools live on shelves — Attributes, Skills, Motivations, or
+            shelves you mint. Tap a tile to stage it into the draft; digits
+            1–9 stage by position. <b>✎ Edit pools</b> is
+            manage-and-measure: the editing chrome plus the dice-value
+            figures for each shelf and the whole rack.</p>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <!-- Roll moment ceremony (UX §2.4/§5.3, identical in compact view — §7.4).
        Ornate corners are injected by JS;
        phase classes (c-declare/c-tumble/c-settle/c-verdict) drive visibility. -->
