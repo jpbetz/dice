@@ -22,7 +22,7 @@ import * as CANNON from 'cannon-es';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, SHADER_TIME } from './dice.js';
 import { dieArtURL } from './diceart.js';
 import { connect, forgetSeat } from './net.js';
-import { SYSTEMS, DEFAULT_SYSTEM } from './meanings.js';
+import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_MARKS } from './meanings.js';
 import { composeRoll, validateMods, budgetOf } from './rollspec.js';
 import { previewOf, countingPmfs } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
@@ -7483,11 +7483,33 @@ function buildForecast(fcast, visSuffix) {
         seg.className = 'fc-seg' + (s.tier ? ` fc-${s.tier}` : ' fc-quiet');
         seg.style.width = `${s.p * 100}%`;
         seg.title = `${s.word || 'quiet'} — ${Math.round(s.p * 100)}%`;
+        // marks only where they fit (~8% of the track); the hover legend
+        // and the title carry the narrow ones. quiet stays unmarked.
+        if (s.word && s.p >= 0.08) {
+          const m = document.createElement('b');
+          m.className = 'fc-mark';
+          m.textContent = OUTCOME_MARKS[s.word] || '';
+          seg.appendChild(m);
+        }
         geo.appendChild(seg);
       }
       row.append(text, geo);
     }
     frag.appendChild(row);
+  }
+  // hover legend: the marks this pool actually uses, spelled out once
+  const marks = new Map();
+  for (const bar of fcast.bars) {
+    for (const s of bar.segments) {
+      if (s.word && !marks.has(s.word)) marks.set(s.word, OUTCOME_MARKS[s.word]);
+    }
+  }
+  if (marks.size) {
+    const lg = document.createElement('span');
+    lg.className = 'fc-legend';
+    lg.setAttribute('aria-hidden', 'true'); // the text layer speaks full words
+    lg.textContent = [...marks].map(([w, m]) => `${m} ${w}`).join(' · ');
+    frag.appendChild(lg);
   }
   if (visSuffix) {
     const vis = document.createElement('span');

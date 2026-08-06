@@ -490,15 +490,27 @@ limitations under the License.
     <!-- The improviser's hot pair rides near the top (CUJ2): a target and
          a moment are the stakes; keep/drop/reroll/visibility are the long
          tail below. Same controls, ~500px less travel. -->
-    <div class="sec tight">
+    <div class="sec tight sec-sum">
       <div class="prow prow-sum">
         <span class="prow-label grow">Target (DC)</span>
         <input id="pop-dc" class="tin num" inputmode="numeric" placeholder="—" maxlength="3">
       </div>
-      <div class="pfield">
-        <span class="plabel">Comment / mat text</span>
-        <input id="pop-comment" class="tin" maxlength="64" placeholder="shows as the roll label">
+    </div>
+
+    <div class="sec tight">
+      <span class="plabel">Visibility</span>
+      <!-- Labels, not wire words (UX.md §3.2's terminology note): "Secret",
+           "Blind", "GM" and "Private" each read as their own opposite to a
+           player arriving from another VTT, so no mode label may use them.
+           The data-v values ARE the wire words and must not change. -->
+      <div id="pop-seg-vis" class="seg">
+        <button data-v="">Open</button>
+        <button data-v="held">Face down</button>
+        <button data-v="secret">Only me</button>
+        <button data-v="whisper">Whisper to…</button>
       </div>
+      <div id="pop-vis-aud" class="vis-aud hidden"></div>
+      <div id="pop-vis-sub" class="prow-sub"></div>
     </div>
 
     <div class="sec tight">
@@ -512,6 +524,10 @@ limitations under the License.
         <input id="pop-exp-subtitle" class="tin" maxlength="40" placeholder="subtitle — e.g. Charisma Check">
       </div>
       <div id="pop-exp-sub" class="prow-sub"></div>
+      <div class="pfield">
+        <span class="plabel">Comment / mat text</span>
+        <input id="pop-comment" class="tin" maxlength="64" placeholder="shows as the roll label">
+      </div>
     </div>
 
 
@@ -552,21 +568,6 @@ limitations under the License.
       </div>
     </div>
 
-    <div class="sec tight">
-      <span class="plabel">Visibility</span>
-      <!-- Labels, not wire words (UX.md §3.2's terminology note): "Secret",
-           "Blind", "GM" and "Private" each read as their own opposite to a
-           player arriving from another VTT, so no mode label may use them.
-           The data-v values ARE the wire words and must not change. -->
-      <div id="pop-seg-vis" class="seg">
-        <button data-v="">Open</button>
-        <button data-v="held">Face down</button>
-        <button data-v="secret">Only me</button>
-        <button data-v="whisper">Whisper to…</button>
-      </div>
-      <div id="pop-vis-aud" class="vis-aud hidden"></div>
-      <div id="pop-vis-sub" class="prow-sub"></div>
-    </div>
 
     <div id="pop-preview" class="pop-preview"></div>
     <!-- THE TRIGGER PASS (2026-08-03, Joe): the popover is a pure EDITOR —

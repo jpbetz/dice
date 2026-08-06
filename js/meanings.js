@@ -65,6 +65,25 @@ const TIERS = {
   'Critical Success': 'crit-success',
 };
 
+// Segment marks for the spectrum bars (§2l ④, Joe 2026-08-06): small
+// letters on the bar itself, a hover legend spelling them out. Quiet is
+// deliberately unmarked — the silence needs no initial. Every worded row
+// must have a distinct mark (the unit suite pins totality).
+export const OUTCOME_MARKS = {
+  'Critical Fail': 'CF',
+  'Fail': 'F',
+  'Mishap': 'MH',
+  'Blemish': 'B',
+  'Minimal Success': 'Mn',
+  'Minor Success': 'Mi',
+  'Partial Success': 'P',
+  'Success': 'S',
+  'Success & Bonus': 'S+',
+  'Advantage': 'A',
+  'Success & Perm Bonus': 'SP',
+  'Critical Success': 'CS',
+};
+
 // THE SOUL DEAL READ (corrected 2026-07-31, from the system's author):
 // dice values never sum. Each die is read INDIVIDUALLY — the chart's rank
 // columns (Mug ... Boaire) are DIE ranks, so a d4's face reads the d4
