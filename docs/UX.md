@@ -2269,3 +2269,96 @@ left-click-opens-menu wiring — the menu still exists at the same
 coordinates, only its entry gesture changed. Solo users access
 rename/leave/invite via right-click (mouse) or long-press (touch);
 the chip's tooltip teaches the new gesture explicitly.
+
+### 7.18 Manage-and-measure — what the ✎ gate now covers (2026-08-06)
+
+§7.9 framed `✎` narrowly, as **the destructive gate**: the place row
+delete, rename and reorder live, kept behind a toggle so the resting
+rack is quiet and nothing dangerous is one mis-tap away. Two later
+passes widened what stands behind it, and this section is the record so
+the gate does not keep widening by accident.
+
+**§2l made it manage-AND-MEASURE.** The dice-value ledger — the summed
+`DIE_MAX` of the dice a shelf is guaranteed to put on the felt — renders
+only while the toggle is on (Joe's own constraint: *"I don't need to see
+this all the time… maybe only when editing the saved pools?"*). The
+figures are **built in manage mode only, not built-and-hidden**: nine
+existing assertions read `.pool-sec-head`'s textContent across four
+scenarios, and `display:none` still concatenates, so a CSS-hidden figure
+would break all nine while a not-built one breaks the two that read it
+with manage mode on. That is a behavioural contract, not an
+implementation detail.
+
+**§G3 made it manage-and-measure-SOMEONE-ELSE'S.** The prepared-table
+pass (PROFILES.md §4) lets an organizer load a profile from a table file
+into their own rack, so the editor, the ± popover, the spectrum bars and
+the ledger all read it **unmodified** — the alternative, parameterizing
+every management surface off `poolsOwner`, was rejected as a wide blast
+radius to save one click. The consequence for this gate: while a profile
+is loaded, `✎` is editing a *character*, not a *rack*, and the surface
+must say so. It does, in three places at once:
+
+- **the banner** (§7.19) is sticky above the pools head for exactly as
+  long as the swap is live, wearing the toolbar's editing dress;
+- **the category heads yield their sticky pin** to it —
+  `#groups-list.profile-editing` makes the same call `#pools-head.foreign`
+  already makes, for the same reason: ownership is the one thing that
+  must not scroll away;
+- **publishing goes silent** — `publishPools()` no-ops while a profile is
+  loaded, because publishing means *here is my rack* and pushing Rill's
+  pools under Alice's name would lie to every teammate's owner switcher.
+
+**The gate's boundary, restated.** `✎` covers: destructive row edits ·
+the point-budget read · profile authoring. It does **not** cover
+anything a player does at rest, and the ledger's own rule still holds —
+a foreign rack browsed through the owner switcher never shows a figure,
+because manage mode forces `poolsOwner = null`.
+
+### 7.19 The prepared table — the file, the profiles, the seat
+(2026-08-06, shipped)
+
+Tier G. Design authority is [PROFILES.md](PROFILES.md); this section
+specifies the surfaces. The governing sentence is **the file is the
+truth, the room is a convenience, the link is an address** — every
+component below is one of those three and behaves accordingly.
+
+**THE FILE DOOR** (§G1) finishes *Your data*. `Download` writes a fresh
+`portableSnapshot()` — not the textarea's scratch text, which may hold a
+half-edited import — as `<slug>-YYYY-MM-DD.dice.yaml`, slug from the
+table name, else the `?room=` key, else `dice-table`. `Open file…`
+triggers a hidden `<input type="file">`, reads it with `File.text()`, and
+**only fills the textarea and re-previews**. There is deliberately no
+second import path: preview-then-apply is the safety contract, and a
+file must not be a way around it. Oversize (>512 KB) refuses by name and
+size *and disarms Apply*, so a refusal never leaves a stale plan armed.
+
+**THE TABLE FILE** (§G2) adds `table:` and `players:` to the portable
+format, both present-or-absent. A player block nests `pools:` rather
+than putting shelves at the name's depth, because a shelf may legally be
+named `set` or `pools`; nesting puts the reserved keys where a shelf can
+never appear and makes the inner block the same grammar as the
+top-level one. Profile names take the `#` ban (a profile name becomes a
+display name, and display names are whisper addresses); `tableName` does
+not (table names are never whisper-addressed) — the asymmetry the server
+already had. Unknown top-level *sections* skip and warn so the format can
+grow; a line that is not section-shaped still refuses, and a known
+section's contents stay strict.
+
+**THE PROFILE LIST AND THE BANNER** (§G3) are the authoring surface, and
+their whole design is guardrails — see §7.18 for what the gate now means
+and PROFILES.md §4 for why authoring is a rack swap rather than a second
+editor. The one rule worth repeating here: **the operator's own rack is
+stashed, and the stash write is read back and verified before `groups`
+moves.** If storage cannot be trusted, the swap refuses rather than
+proceeding — losing your own pools to a click is the failure this design
+exists to prevent, and it is the `#g=` codec's failure wearing a
+friendlier hat.
+
+**THE SEAT** (§G5) is CUJ2: one link in Discord, six people, each landing
+at the right table under their own name with their own pools. A prepared
+seat is *offered*, never imposed — choosing one takes the name and then
+shows the same `✓ 8 new · …` preview every other import shows, applied
+only on an explicit click. `&as=Name` pre-selects a seat and nothing
+more: it never auto-joins and never auto-applies, and an `as=` naming no
+profile is ignored silently so a stale link cannot break a join. One
+link for everyone stays the primary form — `inviteUrl()` is unchanged.
