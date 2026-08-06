@@ -4909,4 +4909,80 @@ export const scenarios = [
       assert.equal(bannerKids2, 2, 'holder stays at 2 children through a reroll');
     },
   },
+  {
+    name: 'file-door',
+    tags: ['table-file', 'groups'],
+    // ROADMAP §G1: Settings → Your data can now put the rack on disk and take
+    // it back. The file IS the durable copy (PROFILES.md §5), so the two
+    // things worth pinning are that the name is predictable enough to find
+    // again and that the round trip does not drift. Download's a.click() is
+    // deliberately unasserted — firing it would drop a file in the operator's
+    // Downloads; filename() and the snapshot round trip are the testable half.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+
+      // The room key is the fallback slug, and this ctx room is a generated
+      // one — so assert the SHAPE, then pin the tableName override, which is
+      // the branch an organizer actually hits.
+      const bare = await a.dbg('portable.filename()');
+      assert.ok(/^[a-z0-9-]{1,40}-\d{4}-\d{2}-\d{2}\.dice\.yaml$/.test(bare),
+        `filename is a dated slug (got ${bare})`);
+
+      await ctx.api('/api/settings', {
+        playerId: await a.playerId(),
+        settings: { tableName: 'Your Soul Deal!! Session 3' },
+      });
+      await a.waitFor(
+        `window.__diceDebug.portable.filename().startsWith('your-soul-deal-session-3-')`,
+        { desc: 'the table name drives the filename, slugified' });
+
+      // Round trip: what Download would write, read straight back, is a
+      // fixed point — no format drift, nothing to apply.
+      const v = await a.dbg('portable.loadText(window.__diceDebug.portable.snapshot())');
+      assert.equal(v.ok, true, 'a snapshot re-reads clean');
+      assert.equal(v.canApply, false, `round trip has nothing to apply (got ${v.status})`);
+
+      // A file with one pool the rack lacks previews as exactly one add, and
+      // Apply takes it. The import is additive by contract — planImport
+      // deletes nothing, which is why the codec lost (GOALS §7).
+      const before = (await a.dbg('groups')).length;
+      const withNew = "pools:\n  Pools:\n    - 'Doorbell': '2d6+1'\n";
+      const v2 = await a.dbg(`portable.loadText(${JSON.stringify(withNew)})`);
+      assert.equal(v2.canApply, true, `a new pool is appliable (got ${v2.status})`);
+      assert.ok(v2.status.startsWith('✓ 1 new'), `previewed as 1 new (got ${v2.status})`);
+      await a.eval(`document.getElementById('portable-apply').click()`);
+      await a.waitFor(`window.__diceDebug.groups.length === ${before + 1}`,
+        { desc: 'Apply adds the pool' });
+      const names = (await a.dbg('groups')).map((g) => g.name);
+      assert.ok(names.includes('Doorbell'), `the imported pool landed (got ${names.join(',')})`);
+
+      // Oversize refuses by name and size, and drops any plan it was holding
+      // — a refusal must never leave a stale Apply armed.
+      const big = await a.eval(
+        `window.__diceDebug.portable.acceptFile(`
+        + `new File([new Uint8Array(600 * 1024)], 'huge.yaml'))`);
+      assert.equal(big.ok, false, 'an oversize file is refused');
+      assert.equal(big.canApply, false, 'a refusal disarms Apply');
+      assert.ok(big.status.includes('huge.yaml'), `the refusal names the file (got ${big.status})`);
+      assert.equal(await a.eval(`document.getElementById('portable-apply').disabled`), true,
+        'the Apply button is actually disabled after a refusal');
+
+      // The real user path — a picked file — reaches the same place. Chrome
+      // will not let a script set input.files except through DataTransfer.
+      const picked = "pools:\n  Pools:\n    - 'Latchkey': '1d20'\n";
+      await a.eval(`(() => {
+        const dt = new DataTransfer();
+        dt.items.add(new File([${JSON.stringify(picked)}], 'party.dice.yaml',
+          { type: 'text/plain' }));
+        const el = document.getElementById('portable-file');
+        el.files = dt.files;
+        el.dispatchEvent(new Event('change'));
+      })()`);
+      await a.waitFor(
+        `document.getElementById('portable-text').value.includes('Latchkey')`,
+        { desc: 'a picked file fills the textarea' });
+      assert.equal(await a.eval(`document.getElementById('portable-file').value`), '',
+        're-picking the same file must re-fire, so the input clears itself');
+    },
+  },
 ];
