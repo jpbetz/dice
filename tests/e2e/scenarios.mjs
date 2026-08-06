@@ -600,6 +600,50 @@ export const scenarios = [
     },
   },
   {
+    name: 'floor-texture-persistent',
+    tags: ['smoke', 'perf', 'themes'],
+    // Tier 0 §0 (hot-paths): the floor's texture identity is permanent —
+    // recompositeFelt, applyFeltTheme, applyZoom, applyMatDecal, and the
+    // corner sweep all repaint the same CanvasTexture in place and flip
+    // needsUpdate. A collect→theme→zoom→clear sweep must NOT allocate a
+    // fresh texture (that was the old swapFloorMap dispose+new churn).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const uuid0 = await a.dbg('floorTextureId()');
+      assert.ok(typeof uuid0 === 'string' && uuid0.length > 0,
+        'boot paints the persistent texture and it has a uuid');
+      // A roll + collect triggers the whisk-landing recomposite (glow rings
+      // paint in place); the uuid must not change.
+      await a.roll('d20');
+      const rid = await a.rollId();
+      assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, 'collect accepted');
+      await a.waitFor(
+        `(window.__diceDebug.sim(160), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        { desc: 'roll shelved (whisk-landing recomposite fired)' },
+      );
+      assert.equal(await a.dbg('floorTextureId()'), uuid0,
+        'the persistent texture survives whisk-landing recomposite');
+      // applyFeltTheme repaints on the new base — same texture.
+      assert.equal(await a.dbg(`setFelt('emerald')`), true, 'theme swap accepted');
+      assert.equal(await a.dbg('floorTextureId()'), uuid0,
+        'the persistent texture survives an applyFeltTheme repaint');
+      // applyZoom re-places the shelf and recomposites — same texture.
+      await a.dbg(`setZoom('close')`);
+      await a.waitFor(`window.__diceDebug.zoom === 'close'`, { desc: 'zoom took' });
+      assert.equal(await a.dbg('floorTextureId()'), uuid0,
+        'the persistent texture survives an applyZoom recomposite');
+      // Clearing the shelved roll triggers reflowShelf's recomposite — same
+      // texture again.
+      assert.equal(await a.dbg(`clearRoll(${JSON.stringify(rid)})`), true, 'clear accepted');
+      await a.waitFor(
+        `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 0 && window.__diceDebug.tableDice.length === 0)`,
+        { desc: 'shelf empty (reflowShelf recomposite fired)' },
+      );
+      assert.equal(await a.dbg('floorTextureId()'), uuid0,
+        'the persistent texture survives a shelf-clear recomposite');
+    },
+  },
+  {
     name: 'per-die-read',
     tags: ['smoke', 'meanings'],
     // THE SOUL DEAL READ (author-confirmed): dice never sum. Under the

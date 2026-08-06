@@ -376,15 +376,24 @@ function baseFeltCanvas(base) {
   return c;
 }
 
-// One full-plane felt composite: tiles + occupied-slot glow (+ mat text).
-function feltCanvas(base, text) {
-  const c = document.createElement('canvas');
-  c.width = c.height = DECAL_SIZE;
-  const ctx = c.getContext('2d');
-  ctx.drawImage(baseFeltCanvas(base), 0, 0);
-  drawShelfGlow(ctx);
-  if (!text) return c;
+// Tier 0 §0 (hot-paths): ONE persistent DECAL_SIZE canvas + ONE CanvasTexture
+// serve the floor for the life of the process. paintFloor clears + redraws in
+// place and flips needsUpdate; the floor material's `map` reference never
+// changes after boot, so there is no dispose/allocate churn on shelf change,
+// theme swap, or mat-decal open/close. The GPU still re-uploads the 2048²
+// atlas on each needsUpdate (that cost is unchanged), but the CPU allocation
+// (a fresh backing canvas + a new WebGLTexture handle per recomposite) and
+// the GC pressure that came with it are gone — the primary win.
+const floorCanvas = document.createElement('canvas');
+floorCanvas.width = floorCanvas.height = DECAL_SIZE;
+const floorCtx = floorCanvas.getContext('2d');
+const floorTexture = new THREE.CanvasTexture(floorCanvas);
+floorTexture.colorSpace = THREE.SRGBColorSpace;
 
+// The mat-text branch, extracted verbatim from the old feltCanvas() — the
+// letterSpacing try/catch, the 30→13 px shrink loop bounds, and the +3.4
+// unit y-offset must not drift (no scenario asserts glyph position).
+function drawMatText(ctx, text) {
   const line = text.toUpperCase();
   ctx.save();
   ctx.globalAlpha = 0.28;
@@ -401,36 +410,30 @@ function feltCanvas(base, text) {
   }
   ctx.fillText(line, DECAL_SIZE / 2, DECAL_SIZE / 2 + 3.4 * DECAL_PX_PER_UNIT);
   ctx.restore();
-  return c;
 }
 
-function makeFeltTexture(base) {
-  return decalTexture(base, null);
-}
-
-function decalTexture(base, text) {
-  const tex = new THREE.CanvasTexture(feltCanvas(base, text));
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-function swapFloorMap(tex) {
-  const old = floor.material.map;
-  floor.material.map = tex;
-  floor.material.needsUpdate = true;
-  if (old) old.dispose();
+// Repaint the persistent floor canvas in place. base is a felt-tile cache
+// entry; text is the optional mat declaration line. MUST be called at least
+// once before the first render() — otherwise the first frame samples a blank
+// atlas. Boot does this at end-of-file just below the floor construction.
+function paintFloor(base, text) {
+  floorCtx.clearRect(0, 0, DECAL_SIZE, DECAL_SIZE);
+  floorCtx.drawImage(baseFeltCanvas(base), 0, 0);
+  drawShelfGlow(floorCtx);
+  if (text) drawMatText(floorCtx, text);
+  floorTexture.needsUpdate = true;
 }
 
 function applyMatDecal(text) {
   if (typeof text !== 'string' || !text.trim()) return;
   matDecalText = text.trim();
-  swapFloorMap(decalTexture(FELT_THEMES[currentFeltId].feltBase, matDecalText));
+  paintFloor(FELT_THEMES[currentFeltId].feltBase, matDecalText);
 }
 
 function clearMatDecal() {
   if (matDecalText === null) return;
   matDecalText = null;
-  swapFloorMap(makeFeltTexture(FELT_THEMES[currentFeltId].feltBase));
+  paintFloor(FELT_THEMES[currentFeltId].feltBase, null);
 }
 
 // Repaint the live floor for the current shelf occupancy: same base, same mat
@@ -438,15 +441,13 @@ function clearMatDecal() {
 // whisk-end landing, the corner sweep) — the same recomposite path mat text
 // already rides, so theme changes and ceremonies compose with the rings.
 function recompositeFelt() {
-  swapFloorMap(matDecalText !== null
-    ? decalTexture(FELT_THEMES[currentFeltId].feltBase, matDecalText)
-    : makeFeltTexture(FELT_THEMES[currentFeltId].feltBase));
+  paintFloor(FELT_THEMES[currentFeltId].feltBase, matDecalText);
 }
 
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(160, 160),
   new THREE.MeshStandardMaterial({
-    map: makeFeltTexture(FELT_THEMES[DEFAULT_FELT].feltBase),
+    map: floorTexture,
     roughness: 0.95,
     metalness: 0,
   })
@@ -454,6 +455,9 @@ const floor = new THREE.Mesh(
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
+// MUST paint at least once before the first render — the persistent canvas
+// starts blank, and the material.map reference is now permanent.
+paintFloor(FELT_THEMES[DEFAULT_FELT].feltBase, null);
 
 // Swap the felt + scene background live. Returns false for unknown ids — the
 // id can arrive off the wire or from localStorage, never trust it blindly.
@@ -4755,6 +4759,11 @@ window.__diceDebug = {
     const py = Math.max(0, Math.min(DECAL_SIZE - 1, Math.round((z + 80) * DECAL_PX_PER_UNIT)));
     return [...img.getContext('2d').getImageData(px, py, 1, 1).data];
   },
+  // Tier 0 §0 (hot-paths): the floor's texture identity is now permanent —
+  // this hook is the regression fence a scenario uses to prove no future
+  // refactor reintroduces swapFloorMap-style dispose+new churn on shelf
+  // changes, theme swaps, or mat-decal open/close.
+  floorTextureId() { return (floor.material.map || {}).uuid || null; },
   sim(frames) { for (let i = 0; i < frames; i++) tick(1 / 60, false); },
   // Freeze the rAF clock: with it held, only sim() advances playback, which is
   // how a scenario parks a tab mid-tumble (a reveal arriving THERE must defer).
