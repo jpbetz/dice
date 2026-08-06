@@ -40,7 +40,7 @@ const SSE_EVENTS = [
   'hello', 'player-joined', 'player-left', 'player-renamed', 'pools-changed',
   'roll', 'clear', 'reveal', 'roll-cleared', 'roll-collected',
   'offer', 'offer-claimed', 'offer-rescinded',
-  'settings-changed',
+  'settings-changed', 'table-setup',
 ];
 
 function apiUrl(path) {
@@ -173,6 +173,12 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     log: joined.data.log || [],
     offers: joined.data.offers || [],
     settings: joined.data.settings || {},
+    // The room's prepared table as of this join — {rev, table, profiles, at}
+    // (ROADMAP §G4) — or null when nobody has pushed one. A SNAPSHOT, exactly
+    // like `players`/`log`/`settings` above: net.js does not keep it current,
+    // it hands later 'table-setup' events to onEvent and the caller owns the
+    // state from there, the same way it owns settings after 'settings-changed'.
+    setup: joined.data.setup || null,
 
     // Ask the server to roll. Values arrive later on the 'roll' event — the
     // caller must never animate from this return value.
@@ -310,6 +316,31 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
       return res.ok;
     },
 
+    // Push the prepared table — the organizer's room settings plus the player
+    // profiles they built (ROADMAP §G4). Any player may, and it grants no
+    // power: it is furniture like the felt colour, and it is authority over
+    // nobody's saved pools (the seat picker previews and applies on a click).
+    //
+    // `rev` is a monotonic counter the caller keeps beside its own copy of the
+    // setup. The server takes the push only when rev BEATS the room's, so two
+    // organizer tabs cannot ping-pong. Losing is NOT an error — the answer is
+    // {applied: false, rev} naming the rev that won, which is what a re-push
+    // needs in order to either stand down or beat it. null means the request
+    // itself failed (offline, refused).
+    //
+    // Everyone — us included — learns of a winning push on the 'table-setup'
+    // event; apply on that echo, never optimistically, exactly as with
+    // settings. The whole thing goes through withPlayer, so it inherits the
+    // one re-join-on-404 retry every other POST here uses.
+    async pushTable({ rev, table, profiles } = {}) {
+      const body = { rev };
+      if (table) body.table = table;
+      if (Array.isArray(profiles)) body.profiles = profiles;
+      const res = await withPlayer('/api/table', body);
+      if (!res.ok || !res.data) return null;
+      return { applied: res.data.applied === true, rev: res.data.rev };
+    },
+
     // Give up the seat for good — 'Leave & switch seat', never a reload.
     forgetSeat() { forgetSeat(room); },
 
@@ -426,6 +457,11 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
       conn.log = res.data.log || [];
       conn.offers = res.data.offers || [];
       conn.settings = res.data.settings || conn.settings;
+      // Absent means the room genuinely has NO prepared table — a restarted
+      // server forgot it — so this falls to null rather than keeping the last
+      // one we saw. §G6's re-push is what heals that, and it can only notice
+      // the gap if the gap is visible here.
+      conn.setup = res.data.setup || null;
       return true;
     })();
     rejoining = pending.then(

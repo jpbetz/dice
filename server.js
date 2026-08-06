@@ -28,7 +28,7 @@ limitations under the License.
 // ordered ladder — debug < info (default) < warn < error < silent — and
 // suppresses anything below the threshold. Per-roll lines (roll, evict,
 // collect, offer, claim, pools, setting, clrroll) log at debug; join/leave/
-// resume/reveal/rename/clear/unoffer/uncaught log at info. That keeps a busy
+// resume/reveal/rename/clear/unoffer/table/uncaught log at info. That keeps a busy
 // room from filling disk on the default setting, but it also means a user
 // report of "my roll didn't happen" leaves no server-side breadcrumb until
 // DICE_LOG_LEVEL=debug is flipped on for triage.
@@ -69,6 +69,12 @@ const MAX_ROOMS = 500;            // live rooms across the server
 const MAX_PLAYERS_PER_ROOM = 40;
 const MAX_POOLS_PER_PLAYER = 40;
 const MAX_POOL_NOTATION = 200;
+// Prepared player profiles in a room's table setup (docs/PROFILES.md §3.2).
+// Twelve is the organizer's six characters with room to spare, and small
+// enough that a setup stays furniture rather than a database. Together with
+// MAX_POOLS_PER_PLAYER (applied per profile) and MAX_BODY it is the whole
+// bound on the stored shape — there is no third cap to keep in sync.
+const MAX_PROFILES = 12;
 const MAX_STREAMS_PER_PLAYER = 4; // extra SSE streams evict the oldest
 const OFFER_CAP = 20;             // offered rolls kept per room
 const HEARTBEAT_MS = 20_000;
@@ -305,7 +311,8 @@ function defaultSettings() {
  *   log: [roll],
  *   offers: [offer],
  *   collectSeq: int,        // last collection sequence handed out (see §7.7)
- *   settings: {felt, ...}   // room-wide, see SETTING_SPECS
+ *   settings: {felt, ...},  // room-wide, see SETTING_SPECS
+ *   setup: null | {rev, table, profiles, at}  // the prepared table (§G4)
  * }
  */
 const rooms = new Map();
@@ -321,6 +328,10 @@ function getRoom(name) {
       offers: [],
       collectSeq: 0,
       settings: defaultSettings(),
+      // The prepared table (docs/PROFILES.md §3.2). null until someone
+      // pushes one — a fresh room's hello and /api/join carry no `setup`
+      // key at all, so their payloads stay byte-identical to today's.
+      setup: null,
     };
     rooms.set(name, room);
     log(`room created: ${logField('room', name)}`);
@@ -613,6 +624,14 @@ function cleanName(value, max) {
 // rolls already on the tray saw none of them until some later offer event
 // arrived. The log is projected for THIS player, exactly as hello's is: a
 // late joiner gets no secret entries and no held/whisper values.
+//
+// The prepared table (§G4) rides here and on hello PRESENT-OR-ABSENT: a room
+// nobody prepared sends the payload it sends today, byte for byte. It is sent
+// whole rather than projected because there is nothing in it to project — no
+// roll entries, no values, no per-player anything (PROFILES.md §8: this must
+// not become a second egress for anything roll-shaped). room.setup is replaced
+// wholesale on every push and never mutated in place, so handing the stored
+// object straight out is safe, exactly as `offers` is.
 function joinSnapshot(room, player) {
   return {
     playerId: player.id,
@@ -621,6 +640,7 @@ function joinSnapshot(room, player) {
     log: room.log.map((r) => projectEntryFor(r, player.id)).filter((r) => r !== null),
     offers: room.offers,
     settings: { ...room.settings },
+    ...(room.setup ? { setup: room.setup } : {}),
   };
 }
 
@@ -760,6 +780,10 @@ function handleEvents(req, res, url) {
     log: room.log.map((r) => projectEntryFor(r, playerId)).filter((r) => r !== null),
     offers: room.offers,
     settings: { ...room.settings },
+    // Present-or-absent, and identical to /api/join's — see joinSnapshot. It
+    // is on EVERY stream (re)open by design: §G6's re-push heals a restarted
+    // room by noticing that hello carries no setup, or a lower rev.
+    ...(room.setup ? { setup: room.setup } : {}),
   });
 
   const onClose = () => {
@@ -1595,6 +1619,77 @@ function sanitizePools(value) {
   return out;
 }
 
+// A DEFAULT dice set — a live player's (/api/pools) or a prepared profile's
+// (§G4). Present-or-absent, where ABSENT means the classics: 'std' and unknown
+// ids both normalize to absent, because for a default they say the same thing,
+// and an id this server cannot validate must not be relayed to the table (§9,
+// fail closed). Deliberately NOT sanitizePools' per-POOL rule, which keeps an
+// explicit 'std' — there it means "this pool is standard even though its owner
+// is not", which is a claim absence cannot make. One helper so the two
+// endpoints that publish a default can never drift apart.
+function defaultSetOf(raw) {
+  const id = cleanString(raw, 64);
+  return id && id !== 'std' && SET_IDS.includes(id) ? id : null;
+}
+
+// The prepared player profiles of a room's table setup (docs/PROFILES.md
+// §3.2, ROADMAP §G4). A profile is a NAME and a RACK and nothing else (goal
+// 12: this is not a character sheet), and the list is FURNITURE in exactly the
+// sense published pools are: the organizer's .dice.yaml file is the truth, the
+// room keeps a copy so an arriving player is offered a seat. It is authority
+// over nobody's saved pools — §3.3's picker shows the existing import preview
+// and applies only on an explicit click — and it carries no roll entries and
+// no values, so projectEntryFor remains the ONLY path a roll entry ever leaves
+// this server (PROFILES.md §8).
+//
+// Fail-closed like its neighbours, and the split between DROP and REFUSE is
+// deliberate: a per-entry defect is dropped (as sanitizePools drops a pool
+// whose notation will not parse), a cap is refused (as every other entity cap
+// on this server is).
+//
+// Names take cleanName, NOT cleanString, and that is the load-bearing line of
+// the whole key: a profile name becomes a player's display name, and a display
+// name is a whisper address. '#' is banned at every entry point or whisper
+// addressing stops being total (GOALS notation-totality invariant, PROFILES
+// §8) — a seat whose name is nothing but '#'s cleans to empty and is dropped
+// rather than seating someone at an address that silently misdelivers.
+//
+// Duplicate names collapse to the FIRST, case-insensitively. §3.1's file keys
+// profiles by name (`players:` is a mapping), so a duplicate cannot survive an
+// honest export; and two identical seats are indistinguishable to the player
+// choosing between them.
+//
+// Returns {error: [...]} or {profiles: [...]}.
+function sanitizeProfiles(value) {
+  if (value === undefined || value === null) return { profiles: [] };
+  if (!Array.isArray(value) || value.length > MAX_PROFILES) {
+    return { error: [400, `profiles must be a list of at most ${MAX_PROFILES}`, 'bad_profiles'] };
+  }
+  const out = [];
+  const seen = new Set();
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+    const name = cleanName(raw.name, MAX_NAME);
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    // An absent pools list is a name-only seat: legal, and useful — it seats a
+    // player under the right name with nothing to import. An OVERFLOWING one
+    // is a cap, so it refuses: quietly seating a character with pools missing
+    // would read as data loss, which is the same call handlePools makes.
+    const pools = raw.pools === undefined || raw.pools === null ? [] : sanitizePools(raw.pools);
+    if (!pools) {
+      return { error: [400, `each profile's pools must be a list of at most ${MAX_POOLS_PER_PLAYER}`, 'bad_pools'] };
+    }
+    seen.add(key);
+    const rec = { name, pools };
+    const set = defaultSetOf(raw.set);
+    if (set) rec.set = set;
+    out.push(rec);
+  }
+  return { profiles: out };
+}
+
 async function handlePools(req, res) {
   const body = await readJsonBody(req);
   if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
@@ -1607,11 +1702,10 @@ async function handlePools(req, res) {
   if (!pools) return sendError(res, 400, `pools must be a list of at most ${MAX_POOLS_PER_PLAYER}`, 'bad_pools');
 
   // §9: the owner's DEFAULT set rides the same publish, so viewers can
-  // resolve unmarked pools to the owner's skin. 'std' and unknown ids both
-  // normalize to absent — for a player default they mean the same thing
-  // (the classics), and an id this server can't validate must not relay.
-  const rawSet = cleanString(body.value.set, 64);
-  const set = rawSet && rawSet !== 'std' && SET_IDS.includes(rawSet) ? rawSet : null;
+  // resolve unmarked pools to the owner's skin. See defaultSetOf for why
+  // 'std' and unknown ids both normalize to absent — a prepared profile's
+  // set (§G4) takes the identical rule from the identical helper.
+  const set = defaultSetOf(body.value.set);
 
   // A no-op publish answers ok without re-broadcasting: the client re-shares
   // on every hello (rejoin safety), and 40 streams need not hear about it.
@@ -1897,6 +1991,43 @@ function sameSetting(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+// Merge an ALREADY-VALIDATED settings patch into a room and tell everyone.
+// Returns the full merged settings object.
+//
+// Split out of handleSettings because the table setup key (§G4) writes the
+// organizer's felt/system/name/zoom through this exact path. PROFILES.md §3.2
+// asks for "no second validator for felt", and one commit point is what keeps
+// the echo shape, the change diff and the 'settings-changed' broadcast
+// identical no matter which endpoint the write arrived on — a parallel writer
+// is precisely how "settings echo-apply with no optimistic divergence" rots.
+//
+// Validation stays a SEPARATE call (validateSettingsPatch) rather than folding
+// in here: /api/table must be able to prove the whole push is well-formed
+// before it mutates anything, so a rejected profile list never leaves the felt
+// already changed.
+function commitSettings(room, player, checkedPatch) {
+  // Drop keys whose value already matches the room: re-clicking the selected
+  // swatch must not broadcast a "changed the table" event that changed nothing.
+  const patch = {};
+  for (const key of Object.keys(checkedPatch)) {
+    if (!sameSetting(room.settings[key], checkedPatch[key])) patch[key] = checkedPatch[key];
+  }
+  if (Object.keys(patch).length === 0) return { ...room.settings };   // valid no-op
+
+  Object.assign(room.settings, patch);
+  const settings = { ...room.settings };
+
+  // A container-valued setting logs its size, not its contents — the server
+  // log is an operator's trace, not a dump of every template in the room.
+  // logField also quotes string-valued settings (tableName is user text): a
+  // rename like tableName='foo felt=crimson' must not look like two settings
+  // in the same line.
+  const applied = Object.keys(patch).map((k) => logField(k, patch[k])).join(' ');
+  logDebug(() => `setting ${logField('room', room.name)} ${logField('name', player.name)} ${applied}`);
+  broadcast(room, 'settings-changed', { settings, byId: player.id, byName: player.name });
+  return settings;
+}
+
 // Any player at the table may write room settings — deliberately no roles
 // (docs/ROADMAP.md §2). The patch is merged and the FULL merged object is
 // broadcast, so a late-arriving event can never leave a client with a
@@ -1912,28 +2043,110 @@ async function handleSettings(req, res) {
   const checked = validateSettingsPatch(body.value.settings);
   if (checked.error) return sendError(res, ...checked.error);
 
-  // Drop keys whose value already matches the room: re-clicking the selected
-  // swatch must not broadcast a "changed the table" event that changed nothing.
-  const patch = {};
-  for (const key of Object.keys(checked.patch)) {
-    if (!sameSetting(room.settings[key], checked.patch[key])) patch[key] = checked.patch[key];
-  }
-  if (Object.keys(patch).length === 0) {
-    return sendJson(res, 200, { settings: { ...room.settings } }); // valid no-op
+  sendJson(res, 200, { settings: commitSettings(room, player, checked.patch) });
+}
+
+// POST /api/table — the room setup key (docs/PROFILES.md §3.2, ROADMAP §G4).
+//
+// The prepared table: the settings an organizer chose plus the player profiles
+// they built, pushed once so that everyone who joins finds the table
+// configured and the seats waiting. "The file is the truth, the room is a
+// convenience, the link is an address" — this is the convenience, and it is
+// deliberately the weakest of the three. It lives and dies with the in-memory
+// room (§G6 gives a room holding a setup a TTL so prep-Tuesday/play-Thursday
+// works; today dropRoomIfEmpty still takes it when the last player leaves).
+//
+// ANYONE may push it. That is goal 10 compliance ("no roles, ever"), not an
+// oversight: a setup is furniture, exactly like the felt colour any player can
+// already change, and it grants no power — a player's localStorage stays the
+// truth for their own rack, and §3.3's seat picker shows the existing import
+// preview and applies only on an explicit click. GOALS §7 records why that
+// matters: the `#g=` codec died for replacing a visitor's rack on arrival, and
+// a prepared seat that overwrote on arrival would re-commit that sin with
+// better manners.
+//
+// The settings ride the EXISTING path (validateSettingsPatch + commitSettings)
+// so there is no second felt validator to drift, and the table hears about
+// them on the same 'settings-changed' event a swatch click produces.
+// `experiences` is refused outright: §10's editor does not exist, so the key
+// would carry nothing, and an endpoint able to smuggle a room-wide template
+// set to every client is a wider door than this one needs to be.
+//
+// THE CONFLICT RULE. A push whose rev does not BEAT the stored one is a silent
+// no-op answering 200 {ok:true, applied:false, rev} — not a refusal. Both were
+// on the table; the no-op wins for one reason: js/net.js turns every non-404
+// error body into a player-visible refusal, and the loser of a two-organizer
+// race — or of §G6's re-push-on-hello, where two tabs holding the same file
+// both try to heal a restarted room — did nothing wrong. The room already
+// holds a setup at least as new as theirs. The error channel stays for pushes
+// that are actually malformed. The winning rev comes back either way, so a
+// client that lost knows exactly what it has to beat.
+//
+// The rev guards the push as ONE unit: a stale push applies neither its
+// profiles nor its settings. The rev versions the SETUP, not the felt — a
+// player who changes the felt by hand afterwards is not fighting the rev, and
+// the next winning push simply reconfigures the table again.
+async function handleTable(req, res) {
+  const body = await readJsonBody(req);
+  if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
+
+  const found = lookup(body.value);
+  if (found.error) return sendError(res, ...found.error);
+  const { room, player } = found;
+
+  // A monotonic counter minted by the pushing client (§G6 keeps it beside its
+  // copy of the setup in localStorage). Integer and >= 1: 0 is reserved for
+  // "this room has no setup", and a float, a string or a bignum would each
+  // compare in ways nobody wants at the guard below.
+  const rev = body.value.rev;
+  if (!Number.isInteger(rev) || rev < 1) {
+    return sendError(res, 400, 'rev must be a positive integer', 'bad_rev');
   }
 
-  Object.assign(room.settings, patch);
-  const settings = { ...room.settings };
+  // Validate EVERYTHING before mutating anything — this is why the settings
+  // path is split into validate + commit rather than called whole. A push with
+  // a good felt and a bad profile list must leave the table exactly as it was.
+  const table = body.value.table;
+  let patch = null;
+  if (table !== undefined && table !== null) {
+    if (typeof table !== 'object' || Array.isArray(table)) {
+      return sendError(res, 400, 'table must be an object', 'bad_setting');
+    }
+    // Own-key check: JSON.parse makes real own keys, so this sees what
+    // validateSettingsPatch would have seen.
+    if (Object.hasOwn(table, 'experiences')) {
+      return sendError(res, 400, 'table setup does not carry experiences', 'bad_setting');
+    }
+    // An EMPTY table block is legal here, where /api/settings refuses one:
+    // there an empty patch is the entire request and means nothing; here it
+    // is an honest profiles-only push (seats prepared, felt left alone).
+    if (Object.keys(table).length > 0) {
+      const checked = validateSettingsPatch(table);
+      if (checked.error) return sendError(res, ...checked.error);
+      patch = checked.patch;
+    }
+  }
 
-  // A container-valued setting logs its size, not its contents — the server
-  // log is an operator's trace, not a dump of every template in the room.
-  // logField also quotes string-valued settings (tableName is user text): a
-  // rename like tableName='foo felt=crimson' must not look like two settings
-  // in the same line.
-  const applied = Object.keys(patch).map((k) => logField(k, patch[k])).join(' ');
-  logDebug(() => `setting ${logField('room', room.name)} ${logField('name', player.name)} ${applied}`);
-  broadcast(room, 'settings-changed', { settings, byId: player.id, byName: player.name });
-  sendJson(res, 200, { settings });
+  const checked = sanitizeProfiles(body.value.profiles);
+  if (checked.error) return sendError(res, ...checked.error);
+  const { profiles } = checked;
+
+  // Last write wins, guarded by rev — see THE CONFLICT RULE above.
+  if (room.setup && rev <= room.setup.rev) {
+    return sendJson(res, 200, { ok: true, applied: false, rev: room.setup.rev });
+  }
+
+  if (patch) commitSettings(room, player, patch);
+
+  // Stored as PUSHED (validated), not as merged. room.settings is the live
+  // truth for what the table looks like now and already rides hello/join; this
+  // is the record of what the setup DECLARED, so the organizer's intent is
+  // still legible after someone else swaps the felt mid-session.
+  room.setup = { rev, table: patch ? { ...patch } : {}, profiles, at: Date.now() };
+
+  log(`table   ${logField('room', room.name)} ${logField('name', player.name)} rev=${rev} ${logField('profiles', profiles)}`);
+  broadcast(room, 'table-setup', { setup: room.setup, byId: player.id, byName: player.name });
+  sendJson(res, 200, { ok: true, applied: true, rev });
 }
 
 // ---------------------------------------------------------------------------
@@ -2072,6 +2285,7 @@ const server = http.createServer((req, res) => {
     if (route === '/api/collect-roll' && req.method === 'POST') return handleCollectRoll(req, res);
     if (route === '/api/clear-roll' && req.method === 'POST') return handleClearRoll(req, res);
     if (route === '/api/settings' && req.method === 'POST') return handleSettings(req, res);
+    if (route === '/api/table' && req.method === 'POST') return handleTable(req, res);
     if (route.startsWith('/api/')) return sendError(res, 404, 'no such endpoint', 'not_found');
     return serveStatic(req, res, url);
   };
@@ -2145,4 +2359,4 @@ if (IS_MAIN) {
   });
 }
 
-export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor, entryExistsForAll, cleanName, sanitizePools, LOG_DEBUG, LOG_INFO, LOG_THRESHOLD };
+export { server, DIE_TYPES, PALETTE, FELT_THEMES, SYSTEMS, projectEntryFor, resolveVisibility, entryExistsFor, entryExistsForAll, cleanName, sanitizePools, sanitizeProfiles, MAX_PROFILES, LOG_DEBUG, LOG_INFO, LOG_THRESHOLD };
