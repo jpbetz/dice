@@ -4334,6 +4334,10 @@ window.__diceDebug = {
     addProfile(name) { return portableAddProfile(name); },
     doneEditing() { return portableDoneEditing(); },
     get editingProfile() { return portableEditing; },
+    // §G4/§G6: the Apply-to-table button, clickless. ASYNC — resolves the
+    // pane's verdict once the push answers; success records authorship in
+    // dice.table.v1:<room> exactly as the click does.
+    pushToTable() { return portablePushToTable(); },
   },
   // G5 seat picker (§G5) — the whole flow, clickless. seatPicker is one
   // JSON-safe projection (identityInfo's pattern); the four verbs mirror the
@@ -4354,6 +4358,20 @@ window.__diceDebug = {
   chooseSomeoneElse(name) { return takeFreeSeat(name); },
   applySeatImport() { return applySeatChoice(); },
   dismissSeatImport() { return dismissSeatChoice(); },
+  // §G6: the authorship record vs the room. stored = the rev this browser
+  // last pushed (0 = never pushed, so it never re-pushes); room = the setup
+  // rev the room holds as this client knows it (0 = unprepared).
+  get tableRev() {
+    const stored = storedTable();
+    return {
+      stored: stored ? stored.rev : 0,
+      room: roomSetup && Number.isInteger(roomSetup.rev) ? roomSetup.rev : 0,
+    };
+  },
+  // Run the §G6 re-push check on demand (the same call every hello makes).
+  // Resolves {applied, rev} | null from net.pushTable, or false when there
+  // was nothing to heal — no stored record, or the room is already current.
+  repushTable() { return maybeRepushTable() || false; },
   // ceremony introspection (UX §2.4): phase machine + decal state
   get ceremonyState() {
     const r = currentRoll;
@@ -9189,6 +9207,21 @@ document.getElementById('portable-download').addEventListener('click', (e) => {
   setTimeout(() => { btn.textContent = 'Download'; }, 900);
 });
 const portableFileInput = document.getElementById('portable-file');
+// §G4/§G6: one push per click — the button disarms while its own request is
+// out, so a double-click cannot race itself into rev n+1 vs n+2. The verdict
+// lands on the pane's status line; the morph is the receipt (Copy's pattern).
+document.getElementById('portable-push').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  if (btn.disabled) return;
+  btn.disabled = true;
+  try {
+    const r = await portablePushToTable();
+    btn.textContent = r.ok ? 'Sent!' : 'Apply to table';
+  } finally {
+    btn.disabled = false;
+    setTimeout(() => { btn.textContent = 'Apply to table'; }, 900);
+  }
+});
 document.getElementById('portable-openfile').addEventListener('click', () => portableFileInput.click());
 portableFileInput.addEventListener('change', () => {
   const file = portableFileInput.files && portableFileInput.files[0];
@@ -9409,6 +9442,60 @@ function portableAddProfile(rawName) {
   const v = portableLoadText(text);
   if (!v.ok) return { ...v, text };
   return { ...portableReceipt(`✓ added '${nm}' — Download writes the file`), text };
+}
+
+// Apply to table (§G4's client half; the record §G6's re-push replays): push
+// the box's table: + players: to the room as the prepared setup, so joiners
+// are offered the seats. The FILE stays the truth (Download is one row up);
+// the room holds a copy, replaceable furniture like the felt (goal 10 —
+// anyone may). The box's PARSE is what goes: felt/system/zoom/name map onto
+// the settings keys the server validates (file 'name' ↔ wire 'tableName'),
+// shelves flatten through profileShelvesToGroups minus their rack-local ids.
+//
+// Unlike G3's profile verbs this does NOT refuse a file with skipped unknown
+// sections: nothing is rewritten, so nothing can be dropped — the room key
+// only ever carried table+players, and the file keeps its future.
+//
+// The rev outbids everything this client can see (the room's, and its own
+// stored record); a push that STILL loses raced a same-instant winner, so it
+// retries once over the answered rev — the click meant "make the room look
+// like this file", and the no-op answer names exactly what to beat. Success
+// writes dice.table.v1:<room> — the ONE place it is written — making this
+// browser an author §G6 will re-push for.
+async function portablePushToTable() {
+  if (!portableParsed) return portableRefuse('✗ nothing usable in the box — open a table file or Fill with my data first');
+  if (!netOnline || !net) return portableRefuse('✗ solo — no table to prepare (the file itself still works anywhere)');
+  const t = portableParsed.table || null;
+  const seats = portableParsed.profiles;
+  if (!t && !seats.length) {
+    return portableRefuse('✗ nothing to send — the box has no table: and no players:');
+  }
+  const table = {};
+  if (t) {
+    if (t.name) table.tableName = t.name;
+    if (t.felt) table.felt = t.felt;
+    if (t.system) table.system = t.system;
+    if (t.zoom) table.zoom = t.zoom;
+  }
+  const profiles = seats.map((p) => ({
+    name: p.name,
+    ...(p.set ? { set: p.set } : {}),
+    pools: profileShelvesToGroups(p.shelves).map(({ id, ...rec }) => rec),
+  }));
+  const stored = storedTable();
+  const base = Math.max(
+    roomSetup && Number.isInteger(roomSetup.rev) ? roomSetup.rev : 0,
+    stored ? stored.rev : 0,
+  );
+  let res = await net.pushTable({ rev: base + 1, table, profiles });
+  if (res && !res.applied) {
+    res = await net.pushTable({ rev: res.rev + 1, table, profiles });
+  }
+  if (!res) return portableRefuse('✗ couldn’t reach the table — nothing was sent');
+  if (!res.applied) return portableRefuse('✗ the table took a newer setup just now — try again');
+  save(LS_TABLE, { rev: res.rev, table, profiles, at: Date.now() });
+  const n = profiles.length;
+  return portableReceipt(`✓ table prepared — ${n ? `${n} seat${n === 1 ? '' : 's'} offered at this room` : 'settings sent to the room'}`);
 }
 
 // The other exit: the operator's own rack comes back, the stash clears, and
@@ -10035,6 +10122,44 @@ document.addEventListener('keydown', (e) => {
 const LS_NAME = 'dice.name.v1';
 const ROOM = new URLSearchParams(window.location.search).get('room') || 'table';
 
+// §G6 client half: the last setup THIS BROWSER pushed to THIS room, kept as
+// the exact wire body beside its rev. localStorage (not session): "prep
+// Tuesday, play Thursday" means outliving the tab. Written in exactly one
+// place — a push that the server APPLIED (portablePushToTable) — which is
+// the whole authorship rule: a player who merely joined a prepared table, or
+// applied a seat, never gets a record here and so can never start re-pushing
+// a setup they did not author.
+const LS_TABLE = `dice.table.v1:${ROOM}`;
+
+function storedTable() {
+  const v = load(LS_TABLE, null);
+  return v && typeof v === 'object' && !Array.isArray(v) && Number.isInteger(v.rev) && v.rev >= 1
+    ? v : null;
+}
+
+// Re-push on hello (§G6, PROFILES §5 mechanism 2): the organizer's browser is
+// the durable copy, so a restarted server self-heals the moment this tab
+// reconnects. Fires only when the room is BEHIND the stored record — setup
+// absent (rev 0) or lower rev — and re-sends the SAME rev, not rev+1: it is
+// the same setup, not a new one, and G4's conflict rule makes losing a race
+// (two organizer tabs healing at once, or a fresher push landing first) a
+// silent no-op answering the winning rev. No conflict UI by design — the
+// loser did nothing wrong and the room already holds something at least as
+// new; the 'table-setup' echo of whichever push won updates roomSetup for
+// everyone. Returns the push promise (null when there is nothing to do) so
+// the debug hook can await the heal.
+let repushInFlight = false;
+function maybeRepushTable() {
+  if (!netOnline || !net || repushInFlight) return null;
+  const stored = storedTable();
+  if (!stored) return null;
+  const roomRev = roomSetup && Number.isInteger(roomSetup.rev) ? roomSetup.rev : 0;
+  if (roomRev >= stored.rev) return null;
+  repushInFlight = true;
+  return net.pushTable({ rev: stored.rev, table: stored.table || {}, profiles: stored.profiles || [] })
+    .finally(() => { repushInFlight = false; });
+}
+
 // net / netOnline / players are declared beside the owner switcher above —
 // the module-scope renderGroups() boot call reads the roster.
 let offers = [];        // open offered-roll cards for this room
@@ -10540,8 +10665,13 @@ function handleNetEvent(type, data) {
       // The prepared table, present-or-absent (§G4): ABSENT means the room
       // genuinely holds none — a restarted server forgot it — so this falls
       // to null rather than keeping the last one seen. §G6's re-push heals
-      // exactly that gap, and only sees it if it is recorded here.
+      // exactly that gap, and only sees it if it is recorded here. hello is
+      // THE healing hook on purpose: it fires on every stream (re)open, which
+      // is exactly when a restarted room becomes visible. (The very first
+      // hello can outrun initNet's `net =` assignment — maybeRepushTable
+      // no-ops then, and initNet's own call right after the join covers it.)
       roomSetup = data.setup || null;
+      maybeRepushTable();
       // §7.5/§3.1 resync: 'roll-cleared' and 'reveal' are one-shot broadcasts a
       // stream blip can swallow, and the server deliberately never re-sends
       // them — it flags the surviving state on the logged roll instead. Replay
@@ -11152,6 +11282,10 @@ async function initNet() {
   // of join state above, so netReady never resolves with it half-built. A
   // free-text join (or a seat the join couldn't substantiate) is a no-op.
   seatFollowThrough();
+  // §G6: if this browser authored the room's setup and the room came up
+  // without it (or behind it), heal it now — the first SSE hello can fire
+  // before `net` is assigned above, so this call is the join-time guarantee.
+  maybeRepushTable();
   updateIdentityChip(); // the rail chip takes the seat's name + color
   updateTrayButtons();  // the draft's Offer verb appears only at a table
   return { online: netOnline };
