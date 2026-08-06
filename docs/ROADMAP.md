@@ -417,7 +417,10 @@ still has no assertion.
 
 **BUILD ORDER — seven slices, each independently shippable.** ①
 the math floor + the honest preview — **SHIPPED 2026-08-06** · ② ③ ④
-— **SHIPPED 2026-08-06** (seam `755808f` · ledger `25012c6` · bars) · the profile
+— **SHIPPED 2026-08-06** (seam `755808f` · ledger `25012c6` · bars
+`711771e`, then the polish wave `c7b90fc`…`fea43e6` — collapsed
+mixture default, hover readout, sectioned help, 'pools' vocabulary;
+SHIPPED.md §2l) · the profile
 seam (`forecastFor(spec, tools)` with `pmf` injected so
 meanings.js stays dependency-free) · ③ the dice-value ledger —
 **ask (2) usable here** · ④ the spectrum bars — **ask (1) ships

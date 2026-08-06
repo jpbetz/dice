@@ -634,9 +634,9 @@ Follow-ups from the critic that shipped same day:
   foreign` joins the sticky stack; category heads yield sticky in
   foreign state.
 
-### 2l partial — slice ① the honesty pass — SHIPPED 2026-08-06
+### 2l partial — slices ①–④: honesty, seam, ledger, spectrum — SHIPPED 2026-08-06
 
-The math floor under pool analysis (`b91a32b`, `4c92ae6`); slices ②–⑦
+The math floor under pool analysis (`b91a32b`, `4c92ae6`); slices ⑤–⑦
 remain open in ROADMAP §2l. `js/odds.js` `previewOf(dice, mods)` →
 `{min, avg, max, exact}`: each capped mechanic is classified per spec —
 VOID (the 40-die cap zeroes it: `40d20!`, `40d6 ro<=3` — exact with the
@@ -657,6 +657,38 @@ exhaustive enumeration of composeRoll's own rng-draw tree — caps, ties
 and sort stability captured mechanically; e2e `preview-honest`
 (`notation`, `smoke`) pins the literal preview text, an assertion that
 was impossible under Monte Carlo.
+
+Slices ②–④ followed the same day (profile seam `755808f` · dice-value
+ledger `25012c6` · spectrum bars `711771e`), then a ten-commit polish
+wave (`c7b90fc`…`fea43e6`) driven by Joe's screenshots. The forecast
+lives in the ± popover under a labeled **Pool stats** head: per-die
+spectrum bars in chart row order, identical (source, rank, transform)
+dice deduplicated into one counted bar, keep/drop and binding-reroll
+specs refused in plain words rather than shown wrong. Display amendment
+(POOL-ANALYSIS §8): a multi-bar pool opens as ONE count-weighted mixture
+line — `P(O) = (n₁·p₁(O) + n₂·p₂(O) + …) ÷ N`, exact, laid out in
+`OUTCOME_LADDER` order — with a `per die` toggle; results still never
+fold. Sliver honesty (Joe: a 3% Blemish vanished and its neighbor color
+swallowed it): 1px mosaic rules between segments, 2px minimum segment
+width, a sequential within-tier lightness palette, and a fixed readout
+strip below the bar — caret at the hovered segment's midpoint, `Blemish
+· 3%` — which replaced both the in-segment letters and the tick-lane
+callouts (kept "for print" in POOL-ANALYSIS). Around it the popover
+reorganized: Set and Saved-pool sections, Visibility above Moment,
+comment folded into Moment and gated to check/cinematic, one title at
+the top (the head is the rename affordance), and Soul Deal folds
+sum-only mechanics plus the sysnote outright. Help arrived
+concept-first (Joe: durable concepts over UI choreography): a rail `?`
+door and a Pool-stats `(?)` bubble open one sectioned dialog — seven
+topics (fair rolls & the pose seed, systems-as-lens, notation,
+visibility, the mixture math, pools, your data) with in-dialog anchors
+because the URL carries nothing. "Rack" left the UI vocabulary for
+"pools" (US slang collision, Joe); `racks?` joined the terminology
+sweep's banned regex and `#help-overlay` its swept roots, so the ruling
+is test-enforced. Verified: `pool-forecast` + `rack-dice-value` e2e,
+meanings unit vectors incl. collapsed-mixture exactness, and a clean
+33-scenario gate at `fea43e6` (sole failure the known-environmental
+`seat-resume`, proven pre-existing at baseline `4d7161a`).
 
 ---
 
