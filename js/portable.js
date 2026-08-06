@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-// js/portable.js — pools & just-you settings as portable YAML (Tier 4 §5).
+// js/portable.js — pools & just-you settings as portable YAML (Tier 4 §5),
+// grown into the whole prepared table (Tier G §G2, docs/PROFILES.md §3.1).
 //
 // A HAND-ROLLED emitter and a STRICT YAML-subset parser (the zero-dep rule:
 // no npm YAML library). The subset is exactly the shape exportYaml emits —
-// two top-level maps, shelves as keys, pools as a list of one-pair maps,
-// scalars single-quoted — and the parser FAILS CLOSED: anything outside the
-// subset is an error naming its line, never a guess.
+// top-level maps, shelves as keys, pools as a list of one-pair maps, scalars
+// single-quoted — and the parser FAILS CLOSED: anything outside the subset is
+// an error naming its line, never a guess.
 //
 // Since 2026-08-04 this is the ONLY way a rack travels between browsers: the
 // address-bar codec that used to carry it (`#g=`) is retired, because a
@@ -42,6 +43,42 @@
 // survives — main's migrateGroup is the door they die at). The '@' form
 // only follows a QUOTED notation, so a bare hand-written
 // '3d6 # struck @ dawn' can never be misread.
+//
+// THE PREPARED TABLE (2026-08-06). Two more top-level sections, both
+// present-or-absent, so every file written before today still parses and
+// still exports byte-identically:
+//
+//   table:      the room's own furniture — name/felt/system/zoom, mapping
+//               1:1 onto the server's SETTING_SPECS ('name' is that side's
+//               'tableName'). The enums are MIRRORED below rather than
+//               imported: portable.js must keep running in a browser and
+//               under plain Node, and server.js is neither. An unknown value
+//               is a refusal naming its line — a felt that silently fell back
+//               would be a table nobody prepared. 'experiences' is out: no
+//               editor writes it, so the key would carry nothing.
+//   players:    the prepared characters, each a display name, an optional
+//               dice set, and a rack of its own.
+//
+// Why a player block NESTS `pools:` instead of hanging shelves off the name:
+// shelf labels are user-authored, so a shelf may legally be called 'set' or
+// 'pools'. Nesting puts the reserved keys at a depth where a shelf can never
+// appear, and makes a player's block THE SAME GRAMMAR as the top-level
+// `pools:` section — one parser (blockLine), called at two base indents.
+// Verbosity bought with the total absence of ambiguity.
+//
+// Profile names are display names, and a display name is a WHISPER ADDRESS.
+// '#' starts the comment in roll notation and the comment split runs before
+// the whisper-flag scan, so a name carrying one re-parses as a whisper
+// somewhere else — a silent misdelivery (GOALS notation-totality; server.js
+// cleanName). The server STRIPS it as a last resort; a hand-edited file gets
+// the loud version, refused at its line, because there is a human right there
+// who can fix the spelling.
+//
+// Unknown TOP-LEVEL sections skip and warn rather than aborting the document
+// (PROFILES §9 decision 4): a file from a later version must not be a hard
+// version break. The skip runs to the next column-0 line and never looks
+// inside. That tolerance is for sections this version does not know —
+// a section it DOES know stays strict to the character.
 
 import { parseNotation, cutText } from './notation.js';
 import { SETS } from './themes.js'; // import-free data — still runs under Node
@@ -49,8 +86,28 @@ import { SETS } from './themes.js'; // import-free data — still runs under Nod
 const TRIO = ['attributes', 'skills', 'motivations'];
 const TRIO_LABELS = { attributes: 'Attributes', skills: 'Skills', motivations: 'Motivations' };
 const PLAIN_LABEL = 'Pools';
-const MAX_POOLS = 40;
+
+// Caps. 40 was a DOCUMENT cap while a file held exactly one rack; a prepared
+// table holds one per player, so it is now PER PLAYER — the top-level `pools:`
+// (which is one player's: the exporting browser's own) and each player block
+// each get the full 40, under the same name the server's own cap wears. Six
+// players × 20 pools is an ordinary game night and must never be a refusal;
+// MAX_POOLS_PER_FILE is the separate whole-document ceiling, and MAX_PROFILES
+// matches the room key's cap (PROFILES §3.2).
+const MAX_POOLS_PER_PLAYER = 40;
+const MAX_POOLS_PER_FILE = 300;
+const MAX_PROFILES = 12;
 const MAX_NAME = 24;
+const MAX_TABLE_NAME = 28; // SETTING_SPECS.tableName's cap
+
+// The `table:` values, mirrored by hand from server.js SETTING_SPECS (see the
+// header: no import). Adding a felt or a system there means adding it here.
+const FELT_THEMES = ['emerald', 'crimson', 'midnight', 'slate', 'walnut',
+  'obsidian', 'ocean', 'plum', 'sand'];
+const SYSTEMS = ['soul-deal', 'dnd', 'none'];
+const ZOOMS = ['wide', 'medium', 'close'];
+// key → the values it accepts, or null for free text (capped, never enumerated)
+const TABLE_KEYS = { name: null, felt: FELT_THEMES, system: SYSTEMS, zoom: ZOOMS };
 
 const BARE_KEY_RE = /^[A-Za-z0-9][A-Za-z0-9 _-]*$/;
 
@@ -65,8 +122,9 @@ function shelfKey(label) {
 // Emit
 // ---------------------------------------------------------------------------
 
-// groups: [{name, notation, category?, set?}] · settings: {sound?, numbers?}
-export function exportYaml({ groups = [], settings = {} } = {}) {
+// groups → shelves in the rack's own reading order: the trio first, customs
+// alphabetically, the plain shelf last.
+function shelvesOf(groups) {
   const shelves = [];
   const byKey = new Map();
   for (const g of groups) {
@@ -78,24 +136,58 @@ export function exportYaml({ groups = [], settings = {} } = {}) {
     }
     byKey.get(k).pools.push({ name: g.name || '', notation: g.notation, set: g.set || null });
   }
-  // trio order first, customs alphabetically, the plain shelf last — the
-  // rack's own reading order
   shelves.sort((a, b) => {
     const rank = (s) => (s.key === PLAIN_LABEL.toLowerCase() ? 2 : TRIO.includes(s.key) ? 0 : 1);
     return rank(a) - rank(b)
       || (rank(a) === 0 ? TRIO.indexOf(a.key) - TRIO.indexOf(b.key) : a.label.localeCompare(b.label));
   });
+  return shelves;
+}
+
+// One rack's shelves at `base` indent (pools at base + 2) — the emit twin of
+// blockLine: the top-level section and a player's own pools take it at 2 and
+// at 6. Returns how many shelves it wrote.
+function emitShelves(lines, groups, base) {
+  const pad = ' '.repeat(base);
+  const shelves = shelvesOf(groups);
+  for (const s of shelves) {
+    lines.push(`${pad}${shelfKey(s.label)}:`);
+    for (const p of s.pools) lines.push(`${pad}  - ${quote(p.name)}: ${quote(p.notation)}${p.set ? ` @ ${quote(p.set)}` : ''}`);
+  }
+  return shelves.length;
+}
+
+// groups: [{name, notation, category?, set?}] · settings: {sound?, numbers?}
+// table: {name?, felt?, system?, zoom?} · profiles: [{name, set?, groups}]
+// table and profiles are present-or-absent: given neither (or nothing in
+// them), the output is byte-identical to what this emitter wrote before the
+// prepared table existed. Profiles keep the order they are handed in — that
+// is the order the seats sit in — while shelves inside each sort as always.
+export function exportYaml({ groups = [], settings = {}, table = null, profiles = null } = {}) {
+  const tableLines = [];
+  for (const key of Object.keys(TABLE_KEYS)) {
+    const value = table && table[key];
+    if (typeof value === 'string' && value) tableLines.push(`  ${key}: ${quote(value)}`);
+  }
+  const seats = Array.isArray(profiles) ? profiles : [];
+  const prepared = tableLines.length > 0 || seats.length > 0;
 
   const lines = [
-    '# Dice Table — pools & just-you settings',
+    prepared ? '# Dice Table — the prepared table' : '# Dice Table — pools & just-you settings',
     '# paste back via Settings → Your data (import previews; Apply is explicit)',
-    'pools:',
   ];
-  for (const s of shelves) {
-    lines.push(`  ${shelfKey(s.label)}:`);
-    for (const p of s.pools) lines.push(`    - ${quote(p.name)}: ${quote(p.notation)}${p.set ? ` @ ${quote(p.set)}` : ''}`);
+  if (tableLines.length) lines.push('table:', ...tableLines);
+  if (seats.length) {
+    lines.push('players:');
+    for (const p of seats) {
+      lines.push(`  ${quote(p.name || '')}:`);
+      if (p.set) lines.push(`    set: ${quote(p.set)}`);
+      lines.push('    pools:'); // an empty rack still names the key, so the seat survives
+      emitShelves(lines, p.groups || [], 6);
+    }
   }
-  if (!shelves.length) lines.push(`  ${PLAIN_LABEL}:`);
+  lines.push('pools:');
+  if (!emitShelves(lines, groups, 2)) lines.push(`  ${PLAIN_LABEL}:`);
   lines.push('settings:');
   lines.push(`  sound: ${settings.sound === false ? 'false' : 'true'}`);
   lines.push(`  numbers: ${settings.numbers === true ? 'true' : 'false'}`);
@@ -128,32 +220,128 @@ function readScalar(s, stop) {
   return { value: s.trim(), rest: '' };
 }
 
+// The key half of a mapping line ("Label:" / "'Label':"), bare or quoted.
+// null = not a key line at all; '' = a key line with nothing in it.
+function readKey(body) {
+  const key = readScalar(body, ':');
+  if (!key || (key.rest !== ':' && key.rest.trim() !== ':')) return null;
+  return key.value.trim();
+}
+
+// A dice-set id, fallen closed: unknown ids become no override at all, so the
+// pool (or the seat) survives a file written against a later set catalogue.
+const knownSet = (id) => (id === 'std' || SETS[id] ? id : null);
+
 const fail = (line, error) => ({ ok: false, line, error });
 
+// One shelf/pool block — the `pools:` grammar at ONE base indent. `shelves` is
+// the array it fills, `doc` the shared whole-file pool counter, `what` the
+// suffix an over-cap refusal wears. The top-level section takes base 2 and a
+// player's own pools base 6: same function, same grammar, two depths.
+function newBlock(base, shelves, doc, what = '') {
+  return { base, pad: ' '.repeat(base), shelves, byKey: new Map(), count: 0, shelf: null, doc, what };
+}
+
+// → null when the line is consumed, or a fail() when it is refused.
+function blockLine(block, raw, lineNo) {
+  const { base, pad } = block;
+
+  if (raw.startsWith(pad) && raw[base] !== ' ') {
+    // a shelf: "<pad>Label:" (key bare or quoted)
+    const body = raw.slice(base);
+    const label = readKey(body);
+    if (label === null) {
+      return fail(lineNo, `expected a shelf like "${pad}Attributes:" (got ${JSON.stringify(body.slice(0, 30))})`);
+    }
+    if (!label) return fail(lineNo, 'a shelf needs a name');
+    if (label.length > MAX_NAME) return fail(lineNo, `shelf name over ${MAX_NAME} characters`);
+    const k = label.toLowerCase();
+    if (block.byKey.has(k)) return fail(lineNo, `shelf ${JSON.stringify(label)} appears twice`);
+    block.shelf = { label: TRIO_LABELS[k] || label, plain: k === PLAIN_LABEL.toLowerCase(), pools: [] };
+    block.byKey.set(k, block.shelf);
+    block.shelves.push(block.shelf);
+    return null;
+  }
+
+  if (raw.startsWith(`${pad}  - `)) {
+    if (!block.shelf) return fail(lineNo, 'a pool line stands outside any shelf');
+    const body = raw.slice(base + 4);
+    const key = readScalar(body, ': ');
+    if (!key) return fail(lineNo, `expected "- 'Name': 'notation'" (got ${JSON.stringify(body.slice(0, 30))})`);
+    let rest = key.rest;
+    if (!rest.startsWith(': ')) return fail(lineNo, 'expected ": " between name and notation');
+    rest = rest.slice(2);
+    const val = readScalar(rest);
+    if (!val) return fail(lineNo, 'expected a notation scalar');
+    let set = null;
+    let tail = val.rest.trim();
+    if (tail.startsWith('@')) {
+      // "- 'Name': 'notation' @ 'set-id'" — the §9 override suffix. Only
+      // reachable after a QUOTED notation (a bare scalar consumes the line).
+      const sv = readScalar(tail.slice(1).trim());
+      if (!sv || sv.rest.trim() !== '') return fail(lineNo, 'trailing text after the dice-set id');
+      set = knownSet(sv.value.trim());
+      tail = '';
+    }
+    if (tail !== '') return fail(lineNo, 'trailing text after the notation');
+    const name = cutText(key.value, MAX_NAME + 1);
+    if (name.length > MAX_NAME) return fail(lineNo, `name over ${MAX_NAME} characters`);
+    const res = parseNotation(val.value);
+    if (!res.ok) return fail(lineNo, `notation ${JSON.stringify(val.value.slice(0, 40))}: ${res.error}`);
+    if (++block.count > MAX_POOLS_PER_PLAYER) return fail(lineNo, `more than ${MAX_POOLS_PER_PLAYER} pools${block.what}`);
+    if (++block.doc.count > MAX_POOLS_PER_FILE) return fail(lineNo, `more than ${MAX_POOLS_PER_FILE} pools in the file`);
+    block.shelf.pools.push({ name, notation: res.canonical, ...(set ? { set } : {}) });
+    return null;
+  }
+
+  return fail(lineNo, `unrecognized indentation ${JSON.stringify(raw.slice(0, 20))} — shelves at ${base} spaces, pools at "${pad}  - "`);
+}
+
 // → { ok:true, shelves:[{label, plain, pools:[{name, notation, set?}]}],
-//     settings:{sound, numbers} (each present only when the text set it) }
-// or { ok:false, line, error }.
+//     settings:{sound, numbers} (each present only when the text set it),
+//     profiles:[{name, set?, shelves:[…]}], warnings:[…], table?:{…} }
+// or { ok:false, line, error }. `table` is present only if the text set it;
+// `profiles` and `warnings` are always arrays, empty in a today-format file.
 export function parsePortable(text) {
   if (typeof text !== 'string' || !text.trim()) return fail(0, 'nothing to import');
+  const doc = { count: 0 }; // pools across the whole file
   const shelves = [];
-  const byKey = new Map();
+  const rack = newBlock(2, shelves, doc); // the top-level pools: section
   const settings = {};
-  let section = null; // 'pools' | 'settings'
-  let shelf = null;
-  let poolCount = 0;
+  const profiles = [];
+  const byName = new Map();
+  const warnings = [];
+  const tableSeen = new Set();
+  let table = null;
+  let section = null; // 'pools' | 'settings' | 'table' | 'players' | 'skip'
+  let seat = null;    // the player block being read
   const rows = text.split(/\r\n?|\n/);
 
   for (let n = 0; n < rows.length; n++) {
     const raw = rows[n];
     const lineNo = n + 1;
     if (!raw.trim() || raw.trim().startsWith('#')) continue; // blank / comment line
+    // An unknown section's body is not examined AT ALL — that is what
+    // skipping means, indentation style included. It ends at column 0.
+    if (section === 'skip' && /^[ \t]/.test(raw)) continue;
     if (raw.includes('\t')) return fail(lineNo, 'tabs are not allowed — use spaces');
 
     if (!raw.startsWith(' ')) {
-      // top level: exactly the two known sections
-      if (raw === 'pools:') { section = 'pools'; shelf = null; continue; }
+      seat = null;
+      if (raw === 'pools:') { section = 'pools'; rack.shelf = null; continue; }
       if (raw === 'settings:') { section = 'settings'; continue; }
-      return fail(lineNo, `unknown top-level line ${JSON.stringify(raw.slice(0, 30))} — expected "pools:" or "settings:"`);
+      if (raw === 'table:') { section = 'table'; continue; }
+      if (raw === 'players:') { section = 'players'; continue; }
+      // Forward tolerance (PROFILES §9 decision 4): a SECTION this version
+      // does not know is skipped with a warning rather than breaking the
+      // document. A top-level line that is not even section-shaped is still
+      // a refusal — there is no block to skip.
+      if (raw.endsWith(':')) {
+        section = 'skip';
+        warnings.push(`line ${lineNo}: skipped unknown section ${JSON.stringify(raw.slice(0, 30))}`);
+        continue;
+      }
+      return fail(lineNo, `unknown top-level line ${JSON.stringify(raw.slice(0, 30))} — expected "pools:", "settings:", "table:" or "players:"`);
     }
 
     if (section === 'settings') {
@@ -163,65 +351,120 @@ export function parsePortable(text) {
       continue;
     }
 
+    if (section === 'table') {
+      // The room's furniture. Every key is known, every enum is closed: a
+      // value that fell back silently would be a table nobody prepared.
+      const m = /^ {2}([A-Za-z]+):(.*)$/.exec(raw);
+      if (!m) return fail(lineNo, `table lines are "  key: 'value'" (got ${JSON.stringify(raw.trim().slice(0, 30))})`);
+      const key = m[1];
+      if (!Object.hasOwn(TABLE_KEYS, key)) {
+        return fail(lineNo, `unknown table key ${JSON.stringify(key)} — expected ${Object.keys(TABLE_KEYS).join(', ')}`);
+      }
+      if (tableSeen.has(key)) return fail(lineNo, `table key ${JSON.stringify(key)} appears twice`);
+      tableSeen.add(key);
+      const sv = readScalar(m[2].trim());
+      if (!sv || sv.rest.trim() !== '') return fail(lineNo, `expected one value after "${key}:"`);
+      const allowed = TABLE_KEYS[key];
+      let value = sv.value;
+      if (allowed) {
+        if (!allowed.includes(value)) {
+          return fail(lineNo, `${key} ${JSON.stringify(value.slice(0, 30))} is not one of ${allowed.join(', ')}`);
+        }
+      } else {
+        // free text (the table's own name), capped like every other name
+        value = cutText(value, MAX_TABLE_NAME + 1);
+        if (value.length > MAX_TABLE_NAME) return fail(lineNo, `table name over ${MAX_TABLE_NAME} characters`);
+      }
+      if (value) { // '' is 'unnamed', which is what carrying nothing already means
+        if (!table) table = {};
+        table[key] = value;
+      }
+      continue;
+    }
+
+    if (section === 'players') {
+      if (/^ {2}\S/.test(raw)) {
+        // a player: "  'Alice':"
+        const label = readKey(raw.slice(2));
+        if (label === null) {
+          return fail(lineNo, `expected a player like "  'Alice':" (got ${JSON.stringify(raw.slice(2, 32))})`);
+        }
+        if (!label) return fail(lineNo, 'a player needs a name');
+        // The whisper-address ban, refused rather than stripped: '#' opens the
+        // comment in roll notation, so 'Bo#b' would re-parse as a whisper to
+        // 'Bo' — a silent misdelivery. See the header.
+        if (label.includes('#')) {
+          return fail(lineNo, `player name ${JSON.stringify(label.slice(0, 30))} carries '#', which starts a comment in dice notation — a name holding one would misdirect whispers`);
+        }
+        const name = cutText(label, MAX_NAME + 1);
+        if (name.length > MAX_NAME) return fail(lineNo, `player name over ${MAX_NAME} characters`);
+        if (!name) return fail(lineNo, 'a player needs a name');
+        const k = name.toLowerCase();
+        if (byName.has(k)) return fail(lineNo, `player ${JSON.stringify(name)} appears twice`);
+        if (profiles.length >= MAX_PROFILES) return fail(lineNo, `more than ${MAX_PROFILES} players`);
+        const rec = { name, shelves: [] };
+        byName.set(k, rec);
+        profiles.push(rec);
+        seat = { rec, block: newBlock(6, rec.shelves, doc, ' for one player'), inPools: false };
+        continue;
+      }
+
+      if (!seat) return fail(lineNo, 'an indented line stands outside any player');
+
+      if (/^ {4}\S/.test(raw)) {
+        // the reserved keys, at the depth a shelf can never reach
+        const m = /^ {4}(set|pools):(.*)$/.exec(raw);
+        if (!m) return fail(lineNo, `a player carries only "    set: 'id'" and "    pools:" (got ${JSON.stringify(raw.trim().slice(0, 30))})`);
+        if (m[1] === 'pools') {
+          if (m[2].trim() !== '') return fail(lineNo, '"pools:" takes no value — the shelves sit under it');
+          seat.inPools = true;
+          seat.block.shelf = null;
+          continue;
+        }
+        const sv = readScalar(m[2].trim());
+        if (!sv || sv.rest.trim() !== '') return fail(lineNo, 'expected one dice-set id after "set:"');
+        const id = knownSet(sv.value.trim()); // unknown ids fall closed, like a pool's
+        if (id) seat.rec.set = id;
+        else delete seat.rec.set;
+        continue;
+      }
+
+      if (!seat.inPools) return fail(lineNo, 'a shelf must sit under the player\'s "pools:"');
+      const bad = blockLine(seat.block, raw, lineNo);
+      if (bad) return bad;
+      continue;
+    }
+
     if (section !== 'pools') return fail(lineNo, 'indented line before any section');
 
-    if (/^ {2}\S/.test(raw)) {
-      // a shelf: "  Label:" (key bare or quoted)
-      const body = raw.slice(2);
-      const key = readScalar(body, ':');
-      if (!key || key.rest !== ':' && key.rest.trim() !== ':') {
-        return fail(lineNo, `expected a shelf like "  Attributes:" (got ${JSON.stringify(body.slice(0, 30))})`);
-      }
-      const label = key.value.trim();
-      if (!label) return fail(lineNo, 'a shelf needs a name');
-      if (label.length > MAX_NAME) return fail(lineNo, `shelf name over ${MAX_NAME} characters`);
-      const k = label.toLowerCase();
-      if (byKey.has(k)) return fail(lineNo, `shelf ${JSON.stringify(label)} appears twice`);
-      shelf = { label: TRIO_LABELS[k] || label, plain: k === PLAIN_LABEL.toLowerCase(), pools: [] };
-      byKey.set(k, shelf);
-      shelves.push(shelf);
-      continue;
-    }
-
-    if (/^ {4}- /.test(raw)) {
-      if (!shelf) return fail(lineNo, 'a pool line stands outside any shelf');
-      const body = raw.slice(6);
-      const key = readScalar(body, ': ');
-      if (!key) return fail(lineNo, `expected "- 'Name': 'notation'" (got ${JSON.stringify(body.slice(0, 30))})`);
-      let rest = key.rest;
-      if (!rest.startsWith(': ')) return fail(lineNo, 'expected ": " between name and notation');
-      rest = rest.slice(2);
-      const val = readScalar(rest);
-      if (!val) return fail(lineNo, 'expected a notation scalar');
-      let set = null;
-      let tail = val.rest.trim();
-      if (tail.startsWith('@')) {
-        // "- 'Name': 'notation' @ 'set-id'" — the §9 override suffix. Only
-        // reachable after a QUOTED notation (a bare scalar consumes the line).
-        const sv = readScalar(tail.slice(1).trim());
-        if (!sv || sv.rest.trim() !== '') return fail(lineNo, 'trailing text after the dice-set id');
-        const id = sv.value.trim();
-        // unknown ids fall closed to no override — the pool survives
-        set = id === 'std' || SETS[id] ? id : null;
-        tail = '';
-      }
-      if (tail !== '') return fail(lineNo, 'trailing text after the notation');
-      const name = cutText(key.value, MAX_NAME + 1);
-      if (name.length > MAX_NAME) return fail(lineNo, `name over ${MAX_NAME} characters`);
-      const res = parseNotation(val.value);
-      if (!res.ok) return fail(lineNo, `notation ${JSON.stringify(val.value.slice(0, 40))}: ${res.error}`);
-      if (++poolCount > MAX_POOLS) return fail(lineNo, `more than ${MAX_POOLS} pools`);
-      shelf.pools.push({ name, notation: res.canonical, ...(set ? { set } : {}) });
-      continue;
-    }
-
-    return fail(lineNo, `unrecognized indentation ${JSON.stringify(raw.slice(0, 20))} — shelves at 2 spaces, pools at "    - "`);
+    const bad = blockLine(rack, raw, lineNo);
+    if (bad) return bad;
   }
 
-  if (!shelves.length && !('sound' in settings) && !('numbers' in settings)) {
-    return fail(0, 'no pools and no settings found');
+  if (!shelves.length && !profiles.length && !table
+    && !('sound' in settings) && !('numbers' in settings)) {
+    // Name the skips here or they vanish: a file of nothing but sections this
+    // version does not know reads as empty, and "why?" deserves an answer.
+    return fail(0, warnings.length
+      ? `no pools, settings, table or players found (${warnings.length} unknown section${warnings.length > 1 ? 's' : ''} skipped)`
+      : 'no pools and no settings found');
   }
-  return { ok: true, shelves, settings };
+  return { ok: true, shelves, settings, profiles, warnings, ...(table ? { table } : {}) };
+}
+
+// One parsed profile → exactly what planImport (and the preview status line)
+// consumes, so no caller has to know that a bare {shelves} would leave
+// plan.settings undefined under `'sound' in plan.settings`. A profile carries
+// no just-you settings — sound and numbers are the receiving browser's, never
+// the organizer's. The profile's own `set` is that PLAYER's dice identity, not
+// a per-pool override, so it deliberately does not ride along: the seat picker
+// applies it where identity lives.
+export function profileToImport(profile) {
+  return {
+    ok: true,
+    shelves: profile && Array.isArray(profile.shelves) ? profile.shelves : [],
+    settings: {},
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -229,10 +472,11 @@ export function parsePortable(text) {
 // ---------------------------------------------------------------------------
 
 // current: [{id, name, notation, category?, set?}] · parsed: parsePortable's
-// ok shape. A named pool matches the FIRST current pool with the same name
-// (exact); a match with identical notation+shelf+set counts unchanged, else
-// it becomes an update. Unnamed or unmatched pools are adds. Nothing is ever
-// deleted — an import narrows nothing.
+// ok shape (or profileToImport's, which is the same shape for one player). A
+// named pool matches the FIRST current pool with the same name (exact); a
+// match with identical notation+shelf+set counts unchanged, else it becomes an
+// update. Unnamed or unmatched pools are adds. Nothing is ever deleted — an
+// import narrows nothing.
 export function planImport(current, parsed) {
   const adds = [];
   const updates = [];

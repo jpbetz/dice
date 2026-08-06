@@ -14,13 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// tests/portable.test.mjs — the pools & settings YAML (Tier 4 §5): the
-// emitter/parser round-trip is a fixed point, quoting survives the two YAML
-// traps ('#' in notation, ': ' in names), and everything outside the strict
-// subset fails CLOSED with a line number — never a guess.
+// tests/portable.test.mjs — the pools & settings YAML (Tier 4 §5) grown into
+// the whole prepared table (Tier G §G2): the emitter/parser round-trip is a
+// fixed point, quoting survives the two YAML traps ('#' in notation, ': ' in
+// names), and everything outside the strict subset fails CLOSED with a line
+// number — never a guess. The G2 sections add their own load-bearing rules:
+// a today-format file must still parse and still export byte-identically, the
+// pool cap is per PLAYER, a '#' in a player name is refused rather than
+// stripped (it is a whisper address), and an unknown SECTION is skipped with
+// a warning while garbage INSIDE a known section still refuses.
 
 import assert from 'node:assert/strict';
-import { exportYaml, parsePortable, planImport } from '../js/portable.js';
+import { exportYaml, parsePortable, planImport, profileToImport } from '../js/portable.js';
 
 let n = 0;
 const t = (name, fn) => {
@@ -31,8 +36,11 @@ const t = (name, fn) => {
   }
 };
 
+// takes anything carrying shelves — the parsed document OR one parsed profile
 const flat = (parsed) => parsed.shelves.flatMap((s) =>
   s.pools.map((p) => ({ ...p, category: s.plain ? null : s.label })));
+// one parsed profile back into exportYaml's input shape
+const asSeat = (p) => ({ name: p.name, ...(p.set ? { set: p.set } : {}), groups: flat(p) });
 
 // ---- round-trip ------------------------------------------------------------
 
@@ -111,7 +119,7 @@ const refuses = (text, wantIn, name) => t(name, () => {
   assert.ok(parsed.error.includes(wantIn), `error ${JSON.stringify(parsed.error)} names ${JSON.stringify(wantIn)}`);
 });
 
-refuses('stuff:\n', 'unknown top-level', 'unknown top-level keys refuse');
+refuses('stuff\n', 'unknown top-level', 'a top-level line that is not even section-shaped refuses');
 refuses('pools:\n\t- A: 1d6\n', 'tabs', 'tabs refuse');
 refuses('pools:\n    - A: 1d6\n', 'outside any shelf', 'a pool without a shelf refuses');
 refuses('pools:\n  P:\n    - A: not dice\n', 'notation', 'bad notation refuses and names it');
@@ -227,6 +235,286 @@ t('planImport: a set change alone is an update; the same set is unchanged', () =
   const plan = planImport(current, parsed);
   assert.equal(plan.unchanged, 1);
   assert.deepEqual(plan.updates.map((u) => [u.id, u.set]), [[2, 'emberforge.blackanvil']]);
+});
+
+// ---- §G2: the prepared table — table: + players: ---------------------------
+
+t('the today-format file still parses, and still exports byte-identically', () => {
+  // the literal bytes a pre-G2 browser wrote — the regression guard for
+  // "both new sections are present-or-absent"
+  const text = [
+    '# Dice Table — pools & just-you settings',
+    '# paste back via Settings → Your data (import previews; Apply is explicit)',
+    'pools:',
+    '  Attributes:',
+    "    - 'Body': '3d6'",
+    '  Pools:',
+    "    - 'Damage': '3d4'",
+    'settings:',
+    '  sound: true',
+    '  numbers: false',
+  ].join('\n') + '\n';
+  const parsed = parsePortable(text);
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.deepEqual(parsed.profiles, []);
+  assert.deepEqual(parsed.warnings, []);
+  assert.equal('table' in parsed, false, 'table is absent unless the text set it');
+  const again = exportYaml({
+    groups: [
+      { id: 1, name: 'Body', notation: '3d6', category: 'Attributes' },
+      { id: 2, name: 'Damage', notation: '3d4' },
+    ],
+    settings: parsed.settings,
+  });
+  assert.equal(again, text);
+});
+
+t('export → parse → export is a fixed point WITH table: and players:', () => {
+  const table = { name: 'Your Soul Deal — S3', felt: 'obsidian', system: 'soul-deal', zoom: 'wide' };
+  const profiles = [
+    { name: 'Alice', set: 'emberforge.blackanvil', groups: [
+      { name: 'Strength', notation: '3d6', category: 'Attributes' },
+      { name: 'Larceny', notation: '1d20', category: 'Skills' },
+    ] },
+    { name: 'Walter', groups: [{ name: 'Strength', notation: '4d6', category: 'Attributes' }] },
+  ];
+  const groups = [{ id: 1, name: 'Damage', notation: '3d4' }];
+  const text = exportYaml({ groups, settings: { sound: true, numbers: false }, table, profiles });
+  const parsed = parsePortable(text);
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.deepEqual(parsed.table, table);
+  assert.deepEqual(parsed.profiles.map((p) => p.name), ['Alice', 'Walter'], 'seat order is authored, not sorted');
+  assert.equal(parsed.profiles[0].set, 'emberforge.blackanvil');
+  assert.equal(parsed.profiles[1].set ?? null, null, 'a set is present-or-absent');
+  assert.deepEqual(flat(parsed.profiles[0]), [
+    { name: 'Strength', notation: '3d6', category: 'Attributes' },
+    { name: 'Larceny', notation: '1d20', category: 'Skills' },
+  ]);
+  assert.deepEqual(flat(parsed), [{ name: 'Damage', notation: '3d4', category: null }]);
+  const again = exportYaml({
+    groups: flat(parsed).map((p) => ({ name: p.name, notation: p.notation, ...(p.category ? { category: p.category } : {}) })),
+    settings: parsed.settings,
+    table: parsed.table,
+    profiles: parsed.profiles.map(asSeat),
+  });
+  assert.equal(again, text);
+});
+
+t('a player with no pools is still a seat (the key stands, the rack is empty)', () => {
+  const text = exportYaml({ profiles: [{ name: 'Alice', groups: [] }] });
+  assert.ok(text.includes("  'Alice':\n    pools:\n"), text);
+  const parsed = parsePortable(text);
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal(parsed.profiles.length, 1);
+  assert.deepEqual(parsed.profiles[0].shelves, []);
+  assert.equal(exportYaml({ profiles: parsed.profiles.map(asSeat) }), text);
+});
+
+t("the YAML traps hold for player names too (': ' and quotes)", () => {
+  const text = exportYaml({ profiles: [{ name: "O'Ma: lley", groups: [{ name: 'A', notation: '1d6' }] }] });
+  const parsed = parsePortable(text);
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal(parsed.profiles[0].name, "O'Ma: lley");
+  assert.equal(exportYaml({ profiles: parsed.profiles.map(asSeat) }), text);
+});
+
+t("'#' is banned in a player name but LEGAL in a table name — they are not the same string", () => {
+  // server.js says it outright: a table name is never whisper-addressed, so
+  // the ban that makes whisper addressing total does not reach it.
+  const text = exportYaml({ table: { name: 'Bar # Grill' } });
+  const parsed = parsePortable(text);
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal(parsed.table.name, 'Bar # Grill');
+  assert.equal(exportYaml({ table: parsed.table }), text);
+  assert.equal(parsePortable("players:\n  'Bar # Grill':\n    pools:\n").ok, false);
+});
+
+// ---- the reserved-key collision the nesting exists to prevent ---------------
+
+t("a player may own shelves named 'set' and 'pools' — that is why pools: nests", () => {
+  const parsed = parsePortable([
+    'players:',
+    "  'Alice':",
+    "    set: 'std'",       // the reserved key, at depth 4
+    '    pools:',           // the reserved key, at depth 4
+    '      set:',           // a SHELF called set, at depth 6
+    "        - 'A': '1d6'",
+    '      pools:',         // a SHELF called pools, at depth 6
+    "        - 'B': '1d8'",
+  ].join('\n'));
+  assert.equal(parsed.ok, true, parsed.error);
+  const p = parsed.profiles[0];
+  assert.equal(p.set, 'std', "the reserved set: is not confused by a shelf named 'set'");
+  assert.deepEqual(flat(p), [
+    { name: 'A', notation: '1d6', category: 'set' },
+    { name: 'B', notation: '1d8', category: null }, // 'pools' IS the plain shelf
+  ]);
+});
+
+// ---- caps: per player, and a separate document ceiling ---------------------
+
+t('the pool cap is PER PLAYER: six players × 20 pools is not a refusal', () => {
+  const lines = ['players:'];
+  for (let p = 0; p < 6; p++) {
+    lines.push(`  'P${p}':`, '    pools:', '      Attributes:');
+    for (let i = 0; i < 20; i++) lines.push(`        - 'N${i}': '1d6'`);
+  }
+  const parsed = parsePortable(lines.join('\n'));
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal(parsed.profiles.length, 6);
+  assert.equal(flat(parsed.profiles[5]).length, 20);
+});
+
+t('one player over 40 pools refuses at the line that breaks it', () => {
+  const lines = ['players:', "  'Alice':", '    pools:', '      Attributes:'];
+  for (let i = 0; i < 41; i++) lines.push(`        - 'N${i}': '1d6'`);
+  const parsed = parsePortable(lines.join('\n'));
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.line, 45, 'the 41st pool line');
+  assert.ok(parsed.error.includes('40'), parsed.error);
+  assert.ok(parsed.error.includes('player'), parsed.error);
+});
+
+t('the document ceiling is separate and larger: 12 × 26 trips it, not the per-player cap', () => {
+  const lines = ['players:'];
+  for (let p = 0; p < 12; p++) {
+    lines.push(`  'P${p}':`, '    pools:', '      Attributes:');
+    for (let i = 0; i < 26; i++) lines.push(`        - 'N${i}': '1d6'`);
+  }
+  const parsed = parsePortable(lines.join('\n'));
+  assert.equal(parsed.ok, false);
+  assert.ok(parsed.error.includes('300'), parsed.error);
+  assert.ok(parsed.error.includes('file'), parsed.error);
+});
+
+refuses(`players:\n${Array.from({ length: 13 }, (_, i) => `  'P${i}':\n    pools:`).join('\n')}\n`,
+  'more than 12 players', 'more than twelve players refuses');
+
+// ---- '#' in a player name: a REFUSAL, never a strip -------------------------
+
+t("a '#' in a player name refuses by line — whisper addressing depends on the ban", () => {
+  const parsed = parsePortable([
+    'table:',
+    "  felt: 'ocean'",
+    'players:',
+    "  'Bo#b':",
+    '    pools:',
+  ].join('\n'));
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.line, 4);
+  assert.ok(parsed.error.includes('#'), parsed.error);
+  assert.ok(/whisper/i.test(parsed.error), parsed.error);
+});
+
+refuses("players:\n  Bo#b:\n    pools:\n", '#', "a bare (unquoted) '#' name refuses too");
+refuses(`players:\n  '${'x'.repeat(30)}':\n    pools:\n`, 'over 24', 'an over-long player name refuses');
+refuses("players:\n  '':\n    pools:\n", 'needs a name', 'an unnamed player refuses');
+refuses("players:\n  'Ann':\n    pools:\n  'ann':\n    pools:\n", 'twice', 'two players with one name refuse');
+refuses("players:\n  'Ann':\n      Attributes:\n", 'under the player', 'a shelf outside a player\'s pools: refuses');
+refuses("players:\n  'Ann':\n    hp: 12\n", 'set', 'an unknown key inside a player refuses');
+refuses("players:\n    pools:\n", 'outside any player', 'a player key with no player refuses');
+
+t("a player's unknown dice-set id falls closed, like a pool's — the seat survives", () => {
+  const parsed = parsePortable("players:\n  'Ann':\n    set: 'no.such'\n    pools:\n");
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal(parsed.profiles[0].set ?? null, null);
+});
+
+// ---- table: maps 1:1 onto the room's settings ------------------------------
+
+t("table: parses, bare or quoted, and 'name' is the room's tableName", () => {
+  const parsed = parsePortable([
+    'table:',
+    "  name: 'Session 3'",
+    '  felt: obsidian',      // hand-written bare scalar
+    "  system: 'dnd'",
+    "  zoom: 'close'",
+  ].join('\n'));
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.deepEqual(parsed.table, { name: 'Session 3', felt: 'obsidian', system: 'dnd', zoom: 'close' });
+  assert.deepEqual(parsed.shelves, []);
+});
+
+t('an unknown felt refuses by line — a silent fallback is a table nobody prepared', () => {
+  const parsed = parsePortable(['table:', "  name: 'Night'", "  felt: 'chartreuse'"].join('\n'));
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.line, 3);
+  assert.ok(parsed.error.includes('felt'), parsed.error);
+});
+
+refuses("table:\n  system: 'gurps'\n", 'system', 'an unknown system refuses');
+refuses("table:\n  zoom: 'huge'\n", 'zoom', 'an unknown zoom refuses');
+refuses('table:\n  experiences: []\n', 'unknown table key', 'experiences is deliberately out of the format');
+refuses("table:\n  felt: 'ocean'\n  felt: 'plum'\n", 'twice', 'a repeated table key refuses');
+refuses(`table:\n  name: '${'x'.repeat(30)}'\n`, 'over 28', 'an over-long table name refuses');
+refuses("table:\n  felt: 'ocean' extra\n", 'one value', 'trailing text after a table value refuses');
+
+t("an empty table name carries nothing — it does not round-trip as a key", () => {
+  const parsed = parsePortable("table:\n  name: ''\n  felt: 'plum'\n");
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.deepEqual(parsed.table, { felt: 'plum' });
+  assert.equal(exportYaml({ table: parsed.table }), exportYaml({ table: { felt: 'plum' } }));
+});
+
+// ---- forward tolerance: skip an unknown SECTION, stay strict inside a known one
+
+t('an unknown top-level section skips with a warning; the rest of the file lands', () => {
+  const parsed = parsePortable([
+    'pools:',
+    '  Pools:',
+    "    - 'A': '1d6'",
+    'characters:',        // line 4 — a section this version does not know
+    '  Alice:',
+    '    hp: 12',
+    '\tnot even spaces',  // an unknown block's body is not examined at all
+    'settings:',
+    '  sound: false',
+    '  numbers: true',
+  ].join('\n'));
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.deepEqual(parsed.warnings, ['line 4: skipped unknown section "characters:"']);
+  assert.deepEqual(flat(parsed), [{ name: 'A', notation: '1d6', category: null }]);
+  assert.deepEqual(parsed.settings, { sound: false, numbers: true });
+});
+
+t('skipping an unknown SECTION is not tolerating garbage inside a known one', () => {
+  const parsed = parsePortable([
+    'characters:', '  anything: at all',
+    'pools:', '  Pools:', '    - A: not dice',
+  ].join('\n'));
+  assert.equal(parsed.ok, false, 'a known section stays strict to the character');
+  assert.equal(parsed.line, 5);
+  assert.ok(parsed.error.includes('notation'), parsed.error);
+});
+
+t('a file of nothing but unknown sections refuses, and says how many it skipped', () => {
+  const parsed = parsePortable('characters:\n  Alice: 1\nscenes:\n  - a\n');
+  assert.equal(parsed.ok, false);
+  assert.ok(parsed.error.includes('2 unknown sections skipped'), parsed.error);
+});
+
+// ---- one profile → the shape planImport already consumes --------------------
+
+t('profileToImport hands planImport a whole parsed shape, settings included', () => {
+  const parsed = parsePortable([
+    'players:',
+    "  'Alice':",
+    '    pools:',
+    '      Attributes:',
+    "        - 'Body': '3d6'",
+    "        - 'Grit': '2d8'",
+  ].join('\n'));
+  assert.equal(parsed.ok, true, parsed.error);
+  const one = profileToImport(parsed.profiles[0]);
+  assert.deepEqual(one.settings, {}, 'a seat carries no just-you settings to flip');
+  const plan = planImport([{ id: 7, name: 'Body', notation: '1d6' }], one);
+  assert.equal(plan.unchanged, 0);
+  assert.deepEqual(plan.updates, [{ id: 7, name: 'Body', notation: '3d6', category: 'Attributes' }]);
+  assert.deepEqual(plan.adds, [{ name: 'Grit', notation: '2d8', category: 'Attributes' }]);
+  assert.deepEqual(plan.settings, {});
+  // and a seat with nothing in it plans nothing rather than throwing
+  const none = planImport([], profileToImport(undefined));
+  assert.deepEqual([none.adds.length, none.updates.length, none.unchanged], [0, 0, 0]);
 });
 
 if (process.exitCode) process.exit(process.exitCode);
