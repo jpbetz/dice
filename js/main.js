@@ -23,7 +23,8 @@ import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRang
 import { dieArtURL } from './diceart.js';
 import { connect, forgetSeat } from './net.js';
 import { SYSTEMS, DEFAULT_SYSTEM } from './meanings.js';
-import { composeRoll, validateMods, previewSpec } from './rollspec.js';
+import { composeRoll, validateMods } from './rollspec.js';
+import { previewOf } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { exportYaml, parsePortable, planImport } from './portable.js';
 import { THEMES, SETS } from './themes.js';
@@ -5437,7 +5438,7 @@ clearTrayBtn.addEventListener('click', clearDraft);
 
 // ---------------------------------------------------------------------------
 // Command box (UX §1.3): one canonical string, two editors. Three validation
-// states on a 300 ms debounce — valid (gold + canonical/Monte-Carlo preview),
+// states on a 300 ms debounce — valid (gold + canonical/exact preview),
 // incomplete (neutral, never red), invalid (red + error + hint). Enter rolls;
 // ↑/↓ walk 'dice.cmdhistory.v1'; '?' toggles a static cheatsheet. The tray and
 // the box are two views of one draft: tray edits regenerate the string, a
@@ -5507,14 +5508,19 @@ function pushHistory(canonical) {
   for (const w of historyWalkers) w.rebase();
 }
 
+// Exact by construction (js/odds.js) — assertable text, stable across
+// repaints, identical on every seat. The rare cap-truncation corners come
+// back exact:false and must SAY they are sampled (POOL-ANALYSIS §6.3:
+// labeled, seeded, never a bare ≈).
 function fmtPreview(dice, mods) {
-  const p = previewSpec(dice, mods, 800);
+  const p = previewOf(dice, mods);
   const avg = Math.round(p.avg * 10) / 10;
-  return `min ${p.min} avg ${Number.isInteger(avg) ? avg : avg.toFixed(1)} max ${p.max}`;
+  const label = p.exact ? '' : ' · sampled — 4,000 rolls';
+  return `min ${p.min} avg ${Number.isInteger(avg) ? avg : avg.toFixed(1)} max ${p.max}${label}`;
 }
 
 // Three-state validation paint shared by the panel box and the quick palette:
-// valid (gold + canonical/Monte-Carlo preview + warnings), incomplete
+// valid (gold + canonical/exact preview + warnings), incomplete
 // (neutral, never red), invalid (red + error + hint). Pure presentation —
 // callers own their side effects (tray sync, buttons).
 function renderCmdState(boxEl, slotEl, res, raw) {
@@ -6799,7 +6805,7 @@ renderGroups();
 // ± popover (docs/mockups/panel.html): per-group modifier + attributed parts,
 // adv/dis, keep/drop, reroll, explode, visibility, dc and comment. Opening it
 // parses the source's notation into edit state; every edit re-renders the
-// canonical echo and Monte Carlo preview.
+// canonical echo and exact preview.
 //
 // THE TRIGGER PASS (2026-08-03): the popover is a pure EDITOR — it never
 // rolls or offers (those verbs live on ROLL ❯❯❯ triggers and the draft row).

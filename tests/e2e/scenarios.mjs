@@ -1095,6 +1095,29 @@ export const scenarios = [
     },
   },
   {
+    name: 'preview-honest',
+    tags: ['notation', 'smoke'],
+    // The command-box preview is exact (ROADMAP §2l ①, js/odds.js) — literal
+    // min/avg/max text is assertable, which the Monte-Carlo preview never
+    // was. The cap-truncation corners drop to seeded sampling and say so.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const type = (s) => a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = ${JSON.stringify(s)};
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      const slotOk = `(document.querySelector('#cmd-slot .ok') || {}).textContent || ''`;
+      await type('3d6+5');
+      await a.waitFor(`(${slotOk}).includes('min 8 avg 15.5 max 23')`,
+        { desc: 'exact preview for 3d6+5' });
+      assert.ok(!(await a.eval(slotOk)).includes('sampled'), 'exact line carries no label');
+      await type('30d6 ro<=3'); // 10 reroll slots for 30 candidates — BINDING
+      await a.waitFor(`(${slotOk}).includes('sampled — 4,000 rolls')`,
+        { desc: 'cap-truncation corner is labeled as sampled' });
+    },
+  },
+  {
     name: 'resync',
     tags: ['smoke', 'resync'],
     // A late joiner reconstructs the world: shelved rolls, live table dice,
