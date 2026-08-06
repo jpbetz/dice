@@ -7504,50 +7504,44 @@ function buildForecast(fcast, visSuffix) {
       const geo = document.createElement('span');
       geo.className = 'fc-geo';
       geo.setAttribute('aria-hidden', 'true');
-      // Slivers stay honest the way mosaic plots keep them honest: true
-      // widths (2px minimum stroke, 1px rules between segments — CSS), and
-      // marks that cannot fit INSIDE drop to a tick lane below at their
-      // real midpoint. Never a stretched segment.
-      const lane = [];
+      // THE READOUT (Joe 2026-08-06, superseding the print-style tick
+      // lane): a fixed strip below the bar — dedicated room, so nothing
+      // jumps — names the hovered segment in full, a caret tracking its
+      // true midpoint. Widths stay honest (2px minimum stroke, 1px mosaic
+      // rules — CSS); the strip is where slivers get their name.
+      const read = document.createElement('span');
+      read.className = 'fc-read';
+      read.setAttribute('aria-hidden', 'true'); // the text layer speaks full words
+      const caret = document.createElement('i');
+      caret.className = 'fc-caret';
+      const readText = document.createElement('span');
+      readText.className = 'fc-read-text';
+      read.append(caret, readText);
       let at = 0;
       for (const s of bar.segments) {
         const seg = document.createElement('i');
         seg.className = 'fc-seg ' + (s.word ? `fc-w-${OUTCOME_SLUGS[s.word]}` : 'fc-quiet');
         seg.style.width = `${s.p * 100}%`;
-        seg.title = `${s.word || 'quiet'} — ${Math.round(s.p * 100)}%`;
         if (s.word && s.p >= 0.08) {
           const m = document.createElement('b');
           m.className = 'fc-mark';
           m.textContent = OUTCOME_MARKS[s.word] || '';
           seg.appendChild(m);
-        } else if (s.word && s.p > 0) {
-          lane.push({ mid: at + s.p / 2, mark: OUTCOME_MARKS[s.word] || '' });
         }
+        const mid = at + s.p / 2;
+        seg.addEventListener('mouseenter', () => {
+          readText.textContent = `${s.word || 'quiet'} · ${Math.round(s.p * 100) || '<1'}%`;
+          read.style.setProperty('--fc-x', `${mid * 100}%`);
+          read.classList.add('on');
+        });
         geo.appendChild(seg);
         at += s.p;
       }
-      row.append(text, geo);
-      if (lane.length) {
-        const lr = document.createElement('span');
-        lr.className = 'fc-lane';
-        lr.setAttribute('aria-hidden', 'true');
-        let edge = -Infinity;
-        for (const o of lane) {
-          const tick = document.createElement('i');
-          tick.className = 'fc-tick';
-          tick.style.left = `${o.mid * 100}%`;
-          lr.appendChild(tick);
-          const m = document.createElement('b');
-          m.className = 'fc-omark';
-          m.textContent = o.mark;
-          // labels dodge each other; the tick keeps the true position
-          const x = Math.min(Math.max(o.mid * 100, edge + 5.5), 98);
-          edge = x;
-          m.style.left = `${x}%`;
-          lr.appendChild(m);
-        }
-        row.appendChild(lr);
-      }
+      geo.addEventListener('mouseleave', () => {
+        read.classList.remove('on');
+        readText.textContent = '';
+      });
+      row.append(text, geo, read);
     }
     frag.appendChild(row);
   }
@@ -7559,20 +7553,6 @@ function buildForecast(fcast, visSuffix) {
       ? 'Average the pool into one line' : 'Show each rank on its own line';
     tog.addEventListener('click', () => { forecastPerDie = !forecastPerDie; renderPopEcho(); });
     frag.appendChild(tog);
-  }
-  // hover legend: the marks this pool actually uses, spelled out once
-  const marks = new Map();
-  for (const bar of fcast.bars) {
-    for (const s of bar.segments) {
-      if (s.word && !marks.has(s.word)) marks.set(s.word, OUTCOME_MARKS[s.word]);
-    }
-  }
-  if (marks.size) {
-    const lg = document.createElement('span');
-    lg.className = 'fc-legend';
-    lg.setAttribute('aria-hidden', 'true'); // the text layer speaks full words
-    lg.textContent = [...marks].map(([w, m]) => `${m} ${w}`).join(' · ');
-    frag.appendChild(lg);
   }
   if (visSuffix) {
     const vis = document.createElement('span');

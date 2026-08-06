@@ -2450,8 +2450,11 @@ export const scenarios = [
       assert.equal(await a.eval(
         `[...document.querySelectorAll('#pop-preview .fc-mark')].map((m) => m.textContent).join(' ')`),
         'F P S S+', 'marks ride the segments that fit; quiet is unmarked');
-      assert.ok((await a.eval(`document.querySelector('#pop-preview .fc-legend').textContent`))
-        .includes('S+ Success & Bonus'), 'the hover legend spells the marks out');
+      // hovering a segment names it in the fixed readout below the bar
+      await a.eval(`document.querySelectorAll('#pop-preview .fc-seg')[3]
+        .dispatchEvent(new MouseEvent('mouseenter'))`);
+      assert.equal(await a.eval(`document.querySelector('#pop-preview .fc-read-text').textContent`),
+        'Success · 17%', 'the readout names the hovered segment in full');
       assert.equal(await a.eval(`document.querySelectorAll('#pop-preview .fc-toggle').length`), 0,
         'one rank needs no view toggle');
 
@@ -2470,14 +2473,15 @@ export const scenarios = [
         "'per die' expands to the true rows");
       await a.eval(`document.querySelector('#pop-preview .fc-toggle').click()`);
 
-      // a sliver never disappears: too thin for an inside mark, its letter
-      // drops to the tick lane at the true midpoint (1d4+8d6 → Blemish 2.8%)
+      // a sliver never disappears: 2px minimum stroke keeps it visible,
+      // and hovering it fills the readout (1d4+8d6 → Blemish 2.8%)
       assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify((await pool('Sliver')).id)})`), true);
-      assert.equal(await a.eval(
-        `[...document.querySelectorAll('#pop-preview .fc-omark')].map((m) => m.textContent).join(' ')`),
-        'B Mn Mi', 'thin outcomes annotate below the bar');
-      assert.ok(await a.eval(`document.querySelectorAll('#pop-preview .fc-tick').length >= 3`),
-        'ticks anchor the true midpoints');
+      assert.equal(await a.eval(`document.querySelector('#pop-preview .fc-read-text').textContent`),
+        '', 'the readout is reserved room — empty until hover, so nothing jumps');
+      await a.eval(`document.querySelectorAll('#pop-preview .fc-seg')[1]
+        .dispatchEvent(new MouseEvent('mouseenter'))`);
+      assert.equal(await a.eval(`document.querySelector('#pop-preview .fc-read-text').textContent`),
+        'Blemish · 3%', 'the sliver names itself in the readout');
 
       assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify((await pool('Kept')).id)})`), true);
       assert.ok(/keep\/drop/.test(await a.eval(`document.getElementById('pop-preview').textContent`)),
