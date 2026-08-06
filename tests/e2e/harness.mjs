@@ -50,9 +50,16 @@ export async function freePort() {
   });
 }
 
+// DICE_SETUP_TTL_MS: a prepared room outlives its last player by 12 hours in
+// production (ROADMAP §G6), which no scenario can wait out. The server reads
+// the override once at boot, so it is set here for the whole run rather than
+// per scenario — only the linger scenario cares, and a short TTL is invisible
+// to every other one (an unprepared room is deleted immediately either way).
+const SETUP_TTL_MS = 4000;
+
 export async function startServer(port) {
   const proc = spawn(process.execPath, [join(ROOT, 'server.js')], {
-    env: { ...process.env, PORT: String(port) },
+    env: { ...process.env, PORT: String(port), DICE_SETUP_TTL_MS: String(SETUP_TTL_MS) },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let out = '';
@@ -305,12 +312,29 @@ export class Table {
 }
 
 export class Ctx {
-  constructor(browser, port, room) {
+  constructor(browser, port, room, server = null) {
     this.browser = browser;
     this.port = port;
     this.room = room;
+    this.server = server;
     this.tables = [];
     this.rawPlayers = [];
+  }
+
+  // The server's own stdout, for the handful of facts that have no wire
+  // surface at all — room lifecycle (ROADMAP §G6) is the case in point: a
+  // room lingering, resuming or expiring is observable only in the log,
+  // because by definition nobody is connected to be told. Polling this beats
+  // sleeping on a guessed interval, which is what the alternative would be.
+  serverLog() { return this.server ? this.server.output() : ''; }
+
+  async waitForLog(re, { timeout = 20000, desc = String(re) } = {}) {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      if (re.test(this.serverLog())) return true;
+      await sleep(100);
+    }
+    throw new Error(`timeout waiting for server log: ${desc}`);
   }
 
   // Speak to this room's API directly (room is filled in for you).
@@ -437,7 +461,7 @@ export async function runScenarios(scenarios, { only = null, full = false } = {}
   let failed = 0;
   console.log(`e2e: ${selected.length} scenario(s) on :${port} (run ${runId})\n`);
   for (const s of selected) {
-    const ctx = new Ctx(browser, port, `e2e-${s.name}-${runId}`);
+    const ctx = new Ctx(browser, port, `e2e-${s.name}-${runId}`, server);
     const t0 = Date.now();
     let err = null;
     try {

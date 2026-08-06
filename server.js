@@ -565,7 +565,7 @@ function dropStream(room, player, res) {
   player.clients.delete(res);
   endStream(res);
   if (player.clients.size === 0 && room.players.get(player.id) === player) {
-    log(`DBG dropStream schedReap ${logField('player', player.name)} caller=${new Error().stack.split('\n')[2].trim()}`);
+    logDebug(() => `reap-armed ${logField('player', player.name)} (stream dropped)`);
     scheduleReap(room, player, DISCONNECT_GRACE_MS);
   }
 }
@@ -946,7 +946,7 @@ function handleEvents(req, res, url) {
   const onClose = () => {
     player.clients.delete(res);
     if (player.clients.size === 0 && room.players.get(playerId) === player) {
-      log(`DBG onClose schedReap ${logField('player', player.name)}`);
+      logDebug(() => `reap-armed ${logField('player', player.name)} (stream closed)`);
       scheduleReap(room, player, DISCONNECT_GRACE_MS);
     }
   };

@@ -5065,4 +5065,57 @@ export const scenarios = [
       }
     },
   },
+  {
+    name: 'room-linger',
+    tags: ['prepared-seat'],
+    // ROADMAP §G6: prep Tuesday, play Thursday. Before this, dropRoomIfEmpty
+    // deleted the room the instant the last player left — so an organizer who
+    // set the felt, named the table and built six seats lost all of it by
+    // WALKING AWAY, not by any restart. That is the surprise this whole tier
+    // exists to close, so it gets a real test rather than a unit-level one.
+    //
+    // Slow by nature (DISCONNECT_GRACE_MS is a hard 5s), hence not in smoke.
+    // The waits poll the server's own log rather than sleeping on a guess —
+    // a room lingering or expiring has no wire surface, because by definition
+    // nobody is connected to be told.
+    async fn(ctx) {
+      const room = ctx.room;
+      const alice = await ctx.rawPlayer('Alice');
+      await ctx.api('/api/table', {
+        playerId: alice.playerId,
+        rev: 2,
+        table: { felt: 'plum' },
+        profiles: [{ name: 'Rill', pools: [{ name: 'Strength', notation: '3d6' }] }],
+      });
+      // Something in the log, so we can prove the per-session half is cleared
+      // while the per-preparation half survives.
+      await ctx.api('/api/roll', { playerId: alice.playerId, notation: '2d6' });
+      alice.close();
+
+      await ctx.waitForLog(new RegExp(`room lingering: room="${room}"`),
+        { desc: 'the room lingers instead of being deleted', timeout: 20000 });
+
+      // Thursday. The table is still prepared.
+      const bob = await ctx.rawPlayer('Bob');
+      assert.ok(bob.joinPayload.setup, 'the setup survived the last player leaving');
+      assert.equal(bob.joinPayload.setup.rev, 2, 'at the rev it was pushed');
+      assert.equal(bob.joinPayload.settings.felt, 'plum',
+        'the felt the organizer chose survived too — settings are preparation, not session');
+      assert.deepEqual(bob.joinPayload.log, [],
+        'but the roll log did NOT — a resumed room is a clean table');
+      assert.deepEqual(bob.joinPayload.offers, [], 'offers are session state too');
+      await ctx.waitForLog(new RegExp(`room resumed: room="${room}"`),
+        { desc: 'the linger timer is cancelled by the join' });
+
+      // Nobody comes back this time: the TTL runs out and the room really goes.
+      bob.close();
+      await ctx.waitForLog(new RegExp(`room expired: room="${room}"`),
+        { desc: 'the room expires once the TTL passes with no one there', timeout: 30000 });
+
+      const cara = await ctx.rawPlayer('Cara');
+      assert.equal(cara.joinPayload.setup ?? null, null, 'an expired room keeps nothing');
+      assert.equal(cara.joinPayload.settings.felt, 'obsidian',
+        'and comes back at the defaults, not the old table dressed as new');
+    },
+  },
 ];
