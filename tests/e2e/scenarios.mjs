@@ -670,9 +670,9 @@ export const scenarios = [
         { desc: 'totals return under dnd' });
       assert.ok((await a.logTop()).includes('vs 15'), 'and the DC verdict with them');
 
-      // The ± popover folds the sum-world sections under a per-die system
-      // (Trigger Pass): modifiers/pairing/Target/keep-drop hide; the
-      // sysnote's 'Show anyway' unfolds them for this open only.
+      // The ± popover folds the sum-world sections under a per-die system —
+      // modifiers/pairing/Target/keep-drop AND reroll/exploding, with no
+      // note and no disclosure (Joe 2026-08-06; supersedes 'Show anyway').
       await a.dbg(`setSystem('soul-deal')`);
       await a.waitFor(`window.__diceDebug.system === 'soul-deal'`, { desc: 'per-die lens back' });
       await a.eval(`(() => {
@@ -684,16 +684,20 @@ export const scenarios = [
       const secVisible = `[...document.querySelectorAll('#mods-popover .sec-sum, #mods-popover .prow-sum')]
         .some((el) => el.offsetParent !== null)`;
       assert.equal(await a.eval(secVisible), false, 'sum-world sections fold under per-die');
-      await a.eval(`document.getElementById('pop-sum-toggle').click()`);
-      assert.equal(await a.eval(secVisible), true, "'Show anyway' unfolds them");
+      assert.equal(await a.eval(`document.getElementById('pop-sw-reroll').offsetParent !== null`),
+        false, 'reroll folds with them');
+      assert.equal(await a.eval(`document.getElementById('pop-sw-explode').offsetParent !== null`),
+        false, 'exploding too');
+      assert.equal(await a.eval(`document.getElementById('pop-sysnote') === null`), true,
+        'the note is gone, not merely hidden');
       await a.dbg('closePopover()');
       await a.dbg(`setSystem('dnd')`);
       // the system echo-applies (settings round-trip) — wait before opening
       await a.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'dnd lens applied' });
       await a.dbg(`openPopoverFor('tray')`);
       assert.equal(await a.eval(secVisible), true, 'a totals system shows them by default');
-      assert.equal(await a.eval(`document.getElementById('pop-sysnote').offsetParent !== null`),
-        false, 'and carries no per-die note');
+      assert.equal(await a.eval(`document.getElementById('pop-sw-reroll').offsetParent !== null`),
+        true, 'reroll rides the totals world');
       // per-source commit chrome has real display rules (no global .hidden
       // here): a pool popover shows Save but never Open in draft
       assert.equal(await a.eval(`document.getElementById('pop-todraft').offsetParent !== null`),

@@ -993,6 +993,10 @@ html, body {
   margin: 12px -14px 4px;
   padding: 6px 14px 4px;
   background: rgba(24, 19, 14, 0.96);
+}
+/* id-scoped so the row layout outranks .plabel's display:block, which
+   sits later in this file */
+#groups-list .pool-sec-head {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -1135,7 +1139,22 @@ html, body {
   font-size: 13px;
 }
 .pid-cat-input { max-width: 110px; font-size: 11px; }
-.pid-cats { gap: 4px; }
+.pid-cats { gap: 4px; flex-wrap: wrap; }
+.pid-cat {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.pid-cat:hover { color: var(--ivory); }
+.pid-cat[aria-pressed="true"] {
+  color: var(--ivory);
+  border-color: rgba(243, 234, 215, 0.45);
+  background: rgba(243, 234, 215, 0.08);
+}
 .pid-cat .oc-name { max-width: 90px; }
 .pid-cat-new { padding: 3px 7px; }
 /* the rank ladder: six real die faces, ivory ring on the current rank —
@@ -2085,13 +2104,14 @@ html, body {
 .verdict-outcomes .oc-solo .oc-word { font-size: clamp(22px, 4.4vmin, 32px); }
 .pk-outcomes .oc-solo .oc-word { font-size: 19px; }
 .pk-outcomes .oc-solo .oc-chip { padding: 3px 12px 4px; }
-.pop-sysnote { margin: 8px 14px 0; font-style: italic; }
+
 /* Per-die tables (Soul Deal) fold the sum-world sections away — modifiers,
    d20 pairing, Target (DC), keep/drop don't change outcomes there (Joe
    2026-08-03). The sysnote's 'Show anyway' unfolds them per popover-open. */
-.popover.pop-perdie:not(.pop-sum-shown) .sec-sum,
-.popover.pop-perdie:not(.pop-sum-shown) .prow-sum { display: none; }
-.pop-sysnote .pid-ghost-verb { font-style: normal; }
+/* Per-die systems fold the sum-world sections away entirely — no
+   disclosure (Joe 2026-08-06). */
+.popover.pop-perdie .sec-sum,
+.popover.pop-perdie .prow-sum { display: none; }
 
 /* ---------- crit overlay ---------- */
 #crit-overlay {
@@ -3182,8 +3202,8 @@ body.mini #result-verdict { font-size: 11px; }
 .pop-actions:last-child, .pop-actions-2nd { padding-bottom: 14px; }
 .pop-actions .btn { flex: 1; }
 /* per-source commit chrome (Trigger Pass): Save is pool-only, Open in
-   draft is shelf-only; the per-die sysnote hides under totals systems */
-#pop-save.hidden, #pop-todraft.hidden, .pop-sysnote.hidden { display: none; }
+   draft is shelf-only */
+#pop-save.hidden, #pop-todraft.hidden { display: none; }
 /* the popover's inline save morph (same flow as the New pool panel's) */
 #pop-save-row.hidden, #mods-popover .pop-actions-2nd.hidden { display: none; }
 /* D2 AGAIN (2026-08-04): no bare `.hidden` rule exists in this codebase, so

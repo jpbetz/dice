@@ -458,14 +458,11 @@ limitations under the License.
          the roll-tweak draft. Built by renderPopIdentity; group source only. -->
     <div id="pop-identity" class="hidden"></div>
     <!-- Per-die tables (Soul Deal) HIDE the sum-world sections below
-         (.sec-sum/.prow-sum — modifiers, d20 pairing, Target, keep/drop)
-         instead of just noting them (Joe 2026-08-03; supersedes 'mark as
-         such'). The note is the disclosure: 'Show anyway' unfolds them for
-         one popover-open; a pool's stored values ride its canonical either
-         way (notation totality is app-wide). -->
-    <p id="pop-sysnote" class="hint pop-sysnote hidden">This table reads each
-      die on its own — modifiers and targets don’t change outcomes here.
-      <button id="pop-sum-toggle" class="pid-ghost-verb">Show anyway</button></p>
+         (.sec-sum/.prow-sum — modifiers, d20 pairing, Target, keep/drop,
+         reroll, exploding) entirely — no note, no disclosure (Joe
+         2026-08-06; supersedes the 'Show anyway' unfold of 2026-08-03).
+         A pool's stored values still ride its canonical either way
+         (notation totality is app-wide). -->
 
     <div class="sec sec-sum">
       <span class="plabel">Modifier</span>
@@ -535,7 +532,7 @@ limitations under the License.
       <div id="pop-keep-sub" class="prow-sub"></div>
     </div>
 
-    <div class="sec tight">
+    <div class="sec tight sec-sum">
       <div class="prow">
         <span class="grow">
           <span class="prow-label">Reroll low</span>

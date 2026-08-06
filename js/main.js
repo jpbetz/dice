@@ -7024,9 +7024,6 @@ function openPopover(binding) {
   // Values a pool already carries stay in its canonical either way —
   // notation totality is app-wide, and the room can switch systems later.
   popEl.classList.toggle('pop-perdie', !activeSystem().usesMods);
-  popEl.classList.remove('pop-sum-shown');
-  popSumToggle.textContent = 'Show anyway';
-  document.getElementById('pop-sysnote').classList.toggle('hidden', activeSystem().usesMods);
   popEl.classList.remove('hidden');
   renderPopIdentity(); // the Sheet Pass strip (group popovers only)
   renderPop();
@@ -7168,7 +7165,7 @@ function renderPopIdentity() {
   ]).values()];
   for (const c of known) {
     const b = document.createElement('button');
-    b.className = 'owner-chip pid-cat';
+    b.className = 'pid-cat';
     const pressed = c.toLowerCase() === cur;
     b.setAttribute('aria-pressed', String(pressed));
     const nm = document.createElement('span');
@@ -7180,7 +7177,7 @@ function renderPopIdentity() {
     cats.appendChild(b);
   }
   const plus = document.createElement('button');
-  plus.className = 'owner-chip pid-cat pid-cat-new';
+  plus.className = 'pid-cat pid-cat-new';
   plus.textContent = '＋';
   plus.title = 'New shelf…';
   plus.addEventListener('click', () => {
@@ -7789,12 +7786,6 @@ popEchoEl.addEventListener('click', () => {
 // The per-die disclosure: unfold/refold the sum-world sections for THIS
 // popover-open (openPopover refolds — a fold is a reading default, not a
 // setting). The popover re-clamps: four sections change its height.
-const popSumToggle = document.getElementById('pop-sum-toggle');
-popSumToggle.addEventListener('click', () => {
-  const shown = popEl.classList.toggle('pop-sum-shown');
-  popSumToggle.textContent = shown ? 'Hide again' : 'Show anyway';
-  placePopover();
-});
 
 document.getElementById('pop-close').addEventListener('click', closePopover);
 document.getElementById('pop-done').addEventListener('click', () => closePopover());
