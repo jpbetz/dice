@@ -5231,4 +5231,165 @@ export const scenarios = [
         'and cleared the stash, so a later boot cannot undo you twice');
     },
   },
+  {
+    name: 'prepared-seat',
+    tags: ['prepared-seat', 'chrome'],
+    // ROADMAP §G5 — CUJ2, the whole point of the tier: one link in Discord,
+    // and a player lands at the right table under their own name with their
+    // own pools. The seat is OFFERED, never imposed: GOALS §7 records that
+    // the `#g=` codec was deleted for replacing a visitor's rack sight-unseen,
+    // so the assertion that matters most is that nothing lands until a click.
+    async fn(ctx) {
+      const organizer = await ctx.rawPlayer('Organizer');
+      await ctx.api('/api/table', {
+        playerId: organizer.playerId,
+        rev: 1,
+        table: { tableName: 'Session 3' },
+        profiles: [
+          { name: 'Alice', pools: [
+            { name: 'Strength', notation: '3d6', category: 'Attributes' },
+            { name: 'Larceny', notation: '1d20', category: 'Skills' },
+          ] },
+          { name: 'Rill', pools: [{ name: 'Agility', notation: '2d8' }] },
+        ],
+      });
+
+      // The pre-join peek: no roster, no log, no notations, no rev.
+      const peek = await fetch(
+        `http://127.0.0.1:${ctx.port}/api/table?room=${encodeURIComponent(ctx.room)}`,
+      ).then((r) => r.json());
+      assert.equal(peek.name, 'Session 3', 'the peek names the table (ROADMAP §2k)');
+      assert.deepEqual(peek.seats.map((s) => s.name), ['Alice', 'Rill'], 'and lists the seats');
+      assert.equal(peek.seats[0].pools, 2, 'with a pool count to show');
+      const peekBlob = JSON.stringify(peek);
+      for (const leak of ['3d6', 'playerId', 'rev', 'log', 'felt']) {
+        assert.equal(peekBlob.includes(leak), false, `the peek leaks no '${leak}'`);
+      }
+
+      // A player opens the link. `as=` is case-insensitive and pre-selects
+      // only — it must never auto-join and never auto-apply.
+      const p = await ctx.newTable({ origin: 'localhost', anon: true, query: '&as=alice' });
+      await p.waitFor(`window.__diceDebug.seatPicker.seats.length === 2`,
+        { desc: 'the seats reach the modal' });
+      const picker = await p.dbg('seatPicker');
+      assert.equal(picker.open, true, 'the modal is up');
+      assert.equal(picker.preselect, 'Alice', '&as= pre-selects, case-insensitively');
+      assert.equal(picker.chosen, null, 'but nothing is chosen for the player');
+
+      const groupsBefore = (await p.dbg('groups')).map((g) => g.name).sort();
+      await p.dbg(`chooseSeat('Alice')`);
+      await p.waitOnline();
+      assert.deepEqual((await p.dbg('groups')).map((g) => g.name).sort(), groupsBefore,
+        'taking the seat joins but applies NOTHING — the preview is the gate');
+
+      const v = await p.waitFor(`window.__diceDebug.seatPicker.verdict.canApply === true`,
+        { desc: 'the import previews' }) && await p.dbg('seatPicker.verdict');
+      assert.ok(/^✓ /.test(v.status), `preview uses the shared verdict grammar (got ${v.status})`);
+
+      await p.dbg('applySeatImport()');
+      await p.waitFor(`window.__diceDebug.groups.some((g) => g.name === 'Larceny')`,
+        { desc: 'the explicit apply lands the pools' });
+      const after = (await p.dbg('groups')).map((g) => g.name);
+      assert.ok(after.includes('Strength') && after.includes('Larceny'), "Alice's pools arrived");
+      for (const had of groupsBefore) {
+        assert.ok(after.includes(had), `the player's own pool '${had}' was not deleted`);
+      }
+      assert.equal(await p.eval(`localStorage.getItem('dice.name.v1')`), 'Alice',
+        'and the seat named them');
+    },
+  },
+  {
+    name: 'prepared-seat-declined',
+    tags: ['prepared-seat'],
+    // The other half of "offered, never imposed": declining must be a real
+    // option that costs nothing. Also covers the two stale-link degradations
+    // — an `as=` naming no profile, and a room with no setup at all — because
+    // a link that outlives its table must still let people in.
+    async fn(ctx) {
+      const organizer = await ctx.rawPlayer('Organizer');
+      await ctx.api('/api/table', {
+        playerId: organizer.playerId,
+        rev: 1,
+        profiles: [{ name: 'Alice', pools: [{ name: 'Strength', notation: '3d6' }] }],
+      });
+
+      const p = await ctx.newTable({ origin: '127.0.0.3', anon: true, query: '&as=Nobody' });
+      await p.waitFor(`window.__diceDebug.seatPicker.seats.length === 1`,
+        { desc: 'the seat reaches the modal' });
+      assert.equal((await p.dbg('seatPicker')).preselect, null,
+        'an `as=` naming no profile is ignored silently — a stale link must not break the join');
+
+      const before = (await p.dbg('groups')).map((g) => g.name).sort();
+      await p.dbg(`chooseSeat('Alice')`);
+      await p.waitOnline();
+      await p.waitFor(`window.__diceDebug.seatPicker.verdict.canApply === true`,
+        { desc: 'the import previews' });
+      await p.dbg('dismissSeatImport()');
+      assert.deepEqual((await p.dbg('groups')).map((g) => g.name).sort(), before,
+        'declining changes nothing at all');
+      assert.equal(await p.eval(`localStorage.getItem('dice.name.v1')`), 'Alice',
+        'but the seat still named them — the name and the pools are separate decisions');
+    },
+  },
+  {
+    name: 'setup-repush',
+    tags: ['prepared-seat', 'table-file'],
+    // ROADMAP §G6 client half: the organizer's browser is the durable copy,
+    // so a room that loses its setup heals as soon as an authoring tab
+    // reconnects. The counterpart assertion is the one that keeps this safe —
+    // a player who merely JOINED a prepared table must never start re-pushing
+    // a setup they did not author.
+    async fn(ctx) {
+      const org = await ctx.newTable({ origin: 'localhost', name: 'Organizer' });
+      const file = [
+        'table:',
+        "  felt: 'plum'",
+        'players:',
+        "  'Alice':",
+        '    pools:',
+        '      Attributes:',
+        "        - 'Strength': '3d6'",
+        '',
+      ].join('\n');
+      await org.dbg(`portable.loadText(${JSON.stringify(file)})`);
+      const pushed = await org.dbg('portable.pushToTable()');
+      assert.equal(pushed.ok, true, `the organizer pushes the table (got ${pushed.status})`);
+      await org.waitFor(`window.__diceDebug.tableRev.room >= 1`, { desc: 'the room takes it' });
+      const rev = await org.dbg('tableRev');
+      assert.equal(rev.stored, rev.room, 'this browser is on record as the author');
+
+      assert.equal(await org.dbg('repushTable()'), false,
+        'and stands down while the room is already current — a heal is not a heartbeat');
+
+      // A plain joiner is NOT an author. This is the assertion that keeps the
+      // re-push safe: without it, every player who ever joined a prepared
+      // table would start pushing a setup back at it.
+      const guest = await ctx.newTable({ origin: '127.0.0.1', name: 'Guest' });
+      assert.equal((await guest.dbg('tableRev')).stored, 0, 'a joiner holds no authorship record');
+      assert.equal(await guest.dbg('repushTable()'), false,
+        'and can never re-push a setup it did not author');
+
+      // Now really lose it: everyone leaves, the room lingers, the TTL runs
+      // out and it is deleted. This is the actual failure §G6 exists for —
+      // a restart looks the same from the client's side.
+      await guest.close();
+      await org.close();
+      await ctx.waitForLog(new RegExp(`room expired: room="${ctx.room}"`),
+        { desc: 'the room and its setup are gone', timeout: 30000 });
+
+      // The organizer comes back. Same origin, so the same localStorage still
+      // holds the authorship record — and hello finds a room with no setup.
+      const org2 = await ctx.newTable({ origin: 'localhost', name: 'Organizer' });
+      assert.equal((await org2.dbg('tableRev')).stored, 1, 'the browser still remembers what it pushed');
+      await org2.waitFor(`window.__diceDebug.tableRev.room >= 1`,
+        { desc: 'reconnecting heals the room unprompted' });
+      const peek = await fetch(
+        `http://127.0.0.1:${ctx.port}/api/table?room=${encodeURIComponent(ctx.room)}`,
+      ).then((r) => r.json());
+      assert.deepEqual((peek.seats || []).map((s) => s.name), ['Alice'],
+        'the seats are back for anyone arriving now');
+      assert.equal((await org2.dbg('felt')).id, 'plum',
+        "and so is the felt the organizer chose — the heal carries the table, not just the seats");
+    },
+  },
 ];
