@@ -2448,6 +2448,35 @@ html, body {
 }
 #name-panel .hint { margin-bottom: 4px; }
 #name-panel .hint.warn { color: var(--amber); } /* '#'-in-name refusal */
+/* G5 seat picker (ROADMAP §G5): prepared seats over the free-text row.
+   Quiet chrome (UX §7.9) — .btn dress, panel rhythm, no new colour; the
+   pool count and the "Someone else…" divider speak at hint volume. */
+.seat-table-name { font-style: italic; }
+#seat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 2px;
+}
+.seat-btn {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+}
+.seat-btn .seat-count {
+  font-size: 11px;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+/* &as= pre-select: the shortcut's highlight — focus ring dress, standing,
+   so the pointed-at seat reads chosen-but-not-taken. Enter takes it. */
+.seat-btn.preselected { border-color: rgba(212, 175, 55, 0.55); }
+.seat-someone { margin-top: 10px; }
+#seat-preview { margin-top: 6px; }
+#seat-preview .btn-row { margin-top: 10px; }
 .roller-name { font-weight: 700; }
 
 /* scrollbars */

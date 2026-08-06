@@ -21,12 +21,12 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, SHADER_TIME } from './dice.js';
 import { dieArtURL } from './diceart.js';
-import { connect, forgetSeat } from './net.js';
+import { connect, forgetSeat, peekTable } from './net.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, validateMods, budgetOf } from './rollspec.js';
 import { previewOf, countingPmfs } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
-import { exportYaml, parsePortable, planImport } from './portable.js';
+import { exportYaml, parsePortable, planImport, profileToImport } from './portable.js';
 import { THEMES, SETS } from './themes.js';
 import { ParticleField } from './particles.js';
 import { DecalField } from './decals.js';
@@ -4335,6 +4335,25 @@ window.__diceDebug = {
     doneEditing() { return portableDoneEditing(); },
     get editingProfile() { return portableEditing; },
   },
+  // G5 seat picker (§G5) — the whole flow, clickless. seatPicker is one
+  // JSON-safe projection (identityInfo's pattern); the four verbs mirror the
+  // modal's own controls and answer in the pane's {ok, status, canApply}
+  // verdict shape wherever a refusal is possible.
+  get seatPicker() {
+    return {
+      open: !document.getElementById('name-modal').classList.contains('hidden'),
+      phase: seatPhase,
+      tableName: seatPeekInfo && typeof seatPeekInfo.name === 'string' ? seatPeekInfo.name : null,
+      seats: seatChoices(),
+      preselect: seatPreselect(),
+      chosen: seatChosen,
+      verdict: { ...seatVerdict },
+    };
+  },
+  chooseSeat(name) { return takeSeat(name); },
+  chooseSomeoneElse(name) { return takeFreeSeat(name); },
+  applySeatImport() { return applySeatChoice(); },
+  dismissSeatImport() { return dismissSeatChoice(); },
   // ceremony introspection (UX §2.4): phase machine + decal state
   get ceremonyState() {
     const r = currentRoll;
@@ -5769,6 +5788,12 @@ let net = null;         // live connection handle from net.connect (online only)
 let netOnline = false;
 let players = [];
 let poolsOwner = null;  // a player id, or null = your own rack
+// The room's prepared table as this client knows it (§G4): {rev, table,
+// profiles, at} or null. Seeded from the join response, tracked on 'hello'
+// (present-or-absent — an absent key means the room genuinely has none) and
+// 'table-setup'. The §G5 seat picker reads profiles out of it after the
+// join; §G6's re-push compares its rev against the one this client pushed.
+let roomSetup = null;
 // G3 profile authoring (declared here with poolsOwner because publishPools
 // and renderGroups both read it, and both can run before the portable pane's
 // own section evaluates): the display name of the table-file profile whose
@@ -8985,6 +9010,41 @@ function portableSnapshot() {
   return exportYaml({ groups, settings: { sound: soundOn, numbers: chipsOn } });
 }
 
+// The preview's counting grammar — '3 new · 1 update · 2 unchanged' — shared
+// verbatim by the pane's status line and the §G5 seat picker, so the two
+// surfaces that answer "what would Apply do" can never drift apart.
+function importVerdictBits(plan) {
+  const bits = [];
+  if (plan.adds.length) bits.push(`${plan.adds.length} new`);
+  if (plan.updates.length) bits.push(`${plan.updates.length} update${plan.updates.length > 1 ? 's' : ''}`);
+  if (plan.unchanged) bits.push(`${plan.unchanged} unchanged`);
+  return bits;
+}
+
+// Commit a previewed import plan into the rack. ONE function on purpose: the
+// pane's Apply button and the §G5 seat picker's Apply both land here, because
+// GOALS §7's post-mortem leaves exactly one road into a rack — a previewed
+// plan, explicitly applied, merging by name and deleting nothing. Returns the
+// receipt fragments ('8 added', 'sound on', …) for the caller's own grammar.
+function applyImportPlan(plan) {
+  for (const u of plan.updates) {
+    editPoolById(u.id, { notation: u.notation, category: u.category || '', set: u.set || '' });
+  }
+  plan.adds.forEach((a, i) => {
+    groups.push({ id: Date.now() + i, name: a.name, notation: a.notation,
+      ...(a.category ? { category: a.category } : {}),
+      ...(a.set ? { set: a.set } : {}) });
+  });
+  if (plan.adds.length) { saveGroups(); renderGroups(); }
+  if ('sound' in plan.settings) setSound(plan.settings.sound);
+  if ('numbers' in plan.settings) setChips(plan.settings.numbers);
+  const done = [];
+  if (plan.adds.length) done.push(`${plan.adds.length} added`);
+  if (plan.updates.length) done.push(`${plan.updates.length} updated`);
+  done.push(...(plan.flips || []));
+  return done;
+}
+
 function portablePreview() {
   const text = portableText.value;
   portablePlan = null;
@@ -9012,11 +9072,7 @@ function portablePreview() {
   const flips = [];
   if ('sound' in plan.settings && plan.settings.sound !== soundOn) flips.push(`sound ${plan.settings.sound ? 'on' : 'off'}`);
   if ('numbers' in plan.settings && plan.settings.numbers !== chipsOn) flips.push(`numbers ${plan.settings.numbers ? 'on' : 'off'}`);
-  const bits = [];
-  if (plan.adds.length) bits.push(`${plan.adds.length} new`);
-  if (plan.updates.length) bits.push(`${plan.updates.length} update${plan.updates.length > 1 ? 's' : ''}`);
-  if (plan.unchanged) bits.push(`${plan.unchanged} unchanged`);
-  bits.push(...flips);
+  const bits = [...importVerdictBits(plan), ...flips];
   if (plan.adds.length || plan.updates.length || flips.length) {
     portablePlan = { ...plan, flips };
     portableApplyBtn.disabled = false;
@@ -9482,22 +9538,7 @@ document.getElementById('portable-copy').addEventListener('click', async (e) => 
 portableText.addEventListener('input', portablePreview);
 portableApplyBtn.addEventListener('click', () => {
   if (!portablePlan) return;
-  const plan = portablePlan;
-  for (const u of plan.updates) {
-    editPoolById(u.id, { notation: u.notation, category: u.category || '', set: u.set || '' });
-  }
-  plan.adds.forEach((a, i) => {
-    groups.push({ id: Date.now() + i, name: a.name, notation: a.notation,
-      ...(a.category ? { category: a.category } : {}),
-      ...(a.set ? { set: a.set } : {}) });
-  });
-  if (plan.adds.length) { saveGroups(); renderGroups(); }
-  if ('sound' in plan.settings) setSound(plan.settings.sound);
-  if ('numbers' in plan.settings) setChips(plan.settings.numbers);
-  const done = [];
-  if (plan.adds.length) done.push(`${plan.adds.length} added`);
-  if (plan.updates.length) done.push(`${plan.updates.length} updated`);
-  done.push(...plan.flips);
+  const done = applyImportPlan(portablePlan);
   portableStatus.textContent = `✓ applied — ${done.join(' · ') || 'settings'}`;
   portablePlan = null;
   portableApplyBtn.disabled = true;
@@ -10496,6 +10537,11 @@ function handleNetEvent(type, data) {
       offers = data.offers || [];
       renderOffers();
       applyRoomSettings(data.settings); // late joiners + reconnects land on the room felt
+      // The prepared table, present-or-absent (§G4): ABSENT means the room
+      // genuinely holds none — a restarted server forgot it — so this falls
+      // to null rather than keeping the last one seen. §G6's re-push heals
+      // exactly that gap, and only sees it if it is recorded here.
+      roomSetup = data.setup || null;
       // §7.5/§3.1 resync: 'roll-cleared' and 'reveal' are one-shot broadcasts a
       // stream blip can swallow, and the server deliberately never re-sends
       // them — it flags the surviving state on the logged roll instead. Replay
@@ -10635,6 +10681,16 @@ function handleNetEvent(type, data) {
         showSettingsNote(`${data.byName || 'someone'} changed the table`);
       }
       break;
+    case 'table-setup':
+      // A winning push (§G4): adopt the room's new prepared table. Settings
+      // inside the push arrive on their own 'settings-changed' echo, so this
+      // case only tracks state (the seat picker and §G6's re-push read it)
+      // and gives the roster the same quiet note grammar settings use.
+      roomSetup = data.setup || null;
+      if (data.byId && net && data.byId !== net.playerId) {
+        showSettingsNote(`${data.byName || 'someone'} prepared the table`);
+      }
+      break;
   }
 }
 
@@ -10725,13 +10781,281 @@ function requestClear() {
   else clearTable();
 }
 
-function promptName() {
+// ---------------------------------------------------------------------------
+// The seat picker (ROADMAP §G5, PROFILES §3.3). 'Take a seat' grows a list of
+// the room's PREPARED seats above the free-text row, which keeps today's
+// behaviour verbatim ('Someone else…').
+//
+// THE ORDERING PROBLEM this block exists around: the name prompt runs BEFORE
+// the join, and a room's setup arrives in the join response — so the modal
+// needs the seats at the one moment the client cannot have them. The answer
+// is net.js peekTable (GET /api/table, public, read-only): initNet fires it
+// as the modal opens, the free-text prompt renders IMMEDIATELY (the join is
+// never delayed by the peek — no server, a 404, junk or a timeout all resolve
+// null and the modal simply stays plain, which is goal 9's degrade), and the
+// seats render if and when the answer lands.
+//
+// Choosing a seat is three steps, and the third is the whole design:
+//   1. the profile's name becomes the display name and the join proceeds;
+//   2. the modal STAYS UP through the join and then shows the EXISTING import
+//      preview for that profile's pools (profileToImport + planImport, the
+//      pane's own '✓ 8 new · …' grammar);
+//   3. pools land only on an explicit Apply, through the same applyImportPlan
+//      the pane's Apply uses. GOALS §7 records why there is no shortcut: the
+//      '#g=' codec was deleted for replacing a visitor's rack on arrival, and
+//      a prepared seat that auto-applied would re-commit that with better
+//      manners. 'Not now' keeps the seat and touches nothing.
+//
+// '&as=Alice' PRE-SELECTS a seat (case-insensitive) — a highlight and a
+// focus, so Enter takes it. Never an auto-join, never an auto-apply; an as=
+// that names no seat is ignored without a word (a stale link must not break
+// the join). A returning player with a stored name skips this modal entirely,
+// exactly as before.
+// ---------------------------------------------------------------------------
+
+const AS_PARAM = (new URLSearchParams(window.location.search).get('as') || '').trim();
+
+let seatPhase = 'idle';   // 'idle' | 'pick' | 'joining' | 'preview'
+let seatPeekInfo = null;  // peekTable's answer for the LIVE prompt ({name?, seats?} | null)
+let seatChosen = null;    // the prepared-seat name taken this join (null = free text)
+let seatProfile = null;   // the wire profile behind the pending preview
+let seatPlan = null;      // the previewed plan Apply commits (null = nothing to commit)
+let seatSetFlip = null;   // the seat's dice-set id, applied on the same click
+let seatVerdict = { ok: true, status: '', canApply: false };
+let seatResolve = null;   // promptName's resolver while the modal waits
+let seatCleanup = null;   // detaches the live prompt's input listeners
+
+// The peeked seats, defensively filtered: the picker trusts the server no
+// further than "strings and counts" (names render as text nodes only).
+function seatChoices() {
+  const raw = seatPeekInfo && Array.isArray(seatPeekInfo.seats) ? seatPeekInfo.seats : [];
+  return raw
+    .filter((s) => s && typeof s.name === 'string' && s.name.trim())
+    .slice(0, 12)
+    .map((s) => ({ name: s.name.trim(), pools: Number.isInteger(s.pools) && s.pools > 0 ? s.pools : 0 }));
+}
+
+// The &as= match against the current offer (the canonical seat name, or null).
+function seatPreselect() {
+  if (!AS_PARAM) return null;
+  const hit = seatChoices().find((s) => s.name.toLowerCase() === AS_PARAM.toLowerCase());
+  return hit ? hit.name : null;
+}
+
+function renderSeatChoices() {
+  const nameLine = document.getElementById('seat-table-name');
+  const list = document.getElementById('seat-list');
+  const divider = document.getElementById('seat-someone');
+  const tn = seatPeekInfo && typeof seatPeekInfo.name === 'string' ? seatPeekInfo.name.trim() : '';
+  nameLine.textContent = tn; // user text: textContent only
+  nameLine.classList.toggle('hidden', !tn);
+  list.textContent = '';
+  const seats = seatChoices();
+  list.classList.toggle('hidden', !seats.length);
+  divider.classList.toggle('hidden', !seats.length);
+  if (!seats.length) return;
+  const wanted = seatPreselect();
+  const input = document.getElementById('name-input');
+  let preselected = null;
+  for (const s of seats) {
+    const btn = document.createElement('button');
+    btn.className = 'btn seat-btn';
+    const nm = document.createElement('span');
+    nm.textContent = s.name;
+    btn.appendChild(nm);
+    if (s.pools) {
+      const ct = document.createElement('span');
+      ct.className = 'seat-count';
+      ct.textContent = `${s.pools} pool${s.pools === 1 ? '' : 's'}`;
+      btn.appendChild(ct);
+    }
+    btn.title = `Join as ${s.name}` + (s.pools ? ` — their prepared pools are offered after a preview` : '');
+    if (wanted === s.name) {
+      btn.classList.add('preselected');
+      preselected = btn;
+    }
+    btn.addEventListener('click', () => takeSeat(s.name));
+    list.appendChild(btn);
+  }
+  // The &as= shortcut is ONE keypress (Enter), never zero: focus the seat,
+  // don't join it — AFTER the append (a detached element refuses focus), and
+  // never over a name mid-typing (the link's suggestion must not fight the
+  // player's own intent).
+  if (preselected && !input.value) preselected.focus();
+}
+
+// Phase → which halves of the panel exist. The pick furniture and the
+// preview are mutually exclusive; the preview's buttons wait for 'preview'
+// (during 'joining' the status line speaks alone).
+function renderSeatPhase() {
+  document.getElementById('seat-pick').classList.toggle('hidden', seatPhase !== 'pick' && seatPhase !== 'idle');
+  const preview = document.getElementById('seat-preview');
+  preview.classList.toggle('hidden', seatPhase !== 'joining' && seatPhase !== 'preview');
+  const status = document.getElementById('seat-preview-status');
+  status.textContent = seatVerdict.status;
+  status.classList.toggle('warn', !seatVerdict.ok);
+  document.getElementById('seat-preview-btns').classList.toggle('hidden', seatPhase !== 'preview');
+  document.getElementById('seat-apply').disabled = !seatVerdict.canApply;
+}
+
+function closeSeatModal() {
+  seatPhase = 'idle';
+  seatPlan = null;
+  seatProfile = null;
+  seatSetFlip = null;
+  document.getElementById('name-modal').classList.add('hidden');
+}
+
+// Take a PREPARED seat: resolve the prompt with the profile's name and keep
+// the modal up for the preview (seatFollowThrough owns the next beat, once
+// initNet's join settles). Refusals answer in the pane's verdict shape.
+function takeSeat(rawName) {
+  if (seatPhase !== 'pick' || !seatResolve) {
+    return { ok: false, status: '✗ no seat is being offered right now', canApply: false };
+  }
+  const want = String(rawName == null ? '' : rawName).trim().toLowerCase();
+  const seat = seatChoices().find((s) => s.name.toLowerCase() === want);
+  if (!seat) {
+    return { ok: false, status: `✗ no prepared seat ${JSON.stringify(String(rawName == null ? '' : rawName).trim())}`, canApply: false };
+  }
+  seatChosen = seat.name;
+  seatPhase = 'joining';
+  seatVerdict = { ok: true, status: `joining as ${seat.name}…`, canApply: false };
+  renderSeatPhase();
+  const resolve = seatResolve;
+  seatResolve = null;
+  if (seatCleanup) { seatCleanup(); seatCleanup = null; }
+  resolve(seat.name);
+  return { ...seatVerdict };
+}
+
+// The free-text path — today's join, byte for byte ('Someone else…'). Both
+// the Join button and the __diceDebug verb land here so the '#' refusal and
+// the trim/cut rules cannot fork.
+function takeFreeSeat(rawName) {
+  if (seatPhase !== 'pick' || !seatResolve) {
+    return { ok: false, status: '✗ no seat is being offered right now', canApply: false };
+  }
+  const name = cutText(String(rawName ?? ''), 24);
+  if (!name) return { ok: false, status: '✗ a display name is required', canApply: false };
+  if (name.includes('#')) {
+    return { ok: false, status: '✗ names cannot contain # — it starts a comment in roll notation', canApply: false };
+  }
+  seatChosen = null; // a typed name is nobody's prepared seat, even a matching one
+  seatPhase = 'idle';
+  const resolve = seatResolve;
+  seatResolve = null;
+  if (seatCleanup) { seatCleanup(); seatCleanup = null; }
+  document.getElementById('name-modal').classList.add('hidden');
+  resolve(name);
+  return { ok: true, status: `✓ joining as ${name}`, canApply: false };
+}
+
+// One wire profile's pools ({name, notation, category?, set?}, flat — the
+// server stores them the way the rack stores groups) → parsePortable's shelf
+// shape, so profileToImport/planImport read a room seat exactly as they read
+// a file seat. Grouped by category in arrival order; uncategorized pools ride
+// a 'plain' shelf, mirroring shelvesOf in js/portable.js.
+function wirePoolsToShelves(pools) {
+  const shelves = [];
+  const byKey = new Map();
+  for (const p of Array.isArray(pools) ? pools : []) {
+    if (!p || typeof p.notation !== 'string') continue;
+    const label = typeof p.category === 'string' ? p.category.trim() : '';
+    const key = label.toLowerCase();
+    let shelf = byKey.get(key);
+    if (!shelf) {
+      shelf = { label: label || 'Pools', plain: !label, pools: [] };
+      byKey.set(key, shelf);
+      shelves.push(shelf);
+    }
+    shelf.pools.push({
+      name: typeof p.name === 'string' ? p.name : '',
+      notation: p.notation,
+      ...(p.set ? { set: p.set } : {}),
+    });
+  }
+  return shelves;
+}
+
+// The beat after the join: if a prepared seat was chosen, find its profile in
+// the room's setup and stand up the preview. Every miss — solo fallback, a
+// setup that vanished between peek and join, a seat someone re-pushed away —
+// closes the modal without a word: the NAME landed (that much of the seat is
+// real), and there is simply nothing to offer. Called at the end of initNet,
+// so netReady never resolves with the preview half-built.
+function seatFollowThrough() {
+  if (seatPhase !== 'joining') return;
+  const prof = netOnline && roomSetup && Array.isArray(roomSetup.profiles)
+    ? roomSetup.profiles.find((p) => p && typeof p.name === 'string'
+        && p.name.toLowerCase() === seatChosen.toLowerCase())
+    : null;
+  if (!prof) { closeSeatModal(); return; }
+  seatProfile = prof;
+  const plan = planImport(groups, profileToImport({ shelves: wirePoolsToShelves(prof.pools) }));
+  // The seat's dice identity (profileToImport leaves it out by contract: "the
+  // seat picker applies it where identity lives"). Previewed as a flip bit,
+  // applied on the SAME explicit click as the pools — never on arrival.
+  seatSetFlip = typeof prof.set === 'string' && SETS[prof.set] && prof.set !== diceSet ? prof.set : null;
+  const flips = seatSetFlip ? [`dice set ${SETS[seatSetFlip].label}`] : [];
+  if (groups.length + plan.adds.length > 40) {
+    // The pane's own overflow refusal, verbatim grammar (portablePreview).
+    seatPlan = null;
+    seatSetFlip = null;
+    seatVerdict = { ok: false, status: `✗ would exceed 40 pools (you have ${groups.length}, this adds ${plan.adds.length})`, canApply: false };
+  } else if (plan.adds.length || plan.updates.length || flips.length) {
+    seatPlan = { ...plan, flips };
+    seatVerdict = { ok: true, status: `✓ ${[...importVerdictBits(plan), ...flips].join(' · ')} — Apply takes them`, canApply: true };
+  } else {
+    seatPlan = null;
+    seatVerdict = { ok: true, status: '✓ matches what you have — nothing to apply', canApply: false };
+  }
+  seatPhase = 'preview';
+  renderSeatPhase();
+}
+
+// The explicit click that PROFILES §3.3 step 3 is about. Same commit path as
+// the pane's Apply (applyImportPlan), plus the seat's dice identity.
+function applySeatChoice() {
+  if (seatPhase !== 'preview' || !seatVerdict.canApply || !seatPlan) {
+    return { ok: false, status: '✗ nothing to apply', canApply: false };
+  }
+  const done = applyImportPlan(seatPlan);
+  if (seatSetFlip) setDiceSet(seatSetFlip);
+  seatPlan = null;
+  seatSetFlip = null;
+  seatVerdict = { ok: true, status: `✓ applied — ${done.join(' · ')}`, canApply: false };
+  renderSeatPhase();
+  document.getElementById('seat-preview-btns').classList.add('hidden'); // spent
+  setTimeout(closeSeatModal, 900); // the receipt lingers a beat (Copy's rhythm)
+  return { ...seatVerdict };
+}
+
+function dismissSeatChoice() {
+  if (seatPhase !== 'preview') return { ok: false, status: '✗ no seat preview is open', canApply: false };
+  closeSeatModal();
+  return { ok: true, status: '✓ seat kept — your pools were left alone', canApply: false };
+}
+
+// peek: a promise from net.js peekTable (or null on the solo re-prompt path).
+// The modal renders NOW; the peek only ever adds furniture.
+function promptName(peek) {
   return new Promise((resolve) => {
     const modal = document.getElementById('name-modal');
     const input = document.getElementById('name-input');
     const joinBtn = document.getElementById('name-join');
-    const hint = document.querySelector('#name-panel .hint');
+    const hint = document.getElementById('name-hint');
     const hintText = 'Pick a display name for the table.';
+    seatPhase = 'pick';
+    seatPeekInfo = null;
+    seatChosen = null;
+    seatProfile = null;
+    seatPlan = null;
+    seatSetFlip = null;
+    seatVerdict = { ok: true, status: '', canApply: false };
+    seatResolve = resolve;
+    renderSeatChoices();
+    renderSeatPhase();
     modal.classList.remove('hidden');
     input.value = '';
     // '#' is banned in names at every entry point (it starts a comment in
@@ -10745,31 +11069,47 @@ function promptName() {
         : hintText;
       hint.classList.toggle('warn', hash);
     };
-    const submit = () => {
-      const name = cutText(input.value, 24);
-      if (!name || name.includes('#')) return;
-      // 'Leave & switch' re-opens this modal, so listeners must not stack
-      // across prompts: detach this round's before resolving.
+    const submit = () => { takeFreeSeat(input.value); };
+    const onKey = (e) => { if (e.key === 'Enter') submit(); };
+    // 'Leave & switch' re-opens this modal, so listeners must not stack
+    // across prompts: whichever door resolves this prompt detaches them
+    // (seatCleanup is called by takeSeat and takeFreeSeat alike).
+    seatCleanup = () => {
       input.removeEventListener('input', update);
       input.removeEventListener('keydown', onKey);
       joinBtn.removeEventListener('click', submit);
-      modal.classList.add('hidden');
-      resolve(name);
     };
-    const onKey = (e) => { if (e.key === 'Enter') submit(); };
     input.addEventListener('input', update);
     update();
     joinBtn.addEventListener('click', submit);
     input.addEventListener('keydown', onKey);
     input.focus();
+    if (peek && typeof peek.then === 'function') {
+      peek.then((info) => {
+        // Stale answers keep quiet: the prompt may have resolved (or been
+        // re-opened by 'Leave & switch') while the fetch was out.
+        if (seatPhase !== 'pick' || seatResolve !== resolve) return;
+        seatPeekInfo = info;
+        renderSeatChoices();
+      });
+    }
   });
 }
+
+// The preview's two exits — the ONLY two. Static buttons, bound once.
+document.getElementById('seat-apply').addEventListener('click', () => applySeatChoice());
+document.getElementById('seat-skip').addEventListener('click', () => dismissSeatChoice());
 
 async function initNet() {
   let name = '';
   try { name = (localStorage.getItem(LS_NAME) || '').trim(); } catch { /* ignore */ }
   if (!name) {
-    name = await promptName();
+    // §G5: peek at the room's prepared seats WHILE the modal is up. Fired
+    // here, not awaited here — the prompt renders immediately and the picker
+    // is furniture that arrives if the answer does (peekTable resolves null
+    // on every failure inside its own short timeout, so no server and no
+    // setup both leave today's plain prompt, and the join never hangs on it).
+    name = await promptName(peekTable(ROOM));
     try { localStorage.setItem(LS_NAME, name); } catch { /* ignore */ }
   }
 
@@ -10792,6 +11132,7 @@ async function initNet() {
     if (me && me.name && me.name !== name) {
       try { localStorage.setItem(LS_NAME, me.name); } catch { /* ignore */ }
     }
+    roomSetup = conn.setup || null; // the prepared table rides the join (§G4)
     renderPlayers(); // the rail roster fills in (solo it is simply empty)
     renderGroups();  // the owner switcher appears once the roster is known
     publishPools();  // share the rack (display copy; localStorage stays truth)
@@ -10803,9 +11144,14 @@ async function initNet() {
     setPill(null);
   } else {
     netOnline = false;
+    roomSetup = null;
     setPill('solo', 'solo'); // static hosting / no server: local play
     applyRoomSettings(load(LS_ROOMSETTINGS, null)); // solo keeps its own felt
   }
+  // §G5: a chosen prepared seat's preview stands up now — after every piece
+  // of join state above, so netReady never resolves with it half-built. A
+  // free-text join (or a seat the join couldn't substantiate) is a no-op.
+  seatFollowThrough();
   updateIdentityChip(); // the rail chip takes the seat's name + color
   updateTrayButtons();  // the draft's Offer verb appears only at a table
   return { online: netOnline };

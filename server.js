@@ -2308,6 +2308,49 @@ async function handleTable(req, res) {
   sendJson(res, 200, { ok: true, applied: true, rev });
 }
 
+// GET /api/table?room=NAME — the pre-join peek (ROADMAP §G5, and §2k's
+// standing follow-up: "join modal shows the table name pre-join").
+//
+// The seat picker's ordering problem is that the join flow prompts for a name
+// BEFORE joining, and everything a client knows about a room arrives in the
+// join response — so the modal that needs the prepared seats is on screen at
+// the one moment the client cannot have them. This endpoint is the answer:
+// public, read-only, no playerId, answering just enough to draw the picker.
+//
+// The projection is written out field by field ON PURPOSE — never a spread of
+// room.setup — because this is the only unauthenticated read on the server
+// and its budget is exactly: the table's display name, the prepared seat
+// names, and a pool count per seat. No players, no roster, no log, no offers,
+// no settings beyond the name, no notations, no rev. A seat name and a table
+// name are what an invite link's recipient was going to see two clicks later
+// anyway; nothing else here is.
+//
+// rooms.get, NEVER getRoom: a peek must not create a room (any crawler
+// guessing ?room= values would mint rooms toward MAX_ROOMS), and it must not
+// touch a lingering room's TTL — the timer measures "nobody is here", and
+// someone looking at the door is not someone at the table. An unknown,
+// unprepared or unnamed room all answer 200 {} rather than an error: to the
+// picker they mean the same thing (nothing to offer, show the plain prompt),
+// and a 404 would make the client's failure path load-bearing for the
+// ordinary case.
+function handleTableInfo(req, res, url) {
+  const roomName = cleanString(url.searchParams.get('room'), MAX_ROOM);
+  if (!roomName) return sendError(res, 400, 'room is required', 'bad_request');
+  const room = rooms.get(roomName);
+  const out = {};
+  if (room) {
+    const name = room.settings.tableName;
+    if (typeof name === 'string' && name) out.name = name;
+    if (room.setup && Array.isArray(room.setup.profiles) && room.setup.profiles.length) {
+      out.seats = room.setup.profiles.map((p) => ({
+        name: p.name,
+        pools: Array.isArray(p.pools) ? p.pools.length : 0,
+      }));
+    }
+  }
+  sendJson(res, 200, out);
+}
+
 // ---------------------------------------------------------------------------
 // Static files
 // ---------------------------------------------------------------------------
@@ -2445,6 +2488,7 @@ const server = http.createServer((req, res) => {
     if (route === '/api/clear-roll' && req.method === 'POST') return handleClearRoll(req, res);
     if (route === '/api/settings' && req.method === 'POST') return handleSettings(req, res);
     if (route === '/api/table' && req.method === 'POST') return handleTable(req, res);
+    if (route === '/api/table' && req.method === 'GET') return handleTableInfo(req, res, url);
     if (route.startsWith('/api/')) return sendError(res, 404, 'no such endpoint', 'not_found');
     return serveStatic(req, res, url);
   };

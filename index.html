@@ -865,14 +865,34 @@ limitations under the License.
     </div>
   </div>
 
-  <!-- Display-name modal (multiplayer identity) -->
+  <!-- Display-name modal (multiplayer identity). Since ROADMAP §G5 it is
+       also the SEAT PICKER: a pre-join peek (GET /api/table) may fill
+       #seat-list with the room's prepared seats, listed ABOVE the free-text
+       row, which stays byte-for-byte today's behaviour ("Someone else…").
+       Choosing a seat keeps the modal up through the join and then shows the
+       import preview in #seat-preview — Apply is the ONLY way a seat's pools
+       enter the rack (GOALS §7's '#g=' post-mortem: never replace a rack on
+       arrival). With no server / no setup, none of the seat furniture
+       renders and the modal is exactly the plain prompt it always was. -->
   <div id="name-modal" class="hidden">
     <div class="panel" id="name-panel">
       <h2>Take a seat</h2>
-      <p class="hint">Pick a display name for the table.</p>
-      <div class="btn-row">
-        <input id="name-input" type="text" placeholder="Display name…" maxlength="24" autocomplete="off">
-        <button id="name-join" class="btn confirm" disabled>Join</button>
+      <p id="seat-table-name" class="hint seat-table-name hidden"></p>
+      <div id="seat-pick">
+        <div id="seat-list" class="hidden"></div>
+        <p id="seat-someone" class="hint seat-someone hidden">Someone else…</p>
+        <p id="name-hint" class="hint">Pick a display name for the table.</p>
+        <div class="btn-row">
+          <input id="name-input" type="text" placeholder="Display name…" maxlength="24" autocomplete="off">
+          <button id="name-join" class="btn confirm" disabled>Join</button>
+        </div>
+      </div>
+      <div id="seat-preview" class="hidden">
+        <p id="seat-preview-status" class="hint"></p>
+        <div id="seat-preview-btns" class="btn-row hidden">
+          <button id="seat-apply" class="btn confirm">Apply</button>
+          <button id="seat-skip" class="btn">Not now</button>
+        </div>
       </div>
     </div>
   </div>

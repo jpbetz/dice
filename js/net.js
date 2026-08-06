@@ -103,6 +103,38 @@ export function forgetSeat(room) {
 }
 
 /**
+ * Pre-join peek at a room's prepared table (GET /api/table — ROADMAP §G5).
+ *
+ * The seat picker's one impossible read: it renders BEFORE the join, and
+ * everything else a client knows about a room arrives in the join response.
+ * Answers {name?, seats?: [{name, pools}]} — just enough to draw the picker —
+ * or null for every failure there is: no server (static hosting answers 404),
+ * a refusal, junk, or nothing inside the timeout. Callers treat null as
+ * "show the plain free-text prompt"; the join must NEVER hang on this, which
+ * is what the short timeout is for (goal 9: the picker is an enhancement, and
+ * an enhancement that can stall the door is a regression wearing a feature's
+ * name).
+ */
+export async function peekTable(room, { timeoutMs = 2500 } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(
+      apiUrl(`/api/table?room=${encodeURIComponent(room)}`),
+      { cache: 'no-store', signal: controller.signal },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+    return data;
+  } catch {
+    return null; // no server / aborted / non-JSON — the plain prompt is the answer
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Join a room and stream its events.
  *
  * @param {object}   opts
