@@ -7113,14 +7113,14 @@ function stripCommit(patch) {
 function renderPopIdentity() {
   const g = stripGroup();
   popIdentityEl.classList.toggle('hidden', !g);
-  document.getElementById('pop-name').classList.toggle('hidden', !!g); // the strip's name row takes over
   popIdentityEl.textContent = '';
   if (!g) return;
 
-  // Row 1 — NAME: display type; click morphs to the save-morph input
-  // grammar (Enter commits, Esc reverts, blur commits a CHANGED name).
-  const nameRow = document.createElement('div');
-  nameRow.className = 'pid-row';
+  // ONE TITLE, AT THE TOP (Joe 2026-08-06): the head's name IS the pool's
+  // name — the strip's old hero row is gone, and the head carries the
+  // rename affordance with the same save-morph grammar (Enter commits,
+  // Esc reverts, blur commits a CHANGED name).
+  popNameEl.textContent = '';
   const nameBtn = document.createElement('button');
   nameBtn.className = 'pid-name' + (g.name ? '' : ' as-notation');
   nameBtn.textContent = g.name || g.notation;
@@ -7147,14 +7147,29 @@ function renderPopIdentity() {
       // target before the click dispatches (fleet catch). Both writes land.
       setTimeout(() => { (input.value !== (g.name || '') ? commit : revert)(); }, 0);
     });
-    nameRow.replaceChild(input, nameBtn);
+    popNameEl.replaceChild(input, nameBtn);
     input.focus();
     input.select();
   });
-  nameRow.appendChild(nameBtn);
-  popIdentityEl.appendChild(nameRow);
+  popNameEl.appendChild(nameBtn);
 
-  // Row 2 — SHELF chips (owner-chip dress): tap moves the pool; tapping the
+  // The strip speaks the panel's own .sec grammar (the spacing pass, Joe
+  // 2026-08-06): shelf · Set · Saved pool, same padding and hairlines as
+  // every section below.
+  const sec = (label) => {
+    const el = document.createElement('div');
+    el.className = 'sec tight pid-sec';
+    if (label) {
+      const l = document.createElement('span');
+      l.className = 'plabel';
+      l.textContent = label;
+      el.appendChild(l);
+    }
+    popIdentityEl.appendChild(el);
+    return el;
+  };
+
+  // SHELF chips (owner-chip dress): tap moves the pool; tapping the
   // pressed chip demotes to the plain Pools shelf (P4); trailing ＋ mints a
   // new shelf name.
   const cats = document.createElement('div');
@@ -7203,17 +7218,13 @@ function renderPopIdentity() {
     input.focus();
   });
   cats.appendChild(plus);
-  popIdentityEl.appendChild(cats);
+  sec(null).appendChild(cats);
 
   // Row 3 — DICE SET (§9 override): this pool rolls as itself. The same
   // compact select the settings row uses; the default choice follows your
   // own set, and 'Standard' PINS the classics even when you wear a house
   // set (the wire keeps its present-or-absent rule — std resolves to
   // absent at roll time).
-  const setLabel = document.createElement('span');
-  setLabel.className = 'plabel pid-set-label';
-  setLabel.textContent = 'Set';
-  popIdentityEl.appendChild(setLabel);
   const setRow = document.createElement('div');
   setRow.className = 'pid-row pid-set';
   setRow.appendChild(buildSetSelect({
@@ -7222,7 +7233,7 @@ function renderPopIdentity() {
     onPick: (v) => stripCommit({ set: v || '' }),
     title: 'Dice set for this pool — its rolls wear these dice',
   }));
-  popIdentityEl.appendChild(setRow);
+  sec('Set').appendChild(setRow);
 
   // Row 4 — THE DICE, composing like the creation card (Trigger Pass; Joe:
   // 'the same behavior as + pool for dice'). A PURE dice pool — nothing but
@@ -7279,7 +7290,8 @@ function renderPopIdentity() {
       units.appendChild(u);
     }
     dieRow.appendChild(units);
-    popIdentityEl.appendChild(dieRow);
+    const poolSec = sec('Saved pool');
+    poolSec.appendChild(dieRow);
     const ladderRow = document.createElement('div');
     ladderRow.className = 'pid-row pid-die';
     const full = dice.length >= MAX_DICE_ON_TABLE;
@@ -7293,7 +7305,7 @@ function renderPopIdentity() {
       b.addEventListener('click', () => commitDice([...dice, type]));
       ladderRow.appendChild(b);
     }
-    popIdentityEl.appendChild(ladderRow);
+    poolSec.appendChild(ladderRow);
     return;
   }
   {
@@ -7315,7 +7327,7 @@ function renderPopIdentity() {
     });
     dieRow.append(editBtn, draftBtn);
   }
-  popIdentityEl.appendChild(dieRow);
+  sec('Saved pool').appendChild(dieRow);
 }
 
 function closePopover() {
@@ -7458,16 +7470,26 @@ function renderPopParts() {
 // aria-hidden (the shipped audit rule). A wholly quiet die (d10x) renders
 // the single italic word, never a 100%-wide dim bar (§3.4: dash AND word
 // would mark one silence twice).
+let forecastPerDie = false; // session-local view state (Joe 2026-08-06)
+
 function buildForecast(fcast, visSuffix) {
   const frag = document.createDocumentFragment();
-  for (const bar of fcast.bars) {
+  // Collapsed by default: one count-weighted mixture line — 'a die from
+  // this pool, on average' — with the true per-die rows one tap away.
+  // The no-aggregation law still governs RESULTS and printed counts;
+  // this is a display default over the same per-die math.
+  const many = fcast.bars.length > 1;
+  const rows = many && !forecastPerDie ? [fcast.collapsed] : fcast.bars;
+  for (const bar of rows) {
     const row = document.createElement('div');
     row.className = 'fc-row';
     const label = document.createElement('span');
     label.className = 'fc-label';
-    label.textContent = (bar.source ? `${bar.source} · ` : '')
-      + (bar.count > 1 ? `${bar.count}×` : '') + bar.type
-      + (bar.variant === 'plain' ? ' (unpaired)' : '');
+    label.textContent = bar.mixed
+      ? `${bar.count} dice · per-die average`
+      : (bar.source ? `${bar.source} · ` : '')
+        + (bar.count > 1 ? `${bar.count}×` : '') + bar.type
+        + (bar.variant === 'plain' ? ' (unpaired)' : '');
     row.appendChild(label);
     if (bar.allQuiet) {
       const q = document.createElement('span');
@@ -7500,6 +7522,15 @@ function buildForecast(fcast, visSuffix) {
       row.append(text, geo);
     }
     frag.appendChild(row);
+  }
+  if (many) {
+    const tog = document.createElement('button');
+    tog.className = 'pid-ghost-verb fc-toggle';
+    tog.textContent = forecastPerDie ? 'one line' : 'per die';
+    tog.title = forecastPerDie
+      ? 'Average the pool into one line' : 'Show each rank on its own line';
+    tog.addEventListener('click', () => { forecastPerDie = !forecastPerDie; renderPopEcho(); });
+    frag.appendChild(tog);
   }
   // hover legend: the marks this pool actually uses, spelled out once
   const marks = new Map();

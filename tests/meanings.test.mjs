@@ -21,7 +21,7 @@ limitations under the License.
 // gate wholesale.
 
 import assert from 'node:assert/strict';
-import { outcomeForDie, SYSTEMS, OUTCOME_MARKS } from '../js/meanings.js';
+import { outcomeForDie, SYSTEMS, OUTCOME_MARKS, OUTCOME_LADDER } from '../js/meanings.js';
 import { countingPmfs } from '../js/odds.js';
 import { composeRoll } from '../js/rollspec.js';
 
@@ -217,6 +217,30 @@ t('every worded chart row has a distinct segment mark', () => {
     marks.add(OUTCOME_MARKS[w]);
   }
   assert.equal(marks.size, words.size, 'no two words share a mark');
+});
+
+t('every column embeds OUTCOME_LADDER as a subsequence', () => {
+  for (const dice of [['d4'], ['d6'], ['d8'], ['d10'], ['d12'], ['d20']]) {
+    const idx = fc(dice).bars[0].segments.map((x) => OUTCOME_LADDER.indexOf(x.word));
+    for (let i = 1; i < idx.length; i++) {
+      assert.ok(idx[i] > idx[i - 1], `${dice} column breaks ladder order`);
+    }
+  }
+});
+
+t('collapsed mixture: count-weighted, ladder-ordered; homogeneous is the bar itself', () => {
+  const f = fc(['d4', 'd6', 'd6']);
+  assert.equal(f.collapsed.count, 3);
+  close(f.collapsed.segments.reduce((s, x) => s + x.p, 0), 1);
+  assert.deepEqual(f.collapsed.segments.map((x) => x.word),
+    ['Fail', 'Blemish', null, 'Minimal Success', 'Minor Success',
+      'Partial Success', 'Success', 'Success & Bonus']);
+  const p = (w) => f.collapsed.segments.find((x) => x.word === w).p;
+  close(p('Fail'), (2 / 6) / 3);        // two d6 contribute, the d4 cannot Fail
+  close(p('Blemish'), (1 / 4) / 3);     // only the d4 can Blemish
+  close(p(null), (2 * (2 / 6) + 1 / 4) / 3);
+  const homo = fc(['d6', 'd6']);
+  assert.deepEqual(homo.collapsed.segments, homo.bars[0].segments.map((x) => ({ ...x })));
 });
 
 t('sum profiles have no forecast yet (§2l ⑥)', () => {

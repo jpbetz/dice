@@ -84,6 +84,32 @@ export const OUTCOME_MARKS = {
   'Critical Success': 'CS',
 };
 
+// The one worst→best ladder every rank column embeds as a subsequence
+// (pinned by unit test) — the collapsed forecast lays its mixture out in
+// this order, so the average never contradicts any die's own order.
+// null is the quiet band's seat.
+export const OUTCOME_LADDER = ['Critical Fail', 'Fail', 'Mishap', 'Blemish', null,
+  'Minimal Success', 'Minor Success', 'Partial Success', 'Success',
+  'Success & Bonus', 'Advantage', 'Success & Perm Bonus', 'Critical Success'];
+
+// Count-weighted mixture of the per-die spectra — the collapsed VIEW
+// (Joe 2026-08-06, amending the display default only): one line answering
+// 'a die from this pool, on average', with the per-die rows one tap away.
+// Results still never fold and no printed number counts across dice.
+function collapseBars(bars) {
+  const total = bars.reduce((s, b) => s + b.count, 0);
+  const acc = new Map();
+  for (const b of bars) {
+    for (const seg of b.segments) acc.set(seg.word, (acc.get(seg.word) || 0) + seg.p * b.count);
+  }
+  const segments = [];
+  for (const word of OUTCOME_LADDER) {
+    if (!acc.has(word)) continue;
+    segments.push({ word, tier: word ? TIERS[word] : null, p: acc.get(word) / total });
+  }
+  return { mixed: true, count: total, allQuiet: bars.every((b) => b.allQuiet), segments };
+}
+
 // THE SOUL DEAL READ (corrected 2026-07-31, from the system's author):
 // dice values never sum. Each die is read INDIVIDUALLY — the chart's rank
 // columns (Mug ... Boaire) are DIE ranks, so a d4's face reads the d4
@@ -205,7 +231,8 @@ export const SYSTEMS = {
           allQuiet: !column, segments: segmentsFor(t, q),
         });
       });
-      return { kind: 'per-die', bars: [...bars.values()] };
+      const list = [...bars.values()];
+      return { kind: 'per-die', bars: list, collapsed: collapseBars(list) };
     },
   },
   dnd: {

@@ -1933,9 +1933,9 @@ export const scenarios = [
       // The Sheet Pass: renaming lives on the popover's identity strip;
       // the slimmed card owns NOTATION only, reached via 'Edit notation…'.
       assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify(atk.id)})`), true, 'strip opens');
-      await a.eval(`document.querySelector('#pop-identity .pid-name').click()`);
+      await a.eval(`document.querySelector('#pop-name .pid-name').click()`);
       await a.eval(`(() => {
-        const i = document.querySelector('#pop-identity .pid-name-input');
+        const i = document.querySelector('#pop-name .pid-name-input');
         i.value = 'Alpha Strike';
         i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
       })()`);
@@ -2190,9 +2190,9 @@ export const scenarios = [
 
       // CUJ rename: two gestures — open the strip, click the name, type.
       assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify(claws.id)})`), true, 'the strip opens');
-      await a.eval(`document.querySelector('#pop-identity .pid-name').click()`);
+      await a.eval(`document.querySelector('#pop-name .pid-name').click()`);
       await a.eval(`(() => {
-        const i = document.querySelector('#pop-identity .pid-name-input');
+        const i = document.querySelector('#pop-name .pid-name-input');
         i.value = 'Fangs';
         i.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
       })()`);
@@ -2429,6 +2429,7 @@ export const scenarios = [
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.dbg(`setSystem('soul-deal')`);
       await a.dbg(`setGroups([{name: 'Grit', notation: '3d6', category: 'Attributes'},
+        {name: 'Mixed', notation: '1d4+2d6'},
         {name: 'Kept', notation: '4d6dl1'}, {name: 'Fate', notation: '2d10x'}])`);
       await a.dbg('setPoolsEditMode(true)'); // the group door opens inside ✎
       const pool = async (name) => (await a.dbg('groups')).find((g) => g.name === name);
@@ -2451,6 +2452,23 @@ export const scenarios = [
         'F P S S+', 'marks ride the segments that fit; quiet is unmarked');
       assert.ok((await a.eval(`document.querySelector('#pop-preview .fc-legend').textContent`))
         .includes('S+ Success & Bonus'), 'the hover legend spells the marks out');
+      assert.equal(await a.eval(`document.querySelectorAll('#pop-preview .fc-toggle').length`), 0,
+        'one rank needs no view toggle');
+
+      // mixed pools collapse to one count-weighted line by default (Joe
+      // 2026-08-06); 'per die' expands to the true rows
+      assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify((await pool('Mixed')).id)})`), true);
+      assert.equal(await a.eval(`document.querySelectorAll('#pop-preview .fc-row').length`), 1,
+        'mixed pools default to one averaged line');
+      assert.ok((await a.eval(`document.querySelector('#pop-preview .fc-label').textContent`))
+        .includes('3 dice'), 'labeled as the average it is');
+      const mixText = await a.eval(`document.querySelector('#pop-preview .fc-text').textContent`);
+      assert.ok(mixText.includes('Fail 11%') && mixText.includes('Blemish 8%'),
+        `count-weighted mixture in ladder order (got: ${mixText})`);
+      await a.eval(`document.querySelector('#pop-preview .fc-toggle').click()`);
+      assert.equal(await a.eval(`document.querySelectorAll('#pop-preview .fc-row').length`), 2,
+        "'per die' expands to the true rows");
+      await a.eval(`document.querySelector('#pop-preview .fc-toggle').click()`);
 
       assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify((await pool('Kept')).id)})`), true);
       assert.ok(/keep\/drop/.test(await a.eval(`document.getElementById('pop-preview').textContent`)),

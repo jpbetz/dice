@@ -1104,11 +1104,10 @@ html, body {
 /* ---- THE SHEET PASS (2026-08-01): identity strip + ghost tiles ---- */
 /* The strip sits above a hairline inside the pool popover: above it,
    identity (writes instantly by id); below it, the roll-tweak draft. */
-#pop-identity {
-  margin: 2px 0 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--hair);
-}
+/* the strip is three real sections now (shelf · Set · Saved pool) — the
+   .sec grammar brings the padding and hairlines */
+#pop-identity { margin: 0; }
+.pop-nm .pid-name { font-size: inherit; padding: 0; }
 #pop-identity.hidden { display: none; }
 .pid-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .pid-row:first-child { margin-top: 0; }
@@ -3196,6 +3195,7 @@ body.mini #result-verdict { font-size: 11px; }
   font-size: 8px; font-weight: 600; font-style: normal; letter-spacing: 0.02em;
   color: rgba(243, 234, 215, 0.8); pointer-events: none;
 }
+.pop-preview .fc-toggle { display: block; margin-top: 4px; font-size: 10px; }
 .pop-preview .fc-legend {
   display: none; margin-top: 6px; font-size: 10px;
   color: var(--muted); font-family: var(--font-ui);
@@ -3220,7 +3220,6 @@ body.mini #result-verdict { font-size: 11px; }
    comment exist only inside a Check/Cinematic moment (Joe 2026-08-06). */
 #pop-save.hidden, #pop-todraft.hidden, #pop-name.hidden,
 #pop-exp-sub-field.hidden, #pop-comment-field.hidden { display: none; }
-#pop-identity .pid-set-label { margin: 10px 0 4px; }
 /* the popover's inline save morph (same flow as the New pool panel's) */
 #pop-save-row.hidden, #mods-popover .pop-actions-2nd.hidden { display: none; }
 /* D2 AGAIN (2026-08-04): no bare `.hidden` rule exists in this codebase, so
