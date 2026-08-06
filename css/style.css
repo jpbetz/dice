@@ -1842,8 +1842,10 @@ html, body {
 #result-banner[data-act="dismiss"] #banner-main:focus-visible::after {
   color: rgba(156, 143, 119, 0.18);
 }
-/* the fold: a hairline crease; the verbs below never wear the removal wash */
-#banner-actions.banner-fold:not(:empty) {
+/* the fold: a hairline crease; the verbs below never wear the removal wash.
+   L8: the two children are mounted once and only hidden, so `:empty` is dead
+   as a gate — .card-actions-empty rides the same signal from JS. */
+#banner-actions.banner-fold:not(.card-actions-empty) {
   border-top: 1px solid var(--hair);
   margin: 6px 4px 0;
   padding-top: 6px;
@@ -2665,7 +2667,7 @@ body.mini .pk-breakdown { font-size: 10px; }
    arrive with the pointer or keyboard focus (P6) and stand on coarse
    pointers. The result serves the result. */
 #banner-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; margin-top: 8px; }
-#banner-actions:empty { display: none; }
+#banner-actions.card-actions-empty { display: none; }
 .banner-row { display: flex; gap: 8px; justify-content: center; }
 .banner-foot { display: flex; gap: 8px; justify-content: center; margin-top: 0; }
 .banner-btn { pointer-events: auto; font-size: 13px; padding: 5px 16px; }
@@ -3512,7 +3514,7 @@ body.mini .popover { width: min(94vw, 312px); }
   margin-top: clamp(8px, 1.6vmin, 12px);
 }
 .verdict-fold { display: flex; flex-direction: column; gap: 6px; }
-.verdict-fold:empty { display: none; }
+.verdict-fold.card-actions-empty { display: none; }
 .verdict-fold .pk-strip { margin-top: 0; }
 .verdict-fold .banner-foot { margin-top: 0; }
 

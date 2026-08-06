@@ -4611,4 +4611,62 @@ export const scenarios = [
       assert.ok(bRid, 'the endurance loop actually produced a roll id');
     },
   },
+  {
+    name: 'endurance-banner-actions',
+    tags: ['perf', 'roll', 'chrome', 'endurance-banner-actions'],
+    // Tier 0 §0e / L8: renderBannerActions used to full-rebuild #banner-actions
+    // (and renderVerdictCard used to wipe #verdict-fold) on every roll arrival,
+    // tossing 4 DOM nodes + 2 listeners per collect-then-reroll cycle. Under
+    // mount-once semantics both holders sit at exactly 2 children forever —
+    // the reveal foot and the REROLL strip — with `hidden` toggled per entry.
+    // This scenario stresses the invariant 60 rolls deep, then confirms the
+    // Reroll strip still routes to requestRoll from the banner (concern #3 in
+    // the L8 review: rollId-less handlers must not silently no-op).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+
+      // 60 rolls back-to-back — the banner + verdict-fold repaint each time.
+      const N = 60;
+      for (let i = 0; i < N; i++) await a.roll(`d6 # r${i + 1}`);
+
+      // The mount-once invariant: exactly 2 children (reveal foot + strip)
+      // regardless of how many roll arrivals paint the holder.
+      const bannerKids = await a.eval(
+        `document.getElementById('banner-actions').childElementCount`);
+      assert.equal(bannerKids, 2,
+        `#banner-actions holds exactly reveal-foot + strip (got ${bannerKids})`);
+
+      // The visibility gate rides `.card-actions-empty`, not `:empty`. With a
+      // canReroll entry showing, the strip is visible so the class is off.
+      const bannerEmptyClass = await a.eval(
+        `document.getElementById('banner-actions').classList.contains('card-actions-empty')`);
+      assert.equal(bannerEmptyClass, false,
+        'a live rerollable entry keeps the empty-gate class off');
+      const stripHidden = await a.eval(
+        `document.querySelector('#banner-actions .pk-strip').hidden`);
+      assert.equal(stripHidden, false, 'the REROLL strip is visible for a rerollable roll');
+      const revealHidden = await a.eval(
+        `document.querySelector('#banner-actions .banner-foot').hidden`);
+      assert.equal(revealHidden, true, 'the reveal foot stays hidden for a face-up roll');
+
+      // Click the strip — the handler reads holder._entry, not a log lookup,
+      // so it still fires for the current banner entry.
+      const beforeRid = await a.rollId();
+      await a.eval(`document.querySelector('#banner-actions .pk-strip').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), !window.__diceDebug.busy`
+        + ` && (window.__diceDebug.lastRequestedRoll || {}).rerollOfId === ${JSON.stringify(beforeRid)})`,
+        { desc: 'the persistent strip still rolls the current entry' });
+      const asked = await a.dbg('lastRequestedRoll');
+      assert.ok(asked, 'requestRoll fired from the persistent strip');
+      assert.equal(asked.label, `r${N}`,
+        `the strip rerolled the r${N} entry (got ${asked.label})`);
+
+      // After the reroll, the holder is STILL exactly two children — the
+      // update path never appends, only toggles.
+      const bannerKids2 = await a.eval(
+        `document.getElementById('banner-actions').childElementCount`);
+      assert.equal(bannerKids2, 2, 'holder stays at 2 children through a reroll');
+    },
+  },
 ];

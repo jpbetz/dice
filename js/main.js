@@ -1250,53 +1250,76 @@ function stepWhisking(dt) {
 // Reveal for the authority, and the prominent clear-✕ ANY player may use
 // (§7.7 universal housekeeping). Rebuilt whole on every shelf/lens/reveal
 // change.
+
+// L6 (Tier 0e endurance): the four marker listeners attach ONCE per element
+// via a factory and read `el.dataset.rollId` at fire time. renderShelfMarkers
+// only mutates dataset/title in place — a marker's lifetime spans cluster
+// join to leave, not one render — so a hundred re-renders of the same five
+// clusters do not accrete 100×5×4 handler closures on the shelf layer.
+function createShelfMarker() {
+  const el = document.createElement('div');
+  el.className = 'shelf-marker';
+  el.addEventListener('pointerenter', (ev) => {
+    if (ev.pointerType === 'mouse' && el.dataset.rollId) schedulePeekOpen(el.dataset.rollId);
+  });
+  el.addEventListener('pointerleave', (ev) => {
+    if (ev.pointerType === 'mouse') schedulePeekClose();
+  });
+  el.addEventListener('click', (ev) => {
+    const t = ev.target;
+    if (t instanceof HTMLElement && t.closest('button')) return;
+    const rid = el.dataset.rollId;
+    if (!rid) return;
+    if (peekRollId === rid) closePeek();
+    else openPeek(rid);
+  });
+  el.addEventListener('contextmenu', (ev) => {
+    ev.preventDefault();
+    const rid = el.dataset.rollId;
+    // Look up at fire time (not render time): rolls that drop out of the
+    // 100-entry log between render and right-click resolve to null here,
+    // and canReroll(null) short-circuits — no popover, no crash.
+    const entry = rid ? log.find((e) => e.rollId === rid) : null;
+    if (entry && canReroll(entry)) openShelfPopover(entry, rid);
+  });
+  return el;
+}
+
 function renderShelfMarkers() {
-  // Markers mid-fade are NOT ours to wipe: an eviction is 'roll-cleared'
-  // immediately followed by 'roll-collected', so a wholesale innerHTML reset
+  // Reap orphaned markers (a cluster departed): a marker's classList carries
+  // '.shelf-marker' — filter by it so future overlays on shelfLayer don't get
+  // pruned. Mid-fade markers are NOT ours to wipe: an eviction is
+  // 'roll-cleared' immediately followed by 'roll-collected', so removing them
   // here would pop the departing marker out of existence a millisecond into
-  // its sink — the aging animation would never be visible on the very path
-  // that aging takes. stepSinking drops them when their dice are gone.
+  // its sink — stepSinking drops them when their dice are gone.
+  const liveIds = new Set(shelfClusters.keys());
   for (const el of [...shelfLayer.children]) {
-    if (!el.classList.contains('chip-clearing')) el.remove();
+    if (!el.classList.contains('shelf-marker')) continue;
+    if (el.classList.contains('chip-clearing')) continue;
+    const rid = el.dataset.rollId;
+    if (!rid || !liveIds.has(rid)) el.remove();
   }
   const clusters = [...shelfClusters.values()].sort((a, b) => a.seq - b.seq);
   for (const c of clusters) {
-    const entry = log.find((e) => e.rollId === c.rollId) || null;
-    const el = document.createElement('div');
-    el.className = 'shelf-marker';
+    // Reuse: the marker's four listeners stay pinned to this element for its
+    // whole cluster lifetime. `!isConnected` covers the full-sweep reset path
+    // (line ~811/817) — cluster.clear() nulls c.markerEl transitively but the
+    // guard is defensive either way.
+    let el = c.markerEl;
+    if (!el || !el.isConnected) {
+      el = createShelfMarker();
+      c.markerEl = el;
+      shelfLayer.appendChild(el);
+    }
     el.dataset.rollId = c.rollId;
-    // No visible body: the settled cluster IS the marker's presence, and the
-    // roller's color dot lives in the peek card this target opens.
+    const entry = log.find((e) => e.rollId === c.rollId) || null;
     // A held roll's Reveal lives in its peek card: the shelf is where a held
     // roll spends its life (auto-collect fires on ANYONE's next roll), and
     // the peek renders Reveal for the authority (the server enforces it
     // regardless) — the resting marker stays a quiet dot either way.
-    if (entry && entry.playerName) el.title = `${entry.playerName} · ${entry.label}`;
-    else if (entry) el.title = `${entry.label}`;
-    else el.title = 'Collected roll';
-    // ONE grammar with the reveal card (Joe 2026-08-03, take three): the
-    // marker only OPENS the card — hover peeks it (desktop), a click/tap
-    // toggles it pinned-open — and the CARD's body is the one big clear
-    // target, exactly like the banner. The ✕-over-the-dice sweep dress
-    // retires, and with it the whole gesture-tracked one-✕ machinery.
-    el.addEventListener('pointerenter', (ev) => {
-      if (ev.pointerType === 'mouse') schedulePeekOpen(c.rollId);
-    });
-    el.addEventListener('pointerleave', (ev) => {
-      if (ev.pointerType === 'mouse') schedulePeekClose();
-    });
-    el.addEventListener('click', (ev) => {
-      const t = ev.target;
-      if (t instanceof HTMLElement && t.closest('button')) return;
-      if (peekRollId === c.rollId) closePeek();
-      else openPeek(c.rollId);
-    });
-    el.addEventListener('contextmenu', (ev) => {
-      ev.preventDefault();
-      if (entry && canReroll(entry)) openShelfPopover(entry, c.rollId);
-    });
-    c.markerEl = el;
-    shelfLayer.appendChild(el);
+    el.title = entry && entry.playerName ? `${entry.playerName} · ${entry.label}`
+      : entry ? `${entry.label}`
+      : 'Collected roll';
   }
   positionShelfMarkers();
   // An open peek re-reads whatever changed here — a reveal, a lens toggle, a
@@ -2941,13 +2964,79 @@ function appendCardActions(holder, entry, opts) {
   }
 }
 
+// Persistent-mount variant (Tier 0 §0e endurance / L8): the banner and the
+// verdict card repaint on every roll arrival, and every collect-then-reroll
+// used to churn appendCardActions — 4 DOM nodes + 2 listeners tossed per
+// entry. mountCardActions builds the reveal foot and REROLL ❯❯❯ strip ONCE
+// at first update and stashes them on the holder; updateCardActions toggles
+// their hidden attribute per render and stamps the live entry on the holder
+// for the handlers to close over (a rollId-less entry — e.g. a pre-network
+// draft banner — still rerolls because the handler reads holder._entry, not
+// a log lookup that would drop it). Peek keeps appendCardActions above
+// because its whole card rebuilds per render (see L9).
+//
+// Mount is LAZY (deferred to the first updateCardActions) because the two
+// mount targets sit at module init, well before CUE_WORDS / buildRollCue's
+// const dependencies exist in scope. Any renderBannerActions /
+// renderVerdictCard call fires on a network/UI event — always after module
+// load completes — so first render doubles as the mount trigger.
+function mountCardActions(holder, opts) {
+  if (holder._cardActionsMounted) return;
+  const foot = document.createElement('div');
+  foot.className = 'banner-foot';
+  foot.hidden = true;
+  const reveal = document.createElement('button');
+  reveal.className = opts.revealClass;
+  reveal.textContent = 'Reveal';
+  reveal.title = 'Flip this roll face up for the table';
+  reveal.addEventListener('click', () => {
+    const e = holder._entry;
+    if (e && e.rollId) requestReveal(e.rollId);
+  });
+  foot.appendChild(reveal);
+
+  const strip = document.createElement('button');
+  strip.className = 'pool-roll pk-again pk-strip pk-bare reveal-tier';
+  strip.title = 'Reroll these dice';
+  strip.hidden = true;
+  strip.appendChild(buildRollCue('reroll'));
+  strip.addEventListener('click', () => {
+    const e = holder._entry;
+    if (!e || !canReroll(e)) return;
+    requestRoll([...e.spec.dice], e.label, rerollOpts(e));
+  });
+
+  holder.appendChild(foot);
+  holder.appendChild(strip);
+  holder._entry = null;
+  holder._cardActionsMounted = true;
+  // Class-gated visibility (see .card-actions-empty CSS): with the two
+  // children permanently mounted, `:empty` can never fire — the class rides
+  // the same signal so the hairline crease and column gaps stay honest.
+  holder.classList.add('card-actions-empty');
+}
+
+function updateCardActions(holder, entry, opts) {
+  if (!holder._cardActionsMounted) mountCardActions(holder, opts);
+  holder._entry = entry || null;
+  const foot = holder.firstElementChild;         // .banner-foot
+  const strip = foot && foot.nextElementSibling; // .pk-strip
+  const showReveal = canReveal(entry);
+  const showStrip = canReroll(entry);
+  if (foot) foot.hidden = !showReveal;
+  if (strip) {
+    strip.hidden = !showStrip;
+    if (showStrip) strip.setAttribute('aria-label', `Reroll — ${entry.label}`);
+  }
+  holder.classList.toggle('card-actions-empty', !showReveal && !showStrip);
+}
+
 // The folded card's BODY act: 'clear' (the roller — for everyone) or
 // 'dismiss' (a spectator — locally; the dice stay). Set on every banner
 // paint; the static click handler below reads it.
 let bannerAct = { mode: 'dismiss', rollId: null };
 
 function renderBannerActions(entry) {
-  bannerActionsEl.innerHTML = '';
   const hidden = entryHidden(entry);
   const mine = !netOnline || (net && entry.playerId === net.playerId);
   // The body-as-target dress + act (the folded card): red removal for the
@@ -2959,10 +3048,11 @@ function renderBannerActions(entry) {
     ? 'Clear this roll for everyone'
     : 'Dismiss — hides this for you; the dice stay until the roller acts';
   bannerMainEl.setAttribute('aria-label', bannerMainEl.title);
-  if (!entry.rollId && !canReroll(entry)) return;
   // ONE Reveal dress (2i-C): confirm weight, sized by surface — the gold
   // primary it wore here was the roll verb's hue on a non-roll act.
-  appendCardActions(bannerActionsEl, entry, { revealClass: 'reveal-verb banner-btn' });
+  // L8: mounted once (lazy, on first call), toggled thereafter — the fold's
+  // two children never churn per banner paint.
+  updateCardActions(bannerActionsEl, entry, { revealClass: 'reveal-verb banner-btn' });
 }
 
 // The body's click — one press, the likeliest act. Static wiring; the act
@@ -3670,6 +3760,10 @@ function attributionCards(roll, entry) {
 }
 
 let verdictFor = null; // {rollId, mine} — what the verdict card's control acts on
+// Verdict-fold cell (L8): resolved once here, mounted lazily on the first
+// updateCardActions call so renderVerdictCard never rebuilds these two
+// children per paint.
+const verdictFoldEl = document.getElementById('verdict-fold');
 
 function renderVerdictCard(roll, entry) {
   stagedVerdict = { roll, entry }; // the repaint target while this card is up
@@ -3705,9 +3799,9 @@ function renderVerdictCard(roll, entry) {
   // ONE card family (2i-C): the fold's shared verbs — Reveal for the
   // authority (goal 11), the REROLL ❯❯❯ strip once the values are
   // readable — come from the same builder the banner and peek use.
-  const vFold = document.getElementById('verdict-fold');
-  vFold.textContent = '';
-  appendCardActions(vFold, entry, { revealClass: 'reveal-verb' });
+  // Mounted lazily on first call (L8) — this only updates the entry pointer
+  // and toggles hidden so #verdict-fold never churns DOM per verdict paint.
+  updateCardActions(verdictFoldEl, entry, { revealClass: 'reveal-verb' });
 
   // Per-die systems have no total: the ring shows no number and DC math
   // never renders (usesTotal, meanings.js v2). The card's center carries
@@ -4300,6 +4394,22 @@ window.__diceDebug = {
   get pendingCollects() { return [...pendingCollects.keys()]; },
   // shelf quiet-by-default (P1): the resting markers' shape, for asserting
   // they stay dot-only targets with no always-on total/word/✕. JSON-safe.
+  // L6 endurance pin: total live-marker element count under #shelf-layer.
+  // The reap loop only wipes stale '.shelf-marker' children, so re-rendering
+  // the same set of clusters N times must leave this count stable at
+  // shelfClusters.size (plus any mid-fade '.chip-clearing' markers still
+  // present). Excludes chip-clearing to match the shelfMarkers getter.
+  get shelfLayerChildCount() {
+    return [...shelfLayer.querySelectorAll('.shelf-marker')]
+      .filter((el) => !el.classList.contains('chip-clearing'))
+      .length;
+  },
+  // L6 endurance harness: repeatedly re-render markers to prove the reuse
+  // invariant (child count stable). Callable from e2e scenarios only.
+  rerenderShelf(n = 1) {
+    for (let i = 0; i < n; i++) renderShelfMarkers();
+    return true;
+  },
   get shelfMarkers() {
     return [...shelfLayer.querySelectorAll('.shelf-marker')]
       .filter((el) => !el.classList.contains('chip-clearing'))
