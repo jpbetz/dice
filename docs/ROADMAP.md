@@ -32,6 +32,18 @@ three decisions are recorded in
 6. **§3b L0 is a defect and outranks the rest of §3b**; L1–L4 sequence
 normally, behind §0j's room-creation throttle.
 
+**2026-08-07 (later) — Joe's three UI notes, two shipped the same day.** A
+multi-agent UX design pass (two surfaces, three stances each, judged and
+adversarially verified) produced the two specs now in
+[UX.md §7.21](UX.md#721-the-named-verb--a-cards-main-act-says-its-name-2026-08-07)
+and [§7.22](UX.md#722-the-collapsed-pool-rail--pick-three-roll-once-2026-08-07);
+both shipped. The verify pass also turned up a **live bug** the suite could
+not see — `el.hidden` was setting a property no author-origin `display` was
+obeying, so every face-up card shipped a Reveal the server 403s and every
+held card a REROLL of an unreadable spec (fixed, `631a562`). Joe's third
+note is [§3c](#3c-dice-on-the-table-before-they-are-rolled-joe-2026-08-07)
+below — his own "not as urgent".
+
 ---
 
 ## Tier 0 — Performance & foundation
@@ -669,6 +681,33 @@ it: goal 7 (recents are client-side, the sub-table directory is
 in-memory) · goal 9 (the lobby IS the static-hosting table) · goal 10
 (no access control — which is *why* there is no public list) · goal 12
 (no lobby presence, no summon, nothing chat-shaped).
+
+### 3c. Dice on the table before they are rolled (Joe 2026-08-07)
+
+*"I think in addition to being able to roll dice, the ability to put the
+dice on the table (in a collect area), so that you can roll them in the
+future might be useful, but not as urgent."*
+
+His own priority: **not as urgent**, recorded here so it does not evaporate.
+Physical dice-set-aside — you place dice on the felt now and roll them
+later — which is the physical-table instinct goals 1 and 3 keep pointing at,
+and which §11 (physical pool building, DEMOTED) is the neighbouring idea.
+
+**What already exists that this composes with:** the collect shelf (§7.7)
+is a *post*-roll parking area with five slot positions and real settled
+poses — this asks for the same furniture *pre*-roll · the draft/tray is
+already "dice chosen but not yet thrown", so the question is largely whether
+the draft gains a PHYSICAL representation on the felt rather than a new
+mechanism · §3's landing zones and ordered eviction would have to know about
+a reserved area that is not a roll.
+
+**Open before it can be designed:** is the placed set per-player or shared
+(goal 10 says anyone can grab dice, which argues shared, but then two
+players' set-asides collide on one felt) · does it survive a reload and a
+rejoin (the tray does not, and goal 7 says the server holds no state) · what
+it means to "roll them" — does the set-aside carry a pool identity and
+modifiers, or is it bare dice, in which case the attributed-math invariant
+has nothing to attribute.
 
 ---
 

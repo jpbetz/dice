@@ -1129,9 +1129,19 @@ the notation surfaces it comes for free (§7.8).
 | Saved-pool row | Roll button | via ± popover | ± button, and ✎ for name + notation |
 | ~~Saved pool (compact pill)~~ | — | — | retired with the mini bar (§7.9); the Saved pools panel expands from its edge tab instead |
 | Reroll-last (⟳) | click | — (re-rolls as rolled) | inherits original intent |
+| Collapsed pool rail (launcher) | tap to select, gold bar rolls | — | — (see the carve-out) |
 
 Offer is disabled (with tooltip) in solo mode on every surface. A surface
 gaining a new capability must fill its whole column.
+
+**The launcher carve-out** *(2026-08-07, §7.22)*: the full-column law binds
+**authoring** surfaces — the ones where a roll's intent is composed. A
+LAUNCHER fires intents that were already authored elsewhere (a single pick
+rides its pool's stored intent verbatim; a multi-pick composes what the
+grammar can union and says what it set aside), and the authoring surface is
+one keystroke away — `n` opens the workbench. This regularizes an
+already-shipped state rather than creating a new exemption: the collapsed
+rail has never offered or edited intent.
 
 ### 7.5 Per-roll Done: dice leave with their moment
 
@@ -1440,14 +1450,13 @@ control (`#edge-toggle`, chevron at top). The canvas is sized BESIDE it
 (refitView: `--table-left` = live panel width; camera, renderer and every
 felt-anchored overlay re-derive on toggle), so expanding never covers a
 landed roll — the felt resizes instead. There is no "Pools" title row.
-Collapsed = a slim icon rail (~56px): identity dot up top, the utility
-stack at the foot, and between them a SUPER-MINIMAL pool quick list —
-named pools as vertical names alone, unnamed pools as die chips alone,
-zero edit/save/notation chrome — where a tap ROLLS the pool directly
-(the draft untouched, the panel staying slim; rollRailPool round-trips
-the pool through the one grammar so name/set/dc all ride exactly as a
-staged roll). The collapsed-tab hover flyout is retired. State stays in
-`dice.panels.v1`.
+Collapsed = a POOL RAIL (112px — *superseded 2026-08-07, §7.22; it was a
+56px icon rail with vertical names and a tap that rolled*): identity dot
+up top, the utility stack at the foot, and between them the shelf-grouped
+pool list. Zero edit/save/notation chrome, as before. A tap SELECTS and
+one gold bar rolls the selection. The collapsed-tab hover flyout is
+retired. State stays in `dice.panels.v1`; the selection is deliberately
+NOT stored anywhere.
 
 **ONE region since the panel merge (2026-07-31)** *(was three, then two:
 the roll log moved to the rail flyout — `l` — and then New pool and Saved
@@ -2721,3 +2730,96 @@ state) · `named-verb-touch` (44px, opacity 1, zero pointer events) ·
 `named-verb-keys` (the body holds no tab stop; the table's Enter-collects
 yields to the focused button) · `verdict-skip-verb` (Skip mid-beat, Clear
 after).
+
+### 7.22 The collapsed pool rail — pick three, roll once (2026-08-07)
+
+*Joe: "The minimize view of the panel is really bad right now. I'm tempted
+to just drop it. If we keep it, we should do a full UX pass on it. I think
+if it remains, it should be able to do only the most core operations, but
+do them quickly and cleanly. The problems right now are: It drops the saved
+pool shelf titles, it shows saved pool names vertically, it don't allow for
+the common case of picking multiple pools (an attribute, skill and
+motivation is a common pool combo in Your Soul Deal). The ability to select
+a few pools and roll feels key. I think it should clear the tray after each
+roll if we don't show the tray (which we don't seem to have enough space
+for)."*
+
+**Kept, not dropped — and every defect on the list was downstream of one
+number.** Names ran vertically because a word does not fit in 56px. Shelf
+titles vanished because a heading does not fit. Multi-pick was impossible
+because a tray has nowhere to live. So the rail is **112px**, and the width
+buys all five back at once. (A "drop it" design was built and judged; it
+lost because it made every collapsed roll an expand → refit → roll →
+collapse → refit cycle — two camera reframes per roll, on the very table
+stillness §7.4 says collapsing exists to protect — and left touch with no
+roll surface at all, since the digit shortcuts are keyboard-only.)
+
+**The surface.** Shelf heads spelled (suppressed when the rack has only one
+shelf — a lone head is chrome announcing itself) · names **horizontal**,
+ellipsized, with the full name on `title` and `aria-label` · rows at a 44px
+thumb height · the digit ordinal in the corner, mirroring `.pool-ord`'s
+rest state exactly · a ✓ gutter that **stands empty** rather than appearing
+on selection, so a name that fits does not truncate the moment you pick it.
+
+**Selecting is steel, rolling is gold.** A tap toggles `aria-pressed` and
+paints a steel ring. Gold belongs to the one bar below, which is absent at
+rest and STANDS while picks exist (§7.14's contextual-rail grammar), showing
+the pick count and naming every picked pool in its `aria-label`. Over the
+40-die cap it drains to the 2i-C disabled code rather than truncating
+silently.
+
+**2i-G — A SELECTION IS NOT A DRAFT.** Ordered by the RACK, never by tap
+order (so `1 2 3 Enter` means the same roll whether the panel is open or
+closed) · never persisted · **spent by its roll** · dropped when the panel
+expands. This is what makes Joe's "clear it after each roll" compatible with
+**2i-E, which is unchanged**: a draft is a composition you keep editing and
+which survives to be repeated; a rail selection is a pick you already fired.
+Esc drops the picks at the same rung the staged draft peels at, so a mis-tap
+never costs a roll.
+
+**What a compose can and cannot carry.** A SINGLE pick launches the pool
+exactly as authored — dc, moment, visibility, keep/drop, reroll, explode and
+set override all ride, byte-identical to a rack roll. TWO OR MORE compose:
+dice, per-die source labels, and each pool's flat modifier as a labelled
+part (`+2[Wisdom]`, so the attributed-math invariant survives). **Set aside,
+out loud, in the rail's own note line:** keep/drop, reroll, explode and adv
+(the grammar glues these to one dice type and has no union for a sum) · a dc
+or moment declared by more than one pick. **Visibility fails CLOSED**
+(goal 11): one declared mode rides, two different ones become `secret`.
+
+*Why the glue is stripped unconditionally rather than attempted:* a sum of
+DIFFERENT die types rejects glued mods outright, but a sum of the SAME type
+does not — `4d6dl1 + 2d6` parses happily as `6d6dl1`, widening the drop
+across dice that never had it and silently changing the distribution. A
+"try it and catch the error" design would have shipped that. Pinned by
+`rail-compose-rules`.
+
+**The note lives in the rail.** `showSettingsNote` cannot serve here: outside
+the settings modal it falls through to the status pill, and the collapsed
+rail folds that pill to a 10px colorless dot — so every set-aside whisper
+would be invisible in exactly the state that sends it.
+
+**§7.4's capability matrix gains a row, with a carve-out:** *Collapsed pool
+rail (launcher) — Roll ✓ (authored intents; multi-pick composes) · Offer ✗ ·
+full-intent editing ✗.* The full-column law binds **authoring** surfaces; a
+launcher fires intents that were already authored elsewhere, and the
+authoring surface is one keystroke away (`n`).
+
+**Also fixed here:** the rail repaints ABOVE `renderGroups`' foreign-rack
+early return, so visiting a teammate's rack no longer leaves the collapsed
+rail showing whatever it last painted · a hidden draft never fires silently
+(Enter with the panel collapsed and nothing picked surfaces the workbench
+and pulses its roll button instead of broadcasting something you cannot
+see) · digits do the panel's own verb — stage when open, select when
+collapsed.
+
+**Open (Joe's call, after a Thursday):** a single-pool roll is now two taps
+(select, then Roll) where it was one. The candidate if that grates is
+long-press-a-row-to-roll-now, deliberately not shipped first because two
+verbs on one 44px row is how quiet chrome gets loud.
+
+**Scenarios:** `rail-multi-pick` (the attribute + skill + motivation roll,
+three digits and Enter, spent-by-its-roll, Esc, expand-drops) ·
+`rail-compose-rules` (authored-verbatim single pick, the same-type glue
+trap, fail-closed visibility) · `side-panel` (the rail's shape and the
+select-then-roll flow).

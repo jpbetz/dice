@@ -11,6 +11,76 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Joe's UI notes — the named verb and the pool rail (2026-08-07)
+
+Design authority: [UX.md](UX.md) §7.21 and §7.22. Both came out of a
+multi-agent design pass (two surfaces × three stances, judged, then
+adversarially verified against the tree); the verify pass is what caught
+the `[hidden]` bug below and the same-type glue trap in §7.22's compose.
+
+### The `hidden` that never hid — SHIPPED 2026-08-07 (`631a562`)
+
+`el.hidden = true` sets a property; the paint is a separate question. The
+UA sheet's `[hidden] { display: none }` is user-agent origin, so any
+author-origin `display` beats it regardless of specificity — and
+`.banner-foot` (css:3018) and `.pool-roll` (css:797) both declare
+`display: flex`. Since the Tier 0 §0e/L8 mount-once rewrite, which
+replaced *build the verb when it applies* with *mount both and toggle
+`.hidden`*, every face-up result card shipped a live **Reveal** the server
+answers with 403, and every held card a **REROLL** of a spec nobody at the
+table can read. The suite stayed green for one reason: it asserted the
+PROPERTY (`revealHidden === true` — always true, always beside the point).
+Fixed with a global `[hidden] { display: none !important }`, verified safe
+by grepping every attribute write in `js/` (exactly the four card-actions
+sites) — the `.idm-item` trap uses inline `style.display`, not the
+attribute. Pinned by `fold-visibility`, which fails on the old CSS.
+
+### The named verb — SHIPPED 2026-08-07 (`8a28827`)
+
+Joe: *"the 'x' on the main body is probably too non-intuitive. I think we
+need that to remain the main action but find a better UX."* Both halves
+honoured: clearing stays the main act and gains a name. Every result
+surface's fold now LEADS with a standing worded primary — `✕ Clear`,
+`✕ Dismiss`, or `❯❯ Skip` while a ceremony beat still plays — at `flex: 1`
+and full opacity, first in the tab order. **Hierarchy is area, not
+volume** (2i-C's fourth law): the primary never wins by being redder.
+The body stays a clear target but loses `role`/`tabindex`/`title` and its
+keydown twin; hovering it lights the named bar (*the linked press*)
+instead of painting a 72px ✕ watermark that only a cursor could find.
+Retired: the watermarks and body washes on all three surfaces, the
+`.card-actions-empty` gate, the verdict card's blanket rest-dim and the
+un-stack rule it forced, dead `.banner-row` and `.clear-x`. One
+`runCardClear` now owns every clear, so the re-entrancy guard rides the
+button's `disabled` (visible) instead of two silent closure booleans; and
+the touch mirror of hover-holds-the-clock landed, so a thumb on the banner
+holds the tidy-away that used to collect the roll mid-read. Six scenarios,
+including this suite's first assertions on computed display.
+
+### The collapsed pool rail — SHIPPED 2026-08-07 (`fd9d9b0`)
+
+Joe listed five defects and offered to drop the surface entirely. Every
+defect was downstream of one number — 56px — so the rail is **112px** and
+they go together: shelf heads spelled, names horizontal and ellipsized,
+44px rows, and a tap that SELECTS (steel — gold belongs to the one bar
+that rolls) so the common *Your Soul Deal* roll of an attribute, a skill
+and a motivation is three taps and a bar. **2i-G: a selection is not a
+draft** — rack-ordered, never persisted, spent by its roll, dropped on
+expand — which is how "clear it after each roll" coexists with 2i-E's
+surviving draft. A single pick launches its pool verbatim; a multi-pick
+composes dice, per-die sources and labelled flat modifiers, and says out
+loud what it set aside. Glue mods are stripped **unconditionally**: a
+same-type sum like `4d6dl1 + 2d6` parses happily as `6d6dl1`, so a
+try-and-catch design would have silently changed the distribution. Mixed
+visibility fails closed to `secret`. The set-aside note lives in the rail,
+because `showSettingsNote` falls through to a status pill the collapsed
+rail folds to a 10px colorless dot. Two fixes the interactive pass caught
+that no assertion would have: the ✓ gutter stands empty rather than
+appearing on selection (a name that fit would truncate the moment you
+picked it), and the rail repaints above `renderGroups`' foreign-rack
+return, so a teammate's rack no longer leaves it stale.
+
+---
+
 ## §3b — The lobby and the table flow (2026-08-07)
 
 Design authority: [ROADMAP.md](ROADMAP.md) §3b (CUJs and rulings) and
