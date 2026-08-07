@@ -10304,7 +10304,7 @@ function renderPlayers() {
   // fix, in the same slot where the people will appear — and every pill below
   // is retired by its own success, which is what keeps it out of the
   // standing-chrome trap that killed .tray-invite and #groups-empty.
-  if (!others.length) renderPresenceExits();
+  renderPresenceExits(others.length);
   // An open whisper picker tracks the live roster (joins/leaves/renames).
   if (pop && pop.vis && pop.vis.mode === 'whisper') renderPop();
   updateIdentityChip(); // the rail chip mirrors the roster's name + color
@@ -10397,8 +10397,9 @@ async function shareInvite(url, btn, restoreLabel) {
 // player can do about it: the lobby has exits, an empty table has an invite,
 // and a table with no server has neither — there the status pill speaks,
 // because a readout is the right object when there is no action to offer.
-function renderPresenceExits() {
+function renderPresenceExits(othersCount) {
   if (IN_LOBBY) {
+    if (othersCount) return; // no roster exists without a room; belt and braces
     rosterEl.appendChild(railGhost('+ New table', 'Start a table and get a link to share', openNewTable));
     if (recentTables().length) {
       const b = railGhost('Tables ▾', 'Tables you have been to', (e) => openTablesMenu(e.currentTarget));
@@ -10409,25 +10410,42 @@ function renderPresenceExits() {
     return;
   }
   if (!netOnline || !net) return; // asked for a table, got no server — see initNet
+
+  // A PREPARED TABLE SHOWS ITS EMPTY CHAIRS FOR AS LONG AS THEY ARE EMPTY —
+  // NOT only while you are alone. The first arrival must not take the other
+  // five chairs off the wall: an organizer with six prepared seats and two
+  // players present still has four people to fetch, and the row's whole value
+  // is being a live read of who is still missing. These retire PER CHAIR, as
+  // each seat is claimed, which is the same "retired by its own success"
+  // property the Invite pill has — just at the grain of a seat rather than the
+  // row. (Corrected 2026-08-07 after testing: the original `!others.length`
+  // gate made the documented "the outlines fill in one by one" impossible.)
   const free = unclaimedSeats();
-  if (!free.length) {
-    rosterEl.appendChild(railGhost('Invite', 'Copy this table’s link', (e) =>
-      shareInvite(inviteUrl(), e.currentTarget, 'Invite')));
+  if (free.length) {
+    // Chairs take whatever room the real people left, so a full-ish table
+    // degrades to a count rather than a wrapped wall of pills.
+    const room = Math.max(0, ROSTER_MAX - Math.min(othersCount, ROSTER_MAX));
+    for (const seatName of free.slice(0, room)) {
+      rosterEl.appendChild(railGhost(seatName, `Copy ${seatName}'s link to this table`, (e) =>
+        shareInvite(seatInviteUrl(seatName), e.currentTarget, seatName), { dot: true }));
+    }
+    if (free.length > room) {
+      const more = document.createElement('span');
+      more.className = 'roster-more';
+      more.textContent = `+${free.length - room}`;
+      more.title = `Seats still free: ${free.slice(room).join(', ')}`;
+      rosterEl.appendChild(more);
+    }
     return;
   }
-  // A PREPARED TABLE SHOWS ITS EMPTY CHAIRS. Same cap and same fold as the
-  // roster, so one grammar governs the row whether the pills are people or
-  // vacancies — and as players arrive the outlines fill in one by one.
-  for (const seatName of free.slice(0, ROSTER_MAX)) {
-    rosterEl.appendChild(railGhost(seatName, `Copy ${seatName}'s link to this table`, (e) =>
-      shareInvite(seatInviteUrl(seatName), e.currentTarget, seatName), { dot: true }));
-  }
-  if (free.length > ROSTER_MAX) {
-    const more = document.createElement('span');
-    more.className = 'roster-more';
-    more.textContent = `+${free.length - ROSTER_MAX}`;
-    more.title = free.slice(ROSTER_MAX).join(', ');
-    rosterEl.appendChild(more);
+
+  // An UNPREPARED table has no chairs to show, so the generic invite stands in
+  // — but only while you are alone. Once anyone is here the row is doing its
+  // real job, and a permanent Invite pill would be exactly the standing chrome
+  // §7.9 kills; the link keeps its home in the identity menu.
+  if (!othersCount) {
+    rosterEl.appendChild(railGhost('Invite', 'Copy this table’s link', (e) =>
+      shareInvite(inviteUrl(), e.currentTarget, 'Invite')));
   }
 }
 
@@ -11765,6 +11783,16 @@ async function initNet() {
   return { online: netOnline };
 }
 
-// let, not const: 'Leave & switch seat' (leaveTable) re-runs the join flow
-// and repoints this at the fresh promise.
-let netReady = initNet();
+// let, not const: 'Change seat…' (leaveTable) re-runs the join flow and
+// repoints this at the fresh promise.
+//
+// DECLARED ON ITS OWN LINE, initialized on the next. `let netReady = initNet()`
+// leaves netReady in TDZ for the whole SYNCHRONOUS prefix of initNet — which
+// used to be harmless because the online path awaited connect() almost
+// immediately, but the lobby path renders the presence row and returns without
+// ever awaiting. Anything on that path that reads netReady would throw, and the
+// module would die at eval with the page still standing on its static markup
+// (which is what makes this failure read as a render bug rather than a dead
+// module). Splitting the two costs nothing and closes the window.
+let netReady;
+netReady = initNet();
