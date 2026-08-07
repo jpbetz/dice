@@ -525,15 +525,20 @@ limitations under the License.
          THE FLOW TO COLLECTED (Joe 2026-08-04: 'cinematics have too many
          stages… no ✕ and Done button — just flow to collected'): the card
          is a FOLDED CARD now, same grammar as the banner and peek — the
-         BODY (#verdict-main) is the one big clear target (red for the
-         roller's clear-for-everyone, slate for a spectator's local
-         dismiss), the fold below holds the built verbs (REROLL ❯❯❯,
-         Reveal — appendCardActions, one codepath, 2i-C), and when its
-         clock runs out the roll flows STRAIGHT to the shelf. The banner
-         stage between card and shelf is gone; hover holds the clock; a
-         hidden card stands until its reveal. -->
+         BODY (#verdict-main) is a clear target (red for the roller's
+         clear-for-everyone, slate for a spectator's local dismiss), the
+         fold below holds the built verbs (REROLL ❯❯❯, Reveal — one
+         codepath, 2i-C), and when its clock runs out the roll flows
+         STRAIGHT to the shelf. The banner stage between card and shelf is
+         gone; hover holds the clock; a hidden card stands until its reveal.
+         Named-verb pass (2026-08-07): the fold now LEADS with the primary
+         act, and this card is the one surface where that act changes under
+         you — while the moment still plays it reads ❯❯ Skip in steel,
+         because completing the beat and clearing the roll are never one
+         gesture and the word should say which one you are about to do. It
+         repaints to ✕ Clear the instant the beat lands. -->
     <section class="card-ornate" id="verdict-card">
-      <div id="verdict-main" role="button" tabindex="0">
+      <div id="verdict-main">
         <div class="eyebrow" id="verdict-eyebrow"></div>
         <div class="ring-wrap">
           <svg viewBox="0 0 120 120" aria-hidden="true">
@@ -559,23 +564,34 @@ limitations under the License.
        furniture.) -->
 
   <!-- Result banner -->
-  <!-- THE FOLDED CARD (Joe 2026-08-03): the card's BODY is the one big
-       clear target — the most likely act after reading a result is
-       removing it, and the collected cluster already taught that grammar
-       (the sweep). The dice on the felt are scattered, so here the PANEL
-       is the target: hovering the body arms an unmistakable removal
-       dress (red wash + hairline + ✕ watermark; a spectator's dismiss
-       wears the muted slate variant). Below a horizontal fold line sit
-       the verbs that do anything ELSE — REROLL ❯❯❯, Reveal — so they
-       never light up red under the removal hover. -->
+  <!-- THE FOLDED CARD, named-verb edition (Joe 2026-08-07: "the 'x' on the
+       main body is probably too non-intuitive… we need that to remain the
+       main action but find a better UX").
+       Removing the result is still the likeliest act after reading it, so
+       it is still the main action — but it now SAYS SO. The fold below the
+       crease leads with a standing, worded bar (✕ Clear for the roller,
+       ✕ Dismiss for a spectator) that takes the free width, never rests
+       dim, and is the first thing Tab reaches. REROLL ❯❯❯ and Reveal ride
+       beside it at their own intrinsic width, keeping the 0.45 rest-dim.
+       Hierarchy is AREA, not hue.
+       The body stays clickable — the biggest target on screen, and the
+       hand already knows it — but it is a shortcut now, not the advertised
+       control: no role, no tabindex, no title, and hovering it lights the
+       named bar rather than painting a 72px ✕ watermark. That watermark
+       was the defect: an affordance that existed only under a cursor, on a
+       surface phones reach by thumb.
+       #banner-live is the announcement channel — one composed sentence per
+       landed result, so a screen reader hears the roll once instead of
+       hearing five cells repaint. -->
   <div id="result-banner" class="hidden">
-    <div id="banner-main" role="button" tabindex="0">
+    <div id="banner-main">
       <div id="result-label"></div>
       <div id="result-total"></div>
       <div id="result-verdict"></div>
       <div id="result-meaning"></div>
       <div id="result-breakdown"></div>
     </div>
+    <div id="banner-live" class="sr-live" aria-live="polite"></div>
     <div id="banner-actions" class="banner-fold"></div>
   </div>
 

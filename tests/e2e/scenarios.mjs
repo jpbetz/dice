@@ -1003,14 +1003,16 @@ export const scenarios = [
       assert.equal(await a.eval(
         `getComputedStyle(document.getElementById('verdict-hero')).display`), 'grid',
         'the ledger grid ENGAGES on the ceremony card (computed display is the contract — the hero slot’s own flex once silently won)');
-      // 2i-B: the card's chips never SHOUT (no inherited uppercase), and
-      // its action row rests DIM — quiet, never invisible-interactive
+      // 2i-B: the card's chips never SHOUT (no inherited uppercase). The
+      // row's blanket rest-dim retired 2026-08-07: each verb carries its own
+      // state now, because a blanket also dimmed the primary act, which
+      // under the named-verb rule must stand.
       assert.equal(await a.eval(
         `getComputedStyle(document.getElementById('verdict-hero')).textTransform`),
         'none', 'the shared chips keep their lowercase evidence identity');
-      assert.equal(await a.eval(
-        `getComputedStyle(document.querySelector('#verdict-card .verdict-actions')).opacity`),
-        '0.45', 'the verdict actions rest dim, never invisible');
+      const vActs = await a.dbg(`cardActs('verdict')`);
+      assert.equal(vActs.primary.opacity, '1', 'the verdict primary stands — it is the main act');
+      assert.equal(vActs.reroll.opacity, '0.45', 'the REROLL strip still rests dim beside it');
       // 2i-C ONE card family: the fold's REROLL strip comes from the same
       // builder as the banner's/peek's; the static ⟳ is gone for good
       assert.ok(await a.eval(`!!document.querySelector('#verdict-fold .pk-strip')`),
@@ -5059,6 +5061,171 @@ export const scenarios = [
     },
   },
   {
+    name: 'named-verb',
+    tags: ['smoke', 'roll', 'chrome'],
+    // THE NAMED VERB (Joe 2026-08-07: "the 'x' on the main body is probably
+    // too non-intuitive… we need that to remain the main action but find a
+    // better UX"). The act keeps its primacy and gains a name. Everything
+    // here is read WITHOUT hovering anything — that is the whole point: the
+    // old affordance existed only under a cursor.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.roll('2d8[Wisdom]+1d4 # Reach');
+      await b.settle();
+      await b.waitFor(`!document.getElementById('result-banner').classList.contains('hidden')`,
+        { desc: 'the banner reaches Bob' });
+
+      // The roller: a standing, worded, red Clear that never rests dim and
+      // carries the §7.9 contract sentence as its accessible name.
+      const av = await a.dbg(`cardActs('banner')`);
+      assert.equal(av.primary.verb, 'clear', 'the roller’s primary act is clear');
+      assert.equal(av.primary.word, 'Clear', 'and it says the word');
+      assert.equal(av.primary.opacity, '1', 'standing, not dim — no hover needed');
+      assert.equal(av.primary.label, 'Clear this roll for everyone',
+        'the contract sentence is the accessible name');
+      assert.equal(av.primary.disabled, false, 'armed at rest');
+
+      // The spectator: the same geometry, a different word and a different
+      // hue. Red on a local dismiss would lie about what the press does.
+      const bv = await b.dbg(`cardActs('banner')`);
+      assert.equal(bv.primary.verb, 'dismiss', 'a spectator dismisses');
+      assert.equal(bv.primary.word, 'Dismiss', 'and the word says so');
+      assert.ok(bv.primary.label.startsWith('Dismiss —'), 'with its own sentence');
+
+      // Bob's press is local: his card goes, the dice stay for everyone.
+      await b.eval(`document.querySelector('#banner-actions .card-act').click()`);
+      await b.waitFor(`document.getElementById('result-banner').classList.contains('hidden')`,
+        { desc: 'the spectator’s dismiss closes his card' });
+      assert.ok(await b.diceCount() > 0, 'and leaves the dice on the felt');
+      assert.ok(await a.diceCount() > 0, 'Alice still sees them too');
+
+      // Alice's press clears for the room.
+      await a.eval(`document.querySelector('#banner-actions .card-act').click()`);
+      for (const [t, who] of [[a, 'Alice'], [b, 'Bob']]) {
+        await t.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 0)`,
+          { desc: `the named Clear emptied the felt for ${who}` });
+      }
+    },
+  },
+  {
+    name: 'linked-press',
+    tags: ['chrome', 'roll'],
+    // The body stays a clear target — the biggest one on screen — but it is
+    // a SHORTCUT now, not the advertised control. Hovering it lights the
+    // named bar (teaching the word) instead of painting a 72px ✕ watermark
+    // that only a cursor could ever discover.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      await a.roll('d20 # Body');
+      // The retired dress: no role, no tabindex, no watermark.
+      assert.equal(await a.eval(`document.getElementById('banner-main').getAttribute('role')`), null,
+        'the body is no longer announced as a button');
+      assert.equal(await a.eval(`document.getElementById('banner-main').getAttribute('tabindex')`), null,
+        'and no longer holds a tab stop');
+      assert.equal(await a.eval(
+        `getComputedStyle(document.getElementById('banner-main'), '::after').content`),
+        'none', 'the ✕ watermark is gone');
+      // The linked press. Needs a REAL cursor: a synthetic mouseover runs
+      // listeners but never moves the browser's hover state, so the rule
+      // would stay unmatched and the assertion would lie either way.
+      await a.eval(`document.querySelectorAll('.card-act').forEach((el) => { el.style.transition = 'none'; })`);
+      const borderOf = `getComputedStyle(document.querySelector('#banner-actions .card-act')).borderTopColor`;
+      const rest = await a.eval(borderOf);
+      assert.ok(await a.hover('#banner-main'), 'the banner body is on screen to hover');
+      const lit = await a.eval(borderOf);
+      assert.notEqual(lit, rest, 'hovering the body lights the named bar');
+      // …and the body click still clears, because the hand already knows it.
+      await a.eval(`document.getElementById('banner-main').click()`);
+      await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 0)`,
+        { desc: 'the body shortcut still clears' });
+    },
+  },
+  {
+    name: 'named-verb-touch',
+    tags: ['chrome', 'roll'],
+    // The state the old design failed outright. A phone has no hover, so a
+    // hover-armed affordance is not a quiet affordance — it is no
+    // affordance. Read with ZERO pointer events sent.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      await a.emulateCoarsePointer(true);
+      try {
+        await a.roll('d20 # Thumb');
+        const v = await a.dbg(`cardActs('banner')`);
+        assert.equal(v.primary.opacity, '1', 'the primary stands on a phone, unhovered');
+        assert.ok(v.primary.minH >= 44,
+          `the primary is a real touch target (got ${v.primary.minH}px)`);
+        assert.ok(v.reroll.minH >= 44,
+          `so is the REROLL strip (got ${v.reroll.minH}px)`);
+      } finally {
+        await a.emulateCoarsePointer(false); // per-tab, outlives the scenario
+      }
+    },
+  },
+  {
+    name: 'named-verb-keys',
+    tags: ['chrome', 'roll'],
+    // The primary is a real <button>, which is what makes the keyboard path
+    // work without a hand-rolled keydown twin: it owns Enter and Space
+    // natively, and the table's global Enter (collect) bails on a focused
+    // button rather than firing underneath it.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      await a.roll('d20 # Keys');
+      assert.equal(await a.eval(
+        `document.querySelector('#banner-actions .card-act').tagName`), 'BUTTON',
+        'the primary is a native button, not a div wearing role=button');
+      // Focus it and fire Enter FROM it (target = the button, bubbling to
+      // the document handler) — the global collect must decline.
+      await a.eval(`document.querySelector('#banner-actions .card-act').focus()`);
+      assert.ok(await a.eval(
+        `document.activeElement === document.querySelector('#banner-actions .card-act')`),
+        'the primary takes focus');
+      const shelfBefore = (await a.shelf()).length;
+      await a.eval(`document.activeElement.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`);
+      await a.settle();
+      assert.equal((await a.shelf()).length, shelfBefore,
+        'the table’s Enter-collects yields to the focused button');
+      assert.ok(await a.diceCount() > 0, 'and nothing was swept underneath it');
+    },
+  },
+  {
+    name: 'verdict-skip-verb',
+    tags: ['roll', 'ceremony'],
+    // The one surface whose primary act changes under you. While the moment
+    // plays, the press SKIPS — completing the beat and clearing the roll are
+    // never one gesture (§7.16) — so the word must say Skip, in steel,
+    // because skipping is a tool and not a removal. When the beat lands it
+    // repaints to Clear.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`commandRoll('d20 check dc10')`);
+      // The Skip window is real and bounded: the card paints at tVerdict and
+      // the beat ends 0.45s later (ceremonyFinish). Step in small increments
+      // so we land inside it rather than stepping straight over it.
+      await a.waitFor(
+        `(window.__diceDebug.sim(30), !!document.querySelector('#verdict-fold .card-act')`
+        + ` && !(window.__diceDebug.currentRoll || {}).done)`,
+        { desc: 'the verdict card is up while the beat still plays' });
+      const mid = await a.dbg(`cardActs('verdict')`);
+      assert.equal(mid.primary.verb, 'skip', 'mid-beat the primary act is SKIP');
+      assert.equal(mid.primary.word, 'Skip', 'and it says so — never a silent clear');
+
+      await a.waitFor(
+        `(window.__diceDebug.skipCeremony(), window.__diceDebug.sim(30), (window.__diceDebug.ceremonyState || {}).phase === 'done')`,
+        { desc: 'the beat lands' });
+      const done = await a.dbg(`cardActs('verdict')`);
+      assert.equal(done.primary.verb, 'clear', 'the word catches up with the beat');
+      assert.equal(done.primary.word, 'Clear', 'and now offers the removal');
+      // …and it really clears, for everyone.
+      await a.eval(`document.querySelector('#verdict-fold .card-act').click()`);
+      await a.waitFor(`(window.__diceDebug.sim(160), window.__diceDebug.tableDice.length === 0)`,
+        { desc: 'the ceremony card’s named Clear empties the felt' });
+    },
+  },
+  {
     name: 'fold-visibility',
     tags: ['smoke', 'roll', 'chrome'],
     // The pin the suite never had. endurance-banner-actions asserts the
@@ -5098,8 +5265,9 @@ export const scenarios = [
     // Tier 0 §0e / L8: renderBannerActions used to full-rebuild #banner-actions
     // (and renderVerdictCard used to wipe #verdict-fold) on every roll arrival,
     // tossing 4 DOM nodes + 2 listeners per collect-then-reroll cycle. Under
-    // mount-once semantics both holders sit at exactly 2 children forever —
-    // the reveal foot and the REROLL strip — with `hidden` toggled per entry.
+    // mount-once semantics both holders sit at exactly 3 children forever —
+    // the named primary, the reveal foot and the REROLL strip — with the
+    // primary repainted and the other two `hidden`-toggled per entry.
     // This scenario stresses the invariant 60 rolls deep, then confirms the
     // Reroll strip still routes to requestRoll from the banner (concern #3 in
     // the L8 review: rollId-less handlers must not silently no-op).
@@ -5110,25 +5278,30 @@ export const scenarios = [
       const N = 60;
       for (let i = 0; i < N; i++) await a.roll(`d6 # r${i + 1}`);
 
-      // The mount-once invariant: exactly 2 children (reveal foot + strip)
-      // regardless of how many roll arrivals paint the holder.
+      // The mount-once invariant: exactly 3 children (primary + reveal foot
+      // + strip) regardless of how many roll arrivals paint the holder.
       const bannerKids = await a.eval(
         `document.getElementById('banner-actions').childElementCount`);
-      assert.equal(bannerKids, 2,
-        `#banner-actions holds exactly reveal-foot + strip (got ${bannerKids})`);
+      assert.equal(bannerKids, 3,
+        `#banner-actions holds exactly primary + reveal-foot + strip (got ${bannerKids})`);
 
-      // The visibility gate rides `.card-actions-empty`, not `:empty`. With a
-      // canReroll entry showing, the strip is visible so the class is off.
-      const bannerEmptyClass = await a.eval(
-        `document.getElementById('banner-actions').classList.contains('card-actions-empty')`);
-      assert.equal(bannerEmptyClass, false,
-        'a live rerollable entry keeps the empty-gate class off');
+      // The row never collapses now — the primary always stands, so the old
+      // .card-actions-empty gate is gone and the crease is honest at rest.
+      const acts = await a.dbg(`cardActs('banner')`);
+      assert.equal(acts.foldDisplay, 'flex', 'the fold stands as a row');
+      assert.equal(acts.primary.verb, 'clear', 'the roller’s primary act is Clear');
+      assert.equal(acts.primary.word, 'Clear', 'and it says so');
+      assert.equal(acts.primary.opacity, '1', 'the primary never rests dim');
+      // Both the property AND the paint — the property alone is what let a
+      // live Reveal ship on every face-up card (see fold-visibility).
       const stripHidden = await a.eval(
         `document.querySelector('#banner-actions .pk-strip').hidden`);
       assert.equal(stripHidden, false, 'the REROLL strip is visible for a rerollable roll');
+      assert.notEqual(acts.reroll.display, 'none', 'and it actually paints');
       const revealHidden = await a.eval(
         `document.querySelector('#banner-actions .banner-foot').hidden`);
       assert.equal(revealHidden, true, 'the reveal foot stays hidden for a face-up roll');
+      assert.equal(acts.reveal.display, 'none', 'and it actually stays off screen');
 
       // Click the strip — the handler reads holder._entry, not a log lookup,
       // so it still fires for the current banner entry.
@@ -5143,11 +5316,11 @@ export const scenarios = [
       assert.equal(asked.label, `r${N}`,
         `the strip rerolled the r${N} entry (got ${asked.label})`);
 
-      // After the reroll, the holder is STILL exactly two children — the
-      // update path never appends, only toggles.
+      // After the reroll, the holder is STILL exactly three children — the
+      // update path never appends, only toggles and repaints.
       const bannerKids2 = await a.eval(
         `document.getElementById('banner-actions').childElementCount`);
-      assert.equal(bannerKids2, 2, 'holder stays at 2 children through a reroll');
+      assert.equal(bannerKids2, 3, 'holder stays at 3 children through a reroll');
     },
   },
   {

@@ -23,6 +23,7 @@ limitations under the License.
   --ivory: #f3ead7;
   --muted: #9c8f77;
   --red: #e2493b;
+  --red-soft: rgba(226, 73, 59, 0.14); /* the named clear verb's resting seat */
   --amber: #d9a441;
   --hair: rgba(255, 255, 255, 0.07);
   --well: rgba(0, 0, 0, 0.32);
@@ -2084,45 +2085,10 @@ html, body {
   cursor: pointer;
   transition: background 0.15s, box-shadow 0.15s;
 }
-#banner-main::after {
-  content: '✕';
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 72px;
-  font-weight: 700;
-  color: transparent;
-  pointer-events: none;
-  transition: color 0.15s;
-}
-#result-banner[data-act="clear"] #banner-main:hover,
-#result-banner[data-act="clear"] #banner-main:focus-visible {
-  background: rgba(226, 73, 59, 0.10);
-  box-shadow: inset 0 0 0 1px rgba(226, 73, 59, 0.55);
-}
-#result-banner[data-act="clear"] #banner-main:hover::after,
-#result-banner[data-act="clear"] #banner-main:focus-visible::after {
-  color: rgba(226, 73, 59, 0.20);
-}
-#result-banner[data-act="dismiss"] #banner-main:hover,
-#result-banner[data-act="dismiss"] #banner-main:focus-visible {
-  background: rgba(156, 143, 119, 0.08);
-  box-shadow: inset 0 0 0 1px rgba(156, 143, 119, 0.45);
-}
-#result-banner[data-act="dismiss"] #banner-main:hover::after,
-#result-banner[data-act="dismiss"] #banner-main:focus-visible::after {
-  color: rgba(156, 143, 119, 0.18);
-}
-/* the fold: a hairline crease; the verbs below never wear the removal wash.
-   L8: the two children are mounted once and only hidden, so `:empty` is dead
-   as a gate — .card-actions-empty rides the same signal from JS. */
-#banner-actions.banner-fold:not(.card-actions-empty) {
-  border-top: 1px solid var(--hair);
-  margin: 6px 4px 0;
-  padding-top: 6px;
-}
+/* (The ✕ watermark and the body's removal wash retired 2026-08-07 — the
+   named bar in the fold carries the removal dress now, and it carries it
+   standing. The body keeps only a quiet lift, defined with its siblings
+   in the card-act block below.) */
 #result-label {
   font-family: var(--font-display);
   /* a quiet identity caption (2i-A): the rows are the data — the loud
@@ -2923,43 +2889,12 @@ body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
   cursor: pointer;
   transition: background 0.15s, box-shadow 0.15s;
 }
-.pk-main::after {
-  content: '✕';
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 44px;
-  font-weight: 700;
-  color: transparent;
-  pointer-events: none;
-  transition: color 0.15s;
-}
-.pk-main:hover,
-.pk-main:focus-visible {
-  background: rgba(226, 73, 59, 0.10);
-  box-shadow: inset 0 0 0 1px rgba(226, 73, 59, 0.55);
-}
-.pk-main:hover::after,
-.pk-main:focus-visible::after { color: rgba(226, 73, 59, 0.20); }
-.pk-fold {
-  border-top: 1px solid var(--hair);
-  margin-top: 8px;
-  padding-top: 6px;
-}
+/* (The peek's ✕ watermark and body wash retired 2026-08-07 with the
+   banner's — same reason, same replacement: the named bar in .pk-fold.) */
 /* .pk-tweak retired 2026-08-01 — the tweak path is right-click (cluster/card) */
-
-/* ---------- the unified 'clear this roll' ✕ (P1, cross-cutting) ---------- */
-/* One gesture, one look, one sentence — every result surface's revealed
-   tier carries the same ✕ with the same title: 'Clear this roll for
-   everyone'. (Its full-width base seat retired with the Done redesign.) */
-.clear-x:hover,
-.clear-x:hover:not(:disabled) {
-  color: #fff;
-  border-color: var(--red);
-  background: rgba(226, 73, 59, 0.16);
-}
+/* (.clear-x retired: it had no producer left in js/ and two scenarios
+   already pinned its absence. The named .card-act is the one clear dress
+   on every result surface now.) */
 /* The peek's reroll: the same roll button as everywhere else, minus the
    die art — the ACTUAL dice sit right under the card (no miniatures over
    the real thing). The cue itself is the button's face: quiet at rest,
@@ -3026,9 +2961,7 @@ body.mini .pk-breakdown { font-size: 10px; }
    quiet Done; ⟳ and the roller's clear-✕ are the REVEALED tier — they
    arrive with the pointer or keyboard focus (P6) and stand on coarse
    pointers. The result serves the result. */
-#banner-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; margin-top: 8px; }
-#banner-actions.card-actions-empty { display: none; }
-.banner-row { display: flex; gap: 8px; justify-content: center; }
+#banner-actions { margin-top: 8px; }
 .banner-foot { display: flex; gap: 8px; justify-content: center; margin-top: 0; }
 .banner-btn { pointer-events: auto; font-size: 13px; padding: 5px 16px; }
 /* One tier, every result card (2026-08-01): the banner, the verdict card
@@ -3056,13 +2989,12 @@ body.mini .pk-breakdown { font-size: 10px; }
    grammar — quiet → loud on approach, the same P6 fold rule the banner
    and peek carry). display:contents folds the inner tier's buttons into
    the one centered row. */
-#verdict-card .verdict-actions { opacity: 0.45; transition: opacity 0.15s; }
-#verdict-card:hover .verdict-actions,
-#verdict-card:focus-within .verdict-actions { opacity: 1; }
-/* the row itself carries the card's rest-dim — the builder's reveal-tier
-   strip inside it must not stack a second one (2i-C) */
-#verdict-card .verdict-actions .reveal-tier { opacity: 1; }
-@media (pointer: coarse) { #verdict-card .verdict-actions { opacity: 1; } }
+/* (The verdict card's blanket rest-dim retired 2026-08-07. It dimmed the
+   whole row including the primary act, which under the named-verb rule
+   must stand — and it forced an un-stack rule for .reveal-tier inside it,
+   which would have made the verdict's REROLL the one strip standing full
+   at rest. Each verb now carries its own state: the primary stands, the
+   REROLL strip keeps .reveal-tier's 0.45, Reveal keeps confirm weight.) */
 
 /* ---------- offered-roll cards ---------- */
 #offers-layer {
@@ -3960,45 +3892,104 @@ body.mini .popover { width: min(94vw, 312px); }
   cursor: pointer;
   transition: background 0.15s, box-shadow 0.15s;
 }
-#verdict-main::after {
-  content: '✕';
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 84px;
-  font-weight: 700;
-  color: transparent;
-  pointer-events: none;
-  transition: color 0.15s;
-}
-#verdict-card[data-act="clear"] #verdict-main:hover,
-#verdict-card[data-act="clear"] #verdict-main:focus-visible {
-  background: rgba(226, 73, 59, 0.10);
-  box-shadow: inset 0 0 0 1px rgba(226, 73, 59, 0.55);
-}
-#verdict-card[data-act="clear"] #verdict-main:hover::after,
-#verdict-card[data-act="clear"] #verdict-main:focus-visible::after {
-  color: rgba(226, 73, 59, 0.18);
-}
-#verdict-card[data-act="dismiss"] #verdict-main:hover,
-#verdict-card[data-act="dismiss"] #verdict-main:focus-visible {
-  background: rgba(156, 143, 119, 0.08);
-  box-shadow: inset 0 0 0 1px rgba(156, 143, 119, 0.45);
-}
-#verdict-card[data-act="dismiss"] #verdict-main:hover::after,
-#verdict-card[data-act="dismiss"] #verdict-main:focus-visible::after {
-  color: rgba(156, 143, 119, 0.16);
-}
+/* (The verdict's ✕ watermark and body washes retired 2026-08-07 with the
+   banner's and the peek's — one grammar across the card family.) */
 .verdict-actions {
   display: flex; flex-direction: column; align-items: stretch; gap: 6px;
   margin-top: clamp(8px, 1.6vmin, 12px);
 }
-.verdict-fold { display: flex; flex-direction: column; gap: 6px; }
-.verdict-fold.card-actions-empty { display: none; }
 .verdict-fold .pk-strip { margin-top: 0; }
 .verdict-fold .banner-foot { margin-top: 0; }
+
+/* ---------- THE NAMED VERB: every card's primary act (2026-08-07) --------- */
+/* Joe: "the 'x' on the main body is probably too non-intuitive… we need
+   that to remain the main action but find a better UX." So the act keeps
+   its primacy and gains a name.
+   HIERARCHY IS AREA, NOT VOLUME: the primary takes the free width and
+   never rests dim; the secondaries take their intrinsic width and keep
+   0.45. Hue still means act (red destroys, steel is a tool) — a primary
+   may not win by being redder than its neighbours.
+   This block sits AFTER .verdict-fold on purpose: that rule sets
+   flex-direction: column at equal specificity, and source order is what
+   decides between them. Moving this block up turns the verdict card's row
+   back into a stack. */
+#banner-actions.banner-fold, .pk-fold, .verdict-fold {
+  display: flex; flex-direction: row; flex-wrap: nowrap; align-items: stretch;
+  gap: 6px;
+  border-top: 1px solid var(--hair);
+  margin: 6px 4px 0;
+  padding-top: 6px;
+}
+.card-act {
+  flex: 1 1 auto; min-width: 0; overflow: hidden;
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  min-height: 34px; padding: 0 14px;
+  border-radius: 7px;
+  font: 700 13px/1.2 var(--font-ui);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  color: var(--red);
+  background: var(--red-soft);
+  border: 1px solid rgba(226, 73, 59, 0.42);
+  transition: background 0.12s, border-color 0.12s, color 0.12s; /* no transform: cards are chrome */
+}
+.card-act:hover, .card-act:focus-visible {
+  background: rgba(226, 73, 59, 0.24); border-color: var(--red); color: #fff;
+}
+/* 2i-C's disabled code: drain the hue. A clear in flight LOOKS spent — the
+   old guard was a closure boolean that swallowed the second press in silence. */
+.card-act:disabled { filter: grayscale(1); cursor: default; }
+/* A spectator's dismiss is not destructive and must not wear red. The
+   :not() keeps this off the ceremony's Skip, which is steel and whose own
+   hover would otherwise lose to this more specific rule. */
+[data-act="dismiss"] .card-act:not([data-verb="skip"]) {
+  color: var(--muted); background: rgba(156, 143, 119, 0.10);
+  border-color: rgba(156, 143, 119, 0.40);
+}
+[data-act="dismiss"] .card-act:not([data-verb="skip"]):hover,
+[data-act="dismiss"] .card-act:not([data-verb="skip"]):focus-visible {
+  background: rgba(156, 143, 119, 0.20); border-color: var(--muted); color: var(--ivory);
+}
+/* Skip is a TOOL, not a removal — steel, per HUE = ACT. */
+.card-act[data-verb="skip"] {
+  color: var(--ivory); background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(243, 234, 215, 0.28);
+}
+.card-act[data-verb="skip"]:hover, .card-act[data-verb="skip"]:focus-visible {
+  background: rgba(255, 255, 255, 0.14); border-color: var(--ivory);
+}
+/* THE LINKED PRESS: hovering the body lights the named bar, so the shortcut
+   teaches the word instead of hiding behind a watermark. #verdict-fold is
+   nested inside .verdict-actions, so its selector reaches one level deeper. */
+#banner-main:hover ~ #banner-actions .card-act,
+.pk-main:hover ~ .pk-fold .card-act,
+#verdict-main:hover ~ .verdict-actions .card-act:not([data-verb="skip"]) {
+  background: rgba(226, 73, 59, 0.24); border-color: var(--red); color: #fff;
+}
+#result-banner[data-act="dismiss"] #banner-main:hover ~ #banner-actions .card-act,
+#verdict-card[data-act="dismiss"] #verdict-main:hover ~ .verdict-actions .card-act:not([data-verb="skip"]) {
+  background: rgba(156, 143, 119, 0.20); border-color: var(--muted); color: var(--ivory);
+}
+#verdict-main:hover ~ .verdict-actions .card-act[data-verb="skip"] {
+  background: rgba(255, 255, 255, 0.14); border-color: var(--ivory);
+}
+/* the body's own feedback is now a quiet lift, nothing more */
+#banner-main:hover, .pk-main:hover, #verdict-main:hover { background: rgba(255, 255, 255, 0.035); }
+/* secondaries: intrinsic width, one row, compress rather than wrap — a card
+   that changes height between states is the §7.10 defect */
+#banner-actions .pk-strip, .pk-fold .pk-strip, .verdict-fold .pk-strip {
+  flex: 0 0 auto; width: auto; margin-top: 0; min-height: 34px; min-width: 0;
+}
+.banner-foot { flex: 0 0 auto; }
+body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives */
+/* Touch is where the old hover-only affordance failed outright. */
+@media (pointer: coarse) {
+  .card-act,
+  #banner-actions .pk-strip, .pk-fold .pk-strip, .verdict-fold .pk-strip,
+  .banner-foot > button { min-height: 44px; }
+}
+/* the announcement channel: read by screen readers, invisible to everyone else */
+.sr-live { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }
 
 /* hit-stop radial flash (§2.4 phase 3) */
 #hit-flash {
@@ -4049,7 +4040,6 @@ body.mini .popover { width: min(94vw, 312px); }
   .mod-card { min-width: 52px; padding: 4px 8px 3px; }
   .mod-card .mv { font-size: 14px; }
   .verdict-actions { margin-top: 8px; }
-  #verdict-main::after { font-size: 56px; }
   .pre-mods { margin: 8px 0; }
   .notation-line { margin-top: 6px; }
 }

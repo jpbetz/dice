@@ -292,6 +292,26 @@ export class Table {
     return this.dbg(`entryState(${rollId === null ? '' : JSON.stringify(rollId)})`);
   }
 
+  // Park a REAL cursor over an element, so CSS `:hover` actually matches.
+  // A synthetic MouseEvent cannot do this — dispatching 'mouseover' runs JS
+  // listeners but never moves the browser's hover state, so any rule in the
+  // cascade stays unmatched. Only Input.dispatchMouseEvent moves the cursor
+  // for real. Returns false when the element isn't on screen to aim at.
+  async hover(selector) {
+    const box = await this.eval(`(() => {
+      const el = document.querySelector(${JSON.stringify(selector)});
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height) return null;
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    })()`);
+    if (!box) return false;
+    await this.page.browser.send('Input.dispatchMouseEvent', {
+      type: 'mouseMoved', x: Math.round(box.x), y: Math.round(box.y), buttons: 0,
+    }, this.page.sessionId);
+    return true;
+  }
+
   // Make this tab a TOUCH device: `(pointer: coarse)` starts matching, which
   // is the only way to exercise a contract whose complement is a coarse
   // media rule (the one-✕ rule's sweep, §7.15). Emulation.setEmulatedMedia

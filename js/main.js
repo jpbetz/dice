@@ -1511,32 +1511,21 @@ function renderPeek() {
   peekEl.textContent = '';
 
   // THE FOLDED CARD, shelf edition (Joe 2026-08-03: 'roughly the same as
-  // the roll reveal panel'): the card's BODY is the one big clear target —
-  // hover arms the red removal dress, click clears for everyone (§7.7:
-  // tidying a collected roll is anyone's housekeeping; the server still
-  // enforces it) — and the fold below keeps REROLL/Reveal untinted. The
-  // ✕-over-the-dice sweep is retired.
+  // the roll reveal panel'): the card's BODY stays a clear target — click
+  // clears for everyone (§7.7: tidying a collected roll is anyone's
+  // housekeeping; the server still enforces it) — but the named ✕ Clear in
+  // the fold is what ADVERTISES the act now (2026-08-07). The body keeps no
+  // role/tabindex/title: it is a shortcut, and the bar below is the control.
   const main = document.createElement('div');
   main.className = 'pk-main';
-  main.setAttribute('role', 'button');
-  main.tabIndex = 0;
-  main.title = 'Clear this roll for everyone';
-  main.setAttribute('aria-label', main.title);
   const rid = c.rollId;
-  main.addEventListener('click', () => {
-    if (peekPinned()) closePopover(); // release the pin before the roll dies
-    requestClearRoll(rid).then((ok) => {
-      if (ok) closePeek();
-      else showSettingsNote('couldn’t clear the roll — try again');
-    });
-  });
-  main.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      e.stopPropagation();
-      main.click();
-    }
-  });
+  // The pin release must happen before the roll dies, or a pinned peek
+  // outlives its own cluster (the immortal-peek trap this file warns about).
+  const peekClear = (btn) => {
+    if (peekPinned()) closePopover();
+    runCardClear(rid, btn, closePeek);
+  };
+  main.addEventListener('click', () => peekClear(null));
 
   // header: the BANNER's identity treatment (Joe 2026-08-04, panel
   // parity) — the roller's name in their color carries the who; the old
@@ -1600,19 +1589,23 @@ function renderPeek() {
   main.appendChild(bd);
   peekEl.appendChild(main);
 
-  // The FOLD: the banner's action set below a hairline crease — REROLL ❯❯❯
-  // on approach, Reveal standing for a hidden roll. No die art on the
-  // strip (user call, 2026-07-31: the actual dice sit right under this
-  // card); the reroll REPLACES the shelved cluster. The card ± stays on
-  // right-click. No ✕ anywhere: the body above IS the clear target.
+  // The FOLD: the named primary plus the banner's action set below a
+  // hairline crease — ✕ Clear standing, REROLL ❯❯❯ on approach, Reveal
+  // standing for a hidden roll. No die art on the strip (user call,
+  // 2026-07-31: the actual dice sit right under this card); the reroll
+  // REPLACES the shelved cluster. The card ± stays on right-click.
+  // The peek's primary is ALWAYS red Clear — a collected roll belongs to
+  // the table, not to its roller (§7.7's documented asymmetry).
   if (entry) {
     const fold = document.createElement('div');
     fold.className = 'pk-fold';
     appendCardActions(fold, entry, {
       revealClass: 'sm-reveal pk-reveal', // the one Reveal dress, small size
       replaceShelfId: c.rollId,
+      verb: 'clear',
+      onPrimary: peekClear,
     });
-    if (fold.childElementCount) peekEl.appendChild(fold);
+    peekEl.appendChild(fold); // never empty now: the primary always stands
   }
   peekEl.oncontextmenu = entry && canReroll(entry) ? (ev) => {
     ev.preventDefault();
@@ -2251,6 +2244,7 @@ const resultBreakdownEl = document.getElementById('result-breakdown');
 const resultVerdictEl   = document.getElementById('result-verdict');
 const bannerActionsEl   = document.getElementById('banner-actions');
 const bannerMainEl      = document.getElementById('banner-main');
+const bannerLiveEl      = document.getElementById('banner-live');
 
 // One clean way to hide the banner (Tier 0 §0e endurance leak): the roll-dice
 // outline is anchored to the banner (mouseenter paints it, mouseleave clears
@@ -2312,9 +2306,15 @@ function armAutoCollect(entry) {
   fire.tries = 0;
   autoCollect.timer = setTimeout(fire, autoCollectMs);
 }
-// Reading holds the clock; leaving restarts it whole.
+// Reading holds the clock; leaving restarts it whole. A thumb reads too:
+// touch fires no mouseenter, so without the pointer pair the tidy-away
+// clock collects the roll out from under whoever is still reading it.
 banner.addEventListener('mouseenter', () => clearTimeout(autoCollect.timer));
 banner.addEventListener('mouseleave', () => { if (lastEntry) armAutoCollect(lastEntry); });
+banner.addEventListener('pointerdown', () => clearTimeout(autoCollect.timer));
+for (const ev of ['pointerup', 'pointercancel']) {
+  banner.addEventListener(ev, () => { if (lastEntry) armAutoCollect(lastEntry); });
+}
 
 // ---------------------------------------------------------------------------
 // Roll outlines (Joe 2026-08-03): the card's removal highlight doubles as a
@@ -2931,6 +2931,16 @@ function renderRollResults(entry, dice, fx = true) {
   }
 
   banner.classList.remove('hidden', 'crit-success', 'crit-fail');
+  // One composed sentence per result, into a node that holds nothing else.
+  // aria-live on the body itself would re-announce on every incidental
+  // repaint (a room-wide system change repaints five cells) and can speak a
+  // half-built card; this speaks once, when a result actually lands.
+  bannerLiveEl.textContent = [
+    entry.playerName || null,
+    entry.label || null,
+    hidden ? 'held' : (activeSystem().usesTotal ? String(entry.total) : null),
+    resultVerdictEl.textContent || null,
+  ].filter(Boolean).join(' — ');
   renderBannerActions(entry);
   armAutoCollect(entry); // every banner paint restarts the tidy-away clock
   const crit = entryCrit(entry);
@@ -2955,11 +2965,83 @@ function renderRollResults(entry, dice, fx = true) {
 //   · the peek's reroll REPLACES its shelved cluster (Joe's rule: reroll,
 //     not a copy); the banner's and the verdict's let the old roll shelve
 //     itself on arrival
-//   · clearing is the CARD BODY's job on the banner and peek (the folded
-//     card, Joe 2026-08-03) while the verdict card — whose body is the
-//     ceremony stage, not a removal target — keeps its static §7.7.2
-//     roller-✕. No ✕ is built here; this holder is the fold's verbs only.
+//   · every surface's primary act is BUILT here now (2026-08-07) and named:
+//     the banner and verdict say Clear or Dismiss by role, the peek always
+//     says Clear (a collected roll is the table's housekeeping, §7.7), and
+//     the verdict says Skip while its beat still runs. The card body stays
+//     a clear target on all three — it just stopped being the only one.
+// THE NAMED VERB (Joe 2026-08-07: "the 'x' on the main body is probably too
+// non-intuitive… we need that to remain the main action but find a better
+// UX"). The body stays a clear target — the biggest one on the card — but it
+// stops being the ADVERTISED one. A card's primary act now says its own name
+// in the fold, standing at full opacity, first in the tab order, wide enough
+// that hierarchy comes from AREA rather than from being redder than its
+// neighbours. Hover on the body lights that bar instead of painting a 72px ✕
+// watermark nobody asked to learn: the shortcut now teaches the word.
+//
+// One dress per verb still holds (2i-C) — red destroys, steel is a tool —
+// and `skip` is here because completing a ceremony beat and clearing the
+// roll are never one gesture (§7.16): mid-beat the ceremony card's primary
+// says what the press will actually do.
+const CARD_VERBS = {
+  clear:   { word: 'Clear',   glyph: '✕',  sentence: 'Clear this roll for everyone' },
+  dismiss: { word: 'Dismiss', glyph: '✕',  sentence: 'Dismiss — hides this for you; the dice stay until the roller acts' },
+  skip:    { word: 'Skip',    glyph: '❯❯', sentence: 'Skip to the result' },
+};
+
+function buildPrimaryAct(opts) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'card-act';
+  const glyph = document.createElement('span');
+  glyph.className = 'card-act-x';
+  glyph.setAttribute('aria-hidden', 'true'); // the WORD is the accessible name
+  const word = document.createElement('span');
+  word.className = 'card-act-w';
+  btn.append(glyph, word);
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation(); // never let the card body's shortcut fire twice
+    opts.onPrimary(btn);
+  });
+  return btn;
+}
+
+function paintPrimaryAct(btn, key) {
+  const v = CARD_VERBS[key] || CARD_VERBS.dismiss;
+  btn.dataset.verb = key;
+  btn.firstElementChild.textContent = v.glyph;
+  btn.lastElementChild.textContent = v.word;
+  btn.title = v.sentence;
+  btn.setAttribute('aria-label', v.sentence);
+}
+
+// Was the roll mine? Solo has no one else, so every roll is. Extracted from
+// the two inline copies (renderBannerActions, renderVerdictCard) now that
+// updateCardActions needs the same question.
+function isMine(entry) {
+  return !netOnline || !!(net && entry && entry.playerId === net.playerId);
+}
+
+// ONE clear runner for every surface. The re-entrancy guard used to be a
+// closure boolean per card — invisible, and duplicated. Now it rides the
+// button's own `disabled`, so a press in flight LOOKS spent (2i-C drains hue
+// via grayscale) instead of silently swallowing the second click. `btn` is
+// null when the press came from a body shortcut, which has no dress to drain.
+function runCardClear(rollId, btn, onOk) {
+  if (!rollId || (btn && btn.disabled)) return;
+  if (btn) btn.disabled = true;
+  requestClearRoll(rollId).then((ok) => {
+    if (btn) btn.disabled = false;
+    if (ok) { if (onOk) onOk(); } else showSettingsNote('couldn’t clear the roll — try again');
+  });
+}
+
 function appendCardActions(holder, entry, opts) {
+  if (opts.onPrimary) {
+    const primary = buildPrimaryAct(opts);
+    paintPrimaryAct(primary, opts.verb || 'clear');
+    holder.appendChild(primary);
+  }
   if (canReveal(entry)) {
     const foot = document.createElement('div');
     foot.className = 'banner-foot';
@@ -3011,6 +3093,9 @@ function appendCardActions(holder, entry, opts) {
 // load completes — so first render doubles as the mount trigger.
 function mountCardActions(holder, opts) {
   if (holder._cardActionsMounted) return;
+  // The primary leads the row: DOM order is tab order is visual order, and
+  // the act the player most likely wants is the one their thumb lands on.
+  const primary = buildPrimaryAct(opts);
   const foot = document.createElement('div');
   foot.className = 'banner-foot';
   foot.hidden = true;
@@ -3035,29 +3120,25 @@ function mountCardActions(holder, opts) {
     requestRoll([...e.spec.dice], e.label, rerollOpts(e));
   });
 
-  holder.appendChild(foot);
-  holder.appendChild(strip);
+  holder.append(primary, foot, strip);
   holder._entry = null;
+  // Named children beat a positional walk: the row's shape is now a fact the
+  // update path reads, not a chain of nextElementSibling it has to re-derive.
+  holder._acts = { primary, foot, strip };
   holder._cardActionsMounted = true;
-  // Class-gated visibility (see .card-actions-empty CSS): with the two
-  // children permanently mounted, `:empty` can never fire — the class rides
-  // the same signal so the hairline crease and column gaps stay honest.
-  holder.classList.add('card-actions-empty');
 }
 
 function updateCardActions(holder, entry, opts) {
   if (!holder._cardActionsMounted) mountCardActions(holder, opts);
   holder._entry = entry || null;
-  const foot = holder.firstElementChild;         // .banner-foot
-  const strip = foot && foot.nextElementSibling; // .pk-strip
-  const showReveal = canReveal(entry);
+  const { primary, foot, strip } = holder._acts;
+  paintPrimaryAct(primary, opts.verbFor
+    ? opts.verbFor(entry)
+    : (entry && entry.rollId && isMine(entry) ? 'clear' : 'dismiss'));
   const showStrip = canReroll(entry);
-  if (foot) foot.hidden = !showReveal;
-  if (strip) {
-    strip.hidden = !showStrip;
-    if (showStrip) strip.setAttribute('aria-label', `Reroll — ${entry.label}`);
-  }
-  holder.classList.toggle('card-actions-empty', !showReveal && !showStrip);
+  foot.hidden = !canReveal(entry);
+  strip.hidden = !showStrip;
+  if (showStrip) strip.setAttribute('aria-label', `Reroll — ${entry.label}`);
 }
 
 // The folded card's BODY act: 'clear' (the roller — for everyone) or
@@ -3067,48 +3148,40 @@ let bannerAct = { mode: 'dismiss', rollId: null };
 
 function renderBannerActions(entry) {
   const hidden = entryHidden(entry);
-  const mine = !netOnline || (net && entry.playerId === net.playerId);
-  // The body-as-target dress + act (the folded card): red removal for the
-  // roller's clear, muted slate for a spectator's dismiss — the highlight
-  // must say WHICH removal it is.
-  bannerAct = { mode: entry.rollId && mine ? 'clear' : 'dismiss', rollId: entry.rollId || null };
+  // The act itself (the folded card): the roller CLEARS for everyone, a
+  // spectator DISMISSES locally. dataset.act still dresses the card — red
+  // removal vs muted slate — because the named bar must say WHICH removal
+  // it is, and a spectator's slate must never read as destructive.
+  bannerAct = { mode: entry.rollId && isMine(entry) ? 'clear' : 'dismiss', rollId: entry.rollId || null };
   banner.dataset.act = bannerAct.mode;
-  bannerMainEl.title = bannerAct.mode === 'clear'
-    ? 'Clear this roll for everyone'
-    : 'Dismiss — hides this for you; the dice stay until the roller acts';
-  bannerMainEl.setAttribute('aria-label', bannerMainEl.title);
+  // The body carries no title/aria-label any more: it is no longer the
+  // announced control, only a shortcut to the one that is. Announcing both
+  // would put two names on one act.
   // ONE Reveal dress (2i-C): confirm weight, sized by surface — the gold
   // primary it wore here was the roll verb's hue on a non-roll act.
   // L8: mounted once (lazy, on first call), toggled thereafter — the fold's
-  // two children never churn per banner paint.
-  updateCardActions(bannerActionsEl, entry, { revealClass: 'reveal-verb banner-btn' });
+  // children never churn per banner paint. opts are consumed at MOUNT only,
+  // so onPrimary closes over module-level bannerAct, never over `entry`.
+  updateCardActions(bannerActionsEl, entry, {
+    revealClass: 'reveal-verb banner-btn',
+    verbFor: () => bannerAct.mode,
+    onPrimary: (btn) => {
+      if (bannerAct.mode === 'clear') runCardClear(bannerAct.rollId, btn);
+      else hideBanner();
+    },
+  });
 }
 
-// The body's click — one press, the likeliest act. Static wiring; the act
-// itself is repainted state (bannerAct). A pending clear disarms the body
-// so a double-click cannot double-POST.
-{
-  let clearing = false;
-  bannerMainEl.addEventListener('click', () => {
-    if (bannerAct.mode === 'clear' && bannerAct.rollId) {
-      if (clearing) return;
-      clearing = true;
-      requestClearRoll(bannerAct.rollId).then((ok) => {
-        clearing = false;
-        if (!ok) showSettingsNote('couldn’t clear the roll — try again');
-      });
-    } else {
-      hideBanner();
-    }
-  });
-  bannerMainEl.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      e.stopPropagation(); // the table's Enter (roll) must not also fire
-      bannerMainEl.click();
-    }
-  });
-}
+// The body's click — the shortcut, kept because it is the biggest target on
+// screen and the hand already knows it. Static wiring; the act itself is
+// repainted state (bannerAct). No keydown twin any more: the body is not
+// focusable, and the named bar beside it is a real <button> that owns Enter
+// and Space natively (the global Enter handler already bails on a focused
+// button, and the ceremony's Space branch does the same).
+bannerMainEl.addEventListener('click', () => {
+  if (bannerAct.mode === 'clear' && bannerAct.rollId) runCardClear(bannerAct.rollId, null);
+  else hideBanner();
+});
 
 // True only while a hello resync fast-forwards the on-felt roll back into
 // place (§7.7): the surfaces repaint, but crit fanfare that already played
@@ -3595,6 +3668,12 @@ function ceremonyFinish(roll) {
   // (stagedVerdict null → the arm no-ops), and a landed reveal means the
   // clock arms against the readable entry.
   armCeremonyRetire(roll);
+  // The word has to catch up with the beat: while the moment ran, the card's
+  // primary said SKIP. It has just stopped running, so repaint before the
+  // queue can move — playRoll() below calls dismissCeremonyUI(), which nulls
+  // stagedVerdict, and a repaint after that either no-ops or paints a
+  // superseded roll's verdict over the incoming one.
+  if (stagedVerdict) renderVerdictCard(stagedVerdict.roll, stagedVerdict.entry);
   if (rollQueue.length) playRoll(rollQueue.shift());
 }
 
@@ -3789,8 +3868,13 @@ function attributionCards(roll, entry) {
 }
 
 let verdictFor = null; // {rollId, mine} — what the verdict card's control acts on
+// Is the moment still running? While it is, the card's primary act is SKIP,
+// not clear — the one rule §7.16 states outright ("completing the beat and
+// clearing the roll are never one gesture"). Named once because the body
+// shortcut, the named bar and its label all have to agree on the answer.
+const ceremonyBeatPlaying = () => !!(currentRoll && currentRoll.ceremony && !currentRoll.done);
 // Verdict-fold cell (L8): resolved once here, mounted lazily on the first
-// updateCardActions call so renderVerdictCard never rebuilds these two
+// updateCardActions call so renderVerdictCard never rebuilds these
 // children per paint.
 const verdictFoldEl = document.getElementById('verdict-fold');
 
@@ -3816,21 +3900,29 @@ function renderVerdictCard(roll, entry) {
   // the same role split as the banner's — the roller's click clears for
   // everyone, a spectator's dismisses locally (the dice stay until the
   // roller acts). Idle flow is armCeremonyRetire's clock, not a button.
-  const mine = !netOnline || (net && entry.playerId === net.playerId);
+  const mine = isMine(entry);
   verdictFor = { rollId: entry.rollId || null, mine };
   const card = document.getElementById('verdict-card');
   card.dataset.act = entry.rollId && mine ? 'clear' : 'dismiss';
-  const vMain = document.getElementById('verdict-main');
-  vMain.title = entry.rollId && mine
-    ? 'Clear this roll for everyone'
-    : 'Dismiss — hides this for you; the dice stay until the roller acts';
-  vMain.setAttribute('aria-label', vMain.title);
+  // The body keeps no title/aria-label: the named bar below is the announced
+  // control (2026-08-07), and mid-beat it is the ONLY surface that can say
+  // the press will SKIP rather than clear — which is the whole point of
+  // "completing the beat and clearing the roll are never one gesture".
   // ONE card family (2i-C): the fold's shared verbs — Reveal for the
   // authority (goal 11), the REROLL ❯❯❯ strip once the values are
   // readable — come from the same builder the banner and peek use.
   // Mounted lazily on first call (L8) — this only updates the entry pointer
   // and toggles hidden so #verdict-fold never churns DOM per verdict paint.
-  updateCardActions(verdictFoldEl, entry, { revealClass: 'reveal-verb' });
+  updateCardActions(verdictFoldEl, entry, {
+    revealClass: 'reveal-verb',
+    verbFor: () => (ceremonyBeatPlaying() ? 'skip'
+      : verdictFor.rollId && verdictFor.mine ? 'clear' : 'dismiss'),
+    onPrimary: (btn) => {
+      if (ceremonyBeatPlaying()) { skipCeremony(); return; }
+      if (verdictFor.rollId && verdictFor.mine) runCardClear(verdictFor.rollId, btn);
+      else dismissCeremonyUI();
+    },
+  });
 
   // Per-die systems have no total: the ring shows no number and DC math
   // never renders (usesTotal, meanings.js v2). The card's center carries
@@ -3958,31 +4050,12 @@ document.addEventListener('keydown', (e) => {
 // the roll are never one gesture.
 {
   const vMain = document.getElementById('verdict-main');
-  let clearing = false;
   vMain.addEventListener('click', (e) => {
     e.stopPropagation(); // the layer's skip listener must not double-handle
-    if (currentRoll && currentRoll.ceremony && !currentRoll.done) {
-      skipCeremony();
-      return;
-    }
+    if (ceremonyBeatPlaying()) { skipCeremony(); return; }
     const v = verdictFor;
-    if (v && v.mine && v.rollId) {
-      if (clearing) return;
-      clearing = true;
-      requestClearRoll(v.rollId).then((ok) => {
-        clearing = false;
-        if (!ok) showSettingsNote('couldn’t clear the roll — try again');
-      });
-    } else {
-      dismissCeremonyUI(); // spectator: local dismiss only — the dice stay
-    }
-  });
-  vMain.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      e.stopPropagation();
-      vMain.click();
-    }
+    if (v && v.mine && v.rollId) runCardClear(v.rollId, null);
+    else dismissCeremonyUI(); // spectator: local dismiss only — the dice stay
   });
   // Reading holds the flow clock, exactly like hovering the banner holds
   // the tidy-away; leaving re-arms it whole (hidden cards stay standing —
@@ -4669,6 +4742,36 @@ window.__diceDebug = {
   // is a memory + GPU leak the hideBanner helper closes.
   get outlinedCount() { return outlined.length; },
   hoverBanner(on) { outlineRollDice(on !== false); return outlined.length; },
+  // The card action row, read as the EYE gets it. Every field here is
+  // computed style, never the `.hidden` property — asserting the property
+  // is exactly how the fold shipped two live verbs on every card while the
+  // suite stayed green. `surface` is 'banner' | 'verdict' | 'peek'.
+  cardActs(surface) {
+    const holder = document.querySelector(
+      surface === 'verdict' ? '#verdict-fold'
+      : surface === 'peek' ? '#peek-card .pk-fold'
+      : '#banner-actions');
+    if (!holder) return null;
+    const read = (el) => {
+      if (!el) return { display: 'absent' };
+      const cs = getComputedStyle(el);
+      return { display: cs.display, opacity: cs.opacity, minH: parseFloat(cs.minHeight) || 0 };
+    };
+    const primary = holder.querySelector('.card-act');
+    return {
+      kids: holder.childElementCount,
+      foldDisplay: getComputedStyle(holder).display,
+      primary: primary ? {
+        ...read(primary),
+        verb: primary.dataset.verb || null,
+        word: primary.querySelector('.card-act-w').textContent,
+        label: primary.getAttribute('aria-label'),
+        disabled: primary.disabled,
+      } : { display: 'absent' },
+      reveal: read(holder.querySelector('.banner-foot')),
+      reroll: read(holder.querySelector('.pk-strip')),
+    };
+  },
   setChipsVisible(on) { setChips(on); return chipsOn; },
   get chipCount() { return chips.length; },
   // chrome (the two collapsible panel regions + emergent compact view):
