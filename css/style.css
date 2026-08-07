@@ -1851,7 +1851,7 @@ html, body {
   border: 1px solid currentColor;
   background: none;
 }
-/* There is NO global `.hidden` in this stylesheet (see css:2563) — every hide
+/* There is NO global `.hidden` in this stylesheet (see css:2642) — every hide
    carries its own rule, so `Tables ▾` (absent when there are no recents) can
    be hidden in place rather than only by not being built. */
 .rail-ghost.hidden { display: none; }
@@ -1861,6 +1861,85 @@ html, body {
    home in the identity menu. #rail-roster:empty (css:1729) is untouched
    either way: with affordances in it the row is not empty, and when the first
    real pill replaces them it is still not empty. */
+
+/* THE LOBBY MENU (§7.20) — what `+ New table` and `Tables ▾` drop. Built on
+   demand onto document.body, so it is a FLOATING menu and joins the family
+   #identity-menu (css:1642) / #offer-menu (css:1681) already established:
+   same --z-popover rung, same .panel fill, same tight padding, so the rail's
+   menu and the identity chip's menu are visibly one thing. `position: fixed`
+   is load-bearing — without it the menu computes static and lays out at the
+   body's flow position. Deliberately NO top/left/width here: the JS measures,
+   clamps to the viewport and flips above when the rail is low on screen, so
+   any offset in CSS would fight it. Only the bounds it clamps WITHIN. */
+.rail-menu {
+  position: fixed;
+  z-index: var(--z-popover); /* a small popover — same rung as ± */
+  min-width: 210px;
+  max-width: 260px;
+  padding: 6px;
+}
+.rail-menu.hidden { display: none; } /* no global .hidden (css:2642) */
+/* .btn-row was written for the panel column (css:286-298) and needs two
+   tightenings at menu scale. (1) Its 2:1 flex split leaves `Create` ~67px in
+   a 210px menu — under the width the label needs — so the button sizes to its
+   text and the input takes what is left. (2) Its input dress paints a
+   var(--panel-border) hairline, which is GOLD-tinted, 6px inside .panel's own
+   gold hairline: two concentric gold rings in a menu, and ambient chrome
+   reads steel by the standing law (css:226-231). .tin's quieter well+hair
+   dress is restored instead. Focus is left alone on purpose — .btn-row
+   input:focus already outranks .tin:focus, so the ring is IVORY, which is the
+   law's own answer (css:298: focus is a tool state, not a roll). */
+.rail-menu .btn-row { margin-top: 0; gap: 6px; }
+.rail-menu .btn-row .btn { flex: 0 0 auto; white-space: nowrap; }
+.rail-menu .btn-row input {
+  flex: 1 1 auto;
+  padding: 6px 8px;
+  border-color: var(--hair);
+  background: var(--well);
+  font-size: 12px;
+}
+/* one remembered table per row: the go-button carries the width, the forget
+   rides its end. .idm-item is display:block/width:100% by itself, so both are
+   undone here rather than in the shared rule. Names cap with an ellipsis for
+   the reason .offer-menu-item gives (css:1689): the menu never jiggles. */
+.rail-menu-row { display: flex; align-items: center; gap: 2px; }
+.rail-menu-row .idm-item {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* THE FORGET ✕ — the REVEALED tier (P6), the same three-line pattern .die-x
+   (css:421) and .log-again (css:2984) already wear: absent until you reach
+   for the row, standing on coarse pointers where no hover exists to aim with,
+   and always present to the keyboard. That is what keeps it subordinate to
+   the row's main button without hiding it from anyone.
+   RED, and here is the judgement call: this forgets a bookmark, not data, so
+   it is not "destruction" in the sense css:251-255 reserves red for. But the
+   red in this app marks the REMOVE VERB at the moment of aim — .cc-unit
+   (css:1260) tints red to drop a die from a draft, which destroys nothing
+   either — and a ✕ that stayed muted on hover would read as inert. Red on
+   HOVER only; at rest it is muted like every other quiet glyph. */
+.rail-menu-forget {
+  flex: none;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s, background 0.12s;
+}
+.rail-menu-row:hover .rail-menu-forget,
+.rail-menu-forget:focus-visible { opacity: 1; }
+.rail-menu-forget:hover { color: var(--red); background: rgba(226, 73, 59, 0.12); }
+.rail-menu-forget:focus-visible { outline: 1px solid var(--ivory); outline-offset: -1px; }
+@media (pointer: coarse) { .rail-menu-forget { opacity: 1; } }
 
 /* the settings rename row: the input takes a bounded seat beside its
    label — .tin's block width would crush the prow's label column */

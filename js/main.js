@@ -4795,6 +4795,22 @@ window.__diceDebug = {
   get players() { return players.map((p) => ({ id: p.id, name: p.name })); },
   changeName(name) { return applyRename(name); },
   leaveTable() { return leaveTable(); },
+  // §7.20 presence row (the rail's first slot): ghosts = the dashed exits
+  // (lobby verbs / Invite / unclaimed seat chairs), pills = the live roster.
+  // One JSON projection so scenarios assert the row's grammar, never its DOM.
+  get presenceRow() {
+    return {
+      ghosts: [...rosterEl.querySelectorAll('.rail-ghost')].map((b) => ({
+        label: ((b.querySelector('.rg-label') || {}).textContent || '').trim(),
+        title: b.title,
+        dot: !!b.querySelector('.rg-dot'),
+      })),
+      pills: [...rosterEl.querySelectorAll('.roster-name')].map((el) => el.textContent.trim()),
+    };
+  },
+  // §7.20 per-seat link (what an unclaimed chair copies): base + &as=Name.
+  // Null in the lobby, exactly as inviteUrl() is.
+  seatInviteUrl(name) { return seatInviteUrl(name); },
   get shroudedCount() { return tableDice.filter((d) => d.shrouded).length; },
   get revealingCount() { return revealing.length; },
   get pendingReveals() { return [...pendingReveals.keys()]; },
@@ -10294,6 +10310,14 @@ function renderPlayers() {
   updateIdentityChip(); // the rail chip mirrors the roster's name + color
   updateTrayButtons(); // the ▾ offer picker appears/leaves with teammates
   if (isOfferMenuOpen()) closeOfferMenu(); // never target a stale roster
+  // ...and neither may the rail menu OUTLIVE ITS ANCHOR. This function clears
+  // rosterEl, so every re-render destroys the '+ New table' / 'Tables ▾' button
+  // the open menu is anchored to and leaves it floating over nothing. Not
+  // hypothetical in the lobby, where there are no roster events but toggling
+  // '✎ Edit pools' re-renders this row (setPoolsOwner and the manage-mode
+  // gates all land here). Same rule the set menu keeps: a menu must not
+  // outlive its anchor.
+  if (isRailMenuOpen()) closeRailMenu();
 }
 
 // One dashed pill in a roster pill's geometry — the shared body of every
