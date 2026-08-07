@@ -5059,6 +5059,40 @@ export const scenarios = [
     },
   },
   {
+    name: 'fold-visibility',
+    tags: ['smoke', 'roll', 'chrome'],
+    // The pin the suite never had. endurance-banner-actions asserts the
+    // `.hidden` PROPERTY, which the toggle really does set — but a property
+    // is not a paint. `.banner-foot { display: flex }` (css:3018) and
+    // `.pool-roll { display: flex }` (css:797) are AUTHOR-origin rules, and
+    // the UA sheet's `[hidden] { display: none }` is user-agent origin, so
+    // the author rule wins no matter its specificity. Everything here reads
+    // COMPUTED DISPLAY: what the player's eye actually gets.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      const shown = (sel) => a.eval(
+        `(() => { const el = document.querySelector(${JSON.stringify(sel)});`
+        + ` return el ? getComputedStyle(el).display : 'absent'; })()`);
+
+      // Face up and rerollable: REROLL stands, Reveal must be GONE — there is
+      // nothing left to reveal, and the server would 403 the attempt.
+      await a.roll('d6 # open');
+      assert.notEqual(await shown('#banner-actions .pk-strip'), 'none',
+        'a face-up roll shows its REROLL strip');
+      assert.equal(await shown('#banner-actions .banner-foot'), 'none',
+        'a face-up roll paints NO Reveal — the value is already public');
+
+      // Held: the mirror image. Reveal stands; REROLL must be gone, because a
+      // reroll would replay a spec nobody at the table can read (the same rule
+      // the log line already follows — held-roll pins 'no ⟳ while hidden').
+      await a.roll('d6 held # sealed');
+      assert.notEqual(await shown('#banner-actions .banner-foot'), 'none',
+        'a held roll shows its Reveal');
+      assert.equal(await shown('#banner-actions .pk-strip'), 'none',
+        'a held roll paints NO REROLL while the result is unreadable');
+    },
+  },
+  {
     name: 'endurance-banner-actions',
     tags: ['perf', 'roll', 'chrome', 'endurance-banner-actions'],
     // Tier 0 §0e / L8: renderBannerActions used to full-rebuild #banner-actions

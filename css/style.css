@@ -76,6 +76,20 @@ limitations under the License.
 
 * { box-sizing: border-box; }
 
+/* `hidden` is a PROMISE, and the UA sheet cannot keep it here. Its
+   `[hidden] { display: none }` lives in the user-agent origin, so ANY
+   author-origin display wins over it regardless of specificity — and two
+   of ours did: `.banner-foot { display: flex }` (:3018) and `.pool-roll
+   { display: flex }` (:797). The result shipped: `foot.hidden = true`
+   (js/main.js:3055) set the property, the suite asserted the property,
+   and the button stayed on screen — a face-up roll wearing a Reveal the
+   server would 403, a held roll wearing a REROLL of a spec nobody can
+   read. Global and !important on purpose: the next `el.hidden = true`
+   must not have to know which display rule it is fighting.
+   Pinned by the `fold-visibility` scenario, which reads computed display,
+   never the property. (Not a `.hidden` CLASS utility — see :2655.) */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
