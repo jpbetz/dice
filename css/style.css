@@ -1837,6 +1837,19 @@ html, body {
   border-color: rgba(243, 234, 215, 0.45);
   background: rgba(243, 234, 215, 0.07);
 }
+/* THE LABEL SPAN. The button's own text-overflow cannot reach it: .rg-label
+   is a FLEX ITEM, and ellipsis applies to a block container's inline content,
+   not to the items of a flex container. Measured: a long seat name lays out
+   215px inside the 120px pill and gets hard-cut mid-glyph with no '…'. So the
+   cap is honoured where it can be — on the span itself, the same shape
+   .identity-name (css:1636) already uses for a label inside a flex button.
+   min-width:0 is the load-bearing half: without it the item's automatic
+   minimum size refuses to shrink below the text. */
+.rail-ghost .rg-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 /* the optional leading dot, so a per-seat pill parses as the roster's
    [dot][name] grammar. .roster-dot's exact 8px round (border-box keeps it 8px
    with the ring on), but HOLLOW: an unclaimed seat has no player colour to
@@ -1851,7 +1864,7 @@ html, body {
   border: 1px solid currentColor;
   background: none;
 }
-/* There is NO global `.hidden` in this stylesheet (see css:2642) — every hide
+/* There is NO global `.hidden` in this stylesheet (see css:2655) — every hide
    carries its own rule, so `Tables ▾` (absent when there are no recents) can
    be hidden in place rather than only by not being built. */
 .rail-ghost.hidden { display: none; }
@@ -1878,7 +1891,7 @@ html, body {
   max-width: 260px;
   padding: 6px;
 }
-.rail-menu.hidden { display: none; } /* no global .hidden (css:2642) */
+.rail-menu.hidden { display: none; } /* no global .hidden (css:2655) */
 /* .btn-row was written for the panel column (css:286-298) and needs two
    tightenings at menu scale. (1) Its 2:1 flex split leaves `Create` ~67px in
    a 210px menu — under the width the label needs — so the button sizes to its
@@ -1912,7 +1925,7 @@ html, body {
   white-space: nowrap;
 }
 /* THE FORGET ✕ — the REVEALED tier (P6), the same three-line pattern .die-x
-   (css:421) and .log-again (css:2984) already wear: absent until you reach
+   (css:421) and .log-again (css:2997) already wear: absent until you reach
    for the row, standing on coarse pointers where no hover exists to aim with,
    and always present to the keyboard. That is what keeps it subordinate to
    the row's main button without hiding it from anyone.
