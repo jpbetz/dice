@@ -2362,3 +2362,255 @@ only on an explicit click. `&as=Name` pre-selects a seat and nothing
 more: it never auto-joins and never auto-applies, and an `as=` naming no
 profile is ignored silently so a stale link cannot break a join. One
 link for everyone stays the primary form — `inviteUrl()` is unchanged.
+
+### 7.20 The lobby, the empty seat, and the way to a table
+(2026-08-07, design — ROADMAP §3b)
+
+Roadmap authority is [ROADMAP.md](ROADMAP.md) §3b, which holds the CUJs
+and the three rulings; this section specifies the surfaces. The
+governing sentence: **the rail's first row already asks "who is here" —
+so when the answer is "nobody yet", that row carries the fix.**
+
+**WHY `solo` IS DELETED RATHER THAN REWORDED.** `setPill('solo','solo')`
+(main.js:11301) fails four ways, each disqualifying alone.
+
+1. *Wrong object.* `#status-pill` is a `<span>` — unclickable,
+   unfocusable, not in the tab order. It can only ever be a readout, and
+   getting to a table is now a common action, which GOALS' keyboard-paths
+   line covers.
+2. *Wrong channel.* The pill is a SHARED TRANSIENT. `showSettingsNote`
+   borrows it on a 3 s timer (main.js:8940) and releases it under an
+   explicit *"a status change may have taken the pill"* guard;
+   `reconnecting…` and the refusal message are its other writers. All of
+   them resolve. `solo` never does — and since nothing restores it, one
+   settings note silently destroys the indicator for the rest of the
+   session. Latent today (a solo table receives no settings events), and
+   live the moment the same trick is tried at a table with a teammate in
+   it.
+3. *Wrong proposition.* "solo" diagnoses the PLAYER. The player's
+   questions are about the ROOM: how do I get someone in here, and how do
+   I get to my friends' table.
+4. *It flattens two opposite states into one word.* This is the real
+   defect. "There is no table" and "there is a table and nobody else has
+   arrived yet" have different exits, and today both read `solo`.
+
+**THE THREE PRESENCE STATES.** The rail's first row has exactly three,
+and `renderPlayers()` becomes the renderer of all three — today it runs
+only in `initNet()`'s online branch (main.js:11289), so the lobby branch
+must call it too:
+
+- **L — the lobby.** No `?room=`. You are not at a table.
+- **A — the empty table.** A room with nobody else in it. CUJ2's waiting
+  room, and the most important moment in the whole flow.
+- **T — the table.** Roster pills, exactly as they ship today. **No new
+  chrome at all**: every affordance below exists only while the roster is
+  empty, and each is retired by its own success.
+
+**FIRST, THE RULE THIS MUST SURVIVE.** *Empty renders nothing* is this
+app's established law and it has been enforced with deletions: the
+draft well's one-line `Tap a die above…` was killed the day it shipped
+(Joe 2026-08-04, "aesthetically distracting", css:439-442) and
+`#groups-empty` went the same way. Any lobby design that answers
+emptiness with a **sentence** is already dead on that precedent. But the
+exceptions the tree kept are exact about *what* survives: the dashed
+`＋` ghost tiles, which the source defends as **"an affordance, not
+prose"**. That is the seam this design goes through — everything below
+is a button that performs the exit, never a line of text describing the
+situation.
+
+**THE EMPTY SEAT (state A).** The roster's grammar is one [dot][name]
+pill per person, and `#rail-roster` is `:empty { display: none }`
+(css:1729) — with no children the row between your chip and the
+nameplate is ~165 px of nothing, in a `flex-wrap: wrap` row. The empty
+state fills it with a pill at exactly `.roster-name`'s geometry
+(999 px, `padding: 4px 10px`, 12 px) wearing the app's existing **ghost
+dress** instead of the solid one — `border: 1px dashed var(--hair);
+background: none; color: var(--muted)`, promoting to `var(--ivory)` on
+hover, the same recipe as `.ghost-add` and `.pt-toggle`. A dashed pill
+where a solid person-pill goes reads as **a chair nobody is sitting in**,
+in the row that already means "these people, at this table". It spends no
+word on being alone, it is the same visual language as `＋ New shelf…`,
+and it is replaced by the very person it asks for. Its label is the verb
+— `Invite`.
+
+Tapping it copies the invite link, reusing `idm-invite`'s path and its
+**exact feedback grammar** (js:10581): in-place label swap to `Copied!`,
+900 ms, restore — with the `window.prompt(…)` fallback when the
+clipboard refuses, so the link is never unreachable. On a device with
+`navigator.share` it opens the share sheet instead, because a phone
+hand-off is literally CUJ2's *"somehow get all the players to join"*. It
+**never borrows the status pill** — that channel is transient-only,
+which is the whole finding above.
+
+**PREPARED SEATS TURN THIS INTO THE WHOLE OF CUJ2.** A table set up
+through Tier G knows its seats: `roomSetup.profiles` is live client-side
+(main.js:11142) and `players` is the live roster, so the UNCLAIMED seats
+are a client-side difference of the two — no endpoint, no wire key, no
+new state. Render one outlined pill per unclaimed seat wearing that
+seat's name — `Bo`, `Ada`, `Kit` — and tapping one copies THAT seat's
+link, which is `&as=Name` and already ships (main.js:10969). The
+organizer who prepared six seats sees six empty chairs and taps each for
+six personalized links; **as players arrive, the outlines fill in one by
+one** and the row becomes a live read of who is still missing. Same cap
+and same fold as the roster (`ROSTER_MAX` 6, then `+N`), so one grammar
+governs the row whether the pills are people or vacancies. §7.19's "one
+link for everyone stays the primary form" is unchanged: the generic
+`Invite` pill is what an unprepared table shows, and the per-seat pills
+are the shortcut §7.19 already describes, finally given a surface.
+
+**THE LOBBY ROW (state L)** carries the two exits in the same slot:
+
+- `+ New table` — name it, land in it (§3b L1).
+- `Tables ▾` — the recents menu (§3b L3), most recent first, each row
+  with a forget. **Absent entirely when there are no recents**, so a
+  first-ever visitor sees exactly one affordance and no dead control.
+
+**The lobby is the switchboard; tables do not link to each other.** From
+a table you leave to the lobby and choose from there — one path, not a
+web of cross-links. §3b L4's sub-tables are the single deliberate
+exception (a child carries a parent pointer), and being the only
+exception is what keeps it legible.
+
+*Recorded as considered and not done:* a dedicated `Back to <name>` pill
+for the most recent table. It is a third standing pill to save one tap
+inside a menu whose top row is already that table.
+
+**WHAT THE LOBBY DOES NOT GET.** No splash, no landing page, no modal,
+no name prompt. CUJ1 (*"I just need to do a dice roll NOW"*) is answered
+by **removing** the join prompt, not by adding a welcome — the felt and
+the pools panel paint live and the first tap rolls. Solo rolls already
+carry `playerName: null` and every render path guards it, so the lobby
+needs no name at all; the identity chip reads `You` until you set one.
+And nothing goes on the felt: zero tabletop overlays (§7.9) is not
+relaxed for the lobby.
+
+**TELLING L FROM A — AND THE PHANTOM NAME THAT BREAKS IT.** The
+nameplate is meant to be the tell: state A always shows something at the
+row's right edge (a hand-edited `?room=key` means someone CHOSE a key,
+so the documented `?room=` fallback fires), while the lobby shows
+nothing. **Today that is false.** `renderTableName()` reads
+`roomSettings.tableName` (main.js:8502), which the solo branch restores
+from `LS_ROOMSETTINGS` (main.js:11302) — so a lobby inherits the table
+name of whatever table this browser last configured, renders it on the
+plate, and **puts it in the tab title** (main.js:8506). The tooltip
+compounds it: `'this table, solo'` (main.js:8504), asserting a table
+while there is none. A lobby must therefore **clear the table identity,
+not merely decline to draw it** — `tableName` is room state and has no
+business surviving into a roomless session. Same defect, same fix, in
+`portableFilename()` (main.js:9127): the `ROOM !== 'table'` half already
+yields nothing in the lobby, but the `roomSettings.tableName` half will
+happily name your download after a table you are not at.
+
+**WHAT THE LOBBY MUST SUPPRESS — the governing rule.** The audit found
+**no crash and no unguarded `net.` dereference**: every one of ~40 sites
+is properly gated. The lobby's problem is **not safety, it is honesty** —
+a page that still looks and talks like a table. One rule settles every
+case: **a surface that speaks about YOU keeps working; a surface that
+speaks about THE TABLE must be absent — never disabled, never silently
+downgraded to local.** Applied:
+
+- **The "Everyone at the table" settings section** (index.html:837) is
+  the worst offender: all four controls have working local branches, so
+  in the lobby felt, system, zoom and table name **silently become
+  personal** with no UI change, under a heading that is a lie and
+  tooltips that state falsehoods ("everyone at the table sees this",
+  main.js:8635). The fix is not new controls — felt, system and zoom
+  genuinely ARE "just you" with no table, so in the lobby they **sit
+  under the existing *Just you* heading and the room section does not
+  render at all**; Table name has no lobby meaning and is absent. Same
+  controls, shelved under the heading that happens to be true.
+- **`Apply to table`** (index.html:812) is a standing, enabled button
+  whose only possible lobby outcome is the refusal at main.js:9467. It
+  is the one room-scoped intruder in an otherwise roomless *Your data*
+  section, and it goes.
+- **`inviteUrl()`** (main.js:10379) interpolates `ROOM` unconditionally,
+  so in a lobby it **fabricates a working link to the shared room named
+  `table`** — the single most misleading affordance in the app, and
+  precisely the defect L0 exists to kill.
+- **Reveal.** `canReveal()` returns true when offline (main.js:2385, "the
+  only player is the authority"), so every held roll in the lobby offers
+  a Reveal that reveals to nobody. Correct for solo-at-a-table; theatre
+  in a lobby.
+- **The whisper picker leaks a table into a roomless page.** A saved pool
+  spelled `w:Ann` or `held` seats `pop.vis.mode` from its own notation,
+  so the solo note at main.js:7818 is skipped and the sub line prints
+  *"others see you rolled, not what"* — and `renderPopAudience()` prints
+  **"no one else is at the table yet"** (main.js:7752) while silently
+  emptying the pool's audience (`pop.vis.names = []`, main.js:7761).
+  **This is a live bug today, not a lobby regression** — it needs fixing
+  either way, and the lobby makes it unmissable.
+- **Voice.** `offerNeedsTable()` says *"offers need a table — you are
+  playing solo"* (main.js:5764). In the lobby you are not solo as a
+  fallback; you chose no table. The refusal names the exit instead.
+
+**STORAGE IS ROOM-SHAPED AND THE LOBBY IS NOT.** `LS_TABLE` is
+`dice.table.v1:${ROOM}` (main.js:10132), so a lobby that keeps
+`ROOM = 'table'` would read and write the prepared-table record of the
+real shared room named `table`. `LS_LOG` (`dice.log.v1`, main.js:64) is
+not room-scoped at all, so a lobby log and a solo-fallback-in-a-room log
+share one drawer. Both want a decision at build time; neither is
+load-bearing for the shape above, and both are recorded here so the
+build does not discover them late.
+
+**THE IDENTITY MENU** gains a lobby shape. `idm-room` already reads
+`solo — no table joined` (main.js:10421) and becomes `not at a table —
+your rolls stay on this device`: P1's "detail on intent" is where the
+privacy read belongs, rather than standing on screen. **Its condition is
+wrong, though** — it branches on `info.online`, not on *has a room*, so
+a lobby with a healthy server reachable would print `room: table`. The
+whole menu keys off the same mistake: `identityInfo()` returns
+`room: ROOM` unconditionally (main.js:10384). `identityInfo()` gaining a
+real "no room" value is the prerequisite for every line here.
+
+`idm-invite` and `idm-leave` are **hidden** in the lobby, not greyed —
+there is no link to copy and no seat to leave. `idm-leave` is a
+collision to fix regardless: it reads `Leave & switch seat`
+(index.html:300) but switches SEATS, so it becomes `Change seat…`,
+freeing `Leave table` to be §3b L3's real verb (states A and T,
+navigating to `/`).
+
+**`Leave table` MUST NOT REUSE `leaveTable()`.** That function
+(main.js:10536) drops the seat *and* `localStorage.removeItem(LS_NAME)`
+(main.js:10548), then re-enters `initNet()` (main.js:10558) — so wiring
+the new verb to it would **silently delete the player's display name**
+and, in a lobby, loop straight back into the "Take a seat" modal with
+nowhere to go. Leaving a table for the lobby drops the SEAT and keeps
+the NAME; those are different things and the existing function conflates
+them.
+
+**THE PILL, RESTORED.** With `solo` gone, `#status-pill` is what its own
+ordering comment always claimed: transient only — settings notes,
+`reconnecting…`, refusals. Nothing permanent squats in the slot that
+exists so an announcement can wrap below your name without moving it.
+
+**THE BOOT PROMPT IS THE LAST THING IN THE WAY.** `initNet()` awaits
+`promptName(peekTable(ROOM))` whenever `LS_NAME` is empty
+(main.js:11259) — and `promptName` has **no cancel and no skip path**
+(main.js:11195), so the promise resolves only when a seat is taken. That
+modal is titled *Take a seat* and hints *"Pick a display name for the
+table"* (index.html:889). A first-time visitor therefore meets a table
+they did not ask for, before any dice. The lobby does not reach this
+code at all: it neither prompts nor calls `peekTable`, which would
+otherwise fire `GET /api/table?room=table` about a room the player is
+not in.
+
+**SEAMS** (each verified against the tree): `renderPlayers()` runs only
+in `initNet()`'s online branch (main.js:11289) and must run in both ·
+`#rail-roster` is `:empty { display: none }` (css:1729), so the row
+returns to nothing the moment the affordance retires · **there is no
+global `.hidden` utility** (css:2478) — every new hideable node needs its
+own rule or `class="hidden"` styles nothing · a new `Tables ▾` menu owes
+two touchpoints beyond itself: a rung in the single Esc chain
+(main.js:10036) and an entry in `modalOpen` (main.js:10061) · it should
+be built on `openSetMenuFor`'s machinery (main.js:8697 — the only one of
+the app's three menus with keyboard nav, viewport clamping and
+flip-above), which means **extracting `placeAnchored` — the same
+extraction ROADMAP §2l slice ⑤ already owes**, so the two should land
+together rather than fork · `ROOM` is a module-scope `const`
+(main.js:10123) with no representable "no room" value, and every
+transition here NAVIGATES rather than swapping in place (§3b L3) ·
+`setPill(null)` only adds `hidden` without clearing the class, and the
+`title` set on a refusal (main.js:10865) is never cleared — hygiene to
+fix while the pill is being simplified · `.solo` never had a CSS rule at
+all (css:1810-1835 defines only base, `.offline`, `.refused`), which is
+its own small evidence that the state was never designed.

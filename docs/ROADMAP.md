@@ -533,6 +533,12 @@ has never existed is a way to **reach** a second table. You hand-edit the
 address bar. The roadmap's only multi-table entry was §13, parked at the
 bottom of Tier 6 with "design when reached".
 
+**The surfaces — the lobby row, the empty seat, what the lobby must
+suppress — are specified in
+[UX.md §7.20](UX.md#720-the-lobby-the-empty-seat-and-the-way-to-a-table).**
+This section holds the sequencing and the rulings; that one holds the
+components.
+
 **Sequenced against the CUJs, not against the machinery** (Joe's five,
 2026-08-07):
 
@@ -578,11 +584,26 @@ is stopped by the name prompt before they can roll anything, which is
 CUJ1's whole complaint. Change: no `?room=` means the lobby, and the
 lobby does not call `connect()` at all. No name is asked — you are alone
 and nobody needs to address you; the prompt moves to where it is already
-asked, on entering a table, where G5's peek already runs. Two seams:
-`portableDownload()`'s filename fallback reads `ROOM !== 'table'`
-(main.js:9128) and simplifies once the default key is gone; and
-`setPill('solo', 'solo')` currently signals *"no server"* — in the lobby
-it names a **place**, which is a wording pass, not a mechanism.
+asked, on entering a table, where G5's peek already runs.
+
+**L0 is bigger than routing, and the surfaces are specified in
+[UX.md §7.20](UX.md#720-the-lobby-the-empty-seat-and-the-way-to-a-table).**
+A 2026-08-07 audit of every room-assuming site found **no crash and no
+unguarded `net.` dereference** — the lobby is safe. It is not *honest*:
+the page keeps talking like a table. `inviteUrl()` fabricates a working
+link to the shared room named `table`; the "Everyone at the table"
+settings section silently becomes personal under a heading that is a lie;
+`Apply to table` stands enabled with a refusal as its only outcome; a
+held roll offers a Reveal to nobody; and `roomSettings.tableName`
+survives from `LS_ROOMSETTINGS` into the nameplate **and the tab title**,
+so the lobby wears the name of whatever table you last configured. The
+`solo` pill is deleted rather than reworded — it is a `<span>` in a
+channel `showSettingsNote` borrows on a 3 s timer, so it can neither be
+tapped nor reliably survive; §7.20 has the four-count argument and the
+affordance that replaces it. **One live bug surfaced on the way**, owed
+regardless of this tier: a whisper-spelled saved pool opened offline
+prints "no one else is at the table yet" and silently empties the pool's
+audience (main.js:7752, 7761).
 
 **L1. Making a table, and the link that gets people in (CUJ2).** A "New
 table" verb: name it, land in it. Keys must be unguessable rather than
