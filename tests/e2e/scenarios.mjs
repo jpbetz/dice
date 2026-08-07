@@ -37,6 +37,146 @@ const revealSettled = (rollId) =>
   + ` && window.__diceDebug.pendingReveals.length === 0`
   + ` && (window.__diceDebug.entryState(${JSON.stringify(rollId)}) || {}).hidden === false)`;
 
+// ---------------------------------------------------------------------------
+// The lobby → table flow (ROADMAP §3b, UX §7.20)
+//
+// The harness's newTable always appends ?room= — and the lobby is exactly the
+// absence of it — so these helpers boot their own tabs. bootTab mirrors
+// newTable's one-retry discipline (~1–2% of fresh headless tabs come up
+// broken; see the harness note) and adds what lobby scenarios need:
+//
+//   clean/seed — applied ONCE, on the tab's first document only (guarded by a
+//     sessionStorage flag). localStorage on a shared origin OUTLIVES
+//     scenarios, so a lobby test states its starting storage instead of
+//     inheriting an earlier scenario's — and the one-shot guard matters
+//     because gotoTable()/leaveToLobby() NAVIGATE: init scripts re-run on the
+//     next document, and a re-run seed of dice.name.v1 after leaveToLobby
+//     would blind the exact assertion (name kept) leave-to-lobby makes, while
+//     a re-run clean of dice.tables.v1 would wipe the recents entry the
+//     round-trip scenario is returning through.
+//
+//   recordApi — every fetch()/EventSource url the document opens lands on
+//     window.__apiCalls (per document, deliberately: a landed table SHOULD
+//     have join traffic; the lobby document must have none — §3b L0 "does
+//     not call connect() at all").
+// ---------------------------------------------------------------------------
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function bootTab(ctx, {
+  origin = 'localhost', path = '/', clean = [], seed = {}, recordApi = false,
+  readyExpr, readyDesc,
+} = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const page = await ctx.browser.newPage();
+    await page.addInitScript('window.__diceTestMode = true;');
+    if (recordApi) {
+      await page.addInitScript(`(() => {
+        window.__apiCalls = [];
+        const rec = (u) => { try { const s = String(u); if (s.includes('/api/')) window.__apiCalls.push(s); } catch { /* ignore */ } };
+        const realFetch = window.fetch.bind(window);
+        window.fetch = (u, ...rest) => { rec(u && u.url ? u.url : u); return realFetch(u, ...rest); };
+        window.EventSource = new Proxy(window.EventSource, {
+          construct(target, args) { rec(args[0]); return new target(...args); },
+        });
+      })();`);
+    }
+    const lines = [
+      ...clean.map((k) => `localStorage.removeItem(${JSON.stringify(k)});`),
+      ...Object.entries(seed).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`),
+    ];
+    if (lines.length) {
+      await page.addInitScript(`try { if (!sessionStorage.getItem('__e2eSeeded')) {`
+        + ` sessionStorage.setItem('__e2eSeeded', '1'); ${lines.join(' ')} } } catch { /* ignore */ }`);
+    }
+    const url = `http://${origin}:${ctx.port}${path}`;
+    await page.navigate(url);
+    const t = new Table(page, url);
+    try {
+      await t.waitFor(readyExpr, { desc: readyDesc || `tab ready (${origin}${path})`, timeout: 30000 });
+    } catch (e) {
+      if (attempt > 0) { ctx.tables.push(t); throw e; }
+      console.log(`    (boot retry: ${String(e.message || e).slice(0, 100)})`);
+      await t.close().catch(() => {});
+      continue;
+    }
+    if (attempt === 0 && page.errors.length) {
+      console.log(`    (boot retry: page exception on load — ${String(page.errors[0]).slice(0, 120)})`);
+      await t.close().catch(() => {});
+      continue;
+    }
+    ctx.tables.push(t);
+    return t;
+  }
+}
+
+// A tab in the LOBBY: the bare url, ready when the app itself says lobby.
+const lobbyTab = (ctx, opts = {}) => bootTab(ctx, {
+  recordApi: true,
+  ...opts,
+  path: '/',
+  readyExpr: `!!window.__diceDebug && (window.__diceDebug.identity || {}).lobby === true`,
+  readyDesc: `lobby up (${opts.origin || 'localhost'})`,
+});
+
+// A tab AT THIS SCENARIO'S TABLE via bootTab — for flows that later navigate
+// and therefore need the one-shot seeding (newTable seeds per document).
+// Callers still await t.waitOnline().
+const tableTab = (ctx, opts = {}) => bootTab(ctx, {
+  ...opts,
+  path: `/?room=${encodeURIComponent(ctx.room)}`,
+  readyExpr: `!!window.__diceDebug && window.__diceDebug.netReady`,
+  readyDesc: `table tab up (${opts.origin || 'localhost'})`,
+});
+
+// gotoTable()/leaveToLobby() NAVIGATE (§3b L3: ROOM is a module const, so
+// every table transition is a real page load) — evals die mid-flight, so
+// poll under try/catch exactly as harness.reload does.
+async function settleNavigation(t, expr, desc, { timeout = 30000 } = {}) {
+  const deadline = Date.now() + timeout;
+  let last = null;
+  while (Date.now() < deadline) {
+    try {
+      last = await t.eval(expr);
+      if (last) return last;
+    } catch { /* execution context torn down mid-navigation */ }
+    await sleep(100);
+  }
+  throw new Error(`timeout waiting for: ${desc} (last: ${JSON.stringify(last)})`);
+}
+
+// Landed at a table: out of the lobby, online — resolves '?room=<key>'.
+const landedAtTable = (t) => settleNavigation(
+  t,
+  `(!!window.__diceDebug && (window.__diceDebug.identity || {}).lobby === false)`
+  + ` ? window.__diceDebug.netReady.then((r) => !!(r && r.online) && window.location.search)`
+  + ` : false`,
+  'the navigation to land at a table',
+);
+
+// Landed in the lobby: the bare url, and the app says lobby.
+const landedInLobby = (t) => settleNavigation(
+  t,
+  `!!window.__diceDebug && (window.__diceDebug.identity || {}).lobby === true`
+  + ` && window.location.search === ''`,
+  'the navigation to land in the lobby',
+);
+
+// Drive the lobby's "+ New table" pill for real — open the rail menu, type
+// the name, Create — and ride the navigation to the minted room.
+async function createTableFromLobby(t, tableName) {
+  await t.eval(`[...document.querySelectorAll('#rail-roster .rail-ghost')]
+    .find((b) => b.textContent.includes('New table')).click()`);
+  await t.waitFor(`!!document.querySelector('.rail-menu input.tin')`, { desc: 'the New table menu opens' });
+  try {
+    await t.eval(`(() => {
+      document.querySelector('.rail-menu input.tin').value = ${JSON.stringify(tableName)};
+      document.querySelector('.rail-menu .btn.confirm').click();
+    })()`);
+  } catch { /* the context can die inside the click — that IS the navigation */ }
+  return landedAtTable(t);
+}
+
 export const scenarios = [
   {
     name: 'shared-roll',
@@ -5470,6 +5610,399 @@ export const scenarios = [
         'the seats are back for anyone arriving now');
       assert.equal((await org2.dbg('felt')).id, 'plum',
         "and so is the felt the organizer chose — the heal carries the table, not just the seats");
+    },
+  },
+
+  // ---------------------------------------------------------------------
+  // The lobby → table flow (ROADMAP §3b, UX §7.20) — tag: lobby
+  // ---------------------------------------------------------------------
+  {
+    name: 'lobby-no-prompt',
+    tags: ['smoke', 'lobby'],
+    // §3b L0 — CUJ1: "I just need to do a dice roll NOW". The bare url is the
+    // LOBBY: no join, no name prompt, no server call at all. The old front
+    // door seated every stranger on one shared room named 'table', behind a
+    // 'Take a seat' modal with no cancel path. The lobby answers by REMOVING
+    // the prompt, not by adding a welcome — so the assertion is absence: no
+    // modal, not one /api call (join, peek, or stream), and the first roll
+    // just works, on this device, addressed to nobody.
+    async fn(ctx) {
+      const a = await lobbyTab(ctx, {
+        origin: '127.0.0.10',
+        clean: ['dice.name.v1', 'dice.tables.v1', 'dice.roomsettings.v1'],
+      });
+
+      assert.equal(await a.eval(`document.getElementById('name-modal').classList.contains('hidden')`),
+        true, 'no "Take a seat" modal — the prompt moved to entering a table');
+      assert.equal((await a.dbg('seatPicker')).open, false, 'the seat picker agrees');
+      assert.deepEqual(await a.eval('window.__apiCalls'), [],
+        'not one API call: no /api/join, no /api/table peek, no /api/events stream');
+
+      const id = await a.dbg('identity');
+      assert.equal(id.lobby, true, 'the app knows this is the lobby');
+      assert.equal(id.room, null, 'no room');
+      assert.equal(id.online, false, 'no server session');
+      assert.equal(await a.eval(`document.getElementById('identity-name').textContent`), 'You',
+        'the chip reads the honest word, not a join placeholder');
+
+      // CUJ1 itself: the dice are live right now.
+      await a.roll('2d6');
+      assert.equal(await a.diceCount(), 2, 'two dice on the felt');
+      const st = await a.entryState();
+      assert.ok(st && typeof st.total === 'number' && st.total >= 2 && st.total <= 12,
+        `the roll resolved locally (got ${JSON.stringify(st && st.total)})`);
+      assert.deepEqual(await a.eval('window.__apiCalls'), [],
+        'and the roll stayed on this device — still zero API traffic');
+      assert.equal(await a.eval(`document.getElementById('name-modal').classList.contains('hidden')`),
+        true, 'and still no prompt after rolling');
+    },
+  },
+  {
+    name: 'lobby-exits',
+    tags: ['lobby', 'chrome'],
+    // §7.20 state L: the presence row carries the lobby's exits — and only as
+    // many as are real. '+ New table' always; 'Tables ▾' only once this
+    // browser has a table to go back to, so a first-ever visitor sees exactly
+    // one affordance and no dead control. Forgetting the last recent retires
+    // the menu pill on the spot (every ghost is retired by its own success).
+    async fn(ctx) {
+      // A virgin browser: recents cleaned off this origin.
+      const virgin = await lobbyTab(ctx, {
+        origin: '127.0.0.11',
+        clean: ['dice.name.v1', 'dice.tables.v1'],
+      });
+      let row = await virgin.dbg('presenceRow');
+      assert.deepEqual(row.ghosts.map((g) => g.label), ['+ New table'],
+        `one affordance and no dead control (got: ${JSON.stringify(row.ghosts)})`);
+      assert.deepEqual(row.pills, [], 'and no roster — there is no table');
+
+      // A browser that has been somewhere: the recents pill appears.
+      const back = await lobbyTab(ctx, {
+        origin: '127.0.0.12',
+        clean: ['dice.name.v1'],
+        seed: { 'dice.tables.v1': JSON.stringify([{ room: 'old-haunt-k3x9', name: 'Old Haunt', at: 1754500000000 }]) },
+      });
+      row = await back.dbg('presenceRow');
+      assert.deepEqual(row.ghosts.map((g) => g.label), ['+ New table', 'Tables ▾'],
+        'both exits once there is somewhere to go back to');
+
+      // The menu lists the table by NAME, with a forget — and forgetting the
+      // last recent retires the Tables pill itself.
+      await back.eval(`[...document.querySelectorAll('#rail-roster .rail-ghost')]
+        .find((b) => b.textContent.includes('Tables')).click()`);
+      await back.waitFor(`!!document.querySelector('.rail-menu')`, { desc: 'the Tables menu opens' });
+      assert.deepEqual(
+        await back.eval(`[...document.querySelectorAll('.rail-menu .idm-item')].map((b) => b.textContent)`),
+        ['Old Haunt'], 'the row wears the table name, not the key');
+      await back.eval(`document.querySelector('.rail-menu .rail-menu-forget').click()`);
+      await back.waitFor(`!document.querySelector('.rail-menu')`, { desc: 'the menu closes on forget' });
+      row = await back.dbg('presenceRow');
+      assert.deepEqual(row.ghosts.map((g) => g.label), ['+ New table'],
+        'the pill leaves with the last remembered table');
+      assert.equal(JSON.parse(await back.eval(`localStorage.getItem('dice.tables.v1')`)).length, 0,
+        'and the store agrees');
+    },
+  },
+  {
+    name: 'lobby-no-phantom-table',
+    tags: ['lobby', 'settings'],
+    // §7.20's phantom name, pinned as a regression. tableName is ROOM state,
+    // but it used to survive LS_ROOMSETTINGS (the solo settings copy) into a
+    // roomless page — the nameplate, the TAB TITLE, and the export filename
+    // all wore the name of whatever table this browser configured last. The
+    // lobby must clear the table identity, not merely decline to draw it —
+    // while felt/system/zoom (yours, not the room's) still restore from the
+    // very same record.
+    async fn(ctx) {
+      const a = await lobbyTab(ctx, {
+        origin: '127.0.0.13',
+        clean: ['dice.name.v1', 'dice.tables.v1'],
+        seed: { 'dice.roomsettings.v1': JSON.stringify({ felt: 'plum', tableName: 'Haunted Manor' }) },
+      });
+
+      assert.equal((await a.dbg('settings')).tableName, '',
+        'the inherited tableName is cleared, not just hidden');
+      assert.equal(await a.eval(`document.getElementById('table-name').classList.contains('hidden')`),
+        true, 'no nameplate');
+      assert.equal(await a.eval(`document.getElementById('table-name').textContent`), '',
+        'and nothing staged inside it');
+      assert.equal(await a.eval('document.title'), 'Dice Table',
+        'the tab title is plain — no phantom table');
+      const filename = await a.dbg('portable.filename()');
+      assert.ok(filename.startsWith('dice-table-'),
+        `a roomless export is 'dice-table', never last week's table (got: ${filename})`);
+
+      // The same stored record's PERSONAL half still lands: your felt is yours.
+      assert.equal((await a.dbg('felt')).id, 'plum',
+        'felt is restored from the same record the name was dropped from');
+    },
+  },
+  {
+    name: 'lobby-suppresses-table-surfaces',
+    tags: ['lobby', 'settings', 'chrome'],
+    // §7.20's governing rule: a surface that speaks about YOU keeps working;
+    // a surface that speaks about THE TABLE is ABSENT — never disabled, never
+    // silently downgraded to local. identityInfo answers room:null (the
+    // prerequisite for every line here), inviteUrl refuses to fabricate a
+    // link, the identity menu drops its three table verbs, and Settings drops
+    // the "Everyone at the table" section and Apply to table.
+    async fn(ctx) {
+      const a = await lobbyTab(ctx, { origin: '127.0.0.14', clean: ['dice.name.v1'] });
+
+      const id = await a.dbg('identity');
+      assert.equal(id.room, null, 'identity carries no room — not the old unconditional ROOM');
+      assert.equal(id.lobby, true, 'lobby is its own state, not a failed join');
+      assert.equal(id.inviteUrl, null,
+        'inviteUrl is null — never a fabricated link to a room named table');
+      assert.equal(await a.dbg(`seatInviteUrl('Anyone')`), null, 'and the per-seat form is null with it');
+
+      // The identity menu, opened the real way (right-click on the chip).
+      await a.eval(`document.getElementById('identity-chip').dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`);
+      assert.equal(await a.eval(`!document.getElementById('identity-menu').classList.contains('hidden')`),
+        true, 'the menu opens — it still speaks about YOU');
+      const shown = (idName) => `getComputedStyle(document.getElementById('${idName}')).display`;
+      assert.equal(await a.eval(shown('idm-invite')), 'none', 'Copy invite link is absent');
+      assert.equal(await a.eval(shown('idm-leave')), 'none', 'Change seat is absent');
+      assert.equal(await a.eval(shown('idm-lobby')), 'none', 'Leave table is absent');
+      assert.notEqual(await a.eval(shown('idm-rename')), 'none',
+        "rename stays — the name is yours, not the table's");
+      assert.equal(await a.eval(`document.getElementById('idm-room').textContent`),
+        'not at a table — your rolls stay on this device',
+        'the room line becomes the privacy read');
+      await a.eval(`document.getElementById('identity-chip').click()`); // close it again
+
+      // Settings: the room section, and its one intruder in Your data.
+      await a.dbg('openSettings()');
+      assert.equal(await a.eval(shown('set-room-label')), 'none',
+        'the "Everyone at the table" heading is gone — it would be a lie');
+      assert.equal(await a.eval(shown('set-table-name-row')), 'none', 'the Table name row is gone');
+      assert.equal(await a.eval(shown('portable-push')), 'none', 'Apply to table is gone');
+      assert.notEqual(await a.eval(shown('felt-swatches')), 'none', 'felt (yours) is still offered');
+      assert.notEqual(await a.eval(shown('system-picker')), 'none', 'system (yours) is still offered');
+    },
+  },
+  {
+    name: 'new-table',
+    tags: ['lobby'],
+    // §3b L1: name it, land in it. The key is MINTED, never the typed name —
+    // no access control by design (goal 10), so ?room=<the name> would be a
+    // door anyone can guess. The typed name travels as the TABLE NAME via the
+    // read-once sessionStorage hand-off, lands on the room for everyone, and
+    // the new table is recorded in this browser's recents.
+    async fn(ctx) {
+      const a = await lobbyTab(ctx, {
+        origin: '127.0.0.15',
+        clean: ['dice.tables.v1'],
+        seed: { 'dice.name.v1': 'Alice' },
+      });
+
+      const search = await createTableFromLobby(a, 'The Tavern');
+      const key = decodeURIComponent(search.replace('?room=', ''));
+      assert.notEqual(key, 'The Tavern', 'the key is not the typed name');
+      assert.match(key, /^the-tavern-[a-z0-9]{16}$/,
+        `a readable slug + 16 random base36 chars — the random tail IS the door (got: ${key})`);
+
+      // The typed name became the room's name — server-side truth, not just
+      // this client's rendering (the peek is the unauthenticated read).
+      await a.waitFor(`window.__diceDebug.settings.tableName === 'The Tavern'`,
+        { desc: 'the table name lands on the room' });
+      const peek = await fetch(
+        `http://127.0.0.1:${ctx.port}/api/table?room=${encodeURIComponent(key)}`,
+      ).then((r) => r.json());
+      assert.equal(peek.name, 'The Tavern', 'the room itself carries the name');
+
+      assert.equal(await a.eval(`sessionStorage.getItem('dice.newtable.v1:' + ${JSON.stringify(key)})`),
+        null, 'the pending name was consumed by the join — read-and-clear');
+
+      const recents = JSON.parse(await a.eval(`localStorage.getItem('dice.tables.v1')`));
+      assert.equal(recents[0].room, key, 'the new table is the newest recent');
+      assert.equal(recents[0].name, 'The Tavern', 'remembered under its name');
+    },
+  },
+  {
+    name: 'invite-chair',
+    tags: ['lobby', 'chrome'],
+    // §7.20 state A — the empty table, CUJ2's waiting room. The roster row's
+    // empty state is an AFFORDANCE, not a sentence: one dashed pill wearing
+    // the verb (Invite) in the slot where the people will appear — and it is
+    // REPLACED by the very person it asks for.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      let row = await a.dbg('presenceRow');
+      assert.deepEqual(row.ghosts.map((g) => ({ label: g.label, dot: g.dot })),
+        [{ label: 'Invite', dot: false }],
+        `one Invite pill, no dot — a chair for anyone (got: ${JSON.stringify(row.ghosts)})`);
+      assert.deepEqual(row.pills, [], 'and nobody on the roster yet');
+      assert.ok((await a.dbg('identity')).inviteUrl.includes(`room=${ctx.room}`),
+        "what it copies is this room's real link");
+
+      await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'Bob arrives' });
+      row = await a.dbg('presenceRow');
+      assert.deepEqual(row.ghosts, [], 'the affordance retired by its own success');
+      assert.deepEqual(row.pills, ['Bob'], 'replaced by the person it asked for');
+    },
+  },
+  {
+    name: 'prepared-seat-chairs',
+    tags: ['lobby', 'prepared-seat', 'chrome'],
+    // §7.20: a prepared table shows its EMPTY CHAIRS — for as long as they
+    // are empty, not only while you are alone. Unclaimed seats are
+    // roomSetup.profiles minus the live roster (a client-side difference —
+    // no endpoint, no wire key); each chair wears its seat's name and copies
+    // that seat's &as= link. Chairs retire PER CHAIR as each seat is claimed
+    // ("the outlines fill in one by one" — the row is a live read of who is
+    // still missing), and a claimed seat's chair is gone from the start.
+    async fn(ctx) {
+      const org = await ctx.rawPlayer('Organizer');
+      await ctx.api('/api/table', {
+        playerId: org.playerId,
+        rev: 1,
+        table: { tableName: 'Chairs' },
+        profiles: [
+          { name: 'Alice', pools: [{ name: 'Strength', notation: '3d6' }] },
+          { name: 'Rill', pools: [{ name: 'Agility', notation: '2d8' }] },
+          { name: 'Bo', pools: [{ name: 'Bravery', notation: '1d20' }] },
+        ],
+      });
+
+      // Alice sits down in HER prepared seat by name. The chairs stand
+      // ALONGSIDE the organizer's pill — the first arrival must not take the
+      // other chairs off the wall — and Alice's own chair is GONE: she
+      // claimed it by sitting down.
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      let row = await a.dbg('presenceRow');
+      assert.deepEqual(row.pills, ['Organizer'], 'the roster shows who IS here');
+      assert.deepEqual(row.ghosts.map((g) => ({ label: g.label, dot: g.dot })),
+        [{ label: 'Rill', dot: true }, { label: 'Bo', dot: true }],
+        `a chair per unclaimed seat, none for the claimed one (got: ${JSON.stringify(row.ghosts)})`);
+      assert.ok(row.ghosts.every((g) => g.title.includes('link')),
+        'a chair says what it does — it copies a link');
+
+      // Each chair copies a PERSONALIZED link: this room's url + &as=<seat>,
+      // the §G5 pre-select — "Rill, this is your seat".
+      const link = await a.dbg(`seatInviteUrl('Rill')`);
+      assert.ok(link.includes(`?room=${encodeURIComponent(ctx.room)}`),
+        `the seat link addresses this room (got: ${link})`);
+      assert.ok(link.endsWith('&as=Rill'), `and carries the seat's &as= (got: ${link})`);
+
+      // Rill arrives: HER chair is retired by its own success; Bo's stays —
+      // the outlines fill in one by one.
+      await ctx.newTable({ origin: '127.0.0.1', name: 'Rill' });
+      await a.waitFor(`window.__diceDebug.players.length === 3`, { desc: 'Rill sits down' });
+      row = await a.dbg('presenceRow');
+      assert.deepEqual(row.pills, ['Organizer', 'Rill'], 'the seat filled in with its person');
+      assert.deepEqual(row.ghosts.map((g) => g.label), ['Bo'],
+        `only the still-empty chair remains (got: ${JSON.stringify(row.ghosts)})`);
+
+      // And the chairs are presence-driven both ways: the organizer leaving
+      // changes the PILLS, never the chairs — Bo is still missing.
+      await ctx.api('/api/leave', { playerId: org.playerId, immediate: true });
+      org.close();
+      await a.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'the organizer leaves' });
+      row = await a.dbg('presenceRow');
+      assert.deepEqual(row.pills, ['Rill'], 'the roster follows the departure');
+      assert.deepEqual(row.ghosts.map((g) => g.label), ['Bo'], "and Bo's chair still stands");
+    },
+  },
+  {
+    name: 'leave-to-lobby',
+    tags: ['lobby', 'seat'],
+    // §3b L3's real verb, and the regression it exists to guard: Leave table
+    // must NOT reuse leaveTable() — that function drops the seat AND deletes
+    // dice.name.v1 (it re-prompts 'Take a seat'), so wiring the new verb to
+    // it would silently wipe the player's display name on the way out.
+    // Leaving a table for the lobby drops the SEAT and keeps the NAME. The
+    // departure is also said out loud (GOALS): the other tab sees the seat go
+    // promptly, not on a liveness timeout.
+    async fn(ctx) {
+      // tableTab, not newTable: its seeding is one-shot, and leaveToLobby
+      // NAVIGATES — a per-document re-seed of dice.name.v1 on the lobby
+      // document would mask exactly the deletion this scenario watches for.
+      const a = await tableTab(ctx, { origin: 'localhost', seed: { 'dice.name.v1': 'Alice' } });
+      await a.waitOnline();
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await b.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+
+      // Open the identity menu for real; at a table the verb is offered.
+      await a.eval(`document.getElementById('identity-chip').dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`);
+      assert.notEqual(await a.eval(`getComputedStyle(document.getElementById('idm-lobby')).display`),
+        'none', 'Leave table is offered at a table');
+      try {
+        await a.eval(`document.getElementById('idm-lobby').click()`);
+      } catch { /* the context can die inside the click — that IS the leave */ }
+
+      await landedInLobby(a);
+      assert.equal(await a.eval(`localStorage.getItem('dice.name.v1')`), 'Alice',
+        "the display name SURVIVES leaving — the seat was the table's, the name is yours");
+      assert.equal(await a.eval(`sessionStorage.getItem(${JSON.stringify(`dice.seat.v1:${ctx.room}`)})`),
+        null, 'the seat is forgotten — a later visit is a fresh sit-down');
+      const id = await a.dbg('identity');
+      assert.equal(id.lobby, true, 'landed in the lobby');
+      assert.equal(id.room, null, 'on the bare url');
+      assert.equal(id.name, 'Alice', 'and the chip still knows you');
+
+      // The lobby row has both exits: the table just left is a recent.
+      const row = await a.dbg('presenceRow');
+      assert.deepEqual(row.ghosts.map((g) => g.label), ['+ New table', 'Tables ▾'],
+        'the table you just left is reachable again through Tables ▾');
+
+      // Departure was said out loud: B's roster empties without waiting out
+      // a liveness clock (generous bound — the claim is seconds, not an hour).
+      await b.waitFor(`window.__diceDebug.players.length === 1`,
+        { desc: 'the departure reaches the other tab', timeout: 20000 });
+    },
+  },
+  {
+    name: 'table-name-survives-round-trip',
+    tags: ['lobby'],
+    // §3b L3 + initNet's name restoration: an UNPREPARED room is deleted the
+    // moment its last player leaves, so "leave, come back via recents" lands
+    // in a brand-new room that merely shares a key — and the name would be
+    // gone while your Tables list still shows it. The remembered entry heals
+    // the room on arrival (the same organizer's-browser-is-the-durable-copy
+    // principle §G6 established for setups).
+    async fn(ctx) {
+      const a = await lobbyTab(ctx, {
+        origin: '127.0.0.16',
+        clean: ['dice.tables.v1'],
+        seed: { 'dice.name.v1': 'Alice' },
+      });
+      const search = await createTableFromLobby(a, 'Round Trip');
+      const key = decodeURIComponent(search.replace('?room=', ''));
+      await a.waitFor(`window.__diceDebug.settings.tableName === 'Round Trip'`,
+        { desc: 'the name lands on the room' });
+
+      // Leave. The room is unprepared, so the server deletes it outright —
+      // the recents entry is now the only copy of the name anywhere.
+      try {
+        await a.eval(`document.getElementById('idm-lobby').click()`);
+      } catch { /* navigation */ }
+      await landedInLobby(a);
+      await ctx.waitForLog(new RegExp(`room deleted: room="${key}"`),
+        { desc: 'the empty unprepared room evaporates' });
+
+      // Back through the recents menu — the row still wears the name.
+      await a.eval(`[...document.querySelectorAll('#rail-roster .rail-ghost')]
+        .find((b) => b.textContent.includes('Tables')).click()`);
+      await a.waitFor(`!!document.querySelector('.rail-menu')`, { desc: 'the Tables menu opens' });
+      try {
+        await a.eval(`[...document.querySelectorAll('.rail-menu .idm-item')]
+          .find((b) => b.textContent === 'Round Trip').click()`);
+      } catch { /* navigation */ }
+      const back = await landedAtTable(a);
+      assert.equal(decodeURIComponent(back.replace('?room=', '')), key,
+        'the recents row returns to the SAME key');
+
+      // A brand-new room under the old key — and the name came back with you.
+      await a.waitFor(`window.__diceDebug.settings.tableName === 'Round Trip'`,
+        { desc: 'the remembered name heals the fresh room' });
+      const peek = await fetch(
+        `http://127.0.0.1:${ctx.port}/api/table?room=${encodeURIComponent(key)}`,
+      ).then((r) => r.json());
+      assert.equal(peek.name, 'Round Trip', 'server-side too, for the next arrival');
     },
   },
 ];
