@@ -2451,12 +2451,25 @@ seat's name — `Bo`, `Ada`, `Kit` — and tapping one copies THAT seat's
 link, which is `&as=Name` and already ships (main.js:10969). The
 organizer who prepared six seats sees six empty chairs and taps each for
 six personalized links; **as players arrive, the outlines fill in one by
-one** and the row becomes a live read of who is still missing. Same cap
-and same fold as the roster (`ROSTER_MAX` 6, then `+N`), so one grammar
-governs the row whether the pills are people or vacancies. §7.19's "one
-link for everyone stays the primary form" is unchanged: the generic
-`Invite` pill is what an unprepared table shows, and the per-seat pills
-are the shortcut §7.19 already describes, finally given a surface.
+one** and the row becomes a live read of who is still missing.
+
+**The chairs therefore stand while the SEATS are empty, not while the ROW
+is** — they retire one at a time, at the grain of a seat rather than the
+row, which is the same retired-by-its-own-success property the `Invite`
+pill has. *(Shipped 2026-08-07 with a row-level `!others.length` gate by
+mistake, which made the paragraph above impossible: the first arrival
+took every remaining chair off the wall. Caught by driving a three-seat
+prepared table in a browser and corrected the same day — the sentence was
+right and the gate was wrong.)* Chairs take whatever room the real people
+leave (`ROSTER_MAX` 6, then `+N`), so one grammar governs the row whether
+the pills are people or vacancies.
+
+The generic `Invite` pill keeps the row-level rule, because an unprepared
+table has nothing to enumerate and a permanent Invite would be exactly
+the standing chrome §7.9 kills. §7.19's "one link for everyone stays the
+primary form" is unchanged: `Invite` is what an unprepared table shows,
+and the per-seat pills are the shortcut §7.19 already describes, finally
+given a surface.
 
 **THE LOBBY ROW (state L)** carries the two exits in the same slot:
 

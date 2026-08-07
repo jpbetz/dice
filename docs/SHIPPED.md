@@ -62,13 +62,21 @@ solid roster pill's geometry reads as a chair nobody is sitting in.
 
 - **Lobby:** `+ New table`, and `Tables ▾` only once a table has been
   visited.
-- **Empty table:** the `Invite` chair — or **one chair per UNCLAIMED
-  prepared seat**, wearing that seat's name and copying that seat's
-  `&as=` link. `roomSetup.profiles` minus the live roster, client-side:
-  no endpoint, no wire key, no new state. Verified: the chair is
-  replaced by a real roster pill the moment a second player arrives.
-- **Table with people:** unchanged, and no new chrome — each affordance
-  is retired by its own success.
+- **Unprepared table, nobody else here:** the `Invite` chair. It stands
+  only while you are alone — an unprepared table has nothing to
+  enumerate, and a permanent Invite pill would be the standing chrome
+  §7.9 kills; the link keeps its home in the identity menu.
+- **Prepared table:** one chair per UNCLAIMED seat, wearing that seat's
+  name and copying that seat's `&as=` link. `roomSetup.profiles` minus
+  the live roster, client-side: no endpoint, no wire key, no new state.
+  These stand **for as long as the seats are empty, not only while you
+  are alone** — the first arrival must not take the other five chairs
+  off the wall. They retire per seat, at the grain of a seat rather than
+  the row. *(Corrected the same day: the first gate was `!others.length`,
+  which made the documented "the outlines fill in one by one"
+  impossible. Caught by driving a three-seat prepared table in a
+  browser — seated as Bo, the row must read Ada and Kit.)*
+- **Table with people, no free seats:** unchanged, and no new chrome.
 
 The label lives in its own `.rg-label` span (`765b7da`): the copy
 feedback swaps it to `Copied!`, and a `btn.textContent =` would take the
