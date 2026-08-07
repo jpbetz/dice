@@ -11,6 +11,113 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## §3b — The lobby and the table flow (2026-08-07)
+
+Design authority: [ROADMAP.md](ROADMAP.md) §3b (CUJs and rulings) and
+[UX.md](UX.md) §7.20 (surfaces). Rooms had worked since the beginning;
+nothing in the UI ever let a player *reach* a second one. L0/L1/L3
+shipped together because a lobby you cannot leave is not a lobby.
+
+### The lobby exists — SHIPPED 2026-08-07 (`94f3069`)
+
+`?room=` absent no longer falls back to the key `table`. `ROOM` is
+nullable, `IN_LOBBY` is the question every room-assuming site now asks,
+and `initNet()` exits before `promptName()` — so a first-time visitor
+meets dice instead of a modal titled *Take a seat* about a table they
+never asked for (CUJ1), and the bare deployed URL stops seating every
+stranger on one shared felt. Nothing about it is a fallback: the lobby
+does not call `connect()`, so there is no failed join to report, and it
+does not call `peekTable()` either.
+
+**`solo` deleted as the lobby's indicator, kept where it was always
+true.** The four-count argument is UX §7.20; the load-bearing one is that
+`#status-pill` is a shared TRANSIENT channel — `showSettingsNote`
+borrows it on a 3 s timer under an explicit *"a status change may have
+taken the pill"* guard — so a permanent state parked there is destroyed
+by the first note and never restored. It survives only for "you asked
+for a table (`?room=` is set) and there is no server": a state with no
+next action, which is when a readout is the right object, and where no
+settings event can steal the slot because there is no server to send one.
+
+**The suppression pass, by one rule** — a surface that speaks about YOU
+keeps working; a surface that speaks about THE TABLE is absent, never
+disabled and never silently downgraded to local. `inviteUrl()` returns
+null instead of fabricating a working link to the room named `table`;
+the *Everyone at the table* heading and the Table name row do not render;
+`Apply to table` goes (its only roomless outcome was a refusal); the felt
+and system tooltips stop claiming an audience; the offer refusal names
+the exit instead of diagnosing you. The **phantom name** is gone —
+`tableName` no longer survives `LS_ROOMSETTINGS` into the nameplate, the
+tab title, or the download slug.
+
+### The presence row, three states — SHIPPED 2026-08-07 (`94f3069`, `765b7da`)
+
+`renderPlayers()` is now their renderer and runs in **both** branches.
+The row already asked "who is here", so when the answer is "nobody yet"
+it carries the fix, in the slot where the people will appear — an
+**affordance, not prose**, which is the only way past the actively
+enforced *empty renders nothing* law (`.tray-invite` was killed the day
+it shipped; `#groups-empty` went the same way). A dashed ghost pill in a
+solid roster pill's geometry reads as a chair nobody is sitting in.
+
+- **Lobby:** `+ New table`, and `Tables ▾` only once a table has been
+  visited.
+- **Empty table:** the `Invite` chair — or **one chair per UNCLAIMED
+  prepared seat**, wearing that seat's name and copying that seat's
+  `&as=` link. `roomSetup.profiles` minus the live roster, client-side:
+  no endpoint, no wire key, no new state. Verified: the chair is
+  replaced by a real roster pill the moment a second player arrives.
+- **Table with people:** unchanged, and no new chrome — each affordance
+  is retired by its own success.
+
+The label lives in its own `.rg-label` span (`765b7da`): the copy
+feedback swaps it to `Copied!`, and a `btn.textContent =` would take the
+whole subtree with it, deleting a seat chair's dot permanently on first
+use.
+
+### New table, recents, and leaving — SHIPPED 2026-08-07 (`f1575ac`, `b4f5a6f`, `94f3069`)
+
+`js/tables.js` is the store: `recentTables` / `rememberTable` /
+`forgetTable` / `mintRoomKey`, never-throws, capped at 8, with its own
+unit suite. **The key is minted, never the name** — this app has no
+access control by design (goal 10), so the key IS the door and
+`?room=soulseal` would be one anyone can guess; a readable slug carries
+~83 bits of `crypto.getRandomValues` behind it, verified byte-identical
+through the server's own `cleanString`/`MAX_ROOM` gate.
+
+**`Leave table` is its own verb and deliberately does not reuse
+`leaveTable()`**, which drops the seat *and* deletes `LS_NAME` and then
+re-enters `initNet()` — wiring it up would have silently wiped the
+player's display name and, in a lobby, looped back into *Take a seat*
+with nowhere to go. The seat belongs to the table; the name comes with
+you. `Leave & switch seat` became `Change seat…`, which is what it
+always did.
+
+**The name survives the round trip.** An unprepared room is deleted when
+its last player leaves (only a room holding a setup lingers — §G6), so
+leaving and returning landed in a new room with the name gone while your
+own Tables list still showed it. The join now restores a remembered name
+to a room that has none — the same trade `maybeRepushTable()` already
+makes for setups, with the same accepted cost (it can bring back a name
+somebody deliberately cleared).
+
+### Two traps worth keeping
+
+**Module-evaluation TDZ.** `ROOM`/`IN_LOBBY` are declared at the TOP of
+main.js, beside `ZOOM_LEVELS` and for the identical reason: `setSound()`
+→ `syncSettingsUI()` builds the felt and system pickers *during module
+evaluation*, and those tooltips now read `IN_LOBBY`. Declared beside the
+other net constants, it killed the whole module in TDZ — the page still
+rendered from static markup, which is what made it briefly look like a
+render bug rather than a dead module.
+
+**No global `.hidden`.** Menu items hide by inline `display` because
+`.idm-item`'s own `display: block` outranks the `[hidden]` attribute and
+this codebase has no global `.hidden` utility (every hideable element
+carries its own rule).
+
+---
+
 ## Tier G — Game night: the prepared table (2026-08-06)
 
 Design authority: [PROFILES.md](PROFILES.md). Built in one pass against a

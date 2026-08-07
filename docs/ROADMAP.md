@@ -521,9 +521,19 @@ side: no endpoint, no wire key, no stored field, no build step)
 *§3 is ONE felt's organization — zones, eviction, resync. Organizing
 across tables is §3b, which shares only the word "table".*
 
-### 3b. The lobby and the table flow — DESIGN, three decisions taken
-(2026-08-07, Joe: *"the roadmap is not well aligned against core CUJs
-where the users use the UI… I think we need a lobby → table flow"*)
+### 3b. The lobby and the table flow — **L0, L1, L3 SHIPPED 2026-08-07**
+(Joe: *"the roadmap is not well aligned against core CUJs where the users
+use the UI… I think we need a lobby → table flow"*)
+
+**Status.** L0 (the lobby exists, and the suppression pass), L1 (New
+table, the minted key, the invite chair and the per-seat chairs) and L3
+(the recents list, Leave table) shipped — `f1575ac`, `94f3069`,
+`765b7da`, detail in [SHIPPED.md](SHIPPED.md). CUJs 1–4 run end to end.
+**L2** (arrival polish — whether the pre-join peek should also say how
+many people are here) and **L4** (sub-tables, CUJ5) remain open below.
+The blocker restated: §0j's per-IP room-creation throttle is now owed
+*before this is exposed publicly*, because L1 turned room creation into a
+button.
 
 Rooms have been real since the beginning — `?room=` addresses a table
 (main.js:10123), 500 live rooms (server.js:70), per-room settings, seats
