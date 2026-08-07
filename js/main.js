@@ -10299,6 +10299,10 @@ function renderPlayers() {
 // One dashed pill in a roster pill's geometry — the shared body of every
 // presence-row exit. A real <button>, so the tab order reaches it right after
 // your own chip and Space/Enter work without further ceremony.
+// The label lives in its OWN span, never as a bare text node on the button.
+// shareInvite swaps the label to 'Copied!' and back, and a `btn.textContent =`
+// would take the whole subtree with it — on a seat chair that means the .rg-dot
+// is deleted by the first copy and never returns.
 function railGhost(label, title, onClick, { dot = false } = {}) {
   const b = document.createElement('button');
   b.className = 'rail-ghost';
@@ -10308,10 +10312,17 @@ function railGhost(label, title, onClick, { dot = false } = {}) {
     d.className = 'rg-dot';
     b.appendChild(d);
   }
-  b.appendChild(document.createTextNode(label));
+  const span = document.createElement('span');
+  span.className = 'rg-label';
+  span.textContent = label; // user text (a seat name) — textContent only
+  b.appendChild(span);
   b.addEventListener('click', onClick);
   return b;
 }
+
+// Where a transient label swap is allowed to write. A rail ghost owns a label
+// span; the identity menu's plain item does not, and writes to itself.
+const labelNodeOf = (btn) => (btn && btn.querySelector && btn.querySelector('.rg-label')) || btn;
 
 // The prepared seats nobody is sitting in: roomSetup.profiles minus the live
 // roster, matched case-insensitively the way §G5's &as= pre-select matches.
@@ -10346,10 +10357,14 @@ async function shareInvite(url, btn, restoreLabel) {
     return;
   }
   if (!btn) return;
-  btn.textContent = 'Copied!';
+  // Re-entrant by construction: a second click inside the 900 ms window must
+  // not queue a restore that writes 'Copied!' back as the resting label, so the
+  // pending timer is cancelled rather than raced.
+  clearTimeout(btn.__restoreTimer);
+  labelNodeOf(btn).textContent = 'Copied!';
   btn.classList.add('done');
-  setTimeout(() => {
-    btn.textContent = restoreLabel;
+  btn.__restoreTimer = setTimeout(() => {
+    labelNodeOf(btn).textContent = restoreLabel;
     btn.classList.remove('done');
   }, 900);
 }
