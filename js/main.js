@@ -22,6 +22,7 @@ import * as CANNON from 'cannon-es';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, SHADER_TIME } from './dice.js';
 import { dieArtURL } from './diceart.js';
 import { connect, forgetSeat, peekTable } from './net.js';
+import { recentTables, rememberTable, forgetTable, mintRoomKey } from './tables.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, validateMods, budgetOf } from './rollspec.js';
 import { previewOf, countingPmfs } from './odds.js';
@@ -36,6 +37,24 @@ import { PostStack, MAX_SHIMMER } from './post.js';
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
+
+// THE URL ADDRESSES A TABLE, AND NOW IT IS ALLOWED NOT TO (§3b L0, UX §7.20).
+// `?room=` absent used to fall back to the key 'table', which meant the bare
+// deployed URL sat every stranger who opened it on ONE shared felt — nobody
+// joined that table, it was just the only front door. ROOM is now nullable and
+// null IS the lobby: no join, no name prompt, no server call at all. Every
+// consumer that interpolates ROOM into a key, a URL or a wire field has to ask
+// IN_LOBBY first — the audit's rule is that a surface speaking about YOU keeps
+// working and a surface speaking about THE TABLE must be absent, and this pair
+// is where that question gets asked.
+//
+// DECLARED HERE, at the top, for exactly the reason ZOOM_LEVELS below is:
+// setSound() → syncSettingsUI() → the felt/system pickers run during MODULE
+// EVALUATION, and those pickers now word their tooltips differently in the
+// lobby. Left down beside LS_NAME (where the rest of the net constants live)
+// this pair is in TDZ when they read it, and the whole module dies at eval.
+const ROOM = new URLSearchParams(window.location.search).get('room') || null;
+const IN_LOBBY = ROOM === null;
 
 // Mat extents — LET, not const: the room-wide zoom setting resizes the mat
 // live (walls, shelf pitch, camera framing all follow). The base values here
@@ -5761,7 +5780,11 @@ function offerNeedsTable(boxEl, slotEl) {
   slotEl.textContent = '';
   const el = document.createElement('span');
   el.className = 'warn';
-  el.textContent = 'offers need a table — you are playing solo';
+  // In the lobby you are not solo as a FALLBACK, you chose no table — so the
+  // refusal names the exit instead of diagnosing you.
+  el.textContent = IN_LOBBY
+    ? 'offers need a table — start one from the lobby'
+    : 'offers need a table — you are playing solo';
   slotEl.appendChild(el);
 }
 
@@ -8498,12 +8521,29 @@ function rerenderInterpretation() {
 // cheapest identity surface in the app — tabs, history, link previews).
 function renderTableName() {
   const el = document.getElementById('table-name');
-  const key = netOnline && ROOM !== 'table' ? ROOM.replace(/[-_]+/g, ' ') : '';
-  const name = roomSettings.tableName || key;
+  // The lobby has no table, so it wears no name — and crucially it cannot
+  // INHERIT one. roomSettings.tableName is restored from LS_ROOMSETTINGS (the
+  // solo settings copy), so before L0 a roomless page rendered the name of
+  // whatever table this browser last configured, on the plate AND in the tab
+  // title. `tableName` is room state; it has no business surviving into a
+  // roomless session. clearTableIdentity() below is what enforces that at boot;
+  // this guard is the render-side belt to its braces.
+  const key = !IN_LOBBY && netOnline ? ROOM.replace(/[-_]+/g, ' ') : '';
+  const name = IN_LOBBY ? '' : (roomSettings.tableName || key);
   el.textContent = name;
   el.title = netOnline ? `room: ${ROOM}` : 'this table, solo';
   el.classList.toggle('hidden', !name);
   document.title = name ? `${name} — Dice Table` : 'Dice Table';
+}
+
+// The lobby's table identity is NOT the last table's. Felt, system and zoom are
+// yours and are restored from LS_ROOMSETTINGS as ever (they are "just you" with
+// no table — §7.20); the NAME is the one field that belongs to a room, so it is
+// dropped rather than inherited. Called once, from initNet's lobby exit, after
+// applyRoomSettings has done the restoring.
+function clearTableIdentity() {
+  roomSettings.tableName = '';
+  renderTableName();
 }
 
 // Mat-zoom presets (Joe 2026-08-04: small screens need a smaller mat).
@@ -8632,7 +8672,7 @@ function renderFeltSwatches() {
       const nm = document.createElement('span');
       nm.textContent = theme.name;
       chip.append(dot, nm);
-      chip.title = `${theme.name} felt — everyone at the table sees this`;
+      chip.title = IN_LOBBY ? `${theme.name} felt` : `${theme.name} felt — everyone at the table sees this`;
       chip.addEventListener('click', () => selectFelt(id));
       holder.appendChild(chip);
     }
@@ -8827,7 +8867,7 @@ function renderSystemPicker() {
       chip.className = 'system-chip';
       chip.dataset.system = sys.id;
       chip.textContent = sys.label;
-      chip.title = `${sys.label} — everyone at the table reads rolls this way`;
+      chip.title = IN_LOBBY ? `${sys.label} — how your rolls read` : `${sys.label} — everyone at the table reads rolls this way`;
       chip.addEventListener('click', () => selectSystem(sys.id));
       holder.appendChild(chip);
     }
@@ -8963,6 +9003,15 @@ function openSettingsModal() {
   // below records. A modal can only open long after eval.
   const nameInput = document.getElementById('set-table-name');
   if (document.activeElement !== nameInput) nameInput.value = roomSettings.tableName || '';
+  // The lobby's honesty pass (§7.20): a heading that claims "everyone at the
+  // table" with no table is the section's own lie, and Table name has no
+  // roomless meaning. Felt, system and zoom stay — they are yours either way.
+  // `Apply to table` goes too: it is the one room-scoped control in an
+  // otherwise roomless 'Your data', and with no table its ONLY outcome is a
+  // refusal, which is a button that exists to say no.
+  document.getElementById('set-room-label').style.display = IN_LOBBY ? 'none' : '';
+  document.getElementById('set-table-name-row').style.display = IN_LOBBY ? 'none' : '';
+  document.getElementById('portable-push').style.display = IN_LOBBY ? 'none' : '';
   syncSettingsUI();
   settingsModal.classList.remove('hidden');
 }
@@ -9120,12 +9169,13 @@ function portablePreview() {
 const PORTABLE_MAX_BYTES = 512 * 1024; // a text format; MB-scale means wrong file, not big rack
 
 // '<slug>-<YYYY-MM-DD>.dice.yaml' — named for the TABLE so six characters'
-// files don't all land in Downloads as 'export (3)'. The table name wins; a
-// chosen ?room= key is the fallback (the default 'table' key is nobody's word
-// for their table — renderTableName makes the same call). The date is LOCAL:
-// UTC would rename an evening save to tomorrow.
+// files don't all land in Downloads as 'export (3)'. The table name wins, the
+// ?room= key is the fallback, and in the LOBBY neither exists: a roomless save
+// is 'dice-table', never the name of the table you were at last week (the same
+// phantom-name defect renderTableName carried). The date is LOCAL: UTC would
+// rename an evening save to tomorrow.
 function portableFilename() {
-  const slug = String(roomSettings.tableName || (ROOM !== 'table' ? ROOM : ''))
+  const slug = String(IN_LOBBY ? '' : (roomSettings.tableName || ROOM))
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
@@ -10036,6 +10086,7 @@ document.addEventListener('keydown', (e) => {
     else if (!settingsModal.classList.contains('hidden')) closeSettingsModal();
     else if (isIdentityMenuOpen()) closeIdentityMenu();
     else if (isOfferMenuOpen()) closeOfferMenu();
+    else if (isRailMenuOpen()) closeRailMenu(true); // the lobby's New table / Tables ▾
     // a shelf-bound popover rides ON the peek: peel it first, the card next
     else if (pop && pop.source === 'shelf') closePopover();
     else if (isPeekOpen()) closePeek();
@@ -10059,7 +10110,11 @@ document.addEventListener('keydown', (e) => {
   if (typing) return;
 
   const modalOpen = !settingsModal.classList.contains('hidden')
-    || !document.getElementById('name-modal').classList.contains('hidden');
+    || !document.getElementById('name-modal').classList.contains('hidden')
+    // The rail menu owns the keyboard while it is up: 'Tables ▾' has no input
+    // to make `typing` true, so without this a stray 'c' would sweep the felt
+    // underneath a menu the player is reading.
+    || isRailMenuOpen();
 
   // Ctrl/Cmd+K — the one allowed modifier shortcut (browser-conflict safe).
   if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {
@@ -10120,7 +10175,8 @@ document.addEventListener('keydown', (e) => {
 // ---------------------------------------------------------------------------
 
 const LS_NAME = 'dice.name.v1';
-const ROOM = new URLSearchParams(window.location.search).get('room') || 'table';
+// ROOM / IN_LOBBY are declared at the top of the file, not here where the rest
+// of the net constants live — the module-evaluation TDZ trap is recorded there.
 
 // §G6 client half: the last setup THIS BROWSER pushed to THIS room, kept as
 // the exact wire body beside its rev. localStorage (not session): "prep
@@ -10128,10 +10184,13 @@ const ROOM = new URLSearchParams(window.location.search).get('room') || 'table';
 // place — a push that the server APPLIED (portablePushToTable) — which is
 // the whole authorship rule: a player who merely joined a prepared table, or
 // applied a seat, never gets a record here and so can never start re-pushing
-// a setup they did not author.
-const LS_TABLE = `dice.table.v1:${ROOM}`;
+// a setup they did not author. Null in the lobby: there is no room to hold a
+// setup for, and keying it off the old 'table' default would have made the
+// lobby read and write the REAL shared room's record.
+const LS_TABLE = IN_LOBBY ? null : `dice.table.v1:${ROOM}`;
 
 function storedTable() {
+  if (!LS_TABLE) return null;
   const v = load(LS_TABLE, null);
   return v && typeof v === 'object' && !Array.isArray(v) && Number.isInteger(v.rev) && v.rev >= 1
     ? v : null;
@@ -10224,11 +10283,267 @@ function renderPlayers() {
     more.title = others.slice(ROSTER_MAX).map((p) => p.name).join(', ');
     rosterEl.appendChild(more);
   }
+  // THE ROW'S EMPTY STATE IS AN AFFORDANCE, NOT A SENTENCE (§7.20). This row
+  // already asks "who is here"; when the answer is "nobody yet" it carries the
+  // fix, in the same slot where the people will appear — and every pill below
+  // is retired by its own success, which is what keeps it out of the
+  // standing-chrome trap that killed .tray-invite and #groups-empty.
+  if (!others.length) renderPresenceExits();
   // An open whisper picker tracks the live roster (joins/leaves/renames).
   if (pop && pop.vis && pop.vis.mode === 'whisper') renderPop();
   updateIdentityChip(); // the rail chip mirrors the roster's name + color
   updateTrayButtons(); // the ▾ offer picker appears/leaves with teammates
   if (isOfferMenuOpen()) closeOfferMenu(); // never target a stale roster
+}
+
+// One dashed pill in a roster pill's geometry — the shared body of every
+// presence-row exit. A real <button>, so the tab order reaches it right after
+// your own chip and Space/Enter work without further ceremony.
+function railGhost(label, title, onClick, { dot = false } = {}) {
+  const b = document.createElement('button');
+  b.className = 'rail-ghost';
+  b.title = title;
+  if (dot) {
+    const d = document.createElement('span');
+    d.className = 'rg-dot';
+    b.appendChild(d);
+  }
+  b.appendChild(document.createTextNode(label));
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+// The prepared seats nobody is sitting in: roomSetup.profiles minus the live
+// roster, matched case-insensitively the way §G5's &as= pre-select matches.
+// Entirely client-side — both halves are already in hand, so this needs no
+// endpoint, no wire key and no new state.
+function unclaimedSeats() {
+  if (!netOnline || !roomSetup || !Array.isArray(roomSetup.profiles)) return [];
+  const taken = new Set(players.map((p) => String(p.name || '').trim().toLowerCase()));
+  return roomSetup.profiles
+    .map((p) => (p && typeof p.name === 'string' ? p.name.trim() : ''))
+    .filter((n) => n && !taken.has(n.toLowerCase()));
+}
+
+// Copy — or hand off. navigator.share is the right verb on a TOUCH device
+// (CUJ2 is literally "somehow get all the players to join", and on a phone
+// that is the share sheet); on a desktop it would pop an OS dialog where the
+// player expected a clipboard, so it is gated on a device with no hover.
+// A cancelled share is a decision, not a failure: it does NOT fall through to
+// a copy the player did not ask for.
+async function shareInvite(url, btn, restoreLabel) {
+  if (!url) return;
+  if (navigator.share && window.matchMedia('(hover: none)').matches) {
+    try { await navigator.share({ url }); return; } catch (err) {
+      if (err && err.name === 'AbortError') return;
+      /* anything else: fall through to the clipboard */
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+  } catch {
+    window.prompt('Copy this invite link:', url); // never leave the link unreachable
+    return;
+  }
+  if (!btn) return;
+  btn.textContent = 'Copied!';
+  btn.classList.add('done');
+  setTimeout(() => {
+    btn.textContent = restoreLabel;
+    btn.classList.remove('done');
+  }, 900);
+}
+
+// The three presence states, in the one slot (§7.20). Ordered by how much the
+// player can do about it: the lobby has exits, an empty table has an invite,
+// and a table with no server has neither — there the status pill speaks,
+// because a readout is the right object when there is no action to offer.
+function renderPresenceExits() {
+  if (IN_LOBBY) {
+    rosterEl.appendChild(railGhost('+ New table', 'Start a table and get a link to share', openNewTable));
+    if (recentTables().length) {
+      const b = railGhost('Tables ▾', 'Tables you have been to', (e) => openTablesMenu(e.currentTarget));
+      b.setAttribute('aria-haspopup', 'menu');
+      b.setAttribute('aria-expanded', 'false');
+      rosterEl.appendChild(b);
+    }
+    return;
+  }
+  if (!netOnline || !net) return; // asked for a table, got no server — see initNet
+  const free = unclaimedSeats();
+  if (!free.length) {
+    rosterEl.appendChild(railGhost('Invite', 'Copy this table’s link', (e) =>
+      shareInvite(inviteUrl(), e.currentTarget, 'Invite')));
+    return;
+  }
+  // A PREPARED TABLE SHOWS ITS EMPTY CHAIRS. Same cap and same fold as the
+  // roster, so one grammar governs the row whether the pills are people or
+  // vacancies — and as players arrive the outlines fill in one by one.
+  for (const seatName of free.slice(0, ROSTER_MAX)) {
+    rosterEl.appendChild(railGhost(seatName, `Copy ${seatName}'s link to this table`, (e) =>
+      shareInvite(seatInviteUrl(seatName), e.currentTarget, seatName), { dot: true }));
+  }
+  if (free.length > ROSTER_MAX) {
+    const more = document.createElement('span');
+    more.className = 'roster-more';
+    more.textContent = `+${free.length - ROSTER_MAX}`;
+    more.title = free.slice(ROSTER_MAX).join(', ');
+    rosterEl.appendChild(more);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The rail menu — the lobby's two exits (§3b L1/L3)
+//
+// One open menu app-wide, body-level, anchored with viewport clamping and a
+// flip-above: the same discipline as openSetMenuFor, which is the only one of
+// the app's menus that had all three. (Extracting a shared placeAnchored is
+// owed here AND by §2l slice ⑤ — deliberately not done in this pass so the two
+// land together rather than fork; recorded in UX §7.20's seams.)
+// ---------------------------------------------------------------------------
+
+let railMenuState = null; // { el, anchor } — one at a time
+
+function isRailMenuOpen() { return railMenuState !== null; }
+
+function closeRailMenu(refocus = false) {
+  if (!railMenuState) return;
+  const { el, anchor } = railMenuState;
+  railMenuState = null;
+  el.remove();
+  document.removeEventListener('pointerdown', railMenuAway, true);
+  if (anchor) {
+    anchor.setAttribute('aria-expanded', 'false');
+    if (refocus) anchor.focus();
+  }
+}
+
+function railMenuAway(e) {
+  if (!railMenuState) return;
+  if (e.target.closest && (e.target.closest('.rail-menu') || e.target === railMenuState.anchor
+      || (railMenuState.anchor && railMenuState.anchor.contains(e.target)))) return;
+  closeRailMenu();
+}
+
+function openRailMenu(anchor, build) {
+  closeRailMenu(); // enforce one-menu before anything is measured
+  const el = document.createElement('div');
+  el.className = 'rail-menu panel';
+  el.setAttribute('role', 'menu');
+  build(el);
+  document.body.appendChild(el);
+  const r = anchor.getBoundingClientRect();
+  let top = r.bottom + 6;
+  if (top + el.offsetHeight > window.innerHeight - 12) {
+    top = Math.max(12, r.top - el.offsetHeight - 6); // flip above rather than clip
+  }
+  el.style.top = `${Math.round(top)}px`;
+  el.style.left = `${Math.round(Math.max(12, Math.min(r.left, window.innerWidth - el.offsetWidth - 12)))}px`;
+  anchor.setAttribute('aria-expanded', 'true');
+  railMenuState = { el, anchor };
+  document.addEventListener('pointerdown', railMenuAway, true);
+  // Table shortcuts must not fire underneath a menu that owns the keyboard.
+  el.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Escape') { e.preventDefault(); closeRailMenu(true); }
+    else if (e.key === 'Tab') closeRailMenu();
+  });
+  return el;
+}
+
+// Where a new table's chosen name waits out the navigation. sessionStorage,
+// not local: the tab that creates the table is the tab that lands on it, and a
+// name left behind by an abandoned create must not haunt a later visit.
+const pendingNameKey = (room) => `dice.newtable.v1:${room}`;
+
+// "+ New table" — name it, land in it. The key is MINTED, never the name:
+// this app has no access control by design (goal 10), so the key is the door,
+// and `?room=soulseal` would be a door anyone can guess. A blank name is
+// allowed — it makes an unnamed table, exactly as one made by hand.
+function openNewTable(e) {
+  const anchor = e.currentTarget;
+  const menu = openRailMenu(anchor, (el) => {
+    const input = document.createElement('input');
+    input.className = 'tin';
+    input.type = 'text';
+    input.maxLength = 28; // mirrors the server's table-name cap
+    input.placeholder = 'Table name…';
+    input.autocomplete = 'off';
+    const go = document.createElement('button');
+    go.className = 'btn confirm';
+    go.textContent = 'Create';
+    const row = document.createElement('div');
+    row.className = 'btn-row';
+    row.appendChild(input);
+    row.appendChild(go);
+    el.appendChild(row);
+    const create = () => {
+      const name = cutText(input.value.trim(), 28);
+      const key = mintRoomKey(name);
+      try { sessionStorage.setItem(pendingNameKey(key), name); } catch { /* a nameless table still works */ }
+      closeRailMenu();
+      gotoTable(key);
+    };
+    go.addEventListener('click', create);
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); create(); }
+    });
+  });
+  menu.querySelector('input').focus();
+}
+
+// "Tables ▾" — the tables THIS BROWSER has been to (§3b's no-global-directory
+// ruling: the server never publishes a list of live rooms, so this is the only
+// directory a lobby has, and it is yours).
+function openTablesMenu(anchor) {
+  if (isRailMenuOpen() && railMenuState.anchor === anchor) { closeRailMenu(true); return; }
+  openRailMenu(anchor, (el) => {
+    for (const t of recentTables()) {
+      const row = document.createElement('div');
+      row.className = 'rail-menu-row';
+      const go = document.createElement('button');
+      go.className = 'idm-item';
+      go.setAttribute('role', 'menuitem');
+      go.textContent = t.name || t.room; // user text: textContent only
+      go.title = `Go to ${t.name || t.room}`;
+      go.addEventListener('click', () => { closeRailMenu(); gotoTable(t.room); });
+      const drop = document.createElement('button');
+      drop.className = 'rail-menu-forget';
+      drop.textContent = '✕';
+      drop.title = `Forget ${t.name || t.room}`;
+      drop.addEventListener('click', () => {
+        forgetTable(t.room);
+        closeRailMenu(true);
+        renderPlayers(); // the pill leaves with the last remembered table
+      });
+      row.appendChild(go);
+      row.appendChild(drop);
+      el.appendChild(row);
+    }
+  });
+}
+
+// Read-and-clear: a pending name is consumed by the first join that lands on
+// its room, so a reload of the same table never re-imposes it over a name the
+// table has since been given.
+function takePendingTableName() {
+  if (IN_LOBBY) return '';
+  try {
+    const k = pendingNameKey(ROOM);
+    const v = sessionStorage.getItem(k) || '';
+    if (v) sessionStorage.removeItem(k);
+    return v.trim();
+  } catch { return ''; }
+}
+
+// Every transition between tables NAVIGATES. ROOM is a module-scope const and
+// some fifty netOnline sites assume the room identity does not change under
+// them; a same-page swap is a real refactor for something that happens a few
+// times a session (§7.20 seams, §3b L3).
+function gotoTable(room) {
+  window.location.href = room
+    ? `${window.location.pathname}?room=${encodeURIComponent(room)}`
+    : window.location.pathname;
 }
 
 // Compact human summary of a mods spec: "+3 · adv · drop low 1 · reroll ≤2 · explode"
@@ -10376,11 +10691,27 @@ function renderOffers() {
 
 const identityMenu = document.getElementById('identity-menu');
 
+// NULL IN THE LOBBY, and every caller must handle it. This used to interpolate
+// ROOM unconditionally, so a roomless client happily produced a WORKING link to
+// the shared room named 'table' and offered it as "your invite" — the single
+// most misleading affordance the L0 audit found. There is no table to invite
+// anyone to from the lobby; the honest answer is no link, not a plausible one.
 function inviteUrl() {
-  return `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(ROOM)}`;
+  return IN_LOBBY ? null : `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(ROOM)}`;
 }
 
-// JSON-safe projection — also __diceDebug.identity.
+// The per-seat form (§7.20): the same link with `&as=Name`, which G5 already
+// reads to pre-select a prepared seat. One prepared table, one link per chair.
+function seatInviteUrl(seatName) {
+  const base = inviteUrl();
+  return base ? `${base}&as=${encodeURIComponent(seatName)}` : null;
+}
+
+// JSON-safe projection — also __diceDebug.identity. `room` is null in the
+// lobby and `online` no longer implies it: the two questions are separate now
+// (a healthy server with no room joined is a lobby, not a connection failure),
+// and every consumer that used to read `online` to mean "has a table" reads
+// `room` instead.
 function identityInfo() {
   const me = netOnline && net ? players.find((p) => p.id === net.playerId) : null;
   let stored = '';
@@ -10390,6 +10721,7 @@ function identityInfo() {
     color: (me && me.color) || (netOnline && net ? net.color : null) || null,
     online: netOnline,
     room: ROOM,
+    lobby: IN_LOBBY,
     inviteUrl: inviteUrl(),
   };
 }
@@ -10398,7 +10730,10 @@ function updateIdentityChip() {
   const info = identityInfo();
   // '' falls back to the stylesheet's solo dot color
   document.getElementById('identity-dot').style.background = info.color || '';
-  document.getElementById('identity-name').textContent = info.name || '…';
+  // '…' is the JOIN's placeholder — it means "a name is coming, the prompt is
+  // resolving". The lobby never joins and never prompts, so there is nothing
+  // coming: it says the honest word instead, until you choose one.
+  document.getElementById('identity-name').textContent = info.name || (IN_LOBBY ? 'You' : '…');
   // ONE grammar for whose-rack (Joe 2026-08-04): teammate consolidation
   // grew the rail into a "whose pools" segmented control — pill click
   // browses, press-again falls home. The identity chip joins that
@@ -10409,17 +10744,34 @@ function updateIdentityChip() {
   const atHome = poolsOwner === null;
   chip.setAttribute('aria-pressed', String(atHome));
   chip.title = atHome
-    ? 'You — right-click for name, leave, invite'
-    : 'Back to your pools — right-click for name, leave, invite';
+    ? 'You — right-click for name, seat, invite'
+    : 'Back to your pools — right-click for name, seat, invite';
 }
 
 function isIdentityMenuOpen() { return !identityMenu.classList.contains('hidden'); }
 
+// Items hide by inline style, not a class: there is no global `.hidden`
+// utility in this codebase, and `.idm-item`'s own `display: block` outranks
+// the `[hidden]` attribute — an inline display is the one thing that wins
+// without adding a rule per item.
+const idmShow = (id, on) => { document.getElementById(id).style.display = on ? '' : 'none'; };
+
 function openIdentityMenu() {
   const info = identityInfo();
-  document.getElementById('idm-who').textContent = info.name || '…';
-  document.getElementById('idm-room').textContent = info.online
-    ? `room: ${ROOM}` : 'solo — no table joined';
+  document.getElementById('idm-who').textContent = info.name || 'You';
+  // This line used to branch on `online`, which conflated two questions: a
+  // healthy server with no room joined would have printed `room: table`. The
+  // question is whether there IS a room. P1's "detail on intent" is also why
+  // the privacy read lives here rather than standing on screen.
+  document.getElementById('idm-room').textContent = IN_LOBBY
+    ? 'not at a table — your rolls stay on this device'
+    : (info.online ? `room: ${ROOM}` : 'no server — playing solo');
+  // A surface that speaks about YOU keeps working; a surface that speaks about
+  // THE TABLE is ABSENT in the lobby — not greyed, not a refusal on click.
+  // There is no link to copy, no seat to change, and no table to leave.
+  idmShow('idm-invite', !IN_LOBBY);
+  idmShow('idm-leave', !IN_LOBBY);
+  idmShow('idm-lobby', !IN_LOBBY);
   document.getElementById('idm-rename-row').classList.add('hidden');
   identityMenu.classList.remove('hidden');
 }
@@ -10560,6 +10912,24 @@ function leaveTable() {
 }
 document.getElementById('idm-leave').addEventListener('click', () => leaveTable());
 
+// LEAVING THE TABLE IS NOT CHANGING SEATS, and it must not borrow leaveTable()
+// to do it. That function drops the seat AND deletes LS_NAME, then re-enters
+// initNet() — wiring this verb to it would silently wipe the player's display
+// name on the way out and, in the lobby, loop back into "Take a seat" with
+// nowhere to go. The seat belongs to the table; the NAME is yours and comes
+// with you. (GOALS: presence is asserted, never inferred — so the departure is
+// said out loud before the page goes, bounded so a slow server cannot trap you
+// at a table you asked to leave.)
+async function leaveToLobby() {
+  closeIdentityMenu();
+  forgetSeat(ROOM);
+  if (net && netOnline) {
+    await Promise.race([net.leave({ immediate: true }), new Promise((r) => setTimeout(r, 1200))]);
+  }
+  gotoTable(null);
+}
+document.getElementById('idm-lobby').addEventListener('click', () => leaveToLobby());
+
 // Closing the tab is the ordinary way to leave a table, and until now it was
 // the one the server could not see: behind a proxy the stream stays open and
 // the seat sits on the roster for an hour (server.js LIVENESS_TIMEOUT_MS has
@@ -10578,18 +10948,13 @@ window.addEventListener('pagehide', (e) => {
   net.leave();
 });
 
+// One copy path, two doors. The menu item and the presence row's Invite chair
+// share shareInvite(), so the feedback grammar ('Copied!', 900 ms, restore) and
+// the clipboard-refused fallback cannot drift apart.
 document.getElementById('idm-invite').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
-  try {
-    await navigator.clipboard.writeText(inviteUrl());
-    btn.textContent = 'Copied!';
-  } catch {
-    window.prompt('Copy this invite link:', inviteUrl());
-  }
-  setTimeout(() => {
-    btn.textContent = 'Copy invite link';
-    closeIdentityMenu();
-  }, 900);
+  await shareInvite(inviteUrl(), btn, 'Copy invite link');
+  setTimeout(closeIdentityMenu, 900);
 });
 
 updateIdentityChip(); // seed the chip before the join resolves
@@ -11254,6 +11619,27 @@ document.getElementById('seat-apply').addEventListener('click', () => applySeatC
 document.getElementById('seat-skip').addEventListener('click', () => dismissSeatChoice());
 
 async function initNet() {
+  // THE LOBBY EXITS FIRST, BEFORE ANYTHING ASKS FOR A NAME (§3b L0). CUJ1 is
+  // "I just need to do a dice roll NOW", and what stood in the way was this
+  // function: promptName() below has no cancel and no skip path, so a
+  // first-time visitor met a modal titled "Take a seat" — about a table they
+  // never asked for — before they could touch a die. The lobby answers that by
+  // REMOVING the prompt, not by adding a welcome. Nothing here is a fallback:
+  // we do not call connect(), so there is no failed join to report, and we do
+  // not call peekTable() either (it would fire GET /api/table about a room the
+  // player is not in). A name is what a table needs to address you; alone,
+  // nobody needs to address you, and solo rolls carry playerName: null through
+  // every render path already.
+  if (IN_LOBBY) {
+    netOnline = false;
+    roomSetup = null;
+    applyRoomSettings(load(LS_ROOMSETTINGS, null)); // your own felt, kept
+    clearTableIdentity(); // ...but never a table NAME (see the function)
+    renderPlayers();      // the presence row draws the lobby's exits
+    updateIdentityChip();
+    return;
+  }
+
   let name = '';
   try { name = (localStorage.getItem(LS_NAME) || '').trim(); } catch { /* ignore */ }
   if (!name) {
@@ -11295,10 +11681,36 @@ async function initNet() {
     renderOffers();
     applyRoomSettings(conn.settings); // room settings from the join response
     setPill(null);
+    // A table you actually reached is a table you can come back to (§3b L3).
+    // Written HERE, on a successful join, so the lobby's list can never
+    // accumulate rooms that refused you or never existed.
+    // THE NAME HAS TO SURVIVE THE ROUND TRIP, and without this it does not.
+    // An UNPREPARED room is deleted the moment its last player leaves (only a
+    // room holding a setup lingers — §G6), so "leave the table, come back two
+    // minutes later" lands you in a brand-new room that merely shares a key,
+    // with the name gone while your own Tables list still shows it. Restoring
+    // it is the same principle G6 already established for setups: the
+    // organizer's browser is the durable copy and heals the room on arrival.
+    // Guarded to a room with NO name, so it can never overwrite one somebody
+    // else has since given the table — the one thing it CAN do is bring back a
+    // name a player deliberately cleared, which is the accepted cost (and the
+    // identical trade maybeRepushTable() makes for setups).
+    const remembered = recentTables().find((t) => t.room === ROOM);
+    const wanted = takePendingTableName() || (remembered && remembered.name) || '';
+    if (wanted && !roomSettings.tableName && net) net.setSettings({ tableName: wanted });
+    rememberTable(ROOM, roomSettings.tableName || wanted || '');
   } else {
     netOnline = false;
     roomSetup = null;
-    setPill('solo', 'solo'); // static hosting / no server: local play
+    // `solo` SURVIVES HERE, AND ONLY HERE. §7.20 deletes it as the LOBBY's
+    // indicator because a lobby has exits and a <span> cannot offer them. This
+    // branch is the opposite case: the player ASKED for a table (?room= is
+    // set) and there is no server to give them one — static hosting (goal 9,
+    // a supported mode, so no red) or a server that is down. There is no next
+    // action to point at, which is exactly when a readout is the right object.
+    // Safe in the shared-transient channel too: with no server, no settings
+    // event can fire and steal the slot.
+    setPill('solo', 'solo');
     applyRoomSettings(load(LS_ROOMSETTINGS, null)); // solo keeps its own felt
   }
   // §G5: a chosen prepared seat's preview stands up now — after every piece

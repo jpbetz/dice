@@ -55,7 +55,7 @@ limitations under the License.
          BELOW you instead of pushing you down (it led the rail before, which
          is exactly the drift this ordering exists to kill). -->
     <div id="rail">
-      <button id="identity-chip" class="btn ghost" title="You — change name, leave &amp; switch, invite">
+      <button id="identity-chip" class="btn ghost" title="You — right-click for name, seat, invite">
         <span id="identity-dot" class="identity-dot"></span>
         <span id="identity-name" class="identity-name">…</span>
       </button>
@@ -287,7 +287,14 @@ limitations under the License.
        the ≣ badge stays a SPAN, not a nested button.) -->
 
   <!-- Identity menu (rail chip): who you are + seat actions. Fully solo-capable
-       (goal 9): renaming writes the stored name; Leave & switch re-prompts. -->
+       (goal 9): renaming writes the stored name; Change seat re-prompts.
+       §3b/L3 split two verbs that used to wear one label: 'Change seat…' drops
+       THIS SEAT and re-prompts at the same table (what the old 'Leave & switch
+       seat' actually did), while 'Leave table' goes to the lobby and KEEPS your
+       name. The three table-scoped items below are hidden outright in the
+       lobby — there is no link to copy, no seat to change, no table to leave —
+       by inline display, since .idm-item's own `display:block` outranks the
+       [hidden] attribute and this codebase has no global .hidden utility. -->
   <div id="identity-menu" class="panel hidden">
     <div class="idm-head">
       <span id="idm-who" class="idm-name"></span>
@@ -297,7 +304,8 @@ limitations under the License.
     <div id="idm-rename-row" class="idm-rename hidden">
       <input id="idm-name-input" class="tin" type="text" maxlength="24" autocomplete="off" placeholder="New name…">
     </div>
-    <button id="idm-leave" class="idm-item">Leave &amp; switch seat</button>
+    <button id="idm-leave" class="idm-item" title="Drop this seat and sit down again at this same table">Change seat…</button>
+    <button id="idm-lobby" class="idm-item" title="Leave this table and go back to the lobby — your name and pools come with you">Leave table</button>
     <button id="idm-invite" class="idm-item" title="This room’s link — invites a player. Pools travel via Settings → Your data → Export">Copy invite link</button>
   </div>
 
@@ -833,12 +841,20 @@ limitations under the License.
           </div>
         </div>
       </div>
+      <!-- §3b/L0: this section's heading is a CLAIM, and in the lobby it is a
+           false one. All four controls have working local branches, so with no
+           table they silently become personal while the heading still says
+           "Everyone at the table" and the felt tooltip still says "everyone at
+           the table sees this". Felt, system and zoom genuinely ARE just you
+           with no table, so the lobby drops the heading (rather than repeat
+           "Just you" and label two sections the same) and hides Table name,
+           which has no roomless meaning at all. -->
       <div class="settings-sec">
-        <span class="plabel">Everyone at the table</span>
+        <span class="plabel" id="set-room-label">Everyone at the table</span>
         <!-- Table name (anatomy pass): the rail nameplate's rename path —
              management stands behind the settings gate (P6), room-wide
              like felt/system. Empty = unnamed (no plate). -->
-        <div class="prow">
+        <div class="prow" id="set-table-name-row">
           <span class="grow">
             <span class="prow-label">Table name</span>
             <span class="prow-sub">shows at the top of everyone’s panel</span>

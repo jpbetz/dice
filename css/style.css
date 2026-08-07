@@ -1779,6 +1779,89 @@ html, body {
   cursor: default;
 }
 
+/* ---------- the presence row's GHOST AFFORDANCES (§7.20) ---------- */
+/* When the roster is empty this row does not go quiet — it carries the exit.
+   `Invite`, the unclaimed prepared seats, `+ New table`, `Tables ▾` all wear
+   ONE dress, because §7.20's ruling is that emptiness is answered by a button
+   that PERFORMS the exit, never by a line of text describing the situation
+   (the same seam the dashed '＋' tiles went through: "an affordance, not
+   prose" — the draft well's one sentence and #groups-empty both died for the
+   other kind). Geometry is .roster-name's to the pixel, so a vacancy sits in
+   the row as a PEER of the people; only the dress differs — the app's ghost
+   recipe (.pt-toggle css:1340, .ghost-add css:1214): a dashed hairline over
+   nothing. A dashed pill where a solid person-pill goes reads as a chair
+   nobody is sitting in, and it is retired by the very person it asks for. */
+.rail-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 120px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px dashed var(--hair);
+  background: none;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+}
+/* HUE = ACT (css:226-231, 250-255): steel, never gold — gold survives only
+   where the verb is roll, and copying a link is not a roll. Focus takes the
+   hover promotion (.ghost-add's house pattern, css:1230) AND an ivory ring:
+   a row of six identical dashed seats needs to say WHICH one is focused, and
+   a promotion this quiet cannot do that on its own. Offset OUTSIDE the pill
+   so the ring never reads as a second border. */
+.rail-ghost:hover:not(:disabled),
+.rail-ghost:focus-visible {
+  color: var(--ivory);
+  border-color: rgba(243, 234, 215, 0.35);
+  background: rgba(243, 234, 215, 0.04);
+}
+.rail-ghost:focus-visible { outline: 1px solid var(--ivory); outline-offset: 1px; }
+/* the third visibility code (css:258-262): disabled drains hue */
+.rail-ghost:disabled { opacity: 0.4; cursor: default; filter: grayscale(0.7); }
+/* THE COPIED ACKNOWLEDGEMENT — the 900 ms after the label swaps to `Copied!`.
+   It holds the hover promotion WITHOUT a pointer, because on a phone there is
+   no hover at all and the share/copy hand-off is exactly the phone's moment:
+   the dress has to carry the confirmation alone. Deliberately no gold, no
+   pulse, no motion — §5.1 rations ornament to one element for a few seconds
+   and the roll moment owns that budget; this is an acknowledgement, not an
+   event. The border stays DASHED on purpose: the COPY completed, the seat did
+   not fill, and a solid pill here would claim somebody arrived. */
+.rail-ghost.done {
+  color: var(--ivory);
+  border-color: rgba(243, 234, 215, 0.45);
+  background: rgba(243, 234, 215, 0.07);
+}
+/* the optional leading dot, so a per-seat pill parses as the roster's
+   [dot][name] grammar. .roster-dot's exact 8px round (border-box keeps it 8px
+   with the ring on), but HOLLOW: an unclaimed seat has no player colour to
+   fill, and currentColor makes the ring promote with its pill for free. No
+   drop shadow — that lift exists to float a saturated colour off the panel,
+   and a hairline ring has nothing to lift. */
+.rail-ghost .rg-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  background: none;
+}
+/* There is NO global `.hidden` in this stylesheet (see css:2563) — every hide
+   carries its own rule, so `Tables ▾` (absent when there are no recents) can
+   be hidden in place rather than only by not being built. */
+.rail-ghost.hidden { display: none; }
+/* Collapsed rail: nothing to add. #left-panel.collapsed #rail-roster is
+   already display:none (css:1553), so vacancies leave with the people they
+   stand in for — 56px has no room for a word, and the invite path keeps its
+   home in the identity menu. #rail-roster:empty (css:1729) is untouched
+   either way: with affordances in it the row is not empty, and when the first
+   real pill replaces them it is still not empty. */
+
 /* the settings rename row: the input takes a bounded seat beside its
    label — .tin's block width would crush the prow's label column */
 #set-table-name { flex: 0 0 150px; width: 150px; min-width: 0; }
