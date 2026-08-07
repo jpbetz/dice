@@ -74,10 +74,27 @@ limitations under the License.
       <span id="status-pill" class="hidden"></span>
     </div>
 
-    <!-- Collapsed-only quick list (super minimal, Joe 2026-08-04): your
-         pools with zero edit/save/notation chrome — named pools are a name
-         alone, unnamed pools are their die chips alone; a tap rolls it. -->
+    <!-- THE COLLAPSED POOL RAIL (Joe 2026-08-07). At 56px a pool name had
+         to be rotated on its side and a shelf title had nowhere to go, so
+         the rail is 104px and the words come back: shelf heads spelled,
+         names horizontal and ellipsized, one row per pool at a 44px touch
+         height. A tap SELECTS (steel ring + ✓, aria-pressed) because the
+         common Soul Deal roll is three pools — an attribute, a skill and a
+         motivation — and the gold bar below rolls the selection whole.
+         The selection is spent by its roll: no tray lives up here, so
+         nothing is left behind to wonder about (2i-G). -->
     <div id="rail-pools"></div>
+
+    <!-- The selection's one verb: absent at rest, STANDS while picks exist
+         (§7.14's contextual-rail grammar). Gold rolls; the ✕ drops the
+         picks. #rail-note is the rail's own whisper channel — the status
+         pill folds to a 10px colorless dot while collapsed, so a note sent
+         there would be invisible in exactly the state that sends it. -->
+    <div id="rail-roll-wrap" hidden>
+      <button id="rail-roll" type="button"><b class="cue-word">Roll</b><span class="rr-count"></span></button>
+      <button id="rail-clearsel" type="button" title="Clear selection — Esc">✕</button>
+    </div>
+    <div id="rail-note" hidden aria-live="polite"></div>
 
     <!-- ONE Pools panel (2026-07-31, the panel merge): the draft is its
          FIRST ROW — structurally a saved-pool row that does not exist yet —

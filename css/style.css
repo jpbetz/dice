@@ -37,7 +37,7 @@ limitations under the License.
      keeps it in sync (refitView) and the canvas + felt-anchored overlays
      read it. The CSS default matches the expanded desktop first paint. */
   --sidebar-w: 316px;
-  --sidebar-rail-w: 56px;
+  --sidebar-rail-w: 112px; /* 56 → 112 (2026-08-07): a pool name fits lying down */
   --table-left: 316px;
 
   /* ---- the layer scale (GOALS P2: one documented z ladder) ----------------
@@ -1577,46 +1577,135 @@ html, body {
   color: transparent; /* the pill folds to its dot; the color still signals */
 }
 
-/* collapsed-only pools quick list (super minimal): filled by renderRailPools */
+/* THE COLLAPSED POOL RAIL (2026-08-07) — 104px, which is the whole design.
+   Every defect the 56px rail had was a width symptom: names rotated on
+   their side, shelf titles dropped, no room to hold a selection. A tap
+   SELECTS and the one gold bar ROLLS; the selection is spent by its roll.
+   Filled by renderRailPools. */
 #rail-pools {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 4px;
+  align-items: stretch;
+  gap: 4px;
+  padding: 8px 6px;
   scrollbar-width: none;
+  /* the list fades out under the roll bar instead of being cut mid-row */
+  mask-image: linear-gradient(#000 calc(100% - 14px), transparent);
 }
-/* one pool, one tap, one roll — a name alone (vertical: the rail is 56px)
-   or die chips alone; every word of edit/save chrome stays expanded-only */
+.rp-shelf { display: flex; flex-direction: column; gap: 4px; }
+/* the shelf title Joe missed — spelled, not implied. One shelf gets none:
+   a lone head over the whole rack is chrome announcing itself. */
+.rp-shelf-head {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 4px 2px;
+}
 .rp-item {
+  position: relative;
   flex: none;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 2px;
-  max-width: 36px;
-  padding: 7px 5px;
+  gap: 6px;
+  min-height: 44px; /* a thumb target, not a chip */
+  padding: 6px 6px;
   border: 1px solid var(--panel-border);
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.05);
   color: var(--ivory);
   cursor: pointer;
+  text-align: left;
 }
 .rp-item:hover { background: rgba(255, 255, 255, 0.11); border-color: rgba(255, 255, 255, 0.32); }
+.rp-item:focus-visible { outline: 1px solid var(--ivory); outline-offset: 1px; }
+/* SELECTED is steel: picking is a tool act. Gold belongs to the roll, and
+   the roll is the bar below — if a picked row went gold, two things on
+   screen would claim the same verb. */
+.rp-item[aria-pressed="true"] {
+  border-color: #8c98a6;
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(140, 152, 166, 0.45);
+}
+/* The tick's gutter STANDS EMPTY rather than appearing with the tick: if
+   the mark took its width on selection, a name that fit would truncate the
+   moment you picked it — the row would get less readable exactly as it
+   became the one you cared about. Constant width, constant text. */
+.rp-item::before {
+  content: '✓';
+  flex: none;
+  width: 8px;
+  font-size: 10px;
+  color: transparent;
+  transition: color 0.12s;
+}
+.rp-item[aria-pressed="true"]::before { color: #b9c3cd; }
+.rp-item.rp-bad { filter: grayscale(1); opacity: 0.45; cursor: default; } /* 2i-C disabled */
 .rp-name {
-  writing-mode: vertical-rl;
   font-size: 11px;
-  letter-spacing: 0.05em;
-  max-height: 128px;
+  letter-spacing: 0.02em;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: nowrap; /* horizontal and clipped — never rotated */
 }
 .rp-dice .die-art { width: 18px; height: 18px; }
 .rp-dice .strip-count { font-size: 9px; }
+.rp-empty { font-size: 10.5px; color: var(--muted); padding: 10px 6px; opacity: 0.7; }
+/* the digit shortcut, mirroring .pool-ord's rest state exactly (0 → 0.8 on
+   approach) so the rail and the rack teach the same thing the same way */
+.rp-ord {
+  position: absolute; top: 2px; right: 4px;
+  font-size: 8px; color: var(--muted); opacity: 0;
+  transition: opacity 0.12s;
+}
+.rp-item:hover .rp-ord, .rp-item:focus-visible .rp-ord { opacity: 0.8; }
+/* the selection's verb: gold rolls */
+#rail-roll-wrap {
+  flex: none;
+  display: flex; gap: 4px; align-items: center;
+  padding: 7px 6px 8px;
+  border-top: 1px solid var(--hair);
+}
+#rail-roll-wrap[hidden], #rail-note[hidden] { display: none; }
+#left-panel:not(.collapsed) #rail-roll-wrap,
+#left-panel:not(.collapsed) #rail-note { display: none; }
+#rail-roll {
+  flex: 1 1 auto;
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  min-height: 40px;
+  border-radius: 7px;
+  cursor: pointer;
+  border: 1px solid rgba(212, 175, 55, 0.55);
+  color: var(--gold-bright);
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.30), rgba(212, 175, 55, 0.16));
+}
+#rail-roll:hover {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, rgba(255, 215, 102, 0.42), rgba(212, 175, 55, 0.24));
+}
+#rail-roll .cue-word { font-size: 10px; letter-spacing: 0.08em; }
+#rail-roll .rr-count:not(:empty) {
+  font-size: 9px; padding: 1px 5px; border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28); color: var(--gold-bright);
+}
+#rail-roll:disabled { filter: grayscale(1); opacity: 0.45; cursor: default; }
+#rail-clearsel {
+  padding: 8px 10px; border: 0; background: none;
+  color: var(--muted); font-size: 11px; cursor: pointer;
+}
+#left-panel #rail-clearsel:hover { color: var(--red); }
+#rail-note {
+  flex: none;
+  padding: 0 8px 8px;
+  font-size: 10px; line-height: 1.35;
+  color: var(--muted);
+}
 
 /* ---------- identity chip + menu (the rail) ---------- */
 #identity-chip {

@@ -1908,10 +1908,10 @@ export const scenarios = [
     tags: ['smoke', 'chrome', 'groups'],
     // THE SIDE PANEL (2026-08-04): a real layout column, never an overlay —
     // the felt (canvas) is sized beside it and resizes on toggle. The
-    // divider strip collapses it to a slim icon rail carrying the menu
-    // buttons and a SUPER-MINIMAL pool list: names alone / die chips
-    // alone, zero edit chrome, tap = roll (draft untouched, panel stays
-    // collapsed). The hover flyout is retired.
+    // divider strip collapses it to a 104px POOL RAIL (2026-08-07) carrying
+    // the menu buttons and a shelf-grouped pool list with horizontal names;
+    // a tap SELECTS and the gold bar rolls. Zero edit chrome either way.
+    // The hover flyout is retired.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {notation: '2d6'}])`);
@@ -1945,41 +1945,48 @@ export const scenarios = [
                  builder: document.getElementById('builder-panel').offsetParent !== null,
                  expanded: document.getElementById('edge-toggle').getAttribute('aria-expanded') };
       })())`));
-      assert.ok(geo2.panelW < 80, `collapsed is a slim rail (got ${geo2.panelW})`);
+      assert.ok(geo2.panelW < 120, `collapsed is a pool rail (got ${geo2.panelW})`);
       assert.ok(Math.abs(geo2.panelW + geo2.feltW - geo2.vw) <= 1, 'the felt took the difference');
       assert.equal(geo2.builder, false, 'the workbench leaves entirely');
       assert.equal(geo2.expanded, 'false', 'the strip reports collapsed');
 
-      // the super-minimal quick list: a named pool is text alone, an
-      // unnamed pool is chips alone, and NO edit/save/notation chrome
-      const rail = JSON.parse(await a.eval(`JSON.stringify((() => {
-        const items = [...document.querySelectorAll('#rail-pools .rp-item')];
-        return {
-          named: items.filter((b) => b.classList.contains('rp-name'))
-            .map((b) => ({ text: b.textContent, imgs: b.querySelectorAll('img').length })),
-          dice: items.filter((b) => b.classList.contains('rp-dice'))
-            .map((b) => ({ text: b.textContent.replace(/[×x]\\d+/g, '').trim(), imgs: b.querySelectorAll('img').length })),
-          editChrome: document.querySelectorAll('#rail-pools .btn, #rail-pools input').length,
-        };
-      })())`));
-      assert.ok(rail.named.some((i) => i.text === 'Attack' && i.imgs === 0),
-        'a named pool is its name alone — no dice images');
-      assert.ok(rail.dice.some((i) => i.imgs >= 1 && i.text === ''),
+      // the pool rail: a named pool is its name — HORIZONTAL, the defect
+      // this width buys out — an unnamed pool is die chips, and there is no
+      // edit/save/notation chrome either way
+      const rail = await a.dbg('railState');
+      const attack = rail.items.find((i) => i.name === 'Attack');
+      assert.ok(attack, 'the named pool shows its name');
+      assert.equal(attack.imgs, 0, 'a named pool is its name alone — no dice images');
+      assert.equal(attack.vertical, 'horizontal-tb', 'and it reads horizontally, never rotated');
+      assert.ok(rail.items.some((i) => i.dice && i.imgs >= 1 && !i.name),
         'an unnamed pool is die chips alone — no text');
-      assert.equal(rail.editChrome, 0, 'zero edit/save chrome in the rail');
+      assert.equal(await a.eval(
+        `document.querySelectorAll('#rail-pools .btn, #rail-pools input').length`),
+        0, 'zero edit/save chrome in the rail');
 
-      // tap = ROLL: dice fly, the draft stays untouched, the panel stays
-      // collapsed, and the roll carries the pool's name as its source
+      // tap = SELECT, then the one gold bar ROLLS. The draft is never
+      // touched, the panel stays collapsed, the roll carries the pool's
+      // identity, and the selection is SPENT by its roll (2i-G).
+      assert.equal(rail.rollStanding, false, 'no verb stands until something is picked');
       const logBefore = await a.logCount();
-      await a.eval(`[...document.querySelectorAll('#rail-pools .rp-item.rp-name')]
-        .find((b) => b.textContent === 'Attack').click()`);
+      await a.eval(`[...document.querySelectorAll('#rail-pools .rp-item')]
+        .find((b) => (b.querySelector('.rp-name') || {}).textContent === 'Attack').click()`);
+      const picked = await a.dbg('railState');
+      assert.deepEqual(picked.selected, ['Attack'], 'the tap SELECTS rather than rolling');
+      assert.equal(picked.rollStanding, true, 'and the gold verb arrives with the pick');
+      assert.equal(await a.logCount(), logBefore, 'nothing has rolled yet');
+
+      await a.eval(`document.getElementById('rail-roll').click()`);
       await a.waitFor(
         `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${logBefore} && !window.__diceDebug.busy)`,
-        { desc: 'the rail item rolls' },
+        { desc: 'the gold bar rolls the selection' },
       );
       assert.equal((await a.dbg('trayState')).dice.length, 0, 'the draft was never touched');
       assert.equal((await a.dbg('panelState')).pools, false, 'the panel stays collapsed');
       assert.ok((await a.logTop()).includes('Attack'), 'the roll carries the pool identity');
+      const spent = await a.dbg('railState');
+      assert.deepEqual(spent.selected, [], 'the selection is spent by its roll');
+      assert.equal(spent.rollStanding, false, 'and its verb leaves with it');
 
       // expand again: the quick list yields to the full workbench
       await a.eval(`document.getElementById('edge-toggle').click()`);
@@ -5058,6 +5065,144 @@ export const scenarios = [
 
       // sanity: the last cleared roll is really gone from the felt view
       assert.ok(bRid, 'the endurance loop actually produced a roll id');
+    },
+  },
+  {
+    name: 'rail-multi-pick',
+    tags: ['smoke', 'chrome', 'groups'],
+    // THE CORE ASK (Joe 2026-08-07): "it don't allow for the common case of
+    // picking multiple pools (an attribute, skill and motivation is a common
+    // pool combo in Your Soul Deal). The ability to select a few pools and
+    // roll feels key." Three taps and one gold bar, from the collapsed rail,
+    // without a tray and without expanding the panel.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setGroups([
+        {name: 'Wisdom', notation: '2d8', category: 'attributes'},
+        {name: 'Swords', notation: '1d10', category: 'skills'},
+        {name: 'Zeal', notation: '1d4', category: 'motivations'}
+      ])`);
+      // Panel state leaks across scenarios on a shared origin profile — the
+      // finally is what keeps a failure here from collapsing the next one.
+      await a.dbg('setPanelState({pools: false})');
+      try {
+        // The shelf titles Joe said were dropped, spelled and in rack order.
+        const rail = await a.dbg('railState');
+        // Raw category text, uppercased by CSS — exactly what the expanded
+        // rack's own section heads carry, so the two surfaces agree.
+        assert.deepEqual(rail.shelves, ['attributes', 'skills', 'motivations'],
+          'the shelf titles come back, trio-ordered');
+        assert.deepEqual(rail.items.map((i) => i.name), ['Wisdom', 'Swords', 'Zeal'],
+          'every pool reads as a word');
+
+        // Three digits = three picks. Same order as the rack, so '1 2 3'
+        // means the same roll whether the panel is open or closed.
+        for (const k of ['1', '2', '3']) {
+          await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: '${k}'}))`);
+        }
+        const picked = await a.dbg('railState');
+        assert.deepEqual(picked.selected, ['Wisdom', 'Swords', 'Zeal'], 'all three are picked');
+        assert.equal(picked.rollStanding, true, 'the gold verb stands');
+        assert.equal(picked.rollDisabled, false, 'four dice is well under the cap');
+        assert.equal((await a.dbg('trayState')).dice.length, 0,
+          'and the draft below is still untouched');
+
+        // Enter fires the selection — ONE roll carrying all three pools.
+        const before = await a.logCount();
+        await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}))`);
+        await a.waitFor(
+          `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${before}`
+          + ` && !window.__diceDebug.busy)`,
+          { desc: 'the selection rolls' });
+        assert.equal(await a.logCount(), before + 1, 'exactly one roll, not three');
+        const top = await a.logTop();
+        for (const n of ['Wisdom', 'Swords', 'Zeal']) {
+          assert.ok(top.includes(n), `the composed roll names ${n} (got: ${top})`);
+        }
+        assert.equal(await a.diceCount(), 4, 'all four dice hit the felt together');
+
+        // Spent by its roll (2i-G) — nothing left behind, and no tray was
+        // ever needed to hold it.
+        const after = await a.dbg('railState');
+        assert.deepEqual(after.selected, [], 'the selection is spent');
+        assert.equal(after.rollStanding, false, 'its verb leaves with it');
+        assert.equal((await a.dbg('panelState')).pools, false, 'the panel never expanded');
+
+        // Esc drops picks before it ever sweeps the felt.
+        await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: '1'}))`);
+        assert.deepEqual((await a.dbg('railState')).selected, ['Wisdom'], 'picked again');
+        await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
+        assert.deepEqual((await a.dbg('railState')).selected, [],
+          'Esc drops the picks first — a mis-tap never costs a roll');
+        assert.ok(await a.diceCount() > 0, 'and the felt was not swept');
+
+        // Expanding drops a half-pick: the workbench is the composing
+        // surface, and state visible in neither place is the worse outcome.
+        await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: '2'}))`);
+        assert.deepEqual((await a.dbg('railState')).selected, ['Swords'], 'picked before expanding');
+        await a.dbg('setPanelState({pools: true})');
+        assert.deepEqual((await a.dbg('railState')).selected, [],
+          'expanding drops the rail selection');
+        assert.equal((await a.dbg('railState')).rollStanding, false,
+          'and the gold bar does not survive into the open panel');
+      } finally {
+        await a.dbg('setPanelState({pools: true})');
+      }
+    },
+  },
+  {
+    name: 'rail-compose-rules',
+    tags: ['chrome', 'groups'],
+    // What a multi-pick can and cannot carry. One pick launches the pool as
+    // AUTHORED; two or more compose, and the grammar has no union for the
+    // glue mods — so they are stripped OUT LOUD rather than silently.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setGroups([
+        {name: 'Brutal', notation: '4d6dl1'},
+        {name: 'Plain', notation: '2d6'},
+        {name: 'Sneaky', notation: '1d8 secret'},
+        {name: 'Open', notation: '1d8'}
+      ])`);
+      await a.dbg('setPanelState({pools: false})');
+      try {
+        // SINGLE pick: authored intent rides verbatim. dl1 survives.
+        await a.dbg(`setRailSelection(['Brutal'])`);
+        await a.dbg('railRoll()');
+        await a.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy)`,
+          { desc: 'the single pick rolls' });
+        assert.ok((await a.dbg('lastRequestedRoll')).canonical.includes('dl1'),
+          'one pick keeps its keep/drop — it is the pool as its author wrote it');
+
+        // MULTI pick: the same pool's dl1 is stripped. This is the trap the
+        // design pass caught — `4d6dl1 + 2d6` is a SAME-TYPE sum, which the
+        // parser accepts by widening the glue to `6d6dl1`, silently changing
+        // the distribution. So glue comes off unconditionally, never as a
+        // fallback on a parse error.
+        await a.dbg(`setRailSelection(['Brutal', 'Plain'])`);
+        await a.dbg('railRoll()');
+        await a.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy)`,
+          { desc: 'the composed pick rolls' });
+        const asked = await a.dbg('lastRequestedRoll');
+        assert.ok(!asked.canonical.includes('dl'),
+          `a composed roll drops keep/drop (got: ${asked.canonical})`);
+        assert.equal(asked.dice.length, 6, 'all six dice ride');
+        const note = (await a.dbg('railState')).note;
+        assert.ok(note && note.includes('Brutal') && /set aside/.test(note),
+          `and the rail SAYS what it set aside (got: ${JSON.stringify(note)})`);
+
+        // Visibility fails CLOSED (goal 11): mixing a secret pick with an
+        // open one yields secret, never the more open of the two.
+        await a.dbg(`setRailSelection(['Sneaky', 'Open'])`);
+        await a.dbg('railRoll()');
+        await a.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy)`,
+          { desc: 'the mixed-visibility pick rolls' });
+        const vis = (await a.dbg('lastRequestedRoll')).visibility;
+        assert.equal(vis && vis.mode, 'secret',
+          'mixed visibility closes down to secret, never up to open');
+      } finally {
+        await a.dbg('setPanelState({pools: true})');
+      }
     },
   },
   {

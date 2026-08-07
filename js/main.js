@@ -4742,6 +4742,38 @@ window.__diceDebug = {
   // is a memory + GPU leak the hideBanner helper closes.
   get outlinedCount() { return outlined.length; },
   hoverBanner(on) { outlineRollDice(on !== false); return outlined.length; },
+  // The collapsed pool rail: what it shows, what is picked, and the state of
+  // its one gold verb. Scenarios read THIS, never the .rp-* DOM.
+  get railState() {
+    const rows = [...document.querySelectorAll('#rail-pools .rp-item')];
+    const btn = document.getElementById('rail-roll');
+    const wrap = document.getElementById('rail-roll-wrap');
+    const note = document.getElementById('rail-note');
+    return {
+      shelves: [...document.querySelectorAll('#rail-pools .rp-shelf')]
+        .map((s) => (s.querySelector('.rp-shelf-head') || {}).textContent || null),
+      items: rows.map((b) => ({
+        name: (b.querySelector('.rp-name') || {}).textContent || null,
+        dice: !!b.querySelector('.rp-dice'),
+        imgs: b.querySelectorAll('.rp-dice img').length,
+        ord: (b.querySelector('.rp-ord') || {}).textContent || null,
+        selected: b.getAttribute('aria-pressed') === 'true',
+        bad: b.classList.contains('rp-bad'),
+        vertical: getComputedStyle(b.querySelector('.rp-name') || b).writingMode,
+      })),
+      selected: railPicked().map((g) => g.name || g.notation),
+      rollStanding: !!wrap && !wrap.hidden && getComputedStyle(wrap).display !== 'none',
+      rollDisabled: !!btn && btn.disabled,
+      note: note && !note.hidden ? note.textContent : null,
+    };
+  },
+  setRailSelection(names) {
+    railSel.clear();
+    for (const g of groups) if (names.includes(g.name)) railSel.add(g.id);
+    renderRailPools();
+    return railPicked().map((g) => g.name);
+  },
+  railRoll() { rollRailSelection(); return true; },
   // The card action row, read as the EYE gets it. Every field here is
   // computed style, never the `.hidden` property — asserting the property
   // is exactly how the fold shipped two live verbs on every card while the
@@ -6396,12 +6428,15 @@ function stageGroup(g) {
   if (dropped.length) {
     showSettingsNote(`${g.name || 'pool'}: ${dropped.join(' · ')} set aside — re-add via ±`);
   }
-  if (wasEmpty) {
-    // the cluster announces itself as the next tap (touch has no hover)
-    trayRollBtn.classList.add('stage-pulse');
-    setTimeout(() => trayRollBtn.classList.remove('stage-pulse'), 900);
-  }
+  if (wasEmpty) pulseTrayRoll();
   return true;
+}
+
+// The cluster announces itself as the next tap (touch has no hover). Shared
+// with the Enter guard, which surfaces a hidden draft rather than firing it.
+function pulseTrayRoll() {
+  trayRollBtn.classList.add('stage-pulse');
+  setTimeout(() => trayRollBtn.classList.remove('stage-pulse'), 900);
 }
 
 // P2 use-vs-manage: manage mode is ONE explicit, transient toggle (the
@@ -6836,6 +6871,12 @@ function renderGroups() {
     fig.append(w, num);
     poolsHead.appendChild(fig);
   }
+  // The rail tracks the same truth — and it has to be updated ABOVE the
+  // foreign-rack return, or navigating to a teammate's rack leaves the
+  // collapsed rail showing whatever it last painted. The rail is always
+  // YOUR pools (a launcher fires what you own), so it repaints from
+  // `groups` regardless of whose rack the panel is showing.
+  renderRailPools();
   if (foreign) {
     renderForeignPools(poolsOwnerPlayer());
     return;
@@ -6990,34 +7031,168 @@ function renderGroups() {
     groupsListEl.appendChild(grid);
   }
   if (poolsEdit) groupsListEl.appendChild(buildNewShelfRow());
-  renderRailPools(); // the collapsed rail's quick list tracks the same truth
 }
 
-// The collapsed rail's pools, SUPER MINIMAL (Joe 2026-08-04): your own
-// pools only, flat (no shelves), zero edit/save/notation chrome. A named
-// pool is its name alone (vertical, the rail is 56px); an unnamed pool is
-// its die chips alone. A tap ROLLS it directly — the draft is untouched
-// and the panel stays collapsed: the rail is a launcher, not a composer.
+// THE COLLAPSED POOL RAIL (Joe 2026-08-07: "the minimize view of the panel
+// is really bad right now… if it remains, it should be able to do only the
+// most core operations, but do them quickly and cleanly").
+//
+// Every defect he listed was downstream of ONE number: 56px. Names ran
+// VERTICALLY because a word did not fit. Shelf titles vanished because a
+// heading did not fit. Multi-pick was impossible because a tray had nowhere
+// to live. So the rail is 104px now, and the defects go with the width:
+// shelf-grouped rows, horizontal names, a tap that SELECTS, and one gold
+// bar that rolls the selection.
+//
+// 2i-G — A SELECTION IS NOT A DRAFT. It is ordered by the rack (never by
+// tap order), visible where it is made, never persisted, and SPENT BY ITS
+// ROLL. That is why "clear it after each roll" here does not contradict
+// 2i-E's spent-draft rule (a draft survives its roll and cools): the draft
+// is a composition you can keep editing; this is a pick you already fired.
+// Expanding the panel drops the selection too — the workbench is the
+// composing surface, and carrying a half-pick across the boundary would
+// leave state visible in neither place.
+let railSel = new Set(); // pool ids, this session only
+
 function renderRailPools() {
   const el = document.getElementById('rail-pools');
-  if (!el || !document.getElementById('left-panel').classList.contains('collapsed')) return;
-  el.innerHTML = '';
-  for (const g of groups) {
-    const res = parseNotation(g.notation);
-    if (!res.ok) continue;
-    const b = document.createElement('button');
-    b.className = 'rp-item';
-    b.title = `Roll ${g.name || res.canonical} — ${res.canonical}`;
-    if (g.name) {
-      b.classList.add('rp-name');
-      b.textContent = g.name;
-    } else {
-      b.classList.add('rp-dice');
-      b.appendChild(buildDieStrip(res.spec.dice, 2, { grouped: true, set: g.set || null }));
-    }
-    b.addEventListener('click', () => rollRailPool(g));
-    el.appendChild(b);
+  if (!el) return;
+  // Clear BEFORE the collapsed gate: renderGroups calls this above its own
+  // foreign-rack early return now, so it runs while expanded too, and stale
+  // rows must not survive under a rack you have navigated away from.
+  el.textContent = '';
+  if (!document.getElementById('left-panel').classList.contains('collapsed')) {
+    updateRailRoll();
+    return;
   }
+  // Shelves as the rack orders them (no ensureTrio: a launcher shows what
+  // you HAVE, where the character sheet shows what you could have).
+  const secs = buildSections(groups).filter((s) => s.pools.length);
+  const live = new Set();
+  let ord = 0;
+  for (const sec of secs) {
+    const wrap = document.createElement('div');
+    wrap.className = 'rp-shelf';
+    wrap.setAttribute('role', 'group');
+    wrap.setAttribute('aria-label', sec.label);
+    // One shelf needs no heading — a lone 'POOLS' head over the whole rack
+    // is chrome announcing itself.
+    if (secs.length > 1) {
+      const h = document.createElement('div');
+      h.className = 'rp-shelf-head';
+      h.textContent = sec.label;
+      wrap.appendChild(h);
+    }
+    for (const g of sec.pools) {
+      const res = parseNotation(g.notation);
+      ord++;
+      const b = document.createElement('button');
+      b.className = 'rp-item';
+      if (!res.ok) {
+        // Unreachable through every shipped door (migrateGroup and setGroups
+        // both refuse a pool whose notation will not parse) — kept as
+        // defence, because a silent `continue` would make a pool that is
+        // really there simply vanish from its shelf.
+        b.classList.add('rp-bad');
+        b.disabled = true;
+        b.textContent = g.name || '?';
+        b.title = `${g.name || 'this pool'} — its notation no longer parses`;
+        wrap.appendChild(b);
+        continue;
+      }
+      live.add(g.id);
+      const picked = railSel.has(g.id);
+      b.setAttribute('aria-pressed', picked ? 'true' : 'false');
+      b.title = `${g.name || res.canonical} — ${res.canonical}`;
+      b.setAttribute('aria-label', `${g.name || res.canonical}, ${res.canonical} — ${sec.label}`);
+      if (g.name) {
+        const nm = document.createElement('span');
+        nm.className = 'rp-name';
+        nm.textContent = g.name; // horizontal, ellipsized — never rotated
+        b.appendChild(nm);
+      } else {
+        const dice = document.createElement('span');
+        dice.className = 'rp-dice';
+        dice.appendChild(buildDieStrip(res.spec.dice, 3, { grouped: true, set: g.set || null }));
+        b.appendChild(dice);
+      }
+      if (ord <= 9) {
+        const o = document.createElement('span');
+        o.className = 'rp-ord';
+        o.setAttribute('aria-hidden', 'true'); // the digit shortcut, not content
+        o.textContent = String(ord);
+        b.appendChild(o);
+      }
+      b.addEventListener('click', () => railToggle(g));
+      wrap.appendChild(b);
+    }
+    el.appendChild(wrap);
+  }
+  if (!secs.length) {
+    const ghost = document.createElement('div');
+    ghost.className = 'rp-empty';
+    ghost.textContent = 'No saved pools';
+    el.appendChild(ghost);
+  }
+  // A pool that left the rack takes its pick with it.
+  for (const id of [...railSel]) if (!live.has(id)) railSel.delete(id);
+  updateRailRoll();
+}
+
+function railToggle(g) {
+  if (railSel.has(g.id)) railSel.delete(g.id); else railSel.add(g.id);
+  renderRailPools();
+}
+
+function railClearSel() {
+  railSel.clear();
+  renderRailPools();
+  updateRailRoll(); // renderRailPools returns early when expanded; the bar still has to go
+}
+
+// The picked pools, in RACK order — never tap order. Two players tapping the
+// same three pools in different orders must send the same roll, and it is
+// also what makes the digit shortcuts mean the same thing everywhere.
+function railPicked() {
+  const out = [];
+  for (const sec of buildSections(groups)) {
+    for (const g of sec.pools) if (railSel.has(g.id)) out.push(g);
+  }
+  return out;
+}
+
+// The rail's own note line. showSettingsNote cannot serve here: outside the
+// settings modal it falls through to the status pill, and the collapsed rail
+// folds that pill to a 10px colorless dot — so every "set aside" whisper the
+// compose path owes would be invisible in exactly the state it fires in.
+function railNote(text) {
+  const el = document.getElementById('rail-note');
+  if (!el) return;
+  el.textContent = text || '';
+  el.hidden = !text;
+}
+
+function updateRailRoll() {
+  const wrap = document.getElementById('rail-roll-wrap');
+  const btn = document.getElementById('rail-roll');
+  if (!wrap || !btn) return;
+  const picks = railPicked();
+  wrap.hidden = !picks.length;
+  if (!picks.length) { railNote(''); return; }
+  let dice = 0;
+  for (const g of picks) {
+    const res = parseNotation(g.notation);
+    if (res.ok) dice += res.spec.dice.length;
+  }
+  const over = dice > MAX_DICE_ON_TABLE;
+  btn.disabled = over;
+  btn.title = over
+    ? `${dice} dice — over the ${MAX_DICE_ON_TABLE}-die table cap`
+    : `Roll ${picks.length === 1 ? picks[0].name || 'this pool' : `${picks.length} pools`}`;
+  btn.setAttribute('aria-label',
+    `Roll ${picks.length} pool${picks.length === 1 ? '' : 's'}: ${picks.map((g) => g.name || 'unnamed').join(', ')}`);
+  const count = btn.querySelector('.rr-count');
+  if (count) count.textContent = picks.length > 1 ? String(picks.length) : '';
 }
 
 // Roll a pool AS ITSELF from the rail: the same request the staged-alone
@@ -7052,6 +7227,116 @@ function rollRailPool(g) {
     exp: intent.exp || undefined,
     ...(gSet ? { set: gSet } : {}),
   });
+}
+
+// Roll the rail's selection. ONE pick launches the pool exactly as authored
+// (rollRailPool, untouched): its dc, moment, visibility, keep/drop, reroll,
+// explode and set override all ride, byte-identical to what the rack sends.
+//
+// TWO OR MORE is a COMPOSE, and a compose cannot carry everything, because
+// the grammar has no union for it. What rides: the dice, each die's source
+// label, and each pool's flat modifier as a labeled part (`+2[Wisdom]`).
+// What is set aside, out loud:
+//   · keep/drop, reroll, explode, adv — these GLUE to one dice type. A sum
+//     of different types rejects them outright; a sum of the SAME type is
+//     worse, because `4d6dl1 + 2d6` silently canonicalizes to `6d6dl1` and
+//     quietly changes the distribution. So they are stripped unconditionally
+//     rather than attempted and caught.
+//   · a dc or moment declared by more than one pick (no union of two stakes).
+// Visibility fails CLOSED (goal 11): one declared mode rides; two different
+// ones become `secret`, which is strictly more closed than either.
+function rollRailSelection() {
+  const picks = railPicked();
+  if (!picks.length) return;
+  const parsed = [];
+  for (const g of picks) {
+    const res = parseNotation(g.notation);
+    if (res.ok) parsed.push({ g, res });
+  }
+  if (!parsed.length) return;
+  if (parsed.length === 1) { rollRailPool(parsed[0].g); railClearSel(); return; }
+
+  const dice = [];
+  const sources = [];
+  const sets = [];
+  const parts = [];
+  const setAside = [];
+  let dc = null; let dcConflict = false;
+  let exp = null; let expConflict = false;
+  let vis = null; let visConflict = false;
+  for (const { g, res } of parsed) {
+    const label = sanitizeSourceLabel(g.name);
+    const gSet = typeof g.set === 'string' && (g.set === 'std' || SETS[g.set]) ? g.set : null;
+    for (let i = 0; i < res.spec.dice.length; i++) {
+      if (dice.length >= MAX_DICE_ON_TABLE) break;
+      dice.push(res.spec.dice[i]);
+      sources.push(label || (res.spec.sources ? res.spec.sources[i] || null : null));
+      sets.push(gSet);
+    }
+    const m = res.spec.mods || {};
+    const glued = [];
+    if (m.keep) glued.push('keep/drop');
+    if (m.reroll) glued.push('reroll');
+    if (m.explode) glued.push('!');
+    if (m.adv) glued.push(m.adv);
+    if (glued.length) setAside.push(`${g.name || 'pool'}: ${glued.join(' · ')}`);
+    // A pool's flat bonus rides as a LABELLED part, so the composed roll
+    // still says where every number came from (the attributed-math
+    // invariant). An already-labelled part keeps its own label; a bare
+    // `+2` inherits the pool's name, which is the attribution it meant.
+    if (Array.isArray(m.parts)) {
+      for (const p of m.parts) {
+        if (p.value) parts.push({ label: p.label || label || '', value: p.value });
+      }
+    } else if (typeof m.modifier === 'number' && m.modifier) {
+      parts.push({ label: label || '', value: m.modifier });
+    }
+    if (res.dc != null) { if (dc != null && dc !== res.dc) dcConflict = true; else dc = res.dc; }
+    if (res.exp) { if (exp && exp !== res.exp) expConflict = true; else exp = res.exp; }
+    const v = visOfParse(res);
+    if (v) {
+      if (vis && vis.mode !== v.mode) visConflict = true;
+      else vis = v;
+    }
+  }
+  if (dcConflict) { dc = null; setAside.push('two targets'); }
+  if (expConflict) { exp = null; setAside.push('two moments'); }
+  if (visConflict) { vis = { mode: 'secret' }; setAside.push('mixed visibility → secret'); }
+
+  // `modifier` is the sum parts always ride beside (parseNotation sets it
+  // whenever parts exist); canonicalNotation reads parts, the roll math
+  // reads the sum.
+  const spec = {
+    dice,
+    mods: parts.length
+      ? { parts, modifier: parts.reduce((a, p) => a + p.value, 0) }
+      : null,
+  };
+  if (sources.some(Boolean)) spec.sources = sources;
+  const labeled = canonicalWithVis(spec, { dc, exp }, vis);
+  const res2 = parseNotation(labeled);
+  if (!res2.ok) {
+    // The one real ceiling: MAX_PARTS is 12, so a dozen-plus picks each
+    // carrying a modifier stops parsing. Say so and KEEP the selection —
+    // the player drops a pick rather than losing the whole pick.
+    railNote(res2.error || 'that many pools will not compose');
+    return;
+  }
+  const intent = notationIntent(labeled, res2);
+  const uniform = sets.every((s) => s && s === sets[0]) ? sets[0] : null;
+  requestRoll([...res2.spec.dice], res2.comment || res2.canonical, {
+    notation: intent.notation,
+    canonical: intent.canonical,
+    mods: res2.spec.mods || undefined,
+    sources: res2.spec.sources || undefined,
+    faceDown: res2.faceDown,
+    visibility: visOfParse(res2) || undefined,
+    dc: res2.dc ?? undefined,
+    exp: intent.exp || undefined,
+    ...(uniform ? { set: uniform } : sets.some(Boolean) ? { sets: [...sets] } : {}),
+  });
+  railClearSel();
+  if (setAside.length) railNote(`${setAside.join(' · ')} set aside`);
 }
 
 // '＋ New shelf…' — the rack-level twin of the strip's ＋ chip: a full-width
@@ -9951,8 +10236,12 @@ function applyPanels(persist = true) {
   if (!panelsOpen.pools && poolsEdit) setPoolsEdit(false);
   // The tray's per-die ✕ overlays anchor to laid-out die positions, which
   // are all zero while the panel is collapsed — re-anchor on expand.
-  if (panelsOpen.pools) renderTray();
-  else renderRailPools(); // the collapsed rail carries the quick list
+  // Expanding also drops the rail's picks (2i-G): the workbench is the
+  // composing surface, and a half-pick carried across the boundary would be
+  // state visible in neither place. railClearSel updates the bar itself,
+  // because renderRailPools returns early once the panel is open.
+  if (panelsOpen.pools) { railClearSel(); renderTray(); }
+  else renderRailPools(); // the collapsed rail carries the pool list
   const et = document.getElementById('edge-toggle');
   et.setAttribute('aria-expanded', String(!!panelsOpen.pools));
   et.title = panelsOpen.pools ? 'Collapse the panel — n' : 'Expand the panel — n';
@@ -9988,6 +10277,10 @@ function toggleAllPanels() {
 document.getElementById('edge-toggle').addEventListener('click', () => {
   setPanel('pools', !panelsOpen.pools);
 });
+
+// The collapsed rail's two verbs: roll what is picked, or drop the picks.
+document.getElementById('rail-roll').addEventListener('click', () => rollRailSelection());
+document.getElementById('rail-clearsel').addEventListener('click', () => railClearSel());
 
 // (The collapsed-tab hover flyout retired 2026-08-04 with the overlay
 // panel: expanding the column is cheap now — the felt resizes instead of
@@ -10228,6 +10521,10 @@ document.addEventListener('keydown', (e) => {
     // the overlay z-order, so every layer above it peels first. Esc is one
     // of its only three closes (≣ toggle, header ✕, Esc — never a click-away).
     else if (isLogFlyoutOpen()) closeLogFlyout();
+    // The rail's picks are the collapsed twin of the staged draft below, and
+    // peel at the same rung: Esc drops what you picked before it sweeps the
+    // felt, so a mis-tap never costs you a roll.
+    else if (railSel.size) railClearSel();
     // The staged draft empties before the table sweeps: Esc mirrors Enter's
     // draft-first priority.
     else if (tray.length || cmdInput.value) clearDraft();
@@ -10283,17 +10580,30 @@ document.addEventListener('keydown', (e) => {
       // dice are staged ('1 4 6 Enter'), else it KEEPS the last roll
       // (Esc's affirmative twin).
       if (e.target instanceof HTMLElement && e.target.closest('button, a, [tabindex]')) return;
-      if ((cmdResult && cmdResult.ok) || tray.length > 0) { rollDraft(); return; }
+      // The rail's selection outranks the draft: it is the thing you can
+      // SEE while collapsed, and firing a hidden draft instead would be a
+      // roll from nowhere. (Must sit after the focused-button guard above,
+      // or Enter on a focused .rp-item would roll AND re-toggle the row.)
+      if (railSel.size) { rollRailSelection(); return; }
+      if ((cmdResult && cmdResult.ok) || tray.length > 0) {
+        // …and a draft you cannot see never fires silently either: surface
+        // the workbench that holds it and pulse its roll button instead.
+        if (!panelsOpen.pools) { setPanel('pools', true); pulseTrayRoll(); return; }
+        rollDraft();
+        return;
+      }
       const last = lastRollActionable();
       if (last) requestCollectRoll(last.rollId);
       return;
     }
     default:
       if (e.key >= '1' && e.key <= '9') {
-        // Digits STAGE by rendered shelf order (the Rack): one verb with the
-        // tiles. Wisdom+Swords+Zeal → roll is '1 4 6 Enter'.
+        // Digits do the panel's own verb: STAGE into the draft when the
+        // workbench is open, SELECT in the rail when it is not. Same order
+        // either way (rendered shelf order), so '1 4 6 Enter' means the same
+        // roll in both states — Wisdom + Swords + Zeal.
         const g = renderedPools[Number(e.key) - 1];
-        if (g) stageGroup(g);
+        if (g) { if (panelsOpen.pools) stageGroup(g); else railToggle(g); }
       }
   }
 });
@@ -11508,6 +11818,11 @@ function requestRoll(types, label, opts = {}) {
     },
     vis
   );
+  // The canonical and the resolved visibility join the debug record: what a
+  // composing surface ACTUALLY asked for is the only way to pin that the
+  // rail's multi-pick strips glue and fails visibility closed.
+  lastRequestedRoll.canonical = canonical;
+  lastRequestedRoll.visibility = vis ? { mode: vis.mode, names: [...vis.names] } : null;
   // History records only rolls that actually happened: online that means the
   // server accepted it (a 400 or a network failure resolves null), solo it
   // means the spec passed the same validation rollDice applies.
