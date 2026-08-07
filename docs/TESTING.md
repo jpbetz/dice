@@ -89,7 +89,8 @@ reported but not fatal.
 | `resync`   | Late-join / reload reconstruction               |
 | `visibility` | The ladder (goal 11): held · secret · whisper, reveal authority, offers/dice tower, redaction on the raw wire |
 | `chrome`   | The persistent rail, the ONE Pools panel (`dice.panels.v1`, legacy two-region state migrates; emergent compact view), the identity chip (rename / leave & switch), and the *pool / saved pool* vocabulary (`terminology` scans every readable label, tooltip and placeholder) |
-| `seat`    | Seat identity: rename / leave & switch (`identity-chip`), and the seat surviving a refresh — same playerId, same color, no roster churn, per-TAB not per-origin (`seat-resume`) |
+| `seat`    | Seat identity: rename / change seat (`identity-chip`), and the seat surviving a refresh — same playerId, same color, no roster churn, per-TAB not per-origin (`seat-resume`) |
+| `lobby`   | The lobby → table flow (§3b, UX §7.20): the bare URL prompting for nothing and issuing **zero** API calls (`lobby-no-prompt`, in smoke), the presence row's exits, the suppression pass (no phantom table name, no invite link, no room-scoped settings), minting a table, the Invite chair retiring into a real roster pill, per-seat chairs on a prepared table, leaving without losing your name, and a table name surviving the room evaporating |
 | `groups`   | Saved pools: inline row editor and popover update write back by id, save-as-variant stays additive (the tag keeps the `groups` spelling, like the code) |
 | `lab`      | The dice lab as a raw page (not in smoke — it bakes ~2000 canvas textures): the GEO BENCH sweep's geometry claims via `geoStats`, the SET BUILDER's live rebuild via `builderSet` + `faceDump`, lab-only ids staying out of `SET_IDS` |
 

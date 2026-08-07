@@ -8547,7 +8547,11 @@ function renderTableName() {
   const key = !IN_LOBBY && netOnline ? ROOM.replace(/[-_]+/g, ' ') : '';
   const name = IN_LOBBY ? '' : (roomSettings.tableName || key);
   el.textContent = name;
-  el.title = netOnline ? `room: ${ROOM}` : 'this table, solo';
+  // No title in the lobby: 'this table, solo' asserts a table where there is
+  // none. Hidden today (no name means no plate) — but the plate is exactly the
+  // surface that grows a name the moment one exists, so the lie must not sit
+  // waiting behind it.
+  el.title = IN_LOBBY ? '' : (netOnline ? `room: ${ROOM}` : 'this table, solo');
   el.classList.toggle('hidden', !name);
   document.title = name ? `${name} — Dice Table` : 'Dice Table';
 }
@@ -8866,7 +8870,7 @@ function renderDiceSetPicker() {
       value: diceSet,
       allowDefault: false,
       onPick: (v) => setDiceSet(v || 'std'),
-      title: 'Dice set — everyone sees your rolls in these dice',
+      title: IN_LOBBY ? 'Dice set — the dice you roll in' : 'Dice set — everyone sees your rolls in these dice',
     });
     holder.appendChild(btn);
   }
@@ -9025,9 +9029,19 @@ function openSettingsModal() {
   // `Apply to table` goes too: it is the one room-scoped control in an
   // otherwise roomless 'Your data', and with no table its ONLY outcome is a
   // refusal, which is a button that exists to say no.
-  document.getElementById('set-room-label').style.display = IN_LOBBY ? 'none' : '';
+  // The heading is RELABELLED, not removed. Removing it left felt/system/zoom
+  // in a heading-less block that reads as a continuation of the section ABOVE
+  // it ("Your data"), which is worse than the lie it was fixing. "This table"
+  // is truthful with no table joined — GOALS goal 9 calls the serverless
+  // experience "a fully working solo table" — and it stays distinct from the
+  // "Just you" section rather than duplicating its heading.
+  document.getElementById('set-room-label').textContent = IN_LOBBY
+    ? 'This table' : 'Everyone at the table';
   document.getElementById('set-table-name-row').style.display = IN_LOBBY ? 'none' : '';
   document.getElementById('portable-push').style.display = IN_LOBBY ? 'none' : '';
+  document.getElementById('set-diceset-sub').textContent = IN_LOBBY
+    ? 'the dice you roll in — from your next roll'
+    : 'the dice everyone sees you roll — from your next roll';
   syncSettingsUI();
   settingsModal.classList.remove('hidden');
 }
@@ -10400,7 +10414,10 @@ async function shareInvite(url, btn, restoreLabel) {
 function renderPresenceExits(othersCount) {
   if (IN_LOBBY) {
     if (othersCount) return; // no roster exists without a room; belt and braces
-    rosterEl.appendChild(railGhost('+ New table', 'Start a table and get a link to share', openNewTable));
+    const nt = railGhost('+ New table', 'Start a table and get a link to share', openNewTable);
+    nt.setAttribute('aria-haspopup', 'menu');
+    nt.setAttribute('aria-expanded', 'false');
+    rosterEl.appendChild(nt);
     if (recentTables().length) {
       const b = railGhost('Tables ▾', 'Tables you have been to', (e) => openTablesMenu(e.currentTarget));
       b.setAttribute('aria-haspopup', 'menu');
@@ -10503,7 +10520,28 @@ function openRailMenu(anchor, build) {
   el.addEventListener('keydown', (e) => {
     e.stopPropagation();
     if (e.key === 'Escape') { e.preventDefault(); closeRailMenu(true); }
-    else if (e.key === 'Tab') closeRailMenu();
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      // Arrow navigation, the same affordance openSetMenuFor offers — a
+      // role="menu" that cannot be walked with the arrows is one in name only.
+      e.preventDefault();
+      const items = [...el.querySelectorAll('button, input')];
+      if (!items.length) return;
+      const at = items.indexOf(document.activeElement);
+      const next = e.key === 'ArrowDown'
+        ? (at + 1) % items.length
+        : (at <= 0 ? items.length - 1 : at - 1);
+      items[next].focus();
+    }
+  });
+  // Tab must NOT close the menu: inside "+ New table" that trapped the player
+  // one Tab from the input, closing the menu instead of reaching Create.
+  // Leaving on focus is the honest condition, and it covers Tab out of either
+  // end without breaking Tab within.
+  el.addEventListener('focusout', () => {
+    setTimeout(() => {
+      if (!railMenuState || railMenuState.el !== el) return;
+      if (!el.contains(document.activeElement)) closeRailMenu();
+    }, 0); // focusout precedes focusin; settle first, then ask where focus went
   });
   return el;
 }
@@ -10519,6 +10557,10 @@ const pendingNameKey = (room) => `dice.newtable.v1:${room}`;
 // allowed — it makes an unnamed table, exactly as one made by hand.
 function openNewTable(e) {
   const anchor = e.currentTarget;
+  // Toggle, like the Tables pill: without this a second click on the anchor
+  // (pointerdown-away deliberately exempts it) rebuilt the menu and threw away
+  // a half-typed table name.
+  if (isRailMenuOpen() && railMenuState.anchor === anchor) { closeRailMenu(true); return; }
   const menu = openRailMenu(anchor, (el) => {
     const input = document.createElement('input');
     input.className = 'tin';
@@ -10554,7 +10596,7 @@ function openNewTable(e) {
 // directory a lobby has, and it is yours).
 function openTablesMenu(anchor) {
   if (isRailMenuOpen() && railMenuState.anchor === anchor) { closeRailMenu(true); return; }
-  openRailMenu(anchor, (el) => {
+  const menu = openRailMenu(anchor, (el) => {
     for (const t of recentTables()) {
       const row = document.createElement('div');
       row.className = 'rail-menu-row';
@@ -10570,14 +10612,23 @@ function openTablesMenu(anchor) {
       drop.title = `Forget ${t.name || t.room}`;
       drop.addEventListener('click', () => {
         forgetTable(t.room);
-        closeRailMenu(true);
+        closeRailMenu(); // NOT refocus: renderPlayers below destroys the anchor
         renderPlayers(); // the pill leaves with the last remembered table
+        // Land the keyboard somewhere real — on the rebuilt Tables pill if
+        // any tables remain, else on the row's first exit.
+        const back = rosterEl.querySelector('.rail-ghost');
+        if (back) back.focus();
       });
       row.appendChild(go);
       row.appendChild(drop);
       el.appendChild(row);
     }
   });
+  // Focus lands INSIDE the menu, so the arrows and Esc have somewhere to act
+  // from — and so a keyboard player is not left on an anchor behind an open
+  // menu (the failure openSetMenuFor avoids by focusing its selected row).
+  const first = menu.querySelector('.idm-item');
+  if (first) first.focus();
 }
 
 // Read-and-clear: a pending name is consumed by the first join that lands on
@@ -10979,9 +11030,24 @@ document.getElementById('idm-leave').addEventListener('click', () => leaveTable(
 // at a table you asked to leave.)
 async function leaveToLobby() {
   closeIdentityMenu();
+  // THE STREAM HAS TO BE DISARMED BEFORE WE GO, not merely left behind. The
+  // immediate leave makes the server drop our seat and end our SSE; the
+  // browser then auto-retries that EventSource, gets 404 unknown_player, and
+  // net.js's reopen ladder answers by calling rejoin() — a POST /api/join that
+  // RE-CREATES the room we just deleted and re-persists the seat forgetSeat()
+  // just cleared. All of it races the navigation, and on a cold start that gap
+  // is seconds. If the page then dies mid-rejoin, the ghost sits out
+  // JOIN_GRACE_MS — exactly the ghost-seat class the presence work just fixed,
+  // and this function's own "said out loud" comment undone by its own cleanup.
+  // Only disconnect() sets net.js's `closed` flag, so only disconnect() stops
+  // the ladder. Same teardown order leaveTable() uses, and for the same reason.
+  const old = net;
+  net = null;
+  netOnline = false; // status callbacks from the dying stream are ignored
   forgetSeat(ROOM);
-  if (net && netOnline) {
-    await Promise.race([net.leave({ immediate: true }), new Promise((r) => setTimeout(r, 1200))]);
+  if (old) {
+    await Promise.race([old.leave({ immediate: true }), new Promise((r) => setTimeout(r, 1200))]);
+    old.disconnect();
   }
   gotoTable(null);
 }
@@ -11087,7 +11153,12 @@ function handleNetEvent(type, data) {
   switch (type) {
     case 'hello': // initial state + re-sync after a reconnect
       players = data.players || [];
-      renderPlayers();
+      // NOT rendered here — the presence row now draws the prepared table's
+      // unclaimed chairs, and `roomSetup` is not adopted until below. Rendering
+      // first would draw chairs from the PRE-reconnect setup: after a server
+      // restart, seats the room no longer holds, each offering an &as= link to
+      // a seat that no longer exists. The render moved to just after the setup
+      // lands (see the end of this case).
       refreshPoolsPresence(); // switcher resync; never clobbers an open editor
       publishPools(); // a silent rejoin minted a fresh (pool-less) seat: re-share
       log = (data.log || []).map(rollToLogEntry);
@@ -11116,6 +11187,9 @@ function handleNetEvent(type, data) {
       // hello can outrun initNet's `net =` assignment — maybeRepushTable
       // no-ops then, and initNet's own call right after the join covers it.)
       roomSetup = data.setup || null;
+      // NOW the presence row can be drawn: roster and setup are both current,
+      // so the unclaimed chairs describe the room this hello just described.
+      renderPlayers();
       maybeRepushTable();
       // §7.5/§3.1 resync: 'roll-cleared' and 'reveal' are one-shot broadcasts a
       // stream blip can swallow, and the server deliberately never re-sends
@@ -11262,6 +11336,11 @@ function handleNetEvent(type, data) {
       // case only tracks state (the seat picker and §G6's re-push read it)
       // and gives the roster the same quiet note grammar settings use.
       roomSetup = data.setup || null;
+      // ...and the presence row, which now draws the unclaimed chairs FROM
+      // that setup. Without this the chairs are whatever the last join/leave
+      // left behind: an organizer pushing a six-seat setup at a live table
+      // changed nobody's row until an unrelated roster event happened to fire.
+      renderPlayers();
       if (data.byId && net && data.byId !== net.playerId) {
         showSettingsNote(`${data.byName || 'someone'} prepared the table`);
       }
@@ -11752,7 +11831,21 @@ async function initNet() {
     // else has since given the table — the one thing it CAN do is bring back a
     // name a player deliberately cleared, which is the accepted cost (and the
     // identical trade maybeRepushTable() makes for setups).
-    const remembered = recentTables().find((t) => t.room === ROOM);
+    // `!roomSettings.tableName` alone is NOT enough to justify the restore: it
+    // cannot tell a recreated empty room from a LIVE room whose name somebody
+    // deliberately cleared (unnamed is a documented state — the input says
+    // `placeholder="unnamed"`). Unguarded, any browser that ever saw the name
+    // pushes it back on its next join, every screen reads "X changed the
+    // table", and because a remembered name is re-recorded each time, the
+    // clear can never stick against anyone — an unkillable name.
+    //
+    // So the heal is restricted to a room that is demonstrably NEW: no history,
+    // no setup, nobody else in it. That is the round trip this exists for (an
+    // unprepared room is deleted when its last player leaves) and it is not any
+    // of the live-room cases. A pending name is different and always applies —
+    // you typed it into "+ New table" seconds ago.
+    const freshRoom = !(conn.log && conn.log.length) && players.length <= 1 && !roomSetup;
+    const remembered = freshRoom ? recentTables().find((t) => t.room === ROOM) : null;
     const wanted = takePendingTableName() || (remembered && remembered.name) || '';
     if (wanted && !roomSettings.tableName && net) net.setSettings({ tableName: wanted });
     rememberTable(ROOM, roomSettings.tableName || wanted || '');
@@ -11769,6 +11862,7 @@ async function initNet() {
     // event can fire and steal the slot.
     setPill('solo', 'solo');
     applyRoomSettings(load(LS_ROOMSETTINGS, null)); // solo keeps its own felt
+    renderPlayers(); // genuinely all three branches now — it early-returns here
   }
   // §G5: a chosen prepared seat's preview stands up now — after every piece
   // of join state above, so netReady never resolves with it half-built. A

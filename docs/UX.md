@@ -2527,11 +2527,18 @@ downgraded to local.** Applied:
   in the lobby felt, system, zoom and table name **silently become
   personal** with no UI change, under a heading that is a lie and
   tooltips that state falsehoods ("everyone at the table sees this",
-  main.js:8635). The fix is not new controls — felt, system and zoom
-  genuinely ARE "just you" with no table, so in the lobby they **sit
-  under the existing *Just you* heading and the room section does not
-  render at all**; Table name has no lobby meaning and is absent. Same
-  controls, shelved under the heading that happens to be true.
+  main.js:8635). The fix is not new controls — felt, system and zoom are
+  yours either way — so in the lobby the section is **relabelled *This
+  table*** and Table name, which has no roomless meaning, is absent.
+  *(Amended 2026-08-07 during the build. The first ruling was to drop the
+  heading entirely and let the controls fall under "Just you"; built, that
+  left them in a heading-less block reading as a continuation of the
+  section ABOVE — "Your data" — which is worse than the lie it replaced.
+  "This table" is truthful with no table joined: goal 9 calls the
+  serverless experience "a fully working solo table". Moving the nodes
+  between sections was the alternative, and is not worth the DOM churn.)*
+  The dice-set row's sub and the picker's own tooltip drop their audience
+  clause in the lobby for the same reason the felt and system ones do.
 - **`Apply to table`** (index.html:812) is a standing, enabled button
   whose only possible lobby outcome is the refusal at main.js:9467. It
   is the one room-scoped intruder in an otherwise roomless *Your data*

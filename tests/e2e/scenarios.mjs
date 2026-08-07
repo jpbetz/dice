@@ -5774,8 +5774,15 @@ export const scenarios = [
 
       // Settings: the room section, and its one intruder in Your data.
       await a.dbg('openSettings()');
-      assert.equal(await a.eval(shown('set-room-label')), 'none',
-        'the "Everyone at the table" heading is gone — it would be a lie');
+      // The heading is RELABELLED, not hidden (UX §7.20, amended during the
+      // build): hiding it left felt/system/zoom in a heading-less block that
+      // reads as part of the section above — "Your data". What must never
+      // survive is the AUDIENCE CLAIM, so that is what this asserts.
+      const roomLabel = await a.eval(`document.getElementById('set-room-label').textContent`);
+      assert.equal(roomLabel, 'This table',
+        'the room heading stops claiming an audience it does not have');
+      assert.notEqual(await a.eval(shown('set-room-label')), 'none',
+        'but it still stands, or the controls below it read as "Your data"');
       assert.equal(await a.eval(shown('set-table-name-row')), 'none', 'the Table name row is gone');
       assert.equal(await a.eval(shown('portable-push')), 'none', 'Apply to table is gone');
       assert.notEqual(await a.eval(shown('felt-swatches')), 'none', 'felt (yours) is still offered');
