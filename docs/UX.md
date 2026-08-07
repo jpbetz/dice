@@ -2122,6 +2122,10 @@ royal" — `.reveal-verb` full, `.sm-reveal` small. The fold's verbs come
 from ONE builder (`appendCardActions`) on banner, peek AND the ceremony
 card. The draft's ✕ removers anchor INSIDE their chip's corner, never
 the gutter between neighbours.
+*(Amended 2026-08-07, §7.21: a fourth law — **HIERARCHY IS AREA, NOT
+VOLUME**, the primary act takes the free width and a primary may never win
+by being redder — and the rest-dim rule now reads "0.45 covers SECONDARY
+verbs; the primary act of a surface stands at full opacity.")*
 
 **Material (2i-D, Scheme C).** Keep graphite/bronze; the steel got a
 BODY — gradient, top bevel, seat shadow on palette tiles, pool tiles and
@@ -2634,3 +2638,86 @@ transition here NAVIGATES rather than swapping in place (§3b L3) ·
 fix while the pill is being simplified · `.solo` never had a CSS rule at
 all (css:1810-1835 defines only base, `.offline`, `.refused`), which is
 its own small evidence that the state was never designed.
+
+### 7.21 The named verb — a card's main act says its name (2026-08-07)
+
+*Joe: "I still don't feel like the 'reveal' panel is quite right. Reroll is
+a nice ability. I'd like to keep that. The 'x' on the main body is probably
+too non-intuitive. I think we need that to remain the main action but find a
+better UX."*
+
+**Shipped.** Every result surface — the banner (§7.11b), the shelf peek
+(§7.7.1) and the ceremony verdict card (§7.16) — now leads its fold with a
+**named primary act**: a standing, worded control that takes the free width
+of the row.
+
+- **The words.** `✕ Clear` (the roller — for everyone, server-validated) ·
+  `✕ Dismiss` (a spectator — locally; the dice stay) · `❯❯ Skip` (the
+  ceremony card while its beat still plays). Each carries the §7.9 contract
+  sentence as its `aria-label`; the glyph is `aria-hidden`, so the WORD is
+  the accessible name. The peek's primary is always `✕ Clear` — tidying a
+  collected roll is anyone's housekeeping (§7.7), the one deliberate
+  asymmetry in the family.
+
+- **HIERARCHY IS AREA, NOT VOLUME** — the fourth law of 2i-C. The primary is
+  `flex: 1` and never rests dim; the secondaries are `flex: none` and keep
+  their 0.45. **A primary may never win by being redder than its
+  neighbours.** This amends 2i-C's rest-dim rule to read: *0.45 covers
+  SECONDARY verbs; the primary act of a surface stands at full opacity.*
+
+- **HUE = ACT survives intact.** Red destroys, so `Clear` is red and a
+  spectator's `Dismiss` is slate — red on a local dismiss would lie about
+  what the press does. Skipping is a *tool*, so `Skip` is steel. The
+  verdict card's primary is the one in the app that changes under you: it
+  repaints from Skip to Clear the moment the beat lands, because
+  **completing a moment and clearing a roll are never one gesture** (§7.16)
+  and the word should say which one you are about to do.
+
+- **The body is a shortcut now, not the control.** `#banner-main`,
+  `.pk-main` and `#verdict-main` still clear on click — the biggest target
+  on screen, and the hand already knows it — but they carry no `role`, no
+  `tabindex`, no `title`, and no keydown twin (the named bar is a real
+  `<button>` that owns Enter and Space natively). **The ✕ watermark and the
+  body's removal wash are retired on all three surfaces.** Hovering the body
+  now lights the named bar — *the linked press* — so the shortcut teaches
+  the word instead of hiding behind it.
+
+**Why the old dress was a defect, stated plainly.** It was an affordance
+that existed only under a cursor. §7.9's own P6 grammar — *quiet → loud on
+approach, never invisible → visible* — had already been applied to the
+fold's verbs and to the verdict card's action row; the body-as-button was
+the last surface still breaking it, and it broke it on the one act the card
+most wanted you to find. On touch there is no hover at all, so the panel's
+primary act was simply unannounced. `(pointer: coarse)` now also raises
+every verb in the row to a 44px target.
+
+**Superseded in part:** §7.11b (the folded card's hover read is unaffected —
+hovering the banner still outlines that roll's dice per source pool; only
+the removal dress moved) · §7.7.2 (the roller's ✕ returns to the card, once,
+named and full-width) · §7.16's 2i-C rest-dim, as amended above.
+
+**Amended in §7.9:** "never a second smaller target for one verb" becomes
+**"never a smaller UNNAMED target for one verb"** — the named control is the
+target of record; the body click is a shortcut to it, not a rival.
+
+**A shipped bug fell out of the audit.** `el.hidden = true` sets a property;
+the paint is a separate question. The UA sheet's `[hidden] { display: none }`
+is user-agent origin, so any author-origin `display` beats it regardless of
+specificity — and `.banner-foot` and `.pool-roll` both declare
+`display: flex`. Since the L8 mount-once rewrite (which replaced *build the
+verb when it applies* with *mount both and toggle `.hidden`*), every face-up
+card shipped a live Reveal the server answers with 403, and every held card
+a REROLL of a spec nobody at the table can read. The suite stayed green
+because it asserted the PROPERTY. Fixed with a global
+`[hidden] { display: none !important }`; pinned by `fold-visibility`, which
+reads computed display. **The lesson is the assertion, not the rule:** a
+visibility contract is about what the eye gets, so pin computed display.
+
+**Scenarios:** `named-verb` (roller vs spectator, no hover anywhere) ·
+`fold-visibility` (the computed-display regression pin) · `linked-press`
+(the retired watermark + body hover lights the bar; needs the harness's real
+`hover()`, since a synthetic mouseover never moves the browser's hover
+state) · `named-verb-touch` (44px, opacity 1, zero pointer events) ·
+`named-verb-keys` (the body holds no tab stop; the table's Enter-collects
+yields to the focused button) · `verdict-skip-verb` (Skip mid-beat, Clear
+after).
