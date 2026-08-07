@@ -21,6 +21,17 @@ reasoning recorded in PROFILES.md §5–§6; what remains of them is
 [§5b](#5b-persistence-beyond-the-file-deferred-2026-08-06) below.
 **Normal sequencing resumes at Tier 0.**
 
+**2026-08-07 — the front door was never on the ladder.** Joe: *"the
+roadmap is not well aligned against core CUJs where the users use the
+UI… I think we need a lobby → table flow."* Rooms have worked since the
+beginning, but nothing in the UI ever let a player *reach* a second one,
+and the bare URL put every stranger on one shared felt. Five CUJs and
+three decisions are recorded in
+[§3b](#3b-the-lobby-and-the-table-flow--design-three-decisions-taken);
+§2k closed (G5 shipped it) and §13 moved there from the bottom of Tier
+6. **§3b L0 is a defect and outranks the rest of §3b**; L1–L4 sequence
+normally, behind §0j's room-creation throttle.
+
 ---
 
 ## Tier 0 — Performance & foundation
@@ -325,9 +336,14 @@ exports carry a roll's FULL intent:
   2026-08-03 play notes)*: tap-to-stage was hard to discover —
   consider DnD from tile to draft/felt. Tap stays primary; DnD is
   the intuition players arrive with.
-- **2k — join modal shows the table name pre-join.** Settings arrive
-  in the join response, so a pre-join peek needs a new endpoint or
-  a name-in-URL surface. Not urgent.
+- ~~**2k — join modal shows the table name pre-join.**~~ — **CLOSED
+  2026-08-07, shipped by G5.** The entry said a pre-join peek "needs a
+  new endpoint"; the endpoint shipped as `GET /api/table`
+  (server.js:2480, `rooms.get` not `getRoom` so a peek can neither mint
+  a room nor touch a lingering room's TTL), and the seat modal renders
+  the name and the prepared seats before you commit
+  (`renderSeatChoices`, main.js:10998). Arrival is now §3b's L2, which
+  audits what the peek should say beyond the name.
 
 ### 2l. Pool analysis — the die spectrum and the dice-value ledger
 (2026-08-05, Joe: "I want to support analysis of dice pools") —
@@ -501,6 +517,127 @@ side: no endpoint, no wire key, no stored field, no build step)
   the table; joining/reloading clients replay them settled (final
   pose, no tumble) — today a reload shows an empty felt while
   everyone else still sees dice.
+
+*§3 is ONE felt's organization — zones, eviction, resync. Organizing
+across tables is §3b, which shares only the word "table".*
+
+### 3b. The lobby and the table flow — DESIGN, three decisions taken
+(2026-08-07, Joe: *"the roadmap is not well aligned against core CUJs
+where the users use the UI… I think we need a lobby → table flow"*)
+
+Rooms have been real since the beginning — `?room=` addresses a table
+(main.js:10123), 500 live rooms (server.js:70), per-room settings, seats
+and prepared profiles (Tier G), a 12-hour linger (server.js:154), and a
+seat scoped per room by construction (`seatKey(room)`, net.js:100). What
+has never existed is a way to **reach** a second table. You hand-edit the
+address bar. The roadmap's only multi-table entry was §13, parked at the
+bottom of Tier 6 with "design when reached".
+
+**Sequenced against the CUJs, not against the machinery** (Joe's five,
+2026-08-07):
+
+1. *"I just need to do a dice roll NOW"* → **L0**
+2. *"I'm preparing to play with friends, I need to set up a table and
+   then somehow get all the players to join my table"* → **L1**
+3. *"My friend invited me to play, I want to join up on them"* → **L2**
+4. *"My game is over, I want to join another table with other friends,
+   or return to the lobby"* → **L3**
+5. *"I need to split a group into two smaller groups at their own tables
+   for a bit, and maybe return to the main table"* → **L4**
+
+**[JOE: no public global tables.]** The lobby lists only the tables THIS
+browser has visited — client-side, so goal 7 is untouched and the server
+never publishes a directory of live rooms. This is also what keeps goal
+10 honest: there is no access control and there never will be, so a
+*listed* table is a *walk-in-able* table, and a public list would make
+every game in progress interruptible by any stranger who loaded the
+deployment. The room key is the door.
+
+**[JOE: sub-tables are public to the top-level table.]** The one
+directory in the system is scoped to a parent: a table that splits lists
+its children to everyone sitting at it. In-memory on a room the server
+already holds — no persistence, no new store.
+
+**[JOE: URL sharing gets people to the start table — "but make the link
+sharing easy".]** With no directory, the link is the *only* way in, so
+it carries CUJ2 and CUJ3 by itself. Today it is the third item in a menu
+behind the identity chip (index.html:301). That is the gap L1 closes.
+
+**The engine is already built.** `initNet()` (main.js:11256) has exactly
+the branch a lobby needs — join, else `netOnline = false`, its own felt
+settings (`LS_ROOMSETTINGS`), its own log, its own collect mirror
+(`soloCollectEntries`). The lobby is a third state of that branch, not
+new machinery: **the lobby is what static hosting already renders**, so
+goal 9 gains a name rather than a burden.
+
+**L0. The front door is a lobby, not a shared room — DEFECT, ships
+first.** Today no `?room=` joins a server room literally named `table`
+(main.js:10123), so on the deployed table every stranger who opens the
+bare URL lands on **one shared felt** together. And a first-time visitor
+is stopped by the name prompt before they can roll anything, which is
+CUJ1's whole complaint. Change: no `?room=` means the lobby, and the
+lobby does not call `connect()` at all. No name is asked — you are alone
+and nobody needs to address you; the prompt moves to where it is already
+asked, on entering a table, where G5's peek already runs. Two seams:
+`portableDownload()`'s filename fallback reads `ROOM !== 'table'`
+(main.js:9128) and simplifies once the default key is gone; and
+`setPill('solo', 'solo')` currently signals *"no server"* — in the lobby
+it names a **place**, which is a wording pass, not a mechanism.
+
+**L1. Making a table, and the link that gets people in (CUJ2).** A "New
+table" verb: name it, land in it. Keys must be unguessable rather than
+`?room=barn` — with no access control the key IS the door, and
+server.js:2472 already carries the comment worrying about crawlers
+guessing `?room=` values. Then the sharing pass: the invite comes out of
+the identity menu to a visible affordance at the table, one tap to copy,
+`navigator.share` where it exists (a phone hand-off is literally CUJ2's
+"somehow get all the players to join"). **Half of this is already
+built** — `&as=Name` pre-selects a prepared seat (main.js:10969), which
+PROFILES.md's G5 row already calls "CUJ2 end to end. One link, six
+players, right pools." A per-seat link ("Bo, this is your seat") is
+composition, not new work. *Deferred rung:* a QR code for in-person night — zero-dep
+means hand-rolling an encoder, so it earns its own decision.
+
+**L2. Arriving (CUJ3) — mostly shipped, needs an audit.** §2k closed
+above: the peek shows the table name and prepared seats pre-join. What
+is left is judgment, not plumbing — whether the peek should also say how
+many people are here (roster count is live presence, cheap, and answers
+"did I follow the right link?"), and what arrival looks like for a
+visitor with a stored name versus one without.
+
+**L3. Leaving — the table switcher (CUJ4).** A recents list in the lobby
+(`{room, name, last seen}`, localStorage, capped, with a forget), and
+"Leave table → lobby" as a real verb. **Naming collision to resolve
+first:** `idm-leave` is today "Leave & switch seat" (index.html:300) and
+switches SEATS, not tables. Mechanism: **navigate** (`?room=`, full
+reload). A same-page swap reads nicer but `ROOM` is a module-level
+`const` (main.js:10123) and `netOnline` appears at 49 sites, all of them
+assuming the room identity does not change under them — an invasive
+refactor for a transition that happens a few times a session. Navigate
+first; record the swap as an optimization gated on boot cost (§0h).
+
+**L4. Sub-tables (CUJ5) — this is §13, redefined and pulled up.** Split
+creates a child room, listed to the parent's players (the scoped
+directory above) and carrying a parent pointer, so "return to the main
+table" is a link rather than a thing you have to remember. **§13's hard
+part turns out not to be hard:** the display name is origin-global
+(`dice.name.v1`, main.js:10122) and so are the pools, so identity walks
+into a breakout for free; the seat being per-room is *correct*, not a
+gap — a child table mints its own. Open: whether a child inherits the
+parent's felt and system (probably — same game), and what an orphaned
+child is when the parent's linger expires (answer: just a table).
+
+**BLOCKER before any of this is exposed publicly: §0j's per-IP
+room-creation throttle.** L1 turns room creation into a button; 500
+slots (server.js:70) are burnable by a script today, and §0d's F1 lesson
+already named Cloud Armor as the right place rather than in-server
+buckets.
+
+**What does not change** — recorded so the review does not re-litigate
+it: goal 7 (recents are client-side, the sub-table directory is
+in-memory) · goal 9 (the lobby IS the static-hosting table) · goal 10
+(no access control — which is *why* there is no public list) · goal 12
+(no lobby presence, no summon, nothing chat-shaped).
 
 ---
 
@@ -773,10 +910,16 @@ by design.
 Visual skin over step 3's zone machinery; mat color per-player,
 visible to all.
 
-### 13. Breakout rooms
+### 13. Breakout rooms — MOVED to §3b L4 (2026-08-07)
 
-Side tables with shared identities (goal 11's "lower priority"
-advanced privacy; design when reached).
+Side tables with shared identities. Sat here on "design when reached"
+because it read as advanced privacy (goal 11's "lower priority"); it is
+actually **navigation**, and it was the roadmap's only multi-table entry
+while the front door had no lobby at all. Joe's CUJ5 (*"split a group
+into two smaller groups… and maybe return to the main table"*) sequences
+it with the rest of the table flow, and the "shared identities" half is
+most of the way there already (§3b L4). Section number kept so
+cross-references resolve.
 
 ### 11. Physical pool building — DEMOTED
 
