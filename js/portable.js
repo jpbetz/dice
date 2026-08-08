@@ -57,7 +57,13 @@
 //               would be a table nobody prepared. 'experiences' is out: no
 //               editor writes it, so the key would carry nothing.
 //   players:    the prepared characters, each a display name, an optional
-//               dice set, and a rack of its own.
+//               rolling system, an optional dice set, and a rack of its own.
+//
+// Since 2026-08-08 (PROFILES §11) `players:` is also how a PROFILE LIBRARY
+// travels: the same block, up to 32 of them, each naming the system whose lens
+// its dice were chosen under. A DM's prepared table and a player's own library
+// are the same document read by two people — which is the point, and the reason
+// the cap moved rather than a second section being invented.
 //
 // Why a player block NESTS `pools:` instead of hanging shelves off the name:
 // shelf labels are user-authored, so a shelf may legally be called 'set' or
@@ -92,11 +98,23 @@ const PLAIN_LABEL = 'Pools';
 // (which is one player's: the exporting browser's own) and each player block
 // each get the full 40, under the same name the server's own cap wears. Six
 // players × 20 pools is an ordinary game night and must never be a refusal;
-// MAX_POOLS_PER_FILE is the separate whole-document ceiling, and MAX_PROFILES
-// matches the room key's cap (PROFILES §3.2).
+// MAX_POOLS_PER_FILE is the separate whole-document ceiling.
+//
+// MAX_PROFILES is 32 as of 2026-08-08 (PROFILES §11): the file is the durable
+// copy of a PROFILE LIBRARY, and a library that cannot round-trip is not a
+// backup. It deliberately no longer matches the room key's cap — the server
+// still takes 12, because that is how many seats a table has, where 32 is how
+// many characters a person keeps.
+//
+// The whole-document ceiling rises with it, to EXACTLY the structural maximum:
+// 32 players × 40 pools plus the top-level rack's own 40 is 1320. Which means
+// this cap can no longer refuse a legal document — at 300 it refused precisely
+// the library this format now exists to write. It stays, at the arithmetic, as
+// the guard that turns "someone raised one of the other two caps" into a test
+// failure rather than a discovery.
 const MAX_POOLS_PER_PLAYER = 40;
-const MAX_POOLS_PER_FILE = 300;
-const MAX_PROFILES = 12;
+const MAX_PROFILES = 32;
+const MAX_POOLS_PER_FILE = MAX_PROFILES * MAX_POOLS_PER_PLAYER + MAX_POOLS_PER_PLAYER; // 1320
 const MAX_NAME = 24;
 const MAX_TABLE_NAME = 28; // SETTING_SPECS.tableName's cap
 
@@ -158,7 +176,7 @@ function emitShelves(lines, groups, base) {
 }
 
 // groups: [{name, notation, category?, set?}] · settings: {sound?, numbers?}
-// table: {name?, felt?, system?, zoom?} · profiles: [{name, set?, groups}]
+// table: {name?, felt?, system?, zoom?} · profiles: [{name, system?, set?, groups}]
 // table and profiles are present-or-absent: given neither (or nothing in
 // them), the output is byte-identical to what this emitter wrote before the
 // prepared table existed. Profiles keep the order they are handed in — that
@@ -181,6 +199,11 @@ export function exportYaml({ groups = [], settings = {}, table = null, profiles 
     lines.push('players:');
     for (const p of seats) {
       lines.push(`  ${quote(p.name || '')}:`);
+      // `system` before `set`: the rolling system is what decides WHERE a
+      // profile may be taken in hand (PROFILES §11 R5), so it reads first.
+      // Both are present-or-absent, and a profile written before systems
+      // existed still parses — it takes the table's system on the way in.
+      if (p.system && SYSTEMS.includes(p.system)) lines.push(`    system: ${quote(p.system)}`);
       if (p.set) lines.push(`    set: ${quote(p.set)}`);
       lines.push('    pools:'); // an empty rack still names the key, so the seat survives
       emitShelves(lines, p.groups || [], 6);
@@ -299,7 +322,7 @@ function blockLine(block, raw, lineNo) {
 
 // → { ok:true, shelves:[{label, plain, pools:[{name, notation, set?}]}],
 //     settings:{sound, numbers} (each present only when the text set it),
-//     profiles:[{name, set?, shelves:[…]}], warnings:[…], table?:{…} }
+//     profiles:[{name, system?, set?, shelves:[…]}], warnings:[…], table?:{…} }
 // or { ok:false, line, error }. `table` is present only if the text set it;
 // `profiles` and `warnings` are always arrays, empty in a today-format file.
 export function parsePortable(text) {
@@ -413,12 +436,30 @@ export function parsePortable(text) {
 
       if (/^ {4}\S/.test(raw)) {
         // the reserved keys, at the depth a shelf can never reach
-        const m = /^ {4}(set|pools):(.*)$/.exec(raw);
-        if (!m) return fail(lineNo, `a player carries only "    set: 'id'" and "    pools:" (got ${JSON.stringify(raw.trim().slice(0, 30))})`);
+        const m = /^ {4}(set|pools|system):(.*)$/.exec(raw);
+        if (!m) return fail(lineNo, `a player carries only "    system: 'id'", "    set: 'id'" and "    pools:" (got ${JSON.stringify(raw.trim().slice(0, 30))})`);
         if (m[1] === 'pools') {
           if (m[2].trim() !== '') return fail(lineNo, '"pools:" takes no value — the shelves sit under it');
           seat.inPools = true;
           seat.block.shelf = null;
+          continue;
+        }
+        if (m[1] === 'system') {
+          // REFUSED, not fallen closed — the asymmetry with `set:` is
+          // deliberate. An unknown dice set costs a profile its skin; an
+          // unknown SYSTEM costs it the only thing that says where it may be
+          // taken in hand (PROFILES §11 R5), and a character that silently
+          // became a Soul Deal character is a character nobody wrote. Same
+          // call `table.system` already makes, one line above in spirit.
+          const sv = readScalar(m[2].trim());
+          if (!sv || sv.rest.trim() !== '') return fail(lineNo, 'expected one system id after "system:"');
+          const id = sv.value.trim();
+          if (!id) return fail(lineNo, 'expected one system id after "system:"');
+          if (!SYSTEMS.includes(id)) {
+            return fail(lineNo, `system ${JSON.stringify(id.slice(0, 30))} is not one of ${SYSTEMS.join(', ')}`);
+          }
+          if (seat.rec.system) return fail(lineNo, `player ${JSON.stringify(seat.rec.name)} names a system twice`);
+          seat.rec.system = id;
           continue;
         }
         const sv = readScalar(m[2].trim());

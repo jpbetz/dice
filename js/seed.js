@@ -172,9 +172,9 @@ function notationOf(dice) {
   return LADDER.filter((t) => counts.has(t)).map((t) => `${counts.get(t)}${t}`).join('+');
 }
 
-// Deal a whole starting rack: 18 saved-pool records, ready for `migrateGroup`.
-// `rng` is injected so the unit suite can pin a seed; the app passes
-// Math.random and every fresh browser gets its own character.
+// Deal a whole starting SOUL DEAL rack: 18 saved-pool records, ready for
+// `migrateGroup`. `rng` is injected so the unit suite can pin a seed; the app
+// passes Math.random and every fresh browser gets its own character.
 export function dealStartingRack(rng = Math.random) {
   const rack = [];
   for (const shelf of SHELVES) {
@@ -195,3 +195,98 @@ export function dealStartingRack(rng = Math.random) {
 // What each shelf is priced at — the unit suite asserts the dealt rack against
 // this, and it is the one place the figures are written down.
 export const SEED_SHELVES = SHELVES.map((s) => ({ category: s.category, pools: s.pools, value: s.value }));
+
+// ---------------------------------------------------------------------------
+// The other two systems (docs/PROFILES.md §11, the Random option)
+// ---------------------------------------------------------------------------
+//
+// The seat picker's `Random` deals a profile for THE TABLE'S system, so it
+// needs a recipe per system rather than one Soul Deal rack wearing three
+// labels. A dealt rack is dice literacy, not game rules (GOALS goal 6): under
+// D&D style a check is a d20 and a modifier, under Numbers only a pool is a
+// handful of dice, and neither claims to know anything about a rulebook.
+//
+// The Soul Deal recipe stays EXACTLY as it was — priced shelves, dice drawn
+// inside the price, the exactness invariant its unit sweep proves. The other
+// two are unpriced by construction: there is no creation budget to hit, so
+// they draw names and modifiers instead of solving a sum.
+//
+// Every notation here must already be the parser's fixed point (the same claim
+// the Soul Deal deal makes and the unit suite re-checks), which is why a zero
+// modifier is written as no modifier at all rather than '+0'.
+
+const DND_SKILLS = ['Athletics', 'Acrobatics', 'Stealth', 'Perception',
+  'Insight', 'Investigation', 'Arcana', 'History', 'Nature', 'Medicine',
+  'Persuasion', 'Deception', 'Intimidation', 'Survival'];
+const DND_SAVES = ['Strength save', 'Dexterity save', 'Constitution save',
+  'Intelligence save', 'Wisdom save', 'Charisma save'];
+// name → the damage the weapon deals; the attack roll is always a d20.
+const DND_WEAPONS = [
+  ['Longsword', '1d8'], ['Greataxe', '1d12'], ['Rapier', '1d8'],
+  ['Shortbow', '1d6'], ['Dagger', '1d4'], ['Maul', '2d6'],
+  ['Quarterstaff', '1d6'], ['Longbow', '1d8'],
+];
+const DND_SPELLS = [['Fire Bolt', '1d10'], ['Eldritch Blast', '1d10'],
+  ['Fireball', '8d6'], ['Magic Missile', '3d4'], ['Sacred Flame', '1d8'],
+  ['Guiding Bolt', '4d6']];
+// Proficiency-shaped: the mid values carry the sheet, +0 and +5 stay rare, so
+// a dealt character reads as trained at some things and not at others.
+const DND_MODS = [0, 1, 2, 2, 3, 3, 3, 4, 4, 5];
+
+// Numbers only: no chart, no budget, no character — a tray of dice. Named by
+// what they are, which under this system is the whole of what there is to say.
+const PLAIN_POOLS = [['d4', '1d4'], ['d6', '1d6'], ['d8', '1d8'],
+  ['d10', '1d10'], ['d12', '1d12'], ['d20', '1d20'],
+  ['2d6', '2d6'], ['3d6', '3d6'], ['4d6', '4d6'], ['2d10', '2d10']];
+
+const pick = (list, rng) => list[Math.floor(rng() * list.length) % list.length];
+const drawSome = (list, count, rng) => shuffled(list, rng).slice(0, count)
+  .sort((a, b) => list.indexOf(a) - list.indexOf(b));
+
+// A d20 check: '1d20+3', or plain '1d20' when the modifier is zero — '+0'
+// is not the canonical spelling of nothing.
+const check = (mod) => (mod ? `1d20+${mod}` : '1d20');
+
+// 'Quarterstaff damage' is 19 characters; the longest weapon here plus the
+// suffix stays inside the 24-char pool-name cap, and this keeps it true if a
+// longer weapon is ever added.
+const cutName = (s) => (s.length <= 24 ? s : s.slice(0, 24).trim());
+
+function dealDndRack(rng) {
+  const rack = [];
+  const push = (name, notation, category) => rack.push({ id: rack.length + 1, name, notation, category });
+  for (const skill of drawSome(DND_SKILLS, 6, rng)) push(skill, check(pick(DND_MODS, rng)), 'Checks');
+  for (const save of drawSome(DND_SAVES, 3, rng)) push(save, check(pick(DND_MODS, rng)), 'Saves');
+  const [weapon, damage] = pick(DND_WEAPONS, rng);
+  const [spell, spellDice] = pick(DND_SPELLS, rng);
+  const hit = pick(DND_MODS, rng);
+  push(weapon, check(hit), 'Attacks');
+  push(cutName(`${weapon} damage`), hit ? `${damage}+${hit}` : damage, 'Attacks');
+  push(spell, spellDice, 'Attacks');
+  return rack;
+}
+
+function dealPlainRack(rng) {
+  // Six of ten, in list order: a tray, not a collection.
+  return drawSome(PLAIN_POOLS, 6, rng)
+    .map(([name, notation], i) => ({ id: i + 1, name, notation }));
+}
+
+// The one door: a rack for whichever system the table is reading by.
+export function dealRack(system, rng = Math.random) {
+  if (system === 'dnd') return dealDndRack(rng);
+  if (system === 'none') return dealPlainRack(rng);
+  return dealStartingRack(rng);
+}
+
+// A name for a dealt profile, so Random never has to ask a question it can
+// answer. Fantasy-forward (GOALS goal 2) where there is a character to name;
+// under Numbers only there is not one, and pretending otherwise would be the
+// app inventing a person for a tray of dice.
+const DEALT_NAMES = ['Bram', 'Sona', 'Kest', 'Ilda', 'Torv', 'Nessa', 'Garr',
+  'Ovi', 'Yarn', 'Mirek', 'Sable', 'Pike', 'Rowan', 'Cass', 'Dunn', 'Hale',
+  'Vess', 'Orla', 'Fenn', 'Bryn', 'Corr', 'Maeve', 'Tolm', 'Wren'];
+
+export function dealName(system, rng = Math.random) {
+  return system === 'none' ? 'Dice tray' : pick(DEALT_NAMES, rng);
+}

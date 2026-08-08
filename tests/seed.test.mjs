@@ -30,7 +30,7 @@ limitations under the License.
 // column, so it must never be dealt).
 
 import assert from 'node:assert/strict';
-import { dealStartingRack, drawDice, SEED_SHELVES } from '../js/seed.js';
+import { dealStartingRack, dealRack, dealName, drawDice, SEED_SHELVES } from '../js/seed.js';
 import { parseNotation, cutText } from '../js/notation.js';
 import { budgetOf, DIE_MAX } from '../js/rollspec.js';
 
@@ -181,6 +181,113 @@ t('an unpayable shelf throws instead of dealing a lie', () => {
   assert.throws(() => drawDice(30, 9, rngFor(1)), /unpayable shelf: 30 across 9 pools/);
   assert.throws(() => drawDice(35, 3, rngFor(1)), /unpayable shelf: 35 across 3 pools/);
   assert.doesNotThrow(() => drawDice(36, 9, rngFor(1)), 'exactly 4 per pool is payable');
+});
+
+// ---- the other two systems (PROFILES §11, the Random option) ---------------
+//
+// The Soul Deal deal is priced and its exactness is the claim above. These two
+// are unpriced by construction — there is no creation budget to hit — so what
+// must hold instead is that every dealt pool is something the app can actually
+// roll: parseable, already the parser's fixed point, and inside the name cap.
+
+const CANON = (pool) => {
+  const res = parseNotation(pool.notation);
+  assert.ok(res.ok, `${pool.name} '${pool.notation}' must parse`);
+  assert.equal(res.canonical, pool.notation,
+    `${pool.name} '${pool.notation}' must already be canonical (got '${res.canonical}')`);
+  assert.equal(cutText(pool.name, 24), pool.name, `'${pool.name}' survives the 24-char cut`);
+};
+
+t('dealRack routes to the Soul Deal dealer, byte for byte', () => {
+  // The one recipe with a unit sweep behind it must not change shape when the
+  // other two arrive; an unknown system id lands here too rather than nowhere.
+  for (const system of ['soul-deal', undefined, null, 'pathfinder']) {
+    assert.deepEqual(dealRack(system, rngFor(11)), dealStartingRack(rngFor(11)), String(system));
+  }
+});
+
+t('every dealt rack is rollable, canonical and inside the name cap', () => {
+  for (const system of ['soul-deal', 'dnd', 'none']) {
+    for (let seed = 1; seed <= 300; seed++) {
+      const rack = dealRack(system, rngFor(seed));
+      assert.ok(rack.length > 0, `${system} seed ${seed}: dealt nothing`);
+      assert.deepEqual(rack.map((g) => g.id), rack.map((_, i) => i + 1),
+        `${system} seed ${seed}: ids are 1..n, ready for migrateGroup`);
+      const seen = new Set();
+      for (const p of rack) {
+        CANON(p);
+        assert.equal(seen.has(p.name), false, `${system} seed ${seed}: '${p.name}' twice`);
+        seen.add(p.name);
+      }
+    }
+  }
+});
+
+t('the D&D deal reads as a character: checks, saves and something to hit with', () => {
+  for (let seed = 1; seed <= 200; seed++) {
+    const rack = dealRack('dnd', rngFor(seed));
+    assert.equal(rack.length, 12, `seed ${seed}`);
+    assert.deepEqual([...new Set(rack.map((g) => g.category))], ['Checks', 'Saves', 'Attacks'],
+      `seed ${seed}: shelves in authored order`);
+    assert.equal(rack.filter((g) => g.category === 'Checks').length, 6, `seed ${seed}`);
+    assert.equal(rack.filter((g) => g.category === 'Saves').length, 3, `seed ${seed}`);
+    // Every check and save is a d20 read, which is what the system's own
+    // crit rule looks at (js/meanings.js critFor reads the d20s that count).
+    for (const g of rack.filter((p) => p.category !== 'Attacks')) {
+      assert.match(g.notation, /^1d20(\+\d+)?$/, `seed ${seed}: '${g.name}' is a d20 check`);
+    }
+    assert.match(rack[9].notation, /^1d20(\+\d+)?$/, `seed ${seed}: the attack roll is a d20`);
+  }
+});
+
+t('a zero modifier is written as no modifier — +0 is not the canonical nothing', () => {
+  let sawBare = 0;
+  for (let seed = 1; seed <= 400; seed++) {
+    for (const g of dealRack('dnd', rngFor(seed))) {
+      assert.equal(g.notation.includes('+0'), false, `seed ${seed}: '${g.notation}'`);
+      if (g.notation === '1d20') sawBare++;
+    }
+  }
+  assert.ok(sawBare > 0, 'a bare 1d20 does get dealt, so the branch is exercised');
+});
+
+t('Numbers only deals a tray, not a character', () => {
+  for (let seed = 1; seed <= 200; seed++) {
+    const rack = dealRack('none', rngFor(seed));
+    assert.equal(rack.length, 6, `seed ${seed}`);
+    for (const g of rack) {
+      assert.equal(g.category ?? null, null,
+        `seed ${seed}: a tray has no shelves — '${g.name}' claimed ${g.category}`);
+      assert.match(g.notation, /^\d+d\d+$/, `seed ${seed}: plain dice only, got '${g.notation}'`);
+    }
+  }
+});
+
+t('the D&D and tray deals both vary', () => {
+  const dnd = new Set();
+  const tray = new Set();
+  for (let seed = 1; seed <= 300; seed++) {
+    dnd.add(dealRack('dnd', rngFor(seed)).map((g) => `${g.name}${g.notation}`).join(','));
+    tray.add(dealRack('none', rngFor(seed)).map((g) => g.name).join(','));
+  }
+  assert.ok(dnd.size > 100, `D&D racks vary (got ${dnd.size})`);
+  assert.ok(tray.size > 10, `trays vary (got ${tray.size})`);
+});
+
+t('a dealt profile names itself, and Numbers only is not given a person', () => {
+  // Random must never have to ask a question it can answer (PROFILES §11 P5).
+  const drawn = new Set();
+  for (let seed = 1; seed <= 200; seed++) {
+    for (const system of ['soul-deal', 'dnd']) {
+      const name = dealName(system, rngFor(seed));
+      assert.equal(cutText(name, 24), name, `'${name}' survives the cut`);
+      assert.equal(name.includes('#'), false, `'${name}' would misdirect a whisper`);
+      drawn.add(name);
+    }
+    assert.equal(dealName('none', rngFor(seed)), 'Dice tray',
+      'a tray of dice is not a character, and inventing one would say otherwise');
+  }
+  assert.ok(drawn.size > 10, `dealt names vary (got ${drawn.size})`);
 });
 
 console.log(`seed.test.mjs: ${n} tests${process.exitCode ? ' — FAILURES' : ' ok'}`);

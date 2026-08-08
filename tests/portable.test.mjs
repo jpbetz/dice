@@ -40,7 +40,12 @@ const t = (name, fn) => {
 const flat = (parsed) => parsed.shelves.flatMap((s) =>
   s.pools.map((p) => ({ ...p, category: s.plain ? null : s.label })));
 // one parsed profile back into exportYaml's input shape
-const asSeat = (p) => ({ name: p.name, ...(p.set ? { set: p.set } : {}), groups: flat(p) });
+const asSeat = (p) => ({
+  name: p.name,
+  ...(p.system ? { system: p.system } : {}),
+  ...(p.set ? { set: p.set } : {}),
+  groups: flat(p),
+});
 
 // ---- round-trip ------------------------------------------------------------
 
@@ -310,6 +315,60 @@ t('a player with no pools is still a seat (the key stands, the rack is empty)', 
   assert.equal(exportYaml({ profiles: parsed.profiles.map(asSeat) }), text);
 });
 
+// ---- §11: a profile names the system its dice were chosen under ------------
+
+t('a profile carries its rolling system, and the pair round-trips as a fixed point', () => {
+  const text = exportYaml({
+    profiles: [
+      { name: 'Rill', system: 'soul-deal', set: 'emberforge.blackanvil', groups: [{ name: 'Strength', notation: '3d6', category: 'Attributes' }] },
+      { name: 'Grix', system: 'dnd', groups: [{ name: 'Longsword', notation: '1d20+4', category: 'Attacks' }] },
+      { name: 'Tray', system: 'none', groups: [{ name: 'd20', notation: '1d20' }] },
+    ],
+  });
+  // system reads BEFORE set: it decides where the profile may be taken in hand
+  assert.ok(text.includes("  'Rill':\n    system: 'soul-deal'\n    set: 'emberforge.blackanvil'\n"), text);
+  const parsed = parsePortable(text);
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.deepEqual(parsed.profiles.map((p) => p.system), ['soul-deal', 'dnd', 'none']);
+  assert.equal(exportYaml({ profiles: parsed.profiles.map(asSeat) }), text);
+});
+
+t('a profile with no system parses — a seat prepared before systems existed still seats someone', () => {
+  // Present-or-absent, like set: absent means "the receiving side decides",
+  // which is the table's own system (js/profiles.js fromWire).
+  const parsed = parsePortable("players:\n  'Alice':\n    pools:\n      Skills:\n        - 'Larceny': '1d20'\n");
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal(parsed.profiles[0].system ?? null, null, 'absent, not defaulted');
+});
+
+refuses("players:\n  'A':\n    system: 'pathfinder'\n    pools:\n",
+  'is not one of soul-deal, dnd, none', 'an unknown system REFUSES at its line');
+
+refuses("players:\n  'A':\n    system: 'dnd'\n    system: 'none'\n    pools:\n",
+  'names a system twice', 'a doubled system key refuses');
+
+refuses("players:\n  'A':\n    system:\n    pools:\n",
+  'expected one system id', 'an empty system value refuses');
+
+t('the unknown-system refusal names its line', () => {
+  const parsed = parsePortable("table:\n  felt: 'ocean'\nplayers:\n  'A':\n    system: 'nope'\n    pools:\n");
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.line, 5, `the system line (got ${parsed.line})`);
+});
+
+t('a shelf may still be called "system" — the nesting is what makes that safe', () => {
+  // The same collision the nesting exists to prevent (set/pools), now with a
+  // third reserved key. A shelf sits at 6 spaces; reserved keys at 4.
+  const text = exportYaml({
+    profiles: [{ name: 'A', system: 'dnd', groups: [{ name: 'X', notation: '1d6', category: 'system' }] }],
+  });
+  const parsed = parsePortable(text);
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal(parsed.profiles[0].system, 'dnd', 'the reserved key still read');
+  assert.deepEqual(flat(parsed.profiles[0]), [{ name: 'X', notation: '1d6', category: 'system' }]);
+  assert.equal(exportYaml({ profiles: parsed.profiles.map(asSeat) }), text);
+});
+
 t("the YAML traps hold for player names too (': ' and quotes)", () => {
   const text = exportYaml({ profiles: [{ name: "O'Ma: lley", groups: [{ name: 'A', notation: '1d6' }] }] });
   const parsed = parsePortable(text);
@@ -375,20 +434,44 @@ t('one player over 40 pools refuses at the line that breaks it', () => {
   assert.ok(parsed.error.includes('player'), parsed.error);
 });
 
-t('the document ceiling is separate and larger: 12 × 26 trips it, not the per-player cap', () => {
+t('a FULL library round-trips: 32 profiles × 40 pools is not a refusal', () => {
+  // The cap moved from 12 to 32 with the profile library (PROFILES §11): the
+  // file is that library's durable copy, and a library that cannot round-trip
+  // is not a backup. 32 × 40 = 1280 pools, which is exactly the document the
+  // old 300 ceiling would have refused.
   const lines = ['players:'];
-  for (let p = 0; p < 12; p++) {
-    lines.push(`  'P${p}':`, '    pools:', '      Attributes:');
-    for (let i = 0; i < 26; i++) lines.push(`        - 'N${i}': '1d6'`);
+  for (let p = 0; p < 32; p++) {
+    lines.push(`  'P${p}':`, "    system: 'dnd'", '    pools:', '      Attributes:');
+    for (let i = 0; i < 40; i++) lines.push(`        - 'N${i}': '1d6'`);
   }
   const parsed = parsePortable(lines.join('\n'));
-  assert.equal(parsed.ok, false);
-  assert.ok(parsed.error.includes('300'), parsed.error);
-  assert.ok(parsed.error.includes('file'), parsed.error);
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal(parsed.profiles.length, 32);
+  assert.equal(flat(parsed.profiles[31]).length, 40);
 });
 
-refuses(`players:\n${Array.from({ length: 13 }, (_, i) => `  'P${i}':\n    pools:`).join('\n')}\n`,
-  'more than 12 players', 'more than twelve players refuses');
+t('the document ceiling IS the structural maximum: 32 × 40 plus a full rack passes', () => {
+  // 32 profiles × 40 pools + the top-level rack's own 40 is 1320, which is
+  // exactly MAX_POOLS_PER_FILE — so the document cap can no longer refuse a
+  // legal file. That is the point: at 300 it refused precisely the library
+  // this format now exists to write. This test is the arithmetic, so raising
+  // either other cap without raising this one becomes a failure here rather
+  // than a player discovering their own backup will not load.
+  const lines = ['players:'];
+  for (let p = 0; p < 32; p++) {
+    lines.push(`  'P${p}':`, '    pools:', '      Attributes:');
+    for (let i = 0; i < 40; i++) lines.push(`        - 'N${i}': '1d6'`);
+  }
+  lines.push('pools:', '  Attributes:');
+  for (let i = 0; i < 40; i++) lines.push(`    - 'M${i}': '1d6'`);
+  const parsed = parsePortable(lines.join('\n'));
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal(parsed.profiles.length, 32);
+  assert.equal(flat(parsed).length, 40, 'the exporting browser\'s own rack, full');
+});
+
+refuses(`players:\n${Array.from({ length: 33 }, (_, i) => `  'P${i}':\n    pools:`).join('\n')}\n`,
+  'more than 32 players', 'more than thirty-two players refuses');
 
 // ---- '#' in a player name: a REFUSAL, never a strip -------------------------
 
