@@ -6082,6 +6082,54 @@ export const scenarios = [
       for (const leak of ['values', 'rollId', 'total', 'visibility']) {
         assert.equal(blob.includes(leak), false, `setup carries no '${leak}'`);
       }
+
+      // §11: a prepared profile carries the SYSTEM it was built for, present-
+      // or-absent, falling closed on an id this server cannot name. Without it
+      // the join picker cannot obey "only profiles for the roll system of the
+      // table" — it would offer a seat prepared for another rulebook.
+      const sys = await ctx.api('/api/table', {
+        playerId: alice.playerId,
+        rev: 6,
+        table: { system: 'dnd' },
+        profiles: [
+          { name: 'Grix', system: 'dnd', pools: [{ name: 'Longsword', notation: '1d20+4' }] },
+          { name: 'Nym', system: 'pathfinder', pools: [] },
+          { name: 'Old', pools: [] },
+        ],
+      });
+      assert.equal(sys.status, 200, `the systemed push is accepted (got ${sys.status})`);
+      const setup = (await alice.waitForEvent('table-setup', (d) => d.setup.rev === 6)).data.setup;
+      assert.deepEqual(setup.profiles.map((p) => p.system ?? null), ['dnd', null, null],
+        'a known system rides, an unknown one falls closed, an absent one stays absent');
+
+      // The pre-join peek gains the room's system and a system per seat — the
+      // picker paints BEFORE the join, so without this it would filter against
+      // a guess and correct itself after the seat landed.
+      const peek = await fetch(
+        `http://127.0.0.1:${ctx.port}/api/table?room=${encodeURIComponent(ctx.room)}`,
+      ).then((r) => r.json());
+      assert.equal(peek.system, 'dnd', `the peek names the rulebook (got ${JSON.stringify(peek)})`);
+      assert.deepEqual(peek.seats.map((s) => s.system ?? null), ['dnd', null, null],
+        'and each seat says which it was prepared for');
+      // The budget is unchanged otherwise: an enum naming a rulebook, and
+      // nothing that was not already going to be visible two clicks later.
+      const peekBlob = JSON.stringify(peek);
+      for (const leak of ['1d20', 'playerId', 'rev', 'log', 'felt']) {
+        assert.equal(peekBlob.includes(leak), false, `the peek still leaks no '${leak}'`);
+      }
+
+      // A published rack says WHICH profile it is, so a teammate can copy it.
+      // The name takes cleanName, not cleanString: it becomes a display name
+      // the moment somebody copies it, and '#' is banned at every name door.
+      await ctx.api('/api/pools', {
+        playerId: alice.playerId,
+        pools: [{ name: 'Garrote', notation: '2d8' }],
+        profile: 'Night#blade',
+        system: 'nonsense',
+      });
+      const pc = (await alice.waitForEvent('pools-changed')).data;
+      assert.equal(pc.profile, 'Nightblade', `'#' is stripped from a published profile name (got ${pc.profile})`);
+      assert.equal(pc.system ?? null, null, 'and an unknown system falls closed rather than being relayed');
     },
   },
   {
