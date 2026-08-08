@@ -38,6 +38,29 @@ export function findChrome() {
   throw new Error('no Chrome binary found (set CHROME_BIN)');
 }
 
+// SOFTWARE RENDERING BY DEFAULT (2026-08-08). A full suite run opens ~147
+// tables, and every one of them constructs a THREE.WebGLRenderer — so the
+// suite is really ~147 GPU context create/teardown cycles fired back to back
+// at whatever driver the host has. That churn pattern is far harsher than
+// steady rendering, and on Joe's box (RTX 4090, and a driver whose userspace
+// had drifted ahead of its loaded kernel module) it took the whole MACHINE
+// down mid-run, twice, within minutes of starting.
+//
+// The suite does not need a GPU: every assertion reads the DOM or a
+// __diceDebug hook, dice positions come from cannon-es on the CPU, and the
+// die-art pass renders fine under SwiftShader. So we route WebGL to
+// SwiftShader and take the host's driver out of the loop entirely.
+//
+// DICE_E2E_GPU=1 restores the hardware path for anyone who needs to test
+// against a real driver (and for checking whether a rendering bug is
+// SwiftShader-specific).
+const SOFTWARE_GL = [
+  '--disable-gpu',
+  '--use-gl=angle',
+  '--use-angle=swiftshader',
+  '--disable-features=Vulkan',
+];
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 export class Browser {
@@ -62,6 +85,7 @@ export class Browser {
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',
       '--mute-audio',
+      ...(process.env.DICE_E2E_GPU === '1' ? [] : SOFTWARE_GL),
       'about:blank',
     ], { stdio: ['ignore', 'ignore', 'pipe'] });
     let stderr = '';
