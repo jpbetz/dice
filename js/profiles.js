@@ -284,7 +284,7 @@ export function deleteProfile(store, id) {
   const rec = findProfile(store, id);
   if (!rec) return { ok: false, error: 'no such profile' };
   if (profilesOf(store).length <= 1) {
-    return { ok: false, error: 'this is your only profile — a table needs a rack' };
+    return { ok: false, error: 'this is your only profile — a table needs one' };
   }
   store.profiles = store.profiles.filter((p) => p.id !== id);
   if (store.activeId === id) {
