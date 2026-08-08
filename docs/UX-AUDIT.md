@@ -13,8 +13,10 @@ stances** — newcomer, GM at a live table, accessibility, doctrine, and
 consistency — read the shipped experience against the source and sixteen
 captured frames. Every finding was then attacked by a separate verifier
 instructed to kill anything it could not confirm itself; only survivors are
-recorded here. A sixth stance (touch/tablet) is recorded separately in §H —
-it failed on its first run and was re-run on its own.*
+recorded here. A sixth stance (touch/tablet) failed on its first
+run, was re-run on its own afterwards, and is recorded whole in §H rather
+than merged into the themes — it found one defect (T4) that no other stance
+did.*
 
 *This is a design audit of the shipped experience, not a bug hunt — but
 several findings are defects, and one is a shipped flow that stopped working
@@ -194,3 +196,197 @@ These are bets, not bugs. Each will get more expensive to reverse.
 - **Do not unify the two bars by making the rail multi-select, and do not suppress the leading `1` in the dice counter.** Exclusivity is correct for a mode switch and the counter's grammar is correct as shipped; the fixes are a distinct dress for the exclusive bar and an end to the state-destruction, not grammar changes.
 - **Do not make import destructive.** Union-only, preview-then-merge is the load-bearing lesson of the `#g=` post-mortem and it held up under every stance. The missing operation is an *explicit, separately-named* "replace my rack from this file", not a sharper Apply.
 - **Do not split js/main.js as a reflex, and do not reach for a framework.** Zero-dependency single-file is upholding its end — the audit traversed it six ways and the architecture held. The document that needs restructuring is UX.md. Split the code only when a specific change is demonstrably harder because of the file, and record that demonstration when it happens.
+
+---
+
+## H. Touch and tablet
+
+*This stance errored on its first run (a structured-output failure, not an
+empty result) and was re-run on its own afterwards; its findings were not
+available to the synthesis above, so it is recorded whole rather than merged
+into themes A-G. Conversion used throughout: 1 CSS px ≈ 0.265 mm, so the
+44px guideline ≈ 11.6 mm and a 9 mm finger pad ≈ 34 CSS px.*
+
+*It found the one defect no other stance did — **T4**, a touch path that is
+dead code — and one structural result worth pulling to the front:* **seven
+of the eight `(pointer: coarse)` blocks in the stylesheet fix *visibility*
+and only one fixes *size*.** *That is the shape of the whole theme: touch was
+given things to see, not things it can hit. The two clearest cases are `.die-x`
+and `.rd-x`, both made to STAND on coarse pointers by rules written to make
+them reachable — while staying 20px and 18px.*
+
+### What is working (touch)
+
+**The roll verb is the one thing sized for a thumb at both scales, and it got
+there by *removing* padding rather than adding a rule.** `#tray-actions
+{ padding: 0 }` (css:751) exists so "every pixel of the tray — pocket AND
+plate — is the same click target"; `.tray-line2 .tray-roll { min-height:
+113px }` (css:702) makes the expanded roll a 274×113 slab, and the collapsed
+twin `#rail-roll { min-height: 44px }` (css:1970) is full-width in an 86px
+column. Hit-first-time at both sizes, no aim required.
+
+**The card action row is the only surface with a real coarse *size* rule, and
+the mount structure makes it land everywhere.** css:4415-4419 raises
+`.card-act` and the `.pk-strip`s from 34px to 44px; because
+`appendCardActions`/`mountCardActions` (js/main.js:3040, 3086) always build
+the Reveal into a `.banner-foot` and the reroll into a `.pk-strip`, banner,
+peek and verdict all inherit it — and `.sm-reveal`'s `body.mini` rule
+(css:3240) touches only font and padding, so it cannot undercut the
+min-height. Pinned by `named-verb-touch`.
+
+**Shelved rolls carry an invisible 76px hit disc over a layer that refuses
+pointer events.** `#shelf-layer { pointer-events: none }` with
+`.shelf-marker { width: 76px; height: 76px; pointer-events: auto }`
+(css:3183-3194) — 2.4× the visible dot, and the felt behind it never steals
+the press. Still 56px in `body.mini`, which is the state a collapsed-panel
+tablet always lives in.
+
+**Both die grids clear the guideline on geometry alone, with no touch rule.**
+`.tile-stage { min-height: 64px }` in a 3-column grid gives ~87×64 tiles;
+`#die-buttons` at `repeat(4, 1fr)` with `padding: 8px 2px` gives ~64×63. The
+two surfaces a player touches most are the two that never needed a special
+case.
+
+**The pool-tile long-press is a correct implementation, not a stub.**
+js/main.js:7053-7095: a 500ms timer, 10px move-cancel via `pointermove`,
+`pointerup`/`pointercancel` teardown, an `lpFired` flag suppressing the
+synthetic click, and the native Android `contextmenu` handler clearing the
+timer so the door cannot double-toggle. Pinned by `sheet-touch`. **This is
+the reference implementation the other three touch doors should have used.**
+
+**Pinch-zoom is left intact**, which is what makes every undersized target
+below *recoverable* rather than impossible: index.html:20 is
+`width=device-width, initial-scale=1` with no `user-scalable=no` and no
+`maximum-scale`.
+
+### What is weak (touch)
+
+**T1 (major). The only pointer path to collapse/expand is a 14px strip.**
+`#edge-toggle { width: 14px }` (css:236) — 3.7mm against a 9mm pad — and
+js/main.js:10613 calls it "the one pointer target for collapse/expand (the
+title row died with the overlay; keys n/m keep their muscle memory)". The
+chevron inside is an 11px glyph pinned at `top: 14px`, so there is no visual
+centre to aim at over a 768px strip. A miss right lands on the felt
+(harmless); a miss left stages a pool or picks a rail row. **Fix:** keep the
+14px *ink*, widen the *target* — a coarse-only `width: 32px; margin-right:
+-18px`, or a `::before` extending 18px into the felt side, which has no
+competing handler.
+
+**T2 (major). Every control in the collapsed column except the roll plate is
+under half the guideline.** In an 86px content box: `#rail-mode` cells
+**39×23** (css:1797) — §7.23 itself calls this "a 39px control a thumb's
+width above the first row"; collapsed foot glyphs ⚙ ≣ ❯ ✕ **≈19×27** at
+`gap: 2px` (css:1760-1766), where the CSS comment sizes them so "the four
+come to ~80px" — a *width* budget that never considered touch;
+`.rp-item { min-height: 38px }`, 6px short and the only one of the three
+that is defensible. This is the state a tablet lives in, and it is the least
+touch-ready surface in the app. **Fix:** the foot has 6px of slack (80 of
+86) — spend it (`padding: 10px 2px` → ~35px tall, inside budget); bump
+`#rail-mode` to `padding: 11px 2px` (39×35), which has vertical room.
+
+**T3 (major). The ± popover — where every roll axis lives — has no coarse
+branch at all.** Measured, all exact: `.stepper button` **23×24** (css:3839)
+· `.sw` switch **30×17** (css:3843-3845) · `.seg button` ≈23 tall · `.mchip`
+≈23 · `.pid-cat` ≈21 · `.pop-close` ≈17×21 · `.pid-rank` 38×38. The `.sw` at
+17px is 4.5mm — the worst control in the app, and it is also the sound toggle
+in Settings. `audit-popover.png` shows four Visibility cells sharing 268px at
+23px tall. **Fix:** one coarse block; the popover is 312px wide with
+`overflow-y: auto` and can afford the height.
+
+**T4 (major, DEFECT). The identity chip's long-press opens the menu and the
+release-click immediately closes it — the touch path is dead code.**
+js/main.js:11683-11695 arms a 500ms timer calling `openIdentityMenu()`, but
+the `click` listener at js/main.js:11664 reads `if (isIdentityMenuOpen())
+closeIdentityMenu();` and fires on the same release. Unlike the pool tile
+there is no `lpFired` suppressor. On touch: hold → menu flashes → gone. This
+is the **only** path to *Change name…*, *Change seat…* and *Leave table*
+(index.html:370-378) — `Copy invite link` has a second home as a
+`.rail-ghost`, the other three do not. The long-press also lacks the 10px
+move-cancel. **Fix:** copy the pool-tile pattern verbatim.
+
+**T5 (major). Two `contextmenu`-only doors have no long-press, and iOS Safari
+never fires `contextmenu` on long-press.** The four registrations:
+js/main.js:1306 (shelf marker → `openShelfPopover`) **no long-press** ·
+js/main.js:1611 (`peekEl.oncontextmenu`) **no long-press** · js/main.js:5677
+(the well → `#tray-mods`, fine, it has a visible equivalent on the rim) ·
+js/main.js:7090 (pool tile, has one). So a shelved roll's *tweaked* reroll is
+unreachable on iOS. A plain reroll survives via the peek's 44px strip, so the
+loss is bounded — but silent. **Fix:** factor a shared
+`attachLongPress(el, fn)` and attach it to the marker and the peek; both
+already `preventDefault()` in `contextmenu`, so Android is unchanged.
+
+**T6 (moderate). Seven of eight `(pointer: coarse)` blocks fix visibility;
+one fixes size.** Full list: css:543 `.die-x{opacity:1}` · css:893
+`.draft-actions .btn{padding}` · css:1380 `.ghost-add` · css:1852 `.rd-x
+{opacity:.75}` · css:2397 `.rail-menu-forget` · css:3387 `.log-again` ·
+css:3410 `.reveal-tier` · css:4415 the 44px card-act block. The two worst
+outcomes are both removers made to *stand* on touch while staying tiny:
+`.die-x` **20×20** (css:527) overlaying 34px die art with no gap between
+neighbours, and `.rd-x` **18×18** (css:1831) absolutely positioned **on top
+of the row that increments**, occupying x∈[64,82] of an 86px row — a finger
+centred anywhere left of that adds a die instead of removing one. §7.23
+argues it must stand "because a counted row you cannot decrement by touch is
+a trap"; it made it visible, not tappable.
+
+**T7 (moderate). The rim's coarse bump reaches 32px, misses `#tray-mods`
+entirely, and is out-specified on `#offer-pick`.** css:893 yields ≈32px, 12px
+short. `#tray-mods` carries **no `class="btn"`** (index.html:196), so the
+coarse selector never matches it — it survives only because
+`.draft-actions { align-items: stretch }` pulls it to row height, which is
+accidental. And `#offer-pick { padding: 4px 6px }` (css:891) is specificity
+**(1,0,0)** against the coarse rule's **(0,2,0)**; media queries add no
+specificity, so the id wins regardless of order and the targeted-offer
+chooser stays **≈21px wide**. This is the one place in the file where an
+id-scoped rule beats a coarse bump.
+
+**T8 (moderate). A 24px destructive ✕ sits 2px from the tile corner and 6px
+from the neighbouring tile.** `.tile-del` 24×24 at `top/right: 2px`
+(css:1234-1245) inside a `.pool-grid` with `gap: 6px`; in manage mode the
+tile body opens the editor and its corner deletes the pool, with no confirm
+(js/main.js:7107-7112 filters and saves immediately). The CSS comment says it
+was "grown to 24px (grow the target, never multiply it)" — right instinct,
+stopped short. **Fix:** 40×40 flush to the corner on coarse, plus an undo or
+a two-tap arm.
+
+**T9 (moderate). Every pill in the presence row is ~24px tall, including the
+app's three exits.** `.roster-name { padding: 4px 10px; font-size: 12px }`
+(css:2181-2196), and `.rail-ghost` copies it to the pixel (css:2236-2250) —
+covering browse-a-teammate, `Invite`, `+ New table` and `Tables ▾`, which is
+exactly what a first-time tablet user meets. `#rail` is `flex-wrap: wrap`, so
+the row absorbs growth by wrapping rather than overflowing.
+
+**T10 (moderate). No short-viewport branch, and the sticky workbench takes
+30% of a landscape tablet's panel.** Measured `.draft-zone` = **203px**
+(167px with the rim hidden). At **1024×768 landscape**: 654px of panel body,
+minus 203 sticky → 451px of scroll; section bar (46) + palette (152) + `#cmd`
+(~50) = 248, leaving **≈203px for the rack** — about two tile rows. Usable,
+but the whole rack is behind a scroll on the device with the most screen. At
+768×1024 portrait it is comfortable (707px). The `@media (max-width: 640px)`
+branch is **one rule** that computes to no change at 640px and only bites
+below 372px — neither tablet orientation ever enters it, and **nothing
+anywhere keys off height**. **Fix:** a `max-height` branch that trims the
+well rather than the rack; `--draft-h` is recomputed from `offsetHeight`, so
+the sticky shelf-head offset follows automatically.
+
+**T11 (moderate). Every text input is under 16px, and the panel foot is
+pinned behind the software keyboard.** `.cmd-in` 12.5px (css:3499), `.tin`
+12px, `.pid-name-input` 13px, `.new-shelf-input` 12px, `.portable-text` 11px,
+`.btn-row input` 13px. iOS Safari auto-zooms the layout on focus for any
+input below 16px — so tapping the notation box, renaming a pool or naming a
+shelf all jolt the whole table. Separately, `#left-panel { position: fixed;
+top: 0; bottom: 0 }` (css:150-153) with no `dvh` unit and no
+`interactive-widget=resizes-content` means `#rail-foot` sits under the
+keyboard whenever any of those is focused.
+
+**T12 (minor). The keyboard-parity audit comes back mostly clean.** Reachable
+on touch: `1`-`9`, `Enter`, `/`, `l`, `c`, `r`, `s`, and `m`/`n` (only via
+T1's 14px strip). Esc's peel chain has a touch twin at **every** rung —
+backdrop tap, pointerdown-away, `.pop-close`, re-tap the marker, re-tap the
+row, `✕ Clear`. Correctly moot: `?` (its content is keyboard shortcuts) and
+the `.pool-ord`/`.rp-ord` hints (they advertise a keyboard affordance). **The
+one real gap is `.tile-add`** (css:1224-1232) — the `+` whisper that is the
+only thing saying a rack tile *stages into the well* rather than rolling. It
+is `opacity: 0` at rest, hover-only, no coarse branch, so on touch nothing
+distinguishes a rack tile (stages) from a `.pool-roll` strip (rolls
+immediately). This is the cheapest coarse addition and the only one that
+teaches rather than enlarges.
