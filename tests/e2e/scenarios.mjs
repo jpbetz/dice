@@ -806,15 +806,40 @@ export const scenarios = [
       assert.equal(await a.eval(`document.querySelector('#log-list .log-total').textContent.trim()`),
         '', 'the log carries no total either');
 
-      // DC is totals-world: it never renders under the per-die read.
+      // A TARGET IS A STAKE, NOT A SUM (U17). The player typed `dc15` and the
+      // dice were thrown at the moment it created, so the number renders
+      // under every system — what a per-die lens withholds is the
+      // ADJUDICATION, because there is no single number to compare. This
+      // scenario used to pin the opposite and was holding the defect in
+      // place: four surfaces (eight, once the offer card and the SR announce
+      // were counted) each showed a different subset of the same stake.
       await a.roll('d20 dc15');
-      assert.ok(!(await a.logTop()).includes('vs 15'), 'no DC verdict under per-die');
+      assert.ok((await a.logTop()).includes('vs 15'),
+        'the target renders under a per-die system');
+      assert.ok(!/vs 15\s*[✓✗]/.test(await a.logTop()),
+        'but nothing adjudicates it — no ✓/✗ without a total');
+      // …and on the card that actually paints. A bare `dc` implies a Check
+      // (§2.3), so this roll stages a ceremony — and a ceremony never paints
+      // the result banner, it returns into ceremonyEnterSettle. The verdict
+      // card is the surface, and it is the one that used to show NOTHING:
+      // the stake was written inside two branches that a per-die read could
+      // not reach, because renderOutcomeRows wins the if/else first.
+      const margin = `document.getElementById('verdict-margin').textContent`;
+      await a.waitFor(`(${margin}).includes('vs DC 15')`,
+        { desc: 'the verdict card carries the stake' });
+      assert.ok(!/margin|Success|Failure/.test(await a.eval(margin)),
+        `and adjudicates nothing (got ${JSON.stringify(await a.eval(margin))})`);
+      assert.equal(await a.eval(
+        `!!document.querySelector('#verdict-margin .stake-num')`), true,
+      'the numeral wears the unadjudicated register');
 
-      // The lens re-reads in place: switch to a totals system, numbers return.
+      // The lens re-reads in place: switch to a totals system, the
+      // adjudication arrives on top of the stake that was already there.
       await a.dbg(`setSystem('dnd')`);
       await a.waitFor(`document.querySelector('#log-list .log-total').textContent.trim().length > 0`,
         { desc: 'totals return under dnd' });
-      assert.ok((await a.logTop()).includes('vs 15'), 'and the DC verdict with them');
+      assert.ok(/vs 15\s*[✓✗]/.test(await a.logTop()),
+        'and the ✓/✗ arrives with them');
 
       // The ± popover folds the sum-world sections under a per-die system —
       // modifiers/pairing/Target/keep-drop AND reroll/exploding, with no

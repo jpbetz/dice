@@ -1572,14 +1572,14 @@ function renderPeek() {
 
   const verdict = document.createElement('div');
   verdict.className = 'pk-verdict';
-  if (entry && Number.isInteger(entry.dc) && activeSystem().usesTotal) {
-    if (hidden) {
-      // Stakes are public even while the result is hidden (goal 11): the DC
-      // shows, the verdict does not.
-      verdict.textContent = `vs DC ${entry.dc}`;
-    } else {
+  if (entry && Number.isInteger(entry.dc)) {
+    // U17: stakes are public on every visibility rung AND under every system
+    // (goal 11 for the first, the stake/adjudication split for the second).
+    const adjudicated = activeSystem().usesTotal && !hidden;
+    stakeInto(verdict, entry, adjudicated);
+    if (adjudicated) {
       const cleared = entry.total >= entry.dc;
-      verdict.textContent = `vs DC ${entry.dc} — ${cleared ? 'Success' : 'Failure'}`;
+      verdict.append(` — ${cleared ? 'Success' : 'Failure'}`);
       verdict.classList.add(cleared ? 'verdict-success' : 'verdict-fail');
     }
   }
@@ -2484,6 +2484,26 @@ function entryOutcomes(entry) {
   return sys.outcomesFor ? sys.outcomesFor(entry) : null;
 }
 
+// THE STAKE AND THE HELD WORD (U17). A stake is a condition of the moment the
+// player DECLARED — the target, the title, the mechanics deciding which dice
+// count. Its ADJUDICATION — comparing a result against it — is arithmetic and
+// renders only where the system makes a single number to compare. The two
+// never share a slot, and the question at every site is "did the player type
+// this, or did we compute it?".
+const heldWord = (entry) => (entry && entry.visMode === 'whisper' ? 'Whispered' : 'Face down');
+
+// One string, four surfaces, no system in it — deliberately. Unadjudicated,
+// the numeral takes the ivory evidence register; adjudicated, it reads as
+// part of the verdict sentence that follows it.
+function stakeInto(el, entry, adjudicated) {
+  el.append('vs DC ');
+  if (adjudicated) { el.append(String(entry.dc)); return; }
+  const n = document.createElement('span');
+  n.className = 'stake-num';
+  n.textContent = String(entry.dc);
+  el.appendChild(n);
+}
+
 // The tally line: outcomes folded to '2× Success · Blemish', first-seen
 // order, quiet dice counted separately only when EVERY die was quiet.
 function tallyOutcomes(outcomes) {
@@ -2958,13 +2978,16 @@ function renderRollResults(entry, dice, fx = true) {
   // Interim dc verdict (fixed decision): above the meaning word, gold/red.
   // Hidden result, public stakes (goal 11): the DC still shows, the verdict
   // waits for the reveal.
-  if (Number.isInteger(entry.dc) && sysTotals) {
-    if (hidden) {
-      resultVerdictEl.textContent = `vs DC ${entry.dc}`;
-      resultVerdictEl.className = '';
-    } else {
+  if (Number.isInteger(entry.dc)) {
+    // U17: the STAKE renders under every system; only its adjudication is
+    // gated. A per-die table typed a target and the banner showed nothing.
+    resultVerdictEl.textContent = '';
+    resultVerdictEl.className = '';
+    const adjudicated = sysTotals && !hidden;
+    stakeInto(resultVerdictEl, entry, adjudicated);
+    if (adjudicated) {
       const cleared = entry.total >= entry.dc;
-      resultVerdictEl.textContent = `vs DC ${entry.dc} — ${cleared ? 'Success' : 'Failure'}`;
+      resultVerdictEl.append(` — ${cleared ? 'Success' : 'Failure'}`);
       resultVerdictEl.className = cleared ? 'verdict-success' : 'verdict-fail';
     }
   } else {
@@ -3173,10 +3196,14 @@ function mountCardActions(holder, opts) {
   // second save flow, and the popover keeps being the one place a pool is
   // minted.
   const keep = document.createElement('button');
-  // Its own class, not revealClass: they share a size tier but they are two
-  // different verbs, and a selector that cannot tell them apart is a pin that
-  // cannot either.
-  keep.className = `keep-verb ${opts.revealClass.replace('reveal-verb', '').trim()}`;
+  // ONE class of its own — not revealClass, because a selector that cannot
+  // tell the two verbs apart is a pin that cannot either. It wears the
+  // Reveal's exact dress via CSS (quiet steel: keeping a roll is a tool act,
+  // and HUE = ACT keeps gold for the roll and red for removal). The first
+  // build derived the class by string-stripping revealClass, which left it
+  // with no dress at all — a bright white browser-default button between a
+  // red Clear and a gold REROLL. Caught by looking, not by any assertion.
+  keep.className = 'keep-verb';
   keep.textContent = 'Save as pool…';
   keep.title = 'Keep these dice as a saved pool';
   keep.hidden = true;
@@ -3885,12 +3912,21 @@ function renderIntentCard(roll) {
     exp.kind === 'cinematic' ? 'Reckoning' : 'Ordeal';
   document.getElementById('intent-title').textContent = momentTitle(roll);
   document.getElementById('intent-subtitle').textContent = exp.subtitle || '';
-  // Stakes render only where they mean something: a per-die system reads
-  // no totals, so DC badges and modifier chips stay off its declaration.
-  const hasDc = Number.isInteger(roll.dc) && activeSystem().usesTotal;
+  // THE DECLARATION SHOWS WHAT WAS DECLARED (U17). This runs at DECLARE —
+  // there is no entry, no total, no comparison — so gating it on "does this
+  // system sum" withheld a literal the player had just typed, on the grounds
+  // of an arithmetic that had not happened and would not be shown either way.
+  // renderDockStrip has always rendered the same number ungated, and it is
+  // the one that was coherent.
+  const hasDc = Number.isInteger(roll.dc);
   document.getElementById('intent-target').classList.toggle('hidden', !hasDc);
   document.getElementById('intent-target-label').classList.toggle('hidden', !hasDc);
-  if (hasDc) document.getElementById('intent-target-num').textContent = String(roll.dc);
+  if (hasDc) {
+    document.getElementById('intent-target-num').textContent = String(roll.dc);
+    // The profile NAMES the stake; it does not decide whether it renders.
+    document.getElementById('intent-target-label').textContent =
+      activeSystem().targetWord || 'Target';
+  }
 
   const holder = document.getElementById('intent-mods');
   holder.innerHTML = '';
@@ -4032,42 +4068,51 @@ function renderVerdictCard(roll, entry) {
     },
   });
 
-  // Per-die systems have no total: the ring shows no number and DC math
-  // never renders (usesTotal, meanings.js v2). The card's center carries
-  // the outcome count instead so the ring stays a stage, not a lie.
+  // THE STAKE AND ITS ADJUDICATION ARE TWO FACTS (U17). `hasDc` asks only
+  // whether the player declared a target — that is a stake and it renders
+  // under every system. `adjudicable` asks whether this system makes one
+  // number to compare it against, which is what the ring's ratio, the margin
+  // and Success/Failure all need. Fusing them into one flag is what left a
+  // per-die Check showing neither the target it was thrown at nor a reason.
   const sysTotals = activeSystem().usesTotal;
-  const hasDc = Number.isInteger(entry.dc) && sysTotals;
+  const hasDc = Number.isInteger(entry.dc);
+  const adjudicable = hasDc && sysTotals && !hidden;
   const ring = document.getElementById('ring-fill');
   const CIRC = 326.7;
-  const frac = hasDc && !hidden ? Math.max(0.04, Math.min(entry.total / entry.dc, 1)) : 1;
+  const frac = adjudicable ? Math.max(0.04, Math.min(entry.total / entry.dc, 1)) : 1;
   ring.style.strokeDashoffset = String(Math.round(CIRC * (1 - frac) * 10) / 10);
-  ring.classList.toggle('fail', hasDc && !hidden && entry.total < entry.dc);
+  ring.classList.toggle('fail', adjudicable && entry.total < entry.dc);
 
   const marginEl = document.getElementById('verdict-margin');
   const heroEl = document.getElementById('verdict-hero');
   const meaning = entryMeaning(entry); // active-system lens (null in dnd/none)
   heroEl.className = 'verdict-hero';
   marginEl.textContent = '';
+  // WRITTEN ONCE, ABOVE EVERY BRANCH — including the hidden early-return.
+  // The old code repeated it inside two branches and reached neither under a
+  // per-die lens, because renderOutcomeRows wins the if/else first: the
+  // branch ORDER was a second, independent gate nobody had noticed.
+  if (hasDc) stakeInto(marginEl, entry, adjudicable);
   const holderPre = document.getElementById('verdict-modcards');
   if (hidden) {
-    // Public stakes, hidden result (goal 11): DC shows, verdict/margin/
-    // attribution wait for the reveal.
-    if (hasDc) marginEl.append(`vs DC ${entry.dc}`);
-    heroEl.textContent = entry.visMode === 'whisper' ? 'Whispered' : 'Face down';
+    // Public stakes, hidden result (goal 11): the target shows, and the
+    // verdict, margin and attribution wait for the reveal.
+    heroEl.textContent = heldWord(entry);
     heroEl.classList.add('held');
     holderPre.innerHTML = '';
     return;
   }
   if (renderOutcomeRows(heroEl, entry)) {
     // per-die read (2e): the outcome ROWS are the verdict — pool by pool,
-    // each die's face beside its word, same structure as the banner.
+    // each die's face beside its word, same structure as the banner. The
+    // stake line above captions them.
     heroEl.classList.add('verdict-tally', 'verdict-outcomes');
-  } else if (hasDc) {
+  } else if (adjudicable) {
     // The target verdict owns the whole read: entryMeaning is null when a dc
     // exists (the chart interprets bare rolls only), so no chart line ever
     // shares the card with Success/Failure. (Supersedes §2.5's demoted line.)
     const cleared = entry.total >= entry.dc;
-    marginEl.append(`vs DC ${entry.dc} · margin `);
+    marginEl.append(' · margin '); // the 'vs DC N' prefix is already on screen
     const b = document.createElement('b');
     b.textContent = fmtNum(entry.total - entry.dc);
     marginEl.appendChild(b);
@@ -9311,10 +9356,13 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
         })();
     // interim dc verdict (fixed decision): "vs N ✓/✗". Stakes stay public on
     // a hidden roll (goal 11): the target shows, the ✓/✗ waits for the reveal.
-    const verdictHtml = !Number.isInteger(entry.dc) || !activeSystem().usesTotal
+    // U17: the stake is public on every rung AND under every system; the
+    // ✓/✗ is the adjudication and needs a total to compare against.
+    const dcAdjudicated = !hidden && activeSystem().usesTotal;
+    const verdictHtml = !Number.isInteger(entry.dc)
       ? ''
-      : hidden
-        ? `<span class="log-verdict">vs ${entry.dc}</span>`
+      : !dcAdjudicated
+        ? `<span class="log-verdict">vs <span class="stake-num">${entry.dc}</span></span>`
         : `<span class="log-verdict ${entry.total >= entry.dc ? 'ok' : 'bad'}">vs ${entry.dc} ${entry.total >= entry.dc ? '✓' : '✗'}</span>`;
     const meaning = entryMeaning(entry); // active-system lens; null while hidden
     const outcomes = entryOutcomes(entry); // per-die lens (Soul Deal)

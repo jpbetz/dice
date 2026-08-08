@@ -3435,7 +3435,7 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
    verdict); gold stays the roll verb's (HUE = ACT). .sm-reveal is the
    small size of the same dress (a shelved roll's Reveal lives in its
    peek card, §7.7.1 — the resting marker stays a quiet dot). */
-.reveal-verb, .sm-reveal {
+.reveal-verb, .sm-reveal, .keep-verb {
   font-family: var(--font-ui);
   font-weight: 700;
   font-size: 13px;
@@ -3448,7 +3448,7 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
   line-height: 1.2;
   transition: background 0.15s, border-color 0.15s;
 }
-.reveal-verb:hover, .sm-reveal:hover {
+.reveal-verb:hover, .sm-reveal:hover, .keep-verb:hover {
   background: rgba(255, 255, 255, 0.16);
   border-color: rgba(243, 234, 215, 0.65);
 }
@@ -4656,9 +4656,21 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
 }
 /* the announcement channel: read by screen readers, invisible to everyone else */
 .sr-live { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }
-/* U13's "Save as pool…" — the same size tier as Reveal beside it, and the
-   same steel: keeping a roll is a tool act, not the roll act (HUE = ACT). */
-.keep-verb { font-size: 11.5px; }
+/* THE UNADJUDICATED STAKE (U17). `vs DC 15` with no verdict after it: the
+   label stays in its surface's muted register and the NUMERAL takes ivory —
+   the evidence register the per-die chips already use. One dress, four
+   surfaces (verdict margin, banner verdict, peek verdict, log row), so a
+   target reads the same wherever it lands. */
+.stake-num { color: var(--ivory); font-variant-numeric: tabular-nums lining-nums; }
+/* With the ring folded, the stake line has to caption the outcome ROWS
+   rather than echo the eyebrow above it — 6px under an 11px caps line reads
+   as a second eyebrow. */
+#verdict-card .ring-wrap.hidden + .margin-line { margin-top: clamp(10px, 2vmin, 18px); }
+/* U13's "Save as pool…" wears the Reveal's dress exactly (see the shared
+   rule above): same quiet steel, because keeping a roll is a tool act and
+   HUE = ACT reserves gold for the roll and red for removal. Slightly smaller,
+   since it stands beside a verb rather than being the card's own answer. */
+.keep-verb { font-size: 11.5px; padding: 4px 12px; }
 .keep-verb[hidden] { display: none; }
 
 /* hit-stop radial flash (§2.4 phase 3) */

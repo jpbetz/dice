@@ -173,6 +173,12 @@ export const SYSTEMS = {
     label: 'Your Soul Deal',
     aggregate: 'per-die',
     usesTotal: false,
+    // The profile NAMES its stake; it never decides whether the stake renders
+    // (U17). Without this a Soul Deal declaration printed DIFFICULTY CLASS —
+    // a D&D mechanic's proper noun, in gold caps, under a 96px ring, at the
+    // most deliberate beat this app has. 'Target' is the word the ± popover,
+    // the screen-reader announce and UX §2.1's own record field already use.
+    targetWord: 'Target',
     usesMods: false,
     meaningFor: () => null,
     outcomesFor(entry) {
@@ -236,6 +242,7 @@ export const SYSTEMS = {
     aggregate: 'sum',
     usesTotal: true,
     usesMods: true,
+    targetWord: 'Difficulty Class',
     meaningFor: () => null,
     outcomesFor: () => null,
     // Natural-20/1 rule, read off the d20s that actually count: with
@@ -254,6 +261,7 @@ export const SYSTEMS = {
     label: 'Numbers only',
     aggregate: 'sum',
     usesTotal: true,
+    targetWord: 'Target',
     usesMods: true,
     meaningFor: () => null,
     outcomesFor: () => null,
