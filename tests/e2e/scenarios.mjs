@@ -6489,6 +6489,78 @@ export const scenarios = [
     },
   },
   {
+    name: 'profile-dm-prepares',
+    tags: ['profiles', 'prepared-seat'],
+    // R8 END TO END, composed rather than in pieces: "I expect DMs to create
+    // profiles for players and have the players use them when they log in."
+    // The organizer authors three characters in their own library, fills the
+    // box from it, pushes it to the table, and a player who has never been
+    // here opens the link and is offered exactly those three by name.
+    //
+    // The DM is not a role (goal 10) — they are a player with a plan, using
+    // powers every player has.
+    async fn(ctx) {
+      const dm = await ctx.newTable({ origin: '127.0.0.10', name: 'Walter' });
+      await dm.dbg('profiles.reset()');
+      // reset() deals a fresh profile and NAMES it — the dealt name, not the
+      // player's — so the organizer's own seat is whatever was drawn.
+      const dmOwn = (await dm.dbg('profiles.active')).name;
+      // Three characters for three players, each built for this table's system.
+      for (const [name, pool] of [['Rill', '3d6'], ['Bo', '2d8'], ['Ada', '1d20']]) {
+        const made = await dm.dbg(`profiles.create(${JSON.stringify(name)})`);
+        assert.equal(made.ok, true, made.status);
+        await dm.dbg(`setGroups([{name: 'Strength', notation: '${pool}', category: 'Attributes'}])`);
+      }
+      assert.equal((await dm.dbg('profiles.list')).length, 4, 'three players plus the DM’s own');
+
+      // Fill the box from the library, then offer it to the room.
+      await dm.dbg('openSettings()');
+      await dm.eval(`document.getElementById('portable-open').click()`);
+      await dm.eval(`document.getElementById('portable-export').click()`);
+      const push = await dm.dbg('portable.pushToTable()');
+      assert.equal(push.ok, true, push.status);
+      assert.ok(push.status.includes('4 seats'), `all four are offered (got ${push.status})`);
+
+      // A player who has never been here opens the link.
+      const bo = await ctx.newTable({ origin: '127.0.0.11', anon: true, query: '&as=Bo' });
+      // The peek is a separate request that resolves after the modal paints
+      // (net.js peekTable, 2500 ms budget) — the modal renders NOW and the peek
+      // only ever adds furniture, so the seats have to be waited for.
+      await bo.waitFor(`window.__diceDebug.seatPicker.seats.length === 4`,
+        { desc: 'the prepared seats reach the modal' });
+      const picker = await bo.dbg('seatPicker');
+      assert.deepEqual(picker.seats.map((x) => x.name).sort(), ['Ada', 'Bo', 'Rill', dmOwn].sort(),
+        `the prepared seats reach the door (got ${JSON.stringify(picker.seats)})`);
+      assert.equal(picker.preselect, 'Bo', '&as= pre-selects theirs, and nothing more');
+      assert.equal(picker.chosen, null, 'nothing is taken for them');
+
+      await bo.dbg(`chooseSeat('Bo')`);
+      await bo.waitOnline();
+      await bo.waitFor(`window.__diceDebug.seatPicker.verdict.canApply === true`,
+        { desc: 'the seat previews' });
+      const v = await bo.dbg('seatPicker.verdict');
+      assert.ok(v.status.includes("adds 'Bo' to your profiles"),
+        `the preview says what will happen (got ${v.status})`);
+      await bo.dbg('applySeatImport()');
+      await bo.waitFor(`(window.__diceDebug.profiles.active || {}).name === 'Bo'`,
+        { desc: 'the seat becomes their profile' });
+      assert.deepEqual((await bo.dbg('groups')).map((g) => g.notation), ['2d8'],
+        'holding exactly what the DM prepared for them');
+      assert.equal((await bo.dbg('profiles.active')).system, 'soul-deal',
+        'bound to the system the table reads by');
+      assert.equal((await bo.dbg('identity')).name, 'Bo', 'and seated under that name');
+
+      // R4: it is theirs now — persisted, not merely on screen. (Not asserted
+      // by reloading THIS tab: `anon` seeds its name-removal as an init script,
+      // which re-runs on every navigation, so a reload would re-open the seat
+      // modal and never reach ready. `profile-library-reload` covers the F5.)
+      const stored = JSON.parse(await bo.eval(`localStorage.getItem('dice.profiles.v1')`));
+      assert.equal(stored.profiles.find((x) => x.id === stored.activeId).name, 'Bo',
+        'the store agrees with the screen about which profile is in hand');
+      assert.equal(stored.profiles.length, 2, "and their own dealt profile is still there beside it");
+    },
+  },
+  {
     name: 'profile-file',
     tags: ['profiles', 'table-file'],
     // O6/O7/P14: the file is the library's durable copy. The whole library
