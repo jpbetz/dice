@@ -1555,19 +1555,82 @@ html, body {
   padding: 8px 10px 10px;
   border-top: 1px solid var(--hair);
 }
-#left-panel.collapsed #rail,
-#left-panel.collapsed #rail-foot {
+/* THE COLLAPSED HEAD AND FOOT (rebuilt 2026-08-07 on Joe's UX pass:
+   "awkwardly horizontally centered and top aligned in their region").
+   The old rule stacked both into centered columns — correct at 56px, where
+   nothing could sit beside anything else, and wrong at 112px, where the
+   centering read as neither deliberate nor aligned to anything. Both are
+   rows again, and everything in the column now shares ONE left edge with
+   the pool rows. */
+#left-panel.collapsed #rail {
   flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 4px;
+  border-width: 0;
+  padding: 34px 6px 6px; /* the top clears the divider chevron's reach */
+}
+#left-panel.collapsed #rail-roster { display: none; }
+/* YOU, NAMED. A bare colored dot centered over a column said nothing —
+   Joe: "complete garbage UI… I'd rather remove it than keep an unexplained
+   dot". The chip keeps its job (left-click swaps rack, right-click opens
+   the seat menu) and finally says whose seat it is, wearing the same
+   borderless row dress as the pools below so the column has one language. */
+#left-panel.collapsed #identity-chip {
+  display: flex;
+  justify-content: flex-start;
+  gap: 7px;
+  width: 100%;
+  max-width: none;
+  min-height: 34px;
+  padding: 4px 8px;
+  border-color: transparent;
+  background: none;
+}
+#left-panel.collapsed #identity-chip:hover { background: rgba(255, 255, 255, 0.07); }
+#left-panel.collapsed .identity-name {
+  display: block;
+  font-size: 12.5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The foot is a ROW of bare glyphs, pinned to the bottom of the column and
+   inset to the same left edge as everything above it. Boxes were costing
+   ~38px each — four of them need 144px and the collapsed foot has 86 —
+   which is the whole reason they were stacking. Bare, they fit, and they
+   stop competing with the pool list for weight. Order is the shipped one
+   (§7.9): configure → consult → act on the left, the contextual ✕ alone in
+   the right corner. `? Help` is the one that leaves — it is reference
+   material, and the panel it lives in is one keystroke away. */
+#left-panel.collapsed #rail-foot {
+  margin-top: auto; /* a foot, not whatever follows the list */
+  flex-direction: row;
   align-items: center;
   flex-wrap: nowrap;
-  gap: 8px;
-  border-width: 0;
+  gap: 2px;
+  padding: 6px 6px 10px;
+  border-top-width: 1px;
 }
-#left-panel.collapsed #rail { padding: 34px 6px 8px; } /* below the chevron's reach */
-#left-panel.collapsed #rail-foot { padding: 8px 6px 12px; border-top-width: 1px; }
-#left-panel.collapsed #rail-roster,
-#left-panel.collapsed .identity-name { display: none; }
-#left-panel.collapsed #identity-chip { padding: 8px; }
+#left-panel.collapsed #rail-help { display: none; }
+/* Sized by MEASUREMENT, not by eye: the foot's content box is 86px, and
+   ⚙ ≣ ❯ plus the contextual ✕ came to 98px at the boxed padding — already
+   spilling under the divider strip before Help was even considered (Help
+   would have made it 119px, which is why it is the one that leaves). At
+   this padding the four come to ~80px and the row has slack. Fixed widths,
+   never flex: the left cluster must not resize when the ✕ arrives. */
+#left-panel.collapsed #rail-foot .btn.ghost,
+#left-panel.collapsed .corner-btn {
+  flex: none;
+  min-width: 0;
+  padding: 6px 3px;
+  border-color: transparent;
+  background: none;
+  font-size: 12.5px;
+}
+#left-panel.collapsed #rail-foot .btn.ghost:hover,
+#left-panel.collapsed .corner-btn:hover { background: rgba(255, 255, 255, 0.09); }
 #left-panel.collapsed #status-pill:not(.hidden) {
   overflow: hidden;
   width: 10px;
@@ -2803,9 +2866,11 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
    collapsed it joins the icon stack as a bare ✕. */
 #corner-controls { display: flex; gap: 6px; margin-left: auto; }
 #corner-controls.hidden { display: none; }
-#left-panel.collapsed #corner-controls { margin-left: 0; }
+/* Collapsed it keeps the RIGHT CORNER (margin-left:auto stands), which is
+   the whole point of the shipped ordering: the permanent left cluster never
+   shifts when the contextual ✕ arrives. Its box and label go — see the
+   collapsed foot rules for the bare-glyph dress it shares with them. */
 #left-panel.collapsed .cb-label { display: none; }
-#left-panel.collapsed .corner-btn { padding: 8px 10px; }
 .corner-btn {
   padding: 7px 14px;
   border-radius: 999px;

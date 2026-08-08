@@ -1451,12 +1451,14 @@ control (`#edge-toggle`, chevron at top). The canvas is sized BESIDE it
 felt-anchored overlay re-derive on toggle), so expanding never covers a
 landed roll — the felt resizes instead. There is no "Pools" title row.
 Collapsed = a POOL RAIL (112px — *superseded 2026-08-07, §7.22; it was a
-56px icon rail with vertical names and a tap that rolled*): identity dot
-up top, the utility stack at the foot, and between them the shelf-grouped
-pool list. Zero edit/save/notation chrome, as before. A tap SELECTS and
-one gold bar rolls the selection. The collapsed-tab hover flyout is
-retired. State stays in `dice.panels.v1`; the selection is deliberately
-NOT stored anywhere.
+56px icon rail with vertical names and a tap that rolled*): **you, named**,
+at the top; the shelf-grouped pool list and its standing Roll bar below;
+the utility row pinned at the foot — all sharing one left edge, nothing
+centered. Zero edit/save/notation chrome, as before. A tap SELECTS and the
+standing gold bar rolls the selection. `? Help` is the one utility the
+collapsed foot gives up, for measured room (§7.22). The collapsed-tab hover
+flyout is retired. State stays in `dice.panels.v1`; the selection is
+deliberately NOT stored anywhere.
 
 **ONE region since the panel merge (2026-07-31)** *(was three, then two:
 the roll log moved to the rail flyout — `l` — and then New pool and Saved
@@ -2780,14 +2782,23 @@ small word inside, the names read as scattered down the column rather than
 as a group you scan. The gold verb keeps 44 — the verb is as big as what it
 acts on.
 
-**One verb, full width.** The bar is absent at rest and STANDS while picks
-exist (§7.14's contextual-rail grammar), showing the pick count and naming
-every picked pool in its `aria-label`. It spans the column so it aligns with
-the rows it acts on. There is **no ✕ beside it**: a clear-selection button
-spent 29px of an 86px bar on the rarest act in the surface and shrank the
-verb to a button, and dropping a pick has two ways home already — tap the
-row again, or Esc. Over the 40-die cap the bar drains to the 2i-C disabled
-code rather than truncating silently.
+**One verb, full width, STANDING.** *(Corrected 2026-08-07 — Joe: "I
+absolutely despise the fact that the roll button only appears after pools
+are selected. I'd strongly prefer it exist but be grayed out.")* The bar is
+**standing furniture** (§7.9), grayed by the 2i-C disabled code until a pick
+arms it, so the column's geometry never moves. The first build made it
+contextual, citing §7.14 — **which §7.9 explicitly superseded** when the
+workbench rail settled this exact question the same way ("always rendered,
+verbs grayed until a draft exists, so the workbench's geometry never
+moves"). Building on the superseded half was the error; the ruling was
+already made and already shipped one surface over.
+
+It spans the column so it aligns with the rows it acts on, and shows the
+pick count and every picked pool's name in its `aria-label`. There is **no ✕
+beside it**: a clear-selection button spent 29px of an 86px bar on the
+rarest act in the surface and shrank the verb to a button, and dropping a
+pick has two ways home already — tap the row again, or Esc. Over the 40-die
+cap the bar drains to the same disabled code.
 
 **The list hugs its content** (`flex: 0 1 auto`) instead of claiming the
 column. At flex-grow the list held every spare pixel and the roll bar sat
@@ -2850,6 +2861,40 @@ three digits and Enter, spent-by-its-roll, Esc, expand-drops) ·
 `rail-compose-rules` (authored-verbatim single pick, the same-type glue
 trap, fail-closed visibility) · `side-panel` (the rail's shape and the
 select-then-roll flow).
+
+**The head and the foot — ONE LEFT EDGE.** *(Joe 2026-08-07: the user dot
+is "complete garbage UI… I'd rather remove it than keep an unexplained dot
+that is centered horizontally", and the utility buttons are "awkwardly
+horizontally centered and top aligned in their region".)* Both were stacked
+into centered columns by one rule written for the 56px rail, where nothing
+could sit beside anything else. At 112px that centering aligned to nothing.
+
+- **You, named.** The identity chip shows your dot *and your name*, left-
+  aligned, wearing the same borderless row dress as the pools. It keeps
+  both its jobs (left-click swaps rack, right-click opens the seat menu). A
+  bare colored dot centered over a column was a control that named neither
+  itself nor its state.
+- **The foot is a row, pinned to the bottom**, inset to the same left edge
+  as everything above it, in the shipped §7.9 order: configure → consult →
+  act on the left (⚙ ≣ ❯), the contextual ✕ alone in the right corner, and
+  fixed widths so the left cluster never shifts when the ✕ arrives.
+- **`? Help` is the one control the collapsed foot gives up**, and the
+  reason is measured, not asserted: the foot's content box is **86px**, and
+  ⚙ ≣ ❯ plus the ✕ came to **98px** at the boxed padding — already spilling
+  under the divider strip. Help would have made it 119px. Bare glyphs at
+  tighter padding bring the four to ~81px. Help is reference material and
+  its panel is one keystroke away; Settings, Log and Quick roll stay,
+  because `control-rail`'s never-hides promise names them and there is a
+  standing regression pin for Settings-in-compact.
+- **`tools/steps/foot-fit.mjs`** measures that budget, and `control-rail`
+  now asserts the row fits its column — the 12px overflow was invisible to
+  a screenshot *and* to every other assertion in the suite.
+
+**Left open, deliberately:** the roster and the table nameplate stay hidden
+when collapsed. Both are real information (*who else is here*, *which
+table*), and at 112px both are affordable as one more row each — but adding
+them is Joe's call, not a drive-by, since the complaint being answered here
+was too much unexplained chrome rather than too little.
 
 **Looking at it is not optional, and the numbers do not substitute.** Every
 correction in this section — the keypad rows, the marooned verb, the void,

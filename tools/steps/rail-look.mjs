@@ -65,6 +65,14 @@ try {
   console.log(await crop('rail-rest.png'));
   await t.dbg(`setRailSelection(['Wisdom', 'Swordplay', 'Zeal'])`);
   console.log(await crop('rail-picked.png'));
+
+  // …and with dice on the felt, which is the only state that shows the
+  // contextual ✕ in the foot's right corner. The left cluster must not
+  // have shifted to make room for it.
+  await t.dbg('railRoll()');
+  await t.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy'
+    + ' && window.__diceDebug.tableDice.length > 0)', { desc: 'dice land' });
+  console.log(await crop('rail-dice.png'));
 } finally {
   await stage.close();
 }

@@ -7180,8 +7180,23 @@ function updateRailRoll() {
   const btn = document.getElementById('rail-roll');
   if (!wrap || !btn) return;
   const picks = railPicked();
-  wrap.hidden = !picks.length;
-  if (!picks.length) { railNote(''); return; }
+  // STANDING FURNITURE, not a contextual verb (§7.9, Joe 2026-08-07: "I
+  // absolutely despise the fact that the roll button only appears after
+  // pools are selected. I'd strongly prefer it exist but be grayed out").
+  // The workbench rail settled this same question the same way and its
+  // ruling explicitly supersedes §7.14's contextual rail — this surface was
+  // built on the superseded half. The geometry never moves; the verb is
+  // simply not armed yet, which the 2i-C disabled code says out loud.
+  wrap.hidden = false;
+  if (!picks.length) {
+    btn.disabled = true;
+    btn.title = 'Pick a pool to roll';
+    btn.setAttribute('aria-label', 'Roll — pick a pool first');
+    const c0 = btn.querySelector('.rr-count');
+    if (c0) c0.textContent = '';
+    railNote('');
+    return;
+  }
   let dice = 0;
   for (const g of picks) {
     const res = parseNotation(g.notation);

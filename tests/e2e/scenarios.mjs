@@ -1413,7 +1413,43 @@ export const scenarios = [
       assert.equal(st.allCollapsed, true, 'every panel collapsed');
       assert.ok(await a.eval(`document.body.classList.contains('mini')`),
         'compact view is the emergent all-collapsed state');
-      for (const id of RAIL) assert.ok(await visible(id), `#${id} still visible all-collapsed`);
+      // The never-hides promise is the FOUR reachability controls named in
+      // this scenario's own contract — identity, quick roll, roll log,
+      // settings. `? Help` is the one deliberate collapsed-only omission
+      // (Joe 2026-08-07, on trimming the compact view): the collapsed foot
+      // has 86px, four glyphs plus the contextual ✕ do not fit in it, and
+      // help is reference material whose panel is one keystroke away.
+      for (const id of RAIL.filter((x) => x !== 'rail-help')) {
+        assert.ok(await visible(id), `#${id} still visible all-collapsed`);
+      }
+      assert.equal(await visible('rail-help'), false,
+        '? Help is the one control the collapsed foot gives up — by decision, for room');
+      // …and the foot it gives that room to is a ROW at the column's foot,
+      // not the centered stack it was (which read as neither deliberate nor
+      // aligned to anything).
+      assert.ok(await a.eval(`(() => {
+        const tops = [...document.querySelectorAll('#rail-foot .btn.ghost')]
+          .filter((b) => b.offsetParent !== null)
+          .map((b) => Math.round(b.getBoundingClientRect().top));
+        return tops.length >= 3 && new Set(tops).size === 1;
+      })()`), 'the collapsed foot stays one row');
+      // …and that row FITS. It was overflowing its 86px content box by 12px
+      // and spilling under the divider strip — invisible in a screenshot,
+      // invisible to every other assertion here. Measured with dice on the
+      // felt, which is the only state that adds the contextual ✕.
+      await a.roll('d6');
+      const fit = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const foot = document.getElementById('rail-foot');
+        const cs = getComputedStyle(foot);
+        const avail = foot.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        const kids = [...foot.children].filter((el) => getComputedStyle(el).display !== 'none');
+        const used = kids.reduce((s, el) => s + el.getBoundingClientRect().width, 0)
+          + parseFloat(cs.gap || 0) * (kids.length - 1);
+        return { avail: Math.round(avail), used: Math.round(used), n: kids.length };
+      })())`));
+      assert.ok(fit.n >= 4, `the ✕ joined the row (${fit.n} items)`);
+      assert.ok(fit.used <= fit.avail,
+        `the collapsed foot fits its column (${fit.used}px of ${fit.avail}px)`);
 
       // The old bug, dead: settings opens from the rail in compact.
       await a.dbg('openSettings()');
@@ -1967,13 +2003,16 @@ export const scenarios = [
       // tap = SELECT, then the one gold bar ROLLS. The draft is never
       // touched, the panel stays collapsed, the roll carries the pool's
       // identity, and the selection is SPENT by its roll (2i-G).
-      assert.equal(rail.rollStanding, false, 'no verb stands until something is picked');
+      // STANDING FURNITURE (§7.9): the verb is always there, just not armed
+      // — the column's geometry must not move when a pick arrives.
+      assert.equal(rail.rollStanding, true, 'the verb STANDS before anything is picked');
+      assert.equal(rail.rollDisabled, true, 'grayed, because there is nothing to roll yet');
       const logBefore = await a.logCount();
       await a.eval(`[...document.querySelectorAll('#rail-pools .rp-item')]
         .find((b) => (b.querySelector('.rp-name') || {}).textContent === 'Attack').click()`);
       const picked = await a.dbg('railState');
       assert.deepEqual(picked.selected, ['Attack'], 'the tap SELECTS rather than rolling');
-      assert.equal(picked.rollStanding, true, 'and the gold verb arrives with the pick');
+      assert.equal(picked.rollDisabled, false, 'and the pick ARMS the verb rather than summoning it');
       assert.equal(await a.logCount(), logBefore, 'nothing has rolled yet');
 
       await a.eval(`document.getElementById('rail-roll').click()`);
@@ -1986,7 +2025,40 @@ export const scenarios = [
       assert.ok((await a.logTop()).includes('Attack'), 'the roll carries the pool identity');
       const spent = await a.dbg('railState');
       assert.deepEqual(spent.selected, [], 'the selection is spent by its roll');
-      assert.equal(spent.rollStanding, false, 'and its verb leaves with it');
+      assert.equal(spent.rollStanding, true, 'the verb stays standing after the roll');
+      assert.equal(spent.rollDisabled, true, 'disarmed, not removed — the geometry never moves');
+
+      // ONE LEFT EDGE (Joe 2026-08-07: the head and foot were "awkwardly
+      // horizontally centered and top aligned in their region"). The
+      // identity chip, the pool rows and the foot's first glyph all start
+      // at the same x, and the foot is a ROW pinned to the bottom — not a
+      // centered column stacked wherever the list happened to end.
+      const edges = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const L = (s) => { const el = document.querySelector(s);
+          return el ? Math.round(el.getBoundingClientRect().left) : null; };
+        const foot = document.getElementById('rail-foot');
+        const glyphs = [...foot.querySelectorAll('.btn.ghost')]
+          .filter((b) => b.offsetParent !== null);
+        const tops = glyphs.map((b) => Math.round(b.getBoundingClientRect().top));
+        return {
+          chip: L('#identity-chip'), row: L('#rail-pools .rp-item'),
+          glyph: glyphs.length ? Math.round(glyphs[0].getBoundingClientRect().left) : null,
+          oneRow: new Set(tops).size === 1,
+          named: (document.getElementById('identity-name').textContent || '').trim(),
+          footBottomGap: Math.round(
+            document.getElementById('left-panel').getBoundingClientRect().bottom
+            - foot.getBoundingClientRect().bottom),
+        };
+      })())`));
+      assert.ok(Math.abs(edges.chip - edges.row) <= 1,
+        `the identity chip shares the rows' left edge (chip ${edges.chip}, row ${edges.row})`);
+      assert.ok(Math.abs(edges.glyph - edges.row) <= 2,
+        `so does the foot (glyph ${edges.glyph}, row ${edges.row})`);
+      assert.equal(edges.oneRow, true, 'the foot is one row, never a stacked column');
+      assert.ok(edges.footBottomGap <= 4,
+        `and it sits at the foot of the column (gap ${edges.footBottomGap}px)`);
+      assert.equal(edges.named, 'Alice',
+        'you are NAMED in the rail — never a bare unexplained dot');
 
       // expand again: the quick list yields to the full workbench
       await a.eval(`document.getElementById('edge-toggle').click()`);
@@ -5103,7 +5175,7 @@ export const scenarios = [
         const picked = await a.dbg('railState');
         assert.deepEqual(picked.selected, ['Wisdom', 'Swords', 'Zeal'], 'all three are picked');
         assert.equal(picked.rollStanding, true, 'the gold verb stands');
-        assert.equal(picked.rollDisabled, false, 'four dice is well under the cap');
+        assert.equal(picked.rollDisabled, false, 'and four dice is well under the cap, so it is armed');
         assert.equal((await a.dbg('trayState')).dice.length, 0,
           'and the draft below is still untouched');
 
@@ -5125,7 +5197,7 @@ export const scenarios = [
         // ever needed to hold it.
         const after = await a.dbg('railState');
         assert.deepEqual(after.selected, [], 'the selection is spent');
-        assert.equal(after.rollStanding, false, 'its verb leaves with it');
+        assert.equal(after.rollDisabled, true, 'and disarms the verb without moving it');
         assert.equal((await a.dbg('panelState')).pools, false, 'the panel never expanded');
 
         // Esc drops picks before it ever sweeps the felt.
@@ -5347,14 +5419,30 @@ export const scenarios = [
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.dbg(`commandRoll('d20 check dc10')`);
-      // The Skip window is real and bounded: the card paints at tVerdict and
-      // the beat ends 0.45s later (ceremonyFinish). Step in small increments
-      // so we land inside it rather than stepping straight over it.
-      await a.waitFor(
-        `(window.__diceDebug.sim(30), !!document.querySelector('#verdict-fold .card-act')`
-        + ` && !(window.__diceDebug.currentRoll || {}).done)`,
-        { desc: 'the verdict card is up while the beat still plays' });
-      const mid = await a.dbg(`cardActs('verdict')`);
+      // TWO different waits, and conflating them is what made this flaky.
+      // (1) The roll must ARRIVE — online that is a POST and an SSE, which
+      // needs real time, so it has to be a poll.
+      await a.waitFor(`!!(window.__diceDebug.currentRoll || {}).ceremony`,
+        { desc: 'the ceremony arrives' });
+      // (2) The Skip window is then a BOUNDED slice of simulated time — the
+      // card paints at tVerdict and the beat ends 0.45s later. Polling for
+      // THAT raced two ways at once: each round-trip costs real time, and
+      // 30ms of sim per poll needs ~100 polls just to reach the window, so
+      // under a loaded parallel run it timed out before arriving. Frames do
+      // not advance on their own here (that is why sim() exists), so once
+      // the roll has landed the whole beat can be stepped inside ONE eval —
+      // deterministic, and it cannot step past what it is looking for.
+      const mid = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const d = window.__diceDebug;
+        for (let i = 0; i < 900; i++) {
+          d.sim(15);
+          if (document.querySelector('#verdict-fold .card-act') && !(d.currentRoll || {}).done) {
+            return d.cardActs('verdict');
+          }
+        }
+        return null;
+      })())`));
+      assert.ok(mid, 'the verdict card came up while the beat was still playing');
       assert.equal(mid.primary.verb, 'skip', 'mid-beat the primary act is SKIP');
       assert.equal(mid.primary.word, 'Skip', 'and it says so — never a silent clear');
 
