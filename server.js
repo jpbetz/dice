@@ -439,6 +439,17 @@ function publicPlayers(room) {
     // rides the roster so a foreign rack's unmarked pools can resolve to
     // the owner's skin — Alice's rack looks the same on every screen.
     ...(p.set ? { set: p.set } : {}),
+    // §11: WHICH of their profiles this rack is, and the system it was built
+    // for. The owner switcher has browsed teammates' racks since ROADMAP 2b;
+    // until now it could only say whose. A rack a teammate can name is a rack
+    // a teammate can copy — which is the whole of Joe's "see profiles from
+    // other players and even copy the profile for their own use."
+    //
+    // This is a LABEL on a published rack, never an identity: nothing here
+    // links a seat to a stored profile, no id crosses the wire, and the server
+    // keeps no library (goal 7). Both fields are present-or-absent.
+    ...(p.profile ? { profile: p.profile } : {}),
+    ...(p.system ? { system: p.system } : {}),
   }));
 }
 
@@ -1933,9 +1944,30 @@ function defaultSetOf(raw) {
   return id && id !== 'std' && SET_IDS.includes(id) ? id : null;
 }
 
+// The rolling system a profile was built for (docs/PROFILES.md §11). Present-
+// or-absent on the wire, and ABSENT is load-bearing rather than a default: a
+// seat prepared before this pass carries a name and pools and nothing else, and
+// the receiving client reads absence as "the system of the table you are
+// sitting at" — which is the best answer available and the one the arriving
+// player is actually about to roll under.
+//
+// Falls closed on an id this server does not know, like defaultSetOf: the
+// enum is the same three-value list SETTING_SPECS.system validates against, so
+// a system it cannot name must not be relayed to the table as if it could.
+// (The LOUD refusal lives in the file — js/portable.js refuses an unknown
+// `system:` at its line, because there a human is standing right there.)
+function systemOf(raw) {
+  const id = cleanString(raw, 32);
+  return id && SYSTEMS.includes(id) ? id : null;
+}
+
 // The prepared player profiles of a room's table setup (docs/PROFILES.md
-// §3.2, ROADMAP §G4). A profile is a NAME and a RACK and nothing else (goal
-// 12: this is not a character sheet), and the list is FURNITURE in exactly the
+// §3.2 and §11, ROADMAP §G4). A profile is a NAME, a RACK, the SYSTEM it was
+// built for and the SKIN it wears — and nothing else (goal 12: this is not a
+// character sheet). The system joined the list on 2026-08-08 because a profile
+// may only be taken in hand at a table that reads dice the way it was built
+// for, and a seat that cannot say which system it belongs to cannot be filtered
+// out of a picker where it does not belong. The list is FURNITURE in exactly the
 // sense published pools are: the organizer's .dice.yaml file is the truth, the
 // room keeps a copy so an arriving player is offered a seat. It is authority
 // over nobody's saved pools — §3.3's picker shows the existing import preview
@@ -1984,6 +2016,8 @@ function sanitizeProfiles(value) {
     }
     seen.add(key);
     const rec = { name, pools };
+    const system = systemOf(raw.system);
+    if (system) rec.system = system;
     const set = defaultSetOf(raw.set);
     if (set) rec.set = set;
     out.push(rec);
@@ -2008,15 +2042,34 @@ async function handlePools(req, res) {
   // set (§G4) takes the identical rule from the identical helper.
   const set = defaultSetOf(body.value.set);
 
+  // §11: which profile this rack is, and the system it was built for. The name
+  // takes cleanName, NOT cleanString — a profile name becomes a display name
+  // the moment a teammate copies it, and '#' is banned at every name door or
+  // whisper addressing stops being total (GOALS notation-totality). Both fall
+  // closed to absent, and absent is what every client published before today.
+  const profile = cleanName(body.value.profile, MAX_NAME);
+  const system = systemOf(body.value.system);
+
   // A no-op publish answers ok without re-broadcasting: the client re-shares
   // on every hello (rejoin safety), and 40 streams need not hear about it.
-  if ((player.set || null) === set && JSON.stringify(player.pools) === JSON.stringify(pools)) {
+  if ((player.set || null) === set
+      && (player.profile || null) === profile
+      && (player.system || null) === system
+      && JSON.stringify(player.pools) === JSON.stringify(pools)) {
     return sendJson(res, 200, { ok: true });
   }
   player.pools = pools;
   if (set) player.set = set; else delete player.set;
+  if (profile) player.profile = profile; else delete player.profile;
+  if (system) player.system = system; else delete player.system;
   logDebug(() => `pools   ${logField('room', room.name)} ${logField('name', player.name)} count=${pools.length}`);
-  broadcast(room, 'pools-changed', { playerId: player.id, pools, ...(set ? { set } : {}) });
+  broadcast(room, 'pools-changed', {
+    playerId: player.id,
+    pools,
+    ...(set ? { set } : {}),
+    ...(profile ? { profile } : {}),
+    ...(system ? { system } : {}),
+  });
   sendJson(res, 200, { ok: true });
 }
 
@@ -2463,11 +2516,26 @@ async function handleTable(req, res) {
 //
 // The projection is written out field by field ON PURPOSE — never a spread of
 // room.setup — because this is the only unauthenticated read on the server
-// and its budget is exactly: the table's display name, the prepared seat
-// names, and a pool count per seat. No players, no roster, no log, no offers,
-// no settings beyond the name, no notations, no rev. A seat name and a table
-// name are what an invite link's recipient was going to see two clicks later
-// anyway; nothing else here is.
+// and its budget is exactly: the table's display name, its rolling system, the
+// prepared seat names, and a pool count and system per seat. No players, no
+// roster, no log, no offers, no settings beyond those two, no notations, no
+// rev. A seat name and a table name are what an invite link's recipient was
+// going to see two clicks later anyway; nothing else here is.
+//
+// THE SYSTEM WAS ADDED 2026-08-08 (§11) and it earns its place on the same
+// test. A player may only take a profile in hand at a table that reads dice the
+// way it was built for (Joe's R5), and the picker that offers the choice paints
+// BEFORE the join — so without the system here the modal would have to filter
+// against a guess and correct itself after the seat landed, which is a silent
+// swap wearing a spinner. What it discloses is one of three enum values naming
+// a rulebook: no user text, no cardinality, nothing to redact, and every
+// joiner receives it in `hello` seconds later. It is strictly less revealing
+// than tableName, which already ships.
+//
+// It is also STALE BY CONSTRUCTION, and that is fine: any player may flip the
+// system between this read and the join (goal 10). The client's answer is not
+// to trust it — it is that a mismatch is labelled and nothing is ever swapped
+// without a click, so a stale peek costs a re-pick, never a rack.
 //
 // rooms.get, NEVER getRoom: a peek must not create a room (any crawler
 // guessing ?room= values would mint rooms toward MAX_ROOMS), and it must not
@@ -2485,10 +2553,16 @@ function handleTableInfo(req, res, url) {
   if (room) {
     const name = room.settings.tableName;
     if (typeof name === 'string' && name) out.name = name;
+    out.system = room.settings.system;
     if (room.setup && Array.isArray(room.setup.profiles) && room.setup.profiles.length) {
       out.seats = room.setup.profiles.map((p) => ({
         name: p.name,
         pools: Array.isArray(p.pools) ? p.pools.length : 0,
+        // Per seat as well as per room: a seat prepared for another system is
+        // one the picker must not offer here, and deriving that from the room's
+        // own system would only be true while nobody had flipped it since the
+        // push. Absent on a seat prepared before §11.
+        ...(p.system ? { system: p.system } : {}),
       }));
     }
   }
