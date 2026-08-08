@@ -1065,7 +1065,8 @@ the headings. Per [TESTING.md](TESTING.md) each rung ships with its e2e
 scenario; where the audit found the suite *blind*, the scenario fix is named
 in the entry rather than left to the step.
 
-### U1. The draft drops its intent — `stageGroup` carries only dice — DEFECT, small
+### U1. The draft drops its intent — `stageGroup` carries only dice — DEFECT, small  
+**SHIPPED 2026-08-08 (`07099a7`).**
 
 *Audit A1 (major). The sharpest finding in the audit.* The same pool sends
 two different rolls depending on whether the panel is open. `rollRailPool`
@@ -1089,7 +1090,8 @@ scope: the partial stage at the 40-die cap (a chip labelled "Strength"
 holding half of Strength). Closes the expanded/collapsed behavioural fork in
 the same change.
 
-### U2. An invalid box plus staged dice rolls the tray, open — DEFECT, small
+### U2. An invalid box plus staged dice rolls the tray, open — DEFECT, small  
+**SHIPPED 2026-08-08 (`07099a7`).**
 
 *Audit A2 (major).* `usable = cmdResult.ok || tray.length > 0`
 (main.js:5504) arms the plate on staged dice alone; `paintCmd` only syncs
@@ -1106,7 +1108,8 @@ answer is to do nothing, loudly.
 or route the press to the existing `cmd-shake` + `#cmd-slot` error path.
 Stop silently substituting the stale tray.
 
-### U3. The prepared seat never reaches a returning player (CUJ2) — DEFECT, medium
+### U3. The prepared seat never reaches a returning player (CUJ2) — DEFECT, medium  
+**SHIPPED 2026-08-08 (`5a0b45b`).**
 
 *Audit E1 (major).* `initNet` prompts for a seat only when `dice.name.v1` is
 empty, and that key is **origin-global**. A returning player opening an
@@ -1126,7 +1129,8 @@ interact. Minimum: an `&as=` link reaches the picker despite a stored name,
 pre-selecting the named seat. **Game night is 2026-08-13** — this is the
 one audit finding with a date on it.
 
-### U4. The record: a WHAT IS TRUE TODAY table, four amendments, one GOALS sentence — small-medium
+### U4. The record: a WHAT IS TRUE TODAY table, four amendments, one GOALS sentence — small-medium  
+**SHIPPED 2026-08-08 (`e76b723`).**
 
 *Audit G1, G2, G3 (major/moderate). Cuts off the defect class that has now
 bitten six times* — twice as shipped-on-superseded-doctrine incidents UX.md
@@ -1166,7 +1170,8 @@ passes because `textContent` of a `display:none` node reads fine.** That is
 the exact inverse of the build-not-hide lesson §2l recorded. Fix the
 assertion with the doc.
 
-### U5. Live-region triage — the ceremony and both notice channels are silent — small
+### U5. Live-region triage — the ceremony and both notice channels are silent — small  
+**SHIPPED 2026-08-08 (`e76b723`).**
 
 *Audit D1, D2 (major), plus B3's wrong word.* The largest verified a11y gap,
 and three fixes share one shape.
@@ -1194,7 +1199,8 @@ and three fixes share one shape.
 - **`renderRollResults` says `'held'` for a *whisper*** (main.js:2941) — the
   one channel a blind player has, using the wrong rung's word. One line.
 
-### U6. Hue-law and legibility one-liners — small
+### U6. Hue-law and legibility one-liners — small  
+**SHIPPED 2026-08-08 (`6285473`).**
 
 *Audit C1, C2, C3, C4 (major/moderate).* Four measured breaks, four small
 changes, no new machinery.
@@ -1233,7 +1239,8 @@ changes, no new machinery.
   code that *works well* and exists only as an unwritten exception. Write it
   down here; the base-rule-plus-named-exceptions collapse is U23.
 
-### U7. Gate the box preview on `forecastFor` — small
+### U7. Gate the box preview on `forecastFor` — small  
+**SHIPPED 2026-08-08 (`485616d`).**
 
 *Audit A4 (major).* `renderCmdState` calls `fmtPreview` with no system gate
 (main.js:5883), so the notation box forecasts a **sum total** under
@@ -1247,7 +1254,8 @@ rewrite: the preview *is* the validator in a fixed-height slot (replace,
 never blank), and the success branch ends in `visSuffix` (a naive rewrite
 drops the visibility echo).
 
-### U8. Reduced-motion the crit — small
+### U8. Reduced-motion the crit — small  
+**SHIPPED 2026-08-08 (`485616d`).**
 
 *Audit B2 (major), first half.* UX.md:962 explicitly orders "always drop
 shake/flash/sweep" under `prefers-reduced-motion`; the shipped block scopes
@@ -1258,7 +1266,8 @@ in all of js/, for `navigator.share`. **Add `.shake`/`#crit-text`/
 `#crit-overlay` to the block *and* gate the class in `playCritEffect` on
 `matchMedia`.** The frequency half is U18.
 
-### U9. Rail dice rows — the cascade tie and the floating ✕ — small
+### U9. Rail dice rows — the cascade tie and the floating ✕ — small  
+**SHIPPED 2026-08-08 (`6285473`).**
 
 *Audit C6 (moderate).* `.rd-item { flex:1 }` (css:1829) loses to
 `.rp-item { flex:none }` (css:1896) — equal specificity, later wins — so the
@@ -1274,7 +1283,8 @@ the pattern is the finding** (the durable half is U23).
 its `tabIndex=-1` (see U22), and add a hover frame to `rail-look.mjs` —
 `.rd-x` currently appears in **zero** captured frames.
 
-### U10. The mode switch stops destroying the dice pick — small-medium
+### U10. The mode switch stops destroying the dice pick — small-medium  
+**SHIPPED 2026-08-08 (`485616d`).**
 
 *Audit C5 (moderate).* `#section-bar` (checkbox, 0-3 lit) and `#rail-mode`
 (radio, exactly one lit) are styled by the same selector and are
@@ -1291,7 +1301,8 @@ affordance (thumb or underline). **Recorded so it is not re-attempted:** the
 previously proposed fix — setting `railModeVisit` instead of clearing — does
 **not** work; `railMode()`'s resolution order is the mechanism.
 
-### U11. `± Modify` cannot modify anything in the shipped default system — small
+### U11. `± Modify` cannot modify anything in the shipped default system — small  
+**SHIPPED 2026-08-08 (`0f34acc`).**
 
 *Audit A3 (major).* `soul-deal` has `usesMods:false`, and `pop-perdie` folds
 Modifier, d20 pairing, Target, keep/drop and reroll/explode (main.js:7896);
@@ -1306,7 +1317,8 @@ two of which are absent by default. It also invalidates the remedy U1's
 outcomes", while index.html:678 records Joe's superseding ruling
 ("entirely — no note").
 
-### U12. Long-press on `.shelf-marker` and `#peek-card` — small
+### U12. Long-press on `.shelf-marker` and `#peek-card` — small  
+**SHIPPED 2026-08-08 (`07099a7`).**
 
 *Audit D5 (moderate, touch).* Both have `contextmenu` only, and iOS Safari
 never fires it on long-press — so a shelved roll's **±**, "Open in draft" and
@@ -1314,7 +1326,8 @@ never fires it on long-press — so a shelved roll's **±**, "Open in draft" and
 exists ~5,700 lines up, on pool tiles. Closes the iOS hole and the GOALS
 uniformity gap in one wiring change.
 
-### U13. `Save as pool…` in the banner fold, `Edit notation…` on the pure branch — small
+### U13. `Save as pool…` in the banner fold, `Edit notation…` on the pure branch — small  
+**SHIPPED 2026-08-08 (`6285473`).**
 
 *Audit A6 (moderate).* A draft is buildable, editable, spendable, repeatable
 — and **keepable only by spending**. §7.16 retired the rim's Save on the
@@ -1330,7 +1343,8 @@ unreachable branch; `beginEditGroup` has exactly one call site, inside it).
 fold, and keep `Edit notation…` standing on the pure branch (one
 `appendChild`). Both are wiring into existing builders — no new surface.
 
-### U14. Guard scope, one label, one discarded count — small
+### U14. Guard scope, one label, one discarded count — small  
+**SHIPPED 2026-08-08 (`44b71a4`).**
 
 *Audit E5 (moderate), F3.* Three unrelated one-liners that all cost a real
 table something.
@@ -1346,7 +1360,8 @@ table something.
 - **Surface the `dropped` count the log already computes** and discards
   (main.js:9082); `LOG_CAP` drops history silently today.
 
-### U15. Re-fixture the look tools with the dealt rack — small
+### U15. Re-fixture the look tools with the dealt rack — small  
+**SHIPPED 2026-08-08 (`07099a7`).**
 
 *Audit G5 (minor), and §7.22's own closing rule: "Run it, and look, before
 calling a visual change done."* Both look tools fixture a hand-authored
@@ -1692,7 +1707,8 @@ first table night runs into.
   demonstrably harder because of the file, and record that demonstration when
   it happens.
 
-### U27. The identity menu's touch path is dead code — DEFECT, small
+### U27. The identity menu's touch path is dead code — DEFECT, small  
+**SHIPPED 2026-08-08 (`07099a7`).**
 
 *Audit T4 (major).* `identityChip` arms a 500ms long-press that calls
 `openIdentityMenu()` (js/main.js:11683-11695), and the `click` listener
