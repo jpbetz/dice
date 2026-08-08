@@ -1385,7 +1385,7 @@ visibility chips or equivalent); it interacts with the cue band and the heat
 ladder, so design before code. U1 closes the *transport*; this closes the
 *read*.
 
-### U17. What a per-die system's Check shows — DESIGN FIRST, medium
+### U17. What a per-die system's Check shows — **DESIGNED 2026-08-08, not built**
 
 *Audit B1 (major), B3, B4.* `1d20+5 check dc15 # The Duel` renders on the
 verdict card as one chip and a word — no DC, no `+5`, no subtitle — because
@@ -1398,6 +1398,486 @@ a bonus, the app rolled with both, and showed neither at the moment of the
 verdict. **The gates conflate "this system sums" with "this system has
 stakes" — different facts.** Decide once (is a dc a stake even without a
 summed verdict?), then apply to all four surfaces together.
+
+**THE DESIGN IS SETTLED — this entry is now a build spec, not a question.**
+Five agents: one mapping every gate site in source, three stances (a target is
+a stake / invert the profile interface / render less, not more), one decider.
+The full record is in the workflow journal; the decision follows verbatim.
+
+*One correction the pass made to the audit itself:* the audit said FOUR
+surfaces disagree. It is **eight**, rendering **six** different subsets — the
+offer card and the ceremony's screen-reader announce were never gated at all,
+so an offered Check declares both stakes under soul-deal and rolling it shows
+neither, and a blind player hears `target 15` while the sighted player's card
+says `d20 8 quiet`. The 2026-07-31 gate sweep touched five sites and missed
+three; that is the whole shape of the bug.
+
+---
+
+**Stance A leads.** Its rule is right and its gate table is the one that survives contact with the source. I graft three things onto it:
+
+- **From C — the flat modifier.** A and B both keep `+5` alive under a per-die lens (A as a "receipt" in the log, B by restoring the mod-card outright). C is right and they are wrong. `.log-mod` is `var(--gold-bright)` at weight 700 (`css/style.css:3572`) — louder than the die it sits beside — feeding a total column the lens has emptied. A dangling `+5` is the one surface that actually *implies* the sum. It goes. C's "quote register" also wins on the intent card's notation line: it stays whole, `dc15` included (A's proposal to truncate it is rejected — a canonical echo that silently drops a token is worse than a duplicate, and `ledger-read` already pins that line as a verbatim declaration of pools).
+- **From B — the interface gets smaller, not larger.** B's diagnosis is correct (`usesMods` does two unrelated jobs) and its cure is too big for 2026-08-13. I take the subtraction without the rewrite: **`usesMods` is deleted outright**, `meaningFor` with it, and nothing replaces them. Three members out, one tiny one in. B's `readFor` is refused — see *Deferred, and what it costs*.
+- **Against all three — the naming.** If the gold target ring returns to the declaration under Joe's own game, it currently reads **`DIFFICULTY CLASS`**. That is a D&D mechanic's name printed in 9.5px gold caps on a Soul Deal table at the app's most deliberate beat. Nobody caught it. One new profile string fixes it, and it is the correct shape for the whole decision: *the stake renders under every system; the profile names it.*
+
+Also ruled: **§2.5 is struck to a pointer and the live rule goes into a new §7.24 with WHAT IS TRUE TODAY rows.** A rewrites §2.5 in place — that puts binding spec back inside the §1–§6 block the document's own banner declares to be history, which is the exact failure mode §7's table exists to prevent (it has already shipped two wrong builds).
+
+And **the verdict card's subtitle is deferred** — against A and B. It is a missing *element*, uniform across all three systems, not a gate; it is not part of the conflation, and it costs new markup at the one beat where hierarchy is most fragile.
+
+---
+
+## The rule
+
+> **A stake renders on every surface under every system. Its adjudication — the comparison of a result against it — renders only where the system produces a single number to compare (`usesTotal`). The two never share a slot.**
+>
+> A **stake** is a condition of the moment the player declared: the target, the title, the subtitle, and the mechanics that decide *which dice land and which count*. A stake is a fact about the roll and does not ask the app to compute anything.
+>
+> **Arithmetic** is a term in a sum: the flat modifier, named bonus parts, the total, the margin, the ring's ratio, `Success`/`Failure`, `✓`/`✗`. Arithmetic renders where its sum renders, and nowhere else.
+>
+> The dividing question at every site is **"did the player type this, or did we compute it?"** — with one refinement: a typed value that has no meaning except as an operand of an absent operation is arithmetic, not a stake. A target stands on its own (*we are throwing at 15*). A `+5` does not.
+
+Three consequences, stated so a future reader does not re-derive them:
+
+1. **`usesTotal` narrows to one sentence** and that sentence goes into `js/meanings.js`'s contract prose: *gates the SUM and everything derived from it — the big number, the margin delta, the ring's ratio, and the Success/Failure adjudication of a target. **It does not gate the target.***
+2. **`usesMods` is deleted.** It never distinguished anything (all three profiles set it equal to `usesTotal`) and it conflated arithmetic with selection. After the split, arithmetic keys off `usesTotal` and selection mods are universal — so the interface loses a member and the conflation this audit found becomes unspellable.
+3. **No per-die comparator is built, now or in this change.** `grep -rn "cmp\b" --include=*.js` → zero hits; `js/odds.js` has no threshold concept; `docs/UX.md:346` reserves `scope:'each'` for roadmap §8 success counting under a *different* notation (`cs>=N`) and a different verdict rendering (success pips, not a ring). U17 says so in one line so the next reader does not re-litigate it.
+
+### Why the app's own record already says a target is a stake
+
+Not argued from taste — three places in this repo already decided it:
+
+- `index.html:758` — *"The improviser's hot pair rides near the top (CUJ2): **a target and a moment are the stakes**."* The markup calls it a stake.
+- `docs/UX.md:348` — *"There is **no `target.hidden`**: stakes are public on every visibility rung (§3.0), so the target number and its odds line render the same for everybody — the drama comes from the held *result*, not a secret number."*
+- `docs/GOALS.md` superseded decisions — the DM seat's fourth power, *hidden Targets*, **was rejected outright, "because stakes are public on every visibility rung."**
+
+The held branch at `js/main.js:4052-4059` already ships the exact shape C calls incoherent: `vs DC 15` over `Face down`, commented *"Public stakes, hidden result."* Nobody has ever filed that as a bug. A per-die read is the same case — *unavailable because this system does not judge* instead of *unavailable because not yet*. The code already knew how to render a stake without a verdict; it never noticed it had a second reason to.
+
+**And the decisive one for the default table:** under UX.md §2.3, `dc15` *with no experience implies a Check* — "a target with no staging would be mute." Under C, `2d6 dc15` on a Soul Deal table stages a full Ordeal ceremony — card, title, dwell, dock, verdict — whose sole trigger is a number the app then refuses to name on any surface. Staging a ceremony because of a fact and then suppressing the fact is worse than either extreme. C's "dormant notation" analogy (chart words under `dnd`) fails on exactly this point: a chart word is *the app's reading*, which a lens legitimately governs. A target is *the player's sentence*, which no lens authored and no lens may retract.
+
+---
+
+## What each surface shows, exactly
+
+Fixture `1d20+5 check dc15 # The Duel`, system `soul-deal`, the d20 lands **8** (the d20's null band is faces 4–9, `js/meanings.js:46`; the chart reads the **raw** face — the `+5` never touches it). Node-confirmed: `# The Duel` is the **comment**, not the subtitle; `exp = {kind:'check'}`. Where a subtitle exists (`… # The Duel | Charisma`) it is shown in parentheses.
+
+### 1 · Intent card — `renderIntentCard` (declare)
+
+```
+                ( J )
+             O R D E A L
+              The Duel
+           (C H A R I S M A)
+              ╭────────╮
+              │   15   │        gold ornament, IVORY numeral, ~96px
+              ╰────────╯
+              T A R G E T       9.5px/0.24em gold caps  ← was DIFFICULTY CLASS
+                                #intent-mods empty (:empty shrinks the gap)
+             1d20+5 dc15        10px mono, muted — unchanged, whole
+```
+
+The badge returns under every system. The `+5` chip does **not** — it is arithmetic. `2d6 adv dc15` *would* show an `ADV Advantage` chip, because advantage decides which face the chart reads.
+
+The label becomes profile-supplied (`targetWord`, below). The notation line is untouched: it is the app **quoting the player**, in the evidence register, and a quote that drops a token is a lie. The dnd double-print (badge + `dc15` in mono) already ships and stays.
+
+Look at `tools/out/lifecycle/07-check-declare.png`: today there is a conspicuous dead band between `CHARISMA` and the mono line, where the badge was suppressed. The card reads as though something failed to load. The badge fills the hole it was designed to fill.
+
+### 2 · Dock strip — `renderDockStrip` — **no change**
+
+`js/main.js:3921` (`const hasDc = Number.isInteger(roll.dc);`) is already the rule. `git blame` shows the gate sweep `c39df53` rewrote exactly two `hasDc` declarations and never visited this function — it was an omission, and the omission happened to be correct. Its correctness is now derived rather than accidental. The cinematic-only *paint* stays: A is right that `css/style.css:4374-4376` carries that decision in prose (*"The docked strip is CINEMATIC furniture only"*) — a presence decision about a bar riding the top of the screen, not a content decision about stakes.
+
+### 3 · Verdict card — `renderVerdictCard` — the card that showed nothing
+
+```
+      J O E   ·   T H E   D U E L        11px muted tracked caps
+                                          ← ring folded (usesTotal), the gap it leaves
+              v s   D C   1 5             10px/0.2em muted caps, numeral IVORY
+          ╭──────────╮
+          │  d20 8   │   quiet            .oc-solo hero scale, 19px
+          ╰──────────╯
+      ───────────────────────────
+      [    ✕  Clear    ]   REROLL ❯❯❯
+```
+
+Text layer: **`JOE · THE DUEL vs DC 15 d20 8 quiet ✕ Clear REROLL ❯ ❯ ❯`**
+Captured today (`tools/out/lifecycle/facts.json`): `JOE · THE DUEL d20 8 quiet ✕ Clear REROLL ❯ ❯ ❯`.
+
+**The branch-order trap dissolves rather than being patched.** `renderOutcomeRows` runs first at 4061, so `else if (hasDc)` at 4065 is unreachable under soul-deal *regardless of what `hasDc` evaluates to* — which is why flipping only `&& sysTotals` at 4039 changes nothing visible. The fix is not a gate flip: **the stake is written into `#verdict-margin` unconditionally, above and outside the entire hero chain.** Stake and reading are different slots; the rows owning the hero can no longer suppress the stake.
+
+`#verdict-margin` is the correct home and needs no new element: the ring is a **ratio** (`total/dc`) and `.vtotal` is the **result** slot — putting `15` there is the "dice-count read as a total" confusion 2i-B killed. The slot already proves it works; `js/main.js:4055` writes a bare `vs DC 15` into it on the held branch today.
+
+Held, per-die (`… dc15 held`): `vs DC 15` / *Face down* — identical text, now reached under every system.
+
+**dnd, same fixture, unchanged:** eyebrow / ring at `13/15 = .867` with `.fail` / **13** at clamp(36px,8.6vmin,62px) / `vs DC 15 · margin −2` / **FAILURE** in red / a `+5 Modifier` card flying up.
+
+### 4 · Roll log — `buildLogEntryEl`
+
+```
+Joe · The Duel                    ⟳                        (total column empty)
+[d20 art]  d20 8  ·  vs 15  ·  a quiet roll                        09:28
+```
+
+`vs 15` renders, **without `✓`/`✗` and without `.ok`/`.bad`** — that is the comparator, and it does not exist. **The `+5` is gone.** `.log-mod` exists to decompose `.log-total`; it gates with the column it feeds. This is the audit's own named inversion (the log shows `+5` and not `15`) closed in both directions at once.
+
+**dnd unchanged:** `d20 8 +5 · vs 15 ✗`, total **13** gold.
+
+### 5 · Result banner — `renderRollResults`
+
+A ceremony never paints it (`ceremonyEnterSettle` returns before `showResults`); this is the reloaded / revealed / plain path.
+
+```
+Joe · The Duel
+                                  #result-total — display:none, and EMPTY in the DOM
+V S   D C   1 5                   15px display caps, no hue class, numeral ivory
+d20 8   quiet                     #result-meaning.result-outcomes
+                                  #result-breakdown folded (the rows carry it)
+```
+
+Held whisper, per-die: `Joe · A word in your ear` / `VS DC 14` / ***Whispered*** in the held dress. Today (`facts.json.whisperBystander`): a mute 52px gold `?` and a `✕ Dismiss`.
+
+Free correctness win: `js/main.js:2987` routes the SR sentence through `resultVerdictEl.textContent`, so the banner now says `vs DC 15` and **finally agrees with `ceremonyEnterSettle:3677`'s ungated `target 15`**. The two announce sites stop contradicting each other and their own cards.
+
+### 6 · Peek — `renderPeek`
+
+```
+Joe · The Duel
+d20 8  quiet
+vs DC 15
+✕ Clear    REROLL ❯❯❯
+```
+
+Hidden, per-die: ***Face down*** / ***Whispered*** in the held dress replaces the 30px gold `?`. The `?` for `!entry` (a collected roll carrying no data) **is preserved** — C caught this; there the `?` is not a lens question.
+
+### 7 · SR announce, offer card
+
+`ceremonyEnterSettle:3677` (`target 15`) stays ungated — correct by rule, now for a reason. `renderOffers:11888` (`vs 15`) stays ungated. `modsSummary` gains a `values` option so an offer's arithmetic follows the same law as everything else: **`d20 · advantage · vs 15 · Check — Charisma`** under soul-deal, `+5` restored under dnd. The `9176` call site (the ± variant row — a quote surface) passes nothing and is unchanged.
+
+### The eight-surface table, after
+
+| surface | title | subtitle | dc | flat +5 | selection mods | Success/Fail |
+|---|---|---|---|---|---|---|
+| offer card | ✅ | ✅ | ✅ `vs 15` | ❌ | ✅ | — |
+| intent card | ✅ | ✅ | ✅ **gold ring, ivory 15** | ❌ | ✅ chips | — |
+| dock strip | ✅ | ✅ | ✅ pill *(cinematic paint)* | ❌ | — | — |
+| SR announce | ✅ | — | ✅ `target 15` | ❌ | — | ❌ |
+| verdict card | ✅ | ⚠️ *no element — deferred* | ✅ `vs DC 15` | ❌ | ✅ mod-cards | ❌ |
+| result banner | ✅ | — | ✅ `VS DC 15` | ❌ | — | ❌ |
+| roll log | ✅ | — | ✅ `vs 15` | ❌ | ✅ struck/✴ | ❌ |
+| peek | ✅ | — | ✅ `vs DC 15` | ❌ | ✅ (breakdown) | ❌ |
+
+Six subsets → **one**, with one honest, uniform, system-independent gap (the verdict card's subtitle) held open in the roadmap.
+
+---
+
+## What `#result-total` does under a per-die system
+
+**Nothing. It never paints — and it never holds a number.**
+
+`#result-total` is `css/style.css:2738-2745`: `var(--font-display)` **52px/700**, `color: var(--gold-bright)` = `#ffd766` (css:22). `.roll-cue` is `rgba(255,215,102,0.34)` (css:1070-1082) — `rgb(255,215,102)` **is** `#ffd766`. The 52px number is literally the roll verb's hue at full alpha, and under soul-deal it is `display:none` for every open roll and springs to life only to announce an absence.
+
+```js
+// js/main.js:2937-2938
+resultTotalEl.style.display = sysTotals ? '' : 'none';                    // drop `|| hidden`
+resultTotalEl.textContent   = sysTotals ? (hidden ? '?' : String(entry.total)) : '';
+```
+
+Two things happen there and both matter. The display gate loses `|| hidden`; and **the textContent write moves inside the gate.** Today line 2938 writes `entry.total` into the node on *every paint under every system* and only CSS withholds it — the sum is in the DOM at all times, one devtools inspection or one CSS regression from leaking. That closes.
+
+The `?` leaving is a **correctness** fix, not taste. Under dnd a `?` is right: a number exists and is being withheld. Under soul-deal **no number is being withheld** — *words* are. A `?` in the total slot claims a hidden sum that will never exist. The state is a fact of the roll (goal 11), so it is spoken in words in the slot that already holds words — exactly what the verdict card (`.verdict-hero.held`) and the log (`.log-hidden`) already do. Three surfaces converge on one vocabulary, factored into `heldWord(entry)`.
+
+This resolves the 2i-C hue collision by **deletion, not re-hueing** — no new colour decision — and §7.21's *hierarchy is AREA, not volume* is satisfied because the outcome rows already own the hero area.
+
+Same edit at `js/main.js:1566` for `.pk-total`, with a `.pk-held` dress.
+
+**Explicitly out of scope, and named:** `#dock-strip .strip-dc` (gold-bright) and `.offer-vs` (`--gold`) are gold numerals on *pre-roll declaration* surfaces. They ship that way, nobody has complained, and retinting them is a §7.9 / 2i-C hue pass I cannot judge without looking. U17 governs the **post-roll** register only: on a result surface, gold and red mean *adjudicated*. An unadjudicated stake takes the muted register with an ivory numeral.
+
+---
+
+## What happens to the dead `meaningFor` surface
+
+**Delete the channel — producer, all consumers, its CSS, and its spec section.** All three profiles declare `meaningFor: () => null` (`js/meanings.js:177, 239, 258`), so `entryMeaning` returns `null` on every path. Unreachable, untested render code with live CSS is debt wearing a socket's costume.
+
+| site | disposition |
+|---|---|
+| `js/meanings.js:177, 239, 258` + contract prose at 161 | `meaningFor` removed from all three profiles and from the interface |
+| `js/main.js:2470-2477` `entryMeaning` | deleted (behaviour-neutral: it returned null on every path) |
+| `js/main.js:2474` the dc short-circuit | deleted **with the doctrine restated, not lost** — see below |
+| `js/main.js:2544-2545` `critWord`'s `if (meaning)` | deleted; signature becomes `critWord(crit, entry)`; both call sites (2994, 2997) updated. It always fell through already |
+| `js/main.js:2944, 2951-2953` banner else-branch | replaced by `hidden ? heldWord(entry) : ''` |
+| `js/main.js:1588-1596` `.pk-meaning` element | deleted, markup and producer |
+| `js/main.js:4048, 4076-4078` verdict `else if (meaning)` | deleted; the chain becomes rows → adjudication → `''` |
+| `js/main.js:9319-9323, 9335` log `meaningHtml` | keys off `outcomes` alone; the `else slot.textContent = meaning.word` goes |
+| `css/style.css:3521-3522` `.pk-meaning` | deleted (live CSS with no producer) |
+| `css/style.css:4507-4508` `.verdict-hero.tier-crit-success/-crit-fail` | deleted — reachable *only* through the deleted branch (`renderOutcomeRows` puts tier classes on child `.oc-word` spans, never on `heroEl`) |
+
+**The one thing that must not die with it.** `entryMeaning:2474` (`if (Number.isInteger(entry.dc)) return null;`) encodes real doctrine — *a roll with a target is a Check and the verdict is its entire read*, the gate that killed "Failure beside a chart Success." That is precisely the conflation U17 names: "a dc is present" wired as "the sum verdict owns the hero." **This rule supersedes it and states it better:** the hero holds the READING, `#verdict-margin` holds the STAKE, and they never contend for one slot — so a target no longer needs to suppress anything.
+
+**Doc placement (my ruling, against all three).** §2.5's ruling is retired. It does **not** get rewritten in place: §1–§6 are declared history by the document's own banner, and the §7 table exists because two agents already shipped wrong builds by reading a section that *described* a surface instead of the one that *changed* it. So:
+
+- **`docs/UX.md` §2.5** is struck to a two-line pointer: *"Retired by §7.24. The one-hero-slot conflict it arbitrates cannot arise — `meaningFor` is gone — and the conflict it feared is resolved by moving the target out of the hero, not by silencing the chart."*
+- **New `docs/UX.md` §7.24 — THE STAKE AND THE READ**: the rule at the head of this document, the stake/arithmetic/selection taxonomy, the eight-surface table, the note that no per-die comparator exists and `cs>=N` is roadmap §8's.
+- **WHAT IS TRUE TODAY gains/updates rows** in the same commit for **Verdict card**, **Result banner**, **Peek**, **Roll log** and **± popover** — each pointing at §7.24 for stakes and naming §2.5 under *Do not build from*. The table's own rule is "update the row in the same commit that changes the surface"; U17 changes five surfaces. This is the item ROADMAP U4 already lists.
+- **`js/meanings.js`'s interface prose** (lines 138–169) is rewritten to interface **v3**: `usesTotal` narrowed to the one sentence above, `usesMods` and `meaningFor` gone, `targetWord` added, and one line recording that selection mods are universal because `outcomesFor` filters on `p.counts && !p.child`.
+
+---
+
+## Which existing gates change, and to what
+
+### The profile interface (`js/meanings.js`)
+
+**Removed:** `usesMods` (176/238/257), `meaningFor` (177/239/258).
+**Kept, narrowed in prose:** `usesTotal` (175/237/256).
+**Added — one string:**
+
+```js
+targetWord: 'Target'            // soul-deal, none
+targetWord: 'Difficulty Class'  // dnd
+```
+
+Used by exactly one site: `#intent-target-label`. The profile owns the *name* of the stake; nothing about whether it renders. `aggregate` stays as-is (still consulted by nothing but comments — not U17's problem).
+
+**Why this field exists.** With the badge ungated, a Soul Deal declaration would print `DIFFICULTY CLASS` in gold caps under a 96px ring — a D&D mechanic's proper noun on Joe's own game, at the beat GOALS goal 3 calls the app's most deliberate. `Target` is the word the ± popover (`Target (DC)`), the SR announce (`target 15`) and UX §2.1's own record field already use. Cost: nothing — dnd keeps its flavour, and the terse post-roll strings (`vs DC 15`, `vs 15`) are unchanged because they are readbacks of the `dc` token itself, not names of a concept.
+
+### `js/main.js` — new helpers (next to `entryOutcomes`, ~2480)
+
+```js
+const heldWord = (entry) => (entry.visMode === 'whisper' ? 'Whispered' : 'Face down');
+
+// The stake, one string, no system in it — deliberately.
+function stakeInto(el, entry, adjudicated) {
+  el.append('vs DC ');
+  if (adjudicated) { el.append(String(entry.dc)); return; }
+  const n = document.createElement('span');
+  n.className = 'stake-num';       // unadjudicated register: muted label, ivory numeral
+  n.textContent = String(entry.dc);
+  el.appendChild(n);
+}
+```
+
+### The render sites
+
+| # | site | from | to |
+|---|---|---|---|
+| 1 | `renderIntentCard`:3890 | `Number.isInteger(roll.dc) && activeSystem().usesTotal` | `Number.isInteger(roll.dc)` — the cleanest case in the file: this runs at *declare*, with no `entry`, no `total`, no comparison. It was withholding a literal the player typed on the grounds of an arithmetic that had not happened and would not be shown either way |
+| 2 | `renderIntentCard`, target label | static `Difficulty Class` in `index.html:616` | `= activeSystem().targetWord` |
+| 3 | `renderIntentCard`:3897 | `activeSystem().usesMods ? preModChips(m) : []` | `preModChips(m, { arithmetic: activeSystem().usesTotal })` |
+| 4 | `preModChips`:3849-3854 | unconditional | the flat/named block runs only `if (opts.arithmetic)`; 3855-3859 (ADV/DIS, keep, `RO≤`, `!`) **always** emit |
+| 5 | `renderIntentCard`:3906-3912 | — | **unchanged.** The notation line stays whole, `dc15` included |
+| 6 | `renderDockStrip`:3921 | — | **unchanged** |
+| 7 | `renderVerdictCard`:4038-4039 | `sysTotals`; `hasDc = …&& sysTotals` | `const hasDc = Number.isInteger(entry.dc);`<br>`const adjudicable = hasDc && sysTotals && !hidden;` |
+| 8 | `renderVerdictCard`:4042, 4044 | `hasDc && !hidden` | `adjudicable` |
+| 9 | **new, immediately after `marginEl.textContent = ''`** | — | `if (hasDc) stakeInto(marginEl, entry, adjudicable);` — **written once, above and outside every branch, including the hidden early-return** |
+| 10 | `renderVerdictCard`:4055 | `if (hasDc) marginEl.append(…)` | deleted (line 9 covers it); hero ← `heldWord(entry)` |
+| 11 | `renderVerdictCard`:4065-4075 | `else if (hasDc)` + `marginEl.append('vs DC N · margin ')` | `else if (adjudicable)` + `marginEl.append(' · margin ')` — the prefix is already on screen. Byte-identical dnd output |
+| 12 | `renderVerdictCard`:4087 | `activeSystem().usesMods ? attributionCards(…) : []` | `attributionCards(roll, entry, { arithmetic: activeSystem().usesTotal })` |
+| 13 | `attributionCards`:3932-3937 | unconditional | the flat/named block runs only `if (opts.arithmetic)`; adv (3938-49), reroll (3950-61), keep (3962-70), explode (3971-74) **always** emit |
+| 14 | `renderRollResults`:2937-2938 | see above | display gate loses `\|\| hidden`; textContent write moves **inside** the gate |
+| 15 | `renderRollResults`:2951-2953 | `meaning ? meaning.word : ''` | `hidden ? heldWord(entry) : ''`, `className = hidden ? 'held' : ''` |
+| 16 | `renderRollResults`:2961 | `if (Number.isInteger(entry.dc) && sysTotals)` | `if (Number.isInteger(entry.dc))` → `stakeInto(el, entry, adjudicated)`, then the `— Success/Failure` tail + hue class only when `adjudicated` |
+| 17 | `renderRollResults`:2986 | — | unchanged (already `usesTotal`-gated) |
+| 18 | `ceremonyEnterSettle`:3676-3677 | — | **unchanged.** Correct by rule; and #16 makes the banner's twin agree with it |
+| 19 | `renderPeek`:1566 | `if (hidden \|\| !entry) total.textContent = '?'` | `!entry` keeps `'?'`; `hidden` → `heldWord(entry)` + `.pk-held` under a per-die lens, `'?'` under a totals lens |
+| 20 | `renderPeek`:1571 | `total.textContent = String(entry.total)` | `activeSystem().usesTotal ? String(entry.total) : ''` — closes the ungated sum fallback (unreachable today only by accident) |
+| 21 | `renderPeek`:1575-1585 | `… && activeSystem().usesTotal` | same nested shape as #16 |
+| 22 | `buildLogEntryEl`:9281-9290 | ungated `modPartsOf` / `entry.modifier` | wrap the whole chain in `activeSystem().usesTotal` |
+| 23 | `buildLogEntryEl`:9314-9318 | `!Number.isInteger(dc) \|\| !usesTotal ? '' : …` | `!Number.isInteger(dc) ? '' : (hidden \|\| !usesTotal) ? \`<span class="log-verdict">vs <span class="stake-num">${dc}</span></span>\` : \`<span class="log-verdict ${ok}">vs ${dc} ✓/✗</span>\` ` |
+| 24 | `buildLogEntryEl`:9328, 9361 | — | unchanged (Bucket A) |
+| 25 | `renderBreakdown`:2752 | `if (!mods.length) return;` then `= ${entry.sum}` + tail | `if (!mods.length \|\| !activeSystem().usesTotal) return;` — **missed by A and B.** Reachable under per-die when `outcomesFor` returns null on a visible roll (all-child / all-discarded pools) |
+| 26 | `modsSummary`:11810 | `modsSummary(mods)` | `modsSummary(mods, { values })`; value clauses skipped when `values` is false, shape clauses always. `renderOffers`:11880 passes `{ values: activeSystem().usesTotal }`; `9176` passes nothing |
+| 27 | `renderOffers`:11888 | — | **unchanged** |
+| 28 | `openPopover`:8246 | `toggle('pop-perdie', !activeSystem().usesMods)` | `toggle('pop-perdie', !activeSystem().usesTotal)` |
+| 29 | `index.html`:761-762 | `class="sec tight sec-sum"` / `prow prow-sum` on **Target (DC)** | both dropped — a target is a stake and must be **authorable** under every system |
+| 30 | `index.html`:748, 802, 819 | `sec-sum` on d20 pairing / Keep-drop / Reroll-Exploding | dropped — these decide *which dice count*, which `outcomesFor` reads (`p.counts && !p.child`) and `forecastFor` refuses to pre-read **because** of it |
+| 31 | `index.html`:735 | `sec sec-sum` on **Modifier** | **kept** — the one genuinely sum-world section. Joe's 2026-08-06 fold ruling ("entirely — no note") stands exactly over it |
+| 32 | `updateTrayModsWord`:5945 | `const full = activeSystem().usesMods` → `± Modify` / `± Moment` | `± Modify` unconditionally; the per-die title drops "Modifiers" and gains a tail |
+
+**#29 is not optional.** With the dc on five more surfaces, a target that round-trips invisibly — `popStateFromParse`:8168 loads it, `popCanonical`:8626 emits it, `#pop-echo`:8798 prints it, and the editor shows no row — becomes a worse split than the one U17 is closing. It is U11's own named remaining hole ("re-add via ± is impossible for `dc`").
+
+**#32 applies U11's rule, it does not overturn it.** `± Moment` was correct when the popover held two of seven sections; after #29-#31 it holds **six of seven**, and naming one of six is the same defect U11 fixed.
+
+### CSS — four rules, two deletions
+
+```css
+/* the unadjudicated stake: muted label, ivory numeral. One register,
+   four surfaces (verdict margin, banner verdict, peek verdict, log). */
+.stake-num { color: var(--ivory); font-variant-numeric: tabular-nums lining-nums; }
+
+/* with the ring folded the stake must caption the ROWS, not echo the
+   eyebrow: 6px under an 11px caps line reads as a second eyebrow. */
+#verdict-card .ring-wrap.hidden + .margin-line { margin-top: clamp(10px, 2vmin, 18px); }
+
+/* the held word takes the slot the `?` vacated, in the dress the verdict
+   card already owns (.verdict-hero.held, css:4506). */
+#result-meaning.held { color: var(--muted); font-style: italic; letter-spacing: 0.06em; }
+.pk-total.pk-held  { color: var(--muted); font-style: italic; letter-spacing: 0.06em;
+                     font-size: 15px; text-shadow: none; }
+```
+
+Deleted: `.pk-meaning` (3521-3522), `.verdict-hero.tier-crit-success/-crit-fail` (4507-4508).
+
+**Not renamed:** `.margin-line` / `#verdict-margin` keep their names (against A's #20). A rename buys a nicer word and risks a stale selector in `tools/steps/*`, the look tools and the suite. The section that explains the slot is §7.24; that is where the name lives.
+
+---
+
+## Does it look right?
+
+**The verdict card, soul-deal, after — described as a reader meets it.**
+
+A translucent gold-cornered card sits at the top anchor, 300–430px wide, and it now runs **head, caption, answer, exits** — four bands, top to bottom, with real air between them.
+
+The head is unchanged: `JOE · THE DUEL` in 11px muted tracked caps, the roller's name in their colour.
+
+Then a gap — and this gap is the one thing that had to be got right. The ring is folded, so the stake line would otherwise land 6px under the eyebrow, and two small tracked-caps lines stacked 6px apart read as *one doubled eyebrow*, not as a head and a caption. That is exactly the "measured clean, looked bad" failure this repo keeps post-morteming, and none of the three stances saw it. So `#verdict-card .ring-wrap.hidden + .margin-line` opens the gap to clamp(10px, 2vmin, 18px), and the stake line falls into the seat the ring vacated — closer to the answer than to the head, which is what it is: a caption over the reading.
+
+The caption reads **`v s   D C   1 5`** — 10px, 0.2em tracking, uppercase, `--muted`, with the numeral in `--ivory`. That ivory numeral is doing real work. It gives the line a focal point without hue, so the eye lands on *15* rather than sliding past a grey ribbon; and it is not an invention — the intent card's `.tnum` is already `--ivory` inside a gold ornament, so the card that declared the stake and the card that answers it now spell the number the same colour. Gold on a result surface would say *how it went*, and nothing has gone.
+
+Then the answer, and it is unmistakably the largest thing on the card: one pill reading `d20 8` in mono, and beside it *quiet* in italic grey, at `.oc-solo` hero scale — 19px, roughly double the caption. §7.21's law holds without argument: the reading wins the **area**, the stake is the small line above it. The hero's gold flanking bars stay suppressed by `verdict-outcomes` (`content: none`), so the row reads as evidence, not as a proclamation.
+
+Hairline, then the fold: `✕ Clear` in red at `flex:1`, `REROLL ❯❯❯` resting at 0.45. Unchanged.
+
+What the card no longer does is the thing the audit caught it doing: stand at the moment of the verdict with a name and a die and nothing about the moment that was declared. And what it still refuses to do is conclude. There is no ring, no empty gold circle implying a missing number, no `?`, no `Success`, no `13`. The absence of the ring is what keeps `vs DC 15` reading as a **caption** rather than a **gap** — there is no vacant socket beside it announcing that something failed to arrive.
+
+Compare `tools/out/lifecycle/09-check-verdict.png`: today the card is head, chip, rule, buttons — three bands with a large unexplained void between the head and the chip. The stake line fills that void with the one fact the player is holding in their head.
+
+**One line I will not certify from source.** The intent card's badge under soul-deal I can predict confidently (it is dnd's shipped render with one word changed and `tools/out/lifecycle/07-check-declare.png` shows the hole it fills), but per this repo's own standing rule — *look before "done"* — the stake line's vertical rhythm on the verdict card, and the `.pk-held` word replacing a 30px gold numeral on the peek, get an interactive look before U17 is called shipped. That look is one pass over the existing `tools/steps/lifecycle-*` fixtures, not a validation sweep.
+
+---
+
+## Every disagreement, ruled
+
+| # | question | ruling | who wins |
+|---|---|---|---|
+| 1 | Is a dc a stake without a summed verdict? | **Yes.** It is the player's sentence, not the app's reading; three places in the repo already say so; and `dc` alone stages the ceremony that then hides it | A, B |
+| 2 | Gate the dock strip? | **No.** Ungated `hasDc` is the model. CSS cinematic-only paint stays — `css:4374-4376` states that decision in prose | A, B |
+| 3 | Gate the offer card's `vs 15`? | **No** | A, B |
+| 4 | Gate the SR announce's `target 15`? | **No** — and #16 makes the banner's twin agree with it for free | A, B |
+| 5 | The flat / named modifier under a per-die lens? | **Renders nowhere in the app's voice — intent chip, mod-card, log, offer summary, breakdown tail all gate on `usesTotal`.** `.log-mod` is gold-bright/700 feeding an empty column; it is the surface that most implies the sum | **C** |
+| 6 | Selection mods (adv, keep/drop, reroll, explode)? | **Universal.** `outcomesFor` filters on `p.counts && !p.child` and `forecastFor` refuses keep/drop *because* they matter. Today a `4d6dl1` under soul-deal shows no dropped die on the verdict card, banner or peek — a live break of GOALS' *Attributed math* on the default system | A, B |
+| 7 | Rewrite the interface as `readFor(entry)`? | **No.** See the deferral below | A over B |
+| 8 | Keep `usesMods`? | **No — delete it.** It never distinguished anything | A, B |
+| 9 | Strip `dc` from the intent notation line? | **No.** It is a verbatim quote; a canonical echo that drops a token is a lie, and `ledger-read` pins that line as a declaration of pools | **C** over A |
+| 10 | Rename `.margin-line` → `.stake-line`? | **No.** Churn with selector risk across tools, look tools and suite | against A |
+| 11 | Add `#verdict-subtitle`? | **Deferred** — see below | against A, B |
+| 12 | `#result-total`'s `?` under per-die? | **Gone, and the textContent write moves inside the gate.** State goes to words via `heldWord` | unanimous |
+| 13 | `meaningFor`? | **Deleted**, producer + 5 consumers + 2 CSS rules, with its dc-doctrine restated by the new rule | unanimous |
+| 14 | Where does the live ruling live? | **New §7.24 + WHAT IS TRUE TODAY rows.** §2.5 struck to a pointer | **mine** — A rewrites a dead section |
+| 15 | `± Moment` → `± Modify`? | **Yes, unconditionally.** Six of seven sections now stand under a per-die lens | A |
+| 16 | Popover `Target (DC)` folded? | **Unfolded.** Also pairing, keep/drop, reroll/explode. Modifier stays folded | A, refined |
+| 17 | The badge's label under soul-deal? | **`targetWord`, profile-supplied.** `Target` / `Difficulty Class` | **mine** — all three missed it |
+| 18 | Hue for the unadjudicated stake? | **`.stake-num` — muted label, ivory numeral, one register on four surfaces.** Pre-roll gold (dock pill, offer `vs`) explicitly out of scope | **mine** |
+| 19 | Build a per-die comparator? | **No.** `cs>=N` / `target.cmp` / `scope:'each'` stay roadmap §8, and U17 says so in one line | unanimous |
+
+---
+
+## Deferred, and what the deferral costs
+
+**1. B's `readFor(entry)` interface.** Refused for 2026-08-13. It changes nothing the player sees versus this spec; it is ~70 lines across the file's most-repainted functions five days before a play date; and its own shape (`{headline, verdict, ring}`) presumes the sum world's furniture, so the first genuinely different profile would force a redesign anyway. **Cost of deferring:** hero arbitration stays in `js/main.js` rather than in the profile, so the day a hybrid system (chart words *and* totals) ships, whoever builds it re-opens the one-hero-slot question §2.5 was invented for. §7.24 records that explicitly, so it is a known door and not a rediscovery. B's real content — a smaller interface, the stake and the read in separate slots — ships here by subtraction.
+
+**2. `#verdict-subtitle`.** The verdict card has no subtitle element (`index.html:647-664`), under any system, for any notation. That is a **missing element**, uniform across all three profiles — not a gate, not part of the conflation, and not something a lens can be blamed for. Adding it means new markup, new CSS, and a third small line between the eyebrow and the answer on a card whose whole virtue is *the name, the answer, the exits* — a hierarchy call I decline to make from source. **Cost:** the eight-surface table keeps one residual asymmetry (row 5, subtitle). Named in §7.24, and filed as a ROADMAP rider under U16 (which owns the draft's intent read) rather than left to be re-audited.
+
+**3. Pre-roll gold numerals** (`.strip-dc`, `.offer-vs`). Named above; a §7.9 hue pass, not U17's.
+
+---
+
+## The strongest objection, and the answer
+
+> **`vs DC 15` beside `d20 8 quiet` is a promise the app cannot keep.** You replaced a silent card with one that raises a question and refuses to answer it. The player has a target on screen and no arithmetic anywhere, so they will do it in their head — and `entry.total` is sitting at **13** (`entryFromRoll`:2595 computes `sum + modifier` unconditionally, every system, forever), while the chart beside it read the raw **8**. Two numbers, one die, one card. And at N > 1 it is worse: `3d10 dc15` prints three independent chart words above a target that can only be met by *adding them* — the one act Joe's law forbids in ten words. Silence was safer.
+
+Four answers.
+
+**1. Removing the `+5` removes the arithmetic, and that is why C had to be grafted in.** This is where A and B were genuinely vulnerable and this spec is not. Under A's version the card shows `vs DC 15`, a `+5 Modifier` flying up, and a raw `8` — every operand of the phantom sum, laid out, minus the operation. Here the card shows `vs DC 15` and `d20 8 quiet`, and **13 appears on no surface under this lens** — not the banner, not the peek, not the ring, not the log's total column, not the log's detail, not the breakdown tail (#25), not the offer card. The mental arithmetic the objection fears now requires the player to supply an operand the app never showed them. Today's build is the one that lays the trap: `d20 8 +5 · a quiet roll`, a bonus added to a number that is nowhere on screen.
+
+**2. The invitation exists whether we print it or not.** The player typed `dc15`. It is on the offer card, in the dock pill, in `popCanonical`, in `#pop-echo`, in the saved-pool record, in the YAML export, and — in a build four days old — **spoken aloud** to a blind player as `target 15` at `ceremonyEnterSettle:3677`. Withholding it from four surfaces does not un-declare it; it guarantees that the one place a player looks at the decisive moment is the one place it is missing. The audit's sentence is exact.
+
+**3. Declining to conclude is obedience, not evasion.** GOALS goal 6 draws the line: *"Dice, not game rules. How rolls fit into an RPG's mechanics is the players' business."* `total >= dc` is not a fact about dice — it is a house rule, true under D&D-style play and undefined under Soul Deal. `usesTotal:false` is a profile saying *I do not define that comparison*. Silence on the **verdict** is obedience; silence on the **stake** is amnesia. Printing `Success` would invent a rule; printing `vs DC 15` repeats what the table said before it rolled.
+
+**4. On N > 1: this rule is what *prevents* the sum, and the current build is what implies it.** `13` lives only in `entry.total`, and every render of it stays behind `usesTotal`. Under soul-deal `3d10 dc15` shows three chart words and `vs DC 15`; it never shows 22, never draws a ring at 22/15, never says cleared, and after #22 never prints a bonus to be added to anything. And the card already ships this exact shape without complaint: **`vs DC 15` over `Face down`**, `js/main.js:4052-4059`, commented *"Public stakes, hidden result."* The code knew how to hold a stake without a verdict. It never noticed a per-die system is the same case.
+
+**The residual cost, stated plainly.** A Soul Deal player who wants a target *judged* still cannot have one, and now sees it rendered without a judgement — which makes the absence more visible than it was. That is the correct trade. The absence is real, inventing a per-die comparator to paper over it would be the app deciding how a target works in someone else's game, and roadmap §8 owns that decision. Making the gap visible is how it gets designed rather than forgotten.
+
+---
+
+## Build order — smallest independently-committable steps
+
+Each step leaves the app coherent and shippable on its own. Total: ~90 lines touched in `js/main.js`, about a third of them deletions; −3/+1 members in `js/meanings.js`; 5 lines of `index.html`; +4/−4 CSS rules.
+
+**Step 1 — The stake renders.** *(the audit's core; ships alone)*
+`heldWord` + `stakeInto` helpers · gates #1, #7, #8, #9, #10, #11, #16, #19(dc half), #21, #23 · `targetWord` in all three profiles + gate #2 · the `.stake-num` and `.ring-wrap.hidden + .margin-line` CSS rules.
+After this commit: the dc renders on all eight surfaces, no surface prints an unearned `✓`/`✗`/`Success`, and the verdict card's branch-order trap is gone. `+5` is still inconsistent — that is step 3.
+
+**Step 2 — The `?` leaves the total slot.**
+Gates #14, #15, #19(held half), #20 · `#result-meaning.held` and `.pk-held` CSS.
+Independently valuable: the app's headline privacy feature stops answering with a mute 52px gold glyph, and the sum leaves the DOM under a lens that refuses it.
+
+**Step 3 — Arithmetic and selection split.**
+Gates #3, #4, #12, #13, #22, #25, #26, #28, #32 · `index.html` #29, #30 (#31 untouched) · delete `usesMods` from all three profiles.
+Independently valuable even without steps 1–2: it closes the *Attributed math* invariant break on the default system (`4d6dl1`'s dropped die returns to the verdict card, banner and peek) and makes the dc authorable in the ± popover.
+
+**Step 4 — Delete the `meaningFor` channel.** JS + CSS per the table above; `critWord` signature and both call sites. Pure subtraction, behaviour-neutral.
+
+**Step 5 — Docs, one commit.** `js/meanings.js` interface v3 prose · UX.md §2.5 → pointer · new §7.24 · five WHAT IS TRUE TODAY rows · ROADMAP U17 marked shipped, with the two deferrals (`readFor`, `#verdict-subtitle`) recorded where the next reader will find them.
+
+**Step 6 — Look.** One interactive pass over the existing lifecycle fixtures: check-declare (badge + `TARGET`), check-verdict (stake line rhythm), peek held, whisper banner. Per the repo's standing rule, U17 is not "done" before this.
+
+---
+
+## Test plan — scenarios by tag, `__diceDebug` hooks needed, existing pins to re-point
+
+**No new `__diceDebug` hooks are required.** Everything the new assertions need already exists and is exercised by `ledger-read`: `commandRoll`, `sim`, `skipCeremony`, `ceremonyState`, `retireCeremony`, `setSystem`, `openPopoverFor`, `closePopover`, `cardActs`, `logTop`. Per §7.21's lesson, **every visibility assertion reads computed `display`/`offsetParent`, never a class.**
+
+### Existing pins to re-point
+
+| file:line | today | becomes | step |
+|---|---|---|---|
+| `tests/e2e/scenarios.mjs:811` (`per-die-read`, **smoke**) | `assert.ok(!logTop().includes('vs 15'))` | `assert.ok(logTop().includes('vs 15') && !/[✓✗]/.test(logTop()), 'the stake shows; the verdict does not')` | 1 |
+| `scenarios.mjs:817` (same) | `assert.ok(logTop().includes('vs 15'))` under dnd | **must tighten** to `/vs 15 [✓✗]/` — it stops discriminating otherwise | 1 |
+| `scenarios.mjs:801-803` `#result-total` computed `display === 'none'` | — | **survives, becomes more true** (no `?` flicker on the hidden path) | — |
+| `scenarios.mjs:806-807` `.log-total` textContent `''` | — | **survives** | — |
+| `scenarios.mjs:~830` `secVisible` over `.sec-sum, .prow-sum` | asserts all fold under per-die | re-scope to the **Modifier** section only; add positive computed-visibility assertions that `#pop-dc`, `#pop-seg-adv`, `#pop-seg-keep`, `#pop-sw-reroll`, `#pop-sw-explode` are **visible** under soul-deal (four of these currently assert the opposite) | 3 |
+| `scenarios.mjs:838` `#pop-sysnote === null` | — | **survives** — no note returns, per Joe's 2026-08-06 ruling | — |
+| `scenarios.mjs:3597, 3610` (`rim-word`, **smoke**) | `'± Moment'` under soul-deal | `'± Modify'` under both; assert the *title tail* differs instead of the word, and keep the `!/tweak/i` ban | 3 |
+| `scenarios.mjs:996-999` (`ledger-read`) ring folds | — | **survives** — the ring folds on `usesTotal` (4004), untouched | — |
+| `scenarios.mjs:~991` `#intent-notation` includes `[Wisdom]` | — | **survives** — the notation line stays whole | — |
+| `tests/meanings.test.mjs:81` `sd.usesMods === false` | — | **deleted** (field is gone) | 3 |
+| `tests/meanings.test.mjs:82` `sd.meaningFor() === null` | — | **deleted**; replace with `assert.equal(sd.targetWord, 'Target')` and `assert.equal(SYSTEMS.dnd.targetWord, 'Difficulty Class')` | 4/1 |
+
+### New scenario — `stake-read`, tags `['smoke','meanings']`
+
+One pass, one fixture (`1d20+5 check dc15 # The Duel | Charisma`) under soul-deal, then the same log re-read under dnd:
+
+1. **Declare:** `#intent-target` computed-visible; `#intent-target-label` textContent `Target`; `#intent-notation` still contains `dc15`; `#intent-mods` has **no** `+5` chip.
+2. **Verdict:** `#verdict-margin` textContent is exactly `vs DC 15`; `#verdict-hero` contains none of `Success`, `Failure`, `13`; `#verdict-hero` carries `verdict-outcomes`; `#verdict-modcards` is empty; `#verdict-margin .stake-num` exists.
+3. **Selection mods return** *(step 3's real payload)*: `4d6dl1 check` under soul-deal → `#verdict-modcards` contains a `DL1 dropped …` card, and the dropped die's label appears inside an `<s>`. This is the GOALS *Attributed math* pin.
+4. **Log:** `.log-verdict` reads `vs 15` with no `ok`/`bad` class; the line contains **no** `+5`; `.log-total` is `''`.
+5. **Banner / peek:** `#result-verdict` has neither `verdict-success` nor `verdict-fail`; `#result-total` computed `display === 'none'` **and** `textContent === ''`.
+6. **Hidden:** a whispered roll's banner → `#result-meaning` reads `Whispered`, carries `held`, and `#result-total` is both `display:none` and empty. Peek → `Face down` with `.pk-held`.
+7. **SR agreement:** after a ceremony settle `#sr-live` contains `target 15`; after a banner paint the announce contains `vs DC 15`. *(The one assertion that pins the two announce sites to each other.)*
+8. **The relit re-read:** `setSystem('dnd')` on the standing card → `#verdict-margin` becomes `vs DC 15 · margin −2`, `#verdict-hero` reads `Failure`, the ring unfolds, a `+5 Modifier` mod-card appears. `setSystem('soul-deal')` → all of it withdraws and `vs DC 15` remains. This is the lens contract, pinned in one place.
+
+### Run path
+
+`npm test` (unit + fuzz + e2e smoke) after every step — `per-die-read`, `ledger-read`, `rim-word` and `stake-read` are all smoke-tagged, so the whole U17 surface is covered by the seconds-long script. `node tests/e2e/run.mjs --only meanings` for the targeted loop. Full sweep is a pre-release gate, not a per-step cost.
+
+---
+
+## What NOT to do
+
+- **Do not build a per-die comparator.** No `target.cmp`, no `scope:'each'`, no `cs>=N`, nothing in `outcomesFor` that consults `entry.dc`. It would burn a field UX.md §2.1 explicitly reserves for roadmap §8 (which already rules that case needs a *different verdict rendering* — success pips, not a ring) and it would have the app decide how a target works in someone else's system. §7.24 says this in one line so it is not re-derived.
+- **Do not flip `renderVerdictCard`'s `hasDc` gate alone and call U17 done.** It changes exactly three things: `strokeDashoffset` and `.fail` computed on an element `css:4460` has set to `display:none`, and the held-branch line at 4055. The verdict card — the surface the audit is *about* — shows nothing new, because `renderOutcomeRows` at 4061 blocks the `else if` at 4065. The stake must be written **outside** the chain.
+- **Do not flip the log's gate at 9314 alone.** It prints `vs 15 ✗` off a phantom **13** while the chart beside it reads the raw **8**. Worse than doing nothing.
+- **Do not un-gate `#result-total` in CSS.** Line 2938 writes `entry.total` into the node on every paint under every system; only `display:none` withholds it. The textContent write must move inside the gate.
+- **Do not restore the flat `+5` anywhere** — not as an intent chip, not as a mod-card, not in the log detail, not in the breakdown tail, not in the offer summary. It is the operand of an operation this lens does not perform.
+- **Do not strip `dc15` from `#intent-notation`.** It is a verbatim canonical echo. The dnd double-print is intentional and already ships.
+- **Do not gate the dock strip, the offer card's `vs`, or `ceremonyEnterSettle`'s `target N`.** They are correct; they were only accidentally correct before.
+- **Do not restore `#pop-sysnote` or add any "the dc does nothing here" note.** Joe deleted that species of note on 2026-08-06 ("entirely — no note"), it would fire per keystroke, and it would be false: `dc15` under soul-deal stages the Check (`notationIntent`) and arms the dnd re-read.
+- **Do not un-fold the popover's Modifier section.** #31 stays `sec-sum`. It is the one genuinely sum-world section and Joe's ruling sits exactly over it.
+- **Do not rename `.margin-line` / `#verdict-margin`,** and do not add `#verdict-subtitle` in this pass.
+- **Do not touch U18.** `soul-deal.critFor` fires on any crit chart cell — a `3d10` pool crits 48.8% of the time. It is inside the same file and outside this decision.
+- **Do not re-tint `.strip-dc` or `.offer-vs`.** Pre-roll declaration hue is a §7.9 pass.
+- **Do not restructure the profile interface** (`readFor`) before 2026-08-13. Take the subtraction, leave the rewrite.
+- **Do not add a `declaresStakes` profile bit.** It would equal `usesTotal` for every shipped profile, and the one future system that legitimately reads per-die targets needs real design, not a boolean.
+- **Do not touch port 8123.**
+
+---
 
 **Rides with it:** the only 52 px gold number a Soul Deal table sees is `?`
 — `#result-total` is dead for every open roll and springs to life, in the
