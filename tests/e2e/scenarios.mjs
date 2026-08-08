@@ -3537,6 +3537,88 @@ export const scenarios = [
   },
 
   {
+    name: 'announced',
+    tags: ['smoke', 'chrome', 'ceremony'],
+    // U5. The app had ONE live region and it lived inside #result-banner —
+    // which a ceremony never paints, because stepPlayback returns into
+    // ceremonyEnterSettle before showResults. So every Check and every
+    // Cinematic, the rolls carrying a DC and a moment, landed unannounced.
+    // The other two notice channels were silent by construction: #rail-note
+    // sets textContent and clears `hidden` in the same task (out of the a11y
+    // tree at the moment of the mutation) and #status-pill had no role at all.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.11', name: 'Heard' });
+      const live = `document.getElementById('sr-live')`;
+      const said = () => a.eval(`${live}.textContent.replace(/\u200B/g, '')`);
+
+      // (i) The channel is mounted at the root, outside every surface that
+      // might not paint, and is never hidden.
+      assert.equal(await a.eval(`${live}.parentElement === document.body`), true,
+        'the live region is at the body root, not inside a card');
+      assert.equal(await a.eval(`${live}.hasAttribute('hidden')`), false,
+        'and is never hidden — a hidden region is out of the a11y tree');
+      assert.equal(await a.eval(`${live}.getAttribute('aria-live')`), 'polite',
+        'and announces politely');
+
+      // (ii) A PLAIN roll speaks.
+      await a.roll('2d6 # Bread');
+      await a.settle();
+      await a.waitFor(`${live}.textContent.includes('Bread')`,
+        { desc: 'the plain roll is announced' });
+
+      // (iii) A CEREMONY speaks — the case that was silent. It also carries
+      // the target, which is the whole reason a Check is a Check.
+      await a.roll('1d20 check dc15 # The Duel');
+      await a.waitFor(`${live}.textContent.includes('The Duel')`,
+        { desc: 'the ceremony announces its own result' });
+      assert.ok((await said()).includes('target 15'),
+        `and names the target it was rolled against (got ${JSON.stringify(await said())})`);
+      await a.settle();
+
+      // (iv) A HIDDEN roll names ITS OWN RUNG to the people it is hidden
+      // from. The old line said 'held' for a whisper too — the one channel a
+      // blind player has, using the wrong word for the mode. (The ROLLER is
+      // not a hidden viewer of their own roll, so this is a spectator's
+      // assertion by construction.)
+      const b = await ctx.newTable({ origin: '127.0.0.12', name: 'Watcher' });
+      const bLive = () => b.eval(`${live}.textContent.replace(/\u200B/g, '')`);
+
+      await a.roll('2d6 held # Facedown');
+      await b.settle();
+      await b.waitFor(`${live}.textContent.includes('held')`,
+        { desc: "a spectator hears 'held' for a face-down roll" });
+
+      await a.roll(`2d6 w:Watcher # Mine`);
+      await a.settle();
+      // Watcher is IN the audience, so they hear the real result…
+      await b.waitFor(`${live}.textContent.includes('Mine')`,
+        { desc: 'an addressee hears the whisper' });
+
+      // …and a third player, who is not, hears that it is HIDDEN and never a
+      // value. Not the literal word 'held' — that was the defect, one rung's
+      // word standing in for every rung. Not 'whisper' either: the server
+      // strips `visibility` from a redacted entry, so the client genuinely
+      // does not know which rung it was, and guessing would tell a
+      // non-addressee more than the server did. The label rides on purpose —
+      // a whisper's stakes are public by design (UX.md's "others see you
+      // rolled, not what").
+      const c = await ctx.newTable({ origin: '127.0.0.13', name: 'Outside' });
+      await a.roll(`2d6 w:Watcher # Secrets`);
+      await c.settle();
+      const heard = await c.eval(`${live}.textContent.replace(/\u200B/g, '')`);
+      assert.ok(/hidden|whisper/.test(heard),
+        `a non-addressee hears that it is hidden (got ${JSON.stringify(heard)})`);
+      assert.equal(/\bheld\b/.test(heard), false,
+        `and NOT the wrong rung's word (got ${JSON.stringify(heard)})`);
+      assert.equal(/\b(?:\d+\s*—|—\s*\d+)/.test(heard), false,
+        `and never a value (got ${JSON.stringify(heard)})`);
+      await b.close();
+      await c.close();
+      void bLive;
+    },
+  },
+
+  {
     name: 'touch-doors',
     tags: ['smoke', 'chrome', 'seat'],
     // U27 + U12. Every right-click door needs a touch twin, because iOS

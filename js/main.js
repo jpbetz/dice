@@ -2265,7 +2265,24 @@ const resultBreakdownEl = document.getElementById('result-breakdown');
 const resultVerdictEl   = document.getElementById('result-verdict');
 const bannerActionsEl   = document.getElementById('banner-actions');
 const bannerMainEl      = document.getElementById('banner-main');
-const bannerLiveEl      = document.getElementById('banner-live');
+// THE ONE ANNOUNCEMENT CHANNEL (U5). #banner-live lived inside the result
+// banner, so a ceremony — which returns into ceremonyEnterSettle before
+// showResults and never paints that banner — announced NOTHING. Every Check
+// and every Cinematic, the rolls that carry a DC, a moment and a subtitle,
+// landed silent. This node is at the body root, always mounted, never
+// `hidden`: a live region that is hidden at the moment it is written is out
+// of the accessibility tree exactly when it has something to say, which is
+// the same reason railNote's whispers never announced either.
+const srLiveEl = document.getElementById('sr-live');
+// Re-announce identical text by nudging the node: assigning the same string
+// is a no-op to the a11y tree, and two identical rolls in a row is ordinary.
+let lastAnnounced = '';
+function announce(text) {
+  const msg = String(text || '').trim();
+  if (!srLiveEl || !msg) return;
+  srLiveEl.textContent = msg === lastAnnounced ? `${msg}\u200B` : msg;
+  lastAnnounced = msg;
+}
 
 // One clean way to hide the banner (Tier 0 §0e endurance leak): the roll-dice
 // outline is anchored to the banner (mouseenter paints it, mouseleave clears
@@ -2956,12 +2973,15 @@ function renderRollResults(entry, dice, fx = true) {
   // aria-live on the body itself would re-announce on every incidental
   // repaint (a room-wide system change repaints five cells) and can speak a
   // half-built card; this speaks once, when a result actually lands.
-  bannerLiveEl.textContent = [
+  announce([
     entry.playerName || null,
     entry.label || null,
-    hidden ? 'held' : (activeSystem().usesTotal ? String(entry.total) : null),
+    // The MODE, not a guess at it: this said 'held' for a whisper too, so the
+    // one channel a blind player has used the wrong rung's word.
+    hidden ? (entryVis(entry) ? entryVis(entry).mode : 'hidden')
+      : (activeSystem().usesTotal ? String(entry.total) : null),
     resultVerdictEl.textContent || null,
-  ].filter(Boolean).join(' — ');
+  ].filter(Boolean).join(' — '));
   renderBannerActions(entry);
   armAutoCollect(entry); // every banner paint restarts the tidy-away clock
   const crit = entryCrit(entry);
@@ -3590,6 +3610,21 @@ function ceremonyEnterSettle(roll) {
   cer.entry = entry;
   lastEntry = entry;
   addLogEntry(entry); // same log entry as today (entry.spec carries exp)
+  // U5: a ceremony returns here and never paints #result-banner, so this is
+  // the ONLY place its result can be announced. It is the roll carrying a
+  // DC, a moment and a subtitle — the one that most owes a sentence — and it
+  // was the one that said nothing.
+  {
+    const vis = entryVis(entry);
+    const held = entryHidden(entry);
+    announce([
+      entry.playerName || null,
+      entry.label || null,
+      held ? (vis ? vis.mode : 'hidden')
+        : (activeSystem().usesTotal ? String(entry.total) : null),
+      Number.isInteger(entry.dc) ? `target ${entry.dc}` : null,
+    ].filter(Boolean).join(' — '));
+  }
 
   const n = entry.parts.length;
   const stagger = n <= 6 ? 0.07 : 0.04;
@@ -7326,9 +7361,10 @@ function renderGroups() {
 // Every defect he listed was downstream of ONE number: 56px. Names ran
 // VERTICALLY because a word did not fit. Shelf titles vanished because a
 // heading did not fit. Multi-pick was impossible because a tray had nowhere
-// to live. So the rail is 104px now, and the defects go with the width:
-// shelf-grouped rows, horizontal names, a tap that SELECTS, and one gold
-// bar that rolls the selection.
+// to live. So the rail is 112px now (--sidebar-rail-w; this comment and two
+// others said 104 through the pass that shipped 112), and the defects go with
+// the width: shelf-grouped rows, horizontal names, a tap that SELECTS, and
+// one gold bar that rolls the selection.
 //
 // 2i-G — A SELECTION IS NOT A DRAFT. It is ordered by the rack (never by
 // tap order), visible where it is made, never persisted, and SPENT BY ITS
@@ -7665,6 +7701,11 @@ function railNote(text) {
   if (!el) return;
   el.textContent = text || '';
   el.hidden = !text;
+  // …and SAY it. This node sets textContent and clears `hidden` in the same
+  // task, so it is out of the a11y tree at the moment of the mutation and
+  // announced nothing — the cap refusal, which exists precisely because the
+  // collapsed pill is invisible, was invisible twice over.
+  if (text) announce(text);
 }
 
 function updateRailRoll() {
@@ -9910,6 +9951,11 @@ let settingsPillTimer = null; // status-pill note
 // notification framework.
 function showSettingsNote(text) {
   const noteEl = document.getElementById('settings-note');
+  // U5: whichever surface carries it visually, it is SAID once. The pill is a
+  // 3-second string with no live region and folds to a 10px colorless dot
+  // while collapsed, so table events — "Alice changed the table", refusals,
+  // "Bo left" — reached a screen reader through no channel at all.
+  announce(text);
   if (!settingsModal.classList.contains('hidden')) {
     clearTimeout(settingsNoteTimer);
     noteEl.textContent = text;

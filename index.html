@@ -32,6 +32,13 @@ limitations under the License.
 <body>
   <div id="scene-container"></div>
 
+  <!-- THE ONE ANNOUNCEMENT CHANNEL (U5). Mounted at the root, always present,
+       never `hidden`, holding nothing else — so it cannot be skipped by a
+       surface that does not paint (the ceremony), and cannot be written while
+       out of the accessibility tree (the rail note). Everything that owes a
+       screen reader a sentence writes it here through announce(). -->
+  <div id="sr-live" class="sr-live" aria-live="polite" aria-atomic="true"></div>
+
   <!-- THE SIDE PANEL (Joe 2026-08-04): a dedicated layout column, NOT an
        overlay — the felt (canvas) is sized beside it and owns zero standing
        chrome. One vertical divider (#edge-toggle, also the collapse control)
@@ -71,12 +78,16 @@ limitations under the License.
            lives in Settings; the invite link keeps its one home in the
            identity menu). -->
       <span id="table-name" class="table-name hidden"></span>
-      <span id="status-pill" class="hidden"></span>
+      <!-- role=status (U5): every table event — "Alice changed the table", a
+           refusal, "Bo left" — was a 3-second unannounced string, and
+           collapsed the pill folds to a 10px colorless dot. The visual
+           channel keeps its own rules; the announcement rides #sr-live. -->
+      <span id="status-pill" class="hidden" role="status"></span>
     </div>
 
     <!-- THE COLLAPSED POOL RAIL (Joe 2026-08-07). At 56px a pool name had
          to be rotated on its side and a shelf title had nowhere to go, so
-         the rail is 104px and the words come back: shelf heads spelled,
+         the rail is 112px and the words come back: shelf heads spelled,
          names horizontal and ellipsized, one row per pool at a 44px touch
          height. A tap SELECTS (steel ring + ✓, aria-pressed) because the
          common Soul Deal roll is three pools — an attribute, a skill and a
@@ -678,7 +689,13 @@ limitations under the License.
       <div id="result-meaning"></div>
       <div id="result-breakdown"></div>
     </div>
-    <div id="banner-live" class="sr-live" aria-live="polite"></div>
+    <!-- #banner-live retired 2026-08-08 (U5): it lived INSIDE #result-banner,
+         which a ceremony never paints, so every Check and every Cinematic —
+         the rolls carrying a DC, a moment and a subtitle — landed
+         unannounced. The channel is #sr-live at the body root now, mounted
+         once and never hidden, because a live region that is `hidden` at the
+         moment it is written is out of the accessibility tree exactly when
+         it has something to say. -->
     <div id="banner-actions" class="banner-fold"></div>
   </div>
 

@@ -2377,8 +2377,8 @@ because the state it survives into is the one where ownership must not scroll
 away (`#pools-head.foreign` pins at `--draft-h` and the category heads yield
 theirs). ~~Browsing a teammate HIDES it — the standing `ALICE'S POOLS ·
 read-only` banner is that state's region head: one head per state, never
-two.~~ Inverted the same day by the teammate-pill consolidation two paragraphs
-down: the separate banner was retired and this head became that state's
+two.~~ Inverted the same day by the teammate-pill consolidation later in this
+section: the separate banner was retired and this head became that state's
 head — browsing a teammate is now the only thing that SHOWS it.
 *This deliberately supersedes §7.9's "There is no 'Pools' title row" FOR
 THE REGION under Joe's explicit 2026-08-04 ask — the COLUMN still has no
@@ -2394,8 +2394,10 @@ each category head, and a whole-rack `.ph-fig` that rides the region head's
 slack. `renderGroups` builds the rack figure only when `!foreign && poolsEdit`
 — and `#pools-head:not(.foreign)` is `display:none`, so **the state that
 builds it is exactly the state that hides it. The whole-rack `dice value`
-caption has never rendered since the head went foreign-only**; the shelf
-figures are left as bare integers with no unit anywhere on screen. The `✎`
+caption has never rendered since the head went foreign-only**, and the word
+`dice value` lived only there — so the shelf figures are now bare integers
+with no standing unit, carrying `DICE_VALUE_LEGEND` on `title` alone, which
+touch never gets. The `✎`
 gate's own contract in §7.18 says the figures are *"built in manage mode only,
 not built-and-hidden"*, for a stated reason: a CSS-hidden figure still
 concatenates into `textContent`. That is precisely what happened here, and it
@@ -2403,8 +2405,8 @@ is why **the `rack-dice-value` scenario still passes** — it reads the
 `textContent` of a `display:none` node, which reads fine. §2l's build-not-hide
 lesson, inverted by a CSS rule written three sections later. The fix is a code
 change plus an assertion that pins computed display (§7.21's lesson: *a
-visibility contract is about what the eye gets*), and it belongs with U20-era
-work, not with a doc pass.
+visibility contract is about what the eye gets*); ROADMAP U4's entry names the
+assertion, and neither is in this doc pass. This paragraph is the pointer.
 
 **THE REFUSALS (as load-bearing as the additions).** The dice region
 gets nothing: the pressed *Dice* segment already names it and eight
@@ -3176,12 +3178,12 @@ took the affordance out with the noise.
 
 **Shipped, and this is the paragraph of record** *(rewritten 2026-08-08 from
 the comment over `#left-panel :is(.section-seg, #rail-mode)` in
-`css/style.css`, which was the only account of the third iteration; the
-first draft of this section described the second one, and the `#rail-mode`
-comment in `css/style.css` and the source-switch comment in `index.html`
-repeated it)*. Both bars keep **one
-quiet track** around the whole strip — `1px` of `rgba(255,255,255,.055)` over
-`rgba(0,0,0,.16)`, `8px` radius, `2px` of padding. One object, unmistakably a
+`css/style.css`, which was the only account of the third iteration; the first
+draft of this section described the second one, and the `#rail-mode` comment
+and the source-switch comment in `index.html` repeated it)*. Both bars keep
+**one quiet track** around the whole strip — `1px` of
+`rgba(255,255,255,.055)` over `rgba(0,0,0,.16)`, `8px` radius, `2px` of
+padding. One object, unmistakably a
 control, rather than three lit ones. Inside it nothing is filled loudly: a
 pressed cell wears **the faintest recess the panel can hold**,
 `rgba(255,255,255,.05)` with no inset ring — against the `0.13`-plus-ring the
@@ -3203,12 +3205,12 @@ quiet into unmarked.
 the `#rail-mode` CSS comment and the source-switch comment in `index.html`
 all went on describing the middle iteration — "no track, no lit cell, weight
 alone, 0.72/0.45" — while the build shipped a track, a recess and 0.42/0.78,
-recorded nowhere but that CSS block's own comment. Three stale records against one
-accurate one, on the newest surface in the file, in a repo whose CLAUDE.md
-names this document the authority. All four now agree, and the section bar's
-own `index.html` comment — which described the markup and said nothing about
-the dress — now carries it too. The CSS comment stays the dress of record,
-because the numbers live beside it.)*
+recorded nowhere but the CSS block's own comment. Three stale records against
+one accurate one, on the newest surface in the file, in a repo whose
+CLAUDE.md names this document the authority. All three now agree, and the
+section bar's own `index.html` comment — which described the markup and said
+nothing about the dress — now carries it too. The CSS comment stays the dress
+of record, because the numbers live beside it.)*
 
 **2i-C's disabled code is unchanged and still the third state.** Only the
 collapsed switch has a cell that can go unavailable — `Pools` on an empty
