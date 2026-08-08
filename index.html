@@ -118,10 +118,18 @@ limitations under the License.
          "In collapsed view I don't think we can ever show notation. I'm
          totally OK with that" — and `/` reaches the quick palette anyway.
          Pools is the default when you have any, dice when you have none
-         (and then Pools is disabled rather than absent, 2i-C). Deliberately
-         INKLESS — no track, no lit cell — so the column's only box stays the
-         pool-row selection (§7.22), and a control you touch twice a session
-         never outshouts the rows you touch constantly. -->
+         (and then Pools is disabled rather than absent, 2i-C — grayscale,
+         drained below rest-dim). It shares the section bar's dress, which is
+         THE INK MARKS THE CONTROL, THE WEIGHT MARKS THE STATE: one quiet
+         track around the strip so it reads as a control, and inside it the
+         faintest recess the panel can hold on the pressed cell, with the
+         real signal carried by weight (pressed ivory .78, unpressed muted
+         .42). Quiet, not inkless — a bar with no track at all read as
+         floating text with no visual language. Quiet enough that the
+         column's only real box stays the pool-row selection (§7.22), and a
+         control you touch twice a session never outshouts the rows you touch
+         constantly. The numbers live on the shared
+         `#left-panel :is(.section-seg, #rail-mode)` block in css/style.css. -->
     <div id="rail-mode" class="seg rail-seg" role="group" aria-label="Show dice or saved pools">
       <button data-rm="dice" type="button" title="Loose dice">Dice</button>
       <button data-rm="pools" type="button" title="Your saved pools">Pools</button>
@@ -220,11 +228,22 @@ limitations under the License.
            was density (P1), which is a preference, so it becomes one.
            role="group" with independent aria-pressed: checkbox semantics,
            zero to three pressed, never a radiogroup. All-off is legal — the
-           workbench above is a complete surface by itself.
+           workbench above is a complete surface by itself — and no cell here
+           ever disables, so every section is always one tap away.
            It sits BELOW the well and ABOVE what it reveals, so the bar and
            the stack read in the same order and the map never lies. Not
            sticky: a second pinned band would spend 31px of the column
-           permanently. -->
+           permanently.
+           THE DRESS: the ink marks the control, the weight marks the state.
+           One quiet track around the whole strip (it is one object, not
+           three lit ones); the pressed cell wears the faintest recess the
+           panel can hold; the signal that actually reads is weight —
+           pressed ivory .78, unpressed muted .42. No gold: HUE = ACT and
+           this is a tool. Two earlier iterations are NOT what ships — a
+           loud recess (.13 plus an inset ring), then no track at all, which
+           read as floating text. The numbers and the reasoning live on the
+           shared `#left-panel :is(.section-seg, #rail-mode)` block in
+           css/style.css; UX.md §7.23 carries the prose. -->
       <div id="section-bar" class="seg section-seg" role="group" aria-label="Panel sections">
         <button data-sec="dice" aria-pressed="true" title="Build by tapping dice">Dice</button>
         <button data-sec="notation" aria-pressed="false" title="Type dice notation — 2d6+3, 4d6dl1, 1d20 adv dc15">2d6</button>
@@ -988,6 +1007,12 @@ limitations under the License.
       <div id="seat-pick">
         <div id="seat-list" class="hidden"></div>
         <p id="seat-someone" class="hint seat-someone hidden">Someone else…</p>
+        <!-- U3: a RETURNING player pulled in by an `&as=` link. They already
+             have a name on this origin, so the picker owes them two things a
+             first-timer does not need — why it opened at all, and their own
+             name back in one press rather than retyped. Absent for everyone
+             else, which is every other path into this modal. -->
+        <button id="seat-keep-name" class="btn seat-keep hidden"></button>
         <p id="name-hint" class="hint">Pick a display name for the table.</p>
         <div class="btn-row">
           <input id="name-input" type="text" placeholder="Display name…" maxlength="24" autocomplete="off">

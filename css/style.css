@@ -1777,11 +1777,13 @@ html, body {
   color: transparent; /* the pill folds to its dot; the color still signals */
 }
 
-/* THE COLLAPSED POOL RAIL (2026-08-07) — 104px, which is the whole design.
-   Every defect the 56px rail had was a width symptom: names rotated on
-   their side, shelf titles dropped, no room to hold a selection. A tap
-   SELECTS and the one gold bar ROLLS; the selection is spent by its roll.
-   Filled by renderRailPools. */
+/* THE COLLAPSED POOL RAIL (2026-08-07) — 112px, which is the whole design
+   (the number lives in --sidebar-rail-w; this comment said 104 through the
+   pass that shipped 112). Every defect the 56px rail had was a width
+   symptom: names rotated on their side, shelf titles dropped, no room to
+   hold a selection.
+   A tap SELECTS and the one gold bar ROLLS; the selection is spent by its
+   roll. Filled by renderRailPools. */
 /* ---------- the collapsed column's source switch (§7.23) ---------- */
 /* Expanded, neither the switch nor the dice list exists — the workbench owns
    composing up there, and the launcher's two lists are collapsed-only. */
@@ -1795,11 +1797,15 @@ html, body {
   margin: 8px 6px 2px; /* one left edge with the chip, the rows and the foot */
 }
 #rail-mode button { font-size: 11px; padding: 5px 2px; }
-/* The switch shares the section bar's quiet dress (see .section-seg) — no
-   track, no lit cell. That matters twice over here: it keeps the collapsed
-   column's ONE box the pool-row selection, which is what lets a single
-   signal carry it (§7.22), and it stops a control you touch twice a session
-   from outshouting the rows you touch constantly.
+/* The switch shares the section bar's quiet dress, rules and all — it is the
+   same `:is(.section-seg, #rail-mode)` block up at the top of this file, so
+   there is nothing to keep in sync: one quiet track, the faintest recess on
+   the pressed cell, and weight as the real signal (.78 / .42). Quiet, not
+   inkless — an earlier pass deleted the track outright and the bar read as
+   floating text. That it stays quiet matters twice over here: it keeps the
+   collapsed column's ONE box the pool-row selection, which is what lets a
+   single signal carry it (§7.22), and it stops a control you touch twice a
+   session from outshouting the rows you touch constantly.
    Unavailable still wears the DISABLED code — grayscale-drained and dimmer
    than rest — because an empty rack makes Pools impossible, not secondary. */
 #left-panel #rail-mode button:disabled {
@@ -3057,6 +3063,16 @@ html, body {
    so the pointed-at seat reads chosen-but-not-taken. Enter takes it. */
 .seat-btn.preselected { border-color: rgba(212, 175, 55, 0.55); }
 .seat-someone { margin-top: 10px; }
+/* U3's returning-player exit: "Stay as ⟨name⟩". Quiet, full width, and
+   BELOW the seat list — the link named a seat, so the seat leads and keeping
+   your own name is the deliberate alternative rather than the default. It is
+   the free-text path with the typing already done. */
+.seat-keep {
+  width: 100%;
+  margin-top: 8px;
+  text-align: left;
+}
+.seat-keep.hidden { display: none; }
 #seat-preview { margin-top: 6px; }
 #seat-preview .btn-row { margin-top: 10px; }
 /* The two phase panes. There is NO global `.hidden` utility in this

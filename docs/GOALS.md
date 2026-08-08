@@ -104,7 +104,17 @@ note).
   redaction suite; see UX.md §3.0.)*
 - **Uniform roll surfaces.** Every UI element that triggers a roll offers
   the same capabilities (the UX.md §7.4 matrix): full intent editing, both
-  verbs (Roll / Offer), in both full and compact view.
+  verbs (Roll / Offer), in both full and compact view. *(One carve-out,
+  added 2026-08-08 to match what has always shipped: this binds **authoring**
+  surfaces, the ones where a roll's intent is composed. A **launcher** — the
+  collapsed column's pool rail and dice list — fires intents authored
+  elsewhere and is exempt from the Offer and intent-editing columns, on the
+  condition that an authoring surface is one keystroke away, `n` or `/`. What
+  a launcher may send is bounded so the exemption cannot hide anything: a
+  single pick rides its pool's stored intent verbatim, a multi-pick composes
+  only what the grammar can union and names what it set aside, the dice list
+  sends a bare `NdX`, and a visibility conflict fails closed to `secret`.
+  UX.md §7.4 holds the matrix and §7.22/§7.23 the reasoning.)*
 - **Immersion is never a downgrade.** Compact view hides chrome only; the
   experience renders identically.
 - **Always interruptible.** Any ceremony or effect is skippable to its

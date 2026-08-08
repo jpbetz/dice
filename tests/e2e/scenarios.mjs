@@ -6467,6 +6467,51 @@ export const scenarios = [
         'the preview pane is not on screen while choosing a seat');
       assert.notEqual(await p.eval(shown('seat-pick')), 'none', 'the seat list is');
 
+      // THE RETURNING PLAYER (U3). `dice.name.v1` is origin-GLOBAL, so before
+      // 2026-08-08 anyone who had ever opened the app skipped this modal
+      // entirely and `&as=` did nothing — CUJ2 held only for people who had
+      // never used the app, which is the opposite of who gets sent a link.
+      // This scenario could not see it: `anon: true` cleared the name, so the
+      // fixture only ever tested first-timers.
+      {
+        const back = await ctx.newTable({
+          origin: '127.0.0.9', name: 'Wanderer', anon: true, query: '&as=Rill',
+        });
+        try {
+          await back.waitFor(`window.__diceDebug.seatPicker.seats.length === 2`,
+            { desc: 'a returning player still reaches the picker' });
+          const pick2 = await back.dbg('seatPicker');
+          assert.equal(pick2.open, true, 'the modal opens despite a stored name');
+          assert.equal(pick2.preselect, 'Rill', 'and the link pre-selects its seat');
+          // …and the name they arrived with is one press away, not retyped.
+          assert.equal(await back.eval(
+            `getComputedStyle(document.getElementById('seat-keep-name')).display !== 'none'`),
+          true, 'the returning player is offered their own name back');
+          assert.equal(await back.eval(
+            `document.getElementById('seat-keep-name').textContent`), 'Stay as Wanderer',
+          'by name');
+          // Taking it joins as themselves, NOT as the seat.
+          await back.eval(`document.getElementById('seat-keep-name').click()`);
+          await back.waitFor(`!!window.__diceDebug && window.__diceDebug.netReady`,
+            { desc: 'the returning player joins' });
+          assert.equal((await back.dbg('identity')).name || await back.eval(
+            `document.getElementById('identity-name').textContent`), 'Wanderer',
+          'under the name they arrived with');
+        } finally { await back.close(); }
+      }
+
+      // A returning player with NO `&as=` still joins straight through — the
+      // link is what outranks the stored name, not the mere existence of a
+      // prepared table. Breaking this would tax every ordinary re-open.
+      {
+        const plain = await ctx.newTable({ origin: '127.0.0.10', name: 'Straight' });
+        try {
+          assert.equal(await plain.eval(
+            `document.getElementById('name-modal').classList.contains('hidden')`),
+          true, 'no link, no picker — a stored name still joins straight through');
+        } finally { await plain.close(); }
+      }
+
       const groupsBefore = (await p.dbg('groups')).map((g) => g.name).sort();
       await p.dbg(`chooseSeat('Alice')`);
       await p.waitOnline();

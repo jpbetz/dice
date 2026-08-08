@@ -12426,6 +12426,16 @@ function requestClear() {
 // ---------------------------------------------------------------------------
 
 const AS_PARAM = (new URLSearchParams(window.location.search).get('as') || '').trim();
+// The name this origin already held when the tab opened. Read ONCE at boot:
+// takeSeat writes LS_NAME as it joins, so reading it later would answer with
+// the seat just taken rather than the one the player arrived with.
+const STORED_NAME_AT_BOOT = (() => {
+  try { return (localStorage.getItem('dice.name.v1') || '').trim(); } catch { return ''; }
+})();
+// Set when a per-seat link pulled a RETURNING player into the picker (U3):
+// {name, seat}. The modal reads it to explain why it opened at all, and to
+// offer the player their own name back in one press.
+let seatReturning = null;
 
 let seatPhase = 'idle';   // 'idle' | 'pick' | 'joining' | 'preview'
 let seatPeekInfo = null;  // peekTable's answer for the LIVE prompt ({name?, seats?} | null)
@@ -12494,6 +12504,20 @@ function renderSeatChoices() {
   // never over a name mid-typing (the link's suggestion must not fight the
   // player's own intent).
   if (preselected && !input.value) preselected.focus();
+}
+
+// The returning player's own row (U3). A first-timer sees none of this: the
+// button is absent, and the hint is the one it has always been.
+function renderSeatReturning() {
+  const btn = document.getElementById('seat-keep-name');
+  const hint = document.getElementById('name-hint');
+  if (!btn) return;
+  const r = seatReturning;
+  btn.classList.toggle('hidden', !r || !r.name);
+  if (!r || !r.name) return;
+  btn.textContent = `Stay as ${r.name}`;
+  btn.title = `Join this table under the name you already use — not the ${r.seat} seat`;
+  hint.textContent = `This link offers the ${r.seat} seat, with their prepared pools.`;
 }
 
 // Phase → which halves of the panel exist. The pick furniture and the
@@ -12667,6 +12691,7 @@ function promptName(peek) {
     seatVerdict = { ok: true, status: '', canApply: false };
     seatResolve = resolve;
     renderSeatChoices();
+    renderSeatReturning();
     renderSeatPhase();
     modal.classList.remove('hidden');
     input.value = '';
@@ -12703,12 +12728,19 @@ function promptName(peek) {
         if (seatPhase !== 'pick' || seatResolve !== resolve) return;
         seatPeekInfo = info;
         renderSeatChoices();
+        renderSeatReturning();
       });
     }
   });
 }
 
 // The preview's two exits — the ONLY two. Static buttons, bound once.
+// U3's escape hatch: keep the name you arrived with. It is the free-text
+// path with the typing already done, so it lands on takeFreeSeat exactly as
+// "Someone else…" does — no second join door to keep in sync.
+document.getElementById('seat-keep-name').addEventListener('click', () => {
+  if (seatReturning && seatReturning.name) takeFreeSeat(seatReturning.name);
+});
 document.getElementById('seat-apply').addEventListener('click', () => applySeatChoice());
 document.getElementById('seat-skip').addEventListener('click', () => dismissSeatChoice());
 
@@ -12736,13 +12768,43 @@ async function initNet() {
 
   let name = '';
   try { name = (localStorage.getItem(LS_NAME) || '').trim(); } catch { /* ignore */ }
+
+  // A PER-SEAT LINK OUTRANKS A STORED NAME (U3, 2026-08-08). `dice.name.v1`
+  // is origin-GLOBAL, so this gate skipped the picker for anyone who had ever
+  // opened the app on this origin — and `&as=Bo` then did nothing at all.
+  // §7.19's "one link in Discord, six people, each landing at the right seat"
+  // and G5's CUJ2 held only for six people who had never used the app, which
+  // is the opposite of the population an invite link is sent to. The suite
+  // could not see it either: `prepared-seat` passes because the harness seeds
+  // no name.
+  //
+  // A link that NAMES a seat is an explicit intent about THIS table, and a
+  // name stored for the ORIGIN is not. So the link wins — but only when the
+  // room really is offering that chair, which is why this peek is AWAITED
+  // rather than fired alongside the modal: a stale or unmatched `&as=` must
+  // never put a modal in front of a returning player. peekTable resolves
+  // null on every failure inside its own short timeout, so no server, no
+  // prepared table, and no matching seat all fall straight through with the
+  // stored name and today's behaviour.
+  let peeked = null;
+  if (name && AS_PARAM) {
+    peeked = await peekTable(ROOM);
+    seatPeekInfo = peeked;
+    const wanted = seatPreselect();
+    seatPeekInfo = null; // promptName owns this from here
+    if (wanted) {
+      name = '';
+      seatReturning = { name: STORED_NAME_AT_BOOT, seat: wanted };
+    }
+  }
+
   if (!name) {
     // §G5: peek at the room's prepared seats WHILE the modal is up. Fired
     // here, not awaited here — the prompt renders immediately and the picker
     // is furniture that arrives if the answer does (peekTable resolves null
     // on every failure inside its own short timeout, so no server and no
     // setup both leave today's plain prompt, and the join never hangs on it).
-    name = await promptName(peekTable(ROOM));
+    name = await promptName(peeked ? Promise.resolve(peeked) : peekTable(ROOM));
     try { localStorage.setItem(LS_NAME, name); } catch { /* ignore */ }
   }
 

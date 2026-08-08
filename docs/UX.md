@@ -1,8 +1,11 @@
 # UX Design: Notation, Roll Moments, Visibility, Dice Sets
 
-*(Latest addendum: §7.16 — the Soul Deal audit fix pass, the ceremony's
-flow to collected, and the one-way rim, all 2026-08-04. Where it touches
-earlier sections it wins; superseded spots carry pointers.)*
+*(Latest addendum: §7.23 — three independent section switches, the well at
+the head of the column, and a second source list in the collapsed one, all
+2026-08-08. Where a later section touches an earlier one it wins; superseded
+spots carry pointers. **Start at §7's WHAT IS TRUE TODAY table**: §7 runs in
+commit order, so the section that describes a surface is usually not the one
+that last changed it.)*
 
 Authoritative UX spec for the next evolution. This is a spec, not a survey:
 where alternatives existed, the decision is recorded here and the alternative
@@ -30,6 +33,42 @@ still spells the code that way and only that way. (The collect shelf's internal 
 a different thing again and keeps its name.)
 
 ---
+
+> **§1–§6 ARE THE ORIGINAL SPEC, AND PARTS OF THEM ARE HISTORY.** They were
+> written before anything shipped and were never revised in place; §7 has
+> been overwriting them, section by section, ever since. Most of what they
+> define still binds — the grammar (§1.1), the parser API (§1.2), the
+> round-trip invariant (§1.5), the server's re-parse (§1.6), the whole
+> visibility spec (§3), dice sets (§4) and the visual language (§5) are all
+> live and are cited from §7. But six things here describe a build that does
+> not exist, and each has been checked against the source:
+>
+> - **§1.3's placement** — the box is not below the pool chip row inside a
+>   Compose panel. It is one of three independent sections below the well,
+>   switched by the `2d6` cell (§7.23). The paragraph's *model* — one spec
+>   object, two projections — is still binding; only the geography is dead.
+> - **§1.4's click-to-copy formula** — `.group-formula` has a stylesheet
+>   entry and **no producer in `js/`**; there is no "notation copied" toast
+>   anywhere in the app.
+> - **§2.1 / §2.3's experience records and their editor** — never built. The
+>   three moments ship as notation flags instead (§7.6, `check` / `cinematic`
+>   + `# Title | Subtitle`), the room-wide `experiences` key ships empty, and
+>   `/api/table` refuses it outright rather than carry a key nothing writes.
+> - **§2.4 phase 0's user-held dwell and Roll button** — the intent card has
+>   no button and holds the stage for a fixed `CEREMONY_DECLARE_S = 1.35`
+>   seconds. Phases 1–8 and the reduced-motion guardrails still bind.
+> - **§2.5's one hero slot** — unreachable. All three profiles in
+>   `js/meanings.js` declare `meaningFor: () => null`, so the meaning branch
+>   never paints and the verdict/chart disagreement it arbitrates cannot
+>   arise. (ROADMAP U17 decides what a per-die system's Check shows; until it
+>   lands, this section is a ruling with nothing to rule on.)
+> - **§6's four slices** — a build order, executed. Read it as a record of
+>   what was sequenced, never as work remaining; ROADMAP.md sequences work.
+>
+> Nothing here is deleted, because this repo keeps its post-mortems and the
+> reasoning in these sections is still the reasoning. **For what is true of a
+> surface today, start at §7's WHAT IS TRUE TODAY table** — it names the one
+> authoritative section per surface and the readings that mislead.
 
 ## 1. Notation layer
 
@@ -1039,6 +1078,36 @@ per-roll choices — §3.3.)
 Two principles arrived from Joe after §1–§6 were drafted. They are binding;
 where they touch earlier sections, this addendum wins.
 
+### WHAT IS TRUE TODAY (2026-08-08)
+
+The subsections below run in **commit order**, not surface order, and they
+supersede one another in place. That structure has already shipped two wrong
+builds, both post-mortemed here: §7.22's contextual roll bar (built on the
+half of §7.14 that §7.9 had superseded) and §7.23's first section-bar plan
+(built on a `.seg` rule the panel had already overridden). Both agents read
+a section that described the surface and never found the one that changed
+it. This table is the index: per surface, the section that is authoritative
+today and the reading that will mislead you. **Read the row before the
+section, and update the row in the same commit that changes the surface** —
+a stale row is worse than no table.
+
+| Surface | Authoritative today | Do not build from |
+|---|---|---|
+| Workbench well + rim | §7.14.1 — one object, two zones; the plate IS `#tray-actions::after`; the cue owns a reserved band · §7.16's ONE-WAY RIM (`± Modify · Offer ▾ · ✕ Clear`) | §7.14's well/rail bullets — the ± left the well and Save is retired · §7.9's 2026-08-01 ghost-text demotion |
+| Section bar (`Dice · 2d6 · Pools`) | §7.23, as amended 2026-08-08 — three independent switches, all-off legal, two state objects; the DRESS of record is the comment over `#left-panel :is(.section-seg, #rail-mode)` in `css/style.css` | §7.9's "ONE input view at a time" and the two-value `dice.inputmode.v1` |
+| Die palette (`#die-buttons`) | §7.23 — it is a section now, switched by the `Dice` cell · §7.16's 2i-D for the steel tile body · §7.10's identity strip for the one build-dice idiom shared with the creation card | §7.1 entire: the felt die shelf was never built and its "the buttons become the fallback" demotion never took effect. GOALS moved physical pool-building to the delight tier |
+| Notation box (`#cmd`) | §1.1 grammar · §1.2 parser API · §1.6 server parse · §7.23 for where it sits and what switches it on | §1.3's placement paragraph (see the §1 banner). **No section yet records ROADMAP U1/U2**, shipped 2026-08-08 in `07099a7`: staging carries intent, and a box that stops parsing disarms the plate |
+| Saved-pools rack + shelves | §7.9's THE SHEET PASS — identity edits by id, creation-as-editing, the ✎ row — and its DEALT RACK amendment · §7.18 for what the ✎ gate covers | §7.17's region head, amended below: `SAVED POOLS` no longer stands over your own rack |
+| Collapsed launcher (the rail) | §7.22 — 112px, a row is a word, the standing verb, 2i-G · §7.23's "The collapsed column" — the source switch, the dice list, the plate at rail scale | §7.9's collapsed paragraph: it predates the second source list and describes a column that holds only pools (its 56px history is already struck there) |
+| Result banner | §7.11b — the folded card, the hover read, the beacon, auto-collect at 3 s · §7.21 — the named primary verb, the retired watermark | §7.9's Done-at-rest and its ~6 s clock (the shipped clock is 3 s) · §7.7.2's ⟳ / Collect / ✕ trio |
+| Verdict card | §7.16's THE FLOW TO COLLECTED — a folded card whose clock shelves the roll · §7.21 — `❯❯ Skip` repaints to `✕ Clear` when the beat lands | §7.7.2's verdict half (struck there) · §2.4 phase 0's user-held dwell and Roll button (shipped: a 1.35 s timer, no button) |
+| Peek | §7.7.1 for what a peek is · §7.11b's "folded card, shelf edition" · §7.21 — its primary is always `✕ Clear`, housekeeping being anyone's | §7.15's one-✕ rule — retired, struck below · §7.9's "the peek carries a prominent ✕ at its base" amendment |
+| Roll log | No single section. §7.9 for the rail-foot flyout and key `l` · §7.12 for the compact grouped line (the per-die ROWS belong to the other three surfaces) · §7.15's "The log says so" for `reroll` / `rerolled` | — |
+| Shelf | §7.7 — slots, collect, FIFO ranks, universal housekeeping, resync · §7.7.1 — no casino markings, left-to-right compaction | The marker's resting read in §7.7 and §7.9, amended below: it ships invisible. ROADMAP U20 owns the redesign |
+| ± popover | §7.10 — a pure editor, and where an edit lands by source · §7.14.2 — Done, click-away, the ring · §7.9's SHEET PASS identity strip | §7.10's "reroll and explode stay… behind the sysnote's *Show anyway*" — superseded 2026-08-06, no note and no disclosure; the accurate record is the comment at `index.html:683` |
+| Identity chip · roster · nameplate | §7.17 — the rail pill is the one per-player surface, left-click toggles the rack, right-click / long-press opens the menu, and the quiet nameplate · §7.9's ORDER IS THE CONTRACT · §7.22 for the collapsed dress | §7.9's "Identity is on the table" paragraph, where left-click opened the menu |
+| Settings | No single section. §7.9 for the *Just you* scope (chips off by default, the dice-set select) · §7.13 for *Your data* · §7.17 for the table name; the room-wide keys are `SETTING_SPECS` in `server.js` | §2.1 / §2.3's experience record and its editor — never built, and `/api/table` refuses the key |
+
 ### 7.1 Physical pool building (supersedes the button grid as the primary path)
 
 **Principle: physical analogy over UI.** The die-type buttons and pool chips
@@ -1130,16 +1199,21 @@ the notation surfaces it comes for free (§7.8).
 | ~~Saved pool (compact pill)~~ | — | — | retired with the mini bar (§7.9); the Saved pools panel expands from its edge tab instead |
 | Reroll-last (⟳) | click | — (re-rolls as rolled) | inherits original intent |
 | Collapsed pool rail (launcher) | tap to select, gold bar rolls | — | — (see the carve-out) |
+| Collapsed dice list (launcher) | tap to count up, gold bar rolls | — | — (bare specs only; see the carve-out) |
 
 Offer is disabled (with tooltip) in solo mode on every surface. A surface
 gaining a new capability must fill its whole column.
 
-**The launcher carve-out** *(2026-08-07, §7.22)*: the full-column law binds
-**authoring** surfaces — the ones where a roll's intent is composed. A
-LAUNCHER fires intents that were already authored elsewhere (a single pick
-rides its pool's stored intent verbatim; a multi-pick composes what the
-grammar can union and says what it set aside), and the authoring surface is
-one keystroke away — `n` opens the workbench. This regularizes an
+**The launcher carve-out** *(2026-08-07, §7.22; extended to the dice list
+2026-08-08, §7.23; carried into GOALS' Uniform-roll-surfaces invariant
+2026-08-08, because GOALS wins ties and the exemption has to live in the
+document that does)*: the full-column law binds **authoring** surfaces — the
+ones where a roll's intent is composed. A LAUNCHER fires intents that were
+already authored elsewhere (a single pick rides its pool's stored intent
+verbatim; a multi-pick composes what the grammar can union and says what it
+set aside; the dice list fires a bare `NdX` with every axis at its default,
+which is why it can fire at all), and the authoring surface is one keystroke
+away — `n` opens the workbench, `/` the palette. This regularizes an
 already-shipped state rather than creating a new exemption: the collapsed
 rail has never offered or edited intent.
 
@@ -1187,8 +1261,12 @@ at a time; history lives on a shelf.
 
 - **Shelf**: 5 recessed slots along the bottom felt edge, rendered in the 3D
   scene (identical in compact view). A collected roll's dice sit in its slot
-  as a tight cluster; a compact marker floats above it: roller color dot +
-  total + meaning word (active-profile lens).
+  as a tight cluster; ~~a compact marker floats above it: roller color dot +
+  total + meaning word (active-profile lens).~~ *(Amended 2026-08-08: the
+  marker floating above it draws **nothing** — no dot, no total, no lens
+  word. §7.9's P1 pass took quiet-by-default one rung past this line and the
+  read never came back; see the amendment there for what ships and for
+  ROADMAP U20, which owns the redesign.)*
 - **Collect**: replaces Done as the roller's primary on verdict card and
   banner (POST /api/collect-roll, roller-only, idempotent, broadcast
   'roll-collected'). Dice whisk to the slot (~400ms dt-driven slide; full
@@ -1394,19 +1472,38 @@ roll is a record). Not room state: two players wear two sets. Shroud
 outranks identity everywhere (a hidden roll is obsidian, sheds no
 particles, and reveals INTO the roller's set).
 
-**Resting shelf markers are a dot.** One roller-colored dot on a large
+~~**Resting shelf markers are a dot.** One roller-colored dot on a large
 round target — no always-on gold total, no tiny ✕, and a held roll shows
-the same dot rather than shouting `?`. Hover or tap explodes it into the
-existing peek card (§7.7.1) with the full total and breakdown; the peek
-carries a prominent ✕ at its base that clears the roll for everyone.
-*(Amended by §7.15's one-✕ rule: the peek's base ✕ now exists only when a
-TAP opened the card; a hover-opened peek defers the clear to the marker's
-sweep dress — one affordance at a time.)*
+the same dot rather than shouting `?`.~~ **Amended 2026-08-08 to match the
+build: the resting marker draws NOTHING.** P1 was taken one rung further than
+this paragraph records — the settled cluster is its own presence, so a dot
+floating over the pile read as chrome about chrome. `.shelf-marker` ships
+`background:none; border:none` over a 76px invisible hit disc (56px in
+`body.mini`), and `.sm-dot` is styled in `css/style.css` with **no producer in
+`js/`** — a rule waiting for a decision, not a shipped element. The
+consequence is real and known: a shelved roll carries no read at rest at all —
+not who rolled it, not what it meant, not which held roll is still waiting on
+its reveal — and `title` is the whole information channel, which touch never
+gets. **ROADMAP U20 owns that redesign** (produce the dot, add a shroud glyph
+for hidden entries) and it is a DESIGN FIRST item; until it lands, this
+paragraph describes an intention and the CSS describes the surface. Hover or
+tap still explodes the marker into the peek card (§7.7.1) with the full total
+and breakdown. ~~the peek carries a prominent ✕ at its base that clears the
+roll for everyone. *(Amended by §7.15's one-✕ rule: the peek's base ✕ now
+exists only when a TAP opened the card; a hover-opened peek defers the clear
+to the marker's sweep dress — one affordance at a time.)*~~ **Retired by
+§7.11b and §7.21**: the peek's clear is the named `✕ Clear` at the head of its
+fold, in every modality, and nothing branches on the opening gesture.
 
-**The clear gesture is one gesture.** The roller's ✕ on the post-roll
+**The clear gesture is one gesture.** ~~The roller's ✕ on the post-roll
 banner, the ✕ on the verdict card and the peek's base ✕ share a class, a
-look and the label *Clear this roll for everyone*. A spectator's local
-dismiss stays visually distinct — different semantics, different affordance.
+look and the label *Clear this roll for everyone*.~~ **Restated by §7.21**:
+all three surfaces lead their fold with one named primary built by
+`appendCardActions` — `✕ Clear` for the roller, `✕ Dismiss` for a spectator,
+`❯❯ Skip` while a ceremony beat still plays — each carrying that same
+sentence as its `aria-label`. The rule is unchanged; the affordance is a
+worded button rather than a bare glyph. A spectator's local dismiss stays
+visually distinct — different semantics, different affordance.
 
 **The rail never hides — and it rides the panel now.** *(2026-08-04, Joe:
 zero overlays on the tabletop.)* The rail split in two inside the side
@@ -1525,13 +1622,19 @@ pointer bonus as tiles. Deliberate asymmetries: the peek's reroll REPLACES
 its shelved cluster while the banner's lets the old roll shelve itself on
 arrival, and the banner ✕ role-splits (roller clears for everyone, a
 spectator dismisses their own card) where the peek's ✕ is §7.7
-housekeeping for anyone. The collected cluster itself stays the ONE big
+housekeeping for anyone. ~~The collected cluster itself stays the ONE big
 felt-side clear target — click sweeps it, hover dresses the whole circle
 with the ✕ promise (never a second smaller target for the same verb).
 *(That "never a second target" clause was violated in the shipped build —
 the zero-delay peek carried its ✕ on the same pointer beat that dressed
 the sweep; §7.15's one-✕ rule closes it: the peek builds a ✕ only when a
-tap opened it.)*
+tap opened it.)*~~ **Retired by §7.11b, and the clause restated by §7.21.**
+The felt-side sweep dress is gone: clicking a marker OPENS its peek, and the
+peek's own named `✕ Clear` is the clear target — one affordance, no gesture
+branch, so §7.15's whole one-✕ machinery went with it. The clause survives
+in §7.21's sharpened form — *never a smaller UNNAMED target for one verb* —
+because the card body is still a shortcut to the named button, not a rival
+to it.
 (4) The
 default rack is the Soul Deal starting set: nine attributes in their
 Physical/Mental/Social triads (Strength/Toughness/Agility ·
@@ -2030,39 +2133,55 @@ Stage B of Joe's play notes: one clear affordance per collected roll, the
 reroll verb named everywhere it fires, and history that tells rolls and
 rerolls apart — server-substantiated.
 
-**The one-✕ rule (Joe's decision: keep the big red one).** A collected
+~~**The one-✕ rule (Joe's decision: keep the big red one).** A collected
 roll has exactly ONE reachable clear affordance, **chosen by the gesture
-that opened the card**:
+that opened the card**:~~ **Retired by §7.11b** (same day, and completed by
+§7.21): the ✕-over-the-dice sweep dress is gone, and with it the whole
+gesture-tracked machinery below. The marker only OPENS the card now — hover
+peeks, click pins, in every modality — and the card clears, leading its fold
+with the named `✕ Clear` §7.21 gave all three result surfaces. One removal
+grammar on banner and peek alike; nothing branches on how the card was
+opened. `peekVia` and `sweepUnavailable` are gone from `js/main.js`, which
+records the retirement at the declaration of `peekRollId`, and
+`hasClear: !!peekEl.querySelector('.pk-clear')` survives in the debug hook as
+a regression pin that must read false. **Nothing below this line describes
+the build.**
 
-- Peek opened by hover (or a pin) → the marker's sweep dress — the whole
+- ~~Peek opened by hover (or a pin) → the marker's sweep dress — the whole
   76px circle with the 30px salmon ✕ promise — is the clear target; the
   card builds **no ✕ row at all** (not a hidden node: a vestigial node
-  invites "fixing").
-- Peek opened by tap → there is no hover to dress the circle, so the
+  invites "fixing").~~
+- ~~Peek opened by tap → there is no hover to dress the circle, so the
   card's base ✕ **is** the big red one. This is why `.pk-clear` could not
   simply be deleted: the sweep is `display:none` on coarse pointers *and*
   the marker's click handler branches on the recorded pointer type (a tap
   toggles the peek instead of clearing), so on touch — hybrid laptops
   included, where the coarse media query can be false — the card ✕ is the
   only clear path. The coarse `display:none` on the sweep is load-bearing
-  as the rule's complement.
-- **Exactly one, never zero** (amended 2026-08-03, adversarial pass): the
+  as the rule's complement.~~
+- ~~**Exactly one, never zero** (amended 2026-08-03, adversarial pass): the
   gesture alone cannot decide, because not every open on a touch device
   is a tap. A long-press fires `contextmenu` → `openShelfPopover` →
   `openPeek` with the default `'hover'`, and on a coarse pointer that
   card had *no sweep and no ✕* — a collected roll nobody could tidy. So
   the card also keeps its ✕ wherever the sweep cannot be dressed, read
   live from the same media query that hides it (`sweepUnavailable`). The
-  complement is now enforced in code, not merely relied upon in prose.
+  complement is now enforced in code, not merely relied upon in prose.~~
 
-Mechanism: `peekVia` ('hover' | 'tap') rides `openPeek`; only the
+~~Mechanism: `peekVia` ('hover' | 'tap') rides `openPeek`; only the
 marker's touch branch passes 'tap', and a mouse `pointerenter` over an
 already-tap-opened card never steals its ✕ mid-interaction (the gesture
 is taken only on an actual open). The banner ✕ stays unconditional — an
 uncollected roll has no marker to sweep — and the verdict ✕ is untouched
 *(later retired with the card's Done — §7.16's flow to collected; the
 card BODY is its clear affordance now)*. Keyboard users clear as before
-(Esc's sweep, the log/corner paths): no regression, no new path this pass.
+(Esc's sweep, the log/corner paths): no regression, no new path this pass.~~
+
+*Kept struck rather than deleted because the reasoning is still worth having:
+the rule was right about the hazard — two targets for one verb — and wrong
+about the fix, which turned out to be one target that does not depend on the
+pointer at all. The rest of §7.15 (the cue vocabulary, `rerollOfId`, the log's
+qualifiers) is unaffected and still binds.*
 
 **The reroll cue vocabulary.** `buildRollCue` draws from a CLOSED set —
 `ROLL` for fresh pools (the draft cluster, an offer's claim strip),
@@ -2235,20 +2354,57 @@ identity surface in the app. The ORDER contract holds: the you-chip
 keeps its corner; past four players the plate wraps below exactly like
 the status pill always has.
 
-**THE REGION HEAD.** `SAVED POOLS` stands over the rack — the one region
+**THE REGION HEAD.** ~~`SAVED POOLS` stands over the rack — the one region
 a newcomer genuinely misreads, because its steel tiles wear the dice
-palette's exact grammar two regions up. Same 10px ambient tier as the
-category heads; the RANK difference is structural, not typographic: a
-hairline runs from the word to the panel edge (region rank), category
-heads carry none (shelf rank). Head at entry + '✎ Edit pools' at exit
-bracket the region. Not sticky (the category heads keep the mid-scroll
-naming job; a second pinned band would steal tray-adjacent pixels).
-Browsing a teammate HIDES it — the standing `ALICE'S POOLS · read-only`
-banner is that state's region head: one head per state, never two.
+palette's exact grammar two regions up.~~ **Retired 2026-08-08 by §7.23's
+section bar** (Joe, same day: *"instead of SAVED POOLS let's just say POOLS.
+Or drop the group name? …we don't name the DICE UI region"*). The head was
+stood up to kill one confusion, and the bar kills it better: the pressed
+`Pools` cell stands directly above the region and names it, in the same
+breath as the two cells beside it. A second name for one region is exactly
+the redundant standing chrome §7.9 kills, and no other section carries one.
+`#pools-head:not(.foreign) { display: none }` is the whole change.
+
+**What survives is the job the bar cannot do.** On a teammate's rack the same
+element swaps to their identity and surfaces the read-only tag, so ownership
+can never scroll away — so the head now renders in the **foreign state only**.
+Same 10px ambient tier as the category heads; the RANK difference is
+structural, not typographic: a hairline runs from the word to the panel edge
+(region rank), category heads carry none (shelf rank). ~~Head at entry +
+'✎ Edit pools' at exit bracket the region.~~ Only '✎ Edit pools' brackets your
+own rack now; the section bar is the other end. ~~Not sticky~~ — it is sticky,
+because the state it survives into is the one where ownership must not scroll
+away (`#pools-head.foreign` pins at `--draft-h` and the category heads yield
+theirs). ~~Browsing a teammate HIDES it — the standing `ALICE'S POOLS ·
+read-only` banner is that state's region head: one head per state, never
+two.~~ Inverted the same day by the teammate-pill consolidation two paragraphs
+down: the separate banner was retired and this head became that state's
+head — browsing a teammate is now the only thing that SHOWS it.
 *This deliberately supersedes §7.9's "There is no 'Pools' title row" FOR
 THE REGION under Joe's explicit 2026-08-04 ask — the COLUMN still has no
 title, and what died in §7.9 (a name floating over the whole panel)
-stays dead.*
+stays dead.* *(And it is now largely back: with the head foreign-only, your
+own rack again carries no standing word of its own. That is the intended end
+state, not drift — the bar names it.)*
+
+**A LIVE DEFECT the deletion left behind** *(recorded 2026-08-08; do not fix
+it here — it needs a code change, and its assertion needs one too)*. The
+dice-value ledger (§7.18, §2l ③) has two figures: a per-shelf `.psh-fig` on
+each category head, and a whole-rack `.ph-fig` that rides the region head's
+slack. `renderGroups` builds the rack figure only when `!foreign && poolsEdit`
+— and `#pools-head:not(.foreign)` is `display:none`, so **the state that
+builds it is exactly the state that hides it. The whole-rack `dice value`
+caption has never rendered since the head went foreign-only**; the shelf
+figures are left as bare integers with no unit anywhere on screen. The `✎`
+gate's own contract in §7.18 says the figures are *"built in manage mode only,
+not built-and-hidden"*, for a stated reason: a CSS-hidden figure still
+concatenates into `textContent`. That is precisely what happened here, and it
+is why **the `rack-dice-value` scenario still passes** — it reads the
+`textContent` of a `display:none` node, which reads fine. §2l's build-not-hide
+lesson, inverted by a CSS rule written three sections later. The fix is a code
+change plus an assertion that pins computed display (§7.21's lesson: *a
+visibility contract is about what the eye gets*), and it belongs with U20-era
+work, not with a doc pass.
 
 **THE REFUSALS (as load-bearing as the additions).** The dice region
 gets nothing: the pressed *Dice* segment already names it and eight
@@ -3007,20 +3163,58 @@ are a MULTISET you count up. Both are picks under **2i-G** — ordered by their
 list, never persisted, spent by their roll. The MODE is a preference and
 persists (`dice.railmode.v1`); the PICKS never do.
 
-**QUIET CHROME, both views** *(Joe 2026-08-08: "too bright/prominent… it's
-almost always all selected elements, making it the eye catching part of the
-screen until some action is taken")*. That is inverted emphasis: a segmented
-control lights what is ON, but here nearly everything is on nearly always, so
-the loudest object in the panel was the one you touch least. Both bars shed
-the `.seg` track entirely — no recess, no border, no lit cells — and carry
-state in **weight alone**: sections you have are legible at 0.72 ivory, ones
-you don't sit at 0.45 muted. Nothing competes with the well.
-*This also settles the one genuine Joe-vs-doctrine collision the design pass
-found.* His sketch asked for a recess showing the active option; §7.22 had
-spent a whole pass removing standing boxes from the 112px column, because
+**QUIET CHROME, both views — THE INK MARKS THE CONTROL, THE WEIGHT MARKS THE
+STATE.** *(Joe 2026-08-08, twice: first "too bright/prominent… it's almost
+always all selected elements, making it the eye catching part of the screen
+until some action is taken", then — after a pass that simply deleted the
+dress — "now it's just floating text with no visual language".)* Both notes
+are right and they are not in tension. The fault was never that the bar HAD a
+dress; it was that the ink sat on the wrong thing. A segmented control lights
+what is ON, and here nearly everything is on nearly always, so the loudest
+object in the panel was the one you touch least — and stripping it bare then
+took the affordance out with the noise.
+
+**Shipped, and this is the paragraph of record** *(rewritten 2026-08-08 from
+the comment over `#left-panel :is(.section-seg, #rail-mode)` in
+`css/style.css`, which was the only account of the third iteration; the
+first draft of this section described the second one, and the `#rail-mode`
+comment in `css/style.css` and the source-switch comment in `index.html`
+repeated it)*. Both bars keep **one
+quiet track** around the whole strip — `1px` of `rgba(255,255,255,.055)` over
+`rgba(0,0,0,.16)`, `8px` radius, `2px` of padding. One object, unmistakably a
+control, rather than three lit ones. Inside it nothing is filled loudly: a
+pressed cell wears **the faintest recess the panel can hold**,
+`rgba(255,255,255,.05)` with no inset ring — against the `0.13`-plus-ring the
+first build gave it — and the real signal is **weight**: pressed reads
+`--ivory` at `0.78`, unpressed `--muted` at `0.42` (2i-C's rest-dim). Hover
+lifts either to `1`. No gold anywhere on the bar: HUE = ACT, and this is a
+tool. Nothing here competes with the well.
+*This is also how the one genuine Joe-vs-doctrine collision of the design
+pass settled.* His sketch asked for a recess showing the active option; §7.22
+had spent a whole pass removing standing boxes from the 112px column, because
 **selection is the only box there** and that is what lets one signal carry it.
-A quiet bar satisfies both, and it took his own second look to get there — the
-first build shipped the recess and it was the brightest thing on screen.
+A recess at a tenth the volume satisfies both — it is the "recessed area shows
+which is active" he asked for, quiet enough that the selection box downstairs
+is still the only box that reads as one. It took his second look to get
+there: the first build shipped the loud recess and it was the brightest thing
+on screen, and the pass that answered him by deleting the track went past
+quiet into unmarked.
+*(A record note, because it is the point of §7's index table: this paragraph,
+the `#rail-mode` CSS comment and the source-switch comment in `index.html`
+all went on describing the middle iteration — "no track, no lit cell, weight
+alone, 0.72/0.45" — while the build shipped a track, a recess and 0.42/0.78,
+recorded nowhere but that CSS block's own comment. Three stale records against one
+accurate one, on the newest surface in the file, in a repo whose CLAUDE.md
+names this document the authority. All four now agree, and the section bar's
+own `index.html` comment — which described the markup and said nothing about
+the dress — now carries it too. The CSS comment stays the dress of record,
+because the numbers live beside it.)*
+
+**2i-C's disabled code is unchanged and still the third state.** Only the
+collapsed switch has a cell that can go unavailable — `Pools` on an empty
+rack — and it is grayscale-drained to `0.25`, below rest-dim: unavailable,
+not merely secondary. The expanded bar never disables a cell; all-off is
+legal, so every section is always reachable.
 *(Two cascade notes, both paid for: `.seg`'s track sits ~3100 lines below
 these rules, so an unscoped `.section-seg` loses the tie on source order; and
 the pressed dress inside the panel is IVORY via `#left-panel .seg`, not the

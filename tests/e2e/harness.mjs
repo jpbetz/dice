@@ -411,6 +411,12 @@ export class Ctx {
         await page.addInitScript(
           `try { localStorage.setItem('dice.name.v1', ${JSON.stringify(name)}); } catch {}`,
         );
+        // `name` WITH `anon` is the RETURNING PLAYER (U3): a stored name AND
+        // an expectation of meeting the seat picker anyway. Until the &as=
+        // fix that combination was unreachable — `anon` meant "no name", so
+        // the one population an invite link is actually sent to could not be
+        // expressed, which is exactly why prepared-seat passed while CUJ2 was
+        // broken for everyone who had ever opened the app.
       } else if (anon) {
         // Anonymous means anonymous. Names live in per-origin localStorage,
         // which OUTLIVES a scenario's room — so merely declining to seed one
