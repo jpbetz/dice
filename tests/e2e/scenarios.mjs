@@ -3537,6 +3537,178 @@ export const scenarios = [
   },
 
   {
+    name: 'touch-doors',
+    tags: ['smoke', 'chrome', 'seat'],
+    // U27 + U12. Every right-click door needs a touch twin, because iOS
+    // Safari never fires `contextmenu` on a long press — a contextmenu-only
+    // door is a door that does not exist on an iPhone. Three of the four
+    // were wrong: the identity chip opened its menu on the hold and let its
+    // own click handler CLOSE it on the same release (dead since it
+    // shipped), and the shelf marker and peek card had no hold at all.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.8', name: 'Touch' });
+      const hold = async (sel, ms = 620) => {
+        await a.eval(`(() => { const t = document.querySelector(${JSON.stringify(sel)});
+          t.dispatchEvent(new PointerEvent('pointerdown',
+            {bubbles: true, pointerType: 'touch', clientX: 10, clientY: 10})); })()`);
+        await new Promise((r) => setTimeout(r, ms));
+        await a.eval(`(() => { const t = document.querySelector(${JSON.stringify(sel)});
+          t.dispatchEvent(new PointerEvent('pointerup',
+            {bubbles: true, pointerType: 'touch', clientX: 10, clientY: 10}));
+          t.click(); })()`);
+      };
+
+      // (i) THE IDENTITY CHIP — the defect. That menu is the only door to
+      // Change name, Change seat and Leave table, so a touch-only player
+      // could not rename, re-seat or leave.
+      assert.equal(await a.eval(
+        `!document.getElementById('identity-menu').classList.contains('hidden')`),
+      false, 'the menu starts closed');
+      await hold('#identity-chip');
+      assert.equal(await a.eval(
+        `!document.getElementById('identity-menu').classList.contains('hidden')`),
+      true, 'a hold opens the identity menu AND THE RELEASE DOES NOT CLOSE IT');
+      // …and the three items it is the only door to are really there.
+      // Change name… · Change seat… · Leave table — the three verbs whose
+      // ONLY door this menu is (Copy invite link has a second home as a
+      // .rail-ghost when the roster is empty; these do not).
+      for (const id of ['idm-rename', 'idm-leave', 'idm-lobby']) {
+        assert.equal(await a.eval(
+          `getComputedStyle(document.getElementById(${JSON.stringify(id)})).display !== 'none'`),
+        true, `${id} is reachable through the touch door`);
+      }
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
+
+      // (ii) A NORMAL TAP still falls home rather than opening the menu —
+      // the suppressor must not swallow the ordinary press.
+      await a.eval(`document.getElementById('identity-chip').click()`);
+      assert.equal(await a.eval(
+        `!document.getElementById('identity-menu').classList.contains('hidden')`),
+      false, 'a plain tap does not open the menu');
+
+      // (iii) THE SHELF MARKER — a shelved roll's tweaked reroll was
+      // unreachable on iOS. Roll, collect, then hold the marker.
+      await a.roll('2d6');
+      await a.settle();
+      const rid = await a.rollId();
+      assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, 'collect accepted');
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), document.querySelectorAll('.shelf-marker').length > 0`
+        + ` && window.__diceDebug.whiskingCount === 0)`,
+        { desc: 'the roll reaches the shelf' });
+      await hold('.shelf-marker');
+      assert.equal((await a.dbg('popover')).open, true,
+        'a hold on the shelf marker opens the tweaks popover');
+      // The peek stands open UNDER it on purpose — openShelfPopover anchors
+      // the popover to the card ("the peek pins while it lives"). What must
+      // NOT happen is the marker's own click toggling that peek back shut on
+      // the release, which is the fall-through lp.took() exists to stop.
+      assert.equal(await a.eval(
+        `!document.getElementById('peek-card').classList.contains('hidden')`),
+      true, 'the peek stands as the popover’s anchor, not toggled shut by the release');
+      await a.dbg('closePopover()');
+
+      // (iv) THE PEEK'S OWN HOLD — the other contextmenu-only door. It is
+      // attached once at boot rather than per render, so a peek opened and
+      // closed repeatedly must not stack one timer per visit.
+      // The marker's tap TOGGLES, and closePopover above left peekRollId
+      // pointing at this roll — so the first tap may close rather than open.
+      // Tap until it stands; two is the most it can ever take.
+      for (let i = 0; i < 2; i++) {
+        if (await a.eval(
+          `!document.getElementById('peek-card').classList.contains('hidden')`)) break;
+        await a.eval(`document.querySelector('.shelf-marker').click()`);
+      }
+      await a.waitFor(
+        `!document.getElementById('peek-card').classList.contains('hidden')`,
+        { desc: 'the peek stands' });
+      await hold('#peek-card');
+      assert.equal((await a.dbg('popover')).open, true,
+        'a hold on the peek card opens the tweaks popover too');
+      await a.dbg('closePopover()');
+    },
+  },
+
+  {
+    name: 'draft-intent',
+    tags: ['smoke', 'groups', 'visibility', 'notation'],
+    // U1 + U2. THE SAME POOL MUST SEND THE SAME ROLL whichever surface fires
+    // it. Until 2026-08-08 stageGroup pushed dice and threw the rest away, so
+    // `3d6+2 dc12 cinematic held` rolled face-down and cinematic from the
+    // collapsed rail and landed as a bare OPEN 3d6 in the workbench — failing
+    // open on a goal-11 surface. And a box whose text stopped parsing fired
+    // the stale tray instead, dropping `secret` with it.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.7', name: 'Intent' });
+      try {
+        await a.dbg(`setGroups([{name: 'Sneak', notation: '3d6+2 dc12 cinematic held'},`
+          + ` {name: 'Plain', notation: '2d8'}, {name: 'Loud', notation: '1d4 secret'}])`);
+        await a.dbg('setPanelState({pools: true})');
+
+        // (i) THE FORK, CLOSED. Staging carries dc, moment, label, the flat
+        // bonus as a labelled part, and the visibility.
+        await a.eval(`document.querySelectorAll('#groups-list .tile-stage')[0].click()`);
+        const i1 = await a.dbg('draftIntent');
+        assert.equal(i1.dc, 12, 'the target rides');
+        assert.ok(i1.exp, `the moment rides (got ${JSON.stringify(i1.exp)})`);
+        assert.equal(i1.visibility, 'held', 'the visibility rides — this is the goal-11 half');
+        assert.equal(i1.mods && i1.mods.modifier, 2, 'the flat bonus rides');
+        assert.ok((i1.mods.parts || []).some((p) => p.label === 'Sneak'),
+          `and rides ATTRIBUTED (got ${JSON.stringify(i1.mods.parts)})`);
+
+        // (ii) The canonical the box now holds re-parses to the same intent —
+        // the projection and the spec agree.
+        const canon = i1.canonical;
+        assert.ok(/held/.test(canon) && /dc12/.test(canon),
+          `the box carries it too (got ${JSON.stringify(canon)})`);
+
+        // (iii) AND THE ROLL IT SENDS matches what the rail would send.
+        await a.eval(`document.getElementById('tray-roll').click()`);
+        await a.waitFor(`!!window.__diceDebug.lastRequestedRoll`, { desc: 'roll sent' });
+        const sent = await a.dbg('lastRequestedRoll');
+        assert.equal(sent.visibility && sent.visibility.mode, 'held',
+          `the wire carries held (got ${JSON.stringify(sent.visibility)})`);
+        assert.equal(sent.dc, 12, 'and the target');
+        await a.eval(`document.getElementById('clear-tray').click()`);
+
+        // (iv) VISIBILITY FAILS CLOSED when two staged pools disagree — the
+        // one rule here that is not first-wins, because the other direction
+        // leaks. (held + secret → secret, never open.)
+        await a.eval(`document.querySelectorAll('#groups-list .tile-stage')[0].click()`);
+        await a.eval(`document.querySelectorAll('#groups-list .tile-stage')[2].click()`);
+        assert.equal((await a.dbg('draftIntent')).visibility, 'secret',
+          'mixed visibility closes to secret');
+        await a.eval(`document.getElementById('clear-tray').click()`);
+
+        // (v) Glue still cannot ride a sum, and stageLossFor says so without
+        // anyone having to read a transient note.
+        await a.dbg(`setGroups([{name: 'Ability', notation: '4d6dl1'}])`);
+        assert.deepEqual(await a.dbg(`stageLossFor('Ability')`), ['keep/drop'],
+          'glued keep/drop is named as set aside');
+
+        // (vi) U2 — A BROKEN BOX DISARMS THE PLATE. It must not fall through
+        // to the tray: the tray is the stale projection and dropping a
+        // `secret` on the way is exactly the leak U1 just closed.
+        await a.dbg(`setGroups([{name: 'Quiet', notation: '2d8 secret'}])`);
+        await a.eval(`document.querySelector('#groups-list .tile-stage').click()`);
+        assert.equal((await a.dbg('draftIntent')).rollArmed, true, 'armed while valid');
+        await a.eval(`(() => { const i = document.getElementById('cmd-input');
+          i.value = i.value + ' @@@'; i.dispatchEvent(new Event('input')); })()`);
+        await a.waitFor(`window.__diceDebug.draftIntent.boxBroken === true`,
+          { desc: 'the box stops parsing' });
+        assert.equal((await a.dbg('draftIntent')).rollArmed, false,
+          'a broken box disarms the plate rather than firing the stale tray');
+        const before = (await a.dbg('lastRequestedRoll')) || null;
+        await a.eval(`document.getElementById('tray-roll').click()`);
+        assert.deepEqual(await a.dbg('lastRequestedRoll'), before,
+          'and pressing it sends nothing at all');
+      } finally {
+        await a.eval(`localStorage.removeItem('dice.sections.v1')`).catch(() => {});
+      }
+    },
+  },
+
+  {
     name: 'terminology',
     tags: ['smoke', 'chrome'],
     // The vocabulary is 'pool' / 'saved pool'; 'tray' and 'group' survive only

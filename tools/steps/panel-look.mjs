@@ -20,43 +20,38 @@ limitations under the License.
 // it is not optional, and the numbers do not substitute") binds both states,
 // and only one of them had a tool.
 //
-// Seeded with the same twelve-pool Your Soul Deal sheet rail-look uses: a
-// rack of three toy pools cannot show whether a section boundary reads, and
-// the panel's whole job is stacking sections.
+// Seeded with THE RACK THE APP DEALS, exactly as rail-look is: `dealtRack()`
+// calls js/seed.js's own dealer (audit G5, ROADMAP U15). Both tools used to
+// fixture the same twelve hand-typed pools, so every frame judged this week
+// was of a character no player will ever open — eighteen pools across three
+// priced shelves is what a fresh seat gets, and stacking sections is this
+// panel's whole job. The fixture must keep tracking the shipped seed: change
+// js/seed.js or pass another draw seed, never paste a pool list in here.
 //
 // Run: node tools/steps/panel-look.mjs
 
-import { startStage } from '../stage.mjs';
+import { startStage, dealtRack } from '../stage.mjs';
 
-const SHEET = [
-  { name: 'Strength', notation: '2d8', category: 'attributes' },
-  { name: 'Toughness', notation: '2d6', category: 'attributes' },
-  { name: 'Agility', notation: '2d8', category: 'attributes' },
-  { name: 'Wit', notation: '1d10', category: 'attributes' },
-  { name: 'Wisdom', notation: '2d8', category: 'attributes' },
-  { name: 'Intelligence', notation: '2d6', category: 'attributes' },
-  { name: 'Charm', notation: '1d12', category: 'attributes' },
-  { name: 'Will', notation: '2d6', category: 'attributes' },
-  { name: 'Empathy', notation: '1d8', category: 'attributes' },
-  { name: 'Swordplay', notation: '1d10', category: 'skills' },
-  { name: 'Persuasion of the Crowd', notation: '1d8', category: 'skills' },
-  { name: 'Zeal', notation: '1d4', category: 'motivations' },
-];
+const RACK = dealtRack();
 
 const stage = await startStage();
 try {
   const t = await stage.tab('localhost', 'Joe');
-  await t.dbg(`setGroups(${JSON.stringify(SHEET)})`);
+  await t.dbg(`setGroups(${JSON.stringify(RACK)})`);
   await t.dbg('setPanelState({pools: true})');
 
   const { writeFileSync } = await import('node:fs');
   // Tall on purpose: the panel is a COLUMN of sections, and the defect this
   // tool exists to catch is how they stack. A viewport that clips the rack
   // hides exactly that.
-  await t.page.browser.send('Emulation.setDeviceMetricsOverride',
-    { width: 1200, height: 1100, deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
+  const viewport = async (height) => t.page.browser.send('Emulation.setDeviceMetricsOverride',
+    { width: 1200, height, deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
+  await viewport(1100);
 
   const crop = async (name) => {
+    // Front THIS tab first — the roster frame opens three more tables, and a
+    // backgrounded target answers with whatever it last painted.
+    await t.page.browser.send('Page.bringToFront', {}, t.page.sessionId);
     const clip = JSON.parse(await t.eval(`JSON.stringify((() => {
       const r = document.getElementById('left-panel').getBoundingClientRect();
       return { x: 0, y: 0, width: Math.ceil(r.width) + 24, height: Math.ceil(r.height), scale: 2 };
@@ -75,7 +70,35 @@ try {
   await t.eval(`document.querySelectorAll('#die-buttons .die-btn')[1].click()`);
   await t.eval(`document.querySelectorAll('#die-buttons .die-btn')[5].click()`);
   console.log(await crop('panel-draft.png'));
+
+  // …AND THE SAME DRAFT, SPENT (2i-E). The draft survives its own roll wearing
+  // a cool-down — `.spent` on the draft zone, and a Roll title that says
+  // "again". It is the well's only self-referential state and no frame had
+  // ever carried it, so nobody has looked at whether "already rolled" reads
+  // as cooling or as broken.
+  await t.eval(`document.getElementById('tray-roll').click()`);
+  await t.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy'
+    + ' && window.__diceDebug.trayState.spent === true)', { desc: 'the draft goes spent' });
+  console.log(await crop('panel-spent.png'));
   await t.eval(`document.getElementById('clear-tray').click()`);
+
+  // THE BOX REFUSING. Notation is off by default, so the one section a player
+  // has to opt into is also the one no capture had ever shown carrying its
+  // own error — a red rule, the message, and the flag list as its hint, all
+  // inside a 300px column. Typing is the real path (the paint is debounced),
+  // and `advantge` is the typo the flags hint exists to answer.
+  await t.dbg(`setSections({notation: true})`);
+  await t.eval(`(() => {
+    const i = document.getElementById('cmd-input');
+    i.focus();
+    i.value = '2d20 advantge';
+    i.dispatchEvent(new Event('input'));
+  })()`);
+  await t.waitFor(`document.getElementById('cmd').classList.contains('is-invalid')`,
+    { desc: 'the box goes red' });
+  console.log(await crop('panel-invalid.png'));
+  await t.eval(`document.getElementById('clear-tray').click()`);
+  await t.dbg(`setSections({notation: false})`);
 
   // The section bar's own states (§7.23). All-on is the tall opt-in column;
   // all-off is the floor the design claims is still a complete surface —
@@ -97,12 +120,25 @@ try {
   // and a TALL window shows nothing either, because there is nothing to
   // scroll. The first version of this frame was taken at 1100px and was a
   // duplicate of the resting shot; a short window is the whole assignment.
-  await t.page.browser.send('Emulation.setDeviceMetricsOverride',
-    { width: 1200, height: 640, deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
+  await viewport(640);
   await t.dbg(`setSections({dice: true, notation: true, pools: true})`);
   console.log(await crop('panel-short.png'));
   await t.eval(`document.querySelector('#builder-panel > .panel-body').scrollTop = 300`);
   console.log(await crop('panel-scrolled.png'));
+  await t.eval(`document.querySelector('#builder-panel > .panel-body').scrollTop = 0`);
+  await t.dbg(`setSections({dice: true, notation: false, pools: true})`);
+  await viewport(1100);
+
+  // A POPULATED PRESENCE ROW. The rail heads the panel in BOTH states, and
+  // the roster is the one thing in it whose geometry moves — your chip is
+  // pinned top-left and teammates grow rightward from it until they wrap.
+  // Wide, the wrap lands somewhere quite different from the 104px column
+  // rail-look frames, and the row pushes the whole panel down either way.
+  for (const [origin, name] of [['127.0.0.1', 'Mara'], ['127.0.0.2', 'Devi'], ['127.0.0.3', 'Bram']]) {
+    await stage.tab(origin, name);
+  }
+  await t.waitFor(`window.__diceDebug.presenceRow.pills.length === 3`, { desc: 'four seats' });
+  console.log(await crop('panel-roster.png'));
 } finally {
   await stage.close();
 }

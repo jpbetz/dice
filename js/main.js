@@ -1298,19 +1298,27 @@ function createShelfMarker() {
   el.addEventListener('click', (ev) => {
     const t = ev.target;
     if (t instanceof HTMLElement && t.closest('button')) return;
+    if (lp.took()) return; // a long-press already opened the tweaks popover
     const rid = el.dataset.rollId;
     if (!rid) return;
     if (peekRollId === rid) closePeek();
     else openPeek(rid);
   });
-  el.addEventListener('contextmenu', (ev) => {
-    ev.preventDefault();
+  // Look up at fire time (not render time): rolls that drop out of the
+  // 100-entry log between render and right-click resolve to null here, and
+  // canReroll(null) short-circuits — no popover, no crash.
+  const openTweaks = () => {
     const rid = el.dataset.rollId;
-    // Look up at fire time (not render time): rolls that drop out of the
-    // 100-entry log between render and right-click resolve to null here,
-    // and canReroll(null) short-circuits — no popover, no crash.
     const entry = rid ? log.find((e) => e.rollId === rid) : null;
     if (entry && canReroll(entry)) openShelfPopover(entry, rid);
+  };
+  // U12: the touch twin. Without it a shelved roll's tweaked reroll was
+  // unreachable on iOS, where a long press never produces `contextmenu`.
+  const lp = attachLongPress(el, openTweaks);
+  el.addEventListener('contextmenu', (ev) => {
+    ev.preventDefault();
+    lp.clear(); // Android fires this first — one door wins
+    openTweaks();
   });
   return el;
 }
@@ -1429,6 +1437,11 @@ function positionShelfMarkers() {
 const PEEK_HOVER_MS = 0;     // the peek opens the moment the pointer arrives
 const PEEK_CLOSE_MS = 220;   // grace to cross from marker into the card
 const peekEl = document.getElementById('peek-card');
+// U12: the peek's touch twin, attached ONCE. The card re-renders on every
+// open, so attaching per render would stack a timer per visit; the action is
+// read live from whatever the current render installed.
+let peekTweaksNow = null;
+const peekLp = attachLongPress(peekEl, () => { if (peekTweaksNow) peekTweaksNow(); });
 let peekRollId = null;       // rollId of the open peek, or null
 // THE ONE-✕ RULE (Joe, 2026-08-03): a collected roll has exactly ONE
 // reachable clear affordance, chosen by the gesture that opened the card.
@@ -1608,10 +1621,17 @@ function renderPeek() {
     });
     peekEl.appendChild(fold); // never empty now: the primary always stands
   }
-  peekEl.oncontextmenu = entry && canReroll(entry) ? (ev) => {
+  const peekTweaks = entry && canReroll(entry) ? () => openShelfPopover(entry, c.rollId) : null;
+  peekEl.oncontextmenu = peekTweaks ? (ev) => {
     ev.preventDefault();
-    openShelfPopover(entry, c.rollId);
+    if (peekLp) peekLp.clear(); // Android fires this first — one door wins
+    peekTweaks();
   } : null;
+  // U12: the touch twin, attached ONCE to the element rather than per render
+  // (the peek re-renders on every open, and a listener per open would stack
+  // one timer per visit). The action it fires is read live from the closure
+  // the current render installed.
+  peekTweaksNow = peekTweaks;
 
   peekEl.classList.remove('hidden');
   measurePeek();
@@ -4875,6 +4895,26 @@ window.__diceDebug = {
     return isLogFlyoutOpen();
   },
   // the draft cluster (P1): what the Pools panel's draft row shows now.
+  // The draft's INTENT, as boxExtras holds it (U1). A scenario asserts on
+  // this rather than on the canonical string, because the string is the
+  // projection and the projection is what kept hiding the drop.
+  get draftIntent() {
+    return {
+      dc: boxExtras.dc ?? null,
+      exp: boxExtras.exp ?? null,
+      comment: boxExtras.comment ?? null,
+      visibility: boxExtras.visibility ? boxExtras.visibility.mode : null,
+      mods: boxExtras.mods ? JSON.parse(JSON.stringify(boxExtras.mods)) : null,
+      canonical: cmdInput.value,
+      boxBroken: draftBoxBroken(),
+      rollArmed: !trayRollBtn.disabled,
+    };
+  },
+  // What a named pool would lose if staged into the draft as it stands.
+  stageLossFor(name) {
+    const g = groups.find((x) => x.name === name);
+    return g ? stageLoss(g) : null;
+  },
   get trayState() {
     return {
       dice: [...tray],
@@ -5501,8 +5541,35 @@ function renderTray() {
   if (body) body.style.setProperty('--draft-h', `${draftZoneEl.offsetHeight}px`);
 }
 
+// THE TWO PROJECTIONS DISAGREE (§1.3, U2). The box and the cluster are two
+// views of one spec object, so there is no answer to "which is right" when
+// the text stops parsing — and the old code answered anyway, by silently
+// firing the TRAY: type `2d8 secret`, break it with one character, press the
+// plate, and it rolled `2d8` in the open. The safe answer is to do nothing,
+// loudly. A draft is unusable while its text is broken, whatever dice are
+// still sitting in the well.
+function draftBoxBroken() {
+  return !!(cmdInput.value.trim()) && !(cmdResult && cmdResult.ok);
+}
+
+// The press that lands on a disarmed plate anyway (the global Enter, a
+// stale pointer) gets told WHY: the box shakes, and if the section is off
+// the box comes back for this visit only — the error lives in the box, so
+// the box has to be on screen to carry it.
+function refuseBrokenBox() {
+  if (typeof setSection === 'function' && !sectionOn('notation')) {
+    setSection('notation', true, false);
+  }
+  const boxEl = cmdEl;
+  if (!boxEl) return;
+  boxEl.classList.remove('cmd-shake');
+  void boxEl.offsetWidth; // restart the animation
+  boxEl.classList.add('cmd-shake');
+  cmdInput.focus();
+}
+
 function updateTrayButtons() {
-  const usable = (cmdResult && cmdResult.ok) || tray.length > 0;
+  const usable = (cmdResult && cmdResult.ok) || (tray.length > 0 && !draftBoxBroken());
   // The ghost dice REAPPEAR whenever the well truly empties (Joe: removing
   // the last die must bring them back) — read live state, not renderTray's
   // snapshot: the ✕-remover path re-renders before the box catches up.
@@ -5561,6 +5628,10 @@ function rollDraft() {
       exp: intent.exp || undefined,
       ...(uniform ? { set: uniform } : perDie ? { sets: perDie } : {}),
     });
+  } else if (draftBoxBroken()) {
+    // U2: never substitute the stale tray for text that stopped parsing.
+    refuseBrokenBox();
+    return;
   } else if (tray.length) {
     const perDie = draftDieSets(tray, traySources);
     const uniform = perDie && perDie.every((s) => s && s === perDie[0]) ? perDie[0] : null;
@@ -5600,6 +5671,7 @@ function offerDraft(to = null) {
   if (!netOnline || !net) return;
   paintCmd();
   if (cmdResult && cmdResult.ok) commandOffer(cmdInput.value, to);
+  else if (draftBoxBroken()) refuseBrokenBox(); // U2: same refusal as the plate
   else if (tray.length) net.offer({ label: formula(tray), dice: [...tray], ...(to ? { to } : {}) });
 }
 offerDraftBtn.addEventListener('click', () => offerDraft());
@@ -6493,6 +6565,52 @@ trayHintEl.appendChild(buildRollCue('roll', true)); // the ghost previews the SA
 function sanitizeSourceLabel(name) {
   return cleanPartLabel(name || '') || null;
 }
+// ONE LONG-PRESS DOOR (U27/U12, 2026-08-08). Every surface with a
+// right-click door needs a touch twin, because **iOS Safari never fires
+// `contextmenu` on a long press** — so a `contextmenu`-only door is a door
+// that does not exist on an iPhone. This is the pool tile's implementation,
+// which was the only correct one, lifted so the other three stop being
+// written from memory: the identity chip's hand-rolled copy opened the menu
+// and let its own click handler close it on the same release (dead code
+// since it shipped), and the shelf marker and peek card never got one at all.
+//
+// `took()` reads AND resets, so a click handler asks "did a press already
+// handle this?" exactly once. `clear()` is for the native `contextmenu`
+// handler on Android, which fires FIRST — one door has to win.
+function attachLongPress(el, fire, { ms = 500, tolerance = 10 } = {}) {
+  let timer = null;
+  const lp = {
+    fired: false,
+    clear() { clearTimeout(timer); },
+    took() { if (!lp.fired) return false; lp.fired = false; return true; },
+  };
+  el.addEventListener('pointerdown', (ev) => {
+    lp.fired = false; // ANY new press resets the suppressor (touch→mouse handoff)
+    clearTimeout(timer);
+    if (ev.pointerType !== 'touch') return; // right-click owns mouse
+    const x0 = ev.clientX;
+    const y0 = ev.clientY;
+    const cancel = () => {
+      clearTimeout(timer);
+      el.removeEventListener('pointermove', onMove);
+    };
+    const onMove = (e2) => {
+      if (Math.hypot(e2.clientX - x0, e2.clientY - y0) > tolerance) cancel();
+    };
+    timer = setTimeout(() => {
+      cancel();
+      // The synthetic click is suppressed EITHER way — a long-press over an
+      // already-open surface must not fall through to the primary verb.
+      lp.fired = true;
+      fire(ev);
+    }, ms);
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', cancel, { once: true });
+    el.addEventListener('pointercancel', cancel, { once: true });
+  });
+  return lp;
+}
+
 function stageGroup(g) {
   const res = parseNotation(g.notation);
   if (!res.ok) return false;
@@ -6504,15 +6622,90 @@ function stageGroup(g) {
   const gSet = typeof g.set === 'string' && (g.set === 'std' || SETS[g.set]) ? g.set : null;
   const wasEmpty = tray.length === 0;
   const dropped = [];
-  if (res.spec.mods) { const s = modsSummary(res.spec.mods); if (s) dropped.push(s); }
-  if (res.dc != null) dropped.push(`dc${res.dc}`);
+  let capped = false;
   for (let i = 0; i < res.spec.dice.length; i++) {
-    if (tray.length >= MAX_DICE_ON_TABLE) break;
+    if (tray.length >= MAX_DICE_ON_TABLE) { capped = true; break; }
     tray.push(res.spec.dice[i]);
     // the pool's own name wins; a composed pool's inner sources survive
     // only when the pool is unnamed
     traySources.push(label || (res.spec.sources ? res.spec.sources[i] || null : null));
     traySets.push(gSet);
+  }
+  // A PARTIAL STAGE SAYS SO. Silently keeping half of Strength under a chip
+  // labelled "Strength" is the same lie the intent drop below was.
+  if (capped) dropped.push(`only part of it fits under the ${MAX_DICE_ON_TABLE}-die cap`);
+
+  // THE POOL'S INTENT RIDES (§7.8, U1). Until 2026-08-08 this function
+  // pushed dice and threw everything else away: `Sneak Attack =
+  // 3d6+2 dc12 cinematic held` fired face-down and cinematic from the 112px
+  // rail and landed as a bare open `3d6` here — the same pool sending two
+  // different rolls depending on whether the panel happened to be open, and
+  // failing OPEN on a goal-11 surface while rollRailSelection failed closed
+  // on the same data a few dozen lines away.
+  //
+  // The rules below are rollRailSelection's, deliberately: staging into a
+  // draft IS composing, so the two paths now share one grammar rather than
+  // two that drift. Glue (keep/drop · reroll · ! · adv) still cannot ride —
+  // the notation glues it to ONE dice type and a sum has no union for it —
+  // so it is set aside out loud, which is what it always was.
+  const m = res.spec.mods || {};
+  const glued = [];
+  if (m.keep) glued.push('keep/drop');
+  if (m.reroll) glued.push('reroll');
+  if (m.explode) glued.push('!');
+  if (m.adv) glued.push(m.adv === 'adv' ? 'advantage' : 'disadvantage');
+  if (glued.length) dropped.push(glued.join(' · '));
+
+  // A pool's flat bonus rides as a LABELLED part, so a composed draft still
+  // says where every number came from (the attributed-math invariant). Other
+  // keys on boxExtras.mods — an adv or a keep the player set through ± —
+  // survive untouched; only the parts list grows.
+  const add = [];
+  if (Array.isArray(m.parts)) {
+    for (const p of m.parts) if (p.value) add.push({ label: p.label || label || '', value: p.value });
+  } else if (typeof m.modifier === 'number' && m.modifier) {
+    add.push({ label: label || '', value: m.modifier });
+  }
+  if (add.length) {
+    const base = boxExtras.mods ? JSON.parse(JSON.stringify(boxExtras.mods)) : {};
+    const parts = Array.isArray(base.parts) && base.parts.length
+      ? [...base.parts]
+      : (base.modifier ? [{ label: '', value: base.modifier }] : []);
+    // MAX_PARTS is 12 in the grammar; past it the canonical stops parsing and
+    // the box would go red for a reason the player never chose. Refuse the
+    // overflow, keep the draft, say so.
+    const room = Math.max(0, 12 - parts.length);
+    if (add.length > room) dropped.push('too many labelled bonuses');
+    parts.push(...add.slice(0, room));
+    if (parts.length) {
+      base.parts = parts;
+      base.modifier = parts.reduce((a, p) => a + p.value, 0);
+      boxExtras.mods = base;
+    }
+  }
+
+  // dc · moment · label: the first one wins and a genuine conflict is set
+  // aside rather than silently overwritten.
+  const takeOne = (cur, next, conflictWord) => {
+    if (next == null || next === '') return cur;
+    if (cur != null && cur !== '' && cur !== next) { dropped.push(conflictWord); return cur; }
+    return next;
+  };
+  boxExtras.dc = takeOne(boxExtras.dc, res.dc, 'two targets');
+  boxExtras.exp = takeOne(boxExtras.exp, res.exp, 'two moments');
+  boxExtras.comment = takeOne(boxExtras.comment, res.comment, 'two labels');
+
+  // VISIBILITY FAILS CLOSED (goal 11). Two modes in one draft become the
+  // tighter one, never the looser — the one rule here that is not "first
+  // wins", and the reason is that the other direction leaks.
+  const v = visOfParse(res);
+  if (v) {
+    if (boxExtras.visibility && boxExtras.visibility.mode !== v.mode) {
+      boxExtras.visibility = { mode: 'secret' };
+      dropped.push('mixed visibility → secret');
+    } else {
+      boxExtras.visibility = v;
+    }
   }
   // Render NOW: syncBoxFromTray→paintCmd only re-renders when the parsed
   // box DIFFERS from the tray, and we just made them equal — without this
@@ -6524,6 +6717,28 @@ function stageGroup(g) {
   }
   if (wasEmpty) pulseTrayRoll();
   return true;
+}
+
+// What a pool would LOSE if it were staged into the draft as it stands —
+// the same set-aside list stageGroup builds, computed without touching
+// anything. Exists so a scenario can pin the intent contract per pool
+// instead of asserting on a transient note string, and so the rail and the
+// workbench can be compared on one function's output.
+function stageLoss(g, into = boxExtras) {
+  const res = parseNotation(g.notation);
+  if (!res.ok) return null;
+  const m = res.spec.mods || {};
+  const out = [];
+  if (m.keep) out.push('keep/drop');
+  if (m.reroll) out.push('reroll');
+  if (m.explode) out.push('!');
+  if (m.adv) out.push(m.adv === 'adv' ? 'advantage' : 'disadvantage');
+  if (res.dc != null && into.dc != null && into.dc !== res.dc) out.push('two targets');
+  if (res.exp && into.exp && into.exp !== res.exp) out.push('two moments');
+  if (res.comment && into.comment && into.comment !== res.comment) out.push('two labels');
+  const v = visOfParse(res);
+  if (v && into.visibility && into.visibility.mode !== v.mode) out.push('mixed visibility → secret');
+  return out;
 }
 
 // The cluster announces itself as the next tap (touch has no hover). Shared
@@ -7041,7 +7256,7 @@ function renderGroups() {
       // In manage mode the whole 64px tile is the editor door (the retired
       // per-tile ✎'s verb) — staging stays gated off; at rest it stages.
       stage.addEventListener('click', () => {
-        if (lpFired) { lpFired = false; return; } // a long-press already opened the popover
+        if (lp.took()) return; // a long-press already opened the popover
         if (poolsEdit) togglePopover(g, tile);
         else stageGroup(g);
       });
@@ -7054,32 +7269,9 @@ function renderGroups() {
       // that follows is suppressed. Android fires native contextmenu too —
       // the contextmenu handler clears this timer so the doors never
       // double-toggle.
-      let lpTimer = null;
-      let lpFired = false;
-      stage.addEventListener('pointerdown', (ev) => {
-        lpFired = false; // ANY new press resets the suppressor (touch→mouse handoff)
-        clearTimeout(lpTimer);
-        if (ev.pointerType !== 'touch') return;
-        const x0 = ev.clientX;
-        const y0 = ev.clientY;
-        const cancel = () => {
-          clearTimeout(lpTimer);
-          stage.removeEventListener('pointermove', onMove);
-        };
-        const onMove = (e2) => {
-          if (Math.hypot(e2.clientX - x0, e2.clientY - y0) > 10) cancel();
-        };
-        lpTimer = setTimeout(() => {
-          cancel();
-          lpFired = true; // the synthetic click is suppressed EITHER way —
-          // a long-press over an already-open popover must not fall
-          // through to staging (fleet catch)
-          if (pop && pop.source === 'group' && pop.groupId === g.id) return;
-          togglePopover(g, tile);
-        }, 500);
-        stage.addEventListener('pointermove', onMove);
-        stage.addEventListener('pointerup', cancel, { once: true });
-        stage.addEventListener('pointercancel', cancel, { once: true });
+      const lp = attachLongPress(stage, () => {
+        if (pop && pop.source === 'group' && pop.groupId === g.id) return;
+        togglePopover(g, tile);
       });
       tile.appendChild(stage);
 
@@ -7089,7 +7281,7 @@ function renderGroups() {
       // (Update-this-pool / variants), same pointer bonus as the cluster.
       tile.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        clearTimeout(lpTimer); // Android fires this first — one door wins
+        lp.clear(); // Android fires this first — one door wins
         if (pop && pop.source === 'group' && pop.groupId === g.id) return; // long-press won
         togglePopover(g, tile);
       });
@@ -11661,7 +11853,17 @@ function closeIdentityMenu() {
 // is aria-pressed to say so); right-click is the way in to rename /
 // leave / invite. This deliberately supersedes the pre-2026-08-04
 // left-click-opens-menu wiring — recorded in UX.md §7.17.
+const identityLp = attachLongPress(
+  document.getElementById('identity-chip'),
+  () => { if (!isIdentityMenuOpen()) openIdentityMenu(); },
+);
 document.getElementById('identity-chip').addEventListener('click', () => {
+  // U27: the press that just opened the menu must not be the press that
+  // closes it. The old hand-rolled hold had no suppressor at all, so on
+  // touch the menu flashed and vanished — and that menu is the ONLY door to
+  // Change name, Change seat and Leave table, so a touch-only player could
+  // not rename, re-seat, or leave.
+  if (identityLp.took()) return;
   if (isIdentityMenuOpen()) closeIdentityMenu(); // menu is open (from right-click): let click-away close it
   else setPoolsOwner(null); // fall home; no-op if already home
 });
@@ -11669,30 +11871,11 @@ document.getElementById('identity-chip').addEventListener('click', () => {
 // menu never shows over the rail; the app's own menu is the answer.
 document.getElementById('identity-chip').addEventListener('contextmenu', (e) => {
   e.preventDefault();
+  identityLp.clear(); // Android fires this first — one door wins
   if (isIdentityMenuOpen()) closeIdentityMenu();
   else openIdentityMenu();
 });
-// Touch long-press (500ms — matches the pool-tile popover contract):
-// pointerdown starts a timer, pointerup/leave/cancel/scroll all cancel
-// it. The click above still runs on a normal tap; the timer only fires
-// if the finger stays put.
-{
-  const chip = document.getElementById('identity-chip');
-  let holdTimer = null;
-  const armed = new WeakSet();
-  chip.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse') return; // right-click owns mouse
-    armed.add(e);
-    holdTimer = setTimeout(() => {
-      holdTimer = null;
-      if (armed.has(e)) openIdentityMenu();
-    }, 500);
-  });
-  const cancel = () => { if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; } };
-  chip.addEventListener('pointerup', cancel);
-  chip.addEventListener('pointerleave', cancel);
-  chip.addEventListener('pointercancel', cancel);
-}
+// (the hand-rolled hold moved to attachLongPress above — see U27)
 // A press anywhere else dismisses the menu; presses inside the menu or
 // on the chip fall through to their own handlers.
 document.addEventListener('pointerdown', (e) => {
@@ -12173,6 +12356,13 @@ function requestRoll(types, label, opts = {}) {
   // rail's multi-pick strips glue and fails visibility closed.
   lastRequestedRoll.canonical = canonical;
   lastRequestedRoll.visibility = vis ? { mode: vis.mode, names: [...vis.names] } : null;
+  // The rest of the INTENT joins it too (2026-08-08, U1): a scenario proving
+  // that two composing surfaces send the same roll has to be able to compare
+  // the axes one at a time. Reading them out of `canonical` works until the
+  // day the canonical is the thing that is wrong.
+  lastRequestedRoll.dc = Number.isInteger(opts.dc) ? opts.dc : null;
+  lastRequestedRoll.exp = sanitizeExp(opts.exp) || null;
+  lastRequestedRoll.mods = opts.mods ? JSON.parse(JSON.stringify(opts.mods)) : null;
   // History records only rolls that actually happened: online that means the
   // server accepted it (a 400 or a network failure resolves null), solo it
   // means the spec passed the same validation rollDice applies.

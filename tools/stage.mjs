@@ -25,9 +25,36 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Browser } from '../tests/e2e/cdp.mjs';
 import { freePort, startServer, Ctx } from '../tests/e2e/harness.mjs';
+import { dealStartingRack } from '../js/seed.js';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 export const OUT_DIR = join(ROOT, 'tools', 'out'); // gitignored
+
+// THE LOOK TOOLS' RACK IS THE SHIPPED SEED — never a hand-authored sheet.
+//
+// Both look tools used to fixture twelve pools somebody typed out by hand, so
+// every frame anyone judged was of a rack no player will ever open: the dealt
+// rack is EIGHTEEN pools across three shelves, its dice drawn at random inside
+// each shelf's price, and it scrolls where twelve did not (audit G5, ROADMAP
+// U15). A fixture that can drift from js/seed.js is the bug, so this calls the
+// shipped dealer — re-price the shelves, add a pool, rename a shelf, and these
+// frames follow without anyone remembering to edit a tool.
+//
+// The DRAW is pinned (mulberry32, the unit suite's own generator) only so two
+// runs are comparable: the app deals with Math.random and every fresh browser
+// opens on its own character. Any seed is a legal rack — pass a different one
+// to look at a different draw. Names and pool count come from the seed either
+// way; nothing about the rack's SHAPE depends on this number.
+export function dealtRack(seed = 20260808) {
+  let a = seed | 0;
+  const rng = () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let x = Math.imul(a ^ (a >>> 15), 1 | a);
+    x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+  };
+  return dealStartingRack(rng);
+}
 
 export async function startStage({ room = `drive-${Math.random().toString(36).slice(2, 8)}` } = {}) {
   const port = await freePort();
