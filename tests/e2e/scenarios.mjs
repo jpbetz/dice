@@ -1866,8 +1866,12 @@ export const scenarios = [
       assert.equal(ts.hasActions, true, 'the rail stands with content too');
       assert.equal(await a.eval(`document.getElementById('tray-mods').disabled`), false,
         'and its verbs arm with the draft');
-      assert.ok((await a.eval(`document.getElementById('tray-mods').textContent`)).includes('Modify'),
-        "the modifier tool wears its word — '± Modify', never 'Tweak'");
+      // The guideline is that 'Tweak' is dead, not that one label is eternal
+      // (Joe 2026-08-08). The word follows the system now — '± Modify' where
+      // there are modifiers, '± Moment' where the popover folds them away —
+      // so pin the BAN, which is what the ruling actually said.
+      assert.ok(!/tweak/i.test(await a.eval(`document.getElementById('tray-mods').textContent`)),
+        "the modifier tool never says 'Tweak' (Joe 2026-08-04)");
       assert.equal(await a.eval(`!!document.getElementById('save-group')`), false,
         'the rim carries no Save — pool editing owns creation (Joe 2026-08-04)');
       assert.ok(await a.eval(`(() => {
@@ -3575,6 +3579,40 @@ export const scenarios = [
   },
 
   {
+    name: 'rim-word',
+    tags: ['smoke', 'chrome', 'meanings'],
+    // U11. soul-deal — the DEFAULT — sets usesMods:false, which folds the
+    // Modifier, pairing, Target and keep/drop sections out of the ± popover
+    // entirely. So the panel's loudest tool said "± Modify" with
+    // title="Modifiers, target, moment" while two of those three were absent,
+    // and U1's own set-aside note pointed at it as the remedy for a `dc` the
+    // popover cannot express.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.15', name: 'Rim' });
+      const word = `document.getElementById('tray-mods').textContent`;
+      const tip = `document.getElementById('tray-mods').title`;
+
+      // Default (per-die): the button names what is actually behind it, and
+      // 'Tweak' stays dead — that ban is what the 2026-08-04 ruling said.
+      assert.equal(await a.eval(word), '± Moment',
+        'a per-die system does not promise modifiers its popover folds away');
+      assert.ok(!/Modifiers/.test(await a.eval(tip)), 'nor in the tooltip');
+      assert.ok(!/tweak/i.test(await a.eval(word)), "and never 'Tweak'");
+
+      // A totals system restores both.
+      await a.dbg(`setSystem('dnd')`);
+      await a.waitFor(`${word} === '± Modify'`,
+        { desc: 'a totals system gets the full word' });
+      assert.ok(/Modifiers/.test(await a.eval(tip)), 'and the full tooltip');
+
+      // …and back, because a room-wide system change arrives as an echo.
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.waitFor(`${word} === '± Moment'`,
+        { desc: 'the word follows the system back' });
+    },
+  },
+
+  {
     name: 'clear-scope',
     tags: ['smoke', 'chrome', 'log'],
     // U14. `c` sweeps the felt FOR THE WHOLE TABLE. Its guard's own comment
@@ -3889,8 +3927,9 @@ export const scenarios = [
         'the uncategorized shelf is plainly named (trio shelves stand above it)');
       assert.equal(await a.eval(`document.getElementById('pop-save').textContent`),
         'Save', 'the popover commits with one verb (Trigger Pass)');
-      assert.ok((await a.eval(`document.getElementById('tray-mods').textContent`)).includes('Modify'),
-        "the rim's modifier tool says 'Modify' (Joe 2026-08-04 — never 'Tweak')");
+      assert.ok(!/tweak/i.test(await a.eval(`document.getElementById('tray-mods').textContent`)),
+        "the rim's modifier tool never says 'Tweak' (Joe 2026-08-04); its word "
+        + 'follows the system since U11');
       assert.equal(await a.eval(`document.getElementById('pop-save-name').placeholder`),
         'Name this pool…', 'the duplicate morph names a pool');
       assert.equal(await a.eval(`document.getElementById('pools-edit').textContent.trim()`),

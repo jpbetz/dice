@@ -5924,6 +5924,32 @@ sectionBarEl.addEventListener('click', (e) => {
 });
 applySections(false);
 // The ad-hoc tray's ± (§7.4): the SAME popover, bound to the tray draft.
+// THE RIM'S WORD IS THE SYSTEM'S (U11). `soul-deal` — the DEFAULT — sets
+// usesMods:false, which folds Modifier, d20 pairing, Target and keep/drop
+// out of the popover entirely. So the panel's loudest tool said "± Modify"
+// with title="Modifiers, target, moment" while two of those three were
+// absent, and U1's own set-aside note pointed at it as the remedy
+// ("re-add via ±") for a `dc` the popover cannot express.
+function updateTrayModsWord() {
+  if (!trayModsBtn) return;
+  // THE BUTTON NAMES WHAT IS BEHIND IT. `soul-deal` — the DEFAULT — sets
+  // usesMods:false, which folds Modifier, d20 pairing, Target and keep/drop
+  // out of the popover entirely; the rim still said "± Modify" over
+  // "Modifiers, target, moment", two of which were absent, and U1's set-aside
+  // note pointed here as the remedy for a `dc` this popover cannot express.
+  //
+  // "Modify, never Tweak" (Joe 2026-08-04) is a TERMINOLOGY guideline — it
+  // bans the weak synonym, it does not pin one label for all time (Joe
+  // 2026-08-08, correcting a first pass that read it as a pin and changed
+  // only the tooltip). So the word follows the system and 'Tweak' stays dead.
+  const full = activeSystem().usesMods;
+  trayModsBtn.textContent = full ? '± Modify' : '± Moment';
+  trayModsBtn.title = full
+    ? 'Modifiers, target, moment'
+    : 'Moment and visibility — this system reads each die, so there is no total to modify';
+}
+updateTrayModsWord();
+
 trayModsBtn.addEventListener('click', () => {
   if (pop && pop.source === 'tray') {
     closePopover();
@@ -9738,6 +9764,7 @@ function applyRoomSettings(settings) {
     if (settings.system !== currentSystemId) {
       currentSystemId = settings.system;
       rerenderInterpretation();
+      updateTrayModsWord(); // U11: the rim names what the popover can express
     }
     renderSystemPicker();
   }

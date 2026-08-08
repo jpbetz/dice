@@ -149,9 +149,13 @@ function segmentsFor(type, q) {
 // Profile interface v2 (ROADMAP step 2): a profile declares its READ.
 //   aggregate   'per-die' | 'sum' — how a roll's dice become outcomes
 //   usesTotal   gates the big total, DC verdicts and margin lines
-//   usesMods    gates modifier emphasis; false = the ± popover notes that
-//               modifiers/targets do not change outcomes under this system
-//               (they stay rollable — notation totality is app-wide)
+//   usesMods    gates modifier emphasis; false = the ± popover FOLDS the
+//               modifier, pairing, target and keep/drop sections entirely —
+//               no note (Joe's ruling, index.html's popover comment,
+//               superseding the earlier "the popover notes that they do not
+//               change outcomes"). They stay rollable through the notation:
+//               notation totality is app-wide, and what folds is the ±
+//               popover's SECTIONS, never the grammar.
 //   outcomesFor(entry) -> [{dieIndex, type, value, word, tier}] for per-die
 //               systems (quiet dice carry word/tier null), else null
 //   meaningFor  the sum-world hero word (per-die systems return null)
