@@ -1618,6 +1618,10 @@ function renderPeek() {
       replaceShelfId: c.rollId,
       verb: 'clear',
       onPrimary: peekClear,
+      // Not here: the peek's OWN popover already carries 'Save as pool…',
+      // and the keep verb is the door TO that popover. Standing it on the
+      // peek would be a button that opens the thing it is standing in.
+      keepable: false,
     });
     peekEl.appendChild(fold); // never empty now: the primary always stands
   }
@@ -3161,23 +3165,55 @@ function mountCardActions(holder, opts) {
     requestRoll([...e.spec.dice], e.label, rerollOpts(e));
   });
 
+  // U13: KEEP THIS ROLL. The only door to "save what I just rolled" was the
+  // peek's popover, reached by waiting out the 3s auto-collect, finding an
+  // invisible 150-200px disc, and right-clicking it — a gesture that does
+  // not exist on iOS at all. This is the same door, opened from a standing
+  // control on the card that is already in front of you: no new surface, no
+  // second save flow, and the popover keeps being the one place a pool is
+  // minted.
+  const keep = document.createElement('button');
+  // Its own class, not revealClass: they share a size tier but they are two
+  // different verbs, and a selector that cannot tell them apart is a pin that
+  // cannot either.
+  keep.className = `keep-verb ${opts.revealClass.replace('reveal-verb', '').trim()}`;
+  keep.textContent = 'Save as pool…';
+  keep.title = 'Keep these dice as a saved pool';
+  keep.hidden = true;
+  keep.addEventListener('click', () => {
+    const e = holder._entry;
+    if (e && e.rollId && canReroll(e)) openShelfPopover(e, e.rollId);
+  });
+  foot.appendChild(keep);
+
   holder.append(primary, foot, strip);
   holder._entry = null;
   // Named children beat a positional walk: the row's shape is now a fact the
   // update path reads, not a chain of nextElementSibling it has to re-derive.
-  holder._acts = { primary, foot, strip };
+  holder._acts = { primary, foot, strip, keep, reveal };
   holder._cardActionsMounted = true;
 }
 
 function updateCardActions(holder, entry, opts) {
   if (!holder._cardActionsMounted) mountCardActions(holder, opts);
   holder._entry = entry || null;
-  const { primary, foot, strip } = holder._acts;
+  const { primary, foot, strip, keep, reveal } = holder._acts;
   paintPrimaryAct(primary, opts.verbFor
     ? opts.verbFor(entry)
     : (entry && entry.rollId && isMine(entry) ? 'clear' : 'dismiss'));
   const showStrip = canReroll(entry);
-  foot.hidden = !canReveal(entry);
+  // The keep verb rides the same gate as the reroll strip — both need a spec
+  // this viewer can actually read — and the fold now stands for either of
+  // its two children rather than for Reveal alone.
+  const showKeep = !!(keep && opts.keepable !== false && showStrip);
+  const showReveal = canReveal(entry);
+  // Each verb owns its own visibility, and the foot stands for EITHER. When
+  // the foot alone carried Reveal's gate, adding a second child to it made a
+  // face-up roll paint a live Reveal — the exact defect the `hidden` fold
+  // shipped once before, caught here by the pins that were written for it.
+  if (keep) keep.hidden = !showKeep;
+  if (reveal) reveal.hidden = !showReveal;
+  foot.hidden = !showReveal && !showKeep;
   strip.hidden = !showStrip;
   if (showStrip) strip.setAttribute('aria-label', `Reroll — ${entry.label}`);
 }
@@ -4892,7 +4928,13 @@ window.__diceDebug = {
         label: primary.getAttribute('aria-label'),
         disabled: primary.disabled,
       } : { display: 'absent' },
-      reveal: read(holder.querySelector('.banner-foot')),
+      // The Reveal ITSELF, not the foot it sits in. U13 put a second verb in
+      // that foot ("Save as pool…"), so reading the container answers about
+      // whichever child happens to be showing — which is how a hook meant to
+      // pin Reveal's visibility would have started reporting the keep verb's.
+      reveal: read(holder.querySelector('.banner-foot .reveal-verb, .banner-foot .sm-reveal')),
+      keep: read(holder.querySelector('.banner-foot .keep-verb')),
+      foot: read(holder.querySelector('.banner-foot')),
       reroll: read(holder.querySelector('.pk-strip')),
     };
   },
@@ -8409,6 +8451,18 @@ function renderPopIdentity() {
       ladderRow.appendChild(b);
     }
     poolSec.appendChild(ladderRow);
+    // U13: `Edit notation…` STANDS on the pure branch too. It lived only in
+    // the else-branch below, so a pool made of plain dice — which is most of
+    // a dealt rack — had no door to its own notation at all: the ghost verb
+    // existed in a branch that pool could never reach, and beginEditGroup's
+    // one call site was inside it. The rank ladder edits DICE; this edits the
+    // intent around them, and they are different jobs.
+    const pureEdit = document.createElement('button');
+    pureEdit.className = 'pid-ghost-verb';
+    pureEdit.textContent = 'Edit notation…';
+    pureEdit.title = 'Add a target, a moment, or keep/drop';
+    pureEdit.addEventListener('click', () => beginEditGroup(g.id)); // closes this popover itself
+    poolSec.appendChild(pureEdit);
     return;
   }
   {

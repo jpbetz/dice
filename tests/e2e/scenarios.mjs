@@ -6138,8 +6138,14 @@ export const scenarios = [
       await a.roll('d6 # open');
       assert.notEqual(await shown('#banner-actions .pk-strip'), 'none',
         'a face-up roll shows its REROLL strip');
-      assert.equal(await shown('#banner-actions .banner-foot'), 'none',
+      // U13 put a second verb in this foot ("Save as pool…"), so the FOOT is
+      // no longer Reveal's proxy — assert the Reveal itself. The contract is
+      // unchanged and is the one that matters: nothing left to reveal, and
+      // the server would 403 the attempt.
+      assert.equal(await shown('#banner-actions .banner-foot .reveal-verb'), 'none',
         'a face-up roll paints NO Reveal — the value is already public');
+      assert.notEqual(await shown('#banner-actions .banner-foot'), 'none',
+        'though the foot stands, because keeping the roll as a pool is offered');
 
       // Held: the mirror image. Reveal stands; REROLL must be gone, because a
       // reroll would replay a spec nobody at the table can read (the same rule
@@ -6190,9 +6196,13 @@ export const scenarios = [
         `document.querySelector('#banner-actions .pk-strip').hidden`);
       assert.equal(stripHidden, false, 'the REROLL strip is visible for a rerollable roll');
       assert.notEqual(acts.reroll.display, 'none', 'and it actually paints');
+      // Reveal owns its own gate since U13 — the foot holds two verbs now, so
+      // reading the foot's `hidden` would answer about the wrong thing. (And
+      // reading `.hidden` at all is what let a live Reveal ship once: the
+      // computed-display assertion on the next line is the real pin.)
       const revealHidden = await a.eval(
-        `document.querySelector('#banner-actions .banner-foot').hidden`);
-      assert.equal(revealHidden, true, 'the reveal foot stays hidden for a face-up roll');
+        `document.querySelector('#banner-actions .banner-foot .reveal-verb').hidden`);
+      assert.equal(revealHidden, true, 'the Reveal stays hidden for a face-up roll');
       assert.equal(acts.reveal.display, 'none', 'and it actually stays off screen');
 
       // Click the strip — the handler reads holder._entry, not a log lookup,

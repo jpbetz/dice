@@ -254,12 +254,16 @@ html, body {
    its glow keep their dress untouched); ambient chrome — hover borders,
    pressed segments, sticky shelf heads — reads steel over graphite.
    (2i-C unscoped the hover half of this law app-wide — the global .btn /
-   .ghost-btn hovers are steel now, so the per-panel overrides retired.) */
-#left-panel .seg button[aria-pressed="true"] {
-  background: rgba(243, 234, 215, 0.13);
-  color: var(--ivory);
-  box-shadow: inset 0 0 0 1px rgba(243, 234, 215, 0.28);
-}
+   .ghost-btn hovers are steel now, so the per-panel overrides retired.)
+   …and audit C3 unscoped the PRESSED-SEGMENT half the same way, for the
+   same reason it had to be unscoped the first time: a law that is only
+   true inside `#left-panel` is not a law, it is a local exception that
+   the next surface built outside the column will break. It broke on the
+   ± popover, which is body-level. `#left-panel .seg button[aria-pressed]`
+   lived here and is retired — its steel values ARE the global
+   `.seg button[aria-pressed="true"]` dress now. Nothing else used it: both
+   panel segs (#section-bar, #rail-mode) are dressed by their own more
+   specific block above. */
 #left-panel .pool-sec-head { background: rgba(25, 27, 30, 0.96); }
 
 /* ---------- buttons ---------- */
@@ -284,8 +288,39 @@ html, body {
 /* THREE visibility codes (2i-C): disabled drains hue (grayscale) so it can
    never be mistaken for the reveal tier's resting dim; absent is a real
    display:none (this codebase has no bare .hidden — every hide is
-   explicit). */
-.btn:disabled { opacity: 0.4; cursor: default; filter: grayscale(0.7); }
+   explicit).
+   ONE RECIPE, NAMED EXCEPTIONS (audit C4/U6, 2026-08-08). The code above
+   was doctrine and thirteen local rules were the practice: six of them
+   carried no grayscale at all (so "unavailable" was indistinguishable
+   from "dim"), two sat on 0.45 — the reveal tier's own resting number,
+   the one thing the grayscale exists to stay clear of — and the drains
+   ran 0.25 · 0.35 · 0.4 · 0.42 · 0.45 · 0.5 · 0.55 with no rule saying
+   which. C2 measured what that cost: the rim's unlit tools at 2.36:1
+   against live section-bar cells at 2.24:1, i.e. the third state read as
+   the second one.
+   So the dress lives HERE, once — call it THE DISABLED RECIPE, and let
+   everything below refer to it by that name rather than by a line number
+   that drifts. At the front of the file, where source order lets any
+   honest exception below it win. grayscale(1), not 0.7 — a partial drain
+   still carries hue, and hue is the signal being spent.
+   0.30, below every rest-dim in the app, so the tier ordering is a fact
+   of the numbers rather than a convention. Element selectors on purpose
+   (0,1,1): it reaches the next disabled control nobody remembered to
+   dress, which is the whole failure mode this replaces.
+   THE NAMED EXCEPTIONS, all three, and there are no others:
+     · `#rail-roll:disabled` — an unarmed roll plate stays BRONZE.
+     · `.pool-roll:disabled` / `.cc-unit:disabled` — the face IS the
+       content: a rack in manage mode and a composer's last die must stay
+       READABLE while their affordance is off.
+     · `.draft-actions .btn:disabled` / `#tray-mods:disabled` — keeps only
+       `box-shadow: none`; an unlit plate is not a raised object. It takes
+       the drain from here like everything else. */
+:is(button, input, select, textarea):disabled,
+.rp-item.rp-bad {
+  opacity: 0.3;
+  cursor: default;
+  filter: grayscale(1);
+}
 
 .btn.primary {
   background: linear-gradient(180deg, #caa53a, #9c7c1e);
@@ -426,9 +461,26 @@ html, body {
 /* the section gap the sections themselves own (see #die-buttons) — the bar
    names the stack below it, it does not sit on top of it */
 .section-seg { margin-bottom: 20px; }
+/* THE DIM TIER IS NOT A CONTRAST BUDGET (audit C2/U6, 2026-08-08).
+   Unpressed cells shipped at `opacity: .42` on --muted over this track,
+   which measures 2.24:1 — a flat WCAG 1.4.3 failure at 11-12px, and a
+   dead heat with the DISABLED code (the rim's unlit tools measured
+   2.36:1). Two of 2i-C's three visibility states had collapsed into one
+   percept: "off but pressable" and "unavailable" were the same grey. In
+   the all-off floor state these three words are the ONLY route back to
+   the sections, and they were ghosts.
+   Reconciling the doc's 0.45 against the build's 0.42 was not the fix —
+   0.45 measures 2.4:1 here, which fails just as flatly. The rule that
+   actually settles it: **rest-dim dresses a whole secondary CONTROL; it
+   is never the only ink a WORD has.** Where the dim tier is the label
+   itself, the floor is 1.4.3's 4.5:1. So 0.42 retires (it existed in
+   exactly two rules and both were wrong for other reasons) and this tier
+   reads 0.78 → 4.67:1. The pressed cell goes to full opacity in exchange,
+   which keeps WEIGHT the real signal at 3.2:1 between the two states —
+   1.4.11's floor, where the old pair sat at 4.35:1 only by making the
+   quiet one unreadable. Hover still lifts either to 1. */
 #left-panel :is(.section-seg, #rail-mode) button {
   color: var(--muted);
-  opacity: 0.42; /* 2i-C's rest-dim: present, secondary, not unavailable */
   padding: 6px 4px;
   font-size: 12px;
   border-radius: 6px;
@@ -465,13 +517,29 @@ html, body {
 }
 /* ON is legible, seated in the faintest recess the panel can hold — the
    "recessed area shows which is active" Joe asked for, at a tenth the volume
-   the first build gave it. No gold: HUE = ACT, and this is a tool. */
+   the first build gave it. No gold: HUE = ACT, and this is a tool.
+   Full opacity since C2 (was 0.78): the recess is unchanged and still the
+   faintest the panel can hold, so the cell is not louder as an OBJECT —
+   only its word is, and it is the word that has to out-read a neighbour
+   that just became legible. 13.3:1. */
 #left-panel :is(.section-seg, #rail-mode) button[aria-pressed="true"] {
   background: rgba(255, 255, 255, 0.05);
   box-shadow: none;
   color: var(--ivory);
-  opacity: 0.78;
 }
+/* THE WEIGHT LADDER, HELD CLEAR OF :disabled. Both selectors above carry
+   an id's weight, so a bare `opacity` in either of them outranks THE
+   DISABLED RECIPE — and the Pools cell on an empty rack would
+   come out drained of hue but at full brightness, which is a fourth
+   visibility state nobody asked for. `:not(:disabled)` is how a
+   high-specificity resting dress gets out of the disabled rule's way; the
+   drain's number stays spelled in exactly one place.
+   (The C6 lesson in its other form: the rail block's ties are lost to
+   source order, this one would have been lost to id weight. Same finding —
+   a dress written where it cannot be beaten by the rule that should beat
+   it.) */
+#left-panel :is(.section-seg, #rail-mode) button:not(:disabled) { opacity: 0.78; }
+#left-panel :is(.section-seg, #rail-mode) button[aria-pressed="true"]:not(:disabled) { opacity: 1; }
 #left-panel :is(.section-seg, #rail-mode) button:hover:not(:disabled) {
   opacity: 1;
   background: rgba(255, 255, 255, 0.07);
@@ -505,14 +573,25 @@ html, body {
 /* The draft's promise STANDS (2026-08-01): a quiet gold ROLL whisper rests
    on the cluster whenever dice are staged — hover turns it loud. Pool
    tiles never wear it (they stage); this is the one roll button. */
-/* the standing ROLL whisper gathers gold with the pool (heat classes):
-   a one-die draft whispers at 0.3; a heavy pool promises at 0.55 */
-/* resting presence up a step (Joe 2026-08-04: it 'looks better when
-   activated' — let it rest closer to that) */
-.tray-roll .roll-cue { opacity: 0.4; }
-.draft-zone.heat-2 .tray-roll .roll-cue { opacity: 0.48; }
-.draft-zone.heat-3 .tray-roll .roll-cue { opacity: 0.56; }
-.draft-zone.heat-4 .tray-roll .roll-cue { opacity: 0.65; }
+/* THE WELL'S CUE IS THE RAIL'S CUE, VALUE FOR VALUE (audit C1/U6,
+   2026-08-08). Measured before this change: the well's armed ROLL read
+   1.4:1 resting and 1.8:1 at full heat, while the rail plate — same
+   builder, same word, same bronze — read 4.9:1 armed. The workbench's
+   LIVE primary act was dimmer than the launcher's, and the mechanism was
+   an opacity ladder (0.4 → 0.65) multiplying an already-translucent base
+   colour (.roll-cue is rgba(255,215,102,.34)), so the two alphas
+   compounded to an effective 0.14.
+   §7.21's amendment governs: 0.45 covers SECONDARY verbs, *the primary
+   act of a surface stands at full opacity*. So the cue takes the rail's
+   declared colour at opacity 1 and the heat ladder leaves the lettering
+   alone — heat was specified as light and depth, never the word (§7.10),
+   and it still rides the pocket bloom on #tray-actions below. Same
+   reasoning retires the SPENT cue's dim: a spent draft is still an armed
+   primary (Enter repeats it), and 2i-E's cooling already speaks through
+   three other channels — the drained pocket glow, the dice at 0.6 and
+   the chips at 0.6. Approach still lifts to the loud cue
+   (.pool-roll:hover, ~10:1); the ✕-hover suppression is untouched. */
+.tray-roll .roll-cue { color: rgba(255, 215, 102, 0.62); opacity: 1; }
 .tray-roll.hidden { display: none; }
 /* (the well's die size lives with the beacon block below — 34px, larger
    than the pool rows' 28: the draft is the star) */
@@ -685,11 +764,17 @@ html, body {
   background: linear-gradient(180deg, rgba(50, 38, 19, 0.92), rgba(36, 27, 14, 0.94));
   box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.35), 0 0 16px rgba(255, 214, 102, 0.14);
 }
+/* …and the EMPTY well takes the rail's UNARMED value the same way (audit
+   C1): 1.3:1 before, 2.0:1 now — quieter than the armed cue by the same
+   margin the rail already ships, because both states are the same plate
+   under the same word. Colour, not opacity, for the reason above: the
+   base .roll-cue alpha must not be multiplied twice. */
 #tray-hint .roll-cue {
-  opacity: 0.3;
-  transition: opacity 0.25s;
+  color: rgba(255, 215, 102, 0.26);
+  opacity: 1;
+  transition: color 0.25s;
 }
-#tray-actions:hover #tray-hint .roll-cue { opacity: 0.45; }
+#tray-actions:hover #tray-hint .roll-cue { color: rgba(255, 215, 102, 0.39); }
 #tray-hint.hidden { display: none; }
 .tray-line2.hidden { display: none; }
 /* EVEN taller (Joe 2026-08-03: '+20-30%' — and a floor that absorbs a
@@ -766,7 +851,11 @@ html, body {
      states the transitions smooth, simple to reason about and to test
      (frame-starved renderers freeze transitions mid-flight — the e2e
      strips them before asserting the cascade target). Light and depth,
-     never size (§7.10); an empty well is quiet. */
+     never size (§7.10); an empty well is quiet.
+     Heat rides THESE FOUR RULES ALONE now (audit C1, 2026-08-08): it used
+     to fade the ROLL cue up the same ladder, which made the verb's
+     legibility a function of how many dice you had staged. The bloom is
+     the beacon; the word is not part of it. */
   box-shadow: var(--pocket);
   transition: box-shadow 0.35s;
 }
@@ -776,19 +865,23 @@ html, body {
 .draft-zone.heat-4 #tray-actions { box-shadow: var(--pocket), 0 0 20px rgba(255, 215, 102, 0.14); }
 /* THE SPENT DRAFT (2i-E): a rolled draft STAYS — Enter-again is the
    deliberate repeat, never an auto-clear — but it visibly COOLS until
-   its next edit: the heat glow drains, the staged dice rest dimmer, the
-   cue falls back to its resting whisper. Approach re-warms everything
-   (the hover rules outrank these on :hover), and any edit clears the
-   state (renderTray / setTraySpent). Light and depth only, geometry
-   untouched (§7.10). This cue is what separates 'roll it again' from
-   'compose the NEXT roll on top of it by accident' — the silent
-   Wisdom-×4 accretion the audit named. AFTER the heat rules on purpose:
-   equal specificity, spent must win the glow. */
+   its next edit: the heat glow drains and the staged dice rest dimmer.
+   Approach re-warms everything (the hover rules outrank these on
+   :hover), and any edit clears the state (renderTray / setTraySpent).
+   Light and depth only, geometry untouched (§7.10). This cooling is what
+   separates 'roll it again' from 'compose the NEXT roll on top of it by
+   accident' — the silent Wisdom-×4 accretion the audit named. AFTER the
+   heat rules on purpose: equal specificity, spent must win the glow.
+   THE CUE NO LONGER COOLS WITH IT (audit C1, 2026-08-08). Its dim was
+   `opacity: 0.3` over the cue's own translucent colour, i.e. the same
+   double-alpha that made the armed cue illegible — and it landed on the
+   most common state this well is ever in, since every roll leaves the
+   draft spent. §7.21: a spent draft is still the surface's PRIMARY act.
+   The three channels above carry the cooling on their own. */
 .draft-zone.spent #tray-actions { box-shadow: var(--pocket); }
 .draft-zone.spent .tray-roll:not(:hover) .die-art,
 .draft-zone.spent .tray-roll:not(:hover) .src-chip,
 .draft-zone.spent .tray-roll:not(:hover) .strip-count { opacity: 0.6; }
-.draft-zone.spent .tray-roll:not(:hover) .roll-cue { opacity: 0.3; }
 /* The ± editor open → the field it edits is the one lit. openPopover
    toggles 'open' on pop.row. The lit state is a RING, never a repaint
    (Joe 2026-08-04: a flat translucent wash here replaced the pocket's
@@ -847,13 +940,16 @@ html, body {
 }
 /* unlit, not absent: an empty well's tools recede but hold their place —
    and wear the disabled CODE (grayscale) so recede never reads as the
-   reveal tier's resting dim (2i-C, three states three codes) */
+   reveal tier's resting dim (2i-C, three states three codes).
+   NAMED EXCEPTION, and only for the seat (audit C4): the drain itself now
+   comes from THE DISABLED RECIPE — this block used to carry its own
+   0.42 + grayscale(0.7), which is the pair C2 measured at 2.36:1 against
+   live 2.24:1 cells. What is genuinely local is the SHADOW: a plate that
+   is not powered is not a raised object either, so it sheds the machined
+   bevel-and-seat while the lit tools keep it. */
 .draft-actions .btn:disabled,
 #tray-mods:disabled {
-  opacity: 0.42;
   box-shadow: none;
-  cursor: default;
-  filter: grayscale(0.7);
 }
 /* '± Modify' leads the rim (Joe 2026-08-04: the rim's Save retired, the
    freed room lets the modifier tool wear its word) — the one tool that
@@ -931,7 +1027,15 @@ html, body {
   background: rgba(212, 175, 55, 0.07);
   box-shadow: 0 0 14px rgba(255, 214, 102, 0.12);
 }
-.pool-roll:disabled { opacity: 0.45; cursor: default; } /* manage mode disarms it */
+/* NAMED EXCEPTION to THE DISABLED RECIPE (audit C4). A pool row
+   is disarmed by MANAGE MODE, and by the well when a staged draft's
+   notation stops parsing — in both states the button's face is the pool
+   itself, the dice and the name you are there to edit. Draining it to
+   grayscale(1)/0.3 would gray out the whole rack while you work in it.
+   "Unavailable" is the wrong word for this; the affordance is off, the
+   content is not. Moved off 0.45 as well — that was the reveal tier's own
+   resting number, one of the two collisions C4 counted. */
+.pool-roll:disabled { opacity: 0.55; filter: none; cursor: default; }
 /* ---- the hover ROLL cue (P1 made loud) ---- */
 /* Approach turns the strip into a promise: a heavy translucent ROLL fills
    the button's empty side BEHIND the dice (they ride z-index 1), and the
@@ -1150,7 +1254,14 @@ html, body {
 /* THE DICE-VALUE LEDGER (§2l ③): shelf and rack figures share one
    right-flush column — steel word, ivory figure, no gold (HUE = ACT:
    nothing here is an action). Figures are BUILT only in manage mode,
-   never styled into hiding. */
+   never styled into hiding.
+   KNOWN BROKEN for the rack half (recorded 2026-08-08, UX.md §7.17): the
+   `.ph-fig` total is built only when the rack is YOURS, and #pools-head is
+   `display:none` in exactly that state (see :not(.foreign) above), so the
+   whole-rack figure and the standing 'dice value' word never reach a screen —
+   which also leaves .psh-fig as bare integers with no unit. rack-dice-value
+   still passes because textContent reads through display:none. Do not "fix"
+   it by unhiding the head; the fix is where the figure mounts. */
 .pool-sec-head .psh-fig,
 #pools-head .ph-fig b {
   color: var(--ivory);
@@ -1201,7 +1312,9 @@ html, body {
   border-color: rgba(243, 234, 215, 0.5);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.055));
 }
-.tile-stage:disabled { opacity: 0.5; cursor: default; }
+/* (.tile-stage:disabled retired into THE DISABLED RECIPE — audit C4. It only ever fires on the ghost '+' tile at the 40-pool cap,
+   where the face is a plus sign and a noun: pure affordance, nothing to
+   keep readable, so it takes the base drain like everything else.) */
 .tile-art { display: flex; align-items: center; gap: 3px; pointer-events: none; }
 .tile-art .die-art { width: 24px; height: 24px; }
 .tile-name {
@@ -1335,7 +1448,13 @@ html, body {
 /* the identity strip's composer (Trigger Pass): a pure-dice pool edits
    exactly like the creation card — units remove one die, rank faces add */
 .pid-pool { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 30px; }
-.cc-unit:disabled { cursor: default; opacity: 0.55; }
+/* NAMED EXCEPTION to THE DISABLED RECIPE (audit C4) — the same
+   exception as .pool-roll's, for the same reason. A unit is disabled when
+   it is the pool's LAST die ("a pool needs at least one die"), and its
+   face is that die. Draining the only die in a composer to a colourless
+   0.3 hides the thing being composed in order to say you cannot remove
+   it. The affordance drains (no cursor, no red aim); the die does not. */
+.cc-unit:disabled { cursor: default; opacity: 0.55; filter: none; }
 .cc-unit:disabled:hover { border-color: rgba(243, 234, 215, 0.35); background: rgba(243, 234, 215, 0.05); }
 .pid-echo {
   font-family: var(--font-mono);
@@ -1376,7 +1495,8 @@ html, body {
 .ghost-add:focus-visible .ghost-plus { opacity: 0.85; }
 .ghost-add:hover:not(:disabled) .ghost-noun,
 .ghost-add:focus-visible .ghost-noun { opacity: 0.9; }
-.ghost-add:disabled { opacity: 0.35; cursor: default; }
+/* (.ghost-add:disabled retired into THE DISABLED RECIPE — audit C4. Same element as .tile-stage:disabled: two rules, one button,
+   two different drains, which is the arithmetic that made thirteen.) */
 @media (pointer: coarse) {
   .ghost-add .ghost-plus { opacity: 0.6; }
   .ghost-add .ghost-noun { opacity: 0.7; }
@@ -1800,19 +1920,19 @@ html, body {
 /* The switch shares the section bar's quiet dress, rules and all — it is the
    same `:is(.section-seg, #rail-mode)` block up at the top of this file, so
    there is nothing to keep in sync: one quiet track, the faintest recess on
-   the pressed cell, and weight as the real signal (.78 / .42). Quiet, not
-   inkless — an earlier pass deleted the track outright and the bar read as
-   floating text. That it stays quiet matters twice over here: it keeps the
-   collapsed column's ONE box the pool-row selection, which is what lets a
-   single signal carry it (§7.22), and it stops a control you touch twice a
-   session from outshouting the rows you touch constantly.
+   the pressed cell, and weight as the real signal (1 / .78 since audit C2 —
+   .78 / .42 before it, where the quiet half measured 2.24:1 and could not be
+   read). Quiet, not inkless — an earlier pass deleted the track outright and
+   the bar read as floating text. That it stays quiet matters twice over here:
+   it keeps the collapsed column's ONE box the pool-row selection, which is
+   what lets a single signal carry it (§7.22), and it stops a control you touch
+   twice a session from outshouting the rows you touch constantly.
    Unavailable still wears the DISABLED code — grayscale-drained and dimmer
-   than rest — because an empty rack makes Pools impossible, not secondary. */
-#left-panel #rail-mode button:disabled {
-  filter: grayscale(1);
-  opacity: 0.25;
-  cursor: default;
-}
+   than rest — because an empty rack makes Pools impossible, not secondary.
+   That code is THE DISABLED RECIPE now (audit C4): this block used to
+   spell it locally at grayscale(1)/0.25 and is retired. 0.30 replaces 0.25,
+   which is still far below a rest tier that itself moved up to 0.78 —
+   1.73:1 against 4.67:1, the widest that ordering has ever been. */
 
 /* ---------- the collapsed dice list ---------- */
 /* Same box as #rail-pools: the switch swaps the CONTENTS of one list, it does
@@ -1831,8 +1951,49 @@ html, body {
 #rail-dice::-webkit-scrollbar { width: 0; height: 0; }
 /* The row and its remover are SIBLINGS in a positioned wrapper — never a
    button inside a button (two scenarios pin that). */
+/* THE SAME 86px BOX, HONESTLY WON (audit C6/U9, 2026-08-08). The width is
+   not a choice made here: 112px rail − 14px #left-panel padding − 12px
+   #rail-dice padding = 86px, and that is what every pool row downstairs
+   already is. A dice row was not, because `.rd-item { flex: 1 }` and
+   `.rp-item { flex: none }` are BOTH (0,1,0) and .rp-item is ~60 lines
+   later, so it won on source order and the button shrink-wrapped its
+   label: measured 74.0 / 51.7 / 72.7 CSS px across three frames — the
+   selection box growing under your finger with every digit you added.
+   (Pool rows escaped the same declaration because they are cross-axis
+   items of a column flex container, where `flex: none` says nothing about
+   width and align-items: stretch decides it. Only here is .rp-item a
+   MAIN-axis item, inside .rd-cell's row.)
+   `.rd-cell .rp-item` is (0,2,0) — it beats .rp-item on weight instead of
+   position, so a future rule moved anywhere in this file cannot silently
+   take it back.
+   THE PATTERN IS THE FINDING, not this instance. Three `.rp-` / `.seg`
+   cascade ties have now been paid for in three commits, all the same
+   shape — a specific block written EARLIER than the generic one it meant
+   to override: (1) `.section-seg` losing its track to `.seg` ~3,100 lines
+   below it, fixed by scoping to `#left-panel :is(…)`; (2) the panel's
+   ivory pressed segment, which only ever beat the bare `.seg` gold
+   because of the `#left-panel` in front of it — and so did not beat it in
+   the ± popover, which is audit C3, retired today; (3) this. The
+   rail block sits between two much older neighbours and keeps losing ties
+   it looks like it should win. The durable half is U23's shared
+   `--label-sm` recipe; until then, every rule in this block that means to
+   override .rp-* must out-SPECIFY it, never merely follow it.
+   The ✕ rides the button, not the cell: the cell has exactly two children
+   and the button is the only one that grows, so once it is `flex: 1` the
+   two boxes are the same rectangle and `right: 4px` is measured from the
+   button's own edge. That is what kills the FLOAT — the remover sat ~19px
+   clear of a 51px button in an 86px cell at `3d6`.
+   NOT FIXED HERE, and deliberately not: at the longest label the ✕ still
+   overlaps the last character or so, because 86px cannot hold all four
+   things at once — 8 + 18 art + 6 gap + 42 (`10d10x` at 12.5px) + 18 ✕ +
+   8 is 100px. A reserved right lane was measured and refused: it leaves
+   the name 18px and ellipsises the notation, and the notation IS the
+   label here (`3d6`, not `d6 ×3`) — clipping it to `10d1…` costs more
+   than the overlap does. The real answers are markup, not cascade: drop
+   the art on a counted row, or move the count out of the name. Left for
+   whoever owns index.html / renderRailDice. */
 .rd-cell { position: relative; flex: none; display: flex; }
-.rd-item { flex: 1; min-width: 0; }
+.rd-cell .rp-item { flex: 1; min-width: 0; }
 .rd-item .rp-name { font-variant-numeric: tabular-nums; }
 .rd-x {
   position: absolute;
@@ -1925,7 +2086,11 @@ html, body {
   background: rgba(140, 152, 166, 0.16);
 }
 .rp-item[aria-pressed="true"] .rp-name { color: #fff; }
-.rp-item.rp-bad { filter: grayscale(1); opacity: 0.45; cursor: default; } /* 2i-C disabled */
+/* (.rp-item.rp-bad's local dress retired into THE DISABLED RECIPE —
+   audit C4. A broken row is also `disabled` in the DOM, so the base
+   rule reaches it by both names; its 0.45 was the second of the two
+   collisions with the reveal tier's resting number. A pool whose notation
+   no longer parses IS unavailable — no content exception here.) */
 /* 12.5px, not 11px: in a 44px row an 11px word has so much air around it
    that the list stopped reading as a list — nine names scattered down a
    column rather than a group you scan. The row keeps its thumb height; the
@@ -2012,9 +2177,20 @@ html, body {
   color: rgba(255, 215, 102, 0.5);
 }
 /* UNARMED is the well's own unpowered plate, value for value — the light
-   goes out of the surface and the lip goes quiet. Nothing turns gray. */
+   goes out of the surface and the lip goes quiet. Nothing turns gray.
+   THE NAMED EXCEPTION to THE DISABLED RECIPE — Joe
+   2026-08-08, verbatim: "the empty tray on expanded DOES NOT switch to
+   steel, it stays bronze". It reads as a fourth visibility code and it
+   works, so it is written down here rather than left to be rediscovered
+   as an accident (audit C4 counted it among the six drainless rules; it
+   is the one of the six that was right). `filter: none; opacity: 1`
+   are load-bearing: they are how this block opts OUT of the base drain
+   now that there is one. A plate is unpowered by its own light going
+   out, never by being desaturated — the whole surface is one hue. */
 #rail-roll:disabled {
   cursor: default;
+  filter: none;
+  opacity: 1;
   border-color: rgba(212, 175, 55, 0.14);
   background: linear-gradient(180deg, #322611 0%, #251b0c 100%);
   box-shadow: inset 0 1px 0 rgba(255, 228, 158, 0.05);
@@ -2208,7 +2384,9 @@ html, body {
   border-color: rgba(243, 234, 215, 0.42);
   box-shadow: inset 0 0 0 1px rgba(243, 234, 215, 0.14);
 }
-.roster-name:disabled { opacity: 0.4; cursor: default; filter: grayscale(0.7); }
+/* (.roster-name:disabled retired into THE DISABLED RECIPE — audit C4. Manage mode is the only state that disables a pill, and
+   grayscale(1) draining the seat DOT with it is correct rather than a
+   loss: an unpressable seat colour is a colour you cannot act on.) */
 .roster-dot {
   flex: none;
   width: 8px;
@@ -2270,8 +2448,10 @@ html, body {
   background: rgba(243, 234, 215, 0.04);
 }
 .rail-ghost:focus-visible { outline: 1px solid var(--ivory); outline-offset: 1px; }
-/* the third visibility code (css:258-262): disabled drains hue */
-.rail-ghost:disabled { opacity: 0.4; cursor: default; filter: grayscale(0.7); }
+/* (the third visibility code — disabled drains hue — is THE DISABLED
+   RECIPE now; .rail-ghost:disabled's local copy retired, audit C4. Its
+   comment pointed at css:258-262, a line reference that had already
+   drifted by 30 lines, which is its own argument for one rule.) */
 /* THE COPIED ACKNOWLEDGEMENT — the 900 ms after the label swaps to `Copied!`.
    It holds the hover promotion WITHOUT a pointer, because on a phone there is
    no hover at all and the share/copy hand-off is exactly the phone's moment:
@@ -3806,12 +3986,28 @@ body.mini #result-verdict { font-size: 11px; }
   transition: background 0.15s, color 0.15s;
 }
 .seg button:hover:not(:disabled) { color: var(--ivory); }
+/* THE SEG'S PRESSED DRESS IS IVORY, APP-WIDE (audit C3/U6, 2026-08-08).
+   It used to be gold here and ivory only under `#left-panel .seg` — and
+   the ± popover is body-level, so every seg in it ("Face down",
+   "Cinematic", the kh/kl keeps) lit with the ROLL hue three inches from a
+   panel where the identical control wears steel precisely so it would
+   not. HUE = ACT is global or it is nothing: a seg chooses a mode, and
+   choosing a mode is a tool act. The panel's override was the only thing
+   keeping the law true anywhere, which is exactly the wrong way round —
+   so the law is the default now and the override is retired (it lived in
+   the "neutral accents inside the column" block).
+   NO GOLD OPT-IN CLASS. Every .seg in the app was enumerated first:
+   #section-bar and #rail-mode (already ivory, via their own block) and
+   #pop-seg-adv / -vis / -exp / -keep (all four wrong). Nothing wanted
+   gold, so nothing gets a door back to it — an opt-in with no callers is
+   just the same defect waiting to be re-adopted.
+   The steel values are the panel's own, lifted verbatim from the rule
+   this replaces; measured 10.0:1 → 11.1:1 on the popover surface. */
 .seg button[aria-pressed="true"] {
-  background: rgba(212, 175, 55, 0.16);
-  color: var(--gold-bright);
-  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.32);
+  background: rgba(243, 234, 215, 0.13);
+  color: var(--ivory);
+  box-shadow: inset 0 0 0 1px rgba(243, 234, 215, 0.28);
 }
-.seg button:disabled { opacity: 0.4; cursor: default; }
 .seg.mono button { font-family: var(--font-mono); font-size: 10.5px; }
 
 .mchips { display: flex; gap: 4px; margin-bottom: 8px; }
@@ -4381,9 +4577,12 @@ body.mini .popover { width: min(94vw, 312px); }
 .card-act:hover, .card-act:focus-visible {
   background: rgba(226, 73, 59, 0.24); border-color: var(--red); color: #fff;
 }
-/* 2i-C's disabled code: drain the hue. A clear in flight LOOKS spent — the
-   old guard was a closure boolean that swallowed the second press in silence. */
-.card-act:disabled { filter: grayscale(1); cursor: default; }
+/* (2i-C's disabled code — drain the hue, so a clear in flight LOOKS spent
+   where the old guard was a closure boolean that swallowed the second
+   press in silence — is THE DISABLED RECIPE now, audit C4. This was
+   the only local recipe already spelling grayscale(1), and the only one
+   with no opacity at all: an in-flight press now dims as well as drains,
+   which is what "spent" was trying to say.) */
 /* A spectator's dismiss is not destructive and must not wear red. The
    :not() keeps this off the ceremony's Skip, which is steel and whose own
    hover would otherwise lose to this more specific rule. */
@@ -4435,6 +4634,10 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
 }
 /* the announcement channel: read by screen readers, invisible to everyone else */
 .sr-live { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }
+/* U13's "Save as pool…" — the same size tier as Reveal beside it, and the
+   same steel: keeping a roll is a tool act, not the roll act (HUE = ACT). */
+.keep-verb { font-size: 11.5px; }
+.keep-verb[hidden] { display: none; }
 
 /* hit-stop radial flash (§2.4 phase 3) */
 #hit-flash {
