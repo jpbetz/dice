@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node server.js",
     "test": "npm run -s test:unit && npm run -s test:fuzz && npm run -s test:e2e",
-    "test:unit": "node tests/notation.test.mjs && node tests/rollspec.test.mjs && node tests/odds.test.mjs && node tests/redaction.test.mjs && node tests/meanings.test.mjs && node tests/portable.test.mjs && node tests/static-cache.test.mjs && node tests/log-level.test.mjs && node tests/log-injection.test.mjs && node tests/presence.test.mjs && node tests/tables.test.mjs",
+    "test:unit": "node tests/notation.test.mjs && node tests/rollspec.test.mjs && node tests/odds.test.mjs && node tests/redaction.test.mjs && node tests/meanings.test.mjs && node tests/seed.test.mjs && node tests/portable.test.mjs && node tests/static-cache.test.mjs && node tests/log-level.test.mjs && node tests/log-injection.test.mjs && node tests/presence.test.mjs && node tests/tables.test.mjs",
     "test:fuzz": "node tests/notation.fuzz.mjs",
     "test:e2e": "node tests/e2e/run.mjs",
     "test:e2e:full": "node tests/e2e/run.mjs --full"

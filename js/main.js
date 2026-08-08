@@ -27,6 +27,7 @@ import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, validateMods, budgetOf } from './rollspec.js';
 import { previewOf, countingPmfs } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
+import { dealStartingRack } from './seed.js';
 import { exportYaml, parsePortable, planImport, profileToImport } from './portable.js';
 import { THEMES, SETS } from './themes.js';
 import { ParticleField } from './particles.js';
@@ -6162,25 +6163,17 @@ let groups = load(LS_GROUPS, null);
     try { localStorage.removeItem(LS_GROUPS_MINE); } catch { /* ignore */ }
   }
 }
-// The Soul Deal starting rack (Joe, 2026-08-01): the nine attributes in
-// their Physical/Mental/Social triads (offense/defense/utility), one
-// skill, one motivation — a fresh seat can stage attribute+skill+
-// motivation and roll ('1 2 3 Enter' territory). Everything starts at
-// d6 (Senchléithe); the ✎ editor is the advancement path.
+// The Soul Deal starting rack (Joe, 2026-08-01; DEALT since 2026-08-08):
+// the nine attributes in their Physical/Mental/Social triads, six weapon
+// skills and three motivations — a fresh seat can stage attribute+skill+
+// motivation and roll ('1 2 3 Enter' territory). The dice are dealt at
+// random inside each shelf's price (js/seed.js), so a fresh browser opens
+// on a character rather than on eleven identical d6 pools; the ✎ editor is
+// still the advancement path. Dealt ONCE, at the moment storage is empty,
+// and persisted by the saveGroups() below — a reload never re-rolls a rack
+// out from under its owner.
 function defaultGroups() {
-  return [
-    { id: 1, name: 'Strength', notation: '1d6', category: 'Attributes' },
-    { id: 2, name: 'Toughness', notation: '1d6', category: 'Attributes' },
-    { id: 3, name: 'Agility', notation: '1d6', category: 'Attributes' },
-    { id: 4, name: 'Wit', notation: '1d6', category: 'Attributes' },
-    { id: 5, name: 'Wisdom', notation: '1d6', category: 'Attributes' },
-    { id: 6, name: 'Intelligence', notation: '1d6', category: 'Attributes' },
-    { id: 7, name: 'Charm', notation: '1d6', category: 'Attributes' },
-    { id: 8, name: 'Will', notation: '1d6', category: 'Attributes' },
-    { id: 9, name: 'Empathy', notation: '1d6', category: 'Attributes' },
-    { id: 10, name: 'Sword', notation: '1d6', category: 'Skills' },
-    { id: 11, name: 'Peer Respect', notation: '1d6', category: 'Motivations' },
-  ];
+  return dealStartingRack();
 }
 if (!groups) groups = defaultGroups();
 groups = (Array.isArray(groups) ? groups : []).map(migrateGroup).filter(Boolean);

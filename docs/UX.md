@@ -1535,10 +1535,32 @@ tap opened it.)*
 (4) The
 default rack is the Soul Deal starting set: nine attributes in their
 Physical/Mental/Social triads (Strength/Toughness/Agility ·
-Wit/Wisdom/Intelligence · Charm/Will/Empathy), one skill (Sword), one
-motivation (Peer Respect), all at d6 — attribute+skill+motivation is
-'1 2 3 Enter' from a fresh seat. (Fixed underneath: migrateGroup dropped
-pool categories on every boot, on every path into the rack.)
+Wit/Wisdom/Intelligence · Charm/Will/Empathy), six weapon skills and
+three motivations — attribute+skill+motivation is '1 2 3 Enter' from a
+fresh seat. (Fixed underneath: migrateGroup dropped pool categories on
+every boot, on every path into the rack.)
+
+*(**THE DEALT RACK, 2026-08-08.** The seed shipped as eleven identical
+1d6 pools — correct, and completely flat. It is now **dealt**
+(`js/seed.js`): each shelf is PRICED — Attributes 100, Skills 100,
+Motivations 30 dice value, the first two being Joe's own framing of the
+creation budget in POOL-ANALYSIS §1 — and the dice are drawn at random
+*inside* that price, so a fresh browser opens on a character (Strength
+1d20 beside Wit 1d4) rather than on a blank form. The nine attribute
+names are fixed, being the sheet's spine; the six weapons are drawn from
+ten and the three motivations from twelve, so two seats rarely open the
+same armoury or the same drives. Three properties hold the design
+honest. **The price is exact, not approximate** — the dealer draws a
+rank only when what it leaves behind is still spendable and still opens
+every pool that has nothing, so the shelf lands on its number by
+construction rather than by retrying; `tests/seed.test.mjs` re-prices
+4000 deals through `budgetOf`, the ✎ ledger's own function. **The price
+is the data's, not a rule** — POOL-ANALYSIS §5 keeps the budget target
+out of storage and nothing here changes that; the app still enforces no
+budget and the ✎ editor is still the only advancement path. **The deal
+happens once**, at the moment storage is empty; a reload re-reads the
+stored rack, and a re-roll there would rewrite a sheet someone had
+already played. `soul-seed` pins all three in a browser.)*
 
 **THE SHEET PASS (2026-08-01, panel-designed).** The rack is the
 CHARACTER SHEET, so a pool's IDENTITY — name, shelf, die rank — edits like

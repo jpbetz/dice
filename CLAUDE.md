@@ -41,7 +41,8 @@ authority (goals, invariants, priorities, superseded decisions).
 `server.js` (zero-dep Node, in-memory rooms, SSE) · `js/main.js` (scene,
 engine, ceremonies, UI) · `js/notation.js` (Roll20-dialect parser) ·
 `js/rollspec.js` (shared roll mechanics, server + solo) · `js/meanings.js`
-(interpretation system registry) · `js/portable.js` (pools/settings ⇄
+(interpretation system registry) · `js/seed.js` (the dealt starting rack —
+priced shelves, dice drawn inside the price) · `js/portable.js` (pools/settings ⇄
 portable YAML — the ONLY rack transport; the `#g=` URL codec was dropped
 2026-08-04, GOALS §7, and the URL now carries no user state beyond
 `?room=`) · `js/net.js` (SSE/fetch client) · `tests/` (unit + fuzz +

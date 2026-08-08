@@ -178,7 +178,7 @@ rolled** (`js/rollspec.js`), so they are always countable. Verified:
 | `2d20` | — | **40** |
 | `1d20+1d4` | `1d4+1d20` | **24** |
 | `d100` | — | 100 |
-| `9d6` (the seeded Attributes shelf) | — | 54 |
+| `9d6` (the seeded Attributes shelf until 2026-08-08) | — | 54 |
 | `4d6dl1` | — | 24 |
 | `1d6!` | — | 6 |
 | `2d20kh1` | `1d20 adv` | **40** |

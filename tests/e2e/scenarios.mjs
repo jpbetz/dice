@@ -2401,15 +2401,40 @@ export const scenarios = [
     // The pre-Soul-Deal starter trio (Attack/Damage/Percentile, untouched)
     // upgrades to the Soul Deal rack on the next boot — it was never the
     // player's own work. One edit and the rack is theirs: no swap.
+    //
+    // The rack is DEALT (js/seed.js, unit-tested in tests/seed.test.mjs), so
+    // what this proves in a real browser is the wiring, not the arithmetic:
+    // the deal reaches storage, survives migrateGroup, prices at 100/100/30
+    // through the app's OWN ledger, and — the one thing only a reload can
+    // show — does not re-roll itself out from under its owner on the way
+    // back in.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);
       const b = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const gs = await b.dbg('groups');
-      assert.equal(gs.length, 11, `the old trio upgraded (got ${gs.length})`);
+      assert.equal(gs.length, 18, `the old trio upgraded (got ${gs.length})`);
       assert.equal(gs[0].name, 'Strength', 'attributes lead the rack');
       assert.equal(await b.eval(`document.querySelector('#groups-list .pool-sec-head').textContent`),
         'Attributes', 'the shelves are live');
+      // Priced by the same rackDiceValue the ✎ ledger prints.
+      const ledger = await b.dbg('rackDiceValue');
+      assert.deepEqual(ledger.shelves, [
+        { label: 'Attributes', value: 100 },
+        { label: 'Skills', value: 100 },
+        { label: 'Motivations', value: 30 },
+      ], 'the dealt shelves land on their prices');
+      assert.equal(ledger.total, 230, 'and the rack totals them');
+      // Dealt, not flat: the old seed was eleven identical 1d6 pools.
+      assert.ok(new Set(gs.map((g) => g.notation)).size > 3,
+        `the dice vary across the rack (got ${JSON.stringify(gs.map((g) => g.notation))})`);
+
+      // ONE deal per rack. A reload re-enters defaultGroups' neighbourhood
+      // with storage already full, so the character has to come back byte
+      // for byte — a re-roll here would silently rewrite a played sheet.
+      const again = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      assert.deepEqual((await again.dbg('groups')).map((g) => `${g.name} ${g.notation}`),
+        gs.map((g) => `${g.name} ${g.notation}`), 'a reload keeps the dealt rack');
 
       // a touched rack is the player's: rename one pool, reboot — no swap
       await b.dbg(`setGroups([{name: 'MyAttack', notation: '1d20'}, {name: 'Damage', notation: '3d4'}, {name: 'Percentile', notation: 'd100'}])`);

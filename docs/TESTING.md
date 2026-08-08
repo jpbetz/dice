@@ -9,7 +9,10 @@ this document defines how we check them.
 ## The layers
 
 1. **Unit suites** (`npm run test:unit`, ~1 s) — pure-module tests for
-   notation, rollspec, meanings, the portable YAML, and the visibility
+   notation, rollspec, meanings, the dealt starting rack
+   (`seed.test.mjs`: 4000 deals re-priced through `budgetOf`, because a
+   shelf that misses its price is the one failure the seed can have),
+   the portable YAML, and the visibility
    projection
    (`redaction.test.mjs`: the `projectEntryFor` matrix in-process, plus an
    endpoint layer that spawns `server.js` on an ephemeral port and asserts on
