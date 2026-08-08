@@ -148,17 +148,29 @@ function segmentsFor(type, q) {
 //
 // Profile interface v2 (ROADMAP step 2): a profile declares its READ.
 //   aggregate   'per-die' | 'sum' — how a roll's dice become outcomes
-//   usesTotal   gates the big total, DC verdicts and margin lines
-//   usesMods    gates modifier emphasis; false = the ± popover FOLDS the
-//               modifier, pairing, target and keep/drop sections entirely —
-//               no note (Joe's ruling, index.html's popover comment,
-//               superseding the earlier "the popover notes that they do not
-//               change outcomes"). They stay rollable through the notation:
-//               notation totality is app-wide, and what folds is the ±
-//               popover's SECTIONS, never the grammar.
+//   usesTotal   gates the SUM and everything derived from it — the big
+//               number, the margin delta, the ring's ratio, and the
+//               Success/Failure adjudication of a target. It does NOT gate
+//               the target itself: a stake is a condition the player
+//               declared, and it renders under every system (U17).
+//   targetWord  what THIS system calls a declared target ('Target',
+//               'Difficulty Class'). The profile NAMES the stake; it never
+//               decides whether the stake renders — that is U17's rule and
+//               the reason `usesMods` is gone (below).
+//
+//   (RETIRED — usesMods, U17 2026-08-08.) It did two unrelated jobs and all
+//   three profiles set it equal to usesTotal, so it never distinguished
+//   anything. Worse, it conflated ARITHMETIC (a flat bonus — a term in a sum,
+//   which renders where the sum does) with SELECTION (advantage, keep/drop,
+//   reroll, explode — which decide WHICH DICE LAND AND WHICH COUNT). The
+//   second is a fact under every system: outcomesFor below filters on
+//   `p.counts && !p.child`, and forecastFor REFUSES to pre-read keep/drop for
+//   exactly that reason. So `usesMods:false` was suppressing attribution this
+//   same profile treats as load-bearing, against GOALS' Attributed math
+//   invariant. Arithmetic now keys off usesTotal and selection is universal,
+//   which makes the conflation unspellable rather than merely fixed.
 //   outcomesFor(entry) -> [{dieIndex, type, value, word, tier}] for per-die
 //               systems (quiet dice carry word/tier null), else null
-//   meaningFor  the sum-world hero word (per-die systems return null)
 //   critFor(entry) -> 'success' | 'fail' | null
 //   forecastFor(spec, tools) -> the pre-roll read of a spec (ROADMAP §2l),
 //               or null when the profile has none (sum profiles until the
@@ -179,8 +191,6 @@ export const SYSTEMS = {
     // most deliberate beat this app has. 'Target' is the word the ± popover,
     // the screen-reader announce and UX §2.1's own record field already use.
     targetWord: 'Target',
-    usesMods: false,
-    meaningFor: () => null,
     outcomesFor(entry) {
       if (!entry || !Array.isArray(entry.parts)) return null;
       const out = [];
@@ -241,9 +251,7 @@ export const SYSTEMS = {
     label: 'D&D style',
     aggregate: 'sum',
     usesTotal: true,
-    usesMods: true,
     targetWord: 'Difficulty Class',
-    meaningFor: () => null,
     outcomesFor: () => null,
     // Natural-20/1 rule, read off the d20s that actually count: with
     // advantage the discarded die never triggers (counts is false on it),
@@ -262,8 +270,6 @@ export const SYSTEMS = {
     aggregate: 'sum',
     usesTotal: true,
     targetWord: 'Target',
-    usesMods: true,
-    meaningFor: () => null,
     outcomesFor: () => null,
     critFor: () => null,
     forecastFor: () => null, // the sum read ships in §2l ⑥

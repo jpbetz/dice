@@ -194,7 +194,25 @@ export const scenarios = [
       const [la, lb] = [await a.logTop(), await b.logTop()];
       assert.equal(la, lb, 'log entries identical across tabs');
       assert.ok(la.includes('Alice'), `roller attributed (got: ${la})`);
-      assert.ok(la.includes('str'), `bonus attribution present (got: ${la})`);
+
+      // ATTRIBUTED MATH, where math happens (U17 step 3). This asserted the
+      // named bonus under the DEFAULT system, which is per-die: nothing sums
+      // there, so `+3 str` was a gold weight-700 token feeding a total column
+      // the lens has emptied — a term of an arithmetic the app never performs.
+      // GOALS' Attributed math invariant is about attributing math that
+      // HAPPENS; under a per-die read there is no sum to attribute, and the
+      // canonical still carries the token for anyone reading the notation.
+      assert.ok(!la.includes('str'),
+        `a per-die lens shows no term of a sum it never computes (got: ${la})`);
+      for (const t of [a, b]) await t.dbg(`setSystem('dnd')`);
+      for (const t of [a, b]) {
+        await t.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'totals lens' });
+      }
+      const [da, db] = [await a.logTop(), await b.logTop()];
+      assert.equal(da, db, 'still identical across tabs under the other lens');
+      assert.ok(da.includes('str'),
+        `and a totals lens attributes the bonus by name (got: ${da})`);
+      for (const t of [a, b]) await t.dbg(`setSystem('soul-deal')`);
     },
   },
   {
@@ -877,11 +895,19 @@ export const scenarios = [
       await a.dbg(`openPopoverFor('tray')`);
       const secVisible = `[...document.querySelectorAll('#mods-popover .sec-sum, #mods-popover .prow-sum')]
         .some((el) => el.offsetParent !== null)`;
-      assert.equal(await a.eval(secVisible), false, 'sum-world sections fold under per-die');
+      // U17 #29-#31: only the MODIFIER section folds now. A flat bonus is a
+      // term in a sum and has nowhere to land without one; everything else
+      // that used to fold with it came back, because a target is a stake the
+      // player declared and pairing/keep-drop/reroll/explode decide WHICH
+      // DICE COUNT — facts under every system, and ones this profile's own
+      // outcomesFor and forecastFor already honour.
+      assert.equal(await a.eval(secVisible), false, 'the Modifier section folds under per-die');
+      assert.equal(await a.eval(`document.getElementById('pop-dc').offsetParent !== null`),
+        true, 'but Target is authorable — a dc used to round-trip invisibly');
       assert.equal(await a.eval(`document.getElementById('pop-sw-reroll').offsetParent !== null`),
-        false, 'reroll folds with them');
+        true, 'and reroll stands: it decides which dice count');
       assert.equal(await a.eval(`document.getElementById('pop-sw-explode').offsetParent !== null`),
-        false, 'exploding too');
+        true, 'exploding too');
       assert.equal(await a.eval(`document.getElementById('pop-sysnote') === null`), true,
         'the note is gone, not merely hidden');
       await a.dbg('closePopover()');
@@ -3642,21 +3668,26 @@ export const scenarios = [
 
       // Default (per-die): the button names what is actually behind it, and
       // 'Tweak' stays dead — that ban is what the 2026-08-04 ruling said.
-      assert.equal(await a.eval(word), '± Moment',
-        'a per-die system does not promise modifiers its popover folds away');
-      assert.ok(!/Modifiers/.test(await a.eval(tip)), 'nor in the tooltip');
+      // U17 #32 applies U11's rule rather than overturning it: '± Moment' was
+      // right when the popover held two of seven sections; it now holds SIX,
+      // and naming one of six is the same defect U11 fixed. So the WORD is
+      // constant again and the TOOLTIP is what varies — it stops promising
+      // modifiers where the one folded section is Modifier.
+      assert.equal(await a.eval(word), '± Modify', 'the word stands in every system');
+      assert.ok(!/Modifiers/.test(await a.eval(tip)),
+        'a per-die system does not promise the one section it folds');
       assert.ok(!/tweak/i.test(await a.eval(word)), "and never 'Tweak'");
 
-      // A totals system restores both.
+      // A totals system restores the full promise.
       await a.dbg(`setSystem('dnd')`);
-      await a.waitFor(`${word} === '± Modify'`,
-        { desc: 'a totals system gets the full word' });
-      assert.ok(/Modifiers/.test(await a.eval(tip)), 'and the full tooltip');
+      await a.waitFor(`/Modifiers/.test(${tip})`,
+        { desc: 'a totals system gets the full tooltip' });
+      assert.equal(await a.eval(word), '± Modify', 'same word, either way');
 
       // …and back, because a room-wide system change arrives as an echo.
       await a.dbg(`setSystem('soul-deal')`);
-      await a.waitFor(`${word} === '± Moment'`,
-        { desc: 'the word follows the system back' });
+      await a.waitFor(`!/Modifiers/.test(${tip})`,
+        { desc: 'the tooltip follows the system back' });
     },
   },
 

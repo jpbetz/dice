@@ -1597,16 +1597,6 @@ function renderPeek() {
   }
   main.appendChild(verdict);
 
-  const meaningEl = document.createElement('div');
-  meaningEl.className = 'pk-meaning';
-  const meaning = entry && !hidden ? entryMeaning(entry) : null;
-  if (meaning) {
-    meaningEl.textContent = meaning.word;
-    meaningEl.classList.add(`tier-${meaning.tier}`);
-    meaningEl.title = `${meaning.rank} column (${meaning.column})`;
-  }
-  main.appendChild(meaningEl);
-
   const bd = document.createElement('div');
   bd.className = 'pk-breakdown';
   // 2e: the rows already carry every source and face — the breakdown line
@@ -2479,14 +2469,15 @@ function canReroll(entry) {
 // outcomesFor. Interpretation stays a render-time lens.
 function activeSystem() { return SYSTEMS[currentSystemId]; }
 
-function entryMeaning(entry) {
-  if (entryHidden(entry)) return null;
-  // Sum-world hero word: a roll with a target is a CHECK and the verdict is
-  // its entire read (the gate that killed 'Failure beside a chart Success').
-  if (Number.isInteger(entry.dc)) return null;
-  const counting = entry.parts.filter((p) => p.counts && !p.child);
-  return activeSystem().meaningFor(counting.map((p) => p.type), entry.total);
-}
+// RETIRED (U17 step 4, 2026-08-08). `meaningFor` was the sum-world hero word,
+// and after the meanings migration ALL THREE profiles defined it as
+// `() => null` — so this returned null on every path, and five render
+// branches, two CSS tiers and the whole of UX §2.5's hero-slot ruling were
+// unreachable code describing a feature that no longer existed. The chart
+// word still reaches the screen, through outcomesFor → renderOutcomeRows;
+// it never came through here. Deleted rather than left as a null-returning
+// stub, because a stub is what let the dead branches look alive.
+
 
 // Per-die outcomes (Soul Deal's corrected read — meanings.js): N dice, N
 // words; quiet dice carry word null. Null under sum systems or hidden rolls.
@@ -2567,14 +2558,15 @@ function entryCrit(entry) {
   return activeSystem().critFor(entry);
 }
 
-// The crit overlay's word: the chart word when the system has one (soul-deal),
-// else the natural-roll callout (dnd — its meaningFor is always null).
+// The crit overlay's word: the crit die's own chart word, else the
+// natural-roll callout. (Its first branch read a sum-world `meaning` that
+// every profile has returned null for since the meanings migration —
+// retired with that channel in U17 step 4.)
 // The overlay's word never claims dice that were not rolled: 'Natural 20'
 // belongs to pools whose counting dice include a d20; anything else that
 // crits naturally reads the plain truth. (The old unconditional fallback
 // painted 'Natural 20' over a 2d6 check — the worst place to be wrong.)
-function critWord(crit, meaning, entry) {
-  if (meaning) return meaning.word;
+function critWord(crit, entry) {
   // Per-die systems: the crit die's own chart word is the fanfare.
   const os = entryOutcomes(entry) || [];
   const critDie = os.find((o) => o.tier === (crit === 'success' ? 'crit-success' : 'crit-fail'));
@@ -2741,6 +2733,11 @@ function renderBreakdown(el, entry, hidden) {
   // own rule (`else if (entry.modifier)`), so a bare 0 never renders.
   const mods = modPartsOf(entry) || (entry.modifier ? [{ label: '', value: entry.modifier }] : []);
   if (entry.parts.length <= 1 && !mods.length) return;
+  // U17 step 3: this line ends in `= <sum>`, so it is arithmetic. It is
+  // reachable under a per-die lens whenever outcomesFor returns null on a
+  // VISIBLE roll — an all-child or all-discarded pool — which is the corner
+  // both the audit and two of the three design stances missed.
+  if (mods.length && !activeSystem().usesTotal) return;
 
   const partSpan = (p) => {
     const s = document.createElement('span');
@@ -2981,7 +2978,6 @@ function renderRollResults(entry, dice, fx = true) {
   // pool, die by die — and the separate breakdown line folds away (it
   // repeated every source and face the rows already carry; that duplication
   // was the muddle). Sum systems keep the meaning word + breakdown pair.
-  const meaning = entryMeaning(entry);
   resultMeaningEl.className = ''; // reset FIRST: renderOutcomeRows marks oc-ledger
   const perDieRows = !hidden && renderOutcomeRows(resultMeaningEl, entry);
   if (perDieRows) {
@@ -2994,9 +2990,9 @@ function renderRollResults(entry, dice, fx = true) {
     resultMeaningEl.className = 'held';
     resultMeaningEl.title = '';
   } else {
-    resultMeaningEl.textContent = meaning ? meaning.word : '';
-    resultMeaningEl.className = meaning ? `tier-${meaning.tier}` : '';
-    resultMeaningEl.title = meaning ? `${meaning.rank} column (${meaning.column})` : '';
+    resultMeaningEl.textContent = '';
+    resultMeaningEl.className = '';
+    resultMeaningEl.title = '';
   }
   if (perDieRows) resultBreakdownEl.textContent = '';
   else renderBreakdown(resultBreakdownEl, entry, hidden);
@@ -3040,10 +3036,10 @@ function renderRollResults(entry, dice, fx = true) {
   const crit = entryCrit(entry);
   if (crit === 'success') {
     banner.classList.add('crit-success');
-    if (fx) playCritEffect('success', critWord(crit, meaning, entry));
+    if (fx) playCritEffect('success', critWord(crit, entry));
   } else if (crit === 'fail') {
     banner.classList.add('crit-fail');
-    if (fx) playCritEffect('fail', critWord(crit, meaning, entry));
+    if (fx) playCritEffect('fail', critWord(crit, entry));
   }
 }
 
@@ -3772,7 +3768,7 @@ function stageVerdict(roll) {
   const crit = entryCrit(cer.entry); // active-system lens at staging time
   if (crit) {
     ceremonyLayer.classList.add('crit');
-    playCritEffect(crit, critWord(crit, entryMeaning(cer.entry), cer.entry));
+    playCritEffect(crit, critWord(crit, cer.entry));
   }
   renderVerdictCard(roll, cer.entry);
   setCeremonyPhaseClass(roll, 'c-verdict');
@@ -3896,14 +3892,24 @@ function setMonogram(el, roll) {
   el.title = name;
 }
 
-function preModChips(mods) {
+// ARITHMETIC vs SELECTION (U17 step 3). The flat bonus is a term in a sum and
+// renders only where the sum does. Advantage, keep/drop, reroll and explode
+// are SELECTION — they decide which dice land and which count, which is a
+// fact under every system: soul-deal's own outcomesFor filters on
+// `p.counts && !p.child`, and its forecastFor REFUSES to pre-read keep/drop
+// precisely because of it. `usesMods:false` was suppressing attribution the
+// same profile treats as load-bearing, against GOALS' Attributed math
+// invariant — and the one member that conflated the two is now deleted.
+function preModChips(mods, opts = {}) {
   if (!mods) return [];
   const out = [];
   const parts = Array.isArray(mods.parts) ? mods.parts.filter((p) => p.value) : null;
-  if (parts && parts.length) {
-    for (const p of parts.slice(0, 4)) out.push({ v: fmtNum(p.value), l: p.label || 'Modifier' });
-  } else if (mods.modifier) {
-    out.push({ v: fmtNum(mods.modifier), l: 'Modifier' });
+  if (opts.arithmetic) {
+    if (parts && parts.length) {
+      for (const p of parts.slice(0, 4)) out.push({ v: fmtNum(p.value), l: p.label || 'Modifier' });
+    } else if (mods.modifier) {
+      out.push({ v: fmtNum(mods.modifier), l: 'Modifier' });
+    }
   }
   if (mods.adv === 'adv') out.push({ v: 'ADV', l: 'Advantage' });
   if (mods.adv === 'dis') out.push({ v: 'DIS', l: 'Disadvantage' });
@@ -3956,7 +3962,8 @@ function renderIntentCard(roll) {
 
   const holder = document.getElementById('intent-mods');
   holder.innerHTML = '';
-  for (const chip of (activeSystem().usesMods ? preModChips(roll.spec && roll.spec.mods) : [])) {
+  for (const chip of preModChips(roll.spec && roll.spec.mods,
+    { arithmetic: activeSystem().usesTotal })) {
     const el = document.createElement('span');
     el.className = 'pre-mod';
     const b = document.createElement('b');
@@ -3988,14 +3995,18 @@ function renderDockStrip(roll) {
 // Attribution cards for the §2.4 rescue beat: named bonus parts (§7.2),
 // advantage kept-over-struck, rerolls, keep/drop, explosions. Each card is
 // {v, segs:[{t, s?}]} — s marks a struck-through segment.
-function attributionCards(roll, entry) {
+function attributionCards(roll, entry, opts = {}) {
   const cards = [];
   const mods = (roll.spec && roll.spec.mods) || {};
   const parts = Array.isArray(mods.parts) ? mods.parts.filter((p) => p.value) : null;
-  if (parts && parts.length) {
-    for (const p of parts) cards.push({ v: fmtNum(p.value), segs: [{ t: p.label || 'Modifier' }] });
-  } else if (entry.modifier) {
-    cards.push({ v: fmtNum(entry.modifier), segs: [{ t: 'Modifier' }] });
+  // Arithmetic only where the sum lands (U17 step 3); every card below this
+  // one reports which dice COUNTED, which every system needs.
+  if (opts.arithmetic) {
+    if (parts && parts.length) {
+      for (const p of parts) cards.push({ v: fmtNum(p.value), segs: [{ t: p.label || 'Modifier' }] });
+    } else if (entry.modifier) {
+      cards.push({ v: fmtNum(entry.modifier), segs: [{ t: 'Modifier' }] });
+    }
   }
   if (mods.adv) {
     const struck = entry.parts.filter((p) => p.reason === 'adv').map((p) => p.label);
@@ -4111,7 +4122,6 @@ function renderVerdictCard(roll, entry) {
 
   const marginEl = document.getElementById('verdict-margin');
   const heroEl = document.getElementById('verdict-hero');
-  const meaning = entryMeaning(entry); // active-system lens (null in dnd/none)
   heroEl.className = 'verdict-hero';
   marginEl.textContent = '';
   // WRITTEN ONCE, ABOVE EVERY BRANCH — including the hidden early-return.
@@ -4144,18 +4154,19 @@ function renderVerdictCard(roll, entry) {
     marginEl.appendChild(b);
     heroEl.textContent = cleared ? 'Success' : 'Failure';
     if (!cleared) heroEl.classList.add('bad');
-  } else if (meaning) {
-    heroEl.textContent = meaning.word;
-    heroEl.classList.add(`tier-${meaning.tier}`);
   } else {
     heroEl.textContent = '';
   }
 
   const holder = document.getElementById('verdict-modcards');
   holder.innerHTML = '';
-  // usesMods=false: modifiers/keeps do not change outcomes under this
-  // system — no attribution rescue beat to stage.
-  (activeSystem().usesMods ? attributionCards(roll, entry) : []).slice(0, 6).forEach((c, i) => {
+  // U17 step 3: the ARITHMETIC card is gated; the selection cards are not.
+  // "modifiers/keeps do not change outcomes under this system" was half
+  // right and half an invariant break — a keep/drop absolutely changes which
+  // dice the chart reads, and this profile's own forecastFor refuses to
+  // pre-read one for exactly that reason.
+  attributionCards(roll, entry, { arithmetic: activeSystem().usesTotal })
+    .slice(0, 6).forEach((c, i) => {
     const card = document.createElement('div');
     card.className = 'mod-card';
     card.style.setProperty('--fly-delay', `${(0.1 + 0.12 * i).toFixed(2)}s`);
@@ -6013,8 +6024,12 @@ function updateTrayModsWord() {
   // bans the weak synonym, it does not pin one label for all time (Joe
   // 2026-08-08, correcting a first pass that read it as a pin and changed
   // only the tooltip). So the word follows the system and 'Tweak' stays dead.
-  const full = activeSystem().usesMods;
-  trayModsBtn.textContent = full ? '± Modify' : '± Moment';
+  // U17 #32 APPLIES U11'S RULE RATHER THAN OVERTURNING IT. `± Moment` was
+  // right when the popover held two of seven sections. After the fold keys
+  // off usesTotal and Target, pairing, keep/drop and reroll come back, it
+  // holds SIX of seven — and naming one of six is the same defect U11 fixed.
+  const full = activeSystem().usesTotal;
+  trayModsBtn.textContent = '± Modify';
   trayModsBtn.title = full
     ? 'Modifiers, target, moment'
     : 'Moment and visibility — this system reads each die, so there is no total to modify';
@@ -8314,7 +8329,11 @@ function openPopover(binding) {
   // The note is the disclosure ('Show anyway'); every open starts folded.
   // Values a pool already carries stay in its canonical either way —
   // notation totality is app-wide, and the room can switch systems later.
-  popEl.classList.toggle('pop-perdie', !activeSystem().usesMods);
+  // U17 #28/#29: the fold keys off usesTotal, and Target (DC) is no longer
+  // inside it — a target is a stake and must be AUTHORABLE under every
+  // system. It round-tripped invisibly before: loaded by popStateFromParse,
+  // emitted by popCanonical, printed into #pop-echo, and shown in no row.
+  popEl.classList.toggle('pop-perdie', !activeSystem().usesTotal);
   popEl.classList.remove('hidden');
   renderPopIdentity(); // the Sheet Pass strip (group popovers only)
   renderPop();
@@ -9349,14 +9368,20 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
       }
       if (bits.length) tokensHtml = `<span class="log-dice">${bits.join('')}</span>`;
     }
-    const modParts = modPartsOf(entry);
+    // U17 step 3: the flat modifier is ARITHMETIC and renders where the sum
+    // does. This was ungated — the exact inversion of the intent card, which
+    // showed the target and not the `+5` while the log showed the `+5` and
+    // not the target. `.log-mod` is gold at weight 700, louder than the die
+    // beside it, feeding a total column the lens has emptied: a dangling
+    // bonus is the one surface that genuinely implies a sum.
+    const modParts = activeSystem().usesTotal ? modPartsOf(entry) : null;
     let modHtml = '';
     if (modParts) {
       // §7.2 attributed modifiers: "+2 Proficiency +1 Guidance"
       modHtml = modParts
         .map((p) => ` <span class="log-mod">${p.value >= 0 ? '+' : '−'}${Math.abs(p.value)}${p.label ? ` <span class="log-part-label">${escapeHtml(p.label)}</span>` : ''}</span>`)
         .join('');
-    } else if (entry.modifier) {
+    } else if (entry.modifier && activeSystem().usesTotal) {
       modHtml = ` <span class="log-mod">${entry.modifier > 0 ? '+' : '−'}${Math.abs(entry.modifier)}</span>`;
     }
     const detail = hidden
@@ -9390,11 +9415,8 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
       : !dcAdjudicated
         ? `<span class="log-verdict">vs <span class="stake-num">${entry.dc}</span></span>`
         : `<span class="log-verdict ${entry.total >= entry.dc ? 'ok' : 'bad'}">vs ${entry.dc} ${entry.total >= entry.dc ? '✓' : '✗'}</span>`;
-    const meaning = entryMeaning(entry); // active-system lens; null while hidden
     const outcomes = entryOutcomes(entry); // per-die lens (Soul Deal)
-    const meaningHtml = meaning || outcomes
-      ? `<span class="log-meaning${meaning ? ` tier-${meaning.tier}` : ''}"></span>`
-      : '';
+    const meaningHtml = outcomes ? '<span class="log-meaning"></span>' : '';
     el.innerHTML = `
       <div class="log-head">
         <span class="log-group"></span>
@@ -9403,11 +9425,7 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
       </div>
       <div class="log-detail">${tokensHtml}${detail}${verdictHtml ? '  ·  ' + verdictHtml : ''}${meaningHtml ? '  ·  ' + meaningHtml : ''}</div>
       <div class="log-time">${fmtTime(entry.t)}</div>`;
-    if (meaningHtml) {
-      const slot = el.querySelector('.log-meaning');
-      if (outcomes) renderTally(slot, entry);
-      else slot.textContent = meaning.word;
-    }
+    if (meaningHtml) renderTally(el.querySelector('.log-meaning'), entry);
     // Names and labels are user-supplied: textContent only, never innerHTML.
     const groupEl = el.querySelector('.log-group');
     if (entry.playerName) {

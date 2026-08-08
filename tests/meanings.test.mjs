@@ -75,11 +75,21 @@ t('crit fanfare fires when ANY die lands a crit row', () => {
   assert.equal(sd.critFor(entry([die('d4', 4), die('d6', 5)])), null); // small columns have no crit rows
 });
 
-t('the profile declares its read: per-die, no totals, no mods', () => {
+t('the profile declares its read: per-die, no totals, and it names its stake', () => {
   assert.equal(sd.aggregate, 'per-die');
   assert.equal(sd.usesTotal, false);
-  assert.equal(sd.usesMods, false);
-  assert.equal(sd.meaningFor(), null);
+  // usesMods and meaningFor are RETIRED (U17). usesMods did two unrelated
+  // jobs — it conflated a flat bonus (arithmetic, which needs a sum) with
+  // keep/drop, advantage, reroll and explode (SELECTION, which decides which
+  // dice count, and which this very profile honours in outcomesFor and
+  // refuses to pre-read in forecastFor). All three profiles set it equal to
+  // usesTotal, so it never distinguished anything. meaningFor was the
+  // sum-world hero word and every profile returned null from it.
+  assert.equal('usesMods' in sd, false, 'usesMods is gone, not merely false');
+  assert.equal('meaningFor' in sd, false, 'meaningFor is gone with it');
+  // The profile NAMES its stake; it never decides whether the stake renders.
+  assert.equal(sd.targetWord, 'Target');
+  assert.equal(SYSTEMS.dnd.targetWord, 'Difficulty Class');
 });
 
 t('sum systems keep their world: dnd totals + natural d20s only', () => {
