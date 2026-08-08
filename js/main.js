@@ -3525,13 +3525,29 @@ const critOverlay = document.getElementById('crit-overlay');
 const critText = document.getElementById('crit-text');
 let critTimer = null;
 
+// Asked once and cached: a player who has told their OS to stop moving things
+// has said it about this app too. (matchMedia appeared exactly once in all of
+// js/ before this, for navigator.share — the CSS carried the whole policy,
+// and a class added from JS is outside what CSS can decline.)
+const reduceMotionQuery = typeof window.matchMedia === 'function'
+  ? window.matchMedia('(prefers-reduced-motion: reduce)')
+  : null;
+const prefersReducedMotion = () => !!(reduceMotionQuery && reduceMotionQuery.matches);
+
 function playCritEffect(kind, text) {
   clearTimeout(critTimer);
   critOverlay.className = kind;
   critText.textContent = text;
+  // The WORD still lands — a crit is information, not decoration, and
+  // dropping it would tell a reduced-motion player less than the table knows.
+  // What goes is the 1700ms camera shake on the whole scene (U8): the CSS
+  // block that was supposed to cover this scopes to `#ceremony-layer *`, and
+  // #scene-container is not in it.
   container.classList.remove('shake');
-  void container.offsetWidth; // restart animation
-  container.classList.add('shake');
+  if (!prefersReducedMotion()) {
+    void container.offsetWidth; // restart animation
+    container.classList.add('shake');
+  }
   critTimer = setTimeout(() => critOverlay.classList.add('hidden'), 1700);
 }
 
@@ -6029,7 +6045,24 @@ function renderCmdState(boxEl, slotEl, res, raw) {
     slotEl.appendChild(el);
   };
   if (res.ok) {
-    span('ok', `${res.canonical} · ${fmtPreview(res.spec.dice, res.spec.mods)}`);
+    // THE BOX MUST NOT FORECAST A SUM THE SYSTEM NEVER ADDS (U7). fmtPreview
+    // prints `min/avg/max` unconditionally, so under soul-deal — the DEFAULT
+    // system, where no total lands anywhere — the box forecast a total while
+    // the app's own Help stated the per-die rule on the same screen. The
+    // popover already branches correctly; this is that branch, at the width
+    // a one-line slot has.
+    //
+    // The slot is the VALIDATOR as well as the read (§2l), so every path here
+    // must REPLACE, never blank: a per-die system gets a phrase naming where
+    // the real spread lives, a refusal gets its own reason, and only a system
+    // that actually sums gets the sum.
+    const sys = activeSystem();
+    const fc = sys.forecastFor
+      ? sys.forecastFor(res.spec, { countingPmfs }) : null;
+    const read = fc && fc.kind === 'refusal' ? fc.reason
+      : fc && fc.kind === 'per-die' ? 'per-die outcomes — ± for the spread'
+        : fmtPreview(res.spec.dice, res.spec.mods);
+    span('ok', `${res.canonical} · ${read}`);
     for (const w of res.warnings) span('warn', `⚠ ${w}`);
     // §7.4: both verbs are advertised wherever both are available.
     if (netOnline) span('muted', 'Enter roll · Shift+Enter offer');
@@ -7446,10 +7479,24 @@ function railModeStored() {
 // everything, because a pool arriving mid-composition (an import, an SSE
 // push) must never yank the column out from under three taps of work.
 function railMode() {
-  if (railDice.length) return 'dice';
-  if (!groups.length) return 'dice'; // nothing in the other list to show
+  // ORDER IS THE MECHANISM (U10). A live dice pick used to outrank
+  // everything, which forced setRailMode('pools') to WIPE railDice or the
+  // render would flip straight back — so a control that looks exactly like
+  // the harmless bar upstairs destroyed three counted taps with no undo,
+  // four lines under a comment reading "BOTH PICKS SURVIVE". §7.23 states
+  // "Nothing is ever destroyed by navigation" as law, and the code broke it
+  // twice. An explicit choice — a press, or a digit's one-visit loan — now
+  // outranks the pick, so nothing has to be destroyed to make the switch
+  // work, and both picks wait where you left them.
+  if (!groups.length) return 'dice';   // nothing in the other list to show
   if (railModeVisit) return railModeVisit;
-  return railModeStored() || 'pools'; // your pools are the point, when you have them
+  const stored = railModeStored();
+  if (stored) return stored;
+  // Only with NO preference at all does a live pick decide: it is the one
+  // signal there is, and it still must not yank the column out from under
+  // three taps when a pool arrives mid-composition (an import, an SSE push).
+  if (railDice.length) return 'dice';
+  return 'pools'; // your pools are the point, when you have them
 }
 
 function setRailMode(mode) {
@@ -7462,8 +7509,10 @@ function setRailMode(mode) {
   // thumb's width above the first row silently eating three taps of picked
   // work, with no undo. Enter, Esc and the gold bar all act on the VISIBLE
   // list's pick instead, which is the same rule the digits follow.
-  if (mode === 'pools') railDice = []; // …except this one: a live dice pick would
-  // win resolution back immediately and the switch would appear not to work.
+  // …and NOTHING is dropped here any more (U10). The wipe existed only
+  // because railMode() gave a live pick priority above an explicit choice;
+  // with that order fixed the switch simply works, and a mis-tap on a 39px
+  // control costs a tap rather than the work.
   renderRailColumn();
   return railMode();
 }
@@ -11263,7 +11312,7 @@ document.addEventListener('keydown', (e) => {
         if (g) {
           if (panelsOpen.pools) stageGroup(g);
           else if (railMode() === 'dice') {
-            if (groups.length) { railDice = []; railModeVisit = 'pools'; renderRailColumn(); railToggle(g); }
+            if (groups.length) { railModeVisit = 'pools'; renderRailColumn(); railToggle(g); }
           } else railToggle(g);
         }
       }

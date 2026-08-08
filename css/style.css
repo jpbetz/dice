@@ -487,6 +487,28 @@ html, body {
   transition: opacity 0.12s, color 0.12s, background 0.12s;
 }
 #left-panel #rail-mode button { font-size: 11px; padding: 5px 2px; }
+/* ONE DRESS, TWO GRAMMARS — corrected (U10). #section-bar is a CHECKBOX set
+   (zero to three lit, each independent) and #rail-mode is a RADIO pair
+   (exactly one, always). They were styled by the same selector and were
+   indistinguishable, so a control that looked like the harmless bar upstairs
+   was in fact exclusive — which is how it came to destroy a live dice pick
+   without anyone noticing the difference in kind.
+   The switch keeps the quiet dress and gains ONE mark the section bar never
+   has: a rule under the active cell, the shortest way to say "this one, and
+   only this one". Reserved on both cells so choosing cannot shift the text
+   by a pixel — reserve the space, hide the ink, the same rule §7.22 used for
+   the row borders. */
+#left-panel #rail-mode button { position: relative; }
+#left-panel #rail-mode button::after {
+  content: '';
+  position: absolute;
+  left: 7px; right: 7px; bottom: 3px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+#left-panel #rail-mode button[aria-pressed="true"]:not(:disabled)::after { opacity: 0.55; }
 /* NOTATION IS DEMOTED BY AREA (Joe 2026-08-08: "Notation is rarely used by
    me… I feel like it needs a demotion of some kind"). §7.21's fourth law —
    HIERARCHY IS AREA, NOT VOLUME — is the tool for exactly this: it is a real
@@ -4698,4 +4720,13 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
   .value-chip.staged { animation-duration: 0.01s !important; animation-delay: 0s !important; }
   #hit-flash.flash { animation: none; opacity: 0; }
   #verdict-card::after { animation: none !important; opacity: 0 !important; }
+  /* THE CRIT (U8). §7.10's rule is "always drop shake/flash/sweep", and this
+     block scoped to `#ceremony-layer *` — which contains NEITHER of the crit's
+     two loudest parts. The radial wash is a top-level overlay and the shake
+     rides #scene-container, the whole table. Both sit outside the layer, so
+     the one player who asked the operating system to stop moving things got
+     a full-viewport flash and 1700ms of camera shake anyway. */
+  #scene-container.shake { animation: none !important; }
+  #crit-overlay { animation: none !important; transition: none !important; }
+  #crit-text { animation: none !important; transition: none !important; }
 }

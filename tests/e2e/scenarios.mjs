@@ -1271,13 +1271,39 @@ export const scenarios = [
         box.dispatchEvent(new Event('input'));
       })()`);
       const slotOk = `(document.querySelector('#cmd-slot .ok') || {}).textContent || ''`;
+
+      // THE SUM READ BELONGS TO A SUM SYSTEM (U7). This scenario used to
+      // assert min/avg/max under the DEFAULT system — soul-deal, which never
+      // adds the dice up and where no total lands anywhere — so it pinned the
+      // very defect the audit found: the box forecasting a total while the
+      // app's own Help stated the per-die rule on the same screen.
+      await a.dbg(`setSystem('dnd')`);
       await type('3d6+5');
       await a.waitFor(`(${slotOk}).includes('min 8 avg 15.5 max 23')`,
-        { desc: 'exact preview for 3d6+5' });
+        { desc: 'exact preview for 3d6+5 in a totals system' });
       assert.ok(!(await a.eval(slotOk)).includes('sampled'), 'exact line carries no label');
       await type('30d6 ro<=3'); // 10 reroll slots for 30 candidates — BINDING
       await a.waitFor(`(${slotOk}).includes('sampled — 4,000 rolls')`,
         { desc: 'cap-truncation corner is labeled as sampled' });
+
+      // …and under a PER-DIE system the same string must not claim one. The
+      // slot is the validator as well as the read, so it REPLACES rather than
+      // blanking (§2l).
+      await a.dbg(`setSystem('soul-deal')`);
+      await type('3d6+5');
+      await a.waitFor(`(${slotOk}).includes('per-die')`,
+        { desc: 'a per-die system gets a per-die read' });
+      const perDie = await a.eval(slotOk);
+      assert.ok(!/min \d/.test(perDie),
+        `and no sum forecast (got ${JSON.stringify(perDie)})`);
+      assert.ok(perDie.includes('3d6+5'),
+        'the canonical still leads the line');
+
+      // keep/drop has no honest pre-roll per-die read, and says so in its own
+      // words rather than falling back to a sum.
+      await type('4d6dl1');
+      await a.waitFor(`(${slotOk}).includes('keep/drop')`,
+        { desc: 'the refusal speaks for itself' });
     },
   },
   {
@@ -3465,6 +3491,18 @@ export const scenarios = [
         // The remover takes one die back off.
         await a.eval(`document.querySelector('#rail-dice .rd-x').click()`);
         assert.equal((await a.dbg('railDice')).total, 1, 'the ✕ removes one');
+        // U10: switching away must NOT destroy the pick. The wipe lived four
+        // lines under a comment reading "BOTH PICKS SURVIVE", and §7.23
+        // states "Nothing is ever destroyed by navigation" as law.
+        await a.dbg(`railTapDie('d8')`);
+        assert.equal((await a.dbg('railDice')).total, 2, 'a dice pick stands');
+        await a.eval(`document.querySelector('#rail-mode [data-rm="pools"]').click()`);
+        assert.equal((await a.dbg('railMode')).mode, 'pools',
+          'an explicit choice outranks a live pick — the switch works');
+        await a.eval(`document.querySelector('#rail-mode [data-rm="dice"]').click()`);
+        assert.equal((await a.dbg('railDice')).total, 2,
+          'and the pick was waiting where it was left, not destroyed');
+        await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
         await a.dbg('setRailMode("pools")');
 
         // (vi) DIGITS STAY BOUND TO POOLS IN BOTH MODES. Rebinding them to
