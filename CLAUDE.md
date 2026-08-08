@@ -9,6 +9,15 @@ authority (goals, invariants, priorities, superseded decisions).
 [docs/ROADMAP.md](docs/ROADMAP.md) sequences the work;
 [docs/UX.md](docs/UX.md) holds component specs.
 
+[docs/UX-AUDIT.md](docs/UX-AUDIT.md) (2026-08-08) is the state-of-the-UX
+read: what is working and by what mechanism, what is weak, and what NOT to
+change. Its work items are ROADMAP Tier U. **Two cautions it raises about
+this very list:** UX.md's §7 runs in commit order with no map, so "what is
+true today" about a surface may need several sections reconciled — start
+from the WHAT IS TRUE TODAY table once U4 lands. And GOALS wins ties, so
+where the audit found GOALS itself stale (the launcher carve-out), the doc
+you read first is the one that is wrong.
+
 ## Validation policy — read docs/TESTING.md and follow it
 
 - Repeated validation is **scripted**: `npm test` (unit + fuzz + e2e smoke,

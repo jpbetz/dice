@@ -1029,3 +1029,665 @@ never changes who may read a roll; unknown names fail closed as
 `unknown_audience`) · reveal is authority-checked server-side
 (`revealAuthority`, 403 `not_reveal_authority`), never gated by
 which client drew the button.
+
+---
+
+## Tier U — The converged UX: the audit closeout (2026-08-08)
+
+**2026-08-08 — a week of convergence, audited.** Joe: *"It's taken a week,
+but we're finally starting to converge on a UX that is simpler and more
+consistent. I'd like you to do a full analysis of it and catalog its
+strengths and weaknesses."* Five stances (newcomer, GM/table, accessibility,
+doctrine, consistency) read the shipped experience at
+`1b7a8f2` against the source and sixteen captured frames; every finding was
+adversarially verified and only survivors are recorded here. (Five stances
+ran in the main pass — newcomer, GM/table, accessibility, doctrine,
+consistency; touch/tablet errored and was re-run separately, see
+[UX-AUDIT.md](UX-AUDIT.md) §H.) **This is a
+design audit, not a bug hunt** — but two of its findings are defects, and
+one is a shipped CUJ that stopped working for returning players.
+
+**What landed.** The hard part converged: the primary verb is one
+constructed object in both views, geometry no longer moves, sections
+migrate losslessly, and privacy is architectural rather than cosmetic. The
+week did not finish the seams — the draft silently drops the intent the
+notation exists to carry, the default system (*Your Soul Deal*) keeps
+falling through render gates written for sum systems, and UX.md is stale on
+the newest surface it describes.
+
+**Where this sits.** **U1–U3 are defects and outrank the rest of the
+ladder** — U1 and U2 break goal 11 and §7.8's notation-totality invariant
+in the *fail-open* direction, and U3 breaks the CUJ2 claim G5 shipped
+against, with game night on 2026-08-13. **U4–U15 are cheap and clearly
+right** and can ship in any order behind them. **U16–U26 are marked DESIGN
+FIRST or carry a batch** and sequence normally, behind Tier 1. Sizes are in
+the headings. Per [TESTING.md](TESTING.md) each rung ships with its e2e
+scenario; where the audit found the suite *blind*, the scenario fix is named
+in the entry rather than left to the step.
+
+### U1. The draft drops its intent — `stageGroup` carries only dice — DEFECT, small
+
+*Audit A1 (major). The sharpest finding in the audit.* The same pool sends
+two different rolls depending on whether the panel is open. `rollRailPool`
+(main.js:7547) round-trips the pool through the grammar and fires with
+everything — dc, moment, visibility, keep/drop, reroll, explode, set.
+`stageGroup` (main.js:6503) — the expanded rack's tap, the digit keys, **the
+primary path** — pushes only dice, source label and set; its `dropped` note
+is built from `mods` and `dc` alone, and **`res.exp` (moment + subtitle),
+`res.comment` and the parsed visibility are never read**. So
+`Sneak Attack = 3d6+2 dc12 cinematic held` fires face-down and cinematic
+from the 112px rail and lands as a bare open `3d6` in the workbench — the
+exact failure §7.8 names as a GOALS-level violation (*"a pool meant to be
+secret rolls in the open on the next machine that opens it"*, UX.md:1262),
+failing **open** on a goal-11 surface, while `rollRailSelection` fails
+*closed* to `secret` on the same data a few dozen lines away.
+
+**Change:** write `res.exp`, `res.comment` and `visOfParse(res)` into
+`boxExtras` — the fields exist and `syncBoxFromTray` already preserves them.
+Anything that genuinely cannot ride must join `dropped`. Also silent and in
+scope: the partial stage at the 40-die cap (a chip labelled "Strength"
+holding half of Strength). Closes the expanded/collapsed behavioural fork in
+the same change.
+
+### U2. An invalid box plus staged dice rolls the tray, open — DEFECT, small
+
+*Audit A2 (major).* `usable = cmdResult.ok || tray.length > 0`
+(main.js:5504) arms the plate on staged dice alone; `paintCmd` only syncs
+when `res.ok`; `rollDraft` falls through to
+`requestRoll([...tray], formula(tray))` (5563) carrying **no visibility, no
+dc, no exp, no mods**. Type `2d8 secret`, break it with one character, press
+the plate: it rolls `2d8` in the open. `offerDraft` has the identical
+fallthrough (5602). The box's own Enter is correctly gated (6049) — the
+hazard is the plate click and the global Enter. §1.3's "one spec object, two
+projections" has no answer for the moment the projections disagree; the safe
+answer is to do nothing, loudly.
+
+**Change:** when the box is non-empty and the parse fails, disable the plate
+or route the press to the existing `cmd-shake` + `#cmd-slot` error path.
+Stop silently substituting the stale tray.
+
+### U3. The prepared seat never reaches a returning player (CUJ2) — DEFECT, medium
+
+*Audit E1 (major).* `initNet` prompts for a seat only when `dice.name.v1` is
+empty, and that key is **origin-global**. A returning player opening an
+`&as=Bo` invite never sees the seat picker, never gets Bo's pools; the
+parameter does nothing. §7.19's *"one link in Discord, six people, each
+landing at the right seat"* — and PROFILES.md's G5 row, *"CUJ2 end to end.
+One link, six players, right pools"* — hold only for six people who have
+**never opened the app**. The only recovery is `Change seat…`, which says
+nothing about prepared seats.
+
+**Suite is blind:** the `prepared-seat` scenario passes because the harness
+seeds no name. Fix the fixture in the same step — a returning-player variant
+with `dice.name.v1` pre-seeded — or this reopens silently.
+
+**Design call inside it:** how origin-global identity and per-table seats
+interact. Minimum: an `&as=` link reaches the picker despite a stored name,
+pre-selecting the named seat. **Game night is 2026-08-13** — this is the
+one audit finding with a date on it.
+
+### U4. The record: a WHAT IS TRUE TODAY table, four amendments, one GOALS sentence — small-medium
+
+*Audit G1, G2, G3 (major/moderate). Cuts off the defect class that has now
+bitten six times* — twice as shipped-on-superseded-doctrine incidents UX.md
+already post-mortems, four more found by this audit.
+
+- **§7.23 describes a section bar that does not exist, in the commit that
+  shipped it.** The doc, both index.html comments and a second CSS comment
+  all say "no track, no lit cell, weight alone, 0.72/0.45"; the shipped CSS
+  has a track, a lit recess, and 0.42/0.78, with the third iteration
+  recorded *only* at css:405 ("THE INK MARKS THE CONTROL, THE WEIGHT MARKS
+  THE STATE"). Rewrite the paragraph from that comment. Also dead: the
+  `rail-seg` selector (matches nothing), "104px" at css:1780.
+- **A ~30-line "WHAT IS TRUE TODAY" table at the head of §7**, one row per
+  surface naming the one authoritative section. Answering *"what is true
+  about the rack today"* currently means reconciling §7.9, §7.10, §7.16,
+  §7.17, §7.18, §7.22 and §7.23 by hand — demonstrably how four stale-
+  doctrine findings survived.
+- **Banner or move §1–§6**, verified dead letter with no markers: §1.3's
+  notation-box placement, §1.4's click-to-copy formula (no JS producer),
+  §2.1/§2.3's experience records (the server refuses the key), §2.4's
+  user-held dwell and Roll button (shipped: a 1.35 s timer, no button),
+  §2.5's meaning hero (unreachable — see U17).
+- **Amend §7.15** (the one-✕ machinery is fully retired in code and still
+  cited as live doctrine from two places in §7.9), **§7.17** (`SAVED POOLS`
+  no longer stands over the rack), and the **shelf-marker dot** §7.7/§7.9
+  still spec, which ships invisible (see U20).
+- **Add the launcher carve-out sentence to GOALS.** GOALS' Uniform-roll-
+  surfaces invariant has no carve-out while GOALS is the document that wins
+  ties, so the shipped rail is formally out of compliance with the file every
+  agent reads first. The carve-out is right (§7.4); the omission is the bug.
+
+**Suite is blind, and it is the same lesson inverted:** §7.17's deletion took
+the dice-value ledger's caption with it — the whole-rack `.ph-fig` never
+renders (`#pools-head:not(.foreign){display:none}`), the shelf figures are
+four bare integers with no unit, **and the `rack-dice-value` scenario still
+passes because `textContent` of a `display:none` node reads fine.** That is
+the exact inverse of the build-not-hide lesson §2l recorded. Fix the
+assertion with the doc.
+
+### U5. Live-region triage — the ceremony and both notice channels are silent — small
+
+*Audit D1, D2 (major), plus B3's wrong word.* The largest verified a11y gap,
+and three fixes share one shape.
+
+- **Ceremony rolls are completely silent to a screen reader.**
+  `#banner-live` is the app's only working live region and it lives inside
+  `#result-banner`, which a ceremony never paints — `stepPlayback` returns
+  into `ceremonyEnterSettle` before `showResults` (main.js:2216-2222), and
+  the sole write to the region is on the banner path. Every Check and every
+  Cinematic — the rolls carrying a DC, a moment and a subtitle — lands
+  unannounced. **Change:** a permanently-mounted body-level `sr-live` node,
+  written from the settle stage as well as from `renderRollResults`.
+- **Both notice channels are silent by construction.** `railNote()` sets
+  `textContent` and clears `hidden` in the same task, so the region is out
+  of the a11y tree at mutation time and the 40-die cap refusal — which
+  exists *because* the collapsed pill is invisible — never announces.
+  `#status-pill` has no `aria-live`/`role="status"` at all; collapsed it is
+  a colourless 10 px dot (`color:transparent`), and `showSettingsNote`
+  passes no class so it is graphite-on-graphite. index.html:105 documents
+  the irony exactly: `#rail-note` was built because "a note sent there would
+  be invisible in exactly the state that sends it" — and the table's notices
+  were never routed to it. **Change:** one `notify(msg, {scope})` that picks
+  the visible channel from panel state; live regions mounted-and-empty,
+  never `hidden`; `role="status"` on the pill.
+- **`renderRollResults` says `'held'` for a *whisper*** (main.js:2941) — the
+  one channel a blind player has, using the wrong rung's word. One line.
+
+### U6. Hue-law and legibility one-liners — small
+
+*Audit C1, C2, C3, C4 (major/moderate).* Four measured breaks, four small
+changes, no new machinery.
+
+- **The primary verb is least legible on the surface that owns it.** The
+  well's ROLL cue measures **1.42:1** empty and **~1.9-2.0:1 armed with a
+  draft staged**; the rail plate — same builder, same word — is **6.2:1
+  armed** and **2.33:1 disabled**. The workbench's live, armed primary act
+  is dimmer than the launcher's dead one, because the heat ladder caps cue
+  opacity at 0.65 over an already-dim base while the rail ships
+  `rgba(255,215,102,.62)` at opacity 1. §7.21's amendment says "the primary
+  act stands at full opacity"; four CSS lines say otherwise. **Floor the
+  well cue at the rail's value and let heat ride the pocket bloom alone**
+  (heat was specified as light-only anyway).
+- **Live and disabled controls tie at ~2.2:1.** Unpressed section-bar cells
+  measure **2.23:1** (opacity 0.42, undershooting 2i-C's own documented
+  0.45); disabled rim tools measure **2.27:1**. Three visibility codes
+  collapse to one percept, and at 11.5-12 px the live cells are a flat WCAG
+  1.4.3 failure — in the all-off floor state (`panel-all-off.png`) the only
+  route back to the sections is three ghosts at 2.23:1. **Raise unpressed
+  cells to ≥4.5:1 (~0.72 on `--muted`), push disabled to grayscale(1)/~0.30,
+  and reconcile 0.42 vs 0.45 in whichever direction is intended.**
+- **HUE = ACT breaks three ways in one popover.** `#pop-save` is the app's
+  only `.btn.primary` — the gold roll gradient on a pure save, violating the
+  comment four lines above the rule it breaks (css:289) while the correct
+  `.btn.confirm` dress ships on the adjacent button. Every `.seg` inside
+  `#mods-popover` lights **gold** because the ivory override is scoped
+  `#left-panel .seg` and the popover is body-level, so "Face down",
+  "Cinematic" and "kh" wear the roll hue three inches from a panel where the
+  identical control wears ivory precisely so it would not
+  (`audit-popover.png` shows three pressed dresses in one 300 px card).
+  **`#pop-save` → `btn confirm` (one attribute); invert the seg default to
+  ivory with an explicit gold opt-in.**
+- **Name `#rail-roll`'s bronze in 2i-C.** Disabled has thirteen recipes, six
+  without grayscale; the rail plate's bespoke bronze is a fourth visibility
+  code that *works well* and exists only as an unwritten exception. Write it
+  down here; the base-rule-plus-named-exceptions collapse is U23.
+
+### U7. Gate the box preview on `forecastFor` — small
+
+*Audit A4 (major).* `renderCmdState` calls `fmtPreview` with no system gate
+(main.js:5883), so the notation box forecasts a **sum total** under
+soul-deal, where no total ever lands anywhere — while the app's own Help
+(index.html:504-523) states the per-die rule the box contradicts on the same
+screen. The correct branch already exists: the popover's preview at 8446
+calls `activeSystem().forecastFor` with a comment claiming coverage of
+"every ± door alike". **Wire the popover's branch into `renderCmdState`;
+fixes the quick palette too.** §2l's two standing warnings govern the
+rewrite: the preview *is* the validator in a fixed-height slot (replace,
+never blank), and the success branch ends in `visSuffix` (a naive rewrite
+drops the visibility echo).
+
+### U8. Reduced-motion the crit — small
+
+*Audit B2 (major), first half.* UX.md:962 explicitly orders "always drop
+shake/flash/sweep" under `prefers-reduced-motion`; the shipped block scopes
+to `#ceremony-layer *` and misses both the full-viewport radial wash and
+`container.classList.add('shake')` on `#scene-container` for 1700 ms
+(main.js:3452 — an element outside the layer). `matchMedia` appears **once**
+in all of js/, for `navigator.share`. **Add `.shake`/`#crit-text`/
+`#crit-overlay` to the block *and* gate the class in `playCritEffect` on
+`matchMedia`.** The frequency half is U18.
+
+### U9. Rail dice rows — the cascade tie and the floating ✕ — small
+
+*Audit C6 (moderate).* `.rd-item { flex:1 }` (css:1829) loses to
+`.rp-item { flex:none }` (css:1896) — equal specificity, later wins — so the
+selection box shrink-wraps to the label and breaks the "same 86 px box"
+promise: measured **74.0 / 51.7 / 72.7** CSS px across the frames, the box
+growing under your finger with every digit. The `.rd-x` remover is anchored
+to the full-width cell, not the shrunk button, so it floats ~19 px right of
+the row at `3d6` and lands on the label at `10d10x`. **This is the third
+`.rp-*`/`.seg` tie in three commits to silently win against the rail block;
+the pattern is the finding** (the durable half is U23).
+
+**Change:** `.rd-cell .rp-item { flex:1 }`, anchor the ✕ to the button, drop
+its `tabIndex=-1` (see U22), and add a hover frame to `rail-look.mjs` —
+`.rd-x` currently appears in **zero** captured frames.
+
+### U10. The mode switch stops destroying the dice pick — small-medium
+
+*Audit C5 (moderate).* `#section-bar` (checkbox, 0-3 lit) and `#rail-mode`
+(radio, exactly one lit) are styled by the same selector and are
+indistinguishable — one dress, two grammars. Compounding it:
+`setRailMode('pools')` executes `railDice = []` (main.js:7196, immediately
+after a comment reading "BOTH PICKS SURVIVE… except this one") and the digit
+path repeats the wipe (10954) — three counted taps gone, no undo, from a
+control that *looks* like the harmless bar upstairs. §7.23 states "Nothing is
+ever destroyed by navigation" as law; the code destroys twice.
+
+**Change:** reorder the mode resolution so an explicit choice outranks a live
+dice pick, then drop both wipes; give the exclusive bar a visibly different
+affordance (thumb or underline). **Recorded so it is not re-attempted:** the
+previously proposed fix — setting `railModeVisit` instead of clearing — does
+**not** work; `railMode()`'s resolution order is the mechanism.
+
+### U11. `± Modify` cannot modify anything in the shipped default system — small
+
+*Audit A3 (major).* `soul-deal` has `usesMods:false`, and `pop-perdie` folds
+Modifier, d20 pairing, Target, keep/drop and reroll/explode (main.js:7896);
+`audit-popover.png` shows what is left — Visibility, Moment, Pool stats. The
+rim's loudest tool says "Modify" with `title="Modifiers, target, moment"`,
+two of which are absent by default. It also invalidates the remedy U1's
+`dropped` note points at ("re-add via ±" is impossible for `dc`).
+
+**Change:** derive the rim button's word and title from `activeSystem()`.
+**And amend the contract:** js/meanings.js:152-154 still documents
+`usesMods:false` as "the popover NOTES that modifiers do not change
+outcomes", while index.html:678 records Joe's superseding ruling
+("entirely — no note").
+
+### U12. Long-press on `.shelf-marker` and `#peek-card` — small
+
+*Audit D5 (moderate, touch).* Both have `contextmenu` only, and iOS Safari
+never fires it on long-press — so a shelved roll's **±**, "Open in draft" and
+"Save as pool…" are unreachable on an iPhone. The long-press helper already
+exists ~5,700 lines up, on pool tiles. Closes the iOS hole and the GOALS
+uniformity gap in one wiring change.
+
+### U13. `Save as pool…` in the banner fold, `Edit notation…` on the pure branch — small
+
+*Audit A6 (moderate).* A draft is buildable, editable, spendable, repeatable
+— and **keepable only by spending**. §7.16 retired the rim's Save on the
+grounds that the peek's "Save as pool…" covers it; verified coverage is: wait
+out the 3 s auto-collect → find an invisible 150-200 px circle → right-click
+(no long-press, see U12) → find a button in the popover — additionally gated
+on `canReroll` (main.js:1313, 1611). Meanwhile the creation card accepts only
+a name and a d4-d20 multiset, and a pure pool's popover early-returns
+*before* `Edit notation…` (main.js:8178 — the ghost verb exists in the
+unreachable branch; `beginEditGroup` has exactly one call site, inside it).
+
+**Change:** add `Save as pool…` to the banner's existing `appendCardActions`
+fold, and keep `Edit notation…` standing on the pure branch (one
+`appendChild`). Both are wiring into existing builders — no new surface.
+
+### U14. Guard scope, one label, one discarded count — small
+
+*Audit E5 (moderate), F3.* Three unrelated one-liners that all cost a real
+table something.
+
+- **`c` sweeps the felt for everyone and stays live under two menus.** The
+  `modalOpen` guard's own comment names the hazard and covers one of three;
+  `isIdentityMenuOpen()` and `isOfferMenuOpen()` already exist and are absent
+  from it. Add them. *(Do NOT add a confirmation — see the refuted list.)*
+- **Rename the log flyout's header `Clear` to `Clear history`.** The flyout
+  is deliberately un-modal (correct for `r`), so `c` pressed while looking at
+  a button that says Clear sweeps the felt instead of the history — and the
+  same word means local-and-recoverable online but permanent solo.
+- **Surface the `dropped` count the log already computes** and discards
+  (main.js:9082); `LOG_CAP` drops history silently today.
+
+### U15. Re-fixture the look tools with the dealt rack — small
+
+*Audit G5 (minor), and §7.22's own closing rule: "Run it, and look, before
+calling a visual change done."* Both look tools fixture a hand-authored
+12-pool sheet the app never deals — the real rack is 18 pools and scrolls
+below ~975 px with `scrollbar-width:none`. **No frame shows** a populated
+roster, a live `#rail-note`, a hovered `.rd-x`, a spent draft, or an invalid
+box; the presence row is the one geometry that *moves* (wraps at 3-4
+players) and no capture shows it. Re-fixture with `dealStartingRack`'s
+output and add the missing frames, including a short collapsed viewport.
+
+### U16. Draft intent in the well — DESIGN FIRST, medium
+
+*Audit A5 (moderate).* `renderTray` builds chips and the cue and nothing
+else, so `2d8 check dc15 w:Ann # The Duel` is pixel-identical to bare `2d8`
+— and with Notation off (the default), the only ways to see the dc, moment,
+comment or whisper are ± (which hides the dc, per U11) or turning the box
+on. Saved pools got notation carriage precisely so a stored roll could not
+lie about itself; **the live draft — the object you are about to spend — has
+no carrier for intent.** The composing surface needs one (dc/moment/
+visibility chips or equivalent); it interacts with the cue band and the heat
+ladder, so design before code. U1 closes the *transport*; this closes the
+*read*.
+
+### U17. What a per-die system's Check shows — DESIGN FIRST, medium
+
+*Audit B1 (major), B3, B4.* `1d20+5 check dc15 # The Duel` renders on the
+verdict card as one chip and a word — no DC, no `+5`, no subtitle — because
+`hasDc` is gated on `usesTotal` and mod cards on `usesMods`. **Four surfaces
+render four different subsets of the same stake:** the intent card shows the
+subtitle but buries the dc in 9 px mono; the dock strip (cinematic only)
+shows the dc because `renderDockStrip` has *no* gate; the verdict card shows
+none of it; the log shows `+5` but not the dc. The player typed a target and
+a bonus, the app rolled with both, and showed neither at the moment of the
+verdict. **The gates conflate "this system sums" with "this system has
+stakes" — different facts.** Decide once (is a dc a stake even without a
+summed verdict?), then apply to all four surfaces together.
+
+**Rides with it:** the only 52 px gold number a Soul Deal table sees is `?`
+— `#result-total` is dead for every open roll and springs to life, in the
+roll verb's own hue, only to announce an absence, with the banner never
+saying *why* (the verdict card and log both name the state; the banner is
+mute). And the meanings migration left dead surface: all three profiles
+define `meaningFor: () => null`, so the non-ledger `#result-meaning` branch,
+`.pk-meaning`, the verdict's `else if (meaning)` and §2.5's entire hero-slot
+ruling are unreachable while §2.5 is still written as live spec (retire it
+with U4's pass).
+
+### U18. Crit frequency under soul-deal — DESIGN FIRST, then small
+
+*Audit B2 (major), second half.* `soul-deal.critFor` fires when *any* die
+lands a crit cell, and those cells exist on d10/d12/d20 — so a `3d10` pool
+crits on **48.8%** of rolls, each one a full-viewport wash plus a 1700 ms
+shake. §2.4 budgets crit as a rare accent; on a d10-heavy Soul Deal pool it
+is the **median outcome**, and "excitement outranks physicality" inverts into
+noise. This is a chart/threshold question, not a rendering one: decide what
+"crit" means for a multi-die per-die pool. (U8 ships the reduced-motion half
+independently and first.)
+
+### U19. `playerId` succession for reveal and offer authority — DESIGN FIRST, medium
+
+*Audit E2 (major).* Reveal authority and offer ownership are pinned to an
+ephemeral `playerId` with **no fallback**. Lose your stream past the 5 s
+grace, rejoin with a fresh id, and your own held rolls become unrevealable
+*by anyone*, forever. An offerer who leaves strands an un-withdrawable gold
+card; a claimed dice-tower offer from a departed offerer whispers to a dead
+id — a roll nobody can ever see. Rolls got a universal-housekeeping escape
+once collected (§7.7); offers and reveals did not, for no stated reason.
+**Decide:** seat-based fallback, or extend §7.7's escape. Note this is the
+same bet as U3 — see the structural risks below.
+
+### U20. The shelf's read at rest, and the peek's lifetime — DESIGN FIRST, small-medium
+
+*Audit F1, F2 (moderate).* Five collected rolls render as dice plus an
+invisible glow: `.shelf-marker { background:none; border:none }`, `title` as
+the entire information channel (never on touch), `.sm-dot` styled in CSS
+**with no producer**. You cannot tell who rolled what, what it meant, or
+which held roll awaits its reveal — and the shelf is the *designed* home of a
+held roll (main.js:1346). With `PEEK_HOVER_MS = 0` and 150-200 px targets,
+dragging along the table's bottom edge fires five 300-460 px cards in
+sequence.
+
+**Change:** produce the styled-but-orphaned `.sm-dot`, add a shroud glyph for
+hidden entries, and decide how much read the shelf owes *before* touching
+peek lifetime. Then the peek: it closes on nothing a player expects — not a
+new roll, not a ceremony, not the log — and at z 30 outranks all of them (the
+repo's own capture run shows it standing through an entire Check); two cards
+can wear a red `✕ Clear` for two different rolls with nothing marking which
+is live (`19-shelf.png`); in `body.mini` the banner's top edge cuts into
+shelf slot 2; and one roll gets three presentations by arrival path (dressed
+`top:3vh` for 7 s, plain `bottom:26px` for 3 s, reloaded Check comes back
+plain because `replaySettledRoll` passes `exp:null`). **Do not change the
+collect-on-arrival rule** — see the refuted list.
+
+### U21. What the launcher owes the table — DESIGN FIRST, medium
+
+*Audit E3 (moderate).* The collapsed rail deletes multiplayer: roster,
+chairs, Invite, nameplate and offer verb are all expanded-only, and the sole
+browse-mode signal left is `opacity:.68` on the chip with no roster to
+compare against. §7.4's launcher carve-out covers *offering*; it does not
+cover *presence*. Meanwhile `poolsOwner` survives collapse (nothing in
+`applyPanels` clears it), so you can collapse out of Bob's rack, see no
+signal, and expand straight back into it — and with the Pools *section* off,
+clicking a teammate pill flips `aria-pressed` and changes nothing on screen
+(`setPoolsOwner` never surfaces the section; the transient door `loadIntoBox`
+proves exists was not used). Related and worse: the collapsed rail lists
+*your* `groups` unconditionally, so during a G3 profile swap that is Alice's
+pools, unlabelled, rolling under your name — and `sec-off-pools` can hide the
+G3 banner with both its exits.
+
+**Decide the minimum social state a launcher owes.** At least: a browse-mode
+signal, and clearing `poolsOwner` on collapse.
+
+### U22. Modal semantics and the focus pass — DESIGN FIRST (mechanical, broad), medium
+
+*Audit D3 (major), D4, D5.* Batch this; it is one sweep, not eleven fixes.
+
+- **Six modal-ish surfaces, zero focus containment, one dishonest
+  `aria-modal`.** `#help-overlay` is the app's only `role="dialog"
+  aria-modal="true"` and has no trap — Tab walks into content AT has been
+  told does not exist (focus real, speech silent). The other five overlays
+  are anonymous `<div>`s; nothing sets `inert`; `#mods-popover` sits after
+  `</aside>` in the DOM, ~26 tab stops from the button that opens it;
+  `#name-modal` — the blocking front door, no cancel, no Esc rung — is the
+  least accessible surface a new player meets. **Until a trap exists, *drop*
+  `aria-modal` from help**: an honest un-annotated dialog beats a lying
+  annotated one.
+- **`.cmd-in:focus { outline:none }` with nothing put back** — the primary
+  text input and the palette have no focus indicator, the cleanest 2.4.7
+  failure in the app; the correct swap-for-border pattern ships three times
+  in the same file. Add `aria-invalid`/`aria-describedby` for box errors.
+- **Names that are not names.** Icon-only foot buttons and `.die-x` are named
+  by `title`, which the accname algorithm never reaches for a button with
+  glyph content — while `.rd-x` and `#edge-toggle` do it right in the same
+  file. Popover segments are mutually exclusive but announce as independent
+  unlabelled toggles — on Visibility, the one control whose mistake cannot be
+  undone. `#zoom-picker` sets both `aria-checked` and the invalid
+  `aria-pressed` on `role="radio"`.
+- **Keyboard traps and dead ends.** `.rd-x` is `tabIndex=-1` beside the
+  comment "a counted row you cannot decrement by touch is a trap" — the
+  identical keyboard trap left standing (Esc clears the whole pick). Shelf
+  markers are invisible, unlabelled, tabindex-less `<div>`s, so the table's
+  history is a flat 2.1.1 failure — and once a roll is shelved the peek is the
+  *only* door to Reveal.
+- **Structure and focus retention.** No `<main>`, no `<h1>`, no skip link —
+  the workbench announces as "complementary". Every rail re-render drops
+  focus to `<body>` (picking three pools by keyboard costs three Tab-walks
+  from the top) while the expanded rack, via `renderTray`, does not — twins
+  behaving oppositely. Add `scroll-padding-top: calc(var(--draft-h) + 34px)`
+  so Shift+Tab does not land focus rings under the 203 px sticky zone.
+- **Touch floor.** The 44 px coarse floor reached only the card-action row
+  (css:4415); the ± popover — reached on touch by the app's hardest gesture,
+  a 500 ms hold — is built from 23 px seg cells, 23×24 steppers and 30×17
+  switches, and `#offer-pick`'s ID rule beats the coarse bump, leaving ~20 px.
+
+### U23. A token layer for the doctrine — DESIGN FIRST, medium
+
+*Audit C2-C6, and the structural-risk read.* `--dim-rest`/`--dim-off`/
+`--drain`, `--on-fill`/`--on-ink`/`--on-ring`, three die-art sizes, one
+`--label-sm` recipe. **This is what makes U6, U9 and U10 stay fixed.** The
+evidence that it is needed and not taste: thirteen `:disabled` recipes with
+six missing grayscale; `[aria-pressed="true"]` resolving to **nine distinct
+dresses across four hue families**, selected by DOM ancestry rather than by
+kind of choice; and three `.rp-*`/`.seg` cascade ties in three commits, all
+silently winning against the rail block, from one 4.5k-line stylesheet with
+no token layer. Cascade ties — not file size — are the measured cost of the
+CSS as it stands.
+
+### U24. Ordinals versus the dealt rack — DESIGN FIRST (small code), small
+
+*Audit G4 (moderate).* `1 2 3 Enter` — the roll the design says the surface
+exists for — **cannot be typed on the rack the app deals**.
+`dealStartingRack` seeds 9 attributes, then skills at ordinal 10 and
+motivations at 16; ordinals render only for `ord ≤ 9`, and there is no
+reorder affordance. UX.md asserts the claim in the paragraph *directly above*
+the dealt-rack amendment that broke it (1536-1539 vs 1542-1563), and
+main.js:10948's comment advertises a sequence that now means Strength + Wit +
+Intelligence. **Either interleave ordinals across shelves or re-scope the
+promise; either way fix both doc sites and the code comment.**
+
+### U25. The table's smaller seams — batch, small-medium
+
+*Audit E4 (moderate, several).* Each is small; together they are what a
+first table night runs into.
+
+- **Copying the invite link has no primary gesture.** At a table with one
+  other person the Invite chair is gone and the link lives behind
+  right-click/long-press on a chip whose left-click is a visible no-op; the
+  manual is a `title` touch never renders; no keyboard shortcut touches the
+  table at all.
+- **Roster pills shrink to unreadable stubs before `+N` folds**
+  (`row-eight.png`: bare dots plus *two* overflow pills).
+- **`publishPools` broadcasts your entire rack on every edit with no
+  disclosure**, while the one tooltip about pool sharing asserts the opposite
+  ("Pools travel via Settings → Your data → Export").
+- **The change note never names the setting** — "Alice changed the table" for
+  a system flip that reinterprets every result.
+- **An unnamed table renders its minted key** (`drive egw19x`) as the
+  nameplate and tab title, against its own markup comment ("else NOTHING")
+  and against a superseded goal-7 rationale. The marginal *security* cost is
+  nil (the URL bar already shows it); the presentation is wrong by its own
+  rule.
+- **A room that dies says nothing** to the group whose link it was (12 h
+  linger, `--min-instances 0`).
+
+### U26. Lifecycle reads, transport door, and the terminology sweep — batch, small-medium
+
+*Audit F3 (minor, several), plus the two closing results.*
+
+- **The spectator's banner hover-hold silently does nothing** —
+  `armAutoCollect` bails on `!mine`, so the roller's 3 s clock yanks the card
+  a spectator is reading.
+- **The log row duplicates every source label across two lines** — the
+  diagnosis §7.12 wrote and fixed on the other three surfaces, unfixed here,
+  against its own "compact list line" ruling.
+- **A shelved roll whose log row is gone renders a peek with a live
+  body-click and no named verb** — the pre-§7.21 defect surviving in an edge
+  state.
+- **Spectator reroll is deliberate and defensible, but nothing signals the
+  attribution flip or the shelf eviction it causes.**
+- **The whisper sub-line "others see you rolled, not what"** describes a
+  deliberate, thrice-documented stakes-are-public leak in four words that
+  read as the opposite; the offer-context tooltip UX.md:656 specifies for
+  Only-me was never built.
+- **Transport has one real hole:** for a system whose durable copy is a file,
+  *restore from that file* is the one operation it does not offer (no
+  replace-rack, no bulk delete, refusal-wholesale at the 40 cap) — and the
+  rack has no door to its own transport (four levels deep, verbs spelled
+  `Fill with my data` / `Download` / `Apply import` beside `Apply to table`).
+  The missing operation is an **explicit, separately-named** "replace my rack
+  from this file", never a sharper Apply (see refuted).
+- **The terminology sweep found one real contradiction** — one button
+  labelled "shelf" with a tooltip saying "category" — but **the durable half
+  is the suite**: the e2e's banned-word regex omits "category" and sweeps
+  none of the result surfaces.
+
+### Structural risks (bets, not bugs — each gets more expensive to reverse)
+
+- **System capability flags as scattered per-surface render gates.**
+  `usesTotal`/`usesMods` are consulted independently at every render site —
+  verdict card, banner, log, dock strip, popover, preview — and *every*
+  system finding in this audit is the same failure: a gate written for sum
+  systems, applied or missed one call site at a time (the dock strip shows
+  the dc because its author forgot the gate; the box shows a sum forecast
+  because its author never added one). The default system is the one that
+  exercises the `false` branches, so **Joe's own game is where the drift
+  lands**. The durable fix is an inversion: the profile should *supply* the
+  renderers (as it already does for `forecastFor` and `outcomesFor`) rather
+  than surfaces querying booleans. Until then every new result surface
+  re-litigates what a per-die system shows, and loses somewhere.
+- **Identity anchored to browser-storage shape.** U3, U19 and the lobby's
+  stale interpretation system are one bet: `dice.name.v1` origin-global,
+  `playerId` minted per-join with `sessionStorage` resume only,
+  `dice.roomsettings.v1`/`dice.log.v1` global-not-room-scoped. GOALS §7
+  defers persistent identity to "a later pass" — fine — but these keys are
+  load-bearing for **authority** (`revealAuthority`) and **routing** (the
+  seat door), not just convenience. **Schedule the later pass before the next
+  feature that needs a stable "who".**
+- **The size question: main.js is large; UX.md is failing.** Six stances
+  traced every path through js/main.js (12.6k lines) and the choke-point
+  architecture held — findings located to single lines, and **no finding was
+  caused by the file's size**. docs/UX.md at 3.1k lines is the opposite: its
+  append-only §7-in-commit-order structure has produced two self-documented
+  shipped-on-superseded-doctrine incidents and four more stale-authority
+  findings here. **The document, not the code, is the structure actively
+  generating defects** — which is why U4 sits third in this tier.
+
+### Patterns to protect (verified by all six stances)
+
+- `projectEntryFor` (server.js:1440) on all six egress paths, redacted branch
+  as a **whitelist construction** — a future field is private by default;
+  `secret` returns `null`, not a blanked record. `entryExistsFor`/
+  `entryExistsForAll` gate housekeeping; `400 unknown_audience` refuses the
+  whole roll rather than narrowing the audience; shrouded dice carry an
+  identity face-correction, so dice nobody can read have nothing written on
+  them; the dice tower works with **no roles** because `revealAuthority` is
+  separated from `playerId`.
+- The three choke points: `entryHidden()` (three lines, 18 call sites),
+  `editPoolById` (the sole by-id mutator), `CARD_VERBS` + `appendCardActions`
+  (five viewer/mode combinations, one table).
+- `buildRollCue()` — seven call sites — is why the two views cannot drift;
+  the rail plate's gradients are byte-copied with the lesson at the site
+  (css:2017).
+- "Flush" and "one click target" are true by CSS *structure*
+  (`#tray-actions::after`, `padding:0`, `pointer-events:none`, the
+  `:has(.die-x:hover)` honesty override), pinned by `elementFromPoint` at
+  four positions (scenarios.mjs:3251).
+- Failure directions chosen by state shape: `sec-off-*` classes degrade to a
+  visible panel; `sectionsStored`/`sectionsTransient` make laundering
+  unrepresentable; `applyImportPlan` has no delete path; `rollRailSelection`
+  fails closed to `secret` and strips glue mods unconditionally.
+- Geometry observed, never asserted (`--draft-h` ResizeObserver); real
+  `disabled` so keyboards skip dead stops; `[hidden]{display:none!important}`
+  and its generalized suite rule, "pin computed display, never class names"
+  (UX.md:2746).
+- Server owns the shared state machine: ordered `collectEntries`, shelf slots
+  as ranks off a monotonic `collectSeq`, a losing `/api/table` rev as a
+  silent `200 {applied:false}`, presence *asserted* via `pagehide` beacon +
+  application-layer heartbeat.
+- "The count is the label" (`d6 → 1d6 → 3d6`) — counter, notation and wire
+  payload in one token, leading `1` deliberately kept.
+- Input-model care: `e.repeat` rejected at the top of the global handler;
+  `isComposing` in both notation editors; the Esc chain as one ordered ladder
+  mirroring `--z-*` backwards; accessible names computed from the parse
+  ("Roll 3 pools: Wisdom, Swordplay, Zeal"); both real menus complete down to
+  focus restoration on close.
+
+### Refuted, recorded so they stay dead
+
+- **Do not make the section bar sticky.** The 31px-permanent argument
+  (index.html:225) is sound; the crowding fix is letting `#draft-zone`
+  collapse toward the rim when the draft is empty — the ResizeObserver makes
+  the shrink structurally free, and it returns 114 px in exactly the state
+  with nothing to show.
+- **Do not add a confirmation dialog to `c` / Clear table.** Goal 10 makes
+  sweeping the felt everyone's right and the table should stay fast. The
+  verified defects are guard scope and a colliding label (U14); a confirm
+  would tax every legitimate sweep to protect against a typo the guard
+  already almost catches.
+- **Do not badge visibility on every result surface.** The un-badged ruling
+  (UX.md:659) is reasoned and correct — the mode is never sticky, and
+  composing-time announcement ships. The gap is *retrospection* only; one
+  muted token in the log row (derived from `entry.visibility`, reusing
+  `offerVisText`) answers it without reopening the ruling.
+- **Do not change the server's collect-on-arrival rule for held rolls.** It
+  is deliberate, documented at the call site, and the shelf is the designed
+  home of a held roll. The defect is that the shelf cannot show it — fix the
+  marker (U20), not the state machine.
+- **Do not give the rail Offer or full intent editing.** §7.4's launcher
+  carve-out is right: a launcher fires intents authored elsewhere. The fix is
+  putting the carve-out sentence in GOALS (U4), not bringing the rail into
+  compliance with an invariant that should be amended.
+- **Do not unify the two bars by making the rail multi-select, and do not
+  suppress the leading `1` in the dice counter.** Exclusivity is correct for
+  a mode switch and the counter's grammar is correct as shipped; the fixes
+  are a distinct dress and an end to the state-destruction (U10).
+- **Do not make import destructive.** Union-only, preview-then-merge is the
+  load-bearing lesson of the `#g=` post-mortem and it held under every
+  stance. The missing operation is an explicit, separately-named "replace my
+  rack from this file" (U26), not a sharper Apply.
+- **Do not split js/main.js as a reflex, and do not reach for a framework.**
+  Zero-dependency single-file is upholding its end — the audit traversed it
+  six ways and the architecture held. Split only when a specific change is
+  demonstrably harder because of the file, and record that demonstration when
+  it happens.
