@@ -76,7 +76,7 @@ export class Browser {
   async launch() {
     const chrome = findChrome();
     this.profileDir = mkdtempSync(join(tmpdir(), 'dice-e2e-'));
-    this.proc = spawn(chrome, [
+    const args = [
       '--headless',
       '--remote-debugging-port=0',
       `--user-data-dir=${this.profileDir}`,
@@ -85,9 +85,28 @@ export class Browser {
       '--disable-background-timer-throttling',
       '--disable-renderer-backgrounding',
       '--mute-audio',
+      // One renderer at a time. The suite drives tabs SERIALLY (run.mjs is a
+      // plain for-loop), so a pool of renderers buys nothing and only widens
+      // the peak.
+      '--renderer-process-limit=1',
       ...(process.env.DICE_E2E_GPU === '1' ? [] : SOFTWARE_GL),
       'about:blank',
-    ], { stdio: ['ignore', 'ignore', 'pipe'] });
+    ];
+    // A CEILING ON HOW MUCH MACHINE A TEST RUN MAY USE (2026-08-08). Joe's
+    // box died mid-run three times with NOTHING in the kernel log — no panic,
+    // no OOM, no MCE, no thermal trip, the journal simply stops. That is a
+    // power event, not a software fault: the load is what trips it, so the
+    // load is what we bound. It matters most under software rendering, which
+    // rasterizes on the CPU — and an i9-13900K at full all-core tilt is a
+    // bigger transient than the GPU it replaced.
+    //
+    // DICE_E2E_CORES=8 pins the whole browser tree to 8 cores. Unset means
+    // unbounded, which is right for CI and for anyone whose machine is fine.
+    const cores = process.env.DICE_E2E_CORES;
+    this.proc = (cores && /^\d+$/.test(cores))
+      ? spawn('taskset', ['-c', `0-${Math.max(0, Number(cores) - 1)}`, chrome, ...args],
+        { stdio: ['ignore', 'ignore', 'pipe'] })
+      : spawn(chrome, args, { stdio: ['ignore', 'ignore', 'pipe'] });
     let stderr = '';
     this.proc.stderr.on('data', (d) => { stderr += d; });
     this.proc.on('error', (e) => { throw new Error(`chrome failed to start: ${e.message}`); });

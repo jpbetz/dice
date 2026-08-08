@@ -77,6 +77,45 @@ node tests/e2e/run.mjs --list         # scenarios and their tags
 errors *and* on any uncaught page exception; `console.error` output is
 reported but not fatal.
 
+### How much machine a run may use
+
+A full sweep opens ~147 tables, and every one constructs a
+`THREE.WebGLRenderer` — so a run is really ~147 renderer create/teardown
+cycles, back to back. That churn pattern is much harsher than steady
+rendering, and it is the heaviest thing this repo asks of a host.
+
+| env | default | what it does |
+|---|---|---|
+| `DICE_E2E_GPU=1` | off | render on the real GPU instead of SwiftShader |
+| `DICE_E2E_CORES=8` | unset (unbounded) | pin the browser tree to N cores via `taskset` |
+
+By default WebGL goes to **SwiftShader**, so a test run never touches the
+host's graphics driver. Every assertion reads the DOM or a `__diceDebug`
+hook, dice positions come from cannon-es on the CPU, and the die-art pass
+renders fine in software — verified: `ANGLE (Google, Vulkan 1.3.0
+(SwiftShader Device))`, all eight palette tiles still carrying real art.
+`DICE_E2E_GPU=1` restores hardware rendering, which is what to reach for when
+checking whether a rendering bug is SwiftShader-specific.
+
+**Note the trade:** software rendering rasterizes on the CPU. On a machine
+whose CPU is the tighter power budget, that can be *worse* than using the
+GPU — measure before assuming either default is safer for a given host.
+
+`DICE_E2E_CORES` exists because Joe's machine died mid-run three times with
+**nothing in the kernel log** — no panic, no OOM, no MCE, no thermal trip;
+the journal simply stops. That is a power event rather than a software
+fault, so the lever that helps is bounding the load. The contributing
+condition there was an *unlimited* CPU package power limit
+(`/sys/class/powercap/intel-rapl:0/constraint_*_power_limit_uw` at 4095 W,
+the "unrestricted" BIOS profile) on a 13900K, alongside a GPU capped at
+300 W — the capped component was not the one drawing the transient.
+
+Runs are **serial** by design (`run.mjs` is a plain for-loop, one browser,
+one page at a time), so the suite's own peak is modest. The way to get in
+trouble is running a sweep *alongside* other browser-spawning work — a
+multi-agent pass where each agent starts its own stage will multiply the
+peak by the number of agents. Serialize that work; do not overlap it.
+
 ## Tags → areas
 
 | Tag        | Covers                                          |
