@@ -4078,10 +4078,26 @@ export const scenarios = [
         assert.equal(await t.diceCount(), 1, `${who}: the die is on the felt`);
         const line = await t.logTop();
         assert.ok(/face down/.test(line), `${who}: log says face down (got: ${line})`);
-        assert.ok(line.includes('?'), `${who}: log total is ? (got: ${line})`);
+        // U17: the log's total column answers `?` only where a total EXISTS
+        // and is being withheld. Under the default per-die lens there is no
+        // sum to withhold, so the column is empty and `face down` above
+        // carries the state — the same correction the banner and the peek
+        // took in step 2. The `?` CHIP over the die is a different channel
+        // (a hidden face) and is unchanged; it is asserted two lines down.
+        assert.ok(!line.includes('?'),
+          `${who}: no phantom ? for a sum this system never computes (got: ${line})`);
         assert.ok(line.includes('Alice'), `${who}: roller still attributed (got: ${line})`);
         assert.deepEqual(await t.chips(), ['?'], `${who}: the chip over the die reads ?`);
       }
+      // …and a totals lens still answers `?`, because there a number really
+      // is being withheld.
+      for (const t of [a, b]) await t.dbg(`setSystem('dnd')`);
+      for (const t of [a, b]) {
+        await t.waitFor(`document.querySelector('#log-list .log-total').textContent === '?'`,
+          { desc: 'a totals lens keeps the withheld-sum ?' });
+      }
+      for (const t of [a, b]) await t.dbg(`setSystem('soul-deal')`);
+
       assert.equal((await a.entryState(rid)).canReveal, true, 'Alice holds the reveal');
       assert.equal((await b.entryState(rid)).canReveal, false, 'Bob does not');
       // Hidden is hidden for everyone — including the affordances. ⟳ on a

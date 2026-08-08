@@ -1385,7 +1385,65 @@ visibility chips or equivalent); it interacts with the cue band and the heat
 ladder, so design before code. U1 closes the *transport*; this closes the
 *read*.
 
-### U17. What a per-die system's Check shows — **DESIGNED 2026-08-08, not built**
+**Rider from U17 — `#verdict-subtitle`.** The verdict card has **no subtitle
+element**, under any system, for any notation, so `# The Duel | Charisma`
+declares its subtitle on the intent card and the dock strip and then loses it
+at the verdict. U17 deferred it deliberately: it is a **missing element,
+uniform across all three profiles** — not a gate, not part of the
+stake/arithmetic conflation, and not something a lens can be blamed for.
+Adding it means new markup, new CSS, and a third small line between the
+eyebrow and the answer on a card whose whole virtue is *the name, the answer,
+the exits*. That is a hierarchy call, which is why it lands here rather than
+in a gate pass. It is the one residual asymmetry in UX.md §7.24's
+eight-surface table.
+
+### U17. What a per-die system's Check shows — **STEPS 1–4 SHIPPED 2026-08-08; 5–6 OPEN**
+
+**Steps 1–4 shipped** `fe9acbd` (the stake renders; only its adjudication is
+gated) · `ba03e88` (the mute gold `?` leaves the total slot) · `f5359d8`
+(steps 3 & 4 — arithmetic and selection split; the `meaningFor` channel
+deleted). **Step 5 (docs) is this pass. Step 6 (the look) is open**, and per
+the repo's standing rule U17 is not "done" before it: the verdict card's stake
+line rhythm and the peek's `.pk-held` word have not been seen rendered.
+
+**THE LIVE RULE NOW LIVES IN [UX.md §7.24](UX.md).** Everything below this
+block is the **build spec and the record of the defect** — the surface-by-
+surface renders, the gate table, every disagreement ruled, the strongest
+objection and its answer. It is kept because it is what was decided and why,
+and it is written in the present tense of 2026-08-08 *before* the build. Read
+§7.24 for what a surface shows today; read this for why.
+
+**Two sites still disagree with the rule, verified against source 2026-08-08**
+— one a gate the spec listed and the build missed, one a site the spec never
+listed. Both are recorded in §7.24's *Not closed*, and both are small:
+
+- **#26 — `modsSummary`'s `values` option.** Never added; `renderOffers` still
+  calls `modsSummary(o.mods)` with no options, so **an offer card still prints
+  the flat `+5`** under a per-die lens while the intent card it becomes drops
+  it. The last declaration surface on the wrong side of the split.
+- **The log's total column still answers `?`** for a held roll under a per-die
+  lens — the same mute gold glyph step 2 removed from the banner and the peek,
+  making the same claim of a withheld sum that will never exist. The spec
+  never listed this site (it enumerated `#result-total` and `.pk-total` only);
+  by the spec's own reasoning it is the same defect.
+
+**One claim in the spec below overstates what shipped.** Step 3 says
+`4d6dl1`'s dropped die "returns to the verdict card, banner and peek." It
+returned to the **verdict card** only, as a `DL1 dropped` attribution card.
+`renderOutcomeRows` prints only the dice `outcomesFor` returns
+(`p.counts && !p.child`) and the breakdown line folds wherever those rows
+render, so the banner and the peek still show no struck die under a per-die
+lens. That is a live half of GOALS' *Attributed math* and it is a **rows**
+question, not a stake question — it belongs to whoever next touches
+`renderOutcomeRows`, not to a gate.
+
+**The new scenario landed under an existing name.** The spec's `stake-read`
+was folded into **`per-die-read`** (smoke) rather than added beside it, which
+is why `grep stake-read` finds nothing; the assertions are there. Its old
+pin — "no DC verdict under per-die" — was pinning the defect and is re-pointed
+to the contract.
+
+---
 
 *Audit B1 (major), B3, B4.* `1d20+5 check dc15 # The Duel` renders on the
 verdict card as one chip and a word — no DC, no `+5`, no subtitle — because
@@ -1770,6 +1828,10 @@ Compare `tools/out/lifecycle/09-check-verdict.png`: today the card is head, chip
 
 ## Deferred, and what the deferral costs
 
+*(Both are now recorded in **UX.md §7.24, "Deferred, with the cost named"** —
+the section a reader reaches from the WHAT IS TRUE TODAY table. This is the
+reasoning; that is the durable notice.)*
+
 **1. B's `readFor(entry)` interface.** Refused for 2026-08-13. It changes nothing the player sees versus this spec; it is ~70 lines across the file's most-repainted functions five days before a play date; and its own shape (`{headline, verdict, ring}`) presumes the sum world's furniture, so the first genuinely different profile would force a redesign anyway. **Cost of deferring:** hero arbitration stays in `js/main.js` rather than in the profile, so the day a hybrid system (chart words *and* totals) ships, whoever builds it re-opens the one-hero-slot question §2.5 was invented for. §7.24 records that explicitly, so it is a known door and not a rediscovery. B's real content — a smaller interface, the stake and the read in separate slots — ships here by subtraction.
 
 **2. `#verdict-subtitle`.** The verdict card has no subtitle element (`index.html:647-664`), under any system, for any notation. That is a **missing element**, uniform across all three profiles — not a gate, not part of the conflation, and not something a lens can be blamed for. Adding it means new markup, new CSS, and a third small line between the eyebrow and the answer on a card whose whole virtue is *the name, the answer, the exits* — a hierarchy call I decline to make from source. **Cost:** the eight-surface table keeps one residual asymmetry (row 5, subtitle). Named in §7.24, and filed as a ROADMAP rider under U16 (which owns the draft's intent read) rather than left to be re-audited.
@@ -1800,23 +1862,27 @@ Four answers.
 
 Each step leaves the app coherent and shippable on its own. Total: ~90 lines touched in `js/main.js`, about a third of them deletions; −3/+1 members in `js/meanings.js`; 5 lines of `index.html`; +4/−4 CSS rules.
 
-**Step 1 — The stake renders.** *(the audit's core; ships alone)*
+**Step 1 — The stake renders.** *(the audit's core; ships alone)* — **SHIPPED `fe9acbd`.**
 `heldWord` + `stakeInto` helpers · gates #1, #7, #8, #9, #10, #11, #16, #19(dc half), #21, #23 · `targetWord` in all three profiles + gate #2 · the `.stake-num` and `.ring-wrap.hidden + .margin-line` CSS rules.
 After this commit: the dc renders on all eight surfaces, no surface prints an unearned `✓`/`✗`/`Success`, and the verdict card's branch-order trap is gone. `+5` is still inconsistent — that is step 3.
+*As shipped:* all of it, plus one defect only LOOKING caught — U13's "Save as pool…" was deriving its class by string-stripping `revealClass` and shipped with **no dress**, a browser-default white button between a red Clear and a gold REROLL, every assertion green. Fixed in the same commit.
 
-**Step 2 — The `?` leaves the total slot.**
+**Step 2 — The `?` leaves the total slot.** — **SHIPPED `ba03e88`.**
 Gates #14, #15, #19(held half), #20 · `#result-meaning.held` and `.pk-held` CSS.
 Independently valuable: the app's headline privacy feature stops answering with a mute 52px gold glyph, and the sum leaves the DOM under a lens that refuses it.
+*As shipped:* banner and peek only. **The log's total column still answers `?`** — a site the gate table never listed (see the status block).
 
-**Step 3 — Arithmetic and selection split.**
-Gates #3, #4, #12, #13, #22, #25, #26, #28, #32 · `index.html` #29, #30 (#31 untouched) · delete `usesMods` from all three profiles.
-Independently valuable even without steps 1–2: it closes the *Attributed math* invariant break on the default system (`4d6dl1`'s dropped die returns to the verdict card, banner and peek) and makes the dc authorable in the ± popover.
+**Step 3 — Arithmetic and selection split.** — **SHIPPED `f5359d8`** *(with #26 missed)*.
+Gates #3, #4, #12, #13, #22, #25, #28, #32 · `index.html` #29, #30 (#31 untouched) · delete `usesMods` from all three profiles.
+Independently valuable even without steps 1–2: it closes the *Attributed math* invariant break on the default system and makes the dc authorable in the ± popover.
+*As shipped:* **#26 did not land** — `modsSummary` has no `values` option and `renderOffers` passes none, so the offer card still prints the flat `+5`. And the dropped-die claim was narrower than written: it returned to the **verdict card** only (see the status block).
 
-**Step 4 — Delete the `meaningFor` channel.** JS + CSS per the table above; `critWord` signature and both call sites. Pure subtraction, behaviour-neutral.
+**Step 4 — Delete the `meaningFor` channel.** — **SHIPPED `f5359d8`** (same commit as step 3). JS + CSS per the table above; `critWord` signature and both call sites. Pure subtraction, behaviour-neutral.
 
-**Step 5 — Docs, one commit.** `js/meanings.js` interface v3 prose · UX.md §2.5 → pointer · new §7.24 · five WHAT IS TRUE TODAY rows · ROADMAP U17 marked shipped, with the two deferrals (`readFor`, `#verdict-subtitle`) recorded where the next reader will find them.
+**Step 5 — Docs, one commit.** *(this pass)* `js/meanings.js` interface prose · UX.md §2.5 → struck to a pointer · new §7.24 · WHAT IS TRUE TODAY rows · GOALS' *Attributed math* gains the clause that it governs math which happens · ROADMAP U17 marked step by step, with the two deferrals (`readFor`, `#verdict-subtitle`) recorded where the next reader will find them — §7.24's *Deferred* and, for the subtitle, a rider under U16.
+*Note:* the interface prose in `js/meanings.js` was rewritten during steps 1 and 3, so step 5 inherits it. Its heading still reads **"Profile interface v2"** over a v3 member list — a one-word correction for whoever is next in that file.
 
-**Step 6 — Look.** One interactive pass over the existing lifecycle fixtures: check-declare (badge + `TARGET`), check-verdict (stake line rhythm), peek held, whisper banner. Per the repo's standing rule, U17 is not "done" before this.
+**Step 6 — Look. — OPEN.** One interactive pass over the existing lifecycle fixtures: check-declare (badge + `TARGET`), check-verdict (stake line rhythm), peek held, whisper banner. Per the repo's standing rule, U17 is not "done" before this.
 
 ---
 
@@ -1879,15 +1945,19 @@ One pass, one fixture (`1d20+5 check dc15 # The Duel | Charisma`) under soul-dea
 
 ---
 
-**Rides with it:** the only 52 px gold number a Soul Deal table sees is `?`
-— `#result-total` is dead for every open roll and springs to life, in the
-roll verb's own hue, only to announce an absence, with the banner never
-saying *why* (the verdict card and log both name the state; the banner is
-mute). And the meanings migration left dead surface: all three profiles
+**Rode with it — both CLOSED** *(B3 in `ba03e88`, B4 in `f5359d8`)*, kept as
+the statement of what was wrong. ~~the only 52 px gold number a Soul Deal
+table sees is `?` — `#result-total` is dead for every open roll and springs to
+life, in the roll verb's own hue, only to announce an absence, with the banner
+never saying *why* (the verdict card and log both name the state; the banner
+is mute). And the meanings migration left dead surface: all three profiles
 define `meaningFor: () => null`, so the non-ledger `#result-meaning` branch,
 `.pk-meaning`, the verdict's `else if (meaning)` and §2.5's entire hero-slot
 ruling are unreachable while §2.5 is still written as live spec (retire it
-with U4's pass).
+with U4's pass).~~ The banner and the peek name the rung now (`Face down` /
+`Whispered`); the channel is deleted, producer and consumers and CSS; §2.5 is
+struck to a pointer at UX.md §7.24. **The one residue: the log's total column
+still answers `?`** for a held roll under a per-die lens.
 
 ### U18. Crit frequency under soul-deal — DESIGN FIRST, then small
 

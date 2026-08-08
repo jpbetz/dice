@@ -4144,9 +4144,10 @@ function renderVerdictCard(roll, entry) {
     // stake line above captions them.
     heroEl.classList.add('verdict-tally', 'verdict-outcomes');
   } else if (adjudicable) {
-    // The target verdict owns the whole read: entryMeaning is null when a dc
-    // exists (the chart interprets bare rolls only), so no chart line ever
-    // shares the card with Success/Failure. (Supersedes §2.5's demoted line.)
+    // The target verdict owns the whole read. (This used to explain itself
+    // via entryMeaning, which step 4 deleted, and §2.5, which §7.24 retired —
+    // the chart word reaches the card through outcomesFor's rows above, and
+    // those rows win this if/else before this branch is ever reached.)
     const cleared = entry.total >= entry.dc;
     marginEl.append(' · margin '); // the 'vs DC N' prefix is already on screen
     const b = document.createElement('b');
@@ -6032,7 +6033,8 @@ function updateTrayModsWord() {
   trayModsBtn.textContent = '± Modify';
   trayModsBtn.title = full
     ? 'Modifiers, target, moment'
-    : 'Moment and visibility — this system reads each die, so there is no total to modify';
+    : 'Target, moment, visibility, keep/drop — everything but the flat bonus, '
+      + 'which needs a total this system never computes';
 }
 updateTrayModsWord();
 
@@ -9421,7 +9423,7 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
       <div class="log-head">
         <span class="log-group"></span>
         <span class="log-actions"></span>
-        <span class="log-total">${hidden ? '?' : activeSystem().usesTotal ? entry.total : ''}</span>
+        <span class="log-total">${!activeSystem().usesTotal ? '' : hidden ? '?' : entry.total}</span>
       </div>
       <div class="log-detail">${tokensHtml}${detail}${verdictHtml ? '  ·  ' + verdictHtml : ''}${meaningHtml ? '  ·  ' + meaningHtml : ''}</div>
       <div class="log-time">${fmtTime(entry.t)}</div>`;
@@ -11899,10 +11901,17 @@ function gotoTable(room) {
 
 // Compact human summary of a mods spec: "+3 · adv · drop low 1 · reroll ≤2 · explode"
 // Attributed parts (§7.2) show their labels: "+2 Proficiency · +1 Guidance".
-function modsSummary(mods) {
+// `values:false` drops the ARITHMETIC clauses and keeps the SELECTION ones
+// (U17 #26). An offer card was still declaring `+5` under a per-die lens
+// while the intent card it becomes had already stopped — the offer path was
+// never gated at all, which is half of why eight surfaces showed six
+// different subsets of one stake.
+function modsSummary(mods, opts = {}) {
   if (!mods) return '';
+  const values = opts.values !== false;
   const bits = [];
-  if (Array.isArray(mods.parts) && mods.parts.length) {
+  if (!values) { /* arithmetic omitted — the shape clauses below still speak */ }
+  else if (Array.isArray(mods.parts) && mods.parts.length) {
     for (const p of mods.parts) {
       if (!p.value) continue;
       bits.push(`${p.value > 0 ? '+' : ''}${p.value}${p.label ? ` ${p.label}` : ''}`);
@@ -11969,7 +11978,7 @@ function renderOffers() {
 
     const detail = document.createElement('div');
     detail.className = 'offer-detail';
-    const summary = modsSummary(o.mods);
+    const summary = modsSummary(o.mods, { values: activeSystem().usesTotal });
     const exp = sanitizeExp(o.exp);
     // The offer's visibility is part of its stakes (goal 11): show it on the
     // card so a claimer knows they may be rolling blind.

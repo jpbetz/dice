@@ -57,11 +57,11 @@ a different thing again and keeps its name.)
 > - **§2.4 phase 0's user-held dwell and Roll button** — the intent card has
 >   no button and holds the stage for a fixed `CEREMONY_DECLARE_S = 1.35`
 >   seconds. Phases 1–8 and the reduced-motion guardrails still bind.
-> - **§2.5's one hero slot** — unreachable. All three profiles in
->   `js/meanings.js` declare `meaningFor: () => null`, so the meaning branch
->   never paints and the verdict/chart disagreement it arbitrates cannot
->   arise. (ROADMAP U17 decides what a per-die system's Check shows; until it
->   lands, this section is a ruling with nothing to rule on.)
+> - **§2.5's one hero slot** — **retired 2026-08-08 by §7.24** and struck in
+>   place. It was a ruling with nothing to rule on: all three profiles had
+>   declared `meaningFor: () => null` since the meanings migration, so the
+>   branch never painted, and the channel is now deleted outright. §7.24 is
+>   the live rule for what a result surface shows.
 > - **§6's four slices** — a build order, executed. Read it as a record of
 >   what was sequenced, never as work remaining; ROADMAP.md sequences work.
 >
@@ -449,20 +449,36 @@ converted to opacity fades, stagger 0, no shake/flash/overshoot/sweep.
 
 ### 2.5 Verdict vs Soul Deal — one hero slot
 
-Target verdict and `meaningFor()` **will** disagree; they are never
-reconciled and never merged. The card has one large readout:
+~~Target verdict and `meaningFor()` **will** disagree; they are never
+reconciled and never merged. The card has one large readout:~~
 
-- Target set → verdict owns it (`SUCCESS` / `FAILED`, large); the chart
+- ~~Target set → verdict owns it (`SUCCESS` / `FAILED`, large); the chart
   word demotes to a small labeled line: `Chart · Advantage`. Disagreement
   is labeled, not hidden — a Soul Deal table reads it as "you cleared it,
-  at a cost."
-- No target → the chart word owns it, exactly as today.
-- `readouts` lets an experience drop either one (a combat experience with
+  at a cost."~~
+- ~~No target → the chart word owns it, exactly as today.~~
+- ~~`readouts` lets an experience drop either one (a combat experience with
   `['verdict']` turns the chart off — that option is much of what makes
-  experiences feel real).
-- Face extremes (`isMax`/`isMin`, already computed) are a third,
+  experiences feel real).~~
+- ~~Face extremes (`isMax`/`isMin`, already computed) are a third,
   independent channel: a gold ring / red crack on that chip only. The
-  three signals never repaint one another.
+  three signals never repaint one another.~~
+
+**Retired by §7.24.** The conflict this arbitrates cannot arise: `meaningFor`
+is deleted — all three profiles had defined it as `() => null` since the
+meanings migration, so the demoted-chart-line branch was unreachable code
+describing a feature that no longer existed, and the chart word reaches the
+screen through `outcomesFor` and always did. The fear behind the ruling is
+answered by geography rather than by silencing anything: **the hero holds the
+READING and the margin line holds the STAKE, and they never contend for one
+slot**, so a target no longer needs to suppress a chart word. `readouts` never
+shipped either (see the §1–§6 banner: the experience record and its editor
+were never built).
+
+*The one clause that survives in substance:* face extremes ARE an independent
+channel and stay universal — `isMax` / `isMin` dress the die token itself
+(`.crit-max` / `.crit-min`, colour and weight in the log, breakdown and peek),
+never the ring or the crack described above, and they repaint nothing else.
 
 ### 2.6 Multiplayer and the collapsed table
 
@@ -1099,12 +1115,13 @@ a stale row is worse than no table.
 | Notation box (`#cmd`) | §1.1 grammar · §1.2 parser API · §1.6 server parse · §7.23 for where it sits and what switches it on | §1.3's placement paragraph (see the §1 banner). **No section yet records ROADMAP U1/U2**, shipped 2026-08-08 in `07099a7`: staging carries intent, and a box that stops parsing disarms the plate |
 | Saved-pools rack + shelves | §7.9's THE SHEET PASS — identity edits by id, creation-as-editing, the ✎ row — and its DEALT RACK amendment · §7.18 for what the ✎ gate covers | §7.17's region head, amended below: `SAVED POOLS` no longer stands over your own rack |
 | Collapsed launcher (the rail) | §7.22 — 112px, a row is a word, the standing verb, 2i-G · §7.23's "The collapsed column" — the source switch, the dice list, the plate at rail scale | §7.9's collapsed paragraph: it predates the second source list and describes a column that holds only pools (its 56px history is already struck there) |
-| Result banner | §7.11b — the folded card, the hover read, the beacon, auto-collect at 3 s · §7.21 — the named primary verb, the retired watermark | §7.9's Done-at-rest and its ~6 s clock (the shipped clock is 3 s) · §7.7.2's ⟳ / Collect / ✕ trio |
-| Verdict card | §7.16's THE FLOW TO COLLECTED — a folded card whose clock shelves the roll · §7.21 — `❯❯ Skip` repaints to `✕ Clear` when the beat lands | §7.7.2's verdict half (struck there) · §2.4 phase 0's user-held dwell and Roll button (shipped: a 1.35 s timer, no button) |
-| Peek | §7.7.1 for what a peek is · §7.11b's "folded card, shelf edition" · §7.21 — its primary is always `✕ Clear`, housekeeping being anyone's | §7.15's one-✕ rule — retired, struck below · §7.9's "the peek carries a prominent ✕ at its base" amendment |
-| Roll log | No single section. §7.9 for the rail-foot flyout and key `l` · §7.12 for the compact grouped line (the per-die ROWS belong to the other three surfaces) · §7.15's "The log says so" for `reroll` / `rerolled` | — |
+| Intent card · dock strip (the declaration) | §2.4's staging timeline, phases 1–8 · §7.6 for the moment flags and `# Title \| Subtitle` · **§7.24** — the target renders under every system and the profile only NAMES it (`targetWord`); the flat `+5` is arithmetic and does not; `#intent-notation` stays a whole verbatim canonical, `dc15` included | §2.4 phase 0's user-held dwell and Roll button (shipped: a fixed `CEREMONY_DECLARE_S = 1.35` s, no button) · §2.1 / §2.3's experience records — the moment ships as notation flags · any reading in which the badge's label is a fixed string |
+| Result banner | §7.11b — the folded card, the hover read, the beacon, auto-collect at 3 s · §7.21 — the named primary verb, the retired watermark · **§7.24** — `VS DC 15` renders under every system, the adjudication only where a sum does, and the hero slot names the rung (`Face down` / `Whispered`) where the mute gold `?` used to sit | §7.9's Done-at-rest and its ~6 s clock (the shipped clock is 3 s) · §7.7.2's ⟳ / Collect / ✕ trio · §2.5 (retired 2026-08-08) |
+| Verdict card | §7.16's THE FLOW TO COLLECTED — a folded card whose clock shelves the roll · §7.21 — `❯❯ Skip` repaints to `✕ Clear` when the beat lands · **§7.24** — the stake goes into `#verdict-margin`, written ONCE above and outside every branch; the hero holds the reading and the two never share a slot | §7.7.2's verdict half (struck there) · §2.4 phase 0's user-held dwell and Roll button (shipped: a 1.35 s timer, no button) · §2.5's one hero slot — retired, struck there. **The card has no subtitle element under any system** (§7.24's deferral); do not read the eight-surface table as though it does |
+| Peek | §7.7.1 for what a peek is · §7.11b's "folded card, shelf edition" · §7.21 — its primary is always `✕ Clear`, housekeeping being anyone's · **§7.24** — the stake, and the held word in the total slot (the `?` survives only for `!entry`, and under a totals lens) | §7.15's one-✕ rule — retired, struck below · §7.9's "the peek carries a prominent ✕ at its base" amendment · §2.5 (retired) |
+| Roll log | No single section. §7.9 for the rail-foot flyout and key `l` · §7.12 for the compact grouped line (the per-die ROWS belong to the other three surfaces) · §7.15's "The log says so" for `reroll` / `rerolled` · **§7.24** — `vs 15` with no `✓`/`✗` where nothing sums, and no dangling `+5` feeding an empty total column | §2.5 (retired) |
 | Shelf | §7.7 — slots, collect, FIFO ranks, universal housekeeping, resync · §7.7.1 — no casino markings, left-to-right compaction | The marker's resting read in §7.7 and §7.9, amended below: it ships invisible. ROADMAP U20 owns the redesign |
-| ± popover | §7.10 — a pure editor, and where an edit lands by source · §7.14.2 — Done, click-away, the ring · §7.9's SHEET PASS identity strip | §7.10's "reroll and explode stay… behind the sysnote's *Show anyway*" — superseded 2026-08-06, no note and no disclosure; the accurate record is the comment at `index.html:683` |
+| ± popover | §7.10 — a pure editor, and where an edit lands by source · §7.14.2 — Done, click-away, the ring · §7.9's SHEET PASS identity strip · **§7.24** — only **Modifier** folds under a per-die lens; Target, d20 pairing, keep/drop and reroll/exploding are authorable under every system, and the rim reads `± Modify` in both | §7.10's "reroll and explode stay… behind the sysnote's *Show anyway*" — superseded 2026-08-06, no note and no disclosure; the accurate record is the comment over the popover's sections in `index.html` · any account of the fold in which Target or keep/drop hides under a per-die system: that was `usesMods`, deleted 2026-08-08 · ROADMAP U11's `± Moment` — its rule survived, its word did not (§7.24) |
 | Identity chip · roster · nameplate | §7.17 — the rail pill is the one per-player surface, left-click toggles the rack, right-click / long-press opens the menu, and the quiet nameplate · §7.9's ORDER IS THE CONTRACT · §7.22 for the collapsed dress | §7.9's "Identity is on the table" paragraph, where left-click opened the menu |
 | Settings | No single section. §7.9 for the *Just you* scope (chips off by default, the dice-set select) · §7.13 for *Your data* · §7.17 for the table name; the room-wide keys are `SETTING_SPECS` in `server.js` | §2.1 / §2.3's experience record and its editor — never built, and `/api/table` refuses the key |
 
@@ -3349,3 +3366,258 @@ modes, the counted row, the `10d10x` worst case, the empty rack and a real
 `:hover` frame. The scrolled frame was a *duplicate of the resting shot* until
 the viewport was shortened — a tall window has nothing to scroll, so the frame
 that existed to prove the sticky behaviour proved nothing at all.
+
+### 7.24 The stake and the read — what a result surface shows (2026-08-08)
+
+**This is the authoritative section for what any surface prints about a
+declared target, a flat bonus, and the mechanics that decide which dice
+count.** It retires §2.5. The build spec that produced it — the gate table,
+the surface-by-surface renders, every disagreement ruled, the strongest
+objection and its answer — stays in **ROADMAP U17**, which is the record of
+what was decided and why. This section is what is true.
+
+**THE RULE.**
+
+> A **stake** renders on every surface under every system. Its
+> **adjudication** — the comparison of a result against it — renders only
+> where the system produces a single number to compare (`usesTotal`). The two
+> never share a slot.
+
+A **stake** is a condition of the moment the player declared: the target, the
+title, the subtitle, and the mechanics that decide *which dice land and which
+count*. It is a fact about the roll and asks the app to compute nothing.
+
+**Arithmetic** is a term in a sum: the flat modifier, named bonus parts, the
+total, the margin, the ring's ratio, `Success`/`Failure`, `✓`/`✗`. It renders
+where its sum renders and nowhere else.
+
+The dividing question at every site is **"did the player TYPE this, or did we
+COMPUTE it?"** — with one refinement: *a typed value that has no meaning
+except as an operand of an absent operation is arithmetic, not a stake.* A
+target stands on its own — *we are throwing at 15*. A `+5` does not.
+
+**The app's own record already said a target is a stake.** This was not argued
+from taste; three places in the repo had already decided it and nobody had
+joined them up:
+
+- `index.html:764` — *"The improviser's hot pair rides near the top (CUJ2): **a
+  target and a moment are the stakes**."* The markup calls it a stake.
+- §2.1 above — *"There is **no `target.hidden`**: stakes are public on every
+  visibility rung (§3.0)… the drama comes from the held result, not a secret
+  number."*
+- GOALS' superseded decisions — the DM seat's fourth power, *hidden Targets*,
+  **was rejected outright, "because stakes are public on every visibility
+  rung."**
+
+The held branch on the verdict card has always shipped the exact shape:
+`vs DC 15` over *Face down*, commented *"Public stakes, hidden result."*
+Nobody ever filed that as a bug. A per-die read is the same case — *unavailable
+because this system does not judge* rather than *unavailable because not yet*.
+The code already knew how to render a stake without a verdict; it had not
+noticed it had a second reason to.
+
+**And the decisive one for the default table:** under §2.3 a bare `dc15`
+*implies a Check* — "a target with no staging would be mute." So `2d6 dc15`
+on a Soul Deal table staged a full Ordeal — card, title, dwell, dock, verdict
+— whose sole trigger was a number the app then refused to name on any surface
+the roller could see. Staging a ceremony because of a fact and then suppressing
+the fact is worse than either extreme.
+
+**Eight surfaces, not four — and the two that were never gated are the ones
+that prove it.** The 2026-08-08 audit (finding B1) counted four disagreeing
+surfaces; the design pass found **eight**, rendering **six** different subsets
+of one stake. The offer card and the ceremony's screen-reader announce had no
+gate at all, which produced the two readings that settle the question: an
+**offered** Check declared both stakes under a per-die system while **rolling**
+it showed neither, and a blind player heard `target 15` from the same beat at
+which the sighted player's card read `d20 8 quiet`. The 2026-07-31 gate sweep
+touched five sites and missed three; that is the whole shape of the bug.
+*(The audit's four-surface count is history. Read this row set instead.)*
+
+Fixture `1d20+5 check dc15 # The Duel`, system `soul-deal`, the d20 lands 8:
+
+| surface | title | subtitle | target | flat `+5` | selection mods | adjudication |
+|---|---|---|---|---|---|---|
+| offer card | ✅ | ✅ | ✅ `vs 15` | ⚠️ **still prints** — see *not closed* | ✅ | — |
+| intent card | ✅ | ✅ | ✅ gold ring, **ivory** numeral, `targetWord` label | ❌ | ✅ chips | — |
+| dock strip | ✅ | ✅ | ✅ pill *(cinematic paint only)* | ❌ | — | — |
+| SR announce | ✅ | — | ✅ `target 15` | ❌ | — | ❌ |
+| verdict card | ✅ | ⚠️ *no element — deferred* | ✅ `vs DC 15` | ❌ | ✅ mod-cards | only under `usesTotal` |
+| result banner | ✅ | — | ✅ `VS DC 15` | ❌ | ⚠️ rows omit discarded dice | only under `usesTotal` |
+| roll log | ✅ | — | ✅ `vs 15` | ❌ | ✅ struck / ✴ | only under `usesTotal` |
+| peek | ✅ | — | ✅ `vs DC 15` | ❌ | ⚠️ rows omit discarded dice | only under `usesTotal` |
+
+The pre-roll surfaces (dock pill, offer `vs`) keep their gold numerals; that
+is a §7.9 / 2i-C hue question, deliberately out of scope. **On a result
+surface gold and red mean *adjudicated*,** so an unadjudicated stake takes the
+muted register with an ivory numeral: `.stake-num`, one dress, four surfaces
+(verdict margin, banner verdict, peek verdict, log row), so a target reads the
+same wherever it lands. The intent card's `.tnum` was already ivory inside its
+gold ornament — the card that declares the stake and the card that answers it
+now spell the number the same colour.
+
+**BRANCH ORDER WAS A SECOND, INDEPENDENT GATE.** Two mechanisms were
+suppressing the verdict card's stake and only one of them was a flag. The
+obvious one fused `Number.isInteger(entry.dc)` to `usesTotal`. The other was
+that `renderOutcomeRows` wins the if/else first, so the `else if (hasDc)`
+branch below it was **unreachable under a per-die lens no matter what the flag
+evaluated to** — flipping the flag alone would have changed nothing visible.
+The fix is not a gate flip: **the stake is written once, above and outside
+every branch, including the hidden early-return.** Stake and reading are
+different slots; the rows that own the hero can no longer suppress the caption
+over them. *The lesson generalizes: when a value is conditional AND lives
+inside a chain, the chain is a gate too, and grepping for the flag will not
+find it.*
+
+**`usesMods` was an invariant break, not an inconsistency — and it is
+deleted.** One boolean folded five things together: the flat modifier, d20
+pairing, keep/drop, reroll and explode. Only the first is arithmetic. The
+other four decide **which dice land and which count** — and `soul-deal`'s own
+`outcomesFor` filters on `p.counts && !p.child`, while its `forecastFor`
+refuses to pre-read keep/drop *precisely because* of it. The profile was
+suppressing attribution it treats as load-bearing everywhere else, against
+GOALS' **Attributed math** invariant, on the system that cares most which dice
+counted. Arithmetic now keys off `usesTotal`; **selection is universal.**
+`usesMods` is deleted rather than corrected, because all three profiles set it
+equal to `usesTotal` — it never distinguished anything, and deleting it makes
+the conflation unspellable.
+
+**`usesTotal` narrows to one sentence, and `targetWord` names.** `usesTotal`
+gates the sum and everything derived from it — the big number, the margin
+delta, the ring's ratio, and the Success/Failure adjudication of a target.
+**It does not gate the target.** The profile's only say over a stake is what
+to *call* it: `targetWord` is `Target` under `soul-deal` and `none`,
+`Difficulty Class` under `dnd`, and it feeds exactly one site,
+`#intent-target-label`. Without it, ungating the badge would have printed
+**DIFFICULTY CLASS** — a D&D mechanic's proper noun in gold caps under a 96px
+ring — on Joe's own game at the most deliberate beat this app has. Nobody had
+caught it, because the ring had never rendered on that system to be read.
+The terse post-roll strings (`vs DC 15`, `vs 15`) are unchanged: they are
+readbacks of the `dc` token, not names of a concept.
+
+**The mute gold `?` leaves the total slot.** `#result-total` is 52px in
+`--gold-bright` = `#ffd766`, which is literally the ROLL cue's own colour at
+full alpha. Under a per-die system it was `display:none` for every open roll
+and sprang to life for exactly one purpose: to announce an absence — a
+spectator's whole banner for a held roll was a name, a label and a mute gold
+`?`, with nothing on it saying why. **The slot belongs to the sum now** — it
+renders where a sum exists and is gone otherwise — and the hero slot names the
+rung instead: `Face down` / `Whispered` (`heldWord`), in the quiet italic the
+verdict card already owned for it. Three result surfaces converge on one
+vocabulary. A **totals** lens still answers `?`, because there a number
+genuinely exists and is being withheld; the peek also keeps its `?` for
+`!entry` (a collected roll carrying no data), where the `?` is not a lens
+question.
+
+*The write moved inside the gate as well.* The old line put `entry.total` into
+the node on every paint under every system and only `display:none` withheld
+it — the sum a per-die lens refuses to compute was sitting in the DOM the whole
+time, one devtools inspection or one CSS regression from leaking. **A
+visibility contract that is enforced only by CSS is not a contract** (§7.21
+learned the same lesson from the other direction, with `[hidden]`).
+
+**The popover follows the same split.** Only the **Modifier** section folds
+under a per-die lens — a flat bonus is a term in a sum and has nowhere to
+land without one, which is exactly where Joe's 2026-08-06 "fold it entirely —
+no note" ruling sits. **Target, d20 pairing, keep/drop and reroll/exploding
+all came back.** Target is not optional: it round-tripped invisibly —
+`popStateFromParse` loaded it, `popCanonical` emitted it, `#pop-echo` printed
+it, and the editor showed no row — which is ROADMAP U11's own named remaining
+hole ("re-add via ± is impossible for `dc`") and a worse split than the one
+this closes. **The rim reads `± Modify` under both systems**, which *applies*
+U11's rule rather than overturning it: `± Moment` was right when the popover
+held two of seven sections; it holds six of seven now, and naming one of six
+is the same defect U11 fixed. No `#pop-sysnote` returns — it would fire per
+keystroke and it would be false, since `dc15` under a per-die system stages
+the Check and arms the `dnd` re-read.
+
+**No per-die comparator exists, and none is built here.** There is no
+`target.cmp`, no `scope:'each'`, nothing in `outcomesFor` that consults
+`entry.dc`. §2.1 reserves `scope:'each'` for roadmap §8's success counting
+under a *different* notation (`cs>=N`) and a *different* verdict rendering
+(success pips, not a ring). Stated here in one line so it is not
+re-litigated: **declining to conclude is obedience, not evasion.** `total >= dc`
+is a house rule, true under D&D-style play and undefined under Soul Deal, and
+GOALS goal 6 makes that the players' business. Silence on the *verdict* is
+obedience; silence on the *stake* is amnesia.
+
+**The residual cost, stated plainly.** A Soul Deal player who wants a target
+*judged* still cannot have one, and now sees it rendered without a judgement —
+which makes the absence more visible than it was. That is the correct trade:
+inventing a per-die comparator to paper over it would be the app deciding how
+a target works in someone else's game. Making the gap visible is how it gets
+designed rather than forgotten.
+
+#### Deferred, with the cost named
+
+**1. The structural inversion — a profile that SUPPLIES renderers.** The
+alternative design had the profile answer `readFor(entry) → {headline,
+verdict, ring}` instead of surfaces querying booleans. **Refused**, and the
+subtraction taken without the rewrite: two members out (`usesMods`,
+`meaningFor`), one small one in (`targetWord`). It changes nothing a player
+sees against this section; it is ~70 lines across the file's most-repainted
+functions; and its own shape presumes the sum world's furniture, so the first
+genuinely different profile would force a redesign anyway. **Cost of
+deferring:** hero arbitration stays in `js/main.js` rather than in the
+profile, so the day a **hybrid** system ships — chart words *and* totals — the
+one-hero-slot question §2.5 was invented for reopens. Recorded here so that is
+a known door and not a rediscovery. Do not restructure the interface without
+that system in hand: `readFor` designed against three profiles that all agree
+is a guess.
+
+**2. `#verdict-subtitle`.** The verdict card has **no subtitle element** —
+under any system, for any notation. That is a **missing element, uniform
+across all three profiles**: not a gate, not part of the stake/arithmetic
+conflation, and not something a lens can be blamed for. Adding it means new
+markup, new CSS, and a third small line between the eyebrow and the answer on
+a card whose whole virtue is *the name, the answer, the exits*. **Cost:** the
+table above keeps one honest asymmetry (verdict card, subtitle), held open as
+a rider under ROADMAP U16 rather than left to be re-audited.
+
+#### Not closed — verified against source, 2026-08-08
+
+Two sites in the shipped build still disagree with the rule above. Both are
+recorded because an authority section that overstates itself is worse than
+none; ROADMAP U17 carries them as work.
+
+- **The offer card still prints the flat `+5`.** `modsSummary` never gained
+  its arithmetic option and `renderOffers` passes none, so an offer's summary
+  reads `+5 · advantage` under every system while the intent card it becomes
+  drops the `+5`. It is the one *declaration* surface still on the wrong side
+  of the split.
+- **A held roll's log row still answers `?` in the total column** under a
+  per-die lens — the same mute gold glyph the banner and peek gave up, in the
+  same claim of a withheld sum that will never exist. The log's *detail*
+  already names the rung (`face down` / `whispered`), so the row says both.
+
+One more asymmetry is real but is **not** a stake question, and belongs to
+whoever next touches the outcome rows: `renderOutcomeRows` prints only the
+dice `outcomesFor` returns (`p.counts && !p.child`), and the breakdown line
+folds wherever those rows render — so under a per-die lens a `4d6dl1`'s
+**dropped die is still invisible on the banner and the peek**. It returned to
+the verdict card (as a `DL1 dropped` attribution card) and it has always been
+in the log (struck). GOALS' *Attributed math* asks for struck dice on every
+surface that shows the dice.
+
+**Scenarios:** `per-die-read` (**smoke**) carries the whole contract — the
+stake renders and the `✓`/`✗` does not, the verdict card's margin is exactly
+`vs DC 15` with a `.stake-num` inside it, the lens re-reads in place when the
+room switches to `dnd`, `#result-total` is both `display:none` **and** empty
+under a held per-die roll while a totals lens keeps its `?`, and only the
+Modifier section folds in the popover · `rim-word` (**smoke**) pins `± Modify`
+under both systems and makes the TOOLTIP the thing that varies — no promise of
+Modifiers where Modifier is the one folded section, and `Tweak` stays banned ·
+`shared-roll` pins the flat modifier's attribution as *absent where nothing
+sums, present and named under a totals lens, identical across tabs in both* ·
+`meanings` unit asserts the fields are **gone**, not merely false
+(`'usesMods' in sd === false`), and that `targetWord` is `Target` / `Difficulty
+Class`. Every visibility assertion reads computed `display` / `offsetParent`,
+never a class (§7.21's lesson).
+
+**Looking caught a defect the suite could not**, again, in the commit that
+shipped step 1: U13's "Save as pool…" was deriving its class by
+string-stripping `revealClass` and came out with **no dress at all** — a
+bright white browser-default button between a red Clear and a gold REROLL,
+straight through HUE = ACT. Every assertion was green while it shipped; one
+screenshot was not. (Fixed in the same commit: it wears the Reveal's quiet
+steel.)

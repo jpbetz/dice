@@ -146,7 +146,7 @@ function segmentsFor(type, q) {
 // a per-die system a sum is not a fact of play. Per-die max/min chip
 // styling stays universal (a per-die fact).
 //
-// Profile interface v2 (ROADMAP step 2): a profile declares its READ.
+// Profile interface v3 (U17, 2026-08-08): a profile declares its READ.
 //   aggregate   'per-die' | 'sum' — how a roll's dice become outcomes
 //   usesTotal   gates the SUM and everything derived from it — the big
 //               number, the margin delta, the ring's ratio, and the

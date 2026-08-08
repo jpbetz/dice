@@ -127,6 +127,13 @@ note).
   modal locks the shared surface; concurrent rolls are safe.
 - **Attributed math.** Bonuses carry named sources; discarded dice stay
   visible (struck); the arithmetic of a result is always inspectable.
+  *(It governs math that **happens**. An interpretation system that reads each
+  die computes no sum, so there is no term to attribute and the flat bonus
+  renders nowhere in the app's voice — while **which dice counted** is a fact
+  under every system and stays attributed, which is the half that was being
+  broken. The player's declaration is untouched either way: the canonical
+  notation still carries the `+5` and the `dc`, so notation totality is
+  unaffected. UX.md §7.24.)*
 - **Presence is asserted, never inferred.** A seat on the roster means a
   client said it was there — a beacon on the way out, an answered heartbeat
   while it stays. Socket-level signals (a `close` event, a write that
