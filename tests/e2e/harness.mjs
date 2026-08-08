@@ -393,6 +393,20 @@ export class Ctx {
       // Deterministic clocks: wall-time features (auto-collect) stay OFF in
       // scenarios unless one opts in via the setAutoCollectMs debug hook.
       await page.addInitScript('window.__diceTestMode = true;');
+      // VIEW PREFERENCES BOOT AT THEIR DEFAULTS, always. These keys are
+      // per-origin and outlive a scenario's room, and unlike a stale name
+      // they can make whole regions of the panel `display: none` — a leaked
+      // `{pools: false}` hides the rack for every later scenario on this
+      // origin, which is two dozen assertions failing three scenarios away
+      // from the one that caused it. A scenario that wants a non-default
+      // view sets it explicitly through its own hook.
+      await page.addInitScript(
+        // NOT dice.inputmode.v1: it is the legacy key the section migration
+        // reads, it can only ever produce one of two both-safe states, and
+        // section-bar's migration pin needs to be able to seed it.
+        `try { localStorage.removeItem('dice.sections.v1');`
+        + ` localStorage.removeItem('dice.railmode.v1'); } catch {}`,
+      );
       if (name) {
         await page.addInitScript(
           `try { localStorage.setItem('dice.name.v1', ${JSON.stringify(name)}); } catch {}`,

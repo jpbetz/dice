@@ -1889,23 +1889,34 @@ export const scenarios = [
       assert.equal(await a.eval(`document.getElementById('tray-mods').disabled`), true,
         '± Modify grayed with the draft gone');
 
-      // Dice | Notation: one draft, two views. Default is the visual
-      // builder (box hidden); the toggle swaps views without touching the
-      // draft; loading a pool into the box flips to Notation (text intent).
+      // Dice · Notation · Pools: three INDEPENDENT sources over one draft.
+      // Rewritten 2026-08-07 (§7.23) — the old contract here was exclusivity
+      // ("Notation view: the palette hides"), which is exactly what this
+      // supersedes. CO-VISIBILITY is the contract now, and §1.3 is what
+      // makes it safe: both editors are projections of one spec object, so
+      // there is nothing to reconcile when both are on screen at once.
       const vis = (sel) => a.eval(`(() => { const el = document.querySelector(${JSON.stringify(sel)});
         return !!el && el.offsetParent !== null; })()`);
-      assert.equal(await vis('#cmd-input'), false, 'default view: the box is hidden');
-      assert.equal(await vis('#die-buttons'), true, 'default view: the palette shows');
+      assert.equal(await vis('#cmd-input'), false, 'default: the box is off');
+      assert.equal(await vis('#die-buttons'), true, 'default: the palette shows');
       await a.eval(`document.querySelectorAll('#die-buttons .die-btn')[1].click()`);
-      await a.eval(`document.querySelector('#input-mode [data-v="text"]').click()`);
-      assert.equal(await vis('#cmd-input'), true, 'Notation view: the box shows');
-      assert.equal(await vis('#die-buttons'), false, 'Notation view: the palette hides');
+      await a.eval(`document.querySelector('#section-bar [data-sec="notation"]').click()`);
+      assert.equal(await vis('#cmd-input'), true, 'Notation on: the box shows');
+      assert.equal(await vis('#die-buttons'), true,
+        'and the palette STAYS — turning one source on never turns another off');
       assert.equal(await vis('#tray-roll'), true,
-        'the draft cluster stays ALIVE in Notation view — typed dice materialize');
+        'the draft cluster stays ALIVE — typed dice materialize');
       assert.ok((await a.eval(`document.getElementById('cmd-input').value`)).includes('1d6'),
-        'the draft crossed the view switch intact');
-      await a.eval(`document.querySelector('#input-mode [data-v="dice"]').click()`);
-      assert.deepEqual((await a.dbg('trayState')).dice, ['d6'], 'and back again');
+        'the draft crossed the toggle intact');
+      // Both editors live, describing the same draft: type in one, read the
+      // other. This is the pin the exclusivity made impossible to write.
+      await a.eval(`document.querySelector('#section-bar [data-sec="dice"]').click()`);
+      assert.equal(await vis('#die-buttons'), false, 'Dice off: the palette hides');
+      assert.equal(await vis('#cmd-input'), true, 'and the box is untouched by it');
+      assert.deepEqual((await a.dbg('trayState')).dice, ['d6'], 'draft intact through both');
+      await a.dbg(`setSections({dice: true, notation: false})`);
+      assert.equal(await vis('#die-buttons'), true, 'and back to the default pair');
+      assert.equal(await vis('#cmd-input'), false, 'box off again');
       await a.eval(`document.getElementById('clear-tray').click()`);
     },
   },
@@ -3050,22 +3061,75 @@ export const scenarios = [
       assert.equal((await a.dbg('trayState')).railStanding, true,
         'the rail STANDS — visible with no hover (P6: management stands)');
 
-      // (vi) The air pins: the zone's own padding owns the region gap in
-      // BOTH views, so a future pass cannot silently re-tighten it.
-      const airDice = await a.eval(`(() => {
-        const t = document.getElementById('tray-actions').getBoundingClientRect();
+      // (vi) The air pin, re-pointed 2026-08-07 when the sources moved BELOW
+      // the well. The 16px region gap is now the zone's BOTTOM padding —
+      // which lives inside its border box, where no `top - bottom` read can
+      // see it. So measure the padding itself, and separately prove the
+      // first section really rides that padding instead of quietly growing
+      // a margin of its own. (The old pins measured palette→well and
+      // box→well air; both gaps are gone, and a naive re-point to
+      // `section.top - zone.bottom` would have passed at 0 forever.)
+      const air = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const z = document.getElementById('draft-zone');
+        const bar = document.getElementById('section-bar');
+        return {
+          padBottom: parseFloat(getComputedStyle(z).paddingBottom),
+          padTop: parseFloat(getComputedStyle(z).paddingTop),
+          bodyPadTop: parseFloat(getComputedStyle(z.parentElement).paddingTop),
+          gapToFirstSection: Math.round(bar.getBoundingClientRect().top - z.getBoundingClientRect().bottom),
+        };
+      })())`));
+      assert.ok(air.padBottom >= 16,
+        `the region gap is the zone's own bottom padding (got ${air.padBottom}px)`);
+      assert.equal(air.gapToFirstSection, 0,
+        'and the first section rides it — no margin of its own');
+      assert.equal(air.padTop + air.bodyPadTop, 16,
+        `the zone's top inset still reads 16px with the body's own (got ${air.padTop} + ${air.bodyPadTop})`);
+      // …and NONE of that inset may sit above the sticky well, or scrolled
+      // content shows through the slot. The first build of the reorder left
+      // the body's 4px there and die art slid through it.
+      assert.equal(air.bodyPadTop, 0,
+        `no padding above a sticky child — it becomes a leak band (got ${air.bodyPadTop}px)`);
+
+      // (vi-b) THE STICKY PIN, which nothing pinned before the reorder: the
+      // shelf heads must land exactly at the zone's lower edge mid-scroll.
+      // While the zone sat third in the column this was only true after
+      // ~175px of scroll — below that the heads pinned into the gap above
+      // it, and no assertion could tell. Zone-first makes --draft-h exact
+      // at every offset, and this is what proves it stays that way.
+      // A rack deep enough to scroll, with a real shelf to pin. (This
+      // scenario seeds none of its own — the workbench pins above need no
+      // pools — so the sticky contract has to bring its own rack.)
+      await a.dbg(`setGroups(${JSON.stringify(
+        ['Strength', 'Toughness', 'Agility', 'Wit', 'Wisdom', 'Intelligence', 'Charm', 'Will', 'Empathy']
+          .map((n) => ({ name: n, notation: '2d8', category: 'attributes' }))
+          .concat([{ name: 'Swordplay', notation: '1d10', category: 'skills' },
+                   { name: 'Zeal', notation: '1d4', category: 'motivations' }]))})`);
+      const stuck = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const body = document.querySelector('#builder-panel > .panel-body');
+        body.scrollTop = 300;
+        const z = document.getElementById('draft-zone').getBoundingClientRect();
+        const h = document.querySelector('#groups-list .pool-sec-head');
         const pal = document.getElementById('die-buttons').getBoundingClientRect();
-        return Math.round(t.top - pal.bottom);
-      })()`);
-      assert.ok(airDice >= 14, `Dice view: palette → well air >= 14px (got ${airDice})`);
-      await a.eval(`document.querySelector('#input-mode [data-v="text"]').click()`);
-      const airText = await a.eval(`(() => {
-        const t = document.getElementById('tray-actions').getBoundingClientRect();
-        const c = document.getElementById('cmd').getBoundingClientRect();
-        return Math.round(t.top - c.bottom);
-      })()`);
-      assert.ok(airText >= 14, `Notation view: box → well air >= 14px (got ${airText})`);
-      await a.eval(`document.querySelector('#input-mode [data-v="dice"]').click()`);
+        const b = body.getBoundingClientRect();
+        return { scrolled: body.scrollTop, head: h ? Math.round(h.getBoundingClientRect().top) : null,
+                 zoneBottom: Math.round(z.bottom), zoneTop: Math.round(z.top),
+                 bodyTop: Math.round(b.top),
+                 // Does any palette pixel land in the band ABOVE the stuck
+                 // well? The OVERLAP of the palette with [b.top, z.top].
+                 // A plain "pal.top < z.top && pal.bottom > b.top" stays
+                 // true once the band closes, because the zone then simply
+                 // covers the palette instead of leaking it.
+                 leaks: Math.max(pal.top, b.top) < Math.min(pal.bottom, z.top) };
+      })())`));
+      assert.ok(stuck.scrolled > 0, `the panel body scrolls (got ${stuck.scrolled})`);
+      assert.ok(stuck.head !== null, 'and a shelf head is on screen to pin');
+      assert.ok(Math.abs(stuck.head - stuck.zoneBottom) <= 1,
+        `the shelf head pins at the well's lower edge (head ${stuck.head}, zone bottom ${stuck.zoneBottom})`);
+      assert.equal(stuck.zoneTop, stuck.bodyTop,
+        `the well stands flush with the scrollport (zone ${stuck.zoneTop}, body ${stuck.bodyTop})`);
+      assert.equal(stuck.leaks, false, 'and nothing scrolls through above it');
+      await a.eval(`document.querySelector('#builder-panel > .panel-body').scrollTop = 0`);
 
       // (v) The anchor pin: the well dress must not zero the ± popover's
       // anchor rect. Expected top mirrors placePopover's clamp exactly.
@@ -3189,6 +3253,114 @@ export const scenarios = [
       await a.eval(`document.getElementById('clear-tray').click()`);
     },
   },
+
+  {
+    name: 'section-bar',
+    tags: ['smoke', 'chrome', 'groups'],
+    // §7.23 — three INDEPENDENT sources over one workbench. What this pins
+    // that the old two-state toggle could not: co-visibility, the all-off
+    // floor, and the migration receipt that proves P1 survived (every
+    // existing user's panel shows exactly what it showed yesterday).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.4', name: 'Sec' });
+      const stored = `JSON.parse(localStorage.getItem('dice.sections.v1') || 'null')`;
+      try {
+        // The second pool carries a modifier on purpose: 'Open in draft' —
+        // the shipped loadIntoBox door — only exists on the ± popover of a
+        // pool that is NOT pure dice (a pure one gets the rank ladder and
+        // returns early).
+        await a.dbg(`setGroups([{name: 'Wisdom', notation: '2d8', category: 'attributes'},`
+          + ` {name: 'Blessed', notation: '2d8+2', category: 'attributes'}])`);
+
+        // (i) A fresh seat boots at today's panel: palette + rack, no box.
+        // `shown` is computed display, never the stored booleans — the
+        // assertion has to see what the eye sees.
+        assert.deepEqual((await a.dbg('sections')).shown,
+          { dice: true, notation: false, pools: true }, 'default: palette + rack, box off');
+        assert.equal(await a.eval(stored), null, 'and nothing is written until you choose');
+
+        // (ii) MIGRATION, both directions, pixel-identical to the old views.
+        // This is the receipt for the §7.9 supersession: louder is a choice,
+        // never a default.
+        for (const [legacy, want] of [
+          ['text', { dice: false, notation: true, pools: true }],
+          ['dice', { dice: true, notation: false, pools: true }],
+        ]) {
+          const b = await ctx.newTable({ origin: '127.0.0.5', name: 'Mig' });
+          try {
+            await b.eval(`localStorage.setItem('dice.inputmode.v1', ${JSON.stringify(JSON.stringify(legacy))})`);
+            await b.eval(`localStorage.removeItem('dice.sections.v1')`);
+            await b.reload();
+            assert.deepEqual((await b.dbg('sections')).shown, want,
+              `a '${legacy}' user's panel is unchanged by the migration`);
+            assert.equal(await b.eval(`localStorage.getItem('dice.inputmode.v1')`),
+              JSON.stringify(legacy), 'and the legacy key is read, never rewritten');
+          } finally { await b.close(); }
+        }
+
+        // (iii) All eight states are legal and each round-trips through
+        // storage. ALL-OFF included: the workbench above is a complete
+        // surface by itself, so there is no last-section-standing rule.
+        for (const d of [true, false]) for (const n of [true, false]) for (const p of [true, false]) {
+          await a.dbg(`setSections({dice: ${d}, notation: ${n}, pools: ${p}})`);
+          const s = await a.dbg('sections');
+          assert.deepEqual(s.shown, { dice: d, notation: n, pools: p },
+            `state {${d},${n},${p}} shows exactly what it says`);
+          assert.deepEqual(s.pressed, { dice: d, notation: n, pools: p },
+            `and the bar reports it (${d},${n},${p})`);
+          assert.deepEqual(await a.eval(stored), { dice: d, notation: n, pools: p },
+            `and it survives a reload (${d},${n},${p})`);
+        }
+
+        // (iv) The all-off floor still ROLLS. The bar is the last thing on
+        // screen under the well, and the well is a full §7.4 surface.
+        await a.dbg(`setSections({dice: false, notation: false, pools: false})`);
+        assert.equal(await a.eval(
+          `getComputedStyle(document.getElementById('draft-zone')).display !== 'none'`),
+        true, 'all-off: the workbench stands');
+        assert.equal(await a.eval(
+          `getComputedStyle(document.getElementById('section-bar')).display !== 'none'`),
+        true, 'and so does the bar that brings the sections back');
+
+        // (v) THE LAUNDERING PIN. Loading a pool into the box surfaces
+        // Notation for that visit only. Clicking any OTHER cell afterwards
+        // must not write that loan into storage — one merged object would
+        // have, and the panel would boot with a box the user never chose.
+        await a.dbg(`setSections({dice: true, notation: false, pools: true})`);
+        // 'Open in draft' on a pool's ± popover is the shipped loadIntoBox door.
+        const gid = (await a.dbg('groups')).find((g) => g.name === 'Blessed').id;
+        await a.dbg(`poolPopoverOpen(${gid})`);
+        await a.eval(`[...document.querySelectorAll('.pid-ghost-verb')]
+          .find((b) => b.textContent === 'Open in draft').click()`);
+        await a.waitFor(`window.__diceDebug.sections.shown.notation === true`,
+          { desc: 'a text intent surfaces the box' });
+        assert.equal((await a.eval(stored)).notation, false,
+          'the loan is not written when it is taken');
+        await a.eval(`document.querySelector('#section-bar [data-sec="dice"]').click()`);
+        assert.equal((await a.eval(stored)).notation, false,
+          'and clicking another cell does not launder it into storage');
+
+        // (vi) Turning the box off while it holds garbage regenerates the
+        // projection — a hidden invalid string may never gray the rim's
+        // tools with no reason on screen.
+        await a.dbg(`setSections({dice: true, notation: true, pools: true})`);
+        await a.eval(`(() => { const i = document.getElementById('cmd-input');
+          i.value = 'not a roll at all'; i.dispatchEvent(new Event('input')); })()`);
+        await a.waitFor(`document.getElementById('cmd').classList.contains('is-invalid')`,
+          { desc: 'the box is invalid' });
+        await a.eval(`document.querySelector('#section-bar [data-sec="notation"]').click()`);
+        assert.equal(await a.eval(`document.getElementById('cmd').classList.contains('is-invalid')`),
+          false, 'turning Notation off canonicalizes rather than archiving garbage');
+
+        // (vii) No button inside a button anywhere in the new bar.
+        assert.equal(await a.eval(`document.querySelectorAll('#section-bar button button').length`),
+          0, 'the bar nests no buttons');
+      } finally {
+        await a.eval(`localStorage.removeItem('dice.sections.v1')`).catch(() => {});
+      }
+    },
+  },
+
   {
     name: 'terminology',
     tags: ['smoke', 'chrome'],

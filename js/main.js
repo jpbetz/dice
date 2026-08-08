@@ -4811,6 +4811,25 @@ window.__diceDebug = {
   // setPanelState applies a partial {region: bool} patch and returns the
   // resulting state. JSON-safe.
   get panelState() { return panelDebugState(); },
+  // The section bar (§7.23). `shown` is COMPUTED DISPLAY, never the stored
+  // booleans and never `.hidden` — asserting the intent instead of the
+  // pixel is exactly how a fold once shipped two live verbs on every card
+  // while the suite stayed green. `stored` is what a reload would restore,
+  // which is the only way to catch a transient surfacing being laundered
+  // into storage.
+  get sections() {
+    const vis = (id) => getComputedStyle(document.getElementById(id)).display !== 'none';
+    return {
+      shown: { dice: vis('die-buttons'), notation: vis('cmd'), pools: vis('groups-list') },
+      stored: { ...sectionsStored },
+      pressed: Object.fromEntries([...sectionBarEl.querySelectorAll('button')]
+        .map((b) => [b.dataset.sec, b.getAttribute('aria-pressed') === 'true'])),
+    };
+  },
+  setSections(patch) {
+    for (const k of SECTION_KEYS) if (k in patch) setSection(k, !!patch[k], true);
+    return { ...sectionsStored };
+  },
   // roll-log flyout (the rail's ≣): open state + unread badge count, and
   // the direct driver for headless tests (clicks/keys stay the real paths).
   get logFlyout() { return { open: isLogFlyoutOpen(), badge: logUnread }; },
@@ -5624,41 +5643,84 @@ trayEl.addEventListener('contextmenu', (e) => {
   trayModsBtn.click();
 });
 
-// ---- input mode: Dice | Notation --------------------------------------------
-// One draft, two editors (§1.5) — the toggle only picks which EDITOR is on
-// screen; box⇄tray sync keeps the other honest in the background, so a
-// switch never resets or re-parses anything. Per-user, like panel state.
-const LS_INPUTMODE = 'dice.inputmode.v1';
+// ---- the section bar: Dice · Notation · Pools (§7.23) -----------------------
+// Three independent switches over the three SOURCES that feed the workbench.
+// The old two-value view picker is superseded: §1.3 already makes the box and
+// the cluster projections of one spec object (`parse(render(spec)) ≡ spec`),
+// so showing both was never a correctness problem — the exclusivity bought
+// density, and density is a preference. Per-user, like panel state.
+const LS_SECTIONS = 'dice.sections.v1';
+const LS_INPUTMODE = 'dice.inputmode.v1'; // legacy; read once at boot, never written again
+const SECTION_KEYS = ['dice', 'notation', 'pools'];
 const builderPanelEl = document.getElementById('builder-panel');
-const inputModeSeg = document.getElementById('input-mode');
-let inputMode = load(LS_INPUTMODE, 'dice');
-if (inputMode !== 'dice' && inputMode !== 'text') inputMode = 'dice';
-function applyInputMode(persist = true) {
-  builderPanelEl.classList.toggle('mode-dice', inputMode === 'dice');
-  builderPanelEl.classList.toggle('mode-text', inputMode === 'text');
-  for (const b of inputModeSeg.querySelectorAll('button')) {
-    b.setAttribute('aria-pressed', String(b.dataset.v === inputMode));
+const sectionBarEl = document.getElementById('section-bar');
+
+// TWO objects, deliberately. `sectionsStored` is the persisted truth and only
+// an explicit cell click ever mutates it; `sectionsShown` carries a TRANSIENT
+// surfacing (loading a pool into the box turns Notation on for that visit).
+// One merged object would have quietly written the transient bit the next
+// time any OTHER cell was clicked — the audit already caught that exact bug
+// once on the old single variable (see loadIntoBox), and the state shape is
+// what has to prevent it, not care at each call site.
+let sectionsStored = (() => {
+  const st = load(LS_SECTIONS, null);
+  if (st && typeof st === 'object') {
+    // Asymmetric per-key defaults, matching the shipped ones, so a partial or
+    // hand-edited object degrades to today's panel rather than an empty one.
+    return { dice: st.dice !== false, notation: st.notation === true, pools: st.pools !== false };
   }
-  // The well's ghost survives BOTH views (adversarial catch: hiding it in
-  // Notation view left a sunken box of literally nothing). No per-view
-  // caption anymore — the ghost ROLL ❯❯❯ is view-agnostic (Joe: nothing
-  // to wear out on a second read).
-  if (persist) save(LS_INPUTMODE, inputMode);
+  // MIGRATION, pixel-identical in both directions: every existing user's panel
+  // shows exactly what it showed yesterday, which is the receipt that P1
+  // survives this supersession. Louder is now a choice, never a default.
+  return load(LS_INPUTMODE, 'dice') === 'text'
+    ? { dice: false, notation: true, pools: true }
+    : { dice: true, notation: false, pools: true };
+})();
+let sectionsTransient = { dice: false, notation: false, pools: false };
+const sectionOn = (k) => !!(sectionsStored[k] || sectionsTransient[k]);
+
+function applySections(persist = true) {
+  for (const k of SECTION_KEYS) {
+    // OFF-classes, never on-classes: the bare cascade shows everything, so a
+    // JS failure degrades to a full panel instead of an empty one.
+    builderPanelEl.classList.toggle(`sec-off-${k}`, !sectionOn(k));
+  }
+  for (const b of sectionBarEl.querySelectorAll('button')) {
+    b.setAttribute('aria-pressed', String(sectionOn(b.dataset.sec)));
+  }
+  if (persist) save(LS_SECTIONS, sectionsStored);
 }
-function setInputMode(mode, persist = true) {
-  if (mode !== 'dice' && mode !== 'text') return;
-  const was = inputMode;
-  inputMode = mode;
-  applyInputMode(persist);
-  if (was === mode) return;
-  if (mode === 'dice') renderTray(); // ✕ overlays re-anchor (they had no layout while hidden)
-  else cmdInput.focus();
+
+// persist=false is the TRANSIENT door and only ever turns a section ON.
+function setSection(key, on, persist = true) {
+  if (!SECTION_KEYS.includes(key)) return;
+  const was = sectionOn(key);
+  if (persist) {
+    sectionsStored[key] = !!on;
+    sectionsTransient[key] = false; // an explicit choice ends the loan
+  } else if (on) {
+    sectionsTransient[key] = true;
+  }
+  // Turning the box off while it holds an unparseable string would leave the
+  // draft's tools graying for a reason nobody can see. The box is the model
+  // even when hidden, so regenerate the projection rather than archive a
+  // broken one.
+  if (key === 'notation' && was && !sectionOn(key) && cmdEl.classList.contains('is-invalid')) {
+    syncBoxFromTray();
+  }
+  // Manage mode is rack chrome; it cannot outlive the rack going off screen
+  // (the same call the collapse path makes).
+  if (key === 'pools' && was && !sectionOn(key)) setPoolsEdit(false);
+  applySections(persist);
+  if (!was && sectionOn(key) && key === 'notation') cmdInput.focus();
 }
-inputModeSeg.addEventListener('click', (e) => {
+
+sectionBarEl.addEventListener('click', (e) => {
   const btn = e.target.closest('button');
-  if (btn) setInputMode(btn.dataset.v);
+  if (!btn || btn.disabled) return;
+  setSection(btn.dataset.sec, !sectionOn(btn.dataset.sec), true);
 });
-applyInputMode(false);
+applySections(false);
 // The ad-hoc tray's ± (§7.4): the SAME popover, bound to the tray draft.
 trayModsBtn.addEventListener('click', () => {
   if (pop && pop.source === 'tray') {
@@ -6129,7 +6191,10 @@ function loadIntoBox(notation, name) {
   // A text INTENT shows the box for THIS visit only (persist=false): a
   // use-tier action never rewrites the per-user view default — the audit
   // caught the old persisting flip changing how the panel boots forever.
-  setInputMode('text', false);
+  // ADDITIVE now, not a swap: it surfaces Notation and leaves Dice and Pools
+  // exactly as the user left them. The transient bit lives in its own object
+  // so the next click on ANY other cell cannot launder it into storage.
+  setSection('notation', true, false);
   cmdInput.focus();
 }
 

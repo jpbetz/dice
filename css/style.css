@@ -213,7 +213,18 @@ html, body {
 }
 /* EVERY panel body scrolls inside its share of the column: 'the smaller
    the window, the more of it is table' binds small windows too. */
-#builder-panel > .panel-body { overflow-y: auto; overflow-x: hidden; } /* the column never scrolls sideways */
+#builder-panel > .panel-body {
+  overflow-y: auto;
+  overflow-x: hidden; /* the column never scrolls sideways */
+  /* NO top padding, since the workbench leads the column (2026-08-07). A
+     sticky child sticks at the SCROLLPORT's top, so any padding above it is
+     a band the scrolled content shows through — measured at 4px, with die
+     art from the palette visibly sliding through the slot between the
+     identity rail and the well. The zone takes those 4px into its own
+     padding instead, so the optical inset is unchanged and the mask is
+     complete. */
+  padding-top: 0;
+}
 /* collapsed rail: the workbench + rack leave entirely (the rail-pools
    quick list stands in); expanded, the quick list is absent */
 #left-panel.collapsed #builder-panel { display: none; }
@@ -318,6 +329,20 @@ html, body {
   grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
+/* SECTION AIR, owned by each section's own box (2026-08-07, the reorder).
+   A section's trailing gap has to out-rank the shelf gaps INSIDE the rack
+   (12px) or the region head stops reading as a rank above them — measured
+   at 14px against the shelves' 12px right after the move, which is to say
+   the palette's 4-column die grid ran straight into the rack's 3-column
+   die grid with nothing between them but a word. That is exactly the
+   confusion §7.17 shipped SAVED POOLS to kill, and the border-bottom the
+   zone used to interpose is now three sections away.
+   Trailing, not leading: a hidden section takes its air with it for free,
+   so Pools-alone still meets the zone's own 16px and no rule has to know
+   which sections are on. The region head's own leading margin goes with
+   it: .panel-body is a flex column, where adjacent margins do NOT
+   collapse, so leaving both would have stacked to 36px. */
+#die-buttons, #cmd { margin-bottom: 20px; }
 .die-btn {
   position: relative;
   padding: 8px 2px;
@@ -375,19 +400,23 @@ html, body {
 
 /* (the tray chip-row died with the draft cluster: composed dice are die-art
    inside ONE roll button now — see .tray-cluster) */
-/* ---------- input-mode toggle (Dice | Notation — one draft, two views) --- */
-.input-seg { margin-bottom: 10px; }
-.input-seg button { font-size: 12px; padding: 6px 4px; }
-#builder-panel.mode-dice #cmd { display: none; }
-/* Notation view hides only the PALETTE: the draft cluster stays alive under
-   the box, so typed notation visibly materializes as dice — one draft, two
-   editors, and P1 never leaves the panel. (The ghost hint yields to the
-   box's own placeholder.) */
-/* Notation view hides only the PALETTE. The ghost hint SURVIVES with
-   view-appropriate wording (applyInputMode swaps it): without it the
-   empty well is a bordered box of literally nothing under the command
-   box — the adversarial pass measured a 60px sunken void (2026-08-03). */
-#builder-panel.mode-text #die-buttons { display: none; }
+/* ---------- the section bar (Dice · Notation · Pools, §7.23) ---------- */
+.section-seg { margin-bottom: 20px; }
+.section-seg button { font-size: 12px; padding: 6px 4px; }
+/* OFF-classes, never on-classes: the bare cascade shows the whole panel, so
+   a JS failure degrades to everything visible rather than nothing. The WELL
+   is never one of these — it is the workbench, not a section, and it is what
+   makes independent toggling safe: the parts that move all sit below the one
+   part that never does. */
+#builder-panel.sec-off-dice #die-buttons { display: none; }
+#builder-panel.sec-off-notation #cmd { display: none; }
+/* The whole Pools region travels together — its head, its rack and its
+   manage bar are one section, and leaving any of them behind would strand
+   chrome over nothing. #cmd is HIDDEN, never removed: paintCmd keeps syncing
+   into it, so §1.3's projection stays true while the box is off screen. */
+#builder-panel.sec-off-pools :is(#profile-banner, #pools-head, #groups-list, #pools-toolbar) {
+  display: none;
+}
 
 /* ---------- the draft cluster (P1: the dice are the buttons) ---------- */
 /* One roll button of die art; per-die ✕ removers overlay it from a SIBLING
@@ -926,7 +955,12 @@ html, body {
 /* ---------- the Rack: category shelves of pool tiles ---------- */
 /* Tiles are SOURCES (they stage; no gold, no ROLL cue — those live on the
    draft alone). The draft zone is STICKY so the one roll button never
-   scrolls away mid-compose; shelf headers pin just beneath it. */
+   scrolls away mid-compose; shelf headers pin just beneath it.
+   Since 2026-08-07 the zone is also the FIRST child of the body, which
+   makes the sticky exact instead of approximate: the heads pin at
+   --draft-h, and until the zone led the column that offset only matched
+   where the zone actually sat after ~175px of scroll — below that the
+   heads pinned into the gap above it. */
 .draft-zone {
   position: sticky;
   top: 0;
@@ -937,11 +971,15 @@ html, body {
      under it — while the warm well + ± bar do the visual grouping. */
   background: #191b1e;
   margin: 0 -14px;
-  /* 16px top vs the palette's internal 6px grid gap is the region-vs-item
-     grouping signal (§7.14 — the zone was "a really tight little box");
-     the air is the zone's own opaque padding, so scrolled palette rows
-     slide cleanly under it. */
-  padding: 16px 14px 10px;
+  /* The 16px region-vs-item signal (§7.14 — the zone was "a really tight
+     little box") SWAPPED SIDES with the adjacency, 2026-08-07: the sources
+     sit below the well now, so the region gap belongs under it. The
+     mechanism is untouched — the air is still the zone's own opaque
+     padding, so scrolled sections slide cleanly under it and the gap
+     survives the scroll. Above, the full 16px is the zone's own now: the
+     body gives up its top padding so nothing can show through above a
+     stuck well. */
+  padding: 16px 14px 16px;
   border-bottom: 1px solid var(--hair);
 }
 /* THE REGION HEAD (anatomy pass 2026-08-04): SAVED POOLS names the one
@@ -957,7 +995,10 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 14px 0 -4px;
+  /* No leading margin of its own since the reorder: the section above owns
+     the gap (see #die-buttons/#cmd), and in a flex column the two would
+     have added rather than collapsed. */
+  margin: 0 0 -4px;
 }
 #pools-head.hidden { display: none; }
 #pools-head .ph-word {

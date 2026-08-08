@@ -63,10 +63,10 @@ export default async function run(stage) {
   });
   await step('05-notation-view.png', async () => {
     await a.eval(`document.getElementById('save-cancel').click()`);
-    await a.eval(`document.querySelector('#input-mode [data-v="text"]').click()`);
+    await a.eval(`document.querySelector('#section-bar [data-sec="notation"]').click()`);
   });
   await step('06-pool-hover.png', async () => {
-    await a.eval(`document.querySelector('#input-mode [data-v="dice"]').click()`);
+    await a.eval(`document.querySelector('#section-bar [data-sec="notation"]').click()`);
     await a.eval(`document.getElementById('clear-tray').click()`);
     await hover('#groups-list .pool-roll');
   });

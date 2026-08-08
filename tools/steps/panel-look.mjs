@@ -75,6 +75,34 @@ try {
   await t.eval(`document.querySelectorAll('#die-buttons .die-btn')[1].click()`);
   await t.eval(`document.querySelectorAll('#die-buttons .die-btn')[5].click()`);
   console.log(await crop('panel-draft.png'));
+  await t.eval(`document.getElementById('clear-tray').click()`);
+
+  // The section bar's own states (§7.23). All-on is the tall opt-in column;
+  // all-off is the floor the design claims is still a complete surface —
+  // both are worth a look, because "a serene bronze box over three quiet
+  // words" is a sentence, and a sentence is not a screenshot.
+  for (const [name, s] of [
+    ['panel-all-on.png', { dice: true, notation: true, pools: true }],
+    ['panel-notation-only.png', { dice: false, notation: true, pools: false }],
+    ['panel-all-off.png', { dice: false, notation: false, pools: false }],
+  ]) {
+    await t.dbg(`setSections(${JSON.stringify(s)})`);
+    console.log(await crop(name));
+  }
+  await t.dbg(`setSections({dice: true, notation: false, pools: true})`);
+
+  // SCROLLED, which is the whole point of the reorder: the sections have to
+  // slide cleanly under the well's opaque band and the shelf heads have to
+  // pin at its lower edge. No still-life of the resting state can show it —
+  // and a TALL window shows nothing either, because there is nothing to
+  // scroll. The first version of this frame was taken at 1100px and was a
+  // duplicate of the resting shot; a short window is the whole assignment.
+  await t.page.browser.send('Emulation.setDeviceMetricsOverride',
+    { width: 1200, height: 640, deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
+  await t.dbg(`setSections({dice: true, notation: true, pools: true})`);
+  console.log(await crop('panel-short.png'));
+  await t.eval(`document.querySelector('#builder-panel > .panel-body').scrollTop = 300`);
+  console.log(await crop('panel-scrolled.png'));
 } finally {
   await stage.close();
 }

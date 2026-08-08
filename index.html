@@ -111,49 +111,6 @@ limitations under the License.
            and the panel is a tool, not a title card (the app name lives in
            the tab title and the invite link). -->
 
-      <!-- ONE draft, two editors (§1.5): the visual builder and the notation
-           box always describe the same pool, so showing both stacked was
-           redundant chrome. This toggle picks the VIEW (per-user,
-           dice.inputmode.v1); the draft state is shared and never resets on
-           a switch. Loading a pool into the box flips to Notation — that is
-           a text intent. -->
-      <div id="input-mode" class="seg input-seg">
-        <button data-v="dice" aria-pressed="true" title="Build by tapping dice">Dice</button>
-        <button data-v="text" aria-pressed="false" title="Type Roll20-style notation">Notation</button>
-      </div>
-
-      <!-- Command box (UX §1.3): three-state validation, Enter rolls, ↑/↓ history -->
-      <div id="cmd" class="cmd">
-        <div class="cmd-wrap">
-          <input id="cmd-input" class="cmd-in" type="text" spellcheck="false" autocomplete="off"
-                 autocapitalize="off" placeholder="2d6+3, 4d6dl1, 1d20 adv dc15 …" maxlength="500">
-          <button id="cmd-help" class="cmd-help" title="Notation cheatsheet">?</button>
-        </div>
-        <div id="cmd-slot" class="cmd-slot"></div>
-        <div id="cmd-cheatsheet" class="cheatsheet hidden">
-          <table>
-            <tr><td><code>NdX</code></td><td>roll N dice — d4 d6 d8 d10 d12 d20, d100/d% (d10x+d10)</td></tr>
-            <tr><td><code>+N</code> / <code>−N</code></td><td>flat bonus or penalty (±99)</td></tr>
-            <tr><td><code>+2[Proficiency]</code></td><td>attributed bonus — labels show in the breakdown</td></tr>
-            <tr><td><code>khN klN dhN dlN</code></td><td>keep/drop N — <code>4d6dl1</code>; bare k→kh, d→dl</td></tr>
-            <tr><td><code>ro&lt;=N</code></td><td>reroll ≤N, once per die (<code>r&lt;N</code> accepted)</td></tr>
-            <tr><td><code>!</code></td><td>explode on the max face, chains 3 deep</td></tr>
-            <tr><td><code>adv</code> / <code>dis</code></td><td>pair every d20; <code>2d20kh1</code> reads as adv</td></tr>
-            <tr><td><code>dcN</code> / <code>vs N</code></td><td>target number — result shows Success/Failure</td></tr>
-            <tr><td><code>check</code> / <code>cinematic</code></td><td>roll moment — staged declaration + verdict (<code>cine</code> too)</td></tr>
-            <tr><td><code>held</code></td><td>face down for everyone — hidden until the roller reveals</td></tr>
-            <tr><td><code>secret</code></td><td>only you — the table never sees the roll (<code>/selfroll</code>, <code>/gmroll</code>)</td></tr>
-            <tr><td><code>w:Ann,"Bo B"</code></td><td>whisper — the named players see it live; everyone else sees a shrouded roll</td></tr>
-            <tr><td><code>blind</code></td><td>offers only — dice tower: they roll, only you read the result (→ <code>secret</code>)</td></tr>
-            <tr><td><code># text</code></td><td>comment — roll label / mat text (≤64 chars)</td></tr>
-            <tr><td><code># Title | Sub</code></td><td>moment subtitle (≤40) — needs check/cinematic; <code>\|</code> is a literal pipe</td></tr>
-            <tr><td><code>/gmroll /gmr</code></td><td>→ <code>secret</code>, like <code>/selfroll</code> (<code>/roll</code>, <code>/r</code>: plain; <code>/sr</code>: refused as ambiguous)</td></tr>
-            <tr><td colspan="2" class="cheat-note">mixed pools take trailing flags: <code>1d20+2d6 dl1</code></td></tr>
-          </table>
-        </div>
-      </div>
-
-      <div id="die-buttons"></div>
       <!-- The draft cluster (P1: the dice are the buttons): ONE roll button
            holds the composed die art; per-die ✕ removers overlay it as
            absolutely-positioned SIBLINGS (never a button inside a button).
@@ -214,6 +171,58 @@ limitations under the License.
            keeping a draft is pool editing's job — the ✎ ghost tiles mint,
            the popover's Duplicate… copies, the peek's 'Save as pool…'
            keeps a rolled result.) -->
+      </div>
+
+      <!-- THE SECTION BAR (§7.23, Joe 2026-08-07): three INDEPENDENT
+           switches, not a two-way view picker. The old toggle made Dice and
+           Notation exclusive; nothing ever required that — §1.3 makes both
+           editors projections of one spec object, so there is no divergence
+           to reconcile and never was. What the exclusivity actually bought
+           was density (P1), which is a preference, so it becomes one.
+           role="group" with independent aria-pressed: checkbox semantics,
+           zero to three pressed, never a radiogroup. All-off is legal — the
+           workbench above is a complete surface by itself.
+           It sits BELOW the well and ABOVE what it reveals, so the bar and
+           the stack read in the same order and the map never lies. Not
+           sticky: a second pinned band would spend 31px of the column
+           permanently. -->
+      <div id="section-bar" class="seg section-seg" role="group" aria-label="Panel sections">
+        <button data-sec="dice" aria-pressed="true" title="Build by tapping dice">Dice</button>
+        <button data-sec="notation" aria-pressed="false" title="Type Roll20-style notation">Notation</button>
+        <button data-sec="pools" aria-pressed="true" title="Your saved pools">Pools</button>
+      </div>
+
+      <div id="die-buttons"></div>
+
+      <!-- Command box (UX §1.3): three-state validation, Enter rolls, ↑/↓ history -->
+      <div id="cmd" class="cmd">
+        <div class="cmd-wrap">
+          <input id="cmd-input" class="cmd-in" type="text" spellcheck="false" autocomplete="off"
+                 autocapitalize="off" placeholder="2d6+3, 4d6dl1, 1d20 adv dc15 …" maxlength="500">
+          <button id="cmd-help" class="cmd-help" title="Notation cheatsheet">?</button>
+        </div>
+        <div id="cmd-slot" class="cmd-slot"></div>
+        <div id="cmd-cheatsheet" class="cheatsheet hidden">
+          <table>
+            <tr><td><code>NdX</code></td><td>roll N dice — d4 d6 d8 d10 d12 d20, d100/d% (d10x+d10)</td></tr>
+            <tr><td><code>+N</code> / <code>−N</code></td><td>flat bonus or penalty (±99)</td></tr>
+            <tr><td><code>+2[Proficiency]</code></td><td>attributed bonus — labels show in the breakdown</td></tr>
+            <tr><td><code>khN klN dhN dlN</code></td><td>keep/drop N — <code>4d6dl1</code>; bare k→kh, d→dl</td></tr>
+            <tr><td><code>ro&lt;=N</code></td><td>reroll ≤N, once per die (<code>r&lt;N</code> accepted)</td></tr>
+            <tr><td><code>!</code></td><td>explode on the max face, chains 3 deep</td></tr>
+            <tr><td><code>adv</code> / <code>dis</code></td><td>pair every d20; <code>2d20kh1</code> reads as adv</td></tr>
+            <tr><td><code>dcN</code> / <code>vs N</code></td><td>target number — result shows Success/Failure</td></tr>
+            <tr><td><code>check</code> / <code>cinematic</code></td><td>roll moment — staged declaration + verdict (<code>cine</code> too)</td></tr>
+            <tr><td><code>held</code></td><td>face down for everyone — hidden until the roller reveals</td></tr>
+            <tr><td><code>secret</code></td><td>only you — the table never sees the roll (<code>/selfroll</code>, <code>/gmroll</code>)</td></tr>
+            <tr><td><code>w:Ann,"Bo B"</code></td><td>whisper — the named players see it live; everyone else sees a shrouded roll</td></tr>
+            <tr><td><code>blind</code></td><td>offers only — dice tower: they roll, only you read the result (→ <code>secret</code>)</td></tr>
+            <tr><td><code># text</code></td><td>comment — roll label / mat text (≤64 chars)</td></tr>
+            <tr><td><code># Title | Sub</code></td><td>moment subtitle (≤40) — needs check/cinematic; <code>\|</code> is a literal pipe</td></tr>
+            <tr><td><code>/gmroll /gmr</code></td><td>→ <code>secret</code>, like <code>/selfroll</code> (<code>/roll</code>, <code>/r</code>: plain; <code>/sr</code>: refused as ambiguous)</td></tr>
+            <tr><td colspan="2" class="cheat-note">mixed pools take trailing flags: <code>1d20+2d6 dl1</code></td></tr>
+          </table>
+        </div>
       </div>
 
       <!-- THE REGION HEAD (anatomy pass 2026-08-04; teammate consolidation
