@@ -1583,7 +1583,12 @@ html, body {
    SELECTS and the one gold bar ROLLS; the selection is spent by its roll.
    Filled by renderRailPools. */
 #rail-pools {
-  flex: 1 1 auto;
+  /* Hug the pools rather than claim the column: at flex-grow the list held
+     every spare pixel and the roll bar sat marooned at the far bottom with
+     a void above it. Hugging puts the list and its verb together as ONE
+     block under the identity chip, and the utility stack keeps the foot.
+     Still shrinks and scrolls on a short viewport (flex-shrink 1, min-height 0). */
+  flex: 0 1 auto;
   min-height: 0;
   overflow-y: auto;
   display: flex;
@@ -1595,17 +1600,26 @@ html, body {
   /* the list fades out under the roll bar instead of being cut mid-row */
   mask-image: linear-gradient(#000 calc(100% - 14px), transparent);
 }
-.rp-shelf { display: flex; flex-direction: column; gap: 4px; }
-/* the shelf title Joe missed — spelled, not implied. One shelf gets none:
-   a lone head over the whole rack is chrome announcing itself. */
+.rp-shelf { display: flex; flex-direction: column; gap: 1px; }
+/* The shelf title, and now the column's ONLY standing chrome. When every
+   row wore a border the heads were one more thing shouting; with the rows
+   quiet, the heads are what give the column its rhythm — so they can carry
+   a little weight, and the synthetic 'Pools' catch-all is the only one
+   suppressed (a heading over uncategorized pools names nothing). */
 .rp-shelf-head {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
-  padding: 8px 4px 2px;
+  padding: 14px 4px 4px;
 }
+.rp-shelf:first-child .rp-shelf-head { padding-top: 4px; }
+/* A ROW IS A WORD, NOT A BOX. Nine bordered chiclets in a 112px column read
+   as a keypad: no rhythm, every row the same weight, and the name squeezed
+   by the very chrome that was supposed to present it. At rest a row is its
+   name. The border stays in the box model as `transparent` so selecting
+   cannot shift the text by a pixel — reserve the space, hide the ink. */
 .rp-item {
   position: relative;
   flex: none;
@@ -1613,42 +1627,37 @@ html, body {
   flex-direction: row;
   align-items: center;
   gap: 6px;
-  min-height: 44px; /* a thumb target, not a chip */
-  padding: 6px 6px;
-  border: 1px solid var(--panel-border);
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.05);
+  min-height: 38px; /* tappable, but a dense list — 44 left the words adrift */
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
   color: var(--ivory);
   cursor: pointer;
   text-align: left;
+  transition: background 0.12s, border-color 0.12s;
 }
-.rp-item:hover { background: rgba(255, 255, 255, 0.11); border-color: rgba(255, 255, 255, 0.32); }
+.rp-item:hover { background: rgba(255, 255, 255, 0.07); }
 .rp-item:focus-visible { outline: 1px solid var(--ivory); outline-offset: 1px; }
-/* SELECTED is steel: picking is a tool act. Gold belongs to the roll, and
-   the roll is the bar below — if a picked row went gold, two things on
-   screen would claim the same verb. */
+/* SELECTED is steel — picking is a tool act; gold belongs to the bar that
+   rolls. And because it is now the ONLY box in the column, one signal does
+   what four were doing: the ring, the fill, the inset glow and a ✓ were all
+   competing to out-shout a background of boxes that no longer exists. */
 .rp-item[aria-pressed="true"] {
   border-color: #8c98a6;
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(140, 152, 166, 0.45);
+  background: rgba(140, 152, 166, 0.16);
 }
-/* The tick's gutter STANDS EMPTY rather than appearing with the tick: if
-   the mark took its width on selection, a name that fit would truncate the
-   moment you picked it — the row would get less readable exactly as it
-   became the one you cared about. Constant width, constant text. */
-.rp-item::before {
-  content: '✓';
-  flex: none;
-  width: 8px;
-  font-size: 10px;
-  color: transparent;
-  transition: color 0.12s;
-}
-.rp-item[aria-pressed="true"]::before { color: #b9c3cd; }
+.rp-item[aria-pressed="true"] .rp-name { color: #fff; }
 .rp-item.rp-bad { filter: grayscale(1); opacity: 0.45; cursor: default; } /* 2i-C disabled */
+/* 12.5px, not 11px: in a 44px row an 11px word has so much air around it
+   that the list stopped reading as a list — nine names scattered down a
+   column rather than a group you scan. The row keeps its thumb height; the
+   word grows into it. It also puts the names back above the shelf head in
+   the visual hierarchy, where a 10px bold tracked head was outshouting the
+   content it labels. */
 .rp-name {
-  font-size: 11px;
-  letter-spacing: 0.02em;
+  font-size: 12.5px;
+  letter-spacing: 0.01em;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1677,8 +1686,8 @@ html, body {
 #left-panel:not(.collapsed) #rail-note { display: none; }
 #rail-roll {
   flex: 1 1 auto;
-  display: flex; align-items: center; justify-content: center; gap: 4px;
-  min-height: 40px;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  min-height: 44px; /* the rows' height — the verb is as big as what it acts on */
   border-radius: 7px;
   cursor: pointer;
   border: 1px solid rgba(212, 175, 55, 0.55);
@@ -1689,17 +1698,16 @@ html, body {
   border-color: var(--gold);
   background: linear-gradient(180deg, rgba(255, 215, 102, 0.42), rgba(212, 175, 55, 0.24));
 }
-#rail-roll .cue-word { font-size: 10px; letter-spacing: 0.08em; }
+#rail-roll .cue-word { font-size: 11px; letter-spacing: 0.09em; }
 #rail-roll .rr-count:not(:empty) {
   font-size: 9px; padding: 1px 5px; border-radius: 8px;
   background: rgba(0, 0, 0, 0.28); color: var(--gold-bright);
 }
 #rail-roll:disabled { filter: grayscale(1); opacity: 0.45; cursor: default; }
-#rail-clearsel {
-  padding: 8px 10px; border: 0; background: none;
-  color: var(--muted); font-size: 11px; cursor: pointer;
-}
-#left-panel #rail-clearsel:hover { color: var(--red); }
+/* (#rail-clearsel retired 2026-08-07 before it ever shipped: it spent 29px
+   of an 86px bar on the rarest act here, shrinking the gold verb to a
+   button. Dropping a pick has two ways home already — tap the row again,
+   or Esc.) */
 #rail-note {
   flex: none;
   padding: 0 8px 8px;

@@ -2754,19 +2754,46 @@ collapse → refit cycle — two camera reframes per roll, on the very table
 stillness §7.4 says collapsing exists to protect — and left touch with no
 roll surface at all, since the digit shortcuts are keyboard-only.)
 
-**The surface.** Shelf heads spelled (suppressed when the rack has only one
-shelf — a lone head is chrome announcing itself) · names **horizontal**,
-ellipsized, with the full name on `title` and `aria-label` · rows at a 44px
-thumb height · the digit ordinal in the corner, mirroring `.pool-ord`'s
-rest state exactly · a ✓ gutter that **stands empty** rather than appearing
-on selection, so a name that fits does not truncate the moment you pick it.
+**A ROW IS A WORD, NOT A BOX.** *(Corrected 2026-08-07 after actually
+looking at it — the first build gave every row a border and a fill, and
+nine of those stacked in a 112px column read as a keypad: no rhythm, every
+row the same weight, and the name squeezed by the chrome that was supposed
+to present it.)* At rest a row is its name, 12.5px, horizontal, ellipsized,
+with the full text on `title` and `aria-label`. The border stays in the box
+model as `transparent` so selecting cannot shift the text by a pixel —
+**reserve the space, hide the ink**, the same lesson the ✓ gutter taught
+before it was deleted.
 
-**Selecting is steel, rolling is gold.** A tap toggles `aria-pressed` and
-paints a steel ring. Gold belongs to the one bar below, which is absent at
-rest and STANDS while picks exist (§7.14's contextual-rail grammar), showing
-the pick count and naming every picked pool in its `aria-label`. Over the
-40-die cap it drains to the 2i-C disabled code rather than truncating
-silently.
+**Selection is the only box in the column**, which is what lets ONE signal
+carry it. The first build needed four — ring, fill, inset glow and a ✓ —
+because they were all competing against a background of boxes. Steel, not
+gold: picking is a tool act; gold belongs to the verb.
+
+**Shelf heads are the column's only standing chrome**, and therefore its
+rhythm: 10px bold tracked uppercase, shown for every REAL shelf **including
+when it is the only one** — a rack of nine attributes is exactly the case
+Joe was complaining about, and a rule that counted sections would have shown
+him nothing. Only the synthetic `Pools` catch-all is suppressed.
+
+**Rows are 38px, not 44.** Tappable, but this is a dense list: at 44 with a
+small word inside, the names read as scattered down the column rather than
+as a group you scan. The gold verb keeps 44 — the verb is as big as what it
+acts on.
+
+**One verb, full width.** The bar is absent at rest and STANDS while picks
+exist (§7.14's contextual-rail grammar), showing the pick count and naming
+every picked pool in its `aria-label`. It spans the column so it aligns with
+the rows it acts on. There is **no ✕ beside it**: a clear-selection button
+spent 29px of an 86px bar on the rarest act in the surface and shrank the
+verb to a button, and dropping a pick has two ways home already — tap the
+row again, or Esc. Over the 40-die cap the bar drains to the 2i-C disabled
+code rather than truncating silently.
+
+**The list hugs its content** (`flex: 0 1 auto`) instead of claiming the
+column. At flex-grow the list held every spare pixel and the roll bar sat
+marooned at the far bottom behind ~160px of void; hugging puts the list and
+its verb together as one block. It still shrinks and scrolls on a short
+viewport, which is the common case with a real rack.
 
 **2i-G — A SELECTION IS NOT A DRAFT.** Ordered by the RACK, never by tap
 order (so `1 2 3 Enter` means the same roll whether the panel is open or
@@ -2823,3 +2850,13 @@ three digits and Enter, spent-by-its-roll, Esc, expand-drops) ·
 `rail-compose-rules` (authored-verbatim single pick, the same-type glue
 trap, fail-closed visibility) · `side-panel` (the rail's shape and the
 select-then-roll flow).
+
+**Looking at it is not optional, and the numbers do not substitute.** Every
+correction in this section — the keypad rows, the marooned verb, the void,
+the ✕ eating a third of the bar, the names adrift in tall rows — was
+invisible to `getBoundingClientRect` and to all three passing scenarios.
+The first build measured clean and looked bad. `tools/steps/rail-look.mjs`
+renders the rail against a real twelve-pool Soul Deal sheet through the
+same headless Chrome the suite uses (`Page.captureScreenshot` needs no
+displayed pane) and writes crops to `tools/out/`. **Run it, and look, before
+calling a visual change done.**

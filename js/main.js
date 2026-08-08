@@ -7075,9 +7075,12 @@ function renderRailPools() {
     wrap.className = 'rp-shelf';
     wrap.setAttribute('role', 'group');
     wrap.setAttribute('aria-label', sec.label);
-    // One shelf needs no heading — a lone 'POOLS' head over the whole rack
-    // is chrome announcing itself.
-    if (secs.length > 1) {
+    // The head stands for any REAL shelf, even when it is the only one — a
+    // rack of nine attributes is exactly the case Joe was complaining about,
+    // and counting sections would have shown him nothing. Only the synthetic
+    // catch-all is suppressed: 'POOLS' over uncategorized pools names
+    // nothing you did not already know.
+    if (sec.key !== '\u0000') {
       const h = document.createElement('div');
       h.className = 'rp-shelf-head';
       h.textContent = sec.label;
@@ -10278,9 +10281,8 @@ document.getElementById('edge-toggle').addEventListener('click', () => {
   setPanel('pools', !panelsOpen.pools);
 });
 
-// The collapsed rail's two verbs: roll what is picked, or drop the picks.
+// The collapsed rail's one verb.
 document.getElementById('rail-roll').addEventListener('click', () => rollRailSelection());
-document.getElementById('rail-clearsel').addEventListener('click', () => railClearSel());
 
 // (The collapsed-tab hover flyout retired 2026-08-04 with the overlay
 // panel: expanding the column is cheap now — the felt resizes instead of
