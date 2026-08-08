@@ -84,40 +84,53 @@ reported but not fatal.
 
 A full sweep opens ~147 tables, and every one constructs a
 `THREE.WebGLRenderer` — so a run is really ~147 renderer create/teardown
-cycles, back to back. That churn pattern is much harsher than steady
-rendering, and it is the heaviest thing this repo asks of a host.
+cycles, back to back. Runs are **serial** by design (`run.mjs` is a plain
+for-loop, one browser, one page at a time), so the suite's own peak is modest.
 
 | env | default | what it does |
 |---|---|---|
-| `DICE_E2E_GPU=1` | off | render on the real GPU instead of SwiftShader |
+| `DICE_E2E_GPU=1` | off | render WebGL on the real GPU instead of SwiftShader |
 | `DICE_E2E_CORES=8` | unset (unbounded) | pin the browser tree to N cores via `taskset` |
 
-By default WebGL goes to **SwiftShader**, so a test run never touches the
-host's graphics driver. Every assertion reads the DOM or a `__diceDebug`
-hook, dice positions come from cannon-es on the CPU, and the die-art pass
-renders fine in software — verified: `ANGLE (Google, Vulkan 1.3.0
-(SwiftShader Device))`, all eight palette tiles still carrying real art.
-`DICE_E2E_GPU=1` restores hardware rendering, which is what to reach for when
-checking whether a rendering bug is SwiftShader-specific.
+**The suite has never used the GPU**, and that is Chrome's choice rather than
+this repo's — bare `--headless` selects SwiftShader for WebGL on its own.
+Probed directly:
 
-**Note the trade:** software rendering rasterizes on the CPU. On a machine
-whose CPU is the tighter power budget, that can be *worse* than using the
-GPU — measure before assuming either default is safer for a given host.
+```
+--headless                -> ANGLE (SwiftShader Device), SwiftShader
+--headless --enable-gpu   -> ANGLE (NVIDIA GeForce RTX 4090), NVIDIA
+```
 
-`DICE_E2E_CORES` exists because Joe's machine died mid-run three times with
-**nothing in the kernel log** — no panic, no OOM, no MCE, no thermal trip;
-the journal simply stops. That is a power event rather than a software
-fault, so the lever that helps is bounding the load. The contributing
-condition there was an *unlimited* CPU package power limit
-(`/sys/class/powercap/intel-rapl:0/constraint_*_power_limit_uw` at 4095 W,
-the "unrestricted" BIOS profile) on a 13900K, alongside a GPU capped at
-300 W — the capped component was not the one drawing the transient.
+Every scenario is green against the software path, and the die-art pass
+renders fine on it (all eight palette tiles carry real art). `DICE_E2E_GPU=1`
+opts into hardware — closer to what the app ships on, and the way to tell
+whether a rendering bug is SwiftShader-specific.
 
-Runs are **serial** by design (`run.mjs` is a plain for-loop, one browser,
-one page at a time), so the suite's own peak is modest. The way to get in
-trouble is running a sweep *alongside* other browser-spawning work — a
-multi-agent pass where each agent starts its own stage will multiply the
-peak by the number of agents. Serialize that work; do not overlap it.
+#### A wrong diagnosis, recorded so it is not repeated
+
+On 2026-08-08 this file briefly carried an explicit SwiftShader block. A host
+had died mid-run three times with **nothing in the kernel log** — no panic, no
+OOM, no MCE, no thermal trip, the journal simply stopping mid-line, which is a
+power event rather than a software fault — and taking the GPU out of the loop
+looked like the lever.
+
+Wrong twice. **Wrong component:** the GPU was already capped to 300 W while
+the CPU package limit was *unlimited* (`intel-rapl:0/constraint_*` at 4095 W
+on a 13900K); software rasterization would have moved load off the capped part
+onto the uncapped one. Capping the CPU stopped the crashes, and they stayed
+stopped with the GPU unrestricted. **And a no-op:** the renderer was
+SwiftShader before the block and after it, so the change never altered what it
+claimed to.
+
+Three lessons, all cheaper to read than to relearn. **Read the failure before
+choosing the remedy** — the kernel log said "power event, no software fault"
+from the first crash, and the component was guessed at rather than measured.
+**Verify that a fix changed what you think it changed** — one probe of
+`UNMASKED_RENDERER_WEBGL` would have shown the block did nothing, and it was
+run only after the second wrong conclusion. And **a multi-agent pass
+multiplies the peak by the number of agents**: the crashes came while a
+97-scenario sweep ran alongside six agents each starting their own headless
+Chrome. Serialize that work; do not overlap it.
 
 ## Tags → areas
 

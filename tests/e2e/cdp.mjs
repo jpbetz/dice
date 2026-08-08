@@ -38,28 +38,33 @@ export function findChrome() {
   throw new Error('no Chrome binary found (set CHROME_BIN)');
 }
 
-// SOFTWARE RENDERING BY DEFAULT (2026-08-08). A full suite run opens ~147
-// tables, and every one of them constructs a THREE.WebGLRenderer — so the
-// suite is really ~147 GPU context create/teardown cycles fired back to back
-// at whatever driver the host has. That churn pattern is far harsher than
-// steady rendering, and on Joe's box (RTX 4090, and a driver whose userspace
-// had drifted ahead of its loaded kernel module) it took the whole MACHINE
-// down mid-run, twice, within minutes of starting.
+// THE SUITE HAS NEVER USED THE GPU (measured 2026-08-08).
 //
-// The suite does not need a GPU: every assertion reads the DOM or a
-// __diceDebug hook, dice positions come from cannon-es on the CPU, and the
-// die-art pass renders fine under SwiftShader. So we route WebGL to
-// SwiftShader and take the host's driver out of the loop entirely.
+// Bare `--headless` Chrome selects SwiftShader for WebGL on its own — probed
+// directly on this host:
 //
-// DICE_E2E_GPU=1 restores the hardware path for anyone who needs to test
-// against a real driver (and for checking whether a rendering bug is
-// SwiftShader-specific).
-const SOFTWARE_GL = [
-  '--disable-gpu',
-  '--use-gl=angle',
-  '--use-angle=swiftshader',
-  '--disable-features=Vulkan',
-];
+//   --headless                    -> ANGLE (SwiftShader Device), SwiftShader
+//   --headless --enable-gpu       -> ANGLE (NVIDIA GeForce RTX 4090), NVIDIA
+//
+// That matters because of what it retires. For half a day this file carried
+// an explicit SwiftShader block, added when Joe's machine died mid-run three
+// times with NOTHING in the kernel log — no panic, no OOM, no MCE, no thermal
+// trip, the journal simply stopping mid-line, which is a power event rather
+// than a software fault. Taking the GPU out of the loop looked like the
+// lever. It was not: the GPU was already capped to 300W while the CPU package
+// limit was UNLIMITED (RAPL PL1/PL2 at 4095W on a 13900K). Capping the CPU
+// stopped the crashes, and they stayed stopped with the GPU unrestricted.
+//
+// And the block was a no-op besides — the renderer was SwiftShader before it
+// and after it. Two wrong conclusions in a row about a component that was
+// never in the path, which is what happens when a remedy is chosen before the
+// failure is read.
+//
+// DICE_E2E_GPU=1 opts INTO hardware rendering — closer to what the app ships
+// on, and the way to check whether a rendering bug is SwiftShader-specific.
+// It is not the default because every scenario in this suite is green against
+// the software path and nothing has validated the other one.
+const HARDWARE_GL = ['--enable-gpu', '--use-angle=vulkan', '--enable-features=Vulkan'];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -89,19 +94,17 @@ export class Browser {
       // plain for-loop), so a pool of renderers buys nothing and only widens
       // the peak.
       '--renderer-process-limit=1',
-      ...(process.env.DICE_E2E_GPU === '1' ? [] : SOFTWARE_GL),
+      ...(process.env.DICE_E2E_GPU === '1' ? HARDWARE_GL : []),
       'about:blank',
     ];
-    // A CEILING ON HOW MUCH MACHINE A TEST RUN MAY USE (2026-08-08). Joe's
-    // box died mid-run three times with NOTHING in the kernel log — no panic,
-    // no OOM, no MCE, no thermal trip, the journal simply stops. That is a
-    // power event, not a software fault: the load is what trips it, so the
-    // load is what we bound. It matters most under software rendering, which
-    // rasterizes on the CPU — and an i9-13900K at full all-core tilt is a
-    // bigger transient than the GPU it replaced.
+    // A CEILING ON HOW MUCH MACHINE A TEST RUN MAY USE (2026-08-08). Kept
+    // after the software-rendering default was reverted, because it bounds
+    // the thing that actually mattered: CPU load. The host that crashed was
+    // running an UNLIMITED package power limit, and a suite that opens ~147
+    // tabs will find the ceiling of whatever it is given.
     //
     // DICE_E2E_CORES=8 pins the whole browser tree to 8 cores. Unset means
-    // unbounded, which is right for CI and for anyone whose machine is fine.
+    // unbounded, which is right for CI and for a machine with a sane limit.
     const cores = process.env.DICE_E2E_CORES;
     this.proc = (cores && /^\d+$/.test(cores))
       ? spawn('taskset', ['-c', `0-${Math.max(0, Number(cores) - 1)}`, chrome, ...args],
