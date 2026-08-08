@@ -3537,6 +3537,49 @@ export const scenarios = [
   },
 
   {
+    name: 'clear-scope',
+    tags: ['smoke', 'chrome', 'log'],
+    // U14. `c` sweeps the felt FOR THE WHOLE TABLE. Its guard's own comment
+    // named the hazard — "a stray 'c' would sweep the felt underneath a menu
+    // the player is reading" — while covering one of the three menus; the
+    // other two predicates already existed a few lines up in the Esc ladder.
+    // And the log flyout, which is deliberately un-modal so `r` still works,
+    // had a button labelled `Clear`: same word, two scopes, one recoverable
+    // and one permanent.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.14', name: 'Scope' });
+      const c = () => a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'c'}))`);
+      const onFelt = () => a.eval(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length)`);
+
+      await a.roll('2d6');
+      await a.settle();
+      assert.ok(await onFelt() > 0, 'dice are on the felt');
+
+      // (i) The identity menu holds the keyboard.
+      await a.dbg('openIdentityMenu?.()').catch(() => {});
+      await a.eval(`document.getElementById('identity-chip')
+        .dispatchEvent(new MouseEvent('contextmenu', {bubbles: true}))`);
+      await a.waitFor(
+        `!document.getElementById('identity-menu').classList.contains('hidden')`,
+        { desc: 'the identity menu is up' });
+      await c();
+      assert.ok(await onFelt() > 0,
+        'c does NOT sweep the felt under the identity menu');
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
+
+      // (ii) …and with no menu up, it still does its job. A guard that
+      // over-reaches is the other way to get this wrong.
+      await c();
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.tableDice.length === 0)`,
+        { desc: 'c sweeps the felt when nothing owns the keyboard' });
+
+      // (iii) The log's button says which thing it clears.
+      assert.equal(await a.eval(`document.getElementById('clear-log').textContent`),
+        'Clear history', 'the log button names its own scope');
+    },
+  },
+
+  {
     name: 'announced',
     tags: ['smoke', 'chrome', 'ceremony'],
     // U5. The app had ONE live region and it lived inside #result-banner —

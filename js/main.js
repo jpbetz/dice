@@ -9090,6 +9090,15 @@ popSaveName.addEventListener('keydown', (e) => {
 let log = load(LS_LOG, []);
 const logList = document.getElementById('log-list');
 const logEmpty = document.getElementById('log-empty');
+// How many entries the LOG_CAP has eaten this session (U14).
+let logDroppedTotal = 0;
+function updateLogDroppedNote() {
+  const el = document.getElementById('log-dropped');
+  if (!el) return;
+  const n = logDroppedTotal;
+  el.textContent = n ? `${n} earlier roll${n === 1 ? '' : 's'} rolled off the end of the log` : '';
+  el.classList.toggle('hidden', !n);
+}
 
 function fmtTime(t) {
   const d = new Date(t);
@@ -9313,7 +9322,14 @@ function addLogEntry(entry) {
   if (entry.rollId && log.some((e) => e.rollId === entry.rollId)) return;
   log.push(entry);
   const dropped = log.length > LOG_CAP ? log.length - LOG_CAP : 0;
-  if (dropped) log = log.slice(-LOG_CAP);
+  if (dropped) {
+    log = log.slice(-LOG_CAP);
+    // …and SAY so. This number was computed and discarded, so a long session
+    // silently lost its early history and the log looked complete. It is the
+    // history's own surface, so the note goes there rather than to the pill.
+    logDroppedTotal += dropped;
+    updateLogDroppedNote();
+  }
   if (!netOnline) save(LS_LOG, log); // online mode: the server owns the log
   logEmpty.style.display = 'none';
   // Defensive fallback: a rollId-less entry would make the delegated ⟳
@@ -11123,10 +11139,14 @@ document.addEventListener('keydown', (e) => {
 
   const modalOpen = !settingsModal.classList.contains('hidden')
     || !document.getElementById('name-modal').classList.contains('hidden')
-    // The rail menu owns the keyboard while it is up: 'Tables ▾' has no input
-    // to make `typing` true, so without this a stray 'c' would sweep the felt
-    // underneath a menu the player is reading.
-    || isRailMenuOpen();
+    // A MENU OWNS THE KEYBOARD WHILE IT IS UP. None of these has an input to
+    // make `typing` true, so without them a stray `c` sweeps the felt for the
+    // whole table underneath a menu the player is reading. The comment here
+    // named that hazard while covering ONE of the three menus; the other two
+    // predicates already existed a few lines up, in the Esc ladder.
+    || isRailMenuOpen()
+    || isIdentityMenuOpen()
+    || isOfferMenuOpen();
 
   // Ctrl/Cmd+K — the one allowed modifier shortcut (browser-conflict safe).
   if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K')) {

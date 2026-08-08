@@ -423,11 +423,20 @@ limitations under the License.
   <div id="log-flyout" class="panel hidden">
     <div class="lf-head">
       <span class="ph-label">Roll log</span>
-      <button id="clear-log" class="btn tiny ghost">Clear</button>
+      <!-- "Clear history", not "Clear" (U14): `c` sweeps the felt for the
+           WHOLE TABLE, and a button labelled Clear sat inside the one
+           deliberately un-modal surface — so `c` pressed while looking at a
+           button that says Clear cleared the other thing. Same word, two
+           scopes, one local-and-recoverable and one permanent solo. -->
+      <button id="clear-log" class="btn tiny ghost">Clear history</button>
       <button id="log-close" class="pop-close" title="Close">✕</button>
     </div>
     <div id="log-list"></div>
     <p id="log-empty" class="hint">No rolls yet.</p>
+    <!-- U14: the log caps at 100 and the overflow count was computed and
+         thrown away, so a long session silently lost its early history and
+         looked complete. -->
+    <p id="log-dropped" class="hint hidden"></p>
   </div>
 
   <!-- (#corner-controls docked into the rail, 2026-08-04 — the felt keeps
