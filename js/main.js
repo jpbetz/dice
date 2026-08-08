@@ -6434,6 +6434,9 @@ function adoptRack(profile) {
   renderGroups();
   renderPlayers();
   updateProfileBanner();
+  // The library list's own `Use` button switches, so the list has to repaint or
+  // the 'in hand' tag it just moved stays on the row you left.
+  renderProfileLibrary();
 }
 
 // R4: the picked profile stays in use until it is switched.
@@ -10742,7 +10745,9 @@ const PROFILES_AT_TABLE = 12;
 // a room-wide act that belongs on the settings panel where every player can see
 // it, not buried in one player's rack chrome.
 function updateProfileBanner() {
-  const m = netOnline || IN_LOBBY ? profileMismatch() : profileMismatch();
+  // The lobby counts: with no table, "the table's system" is this browser's own
+  // solo setting (§11 X9), and all three exits work there.
+  const m = profileMismatch();
   const on = !!m && !mismatchKept;
   const banner = document.getElementById('profile-banner');
   banner.classList.toggle('hidden', !on);
