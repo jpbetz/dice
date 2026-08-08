@@ -1568,7 +1568,14 @@ html, body {
   flex-wrap: nowrap;
   gap: 4px;
   border-width: 0;
-  padding: 34px 6px 6px; /* the top clears the divider chevron's reach */
+  /* Same top inset as the expanded rail, so YOUR NAME DOES NOT MOVE when
+     the panel toggles. The old 34px was written to clear "the chevron's
+     reach" back when this rail was 56px; the chevron lives in the 14px
+     divider strip on the RIGHT edge and the chip's box stops exactly where
+     that strip begins, so there was never anything to clear here — only a
+     band of unexplained blank space, and a 25px jump every time you
+     collapsed or expanded. */
+  padding: 10px 6px 6px;
 }
 #left-panel.collapsed #rail-roster { display: none; }
 /* YOU, NAMED. A bare colored dot centered over a column said nothing —
@@ -1582,7 +1589,7 @@ html, body {
   gap: 7px;
   width: 100%;
   max-width: none;
-  min-height: 34px;
+  min-height: 31px; /* the expanded chip's own height — see the rail padding above */
   padding: 4px 8px;
   border-color: transparent;
   background: none;

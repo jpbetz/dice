@@ -2060,6 +2060,21 @@ export const scenarios = [
       assert.equal(edges.named, 'Alice',
         'you are NAMED in the rail — never a bare unexplained dot');
 
+      // YOUR NAME DOES NOT MOVE (Joe 2026-08-07: collapsing "makes the
+      // vertical position of the name 'jump around'" and left a band of
+      // blank space at the top for no obvious reason). It jumped 25px,
+      // because the collapsed rail carried a 34px top inset written to
+      // clear a chevron that lives in the divider strip and never reached
+      // it. Both states must put the name at the same y.
+      const nameY = `(() => { const r = document.getElementById('identity-name')
+        .getBoundingClientRect(); return Math.round(r.top + r.height / 2); })()`;
+      const yCollapsed = await a.eval(nameY);
+      await a.dbg('setPanelState({pools: true})');
+      const yExpanded = await a.eval(nameY);
+      await a.dbg('setPanelState({pools: false})');
+      assert.equal(yCollapsed, yExpanded,
+        `the name holds its line through a toggle (collapsed ${yCollapsed}, expanded ${yExpanded})`);
+
       // expand again: the quick list yields to the full workbench
       await a.eval(`document.getElementById('edge-toggle').click()`);
       assert.equal((await a.dbg('panelState')).pools, true, 'the strip expands it back');

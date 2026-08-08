@@ -2869,11 +2869,19 @@ horizontally centered and top aligned in their region".)* Both were stacked
 into centered columns by one rule written for the 56px rail, where nothing
 could sit beside anything else. At 112px that centering aligned to nothing.
 
-- **You, named.** The identity chip shows your dot *and your name*, left-
-  aligned, wearing the same borderless row dress as the pools. It keeps
-  both its jobs (left-click swaps rack, right-click opens the seat menu). A
-  bare colored dot centered over a column was a control that named neither
-  itself nor its state.
+- **You, named — and you do not move.** The identity chip shows your dot
+  *and your name*, left-aligned, wearing the same borderless row dress as
+  the pools. It keeps both its jobs (left-click swaps rack, right-click
+  opens the seat menu). A bare colored dot centered over a column was a
+  control that named neither itself nor its state.
+  The collapsed rail carried a **34px top inset** written to clear "the
+  chevron's reach" back when it was 56px wide — but the chevron lives in
+  the 14px divider strip on the RIGHT edge and the chip's box stops exactly
+  where that strip begins, so there was never anything to clear. What it
+  actually produced was a band of unexplained blank space and a **25px jump
+  in your own name every time the panel toggled**. Both states now use the
+  same 10px inset and the same 31px chip, so the name holds its line —
+  measured at 0px of movement, and pinned in `side-panel`.
 - **The foot is a row, pinned to the bottom**, inset to the same left edge
   as everything above it, in the shipped §7.9 order: configure → consult →
   act on the left (⚙ ≣ ❯), the contextual ✕ alone in the right corner, and
