@@ -4662,6 +4662,16 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
    surfaces (verdict margin, banner verdict, peek verdict, log row), so a
    target reads the same wherever it lands. */
 .stake-num { color: var(--ivory); font-variant-numeric: tabular-nums lining-nums; }
+/* THE HELD WORD takes the slot the mute gold `?` vacated (U17 step 2), in the
+   dress the verdict card already owns for it — quiet, italic, tracked. It
+   says WHICH rung, so the banner stops being the one result surface that
+   never named the state it was showing. */
+#result-meaning.held, .pk-total.pk-held {
+  color: var(--muted);
+  font-style: italic;
+  letter-spacing: 0.06em;
+}
+.pk-total.pk-held { font-size: 15px; text-shadow: none; }
 /* With the ring folded, the stake line has to caption the outcome ROWS
    rather than echo the eyebrow above it — 6px under an 11px caps line reads
    as a second eyebrow. */

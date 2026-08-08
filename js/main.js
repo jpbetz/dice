@@ -1563,11 +1563,23 @@ function renderPeek() {
   const total = document.createElement('div');
   total.className = 'pk-total';
   let peekRows = false; // per-die rows rendered (2e) — the breakdown folds
-  if (hidden || !entry) total.textContent = '?';
-  else if (renderOutcomeRows(total, entry)) {
+  if (!entry) total.textContent = '?';
+  else if (hidden) {
+    // U17 step 2: a totals lens still answers with the `?` it has always
+    // used — there IS a number and it is withheld. A per-die lens has no
+    // number to withhold, so it names the state instead of miming a blank.
+    if (activeSystem().usesTotal) total.textContent = '?';
+    else { total.textContent = heldWord(entry); total.classList.add('pk-held'); }
+  } else if (renderOutcomeRows(total, entry)) {
     peekRows = true;
     total.classList.add('pk-tally', 'pk-outcomes'); // per-die: outcomes, not a sum
-  } else total.textContent = String(entry.total);
+  } else {
+    // The sum fallback was ungated — unreachable under a per-die lens only
+    // by accident (outcomesFor happens to answer for any visible roll with a
+    // counting die). An all-child or all-discarded pool would have printed a
+    // total the system does not compute.
+    total.textContent = activeSystem().usesTotal ? String(entry.total) : '';
+  }
   main.appendChild(total);
 
   const verdict = document.createElement('div');
@@ -2953,9 +2965,17 @@ function renderRollResults(entry, dice, fx = true) {
 
   // Under a per-die system a sum is not a fact of play: the big number
   // yields the hero slot to the outcome ROWS (usesTotal, meanings.js v2).
+  // U17 step 2: the ONLY 52px gold number a Soul Deal table ever saw was a
+  // `?` — the roll verb's own hue (#ffd766 is literally the ROLL cue's
+  // colour), springing to life for no purpose but to announce an absence,
+  // with nothing beside it saying why. The slot now belongs to the sum and
+  // to nothing else: it renders where a sum exists and is gone otherwise.
+  // The write moves INSIDE the gate too — it used to put entry.total in the
+  // DOM on every paint under every system, withheld only by display:none.
   const sysTotals = activeSystem().usesTotal;
-  resultTotalEl.style.display = sysTotals || hidden ? '' : 'none';
-  resultTotalEl.textContent = hidden ? '?' : entry.total;
+  resultTotalEl.style.display = sysTotals ? '' : 'none';
+  if (sysTotals) resultTotalEl.textContent = hidden ? '?' : entry.total;
+  else resultTotalEl.textContent = '';
 
   // The hero slot (2e): per-die systems render the outcome ROWS — pool by
   // pool, die by die — and the separate breakdown line folds away (it
@@ -2967,6 +2987,12 @@ function renderRollResults(entry, dice, fx = true) {
   if (perDieRows) {
     resultMeaningEl.classList.add('result-tally', 'result-outcomes');
     resultMeaningEl.title = 'each die reads its own outcome — the die and face beside each word';
+  } else if (hidden) {
+    // …and the hero slot SAYS the state instead. The banner was the one
+    // surface that never named it: the verdict card and the log both do.
+    resultMeaningEl.textContent = heldWord(entry);
+    resultMeaningEl.className = 'held';
+    resultMeaningEl.title = '';
   } else {
     resultMeaningEl.textContent = meaning ? meaning.word : '';
     resultMeaningEl.className = meaning ? `tier-${meaning.tier}` : '';

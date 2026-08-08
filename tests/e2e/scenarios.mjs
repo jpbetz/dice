@@ -841,6 +841,29 @@ export const scenarios = [
       assert.ok(/vs 15\s*[✓✗]/.test(await a.logTop()),
         'and the ✓/✗ arrives with them');
 
+      // U17 step 2: the mute gold `?`. #result-total is 52px in the ROLL
+      // VERB'S OWN HUE, and under a per-die lens it was dead for every open
+      // roll and sprang to life only to announce an absence — with nothing
+      // beside it saying why. The slot belongs to the sum now; the hero slot
+      // names the rung.
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.waitFor(`window.__diceDebug.system === 'soul-deal'`, { desc: 'per-die lens' });
+      await a.roll('2d6 held # Quiet');
+      await a.settle();
+      assert.equal(await a.eval(
+        `getComputedStyle(document.getElementById('result-total')).display`), 'none',
+      'a held roll under a per-die lens shows no gold ? — there is no number to withhold');
+      assert.equal(await a.eval(`document.getElementById('result-total').textContent`), '',
+        'and the sum is not sitting in the DOM behind display:none either');
+      assert.equal(await a.eval(`document.getElementById('result-meaning').textContent`),
+        'Face down', 'the hero slot names the rung instead');
+      // A totals lens still answers with the ? — there IS a number, withheld.
+      await a.dbg(`setSystem('dnd')`);
+      await a.waitFor(`document.getElementById('result-total').textContent === '?'`,
+        { desc: 'a totals lens keeps the ? it has always used' });
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.waitFor(`window.__diceDebug.system === 'soul-deal'`, { desc: 'back' });
+
       // The ± popover folds the sum-world sections under a per-die system —
       // modifiers/pairing/Target/keep-drop AND reroll/exploding, with no
       // note and no disclosure (Joe 2026-08-06; supersedes 'Show anyway').
