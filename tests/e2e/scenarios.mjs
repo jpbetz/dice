@@ -1083,12 +1083,17 @@ export const scenarios = [
       );
       assert.equal((await plate()).shown, true, 'the chosen key stands back in');
 
-      // the pools region head: SAVED POOLS on YOUR rack…
+      // THE HEAD IS AN OWNERSHIP MARKER, NOT A REGION LABEL (§7.23, Joe
+      // 2026-08-08: "we don't name the DICE UI region"). On YOUR OWN rack it
+      // is absent — the section bar's pressed `Pools` stands directly above
+      // the region and names it, and a second name for one region is the
+      // redundant standing chrome §7.9 kills.
       assert.equal(await a.eval(
         `getComputedStyle(document.getElementById('pools-head')).display`),
-        'flex', 'SAVED POOLS heads your rack');
+        'none', 'your own rack carries no second name — the section bar names it');
       assert.equal(await a.eval(
-        `document.querySelector('#pools-head .ph-word').textContent`), 'Saved pools');
+        `getComputedStyle(document.querySelector('#section-bar [data-sec="pools"]')).display`
+        + ` !== 'none'`), true, 'and that is the word doing the naming');
       // …and it SWAPS identity on a foreign rack — one head, one dress,
       // two states (teammate consolidation 2026-08-04; supersedes the
       // retired .pools-owner-banner which was a second surface for the
@@ -1105,6 +1110,12 @@ export const scenarios = [
       assert.equal(await a.eval(
         `getComputedStyle(document.querySelector('#pools-head .ph-tag')).display !== 'none'`),
         true, 'the read-only tag stands in foreign state');
+      // Gated on visibility first: `position` is readable through
+      // display:none, so asserting it alone would stay green even if the
+      // foreign head stopped rendering (the property-not-the-pixel trap).
+      assert.equal(await a.eval(
+        `getComputedStyle(document.getElementById('pools-head')).display`),
+        'flex', 'the foreign head is really on screen');
       assert.equal(await a.eval(
         `getComputedStyle(document.getElementById('pools-head')).position`),
         'sticky', 'the head becomes sticky so mid-scroll ownership survives');
@@ -1131,8 +1142,8 @@ export const scenarios = [
         { desc: 'left-click on identity chip falls home' },
       );
       assert.equal(await a.eval(
-        `document.querySelector('#pools-head .ph-word').textContent`), 'Saved pools',
-        'and the head is your rack again');
+        `getComputedStyle(document.getElementById('pools-head')).display`), 'none',
+        'and the ownership marker goes with the teammate — your own rack wears none');
       assert.equal(await a.eval(
         `document.getElementById('identity-menu').classList.contains('hidden')`), true,
         'the identity menu does NOT open on left-click (moved to right-click)');
@@ -3357,6 +3368,145 @@ export const scenarios = [
           0, 'the bar nests no buttons');
       } finally {
         await a.eval(`localStorage.removeItem('dice.sections.v1')`).catch(() => {});
+      }
+    },
+  },
+
+  {
+    name: 'rail-mode',
+    tags: ['smoke', 'chrome', 'groups'],
+    // §7.23 — the collapsed column's source switch and its dice list.
+    // Everything here goes through the REAL controls, not the debug hooks:
+    // the hooks branched on mode correctly while #rail-roll was still bound
+    // straight to the pool path, so a dice pick armed the bar and pressing it
+    // did nothing. A hook-driven pin cannot see that.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.6', name: 'Rail' });
+      const SHEET = [{ name: 'Wisdom', notation: '2d8', category: 'attributes' },
+        { name: 'Swordplay', notation: '1d10', category: 'skills' }];
+      try {
+        await a.dbg(`setGroups(${JSON.stringify(SHEET)})`);
+        await a.dbg('setPanelState({pools: false})');
+
+        // (i) THE DECISION TABLE. Pools by default when you have any, and
+        // nothing written until you choose.
+        let m = await a.dbg('railMode');
+        assert.equal(m.mode, 'pools', 'a rack you own opens on Pools');
+        assert.equal(m.stored, null, 'and nothing is stored until you pick');
+        assert.deepEqual(m.shown, { pools: true, dice: false }, 'one list on screen');
+
+        // (ii) The switch is a real control and it persists.
+        await a.eval(`document.querySelector('#rail-mode [data-rm="dice"]').click()`);
+        m = await a.dbg('railMode');
+        assert.equal(m.mode, 'dice', 'the switch switches');
+        assert.equal(m.stored, 'dice', 'and remembers');
+        assert.deepEqual(m.shown, { pools: false, dice: true }, 'the other list is gone, not dim');
+        await a.dbg('setPanelState({pools: true})');
+        await a.dbg('setPanelState({pools: false})');
+        assert.equal((await a.dbg('railMode')).mode, 'dice',
+          'the preference survives expand → collapse');
+
+        // (iii) TAPPING DICE, through the rows themselves. Three taps on d6
+        // make one row read 3d6 — the label IS the notation.
+        const row = (t) => `[...document.querySelectorAll('#rail-dice .rd-item')]`
+          + `.find((b) => b.querySelector('.rp-name').textContent.endsWith('${t}')).click()`;
+        // THE COUNT STARTS AT ONE, VISIBLY. Suppressing the 1 made the first
+        // tap change the highlight but not the word, so the counter looked
+        // like it began at two.
+        await a.eval(row('d6'));
+        assert.ok((await a.dbg('railDice')).labels.includes('1d6'),
+          `the first tap writes 1d6, it does not skip it (got ${(await a.dbg('railDice')).labels})`);
+        await a.eval(row('d6')); await a.eval(row('d6'));
+        let d = await a.dbg('railDice');
+        assert.equal(d.total, 3, 'three taps stage three dice');
+        assert.ok(d.labels.includes('3d6'), `the row reads its own notation (got ${d.labels})`);
+        assert.equal(d.rollDisabled, false, 'and the verb arms');
+        assert.equal(d.rollTitle, 'Roll 3d6', 'naming what it will send');
+        assert.equal(d.removers, 1, 'exactly the counted row carries a remover');
+
+        // (iv) THE BUTTON ROLLS. Not the hook — the button.
+        await a.eval(`document.getElementById('rail-roll').click()`);
+        await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 3)`,
+          { desc: 'the rail bar actually rolls loose dice' });
+        assert.equal((await a.dbg('lastRequestedRoll')).canonical, '3d6',
+          'byte-identical to the same roll from the box');
+        assert.equal((await a.dbg('railDice')).total, 0, 'spent by its roll (2i-G)');
+
+        // (v) d100 is two dice and shows on the rows that carry them.
+        await a.eval(row('d100'));
+        d = await a.dbg('railDice');
+        assert.deepEqual(d.dice, ['d10x', 'd10'], 'd100 stages the pair, as everywhere else');
+        assert.equal(d.canonical, 'd100', 'and canonicalizes back to d100');
+        // The remover takes one die back off.
+        await a.eval(`document.querySelector('#rail-dice .rd-x').click()`);
+        assert.equal((await a.dbg('railDice')).total, 1, 'the ✕ removes one');
+        await a.dbg('setRailMode("pools")');
+
+        // (vi) DIGITS STAY BOUND TO POOLS IN BOTH MODES. Rebinding them to
+        // loose dice would fire the wrong roll from muscle memory — `1 2 3
+        // Enter` is the attribute+skill+motivation roll this surface exists
+        // for, and the mode persists, so one flip would rebind it forever.
+        // A digit in dice mode surfaces the pool list for this visit only.
+        await a.dbg('setRailMode("dice")');
+        await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: '1'}))`);
+        assert.equal((await a.dbg('railMode')).mode, 'pools',
+          'a digit in dice mode brings the pools back');
+        assert.equal((await a.dbg('railMode')).stored, 'dice',
+          'without rewriting the preference');
+        assert.deepEqual((await a.dbg('railState')).selected, ['Wisdom'],
+          'and lands on the pool that digit names');
+        await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
+        assert.deepEqual((await a.dbg('railState')).selected, [], 'Esc drops the pick');
+
+        // (vii) An empty rack forces Dice and DISABLES Pools — present and
+        // drained (2i-C), never absent — and forgets the preference, which is
+        // what "the default logic applies again" means.
+        await a.dbg('setGroups([])');
+        m = await a.dbg('railMode');
+        assert.equal(m.mode, 'dice', 'no pools → the dice list');
+        assert.equal(m.poolsEnabled, false, 'and Pools is unavailable, not gone');
+        assert.equal(m.stored, null, 'the preference is forgotten with the rack');
+        assert.equal(await a.eval(
+          `getComputedStyle(document.querySelector('#rail-mode [data-rm="pools"]')).display !== 'none'`),
+        true, 'the disabled cell still holds its width');
+
+        // (viii) The verb STANDS in both modes, armed or not (§7.9).
+        assert.equal((await a.dbg('railState')).rollStanding, true,
+          'the roll surface never leaves');
+        assert.equal((await a.dbg('railDice')).rollDisabled, true, 'it is simply not armed');
+
+        // UNPOWERED IS BRONZE, NOT STEEL (Joe 2026-08-08: "the empty tray on
+        // expanded DOES NOT switch to steel, it stays bronze"). The verb is
+        // the tray's own plate, so its unarmed state is the tray's unpowered
+        // plate — warm, quiet, still gold-lettered. A stale rule later in the
+        // file was draining it with `filter: grayscale(1)`, which is what
+        // made it read as a dead gray button, and NOTHING in this suite could
+        // see that: every assertion here was about behaviour.
+        const off = JSON.parse(await a.eval(`JSON.stringify((() => {
+          const cs = getComputedStyle(document.getElementById('rail-roll'));
+          const rgb = [...cs.backgroundImage.matchAll(/rgba?\\((\\d+), *(\\d+), *(\\d+)/g)]
+            .map((m) => ({ r: +m[1], g: +m[2], b: +m[3] }));
+          return { filter: cs.filter, stops: rgb };
+        })())`));
+        assert.equal(off.filter, 'none',
+          `the unarmed plate is not drained to grayscale (got ${off.filter})`);
+        assert.ok(off.stops.length > 0, 'the plate carries its gradient');
+        assert.ok(off.stops.every((c) => c.r > c.b),
+          `every stop stays warm — bronze, not steel (got ${JSON.stringify(off.stops)})`);
+
+        // (ix) Neither collapsed-only surface exists while expanded.
+        await a.dbg('setPanelState({pools: true})');
+        assert.equal(await a.eval(
+          `getComputedStyle(document.getElementById('rail-mode')).display`), 'none',
+        'the switch is collapsed-only');
+        assert.equal(await a.eval(
+          `getComputedStyle(document.getElementById('rail-dice')).display`), 'none',
+        'and so is the dice list');
+        assert.equal(await a.eval(`document.querySelectorAll('#rail-dice button button').length`),
+          0, 'the remover is a sibling, never a button inside a button');
+      } finally {
+        await a.dbg('setPanelState({pools: true})').catch(() => {});
+        await a.eval(`localStorage.removeItem('dice.railmode.v1')`).catch(() => {});
       }
     },
   },

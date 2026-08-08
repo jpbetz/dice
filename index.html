@@ -80,24 +80,63 @@ limitations under the License.
          names horizontal and ellipsized, one row per pool at a 44px touch
          height. A tap SELECTS (steel ring + ✓, aria-pressed) because the
          common Soul Deal roll is three pools — an attribute, a skill and a
-         motivation — and the gold bar below rolls the selection whole.
+         motivation — and the bronze plate ABOVE rolls the selection whole
+         (it led from the foot until 2026-08-08, see below).
          The selection is spent by its roll: no tray lives up here, so
          nothing is left behind to wonder about (2i-G). -->
-    <div id="rail-pools"></div>
-
-    <!-- The selection's ONE verb: STANDING FURNITURE (§7.9), grayed until a
-         pick arms it, so the column's geometry never moves. It takes the
-         whole width so it aligns with the rows it acts on. There is no ✕ beside it: a
-         clear-selection button spent a third of an 86px bar on the rarest
-         act in the surface, and dropping a pick already has two ways home
-         (tap the row again, or Esc). #rail-note is the rail's own whisper
-         channel — the status pill folds to a 10px colorless dot while
-         collapsed, so a note sent there would be invisible in exactly the
-         state that sends it. -->
+    <!-- THE WELL, collapsed (Joe 2026-08-08: "a gray roll button at the
+         bottom in compacted mode is very different than a bronze/gold themed
+         tray at the top in the expanded mode"). He was right, and the
+         reorder had just sharpened it: the same act sat at opposite ends of
+         the two views wearing two different dresses. So the collapsed column
+         reads the way the expanded one does — YOU, then the DESTINATION,
+         then the chooser, then the sources — and the verb IS the tray's own
+         ROLL plate at rail scale: same struck-bronze gradient, same lip, same
+         cue built by the same buildRollCue, same hover and press. Not the
+         tray — the tray's BUTTON. Two passes built the whole well up here,
+         pocket and all, and a pocket that never holds dice is a broken tray
+         rather than a small one.
+         STANDING FURNITURE (§7.9), unarmed until a pick arms it — and unarmed
+         stays BRONZE, exactly as the empty tray does; a grayscale drain here
+         is what read as a dead gray button. So the
+         column's geometry never moves. Full width, aligned with the rows it
+         acts on. No ✕ beside it: that spent a third of an 86px bar on the
+         rarest act in the surface, and dropping a pick has two ways home
+         already (tap the row again, or Esc). #rail-note is the rail's own
+         whisper channel — the status pill folds to a 10px colorless dot
+         while collapsed, so a note sent there would be invisible in exactly
+         the state that sends it. -->
     <div id="rail-roll-wrap" hidden>
-      <button id="rail-roll" type="button"><b class="cue-word">Roll</b><span class="rr-count"></span></button>
+      <button id="rail-roll" type="button"><span class="rr-count"></span></button>
     </div>
     <div id="rail-note" hidden aria-live="polite"></div>
+
+    <!-- THE SOURCE SWITCH (§7.23, Joe 2026-08-07: "In collapsed view, there
+         is a toggle between dice/pools"). The collapsed column is a
+         LAUNCHER with two source lists and one standing gold verb; this
+         picks which list feeds it. Notation is deliberately not here — Joe:
+         "In collapsed view I don't think we can ever show notation. I'm
+         totally OK with that" — and `/` reaches the quick palette anyway.
+         Pools is the default when you have any, dice when you have none
+         (and then Pools is disabled rather than absent, 2i-C). Deliberately
+         INKLESS — no track, no lit cell — so the column's only box stays the
+         pool-row selection (§7.22), and a control you touch twice a session
+         never outshouts the rows you touch constantly. -->
+    <div id="rail-mode" class="seg rail-seg" role="group" aria-label="Show dice or saved pools">
+      <button data-rm="dice" type="button" title="Loose dice">Dice</button>
+      <button data-rm="pools" type="button" title="Your saved pools">Pools</button>
+    </div>
+    <div id="rail-pools"></div>
+    <!-- The dice list is the pool list's twin, deliberately: same 86px row,
+         same steel selection box, same left edge. What differs is the
+         arithmetic — pools are a SET you pick from, dice are a MULTISET you
+         count up, so a row's label carries its own notation (d6 → 3d6) and
+         the right-hand slot that holds a digit ordinal in the pool list
+         holds a remove-one ✕ here. A 2-column tile grid was measured and
+         refused: `10d10x` does not fit a 40px tile, and the track would
+         resize its neighbour on the tenth tap. -->
+    <div id="rail-dice"></div>
+
 
     <!-- ONE Pools panel (2026-07-31, the panel merge): the draft is its
          FIRST ROW — structurally a saved-pool row that does not exist yet —
@@ -188,7 +227,7 @@ limitations under the License.
            permanently. -->
       <div id="section-bar" class="seg section-seg" role="group" aria-label="Panel sections">
         <button data-sec="dice" aria-pressed="true" title="Build by tapping dice">Dice</button>
-        <button data-sec="notation" aria-pressed="false" title="Type Roll20-style notation">Notation</button>
+        <button data-sec="notation" aria-pressed="false" title="Type dice notation — 2d6+3, 4d6dl1, 1d20 adv dc15">2d6</button>
         <button data-sec="pools" aria-pressed="true" title="Your saved pools">Pools</button>
       </div>
 

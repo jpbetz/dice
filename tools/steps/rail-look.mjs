@@ -66,6 +66,34 @@ try {
   await t.dbg(`setRailSelection(['Wisdom', 'Swordplay', 'Zeal'])`);
   console.log(await crop('rail-picked.png'));
 
+  // THE OTHER LIST (§7.23). The switch has to read as one control over two
+  // lists rather than two surfaces — which is a judgement only a picture can
+  // settle, and the counted row is the whole idea: the label IS the notation.
+  await t.dbg(`setRailMode('dice')`);
+  console.log(await crop('rail-dice-empty.png'));
+  for (const n of [0, 1, 2]) await t.dbg(`railTapDie('d6')`); // → 3d6
+  await t.dbg(`railTapDie('d20')`);
+  console.log(await crop('rail-dice-counted.png'));
+  // ARMED AND APPROACHED — the plate has to match the tray's own hover, and
+  // real CSS :hover needs real mouse input (a synthetic event runs listeners
+  // but never moves the browser's hover state).
+  await t.hover('#rail-roll');
+  console.log(await crop('rail-roll-hover.png'));
+  await t.hover('#identity-chip');
+  // The worst label this list can hold, and the cap whisper under it.
+  await t.dbg(`setRailMode('pools')`);
+  await t.dbg(`setRailMode('dice')`);
+  for (let i = 0; i < 10; i++) await t.dbg(`railTapDie('d10x')`);
+  console.log(await crop('rail-dice-wide.png'));
+  await t.dbg(`setRailMode('pools')`);
+  await t.dbg(`setRailMode('pools')`);
+  // …and an empty rack, where Pools is impossible rather than merely absent.
+  await t.dbg(`setGroups([])`);
+  console.log(await crop('rail-no-pools.png'));
+  await t.dbg(`setGroups(${JSON.stringify(SHEET)})`);
+  await t.dbg(`setRailMode('pools')`);
+  await t.dbg(`setRailSelection(['Wisdom', 'Swordplay', 'Zeal'])`);
+
   // …and with dice on the felt, which is the only state that shows the
   // contextual ✕ in the foot's right corner. The left cluster must not
   // have shifted to make room for it.

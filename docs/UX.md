@@ -2913,3 +2913,221 @@ renders the rail against a real twelve-pool Soul Deal sheet through the
 same headless Chrome the suite uses (`Page.captureScreenshot` needs no
 displayed pane) and writes crops to `tools/out/`. **Run it, and look, before
 calling a visual change done.**
+
+### 7.23 Three switches, and the collapsed column grows a second list (2026-08-08)
+
+*Joe: "In the expanded view we always show Saved Pools. We also have a toggle
+to show dice or notation… instead of a toggle between dice/notation, there is
+a UI element where dice/pools/notation can be individually enabled disabled.
+It should be a single multi-toggle-button bar… But for consistency, let's move
+all of the UI sections below the Roll tray. In collapsed view, there is a
+toggle between dice/pools."*
+
+**SUPERSEDED:** §7.9 (2026-07-30), *"The draft shows ONE input view at a
+time… a per-user toggle (`dice.inputmode.v1`)"*, for the expanded panel.
+**What dies:** the exclusivity and the two-value key. **What survives, said
+out loud:** (a) **P1** — the migration is pixel-identical in both directions,
+so every existing user's panel shows exactly what it showed the day before;
+louder is now a choice, never a default; (b) **§1.3 is carried forward
+untouched** — both editors remain projections of one spec object,
+`parse(render(spec)) ≡ spec` still binds, and simultaneity introduces no
+reconcile step. That is the whole reason exclusivity was never required: it
+bought density, and density is a preference.
+*(The citation of record is §7.9's clause, not §1.5 — §1.5 is round-tripping,
+and §7.14's "two editors" is a loose paraphrase of it.)*
+
+**THE WELL LEADS THE COLUMN.** Less of a change than it reads as: `.draft-zone`
+was already `position: sticky; top: 0` inside the scrolling body, so the
+palette already slid *under* it after ~130px of scroll. The reorder makes the
+resting order match the scrolled one. It also fixes a latent bug —
+`.pool-sec-head` pins at `--draft-h`, which only matched where the zone
+actually sat after ~175px of scroll; below that the heads pinned into the gap
+above it. Now exact at every offset, and pinned in `draft-bench`.
+
+**Two defects only LOOKING caught**, both invisible to every existing
+assertion and to three passing scenarios:
+- The palette's 4-column die grid ran straight into the rack's 3-column die
+  grid with **14px** between them, against the shelves' own **12px** — the
+  region head had stopped out-ranking the shelves it contains, which is
+  exactly the confusion §7.17 shipped `SAVED POOLS` to kill. Sections now
+  carry **20px** of trailing air, owned by their own boxes so a hidden section
+  takes its gap with it and no rule has to know which sections are on.
+- The body's `padding-top: 4px` became a **leak band** above the sticky well,
+  with die art visibly sliding through the slot between the identity rail and
+  the well. The zone takes those 4px into its own padding. Pinned as
+  "no padding above a sticky child".
+
+**THE SECTION BAR** sits below the well and above what it reveals, so the bar
+and the stack read in the same order and the map never lies. `role="group"`
+with independent `aria-pressed` — checkbox semantics, zero to three pressed,
+never a radiogroup. Order **Dice · Notation · Pools**: Pools last is forced
+(it is the only unbounded-height section and it owns the sticky shelf-head
+machinery, which needs the rack to be the scroller's tail), and Notation
+between the two die-art grids is a physical separator.
+
+**All-off is legal**, with no last-section-standing rule — a chooser whose
+availability depends on its own state argues with you. The workbench above is
+a complete §7.4 surface by itself: cluster, rim, ± popover, both verbs, and
+`/` and `1`–`9` still work.
+
+**TWO OBJECTS, NOT ONE.** `sectionsStored` is the persisted truth and only an
+explicit cell click mutates it; `sectionsTransient` carries `loadIntoBox`'s
+surfacing of the box for one visit. A single merged object would have
+laundered that loan into storage the next time any *other* cell was clicked,
+and the panel would boot with a box the user never chose — which is the audit
+finding the old single variable produced, reintroduced by state shape. The
+shape prevents it now, not care at each call site. Pinned in `section-bar`.
+
+#### The collapsed column: two source lists, one verb
+
+**A LAUNCHER, not a second workbench.** Pools are a SET you pick from; dice
+are a MULTISET you count up. Both are picks under **2i-G** — ordered by their
+list, never persisted, spent by their roll. The MODE is a preference and
+persists (`dice.railmode.v1`); the PICKS never do.
+
+**QUIET CHROME, both views** *(Joe 2026-08-08: "too bright/prominent… it's
+almost always all selected elements, making it the eye catching part of the
+screen until some action is taken")*. That is inverted emphasis: a segmented
+control lights what is ON, but here nearly everything is on nearly always, so
+the loudest object in the panel was the one you touch least. Both bars shed
+the `.seg` track entirely — no recess, no border, no lit cells — and carry
+state in **weight alone**: sections you have are legible at 0.72 ivory, ones
+you don't sit at 0.45 muted. Nothing competes with the well.
+*This also settles the one genuine Joe-vs-doctrine collision the design pass
+found.* His sketch asked for a recess showing the active option; §7.22 had
+spent a whole pass removing standing boxes from the 112px column, because
+**selection is the only box there** and that is what lets one signal carry it.
+A quiet bar satisfies both, and it took his own second look to get there — the
+first build shipped the recess and it was the brightest thing on screen.
+*(Two cascade notes, both paid for: `.seg`'s track sits ~3100 lines below
+these rules, so an unscoped `.section-seg` loses the tie on source order; and
+the pressed dress inside the panel is IVORY via `#left-panel .seg`, not the
+gold of the bare `.seg` — a plan built on "doctrine says steel, the build
+ships gold" was working from a rule the panel had already overridden.)*
+
+**The third cell shows `2d6`, set in the command box's own mono**
+*(Joe: "Notation is rarely used by me… I feel like it needs a demotion of some
+kind", then "the word notation feels too formal")*. It is demoted twice, and
+neither time by dimming — unpressed is already dim, and a dim cell between two
+lit ones was exactly the thing he noticed. First **by area** (§7.21's fourth
+law, HIERARCHY IS AREA NOT VOLUME): it stops claiming a third of a bar whose
+other two cells are on nearly always. Then **by kind**: the label is a literal
+sample of `#cmd-input`'s typeface, so the face does the explaining and no word
+has to — and the cell reads as different in species from its neighbours, which
+is honest, because it is a text field between two tap-surfaces.
+*Rejected, with reasons:* `Type` (vague) · `Formula` (swaps one technical
+register for another) · `Shorthand` (wider than `Pools`, fights the demotion)
+· `Code` (this app already has room keys and invite links; "code" invites the
+worse misread) · a `VTT` badge (Roll20 is a VTT and so is this app, so the
+cell would be naming the whole screen) · the `❯` glyph (already the quick-roll
+palette in the foot — one glyph for two verbs is what ONE DRESS PER VERB
+exists to prevent).
+
+**The decision table.** Pools when you have any and have not chosen; dice when
+you have none, with the Pools cell **disabled rather than absent** (2i-C's
+grayscale code, drained below rest-dim: unavailable, not merely secondary). A live dice pick
+outranks storage, so a pool arriving mid-composition — an import, an SSE push
+— can never yank the column out from under three taps of work. When the rack
+empties the key is **deleted**: forgetting is what "the default logic applies
+again" means, and anything else has an empty rack remembering a choice made
+about a rack that is gone.
+
+**Digits stay bound to POOLS in both modes** — the one place the design
+refused its own symmetry. `1 2 3 Enter` is the attribute+skill+motivation roll
+this surface exists for, and the mode *persists*, so rebinding the digits to
+loose dice would fire the wrong roll from muscle memory forever after one
+flip. A digit pressed in dice mode surfaces the pool list **for that visit
+without rewriting the preference** — `loadIntoBox`'s precedent, and the reason
+2i-G's parenthetical stays true in every state. Loose dice get no digit
+shortcut; §7.22 gave up `? Help` on a tighter budget than this.
+
+**Both picks survive the switch.** An earlier draft dropped the outgoing one
+so that Enter and Esc could stay single-minded — but that is a 39px control a
+thumb's width above the first row silently eating three taps of picked work,
+with no undo. Enter, Esc and the verb act on the VISIBLE list's pick instead,
+the same rule the digits follow. Nothing is ever destroyed by navigation.
+
+**One column, one list.** The dice list is the pool list's twin: same 86px
+row, same steel selection box, same left edge. **The count is the label** —
+`d6` becomes `1d6`, `2d6`, `3d6`: the notation itself, one glyph cheaper than
+a `×3` badge and the same string the roll will send. The **first** tap writes
+`1d6` and does not stay at `d6` *(Joe: "when I click once it highlights, then
+the next click the text jumps to 2dX, it's weird that it skips 1dX")* —
+suppressing the leading 1 is the typographer's instinct and the wrong one
+here, because the label's job is to COUNT, and a counter whose first increment
+is invisible reads as starting at two. The right-hand slot that holds a digit
+ordinal in the pool list holds a **remove-one ✕** here, a sibling of the row
+and never a button inside one, standing on coarse pointers because a counted
+row you cannot decrement by touch is a trap.
+
+*A 2-column tile grid was drawn first and refused on measurement:* at 86px the
+tracks come out ~40px, `10d10x` needs 39px of label alone, and
+`repeat(2, 1fr)` would resize a tile's NEIGHBOUR on the tenth tap. One column
+gives the notation room and costs nothing — **the column was never wide enough
+to be a grid**, which is the lesson §7.22 already learned at 56px.
+
+**The cap is refused at the increment**, with a `#rail-note` whisper: a die
+grows the pick by one or two, so the marginal tap is exactly what to refuse.
+The pool list keeps its drained bar, because a pool can leap the cap in one
+un-splittable tap.
+
+**The roll is BARE by construction** — plain NdX, every axis at its default.
+That is what lets a launcher fire it without becoming an authoring surface
+(§7.4): a bare spec's whole intent is visible on its face, and `3d6` from the
+rail is byte-identical to `3d6` from the box. The first hidden part — a
+modifier, a dc, a visibility — is where authoring begins, and the rail
+refuses; `n` and `/` are one keystroke away. **§7.4's launcher carve-out gains
+a row:** *Collapsed dice list — Roll ✓ (bare specs only) · Offer ✗ ·
+intent editing ✗.*
+
+#### The verb is the tray's own plate, small
+
+*Joe 2026-08-08: "a gray roll button at the bottom in compacted mode is very
+different than a bronze/gold themed tray at the top in the expanded mode…
+you see that?" — then: "it should try REALLY HARD to look like a small version
+of the tray on the expanded view, **but without actually being a tray**."*
+
+He was right, and the reorder had just sharpened it: the same act sat at
+opposite ends of the two views wearing two different dresses. So the collapsed
+column now reads the way the expanded one does — **YOU, then the DESTINATION,
+then the chooser, then the sources** — and the verb heads the column instead
+of sitting in its foot.
+
+**Two passes got the dress wrong the same way**, by building the whole well up
+here: a recessed bronze pocket with a ROLL plate seated in its floor. A pocket
+exists to hold dice; a pocket that never holds any is a *broken* tray, not a
+small one. What carries across is **the plate** — the struck bronze surface
+the verb lives on. What stays behind is the container.
+
+So the collapsed verb is `#tray-actions::after` at rail scale, value for
+value: the same three-stop gradient, the same lip line, the same inset
+highlight, the same unpowered variant when nothing is picked, the same hover
+and the same sinking press. Its lettering is **built by `buildRollCue` itself**
+in the engraved form — the same word, the same lozenge-tipped rules — so the
+font and the decoration cannot drift from the tray's; only the scale changes,
+because 24px tracked at 0.3em does not fit an 86px column.
+
+*Recorded because it cost a round:* the hover values were **eyeballed** on the
+first attempt and came out dimmer than the tray's. "Match it" is a thing you
+copy, not a thing you approximate.
+
+**Scenarios:** `section-bar` (migration both directions, all eight states,
+the all-off floor, the laundering pin) · `rail-mode` (the decision table, the
+switch, tapping rows, **the button actually rolling**, d100's pair, the ✕,
+digits-stay-with-pools, the empty rack, collapsed-only visibility) ·
+`draft-bench` (the region gap, the leak band, the sticky pin that did not
+exist before).
+
+**The hook and the button had diverged.** `rail-mode`'s first draft drove the
+`railRoll()` debug hook, which branched on mode correctly — while `#rail-roll`
+was still bound straight to `rollRailSelection()`. A dice pick armed the bar
+and pressing it did nothing, and the suite was green. **Drive the control, not
+the hook**, wherever the control is the thing being claimed.
+
+**Looking, again, was not optional.** `tools/steps/panel-look.mjs` (new — the
+expanded panel had never had a shot taken of it) captures the section states,
+a short window and a scrolled frame; `rail-look.mjs` gained both collapsed
+modes, the counted row, the `10d10x` worst case, the empty rack and a real
+`:hover` frame. The scrolled frame was a *duplicate of the resting shot* until
+the viewport was shortened — a tall window has nothing to scroll, so the frame
+that existed to prove the sticky behaviour proved nothing at all.

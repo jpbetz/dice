@@ -401,8 +401,85 @@ html, body {
 /* (the tray chip-row died with the draft cluster: composed dice are die-art
    inside ONE roll button now — see .tray-cluster) */
 /* ---------- the section bar (Dice · Notation · Pools, §7.23) ---------- */
+/* QUIET CHROME, TAKE TWO (Joe 2026-08-08: first "too bright/prominent… it's
+   almost always all selected elements, making it the eye catching part of the
+   screen", then — after a pass that simply deleted the dress — "now it's just
+   floating text with no visual language").
+   Both notes are right and they are not in tension. The fault was never that
+   the bar HAD a dress; it was that the ink sat on the wrong thing. A
+   segmented control lights what is ON, and here nearly everything is on
+   nearly always, so the loudest object in the panel was the one you touch
+   least. Stripping it bare then took the affordance with the noise.
+   So: THE INK MARKS THE CONTROL, THE WEIGHT MARKS THE STATE. One quiet track
+   around the whole strip — it is unmistakably a control, and it is ONE object
+   rather than three lit ones. Inside it nothing is filled loudly: an active
+   cell wears a whisper of a recess (0.05, against the old 0.13 plus an inset
+   ring), and the real signal is that its word is legible while an inactive
+   one is dim. Nothing here competes with the well. */
+#left-panel :is(.section-seg, #rail-mode) {
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  background: rgba(0, 0, 0, 0.16);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+/* the section gap the sections themselves own (see #die-buttons) — the bar
+   names the stack below it, it does not sit on top of it */
 .section-seg { margin-bottom: 20px; }
-.section-seg button { font-size: 12px; padding: 6px 4px; }
+#left-panel :is(.section-seg, #rail-mode) button {
+  color: var(--muted);
+  opacity: 0.42; /* 2i-C's rest-dim: present, secondary, not unavailable */
+  padding: 6px 4px;
+  font-size: 12px;
+  border-radius: 6px;
+  transition: opacity 0.12s, color 0.12s, background 0.12s;
+}
+#left-panel #rail-mode button { font-size: 11px; padding: 5px 2px; }
+/* NOTATION IS DEMOTED BY AREA (Joe 2026-08-08: "Notation is rarely used by
+   me… I feel like it needs a demotion of some kind"). §7.21's fourth law —
+   HIERARCHY IS AREA, NOT VOLUME — is the tool for exactly this: it is a real
+   way to compose and it keeps its word, but it stops claiming a third of the
+   bar between the two cells that are on nearly always. Demoting it by dimming
+   instead would have been no demotion at all; unpressed already IS dim, and a
+   dim cell between two lit ones is precisely what he was looking at.
+   THE LABEL IS A SAMPLE OF THE BOX'S OWN TYPE. 'Notation' "feels too formal"
+   (Joe) for a thing you reach for twice a session, and every replacement WORD
+   was worse: 'Type' is vague, 'Formula' swaps one technical register for
+   another, 'Shorthand' is wider than Pools and fights the demotion, and
+   'Code' collides with the room keys and invite links this app already has.
+   So the cell shows `2d6` set in var(--font-mono) — the exact face #cmd-input
+   is set in. The typeface does the explaining, so no word has to, and the
+   cell reads as different IN KIND from its neighbours, which is honest: it is
+   a text field between two tap-surfaces.
+   NOT the ❯ glyph Joe floated — that already means the quick-roll palette in
+   the foot, and one glyph for two verbs is the collision 2i-C's ONE DRESS PER
+   VERB exists to prevent. Not a 'VTT' badge either: Roll20 is a VTT and so is
+   this app, so the cell would be naming the whole screen. */
+#left-panel .section-seg button[data-sec="notation"] {
+  flex: 0 1 auto;
+  padding-left: 11px;
+  padding-right: 11px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+}
+/* ON is legible, seated in the faintest recess the panel can hold — the
+   "recessed area shows which is active" Joe asked for, at a tenth the volume
+   the first build gave it. No gold: HUE = ACT, and this is a tool. */
+#left-panel :is(.section-seg, #rail-mode) button[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+  color: var(--ivory);
+  opacity: 0.78;
+}
+#left-panel :is(.section-seg, #rail-mode) button:hover:not(:disabled) {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.07);
+}
+#left-panel :is(.section-seg, #rail-mode) button:focus-visible {
+  outline: 1px solid var(--ivory);
+  outline-offset: -1px;
+}
 /* OFF-classes, never on-classes: the bare cascade shows the whole panel, so
    a JS failure degrades to everything visible rather than nothing. The WELL
    is never one of these — it is the workbench, not a section, and it is what
@@ -991,6 +1068,18 @@ html, body {
    under --draft-h; a second pinned band would steal tray-adjacent
    pixels). Hidden while browsing a teammate — the owner banner is that
    state's region head. Collapsed it leaves with #builder-panel free. */
+/* THE HEAD IS AN OWNERSHIP MARKER NOW, not a region label (Joe 2026-08-08:
+   "instead of SAVED POOLS let's just say POOLS. Or drop the group name? …we
+   don't name the DICE UI region"). Right: §7.17 stood this head up to kill
+   the confusion between the palette's die-art tiles and the rack's, and the
+   section bar now kills it better — the pressed word `Pools` stands directly
+   above the region and names it, in the same breath as the two beside it. A
+   second name for one region is the redundant standing chrome §7.9 kills, and
+   no other section carries one.
+   What survives is the job the bar CANNOT do: on a teammate's rack the head
+   swaps to their identity and surfaces the read-only tag, so ownership can
+   never scroll away. Hence :not(.foreign). */
+#pools-head:not(.foreign) { display: none; }
 #pools-head {
   display: flex;
   align-items: center;
@@ -1693,6 +1782,77 @@ html, body {
    their side, shelf titles dropped, no room to hold a selection. A tap
    SELECTS and the one gold bar ROLLS; the selection is spent by its roll.
    Filled by renderRailPools. */
+/* ---------- the collapsed column's source switch (§7.23) ---------- */
+/* Expanded, neither the switch nor the dice list exists — the workbench owns
+   composing up there, and the launcher's two lists are collapsed-only. */
+#left-panel:not(.collapsed) #rail-mode,
+#left-panel:not(.collapsed) #rail-dice { display: none; }
+/* Whichever list the switch is not showing is really gone, not merely dim:
+   2i-C's third code, so nothing below it has to make room for a ghost. */
+#rail-pools.rail-list-off, #rail-dice.rail-list-off { display: none; }
+#rail-mode {
+  flex: none;
+  margin: 8px 6px 2px; /* one left edge with the chip, the rows and the foot */
+}
+#rail-mode button { font-size: 11px; padding: 5px 2px; }
+/* The switch shares the section bar's quiet dress (see .section-seg) — no
+   track, no lit cell. That matters twice over here: it keeps the collapsed
+   column's ONE box the pool-row selection, which is what lets a single
+   signal carry it (§7.22), and it stops a control you touch twice a session
+   from outshouting the rows you touch constantly.
+   Unavailable still wears the DISABLED code — grayscale-drained and dimmer
+   than rest — because an empty rack makes Pools impossible, not secondary. */
+#left-panel #rail-mode button:disabled {
+  filter: grayscale(1);
+  opacity: 0.25;
+  cursor: default;
+}
+
+/* ---------- the collapsed dice list ---------- */
+/* Same box as #rail-pools: the switch swaps the CONTENTS of one list, it does
+   not swap between two different surfaces. */
+#rail-dice {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 8px 6px;
+  scrollbar-width: none;
+}
+#rail-dice::-webkit-scrollbar { width: 0; height: 0; }
+/* The row and its remover are SIBLINGS in a positioned wrapper — never a
+   button inside a button (two scenarios pin that). */
+.rd-cell { position: relative; flex: none; display: flex; }
+.rd-item { flex: 1; min-width: 0; }
+.rd-item .rp-name { font-variant-numeric: tabular-nums; }
+.rd-x {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  width: 18px; height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s;
+}
+.rd-cell:hover .rd-x, .rd-cell:focus-within .rd-x { opacity: 0.75; }
+.rd-x:hover { color: var(--red); opacity: 1; }
+/* On a coarse pointer there is no hover to reveal it, and a counted row you
+   cannot decrement by touch is a trap (P6's per-die ✕ tier). */
+@media (pointer: coarse) {
+  .rd-cell .rd-x { opacity: 0.75; }
+}
+
 #rail-pools {
   /* Hug the pools rather than claim the column: at flex-grow the list held
      every spare pixel and the roll bar sat marooned at the far bottom with
@@ -1789,32 +1949,91 @@ html, body {
 #rail-roll-wrap {
   flex: none;
   display: flex; gap: 4px; align-items: center;
-  padding: 7px 6px 8px;
-  border-top: 1px solid var(--hair);
+  /* Heads the column now, directly under the chip — no border-top, because
+     it no longer divides the list from the foot; it IS the destination the
+     list feeds, the same job and the same place as the expanded well. */
+  padding: 4px 6px 2px;
 }
 #rail-roll-wrap[hidden], #rail-note[hidden] { display: none; }
 #left-panel:not(.collapsed) #rail-roll-wrap,
 #left-panel:not(.collapsed) #rail-note { display: none; }
+/* THE TRAY'S ROLL PLATE, SMALL (Joe 2026-08-08). Not the tray — the tray's
+   BUTTON. Two earlier passes built the whole well up here, pocket and all,
+   and that is the thing he kept rejecting: a pocket exists to hold dice, so
+   a pocket that never holds any is a broken tray, not a small one. What
+   carries across is the plate — the struck bronze surface the verb lives on
+   — and what stays behind is the container. Every value below is lifted from
+   #tray-actions::after: the same three-stop gradient, the same lip line, the
+   same inset highlight, the same transition. */
 #rail-roll {
+  position: relative;
   flex: 1 1 auto;
-  display: flex; align-items: center; justify-content: center; gap: 5px;
   min-height: 44px; /* the rows' height — the verb is as big as what it acts on */
-  border-radius: 7px;
+  padding: 0;
+  border-radius: 9px;
   cursor: pointer;
-  border: 1px solid rgba(212, 175, 55, 0.55);
-  color: var(--gold-bright);
-  background: linear-gradient(180deg, rgba(212, 175, 55, 0.30), rgba(212, 175, 55, 0.16));
+  border: 1px solid rgba(212, 175, 55, 0.3); /* THE line, run all the way round */
+  background: linear-gradient(180deg, #4b3919 0%, #38290f 55%, #2a1e0d 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 228, 158, 0.12);
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-#rail-roll:hover {
-  border-color: var(--gold);
-  background: linear-gradient(180deg, rgba(255, 215, 102, 0.42), rgba(212, 175, 55, 0.24));
+/* The cue is the well's own, built by buildRollCue in its engraved form —
+   only the SCALE changes, because 24px tracked at 0.3em does not fit an 86px
+   column. Proportions kept: the word a touch smaller than a shouting label,
+   tracked wide, with the lozenge-tipped rules given room to breathe. */
+#rail-roll .roll-cue {
+  position: absolute;
+  inset: 0;
+  justify-content: center;
+  padding-right: 0;
+  font-size: 13px;
+  letter-spacing: 0.26em;
+  opacity: 1; /* the plate IS the button here; there is no pocket to reveal from */
+  color: rgba(255, 215, 102, 0.62);
+  transition: color 0.15s;
 }
-#rail-roll .cue-word { font-size: 11px; letter-spacing: 0.09em; }
-#rail-roll .rr-count:not(:empty) {
-  font-size: 9px; padding: 1px 5px; border-radius: 8px;
-  background: rgba(0, 0, 0, 0.28); color: var(--gold-bright);
+/* letter-spacing trails after the last letter, so equal margins are not an
+   equal gap — the right one gives that tracking back (the well's own rule) */
+#rail-roll .cue-engraved .cue-word { margin-left: 7px; margin-right: calc(7px - 0.26em); }
+#rail-roll .cue-rule { flex: 0 1 13px; }
+/* The count rides the corner rather than the line, so it can never push the
+   engraving off centre. */
+#rail-roll .rr-count {
+  position: absolute;
+  top: 3px; right: 5px;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 215, 102, 0.5);
 }
-#rail-roll:disabled { filter: grayscale(1); opacity: 0.45; cursor: default; }
+/* UNARMED is the well's own unpowered plate, value for value — the light
+   goes out of the surface and the lip goes quiet. Nothing turns gray. */
+#rail-roll:disabled {
+  cursor: default;
+  border-color: rgba(212, 175, 55, 0.14);
+  background: linear-gradient(180deg, #322611 0%, #251b0c 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 228, 158, 0.05);
+}
+#rail-roll:disabled .roll-cue { color: rgba(255, 215, 102, 0.26); }
+/* Armed and approached — #tray-actions:has(.tray-roll:hover)::after, value
+   for value. (An earlier pass eyeballed these and came out dimmer than the
+   tray's; "match it" is a thing you copy, not a thing you approximate.) */
+#rail-roll:not(:disabled):hover {
+  border-color: rgba(255, 214, 102, 0.55);
+  background: linear-gradient(180deg, #6e5222 0%, #4c3715 55%, #382809 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 240, 196, 0.26), 0 0 15px rgba(255, 214, 102, 0.18);
+}
+#rail-roll:not(:disabled):hover .roll-cue { color: var(--gold-bright); }
+/* PRESS: the face sinks — the bevel inverts, exactly as the tray's does. */
+#rail-roll:not(:disabled):active {
+  background: linear-gradient(180deg, #33250f 0%, #543f1c 100%);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+}
+/* (The old flat-gold hover, the 11px/0.09em cue and the grayscale disabled
+   state lived HERE, after the block above, and quietly won every conflict —
+   which is why the plate kept reading gray when nothing was picked and why
+   the engraved word never took its 13px. The dress is one block now, and it
+   is the one directly above. Joe 2026-08-08: "the empty tray on expanded
+   DOES NOT switch to steel, it stays bronze".) */
 /* (#rail-clearsel retired 2026-08-07 before it ever shipped: it spent 29px
    of an 86px bar on the rarest act here, shrinking the gold verb to a
    button. Dropping a pick has two ways home already — tap the row again,

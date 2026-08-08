@@ -4773,7 +4773,43 @@ window.__diceDebug = {
     renderRailPools();
     return railPicked().map((g) => g.name);
   },
-  railRoll() { rollRailSelection(); return true; },
+  railRoll() {
+    if (railMode() === 'dice') rollRailDice(); else rollRailSelection();
+    return true;
+  },
+  // The collapsed column's source switch and its dice list (§7.23).
+  // `mode` is RESOLVED (what is on screen); `stored` is the preference, and
+  // null means never chosen — the decision table needs both to be pinnable.
+  get railMode() {
+    const seg = document.getElementById('rail-mode');
+    const cell = (v) => seg && seg.querySelector(`[data-rm="${v}"]`);
+    return {
+      mode: railMode(),
+      stored: railModeStored(),
+      poolsEnabled: !!(cell('pools') && !cell('pools').disabled),
+      shown: {
+        pools: getComputedStyle(document.getElementById('rail-pools')).display !== 'none',
+        dice: getComputedStyle(document.getElementById('rail-dice')).display !== 'none',
+      },
+    };
+  },
+  setRailMode(m) { return setRailMode(m); },
+  get railDice() {
+    const btn = document.getElementById('rail-roll');
+    const note = document.getElementById('rail-note');
+    return {
+      dice: [...railDice],
+      total: railDice.length,
+      canonical: railDiceCanonical(),
+      labels: [...document.querySelectorAll('#rail-dice .rd-item .rp-name')].map((e) => e.textContent),
+      removers: document.querySelectorAll('#rail-dice .rd-x').length,
+      rollDisabled: !!btn && btn.disabled,
+      rollTitle: btn ? btn.title : null,
+      note: note && !note.hidden ? note.textContent : null,
+    };
+  },
+  railTapDie(type) { railAddDie(type); return railDice.length; },
+  railRemoveDie(type) { railRemoveDie(type); return railDice.length; },
   // The card action row, read as the EYE gets it. Every field here is
   // computed style, never the `.hidden` property — asserting the property
   // is exactly how the fold shipped two live verbs on every card while the
@@ -6941,7 +6977,7 @@ function renderGroups() {
   // collapsed rail showing whatever it last painted. The rail is always
   // YOUR pools (a launcher fires what you own), so it repaints from
   // `groups` regardless of whose rack the panel is showing.
-  renderRailPools();
+  renderRailColumn();
   if (foreign) {
     renderForeignPools(poolsOwnerPlayer());
     return;
@@ -7119,6 +7155,103 @@ function renderGroups() {
 // leave state visible in neither place.
 let railSel = new Set(); // pool ids, this session only
 
+// ---- the column's two source lists (§7.23) ---------------------------------
+// The collapsed rail is a LAUNCHER: two lists, one standing gold verb. Pools
+// are a SET you pick from; dice are a MULTISET you count up. Both are picks,
+// never drafts (2i-G) — ordered by their list, never persisted, spent by their
+// roll. The MODE is a preference and persists; the PICKS never do.
+const LS_RAILMODE = 'dice.railmode.v1';
+let railDice = []; // die-type strings, this session only
+// A digit pressed while the dice list is up surfaces the pool list for THIS
+// VISIT without rewriting the preference — loadIntoBox's precedent, and the
+// reason `1 2 3 Enter` still means the same roll in every state. Clearing
+// railDice alone could not do it: resolution would fall straight back to the
+// stored 'dice'.
+let railModeVisit = null;
+
+// The palette order the collapsed list walks, shared with the expanded
+// palette's own tiles so the digit map and the two lists can never drift.
+const RAIL_DIE_TYPES = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20', 'd100'];
+
+function railModeStored() {
+  const v = load(LS_RAILMODE, null);
+  return v === 'dice' || v === 'pools' ? v : null;
+}
+
+// Resolution lives ONLY in the render path, so it can never run before
+// `groups`/`railDice` exist. Order matters: a live dice pick outranks
+// everything, because a pool arriving mid-composition (an import, an SSE
+// push) must never yank the column out from under three taps of work.
+function railMode() {
+  if (railDice.length) return 'dice';
+  if (!groups.length) return 'dice'; // nothing in the other list to show
+  if (railModeVisit) return railModeVisit;
+  return railModeStored() || 'pools'; // your pools are the point, when you have them
+}
+
+function setRailMode(mode) {
+  if (mode !== 'dice' && mode !== 'pools') return railMode();
+  if (mode === 'pools' && !groups.length) return railMode();
+  railModeVisit = null; // an explicit choice ends the loan
+  save(LS_RAILMODE, mode);
+  // BOTH PICKS SURVIVE. An earlier design dropped the outgoing one "so Enter
+  // and Esc stay single-minded" — but that is a 39px control sitting a
+  // thumb's width above the first row silently eating three taps of picked
+  // work, with no undo. Enter, Esc and the gold bar all act on the VISIBLE
+  // list's pick instead, which is the same rule the digits follow.
+  if (mode === 'pools') railDice = []; // …except this one: a live dice pick would
+  // win resolution back immediately and the switch would appear not to work.
+  renderRailColumn();
+  return railMode();
+}
+
+// ONE dispatcher for the whole collapsed column: resolve the mode, paint the
+// switch, render exactly one list, arm the verb. renderGroups calls THIS, so a
+// rack that empties or fills while the panel is collapsed can never leave the
+// switch describing a list that is not there.
+function renderRailColumn() {
+  const seg = document.getElementById('rail-mode');
+  const poolsEl = document.getElementById('rail-pools');
+  const diceEl = document.getElementById('rail-dice');
+  if (!seg || !poolsEl || !diceEl) return;
+  // Joe: "unless they delete all their pools, in which case the default logic
+  // applies again". Forgetting the key IS the default logic — anything else
+  // makes an empty rack remember a choice made about a rack that is gone.
+  if (!groups.length && railModeStored()) {
+    try { localStorage.removeItem(LS_RAILMODE); } catch { /* ignore */ }
+  }
+  const mode = railMode();
+  for (const b of seg.querySelectorAll('button')) {
+    b.setAttribute('aria-pressed', String(b.dataset.rm === mode));
+    // Unavailable, not absent and not merely dim (2i-C): the cell keeps its
+    // width so the switch never changes shape under you.
+    b.disabled = b.dataset.rm === 'pools' && !groups.length;
+    b.title = b.disabled ? 'No saved pools yet'
+      : b.dataset.rm === 'dice' ? 'Loose dice' : 'Your saved pools';
+  }
+  poolsEl.classList.toggle('rail-list-off', mode !== 'pools');
+  diceEl.classList.toggle('rail-list-off', mode !== 'dice');
+  if (mode === 'pools') renderRailPools(); else renderRailDice();
+}
+
+{
+  const seg = document.getElementById('rail-mode');
+  if (seg) {
+    seg.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (b && !b.disabled) setRailMode(b.dataset.rm);
+    });
+  }
+  // The collapsed verb wears the WELL'S OWN ROLL CUE — built by the same
+  // function, in the same engraved form, so the word, its tracking and the
+  // lozenge-tipped rules beside it can never drift from the tray's. Joe
+  // 2026-08-08: "aim for the small version to match the 'roll' button on the
+  // bottom of the tray, not just in look-and-feel but also in the font and
+  // decoration". Cut from the same material means built by the same hand.
+  const rb = document.getElementById('rail-roll');
+  if (rb) rb.insertBefore(buildRollCue('roll', true), rb.firstChild);
+}
+
 function renderRailPools() {
   const el = document.getElementById('rail-pools');
   if (!el) return;
@@ -7212,6 +7345,115 @@ function railToggle(g) {
   renderRailPools();
 }
 
+// THE DICE LIST — the pool list's twin, one row per die type. A 2-column tile
+// grid was drawn first and refused on measurement: at 86px the tracks come out
+// ~40px, `10d10x` needs 39px of label alone, and `repeat(2, 1fr)` would resize
+// a tile's NEIGHBOUR on the tenth tap ("the geometry never moves"). One column
+// gives the notation room and costs nothing — the column was never wide enough
+// to be a grid, which is the same lesson §7.22 learned at 56px.
+function renderRailDice() {
+  const el = document.getElementById('rail-dice');
+  if (!el) return;
+  el.textContent = '';
+  if (!document.getElementById('left-panel').classList.contains('collapsed')) return;
+  for (const type of RAIL_DIE_TYPES) {
+    const n = railDice.filter((t) => t === type).length;
+    const cell = document.createElement('div');
+    cell.className = 'rd-cell';
+    const b = document.createElement('button');
+    b.className = 'rp-item rd-item';
+    b.setAttribute('aria-pressed', n ? 'true' : 'false');
+    const art = document.createElement('span');
+    art.className = 'rp-dice';
+    // No d100 solid exists — the palette's eighth cell reuses the d10x art for
+    // the same reason. Without this the row rendered as a bare word and broke
+    // the one left edge every other row holds.
+    art.appendChild(buildDieStrip([type === 'd100' ? 'd10x' : type], 1));
+    b.appendChild(art);
+    const nm = document.createElement('span');
+    nm.className = 'rp-name';
+    // THE COUNT IS THE LABEL: `d6` becomes `1d6`, `2d6`, `3d6` — the notation
+    // itself, one glyph cheaper than a `×3` badge, self-explaining, and the
+    // same string the roll will send.
+    // The FIRST tap writes `1d6`, it does not stay at `d6` (Joe 2026-08-08:
+    // "when I click once it highlights, then the next click the text jumps to
+    // 2dX, it's weird that it skips 1dX"). Suppressing the 1 was the
+    // typographer's instinct and the wrong one: the label's job here is to
+    // count, and a counter whose first increment is invisible reads as
+    // starting at two.
+    nm.textContent = n ? `${n}${type}` : type;
+    b.appendChild(nm);
+    b.title = n ? `${n}${type} staged — tap to add another` : `Add a ${type}`;
+    b.setAttribute('aria-label', n ? `${n} ${type}, add another` : `Add one ${type}`);
+    b.addEventListener('click', () => railAddDie(type));
+    cell.appendChild(b);
+    if (n) {
+      // Remove-one, in the slot the pool list gives its digit ordinal — a
+      // SIBLING of the row, never a button inside a button. It stands on
+      // coarse pointers (P6's per-die ✕ tier) because a counted row you
+      // cannot decrement by touch is a trap.
+      const x = document.createElement('button');
+      x.className = 'rd-x';
+      x.type = 'button';
+      x.tabIndex = -1;
+      x.textContent = '✕';
+      x.title = `Remove one ${type}`;
+      x.setAttribute('aria-label', `Remove one ${type}`);
+      x.addEventListener('click', (e) => { e.stopPropagation(); railRemoveDie(type); });
+      cell.appendChild(x);
+    }
+    el.appendChild(cell);
+  }
+  updateRailRoll();
+}
+
+function railAddDie(type) {
+  // d100 is two dice everywhere else in this app; it is two here too, and its
+  // effect shows on the d10x and d10 rows rather than inventing a third count.
+  const add = type === 'd100' ? ['d10x', 'd10'] : [type];
+  if (railDice.length + add.length > MAX_DICE_ON_TABLE) {
+    // Refused AT THE INCREMENT, not by draining the verb: a die grows the pick
+    // by one or two, so the marginal tap is exactly what to refuse. (A pool
+    // can leap the cap in one un-splittable tap, which is why the pool list
+    // keeps its drained bar instead.)
+    railNote(`That would pass the ${MAX_DICE_ON_TABLE}-die table cap`);
+    return;
+  }
+  railDice.push(...add);
+  railNote('');
+  renderRailDice();
+}
+
+function railRemoveDie(type) {
+  const i = railDice.lastIndexOf(type);
+  if (i >= 0) railDice.splice(i, 1);
+  railNote('');
+  renderRailDice();
+}
+
+// The rail's dice roll is BARE by construction — plain NdX with every axis at
+// its default. That is what lets a launcher fire it without becoming an
+// authoring surface (§7.4): a bare spec's whole intent is visible on its face,
+// and `3d6` from here is byte-identical to `3d6` from the box. The first
+// hidden part — a modifier, a dc, a visibility — is where authoring begins,
+// and the rail refuses it. `n` and `/` are one keystroke away.
+function railDiceCanonical() {
+  return railDice.length ? canonicalNotation({ dice: [...railDice] }) : '';
+}
+
+function rollRailDice() {
+  if (!railDice.length) return;
+  const notation = railDiceCanonical();
+  const res = parseNotation(notation);
+  if (!res.ok) return;
+  requestRoll([...res.spec.dice], res.canonical, {
+    notation, canonical: res.canonical,
+  });
+  railDice = []; // spent by its roll (2i-G) — no well up here to explain a survivor
+  railNote('');
+  renderRailColumn();
+}
+
 function railClearSel() {
   railSel.clear();
   renderRailPools();
@@ -7253,6 +7495,25 @@ function updateRailRoll() {
   // built on the superseded half. The geometry never moves; the verb is
   // simply not armed yet, which the 2i-C disabled code says out loud.
   wrap.hidden = false;
+  // The verb never changes its WORD across the two lists (§7.21: what varies
+  // is the payload, and the payload is the title's job). Only what feeds it
+  // changes; the bar itself is the one thing in this column that never moves.
+  if (railMode() === 'dice') {
+    const count = btn.querySelector('.rr-count');
+    if (!railDice.length) {
+      btn.disabled = true;
+      btn.title = 'Tap a die to roll';
+      btn.setAttribute('aria-label', 'Roll — tap a die first');
+      if (count) count.textContent = '';
+      return;
+    }
+    const canonical = railDiceCanonical();
+    btn.disabled = false;
+    btn.title = `Roll ${canonical}`;
+    btn.setAttribute('aria-label', `Roll ${canonical}`);
+    if (count) count.textContent = railDice.length > 1 ? String(railDice.length) : '';
+    return;
+  }
   if (!picks.length) {
     btn.disabled = true;
     btn.title = 'Pick a pool to roll';
@@ -10323,8 +10584,8 @@ function applyPanels(persist = true) {
   // composing surface, and a half-pick carried across the boundary would be
   // state visible in neither place. railClearSel updates the bar itself,
   // because renderRailPools returns early once the panel is open.
-  if (panelsOpen.pools) { railClearSel(); renderTray(); }
-  else renderRailPools(); // the collapsed rail carries the pool list
+  if (panelsOpen.pools) { railClearSel(); railDice = []; railModeVisit = null; renderTray(); }
+  else renderRailColumn(); // the collapsed rail carries both source lists
   const et = document.getElementById('edge-toggle');
   et.setAttribute('aria-expanded', String(!!panelsOpen.pools));
   et.title = panelsOpen.pools ? 'Collapse the panel — n' : 'Expand the panel — n';
@@ -10362,7 +10623,14 @@ document.getElementById('edge-toggle').addEventListener('click', () => {
 });
 
 // The collapsed rail's one verb.
-document.getElementById('rail-roll').addEventListener('click', () => rollRailSelection());
+// The verb acts on whichever list is ON SCREEN — the same rule Enter, Esc and
+// the digits follow. (This was bound straight to rollRailSelection, so a dice
+// pick armed the bar and then nothing happened when it was pressed. The
+// railRoll debug hook branched correctly, which is exactly why the scenario
+// missed it: it drove the hook instead of the button.)
+document.getElementById('rail-roll').addEventListener('click', () => {
+  if (railMode() === 'dice') rollRailDice(); else rollRailSelection();
+});
 
 // (The collapsed-tab hover flyout retired 2026-08-04 with the overlay
 // panel: expanding the column is cheap now — the felt resizes instead of
@@ -10606,6 +10874,7 @@ document.addEventListener('keydown', (e) => {
     // The rail's picks are the collapsed twin of the staged draft below, and
     // peel at the same rung: Esc drops what you picked before it sweeps the
     // felt, so a mis-tap never costs you a roll.
+    else if (railMode() === 'dice' && railDice.length) { railDice = []; renderRailColumn(); }
     else if (railSel.size) railClearSel();
     // The staged draft empties before the table sweeps: Esc mirrors Enter's
     // draft-first priority.
@@ -10666,7 +10935,8 @@ document.addEventListener('keydown', (e) => {
       // SEE while collapsed, and firing a hidden draft instead would be a
       // roll from nowhere. (Must sit after the focused-button guard above,
       // or Enter on a focused .rp-item would roll AND re-toggle the row.)
-      if (railSel.size) { rollRailSelection(); return; }
+      if (railMode() === 'dice') { if (railDice.length) { rollRailDice(); return; } }
+      else if (railSel.size) { rollRailSelection(); return; }
       if ((cmdResult && cmdResult.ok) || tray.length > 0) {
         // …and a draft you cannot see never fires silently either: surface
         // the workbench that holds it and pulse its roll button instead.
@@ -10685,7 +10955,12 @@ document.addEventListener('keydown', (e) => {
         // either way (rendered shelf order), so '1 4 6 Enter' means the same
         // roll in both states — Wisdom + Swords + Zeal.
         const g = renderedPools[Number(e.key) - 1];
-        if (g) { if (panelsOpen.pools) stageGroup(g); else railToggle(g); }
+        if (g) {
+          if (panelsOpen.pools) stageGroup(g);
+          else if (railMode() === 'dice') {
+            if (groups.length) { railDice = []; railModeVisit = 'pools'; renderRailColumn(); railToggle(g); }
+          } else railToggle(g);
+        }
       }
   }
 });
