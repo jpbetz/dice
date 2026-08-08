@@ -177,17 +177,33 @@ function emitShelves(lines, groups, base) {
 
 // groups: [{name, notation, category?, set?}] · settings: {sound?, numbers?}
 // table: {name?, felt?, system?, zoom?} · profiles: [{name, system?, set?, groups}]
+// profile: {name?, system?, set?} — WHO the top-level `pools:` belong to
+//
+// `profile:` exists to keep the document free of a second home for the same
+// rack. The exporter's own pools have always been the top-level `pools:`; when
+// the library arrived, writing that profile into `players:` as well would have
+// put one character's dice in two places, and a hand-editable format where an
+// edit can land in the ignored copy is a format with a trap in it. So the rack
+// stays exactly where it was, `players:` carries the OTHER profiles, and this
+// three-key section says whose the rack is — which is the only thing the old
+// shape could not record.
 // table and profiles are present-or-absent: given neither (or nothing in
 // them), the output is byte-identical to what this emitter wrote before the
 // prepared table existed. Profiles keep the order they are handed in — that
 // is the order the seats sit in — while shelves inside each sort as always.
-export function exportYaml({ groups = [], settings = {}, table = null, profiles = null } = {}) {
+export function exportYaml({ groups = [], settings = {}, table = null, profiles = null, profile = null } = {}) {
   const tableLines = [];
   for (const key of Object.keys(TABLE_KEYS)) {
     const value = table && table[key];
     if (typeof value === 'string' && value) tableLines.push(`  ${key}: ${quote(value)}`);
   }
   const seats = Array.isArray(profiles) ? profiles : [];
+  const meLines = [];
+  if (profile) {
+    if (typeof profile.name === 'string' && profile.name) meLines.push(`  name: ${quote(profile.name)}`);
+    if (typeof profile.system === 'string' && SYSTEMS.includes(profile.system)) meLines.push(`  system: ${quote(profile.system)}`);
+    if (typeof profile.set === 'string' && profile.set) meLines.push(`  set: ${quote(profile.set)}`);
+  }
   const prepared = tableLines.length > 0 || seats.length > 0;
 
   const lines = [
@@ -195,6 +211,7 @@ export function exportYaml({ groups = [], settings = {}, table = null, profiles 
     '# paste back via Settings → Your data (import previews; Apply is explicit)',
   ];
   if (tableLines.length) lines.push('table:', ...tableLines);
+  if (meLines.length) lines.push('profile:', ...meLines);
   if (seats.length) {
     lines.push('players:');
     for (const p of seats) {
@@ -322,7 +339,8 @@ function blockLine(block, raw, lineNo) {
 
 // → { ok:true, shelves:[{label, plain, pools:[{name, notation, set?}]}],
 //     settings:{sound, numbers} (each present only when the text set it),
-//     profiles:[{name, system?, set?, shelves:[…]}], warnings:[…], table?:{…} }
+//     profiles:[{name, system?, set?, shelves:[…]}], warnings:[…],
+//     table?:{…}, profile?:{name?, system?, set?} }
 // or { ok:false, line, error }. `table` is present only if the text set it;
 // `profiles` and `warnings` are always arrays, empty in a today-format file.
 export function parsePortable(text) {
@@ -335,8 +353,10 @@ export function parsePortable(text) {
   const byName = new Map();
   const warnings = [];
   const tableSeen = new Set();
+  const meSeen = new Set();
   let table = null;
-  let section = null; // 'pools' | 'settings' | 'table' | 'players' | 'skip'
+  let me = null;      // the `profile:` section — whose the top-level pools are
+  let section = null; // 'pools' | 'settings' | 'table' | 'players' | 'profile' | 'skip'
   let seat = null;    // the player block being read
   const rows = text.split(/\r\n?|\n/);
 
@@ -355,6 +375,7 @@ export function parsePortable(text) {
       if (raw === 'settings:') { section = 'settings'; continue; }
       if (raw === 'table:') { section = 'table'; continue; }
       if (raw === 'players:') { section = 'players'; continue; }
+      if (raw === 'profile:') { section = 'profile'; continue; }
       // Forward tolerance (PROFILES §9 decision 4): a SECTION this version
       // does not know is skipped with a warning rather than breaking the
       // document. A top-level line that is not even section-shaped is still
@@ -364,13 +385,45 @@ export function parsePortable(text) {
         warnings.push(`line ${lineNo}: skipped unknown section ${JSON.stringify(raw.slice(0, 30))}`);
         continue;
       }
-      return fail(lineNo, `unknown top-level line ${JSON.stringify(raw.slice(0, 30))} — expected "pools:", "settings:", "table:" or "players:"`);
+      return fail(lineNo, `unknown top-level line ${JSON.stringify(raw.slice(0, 30))} — expected "pools:", "settings:", "table:", "profile:" or "players:"`);
     }
 
     if (section === 'settings') {
       const m = /^ {2}(sound|numbers): (true|false)$/.exec(raw);
       if (!m) return fail(lineNo, 'settings lines are "  sound: true|false" or "  numbers: true|false"');
       settings[m[1]] = m[2] === 'true';
+      continue;
+    }
+
+    if (section === 'profile') {
+      // Whose the top-level `pools:` are. Three keys, all optional, all strict:
+      // an unknown system refuses here exactly as it does in a player block,
+      // because it decides where the rack may be taken in hand.
+      const m = /^ {2}(name|system|set):(.*)$/.exec(raw);
+      if (!m) return fail(lineNo, `profile lines are "  name: 'X'", "  system: 'id'" or "  set: 'id'" (got ${JSON.stringify(raw.trim().slice(0, 30))})`);
+      if (meSeen.has(m[1])) return fail(lineNo, `profile key ${JSON.stringify(m[1])} appears twice`);
+      meSeen.add(m[1]);
+      const sv = readScalar(m[2].trim());
+      if (!sv || sv.rest.trim() !== '') return fail(lineNo, `expected one value after "${m[1]}:"`);
+      const value = sv.value.trim();
+      if (m[1] === 'name') {
+        if (value.includes('#')) {
+          return fail(lineNo, `profile name ${JSON.stringify(value.slice(0, 30))} carries '#', which starts a comment in dice notation — a name holding one would misdirect whispers`);
+        }
+        const nm = cutText(value, MAX_NAME + 1);
+        if (nm.length > MAX_NAME) return fail(lineNo, `profile name over ${MAX_NAME} characters`);
+        if (nm) { me = me || {}; me.name = nm; }
+      } else if (m[1] === 'system') {
+        if (!value) return fail(lineNo, 'expected one system id after "system:"');
+        if (!SYSTEMS.includes(value)) {
+          return fail(lineNo, `system ${JSON.stringify(value.slice(0, 30))} is not one of ${SYSTEMS.join(', ')}`);
+        }
+        me = me || {};
+        me.system = value;
+      } else {
+        const id = knownSet(value); // unknown ids fall closed, like a pool's
+        if (id) { me = me || {}; me.set = id; }
+      }
       continue;
     }
 
@@ -482,7 +535,7 @@ export function parsePortable(text) {
     if (bad) return bad;
   }
 
-  if (!shelves.length && !profiles.length && !table
+  if (!shelves.length && !profiles.length && !table && !me
     && !('sound' in settings) && !('numbers' in settings)) {
     // Name the skips here or they vanish: a file of nothing but sections this
     // version does not know reads as empty, and "why?" deserves an answer.
@@ -490,7 +543,7 @@ export function parsePortable(text) {
       ? `no pools, settings, table or players found (${warnings.length} unknown section${warnings.length > 1 ? 's' : ''} skipped)`
       : 'no pools and no settings found');
   }
-  return { ok: true, shelves, settings, profiles, warnings, ...(table ? { table } : {}) };
+  return { ok: true, shelves, settings, profiles, warnings, ...(table ? { table } : {}), ...(me ? { profile: me } : {}) };
 }
 
 // One parsed profile → exactly what planImport (and the preview status line)

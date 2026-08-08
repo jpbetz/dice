@@ -4493,6 +4493,11 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
    grammar is unchanged — .ph-tag's 10px muted caps, promoted to ivory because
    this one is IDENTITY (the same call .ph-word makes in .foreign) and it is
    tappable, which a readout is not. */
+/* Deliberately NOT wearing .ph-tag. That class IS the read-only tag — the
+   foreign state's `display: inline` is keyed to it and the panel spec reads
+   "the first .ph-tag in the head" — so a second element borrowing it makes the
+   selector ambiguous. The dress is copied instead of shared, and the 10px caps
+   are the head's own grammar either way. */
 #pools-head .ph-pick {
   display: inline-flex;
   align-items: center;

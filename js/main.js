@@ -30,7 +30,7 @@ import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealStartingRack, dealRack, dealName } from './seed.js';
 import { exportYaml, parsePortable, planImport, profileToImport } from './portable.js';
 import {
-  MAX_PROFILES, MAX_POOLS, knownSystem, normalizeStore, profilesOf, findProfile,
+  MAX_PROFILES, MAX_POOLS, knownSystem, emptyStore, normalizeStore, profilesOf, findProfile,
   activeProfile, profilesFor, lastUsedFor, isFull, nameProfile, uniqueName,
   addProfile, renameProfile, deleteProfile, setActive, writeActivePools,
   setActiveSystem, setProfileSet, migrateLegacy, toWire, fromWire,
@@ -4525,6 +4525,24 @@ window.__diceDebug = {
     copyFrom(src, activate = false) { return copyProfileIn(src, { activate }); },
     bindToTable() { return bindActiveToTable(); },
     keepMismatch() { mismatchKept = true; updateProfileBanner(); return { ok: true, status: '✓ kept' }; },
+    // THE PRECONDITION DOOR, for scenarios only. Per-origin localStorage
+    // OUTLIVES a scenario's room (tests/e2e/scenarios.mjs says so at length),
+    // so a library left behind by an earlier scenario on the same origin is
+    // inherited by the next one — and a leftover profile named 'Alice' makes a
+    // prepared seat called 'Alice' dedupe to 'Alice 2', which is correct
+    // behaviour failing an inherited assumption. setGroups exists for the same
+    // reason at the rack's grain; this is it at the library's.
+    reset(system) {
+      const sys = knownSystem(system) || tableSystem();
+      profileStore = emptyStore();
+      const added = addProfile(profileStore, {
+        name: dealName(sys), system: sys, pools: dealRack(sys), at: Date.now(),
+      });
+      saveProfileStore();
+      adoptRack(added.profile);
+      renderProfileLibrary();
+      return { ok: true, status: `✓ library reset to '${added.profile.name}'` };
+    },
     // The picker menu, opened without a pointer.
     openMenu() {
       const anchor = document.getElementById('profile-pick');
@@ -5056,7 +5074,14 @@ window.__diceDebug = {
   setPoolsOwner(id) { setPoolsOwner(id || null); return poolsOwner; },
   get netPlayers() {
     return players.map((p) => ({ id: p.id, name: p.name,
-      pools: (p.pools || []).map((g) => ({ ...g })) }));
+      pools: (p.pools || []).map((g) => ({ ...g })),
+      // §11: WHICH of their profiles the published rack is, and what it was
+      // built for — the two fields that make a teammate's rack copyable rather
+      // than merely visible. Present-or-absent on the wire, so null here rather
+      // than absent, which is what a scenario can actually assert against.
+      profile: p.profile || null,
+      system: p.system || null,
+      set: p.set || null }));
   },
   publishPools() { publishPools(); return true; },
   // the Pools tab flyout (the WHOLE panel body — draft + list — on hover
@@ -6440,7 +6465,7 @@ function makeProfile({ name, system, pools = [], set = null, activate = true }) 
     return pv(false, `✗ ${MAX_PROFILES} profiles is the ceiling — delete one first`);
   }
   if (pools.length > MAX_POOLS) {
-    return pv(false, `✗ that rack carries ${pools.length} pools — a profile holds at most ${MAX_POOLS}`);
+    return pv(false, `✗ that one carries ${pools.length} pools — a profile holds at most ${MAX_POOLS}`);
   }
   const named = nameProfile(name);
   if (!named.ok) return pv(false, `✗ ${named.error}`);
@@ -10219,15 +10244,25 @@ function portableSnapshot() {
       system: roomSettings.system,
       zoom: roomSettings.zoom,
     },
-    profiles: profilesOf(profileStore).map((p) => ({
-      name: p.name,
-      system: p.system,
-      ...(p.set ? { set: p.set } : {}),
-      // The one in hand exports the LIVE rack, not the last-folded copy: a
-      // Download taken between edits must not ship a profile older than the
-      // pools on screen.
-      groups: p.id === profileStore.activeId ? groupsToProfileGroups() : (p.pools || []).map(({ id, ...rec }) => rec),
-    })),
+    // WHOSE the top-level pools are. This is what keeps the document free of a
+    // second home for the same rack: the profile in hand stays exactly where
+    // the exporter's own pools have always been (`pools:`), `players:` carries
+    // only the OTHERS, and this names the one holding the rack. Writing it into
+    // both sections instead would put one character's dice in two places, and
+    // an edit that lands in the ignored copy is a trap in a format people are
+    // invited to hand-edit.
+    profile: (() => {
+      const p = activeProfile(profileStore);
+      return p ? { name: p.name, system: p.system, ...(p.set ? { set: p.set } : {}) } : null;
+    })(),
+    profiles: profilesOf(profileStore)
+      .filter((p) => p.id !== profileStore.activeId)
+      .map((p) => ({
+        name: p.name,
+        system: p.system,
+        ...(p.set ? { set: p.set } : {}),
+        groups: (p.pools || []).map(({ id, ...rec }) => rec),
+      })),
   });
 }
 
@@ -10479,7 +10514,6 @@ function profileShelvesToGroups(shelves) {
   return out;
 }
 
-const profilePoolCount = (p) => p.shelves.reduce((n, s) => n + s.pools.length, 0);
 
 // The rack as exportYaml's flat profile shape (ids stripped — they are
 // rack-local and mean nothing in a file).
@@ -10508,18 +10542,47 @@ function portableReceipt(msg) {
   return portableVerdict();
 }
 
+// Every profile a file offers, in one list — the `players:` blocks PLUS the
+// top-level `pools:` section, which is one profile too: the exporting browser's
+// own, named by the `profile:` key. A file written before that key existed (or
+// hand-written without it) still offers its rack, under a label naming what it
+// is rather than a person who was never recorded.
+function importableProfiles() {
+  if (!portableParsed) return [];
+  const out = [];
+  const top = portableParsed.shelves.reduce((n, sh) => n + sh.pools.length, 0);
+  const me = portableParsed.profile || null;
+  if (top || me) {
+    out.push({
+      key: '',
+      name: (me && me.name) || 'This file’s pools',
+      system: (me && me.system) || null,
+      set: (me && me.set) || null,
+      pools: profileShelvesToGroups(portableParsed.shelves).map(({ id, ...rec }) => rec),
+      named: !!(me && me.name),
+    });
+  }
+  for (const p of portableParsed.profiles) {
+    out.push({
+      key: p.name,
+      name: p.name,
+      system: p.system || null,
+      set: p.set || null,
+      pools: profileShelvesToGroups(p.shelves).map(({ id, ...rec }) => rec),
+      named: true,
+    });
+  }
+  return out;
+}
+
 // One profile out of the box text → the library. The DM's file arriving on a
-// player's machine (§11 O7/P14).
+// player's machine (§11 O7/P14). An empty `key` is the top-level rack.
 function portableAdoptOne(name) {
   if (!portableParsed) return portableRefuse('✗ nothing usable in the box — open a table file or Fill with my data first');
-  const p = portableFindProfile(name);
-  if (!p) return portableRefuse(`✗ no player ${JSON.stringify(String(name == null ? '' : name).trim())} in this file`);
-  const got = copyProfileIn({
-    name: p.name,
-    system: p.system || null,
-    set: p.set || null,
-    pools: profileShelvesToGroups(p.shelves).map(({ id, ...rec }) => rec),
-  });
+  const want = String(name == null ? '' : name).trim().toLowerCase();
+  const p = importableProfiles().find((r) => r.key.toLowerCase() === want);
+  if (!p) return portableRefuse(`✗ no profile ${JSON.stringify(String(name == null ? '' : name).trim())} in this file`);
+  const got = copyProfileIn({ name: p.name, system: p.system, set: p.set, pools: p.pools });
   renderProfileLibrary();
   return got.ok ? portableReceipt(got.status) : portableRefuse(got.status);
 }
@@ -10531,7 +10594,7 @@ function renderImportProfiles() {
   const zone = document.getElementById('import-profiles');
   const rows = document.getElementById('import-profile-rows');
   if (!zone || !rows) return;
-  const seats = portableParsed ? portableParsed.profiles : [];
+  const seats = importableProfiles();
   zone.classList.toggle('hidden', !seats.length);
   rows.textContent = '';
   if (!seats.length) return;
@@ -10545,15 +10608,15 @@ function renderImportProfiles() {
     const sysEl = document.createElement('span');
     sysEl.className = 'pp-tag pp-sys';
     sysEl.textContent = p.system ? systemLabel(p.system) : 'this table';
-    const n = profilePoolCount(p);
+    const n = p.pools.length;
     const countEl = document.createElement('span');
     countEl.className = 'pp-count';
     countEl.textContent = `${n} pool${n === 1 ? '' : 's'}`;
     const add = document.createElement('button');
     add.className = 'btn tiny';
     add.textContent = 'Add';
-    add.title = `Add '${p.name}' to your library — nothing of yours is touched`;
-    add.addEventListener('click', () => portableAdoptOne(p.name));
+    add.title = `Add '${p.name}' to your profiles — nothing of yours is touched`;
+    add.addEventListener('click', () => portableAdoptOne(p.key));
     row.append(nameEl, sysEl, countEl, add);
     rows.appendChild(row);
   }
@@ -10565,17 +10628,12 @@ function renderImportProfiles() {
 // what did land still landed.
 function portableAdoptProfiles() {
   if (!portableParsed) return portableRefuse('✗ nothing usable in the box — open a table file or Fill with my data first');
-  const seats = portableParsed.profiles;
-  if (!seats.length) return portableRefuse('✗ this file carries no players:');
+  const seats = importableProfiles();
+  if (!seats.length) return portableRefuse('✗ this file carries no profiles');
   const added = [];
   let refusal = null;
   for (const p of seats) {
-    const got = copyProfileIn({
-      name: p.name,
-      system: p.system || null,
-      set: p.set || null,
-      pools: profileShelvesToGroups(p.shelves).map(({ id, ...rec }) => rec),
-    });
+    const got = copyProfileIn({ name: p.name, system: p.system, set: p.set, pools: p.pools });
     if (got.ok) added.push(p.name);
     else { refusal = got.status; break; } // the cap, or a name no cleaning saves
   }
@@ -10613,9 +10671,13 @@ async function portablePushToTable() {
   if (!portableParsed) return portableRefuse('✗ nothing usable in the box — open a table file or Fill with my data first');
   if (!netOnline || !net) return portableRefuse('✗ solo — no table to prepare (the file itself still works anywhere)');
   const t = portableParsed.table || null;
-  const seats = portableParsed.profiles;
+  // The top-level rack rides along as a seat when the file names whose it is —
+  // an organizer's own character belongs at the table beside the ones they
+  // prepared for everyone else. Unnamed, it stays out: a seat has to be
+  // choosable by name, and 'This file's pools' is a label, not a person.
+  const seats = importableProfiles().filter((p) => p.named);
   if (!t && !seats.length) {
-    return portableRefuse('✗ nothing to send — the box has no table: and no players:');
+    return portableRefuse('✗ nothing to send — the box has no table: and no profiles to seat');
   }
   const table = {};
   if (t) {
@@ -10635,7 +10697,7 @@ async function portablePushToTable() {
     name: p.name,
     system: p.system || willRead,
     ...(p.set ? { set: p.set } : {}),
-    pools: profileShelvesToGroups(p.shelves).map(({ id, ...rec }) => rec),
+    pools: p.pools,
   }));
   const overCap = fit.length - profiles.length;
   const stored = storedTable();
@@ -10759,7 +10821,7 @@ function buildProfileMenu(el) {
     const n = p.id === profileStore.activeId ? groups.length : (p.pools || []).length;
     row(p.name, `${n} pool${n === 1 ? '' : 's'}`, () => showProfileNote(switchToProfile(p.id)), {
       pressed: p.id === profileStore.activeId,
-      title: p.id === profileStore.activeId ? 'This is the rack in your hands' : `Take '${p.name}' in hand`,
+      title: p.id === profileStore.activeId ? 'These are the pools in your hands' : `Take '${p.name}' in hand`,
     });
   }
   row('⚄ Random…', '', () => showProfileNote(dealNewProfile(sys)), {
@@ -10895,7 +10957,7 @@ function renderProfileLibrary() {
       use.textContent = 'Use';
       use.disabled = p.system !== sys;
       use.title = p.system === sys
-        ? `Take '${p.name}' in hand — the rack you have now keeps its pools`
+        ? `Take '${p.name}' in hand — the pools you have now stay with '${activeProfileName()}'`
         : `'${p.name}' was built for ${systemLabel(p.system)} — this table reads ${systemLabel(sys)}`;
       use.addEventListener('click', () => showProfileNote(switchToProfile(p.id)));
       row.append(use);

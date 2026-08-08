@@ -429,8 +429,14 @@ export class Ctx {
           // No seeded name: the app is sitting at 'Take a seat'. Waiting on
           // netReady here would hang until something takes the seat, which is
           // the caller's job — so the readiness bar is the modal being up.
+          // Optional-chained on purpose: the poll starts the instant navigate
+          // returns, and #name-modal is the LAST element in index.html — so a
+          // tick where the document has not reached it yet is normal, and it
+          // must read as "not yet", not as a thrown TypeError that burns the
+          // boot and costs a retry. (Seen for real once the markup above the
+          // modal grew.)
           await t.waitFor(
-            `!document.getElementById('name-modal').classList.contains('hidden')`,
+            `document.getElementById('name-modal')?.classList.contains('hidden') === false`,
             { desc: `seat modal up (${origin})`, timeout: 30000 },
           );
         } else {

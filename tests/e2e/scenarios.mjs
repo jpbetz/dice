@@ -1744,11 +1744,13 @@ export const scenarios = [
       const first = (await a.dbg('groups'))[0];
       assert.ok(first && first.id, 'the rack seeded');
 
-      // A save writes storage — and nothing else.
+      // A save writes storage — and nothing else. The key moved with PROFILES
+      // §11: dice.groups.v1 is a fossil read once at boot, and the rack now
+      // lives inside the active profile in dice.profiles.v1.
       assert.ok(await a.dbg(`editPool(${first.id}, { notation: '2d12' })`), 'pool edited');
       assert.equal(await a.eval('location.hash'), '', 'a save never writes the address bar');
       assert.ok(
-        (await a.eval(`localStorage.getItem('dice.groups.v1')`)).includes('2d12'),
+        (await a.eval(`localStorage.getItem('dice.profiles.v1')`)).includes('2d12'),
         'the edit landed in storage',
       );
 
@@ -2981,6 +2983,14 @@ export const scenarios = [
       const text = await a.eval(`document.getElementById('portable-text').value`);
       assert.ok(text.includes("- 'Body': '3d6'") && text.includes("'2d6 # To the death'"),
         `export quotes every scalar — the # comment survives (got: ${JSON.stringify(text.slice(0, 200))})`);
+      // PROFILES §11: the box now carries the whole library, and the rack in
+      // hand appears EXACTLY once — under `pools:`, with `profile:` naming
+      // whose it is. A second copy inside `players:` would give a hand-editable
+      // format two homes for one rack, so this asserts the one-home rule that
+      // the edit below depends on.
+      assert.equal(text.split('\n').filter((l) => l.includes("'Body'")).length, 1,
+        `one home for one rack (got: ${JSON.stringify(text.split('\n').filter((l) => l.includes("'Body'")))})`);
+      assert.ok(text.includes('profile:'), `the export names whose the pools are (got: ${JSON.stringify(text.slice(0, 120))})`);
       assert.ok((await a.eval(`document.getElementById('portable-status').textContent`))
         .includes('matches'), 'a fresh export previews as a no-op');
       assert.equal(await a.eval(`document.getElementById('portable-apply').disabled`), true,
@@ -6128,116 +6138,347 @@ export const scenarios = [
     },
   },
   {
-    name: 'profile-swap',
-    tags: ['table-file', 'groups'],
-    // ROADMAP §G3, the MVP: an organizer builds someone else's character by
-    // loading it into their OWN rack, so the ledger and the spectrum bars
-    // (§2l) read it unmodified. Everything worth testing here is a
-    // guardrail — the swap puts another person's pools where yours live, so
-    // each assertion below is one way that could have gone wrong.
+    name: 'profile-library',
+    tags: ['smoke', 'profiles', 'groups'],
+    // PROFILES §11 — THE CLAIM THE WHOLE DESIGN RESTS ON: a switch loses
+    // nothing. This replaces §G3's `profile-swap`, which pinned the machinery
+    // that made ONE rack pretend to be two (a stash under dice.groups.mine.v1,
+    // read back to prove the write landed before `groups` dared move). There
+    // are thirty-two racks now and a switch is a pointer move inside a single
+    // stored value, so the failure class the stash existed to survive cannot be
+    // constructed — and the way to prove that is to switch repeatedly with
+    // edits in between and demand that every profile still hold its own pools.
     async fn(ctx) {
-      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
-      const watcher = await ctx.rawPlayer('Watcher');
+      const a = await ctx.newTable({ origin: '127.0.0.2', name: 'Solo' });
 
-      const mineBefore = (await a.dbg('groups')).map((g) => g.name).sort();
-      assert.ok(mineBefore.length, 'the operator starts with a rack of their own');
+      // A fresh browser deals ONE profile and it is in hand: P1, and no prompt
+      // asked for it.
+      const first = await a.dbg('profiles.active');
+      assert.ok(first && first.name, 'a fresh browser holds a dealt profile');
+      assert.equal(first.system, 'soul-deal', 'bound to the system it was dealt for');
+      assert.equal((await a.dbg('profiles.list')).length, 1, 'a library of exactly one');
+      assert.equal(first.pools, (await a.dbg('groups')).length, 'and its pools ARE the rack');
 
-      const file = [
-        'table:',
-        "  name: 'Session 3'",
-        "  felt: 'plum'",
-        'players:',
-        "  'Rill':",
-        '    pools:',
-        '      Attributes:',
-        "        - 'Strength': '3d6'",
-        "        - 'Agility': '2d8'",
-        "  'Wren':",
-        '    pools:',
-        '      Skills:',
-        "        - 'Larceny': '1d20'",
-        'pools:',
-        '  Pools:',
-        "    - 'Doorbell': '2d6'",
-        '',
-      ].join('\n');
-      const v = await a.dbg(`portable.loadText(${JSON.stringify(file)})`);
-      assert.equal(v.ok, true, `the table file parses (got ${v.status})`);
-      assert.deepEqual(await a.dbg('portable.profiles()'), ['Rill', 'Wren'],
-        'both prepared seats are offered');
+      // The picker is absent while there is nothing to pick between — a library
+      // of one shows no new chrome anywhere (§11.5).
+      assert.equal(
+        await a.eval(`getComputedStyle(document.getElementById('profile-pick')).display`),
+        'none', 'no picker over a library of one');
 
-      // The swap. Yours goes to the stash; theirs takes the rack.
-      const ed = await a.dbg(`portable.editProfile('Rill')`);
-      assert.equal(ed.ok, true, `editing starts (got ${ed.status})`);
-      assert.equal(await a.dbg('portable.editingProfile'), 'Rill', 'the banner has a name to show');
-      const onRack = (await a.dbg('groups')).map((g) => g.name).sort();
-      assert.deepEqual(onRack, ['Agility', 'Strength'], "Rill's pools are on the rack");
-      const stashed = await a.eval(
-        `JSON.parse(localStorage.getItem('dice.groups.mine.v1') || 'null').map((g) => g.name).sort()`);
-      assert.deepEqual(stashed, mineBefore, 'and yours is stashed, intact, before anything moved');
+      const made = await a.dbg(`profiles.create('Fighter')`);
+      assert.equal(made.ok, true, made.status);
+      assert.deepEqual(await a.dbg('groups'), [], 'a new profile starts empty and in hand');
+      assert.notEqual(
+        await a.eval(`getComputedStyle(document.getElementById('profile-pick')).display`),
+        'none', 'and now the picker exists');
 
-      // GUARDRAIL 3: publishing is "here is MY rack". While a profile is
-      // loaded it must go silent, or every teammate's owner switcher would
-      // show Rill's pools under Alice's name.
-      const seen = watcher.events().filter((e) => e.type === 'pools-changed');
-      const leaked = seen.some((e) => JSON.stringify(e.data.pools).includes('Agility'));
-      assert.equal(leaked, false, "no teammate is told Alice's rack became Rill's");
+      await a.dbg(`setGroups([{name: 'Longsword', notation: '1d20+5'}, {name: 'Shield', notation: '1d6'}])`);
+      const fighter = await a.dbg('profiles.active');
+      assert.equal(fighter.name, 'Fighter');
+      assert.equal(fighter.pools, 2, 'edits land in the profile in hand, with no save step');
 
-      // Editing the loaded profile and saving writes the TEXT, not the disk,
-      // and must not disturb the rest of the file.
-      const gid = (await a.dbg('groups')).find((g) => g.name === 'Strength').id;
-      await a.dbg(`editPool(${JSON.stringify(gid)}, {notation: '5d6'})`);
-      const saved = await a.dbg(`portable.saveToProfile('Rill')`);
-      assert.equal(saved.ok, true, `save writes back (got ${saved.status})`);
-      assert.ok(saved.text.includes('5d6'), 'the edit reached the text');
-      assert.ok(saved.text.includes('Wren'), 'the OTHER profile survived the rewrite');
-      assert.ok(saved.text.includes('Larceny'), "and so did that profile's pools");
-      assert.ok(saved.text.includes('Session 3'), 'the table: section survived');
-      assert.ok(saved.text.includes('Doorbell'), 'the top-level rack in the file survived');
+      // THE LOSSLESS CLAIM: five switches with an edit in the middle.
+      const ids = (await a.dbg('profiles.list')).map((p) => p.id);
+      for (const id of [ids[0], ids[1], ids[0], ids[1], ids[0]]) {
+        const v = await a.dbg(`profiles.use('${id}')`);
+        assert.equal(v.ok, true, v.status);
+      }
+      const list = await a.dbg('profiles.list');
+      assert.equal(list.find((p) => p.name === 'Fighter').pools, 2,
+        'Fighter kept its two pools across five switches');
+      assert.equal(list.find((p) => p.name === first.name).pools, first.pools,
+        `${first.name} kept all ${first.pools} of its pools`);
+      assert.equal(list.filter((p) => p.active).length, 1, 'exactly one is in hand');
 
-      // The exit puts you back. This is the one that matters: if it ever
-      // fails, the operator has lost their own pools to a click.
-      const done = await a.dbg('portable.doneEditing()');
-      assert.equal(done.ok, true, `Done succeeds (got ${done.status})`);
-      assert.equal(await a.dbg('portable.editingProfile'), null, 'editing is over');
-      assert.deepEqual((await a.dbg('groups')).map((g) => g.name).sort(), mineBefore,
-        'your own rack is back, exactly as it was');
-      assert.equal(await a.eval(`localStorage.getItem('dice.groups.mine.v1')`), null,
-        'and the stash is spent, so the next boot has nothing to undo');
+      // Rename, duplicate, delete — and the receipts say what happened.
+      const ren = await a.dbg(`profiles.rename('${ids[1]}', 'Champion')`);
+      assert.equal(ren.ok, true, ren.status);
+      assert.ok((await a.dbg('profiles.list')).some((p) => p.name === 'Champion'), 'renamed');
+
+      const dup = await a.dbg(`profiles.copyFrom({name: 'Champion', system: 'soul-deal', pools: [{name: 'X', notation: '1d6'}]})`);
+      assert.equal(dup.ok, true, dup.status);
+      assert.ok(dup.status.includes('Champion 2'), `a collision dedupes (got ${dup.status})`);
+      assert.ok(dup.status.includes('nothing of yours changed'), dup.status);
+
+      const del = await a.dbg(`profiles.remove('${ids[1]}')`);
+      assert.equal(del.ok, true, del.status);
+      assert.equal((await a.dbg('profiles.list')).some((p) => p.name === 'Champion'), false, 'deleted');
+
+      // '#' is refused at the door — a profile name becomes a display name.
+      const hash = await a.dbg(`profiles.create('Bo#b')`);
+      assert.equal(hash.ok, false);
+      assert.ok(hash.status.includes('#'), hash.status);
+
+      // X3 — the ceiling, named.
+      await a.eval(`(() => { let n = 0; while (!window.__diceDebug.profiles.full && n < 60) { window.__diceDebug.profiles.create('P' + n); n++; } return n; })()`);
+      assert.equal((await a.dbg('profiles.list')).length, 32, 'the cap is 32');
+      const over = await a.dbg(`profiles.create('One more')`);
+      assert.equal(over.ok, false);
+      assert.ok(over.status.includes('32'), `the refusal names the ceiling (got ${over.status})`);
     },
   },
   {
-    name: 'profile-swap-reload',
-    tags: ['table-file', 'groups'],
-    // ROADMAP §G3 guardrail 4, split out because it needs its own tab: the
-    // banner and the file text do NOT survive a reload, so booting with a
-    // profile still in dice.groups.v1 would be someone else's rack under your
-    // name with nothing on screen saying so — the `#g=` codec's exact failure
-    // (GOALS §7). The boot guard restores yours instead.
+    name: 'profile-library-reload',
+    tags: ['profiles', 'groups'],
+    // R4 stated literally: "whatever profile they pick should be retained as
+    // the one in use until they switch" — across an F5, which is where the old
+    // §G3 design had its worst moment (a reload landed on somebody else's pools
+    // under your name, so its boot guard threw one of the two racks away). One
+    // store key means there is nothing to reconcile at boot.
     async fn(ctx) {
-      const a = await ctx.newTable({ origin: '127.0.0.2', name: 'Solo' });
-      const mineBefore = (await a.dbg('groups')).map((g) => g.name).sort();
-      const file = [
-        'players:',
-        "  'Rill':",
-        '    pools:',
-        '      Attributes:',
-        "        - 'Strength': '3d6'",
-        '',
-      ].join('\n');
-      await a.dbg(`portable.loadText(${JSON.stringify(file)})`);
-      await a.dbg(`portable.editProfile('Rill')`);
-      assert.deepEqual((await a.dbg('groups')).map((g) => g.name), ['Strength'],
-        'mid-edit: the profile is on the rack');
+      const a = await ctx.newTable({ origin: '127.0.0.3', name: 'Solo' });
+      await a.dbg(`profiles.create('Wizard')`);
+      await a.dbg(`setGroups([{name: 'Fire Bolt', notation: '2d10'}])`);
+      const before = await a.dbg('profiles.list');
+      assert.equal(before.length, 2);
 
       await a.reload();
-
-      assert.equal(await a.dbg('portable.editingProfile'), null,
-        'a reload does not resurrect the editing state');
-      assert.deepEqual((await a.dbg('groups')).map((g) => g.name).sort(), mineBefore,
-        'the boot guard restored your own rack');
+      const after = await a.dbg('profiles.list');
+      assert.deepEqual(after.map((p) => `${p.name}:${p.pools}`), before.map((p) => `${p.name}:${p.pools}`),
+        'the whole library survives a reload');
+      assert.equal((await a.dbg('profiles.active')).name, 'Wizard',
+        'and the one in hand is still the one in hand');
+      assert.deepEqual((await a.dbg('groups')).map((g) => g.name), ['Fire Bolt'],
+        'its pools are the rack');
+      // The fossil is never written again: the rack lives in the library now.
       assert.equal(await a.eval(`localStorage.getItem('dice.groups.mine.v1')`), null,
-        'and cleared the stash, so a later boot cannot undo you twice');
+        'and Tier G’s stash key is gone for good');
+    },
+  },
+  {
+    name: 'profile-systems',
+    tags: ['profiles', 'meanings'],
+    // R3/R5/R6 and X1/X2: a profile is bound to a rolling system, is pickable
+    // only where its dice will be read the way they were chosen, and each
+    // system remembers its own last-used independently. The mismatch is a
+    // LABELLING problem — a pool is notation and a system is a render-time lens
+    // — so nothing is ever swapped and nothing ever breaks.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.5', name: 'Solo' });
+      const soul = await a.dbg('profiles.active');
+      assert.equal(soul.system, 'soul-deal');
+
+      // Deal one for each of the other two systems.
+      const d = await a.dbg(`profiles.deal('dnd')`);
+      assert.equal(d.ok, true, d.status);
+      assert.ok(d.status.includes('D&D style'), `the receipt names the system (got ${d.status})`);
+      await a.dbg(`profiles.deal('none')`);
+
+      // R5: at a Soul Deal table only the Soul Deal profile is pickable, and
+      // the others are present-but-not-offered rather than hidden.
+      const list = await a.dbg('profiles.list');
+      assert.equal(list.length, 3);
+      assert.deepEqual(list.filter((p) => p.pickable).map((p) => p.system), ['soul-deal'],
+        'one pickable at a soul-deal table');
+
+      // X2: the profile in hand is the dealt 'none' one, so the mismatch is
+      // named — and the rack is untouched and still rollable.
+      const mm = await a.dbg('profiles.mismatch');
+      assert.ok(mm && mm.profileSystem === 'none' && mm.tableSystem === 'soul-deal',
+        `the mismatch is named (got ${JSON.stringify(mm)})`);
+      assert.notEqual(
+        await a.eval(`getComputedStyle(document.getElementById('profile-banner')).display`),
+        'none', 'and the banner says so');
+      const rackBefore = (await a.dbg('groups')).map((g) => g.name);
+      await a.roll('2d6');
+      assert.equal(await a.logCount() >= 1, true, 'a mismatched profile still rolls');
+      assert.deepEqual((await a.dbg('groups')).map((g) => g.name), rackBefore,
+        'and nothing was swapped');
+
+      // R6: each system remembers its own, independently.
+      const last = await a.dbg('profiles.lastUsed');
+      assert.equal(last['soul-deal'], soul.name, 'soul-deal remembers its own');
+      assert.ok(last.dnd, 'dnd remembers its own');
+      assert.ok(last.none, 'none remembers its own');
+
+      // X1: the table's system changes under us. Nothing is swapped; the label
+      // is what changes, and the mismatch question is asked again.
+      await a.dbg(`profiles.keepMismatch()`);
+      assert.equal(await a.dbg('profiles.mismatchKept'), true);
+      await a.dbg(`setSystem('none')`);
+      // Online, a settings change applies on the server's echo, not on the
+      // call — the same no-optimistic-divergence rule the felt follows.
+      await a.waitFor(`window.__diceDebug.system === 'none'`, { desc: 'the system echo lands' });
+      assert.equal(await a.dbg('profiles.mismatch'), null,
+        'the table now reads the way the profile does — no mismatch left to name');
+      assert.equal(await a.dbg('profiles.mismatchKept'), false, 'and the acknowledgement reset');
+      assert.deepEqual((await a.dbg('groups')).map((g) => g.name), rackBefore, 'still nothing swapped');
+
+      // The third exit: re-bind the profile in hand to the table instead.
+      await a.dbg(`setSystem('dnd')`);
+      await a.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'the second system echo lands' });
+      const bind = await a.dbg('profiles.bindToTable()');
+      assert.equal(bind.ok, true, bind.status);
+      assert.equal((await a.dbg('profiles.active')).system, 'dnd', 'the profile was re-bound');
+      assert.equal(await a.dbg('profiles.mismatch'), null, 'so there is no mismatch');
+      assert.deepEqual((await a.dbg('groups')).map((g) => g.name), rackBefore,
+        'and re-binding moved a label, not a pool');
+    },
+  },
+  {
+    name: 'profile-join-pick',
+    tags: ['smoke', 'profiles', 'seat'],
+    // R9 and R6 at the door: the join modal carries the profile selector, it
+    // offers only profiles built for THIS table's system, the last-used one is
+    // pre-selected, and Random is there for a player who has none. Picking is
+    // not an import and shows no preview — the outgoing profile keeps every
+    // pool it had, so there is nothing to approve.
+    async fn(ctx) {
+      // Seed a library on this origin, then arrive anonymously so the modal opens.
+      const seed = await ctx.newTable({ origin: '127.0.0.6', name: 'Setup' });
+      await seed.dbg(`profiles.create('Rogue')`);
+      await seed.dbg(`setGroups([{name: 'Sneak', notation: '3d6'}])`);
+      await seed.dbg(`profiles.deal('dnd')`);
+      const seeded = await seed.dbg('profiles.list');
+      assert.equal(seeded.length, 3, 'two soul-deal profiles and one D&D');
+
+      const p = await ctx.newTable({ origin: '127.0.0.6', anon: true });
+      const picker = await p.dbg('seatPicker');
+      assert.equal(picker.open, true, 'the modal is up');
+      assert.equal(picker.system, 'soul-deal', 'and it knows what the table reads by, pre-join');
+      assert.equal(picker.mine.length, 2,
+        `only the profiles for this table's system are offered (got ${JSON.stringify(picker.mine)})`);
+      assert.equal(picker.mine.some((m) => m.name === 'Rogue'), true);
+      assert.ok(picker.profileDefault, 'and one is pre-selected — the last this system saw');
+      assert.equal(picker.profilePick, null, 'nothing is CHOSEN for the player, only offered');
+      assert.notEqual(await p.eval(`getComputedStyle(document.getElementById('seat-mine')).display`),
+        'none', 'the block is on screen');
+
+      // Picking one switches at once and shows no preview pane.
+      const rogue = picker.mine.find((m) => m.name === 'Rogue');
+      const v = await p.dbg(`chooseMyProfile('${rogue.id}')`);
+      assert.equal(v.ok, true, v.status);
+      assert.equal((await p.dbg('profiles.active')).name, 'Rogue');
+      assert.equal(await p.eval(`getComputedStyle(document.getElementById('seat-preview')).display`),
+        'none', 'picking your own profile is not an import — no preview pane');
+      assert.deepEqual((await p.dbg('groups')).map((g) => g.name), ['Sneak'], 'and it is in hand');
+
+      // Then the name completes the join, exactly as it always did.
+      await p.dbg(`chooseSomeoneElse('Bo')`);
+      await p.waitOnline();
+      assert.equal((await p.dbg('profiles.active')).name, 'Rogue',
+        'the pick survives the join');
+      assert.equal((await p.dbg('identity')).name, 'Bo', 'and the name is the name');
+    },
+  },
+  {
+    name: 'profile-random',
+    tags: ['profiles', 'seat'],
+    // R9's Random, at every table. A player with no profile for this system
+    // must be able to get a working one in one tap — including at a Numbers
+    // only table, where what is dealt is a TRAY rather than a character,
+    // because that system declares it has no character model.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.7', name: 'Solo' });
+      for (const [system, min] of [['dnd', 12], ['none', 6]]) {
+        await a.dbg(`setSystem('${system}')`);
+        await a.waitFor(`window.__diceDebug.system === '${system}'`, { desc: `the ${system} echo lands` });
+        const v = await a.dbg(`profiles.deal('${system}')`);
+        assert.equal(v.ok, true, v.status);
+        const rack = await a.dbg('groups');
+        assert.equal(rack.length, min, `${system} deals ${min} pools (got ${rack.length})`);
+        assert.equal((await a.dbg('profiles.active')).system, system, 'bound to the system dealt for');
+        assert.equal(await a.dbg('profiles.mismatch'), null, 'so there is no mismatch');
+        // Every dealt pool must actually roll — the point of a dealt profile.
+        for (const g of rack) {
+          const parsed = await a.dbg(`parseNotation(${JSON.stringify(g.notation)})`);
+          assert.equal(parsed.ok, true, `${system}: '${g.name}' = '${g.notation}' parses`);
+          assert.equal(parsed.canonical, g.notation,
+            `${system}: '${g.notation}' is already the parser's fixed point (got '${parsed.canonical}')`);
+        }
+        await a.roll(rack[0].notation);
+        assert.ok(await a.logCount() >= 1, `${system}: a dealt pool rolls`);
+      }
+      assert.equal((await a.dbg('profiles.active')).name, 'Dice tray',
+        'Numbers only deals a tray, and says so — it does not invent a person');
+    },
+  },
+  {
+    name: 'profile-copy',
+    tags: ['profiles', 'groups'],
+    // R7: "players should be able to see profiles from other players and even
+    // copy the profile for their own use." The owner switcher has browsed
+    // teammates' racks since ROADMAP 2b; until §11 it could only say WHOSE.
+    // Now the wire carries which profile it is and what it was built for, so a
+    // rack a teammate can name is a rack a teammate can copy — into a NEW
+    // profile, under a deduped name, with nothing of theirs written to.
+    async fn(ctx) {
+      const alice = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const bob = await ctx.newTable({ origin: '127.0.0.8', name: 'Bob' });
+      await alice.dbg(`profiles.rename('${(await alice.dbg('profiles.active')).id}', 'Nightblade')`);
+      await alice.dbg(`setGroups([{name: 'Garrote', notation: '2d8', category: 'Skills'}])`);
+      await alice.dbg('publishPools()');
+
+      // Bob sees the label, not just the owner.
+      await bob.waitFor(
+        `(window.__diceDebug.netPlayers.find((p) => p.name === 'Alice') || {}).profile === 'Nightblade'`,
+        { desc: "the profile's name reaches the room" });
+      const seen = (await bob.dbg('netPlayers')).find((p) => p.name === 'Alice');
+      assert.equal(seen.profile, 'Nightblade', 'which profile');
+      assert.equal(seen.system, 'soul-deal', 'and what it reads by');
+
+      // And can copy it. Nothing of Bob's is touched.
+      const mineBefore = await bob.dbg('profiles.active');
+      const got = await bob.dbg(`profiles.copyFrom({name: ${JSON.stringify(seen.profile)}, system: ${JSON.stringify(seen.system)}, pools: ${JSON.stringify(seen.pools)}})`);
+      assert.equal(got.ok, true, got.status);
+      assert.ok(got.status.includes('nothing of yours changed'), got.status);
+      const list = await bob.dbg('profiles.list');
+      assert.equal(list.length, 2, 'a second profile, not a merge');
+      assert.equal(list.find((p) => p.name === 'Nightblade').pools, 1);
+      assert.equal(list.find((p) => p.id === mineBefore.id).pools, mineBefore.pools,
+        'and Bob’s own profile is untouched');
+      assert.equal(list.find((p) => p.id === mineBefore.id).active, true,
+        'a copy is not taken in hand unless asked for');
+
+      // A copy is a copy: Alice editing hers afterwards does not reach Bob's.
+      await alice.dbg(`setGroups([{name: 'Garrote', notation: '9d8'}])`);
+      await alice.dbg('publishPools()');
+      await bob.waitFor(
+        `((window.__diceDebug.netPlayers.find((p) => p.name === 'Alice') || {}).pools || [])[0]?.notation === '9d8'`,
+        { desc: "Alice's edit reaches the room" });
+      const still = (await bob.dbg('profiles.list')).find((p) => p.name === 'Nightblade');
+      assert.equal(still.pools, 1, "Bob's copy is his own — no pointer back to Alice");
+    },
+  },
+  {
+    name: 'profile-file',
+    tags: ['profiles', 'table-file'],
+    // O6/O7/P14: the file is the library's durable copy. The whole library
+    // round-trips through `players:` + `profile:`, the rack appears in exactly
+    // ONE place (a hand-editable format with two homes for one rack is a trap),
+    // and a file from someone else ADDS profiles rather than replacing any.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.9', name: 'Solo' });
+      await a.dbg(`profiles.rename('${(await a.dbg('profiles.active')).id}', 'Nessa')`);
+      await a.dbg(`setGroups([{name: 'Body', notation: '3d6', category: 'Attributes'}])`);
+      await a.dbg(`profiles.deal('dnd')`);
+      await a.dbg(`profiles.use('${(await a.dbg('profiles.list')).find((p) => p.name === 'Nessa').id}')`);
+
+      const text = await a.dbg('portable.snapshot()');
+      assert.ok(text.includes('profile:') && text.includes("name: 'Nessa'"),
+        `the export names whose the pools are (got: ${JSON.stringify(text.slice(0, 200))})`);
+      assert.equal(text.split('\n').filter((l) => l.includes("'Body'")).length, 1,
+        'one home for one rack');
+      assert.ok(text.includes('players:'), 'and the other profiles ride along');
+
+      // The file offers every profile it holds — the `players:` blocks AND the
+      // top-level rack, which is a profile too.
+      const v = await a.dbg(`portable.loadText(${JSON.stringify(text)})`);
+      assert.equal(v.ok, true, v.status);
+      const offered = await a.dbg('portable.profiles()');
+      assert.equal(offered.length, 1, 'one other profile in players:');
+      const rows = await a.eval(`[...document.querySelectorAll('#import-profile-rows .pp-row .pp-name')].map((e) => e.textContent)`);
+      assert.equal(rows.length, 2, `the rack is offered too (got ${JSON.stringify(rows)})`);
+      assert.ok(rows.includes('Nessa'), 'under its own name');
+
+      // Adding is additive: names dedupe, nothing is replaced.
+      const before = (await a.dbg('profiles.list')).length;
+      const add = await a.dbg(`portable.adopt('')`); // '' = the top-level rack
+      assert.equal(add.ok, true, add.status);
+      const after = await a.dbg('profiles.list');
+      assert.equal(after.length, before + 1, 'an add, not a replace');
+      assert.ok(after.some((p) => p.name === 'Nessa 2'), `the name deduped (got ${after.map((p) => p.name).join(', ')})`);
+      assert.equal(after.find((p) => p.name === 'Nessa').pools, 1, 'and the original is untouched');
     },
   },
   {
@@ -6295,6 +6536,13 @@ export const scenarios = [
         'the preview pane is not on screen while choosing a seat');
       assert.notEqual(await p.eval(shown('seat-pick')), 'none', 'the seat list is');
 
+      // ESTABLISH, don't inherit: per-origin localStorage outlives a
+      // scenario's room, and a library left behind on `localhost` by an
+      // earlier scenario may already hold a profile named 'Alice' — which
+      // makes the seat below dedupe to 'Alice 2'. That is correct behaviour
+      // (a copy never overwrites) failing an inherited assumption, so the
+      // library is reset to one freshly dealt profile first.
+      await p.dbg('profiles.reset()');
       const groupsBefore = (await p.dbg('groups')).map((g) => g.name).sort();
       await p.dbg(`chooseSeat('Alice')`);
       await p.waitOnline();
@@ -6308,14 +6556,35 @@ export const scenarios = [
         'and the seat list steps aside once the preview is up');
       assert.notEqual(await p.eval(shown('seat-preview')), 'none', 'the preview pane is');
 
+      // PROFILES §11 CHANGED WHAT APPLY MEANS, and this is where it shows. It
+      // used to MERGE the seat's pools into the player's one rack, because
+      // there was only one rack to put them in — so a player who already had
+      // an 18-pool character and took an 18-pool seat ended up holding one
+      // 36-pool rack that was two characters wearing each other's clothes. The
+      // seat is now a PROFILE of its own: the preview still gates it, but what
+      // lands is separate, and the player's own pools are not written to at all.
+      const mineBefore = await p.dbg('profiles.active');
       await p.dbg('applySeatImport()');
       await p.waitFor(`window.__diceDebug.groups.some((g) => g.name === 'Larceny')`,
         { desc: 'the explicit apply lands the pools' });
       const after = (await p.dbg('groups')).map((g) => g.name);
       assert.ok(after.includes('Strength') && after.includes('Larceny'), "Alice's pools arrived");
-      for (const had of groupsBefore) {
-        assert.ok(after.includes(had), `the player's own pool '${had}' was not deleted`);
-      }
+      assert.equal((await p.dbg('profiles.active')).name, 'Alice',
+        'and they are a profile of their own, in hand');
+      // The stronger claim the merge could never make: nothing of the player's
+      // was touched. Their own profile still holds exactly what it held.
+      const mineAfter = (await p.dbg('profiles.list')).find((x) => x.id === mineBefore.id);
+      assert.ok(mineAfter, `the player's own profile survives (had ${mineBefore.name})`);
+      assert.equal(mineAfter.pools, mineBefore.pools,
+        `and keeps all ${mineBefore.pools} of its pools (got ${mineAfter.pools})`);
+      assert.equal(mineAfter.active, false, 'while the seat is what is in hand');
+      // The seat's profile holds EXACTLY the seat's two pools — not the seat's
+      // plus the player's. (A name check cannot make this claim: the dealt Soul
+      // Deal rack and Alice's seat both carry a 'Strength', which is precisely
+      // the collision the old merge would have silently resolved.)
+      assert.equal(after.length, 2,
+        `the seat's profile is the seat's pools alone (got ${after.length}: ${after.join(', ')})`);
+      assert.ok(groupsBefore.length > 2, `the player had more than that (${groupsBefore.length})`);
       assert.equal(await p.eval(`localStorage.getItem('dice.name.v1')`), 'Alice',
         'and the seat named them');
     },

@@ -315,6 +315,72 @@ t('a player with no pools is still a seat (the key stands, the rack is empty)', 
   assert.equal(exportYaml({ profiles: parsed.profiles.map(asSeat) }), text);
 });
 
+// ---- §11: `profile:` — whose the top-level pools are -----------------------
+
+t('the top-level rack can name its owner, and the trio round-trips', () => {
+  // The section exists so one character's dice never live in two places: the
+  // exporter's own pools stay where they have always been (`pools:`), and this
+  // says whose they are. Writing that profile into `players:` as well would
+  // give a hand-editable format two homes for one rack, and an edit landing in
+  // the ignored copy is a trap.
+  const text = exportYaml({
+    profile: { name: 'Nessa', system: 'soul-deal', set: 'emberforge.blackanvil' },
+    groups: [{ name: 'Strength', notation: '3d6', category: 'Attributes' }],
+    profiles: [{ name: 'Yarn', system: 'dnd', groups: [{ name: 'Longsword', notation: '1d20+4' }] }],
+  });
+  assert.ok(text.includes("profile:\n  name: 'Nessa'\n  system: 'soul-deal'\n  set: 'emberforge.blackanvil'\n"), text);
+  const parsed = parsePortable(text);
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.deepEqual(parsed.profile, { name: 'Nessa', system: 'soul-deal', set: 'emberforge.blackanvil' });
+  assert.deepEqual(parsed.profiles.map((p) => p.name), ['Yarn'], 'the OTHERS, not the one in hand');
+  assert.deepEqual(flat(parsed), [{ name: 'Strength', notation: '3d6', category: 'Attributes' }]);
+  const again = exportYaml({
+    profile: parsed.profile,
+    groups: flat(parsed).map((p) => ({ name: p.name, notation: p.notation, ...(p.category ? { category: p.category } : {}) })),
+    settings: parsed.settings,
+    profiles: parsed.profiles.map(asSeat),
+  });
+  assert.equal(again, text);
+});
+
+t('the rack appears EXACTLY once — no pool line is written twice', () => {
+  const text = exportYaml({
+    profile: { name: 'Nessa', system: 'soul-deal' },
+    groups: [{ name: 'Damage', notation: '3d4' }],
+    profiles: [{ name: 'Yarn', system: 'dnd', groups: [{ name: 'Longsword', notation: '1d20+4' }] }],
+  });
+  const hits = text.split('\n').filter((l) => l.includes("'Damage'"));
+  assert.equal(hits.length, 1, `one home for one rack (got ${hits.length}: ${JSON.stringify(hits)})`);
+});
+
+t("a file with no `profile:` still parses — 'profile' in parsed is false", () => {
+  const parsed = parsePortable("pools:\n  Pools:\n    - 'A': '1d6'\n");
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal('profile' in parsed, false, 'present-or-absent, never a default');
+});
+
+t('a `profile:` section alone is a usable document', () => {
+  // A file naming who the pools belong to but carrying none of them is thin,
+  // but it is not empty — the refusal is for a file that said nothing at all.
+  const parsed = parsePortable("profile:\n  name: 'Nessa'\n");
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.deepEqual(parsed.profile, { name: 'Nessa' });
+});
+
+refuses("profile:\n  system: 'pathfinder'\n", 'is not one of soul-deal, dnd, none',
+  'an unknown system in profile: refuses, as it does in a player block');
+refuses("profile:\n  name: 'Bo#b'\n", "carries '#'",
+  "'#' in the profile: name refuses — it is a display name too");
+refuses("profile:\n  name: 'A'\n  name: 'B'\n", 'appears twice', 'a doubled profile key refuses');
+refuses("profile:\n  nickname: 'A'\n", 'profile lines are', 'an unknown profile key refuses');
+
+t("an unknown dice set in profile: falls closed, like a pool's", () => {
+  const parsed = parsePortable("profile:\n  name: 'Nessa'\n  set: 'no.such.set'\n");
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal(parsed.profile.set ?? null, null);
+  assert.equal(parsed.profile.name, 'Nessa', 'the rest of the section survived');
+});
+
 // ---- §11: a profile names the system its dice were chosen under ------------
 
 t('a profile carries its rolling system, and the pair round-trips as a fixed point', () => {
