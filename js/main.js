@@ -7596,7 +7596,26 @@ function publishPools() {
   // owner switcher has browsed teammates' racks since ROADMAP 2b; until now
   // it could only say whose. A rack a teammate can name is one they can copy.
   mine ? mine.name : null,
-  mine ? mine.system : null);
+  mine ? mine.system : null,
+  // C17: THE WHOLE LIBRARY RIDES ALONG. An organizer builds six characters
+  // and sits down; the table offers six, with no push and no YAML pane. The
+  // ACTIVE profile's pools come from `groups` (the live rack) rather than
+  // from its stored copy, because an edit in progress has not been written
+  // back yet and a seat offering yesterday's version of the character you
+  // are visibly editing is worse than none.
+  profilesOf(profileStore).map((p) => ({
+    name: p.name,
+    system: p.system,
+    ...(p.set ? { set: p.set } : {}),
+    pools: (p.id === profileStore.activeId ? groups : (p.pools || []))
+      .slice(0, MAX_POOLS)
+      .map((g) => {
+        const rec = { name: g.name || '', notation: g.notation };
+        if (g.category) rec.category = g.category;
+        if (g.set) rec.set = g.set;
+        return rec;
+      }),
+  })));
 }
 
 // Category shelves (the Rack): fixed trio order — Attributes, Skills,
@@ -12067,10 +12086,8 @@ function renderTableProfiles() {
   if (!zone || !rows) return;
   rows.textContent = '';
   const offers = [];
-  if (netOnline && roomSetup && Array.isArray(roomSetup.profiles)) {
-    for (const p of roomSetup.profiles) {
-      offers.push({ label: p.name, sub: 'prepared', rec: p });
-    }
+  for (const o of tableOffers()) {
+    offers.push({ label: o.rec.name, sub: o.from === 'prepared' ? 'prepared' : o.from, rec: o.rec });
   }
   for (const pl of players) {
     if (!pl || pl.id === (net && net.playerId) || !Array.isArray(pl.pools) || !pl.pools.length) continue;
@@ -14456,12 +14473,36 @@ function wirePoolsToShelves(pools) {
 // closes the modal without a word: the NAME landed (that much of the seat is
 // real), and there is simply nothing to offer. Called at the end of initNet,
 // so netReady never resolves with the preview half-built.
+// EVERY CHARACTER THIS TABLE OFFERS (C17), from both sources: the profiles a
+// file PREPARED it with (roomSetup — survives everyone leaving) and the
+// libraries the players actually at it are holding (published automatically,
+// gone when they go). Setup wins a name collision: it was chosen deliberately
+// for this table, and a live library is whatever somebody is carrying.
+function tableOffers() {
+  const out = [];
+  const seen = new Set();
+  const add = (rec, from) => {
+    const name = rec && typeof rec.name === 'string' ? rec.name.trim() : '';
+    if (!name || seen.has(name.toLowerCase())) return;
+    seen.add(name.toLowerCase());
+    out.push({ rec, from });
+  };
+  if (netOnline && roomSetup && Array.isArray(roomSetup.profiles)) {
+    for (const p of roomSetup.profiles) add(p, 'prepared');
+  }
+  for (const pl of players) {
+    for (const p of (pl && pl.library) || []) add(p, pl.name || 'a player');
+  }
+  return out;
+}
+
 function seatFollowThrough() {
   if (seatPhase !== 'joining') return;
-  const prof = netOnline && roomSetup && Array.isArray(roomSetup.profiles)
-    ? roomSetup.profiles.find((p) => p && typeof p.name === 'string'
-        && p.name.toLowerCase() === seatChosen.toLowerCase())
-    : null;
+  // Both sources (C17) — a seat offered because somebody at the table is
+  // holding that character must resolve, or the picker offers a chair the
+  // door cannot open.
+  const hit = tableOffers().find((o) => o.rec.name.toLowerCase() === seatChosen.toLowerCase());
+  const prof = hit ? hit.rec : null;
   if (!prof) { closeSeatModal(); return; }
   seatProfile = prof;
   // §11 CHANGES WHAT APPLY MEANS, and this is the whole improvement the

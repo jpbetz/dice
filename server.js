@@ -435,6 +435,9 @@ function getRoom(name) {
 function publicPlayers(room) {
   return [...room.players.values()].map((p) => ({
     id: p.id, name: p.name, color: p.color, pools: p.pools || [],
+    // C17: their whole library, so a joiner is offered every character at
+    // the table rather than only the one each player happens to be holding.
+    ...(p.library && p.library.length ? { library: p.library } : {}),
     // §9: the player's DEFAULT set (present-or-absent, absent = standard)
     // rides the roster so a foreign rack's unmarked pools can resolve to
     // the owner's skin — Alice's rack looks the same on every screen.
@@ -2065,13 +2068,32 @@ async function handlePools(req, res) {
 
   // A no-op publish answers ok without re-broadcasting: the client re-shares
   // on every hello (rejoin safety), and 40 streams need not hear about it.
+  const libNow = sanitizeProfiles(body.value.library);
+  if (libNow.error) return sendError(res, ...libNow.error);
   if ((player.set || null) === set
       && (player.profile || null) === profile
       && (player.system || null) === system
-      && JSON.stringify(player.pools) === JSON.stringify(pools)) {
+      && JSON.stringify(player.pools) === JSON.stringify(pools)
+      && JSON.stringify(player.library || []) === JSON.stringify(libNow.profiles)) {
     return sendJson(res, 200, { ok: true });
   }
+  // THE WHOLE LIBRARY, not just the rack in hand (C17, 2026-08-09). An
+  // organizer builds six characters and the table should offer them — with no
+  // push, no YAML pane, no explicit "apply". Their library IS the seats.
+  //
+  // PER-PLAYER, deliberately, and not folded into room.setup: setup carries a
+  // rev and a conflict rule because it is ONE shared object, so six players
+  // publishing into it would take turns replacing each other's characters.
+  // This rides the same shape as `pools` above — a field on the player,
+  // broadcast when it changes — which is the shape that already scales to
+  // forty streams.
+  //
+  // Visibility is deliberately WIDE for now (Joe 2026-08-09: "all profiles
+  // available for now, we can refine visibility later"), so this publishes
+  // every profile the player holds. The narrowing, when it comes, belongs
+  // here: one filter, one place.
   player.pools = pools;
+  player.library = libNow.profiles;
   if (set) player.set = set; else delete player.set;
   if (profile) player.profile = profile; else delete player.profile;
   if (system) player.system = system; else delete player.system;
@@ -2079,6 +2101,7 @@ async function handlePools(req, res) {
   broadcast(room, 'pools-changed', {
     playerId: player.id,
     pools,
+    library: player.library,
     ...(set ? { set } : {}),
     ...(profile ? { profile } : {}),
     ...(system ? { system } : {}),
@@ -2590,17 +2613,38 @@ function handleTableInfo(req, res, url) {
     const name = room.settings.tableName;
     if (typeof name === 'string' && name) out.name = name;
     out.system = room.settings.system;
-    if (room.setup && Array.isArray(room.setup.profiles) && room.setup.profiles.length) {
-      out.seats = room.setup.profiles.map((p) => ({
-        name: p.name,
-        pools: Array.isArray(p.pools) ? p.pools.length : 0,
+    // TWO SOURCES, ONE LIST (C17). A table offers the characters a file
+    // PREPARED it with (room.setup — survives everyone leaving, for
+    // SETUP_TTL_MS) and the characters the players actually AT it are
+    // holding (their published libraries — zero effort, gone when they go).
+    // The organizer needs no push for the second: they built six characters
+    // and sat down, so the table offers six.
+    //
+    // Setup wins a name collision: it was chosen deliberately for this table,
+    // and a live library is whatever somebody happens to be carrying.
+    const seats = [];
+    const seen = new Set();
+    const add = (name, pools, system) => {
+      const key = String(name).toLowerCase();
+      if (!name || seen.has(key)) return;
+      seen.add(key);
+      seats.push({ name, pools, ...(system ? { system } : {}) });
+    };
+    if (room.setup && Array.isArray(room.setup.profiles)) {
+      for (const p of room.setup.profiles) {
         // Per seat as well as per room: a seat prepared for another system is
         // one the picker must not offer here, and deriving that from the room's
         // own system would only be true while nobody had flipped it since the
         // push. Absent on a seat prepared before §11.
-        ...(p.system ? { system: p.system } : {}),
-      }));
+        add(p.name, Array.isArray(p.pools) ? p.pools.length : 0, p.system);
+      }
     }
+    for (const pl of room.players.values()) {
+      for (const p of pl.library || []) {
+        add(p.name, Array.isArray(p.pools) ? p.pools.length : 0, p.system);
+      }
+    }
+    if (seats.length) out.seats = seats;
   }
   sendJson(res, 200, out);
 }

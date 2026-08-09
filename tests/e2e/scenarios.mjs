@@ -562,6 +562,56 @@ export const scenarios = [
     },
   },
   {
+    name: 'library-is-the-seats',
+    tags: ['profiles', 'prepared-seat', 'cuj6', 'cuj7'],
+    // C17 — THE ORGANIZER PUSHES NOTHING. Joe, 2026-08-09: "I was imagining a
+    // simpler approach where all profiles are available for use when joining
+    // a table." Before this, the only way a table offered characters was
+    // Settings → Your data → Export/import… → Fill with my data → Apply to
+    // table: five gestures behind a YAML textarea, for the headline act of
+    // the whole preparation journey.
+    //
+    // Now a player's library rides the publish their rack already rode, and
+    // the table offers what the people at it are holding. This asserts the
+    // ABSENCE of the push: the organizer never opens Settings.
+    async fn(ctx) {
+      const dm = await ctx.newTable({ origin: '127.0.0.10', name: 'Walter' });
+      await dm.dbg('profiles.reset()');
+      // Three characters, built the way C16 made possible — in the picker,
+      // never in the modal.
+      for (const [nm, pool] of [['Rill', '3d6'], ['Bo', '2d8'], ['Nessa', '1d20']]) {
+        const v = await dm.dbg(`profiles.create(${JSON.stringify(nm)}, 'soul-deal')`);
+        assert.equal(v.ok, true, `${nm} is made (${v.status})`);
+        await dm.dbg(`setGroups([{name: 'Strength', notation: '${pool}', category: 'Attributes'}])`);
+      }
+      await dm.settle();
+      assert.equal(await dm.eval(
+        `document.getElementById('settings-modal').classList.contains('hidden')`), true,
+      'and Settings was never opened — no Apply to table, no YAML pane');
+
+      // A player who has never been here opens the link and is offered them.
+      const p = await ctx.newTable({ origin: 'localhost', anon: true });
+      await p.waitFor(`window.__diceDebug.seatPicker.seats.length >= 3`,
+        { desc: "the table offers the organizer's characters" });
+      const seats = (await p.dbg('seatPicker')).seats.map((s) => s.name).sort();
+      for (const nm of ['Bo', 'Nessa', 'Rill']) {
+        assert.ok(seats.includes(nm), `'${nm}' is on offer (got ${seats})`);
+      }
+
+      // …and taking one WORKS — a seat the picker offers but the door cannot
+      // open would be worse than no offer at all.
+      await p.dbg(`chooseSeat('Bo')`);
+      await p.waitOnline();
+      await p.waitFor(`window.__diceDebug.seatPicker.verdict.canApply === true`,
+        { desc: 'the preview resolves against a LIVE library, not just a pushed setup' });
+      assert.equal((await p.dbg('applySeatImport()')).ok, true, 'and applies');
+      const held = await p.dbg('profiles.active');
+      assert.equal(held.name, 'Bo', "the player is holding Bo");
+      assert.equal(held.pools, 1, 'with the pools Walter built for it');
+      await dm.dbg('profiles.reset()');
+    },
+  },
+  {
     name: 'author-in-place',
     tags: ['groups', 'profiles', 'cuj6'],
     // C16 — MAKING A CHARACTER MUST NOT CROSS THE MODAL. Settings is
@@ -8158,8 +8208,15 @@ export const scenarios = [
       const peek = await fetch(
         `http://127.0.0.1:${ctx.port}/api/table?room=${encodeURIComponent(ctx.room)}`,
       ).then((r) => r.json());
-      assert.deepEqual((peek.seats || []).map((s) => s.name), ['Alice'],
-        'the seats are back for anyone arriving now');
+      // The PREPARED seat is what this scenario is about — that a re-push
+      // heals a room whose setup expired. Since C17 the peek also carries the
+      // live libraries of whoever is sitting there, and the organizer is
+      // sitting there holding their own dealt profile, so `includes` rather
+      // than `deepEqual`: asserting the exact list here would be asserting
+      // that nobody is at the table, which is a different claim and a false
+      // one. `library-is-the-seats` owns the live half.
+      assert.ok((peek.seats || []).map((s) => s.name).includes('Alice'),
+        `the prepared seat is back for anyone arriving now (got ${(peek.seats || []).map((s) => s.name)})`);
       assert.equal((await org2.dbg('felt')).id, 'plum',
         "and so is the felt the organizer chose — the heal carries the table, not just the seats");
     },

@@ -289,12 +289,17 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     // §11: `profile` and `system` label the rack — WHICH of your profiles this
     // is and what it was built for — so a teammate browsing it can name it and
     // copy it. Present-or-absent, and absent is exactly what shipped before.
-    async setPools(pools, set, profile = null, system = null) {
+    // `library` (C17): every profile this player holds, so the table can
+    // offer them as seats without anyone pushing a setup. Rides this call
+    // rather than earning its own, because it changes exactly when the rack
+    // does and the server's no-op guard already covers both.
+    async setPools(pools, set, profile = null, system = null, library = null) {
       const res = await withPlayer('/api/pools', {
         pools,
         ...(set ? { set } : {}),
         ...(profile ? { profile } : {}),
         ...(system ? { system } : {}),
+        ...(library ? { library } : {}),
       });
       return res.ok;
     },

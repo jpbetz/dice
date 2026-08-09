@@ -1053,6 +1053,55 @@ is still the right home for "I am building to 80 tonight". Pinned by
   while *inheriting* a library from whatever ran before it on that origin.
   Both scenarios now establish their own state.
 
+### C17. The table offers what the players hold — no push — SHIPPED
+
+*CUJ6/CUJ7, Joe 2026-08-09: "I was imagining a simpler approach where all
+profiles are available for use when joining a table… all profiles available
+for now, we can refine visibility later."*
+
+The organizer's headline act — **hand these characters out** — was five
+gestures behind a YAML textarea: Settings → Your data → `Export / import…` →
+`Fill with my data` → `Apply to table`. A developer-shaped door on the most
+important verb in the preparation journey.
+
+**SHIPPED 2026-08-09.** A player's whole **library** now rides the publish
+their active rack already rode, and a table offers what the people at it are
+holding. The organizer builds six characters and sits down; the table offers
+six. Nothing is pushed and Settings is never opened.
+
+**Per-player, not folded into `room.setup`.** Setup carries a rev and a
+conflict rule because it is ONE shared object — six players publishing into it
+would take turns replacing each other's characters. This rides `handlePools`'
+shape instead: a field on the player, broadcast when it changes, with the
+existing no-op guard extended to cover it. That shape already scales to forty
+streams.
+
+**Two sources, one list**, and they do different jobs: `room.setup` is what a
+FILE prepared the table with and survives everyone leaving (SETUP_TTL_MS);
+live libraries are zero-effort and leave when their owner does. Setup wins a
+name collision — it was chosen deliberately for this table, a live library is
+whatever somebody happens to be carrying. `tableOffers()` is the one merge,
+used by the seat door and the in-room list alike, so a seat the picker offers
+is always a seat the door can open.
+
+The ACTIVE profile publishes from `groups` (the live rack) rather than its
+stored copy: an edit in progress has not been written back, and offering
+yesterday's version of the character you are visibly editing is worse than
+offering none.
+
+**Visibility is deliberately wide** — every profile, to anyone with the link.
+Joe's call, explicitly for now. The narrowing belongs in one place when it
+comes: the `sanitizeProfiles(body.value.library)` call in `handlePools`.
+
+The YAML path is untouched and still does table settings + seats, because a
+file is the only thing that crosses a browser or outlives a room. What changed
+is that it is no longer the ONLY door.
+
+Pinned by `library-is-the-seats`, verified to fail when the server stops
+merging live libraries. `setup-repush` re-pointed from `deepEqual` to
+`includes`: asserting the exact seat list there would now be asserting that
+nobody is sitting at the table.
+
 ### C16. Authoring a character crossed the Settings modal — SHIPPED
 
 *CUJ6, raised by Joe 2026-08-09: "I'm not convinced a player preparing a game
