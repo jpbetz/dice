@@ -975,7 +975,7 @@ and ruled in POOL-ANALYSIS §9 ("the number `100` appears nowhere in code").
 **The ruling and the journey are in tension** and that is the thing to
 decide: a budget that cannot be shown cannot be spent deliberately.
 
-### C9. Four small preparation defects, all obvious — CUJ6/CUJ7, batch, small
+### C9. Four small preparation defects — SHIPPED
 
 - **The `dice value` caption never renders while you build your first
   character.** The rack figure builds only under `!foreign && poolsEdit`, and
@@ -998,6 +998,29 @@ decide: a budget that cannot be shown cannot be spent deliberately.
   attributes/skills/motivations into every rack in manage mode whatever the
   profile's system — PROFILES §11.6 names exactly this: *"a D&D rack in manage
   mode would stand three empty Soul Deal shelves. It becomes system-aware."*
+
+**SHIPPED 2026-08-08.** All four. Notes worth keeping:
+
+- The head gained a **fourth** reason to stand (`.ledgered`) rather than a
+  looser gate. §11's `.profiled` had already narrowed this bug without fixing
+  it, leaving it aimed at the player holding one profile — i.e. exactly the
+  person building their first character. `rack-dice-value` is re-pointed at
+  **computed display**: it passed for weeks reading `textContent` straight
+  through `display:none`, which is the failure §7.21 already named.
+- The head now hides its region NAME when it stands only for the ledger.
+  Otherwise manage mode printed "SAVED POOLS" one line under the section
+  bar's "Pools" — §7.23's own rule, broken by the fix for something else.
+- `Apply to table` re-snapshots **only when the box still holds exactly what
+  we put there**. Always re-snapshotting would silently discard an opened
+  file, which is the worse failure by a distance; a hand-edited box goes as
+  it reads.
+- The trio follows the **profile's** system, not the table's — a D&D profile
+  briefly sitting at a Soul Deal table is what the mismatch banner is for, and
+  it must not also grow three shelves its own system never had.
+- Pinned by `prep-affordances`, verified to fail without the fixes. It also
+  surfaced a latent fragility: `panel-anatomy` asserted the head is absent
+  while *inheriting* a library from whatever ran before it on that origin.
+  Both scenarios now establish their own state.
 
 ### C10. The generic invite link never offers a prepared seat to a returning player — DEFECT, medium — **DESIGN REOPENED**
 

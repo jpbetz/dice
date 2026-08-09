@@ -533,6 +533,57 @@ export const scenarios = [
     },
   },
   {
+    name: 'prep-affordances',
+    tags: ['groups', 'profiles', 'cuj6'],
+    // C9 — four small things between "I sit down to make six characters" and
+    // having them. Each was invisible to the suite for its own reason.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg('profiles.reset()');
+      await a.dbg('setPanelState({pools: true})');
+
+      // ① `⚄ Random` honours the name box. It shares one row with `＋ New`,
+      // which read the box while Random did not — and Random is the only one
+      // of the two that deals a PRICED rack, so building six characters meant
+      // Random-then-rename six times.
+      await a.eval(`(() => { const i = document.getElementById('profile-newname');
+        i.value = 'Nessa'; })()`);
+      await a.eval(`document.getElementById('profile-deal').click()`);
+      const names = (await a.dbg('profiles.list')).map((p) => p.name);
+      assert.ok(names.includes('Nessa'), `the dealt profile takes the typed name (got ${names})`);
+      assert.equal(await a.eval(`document.getElementById('profile-newname').value`), '',
+        'and the box empties, like ＋ New');
+      const nessa = (await a.dbg('profiles.list')).find((p) => p.name === 'Nessa');
+      assert.ok(nessa.pools > 0, 'and it is DEALT — priced pools, not an empty rack');
+
+      // ② The trio is this profile's character sheet, not every game's.
+      // PROFILES §11.6 said so and it was never built: a D&D rack stood three
+      // empty Soul Deal shelves in the one mode where you decide what your
+      // character is made of.
+      await a.dbg('setPoolsEditMode(true)');
+      const shelves = () => a.eval(
+        `[...document.querySelectorAll('.pool-sec-head .psh-word')].map((e) => e.textContent.trim())`);
+      const soul = await shelves();
+      for (const w of ['Attributes', 'Skills', 'Motivations']) {
+        assert.ok(soul.includes(w), `a Soul Deal rack stands its ${w} shelf`);
+      }
+      const made = await a.dbg(`profiles.create('Warden', 'dnd')`);
+      assert.equal(made.ok, true, `a D&D profile is made (${made.status})`);
+      const warden = (await a.dbg('profiles.list')).find((p) => p.name === 'Warden');
+      await a.dbg(`profiles.use(${JSON.stringify(warden.id)})`);
+      await a.dbg('setPoolsEditMode(true)');
+      const dnd = await shelves();
+      assert.deepEqual(dnd.filter((w) => ['Attributes', 'Skills', 'Motivations'].includes(w)), [],
+        `a D&D rack invents no Soul Deal shelves (got ${dnd})`);
+      // Leave the origin as we found it: the library is per-ORIGIN and
+      // outlives this room, and a scenario that ends holding two profiles
+      // makes the NEXT one boot `.profiled` — which is a head standing where
+      // it asserted none. Found exactly that way.
+      await a.dbg('setPoolsEditMode(false)');
+      await a.dbg('profiles.reset()');
+    },
+  },
+  {
     name: 'storage-jam',
     tags: ['groups', 'cuj6', 'cuj13'],
     // CUJ13: THE FAILURE THAT USED TO BE SILENT. saveGroups is the app's
@@ -1670,6 +1721,14 @@ export const scenarios = [
       // is absent — the section bar's pressed `Pools` stands directly above
       // the region and names it, and a second name for one region is the
       // redundant standing chrome §7.9 kills.
+      //
+      // ESTABLISH, don't inherit: the head also stands for `.profiled` (a
+      // library holding more than one) and `.ledgered` (manage mode), and the
+      // library is per-ORIGIN, so a scenario that ran earlier on this origin
+      // and left two profiles behind turns this assertion into a failure
+      // three scenarios from its cause. Reset first, and read at rest.
+      await a.dbg('profiles.reset()');
+      await a.dbg('setPoolsEditMode(false)');
       assert.equal(await a.eval(
         `getComputedStyle(document.getElementById('pools-head')).display`),
         'none', 'your own rack carries no second name — the section bar names it');
@@ -3333,6 +3392,25 @@ export const scenarios = [
         'no figures at rest');
 
       await a.dbg('setPoolsEditMode(true)');
+      // COMPUTED DISPLAY, not textContent (C9). This scenario passed for weeks
+      // while the whole-rack figure was invisible: `renderGroups` builds
+      // `.ph-fig` only when `!foreign && poolsEdit`, and `#pools-head` was
+      // `display:none` in exactly that state — the state that built it was the
+      // state that hid it — and textContent reads straight through
+      // display:none. A visibility contract is about what the EYE gets
+      // (§7.21), so it has to be asserted that way. This is the one assertion
+      // that would have caught it, on the one player it hurt most: someone
+      // holding a single profile, building their first character.
+      assert.equal(await a.eval(
+        `getComputedStyle(document.getElementById('pools-head')).display !== 'none'`),
+      true, 'the region head STANDS in manage mode, so its total can be seen');
+      assert.equal(await a.eval(`(() => {
+        const f = document.querySelector('#pools-head .ph-fig');
+        return !!f && getComputedStyle(f).display !== 'none' && f.getBoundingClientRect().width > 0;
+      })()`), true, 'and the rack total is on screen, not merely in the DOM');
+      assert.equal(await a.eval(
+        `document.querySelectorAll('#pools-head .phf-word').length`), 1,
+        "and the standing 'dice value' word with it — the shelf figures' unit");
       const led = await a.dbg('rackDiceValue');
       assert.equal(led.total, 102, `rack total: 6+16+40+40 (got ${led.total})`);
       const shelf = (l) => led.shelves.find((s) => s.label === l).value;

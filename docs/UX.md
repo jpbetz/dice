@@ -2453,6 +2453,14 @@ change plus an assertion that pins computed display (§7.21's lesson: *a
 visibility contract is about what the eye gets*); ROADMAP U4's entry names the
 assertion, and neither is in this doc pass. This paragraph is the pointer.
 
+***FIXED 2026-08-08 (ROADMAP C9).*** The head now has a **fourth** reason to
+stand: `.ledgered`, set whenever the figure is built, joins `.foreign` and
+`.profiled` in the `:not()` chain. §11's `.profiled` had already made the
+head appear for anyone holding more than one profile — which quietly narrowed
+the bug rather than fixing it, and left it aimed squarely at the player
+building their FIRST character, i.e. exactly when the number matters. The
+scenario is re-pointed at computed display, per the lesson above.*
+
 **THE REFUSALS (as load-bearing as the additions).** The dice region
 gets nothing: the pressed *Dice* segment already names it and eight
 tiles reading d4–d100 self-label (a DICE caption would kill no

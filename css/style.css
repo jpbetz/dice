@@ -1357,7 +1357,15 @@ html, body {
    profiles is in your hands. Same contract as .foreign — the head appears when
    it has ownership to declare and stays absent when it does not, so a library
    holding one profile shows no new chrome anywhere. */
-#pools-head:not(.foreign):not(.profiled) { display: none; }
+/* …and a FOURTH (C9, 2026-08-08): it carries the rack's dice-value figure in
+   manage mode, and that figure is the only thing on screen answering "have I
+   spent my creation budget". With just `.foreign` and `.profiled` the head
+   stayed `display:none` for anyone holding ONE profile — so a player building
+   their FIRST character, which is exactly when the number matters, got
+   unlabelled integers on the shelf heads and no rack total at all. The figure
+   was built the whole time; nothing showed it. `rack-dice-value` passed
+   regardless, because textContent reads straight through display:none. */
+#pools-head:not(.foreign):not(.profiled):not(.ledgered) { display: none; }
 #pools-head {
   display: flex;
   align-items: center;
@@ -1406,6 +1414,15 @@ html, body {
   margin: 8px 0 0;
 }
 #pools-head.foreign .ph-word { color: var(--ivory); }
+/* …and NO region name when the head stands only for the ledger (C9). The
+   head has three reasons to exist and they want different words: `.foreign`
+   names whose rack you are reading, `.profiled` names which of yours is in
+   your hands, and `.ledgered` carries the total. Only the first two are
+   about identity. In manage mode on your own single-profile rack the head
+   would otherwise print "SAVED POOLS" directly under the section bar's
+   "Pools" — the region named twice, one line apart, which §7.23 already
+   ruled against when it gave the sections their one name. */
+#pools-head.ledgered:not(.foreign):not(.profiled) .ph-word { display: none; }
 #pools-head.foreign .ph-tag { display: inline; }
 #groups-list.foreign .pool-sec-head { position: static; }
 
@@ -1429,13 +1446,14 @@ html, body {
    right-flush column — steel word, ivory figure, no gold (HUE = ACT:
    nothing here is an action). Figures are BUILT only in manage mode,
    never styled into hiding.
-   KNOWN BROKEN for the rack half (recorded 2026-08-08, UX.md §7.17): the
-   `.ph-fig` total is built only when the rack is YOURS, and #pools-head is
-   `display:none` in exactly that state (see :not(.foreign) above), so the
-   whole-rack figure and the standing 'dice value' word never reach a screen —
-   which also leaves .psh-fig as bare integers with no unit. rack-dice-value
-   still passes because textContent reads through display:none. Do not "fix"
-   it by unhiding the head; the fix is where the figure mounts. */
+   FIXED 2026-08-08 (C9): the rack `.ph-fig` is built only when the rack is
+   YOURS and in manage mode, and #pools-head used to be display:none in
+   exactly that state — the state that built the figure was the state that
+   hid it. The head now stands on `.ledgered` too (see the :not() chain
+   above), so the whole-rack total and the standing `dice value` word reach
+   the screen for a library of one, which is when a first character is being
+   priced.
+*/
 .pool-sec-head .psh-fig,
 #pools-head .ph-fig b {
   color: var(--ivory);

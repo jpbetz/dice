@@ -6962,9 +6962,18 @@ function makeProfile({ name, system, pools = [], set = null, activate = true }) 
 
 // R9's Random: a whole dealt profile for the table's own system, named without
 // asking a question it can answer (js/seed.js dealName).
-function dealNewProfile(system) {
+// `wanted` is the name box's text (C9): a dealt character you have already
+// named is the common case when you are making six of them, and the dealt
+// name is the fallback rather than the rule. Deduped either way — a copy
+// never overwrites, and neither does a deal.
+function dealNewProfile(system, wanted = '') {
   const sys = knownSystem(system) || tableSystem();
-  const made = makeProfile({ name: uniqueName(profileStore, dealName(sys)), system: sys, pools: dealRack(sys) });
+  const asked = String(wanted || '').trim();
+  const made = makeProfile({
+    name: uniqueName(profileStore, asked || dealName(sys)),
+    system: sys,
+    pools: dealRack(sys),
+  });
   if (!made.ok) return made;
   return pv(true, `✓ dealt '${made.name}' — ${systemLabel(sys)}, ${groups.length} pools`);
 }
@@ -7591,7 +7600,20 @@ function buildSections(list, { ensureTrio = false } = {}) {
   }
   // Your own rack is the character sheet: the trio shelves stand even when
   // empty, each ending in its ghost '+' tile (the Sheet Pass).
-  if (ensureTrio) {
+  //
+  // SYSTEM-AWARE (C9, PROFILES §11.6's own words: *"a D&D rack in manage mode
+  // would stand three empty Soul Deal shelves. It becomes system-aware."* It
+  // did not, until now.) Attributes/Skills/Motivations are *Your Soul Deal*'s
+  // character sheet, not every game's — standing them empty on a D&D rack
+  // invents three shelves that system has no name for, in the one mode where
+  // a player is deciding what their character is made of.
+  // The PROFILE's system, not the table's: these shelves are this character's
+  // sheet, and a D&D profile briefly sitting at a Soul Deal table is exactly
+  // the case the mismatch banner exists to name — it must not also grow three
+  // shelves its own system never had. Falls back to the table's when nothing
+  // is in hand (the lobby, a foreign rack).
+  const rackSystem = (activeProfile(profileStore) || {}).system || tableSystem();
+  if (ensureTrio && rackSystem === 'soul-deal') {
     for (const k of TRIO) {
       if (!secs.has(k)) secs.set(k, { key: k, label: TRIO_LABELS[k], pools: [] });
     }
@@ -8042,6 +8064,8 @@ function renderGroups() {
   // paid once here. Rebuilt fresh per render; absent outside manage.
   const oldFig = poolsHead.querySelector('.ph-fig');
   if (oldFig) oldFig.remove();
+  // The head has to STAND to show it (C9) — see the :not(.ledgered) rule.
+  poolsHead.classList.toggle('ledgered', !foreign && poolsEdit);
   if (!foreign && poolsEdit) {
     const fig = document.createElement('span');
     fig.className = 'ph-fig';
@@ -11563,6 +11587,12 @@ function portableAdoptProfiles() {
 // dice.table.v1:<room> — the ONE place it is written — making this browser an
 // author §G6 will re-push for.
 async function portablePushToTable() {
+  // …AND SEND WHAT IS TRUE NOW (C9). If the box still holds exactly what we
+  // put there, it is a stale view of our own data and the live one is what
+  // was meant. Anything else — a file, or an edit — goes as it reads.
+  if (portableFilledText !== null && portableText.value === portableFilledText) {
+    fillPortableBox();
+  }
   if (!portableParsed) return portableRefuse('✗ nothing usable in the box — open a table file or Fill with my data first');
   if (!netOnline || !net) return portableRefuse('✗ solo — no table to prepare (the file itself still works anywhere)');
   const t = portableParsed.table || null;
@@ -11961,24 +11991,46 @@ document.getElementById('profile-newname').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); document.getElementById('profile-new').click(); }
 });
 document.getElementById('profile-deal').addEventListener('click', () => {
-  showProfileNote(dealNewProfile(tableSystem()));
+  // THE NAME BOX GOVERNS BOTH BUTTONS (C9). It sits in one row with `＋ New`
+  // and `⚄ Random`; `＋ New` read it and Random did not, so the realistic
+  // six-character path — Random gives you a PRICED rack, `＋ New` gives you
+  // an empty one — was Random, then rename, six times. The box is one input
+  // in one row: a control beside it that ignores it is a control that lies
+  // about what the row is for.
+  const input = document.getElementById('profile-newname');
+  const v = dealNewProfile(tableSystem(), input.value);
+  if (v.ok) input.value = '';
+  showProfileNote(v);
   renderProfileLibrary();
 });
 document.getElementById('profile-pick').addEventListener('click', openProfileMenu);
 document.getElementById('import-adopt-all').addEventListener('click', () => portableAdoptProfiles());
 
 
+// WHAT THE BOX LAST HELD BY OUR OWN HAND (C9). The box is two things wearing
+// one textarea: a snapshot of YOUR data, and a file somebody sent you. Apply
+// to table reads whichever is there, and the box only ever refilled on first
+// open / Fill with my data / Open file — so editing a character after opening
+// the pane sent the room the PRE-EDIT set, while `Download` an inch away read
+// live. Two buttons in one row disagreeing about what your data is.
+//
+// Remembering the exact text we filled is what lets the refresh be safe: an
+// untouched own-data box is re-snapshotted before it is sent, and a box
+// holding a file — or your own edits — is sent exactly as it reads. The
+// alternative (always re-snapshot) would silently discard an opened file,
+// which is the worse failure by a distance.
+let portableFilledText = null;
+function fillPortableBox() {
+  portableFilledText = portableSnapshot();
+  portableText.value = portableFilledText;
+  portablePreview();
+}
+
 document.getElementById('portable-open').addEventListener('click', () => {
   const opening = portableZone.classList.toggle('hidden') === false;
-  if (opening && !portableText.value) {
-    portableText.value = portableSnapshot();
-    portablePreview();
-  }
+  if (opening && !portableText.value) fillPortableBox();
 });
-document.getElementById('portable-export').addEventListener('click', () => {
-  portableText.value = portableSnapshot();
-  portablePreview();
-});
+document.getElementById('portable-export').addEventListener('click', fillPortableBox);
 document.getElementById('portable-copy').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   try {
