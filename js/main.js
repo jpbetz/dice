@@ -7077,6 +7077,7 @@ function setPoolsEdit(on) {
   if (poolsEdit) poolsOwner = null; // ✎ manages YOUR rack — fall home first
   if (!poolsEdit) {
     editingGroupId = null; // leaving manage mode closes any open editor
+    deletedPool = null;    // …and the undo tombstone (U28a: scoped to the gate)
     creatingShelf = null;  // …and the creation card
     creationDraft = { name: '', dice: ['d6'], touched: false };
     draftShelves = [];     // unused session shelves evaporate (pools persist theirs)
@@ -7228,6 +7229,53 @@ let draftShelves = [];
 // typed name must survive the repaint (fleet catch)
 let creationDraft = { name: '', dice: ['d6'], touched: false };
 const SHELF_NOUN = { attributes: 'attribute', skills: 'skill', motivations: 'motivation' };
+
+// THE UNDO FOR A DELETED POOL (U28a). One slot, not a stack: a rack edit is
+// a deliberate act and an undo history of them would be a second thing to
+// reason about. It holds the pool AND the index it sat at, so restoring puts
+// it back where it was rather than at the end of its shelf — a pool that
+// reappears somewhere else has not really been restored, and on a rack with
+// digit shortcuts it would silently move under the keys.
+// Cleared when manage mode closes: the undo is scoped to the editing session
+// you are in, and a tombstone outliving its gate would be a stale door.
+let deletedPool = null; // {group, index}
+
+// THE TOMBSTONE. It occupies the slot the pool just left, which is where
+// your eye and your finger already are — no toast, no timer racing your
+// reading, no z-index, and nothing to find. It borrows the ghost cell's
+// dashed dress (same footprint, same "this is not a pool" reading) but wears
+// the RESTORE verb rather than a `+`, and it is a real button, not chrome.
+function buildUndoTile() {
+  const tile = document.createElement('div');
+  tile.className = 'pool-tile ghost undo-tomb';
+  const g = deletedPool.group;
+  const nm = g.name || g.notation;
+  const b = document.createElement('button');
+  b.className = 'tile-stage ghost-add undo-restore';
+  b.title = `Put ${nm} back`;
+  b.setAttribute('aria-label', `Undo — put ${nm} back on the shelf`);
+  const glyph = document.createElement('span');
+  glyph.className = 'ghost-plus';
+  glyph.setAttribute('aria-hidden', 'true');
+  glyph.textContent = '↩';
+  const word = document.createElement('span');
+  word.className = 'ghost-noun';
+  word.textContent = 'Undo';
+  b.append(glyph, word);
+  b.addEventListener('click', () => {
+    const d = deletedPool;
+    if (!d) return;
+    deletedPool = null;
+    // splice at the REMEMBERED index, clamped: the rack can have changed
+    // under the tombstone (another delete, a new pool) while it stood.
+    groups.splice(Math.min(d.index, groups.length), 0, d.group);
+    saveGroups();
+    renderGroups();
+    announce(`${nm} is back.`);
+  });
+  tile.appendChild(b);
+  return tile;
+}
 
 // A ghost '+' cell ends every shelf on YOUR rack: creation happens where
 // the thing will live, so category is never typed. A stray tap is free —
@@ -7570,7 +7618,17 @@ function renderGroups() {
     groupsListEl.appendChild(head);
     const grid = document.createElement('div');
     grid.className = 'pool-grid';
-    for (const g of sec.pools) {
+    // Where the tombstone goes, if this is its shelf (U28a). Counted among
+    // the SURVIVORS: the deleted pool's global index is compared against each
+    // remaining pool's, so the slot lands between the same two neighbours it
+    // sat between — not at the end, and not off by one when the shelf is not
+    // a contiguous run of the rack.
+    const sectionKeyOf = (g) => (g.category || '').trim().toLowerCase() || '\u0000';
+    const tombAt = (deletedPool && sectionKeyOf(deletedPool.group) === sec.key)
+      ? sec.pools.filter((p) => groups.indexOf(p) < deletedPool.index).length
+      : -1;
+    for (const [gi, g] of sec.pools.entries()) {
+      if (gi === tombAt) grid.appendChild(buildUndoTile());
       const ord = digitOf(g); // U24: the shelf-shared digit, 0 when it has none
 
       // This tile is being edited: the editor card spans the shelf.
@@ -7657,9 +7715,16 @@ function renderGroups() {
         delBtn.title = 'Delete pool';
         delBtn.addEventListener('click', () => {
           if (pop && pop.source === 'group' && pop.groupId === g.id) closePopover();
+          // REMEMBER IT (U28a). One tap used to delete a saved pool outright,
+          // with no confirm and no way back — the rack's only irreversible
+          // act, on its smallest control. The pool and its index go to the
+          // tombstone, which renders in the slot it just left.
+          const at = groups.findIndex((x) => x.id === g.id);
+          deletedPool = { group: g, index: at < 0 ? groups.length : at };
           groups = groups.filter((x) => x.id !== g.id);
           saveGroups();
           renderGroups();
+          announce(`Deleted ${nm}. Undo is in its place.`);
         });
         tile.append(delBtn);
       }
@@ -7670,6 +7735,9 @@ function renderGroups() {
         pop.row = tile;
       }
     }
+    // …and if it sat LAST on its shelf there is no survivor to precede, so
+    // the loop above never placed it. The ghost/creation cell comes after.
+    if (tombAt >= sec.pools.length) grid.appendChild(buildUndoTile());
     if (poolsEdit) {
       // creation is an EDITING verb (Joe, 2026-08-01): ghosts and the
       // card render only inside ✎ — the rest state is pure play

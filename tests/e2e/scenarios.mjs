@@ -318,6 +318,62 @@ export const scenarios = [
     },
   },
   {
+    name: 'pool-undo',
+    tags: ['groups'],
+    // U28a: DELETING A POOL IS THE RACK'S ONE IRREVERSIBLE ACT, and it was
+    // one tap on its smallest control with no confirm and no way back. The
+    // undo stands in the SLOT the pool left — the way back is where the
+    // thing was, so there is nothing to find and no timer racing the read.
+    // It restores at the remembered INDEX: a pool that reappears somewhere
+    // else has not been restored, and on a rack with digit shortcuts it
+    // would silently move under the keys.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setGroups([
+        {name: 'Strength', notation: '1d8', category: 'Attributes'},
+        {name: 'Wit', notation: '1d12', category: 'Attributes'},
+        {name: 'Will', notation: '1d6', category: 'Attributes'},
+        {name: 'Axe', notation: '2d8', category: 'Skills'}
+      ])`);
+      await a.dbg('setPoolsEditMode(true)');
+      const names = () => a.eval(
+        `[...document.querySelectorAll('.pool-tile .tile-name')].map((e) => e.textContent.trim())`);
+      assert.deepEqual(await names(), ['Strength', 'Wit', 'Will', 'Axe'], 'the rack as dealt');
+
+      // Delete the MIDDLE of its shelf — the case an append-style restore
+      // gets wrong while still looking like it worked.
+      await a.eval(`[...document.querySelectorAll('.pool-tile')]
+        .find((t) => t.textContent.includes('Wit')).querySelector('.tile-del').click()`);
+      assert.deepEqual(await names(), ['Strength', 'Will', 'Axe'], 'the pool is gone');
+      assert.equal(await a.eval(`document.querySelectorAll('.undo-tomb').length`), 1,
+        'a tombstone stands in its place');
+      // …IN ITS PLACE, not at the end: the tombstone's own neighbours are
+      // the ones the pool had.
+      assert.equal(await a.eval(`(() => {
+        const cells = [...document.querySelectorAll('.pool-grid')[0].children];
+        return cells.findIndex((c) => c.classList.contains('undo-tomb'));
+      })()`), 1, 'the tombstone sits where the pool sat');
+
+      await a.eval(`document.querySelector('.undo-restore').click()`);
+      assert.deepEqual(await names(), ['Strength', 'Wit', 'Will', 'Axe'],
+        'undo puts it back WHERE it was, not at the end');
+      assert.equal(await a.eval(`document.querySelectorAll('.undo-tomb').length`), 0,
+        'the tombstone leaves with the rescue');
+
+      // THE UNDO IS SCOPED TO THE GATE. A door that outlives manage mode is
+      // a stale one — and the pool is saved, so leaving is the commit.
+      await a.eval(`[...document.querySelectorAll('.pool-tile')]
+        .find((t) => t.textContent.includes('Axe')).querySelector('.tile-del').click()`);
+      assert.equal(await a.eval(`document.querySelectorAll('.undo-tomb').length`), 1,
+        'a tombstone for the last pool on its shelf');
+      await a.dbg('setPoolsEditMode(false)');
+      await a.dbg('setPoolsEditMode(true)');
+      assert.equal(await a.eval(`document.querySelectorAll('.undo-tomb').length`), 0,
+        'leaving manage mode closes the undo');
+      assert.deepEqual(await names(), ['Strength', 'Wit', 'Will'], 'and the delete stands');
+    },
+  },
+  {
     name: 'touch-targets',
     tags: ['chrome'],
     // U28's list-driven pin. Seven of the eight (pointer: coarse) blocks in
@@ -395,14 +451,28 @@ export const scenarios = [
         // ---- the rack in manage mode ----
         await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Sneak', notation: '2d6'}])`);
         assert.equal(await a.dbg('setPoolsEditMode(true)'), true, 'the pencil enters manage mode');
-        // THE DELETE x IS PINNED SMALL, ON PURPOSE (U28). It shipped at 36
-        // and was reverted the same day: a counted pool wears its badge
-        // immediately left of this button, with 2px of overlap already at
-        // 24, so 36 puts the box on top of the "2". This asserts the REVERT
-        // — if someone grows it again in CSS without moving the badge, the
-        // collision comes back, and no size assertion would have caught it.
-        assert.deepEqual(await box('.tile-del'), { w: 24, h: 24 },
-          'the pool delete x stays 24 until the badge moves (needs markup + undo)');
+        // THE DELETE RAIL (U28a). Not a corner button: growing that one put
+        // its box on top of the `×2` badge of every counted pool. So it is
+        // 34 wide down the tile's full height, and the badge is on a
+        // different axis entirely. The NO-OVERLAP check is the real pin —
+        // a size assertion alone is exactly what passed while the shipped
+        // control was visibly broken.
+        const del = await box('.tile-del');
+        assert.ok(del && del.w >= 34 && del.h >= 34,
+          `the delete rail clears the finger floor (got ${del && del.w}x${del && del.h})`);
+        const clash = await a.eval(`(() => {
+          const out = [];
+          for (const tile of document.querySelectorAll('.pool-tile')) {
+            const x = tile.querySelector('.tile-del');
+            const art = tile.querySelector('.tile-art');
+            if (!x || !art) continue;
+            const xr = x.getBoundingClientRect(), ar = art.getBoundingClientRect();
+            if (ar.right > xr.left) out.push(Math.round(ar.right - xr.left));
+          }
+          return out;
+        })()`);
+        assert.deepEqual(clash, [],
+          'no tile\'s art reaches under the delete rail — the badge collision that got the corner button reverted');
         // The one item that TEACHES rather than enlarges: the `+` whisper is
         // the only thing saying a rack tile stages rather than rolls, and it
         // is hover-only, so on touch it never rendered at all.

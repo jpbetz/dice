@@ -104,6 +104,14 @@ try {
   // glyph reads as reachable or as looming.
   await t.dbg('setPoolsEditMode(true)');
   console.log(await crop('touch-manage.png'));
+
+  // …AND THE UNDO IT LEAVES (U28a). Delete a counted pool from the middle of
+  // the attribute shelf: the tombstone stands in the slot, and the rail that
+  // deleted it is in the same frame as the badge it used to sit on top of.
+  await t.eval(`[...document.querySelectorAll('.pool-tile')]
+    .find((el) => el.textContent.includes('Wit')).querySelector('.tile-del').click()`);
+  console.log(await crop('touch-undo.png'));
+  await t.eval(`document.querySelector('.undo-restore').click()`);
   await t.dbg('setPoolsEditMode(false)');
 
   // THE COLLAPSED COLUMN, which is the state a tablet lives in: the source

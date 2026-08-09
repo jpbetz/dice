@@ -2482,7 +2482,7 @@ source order. Both are answered at id weight. The markup fix for `#tray-mods`
 is deliberately NOT taken: it has a full dress of its own at `#tray-mods`, and
 adding `.btn` would layer a second one under it for no behavioural gain.
 
-### U28a. The rack's delete ✕ needs a layout change before it needs a bigger target — small
+### U28a. The rack's delete ✕ needs a layout change before it needs a bigger target — SHIPPED
 
 **Found by LOOKING, after U28 shipped and was partly reverted the same day**
 (`tools/steps/touch-look.mjs`, `touch-manage.png`). `.tile-del` went 24 → 36
@@ -2500,9 +2500,33 @@ undo** (js/main.js filters and saves on the first tap). A hit area that
 quietly extends over a neighbouring label is exactly how the wrong pool gets
 deleted; a bigger target is worth less than the accident it invites.
 
-So `.tile-del` is pinned at 24 by `touch-targets`, and the real fix is markup
-plus interaction, not cascade: **move the badge or move the ✕ off the corner**
-(`renderPoolTile`), **and add an undo**. Do both or neither.
+**SHIPPED 2026-08-08, both halves.** The ✕ came off the corner and became a
+**rail**: in manage mode the tile is `[content | 34px rail]`, `.tile-stage`
+gives up the width and the ✕ takes the full height of what it gave up. The
+badge and the button no longer share an axis at all, so there is nothing left
+to collide. Flush to the right edge is safe here in a way a flush corner was
+not — a miss to the right crosses the 6px grid gap into the NEXT tile's left
+side, which is its stage/edit door, so the worst miss is a wrong-tile *edit*,
+never a wrong-tile *delete*.
+
+And the **undo is a tombstone in the slot**: the deleted pool leaves a
+ghost-footprint cell reading `↩ Undo` exactly where it stood, which is where
+your eye and finger already are. No toast, no timer racing the read, no
+z-index, nothing to find. It restores at the REMEMBERED INDEX (clamped) —
+a pool that reappears somewhere else has not been restored, and on a rack
+with digit shortcuts it would silently move under the keys. One slot, not a
+stack, and it closes when manage mode does: an undo that outlives its gate is
+a stale door. Pinned by `pool-undo` (including the delete-from-the-middle and
+last-on-shelf cases) and by `touch-targets`, whose delete assertion is now a
+NO-OVERLAP check rather than a size — a size assertion alone is exactly what
+passed while the shipped control was visibly broken.
+
+**And it happened again, in the same commit.** The tombstone's gold dress sat
+150 lines above `.ghost-add .ghost-plus` at the identical (0,2,0), so
+ivory-at-0.4 won on source order and the rescue rendered as grey furniture —
+indistinguishable from the `+` ghost beside it. Caught by looking; every
+assertion was green. That is three equal-specificity source-order losses in
+this file in as many weeks, which is the argument for U23's token layer.
 
 **The tooling lesson generalises.** `rail-look` and `panel-look` both frame a
 FINE pointer at a tall desktop viewport — the one configuration U28/U29/U30 do

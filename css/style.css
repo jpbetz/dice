@@ -1509,17 +1509,39 @@ html, body {
 /* .tile-edit retired (the Sheet Pass, 2026-08-01): in manage mode the
    whole tile opens the editor popover. The ✕ — what the gate is FOR —
    stays, grown to 24px (grow the target, never multiply it). */
+/* THE DELETE RAIL (U28a, 2026-08-08) — the ✕ off the corner and down the
+   tile's right edge, at every pointer.
+   It was a 24px corner button, and it could not grow: a pool with a count
+   wears its `×2` immediately to the ✕'s left, and at 24 the badge's right
+   edge ALREADY overlapped by 2px. There was no free space beside it, so 36
+   put the box on top of the "2" on five of the eighteen pools the app deals.
+   Ink/target separation (how #edge-toggle, .die-x and .sw reach 34+) does
+   not rescue it either — the halo would swallow the badge just as invisibly,
+   which on the rack's one destructive control is worse than a small button.
+   So the LAYOUT moves instead. In manage mode the tile becomes
+   [content | rail]: .tile-stage gives up 34px on its right (below), and the
+   ✕ takes the full height of what it gave up. 34 wide × the tile's own
+   height clears the finger floor without borrowing a single pixel from the
+   badge, and the two no longer share an axis at all.
+   Flush to the right edge is SAFE here in a way a flush corner was not: a
+   miss to the right crosses the 6px grid gap into the NEXT tile's left side,
+   which is its stage/edit door — a wrong-tile edit, never a wrong-tile
+   delete. And it is undoable now regardless (js/main.js buildUndoTile). */
+.pool-tile:has(> .tile-del) > .tile-stage { padding-right: 34px; }
 .tile-del {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 24px;
-  height: 24px;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 34px;
   padding: 0;
-  border-radius: 6px;
+  border: 0;
+  border-left: 1px solid var(--panel-border);
+  border-radius: 0 10px 10px 0;
   background: rgba(18, 14, 9, 0.9);
-  border: 1px solid var(--panel-border);
 }
+
+
 /* ---- what the rack owes a finger (U28 / audit T8, T12) ---- */
 @media (pointer: coarse) {
   /* THE ONE THAT TEACHES RATHER THAN ENLARGES, and the cheapest item in
@@ -1534,26 +1556,11 @@ html, body {
      KEYBOARD shortcut, and there is no keyboard here to advertise it to
      (the same reason `?` is correctly moot on touch). */
   .tile-add { opacity: 0.6; }
-  /* .tile-del IS DELIBERATELY NOT GROWN — the one item of U28 that CSS
-     cannot fix, found by looking at it rather than by measuring it
-     (tools/steps/touch-look.mjs, touch-manage.png).
-     It shipped here at 36×36 and had to be reverted the same day. The ✕
-     sits at the tile's top-right; a pool with a count wears its `×2` badge
-     immediately to its LEFT, and at the shipped 24px the badge's right edge
-     already overlaps the button's left edge by 2px — a designed near-touch
-     with NO free space beside it. At 36 that overlap becomes 14px: the
-     button's box lands on top of the "2" on every counted pool (Agility,
-     Charm, Axe, Club, Staff on the dealt rack — a third of it).
-     Ink/target separation, which is how #edge-toggle, .die-x and .sw all
-     reach 34+ in this same block, does not rescue it either. The halo would
-     still swallow the badge, and this is the rack's ONE destructive control
-     with no confirm and no undo (js/main.js filters and saves on the first
-     tap) — a hit area that quietly extends over a neighbouring label is
-     exactly how a wrong pool gets deleted. A bigger target here is worth
-     LESS than the accident it invites.
-     So it needs a layout change (move the badge, or move the ✕ off the
-     corner) plus an undo, both in js/main.js + index.html. Reported in
-     ROADMAP U28, not bodged in the cascade. */
+  /* .tile-del's reach comes from U28a's RAIL, not from a bigger corner
+     button — see the rule below, outside this block. Growing it in place
+     was tried here and reverted the same day: it measured correctly, passed
+     every assertion, and put its box on top of the `×2` badge of every
+     counted pool. */
 }
 /* ---- THE SHEET PASS (2026-08-01): identity strip + ghost tiles ---- */
 /* The strip sits above a hairline inside the pool popover: above it,
@@ -1697,6 +1704,25 @@ html, body {
   .ghost-add .ghost-plus { opacity: 0.6; }
   .ghost-add .ghost-noun { opacity: 0.7; }
 }
+
+/* THE UNDO TOMBSTONE (U28a). It stands in the slot the pool just left, so
+   the way back is where the thing was — no toast, no timer racing your
+   reading, nothing to find. Ghost FOOTPRINT because it is not a pool; the ↩
+   and the word carry the verb where the ghost cell carries a `+`.
+   Warmer than a ghost ON PURPOSE: a ghost is a standing invitation and this
+   is a rescue with a deadline, and a rescue that reads as furniture is one
+   nobody takes. Which is exactly how it first shipped — these three rules
+   sat 150 lines ABOVE `.ghost-add .ghost-plus`, at the identical (0,2,0),
+   so the ivory-at-0.4 won on source order alone and the tombstone rendered
+   as grey furniture. Caught by looking; every assertion was green. Placed
+   here, after the block it has to answer, rather than escalated with an id
+   the element does not need. */
+.undo-tomb .undo-restore { border-style: solid; border-color: rgba(212, 175, 55, 0.38); }
+.undo-tomb .ghost-plus { color: var(--gold-bright); opacity: 0.9; }
+.undo-tomb .ghost-noun { color: var(--gold-bright); opacity: 0.85; }
+.undo-tomb .undo-restore:hover .ghost-plus,
+.undo-tomb .undo-restore:hover .ghost-noun { opacity: 1; }
+.undo-tomb .undo-restore:hover { border-color: var(--gold-bright); background: rgba(212, 175, 55, 0.10); }
 /* the creation card spans its shelf; adders reuse .pid-rank and the
    growing pool previews as removable grouped units */
 .creation-card .cc-pool {
