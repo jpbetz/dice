@@ -411,6 +411,19 @@ All phases hang off the two existing hooks: keyframe playback
 | **7 Flavor** | +200 ms | Soul Deal word fades in per the readout rules (§2.5). |
 | **8 Crit** | crit only | +250 ms hold, existing `.shake`, gold sweep. Trim `playCritEffect` overlay 1700 → ~1100 ms. |
 
+**Beat 8 is a RARE accent, and under a per-die system that has to be enforced**
+(ROADMAP U18, 2026-08-08). `soul-deal.critFor` fires when *any* die lands a
+crit cell, so `3d10` washed the viewport and shook the camera on **48.8%** of
+rolls — the median outcome wearing the budget of an exception. The chart is
+right and untouched; what was wrong is that a per-die system has no roll-level
+verdict for a whole-viewport claim to come from. The profile now answers two
+questions instead of one: `critFor` (did something crit — **the word always
+lands**, exactly as U8's reduced-motion rule already established) and
+`critCeremony` (does the table stop). Soul Deal stops only for a strict
+majority of the crit-*capable* dice; a d20 system always stops, because
+`some()` over one verdict is not an aggregation. The card keeps its gold dress
+under both. Rates and the full argument live in ROADMAP U18.
+
 **Placement — one anchor, and the ceremony wins.** Phase 0's intent card is
 center-stage while the table is still empty; from Commit onward every
 piece of card chrome lives at the **top anchor** — the strip during the

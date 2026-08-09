@@ -278,6 +278,46 @@ export const scenarios = [
     },
   },
   {
+    name: 'crit-budget',
+    tags: ['roll', 'chrome'],
+    // U18: THE WASH IS RATIONED, THE WORD IS NOT. `soul-deal.critFor` fires
+    // when ANY die lands a crit cell, and those cells exist on d10/d12/d20 —
+    // so 3d10 washed the whole viewport and shook the camera on 48.8% of
+    // rolls. §2.4 budgets crit as a RARE accent; it was the median outcome.
+    //
+    // The chart is untouched (face 10 on a d10 IS a Critical Success). What
+    // moved is who the ceremony belongs to: the table stops only when a
+    // strict majority of the crit-CAPABLE dice agree. One crit in 3d10 still
+    // prints its word — that is information, and U8 already established the
+    // word survives what the motion does not.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+
+      // playRoll is the arrival path a networked roll already takes (the
+      // server sends dice + values), so driving it with chosen values is the
+      // real ceremony, not a rig — and the only way to ask about an outcome
+      // that is 2.8% of rolls without a flaky wait for one to happen.
+      const land = async (values) => {
+        await a.dbg(`playRoll({ dice: ['d10','d10','d10'], values: ${JSON.stringify(values)} })`);
+        await a.settle();
+        return a.eval(`(() => ({
+          overlay: !document.getElementById('crit-overlay').classList.contains('hidden'),
+          shake: document.getElementById('scene-container').classList.contains('shake'),
+        }))()`);
+      };
+
+      // ONE crit among three d10s: the audit's case.
+      assert.deepEqual(await land([10, 5, 7]), { overlay: false, shake: false },
+        'one voice in three does not stop the table');
+      assert.match(await a.logTop(), /Critical Success/,
+        'the crit still SAYS what it is — the word is information');
+
+      // TWO of three agree: a real verdict, and the wash comes back.
+      assert.deepEqual(await land([10, 10, 7]), { overlay: true, shake: true },
+        'a majority of the crit-capable dice still washes');
+    },
+  },
+  {
     name: 'folded-card',
     tags: ['smoke', 'roll', 'chrome'],
     // The folded card + the hover read + the feed (Joe 2026-08-03): the

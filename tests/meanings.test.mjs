@@ -75,6 +75,44 @@ t('crit fanfare fires when ANY die lands a crit row', () => {
   assert.equal(sd.critFor(entry([die('d4', 4), die('d6', 5)])), null); // small columns have no crit rows
 });
 
+// U18. critFor keeps answering "did something crit" (the word always lands);
+// critCeremony answers the separate question of whether the table STOPS.
+t('the wash needs a majority of the CRIT-CAPABLE dice, not just one', () => {
+  // One eligible die, and it crit: the author's own 10% survives intact.
+  // The d4 and d6 have no crit row, so they are not dissenting voices —
+  // counting them would make the canonical 3-die roll unable to ever wash.
+  assert.equal(sd.critCeremony(entry([die('d4', 1), die('d6', 3), die('d10', 10)])), true);
+
+  // 3d10 with ONE crit: the case that made the wash the median outcome.
+  assert.equal(sd.critFor(entry([die('d10', 10), die('d10', 5), die('d10', 7)])), 'success');
+  assert.equal(sd.critCeremony(entry([die('d10', 10), die('d10', 5), die('d10', 7)])), false);
+
+  // Two of three agree — 3d10 washes on 5.3% of rolls now (measured), down
+  // from 48.8%, which is a rare accent instead of the median outcome.
+  assert.equal(sd.critCeremony(entry([die('d10', 10), die('d10', 10), die('d10', 7)])), true);
+
+  // A SPLIT POOL is not a verdict: one crit-success and one crit-fail may
+  // not stop the table for either of them.
+  assert.equal(sd.critCeremony(entry([die('d10', 10), die('d10', 1)])), false);
+
+  // Discarded and child dice are already out of outcomesFor, so they cannot
+  // pad the denominator into refusing a real crit.
+  assert.equal(sd.critCeremony(entry([
+    die('d10', 10), die('d10', 5, { counts: false }), die('d10', 5, { child: true }),
+  ])), true);
+
+  // No crit at all, and no eligible die at all.
+  assert.equal(sd.critCeremony(entry([die('d10', 5), die('d10', 7)])), false);
+  assert.equal(sd.critCeremony(entry([die('d4', 4), die('d6', 5)])), false);
+});
+
+t('a d20 system always washes — its `some` is the verdict, not an aggregate', () => {
+  // Advantage: the second d20 disagreeing is WHY the natural 20 is a crit,
+  // so soul-deal's majority rule must not leak across profiles.
+  assert.equal(SYSTEMS.dnd.critCeremony(entry([die('d20', 20), die('d20', 3)])), true);
+  assert.equal(SYSTEMS.dnd.critCeremony(entry([die('d20', 20), die('d20', 1)])), true);
+});
+
 t('the profile declares its read: per-die, no totals, and it names its stake', () => {
   assert.equal(sd.aggregate, 'per-die');
   assert.equal(sd.usesTotal, false);

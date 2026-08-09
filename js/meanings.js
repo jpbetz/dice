@@ -49,6 +49,18 @@ const CHART = {
 
 const DIE_MAX = { d4: 4, d6: 6, d8: 8, d10: 10, d10x: 90, d12: 12, d20: 20 };
 
+// Which columns carry a crit cell AT ALL (d10/d12/d20 today). A d4, d6 or d8
+// cannot crit under any face, so it must not sit in the denominator when we
+// ask whether a crit SPEAKS FOR the pool (U18) — otherwise the canonical
+// attribute+skill+motivation roll, which typically fields exactly one
+// crit-capable die, could never clear a majority. Derived from the chart, so
+// editing a column moves this with it rather than leaving a stale list.
+const CRIT_COLUMNS = new Set(
+  Object.entries(CHART)
+    .filter(([, c]) => c.rows.some((w) => w === 'Critical Success' || w === 'Critical Fail'))
+    .map(([col]) => Number(col)),
+);
+
 // Tier drives styling: which words are celebrations vs. failures.
 const TIERS = {
   'Critical Fail': 'crit-fail',
@@ -171,7 +183,16 @@ function segmentsFor(type, q) {
 //   which makes the conflation unspellable rather than merely fixed.
 //   outcomesFor(entry) -> [{dieIndex, type, value, word, tier}] for per-die
 //               systems (quiet dice carry word/tier null), else null
-//   critFor(entry) -> 'success' | 'fail' | null
+//   critFor(entry) -> 'success' | 'fail' | null. THE INFORMATION: did
+//               something crit? The word always lands (U8).
+//   critCeremony(entry) -> bool. OPTIONAL, default true. Does that crit
+//               deserve the table-stopping wash — the full-viewport flash
+//               plus the 1700ms camera shake — as opposed to just its word?
+//               Split out in U18 because critFor answers a question about a
+//               DIE while the ceremony makes a claim about the ROLL, and a
+//               per-die profile has no roll-level verdict to make that claim
+//               from. A profile that leaves it undefined always washes,
+//               which is the right default for a one-die verdict.
 //   forecastFor(spec, tools) -> the pre-roll read of a spec (ROADMAP §2l),
 //               or null when the profile has none (sum profiles until the
 //               sum read ships). tools injects the math — countingPmfs from
@@ -207,6 +228,51 @@ export const SYSTEMS = {
       if (os.some((o) => o.tier === 'crit-success')) return 'success';
       if (os.some((o) => o.tier === 'crit-fail')) return 'fail';
       return null;
+    },
+    // DOES THE CRIT SPEAK FOR THE POOL? (U18, audit B2.) critFor above is a
+    // `some()` over N independent readings, and the full-viewport wash it fed
+    // is a claim about the ROLL — the one place this profile aggregated,
+    // under a law (POOL-ANALYSIS §2) that says a roll has no verdict to
+    // aggregate INTO. The visible cost: a d10 crits on 2 of 10 faces, so 3d10
+    // washed the screen and shook the camera on 48.8% of rolls. §2.4 budgets
+    // crit as a rare accent; it was the median outcome.
+    //
+    // The chart is not the problem and is untouched: face 10 on a d10 IS a
+    // Critical Success, 1 in 10, as its author wrote it. What changes is who
+    // the ceremony belongs to. The WORD still lands on every crit (U8's rule,
+    // and the per-die card prints it regardless) — the table only stops when
+    // a STRICT MAJORITY of the crit-capable dice crit the same way.
+    //
+    // The denominator is crit-CAPABLE dice, not all counting dice: a d4/d6/d8
+    // has no crit cell, so counting it would mean the canonical
+    // attribute+skill+motivation roll (typically one d10 among three dice)
+    // could never clear a majority and would lose the accent entirely.
+    // With one eligible die the rule is "that die crit" — the author's own
+    // rate, untouched — and each further eligible die asks for another
+    // agreeing voice. A pool that splits (one crit-success, one crit-fail)
+    // does not wash, which is right: that is not a verdict.
+    //
+    // MEASURED (2e6 rolls each, wash rate before -> after):
+    //   1d10          20.0% -> 20.0%   the author's rate, unchanged
+    //   d8+d6+d10     20.0% -> 20.0%   the canonical attribute+skill+motivation
+    //   3d10          48.8% ->  5.3%   the audit's case: median -> accent
+    //   d10+d12+d20   40.0% ->  3.2%
+    //   4d20          34.4% ->  0.1%   strict majority of four is a big ask
+    // The shapes Soul Deal actually plays cost nothing; only the crit-capable
+    // STACK is rationed, which is exactly the pool that was drowning.
+    //
+    // THE THRESHOLD IS THE TUNABLE. Strict majority is a defensible default,
+    // not a law of the system — it is one comparison, and it is Joe's to
+    // retune against play.
+    critCeremony(entry) {
+      const kind = this.critFor(entry);
+      if (!kind) return false;
+      const eligible = (this.outcomesFor(entry) || [])
+        .filter((o) => CRIT_COLUMNS.has(DIE_MAX[o.type]));
+      if (!eligible.length) return false;
+      const tier = kind === 'success' ? 'crit-success' : 'crit-fail';
+      const agreeing = eligible.filter((o) => o.tier === tier).length;
+      return agreeing * 2 > eligible.length;
     },
     // THE NO-AGGREGATION LAW (docs/POOL-ANALYSIS.md §2, Joe 2026-08-05):
     // every number describes exactly one die — the joint distribution
@@ -262,6 +328,12 @@ export const SYSTEMS = {
       if (d20s.some((p) => p.value === 1)) return 'fail';
       return null;
     },
+    // NOT the per-die majority rule (U18). A d20 system has exactly one
+    // verdict, so `some()` is not an aggregation here — it is the answer, and
+    // a natural 20 under advantage is a crit precisely BECAUSE the other d20
+    // disagreed. Stated rather than defaulted, so the contrast with
+    // soul-deal's rule is on the record where both live.
+    critCeremony() { return true; },
     forecastFor: () => null, // the sum read ships in §2l ⑥
   },
   none: {

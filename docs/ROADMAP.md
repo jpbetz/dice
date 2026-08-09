@@ -1959,7 +1959,7 @@ with U4's pass).~~ The banner and the peek name the rung now (`Face down` /
 struck to a pointer at UX.md §7.24. **The one residue: the log's total column
 still answers `?`** for a held roll under a per-die lens.
 
-### U18. Crit frequency under soul-deal — DESIGN FIRST, then small
+### U18. Crit frequency under soul-deal — SHIPPED
 
 *Audit B2 (major), second half.* `soul-deal.critFor` fires when *any* die
 lands a crit cell, and those cells exist on d10/d12/d20 — so a `3d10` pool
@@ -1969,6 +1969,43 @@ is the **median outcome**, and "excitement outranks physicality" inverts into
 noise. This is a chart/threshold question, not a rendering one: decide what
 "crit" means for a multi-die per-die pool. (U8 ships the reduced-motion half
 independently and first.)
+
+**Decided 2026-08-08 — SHIPPED.** It is a *ceremony* question, and the audit's
+framing above is half wrong. The chart is correct and is untouched: face 10 on
+a d10 IS a Critical Success, 1 in 10, as its author wrote it. The defect is
+that `critFor` is a `some()` over N independent readings — the one place the
+soul-deal profile AGGREGATES, under its own no-aggregation law
+(POOL-ANALYSIS §2, "every number describes exactly one die") — and it fed a
+full-viewport wash that makes a claim about the ROLL, which a per-die system
+has no verdict to make.
+
+So the two questions are split. `critFor` still answers *did something crit*,
+and the word always lands (U8's rule; the per-die card prints it regardless).
+A new optional profile method `critCeremony(entry)` answers *does the table
+stop*. Soul Deal says yes only when a **strict majority of the crit-CAPABLE
+dice** agree — d4/d6/d8 have no crit cell and so are not in the denominator,
+without which the canonical attribute+skill+motivation roll (one d10 among
+three dice) could never clear a majority and would lose the accent entirely.
+D&D states `critCeremony: () => true` explicitly: a d20 system has one
+verdict, and a natural 20 under advantage is a crit *because* the other d20
+disagreed.
+
+Measured (2e6 rolls each, wash rate before → after):
+
+| pool | before | after | |
+|---|---|---|---|
+| `1d10` | 20.0% | 20.0% | the author's rate, unchanged |
+| `d8+d6+d10` | 20.0% | 20.0% | the canonical attribute+skill+motivation |
+| `3d10` | 48.8% | 5.3% | the audit's case: median → accent |
+| `d10+d12+d20` | 40.0% | 3.2% | |
+| `4d20` | 34.4% | 0.1% | strict majority of four is a big ask |
+
+The shapes Soul Deal actually plays cost nothing; only the crit-capable STACK
+is rationed, which is exactly the pool that was drowning. **The threshold is
+the tunable** — strict majority is a defensible default, not a law, and it is
+one comparison in `soul-deal.critCeremony` for Joe to retune against play.
+Pinned by unit tests (7 cases) and the `crit-budget` scenario, which was
+verified to FAIL against pre-U18 behavior.
 
 ### U19. `playerId` succession for reveal and offer authority — SHIPPED
 

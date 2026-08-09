@@ -2563,6 +2563,20 @@ function entryCrit(entry) {
   return activeSystem().critFor(entry);
 }
 
+// Does this crit get the TABLE-STOPPING ceremony — the full-viewport wash and
+// the 1700ms camera shake — or only its word? (U18.) The profile decides;
+// one that stays silent always washes, which is right for a one-die verdict.
+// Kept separate from entryCrit because the word is INFORMATION and the wash
+// is emphasis, and U8 already established that reduced motion drops the
+// second without touching the first. This is the same seam, for frequency
+// instead of for motion.
+function entryCritCeremony(entry) {
+  const kind = entryCrit(entry);
+  if (!kind) return null;
+  const sys = activeSystem();
+  return (!sys.critCeremony || sys.critCeremony(entry)) ? kind : null;
+}
+
 // The crit overlay's word: the crit die's own chart word, else the
 // natural-roll callout. (Its first branch read a sum-world `meaning` that
 // every profile has returned null for since the meanings migration —
@@ -3039,12 +3053,15 @@ function renderRollResults(entry, dice, fx = true) {
   renderBannerActions(entry);
   armAutoCollect(entry); // every banner paint restarts the tidy-away clock
   const crit = entryCrit(entry);
+  // The banner's own dress follows the READING — a crit landed, and the
+  // banner says so under every pool size. Only the wash is rationed (U18).
+  const wash = fx && entryCritCeremony(entry);
   if (crit === 'success') {
     banner.classList.add('crit-success');
-    if (fx) playCritEffect('success', critWord(crit, entry));
+    if (wash) playCritEffect('success', critWord(crit, entry));
   } else if (crit === 'fail') {
     banner.classList.add('crit-fail');
-    if (fx) playCritEffect('fail', critWord(crit, entry));
+    if (wash) playCritEffect('fail', critWord(crit, entry));
   }
 }
 
@@ -3832,8 +3849,10 @@ function stageVerdict(roll) {
   const cer = roll.ceremony;
   const crit = entryCrit(cer.entry); // active-system lens at staging time
   if (crit) {
+    // The CARD's gold dress is the reading and stays universal; the
+    // full-viewport wash and the camera shake are what U18 rations.
     ceremonyLayer.classList.add('crit');
-    playCritEffect(crit, critWord(crit, cer.entry));
+    if (entryCritCeremony(cer.entry)) playCritEffect(crit, critWord(crit, cer.entry));
   }
   renderVerdictCard(roll, cer.entry);
   setCeremonyPhaseClass(roll, 'c-verdict');
