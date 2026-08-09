@@ -3663,3 +3663,104 @@ bright white browser-default button between a red Clear and a gold REROLL,
 straight through HUE = ACT. Every assertion was green while it shipped; one
 screenshot was not. (Fixed in the same commit: it wears the Reveal's quiet
 steel.)
+### 7.25 The profile library — the pick, the switch, the copy (2026-08-08)
+
+*(Renumbered from §7.24 on the merge, 2026-08-08: the touch/stake pass landed
+its own §7.24 above while this branch was out. Same collision the CUJ numbers
+have — see [CUJS.md](CUJS.md) — and the same fix: the section that shipped
+first keeps the number.)*
+
+Design authority is [PROFILES.md §11](PROFILES.md#11-the-library--many-profiles-one-in-your-hands-2026-08-08),
+which holds the model and the ten decisions; this section specifies the
+surfaces. The governing sentence: **the store owns the pools, and the
+profile in your hands IS the rack** — so switching is a pointer move, and
+every surface below is a way of moving that pointer or of naming where it
+points.
+
+**A LIBRARY OF ONE SHOWS NOTHING NEW ANYWHERE.** This is how the pass
+obeys *empty renders nothing* (§7.20) without arguing with it: a player
+who never makes a second profile sees exactly the app they saw before.
+`#profile-pick` is `hidden` until the library holds two, the mismatch
+banner exists only while a mismatch does, and `At this table` is absent
+until the table has something to offer. Every one of them is retired by
+its own success, the property the invite chair established.
+
+**① THE JOIN CHOOSER** (`#seat-mine` in `#name-modal`, above the prepared
+seats). Your profiles **for this table's system**, most recently taken in
+hand first, the last one wearing `.preselected` — the same dress `&as=`
+already uses. `⚄ Random` is the last row, in `.seat-btn` with a dashed
+border, and it is preselected when you have no profile for this system.
+
+The block is **absent** when there is nothing to choose between and
+nothing to deal. The existing `Join` button confirms: no second verb, no
+wizard, no new phase.
+
+**Picking one of yours shows no preview, and that is not a relaxation of
+the preview rule.** PROFILES §9.2 (*preview-then-apply on every rack a
+player receives*) exists because the `#g=` codec replaced a visitor's rack
+sight unseen. Taking your own profile in hand receives nothing: both racks
+are in the store, in one write, and the outgoing one keeps every pool it
+had. A **prepared seat** is still somebody else's rack and still previews —
+and since §11 what it applies is a **profile of your own** rather than a
+merge into your rack, so the player who already had an 18-pool character
+no longer ends up holding one 36-pool rack that is two characters wearing
+each other's clothes.
+
+**② THE PICKER** is `openRailMenu` — the app's one anchored-menu machinery
+(viewport clamp, flip-above, arrow walk, focus-out close, already a rung in
+the Esc chain and a term in `modalOpen`). Rows are `.idm-item`, the dress
+every menu in the app wears; `.pm-head` is the only new recipe.
+
+**Two anchors, and the second is not redundancy.** `#profile-pick` lives
+in `#pools-head`, and §7.23 lets the player switch the Pools section off —
+`#builder-panel.sec-off-pools` hides the whole region, which would strand a
+head-only anchor and make R4's switch unreachable for anyone who collapsed
+it. `#idm-profile` in the identity menu is the other, and it is **not**
+hidden in the lobby: §7.20's suppression rule is that a surface speaking
+about YOU keeps working while one speaking about THE TABLE must be absent,
+and your profiles are yours with or without a table.
+
+**Off-system profiles render disabled, not absent** — R5 without amnesia.
+"Where did my fighter go" is answered by a greyed row carrying its system,
+not by silence.
+
+`#pools-head` gains a **third reason to exist** beside its existing two
+(`.foreign` for a teammate's rack, and nothing at all otherwise): the
+`.profiled` state, where it stands sticky over the shelves and names the
+profile in hand. The system word appears **only when it differs** from the
+table's — a label the player needs exactly when it is surprising, and
+silence the rest of the time. `#profile-pick` deliberately does **not**
+wear `.ph-tag`: that class is the read-only tag's own, and a second element
+borrowing it made the head's selector ambiguous (caught by
+`panel-anatomy`).
+
+**③ THE LIBRARY LIST** (Settings → *Your profiles*) is where
+manage-frequency work lives, for two reasons found by building the
+alternative: a menu that closes on focus-out is the wrong container for a
+rename field, and a 32-row list with a scroller is a panel wearing a
+menu's clothes. Rows are `.pp-row` — the shipped grammar — with the name
+doubling as the rename affordance, the system as a `.pp-tag`, `Use`
+(disabled off-system), `Copy`, and a `✕` that is **two-step in place**: the
+label becomes `Delete ⟨name⟩?` for three seconds and the second click
+commits. That is Copy's own morph grammar used as a confirm, and it keeps
+the promise that nothing modal locks the table.
+
+Below it, **`At this table`** — the prepared seats and the teammates'
+published racks, each one `Copy` away from being yours, absent when the
+table offers neither. This is the surface R7 asks for, and it works
+because the wire now carries *which* profile a published rack is and not
+only whose.
+
+**THE MISMATCH BANNER** is Tier G's `#profile-banner`, re-purposed. It used
+to say *you are holding someone else's pools*, which a library makes
+impossible. It now says the one thing that can still be true and
+surprising — the profile in your hands was built for a different rulebook
+than this table reads. **Nothing is broken when it shows**: a pool is
+notation and a system is a render-time lens (goal 6), so the rack rolls
+identically either way. Hence three exits, none of them a swap:
+`Switch…` (opens the picker), `Read as ⟨system⟩` (re-binds *this profile*
+to the table — for the player whose D&D fighter really is what they want
+here), and `Keep` (says nothing more this session). Changing the *table's*
+system is deliberately **not** a fourth exit: that is a room-wide act
+(goal 10) and it belongs on the settings panel where every player can see
+it, not buried in one player's rack chrome.

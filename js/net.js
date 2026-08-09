@@ -284,8 +284,16 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     // §9: your default dice set rides the same publish (present-or-absent,
     // absent = standard) so foreign racks resolve unmarked pools to YOUR
     // skin, not the viewer's.
-    async setPools(pools, set) {
-      const res = await withPlayer('/api/pools', { pools, ...(set ? { set } : {}) });
+    // §11: `profile` and `system` label the rack — WHICH of your profiles this
+    // is and what it was built for — so a teammate browsing it can name it and
+    // copy it. Present-or-absent, and absent is exactly what shipped before.
+    async setPools(pools, set, profile = null, system = null) {
+      const res = await withPlayer('/api/pools', {
+        pools,
+        ...(set ? { set } : {}),
+        ...(profile ? { profile } : {}),
+        ...(system ? { system } : {}),
+      });
       return res.ok;
     },
 

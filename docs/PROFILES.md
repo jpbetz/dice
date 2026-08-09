@@ -371,3 +371,243 @@ Checked against ROADMAP's standing list:
   `tableName` is cosmetic and dies with the room; the `?room=` key is
   the durable address. Proposal: the file carries `table.name` only,
   and the `?room=` key stays whatever the link says.
+
+---
+
+# 11. The library — many profiles, one in your hands (2026-08-08)
+
+*Design authority for the multi-profile pass. Written against Joe's ask:
+"a player can have multiple profiles of pools and settings… up to 32
+profiles per user… whatever profile they pick should be retained as the
+one in use until they switch… players should be able to see profiles
+from other players and even copy the profile for their own use… profiles
+should be associated with a rolling system and a player should only be
+able to pick a profile for the roll system of the table… when they join
+a table they should use the last used profile for that rolling system…
+I expect DMs to create profiles for players and have the players use
+them when they log in."*
+
+§1–§10 above designed the **prepared table**: a file holding six
+characters, a room that offers them as seats, a link that addresses the
+table. That shipped whole (Tier G). What it never had was a **home for a
+player's own characters**. A rack was singular — `dice.groups.v1`, one
+per browser — and §4's authoring worked by *borrowing* it: swap a
+profile's pools in, stash yours aside, remember to give it back. This
+section replaces the borrowing with a library.
+
+## 11.1 The nine requirements
+
+R1 a library of profiles per browser, cap **32** · R2 profiles have
+**names** · R3 each is bound to a **rolling system** · R4 the picked one
+**stays in use until switched** · R5 only profiles matching **the
+table's system** are pickable there · R6 joining a table takes **the
+last-used profile for that system** · R7 players can **see and copy**
+each other's profiles · R8 DMs **author for players**, who **use them at
+join** · R9 the join surface carries the **selector**, defaulting to
+last-used, with a **Random** option and the table's other profiles.
+
+## 11.2 The one sentence
+
+> **The store owns the pools, and the active profile IS the rack.**
+
+`dice.profiles.v1` is one JSON value:
+
+```js
+{ v: 1, seq: 7, activeId: 'p3',
+  profiles: [
+    { id: 'p3', name: 'Rill', system: 'soul-deal',
+      set: 'emberforge.blackanvil',
+      pools: [{id, name, notation, category?, set?}], at: 1754… } ] }
+```
+
+`at` is "last taken in hand". Everything else derives from it.
+
+**Why one key rather than two.** The tempting shape is *the store holds
+the other profiles and `dice.groups.v1` stays the live rack* — no writer
+changes, tiny diff. Three designs were built out before this one and two
+of them chose exactly that; **both named the same worst defect in their
+own self-critique.** A switch is then three writes across two keys —
+park the outgoing pools, write the incoming rack, move the pointer — with
+only the first verified. A throw in the tail leaves the pointer naming
+one profile and the rack holding another, and every repair for that state
+is itself a data-loss path (one of the two designs traced its own X6 heal
+deleting the outgoing rack). One key means `activeId` and both racks move
+in **one `setItem`**: there is no torn intermediate state to survive.
+
+The objection to one key is that `saveGroups` would have to fan out to
+many writers. It does not: `saveGroups` (js/main.js) is the **only**
+writer of the rack key, so pointing that one function at the store costs
+one line. The real cost is that a pool edit re-serializes the whole
+library — at 32 × 40 pools that is ~100 KB of `JSON.stringify` per
+committed edit, which is sub-millisecond and synchronous, exactly as
+today's write already is.
+
+**Why a switch loses nothing, and why that is not the `#g=` sin.** GOALS
+§7 records why the address-bar codec was deleted: it *replaced* a
+visitor's rack sight unseen. A profile switch replaces nothing — both
+racks are in the store, in the same write, and the outgoing one keeps
+every pool it had. This is the distinction the whole design turns on:
+
+> **Preview-then-apply guards a rack you RECEIVE. It does not guard
+> authorship.** Taking your own profile in hand, or dealing yourself a
+> new one, is not an import and has nothing to preview. Adopting someone
+> else's rack still previews, through the shipped `planImport`.
+
+Because the failure class is gone by construction, Tier G's stash — the
+write-and-verify, the boot guard, the publish gate — is **deleted rather
+than ported** (§11.8).
+
+**Last-used-per-system is derived, never stored.** `lastUsedFor(system)`
+is `profilesFor(system)[0]`, i.e. the most recent `at` among profiles
+bound to that system. A stored `lastBySystem` map goes stale at exactly
+the table R6 was written for: any player may flip the room's system
+(goal 10), nothing is swapped when they do, and the map then files a Soul
+Deal profile as your last D&D one. One field cannot disagree with itself.
+
+## 11.3 One record, three places
+
+| Place | What it is | Cap |
+| --- | --- | --- |
+| `dice.profiles.v1` | **my library** | 32 |
+| `players:` in the portable file | the library's **durable copy**, or a DM's prepared set | 32 |
+| `room.setup.profiles` | profiles **published to a table** | 12 |
+
+The same `{name, system, set?, pools}` shape in all three (`toWire` /
+`fromWire` in `js/profiles.js`). A DM's prepared table and a player's own
+library are **the same document read by two people** — which is why the
+file's cap moved to 32 rather than a second section being invented. The
+room's cap stays 12 on purpose: 32 is how many characters a person keeps,
+12 is how many seats a table has.
+
+## 11.4 What a profile carries — and what it does not
+
+**Carries:** the name, the system, the dice set, the pools. That is the
+reading of "pools and settings" this pass takes: the settings that are
+*about the character* — which rulebook reads its dice, which dice it
+throws — travel with it.
+
+**Does not carry:** `sound` and `numbers`. Those are about the room you
+are physically in and the eyes you are reading with, not the character;
+js/portable.js already decided this for a player block ("sound and
+numbers are the receiving browser's, never the organizer's") and nothing
+here overturns it. Nor felt, zoom or table name: those belong to the
+table (goal 10 — room-wide, any player may change them).
+
+*Flagged for Joe: this is the one judgement call in the pass. If a
+profile should also remember its own sound/chips, say so and it is a
+present-or-absent pair on the record and a reserved key in the file.*
+
+## 11.5 The surfaces
+
+Three anchors, each earning its place. **A library of one shows nothing
+new anywhere** — the whole design is invisible until a second profile
+exists, which is how it obeys "empty renders nothing" and §7.9's
+no-standing-chrome rule.
+
+**① The join chooser** — a `Profile` row in `#name-modal`, beside the
+name. Lists my profiles **for this table's system**, most-recent first
+with the last-used pre-selected (R6/R9), then `Random`, then the
+prepared seats (unchanged §G5 behaviour, still preview-then-apply), then
+`Someone else…`. The existing `Join` button confirms it: no second verb,
+no wizard, no new phase.
+
+The modal opens exactly where it opens today (no stored display name),
+**plus** when `&as=` names a seat — a link that names a seat is a link
+that wants you to take it, so it asks even of a returning player. A
+reload never re-prompts (the seat resumes), and the lobby still asks
+nothing at all: L0's "the first tap rolls" is untouched. Where the modal
+does not open, the last-used profile for the table's system is taken in
+hand silently — which is R6 stated literally, and it is lossless.
+
+**② The switcher** — `openRailMenu`, the app's existing anchored-menu
+machinery (viewport clamping, arrow nav, focus-out close, already a rung
+in the Esc chain and a term in `modalOpen`). Anchored from **two**
+places, and the second is not redundancy: `#pools-head` sits inside a
+panel section §7.23 lets the player switch off, so a pools-panel-only
+anchor is unreachable for anyone who collapsed Pools. The identity menu
+carries the other. One builder, two anchors.
+
+Off-system profiles render **greyed, not absent** — R5 without amnesia.
+"Where did my fighter go" is answered by an affordance, not a sentence.
+
+**③ The library list** in Settings → Your data, replacing §G3's profile
+rows: name · system · pool count · in-hand tag · `Use` · `Copy` ·
+rename · delete, plus `＋ New profile…` and `＋ Random…`, plus an **At
+this table** group (prepared profiles and teammates' published racks,
+each with `Copy`) that is absent when there is nothing at the table.
+Manage-frequency work lives here rather than in the menu, because a
+menu that closes on focus-out is the wrong container for a rename field
+and a 32-row list is a panel wearing a menu's clothes.
+
+**Mismatch (X1/X2).** When the profile in hand is bound to another
+system than the table reads, the pools-panel head surfaces the profile's
+system as a tag and `#profile-banner` — Tier G's, now in a `.mismatch`
+variant — offers `Switch profile…` / `Keep`. Nothing is swapped, nothing
+is reverted, no one is blamed for having flipped the setting, and the
+rack stays rollable throughout: pools are notation, and a system is a
+render-time lens (goal 6), so a mismatch is a **labelling** problem and
+never a validity one.
+
+## 11.6 Random
+
+`js/seed.js` grows `dealRack(system, rng)` and `dealName(system, rng)`;
+`dealStartingRack` keeps its name, signature and behaviour byte for byte,
+so its exactness sweep still holds.
+
+- **`soul-deal`** — unchanged: Attributes 9/100, Skills 6/100,
+  Motivations 3/30, dice drawn inside the price.
+- **`dnd`** — 12 pools: six skill checks and three saves as `1d20+M`,
+  then a weapon's attack, its damage, and a spell. Unpriced by
+  construction (there is no creation budget to hit), so the draw is in
+  the names and the modifiers. A zero modifier emits no modifier — `+0`
+  is not the canonical spelling of nothing.
+- **`none`** — a **tray**, six plain pools drawn from ten, named for the
+  dice they hold, and the dealt profile is called `Dice tray`. "Numbers
+  only" declares it has no character model; inventing a person for it
+  would say something untrue. Random still exists there, because a
+  first-timer at a numbers-only table needs a rack in one tap.
+
+Consequence, named so it is not found late: `buildSections`'
+`ensureTrio` hardcodes the Soul Deal trio, so a D&D rack in manage mode
+would stand three empty Soul Deal shelves. It becomes system-aware.
+
+## 11.7 Caps
+
+library **32** (client only — the server never sees a library) · pools
+per profile **40** (the rack cap, unchanged) · names **24**, `#` banned ·
+file profiles **32**, whole-file pools **1320** (now exactly the
+structural maximum) · room profiles **12**.
+
+## 11.8 What this deletes
+
+`dice.groups.mine.v1` and its boot guard · the write-and-verify stash
+dance · `portableEditProfile` / `portableSaveToProfile` /
+`portableDoneEditing` / `portableAddProfile` · `portableEditing` /
+`portableMine` · the `publishPools` gate that stopped a borrowed rack
+leaking (publishing is now always honest, because the rack is always
+your own active profile) · `#profile-banner`'s Save/Done pair · the
+`Save as new profile` row. Two e2e scenarios (`profile-swap`,
+`profile-swap-reload`) lose their subject and are replaced.
+
+## 11.9 Decisions taken here
+
+1. **One store key, one write.** Two-key designs were built and rejected
+   on their own named defect: a switch with an unverified tail.
+2. **A switch is not an import.** Preview-then-apply guards a rack you
+   receive; authorship has nothing to preview. §9.2 is unamended.
+3. **Last-used-per-system is derived from `at`**, never a stored map.
+4. **A profile carries name, system, dice set, pools** — not sound, not
+   chips, not felt.
+5. **The room's cap stays 12 while the file's moves to 32.** A table has
+   seats; a person has characters.
+6. **The peek discloses the room's system.** Named in server.js: without
+   it the picker filters against a guess and corrects itself after the
+   seat lands, which is a silent swap wearing a spinner.
+7. **Off-system profiles are greyed, not hidden.**
+8. **An unknown system falls back in the store and refuses in the file.**
+   The loud door is where a human is standing.
+9. **Rejected: `&profile=` in the URL.** A link that decides which rack
+   you are wearing is the `#g=` codec with better manners (GOALS §7).
+10. **Rejected: version pointers on a copied profile.** A copy is a copy;
+    tracking "the DM has since edited this" needs a profile identity on
+    the wire that goal 7 does not want (goal 12 territory besides).

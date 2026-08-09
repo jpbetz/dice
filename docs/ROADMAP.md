@@ -21,6 +21,35 @@ reasoning recorded in PROFILES.md §5–§6; what remains of them is
 [§5b](#5b-persistence-beyond-the-file-deferred-2026-08-06) below.
 **Normal sequencing resumes at Tier 0.**
 
+**2026-08-08 — a rack became a library.** Joe: *"a player can have
+multiple profiles of pools and settings… up to 32 profiles per user…
+whatever profile they pick should be retained as the one in use until they
+switch… players should be able to see profiles from other players and even
+copy the profile for their own use… profiles should be associated with a
+rolling system and a player should only be able to pick a profile for the
+roll system of the table… when they join a table they should use the last
+used profile for that rolling system… I expect DMs to create profiles for
+players and have the players use them when they log in."* Tier G had built
+the prepared **table** — a file of six characters, a room that offers them,
+a link that addresses it — but a player's own characters had no home: a
+rack was singular, and §G3's authoring worked by *borrowing* it. Design and
+the ten decisions are [PROFILES.md §11](PROFILES.md#11-the-library--many-profiles-one-in-your-hands-2026-08-08),
+surfaces are [UX.md §7.25](UX.md#725-the-profile-library--the-pick-the-switch-the-copy-2026-08-08).
+**Shipped whole**: `js/profiles.js` (32 profiles, one in hand, one store
+key, one `setItem` per switch), a `system` on every profile and on the
+wire, the join-time picker with last-used pre-selected and Random per
+system, the picker menu on two anchors, the library list with copy-from-a-
+teammate, and the mismatch that is *labelled* rather than swapped. §G3's
+stash — the write-and-verify, the banner, the publish gate, the boot guard
+— is **deleted**, because a switch is now a pointer move and the failure
+class those five guardrails existed to survive cannot be constructed.
+Three competing designs were built out and judged first; two kept the live
+rack in its own key and **both named the same worst defect in their own
+self-critique** (a switch as three writes across two keys with only the
+first verified). One judgement call is Joe's to confirm: "pools and
+settings" was read as name + system + dice set + pools, leaving sound and
+chips device-global on js/portable.js's existing reasoning.
+
 **2026-08-07 — the front door was never on the ladder.** Joe: *"the
 roadmap is not well aligned against core CUJs where the users use the
 UI… I think we need a lobby → table flow."* Rooms have worked since the

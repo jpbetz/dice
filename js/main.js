@@ -27,8 +27,14 @@ import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, validateMods, budgetOf } from './rollspec.js';
 import { previewOf, countingPmfs } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
-import { dealStartingRack } from './seed.js';
+import { dealStartingRack, dealRack, dealName } from './seed.js';
 import { exportYaml, parsePortable, planImport, profileToImport } from './portable.js';
+import {
+  MAX_PROFILES, MAX_POOLS, knownSystem, emptyStore, normalizeStore, profilesOf, findProfile,
+  activeProfile, profilesFor, lastUsedFor, isFull, nameProfile, uniqueName,
+  addProfile, renameProfile, deleteProfile, setActive, writeActivePools,
+  setActiveSystem, setProfileSet, migrateLegacy, toWire, fromWire,
+} from './profiles.js';
 import { THEMES, SETS } from './themes.js';
 import { ParticleField } from './particles.js';
 import { DecalField } from './decals.js';
@@ -75,11 +81,18 @@ const DEFAULT_ZOOM = 'wide';
 const MAX_DICE_ON_TABLE = 40;
 const GRAVITY = -110;
 const LOG_CAP = 100;
+// THE PROFILE LIBRARY (docs/PROFILES.md §11) — up to 32 named racks, each
+// bound to a rolling system, exactly one of them in your hands. This is the
+// rack's home as of 2026-08-08; see the boot block by `let groups` for how the
+// two keys below are read once and then left alone forever.
+const LS_PROFILES = 'dice.profiles.v1';
+// LEGACY, read once at boot and never written again (the LS_INPUTMODE /
+// LS_MINI precedent). LS_GROUPS was the single rack until the library existed
+// and is the one recovery path if the library is ever cleared, so it is left
+// in place as a fossil rather than deleted. LS_GROUPS_MINE was Tier G's
+// authoring stash — present in storage ⇔ a rack swap was live — and IS
+// removed once migrated, because there are no swaps any more for it to mean.
 const LS_GROUPS = 'dice.groups.v1';
-// G3 (ROADMAP §G3): the operator's OWN rack, stashed while a table-file
-// profile is swapped into dice.groups.v1 for editing. Present in storage
-// ⇔ a swap is live; boot treats a leftover stash as "the tab died
-// mid-edit" and restores it (see the reload guard by the groups load).
 const LS_GROUPS_MINE = 'dice.groups.mine.v1';
 const LS_LOG = 'dice.log.v1';
 const LS_HISTORY = 'dice.cmdhistory.v1'; // command-box history: shared across rooms, cap 50
@@ -88,6 +101,11 @@ const LS_SOUND = 'dice.sound.v1';        // "Just you" scope: sound on/off
 const LS_CHIPS = 'dice.chips.v1';        // "Just you" scope: per-die value chips (default OFF — P1)
 const LS_ROOMSETTINGS = 'dice.roomsettings.v1'; // solo-mode copy of the table settings
 const LS_DICESET = 'dice.diceset.v1';    // "Just you" scope: dice-set identity (Tier 6 §9)
+// Declared up here with the rest, not down beside initNet where it used to
+// live: the library's migration names a fresh profile after the player, and
+// that runs during the rack's module-eval block — a const down at the net
+// section is in TDZ there, which kills the whole module.
+const LS_NAME = 'dice.name.v1';
 
 // ---------------------------------------------------------------------------
 // Renderer / scene
@@ -4729,17 +4747,14 @@ window.__diceDebug = {
     loadText(text) { return portableLoadText(text); },
     acceptFile(file) { return portableAcceptFile(file); },
     get maxBytes() { return PORTABLE_MAX_BYTES; },
-    // G3 profile authoring (§G3) — the rack swap, minus the clicks. All of
-    // these return the pane's own verdict ({ok, status, canApply}); the two
-    // that rewrite the box add {text}. editingProfile is the name whose
-    // pools are swapped into the rack right now, or null = the rack is
-    // yours (the banner shows exactly when this is non-null).
+    // What the BOX holds, and the two doors from a file into the library
+    // (§11 O7/P14). The rack-swap verbs (editProfile / saveToProfile /
+    // doneEditing) are GONE with the swap itself — see __diceDebug.profiles
+    // for what replaced them.
     profiles() { return portableParsed ? portableParsed.profiles.map((p) => p.name) : []; },
-    editProfile(name) { return portableEditProfile(name); },
-    saveToProfile(name) { return portableSaveToProfile(name); },
-    addProfile(name) { return portableAddProfile(name); },
-    doneEditing() { return portableDoneEditing(); },
-    get editingProfile() { return portableEditing; },
+    profileSystems() { return portableParsed ? portableParsed.profiles.map((p) => p.system || null) : []; },
+    adopt(name) { return portableAdoptOne(name); },
+    adoptAll() { return portableAdoptProfiles(); },
     // §G4/§G6: the Apply-to-table button, clickless. ASYNC — resolves the
     // pane's verdict once the push answers; success records authorship in
     // dice.table.v1:<room> exactly as the click does.
@@ -4758,12 +4773,106 @@ window.__diceDebug = {
       preselect: seatPreselect(),
       chosen: seatChosen,
       verdict: { ...seatVerdict },
+      // §11: the profile half of the same modal. `system` is what the PEEK
+      // says this table reads by — the room's settings have not arrived yet,
+      // which is why the peek carries it at all.
+      system: seatSystem(),
+      mine: profilesFor(profileStore, seatSystem()).map((p) => ({
+        id: p.id,
+        name: p.name,
+        pools: p.id === profileStore.activeId ? groups.length : (p.pools || []).length,
+      })),
+      profilePick: seatProfilePicked,
+      profileDefault: lastUsedFor(profileStore, seatSystem()),
     };
   },
+  chooseMyProfile(id) { return chooseMyProfile(id); },
+  chooseDealtProfile() { return chooseDealtProfile(); },
   chooseSeat(name) { return takeSeat(name); },
   chooseSomeoneElse(name) { return takeFreeSeat(name); },
   applySeatImport() { return applySeatChoice(); },
   dismissSeatImport() { return dismissSeatChoice(); },
+  // §11: the library. One JSON-safe projection plus one verb per act, every
+  // verb answering {ok, status} so the refusal strings themselves are
+  // assertable. `list` carries pool COUNTS, not pools: 32 racks through a CDP
+  // evaluate is a payload no scenario needs, and the one in hand is counted
+  // from the LIVE rack rather than its last-folded copy.
+  profiles: {
+    get list() {
+      const sys = tableSystem();
+      return profilesOf(profileStore).map((p) => ({
+        id: p.id,
+        name: p.name,
+        system: p.system,
+        pools: p.id === profileStore.activeId ? groups.length : (p.pools || []).length,
+        active: p.id === profileStore.activeId,
+        pickable: p.system === sys,
+        ...(p.set ? { set: p.set } : {}),
+      }));
+    },
+    get active() {
+      const p = activeProfile(profileStore);
+      return p ? { id: p.id, name: p.name, system: p.system, pools: groups.length, ...(p.set ? { set: p.set } : {}) } : null;
+    },
+    get tableSystem() { return tableSystem(); },
+    // R6's answer, per system — what each table would hand you on arrival.
+    get lastUsed() {
+      const out = {};
+      for (const id of Object.keys(SYSTEMS)) {
+        const pick = lastUsedFor(profileStore, id);
+        out[id] = pick ? findProfile(profileStore, pick).name : null;
+      }
+      return out;
+    },
+    get mismatch() { return profileMismatch(); },
+    get mismatchKept() { return mismatchKept; },
+    get full() { return isFull(profileStore); },
+    get max() { return MAX_PROFILES; },
+    use(id) { return switchToProfile(id); },
+    create(name, system) { return makeProfile({ name, system: system || tableSystem(), pools: [] }); },
+    deal(system) { return dealNewProfile(system || tableSystem()); },
+    rename(id, name) { return renameProfileTo(id, name); },
+    remove(id) { return removeProfileById(id); },
+    // src: a wire record {name, system?, set?, pools} — a teammate's published
+    // rack, a prepared seat, or a file profile. Copies into the library.
+    copyFrom(src, activate = false) { return copyProfileIn(src, { activate }); },
+    bindToTable() { return bindActiveToTable(); },
+    keepMismatch() { mismatchKept = true; updateProfileBanner(); return { ok: true, status: '✓ kept' }; },
+    // THE PRECONDITION DOOR, for scenarios only. Per-origin localStorage
+    // OUTLIVES a scenario's room (tests/e2e/scenarios.mjs says so at length),
+    // so a library left behind by an earlier scenario on the same origin is
+    // inherited by the next one — and a leftover profile named 'Alice' makes a
+    // prepared seat called 'Alice' dedupe to 'Alice 2', which is correct
+    // behaviour failing an inherited assumption. setGroups exists for the same
+    // reason at the rack's grain; this is it at the library's.
+    reset(system) {
+      const sys = knownSystem(system) || tableSystem();
+      profileStore = emptyStore();
+      const added = addProfile(profileStore, {
+        name: dealName(sys), system: sys, pools: dealRack(sys), at: Date.now(),
+      });
+      saveProfileStore();
+      adoptRack(added.profile);
+      renderProfileLibrary();
+      return { ok: true, status: `✓ library reset to '${added.profile.name}'` };
+    },
+    // The picker menu, opened without a pointer.
+    openMenu() {
+      const anchor = document.getElementById('profile-pick');
+      const visible = anchor && !anchor.classList.contains('hidden');
+      openRailMenu(visible ? anchor : document.getElementById('identity-chip'), buildProfileMenu);
+      return { ok: true, status: '✓ open' };
+    },
+    get menuRows() {
+      if (!isRailMenuOpen()) return null;
+      return [...railMenuState.el.querySelectorAll('.pm-row')].map((b) => ({
+        label: b.querySelector('.pm-name') ? b.querySelector('.pm-name').textContent : '',
+        sub: b.querySelector('.pm-sub') ? b.querySelector('.pm-sub').textContent : '',
+        disabled: !!b.disabled,
+        active: b.getAttribute('aria-checked') === 'true',
+      }));
+    },
+  },
   // §G6: the authorship record vs the room. stored = the rev this browser
   // last pushed (0 = never pushed, so it never re-pushes); room = the setup
   // rev the room holds as this client knows it (0 = unprepared).
@@ -5304,7 +5413,14 @@ window.__diceDebug = {
   setPoolsOwner(id) { setPoolsOwner(id || null); return poolsOwner; },
   get netPlayers() {
     return players.map((p) => ({ id: p.id, name: p.name,
-      pools: (p.pools || []).map((g) => ({ ...g })) }));
+      pools: (p.pools || []).map((g) => ({ ...g })),
+      // §11: WHICH of their profiles the published rack is, and what it was
+      // built for — the two fields that make a teammate's rack copyable rather
+      // than merely visible. Present-or-absent on the wire, so null here rather
+      // than absent, which is what a scenario can actually assert against.
+      profile: p.profile || null,
+      system: p.system || null,
+      set: p.set || null }));
   },
   publishPools() { publishPools(); return true; },
   // the Pools tab flyout (the WHOLE panel body — draft + list — on hover
@@ -6520,12 +6636,11 @@ let poolsOwner = null;  // a player id, or null = your own rack
 // 'table-setup'. The §G5 seat picker reads profiles out of it after the
 // join; §G6's re-push compares its rev against the one this client pushed.
 let roomSetup = null;
-// G3 profile authoring (declared here with poolsOwner because publishPools
-// and renderGroups both read it, and both can run before the portable pane's
-// own section evaluates): the display name of the table-file profile whose
-// pools are currently swapped into `groups`, or null = the rack is yours.
-let portableEditing = null;
-let portableMine = null; // the pre-swap rack (same records), for a same-session restore
+// §11: the mismatch acknowledgement — set when the player has been told their
+// profile's system is not this table's and answered "Keep". Per session and per
+// room by construction (a module `let` in a page that reloads to change rooms),
+// so the banner names the situation once and then stops.
+let mismatchKept = false;
 
 renderTray();
 paintCmd();
@@ -6579,53 +6694,92 @@ if (/[#&]g=/.test(location.hash)) {
   try { history.replaceState(null, '', location.pathname + location.search); } catch { /* ignore */ }
 }
 
-let groups = load(LS_GROUPS, null);
-// G3 RELOAD GUARD: a stash under dice.groups.mine.v1 means the last session
-// ended while a table-file profile was swapped into the rack (Edit ⟨name⟩,
-// PROFILES §4). DELIBERATE CHOICE of the two the design allows: restore the
-// operator's OWN rack and drop the editing state, rather than resurrecting
-// the swap. The banner and the file text do not survive a reload, so booting
-// with the profile's pools still in dice.groups.v1 would be someone else's
-// rack under your name with nothing on screen saying so — the `#g=` codec's
-// exact failure (GOALS §7). The profile itself is safe wherever it was last
-// saved (the text, the downloaded file); unsaved profile edits from the dead
-// session are the one thing lost, and losing those is the honest outcome —
-// the file is the truth, and nothing was ever truer than its last Save.
-{
-  const mine = load(LS_GROUPS_MINE, null);
-  if (Array.isArray(mine)) {
-    groups = mine; // re-persisted under LS_GROUPS by the saveGroups() below
+// THE LIBRARY (docs/PROFILES.md §11). One store key, and the profile it names
+// active IS the rack — so `groups` below is not loaded from storage of its own
+// any more, it is a view of `profileStore`.
+//
+// Tier G's RELOAD GUARD is gone from here along with the swap it guarded. It
+// existed because `Edit ⟨name⟩` copied a profile's pools into the one rack and
+// stashed yours beside it, so a tab that died mid-edit booted holding somebody
+// else's pools under your name — the `#g=` codec's exact failure (GOALS §7) —
+// and the only repair was to restore the stash and DROP the half-edited rack.
+// A library has somewhere to put both, so migrateLegacy keeps both: the stash
+// becomes your profile and the rack in front of it becomes 'Recovered'. This is
+// the one place this pass gains data rather than merely moving it.
+let profileStore = normalizeStore(load(LS_PROFILES, null));
+if (!profilesOf(profileStore).length) {
+  // First boot on the library. Everything below runs ONCE — after this the
+  // store is non-empty forever (deleteProfile refuses the last one), so the
+  // legacy keys are read here and never again.
+  const legacyRack = load(LS_GROUPS, null);
+  const legacyMine = load(LS_GROUPS_MINE, null);
+  // The system the migrated rack is bound to: whatever table this browser last
+  // configured, else the default. Guessing 'soul-deal' for a rack built at a
+  // D&D table would strand it as a mismatch on its very first boot.
+  const stored = load(LS_ROOMSETTINGS, null);
+  const bootSystem = knownSystem(stored && stored.system) || DEFAULT_SYSTEM;
+  let label = '';
+  try { label = (localStorage.getItem(LS_NAME) || '').trim().replace(/#/g, ''); } catch { /* ignore */ }
+  if (Array.isArray(legacyRack) && legacyRack.length) {
+    profileStore = migrateLegacy({
+      groups: legacyRack,
+      mine: legacyMine,
+      system: bootSystem,
+      set: diceSet !== 'std' ? diceSet : null,
+      label: label || 'My pools',
+    });
+  }
+  if (Array.isArray(legacyMine)) {
+    // Spent: there are no rack swaps left for a stash to mean, and leaving it
+    // would migrate a second time if the library were ever cleared.
     try { localStorage.removeItem(LS_GROUPS_MINE); } catch { /* ignore */ }
   }
+  // The Soul Deal starting rack (Joe, 2026-08-01; DEALT since 2026-08-08): the
+  // nine attributes in their Physical/Mental/Social triads, six weapon skills
+  // and three motivations — a fresh seat can stage attribute+skill+motivation
+  // and roll ('1 2 3 Enter' territory). The dice are dealt at random inside
+  // each shelf's price (js/seed.js), so a fresh browser opens on a character
+  // rather than on eleven identical d6 pools; the ✎ editor is still the
+  // advancement path. Dealt ONCE, at the moment storage is empty — a reload
+  // never re-rolls a rack out from under its owner. It becomes profile #1
+  // with no prompt of any kind: the lobby asks nothing, and the first tap
+  // rolls (ROADMAP §3b L0).
+  if (!profilesOf(profileStore).length) {
+    addProfile(profileStore, {
+      name: label || dealName(bootSystem),
+      system: bootSystem,
+      pools: dealRack(bootSystem),
+      at: Date.now(),
+    });
+  }
 }
-// The Soul Deal starting rack (Joe, 2026-08-01; DEALT since 2026-08-08):
-// the nine attributes in their Physical/Mental/Social triads, six weapon
-// skills and three motivations — a fresh seat can stage attribute+skill+
-// motivation and roll ('1 4 7 Enter' on the dealt rack, since U24 shares the
-// nine digits out across the shelves 3/3/3). The dice are dealt at
-// random inside each shelf's price (js/seed.js), so a fresh browser opens
-// on a character rather than on eleven identical d6 pools; the ✎ editor is
-// still the advancement path. Dealt ONCE, at the moment storage is empty,
-// and persisted by the saveGroups() below — a reload never re-rolls a rack
-// out from under its owner.
-function defaultGroups() {
-  return dealStartingRack();
+// The rack: the active profile's pools, through migrateGroup — the one door a
+// pool record takes on its way in, canonicalizing notations, lazily upgrading
+// pre-notation records and dropping what it cannot read. Every profile takes
+// it at the moment it is picked up, never before: parked pools are stored as
+// they were written, and a profile from a later version is migrated the day
+// somebody actually holds it.
+//
+// MERGE NOTE (2026-08-08): master's `defaultGroups()` wrapper is gone, not
+// lost. It returned dealStartingRack() for the ONE rack the app used to have;
+// the library deals per profile instead (dealRack(sys) at profile creation),
+// so the wrapper had no caller left. The dealt rack itself — and U24's
+// digit map that reads it — are untouched.
+function poolsOfProfile(profile) {
+  return ((profile && profile.pools) || []).map(migrateGroup).filter(Boolean);
 }
-if (!groups) groups = defaultGroups();
-groups = (Array.isArray(groups) ? groups : []).map(migrateGroup).filter(Boolean);
+let groups = poolsOfProfile(activeProfile(profileStore));
 
 // Seed upgrade (2026-08-01): a rack that is EXACTLY the pre-Soul-Deal
 // starter set — Attack/Damage/Percentile, untouched, uncategorized — was
 // never the player's own work, so it swaps for the Soul Deal starting rack
-// instead of blocking it forever (defaults otherwise only seed EMPTY
-// storage, and the stored trio would sit there forever). One edit to any of
-// the three and the rack is theirs: no swap. (Runs after migrate so it sees
-// the rack in its canonical shape.)
+// instead of blocking it forever. One edit to any of the three and the rack is
+// theirs: no swap. (Runs after migrate so it sees the rack in canonical shape.)
 {
   const oldSeed = [['Attack', '1d20'], ['Damage', '3d4'], ['Percentile', 'd100']];
   const untouched = groups.length === 3 && groups.every((g, i) =>
     g.name === oldSeed[i][0] && g.notation === oldSeed[i][1] && !g.category);
-  if (untouched) groups = defaultGroups();
+  if (untouched) groups = dealStartingRack();
 }
 
 // Publish the rack to the room whenever it changes (ROADMAP 2b): a
@@ -6639,11 +6793,217 @@ function schedulePublishPools() {
   poolsPublishTimer = setTimeout(() => { poolsPublishTimer = null; publishPools(); }, 250);
 }
 
+// THE ONE WRITER of the rack, and now of the library it lives in. It was one
+// line (`save(LS_GROUPS, groups)`) and it is still one write: `groups` folds
+// into the active profile and the whole store goes down in a single setItem.
+//
+// That single write is why the library is ONE key. Three designs were built out
+// before this one and two of them kept the live rack in its own key with the
+// store holding the rest — and both, in their own self-critique, named the same
+// worst defect: a profile switch is then three writes across two keys with only
+// the first verified, so a throw in the tail leaves the pointer naming one
+// profile while the rack holds another, and every repair for that state is
+// itself a data-loss path. Here there is no intermediate state to survive.
 function saveGroups() {
-  save(LS_GROUPS, groups);
+  writeActivePools(profileStore, groups);
+  saveProfileStore();
   schedulePublishPools();
 }
+
+// Persist the library. Returns false when storage refused it, so the callers
+// that MOVE data (switch, create, delete) can refuse out loud instead of
+// leaving the screen disagreeing with the disk — the guardrail Tier G's stash
+// needed a read-back to get, kept where it is still cheap.
+function saveProfileStore() {
+  try {
+    localStorage.setItem(LS_PROFILES, JSON.stringify(profileStore));
+    return true;
+  } catch {
+    return false;
+  }
+}
 saveGroups();
+
+// ---------------------------------------------------------------------------
+// The library's verbs (docs/PROFILES.md §11)
+// ---------------------------------------------------------------------------
+//
+// These replace Tier G's rack swap entire — Edit ⟨name⟩ / Save to ⟨name⟩ /
+// Done, the stash, its read-back and its boot guard (§11.8). That machinery
+// existed to make one rack pretend to be two; there are thirty-two now, so a
+// switch is a pointer move and there is nothing to set aside, verify or give
+// back.
+//
+// Every verb answers the pane's verdict shape {ok, status} so the same string
+// can be read out at the three places a profile can be acted on: the join
+// modal's hint line, the switcher menu, and the library list.
+
+const pv = (ok, status) => ({ ok, status });
+
+const activeProfileName = () => {
+  const p = activeProfile(profileStore);
+  return p ? p.name : null;
+};
+
+// The system this table reads dice by — the room's setting when online, the
+// solo copy in the lobby (§11 X9). `currentSystemId` is already exactly that.
+const tableSystem = () => currentSystemId;
+
+// The profile in hand is bound to a different system than this table reads.
+// A LABELLING problem, never a validity one: pools are notation and a system
+// is a render-time lens (goal 6), so the rack keeps rolling either way.
+function profileMismatch() {
+  const p = activeProfile(profileStore);
+  if (!p || p.system === tableSystem()) return null;
+  return { name: p.name, profileSystem: p.system, tableSystem: tableSystem() };
+}
+
+const systemLabel = (id) => (SYSTEMS[id] ? SYSTEMS[id].label : id);
+
+// Put a profile's pools in your hands. No copy, no stash: `groups` is rebuilt
+// from the record and the record it came from is untouched.
+function adoptRack(profile) {
+  editingGroupId = null;      // no open tile editor may survive into another rack
+  creatingShelf = null;
+  if (pop && pop.source === 'group') closePopover();
+  poolsOwner = null;          // you are looking at your own rack again
+  groups = poolsOfProfile(profile);
+  mismatchKept = false;       // a new profile is a new question
+  saveGroups();               // persists the store and re-publishes the label
+  if (profile && profile.set && profile.set !== diceSet) setDiceSet(profile.set);
+  renderGroups();
+  renderPlayers();
+  updateProfileBanner();
+  // The library list's own `Use` button switches, so the list has to repaint or
+  // the 'in hand' tag it just moved stays on the row you left.
+  renderProfileLibrary();
+}
+
+// R4: the picked profile stays in use until it is switched.
+function switchToProfile(id) {
+  const rec = findProfile(profileStore, id);
+  if (!rec) return pv(false, '✗ that profile is gone — the list has been rebuilt');
+  if (profileStore.activeId === id) {
+    return pv(true, `✓ '${rec.name}' is already in your hands`);
+  }
+  const outgoing = activeProfile(profileStore);
+  writeActivePools(profileStore, groups); // fold the rack in before the pointer moves
+  setActive(profileStore, id, Date.now());
+  if (!saveProfileStore()) {
+    // Storage refused the write. Put the pointer back and say so: the screen
+    // must never disagree with the disk about which rack you are holding.
+    if (outgoing) setActive(profileStore, outgoing.id, outgoing.at);
+    return pv(false, '✗ couldn’t save the switch (storage unavailable?) — nothing moved');
+  }
+  adoptRack(rec);
+  const kept = outgoing ? ` — '${outgoing.name}' keeps its ${outgoing.pools.length} pool${outgoing.pools.length === 1 ? '' : 's'}` : '';
+  return pv(true, `✓ '${rec.name}' is in your hands${kept}`);
+}
+
+// One door for every new profile: created empty, dealt, or copied from a
+// teammate, a prepared seat or a file. `activate` is false only where a caller
+// wants to add without taking it in hand (a bulk file import).
+function makeProfile({ name, system, pools = [], set = null, activate = true }) {
+  if (isFull(profileStore)) {
+    return pv(false, `✗ ${MAX_PROFILES} profiles is the ceiling — delete one first`);
+  }
+  if (pools.length > MAX_POOLS) {
+    return pv(false, `✗ that one carries ${pools.length} pools — a profile holds at most ${MAX_POOLS}`);
+  }
+  const named = nameProfile(name);
+  if (!named.ok) return pv(false, `✗ ${named.error}`);
+  const outgoing = activeProfile(profileStore);
+  if (outgoing) writeActivePools(profileStore, groups);
+  const before = profileStore.activeId;
+  const added = addProfile(profileStore, {
+    name: named.name, system: knownSystem(system) || tableSystem(), pools, set, at: Date.now(),
+  });
+  if (!added.ok) return pv(false, `✗ ${added.error}`);
+  if (!activate && before) setActive(profileStore, before, outgoing ? outgoing.at : 0);
+  if (!saveProfileStore()) {
+    deleteProfile(profileStore, added.id);
+    if (before) setActive(profileStore, before, outgoing ? outgoing.at : 0);
+    return pv(false, '✗ couldn’t save the new profile (storage unavailable?) — nothing was added');
+  }
+  if (activate) adoptRack(added.profile);
+  else renderProfileLibrary();
+  const n = added.profile.pools.length;
+  return { ...pv(true, `✓ '${added.profile.name}' added — ${n} pool${n === 1 ? '' : 's'}${activate ? ', and it is in your hands' : ''}`), id: added.id, name: added.profile.name };
+}
+
+// R9's Random: a whole dealt profile for the table's own system, named without
+// asking a question it can answer (js/seed.js dealName).
+function dealNewProfile(system) {
+  const sys = knownSystem(system) || tableSystem();
+  const made = makeProfile({ name: uniqueName(profileStore, dealName(sys)), system: sys, pools: dealRack(sys) });
+  if (!made.ok) return made;
+  return pv(true, `✓ dealt '${made.name}' — ${systemLabel(sys)}, ${groups.length} pools`);
+}
+
+// R7: a teammate's published rack, a prepared seat, or a profile out of a
+// file — copied into MY library. Nothing of mine is touched: this is an add,
+// under a deduped name, and the copy is not taken in hand unless asked for.
+// (A copy is a copy: no pointer back to whoever wrote it, so no "there is a
+// newer version" to track. PROFILES §11.9 decision 10.)
+function copyProfileIn(rec, { activate = false } = {}) {
+  const wire = fromWire(rec, tableSystem());
+  if (!wire) return pv(false, '✗ nothing to copy');
+  const named = nameProfile(wire.name);
+  if (!named.ok) return pv(false, `✗ ${named.error}`);
+  const made = makeProfile({
+    name: uniqueName(profileStore, named.name),
+    system: wire.system,
+    pools: wire.pools,
+    set: wire.set,
+    activate,
+  });
+  if (!made.ok) return made;
+  const n = wire.pools.length;
+  return pv(true, `✓ copied as '${made.name}' — ${n} pool${n === 1 ? '' : 's'}, nothing of yours changed`);
+}
+
+function renameProfileTo(id, name) {
+  const got = renameProfile(profileStore, id, name);
+  if (!got.ok) return pv(false, `✗ ${got.error}`);
+  if (!saveProfileStore()) return pv(false, '✗ couldn’t save the new name (storage unavailable?)');
+  if (id === profileStore.activeId) { schedulePublishPools(); renderGroups(); }
+  renderProfileLibrary();
+  return pv(true, `✓ renamed to '${got.name}'`);
+}
+
+function removeProfileById(id) {
+  const rec = findProfile(profileStore, id);
+  if (!rec) return pv(false, '✗ that profile is gone already');
+  const wasActive = id === profileStore.activeId;
+  if (!wasActive) writeActivePools(profileStore, groups); // don't lose edits to the one in hand
+  const got = deleteProfile(profileStore, id);
+  if (!got.ok) return pv(false, `✗ ${got.error}`);
+  if (!saveProfileStore()) return pv(false, '✗ couldn’t save the deletion (storage unavailable?) — nothing was removed');
+  if (wasActive) adoptRack(activeProfile(profileStore));
+  else renderProfileLibrary();
+  const left = profilesOf(profileStore).length;
+  return pv(true, `✓ deleted '${rec.name}' — ${left} profile${left === 1 ? '' : 's'} left${wasActive ? `, '${activeProfileName()}' is in your hands` : ''}`);
+}
+
+// Re-bind the profile in hand to the table's system — the mismatch banner's
+// third option, for the player whose D&D fighter really is what they want to
+// roll at this Soul Deal table. Explicit, one click, nothing moves but a label.
+function bindActiveToTable() {
+  const p = activeProfile(profileStore);
+  if (!p) return pv(false, '✗ no profile in hand');
+  const was = p.system;
+  setActiveSystem(profileStore, tableSystem());
+  if (!saveProfileStore()) {
+    setActiveSystem(profileStore, was);
+    return pv(false, '✗ couldn’t save (storage unavailable?)');
+  }
+  mismatchKept = false;
+  schedulePublishPools();
+  renderGroups();
+  updateProfileBanner();
+  renderProfileLibrary();
+  return pv(true, `✓ '${p.name}' now reads as ${systemLabel(p.system)}`);
+}
 
 const groupsListEl = document.getElementById('groups-list');
 // #groups-empty retired with the Sheet Pass: ghost tiles ARE the empty state.
@@ -7165,22 +7525,27 @@ function setPoolsOwner(id) {
 // Share the rack with the room: name + notation + category, capped like the
 // server caps it. Fire-and-forget — everyone (us included) hears the
 // 'pools-changed' echo, and a solo table simply has no one to tell.
+// Tier G's publish gate is GONE, and its deletion is a design consequence
+// rather than a tidy-up: it existed because `Edit ⟨name⟩` put somebody else's
+// pools in the one rack, so a publish mid-swap would have claimed Alice's rack
+// under your own name and corrupted the owner switcher. The rack is now always
+// the profile in your own hands, so a publish is always honest and there is
+// nothing left to gate (PROFILES §11.8).
 function publishPools() {
   if (!net) return;
-  // G3: while a table-file profile is swapped into the rack, the rack is not
-  // ours to claim — publishing is "here is MY rack" to the whole room, and
-  // pushing Alice's pools under our own name would lie to every teammate and
-  // corrupt the owner switcher. EVERY publish funnels through here (the
-  // saveGroups debounce, the join at hello, the silent-rejoin re-share, the
-  // debug hook), so this one gate covers them all; Done's saveGroups()
-  // re-publishes the restored rack the moment the gate lifts.
-  if (portableEditing) return;
-  net.setPools(groups.slice(0, 40).map((g) => {
+  const mine = activeProfile(profileStore);
+  net.setPools(groups.slice(0, MAX_POOLS).map((g) => {
     const rec = { name: g.name || '', notation: g.notation };
     if (g.category) rec.category = g.category;
     if (g.set) rec.set = g.set; // §9: pool identity rides the rack broadcast
     return rec;
-  }), wireSet()); // §9: your default set rides too — foreign racks show YOUR world
+  }),
+  wireSet(), // §9: your default set rides too — foreign racks show YOUR world
+  // §11: and WHICH profile this is, plus the system it was built for. The
+  // owner switcher has browsed teammates' racks since ROADMAP 2b; until now
+  // it could only say whose. A rack a teammate can name is one they can copy.
+  mine ? mine.name : null,
+  mine ? mine.system : null);
 }
 
 // Category shelves (the Rack): fixed trio order — Attributes, Skills,
@@ -7621,6 +7986,28 @@ function renderGroups() {
   groupsListEl.classList.toggle('foreign', foreign);
   poolsHead.querySelector('.ph-word').textContent = foreign ? `${owner.name}'s pools` : 'Saved pools';
   poolsHead.classList.remove('hidden'); // one region head, always shown online-with-content
+  // §11: the head gains a THIRD reason to exist — naming which of your
+  // profiles is in your hands, and offering the switch. Hidden while a library
+  // holds one profile, because then there is nothing to disambiguate and
+  // nothing to switch to: a player who never makes a second profile sees no new
+  // chrome anywhere. Hidden on a foreign rack too — one head, one state, and
+  // the foreign one is about THEM.
+  const pick = document.getElementById('profile-pick');
+  const mineNow = activeProfile(profileStore);
+  const many = profilesOf(profileStore).length > 1;
+  const showPick = !foreign && !!mineNow && many;
+  pick.classList.toggle('hidden', !showPick);
+  poolsHead.classList.toggle('profiled', showPick);
+  if (showPick) {
+    const off = mineNow.system !== tableSystem();
+    // The system word appears ONLY when it differs — a label the player needs
+    // exactly when it is surprising, and silence the rest of the time.
+    pick.textContent = off ? `${mineNow.name} · ${systemLabel(mineNow.system)} ▾` : `${mineNow.name} ▾`;
+    pick.title = off
+      ? `'${mineNow.name}' reads as ${systemLabel(mineNow.system)}; this table reads ${systemLabel(tableSystem())} — tap to switch`
+      : `'${mineNow.name}' is in your hands — tap to switch profile`;
+    pick.classList.toggle('off', off);
+  }
   // The rack total rides the region head's slack (.ph-rule flex:1) — one
   // right-flush ledger column with the shelf figures, its standing word
   // paid once here. Rebuilt fresh per render; absent outside manage.
@@ -10033,6 +10420,17 @@ function setChips(on, persist = true) {
 // (fx=false, 'relit'), a dismissed banner stays dismissed, and a mid-flight
 // ceremony keeps its stage — its own verdict staging reads the new lens when
 // it gets there.
+// §11 X1: the table's system changed under us (any player may — goal 10).
+// NOTHING is swapped: a pool is notation and a system is a render-time lens, so
+// the rack rolls the same. What changes is what is TRUE about the label, so the
+// head's system word and the mismatch banner are repainted and the picker's
+// filter follows. The acknowledgement resets — this is a new question.
+function onTableSystemChanged() {
+  mismatchKept = false;
+  updateProfileBanner();
+  renderProfileLibrary();
+}
+
 function rerenderInterpretation() {
   renderLog();
   renderShelfMarkers(); // the shelf markers' meaning words re-read the lens
@@ -10193,7 +10591,12 @@ function applyRoomSettings(settings) {
     if (settings.system !== currentSystemId) {
       currentSystemId = settings.system;
       rerenderInterpretation();
-      updateTrayModsWord(); // U11: the rim names what the popover can express
+      // BOTH (merge 2026-08-08): they answer different halves of a system
+      // flip. updateTrayModsWord (U11) re-words the rim for what the popover
+      // can express under the new system; onTableSystemChanged (§11 X1) says
+      // the table's LABEL changed and nothing was swapped underneath.
+      updateTrayModsWord();
+      onTableSystemChanged();
     }
     renderSystemPicker();
   }
@@ -10445,6 +10848,7 @@ function selectSystem(id) {
   save(LS_ROOMSETTINGS, roomSettings);
   currentSystemId = id;
   rerenderInterpretation();
+  onTableSystemChanged(); // §11 X1/X9 — the lobby's own system counts too
   renderSystemPicker();
   return true;
 }
@@ -10560,6 +10964,7 @@ function syncSettingsUI() {
 }
 
 function openSettingsModal() {
+  renderProfileLibrary(); // §11: the library and 'At this table', fresh per open
   // The table-name prefill lives HERE, not in syncSettingsUI: setSound()
   // calls syncSettingsUI during module evaluation, before roomSettings'
   // let initializes — the exact eval-order trap the felt-swatch comment
@@ -10648,8 +11053,48 @@ const portableApplyBtn = document.getElementById('portable-apply');
 let portablePlan = null; // the previewed plan Apply commits (null = nothing valid)
 let portableParsed = null; // the last GOOD parse of the box (drives the G3 profile list)
 
+// The file this browser would write right now. Since §11 that is THE WHOLE
+// LIBRARY: `players:` carries every profile with the system it was built for,
+// and `pools:` stays the rack in your hands — the same shape it has always
+// been, so a file from this app still hands its pools to an importer that
+// knows nothing about profiles. The active profile therefore appears twice,
+// once as a seat and once as the top-level rack; that is deliberate, because
+// the two sections answer different questions ("who is in this file" and "what
+// would Apply merge into my rack") and collapsing them would break one.
+//
+// `table:` is only written when there is a table to describe — the lobby has
+// none, and a file naming a table you are not at is exactly the phantom §7.20
+// went and deleted from the nameplate.
 function portableSnapshot() {
-  return exportYaml({ groups, settings: { sound: soundOn, numbers: chipsOn } });
+  return exportYaml({
+    groups,
+    settings: { sound: soundOn, numbers: chipsOn },
+    table: IN_LOBBY ? null : {
+      ...(roomSettings.tableName ? { name: roomSettings.tableName } : {}),
+      felt: roomSettings.felt,
+      system: roomSettings.system,
+      zoom: roomSettings.zoom,
+    },
+    // WHOSE the top-level pools are. This is what keeps the document free of a
+    // second home for the same rack: the profile in hand stays exactly where
+    // the exporter's own pools have always been (`pools:`), `players:` carries
+    // only the OTHERS, and this names the one holding the rack. Writing it into
+    // both sections instead would put one character's dice in two places, and
+    // an edit that lands in the ignored copy is a trap in a format people are
+    // invited to hand-edit.
+    profile: (() => {
+      const p = activeProfile(profileStore);
+      return p ? { name: p.name, system: p.system, ...(p.set ? { set: p.set } : {}) } : null;
+    })(),
+    profiles: profilesOf(profileStore)
+      .filter((p) => p.id !== profileStore.activeId)
+      .map((p) => ({
+        name: p.name,
+        system: p.system,
+        ...(p.set ? { set: p.set } : {}),
+        groups: (p.pools || []).map(({ id, ...rec }) => rec),
+      })),
+  });
 }
 
 // The preview's counting grammar — '3 new · 1 update · 2 unchanged' — shared
@@ -10693,18 +11138,18 @@ function portablePreview() {
   portableParsed = null;
   portableApplyBtn.disabled = true;
   portableStatus.classList.remove('warn');
-  if (!text.trim()) { portableStatus.textContent = ''; renderPortableProfiles(); return; }
+  if (!text.trim()) { portableStatus.textContent = ''; renderImportProfiles(); return; }
   const parsed = parsePortable(text);
   if (!parsed.ok) {
     portableStatus.textContent = `✗ ${parsed.line ? `line ${parsed.line}: ` : ''}${parsed.error}`;
     portableStatus.classList.add('warn');
-    renderPortableProfiles();
+    renderImportProfiles();
     return;
   }
-  // The parse stands even when the IMPORT plan below is refused: the profile
-  // list (G3) is about what the file holds, not what would merge into you.
+  // The parse stands even when the IMPORT plan below is refused: what the file
+  // HOLDS is a different question from what would merge into your own rack.
   portableParsed = parsed;
-  renderPortableProfiles();
+  renderImportProfiles();
   const plan = planImport(groups, parsed);
   if (groups.length + plan.adds.length > 40) {
     portableStatus.textContent = `✗ would exceed 40 pools (you have ${groups.length}, this adds ${plan.adds.length})`;
@@ -10855,49 +11300,36 @@ portableFileInput.addEventListener('change', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Profile authoring — the rack swap (ROADMAP §G3 ⟨MVP⟩, PROFILES §4).
+// The profile library's surfaces (docs/PROFILES.md §11).
 //
-// The organizer needs the pool editor AND the dice-value ledger pointed at
-// someone else's rack, and every management surface (✎, the popover, drag,
-// editPoolById) assumes it writes YOUR dice.groups.v1. So there is no second
-// editor: Edit ⟨name⟩ swaps that profile's pools INTO `groups`, and manage
-// mode, the spectrum bars and the ledger all work unmodified because as far
-// as they know it is your rack. Save to ⟨name⟩ writes the rack back into the
-// BOX TEXT only — the file door (G1) stays the one explicit way to disk.
+// THIS REPLACES TIER G's RACK SWAP. §G3 gave the organizer the pool editor and
+// the dice-value ledger pointed at somebody else's rack by swapping that
+// profile's pools INTO the one rack and stashing yours beside it — with a
+// write-and-verify before `groups` moved, a sticky banner naming whose pools
+// were on screen, a publish gate so the room never heard Alice's rack under
+// your name, and a boot guard for the tab that died mid-edit. Every one of
+// those existed because there was ONE rack and it had to pretend to be two.
 //
-// The guardrails, because this is the slice with real data-loss risk:
-//   1. The stash. Entering a swap writes the pre-swap rack to
-//      dice.groups.mine.v1 BEFORE touching `groups`, and verifies the write
-//      landed (a full/backless localStorage refuses the whole swap — nothing
-//      moves). Losing your own pools because you clicked "Edit Alice" would
-//      be the `#g=` codec all over again (GOALS §7).
-//   2. The banner. A sticky bar over the rack names whose pools are on
-//      screen the whole time, wearing the #pools-toolbar.on editing dress
-//      and holding the only two exits: Save to ⟨name⟩ and Done.
-//   3. The publish gate. publishPools() no-ops while a swap is live (see the
-//      gate there) — the room never hears Alice's rack under your name.
-//   4. The reload guard, by the groups load at boot: a leftover stash
-//      restores YOUR rack and drops the editing state, deliberately.
-//   5. Commits spend the preview. Every verb that changes `groups` or the
-//      box text ends in portableReceipt(), which drops the previewed plan
-//      the way Apply's own commit does — a plan computed against one rack is
-//      never left armed against another.
+// There are thirty-two now. Taking a profile in hand is a pointer move inside a
+// single stored value, both racks are already in it, and the failure class the
+// stash was built to survive cannot be constructed — so the stash, its
+// verification, its banner, its gate and its guard are deleted rather than
+// ported (§11.8). What survives from §G3 is the OBSERVATION that made it work:
+// there is no second editor, because the rack in your hands is always the thing
+// the ✎ overlays, the popover, the spectrum bars and the ledger act on.
 //
-// A file whose parse carried warnings (sections a later version wrote) is
-// READ-ONLY to these verbs: a rewrite would silently drop what the skip
-// skipped, so both doors refuse it — skip-and-warn is an import tolerance,
-// not a license to emit a file minus the parts we didn't understand.
+// The banner survives too, re-purposed. It used to say "you are holding
+// someone else's pools"; it now says the one thing that can still be true and
+// surprising — that the profile in your hands was built for a different
+// rulebook than this table reads (§11.5).
 // ---------------------------------------------------------------------------
 
-// Caps, MIRRORED from js/portable.js (like its own SETTING_SPECS mirror:
-// portable.js does not export them, and the pre-check keeps a refusable
-// Save from ever replacing good box text with an over-cap file).
-const PORTABLE_MAX_PROFILES = 12;
-const PORTABLE_MAX_POOLS_PER_PLAYER = 40;
-const PORTABLE_MAX_POOLS_PER_FILE = 300;
+// The whole-file pool ceiling, MIRRORED from js/portable.js (which does not
+// export it) so a refusable push never replaces good box text.
+const PORTABLE_MAX_POOLS_PER_FILE = MAX_PROFILES * MAX_POOLS + MAX_POOLS;
 
 // One parsed rack (parsePortable's shelves) → flat group records, ids minted
-// fresh. Fresh ids are safe: the swap replaces the whole rack, and Apply's
+// fresh. Fresh ids are safe: nothing downstream joins on them, and Apply's
 // added ids are Date.now()-scale so they never collide with these.
 function profileShelvesToGroups(shelves) {
   const out = [];
@@ -10913,7 +11345,6 @@ function profileShelvesToGroups(shelves) {
   return out;
 }
 
-const profilePoolCount = (p) => p.shelves.reduce((n, s) => n + s.pools.length, 0);
 
 // The rack as exportYaml's flat profile shape (ids stripped — they are
 // rack-local and mean nothing in a file).
@@ -10930,16 +11361,6 @@ function portableFindProfile(name) {
   return (portableParsed ? portableParsed.profiles : []).find((p) => p.name.toLowerCase() === k) || null;
 }
 
-// The shared door check for every profile verb. null = clear to proceed.
-function portableProfileGuard() {
-  if (!portableParsed) return portableRefuse('✗ nothing usable in the box — open a table file or Fill with my data first');
-  const n = portableParsed.warnings.length;
-  if (n) {
-    return portableRefuse(`✗ ${n} unknown section${n > 1 ? 's' : ''} in this file — a rewrite would drop ${n > 1 ? 'them' : 'it'}, so profile editing is off here`);
-  }
-  return null;
-}
-
 // A commit receipt in the pane's voice: the previewed plan is SPENT (Apply's
 // own post-commit grammar) — a plan computed against the pre-commit rack or
 // text must never stay armed after either has changed. Any new input, Fill,
@@ -10952,148 +11373,142 @@ function portableReceipt(msg) {
   return portableVerdict();
 }
 
-// Re-emit the box's parsed model with `profilesOut` as the players section —
-// table and top-level pools ride through untouched; settings ride through
-// with exportYaml's defaults filling any the text left unsaid (the emitter
-// always writes the section — one Save normalizes to canonical form, the
-// same way notations normalize on import).
-function portableEmitWith(profilesOut) {
-  return exportYaml({
-    groups: profileShelvesToGroups(portableParsed.shelves),
-    settings: portableParsed.settings,
-    table: portableParsed.table || null,
-    profiles: profilesOut,
-  });
+// Every profile a file offers, in one list — the `players:` blocks PLUS the
+// top-level `pools:` section, which is one profile too: the exporting browser's
+// own, named by the `profile:` key. A file written before that key existed (or
+// hand-written without it) still offers its rack, under a label naming what it
+// is rather than a person who was never recorded.
+function importableProfiles() {
+  if (!portableParsed) return [];
+  const out = [];
+  const top = portableParsed.shelves.reduce((n, sh) => n + sh.pools.length, 0);
+  const me = portableParsed.profile || null;
+  if (top || me) {
+    out.push({
+      key: '',
+      name: (me && me.name) || 'This file’s pools',
+      system: (me && me.system) || null,
+      set: (me && me.set) || null,
+      pools: profileShelvesToGroups(portableParsed.shelves).map(({ id, ...rec }) => rec),
+      named: !!(me && me.name),
+    });
+  }
+  for (const p of portableParsed.profiles) {
+    out.push({
+      key: p.name,
+      name: p.name,
+      system: p.system || null,
+      set: p.set || null,
+      pools: profileShelvesToGroups(p.shelves).map(({ id, ...rec }) => rec),
+      named: true,
+    });
+  }
+  return out;
 }
 
-// Enter the swap: guardrails 1 (stash, verified) and 2 (banner), publish
-// gate armed by the portableEditing assignment. Manage mode comes on and the
-// panel opens — the ledger pointed at this rack is the whole point (CUJ1).
-function portableEditProfile(name) {
-  const guard = portableProfileGuard();
-  if (guard) return guard;
-  const prof = portableFindProfile(name);
-  if (!prof) return portableRefuse(`✗ no player ${JSON.stringify(String(name == null ? '' : name).trim())} in this file`);
-  if (portableEditing && prof.name === portableEditing) {
-    // Idempotent on purpose: a re-swap here would silently discard unsaved
-    // edits and reload the profile from the text — that is Done's job to do
-    // loudly, never a repeated click's to do quietly.
-    return portableReceipt(`✓ already editing '${prof.name}' — Save to writes it back, Done restores your pools`);
-  }
-  if (portableEditing) {
-    return portableRefuse(`✗ still editing '${portableEditing}' — Save to it first, or Done to set it aside`);
-  }
-  // GUARDRAIL 1 — the stash, written and VERIFIED before groups is touched.
-  // If localStorage can't hold it (quota, private mode with storage dead),
-  // the swap refuses entirely: "nothing was swapped" must stay literally true.
-  save(LS_GROUPS_MINE, groups);
-  const stashed = load(LS_GROUPS_MINE, null);
-  if (!Array.isArray(stashed) || stashed.length !== groups.length) {
-    try { localStorage.removeItem(LS_GROUPS_MINE); } catch { /* ignore */ }
-    return portableRefuse('✗ couldn’t set your own pools aside (storage unavailable?) — nothing was swapped');
-  }
-  portableMine = groups;
-  portableEditing = prof.name; // arms the publish gate from here on
-  poolsOwner = null;
-  editingGroupId = null; // no open tile editor may survive into another rack
-  creatingShelf = null;
-  if (pop && pop.source === 'group') closePopover();
-  groups = profileShelvesToGroups(prof.shelves);
-  saveGroups(); // persists under LS_GROUPS (the reload guard covers it); publish stays gated
-  if (!panelsOpen.pools) setPanel('pools', true); // the banner must be somewhere it can be seen
-  setPoolsEdit(true); // manage + ledger on; renders groups and players
-  updateProfileBanner();
-  renderPortableProfiles();
-  return portableReceipt(`✓ editing '${prof.name}' — your own pools are set aside; Save to '${prof.name}' writes back, Done restores yours`);
+// One profile out of the box text → the library. The DM's file arriving on a
+// player's machine (§11 O7/P14). An empty `key` is the top-level rack.
+function portableAdoptOne(name) {
+  if (!portableParsed) return portableRefuse('✗ nothing usable in the box — open a table file or Fill with my data first');
+  const want = String(name == null ? '' : name).trim().toLowerCase();
+  const p = importableProfiles().find((r) => r.key.toLowerCase() === want);
+  if (!p) return portableRefuse(`✗ no profile ${JSON.stringify(String(name == null ? '' : name).trim())} in this file`);
+  const got = copyProfileIn({ name: p.name, system: p.system, set: p.set, pools: p.pools });
+  renderProfileLibrary();
+  return got.ok ? portableReceipt(got.status) : portableRefuse(got.status);
 }
 
-// Write the CURRENT rack into ⟨name⟩'s block in the box text (guardrail 5's
-// receipt spends the plan). Works while editing that profile — the round
-// trip — but also cold: overwriting a seat with your own rack is a legal,
-// explicit, text-only act the operator can read before Downloading.
-function portableSaveToProfile(name) {
-  const guard = portableProfileGuard();
-  if (guard) return guard;
-  const prof = portableFindProfile(name);
-  if (!prof) return portableRefuse(`✗ no player ${JSON.stringify(String(name == null ? '' : name).trim())} in this file — Save as new profile adds one`);
-  if (groups.length > PORTABLE_MAX_POOLS_PER_PLAYER) {
-    return portableRefuse(`✗ you have ${groups.length} pools — a profile carries at most ${PORTABLE_MAX_POOLS_PER_PLAYER}`);
+// What the box's `players:` section holds, one row per profile, each an Add
+// away from the library — plus one Add all for the DM's six-character file.
+// Rebuilt on every preview (the box is live), so the rows carry no state.
+function renderImportProfiles() {
+  const zone = document.getElementById('import-profiles');
+  const rows = document.getElementById('import-profile-rows');
+  if (!zone || !rows) return;
+  const seats = importableProfiles();
+  zone.classList.toggle('hidden', !seats.length);
+  rows.textContent = '';
+  if (!seats.length) return;
+  document.getElementById('import-adopt-all').textContent = `Add all ${seats.length}`;
+  for (const p of seats) {
+    const row = document.createElement('div');
+    row.className = 'pp-row';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'pp-name';
+    nameEl.textContent = p.name;
+    const sysEl = document.createElement('span');
+    sysEl.className = 'pp-tag pp-sys';
+    sysEl.textContent = p.system ? systemLabel(p.system) : 'this table';
+    const n = p.pools.length;
+    const countEl = document.createElement('span');
+    countEl.className = 'pp-count';
+    countEl.textContent = `${n} pool${n === 1 ? '' : 's'}`;
+    const add = document.createElement('button');
+    add.className = 'btn tiny';
+    add.textContent = 'Add';
+    add.title = `Add '${p.name}' to your profiles — nothing of yours is touched`;
+    add.addEventListener('click', () => portableAdoptOne(p.key));
+    row.append(nameEl, sysEl, countEl, add);
+    rows.appendChild(row);
   }
-  const others = portableParsed.profiles.reduce((n, p) => n + (p === prof ? 0 : profilePoolCount(p)), 0);
-  const top = portableParsed.shelves.reduce((n, s) => n + s.pools.length, 0);
-  if (others + top + groups.length > PORTABLE_MAX_POOLS_PER_FILE) {
-    return portableRefuse(`✗ would put the file over ${PORTABLE_MAX_POOLS_PER_FILE} pools`);
-  }
-  const profilesOut = portableParsed.profiles.map((p) => ({
-    name: p.name,
-    ...(p.set ? { set: p.set } : {}), // the seat's dice identity is not the rack's to clobber
-    groups: p === prof ? groupsToProfileGroups() : profileShelvesToGroups(p.shelves),
-  }));
-  const text = portableEmitWith(profilesOut);
-  const v = portableLoadText(text); // the one door text enters; re-previews and re-lists
-  if (!v.ok) return { ...v, text }; // emit that refuses its own parse would be a bug — surface it, never hide it
-  return { ...portableReceipt(`✓ saved to '${prof.name}' — Download writes the file`), text };
 }
 
-// Save as new profile: the current rack becomes a NEW seat in the text —
-// six characters have to start somewhere, and this is where (CUJ1: Fill
-// with my data, then add 'Alice' and Edit her into shape).
-function portableAddProfile(rawName) {
-  const guard = portableProfileGuard();
-  if (guard) return guard;
-  const nm = String(rawName == null ? '' : rawName).trim();
-  if (!nm) return portableRefuse('✗ a profile needs a name');
-  if (nm.includes('#')) return portableRefuse('✗ profile names can’t carry \'#\' — it starts a comment in dice notation, so the name would misdirect whispers');
-  if (nm.length > 24) return portableRefuse('✗ profile name over 24 characters');
-  if (portableFindProfile(nm)) return portableRefuse(`✗ '${portableFindProfile(nm).name}' is already in this file — its Save to overwrites it`);
-  if (portableParsed.profiles.length >= PORTABLE_MAX_PROFILES) {
-    return portableRefuse(`✗ the file already holds ${PORTABLE_MAX_PROFILES} players`);
+// Add every profile in the box text to the library — how a DM's file reaches a
+// player who was not at the table (§11 O7/P14). An ADD, never a replace: names
+// dedupe, nothing of the player's is touched, and the cap refuses out loud with
+// what did land still landed.
+function portableAdoptProfiles() {
+  if (!portableParsed) return portableRefuse('✗ nothing usable in the box — open a table file or Fill with my data first');
+  const seats = importableProfiles();
+  if (!seats.length) return portableRefuse('✗ this file carries no profiles');
+  const added = [];
+  let refusal = null;
+  for (const p of seats) {
+    const got = copyProfileIn({ name: p.name, system: p.system, set: p.set, pools: p.pools });
+    if (got.ok) added.push(p.name);
+    else { refusal = got.status; break; } // the cap, or a name no cleaning saves
   }
-  if (groups.length > PORTABLE_MAX_POOLS_PER_PLAYER) {
-    return portableRefuse(`✗ you have ${groups.length} pools — a profile carries at most ${PORTABLE_MAX_POOLS_PER_PLAYER}`);
-  }
-  const others = portableParsed.profiles.reduce((n, p) => n + profilePoolCount(p), 0);
-  const top = portableParsed.shelves.reduce((n, s) => n + s.pools.length, 0);
-  if (others + top + groups.length > PORTABLE_MAX_POOLS_PER_FILE) {
-    return portableRefuse(`✗ would put the file over ${PORTABLE_MAX_POOLS_PER_FILE} pools`);
-  }
-  const profilesOut = portableParsed.profiles.map((p) => ({
-    name: p.name,
-    ...(p.set ? { set: p.set } : {}),
-    groups: profileShelvesToGroups(p.shelves),
-  }));
-  profilesOut.push({ name: nm, groups: groupsToProfileGroups() }); // no set: the seat's identity is the file author's call
-  const text = portableEmitWith(profilesOut);
-  const v = portableLoadText(text);
-  if (!v.ok) return { ...v, text };
-  return { ...portableReceipt(`✓ added '${nm}' — Download writes the file`), text };
+  renderProfileLibrary();
+  if (!added.length) return portableRefuse(refusal || '✗ nothing could be added');
+  const tail = refusal ? ` — then stopped: ${refusal.replace(/^✗ /, '')}` : '';
+  return portableReceipt(`✓ ${added.length} profile${added.length === 1 ? '' : 's'} added to your library${tail}`);
 }
 
 // Apply to table (§G4's client half; the record §G6's re-push replays): push
-// the box's table: + players: to the room as the prepared setup, so joiners
-// are offered the seats. The FILE stays the truth (Download is one row up);
-// the room holds a copy, replaceable furniture like the felt (goal 10 —
-// anyone may). The box's PARSE is what goes: felt/system/zoom/name map onto
-// the settings keys the server validates (file 'name' ↔ wire 'tableName'),
-// shelves flatten through profileShelvesToGroups minus their rack-local ids.
+// the box's table: + players: to the room as the prepared setup, so joiners are
+// offered the seats. The FILE stays the truth (Download is one row up); the
+// room holds a copy, replaceable furniture like the felt (goal 10 — anyone
+// may). The box's PARSE is what goes: felt/system/zoom/name map onto the
+// settings keys the server validates (file 'name' ↔ wire 'tableName'), shelves
+// flatten through profileShelvesToGroups minus their rack-local ids.
 //
-// Unlike G3's profile verbs this does NOT refuse a file with skipped unknown
-// sections: nothing is rewritten, so nothing can be dropped — the room key
-// only ever carried table+players, and the file keeps its future.
+// §11: the seats are FILTERED to the system the table will be reading by, and
+// capped at the room's 12. A library holds 32 because that is how many
+// characters a person keeps; a table takes 12 because that is how many seats it
+// has, and a seat prepared for another rulebook is one the picker must not
+// offer. Both the filter and the cap are named in the receipt — a push that
+// silently dropped four of your six players would read as a bug.
+//
+// Unlike the old §G3 profile verbs this does NOT refuse a file with skipped
+// unknown sections: nothing is rewritten, so nothing can be dropped.
 //
 // The rev outbids everything this client can see (the room's, and its own
 // stored record); a push that STILL loses raced a same-instant winner, so it
-// retries once over the answered rev — the click meant "make the room look
-// like this file", and the no-op answer names exactly what to beat. Success
-// writes dice.table.v1:<room> — the ONE place it is written — making this
-// browser an author §G6 will re-push for.
+// retries once over the answered rev — the click meant "make the room look like
+// this file", and the no-op answer names exactly what to beat. Success writes
+// dice.table.v1:<room> — the ONE place it is written — making this browser an
+// author §G6 will re-push for.
 async function portablePushToTable() {
   if (!portableParsed) return portableRefuse('✗ nothing usable in the box — open a table file or Fill with my data first');
   if (!netOnline || !net) return portableRefuse('✗ solo — no table to prepare (the file itself still works anywhere)');
   const t = portableParsed.table || null;
-  const seats = portableParsed.profiles;
+  // The top-level rack rides along as a seat when the file names whose it is —
+  // an organizer's own character belongs at the table beside the ones they
+  // prepared for everyone else. Unnamed, it stays out: a seat has to be
+  // choosable by name, and 'This file's pools' is a label, not a person.
+  const seats = importableProfiles().filter((p) => p.named);
   if (!t && !seats.length) {
-    return portableRefuse('✗ nothing to send — the box has no table: and no players:');
+    return portableRefuse('✗ nothing to send — the box has no table: and no profiles to seat');
   }
   const table = {};
   if (t) {
@@ -11102,11 +11517,20 @@ async function portablePushToTable() {
     if (t.system) table.system = t.system;
     if (t.zoom) table.zoom = t.zoom;
   }
-  const profiles = seats.map((p) => ({
+  // What the room WILL read by once this push lands — the file's own system if
+  // it names one, else whatever the room already reads by.
+  const willRead = knownSystem(table.system) || tableSystem();
+  // A seat naming no system is one prepared before §11: it belongs to the
+  // table it was written for, which is this one.
+  const fit = seats.filter((p) => (p.system || willRead) === willRead);
+  const wrongSystem = seats.length - fit.length;
+  const profiles = fit.slice(0, PROFILES_AT_TABLE).map((p) => ({
     name: p.name,
+    system: p.system || willRead,
     ...(p.set ? { set: p.set } : {}),
-    pools: profileShelvesToGroups(p.shelves).map(({ id, ...rec }) => rec),
+    pools: p.pools,
   }));
+  const overCap = fit.length - profiles.length;
   const stored = storedTable();
   const base = Math.max(
     roomSetup && Number.isInteger(roomSetup.rev) ? roomSetup.rev : 0,
@@ -11120,111 +11544,365 @@ async function portablePushToTable() {
   if (!res.applied) return portableRefuse('✗ the table took a newer setup just now — try again');
   save(LS_TABLE, { rev: res.rev, table, profiles, at: Date.now() });
   const n = profiles.length;
-  return portableReceipt(`✓ table prepared — ${n ? `${n} seat${n === 1 ? '' : 's'} offered at this room` : 'settings sent to the room'}`);
+  const left = [];
+  if (wrongSystem) left.push(`${wrongSystem} for another system`);
+  if (overCap) left.push(`${overCap} over the ${PROFILES_AT_TABLE}-seat limit`);
+  const tail = left.length ? ` · left behind: ${left.join(', ')}` : '';
+  return portableReceipt(`✓ table prepared — ${n ? `${n} seat${n === 1 ? '' : 's'} offered at this room` : 'settings sent to the room'}${tail}`);
 }
 
-// The other exit: the operator's own rack comes back, the stash clears, and
-// the publish gate lifts BEFORE saveGroups so the restored rack re-shares.
-// The profile keeps whatever was last saved to the text — unsaved edits are
-// discarded here exactly like closing a file without saving, which is what
-// the banner's Save button exists to make hard to do by accident.
-function portableDoneEditing() {
-  if (!portableEditing) return portableVerdict(); // nothing to do; the screen already says so
-  const name = portableEditing;
-  portableEditing = null;
-  const mine = Array.isArray(portableMine) ? portableMine : load(LS_GROUPS_MINE, []);
-  portableMine = null;
-  // Belt and braces: the stash re-enters through the same door storage does,
-  // so a hand-damaged stash drops bad records instead of seating them.
-  groups = (Array.isArray(mine) ? mine : []).map(migrateGroup).filter(Boolean);
-  try { localStorage.removeItem(LS_GROUPS_MINE); } catch { /* ignore */ }
-  editingGroupId = null;
-  creatingShelf = null;
-  if (pop && pop.source === 'group') closePopover();
-  saveGroups(); // persists yours back and re-publishes now the gate is open
-  setPoolsEdit(false); // renders groups and players
-  updateProfileBanner();
-  renderPortableProfiles();
-  return portableReceipt(`✓ your own pools are back — '${name}' keeps what was last saved to the text`);
-}
+// The room's own cap, mirrored from server.js MAX_PROFILES. Not the library's:
+// 32 is how many characters a person keeps, 12 is how many seats a table has.
+const PROFILES_AT_TABLE = 12;
 
-// GUARDRAIL 2 — the banner. One sticky bar over the rack, wearing the
-// pools-toolbar's editing dress, present exactly while a swap is live. Its
-// two buttons are the only exits; #groups-list.profile-editing releases the
-// category heads' sticky pin so ownership is the one thing pinned
-// (#pools-head.foreign makes the identical call for the identical reason).
+// ---------------------------------------------------------------------------
+// The mismatch banner (§11.5) — Tier G's #profile-banner, re-purposed
+// ---------------------------------------------------------------------------
+//
+// One sticky bar over the rack, wearing the pools-toolbar's editing dress,
+// present exactly while the profile in your hands is bound to a different
+// system than this table reads. It is not a warning and nothing is broken: a
+// pool is notation and a system is a render-time lens (goal 6), so the rack
+// rolls the same either way. It exists because the alternative to naming the
+// situation is a player wondering why their Soul Deal words stopped appearing.
+//
+// Three exits, all explicit, none of them a swap: Switch (opens the picker),
+// Read as ⟨system⟩ (re-binds THIS profile to the table — for the player whose
+// D&D fighter really is what they want here), and Keep (says nothing more this
+// session). No fourth exit changes the table's own setting from here: that is
+// a room-wide act that belongs on the settings panel where every player can see
+// it, not buried in one player's rack chrome.
 function updateProfileBanner() {
-  const on = !!portableEditing;
-  document.getElementById('profile-banner').classList.toggle('hidden', !on);
+  // The lobby counts: with no table, "the table's system" is this browser's own
+  // solo setting (§11 X9), and all three exits work there.
+  const m = profileMismatch();
+  const on = !!m && !mismatchKept;
+  const banner = document.getElementById('profile-banner');
+  banner.classList.toggle('hidden', !on);
   groupsListEl.classList.toggle('profile-editing', on);
-  if (on) {
-    document.getElementById('profile-banner-name').textContent = portableEditing;
-    const saveBtn = document.getElementById('profile-save');
-    saveBtn.textContent = `Save to ${portableEditing}`;
-    saveBtn.title = `Write these pools back into '${portableEditing}' in Your data — then Download keeps the file`;
+  if (!on) return;
+  document.getElementById('profile-banner-name').textContent = m.name;
+  document.getElementById('profile-banner-system').textContent = systemLabel(m.profileSystem);
+  document.getElementById('profile-banner-table').textContent = systemLabel(m.tableSystem);
+  const bind = document.getElementById('profile-bind');
+  bind.textContent = `Read as ${systemLabel(m.tableSystem)}`;
+  bind.title = `Re-bind '${m.name}' to ${systemLabel(m.tableSystem)} — the pools do not change, only which tables offer it`;
+}
+
+// ---------------------------------------------------------------------------
+// The picker (§11.5 ②) — one builder, two anchors
+// ---------------------------------------------------------------------------
+//
+// TWO anchors, and the second is not redundancy. #pools-head sits inside a
+// panel section §7.23 lets the player switch off, so a pools-panel-only anchor
+// is unreachable for anyone who collapsed Pools — a defect found by building
+// the one-anchor design out and reading it back. The identity menu carries the
+// other, and it is always there.
+//
+// Built with openRailMenu: the app's existing anchored-menu machinery, which
+// already clamps to the viewport, flips above when it would clip, walks with
+// the arrows, closes on focus-out rather than on Tab (a trap it has already
+// been bitten by once), and is already a rung in the Esc chain and a term in
+// modalOpen. A third menu implementation would have to earn all of that again.
+//
+// Off-system profiles render DISABLED, not absent: R5 says a profile is only
+// pickable where its dice will be read the way they were chosen, and hiding
+// them instead would answer "where did my fighter go" with silence.
+function buildProfileMenu(el) {
+  const sys = tableSystem();
+  const mine = profilesFor(profileStore, sys);
+  const others = profilesOf(profileStore).filter((p) => p.system !== sys);
+
+  // .idm-item is the shared menu-item dress every menu in the app wears (the
+  // identity menu, the offer menu, the recents list); .pm-head is the only new
+  // recipe, and it borrows .plabel's ambient 10px caps.
+  const head = (text) => {
+    const h = document.createElement('div');
+    h.className = 'pm-head';
+    h.textContent = text;
+    el.appendChild(h);
+  };
+  const row = (label, sub, onClick, { pressed = false, disabled = false, title = '' } = {}) => {
+    const b = document.createElement('button');
+    b.className = 'idm-item pm-row';
+    b.disabled = disabled;
+    b.setAttribute('role', 'menuitemradio');
+    b.setAttribute('aria-checked', String(!!pressed));
+    if (title) b.title = title;
+    const n = document.createElement('span');
+    n.className = 'pm-name';
+    n.textContent = label;
+    b.appendChild(n);
+    if (sub) {
+      const t = document.createElement('span');
+      t.className = 'pm-sub';
+      t.textContent = sub;
+      b.appendChild(t);
+    }
+    if (!disabled) {
+      b.addEventListener('click', () => {
+        closeRailMenu(true);
+        onClick();
+      });
+    }
+    el.appendChild(b);
+    return b;
+  };
+
+  head(systemLabel(sys));
+  for (const p of mine) {
+    const n = p.id === profileStore.activeId ? groups.length : (p.pools || []).length;
+    row(p.name, `${n} pool${n === 1 ? '' : 's'}`, () => showProfileNote(switchToProfile(p.id)), {
+      pressed: p.id === profileStore.activeId,
+      title: p.id === profileStore.activeId ? 'These are the pools in your hands' : `Take '${p.name}' in hand`,
+    });
+  }
+  row('⚄ Random…', '', () => showProfileNote(dealNewProfile(sys)), {
+    disabled: isFull(profileStore),
+    title: isFull(profileStore) ? `${MAX_PROFILES} profiles is the ceiling — delete one first` : `Deal a fresh ${systemLabel(sys)} profile`,
+  });
+  row('＋ New profile…', '', () => openSettingsAtLibrary(), {
+    disabled: isFull(profileStore),
+    title: isFull(profileStore) ? `${MAX_PROFILES} profiles is the ceiling — delete one first` : 'Name one in Settings → Your data',
+  });
+  if (others.length) {
+    head('Other systems');
+    for (const p of others) {
+      row(p.name, systemLabel(p.system), () => {}, {
+        disabled: true,
+        title: `'${p.name}' was built for ${systemLabel(p.system)} — this table reads ${systemLabel(sys)}`,
+      });
+    }
   }
 }
 
-// The profile list under the status line: what the box's players: section
-// holds, one row per seat, Edit and Save to on each. Rebuilt on every
-// preview (the box is live), so the rows carry no state of their own; the
-// add-a-profile row is static HTML so a half-typed name survives a repaint.
-function renderPortableProfiles() {
-  const zone = document.getElementById('portable-profiles');
-  const rows = document.getElementById('portable-profile-rows');
-  const show = !!portableParsed;
-  zone.classList.toggle('hidden', !show);
+function openProfileMenu(e) {
+  const anchor = e.currentTarget;
+  if (isRailMenuOpen() && railMenuState.anchor === anchor) { closeRailMenu(true); return; }
+  openRailMenu(anchor, buildProfileMenu);
+}
+
+// A profile verb's receipt, said where it can be seen. The library list's own
+// status line when the settings modal is open; the transient status pill
+// otherwise — the picker works with the modal closed, which is the whole point
+// of it being a menu over the rack.
+function showProfileNote(v) {
+  const line = document.getElementById('profile-status');
+  if (line) {
+    line.textContent = v.status;
+    line.classList.toggle('warn', !v.ok);
+  }
+  if (!document.getElementById('settings-modal').classList.contains('hidden')) return v;
+  showSettingsNote(v.status);
+  return v;
+}
+
+function openSettingsAtLibrary() {
+  openSettings();
+  const zone = document.getElementById('portable-zone');
+  if (zone && zone.classList.contains('hidden')) {
+    document.getElementById('portable-open').click();
+  }
+  const input = document.getElementById('profile-newname');
+  if (input) input.focus();
+}
+
+// ---------------------------------------------------------------------------
+// The library list (§11.5 ③) — Settings → Your data
+// ---------------------------------------------------------------------------
+//
+// Manage-frequency work lives here rather than in the picker, for two reasons
+// found by building the alternative: a menu that closes on focus-out is the
+// wrong container for a rename field, and a 32-row list with a scroller is a
+// panel wearing a menu's clothes.
+//
+// Delete is two-step IN PLACE — the label becomes 'Delete ⟨name⟩?' for three
+// seconds and the second click commits. That is Copy's own morph grammar
+// (js:portable-copy) used as a confirm, and it keeps the promise that nothing
+// modal locks the table (goal: the table is never blocked).
+let profileArmedDelete = null;
+let profileDeleteTimer = null;
+let profileRenaming = null;
+
+function renderProfileLibrary() {
+  const rows = document.getElementById('profile-rows');
+  if (!rows) return;
   rows.textContent = '';
-  if (!show) return;
-  for (const p of portableParsed.profiles) {
+  const sys = tableSystem();
+  for (const p of profilesOf(profileStore)) {
+    const active = p.id === profileStore.activeId;
+    const n = active ? groups.length : (p.pools || []).length;
+    const row = document.createElement('div');
+    row.className = 'pp-row';
+    if (active) row.classList.add('editing');
+
+    if (profileRenaming === p.id) {
+      const input = document.createElement('input');
+      input.className = 'tin';
+      input.type = 'text';
+      input.maxLength = 24;
+      input.value = p.name;
+      input.autocomplete = 'off';
+      const commit = () => {
+        const v = renameProfileTo(p.id, input.value);
+        profileRenaming = null;
+        showProfileNote(v);
+        renderProfileLibrary();
+      };
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+        if (ev.key === 'Escape') { ev.preventDefault(); profileRenaming = null; renderProfileLibrary(); }
+      });
+      const ok = document.createElement('button');
+      ok.className = 'btn tiny confirm';
+      ok.textContent = 'Rename';
+      ok.addEventListener('click', commit);
+      row.append(input, ok);
+      rows.appendChild(row);
+      setTimeout(() => input.focus(), 0);
+      continue;
+    }
+
+    const nameEl = document.createElement('button');
+    nameEl.className = 'pp-name pp-rename';
+    nameEl.textContent = p.name;
+    nameEl.title = 'Rename';
+    nameEl.addEventListener('click', () => { profileRenaming = p.id; renderProfileLibrary(); });
+
+    const sysEl = document.createElement('span');
+    sysEl.className = 'pp-tag pp-sys';
+    sysEl.textContent = systemLabel(p.system);
+    if (p.system !== sys) sysEl.classList.add('off');
+
+    const countEl = document.createElement('span');
+    countEl.className = 'pp-count';
+    countEl.textContent = `${n} pool${n === 1 ? '' : 's'}`;
+    row.append(nameEl, sysEl, countEl);
+
+    if (active) {
+      const tag = document.createElement('span');
+      tag.className = 'pp-tag';
+      tag.textContent = 'in hand';
+      row.append(tag);
+    } else {
+      const use = document.createElement('button');
+      use.className = 'btn tiny';
+      use.textContent = 'Use';
+      use.disabled = p.system !== sys;
+      use.title = p.system === sys
+        ? `Take '${p.name}' in hand — the pools you have now stay with '${activeProfileName()}'`
+        : `'${p.name}' was built for ${systemLabel(p.system)} — this table reads ${systemLabel(sys)}`;
+      use.addEventListener('click', () => showProfileNote(switchToProfile(p.id)));
+      row.append(use);
+    }
+
+    const copy = document.createElement('button');
+    copy.className = 'btn tiny';
+    copy.textContent = 'Copy';
+    copy.title = `Add a second copy of '${p.name}' — a variant to edit without touching this one`;
+    copy.addEventListener('click', () => showProfileNote(copyProfileIn(toWire(
+      p.id === profileStore.activeId ? { ...p, pools: groups } : p,
+    ))));
+    row.append(copy);
+
+    const del = document.createElement('button');
+    del.className = 'btn tiny pp-del';
+    const armed = profileArmedDelete === p.id;
+    del.textContent = armed ? `Delete ${p.name}?` : '✕';
+    del.title = `Delete '${p.name}'`;
+    del.addEventListener('click', () => {
+      clearTimeout(profileDeleteTimer);
+      if (!armed) {
+        profileArmedDelete = p.id;
+        renderProfileLibrary();
+        profileDeleteTimer = setTimeout(() => { profileArmedDelete = null; renderProfileLibrary(); }, 3000);
+        return;
+      }
+      profileArmedDelete = null;
+      showProfileNote(removeProfileById(p.id));
+      renderProfileLibrary();
+    });
+    row.append(del);
+    rows.appendChild(row);
+  }
+
+  const count = document.getElementById('profile-count');
+  if (count) count.textContent = `${profilesOf(profileStore).length} of ${MAX_PROFILES}`;
+  renderTableProfiles();
+}
+
+// 'At this table' — the prepared seats and the teammates' published racks, each
+// one Copy away from being mine (§11 P10/P11/P12). ABSENT when there is nothing
+// at the table: empty renders nothing, and a heading over no rows is prose.
+function renderTableProfiles() {
+  const zone = document.getElementById('table-profiles');
+  const rows = document.getElementById('table-profile-rows');
+  if (!zone || !rows) return;
+  rows.textContent = '';
+  const offers = [];
+  if (netOnline && roomSetup && Array.isArray(roomSetup.profiles)) {
+    for (const p of roomSetup.profiles) {
+      offers.push({ label: p.name, sub: 'prepared', rec: p });
+    }
+  }
+  for (const pl of players) {
+    if (!pl || pl.id === (net && net.playerId) || !Array.isArray(pl.pools) || !pl.pools.length) continue;
+    offers.push({
+      label: pl.profile || pl.name,
+      sub: pl.profile ? pl.name : 'their rack',
+      rec: { name: pl.profile || pl.name, system: pl.system || null, set: pl.set || null, pools: pl.pools },
+    });
+  }
+  zone.classList.toggle('hidden', !offers.length);
+  if (!offers.length) return;
+  for (const o of offers) {
     const row = document.createElement('div');
     row.className = 'pp-row';
     const nameEl = document.createElement('span');
     nameEl.className = 'pp-name';
-    nameEl.textContent = p.name;
-    const n = profilePoolCount(p);
+    nameEl.textContent = o.label;
+    const sysEl = document.createElement('span');
+    sysEl.className = 'pp-tag pp-sys';
+    sysEl.textContent = o.rec.system ? systemLabel(o.rec.system) : o.sub;
+    const n = (o.rec.pools || []).length;
     const countEl = document.createElement('span');
     countEl.className = 'pp-count';
     countEl.textContent = `${n} pool${n === 1 ? '' : 's'}`;
-    row.append(nameEl, countEl);
-    if (portableEditing === p.name) {
-      const tag = document.createElement('span');
-      tag.className = 'pp-tag';
-      tag.textContent = 'editing';
-      row.append(tag);
-      row.classList.add('editing');
-    }
-    const editBtn = document.createElement('button');
-    editBtn.className = 'btn tiny';
-    editBtn.textContent = 'Edit';
-    editBtn.title = `Load ${p.name}’s pools in to edit and price — your own pools are set aside first`;
-    editBtn.addEventListener('click', () => portableEditProfile(p.name));
-    const saveBtn = document.createElement('button');
-    saveBtn.className = 'btn tiny';
-    saveBtn.textContent = 'Save to';
-    saveBtn.title = `Overwrite ${p.name} in the text with the pools you have now`;
-    saveBtn.addEventListener('click', () => portableSaveToProfile(p.name));
-    row.append(editBtn, saveBtn);
+    const copy = document.createElement('button');
+    copy.className = 'btn tiny';
+    copy.textContent = 'Copy';
+    copy.title = `Add '${o.label}' to your library — nothing of yours is touched`;
+    copy.addEventListener('click', () => showProfileNote(copyProfileIn(o.rec)));
+    row.append(nameEl, sysEl, countEl, copy);
     rows.appendChild(row);
   }
 }
 
-// The banner's two exits. Save's receipt is a button morph (G1 Download's
-// pattern): the banner works with the settings modal closed, where the
-// status line can't be seen.
-document.getElementById('profile-save').addEventListener('click', (e) => {
-  if (!portableEditing) return;
-  const btn = e.currentTarget;
-  const r = portableSaveToProfile(portableEditing);
-  btn.textContent = r.ok ? 'Saved ✓' : '✗ couldn’t save — see Your data';
-  setTimeout(() => updateProfileBanner(), r.ok ? 900 : 2200); // restores the label
+// The banner's three exits.
+document.getElementById('profile-switch').addEventListener('click', openProfileMenu);
+document.getElementById('profile-bind').addEventListener('click', () => showProfileNote(bindActiveToTable()));
+document.getElementById('profile-keep').addEventListener('click', () => {
+  mismatchKept = true;
+  updateProfileBanner();
 });
-document.getElementById('profile-done').addEventListener('click', () => portableDoneEditing());
-document.getElementById('portable-addprofile').addEventListener('click', () => {
-  const input = document.getElementById('portable-newname');
-  const r = portableAddProfile(input.value);
-  if (r.ok) input.value = '';
+
+document.getElementById('profile-new').addEventListener('click', () => {
+  const input = document.getElementById('profile-newname');
+  const v = makeProfile({ name: input.value, system: tableSystem(), pools: [] });
+  if (v.ok) input.value = '';
+  showProfileNote(v);
+  renderProfileLibrary();
 });
+document.getElementById('profile-newname').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); document.getElementById('profile-new').click(); }
+});
+document.getElementById('profile-deal').addEventListener('click', () => {
+  showProfileNote(dealNewProfile(tableSystem()));
+  renderProfileLibrary();
+});
+document.getElementById('profile-pick').addEventListener('click', openProfileMenu);
+document.getElementById('import-adopt-all').addEventListener('click', () => portableAdoptProfiles());
+
 
 document.getElementById('portable-open').addEventListener('click', () => {
   const opening = portableZone.classList.toggle('hidden') === false;
@@ -11875,9 +12553,11 @@ document.addEventListener('keydown', (e) => {
 // ({online:false} from connect) keeps the fully-local solo behavior.
 // ---------------------------------------------------------------------------
 
-const LS_NAME = 'dice.name.v1';
-// ROOM / IN_LOBBY are declared at the top of the file, not here where the rest
-// of the net constants live — the module-evaluation TDZ trap is recorded there.
+// LS_NAME, ROOM and IN_LOBBY are all declared at the top of the file, not here
+// where the rest of the net constants live — the module-evaluation TDZ trap is
+// recorded there. (LS_NAME moved up 2026-08-08: the profile library's
+// migration names the migrated rack after the player, and that runs during the
+// rack's own module-eval block.)
 
 // §G6 client half: the last setup THIS BROWSER pushed to THIS room, kept as
 // the exact wire body beside its rev. localStorage (not session): "prep
@@ -12635,6 +13315,17 @@ function applyRename(raw) {
   return true;
 }
 
+// The picker's second anchor (§11.5 ②). NOT hidden in the lobby: your
+// profiles are yours whether or not there is a table, which is exactly the
+// distinction §7.20's suppression rule draws — a surface that speaks about YOU
+// keeps working, one that speaks about THE TABLE must be absent.
+document.getElementById('idm-profile').addEventListener('click', () => {
+  closeIdentityMenu();
+  // Anchored to the CHIP, not to the row that was clicked: the row lives inside
+  // the panel we just closed, and a hidden element measures as a zero-size box
+  // at the origin, which would park the menu in the corner.
+  openRailMenu(document.getElementById('identity-chip'), buildProfileMenu);
+});
 document.getElementById('idm-rename').addEventListener('click', () => {
   const row = document.getElementById('idm-rename-row');
   const input = document.getElementById('idm-name-input');
@@ -12928,10 +13619,19 @@ function handleNetEvent(type, data) {
       // §9: carry the owner's default set alongside the rack (absent =
       // standard) — dropping it here was exactly the whitelist information
       // loss that made foreign racks wear the viewer's skin.
-      if (p) { p.pools = data.pools || []; p.set = typeof data.set === 'string' ? data.set : null; }
+      if (p) {
+        p.pools = data.pools || [];
+        p.set = typeof data.set === 'string' ? data.set : null;
+        // §11: which of THEIR profiles this rack is, and what it was built for
+        // — the owner switcher could only ever say whose until now, and a rack
+        // a teammate can name is a rack a teammate can copy.
+        p.profile = typeof data.profile === 'string' ? data.profile : null;
+        p.system = typeof data.system === 'string' ? data.system : null;
+      }
       // repaint only when the rack on screen is the one that changed —
       // your own echo lands in `players` silently
       if (poolsOwner === data.playerId) renderGroups();
+      renderTableProfiles(); // 'At this table' follows the room, live
       break;
     }
     case 'roll': // the only path that animates in online mode — ours included
@@ -13011,6 +13711,7 @@ function handleNetEvent(type, data) {
       // left behind: an organizer pushing a six-seat setup at a live table
       // changed nobody's row until an unrelated roster event happened to fire.
       renderPlayers();
+      renderTableProfiles(); // the prepared seats are copy sources (§11 P12)
       if (data.byId && net && data.byId !== net.playerId) {
         showSettingsNote(`${data.byName || 'someone'} prepared the table`);
       }
@@ -13170,15 +13871,129 @@ let seatSetFlip = null;   // the seat's dice-set id, applied on the same click
 let seatVerdict = { ok: true, status: '', canApply: false };
 let seatResolve = null;   // promptName's resolver while the modal waits
 let seatCleanup = null;   // detaches the live prompt's input listeners
+let seatProfilePicked = null; // §11: the profile picked at THIS prompt, or null = the default
+
+// Which rulebook this table reads, BEFORE the join. The room's settings do not
+// reach this client until the join answers, so `currentSystemId` is still this
+// browser's own until then — the peek is the only source, and it is why the
+// peek carries `system` at all (§11 decision 6). Falls back to what we read by
+// now when there is no peek (solo, or a server that answered nothing).
+const seatSystem = () => knownSystem(seatPeekInfo && seatPeekInfo.system) || tableSystem();
 
 // The peeked seats, defensively filtered: the picker trusts the server no
 // further than "strings and counts" (names render as text nodes only).
+//
+// §11 R5: a seat prepared for another system is NOT offered here — a profile is
+// pickable only where its dice will be read the way they were chosen. A seat
+// naming no system was prepared before §11 and belongs to the table it was
+// written for, which is this one, so absence passes the filter.
 function seatChoices() {
   const raw = seatPeekInfo && Array.isArray(seatPeekInfo.seats) ? seatPeekInfo.seats : [];
+  const sys = seatSystem();
   return raw
     .filter((s) => s && typeof s.name === 'string' && s.name.trim())
+    .filter((s) => !s.system || s.system === sys)
     .slice(0, 12)
     .map((s) => ({ name: s.name.trim(), pools: Number.isInteger(s.pools) && s.pools > 0 ? s.pools : 0 }));
+}
+
+// MY profiles at the join (§11.5 ①, Joe's R9). The row that will be used is
+// pre-selected: whatever this session has picked, else the last one this
+// SYSTEM saw (R6). Picking one switches immediately and shows no preview —
+// preview-then-apply guards a rack you RECEIVE, and taking your own profile in
+// hand receives nothing: the outgoing one keeps every pool it had.
+function renderSeatMine() {
+  const zone = document.getElementById('seat-mine');
+  const rows = document.getElementById('seat-mine-rows');
+  const sys = seatSystem();
+  const mine = profilesFor(profileStore, sys);
+  const canDeal = !isFull(profileStore);
+  // Nothing to choose between and nothing to deal → the whole block is absent.
+  zone.classList.toggle('hidden', !mine.length && !canDeal);
+  rows.textContent = '';
+  if (!mine.length && !canDeal) return;
+  const chosen = seatProfilePicked || lastUsedFor(profileStore, sys);
+  for (const p of mine) {
+    const btn = document.createElement('button');
+    btn.className = 'btn seat-btn';
+    const nm = document.createElement('span');
+    nm.textContent = p.name;
+    btn.appendChild(nm);
+    const n = p.id === profileStore.activeId ? groups.length : (p.pools || []).length;
+    const ct = document.createElement('span');
+    ct.className = 'seat-count';
+    ct.textContent = `${n} pool${n === 1 ? '' : 's'}`;
+    btn.appendChild(ct);
+    btn.title = `Roll with '${p.name}' at this table`;
+    if (p.id === chosen) btn.classList.add('preselected');
+    btn.addEventListener('click', () => chooseMyProfile(p.id));
+    rows.appendChild(btn);
+  }
+  if (canDeal) {
+    const deal = document.createElement('button');
+    deal.className = 'btn seat-btn seat-deal';
+    const nm = document.createElement('span');
+    nm.textContent = '⚄ Random';
+    deal.appendChild(nm);
+    const ct = document.createElement('span');
+    ct.className = 'seat-count';
+    ct.textContent = systemLabel(sys);
+    deal.appendChild(ct);
+    deal.title = `Deal a whole ${systemLabel(sys)} profile — dice, names and all`;
+    if (!mine.length) deal.classList.add('preselected');
+    deal.addEventListener('click', () => chooseDealtProfile());
+    rows.appendChild(deal);
+  }
+}
+
+// Pick one of mine at the join. Takes it in hand right away — the modal is
+// still up, so the player sees the choice register before they commit a name.
+function chooseMyProfile(id) {
+  const v = switchToProfile(id);
+  if (v.ok) seatProfilePicked = id;
+  seatPickNote(v);
+  renderSeatMine();
+  return v;
+}
+
+function chooseDealtProfile() {
+  const v = dealNewProfile(seatSystem());
+  if (v.ok) seatProfilePicked = profileStore.activeId;
+  seatPickNote(v);
+  renderSeatMine();
+  return v;
+}
+
+// R6: take the last-used profile for THIS table's system, with no click. Runs
+// at the end of every join, on both arrival paths.
+//
+// A silent switch here is not the `#g=` sin and the distinction is the load-
+// bearing one of the whole pass (§11.2): the codec REPLACED a visitor's rack
+// with no way back, where a switch moves a pointer and leaves both racks whole.
+// Nothing can be lost, so nothing needs approving — and R6 asked for it in
+// those words.
+//
+// It does nothing at all when the profile already in hand fits the table, which
+// is the common case, or when this system has no profile yet — in which case
+// the mismatch banner names the situation and the picker offers Random.
+function ensureProfileForTable() {
+  const p = activeProfile(profileStore);
+  if (!p) return null;
+  if (p.system === tableSystem()) { updateProfileBanner(); return null; }
+  const want = lastUsedFor(profileStore, tableSystem());
+  if (!want || want === p.id) { updateProfileBanner(); return null; }
+  const v = switchToProfile(want);
+  updateProfileBanner();
+  return v;
+}
+
+// The pick's receipt, said on the modal's own hint line — the status pill is a
+// shared transient and this modal is not (UX §7.20's four-count argument).
+function seatPickNote(v) {
+  const hint = document.getElementById('name-hint');
+  if (!hint) return;
+  hint.textContent = v.status;
+  hint.classList.toggle('warn', !v.ok);
 }
 
 // The &as= match against the current offer (the canonical seat name, or null).
@@ -13196,6 +14011,7 @@ function renderSeatChoices() {
   nameLine.textContent = tn; // user text: textContent only
   nameLine.classList.toggle('hidden', !tn);
   list.textContent = '';
+  renderSeatMine(); // §11: your own profiles sit above the prepared seats
   const seats = seatChoices();
   list.classList.toggle('hidden', !seats.length);
   divider.classList.toggle('hidden', !seats.length);
@@ -13352,39 +14168,58 @@ function seatFollowThrough() {
     : null;
   if (!prof) { closeSeatModal(); return; }
   seatProfile = prof;
-  const plan = planImport(groups, profileToImport({ shelves: wirePoolsToShelves(prof.pools) }));
-  // The seat's dice identity (profileToImport leaves it out by contract: "the
-  // seat picker applies it where identity lives"). Previewed as a flip bit,
-  // applied on the SAME explicit click as the pools — never on arrival.
+  // §11 CHANGES WHAT APPLY MEANS, and this is the whole improvement the
+  // library buys CUJ2. It used to MERGE the seat's pools into your one rack,
+  // because there was only one rack to put them in — so a player who already
+  // had an 18-pool character and took the DM's 18-pool seat ended up holding
+  // one 36-pool rack that was two characters wearing each other's clothes.
+  // Now the seat becomes a PROFILE of its own, taken in hand, and your own
+  // profile is not touched at all. Nothing merges, so nothing can collide, and
+  // the 40-pool overflow that used to refuse the arrival cannot arise.
+  //
+  // The PREVIEW stays, and it is still the point (GOALS §7's `#g=` post-mortem
+  // — never replace a rack on arrival): what lands is named before it lands,
+  // and it lands on an explicit click.
+  const pools = Array.isArray(prof.pools) ? prof.pools : [];
   seatSetFlip = typeof prof.set === 'string' && SETS[prof.set] && prof.set !== diceSet ? prof.set : null;
-  const flips = seatSetFlip ? [`dice set ${SETS[seatSetFlip].label}`] : [];
-  if (groups.length + plan.adds.length > 40) {
-    // The pane's own overflow refusal, verbatim grammar (portablePreview).
+  const bits = [`${pools.length} pool${pools.length === 1 ? '' : 's'}`];
+  if (seatSetFlip) bits.push(`dice set ${SETS[seatSetFlip].label}`);
+  if (isFull(profileStore)) {
     seatPlan = null;
     seatSetFlip = null;
-    seatVerdict = { ok: false, status: `✗ would exceed 40 pools (you have ${groups.length}, this adds ${plan.adds.length})`, canApply: false };
-  } else if (plan.adds.length || plan.updates.length || flips.length) {
-    seatPlan = { ...plan, flips };
-    seatVerdict = { ok: true, status: `✓ ${[...importVerdictBits(plan), ...flips].join(' · ')} — Apply takes them`, canApply: true };
-  } else {
+    seatVerdict = { ok: false, status: `✗ you already keep ${MAX_PROFILES} profiles — delete one to take this seat`, canApply: false };
+  } else if (pools.length > MAX_POOLS) {
     seatPlan = null;
-    seatVerdict = { ok: true, status: '✓ matches what you have — nothing to apply', canApply: false };
+    seatSetFlip = null;
+    seatVerdict = { ok: false, status: `✗ this seat carries ${pools.length} pools — a profile holds at most ${MAX_POOLS}`, canApply: false };
+  } else {
+    seatPlan = { profile: prof };
+    seatVerdict = {
+      ok: true,
+      status: `✓ ${bits.join(' · ')} — Apply adds '${prof.name}' to your profiles and takes it in hand`,
+      canApply: true,
+    };
   }
   seatPhase = 'preview';
   renderSeatPhase();
 }
 
-// The explicit click that PROFILES §3.3 step 3 is about. Same commit path as
-// the pane's Apply (applyImportPlan), plus the seat's dice identity.
+// The explicit click that PROFILES §3.3 step 3 is about, through §11's door:
+// the seat becomes a profile of the player's own, under a deduped name, and
+// nothing they already had is written to.
 function applySeatChoice() {
   if (seatPhase !== 'preview' || !seatVerdict.canApply || !seatPlan) {
     return { ok: false, status: '✗ nothing to apply', canApply: false };
   }
-  const done = applyImportPlan(seatPlan);
-  if (seatSetFlip) setDiceSet(seatSetFlip);
+  const got = copyProfileIn(seatPlan.profile, { activate: true });
   seatPlan = null;
   seatSetFlip = null;
-  seatVerdict = { ok: true, status: `✓ applied — ${done.join(' · ')}`, canApply: false };
+  if (!got.ok) {
+    seatVerdict = { ok: false, status: got.status, canApply: false };
+    renderSeatPhase();
+    return { ...seatVerdict };
+  }
+  seatVerdict = { ok: true, status: got.status, canApply: false };
   renderSeatPhase();
   document.getElementById('seat-preview-btns').classList.add('hidden'); // spent
   setTimeout(closeSeatModal, 900); // the receipt lingers a beat (Copy's rhythm)
@@ -13394,7 +14229,7 @@ function applySeatChoice() {
 function dismissSeatChoice() {
   if (seatPhase !== 'preview') return { ok: false, status: '✗ no seat preview is open', canApply: false };
   closeSeatModal();
-  return { ok: true, status: '✓ seat kept — your pools were left alone', canApply: false };
+  return { ok: true, status: '✓ seat kept — your own profiles were left alone', canApply: false };
 }
 
 // peek: a promise from net.js peekTable (or null on the solo re-prompt path).
@@ -13413,6 +14248,7 @@ function promptName(peek) {
     seatPlan = null;
     seatSetFlip = null;
     seatVerdict = { ok: true, status: '', canApply: false };
+    seatProfilePicked = null;
     seatResolve = resolve;
     renderSeatChoices();
     renderSeatReturning();
@@ -13608,6 +14444,12 @@ async function initNet() {
     applyRoomSettings(load(LS_ROOMSETTINGS, null)); // solo keeps its own felt
     renderPlayers(); // genuinely all three branches now — it early-returns here
   }
+  // §11 R6, stated literally: "when they join a table they should use the last
+  // used profile for that rolling system." This is that, and it runs AFTER
+  // applyRoomSettings above so it reads the table's own system rather than this
+  // browser's last one. It fires on both arrival paths — the one that showed
+  // the modal and the one that skipped it because the name was already stored.
+  ensureProfileForTable();
   // §G5: a chosen prepared seat's preview stands up now — after every piece
   // of join state above, so netReady never resolves with it half-built. A
   // free-text join (or a seat the join couldn't substantiate) is a no-op.

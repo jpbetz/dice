@@ -1353,7 +1353,11 @@ html, body {
    What survives is the job the bar CANNOT do: on a teammate's rack the head
    swaps to their identity and surfaces the read-only tag, so ownership can
    never scroll away. Hence :not(.foreign). */
-#pools-head:not(.foreign) { display: none; }
+/* §11 adds a THIRD reason for the head to exist: naming which of your own
+   profiles is in your hands. Same contract as .foreign — the head appears when
+   it has ownership to declare and stays absent when it does not, so a library
+   holding one profile shows no new chrome anywhere. */
+#pools-head:not(.foreign):not(.profiled) { display: none; }
 #pools-head {
   display: flex;
   align-items: center;
@@ -5162,3 +5166,111 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
   #crit-overlay { animation: none !important; transition: none !important; }
   #crit-text { animation: none !important; transition: none !important; }
 }
+
+/* ---------------------------------------------------------------------------
+   THE PROFILE LIBRARY (PROFILES §11)
+   --------------------------------------------------------------------------- */
+
+/* The picker's anchor in the region head. A bare button so the head's own
+   grammar is unchanged — .ph-tag's 10px muted caps, promoted to ivory because
+   this one is IDENTITY (the same call .ph-word makes in .foreign) and it is
+   tappable, which a readout is not. */
+/* Deliberately NOT wearing .ph-tag. That class IS the read-only tag — the
+   foreign state's `display: inline` is keyed to it and the panel spec reads
+   "the first .ph-tag in the head" — so a second element borrowing it makes the
+   selector ambiguous. The dress is copied instead of shared, and the 10px caps
+   are the head's own grammar either way. */
+#pools-head .ph-pick {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  max-width: 42%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ivory);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+#pools-head .ph-pick.hidden { display: none; }
+#pools-head .ph-pick:hover { color: var(--gold); }
+#pools-head .ph-pick:focus-visible { outline: 1px solid var(--ivory); outline-offset: 2px; }
+/* The system word only ever renders when it DIFFERS from the table's, so this
+   state is the surprising one and reads muted-with-emphasis rather than as an
+   error: nothing is broken, the label is just worth a second look. */
+#pools-head .ph-pick.off { color: var(--muted); }
+#pools-head .ph-pick.off:hover { color: var(--ivory); }
+/* Standing over the rack the moment it has a name to hold, exactly as .foreign
+   does — mid-scroll, whose rack this is must never scroll away. */
+#pools-head.profiled {
+  position: sticky;
+  top: var(--draft-h, 0px);
+  z-index: 2;
+  background: #191b1e;
+  padding: 6px 0 2px;
+  margin: 8px 0 0;
+}
+#groups-list.profiled .pool-sec-head { position: static; }
+
+/* the mismatch banner's two system words — italic, ivory, so the sentence
+   'RILL READS AS YOUR SOUL DEAL · THIS TABLE READS D&D STYLE' has its two
+   nouns picked out without a second colour entering the bar */
+#profile-banner .pb-label i { color: var(--ivory); font-style: italic; }
+
+/* the library's rows reuse .pp-row wholesale; these are the two additions */
+.pp-row .pp-sys { flex: none; }
+/* a profile bound to another system: the row is real, it is simply not
+   pickable here (R5 without amnesia — hiding it would answer "where did my
+   fighter go" with silence) */
+.pp-row .pp-sys.off { color: var(--muted); opacity: 0.7; }
+/* the name doubles as the rename affordance — a button wearing the span's
+   dress, so the row does not grow a control it only sometimes needs */
+.pp-row .pp-name.pp-rename {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pp-row .pp-name.pp-rename:hover { color: var(--gold); }
+.pp-row .pp-name.pp-rename:focus-visible { outline: 1px solid var(--ivory); outline-offset: 2px; }
+/* Delete, in the .rail-menu-forget tier's spirit: quiet at rest, red at the
+   moment of aim. Two-step in place (the label becomes 'Delete ⟨name⟩?'), so it
+   widens when armed and must not shove the row around — hence flex: none and
+   the ellipsis. */
+.pp-row .pp-del { max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-row .pp-del:hover { color: var(--red); border-color: rgba(226, 73, 59, 0.5); }
+.pp-row .pp-name + .pp-sys { margin-left: 2px; }
+.portable-profiles .pp-head .btn { margin-left: 8px; }
+
+/* the picker menu's rows — .idm-item does the work; this adds the count/system
+   column on the right and the group heading */
+.pm-head {
+  padding: 4px 8px 2px;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.pm-row { display: flex; align-items: center; gap: 8px; }
+.pm-row .pm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pm-row .pm-sub { flex: none; font-size: 11px; color: var(--muted); }
+.pm-row[aria-checked="true"] .pm-name { color: var(--gold); }
+/* Off-system rows are disabled, not absent. .idm-item:disabled has no shared
+   rule yet, so the grayscale-unavailable dress §7.23 uses is spelled here. */
+.pm-row:disabled { opacity: 0.45; cursor: default; }
+.pm-row:disabled:hover { background: none; }
+
+/* the join modal's own-profile rows are .seat-btn verbatim; Random is the same
+   row with the dashed ghost dress the app uses for 'an affordance, not prose' */
+#seat-mine.hidden { display: none; }
+#seat-mine-rows { display: flex; flex-direction: column; gap: 6px; }
+.seat-btn.seat-deal { border-style: dashed; }

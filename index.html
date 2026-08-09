@@ -330,20 +330,33 @@ limitations under the License.
            deliberately supersedes §7.9's "no Pools title row" FOR THE
            REGION (Joe's 2026-08-04 explicit-anatomy ask); the COLUMN
            still has no title. -->
-      <!-- G3 profile editing (ROADMAP §G3): while a table-file profile is
-           swapped into the rack, this bar names whose pools are on screen
-           and holds the only two exits — Save to ⟨name⟩ and Done. It wears
-           #pools-toolbar.on's ivory editing dress and pins sticky over the
-           rack, so ownership can never scroll away (the same call
-           #pools-head.foreign makes for a teammate's rack). -->
+      <!-- THE MISMATCH BANNER (PROFILES §11.5). Tier G's profile-editing bar,
+           re-purposed: it used to say "you are holding someone else's pools",
+           which a library makes impossible. It now says the one thing that can
+           still be true and surprising — the profile in your hands was built
+           for a different rulebook than this table reads. Nothing is broken
+           when it shows (a pool is notation; a system is a render-time lens),
+           so its three exits are all explicit and none of them is a swap. Same
+           #pools-toolbar.on ivory dress, same sticky pin over the rack. -->
       <div id="profile-banner" class="hidden">
-        <span class="pb-label">Editing <b id="profile-banner-name"></b></span>
-        <button id="profile-save" class="btn tiny confirm">Save to …</button>
-        <button id="profile-done" class="btn tiny ghost"
-                title="Restore your own pools — the profile keeps what was last saved to the text">Done</button>
+        <span class="pb-label"><b id="profile-banner-name"></b> reads as
+          <i id="profile-banner-system"></i> · this table reads
+          <i id="profile-banner-table"></i></span>
+        <button id="profile-switch" class="btn tiny confirm" aria-haspopup="menu"
+                aria-expanded="false" title="Pick a profile built for this table">Switch…</button>
+        <button id="profile-bind" class="btn tiny ghost">Read as …</button>
+        <button id="profile-keep" class="btn tiny ghost"
+                title="Leave it as it is — these pools roll the same either way">Keep</button>
       </div>
       <div id="pools-head" class="hidden">
         <span class="ph-word">Saved pools</span>
+        <!-- The picker's first anchor (PROFILES §11.5 ②). Hidden until there is
+             something to pick between: a library of one shows no new chrome
+             anywhere, which is how this pass obeys "empty renders nothing". The
+             identity menu carries the second anchor, because this whole region
+             is a panel section §7.23 lets the player switch off. -->
+        <button id="profile-pick" class="ph-pick hidden" aria-haspopup="menu"
+                aria-expanded="false" title="The profile in your hands — tap to switch"></button>
         <span class="ph-tag">read-only</span>
         <span class="ph-rule"></span>
       </div>
@@ -421,6 +434,13 @@ limitations under the License.
       <span id="idm-who" class="idm-name"></span>
       <span id="idm-room" class="idm-sub"></span>
     </div>
+    <!-- The picker's second anchor (PROFILES §11.5 ②), and it is not
+         redundancy: the first lives in #pools-head, inside a panel section
+         §7.23 lets the player switch off, so on its own it is unreachable for
+         anyone who collapsed Pools. This one is always here. Not table-scoped —
+         your profiles are yours in the lobby too. -->
+    <button id="idm-profile" class="idm-item" aria-haspopup="menu" aria-expanded="false"
+            title="The profile in your hands — tap to switch">Profile…</button>
     <button id="idm-rename" class="idm-item">Change name…</button>
     <div id="idm-rename-row" class="idm-rename hidden">
       <input id="idm-name-input" class="tin" type="text" maxlength="24" autocomplete="off" placeholder="New name…">
@@ -981,23 +1001,45 @@ limitations under the License.
               accept=".yaml,.yml,.txt,text/plain">
           </div>
           <p id="portable-status" class="hint portable-status"></p>
-          <!-- G3 profile authoring (ROADMAP §G3): when the box holds a table
-               file, its players: section lists here — Edit swaps a profile's
-               pools into YOUR rack (own pools stashed first, banner over the
-               rack, publish suppressed), Save to writes the rack back into
-               the TEXT (Download above stays the one door to disk). Rows are
-               rebuilt per preview; the add-row is static so a half-typed
-               name survives the repaint. -->
-          <div id="portable-profiles" class="portable-profiles hidden">
-            <span class="pp-head">Players in this file</span>
-            <div id="portable-profile-rows"></div>
-            <div class="pp-new">
-              <input id="portable-newname" type="text" maxlength="24"
-                     placeholder="new profile name…" spellcheck="false">
-              <button id="portable-addprofile" class="btn tiny"
-                      title="Add a new profile to the text, holding the pools you have now">Save as new profile</button>
-            </div>
+          <!-- What the BOX holds (PROFILES §11 O7/P14): the players: section of
+               whatever file is pasted or opened above, one Add per profile plus
+               one Add all for a DM's six-character file. An ADD, never a
+               replace — names dedupe and nothing of the player's is touched.
+               Absent when the box carries no players:. -->
+          <div id="import-profiles" class="portable-profiles hidden">
+            <span class="pp-head">Profiles in this file
+              <button id="import-adopt-all" class="btn tiny"
+                      title="Add every profile in this file to your library">Add all</button></span>
+            <div id="import-profile-rows"></div>
           </div>
+        </div>
+      </div>
+      <!-- THE LIBRARY (PROFILES §11.5 ③). Manage-frequency work lives here
+           rather than in the picker menu over the rack, for two reasons found
+           by building the alternative: a menu that closes on focus-out is the
+           wrong container for a rename field, and a 32-row list with a scroller
+           is a panel wearing a menu's clothes. The picker switches; this
+           creates, renames, deletes, duplicates and copies.
+
+           'At this table' below it is the prepared seats plus the teammates'
+           published racks — each one Copy away from being yours. Absent when
+           there is nothing at the table, because a heading over no rows is the
+           prose "empty renders nothing" exists to refuse. -->
+      <div class="settings-sec">
+        <span class="plabel">Your profiles <span id="profile-count" class="pp-count"></span></span>
+        <div id="profile-rows"></div>
+        <div class="pp-new">
+          <input id="profile-newname" type="text" maxlength="24"
+                 placeholder="new profile name…" spellcheck="false">
+          <button id="profile-new" class="btn tiny"
+                  title="A new, empty profile for this table’s system — build its pools with ✎">＋ New</button>
+          <button id="profile-deal" class="btn tiny"
+                  title="Deal a whole profile at random for this table’s system">⚄ Random</button>
+        </div>
+        <p id="profile-status" class="hint portable-status"></p>
+        <div id="table-profiles" class="portable-profiles hidden">
+          <span class="pp-head">At this table</span>
+          <div id="table-profile-rows"></div>
         </div>
       </div>
       <!-- §3b/L0: this section's heading is a CLAIM, and in the lobby it is a
@@ -1059,6 +1101,16 @@ limitations under the License.
       <h2>Take a seat</h2>
       <p id="seat-table-name" class="hint seat-table-name hidden"></p>
       <div id="seat-pick">
+        <!-- YOUR profiles for this table's system (PROFILES §11.5 ①, Joe's R9):
+             most recently used first, the last one pre-selected. Picking one is
+             not an import and shows no preview — the outgoing profile keeps
+             every pool it had, so there is nothing to lose and nothing to
+             approve. A PREPARED seat below is somebody else's rack and still
+             previews, unchanged. Absent when there is nothing to choose. -->
+        <div id="seat-mine" class="hidden">
+          <p id="seat-mine-head" class="hint seat-someone">Your profiles</p>
+          <div id="seat-mine-rows"></div>
+        </div>
         <div id="seat-list" class="hidden"></div>
         <p id="seat-someone" class="hint seat-someone hidden">Someone else…</p>
         <!-- U3: a RETURNING player pulled in by an `&as=` link. They already
