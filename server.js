@@ -2306,15 +2306,31 @@ async function handleClear(req, res) {
   if (found.error) return sendError(res, ...found.error);
   const { room, player } = found;
 
+  // SCOPE (C7 ②, 2026-08-08). This swept every uncleared roll in the room —
+  // the felt plus every shelved roll from every player — with no authority
+  // check, on an unmodified `c`, and with no confirmation anywhere in the
+  // app. Goal 10 is why ANYONE may tidy the table and that stands; it is not
+  // a reason for the only available scope to be "everyone's evening".
+  //
+  // 'mine' is the ordinary act and stays instant. 'table' is the wider one
+  // and the client arms it — but the server does NOT gate it on anything,
+  // because gating would be an access control and there are none here (goal
+  // 10). The arming is a courtesy to the presser, not a permission.
+  const scope = body.value.scope === 'table' ? 'table' : 'mine';
   let swept = 0;
   for (const roll of room.log) {
     if (roll.cleared) continue;
+    if (scope === 'mine' && roll.playerId !== player.id) continue;
     roll.cleared = true;
     swept++;
   }
 
-  log(`clear   ${logField('room', room.name)} ${logField('name', player.name)} swept=${swept}`);
-  broadcast(room, 'clear', { playerId: player.id, playerName: player.name });
+  log(`clear   ${logField('room', room.name)} ${logField('name', player.name)} scope=${scope} swept=${swept}`);
+  // The rollIds let a client clear exactly what the server cleared — a
+  // scoped sweep cannot be re-derived from `clearTable()` alone, which is
+  // why the event now names them.
+  const cleared = room.log.filter((r) => r.cleared).map((r) => r.rollId).filter(Boolean);
+  broadcast(room, 'clear', { playerId: player.id, playerName: player.name, scope, cleared });
   sendJson(res, 200, { ok: true });
 }
 

@@ -3758,6 +3758,20 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
   background: rgba(226, 73, 59, 0.16);
 }
 
+/* THE ARMED WIDE CLEAR (C7 ②). Same in-place two-tap grammar as .tile-del's
+   delete: the control does not move, it changes what it says and goes red to
+   say the next press is the bigger act. Red because HUE = ACT and this one
+   reaches other people's rolls.
+   #left-panel-prefixed to outgun `#left-panel.collapsed .corner-btn` (1,2,0),
+   which sets this button's background in the rail — the state where the
+   LABEL is hidden and colour is the only channel the arm has. Written at
+   (1,2,0) rather than with !important, same as the hover pair above. */
+#left-panel #corner-clear.armed {
+  color: #fff;
+  border-color: var(--red);
+  background: rgba(226, 73, 59, 0.30);
+}
+
 /* ---------- roll mechanics display ---------- */
 .value-chip.discarded {
   opacity: 0.45;

@@ -1307,6 +1307,18 @@ at a time; history lives on a shelf.
 - **Slots are FIFO**: the server assigns slot order by collection order;
   collecting past capacity marks the oldest collected roll cleared (existing
   sink/fade). The 40-dice whole-table wipe is retired.
+- **The corner ✕ has TWO scopes** (ROADMAP C7 ②, 2026-08-08). One press
+  clears **your** rolls — the ordinary act, instant, and what almost every
+  press means. When other people's rolls are still on the table it then
+  **arms in place** for the wider sweep, using the same two-tap grammar the
+  rack's delete uses, and disarms after 4 s. Skipped when your rolls were all
+  the rolls: pressing twice to clear a table you are alone at is a toll, not
+  a safeguard. Before this the single press swept every player's shelf, on an
+  unmodified `c`, with no confirmation anywhere in the app and no word about
+  who did it. **The server gates nothing** — goal 10 means there is no
+  permission to check, so the arming is a courtesy to the presser, not an
+  access control; and every sweep now names its author and its scope to the
+  table (`Bob cleared their rolls` / `Bob cleared the table`).
 - **Housekeeping is universal**: a COLLECTED roll may be cleared by anyone
   (slot ✕ or its marker); an uncollected roll's dice remain roller-only to
   clear. Corner ✕ sweeps everything, unchanged.

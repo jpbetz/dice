@@ -938,7 +938,7 @@ can read. `logDroppedTotal` resets with the thing it counted, the peek closes,
 and the sweep is announced. Pinned by `clear-consequences`, verified to fail
 without the fix.
 
-### C7. `Clear table` wipes five people's evening — **attribution SHIPPED, scope open**
+### C7. `Clear table` wipes five people's evening — SHIPPED
 
 *CUJ9.* `handleClear` (server.js:2301-2319) has **no authority check** and
 sets `cleared` on every uncleared roll in `room.log` — the felt *plus every
@@ -955,10 +955,23 @@ playerName}`; the client now reads it. A neighbour's sweep says who, on the
 pill and to a screen reader — and is deliberately *not* narrated back at the
 person who pressed it. New `#status-pill.notice` dress: `.refused`'s shape
 (a sentence, not a shout) without the lie in the class name.
-**② Scope and confirmation still need a decision** — there is no intermediate
-today, no "clear only my rolls", no "clear the shelf, keep the felt". Goal
-10 says anyone may tidy the table, which is right; it does not say the
-tidying must be silent or unbounded.
+**② SHIPPED 2026-08-08** (Joe's call: scope split, arm the wide one). One
+press clears **yours** — instant, and what almost every press means. When
+other people's rolls remain it **arms in place** for the wider sweep, same
+two-tap grammar as the rack's delete, disarming after 4 s; skipped entirely
+when your rolls were all the rolls, because pressing twice to clear a table
+you are alone at is a toll rather than a safeguard. `c` routes through the
+button, so the key and the control are one path and the arm is not
+mouse-only.
+
+The server takes a `scope` and **gates nothing** — goal 10 means there is no
+permission to check, so the arming is a courtesy to the presser, not an
+access control. The broadcast now names the cleared rollIds, because a scoped
+sweep cannot be re-derived from `clearTable()` — that call removes
+everything, which is right for `table` and wrong for `mine`.
+
+Still open, and small: **no "clear the shelf, keep the felt"**. Nobody has
+asked for it; noting it so the absence stays deliberate.
 
 ### C8. The creation budget exists in code and never reaches a screen — CUJ6, needs design
 

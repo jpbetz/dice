@@ -266,8 +266,10 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
       return res.ok && res.data ? res.data.roll : null;
     },
 
-    async clear() {
-      const res = await withPlayer('/api/clear', {});
+    // scope: 'mine' (default — your rolls only) or 'table' (everyone's).
+    // See server handleClear and UX §7.7's housekeeping rule.
+    async clear(scope = 'mine') {
+      const res = await withPlayer('/api/clear', { scope });
       return res.ok;
     },
 

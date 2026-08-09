@@ -520,16 +520,45 @@ export const scenarios = [
       await b.settle();
       await a.settle();
       // The corner ✕, not __diceDebug.clearTable — the local function skips
-      // the wire entirely, and the wire is what carries the name.
+      // the wire entirely, and the wire is what carries the name. One press
+      // clears Bob's own; his rolls are the only ones on the table here, so
+      // no arm follows (C7 ②: pressing twice to clear a table you are alone
+      // at is a toll, not a safeguard).
       await b.eval(`document.getElementById('corner-clear').click()`);
       await a.waitFor(
-        `(window.__diceDebug.sim(120), /cleared the table/.test(document.getElementById('status-pill').textContent))`,
+        `(window.__diceDebug.sim(120), /cleared/.test(document.getElementById('status-pill').textContent))`,
         { desc: "Alice is told who swept" });
       assert.match(await a.eval(`document.getElementById('status-pill').textContent`), /Bob/,
         'by name — the broadcast carried it all along');
+      assert.match(await a.eval(`document.getElementById('status-pill').textContent`),
+        /cleared their rolls/, 'and the notice names the SCOPE, not "the table"');
       // …and NOT narrated back at the person who pressed it.
       assert.doesNotMatch(await b.eval(`document.getElementById('status-pill').textContent`),
-        /cleared the table/, 'your own sweep is not announced back at you');
+        /cleared/, 'your own sweep is not announced back at you');
+
+      // --- C7 ②: SCOPE. One press takes yours; the rest need a second. ---
+      await a.roll('d12');
+      await a.settle();
+      await b.roll('d4');
+      await b.settle();
+      await a.settle();
+      assert.equal((await a.dbg('onTable')).length, 2, 'two rolls on the table, one each');
+      await a.eval(`document.getElementById('corner-clear').click()`);
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.onTable.length === 1)`,
+        { desc: "Alice's roll goes, Bob's stays" });
+      assert.equal((await a.dbg('onTable'))[0].mine, false, 'and what is left is his');
+      // …and the button ARMS rather than having taken his already.
+      assert.equal(await a.eval(
+        `document.getElementById('corner-clear').classList.contains('armed')`), true,
+      'the wider act arms in place — the same two-tap the rack delete uses');
+      assert.match(await a.eval(`document.getElementById('corner-clear').textContent`), /1 more/,
+        'and says how many are not yours');
+      await a.eval(`document.getElementById('corner-clear').click()`);
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.onTable.length === 0)`,
+        { desc: "the second press takes everyone's" });
+      assert.equal(await a.eval(
+        `document.getElementById('corner-clear').classList.contains('armed')`), false,
+      'and disarms behind itself');
     },
   },
   {

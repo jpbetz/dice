@@ -4656,6 +4656,19 @@ window.__diceDebug = {
   // at the one function that catches it. The banner under test is what a
   // player sees in those cases and in no other.
   jamStorage(on) { forceStorageFail = !!on; },
+  // Uncleared rolls still on the table, and whose they are (C7 ②). A
+  // projection, never the live Map — rollStates is keyed state the render
+  // path owns, and handing it out would let a scenario mutate the machine
+  // it is meant to observe.
+  get onTable() {
+    const out = [];
+    for (const [rollId, st] of rollStates) {
+      if (st.cleared) continue;
+      const e = log.find((x) => x.rollId === rollId);
+      out.push({ rollId, mine: !!(e && net && e.playerId === net.playerId), collected: st.collected !== null });
+    }
+    return out;
+  },
   // The blocking surfaces, by name (U22): a11y-modals asserts the trap on
   // each, and driving them through their real open/close is the only way to
   // catch a surface that claims aria-modal without going with it.
@@ -10447,7 +10460,37 @@ document.getElementById('log-close').addEventListener('click', closeLogFlyout);
 // Rail + corner controls
 // ---------------------------------------------------------------------------
 
-document.getElementById('corner-clear').addEventListener('click', () => requestClear());
+// The corner ✕: clear mine, then offer the rest (C7 ②).
+let clearArmTimer = null;
+function disarmClear() {
+  clearTimeout(clearArmTimer);
+  clearArmTimer = null;
+  const btn = document.getElementById('corner-clear');
+  btn.classList.remove('armed');
+  btn.querySelector('.cb-label').textContent = ' Clear';
+  btn.title = "Clear your rolls — c (press again to clear everyone's)";
+  btn.setAttribute('aria-label', 'Clear your rolls from the table');
+}
+document.getElementById('corner-clear').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  if (btn.classList.contains('armed')) {
+    disarmClear();
+    requestClear('table');
+    return;
+  }
+  const others = othersOnTable();
+  requestClear('mine');
+  if (!others) return; // your rolls were all the rolls — nothing left to ask about
+  btn.classList.add('armed');
+  btn.querySelector('.cb-label').textContent = ` Clear ${others} more?`;
+  // The TITLE moves too: in the collapsed rail `.cb-label` is display:none,
+  // so the glyph's red is the only standing channel the arm has there and
+  // the hover read is the only place the count can still be said.
+  btn.title = `Also clear ${others} roll${others === 1 ? '' : 's'} belonging to other players`;
+  btn.setAttribute('aria-label', `Also clear ${others} roll${others === 1 ? '' : 's'} belonging to other players`);
+  announce(`Your rolls are gone. ${others} left — press again to clear everyone's.`);
+  clearArmTimer = setTimeout(disarmClear, 4000);
+});
 
 // The sound preference's ONE home is the settings modal (Joe 2026-08-03:
 // the rail's 🔊 retired — the setting is sufficient; 's' stays the
@@ -12607,7 +12650,9 @@ document.addEventListener('keydown', (e) => {
     case '/': e.preventDefault(); openPalette(); return; // swallowed, not inserted
     case '?': e.preventDefault(); toggleKbd(); return;
     case 'r': rerollLast(); return;
-    case 'c': requestClear(); return;
+    // Through the BUTTON, so the key and the control are one path: `c c`
+    // does what two presses do, and the arm is not a mouse-only affordance.
+    case 'c': document.getElementById('corner-clear').click(); return;
     case 'm': toggleAllPanels(); return;
     // 'n' is the documented key; 'b' and 'g' survive as silent aliases for
     // the old two-panel muscle memory (they toggled Compose / Saved pools).
@@ -13786,14 +13831,23 @@ function handleNetEvent(type, data) {
       // said to a screen reader. Goal 10 is why ANYONE may do it; it is not a
       // reason for it to happen invisibly. The name is skipped for your own
       // press: you know, and narrating your own act back at you is noise.
-      clearTable();
+      // A SCOPED SWEEP CANNOT BE RE-DERIVED (C7 ②): clearTable() removes
+      // everything, which is right for scope 'table' and wrong for 'mine'.
+      // The event names the rollIds the server actually cleared, so the
+      // client applies exactly that set.
+      if (data.scope === 'mine' && Array.isArray(data.cleared)) {
+        for (const rollId of data.cleared) applyClearRoll(rollId);
+      } else {
+        clearTable();
+      }
       if (data.playerId && (!net || data.playerId !== net.playerId)) {
         const who = data.playerName || 'Someone';
-        setPill(`${who} cleared the table`, 'notice');
+        const what = data.scope === 'mine' ? 'cleared their rolls' : 'cleared the table';
+        setPill(`${who} ${what}`, 'notice');
         setTimeout(() => {
-          if (statusPill.textContent === `${who} cleared the table`) setPill(null);
+          if (statusPill.textContent === `${who} ${what}`) setPill(null);
         }, 4000);
-        announce(`${who} cleared the table.`);
+        announce(`${who} ${what}.`);
       }
       break;
     case 'reveal':
@@ -13943,9 +13997,31 @@ function requestRoll(types, label, opts = {}) {
   }
 }
 
-function requestClear() {
-  if (netOnline && net) net.clear(); // table clears when the 'clear' event arrives
+// TWO SCOPES, ONE CONTROL (C7 ②). The corner ✕ used to sweep every player's
+// shelf on one unmodified press. It now clears YOURS instantly — the ordinary
+// act, and the only one most presses ever mean — and, when other people's
+// rolls are still on the table, arms once for the wider one. Same two-tap
+// grammar the rack's delete already uses, and it reaches the wide act without
+// inventing a second control.
+//
+// The arm is skipped when your rolls ARE all the rolls: pressing twice to
+// clear a table you are alone at is a toll, not a safeguard.
+function requestClear(scope = 'mine') {
+  if (netOnline && net) net.clear(scope); // table clears when the 'clear' event arrives
   else clearTable();
+}
+
+// How many uncleared rolls belong to somebody else. Read from the same state
+// row the shelf reads, so it counts what is actually still on the table.
+function othersOnTable() {
+  if (!netOnline || !net) return 0;
+  let n = 0;
+  for (const [rollId, st] of rollStates) {
+    if (st.cleared) continue;
+    const e = log.find((x) => x.rollId === rollId);
+    if (e && e.playerId && e.playerId !== net.playerId) n++;
+  }
+  return n;
 }
 
 // ---------------------------------------------------------------------------
