@@ -1414,15 +1414,60 @@ html, body {
   margin: 8px 0 0;
 }
 #pools-head.foreign .ph-word { color: var(--ivory); }
-/* …and NO region name when the head stands only for the ledger (C9). The
-   head has three reasons to exist and they want different words: `.foreign`
-   names whose rack you are reading, `.profiled` names which of yours is in
-   your hands, and `.ledgered` carries the total. Only the first two are
-   about identity. In manage mode on your own single-profile rack the head
-   would otherwise print "SAVED POOLS" directly under the section bar's
-   "Pools" — the region named twice, one line apart, which §7.23 already
-   ruled against when it gave the sections their one name. */
-#pools-head.ledgered:not(.foreign):not(.profiled) .ph-word { display: none; }
+
+/* ✎ AND THE INLINE NAME (C16). Quiet steel at rest — renaming is a tool act,
+   not a roll act, so no gold (HUE = ACT) — and it sits immediately after the
+   name it edits rather than in a corner, because the two are one control in
+   the player's head. The input takes the name's own place so the head does
+   not jump when it opens. */
+#pools-head .ph-rename {
+  flex: none;
+  padding: 2px 5px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+}
+#pools-head .ph-rename:hover, #pools-head .ph-rename:focus-visible {
+  opacity: 1;
+  color: var(--ivory);
+  background: rgba(255, 255, 255, 0.07);
+}
+#pools-head .ph-rename.hidden { display: none; }
+#pools-head .ph-rename-in {
+  flex: none;
+  width: 12ch;
+  min-width: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(243, 234, 215, 0.5);
+  background: var(--well);
+  color: var(--ivory);
+  font: inherit;
+  font-size: 11px;
+}
+#pools-head .ph-rename-in:focus { outline: none; border-color: var(--gold); }
+#pools-head .ph-rename-in.hidden { display: none; }
+@media (pointer: coarse) {
+  /* The floor U28 set: a 34px pad, taken in padding so the glyph keeps its
+     size and the head keeps its rhythm. */
+  #pools-head .ph-rename { padding: 11px 10px; }
+}
+/* …and NO region name on YOUR OWN rack, ever (C9, widened by C16). The head
+   has three reasons to exist and they want different words: `.foreign` names
+   whose rack you are reading, `.profiled` names which of YOURS is in hand,
+   and `.ledgered` carries the total. Only the FIRST is a region name — the
+   other two name a profile or a number, and the region itself is already
+   named by the section bar's pressed `Pools` directly above it. §7.23 gave
+   the sections their one name for exactly this reason, and "SAVED POOLS"
+   one line under "Pools" is the redundant standing chrome §7.9 kills.
+   (First written as `:not(.profiled)`, which held only until manage mode
+   started setting that class — the narrower rule was aimed at a symptom.) */
+#pools-head:not(.foreign) .ph-word { display: none; }
 #pools-head.foreign .ph-tag { display: inline; }
 #groups-list.foreign .pool-sec-head { position: static; }
 

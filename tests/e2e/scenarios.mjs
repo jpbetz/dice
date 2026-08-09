@@ -562,6 +562,57 @@ export const scenarios = [
     },
   },
   {
+    name: 'author-in-place',
+    tags: ['groups', 'profiles', 'cuj6'],
+    // C16 — MAKING A CHARACTER MUST NOT CROSS THE MODAL. Settings is
+    // `position: fixed; inset: 0` with a blur: it COVERS the rack. So
+    // creating a profile (in ⚙) and building its pools (on the rack behind
+    // it) could never be seen together, and preparing six characters meant
+    // six open/close round trips. The picker's `＋ New profile…` was the
+    // worst of it — it promised a new character and delivered
+    // openSettingsAtLibrary(), which opened the modal AND force-expanded the
+    // YAML box.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg('profiles.reset()');
+      await a.dbg('setPanelState({pools: true})');
+      const before = (await a.dbg('profiles.list')).length;
+
+      // ＋ New CREATES, in hand, without opening anything.
+      await a.eval(`document.getElementById('profile-pick').click()`);
+      await a.eval(`[...document.querySelectorAll('.pm-row')]
+        .find((b) => b.textContent.includes('New profile')).click()`);
+      const after = await a.dbg('profiles.list');
+      assert.equal(after.length, before + 1, '＋ New mints a profile');
+      assert.equal(after.find((p) => p.active).pools, 0, 'an EMPTY one, taken in hand');
+      assert.equal(await a.eval(
+        `document.getElementById('settings-modal').classList.contains('hidden')`), true,
+      'and the rack is never covered — no modal opened');
+
+      // …and it can be NAMED where the character is.
+      await a.eval(`document.getElementById('profile-rename').click()`);
+      assert.equal(await a.eval(
+        `document.activeElement.id`), 'profile-rename-in', 'the name becomes an input in place');
+      await a.eval(`(() => { const i = document.getElementById('profile-rename-in');
+        i.value = "Alice's Rogue";
+        i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); })()`);
+      assert.equal((await a.dbg('profiles.active')).name, "Alice's Rogue",
+        'Enter commits the new name');
+      assert.match(await a.eval(`document.getElementById('profile-pick').textContent`),
+        /Alice's Rogue/, 'and the head says so');
+
+      // Esc abandons rather than committing a half-typed name.
+      await a.eval(`document.getElementById('profile-rename').click()`);
+      await a.eval(`(() => { const i = document.getElementById('profile-rename-in');
+        i.value = 'oops';
+        i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); })()`);
+      assert.equal((await a.dbg('profiles.active')).name, "Alice's Rogue",
+        'Esc abandons — the newborn contract, applied to a rename');
+
+      await a.dbg('profiles.reset()');
+    },
+  },
+  {
     name: 'creation-budget',
     tags: ['groups', 'meanings', 'cuj6'],
     // C8 — CUJ6's done-when is "priced against the system's creation budget",

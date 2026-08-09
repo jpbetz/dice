@@ -375,6 +375,17 @@ limitations under the License.
              is a panel section §7.23 lets the player switch off. -->
         <button id="profile-pick" class="ph-pick hidden" aria-haspopup="menu"
                 aria-expanded="false" title="The profile in your hands — tap to switch"></button>
+        <!-- RENAME WHERE THE CHARACTER IS (ROADMAP C16). Naming used to live
+             only in Settings, which is `position: fixed; inset: 0` with a blur
+             — it COVERS the rack. So making a character and naming it were on
+             opposite sides of a modal, and building six meant six round trips.
+             This is not a text field inside a closing menu (PROFILES §11.5 ③
+             refused that, correctly): the head is a standing surface, and the
+             input replaces the name in place on it. -->
+        <button id="profile-rename" class="ph-rename hidden"
+                title="Rename this profile">✎</button>
+        <input id="profile-rename-in" class="ph-rename-in hidden" type="text" maxlength="24"
+               spellcheck="false" aria-label="New name for this profile">
         <span class="ph-tag">read-only</span>
         <span class="ph-rule"></span>
       </div>

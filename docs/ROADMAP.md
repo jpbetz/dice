@@ -1053,6 +1053,42 @@ is still the right home for "I am building to 80 tonight". Pinned by
   while *inheriting* a library from whatever ran before it on that origin.
   Both scenarios now establish their own state.
 
+### C16. Authoring a character crossed the Settings modal — SHIPPED
+
+*CUJ6, raised by Joe 2026-08-09: "I'm not convinced a player preparing a game
+for a group has a sufficiently easy process."* Counted honestly, preparing six
+characters cost about thirty gestures **and six modal round trips**, because
+the two halves of one job sat on opposite sides of one: Settings is
+`position: fixed; inset: 0` with a blur — it **covers the rack** — so
+"make a profile" and "build its pools" could never be seen together.
+
+The picker's `＋ New profile…` was the sharpest instance: the one row that
+promises a new character called `openSettingsAtLibrary()`, which opened the
+modal **and force-expanded the YAML box**. It delivered a text editor.
+
+**SHIPPED 2026-08-09.** `＋ New profile…` mints an empty profile under a dealt
+name and takes it in hand, like `⚄ Random…` beside it already did. Renaming
+moved to the rack: a `✎` beside the name on the region head opens an input
+**in place** — Enter commits, Esc abandons. This does not fight PROFILES
+§11.5 ③, which refused a rename field inside the *picker menu* because a menu
+closes on focus-out; the head is standing furniture and does not close.
+
+Two follow-on corrections, both found by looking:
+
+- The `✎` first rendered as a **floating pencil with no name beside it**,
+  because §11.5 ② hides the picker at a library of one. At rest that is still
+  right — no new chrome for a player who never makes a second profile — but in
+  manage mode it is wrong twice: the head is already standing for its ledger
+  (C8), and the menu is the one place a *second* character gets made. So while
+  you are deliberately editing a character, the head names it.
+- That turned `.profiled` on and brought back **"SAVED…"**, truncated, one
+  line under the section bar's "Pools". C9's rule had been aimed at the
+  symptom (`:not(.profiled)`); the honest rule is that **your own rack never
+  carries a region name at all** — only a foreign rack's head names anything,
+  because the section bar names the region (§7.23).
+
+Pinned by `author-in-place`.
+
 ### C10. The generic invite link never offers a prepared seat to a returning player — DEFECT, medium — **DESIGN REOPENED**
 
 *CUJ7, steps 2 and 7.* The picker is gated on `name && AS_PARAM`. With a

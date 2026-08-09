@@ -8070,7 +8070,14 @@ function renderGroups() {
   const pick = document.getElementById('profile-pick');
   const mineNow = activeProfile(profileStore);
   const many = profilesOf(profileStore).length > 1;
-  const showPick = !foreign && !!mineNow && many;
+  // …OR MANAGE MODE (C16). §11.5 ② hides the picker at a library of one
+  // because there is nothing to switch to, and at REST that is still right —
+  // no new chrome for a player who never makes a second profile. In manage
+  // mode it is wrong twice over: the head is already standing for its ledger
+  // (C8), the ✎ beside it would be a rename control with no name in sight,
+  // and the menu is the one place a SECOND character gets made. So while you
+  // are deliberately editing a character, the head names it.
+  const showPick = !foreign && !!mineNow && (many || poolsEdit);
   pick.classList.toggle('hidden', !showPick);
   poolsHead.classList.toggle('profiled', showPick);
   if (showPick) {
@@ -8083,6 +8090,15 @@ function renderGroups() {
       : `'${mineNow.name}' is in your hands — tap to switch profile`;
     pick.classList.toggle('off', off);
   }
+  // ✎ RIDES WITH THE NAME (C16), and only where the name is: on your own
+  // rack, with something in hand. It stands whenever the head does — a
+  // library of one still renames, because the first character you make is
+  // the one most likely to be called 'Corr' when you wanted 'Alice'.
+  const ren = document.getElementById('profile-rename');
+  const renIn = document.getElementById('profile-rename-in');
+  const canRename = !foreign && !!mineNow;
+  ren.classList.toggle('hidden', !canRename || !renIn.classList.contains('hidden'));
+  if (!canRename) renIn.classList.add('hidden');
   // The rack total rides the region head's slack (.ph-rule flex:1) — one
   // right-flush ledger column with the shelf figures, its standing word
   // paid once here. Rebuilt fresh per render; absent outside manage.
@@ -11828,9 +11844,19 @@ function buildProfileMenu(el) {
     disabled: isFull(profileStore),
     title: isFull(profileStore) ? `${MAX_PROFILES} profiles is the ceiling — delete one first` : `Deal a fresh ${systemLabel(sys)} profile`,
   });
-  row('＋ New profile…', '', () => openSettingsAtLibrary(), {
+  // CREATES, rather than opening the modal on an unrelated pane (C16). This
+  // called openSettingsAtLibrary(), which covered the rack with Settings AND
+  // force-expanded the YAML box — so the one row in the picker that promises
+  // a new character delivered a text editor. It now mints an empty profile
+  // under a dealt name and takes it in hand; ✎ on the head renames it, and
+  // the rack is never left. `⚄ Random…` above already worked this way.
+  row('＋ New profile…', '', () => showProfileNote(makeProfile({
+    name: uniqueName(profileStore, dealName(sys)), system: sys, pools: [],
+  })), {
     disabled: isFull(profileStore),
-    title: isFull(profileStore) ? `${MAX_PROFILES} profiles is the ceiling — delete one first` : 'Name one in Settings → Your data',
+    title: isFull(profileStore)
+      ? `${MAX_PROFILES} profiles is the ceiling — delete one first`
+      : 'An empty profile, in your hands — build it with ✎ and rename it on the head',
   });
   if (others.length) {
     head('Other systems');
@@ -11842,6 +11868,40 @@ function buildProfileMenu(el) {
     }
   }
 }
+
+// THE INLINE RENAME (C16). The head's name becomes an input in place —
+// Enter commits, Esc and blur abandon. Not a menu: PROFILES §11.5 ③ refused
+// a rename field inside the picker because a menu closes on focus-out, and
+// that refusal is right; the head is standing furniture and does not close.
+function startProfileRename() {
+  const mineNow = activeProfile(profileStore);
+  if (!mineNow) return;
+  const pick = document.getElementById('profile-pick');
+  const ren = document.getElementById('profile-rename');
+  const input = document.getElementById('profile-rename-in');
+  input.value = mineNow.name;
+  input.classList.remove('hidden');
+  pick.classList.add('hidden');
+  ren.classList.add('hidden');
+  input.focus();
+  input.select();
+}
+function endProfileRename(commit) {
+  const input = document.getElementById('profile-rename-in');
+  if (input.classList.contains('hidden')) return;
+  const mineNow = activeProfile(profileStore);
+  input.classList.add('hidden');
+  if (commit && mineNow && input.value.trim() && input.value.trim() !== mineNow.name) {
+    showProfileNote(renameProfileTo(mineNow.id, input.value));
+  }
+  renderGroups(); // repaints the head, which restores the pick and the ✎
+}
+document.getElementById('profile-rename').addEventListener('click', startProfileRename);
+document.getElementById('profile-rename-in').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); endProfileRename(true); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); endProfileRename(false); }
+});
+document.getElementById('profile-rename-in').addEventListener('blur', () => endProfileRename(false));
 
 function openProfileMenu(e) {
   const anchor = e.currentTarget;
