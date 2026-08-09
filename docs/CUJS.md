@@ -237,6 +237,20 @@ file* is the one operation it does not offer.
 
 ---
 
+## Coverage today (measured 2026-08-09)
+
+Scenarios carrying each journey's tag. Counts, not quality — a journey with
+many part-scenarios and no composed walk is still the gap **C1** names.
+
+| | CUJ1 | CUJ2 | CUJ3 | CUJ4 | CUJ5 | CUJ6 | CUJ7 | CUJ8 | CUJ9 | CUJ10 | CUJ11 | CUJ12 | CUJ13 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| scenarios | 4 | 5 | 10 | 1 | **0** | 16 | 6 | 32 | 17 | 14 | 1 | 6 | 6 |
+
+**CUJ5 is the zero** — sub-tables have no code and no test, as this file has
+said since it was written. **CUJ4 and CUJ11 are thin**: leaving a table and
+being present without rolling each rest on a single scenario, and neither has
+a composed walk.
+
 ## Coverage rule (why a journey needs its own scenario)
 
 **A journey with no end-to-end scenario can pass in every part and fail as a
