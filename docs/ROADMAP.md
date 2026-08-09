@@ -2353,7 +2353,7 @@ helper once.
 model; the identity chip has no touch coverage at all today, which is why a
 dead path shipped.
 
-### U28. The coarse-pointer size pass — batch, medium
+### U28. The coarse-pointer size pass — SHIPPED
 
 *Audit T1, T2, T3, T6, T7, T8, T9, T12.* **The structural finding, and the
 reason this is one batch rather than eight entries: seven of the eight
@@ -2416,7 +2416,7 @@ token is exactly the kind of thing that keeps this fixed. **Scenario:** a
 `named-verb-touch` is the model, and a list-driven pin is what stops the next
 control from shipping at 23px.
 
-### U29. iOS text-input zoom and the keyboard-occluded foot — small
+### U29. iOS text-input zoom and the keyboard-occluded foot — SHIPPED
 
 *Audit T11 (moderate).* Every text input in the app is under 16px —
 `.cmd-in` 12.5 (css:3499), `.tin` 12, `.pid-name-input` 13,
@@ -2437,7 +2437,7 @@ Note index.html:20 is otherwise correct and should be left alone:
 keeps pinch-zoom alive, and pinch-zoom is what makes every undersized target
 in U28 *recoverable* rather than impossible.
 
-### U30. A short-viewport branch that trims the well, not the rack — small
+### U30. A short-viewport branch that trims the well, not the rack — SHIPPED
 
 *Audit T10 (moderate).* `.draft-zone` measures **203px** (167 with the rim
 hidden) and it is sticky, so it is subtracted from every scroll. On a
@@ -2458,3 +2458,75 @@ sticky shelf-head offset follows automatically with no second edit. This
 composes with the empty-draft shrink already argued for in **What NOT To Do**
 (do not make the section bar sticky; let the well collapse toward the rim
 when there is nothing staged).
+
+**SHIPPED 2026-08-08 (U28, U29, U30 together).** Every rule is in `css/style.css`
+plus one line of `index.html` (the viewport meta gains
+`interactive-widget=resizes-content` and NOTHING else — `initial-scale=1` with
+no `user-scalable=no` and no `maximum-scale` is what keeps pinch-zoom alive,
+and pinch-zoom is what makes an undersized target recoverable rather than
+impossible). Pinned by `touch-targets`, which walks a LIST rather than
+asserting one control — the audit's finding was that seven of the eight
+`(pointer: coarse)` blocks fixed *visibility* and exactly one fixed *size*,
+and nothing caught it because every touch assertion pointed at the same
+button. U30's branch gates at **max-height: 780px**, deliberately a height
+question and not a touch one (a 1366×768 laptop has the identical problem),
+and deliberately below 800 so the 1440×900 class — where the rack already
+gets ~349px and there is nothing to buy — stays out of it.
+
+**Two cascade faults, both worth keeping on the record.** `#tray-mods` carries
+no `class="btn"`, so `.draft-actions .btn`'s coarse rule never matched it; it
+reached row height only because `align-items: stretch` dragged it there. And
+`#offer-pick { padding: 4px 6px }` is (1,0,0) against the coarse rule's
+(0,2,0) — **media queries add no specificity**, so the id won regardless of
+source order. Both are answered at id weight. The markup fix for `#tray-mods`
+is deliberately NOT taken: it has a full dress of its own at `#tray-mods`, and
+adding `.btn` would layer a second one under it for no behavioural gain.
+
+### U28a. The rack's delete ✕ needs a layout change before it needs a bigger target — small
+
+**Found by LOOKING, after U28 shipped and was partly reverted the same day**
+(`tools/steps/touch-look.mjs`, `touch-manage.png`). `.tile-del` went 24 → 36
+with the rest of the batch. It measured correctly and every assertion passed.
+It was also visibly broken: a pool with a count wears its `×2` badge
+immediately left of the ✕, and at the shipped 24px the badge's right edge
+*already* overlapped the button's left edge by 2px — a designed near-touch
+with no free space beside it. At 36 that overlap is **14px**, so the button's
+box lands on top of the "2" on every counted pool (5 of 18 on the dealt rack).
+
+Ink/target separation — how `#edge-toggle`, `.die-x` and `.sw` all reach 34+
+in this same batch — does not rescue it: the halo would still swallow the
+badge, and this is the rack's one destructive control with **no confirm and no
+undo** (js/main.js filters and saves on the first tap). A hit area that
+quietly extends over a neighbouring label is exactly how the wrong pool gets
+deleted; a bigger target is worth less than the accident it invites.
+
+So `.tile-del` is pinned at 24 by `touch-targets`, and the real fix is markup
+plus interaction, not cascade: **move the badge or move the ✕ off the corner**
+(`renderPoolTile`), **and add an undo**. Do both or neither.
+
+**The tooling lesson generalises.** `rail-look` and `panel-look` both frame a
+FINE pointer at a tall desktop viewport — the one configuration U28/U29/U30 do
+not change — so they were structurally incapable of showing this batch at all.
+`touch-look.mjs` is the third look tool: coarse pointer, tablet portrait, plus
+a short-laptop frame for U30's height branch. A coarse-only rule is invisible
+to a tool that never emulates touch, which is the same blindness the audit
+found in the suite itself.
+
+### U28b. Two smaller touch findings, deliberately deferred — batch, small
+
+Left alone by U28 with reasons in the stylesheet, and worth a decision rather
+than a silent omission:
+
+- **`.rd-cell`'s 86px cannot hold art + name + remover** at the longest
+  labels; the grown `.rd-x` overlaps a 34px lane of the name. The stylesheet
+  refuses to fix this in cascade — the answer is markup (drop the art on a
+  counted row, or move the count out of the name) in `renderRailDice`.
+- **The rim is a no-wrap flex row.** At coarse the four tools come to ~240px
+  of the expanded panel's 260 — fine on a tablet, but it already overflows
+  below a ~320px viewport (pre-existing). `flex-wrap` on `.draft-actions`, or
+  a narrower phone dress.
+- **Near-misses the size pass did not take**, because a blanket coarse `.btn`
+  bump touches ~30 surfaces and bumping `#section-bar` spends U30's rack
+  budget directly (it is in the scroll, not the sticky zone): the `.btn.ghost`
+  family at 31px, `.corner-btn` at 28 expanded, `.btn.tiny` at 19,
+  `#section-bar` cells at 26.

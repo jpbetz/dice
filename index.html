@@ -17,7 +17,14 @@ limitations under the License.
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- interactive-widget=resizes-content (U29): the software keyboard RESIZES
+     the viewport instead of covering it, so #rail-foot stops sitting under
+     it while any field is focused (css #left-panel's 100dvh reads the
+     resized value). Everything else here is deliberate and must stay:
+     initial-scale=1 with NO user-scalable=no and NO maximum-scale is what
+     keeps pinch-zoom alive, and pinch-zoom is what makes an undersized
+     target recoverable rather than impossible. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
 <title>Dice Table</title>
 <link rel="stylesheet" href="css/style.css">
 <script type="importmap">

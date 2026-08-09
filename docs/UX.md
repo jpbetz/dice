@@ -3397,6 +3397,18 @@ modes, the counted row, the `10d10x` worst case, the empty rack and a real
 the viewport was shortened — a tall window has nothing to scroll, so the frame
 that existed to prove the sticky behaviour proved nothing at all.
 
+**And a third tool, for the same reason one level up (2026-08-08).** Both of
+those frame a FINE pointer at a tall desktop viewport — which is precisely the
+configuration the touch pass (ROADMAP U28–U30) does not change. Every rule it
+moved is behind `(pointer: coarse)` or a height branch, so a tool that never
+emulates touch is *structurally incapable* of showing the work: not a gap in
+coverage, an inability. `tools/steps/touch-look.mjs` captures the coarse dress
+at tablet portrait plus a short-laptop frame for the height branch. It earned
+itself on the first run — `.tile-del` had grown 24 → 36, measured correctly,
+passed every assertion, and put its box on top of the `×2` badge of every
+counted pool. **A control can pass 34×34 and still be wrong**, and no number
+in this repo would have said so.
+
 ### 7.24 The stake and the read — what a result surface shows (2026-08-08)
 
 **This is the authoritative section for what any surface prints about a

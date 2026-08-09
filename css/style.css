@@ -151,6 +151,20 @@ html, body {
   top: 0;
   left: 0;
   bottom: 0;
+  /* THE FOOT UNDER THE KEYBOARD (U29 / audit T11). `top: 0; bottom: 0`
+     measures the LAYOUT viewport, and iOS does not shrink that when the
+     software keyboard opens — it merely covers it. So #rail-foot (⚙ ≣ ?
+     ❯ and ✕ Clear table) sat BEHIND the keyboard for as long as any input
+     was focused, which is exactly when a player wants Done or Clear.
+     Two halves and both are load-bearing: `interactive-widget=
+     resizes-content` on the viewport meta (index.html:20) tells the
+     browser to RESIZE the viewport rather than overlay it, and 100dvh is
+     the unit that reads the resized value. Over-constrained on purpose —
+     with top, bottom and height all declared, CSS drops `bottom`, so dvh
+     governs where it is supported and the old top/bottom pair is the
+     fallback where it is not. No `100vh` anywhere: vh is the LARGE
+     viewport and would re-introduce the same overhang under a URL bar. */
+  height: 100dvh;
   width: var(--sidebar-w);
   display: flex;
   flex-direction: column;
@@ -248,6 +262,36 @@ html, body {
 #edge-toggle:focus-visible { outline: 1px solid var(--ivory); outline-offset: -2px; }
 .et-chev { position: absolute; top: 14px; left: 0; right: 0; font-size: 11px; line-height: 1; text-align: center; }
 #left-panel.collapsed .et-chev { transform: scaleX(-1); }
+/* THE INK STAYS 14, THE TARGET BECOMES 44×44 (U28 / audit T1). This strip
+   is the ONLY pointer path to collapse/expand — js/main.js calls it "the
+   one pointer target" and n/m are the keyboard's — and 14px is 3.7mm
+   against a 9mm pad. Widening the divider itself was refused: the divider
+   IS the panel's edge, and moving it moves the felt.
+   So the target grows and the ink does not: a transparent ::before that
+   reaches 30px into the felt side, where a miss costs nothing (a miss LEFT
+   stages a pool or picks a rail row).
+   AND IT IS A SQUARE, NOT A CURTAIN. The audit's other half of T1 is that
+   a 768px strip has "no visual centre to aim at", and the felt is not
+   handler-free either — js/main.js:4238 gives #scene-container a click
+   that skips playback. A full-height 30px overlay would swallow that skip
+   down the whole left edge. So the patch is 44 tall, seated on the
+   chevron (.et-chev, top 14px): the one place the control announces
+   itself is the one place it is 44px, and 44×44 of felt in the top corner
+   is all the skip gives up.
+   Coarse-only: a mouse already hits 14px exactly, and an invisible square
+   over the felt would be a hover trap for everyone who never needed it. */
+@media (pointer: coarse) {
+  #edge-toggle::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* -31, not -30: this strip's 14px is 13 of padding box plus the 1px
+       divider, and an inset resolves against the padding box. 13 + 31 = 44. */
+    right: -31px;
+    height: 44px; /* seated on the chevron at top:14 */
+  }
+}
 
 /* ---------- neutral accents inside the column ---------- */
 /* Joe 2026-08-04: gold survives ONLY where it means roll (the tray cue and
@@ -641,7 +685,26 @@ html, body {
    pointer-events:none, so CSS alone cannot scope this). Touch keeps them
    all standing (no hover exists to aim with). */
 .die-x.show, .die-x:hover, .die-x:focus-visible { opacity: 1; }
-@media (pointer: coarse) { .die-x { opacity: 1; } }
+/* VISIBLE IS NOT TAPPABLE (U28 / audit T6). The rule below has stood every
+   ✕ up on touch since the proximity reveal shipped — and left them 20px,
+   overlaying 34px die art with no gap to the neighbour, which is the
+   structural finding of the whole touch stance: seven of the eight coarse
+   blocks in this file fix VISIBILITY and one fixed size.
+   So the disc keeps its 20px ink (the ✕ is a real object here — border,
+   fill, glyph — and growing the ink would put a red bullseye on every
+   staged die) and the TARGET goes to 34×34 through a transparent ::before.
+   -8, not -7: the disc is 20px border-box over a 1px border, so the halo
+   grows an 18px padding box — 18 + 16 = 34. Symmetric on purpose:
+   renderTray anchors this button with inline left/top (js/main.js), so a
+   symmetric halo leaves the disc exactly where the layout math put it and
+   needs no second edit there.
+   34, not 44: the removers are anchored one per source chip / per die
+   type, and at 44 two neighbouring halos would overlap — a remover that
+   removes the wrong thing is worse than one that is 5px short. */
+@media (pointer: coarse) {
+  .die-x { opacity: 1; }
+  .die-x::before { content: ''; position: absolute; inset: -8px; }
+}
 .tray-cluster:has(.die-x:hover) .tray-roll:hover:not(:disabled) {
   border-color: transparent;
   background: none;
@@ -1008,7 +1071,32 @@ html, body {
 #offer-draft { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 #offer-pick  { margin-left: -7px; padding: 4px 6px;
                border-top-left-radius: 0; border-bottom-left-radius: 0; }
-@media (pointer: coarse) { .draft-actions .btn { padding: 8px 12px; } }
+/* THE RIM'S COARSE BUMP, AND THE TWO SELECTORS IT WAS MISSING (U28 /
+   audit T7). The bump was real and landed on two of the rim's four tools;
+   both misses are cascade faults rather than taste, and both are worth
+   naming because the same shape can happen again anywhere in this file.
+     · `#tray-mods` carries NO class="btn" (index.html:215), so
+       `.draft-actions .btn` never matched it. It reached row height only
+       because `.draft-actions { align-items: stretch }` dragged it there —
+       accidental, and it would have died the moment the rim stopped
+       stretching. Adding the class is an index.html edit; naming the id
+       here costs one selector and cannot drift.
+     · `#offer-pick { padding: 4px 6px }` above is (1,0,0) and the old
+       coarse rule was (0,2,0). MEDIA QUERIES ADD NO SPECIFICITY — a
+       @media block is not a selector — so the id won regardless of source
+       order and the targeted-offer chooser stayed ≈21px wide no matter
+       where this block was moved. This is the ONE place in the file where
+       an id beat a coarse bump; the fix is to answer it at id weight.
+   Sizes, all border-box: the three .btn tools 26 → 36 tall, `± Modify` 26
+   → 36 (its 13px horizontal survives so its width does not move), and
+   `▾` ≈21×26 → 37×36. Horizontal padding lands at 10px rather than 12
+   deliberately: the rim is a no-wrap flex row and the four tools plus
+   gaps come to ~240px of the expanded panel's 260 — 12px would have made
+   the row overflow on the narrowest phone the panel still expands on. */
+@media (pointer: coarse) {
+  .draft-actions .btn { padding: 10px 10px; }
+  #tray-mods, #offer-pick { padding: 10px 13px; }
+}
 /* (the tray save morph's rules retired 2026-08-04 with the rim's Save) */
 
 /* ---------- saved pools (read-only quick access, P2) ---------- */
@@ -1184,6 +1272,57 @@ html, body {
      stuck well. */
   padding: 16px 14px 16px;
   border-bottom: 1px solid var(--hair);
+}
+/* ---------- the short-viewport branch (U30 / audit T10) ---------- */
+/* NOTHING IN THIS FILE KEYED OFF HEIGHT until this block. The only other
+   viewport branch is `@media (max-width: 640px)` up at the top, and it is
+   a single rule that computes to no change at 640px and only bites below
+   372px wide — so neither tablet orientation ever entered it, and the
+   device with the MOST screen was the one that put the whole rack behind
+   a scroll.
+   The arithmetic, measured. This zone is 203px and it is STICKY, so it is
+   subtracted from every scroll: 33 (its own padding + hairline) + 134
+   (#tray-actions: 115 tall plus 19 of margin) + 36 (the rim). At
+   1024×768 landscape the panel body is 654px; minus the zone leaves 451,
+   and the section bar (46) + palette (152) + #cmd (~50) take 248 of that
+   — ≈203px for the rack, about two tile rows.
+   WHAT GIVES IS THE WELL, NEVER THE RACK. Trimming the rack would answer
+   "too little room to see your pools" by showing fewer pools. So the
+   pocket loses air it can spare (113 → 84-91, the range being empty/loose
+   dice vs a staged source chip), the zone's own 16px region gaps go to
+   10, and the well's margins tighten by 5. 203 → ~158-164px, which hands
+   the rack ~245px — three tile rows and a shelf head instead of two.
+   THE VERB IS UNTOUCHED. --cue-band stays 34px and .tray-line2 .roll-cue
+   keeps its 24px/0.3em engraving, so the ROLL plate — the surface's
+   primary act (§7.21) — is exactly the object it is at full height. Only
+   the deck above it gets shorter. The dice stay 34px too: "the draft is
+   the star" is a hierarchy claim, not a spare pixel.
+   No second edit anywhere: --draft-h is recomputed from offsetHeight
+   (js/main.js), so the shelf heads' sticky offset follows this block on
+   its own, and the ResizeObserver already re-measures on rotate.
+   NOT A TOUCH GATE, and the distinction is the whole point of U30: this
+   is about how much COLUMN there is, and a 1366×768 laptop has exactly
+   the same problem an iPad in landscape does. Pointer type says nothing
+   about it. (Consequence, recorded because it surprised a test run: the
+   e2e harness launches headless Chrome at its 800×600 default, so this
+   branch is ON for the whole suite and the full-height dress is the one
+   nothing measures. Spacing pins here have to name which side they are
+   asserting — draft-bench does, by driving both.)
+   780, chosen by what it must and must not catch. IN: 1024×768 landscape
+   (768, or ~694 under Safari's toolbars) and the 1280×800 / 1366×768
+   laptop class, whose ~660-700px of viewport leaves the rack under three
+   tile rows. OUT: 768×1024 portrait, which the audit measured as
+   comfortable at 707px of body, and the 1440×900 class at ~800px, where
+   the rack already gets ~349px — five rows, and nothing to buy. */
+@media (max-height: 780px) {
+  .draft-zone { padding: 10px 14px; }
+  #tray-actions { margin: 8px 0 6px; }
+  .tray-line2 .tray-cluster,
+  .tray-line2 .tray-roll { min-height: 84px; }
+  /* the pocket's air, halved but never zero — a staged plate must still
+     not crowd the cue band's seam (the 10px was Joe's "you're missing
+     padding between tiles and the roll button") */
+  .tray-line2 .tray-roll { padding: 10px 18px calc(var(--cue-band) + 6px); }
 }
 /* THE REGION HEAD (anatomy pass 2026-08-04): SAVED POOLS names the one
    region a newcomer misreads — its steel tiles wear the dice palette's
@@ -1380,6 +1519,41 @@ html, body {
   border-radius: 6px;
   background: rgba(18, 14, 9, 0.9);
   border: 1px solid var(--panel-border);
+}
+/* ---- what the rack owes a finger (U28 / audit T8, T12) ---- */
+@media (pointer: coarse) {
+  /* THE ONE THAT TEACHES RATHER THAN ENLARGES, and the cheapest item in
+     U28 (audit T12). This `+` is the ONLY thing on a rack tile that says
+     it STAGES into the well rather than rolling — a .pool-roll strip that
+     looks almost identical fires immediately. It is opacity:0 at rest and
+     lifts on hover, so on touch, where no hover exists, the one signal
+     separating "compose" from "roll now" was never rendered at all.
+     0.6 at rest, which is .ghost-add's coarse value two blocks down, not
+     the 0.7 of the hover state: standing chrome, not an approach. Its
+     neighbour .pool-ord stays at 0 on purpose — an ordinal advertises a
+     KEYBOARD shortcut, and there is no keyboard here to advertise it to
+     (the same reason `?` is correctly moot on touch). */
+  .tile-add { opacity: 0.6; }
+  /* .tile-del IS DELIBERATELY NOT GROWN — the one item of U28 that CSS
+     cannot fix, found by looking at it rather than by measuring it
+     (tools/steps/touch-look.mjs, touch-manage.png).
+     It shipped here at 36×36 and had to be reverted the same day. The ✕
+     sits at the tile's top-right; a pool with a count wears its `×2` badge
+     immediately to its LEFT, and at the shipped 24px the badge's right edge
+     already overlaps the button's left edge by 2px — a designed near-touch
+     with NO free space beside it. At 36 that overlap becomes 14px: the
+     button's box lands on top of the "2" on every counted pool (Agility,
+     Charm, Axe, Club, Staff on the dealt rack — a third of it).
+     Ink/target separation, which is how #edge-toggle, .die-x and .sw all
+     reach 34+ in this same block, does not rescue it either. The halo would
+     still swallow the badge, and this is the rack's ONE destructive control
+     with no confirm and no undo (js/main.js filters and saves on the first
+     tap) — a hit area that quietly extends over a neighbouring label is
+     exactly how a wrong pool gets deleted. A bigger target here is worth
+     LESS than the accident it invites.
+     So it needs a layout change (move the badge, or move the ✕ off the
+     corner) plus an undo, both in js/main.js + index.html. Reported in
+     ROADMAP U28, not bodged in the cascade. */
 }
 /* ---- THE SHEET PASS (2026-08-01): identity strip + ghost tiles ---- */
 /* The strip sits above a hairline inside the pool popover: above it,
@@ -1918,6 +2092,24 @@ html, body {
   border-radius: 50%;
   color: transparent; /* the pill folds to its dot; the color still signals */
 }
+/* ---- the collapsed column is where a tablet LIVES (U28 / audit T2) ---- */
+/* Every control in this column except the roll plate was under half the
+   guideline, and the reason is in the comment above: the foot was sized by
+   a WIDTH budget ("the four come to ~80px") that never asked how tall a
+   glyph needs to be. The budget is unchanged and it pays for this — at
+   `padding: 11px 3px` the four still come to 4×19 + 3 gaps = 82 of the
+   86px content box, so the horizontal inset does NOT drop to 2px: there is
+   4px of slack and no reason to spend width buying height.
+     ⚙ ≣ ❯ (.btn.ghost, line-height normal)  19×27   → 19×37
+     ✕ (.corner-btn, line-height 1)          19×26.5 → 19×36.5
+   .rp-item is deliberately NOT here. 38px is 6px short, and §7.22 argues
+   the density on the record ("44 left the words adrift"); it is the one
+   control in this column that was a judgement rather than an oversight, so
+   it keeps its judgement. */
+@media (pointer: coarse) {
+  #left-panel.collapsed #rail-foot .btn.ghost,
+  #left-panel.collapsed .corner-btn { padding: 11px 3px; }
+}
 
 /* THE COLLAPSED POOL RAIL (2026-08-07) — 112px, which is the whole design
    (the number lives in --sidebar-rail-w; this comment said 104 through the
@@ -1939,6 +2131,22 @@ html, body {
   margin: 8px 6px 2px; /* one left edge with the chip, the rows and the foot */
 }
 #rail-mode button { font-size: 11px; padding: 5px 2px; }
+/* 39×23 → 39×35 (U28 / audit T2). §7.23 wrote this control up as "a 39px
+   control a thumb's width above the first row" — the 39 is its WIDTH, and
+   nobody measured the other axis. The column has the vertical room (the
+   list below is `flex: 0 1 auto` with its own scroll, so the switch's 12px
+   comes out of slack, never out of a pool row) and the width is untouched,
+   so the cells stay exactly as wide as the rows they choose between.
+   The pressed cell's rule moves with the word it underlines: at 5px of
+   padding `bottom: 3px` sits 1px under the text, and at 11px it would have
+   floated 7px under it — the mark says "this one" only while it is
+   attached to the word. Specificity matches the two rules it overrides
+   ((2,0,1) and (2,0,1)) so this wins on source order, never on weight;
+   see the C6 note in the rail block below for why that is spelled out. */
+@media (pointer: coarse) {
+  #left-panel #rail-mode button { padding: 11px 2px; }
+  #left-panel #rail-mode button::after { bottom: 9px; }
+}
 /* The switch shares the section bar's quiet dress, rules and all — it is the
    same `:is(.section-seg, #rail-mode)` block up at the top of this file, so
    there is nothing to keep in sync: one quiet track, the faintest recess on
@@ -2038,8 +2246,29 @@ html, body {
 .rd-x:hover { color: var(--red); opacity: 1; }
 /* On a coarse pointer there is no hover to reveal it, and a counted row you
    cannot decrement by touch is a trap (P6's per-die ✕ tier). */
+/* …AND STANDING IS NOT REACHING (U28 / audit T6). The rule below made this
+   ✕ visible on touch and left it 18×18 — sitting ON TOP of the row that
+   INCREMENTS, holding x∈[64,82] of an 86px row. A finger centred anywhere
+   left of that 18px window adds a die instead of removing one, which is
+   the worst outcome in the file: the miss is silent, it is the opposite of
+   the intent, and it compounds (tap, tap, tap → 6d6).
+   The fix partitions the row instead of enlarging a dot inside it. 18×18 →
+   34×34 at `right: 0`, so everything right of x=52 removes and everything
+   left of it adds — one boundary, learnable, with the glyph standing on the
+   remove side of it. The button carries NO ink of its own (no border, no
+   background — see the base rule), so growing it moves nothing on screen
+   except the glyph's own centre, and that moves 4px left (73 → 69). The
+   4px is the whole visual cost of the change.
+   34, not 44: the row is 38px tall and .rp-item's 38 is deliberate
+   (§7.22), so 34 is what fits inside it without touching a height this
+   column argued for on the record.
+   NOT FIXED HERE, and it is the same thing the block above already
+   refuses: at the longest labels the ✕ overlaps the last character or so,
+   and now a 34px lane of them. 86px cannot hold art + name + remover, and
+   the answer is markup (drop the art on a counted row, or move the count
+   out of the name), not more cascade. */
 @media (pointer: coarse) {
-  .rd-cell .rd-x { opacity: 0.75; }
+  .rd-cell .rd-x { opacity: 0.75; width: 34px; height: 34px; right: 0; }
 }
 
 #rail-pools {
@@ -2524,6 +2753,33 @@ html, body {
    home in the identity menu. #rail-roster:empty (css:1729) is untouched
    either way: with affordances in it the row is not empty, and when the first
    real pill replaces them it is still not empty. */
+/* ---- the presence row, at a finger's scale (U28 / audit T9) ---- */
+/* This row is what a first-time tablet user MEETS, and every pill in it was
+   ~24px tall: a teammate's name (browse their rack), `Invite`, `+ New
+   table`, `Tables ▾` — three of the app's exits among them. The two dresses
+   are already pixel-identical by §7.20's ruling ("geometry is
+   .roster-name's to the pixel, so a vacancy sits in the row as a PEER of
+   the people"), so they take the bump as one thing or the ruling stops
+   being true. 4px/10px → 10px/12px: 24 → 36 tall.
+   The row absorbs it by WRAPPING, not by overflowing — #rail is
+   `flex-wrap: wrap` — so a full roster on a narrow tablet takes a second
+   line instead of pushing `Tables ▾` off the edge.
+   .roster-more (+N) comes along at 23 → 35 for RHYTHM only, and is the one
+   thing here that is not a target: it is `cursor: default`, an overflow
+   count whose names live in its title. Left 12px shorter than the pills it
+   sits between, it would have read as a broken one.
+   #identity-chip takes a min-height rather than padding, and takes it in
+   BOTH states: it was 31px (the .btn dress) beside pills that are now 36,
+   and its collapsed twin is pinned to the expanded height on purpose —
+   "YOUR NAME DOES NOT MOVE when the panel toggles" is the rule in the
+   collapsed-rail block, and bumping one side without the other is exactly
+   the 25px jump that comment was written to kill. */
+@media (pointer: coarse) {
+  .roster-name, .rail-ghost { padding: 10px 12px; }
+  .roster-more { padding: 10px 10px; }
+  #identity-chip,
+  #left-panel.collapsed #identity-chip { min-height: 36px; }
+}
 
 /* THE LOBBY MENU (§7.20) — what `+ New table` and `Tables ▾` drop. Built on
    demand onto document.body, so it is a FLOATING menu and joins the family
@@ -4136,6 +4392,77 @@ body.mini #result-verdict { font-size: 11px; }
 .part-del:hover { color: var(--red); }
 #pop-add-part { margin-top: 8px; }
 
+/* ---------- the ± popover on a finger (U28 / audit T3) ---------- */
+/* EVERY ROLL AXIS LIVES IN THIS PANEL and it had no coarse branch at all —
+   the only surface in the app where that is true of a whole editor rather
+   than one control. Measured before, all exact: stepper 23×24 · .sw 30×17
+   (4.5mm, the worst control in the app, and it is ALSO the Settings sound
+   toggle) · .seg cell ≈23 tall · .mchip ≈23 · .pid-cat ≈21 · .pop-close
+   ≈17×21 · .part-del ≈15×20. Only .pid-rank (38×38) already cleared.
+   The budget is why this is arithmetic: the popover is a fixed 312px with
+   `overflow-y: auto`, so height is free and only WIDTH has to be argued.
+   Where width is the constraint the row wraps instead of the control
+   shrinking — see the keep/drop note below.
+   Nothing here changes a dress: same colours, same borders, same pressed
+   states, same knob-in-a-track. Only the boxes grow. */
+@media (pointer: coarse) {
+  /* 23×24 → 44×44. The output keeps its 34px min-width, so the whole
+     control is 124px where it was 82 — which is what forces the wrap
+     below. 44 rather than 34 here because a stepper is the one control in
+     this panel you press REPEATEDLY, and the popover's height is free. */
+  .stepper button { width: 44px; height: 44px; }
+  /* 30×17 → 48×30 of ink, 54×34 of target. The knob and its travel are
+     re-derived rather than scaled by eye: padding box 46×28, knob 22 at a
+     3px inset, so pressed sits at 46 − 3 − 22 = 21 and the insets stay
+     symmetric exactly as they are at 30×17.
+     The halo buys the SHORT axis and nothing more — 28 + 6 = 34 — and its
+     3px is sized against the ROW GAP: `.prow + .prow` is 8px (Settings
+     10px), so two stacked switches never reach each other. A switch you
+     can miss into the one below it is worse than a small switch. The wide
+     axis is already 48 and takes 4px only for symmetry of feel. */
+  .sw { width: 48px; height: 30px; }
+  .sw::after { top: 3px; left: 3px; width: 22px; height: 22px; }
+  .sw[aria-pressed="true"]::after { left: 21px; }
+  .sw::before { content: ''; position: absolute; inset: -3px -4px; }
+  /* ≈23 → 35. Horizontal padding is untouched everywhere in this block:
+     these are flex cells whose width is decided by the row, and adding to
+     it would only starve the label. (This reaches the FOUR popover segs
+     alone — #section-bar and #rail-mode are dressed by
+     `#left-panel :is(.section-seg, #rail-mode) button`, which is (2,0,1)
+     and out-weighs this by design.) */
+  .seg button { padding: 11px 3px; }
+  /* THE KEEP/DROP ROW IS THE ONE PLACE WIDTH BINDS. Five mono cells and a
+     stepper share 284px; at a 124px stepper the seg is left with 152 and
+     its cells fall to ~28px — the height fix would have bought a width
+     failure. So the row is allowed to WRAP and the seg is given a real
+     floor: 190 + 8 + 124 = 322 overflows 284, the stepper drops to its
+     own line, and the five cells get 54px each.
+     `.prow` wraps globally under coarse and this is the only row that
+     takes it: everything else in a .prow is `.grow` (`min-width: 0`), so
+     it shrinks its text rather than breaking the line. Nothing here needs
+     markup — which was the alternative, and it is not ours to write. */
+  .prow { flex-wrap: wrap; }
+  .seg.mono.grow { min-width: 190px; }
+  /* ≈23 → 35 (.mchip's own padding is 0 horizontally — the chips are
+     `flex: 1`); .aud-chip keeps a wider inset because it holds a NAME, and
+     it needs its own line here: it is `class="mchip aud-chip"`, so the
+     rule above would otherwise reach it on source order. */
+  .mchip { padding: 10px 0; }
+  .aud-chip { padding: 10px 12px; }
+  /* ≈21 → 35. Same pair-of-classes trap: the `＋` is `pid-cat pid-cat-new`
+     and keeps its narrower waist. */
+  .pid-cat { padding: 10px 12px; }
+  .pid-cat-new { padding: 10px 10px; }
+  /* ≈17×21 → 36×36, on all four surfaces that wear this class (± popover,
+     settings, the log flyout, the cheatsheet). Esc and a backdrop tap are
+     the other ways out of each — this is the one a finger uses. */
+  .pop-close { padding: 9px 13px; font-size: 16px; }
+  /* ≈15×20 → 34×37. A part row's remover, destructive at one tap like the
+     ✕s in the well and the rack, and the last control in this panel still
+     under the pad. */
+  .part-del { padding: 10px 12px; font-size: 15px; }
+}
+
 .pop-preview {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -4649,6 +4976,37 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
   .card-act,
   #banner-actions .pk-strip, .pk-fold .pk-strip, .verdict-fold .pk-strip,
   .banner-foot > button { min-height: 44px; }
+}
+
+/* ---------- 16px, or iOS moves the table (U29 / audit T11) ---------- */
+/* Mobile Safari AUTO-ZOOMS the entire layout when a text field under 16px
+   takes focus, and every text entry in this app was under it: .cmd-in 12.5
+   · .tin 12 · .pid-name-input 13 · .pid-cat-input 11 · .new-shelf-input 12
+   · .group-editor input 12.5 · .ge-notation 11.5 · .btn-row input 13 ·
+   .pp-new input 12 · .portable-text 11 · .cc-name (UA default 13.3). So
+   tapping the notation box, renaming a pool, naming a shelf or typing a
+   table name jolted the whole table sideways and left it zoomed.
+   16 is not a taste number — it is the threshold, and one pixel under it
+   is the same jolt as five. The mono face carries the size without
+   changing register; the UI face gains a little presence in fields that
+   are usually one short word.
+   ELEMENT SELECTORS ON PURPOSE, the same argument THE DISABLED RECIPE
+   makes at the top of this file: `input:not([type="file"])` reaches the
+   next field nobody remembered to dress, which is exactly how eleven of
+   them came to ship under the threshold. `:not()` takes its argument's
+   weight, so this is (0,1,1) — above every single-class size rule in the
+   file and, being last, above the (0,1,1) ties too. The one rule it does
+   NOT out-weigh is .group-editor .ge-notation at (0,2,0), which is why it
+   is answered by name rather than left to drift.
+   type=file is excluded because it is not a text field and its control is
+   `display: none` anyway (.portable-file — the button is the real door).
+   COARSE ONLY. This is a mobile-Safari behaviour, and 16px monospace in a
+   316px desktop column would cost the notation box its columns for
+   nothing. */
+@media (pointer: coarse) {
+  input:not([type="file"]),
+  textarea { font-size: 16px; }
+  .group-editor .ge-notation { font-size: 16px; }
 }
 /* the announcement channel: read by screen readers, invisible to everyone else */
 .sr-live { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }

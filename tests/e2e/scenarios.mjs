@@ -318,6 +318,152 @@ export const scenarios = [
     },
   },
   {
+    name: 'touch-targets',
+    tags: ['chrome'],
+    // U28's list-driven pin. Seven of the eight (pointer: coarse) blocks in
+    // the stylesheet fixed VISIBILITY and exactly one fixed SIZE, and nothing
+    // caught it because every touch assertion in this suite pointed at ONE
+    // control. So this one walks a LIST — it is what stops the next control
+    // from shipping at 23px.
+    // Two floors, from the audit's conversion (1 CSS px ~ 0.265 mm): 34 is a
+    // 9 mm finger pad and the file's floor; 44 is the platform guideline, and
+    // the controls whose budget could afford it took it.
+    // GEOMETRY, NEVER A CLASS. A coarse rule that "stands" a control up tells
+    // you nothing about whether it can be hit — that confusion IS the finding.
+    // And where the ink is deliberately smaller than the target (#edge-toggle,
+    // .die-x, .sw all keep their ink and grow a ::before), the host's border
+    // box is the wrong thing to read, so those are measured on the pseudo.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.settle();
+      await a.emulateCoarsePointer(true);
+      try {
+        // offsetWidth/offsetHeight, NOT getBoundingClientRect. The rect is
+        // the TRANSFORMED box, and the popover arrives on a 0.22s `pop-in`
+        // from `scale(0.985)` — so a 44px stepper measured on arrival reads
+        // 43.34 and fails its own floor by two thirds of a pixel. settle()
+        // drives the dice clock, not CSS, so there is nothing to wait on
+        // that this suite already owns. The layout box is also the honest
+        // answer to the question being asked: how big is this control, not
+        // how big is it one frame into an entrance nobody taps during.
+        const box = (sel) => a.eval(`(() => {
+          const el = document.querySelector(${JSON.stringify(sel)});
+          if (!el || el.offsetParent === null) return null;
+          return { w: el.offsetWidth, h: el.offsetHeight };
+        })()`);
+        const halo = (sel) => a.eval(`(() => {
+          const el = document.querySelector(${JSON.stringify(sel)});
+          if (!el || el.offsetParent === null) return null;
+          const cs = getComputedStyle(el, '::before');
+          return { w: Math.round(parseFloat(cs.width)), h: Math.round(parseFloat(cs.height)) };
+        })()`);
+        const atLeast = async (label, sel, w, h, read = box) => {
+          const r = await read(sel);
+          assert.ok(r, `${label} (${sel}) exists on a coarse pointer`);
+          assert.ok(r.w >= w && r.h >= h,
+            `${label} is ${w}x${h} or better (got ${r.w}x${r.h})`);
+        };
+
+        // ---- the presence row: what a first-time tablet user MEETS ----
+        await atLeast('the collapse strip', '#edge-toggle', 44, 44, halo);
+        await atLeast('the identity chip', '#identity-chip', 34, 34);
+        await atLeast('a teammate pill', '.roster-name', 34, 34);
+
+        // ---- the well and its rim (a staged die builds both) ----
+        await a.eval(`document.querySelector('#die-buttons .die-btn').click()`);
+        await a.waitFor(`window.__diceDebug.trayState.dice.length === 1`,
+          { desc: 'a die is staged' });
+        await atLeast('the per-die x', '.die-x', 34, 34, halo);
+        await atLeast('+/- Modify', '#tray-mods', 34, 34);
+        await atLeast('Clear', '#clear-tray', 34, 34);
+        // THE WIDTH-SUM, because a naive scrollWidth read is blind to what a
+        // no-wrap flex row does when it overflows: the rim's tools got 10px
+        // taller AND the row must still fit the column it lives in.
+        const rim = await a.eval(`(() => {
+          const row = document.getElementById('draft-actions');
+          const cs = getComputedStyle(row);
+          const avail = row.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+          const kids = [...row.children].filter((el) => getComputedStyle(el).display !== 'none');
+          const used = kids.reduce((s, el) => s + el.getBoundingClientRect().width, 0)
+            + parseFloat(cs.gap || 0) * (kids.length - 1);
+          return { avail: Math.round(avail), used: Math.round(used), n: kids.length };
+        })()`);
+        assert.ok(rim.used <= rim.avail,
+          `the grown rim still fits its column (${rim.used}px of ${rim.avail}px, ${rim.n} tools)`);
+
+        // ---- the rack in manage mode ----
+        await a.dbg(`setGroups([{name: 'Attack', notation: '1d20'}, {name: 'Sneak', notation: '2d6'}])`);
+        assert.equal(await a.dbg('setPoolsEditMode(true)'), true, 'the pencil enters manage mode');
+        // THE DELETE x IS PINNED SMALL, ON PURPOSE (U28). It shipped at 36
+        // and was reverted the same day: a counted pool wears its badge
+        // immediately left of this button, with 2px of overlap already at
+        // 24, so 36 puts the box on top of the "2". This asserts the REVERT
+        // — if someone grows it again in CSS without moving the badge, the
+        // collision comes back, and no size assertion would have caught it.
+        assert.deepEqual(await box('.tile-del'), { w: 24, h: 24 },
+          'the pool delete x stays 24 until the badge moves (needs markup + undo)');
+        // The one item that TEACHES rather than enlarges: the `+` whisper is
+        // the only thing saying a rack tile stages rather than rolls, and it
+        // is hover-only, so on touch it never rendered at all.
+        assert.ok((await a.eval(
+          `parseFloat(getComputedStyle(document.querySelector('.tile-add')).opacity)`)) >= 0.5,
+          'the stage + stands on touch — the only signal separating a tile from a roll strip');
+        await a.dbg('setPoolsEditMode(false)');
+
+        // ---- the +/- popover: every roll axis, and it had no coarse branch ----
+        assert.equal(await a.dbg(`openPopoverFor('tray')`), true, 'the popover opens');
+        // #pop-keep-step, NOT `.stepper button` — the first .stepper in DOM
+        // order is the Flat bonus one, and soul-deal (usesTotal:false) hides
+        // arithmetic entirely, so the bare selector reads a display:none
+        // control and reports it missing. The keep/drop stepper is the one
+        // every system shows.
+        await atLeast('a stepper button', '#pop-keep-step button', 44, 44);
+        await atLeast('a Visibility cell', '#pop-seg-vis button', 34, 34);
+        // The one place WIDTH binds: five mono cells beside a 124px stepper.
+        // The row wraps rather than starving them — assert the CELLS, since a
+        // seg that merely "fits" can fit at 28px.
+        await atLeast('a keep/drop cell', '#pop-seg-keep button', 34, 34);
+        // U29 rides here: under 16px iOS zooms the whole layout on focus.
+        assert.equal(await a.eval(
+          `parseFloat(getComputedStyle(document.getElementById('pop-dc')).fontSize)`), 16,
+          'the target field is 16px on a coarse pointer — below it, focus zooms the table');
+        await a.eval(`document.getElementById('pop-close').click()`);
+
+        // ---- the collapsed column: the state a tablet LIVES in ----
+        await a.dbg('setPanelState({pools: false})');
+        await atLeast('a source-switch cell', '#rail-mode button', 34, 34);
+        await a.dbg(`setRailMode('dice')`);
+        await a.dbg(`railTapDie('d6')`);
+        await a.waitFor(`document.querySelector('#rail-dice .rd-x') !== null`,
+          { desc: 'a counted dice row exists' });
+        // The remover sits ON the row that increments, so its size is not a
+        // nicety: a finger left of it ADDS a die.
+        await atLeast('the dice-row remover', '.rd-x', 34, 34);
+        await atLeast('a foot glyph', '#rail-foot .btn.ghost', 17, 34);
+        await a.roll('d6'); // the contextual x only joins with dice on the felt
+        await atLeast('the corner x', '#left-panel .corner-btn', 17, 34);
+        // …AND THE FOOT STILL FITS. This is the whole reason the bump spent
+        // height and not width: the glyphs share an 86px content box, and a
+        // taller row that overflows it is a worse bug than a short one.
+        const foot = await a.eval(`(() => {
+          const el = document.getElementById('rail-foot');
+          const cs = getComputedStyle(el);
+          const avail = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+          const kids = [...el.children].filter((c) => getComputedStyle(c).display !== 'none');
+          const used = kids.reduce((s, c) => s + c.getBoundingClientRect().width, 0)
+            + parseFloat(cs.gap || 0) * (kids.length - 1);
+          return { avail: Math.round(avail), used: Math.round(used), n: kids.length };
+        })()`);
+        assert.ok(foot.used <= foot.avail,
+          `the grown foot still fits its 86px column (${foot.used}px of ${foot.avail}px)`);
+      } finally {
+        await a.emulateCoarsePointer(false); // per-tab, outlives the scenario
+        await a.dbg('setPanelState({pools: true})'); // panel state is persisted localStorage
+      }
+    },
+  },
+  {
     name: 'folded-card',
     tags: ['smoke', 'roll', 'chrome'],
     // The folded card + the hover read + the feed (Joe 2026-08-03): the
@@ -361,9 +507,20 @@ export const scenarios = [
       assert.ok((await a.eval(
         `parseFloat(getComputedStyle(document.querySelector('.tray-line2 .tray-cluster')).minHeight)`)) >= 64,
         'the well stands tall');
+      // …and breathes above. RE-POINTED for U30's height branch: below
+      // 780px of viewport the well gives its air back to the rack (12 →
+      // 8), so the number this pin holds depends on which side of that
+      // branch the window is on — and the harness's own window (headless
+      // Chrome's 800×600 default) is on the SHORT side, which is why an
+      // unqualified `>= 10` started failing. The claim being pinned is
+      // unchanged: the well is a beacon with real margin, never flush.
+      // draft-bench drives BOTH sides; this one only has to stay honest
+      // about which side it is standing on.
+      const shortCol = await a.eval(`matchMedia('(max-height: 780px)').matches`);
       assert.ok((await a.eval(
-        `parseFloat(getComputedStyle(document.getElementById('tray-actions')).marginTop)`)) >= 10,
-        'and breathes above');
+        `parseFloat(getComputedStyle(document.getElementById('tray-actions')).marginTop)`))
+        >= (shortCol ? 8 : 10),
+        `and breathes above (${shortCol ? 'short' : 'full'}-column dress)`);
       const heatOf = `parseFloat(getComputedStyle(document.getElementById('draft-zone')).getPropertyValue('--draft-heat')) || 0`;
       const cold = await a.eval(heatOf);
       await a.eval(`(() => {
@@ -3292,27 +3449,78 @@ export const scenarios = [
       // a margin of its own. (The old pins measured palette→well and
       // box→well air; both gaps are gone, and a naive re-point to
       // `section.top - zone.bottom` would have passed at 0 forever.)
-      const air = JSON.parse(await a.eval(`JSON.stringify((() => {
-        const z = document.getElementById('draft-zone');
-        const bar = document.getElementById('section-bar');
-        return {
-          padBottom: parseFloat(getComputedStyle(z).paddingBottom),
-          padTop: parseFloat(getComputedStyle(z).paddingTop),
-          bodyPadTop: parseFloat(getComputedStyle(z.parentElement).paddingTop),
-          gapToFirstSection: Math.round(bar.getBoundingClientRect().top - z.getBoundingClientRect().bottom),
+      // RE-POINTED AGAIN 2026-08-08 for U30's height branch, and this time
+      // the pin drives BOTH sides rather than naming one. The zone's region
+      // gap is 16px at full column height and 10px below 780px of viewport,
+      // where the well hands its air back to the rack — both numbers are
+      // the contract, so a pin that knows only one of them is half a pin.
+      // It matters more than it looks: the harness launches headless Chrome
+      // at its 800×600 default, so EVERY scenario in this suite runs on the
+      // short side of that branch, and the full-height dress — the one a
+      // desktop actually ships — is measured nowhere else. Hence the
+      // explicit metrics override instead of reading whatever window we
+      // happen to be in.
+      const airAt = async (h) => {
+        await a.page.browser.send('Emulation.setDeviceMetricsOverride',
+          { width: 1024, height: h, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
+        await a.waitFor(`matchMedia('(max-height: 780px)').matches === ${h <= 780}`,
+          { desc: `the height branch settles at ${h}px` });
+        return JSON.parse(await a.eval(`JSON.stringify((() => {
+          const z = document.getElementById('draft-zone');
+          const bar = document.getElementById('section-bar');
+          return {
+            padBottom: parseFloat(getComputedStyle(z).paddingBottom),
+            padTop: parseFloat(getComputedStyle(z).paddingTop),
+            bodyPadTop: parseFloat(getComputedStyle(z.parentElement).paddingTop),
+            gapToFirstSection: Math.round(bar.getBoundingClientRect().top - z.getBoundingClientRect().bottom),
+          };
+        })())`));
+      };
+      const baseH = await a.eval(`window.innerHeight`);
+      try {
+        for (const [h, gap, side] of [[900, 16, 'full'], [700, 10, 'short']]) {
+          const air = await airAt(h);
+          assert.equal(air.padBottom, gap,
+            `${side} column: the region gap is the zone's own bottom padding (got ${air.padBottom}px)`);
+          assert.equal(air.gapToFirstSection, 0,
+            `${side} column: the first section rides it — no margin of its own`);
+          assert.equal(air.padTop + air.bodyPadTop, gap,
+            `${side} column: the zone's top inset reads ${gap}px with the body's own (got ${air.padTop} + ${air.bodyPadTop})`);
+          // …and NONE of that inset may sit above the sticky well, or
+          // scrolled content shows through the slot. The first build of the
+          // reorder left the body's 4px there and die art slid through it.
+          assert.equal(air.bodyPadTop, 0,
+            `${side} column: no padding above a sticky child — it becomes a leak band (got ${air.bodyPadTop}px)`);
+        }
+        // The trade itself, which is the whole reason U30 exists: what the
+        // zone gives up on a short column is real, and it comes out of the
+        // WELL rather than the rack below it.
+        const wellAt = async (h) => {
+          await a.page.browser.send('Emulation.setDeviceMetricsOverride',
+            { width: 1024, height: h, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
+          await a.waitFor(`matchMedia('(max-height: 780px)').matches === ${h <= 780}`,
+            { desc: `the height branch settles at ${h}px` });
+          return a.eval(`(() => {
+            const cs = getComputedStyle(document.querySelector('.tray-line2 .tray-roll'));
+            return { minH: parseFloat(cs.minHeight),
+                     cue: parseFloat(getComputedStyle(document.querySelector('.tray-line2 .tray-roll .roll-cue')).fontSize),
+                     die: parseFloat(getComputedStyle(document.querySelector('.tray-line2 .tray-roll .die-art')).width) };
+          })()`);
         };
-      })())`));
-      assert.ok(air.padBottom >= 16,
-        `the region gap is the zone's own bottom padding (got ${air.padBottom}px)`);
-      assert.equal(air.gapToFirstSection, 0,
-        'and the first section rides it — no margin of its own');
-      assert.equal(air.padTop + air.bodyPadTop, 16,
-        `the zone's top inset still reads 16px with the body's own (got ${air.padTop} + ${air.bodyPadTop})`);
-      // …and NONE of that inset may sit above the sticky well, or scrolled
-      // content shows through the slot. The first build of the reorder left
-      // the body's 4px there and die art slid through it.
-      assert.equal(air.bodyPadTop, 0,
-        `no padding above a sticky child — it becomes a leak band (got ${air.bodyPadTop}px)`);
+        const tall = await wellAt(900);
+        const shortW = await wellAt(700);
+        assert.equal(tall.minH, 113, 'a full column keeps the well at its shipped 113px');
+        assert.equal(shortW.minH, 84, 'a short column trims the well to 84px');
+        // …and trims NOTHING else. The ROLL plate is the surface's primary
+        // act (§7.21) and the dice are "the star" — a height branch that
+        // shrank either would be answering "too little room" by making the
+        // thing you came for smaller.
+        assert.equal(shortW.cue, tall.cue, 'the ROLL cue is the same object at both heights');
+        assert.equal(shortW.die, tall.die, 'and the well keeps its 34px dice');
+      } finally {
+        await a.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, a.page.sessionId);
+      }
+      await a.waitFor(`window.innerHeight === ${baseH}`, { desc: "the harness's own window is back" });
 
       // (vi-b) THE STICKY PIN, which nothing pinned before the reorder: the
       // shelf heads must land exactly at the zone's lower edge mid-scroll.
