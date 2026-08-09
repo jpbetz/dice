@@ -374,6 +374,53 @@ export const scenarios = [
     },
   },
   {
+    name: 'hidden-means-hidden',
+    tags: ['chrome'],
+    // C20 — `.hidden` IS A CLASS THIS STYLESHEET DOES NOT DEFINE. There is a
+    // global rule for the `[hidden]` ATTRIBUTE and every `.hidden` is scoped
+    // to its own element (`#settings-modal.hidden`, `.popover.hidden`, …), so
+    // `classList.add('hidden')` on an element without a rule is a no-op that
+    // reads exactly like a fix. Four shipped that way: `#seat-someone`
+    // ("Someone else…") was visible every time the code asked it not to be,
+    // plus `#seat-list`, `#seat-table-name` and `#seat-preview-btns`.
+    //
+    // This walks the elements the code actually toggles and proves each one
+    // OBEYS. A blanket `.hidden { display: none }` was refused: in a 4.5k-line
+    // sheet where the class currently means nothing on its own, making it mean
+    // something everywhere at once is the kind of change this file has already
+    // been bitten by four times. So the rules stay scoped and this is what
+    // keeps them honest.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+      const disobedient = await a.eval(`(() => {
+        const ids = ${JSON.stringify([
+          'result-banner', 'settings-modal', 'name-modal', 'help-overlay', 'kbd-overlay',
+          'mods-popover', 'identity-menu', 'offer-menu', 'log-flyout', 'peek-card',
+          'crit-overlay', 'ceremony-layer', 'palette-backdrop', 'pools-head',
+          'profile-banner', 'storage-banner', 'offer-banner', 'seat-mine', 'seat-list',
+          'seat-someone', 'seat-table-name', 'seat-preview', 'seat-preview-btns',
+          'seat-keep-name', 'profile-pick', 'profile-rename', 'profile-rename-in',
+          'import-profiles', 'table-profiles', 'portable-zone', 'cmd-cheatsheet',
+          'draft-actions', 'strip-dc', 'rail-dice', 'rail-pools',
+        ])};
+        const bad = [];
+        for (const id of ids) {
+          const el = document.getElementById(id);
+          if (!el) { bad.push(id + ' (absent)'); continue; }
+          const had = el.classList.contains('hidden');
+          el.classList.add('hidden');
+          const d = getComputedStyle(el).display;
+          if (!had) el.classList.remove('hidden');
+          if (d !== 'none') bad.push(id + ' (' + d + ')');
+        }
+        return bad;
+      })()`);
+      assert.deepEqual(disobedient, [],
+        `every element the code hides by class actually hides: ${disobedient.join(', ')}`);
+    },
+  },
+  {
     name: 'a11y-modals',
     tags: ['chrome', 'a11y'],
     // U22 (audit D3, D4, D5). Six modal-ish surfaces, zero focus
@@ -7392,14 +7439,20 @@ export const scenarios = [
       await a.roll('d6 # open');
       assert.notEqual(await shown('#banner-actions .pk-strip'), 'none',
         'a face-up roll shows its REROLL strip');
-      // U13 put a second verb in this foot ("Save as pool…"), so the FOOT is
-      // no longer Reveal's proxy — assert the Reveal itself. The contract is
-      // unchanged and is the one that matters: nothing left to reveal, and
-      // the server would 403 the attempt.
+      // Assert the REVEAL itself, not the foot around it. U13 put a second
+      // verb in this foot ("Save as pool…") which made the foot stop being
+      // Reveal's proxy; C18 took that verb back out, so the foot is a proxy
+      // again — but going back to reading it would re-adopt the coupling that
+      // made this pin wrong once already. The contract is the Reveal:
+      // nothing left to reveal, and the server would 403 the attempt.
       assert.equal(await shown('#banner-actions .banner-foot .reveal-verb'), 'none',
         'a face-up roll paints NO Reveal — the value is already public');
-      assert.notEqual(await shown('#banner-actions .banner-foot'), 'none',
-        'though the foot stands, because keeping the roll as a pool is offered');
+      // …and the keep verb is gone from this surface entirely (C18): the
+      // result panel had become a list of facts about a result rather than
+      // the result. The peek still offers it.
+      assert.equal(await a.eval(
+        `document.querySelectorAll('#banner-actions .keep-verb:not([hidden])').length`), 0,
+      'and no Save as pool — that door is the peek\'s now');
 
       // Held: the mirror image. Reveal stands; REROLL must be gone, because a
       // reroll would replay a spec nobody at the table can read (the same rule

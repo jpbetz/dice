@@ -3748,6 +3748,13 @@ html, body {
    a safe place to make it mean something everywhere at once — that is
    ROADMAP C18. */
 #seat-someone.hidden, #seat-list.hidden, #seat-table-name.hidden { display: none; }
+/* …and the Apply/Not now row, found by the C20 audit. `renderSeatPhase`
+   toggles it off outside the preview phase and `applySeatChoice` adds
+   `hidden` once it is spent — neither did anything. It went unnoticed
+   because its PARENT `#seat-preview` has a rule and hides the whole block
+   during the pick, so the only visible symptom was the buttons lingering
+   after a seat had already been applied. */
+#seat-preview-btns.hidden { display: none; }
 /* U3's returning-player exit: "Stay as ⟨name⟩". Quiet, full width, and
    BELOW the seat list — the link named a seat, so the seat leads and keeping
    your own name is the deliberate alternative rather than the default. It is

@@ -1153,7 +1153,7 @@ the ladder asserts a decision rather than a behaviour, and fails on a retune
 that is working exactly as intended. What it is for — every client agrees,
 the walls and shelf pitch follow the setting — is what it checks now.
 
-### C18. The result panel is too busy — small
+### C18. The result panel is too busy — SHIPPED
 
 *Joe 2026-08-09.* Two cuts, both subtractive:
 
@@ -1180,7 +1180,7 @@ title is where it has to live anyway, because the collapsed rail hides
 `.cb-label` and the hover read is the only channel left there. Swept the rest
 of the app's controls: this was the only one that asked.
 
-### C20. `.hidden` is a class this stylesheet does not define — small
+### C20. `.hidden` is a class this stylesheet does not define — SHIPPED
 
 *Found 2026-08-09 while rebuilding the join door.* `css/style.css` has a
 global rule for the `[hidden]` **attribute** and **no generic `.hidden`
@@ -1192,12 +1192,20 @@ Three were found in the seat modal alone: `#seat-someone` ("Someone else…")
 had been visible every time the code asked it not to be, plus `#seat-list` and
 `#seat-table-name`. Those three are now named individually.
 
-**Change:** audit every `classList.*('hidden')` call against the stylesheet and
-either give the element a rule or use the `hidden` property, which the global
-rule already covers. **Do not simply add a blanket `.hidden { display: none }`**
-without that audit — in a 4.5k-line sheet where the class currently means
-nothing on its own, making it mean something everywhere at once is exactly the
-kind of change this file has already been bitten by four times.
+**SHIPPED 2026-08-09.** 48 elements are toggled by class; **four had no rule**
+— `#seat-someone`, `#seat-list`, `#seat-table-name` (named the day before) and
+`#seat-preview-btns`, found by this audit. The last went unnoticed because its
+PARENT `#seat-preview` has a rule and hides the whole block during the pick,
+so the only visible symptom was the Apply/Not now row lingering after a seat
+had already been applied.
+
+The blanket `.hidden` stays refused, and `hidden-means-hidden` is what makes
+that safe: it walks 35 elements the code actually toggles and proves each one
+OBEYS — a rule-by-rule sheet stays honest by being checked, not by being
+replaced. Two candidates the grep raised were false positives (`#draft-actions`
+and `#strip-dc` hide via class-scoped rules; `#name-input` was a same-named
+variable in another scope), which is the argument for testing computed display
+rather than reading selectors.
 
 ### C16. Authoring a character crossed the Settings modal — SHIPPED
 

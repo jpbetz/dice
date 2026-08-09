@@ -3013,16 +3013,26 @@ function renderRollResults(entry, dice, fx = true) {
   outlineRollDice(false); // a repaint resets the hover read (re-enter restores)
   const hidden = entryHidden(entry);
 
-  // Names and labels are user-supplied: textContent only, never innerHTML.
+  // WHO ROLLED, and nothing else (C18, Joe 2026-08-09: "don't show text
+  // version of a roll in the title of the result panel, just show the player
+  // who rolled… this panel got too busy somehow").
+  //
+  // The label — `3d20`, `2d8[Wisdom]+1d4` — is already on the felt as actual
+  // dice, in the breakdown two rows below, and in the log. Repeating it in
+  // the title made the surface a list of facts ABOUT a result rather than the
+  // result. The name is the one thing no other row carries.
+  //
+  // Solo keeps its empty title rather than falling back to the label: there
+  // is nobody to attribute a roll to, and the answer to "whose is this" is
+  // not the notation.
+  // Names are user-supplied: textContent only, never innerHTML.
   resultLabelEl.textContent = '';
   if (entry.playerName) {
     const who = document.createElement('span');
     who.className = 'roller-name';
     if (entry.color) who.style.color = entry.color;
     who.textContent = entry.playerName;
-    resultLabelEl.append(who, ` · ${entry.label}`);
-  } else {
-    resultLabelEl.textContent = entry.label;
+    resultLabelEl.append(who);
   }
 
   // Under a per-die system a sum is not a fact of play: the big number
@@ -3475,6 +3485,14 @@ function renderBannerActions(entry) {
   // so onPrimary closes over module-level bannerAct, never over `entry`.
   updateCardActions(bannerActionsEl, entry, {
     revealClass: 'reveal-verb banner-btn',
+    // NO KEEP VERB (C18). U13 put `Save as pool…` here because the only door
+    // to "save what I just rolled" was an invisible 150px disc behind a
+    // right-click, reached by waiting out the 3s auto-collect. That argument
+    // still holds for the PEEK, which is where it stays. On the result panel
+    // it was a third verb competing with the roll's own reading, and this
+    // surface got too busy — a roll you want to keep is still one press away
+    // from the shelf, which is where the peek's popover lives.
+    keepable: false,
     verbFor: () => bannerAct.mode,
     onPrimary: (btn) => {
       if (bannerAct.mode === 'clear') runCardClear(bannerAct.rollId, btn);
@@ -4283,6 +4301,7 @@ function renderVerdictCard(roll, entry) {
   // and toggles hidden so #verdict-fold never churns DOM per verdict paint.
   updateCardActions(verdictFoldEl, entry, {
     revealClass: 'reveal-verb',
+    keepable: false, // C18 — same reasoning as the banner's; the peek keeps it
     verbFor: () => (ceremonyBeatPlaying() ? 'skip'
       : verdictFor.rollId && verdictFor.mine ? 'clear' : 'dismiss'),
     onPrimary: (btn) => {
