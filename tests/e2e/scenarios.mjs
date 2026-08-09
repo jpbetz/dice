@@ -82,6 +82,14 @@ async function bootTab(ctx, {
       })();`);
     }
     const lines = [
+      // STAMP THE SCHEMA FIRST, or the seeds below are deleted before they are
+      // read. main.js's one-time clean break drops every `dice.*` key on a
+      // client older than the current schema — which is what a freshly-made
+      // test page looks like — so a scenario seeding `dice.roomsettings.v1`
+      // would find it gone by the time the app booted. `newTable` carries the
+      // same stamp; `schema-reset` is where the purge is proven, by clearing
+      // it on purpose.
+      `localStorage.setItem('dice.schema.v1','2');`,
       ...clean.map((k) => `localStorage.removeItem(${JSON.stringify(k)});`),
       ...Object.entries(seed).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`),
     ];

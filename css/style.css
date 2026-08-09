@@ -109,13 +109,14 @@ html, body {
   left: var(--table-left); /* the felt lives BESIDE the panel, full height */
 }
 #scene-container canvas { display: block; }
-#scene-container::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%);
-}
+/* THE STANDING VIGNETTE IS GONE (Joe 2026-08-09: "the background has a
+   subtle circle/oval shape. I think we want to get rid of that").
+   `radial-gradient(ellipse …)` sizes to its BOX, so on a desktop's wide felt
+   it read as a soft darkening at the corners and on a phone's tall narrow one
+   it became a visible oval with an edge — the same declaration, two different
+   pictures, and only one of them was designed. The ceremony's own vignette
+   (#ceremony-vignette) stays: that one is a transient beat with a reason to
+   be seen, not standing furniture. */
 
 /* ---------- panels ---------- */
 .panel {
@@ -3163,8 +3164,15 @@ html, body {
   /* stable geometry (Trigger Pass, Joe 2026-08-03: result cards jumped
      size dramatically with every title) — a floor and a ceiling instead
      of pure content width; long titles wrap inside the card */
-  min-width: 320px;
-  max-width: min(520px, calc(100vw - 24px));
+  /* BOUNDED BY THE FELT, not the viewport (2026-08-09). This read
+     `min-width: 320px` and `max-width: … 100vw …`, and the banner is
+     centered over the FELT — which beside the panel is ~278px on a phone. So
+     a 320px floor measured against a 390px viewport produced a card wider
+     than the surface it is centered on, and it ran off the right edge with
+     its outcome words cut in half. The floor now yields, and the ceiling
+     measures the space that actually exists. */
+  min-width: min(320px, calc(100vw - var(--table-left) - 20px));
+  max-width: min(520px, calc(100vw - var(--table-left) - 20px));
   overflow-wrap: break-word;
   /* the folded card: the horizontal padding moved INTO #banner-main so
      the removal target reads edge to edge; the fold sits flush below */
@@ -3316,6 +3324,33 @@ html, body {
   margin-right: 0; /* the grid's column-gap carries the gutter */
 }
 .oc-ledger .oc-cell { grid-column: 2; justify-content: flex-start; }
+/* …AND THE SPINE STACKS WHEN THERE IS NO ROOM FOR IT (2026-08-09). The label
+   column is `auto`, so it takes what a word like STRENGTH needs — about 90px
+   — out of a card that is ~280px wide beside the rail on a phone. What is
+   left cannot hold `d8 7 Success & Bonus`, and the chip is deliberately
+   `nowrap` (a reading split across two lines is worse than a narrow one), so
+   it overflowed the card and had its outcome word cut in half.
+   Below 560px the ledger becomes ONE column with each label above its own
+   row: the hanging indent that makes the spine worth having costs more than
+   it buys at this width, and the reading is what the surface is for. */
+@media (max-width: 560px) {
+  .oc-ledger { grid-template-columns: minmax(0, 1fr); row-gap: 2px; width: 100%; }
+  .oc-ledger .tally-src {
+    grid-column: 1;
+    justify-self: start;
+    text-align: left;
+    margin-top: 4px;
+  }
+  .oc-ledger .oc-cell { grid-column: 1; }
+  /* AND THE LONGEST READING WRAPS RATHER THAN BEING CUT. `Success & Perm
+     Bonus` beside its `d12 11` cannot fit ~280px at this weight, and a chip
+     is `nowrap` because a reading split mid-phrase reads worse than a narrow
+     one — but that only holds while the alternative is a SHORTER line, not a
+     TRUNCATED one. The evidence (`d12 11`) keeps its own nowrap so the die
+     and its face never separate; only the word is allowed a second line. */
+  .oc-chip { white-space: normal; }
+  .oc-die { white-space: nowrap; }
+}
 .outcome-row {
   display: flex;
   flex-wrap: wrap;

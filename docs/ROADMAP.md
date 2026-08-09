@@ -1153,6 +1153,31 @@ the ladder asserts a decision rather than a behaviour, and fails on a retune
 that is working exactly as intended. What it is for — every client agrees,
 the walls and shelf pitch follow the setting — is what it checks now.
 
+### C23. Three things a phone showed — SHIPPED
+
+*Joe 2026-08-09, with a screenshot, once mobile was working again.*
+
+- **The dice were still too small.** The whole ladder moved in one more step:
+  each level became the next one down (`wide` and `medium` are the previous
+  `medium` and `close`, values already looked at) and a genuinely closer
+  `close` was added below. Default stays `medium`. Measured die span on a
+  phone with the rail: **40 → 49 px**.
+- **The result panel ran off the right edge**, with its outcome words cut in
+  half. Two separate causes, both about measuring the wrong thing: the card
+  was bounded by `100vw` while being centered on the **felt**, which beside
+  the panel is ~278px on a phone — so a 320px floor produced a card wider
+  than the surface it sits on. And inside it, the ledger's label spine is an
+  `auto` column that takes ~90px for a word like STRENGTH, leaving too little
+  for `d8 7 Success & Bonus`. Below 560px the spine now stacks above its row,
+  and the longest reading wraps rather than truncating — a chip is `nowrap`
+  because a split phrase reads worse than a narrow one, but that only holds
+  while the alternative is SHORTER, not CUT.
+- **The felt's standing vignette is gone.** `radial-gradient(ellipse …)` sizes
+  to its box, so the same declaration was a soft corner-darkening on a wide
+  desktop felt and a visible oval with an edge on a tall narrow one — two
+  pictures, one of them designed. The ceremony's own vignette stays: a
+  transient beat with a reason to be seen, not standing furniture.
+
 ### C22. A versioning contract for client state — DESIGN, then small
 
 *Joe 2026-08-09: "I'd like to establish some diligence on client state… an
