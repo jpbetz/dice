@@ -374,6 +374,101 @@ export const scenarios = [
     },
   },
   {
+    name: 'schema-reset',
+    tags: ['groups', 'cuj13'],
+    // A CLEAN BREAK, ONCE (Joe 2026-08-09: "I'm okay with a full reset on all
+    // user data… version forward and code the system to ditch this old broken
+    // data from clients"). The frozen-mtime bug meant a browser could be
+    // running a months-old main.js against a current index.html, so state on
+    // those clients was written by code nobody can reason about any more.
+    // Keeping it is not caution, it is carrying an unknown.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.12', name: 'Alice' });
+      // Pre-fix state: dice.* keys with NO schema stamp, which is what every
+      // client from before today looks like.
+      await a.eval(`(() => {
+        localStorage.removeItem('dice.schema.v1');
+        localStorage.setItem('dice.profiles.v1', '{"v":1,"activeId":"old","profiles":[]}');
+        localStorage.setItem('dice.log.v1', '[{"stale":true}]');
+        localStorage.setItem('dice.panels.v1', '{"pools":false}');
+        localStorage.setItem('keepme.other.app', 'not ours');
+      })()`);
+      // At least the three seeded — the tab has its own dice.* keys too, and
+      // asserting an exact count would be asserting how much state a booted
+      // tab happens to hold.
+      assert.ok(await a.dbg('purgeStale()') >= 3, 'the stale dice.* keys are dropped');
+
+      const after = await a.eval(`JSON.stringify({
+        schema: localStorage.getItem('dice.schema.v1'),
+        diceKeysLeft: Object.keys(localStorage).filter((k) => k.startsWith('dice.')
+          && k !== 'dice.schema.v1' && !localStorage.getItem(k)).length,
+        stalePool: localStorage.getItem('dice.profiles.v1'),
+        staleLog: localStorage.getItem('dice.log.v1'),
+        foreign: localStorage.getItem('keepme.other.app'),
+      })`);
+      const st = JSON.parse(after);
+      assert.equal(st.schema, '2', 'the schema stamp is written');
+      assert.notEqual(st.stalePool, '{"v":1,"activeId":"old","profiles":[]}',
+        'pre-fix profile state is gone');
+      assert.equal(st.staleLog, null, 'and the stale log with it');
+      // A RESET OF OUR DATA IS NOT A LICENCE TO CLEAR ANYONE ELSE'S. This
+      // origin may be shared with another app.
+      assert.equal(st.foreign, 'not ours', "a foreign key on the same origin is untouched");
+
+      // …and ONCE. A second boot must not wipe the profile you just made.
+      await a.dbg(`profiles.create('Keeper', 'soul-deal')`);
+      assert.equal(await a.dbg('purgeStale()'), 0, 'the reset does not repeat');
+      const names = (await a.dbg('profiles.list')).map((p) => p.name);
+      assert.ok(names.includes('Keeper'),
+        `and the profile made after it survives (got ${names.join(', ')})`);
+    },
+  },
+  {
+    name: 'cache-validator',
+    tags: ['net'],
+    // A STALE BUILD IS A PERMANENT ONE, unless the validator changes with the
+    // content (2026-08-09). This served `Last-Modified` from the file's
+    // mtime, and Cloud Native Buildpacks NORMALIZE every mtime to 1980-01-01
+    // for reproducible builds — so the validator was identical in every
+    // deploy forever, and a browser holding `If-Modified-Since: 1980` got 304
+    // no matter how many times the app shipped. It served its cached copy
+    // until site data was cleared by hand.
+    //
+    // Found from the field by the crash reporting added the same day: a phone
+    // reporting `#profile-save` null at main.js:10402, an element that had
+    // not existed for weeks — a NEW index.html against a MONTHS-OLD main.js.
+    async fn(ctx) {
+      const base = `http://127.0.0.1:${ctx.port}`;
+      const r = await fetch(`${base}/js/main.js`);
+      const etag = r.headers.get('etag');
+      assert.ok(etag && /^"[\w-]+"$/.test(etag), `an ETag is served (got ${etag})`);
+      assert.equal(r.headers.get('last-modified'), null,
+        'and NO Last-Modified — a header a build system freezes is a validator that lies');
+
+      // The right validator still 304s, so revalidation stays cheap.
+      const same = await fetch(`${base}/js/main.js`, { headers: { 'If-None-Match': etag } });
+      assert.equal(same.status, 304, 'a matching ETag answers 304');
+
+      // THE ONE THAT WAS BROKEN: a frozen 1980 date must no longer satisfy
+      // anything. This is the exact request every previously-cached browser
+      // makes.
+      const stale = await fetch(`${base}/js/main.js`, {
+        headers: { 'If-Modified-Since': 'Tue, 01 Jan 1980 00:00:01 GMT' },
+      });
+      assert.equal(stale.status, 200, 'a 1980 timestamp gets the real file, not a 304');
+      assert.ok((await stale.text()).length > 1000, 'and it has a body');
+
+      // A WRONG ETag is a full response too.
+      const wrong = await fetch(`${base}/js/main.js`, { headers: { 'If-None-Match': '"nope"' } });
+      assert.equal(wrong.status, 200, 'a stale ETag gets the real file');
+
+      // Two DIFFERENT files must not share a validator, or one would
+      // revalidate the other into place.
+      const other = await fetch(`${base}/css/style.css`);
+      assert.notEqual(other.headers.get('etag'), etag, 'different files, different ETags');
+    },
+  },
+  {
     name: 'crash-reporting',
     tags: ['net', 'perf'],
     // Joe 2026-08-09: "no telemetry here has me worried about maintaining

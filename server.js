@@ -2793,6 +2793,43 @@ async function serveStatic(req, res, url) {
   return streamFile(req, res, file, stat);
 }
 
+// THE VALIDATOR IS A CONTENT HASH, NOT A TIMESTAMP (2026-08-09).
+//
+// This served `Last-Modified` from the file's mtime, and on Cloud Run that is
+// a catastrophe rather than an inefficiency: Cloud Native Buildpacks NORMALIZE
+// every file's mtime to 1980-01-01 so builds are reproducible. So the
+// validator was byte-identical in every deploy, forever — a browser holding
+// `If-Modified-Since: Tue, 01 Jan 1980` got **304 Not Modified** no matter how
+// many times the app shipped, and served its cached copy until someone cleared
+// site data by hand.
+//
+// It was found from the field, by the crash reporting added the same day: a
+// phone reporting `document.getElementById('profile-save')` is null at
+// main.js:10402 — an element that had not existed for weeks. A NEW index.html
+// against a MONTHS-OLD main.js, which is the shape this bug makes. Incognito
+// worked because its cache was empty; the main profile was pinned.
+//
+// An ETag over the bytes cannot have that failure: it changes when and only
+// when the content does, and it does not care what a build system did to the
+// clock. Hashed once per file per process and cached — the app tree is a few
+// dozen files and a restart is the only thing that invalidates it.
+const etagCache = new Map(); // absolute path -> {size, mtimeMs, tag}
+function etagFor(file, stat) {
+  const hit = etagCache.get(file);
+  if (hit && hit.size === stat.size && hit.mtimeMs === stat.mtimeMs) return hit.tag;
+  let tag;
+  try {
+    tag = `"${crypto.createHash('sha1').update(fs.readFileSync(file)).digest('base64url').slice(0, 27)}"`;
+  } catch {
+    // Unreadable here means the stream below will fail too; fall back to a
+    // validator that is at least unique per process rather than per epoch.
+    tag = `"p${PROCESS_TAG}-${stat.size}"`;
+  }
+  etagCache.set(file, { size: stat.size, mtimeMs: stat.mtimeMs, tag });
+  return tag;
+}
+const PROCESS_TAG = Math.random().toString(36).slice(2, 10);
+
 function streamFile(req, res, file, stat) {
   const type = MIME[path.extname(file).toLowerCase()] || 'application/octet-stream';
   // /vendor/ is immutable (see VENDOR_DIR comment above); the app tree stays
@@ -2801,27 +2838,20 @@ function streamFile(req, res, file, stat) {
   // rides the RESOLVED absolute path (not the URL) so %2f / non-canonical
   // smuggling can't reach the vendor bucket.
   const cacheControl = isVendor(file) ? 'public, max-age=31536000, immutable' : 'no-cache';
-  // HTTP-date has 1-second precision; round the truth to match before
-  // comparing. NOTE: a client that fetched a file mid-write and revalidates
-  // within the same wall-clock second can pin a stale copy via 304 — real
-  // but rare, and re-check happens on the next request because the app tree
-  // stays no-cache.
-  const mtimeSec = Math.floor(stat.mtimeMs / 1000);
-  const ims = req.headers['if-modified-since'];
-  if (ims) {
-    const parsed = Date.parse(ims);
-    if (Number.isFinite(parsed) && Math.floor(parsed / 1000) >= mtimeSec) {
-      res.writeHead(304, {
-        'Last-Modified': stat.mtime.toUTCString(),
-        'Cache-Control': cacheControl,
-      });
-      return res.end();
-    }
+  const etag = etagFor(file, stat);
+  // If-None-Match beats If-Modified-Since when both are sent (RFC 9110), and
+  // it is the only one this answers now. `Last-Modified` is deliberately NOT
+  // sent: a header a build system freezes is a validator that lies, and one
+  // absent header is safer than two that disagree.
+  const inm = req.headers['if-none-match'];
+  if (inm && inm.split(',').some((t) => t.trim() === etag || t.trim() === `W/${etag}`)) {
+    res.writeHead(304, { ETag: etag, 'Cache-Control': cacheControl });
+    return res.end();
   }
   res.writeHead(200, {
     'Content-Type': type,
     'Content-Length': stat.size,
-    'Last-Modified': stat.mtime.toUTCString(),
+    ETag: etag,
     'Cache-Control': cacheControl,
   });
   if (req.method === 'HEAD') return res.end();

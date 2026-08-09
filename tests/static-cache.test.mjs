@@ -112,72 +112,77 @@ try {
   });
 
   // ---- 304 revalidation ---------------------------------------------------
+  //
+  // THE VALIDATOR IS AN ETAG OVER THE BYTES, NOT A TIMESTAMP (2026-08-09).
+  // These asserted Last-Modified semantics, and one of them asserted the BUG:
+  // "If-Modified-Since NEWER than mtime still returns 304" is exactly the
+  // behaviour that pinned a stale build on every returning browser, because
+  // Cloud Native Buildpacks normalize every mtime to 1980-01-01 for
+  // reproducible builds — so the validator never changed between deploys and
+  // the server 304'd forever. Found from the field by the crash reporting.
 
-  // The Last-Modified the server just handed us is exactly the value a
-  // conformant browser will echo back — the golden IMS.
-  await t('If-Modified-Since equal to Last-Modified returns 304 with an empty body', async () => {
+  await t('the ETag is over the CONTENT, and there is no Last-Modified to lie', async () => {
     const first = await fetch(`${base}/js/main.js`);
     assert.equal(first.status, 200);
-    const lastMod = first.headers.get('last-modified');
-    assert.ok(lastMod, 'server should send Last-Modified');
+    const etag = first.headers.get('etag');
+    assert.ok(etag && /^"[\w-]+"$/.test(etag), `server should send an ETag (got ${etag})`);
+    assert.equal(first.headers.get('last-modified'), null,
+      'and NOT Last-Modified: a header a build system freezes is a validator that lies');
     await first.arrayBuffer();
 
     const revalidate = await fetch(`${base}/js/main.js`, {
-      headers: { 'If-Modified-Since': lastMod },
+      headers: { 'If-None-Match': etag },
     });
     assert.equal(revalidate.status, 304);
     assert.equal(revalidate.headers.get('content-length'), null,
       '304 must not advertise a body');
-    const body = await revalidate.arrayBuffer();
-    assert.equal(body.byteLength, 0, '304 body must be empty');
-    // The Last-Modified is preserved on the 304 so the browser can keep its
-    // own bookkeeping intact across revalidations.
-    assert.equal(revalidate.headers.get('last-modified'), lastMod);
+    assert.equal((await revalidate.arrayBuffer()).byteLength, 0, '304 body must be empty');
+    assert.equal(revalidate.headers.get('etag'), etag,
+      'the ETag is preserved on the 304 so the browser keeps its bookkeeping');
   });
 
-  await t('If-Modified-Since NEWER than mtime still returns 304 (browser has a fresh copy)', async () => {
-    const first = await fetch(`${base}/js/main.js`);
-    const lastMod = first.headers.get('last-modified');
-    await first.arrayBuffer();
-    const future = new Date(Date.parse(lastMod) + 60_000).toUTCString();
+  await t('a frozen 1980 timestamp no longer satisfies anything', async () => {
+    // The exact request every browser cached under the old scheme makes.
     const res = await fetch(`${base}/js/main.js`, {
-      headers: { 'If-Modified-Since': future },
+      headers: { 'If-Modified-Since': 'Tue, 01 Jan 1980 00:00:01 GMT' },
     });
-    assert.equal(res.status, 304);
-    await res.arrayBuffer();
+    assert.equal(res.status, 200, 'a stale build must not be able to pin itself');
+    assert.ok((await res.arrayBuffer()).byteLength > 1000, 'and the real file comes back');
   });
 
-  await t('If-Modified-Since OLDER than mtime returns 200 with the full body', async () => {
+  await t('a wrong ETag returns 200 with the full body', async () => {
     const first = await fetch(`${base}/js/main.js`);
-    const lastMod = first.headers.get('last-modified');
     const size = Number(first.headers.get('content-length'));
     await first.arrayBuffer();
-    const past = new Date(Date.parse(lastMod) - 60_000).toUTCString();
-    const res = await fetch(`${base}/js/main.js`, {
-      headers: { 'If-Modified-Since': past },
-    });
+    const res = await fetch(`${base}/js/main.js`, { headers: { 'If-None-Match': '"stale"' } });
     assert.equal(res.status, 200);
-    const body = await res.arrayBuffer();
-    assert.equal(body.byteLength, size, 'stale IMS must fetch the full body');
+    assert.equal((await res.arrayBuffer()).byteLength, size, 'a stale ETag fetches the full body');
   });
 
-  await t('malformed If-Modified-Since falls through to a full 200 (Number.isFinite guard)', async () => {
-    // "not a date" parses to NaN — the guard has to reject it, not treat NaN
-    // as "in the past" or "in the future".
-    const res = await fetch(`${base}/js/main.js`, {
-      headers: { 'If-Modified-Since': 'not a date' },
-    });
-    assert.equal(res.status, 200);
-    const body = await res.arrayBuffer();
-    assert.ok(body.byteLength > 0, 'malformed IMS must not short-circuit');
+  await t('different files carry different ETags', async () => {
+    const [a, b] = await Promise.all([fetch(`${base}/js/main.js`), fetch(`${base}/css/style.css`)]);
+    assert.notEqual(a.headers.get('etag'), b.headers.get('etag'),
+      'or one file would revalidate another into place');
+    await Promise.all([a.arrayBuffer(), b.arrayBuffer()]);
+  });
+
+  await t('If-Modified-Since is ignored entirely now', async () => {
+    // Not merely "old dates get 200": the header is no longer consulted, so
+    // NO value of it can produce a 304. That is the property that makes a
+    // frozen build clock harmless rather than fatal.
+    for (const ims of ['Tue, 01 Jan 1980 00:00:01 GMT', new Date().toUTCString(), 'not a date']) {
+      const res = await fetch(`${base}/js/main.js`, { headers: { 'If-Modified-Since': ims } });
+      assert.equal(res.status, 200, `IMS "${ims}" must not short-circuit`);
+      await res.arrayBuffer();
+    }
   });
 
   await t('/vendor/ 304 carries the immutable Cache-Control too (symmetry)', async () => {
     const first = await fetch(`${base}/vendor/cannon-es.js`);
-    const lastMod = first.headers.get('last-modified');
+    const etag = first.headers.get('etag');
     await first.arrayBuffer();
     const res = await fetch(`${base}/vendor/cannon-es.js`, {
-      headers: { 'If-Modified-Since': lastMod },
+      headers: { 'If-None-Match': etag },
     });
     assert.equal(res.status, 304);
     assert.equal(res.headers.get('cache-control'), 'public, max-age=31536000, immutable');
@@ -188,15 +193,12 @@ try {
 
   await t('directory URL (/) revalidates through index.html correctly', async () => {
     const first = await fetch(`${base}/`);
-    const lastMod = first.headers.get('last-modified');
-    assert.ok(lastMod, 'index.html served via / should carry Last-Modified');
+    const etag = first.headers.get('etag');
+    assert.ok(etag, 'index.html served via / should carry an ETag');
     await first.arrayBuffer();
-    const res = await fetch(`${base}/`, {
-      headers: { 'If-Modified-Since': lastMod },
-    });
+    const res = await fetch(`${base}/`, { headers: { 'If-None-Match': etag } });
     assert.equal(res.status, 304);
-    const body = await res.arrayBuffer();
-    assert.equal(body.byteLength, 0);
+    assert.equal((await res.arrayBuffer()).byteLength, 0);
   });
 
   // ---- HEAD requests still behave --------------------------------------

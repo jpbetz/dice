@@ -4749,6 +4749,10 @@ window.__diceDebug = {
   // at the one function that catches it. The banner under test is what a
   // player sees in those cases and in no other.
   jamStorage(on) { forceStorageFail = !!on; },
+  // The one-time clean break, drivable without a page reload (it otherwise
+  // only runs at boot, and a scenario that has to navigate to reach it is
+  // testing the harness as much as the behaviour).
+  purgeStale() { return purgeStaleClientState(); },
   // How big a die actually LANDS on screen, in CSS px — the only number that
   // answers "can I see the dice". Projects a unit-radius sphere at the mat's
   // centre through the live camera, so it accounts for the preset, the
@@ -5713,6 +5717,51 @@ function load(key, fallback) {
     return v;
   } catch { return fallback; }
 }
+// A VERSION FORWARD, AND A CLEAN BREAK (Joe 2026-08-09: "I'm okay with a full
+// reset on all user data. Focus on fixing forward. It's still a prototype.
+// Maybe version forward and code the system to ditch this old broken data
+// from clients?").
+//
+// Every `dice.*` key this app has ever written is dropped once, on the first
+// boot that sees a SCHEMA older than this one. That is a deliberate data loss
+// and it is the right trade exactly once: the frozen-mtime bug meant a
+// browser could be running a months-old main.js against a current
+// index.html, so the state on those clients was written by code nobody can
+// reason about any more. Keeping it is not caution, it is carrying an unknown.
+//
+// The bump is what makes the fix reachable. A client pinned to an old build
+// gets the new one now that the validator is a content hash — and this makes
+// sure it does not then boot on top of state that build left behind.
+//
+// RAISE THIS ONLY for a break that cannot be migrated. Every ordinary shape
+// change belongs in normalizeStore / migrateGroup, which are lossless; this
+// is the door for "the writer was a version we cannot identify".
+const SCHEMA = 2;
+const LS_SCHEMA = 'dice.schema.v1';
+function purgeStaleClientState() {
+  try {
+    const seen = Number(localStorage.getItem(LS_SCHEMA) || 0);
+    if (seen >= SCHEMA) return 0; // 0, not undefined: the count is the contract
+    const doomed = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      // `dice.` only — this origin may be shared with something else, and a
+      // reset of OUR data is not a licence to clear anyone else's.
+      if (k && k.startsWith('dice.') && k !== LS_SCHEMA) doomed.push(k);
+    }
+    for (const k of doomed) localStorage.removeItem(k);
+    localStorage.setItem(LS_SCHEMA, String(SCHEMA));
+    if (doomed.length && window.__diceReport) {
+      // Worth one line in the field log: it says how many clients were
+      // carrying pre-fix state, which is the only measure of how far the
+      // stale-build bug actually reached.
+      window.__diceReport(`schema reset: dropped ${doomed.length} keys below v${SCHEMA}`);
+    }
+    return doomed.length;
+  } catch { return 0; /* a browser that will not store has nothing stale to drop */ }
+}
+purgeStaleClientState();
+
 function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
 }

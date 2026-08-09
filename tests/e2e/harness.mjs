@@ -405,7 +405,14 @@ export class Ctx {
         // reads, it can only ever produce one of two both-safe states, and
         // section-bar's migration pin needs to be able to seed it.
         `try { localStorage.removeItem('dice.sections.v1');`
-        + ` localStorage.removeItem('dice.railmode.v1'); } catch {}`,
+        + ` localStorage.removeItem('dice.railmode.v1');`
+        // …and STAMP THE SCHEMA CURRENT. The one-time clean break (main.js
+        // purgeStaleClientState) drops every `dice.*` key on a client older
+        // than the current schema — INCLUDING the name seeded just below,
+        // which leaves every tab sitting at the seat modal waiting for a join
+        // that never comes. A test tab is not a legacy client. `schema-reset`
+        // is where the purge itself is proven, by clearing this on purpose.
+        + ` localStorage.setItem('dice.schema.v1','2'); } catch {}`,
       );
       if (name) {
         await page.addInitScript(

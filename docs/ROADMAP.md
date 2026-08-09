@@ -1153,6 +1153,58 @@ the ladder asserts a decision rather than a behaviour, and fails on a retune
 that is working exactly as intended. What it is for — every client agrees,
 the walls and shelf pitch follow the setting — is what it checks now.
 
+### C22. A versioning contract for client state — DESIGN, then small
+
+*Joe 2026-08-09: "I'd like to establish some diligence on client state… an
+epoch part, a major number which indicates new capabilities, and a minor
+version to track each compatible change."* Written after the frozen-mtime bug
+put months-old clients in front of a current server with nobody able to say
+what they were carrying.
+
+**Three numbers, `epoch.major.minor`, on every stored blob and every wire
+payload that carries state** (`dice.profiles.v1`, the portable file's
+`version:`, `room.setup`).
+
+| Part | Means | Reader's duty when it does not match |
+| --- | --- | --- |
+| **epoch** | *This is a different data model.* No compatibility is offered or implied. | **Purge it**, unless a converter is registered for that exact epoch. A registered converter runs once and rewrites forward. |
+| **major** | *New capabilities exist in this data.* | A reader that supports a LOWER major must **refuse and say so to the user** — never load it partially. Older data with a lower major loads normally. |
+| **minor** | *A compatible change.* Tracking only. | Load it. Nothing branches on minor; it exists so a bug report names a build. |
+
+**The asymmetry is the point, and it is easy to get backwards.** *Older* data
+is a migration problem — the reader knows more than the writer did and can
+fill the gap. *Newer* data is a refusal — the reader knows less than the
+writer did, and loading it means silently dropping whatever it did not
+understand. PROFILES §11.9 (8) already rules this for one case ("an unknown
+system falls back in the store and refuses in the file"); this generalises it
+and states the reason: **the loud door is where a human is standing.**
+
+**What exists today, and what it is missing.** `dice.schema.v1 = 2` shipped
+2026-08-09 as the epoch mechanism, doing the purge half only: a client below
+it drops every `dice.*` key once. `STORE_VERSION` is written into the profile
+store and **never read**. `normalizeStore` and `migrateGroup` are the
+lossless-migration path and are the right home for *major* handling. The
+portable file has no version field at all.
+
+**Build order.**
+1. Fold `dice.schema.v1` into a single `{epoch, major, minor}` stamp and read
+   it in one place, so there is one function that answers "can I load this".
+2. Give it a **converter registry**: `epoch N → N+1`, run at boot, so the next
+   break has an alternative to a purge. The purge stays the default; a
+   converter is what you write when the data is worth carrying.
+3. Make **major** refuse out loud, with the app's existing refusal grammar
+   (`✗ …`) rather than a silent fallback — and say what to do (download your
+   data, update the page).
+4. Put the same triple in the **portable file** and in `room.setup`, since a
+   file crosses versions by definition and is the one artefact meant to
+   outlive a browser.
+5. **Report the numbers with every crash** (js/report.js already sends what it
+   is told) so the field log says which build wrote the state that broke.
+
+**Not for this:** the room's wire protocol between a live client and server.
+That is a different problem with a different answer — a live client can be
+told to reload, which stored data cannot.
+
 ### C18. The result panel is too busy — SHIPPED
 
 *Joe 2026-08-09.* Two cuts, both subtractive:
