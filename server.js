@@ -1850,7 +1850,20 @@ async function handleClearRoll(req, res) {
   // A claimed offer's roller is the claimer, not the offer's author, so the
   // player who actually threw the dice is the one who can send them away —
   // until it reaches the shelf, after which any player at the table may.
-  if (roll.playerId !== player.id && !roll.collected) {
+  // …and, since U19, once its ROLLER HAS LEFT. An uncollected held roll whose
+  // roller is gone was immovable: nobody could reveal it (the authority id is
+  // ephemeral and no fallback is safe — see below) and nobody could clear it,
+  // so it sat on the felt for the rest of the session. Clearing sends dice
+  // away; it never discloses a value, so the fail-closed direction is kept
+  // while the table gets its felt back.
+  //
+  // NO AUTHORITY FALLBACK IS INVENTED. Matching a departed authority by SEAT
+  // NAME was the obvious fix and is refused: duplicate player names all join
+  // (documented, resolveVisibility), so anyone could join under the roller's
+  // name and reveal their held rolls. Reclaiming authority needs durable
+  // identity, which GOALS defers — the same bet as U3.
+  const roller = room.players.get(roll.playerId);
+  if (roll.playerId !== player.id && !roll.collected && roller) {
     return sendError(res, 403, 'only the roller may clear their roll', 'forbidden');
   }
   // Idempotent, and deliberately silent: a second Done must not re-broadcast a
@@ -2205,7 +2218,14 @@ async function handleUnoffer(req, res) {
 
   const idx = room.offers.findIndex((o) => o.offerId === offerId);
   if (idx < 0) return sendError(res, 404, 'unknown offer', 'unknown_offer');
-  if (room.offers[idx].byId !== player.id) {
+  // §7.7's housekeeping rule, extended to the one case it never covered
+  // (U19): an offer whose CREATOR HAS LEFT is table furniture — nobody can
+  // withdraw it and it sits on the felt forever. Withdrawing destroys nothing
+  // private (the offer is a public invitation, and its spec was public the
+  // moment it was made), so anyone may tidy it away once its author is gone.
+  // While the creator is still here it stays theirs, unchanged.
+  const offerer = room.players.get(room.offers[idx].byId);
+  if (room.offers[idx].byId !== player.id && offerer) {
     return sendError(res, 403, 'only the offer creator may rescind it', 'forbidden');
   }
   room.offers.splice(idx, 1);

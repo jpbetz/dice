@@ -2450,6 +2450,11 @@ function canReveal(entry) {
     || entry.revealAuthority
     || entry.playerId
     || null;
+  // U19: only the authority, and only while they are still here. The id is
+  // minted per join, so a dropped stream past the grace window leaves a roll
+  // nobody can flip — the server would 403 it. Advertising a Reveal that
+  // cannot work is worse than not advertising one: the roll can still be
+  // CLEARED by anyone once its roller is gone, which is the recovery.
   return !!auth && auth === net.playerId;
 }
 
@@ -3112,6 +3117,52 @@ function isMine(entry) {
   return !netOnline || !!(net && entry && entry.playerId === net.playerId);
 }
 
+// Repaint the primary verb on every mounted card, for the one thing that can
+// change under a card that is already painted: the roller leaving. Called from
+// renderPlayers, which is the roster's single write point.
+function repaintAwayVerbs() {
+  for (const holder of mountedActionHolders) {
+    if (!holder.isConnected || !holder._acts) continue;
+    const entry = holder._entry;
+    if (!entry || !entry.rollId) continue;
+    paintPrimaryAct(holder._acts.primary, holder._verbFor
+      ? holder._verbFor(entry)
+      : ((isMine(entry) || rollerAway(entry)) ? 'clear' : 'dismiss'));
+  }
+  // The banner's click handler reads bannerAct, not the button, so the act
+  // has to move with the paint or the two disagree.
+  if (bannerAct.rollId) {
+    const e = log.find((x) => x.rollId === bannerAct.rollId);
+    if (e) {
+      bannerAct.mode = (isMine(e) || rollerAway(e)) ? 'clear' : 'dismiss';
+      // The DRESS moves with the act. A card that says Clear in slate would
+      // be a destructive verb painted as a spectator's tidy-away.
+      const banner = document.getElementById('result-banner');
+      if (banner) banner.dataset.act = bannerAct.mode;
+    }
+  }
+  const vc = document.getElementById('verdict-card');
+  if (vc && verdictFoldEl && verdictFoldEl._entry && verdictFoldEl._entry.rollId) {
+    const e = verdictFoldEl._entry;
+    vc.dataset.act = (isMine(e) || rollerAway(e)) ? 'clear' : 'dismiss';
+  }
+}
+
+// U19: has the roll's ROLLER LEFT the table? An uncollected roll is normally
+// its roller's to end (§7.7), which used to mean a roll from a departed player
+// could never be cleared by anyone — it just sat on the felt. The server now
+// admits that case, and this is the client half: paint the real red Clear
+// instead of a local Dismiss, so the affordance matches what the server allows.
+//
+// An EMPTY roster means "we don't know yet" (it is emptied on disconnect
+// before the next snapshot lands), never "everyone left" — returning false
+// there keeps the Dismiss and avoids a red flicker across a reconnect.
+function rollerAway(entry) {
+  if (!netOnline || !net || !entry || !entry.playerId) return false;
+  if (!players.length) return false;
+  return !players.some((p) => p.id === entry.playerId);
+}
+
 // ONE clear runner for every surface. The re-entrancy guard used to be a
 // closure boolean per card — invisible, and duplicated. Now it rides the
 // button's own `disabled`, so a press in flight LOOKS spent (2i-C drains hue
@@ -3241,15 +3292,26 @@ function mountCardActions(holder, opts) {
   // update path reads, not a chain of nextElementSibling it has to re-derive.
   holder._acts = { primary, foot, strip, keep, reveal };
   holder._cardActionsMounted = true;
+  mountedActionHolders.add(holder);
 }
+
+// Every card-actions holder ever mounted. The banner and the verdict card are
+// long-lived and PAINT THEIR VERB ONCE, so a roll that becomes clearable while
+// it is already on screen (U19: its roller leaves) needs someone to come back
+// and repaint. The registry is what lets repaintAwayVerbs find them without
+// re-deriving each surface's own opts.
+const mountedActionHolders = new Set();
 
 function updateCardActions(holder, entry, opts) {
   if (!holder._cardActionsMounted) mountCardActions(holder, opts);
   holder._entry = entry || null;
+  // Kept for the repaint: the verb is a FUNCTION of roster state, not a
+  // constant, and the repaint has to ask the same question this call did.
+  holder._verbFor = opts.verbFor || null;
   const { primary, foot, strip, keep, reveal } = holder._acts;
   paintPrimaryAct(primary, opts.verbFor
     ? opts.verbFor(entry)
-    : (entry && entry.rollId && isMine(entry) ? 'clear' : 'dismiss'));
+    : (entry && entry.rollId && (isMine(entry) || rollerAway(entry)) ? 'clear' : 'dismiss'));
   const showStrip = canReroll(entry);
   // The keep verb rides the same gate as the reroll strip — both need a spec
   // this viewer can actually read — and the fold now stands for either of
@@ -3278,7 +3340,10 @@ function renderBannerActions(entry) {
   // spectator DISMISSES locally. dataset.act still dresses the card — red
   // removal vs muted slate — because the named bar must say WHICH removal
   // it is, and a spectator's slate must never read as destructive.
-  bannerAct = { mode: entry.rollId && isMine(entry) ? 'clear' : 'dismiss', rollId: entry.rollId || null };
+  bannerAct = {
+    mode: entry.rollId && (isMine(entry) || rollerAway(entry)) ? 'clear' : 'dismiss',
+    rollId: entry.rollId || null,
+  };
   banner.dataset.act = bannerAct.mode;
   // The body carries no title/aria-label any more: it is no longer the
   // announced control, only a shortcut to the one that is. Announcing both
@@ -4084,7 +4149,7 @@ function renderVerdictCard(roll, entry) {
   const mine = isMine(entry);
   verdictFor = { rollId: entry.rollId || null, mine };
   const card = document.getElementById('verdict-card');
-  card.dataset.act = entry.rollId && mine ? 'clear' : 'dismiss';
+  card.dataset.act = entry.rollId && (mine || rollerAway(entry)) ? 'clear' : 'dismiss';
   // The body keeps no title/aria-label: the named bar below is the announced
   // control (2026-08-07), and mid-beat it is the ONLY surface that can say
   // the press will SKIP rather than clear — which is the whole point of
@@ -4526,6 +4591,14 @@ window.__diceDebug = {
   parseNotation,
   canonicalNotation,
   commandRoll(str) { return commandRoll(str); }, // execute a notation string
+  // U19: vacate the seat NOW, skipping DISCONNECT_GRACE_MS. Closing the page
+  // would get there too, five seconds later — a scenario about what the table
+  // does AFTER someone leaves should not buy that wait once per assertion.
+  leaveNow() { return net ? net.leave({ immediate: true }) : Promise.resolve(false); },
+  rollerAway(rollId) {
+    const e = log.find((x) => x.rollId === rollId);
+    return e ? rollerAway(e) : null;
+  },
   get groups() { return groups; },
   // saved groups: write back to ONE record by id — the inline row editor's
   // own path (editPoolById). patch = {name?, notation?}; returns the updated
@@ -6462,7 +6535,8 @@ let groups = load(LS_GROUPS, null);
 // The Soul Deal starting rack (Joe, 2026-08-01; DEALT since 2026-08-08):
 // the nine attributes in their Physical/Mental/Social triads, six weapon
 // skills and three motivations — a fresh seat can stage attribute+skill+
-// motivation and roll ('1 2 3 Enter' territory). The dice are dealt at
+// motivation and roll ('1 4 7 Enter' on the dealt rack, since U24 shares the
+// nine digits out across the shelves 3/3/3). The dice are dealt at
 // random inside each shelf's price (js/seed.js), so a fresh browser opens
 // on a character rather than on eleven identical d6 pools; the ✎ editor is
 // still the advancement path. Dealt ONCE, at the moment storage is empty,
@@ -7075,6 +7149,53 @@ function buildSections(list, { ensureTrio = false } = {}) {
 // The digits stage by RENDERED order (rebuilt on every paint).
 let renderedPools = [];
 
+// EVERY SHELF IS REACHABLE BY DIGIT (U24, 2026-08-08). The digit map used to
+// be the flat rendered order, which meant the first nine pools — and on the
+// rack the app DEALS that is nine attributes, so `1 2 3 Enter`, the roll this
+// whole surface is built for, could only ever be three attributes. UX.md
+// asserted the attribute+skill+motivation claim in the paragraph directly
+// above the dealt-rack amendment that broke it, and the digit handler's own
+// comment advertised `1 4 6 Enter` — a NON-CONTIGUOUS map it did not have.
+//
+// So the nine digits are shared out across the shelves instead of spent on
+// the first one: one to every shelf at minimum, the remainder by size, in
+// rack order. On the dealt rack that is 3/3/3, so `1 4 7` is exactly an
+// attribute, a skill and a motivation. Within a shelf the order is still the
+// rendered one, so a badge never contradicts reading order; what changes is
+// that a shelf can run out of digits rather than a shelf never getting any.
+//
+// Not a reorder affordance — that is a bigger question (ROADMAP §9b) and this
+// is the smallest change that makes the advertised roll typeable.
+const DIGIT_SLOTS = 9;
+function digitPools(list) {
+  const secs = buildSections(list).filter((s) => s.pools.length);
+  if (!secs.length) return [];
+  // One each, then hand out what is left largest-shelf-first, capped by what
+  // each shelf actually holds.
+  const quota = secs.map(() => 0);
+  let left = DIGIT_SLOTS;
+  for (let i = 0; i < secs.length && left > 0; i++) { quota[i] = 1; left--; }
+  const order = secs.map((s, i) => i).sort((x, y) => secs[y].pools.length - secs[x].pools.length);
+  let moved = true;
+  while (left > 0 && moved) {
+    moved = false;
+    for (const i of order) {
+      if (left <= 0) break;
+      if (quota[i] >= secs[i].pools.length) continue;
+      quota[i]++; left--; moved = true;
+    }
+  }
+  const out = [];
+  secs.forEach((sec, i) => out.push(...sec.pools.slice(0, quota[i])));
+  return out;
+}
+// The digit a pool answers to, or 0 — read by both the rack tile and the rail
+// row so the two can never print different numbers for the same pool.
+function digitOf(g) {
+  const i = renderedPools.indexOf(g);
+  return i >= 0 && i < DIGIT_SLOTS ? i + 1 : 0;
+}
+
 // The Sheet Pass ghost tiles: which shelf's creation card is open (a
 // section KEY, one at a time — like editingGroupId for the notation card).
 let creatingShelf = null;
@@ -7370,8 +7491,7 @@ function renderGroups() {
   groupsListEl.innerHTML = '';
   // Digit targets are ALWAYS your own pools in your own rendered order —
   // browsing a teammate's rack must never remap your keyboard.
-  renderedPools = [];
-  for (const sec of buildSections(groups)) renderedPools.push(...sec.pools);
+  renderedPools = digitPools(groups);
   if (poolsOwner && !poolsOwnerPlayer()) poolsOwner = null; // the owner left; fall home
   document.getElementById('pools-toolbar').classList.toggle('hidden', !!poolsOwner);
   // THE REGION HEAD (anatomy pass; teammate consolidation 2026-08-04): the
@@ -7414,7 +7534,6 @@ function renderGroups() {
     renderForeignPools(poolsOwnerPlayer());
     return;
   }
-  let ownOrd = 0;
   for (const sec of buildSections(groups, { ensureTrio: poolsEdit })) {
     const head = document.createElement('div');
     head.className = 'plabel pool-sec-head';
@@ -7433,7 +7552,7 @@ function renderGroups() {
     const grid = document.createElement('div');
     grid.className = 'pool-grid';
     for (const g of sec.pools) {
-      const ord = ++ownOrd;
+      const ord = digitOf(g); // U24: the shelf-shared digit, 0 when it has none
 
       // This tile is being edited: the editor card spans the shelf.
       if (g.id === editingGroupId) {
@@ -7470,7 +7589,7 @@ function renderGroups() {
       add.setAttribute('aria-hidden', 'true');
       add.textContent = '+';
       stage.appendChild(add);
-      if (ord <= 9) {
+      if (ord) {
         const o = document.createElement('span');
         o.className = 'pool-ord';
         o.setAttribute('aria-hidden', 'true');
@@ -7574,7 +7693,7 @@ const LS_RAILMODE = 'dice.railmode.v1';
 let railDice = []; // die-type strings, this session only
 // A digit pressed while the dice list is up surfaces the pool list for THIS
 // VISIT without rewriting the preference — loadIntoBox's precedent, and the
-// reason `1 2 3 Enter` still means the same roll in every state. Clearing
+// reason a digit sequence still means the same roll in every state. Clearing
 // railDice alone could not do it: resolution would fall straight back to the
 // stored 'dice'.
 let railModeVisit = null;
@@ -7693,7 +7812,6 @@ function renderRailPools() {
   // you HAVE, where the character sheet shows what you could have).
   const secs = buildSections(groups).filter((s) => s.pools.length);
   const live = new Set();
-  let ord = 0;
   for (const sec of secs) {
     const wrap = document.createElement('div');
     wrap.className = 'rp-shelf';
@@ -7712,7 +7830,7 @@ function renderRailPools() {
     }
     for (const g of sec.pools) {
       const res = parseNotation(g.notation);
-      ord++;
+      const ord = digitOf(g); // U24: one map, both surfaces
       const b = document.createElement('button');
       b.className = 'rp-item';
       if (!res.ok) {
@@ -7743,7 +7861,7 @@ function renderRailPools() {
         dice.appendChild(buildDieStrip(res.spec.dice, 3, { grouped: true, set: g.set || null }));
         b.appendChild(dice);
       }
-      if (ord <= 9) {
+      if (ord) {
         const o = document.createElement('span');
         o.className = 'rp-ord';
         o.setAttribute('aria-hidden', 'true'); // the digit shortcut, not content
@@ -11426,9 +11544,13 @@ document.addEventListener('keydown', (e) => {
     default:
       if (e.key >= '1' && e.key <= '9') {
         // Digits do the panel's own verb: STAGE into the draft when the
-        // workbench is open, SELECT in the rail when it is not. Same order
-        // either way (rendered shelf order), so '1 4 6 Enter' means the same
-        // roll in both states — Wisdom + Swords + Zeal.
+        // workbench is open, SELECT in the rail when it is not — the same map
+        // either way, so a sequence means the same roll in both states.
+        // The nine are shared ACROSS shelves (U24, digitPools): on the rack
+        // the app deals that is 3/3/3, so `1 4 7 Enter` is an attribute, a
+        // skill and a motivation. Spent on the flat rendered order they were
+        // nine attributes, and the canonical Soul Deal roll could not be
+        // typed at all.
         const g = renderedPools[Number(e.key) - 1];
         if (g) {
           if (panelsOpen.pools) stageGroup(g);
@@ -11523,6 +11645,7 @@ const ROSTER_MAX = 6; // pills shown before the tail folds into +N — raised
 // gap in ROADMAP §2k.
 function renderPlayers() {
   rosterEl.innerHTML = '';
+  repaintAwayVerbs(); // a departure can make a roll on screen clearable (U19)
   const you = net ? net.playerId : null;
   const others = players.filter((p) => p.id !== you);
   for (const p of others.slice(0, ROSTER_MAX)) {

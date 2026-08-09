@@ -1970,7 +1970,7 @@ noise. This is a chart/threshold question, not a rendering one: decide what
 "crit" means for a multi-die per-die pool. (U8 ships the reduced-motion half
 independently and first.)
 
-### U19. `playerId` succession for reveal and offer authority — DESIGN FIRST, medium
+### U19. `playerId` succession for reveal and offer authority — SHIPPED
 
 *Audit E2 (major).* Reveal authority and offer ownership are pinned to an
 ephemeral `playerId` with **no fallback**. Lose your stream past the 5 s
@@ -1979,8 +1979,32 @@ grace, rejoin with a fresh id, and your own held rolls become unrevealable
 card; a claimed dice-tower offer from a departed offerer whispers to a dead
 id — a roll nobody can ever see. Rolls got a universal-housekeeping escape
 once collected (§7.7); offers and reveals did not, for no stated reason.
-**Decide:** seat-based fallback, or extend §7.7's escape. Note this is the
-same bet as U3 — see the structural risks below.
+**Decided 2026-08-08 — SHIPPED.** Neither option as written. The two halves
+have different stakes and got different answers:
+
+- **Seat-name fallback: REFUSED, permanently.** `resolveVisibility`'s own
+  contract is that *duplicate player names all join* (server.js:1376, :2045).
+  Matching a departed authority by name would let anyone sit down under the
+  roller's name and reveal their held rolls — a privacy hole traded for a
+  convenience. Any real succession needs durable identity, which GOALS
+  defers. This is the same bet as U3, and the answer stays "not yet".
+- **Offers: §7.7 extended.** An offer whose creator has left is table
+  furniture — the invitation was public and its spec was public the moment
+  it was made, so withdrawing discloses nothing. Anyone may now rescind an
+  orphaned offer; while the creator is present it stays theirs, unchanged.
+- **Reveals: no fallback, but no longer immovable.** A held roll whose
+  authority is gone stays unrevealable forever — that is the *correct*
+  failure direction, and inventing a successor is the only way to get it
+  wrong. What was actually broken is that it also could not be **cleared**,
+  so it sat on the felt for the rest of the session. Clearing sends dice
+  away and never discloses a value, so it is now universal once the roller
+  is away. The values die with the seat; the felt comes back.
+
+The client half matters as much as the server's: the banner and verdict card
+paint their verb once, so a departure now repaints them (`repaintAwayVerbs`,
+called from `renderPlayers`) from a local Dismiss to a real red Clear. An
+empty roster reads as "we don't know yet", never "everyone left", so a
+reconnect does not flicker red. Pinned by `orphan-clear`.
 
 ### U20. The shelf's read at rest, and the peek's lifetime — DESIGN FIRST, small-medium
 
@@ -2079,7 +2103,7 @@ silently winning against the rail block, from one 4.5k-line stylesheet with
 no token layer. Cascade ties — not file size — are the measured cost of the
 CSS as it stands.
 
-### U24. Ordinals versus the dealt rack — DESIGN FIRST (small code), small
+### U24. Ordinals versus the dealt rack — SHIPPED
 
 *Audit G4 (moderate).* `1 2 3 Enter` — the roll the design says the surface
 exists for — **cannot be typed on the rack the app deals**.
@@ -2090,6 +2114,16 @@ the dealt-rack amendment that broke it (1536-1539 vs 1542-1563), and
 main.js:10948's comment advertises a sequence that now means Strength + Wit +
 Intelligence. **Either interleave ordinals across shelves or re-scope the
 promise; either way fix both doc sites and the code comment.**
+
+**Decided 2026-08-08 — SHIPPED.** Interleaved. The nine digits are dealt
+ACROSS the shelves rather than down the first one: `digitPools` gives every
+non-empty section at least one slot, then hands the remainder out largest-
+section-first. On the rack the app actually deals (18 pools — 9 attributes,
+6 skills, 3 motivations) that lands 3/3/3, so `1 4 7 Enter` is an attribute
+plus a skill plus a motivation — the cross-section roll the surface exists
+for, and the exact roll the old ordering made untypable. `digitOf` reads the
+position back out of `renderedPools`, so the badge and the key agree by
+construction rather than by a parallel count. Pinned by `digit-reach`.
 
 ### U25. The table's smaller seams — batch, small-medium
 

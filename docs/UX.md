@@ -1297,6 +1297,18 @@ at a time; history lives on a shelf.
 - **Housekeeping is universal**: a COLLECTED roll may be cleared by anyone
   (slot ✕ or its marker); an uncollected roll's dice remain roller-only to
   clear. Corner ✕ sweeps everything, unchanged.
+- **…and universal once the ROLLER LEAVES** (ROADMAP U19, 2026-08-08). The
+  roller-only rule above had no exception for the roller being gone, so an
+  uncollected roll from a departed player was immovable: for a HELD roll,
+  unrevealable too (authority is an ephemeral `playerId` with no successor),
+  which meant it sat on the felt for the rest of the session. Clearing sends
+  dice away and **never discloses a value**, so extending housekeeping here
+  costs no privacy. The same applies to an **offer** whose creator has left:
+  a public invitation nobody can withdraw is just litter.
+  What did NOT change: reveal gains no fallback. A held roll whose authority
+  is gone stays secret forever — the right failure direction. Succeeding to
+  authority by seat NAME is refused outright, because duplicate names all
+  join and anyone could sit down as you and flip your held rolls.
 - **Resync**: hello/join carries per-roll state (uncleared rolls: on-felt |
   collected+order). Clients reconstruct the felt (settled replay of the
   newest on-felt roll, no tumble) and the shelf identically — closing the
@@ -1656,8 +1668,11 @@ to it.
 default rack is the Soul Deal starting set: nine attributes in their
 Physical/Mental/Social triads (Strength/Toughness/Agility ·
 Wit/Wisdom/Intelligence · Charm/Will/Empathy), six weapon skills and
-three motivations — attribute+skill+motivation is '1 2 3 Enter' from a
-fresh seat. (Fixed underneath: migrateGroup dropped pool categories on
+three motivations — attribute+skill+motivation is **'1 4 7 Enter'** from a
+fresh seat. (It read '1 2 3 Enter' until 2026-08-08, which the dealt rack
+directly below had made false: nine attributes filled all nine digits. U24
+shares the digits out across the shelves — 3/3/3 here — so the claim is a
+fact again rather than an aspiration.) (Fixed underneath: migrateGroup dropped pool categories on
 every boot, on every path into the rack.)
 
 *(**THE DEALT RACK, 2026-08-08.** The seed shipped as eleven identical
@@ -3004,8 +3019,8 @@ its verb together as one block. It still shrinks and scrolls on a short
 viewport, which is the common case with a real rack.
 
 **2i-G — A SELECTION IS NOT A DRAFT.** Ordered by the RACK, never by tap
-order (so `1 2 3 Enter` means the same roll whether the panel is open or
-closed) · never persisted · **spent by its roll** · dropped when the panel
+order (so a digit sequence means the same roll whether the panel is open or
+closed — `1 4 7` on the dealt rack, per U24) · never persisted · **spent by its roll** · dropped when the panel
 expands. This is what makes Joe's "clear it after each roll" compatible with
 **2i-E, which is unchanged**: a draft is a composition you keep editing and
 which survives to be repeated; a rail selection is a pick you already fired.
@@ -3268,8 +3283,10 @@ again" means, and anything else has an empty rack remembering a choice made
 about a rack that is gone.
 
 **Digits stay bound to POOLS in both modes** — the one place the design
-refused its own symmetry. `1 2 3 Enter` is the attribute+skill+motivation roll
-this surface exists for, and the mode *persists*, so rebinding the digits to
+refused its own symmetry. `1 4 7 Enter` is the attribute+skill+motivation roll
+this surface exists for (U24; the digits are dealt ACROSS the shelves, so the
+sequence follows the rack's shape rather than a flat count), and the mode
+*persists*, so rebinding the digits to
 loose dice would fire the wrong roll from muscle memory forever after one
 flip. A digit pressed in dice mode surfaces the pool list **for that visit
 without rewriting the preference** — `loadIntoBox`'s precedent, and the reason

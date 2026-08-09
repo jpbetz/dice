@@ -235,6 +235,49 @@ export const scenarios = [
     },
   },
   {
+    name: 'orphan-clear',
+    tags: ['roll', 'net'],
+    // U19: A ROLL WHOSE ROLLER LEFT MUST NOT BE IMMOVABLE. Before this, an
+    // uncollected roll was its roller's to end (§7.7) with no exception for
+    // the roller being gone — nobody could clear it, and for a HELD roll
+    // nobody could reveal it either, so it sat on the felt for the session.
+    //
+    // The fix deliberately splits the two: CLEAR becomes universal once the
+    // roller is away (it sends dice away, it never discloses a value, so the
+    // fail-closed direction is kept), while REVEAL gains no fallback at all.
+    // Matching a departed authority by seat NAME was the obvious fix and is
+    // refused on purpose: duplicate player names all join, so anyone could
+    // sit down under the roller's name and flip their held rolls.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await b.roll('d20 held');
+      await a.settle();
+      const rid = await b.rollId();
+      assert.ok(rid, 'Bob rolled');
+
+      // While Bob is here it is his roll: Alice only gets a local dismiss.
+      assert.equal(await a.eval(`document.getElementById('result-banner').dataset.act`),
+        'dismiss', "a present roller's roll is not Alice's to clear");
+      assert.equal(await a.dbg(`rollerAway(${JSON.stringify(rid)})`), false, 'Bob is at the table');
+
+      await b.dbg('leaveNow()');
+      await a.waitFor(`window.__diceDebug.rollerAway(${JSON.stringify(rid)}) === true`,
+        { desc: 'Alice sees Bob leave' });
+
+      // The verb REPAINTS under the card that is already on screen — the
+      // banner was painted while Bob was still here.
+      assert.equal(await a.eval(`document.getElementById('result-banner').dataset.act`),
+        'clear', 'the departure repaints the standing card as a real Clear');
+
+      // And the server agrees: the same act the affordance now advertises.
+      assert.equal(await a.dbg(`clearRoll(${JSON.stringify(rid)})`), true,
+        'the orphaned roll clears');
+      await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 0)`,
+        { desc: 'the felt is Alice\'s again' });
+    },
+  },
+  {
     name: 'folded-card',
     tags: ['smoke', 'roll', 'chrome'],
     // The folded card + the hover read + the feed (Joe 2026-08-03): the
@@ -3498,6 +3541,62 @@ export const scenarios = [
       } finally {
         await a.eval(`localStorage.removeItem('dice.sections.v1')`).catch(() => {});
       }
+    },
+  },
+
+  {
+    name: 'digit-reach',
+    tags: ['smoke', 'groups', 'chrome'],
+    // U24. `1 2 3 Enter` is the roll this surface exists for — an attribute,
+    // a skill and a motivation. On the rack the app DEALS (9 attributes, 6
+    // skills, 3 motivations) the flat rendered order spent all nine digits on
+    // attributes, so the advertised roll could not be typed at all. UX.md
+    // asserted the claim in the paragraph directly above the dealt-rack
+    // amendment that broke it.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.16', name: 'Dig' });
+      const rack = [];
+      for (const n of ['At1', 'At2', 'At3', 'At4', 'At5', 'At6', 'At7', 'At8', 'At9']) {
+        rack.push({ name: n, notation: '2d8', category: 'Attributes' });
+      }
+      for (const n of ['Sk1', 'Sk2', 'Sk3', 'Sk4', 'Sk5', 'Sk6']) {
+        rack.push({ name: n, notation: '1d10', category: 'Skills' });
+      }
+      for (const n of ['Mo1', 'Mo2', 'Mo3']) {
+        rack.push({ name: n, notation: '1d4', category: 'Motivations' });
+      }
+      await a.dbg(`setGroups(${JSON.stringify(rack)})`);
+      await a.dbg('setPanelState({pools: false})');
+
+      // EVERY SHELF IS REACHABLE. Nine digits shared out one-per-shelf then
+      // by size: on this shape that is 3/3/3.
+      const digits = `JSON.stringify([...document.querySelectorAll('#rail-pools .rp-item')]
+        .map((b) => [(b.querySelector('.rp-ord') || {}).textContent || '',
+                     (b.querySelector('.rp-name') || {}).textContent || '']))`;
+      const map = JSON.parse(await a.eval(digits));
+      const numbered = map.filter(([d]) => d);
+      assert.equal(numbered.length, 9, 'all nine digits are spent');
+      assert.deepEqual(numbered.map(([, n]) => n),
+        ['At1', 'At2', 'At3', 'Sk1', 'Sk2', 'Sk3', 'Mo1', 'Mo2', 'Mo3'],
+        'and every shelf gets three — not nine attributes and nothing else');
+
+      // …so the canonical roll is typeable. 1 · 4 · 7 then Enter.
+      for (const k of ['1', '4', '7']) {
+        await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: ${JSON.stringify(k)}}))`);
+      }
+      assert.deepEqual((await a.dbg('railState')).selected, ['At1', 'Sk1', 'Mo1'],
+        'an attribute, a skill and a motivation — the roll the surface is for');
+
+      // The rack and the rail print the SAME number for the same pool: one
+      // map, two surfaces, so a badge can never contradict the keyboard.
+      await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
+      await a.dbg('setPanelState({pools: true})');
+      const rackMap = JSON.parse(await a.eval(`JSON.stringify(
+        [...document.querySelectorAll('#groups-list .pool-tile')]
+          .map((el) => (el.querySelector('.pool-ord') || {}).textContent || '')
+          .filter(Boolean))`));
+      assert.deepEqual(rackMap, ['1', '2', '3', '4', '5', '6', '7', '8', '9'],
+        'the rack shows the same nine, in the same order');
     },
   },
 
