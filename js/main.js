@@ -67,8 +67,8 @@ const IN_LOBBY = ROOM === null;
 // live (walls, shelf pitch, camera framing all follow). The base values here
 // are DEFAULT_ZOOM's preset and must move with it; ZOOM_PRESETS owns them all, and
 // applyZoom mutates these + the wall body positions in place.
-let TABLE_W = 11;            // playable width (x) — the DEFAULT ('medium')
-let TABLE_D = 6.7;           // playable depth (z)
+let TABLE_W = 8.6;           // playable width (x) — the DEFAULT ('medium')
+let TABLE_D = 5.2;           // playable depth (z)
 // Zoom picker labels — declared here (not next to renderZoomPicker) because
 // setSound() → syncSettingsUI() → renderZoomPicker() runs during module
 // evaluation, and the picker's early build must not read this in TDZ.
@@ -88,6 +88,18 @@ const ZOOM_LEVELS = [
 // zooms a bit closer"). Each level became the next one down — the new `wide`
 // and `medium` are the previous `medium` and `close`, values already looked
 // at — and a genuinely closer `close` was added below them.
+//
+// AND ONCE MORE, same day ("increase the zooms further still — what is
+// considered 'close' now should be the medium setting"). Same shift, third
+// time: the ladder has now travelled from 30×17 to 8.6×5.2 at the default,
+// a 3.5× tightening. The mat IS the physics walls, so the 40-die cap was the
+// thing to check before shipping a third one — and it holds: a 40d6 pool at
+// the new `close` (6.7×4.1) settles with ZERO dice escaping the walls and
+// zero resting above 1.6, the same as at `medium`. Measured, not assumed —
+// the worry was mine and the numbers did not support it.
+//
+// Die span at the default, for the record: 260px on a desktop with the rail,
+// 80px on a 390px phone. The first `wide` this ladder ever had was 30×17.
 const DEFAULT_ZOOM = 'medium';
 const MAX_DICE_ON_TABLE = 40;
 const GRAVITY = -110;
@@ -10907,9 +10919,9 @@ function clearTableIdentity() {
 // smaller with it (slot pitch derives from TABLE_W), which is what forces the
 // retreat on a narrow phone in the first place.
 const ZOOM_PRESETS = {
-  wide:   { w: 14,  d: 8.6, eyeFull: [0, 13.2, 7.6], eyeMini: [0, 10.9, 6.1] },
-  medium: { w: 11,  d: 6.7, eyeFull: [0, 10.4, 6.0], eyeMini: [0,  8.6, 4.8] },
-  close:  { w: 8.6, d: 5.2, eyeFull: [0,  8.1, 4.7], eyeMini: [0,  6.7, 3.8] },
+  wide:   { w: 11,  d: 6.7, eyeFull: [0, 10.4, 6.0], eyeMini: [0, 8.6, 4.8] },
+  medium: { w: 8.6, d: 5.2, eyeFull: [0,  8.1, 4.7], eyeMini: [0, 6.7, 3.8] },
+  close:  { w: 6.7, d: 4.1, eyeFull: [0,  6.3, 3.7], eyeMini: [0, 5.2, 3.0] },
 };
 
 let pendingZoom = null; // set by queueZoom when a change arrives mid-roll
@@ -12529,7 +12541,7 @@ function panelDebugState() {
 // LET, not const: zoom rewrites the eye preset so the walker's angle stays
 // fixed (every entry keeps y/z ≈ 1.74). applyCameraFraming's step-back still
 // runs after — it just starts from the closer eye at 'medium'/'close'.
-let CAM_EYE = { full: [0, 10.4, 6.0], mini: [0, 8.6, 4.8] }; // the DEFAULT ('medium')
+let CAM_EYE = { full: [0, 8.1, 4.7], mini: [0, 6.7, 3.8] }; // the DEFAULT ('medium')
 const CAM_TARGET = new THREE.Vector3(0, 0, 0.5);
 
 // What must stay on screen, each with the NDC headroom its own chrome needs.
