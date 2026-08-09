@@ -37,6 +37,15 @@ shipped, and SHIPPED.md records "CUJs 1–4 run end to end" against them.
 Everything the audit found unnamed is added from **6** up. The retired
 schemes are mapped at the bottom, not silently dropped.
 
+**Shape.** Thirteen journeys, in the order a person meets them: **1–5** are
+rooms (get in, get others in, leave, split), **6–7** are characters (build
+them, be handed one), **8–11** are the session itself (roll a thing, keep it
+legible, control who sees it, follow along), **12** is the table's rules and
+**13** is not losing any of it. The session block is where all the time goes
+and it was **entirely absent** from every list before this file: Joe's five
+are about rooms, PROFILES' two are about characters, and nobody owned the
+evening in between.
+
 ---
 
 ## The journeys
@@ -123,25 +132,79 @@ without overwriting anything they already had.
 `profile-random`.
 **SHIPPED.**
 
-### CUJ8 — "We're playing. I keep rolling things." ⚠️ **NEWLY NAMED**
+### CUJ8 — "I want to roll this specific thing." ⚠️ **NEWLY NAMED**
 
-*Actor:* every player, for the entire session — this is where all the time
-goes.
-**Done when:** a roll can be composed, thrown, read, kept or cleared, made
-secret or shown, repeated, and found again later — without leaving the felt
-and without the table becoming chaos.
-*Surfaces:* substantially the whole app — the well and the rim, the collapsed
-rail, the ceremony, the verdict card, the shelf, the log, the ± popover,
-visibility, offers.
-*Proof:* ~60 scenarios covering the **parts** (`shared-roll`, `folded-card`,
-`collect-peek`, `held-roll`, `draft-offer`, `digit-reach`, `rail-mode`,
-`clear-scope`, `reroll-history`, the whole `visibility` tag …) and **none
-covering the whole**.
-**SHIPPED in pieces, never named.** See gap **A** below — this is the largest
-journey in the product and it had no entry in any list, which is why all 30
-Tier U findings had to be found by inspection rather than by walking it.
+*Actor:* every player, dozens of times an evening. The single most-repeated
+act in the product.
+**Done when:** an intended roll — dice, modifiers, target, advantage,
+keep/drop, a name for what it is — can be composed, thrown, and read, without
+leaving the felt and without typing notation unless you want to.
+*Surfaces:* the well and the rim, the die palette, the rack and the collapsed
+rail, digits, the ± popover, the notation box, the ceremony, the verdict card.
+*Proof (parts):* `compose-grammar`, `spent-draft`, `draft-intent`,
+`digit-reach`, `rail-multi-pick`, `rail-compose-rules`, `named-verb`,
+`preview-honest`, `per-die-read`, `source-read`, `crit-budget`,
+`folded-card`, `shared-roll`.
+*Proof (composed):* **none** → **C1**.
+**SHIPPED in pieces.**
 
-### CUJ9 — "This table plays a different game than the last one."
+### CUJ9 — "I want the table to stay legible all evening." ⚠️ **NEWLY NAMED**
+
+*Actor:* every player, but the cost lands on whoever is running the game.
+**Done when:** thirty rolls into a session you can still see what is on the
+felt, find what happened earlier, repeat a roll you liked, and clear what you
+are done with — without the table becoming the chaos goal 5 forbids.
+*Surfaces:* the shelf, auto-collect, the peek, the log and its flyout, Clear
+table, reroll and its provenance.
+*Proof (parts):* `collect-peek`, `shelf-quiet`, `shelf-actions`,
+`auto-collect`, `shelf-cap`, `tidy-away`, `clear-scope`, `log-flyout`,
+`reroll-history`, `reroll-provenance-gate`, `endurance-log`,
+`endurance-outline`, `endurance-banner-actions`.
+*Proof (composed):* **none** → **C1**.
+**SHIPPED in pieces.** This is the journey goal 5 ("organized over
+realistic") exists to serve, and ROADMAP **U20** — the shelf ships invisible,
+with `title` as its entire information channel — is a hole in the middle of
+it.
+
+### CUJ10 — "I want to control who sees this roll." ⚠️ **NEWLY NAMED**
+
+*Actor:* the roller, or the person offering the roll.
+**Done when:** a roll can be open, face-down, secret, or whispered to named
+players; the choice is legible before you commit to it and after it lands;
+and nothing leaks by any path — including the raw wire.
+*Surfaces:* the ± popover's Visibility seg, the audience picker, offers, the
+reveal verb, the shroud.
+*Proof (parts):* the whole `visibility` tag — `held-roll`, `secret-roll`,
+`whisper-roll`, `whisper-unknown-audience`, `gm-screen-offer`,
+`targeted-offer`, `whisper-offer`, `reveal-authority`, `reveal-mid-playback`,
+`raw-sse-leak`, `resync-shrouded`, `fold-visibility`.
+*Proof (composed):* **none** → **C1**.
+**SHIPPED in pieces.** Serves goal 11 ("secrecy without hierarchy"). The
+best-covered journey in the product by part-count, and the one whose failure
+mode is worst, which is why `raw-sse-leak` asserts on the wire and not the
+DOM.
+
+### CUJ11 — "I'm at this table to follow along, not to roll." ⚠️ **NEWLY NAMED**
+
+*Actor:* someone present and not rolling — waiting a turn, adjudicating
+someone else's roll, or watching a held roll they cannot reveal. **Not a
+role** (goal 10): the same person rolls two minutes later. It is a *posture*,
+and the product has surfaces that only exist for it.
+**Done when:** someone who never touches the dice can still follow what
+happened — whose roll it was, what it meant, what is still hidden — at their
+own reading pace.
+*Surfaces:* the result banner as a spectator sees it, the log, the shelf,
+teammate pills, the roster, the shroud.
+*Proof:* `shared-roll`, `fold-visibility` (the spectator half),
+`shared-pools`, `presence`-tagged work.
+**PARTLY SHIPPED — and the gap was already found by inspection.** ROADMAP
+**U26**: *"the spectator's banner hover-hold silently does nothing —
+`armAutoCollect` bails on `!mine`, so the roller's 3 s clock yanks the card a
+spectator is reading."* A spectator-journey defect, found by reading code
+because no journey named the spectator. That defect is the argument for this
+entry; **U26**'s bullet is now this journey's first item.
+
+### CUJ12 — "This table plays a different game than the last one."
 
 *Actor:* whoever sets the table's rules; any player, per goal 10.
 **Done when:** the interpretation system, felt, dice set and zoom are the
@@ -153,7 +216,15 @@ mis-read.
 `pool-set-override`.
 **SHIPPED** (the mismatch banner's three exits, PROFILES §11 X1/X9).
 
-### CUJ10 — "I don't want to lose my characters." ⚠️ **NEWLY NAMED**
+**Adding a NEW interpretation system is not a journey** (ruled 2026-08-08).
+Goal 6's "others addable" means the `js/meanings.js` profile interface stays
+clean and documented — it is at v3 with six methods — **addable by a
+developer, in a commit**. There is no user-facing surface owed for authoring
+a chart, and this file says so once so the question stops being reopened.
+Goal 12 draws the same line: not a chat, not a character sheet, not a
+campaign manager, and not a rules editor.
+
+### CUJ13 — "I don't want to lose my characters." ⚠️ **NEWLY NAMED**
 
 *Actor:* anyone whose browser is the only copy.
 **Done when:** a library can be written to a file they hold, and **restored
@@ -200,15 +271,17 @@ the second person ends up holding.
 Solvable ones are ROADMAP items **C1–C5**. The ones that are Joe's call are
 listed after them and are **not** in the roadmap.
 
-**A. No journey owned the session itself.** CUJ8 above. Everything between
-"I joined" and "I left" — the whole reason the app exists — was absent from
-every list, so no roadmap item was ever sequenced against it and the entire
-UX audit had to be conducted by reading code. → **C1**.
+**A. No journey owned the session itself.** CUJ8–CUJ11 above. Everything
+between "I joined" and "I left" — the whole reason the app exists — was
+absent from every list, so no roadmap item was ever sequenced against it and
+the entire UX audit had to be conducted by reading code. Split into four on
+Joe's call (2026-08-08): one journey covering 60% of the app cannot tell you
+what is missing, which is the failure being fixed. → **C1**.
 
 **B. CUJ5 has no code and no scenario.** Known (`L4`), listed here so the
 zero shows in the same table as everything else.
 
-**C. CUJ10 is one-directional.** Export exists; restore does not. → **C2**.
+**C. CUJ13 is one-directional.** Export exists; restore does not. → **C2**.
 
 **D. No journey→scenario map, so journeys fail whole while passing in
 parts.** → **C3**.
@@ -217,26 +290,39 @@ parts.** → **C3**.
 that proves the product's headline story is named after a requirement number.
 → folded into **C1**.
 
+**G. The spectator had no journey, and a spectator defect proves it.** CUJ11
+above. ROADMAP U26's *"the spectator's banner hover-hold silently does
+nothing"* is a journey gap that had to be found by reading `armAutoCollect`.
+Named on Joe's call (2026-08-08); U26's bullet is now CUJ11's first item.
+
 **F. Namespace collisions have no owner** — `CUJ2` twice, `UX.md §7.24`
 twice, in the same week. → **C4**.
 
 ---
 
-## Open questions — Joe's call, deliberately not decided here
+## Decided by Joe, 2026-08-08
 
-1. **Is CUJ8 one journey or four?** It could split into *compose a roll* /
-   *read a result* / *keep a table legible* / *decide who sees what*. One
-   journey keeps the list honest about where the time goes; four would let
-   roadmap items sequence against something narrower. I left it as one and
-   flagged it rather than guessing at a decomposition of Joe's own game.
-2. **Is there a spectator journey?** Goal 10 says no roles, but held rolls,
-   whispers and the GM-screen offer all imply someone who is present and
-   *not* rolling. No journey covers "I am at this table to watch."
-3. **Is "add a new interpretation system" a CUJ?** Goal 6 promises
-   "D&D-style and others addable". If a table owner is ever meant to do that
-   without editing `js/meanings.js`, it is a journey with no surfaces at all.
-   If it is an engineering concern, this file should say so once.
-4. **PROFILES §10 still holds four open questions** (the date, deployed vs
-   local, whether a profile carries a felt, whether Apply-to-table renames
-   the room) and §11 ten more decisions. They gate CUJ6/CUJ7 refinements and
-   are unanswered since 2026-08-06.
+1. **CUJ8 is four journeys, not one** — *roll a thing* / *keep it legible* /
+   *who sees it* / *follow along* (CUJ8–CUJ11). One journey covering most of
+   the app cannot drive gaps, and driving gaps is the point.
+2. **The spectator is a journey** (CUJ11) — a *posture*, not a role, since
+   the same person rolls two minutes later. Goal 10 is untouched.
+3. **Adding an interpretation system is a developer act, not a journey.**
+   Goal 6's "addable" means the `js/meanings.js` interface stays clean and
+   documented; there is no surface owed for authoring a chart. Recorded in
+   CUJ12 so the question stops being reopened.
+4. **PROFILES' open questions** get triaged first. **Done** — and the
+   count was wrong: §11.9's ten are *decisions taken*, not questions. Of
+   §10's four, three are closed (the date is now; deployment is Cloud Run and
+   live; §11.9 (4) already says a profile carries no felt). **One is live:**
+   whether the organizer's Apply-to-table should also rename the room. One
+   ops residual: DEPLOY.md's >60-minute reconnect check is unverified.
+
+## Still open
+
+**One product question**, from the PROFILES triage: *should the organizer's
+`Apply to table` also rename the room?* The standing proposal is no — the
+file carries `table.name`, and the `?room=` key stays whatever the link says,
+because the key is the durable address and the name is cosmetic. Unruled
+since 2026-08-06. Everything else conceptual is decided; what remains is the
+build work in ROADMAP Tier C.

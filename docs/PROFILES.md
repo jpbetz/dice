@@ -362,7 +362,27 @@ Checked against ROADMAP's standing list:
 7. **No server-side persistence, no Google sign-in, before game
    night.**
 
-## 10. Open questions for Joe
+## 10. Open questions for Joe — **TRIAGED 2026-08-08**
+
+> Of the four below, **three are closed** by time or by shipped code and one
+> is live. §11.9's ten are *decisions taken*, not questions — they were
+> miscounted as open in the CUJ audit's first pass.
+>
+> - **The date — CLOSED.** "Next week" is now: today is 2026-08-08 and game
+>   night is 2026-08-13. G1–G6 all shipped; nothing needs cutting.
+> - **Deployed or local — CLOSED.** Cloud Run, live, deployed twice on
+>   2026-08-08 (`dice-00007-pwc`, `dice-00008-824`). §5's mechanism 3 (room
+>   TTL) is therefore the one that matters. *Residual:* DEPLOY.md's
+>   ">60-minute reconnect" check is still unverified — the one real thing
+>   left in this bullet, and it is an ops check, not a decision.
+> - **Does a profile carry a felt or a dice set — CLOSED by §11.9 (4):**
+>   name, system, dice set, pools. Not sound, not chips, not felt.
+> - **Should Apply-to-table rename the room — STILL OPEN.** The proposal
+>   below (file carries `table.name`; the `?room=` key stays whatever the
+>   link says) has never been ruled. It is the only live question in this
+>   section.
+
+
 
 - **The date.** "Next week" was read as the week of 2026-08-10. If it
   is sooner, G4–G6 are the ones to cut — G1–G3 alone make the game
