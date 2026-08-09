@@ -1991,6 +1991,42 @@ html, body {
 #profile-banner .pb-label b { color: var(--ivory); font-weight: 400; }
 #profile-banner .btn { margin-left: 0; flex: none; }
 
+/* THE TABLE'S OFFER (C10). The mismatch banner's shape and place — standing,
+   named, with a way out — in the roll verb's gold rather than red, because
+   this one reports an OPPORTUNITY and not a loss. It sits below the mismatch
+   (z 2 to its 3) for the case where both are true: what you are holding
+   being mis-read is the more urgent of the two. */
+#offer-banner {
+  position: sticky;
+  top: var(--draft-h, 0px);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  margin: 14px 0 -4px;
+  padding: 8px 9px 9px;
+  border: 1px solid rgba(212, 175, 55, 0.42);
+  border-radius: 8px;
+  background: rgba(36, 32, 22, 0.96);
+}
+#offer-banner.hidden { display: none; }
+/* STACKED, and the sentence is not in the label voice — the same correction
+   the storage banner needed, for the same reason. .pb-label's tracked 10px
+   uppercase suits a fact you re-read at leisure ("Nessa reads as Your Soul
+   Deal"); here it turned a short sentence into "BO WAS PREP…" beside two
+   buttons that had eaten the width. The name keeps the emphasis; the
+   sentence is set to be read. */
+#offer-banner .ob-label {
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ivory);
+}
+#offer-banner .ob-label b { color: var(--gold-bright); font-weight: 700; }
+#offer-banner .ob-row { display: flex; gap: 8px; }
+#offer-banner .btn { margin-left: 0; flex: none; }
+
 /* THE STORAGE JAM (CUJ13). Same standing-banner shape as the mismatch above
    — same place, same rhythm — in RED, because HUE = ACT and this is the only
    banner reporting loss rather than a choice. It sits ABOVE the mismatch in

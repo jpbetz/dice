@@ -348,6 +348,28 @@ limitations under the License.
         <button id="profile-keep" class="btn tiny ghost"
                 title="Leave it as it is — these pools roll the same either way">Keep</button>
       </div>
+      <!-- THE TABLE HAS CHARACTERS FOR YOU (ROADMAP C10). A returning player
+           following a plain invite link joins straight through — no picker,
+           no seats, no offer — and lands under their old name holding their
+           old rack. U3 fixed exactly this for `&as=` links and stopped, while
+           UX §7.19 still calls the one-link form primary.
+           NOT a modal at the door: that was built first and reverted the same
+           day, because "unclaimed" is not knowable pre-join (the peek omits
+           the roster on purpose) so it fired for the organizer at their own
+           table and hung three scenarios waiting for a join that never came.
+           A standing, dismissible invitation cannot block a join at all, and
+           it works for every arrival rather than only for name-matches. Same
+           grammar as the mismatch banner above: standing, named, with a way
+           out. -->
+      <div id="offer-banner" class="hidden">
+        <span class="ob-label"></span>
+        <div class="ob-row">
+          <button id="offer-take" class="btn tiny confirm" aria-haspopup="menu"
+                  aria-expanded="false">Choose…</button>
+          <button id="offer-dismiss" class="btn tiny ghost"
+                  title="Keep what you are holding — this table will stop asking">Not now</button>
+        </div>
+      </div>
       <!-- THE ONE FAILURE THAT MUST NOT BE TRANSIENT (CUJ13). saveGroups is
            the app's highest-frequency writer — every ✎ edit, every added
            pool, every applied import — and it discarded saveProfileStore's

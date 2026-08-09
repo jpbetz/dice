@@ -3174,6 +3174,63 @@ function isMine(entry) {
   return !netOnline || !!(net && entry && entry.playerId === net.playerId);
 }
 
+// THE TABLE'S OFFER, said once per room (ROADMAP C10). A returning player
+// joins straight through — no picker — so nothing ever tells them the table
+// is holding characters. The switcher over the rack has listed them since
+// C17; this is what points at it.
+//
+// Dismissal is per ROOM and persists, so a player who said "not now" is not
+// asked again all evening. It clears itself when there is nothing to offer,
+// so a table that gains characters later can still speak up.
+const LS_OFFER_SEEN = 'dice.offerseen.v1';
+function offerDismissed() {
+  try { return (load(LS_OFFER_SEEN, []) || []).includes(ROOM); } catch { return false; }
+}
+function dismissOffer() {
+  try {
+    const seen = load(LS_OFFER_SEEN, []) || [];
+    if (!seen.includes(ROOM)) { seen.push(ROOM); save(LS_OFFER_SEEN, seen.slice(-40)); }
+  } catch { /* a browser that will not store asks once more; harmless */ }
+  updateOfferBanner();
+}
+
+function updateOfferBanner() {
+  const el = document.getElementById('offer-banner');
+  if (!el) return;
+  const sys = tableSystem();
+  const held = new Set(profilesOf(profileStore).map((p) => p.name.toLowerCase()));
+  const offers = netOnline && !offerDismissed()
+    ? tableOffers().filter((o) => (!o.rec.system || o.rec.system === sys)
+        && !held.has(o.rec.name.toLowerCase()))
+    : [];
+  el.classList.toggle('hidden', !offers.length);
+  if (!offers.length) return;
+  // IF ONE OF THEM IS YOU, lead with it. `unclaimedSeats` matches prepared
+  // seats against roster NAMES, so a player whose stored name happens to
+  // equal a character silently claims that chair on everyone's rail while
+  // holding none of its pools — the second half of C10's defect. Naming it
+  // here is what turns that collision into an invitation.
+  // identityInfo() is the one place the client's own display name is
+  // resolved (net does not expose it); reaching for `net.name` read undefined
+  // and quietly turned the name-collision case into the generic one.
+  const me = ((identityInfo() || {}).name || '').toLowerCase();
+  const mine = offers.find((o) => o.rec.name.toLowerCase() === me);
+  const label = el.querySelector('.ob-label');
+  label.textContent = '';
+  const b = document.createElement('b');
+  const rest = document.createTextNode('');
+  if (mine) {
+    b.textContent = mine.rec.name;
+    rest.textContent = ` was prepared for you${mine.from === 'prepared' ? '' : ` by ${mine.from}`}.`;
+  } else {
+    b.textContent = offers.length === 1 ? offers[0].rec.name : `${offers.length} characters`;
+    rest.textContent = offers.length === 1
+      ? ` is on offer at this table.`
+      : ` are on offer at this table.`;
+  }
+  label.append(b, rest);
+}
+
 // Repaint the primary verb on every mounted card, for the one thing that can
 // change under a card that is already painted: the roller leaving. Called from
 // renderPlayers, which is the roster's single write point.
@@ -10620,6 +10677,7 @@ function setChips(on, persist = true) {
 function onTableSystemChanged() {
   mismatchKept = false;
   updateProfileBanner();
+  updateOfferBanner(); // the system filter decides what is on offer
   renderProfileLibrary();
 }
 
@@ -12163,6 +12221,8 @@ function renderTableProfiles() {
 }
 
 // The banner's three exits.
+document.getElementById('offer-take').addEventListener('click', openProfileMenu);
+document.getElementById('offer-dismiss').addEventListener('click', dismissOffer);
 document.getElementById('profile-switch').addEventListener('click', openProfileMenu);
 document.getElementById('profile-bind').addEventListener('click', () => showProfileNote(bindActiveToTable()));
 document.getElementById('profile-keep').addEventListener('click', () => {
@@ -12938,6 +12998,9 @@ const ROSTER_MAX = 6; // pills shown before the tail folds into +N — raised
 function renderPlayers() {
   rosterEl.innerHTML = '';
   repaintAwayVerbs(); // a departure can make a roll on screen clearable (U19)
+  // …and the roster IS where the table's characters come from since C17, so
+  // someone arriving with a library, or leaving with one, changes the offer.
+  updateOfferBanner();
   const you = net ? net.playerId : null;
   const others = players.filter((p) => p.id !== you);
   for (const p of others.slice(0, ROSTER_MAX)) {

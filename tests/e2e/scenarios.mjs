@@ -562,6 +562,71 @@ export const scenarios = [
     },
   },
   {
+    name: 'table-offers-you',
+    tags: ['profiles', 'prepared-seat', 'cuj7', 'cuj3'],
+    // C10 — THE RETURNING PLAYER. A player with a stored name following a
+    // plain invite link joins STRAIGHT THROUGH: no picker, no seats, no
+    // offer. They land under their old name holding their old rack, and
+    // nothing ever tells them the table is holding characters for them. U3
+    // fixed exactly this for `&as=` links and stopped there, while UX §7.19
+    // still calls the one-link-for-everyone form primary.
+    //
+    // A MODAL AT THE DOOR WAS BUILT FIRST AND REVERTED THE SAME DAY: the word
+    // doing the work is "unclaimed", and the pre-join peek omits the roster
+    // on purpose, so the gate fired for the organizer at their own table and
+    // hung three scenarios waiting for a join that never came. A standing
+    // invitation cannot block a join at all, and it works for every arrival
+    // rather than only for the ones whose name happens to match.
+    async fn(ctx) {
+      const dm = await ctx.newTable({ origin: '127.0.0.10', name: 'Walter' });
+      await dm.dbg('profiles.reset()');
+      for (const nm of ['Rill', 'Bo']) {
+        await dm.dbg(`profiles.create(${JSON.stringify(nm)}, 'soul-deal')`);
+        await dm.dbg(`setGroups([{name: 'Strength', notation: '2d8', category: 'Attributes'}])`);
+      }
+      await dm.settle();
+
+      // A RETURNING player: a stored name, no `&as=`. They join straight
+      // through — that part is deliberate and stays — and are told.
+      const back = await ctx.newTable({ origin: 'localhost', name: 'Wanderer' });
+      await back.dbg('profiles.reset()');
+      assert.equal(await back.eval(
+        `document.getElementById('name-modal').classList.contains('hidden')`), true,
+      'a stored name still joins straight through — no modal was added');
+      await back.dbg('setPanelState({pools: true})');
+      await back.waitFor(
+        `!document.getElementById('offer-banner').classList.contains('hidden')`,
+        { desc: 'the table says it is holding characters' });
+      // A COUNT, not a hard-coded one: Walter holds the profile reset() dealt
+      // him as well as the two he made, and all three are genuinely on offer.
+      // Asserting "2" would be asserting how many characters he happens to
+      // have rather than that the banner counts them.
+      assert.match(await back.eval(`document.getElementById('offer-banner').textContent`),
+        /\d+ characters are on offer/, 'and how many');
+
+      // "Not now" is remembered for THIS room, so it does not nag all evening.
+      await back.eval(`document.getElementById('offer-dismiss').click()`);
+      assert.equal(await back.eval(
+        `document.getElementById('offer-banner').classList.contains('hidden')`), true,
+      'and it takes an answer');
+
+      // THE NAME COLLISION, which is C10's second half: a player whose stored
+      // name equals a prepared character silently claims that chair on
+      // everyone's rail while holding none of its pools. Naming it turns the
+      // collision into an invitation.
+      const bo = await ctx.newTable({ origin: '127.0.0.11', name: 'Bo' });
+      await bo.dbg('profiles.reset()');
+      await bo.dbg('setPanelState({pools: true})');
+      await bo.waitFor(
+        `!document.getElementById('offer-banner').classList.contains('hidden')`,
+        { desc: 'Bo is told too' });
+      assert.match(await bo.eval(`document.getElementById('offer-banner').textContent`),
+        /prepared for you/, 'and told it is THEIRS, by name');
+      await dm.dbg('profiles.reset()');
+      await back.dbg('profiles.reset()');
+    },
+  },
+  {
     name: 'join-door',
     tags: ['seat', 'profiles', 'cuj3', 'cuj7'],
     // Joe 2026-08-09, three things about the door: it says JOIN, the NAME

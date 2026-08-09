@@ -1182,7 +1182,7 @@ Two follow-on corrections, both found by looking:
 
 Pinned by `author-in-place`.
 
-### C10. The generic invite link never offers a prepared seat to a returning player — DEFECT, medium — **DESIGN REOPENED**
+### C10. The generic invite link never offers a prepared seat to a returning player — SHIPPED
 
 *CUJ7, steps 2 and 7.* The picker is gated on `name && AS_PARAM`. With a
 stored `dice.name.v1` and **no `&as=`**, `initNet` skips both `peekTable` and
@@ -1228,6 +1228,31 @@ answers, none free:
 
 (2) and (3) compose and are probably the answer together; (1) is the one that
 touches the privacy surface. **Decide before rebuilding.**
+
+**SHIPPED 2026-08-09 — option (3), with (2) folded in.** A standing,
+dismissible **offer banner** in the panel, not a modal at the door. It cannot
+block a join at all, which is the property the first attempt lacked, and it
+serves every arrival rather than only the ones whose name happens to match.
+
+The join stays exactly as it was: a stored name with no `&as=` still joins
+straight through, and the pin asserts that no modal was added. What changed is
+that the table now *says* it is holding characters — the switcher over the
+rack has listed them since C17, and this points at it. Two exits: `Choose…`
+opens that switcher, `Not now` is remembered **per room** so it does not nag
+all evening.
+
+**(2) is the banner's lead line.** `unclaimedSeats` matches prepared seats
+against roster NAMES, so a player whose stored name equals a character
+silently claims that chair on everyone's rail while holding none of its pools
+— C10's second half. When the offer includes a character with your name, the
+banner leads with it: *"**Bo** was prepared for you by Walter."* The collision
+becomes the invitation.
+
+(1) — a `seatsOpen` count on the peek — stays unbuilt and unneeded: nothing
+here reads the peek, so the roster-privacy boundary is untouched.
+
+Pinned by `table-offers-you`, which asserts the straight-through join, the
+banner, the per-room dismissal, and the name-collision lead.
 
 ### C11. The seat picker is unusable on the phone it is designed for — CUJ7, small
 
