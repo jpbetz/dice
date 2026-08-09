@@ -3215,7 +3215,18 @@ function updateOfferBanner() {
   if (!el) return;
   const sys = tableSystem();
   const held = new Set(profilesOf(profileStore).map((p) => p.name.toLowerCase()));
-  const offers = netOnline && !offerDismissed()
+  // ONE BANNER AT A TIME (2026-08-09). All three — storage, mismatch, offer —
+  // are `position: sticky` at the SAME `top: var(--draft-h)`, so two of them
+  // up at once do not stack, they OVERLAP: the higher z-index covers the
+  // lower one's label and leaves its buttons peeking out from underneath. Joe
+  // photographed exactly that on his phone — a bare `Choose… / Not now` above
+  // a storage warning, with the sentence explaining them nowhere.
+  //
+  // The order is urgency, and it is also meaning: being offered a character
+  // while NOTHING PERSISTS is a trap, because taking one would not survive
+  // the tab. The jam outranks the offer for the same reason it outranks the
+  // mismatch — it is the one that makes the others pointless.
+  const offers = netOnline && !offerDismissed() && !storageJammed
     ? tableOffers().filter((o) => (!o.rec.system || o.rec.system === sys)
         && !held.has(o.rec.name.toLowerCase()))
     : [];
@@ -6966,6 +6977,10 @@ function setStorageJammed(on) {
   storageJammed = on;
   const el = document.getElementById('storage-banner');
   if (el) el.classList.toggle('hidden', !on);
+  // The two it suppresses have to be repainted either way: on, to stand
+  // down; off, to come back if they still apply.
+  updateProfileBanner();
+  updateOfferBanner();
   if (on) announce('Your changes are not being saved. Download your data.');
 }
 
@@ -11925,7 +11940,10 @@ function updateProfileBanner() {
   // The lobby counts: with no table, "the table's system" is this browser's own
   // solo setting (§11 X9), and all three exits work there.
   const m = profileMismatch();
-  const on = !!m && !mismatchKept;
+  // …and the mismatch yields to the jam too (see updateOfferBanner): a
+  // profile being mis-read matters less than nothing being saved, and two
+  // sticky banners at one offset overlap rather than stack.
+  const on = !!m && !mismatchKept && !storageJammed;
   const banner = document.getElementById('profile-banner');
   banner.classList.toggle('hidden', !on);
   groupsListEl.classList.toggle('profile-editing', on);

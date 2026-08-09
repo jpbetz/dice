@@ -1086,6 +1086,20 @@ export const scenarios = [
         `document.getElementById('storage-banner').contains(document.getElementById('storage-download'))`),
       true, 'and the way to save the work is in the notice itself');
 
+      // ONE BANNER AT A TIME. All three are `position: sticky` at the SAME
+      // top, so two up at once OVERLAP rather than stack — the higher
+      // z-index covers the lower one's label and leaves its buttons peeking
+      // out from under, which is what a phone photograph caught. The jam
+      // outranks both, and that is meaning as well as order: being offered a
+      // character while nothing persists is a trap, because taking one would
+      // not survive the tab.
+      assert.equal(await a.eval(
+        `document.getElementById('offer-banner').classList.contains('hidden')`), true,
+      'the offer stands down while nothing is being saved');
+      assert.equal(await a.eval(
+        `document.getElementById('profile-banner').classList.contains('hidden')`), true,
+      'and so does the mismatch');
+
       await a.dbg('jamStorage(false)');
       await a.dbg(`setGroups([{name: 'Wit', notation: '1d12', category: 'Attributes'}])`);
       assert.equal(await shown(), false, 'and it clears when storage comes back');
