@@ -5680,8 +5680,27 @@ window.addEventListener('resize', refitView);
 // Storage helpers
 // ---------------------------------------------------------------------------
 
+// A STORED VALUE OF THE WRONG SHAPE IS NOT A VALUE (2026-08-09). This caught
+// a parse failure and nothing else, so valid JSON of the wrong TYPE sailed
+// straight through: `dice.log.v1` holding `{"a":1}` made `log` an object, and
+// the first `for…of` over it threw `log is not iterable` at boot. Found by
+// seeding corrupt keys against the deployed site — the app survived every
+// case, but that one left an uncaught exception behind it.
+//
+// The fallback is the type declaration: an array fallback refuses a non-array,
+// an object fallback refuses a primitive, a primitive fallback refuses a
+// different primitive. A `null` fallback declares nothing and is passed
+// through untouched, because the callers that pass null (panels, roomSetup)
+// do their own shape check and would lose it here.
 function load(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+  try {
+    const v = JSON.parse(localStorage.getItem(key));
+    if (v === null || v === undefined) return fallback;
+    if (fallback === null || fallback === undefined) return v;
+    if (Array.isArray(fallback) !== Array.isArray(v)) return fallback;
+    if (typeof v !== typeof fallback) return fallback;
+    return v;
+  } catch { return fallback; }
 }
 function save(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }

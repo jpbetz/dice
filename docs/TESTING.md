@@ -205,6 +205,35 @@ The `#`-in-a-name whisper-misdirection ban is pinned in the redaction suite
 fails closed as `unknown_audience`, the sanitized name addresses exactly its
 player), which runs in `test:unit`.
 
+## Reading crashes from the field
+
+Clients report uncaught exceptions, unhandled rejections and failed resource
+loads to `POST /api/clienterror`, which writes one `clienterr` line to stdout
+and nothing else — no store, no file, no retention decision. On Cloud Run that
+means:
+
+```bash
+gcloud run services logs read dice --region us-central1 --limit 200 | grep clienterr
+```
+
+`js/report.js` is a **classic script loaded before the module graph**, because
+the most valuable failure to catch is `js/main.js` failing to parse or one of
+its imports 404ing — at which point nothing inside main.js runs.
+
+**What a report carries:** message, trimmed stack, source position, user
+agent, viewport, seconds-since-boot, and a per-tab random `sid` so two lines
+can be told to be one session. **What it must never carry:** the room key
+(the table's only access control), player names, pool names, notation, roll
+values. `crash-reporting` asserts those absences, not just the presence.
+
+Bounds, because the door is unauthenticated like every other: the client sends
+one report per distinct error and at most 12 a session; the server drops past
+20/minute per address and truncates every field rather than trusting it.
+
+A scenario that throws ON PURPOSE arms `ctx.expectErrors(/…/)` with a regex
+matching only its own messages — page exceptions stay fatal for every other
+scenario, and for any other message in that one.
+
 ## Scenario backlog
 
 Not yet scripted (need `__diceDebug` hooks first — add them with the

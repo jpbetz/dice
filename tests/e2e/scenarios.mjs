@@ -374,6 +374,65 @@ export const scenarios = [
     },
   },
   {
+    name: 'crash-reporting',
+    tags: ['net', 'perf'],
+    // Joe 2026-08-09: "no telemetry here has me worried about maintaining
+    // this." A browser that breaks now says so, to the server log, where
+    // Cloud Run is already keeping stdout.
+    //
+    // The handlers live in a CLASSIC script loaded before the module graph,
+    // because the most valuable failure to catch is js/main.js failing to
+    // parse or one of its imports 404ing — at which point nothing inside
+    // main.js runs and a handler registered there would never exist.
+    async fn(ctx) {
+      // This scenario's SUBJECT is uncaught exceptions, so the ones it throws
+      // are not its failures. Narrowed to its own messages: any other
+      // exception still fails it.
+      ctx.expectErrors(/scenario-(boom|reject)/);
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+
+      // An uncaught exception reaches the server, with a stack.
+      await a.eval(`setTimeout(() => { throw new Error('scenario-boom'); }, 0)`);
+      await ctx.waitForLog(/clienterr .*msg="[^"]*scenario-boom/,
+        { desc: 'an uncaught exception is reported' });
+      await ctx.waitForLog(/clienterr .*stack=/, { desc: 'and carries a stack' });
+
+      // An unhandled rejection is a different event and is caught too.
+      // `void`, so the eval does not RETURN the rejected promise — CDP is
+      // told to await promise results, and handing it this one would fail the
+      // eval instead of leaving the rejection unhandled, which is the whole
+      // thing under test.
+      await a.eval(`void Promise.reject(new Error('scenario-reject'))`);
+      await ctx.waitForLog(/clienterr .*kind="rejection".*scenario-reject/,
+        { desc: 'an unhandled rejection is reported' });
+
+      // WHAT IT MUST NOT CARRY. The room key is the table's only access
+      // control (goal 10: there is no other), so a door anyone on the
+      // internet can knock on must never log it — and no player name or
+      // pool text goes either.
+      await a.eval(`window.__diceReport('scenario-explicit')`);
+      await ctx.waitForLog(/clienterr .*scenario-explicit/, { desc: 'the explicit door works' });
+      const logs = ctx.serverLog();
+      const lines = logs.split('\n').filter((l) => l.includes('clienterr'));
+      assert.ok(lines.length >= 3, `three reports landed (got ${lines.length})`);
+      for (const l of lines) {
+        assert.ok(!l.includes(ctx.room), `no report carries the room key: ${l.slice(0, 160)}`);
+        assert.ok(!/\bAlice\b/.test(l), `no report carries a player name: ${l.slice(0, 160)}`);
+      }
+
+      // A REPEAT IS COUNTED, NOT RE-SENT: the same error 400 times is one
+      // fact about the build and 400 requests about nothing.
+      const before = ctx.serverLog().split('\n').filter((l) => l.includes('scenario-boom')).length;
+      for (let i = 0; i < 5; i++) {
+        await a.eval(`setTimeout(() => { throw new Error('scenario-boom'); }, 0)`);
+      }
+      await a.dbg('sim(120)');
+      const after = ctx.serverLog().split('\n').filter((l) => l.includes('scenario-boom')).length;
+      assert.equal(after, before, 'a repeat of a reported error sends nothing further');
+    },
+  },
+  {
     name: 'hidden-means-hidden',
     tags: ['chrome'],
     // C20 — `.hidden` IS A CLASS THIS STYLESHEET DOES NOT DEFINE. There is a

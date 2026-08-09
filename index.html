@@ -26,6 +26,13 @@ limitations under the License.
      target recoverable rather than impossible. -->
 <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
 <title>Dice Table</title>
+<!-- CRASH REPORTING, before the module graph and on purpose (js/report.js).
+     The most valuable failure to catch is js/main.js failing to PARSE or one
+     of its imports 404ing — at which point nothing inside main.js runs and a
+     handler registered there would never exist. A classic <script> with no
+     `type` is the only thing running at that moment. It has no imports, it
+     cannot throw, and it never blocks the boot. -->
+<script src="js/report.js"></script>
 <link rel="stylesheet" href="css/style.css">
 <script type="importmap">
 {

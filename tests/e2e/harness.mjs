@@ -482,10 +482,20 @@ export class Ctx {
 
   // Uncaught page exceptions are scenario failures; console.error is noise
   // worth surfacing but not fatal.
+  //
+  // …unless a scenario THROWS ON PURPOSE. `crash-reporting` exists to prove
+  // that an uncaught exception reaches the server, so the exception is its
+  // subject rather than its failure. expectErrors(re) narrows the exemption
+  // to matching messages, so a scenario that arms this still fails on any
+  // OTHER exception — a blanket opt-out would hide the next real one.
+  expectErrors(re) { this.expectedErrors = re; }
+
   collectErrors() {
     const errors = [], warnings = [];
     for (const t of this.tables) {
-      errors.push(...t.page.errors);
+      errors.push(...(this.expectedErrors
+        ? t.page.errors.filter((e) => !this.expectedErrors.test(String(e)))
+        : t.page.errors));
       warnings.push(...t.page.consoleErrors);
     }
     return { errors, warnings };

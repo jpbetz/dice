@@ -735,6 +735,18 @@ function logDebug(build) { if (LOG_DEBUG) writeLog(typeof build === 'function' ?
 // Kept next to stripCtl/cutText because the same discipline applies: one
 // helper decides how untrusted text becomes a log token, so no future site
 // re-derives its own quoting rule.
+// The caller's address, for the one thing this server rate-limits by it.
+// Cloud Run terminates TLS at its front end and puts the real client first in
+// x-forwarded-for, so the socket address is the proxy and useless here; the
+// socket is the fallback for a local run where there is no proxy. Truncated
+// and never logged beside anything that identifies a person — it exists to
+// bound a door, not to follow anyone around.
+function clientAddr(req) {
+  const fwd = req.headers['x-forwarded-for'];
+  if (typeof fwd === 'string' && fwd) return fwd.split(',')[0].trim().slice(0, 45);
+  return String((req.socket && req.socket.remoteAddress) || '?').slice(0, 45);
+}
+
 function logField(k, v) {
   if (Array.isArray(v)) return `${k}=[${v.length}]`;
   if (typeof v === 'string') return `${k}="${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
@@ -1100,6 +1112,61 @@ async function handlePong(req, res) {
 //
 // A leave for an unknown player/room 404s like any other lookup, which the
 // beacon ignores — it is fire-and-forget by construction.
+// POST /api/clienterror — a browser telling us it broke (Joe 2026-08-09:
+// "no telemetry here has me worried about maintaining this").
+//
+// It writes to STDOUT and nowhere else. Cloud Run captures stdout, so this is
+// searchable with the logs already being kept and adds no store, no file, no
+// retention decision and nothing to clean up. Nothing is broadcast — a
+// player's crash is not table furniture.
+//
+// UNAUTHENTICATED, like every other door here (goal 10), which makes it a
+// log-spam vector unless it is bounded. Three bounds: the client sends at
+// most 12 per session and dedupes repeats, this refuses more than
+// CLIENT_ERROR_PER_MIN from one address per minute, and the payload is
+// truncated field by field rather than trusted. The last one is the one that
+// matters, because the first is advice to a client that may not be ours.
+//
+// WHAT IT REFUSES TO LOG is as deliberate as what it keeps: no room key (it
+// is the table's only access control), no player name, no pool or roll text.
+// A stack trace and a user agent are enough to find a bug, and are the most
+// that can be taken from a door anyone on the internet can knock on.
+const CLIENT_ERROR_PER_MIN = 20;
+const clientErrorHits = new Map(); // ip -> {n, min}
+
+async function handleClientError(req, res) {
+  const ip = clientAddr(req);
+  const min = Math.floor(Date.now() / 60000);
+  const hit = clientErrorHits.get(ip);
+  if (hit && hit.min === min) {
+    if (hit.n >= CLIENT_ERROR_PER_MIN) return sendJson(res, 200, { ok: true }); // silent drop
+    hit.n++;
+  } else {
+    clientErrorHits.set(ip, { n: 1, min });
+    if (clientErrorHits.size > 500) {
+      for (const [k, v] of clientErrorHits) if (v.min !== min) clientErrorHits.delete(k);
+    }
+  }
+
+  const body = await readJsonBody(req);
+  // A malformed crash report is itself a fact worth one line, but not worth
+  // an error response — the client that sent it is already broken.
+  if (!body.ok || !body.value || typeof body.value !== 'object') {
+    log(`clienterr ${logField('ip', ip)} unparseable`);
+    return sendJson(res, 200, { ok: true });
+  }
+  const v = body.value;
+  const f = (k, n) => String(v[k] === undefined || v[k] === null ? '' : v[k]).slice(0, n).replace(/\s+/g, ' ');
+  log(`clienterr ${logField('ip', ip)} ${logField('kind', f('kind', 16))} `
+    + `${logField('sid', f('sid', 12))} ${logField('up', f('up', 8))}s `
+    + `${logField('view', f('view', 12))} ${logField('msg', f('message', 300))} `
+    + `${logField('at', `${f('source', 200)}:${f('line', 8)}:${f('col', 8)}`)} `
+    + `${logField('ua', f('ua', 200))}`);
+  const stack = f('stack', 900);
+  if (stack) log(`clienterr ${logField('sid', f('sid', 12))} stack=${stack}`);
+  sendJson(res, 200, { ok: true });
+}
+
 async function handleLeave(req, res) {
   const body = await readJsonBody(req);
   if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
@@ -2781,6 +2848,7 @@ const server = http.createServer((req, res) => {
     if (route === '/api/join' && req.method === 'POST') return handleJoin(req, res);
     if (route === '/api/events' && req.method === 'GET') return handleEvents(req, res, url);
     if (route === '/api/pong' && req.method === 'POST') return handlePong(req, res);
+    if (route === '/api/clienterror' && req.method === 'POST') return handleClientError(req, res);
     if (route === '/api/leave' && req.method === 'POST') return handleLeave(req, res);
     if (route === '/api/roll' && req.method === 'POST') return handleRoll(req, res);
     if (route === '/api/reveal' && req.method === 'POST') return handleReveal(req, res);
