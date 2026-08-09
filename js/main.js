@@ -8021,6 +8021,17 @@ function renderForeignPools(owner) {
 // directions: 4d6dl1 values 24 and caps at 18, 1d6! values 6 and reaches
 // 24. The one legend sentence rides as the title.
 const DICE_VALUE_LEGEND = 'dice value — the sum of every die’s highest face; modifiers, drops and explosions are not counted';
+// What this shelf is allowed to cost under the rack's own system, or 0 when
+// the system names no budget. The PROFILE's system, like the trio shelves —
+// a character is priced by the rulebook it was built for, not by whichever
+// table it is briefly sitting at.
+function shelfBudget(label) {
+  const sysId = (activeProfile(profileStore) || {}).system || tableSystem();
+  const sys = SYSTEMS[sysId] || null;
+  const b = sys && sys.budget;
+  return (b && Number.isFinite(b[label])) ? b[label] : 0;
+}
+
 function shelfDiceValue(pools) {
   let sum = 0;
   for (const g of pools) {
@@ -8111,8 +8122,27 @@ function renderGroups() {
     if (poolsEdit) {
       const fig = document.createElement('span');
       fig.className = 'psh-fig';
-      fig.title = DICE_VALUE_LEGEND;
-      fig.textContent = String(shelfDiceValue(sec.pools));
+      const spent = shelfDiceValue(sec.pools);
+      // THE BUDGET, WHERE IT IS BEING SPENT (C8). The bare integer answered
+      // "what does this shelf cost" and never "is that right" — so CUJ6's
+      // own done-when, *priced against the system's creation budget*, was
+      // served by the player remembering 100 from a design document. The
+      // target comes from the SYSTEM's profile (meanings.js `budget`), so no
+      // Soul Deal number lives at a render site, which is what
+      // POOL-ANALYSIS §9's ruling was protecting. A system that names no
+      // budget still prints its bare total.
+      const target = shelfBudget(sec.label);
+      if (target) {
+        fig.title = `${DICE_VALUE_LEGEND} — this shelf's budget is ${target}`;
+        fig.textContent = `${spent}/${target}`;
+        // Over is the only state worth a hue: under-budget is an ordinary
+        // moment in building a character, and colouring it would nag at
+        // every step of the thing it is meant to help.
+        fig.classList.toggle('over', spent > target);
+      } else {
+        fig.title = DICE_VALUE_LEGEND;
+        fig.textContent = String(spent);
+      }
       head.appendChild(fig);
     }
     groupsListEl.appendChild(head);

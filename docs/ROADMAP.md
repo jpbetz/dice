@@ -973,7 +973,7 @@ everything, which is right for `table` and wrong for `mine`.
 Still open, and small: **no "clear the shelf, keep the felt"**. Nobody has
 asked for it; noting it so the absence stays deliberate.
 
-### C8. The creation budget exists in code and never reaches a screen — CUJ6, needs design
+### C8. The creation budget exists in code and never reaches a screen — SHIPPED
 
 *CUJ6, the journey's stated done-when.* Shelves print a bare integer
 (`shelfDiceValue`) with **no target, no over/under, no colour**. The prices
@@ -987,6 +987,24 @@ Partly tracked already as §2l ⑤ (the ledger sheet, "session-only target")
 and ruled in POOL-ANALYSIS §9 ("the number `100` appears nowhere in code").
 **The ruling and the journey are in tension** and that is the thing to
 decide: a budget that cannot be shown cannot be spent deliberately.
+
+**SHIPPED 2026-08-08 (Joe's call: the system profile names its budget).**
+`SYSTEMS['soul-deal'].budget` sits beside the chart — the same place every
+other fact of that rulebook lives, which is what makes it pluggable rather
+than hardcoded (goal 6). Shelf heads read it through one accessor and print
+`100/100`; a system naming no budget prints a bare total, which is what D&D
+does. §9's ruling is **amended, not overturned**, in POOL-ANALYSIS itself:
+what it protected — no Soul Deal rule scattered across render sites — is
+intact, and the session-only half (no storage, no wire key, no portable
+field) is untouched. Over-budget is the only state with a hue: being part-way
+through building a character is not an error, and colouring it would nag at
+every step of the thing the figure exists to help.
+
+The budget follows the **profile's** system, like the trio shelves — a
+character is priced by the rulebook it was built for, not by whichever table
+it is briefly sitting at. §2l ⑤'s *typed* session target is still unbuilt and
+is still the right home for "I am building to 80 tonight". Pinned by
+`creation-budget`.
 
 ### C9. Four small preparation defects — SHIPPED
 

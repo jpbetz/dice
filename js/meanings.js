@@ -185,6 +185,10 @@ function segmentsFor(type, q) {
 //               systems (quiet dice carry word/tier null), else null
 //   critFor(entry) -> 'success' | 'fail' | null. THE INFORMATION: did
 //               something crit? The word always lands (U8).
+//   budget      OPTIONAL {shelfLabel: points} — what a character costs to
+//               build under this system, by shelf. Absent means the system
+//               names no budget and the ledger prints bare totals. The one
+//               place a creation price is written (C8).
 //   critCeremony(entry) -> bool. OPTIONAL, default true. Does that crit
 //               deserve the table-stopping wash — the full-viewport flash
 //               plus the 1700ms camera shake — as opposed to just its word?
@@ -212,6 +216,23 @@ export const SYSTEMS = {
     // most deliberate beat this app has. 'Target' is the word the ± popover,
     // the screen-reader announce and UX §2.1's own record field already use.
     targetWord: 'Target',
+    // WHAT A CHARACTER COSTS (C8, 2026-08-08). The budget is a fact of the
+    // rulebook, exactly like the chart above — so it lives with the chart,
+    // which is what makes it pluggable rather than hardcoded (goal 6:
+    // "pluggable per system — not hardcoded").
+    //
+    // POOL-ANALYSIS §9 ruled that "the number 100 appears nowhere in code",
+    // and that ruling was RIGHT about what it was protecting: no Soul Deal
+    // rule scattered through render sites. It was read as "the budget may
+    // never be shown", which made CUJ6's own done-when — *priced against the
+    // system's creation budget* — served by the player remembering 100 from
+    // a design document. The figures existed in js/seed.js and were imported
+    // only by tests. Amended, not overturned: the number lives in exactly one
+    // place per system, and that place is the system's profile.
+    //
+    // A system with no budget omits this and the ledger prints bare totals,
+    // which is what D&D and 'none' do.
+    budget: { Attributes: 100, Skills: 100, Motivations: 30 },
     outcomesFor(entry) {
       if (!entry || !Array.isArray(entry.parts)) return null;
       const out = [];

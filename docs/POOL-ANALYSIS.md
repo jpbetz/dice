@@ -237,6 +237,26 @@ field the dice never read, so this closes the goal 12 ("not a character sheet")
 exposure and leaves PROFILES.md **[JOE-2]** unmade. The number `100` appears
 nowhere in code.
 
+> **AMENDED 2026-08-08 (ROADMAP C8, Joe's call).** The last sentence was read
+> as *the budget may never be shown*, and under that reading CUJ6's own
+> done-when — *"priced against the system's creation budget"* — was served by
+> the player remembering 100 from this document while spending it. The
+> figures did exist, in `js/seed.js`, imported **only by tests**.
+>
+> What the ruling was protecting is intact and is the part that matters: **no
+> Soul Deal rule scattered across render sites.** So the number lives in
+> exactly one place per system — `SYSTEMS['soul-deal'].budget` in
+> `js/meanings.js`, beside the chart, which is where every other fact of that
+> rulebook already lives and what makes it pluggable rather than hardcoded
+> (goal 6). Shelf heads read it through one accessor; a system that names no
+> budget prints a bare total, which is what D&D does. Still no storage, no
+> wire key, no portable field — the session-only half is untouched.
+>
+> The **typed** session target this paragraph describes (§2l ⑤'s ledger
+> sheet) remains unbuilt and is still the right home for *"I am building to
+> 80 tonight"*. This amendment is about the system's own default, not about
+> that.
+
 `.pool-sec-head` becomes a flex row with `.psh-word` and `.psh-fig`, **built in
 manage mode only**. `#pools-head` keeps its hairline — `.ph-rule` is the
 region-rank mark and promoting it to a data track would regrade a decision

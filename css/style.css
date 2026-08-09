@@ -1462,6 +1462,12 @@ html, body {
   letter-spacing: 0;
 }
 .pool-sec-head .psh-fig { margin-left: auto; }
+/* OVER BUDGET (C8) — the one state worth a hue. Under-budget is an ordinary
+   moment in building a character; colouring it would nag at every step of
+   the thing the figure exists to help. HUE = ACT does not govern here (this
+   is a reading, not an action), so red is used at reading weight: the
+   figure's own ivory going warm, no fill, no border, nothing to press. */
+.pool-sec-head .psh-fig.over { color: var(--red); }
 #pools-head .ph-fig {
   display: inline-flex;
   align-items: baseline;

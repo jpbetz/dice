@@ -562,6 +562,62 @@ export const scenarios = [
     },
   },
   {
+    name: 'creation-budget',
+    tags: ['groups', 'meanings', 'cuj6'],
+    // C8 — CUJ6's done-when is "priced against the system's creation budget",
+    // and the budget reached no screen: the figures lived in js/seed.js and
+    // were imported ONLY by tests, so the player was expected to remember 100
+    // from a design document while spending it.
+    //
+    // POOL-ANALYSIS §9's "the number 100 appears nowhere in code" is amended,
+    // not overturned — it was protecting against a Soul Deal rule scattered
+    // through render sites, and the number now lives in exactly one place per
+    // system: the system's own profile, beside its chart. A system that names
+    // no budget still prints a bare total, which is what this asserts second.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg('profiles.reset()');
+      await a.dbg('setPanelState({pools: true})');
+      const fig = (label) => a.eval(`(() => {
+        const head = [...document.querySelectorAll('.pool-sec-head')]
+          .find((h) => h.textContent.trim().toUpperCase().startsWith(${JSON.stringify('')} + '${label}'.toUpperCase()));
+        if (!head) return null;
+        const f = head.querySelector('.psh-fig');
+        return f ? { text: f.textContent.trim(), over: f.classList.contains('over') } : null;
+      })()`);
+
+      // Under budget: the target is stated, and nothing is coloured — being
+      // part-way through building a character is not an error state.
+      await a.dbg(`setGroups([{name: 'Strength', notation: '1d8', category: 'Attributes'}])`);
+      await a.dbg('setPoolsEditMode(true)');
+      assert.deepEqual(await fig('Attributes'), { text: '8/100', over: false },
+        'the shelf says what it costs AND what it may cost');
+
+      // Over budget: the one state worth a hue.
+      await a.dbg(`setGroups([
+        {name: 'Strength', notation: '8d20', category: 'Attributes'},
+        {name: 'Wit', notation: '2d20', category: 'Attributes'}])`);
+      await a.dbg('setPoolsEditMode(true)');
+      const over = await fig('Attributes');
+      assert.equal(over.text, '200/100', 'over-budget still states both numbers');
+      assert.equal(over.over, true, 'and is marked');
+
+      // A SYSTEM THAT NAMES NO BUDGET prints a bare total — the budget is a
+      // fact of the rulebook, and D&D's profile does not carry one.
+      const made = await a.dbg(`profiles.create('Warden', 'dnd')`);
+      assert.equal(made.ok, true, `a D&D profile is made (${made.status})`);
+      const warden = (await a.dbg('profiles.list')).find((p) => p.name === 'Warden');
+      await a.dbg(`profiles.use(${JSON.stringify(warden.id)})`);
+      await a.dbg(`setGroups([{name: 'Sword', notation: '1d8', category: 'Attributes'}])`);
+      await a.dbg('setPoolsEditMode(true)');
+      assert.deepEqual(await fig('Attributes'), { text: '8', over: false },
+        'no budget in the system profile, no target on the shelf');
+
+      await a.dbg('setPoolsEditMode(false)');
+      await a.dbg('profiles.reset()');
+    },
+  },
+  {
     name: 'prep-affordances',
     tags: ['groups', 'profiles', 'cuj6'],
     // C9 — four small things between "I sit down to make six characters" and
@@ -3446,9 +3502,17 @@ export const scenarios = [
       assert.equal(shelf('Attributes'), 22, 'Attributes shelf value');
       assert.equal(shelf('Skills'), 80, "'1d20 adv' and '2d20 kh1' both read 40");
       assert.equal(shelf('Motivations'), 0, 'an empty trio shelf reads 0');
+      // …and each figure carries its SHELF BUDGET (C8): spent/target, from
+      // the system's own profile. `80/100` is a Skills shelf inside budget;
+      // the over-budget hue and the no-budget system are pinned by
+      // `creation-budget`.
       const figs = await a.eval(
         `[...document.querySelectorAll('.pool-sec-head .psh-fig')].map((f) => f.textContent)`);
-      assert.ok(figs.includes('22') && figs.includes('80'), `shelf figures render (got: ${figs})`);
+      assert.ok(figs.includes('22/100') && figs.includes('80/100'),
+        `shelf figures render with their budget (got: ${figs})`);
+      assert.equal(await a.eval(
+        `document.querySelectorAll('.pool-sec-head .psh-fig.over').length`), 0,
+        'and nothing is over budget here');
       assert.equal(await a.eval(`document.querySelector('#pools-head .ph-fig b').textContent`),
         '102', 'the rack total rides the region head');
       assert.ok((await a.eval(`document.querySelector('#pools-head .ph-fig').textContent`))
@@ -3459,8 +3523,8 @@ export const scenarios = [
       await a.dbg(`editPool(${JSON.stringify(claws.id)}, {notation: '1d20'})`);
       assert.equal((await a.dbg('rackDiceValue')).total, 116, 'd6 → d20 moves the rack total');
       assert.equal(await a.eval(
-        `[...document.querySelectorAll('.pool-sec-head .psh-fig')][0].textContent`), '36',
-        'and the shelf figure with it');
+        `[...document.querySelectorAll('.pool-sec-head .psh-fig')][0].textContent`), '36/100',
+        'and the shelf figure with it — the spend moves, the budget does not');
 
       // Done: the instruments leave with the manage chrome
       await a.dbg('setPoolsEditMode(false)');
