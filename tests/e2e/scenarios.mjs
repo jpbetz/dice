@@ -562,6 +562,97 @@ export const scenarios = [
     },
   },
   {
+    name: 'join-door',
+    tags: ['seat', 'profiles', 'cuj3', 'cuj7'],
+    // Joe 2026-08-09, three things about the door: it says JOIN, the NAME
+    // comes first, and a character you did not build is ATTRIBUTED and
+    // copies rather than borrows.
+    //
+    // Random is the fourth and the sharpest: it used to MINT on the tap —
+    // every press made another profile, to the 32 cap, before you had joined
+    // anything — and it is the row a first-timer's Enter aims at. It is a
+    // selection now; the deal happens once, at Join.
+    async fn(ctx) {
+      const dm = await ctx.newTable({ origin: '127.0.0.10', name: 'Walter' });
+      await dm.dbg('profiles.reset()');
+      const v = await dm.dbg(`profiles.create('Bo', 'soul-deal')`);
+      assert.equal(v.ok, true, `Walter builds Bo (${v.status})`);
+      await dm.dbg(`setGroups([{name: 'Bravery', notation: '1d20', category: 'Attributes'}])`);
+      await dm.settle();
+
+      const p = await ctx.newTable({ origin: 'localhost', anon: true });
+      assert.equal(await p.eval(`document.querySelector('#name-panel h2').textContent`), 'Join',
+        'the door says Join');
+      // NAME FIRST: the field the modal cannot proceed without precedes the
+      // list of characters, in DOM order, which is reading and tab order too.
+      assert.equal(await p.eval(`(() => {
+        const pick = document.getElementById('seat-pick');
+        const name = document.getElementById('name-input').closest('.btn-row');
+        const rows = document.getElementById('seat-mine');
+        return [...pick.children].indexOf(name) < [...pick.children].indexOf(rows);
+      })()`), true, 'the name comes before the characters');
+
+      // ATTRIBUTED, and it says what taking it does.
+      await p.waitFor(`[...document.querySelectorAll('#seat-mine-rows .seat-foreign')]
+        .some((el) => el.textContent.includes('Bo'))`,
+      { desc: "Walter's character reaches the door" });
+      // BY NAME: Walter holds his dealt profile as well as Bo, and both are
+      // offered — which is the feature. Reaching for "the first foreign row"
+      // would be asserting how many characters he happens to have.
+      const foreign = await p.eval(`(() => {
+        const b = [...document.querySelectorAll('#seat-mine-rows .seat-foreign')]
+          .find((el) => el.textContent.includes('Bo'));
+        return b ? { text: b.textContent, title: b.title } : null;
+      })()`);
+      assert.ok(foreign, "Bo is among the characters the door offers");
+      assert.match(foreign.text, /Bo/, 'it names the character');
+      assert.match(foreign.text, /Walter/, 'and whose it is');
+      assert.match(foreign.title, /copies it into your profiles/, 'and that taking it copies');
+
+      // RANDOM IS PRE-SELECTED with nothing of your own, and MINTS NOTHING
+      // until you join.
+      const before = (await p.dbg('profiles.list')).length;
+      // A FIRST-TIMER HAS NO CHARACTERS, whatever the store says. Boot deals
+      // every browser one so CUJ1 has dice immediately, but that profile is
+      // scaffolding — unnamed by anyone, unseen by its owner — and showing it
+      // at a join door under "Yours" introduces a stranger by a random name
+      // and then defaults to them.
+      assert.equal(await p.eval(
+        `[...document.querySelectorAll('#seat-mine-rows .seat-group')]`
+        + `.some((h) => h.textContent === 'Yours')`), false,
+      'no "Yours" group for someone who has never played here');
+      assert.equal(await p.eval(
+        `document.querySelector('#seat-mine-rows .seat-deal').classList.contains('preselected')`),
+      true, 'Random is the pre-selection instead');
+      await p.eval(`document.querySelector('#seat-mine-rows .seat-deal').click()`);
+      assert.equal((await p.dbg('profiles.list')).length, before,
+        'selecting Random mints nothing — browsing is not committing');
+
+      // Taking WALTER'S copies it, once, at the join.
+      const clickBo = `[...document.querySelectorAll('#seat-mine-rows .seat-foreign')]
+        .find((el) => el.textContent.includes('Bo')).click()`;
+      await p.eval(clickBo);
+      await p.eval(clickBo);
+      assert.equal((await p.dbg('profiles.list')).length, before,
+        'and browsing his does not either, however many times');
+      await p.eval(`(() => { const i = document.getElementById('name-input');
+        i.value = 'Alice'; i.dispatchEvent(new Event('input')); })()`);
+      await p.eval(`document.getElementById('name-join').click()`);
+      await p.waitOnline();
+      const held = await p.dbg('profiles.active');
+      assert.equal(held.name, 'Bo', "the copy is in hand");
+      assert.equal((await p.dbg('profiles.list')).length, before + 1, 'and there is exactly ONE of it');
+      assert.equal((await p.dbg('profiles.list')).filter((x) => x.name === 'Bo').length, 1,
+        'under its own name, not deduped against something they never made');
+      // Leave the origin clean: the library is per-ORIGIN and outlives this
+      // room, so a copy of 'Bo' left here makes the NEXT scenario's copy
+      // dedupe to 'Bo 2' — correct behaviour failing an inherited assumption,
+      // three scenarios from its cause.
+      await p.dbg('profiles.reset()');
+      await dm.dbg('profiles.reset()');
+    },
+  },
+  {
     name: 'library-is-the-seats',
     tags: ['profiles', 'prepared-seat', 'cuj6', 'cuj7'],
     // C17 — THE ORGANIZER PUSHES NOTHING. Joe, 2026-08-09: "I was imagining a
@@ -590,7 +681,11 @@ export const scenarios = [
       'and Settings was never opened — no Apply to table, no YAML pane');
 
       // A player who has never been here opens the link and is offered them.
+      // ESTABLISH: this asserts a copy lands under its own name, which an
+      // inherited 'Bo' from an earlier scenario on this origin would turn
+      // into 'Bo 2'.
       const p = await ctx.newTable({ origin: 'localhost', anon: true });
+      await p.dbg('profiles.reset()');
       await p.waitFor(`window.__diceDebug.seatPicker.seats.length >= 3`,
         { desc: "the table offers the organizer's characters" });
       const seats = (await p.dbg('seatPicker')).seats.map((s) => s.name).sort();
@@ -713,6 +808,15 @@ export const scenarios = [
       await a.dbg('setPoolsEditMode(true)');
       assert.deepEqual(await fig('Attributes'), { text: '8', over: false },
         'no budget in the system profile, no target on the shelf');
+
+      // A SHELF THE SYSTEM DOES NOT PRICE gets the bare sum (Joe 2026-08-09).
+      // Motivations carries no budget: printing `X/30` would invent a ceiling
+      // the rulebook never set, and then mark you red for passing it.
+      await a.dbg(`profiles.reset()`);
+      await a.dbg(`setGroups([{name: 'Oath', notation: '1d10', category: 'Motivations'}])`);
+      await a.dbg('setPoolsEditMode(true)');
+      assert.deepEqual(await fig('Motivations'), { text: '10', over: false },
+        'an unpriced shelf shows its sum and no target');
 
       await a.dbg('setPoolsEditMode(false)');
       await a.dbg('profiles.reset()');

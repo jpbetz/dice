@@ -1127,32 +1127,40 @@ limitations under the License.
        renders and the modal is exactly the plain prompt it always was. -->
   <div id="name-modal" class="hidden">
     <div class="panel" id="name-panel">
-      <h2>Take a seat</h2>
+      <h2>Join</h2>
       <p id="seat-table-name" class="hint seat-table-name hidden"></p>
       <div id="seat-pick">
+        <!-- THE NAME COMES FIRST (Joe 2026-08-09). It used to sit at the
+             bottom under the profile lists, so the first thing a new player
+             met was a list of strangers' characters and the last was the one
+             field the modal cannot proceed without. Who you are, then what
+             you are holding. -->
+        <p id="name-hint" class="hint">What should the table call you?</p>
+        <!-- U3: a RETURNING player pulled in by a link. They already have a
+             name on this origin, so the picker owes them their own name back
+             in one press rather than retyped — and it belongs HERE, beside
+             the field it fills, not under the profile lists where it used to
+             sit. Absent for everyone else. -->
+        <button id="seat-keep-name" class="btn seat-keep hidden"></button>
+        <div class="btn-row seat-name-row">
+          <input id="name-input" type="text" placeholder="Display name…" maxlength="24" autocomplete="off">
+          <button id="name-join" class="btn confirm" disabled>Join</button>
+        </div>
         <!-- YOUR profiles for this table's system (PROFILES §11.5 ①, Joe's R9):
              most recently used first, the last one pre-selected. Picking one is
              not an import and shows no preview — the outgoing profile keeps
              every pool it had, so there is nothing to lose and nothing to
              approve. A PREPARED seat below is somebody else's rack and still
              previews, unchanged. Absent when there is nothing to choose. -->
+        <!-- ONE grouped list (2026-08-09): renderSeatMine emits its own
+             'Yours' / 'At this table' heads, matching the switcher over the
+             rack. The static 'Your profiles' head that used to sit here was
+             a third heading over a list that had stopped being only yours. -->
         <div id="seat-mine" class="hidden">
-          <p id="seat-mine-head" class="hint seat-someone">Your profiles</p>
           <div id="seat-mine-rows"></div>
         </div>
         <div id="seat-list" class="hidden"></div>
         <p id="seat-someone" class="hint seat-someone hidden">Someone else…</p>
-        <!-- U3: a RETURNING player pulled in by an `&as=` link. They already
-             have a name on this origin, so the picker owes them two things a
-             first-timer does not need — why it opened at all, and their own
-             name back in one press rather than retyped. Absent for everyone
-             else, which is every other path into this modal. -->
-        <button id="seat-keep-name" class="btn seat-keep hidden"></button>
-        <p id="name-hint" class="hint">Pick a display name for the table.</p>
-        <div class="btn-row">
-          <input id="name-input" type="text" placeholder="Display name…" maxlength="24" autocomplete="off">
-          <button id="name-join" class="btn confirm" disabled>Join</button>
-        </div>
       </div>
       <div id="seat-preview" class="hidden">
         <p id="seat-preview-status" class="hint"></p>

@@ -232,7 +232,11 @@ export const SYSTEMS = {
     //
     // A system with no budget omits this and the ledger prints bare totals,
     // which is what D&D and 'none' do.
-    budget: { Attributes: 100, Skills: 100, Motivations: 30 },
+    // Motivations has NO budget on purpose (Joe 2026-08-09): the system does
+    // not define 30 as a ceiling, so printing `X/30` would invent a rule and
+    // then mark you in red for breaking it. A shelf the system prices gets a
+    // target; a shelf it does not gets the bare sum of its dice.
+    budget: { Attributes: 100, Skills: 100 },
     outcomesFor(entry) {
       if (!entry || !Array.isArray(entry.parts)) return null;
       const out = [];

@@ -3087,6 +3087,13 @@ html, body {
 }
 #status-pill.hidden { display: none; }
 
+/* A row for somebody else's character (2026-08-09): same shape as your own
+   seat rows, and the attribution rides the count line where the pool count
+   already lives — one line, two facts, no new column. Slightly cooler ink
+   than your own, because "yours" and "theirs" is the distinction the row
+   exists to make. */
+.seat-btn.seat-foreign .seat-count { color: var(--muted); font-style: italic; }
+
 /* ---------- log ---------- */
 .log-player { font-weight: 700; }
 .log-entry {
@@ -3693,6 +3700,18 @@ html, body {
    so the pointed-at seat reads chosen-but-not-taken. Enter takes it. */
 .seat-btn.preselected { border-color: rgba(212, 175, 55, 0.55); }
 .seat-someone { margin-top: 10px; }
+/* THESE THREE HAD NO `.hidden` RULE AT ALL (found 2026-08-09). This
+   stylesheet has no generic `.hidden` class — every one is scoped to its
+   element, and the global rule at the top of the file matches the `hidden`
+   ATTRIBUTE, not the class. So `classList.add('hidden')` on any element
+   without its own rule is a no-op that reads like a fix: `#seat-someone`
+   ("Someone else…") has been visible every time the code asked it not to be,
+   and `#seat-table-name` would print an empty line at a table with no name.
+   Named individually rather than by adding a blanket `.hidden`, because a
+   4.5k-line sheet where `.hidden` currently means nothing on its own is not
+   a safe place to make it mean something everywhere at once — that is
+   ROADMAP C18. */
+#seat-someone.hidden, #seat-list.hidden, #seat-table-name.hidden { display: none; }
 /* U3's returning-player exit: "Stay as ⟨name⟩". Quiet, full width, and
    BELOW the seat list — the link named a seat, so the seat leads and keeping
    your own name is the deliberate alternative rather than the default. It is

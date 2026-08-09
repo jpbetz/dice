@@ -2624,11 +2624,17 @@ function handleTableInfo(req, res, url) {
     // and a live library is whatever somebody happens to be carrying.
     const seats = [];
     const seen = new Set();
-    const add = (name, pools, system) => {
+    // `from` is WHOSE character this is (2026-08-09). A profile you did not
+    // build must say who did, everywhere it appears — the picker at the door
+    // and the switcher over the rack alike — because taking one COPIES it,
+    // and a copy you did not know you were making is the `#g=` mistake with
+    // better manners. Absent for a file-prepared seat: it belongs to the
+    // table, not to a person who is standing here.
+    const add = (name, pools, system, from) => {
       const key = String(name).toLowerCase();
       if (!name || seen.has(key)) return;
       seen.add(key);
-      seats.push({ name, pools, ...(system ? { system } : {}) });
+      seats.push({ name, pools, ...(system ? { system } : {}), ...(from ? { from } : {}) });
     };
     if (room.setup && Array.isArray(room.setup.profiles)) {
       for (const p of room.setup.profiles) {
@@ -2641,7 +2647,7 @@ function handleTableInfo(req, res, url) {
     }
     for (const pl of room.players.values()) {
       for (const p of pl.library || []) {
-        add(p.name, Array.isArray(p.pools) ? p.pools.length : 0, p.system);
+        add(p.name, Array.isArray(p.pools) ? p.pools.length : 0, p.system, pl.name);
       }
     }
     if (seats.length) out.seats = seats;

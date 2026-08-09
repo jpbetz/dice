@@ -6996,7 +6996,13 @@ function dealNewProfile(system, wanted = '') {
 // under a deduped name, and the copy is not taken in hand unless asked for.
 // (A copy is a copy: no pointer back to whoever wrote it, so no "there is a
 // newer version" to track. PROFILES §11.9 decision 10.)
-function copyProfileIn(rec, { activate = false } = {}) {
+// `from` names whose it was, for the receipt (Joe 2026-08-09: "there should
+// be some modal or something letting you know you're copying it"). The receipt
+// is the notice rather than a modal: a modal you must dismiss to proceed is a
+// gate, and this is not a decision — the row already said "copies to yours"
+// before you pressed it. What is owed AFTER is a plain statement of what
+// landed and whose it was, which is what this returns.
+function copyProfileIn(rec, { activate = false, from = null } = {}) {
   const wire = fromWire(rec, tableSystem());
   if (!wire) return pv(false, '✗ nothing to copy');
   const named = nameProfile(wire.name);
@@ -7010,7 +7016,8 @@ function copyProfileIn(rec, { activate = false } = {}) {
   });
   if (!made.ok) return made;
   const n = wire.pools.length;
-  return pv(true, `✓ copied as '${made.name}' — ${n} pool${n === 1 ? '' : 's'}, nothing of yours changed`);
+  const whose = from ? ` from ${from}` : '';
+  return pv(true, `✓ '${made.name}' copied${whose} into your profiles — ${n} pool${n === 1 ? '' : 's'}, yours to edit, nothing of yours changed`);
 }
 
 function renameProfileTo(id, name) {
@@ -11877,6 +11884,39 @@ function buildProfileMenu(el) {
       ? `${MAX_PROFILES} profiles is the ceiling — delete one first`
       : 'An empty profile, in your hands — build it with ✎ and rename it on the head',
   });
+  // OTHER PLAYERS' CHARACTERS, ATTRIBUTED (Joe 2026-08-09). The switcher was
+  // your own library only, so the one place you pick a character had nothing
+  // to say about the five other people at the table holding theirs.
+  //
+  // Two rules, and the second is why the first is safe. ATTRIBUTION: a
+  // profile you did not build says who did, right in the row, everywhere it
+  // appears. COPY-ON-SELECT: taking one does not borrow it, it copies it into
+  // your library under a deduped name, so editing it cannot reach back into
+  // theirs — and the row SAYS so before you press, rather than reporting it
+  // afterwards. That is the `#g=` lesson (GOALS §7): nothing arrives in your
+  // rack without you knowing what arrived.
+  const theirs = tableOffers().filter((o) => o.from !== 'prepared'
+    && (!o.rec.system || o.rec.system === sys));
+  const prepared = tableOffers().filter((o) => o.from === 'prepared'
+    && (!o.rec.system || o.rec.system === sys));
+  if (prepared.length) {
+    head('Prepared for this table');
+    for (const o of prepared) {
+      const n = (o.rec.pools || []).length;
+      row(o.rec.name, `${n} pool${n === 1 ? '' : 's'} · copies to yours`,
+        () => showProfileNote(copyProfileIn(o.rec, { activate: true })),
+        { title: `Take '${o.rec.name}' — a copy lands in your profiles, yours to edit` });
+    }
+  }
+  if (theirs.length) {
+    head('At this table');
+    for (const o of theirs) {
+      const n = (o.rec.pools || []).length;
+      row(o.rec.name, `${o.from} · ${n} pool${n === 1 ? '' : 's'} · copies to yours`,
+        () => showProfileNote(copyProfileIn(o.rec, { activate: true, from: o.from })),
+        { title: `${o.from}'s '${o.rec.name}' — taking it copies it into your profiles, yours to edit` });
+    }
+  }
   if (others.length) {
     head('Other systems');
     for (const p of others) {
@@ -14207,7 +14247,14 @@ function seatChoices() {
     .filter((s) => s && typeof s.name === 'string' && s.name.trim())
     .filter((s) => !s.system || s.system === sys)
     .slice(0, 12)
-    .map((s) => ({ name: s.name.trim(), pools: Number.isInteger(s.pools) && s.pools > 0 ? s.pools : 0 }));
+    // `from` rides through (2026-08-09): whose character this is, so the door
+    // can attribute it. Absent on a file-prepared seat, which belongs to the
+    // table rather than to anyone standing here.
+    .map((s) => ({
+      name: s.name.trim(),
+      pools: Number.isInteger(s.pools) && s.pools > 0 ? s.pools : 0,
+      ...(s.from ? { from: s.from } : {}),
+    }));
 }
 
 // MY profiles at the join (§11.5 ①, Joe's R9). The row that will be used is
@@ -14219,13 +14266,45 @@ function renderSeatMine() {
   const zone = document.getElementById('seat-mine');
   const rows = document.getElementById('seat-mine-rows');
   const sys = seatSystem();
-  const mine = profilesFor(profileStore, sys);
+  // A FIRST-TIMER HAS NO CHARACTERS, whatever the store says (Joe 2026-08-09:
+  // "it's super weird to be given a link if never played before and see
+  // 'yours'… instead of having random being the selected default").
+  //
+  // Boot deals every browser one profile so CUJ1 — "I just need to roll NOW"
+  // — has dice on the felt immediately. That profile is scaffolding, not a
+  // character: nobody named it, nobody built it, and its owner has never seen
+  // it. Presenting it at a join door under "Yours" introduces a stranger by a
+  // random name and then defaults to them.
+  //
+  // Never having a display name on this origin is the honest test for "has
+  // not played here before" — it is the same signal the picker itself opens
+  // on, and it needs no new state to go stale.
+  const firstTimer = !STORED_NAME_AT_BOOT;
+  const mine = firstTimer ? [] : profilesFor(profileStore, sys);
   const canDeal = !isFull(profileStore);
   // Nothing to choose between and nothing to deal → the whole block is absent.
   zone.classList.toggle('hidden', !mine.length && !canDeal);
   rows.textContent = '';
   if (!mine.length && !canDeal) return;
   const chosen = seatProfilePicked || lastUsedFor(profileStore, sys);
+  // HEADS, like the switcher over the rack (Joe 2026-08-09: "the selection of
+  // the profile should match very close to the drop down to switch
+  // profiles"). One list, grouped — yours, then the table's — because a flat
+  // list under a heading that says "Your profiles" was calling other people's
+  // characters yours.
+  // The free-text divider goes with the list it divided (2026-08-09): the
+  // name row is at the top of the modal now, so "Someone else…" separated
+  // the characters from nothing. Hidden here rather than only in
+  // renderSeatChoices, because this function is the one that always runs.
+  const divider = document.getElementById('seat-someone');
+  if (divider) divider.classList.add('hidden');
+  const groupHead = (text) => {
+    const h = document.createElement('p');
+    h.className = 'hint seat-someone seat-group';
+    h.textContent = text;
+    rows.appendChild(h);
+  };
+  if (mine.length) groupHead('Yours');
   for (const p of mine) {
     const btn = document.createElement('button');
     btn.className = 'btn seat-btn';
@@ -14242,6 +14321,34 @@ function renderSeatMine() {
     btn.addEventListener('click', () => chooseMyProfile(p.id));
     rows.appendChild(btn);
   }
+  // OTHER PEOPLE'S CHARACTERS, ATTRIBUTED (Joe 2026-08-09) — the same rule
+  // the switcher over the rack follows, because this is the same choice made
+  // at a different moment. A row you did not build says whose it is, and says
+  // that taking it COPIES rather than borrows, before you press it.
+  // FROM THE PEEK, not from `players` — this list paints BEFORE the join, so
+  // the roster is still empty and tableOffers() would find nothing. The peek
+  // is the one pre-join source and it carries `from` for exactly this.
+  const offered = seatChoices();
+  if (offered.length) groupHead('At this table');
+  for (const s of offered) {
+    const btn = document.createElement('button');
+    btn.className = 'btn seat-btn seat-foreign';
+    const nm = document.createElement('span');
+    nm.textContent = s.name;
+    btn.appendChild(nm);
+    const ct = document.createElement('span');
+    ct.className = 'seat-count';
+    ct.textContent = s.from
+      ? `${s.from} · ${s.pools} pool${s.pools === 1 ? '' : 's'}`
+      : `prepared · ${s.pools} pool${s.pools === 1 ? '' : 's'}`;
+    btn.appendChild(ct);
+    btn.title = s.from
+      ? `${s.from}'s '${s.name}' — taking it copies it into your profiles, yours to edit`
+      : `'${s.name}' was prepared for this table — taking it copies it into your profiles`;
+    if (seatProfilePicked === `copy:${s.name}`) btn.classList.add('preselected');
+    btn.addEventListener('click', () => chooseOfferedProfile(s));
+    rows.appendChild(btn);
+  }
   if (canDeal) {
     const deal = document.createElement('button');
     deal.className = 'btn seat-btn seat-deal';
@@ -14252,11 +14359,29 @@ function renderSeatMine() {
     ct.className = 'seat-count';
     ct.textContent = systemLabel(sys);
     deal.appendChild(ct);
-    deal.title = `Deal a whole ${systemLabel(sys)} profile — dice, names and all`;
-    if (!mine.length) deal.classList.add('preselected');
-    deal.addEventListener('click', () => chooseDealtProfile());
+    deal.title = `Deal a whole ${systemLabel(sys)} profile when you join — dice, names and all`;
+    // SELECTED, NOT SPENT (Joe 2026-08-09: "don't auto pick a name and show
+    // it in this UI, do whatever random does"). This used to MINT on the tap
+    // — every press made another profile, to the 32 cap, before you had
+    // joined anything, and it is the row a first-timer's Enter aims at. It is
+    // now a choice like the others; the deal happens at Join.
+    if (seatProfilePicked === 'random' || (!mine.length && !seatProfilePicked)) {
+      deal.classList.add('preselected');
+    }
+    deal.addEventListener('click', () => { seatProfilePicked = 'random'; renderSeatMine(); });
     rows.appendChild(deal);
   }
+}
+
+// A character somebody else is holding, or one this table was prepared with.
+// Selecting only MARKS it — the copy lands at Join, so browsing the list does
+// not fill your library with profiles you were only looking at.
+function chooseOfferedProfile(s) {
+  seatProfilePicked = `copy:${s.name}`;
+  seatPickNote(pv(true, s.from
+    ? `${s.from}'s '${s.name}' — a copy lands in your profiles when you join`
+    : `'${s.name}' — a copy lands in your profiles when you join`));
+  renderSeatMine();
 }
 
 // Pick one of mine at the join. Takes it in hand right away — the modal is
@@ -14324,11 +14449,18 @@ function renderSeatChoices() {
   nameLine.textContent = tn; // user text: textContent only
   nameLine.classList.toggle('hidden', !tn);
   list.textContent = '';
-  renderSeatMine(); // §11: your own profiles sit above the prepared seats
-  const seats = seatChoices();
-  list.classList.toggle('hidden', !seats.length);
-  divider.classList.toggle('hidden', !seats.length);
-  if (!seats.length) return;
+  renderSeatMine();
+  // #seat-list IS RETIRED (2026-08-09). It listed the same prepared seats
+  // renderSeatMine now lists WITH attribution, so every character at the
+  // table appeared twice — once saying whose it was and once not. The
+  // "Someone else…" divider goes with it: it separated the seat list from a
+  // free-text name row that is now at the top of the modal, so it divided
+  // nothing. The element stays in the DOM as an empty, hidden container
+  // rather than being deleted, because renderSeatChoices' callers and the
+  // `prepared-seat` pins both reach for it by id.
+  list.classList.add('hidden');
+  divider.classList.add('hidden');
+  return;
   const wanted = seatPreselect();
   const input = document.getElementById('name-input');
   let preselected = null;
@@ -14421,6 +14553,41 @@ function takeSeat(rawName) {
 // The free-text path — today's join, byte for byte ('Someone else…'). Both
 // the Join button and the __diceDebug verb land here so the '#' refusal and
 // the trim/cut rules cannot fork.
+// WHAT THE DOOR PROMISED, DELIVERED AFTER THE JOIN (Joe 2026-08-09).
+// Selecting Random or somebody else's character at the door only MARKS it —
+// browsing six characters must not leave six copies in your library, and
+// Random used to mint on every tap. The deal or the copy happens once, here,
+// when the roster is up and a foreign character's actual pools exist to copy.
+let seatPending = null;
+function settlePendingPick() {
+  const want = seatPending;
+  seatPending = null;
+  if (!want) return;
+  if (want === 'random') {
+    // A first-timer's Random REPLACES the scaffolding profile boot dealt them
+    // rather than adding beside it — they came here with nothing and should
+    // leave the door holding one character, not two, one of which they have
+    // never seen. Anyone else gets a new one, which is what Random means.
+    if (!STORED_NAME_AT_BOOT && profilesOf(profileStore).length === 1) {
+      const old = activeProfile(profileStore);
+      const v = dealNewProfile(tableSystem());
+      if (v.ok && old) removeProfileById(old.id);
+      showProfileNote(v);
+      return;
+    }
+    showProfileNote(dealNewProfile(tableSystem()));
+    return;
+  }
+  if (typeof want !== 'string' || !want.startsWith('copy:')) return;
+  const name = want.slice(5).toLowerCase();
+  const o = tableOffers().find((x) => x.rec.name.toLowerCase() === name);
+  if (!o) return; // they left, or the table changed under us — say nothing false
+  showProfileNote(copyProfileIn(o.rec, {
+    activate: true,
+    from: o.from === 'prepared' ? null : o.from,
+  }));
+}
+
 function takeFreeSeat(rawName) {
   if (seatPhase !== 'pick' || !seatResolve) {
     return { ok: false, status: '✗ no seat is being offered right now', canApply: false };
@@ -14491,6 +14658,7 @@ function tableOffers() {
     for (const p of roomSetup.profiles) add(p, 'prepared');
   }
   for (const pl of players) {
+    if (pl && net && pl.id === net.playerId) continue; // yours are not "at this table"
     for (const p of (pl && pl.library) || []) add(p, pl.name || 'a player');
   }
   return out;
@@ -14577,7 +14745,7 @@ function promptName(peek) {
     const input = document.getElementById('name-input');
     const joinBtn = document.getElementById('name-join');
     const hint = document.getElementById('name-hint');
-    const hintText = 'Pick a display name for the table.';
+    const hintText = 'What should the table call you?';
     seatPhase = 'pick';
     seatPeekInfo = null;
     seatChosen = null;
@@ -14603,7 +14771,19 @@ function promptName(peek) {
         : hintText;
       hint.classList.toggle('warn', hash);
     };
-    const submit = () => { takeFreeSeat(input.value); };
+    // THE DEFERRED PICK LANDS HERE (Joe 2026-08-09). Selecting Random or
+    // somebody else's character only MARKS it — browsing a list of six
+    // characters must not leave six copies in your library, and Random used
+    // to mint on every tap. Whatever was marked is created at the moment you
+    // actually join, once, and the receipt says what landed.
+    // The pick is carried ACROSS the join, not spent before it: the peek
+    // knows a character's name and pool COUNT, never its pools, so a copy
+    // cannot be made until `hello` brings the real thing. seatPending is read
+    // by settlePendingPick() once the roster is up.
+    const submit = () => {
+      seatPending = seatProfilePicked;
+      takeFreeSeat(input.value);
+    };
     const onKey = (e) => { if (e.key === 'Enter') submit(); };
     // 'Leave & switch' re-opens this modal, so listeners must not stack
     // across prompts: whichever door resolves this prompt detaches them
@@ -14791,6 +14971,7 @@ async function initNet() {
   // of join state above, so netReady never resolves with it half-built. A
   // free-text join (or a seat the join couldn't substantiate) is a no-op.
   seatFollowThrough();
+  settlePendingPick(); // the door's deferred Random / copy, now that hello has landed
   // §G6: if this browser authored the room's setup and the room came up
   // without it (or behind it), heal it now — the first SSE hello can fire
   // before `net` is assigned above, so this call is the join-time guarantee.

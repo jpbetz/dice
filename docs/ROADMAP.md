@@ -1102,6 +1102,50 @@ merging live libraries. `setup-repush` re-pointed from `deepEqual` to
 `includes`: asserting the exact seat list there would now be asserting that
 nobody is sitting at the table.
 
+### C18. The result panel is too busy — small
+
+*Joe 2026-08-09.* Two cuts, both subtractive:
+
+- **Drop `Save as pool…` from the result panel.** It was added in U13 to give
+  "save what I just rolled" a door that was not an invisible 150px disc behind
+  a right-click. That reasoning still holds for the *peek*, but on the result
+  panel it is a third verb competing with the roll's own reading.
+- **Stop printing the roll's text form in the panel's title.** Show **who
+  rolled** and nothing else. The notation is already on the card body, in the
+  log, and on the felt as dice; the title repeating it is what tipped the
+  surface from "a result" into a list of facts about a result.
+
+### C19. Buttons should not ask questions — small
+
+*Joe 2026-08-09, on C7's armed clear:* the double-press is right, the wording
+is not. `Clear 1 more?` puts a question in a control. **Buttons guide, they do
+not interrogate** — a question belongs in a modal, and this is deliberately
+not one.
+
+**Change:** the armed state states the next act rather than asking about it —
+`Clear mine` → press → `Clear all`. Same two-tap, same red escalation dress,
+no question mark. Check the same rule against the rest of the app's controls
+while in there; this is the only one that asks, but it is worth confirming.
+
+### C20. `.hidden` is a class this stylesheet does not define — small
+
+*Found 2026-08-09 while rebuilding the join door.* `css/style.css` has a
+global rule for the `[hidden]` **attribute** and **no generic `.hidden`
+class** — every one is scoped to its element (`#settings-modal.hidden`,
+`.popover.hidden`, …). So `classList.add('hidden')` on any element without its
+own rule **is a no-op that reads exactly like a fix**.
+
+Three were found in the seat modal alone: `#seat-someone` ("Someone else…")
+had been visible every time the code asked it not to be, plus `#seat-list` and
+`#seat-table-name`. Those three are now named individually.
+
+**Change:** audit every `classList.*('hidden')` call against the stylesheet and
+either give the element a rule or use the `hidden` property, which the global
+rule already covers. **Do not simply add a blanket `.hidden { display: none }`**
+without that audit — in a 4.5k-line sheet where the class currently means
+nothing on its own, making it mean something everywhere at once is exactly the
+kind of change this file has already been bitten by four times.
+
 ### C16. Authoring a character crossed the Settings modal — SHIPPED
 
 *CUJ6, raised by Joe 2026-08-09: "I'm not convinced a player preparing a game
