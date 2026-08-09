@@ -374,6 +374,116 @@ export const scenarios = [
     },
   },
   {
+    name: 'a11y-modals',
+    tags: ['chrome', 'a11y'],
+    // U22 (audit D3, D4, D5). Six modal-ish surfaces, zero focus
+    // containment, and exactly ONE aria-modal — on #help-overlay, which had
+    // no trap either. That annotation promises assistive tech the rest of
+    // the page is not there, and Tab walked straight into content AT had
+    // been told did not exist: focus real, speech silent. The rule now is
+    // that aria-modal and the trap ship together or neither ships, so this
+    // asserts them TOGETHER — an aria-modal with no inert background is the
+    // exact defect, and it would pass a test that only looked for the
+    // attribute.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+
+      // ---- structure: the landmarks that were simply absent ----
+      assert.equal(await a.eval(`document.querySelectorAll('h1').length`), 1,
+        'the document has exactly one h1');
+      assert.equal(await a.eval(`!!document.querySelector('main')`), true,
+        'and a main landmark — without it the workbench announced as "complementary"');
+      assert.equal(await a.eval(
+        `document.getElementById('left-panel').getAttribute('aria-label')`), 'Dice workbench',
+        'the panel is a NAMED region');
+
+      // ---- the trap, on every blocking surface ----
+      const state = (id) => a.eval(`(() => {
+        const el = document.getElementById(${JSON.stringify(id)});
+        const bg = [...document.body.children].filter((c) => c !== el);
+        return {
+          modal: el.getAttribute('aria-modal'),
+          role: el.getAttribute('role'),
+          named: !!(el.getAttribute('aria-labelledby') || el.getAttribute('aria-label')),
+          inertBg: bg.every((c) => c.inert),
+          focusInside: el.contains(document.activeElement),
+        };
+      })()`);
+
+      for (const [id, open, close] of [
+        ['help-overlay', `openHelpDialog(null)`, `closeHelpDialog()`],
+        ['kbd-overlay', `toggleKbd()`, `closeKbd()`],
+        ['settings-modal', `openSettingsModal()`, `closeSettingsModal()`],
+      ]) {
+        await a.dbg(open);
+        const st = await state(id);
+        assert.equal(st.modal, 'true', `${id} claims aria-modal`);
+        assert.equal(st.role, 'dialog', `${id} is a dialog`);
+        assert.ok(st.named, `${id} has an accessible name`);
+        // THE HALF THAT WAS MISSING. Claiming modality without it is the
+        // lie the audit found.
+        assert.equal(st.inertBg, true, `${id} makes the rest of the page inert`);
+        assert.equal(st.focusInside, true, `${id} takes focus when it opens`);
+        await a.dbg(close);
+        const after = await a.eval(
+          `[...document.body.children].some((c) => c.inert)`);
+        assert.equal(after, false, `${id} releases the page when it closes`);
+      }
+
+      // ---- the focus ring that was removed with nothing put back ----
+      // The notation section is OFF by default (§7.23 demoted it), and a
+      // display:none input cannot take focus — so :focus would never match
+      // and the assertion would read `none` for the wrong reason.
+      await a.dbg(`setSections({notation: true})`);
+      const ring = await a.eval(`(() => {
+        const i = document.getElementById('cmd-input');
+        i.focus();
+        const cs = getComputedStyle(i);
+        return { outline: cs.outlineStyle, shadow: cs.boxShadow };
+      })()`);
+      assert.ok(ring.shadow && ring.shadow !== 'none',
+        `the notation box shows focus (outline:${ring.outline}, shadow:${ring.shadow})`);
+
+      // ---- a seg is a CHOICE, not a row of switches ----
+      await a.eval(`document.querySelector('#die-buttons .die-btn').click()`);
+      assert.equal(await a.dbg(`openPopoverFor('tray')`), true, 'the popover opens');
+      const seg = await a.eval(`(() => {
+        const g = document.getElementById('pop-seg-vis');
+        const cells = [...g.querySelectorAll('button')];
+        return {
+          role: g.getAttribute('role'),
+          named: !!g.getAttribute('aria-label'),
+          cellRoles: [...new Set(cells.map((c) => c.getAttribute('role')))],
+          pressed: cells.filter((c) => c.hasAttribute('aria-pressed')).length,
+          checked: cells.filter((c) => c.hasAttribute('aria-checked')).length,
+          stops: cells.filter((c) => c.tabIndex === 0).length,
+        };
+      })()`);
+      assert.equal(seg.role, 'radiogroup', 'Visibility is one decision, not four switches');
+      assert.ok(seg.named, 'and the group carries its own name');
+      assert.deepEqual(seg.cellRoles, ['radio'], 'its cells are radios');
+      assert.equal(seg.pressed, 0, 'aria-pressed is gone — it is not a toggle');
+      assert.equal(seg.checked, 4, 'every cell reports checked state');
+      assert.equal(seg.stops, 1, 'a radiogroup is ONE tab stop, arrows move within');
+      await a.eval(`document.getElementById('pop-close').click()`);
+      await a.eval(`document.getElementById('clear-tray').click()`);
+
+      // ---- the shelf: the table's history was a flat 2.1.1 failure ----
+      await a.roll('d20');
+      await a.dbg(`collectRoll(${JSON.stringify(await a.rollId())})`);
+      await a.waitFor(`(window.__diceDebug.sim(120), document.querySelectorAll('.shelf-marker').length > 0)`,
+        { desc: 'a marker on the shelf' });
+      const mk = await a.eval(`(() => {
+        const m = document.querySelector('.shelf-marker');
+        return { role: m.getAttribute('role'), tab: m.tabIndex, named: (m.getAttribute('aria-label') || '').length };
+      })()`);
+      assert.equal(mk.role, 'button', 'a shelf marker is a button');
+      assert.equal(mk.tab, 0, 'and it is reachable — once shelved, its card is the only door to Reveal');
+      assert.ok(mk.named > 10, `and it says which roll it is (name is ${mk.named} chars)`);
+    },
+  },
+  {
     name: 'touch-targets',
     tags: ['chrome'],
     // U28's list-driven pin. Seven of the eight (pointer: coarse) blocks in

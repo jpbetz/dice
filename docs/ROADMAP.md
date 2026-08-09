@@ -2085,7 +2085,7 @@ G3 banner with both its exits.
 **Decide the minimum social state a launcher owes.** At least: a browse-mode
 signal, and clearing `poolsOwner` on collapse.
 
-### U22. Modal semantics and the focus pass — DESIGN FIRST (mechanical, broad), medium
+### U22. Modal semantics and the focus pass — SHIPPED
 
 *Audit D3 (major), D4, D5.* Batch this; it is one sweep, not eleven fixes.
 
@@ -2126,6 +2126,60 @@ signal, and clearing `poolsOwner` on collapse.
   (css:4415); the ± popover — reached on touch by the app's hardest gesture,
   a 500 ms hold — is built from 23 px seg cells, 23×24 steppers and 30×17
   switches, and `#offer-pick`'s ID rule beats the coarse bump, leaving ~20 px.
+  *(Closed by U28 — this bullet shipped there, including the `#offer-pick`
+  specificity fault it names.)*
+
+**SHIPPED 2026-08-08.** One sweep, as the entry asked for.
+
+- **The trap, and an honest `aria-modal`.** `openModal`/`closeModal` put every
+  OTHER body child `inert` — which removes the rest of the page from the tab
+  order, from hit-testing and from the accessibility tree in one property,
+  rather than three hand-rolled mechanisms each getting it subtly wrong — plus
+  a Tab wrap (inert bounds where focus may GO, not where it wraps) and focus
+  RETURN to the opener. `role`/`aria-modal`/`aria-labelledby` are now set by
+  that same function, so the annotation and the containment cannot ship apart:
+  the audit's finding was a true `aria-modal` on a dialog Tab walked straight
+  out of, which is a promise to AT that the rest of the page is not there.
+  Applied to `#help-overlay`, `#kbd-overlay`, `#settings-modal`.
+- **The focus ring.** `.cmd-in:focus { outline: none }` had nothing put back —
+  the primary text input and the command palette, no indicator at all. It is a
+  **box-shadow**, not the border swap the file's three other instances use,
+  because `.cmd-in`'s border already carries a STATE (`.cmd.is-invalid` paints
+  it red) and a focus indicator that overwrites the error is a worse trade
+  than none. Two channels: border says valid/invalid, ring says focused, and
+  the invalid ring is red so the two never fight. Plus `aria-invalid` and
+  `aria-describedby` pointing at the slot that was already the validator's
+  voice — the wire between them was simply never run.
+- **Names.** `aria-label` on every glyph-only button (`⚙ ≣ ? ❯`, the corner
+  clear, `.die-x`, the cheatsheet `?`): accname never reaches `title` for a
+  button that HAS content, and `⚙` is content, so a title-only icon button
+  announces as its glyph and nothing else. `title` stays — it is the sighted
+  hover read, and both say the same thing on purpose.
+- **A seg is a choice.** `segSet` — the single place all four popover segs are
+  painted — now emits `radiogroup`/`radio`/`aria-checked` with a roving
+  tabindex and arrow-key selection, replacing `aria-pressed` (which says "this
+  button is on", invites turning several on, and says nothing about the four
+  being one decision — on Visibility, the control whose mistake cannot be
+  undone). `#zoom-picker` no longer sets both `aria-pressed` and
+  `aria-checked` on `role="radio"`; pressed is not valid there, so one of the
+  two was always wrong.
+- **Reach.** `.rd-x` is tabbable — it was `tabIndex=-1` three lines under a
+  comment calling the touch version of the same omission a trap, and Esc
+  (which drops the whole pick) was the only other undo. Shelf markers are
+  `role="button"`, `tabIndex=0`, named per-render with Enter/Space: they were
+  unlabelled tabindex-less `<div>`s, so the table's history was a flat 2.1.1
+  failure and a keyboard player could not reveal their own held roll at all.
+- **Structure and focus retention.** An `<h1>` and a `<main>` where there were
+  neither, `aria-label` on the panel so it is a named region rather than an
+  anonymous "complementary", `scroll-padding-top: calc(var(--draft-h) + 34px)`
+  so Shift+Tab does not park a focus ring under the sticky well, and
+  `keepFocusThrough` on both rail renders — they rebuild from
+  `textContent = ''`, so picking three pools by keyboard cost three full
+  tab-walks from the top while the expanded twin kept focus throughout.
+
+Pinned by `a11y-modals`, verified to FAIL when `openModal` stops setting
+`inert` — i.e. it catches the exact "annotated but not contained" shape the
+audit found, which an attribute-only assertion would have passed.
 
 ### U23. A token layer for the doctrine — DESIGN FIRST, medium
 

@@ -1289,6 +1289,22 @@ function stepWhisking(dt) {
 function createShelfMarker() {
   const el = document.createElement('div');
   el.className = 'shelf-marker';
+  // REACHABLE (U22, audit D5). These were tabindex-less, unlabelled <div>s,
+  // which made the table's whole history a flat 2.1.1 failure — and once a
+  // roll is shelved the peek is the ONLY door to Reveal, so a keyboard
+  // player could not reveal their own held roll at all. role=button + a tab
+  // stop + Enter/Space is the same door the click already opens; the NAME is
+  // written per-render, where the roll it stands for is known.
+  el.setAttribute('role', 'button');
+  el.tabIndex = 0;
+  el.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    ev.preventDefault();
+    const rid = el.dataset.rollId;
+    if (!rid) return;
+    if (peekRollId === rid) closePeek();
+    else openPeek(rid);
+  });
   el.addEventListener('pointerenter', (ev) => {
     if (ev.pointerType === 'mouse' && el.dataset.rollId) schedulePeekOpen(el.dataset.rollId);
   });
@@ -1358,6 +1374,12 @@ function renderShelfMarkers() {
     el.title = entry && entry.playerName ? `${entry.playerName} · ${entry.label}`
       : entry ? `${entry.label}`
       : 'Collected roll';
+    // The NAME, and it has to say what pressing does — `title` alone never
+    // reached the accname algorithm here and the marker had no text at all,
+    // so the shelf announced as five identical unlabelled buttons. A held
+    // roll says so, because that is the one whose card holds Reveal.
+    const held = entry && entryHidden(entry);
+    el.setAttribute('aria-label', `${el.title}${held ? ' — hidden' : ''}. Open this roll's card.`);
   }
   positionShelfMarkers();
   // An open peek re-reads whatever changed here — a reveal, a lens toggle, a
@@ -4610,6 +4632,15 @@ window.__diceDebug = {
   parseNotation,
   canonicalNotation,
   commandRoll(str) { return commandRoll(str); }, // execute a notation string
+  // The blocking surfaces, by name (U22): a11y-modals asserts the trap on
+  // each, and driving them through their real open/close is the only way to
+  // catch a surface that claims aria-modal without going with it.
+  openHelpDialog(topic) { return openHelpDialog(topic || null); },
+  closeHelpDialog() { return closeHelpDialog(); },
+  toggleKbd() { return toggleKbd(); },
+  closeKbd() { return closeKbd(); },
+  openSettingsModal() { return openSettingsModal(); },
+  closeSettingsModal() { return closeSettingsModal(); },
   // U19: vacate the seat NOW, skipping DISCONNECT_GRACE_MS. Closing the page
   // would get there too, five seconds later — a scenario about what the table
   // does AFTER someone leaves should not buy that wait once per assertion.
@@ -5774,6 +5805,11 @@ function renderTray() {
       x.className = 'die-x';
       x.textContent = '✕';
       x.title = r.title;
+      // The NAME, not just the tooltip (U22): accname never reaches `title`
+      // for a button that has content, and '✕' is content — so this
+      // announced as "✕" and nothing more, on the one control that decides
+      // WHICH die leaves.
+      x.setAttribute('aria-label', r.title);
       // INSIDE its chip's top-right corner (2i-C S1): straddling the edge
       // put the ✕ in the gutter between neighbouring pool chips, ambiguous
       // about which one it removes. Overlapping the chip's own art is safe
@@ -6243,7 +6279,18 @@ function fmtPreview(dice, mods) {
 function renderCmdState(boxEl, slotEl, res, raw) {
   slotEl.textContent = '';
   boxEl.classList.toggle('is-valid', res.ok === true);
-  boxEl.classList.toggle('is-invalid', !res.ok && res.state === 'invalid');
+  const bad = !res.ok && res.state === 'invalid';
+  boxEl.classList.toggle('is-invalid', bad);
+  // …AND SAY SO OUT LOUD (U22, audit D4). The red border and the message in
+  // the slot were the entire error channel, both purely visual. aria-invalid
+  // makes the state a fact of the control, and describedby binds the message
+  // to it — the slot already IS the validator's voice (§2l), so this needs no
+  // second surface, only the wire between the two that was never run.
+  const input = boxEl.querySelector('.cmd-in');
+  if (input) {
+    input.setAttribute('aria-invalid', String(bad));
+    if (slotEl.id) input.setAttribute('aria-describedby', slotEl.id);
+  }
   const span = (cls, text) => {
     const el = document.createElement('span');
     el.className = cls;
@@ -7884,8 +7931,36 @@ function renderRailColumn() {
   if (rb) rb.insertBefore(buildRollCue('roll', true), rb.firstChild);
 }
 
+// FOCUS SURVIVES A RE-RENDER (U22, audit D5). Both rail lists rebuild from
+// `textContent = ''`, which destroys whatever was focused and drops focus to
+// <body> — so picking three pools by keyboard cost three full tab-walks from
+// the top of the document, while the expanded rack (renderTray) kept focus
+// the whole time. Twins behaving oppositely, and the collapsed one is the
+// state a keyboard player is most likely to be living in.
+//
+// Restore by INDEX among the container's focusables, not by identity: the
+// render that fires here is a selection toggle, which changes each row's
+// dress and not the list's shape, so position is exactly stable across it.
+// Clamped, so a render that DOES shorten the list (a pool deleted elsewhere)
+// lands on the nearest surviving row instead of nothing.
+function keepFocusThrough(el, render) {
+  const active = document.activeElement;
+  const idx = (active && el.contains(active)) ? focusablesIn(el).indexOf(active) : -1;
+  render();
+  if (idx < 0) return;
+  const items = focusablesIn(el);
+  const target = items[Math.min(idx, items.length - 1)];
+  if (target) { try { target.focus({ preventScroll: true }); } catch { /* gone */ } }
+}
+
 function renderRailPools() {
   const el = document.getElementById('rail-pools');
+  if (el) return keepFocusThrough(el, () => renderRailPoolsInner(el));
+  return renderRailPoolsInner(el);
+}
+
+function renderRailPoolsInner(elIn) {
+  const el = elIn || document.getElementById('rail-pools');
   if (!el) return;
   // Clear BEFORE the collapsed gate: renderGroups calls this above its own
   // foreign-rack early return now, so it runs while expanded too, and stale
@@ -7983,6 +8058,12 @@ function railToggle(g) {
 // gives the notation room and costs nothing — the column was never wide enough
 // to be a grid, which is the same lesson §7.22 learned at 56px.
 function renderRailDice() {
+  const host = document.getElementById('rail-dice');
+  if (host) return keepFocusThrough(host, () => renderRailDiceInner());
+  return renderRailDiceInner();
+}
+
+function renderRailDiceInner() {
   const el = document.getElementById('rail-dice');
   if (!el) return;
   el.textContent = '';
@@ -8026,7 +8107,13 @@ function renderRailDice() {
       const x = document.createElement('button');
       x.className = 'rd-x';
       x.type = 'button';
-      x.tabIndex = -1;
+      // TABBABLE (U22, audit D5). This was tabIndex=-1, three lines under a
+      // comment calling the touch version of the same omission a trap — the
+      // identical trap left standing for the keyboard, where the only other
+      // way to undo a mis-count was Esc, which drops the whole pick. The
+      // reason it was hidden (a ✕ that only appears near the pointer) is a
+      // POINTER affordance; a keyboard has no pointer to be near, and the
+      // dress below already stands it up on :focus-within.
       x.textContent = '✕';
       x.title = `Remove one ${type}`;
       x.setAttribute('aria-label', `Remove one ${type}`);
@@ -8944,11 +9031,54 @@ const POP_VIS_SUBS = {
   whisper: 'others see you rolled, not what',
 };
 
+// A SEG IS A CHOICE, NOT A ROW OF SWITCHES (U22, audit D5). Every seg here
+// is mutually exclusive — Visibility, Moment, d20 pairing, keep/drop — and
+// every one announced as independent unlabelled toggles: `aria-pressed` says
+// "this button is on", which invites turning several on and says nothing
+// about the four being one decision. On Visibility that is the control whose
+// mistake cannot be undone, described to the one user who cannot see the
+// selected cell's dress.
+//
+// radiogroup/radio + aria-checked is the honest shape, and it also buys the
+// arrow-key behaviour a radiogroup is expected to have (below). The group's
+// label comes from the section head already sitting above it — named here
+// rather than duplicated, so the two cannot drift.
 function segSet(seg, value) {
+  if (!seg.hasAttribute('role')) {
+    seg.setAttribute('role', 'radiogroup');
+    if (!seg.getAttribute('aria-label')) {
+      const head = seg.previousElementSibling;
+      const word = head && head.classList.contains('plabel') ? head.textContent.trim() : null;
+      if (word) seg.setAttribute('aria-label', word);
+    }
+  }
   seg.querySelectorAll('button').forEach((b) => {
-    b.setAttribute('aria-pressed', String(b.dataset.v === value));
+    const on = b.dataset.v === value;
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', String(on));
+    b.removeAttribute('aria-pressed');
+    // Roving tabindex: a radiogroup is ONE tab stop, and Tab through five
+    // cells to reach a sixth control is what makes the popover 26 stops deep.
+    b.tabIndex = on ? 0 : -1;
   });
 }
+
+// …and the arrows a radiogroup owes. Without them a roving tabindex is a
+// trap: one cell reachable, the rest unreachable by keyboard entirely.
+document.addEventListener('keydown', (e) => {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+  const cell = e.target.closest && e.target.closest('[role="radio"]');
+  const group = cell && cell.closest('[role="radiogroup"]');
+  if (!group) return;
+  const cells = [...group.querySelectorAll('[role="radio"]:not([disabled])')];
+  const i = cells.indexOf(cell);
+  if (i < 0) return;
+  e.preventDefault();
+  const step = (e.key === 'ArrowRight' || e.key === 'ArrowDown') ? 1 : -1;
+  const next = cells[(i + step + cells.length) % cells.length];
+  next.focus();
+  next.click(); // a radiogroup selects on arrow, which is what makes it one stop
+});
 
 const fmtSigned = (v) => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v);
 
@@ -10341,9 +10471,14 @@ function renderZoomPicker() {
     }
   }
   const active = roomSettings.zoom || DEFAULT_ZOOM;
+  // aria-checked ONLY (U22): `aria-pressed` is not a valid attribute of
+  // role="radio", and setting both means one of the two is always wrong. A
+  // radio's state is checked; pressed belongs to a toggle button.
   holder.querySelectorAll('[data-zoom]').forEach((b) => {
-    b.setAttribute('aria-pressed', String(b.dataset.zoom === active));
-    b.setAttribute('aria-checked', String(b.dataset.zoom === active));
+    const on = b.dataset.zoom === active;
+    b.removeAttribute('aria-pressed');
+    b.setAttribute('aria-checked', String(on));
+    b.tabIndex = on ? 0 : -1; // one tab stop for the group, arrows within
   });
 }
 
@@ -10452,10 +10587,12 @@ function openSettingsModal() {
     : 'the dice everyone sees you roll — from your next roll';
   syncSettingsUI();
   settingsModal.classList.remove('hidden');
+  openModal(settingsModal, { labelledBy: 'settings-title' });
 }
 
 function closeSettingsModal() {
   settingsModal.classList.add('hidden');
+  closeModal(settingsModal);
   document.getElementById('settings-note').textContent = '';
   closeSetMenu(); // the dice-set menu must not outlive its anchor
 }
@@ -11427,11 +11564,87 @@ document.getElementById('rail-palette').addEventListener('click', () => {
 // Keyboard cheatsheet overlay ('?') + global table shortcuts.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// MODAL SEMANTICS (U22, audit D3). One trap, every blocking surface.
+//
+// The app had SIX modal-ish surfaces, zero focus containment, and exactly one
+// `aria-modal="true"` — on #help-overlay, which had no trap either. That
+// annotation is a promise to assistive tech that the rest of the page is not
+// there, and Tab walked straight into content AT had been told did not exist:
+// focus real, speech silent. An honest un-annotated dialog beats a lying
+// annotated one, so the rule here is that `aria-modal` and the trap ship
+// together or neither ships.
+//
+// `inert` on the background does the containment for real — it removes the
+// rest of the page from the tab order, from hit-testing AND from the
+// accessibility tree in one property, which is the thing three separate
+// hand-rolled mechanisms would each get subtly wrong. The Tab wrap below is
+// still needed because `inert` bounds where focus may GO, not where it wraps.
+// ---------------------------------------------------------------------------
+const modalStack = [];
+
+function focusablesIn(root) {
+  return [...root.querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]),'
+    + ' textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+    .filter((el) => el.offsetParent !== null || el === document.activeElement);
+}
+
+function openModal(el, { label = null, labelledBy = null, focus = null } = {}) {
+  if (!el || modalStack.some((m) => m.el === el)) return;
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  if (labelledBy) el.setAttribute('aria-labelledby', labelledBy);
+  else if (label) el.setAttribute('aria-label', label);
+  // Every OTHER body child goes inert. Siblings, not a blanket on <body> —
+  // inert is inherited, so marking the ancestor would silence the dialog too.
+  const muted = [...document.body.children].filter((c) => c !== el && !c.inert);
+  muted.forEach((c) => { c.inert = true; });
+  modalStack.push({ el, muted, returnTo: document.activeElement });
+  const first = focus || focusablesIn(el)[0] || el;
+  if (first === el && !el.hasAttribute('tabindex')) el.setAttribute('tabindex', '-1');
+  try { first.focus({ preventScroll: true }); } catch { /* not focusable */ }
+}
+
+function closeModal(el) {
+  const i = modalStack.findIndex((m) => m.el === el);
+  if (i < 0) return;
+  const [m] = modalStack.splice(i, 1);
+  m.muted.forEach((c) => { c.inert = false; });
+  el.removeAttribute('aria-modal');
+  // FOCUS GOES BACK TO WHAT OPENED IT. Without this it falls to <body> and
+  // the next Tab restarts at the top of the document — the same defect the
+  // rail's re-render has, and the reason a keyboard player pays a full
+  // tab-walk for every dialog they close.
+  if (m.returnTo && m.returnTo.isConnected) {
+    try { m.returnTo.focus({ preventScroll: true }); } catch { /* gone */ }
+  }
+}
+
+// Tab wraps inside the top modal. `inert` already stops focus LEAVING the
+// dialog, but without a wrap the last Tab parks focus on the browser chrome
+// and the next one comes back at the top of the document.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Tab' || !modalStack.length) return;
+  const { el } = modalStack[modalStack.length - 1];
+  const items = focusablesIn(el);
+  if (!items.length) { e.preventDefault(); return; }
+  const first = items[0], last = items[items.length - 1];
+  if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+}, true);
+
 const kbdOverlay = document.getElementById('kbd-overlay');
 
 function isKbdOpen() { return !kbdOverlay.classList.contains('hidden'); }
-function toggleKbd() { kbdOverlay.classList.toggle('hidden'); }
-function closeKbd() { kbdOverlay.classList.add('hidden'); }
+function toggleKbd() {
+  if (isKbdOpen()) closeKbd();
+  else { kbdOverlay.classList.remove('hidden'); openModal(kbdOverlay, { labelledBy: 'kbd-title' }); }
+}
+function closeKbd() {
+  kbdOverlay.classList.add('hidden');
+  closeModal(kbdOverlay);
+}
 
 kbdOverlay.addEventListener('click', (e) => {
   if (e.target === kbdOverlay) closeKbd();
@@ -11442,9 +11655,13 @@ kbdOverlay.addEventListener('click', (e) => {
 // nothing beyond ?room= (GOALS §7).
 const helpOverlay = document.getElementById('help-overlay');
 function isHelpOpen() { return !helpOverlay.classList.contains('hidden'); }
-function closeHelpDialog() { helpOverlay.classList.add('hidden'); }
+function closeHelpDialog() {
+  helpOverlay.classList.add('hidden');
+  closeModal(helpOverlay);
+}
 function openHelpDialog(topic) {
   helpOverlay.classList.remove('hidden');
+  openModal(helpOverlay, { labelledBy: 'help-title' });
   helpOverlay.querySelectorAll('#help-body section').forEach((el) => el.classList.remove('lit'));
   const sec = topic ? document.getElementById(`help-${topic}`) : null;
   if (sec) {

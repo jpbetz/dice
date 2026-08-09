@@ -37,7 +37,15 @@ limitations under the License.
 </script>
 </head>
 <body>
-  <div id="scene-container"></div>
+  <!-- THE DOCUMENT'S ONE HEADING AND ITS MAIN LANDMARK (U22, audit D5).
+       There was neither. A page with no <h1> gives a screen reader nothing to
+       orient by, and with no <main> the workbench announced as an anonymous
+       "complementary" — the whole app filed under "aside from what, exactly".
+       The felt IS the main content: it is where the dice are, where results
+       land, and what the panel exists to operate. The heading is visually
+       hidden because the table's own nameplate carries it on screen. -->
+  <h1 class="sr-only">Dice Table</h1>
+  <main id="scene-container" aria-label="The table"></main>
 
   <!-- THE ONE ANNOUNCEMENT CHANNEL (U5). Mounted at the root, always present,
        never `hidden`, holding nothing else — so it cannot be skipped by a
@@ -54,7 +62,15 @@ limitations under the License.
        the dice themes carry the color. Per-user state in dice.panels.v1
        ("pool" is the user-facing word; tray/group ids, classes and storage
        keys keep their old spelling). -->
-  <aside id="left-panel">
+  <aside id="left-panel" aria-label="Dice workbench">
+    <!-- ACCESSIBLE NAMES, NOT TITLES (U22, audit D5). The glyph-only foot
+         buttons below carry `title` AND `aria-label`. The accname algorithm
+         never reaches `title` for a button that HAS content — `⚙` is content
+         — so a title-only icon button announces as its glyph and nothing
+         else. `.rd-x` and `#edge-toggle` already did this correctly in the
+         same file, which is what made it a slip rather than a policy.
+         `title` stays: it is the sighted hover read, and the two say the same
+         thing on purpose. -->
     <!-- The control rail split top/bottom (Joe 2026-08-04): PRESENCE heads
          the column — status, roster, you — and the utility verbs (❯ quick
          roll, ≣ log, ⚙ settings, contextual ✕ Clear table) sit in the
@@ -275,7 +291,7 @@ limitations under the License.
         <div class="cmd-wrap">
           <input id="cmd-input" class="cmd-in" type="text" spellcheck="false" autocomplete="off"
                  autocapitalize="off" placeholder="2d6+3, 4d6dl1, 1d20 adv dc15 …" maxlength="500">
-          <button id="cmd-help" class="cmd-help" title="Notation cheatsheet">?</button>
+          <button id="cmd-help" class="cmd-help" title="Notation cheatsheet" aria-label="Notation cheatsheet">?</button>
         </div>
         <div id="cmd-slot" class="cmd-slot"></div>
         <div id="cmd-cheatsheet" class="cheatsheet hidden">
@@ -365,15 +381,15 @@ limitations under the License.
          the thing the ✕ pushed around.) ? Help sits with ≣ in the consult
          pair (Joe 2026-08-06). -->
     <div id="rail-foot">
-      <button id="toggle-settings" class="btn ghost" title="Settings">⚙</button>
+      <button id="toggle-settings" class="btn ghost" title="Settings" aria-label="Settings">⚙</button>
       <!-- No notification bubble on the log (user call, 2026-07): history is
            reference material, not an inbox — the since-you-looked count rides
            only the hover title. -->
-      <button id="rail-log" class="btn ghost" title="Roll log — l" aria-pressed="false">≣</button>
-      <button id="rail-help" class="btn ghost" title="Help">?</button>
-      <button id="rail-palette" class="btn ghost" title="Quick roll ( / )">❯</button>
+      <button id="rail-log" class="btn ghost" title="Roll log — l" aria-label="Roll log" aria-pressed="false">≣</button>
+      <button id="rail-help" class="btn ghost" title="Help" aria-label="Help">?</button>
+      <button id="rail-palette" class="btn ghost" title="Quick roll ( / )" aria-label="Quick roll">❯</button>
       <div id="corner-controls" class="hidden">
-        <button id="corner-clear" class="corner-btn" title="Remove all dice from the table — c"><span class="cb-x">✕</span><span class="cb-label"> Clear table</span></button>
+        <button id="corner-clear" class="corner-btn" title="Remove all dice from the table — c" aria-label="Clear table — remove all dice"><span class="cb-x">✕</span><span class="cb-label"> Clear table</span></button>
       </div>
     </div>
 
@@ -462,7 +478,7 @@ limitations under the License.
   <!-- Keyboard-shortcut cheatsheet overlay ('?') -->
   <div id="kbd-overlay" class="hidden">
     <div class="panel" id="kbd-panel">
-      <h2>Keyboard shortcuts</h2>
+      <h2 id="kbd-title">Keyboard shortcuts</h2>
       <div class="cheatsheet">
         <table>
           <tr><td><code>1–9</code></td><td>stage pool N into the draft (then Enter rolls)</td></tr>
@@ -895,7 +911,7 @@ limitations under the License.
   <div id="settings-modal" class="hidden">
     <div class="panel" id="settings-panel">
       <div class="settings-head">
-        <h2>Settings</h2>
+        <h2 id="settings-title">Settings</h2>
         <button id="settings-close" class="pop-close" title="Close">✕</button>
       </div>
       <div class="settings-sec">

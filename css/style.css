@@ -230,6 +230,15 @@ html, body {
 #builder-panel > .panel-body {
   overflow-y: auto;
   overflow-x: hidden; /* the column never scrolls sideways */
+  /* …AND SCROLLING TO A FOCUS RING CLEARS THE STICKY ZONE (U22, audit D5).
+     The draft well is sticky at this scrollport's top, so a Shift+Tab that
+     scrolls a rack tile into view parks it UNDER the well — the browser
+     scrolls the element to the scrollport edge, which the well is covering.
+     scroll-padding-top tells it where the readable edge actually is.
+     --draft-h is recomputed from offsetHeight, so this follows the well's
+     own height (including U30's short-viewport shrink) with no second edit;
+     the +34 is the shelf head that sticks under it. */
+  scroll-padding-top: calc(var(--draft-h, 0px) + 34px);
   /* NO top padding, since the workbench leads the column (2026-08-07). A
      sticky child sticks at the SCROLLPORT's top, so any padding above it is
      a band the scrolled content shows through — measured at 4px, with die
@@ -2270,6 +2279,10 @@ html, body {
 }
 .rd-cell:hover .rd-x, .rd-cell:focus-within .rd-x { opacity: 0.75; }
 .rd-x:hover { color: var(--red); opacity: 1; }
+/* …and FULLY, when it is the focused thing (U22). :focus-within already
+   lifted it off 0 so tabbing to it is not tabbing to nothing, but 0.75 is
+   the approach dress — the control you are actually on reads at full. */
+.rd-x:focus-visible { opacity: 1; }
 /* On a coarse pointer there is no hover to reveal it, and a counted row you
    cannot decrement by touch is a trap (P6's per-die ✕ tier). */
 /* …AND STANDING IS NOT REACHING (U28 / audit T6). The rule below made this
@@ -4000,7 +4013,20 @@ body.mini #offers-layer { top: 8px; width: min(260px, calc(100vw - 16px)); }
   user-select: text;
 }
 .cmd-in::placeholder { color: #665d50; }
-.cmd-in:focus { outline: none; }
+/* THE SWAP, not a removal (U22, audit D4). This was `outline: none` with
+   NOTHING put back — the app's primary text input and its command palette,
+   both with no focus indicator at all, which is the cleanest 2.4.7 failure
+   in the file. The swap-for-border pattern already ships three times in this
+   same stylesheet (.btn-row input, .group-editor input, .tin); this is the
+   fourth, written the same way.
+   The ring is a box-shadow rather than a border change because .cmd-in's
+   border already carries a STATE — `.cmd.is-invalid` paints it red — and a
+   focus indicator that overwrites the error is a worse trade than no focus
+   indicator at all. Two channels, two signals: border says valid/invalid,
+   ring says focused. Both read at once, and the invalid ring below keeps the
+   red visible under focus instead of turning gold over it. */
+.cmd-in:focus { outline: none; border-color: rgba(243, 234, 215, 0.5); box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.35); }
+.cmd.is-invalid .cmd-in:focus { border-color: var(--red); box-shadow: 0 0 0 2px rgba(226, 73, 59, 0.35); }
 .cmd.is-valid .cmd-in {
   border-color: rgba(212, 175, 55, 0.55);
   box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.12);
@@ -5035,7 +5061,11 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
   .group-editor .ge-notation { font-size: 16px; }
 }
 /* the announcement channel: read by screen readers, invisible to everyone else */
-.sr-live { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }
+/* One visually-hidden recipe, two names that say what each is FOR: .sr-live
+   is the announcement channel (U5), .sr-only is content that belongs in the
+   document but is carried on screen by something else — the <h1> (U22),
+   whose on-screen job the table's own nameplate already does. */
+.sr-live, .sr-only { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; }
 /* THE UNADJUDICATED STAKE (U17). `vs DC 15` with no verdict after it: the
    label stays in its surface's muted register and the NUMERAL takes ivory —
    the evidence register the per-die chips already use. One dress, four
