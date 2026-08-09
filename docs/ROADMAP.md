@@ -999,7 +999,7 @@ decide: a budget that cannot be shown cannot be spent deliberately.
   profile's system — PROFILES §11.6 names exactly this: *"a D&D rack in manage
   mode would stand three empty Soul Deal shelves. It becomes system-aware."*
 
-### C10. The generic invite link never offers a prepared seat to a returning player — DEFECT, medium
+### C10. The generic invite link never offers a prepared seat to a returning player — DEFECT, medium — **DESIGN REOPENED**
 
 *CUJ7, steps 2 and 7.* The picker is gated on `name && AS_PARAM`. With a
 stored `dice.name.v1` and **no `&as=`**, `initNet` skips both `peekTable` and
@@ -1014,7 +1014,37 @@ U3 fixed exactly this bug class for `&as=` links and stopped there, while
 UX §7.19 still says *"one link for everyone stays the primary form"* — which
 is the link this breaks. ROADMAP L2 raises the question ("what arrival looks
 like for a visitor with a stored name versus one without") and does not
-answer it. **This is the same shape as U3 and deserves the same answer.**
+answer it.
+
+**Decided 2026-08-08 (Joe):** offer the picker when the table has **unclaimed
+prepared seats** and you have not already settled a seat at this room — so an
+ordinary re-open of a plain table still joins straight through, and a reload
+after choosing or declining does not re-ask.
+
+**FIRST ATTEMPT REVERTED THE SAME DAY, and the reason is the design.** The
+gate was written against the pre-join peek's `seats` list, which made it fire
+for *anyone* arriving at a prepared table — including **the organizer at the
+table they just prepared**, and three scenarios hung waiting for a join that
+never came. The word doing the work in Joe's ruling is **unclaimed**, and the
+peek cannot know it: `handleTableInfo` deliberately omits the roster
+(server.js:2540 — *"No players, no roster, no log, no offers"*), which is a
+privacy decision, not an oversight. `unclaimedSeats()` can only run in-room,
+after the join the gate is deciding whether to make.
+
+**So the open question is where "unclaimed" comes from**, and there are three
+answers, none free:
+1. **Put a count on the peek** — `seatsOpen: n`, a bare integer, no names. The
+   cheapest, and it discloses strictly less than the seat names the peek
+   already carries.
+2. **Offer on name-match instead of on vacancy** — if your stored name equals
+   a prepared seat, that seat is *yours*; take it rather than shadow it. This
+   also fixes the second half of the defect (a stored name silently claiming a
+   chair on everyone's rail) and needs nothing new on the wire.
+3. **Offer after joining**, as a dismissible in-room invitation rather than a
+   modal at the door — no peek change at all, and it cannot hang a join.
+
+(2) and (3) compose and are probably the answer together; (1) is the one that
+touches the privacy surface. **Decide before rebuilding.**
 
 ### C11. The seat picker is unusable on the phone it is designed for — CUJ7, small
 
