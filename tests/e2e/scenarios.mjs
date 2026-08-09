@@ -432,6 +432,65 @@ export const scenarios = [
     },
   },
   {
+    name: 'dice-land-flat',
+    tags: ['roll', 'perf', 'cuj8'],
+    // C24 — THE MAT CANNOT KEEP SHRINKING. Three zoom tightenings shipped
+    // before anyone measured what they did to the floor the dice land on. At
+    // the fourth (refused) notch a 12-die pool put TEN of twelve dice on top
+    // of another die, in a heap nine units tall — which breaks goal 5
+    // ("organized over realistic") and goal 1 (real dice on a real surface),
+    // and reads as a smudge under a camera framed for a flat table.
+    //
+    // This is a FLOOR under the ladder, not a claim that today is ideal:
+    // today's `close` already piles a 40-die pool. It pins the pool sizes a
+    // Soul Deal table actually rolls — a canonical attribute+skill+motivation
+    // is three dice — so the next tightening has to answer for them.
+    //
+    // The check this replaces was VACUOUS: it read `.y` off the mesh wrapper
+    // rather than the physics body, got undefined, and every comparison came
+    // back false. It passed at every zoom level including the broken one.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+      const restHeights = async (notation) => {
+        await a.dbg(`commandRoll(${JSON.stringify(notation)})`);
+        await a.settle();
+        await a.dbg('sim(8000)');
+        const r = await a.eval(`JSON.stringify((() => {
+          const ys = window.__diceDebug.tableDice.map((o) => o.body.position.y);
+          return { n: ys.length, piled: ys.filter((y) => y > 1.2).length,
+                   maxY: Math.round(Math.max(...ys) * 100) / 100 };
+        })())`);
+        await a.dbg('clearTable()');
+        await a.dbg('sim(400)');
+        return JSON.parse(r);
+      };
+
+      for (const lv of ['wide', 'medium', 'close']) {
+        await a.dbg(`setZoom('${lv}')`);
+        await a.dbg('sim(200)');
+        // THE ROLL SOUL DEAL IS BUILT FOR: attribute + skill + motivation.
+        // If these three cannot land flat at any zoom the product ships, the
+        // zoom is wrong — not the roll.
+        const trio = await restHeights('1d8+1d6+1d10');
+        assert.equal(trio.piled, 0,
+          `${lv}: the canonical three-die roll lands flat (maxY ${trio.maxY})`);
+        // A six-die pool is ordinary too — but only the DEFAULT and above owe
+        // it a flat landing. `close` is opt-in and its own tooltip says
+        // "biggest dice, best on a phone": a player who chooses it is
+        // choosing density, and it measurably piles 2 of 6. Asserting it
+        // there would either fail on the shipped app or force the bar down
+        // everywhere, and neither is the truth. Recorded here so the next
+        // tightening cannot claim ignorance.
+        const six = await restHeights('6d6');
+        if (lv !== 'close') {
+          assert.ok(six.piled <= 1,
+            `${lv}: a six-die pool lands flat or nearly (piled ${six.piled}/6, maxY ${six.maxY})`);
+        }
+      }
+    },
+  },
+  {
     name: 'cache-validator',
     tags: ['net'],
     // A STALE BUILD IS A PERMANENT ONE, unless the validator changes with the

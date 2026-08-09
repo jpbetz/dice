@@ -1178,6 +1178,61 @@ the walls and shelf pitch follow the setting — is what it checks now.
   pictures, one of them designed. The ceremony's own vignette stays: a
   transient beat with a reason to be seen, not standing furniture.
 
+### C24. The mat cannot keep shrinking — frame the DICE, not the table — DESIGN, medium
+
+**Measured 2026-08-09, after three tightenings and one refused fourth.** Every
+zoom step shrinks the physics floor those dice have to land on, and nobody was
+measuring what that did. Dice at rest, counted above y=1.2 (i.e. resting on
+another die rather than on the felt):
+
+| mat | 6d6 | 12d6 | 20d6 | 40d6 | max height |
+| --- | --- | --- | --- | --- | --- |
+| 8.6×5.2 *(today's `medium`)* | 1 | 2 | 9/20 | 27/40 | 4.7 |
+| 6.7×4.1 *(today's `close`)* | 2 | 5 | 15/20 | 32/40 | 6.3 |
+| 5.2×3.2 *(a fourth notch, refused)* | 3 | 10/12 | 17/20 | 32/40 | **9.0** |
+
+A 40-die pool is a heap several dice tall, and a 12-die pool at the proposed
+fourth notch had ten of twelve dice off the felt. That breaks goal 5
+("organized over realistic" — the system keeps rolls legible) and goal 1
+(real dice on a real surface), and the camera is framed for a flat mat, so a
+tower reads as a smudge.
+
+**The fourth notch was reverted rather than shipped.** Today's ladder stands.
+
+**Why the mat is the wrong lever, now that it is measured.** It is the
+PHYSICS WALLS — identical on every client, because a seeded roll replayed
+against different walls lands differently — so it cannot vary by device, and
+it must be big enough for the largest pool anyone rolls. Those two facts put a
+floor under it that the "make dice bigger" requests keep pushing against.
+
+**The lever that is left is the CAMERA, and it is currently pointed at the
+wrong thing.** `applyCameraFraming` frames the MAT: it starts at the preset
+eye and pulls BACK until the whole table fits, so a three-die Soul Deal roll
+is shown at the same distance as a forty-die one. Framing the **settled
+cluster** instead would give a canonical attribute+skill+motivation roll big
+dice on a phone *and* leave a 40-die pool room to land flat.
+
+Sketch, in the order the risks appear:
+1. Frame the dice AABB (plus the shelf, which must stay reachable) rather
+   than `TABLE_W`/`TABLE_D`. `framingPoints()` is already the single place
+   that decides what must stay on screen.
+2. Ease to it after settle, never during — the roll's own motion is the
+   ceremony, and a camera moving under a tumbling die is nausea. §7.7's
+   whisk already establishes "one motion at a time".
+3. Keep a floor so a single d20 does not fill the screen, and a ceiling so a
+   40-die pool does not retreat past today's `wide`.
+4. It is per-viewer, not room state: the camera shows no one else anything,
+   which is what makes it safe to vary by device where the mat is not.
+
+**Do not take another notch off the mat until this exists.** The measurement
+above is what that instruction rests on, and `dice-land-flat` is the pin: it
+requires the canonical attribute+skill+motivation roll to land flat at EVERY
+level, and a six-die pool to land flat at the default and above. It
+deliberately does not require it at `close` — that level is opt-in, its own
+tooltip says "biggest dice, best on a phone", and it measurably piles 2 of 6.
+Asserting there would either fail on the shipped app or drag the bar down
+everywhere; recording it is what stops the next tightening claiming ignorance.
+
 ### C22. A versioning contract for client state — DESIGN, then small
 
 *Joe 2026-08-09: "I'd like to establish some diligence on client state… an

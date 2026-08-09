@@ -89,6 +89,15 @@ const ZOOM_LEVELS = [
 // and `medium` are the previous `medium` and `close`, values already looked
 // at — and a genuinely closer `close` was added below them.
 //
+// AND A FOURTH NOTCH WAS REFUSED, measured rather than argued (C24). Every
+// step shrinks the floor the dice land on, and at 5.2×3.2 a 12-die pool put
+// TEN of twelve dice on top of another die, with the heap nine units tall.
+// Today's ladder already piles 27 of 40. The mat cannot be the lever any
+// more: it is the physics walls, identical on every client, and it must hold
+// the largest pool anyone rolls. The camera is what should move — it frames
+// the MAT today, so a three-die roll is shown at the same distance as a
+// forty-die one. C24 has the design.
+//
 // AND ONCE MORE, same day ("increase the zooms further still — what is
 // considered 'close' now should be the medium setting"). Same shift, third
 // time: the ladder has now travelled from 30×17 to 8.6×5.2 at the default,
