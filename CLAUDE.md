@@ -6,6 +6,9 @@ Guidance for Claude Code agents working in this repository.
 
 Read [docs/GOALS.md](docs/GOALS.md) before feature work — it is the design
 authority (goals, invariants, priorities, superseded decisions).
+[docs/CUJS.md](docs/CUJS.md) says what people come here to DO — ten numbered
+journeys, each with the scenario that proves it end to end — and it is the
+**only place a CUJ number is assigned**; cite from it, never mint one.
 [docs/ROADMAP.md](docs/ROADMAP.md) sequences the work;
 [docs/UX.md](docs/UX.md) holds component specs.
 

@@ -591,7 +591,10 @@ This section holds the sequencing and the rulings; that one holds the
 components.
 
 **Sequenced against the CUJs, not against the machinery** (Joe's five,
-2026-08-07):
+2026-08-07). *These five keep the numbers 1–5 in
+[CUJS.md](CUJS.md), which is now the only place a CUJ number is assigned —
+five more journeys were added there on 2026-08-08, including the two the
+audit found unnamed (the session itself, and not losing your characters):*
 
 1. *"I just need to do a dice roll NOW"* → **L0**
 2. *"I'm preparing to play with friends, I need to set up a table and
@@ -666,7 +669,10 @@ the identity menu to a visible affordance at the table, one tap to copy,
 "somehow get all the players to join"). **Half of this is already
 built** — `&as=Name` pre-selects a prepared seat (main.js:10969), which
 PROFILES.md's G5 row already calls "CUJ2 end to end. One link, six
-players, right pools." A per-seat link ("Bo, this is your seat") is
+players, right pools" — in the PROFILES numbering, which is **CUJ7** now
+([CUJS.md](CUJS.md)); the routing half of that sentence is this item's CUJ2
+and the character half is CUJ7, which is exactly why one number could not
+carry both. A per-seat link ("Bo, this is your seat") is
 composition, not new work. *Deferred rung:* a QR code for in-person night — zero-dep
 means hand-rolling an encoder, so it earns its own decision.
 
@@ -822,7 +828,7 @@ table file plus G6's re-push cover it (PROFILES.md §5).
   reason the file cannot serve.
 - **Google sign-in.** Serves neither CUJ better than the file does: it
   does nothing for CUJ1 (the organizer *is* the durable store) and helps
-  CUJ2 only for a player who wants their pools on a second device and
+  CUJ10 only for a player who wants their pools on a second device and
   kept no file. The cost is not the button — it is OAuth redirect
   handling, RS256/JWKS ID-token verification, **a real per-user server
   store** (i.e. exactly the goal-7 amendment above), a consent surface,
@@ -1061,6 +1067,88 @@ which client drew the button.
 
 ---
 
+## Tier C — The CUJ audit closeout (2026-08-08)
+
+*From [CUJS.md](CUJS.md), which is now **the only place a CUJ number is
+assigned**. The audit found three overlapping journey-numbering schemes with
+no owner and two of them using the same numbers for different journeys —
+`CUJ2` named one journey in ROADMAP `L1` and a different one in PROFILES §1,
+UX-AUDIT E1 and this file's own **U3**. Ten journeys are now named; two of
+them (CUJ8, CUJ10) had never appeared in any list.*
+
+### C1. CUJ8 — name the session, then sequence against it — DESIGN FIRST, medium
+
+The largest journey in the product had no entry anywhere. Everything between
+"I joined" and "I left" — composing a roll, throwing it, reading it, keeping
+the table legible, deciding who sees what — was absent from Joe's five (which
+are entirely about *rooms*) and from PROFILES' two jobs (which are entirely
+about *characters*). The measurable cost: **all 30 Tier U findings were found
+by reading code**, because there was no journey to walk. An audit that starts
+from a journey finds different things than one that starts from a file.
+
+**Change:** CUJS.md names it. This item is the follow-through — one **composed**
+end-to-end scenario for CUJ8 on the `profile-dm-prepares` model (two players,
+a whole sequence, assertions about what a person ends up holding), and a pass
+re-reading Tier U's open items against it to see which are journey-blocking
+and which are polish. **First decide the question CUJS.md raises:** whether
+CUJ8 is one journey or four (compose / read / keep legible / who sees what).
+One keeps the list honest about where the time goes; four lets items sequence
+against something narrower. Joe's call — it is a decomposition of his game.
+
+Folds in **`R8`**, which was a journey filed as a requirement: it is why the
+scenario proving the product's headline story is named after a requirement
+number. It is CUJ7 now.
+
+### C2. CUJ10 — restore a library from the file it was written to — small-medium
+
+*Gap C.* For a system whose durable copy is a file, **restore from that file
+is the one operation it does not offer.** Export works (`portable`,
+`file-door`, `profile-file`); the way back is import-as-merge only — no
+replace-library, no bulk delete, and a wholesale refusal at the 40-pool cap.
+A player who loses their browser cannot get their characters back even
+holding the file.
+
+**Change:** an **explicit, separately-named** *"Replace my library from this
+file"* — never a sharper Apply. The distinction is the whole safety property:
+Apply merges and deletes nothing, which is what makes it safe to press on a
+rack you care about, and overloading it would take that away. This is
+ROADMAP **U26**'s transport bullet, re-scoped: U26 said *rack*, and since the
+profile-library merge the unit is the **library**.
+
+### C3. One composed scenario per journey, and a `cuj` tag — small
+
+*Gap D.* **A journey with no end-to-end scenario passes in every part and
+fails as a whole**, and this is measured rather than argued: `prepared-seat`
+was green for weeks while CUJ3/CUJ7 were broken for **every returning
+player**, because the fixture seeded no name and so only tested first-timers
+(UX-AUDIT E1 → U3). Every part was correct; the journey was not.
+
+**Change:** tag each journey's composed scenario `cuj1`…`cuj10`, so
+`--only cuj7` runs the journey rather than a surface. Add the missing
+composed scenarios (CUJ8 via C1; CUJ2, CUJ4, CUJ9 have parts but no walk).
+Add a line to [TESTING.md](TESTING.md): a journey's composed scenario is a
+release gate, and a feature that changes a journey updates it in the same
+commit — the rule WHAT IS TRUE TODAY already applies to surfaces.
+
+### C4. One owner per numbering namespace — small
+
+*Gap F.* `CUJ2` collided across three documents; `UX.md §7.24` was written
+**twice in the same week** by two branches and only caught at merge. Same
+root cause, no owner.
+
+**Change:** CUJS.md owns CUJ numbers (done — it says so at the top). Add the
+matching line to UX.md §7: the next free section number, stated in the
+document that assigns them, so a branch that is out for a week can see what
+is taken. Repoint the stale citations: **U3** and **UX-AUDIT E1** say "CUJ2"
+meaning what is now CUJ7; **SHIPPED.md** says "CUJs 1–4" in the surviving
+sense and is correct as written.
+
+### C5. CUJ5 (sub-tables) is the one journey with nothing at all — see L4
+
+Zero code, zero scenarios. Not a new item — [`L4`](#3b-the-lobby-and-the-table-flow--l0-l1-l3-shipped-2026-08-07)
+holds the design — but it is listed here so the zero appears in the same
+table as everything else rather than only in a section about lobbies.
+
 ## Tier U — The converged UX: the audit closeout (2026-08-08)
 
 **2026-08-08 — a week of convergence, audited.** Joe: *"It's taken a week,
@@ -1137,7 +1225,7 @@ answer is to do nothing, loudly.
 or route the press to the existing `cmd-shake` + `#cmd-slot` error path.
 Stop silently substituting the stale tray.
 
-### U3. The prepared seat never reaches a returning player (CUJ2) — DEFECT, medium  
+### U3. The prepared seat never reaches a returning player (CUJ7) — DEFECT, medium  
 **SHIPPED 2026-08-08 (`5a0b45b`).**
 
 *Audit E1 (major).* `initNet` prompts for a seat only when `dice.name.v1` is

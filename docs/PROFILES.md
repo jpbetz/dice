@@ -18,14 +18,23 @@ named CUJ1 before this document existed).
 
 ## 1. The two jobs
 
-**CUJ1 — the organizer.** One person (Joe or Walter) sits down before
+> **RENUMBERED 2026-08-08.** These two were written before
+> [CUJS.md](CUJS.md) existed and collided with ROADMAP §3b's five, which use
+> the same numbers for different journeys. They are now **CUJ6** (the
+> organizer) and — split, because it was really two — **CUJ3** for the
+> routing half and **CUJ7** for the character half. The prose below is kept
+> verbatim as the record of what was asked for; CUJS.md assigns the numbers.
+> `R8` in §11.1 is CUJ7 as well: it was a journey wearing a requirement's
+> number.
+
+**CUJ1 (now CUJ6) — the organizer.** One person (Joe or Walter) sits down before
 game night and builds *six characters*: each a named profile with
 Attribute / Skill / Motivation shelves of saved pools, priced against
 *Your Soul Deal*'s 100-point creation budget. They also set the table's
 look and rules — felt, interpretation system, table name, mat zoom.
 Then they put it somewhere it cannot be lost.
 
-**CUJ2 — the player arriving.** One link lands in Discord. Six people
+**CUJ2 (now CUJ3 + CUJ7) — the player arriving.** One link lands in Discord. Six people
 open it, and each ends up at the right table, under their own name,
 with their own pools in hand — without typing notation, without being
 walked through an import, and without a stranger's pools silently
