@@ -878,7 +878,7 @@ rack you care about, and overloading it would take that away. This is
 ROADMAP **U26**'s transport bullet, re-scoped: U26 said *rack*, and since the
 profile-library merge the unit is the **library**.
 
-### C3. One composed scenario per journey, and a `cuj` tag — small
+### C3. One composed scenario per journey — **tags SHIPPED, composed scenarios open**
 
 *Gap D.* **A journey with no end-to-end scenario passes in every part and
 fails as a whole**, and this is measured rather than argued: `prepared-seat`
@@ -886,8 +886,10 @@ was green for weeks while CUJ3/CUJ7 were broken for **every returning
 player**, because the fixture seeded no name and so only tested first-timers
 (UX-AUDIT E1 → U3). Every part was correct; the journey was not.
 
-**Change:** tag each journey's composed scenario `cuj1`…`cuj13`, so
-`--only cuj7` runs the journey rather than a surface. Add the missing
+**SHIPPED half (2026-08-08):** 109 scenarios carry `cuj1`…`cuj13`, so
+`--only cuj7` runs the journey rather than a surface, and TESTING.md records
+both the rule and why scenarios *without* a journey tag are deliberate
+(cross-cutting quality gates prove no single journey). **Open half:** Add the missing
 composed scenarios (CUJ8–CUJ11 via C1; CUJ2, CUJ4, CUJ12 have parts but no
 walk).
 Add a line to [TESTING.md](TESTING.md): a journey's composed scenario is a

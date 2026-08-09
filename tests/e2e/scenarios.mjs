@@ -180,7 +180,7 @@ async function createTableFromLobby(t, tableName) {
 export const scenarios = [
   {
     name: 'shared-roll',
-    tags: ['smoke', 'roll'],
+    tags: ['smoke', 'roll', 'cuj8'],
     // One shared truth: a roll made in one tab lands in both with identical
     // values, attribution, and interpretation (byte-equal log entries).
     async fn(ctx) {
@@ -217,7 +217,7 @@ export const scenarios = [
   },
   {
     name: 'post-roll-x',
-    tags: ['smoke', 'roll'],
+    tags: ['smoke', 'roll', 'cuj9'],
     // The roller's direct clear (UX §7.7.2): dice leave every table with no
     // shelf transit.
     async fn(ctx) {
@@ -236,7 +236,7 @@ export const scenarios = [
   },
   {
     name: 'orphan-clear',
-    tags: ['roll', 'net'],
+    tags: ['roll', 'net', 'cuj9'],
     // U19: A ROLL WHOSE ROLLER LEFT MUST NOT BE IMMOVABLE. Before this, an
     // uncollected roll was its roller's to end (§7.7) with no exception for
     // the roller being gone — nobody could clear it, and for a HELD roll
@@ -279,7 +279,7 @@ export const scenarios = [
   },
   {
     name: 'crit-budget',
-    tags: ['roll', 'chrome'],
+    tags: ['roll', 'chrome', 'cuj8'],
     // U18: THE WASH IS RATIONED, THE WORD IS NOT. `soul-deal.critFor` fires
     // when ANY die lands a crit cell, and those cells exist on d10/d12/d20 —
     // so 3d10 washed the whole viewport and shook the camera on 48.8% of
@@ -319,7 +319,7 @@ export const scenarios = [
   },
   {
     name: 'pool-undo',
-    tags: ['groups'],
+    tags: ['groups', 'cuj6'],
     // U28a: DELETING A POOL IS THE RACK'S ONE IRREVERSIBLE ACT, and it was
     // one tap on its smallest control with no confirm and no way back. The
     // undo stands in the SLOT the pool left — the way back is where the
@@ -645,7 +645,7 @@ export const scenarios = [
   },
   {
     name: 'folded-card',
-    tags: ['smoke', 'roll', 'chrome'],
+    tags: ['smoke', 'roll', 'chrome', 'cuj8'],
     // The folded card + the hover read + the feed (Joe 2026-08-03): the
     // banner's BODY is the one big removal target (role-split: the roller
     // clears for everyone, a spectator dismisses locally), the fold below
@@ -764,7 +764,7 @@ export const scenarios = [
   },
   {
     name: 'collect-peek',
-    tags: ['smoke', 'shelf'],
+    tags: ['smoke', 'shelf', 'cuj9'],
     // Collect moves a roll to the shelf on every table; peek recovers the
     // full result; clearing a collected roll empties the shelf everywhere.
     async fn(ctx) {
@@ -799,7 +799,7 @@ export const scenarios = [
   },
   {
     name: 'shelf-quiet',
-    tags: ['smoke', 'shelf'],
+    tags: ['smoke', 'shelf', 'cuj9'],
     // Quiet by default (P1): a resting shelf marker is an INVISIBLE hover/tap
     // target — no dot, no total, no lens word, no tiny ✕, and a held roll
     // never shouts '?'. The settled cluster is its own presence; the detail
@@ -878,7 +878,7 @@ export const scenarios = [
   },
   {
     name: 'shelf-actions',
-    tags: ['shelf'],
+    tags: ['shelf', 'cuj9'],
     // A shelved roll stays actionable: the peek's REROLL strip (the cue
     // SAYS reroll — B2) rolls the SAME dice again — the shelved cluster
     // clears as part of the reroll (a pool is how you mint a copy) — and
@@ -956,7 +956,7 @@ export const scenarios = [
   },
   {
     name: 'auto-collect',
-    tags: ['shelf'],
+    tags: ['shelf', 'cuj9'],
     // A new roll auto-collects the previous uncollected one — the table
     // holds one live roll; history lives on the shelf.
     async fn(ctx) {
@@ -972,7 +972,7 @@ export const scenarios = [
   },
   {
     name: 'shelf-cap',
-    tags: ['shelf'],
+    tags: ['shelf', 'cuj9'],
     timeout: 180000,
     // The shelf holds SHELF_CAP rolls; the oldest is evicted FIFO; occupied
     // clusters compact left-to-right in seq order.
@@ -998,7 +998,7 @@ export const scenarios = [
   },
   {
     name: 'shelve-clear-no-chip-leak',
-    tags: ['shelf', 'perf'],
+    tags: ['shelf', 'perf', 'cuj9'],
     // Tier 0e endurance: the shelf marker sinks on its OWN record — it must
     // not overwrite a die's chip ref, or the die's chip leaks into
     // #chips-layer forever. Two full shelve+clear cycles catch the per-cycle
@@ -1037,7 +1037,7 @@ export const scenarios = [
   },
   {
     name: 'chips-quiet-default',
-    tags: ['smoke', 'roll'],
+    tags: ['smoke', 'roll', 'cuj8'],
     // Quiet by default (P1): the floating die numbers are opt-in. Results
     // stay readable without them (the log line still carries the total); the
     // 'Show numbers on dice' preference paints chips for the roll on the felt
@@ -1063,7 +1063,7 @@ export const scenarios = [
   },
   {
     name: 'layer-scale',
-    tags: ['smoke', 'roll'],
+    tags: ['smoke', 'roll', 'cuj8'],
     // The one layer scale (P2): the ceremony/verdict layer renders ABOVE the
     // ambient table labels (value chips, shelf markers) and the banner, and
     // the crit overlay tops the whole roll moment — a verdict card is never
@@ -1086,7 +1086,7 @@ export const scenarios = [
   },
   {
     name: 'settings-sync',
-    tags: ['smoke', 'settings'],
+    tags: ['smoke', 'settings', 'cuj12'],
     // Room settings are one shared truth: felt and interpretation system
     // changes propagate to every table.
     async fn(ctx) {
@@ -1105,7 +1105,7 @@ export const scenarios = [
   },
   {
     name: 'ceremony-retire',
-    tags: ['roll', 'ceremony'],
+    tags: ['roll', 'ceremony', 'cuj8'],
     // THE FLOW TO COLLECTED (Joe 2026-08-04: 'cinematics have too many
     // stages… no ✕ and Done — just flow to collected'): the ceremony's
     // verdict card is a FOLDED CARD — its BODY is the role-split clear
@@ -1185,7 +1185,7 @@ export const scenarios = [
   },
   {
     name: 'floor-texture-persistent',
-    tags: ['smoke', 'perf', 'themes'],
+    tags: ['smoke', 'perf', 'themes', 'cuj12'],
     // Tier 0 §0 (hot-paths): the floor's texture identity is permanent —
     // recompositeFelt, applyFeltTheme, applyZoom, applyMatDecal, and the
     // corner sweep all repaint the same CanvasTexture in place and flip
@@ -1229,7 +1229,7 @@ export const scenarios = [
   },
   {
     name: 'per-die-read',
-    tags: ['smoke', 'meanings'],
+    tags: ['smoke', 'meanings', 'cuj8'],
     // THE SOUL DEAL READ (author-confirmed): dice never sum. Under the
     // default system a roll shows per-die outcome words and NO total or DC
     // verdict; switching the room to a totals system re-reads the same log
@@ -1348,7 +1348,7 @@ export const scenarios = [
   },
   {
     name: 'source-read',
-    tags: ['smoke', 'meanings', 'groups'],
+    tags: ['smoke', 'meanings', 'groups', 'cuj8'],
     // 2b-⑤: results answer per POOL. The notation carries the attribution
     // (`2d8[Wisdom]`); breakdown, tally and log group by those labels, and
     // the grouping survives a lens switch — it is attribution, not
@@ -1419,7 +1419,7 @@ export const scenarios = [
   },
   {
     name: 'ledger-read',
-    tags: ['smoke', 'meanings'],
+    tags: ['smoke', 'meanings', 'cuj6'],
     // 2i-A THE LEDGER: sourced per-die reads share ONE label column (the
     // grid), each row's chips live in their own cell (structural hanging
     // indent), the evidence/word gap is layout while the string keeps its
@@ -1527,7 +1527,7 @@ export const scenarios = [
   },
   {
     name: 'panel-anatomy',
-    tags: ['chrome', 'settings'],
+    tags: ['chrome', 'settings', 'cuj8'],
     // THE QUIET NAMEPLATE + THE REGION HEAD (the anatomy pass, Joe
     // 2026-08-04): the table is nameable room-wide (settings channel);
     // the rail plate renders the name AS TYPED (content, not chrome),
@@ -1693,7 +1693,7 @@ export const scenarios = [
   },
   {
     name: 'spent-draft',
-    tags: ['smoke', 'groups'],
+    tags: ['smoke', 'groups', 'cuj8'],
     // 2i-E: a rolled draft SURVIVES (the deliberate repeat-roll muscle
     // memory — never auto-cleared) but wears the spent cool-down until
     // its next edit — the cue that separates 'roll it again' from
@@ -1736,7 +1736,7 @@ export const scenarios = [
   },
   {
     name: 'notation-wiring',
-    tags: ['notation'],
+    tags: ['notation', 'cuj8'],
     // The browser-side notation path (grammar itself is unit-tested): a valid
     // command rolls; garbage is rejected without starting a roll or throwing.
     async fn(ctx) {
@@ -1753,7 +1753,7 @@ export const scenarios = [
   },
   {
     name: 'preview-honest',
-    tags: ['notation', 'smoke'],
+    tags: ['notation', 'smoke', 'cuj8'],
     // The command-box preview is exact (ROADMAP §2l ①, js/odds.js) — literal
     // min/avg/max text is assertable, which the Monte-Carlo preview never
     // was. The cap-truncation corners drop to seeded sampling and say so.
@@ -1829,7 +1829,7 @@ export const scenarios = [
   // -- chrome: the persistent rail + collapsible panels + identity ----------
   {
     name: 'panels-collapse',
-    tags: ['smoke', 'chrome'],
+    tags: ['smoke', 'chrome', 'cuj8'],
     // Two regions — Compose, Saved pools — each independently collapsible;
     // collapsed = header tab only; state persists per user ('dice.panels.v1'
     // — same origin, same identity); keyboard parity: 'm' collapses/expands
@@ -1885,7 +1885,7 @@ export const scenarios = [
   },
   {
     name: 'control-rail',
-    tags: ['smoke', 'chrome'],
+    tags: ['smoke', 'chrome', 'cuj8'],
     // The persistent control rail NEVER hides: identity chip, quick roll,
     // roll log and settings stay reachable even with every panel collapsed
     // (the emergent compact view). Since 2026-08-04 it lives at the TOP of
@@ -1998,7 +1998,7 @@ export const scenarios = [
   },
   {
     name: 'log-flyout',
-    tags: ['chrome', 'smoke'],
+    tags: ['chrome', 'smoke', 'cuj9'],
     // The roll log rides the rail (P3: information): ≣ / 'l' toggle a pinned
     // flyout. Closed, arrivals count into the unread badge (which also seeds
     // from the join backlog); open, renderLog keeps painting live. PINNED
@@ -2057,7 +2057,7 @@ export const scenarios = [
   },
   {
     name: 'identity-chip',
-    tags: ['smoke', 'chrome', 'seat'],
+    tags: ['smoke', 'chrome', 'seat', 'cuj3'],
     // The rail identity chip: rename propagates to every roster and the chip
     // itself; '#' is refused; 'Leave & switch' (the once-dead net.disconnect)
     // drops the seat for real — the other tab sees the player leave — clears
@@ -2113,7 +2113,7 @@ export const scenarios = [
 
   {
     name: 'seat-resume',
-    tags: ['smoke', 'chrome', 'seat'],
+    tags: ['smoke', 'chrome', 'seat', 'cuj3'],
     // A REFRESH IS THE SAME PLAYER (Joe 2026-08-04). The tab remembers its
     // seat and offers it back to /api/join; the server sits it down again
     // instead of minting a new one. Before this, every reload flashed two
@@ -2202,7 +2202,7 @@ export const scenarios = [
 
   {
     name: 'seat-closed-tab',
-    tags: ['seat', 'presence'],
+    tags: ['seat', 'presence', 'cuj3'],
     // A CLOSED TAB LEAVES THE TABLE (Joe 2026-08-06). It always did locally —
     // the socket closes, the grace runs, the seat goes. On the DEPLOYED table
     // it did not: behind Cloud Run's front end the container never sees the
@@ -2251,7 +2251,7 @@ export const scenarios = [
 
   {
     name: 'url-carries-nothing',
-    tags: ['smoke', 'groups'],
+    tags: ['smoke', 'groups', 'cuj13'],
     // THE URL IS NOT STORAGE (Joe 2026-08-04). The saved-pool rack used to
     // ride the address bar as '#g=<base64url>', rewritten on every edit and
     // read at boot AHEAD of localStorage — so opening someone else's pools
@@ -2289,7 +2289,7 @@ export const scenarios = [
 
   {
     name: 'die-art',
-    tags: ['chrome'],
+    tags: ['chrome', 'cuj12'],
     // P1 — the dice are the buttons: every die type has real rendered art
     // (a dataURL still of its beveled mesh), the types are visually distinct,
     // and the compose palette tiles carry it as .die-art imgs (alt="",
@@ -2335,7 +2335,7 @@ export const scenarios = [
   },
   {
     name: 'compose-grammar',
-    tags: ['smoke', 'chrome'],
+    tags: ['smoke', 'chrome', 'cuj8'],
     // The New pool panel speaks P1 end to end: composed dice render as one
     // die-art roll button; a per-die ✕ (an overlaid SIBLING, never a nested
     // button) removes exactly one die; the rim is [± Modify][Offer][✕ Clear]
@@ -2460,7 +2460,7 @@ export const scenarios = [
 
   {
     name: 'keyboard-flow',
-    tags: ['smoke', 'chrome', 'roll'],
+    tags: ['smoke', 'chrome', 'roll', 'cuj8'],
     // The fluid-play pair (2026-07 keyboard design): after a roll settles,
     // Enter KEEPS it (collect to the shelf) and Esc SWEEPS it (clear) — only
     // your own settled roll, and only when no layer holds the key first
@@ -2489,7 +2489,7 @@ export const scenarios = [
   },
   {
     name: 'side-panel',
-    tags: ['smoke', 'chrome', 'groups'],
+    tags: ['smoke', 'chrome', 'groups', 'cuj8'],
     // THE SIDE PANEL (2026-08-04): a real layout column, never an overlay —
     // the felt (canvas) is sized beside it and resizes on toggle. The
     // divider strip collapses it to a 104px POOL RAIL (2026-08-07) carrying
@@ -2632,7 +2632,7 @@ export const scenarios = [
   },
   {
     name: 'pools-quick',
-    tags: ['smoke', 'chrome', 'groups'],
+    tags: ['smoke', 'chrome', 'groups', 'cuj8'],
     // THE RACK (2026-08-01): sources add, the pool rolls. At rest the panel
     // is read-only tiles on category shelves — tapping a tile STAGES its
     // dice into the sticky draft (never a broadcast roll); ± rides each
@@ -2739,7 +2739,7 @@ export const scenarios = [
   },
   {
     name: 'saved-group-edit',
-    tags: ['smoke', 'groups'],
+    tags: ['smoke', 'groups', 'cuj6'],
     // Saved-group editing writes back to the SAME record by id: renaming no
     // longer forks a duplicate and an unnamed group can be updated. The
     // inline row editor (✎ → Update/Cancel) and the ± popover's 'Update this
@@ -2889,7 +2889,7 @@ export const scenarios = [
     // shelf-count assertions a scheduling coin flip. run.mjs now refuses
     // duplicate names outright.
     name: 'tidy-away',
-    tags: ['shelf'],
+    tags: ['shelf', 'cuj9'],
     // The tidy-away clock (2026-08-01): a finished OPEN roll of yours
     // collects itself after a quiet moment; the shelf cluster's quick ✕
     // clears it in one click (no peek transit); a hidden roll stands until
@@ -2923,7 +2923,7 @@ export const scenarios = [
   },
   {
     name: 'soul-seed',
-    tags: ['groups'],
+    tags: ['groups', 'cuj6'],
     // The pre-Soul-Deal starter trio (Attack/Damage/Percentile, untouched)
     // upgrades to the Soul Deal rack on the next boot — it was never the
     // player's own work. One edit and the rack is theirs: no swap.
@@ -2970,7 +2970,7 @@ export const scenarios = [
   },
   {
     name: 'sheet-pass',
-    tags: ['smoke', 'groups'],
+    tags: ['smoke', 'groups', 'cuj6'],
     // THE SHEET PASS (2026-08-01): the rack is the character sheet. The
     // pool popover's identity strip renames, re-shelves and re-ranks in
     // place (by id, instantly); ghost '+' tiles mint pools ON their shelf;
@@ -3194,7 +3194,7 @@ export const scenarios = [
   },
   {
     name: 'sheet-touch',
-    tags: ['groups'],
+    tags: ['groups', 'cuj6'],
     // The 500ms hold door: a touch hold opens the pool popover and the
     // synthetic click that follows is suppressed (never a stage); a hold
     // over an already-open popover suppresses too (regression: it staged).
@@ -3226,7 +3226,7 @@ export const scenarios = [
   },
   {
     name: 'rack-dice-value',
-    tags: ['groups', 'chrome'],
+    tags: ['groups', 'chrome', 'cuj6'],
     // THE DICE-VALUE LEDGER (§2l ③): manage-and-measure — figures exist
     // only while ✎ is on (BUILT, not hidden), one right-flush column, never
     // on a foreign rack. Both spellings of 2d20-keep-1 price 40: the ledger
@@ -3288,7 +3288,7 @@ export const scenarios = [
   },
   {
     name: 'pool-forecast',
-    tags: ['groups', 'meanings'],
+    tags: ['groups', 'meanings', 'cuj6'],
     // THE SPECTRUM BARS (§2l ④): per-die forecast in the ± popover — exact
     // by construction, deduplicated never aggregated, keep/drop refused,
     // d10x is the single italic quiet, and a system flip repaints the OPEN
@@ -3388,7 +3388,7 @@ export const scenarios = [
   },
   {
     name: 'shared-pools',
-    tags: ['smoke', 'groups'],
+    tags: ['smoke', 'groups', 'cuj11'],
     // The owner switcher (ROADMAP 2b): racks publish to the room; a teammate
     // can browse them read-only and STAGE from them; digits never leave your
     // own rack; a staged chip is a snapshot a later edit cannot rewrite.
@@ -3484,7 +3484,7 @@ export const scenarios = [
   },
   {
     name: 'portable',
-    tags: ['smoke', 'settings', 'groups'],
+    tags: ['smoke', 'settings', 'groups', 'cuj13'],
     // Tier 4 §5 — pools & just-you settings as portable YAML: export fills
     // the textarea, edits re-parse LIVE into a preview, Apply merges by
     // name (never deletes), refusals name their line, and the '#'-in-
@@ -3553,7 +3553,7 @@ export const scenarios = [
   },
   {
     name: 'draft-offer',
-    tags: ['smoke', 'groups', 'roll'],
+    tags: ['smoke', 'groups', 'roll', 'cuj10'],
     // The Trigger Pass moved Offer onto the draft row (the popover's
     // 'Offer to table' retired): visible at a table, and it posts the box
     // canonical — the draft's FULL intent — as the offer.
@@ -3582,7 +3582,7 @@ export const scenarios = [
   },
   {
     name: 'draft-bench',
-    tags: ['groups', 'chrome'],
+    tags: ['groups', 'chrome', 'cuj8'],
     // THE WORKBENCH (§7.14): the draft line is a field dressed in the
     // command box's --well; the management rail (Save · Offer · ✕ Clear)
     // STANDS below it while a draft exists — P6, superseding the
@@ -3877,7 +3877,7 @@ export const scenarios = [
 
   {
     name: 'section-bar',
-    tags: ['smoke', 'chrome', 'groups'],
+    tags: ['smoke', 'chrome', 'groups', 'cuj8'],
     // §7.23 — three INDEPENDENT sources over one workbench. What this pins
     // that the old two-state toggle could not: co-visibility, the all-off
     // floor, and the migration receipt that proves P1 survived (every
@@ -3984,7 +3984,7 @@ export const scenarios = [
 
   {
     name: 'digit-reach',
-    tags: ['smoke', 'groups', 'chrome'],
+    tags: ['smoke', 'groups', 'chrome', 'cuj8'],
     // U24. `1 2 3 Enter` is the roll this surface exists for — an attribute,
     // a skill and a motivation. On the rack the app DEALS (9 attributes, 6
     // skills, 3 motivations) the flat rendered order spent all nine digits on
@@ -4040,7 +4040,7 @@ export const scenarios = [
 
   {
     name: 'rail-mode',
-    tags: ['smoke', 'chrome', 'groups'],
+    tags: ['smoke', 'chrome', 'groups', 'cuj8'],
     // §7.23 — the collapsed column's source switch and its dice list.
     // Everything here goes through the REAL controls, not the debug hooks:
     // the hooks branched on mode correctly while #rail-roll was still bound
@@ -4191,7 +4191,7 @@ export const scenarios = [
 
   {
     name: 'rim-word',
-    tags: ['smoke', 'chrome', 'meanings'],
+    tags: ['smoke', 'chrome', 'meanings', 'cuj8'],
     // U11. soul-deal — the DEFAULT — sets usesMods:false, which folds the
     // Modifier, pairing, Target and keep/drop sections out of the ± popover
     // entirely. So the panel's loudest tool said "± Modify" with
@@ -4230,7 +4230,7 @@ export const scenarios = [
 
   {
     name: 'clear-scope',
-    tags: ['smoke', 'chrome', 'log'],
+    tags: ['smoke', 'chrome', 'log', 'cuj9'],
     // U14. `c` sweeps the felt FOR THE WHOLE TABLE. Its guard's own comment
     // named the hazard — "a stray 'c' would sweep the felt underneath a menu
     // the player is reading" — while covering one of the three menus; the
@@ -4355,7 +4355,7 @@ export const scenarios = [
 
   {
     name: 'touch-doors',
-    tags: ['smoke', 'chrome', 'seat'],
+    tags: ['smoke', 'chrome', 'seat', 'cuj3'],
     // U27 + U12. Every right-click door needs a touch twin, because iOS
     // Safari never fires `contextmenu` on a long press — a contextmenu-only
     // door is a door that does not exist on an iPhone. Three of the four
@@ -4448,7 +4448,7 @@ export const scenarios = [
 
   {
     name: 'draft-intent',
-    tags: ['smoke', 'groups', 'visibility', 'notation'],
+    tags: ['smoke', 'groups', 'visibility', 'notation', 'cuj8'],
     // U1 + U2. THE SAME POOL MUST SEND THE SAME ROLL whichever surface fires
     // it. Until 2026-08-08 stageGroup pushed dice and threw the rest away, so
     // `3d6+2 dc12 cinematic held` rolled face-down and cinematic from the
@@ -4591,7 +4591,7 @@ export const scenarios = [
   // where it matters, what the wire actually carried.
   {
     name: 'held-roll',
-    tags: ['visibility'],
+    tags: ['visibility', 'cuj10'],
     // A held roll is face down for EVERYONE including the roller; the reveal
     // (authority only) leaves both tabs holding the same full entry.
     async fn(ctx) {
@@ -4662,7 +4662,7 @@ export const scenarios = [
   },
   {
     name: 'secret-roll',
-    tags: ['visibility'],
+    tags: ['visibility', 'cuj10'],
     // A secret roll exists ONLY for its roller: no event, no log line, no dice
     // for anyone else. The open roll that follows proves the channel was live.
     async fn(ctx) {
@@ -4695,7 +4695,7 @@ export const scenarios = [
   },
   {
     name: 'whisper-roll',
-    tags: ['visibility'],
+    tags: ['visibility', 'cuj10'],
     // Three seats: the audience reads the roll, the chooser always reads their
     // own, and everyone else sees a shrouded roll they know happened.
     async fn(ctx) {
@@ -4755,7 +4755,7 @@ export const scenarios = [
   },
   {
     name: 'whisper-unknown-audience',
-    tags: ['visibility'],
+    tags: ['visibility', 'cuj10'],
     // An unmatched audience name refuses the whole action (never silently
     // narrows the audience) — and the refusal is surfaced, not swallowed.
     async fn(ctx) {
@@ -4786,7 +4786,7 @@ export const scenarios = [
   },
   {
     name: 'gm-screen-offer',
-    tags: ['visibility'],
+    tags: ['visibility', 'cuj10'],
     // The dice-tower roll: Alice offers a roll only she will read; Bob picks it
     // up and throws it blind. Reveal authority stays with the offerer.
     async fn(ctx) {
@@ -4832,7 +4832,7 @@ export const scenarios = [
   },
   {
     name: 'targeted-offer',
-    tags: ['visibility'],
+    tags: ['visibility', 'cuj10'],
     // ROADMAP 4b — "Bo, roll this save": an offer claimable only by a named
     // player. The card shows EVERYONE the stakes (including who it's for);
     // only the target gets the claim strip, and the server enforces the
@@ -4903,7 +4903,7 @@ export const scenarios = [
   },
   {
     name: 'whisper-offer',
-    tags: ['visibility'],
+    tags: ['visibility', 'cuj10'],
     // Whisper-offer auto-targeting (Joe 2026-08-03): a whisper is already
     // ADDRESSED, so its offer derives the claim gate from the audience —
     // table-wide whisper offers cease to exist by construction. Conflicting
@@ -4990,7 +4990,7 @@ export const scenarios = [
   },
   {
     name: 'reveal-authority',
-    tags: ['visibility'],
+    tags: ['visibility', 'cuj10'],
     // Only the visibility chooser may flip a hidden roll — enforced by the
     // server, not by whether a client drew the button.
     async fn(ctx) {
@@ -5018,7 +5018,7 @@ export const scenarios = [
   },
   {
     name: 'reveal-mid-playback',
-    tags: ['visibility'],
+    tags: ['visibility', 'cuj10'],
     // A reveal that lands while the shrouded roll is still tumbling must DEFER
     // until it settles — never flip dice mid-throw. (The pendingClears
     // pattern; the race this guards was fixed once already, in 7f9cdf5.)
@@ -5055,7 +5055,7 @@ export const scenarios = [
   },
   {
     name: 'raw-sse-leak',
-    tags: ['visibility'],
+    tags: ['visibility', 'cuj10'],
     // THE redaction proof at this layer: a player who is only an HTTP client
     // keeps every byte the server sent. Nothing a client chose not to render
     // can hide here.
@@ -5139,7 +5139,7 @@ export const scenarios = [
   },
   {
     name: 'resync-shrouded',
-    tags: ['visibility', 'resync'],
+    tags: ['visibility', 'resync', 'cuj10'],
     // Reconstruction obeys the projection: a late joiner rebuilds a shrouded
     // table, and someone who arrives after the reveal rebuilds a full one.
     async fn(ctx) {
@@ -5175,7 +5175,7 @@ export const scenarios = [
   },
   {
     name: 'alias-bindings',
-    tags: ['visibility', 'notation'],
+    tags: ['visibility', 'notation', 'cuj10'],
     // The terminology amendment's cross-tool aliases, end to end: /gmroll is
     // a SECRET roll (Roll20's contract — the roller sees the result, the
     // table learns nothing), /sr refuses to guess between two tools that
@@ -5223,7 +5223,7 @@ export const scenarios = [
   },
   {
     name: 'reroll-history',
-    tags: ['roll', 'shelf'],
+    tags: ['roll', 'shelf', 'cuj9'],
     // B2+B3 end to end: the reroll VERB says reroll (the card strip's cue
     // word vs the draft's plain ROLL), and history TRACKS rolls vs rerolls —
     // rerollOfId is server-substantiated, shared by every tab (late joiners
@@ -5322,7 +5322,7 @@ export const scenarios = [
   },
   {
     name: 'reroll-provenance-gate',
-    tags: ['visibility'],
+    tags: ['visibility', 'cuj9'],
     // THE SECURITY TRAP, at full strength (B3): a reroll of a SECRET roll
     // must not leak the parent's existence via rerollOfId — not to a
     // bytes-only stream, not to a client, NOT EVEN FOR THE ROLLER of the
@@ -5401,7 +5401,7 @@ export const scenarios = [
   },
   {
     name: 'themed-dice',
-    tags: ['themes'],
+    tags: ['themes', 'cuj12'],
     // Dice-set identity (Tier 6 §9): chosen in settings ("Just you"), the
     // set rides each roll request and lands for EVERYONE at the table; a
     // player who never chose stays std (identity is per-player, not room
@@ -5453,7 +5453,7 @@ export const scenarios = [
   },
   {
     name: 'themed-fx',
-    tags: ['themes'],
+    tags: ['themes', 'cuj12'],
     // Ladder Level 4 (felt decals + die lights): a lit set's roll glows
     // on EVERY screen; the 4-light budget holds; a collect puts the
     // flame out (the shelf is the archive); a shrouded roll marks and
@@ -5546,7 +5546,7 @@ export const scenarios = [
   },
   {
     name: 'themed-post',
-    tags: ['themes'],
+    tags: ['themes', 'cuj12'],
     // Ladder Level 5 (selective bloom / shock rings / bypass): a std
     // table renders the released direct path — the stack only engages
     // when something glows. A bolt-glass roll blooms and pops its
@@ -5640,7 +5640,7 @@ export const scenarios = [
   },
   {
     name: 'rest-cadence',
-    tags: ['themes'],
+    tags: ['themes', 'cuj12'],
     // Slice 3: settled-on-felt dice cadence per set — sea-glass swells,
     // sap-amber declares stillness (identity, not omission), and shelved
     // dice never cadence (the shelf is the archive, mirroring the S3
@@ -5720,7 +5720,7 @@ export const scenarios = [
   },
   {
     name: 'themed-chrome',
-    tags: ['themes'],
+    tags: ['themes', 'cuj12'],
     // §9 chrome art: 2D die chips are baked portraits of the real meshes
     // (diceart.js, per (type, variant)). Prospective chrome — palette
     // tiles, strips — wears MY set and follows a set change live; the
@@ -5791,7 +5791,7 @@ export const scenarios = [
   },
   {
     name: 'pool-set-override',
-    tags: ['themes', 'groups'],
+    tags: ['themes', 'groups', 'cuj12'],
     // §9 saved-pool set override, PER DIE (Joe: physical dice): every die
     // wears its own pool's set — a mixed draft rolls anvil + seaglass +
     // the roller's std side by side, on every screen, and the wire carries
@@ -6189,7 +6189,7 @@ export const scenarios = [
   },
   {
     name: 'zoom-syncs',
-    tags: ['smoke', 'settings', 'zoom'],
+    tags: ['smoke', 'settings', 'zoom', 'cuj12'],
     // Mat-zoom (Joe 2026-08-04): the room-wide preset resizes the physics
     // mat (walls move, shelf pitch derives from TABLE_W) and reflows every
     // shelved cluster to the new slot X. All clients agree — the setting
@@ -6339,7 +6339,7 @@ export const scenarios = [
   },
   {
     name: 'endurance-log',
-    tags: ['perf', 'roll', 'log', 'endurance-log'],
+    tags: ['perf', 'roll', 'log', 'endurance-log', 'cuj9'],
     // Tier 0 §0e: addLogEntry used to full-rebuild #log-list on every
     // arrival, rebinding one closure per entry. This scenario proves the
     // append+prune path is:
@@ -6456,7 +6456,7 @@ export const scenarios = [
   },
   {
     name: 'endurance-outline',
-    tags: ['perf', 'roll', 'endurance-outline'],
+    tags: ['perf', 'roll', 'endurance-outline', 'cuj9'],
     // Tier 0 §0e: the roll-dice outline is anchored to banner hover — a
     // mouseenter paints an inverted-hull shell on each die, mouseleave clears
     // them. Any code path that HID the banner without a mouseleave (a new
@@ -6509,7 +6509,7 @@ export const scenarios = [
   },
   {
     name: 'rail-multi-pick',
-    tags: ['smoke', 'chrome', 'groups'],
+    tags: ['smoke', 'chrome', 'groups', 'cuj8'],
     // THE CORE ASK (Joe 2026-08-07): "it don't allow for the common case of
     // picking multiple pools (an attribute, skill and motivation is a common
     // pool combo in Your Soul Deal). The ability to select a few pools and
@@ -6592,7 +6592,7 @@ export const scenarios = [
   },
   {
     name: 'rail-compose-rules',
-    tags: ['chrome', 'groups'],
+    tags: ['chrome', 'groups', 'cuj8'],
     // What a multi-pick can and cannot carry. One pick launches the pool as
     // AUTHORED; two or more compose, and the grammar has no union for the
     // glue mods — so they are stripped OUT LOUD rather than silently.
@@ -6647,7 +6647,7 @@ export const scenarios = [
   },
   {
     name: 'named-verb',
-    tags: ['smoke', 'roll', 'chrome'],
+    tags: ['smoke', 'roll', 'chrome', 'cuj8'],
     // THE NAMED VERB (Joe 2026-08-07: "the 'x' on the main body is probably
     // too non-intuitive… we need that to remain the main action but find a
     // better UX"). The act keeps its primacy and gains a name. Everything
@@ -6695,7 +6695,7 @@ export const scenarios = [
   },
   {
     name: 'linked-press',
-    tags: ['chrome', 'roll'],
+    tags: ['chrome', 'roll', 'cuj8'],
     // The body stays a clear target — the biggest one on screen — but it is
     // a SHORTCUT now, not the advertised control. Hovering it lights the
     // named bar (teaching the word) instead of painting a 72px ✕ watermark
@@ -6728,7 +6728,7 @@ export const scenarios = [
   },
   {
     name: 'named-verb-touch',
-    tags: ['chrome', 'roll'],
+    tags: ['chrome', 'roll', 'cuj8'],
     // The state the old design failed outright. A phone has no hover, so a
     // hover-armed affordance is not a quiet affordance — it is no
     // affordance. Read with ZERO pointer events sent.
@@ -6750,7 +6750,7 @@ export const scenarios = [
   },
   {
     name: 'named-verb-keys',
-    tags: ['chrome', 'roll'],
+    tags: ['chrome', 'roll', 'cuj8'],
     // The primary is a real <button>, which is what makes the keyboard path
     // work without a hand-rolled keydown twin: it owns Enter and Space
     // natively, and the table's global Enter (collect) bails on a focused
@@ -6778,7 +6778,7 @@ export const scenarios = [
   },
   {
     name: 'verdict-skip-verb',
-    tags: ['roll', 'ceremony'],
+    tags: ['roll', 'ceremony', 'cuj8'],
     // The one surface whose primary act changes under you. While the moment
     // plays, the press SKIPS — completing the beat and clearing the roll are
     // never one gesture (§7.16) — so the word must say Skip, in steel,
@@ -6828,7 +6828,7 @@ export const scenarios = [
   },
   {
     name: 'fold-visibility',
-    tags: ['smoke', 'roll', 'chrome'],
+    tags: ['smoke', 'roll', 'chrome', 'cuj10'],
     // The pin the suite never had. endurance-banner-actions asserts the
     // `.hidden` PROPERTY, which the toggle really does set — but a property
     // is not a paint. `.banner-foot { display: flex }` (css:3018) and
@@ -6868,7 +6868,7 @@ export const scenarios = [
   },
   {
     name: 'endurance-banner-actions',
-    tags: ['perf', 'roll', 'chrome', 'endurance-banner-actions'],
+    tags: ['perf', 'roll', 'chrome', 'endurance-banner-actions', 'cuj9'],
     // Tier 0 §0e / L8: renderBannerActions used to full-rebuild #banner-actions
     // (and renderVerdictCard used to wipe #verdict-fold) on every roll arrival,
     // tossing 4 DOM nodes + 2 listeners per collect-then-reroll cycle. Under
@@ -6936,7 +6936,7 @@ export const scenarios = [
   },
   {
     name: 'file-door',
-    tags: ['table-file', 'groups'],
+    tags: ['table-file', 'groups', 'cuj13'],
     // ROADMAP §G1: Settings → Your data can now put the rack on disk and take
     // it back. The file IS the durable copy (PROFILES.md §5), so the two
     // things worth pinning are that the name is predictable enough to find
@@ -7012,7 +7012,7 @@ export const scenarios = [
   },
   {
     name: 'table-setup-wire',
-    tags: ['prepared-seat', 'settings'],
+    tags: ['prepared-seat', 'settings', 'cuj2'],
     // ROADMAP §G4: the room setup key. Driven entirely over HTTP + raw SSE —
     // no client code in the path, which is the point: `setup` is furniture
     // any player may push (GOALS goal 10), and it must carry nothing
@@ -7140,7 +7140,7 @@ export const scenarios = [
   },
   {
     name: 'room-linger',
-    tags: ['prepared-seat'],
+    tags: ['prepared-seat', 'cuj3'],
     // ROADMAP §G6: prep Tuesday, play Thursday. Before this, dropRoomIfEmpty
     // deleted the room the instant the last player left — so an organizer who
     // set the felt, named the table and built six seats lost all of it by
@@ -7193,7 +7193,7 @@ export const scenarios = [
   },
   {
     name: 'profile-library',
-    tags: ['smoke', 'profiles', 'groups'],
+    tags: ['smoke', 'profiles', 'groups', 'cuj6'],
     // PROFILES §11 — THE CLAIM THE WHOLE DESIGN RESTS ON: a switch loses
     // nothing. This replaces §G3's `profile-swap`, which pinned the machinery
     // that made ONE rack pretend to be two (a stash under dice.groups.mine.v1,
@@ -7273,7 +7273,7 @@ export const scenarios = [
   },
   {
     name: 'profile-library-reload',
-    tags: ['profiles', 'groups'],
+    tags: ['profiles', 'groups', 'cuj6'],
     // R4 stated literally: "whatever profile they pick should be retained as
     // the one in use until they switch" — across an F5, which is where the old
     // §G3 design had its worst moment (a reload landed on somebody else's pools
@@ -7301,7 +7301,7 @@ export const scenarios = [
   },
   {
     name: 'profile-systems',
-    tags: ['profiles', 'meanings'],
+    tags: ['profiles', 'meanings', 'cuj12'],
     // R3/R5/R6 and X1/X2: a profile is bound to a rolling system, is pickable
     // only where its dice will be read the way they were chosen, and each
     // system remembers its own last-used independently. The mismatch is a
@@ -7371,7 +7371,7 @@ export const scenarios = [
   },
   {
     name: 'profile-join-pick',
-    tags: ['smoke', 'profiles', 'seat'],
+    tags: ['smoke', 'profiles', 'seat', 'cuj7'],
     // R9 and R6 at the door: the join modal carries the profile selector, it
     // offers only profiles built for THIS table's system, the last-used one is
     // pre-selected, and Random is there for a player who has none. Picking is
@@ -7417,7 +7417,7 @@ export const scenarios = [
   },
   {
     name: 'profile-random',
-    tags: ['profiles', 'seat'],
+    tags: ['profiles', 'seat', 'cuj7'],
     // R9's Random, at every table. A player with no profile for this system
     // must be able to get a working one in one tap — including at a Numbers
     // only table, where what is dealt is a TRAY rather than a character,
@@ -7449,7 +7449,7 @@ export const scenarios = [
   },
   {
     name: 'profile-copy',
-    tags: ['profiles', 'groups'],
+    tags: ['profiles', 'groups', 'cuj6'],
     // R7: "players should be able to see profiles from other players and even
     // copy the profile for their own use." The owner switcher has browsed
     // teammates' racks since ROADMAP 2b; until §11 it could only say WHOSE.
@@ -7496,7 +7496,7 @@ export const scenarios = [
   },
   {
     name: 'profile-dm-prepares',
-    tags: ['profiles', 'prepared-seat'],
+    tags: ['profiles', 'prepared-seat', 'cuj7'],
     // R8 END TO END, composed rather than in pieces: "I expect DMs to create
     // profiles for players and have the players use them when they log in."
     // The organizer authors three characters in their own library, fills the
@@ -7568,7 +7568,7 @@ export const scenarios = [
   },
   {
     name: 'profile-file',
-    tags: ['profiles', 'table-file'],
+    tags: ['profiles', 'table-file', 'cuj13'],
     // O6/O7/P14: the file is the library's durable copy. The whole library
     // round-trips through `players:` + `profile:`, the rack appears in exactly
     // ONE place (a hand-editable format with two homes for one rack is a trap),
@@ -7609,7 +7609,7 @@ export const scenarios = [
   },
   {
     name: 'prepared-seat',
-    tags: ['prepared-seat', 'chrome'],
+    tags: ['prepared-seat', 'chrome', 'cuj3'],
     // ROADMAP §G5 — CUJ2, the whole point of the tier: one link in Discord,
     // and a player lands at the right table under their own name with their
     // own pools. The seat is OFFERED, never imposed: GOALS §7 records that
@@ -7762,7 +7762,7 @@ export const scenarios = [
   },
   {
     name: 'prepared-seat-declined',
-    tags: ['prepared-seat'],
+    tags: ['prepared-seat', 'cuj3'],
     // The other half of "offered, never imposed": declining must be a real
     // option that costs nothing. Also covers the two stale-link degradations
     // — an `as=` naming no profile, and a room with no setup at all — because
@@ -7795,7 +7795,7 @@ export const scenarios = [
   },
   {
     name: 'setup-repush',
-    tags: ['prepared-seat', 'table-file'],
+    tags: ['prepared-seat', 'table-file', 'cuj2'],
     // ROADMAP §G6 client half: the organizer's browser is the durable copy,
     // so a room that loses its setup heals as soon as an authoring tab
     // reconnects. The counterpart assertion is the one that keeps this safe —
@@ -7860,7 +7860,7 @@ export const scenarios = [
   // ---------------------------------------------------------------------
   {
     name: 'lobby-no-prompt',
-    tags: ['smoke', 'lobby'],
+    tags: ['smoke', 'lobby', 'cuj1'],
     // §3b L0 — CUJ1: "I just need to do a dice roll NOW". The bare url is the
     // LOBBY: no join, no name prompt, no server call at all. The old front
     // door seated every stranger on one shared room named 'table', behind a
@@ -7901,7 +7901,7 @@ export const scenarios = [
   },
   {
     name: 'lobby-exits',
-    tags: ['lobby', 'chrome'],
+    tags: ['lobby', 'chrome', 'cuj1'],
     // §7.20 state L: the presence row carries the lobby's exits — and only as
     // many as are real. '+ New table' always; 'Tables ▾' only once this
     // browser has a table to go back to, so a first-ever visitor sees exactly
@@ -7947,7 +7947,7 @@ export const scenarios = [
   },
   {
     name: 'lobby-no-phantom-table',
-    tags: ['lobby', 'settings'],
+    tags: ['lobby', 'settings', 'cuj1'],
     // §7.20's phantom name, pinned as a regression. tableName is ROOM state,
     // but it used to survive LS_ROOMSETTINGS (the solo settings copy) into a
     // roomless page — the nameplate, the TAB TITLE, and the export filename
@@ -7981,7 +7981,7 @@ export const scenarios = [
   },
   {
     name: 'lobby-suppresses-table-surfaces',
-    tags: ['lobby', 'settings', 'chrome'],
+    tags: ['lobby', 'settings', 'chrome', 'cuj1'],
     // §7.20's governing rule: a surface that speaks about YOU keeps working;
     // a surface that speaks about THE TABLE is ABSENT — never disabled, never
     // silently downgraded to local. identityInfo answers room:null (the
@@ -8033,7 +8033,7 @@ export const scenarios = [
   },
   {
     name: 'new-table',
-    tags: ['lobby'],
+    tags: ['lobby', 'cuj2'],
     // §3b L1: name it, land in it. The key is MINTED, never the typed name —
     // no access control by design (goal 10), so ?room=<the name> would be a
     // door anyone can guess. The typed name travels as the TABLE NAME via the
@@ -8071,7 +8071,7 @@ export const scenarios = [
   },
   {
     name: 'invite-chair',
-    tags: ['lobby', 'chrome'],
+    tags: ['lobby', 'chrome', 'cuj2'],
     // §7.20 state A — the empty table, CUJ2's waiting room. The roster row's
     // empty state is an AFFORDANCE, not a sentence: one dashed pill wearing
     // the verb (Invite) in the slot where the people will appear — and it is
@@ -8095,7 +8095,7 @@ export const scenarios = [
   },
   {
     name: 'prepared-seat-chairs',
-    tags: ['lobby', 'prepared-seat', 'chrome'],
+    tags: ['lobby', 'prepared-seat', 'chrome', 'cuj3'],
     // §7.20: a prepared table shows its EMPTY CHAIRS — for as long as they
     // are empty, not only while you are alone. Unclaimed seats are
     // roomSetup.profiles minus the live roster (a client-side difference —
@@ -8157,7 +8157,7 @@ export const scenarios = [
   },
   {
     name: 'leave-to-lobby',
-    tags: ['lobby', 'seat'],
+    tags: ['lobby', 'seat', 'cuj4'],
     // §3b L3's real verb, and the regression it exists to guard: Leave table
     // must NOT reuse leaveTable() — that function drops the seat AND deletes
     // dice.name.v1 (it re-prompts 'Take a seat'), so wiring the new verb to
@@ -8206,7 +8206,7 @@ export const scenarios = [
   },
   {
     name: 'table-name-survives-round-trip',
-    tags: ['lobby'],
+    tags: ['lobby', 'cuj2'],
     // §3b L3 + initNet's name restoration: an UNPREPARED room is deleted the
     // moment its last player leaves, so "leave, come back via recents" lands
     // in a brand-new room that merely shares a key — and the name would be

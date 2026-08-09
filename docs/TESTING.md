@@ -134,6 +134,27 @@ Chrome. Serialize that work; do not overlap it.
 
 ## Tags → areas
 
+Two kinds. **Area tags** (below) say what a scenario touches. **Journey tags**
+(`cuj1`…`cuj13`, [CUJS.md](CUJS.md)) say which user journey it walks, so
+`--only cuj7` runs the journey rather than a surface.
+
+**Why journeys get their own selector.** A journey with no end-to-end proof
+can pass in every part and fail as a whole. That is measured, not argued:
+`prepared-seat` was green for weeks while **CUJ7 was broken for every
+returning player**, because the fixture seeded no name and so only ever
+tested first-timers (UX-AUDIT E1 → ROADMAP U3). Every part was correct; the
+journey was not.
+
+**The rule.** A feature that changes a journey updates that journey's
+scenarios in the same commit — the same rule UX.md's WHAT IS TRUE TODAY table
+already applies to surfaces. A journey's **composed** scenario (one that walks
+it the way a person does, like `profile-dm-prepares`) is a pre-release gate.
+
+Scenarios with **no** `cuj` tag are deliberate: they are cross-cutting quality
+gates that apply to every journey rather than walking one — `a11y-modals`,
+`touch-targets`, `terminology`, `resync`, `perf-determinism`, `announced`,
+`lab-geo-bench`. Tagging those with a journey would claim they prove one.
+
 | Tag        | Covers                                          |
 | ---------- | ----------------------------------------------- |
 | `smoke`    | Cross-cutting core: shared truth, clear, shelf basics, settings sync, resync |
