@@ -484,6 +484,94 @@ export const scenarios = [
     },
   },
   {
+    name: 'clear-consequences',
+    tags: ['roll', 'shelf', 'cuj9'],
+    // TWO CLEARS, BOTH OF WHICH USED TO LOSE SOMETHING QUIETLY (C6, C7).
+    //
+    // C6 — `log` is not just the flyout's list, it is the BACKING STORE for
+    // every shelf read: renderShelfMarkers, glowTint, renderPeek and the
+    // tweak popover all look a marker's roll up in it. Emptying it left five
+    // shelved rolls anonymous, unreadable, unrerollable, and stripped of the
+    // named ✕ Clear and Reveal the fold only builds `if (entry)`. So the
+    // shelf goes with the history now — keeping discs nobody can read is not
+    // keeping anything.
+    //
+    // C7 — the server has always broadcast who swept, and the client threw
+    // the name away. Goal 10 is why ANYONE may clear the table; it is not a
+    // reason for five people's shelves to empty with no cause on screen.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+
+      // --- C6: history and shelf leave together ---
+      for (const n of ['d20', 'd8']) {
+        await a.roll(n);
+        await a.dbg(`collectRoll(${JSON.stringify(await a.rollId())})`);
+      }
+      await a.waitFor(`(window.__diceDebug.sim(120), document.querySelectorAll('.shelf-marker').length === 2)`,
+        { desc: 'two rolls on the shelf' });
+      await a.eval(`document.getElementById('clear-log').click()`);
+      await a.waitFor(`(window.__diceDebug.sim(240), document.querySelectorAll('.shelf-marker').length === 0)`,
+        { desc: 'the shelf leaves with the history it was the record for' });
+      assert.equal(await a.logCount(), 0, 'and the history is gone');
+
+      // --- C7: a neighbour's sweep is said out loud ---
+      await b.roll('d6');
+      await b.settle();
+      await a.settle();
+      // The corner ✕, not __diceDebug.clearTable — the local function skips
+      // the wire entirely, and the wire is what carries the name.
+      await b.eval(`document.getElementById('corner-clear').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), /cleared the table/.test(document.getElementById('status-pill').textContent))`,
+        { desc: "Alice is told who swept" });
+      assert.match(await a.eval(`document.getElementById('status-pill').textContent`), /Bob/,
+        'by name — the broadcast carried it all along');
+      // …and NOT narrated back at the person who pressed it.
+      assert.doesNotMatch(await b.eval(`document.getElementById('status-pill').textContent`),
+        /cleared the table/, 'your own sweep is not announced back at you');
+    },
+  },
+  {
+    name: 'storage-jam',
+    tags: ['groups', 'cuj6', 'cuj13'],
+    // CUJ13: THE FAILURE THAT USED TO BE SILENT. saveGroups is the app's
+    // highest-frequency writer — every edit, every added pool, every applied
+    // import — and it discarded saveProfileStore's refusal while all five
+    // callers that MOVE data (switch, create, rename, delete, bind) checked
+    // it. Exactly backwards: those five are rare and deliberate, this one
+    // runs constantly. On a browser that has stopped storing (Safari private
+    // browsing throws on setItem; so does a full quota) the session looked
+    // completely normal and every character edit was gone on reload, with
+    // nothing ever said.
+    //
+    // The notice STANDS rather than flashing, because this is a state you are
+    // in and not an event that happened — every edit made while it holds is
+    // also lost — and its one exit is a file, since the work is only on
+    // screen. It clears when a write succeeds, so a transient blip leaves no
+    // scar.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const shown = () => a.eval(
+        `!document.getElementById('storage-banner').classList.contains('hidden')`);
+      await a.dbg('setPanelState({pools: true})');
+      assert.equal(await shown(), false, 'nothing to report while storage works');
+
+      await a.dbg('jamStorage(true)');
+      await a.dbg(`setGroups([{name: 'Strength', notation: '1d8', category: 'Attributes'}])`);
+      assert.equal(await shown(), true, 'a refused write is said out loud');
+      // The exit is IN the banner, not four levels deep in a settings pane —
+      // finding one while nothing is saving is not a recovery.
+      assert.equal(await a.eval(
+        `document.getElementById('storage-banner').contains(document.getElementById('storage-download'))`),
+      true, 'and the way to save the work is in the notice itself');
+
+      await a.dbg('jamStorage(false)');
+      await a.dbg(`setGroups([{name: 'Wit', notation: '1d12', category: 'Attributes'}])`);
+      assert.equal(await shown(), false, 'and it clears when storage comes back');
+    },
+  },
+  {
     name: 'touch-targets',
     tags: ['chrome'],
     // U28's list-driven pin. Seven of the eight (pointer: coarse) blocks in

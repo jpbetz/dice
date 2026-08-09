@@ -4650,6 +4650,12 @@ window.__diceDebug = {
   parseNotation,
   canonicalNotation,
   commandRoll(str) { return commandRoll(str); }, // execute a notation string
+  // Make localStorage refuse (CUJ13). A real quota failure cannot be induced
+  // from a scenario — Safari private browsing throws on setItem, a full disk
+  // does too, and neither is reachable from CDP — so the refusal is injected
+  // at the one function that catches it. The banner under test is what a
+  // player sees in those cases and in no other.
+  jamStorage(on) { forceStorageFail = !!on; },
   // The blocking surfaces, by name (U22): a11y-modals asserts the trap on
   // each, and driving them through their real open/close is the only way to
   // catch a surface that claims aria-modal without going with it.
@@ -6806,16 +6812,39 @@ function schedulePublishPools() {
 // itself a data-loss path. Here there is no intermediate state to survive.
 function saveGroups() {
   writeActivePools(profileStore, groups);
-  saveProfileStore();
+  // …AND SAY SO WHEN IT REFUSES (CUJ13). This discarded the return while
+  // every caller that MOVES data — switch, create, rename, delete, bind —
+  // checked it, which is exactly backwards: those five are rare and
+  // deliberate, and this one runs on every edit. A browser that has stopped
+  // storing left the screen and the disk disagreeing with nothing said, and
+  // the disagreement only surfaced on the next reload, as an empty rack.
+  const ok = saveProfileStore();
+  setStorageJammed(!ok);
   schedulePublishPools();
+  return ok;
+}
+
+// The standing notice for a browser that will not store. STANDING, not a
+// pill: this is a state you are in, not an event that happened, and every
+// edit made while it holds is also lost. It clears itself the moment a write
+// succeeds, so a transient quota blip does not leave a scar.
+let storageJammed = false;
+function setStorageJammed(on) {
+  if (on === storageJammed) return;
+  storageJammed = on;
+  const el = document.getElementById('storage-banner');
+  if (el) el.classList.toggle('hidden', !on);
+  if (on) announce('Your changes are not being saved. Download your data.');
 }
 
 // Persist the library. Returns false when storage refused it, so the callers
 // that MOVE data (switch, create, delete) can refuse out loud instead of
 // leaving the screen disagreeing with the disk — the guardrail Tier G's stash
 // needed a read-back to get, kept where it is still cheap.
+let forceStorageFail = false; // test hook only — see __diceDebug.jamStorage
 function saveProfileStore() {
   try {
+    if (forceStorageFail) throw new Error('storage jammed (test)');
     localStorage.setItem(LS_PROFILES, JSON.stringify(profileStore));
     return true;
   } catch {
@@ -10309,10 +10338,34 @@ function addLogEntry(entry) {
   if (!isLogFlyoutOpen()) setLogUnread(logUnread + 1);
 }
 
+// CLEARING HISTORY MUST NOT ORPHAN THE SHELF (C6). `log` is not just the
+// flyout's list — it is the BACKING STORE for every shelf read:
+// renderShelfMarkers, glowTint, renderPeek and the tweak popover all look a
+// marker's roll up in it. Emptying it left five shelved rolls anonymous
+// ("Collected roll", one gold glow for everyone), unreadable (the peek calls
+// them *hidden* when they are merely unlogged, total `?`), unrerollable, and
+// stripped of the named ✕ Clear and Reveal the fold only builds `if (entry)`.
+// One click, and the advertised control on five rolls was gone.
+//
+// So the shelf goes with it. Clearing the history is a housekeeping act on
+// the table's record, and the markers ARE that record's dice — leaving them
+// behind is not "keeping" them, it is keeping five discs nobody can read.
+// §7.7's rule already says a collected roll is anyone's to tidy.
 document.getElementById('clear-log').addEventListener('click', () => {
+  const shelved = [...rollStates.entries()]
+    .filter(([, st]) => st.collected !== null && !st.cleared)
+    .map(([rollId]) => rollId);
   log = [];
+  logDroppedTotal = 0; // …and the dropped note goes with the thing it counted
   if (!netOnline) save(LS_LOG, log);
+  closePeek();
+  for (const rollId of shelved) requestClearRoll(rollId);
   renderLog();
+  updateLogDroppedNote();
+  renderShelfMarkers();
+  announce(shelved.length
+    ? `History cleared, and ${shelved.length} shelved roll${shelved.length === 1 ? '' : 's'} with it.`
+    : 'History cleared.');
 });
 
 // ---------------------------------------------------------------------------
@@ -11267,6 +11320,17 @@ async function portableAcceptFile(file) {
   }
   return portableLoadText(text);
 }
+
+// The jam banner's one exit (CUJ13): the work is only on screen, and a file
+// is the only place it can go. Same writer as Your data → Download — this is
+// that door, brought to where the bad news is, so the recovery does not
+// require finding a settings panel four levels deep while nothing is saving.
+document.getElementById('storage-download').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  portableDownload();
+  btn.textContent = 'Saved to your device';
+  setTimeout(() => { btn.textContent = 'Download my data'; }, 1400);
+});
 
 document.getElementById('portable-download').addEventListener('click', (e) => {
   const btn = e.currentTarget;
@@ -13664,7 +13728,21 @@ function handleNetEvent(type, data) {
       });
       break;
     case 'clear':
+      // SAY WHO SWEPT (C7). The server has always broadcast
+      // {playerId, playerName} and this threw both away — so five people's
+      // shelved rolls vanished at once with no cause on screen and nothing
+      // said to a screen reader. Goal 10 is why ANYONE may do it; it is not a
+      // reason for it to happen invisibly. The name is skipped for your own
+      // press: you know, and narrating your own act back at you is noise.
       clearTable();
+      if (data.playerId && (!net || data.playerId !== net.playerId)) {
+        const who = data.playerName || 'Someone';
+        setPill(`${who} cleared the table`, 'notice');
+        setTimeout(() => {
+          if (statusPill.textContent === `${who} cleared the table`) setPill(null);
+        }, 4000);
+        announce(`${who} cleared the table.`);
+      }
       break;
     case 'reveal':
       // Post-redaction the event carries the newly-authorized FULL entry

@@ -348,6 +348,24 @@ limitations under the License.
         <button id="profile-keep" class="btn tiny ghost"
                 title="Leave it as it is — these pools roll the same either way">Keep</button>
       </div>
+      <!-- THE ONE FAILURE THAT MUST NOT BE TRANSIENT (CUJ13). saveGroups is
+           the app's highest-frequency writer — every ✎ edit, every added
+           pool, every applied import — and it discarded saveProfileStore's
+           refusal while all five callers that MOVE data checked it. On a
+           full or blocked localStorage (Safari private browsing throws on
+           setItem) the session looked perfectly normal and every character
+           edit was gone on reload, with nothing ever said.
+           A pill would be wrong here: the condition PERSISTS, so the notice
+           has to persist with it, and the one exit that saves the work is a
+           file. Modelled on #profile-banner above — standing, named, with a
+           way out — because that is this app's grammar for a state you are
+           in rather than an event that happened. -->
+      <div id="storage-banner" class="hidden" role="alert">
+        <span class="sb-label"><b>Not saving</b> — this browser refused to store
+          your last change. Your work is only on screen.</span>
+        <button id="storage-download" class="btn tiny confirm"
+                title="Write your whole library to a file before you lose it">Download my data</button>
+      </div>
       <div id="pools-head" class="hidden">
         <span class="ph-word">Saved pools</span>
         <!-- The picker's first anchor (PROFILES §11.5 ②). Hidden until there is

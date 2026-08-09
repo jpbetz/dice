@@ -915,6 +915,224 @@ Zero code, zero scenarios. Not a new item — [`L4`](#3b-the-lobby-and-the-table
 holds the design — but it is listed here so the zero appears in the same
 table as everything else rather than only in a section about lobbies.
 
+### C6. `Clear history` orphans the shelf — SHIPPED
+
+*CUJ9.* `clear-log` is `log = []; renderLog()` (js/main.js:10341-10345) and
+nothing else — but `log` is the **backing store for every shelf read**:
+`renderShelfMarkers`, `glowTint`, `renderPeek`, the tweak popover. With
+`entry === null` a shelved roll's peek reports it as *hidden* when it is
+merely unlogged, its header degrades to "collected roll", its total to `?`,
+**and the entire fold — the named `✕ Clear` primary and Reveal — is never
+built**, leaving only the undocumented body-click. Every marker title
+collapses to "Collected roll" and every glow falls back to one gold, so
+colour attribution goes uniform. One click makes five shelved rolls
+anonymous, unreadable, unrerollable and strips their advertised control.
+
+The same handler skips `updateLogDroppedNote()`, so the flyout shows "No
+rolls yet." and "37 earlier rolls rolled off the end" simultaneously.
+
+**SHIPPED 2026-08-08.** The shelf goes with it. Clearing history is
+housekeeping on the table's *record*, and the markers are that record's dice
+— leaving them behind is not "keeping" them, it is keeping five discs nobody
+can read. `logDroppedTotal` resets with the thing it counted, the peek closes,
+and the sweep is announced. Pinned by `clear-consequences`, verified to fail
+without the fix.
+
+### C7. `Clear table` wipes five people's evening — **attribution SHIPPED, scope open**
+
+*CUJ9.* `handleClear` (server.js:2301-2319) has **no authority check** and
+sets `cleared` on every uncleared roll in `room.log` — the felt *plus every
+shelved roll from every player*. It broadcasts `{playerId, playerName}` and
+the client throws both away (`case 'clear': clearTable(); break;`). It is
+bound to an unmodified `c`. There is no `confirm()` anywhere in main.js.
+
+The asymmetry names itself: **deleting one pool from your own rack has an
+undo tombstone (U28a); wiping five players' shelves has nothing** — not a
+confirmation, not attribution, not a way back.
+
+**① SHIPPED 2026-08-08.** The broadcast always carried `{playerId,
+playerName}`; the client now reads it. A neighbour's sweep says who, on the
+pill and to a screen reader — and is deliberately *not* narrated back at the
+person who pressed it. New `#status-pill.notice` dress: `.refused`'s shape
+(a sentence, not a shout) without the lie in the class name.
+**② Scope and confirmation still need a decision** — there is no intermediate
+today, no "clear only my rolls", no "clear the shelf, keep the felt". Goal
+10 says anyone may tidy the table, which is right; it does not say the
+tidying must be silent or unbounded.
+
+### C8. The creation budget exists in code and never reaches a screen — CUJ6, needs design
+
+*CUJ6, the journey's stated done-when.* Shelves print a bare integer
+(`shelfDiceValue`) with **no target, no over/under, no colour**. The prices
+the journey is measured against — Attributes 9 pools/100 points, Skills
+6/100, Motivations 3/30 — are in `js/seed.js` (`SEED_SHELVES`) and are
+imported **only by tests**; main.js imports just the dealers. So "priced
+against the system's creation budget" is currently served by the player
+remembering 100 from a design document.
+
+Partly tracked already as §2l ⑤ (the ledger sheet, "session-only target")
+and ruled in POOL-ANALYSIS §9 ("the number `100` appears nowhere in code").
+**The ruling and the journey are in tension** and that is the thing to
+decide: a budget that cannot be shown cannot be spent deliberately.
+
+### C9. Four small preparation defects, all obvious — CUJ6/CUJ7, batch, small
+
+- **The `dice value` caption never renders while you build your first
+  character.** The rack figure builds only under `!foreign && poolsEdit`, and
+  the head is hidden unless `.foreign` or `.profiled` — and `.profiled`
+  needs *more than one* profile. A player with one profile gets unlabelled
+  integers on shelf heads. `rack-dice-value` passes anyway because it reads
+  `textContent` through `display:none`. **UX.md and the stylesheet both still
+  assert the figure "never reaches a screen"; since `.profiled` landed that
+  is only true at a library of one, so two comments are wrong today.**
+- **`Apply to table` hands out a stale snapshot.** It reads the textarea,
+  which refills only on first open of the pane, on *Fill with my data*, or on
+  *Open file*. Edit a character after opening the pane and the room silently
+  gets the pre-edit set. `Download`, in the same row, calls `portableSnapshot()`
+  live — so two buttons an inch apart disagree about what your data is.
+- **`⚄ Random` ignores the name you just typed**, while `＋ New` (which reads
+  it) makes an *empty* profile. So the realistic six-character path is Random
+  → rename, every time. Related: the picker's `＋ New profile…` creates
+  nothing — it opens Settings and force-expands the unrelated YAML pane.
+- **`ensureTrio` was promised system-aware and is not.** It forces
+  attributes/skills/motivations into every rack in manage mode whatever the
+  profile's system — PROFILES §11.6 names exactly this: *"a D&D rack in manage
+  mode would stand three empty Soul Deal shelves. It becomes system-aware."*
+
+### C10. The generic invite link never offers a prepared seat to a returning player — DEFECT, medium
+
+*CUJ7, steps 2 and 7.* The picker is gated on `name && AS_PARAM`. With a
+stored `dice.name.v1` and **no `&as=`**, `initNet` skips both `peekTable` and
+`promptName` and joins straight through — no modal, no seats, no offer. The
+player lands under their old name holding their old rack. Worse:
+`unclaimedSeats()` matches seats against roster names, so if their stored
+name happens to equal a prepared seat, **that chair vanishes from everyone's
+rail** and the organizer reads it as claimed by someone holding none of its
+pools.
+
+U3 fixed exactly this bug class for `&as=` links and stopped there, while
+UX §7.19 still says *"one link for everyone stays the primary form"* — which
+is the link this breaks. ROADMAP L2 raises the question ("what arrival looks
+like for a visitor with a stored name versus one without") and does not
+answer it. **This is the same shape as U3 and deserves the same answer.**
+
+### C11. The seat picker is unusable on the phone it is designed for — CUJ7, small
+
+*CUJ7, step 1 — the link arrives in Discord and is opened on a phone.*
+`#name-panel` is `width: 320px` with **no `max-height` and no `overflow`**,
+inside a centred flex overlay — centred overflow, where the top clips and
+becomes unreachable. `#settings-panel` got exactly this fix with a comment
+explaining why, so the pattern is known and the picker was simply not
+revisited when it grew to hold six seats plus a profile list (seats cap at
+12, profiles render uncapped to 32). Compounding: `promptName` focuses the
+input unconditionally *before* the peek resolves, and the viewport meta now
+carries `interactive-widget=resizes-content`, so the keyboard halves the
+viewport at the exact moment the seats arrive. No `@media` rule touches
+`#name-panel`. `.seat-btn` computes to ~31px, under the 34/44 floor U28
+established — and U28's own near-miss list does not mention it.
+
+**Why the suite is green through this:** no scenario ever clicks a real
+`.seat-btn` — every seat act goes through `__diceDebug`. The picker's
+*rendered* surface is unproven by all six CUJ7 scenarios.
+
+### C12. Three smaller arrival gaps — CUJ7, batch, small
+
+- **No way out of the picker.** `#name-modal` is not a rung in the Esc
+  ladder (settings, three menus, the popover, the peek and the flyout all
+  are) and has no ✕ and no cancel. You cannot look at the table before
+  committing to a seat.
+- **"Stay as ⟨your name⟩" silently forfeits the prepared character**, one
+  line under a hint that says the link offers it. Recovery exists — Settings
+  → Your profiles → *At this table* → `Copy` — three levels down, unnamed at
+  the door, and `Copy` does not activate, so it takes a second act.
+- **`⚄ Random` at the door mints and persists on the tap**, with no undo, to
+  the 32 cap; it is the row pre-selected for a first-timer, i.e. the one
+  Enter aims at, and the only row in that block that is not a lossless
+  pointer move. Same defect as C9's Random, at a worse moment.
+
+### C13. What a shelf marker owes, past U20 — CUJ9, design
+
+*Extends U20 rather than restating it.* The felt is never ambiguous — one
+roll at a time, prior rolls auto-collected — so goal 5 is satisfied on the
+felt **by eviction**, and every cost of that lands on the shelf. Three
+things U20's text does not name:
+
+- **Rank.** Slots are ranks oldest→newest — the single most useful fact for
+  "find what happened earlier" — and nothing renders it.
+- **Waiting-on-you.** A held roll's Reveal exists *only* in its peek, and the
+  marker is the sole door; the marker writes `— hidden` into its
+  **`aria-label`**. So a screen-reader user is told which shelved roll awaits
+  its reveal and a sighted player is not. That inversion is the sharpest
+  evidence the read was decided and half-shipped.
+- **The glow is claimed as the substitute and is not.** The roller-tinted
+  ring blends 45% toward gold and caps alpha at 0.10 — two players' rings
+  differ by ~10/255 on dark felt. The code comment calling it "the joiner's
+  at-a-glance attribution, restored at zero chrome cost" is what would stop
+  the next person from fixing it.
+
+### C14. Finding and repeating a roll — CUJ9, small-medium
+
+- **The log has no search, filter or anchor.** It is the only path to "ten
+  minutes ago": a 300px column of three-line rows, capped at 100 both ends,
+  with no input element of any kind. Four hours × five players blows 100. A
+  late joiner gets the last 100 with `logDroppedTotal` at 0, so they are told
+  nothing about what already fell off.
+- **`Clear history` online is a lie** — it clears the local array, never
+  calls the server, and the next reconnect's `hello` restores everything.
+  The label carries no scope word.
+- **The ≣ unread count exists only as a `title`** — U20's exact failure in a
+  second place. `aria-label="Roll log"` is static and *overrides* `title` in
+  the accname algorithm, so screen readers never get the count either, and
+  touch gets nothing. `__diceDebug` exposes the number, so tests can assert a
+  signal no user can perceive.
+- **Reroll carries state correctly; finding it is the problem.** `r` repeats
+  `lastEntry`, which auto-collect replaced 3s ago, so the real path is ≣ →
+  hover the row → `⟳`, and `.log-again` is `opacity:0` until hover. Two
+  adjacent notes: `canReroll` refuses hidden entries, so the roller cannot
+  repeat their own unrevealed held roll; and the server substantiates
+  `rerollOfId` on parent existence alone with no same-roller check, so
+  rerolling Bob's roll stamps *Bob's* row `rerolled` in everyone's log.
+
+### C15. Restore: the file this app writes cannot be read back — CUJ13, small-medium
+
+*Supersedes C2's sketch with the measured shape.* Export is complete and
+whole-library. Restore is three paths and none of them is one: **Apply
+import** merges only the file's top-level `pools:` and ignores `players:`
+entirely; **Add** and **Add all N** run every name through `uniqueName`, so
+a restored "Nessa" lands as "Nessa 2". A fresh browser deals one profile at
+boot, so `Add all` on a 32-profile file needs 32 slots against a cap of 32
+and lands **31 of your characters, renamed on collision, beside a stranger's
+dealt profile, with the wrong one in hand.**
+
+**Design (verified against the tree):** one verb, `Replace my library…`, in
+the `#import-profiles` block, using the app's existing two-step in-place
+destructive confirm — armed state **names what is destroyed**, not just
+counts it, and offers `Download` inline first, since the thing being replaced
+may be the only copy. Build the replacement store from `importableProfiles()`
+via `emptyStore()` + `addProfile()` with **no `uniqueName`** (the file's names
+are already unique by `parsePortable`), persist it and **check the return**
+before swapping the live pointer, then `adoptRack()` the profile the file's
+`profile:` key names — the pointer every current path silently drops. The cap
+problem dissolves: replacing starts from empty, so 32 fit exactly.
+
+Also in this journey, and separate:
+
+- **`parsePortable`'s `warnings` are dead end to end** — produced,
+  unit-tested, returned, and read by nothing. PROFILES §3.1 states the
+  requirement in so many words: *"the warning must reach the preview status
+  line, not vanish."* A file from a newer version silently loses sections and
+  reads as a clean `✓`.
+- **An empty file reads as success-with-nothing-said** (blank status line),
+  while a comments-only file refuses properly. Inconsistent.
+- **Boot normalization is lossy and the loss is written back**: profiles past
+  32, pools past 40, and duplicate lowercase names are dropped *silently*,
+  `STORE_VERSION` is written but never checked, and the normalized result is
+  persisted on the first paint before the user touches anything.
+- **`LS_GROUPS` is a fossil sold as a recovery path.** The comment calls it
+  "the one recovery path if the library is ever cleared"; it is read once at
+  boot and never written again. For anyone whose first visit postdates the
+  library, the key does not exist.
+
 ## Tier U — The converged UX: what is still open (2026-08-08)
 
 *The audit that produced this tier, and the twenty-five entries that shipped

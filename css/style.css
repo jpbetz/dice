@@ -1921,6 +1921,50 @@ html, body {
 }
 #profile-banner .pb-label b { color: var(--ivory); font-weight: 400; }
 #profile-banner .btn { margin-left: 0; flex: none; }
+
+/* THE STORAGE JAM (CUJ13). Same standing-banner shape as the mismatch above
+   — same place, same rhythm — in RED, because HUE = ACT and this is the only
+   banner reporting loss rather than a choice. It sits ABOVE the mismatch in
+   z-order for the case where both are true: a browser that cannot save is a
+   worse thing to be told second.
+   The label wraps rather than ellipsing, unlike .pb-label. The mismatch's
+   text is a fact you can re-read at leisure; this one is an instruction, and
+   an instruction cut off at "everything since is only on…" is not one. */
+#storage-banner {
+  position: sticky;
+  top: var(--draft-h, 0px);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+  margin: 14px 0 -4px;
+  padding: 8px 9px 9px;
+  border: 1px solid rgba(226, 73, 59, 0.55);
+  border-radius: 8px;
+  background: rgba(46, 26, 24, 0.96);
+}
+#storage-banner.hidden { display: none; }
+/* STACKED, and the sentence is NOT in the label voice. .pb-label's tracked
+   10px uppercase is right for a fact you re-read at leisure ("Nessa reads as
+   Your Soul Deal"); at this width the same dress turned a two-clause warning
+   into seven lines of shouting with the button floating beside it. Only the
+   lead keeps the alarm; the instruction is set to be read. Wrapping stays —
+   an instruction cut off at "everything since is only on…" is not one. */
+#storage-banner .sb-label {
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ivory);
+}
+#storage-banner .sb-label b {
+  color: var(--red);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+#storage-banner .btn { margin-left: 0; align-self: flex-start; }
 /* Ownership is the ONE sticky pin while a profile is on the rack — the
    category heads yield exactly as they do under a foreign head
    (ownership > category naming, the 2026-08-04 call, same reason). */
@@ -2949,6 +2993,22 @@ html, body {
 #status-pill.refused {
   color: var(--gold);
   border-color: rgba(212, 175, 90, 0.45);
+  text-transform: none;
+  letter-spacing: 0;
+  max-width: min(42ch, 40vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* …and the same SHAPE for a sentence that is not a refusal (C7: "Bob cleared
+   the table"). Shares every rule that makes a sentence readable in a pill —
+   no uppercase shout, clip rather than stretch — and differs only in hue:
+   steel, because HUE = ACT and this reports a neighbour's housekeeping, not
+   a refusal of yours. Written as its own selector rather than reusing
+   `.refused`, which would put a lie in the class list. */
+#status-pill.notice {
+  color: var(--ivory);
+  border-color: var(--panel-border);
   text-transform: none;
   letter-spacing: 0;
   max-width: min(42ch, 40vw);
