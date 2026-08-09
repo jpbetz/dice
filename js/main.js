@@ -65,19 +65,25 @@ const IN_LOBBY = ROOM === null;
 
 // Mat extents — LET, not const: the room-wide zoom setting resizes the mat
 // live (walls, shelf pitch, camera framing all follow). The base values here
-// are the 'wide' preset; ZOOM_PRESETS below owns the alternatives, and
+// are DEFAULT_ZOOM's preset and must move with it; ZOOM_PRESETS owns them all, and
 // applyZoom mutates these + the wall body positions in place.
-let TABLE_W = 30;            // playable width (x)
-let TABLE_D = 17;            // playable depth (z)
+let TABLE_W = 14;            // playable width (x) — the DEFAULT ('medium')
+let TABLE_D = 8.6;           // playable depth (z)
 // Zoom picker labels — declared here (not next to renderZoomPicker) because
 // setSound() → syncSettingsUI() → renderZoomPicker() runs during module
 // evaluation, and the picker's early build must not read this in TDZ.
 const ZOOM_LEVELS = [
-  { id: 'wide',   label: 'Wide',   title: 'Wide — the default table' },
-  { id: 'medium', label: 'Medium', title: 'Medium — closer, still roomy' },
-  { id: 'close',  label: 'Close',  title: 'Close — larger dice, better on small screens' },
+  { id: 'wide',   label: 'Wide',   title: 'Wide — the roomiest table' },
+  { id: 'medium', label: 'Medium', title: 'Medium — the default; larger dice, still room to throw' },
+  { id: 'close',  label: 'Close',  title: 'Close — biggest dice, best on a phone' },
 ];
-const DEFAULT_ZOOM = 'wide';
+// MEDIUM, not wide (2026-08-09). The ladder moved one step closer and `wide`
+// is now byte-for-byte the old `close` — so defaulting to `wide` would ship
+// the view a player previously had to go and choose. Measured die span at the
+// mat's centre: desktop 107 / 138 / 175 px, phone-with-rail 38 / 49 / 62.
+// Medium is the one that reads well on both without spending the room a
+// two-handed throw needs.
+const DEFAULT_ZOOM = 'medium';
 const MAX_DICE_ON_TABLE = 40;
 const GRAVITY = -110;
 const LOG_CAP = 100;
@@ -4713,6 +4719,24 @@ window.__diceDebug = {
   // at the one function that catches it. The banner under test is what a
   // player sees in those cases and in no other.
   jamStorage(on) { forceStorageFail = !!on; },
+  // How big a die actually LANDS on screen, in CSS px — the only number that
+  // answers "can I see the dice". Projects a unit-radius sphere at the mat's
+  // centre through the live camera, so it accounts for the preset, the
+  // viewport, and applyCameraFraming's retreat all at once.
+  // The ladder's own numbers, so a scenario can assert the BEHAVIOUR (walls
+  // follow the setting, every client agrees) without carrying a copy of the
+  // decision that fails on a retune.
+  zoomPreset(id) { const p = ZOOM_PRESETS[id]; return p ? { w: p.w, d: p.d } : null; },
+  zoomProbe() {
+    const p0 = new THREE.Vector3(0, 0, 0).project(camera);
+    const p1 = new THREE.Vector3(1, 0, 0).project(camera);
+    return {
+      dieSpanPx: Math.round(Math.abs(p1.x - p0.x) * view.width),
+      view: `${Math.round(view.width)}x${Math.round(view.height)}`,
+      table: `${TABLE_W}x${TABLE_D}`,
+      camY: Math.round(camera.position.y * 10) / 10,
+    };
+  },
   // Uncleared rolls still on the table, and whose they are (C7 ②). A
   // projection, never the live Map — rollStates is keyed state the render
   // path owns, and handing it out would let a scenario mutate the machine
@@ -10596,8 +10620,8 @@ function disarmClear() {
   clearArmTimer = null;
   const btn = document.getElementById('corner-clear');
   btn.classList.remove('armed');
-  btn.querySelector('.cb-label').textContent = ' Clear';
-  btn.title = "Clear your rolls — c (press again to clear everyone's)";
+  btn.querySelector('.cb-label').textContent = ' Clear mine';
+  btn.title = 'Clear your rolls — c (press again to clear everyone’s)';
   btn.setAttribute('aria-label', 'Clear your rolls from the table');
 }
 document.getElementById('corner-clear').addEventListener('click', (e) => {
@@ -10611,13 +10635,20 @@ document.getElementById('corner-clear').addEventListener('click', (e) => {
   requestClear('mine');
   if (!others) return; // your rolls were all the rolls — nothing left to ask about
   btn.classList.add('armed');
-  btn.querySelector('.cb-label').textContent = ` Clear ${others} more?`;
-  // The TITLE moves too: in the collapsed rail `.cb-label` is display:none,
-  // so the glyph's red is the only standing channel the arm has there and
-  // the hover read is the only place the count can still be said.
+  // A BUTTON STATES THE NEXT ACT; IT DOES NOT ASK (C19, Joe 2026-08-09:
+  // "buttons should guide users to options, not ask them things"). This read
+  // `Clear 1 more?` — a question in a control, which belongs in a modal, and
+  // this is deliberately not one. `Clear mine` → press → `Clear all` is the
+  // same two-tap saying what the next press does. The COUNT moves to the
+  // title and the announcement, where a number informs rather than
+  // interrogates.
+  btn.querySelector('.cb-label').textContent = ' Clear all';
+  // The title carries the count because in the collapsed rail `.cb-label` is
+  // display:none — the glyph's red is the only standing channel the arm has
+  // there, and the hover read is the only place a number can still be said.
   btn.title = `Also clear ${others} roll${others === 1 ? '' : 's'} belonging to other players`;
-  btn.setAttribute('aria-label', `Also clear ${others} roll${others === 1 ? '' : 's'} belonging to other players`);
-  announce(`Your rolls are gone. ${others} left — press again to clear everyone's.`);
+  btn.setAttribute('aria-label', `Clear all — also removes ${others} roll${others === 1 ? '' : 's'} belonging to other players`);
+  announce(`Your rolls are gone. ${others} left; press again to clear all.`);
   clearArmTimer = setTimeout(disarmClear, 4000);
 });
 
@@ -10755,14 +10786,27 @@ function clearTableIdentity() {
 // queueZoom below). 'wide' matches the pre-zoom mat byte-for-byte apart
 // from the shelf pitch, which is now derived from TABLE_W (formula was
 // implicit before; now it's the same formula the e2e scenario asserts).
+// THE WHOLE LADDER MOVED IN ONE STEP (Joe 2026-08-09: "I want to see the dice
+// more closely, particularly on mobile… maybe make what is currently the
+// closest setting the widest setting").
+//
+// `wide` is byte-for-byte the old `close`, and the two below it continue the
+// ladder's own ×0.78 pitch. That is the lever that actually works: the mat is
+// the PHYSICS WALLS and must be identical on every client (a seeded roll
+// replayed against different walls lands differently), so it cannot vary by
+// device — and applyCameraFraming only ever pulls the camera BACK from the
+// preset until the mat fits, never closer. A smaller mat is therefore the one
+// way to make dice bigger, on every screen at once, and it makes the shelf
+// smaller with it (slot pitch derives from TABLE_W), which is what forces the
+// retreat on a narrow phone in the first place.
 const ZOOM_PRESETS = {
-  wide:   { w: 30, d: 17, eyeFull: [0, 27, 15.5], eyeMini: [0, 22, 12.5] },
-  medium: { w: 24, d: 14, eyeFull: [0, 22, 12.6], eyeMini: [0, 18, 10.2] },
-  close:  { w: 18, d: 11, eyeFull: [0, 17,  9.8], eyeMini: [0, 14,  7.9] },
+  wide:   { w: 18, d: 11,   eyeFull: [0, 17,   9.8], eyeMini: [0, 14,   7.9] },
+  medium: { w: 14, d: 8.6,  eyeFull: [0, 13.2, 7.6], eyeMini: [0, 10.9, 6.1] },
+  close:  { w: 11, d: 6.7,  eyeFull: [0, 10.4, 6.0], eyeMini: [0,  8.6, 4.8] },
 };
 
 let pendingZoom = null; // set by queueZoom when a change arrives mid-roll
-let currentZoom = 'wide';
+let currentZoom = DEFAULT_ZOOM;
 
 function tableIsBusyForZoom() {
   // A zoom must not land on a client whose physics is currently baking
@@ -12375,7 +12419,7 @@ function panelDebugState() {
 // LET, not const: zoom rewrites the eye preset so the walker's angle stays
 // fixed (every entry keeps y/z ≈ 1.74). applyCameraFraming's step-back still
 // runs after — it just starts from the closer eye at 'medium'/'close'.
-let CAM_EYE = { full: [0, 27, 15.5], mini: [0, 22, 12.5] };
+let CAM_EYE = { full: [0, 13.2, 7.6], mini: [0, 10.9, 6.1] }; // the DEFAULT ('medium')
 const CAM_TARGET = new THREE.Vector3(0, 0, 0.5);
 
 // What must stay on screen, each with the NDC headroom its own chrome needs.

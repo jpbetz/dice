@@ -551,8 +551,16 @@ export const scenarios = [
       assert.equal(await a.eval(
         `document.getElementById('corner-clear').classList.contains('armed')`), true,
       'the wider act arms in place — the same two-tap the rack delete uses');
-      assert.match(await a.eval(`document.getElementById('corner-clear').textContent`), /1 more/,
-        'and says how many are not yours');
+      // IT STATES THE NEXT ACT, it does not ask (C19). `Clear 1 more?` put a
+      // question in a control; a question belongs in a modal and this is
+      // deliberately not one. The count moves to the title, where a number
+      // informs rather than interrogates.
+      assert.match(await a.eval(`document.getElementById('corner-clear').textContent`), /Clear all/,
+        'the armed state names the wider act');
+      assert.doesNotMatch(await a.eval(`document.getElementById('corner-clear').textContent`), /\?/,
+        'and asks nothing');
+      assert.match(await a.eval(`document.getElementById('corner-clear').title`), /1 roll/,
+        'the count is in the hover read — the collapsed rail hides the label');
       await a.eval(`document.getElementById('corner-clear').click()`);
       await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.onTable.length === 0)`,
         { desc: "the second press takes everyone's" });
@@ -6756,23 +6764,31 @@ export const scenarios = [
           { desc: 'zoom syncs to close' });
       }
 
-      // Wall positions changed to the close preset (TABLE_W=18, TABLE_D=11).
+      // Wall positions changed to the close preset. Read from ZOOM_PRESETS
+      // rather than written here: the whole ladder moved one step closer on
+      // 2026-08-09 (the old `close` became `wide`), and a scenario carrying
+      // its own copy of the numbers asserts a decision instead of a
+      // behaviour — it fails on a retune that is working exactly as intended.
+      // What this pin is FOR is that both clients agree and that the walls
+      // follow the setting, which is what it checks now.
+      const want = await a.dbg(`zoomPreset('close')`);
       for (const [t, tag] of [[a, 'A'], [b, 'B']]) {
         const wp = await t.dbg('wallPositions()');
-        assert.ok(Math.abs(wp.right.x - 9) < 1e-6,
-          `${tag}: right wall at +TABLE_W/2 = 9 (got ${wp.right.x})`);
-        assert.ok(Math.abs(wp.left.x + 9) < 1e-6,
-          `${tag}: left wall at -9 (got ${wp.left.x})`);
-        assert.ok(Math.abs(wp.front.z - 5.5) < 1e-6,
-          `${tag}: front wall at +TABLE_D/2 = 5.5 (got ${wp.front.z})`);
-        assert.ok(Math.abs(wp.back.z + 5.5) < 1e-6,
-          `${tag}: back wall at -5.5 (got ${wp.back.z})`);
+        assert.ok(Math.abs(wp.right.x - want.w / 2) < 1e-6,
+          `${tag}: right wall at +TABLE_W/2 = ${want.w / 2} (got ${wp.right.x})`);
+        assert.ok(Math.abs(wp.left.x + want.w / 2) < 1e-6,
+          `${tag}: left wall at -${want.w / 2} (got ${wp.left.x})`);
+        assert.ok(Math.abs(wp.front.z - want.d / 2) < 1e-6,
+          `${tag}: front wall at +TABLE_D/2 = ${want.d / 2} (got ${wp.front.z})`);
+        assert.ok(Math.abs(wp.back.z + want.d / 2) < 1e-6,
+          `${tag}: back wall at -${want.d / 2} (got ${wp.back.z})`);
       }
 
-      // Shelf pitch is derived from TABLE_W: (18 - 5.4) / 4 ≈ 3.15.
+      // Shelf pitch DERIVES from TABLE_W — the formula is the claim, not the
+      // number it happened to produce before the ladder moved.
       const pitchA = await a.dbg('shelfPitch()');
       const pitchB = await b.dbg('shelfPitch()');
-      const expectedPitch = (18 - 5.4) / 4;
+      const expectedPitch = (want.w - 5.4) / 4;
       assert.ok(Math.abs(pitchA - expectedPitch) < 0.01,
         `A: shelf pitch ≈ ${expectedPitch} (got ${pitchA})`);
       assert.ok(Math.abs(pitchB - expectedPitch) < 0.01,

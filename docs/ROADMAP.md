@@ -1102,6 +1102,57 @@ merging live libraries. `setup-repush` re-pointed from `deepEqual` to
 `includes`: asserting the exact seat list there would now be asserting that
 nobody is sitting at the table.
 
+### C21. The dice are too small, especially on a phone — SHIPPED
+
+*Joe 2026-08-09: "I want to see the dice more closely, particularly on
+mobile… maybe make what is currently the closest setting the widest setting
+and make the medium and close setting even closer."*
+
+**SHIPPED — the whole ladder moved one step in.** `wide` is byte-for-byte the
+old `close` (18×11) and the two below continue the ladder's own ×0.78 pitch:
+`medium` 14×8.6, `close` 11×6.7. **`medium` is the new default**, because
+leaving it at `wide` would ship the view a player previously had to go and
+choose.
+
+**Why the mat and not the camera.** The mat is the PHYSICS WALLS and must be
+identical on every client — a seeded roll replayed against different walls
+lands differently — so it cannot vary by device. And `applyCameraFraming`
+only ever pulls the camera BACK from the preset until the mat fits, never
+closer. A smaller mat is therefore the one lever that makes dice bigger, and
+it shrinks the shelf with it (slot pitch derives from `TABLE_W`), which is
+what forces the retreat on a narrow screen in the first place.
+
+**Measured** (`__diceDebug.zoomProbe()` — a unit-radius span at the mat's
+centre through the live camera, so it accounts for preset, viewport and
+framing retreat at once), in CSS px per die:
+
+| | wide | medium | close |
+|---|---|---|---|
+| desktop 1440, rail | 124 | **160** | 203 |
+| desktop 1440, panel open | 107 | **138** | 175 |
+| phone 390, rail | 38 | **49** | 62 |
+
+**The mobile gap that remains is structural, and worth naming.** A phone is
+portrait (≈278×844 of canvas beside the rail) and the mat is landscape, so
+WIDTH binds and the camera retreats hard — `camY` 40 on a phone against 12.9
+on a desktop at the same preset. Closing that would mean either a
+portrait-shaped mat (a room-wide setting every client shares, so a mixed
+phone/desktop table would have to agree) or framing less than the whole mat
+(dice can land at any wall, so cropping loses them). Both are real options
+and neither is free; not taken here.
+
+One thing the measuring turned up: with the panel OPEN a 390px phone leaves a
+**74px** canvas, and the camera retreats to `camY 62`. The boot rule already
+collapses the panel under 640px, so a real phone gets the rail — but any
+future affordance that opens a region on a phone should know it costs four
+fifths of the felt.
+
+`zoom-syncs` re-pointed to read `ZOOM_PRESETS` through a debug accessor
+instead of carrying its own copy of the numbers: a scenario that hard-codes
+the ladder asserts a decision rather than a behaviour, and fails on a retune
+that is working exactly as intended. What it is for — every client agrees,
+the walls and shelf pitch follow the setting — is what it checks now.
+
 ### C18. The result panel is too busy — small
 
 *Joe 2026-08-09.* Two cuts, both subtractive:
@@ -1115,17 +1166,19 @@ nobody is sitting at the table.
   log, and on the felt as dice; the title repeating it is what tipped the
   surface from "a result" into a list of facts about a result.
 
-### C19. Buttons should not ask questions — small
+### C19. Buttons should not ask questions — SHIPPED
 
 *Joe 2026-08-09, on C7's armed clear:* the double-press is right, the wording
 is not. `Clear 1 more?` puts a question in a control. **Buttons guide, they do
 not interrogate** — a question belongs in a modal, and this is deliberately
 not one.
 
-**Change:** the armed state states the next act rather than asking about it —
-`Clear mine` → press → `Clear all`. Same two-tap, same red escalation dress,
-no question mark. Check the same rule against the rest of the app's controls
-while in there; this is the only one that asks, but it is worth confirming.
+**SHIPPED 2026-08-09.** `Clear mine` → press → `Clear all`. Same two-tap,
+same red escalation dress, no question mark. The COUNT moved to the title and
+the announcement, where a number informs rather than interrogates — and the
+title is where it has to live anyway, because the collapsed rail hides
+`.cb-label` and the hover read is the only channel left there. Swept the rest
+of the app's controls: this was the only one that asked.
 
 ### C20. `.hidden` is a class this stylesheet does not define — small
 
