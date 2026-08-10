@@ -507,6 +507,80 @@ export const scenarios = [
     },
   },
   {
+    name: 'contacts-reach-the-felt',
+    tags: ['roll', 'perf', 'fx', 'cuj8'],
+    // THE RECORDER STARVES EVERY LARGE POOL (2026-08-09). `roll.sounds` is the
+    // ONE array the impact drain reads (js/main.js, stepPlayback): sound,
+    // particle bursts, felt decals and the shock ring all come off it. It was
+    // capped at 400 events for the WHOLE roll — and a 40-die spawn cluster
+    // interpenetrates on frame zero and dispatches enough contacts in that one
+    // step to spend the entire budget before a single die has touched felt.
+    //
+    // So above roughly fourteen dice the app went silent, threw no particles,
+    // laid no marks and fired no ring — and every existing scenario stayed
+    // green, because nothing asserted that a landing produces an EVENT. The
+    // whole Level 3/4/5 layer switching itself off is invisible to a suite
+    // that only checks where dice come to rest.
+    //
+    // The assertion is deliberately about the DRAIN's raw material rather than
+    // about any one effect: a decal can be off by ruling and a set can carry no
+    // particles by design, but a die that lands always owes a contact event.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+
+      // WAIT FOR THE ROLL, don't settle() for it. The fast-forward is
+      // synchronous inside playRoll, so the numbers are final the instant
+      // currentRoll exists — but clearTable() between throws NULLS currentRoll,
+      // so a settle() that returns before the next roll's SSE event lands reads
+      // null and the whole scenario collapses on a race rather than on the
+      // behaviour under test.
+      const stats = async (notation) => {
+        await a.dbg(`commandRoll(${JSON.stringify(notation)})`);
+        await a.waitFor('!!window.__diceDebug.contactStats()',
+          { desc: `${notation}: the roll reached the client` });
+        const s = JSON.parse(await a.eval(
+          'JSON.stringify(window.__diceDebug.contactStats())'));
+        await a.dbg('sim(9000)');
+        await a.dbg('clearTable()');
+        await a.dbg('sim(400)');
+        return s;
+      };
+
+      // SAMPLED like dice-land-flat, and for the same reason: a landing is
+      // physics off a server-seeded roll, so one throw can be unlucky. A
+      // starved recorder fails EVERY throw, so a majority is still a hard fail
+      // on the real regression.
+      const sample = async (notation, n = 3) => {
+        const runs = [];
+        for (let i = 0; i < n; i++) runs.push(await stats(notation));
+        return runs;
+      };
+
+      for (const notation of ['20d6', '40d6']) {
+        const runs = await sample(notation);
+        const heard = runs.filter((r) => r.afterHalfSec > 0).length;
+        const floored = runs.filter((r) => r.onFloor > 0).length;
+        const worstFirst = Math.max(...runs.map((r) => r.firstFrame));
+        assert.ok(heard >= 2,
+          `${notation}: the roll is still making contacts after 0.5 s — a player `
+          + `hears it land (${heard}/3 throws; totals `
+          + `${runs.map((r) => r.total).join('/')}, worst spawn-frame share `
+          + `${worstFirst})`);
+        assert.ok(floored >= 2,
+          `${notation}: contacts reach the felt at all — the decal gate is `
+          + `at[1] < 0.6 (${floored}/3 throws)`);
+      }
+
+      // A small pool was never starved; it is the control. If this fails, the
+      // per-step cap was set too tight and took the ordinary case with it.
+      const trio = await sample('1d8+1d6+1d10');
+      assert.ok(trio.every((r) => r.afterHalfSec > 0),
+        `the canonical three-die roll still records its landings `
+        + `(${trio.map((r) => r.afterHalfSec).join('/')} late contacts)`);
+    },
+  },
+  {
     name: 'cache-validator',
     tags: ['net'],
     // A STALE BUILD IS A PERMANENT ONE, unless the validator changes with the

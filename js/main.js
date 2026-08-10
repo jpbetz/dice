@@ -1989,9 +1989,28 @@ function playRoll(roll) {
   const sounds = []; // {time, strength, at, di}
   const bodyDie = new Map(dice.map((d, i) => [d.body, i]));
   let simTime = 0;
+  // THE BUDGET IS TEMPORAL, NOT JUST TOTAL (2026-08-09). The 400-event cap
+  // alone is spent by the SPAWN CLUSTER: 20 dice interpenetrate on frame zero
+  // and dispatch 280 contacts in that ONE step, the full 400 within a few more
+  // — so the drain (stepPlayback) had nothing left by the time a die touched
+  // felt, and sound, particles, decals and the shock ring all silently
+  // switched off on every pool above ~14 dice. Measured, not inferred:
+  // `contacts-reach-the-felt` fails on HEAD with 0/3 throws recording anything
+  // after 0.5 s, on 20d6 as well as 40d6.
+  //
+  // A per-step cap starves the storm and leaves the landings alone. It is
+  // deliberately NOT a height gate: wall contacts legitimately reach y=22 and
+  // any vertical filter would mis-file exactly the crack off the boards the
+  // sound design most wants.
+  //
+  // Deterministic by construction: consumes no rng() draw, adds no body, and
+  // perturbs no body ordering — cannon dispatches in a fixed order, so every
+  // client keeps and drops exactly the same contacts.
+  const CONTACTS_PER_STEP = 8;
+  let stepContacts = 0;
   const recordCollision = (e) => {
     const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
-    if (v > 2 && sounds.length < 400) {
+    if (v > 2 && sounds.length < 400 && stepContacts++ < CONTACTS_PER_STEP) {
       // The contact point rides along (Level 3): playback fires the set's
       // particle burst exactly where the click sound says the die hit —
       // and WHICH die (§9 mixed pools: the burst wears that die's set;
@@ -2037,6 +2056,7 @@ function playRoll(roll) {
 
   let nudges = 0;
   for (;;) {
+    stepContacts = 0; // the per-step contact budget refills; see the recorder
     world.step(FIXED_DT);
     simTime += FIXED_DT;
 
@@ -5457,6 +5477,27 @@ window.__diceDebug = {
   // state, + attached die-lights.
   fxInfo() {
     return { decals: decalField.count(), stamped: decalField.stampedTotal, decalsEnabled: decalField.enabled, decalsBuilt: decalField.built, lights: dieLights.info() };
+  },
+  // What the impact drain actually has to work with. `roll.sounds` is the ONE
+  // array feeding sound, particles, decals and the shock ring (stepPlayback's
+  // drain), so a starved recorder switches off the whole Level 3/4/5 layer
+  // with no error and no failing test — which is exactly what shipped in v1.0.
+  // Read from currentRoll, never from a painted frame: these numbers are
+  // decided in the synchronous fast-forward, long before anything renders.
+  contactStats() {
+    const s = currentRoll && currentRoll.sounds;
+    if (!s) return null;
+    return {
+      total: s.length,
+      // Contacts recorded on the spawn frame. A 20-die cluster interpenetrates
+      // at t=0 and measured 280 here before the per-step cap.
+      firstFrame: s.filter((e) => e.time <= FIXED_DT).length,
+      // The two the drain cares about: sounds that play while a player is
+      // watching, and floor contacts (the decal gate is `at[1] < 0.6`).
+      afterHalfSec: s.filter((e) => e.time > 0.5).length,
+      onFloor: s.filter((e) => (e.at ? e.at[1] : 99) < 0.6).length,
+      lastTime: s.length ? Math.max(...s.map((e) => e.time)) : 0,
+    };
   },
   // §9 draft state: the per-die override bookkeeping behind mixed rolls.
   get draftSets() {
