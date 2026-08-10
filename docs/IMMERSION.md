@@ -1975,10 +1975,63 @@ and are dead here:
 
 ---
 
-## OPEN QUESTIONS FOR JOE
+## RULINGS — decided 2026-08-09 by Joe
+
+The four gating questions are answered. **He went further than the pass
+recommended on two of them**, which is itself the signal: where this document
+hedged toward the shipped decision, the ruling was to break it.
+
+**① The camera may move during the second half of a tumble — under a quiet
+picture only.** It holds absolutely still while more than one die is in
+motion, and begins moving only once the picture has already gone quiet (on
+20d6 that is roughly the first 1.5 s of no motion at all). This narrows
+UX.md:406 and C24's "ease to it after settle, never during" rather than
+discarding them. `prefers-reduced-motion` owes a real alternate path — a cut,
+not a faster move. *Unblocks 4, 5, 10, 19.*
+
+**② Framing and pacing may vary per client; what the dice DID may not.** A
+phone frames portrait, a desktop wide; a hit-stop may stop one client's clock
+and not another's. Hard limit: **the deciding die is never cropped out of
+frame**, so the teeter stays shareable — which is the Owlbear objection, and
+it is answered by a constraint rather than dismissed. Nothing on the wire
+changes. *Unblocks 4, 5, 6, 7, 9, 19.*
+
+**③ Drama may cost time by default, including the bigger beats.** Not just the
+~200 ms settle hold — the ~1.2 s auto-replay on a crit and the 0–3 s pre-throw
+cup are in too. This goes past what the pass recommended and **argues against
+a shipped decision**: the 6 s → 3 s auto-collect retune of 2026-08-03 ("6 felt
+far too slow"). Two obligations ride with it: `CEREMONY_BUDGET_S` rises as an
+**explicit retune**, never smuggled past a `Math.min`; and a persistent
+"always fast" setting ships as part of the design, because the field's
+evidence is that a per-roll skip is not sufficient. *Affects 5, 6, 10, 15, 17.*
+
+**④ The felt may keep marks that persist while a PERSON does.** This
+**amends the 2026-08-03 residue ruling** — it does not merely thread it. The
+line moves from "transient and caused" to: a mark may persist as long as the
+thing it represents is present. Per-player crescents are in. The cost is
+named and accepted: a six-person room and a solo room currently look
+identical on the felt, and standing chrome is what the 2026-08-04 aesthetic
+audit cut eight effects for. *Unblocks 8, 13, 14, 16.*
+
+**Propagation owed.** ③ and ④ change doctrine that lives outside this
+document. UX.md §7's ceremony budget, GOALS' quiet-felt reading, and the
+residue ruling's own entry in GOALS' superseded-decisions list all now say
+something the product no longer means. That is a docs pass, not a code
+change, and it should happen before the first item that depends on it ships —
+otherwise the next audit reads the stale rule as authority, which is the exact
+failure UX-AUDIT recorded twice.
+
+**Not yet ruled:** the six smaller questions below — what "cinematic" should
+mean, where quiet chrome ends, whether `fx.html` ships to production, shrouded
+positional audio, room tone's default, and whether settled dice become
+movable.
+
+---
+
+## THE QUESTIONS AS PUT (the reasoning behind the rulings)
 
 Joe said "break rules **selectively**," and SELECTIVELY is the word that hands
-him the choosing. Each ruling below unblocks a group, not a single item.
+him the choosing. Each question below unblocks a group, not a single item.
 
 **1. May the camera move during the second half of a tumble?**
 *Unblocks items 4, 5, 10, 19 — four of the six largest payoffs on the slate.*
