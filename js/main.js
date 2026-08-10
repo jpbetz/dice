@@ -12767,38 +12767,94 @@ function decidingOnScreen() {
 //      says what may not.
 //
 // Returns the pose rather than moving the camera, so the caller can ease to it.
-function computeFraming() {
-  const savedPos = camera.position.clone();
-  const savedTgt = camTarget.clone();
+function framingFor(orbit) {
+  const prev = camOrbit;
+  camOrbit = orbit;
   const home = CAM_TARGET_HOME;
   let mode = 'mat';
-  if (!fitCameraTo(framingPoints(), home) && framingLadder) {
+  // THE MAT FITTING DOES NOT MEAN THE DICE DO. Dice pile — C24 measured heaps
+  // up to 4.7 units tall — and a die resting on two others projects from well
+  // above the mat plane, so it can sit outside a frame that contains all four
+  // mat corners. Measured: desktop 1440, 40d6, mat fits and the DECIDING DIE
+  // IS OFF SCREEN. Rung 1 therefore has to clear the same bar as the rest of
+  // the ladder, or the guarantee this whole ladder exists for has a hole in it
+  // on the one device that never reaches rung 2.
+  const matOk = fitCameraTo(framingPoints(), home);
+  if (framingLadder && (!matOk || !decidingOnScreen())) {
     const dice = diceFramingPoints();
     if (dice && fitCameraTo(dice, dice.centre)) {
       mode = 'dice';
     } else if (dice && decidingOnScreen()) {
-      // THE LEAST CROPPING THAT STILL OBEYS RULING ②. The dice do not all fit,
-      // but aimed at the cluster's centre the deciding die IS in frame — so
-      // stop here. Tightening further would buy size by throwing away dice the
-      // view was already able to show, and the ruling asks for the deciding die
-      // to be visible, not for everything else to be discarded.
       mode = 'dice-cropped';
     } else {
       const hero = dice && decidingDieFraming();
       if (hero && fitCameraTo(hero, hero.centre)) mode = 'deciding';
-      else mode = 'mat-overflow'; // nothing to aim at; the old silent behaviour
+      else mode = 'mat-overflow';
     }
   }
+  // Score the candidate from the LIVE camera it just set up.
+  const v = new THREE.Vector3();
+  const on = tableDice.filter((d) => d.body && d.mesh && d.mesh.visible !== false)
+    .filter((d) => { v.copy(d.body.position).project(camera); return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1; }).length;
+  const a0 = new THREE.Vector3(0, 0, 0).project(camera);
+  const a1 = new THREE.Vector3(1, 0, 0).project(camera);
+  const span = Math.hypot((a1.x - a0.x) * view.width, (a1.y - a0.y) * view.height);
   const pose = {
     pos: camera.position.clone(),
     tgt: (mode === 'mat' || mode === 'mat-overflow') ? home.clone()
       : (mode === 'deciding' ? decidingDieFraming().centre : diceFramingPoints().centre),
-    mode,
+    mode, orbit, on, span,
+    hero: decidingOnScreen(),
+    matFits: framingPoints().every(({ p: q }) => { v.copy(q).project(camera); return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1; }),
   };
+  camOrbit = prev;
+  return pose;
+}
+
+// WHICH WAY ROUND THE TABLE SITS, decided by measurement every time the frame
+// is computed rather than by a viewport threshold. Both orientations are run
+// through the ladder above and scored, and the rule is:
+//
+//   PREFER THE ONE THAT SHOWS EVERY DIE. Among those, take the larger die.
+//
+// That single rule produces every behaviour the measurements argued for, with
+// no magic numbers and nothing to retune when the zoom ladder moves:
+//   · a desktop keeps landscape — the mat fits, all dice show, and landscape is
+//     the larger frame. Nothing below rung 1 ever runs there.
+//   · a lone d20 on a phone keeps landscape and its crop, because both
+//     orientations show the one die and landscape shows it at 189px to 74px.
+//   · 20d6 and 40d6 on a phone TURN, because landscape shows 19/20 and 32/40
+//     while portrait shows all of them. Completeness wins the tie-break it is
+//     supposed to win.
+// Turning the table is per-viewer: no shared state, no wire field, and nothing
+// another player can see (ruling ②). The MAT does not move — item 21 proposed
+// rotating the physics walls, which every client would have to agree to.
+function computeFraming() {
+  const savedPos = camera.position.clone();
+  const savedTgt = camTarget.clone();
+  const land = framingFor(0);
+  let best = land;
+  // TURNING THE TABLE IS CATEGORICAL, NOT MARGINAL. The first rule tried was
+  // "prefer whichever shows more dice, then the larger die", and it turned a
+  // DESKTOP at 40d6 — trading 260px for 179px to gain ONE die, because at forty
+  // dice a few are always piled above the mat plane and project out of frame
+  // whichever way round the table sits. A tie-break that fine is noise.
+  //
+  // So the table turns only when portrait changes the KIND of frame available:
+  //   · landscape cannot contain the mat (a desktop always can, so a desktop
+  //     never turns and never even computes the second candidate), AND
+  //   · portrait can, AND
+  //   · landscape is actually dropping dice that portrait would show — which is
+  //     what keeps a lone d20 in landscape at 212px instead of turning for a
+  //     completeness it already had.
+  if (framingLadder && !land.matFits) {
+    const port = framingFor(Math.PI / 2);
+    if (port.matFits && port.on > land.on) best = port;
+  }
   camera.position.copy(savedPos);
   camTarget.copy(savedTgt);
   aimCamera(camTarget);
-  return pose;
+  return best;
 }
 
 // Ease, never cut, and only under a quiet picture — ruling ① permits the
@@ -12806,6 +12862,10 @@ function computeFraming() {
 const CAM_EASE_S = 0.42;
 
 function applyFramingPose(pose, animate) {
+  // The orientation is part of the pose, and it is NOT eased — a table
+  // mid-quarter-turn is a somersault, not a camera move. It cuts, and the
+  // position ease carries the rest.
+  camOrbit = pose.orbit !== undefined ? pose.orbit : camOrbit;
   if (!animate || prefersReducedMotion()) {
     camEase = null;
     camera.position.copy(pose.pos);

@@ -761,6 +761,38 @@ export const scenarios = [
           `phone ${pool}: …and every die is still on screen (${f.diceOnScreen}/${f.dice})`);
       }
 
+      // THE TABLE TURNS, AND ONLY WHERE IT PAYS. Portrait orbit is chosen by
+      // measurement at frame time, not by a viewport threshold: landscape must
+      // fail to contain the mat, portrait must contain it, and landscape must
+      // actually be dropping dice. The first rule tried here was "more dice,
+      // then bigger", and it turned a DESKTOP at 40d6 to gain one die at a 31%
+      // size cost — at forty dice a few are always piled above the mat plane
+      // and out of frame whichever way the table sits, so that tie-break was
+      // noise. These three assertions are the ones that would have caught it.
+      const big = await throwIt('40d6');
+      assert.notEqual(big.orbit, 0,
+        `phone 40d6: the table turns (orbit ${big.orbit}, ${big.diceOnScreen}/${big.dice})`);
+      assert.equal(big.diceOnScreen, big.dice,
+        `phone 40d6: …and every one of forty dice is on screen (${big.diceOnScreen}/${big.dice})`);
+      const lone = await throwIt('1d20');
+      assert.equal(lone.orbit, 0,
+        `phone 1d20: a lone die does NOT turn the table — landscape already `
+        + `showed it, and turning would trade its close frame for nothing `
+        + `(orbit ${lone.orbit}, ${lone.spanPx}px)`);
+
+      // A DESKTOP NEVER TURNS, at any pool size. Its mat always fits, so the
+      // second candidate is never even computed.
+      await viewport(1440, 900, true);
+      for (const pool of ['1d20', '20d6', '40d6']) {
+        const f = await throwIt(pool);
+        assert.equal(f.orbit, 0, `desktop ${pool}: the table stays landscape`);
+        assert.ok(f.decidingOnScreen === true,
+          `desktop ${pool}: and the deciding die is in frame — the mat fitting `
+          + `does NOT imply the dice do, since a die resting on two others `
+          + `projects from above the mat plane (${f.diceOnScreen}/${f.dice})`);
+      }
+      await viewport(390, 844, true);
+
       // PUT THE ORIGIN BACK. `setPanelState` writes per-origin localStorage,
       // which outlives this scenario's room — the same trap TESTING.md records
       // for dice.diceset.v1. Leaving the panels collapsed made
