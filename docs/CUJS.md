@@ -154,17 +154,21 @@ rail, digits, the ± popover, the notation box, the ceremony, the verdict card.
 **Done when:** thirty rolls into a session you can still see what is on the
 felt, find what happened earlier, repeat a roll you liked, and clear what you
 are done with — without the table becoming the chaos goal 5 forbids.
-*Surfaces:* the shelf, auto-collect, the peek, the log and its flyout, Clear
-table, reroll and its provenance.
+*Surfaces:* collecting and auto-collect, the roll log and its flyout (which
+is where a collected roll now LIVES — C25 took the felt shelf away), the peek
+card its row opens, Clear table, reroll and its provenance.
 *Proof (parts):* `collect-peek`, `shelf-quiet`, `shelf-actions`,
 `auto-collect`, `shelf-cap`, `tidy-away`, `clear-scope`, `log-flyout`,
 `reroll-history`, `reroll-provenance-gate`, `endurance-log`,
 `endurance-outline`, `endurance-banner-actions`.
 *Proof (composed):* **none** → **C1**.
-**SHIPPED in pieces.** This is the journey goal 5 ("organized over
-realistic") exists to serve, and ROADMAP **U20** — the shelf ships invisible,
-with `title` as its entire information channel — is a hole in the middle of
-it.
+**SHIPPED in pieces.** This is the journey goal 5 ("organized over realistic")
+exists to serve. The hole in the middle of it moved rather than closing: it
+used to be ROADMAP **U20** (the shelf shipped invisible, with `title` as its
+entire information channel); since C25 Stage 1 the felt is clear and the
+record is legible, but only while the log flyout is OPEN — with it closed a
+collected roll has no ambient presence at all. **C25 Stage 2** owns that, and
+U20 and C13 should fold into it rather than being solved twice.
 
 ### CUJ10 — "I want to control who sees this roll." ⚠️ **NEWLY NAMED**
 
