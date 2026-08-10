@@ -1530,6 +1530,14 @@ cannon's sleep (C30d), and the cure is `allowSleep = false`, which needs a
 terminator that does not depend on sleep to be affordable — C30e. With
 `dispgate + sleepoff` the same families replay byte-for-byte.
 
+**RESOLVED — SHIPPED 2026-08-11.** `SETTLEGATE 'displacement'` +
+`BODYFLAGS.allowSleep false` are the defaults (with the tempo curve and
+`NUDGE.pileScale 1.05`, Joe's A/B picks). Cleared by an adversarial pre-flip
+audit that re-ran every pivotal number; the audit's three conditions (scenario
+pins re-anchored to the shipped defaults, the matrix's creep gate replaced
+with a forward bound on terminator rows, and the C33 ledger entry below) ship
+in the flip commit.
+
 **AND THE INSTRUMENT CAN REPORT A FALSE NEGATIVE, which is the part to
 remember.** The pool-generalized runner throws soul, then 20d6, then 8d6, then
 churns, then repeats — and in that shape shipped's 20d6 came back **8/8
@@ -1565,6 +1573,24 @@ confirmation before a line of code moves.
 The zero-dependency rule (no npm installs, no build step) is what makes "a
 single file we can vendor" a hard requirement rather than a preference, and it
 is also why an emscripten build of our own is a real cost and not a footnote.
+
+### C33. 20d6 at `medium` piles slightly more under the flip — the ledger entry
+
+**Measured by the pre-flip audit, 2026-08-11, and shipped with eyes open.**
+Paired 8 seeds, 20d6 at `medium` (8.6 × 5.2), dice above `restCeiling`:
+shipped **80/160** → flip set **86–87/160** (+6, 4 of 8 seeds worse by one or
+two dice; `pileScale` does NOT buy this pool back the way it buys 6d6 —
+nudged dice land back on a mat that is already past capacity). The
+counterweight on the same seeds: shipped ran **26 dice across 5/8 seeds to
+the 9 s cap** (mean throw 8.37 s, ceremony beats declined on every capped
+roll) versus the flip's **0 caps, mean 4.14 s**. Twenty dice on this mat is
+past its flat capacity in BOTH worlds — the old build just spent nine seconds
+grinding before freezing the same tower. The honest statement is "+6 piled
+dice in 160, minus 26 cap-outs and 4 s of dead time"; the earlier claim
+"candidate ≤ shipped everywhere probed" was false and is corrected here. If
+20d6-at-medium flatness ever matters, the lever is spawn/landing geometry
+(aimed slots, C30c's spread notes) — not the terminator, and not more nudge
+budget (raising it to 8 changes nothing; there is nowhere flat to send them).
 
 **C30b — 20d6 can still reach the cap with dice genuinely tumbling** (3 of 16
 seeds). That is real motion, so shortening `SETTLE_CAP` would truncate it and

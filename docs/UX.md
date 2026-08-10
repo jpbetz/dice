@@ -4096,3 +4096,65 @@ tumbling; that is real physics and a smaller `SETTLE_CAP` would truncate real
 motion, so it is left alone. Pinned by `settle-tail`, which has to test the
 two halves separately: the rest rule made the tail cut go quiet on ordinary
 throws, so the cut is priced under the old 0.82 bar where it still bites.
+
+*Superseded in part by §7.30 (2026-08-11): the "only the damping fixes the
+dithering" conclusion did not survive the next measurement pass — the
+dithering is now ENDED by a better rest test rather than damped away, and the
+caps column below went to zero outright.*
+
+### 7.30 The throw, resolved (2026-08-11)
+
+Four defaults flipped together, each measured alone and audited as a set;
+this is the section to read for what a player gets today.
+
+**1. A die is done when it stops going anywhere.** The freeze test is now
+displacement-based (`SETTLEGATE 'displacement'`, Lengyel's three-point test):
+three tracked points per die, and if none travels more than 2% of a die-width
+over the stillness window, the die freezes. The old velocity bar could be
+held open forever by a die dithering in place — it leaned on cannon's sleep
+to zero velocities under it. Measured at the flip, same 16-seed families:
+
+| pool | duration | caps |
+|---|---|---|
+| Soul Deal | 2.26s → **−35%** | — |
+| 4d6 | −8% | — |
+| 8d6 | −4% *(tidy-up spends most of this pool's −28%)* | — |
+| 20d6 | 6.58s → **−40%** | 6/16 → **0** |
+| all pools | | **7 → 0 capped throws** |
+
+The 9-second dead table is gone: not one die in 80 paired throws ran out the
+clock. Worst end-of-film motion at a freeze: 0.0200 die-widths, against the
+old bar's 0.0279.
+
+**2. Cannon's sleep is off, and every roll replays.** Sleep was the entire
+replay drift (C31): master re-simulated 4 of 8 long 20d6 seeds as a visibly
+different throw on a churned tab. With `allowSleep false` the same families
+replay byte-for-byte, 16/16 and 8/8, pool-isolated, 900 throws of churn.
+Two players now watch the *same film*, always — sleep-off is affordable only
+because the displacement test replaced the retirement job sleep was secretly
+doing (alone it costs soul +31% and caps 7→11; paired, both numbers invert).
+
+**3. Tidy-up is on** (`NUDGE.pileScale 1.05`, Joe's call): a die that stops
+above its rest ceiling — perched on a neighbour — is refused and hurled
+again, sharing the cocked die's budget of 3. Cost accepted with eyes open:
+~3 visible tidy hops on a 20d6 throw, and most of 8d6's duration win spent.
+Buys `close` 6d6 back inside the pile gate (flat throws 8/40 versus the old
+6/40). The honest ledger for the one pool past mat capacity is ROADMAP C33:
+20d6 at `medium` ends with +6 piled dice per 160 — against 26 cap-outs and
+~4 s of dead time removed on the same seeds.
+
+**4. The projector runs Joe's curve** (`TEMPO flight 0.8 → settle 2.2`,
+ramp 0.4 s, anchored at the last instant any die still travels faster than
+8 u/s — a pure function of the baked film, so every client changes gear at
+the same frame). Uniform speeds were A/B'd and refused twice; the shipped
+shape is the hurl a touch *slower* than raw and the wait 2.2× faster. Impact
+clicks are gated in film time (`CLICKGATE 'film'`) so the sound survives any
+speed — measured: zero loud clicks lost across six display/tempo configs.
+
+**What did NOT ship, and why it never will in this form:** restitution
+deadening (fixes shake, but glides on 8d6, piles, and — pre-sleepoff — broke
+replay), gated damping (zero shake benefit, drifts alone), raised sleep
+thresholds (stops dice mid-motion, drifts), the floor magnet (the naive form
+of an engine restitution threshold; failed every gate including its own),
+and uniform tempo (taste). The full pricing history is ROADMAP C30a–e; the
+engine-swap reserve position is C32.

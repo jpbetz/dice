@@ -785,10 +785,15 @@ const SLEEP = { speed: 0.4, time: 0.35 };
 // whatever the projector is doing, and all three are functions of film time,
 // so they pick the same passage of the reel however fast it is running.
 //
-// flight = settle = 1 is byte-identical and is the default. `k` stays as the
-// uniform multiplier the theorem checks use; the two compose (effective =
-// k × curve), so setTempo(2) on the default curve is exactly what it was.
-const TEMPO = { k: 1, flight: 1, settle: 1, rampS: 0.4, anchorSpeed: 6 };
+// SHIPPED CURVE (2026-08-11, Joe's A/B): flight 0.8 — the hurl and tumble a
+// touch slower than raw, his pick over 1.0 twice — ramping to settle 2.2 once
+// the last die stops travelling, so the wait never drags. Uniform k was
+// refused by the same eye at every value tried (2.7 and 2.2 both "too fast
+// for the main dice roll"); the curve is what survived. anchorSpeed 8 by
+// sweep: engages on every pool (late ≤1/8) and sits 35× above the settle bar.
+// `k` stays as the uniform multiplier the theorem checks use; the two compose
+// (effective = k × curve). flight = settle = 1 recovers the pre-curve film.
+const TEMPO = { k: 1, flight: 0.8, settle: 2.2, rampS: 0.4, anchorSpeed: 8 };
 
 // The last film time at which any die's CENTRE is moving faster than `speed`.
 // Centre travel, not angular: a die spinning in place has stopped travelling
@@ -850,14 +855,15 @@ function tempoCurveAt(roll) {
 // What the dither actually needed was a TERMINATOR that can see a bounded
 // excursion, not a force that tries to remove it: see SETTLEGATE.
 
-// Per-body flags applied at spawn. `allowSleep: null` means "leave cannon's
-// own default alone" — the inert setting. This exists for ONE attribution
-// question (C30d): deaden does not replay across a tab's lifetime, and the
-// suspicion is that a deadened die hovers on the sleep boundary where
-// accumulated world.time can tip it either way. allowSleep=false removes the
-// boundary. It is NOT a ship candidate — turning sleep off changes shipped
-// trajectories too, so it gets its own baseline rather than a gate.
-const BODYFLAGS = { allowSleep: null };
+// Per-body flags applied at spawn. SHIPPED false (2026-08-11): cannon's sleep
+// was the entire replay-drift disease — C31; master 20d6 replayed 4/8 seeds
+// as a materially different throw after tab churn, and sleepoff replays
+// byte-identical 16/16 + 8/8 + 8/8. Sleep's hard-zeroing was also the crutch
+// the old velocity freeze leaned on; the displacement terminator (SETTLEGATE)
+// replaced that job, which is why the two ship together — sleepoff ALONE
+// costs soul +31% and caps 7→11 (measured, twice). `allowSleep: null` remains
+// the revert setting: "leave cannon's own default alone".
+const BODYFLAGS = { allowSleep: false };
 
 function addStaticPlane(material, position, euler) {
   const body = new CANNON.Body({ mass: 0, shape: new CANNON.Plane(), material });
@@ -985,10 +991,13 @@ const IMPACT_HARD_GAP_MS = 12;  // …and the wall-clock line nothing may cross
 // click drops" is therefore judged on the LOUD decile — the landing thumps —
 // which is what the criterion was always reaching for.
 //
-// SHIPPED INERT, because it changes which clicks a real roll plays and that is
-// an audible change to a shipped surface, not a tunable's default. 'wall'
-// reproduces today exactly.
-const CLICKGATE = { mode: 'wall' };
+// SHIPPED 'film' (2026-08-11), WITH the tempo curve and because of it: the
+// curve makes k vary inside every throw, and film time is the only gate
+// invariant to that — 'wall' at 60Hz drops a LANDING THUMP at high k. The
+// audible k=1 delta was measured before flipping: −2 quiet / +1 of ~78 corpus
+// clicks, zero loud clicks lost across all six display/tempo configs. 'wall'
+// remains the pre-curve reference gate.
+const CLICKGATE = { mode: 'film' };
 
 // IMPACT VOICE (Slice 1, Joe 2026-08-04 aesthetic pass): the per-set
 // sound identity — one function replaces the single hard-coded click
@@ -1202,13 +1211,18 @@ const SETTLE_CAP = 9;      // hard cap on simulated seconds per roll
 //   scenario can assert the guarantee rather than assert "it settles faster",
 //   which is a benchmark result and not a property.
 //
-// `mode: 'velocity'` is the shipped predicate, verbatim, and is the default:
-// the boxes are still tracked (a pure read of position and quaternion — no rng
-// draw, no body mutation, no ordering change) purely so `endDisp` is a fact on
-// every row, and the still-decision consults ONLY the velocity pair. Byte-
-// identical to master; the settle-matrix canary and its determinism preamble
-// are what prove it. Driven only by __diceDebug.setSettleGate.
-const SETTLEGATE = { mode: 'velocity', eps: 0.02 };
+// SHIPPED 'displacement' (2026-08-11): a die is done when no tracked point
+// travels more than eps×dieWidth over the SETTLE_STILL window. The velocity
+// predicate it replaces could be defeated forever by a die dithering in place
+// — that predicate leaned on cannon's sleep hard-zeroing velocities, which is
+// exactly what C31 removed — and it is why 20d6 rode the 9 s cap on most
+// throws. Measured at the flip: caps 7→0 across every pool, soul −35%,
+// 8d6 −28%, 20d6 −43%, worst end-of-film motion 0.0200 die-widths against
+// shipped's 0.0279. eps 0.02 by sweep: 0.01 sits under this solver's own
+// contact chatter (the box never holds and the cap fires anyway); 0.05 wins
+// more clock and piles +3.3pp. `mode: 'velocity'` remains the pre-flip
+// reference predicate. Driven by __diceDebug.setSettleGate.
+const SETTLEGATE = { mode: 'displacement', eps: 0.02 };
 
 // TWENTY-EIGHT FRAMES, NOT TWENTY-SEVEN, AND THE DIFFERENCE IS A FLOAT. The
 // bake accumulates `stillTime += FIXED_DT` and tests `>= SETTLE_STILL`, and
@@ -1267,9 +1281,15 @@ const SETTLE_STILL_FRAMES = (() => {
 // 12 out of a swept 4/8/12/16/24 x lift 7/2 (tools/steps/pile-sweep.mjs): it
 // resolved the most piles per second bought, and lift stays at the shipped 7
 // so the cocked path is untouched.
+// pileScale 1.05 is SHIPPED (2026-08-11, Joe's call — "tidy on"): a die that
+// stops above its rest ceiling is refused and hurled again, budget permitting.
+// Cost accepted with eyes open: ~3 visible tidy-up rounds per 20d6 throw and
+// most of the mid-pool duration win handed back (8d6 −28%→−4%). Buys close/6d6
+// back inside the pile gate (+0.4pp, flat throws 8/40 vs shipped's 6/40) and
+// resolves the one crowded seed the terminator alone left slower than shipped.
 const NUDGE = {
   budget: 3, lift: 7, spread: 4, spin: 14, cockedDot: 0.6, cockedDotD4: 0.7,
-  pileScale: 0, pileSpread: 12,
+  pileScale: 1.05, pileSpread: 12,
 };
 let seedReplayN = 0; // __diceDebug.throwSeeded — keeps replayed rollIds unique
 
@@ -6007,10 +6027,10 @@ window.__diceDebug = {
   setThrowTarget(f) { THROW_TARGET = typeof f === 'number' ? f : THROW_TARGET; return THROW_TARGET; },
   get sleep() { return { ...SLEEP }; },
   setSleep(o) { Object.assign(SLEEP, o || {}); return { ...SLEEP }; },
-  // The settle terminator (SETTLEGATE). mode 'velocity' is shipped and
-  // byte-identical; 'displacement' swaps in the three-point AABB rest test and
-  // `eps` is its tolerance, as a fraction of a die's WIDTH. Takes effect on the
-  // NEXT roll — playRoll bakes the whole throw before frame one.
+  // The settle terminator (SETTLEGATE). mode 'displacement' is shipped — the
+  // three-point AABB rest test, `eps` its tolerance as a fraction of a die's
+  // WIDTH; 'velocity' restores the pre-2026-08-11 predicate. Takes effect on
+  // the NEXT roll — playRoll bakes the whole throw before frame one.
   get settleGate() { return { ...SETTLEGATE }; },
   setSettleGate(o) {
     const p = o || {};
@@ -6018,10 +6038,10 @@ window.__diceDebug = {
     if (typeof p.eps === 'number' && p.eps > 0) SETTLEGATE.eps = p.eps;
     return { ...SETTLEGATE };
   },
-  // The impact click gate (F2). 'wall' is shipped: 35/k ms measured against
-  // performance.now(), which the rAF batching quantises into a click every
-  // third frame at k=1. 'film' gates the recorded train instead and keeps only
-  // the 12 ms wall floor. Takes effect on the NEXT impact.
+  // The impact click gate (F2). 'film' is shipped: the recorded train gated
+  // in film time plus the 12 ms wall floor — invariant to the tempo curve's
+  // in-throw k changes. 'wall' restores the pre-curve gate (35/k ms against
+  // performance.now()). Takes effect on the NEXT impact.
   // The two constants ride along because a scenario that wants to pin "at k=1
   // the gate is exactly the 35 ms that shipped" must not restate 35 itself —
   // a test carrying its own copy of the number it is checking passes forever.
@@ -6065,8 +6085,9 @@ window.__diceDebug = {
     r.time = held;
     return k;
   },
-  // Attribution only, not a ship candidate — see BODYFLAGS. null restores
-  // cannon's default (dice sleep); false keeps every die awake to its freeze.
+  // SHIPPED false — see BODYFLAGS (cannon's sleep was the C31 replay drift).
+  // null restores cannon's default (dice sleep); false keeps every die awake
+  // to its freeze.
   get bodyFlags() { return { ...BODYFLAGS }; },
   setBodyFlags(o) { Object.assign(BODYFLAGS, o || {}); return { ...BODYFLAGS }; },
   get nudge() { return { ...NUDGE }; },

@@ -535,8 +535,14 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     + `  c caps   total capped throws <= shipped's, AND 20d6 caps <= 1\n`
     + `  d pile   every cell within +/-2pp of shipped, and 6d6@close flat-throws >= shipped's\n`
     + `  e clock  per-pool mean wall <= 1.5x shipped\n`
-    + `  f creep  no pool worse than shipped +15%\n`);
-  const vrows = ran.filter(([n]) => n !== base).map(([n]) => {
+    + `  f rest   same terminator as shipped: creep no pool worse than +15%;\n`
+    + `           a row that MOVES the settle frame is judged FORWARD instead\n`
+    + `           (worst dispMax <= shipped's and loose <= shipped's), because\n`
+    + `           creep's backward window is unreadable across anchor moves —\n`
+    + `           in both directions (audit 2026-08-11: the same confounded\n`
+    + `           meter that showed creep +114% also flattered shake)\n`);
+  const vrows = ran.filter(([n]) => n !== base).map((v) => {
+    const n = v[0];
     const shakeCut = mean(SHAKE_GATED.map((p) => 1 - got.get(`${n}|${p}`).shake / b(p).shake));
     const worstDur = Math.max(...SHAKE_POOLS.map(([p]) => (got.get(`${n}|${p}`).dur - b(p).dur) / b(p).dur));
     const caps = SHAKE_POOLS.reduce((s, [p]) => s + got.get(`${n}|${p}`).capped, 0);
@@ -553,6 +559,17 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     const worstClock = Math.max(...SHAKE_POOLS.map(([p]) => got.get(`${n}|${p}`).wall / b(p).wall));
     const worstCreep = Math.max(...SHAKE_POOLS.map(([p]) =>
       (got.get(`${n}|${p}`).creep - b(p).creep) / b(p).creep));
+    // A row that changes the terminator moves every settle frame, and with it
+    // the anchor of creep's backward window — so it is judged forward.
+    const movesFrame = !!(v[7] && v[7].mode && v[7].mode !== INERT.settleGate.mode);
+    const worstDispMax = Math.max(...SHAKE_POOLS.map(([p]) => got.get(`${n}|${p}`).dispMax));
+    const baseDispMax = Math.max(...SHAKE_POOLS.map(([p]) => b(p).dispMax));
+    const worstLoose = Math.max(...SHAKE_POOLS.map(([p]) => got.get(`${n}|${p}`).loose));
+    const baseLoose = Math.max(...SHAKE_POOLS.map(([p]) => b(p).loose));
+    const restGate = movesFrame
+      ? [worstDispMax <= baseDispMax && worstLoose <= baseLoose,
+        `f disp ${worstDispMax.toFixed(4)}/${baseDispMax.toFixed(4)} loose ${worstLoose}/${baseLoose}`]
+      : [worstCreep <= 0.15, `f creep ${worstCreep >= 0 ? '+' : ''}${(worstCreep * 100).toFixed(0)}%`];
     const g = [
       [shakeCut >= 0.20, `a shake ${(shakeCut * 100).toFixed(0)}%`],
       [worstDur <= 0.05, `b dur ${worstDur >= 0 ? '+' : ''}${(worstDur * 100).toFixed(0)}%`],
@@ -560,10 +577,10 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
       // "within 2pp" read as ONE-SIDED: a cell that piles LESS than shipped is
       // the point of the exercise, not a gate failure.
       [hasPile && worstPile <= 2 && flatOk,
-        `d pile ${hasPile ? `${worstPile >= 0 ? '+' : ''}${worstPile.toFixed(0)}pp` : 'n/a'}`
+        `d pile ${hasPile ? `${worstPile >= 0 ? '+' : ''}${worstPile.toFixed(1)}pp` : 'n/a'}`
         + `${hasPile && !flatOk ? ' flat!' : ''}`],
       [worstClock <= 1.5, `e clock ${worstClock.toFixed(2)}x`],
-      [worstCreep <= 0.15, `f creep ${worstCreep >= 0 ? '+' : ''}${(worstCreep * 100).toFixed(0)}%`],
+      restGate,
     ];
     return [n, ...g.map(([ok, s]) => `${ok ? 'PASS' : 'fail'} ${s}`),
       g.every(([ok]) => ok) ? 'ALL PASS' : ''];

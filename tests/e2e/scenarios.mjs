@@ -9702,19 +9702,19 @@ export const scenarios = [
     // freezes happily on top of its neighbour, because separation used to be
     // a free side effect of ambient bounce: dice skid apart after landing.
     //
-    // The mechanism is OFF in this build (NUDGE.pileScale 0). The measured
-    // tuning it exists for — deadening the restitution — failed its gates
-    // (tools/steps/settle-matrix.mjs, 2026-08-10), so what ships is the
-    // machinery, inert. This scenario therefore pins the three STRUCTURAL
-    // claims, not an outcome: an outcome pinned here would be a lucky seed,
-    // and at `close` the bar resolves 1 crowded throw in 24.
+    // The mechanism is ON in this build (NUDGE.pileScale 1.05, shipped
+    // 2026-08-11 alongside the displacement terminator): the terminator
+    // freezes a die at its true stop, so the ambient dither that used to
+    // shake piles apart is gone, and the bar + nudge do that job on purpose.
+    // This scenario still pins the STRUCTURAL claims, not an outcome: an
+    // outcome pinned here would be a lucky seed, and at `close` the bar
+    // resolves 1 crowded throw in 24.
     //
-    // Poses are deliberately not compared. Nothing in this engine is
-    // byte-identical across a tab's lifetime — the broadphase's axis list has
-    // seen a different history, which moves rest positions by ~5e-6 on a
-    // couple of seeds in sixteen even on the shipped build. Duration and
-    // frame count are the observables that stay exact, and they are the ones
-    // that mean "a different throw".
+    // Poses are deliberately not compared, out of humility rather than need:
+    // the ~5e-6 rest-pose wander once blamed on the broadphase's axis-list
+    // history was cannon's sleep decision all along (C31), and shipping
+    // allowSleep=false removed it. Duration and frame count remain the
+    // observables that mean "a different throw".
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
       await a.dbg("setZoom('close')");
@@ -9735,12 +9735,15 @@ export const scenarios = [
       };
       const sig = (p) => `${p.duration}|${p.frames}|${p.nudged}`;
 
-      // --- 1. off is off ----------------------------------------------------
+      // --- 1. the shipped bar is 1.05, and it is silent on flat throws ------
+      const shipped = await a.dbg('nudge');
+      assert.equal(shipped.pileScale, 1.05,
+        `the shipped pile bar is 1.05x the rest ceiling, found ${shipped.pileScale}`);
       const off = [];
       for (const s of seeds) off.push(await throwOne(s));
       for (const p of off) {
-        assert.equal(p.nudged, 0, `seed ${p.seed}: nudged with the bar off`);
-        assert.equal(p.piled, 0, `seed ${p.seed}: reads as piled with the bar off — it must be silent`);
+        assert.equal(p.nudged, 0, `seed ${p.seed}: a flat throw was nudged at the shipped bar`);
+        assert.equal(p.piled, 0, `seed ${p.seed}: a flat throw reads as piled at the shipped bar`);
       }
 
       // --- 2. the predicate is wired into the freeze path -------------------
@@ -9770,14 +9773,18 @@ export const scenarios = [
           `seed ${p.seed}: ${p.duration}s with every die refused — the budget guard is not releasing them`);
       }
 
-      // --- 4. the off sentinel restores exactly, leaving no residue ---------
-      // pileScale 0 has to mean "this code was never here", or every
-      // measurement taken against it is measuring the instrument.
+      // --- 4. the off sentinel is a true zero, and the shipped bar adds
+      // nothing to a flat throw. pileScale 0 has to mean "this code was never
+      // here", or every measurement taken against it is measuring the
+      // instrument — and on seeds with nothing above the bar, 0 and 1.05 must
+      // produce the same throw, or the bar is touching dice it has no claim
+      // on. (`off` above ran at the shipped 1.05; `back` runs at 0.)
       const back = [];
       for (const s of seeds) back.push(await throwOne(s));
+      await a.dbg('setNudge({"pileScale":1.05})'); // leave the table as shipped
       seeds.forEach((s, i) => {
         assert.equal(sig(back[i]), sig(off[i]),
-          `seed ${s}: turning the bar off did not restore the throw `
+          `seed ${s}: pileScale 0 vs the shipped 1.05 differ on a flat throw `
           + `(${sig(off[i])} -> ${sig(back[i])})`);
         assert.notEqual(sig(on[i]), sig(off[i]),
           `seed ${s}: the bar at 0.5 changed nothing, so claim 3 proves nothing`);
@@ -9789,24 +9796,23 @@ export const scenarios = [
     tags: ['roll', 'physics', 'cuj8'],
     // A REST TEST THAT CAN SEE A DIE DITHERING IN PLACE.
     //
-    // The shipped freeze predicate is a velocity threshold, and a velocity
+    // The old freeze predicate was a velocity threshold, and a velocity
     // threshold cannot retire an oscillating body: an oscillation has velocity
-    // at every instant however small the excursion. What actually retires a
-    // dithering die today is cannon's own sleep hard-zeroing its velocities
-    // underneath us — a second retirement predicate, the one that flaps, and
-    // the whole of this table's replay drift (C30d/C30e).
+    // at every instant however small the excursion. What actually retired a
+    // dithering die was cannon's own sleep hard-zeroing its velocities
+    // underneath us — a second retirement predicate, the one that flapped, and
+    // the whole of this table's replay drift (C30d/C30e/C31).
     //
-    // SETTLEGATE.mode 'displacement' is Lengyel's jitter-tolerant condition
-    // (Game Engine Gems 2 ch.23, as shipped in Jolt and Rapier): three points
-    // per die — centre of mass plus probes on the local +X and +Y at the
-    // half-width — each growing an AABB, all three inside `eps` for
-    // SETTLE_STILL meaning at rest.
+    // SHIPPED 2026-08-11: SETTLEGATE.mode 'displacement' — Lengyel's
+    // jitter-tolerant condition (Game Engine Gems 2 ch.23, as shipped in Jolt
+    // and Rapier): three points per die — centre of mass plus probes on the
+    // local +X and +Y at the half-width — each growing an AABB, all three
+    // inside `eps` for SETTLE_STILL meaning at rest.
     //
-    // The mechanism is OFF in this build (mode 'velocity'). What this scenario
-    // pins is therefore the GUARANTEE and the MACHINERY, never a benchmark:
-    // "it settles faster" is a result that depends on the seed family and the
-    // machine, while "a die that froze provably moved less than eps" is a
-    // property of the predicate and either holds or does not.
+    // What this scenario pins is the GUARANTEE and the MACHINERY, never a
+    // benchmark: "it settles faster" is a result that depends on the seed
+    // family and the machine, while "a die that froze provably moved less
+    // than eps" is a property of the predicate and either holds or does not.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
       const pool = Array(20).fill('d6');
@@ -9828,10 +9834,16 @@ export const scenarios = [
       };
       const sig = (p) => `${p.duration}|${p.frames}|${p.nudged}`;
 
-      // --- 1. off is off ----------------------------------------------------
+      // --- 1. the shipped gate, and a reference arm to judge it against -----
       const gate0 = await a.dbg('settleGate');
-      assert.equal(gate0.mode, 'velocity',
-        `the shipped terminator is the velocity predicate; found mode ${gate0.mode}`);
+      assert.equal(gate0.mode, 'displacement',
+        `the shipped terminator is the displacement predicate; found mode ${gate0.mode}`);
+      assert.equal(gate0.eps, EPS,
+        `the shipped eps is ${EPS} of a die-width; found ${gate0.eps}`);
+      // `off` runs the RETIRED velocity predicate — kept verbatim as the
+      // reference mode — because claims 2 and 3 are about the probe machinery,
+      // which must hold in both modes or it is not machinery.
+      await a.dbg('setSettleGate({"mode":"velocity","eps":0.02})');
       const off = [];
       for (const s of seeds) off.push(await throwOne(s));
 
@@ -9870,7 +9882,8 @@ export const scenarios = [
         `the worst probe/centre ratio was ${ratio.toFixed(2)} — the off-axis probes are `
         + 'seeing no more than the centre does, so the three-point test is a one-point test');
 
-      // --- 4. the guarantee, which is the whole point -----------------------
+      // --- 4. the guarantee, which is the whole point — back on the shipped
+      // gate.
       await a.dbg(`setSettleGate({"mode":"displacement","eps":${EPS}})`);
       const on = [];
       for (const s of seeds) on.push(await throwOne(s));
@@ -9903,21 +9916,18 @@ export const scenarios = [
       assert.ok(absurd.timedOut > 0,
         `eps 0.0002 still froze every die — the freeze test is not consulting the boxes`);
 
-      // --- 6. the off sentinel restores exactly, leaving no residue ---------
-      // mode 'velocity' has to mean "this code was never here", or every
-      // measurement taken against it is measuring the instrument.
+      // --- 6. the reference mode leaves no residue --------------------------
+      // mode 'velocity' has to mean "the old predicate, verbatim", and
+      // passing through it and back must restore the shipped throw exactly —
+      // or every measurement taken against it is measuring the instrument.
       //
-      // AND IT CANNOT BE PINNED ON 20d6, WHICH IS ITSELF A FINDING. The first
-      // version of this check re-threw the 20d6 family and failed with seed
-      // 1000 coming back 4.683 s/282 fr instead of 5.333 s/321 fr. That is not
-      // residue from the gate — it is the SHIPPED build's own replay drift,
-      // the same signature tools/steps/replay-drift.mjs reproduces on master
-      // (4 of 8 20d6 seeds move materially after churn; ROADMAP C31). Twenty
-      // dice and a dozen throws of accumulated world.time is all it takes.
-      // So the sentinel is pinned on the soul pool, whose duration and frame
-      // count DO replay (its drift is pose-only at 5e-6), and the pool that
-      // cannot hold still is left to the tool that exists to measure that.
-      await a.dbg('setSettleGate({"mode":"velocity","eps":0.02})');
+      // Pinned on the soul pool, not 20d6, for a historical reason worth
+      // keeping: on the PRE-C31 build (cannon sleep on), 20d6 could not
+      // replay itself — seed 1000 came back 4.683 s/282 fr instead of
+      // 5.333 s/321 fr with no setting touched, the drift replay-drift.mjs
+      // measured at 4 of 8 seeds. Shipping allowSleep=false cured that, but
+      // the soul pin is kept: it is cheap, it proved itself against the old
+      // build, and the 20d6 question belongs to the tool built to measure it.
       const soul = ['d8', 'd8', 'd4', 'd6'];
       const soulSig = async (seed) => {
         await a.dbg(`throwSeeded(${JSON.stringify(soul)}, ${seed})`);
@@ -9929,21 +9939,22 @@ export const scenarios = [
         return sig(p);
       };
       const soulSeeds = [1000, 8919, 16838];
+      await a.dbg(`setSettleGate({"mode":"displacement","eps":${EPS}})`); // shipped, off claim 5's absurd eps
       const before = [];
       for (const s of soulSeeds) before.push(await soulSig(s));
-      await a.dbg(`setSettleGate({"mode":"displacement","eps":${EPS}})`);
+      await a.dbg('setSettleGate({"mode":"velocity","eps":0.02})');
       const during = [];
       for (const s of soulSeeds) during.push(await soulSig(s));
-      await a.dbg('setSettleGate({"mode":"velocity","eps":0.02})');
+      await a.dbg(`setSettleGate({"mode":"displacement","eps":${EPS}})`);
       const after = [];
       for (const s of soulSeeds) after.push(await soulSig(s));
       soulSeeds.forEach((s, i) => {
         assert.equal(after[i], before[i],
-          `seed ${s}: returning to the velocity gate did not restore the throw `
+          `seed ${s}: returning to the shipped displacement gate did not restore the throw `
           + `(${before[i]} -> ${after[i]})`);
       });
       assert.ok(soulSeeds.some((_, i) => during[i] !== before[i]),
-        'the displacement gate changed nothing on the soul pool, so the restore proves nothing');
+        'the velocity gate changed nothing on the soul pool, so the restore proves nothing');
     },
   },
   {
@@ -9959,9 +9970,12 @@ export const scenarios = [
     // and "fine for resolution". So the projector runs a CURVE — `flight`
     // while the dice are still travelling, `settle` once they are down.
     //
-    // Everything here is INERT in this build (k = 1, flight = settle = 1).
-    // What is pinned is that the mechanism cannot leak: not into the bake, not
-    // into `sim()`, and not into the click gate.
+    // SHIPPED 2026-08-11: flight 0.8 (Joe's pick, twice A/B'd — the hurl a
+    // touch slower than raw), settle 2.2, rampS 0.4, anchorSpeed 8 — and the
+    // click gate rides in film mode WITH the curve, because film time is the
+    // only gate invariant to in-throw k changes. Uniform `k` stays 1. What is
+    // pinned is that the mechanism cannot leak: not into the bake, not into
+    // `sim()`, and not past its own sentinels.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
       const pool = ['d8', 'd8', 'd4', 'd6'];
@@ -9972,17 +9986,17 @@ export const scenarios = [
       // races rAF across CDP round trips and passes or fails on scheduling.
       await a.dbg('holdClock(true)');
 
-      // --- 1. inert is inert ------------------------------------------------
+      // --- 1. the shipped curve is the curve Joe picked ----------------------
       const c0 = await a.dbg('tempoCurve');
       assert.equal(await a.dbg('tempo'), 1, 'the shipped uniform tempo is 1');
-      assert.equal(c0.flight, 1, `the shipped curve opens at 1, found ${c0.flight}`);
-      assert.equal(c0.settle, 1, `the shipped curve ends at 1, found ${c0.settle}`);
+      assert.equal(c0.flight, 0.8, `the shipped curve opens at 0.8, found ${c0.flight}`);
+      assert.equal(c0.settle, 2.2, `the shipped curve ends at 2.2, found ${c0.settle}`);
 
-      // --- 2. the click gate at k=1 is exactly the 35 ms that shipped -------
-      // Read off the app rather than restated here: a test carrying its own
-      // copy of the number it checks passes forever.
+      // --- 2. the click gate ships in film mode, on the shipped constants ----
+      // Constants read off the app rather than restated here: a test carrying
+      // its own copy of the number it checks passes forever.
       const g = await a.dbg('clickGate');
-      assert.equal(g.mode, 'wall', `the shipped click gate is the wall gate, found ${g.mode}`);
+      assert.equal(g.mode, 'film', `the shipped click gate is the film gate, found ${g.mode}`);
       assert.equal(g.filmGapMs, 35, `the film gap is ${g.filmGapMs}ms, not the shipped 35`);
       assert.equal(g.wallFloorMs, 12, `the wall floor is ${g.wallFloorMs}ms, not the shipped 12`);
 
@@ -10040,9 +10054,8 @@ export const scenarios = [
 
       // --- 5. the curve is monotone and opens at exactly `flight` -----------
       // Sampled on a LIVE roll, because tempoAt reads the current roll's own
-      // anchor. The staged candidate, not the inert default, or the samples
-      // are all 1 and the check is vacuous.
-      await a.dbg('setTempoCurve({"flight":1,"settle":2.2,"rampS":0.4})');
+      // anchor — and sampled on the SHIPPED curve itself, whose settle of 2.2
+      // is what keeps the change-of-gear check below from being vacuous.
       await a.dbg(`throwSeeded(${JSON.stringify(pool)}, ${seeds[0]})`);
       const prof = await a.dbg('settleProfile()');
       const N = 60;
@@ -10053,9 +10066,9 @@ export const scenarios = [
       await a.eval('(() => { while (window.__diceDebug.busy) window.__diceDebug.sim(120); return 1; })()');
       await a.dbg('clearTable()');
       await a.dbg('sim(60)');
-      await a.dbg('setTempoCurve({"flight":1,"settle":1,"rampS":0.4})');
 
-      assert.equal(ks[0], 1, `the curve opens at ${ks[0]}, not at flight (1)`);
+      assert.equal(ks[0], c0.flight,
+        `the curve opens at ${ks[0]}, not at flight (${c0.flight})`);
       for (let i = 1; i < ks.length; i++) {
         assert.ok(ks[i] >= ks[i - 1] - 1e-12,
           `the curve went backwards at sample ${i}: ${ks[i - 1]} -> ${ks[i]}`);
@@ -10064,17 +10077,17 @@ export const scenarios = [
         `the curve only reached ${ks[ks.length - 1]} by the end of the film — it never `
         + 'changes gear, so monotonicity above proves nothing');
 
-      // --- 6. the sentinels restore, leaving no residue ---------------------
+      // --- 6. sampling and the k detour left no residue ---------------------
       const backC = await a.dbg('tempoCurve');
-      assert.equal(backC.flight, 1, 'the curve did not return to flight 1');
-      assert.equal(backC.settle, 1, 'the curve did not return to settle 1');
+      assert.equal(backC.flight, 0.8, 'sampling the curve mutated flight');
+      assert.equal(backC.settle, 2.2, 'sampling the curve mutated settle');
       const back = [];
       for (const s of seeds) back.push(await throwOne(s));
       seeds.forEach((s, i) => {
         assert.equal(back[i].drained, base[i].drained,
-          `seed ${s}: the throw did not drain the same after the curve was disarmed`);
+          `seed ${s}: the throw did not drain the same after the k detour`);
         assert.equal(back[i].duration, base[i].duration,
-          `seed ${s}: the bake did not restore after the curve was disarmed`);
+          `seed ${s}: the bake did not restore after the k detour`);
       });
 
       await a.dbg('holdClock(false)');
