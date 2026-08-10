@@ -53,28 +53,59 @@ limitations under the License.
 // of arrival times — replaying the recorded event train through it answers
 // "what does a compressed train sound like" exactly, with no dependence on
 // whether a muted headless tab will build an AudioContext.
+//
+// AND THE FIRST VERSION OF THIS MODEL WAS AN IDEALIZATION THAT HID A SHIPPED
+// BUG. It gave each impact its own wall-clock arrival at `time/k`, as if the
+// drain delivered them on a continuous clock. It does not. The drain runs
+// inside rAF: every impact whose `time` has passed is played in ONE frame, and
+// every impact in that frame reads essentially the same performance.now(). So
+// arrivals are QUANTISED to the refresh interval, and the wall gate is
+// compared against quantised gaps.
+//
+// What that hides: at 60 Hz and k=1 the gate is 35 ms against frames 16.7 ms
+// apart, so a click can only pass every THIRD frame — 20 a second, when the
+// film asks for up to 28.6. Two thumps 40 ms apart in the film land two frames
+// apart, 33.3 ms of wall, and the second is deleted. Today. At k=1.
+//
+// So the model batches. `hz` is the display; a frame covers `1000/hz` ms of
+// wall and therefore `k * 1000/hz` ms of film.
 const IMPACT_MIN_GAP_MS = 35;
 const IMPACT_HARD_GAP_MS = 12;
 
-function clicksThrough(events, k) {
-  const gate = Math.max(IMPACT_HARD_GAP_MS, IMPACT_MIN_GAP_MS / k);
-  let last = -1e9;
+// mode 'wall'  — shipped: max(12, 35/k) against the quantised wall clock
+// mode 'film'  — candidate: 35 ms of FILM between clicks PLAYED, 12 ms wall
+//                floor, which is what js/main.js CLICKGATE 'film' does
+function clicksThrough(events, k, hz, mode) {
+  const frameMs = 1000 / hz;
+  let lastWall = -1e9;
+  let lastFilm = -1e9;
   let through = 0;
   let thumps = 0;      // events in the top decile of strength that survived
   let minGap = Infinity;
   const strongest = events.reduce((m, e) => Math.max(m, e.strength), 0);
   const played = [];
   for (const e of events) {
-    const at = (e.time / k) * 1000; // ms of WALL clock at this tempo
-    if (at - last < gate) continue;
-    if (last > -1e8) minGap = Math.min(minGap, at - last);
-    last = at;
+    const filmMs = e.time * 1000;
+    // Which rAF frame drains this impact: the first frame whose film cursor
+    // has passed it. Frame j advances the film to j * frameMs * k.
+    const frame = Math.ceil(filmMs / (frameMs * k));
+    const at = frame * frameMs; // every impact in the frame shares this now()
+    if (mode === 'film') {
+      if (at - lastWall < IMPACT_HARD_GAP_MS) continue;
+      if (filmMs - lastFilm < IMPACT_MIN_GAP_MS) continue;
+    } else if (at - lastWall < Math.max(IMPACT_HARD_GAP_MS, IMPACT_MIN_GAP_MS / k)) {
+      continue;
+    }
+    if (lastWall > -1e8) minGap = Math.min(minGap, at - lastWall);
+    lastWall = at;
+    lastFilm = filmMs;
     through++;
     played.push(e.time);
     if (e.strength >= strongest * 0.9) thumps++;
   }
   const loud = events.filter((e) => e.strength >= strongest * 0.9).length;
-  return { through, of: events.length, thumps, loud, minGap, played: played.join(',') };
+  return { through, of: events.length, thumps, loud, minGap,
+    played: played.join(','), set: new Set(played) };
 }
 
 const mean = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
@@ -137,9 +168,10 @@ export default async function run(stage, [kArg = '2', seedCount = '6']) {
     const frames = Number(await a.eval(`(() => { let f = 0;
       while (window.__diceDebug.busy && f < 20000) { window.__diceDebug.sim(1, true); f++; }
       return f; })()`));
+    const anchor = (await a.dbg('settleProfile()')).tempoAnchor;
     await a.dbg('clearTable()');
     await a.dbg('sim(60)');
-    return { sig, sounds, frames };
+    return { sig, sounds, frames, anchor };
   };
 
   const runAt = async (tempo) => {
@@ -220,35 +252,119 @@ export default async function run(stage, [kArg = '2', seedCount = '6']) {
     ? 'PASS — the same film, k times faster'
     : 'FAIL — playback is not tracking duration/k'}\n`);
 
-  // --- the click train ------------------------------------------------------
-  console.log(`(iii-adjacent) the click cap on a compressed train — the recorded`
-    + ` impact train replayed\n    through playImpact's wall-clock gate at each`
-    + ` tempo. "thumps" counts the loudest\n    decile of a throw's impacts that`
-    + ` still get played.\n`);
-  const capRows = seeds.map((s, i) => {
-    const c1 = clicksThrough(at1[i].sounds, 1);
-    const ck = clicksThrough(at1[i].sounds, k);
-    return [s, c1.of, `${c1.through}`, `${c1.thumps}/${c1.loud}`,
-      Number.isFinite(c1.minGap) ? `${c1.minGap.toFixed(0)}ms` : '—',
-      `${ck.through}`, `${ck.thumps}/${ck.loud}`,
-      Number.isFinite(ck.minGap) ? `${ck.minGap.toFixed(0)}ms` : '—',
-      c1.played === ck.played ? 'same clicks' : 'DIFFERENT'];
+  // --- the click train, through rAF ----------------------------------------
+  // THE BASELINE IS WHAT SHIPS, NOT WHAT IS IDEAL. Every candidate is judged
+  // against the set of clicks the WALL gate plays at k=1 on a 60 Hz display,
+  // because that is the sound a player hears today. "No shipped click drops"
+  // means that set is a SUBSET of what the candidate plays. A candidate may
+  // add clicks — the wall gate is deleting real ones — but may never lose one.
+  console.log(`\n(iv) the click train, with rAF frame batching modelled.`
+    + ` The drain plays every due impact in\n     ONE frame, all reading the`
+    + ` same performance.now(), so arrivals are quantised to the\n     refresh`
+    + ` interval. Baseline = the wall gate at k=1 on 60 Hz: what ships.\n`);
+  const CASES = [];
+  for (const hz of [60, 120]) {
+    for (const kk of [1, 2, 2.7]) {
+      for (const mode of ['wall', 'film']) CASES.push({ hz, k: kk, mode });
+    }
+  }
+  const capRows = [];
+  for (const c of CASES) {
+    let played = 0;
+    let of = 0;
+    let lost = 0;      // shipped clicks this case DROPS — the number that matters
+    let gained = 0;
+    let thumpLost = 0;
+    const gaps = [];
+    seeds.forEach((_, i) => {
+      const evs = at1[i].sounds;
+      const base = clicksThrough(evs, 1, 60, 'wall');
+      const got = clicksThrough(evs, c.k, c.hz, c.mode);
+      played += got.through;
+      of += got.of;
+      for (const t of base.set) if (!got.set.has(t)) lost++;
+      for (const t of got.set) if (!base.set.has(t)) gained++;
+      thumpLost += Math.max(0, base.thumps - got.thumps);
+      if (Number.isFinite(got.minGap)) gaps.push(got.minGap);
+    });
+    capRows.push([`${c.hz}Hz k=${c.k}`, c.mode, `${played}/${of}`, lost, gained, thumpLost,
+      gaps.length ? `${Math.min(...gaps).toFixed(1)}ms` : '—',
+      lost === 0 ? 'ok' : 'DROPS']);
+  }
+  table(['display/tempo', 'gate', 'played', 'shipped lost', 'gained', 'loud lost',
+    'min gap', ''], capRows);
+
+  const wallDrops = capRows.filter((r) => r[1] === 'wall' && r[3] > 0);
+  const filmDrops = capRows.filter((r) => r[1] === 'film' && r[3] > 0);
+  console.log(`\n    wall gate: ${wallDrops.length} of ${capRows.length / 2} cases drop a`
+    + ` shipped click${wallDrops.length ? ` (${wallDrops.map((r) => r[0]).join(', ')})` : ''}`);
+  console.log(`    film gate: ${filmDrops.length} of ${capRows.length / 2} cases drop a`
+    + ` shipped click${filmDrops.length ? ` (${filmDrops.map((r) => r[0]).join(', ')})` : ''}`);
+  console.log(`    ${filmDrops.length === 0
+    ? 'PASS — the film gate loses nothing that ships, at either refresh rate,'
+      + ' at every tempo tested'
+    : 'FAIL — the film gate drops clicks that ship today; see the table'}`);
+  console.log(`\n    Note the "gained" column: where it is nonzero the WALL gate is`
+    + ` deleting impacts the\n    film separation says should sound. That is the`
+    + ` bug, not a bonus.`);
+
+  // --- (v) the curve --------------------------------------------------------
+  // A varying k is the case the film gate has to be right about by
+  // construction: it gates roll.time deltas, which do not know what the
+  // projector is doing. The wall gate cannot make that claim at all.
+  console.log(`\n(v) the same train under the tempo CURVE (flight 1 -> settle 2.2).`
+    + ` The film gate is a\n    function of roll.time, so a k that VARIES cannot`
+    + ` change which clicks survive —\n    the wall gate's selection moves with`
+    + ` every gear change.\n`);
+  const curveRows = seeds.map((s, i) => {
+    const evs = at1[i].sounds;
+    const anchor = Number(at1[i].anchor);
+    const dur = Number(at1[i].sig.split('|')[1]);
+    // Wall arrival under the curve: integrate 1/k(t) over film time. The film
+    // gate needs no such integral, which is the point.
+    const kAt = (t) => {
+      if (t <= anchor) return 1;
+      const u = Math.min(1, (t - anchor) / 0.4);
+      return 1 + 1.2 * (u * u * (3 - 2 * u));
+    };
+    const wallOf = (t) => {
+      let w = 0;
+      const step = 1 / 600;
+      for (let x = 0; x < t; x += step) w += step / kAt(x);
+      return w * 1000;
+    };
+    let lastWall = -1e9;
+    let lastFilm = -1e9;
+    const filmSet = new Set();
+    const wallSet = new Set();
+    for (const e of evs) {
+      const w = wallOf(e.time);
+      if (w - lastWall >= IMPACT_HARD_GAP_MS && e.time * 1000 - lastFilm >= IMPACT_MIN_GAP_MS) {
+        lastWall = w; lastFilm = e.time * 1000; filmSet.add(e.time);
+      }
+    }
+    lastWall = -1e9;
+    for (const e of evs) {
+      const w = wallOf(e.time);
+      if (w - lastWall >= Math.max(IMPACT_HARD_GAP_MS, IMPACT_MIN_GAP_MS / kAt(e.time))) {
+        lastWall = w; wallSet.add(e.time);
+      }
+    }
+    const base = clicksThrough(evs, 1, 60, 'wall');
+    const lostFilm = [...base.set].filter((t) => !filmSet.has(t)).length;
+    const lostWall = [...base.set].filter((t) => !wallSet.has(t)).length;
+    return [s, evs.length, dur.toFixed(2), anchor.toFixed(2),
+      `${filmSet.size} / -${lostFilm}`, `${wallSet.size} / -${lostWall}`];
   });
-  table(['seed', 'impacts', `played@1`, 'thumps@1', 'min gap@1',
-    `played@${k}`, `thumps@${k}`, `min gap@${k}`, 'selection'], capRows);
-  const gaps = seeds.map((_, i) => clicksThrough(at1[i].sounds, k).minGap).filter(Number.isFinite);
-  const sameSel = seeds.filter((_, i) =>
-    clicksThrough(at1[i].sounds, 1).played === clicksThrough(at1[i].sounds, k).played).length;
-  const thumpLoss = seeds.reduce((s, _, i) =>
-    s + (clicksThrough(at1[i].sounds, 1).thumps - clicksThrough(at1[i].sounds, k).thumps), 0);
-  console.log(`\n    gate at k=1 ${IMPACT_MIN_GAP_MS}ms (shipped exactly) → at k=${k}`
-    + ` ${Math.max(IMPACT_HARD_GAP_MS, IMPACT_MIN_GAP_MS / k).toFixed(1)}ms;`
-    + ` hard floor ${IMPACT_HARD_GAP_MS}ms caps the rate at ${Math.round(1000 / IMPACT_HARD_GAP_MS)}/s`);
-  console.log(`    tightest gap measured at k=${k}: ${gaps.length ? Math.min(...gaps).toFixed(0) : '—'}ms`);
-  console.log(`    same set of clicks survives at both tempi: ${sameSel}/${n} seeds;`
-    + ` loud impacts lost: ${thumpLoss}`);
-  console.log(`    ${sameSel === n && thumpLoss <= 0
-    ? 'PASS — the same clicks, compressed. Nothing shipped plays today was dropped'
-    : 'READ IT — the compression changed which clicks survive; see the table above'}`);
+  table(['seed', 'impacts', 'duration', 'anchor', 'film: played/lost', 'wall: played/lost'],
+    curveRows);
+  const curveFilmLost = curveRows.reduce((n, r) => n + Number(String(r[4]).split('-')[1]), 0);
+  const curveWallLost = curveRows.reduce((n, r) => n + Number(String(r[5]).split('-')[1]), 0);
+  console.log(`\n    under the curve: film gate loses ${curveFilmLost} shipped clicks,`
+    + ` wall gate loses ${curveWallLost}`);
+  console.log(`    ${curveFilmLost === 0
+    ? 'PASS — a varying projector does not change which clicks survive'
+    : 'FAIL — the film gate is not invariant under a varying k'}`);
+
   await a.dbg('holdClock(false)');
 }

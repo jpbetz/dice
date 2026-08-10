@@ -1538,6 +1538,34 @@ how much unrelated history precedes a family decides which side it lands on.
 **A passing drift run is weak evidence; a failing one is strong.** Judge a
 candidate one pool per invocation.
 
+### C32. If we ever replace cannon-es — the reserve position
+
+**Not a plan, a bookmark.** Recorded 2026-08-10 so the next person who hits
+cannon-es's limits does not re-do the survey. Two of this pass's dead ends —
+the missing restitution threshold (C30d) and a sleep decision that cannot be
+reproduced from a seed (C30e/C31) — are *engine* limitations, not tuning
+problems, and both are solved upstream elsewhere.
+
+**Sourced from a research sweep, NOT verified in this repo.** Nothing below
+was built, benchmarked or vendored here. Treat every claim as needing
+confirmation before a line of code moves.
+
+- **Jolt** is the only candidate that is single-file vendorable, ships a
+  tunable restitution velocity threshold (`mMinVelocityForRestitution` — the
+  exact mechanism `MAGNET.vy` was emulating by hand and failing at), and has
+  CI-verified cross-platform WASM determinism. Two blockers: the published npm
+  package is **not** built with the determinism flag, so we would have to
+  vendor our own emscripten build; and **JoltPhysics#2092**, a NaN-at-sleep
+  bug, should close first. Wait for it.
+- **Rapier** is rejected. Per-pair contact materials and per-body sleep
+  thresholds are absent from the JS bindings — both are things this table
+  tunes today (`cmFloor`/`cmDice`/`cmWall`, `SLEEP`) — and issue **#797**, a
+  `setRotation` determinism problem, is open.
+
+The zero-dependency rule (no npm installs, no build step) is what makes "a
+single file we can vendor" a hard requirement rather than a preference, and it
+is also why an emscripten build of our own is a real cost and not a footnote.
+
 **C30b — 20d6 can still reach the cap with dice genuinely tumbling** (3 of 16
 seeds). That is real motion, so shortening `SETTLE_CAP` would truncate it and
 show dice snapping. Left alone deliberately. If big pools matter later, the

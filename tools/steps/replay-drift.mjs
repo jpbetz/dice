@@ -91,6 +91,10 @@ const VARIANTS = {
     settleGate: { mode: 'displacement', eps: 0.02 } },
   dispgatesleepoffgate4: { dampgate: GATE4, bodyFlags: { allowSleep: false },
     settleGate: { mode: 'displacement', eps: 0.02 } },
+  // The pile mitigation. It spends nudges — which consume rng() draws — so it
+  // is the row most likely to move a throw if anything is going to.
+  dispgatesleepoffnudgepile: { nudge: { pileScale: 1.05 },
+    bodyFlags: { allowSleep: false }, settleGate: { mode: 'displacement', eps: 0.02 } },
 };
 
 // Each pool carries its own seed count: the big pools cost three times as much

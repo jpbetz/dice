@@ -159,6 +159,13 @@ const VARIANTS = [
   ['disp05+sleepoff', {}, null, null, null, null, SLEEPOFF, DISP(0.05)],
   ['disp02+sleepoff+gate4', {}, { gate: 4, ...SLOW }, null, null, null, SLEEPOFF, DISP(0.02)],
   ['disp05+sleepoff+gate4', {}, { gate: 4, ...SLOW }, null, null, null, SLEEPOFF, DISP(0.05)],
+  // The candidate's ONE failing gate is the pile (+2.5pp at close/6d6 over 40
+  // seeds), and the mechanism is plausible: a die that freezes earlier turns
+  // STATIC earlier, so a neighbour landing on it can no longer shove it aside.
+  // NUDGE.pileScale exists for exactly this — it refuses a freeze to a die
+  // resting above its hull's circumradius — and it has never been run against
+  // a terminator cheap enough to afford the extra nudges.
+  ['disp02+sleepoff+nudgepile', {}, null, null, null, PILE, SLEEPOFF, DISP(0.02)],
 ];
 
 const SHAKE_POOLS = [
