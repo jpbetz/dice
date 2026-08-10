@@ -1367,6 +1367,86 @@ table — swapping which prepared seat you occupy is a real and useful gesture,
 and it is not "drop everything and rejoin". If that is the verb, it belongs
 next to the profile picker, not under a menu item that also deletes your name.
 
+### C27. On a phone the mat does not fit the view, and the camera gives up silently — DESIGN, medium
+
+**Found 2026-08-09 by the session working on the Oracle Camera, while pricing
+C25's framing claim; confirmed independently here with `__diceDebug.matFit()`
+(`tools/steps/mat-fits.mjs`).** The four mat corners, projected through the
+live camera — |NDC| > 1 is off screen:
+
+| viewport | felt px | zoom | worst \|ndc.x\| | worst \|ndc.y\| | verdict |
+| --- | --- | --- | --- | --- | --- |
+| desktop 1600 | 1284×1000 | medium | 0.972 | 0.630 | fits |
+| laptop 1440 | 1124×900 | medium | 0.969 | 0.616 | fits |
+| iPad portrait 834 | 722×1112 | medium | 0.972 | 0.361 | fits |
+| **phone 390** | 278×844 | wide / medium / close | **1.279 / 1.284 / 1.292** | 0.24–0.27 | **off screen** |
+| **phone 360** | 248×780 | wide / medium / close | **1.325 / 1.330 / 1.339** | 0.24–0.27 | **off screen** |
+
+**The camera is not choosing to crop — it is failing and not saying so.**
+`fitCameraTo` scans `1 + i*0.03` for `i < 90`, topping out at ~3.67×, and its
+own comment allows the exit: *"the eye stays where the last step left it
+rather than retreating without end."* On a phone the scan is exhausted, the
+loop falls out having satisfied nothing, and the eye parks at the maximum.
+`matFit()` reports `atScanLimit: true` for all six phone rows. **A die landing
+near the left or right edge of the mat is not on screen, and has never been.**
+
+**Three consequences, in order of how badly they were misread before:**
+
+1. **C21/C23's three zoom tightenings could never have fixed this**, and the
+   table shows why: the overflow ratio is nearly *constant* across wide /
+   medium / close (1.279 → 1.292). Shrinking the mat moves the camera
+   proportionally closer and preserves the ratio exactly. The lever was never
+   pointed at the problem.
+2. **It explains C25's phone measurement, and makes that conclusion stronger
+   than the argument given for it.** Removing six of eight framing points
+   bought 1.00× on a phone. The stated reason — "the felt's own corners bind
+   first" — was wrong. The real reason is that the fit had already failed and
+   *no* subset of framing points could have moved a camera parked at its
+   scan limit. "The shelf was never what held the camera back" is right; on a
+   phone, nothing in the framing list can.
+3. **C24 is righter than its own reasoning.** It argued from dice piling up on
+   a shrinking mat. The stronger argument is that framing the MAT is already
+   unsatisfiable on the device the complaint came from.
+
+**What containing the mat would cost, measured, so the tradeoff is not an
+adjective:** retreating until the worst corner is inside costs **~24% of die
+size** — at the default on a 390px phone, 80px → 61px; at `close`, 103px →
+79px; on a 360px phone, 74px → 55px. That is a direct reversal of C21, which
+existed because *"the dice are too small, especially on a phone."* So
+"just fit the mat" is not free and is probably not right.
+
+**The shape of the problem is a landscape mat in a portrait window,** and the
+vertical numbers say it plainly: |ndc.y| is 0.24–0.27 while |ndc.x| is 1.28.
+Roughly three quarters of a phone's viewport height is unused while the mat
+overflows sideways. The mat's aspect is 8.6/5.2 = 1.65; a 390px phone's felt
+region is 278/844 = 0.33. Mismatch factor 5.0.
+
+**Candidates, with what is known about each:**
+
+- **Crop deliberately** (status quo, made honest). Cheapest, but a die that
+  lands off screen on a seeded roll is invisible to that player and visible to
+  everyone else — the shared-truth invariant reads badly here even though the
+  VALUES agree.
+- **Contain** (extend the scan). Priced above: −24% die size. Reverses C21.
+- **Rotate the view 90° in portrait** so the mat's long axis runs down the
+  screen. Rotated, the required aspect is 5.2/8.6 = 0.60 against a viewport
+  of 0.33 — mismatch factor 1.84 instead of 5.0, a 2.7× improvement before
+  any retreat. **Unpriced** — it needs the camera's up-vector and eye preset
+  changed, which is implementation, not measurement. This is the candidate
+  worth building a probe for first. It is also per-viewer, which C24 already
+  established is the safe axis to vary (the MAT cannot vary by device because
+  it is the physics walls; the camera shows no one else anything).
+- **A squarer mat.** Ruled out — the mat is the physics walls and is room-wide
+  for exactly that reason.
+
+**Not a regression, and not introduced by C25 or by the immersion work.** It
+is in the shipped `fitCameraTo` and predates both. Recorded here rather than
+fixed because the choice between cropping, containing and rotating is a design
+decision with a measured cost on each arm, and C24's instruction — price the
+lever before pulling it — applies to this one too. **If field telemetry shows
+phone sessions behaving oddly around dice near the mat edges, this is the
+cause and it is not new.**
+
 ### C22. A versioning contract for client state — DESIGN, then small
 
 *Joe 2026-08-09: "I'd like to establish some diligence on client state… an

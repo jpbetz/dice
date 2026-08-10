@@ -4512,6 +4512,71 @@ window.__diceDebug = {
       camY: Math.round(camera.position.y * 10) / 10,
     };
   },
+  // DOES THE MAT FIT THE VIEW AT ALL? `fitCameraTo` scans a BOUNDED range
+  // (1 + i*0.03, i < 90 → ~3.67×) and its own comment says the eye "stays
+  // where the last step left it rather than retreating without end" — so an
+  // unsatisfiable fit exits having fitted nothing, and does it silently.
+  // This reports the worst mat corner in NDC (|v| > 1 is off screen) and
+  // whether the eye is parked at the scan's maximum, which is the signature
+  // of a fit that gave up rather than one that succeeded.
+  matFit() {
+    const eye = new THREE.Vector3(
+      ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
+    );
+    const maxY = CAM_TARGET.y + (eye.y - CAM_TARGET.y) * (1 + 89 * 0.03);
+    const v = new THREE.Vector3();
+    let worstX = 0;
+    let worstY = 0;
+    for (const sx of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        v.set(sx * TABLE_W / 2, 0, sz * TABLE_D / 2).project(camera);
+        worstX = Math.max(worstX, Math.abs(v.x));
+        worstY = Math.max(worstY, Math.abs(v.y));
+      }
+    }
+    // What CONTAINING the mat would cost, for the viewports where the scan
+    // gives up. Walk further back until the worst corner is inside, then
+    // report the die span there against the span now — the honest price of
+    // "no die ever lands off screen" in the only unit that answers "can I
+    // see the dice". Restores the shipped framing before returning.
+    const span = () => {
+      const p0 = new THREE.Vector3(0, 0, 0).project(camera);
+      const p1 = new THREE.Vector3(1, 0, 0).project(camera);
+      return Math.abs(p1.x - p0.x) * view.width;
+    };
+    const spanNow = span();
+    const worstAt = () => {
+      let m = 0;
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          v.set(sx * TABLE_W / 2, 0, sz * TABLE_D / 2).project(camera);
+          m = Math.max(m, Math.abs(v.x), Math.abs(v.y));
+        }
+      }
+      return m;
+    };
+    const ray = eye.clone().sub(CAM_TARGET);
+    let need = null;
+    let spanFitted = null;
+    for (let i = 0; i < 400; i++) {
+      camera.position.copy(CAM_TARGET).addScaledVector(ray, 1 + i * 0.03);
+      camera.lookAt(CAM_TARGET);
+      camera.updateMatrixWorld(true);
+      if (worstAt() <= 0.98) { need = 1 + i * 0.03; spanFitted = span(); break; }
+    }
+    applyCameraFraming();
+    return {
+      worstX, worstY,
+      fits: worstX <= 1 && worstY <= 1,
+      camY: camera.position.y,
+      atScanLimit: Math.abs(camera.position.y - maxY) < 0.01,
+      needScale: need,          // null = unreachable even at 400 steps
+      spanNow: Math.round(spanNow),
+      spanFitted: spanFitted === null ? null : Math.round(spanFitted),
+      view: `${Math.round(view.width)}x${Math.round(view.height)}`,
+      table: `${TABLE_W}x${TABLE_D}`,
+    };
+  },
   // WHAT THE FRAMING SPENDS (C25). applyCameraFraming pulls the eye back until
   // every framing point fits, so the hungriest point sets the view. This was
   // written to price the SHELF's share of that and answered 1.08–1.18× on a
