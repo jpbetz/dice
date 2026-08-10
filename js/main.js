@@ -892,8 +892,50 @@ const SETTLE_CAP = 9;      // hard cap on simulated seconds per roll
 // 3 of 16. Measured identical to accepting ANY tilt, so nothing in normal
 // play now reads as cocked; the bar survives only as a valve for a rest no
 // die could hold.
-const NUDGE = { budget: 3, lift: 7, spread: 4, spin: 14, cockedDot: 0.6, cockedDotD4: 0.7 };
+// `pileScale` extends the same refusal to a die that stopped ON ANOTHER DIE.
+// A cocked die is refused because of how it is ORIENTED; a piled one lies
+// perfectly flat (dot ≈ 1) at twice its own height, so the cocked bar cannot
+// see it and it freezes happily on the heap. Until now nothing had to see it:
+// bouncy dice skid apart after landing, and separation was a free side effect
+// of the ambient restitution. Deadening the felt takes that away, so the
+// energy has to be delivered ON PURPOSE, to the dice that need it — which is
+// exactly what the nudge already is. ZERO IS THE OFF SENTINEL, not Infinity,
+// because every tool and scenario reaches this through JSON and
+// JSON.stringify turns Infinity into null. See tools/steps/pile-bar.mjs for
+// the calibration and its two-sided margin.
+const NUDGE = {
+  budget: 3, lift: 7, spread: 4, spin: 14, cockedDot: 0.6, cockedDotD4: 0.7,
+  pileScale: 0,
+};
 let seedReplayN = 0; // __diceDebug.throwSeeded — keeps replayed rollIds unique
+
+// The height a die rests at when it lies FLAT: the inradius of its own
+// collision hull (the nearest face plane to the centre). Derived rather than
+// tabulated so it cannot drift from the geometry, and cached — the hull is
+// shared by every die of a type. Measured against the throws in
+// pile-bar.mjs: d4 0.383, d8 0.606, d6 0.675, d10 0.704, d12 0.874, d20 0.993.
+const flatRestY = new Map();
+function flatRestHeight(type) {
+  let h = flatRestY.get(type);
+  if (h === undefined) {
+    const s = getDie(type).shape;
+    h = Infinity;
+    for (let i = 0; i < s.faces.length; i++) {
+      const n = s.faceNormals[i];
+      const v = s.vertices[s.faces[i][0]];
+      h = Math.min(h, Math.abs(n.x * v.x + n.y * v.y + n.z * v.z));
+    }
+    flatRestY.set(type, h);
+  }
+  return h;
+}
+// A die whose centre sits above this stopped on something. The bar is a
+// MULTIPLE of the flat rest rather than one absolute number because the types
+// differ by 2.6x in height — a single bar cannot both clear a d20 (measured
+// resting legitimately at 1.19 against a wall) and catch a d8 on its
+// neighbour (1.03). See the ship comment above PHYS.
+const piledHigh = (d) => NUDGE.pileScale > 0
+  && d.body.position.y > flatRestHeight(d.type) * NUDGE.pileScale;
 
 // How far a die still travels in the last `secs` BEFORE IT STOPS, in
 // die-widths, averaged over the pool — the closest number there is to "how
@@ -1867,7 +1909,20 @@ function playRoll(roll) {
     // look false when it is true.
     d.endStill = d.body.velocity.lengthSquared() < 0.05
       && d.body.angularVelocity.lengthSquared() < 0.05;
-    d.endCocked = readValue(d.type, d.body.quaternion).dot < (d.type === 'd4' ? 0.9 : 0.82);
+    // How high it stopped, and how flat. Face correction rotates every die
+    // exactly flat afterwards, so the landed pose is unreadable from outside
+    // once the roll is over — these are the only record of what the freeze
+    // decision actually saw, and calibrating a height bar needs both (a die
+    // resting HIGH because it leans on a wall is a different animal from one
+    // resting high because it is on another die, and the dot tells them
+    // apart).
+    d.endDot = readValue(d.type, d.body.quaternion).dot;
+    d.endCocked = d.endDot < (d.type === 'd4' ? 0.9 : 0.82);
+    d.endY = d.body.position.y;
+    // The pile twin of endCocked, and the same kind of evidence: when the cap
+    // fires, `parked` says a die was refused and `endCocked`/`endPiled` say by
+    // WHICH bar. Reads the live bar, so it is silent while pileScale is off.
+    d.endPiled = piledHigh(d);
     d.body.velocity.setZero();
     d.body.angularVelocity.setZero();
     d.body.mass = 0;
@@ -1912,7 +1967,12 @@ function playRoll(roll) {
       if (d.stillTime >= SETTLE_STILL) {
         const r = readValue(d.type, d.body.quaternion);
         const cocked = r.dot < (d.type === 'd4' ? NUDGE.cockedDotD4 : NUDGE.cockedDot);
-        if (!cocked) freezeInPlace(d);
+        // Refused for lying on another die, exactly as if it were cocked —
+        // and it only reaches this line after holding STILL for SETTLE_STILL,
+        // so the height is a rest, never a die caught mid-flight over the
+        // heap. The nudge branch below picks up whatever this refuses,
+        // because "still and not frozen" is precisely "refused".
+        if (!cocked && !piledHigh(d)) freezeInPlace(d);
       }
     }
 
@@ -1970,6 +2030,9 @@ function playRoll(roll) {
     timeOld: d.settleTimeOld ?? d.settleTime ?? simTime,
     endStill: !!d.endStill,
     endCocked: !!d.endCocked,
+    endY: d.endY ?? null,
+    endDot: d.endDot ?? null,
+    endPiled: !!d.endPiled,
   }));
   // reduce, not sort: ties keep the FIRST (lowest index) by construction.
   const lastLanding = landings.reduce((a, b) => (b.frame > a.frame ? b : a), landings[0]);
@@ -5491,6 +5554,10 @@ window.__diceDebug = {
       parked: r.landings.filter((l) => l.timedOut && l.endStill).length,
       moving: r.landings.filter((l) => l.timedOut && !l.endStill).length,
       endCocked: r.landings.filter((l) => l.timedOut && l.endCocked).length,
+      endPiled: r.landings.filter((l) => l.timedOut && l.endPiled).length,
+      // Every die that stopped on another one, capped or not — the count the
+      // pile bar is there to drive to zero.
+      piled: r.landings.filter((l) => l.endPiled).length,
       // "Slide and wiggle-move" measured directly, because duration is only
       // a proxy for it — a throw can be short and still crawl to a stop.
       // Read `shake`; `creep` is distance and cuts both ways.
