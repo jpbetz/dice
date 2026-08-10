@@ -1233,88 +1233,98 @@ tooltip says "biggest dice, best on a phone", and it measurably piles 2 of 6.
 Asserting there would either fail on the shipped app or drag the bar down
 everywhere; recording it is what stops the next tightening claiming ignorance.
 
-### C25. The collection phase costs more table than it earns — DESIGN, medium-large
+### C25. The physical shelf does not fit the mat any more — DECIDED 2026-08-09: take it off the felt
 
-*Joe 2026-08-09: "Collected dice take up too much space. Let's consider
-dropping the collection phase altogether, possibly leaving previous N roll
-information as panels only, with the previous N rolls shown as panels across
-the bottom of the screen? … The space is a problem. It wouldn't be so bad if
-not for mobile. Maybe we just show the roll log briefly and then show it
-collapse into a UI element that expands the roll log. If so we'd need UI that
-goes beyond basic buttons and has some elements that visually fit together.
-We'd need to get creative."* **Explicitly not to be implemented yet** — this
-entry is the thinking, recorded so the next pass starts from it.
+*Joe 2026-08-09: "Collected dice take up too much space… consider dropping the
+collection phase altogether… The space is a problem. It wouldn't be so bad if
+not for mobile."* Then: **"dig into C25 hard. Either find space or drop the
+feature entirely."** This is what the digging found.
 
-**What the shelf costs today, measured off the constants.** `SHELF_SLOTS` is
-5, `SHELF_SLOT_D` is 3.6 z-units and `SHELF_Z` is `TABLE_D / 2 - 1.9`. So the
-shelf occupies a full-width band `3.6` deep out of a mat that is `TABLE_D`
-deep — at the `wide` preset that is roughly a **third of the felt**, and the
-band does not shrink with the zoom ladder, so at `close` (the level whose own
-tooltip says "best on a phone") it is proportionally the *largest*. C21 made
-dice bigger and C24 measured why the mat cannot shrink further to help; this
-is the third pull on the same rope, and it is the one with slack in it,
-because the shelf is the only one of the three that does not have to be on
-the felt at all.
+**It is not cramped. It is broken.** `SHELF_PITCH` is
+`(TABLE_W - SHELF_SLOT_W) / (SHELF_SLOTS - 1)`, so it shrinks with the mat —
+and the zoom ladder took `TABLE_W` from 30 to 8.6 over three tightenings on
+2026-08-09 while `SHELF_SLOT_W` stayed at the 5.4 it was given for a 30-unit
+mat. Measured with `__diceDebug.shelfFit` (`tools/steps/shelf-fit.mjs`):
 
-**The shelf is not one feature — it is three, and they should be priced
-separately.** This is the part any redesign has to get right, because
-"drop the collection phase" reads as one decision and is actually three:
+| zoom | mat | pitch | one 3d6 cluster | overlapping neighbours | band as share of mat depth |
+| --- | --- | --- | --- | --- | --- |
+| wide | 11 × 6.7 | 1.40 | 3.26 wide | **all four** | 54% |
+| medium *(default)* | 8.6 × 5.2 | 0.80 | 3.26 wide | **all four** | 69% |
+| close | 6.7 × 4.1 | 0.32 | 3.26 wide | **all four** | 88% |
 
-1. **The tidy-away.** A finished roll leaves the middle of the table on its
-   own (`armAutoCollect`, 3 s). This is load-bearing and nobody has
-   complained about it: without it the next roll lands in the last one.
-2. **The physical record.** The dice themselves persist, at their rolled
-   faces, as objects you can look at and point to. This is goal 1 and goal 5
-   territory — "organized over realistic", but still *dice*. It is also the
-   expensive one: five clusters of static bodies, real geometry, a third of
-   the felt, and `clusterPoses` exists entirely to keep those piles inside
-   their trays so they do not deflect the next roll.
-3. **The re-reach.** A shelved roll can be peeked, rerolled, saved as a pool,
-   cleared (§7.7, U20, C13, C14). Every one of those verbs is on the marker
-   or the peek card — *not* on the dice. The dice are the anchor, not the
-   affordance.
+**The second collected roll already fuses with the first** — overlap −2.46
+units, 75% of a cluster's own width (`tools/steps/shelf-depth.mjs`). Five of
+them at `close` render as a single slab of interpenetrating dice with
+z-fighting across the whole table. No roll on that shelf is readable, and no
+test caught it: the nine `shelf`-tagged scenarios assert `shelf.length`, seq
+ordering and slot compaction — **never that two clusters do not occupy the
+same space.** It broke at `fe24840` (mat 30 → 14), the first tightening.
 
-Read that way, Joe's sketch is: **keep 1 and 3, spend the felt of 2.** That is
-coherent, and it is the direction to design toward.
+**The camera was the wrong suspect.** The thesis going in was that the shelf's
+real cost is `framingPoints` — six of its eight points are the shelf's, so the
+whole view retreats to keep trays and marker pills on screen. Priced with
+`__diceDebug.framingCost`: taking the shelf out of the framing buys
+**1.08–1.18×** die size on desktop, laptop and iPad, and **1.00× on a
+phone** — nothing at all on the device Joe named. The marker pills' 90px
+headroom never binds anywhere. Recorded so nobody re-runs this experiment.
 
-**What has to be answered before anyone writes code:**
+**There is no space to find.** Every lever, priced:
 
-- **What is the anchor when the dice are gone?** The peek is positioned from
-  its cluster (`shelfSlotX(c.slot)`, `SHELF_MARKER_Y`), the glow rings are
-  composited into the felt from cluster geometry, and the marker is placed in
-  3D. A bottom strip of panels is a different coordinate system for all
-  three. C13 ("what a shelf marker owes") and U20 ("the shelf's read at rest")
-  are the same surface and should be folded into this decision rather than
-  solved twice.
-- **What replaces "point at the dice"?** At a shared table, "no, the OTHER
-  Wisdom die" is a real sentence. A panel of numbers can say it, but the
-  physical read is the thing goal 1 buys, and dropping it is a genuine loss,
-  not just a cleanup. Possibly the answer is the felt keeps ONE roll (the
-  last) and the strip holds the rest — a mantel, not a shelf.
-- **Is the strip better than the log we already have?** There is already a
-  roll log with per-die attribution, and `#log-list` renders the same
-  breakdown the banner does. "Previous N rolls as panels across the bottom"
-  may be the log, restyled and moved — in which case the work is a *view* of
-  an existing store, which is much cheaper than it sounds. Check that first;
-  it changes the size of this item by an order of magnitude.
-- **The collapse gesture, and the "beyond basic buttons" note.** Joe's own
-  framing: the log shows itself briefly, then collapses into something that
-  expands it. That is a *shape* problem, not a button problem — the pieces
-  have to look like one object (a tab that is part of the strip, a strip that
-  is part of the felt edge). U23 ("a token layer for the doctrine") is where
-  the vocabulary for that lives; this is its first real customer.
-- **Mobile is the forcing function, so measure there first.** The 560px
-  ledger breakpoint already exists as precedent that this app changes
-  *structure*, not just size, at phone width. A strip across the bottom of a
-  phone competes with the launcher (112px) and the rail. Budget it before
-  designing it.
+- **Fewer slots.** Two 3d6 clusters need 6.5 units and overlap at every zoom;
+  even at `wide` the pitch is 1.40 against a 3.26-wide cluster. The only
+  non-overlapping shelf today holds **one** roll. Capacity 5 → 1 is not
+  finding space.
+- **Narrower clusters** (one die abreast): 5 × 1.8 = 9.0 > 8.6, so it *still*
+  does not fit at the default — and it forces three-storey towers, which C24
+  already refused ("a tower reads as a smudge").
+- **Smaller shelved dice.** They would stop being the objects the player just
+  rolled, which is the only thing a physical shelf buys over a panel; and
+  their static bodies still have to be somewhere.
+- **A bigger mat.** Forbidden by C24 — the mat is the physics walls, identical
+  on every client, and growing it undoes the three tightenings Joe asked for.
 
-**What must not regress:** the physics invariant that no shelved die stands on
-the active felt (`clusterPoses`' whole reason for existing — if dice stop
-being shelved, that constraint disappears, which is a simplification worth
-banking); §7.7's collect/clear state machine and its `rollStates` rows, which
-the server and every client agree on and which are *not* about rendering;
-CUJ9's "find and repeat a roll" (C14), which currently walks the shelf.
+The felt is under five dice wide. A shelf of five rolls cannot live on it, and
+the mat and the shelf have been competing for one scarce resource that C24
+already awarded to the dice.
+
+**DECISION: the collection phase stays; its 3D rendering goes.** The feature
+survives almost free, because *collected is already a list, not a place*:
+
+- `entry.collected` is an integer sequence on a log entry and `shelfEntries()`
+  returns them ordered. **Zero wire change** — the server never knew about
+  slots.
+- `renderPeek` already rebuilds its whole card from
+  `log.find((e) => e.rollId === peekRollId)`. The cluster is used for exactly
+  two things: does this roll still exist, and where to put the card.
+- Deleting the felt shelf deletes `clusterPoses`, `placeCluster`,
+  `spawnShelvedDie`, `canonicalDiePose`, `shroudPoseValue`, the whisk, the
+  glow-ring compositing, six of eight framing points, and the invariant that
+  no shelved die may stand on the active felt — ~220 lines and a constraint.
+- Collect and clear converge on one motion: the dice leave by `lift` (§7.26,
+  shipped the same day) and the only difference is whether the entry stays in
+  the record.
+
+**Sequencing.** Stage 1 is mechanical and fixes a live defect: collected rolls
+stop putting dice on the felt, and the **existing** roll log (`#log-flyout`,
+already reachable by ≣ and `l`, already carrying full per-die attribution and
+unread counting) is the record. Stage 2 is Joe's sketch — "previous N rolls as
+panels across the bottom", the log showing itself briefly and collapsing into
+something that expands it, "UI that goes beyond basic buttons and has some
+elements that visually fit together". Stage 2 is a *view* over a store that
+already exists, which is what makes it cheap; U23's token layer is the
+vocabulary and this is its first customer.
+
+**Two open calls** (Joe's, recorded rather than assumed): whether the felt
+keeps the LAST collected roll as dice — a mantel of one, which is exactly what
+the measurement says fits — or nothing at all; and whether Stage 1 lands
+before Stage 2 is designed.
+
+**What must not regress:** the tidy-away (a finished roll leaves the middle of
+the table on its own) is load-bearing and nobody has complained about it;
+§7.7's collect/clear state machine and its `rollStates` rows are wire, not
+rendering; CUJ9's find-and-repeat (C14) currently walks the shelf and must
+walk the record instead; C13 and U20 are about this same surface and should be
+folded into Stage 2 rather than solved twice.
 
 ### C26. `Change seat…` — WITHHELD 2026-08-09, owes a design before it returns
 

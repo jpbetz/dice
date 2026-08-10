@@ -4893,6 +4893,34 @@ window.__diceDebug = {
       camY: Math.round(camera.position.y * 10) / 10,
     };
   },
+  // WHAT THE FRAMING SPENDS, and on what (C25). applyCameraFraming pulls the
+  // eye back until EVERY framing point fits, so whichever point needs the
+  // most distance sets the view for everything — and the shelf contributes
+  // six of the eight. This refits against subsets and reports the die span
+  // each would give, then puts the real framing back. `dice` is the floor:
+  // what the view would be if nothing but the felt corners had to fit.
+  //   today  — the shipped framing (all eight points)
+  //   noPill — the trays must fit, but not the marker pills' 90px headroom
+  //   noShelf— only the felt corners (i.e. the shelf is not on the felt)
+  framingCost() {
+    const span = () => {
+      const a = new THREE.Vector3(0, 0, 0).project(camera);
+      const b = new THREE.Vector3(1, 0, 0).project(camera);
+      return Math.round(Math.abs(b.x - a.x) * view.width);
+    };
+    const all = framingPoints();
+    const at = (filter) => { fitCameraTo(all.filter(filter)); return { span: span(), camY: Math.round(camera.position.y * 10) / 10 }; };
+    const out = {
+      today: at(() => true),
+      noPill: at((p) => p.of !== 'pill'),
+      noShelf: at((p) => p.of === 'felt'),
+      view: `${Math.round(view.width)}x${Math.round(view.height)}`,
+      table: `${TABLE_W}x${TABLE_D}`,
+      mini: document.body.classList.contains('mini'),
+    };
+    applyCameraFraming(); // never leave the player looking at a probe
+    return out;
+  },
   // Uncleared rolls still on the table, and whose they are (C7 ②). A
   // projection, never the live Map — rollStates is keyed state the render
   // path owns, and handing it out would let a scenario mutate the machine
@@ -5239,6 +5267,48 @@ window.__diceDebug = {
       dy: s.mesh.position.y - s.y0,
       scale: s.mesh.scale.x,
     }));
+  },
+  // DOES THE SHELF STILL FIT THE MAT? (C25.) SHELF_PITCH is derived from
+  // TABLE_W while SHELF_SLOT_W is fixed, and the zoom ladder has moved
+  // TABLE_W a long way — so the question is measurable rather than arguable.
+  // Reports the band the shelf claims in z, where each cluster's dice
+  // actually sit in x, and which neighbours have run into each other.
+  get shelfFit() {
+    const bandZ0 = SHELF_Z - SHELF_SLOT_D / 2;
+    const bandZ1 = SHELF_Z + SHELF_SLOT_D / 2;
+    const r2 = (n) => Math.round(n * 100) / 100;
+    const clusters = [...shelfClusters.values()].sort((a, b) => a.slot - b.slot).map((c) => {
+      const dice = tableDice.filter((d) => d.rollId === c.rollId);
+      const xs = dice.map((d) => d.mesh.position.x);
+      const zs = dice.map((d) => d.mesh.position.z);
+      return {
+        slot: c.slot,
+        cx: r2(shelfSlotX(c.slot)),
+        x0: r2(Math.min(...xs)), x1: r2(Math.max(...xs)),
+        z0: r2(Math.min(...zs)), z1: r2(Math.max(...zs)),
+        outsideMat: Math.max(...xs.map(Math.abs)) > TABLE_W / 2
+          || Math.max(...zs.map(Math.abs)) > TABLE_D / 2,
+      };
+    });
+    const overlaps = [];
+    for (let i = 1; i < clusters.length; i++) {
+      if (clusters[i].x0 <= clusters[i - 1].x1) {
+        overlaps.push(`${clusters[i - 1].slot}↔${clusters[i].slot}`);
+      }
+    }
+    const shelved = tableDice.filter((d) => shelfClusters.has(d.rollId));
+    return {
+      tableW: TABLE_W, tableD: TABLE_D,
+      pitch: r2(SHELF_PITCH), slotW: SHELF_SLOT_W, slotD: SHELF_SLOT_D,
+      bandZ0: r2(bandZ0), bandZ1: r2(bandZ1), bandDepth: SHELF_SLOT_D,
+      bandShare: `${Math.round((SHELF_SLOT_D / TABLE_D) * 100)}%`,
+      trayX0: r2(shelfSlotX(0) - SHELF_SLOT_W / 2),
+      trayX1: r2(shelfSlotX(SHELF_SLOTS - 1) + SHELF_SLOT_W / 2),
+      clusters,
+      overlaps,
+      diceOnShelf: shelved.length,
+      stacked: shelved.filter((d) => d.mesh.position.y > 1.2).length,
+    };
   },
   // the collect shelf (§7.7): entry point + cluster observability
   collectRoll(rollId) { return requestCollectRoll(rollId); },
@@ -12693,6 +12763,10 @@ const CAM_TARGET = new THREE.Vector3(0, 0, 0.5);
 // clearance — capped at a tenth of the window, because on a phone five pills
 // cannot all fit side by side at any distance and the anchor being reachable
 // is what actually matters.
+// `of` tags who each point belongs to, so the framing can be PRICED (C25):
+// fitCameraTo takes any subset, and __diceDebug.framingCost refits with the
+// shelf's points removed to answer how much of the table's apparent distance
+// is the shelf's doing rather than the felt's.
 function framingPoints() {
   const outerX = shelfSlotX(SHELF_SLOTS - 1) + SHELF_SLOT_W / 2;
   const markerX = shelfSlotX(SHELF_SLOTS - 1);
@@ -12701,20 +12775,22 @@ function framingPoints() {
   const pillNdc = (2 * halfPill) / w;
   const pts = [];
   for (const s of [-1, 1]) {
-    pts.push({ p: new THREE.Vector3(s * outerX, 0, SHELF_Z - SHELF_SLOT_D / 2), mx: 0.02, my: 0.02 });
-    pts.push({ p: new THREE.Vector3(s * outerX, 0, SHELF_Z + SHELF_SLOT_D / 2), mx: 0.02, my: 0.02 });
-    pts.push({ p: new THREE.Vector3(s * markerX, SHELF_MARKER_Y, SHELF_Z), mx: pillNdc, my: 0.06 });
-    pts.push({ p: new THREE.Vector3(s * TABLE_W / 2, 0, -TABLE_D / 2), mx: 0.02, my: 0.02 });
+    pts.push({ p: new THREE.Vector3(s * outerX, 0, SHELF_Z - SHELF_SLOT_D / 2), mx: 0.02, my: 0.02, of: 'tray' });
+    pts.push({ p: new THREE.Vector3(s * outerX, 0, SHELF_Z + SHELF_SLOT_D / 2), mx: 0.02, my: 0.02, of: 'tray' });
+    pts.push({ p: new THREE.Vector3(s * markerX, SHELF_MARKER_Y, SHELF_Z), mx: pillNdc, my: 0.06, of: 'pill' });
+    pts.push({ p: new THREE.Vector3(s * TABLE_W / 2, 0, -TABLE_D / 2), mx: 0.02, my: 0.02, of: 'felt' });
   }
   return pts;
 }
 
-function applyCameraFraming() {
+// Pull the eye STRAIGHT BACK along its own ray until every point in `pts`
+// fits. Split out of applyCameraFraming so the same fit can be run against a
+// subset without touching the shipped framing (see framingCost).
+function fitCameraTo(pts) {
   const eye = new THREE.Vector3(
     ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
   );
   const ray = eye.clone().sub(CAM_TARGET);
-  const pts = framingPoints();
   const v = new THREE.Vector3();
   // Pull back in small steps and stop at the first distance that fits — a
   // closed form would have to invert the projection for eight points at once,
@@ -12732,6 +12808,8 @@ function applyCameraFraming() {
     if (fits) break;
   }
 }
+
+function applyCameraFraming() { fitCameraTo(framingPoints()); }
 
 // Reflect panelsOpen into the DOM, persist it, and derive compact view:
 // body.mini appears exactly when every available panel is collapsed. The
