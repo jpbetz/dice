@@ -1930,6 +1930,14 @@ function playRoll(roll) {
   // for both kinds of die. At least one frame, so a zero-length playback can
   // never be produced.
   const motionFrames = Math.max(1, lastLanding.frame);
+  // How many frames the SIMULATION ran, kept because truncating destroyed the
+  // only way to see the cut from outside: with the dead frames deleted,
+  // `keyframes.length - 1` and `duration/FIXED_DT` are equal by construction,
+  // and settle-is-when-they-stop measured the cut as the gap between exactly
+  // those two. It went green-to-red on a change that broke nothing, which is
+  // the good failure — the observable it read had gone, so restore it rather
+  // than relax what it asserts.
+  const simFrames = keyframes[0].length - 1;
   for (const kf of keyframes) kf.length = motionFrames + 1;
   for (const l of landings) l.frame = Math.min(l.frame, motionFrames);
 
@@ -2041,6 +2049,7 @@ function playRoll(roll) {
     keyframes,
     sounds,
     frames: keyframes[0].length,
+    simFrames, // frames simulated before the tail was cut; see the cut above
     duration: motionFrames * FIXED_DT,
     // When each die actually stopped, and which one decided it. Consumed by
     // the settle-keyed beats; `lastLanding.timedOut` is the decline signal.

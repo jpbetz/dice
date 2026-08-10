@@ -606,7 +606,11 @@ export const scenarios = [
         const r = JSON.parse(await a.eval(`JSON.stringify((() => {
           const r = window.__diceDebug.currentRoll, F = 1 / 60;
           const durFrames = Math.round(r.duration / F);
-          const frames = r.keyframes[0].length - 1;
+          // simFrames, not keyframes.length: since 2026-08-10 the dead frames
+          // are TRUNCATED off the array rather than merely skipped, so the
+          // array length equals durFrames by construction and would report
+          // every cut as zero. simFrames is what the simulation actually ran.
+          const frames = r.simFrames;
           // The tie group is the dice sharing the MAX settle frame — not the
           // whole pool. A SETTLE_CAP roll force-freezes only the dice still
           // dynamic at the cap; anything that landed clean before it keeps its
