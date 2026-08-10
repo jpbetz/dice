@@ -27,8 +27,18 @@ limitations under the License.
 // `sleepier` is kept as the CONTROL: an instrument that has never been seen
 // to fail is not yet evidence.
 //
-//   node tools/drive.mjs tools/steps/replay-drift.mjs [variant] [seeds] [churn]
+// POOL-GENERALIZED (2026-08-10). The first version hard-coded the four-die
+// soul family, which is the pool this table drifts LEAST on: a small throw is
+// over in two seconds and gives float accumulation the least room. 20d6 runs
+// three times as long with twenty bodies in the broadphase, and it is where
+// the drift is worth an eye — so the default now sweeps three pools and each
+// carries its own seed count.
+//
+//   node tools/drive.mjs tools/steps/replay-drift.mjs [variant] [seeds] [churn] [pools]
 //     variant: shipped | candidate | sleepier   (sleepier must FAIL)
+//     seeds:   overrides EVERY pool's count (default: per-pool, see POOLS)
+//     churn:   unrelated throws between the two families (default 900)
+//     pools:   comma list of names from POOLS, or "name:count" pairs
 
 const DEADEN = { floorRestitution: 0.15, diceRestitution: 0.2, wallRestitution: 0.5 };
 const GATE4 = { gate: 4, slowLinear: 0.1, slowAngular: 0.14 };
@@ -40,14 +50,10 @@ const VARIANTS = {
   nudgepile: { nudge: { pileScale: 1.05 } },
   candidate: { phys: DEADEN, dampgate: GATE4, nudge: { pileScale: 1.05 } },
   sleepier: { sleep: { speed: 0.9, time: 0.2 } },
-  // C30d. The floor clamp quantises small vertical velocities to exactly 0,
-  // which is a DESTRUCTIVE operation on float state — every divergence living
-  // in a die's last few bits of vy is erased the moment it touches the felt
-  // slowly. The prediction is therefore that magnet ABSORBS drift rather than
-  // adding it, and if it adds any the mechanism is dead on the spot.
-  magnet1: { magnet: { vy: 1 } },
-  magnet2: { magnet: { vy: 2 } },
-  magnet4: { magnet: { vy: 4 } },
+  // The damping gate on its OWN. It appears in three composite rows above and
+  // its drift was never measured alone, so every "candidate replays" result
+  // that included it was resting on an untested component.
+  gate4: { dampgate: GATE4 },
   // Attribution: is deaden's drift a sleep-boundary knife edge? A deadened
   // die spends far longer near sleepSpeedLimit, where accumulated world.time
   // can tip the decision. allowSleep=false removes the boundary. `sleepoff`
@@ -61,30 +67,63 @@ const VARIANTS = {
   // Determinism on its own, with no shake claim attached: sleep off for the
   // replay, gate4 to pay for the slow tail it costs.
   sleepoffgate4: { dampgate: GATE4, bodyFlags: { allowSleep: false } },
+  // C30e — the displacement terminator. The reason this row exists is that the
+  // box test REPLACES the retirement predicate that cannon's sleep was
+  // accidentally supplying, so sleepoff can finally be judged as a fix rather
+  // than as a cost. `dispgate` alone still has cannon's sleep underneath it and
+  // is expected to drift exactly as shipped does; `dispgatesleepoff` is the
+  // candidate and must be byte-identical on every pool.
+  dispgate: { settleGate: { mode: 'displacement', eps: 0.02 } },
+  dispgatesleepoff: { bodyFlags: { allowSleep: false },
+    settleGate: { mode: 'displacement', eps: 0.02 } },
+  dispgatesleepoffgate4: { dampgate: GATE4, bodyFlags: { allowSleep: false },
+    settleGate: { mode: 'displacement', eps: 0.02 } },
 };
 
-export default async function run(stage, [variant = 'candidate', seedCount = '16', churnCount = '700']) {
+// Each pool carries its own seed count: the big pools cost three times as much
+// per throw and the question they answer is the same one, so paying for
+// sixteen of them buys nothing the eighth seed did not already show.
+const POOLS = {
+  soul: { types: ['d8', 'd8', 'd4', 'd6'], seeds: 16 },
+  '20d6': { types: Array(20).fill('d6'), seeds: 8 },
+  '8d6': { types: Array(8).fill('d6'), seeds: 8 },
+};
+
+function table(head, rows) {
+  const w = head.map((h, i) => Math.max(String(h).length, ...rows.map((r) => String(r[i]).length)));
+  const line = (cells) => cells.map((c, i) => String(c).padEnd(w[i])).join('  ').trimEnd();
+  console.log(line(head));
+  console.log(w.map((k) => '-'.repeat(k)).join('  '));
+  for (const r of rows) console.log(line(r));
+}
+
+export default async function run(stage,
+  [variant = 'candidate', seedCount = '', churnCount = '900', poolArg = 'soul,20d6,8d6']) {
   const v = VARIANTS[variant];
   if (!v) throw new Error(`no such variant: ${variant} (have ${Object.keys(VARIANTS).join(', ')})`);
-  const n = Number(seedCount);
   const churn = Number(churnCount);
+  const wanted = poolArg.split(',').filter(Boolean).map((tok) => {
+    const [name, count] = tok.split(':');
+    if (!POOLS[name]) throw new Error(`no such pool: ${name} (have ${Object.keys(POOLS).join(', ')})`);
+    return { name, types: POOLS[name].types,
+      n: Number(count || seedCount || POOLS[name].seeds) };
+  });
   const a = await stage.tab('localhost', 'Drift');
 
   if (v.phys) await a.dbg(`setPhysics(${JSON.stringify(v.phys)})`);
   if (v.dampgate) await a.dbg(`setDampgate(${JSON.stringify(v.dampgate)})`);
   if (v.nudge) await a.dbg(`setNudge(${JSON.stringify(v.nudge)})`);
   if (v.sleep) await a.dbg(`setSleep(${JSON.stringify(v.sleep)})`);
-  if (v.magnet) await a.dbg(`setMagnet(${JSON.stringify(v.magnet)})`);
   if (v.bodyFlags) await a.dbg(`setBodyFlags(${JSON.stringify(v.bodyFlags)})`);
+  if (v.settleGate) await a.dbg(`setSettleGate(${JSON.stringify(v.settleGate)})`);
   console.log(`variant ${variant}`);
   console.log(`  phys      ${JSON.stringify(await a.dbg('physics'))}`);
   console.log(`  dampgate  ${JSON.stringify(await a.dbg('dampgate'))}`);
   console.log(`  nudge     ${JSON.stringify(await a.dbg('nudge'))}`);
   console.log(`  sleep     ${JSON.stringify(await a.dbg('sleep'))}`);
-  console.log(`  magnet    ${JSON.stringify(await a.dbg('magnet'))}`);
   console.log(`  bodyFlags ${JSON.stringify(await a.dbg('bodyFlags'))}`);
-
-  const seeds = Array.from({ length: n }, (_, i) => 1000 + i * 7919);
+  console.log(`  gate      ${JSON.stringify(await a.dbg('settleGate'))}`);
+  console.log(`  pools     ${wanted.map((w) => `${w.name}x${w.n}`).join(' ')}, churn ${churn}`);
 
   // The settled pose at full precision, not a rounded summary: two throws
   // that agree to three decimals and disagree in the mantissa are still two
@@ -103,29 +142,38 @@ export default async function run(stage, [variant = 'candidate', seedCount = '16
     + '|' + window.__diceDebug.currentRoll.frames
     + '|' + window.__diceDebug.currentRoll.nudges`);
 
+  // One family per pool, all thrown BEFORE the churn and all re-thrown after
+  // it: the accumulated world.time has to be shared, or each pool would be
+  // measuring a different amount of history and the comparison between them
+  // would mean nothing.
   const family = async (tag) => {
-    const out = [];
-    for (const seed of seeds) {
-      await a.dbg(`throwSeeded(["d8","d8","d4","d6"], ${seed})`);
-      await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
-        { desc: `${tag} ${seed}`, timeout: 60000 });
-      out.push(await poseOf());
-      await a.dbg('clearTable()');
-      await a.dbg('sim(60)');
+    const out = new Map();
+    for (const w of wanted) {
+      const seeds = Array.from({ length: w.n }, (_, i) => 1000 + i * 7919);
+      const sigs = [];
+      for (const seed of seeds) {
+        await a.dbg(`throwSeeded(${JSON.stringify(w.types)}, ${seed})`);
+        await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+          { desc: `${tag} ${w.name}/${seed}`, timeout: 60000 });
+        sigs.push(await poseOf());
+        await a.dbg('clearTable()');
+        await a.dbg('sim(60)');
+      }
+      out.set(w.name, { seeds, sigs });
     }
     return out;
   };
 
   const before = await family('before');
-  // Churn in the PAGE, fifty at a time: 700 CDP round trips would cost more
+  // Churn in the PAGE, fifty at a time: 900 CDP round trips would cost more
   // than the physics does, and what has to accumulate is world.time, which
   // only playRoll's bake advances.
   //
   // EACH THROW MUST BE DRAINED. playRoll QUEUES when a roll is already
   // playing, so a tight loop of throwSeeded bakes exactly one throw and pushes
-  // 699 onto rollQueue — world.time does not move, and the queue then drains
+  // the rest onto rollQueue — world.time does not move, and the queue then drains
   // into the middle of the measurement. First version of this step did that,
-  // "churned 700 throws in 1s", and reported a drift that was really the
+  // "churned the lot in 1s", and reported a drift that was really the
   // after-family landing on a table littered with 700 rolls' worth of dice.
   // The elapsed seconds and the leftover-dice count below are printed so that
   // failure cannot come back silently.
@@ -147,32 +195,46 @@ export default async function run(stage, [variant = 'candidate', seedCount = '16
   if (left) throw new Error(`the churn left ${left} dice behind; the replay would measure those`);
   const after = await family('after');
 
-  let same = 0;
-  const drifted = [];
-  before.forEach((b, i) => {
-    if (b === after[i]) same++;
-    else drifted.push(seeds[i]);
-  });
-  console.log(`\nreplay after churn — ${same}/${n} byte-identical`);
-  if (drifted.length) console.log(`  drifted seeds: ${drifted.join(', ')}`);
-  // WHICH FIELD MOVED, not just that something did. A pose float in the
-  // fifteenth decimal is float-order noise inside one client; a different
-  // duration or nudge count is a different throw. Reporting only the count
-  // makes those two look the same, and they are not.
-  before.forEach((b, i) => {
-    if (b === after[i]) return;
-    const [bp, ...bt] = b.split('|');
-    const [ap, ...at] = after[i].split('|');
-    const bn = JSON.parse(bp).flat();
-    const an = JSON.parse(ap).flat();
-    const worst = bn.reduce((m, x, k) => Math.max(m, Math.abs(x - an[k])), 0);
-    console.log(`    ${seeds[i]}: tail ${bt.join('|')} -> ${at.join('|')}`
-      + `, largest pose delta ${worst.toExponential(2)}`);
-  });
+  let allSame = true;
+  const verdicts = [];
+  for (const w of wanted) {
+    const { seeds, sigs } = before.get(w.name);
+    const post = after.get(w.name).sigs;
+    let same = 0;
+    const drifted = [];
+    sigs.forEach((b, i) => {
+      if (b === post[i]) same++;
+      else drifted.push(seeds[i]);
+    });
+    console.log(`\n${w.name} — replay after churn: ${same}/${w.n} byte-identical`);
+    if (drifted.length) console.log(`  drifted seeds: ${drifted.join(', ')}`);
+    // WHICH FIELD MOVED, not just that something did. A pose float in the
+    // fifteenth decimal is float-order noise inside one client; a different
+    // duration or nudge count is a different throw. Reporting only the count
+    // makes those two look the same, and they are not.
+    let material = 0;
+    sigs.forEach((b, i) => {
+      if (b === post[i]) return;
+      const [bp, ...bt] = b.split('|');
+      const [ap, ...at] = post[i].split('|');
+      const bn = JSON.parse(bp).flat();
+      const an = JSON.parse(ap).flat();
+      const worst = bn.reduce((m, x, k) => Math.max(m, Math.abs(x - an[k])), 0);
+      if (bt.join('|') !== at.join('|')) material++;
+      console.log(`    ${seeds[i]}: tail ${bt.join('|')} -> ${at.join('|')}`
+        + `, largest pose delta ${worst.toExponential(2)}`);
+    });
+    if (same !== w.n) allSame = false;
+    verdicts.push([w.name, `${same}/${w.n}`, material
+      ? `${material} MATERIAL (duration/frames/nudges moved)` : 'pose-only']);
+  }
+
+  console.log('');
+  table(['pool', 'byte-identical', 'what moved'], verdicts);
   const expectFail = variant === 'sleepier';
-  console.log(`  ${same === n
+  console.log(`\n  ${allSame
     ? (expectFail ? 'IDENTICAL — but this variant is the CONTROL and was supposed to drift;'
-      + ' the instrument is not proving anything' : 'IDENTICAL — the same seed replays')
+      + ' the instrument is not proving anything' : 'IDENTICAL on every pool — the same seed replays')
     : (expectFail ? 'DRIFTED — the control drifts, so the check can detect drift'
       : 'DRIFTED — this tuning does not replay; do not ship it')}`);
 }

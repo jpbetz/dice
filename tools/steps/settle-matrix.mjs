@@ -71,17 +71,6 @@ const SLEEPIER = { speed: 0.9, time: 0.2 };
 // of every type lands at 0.73-0.95 of its own ceiling.
 const PILE = { pileScale: 1.05 };
 
-// FLOOR MAGNETIZE (C30d) — the restitution threshold cannon-es lacks, in
-// units/s of upward velocity. The band is chosen from the geometry, not
-// swept blind: a hop of vy reaches v^2/2g, so at GRAVITY 110 vy=1 buys 0.005
-// units of air and vy=4 buys 0.073 — 0.3% and 5% of a die's width. Anything
-// this can suppress is invisible as motion and audible only as dither. Above
-// ~vy 8 it would start eating real bounces (0.3 of a die), which is where the
-// mechanism would stop being a threshold and start being deadening.
-const MAG1 = { vy: 1 };
-const MAG2 = { vy: 2 };
-const MAG4 = { vy: 4 };
-
 // ATTRIBUTION ONLY, AND IT IS NOT A SHIP CANDIDATE. Deaden does not replay
 // (one seed in sixteen comes back a different throw after 700 unrelated
 // throws) and the standing suspicion is the sleep boundary: a deadened die
@@ -103,7 +92,7 @@ const SLEEPOFF = { allowSleep: false };
 const DISP = (eps) => ({ mode: 'displacement', eps });
 
 // [name, physics overrides, dampgate | null, throwTarget | null, sleep | null,
-//  nudge | null, magnet | null, bodyflags | null, settlegate | null]
+//  nudge | null, bodyflags | null, settlegate | null]
 // null = leave the instrument inert. Everything is reset between variants.
 const VARIANTS = [
   ['shipped', {}, null, null, null, null],
@@ -143,38 +132,33 @@ const VARIANTS = [
   ['deaden+nudgepile', DEADEN, null, null, null, PILE],
   ['deaden+gate4+nudgepile', DEADEN, { gate: 4, ...SLOW }, null, null, PILE],
   ['deaden+gate4+nudgepile+b5', DEADEN, { gate: 4, ...SLOW }, null, null, { ...PILE, budget: 5 }],
-  // PASS FOUR (C30d). The magnet takes ONLY vertical micro-energy off a die
-  // already touching the felt, so unlike deaden it should not glide: the
-  // horizontal skid that fans a pool out is never touched. 8d6's duration
-  // column is where that claim lives or dies.
-  ['magnet1', {}, null, null, null, null, MAG1],
-  ['magnet2', {}, null, null, null, null, MAG2],
-  ['magnet4', {}, null, null, null, null, MAG4],
-  ['magnet2+gate4', {}, { gate: 4, ...SLOW }, null, null, null, MAG2],
+  // PASS FOUR's magnet rows are GONE with the mechanism (excised 2026-08-10).
+  // It failed on its own axis — hops flat, shake +38% — and the finding it
+  // leaves behind is in the FLOOR MAGNETIZE block in js/main.js and C30d.
   // Attribution pair — see SLEEPOFF. Judge these two against each other.
-  ['sleepoff', {}, null, null, null, null, null, SLEEPOFF],
-  ['deaden+sleepoff', DEADEN, null, null, null, null, null, SLEEPOFF],
+  ['sleepoff', {}, null, null, null, null, SLEEPOFF],
+  ['deaden+sleepoff', DEADEN, null, null, null, null, SLEEPOFF],
   // WHAT THE ATTRIBUTION OPENED UP. sleepoff replays 16/16 where shipped
   // replays 14/16, so cannon's sleep is the whole drift story — and deaden,
   // the only proven shake lever, replays 16/16 with it off. What sleepoff
   // costs is the slow half (soul +31%, caps 7->11), which is exactly what
   // gate4 was measured to buy back (20d6 -22%, caps 7->2, zero shake cost).
   // Judge this against `sleepoff`, not against shipped.
-  ['deaden+sleepoff+gate4', DEADEN, { gate: 4, ...SLOW }, null, null, null, null, SLEEPOFF],
-  ['sleepoff+gate4', {}, { gate: 4, ...SLOW }, null, null, null, null, SLEEPOFF],
+  ['deaden+sleepoff+gate4', DEADEN, { gate: 4, ...SLOW }, null, null, null, SLEEPOFF],
+  ['sleepoff+gate4', {}, { gate: 4, ...SLOW }, null, null, null, SLEEPOFF],
   // PASS FIVE (C30e). The eps sweep first — three rows that differ in one
   // number — and then the composite the whole pass is aimed at: the box test
   // supplies the terminator that cannon's sleep was accidentally providing, so
   // sleepoff should stop costing the slow half. sleepoff alone was soul +31%,
   // caps 7 -> 11; if that does not INVERT here, the diagnosis is wrong.
-  ['disp01', {}, null, null, null, null, null, null, DISP(0.01)],
-  ['disp02', {}, null, null, null, null, null, null, DISP(0.02)],
-  ['disp05', {}, null, null, null, null, null, null, DISP(0.05)],
-  ['disp01+sleepoff', {}, null, null, null, null, null, SLEEPOFF, DISP(0.01)],
-  ['disp02+sleepoff', {}, null, null, null, null, null, SLEEPOFF, DISP(0.02)],
-  ['disp05+sleepoff', {}, null, null, null, null, null, SLEEPOFF, DISP(0.05)],
-  ['disp02+sleepoff+gate4', {}, { gate: 4, ...SLOW }, null, null, null, null, SLEEPOFF, DISP(0.02)],
-  ['disp05+sleepoff+gate4', {}, { gate: 4, ...SLOW }, null, null, null, null, SLEEPOFF, DISP(0.05)],
+  ['disp01', {}, null, null, null, null, null, DISP(0.01)],
+  ['disp02', {}, null, null, null, null, null, DISP(0.02)],
+  ['disp05', {}, null, null, null, null, null, DISP(0.05)],
+  ['disp01+sleepoff', {}, null, null, null, null, SLEEPOFF, DISP(0.01)],
+  ['disp02+sleepoff', {}, null, null, null, null, SLEEPOFF, DISP(0.02)],
+  ['disp05+sleepoff', {}, null, null, null, null, SLEEPOFF, DISP(0.05)],
+  ['disp02+sleepoff+gate4', {}, { gate: 4, ...SLOW }, null, null, null, SLEEPOFF, DISP(0.02)],
+  ['disp05+sleepoff+gate4', {}, { gate: 4, ...SLOW }, null, null, null, SLEEPOFF, DISP(0.05)],
 ];
 
 const SHAKE_POOLS = [
@@ -224,7 +208,6 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     sleep: await a.dbg('sleep'),
     zoom: await a.dbg('zoom'),
     nudge: await a.dbg('nudge'),
-    magnet: await a.dbg('magnet'),
     bodyFlags: await a.dbg('bodyFlags'),
     settleGate: await a.dbg('settleGate'),
   };
@@ -232,7 +215,7 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
   console.log(`       dampgate ${JSON.stringify(INERT.dampgate)}  throwTarget ${INERT.throwTarget}`
     + `  sleep ${JSON.stringify(INERT.sleep)}  zoom ${INERT.zoom}`);
   console.log(`       nudge ${JSON.stringify(INERT.nudge)}`
-    + `  magnet ${JSON.stringify(INERT.magnet)}  bodyFlags ${JSON.stringify(INERT.bodyFlags)}`);
+    + `  bodyFlags ${JSON.stringify(INERT.bodyFlags)}`);
   console.log(`       settleGate ${JSON.stringify(INERT.settleGate)}`);
 
   const seedsOf = (n) => Array.from({ length: n }, (_, i) => 1000 + i * 7919);
@@ -244,20 +227,18 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     await a.dbg(`setSleep(${JSON.stringify(INERT.sleep)})`);
     await a.dbg(`setZoom(${JSON.stringify(INERT.zoom)})`);
     await a.dbg(`setNudge(${JSON.stringify(INERT.nudge)})`);
-    await a.dbg(`setMagnet(${JSON.stringify(INERT.magnet)})`);
     await a.dbg(`setBodyFlags(${JSON.stringify(INERT.bodyFlags)})`);
     await a.dbg(`setSettleGate(${JSON.stringify(INERT.settleGate)})`);
     await a.dbg('sim(200)');
   };
 
-  const apply = async ([, phys, dampgate, throwTarget, sleep, nudge, magnet, bodyFlags, settleGate]) => {
+  const apply = async ([, phys, dampgate, throwTarget, sleep, nudge, bodyFlags, settleGate]) => {
     await reset();
     if (Object.keys(phys).length) await a.dbg(`setPhysics(${JSON.stringify(phys)})`);
     if (dampgate) await a.dbg(`setDampgate(${JSON.stringify(dampgate)})`);
     if (throwTarget !== null) await a.dbg(`setThrowTarget(${throwTarget})`);
     if (sleep) await a.dbg(`setSleep(${JSON.stringify(sleep)})`);
     if (nudge) await a.dbg(`setNudge(${JSON.stringify(nudge)})`);
-    if (magnet) await a.dbg(`setMagnet(${JSON.stringify(magnet)})`);
     if (bodyFlags) await a.dbg(`setBodyFlags(${JSON.stringify(bodyFlags)})`);
     if (settleGate) await a.dbg(`setSettleGate(${JSON.stringify(settleGate)})`);
   };
@@ -336,7 +317,7 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
           const p = await a.dbg('settleProfile()');
           if (p.timedOut) capped++;
           rows.push({ ...t, shake: p.shake, creep: p.creep, dur: p.duration,
-            nudged: p.nudged, piled: p.piled, clamps: p.magnetClamps, hops: p.hops,
+            nudged: p.nudged, piled: p.piled, hops: p.hops,
             // The terminator's receipt: how far the worst die in this throw
             // moved over the window that earned its freeze, in die-widths, and
             // how many CLEAN freezes exceeded the gate's own epsilon.
@@ -354,13 +335,9 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
           // (the ones the budget could not save).
           nudged: mean(rows.map((r) => r.nudged)),
           piled: mean(rows.map((r) => r.piled)),
-          // Floor-clamp firings per throw. 0 on every row where the magnet is
-          // off, so a non-zero number here is the mechanism proving it ran —
-          // and a ZERO on a magnet row would mean the row measured nothing.
-          clamps: mean(rows.map((r) => r.clamps)),
           // Times a die goes back UP in its last 0.6s, per die. The literal
-          // reading of "no more bounding" — and, unlike clamps, measured off
-          // the baked film rather than reported by the mechanism.
+          // reading of "no more bounding" — measured off the baked film
+          // rather than reported by whatever mechanism produced it.
           hops: mean(rows.map((r) => r.hops)),
           disp: mean(rows.map((r) => r.disp)),
           // The WORST single die in the whole cell, which is the one that
@@ -379,16 +356,31 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
           let piled = 0;
           let dice = 0;
           let flat = 0;
+          let piledTrue = 0;
           for (const seed of pileSeeds) {
             await throwOnce(types, seed, `${vname} ${z} ${pname}/${seed}`);
             await a.dbg('sim(600)');
-            const p = Number(await a.eval(
-              'window.__diceDebug.tableDice.filter((o) => o.body.position.y > 1.2).length'));
-            piled += p; dice += types.length;
-            if (p === 0) flat++;
+            // TWO BARS, because the old one is a coincidence and the
+            // comparison history is worth keeping. `y > 1.2` is what every
+            // prior pass measured and what `dice-land-flat` uses — it is the
+            // d6 circumradius (1.169) and change, sound for a 6d6 pool and
+            // wrong for anything else. `restCeiling(type)` is the theorem: the
+            // highest a convex die TOUCHING THE FELT can hold its centre, so
+            // above it the die is on something, and it is the bar C30c said
+            // any future check should use. The trio pool (d8/d6/d10) is where
+            // they disagree — a d8 ceiling is 1.050, so 1.2 misses real stacks.
+            const r = JSON.parse(await a.eval(`JSON.stringify((() => {
+              const ds = window.__diceDebug.tableDice;
+              return [ds.filter((o) => o.body.position.y > 1.2).length,
+                ds.filter((o) => o.body.position.y
+                  > window.__diceDebug.restCeiling(o.type)).length];
+            })())`));
+            piled += r[0]; piledTrue += r[1]; dice += types.length;
+            if (r[0] === 0) flat++;
             await clear();
           }
-          piles.set(`${vname}|${z}|${pname}`, { pct: (piled / dice) * 100, flat });
+          piles.set(`${vname}|${z}|${pname}`,
+            { pct: (piled / dice) * 100, flat, n: piled, nTrue: piledTrue, dice });
         }
       }
       await a.dbg(`setZoom(${JSON.stringify(INERT.zoom)})`);
@@ -468,12 +460,11 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
 
   // Nudges are watch time — every one is a die hurled back into the air — so
   // a mechanism that buys flatness with them has to show the bill.
-  console.log(`\nnudge rounds per throw / dice still above the pile bar at the end /`
-    + ` floor clamps per throw\n`);
-  table(['variant', ...SHAKE_POOLS.map(([p]) => `${p} nudge/left/clamp`)],
+  console.log(`\nnudge rounds per throw / dice still above the pile bar at the end\n`);
+  table(['variant', ...SHAKE_POOLS.map(([p]) => `${p} nudge/left`)],
     ran.map(([n]) => [n, ...SHAKE_POOLS.map(([p]) => {
       const r = got.get(`${n}|${p}`);
-      return `${r.nudged.toFixed(2)}/${r.piled.toFixed(2)}/${r.clamps.toFixed(0)}`;
+      return `${r.nudged.toFixed(2)}/${r.piled.toFixed(2)}`;
     })]));
 
   // THE TERMINATOR'S RECEIPT, and the only honest way to read the creep column
@@ -497,8 +488,11 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     })]));
 
   // --- pile ----------------------------------------------------------------
-  console.log(`\ndice resting above y=1.2, and throws that piled NOTHING,`
-    + ` over ${nPile} identical seeds\n`);
+  console.log(`\npiling over ${nPile} identical seeds. "a+b/N pct flat/seeds":`
+    + ` a = dice above y=1.2 (the historical bar,\n  and dice-land-flat's), b = the`
+    + ` EXTRA dice the theorem bar restCeiling(type) catches that 1.2 misses,`
+    + `\n  pct and flat are on the historical bar so the column stays comparable`
+    + ` with every prior pass\n`);
   const pileCells = PILE_ZOOMS.flatMap((z) => PILE_POOLS.map(([p]) => [z, p]));
   table(['variant', ...pileCells.map(([z, p]) => `${z}/${p}`)],
     ran.filter(([n]) => piles.has(`${n}|${PILE_ZOOMS[0]}|${PILE_POOLS[0][0]}`))
@@ -506,8 +500,8 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
         const c = piles.get(`${n}|${z}|${p}`);
         const bc = piles.get(`${base}|${z}|${p}`);
         const d = c.pct - bc.pct;
-        return `${c.pct.toFixed(0)}% ${c.flat}/${nPile}`
-          + (n === base ? '' : ` (${d >= 0 ? '+' : ''}${d.toFixed(0)}pp)`);
+        return `${c.n}+${c.nTrue - c.n}/${c.dice} ${c.pct.toFixed(1)}% ${c.flat}/${nPile}`
+          + (n === base ? '' : ` (${d >= 0 ? '+' : ''}${d.toFixed(1)}pp)`);
       })]));
 
   // --- wall-time -----------------------------------------------------------

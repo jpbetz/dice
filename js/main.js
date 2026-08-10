@@ -624,8 +624,8 @@ const wallMat = new CANNON.Material('wall');
 //   and the next attempt should not have to rediscover it.
 //
 // PASS FOUR (2026-08-10) DID NOT CHANGE THESE NUMBERS EITHER, AND FOUND THE
-// ONE THING THAT WOULD LET SOMEBODY ELSE. Read with the TEMPO and MAGNET
-// blocks below; the full account is ROADMAP C30d.
+// ONE THING THAT WOULD LET SOMEBODY ELSE. Read with the TEMPO and (excised)
+// FLOOR MAGNETIZE blocks below; the full account is ROADMAP C30d.
 //
 //   THE DRIFT IS CANNON'S SLEEP, and that is the finding. Deaden's
 //   disqualification was that it does not replay: throw a seed family, churn
@@ -647,9 +647,9 @@ const wallMat = new CANNON.Material('wall');
 //   two, and they are the hard two — 8d6 +57% (glide) and medium/6d6 +8pp
 //   (pile).
 //
-//   AND THE MISSING RESTITUTION THRESHOLD IS NOT THE ANSWER. See MAGNET
-//   below: it fails on its own axis, because in this solver what the eye
-//   reads at rest is contact chatter, not bounce.
+//   AND THE MISSING RESTITUTION THRESHOLD IS NOT THE ANSWER. See the excised
+//   FLOOR MAGNETIZE block below: it failed on its own axis, because in this
+//   solver what the eye reads at rest is contact chatter, not bounce.
 const PHYS = {
   floorFriction: 0.25, floorRestitution: 0.35,
   diceFriction: 0.15, diceRestitution: 0.45,
@@ -747,61 +747,38 @@ const SLEEP = { speed: 0.4, time: 0.35 };
 // decal lifetimes, and every CSS transition. See stepPlayback and tick.
 const TEMPO = { k: 1 };
 
-// FLOOR MAGNETIZE: the restitution threshold cannon-es does not have.
-// Bullet and PhysX both cut restitution to zero below a relative impact
-// speed, because a coefficient of restitution is a fiction at low speed —
-// a real die that lands slowly does not bounce, it sticks. cannon-es applies
-// the same 0.35 to a 20 unit/s slam and a 0.5 unit/s tap, so the tap bounces
-// forever in miniature, which is the dither.
+// FLOOR MAGNETIZE — BUILT, MEASURED, REFUTED, AND REMOVED (C30d, excised
+// 2026-08-10). THE CODE IS GONE; THIS IS THE KNOWLEDGE, WHICH IS THE PART
+// WORTH KEEPING. Do not rebuild it without reading to the end.
 //
-// `vy` is that missing threshold, in units/s: after each world.step, a die
-// IN CONTACT WITH THE FLOOR that is moving UPWARD slower than `vy` has its
-// vertical velocity zeroed. 0 skips the scan entirely — byte-identical.
+// The idea is sound in general and both Bullet and PhysX ship it. cannon-es
+// has no restitution threshold: it applies the same 0.35 to a 20 unit/s slam
+// and a 0.5 unit/s tap, so the tap bounces forever in miniature. `MAGNET.vy`
+// was that missing threshold — after each world.step, a die IN CONTACT WITH
+// THE FLOOR (by body identity, so nothing airborne was reachable) moving
+// UPWARD slower than vy had its vertical velocity zeroed. Upward-only and
+// vertical-only on purpose: taking a die's INCOMING energy is deadening, a
+// different mechanism with a known price, and horizontal skid is how dice
+// separate on this mat.
 //
-// Three deliberate restrictions:
+// IT FAILED ON ITS OWN AXIS. vy 1/2/4, 16 paired seeds behind a passing
+// canary: `hops` — the count of separate times a die goes back up, the
+// complaint stated literally — did not fall (soul 4.88 -> 5.53 at vy 1), and
+// shake ROSE 38% on the same pool. Zeroing vy does not glue a die down. The
+// contact solver re-supplies the push on the very next step, so what the
+// clamp buys is a trade of one smooth ballistic arc for per-step chatter.
 //
-//   FLOOR CONTACT ONLY, by body identity, and THIS is the one that carries
-//   the safety argument. cannon only puts a body in world.contacts with the
-//   floor plane when its hull actually penetrates y = 0, so a die in the air
-//   is unreachable from here — no trajectory can be altered before it lands,
-//   and no die can be pinned mid-flight. Drop this gate and the mechanism
-//   becomes catastrophic rather than merely useless: gravity adds 110/60 =
-//   1.83 units/s per step, so an ungated clamp at any vy above that re-zeros
-//   a falling die every step and holds it in the air, where zero velocity
-//   passes the stillness test and it FREEZES. Measured, not reasoned: drop
-//   the gate and `settle-magnet` fails with "2 dice ran to SETTLE_CAP at
-//   vy 20" — two dice pinned in mid-air. It also keeps a die resting on
-//   ANOTHER die out of scope, so the mechanism cannot launder a stack into
-//   a flat pile reading.
+// THE TRANSFERABLE FINDING: in THIS solver, what the eye reads at rest is
+// CONTACT CHATTER, NOT BOUNCE. A mechanism aimed at the bounce is aimed at the
+// wrong thing. It also ADDED replay drift (seed 32676 came back a 435-frame
+// throw instead of 450), falsifying the prediction that quantising vy to zero
+// would absorb float divergence, and `settle-tail` named the damage in one
+// line — "2 dice stopped and were refused a freeze" — because the clamp pins a
+// cocked die before it can rock flat, recreating the exact bug C30 shipped a
+// fix for. Full account in ROADMAP C30d.
 //
-//   UPWARD ONLY. Not the hover guard — the contact gate already is, and
-//   clamping downward at a contact was measured to change nothing the
-//   scenario can see. It is a purity choice: taking a die's INCOMING energy
-//   is deadening, which is a different mechanism with a known price (C30c),
-//   and this one is only allowed to decline to give energy BACK.
-//
-//   VERTICAL ONLY. Horizontal skid is how dice separate on this mat — that
-//   is the whole reason the felt tuning was refused (C30c) — so the clamp
-//   never touches vx/vz. It takes the energy that was going into the hop and
-//   leaves the energy that is doing the fanning out.
-//
-// The band is small by construction. A hop of vy reaches v²/2g, so vy = 1 is
-// 0.005 units of air (0.3% of a die) and vy = 4 is 0.073 (5%). Everything
-// this can suppress is invisible as motion and visible only as noise.
-//
-// AND IT DOES NOT WORK — MEASURED 2026-08-10, vy 1/2/4, 16 paired seeds
-// behind a passing canary. It fails on its own axis. `hops` (the count of
-// separate times a die goes back up, which is the complaint stated
-// literally) does not fall: soul 4.88 -> 5.53 at vy 1. Shake RISES, +38% on
-// the same pool. The reason is that zeroing vy does not glue a die down —
-// the contact solver re-supplies the push on the very next step, so what the
-// clamp actually buys is a trade of one smooth ballistic arc for per-step
-// chatter, and it adds replay drift on top (seed 32676 comes back a
-// 435-frame throw instead of 450). Kept inert and documented because the
-// idea is sound in general — Bullet and PhysX both do this — and the next
-// attempt should know that in THIS solver it is the contact chatter, not the
-// bounce, that the eye is reading. Full account in ROADMAP C30d.
-const MAGNET = { vy: 0 };
+// What the dither actually needed was a TERMINATOR that can see a bounded
+// excursion, not a force that tries to remove it: see SETTLEGATE.
 
 // Per-body flags applied at spawn. `allowSleep: null` means "leave cannon's
 // own default alone" — the inert setting. This exists for ONE attribution
@@ -819,10 +796,7 @@ function addStaticPlane(material, position, euler) {
   world.addBody(body);
   return body;
 }
-// The felt itself, held by reference: MAGNET decides whether a contact is
-// the floor's by body identity rather than by height, so this is not a
-// decoration. Static planes are never removed, so the reference never dangles.
-const floorBody = addStaticPlane(floorMat, [0, 0, 0], [-Math.PI / 2, 0, 0]);
+addStaticPlane(floorMat, [0, 0, 0], [-Math.PI / 2, 0, 0]); // the felt
 // Wall refs — applyZoom mutates their positions in place (cannon's SAP
 // broadphase is safe with in-place moves on static bodies; removing + adding
 // would shuffle body ordering and reseed collision-pair enumeration, which is
@@ -2282,10 +2256,6 @@ function playRoll(roll) {
   };
 
   let nudges = 0;
-  // How many times the floor clamp actually fired this bake. Stays 0 while
-  // MAGNET.vy is 0 (the loop body is skipped), so it doubles as the sentinel
-  // check an e2e scenario can assert on: mechanism off means mechanism silent.
-  let magnetClamps = 0;
   for (;;) {
     stepContacts = 0; // the per-step contact budget refills; see the recorder
     // Speed-gated damping (DAMPGATE, off by default): the ONE place dice are
@@ -2301,25 +2271,6 @@ function playRoll(roll) {
     }
     world.step(FIXED_DT);
     simTime += FIXED_DT;
-
-    // FLOOR MAGNETIZE (MAGNET, off by default): the restitution threshold,
-    // applied to the contacts cannon just generated. `world.contacts` is
-    // filled by narrowphase inside the step above and survives it, so this
-    // reads the collisions that actually happened rather than guessing from
-    // height. Upward-only, floor-only, vertical-only — see the MAGNET block.
-    // Frozen dice are STATIC and cannot pair with a static floor in the
-    // broadphase, so they never appear here; the mass test is belt and
-    // braces for a body mid-transition.
-    if (MAGNET.vy > 0) {
-      const cs = world.contacts;
-      for (let ci = 0; ci < cs.length; ci++) {
-        const c = cs[ci];
-        const other = c.bi === floorBody ? c.bj : (c.bj === floorBody ? c.bi : null);
-        if (other === null || other.mass === 0) continue;
-        const vy = other.velocity.y;
-        if (vy > 0 && vy < MAGNET.vy) { other.velocity.y = 0; magnetClamps++; }
-      }
-    }
 
     // Per-die stillness accumulator + freeze test. Thresholds match the old
     // group predicate verbatim (do NOT tune here). Cocked dice never freeze —
@@ -2577,7 +2528,6 @@ function playRoll(roll) {
     landings,
     lastLanding,
     nudges, // how many times a cocked die had to be re-thrown (settleProfile)
-    magnetClamps, // floor-clamp firings this bake (0 whenever MAGNET is off)
     // Which terminator baked this roll, recorded ON the roll rather than read
     // live: a tool that flips the mode between the bake and the read would
     // otherwise judge one throw by the other gate's epsilon.
@@ -5906,17 +5856,19 @@ window.__diceDebug = {
   // Takes effect on the NEXT real-time frame — no reload, no re-bake.
   get tempo() { return TEMPO.k; },
   setTempo(k) { TEMPO.k = typeof k === 'number' && k > 0 ? k : TEMPO.k; return TEMPO.k; },
-  // Floor magnetize (C30d): the restitution threshold, in units/s. 0 is off
-  // and skips the contact scan. Takes effect on the NEXT roll — playRoll
-  // bakes the whole throw before frame one.
-  get magnet() { return { ...MAGNET }; },
-  setMagnet(o) { Object.assign(MAGNET, o || {}); return { ...MAGNET }; },
   // Attribution only, not a ship candidate — see BODYFLAGS. null restores
   // cannon's default (dice sleep); false keeps every die awake to its freeze.
   get bodyFlags() { return { ...BODYFLAGS }; },
   setBodyFlags(o) { Object.assign(BODYFLAGS, o || {}); return { ...BODYFLAGS }; },
   get nudge() { return { ...NUDGE }; },
   setNudge(p) { Object.assign(NUDGE, p || {}); return { ...NUDGE }; },
+  // The pile bar as a theorem: the highest a convex die TOUCHING THE FELT can
+  // hold its centre, so a die above it is resting on another die. Exposed
+  // because every tool that has ever asked "did this throw pile" hard-coded
+  // 1.2 — the d6 circumradius and change, a coincidence for every other type
+  // (C30c: a d20 rests legitimately at 1.190). Takes a type, so P7's zero-arg
+  // sweep skips it; tools/steps/settle-matrix.mjs is the caller.
+  restCeiling(type) { return DIE_DEFS[type] ? restCeiling(type) : null; },
   // Throw a chosen pool on a CHOSEN SEED. The seed decides the whole tumble
   // (spawn side, positions, velocities), so replaying one seed under two
   // tunings is the only way to price a physics change without variance
@@ -5999,9 +5951,6 @@ window.__diceDebug = {
       settleSpreadS: Math.round(((Math.max(...fr) - Math.min(...fr)) * FIXED_DT) * 1000) / 1000,
       timedOut: r.landings.filter((l) => l.timedOut).length,
       nudged: r.nudges,
-      // Floor-clamp firings during the bake. Exactly 0 while MAGNET is off,
-      // which is what makes it a sentinel and not just a statistic.
-      magnetClamps: r.magnetClamps,
       // WHY a die timed out, which is the whole diagnosis. `parked` counts
       // dice that were motionless when the cap fired — they were not still
       // tumbling, something REFUSED to freeze them. `moving` is the honest
@@ -6034,7 +5983,7 @@ window.__diceDebug = {
           shake: Math.round(m.shake * 1000) / 1000,
           // Times per die the die goes back up in its last 0.6s. This is what
           // "no more bounding like they're on the moon" asks to be zero, and
-          // unlike magnetClamps it is measured off the film.
+          // it is measured off the FILM rather than reported by a mechanism.
           hops: Math.round(m.hops * 1000) / 1000,
         };
       })(),
