@@ -585,10 +585,43 @@ const wallMat = new CANNON.Material('wall');
 // in 13 runs against 0 in 8 on the parent commit.
 //
 // So the settle work ships as NUDGE.cockedDot and the tail cut only, which
-// cost nothing here. The felt tuning is ROADMAP C30c: it needs a wider
-// spawn, and the spawn is clamped by a mat that C25/C27 already have opinions
-// about. Priced by tools/steps/pile.mjs and settle-paired.mjs — and note
-// that halving the damping did NOT halve the piling.
+// cost nothing here. Priced by tools/steps/pile.mjs and settle-paired.mjs —
+// and note that halving the damping did NOT halve the piling.
+//
+// STILL UNCHANGED AFTER THREE MEASURED PASSES, and the reasons have moved on
+// from "it needs a wider spawn". tools/steps/settle-matrix.mjs, which judges
+// shake, duration, caps, piling, creep and the clock together, 16 paired
+// seeds and a canary that refuses the run if the rig cannot reproduce a known
+// answer:
+//
+//   The shake win is RESTITUTION. Deadening alone (floor .15 / dice .2 /
+//   wall .5) is -23% to -37% on every multi-die pool. Speed-gated damping on
+//   its own is worth ZERO shake, so the felt tuning's win was never the
+//   damping. What the gate is good for is the slow half: 20d6 -22%, caps 7->2.
+//
+//   Deadening's cost is GLIDE, not pile-grind. It removes where a die's
+//   vertical energy went and leaves the horizontal skid on a floor of
+//   friction 0.25. 8d6 over one 10-seed family: shipped 2.13 s, deaden+gate4
+//   3.71 s, deaden+GRIP+gate4 2.60 s — grip takes back 70% of it. That
+//   answers ROADMAP C30a, which had guessed damping.
+//
+//   Deadening does not REPLAY. Throw a soul family, run 700 unrelated throws,
+//   throw it again: one seed in sixteen comes back a different throw (2.267 s
+//   -> 2.600 s, 137 frames -> 157). That is the disease that took the sleep
+//   raise off the table, and it disqualifies deaden on its own terms — every
+//   client fast-forwards from the seed and must agree, and perf-determinism
+//   compares two FRESHLY LOADED tabs, so it cannot see it.
+//   tools/steps/replay-drift.mjs.
+//
+//   And the pile cannot be nudged away. NUDGE.pileScale (below) refuses a
+//   freeze to a die resting on another and hands it to the existing nudge —
+//   targeted energy where the lost bounce used to do the work. It recovers
+//   part of the regression at medium (6d6 flat throws 17/40 -> 22/40 against
+//   shipped's 33/40) and it is not enough: at `close`, 6d6 across 24 seeds,
+//   it takes a die off the pile ONCE, and that throw costs 4.60 s -> 8.73 s.
+//   Nudging is the wrong instrument for a crowded mat — the die comes down on
+//   another die. The machinery is here, inert, because it is sound and cheap
+//   and the next attempt should not have to rediscover it.
 const PHYS = {
   floorFriction: 0.25, floorRestitution: 0.35,
   diceFriction: 0.15, diceRestitution: 0.45,

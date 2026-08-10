@@ -1266,13 +1266,51 @@ when the spacing wants 2.6). Stop the skid and they stop on each other: at
 `close`, 6d6 went 17% → 33% of dice piled, 3 clean throws in 10 → 1.
 `dice-land-flat` caught it (3 failures in 13 runs vs 0 in 8 on the parent) —
 the C24 floor working. Halving the damping did not halve the piling, so this
-is not a knob-tweak: **it needs a wider spawn, and the spawn is clamped by a
-mat C25 and C27 both already have claims on.** Sequence it after those.
-Priced by `tools/steps/pile.mjs` and `settle-paired.mjs`.
+is not a knob-tweak. Priced by `tools/steps/pile.mjs` and `settle-paired.mjs`.
 
-**C30a — 8d6 paid +0.37s under the felt tuning.** Only relevant if C30c
-proceeds. Likely damping trading tumble time for cocked rests, with the curves
-crossing badly around 8 dice. One paired sweep across 5–12 dice would say.
+**C30c, pass three (2026-08-10) — still not shipped, and the story has
+changed.** `tools/steps/settle-matrix.mjs` now judges shake, duration, caps,
+piling, creep and the clock together on 16 paired seeds behind a canary that
+refuses the run if the rig cannot reproduce a known answer. Four things it
+established, none of which were the "wider spawn" the paragraph above
+predicted:
+
+- **The shake win is restitution, not damping.** Deadening alone is −23% to
+  −37% shake on every multi-die pool; speed-gated damping alone is worth
+  ZERO. What the gate buys is the slow half (20d6 −22%, caps 7→2).
+- **Deadening's duration cost is glide.** 8d6 on one 10-seed family: shipped
+  2.13 s, deaden+gate4 3.71 s, deaden+**grip**+gate4 2.60 s. Grip recovers
+  70% of it — restitution was where a die's vertical energy went, and
+  removing it leaves the skid on a floor of friction 0.25. **This closes
+  C30a**, which had guessed damping.
+- **Deadening does not replay.** Throw a seed family, run 700 unrelated
+  throws, throw it again: one seed in sixteen becomes a materially different
+  throw (2.267 s → 2.600 s, 137 → 157 frames). That is the same disease that
+  took the sleep raise off the table, it is independent of the pile work, and
+  it disqualifies deaden on its own. `tools/steps/replay-drift.mjs`, with
+  `sleepier` kept as the control that must fail. Nothing here is byte-
+  identical across a tab's lifetime — even shipped moves rest positions by
+  ~5e-6 — so the bar that means anything is whether duration or frame count
+  moved.
+- **The pile cannot be nudged away.** `NUDGE.pileScale` (shipped inert)
+  refuses a freeze to a die resting above its hull's circumradius — the
+  highest a convex die touching the felt can hold its centre, so the bar is a
+  theorem rather than a fit — and hands it to the existing nudge. It recovers
+  part of the medium regression (6d6 flat throws 17/40 → 22/40 against
+  shipped's 33/40) and no more: at `close`, across 24 seeds, it takes a die
+  off the pile ONCE, at 4.60 s → 8.73 s. On a crowded mat a hurled die comes
+  down on another die. Pinned by `pile-refusal`; calibrated by
+  `tools/steps/pile-bar.mjs`.
+
+The candidate deaden+gate4+pile-nudge failed 4 of 7 gates (duration +67% on
+8d6, piling +5pp at medium/6d6, wall clock 1.68×, creep +45%). **The open
+rungs are grip and the throw target, not the settle predicate.**
+
+**A bar worth reusing, and a caution.** `dice-land-flat`'s `y > 1.2` is the
+d6 circumradius (1.169) and change — sound for the pools that scenario rolls,
+a coincidence for anything else. A solo d20 was measured resting legitimately
+at **1.190**. Any future check that calls a die piled by height should use
+`restCeiling(type)`, not 1.2.
 
 **C30b — 20d6 can still reach the cap with dice genuinely tumbling** (3 of 16
 seeds). That is real motion, so shortening `SETTLE_CAP` would truncate it and
