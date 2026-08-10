@@ -16,7 +16,7 @@ limitations under the License.
 
 // PRICE A SETTLE CHANGE HONESTLY. Every variant throws THE SAME SEEDS, so the
 // difference between two rows is the change and nothing else. The unpaired
-// unpaired version of this produced 8d6 means of 3.88, 5.57, 3.33 and 2.56
+// version of this produced 8d6 means of 3.88, 5.57, 3.33 and 2.56
 // for four variants whose real spread is far smaller, and talked me out of
 // the materials change that turned out to be the largest single win — with a
 // dozen random throws per cell, variance IS the measurement. Those steps were
@@ -69,7 +69,6 @@ const VARIANTS = [
 export default async function run(stage, [count = '12']) {
   const n = Number(count);
   const a = await stage.tab('localhost', 'Paired');
-  await a.dbg('setBannerRetireMs(0)');
 
   // Fixed, arbitrary, and the same for every variant.
   const seeds = Array.from({ length: n }, (_, i) => 1000 + i * 7919);

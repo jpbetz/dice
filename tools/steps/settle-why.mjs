@@ -32,7 +32,6 @@ const POOLS = ['1d20', '3d6', '4d6', '8d6', '10d6', '20d6'];
 export default async function run(stage, [reps = '6']) {
   const n = Number(reps);
   const a = await stage.tab('localhost', 'Why');
-  await a.dbg('setBannerRetireMs(0)');
 
   const rows = [];
   for (const pool of POOLS) {

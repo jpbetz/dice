@@ -33,7 +33,6 @@ const POOLS = [
 export default async function run(stage, [count = '20']) {
   const n = Number(count);
   const a = await stage.tab('localhost', 'Tail');
-  await a.dbg('setBannerRetireMs(0)');
   const seeds = Array.from({ length: n }, (_, i) => 1000 + i * 7919);
 
   const rows = [];

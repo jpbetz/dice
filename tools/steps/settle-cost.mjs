@@ -41,7 +41,6 @@ const POOLS = [
 export default async function run(stage, [reps = '5']) {
   const n = Number(reps);
   const a = await stage.tab('localhost', 'Settle');
-  await a.dbg('setBannerRetireMs(0)');
 
   const rows = [];
   for (const pool of POOLS) {

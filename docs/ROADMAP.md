@@ -1233,6 +1233,41 @@ tooltip says "biggest dice, best on a phone", and it measurably piles 2 of 6.
 Asserting there would either fail on the shipped app or drag the bar down
 everywhere; recording it is what stops the next tightening claiming ignorance.
 
+### C30. The wiggle was a predicate — **SHIPPED 2026-08-10**; two threads left
+
+*Joe 2026-08-10: "there is a very slow, very shaky process by which the dice
+then slide and wiggle-move until they are stable. It can take quite some time
+and it's super awkward to watch."* He asked whether to change the collider
+shapes and said that, forced to choose, he would accept dice repelled by
+boxes slightly larger than themselves.
+
+**No shape change was needed or possible in that direction.** The colliders
+are exact convex hulls off each die's render mesh. The tail was mostly a
+still table: a die judged cocked was refused a freeze and sat motionless to
+`SETTLE_CAP` = 9 s. 15 of the 17 dice that reached the cap across 36 throws
+were not moving. Shipped: `cockedDot` 0.82 → 0.6, real felt contact numbers,
+and a tail cut that credits a timed-out die with its last moving frame. Soul
+Deal −43%, 20d6 −22%, 8d6 +0.37s. Full account in UX §7.29; pinned by
+`settle-tail`; priced by `tools/steps/settle-paired.mjs`.
+
+**C30a — 8d6 pays 0.37s and nobody has looked at why.** The felt tuning wins
+everywhere except the 8-die neighbourhood. The likely mechanism is that
+damping trades tumble time for cocked rests, and at 8 dice the two curves
+cross badly. Worth one paired sweep across 5–12 dice before touching it —
+it may be a two-value fix, or it may be the honest price.
+
+**C30b — 20d6 can still reach the cap with dice genuinely tumbling** (3 of 16
+seeds). That is real motion, so shortening `SETTLE_CAP` would truncate it and
+show dice snapping. Left alone deliberately. If big pools matter later, the
+fix is a gentler nudge or a smaller spawn spread, not a smaller cap.
+
+**What this cost to find, and the reusable part.** The first sweep was
+unpaired and concluded the materials barely mattered — variance, on the
+largest single win. `__diceDebug.throwSeeded(types, seed)` replays a fixed
+tumble, so any future physics claim can be paired; do not price one without
+it. Same rule as C25's: `settleProfile()` also reports what the *old* rule
+would have played, so before/after comes off one simulation.
+
 ### C25. The physical shelf does not fit the mat any more — **STAGE 1 SHIPPED 2026-08-09**; Stage 2 open
 
 *Joe 2026-08-09: "Collected dice take up too much space… consider dropping the

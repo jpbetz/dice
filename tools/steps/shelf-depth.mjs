@@ -26,7 +26,6 @@ export default async function run(stage, [zoom = 'medium', pool = '3d6']) {
   const a = await stage.tab('localhost', 'Depth');
   await a.page.browser.send('Emulation.setDeviceMetricsOverride',
     { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
-  await a.dbg('setBannerRetireMs(0)');
   await a.dbg(`setZoom(${JSON.stringify(zoom)})`);
 
   for (let n = 1; n <= 5; n++) {

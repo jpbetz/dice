@@ -1079,7 +1079,6 @@ function removeRollDice(rollId, instant = false) {
 // until its own playback settles (§7.5); the pending clear runs from the
 // completion paths (stepPlayback's showResults / ceremonyFinish).
 function applyClearRoll(rollId) {
-  cancelBannerRetire(rollId);
   if (!rollId) return;
   // cleared implies off-shelf (§7.7): the state row flips first so a
   // roll-collected landing later in the same burst becomes a silent no-op.
@@ -1516,7 +1515,6 @@ document.addEventListener('pointerdown', (e) => {
 // exactly as clears defer — always-interruptible playback keeps the stage,
 // and the collect lands from the completion paths (runPendingCollect).
 function applyRollCollected(rollId, seq, animate = true) {
-  cancelBannerRetire(rollId);
   if (!rollId || !Number.isInteger(seq) || seq < 1) return;
   const st = rollState(rollId);
   st.collected = seq;
@@ -1617,7 +1615,6 @@ function flushPendingRollLog() {
 // a roll this sweep just took away. Online the server flags its own log the same
 // way, so both sides of a swept table agree with a fresh join.
 function clearTable() {
-  cancelBannerRetire();
   flushPendingRollLog();
   pendingClears.clear();
   pendingCollects.clear();
@@ -2259,49 +2256,30 @@ function hideBanner() {
 // next roll — it has no other timed exit — and on a phone it is a serious
 // share of the screen.
 //
-// Two bails, both load-bearing:
-//   · A HIDDEN roll's card never retires. It carries Reveal, and with the
-//     dice now staying on the felt UNCOLLECTED, the roll has no `.collected`
-//     log row either — so this card is the only door to revealing it. The
-//     old code bailed here for "standing tension"; the reason is now
-//     structural.
-//   · Hovering, or a thumb down, holds the clock — you are reading.
-// Spectators retire too, which the collect clock could not do: hiding your
-// own card is local, where collecting for the roller was a wire act.
+// …and then the card was ALSO put on a clock — 7 s, hover-held — on the
+// reasoning that it is "chrome" and a phone has little room. Joe, one day
+// later: "It disappears and there is no obvious way to get it back besides
+// open the log. I expect a core CUJ will be to do a roll and then spend
+// minutes analyzing the result to incorporate it into actual gameplay."
 //
-// Tests boot with it off (__diceTestMode) and opt in via setBannerRetireMs.
-const BANNER_RETIRE_MS = 7000; // the read, unhurried; hover holds it open
-let bannerRetireMs = (typeof window !== 'undefined' && window.__diceTestMode) ? 0 : BANNER_RETIRE_MS;
-let bannerRetire = { rollId: null, timer: null };
-function cancelBannerRetire(rollId = null) {
-  if (rollId && bannerRetire.rollId !== rollId) return;
-  clearTimeout(bannerRetire.timer);
-  bannerRetire = { rollId: null, timer: null };
-}
-// No retry ladder here, and that is the point of the split: collecting had to
-// wait for a roll to be settled and still actionable, so it needed one. The
-// card is already on screen — there is nothing to wait for.
-function armBannerRetire(entry) {
-  if (!bannerRetireMs || !entry || !entry.rollId) return;
-  if (entry.revealed === false || entryHidden(entry)) return; // a reveal re-arms
-  cancelBannerRetire();
-  const rid = entry.rollId;
-  bannerRetire.rollId = rid;
-  bannerRetire.timer = setTimeout(() => {
-    if (bannerRetire.rollId !== rid) return;   // superseded while queued
-    bannerRetire = { rollId: null, timer: null };
-    if (lastEntry && lastEntry.rollId === rid) hideBanner();
-  }, bannerRetireMs);
-}
-// Reading holds the clock; leaving restarts it whole. A thumb reads too:
-// touch fires no mouseenter, so without the pointer pair the card goes out
-// from under whoever is still reading it.
-banner.addEventListener('mouseenter', () => clearTimeout(bannerRetire.timer));
-banner.addEventListener('mouseleave', () => { if (lastEntry) armBannerRetire(lastEntry); });
-banner.addEventListener('pointerdown', () => clearTimeout(bannerRetire.timer));
-for (const ev of ['pointerup', 'pointercancel']) {
-  banner.addEventListener(ev, () => { if (lastEntry) armBannerRetire(lastEntry); });
-}
+// The card is not chrome. It is the READ — the per-die breakdown, the
+// sources, the meanings, the pool key — and the dice on the felt cannot
+// replace it. So there is no clock here at all, and there is no right value
+// for one: nothing between 7 s and "minutes" is a duration, it is just a
+// longer ambush. The hover-hold was already the tell, twice over — a timer
+// that has to detect reading and stop is a timer that should not exist.
+//
+// What retires the card is what retires the dice, and they now agree:
+//   · the next roll arrives (hideBanner at the top of playRoll), or
+//   · you dismiss it, which the card has always offered.
+// A hidden roll's card is unaffected and always was — it carries Reveal, and
+// an uncollected roll has no `.collected` log row, so it is the only door.
+//
+// What the clock was really protecting is real but different: on a phone the
+// card is a serious share of the screen, and "dismiss to see the felt" is a
+// worse deal there than here. That is a LAYOUT problem, it belongs with C25
+// Stage 2's bottom strip, and a countdown was never a fix for it — it took
+// the read away from everyone, on every device, to buy back space on one.
 
 // ---------------------------------------------------------------------------
 // Roll outlines (Joe 2026-08-03): the card's removal highlight doubles as a
@@ -2372,8 +2350,6 @@ function outlineRollDice(on) {
 }
 banner.addEventListener('mouseenter', () => outlineRollDice(true));
 banner.addEventListener('mouseleave', () => outlineRollDice(false));
-banner.addEventListener('focusin', () => clearTimeout(bannerRetire.timer));
-banner.addEventListener('focusout', () => { if (lastEntry) armBannerRetire(lastEntry); });
 const chips = []; // {el, die}
 // Quiet by default (P1): the floating die numbers are an opt-in ambient
 // layer ('Show numbers on dice', settings "Just you"). The result stays
@@ -3059,7 +3035,6 @@ function renderRollResults(entry, dice, fx = true) {
     resultVerdictEl.textContent || null,
   ].filter(Boolean).join(' — '));
   renderBannerActions(entry);
-  armBannerRetire(entry); // every banner paint restarts the card's own clock
   const crit = entryCrit(entry);
   // The banner's own dress follows the READING — a crit landed, and the
   // banner says so under every pool size. Only the wash is rationed (U18).
@@ -5753,8 +5728,10 @@ window.__diceDebug = {
   // The CARD's self-retire clock (Joe 2026-08-10). Was setAutoCollectMs, which
   // collected the roll; the dice stay on the felt until the next roll now and
   // only the banner is on a timer. 0 disables, which is how tests boot.
-  get bannerRetireMs() { return bannerRetireMs; },
-  setBannerRetireMs(ms) { bannerRetireMs = Math.max(0, ms | 0); return bannerRetireMs; },
+  // The card has no clock (2026-08-10). Tools and scenarios that used to
+  // silence one now say what they actually want: put it away NOW. Named
+  // `dismissBanner` so the body cannot be misread as recursing into itself.
+  dismissBanner() { hideBanner(); return true; },
   // the Sheet Pass (2026-08-01): drive the identity strip + ghost tiles
   renderGroups() { renderGroups(); return true; }, // an arbitrary repaint, for repaint-survival checks
   poolPopoverOpen(id) {

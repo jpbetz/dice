@@ -57,7 +57,7 @@ export default async function run(stage) {
   console.log(await stage.shot(a, join(OUT_DIR, 'clean-draft-hover.png')));
 
   // 4) roll, let auto-collect tidy it, hover the cluster: the quick ✕
-  await a.dbg('setBannerRetireMs(400)');
+  await a.dbg('dismissBanner()'); // the card has no clock; say what we mean
   await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}))`);
   await a.settle();
   await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,

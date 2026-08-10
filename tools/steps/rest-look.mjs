@@ -47,7 +47,6 @@ export default async function run(stage, [seed = '1000']) {
   const a = await stage.tab('localhost', 'Rest');
   await a.page.browser.send('Emulation.setDeviceMetricsOverride',
     { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
-  await a.dbg('setBannerRetireMs(0)');
   await a.dbg(`setZoom('wide')`); // 20 dice at 'close' fills the frame with one face
 
   const shipped = { phys: await a.dbg('physics'), nudge: await a.dbg('nudge') };

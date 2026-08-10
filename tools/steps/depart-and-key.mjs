@@ -35,7 +35,6 @@ export default async function run(stage, [styles = 'lift,fold,sink']) {
     { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
   // The tidy-away clock is wall-time, not sim-time: it would collect the roll
   // out from under a held clock while we were still looking at it.
-  await a.dbg('setBannerRetireMs(0)');
 
   // ---- 1. the hover key -----------------------------------------------
   await a.roll(NOTATION);

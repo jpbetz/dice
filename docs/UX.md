@@ -1129,7 +1129,7 @@ a stale row is worse than no table.
 | Saved-pools rack + shelves | §7.9's THE SHEET PASS — identity edits by id, creation-as-editing, the ✎ row — and its DEALT RACK amendment · §7.18 for what the ✎ gate covers | §7.17's region head, amended below: `SAVED POOLS` no longer stands over your own rack |
 | Collapsed launcher (the rail) | §7.22 — 112px, a row is a word, the standing verb, 2i-G · §7.23's "The collapsed column" — the source switch, the dice list, the plate at rail scale | §7.9's collapsed paragraph: it predates the second source list and describes a column that holds only pools (its 56px history is already struck there) |
 | Intent card · dock strip (the declaration) | §2.4's staging timeline, phases 1–8 · §7.6 for the moment flags and `# Title \| Subtitle` · **§7.24** — the target renders under every system and the profile only NAMES it (`targetWord`); the flat `+5` is arithmetic and does not; `#intent-notation` stays a whole verbatim canonical, `dc15` included | §2.4 phase 0's user-held dwell and Roll button (shipped: a fixed `CEREMONY_DECLARE_S = 1.35` s, no button) · §2.1 / §2.3's experience records — the moment ships as notation flags · any reading in which the badge's label is a fixed string |
-| Result banner | §7.11b — the folded card, the hover read, the beacon · **§7.28** — the card retires at 7 s and the DICE STAY until the next roll · §7.21 — the named primary verb, the retired watermark · **§7.24** — `VS DC 15` renders under every system, the adjudication only where a sum does, and the hero slot names the rung (`Face down` / `Whispered`) where the mute gold `?` used to sit | §7.9's Done-at-rest and its ~6 s clock (the shipped clock is 3 s) · §7.7.2's ⟳ / Collect / ✕ trio · §2.5 (retired 2026-08-08) |
+| Result banner | §7.11b — the folded card, the hover read, the beacon · **§7.28** — neither the card nor the dice are on a clock; the next roll retires both · §7.21 — the named primary verb, the retired watermark · **§7.24** — `VS DC 15` renders under every system, the adjudication only where a sum does, and the hero slot names the rung (`Face down` / `Whispered`) where the mute gold `?` used to sit | §7.9's Done-at-rest and its ~6 s clock (the shipped clock is 3 s) · §7.7.2's ⟳ / Collect / ✕ trio · §2.5 (retired 2026-08-08) |
 | Verdict card | §7.16's THE FLOW TO COLLECTED — a folded card whose clock shelves the roll · §7.21 — `❯❯ Skip` repaints to `✕ Clear` when the beat lands · **§7.24** — the stake goes into `#verdict-margin`, written ONCE above and outside every branch; the hero holds the reading and the two never share a slot | §7.7.2's verdict half (struck there) · §2.4 phase 0's user-held dwell and Roll button (shipped: a 1.35 s timer, no button) · §2.5's one hero slot — retired, struck there. **The card has no subtitle element under any system** (§7.24's deferral); do not read the eight-surface table as though it does |
 | Peek | §7.7.1 for what a peek is · §7.11b's "folded card, shelf edition" · §7.21 — its primary is always `✕ Clear`, housekeeping being anyone's · **§7.24** — the stake, and the held word in the total slot (the `?` survives only for `!entry`, and under a totals lens) | §7.15's one-✕ rule — retired, struck below · §7.9's "the peek carries a prominent ✕ at its base" amendment · §2.5 (retired) |
 | Roll log | No single section. §7.9 for the rail-foot flyout and key `l` · §7.12 for the compact grouped line (the per-die ROWS belong to the other three surfaces) · §7.15's "The log says so" for `reroll` / `rerolled` · **§7.24** — `vs 15` with no `✓`/`✗` where nothing sums, and no dangling `+5` feeding an empty total column | §2.5 (retired) |
@@ -3945,7 +3945,7 @@ together."* U23's token layer is the vocabulary; C13 and U20 are about this
 same surface and should be folded in rather than solved twice.
 
 
-### 7.28 The card retires; the dice stay (2026-08-10)
+### 7.28 Nothing about a finished roll is on a clock (2026-08-10)
 
 *Joe, after §7.27 took the shelf off the felt: "It seems weird to make the
 dice disappear after just a few seconds. I think we should leave them on the
@@ -3966,26 +3966,30 @@ before the incoming dice land, with `soloAutoCollect` mirroring it offline.
 race between clients. The client clock never added to that guarantee; it only
 decided how long you got to look.
 
-**One gesture was doing two jobs, and only one survives.** Tidying the DICE
-and retiring the CARD were the same timer. The dice are the result and stay
-until the next roll; the banner is chrome and gets out of the way on its own,
-at `BANNER_RETIRE_MS` = 7 s, hover-held. This is the same seam as
-`critFor`/`critCeremony` — the information and the emphasis retire on
-different clocks. Without a card clock the banner would stand until the next
-roll: it has no other timed exit, and on a phone it covers a serious share of
-the screen.
+**One gesture was doing two jobs — and then the second job was rebuilt as its
+own clock, wrongly.** Tidying the DICE and retiring the CARD were the same
+timer. The dice came off it first ("leave them on the table until another roll
+is started"), and the card was left on 7 s of its own, hover-held, on the
+reasoning that it is chrome. **It is not chrome.** Joe, one day later: *"It
+disappears and there is no obvious way to get it back besides open the log. I
+expect a core CUJ will be to do a roll and then spend minutes analyzing the
+result to incorporate it into actual gameplay."* The card is the READ — the
+per-die breakdown, the sources, the meanings, the pool key — and the dice on
+the felt do not carry any of it.
 
-**Two bails, both load-bearing:**
+So there is no clock, and **there is no right value for one**: nothing between
+7 s and "minutes" is a duration, it is a longer ambush. The hover-hold was the
+tell twice over — a timer that has to detect reading and stop is a timer that
+should not exist. What retires the card is what retires the dice: the next
+roll arrives, or you dismiss it. A hidden roll's card is unaffected and always
+was — it carries Reveal, and an uncollected roll has no `.collected` log row,
+so it is the only door.
 
-- **A hidden roll's card never retires.** It carries Reveal — and now that the
-  dice stay UNCOLLECTED, the roll has no `.collected` log row either, so this
-  card is the only door to revealing it. The old clock bailed here for
-  "standing tension"; the reason is now structural.
-- **Hover, or a thumb down, holds it.** You are reading.
-
-**Spectators retire too**, which the collect clock could not do: hiding your
-own card is local, where collecting for the roller was a wire act. That
-asymmetry existed for the wire, not for the reading, and it goes with it.
+**What the clock was protecting is real, and is a layout problem.** On a phone
+the card is a serious share of the screen, and "dismiss it to see the felt" is
+a worse deal there than on a desktop. That belongs with **C25 Stage 2**'s
+bottom strip. A countdown was never a fix for it: it took the read away from
+everyone, on every device, to buy back space on one.
 
 **What got simpler.** The collect clock carried a retry ladder — `lastRollActionable`,
 a `rollStates` re-check, a 60-try bound — because a collect had to wait for a
@@ -3994,5 +3998,71 @@ used to strand the roll forever. The card is already on screen. There is
 nothing to wait for and no ladder.
 
 **Escape hatches unchanged:** the corner ✕, Esc, and the card body still clear
-on demand. `__diceDebug.setBannerRetireMs` replaces `setAutoCollectMs`; 0
-disables, which is how tests boot.
+on demand — the card always had a manual exit, which is most of why the timer
+was redundant. `setAutoCollectMs` and its replacement `setBannerRetireMs` are
+both gone; `__diceDebug.dismissBanner()` is what tools and scenarios use to
+put the card away, because "hide it now" is what they always actually wanted.
+
+### 7.29 How long a throw takes to watch (2026-08-10)
+
+Joe, describing what he sees: *"The dice often don't land with a full face
+flush against the table surface immediately (due to collisions between
+dice…) and there is a very slow, very shaky process by which the dice then
+slide and wiggle-move until they are stable. It can take quite some time and
+it's super awkward to watch."* He offered a trade — glitching dice, slow
+wiggle, or dice repelled by invisible boxes slightly larger than themselves —
+and picked the third.
+
+**The trade was not available and did not need to be.** The colliders are
+exact convex hulls built from each die's own render mesh (`buildShape`,
+js/dice.js) — not boxes, not spheres, no inflation. Nothing overlaps and
+nothing repels. Growing them would have made contact *more* visible, not less,
+because the wiggle was never a shape problem.
+
+**Most of the tail was not dice moving.** `playRoll` fast-forwards the whole
+throw offline and plays the keyframes back, and the played length is decided
+by one number: the frame the LAST die stopped. A die judged **cocked** was
+refused a freeze, so it stayed dynamic — and then just sat there while the
+clock ran to `SETTLE_CAP` = 9 s. Across 36 measured throws, **15 of the 17
+dice that reached the cap were motionless when it fired.** 20d6 capped every
+time. What you watched after the first second was, largely, a still table.
+
+**The cocked bar reads like a fairness rule and is not one.** Face correction
+rotates each die's target face to exactly world-up whatever the physics did,
+so `cockedDot` never touched a VALUE. All it decided was whether a die may
+rest against its neighbour the way dice actually do. At 0.82 (~35°) it refused
+constantly; at **0.6** (~53°) it never fires in normal play and survives only
+as a valve for a rest no die could hold. That also gives back
+`lastLanding.timedOut` — the ceremony's "declined to resolve" signal — which
+had been firing on 13 of 16 big rolls.
+
+**The felt was also frictionless.** The contact numbers were generic bouncy-
+dice values with cannon's 0.01 default damping left in, i.e. none — a die had
+almost no way to lose energy, so it skated and micro-bounced. `PHYS` now
+grips, deadens and damps. Dice stop nearer where they land, which reads
+tidier and serves goal 5.
+
+**The tail cut is the backstop.** A die force-frozen at the cap is credited
+with its last MOVING frame, not the cap, and the keyframes are truncated
+there — so the pose playback ends on and the pose correction reads are the
+same object, for a timed-out die as for a frozen one. It never lengthens a
+throw, and it only ever reclaims time from a die that had stopped.
+
+| pool | before | after | caps before → after |
+|---|---|---|---|
+| 1d20 | 1.37s | 1.29s | 0 → 0 |
+| Soul Deal (2d8+1d4+1d6) | 2.57s | **1.48s** | 3/16 → **0** |
+| 4d6 | 2.06s | 1.58s | 0 → 0 |
+| 8d6 | 2.42s | 2.79s | 0 → 0 |
+| 20d6 | 7.26s | 5.63s | 13/16 → 3 |
+
+8d6 is the one regression. Measured **paired** — the same 16 seeds through
+every candidate, via `__diceDebug.throwSeeded` — because the first, unpaired
+sweep concluded the materials "barely move the tail" and that was variance
+talking, on the change that turned out to be the largest single win.
+
+**What is still open.** 20d6 can still reach the cap with dice genuinely
+tumbling; that is real physics and a smaller `SETTLE_CAP` would truncate real
+motion, so it is left alone. Pinned by `settle-tail`, which has to test the
+two halves separately: the rest rule made the tail cut go quiet on ordinary
+throws, so the cut is priced under the old 0.82 bar where it still bites.
