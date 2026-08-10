@@ -1195,6 +1195,21 @@ const SETTLE_CAP = 9;      // hard cap on simulated seconds per roll
 // are what prove it. Driven only by __diceDebug.setSettleGate.
 const SETTLEGATE = { mode: 'velocity', eps: 0.02 };
 
+// TWENTY-EIGHT FRAMES, NOT TWENTY-SEVEN, AND THE DIFFERENCE IS A FLOAT. The
+// bake accumulates `stillTime += FIXED_DT` and tests `>= SETTLE_STILL`, and
+// twenty-seven additions of 1/60 sum to 0.44999999999999996 — under the bar.
+// The twenty-eighth frame is the one that earns the freeze. Every comment in
+// this file that said "0.45 s = exactly 27 frames" was off by one, and so was
+// the first version of settleProbe, whose re-derivation of endDisp off the
+// film then disagreed with the mechanism by up to 11% of eps on 20d6. Derived
+// by running the loop rather than by dividing, so it cannot drift from it.
+const SETTLE_STILL_FRAMES = (() => {
+  let t = 0;
+  let n = 0;
+  while (t < SETTLE_STILL) { t += FIXED_DT; n++; }
+  return n;
+})();
+
 // What to do about a die that stops at an angle. `lift` is a VERTICAL HURL —
 // the die leaves the pile, flies, and lands somewhere else — so each nudge
 // buys a flat die at the cost of a second of extra throw, and it is the
@@ -2467,8 +2482,9 @@ function playRoll(roll) {
   for (const d of dice) d.body.removeEventListener('collide', recordCollision);
 
   // --- the TRUE settle frame ----------------------------------------------
-  // `stillTime` accrues for SETTLE_STILL (0.45 s = exactly 27 frames) BEFORE a
-  // die is judged landed, so the freeze test concedes 27 frames after the die
+  // `stillTime` accrues for SETTLE_STILL (0.45 s = 28 frames, not 27 — see
+  // SETTLE_STILL_FRAMES) BEFORE a die is judged landed, so the freeze test
+  // concedes 28 frames after the die
   // actually stopped. Every beat keyed to "the settle" therefore fired on a
   // picture that had already been motionless for nearly half a second — the
   // 0.3 s stage flash at stageHitStop lands entirely inside that dead window.
@@ -6187,7 +6203,7 @@ window.__diceDebug = {
   settleProbe() {
     const r = currentRoll;
     if (!r) return null;
-    const want = Math.round(SETTLE_STILL / FIXED_DT);
+    const want = SETTLE_STILL_FRAMES;
     const off = [new THREE.Vector3(), new THREE.Vector3()];
     const p = new THREE.Vector3();
     return r.landings.map((l, i) => {
