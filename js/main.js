@@ -682,6 +682,87 @@ let THROW_TARGET = 0.4;
 // so any raise measured from here is measured from 0.4 / 0.35.
 const SLEEP = { speed: 0.4, time: 0.35 };
 
+// --- two more inert instruments, from the gravity reading (C30d) -----------
+//
+// THE SIM IS IN SLOW MOTION, AND THAT IS ARITHMETIC, NOT TASTE. GRAVITY is
+// -110 in a world where a d6 measures 1.35 units across. A real d6 is ~16 mm,
+// so one unit here is ~11.9 mm and Earth's 9.81 m/s² is 9810 mm/s² ≈ 826
+// units/s². The world runs at 110. That is 7.5x too weak, and since a
+// trajectory's timescale goes as 1/sqrt(g), everything on this table falls,
+// bounces and settles sqrt(7.5) = 2.7x too SLOWLY. Joe's words — "bounding
+// like they're on the moon" — are a correct reading of the number.
+// Corroborated independently: NUDGE.lift 7 buys 2*7/110 = 0.13 s of hang
+// time, which is a hop, and it looks like a float.
+//
+// THE THEOREM THAT MAKES THIS CHEAP. Newton's equations are invariant under
+// t -> t/k when g -> k²g and v -> k·v: substitute and every term scales the
+// same way. So a world at 7.5x gravity, thrown 2.7x harder, traces the
+// IDENTICAL curve through space and comes to rest in the IDENTICAL pose — it
+// just gets there 2.7x sooner. Restitution, friction and the damping
+// coefficients are all dimensionless or per-unit-time and ride along.
+//
+// Which means the correct fix is not a physics change at all. playRoll bakes
+// the whole throw into keyframes before frame one; the projector that plays
+// them back is stepPlayback. Running that projector k times faster is the
+// same film — same trajectory, same rest positions, same pile rate, same
+// baked bytes, same seed replay — with none of the risk a gravity change
+// carries. `k` = 1 is the shipped speed and is byte-identical by
+// construction: stepPlayback multiplies by it and nothing else reads it.
+//
+// WHAT RIDES THE TEMPO AND WHAT DOES NOT. Scaled: the keyframe clock, and
+// therefore every event recorded against it — impact sounds, particle
+// bursts, felt marks, the shock ring, the cinematic slow-mo window and a
+// set's rate graph (a projector speeds up the whole reel, its slow passage
+// included). Unscaled: the ceremony's declare beat and settle phase (a
+// held declaration and a verdict unfold are reading time, not dice), the
+// reveal flip, the sink, the rest cadence, camera easing, shader/particle/
+// decal lifetimes, and every CSS transition. See stepPlayback and tick.
+const TEMPO = { k: 1 };
+
+// FLOOR MAGNETIZE: the restitution threshold cannon-es does not have.
+// Bullet and PhysX both cut restitution to zero below a relative impact
+// speed, because a coefficient of restitution is a fiction at low speed —
+// a real die that lands slowly does not bounce, it sticks. cannon-es applies
+// the same 0.35 to a 20 unit/s slam and a 0.5 unit/s tap, so the tap bounces
+// forever in miniature, which is the dither.
+//
+// `vy` is that missing threshold, in units/s: after each world.step, a die
+// IN CONTACT WITH THE FLOOR that is moving UPWARD slower than `vy` has its
+// vertical velocity zeroed. 0 skips the scan entirely — byte-identical.
+//
+// Three deliberate restrictions, each of which the mechanism needs:
+//
+//   UPWARD ONLY. Clamping a downward vy would be catastrophic, not merely
+//   wrong: gravity adds 110/60 = 1.83 units/s per step, so a threshold of 2
+//   would re-zero a falling die every single step and hover it. Upward-only
+//   can never fight gravity — it can only decline to return energy.
+//
+//   FLOOR CONTACT ONLY, by body identity. A die in flight is never touched,
+//   so no trajectory is altered before it lands; a die resting on ANOTHER
+//   die is not the floor's business (and leaving it alone keeps the pile
+//   measurement honest — this mechanism must not be able to launder a stack
+//   into a flat reading). Contacts come from world.contacts, which cannon
+//   fills during the step we just ran.
+//
+//   VERTICAL ONLY. Horizontal skid is how dice separate on this mat — that
+//   is the whole reason the felt tuning was refused (C30c) — so the clamp
+//   never touches vx/vz. It takes the energy that was going into the hop and
+//   leaves the energy that is doing the fanning out.
+//
+// The band is small by construction. A hop of vy reaches v²/2g, so vy = 1 is
+// 0.005 units of air (0.3% of a die) and vy = 4 is 0.073 (5%). Everything
+// this can suppress is invisible as motion and visible only as noise.
+const MAGNET = { vy: 0 };
+
+// Per-body flags applied at spawn. `allowSleep: null` means "leave cannon's
+// own default alone" — the inert setting. This exists for ONE attribution
+// question (C30d): deaden does not replay across a tab's lifetime, and the
+// suspicion is that a deadened die hovers on the sleep boundary where
+// accumulated world.time can tip it either way. allowSleep=false removes the
+// boundary. It is NOT a ship candidate — turning sleep off changes shipped
+// trajectories too, so it gets its own baseline rather than a gate.
+const BODYFLAGS = { allowSleep: null };
+
 function addStaticPlane(material, position, euler) {
   const body = new CANNON.Body({ mass: 0, shape: new CANNON.Plane(), material });
   body.position.set(...position);
@@ -689,7 +770,10 @@ function addStaticPlane(material, position, euler) {
   world.addBody(body);
   return body;
 }
-addStaticPlane(floorMat, [0, 0, 0], [-Math.PI / 2, 0, 0]);                   // floor
+// The felt itself, held by reference: MAGNET decides whether a contact is
+// the floor's by body identity rather than by height, so this is not a
+// decoration. Static planes are never removed, so the reference never dangles.
+const floorBody = addStaticPlane(floorMat, [0, 0, 0], [-Math.PI / 2, 0, 0]);
 // Wall refs — applyZoom mutates their positions in place (cannon's SAP
 // broadphase is safe with in-place moves on static bodies; removing + adding
 // would shuffle body ordering and reseed collision-pair enumeration, which is
@@ -746,6 +830,25 @@ function rollSetOf(opts) {
   return wireSet();
 }
 let lastSoundAt = 0;
+let lastSoundStrength = 0;
+// THE CLICK CAP, AND WHY IT NEEDED A SECOND CLAUSE (C30d). Impacts are
+// recorded against the playback clock, so running that clock k times faster
+// compresses the whole train: a landing that spread eight contacts over
+// 240 ms delivers them in 120 ms at k=2. The 35 ms floor below has always
+// been WALL clock, so it already makes machine-gunning impossible — the
+// tempo cannot buy more than ~28 clicks a second however fast the film runs.
+//
+// What the tempo breaks is which click survives. A plain "too soon, drop it"
+// is order-dependent, and the order it favours is wrong: a die's landing
+// sequence is a hard THUMP followed by small chatter, and once the train
+// compresses, a stray tick from a neighbour can arrive first and silence the
+// thump behind it. So the floor yields to a hit that is decisively harder
+// than the one just played (the landing, arriving inside another die's
+// chatter) — and a HARD floor underneath it means even a strictly escalating
+// train cannot exceed ~83/s. Cap the density, keep the thumps.
+const IMPACT_MIN_GAP_MS = 35;   // the shipped floor: two clicks closer are one click
+const IMPACT_HARD_GAP_MS = 12;  // …that nothing may cross, however loud
+const IMPACT_OVERRIDE = 1.6;    // "decisively harder" — a thump against chatter
 
 // IMPACT VOICE (Slice 1, Joe 2026-08-04 aesthetic pass): the per-set
 // sound identity — one function replaces the single hard-coded click
@@ -777,8 +880,11 @@ const IMPACT_VOICES = {
 function playImpact(strength, voice) {
   if (!soundOn) return;
   const now = performance.now();
-  if (now - lastSoundAt < 35) return;
+  const since = now - lastSoundAt;
+  if (since < IMPACT_HARD_GAP_MS) return;
+  if (since < IMPACT_MIN_GAP_MS && strength <= lastSoundStrength * IMPACT_OVERRIDE) return;
   lastSoundAt = now;
+  lastSoundStrength = strength;
   if (!audioCtx) {
     try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
   }
@@ -1120,6 +1226,8 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
   // Inert at cannon's own defaults; see SLEEP.
   body.sleepSpeedLimit = SLEEP.speed;
   body.sleepTimeLimit = SLEEP.time;
+  // Attribution instrument only (BODYFLAGS); null leaves the body untouched.
+  if (BODYFLAGS.allowSleep !== null) body.allowSleep = BODYFLAGS.allowSleep;
 
   // line the throw up along the chosen edge of the table. The clamp is
   // tighter than TABLE_W so the outer dice never spawn inside a wall at
@@ -1986,6 +2094,10 @@ function playRoll(roll) {
   };
 
   let nudges = 0;
+  // How many times the floor clamp actually fired this bake. Stays 0 while
+  // MAGNET.vy is 0 (the loop body is skipped), so it doubles as the sentinel
+  // check an e2e scenario can assert on: mechanism off means mechanism silent.
+  let magnetClamps = 0;
   for (;;) {
     stepContacts = 0; // the per-step contact budget refills; see the recorder
     // Speed-gated damping (DAMPGATE, off by default): the ONE place dice are
@@ -2001,6 +2113,25 @@ function playRoll(roll) {
     }
     world.step(FIXED_DT);
     simTime += FIXED_DT;
+
+    // FLOOR MAGNETIZE (MAGNET, off by default): the restitution threshold,
+    // applied to the contacts cannon just generated. `world.contacts` is
+    // filled by narrowphase inside the step above and survives it, so this
+    // reads the collisions that actually happened rather than guessing from
+    // height. Upward-only, floor-only, vertical-only — see the MAGNET block.
+    // Frozen dice are STATIC and cannot pair with a static floor in the
+    // broadphase, so they never appear here; the mass test is belt and
+    // braces for a body mid-transition.
+    if (MAGNET.vy > 0) {
+      const cs = world.contacts;
+      for (let ci = 0; ci < cs.length; ci++) {
+        const c = cs[ci];
+        const other = c.bi === floorBody ? c.bj : (c.bj === floorBody ? c.bi : null);
+        if (other === null || other.mass === 0) continue;
+        const vy = other.velocity.y;
+        if (vy > 0 && vy < MAGNET.vy) { other.velocity.y = 0; magnetClamps++; }
+      }
+    }
 
     // Per-die stillness accumulator + freeze test. Thresholds match the old
     // group predicate verbatim (do NOT tune here). Cocked dice never freeze —
@@ -2241,6 +2372,7 @@ function playRoll(roll) {
     landings,
     lastLanding,
     nudges, // how many times a cocked die had to be re-thrown (settleProfile)
+    magnetClamps, // floor-clamp firings this bake (0 whenever MAGNET is off)
     time: 0,
     soundIdx: 0,
     decalsStamped: 0, // Level 4a per-roll cap counter (the drain reads it)
@@ -2298,7 +2430,13 @@ function rollDice(types, label, opts = {}) {
 // deterministically; CSS animations only decorate. Phase order:
 //   declare (playback held) → tumble (this playback, cinematic slow-mo at the
 //   end) → settle (hit-stop, chip stagger, verdict unfold) → done.
-function stepPlayback(dt) {
+// `tempo` is the projector speed and defaults to 1, so every caller that is
+// not a real-time frame — sim(), fastForwardPlayback — plays the film at its
+// baked speed and stays frame-deterministic. Only animate() passes TEMPO.k.
+// It is applied to `step` alone, BELOW the two ceremony phases: a declaration
+// beat and a verdict unfold are reading time, not dice, and speeding those up
+// would be a UX change wearing a physics change's clothes.
+function stepPlayback(dt, tempo = 1) {
   const roll = currentRoll;
   if (!roll || roll.done) return;
   const cer = roll.ceremony;
@@ -2345,6 +2483,13 @@ function stepPlayback(dt) {
       step *= rate.rate + (1 - rate.rate) * t;
     }
   }
+  // The projector, last and multiplicative: the cinematic ease and the rate
+  // graph are functions of FILM time (roll.duration - roll.time), so they
+  // pick the same passage of the reel whatever speed it is running at — and
+  // that passage then runs k times faster too, which is what "same film,
+  // faster projector" has to mean. Everything scheduled on roll.time — the
+  // impact drain, bursts, marks, the ring — compresses with it for free.
+  if (tempo !== 1) step *= tempo;
   roll.time += step;
 
   const last = roll.frames - 1;
@@ -4765,7 +4910,12 @@ function stepResting() {
 
 // The physics world is only stepped inside playRoll's synchronous
 // fast-forward; the rAF loop just advances keyframe playback.
-function tick(dt, render = true) {
+// `realtime` marks the ONE caller that is a wall-clock frame (animate). The
+// playback tempo applies there and nowhere else, so __diceDebug.sim(n) — and
+// therefore every e2e scenario — keeps stepping the film one baked frame at a
+// time no matter what k is set to. A tempo that leaked into sim() would make
+// the whole suite's timing a function of a debug knob.
+function tick(dt, render = true, realtime = false) {
   // Themed-set clocks (Tier 6 §9): the Level 2 shader uniform and the
   // Level 3 particle field advance with the same dt discipline as
   // everything else (holdClock freezes both — deterministic screenshots).
@@ -4773,7 +4923,7 @@ function tick(dt, render = true) {
   particleField.tick(dt, SHADER_TIME.value);
   decalField.tick(dt);
   dieLights.tick(dt, SHADER_TIME.value);
-  stepPlayback(dt);
+  stepPlayback(dt, realtime ? TEMPO.k : 1);
   stepSinking(dt);   // per-roll Done departures (§7.5)
   stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
   stepRevealing(dt); // reveal correction flips (goal 11)
@@ -4848,7 +4998,7 @@ let clockHeld = false;
 function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.1);
-  tick(clockHeld ? 0 : dt);
+  tick(clockHeld ? 0 : dt, true, true);
 }
 animate();
 
@@ -5530,6 +5680,20 @@ window.__diceDebug = {
   setThrowTarget(f) { THROW_TARGET = typeof f === 'number' ? f : THROW_TARGET; return THROW_TARGET; },
   get sleep() { return { ...SLEEP }; },
   setSleep(o) { Object.assign(SLEEP, o || {}); return { ...SLEEP }; },
+  // Playback tempo (C30d): the projector speed on already-baked keyframes.
+  // 1 is shipped and byte-identical; k>1 plays the same film k times faster.
+  // Takes effect on the NEXT real-time frame — no reload, no re-bake.
+  get tempo() { return TEMPO.k; },
+  setTempo(k) { TEMPO.k = typeof k === 'number' && k > 0 ? k : TEMPO.k; return TEMPO.k; },
+  // Floor magnetize (C30d): the restitution threshold, in units/s. 0 is off
+  // and skips the contact scan. Takes effect on the NEXT roll — playRoll
+  // bakes the whole throw before frame one.
+  get magnet() { return { ...MAGNET }; },
+  setMagnet(o) { Object.assign(MAGNET, o || {}); return { ...MAGNET }; },
+  // Attribution only, not a ship candidate — see BODYFLAGS. null restores
+  // cannon's default (dice sleep); false keeps every die awake to its freeze.
+  get bodyFlags() { return { ...BODYFLAGS }; },
+  setBodyFlags(o) { Object.assign(BODYFLAGS, o || {}); return { ...BODYFLAGS }; },
   get nudge() { return { ...NUDGE }; },
   setNudge(p) { Object.assign(NUDGE, p || {}); return { ...NUDGE }; },
   // Throw a chosen pool on a CHOSEN SEED. The seed decides the whole tumble
@@ -5614,6 +5778,9 @@ window.__diceDebug = {
       settleSpreadS: Math.round(((Math.max(...fr) - Math.min(...fr)) * FIXED_DT) * 1000) / 1000,
       timedOut: r.landings.filter((l) => l.timedOut).length,
       nudged: r.nudges,
+      // Floor-clamp firings during the bake. Exactly 0 while MAGNET is off,
+      // which is what makes it a sentinel and not just a statistic.
+      magnetClamps: r.magnetClamps,
       // WHY a die timed out, which is the whole diagnosis. `parked` counts
       // dice that were motionless when the cap fired — they were not still
       // tumbling, something REFUSED to freeze them. `moving` is the honest
@@ -6124,7 +6291,12 @@ window.__diceDebug = {
   // refactor reintroduces swapFloorMap-style dispose+new churn on shelf
   // changes, theme swaps, or mat-decal open/close.
   floorTextureId() { return (floor.material.map || {}).uuid || null; },
-  sim(frames) { for (let i = 0; i < frames; i++) tick(1 / 60, false); },
+  // sim(n) is the FILM stepper and rides no tempo — n frames of baked
+  // keyframes, always. sim(n, true) is the wall-clock stepper: it asks for
+  // the same 1/60 s of REAL time animate() would deliver, so at k=2 the
+  // playback drains in half as many calls. That difference is the tempo
+  // theorem, and measuring it in frames beats timing a headless browser.
+  sim(frames, realtime = false) { for (let i = 0; i < frames; i++) tick(1 / 60, false, !!realtime); },
   // Freeze the rAF clock: with it held, only sim() advances playback, which is
   // how a scenario parks a tab mid-tumble (a reveal arriving THERE must defer).
   holdClock(on) { clockHeld = !!on; return clockHeld; },
