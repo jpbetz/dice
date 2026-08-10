@@ -1245,16 +1245,34 @@ boxes slightly larger than themselves.
 are exact convex hulls off each die's render mesh. The tail was mostly a
 still table: a die judged cocked was refused a freeze and sat motionless to
 `SETTLE_CAP` = 9 s. 15 of the 17 dice that reached the cap across 36 throws
-were not moving. Shipped: `cockedDot` 0.82 → 0.6, real felt contact numbers,
-and a tail cut that credits a timed-out die with its last moving frame. Soul
-Deal −43%, 20d6 −22%, 8d6 +0.37s. Full account in UX §7.29; pinned by
+were not moving. Shipped: `cockedDot` 0.82 → 0.6 and a tail cut that
+credits a timed-out die with its last moving frame. Soul Deal −12%, 20d6
+−14%, caps 13/16 → 4/16. The felt contact numbers were measured, win far
+bigger, and are held back — see C30c. Full account in UX §7.29; pinned by
 `settle-tail`; priced by `tools/steps/settle-paired.mjs`.
 
-**C30a — 8d6 pays 0.37s and nobody has looked at why.** The felt tuning wins
-everywhere except the 8-die neighbourhood. The likely mechanism is that
-damping trades tumble time for cocked rests, and at 8 dice the two curves
-cross badly. Worth one paired sweep across 5–12 dice before touching it —
-it may be a two-value fix, or it may be the honest price.
+**What shipped does NOT fix: the shakiness itself.** Joe's word was "shaky",
+and the reversing is caused by the absent damping — the shipped subset moves
+`shake` by 0% to −4%. The worst throws got much shorter; the dithering is
+untouched. That is C30c.
+
+**C30c — the felt tuning is measured, wins big, and is blocked on the spawn.**
+Grip 0.6 / bounce 0.15 / damping 0.1/0.14 buys Soul Deal −43%, 20d6 −1.63s,
+**and 20–38% less shake — the only thing that touches the dithering at all.**
+It is not shipped because it PILES: on this mat sliding apart is how dice
+separate, `spawnDie` spreads a throw by `min(TABLE_W - 4.4, count × 2.6)`, and
+at `medium` that clamp bites hard (TABLE_W 8.6 → six dice start 0.84 apart
+when the spacing wants 2.6). Stop the skid and they stop on each other: at
+`close`, 6d6 went 17% → 33% of dice piled, 3 clean throws in 10 → 1.
+`dice-land-flat` caught it (3 failures in 13 runs vs 0 in 8 on the parent) —
+the C24 floor working. Halving the damping did not halve the piling, so this
+is not a knob-tweak: **it needs a wider spawn, and the spawn is clamped by a
+mat C25 and C27 both already have claims on.** Sequence it after those.
+Priced by `tools/steps/pile.mjs` and `settle-paired.mjs`.
+
+**C30a — 8d6 paid +0.37s under the felt tuning.** Only relevant if C30c
+proceeds. Likely damping trading tumble time for cocked rests, with the curves
+crossing badly around 8 dice. One paired sweep across 5–12 dice would say.
 
 **C30b — 20d6 can still reach the cap with dice genuinely tumbling** (3 of 16
 seeds). That is real motion, so shortening `SETTLE_CAP` would truncate it and

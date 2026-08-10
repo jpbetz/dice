@@ -568,29 +568,32 @@ const diceMat = new CANNON.Material('dice');
 const floorMat = new CANNON.Material('floor');
 const wallMat = new CANNON.Material('wall');
 
-// FELT, NOT LINOLEUM. The originals were generic bouncy-dice numbers with
-// cannon's 0.01 default damping left in place — i.e. no damping at all, which
-// should be a choice somebody made and wasn't. A die had almost no way to
-// lose energy, so it skated and micro-bounced instead of stopping, which is
-// exactly what "slide and wiggle-move" describes.
+// UNCHANGED, AND THAT IS A FINDING (2026-08-10). These are generic
+// bouncy-dice numbers with cannon's 0.01 default damping left in — i.e. none.
+// A felt tuning (grip 0.6, bounce 0.15, damping 0.1/0.14) was measured a
+// large win on settle time: Soul Deal -43%, 20d6 -1.63s, and 20-38% less
+// shake. It is not here, because it also PILES.
 //
-// These are measured, not guessed, and the measurement had to be PAIRED to
-// mean anything: tools/steps/settle-paired.mjs replays identical seeds under
-// each candidate. An earlier unpaired sweep concluded materials "barely move
-// the tail" and that conclusion was variance — twelve random throws per cell
-// are a coin flip, not a comparison.
+// On this mat, sliding apart is how dice separate. spawnDie lines the throw
+// up along one edge with `Math.min(TABLE_W - 4.4, count * 2.6)` of spread,
+// and at `medium` that clamp bites hard — TABLE_W is 8.6, so six dice start
+// 0.84 apart when the spacing wants 2.6. They were relying on bounce and
+// skid to fan out. Take that away and they stop where they land, on each
+// other: at `close`, 6d6 went from 17% of dice piled to 33%, and from 3
+// throws in 10 that piled nothing to 1. That is the C24 floor and goal 5
+// ("organized over realistic"), and `dice-land-flat` caught it — 3 failures
+// in 13 runs against 0 in 8 on the parent commit.
 //
-// Against the originals, over 16 seeds per pool (2026-08-10), together with
-// the permissive rest rule in NUDGE.cockedDot, which this tuning NEEDS —
-// damping alone stops dice before they topple flat, and on its own it cost
-// 8d6 +1.42s in nudges:
-//     1d20 -0.08s · Soul Deal -1.10s (-43%) · 4d6 -0.48s · 20d6 -1.63s
-// 8d6 pays +0.37s, the one regression, and no pool ends up bouncier.
+// So the settle work ships as NUDGE.cockedDot and the tail cut only, which
+// cost nothing here. The felt tuning is ROADMAP C30c: it needs a wider
+// spawn, and the spawn is clamped by a mat that C25/C27 already have opinions
+// about. Priced by tools/steps/pile.mjs and settle-paired.mjs — and note
+// that halving the damping did NOT halve the piling.
 const PHYS = {
-  floorFriction: 0.6, floorRestitution: 0.15,
-  diceFriction: 0.4, diceRestitution: 0.2,
-  wallFriction: 0.2, wallRestitution: 0.5,
-  linearDamping: 0.1, angularDamping: 0.14,
+  floorFriction: 0.25, floorRestitution: 0.35,
+  diceFriction: 0.15, diceRestitution: 0.45,
+  wallFriction: 0.05, wallRestitution: 0.7,
+  linearDamping: 0.01, angularDamping: 0.01,
 };
 const cmFloor = new CANNON.ContactMaterial(diceMat, floorMat, { friction: PHYS.floorFriction, restitution: PHYS.floorRestitution });
 const cmDice = new CANNON.ContactMaterial(diceMat, diceMat, { friction: PHYS.diceFriction, restitution: PHYS.diceRestitution });

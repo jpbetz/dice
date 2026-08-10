@@ -4036,11 +4036,20 @@ as a valve for a rest no die could hold. That also gives back
 `lastLanding.timedOut` — the ceremony's "declined to resolve" signal — which
 had been firing on 13 of 16 big rolls.
 
-**The felt was also frictionless.** The contact numbers were generic bouncy-
-dice values with cannon's 0.01 default damping left in, i.e. none — a die had
-almost no way to lose energy, so it skated and micro-bounced. `PHYS` now
-grips, deadens and damps. Dice stop nearer where they land, which reads
-tidier and serves goal 5.
+**The felt is still frictionless, and that is a finding.** The contact numbers
+are generic bouncy-dice values with cannon's 0.01 default damping left in —
+i.e. none. A proper felt tuning (grip 0.6, bounce 0.15, damping 0.1/0.14) was
+measured a *large* win: Soul Deal −43%, 20d6 −1.63s, and 20–38% less shake.
+**It is not shipped, because it piles.** On this mat sliding apart is HOW dice
+separate — `spawnDie` spreads a throw by `min(TABLE_W - 4.4, count × 2.6)`,
+and at `medium` that clamp bites hard (TABLE_W 8.6, so six dice start 0.84
+apart when the spacing wants 2.6). Dice were relying on bounce and skid to fan
+out. Take that away and they stop where they land, on each other: at `close`,
+6d6 went from 17% of dice piled to 33%, and from 3 throws in 10 that piled
+nothing to 1. `dice-land-flat` caught it — 3 failures in 13 runs against 0 in
+8 on the parent commit — which is the C24 floor doing exactly its job.
+Halving the damping did not halve the piling. It is **ROADMAP C30c**, and it
+wants a wider spawn first.
 
 **The tail cut is the backstop.** A die force-frozen at the cap is credited
 with its last MOVING frame, not the cap, and the keyframes are truncated
@@ -4048,37 +4057,39 @@ there — so the pose playback ends on and the pose correction reads are the
 same object, for a timed-out die as for a frozen one. It never lengthens a
 throw, and it only ever reclaims time from a die that had stopped.
 
+What shipped, measured **paired** — the same 16 seeds through every candidate,
+via `__diceDebug.throwSeeded`, because the first unpaired sweep concluded the
+materials "barely move the tail" and that was variance talking:
+
 | pool | before | after | caps before → after |
 |---|---|---|---|
-| 1d20 | 1.37s | 1.29s | 0 → 0 |
-| Soul Deal (2d8+1d4+1d6) | 2.57s | **1.48s** | 3/16 → **0** |
-| 4d6 | 2.06s | 1.58s | 0 → 0 |
-| 8d6 | 2.42s | 2.79s | 0 → 0 |
-| 20d6 | 7.26s | 5.63s | 13/16 → 3 |
+| 1d20 | 1.37s | 1.37s | 0 → 0 |
+| Soul Deal (2d8+1d4+1d6) | 2.57s | 2.26s | 3/16 → 1/16 |
+| 4d6 | 2.06s | 2.04s | 0 → 0 |
+| 8d6 | 2.42s | 2.40s | 0 → 0 |
+| 20d6 | 7.26s | **6.25s** | 13/16 → **4/16** |
 
-8d6 is the one regression. Measured **paired** — the same 16 seeds through
-every candidate, via `__diceDebug.throwSeeded` — because the first, unpaired
-sweep concluded the materials "barely move the tail" and that was variance
-talking, on the change that turned out to be the largest single win.
+The honest summary of that table: **the felt's own worst case is fixed and its
+typical case barely moved.** What C30c would buy is the typical case.
 
-**Duration is not the complaint, though; "shaky" is.** `settleProfile().shake`
-is the share of frames in the 0.6s before a die stops where it REVERSES
-direction — dithering reverses constantly, rolling to a halt does not.
-Anchored to each die's own settle frame, because anchored to the roll it is
-confounded by duration: the first version reported a throw that got 43%
-*shorter* as 143% worse, since "the last second" of a 1.5s throw is the tumble.
+**Duration is not the complaint, though; "shaky" is — and the shipped subset
+does not fix that part.** `settleProfile().shake` is the share of frames in
+the 0.6s before a die stops where it REVERSES direction; dithering reverses
+constantly, rolling to a halt does not. (Anchored to each die's own settle
+frame. Anchored to the roll it is confounded by duration — the first version
+reported a throw that got 43% *shorter* as 143% worse, because "the last
+second" of a 1.5s throw is the tumble.)
 
 | pool | 1d20 | Soul Deal | 4d6 | 8d6 | 20d6 |
 |---|---|---|---|---|---|
-| shake before | 0.106 | 0.144 | 0.152 | 0.185 | 0.206 |
-| shake after | 0.075 | 0.115 | 0.112 | 0.115 | 0.146 |
-| less shaky | 29% | 20% | 27% | **38%** | 29% |
+| shake, shipped subset | 0% | −2% | 0% | +4% | +3% |
+| shake, with C30c felt | **−29%** | **−20%** | **−27%** | **−38%** | **−29%** |
 
-`creep` (distance covered in the same window) went *up* on the small pools
-and down on the big ones, and that is the shape you want rather than a
-contradiction: a die coasting smoothly to rest covers more ground than one
-twitching in place. Read the two together — **less reversing, more travelling
-— or neither means anything.**
+**The reversing is caused by the missing damping, and only the damping fixes
+it.** So what shipped shortens the worst throws and leaves the dithering
+alone. Say that plainly rather than let the duration table imply otherwise:
+the visible wiggle is still there, it is C30c, and C30c is blocked on the
+spawn spread, which is blocked on the mat.
 
 **What is still open.** 20d6 can still reach the cap with dice genuinely
 tumbling; that is real physics and a smaller `SETTLE_CAP` would truncate real
