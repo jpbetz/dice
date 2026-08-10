@@ -1145,6 +1145,12 @@ function closePeek() {
 // (never collected, or cleared) has nothing to hang from.
 function openPeek(rollId) {
   if (!collected.has(rollId)) return false;
+  // The card hangs from a row inside the roll log, so asking for a card is
+  // asking for the log. In the UI this is already true — the only way to
+  // reach openPeek is to be on a row — but the keyboard path, the tweak
+  // popover and __diceDebug.peek() can all arrive with the panel closed, and
+  // a card with no anchor renders nowhere.
+  if (!isLogFlyoutOpen()) openLogFlyout();
   // While the shelf popover is pinned to THIS card, another row's hover must
   // not swap the card out from under it — the popover would keep acting on
   // the old roll while the card showed the new one.
@@ -10341,10 +10347,22 @@ logList.addEventListener('pointerout', (ev) => {
   if (to instanceof HTMLElement && to.closest('.log-entry.collected')) return;
   if (logRowRollId(ev.target)) schedulePeekClose();
 });
+// U12's touch twin, delegated: without it a collected roll's TWEAKED reroll
+// is unreachable on iOS, where a long press never produces `contextmenu`.
+// One instance on the list, resolving the row at fire time — a per-row
+// attachment would stack a timer per rebuild, which is the leak the ⟳
+// delegation exists to avoid. lp.took() below is what stops the release
+// falling through and toggling the card shut again.
+const logLp = attachLongPress(logList, (ev) => {
+  const rid = logRowRollId(ev.target);
+  const entry = rid ? log.find((e) => e.rollId === rid) : null;
+  if (entry && canReroll(entry)) openShelfPopover(entry, rid);
+});
 logList.addEventListener('click', (ev) => {
   if (ev.target instanceof HTMLElement && ev.target.closest('button')) return;
   const rid = logRowRollId(ev.target);
   if (!rid) return;
+  if (logLp.took()) return; // a long press already opened the tweaks popover
   if (peekRollId === rid) closePeek();
   else openPeek(rid);
 });
@@ -10360,6 +10378,7 @@ logList.addEventListener('contextmenu', (ev) => {
   const rid = logRowRollId(ev.target);
   if (!rid) return;
   ev.preventDefault();
+  logLp.clear(); // Android fires this first — one door wins
   const entry = log.find((e) => e.rollId === rid) || null;
   if (entry && canReroll(entry)) openShelfPopover(entry, rid);
 });

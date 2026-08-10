@@ -11,6 +11,64 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## C25 Stage 1 — the shelf comes off the felt (2026-08-09)
+
+Design authority: [UX.md](UX.md) §7.27 (and the amendments at §7.7 / §7.7.1).
+The measurement and the decision are [ROADMAP.md](ROADMAP.md) C25.
+
+*Joe: "dig into C25 hard. Either find space or drop the feature entirely."*
+
+**There was no space, and the reason was worse than "cramped."** `SHELF_PITCH`
+derived from `TABLE_W` while `SHELF_SLOT_W` stayed at the 5.4 it was given for
+a 30-unit mat, so three zoom tightenings on 2026-08-09 left a pitch of 0.80
+against a 3d6 cluster 3.26 wide. **The second collected roll already fused
+with the first** — overlap 2.46 units, three quarters of a cluster's own
+width — and five at `close` rendered as one slab of interpenetrating dice with
+z-fighting. Nine `shelf`-tagged scenarios asserted length, sequence order and
+slot compaction, and not one asserted that two clusters do not occupy the same
+space. It broke at `fe24840`, the first tightening.
+
+**The camera was the wrong suspect,** and the probe that proved it is kept:
+removing the shelf from `framingPoints` bought 1.08–1.18× die size on desktop,
+laptop and iPad, and **1.00× on a phone** — nothing on the device Joe named.
+The shelf was removed for the space it took on the MAT, not in the view.
+
+**Joe's two calls:** the felt keeps **nothing** (not even the mantel of one the
+measurement said would fit), and Stage 1 lands on the existing roll log before
+the bottom strip is designed.
+
+**What shipped.** Collecting a roll takes its dice off the felt with the same
+departure a clear plays (§7.26's lift) — collect and clear are one motion now
+and differ only in bookkeeping. The record is the roll log, which was always
+the backing store: `renderPeek` has always rebuilt its whole card from
+`log.find(...)`, and the server's `collected` is a sequence on a log entry,
+never a position. **Zero wire change.** A collected roll's ROW is the door to
+that card — `role=button`, a tab stop, an `aria-label`, hover to open, click to
+toggle, right-click and long-press to the tweak popover, all delegated on the
+list for the same reason ⟳ is. The card stands beside its row, never over it.
+
+**Deleted:** `canonicalDiePose`, `clusterPoses`, `spawnShelvedDie`,
+`placeCluster`, `reflowShelf`, the collect whisk, the marker pills, the
+under-glow rings, `#shelf-layer`, six of eight `framingPoints`, and
+`revealShelvedRoll` — a collected roll has no dice left to turn over, so
+revealing it is purely a surface act. Also gone: the invariant that no shelved
+die may stand on the active felt, which is the whole reason `clusterPoses`
+existed, and the rest-cadence and bloom "shelf gates" that existed to stop the
+archive breathing.
+
+**A caution for whoever reads this next.** Restoring the debug surface after
+the deletion needed a diff of `__diceDebug`'s own key list against the parent
+commit: an index-based cut swallowed fourteen unrelated hooks (`entryState`,
+`chipsVisible`, `restInfo`, the offer entry points…) and four scenarios failed
+with `is not a function` rather than with anything about shelves. Deleting a
+region of a 15k-line object literal is not a text operation.
+
+**Stage 2 is open** and is the creative half — the bottom strip, the log that
+shows itself and collapses. Stage 1 deliberately left one thing worse: with
+the log closed, a collected roll has no ambient presence at all.
+
+---
+
 ## Joe's cleanup notes — the key, the fold, the withheld verb, the departure (2026-08-09)
 
 Design authority: [UX.md](UX.md) §7.11b (amended) and §7.26. Four small

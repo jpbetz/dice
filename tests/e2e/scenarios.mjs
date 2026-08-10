@@ -924,18 +924,26 @@ export const scenarios = [
       await a.eval(`document.getElementById('pop-close').click()`);
       await a.eval(`document.getElementById('clear-tray').click()`);
 
-      // ---- the shelf: the table's history was a flat 2.1.1 failure ----
+      // ---- collected rolls: the table's history was a flat 2.1.1 failure ----
+      // The door used to be an unlabelled <div> on the felt; since C25 it is
+      // the roll's LOG ROW, which has to carry the same three things — a role,
+      // a tab stop, and a name that says which roll it is. Once a roll is
+      // collected its card is still the only path to Reveal, so a keyboard
+      // player who cannot open it cannot reveal their own held roll.
       await a.roll('d20');
       await a.dbg(`collectRoll(${JSON.stringify(await a.rollId())})`);
-      await a.waitFor(`(window.__diceDebug.sim(120), document.querySelectorAll('.shelf-marker').length > 0)`,
-        { desc: 'a marker on the shelf' });
+      await a.dbg('setLogFlyout(true)');
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), !!document.querySelector('#log-list .log-entry.collected'))`,
+        { desc: 'the collected roll wears its row' });
       const mk = await a.eval(`(() => {
-        const m = document.querySelector('.shelf-marker');
+        const m = document.querySelector('#log-list .log-entry.collected');
         return { role: m.getAttribute('role'), tab: m.tabIndex, named: (m.getAttribute('aria-label') || '').length };
       })()`);
-      assert.equal(mk.role, 'button', 'a shelf marker is a button');
-      assert.equal(mk.tab, 0, 'and it is reachable — once shelved, its card is the only door to Reveal');
+      assert.equal(mk.role, 'button', "a collected roll's row is a button");
+      assert.equal(mk.tab, 0, 'and it is reachable — its card is the only door to Reveal');
       assert.ok(mk.named > 10, `and it says which roll it is (name is ${mk.named} chars)`);
+      await a.dbg('setLogFlyout(false)');
     },
   },
   {
@@ -963,11 +971,11 @@ export const scenarios = [
         await a.roll(n);
         await a.dbg(`collectRoll(${JSON.stringify(await a.rollId())})`);
       }
-      await a.waitFor(`(window.__diceDebug.sim(120), document.querySelectorAll('.shelf-marker').length === 2)`,
-        { desc: 'two rolls on the shelf' });
+      await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 2)`,
+        { desc: 'two rolls collected' });
       await a.eval(`document.getElementById('clear-log').click()`);
-      await a.waitFor(`(window.__diceDebug.sim(240), document.querySelectorAll('.shelf-marker').length === 0)`,
-        { desc: 'the shelf leaves with the history it was the record for' });
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 0)`,
+        { desc: 'the collected set leaves with the history it IS the record for' });
       assert.equal(await a.logCount(), 0, 'and the history is gone');
 
       // --- C7: a neighbour's sweep is said out loud ---
@@ -1790,15 +1798,16 @@ export const scenarios = [
   {
     name: 'shelf-quiet',
     tags: ['smoke', 'shelf', 'cuj9'],
-    // Quiet by default (P1): a resting shelf marker is an INVISIBLE hover/tap
-    // target — no dot, no total, no lens word, no tiny ✕, and a held roll
-    // never shouts '?'. The settled cluster is its own presence; the detail
-    // lives in the peek. THE ONE-✕ RULE (Joe, 2026-08-03): the clear target
-    // is chosen by the gesture that opened the card — a hover-opened peek
-    // carries NO ✕ (the marker's sweep dress is the big red one; clicking
-    // the cluster clears), a tap-opened peek carries the base ✕ (touch has
-    // no hover to dress the circle). Exactly one affordance at a time; both
-    // paths clear for everyone, from any seat (§7.7 universal housekeeping).
+    // WHAT A COLLECTED ROLL LOOKS LIKE AT REST. This asked, until C25,
+    // whether the resting shelf MARKER was invisible — no dot, no total, no
+    // lens word, no ✕ — on the reasoning that the settled cluster was its own
+    // presence and the detail belonged in the peek. There is no cluster and no
+    // marker now: the felt is empty and the roll's LOG ROW is what stands for
+    // it, so the contract inverts and the row has to say which roll it is.
+    // What survives unchanged is the card and its folded-card grammar: the
+    // body is the one clear target, the fold holds the other verbs, no ✕
+    // exists in any modality, and every path clears for everyone from any
+    // seat (§7.7 universal housekeeping).
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
@@ -1812,33 +1821,41 @@ export const scenarios = [
           { desc: 'roll shelved' },
         );
       }
-      const markers = await b.dbg('shelfMarkers');
-      assert.equal(markers.length, 1, 'one resting marker');
-      const m = markers[0];
-      assert.equal(m.rollId, rid, 'marker addresses its roll');
-      assert.equal(m.bare, true, 'resting marker draws nothing at all');
-      assert.equal(m.text.trim(), '', 'no text on the resting marker');
-      assert.equal(m.hasTotal, false, 'no always-on total');
-      assert.equal(m.hasX, false, 'no tiny ✕');
-      assert.ok(m.width >= 24 && m.height >= 24, `an easy target (${m.width}×${m.height})`);
+      // THE FELT IS EMPTY, AND THAT IS THE POINT (C25). A collected roll used
+      // to leave a cluster of real dice standing in a shelf slot; the record
+      // is the roll log now, so the only dice on the table are the live
+      // roll's — here, none.
+      assert.equal(await b.diceCount(), 0, 'nothing collected stands on the felt');
 
-      // THE FOLDED CARD, shelf edition (2026-08-03 — supersedes the three-
-      // leg one-✕ walk): ONE grammar in every modality. The marker only
-      // OPENS the card; the card's BODY is the one big clear target; the
-      // fold below holds the other verbs; no ✕ and no sweep exist at all.
+      // ITS ROW IS ITS DOOR. The resting marker was quiet by design — the
+      // cluster was its own presence, so the target drew nothing. A row in a
+      // list has no cluster to stand for it, so the contract inverts: the row
+      // SAYS which roll it is, and is marked as openable.
+      await b.dbg('setLogFlyout(true)');
+      const row = await b.eval(`(() => {
+        const el = document.querySelector('#log-list .log-entry.collected');
+        if (!el) return null;
+        return { rollId: el.dataset.rollId, role: el.getAttribute('role'), text: el.innerText.trim() };
+      })()`);
+      assert.ok(row, 'the collected roll has a row');
+      assert.equal(row.rollId, rid, 'the row addresses its roll');
+      assert.equal(row.role, 'button', 'and announces itself as openable');
+      assert.ok(row.text.length > 0, 'a row says what it is — unlike the marker it replaced');
+
+      // THE FOLDED CARD, log edition (2026-08-03's grammar, new anchor): the
+      // row only OPENS the card; the card's BODY is the one big clear target;
+      // the fold below holds the other verbs; no ✕ and no sweep exist at all.
       assert.equal(await b.dbg(`peek(${JSON.stringify(rid)})`), rid, 'peek opens');
       const ps = await b.dbg('peekState');
       assert.ok(ps.total, 'the peek shows the total');
       assert.equal(ps.hasMain, true, 'the body clear target stands');
       assert.equal(ps.hasFold, true, 'the fold stands under it');
       assert.equal(ps.hasClear, false, 'no card ✕ anywhere — the body is the target');
-      assert.equal((await b.dbg('shelfMarkers'))[0].hasSweep, false,
-        'no ✕ over the dice — the sweep dress is retired');
       await b.dbg('peek(null)');
 
-      // The marker's click OPENS the card now (it never clears directly).
-      await b.eval(`document.querySelector('#shelf-layer .shelf-marker').click()`);
-      assert.equal((await b.dbg('peekState') || {}).rollId, rid, 'a marker click opens its card');
+      // The row's click OPENS the card (it never clears directly).
+      await b.eval(`document.querySelector('#log-list .log-entry.collected').click()`);
+      assert.equal((await b.dbg('peekState') || {}).rollId, rid, 'a row click opens its card');
       assert.equal((await b.dbg('shelf')).length, 1, 'and clears nothing by itself');
 
       // The BODY click clears for everyone.
@@ -1859,9 +1876,13 @@ export const scenarios = [
         `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1)`,
         { desc: 'held roll shelved' },
       );
-      const hm = (await a.dbg('shelfMarkers'))[0];
-      assert.equal(hm.bare, true, 'a held roll rests just as quiet');
-      assert.ok(!hm.text.includes('?'), 'the marker never shouts ?');
+      // A held roll's row is a row like any other — and hidden means hidden:
+      // the values are not in it, which is the claim the old 'the marker never
+      // shouts ?' assertion was really making.
+      await a.dbg('setLogFlyout(true)');
+      const hrow = await a.eval(
+        `(document.querySelector('#log-list .log-entry.collected') || {}).innerText || ''`);
+      assert.ok(hrow.length > 0, 'a held collected roll still has a row');
       assert.equal(await a.dbg(`peek(${JSON.stringify(hid)})`), hid, 'peek opens for the authority');
       assert.equal((await a.dbg('peekState')).hasReveal, true, 'Reveal lives in the peek');
     },
@@ -1912,7 +1933,7 @@ export const scenarios = [
         { desc: 'the reroll shelves for the ± leg' },
       );
       assert.equal(await a.dbg(`peek(${JSON.stringify(rid2)})`), rid2, 'peek opens on the reroll');
-      await a.eval(`document.querySelector('.shelf-marker')
+      await a.eval(`document.querySelector('#log-list .log-entry.collected')
         .dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true}))`);
       const pop = await a.dbg('popover');
       assert.ok(pop && pop.open, '± opens the ± popover IN PLACE');
@@ -1927,7 +1948,7 @@ export const scenarios = [
 
       // Trigger Pass: the shelf popover never rolls — its tweak travels to
       // the draft ('Open in draft') and rolls from ROLL ❯❯❯ like everything.
-      await a.eval(`document.querySelector('.shelf-marker')
+      await a.eval(`document.querySelector('#log-list .log-entry.collected')
         .dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true}))`);
       assert.equal(await a.eval(`!!document.getElementById('pop-roll')`), false,
         'the popover has no Roll button (pure editor)');
@@ -1957,15 +1978,19 @@ export const scenarios = [
         `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1)`,
         { desc: 'first roll auto-collected' },
       );
-      assert.equal(await a.diceCount(), 2 + 1, 'second roll live (2 dice) + first shelved (1 die)');
+      // C25: the auto-collected roll's die LEFT — the felt holds the live
+      // roll and nothing else, which is the whole point of the change.
+      assert.equal(await a.diceCount(), 2, 'only the live roll stands on the felt');
     },
   },
   {
     name: 'shelf-cap',
     tags: ['shelf', 'cuj9'],
     timeout: 180000,
-    // The shelf holds SHELF_CAP rolls; the oldest is evicted FIFO; occupied
-    // clusters compact left-to-right in seq order.
+    // The record holds COLLECT_CAP rolls; the oldest is evicted FIFO. The
+    // slot half of this scenario retired with the felt shelf (C25) — there
+    // is nothing to compact left-to-right any more — but the CAP and the
+    // FIFO order are wire behaviour the server enforces, and they stay.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       for (let i = 0; i < 6; i++) {
@@ -1978,12 +2003,14 @@ export const scenarios = [
         );
       }
       const shelf = await a.shelf();
-      assert.equal(shelf.length, 5, 'shelf capped at 5');
+      assert.equal(shelf.length, 5, 'the record is capped at 5');
       const seqs = shelf.map((c) => c.seq);
-      assert.deepEqual([...seqs].sort((x, y) => x - y), seqs, 'shelf getter sorted by seq');
+      assert.deepEqual([...seqs].sort((x, y) => x - y), seqs, 'the getter is sorted by seq');
       assert.equal(Math.min(...seqs), 2, 'oldest (seq 1) evicted');
-      const slots = shelf.map((c) => c.slot);
-      assert.deepEqual(slots, [0, 1, 2, 3, 4], 'compacted left-to-right in seq order');
+      // And the felt stays empty through all six — the failure C25 fixed was
+      // six collected rolls piling into one another ON the mat, so the pin is
+      // occupancy, not arrangement.
+      assert.equal(await a.diceCount(), 0, 'six collects leave nothing on the felt');
     },
   },
   {
@@ -2119,20 +2146,20 @@ export const scenarios = [
     name: 'layer-scale',
     tags: ['smoke', 'roll', 'cuj8'],
     // The one layer scale (P2): the ceremony/verdict layer renders ABOVE the
-    // ambient table labels (value chips, shelf markers) and the banner, and
-    // the crit overlay tops the whole roll moment — a verdict card is never
-    // occluded by a floating die number.
+    // ambient table labels (value chips) and the banner, and the crit overlay
+    // tops the whole roll moment — a verdict card is never occluded by a
+    // floating die number. (#shelf-layer left the scale with the felt shelf,
+    // C25; the peek card it hosted is a fixed panel of its own.)
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       const z = (id) => a.eval(
         `parseInt(getComputedStyle(document.getElementById('${id}')).zIndex, 10)`,
       );
-      const [ceremony, chips, shelf, banner, crit, offers] = [
-        await z('ceremony-layer'), await z('chips-layer'), await z('shelf-layer'),
+      const [ceremony, chips, banner, crit, offers] = [
+        await z('ceremony-layer'), await z('chips-layer'),
         await z('result-banner'), await z('crit-overlay'), await z('offers-layer'),
       ];
       assert.ok(ceremony > chips, `ceremony above value chips (${ceremony} vs ${chips})`);
-      assert.ok(ceremony > shelf, `ceremony above shelf markers (${ceremony} vs ${shelf})`);
       assert.ok(ceremony > banner, `ceremony above the banner (${ceremony} vs ${banner})`);
       assert.ok(offers > ceremony, `offers stay claimable over a ceremony (${offers} vs ${ceremony})`);
       assert.ok(crit > offers, `the crit overlay tops the moment (${crit} vs ${offers})`);
@@ -2904,9 +2931,13 @@ export const scenarios = [
       await a.roll('2d6');
       const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
       await b.settle();
+      // The late joiner reconstructs the RECORD (one collected roll) and the
+      // live roll's dice — two of them, not three: since C25 a collected roll
+      // puts nothing on the felt, so there is no shelved die to rebuild. That
+      // reconstruction was the last caller of spawnShelvedDie.
       await b.waitFor(
-        `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1 && window.__diceDebug.tableDice.length === 3)`,
-        { desc: 'late joiner reconstructs shelf + live roll' },
+        `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1 && window.__diceDebug.tableDice.length === 2)`,
+        { desc: 'late joiner reconstructs the record + the live roll' },
       );
       assert.equal((await b.shelf())[0].rollId, rid, 'shelved rollId matches');
       assert.equal(await a.logTop(), await b.logTop(), 'log identical for late joiner');
@@ -3989,12 +4020,12 @@ export const scenarios = [
       await a.waitFor(`(window.__diceDebug.sim(60), window.__diceDebug.shelf.length === 1)`,
         { desc: 'the roll collected itself' });
 
-      // the folded card (2026-08-03): the marker OPENS the card; the card's
-      // BODY is the one big clear target (the sweep-over-the-dice retired)
-      assert.equal(await a.eval(`!!document.querySelector('.shelf-marker .shelf-sweep')`), false,
-        'no ✕ over the dice');
-      await a.eval(`document.querySelector('.shelf-marker').click()`);
-      assert.ok(await a.dbg('peekState'), 'the marker click opens the card');
+      // the folded card (2026-08-03, re-anchored by C25): the collected roll's
+      // LOG ROW opens the card; the card's BODY is the one big clear target
+      assert.equal(await a.diceCount(), 0, 'the tidy-away took the dice with it');
+      await a.dbg('setLogFlyout(true)');
+      await a.eval(`document.querySelector('#log-list .log-entry.collected').click()`);
+      assert.ok(await a.dbg('peekState'), 'the row click opens the card');
       await a.eval(`document.querySelector('#peek-card .pk-main').click()`);
       await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 0 && window.__diceDebug.shelf.length === 0)`,
         { desc: 'the card body click cleared it' });
@@ -5525,22 +5556,24 @@ export const scenarios = [
         `!document.getElementById('identity-menu').classList.contains('hidden')`),
       false, 'a plain tap does not open the menu');
 
-      // (iii) THE SHELF MARKER — a shelved roll's tweaked reroll was
-      // unreachable on iOS. Roll, collect, then hold the marker.
+      // (iii) THE COLLECTED ROLL'S ROW — its tweaked reroll was unreachable on
+      // iOS. Roll, collect, then hold the row. (This was the shelf MARKER
+      // until C25 took the felt shelf away; the door moved, the iOS trap did
+      // not — a long press still never produces `contextmenu` there.)
       await a.roll('2d6');
       await a.settle();
       const rid = await a.rollId();
       assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, 'collect accepted');
+      await a.dbg('setLogFlyout(true)');
       await a.waitFor(
-        `(window.__diceDebug.sim(120), document.querySelectorAll('.shelf-marker').length > 0`
-        + `)`,
-        { desc: 'the roll reaches the shelf' });
-      await hold('.shelf-marker');
+        `(window.__diceDebug.sim(120), !!document.querySelector('#log-list .log-entry.collected'))`,
+        { desc: 'the roll reaches the record' });
+      await hold('#log-list .log-entry.collected');
       assert.equal((await a.dbg('popover')).open, true,
-        'a hold on the shelf marker opens the tweaks popover');
+        'a hold on the collected row opens the tweaks popover');
       // The peek stands open UNDER it on purpose — openShelfPopover anchors
       // the popover to the card ("the peek pins while it lives"). What must
-      // NOT happen is the marker's own click toggling that peek back shut on
+      // NOT happen is the row's own click toggling that peek back shut on
       // the release, which is the fall-through lp.took() exists to stop.
       assert.equal(await a.eval(
         `!document.getElementById('peek-card').classList.contains('hidden')`),
@@ -5550,13 +5583,13 @@ export const scenarios = [
       // (iv) THE PEEK'S OWN HOLD — the other contextmenu-only door. It is
       // attached once at boot rather than per render, so a peek opened and
       // closed repeatedly must not stack one timer per visit.
-      // The marker's tap TOGGLES, and closePopover above left peekRollId
+      // The row's tap TOGGLES, and closePopover above left peekRollId
       // pointing at this roll — so the first tap may close rather than open.
       // Tap until it stands; two is the most it can ever take.
       for (let i = 0; i < 2; i++) {
         if (await a.eval(
           `!document.getElementById('peek-card').classList.contains('hidden')`)) break;
-        await a.eval(`document.querySelector('.shelf-marker').click()`);
+        await a.eval(`document.querySelector('#log-list .log-entry.collected').click()`);
       }
       await a.waitFor(
         `!document.getElementById('peek-card').classList.contains('hidden')`,
@@ -6544,8 +6577,10 @@ export const scenarios = [
           `the roller's set everywhere on ${who} (got: ${info.map((d) => d.variant).join(',')})`);
       }
 
-      // Bob never picked a set: his roll is std on every screen, while
-      // Alice's auto-collected dice keep their skin on the shelf.
+      // Bob never picked a set: his roll is std on every screen. Alice's
+      // auto-collected dice LEAVE — C25 — so the felt holds exactly the live
+      // roll, and the skin claim is about what is on the table, not about an
+      // archive standing beside it.
       await b.roll('1d20 # plain');
       await b.settle();
       const rid = await b.rollId();
@@ -6554,13 +6589,13 @@ export const scenarios = [
         + ` && window.__diceDebug.tableDiceInfo().some((d) => d.rollId === ${JSON.stringify(rid)}))`,
         { desc: 'the plain roll lands on A' },
       );
+      await a.dbg('sim(120)'); // let the collected roll's departure finish
       const infoA = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.tableDiceInfo())`));
       const plain = infoA.filter((d) => d.rollId === rid);
       assert.equal(plain.length, 1, 'one plain die on the felt');
       assert.equal(plain[0].variant, 'std', 'no set chosen ⇒ std');
-      const shelved = infoA.filter((d) => d.rollId !== rid);
-      assert.equal(shelved.length, 2, 'the anvil roll sits on the shelf');
-      assert.ok(shelved.every((d) => d.variant === 'emberforge.blackanvil'), 'the shelf keeps the skin');
+      assert.equal(infoA.length, 1,
+        `and it is the ONLY die there — the anvil roll was collected (got ${infoA.length})`);
 
       // The choice persists locally, and the wire refuses an invented skin.
       assert.equal(await a.eval(`localStorage.getItem('dice.diceset.v1')`),
@@ -6700,7 +6735,11 @@ export const scenarios = [
         assert.ok(p.rings >= 1, `${who}: the discharge popped`);
       }
 
-      // a held roll wears obsidian: no pop, no new bloom flag
+      // a held roll wears obsidian: no pop, no new bloom flag. The baseline
+      // is read AFTER the previous roll has been auto-collected away (C25:
+      // a collect empties the felt), so `diceBefore` is what is really there
+      // when the held roll lands rather than a count that includes an archive.
+      await a.dbg('sim(240)');
       const ringsBefore = (await post(a)).rings;
       const diceBefore = (await post(a)).bloomDice;
       await a.roll('d20 held');
@@ -6812,32 +6851,24 @@ export const scenarios = [
       assert.ok(sawDrift, 'sea-glass swells (measurable Y drift)');
       assert.ok(maxTilt < 0.006, `sea-glass stays readable (max tilt ${maxTilt} rad < 0.006)`);
 
-      // Shelf gate: a collected sea-glass die goes STILL (the shelf is
-      // the archive — same predicate as the S3 bloom leak fix).
+      // THE SHELF GATE IS GONE, AND SO IS WHAT IT GATED (C25). A collected
+      // die used to stand on the felt in its slot, so stepResting had to skip
+      // it or the archive would breathe; now it leaves the table entirely.
+      // The claim worth keeping is the one that made the gate necessary: a
+      // collected roll costs the rest-cadence loop nothing, which is now true
+      // because there is nothing there to iterate.
       const rid = await a.rollId();
       await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
       await a.waitFor(
         `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1)`,
-        { desc: 'roll shelved, whisk done' },
+        { desc: 'roll collected' },
       );
-      await a.dbg('sim(60)'); // 1 s of shelf-side "rest"
-      const shelfBefore = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.restInfo(${JSON.stringify(rid)}))`));
-      assert.ok(shelfBefore.length >= 1, 'the shelved die is still tracked');
-      await a.dbg('sim(60)'); // another 1 s
-      const shelfAfter = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.restInfo(${JSON.stringify(rid)}))`));
-      // Cadence writes mesh.position.y every frame; if the shelf gate
-      // holds, deltaY (mesh minus finalPos) is a fixed whisk-to-shelf
-      // offset that does not move between two samples 1 s apart. Sea-
-      // glass's Y period is 2.6 s, so a running swell would shift Y
-      // by up to ~1 mm across that window.
-      for (let i = 0; i < shelfAfter.length; i++) {
-        assert.equal(shelfAfter[i].kind, 'swell', 'shelved die keeps its recipe kind');
-        assert.equal(
-          shelfAfter[i].deltaY,
-          shelfBefore[i].deltaY,
-          'shelf gate holds — cadence never wrote to the mesh',
-        );
-      }
+      await a.dbg('sim(60)'); // 1 s in which an archive would have breathed
+      const shelfAfter = JSON.parse(await a.eval(
+        `JSON.stringify(window.__diceDebug.restInfo(${JSON.stringify(rid)}))`));
+      assert.equal(shelfAfter.length, 0,
+        `a collected roll is tracked by nothing on the felt (got ${shelfAfter.length})`);
+      assert.equal(await a.diceCount(), 0, 'because it is not on the felt');
     },
   },
   {
@@ -7325,22 +7356,23 @@ export const scenarios = [
       assert.equal(await a.dbg('zoom'), 'wide', 'wide is the default');
       assert.equal(await b.dbg('zoom'), 'wide', 'B sees the same default');
 
-      // Shelve a die at wide zoom, capture its world X on both tabs.
+      // Collect a roll at wide zoom. Its dice leave the felt (C25) — what
+      // both clients must agree on is the STATE, which is wire, so that is
+      // what this reads. (It used to capture the shelved die's world X and
+      // prove the cluster re-placed at the new pitch; there is no cluster to
+      // re-place, and the zoom no longer touches anything but walls, shadow
+      // frustum and camera.)
       await a.roll('1d6');
       await a.dbg(`collectRoll(${JSON.stringify(await a.rollId())})`);
       for (const t of [a, b]) {
         await t.waitFor(
-          `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1`
-          + `)`,
-          { desc: 'die on shelf' },
+          `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1)`,
+          { desc: 'collected on both tabs' },
         );
+        assert.equal(await t.diceCount(), 0, 'and standing on neither felt');
       }
-      const beforeA = await a.dbg('firstShelfDieWorldX()');
-      const beforeB = await b.dbg('firstShelfDieWorldX()');
-      assert.ok(Number.isFinite(beforeA) && Number.isFinite(beforeB),
-        'both tabs have a shelved die');
-      assert.ok(Math.abs(beforeA - beforeB) < 0.01,
-        `shelf X deterministic across clients (A=${beforeA}, B=${beforeB})`);
+      assert.deepEqual(await a.shelf(), await b.shelf(),
+        'both clients hold the same record, same order');
 
       // A sets zoom to 'close'; wait for the echo on BOTH.
       await a.dbg(`setZoom('close')`);
@@ -7369,29 +7401,14 @@ export const scenarios = [
           `${tag}: back wall at -${want.d / 2} (got ${wp.back.z})`);
       }
 
-      // Shelf pitch DERIVES from TABLE_W — the formula is the claim, not the
-      // number it happened to produce before the ladder moved.
-      const pitchA = await a.dbg('shelfPitch()');
-      const pitchB = await b.dbg('shelfPitch()');
-      const expectedPitch = (want.w - 5.4) / 4;
-      assert.ok(Math.abs(pitchA - expectedPitch) < 0.01,
-        `A: shelf pitch ≈ ${expectedPitch} (got ${pitchA})`);
-      assert.ok(Math.abs(pitchB - expectedPitch) < 0.01,
-        `B: shelf pitch ≈ ${expectedPitch} (got ${pitchB})`);
-
-      // Let the whisk settle after reflowShelf's animated re-place.
-      for (const t of [a, b]) await t.dbg('sim(600)');
-
-      // The previously-shelved die moved with the new pitch.
-      const afterA = await a.dbg('firstShelfDieWorldX()');
-      const afterB = await b.dbg('firstShelfDieWorldX()');
-      assert.ok(Math.abs(afterA - afterB) < 0.01,
-        `after: shelf X still deterministic (A=${afterA}, B=${afterB})`);
-      // With one cluster at slot 0 of 5 the slot X is (0 - 2) * pitch =
-      // -2 * pitch. At wide pitch=6.15 the die sits near x=-12.3; at close
-      // pitch=3.15 it sits near x=-6.3 — a real move, not a rounding blip.
-      assert.ok(Math.abs(afterA - beforeA) > 0.5,
-        `the die actually reflowed (before=${beforeA}, after=${afterA})`);
+      // The record survives the zoom on both tabs, and the felt stays empty
+      // through it — a zoom is walls, shadow frustum and camera now, and
+      // nothing it does may put a collected roll back on the mat.
+      for (const t of [a, b]) {
+        await t.dbg('sim(600)');
+        assert.equal((await t.shelf()).length, 1, 'the record rode the zoom');
+        assert.equal(await t.diceCount(), 0, 'and the felt is still clear');
+      }
 
       // Determinism still holds with a non-default mat: keyframes bit-
       // identical across tabs when both are at 'close'.

@@ -1233,7 +1233,7 @@ tooltip says "biggest dice, best on a phone", and it measurably piles 2 of 6.
 Asserting there would either fail on the shipped app or drag the bar down
 everywhere; recording it is what stops the next tightening claiming ignorance.
 
-### C25. The physical shelf does not fit the mat any more — DECIDED 2026-08-09: take it off the felt
+### C25. The physical shelf does not fit the mat any more — **STAGE 1 SHIPPED 2026-08-09**; Stage 2 open
 
 *Joe 2026-08-09: "Collected dice take up too much space… consider dropping the
 collection phase altogether… The space is a problem. It wouldn't be so bad if
@@ -1304,20 +1304,34 @@ survives almost free, because *collected is already a list, not a place*:
   shipped the same day) and the only difference is whether the entry stays in
   the record.
 
-**Sequencing.** Stage 1 is mechanical and fixes a live defect: collected rolls
-stop putting dice on the felt, and the **existing** roll log (`#log-flyout`,
-already reachable by ≣ and `l`, already carrying full per-die attribution and
-unread counting) is the record. Stage 2 is Joe's sketch — "previous N rolls as
-panels across the bottom", the log showing itself briefly and collapsing into
-something that expands it, "UI that goes beyond basic buttons and has some
-elements that visually fit together". Stage 2 is a *view* over a store that
-already exists, which is what makes it cheap; U23's token layer is the
-vocabulary and this is its first customer.
+**STAGE 1 — SHIPPED 2026-08-09.** Collecting a roll takes its dice off the
+felt (§7.26's lift) and the existing roll log is the record; a collected
+roll's ROW is the door to the peek card its felt marker used to open, with the
+same content, the same folded-card grammar, the same right-click and long-press
+to the tweak popover. Detail in [UX.md](UX.md) §7.27. Deleted:
+`canonicalDiePose`, `clusterPoses`, `spawnShelvedDie`, `placeCluster`,
+`reflowShelf`, the whisk, the marker pills, the under-glow rings, six of eight
+`framingPoints`, `revealShelvedRoll`, and the invariant that no shelved die may
+stand on the active felt. Zero wire change, as predicted.
 
-**Two open calls** (Joe's, recorded rather than assumed): whether the felt
-keeps the LAST collected roll as dice — a mantel of one, which is exactly what
-the measurement says fits — or nothing at all; and whether Stage 1 lands
-before Stage 2 is designed.
+**STAGE 2 — OPEN, and it is the creative half.** Joe's sketch, unchanged:
+*"previous N rolls as panels across the bottom… maybe we just show the roll log
+briefly and then show it collapse into a UI element that expands the roll log…
+we'd need UI that goes beyond basic buttons and has some elements that visually
+fit together. We'd need to get creative."* Stage 1 deliberately left one thing
+worse and it is the thing Stage 2 fixes: **with the log closed, a collected
+roll has no ambient presence at all.** The ≣ button carries an unread count in
+its `title` and nothing else. (The bar is lower than it sounds — the marker it
+replaced drew *nothing* at rest either, and U20 has been open about that since
+2026-08-08 — but a row inside a closed panel is a step further away.)
+
+What Stage 2 should take as settled by Stage 1: the store exists and is
+already correct, so this is a VIEW; the card is reusable verbatim; and
+anchoring it to a DOM row rather than a projected 3D point is what made the
+whole thing cheap. C13 ("what a shelf marker owes") and U20 ("the shelf's read
+at rest") are about this same surface and should be folded in rather than
+solved twice. U23's token layer is the vocabulary for "elements that visually
+fit together" and this is its first real customer.
 
 **What must not regress:** the tidy-away (a finished roll leaves the middle of
 the table on its own) is load-bearing and nobody has complained about it;

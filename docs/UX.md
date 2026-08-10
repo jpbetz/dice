@@ -1286,6 +1286,13 @@ structured metadata in the comment section. Adopted design (two halves):
 
 ### 7.7 The collect shelf (table organization — supersedes landing zones)
 
+> **SUPERSEDED IN PART, 2026-08-09 (C25, §7.27).** The *state machine* below
+> is unchanged and is still the spec: on-felt → collected(seq) → cleared, five
+> deep, oldest evicted, server-owned. **The PLACE is gone.** There are no
+> slots, no clusters, no under-glow rings and no markers; a collected roll's
+> dice leave the felt and its record is its row in the roll log. Read this
+> section for the lifecycle and §7.27 for where a collected roll now lives.
+
 Joe's direction (2026-07-30), synthesized: the main felt belongs to ONE roll
 at a time; history lives on a shelf.
 
@@ -1340,6 +1347,11 @@ at a time; history lives on a shelf.
   audit's empty-felt-on-reload gap.
 
 ### 7.7.1 Shelf refinements (play-test feedback, 2026-07-30)
+
+> **The felt half of this section is retired (C25, §7.27):** no slot decals,
+> no under-glow rings, no markers, no whisk. "Nothing is drawn where nothing
+> sits" now describes the whole felt. The peek CARD survives intact — same
+> content, same folded-card grammar — anchored to a log row instead of a slot.
 
 - **No casino markings.** The permanent slot tray decals are removed from the
   felt composite; empty shelf space is plain felt. An OCCUPIED position gets
@@ -3867,3 +3879,65 @@ inside-out for a frame; `stepSinking` clamps at 0.0001.
 die must not deflect a later fast-forward); rolls cleared mid-playback still
 defer to `pendingClears`; the shelf marker still rides its own `mesh: null`
 sink record so its chip fade stays dt-driven.
+
+
+### 7.27 Where a collected roll lives (2026-08-09)
+
+*Joe: "Collected dice take up too much space… consider dropping the collection
+phase altogether… The space is a problem. It wouldn't be so bad if not for
+mobile." Then: "dig into C25 hard. Either find space or drop the feature
+entirely."* The measurement is in [ROADMAP.md](ROADMAP.md) C25; the short of
+it is that the shelf stopped fitting the mat three zoom tightenings ago and
+the **second** collected roll already fused with the first. Joe's call on the
+two open questions: the felt keeps **nothing**, and Stage 1 lands on the
+existing roll log before the bottom strip is designed.
+
+**The felt holds the live roll and nothing else.** Collecting a roll takes its
+dice away with the same departure a clear plays (§7.26's lift). Collect and
+clear are now one motion and differ only in bookkeeping: a collected roll
+keeps its verbs, a cleared one does not.
+
+**The record is the roll log.** It always was — `renderPeek` has always
+rebuilt its whole card from `log.find(...)`, and the server's `collected` is a
+sequence number on a log entry, never a position. What changed is which
+surface admits it.
+
+**A collected roll's ROW is its door.** The contract inverts from the marker's:
+
+| | the marker (retired) | the row |
+| --- | --- | --- |
+| at rest | draws nothing — the cluster was its own presence | says which roll it is |
+| where | projected above its slot on the felt | in the roll log |
+| reachable | `role=button`, a tab stop, an `aria-label` written per render | the same three, on the row |
+| opens | the peek card | the peek card, unchanged |
+| tweak | right-click, or a long press (U12's iOS twin) | the same two, delegated on the list |
+
+The row wears `.collected` — a hairline gold rule down its leading edge,
+warming on hover and focus. Quiet, because the row's own text is the thing
+being read; visible, because unlike the cluster it stands for nothing else.
+
+**The card stands BESIDE its row**, never over it: the row is what the pointer
+rests on, and a card covering its own anchor fires `pointerleave` the instant
+it opens. Right of the flyout where there is room, left otherwise, clamped on
+screen either way. Closing the log closes the card — its anchor just left.
+
+**Opening a card opens the log.** In the UI that is already true (the only way
+to reach `openPeek` is to be on a row), but the keyboard path, the tweak
+popover and `__diceDebug.peek()` can all arrive with the panel shut, and a
+card with no anchor renders nowhere.
+
+**What this deleted:** `canonicalDiePose`, `clusterPoses`, `spawnShelvedDie`,
+`placeCluster`, `reflowShelf`, the whisk, the marker pills, the under-glow
+rings, six of the eight `framingPoints`, and `revealShelvedRoll` — a collected
+roll has no dice left to turn over, so revealing it is purely a surface act.
+Also gone: the invariant that no shelved die may stand on the active felt,
+which is what `clusterPoses` existed to guarantee.
+
+**Still open, and named rather than quietly skipped.** With the log closed, a
+collected roll has no ambient presence at all — the ≣ rail button carries an
+unread count in its title and nothing else. That is Stage 2's job, and Joe's
+sketch for it stands: *"previous N rolls as panels across the bottom… show the
+roll log briefly and then collapse it into a UI element that expands it… UI
+that goes beyond basic buttons and has some elements that visually fit
+together."* U23's token layer is the vocabulary; C13 and U20 are about this
+same surface and should be folded in rather than solved twice.
