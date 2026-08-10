@@ -917,6 +917,14 @@ function resetTableSurface() {
   }
   dieLights.releaseAll(); // the sweep takes every glow with it
   tableDice = [];
+  // THE FRAME FOLLOWS THE FELT. Since the camera may be cropped onto dice
+  // (2026-08-10), an emptied table would otherwise leave the player looking at
+  // a close, off-centre frame of nothing — measured after a clear: mode=dice,
+  // dice=0, aimed at (2.8, 1). Found because master's "the card retires; the
+  // dice stay" removed the timer that used to collect a roll ~3 s after settle,
+  // so dice now sit until something takes them and the emptying is a real
+  // moment rather than an invisible one. Reframing here returns the table home.
+  reframeForFeltChange();
   chips.length = 0;
   chipsLayer.innerHTML = '';
   revealing = [];
@@ -980,6 +988,7 @@ function removeRollDice(rollId, instant = false) {
   const going = tableDice.filter((d) => d.rollId === rollId);
   if (!going.length) return false;
   tableDice = tableDice.filter((d) => d.rollId !== rollId);
+  reframeForFeltChange(); // the frame follows the felt; see resetTableSurface
   const goingSet = new Set(going);
   for (let i = chips.length - 1; i >= 0; i--) {
     if (goingSet.has(chips[i].die)) {
@@ -12890,6 +12899,14 @@ function stepCamera(dt) {
   camTarget.lerpVectors(camEase.fromTgt, camEase.toTgt, k);
   aimCamera(camTarget);
   if (camEase.t >= 1) camEase = null;
+}
+
+// Re-frame after the felt's contents change OUTSIDE a roll (a clear, a per-roll
+// Done). Never during one: a roll's own arrival reframes at playback
+// completion, which is the only moment ruling ① lets the camera move.
+function reframeForFeltChange() {
+  if (currentRoll && !currentRoll.done) return;
+  applyCameraFraming(true);
 }
 
 function applyCameraFraming(animate = false) {
