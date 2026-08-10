@@ -903,9 +903,21 @@ const SETTLE_CAP = 9;      // hard cap on simulated seconds per roll
 // because every tool and scenario reaches this through JSON and
 // JSON.stringify turns Infinity into null. See tools/steps/pile-bar.mjs for
 // the calibration and its two-sided margin.
+// `pileSpread` is the other half, and it exists because the nudge as written
+// CANNOT unstack a die. Gravity here is -110, so `lift: 7` buys 0.13 s of
+// flight and `spread: 4` carries the die a quarter of a unit sideways — a hop
+// in place. That is exactly right for a cocked die, which needs to be
+// re-oriented rather than relocated, and useless for a piled one, which is
+// already flat and merely in the wrong place: measured, three hurls left it
+// on the same neighbour every time. A die must clear about a die-width to
+// come down on felt, so the piled case reuses the same two rng draws against
+// a much wider spread. Same budget, same machinery, one word different.
+// 12 out of a swept 4/8/12/16/24 x lift 7/2 (tools/steps/pile-sweep.mjs): it
+// resolved the most piles per second bought, and lift stays at the shipped 7
+// so the cocked path is untouched.
 const NUDGE = {
   budget: 3, lift: 7, spread: 4, spin: 14, cockedDot: 0.6, cockedDotD4: 0.7,
-  pileScale: 0,
+  pileScale: 0, pileSpread: 12,
 };
 let seedReplayN = 0; // __diceDebug.throwSeeded — keeps replayed rollIds unique
 
@@ -1979,7 +1991,17 @@ function playRoll(roll) {
         // so the height is a rest, never a die caught mid-flight over the
         // heap. The nudge branch below picks up whatever this refuses,
         // because "still and not frozen" is precisely "refused".
-        if (!cocked && !piledHigh(d)) freezeInPlace(d);
+        //
+        // ONLY WHILE THERE IS A NUDGE LEFT TO SPEND. A refusal nobody can act
+        // on is not a refusal, it is a stall: the roll spins to SETTLE_CAP
+        // with a parked die and bills the viewer for the silence. Measured
+        // before this guard existed — 8d6 went +55% because three seeds in
+        // eight ran the full nine seconds after their third nudge. The cocked
+        // bar deliberately does NOT get the same treatment: freezing a die
+        // early turns it STATIC and changes what its neighbours bounce off,
+        // so extending this would alter every shipped throw.
+        const piled = nudges < NUDGE.budget && piledHigh(d);
+        if (!cocked && !piled) freezeInPlace(d);
       }
     }
 
@@ -1995,7 +2017,12 @@ function playRoll(roll) {
         nudges++;
         for (const d of cocked) {
           d.body.wakeUp();
-          d.body.velocity.set((rng() - 0.5) * NUDGE.spread, NUDGE.lift, (rng() - 0.5) * NUDGE.spread);
+          // Why the die was refused decides how hard it is thrown sideways —
+          // the same predicate the freeze test just ran, on a body nothing has
+          // moved since (no world.step between them), so the two cannot
+          // disagree about a die.
+          const spread = piledHigh(d) ? NUDGE.pileSpread : NUDGE.spread;
+          d.body.velocity.set((rng() - 0.5) * spread, NUDGE.lift, (rng() - 0.5) * spread);
           const s = NUDGE.spin;
           d.body.angularVelocity.set((rng() - 0.5) * s, (rng() - 0.5) * s, (rng() - 0.5) * s);
           d.stillTime = 0;
