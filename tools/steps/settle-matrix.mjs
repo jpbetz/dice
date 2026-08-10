@@ -42,6 +42,9 @@ const DEADEN = { floorRestitution: 0.15, diceRestitution: 0.2, wallRestitution: 
 const GRIP = { floorFriction: 0.6, diceFriction: 0.4, wallFriction: 0.2 };
 const FELT_DAMP = { linearDamping: 0.1, angularDamping: 0.14 };
 const SLOW = { slowLinear: 0.1, slowAngular: 0.14 }; // the felt damping, gated
+// A real raise measured from what dice.js ships (0.4 / 0.35), not from
+// cannon's stock 0.1 / 1 — see the SLEEP comment in js/main.js.
+const SLEEPIER = { speed: 0.9, time: 0.2 };
 
 // [name, physics overrides, dampgate | null, throwTarget | null, sleep | null]
 // null = leave the instrument inert. Everything is reset between variants.
@@ -60,8 +63,21 @@ const VARIANTS = [
   ['sleepy', {}, null, null, { speed: 0.35, time: 0.35 }],
   ['sleepy+deaden', DEADEN, null, null, { speed: 0.35, time: 0.35 }],
   // What "raise the sleep thresholds" actually means measured from 0.4 / 0.35.
-  ['sleepier', {}, null, null, { speed: 0.9, time: 0.2 }],
-  ['sleepier+deaden', DEADEN, null, null, { speed: 0.9, time: 0.2 }],
+  ['sleepier', {}, null, null, SLEEPIER],
+  ['sleepier+deaden', DEADEN, null, null, SLEEPIER],
+  // PASS TWO. The first pass put the throw target in exactly one row, next to
+  // the full felt tuning, so it could not be read: everything that won on
+  // shake lost on piling and the one mechanism aimed AT piling was confounded
+  // with the tuning that causes it. These isolate it, and then re-run the
+  // shake winners on top of it.
+  ['target65', {}, null, 0.65, null],
+  ['target80', {}, null, 0.80, null],
+  ['deaden+t65', DEADEN, null, 0.65, null],
+  ['deaden+t80', DEADEN, null, 0.80, null],
+  ['sleepier+t65', {}, null, 0.65, SLEEPIER],
+  ['sleepier+deaden+t50', DEADEN, null, 0.50, SLEEPIER],
+  ['sleepier+deaden+t65', DEADEN, null, 0.65, SLEEPIER],
+  ['sleepier+deaden+t80', DEADEN, null, 0.80, SLEEPIER],
 ];
 
 const SHAKE_POOLS = [
@@ -176,7 +192,12 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
   if (!deterministic) throw new Error('determinism check failed; refusing to run the matrix');
 
   // --- the matrix ----------------------------------------------------------
-  const wanted = VARIANTS.filter(([n]) => !filter || n.includes(filter));
+  const base = 'shipped';
+  // `shipped` is not optional: it is the baseline every gate is judged
+  // against, so a filter selects what to compare TO it, never instead of it.
+  const toks = filter ? filter.split(',').filter(Boolean) : null;
+  const wanted = VARIANTS.filter(([n]) =>
+    n === base || !toks || toks.some((t) => n === t || n.includes(t)));
   const shakeSeeds = seedsOf(nShake);
   const pileSeeds = seedsOf(nPile);
   const got = new Map();   // "variant|pool"      -> { shake, creep, dur, capped, bake, wall }
@@ -237,7 +258,6 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
   await reset();
 
   const ran = wanted.filter(([n]) => SHAKE_POOLS.every(([p]) => got.has(`${n}|${p}`)));
-  const base = 'shipped';
   const b = (pool) => got.get(`${base}|${pool}`);
   if (!b('soul')) throw new Error('the shipped canary did not complete; nothing to judge against');
 
