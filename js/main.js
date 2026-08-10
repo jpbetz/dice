@@ -830,25 +830,30 @@ function rollSetOf(opts) {
   return wireSet();
 }
 let lastSoundAt = 0;
-let lastSoundStrength = 0;
-// THE CLICK CAP, AND WHY IT NEEDED A SECOND CLAUSE (C30d). Impacts are
+// THE CLICK CAP, AND WHY THE TEMPO HAS TO DIVIDE IT (C30d). Impacts are
 // recorded against the playback clock, so running that clock k times faster
 // compresses the whole train: a landing that spread eight contacts over
-// 240 ms delivers them in 120 ms at k=2. The 35 ms floor below has always
-// been WALL clock, so it already makes machine-gunning impossible — the
-// tempo cannot buy more than ~28 clicks a second however fast the film runs.
+// 240 ms delivers them in 120 ms at k=2. The 35 ms floor has always been WALL
+// clock, so machine-gunning was never the risk — a fixed wall-clock floor
+// caps the rate at ~28/s however fast the film runs. The risk is the
+// opposite one: a FIXED floor against a COMPRESSED train silently deletes
+// clicks, and it deletes them by arrival order, which is the wrong order. A
+// die's landing is a hard thump followed by chatter; let a neighbour's chatter
+// arrive first inside the window and the thump behind it is what goes.
 //
-// What the tempo breaks is which click survives. A plain "too soon, drop it"
-// is order-dependent, and the order it favours is wrong: a die's landing
-// sequence is a hard THUMP followed by small chatter, and once the train
-// compresses, a stray tick from a neighbour can arrive first and silence the
-// thump behind it. So the floor yields to a hit that is decisively harder
-// than the one just played (the landing, arriving inside another die's
-// chatter) — and a HARD floor underneath it means even a strictly escalating
-// train cannot exceed ~83/s. Cap the density, keep the thumps.
-const IMPACT_MIN_GAP_MS = 35;   // the shipped floor: two clicks closer are one click
-const IMPACT_HARD_GAP_MS = 12;  // …that nothing may cross, however loud
-const IMPACT_OVERRIDE = 1.6;    // "decisively harder" — a thump against chatter
+// So the floor rides the projector like everything else on the playback
+// clock. 35/k means the SAME set of impacts survives at every tempo — the
+// same film, the same clicks, played k times faster — which keeps every
+// landing thump shipped keeps, by construction rather than by a heuristic
+// about which hit "matters". At k=1 it is exactly the 35 ms that shipped.
+//
+// The hard floor is the one place the compression stops being faithful:
+// past k = 35/12 ≈ 2.9 the cap bites before 35/k does and clicks start
+// dropping again. That is the tempo at which the sound needs a different
+// answer (fewer recorded contacts, not a tighter gate), and it is above any
+// k the gravity arithmetic asks for (2.7).
+const IMPACT_MIN_GAP_MS = 35;   // the shipped floor, in FILM time
+const IMPACT_HARD_GAP_MS = 12;  // …and the wall-clock line nothing may cross
 
 // IMPACT VOICE (Slice 1, Joe 2026-08-04 aesthetic pass): the per-set
 // sound identity — one function replaces the single hard-coded click
@@ -880,11 +885,8 @@ const IMPACT_VOICES = {
 function playImpact(strength, voice) {
   if (!soundOn) return;
   const now = performance.now();
-  const since = now - lastSoundAt;
-  if (since < IMPACT_HARD_GAP_MS) return;
-  if (since < IMPACT_MIN_GAP_MS && strength <= lastSoundStrength * IMPACT_OVERRIDE) return;
+  if (now - lastSoundAt < Math.max(IMPACT_HARD_GAP_MS, IMPACT_MIN_GAP_MS / TEMPO.k)) return;
   lastSoundAt = now;
-  lastSoundStrength = strength;
   if (!audioCtx) {
     try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
   }
