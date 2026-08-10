@@ -28,7 +28,7 @@ const SHOTS = [
 
 export default async function run(stage) {
   const a = await stage.tab('localhost', 'Look');
-  await a.dbg('setAutoCollectMs(0)');
+  await a.dbg('setBannerRetireMs(0)');
 
   for (const vp of SHOTS) {
     await a.page.browser.send('Emulation.setDeviceMetricsOverride',

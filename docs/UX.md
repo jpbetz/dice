@@ -1129,7 +1129,7 @@ a stale row is worse than no table.
 | Saved-pools rack + shelves | §7.9's THE SHEET PASS — identity edits by id, creation-as-editing, the ✎ row — and its DEALT RACK amendment · §7.18 for what the ✎ gate covers | §7.17's region head, amended below: `SAVED POOLS` no longer stands over your own rack |
 | Collapsed launcher (the rail) | §7.22 — 112px, a row is a word, the standing verb, 2i-G · §7.23's "The collapsed column" — the source switch, the dice list, the plate at rail scale | §7.9's collapsed paragraph: it predates the second source list and describes a column that holds only pools (its 56px history is already struck there) |
 | Intent card · dock strip (the declaration) | §2.4's staging timeline, phases 1–8 · §7.6 for the moment flags and `# Title \| Subtitle` · **§7.24** — the target renders under every system and the profile only NAMES it (`targetWord`); the flat `+5` is arithmetic and does not; `#intent-notation` stays a whole verbatim canonical, `dc15` included | §2.4 phase 0's user-held dwell and Roll button (shipped: a fixed `CEREMONY_DECLARE_S = 1.35` s, no button) · §2.1 / §2.3's experience records — the moment ships as notation flags · any reading in which the badge's label is a fixed string |
-| Result banner | §7.11b — the folded card, the hover read, the beacon, auto-collect at 3 s · §7.21 — the named primary verb, the retired watermark · **§7.24** — `VS DC 15` renders under every system, the adjudication only where a sum does, and the hero slot names the rung (`Face down` / `Whispered`) where the mute gold `?` used to sit | §7.9's Done-at-rest and its ~6 s clock (the shipped clock is 3 s) · §7.7.2's ⟳ / Collect / ✕ trio · §2.5 (retired 2026-08-08) |
+| Result banner | §7.11b — the folded card, the hover read, the beacon · **§7.28** — the card retires at 7 s and the DICE STAY until the next roll · §7.21 — the named primary verb, the retired watermark · **§7.24** — `VS DC 15` renders under every system, the adjudication only where a sum does, and the hero slot names the rung (`Face down` / `Whispered`) where the mute gold `?` used to sit | §7.9's Done-at-rest and its ~6 s clock (the shipped clock is 3 s) · §7.7.2's ⟳ / Collect / ✕ trio · §2.5 (retired 2026-08-08) |
 | Verdict card | §7.16's THE FLOW TO COLLECTED — a folded card whose clock shelves the roll · §7.21 — `❯❯ Skip` repaints to `✕ Clear` when the beat lands · **§7.24** — the stake goes into `#verdict-margin`, written ONCE above and outside every branch; the hero holds the reading and the two never share a slot | §7.7.2's verdict half (struck there) · §2.4 phase 0's user-held dwell and Roll button (shipped: a 1.35 s timer, no button) · §2.5's one hero slot — retired, struck there. **The card has no subtitle element under any system** (§7.24's deferral); do not read the eight-surface table as though it does |
 | Peek | §7.7.1 for what a peek is · §7.11b's "folded card, shelf edition" · §7.21 — its primary is always `✕ Clear`, housekeeping being anyone's · **§7.24** — the stake, and the held word in the total slot (the `?` survives only for `!entry`, and under a totals lens) | §7.15's one-✕ rule — retired, struck below · §7.9's "the peek carries a prominent ✕ at its base" amendment · §2.5 (retired) |
 | Roll log | No single section. §7.9 for the rail-foot flyout and key `l` · §7.12 for the compact grouped line (the per-die ROWS belong to the other three surfaces) · §7.15's "The log says so" for `reroll` / `rerolled` · **§7.24** — `vs 15` with no `✓`/`✗` where nothing sums, and no dangling `+5` feeding an empty total column | §2.5 (retired) |
@@ -1673,11 +1673,12 @@ stands on coarse pointers) — draft management is not part of the roll.
 *(The ghost-text demotion is superseded by §7.14: the rail STANDS — P6's
 tier rule lists draft management under "stands"; the quietness is the
 rail's contextual appearance, only while a draft exists.)*
-(3) The tidy-away clock: a finished OPEN roll of YOURS auto-collects to
-the shelf ~6s after it settles (hovering the banner holds the clock — you
+(3) The tidy-away clock **— RETIRED 2026-08-10, see §7.28.** *(As written: a
+finished OPEN roll of YOURS auto-collects to the shelf ~6s after it settles (hovering the banner holds the clock — you
 are reading; Enter keeps it now, Esc sweeps; hidden rolls stand until
 their reveal — the tension is the point; spectators never collect for the
-roller). ONE RESULT CARD (Joe: 'why are the options any different at
+roller.)* The clock that remains on this surface retires the CARD, not the
+roll. ONE RESULT CARD (Joe: 'why are the options any different at
 all?'): the banner and the shelf peek offer the identical action set via
 one builder (appendCardActions) — at rest pure result; approach reveals
 the bare ROLL ❯❯❯ strip and ✕, standing on coarse pointers; Reveal alone
@@ -1966,7 +1967,8 @@ any pool row (28px)** — the draft is the star. Heat stays: stepped
 classes (heat-1…4, two dice per step) brighten the well's gold
 under-glow and gather the standing ROLL whisper from 0.3 toward 0.55.
 Light, depth and scale — never geometry jitter (§7.10). An empty well
-stays quiet; auto-collect runs at 3 s with a hover-hold.
+stays quiet; the banner's own retire runs at 7 s with a hover-hold (it was
+auto-collect at 3 s until §7.28).
 
 **Ghost dice, the loud cue, and the one-home mute** *(same day)*: the
 empty well shows GHOST DICE — three faint desaturated die-art sockets
@@ -3941,3 +3943,56 @@ roll log briefly and then collapse it into a UI element that expands it… UI
 that goes beyond basic buttons and has some elements that visually fit
 together."* U23's token layer is the vocabulary; C13 and U20 are about this
 same surface and should be folded in rather than solved twice.
+
+
+### 7.28 The card retires; the dice stay (2026-08-10)
+
+*Joe, after §7.27 took the shelf off the felt: "It seems weird to make the
+dice disappear after just a few seconds. I think we should leave them on the
+table until another roll is started."*
+
+**He was right, and the fix is a deletion.** The tidy-away clock collected
+your finished roll after 3 s, and its own rationale was *"tidies itself to the
+shelf"* — it had a DESTINATION. §7.27 deleted the destination, and what was
+left was a countdown that erased your result and left an empty table. The
+hover-hold bolted onto it was already the tell that three seconds was short
+for reading.
+
+**The felt-clearing job it was hired for belongs to someone else and always
+did.** The SERVER collects everything on the felt as part of the next roll's
+arrival beat — `collectEntries(room, room.log)`, every roll, whoever threw it,
+before the incoming dice land, with `soloAutoCollect` mirroring it offline.
+"The felt belongs to ONE roll" is enforced there, authoritatively, with no
+race between clients. The client clock never added to that guarantee; it only
+decided how long you got to look.
+
+**One gesture was doing two jobs, and only one survives.** Tidying the DICE
+and retiring the CARD were the same timer. The dice are the result and stay
+until the next roll; the banner is chrome and gets out of the way on its own,
+at `BANNER_RETIRE_MS` = 7 s, hover-held. This is the same seam as
+`critFor`/`critCeremony` — the information and the emphasis retire on
+different clocks. Without a card clock the banner would stand until the next
+roll: it has no other timed exit, and on a phone it covers a serious share of
+the screen.
+
+**Two bails, both load-bearing:**
+
+- **A hidden roll's card never retires.** It carries Reveal — and now that the
+  dice stay UNCOLLECTED, the roll has no `.collected` log row either, so this
+  card is the only door to revealing it. The old clock bailed here for
+  "standing tension"; the reason is now structural.
+- **Hover, or a thumb down, holds it.** You are reading.
+
+**Spectators retire too**, which the collect clock could not do: hiding your
+own card is local, where collecting for the roller was a wire act. That
+asymmetry existed for the wire, not for the reading, and it goes with it.
+
+**What got simpler.** The collect clock carried a retry ladder — `lastRollActionable`,
+a `rollStates` re-check, a 60-try bound — because a collect had to wait for a
+roll to be settled and still actionable, and a clock that fired mid-tumble
+used to strand the roll forever. The card is already on screen. There is
+nothing to wait for and no ladder.
+
+**Escape hatches unchanged:** the corner ✕, Esc, and the card body still clear
+on demand. `__diceDebug.setBannerRetireMs` replaces `setAutoCollectMs`; 0
+disables, which is how tests boot.

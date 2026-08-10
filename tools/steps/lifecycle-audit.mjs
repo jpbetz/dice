@@ -66,8 +66,8 @@ export default async function run(stage) {
   const a = mk(A); const b = mk(B);
   await a.metrics(); await b.metrics();
   // no auto-collect stealing the banner mid-shot
-  await A.dbg('setAutoCollectMs(0)').catch(() => {});
-  await B.dbg('setAutoCollectMs(0)').catch(() => {});
+  await A.dbg('setBannerRetireMs(0)').catch(() => {});
+  await B.dbg('setBannerRetireMs(0)').catch(() => {});
 
   const facts = {};
 
@@ -149,7 +149,7 @@ export default async function run(stage) {
   // ---- 5 · WHISPER, seen by a bystander -------------------------------------
   const C = await stage.tab('127.0.0.2', 'Nyx');
   const c = mk(C); await c.metrics();
-  await C.dbg('setAutoCollectMs(0)').catch(() => {});
+  await C.dbg('setBannerRetireMs(0)').catch(() => {});
   await A.roll('2d6 w:Kira # A word in your ear');
   await A.dbg('sim(600)'); await B.dbg('sim(600)'); await C.dbg('sim(600)');
   await c.park();

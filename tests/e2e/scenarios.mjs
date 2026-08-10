@@ -4014,40 +4014,69 @@ export const scenarios = [
   {
     // RENAMED from 'auto-collect' (2026-08-03): it shared its name — and
     // therefore its ROOM, which the harness keys by scenario name — with
-    // the displacement scenario above, whose shelf residue made this one's
-    // shelf-count assertions a scheduling coin flip. run.mjs now refuses
-    // duplicate names outright.
+    // the displacement scenario above. run.mjs now refuses duplicate names.
     name: 'tidy-away',
-    tags: ['shelf', 'cuj9'],
-    // The tidy-away clock (2026-08-01): a finished OPEN roll of yours
-    // collects itself after a quiet moment; the shelf cluster's quick ✕
-    // clears it in one click (no peek transit); a hidden roll stands until
-    // its reveal. Tests opt in — the harness boots with the clock off.
+    tags: ['shelf', 'roll', 'cuj9'],
+    // THE CARD RETIRES; THE DICE STAY (Joe 2026-08-10).
+    //
+    // This pinned the tidy-away clock: a finished open roll of yours COLLECTED
+    // itself after ~3 s. That clock's rationale was "tidies itself to the
+    // shelf" and C25 deleted the shelf, leaving a countdown that erased the
+    // result and emptied the table. It is gone. What clears the felt is the
+    // next roll's arrival beat, which the SERVER has always driven
+    // (`collectEntries(room, room.log)`) — so the guarantee "one roll on the
+    // felt" is unchanged and is now enforced in exactly one place.
+    //
+    // What is left on a timer is the BANNER, because it has no other timed
+    // exit and on a phone it covers a serious share of the screen. So the
+    // three things worth pinning are: the dice outlive the card, the next
+    // roll is what takes them, and a HIDDEN roll's card never retires —
+    // it carries Reveal, and an uncollected roll has no `.collected` log row,
+    // so that card is the only door to revealing it.
     async fn(ctx) {
-      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
-      assert.equal(await a.dbg('autoCollectMs'), 0, 'the harness boots with the clock off');
-      await a.dbg('setAutoCollectMs(250)');
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      assert.equal(await a.dbg('bannerRetireMs'), 0, 'the harness boots with the clock off');
+      await a.dbg('setBannerRetireMs(200)');
+
       await a.roll('2d6');
-      await a.waitFor(`(window.__diceDebug.sim(60), window.__diceDebug.shelf.length === 1)`,
-        { desc: 'the roll collected itself' });
+      const rid = await a.rollId();
+      const bannerUp = () => a.eval(
+        `!document.getElementById('result-banner').classList.contains('hidden')`);
+      assert.equal(await bannerUp(), true, 'the card stands when the roll lands');
 
-      // the folded card (2026-08-03, re-anchored by C25): the collected roll's
-      // LOG ROW opens the card; the card's BODY is the one big clear target
-      assert.equal(await a.diceCount(), 0, 'the tidy-away took the dice with it');
-      await a.dbg('setLogFlyout(true)');
-      await a.eval(`document.querySelector('#log-list .log-entry.collected').click()`);
-      assert.ok(await a.dbg('peekState'), 'the row click opens the card');
-      await a.eval(`document.querySelector('#peek-card .pk-main').click()`);
-      await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 0 && window.__diceDebug.shelf.length === 0)`,
-        { desc: 'the card body click cleared it' });
+      // THE CARD GOES…
+      await a.waitFor(`!document.getElementById('result-banner').classList.contains('hidden') === false`,
+        { desc: 'the card retires on its own' });
 
-      // a held roll does NOT tidy itself — the standing tension is the point
-      await a.dbg('setAutoCollectMs(120)');
+      // …AND THE DICE DO NOT. This is the whole change: before 2026-08-10 the
+      // same clock took both, and an empty felt three seconds after a roll is
+      // what Joe objected to.
+      await a.dbg('sim(600)'); // ten simulated seconds past the window
+      assert.equal(await a.diceCount(), 2, 'the dice are still on the felt');
+      assert.equal((await a.dbg('shelf')).length, 0, 'and the roll is NOT collected');
+      assert.equal(await a.eval(
+        `window.__diceDebug.onTable.filter((r) => !r.collected).length`), 1,
+      'it is still the live roll on the table');
+
+      // THE NEXT ROLL IS WHAT CLEARS THEM — the server's arrival beat, and
+      // since this is the only clearer left, it is the one that must hold.
+      await a.roll('1d8');
+      await a.waitFor(
+        `(window.__diceDebug.sim(240), window.__diceDebug.tableDice.length === 1)`,
+        { desc: 'the new roll collected the old one off the felt' });
+      assert.equal((await a.dbg('shelf')).length, 1, 'and the old roll is in the record');
+      assert.notEqual(await a.rollId(), rid, 'the felt holds the NEW roll');
+
+      // A HIDDEN ROLL'S CARD STANDS. Its Reveal is the only door, because an
+      // uncollected roll has no collected log row to open a peek from.
       await a.roll('1d20 held');
-      await new Promise((r) => setTimeout(r, 500));
-      await a.dbg('sim(60)');
-      assert.equal((await a.dbg('shelf')).length, 0, 'a hidden roll stays on the felt');
-      assert.ok(await a.diceCount() > 0, 'its dice stand until the reveal');
+      await new Promise((r) => setTimeout(r, 600)); // three retire windows
+      await a.dbg('sim(120)');
+      assert.equal(await bannerUp(), true, "a hidden roll's card never retires");
+      assert.ok(await a.diceCount() > 0, 'and its dice stand until the reveal');
+      assert.equal(await a.eval(
+        `document.querySelectorAll('#banner-actions .banner-foot .reveal-verb:not([hidden])').length`),
+      1, 'because that card is where Reveal lives');
     },
   },
   {

@@ -30,7 +30,7 @@ export default async function run(stage, [only]) {
   const a = await stage.tab('localhost', 'Fit');
   await a.page.browser.send('Emulation.setDeviceMetricsOverride',
     { width: 1600, height: 1000, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
-  await a.dbg('setAutoCollectMs(0)');
+  await a.dbg('setBannerRetireMs(0)');
 
   for (const zoom of (only ? only.split(',') : ZOOMS)) {
     await a.dbg(`setZoom(${JSON.stringify(zoom)})`);

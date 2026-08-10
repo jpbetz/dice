@@ -956,7 +956,7 @@ function removeRollDice(rollId, instant = false) {
 // until its own playback settles (§7.5); the pending clear runs from the
 // completion paths (stepPlayback's showResults / ceremonyFinish).
 function applyClearRoll(rollId) {
-  cancelAutoCollect(rollId);
+  cancelBannerRetire(rollId);
   if (!rollId) return;
   // cleared implies off-shelf (§7.7): the state row flips first so a
   // roll-collected landing later in the same burst becomes a silent no-op.
@@ -1393,7 +1393,7 @@ document.addEventListener('pointerdown', (e) => {
 // exactly as clears defer — always-interruptible playback keeps the stage,
 // and the collect lands from the completion paths (runPendingCollect).
 function applyRollCollected(rollId, seq, animate = true) {
-  cancelAutoCollect(rollId);
+  cancelBannerRetire(rollId);
   if (!rollId || !Number.isInteger(seq) || seq < 1) return;
   const st = rollState(rollId);
   st.collected = seq;
@@ -1443,10 +1443,13 @@ function soloCollectEntries(rollIds) {
   return true;
 }
 
-// Solo auto-collect: when a new roll EXECUTES, everything this session put on
-// the felt that is still uncollected goes to the shelf — the same arrival
-// beat the server drives online. Only session rolls (rollStates rows) are
-// candidates; entries restored from localStorage never grew dice here.
+// Solo arrival-collect: when a new roll EXECUTES, everything this session
+// still has on the felt is collected — the same arrival beat the server
+// drives online (`collectEntries(room, room.log)`). THIS is what keeps one
+// roll on the felt at a time, and since 2026-08-10 it is the ONLY thing that
+// clears it: the client's own tidy-away clock retired with the shelf, so
+// dice now stay put until the next roll. Only session rolls (rollStates rows)
+// are candidates; entries restored from localStorage never grew dice here.
 function soloAutoCollect() {
   const ids = [];
   const seen = new Set();
@@ -1487,11 +1490,11 @@ function flushPendingRollLog() {
 
 // The corner ✕ sweep: felt, shelf, and every surface, gone. The §7.7 state
 // rows are flagged `cleared` with them — solo has no server to remember for
-// it, and a row left on-felt would let the NEXT roll's auto-collect shelve a
-// roll this sweep just took away. Online the server flags its own log the same
+// it, and a row left on-felt would let the NEXT roll's arrival-collect shelve
+// a roll this sweep just took away. Online the server flags its own log the same
 // way, so both sides of a swept table agree with a fresh join.
 function clearTable() {
-  cancelAutoCollect();
+  cancelBannerRetire();
   flushPendingRollLog();
   pendingClears.clear();
   pendingCollects.clear();
@@ -2064,61 +2067,75 @@ function hideBanner() {
   banner.classList.add('hidden');
 }
 
-// Auto-collect (2026-08-01, Joe): a finished roll of YOURS tidies itself to
-// the shelf after a quiet moment — roll, read, and it moves aside on its
-// own; Enter (keep now) and Esc (sweep) stay the fast paths. Hidden rolls
-// wait for their reveal (standing tension is the point), spectators never
-// collect for the roller, and hovering the banner holds the timer — you
-// are reading. Tests run with it off (__diceTestMode) and opt in via the
-// setAutoCollectMs hook; 0 disables. 3 s since 2026-08-03 (Joe: 6 felt
-// far too slow; the hover-hold covers the long reads).
-let autoCollectMs = (typeof window !== 'undefined' && window.__diceTestMode) ? 0 : 3000;
-let autoCollect = { rollId: null, timer: null };
-function cancelAutoCollect(rollId = null) {
-  if (rollId && autoCollect.rollId !== rollId) return;
-  clearTimeout(autoCollect.timer);
-  autoCollect = { rollId: null, timer: null };
+// THE CARD RETIRES; THE DICE STAY (Joe 2026-08-10, after C25 took the shelf
+// off the felt: "it seems weird to make the dice disappear after just a few
+// seconds… leave them on the table until another roll is started").
+//
+// This was auto-collect: a 3 s clock that COLLECTED your finished roll, and
+// its own rationale was "tidies itself to the shelf" — it had a destination.
+// C25 deleted the destination, and what was left was a countdown that erased
+// your result and left an empty table. The hover-hold bolted onto it was
+// already the tell that three seconds was short for reading.
+//
+// It is deleted rather than retuned, because the felt-clearing job it was
+// hired for is done by someone else and always was: the SERVER collects
+// everything on the felt as part of the next roll's arrival beat
+// (`collectEntries(room, room.log)` — every roll, whoever threw it, before
+// the incoming dice land). One roll on the felt at a time is enforced there,
+// authoritatively, with no race between clients. The client clock added
+// nothing to that guarantee; it only decided how long you got to look.
+//
+// What is left is the half that still makes sense. The timer was doing TWO
+// jobs in one gesture — tidying the DICE and retiring the CARD — and only the
+// second survives the shelf's removal: the dice are the result and stay until
+// the next roll, the banner is chrome and gets out of the way on its own.
+// (The same seam as critFor/critCeremony: the information and the emphasis
+// retire on different clocks.) Without this the banner would stand until the
+// next roll — it has no other timed exit — and on a phone it is a serious
+// share of the screen.
+//
+// Two bails, both load-bearing:
+//   · A HIDDEN roll's card never retires. It carries Reveal, and with the
+//     dice now staying on the felt UNCOLLECTED, the roll has no `.collected`
+//     log row either — so this card is the only door to revealing it. The
+//     old code bailed here for "standing tension"; the reason is now
+//     structural.
+//   · Hovering, or a thumb down, holds the clock — you are reading.
+// Spectators retire too, which the collect clock could not do: hiding your
+// own card is local, where collecting for the roller was a wire act.
+//
+// Tests boot with it off (__diceTestMode) and opt in via setBannerRetireMs.
+const BANNER_RETIRE_MS = 7000; // the read, unhurried; hover holds it open
+let bannerRetireMs = (typeof window !== 'undefined' && window.__diceTestMode) ? 0 : BANNER_RETIRE_MS;
+let bannerRetire = { rollId: null, timer: null };
+function cancelBannerRetire(rollId = null) {
+  if (rollId && bannerRetire.rollId !== rollId) return;
+  clearTimeout(bannerRetire.timer);
+  bannerRetire = { rollId: null, timer: null };
 }
-function armAutoCollect(entry) {
-  if (!autoCollectMs || !entry || !entry.rollId) return;
-  if (entry.revealed === false || entryHidden(entry)) return; // reveal re-arms
-  const mine = !netOnline || (net && entry.playerId === net.playerId);
-  if (!mine) return;
-  cancelAutoCollect();
-  autoCollect.rollId = entry.rollId;
-  const fire = () => {
-    const rid = autoCollect.rollId;
-    if (rid !== entry.rollId) return; // cancelled or superseded while queued
-    const last = lastRollActionable(); // re-checks mine + settled + still on felt
-    if (last && last.rollId === rid) {
-      autoCollect = { rollId: null, timer: null };
-      requestCollectRoll(rid);
-      return;
-    }
-    // Not actionable YET vs never again: a clock that fired while the dice
-    // were still landing (slow frame pump, an early banner repaint) used to
-    // give up FOREVER and strand the roll on the felt — the timing decided.
-    // Only a resolved/superseded roll stops the clock; in-flight retries.
-    const st = rollStates.get(rid);
-    const gone = !lastEntry || lastEntry.rollId !== rid
-      || !!(st && (st.cleared || st.collected !== null));
-    // Bounded (adversarial catch): physics that never settles must not
-    // retry forever — ~9s past due covers any real tumble; past it the
-    // roll simply stays for the player to tidy (the pre-retry behavior).
-    if (gone || ++fire.tries > 60) { autoCollect = { rollId: null, timer: null }; return; }
-    autoCollect.timer = setTimeout(fire, 150);
-  };
-  fire.tries = 0;
-  autoCollect.timer = setTimeout(fire, autoCollectMs);
+// No retry ladder here, and that is the point of the split: collecting had to
+// wait for a roll to be settled and still actionable, so it needed one. The
+// card is already on screen — there is nothing to wait for.
+function armBannerRetire(entry) {
+  if (!bannerRetireMs || !entry || !entry.rollId) return;
+  if (entry.revealed === false || entryHidden(entry)) return; // a reveal re-arms
+  cancelBannerRetire();
+  const rid = entry.rollId;
+  bannerRetire.rollId = rid;
+  bannerRetire.timer = setTimeout(() => {
+    if (bannerRetire.rollId !== rid) return;   // superseded while queued
+    bannerRetire = { rollId: null, timer: null };
+    if (lastEntry && lastEntry.rollId === rid) hideBanner();
+  }, bannerRetireMs);
 }
 // Reading holds the clock; leaving restarts it whole. A thumb reads too:
-// touch fires no mouseenter, so without the pointer pair the tidy-away
-// clock collects the roll out from under whoever is still reading it.
-banner.addEventListener('mouseenter', () => clearTimeout(autoCollect.timer));
-banner.addEventListener('mouseleave', () => { if (lastEntry) armAutoCollect(lastEntry); });
-banner.addEventListener('pointerdown', () => clearTimeout(autoCollect.timer));
+// touch fires no mouseenter, so without the pointer pair the card goes out
+// from under whoever is still reading it.
+banner.addEventListener('mouseenter', () => clearTimeout(bannerRetire.timer));
+banner.addEventListener('mouseleave', () => { if (lastEntry) armBannerRetire(lastEntry); });
+banner.addEventListener('pointerdown', () => clearTimeout(bannerRetire.timer));
 for (const ev of ['pointerup', 'pointercancel']) {
-  banner.addEventListener(ev, () => { if (lastEntry) armAutoCollect(lastEntry); });
+  banner.addEventListener(ev, () => { if (lastEntry) armBannerRetire(lastEntry); });
 }
 
 // ---------------------------------------------------------------------------
@@ -2190,8 +2207,8 @@ function outlineRollDice(on) {
 }
 banner.addEventListener('mouseenter', () => outlineRollDice(true));
 banner.addEventListener('mouseleave', () => outlineRollDice(false));
-banner.addEventListener('focusin', () => clearTimeout(autoCollect.timer));
-banner.addEventListener('focusout', () => { if (lastEntry) armAutoCollect(lastEntry); });
+banner.addEventListener('focusin', () => clearTimeout(bannerRetire.timer));
+banner.addEventListener('focusout', () => { if (lastEntry) armBannerRetire(lastEntry); });
 const chips = []; // {el, die}
 // Quiet by default (P1): the floating die numbers are an opt-in ambient
 // layer ('Show numbers on dice', settings "Just you"). The result stays
@@ -2877,7 +2894,7 @@ function renderRollResults(entry, dice, fx = true) {
     resultVerdictEl.textContent || null,
   ].filter(Boolean).join(' — '));
   renderBannerActions(entry);
-  armAutoCollect(entry); // every banner paint restarts the tidy-away clock
+  armBannerRetire(entry); // every banner paint restarts the card's own clock
   const crit = entryCrit(entry);
   // The banner's own dress follows the READING — a crit landed, and the
   // banner says so under every pool size. Only the wash is rationed (U18).
@@ -5349,8 +5366,11 @@ window.__diceDebug = {
     return groups.length;
   },
   // auto-collect (2026-08-01): tests opt in with a short clock; 0 = off
-  get autoCollectMs() { return autoCollectMs; },
-  setAutoCollectMs(ms) { autoCollectMs = Math.max(0, ms | 0); return autoCollectMs; },
+  // The CARD's self-retire clock (Joe 2026-08-10). Was setAutoCollectMs, which
+  // collected the roll; the dice stay on the felt until the next roll now and
+  // only the banner is on a timer. 0 disables, which is how tests boot.
+  get bannerRetireMs() { return bannerRetireMs; },
+  setBannerRetireMs(ms) { bannerRetireMs = Math.max(0, ms | 0); return bannerRetireMs; },
   // the Sheet Pass (2026-08-01): drive the identity strip + ghost tiles
   renderGroups() { renderGroups(); return true; }, // an arbitrary repaint, for repaint-survival checks
   poolPopoverOpen(id) {
