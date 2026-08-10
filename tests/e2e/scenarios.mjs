@@ -9694,6 +9694,97 @@ export const scenarios = [
     },
   },
   {
+    name: 'pile-refusal',
+    tags: ['roll', 'physics', 'cuj8'],
+    // A DIE CAN BE REFUSED FOR STANDING ON ANOTHER, NOT ONLY FOR STANDING UP.
+    // The freeze predicate has always refused a COCKED die — wrong
+    // orientation — and handed it to the nudge. A PILED die reads dot ~ 1 and
+    // freezes happily on top of its neighbour, because separation used to be
+    // a free side effect of ambient bounce: dice skid apart after landing.
+    //
+    // The mechanism is OFF in this build (NUDGE.pileScale 0). The measured
+    // tuning it exists for — deadening the restitution — failed its gates
+    // (tools/steps/settle-matrix.mjs, 2026-08-10), so what ships is the
+    // machinery, inert. This scenario therefore pins the three STRUCTURAL
+    // claims, not an outcome: an outcome pinned here would be a lucky seed,
+    // and at `close` the bar resolves 1 crowded throw in 24.
+    //
+    // Poses are deliberately not compared. Nothing in this engine is
+    // byte-identical across a tab's lifetime — the broadphase's axis list has
+    // seen a different history, which moves rest positions by ~5e-6 on a
+    // couple of seeds in sixteen even on the shipped build. Duration and
+    // frame count are the observables that stay exact, and they are the ones
+    // that mean "a different throw".
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      await a.dbg("setZoom('close')");
+      await a.dbg('sim(200)');
+      const pool = Array(6).fill('d6');
+      // Both land flat with nothing above the bar, so any nudge seen below is
+      // the mechanism and not the pool being unlucky.
+      const seeds = [127704, 175218];
+
+      const throwOne = async (seed) => {
+        await a.dbg(`throwSeeded(${JSON.stringify(pool)}, ${seed})`);
+        await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+          { desc: `6d6/${seed} plays out`, timeout: 30000 });
+        const p = await a.dbg('settleProfile()');
+        await a.dbg('clearTable()');
+        await a.dbg('sim(60)');
+        return { seed, ...p };
+      };
+      const sig = (p) => `${p.duration}|${p.frames}|${p.nudged}`;
+
+      // --- 1. off is off ----------------------------------------------------
+      const off = [];
+      for (const s of seeds) off.push(await throwOne(s));
+      for (const p of off) {
+        assert.equal(p.nudged, 0, `seed ${p.seed}: nudged with the bar off`);
+        assert.equal(p.piled, 0, `seed ${p.seed}: reads as piled with the bar off — it must be silent`);
+      }
+
+      // --- 2. the predicate is wired into the freeze path -------------------
+      // A d6's centre rests at 0.675 and its hull ceiling is 1.169, so a scale
+      // of 0.5 puts the bar UNDER the felt rest: every die reads as piled.
+      // Nothing subtle — either the freeze test consults the bar or it does
+      // not, and with the bar this low a silent run means it does not.
+      await a.dbg('setNudge({"pileScale":0.5})');
+      const on = [];
+      for (const s of seeds) on.push(await throwOne(s));
+      await a.dbg('setNudge({"pileScale":0})');
+      for (const p of on) {
+        assert.ok(p.nudged > 0,
+          `seed ${p.seed}: bar at 0.5x the rest ceiling refused nothing — the freeze test is not reading it`);
+      }
+
+      // --- 3. a refusal nobody can act on must not become a stall -----------
+      // The bug this replaces: with the budget spent, a refused die never
+      // froze and the roll ground on to SETTLE_CAP (9 s) with a parked die,
+      // billing the viewer for the silence. Measured at +55% on 8d6 before the
+      // guard. Every die is refused here and the budget is 3, so this is the
+      // worst case the mechanism can produce.
+      for (const p of on) {
+        assert.equal(p.timedOut, 0,
+          `seed ${p.seed}: ${p.timedOut} dice ran to SETTLE_CAP — an exhausted budget is stalling`);
+        assert.ok(p.duration < 8,
+          `seed ${p.seed}: ${p.duration}s with every die refused — the budget guard is not releasing them`);
+      }
+
+      // --- 4. the off sentinel restores exactly, leaving no residue ---------
+      // pileScale 0 has to mean "this code was never here", or every
+      // measurement taken against it is measuring the instrument.
+      const back = [];
+      for (const s of seeds) back.push(await throwOne(s));
+      seeds.forEach((s, i) => {
+        assert.equal(sig(back[i]), sig(off[i]),
+          `seed ${s}: turning the bar off did not restore the throw `
+          + `(${sig(off[i])} -> ${sig(back[i])})`);
+        assert.notEqual(sig(on[i]), sig(off[i]),
+          `seed ${s}: the bar at 0.5 changed nothing, so claim 3 proves nothing`);
+      });
+    },
+  },
+  {
     name: 'table-name-survives-round-trip',
     tags: ['lobby', 'cuj2'],
     // §3b L3 + initNet's name restoration: an UNPREPARED room is deleted the
