@@ -6775,8 +6775,13 @@ export const scenarios = [
         { desc: 'the revealed die joins the bloom mask' },
       );
 
-      // S3 (2026-08-04): the shelf is the archive — a collected bolt
-      // roll must NOT keep the stack hot on an otherwise-empty felt.
+      // S3 (2026-08-04), and what C25 did to it. The fix was a GATE: shelved
+      // bolt-glass dice stood on the felt carrying a bloom flag, so the post
+      // stack never went idle, and `bloomDiceLive` was added to exclude them.
+      // Since C25 a collected roll's dice leave the table, so the leak is not
+      // gated — it is unrepresentable. The claim that mattered survives
+      // verbatim (an otherwise-empty felt reports IDLE after a collect) and
+      // gets a stronger reason underneath it, so the leg stays.
       // Fresh table so the assertion isn't muddied by held/revealed
       // survivors from the prior steps.
       await a.dbg('clearTable()');
@@ -6798,8 +6803,10 @@ export const scenarios = [
       assert.ok(p.bloomDiceLive >= 2, `felt bolt dice count as live bloom (got ${p.bloomDiceLive})`);
       assert.equal(await a.dbg(`collectRoll(${JSON.stringify(srid)})`), true, 'collect accepted');
       await a.waitFor(
-        `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1 && window.__diceDebug.pendingCollects.length === 0)`,
-        { desc: 'roll shelved, whisk finished' },
+        `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1`
+          + ` && window.__diceDebug.pendingCollects.length === 0`
+          + ` && window.__diceDebug.tableDice.length === 0)`,
+        { desc: 'roll collected and its dice departed' },
       );
       // Drain rings/shimmer (transient wake reasons live outside sim()'s
       // reach) and sim particles to zero — what's LEFT is exactly the
@@ -6812,9 +6819,14 @@ export const scenarios = [
         { desc: 'S3: shelf-only bloom leaves the stack IDLE' },
       );
       p = await post(a);
-      assert.equal(p.active, false, 'S3: pipeline reports IDLE with bloom dice on the shelf');
-      assert.ok(p.bloomDice >= 2, 'shelved dice still carry the bloom flag on their mesh');
-      assert.equal(p.bloomDiceLive, 0, 'no bloom-flagged dice are on the felt');
+      assert.equal(p.active, false, 'S3: the pipeline reports IDLE after the collect');
+      // `bloomDice >= 2` used to prove the gate was doing work — the flag was
+      // still ON those meshes and the stack idled anyway. There are no such
+      // meshes now, and asserting zero is what distinguishes "they left" from
+      // "the gate held": a surviving cluster would show up here.
+      assert.equal(p.bloomDice, 0, 'the collected bolt dice are gone, not merely gated');
+      assert.equal(p.bloomDiceLive, 0, 'and nothing bloom-flagged is on the felt');
+      assert.equal(await a.diceCount(), 0, 'the felt is empty, which is why the stack can idle');
     },
   },
   {
