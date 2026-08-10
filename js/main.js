@@ -168,6 +168,27 @@ const camera = new THREE.PerspectiveCamera(42, view.width / view.height, 1, 200)
 camera.position.set(0, 27, 15.5);
 camera.lookAt(0, 0, 0.5);
 
+// Where the camera LOOKS. Fixed at the mat's centre until the view cannot
+// contain the mat — then it follows the dice, because a cropped frame centred
+// on empty felt is the worst of both. Only fitCameraTo and the framing ladder
+// read it; nothing else in the app knows the camera has a target.
+const CAM_TARGET_HOME = new THREE.Vector3(0, 0, 0.5);
+let camTarget = CAM_TARGET_HOME.clone();
+
+// Camera MOTION state, declared here with the camera rather than beside the
+// framing code: tick() is primed once during boot and stepCamera reads these,
+// so a `let` further down the file is a temporal-dead-zone throw on every
+// frame and the app never reaches ready. (Found exactly that way.)
+let camEase = null;
+let lastFramingMode = 'mat'; // which rung of the framing ladder the frame is on
+// Half-width of the box kept around the deciding die when nothing larger
+// fits. Measured on a 390px phone against today's flat 80px: 1.1 → 175-247px
+// but as few as 2 of 6 dice in frame; 2.2 → 80-107px, barely better than the
+// overflow it replaces. 1.4 is the knee — 111-167px, and the deciding die
+// plus a few neighbours. Retune with __diceDebug.setHeroMargin.
+let HERO_MARGIN = 1.4;
+let framingLadder = true;    // off = the pre-2026-08-10 mat-only framing
+
 scene.add(new THREE.HemisphereLight('#fff6e0', '#2a2018', 1.1));
 
 const keyLight = new THREE.DirectionalLight('#ffeecc', 2.9);
@@ -1548,10 +1569,11 @@ function playRoll(roll) {
   const dice = types.map((t, i) => spawnDie(t, i, types.length, side, rng, shrouded, rollDieSet(roll, i)));
   // Every die on the table is tagged with its roll (§7.5): a per-roll Done
   // removes exactly these dice and never touches a concurrent roll's.
-  for (const d of dice) {
+  dice.forEach((d, i) => {
     d.rollId = roll.rollId || null;
     d.shrouded = shrouded;
-  }
+    d.dieIndex = i; // lastLanding names the deciding die by index; this finds it
+  });
   tableDice.push(...dice);
 
   // Level 4b: a lit set's dice carry their glow from the throw. Shroud
@@ -2009,6 +2031,10 @@ function stepPlayback(dt) {
       return;
     }
     roll.done = true;
+    // THE PICTURE HAS GONE QUIET — the only moment ruling ① lets the camera
+    // move. Re-frame to whatever rung of the ladder this roll needs; on a
+    // desktop the mat still fits and this is a no-op.
+    applyCameraFraming(true);
     showResults(roll);
     runPendingReveal(roll);  // a reveal that arrived mid-playback lands now
     runPendingCollect(roll); // a collect that arrived mid-playback lands now
@@ -4399,6 +4425,7 @@ function tick(dt, render = true) {
   stepSinking(dt);   // per-roll Done departures (§7.5)
   stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
   stepRevealing(dt); // reveal correction flips (goal 11)
+  stepCamera(dt);    // eased reframing; only ever armed under a quiet picture
   if (chips.length) positionChips();
   if (isPeekOpen()) positionPeek();
   updateCornerClear();
@@ -4622,6 +4649,34 @@ window.__diceDebug = {
     applyCameraFraming(); // never leave the player looking at a probe
     return out;
   },
+  // WHAT THE PLAYER CAN ACTUALLY SEE. The assertion surface for the framing
+  // ladder: which rung it settled on, whether the mat fits (on a phone it
+  // never has), and — the claim that matters — whether the dice are on screen.
+  // Reads the LIVE camera, so it measures what is painted rather than what the
+  // framing intended.
+  // Turn the framing ladder off — the camera frames the mat and nothing else,
+  // which is what shipped before 2026-08-10. The scenario measures BOTH sides
+  // through this, so "cropping bought size" is a number rather than a claim.
+  setFramingLadder(on) { framingLadder = !!on; applyCameraFraming(false); return framingLadder; },
+  setHeroMargin(m) { HERO_MARGIN = m; applyCameraFraming(false); return HERO_MARGIN; },
+  framingInfo() {
+    const v = new THREE.Vector3();
+    const ndc = (p) => { v.copy(p).project(camera); return Math.max(Math.abs(v.x), Math.abs(v.y)); };
+    const live = tableDice.filter((d) => d.body && d.mesh && d.mesh.visible !== false);
+    const l = currentRoll && currentRoll.lastLanding;
+    const hero = l && live.find((t) => t.rollId === currentRoll.rollId && t.dieIndex === l.i);
+    return {
+      mode: lastFramingMode,
+      matFits: framingPoints().every(({ p }) => ndc(p) <= 1),
+      dice: live.length,
+      diceOnScreen: live.filter((d) => ndc(d.body.position) <= 1).length,
+      decidingOnScreen: hero ? ndc(hero.body.position) <= 1 : null,
+      easing: !!camEase,
+      target: [Math.round(camTarget.x * 10) / 10, Math.round(camTarget.z * 10) / 10],
+      camY: Math.round(camera.position.y * 10) / 10,
+      view: `${Math.round(view.width)}x${Math.round(view.height)}`,
+    };
+  },
   // PRICING THE ORACLE CAMERA before building it (immersion Wave 2). C25's
   // framingCost answered "what did the shelf cost the view" — 1.00× on a
   // phone — and the honest reading of that was "framing buys nothing." This
@@ -4687,12 +4742,12 @@ window.__diceDebug = {
     const eye = new THREE.Vector3(
       ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
     );
-    const ray = eye.clone().sub(CAM_TARGET);
+    const ray = eye.clone().sub(CAM_TARGET_HOME);
     const v = new THREE.Vector3();
     let usedScale = null;
     for (let s = minScale; s <= 3.7; s += 0.02) {
-      camera.position.copy(CAM_TARGET).addScaledVector(ray, s);
-      camera.lookAt(CAM_TARGET);
+      camera.position.copy(CAM_TARGET_HOME).addScaledVector(ray, s);
+      camera.lookAt(CAM_TARGET_HOME);
       camera.updateMatrixWorld(true);
       const fits = pts.every(({ p, mx, my }) => {
         v.copy(p).project(camera);
@@ -12546,7 +12601,6 @@ function panelDebugState() {
 // fixed (every entry keeps y/z ≈ 1.74). applyCameraFraming's step-back still
 // runs after — it just starts from the closer eye at 'medium'/'close'.
 let CAM_EYE = { full: [0, 8.1, 4.7], mini: [0, 6.7, 3.8] }; // the DEFAULT ('medium')
-const CAM_TARGET = new THREE.Vector3(0, 0, 0.5);
 
 // What must stay on screen, each with the NDC headroom its own chrome needs.
 //
@@ -12574,30 +12628,172 @@ function framingPoints() {
 // Pull the eye STRAIGHT BACK along its own ray until every point in `pts`
 // fits. Split out of applyCameraFraming so the same fit can be run against a
 // subset without touching the shipped framing (see framingCost).
-function fitCameraTo(pts) {
+//
+// RETURNS WHETHER IT ACTUALLY FIT, which it did not used to, and the silence
+// was a shipped defect: the range reaches ~3.67× and a 390px phone needs more
+// than that for the mat at EVERY zoom level (measured — mat corners at NDC
+// 1.28–1.37, i.e. 28–37% off screen). The loop exhausted, left the eye at the
+// last step, and the felt overflowed the view with nothing reporting it. That
+// is also why C25's shelf framing priced at 1.00× on a phone: no subset of
+// points can move a camera already parked at its maximum.
+function fitCameraTo(pts, target = camTarget) {
   const eye = new THREE.Vector3(
     ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
   );
-  const ray = eye.clone().sub(CAM_TARGET);
+  const ray = eye.clone().sub(target);
   const v = new THREE.Vector3();
   // Pull back in small steps and stop at the first distance that fits — a
   // closed form would have to invert the projection for eight points at once,
-  // and this runs only on resize and on the compact-view toggle. The range
-  // reaches ~3.7×, which covers a phone held upright; past that the eye stays
-  // where the last step left it rather than retreating without end.
+  // and this runs only on resize, on the compact-view toggle, and once per
+  // settle.
   for (let i = 0; i < 90; i++) {
-    camera.position.copy(CAM_TARGET).addScaledVector(ray, 1 + i * 0.03);
-    camera.lookAt(CAM_TARGET);
+    camera.position.copy(target).addScaledVector(ray, 1 + i * 0.03);
+    camera.lookAt(target);
     camera.updateMatrixWorld(true);
     const fits = pts.every(({ p, mx, my }) => {
       v.copy(p).project(camera);
       return Math.abs(v.x) <= 1 - mx && Math.abs(v.y) <= 1 - my;
     });
-    if (fits) break;
+    if (fits) return true;
   }
+  return false;
 }
 
-function applyCameraFraming() { fitCameraTo(framingPoints()); }
+// Every die on the felt, as an AABB grown by a die half-extent so a die sits
+// INSIDE the frame rather than tangent to it. Null when the felt is empty.
+function diceFramingPoints(margin = 1.0) {
+  const live = tableDice.filter((d) => d.body && d.mesh && d.mesh.visible !== false);
+  if (!live.length) return null;
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const d of live) {
+    x0 = Math.min(x0, d.body.position.x - margin); x1 = Math.max(x1, d.body.position.x + margin);
+    z0 = Math.min(z0, d.body.position.z - margin); z1 = Math.max(z1, d.body.position.z + margin);
+  }
+  const pts = [];
+  for (const x of [x0, x1]) for (const z of [z0, z1]) {
+    pts.push({ p: new THREE.Vector3(x, 0, z), mx: 0.02, my: 0.02 });
+  }
+  pts.centre = new THREE.Vector3((x0 + x1) / 2, 0, (z0 + z1) / 2);
+  return pts;
+}
+
+// The die the roll came down to, and a box around it that always fits. This is
+// the floor ruling ② puts under cropping: framing may vary per client and the
+// mat may be cut, but THE DECIDING DIE IS NEVER CROPPED OUT OF FRAME. It is
+// knowable because playRoll bakes every final pose before frame one, so
+// lastLanding names it the instant the roll exists.
+function decidingDieFraming(margin = HERO_MARGIN) {
+  const l = currentRoll && currentRoll.lastLanding;
+  const d = l && tableDice.find((t) => t.rollId === currentRoll.rollId && t.dieIndex === l.i);
+  const at = d && d.body ? d.body.position : null;
+  if (!at) return null;
+  const pts = [];
+  for (const x of [at.x - margin, at.x + margin]) for (const z of [at.z - margin, at.z + margin]) {
+    pts.push({ p: new THREE.Vector3(x, 0, z), mx: 0.02, my: 0.02 });
+  }
+  pts.centre = new THREE.Vector3(at.x, 0, at.z);
+  return pts;
+}
+
+// Is the deciding die inside the frame the camera is currently in? Read from
+// the LIVE camera, so it answers what would be painted rather than what the
+// fit intended.
+function decidingOnScreen() {
+  const l = currentRoll && currentRoll.lastLanding;
+  const d = l && tableDice.find((t) => t.rollId === currentRoll.rollId && t.dieIndex === l.i);
+  if (!d || !d.body) return false;
+  const v = new THREE.Vector3().copy(d.body.position).project(camera);
+  return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1;
+}
+
+// THE FRAMING LADDER (Joe 2026-08-10: "crop deliberately and centre it on the
+// dice"). Best frame first; each rung is only reached because the one above it
+// could not fit the view:
+//
+//   1. THE WHOLE MAT, from its centre. What every desktop gets, byte-identical
+//      to the shipped behaviour. Nothing below this rung ever runs there.
+//   2. THE DICE, cropping the mat. Reached on a phone, where the mat has never
+//      fit. Safe to crop HERE and nowhere else: these dice have stopped, and
+//      the AABB contains all of them by construction, so it cuts felt and
+//      cannot cut a die.
+//   3. THE DECIDING DIE. Reached when even the dice do not fit — a 20d6 pool
+//      is nearly as wide as the mat. Something must go off screen; ruling ②
+//      says what may not.
+//
+// Returns the pose rather than moving the camera, so the caller can ease to it.
+function computeFraming() {
+  const savedPos = camera.position.clone();
+  const savedTgt = camTarget.clone();
+  const home = CAM_TARGET_HOME;
+  let mode = 'mat';
+  if (!fitCameraTo(framingPoints(), home) && framingLadder) {
+    const dice = diceFramingPoints();
+    if (dice && fitCameraTo(dice, dice.centre)) {
+      mode = 'dice';
+    } else if (dice && decidingOnScreen()) {
+      // THE LEAST CROPPING THAT STILL OBEYS RULING ②. The dice do not all fit,
+      // but aimed at the cluster's centre the deciding die IS in frame — so
+      // stop here. Tightening further would buy size by throwing away dice the
+      // view was already able to show, and the ruling asks for the deciding die
+      // to be visible, not for everything else to be discarded.
+      mode = 'dice-cropped';
+    } else {
+      const hero = dice && decidingDieFraming();
+      if (hero && fitCameraTo(hero, hero.centre)) mode = 'deciding';
+      else mode = 'mat-overflow'; // nothing to aim at; the old silent behaviour
+    }
+  }
+  const pose = {
+    pos: camera.position.clone(),
+    tgt: (mode === 'mat' || mode === 'mat-overflow') ? home.clone()
+      : (mode === 'deciding' ? decidingDieFraming().centre : diceFramingPoints().centre),
+    mode,
+  };
+  camera.position.copy(savedPos);
+  camTarget.copy(savedTgt);
+  camera.lookAt(camTarget);
+  camera.updateMatrixWorld(true);
+  return pose;
+}
+
+// Ease, never cut, and only under a quiet picture — ruling ① permits the
+// camera to move once the roll has stopped, never through the tumble.
+const CAM_EASE_S = 0.42;
+
+function applyFramingPose(pose, animate) {
+  if (!animate || prefersReducedMotion()) {
+    camEase = null;
+    camera.position.copy(pose.pos);
+    camTarget.copy(pose.tgt);
+    camera.lookAt(camTarget);
+    camera.updateMatrixWorld(true);
+    return;
+  }
+  camEase = {
+    t: 0,
+    fromPos: camera.position.clone(), toPos: pose.pos.clone(),
+    fromTgt: camTarget.clone(), toTgt: pose.tgt.clone(),
+  };
+}
+
+// Advance the ease. Driven from tick() by the same dt the physics uses, so a
+// scenario that freezes the clock freezes the camera with it.
+function stepCamera(dt) {
+  if (!camEase) return;
+  camEase.t = Math.min(1, camEase.t + dt / CAM_EASE_S);
+  const k = 1 - Math.pow(1 - camEase.t, 3); // ease-out cubic
+  camera.position.lerpVectors(camEase.fromPos, camEase.toPos, k);
+  camTarget.lerpVectors(camEase.fromTgt, camEase.toTgt, k);
+  camera.lookAt(camTarget);
+  camera.updateMatrixWorld(true);
+  if (camEase.t >= 1) camEase = null;
+}
+
+function applyCameraFraming(animate = false) {
+  const pose = computeFraming();
+  lastFramingMode = pose.mode;
+  applyFramingPose(pose, animate);
+}
 
 // Reflect panelsOpen into the DOM, persist it, and derive compact view:
 // body.mini appears exactly when every available panel is collapsed. The

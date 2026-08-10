@@ -678,6 +678,104 @@ export const scenarios = [
     },
   },
   {
+    name: 'framing-keeps-the-deciding-die',
+    tags: ['roll', 'perf', 'touch', 'cuj8'],
+    // THE PHONE HAS NEVER FIT THE MAT (measured 2026-08-10). fitCameraTo scans
+    // 1 + i*0.03 for i < 90, tops out at ~3.67×, and on a 390px phone the mat
+    // needs more than that at EVERY zoom — corners at NDC 1.28–1.37. The loop
+    // exhausted, left the eye at the last step, and the felt overflowed with
+    // nothing reporting it. Measured consequence: on 40d6 the die the roll came
+    // down to was OFF SCREEN, and the player had no way to watch it stop.
+    //
+    // Joe's call (2026-08-10) was to crop on purpose and centre on the dice.
+    // Ruling ② sets the floor: framing may vary per client and the mat may be
+    // cut, but THE DECIDING DIE IS NEVER CROPPED OUT OF FRAME. That is what
+    // this pins — on every pool size, which is where it used to fail.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+      const viewport = async (w, h, mini) => {
+        await a.page.browser.send('Emulation.setDeviceMetricsOverride',
+          { width: w, height: h, deviceScaleFactor: 1, mobile: false }, a.page.sessionId);
+        await a.dbg(`setPanelState({pools: ${!mini}, log: ${!mini}})`);
+        await a.dbg("setZoom('medium')"); // dice.zoom.v1 is per-origin and outlives a scenario
+        await a.eval('window.dispatchEvent(new Event("resize"))');
+        await a.dbg('sim(300)');
+      };
+      const throwIt = async (notation) => {
+        await a.dbg('clearTable()');
+        await a.dbg('sim(300)');
+        await a.dbg(`commandRoll(${JSON.stringify(notation)})`);
+        await a.waitFor('!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.lastLanding)',
+          { desc: `${notation}: the roll reached the client` });
+        await a.dbg('sim(9000)'); // settle
+        await a.dbg('sim(1500)'); // let the reframing ease finish
+        return JSON.parse(await a.eval('JSON.stringify(window.__diceDebug.framingInfo())'));
+      };
+
+      // A DESKTOP MUST BE UNTOUCHED. The mat fits there, so the ladder never
+      // leaves its first rung and the framing is the one that shipped.
+      await viewport(1440, 900, true);
+      for (const pool of ['1d20', '6d6']) {
+        const f = await throwIt(pool);
+        assert.equal(f.mode, 'mat', `desktop ${pool}: the camera still frames the whole mat`);
+        assert.ok(f.matFits, `desktop ${pool}: and the mat actually fits (it always has here)`);
+      }
+
+      // A PHONE CROPS, AND THE FLOOR HOLDS. Every pool size, including the ones
+      // whose dice cannot all fit — that is the whole point of the ladder.
+      await viewport(390, 844, true);
+      for (const pool of ['1d20', '1d8+1d6+1d10', '6d6', '20d6', '40d6']) {
+        const f = await throwIt(pool);
+        assert.ok(f.decidingOnScreen === true,
+          `phone ${pool}: the deciding die is in frame (mode ${f.mode}, `
+          + `${f.diceOnScreen}/${f.dice} dice on screen)`);
+        assert.notEqual(f.mode, 'mat-overflow',
+          `phone ${pool}: the camera aims at something rather than overflowing blindly`);
+      }
+
+      // AND THE CROP BOUGHT SIZE — measured against the shipped framing through
+      // the same probe, not asserted from taste.
+      //
+      // ONE DIE ONLY, and that is a finding rather than a convenience. Dice
+      // SCATTER: a three-die pool's AABB measured anywhere from 5x3.4 to
+      // 7.7x5.3 on an 8.6x5.2 mat, so on many throws it does not fit a phone
+      // either and the ladder correctly declines to crop. Asserting a gain for
+      // the trio failed 2 runs in 4 at 78-80px — the honest claim is that the
+      // size win is GUARANTEED for a single die and OPPORTUNISTIC above it.
+      // `1d20 dc 15` is the most common check in the game, so the guaranteed
+      // case is also the frequent one.
+      for (const pool of ['1d20']) {
+        await throwIt(pool);
+        await a.eval('window.__diceDebug.setFramingLadder(false)');
+        await a.dbg('sim(1500)');
+        const off = (await a.eval('JSON.stringify(window.__diceDebug.zoomProbe())'));
+        await a.eval('window.__diceDebug.setFramingLadder(true)');
+        await a.dbg('sim(1500)');
+        const on = (await a.eval('JSON.stringify(window.__diceDebug.zoomProbe())'));
+        const o = JSON.parse(off).dieSpanPx, n = JSON.parse(on).dieSpanPx;
+        assert.ok(n > o * 1.5,
+          `phone ${pool}: framing the die makes it much bigger (${o}px → ${n}px)`);
+        const f = JSON.parse(await a.eval('JSON.stringify(window.__diceDebug.framingInfo())'));
+        assert.equal(f.diceOnScreen, f.dice,
+          `phone ${pool}: …and every die is still on screen (${f.diceOnScreen}/${f.dice})`);
+      }
+
+      // PUT THE ORIGIN BACK. `setPanelState` writes per-origin localStorage,
+      // which outlives this scenario's room — the same trap TESTING.md records
+      // for dice.diceset.v1. Leaving the panels collapsed made
+      // `hidden-means-hidden` and `a11y-modals` fail LATER IN THE SWEEP while
+      // both passed in isolation, which is the most expensive shape a test
+      // failure can take: it accuses the wrong commit. This scenario is the
+      // only one that visits a phone viewport, so it is the one that owes the
+      // cleanup.
+      await a.dbg('setPanelState({pools: true, log: true})');
+      await a.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, a.page.sessionId);
+      await a.eval('window.dispatchEvent(new Event("resize"))');
+      await a.dbg('sim(300)');
+    },
+  },
+  {
     name: 'cache-validator',
     tags: ['net'],
     // A STALE BUILD IS A PERMANENT ONE, unless the validator changes with the
