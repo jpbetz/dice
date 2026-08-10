@@ -730,19 +730,27 @@ const TEMPO = { k: 1 };
 // IN CONTACT WITH THE FLOOR that is moving UPWARD slower than `vy` has its
 // vertical velocity zeroed. 0 skips the scan entirely — byte-identical.
 //
-// Three deliberate restrictions, each of which the mechanism needs:
+// Three deliberate restrictions:
 //
-//   UPWARD ONLY. Clamping a downward vy would be catastrophic, not merely
-//   wrong: gravity adds 110/60 = 1.83 units/s per step, so a threshold of 2
-//   would re-zero a falling die every single step and hover it. Upward-only
-//   can never fight gravity — it can only decline to return energy.
+//   FLOOR CONTACT ONLY, by body identity, and THIS is the one that carries
+//   the safety argument. cannon only puts a body in world.contacts with the
+//   floor plane when its hull actually penetrates y = 0, so a die in the air
+//   is unreachable from here — no trajectory can be altered before it lands,
+//   and no die can be pinned mid-flight. Drop this gate and the mechanism
+//   becomes catastrophic rather than merely useless: gravity adds 110/60 =
+//   1.83 units/s per step, so an ungated clamp at any vy above that re-zeros
+//   a falling die every step and holds it in the air, where zero velocity
+//   passes the stillness test and it FREEZES. Measured, not reasoned: drop
+//   the gate and `settle-magnet` fails with "2 dice ran to SETTLE_CAP at
+//   vy 20" — two dice pinned in mid-air. It also keeps a die resting on
+//   ANOTHER die out of scope, so the mechanism cannot launder a stack into
+//   a flat pile reading.
 //
-//   FLOOR CONTACT ONLY, by body identity. A die in flight is never touched,
-//   so no trajectory is altered before it lands; a die resting on ANOTHER
-//   die is not the floor's business (and leaving it alone keeps the pile
-//   measurement honest — this mechanism must not be able to launder a stack
-//   into a flat reading). Contacts come from world.contacts, which cannon
-//   fills during the step we just ran.
+//   UPWARD ONLY. Not the hover guard — the contact gate already is, and
+//   clamping downward at a contact was measured to change nothing the
+//   scenario can see. It is a purity choice: taking a die's INCOMING energy
+//   is deadening, which is a different mechanism with a known price (C30c),
+//   and this one is only allowed to decline to give energy BACK.
 //
 //   VERTICAL ONLY. Horizontal skid is how dice separate on this mat — that
 //   is the whole reason the felt tuning was refused (C30c) — so the clamp
@@ -752,6 +760,19 @@ const TEMPO = { k: 1 };
 // The band is small by construction. A hop of vy reaches v²/2g, so vy = 1 is
 // 0.005 units of air (0.3% of a die) and vy = 4 is 0.073 (5%). Everything
 // this can suppress is invisible as motion and visible only as noise.
+//
+// AND IT DOES NOT WORK — MEASURED 2026-08-10, vy 1/2/4, 16 paired seeds
+// behind a passing canary. It fails on its own axis. `hops` (the count of
+// separate times a die goes back up, which is the complaint stated
+// literally) does not fall: soul 4.88 -> 5.53 at vy 1. Shake RISES, +38% on
+// the same pool. The reason is that zeroing vy does not glue a die down —
+// the contact solver re-supplies the push on the very next step, so what the
+// clamp actually buys is a trade of one smooth ballistic arc for per-step
+// chatter, and it adds replay drift on top (seed 32676 comes back a
+// 435-frame throw instead of 450). Kept inert and documented because the
+// idea is sound in general — Bullet and PhysX both do this — and the next
+// attempt should know that in THIS solver it is the contact chatter, not the
+// bounce, that the eye is reading. Full account in ROADMAP C30d.
 const MAGNET = { vy: 0 };
 
 // Per-body flags applied at spawn. `allowSleep: null` means "leave cannon's
@@ -1121,10 +1142,12 @@ function restMotion(roll, secs = 0.6) {
   let dist = 0;
   let steps = 0;
   let flips = 0;
+  let hops = 0;
   roll.keyframes.forEach((kf, i) => {
     const def = DIE_DEFS[roll.dice[i] && roll.dice[i].type] || {};
     const w = def.size || (def.radius ? def.radius * 2 : 2);
     const end = Math.min(kf.length - 1, roll.landings[i].frame);
+    let wasRising = false;
     for (let f = Math.max(1, end - back); f < end; f++) {
       a.subVectors(kf[f].pos, kf[f - 1].pos);
       b.subVectors(kf[f + 1].pos, kf[f].pos);
@@ -1133,11 +1156,21 @@ function restMotion(roll, secs = 0.6) {
       // Ignore steps too small to see: below a thousandth of a die-width the
       // direction is numerical noise and every die would look like it shakes.
       if (a.length() > w * 1e-3 && b.length() > w * 1e-3 && a.dot(b) < 0) flips++;
+      // MICRO-BOUNCES, counted as the only thing a viewer can actually see:
+      // how many separate times the die goes back UP. Read off the baked
+      // keyframes, not off the solver, so it is a fact about the film rather
+      // than a restatement of whatever mechanism produced it — a clamp that
+      // reports its own firings proves nothing, and a die glued to the felt
+      // by ANY means registers zero hops here. Same noise floor as `shake`.
+      const rising = b.y > w * 1e-3;
+      if (rising && !wasRising) hops++;
+      wasRising = rising;
     }
   });
   return {
     creep: dist / roll.keyframes.length,
     shake: steps ? flips / steps : 0,
+    hops: hops / roll.keyframes.length,
   };
 }
 
@@ -5802,6 +5835,10 @@ window.__diceDebug = {
         return {
           creep: Math.round(m.creep * 1000) / 1000,
           shake: Math.round(m.shake * 1000) / 1000,
+          // Times per die the die goes back up in its last 0.6s. This is what
+          // "no more bounding like they're on the moon" asks to be zero, and
+          // unlike magnetClamps it is measured off the film.
+          hops: Math.round(m.hops * 1000) / 1000,
         };
       })(),
       byDie: r.landings.map((l) => Math.round(l.time * 100) / 100),

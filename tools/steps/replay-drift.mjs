@@ -40,6 +40,27 @@ const VARIANTS = {
   nudgepile: { nudge: { pileScale: 1.05 } },
   candidate: { phys: DEADEN, dampgate: GATE4, nudge: { pileScale: 1.05 } },
   sleepier: { sleep: { speed: 0.9, time: 0.2 } },
+  // C30d. The floor clamp quantises small vertical velocities to exactly 0,
+  // which is a DESTRUCTIVE operation on float state — every divergence living
+  // in a die's last few bits of vy is erased the moment it touches the felt
+  // slowly. The prediction is therefore that magnet ABSORBS drift rather than
+  // adding it, and if it adds any the mechanism is dead on the spot.
+  magnet1: { magnet: { vy: 1 } },
+  magnet2: { magnet: { vy: 2 } },
+  magnet4: { magnet: { vy: 4 } },
+  // Attribution: is deaden's drift a sleep-boundary knife edge? A deadened
+  // die spends far longer near sleepSpeedLimit, where accumulated world.time
+  // can tip the decision. allowSleep=false removes the boundary. `sleepoff`
+  // is the control — it changes trajectories on its own, so the question is
+  // only whether deaden+sleepoff drifts LESS than deaden does.
+  sleepoff: { bodyFlags: { allowSleep: false } },
+  deadensleepoff: { phys: DEADEN, bodyFlags: { allowSleep: false } },
+  // The candidate the attribution opened up: deaden for the shake, sleepoff
+  // for the replay, gate4 to buy back the slow tail sleepoff costs.
+  deadensleepoffgate4: { phys: DEADEN, dampgate: GATE4, bodyFlags: { allowSleep: false } },
+  // Determinism on its own, with no shake claim attached: sleep off for the
+  // replay, gate4 to pay for the slow tail it costs.
+  sleepoffgate4: { dampgate: GATE4, bodyFlags: { allowSleep: false } },
 };
 
 export default async function run(stage, [variant = 'candidate', seedCount = '16', churnCount = '700']) {
@@ -53,11 +74,15 @@ export default async function run(stage, [variant = 'candidate', seedCount = '16
   if (v.dampgate) await a.dbg(`setDampgate(${JSON.stringify(v.dampgate)})`);
   if (v.nudge) await a.dbg(`setNudge(${JSON.stringify(v.nudge)})`);
   if (v.sleep) await a.dbg(`setSleep(${JSON.stringify(v.sleep)})`);
+  if (v.magnet) await a.dbg(`setMagnet(${JSON.stringify(v.magnet)})`);
+  if (v.bodyFlags) await a.dbg(`setBodyFlags(${JSON.stringify(v.bodyFlags)})`);
   console.log(`variant ${variant}`);
-  console.log(`  phys     ${JSON.stringify(await a.dbg('physics'))}`);
-  console.log(`  dampgate ${JSON.stringify(await a.dbg('dampgate'))}`);
-  console.log(`  nudge    ${JSON.stringify(await a.dbg('nudge'))}`);
-  console.log(`  sleep    ${JSON.stringify(await a.dbg('sleep'))}`);
+  console.log(`  phys      ${JSON.stringify(await a.dbg('physics'))}`);
+  console.log(`  dampgate  ${JSON.stringify(await a.dbg('dampgate'))}`);
+  console.log(`  nudge     ${JSON.stringify(await a.dbg('nudge'))}`);
+  console.log(`  sleep     ${JSON.stringify(await a.dbg('sleep'))}`);
+  console.log(`  magnet    ${JSON.stringify(await a.dbg('magnet'))}`);
+  console.log(`  bodyFlags ${JSON.stringify(await a.dbg('bodyFlags'))}`);
 
   const seeds = Array.from({ length: n }, (_, i) => 1000 + i * 7919);
 
