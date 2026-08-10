@@ -1349,10 +1349,23 @@ function positionPeek() {
   const r = row.getBoundingClientRect();
   const w = peekW;
   const h = peekH;
-  let left = r.right + 12;
-  if (left + w > window.innerWidth - 8) left = r.left - 12 - w;
-  left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+  const roomRight = window.innerWidth - 8 - (r.right + 12);
+  const roomLeft = (r.left - 12) - 8;
+  let left;
   let top = r.top + r.height / 2 - h / 2;
+  if (roomRight >= w || roomLeft >= w) {
+    left = roomRight >= w ? r.right + 12 : r.left - 12 - w;
+  } else {
+    // Neither side fits — a phone, where the record is nearly the whole
+    // width. Beside becomes ABOVE: centred on the viewport and lifted clear
+    // of the row, so the card never sits on top of its own anchor (which
+    // would fire pointerleave the instant it opened) and never hides behind
+    // the rail. Below if there is no room above.
+    left = (window.innerWidth - w) / 2;
+    top = r.top - 10 - h;
+    if (top < 8) top = r.bottom + 10;
+  }
+  left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
   top = Math.max(8, Math.min(top, window.innerHeight - h - 8));
   peekEl.style.left = `${left}px`;
   peekEl.style.top = `${top}px`;

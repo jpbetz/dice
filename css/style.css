@@ -2772,7 +2772,12 @@ html, body {
   position: fixed;
   bottom: 12px; /* the ≣ lives in the panel's FOOT bar now — rise from it */
   left: calc(var(--table-left) + 12px);
-  width: 300px;
+  /* THE RECORD HAS TO FIT THE SCREEN IT IS THE RECORD ON (C25). A fixed
+     300px overflowed a 390px phone by 26px once the panel collapsed, cutting
+     the right-hand end off every outcome word. That was survivable while the
+     log was optional reference material; since collected rolls live here and
+     nowhere else, a clipped row is a lost roll. */
+  width: min(300px, calc(100vw - var(--table-left) - 24px));
   max-height: 60vh;
   overflow-y: auto;
   padding: 8px 14px 12px;
