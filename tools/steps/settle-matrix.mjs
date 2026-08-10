@@ -44,6 +44,18 @@ const FELT_DAMP = { linearDamping: 0.1, angularDamping: 0.14 };
 const SLOW = { slowLinear: 0.1, slowAngular: 0.14 }; // the felt damping, gated
 // A real raise measured from what dice.js ships (0.4 / 0.35), not from
 // cannon's stock 0.1 / 1 — see the SLEEP comment in js/main.js.
+//
+// AND IT DOES NOT REPLAY. Measured 2026-08-10: throw the 16-seed soul family,
+// simulate 700 unrelated throws, throw it again — under the shipped 0.4/0.35
+// all sixteen come back byte-identical, and under 0.9/0.2 FOUR OF SIXTEEN
+// change (pool mean 1.394 -> 1.418). Raising the thresholds puts the sleep
+// decision on a knife edge that accumulated world.time can tip, so the same
+// seed becomes a different throw depending on how long the tab has been
+// open. Every client fast-forwards a roll from its seed and must agree, and
+// perf-determinism compares two FRESHLY LOADED tabs, so it cannot see this.
+// The number this explains is why a variant measured deep in a long run did
+// not match the same variant measured early. Do not ship a sleep raise
+// without solving that first; the piling is the smaller objection.
 const SLEEPIER = { speed: 0.9, time: 0.2 };
 
 // [name, physics overrides, dampgate | null, throwTarget | null, sleep | null]
