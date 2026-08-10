@@ -785,15 +785,19 @@ const SLEEP = { speed: 0.4, time: 0.35 };
 // whatever the projector is doing, and all three are functions of film time,
 // so they pick the same passage of the reel however fast it is running.
 //
-// SHIPPED CURVE (2026-08-11, Joe's A/B): flight 0.8 — the hurl and tumble a
-// touch slower than raw, his pick over 1.0 twice — ramping to settle 2.2 once
-// the last die stops travelling, so the wait never drags. Uniform k was
-// refused by the same eye at every value tried (2.7 and 2.2 both "too fast
-// for the main dice roll"); the curve is what survived. anchorSpeed 8 by
-// sweep: engages on every pool (late ≤1/8) and sits 35× above the settle bar.
-// `k` stays as the uniform multiplier the theorem checks use; the two compose
-// (effective = k × curve). flight = settle = 1 recovers the pre-curve film.
-const TEMPO = { k: 1, flight: 0.8, settle: 2.2, rampS: 0.4, anchorSpeed: 8 };
+// SHIPPED CURVE (2026-08-12, Joe's A/B): flight 0.8 — the hurl and tumble a
+// touch slower than raw, his pick over 1.0 twice — then a LONG ramp (rampS
+// 2.0) to settle 25 once the last die stops travelling: the settling tail is
+// effectively skipped, but the two-second glide into it keeps the cut
+// invisible. Supersedes the first shipped curve (settle 2.2 / rampS 0.4,
+// 2026-08-11) — Joe pushed settle far past it after trying 50 raw, and the
+// long ramp is what made the high gear watchable. Uniform k was refused by
+// the same eye at every value tried (2.7 and 2.2 both "too fast for the main
+// dice roll"). anchorSpeed 8 by sweep: engages on every pool (late ≤1/8) and
+// sits 35× above the settle bar. `k` stays as the uniform multiplier the
+// theorem checks use; the two compose (effective = k × curve).
+// flight = settle = 1 recovers the pre-curve film.
+const TEMPO = { k: 1, flight: 0.8, settle: 25, rampS: 2.0, anchorSpeed: 8 };
 
 // The last film time at which any die's CENTRE is moving faster than `speed`.
 // Centre travel, not angular: a die spinning in place has stopped travelling

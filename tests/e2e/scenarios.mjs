@@ -9970,8 +9970,9 @@ export const scenarios = [
     // and "fine for resolution". So the projector runs a CURVE — `flight`
     // while the dice are still travelling, `settle` once they are down.
     //
-    // SHIPPED 2026-08-11: flight 0.8 (Joe's pick, twice A/B'd — the hurl a
-    // touch slower than raw), settle 2.2, rampS 0.4, anchorSpeed 8 — and the
+    // SHIPPED 2026-08-12: flight 0.8 (Joe's pick, twice A/B'd — the hurl a
+    // touch slower than raw), settle 25 over a long rampS 2.0 glide
+    // (supersedes 2.2/0.4 — Joe's second A/B round), anchorSpeed 8 — and the
     // click gate rides in film mode WITH the curve, because film time is the
     // only gate invariant to in-throw k changes. Uniform `k` stays 1. What is
     // pinned is that the mechanism cannot leak: not into the bake, not into
@@ -9990,7 +9991,7 @@ export const scenarios = [
       const c0 = await a.dbg('tempoCurve');
       assert.equal(await a.dbg('tempo'), 1, 'the shipped uniform tempo is 1');
       assert.equal(c0.flight, 0.8, `the shipped curve opens at 0.8, found ${c0.flight}`);
-      assert.equal(c0.settle, 2.2, `the shipped curve ends at 2.2, found ${c0.settle}`);
+      assert.equal(c0.settle, 25, `the shipped curve ends at 25, found ${c0.settle}`);
 
       // --- 2. the click gate ships in film mode, on the shipped constants ----
       // Constants read off the app rather than restated here: a test carrying
@@ -10054,7 +10055,7 @@ export const scenarios = [
 
       // --- 5. the curve is monotone and opens at exactly `flight` -----------
       // Sampled on a LIVE roll, because tempoAt reads the current roll's own
-      // anchor — and sampled on the SHIPPED curve itself, whose settle of 2.2
+      // anchor — and sampled on the SHIPPED curve itself, whose settle of 25
       // is what keeps the change-of-gear check below from being vacuous.
       await a.dbg(`throwSeeded(${JSON.stringify(pool)}, ${seeds[0]})`);
       const prof = await a.dbg('settleProfile()');
@@ -10080,7 +10081,7 @@ export const scenarios = [
       // --- 6. sampling and the k detour left no residue ---------------------
       const backC = await a.dbg('tempoCurve');
       assert.equal(backC.flight, 0.8, 'sampling the curve mutated flight');
-      assert.equal(backC.settle, 2.2, 'sampling the curve mutated settle');
+      assert.equal(backC.settle, 25, 'sampling the curve mutated settle');
       const back = [];
       for (const s of seeds) back.push(await throwOne(s));
       seeds.forEach((s, i) => {

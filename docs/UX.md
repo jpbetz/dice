@@ -4143,11 +4143,15 @@ Buys `close` 6d6 back inside the pile gate (flat throws 8/40 versus the old
 20d6 at `medium` ends with +6 piled dice per 160 — against 26 cap-outs and
 ~4 s of dead time removed on the same seeds.
 
-**4. The projector runs Joe's curve** (`TEMPO flight 0.8 → settle 2.2`,
-ramp 0.4 s, anchored at the last instant any die still travels faster than
+**4. The projector runs Joe's curve** (`TEMPO flight 0.8 → settle 25`,
+ramp 2.0 s, anchored at the last instant any die still travels faster than
 8 u/s — a pure function of the baked film, so every client changes gear at
-the same frame). Uniform speeds were A/B'd and refused twice; the shipped
-shape is the hurl a touch *slower* than raw and the wait 2.2× faster. Impact
+the same frame). Re-dialed 2026-08-12 by a second live A/B round: the first
+shipped gear (settle 2.2, ramp 0.4 s) was superseded by a far higher settle
+speed made watchable by a much longer glide — the settling tail is
+effectively skipped, and the two-second ramp is what hides the cut. Uniform
+speeds were A/B'd and refused twice; the shipped shape is the hurl a touch
+*slower* than raw and the wait collapsed once the throw is down. Impact
 clicks are gated in film time (`CLICKGATE 'film'`) so the sound survives any
 speed — measured: zero loud clicks lost across six display/tempo configs.
 
