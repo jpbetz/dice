@@ -34,12 +34,22 @@ REPEATS="${1:-10}"
 # tree, which is the worst thing this script could possibly do. The path is
 # predictable and announced so the wreckage is one `cp` away, and
 # `bash tools/armed-suite.sh --restore` does it for you.
-BACKUP=".git/armed-suite-main.js.bak"
+#
+# NOT UNDER .git — IN A WORKTREE THAT IS A FILE, NOT A DIRECTORY. The second
+# run put the backup at .git/armed-suite-main.js.bak, every cp failed with
+# "Not a directory", and because the restores were no-ops the passes LEAKED
+# INTO EACH OTHER: pass B ran carrying pass A's flips and pass C could not find
+# the pattern it meant to arm. The failure was visible only as a cp warning
+# above otherwise-plausible output, which is the worst shape a bug can take.
+# Hence the explicit verification below — if the backup is not readable the
+# script refuses to arm anything at all.
+BACKUP="armed-suite-main.js.bak"
 if [ "$REPEATS" = "--restore" ]; then
   [ -f "$BACKUP" ] || { echo "no backup at $BACKUP"; exit 1; }
   cp -f "$BACKUP" js/main.js && echo "restored js/main.js from $BACKUP"; exit 0
 fi
-cp -f js/main.js "$BACKUP"
+cp -f js/main.js "$BACKUP" || { echo "cannot write backup at $BACKUP"; exit 1; }
+cmp -s js/main.js "$BACKUP" || { echo "backup at $BACKUP does not match the source"; exit 1; }
 echo "backup: $BACKUP  (restore with: bash tools/armed-suite.sh --restore)"
 restore() { cp -f "$BACKUP" js/main.js; echo "--- js/main.js restored from $BACKUP ---"; }
 trap restore EXIT INT TERM
@@ -60,6 +70,13 @@ print('armed')
 PY
 }
 
+# Restore, and PROVE it restored, before every pass. A silent restore failure
+# is how the passes leaked into each other.
+reset_main() {
+  cp -f "$BACKUP" js/main.js
+  cmp -s js/main.js "$BACKUP" || { echo "RESTORE FAILED before arming — refusing to continue"; exit 1; }
+}
+
 run_suite() {
   echo "=== $1 ==="
   node --check js/main.js || return 1
@@ -67,7 +84,7 @@ run_suite() {
 }
 
 # ---- pass A: the settle candidate -----------------------------------------
-cp -f "$BACKUP" js/main.js
+reset_main
 arm "const SETTLEGATE = { mode: 'velocity', eps: 0.02 };||const SETTLEGATE = { mode: 'displacement', eps: 0.02 };" \
     "const BODYFLAGS = { allowSleep: null };||const BODYFLAGS = { allowSleep: false };" \
     "  pileScale: 0, pileSpread: 12,||  pileScale: 1.05, pileSpread: 12," || exit 1
@@ -84,18 +101,18 @@ done
 echo "dice-land-flat armed: $PASS/$REPEATS"
 
 # ---- pass B: the tempo curve + the film click gate -------------------------
-cp -f "$BACKUP" js/main.js
+reset_main
 arm "const TEMPO = { k: 1, flight: 1, settle: 1, rampS: 0.4, anchorSpeed: 6 };||const TEMPO = { k: 1, flight: 1, settle: 2.2, rampS: 0.4, anchorSpeed: 8 };" \
     "const CLICKGATE = { mode: 'wall' };||const CLICKGATE = { mode: 'film' };" || exit 1
 run_suite "B. tempo curve flight 1 -> settle 2.2 (anchor 8) + film click gate"
 
 # ---- pass C: the uniform k=2, as C30d ran it -------------------------------
-cp -f "$BACKUP" js/main.js
+reset_main
 arm "const TEMPO = { k: 1, flight: 1, settle: 1, rampS: 0.4, anchorSpeed: 6 };||const TEMPO = { k: 2, flight: 1, settle: 1, rampS: 0.4, anchorSpeed: 6 };" || exit 1
 run_suite "C. uniform k=2"
 
 # ---- pass D: everything at once --------------------------------------------
-cp -f "$BACKUP" js/main.js
+reset_main
 arm "const SETTLEGATE = { mode: 'velocity', eps: 0.02 };||const SETTLEGATE = { mode: 'displacement', eps: 0.02 };" \
     "const BODYFLAGS = { allowSleep: null };||const BODYFLAGS = { allowSleep: false };" \
     "  pileScale: 0, pileSpread: 12,||  pileScale: 1.05, pileSpread: 12," \
