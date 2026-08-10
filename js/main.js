@@ -948,31 +948,46 @@ let lastSoundAt = 0;
 const IMPACT_MIN_GAP_MS = 35;   // the shipped floor, in FILM time
 const IMPACT_HARD_GAP_MS = 12;  // …and the wall-clock line nothing may cross
 
-// …EXCEPT THAT "35 ms OF FILM" IS NOT WHAT THE CODE ABOVE MEASURES, AND THE
-// DIFFERENCE DELETES CLICKS AT THE SHIPPED TEMPO (F2, 2026-08-10). `35/k` is
-// still compared against `performance.now()`, so the quantity gated is WALL
-// time — and the drain does not deliver impacts on a smooth wall clock. It
-// runs inside rAF: every impact whose `time` has passed is drained in one
-// frame, and every impact in that frame reads essentially the same
-// `performance.now()`. Frames are 16.7 ms apart on a 60 Hz display, so at k=1
-// a 35 ms wall gate can only pass a click every THIRD frame — 20 clicks a
-// second, when the film asks for up to 28.6. Two thumps 40 ms apart in the
-// film land two frames apart, 33.3 ms of wall apart, and the second is
-// silently dropped. That is happening today, at k=1, with no tempo involved.
+// …EXCEPT THAT "35 ms OF FILM" IS NOT WHAT THE CODE ABOVE MEASURES. `35/k` is
+// compared against `performance.now()`, so the quantity gated is WALL time.
+// The drain does not deliver impacts on a smooth wall clock either: it runs
+// inside rAF, every impact whose `time` has passed is drained in one frame,
+// and every impact in that frame reads essentially the same now(). Arrivals
+// are quantised to the refresh interval.
 //
-// The fix is to gate the quantity the comment always claimed: the FILM gap
-// between the last click PLAYED and this one, straight off `roll.time`, with
-// the 12 ms wall floor kept as the only wall-clock line. Then the same set of
-// impacts survives at every tempo and on every refresh rate, because the
-// selection is a property of the recorded train rather than of the machine
-// playing it.
+// I EXPECTED THAT TO BE DELETING CLICKS AT k=1 AND IT IS NOT. Written here as
+// a prediction and then measured, so the prediction is left standing next to
+// the refutation: the reasoning was that a 35 ms wall gate against 16.7 ms
+// frames passes a click only every third frame, so thumps 40 ms apart in the
+// film would be 33.3 ms apart in wall and the second would go. What that
+// missed is that the QUANTISATION APPLIES TO BOTH SIDES. At k=1 a 35 ms film
+// gap and a 35 ms wall gap both round up to the same three frames, so the two
+// gates agree. tools/steps/tempo-check.mjs, 60 Hz, k=1: the wall gate plays 78
+// of 321 impacts and the film gate 77. There is no k=1 bug.
 //
-// SHIPPED INERT ANYWAY, because it changes which clicks a real roll plays at
-// k=1 and that is an audible change to a shipped surface, not a tunable's
-// default. 'wall' reproduces today exactly. Priced by tools/steps/
-// tempo-check.mjs, which models the rAF batching at 60 and 120 Hz rather than
-// pretending impacts arrive on a continuous clock — its first version did
-// pretend that, and it is the reason this bug survived pass four.
+// WHERE IT IS REAL IS TEMPO, and there it is large. At k=2 on 60 Hz the wall
+// gate loses 15 of the clicks that ship and invents 9 others; at k=2.7 it
+// loses 12, invents 27, and drops a LOUD one — a landing thump. The film gate
+// loses 2 and invents 1 in every configuration tested (60 and 120 Hz, k 1, 2
+// and 2.7) and never loses a loud impact. Under the staged tempo CURVE
+// (flight 1 -> settle 2.2) the two are level, because most impacts happen
+// during flight where k is still 1.
+//
+// So the argument for 'film' is not a measured win at the shipped tempo. It is
+// that the selection becomes a property of the recorded train instead of a
+// property of the machine — invariant to refresh rate and to whatever the
+// projector is doing — which is the only version of this gate that can be
+// reasoned about once k varies within a single throw.
+//
+// AND IT CANNOT BE A STRICT SUPERSET OF WHAT SHIPS, whatever the threshold.
+// Both gates are greedy first-fit: play a click the other skipped and your
+// cursor moves, so the two selections diverge rather than nest. "No shipped
+// click drops" is therefore judged on the LOUD decile — the landing thumps —
+// which is what the criterion was always reaching for.
+//
+// SHIPPED INERT, because it changes which clicks a real roll plays and that is
+// an audible change to a shipped surface, not a tunable's default. 'wall'
+// reproduces today exactly.
 const CLICKGATE = { mode: 'wall' };
 
 // IMPACT VOICE (Slice 1, Joe 2026-08-04 aesthetic pass): the per-set

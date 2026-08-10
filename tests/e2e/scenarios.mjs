@@ -9992,12 +9992,18 @@ export const scenarios = [
         // Drain in BAKED frames and count them. sim(n) must step the film n
         // frames whatever the projector is set to — that is the property every
         // other scenario in this file is silently relying on.
-        const frames = Number(await a.eval(`(() => { let f = 0;
+        // `drained`, NOT `frames`. settleProfile() also has a `frames` key —
+        // the BAKED keyframe count, which no projector setting can move — and
+        // the first version of this spread `...p` over the measured value, so
+        // claim 3 compared the bake against itself and passed with the tempo
+        // deliberately leaked into sim(). Caught by red-checking the guard,
+        // which is the only reason it is not still passing.
+        const drained = Number(await a.eval(`(() => { let f = 0;
           while (window.__diceDebug.busy && f < 20000) { window.__diceDebug.sim(1); f++; }
           return f; })()`));
         await a.dbg('clearTable()');
         await a.dbg('sim(60)');
-        return { seed, frames, ...p };
+        return { seed, ...p, drained };
       };
 
       const base = [];
@@ -10012,8 +10018,8 @@ export const scenarios = [
       for (const s of seeds) atK.push(await throwOne(s));
       await a.dbg('setTempo(1)');
       seeds.forEach((s, i) => {
-        assert.equal(atK[i].frames, base[i].frames,
-          `seed ${s}: sim() drained ${atK[i].frames} frames at k=2 against ${base[i].frames} `
+        assert.equal(atK[i].drained, base[i].drained,
+          `seed ${s}: sim() drained ${atK[i].drained} frames at k=2 against ${base[i].drained} `
           + 'at k=1 — the projector has leaked into the debug stepper');
         assert.equal(atK[i].duration, base[i].duration,
           `seed ${s}: the BAKE moved at k=2 (${base[i].duration} -> ${atK[i].duration})`);
@@ -10065,7 +10071,7 @@ export const scenarios = [
       const back = [];
       for (const s of seeds) back.push(await throwOne(s));
       seeds.forEach((s, i) => {
-        assert.equal(back[i].frames, base[i].frames,
+        assert.equal(back[i].drained, base[i].drained,
           `seed ${s}: the throw did not drain the same after the curve was disarmed`);
         assert.equal(back[i].duration, base[i].duration,
           `seed ${s}: the bake did not restore after the curve was disarmed`);
