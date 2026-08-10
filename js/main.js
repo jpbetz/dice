@@ -613,6 +613,42 @@ function setPhysics(p = {}) {
   return { ...PHYS };
 }
 
+// --- three inert instruments for the settle matrix (C30c) ------------------
+// The felt tuning above failed as a CONSTANT. The hypothesis these price is
+// that a throw has two temporally separate phases wanting opposite physics:
+// early and fast, the dice must bounce and skid to fan out; late and slow,
+// they must die quietly instead of dithering. All three default to the
+// shipped behaviour EXACTLY — `gate: 0` skips the loop body entirely (not
+// even an assignment), THROW_TARGET is the 0.4 that was hardcoded, and SLEEP
+// holds cannon-es's own Body defaults (vendor/cannon-es.js:3403) — so master
+// and this file simulate byte-identically until a tool says otherwise.
+// Driven only by __diceDebug.setDampgate / setThrowTarget / setSleep.
+
+// Speed-gated damping: felt damping ONLY while a die is slow. `gate` is a
+// velocity threshold compared against lengthSquared (so gate 4 ≈ 2 units/s),
+// and 0 means the instrument is off.
+const DAMPGATE = { gate: 0, slowLinear: 0, slowAngular: 0 };
+
+// How wide the throw AIMS. spawnDie hurls every die at a random point inside
+// the middle ±THROW_TARGET/2 of the table, so 0.4 means every die in a pool
+// converges on the same small box regardless of where it spawned — a second
+// cause of piling, independent of the spawn line's `TABLE_W - 4.4` clamp.
+let THROW_TARGET = 0.4;
+
+// cannon's native sleep, made tunable. world.allowSleep is already true, so
+// bodies sleep at these thresholds today; the question is whether a coarser
+// bar retires a dithering die sooner than damping does.
+//
+// THESE ARE NOT CANNON'S DEFAULTS AND THAT IS THE POINT. cannon-es Body
+// defaults to sleepSpeedLimit 0.1 / sleepTimeLimit 1 (vendor/cannon-es.js
+// 3403-3404), but createDieBody has always overridden them to 0.4 / 0.35
+// (js/dice.js) — dice on this table are already FAR sleepier than stock.
+// Seeding this with the stock numbers instead made the instrument a live
+// physics change while claiming to be inert, and `settle-tail` caught it:
+// 4 dice stopped and were refused a freeze. Inert means "what dice.js sets",
+// so any raise measured from here is measured from 0.4 / 0.35.
+const SLEEP = { speed: 0.4, time: 0.35 };
+
 function addStaticPlane(material, position, euler) {
   const body = new CANNON.Body({ mass: 0, shape: new CANNON.Plane(), material });
   body.position.set(...position);
@@ -987,6 +1023,9 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
   const body = createDieBody(type, diceMat);
   body.linearDamping = PHYS.linearDamping;
   body.angularDamping = PHYS.angularDamping;
+  // Inert at cannon's own defaults; see SLEEP.
+  body.sleepSpeedLimit = SLEEP.speed;
+  body.sleepTimeLimit = SLEEP.time;
 
   // line the throw up along the chosen edge of the table. The clamp is
   // tighter than TABLE_W so the outer dice never spawn inside a wall at
@@ -1000,8 +1039,10 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
   else if (side === 2) body.position.set(-TABLE_W / 2 + 2.2, 6 + rng() * 4 + index * 0.9, offset * 0.5 + jitter());
   else body.position.set(TABLE_W / 2 - 2.2, 6 + rng() * 4 + index * 0.9, offset * 0.5 + jitter());
 
-  // hurl it toward a random point near the middle of the table
-  const target = new CANNON.Vec3((rng() - 0.5) * TABLE_W * 0.4, 0, (rng() - 0.5) * TABLE_D * 0.4);
+  // hurl it toward a random point near the middle of the table (THROW_TARGET
+  // is the width of that box as a fraction of the table; 0.4 = shipped)
+  const target = new CANNON.Vec3(
+    (rng() - 0.5) * TABLE_W * THROW_TARGET, 0, (rng() - 0.5) * TABLE_D * THROW_TARGET);
   const dir = target.vsub(body.position);
   dir.y = 0;
   dir.normalize();
@@ -1840,6 +1881,17 @@ function playRoll(roll) {
   let nudges = 0;
   for (;;) {
     stepContacts = 0; // the per-step contact budget refills; see the recorder
+    // Speed-gated damping (DAMPGATE, off by default): the ONE place dice are
+    // advanced, so gating here gates the whole app. Frozen dice are STATIC
+    // and their damping is meaningless; skip them.
+    if (DAMPGATE.gate > 0) {
+      for (const d of dice) {
+        if (d.frozen) continue;
+        const slow = d.body.velocity.lengthSquared() < DAMPGATE.gate;
+        d.body.linearDamping = slow ? DAMPGATE.slowLinear : PHYS.linearDamping;
+        d.body.angularDamping = slow ? DAMPGATE.slowAngular : PHYS.angularDamping;
+      }
+    }
     world.step(FIXED_DT);
     simTime += FIXED_DT;
 
@@ -5339,6 +5391,15 @@ window.__diceDebug = {
   setDiceSet(id) { return setDiceSet(id); },
   get physics() { return { ...PHYS }; },
   setPhysics(p) { return setPhysics(p); },
+  // The three settle instruments (C30c). All inert at their defaults — see
+  // DAMPGATE / THROW_TARGET / SLEEP. Priced by tools/steps/settle-matrix.mjs;
+  // nothing in the app sets them.
+  get dampgate() { return { ...DAMPGATE }; },
+  setDampgate(o) { Object.assign(DAMPGATE, o || {}); return { ...DAMPGATE }; },
+  get throwTarget() { return THROW_TARGET; },
+  setThrowTarget(f) { THROW_TARGET = typeof f === 'number' ? f : THROW_TARGET; return THROW_TARGET; },
+  get sleep() { return { ...SLEEP }; },
+  setSleep(o) { Object.assign(SLEEP, o || {}); return { ...SLEEP }; },
   get nudge() { return { ...NUDGE }; },
   setNudge(p) { Object.assign(NUDGE, p || {}); return { ...NUDGE }; },
   // Throw a chosen pool on a CHOSEN SEED. The seed decides the whole tumble
