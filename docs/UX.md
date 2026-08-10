@@ -4061,6 +4061,25 @@ every candidate, via `__diceDebug.throwSeeded` — because the first, unpaired
 sweep concluded the materials "barely move the tail" and that was variance
 talking, on the change that turned out to be the largest single win.
 
+**Duration is not the complaint, though; "shaky" is.** `settleProfile().shake`
+is the share of frames in the 0.6s before a die stops where it REVERSES
+direction — dithering reverses constantly, rolling to a halt does not.
+Anchored to each die's own settle frame, because anchored to the roll it is
+confounded by duration: the first version reported a throw that got 43%
+*shorter* as 143% worse, since "the last second" of a 1.5s throw is the tumble.
+
+| pool | 1d20 | Soul Deal | 4d6 | 8d6 | 20d6 |
+|---|---|---|---|---|---|
+| shake before | 0.106 | 0.144 | 0.152 | 0.185 | 0.206 |
+| shake after | 0.075 | 0.115 | 0.112 | 0.115 | 0.146 |
+| less shaky | 29% | 20% | 27% | **38%** | 29% |
+
+`creep` (distance covered in the same window) went *up* on the small pools
+and down on the big ones, and that is the shape you want rather than a
+contradiction: a die coasting smoothly to rest covers more ground than one
+twitching in place. Read the two together — **less reversing, more travelling
+— or neither means anything.**
+
 **What is still open.** 20d6 can still reach the cap with dice genuinely
 tumbling; that is real physics and a smaller `SETTLE_CAP` would truncate real
 motion, so it is left alone. Pinned by `settle-tail`, which has to test the

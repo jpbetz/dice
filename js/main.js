@@ -856,6 +856,50 @@ const SETTLE_CAP = 9;      // hard cap on simulated seconds per roll
 const NUDGE = { budget: 3, lift: 7, spread: 4, spin: 14, cockedDot: 0.6, cockedDotD4: 0.7 };
 let seedReplayN = 0; // __diceDebug.throwSeeded — keeps replayed rollIds unique
 
+// How far a die still travels in the last `secs` BEFORE IT STOPS, in
+// die-widths, averaged over the pool — the closest number there is to "how
+// much wiggling did I watch".
+//
+// Anchored to each die's own settle frame, not to the end of the roll, and
+// that detail is the whole measurement. Anchored to the roll it is confounded
+// by duration: the tuning being judged cut the Soul Deal throw from 2.57s to
+// 1.48s, so "the last second" stopped being the taper and started including
+// the tumble, and the metric reported the improvement as a 143% REGRESSION.
+// Returns { creep, shake }.
+//
+// `creep` is distance and it is AMBIGUOUS on its own — a die rolling
+// smoothly to a halt covers more ground in its last 0.6s than one twitching
+// in place, so a bigger number can mean either. `shake` is the one that
+// matches the complaint: the share of those frames where the die REVERSES
+// direction. Dithering reverses constantly; coming to rest does not.
+function restMotion(roll, secs = 0.6) {
+  if (!roll || !roll.keyframes || !roll.keyframes.length) return { creep: 0, shake: 0 };
+  const back = Math.round(secs / FIXED_DT);
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  let dist = 0;
+  let steps = 0;
+  let flips = 0;
+  roll.keyframes.forEach((kf, i) => {
+    const def = DIE_DEFS[roll.dice[i] && roll.dice[i].type] || {};
+    const w = def.size || (def.radius ? def.radius * 2 : 2);
+    const end = Math.min(kf.length - 1, roll.landings[i].frame);
+    for (let f = Math.max(1, end - back); f < end; f++) {
+      a.subVectors(kf[f].pos, kf[f - 1].pos);
+      b.subVectors(kf[f + 1].pos, kf[f].pos);
+      dist += b.length() / w;
+      steps++;
+      // Ignore steps too small to see: below a thousandth of a die-width the
+      // direction is numerical noise and every die would look like it shakes.
+      if (a.length() > w * 1e-3 && b.length() > w * 1e-3 && a.dot(b) < 0) flips++;
+    }
+  });
+  return {
+    creep: dist / roll.keyframes.length,
+    shake: steps ? flips / steps : 0,
+  };
+}
+
 // Deterministic PRNG — every client fast-forwards the same throw from the seed.
 function mulberry32(a) {
   a |= 0;
@@ -5374,6 +5418,16 @@ window.__diceDebug = {
       parked: r.landings.filter((l) => l.timedOut && l.endStill).length,
       moving: r.landings.filter((l) => l.timedOut && !l.endStill).length,
       endCocked: r.landings.filter((l) => l.timedOut && l.endCocked).length,
+      // "Slide and wiggle-move" measured directly, because duration is only
+      // a proxy for it — a throw can be short and still crawl to a stop.
+      // Read `shake`; `creep` is distance and cuts both ways.
+      ...(() => {
+        const m = restMotion(r, 0.6);
+        return {
+          creep: Math.round(m.creep * 1000) / 1000,
+          shake: Math.round(m.shake * 1000) / 1000,
+        };
+      })(),
       byDie: r.landings.map((l) => Math.round(l.time * 100) / 100),
     };
   },
