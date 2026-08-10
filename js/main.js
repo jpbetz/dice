@@ -2041,9 +2041,19 @@ function playRoll(roll) {
   // `kf[kf.length - 1]` is the final pose — face correction runs unchanged.
   // Cocked dice stay dynamic (their `stillTime` triggers the same nudge
   // branch); SETTLE_CAP is retained as last-resort safety at the group level.
-  dice.forEach((d) => { d.stillTime = 0; d.frozen = false; d.frozenPose = null; });
+  dice.forEach((d) => {
+    d.stillTime = 0; d.frozen = false; d.frozenPose = null;
+    d.settleTime = null; d.settleTimedOut = false;
+  });
 
-  const freezeInPlace = (d) => {
+  // `timedOut` distinguishes the two ways a die stops being simulated, which
+  // the TRUE settle frame below depends on: a clean landing earned its freeze
+  // by holding still for SETTLE_STILL, so the die actually stopped that long
+  // AGO. A die force-frozen at SETTLE_CAP never went still at all, so its
+  // `stillTime` means nothing and the cap itself is the only honest answer.
+  const freezeInPlace = (d, timedOut = false) => {
+    d.settleTime = timedOut ? simTime : Math.max(0, simTime - d.stillTime);
+    d.settleTimedOut = timedOut;
     d.body.velocity.setZero();
     d.body.angularVelocity.setZero();
     d.body.mass = 0;
@@ -2100,10 +2110,42 @@ function playRoll(roll) {
     // below has a stable pose to correct. Same STATIC/mass=0 transition the
     // clean-landing branch uses; face correction rotates each to its
     // server-declared value regardless of the pre-freeze orientation.
-    for (const d of dice) if (!d.frozen) freezeInPlace(d);
+    for (const d of dice) if (!d.frozen) freezeInPlace(d, true);
     break;
   }
   for (const d of dice) d.body.removeEventListener('collide', recordCollision);
+
+  // --- the TRUE settle frame ----------------------------------------------
+  // `stillTime` accrues for SETTLE_STILL (0.45 s = exactly 27 frames) BEFORE a
+  // die is judged landed, so the freeze test concedes 27 frames after the die
+  // actually stopped. Every beat keyed to "the settle" therefore fired on a
+  // picture that had already been motionless for nearly half a second — the
+  // 0.3 s stage flash at stageHitStop lands entirely inside that dead window.
+  // Recover the real instant by subtracting the accumulator that earned the
+  // freeze (done in freezeInPlace, where simTime is still current).
+  //
+  // The tie is not an edge case. A SETTLE_CAP roll force-freezes every
+  // remaining die on ONE step with ONE identical simTime, and 20d6/40d6 hit
+  // the cap on every measured throw — so "which die settled last" is an N-way
+  // tie on exactly the pools where it matters most. Break it by lowest die
+  // index (deterministic on every client) and carry `timedOut`, so a beat that
+  // wants to hold on the deciding die can decline to fire on a pool that
+  // merely ran out of clock rather than resolving.
+  const lastFrame = keyframes[0].length - 1;
+  const landings = dice.map((d, i) => ({
+    i,
+    frame: Math.min(lastFrame, Math.max(0, Math.round((d.settleTime ?? simTime) / FIXED_DT))),
+    time: d.settleTime ?? simTime,
+    timedOut: !!d.settleTimedOut,
+  }));
+  // reduce, not sort: ties keep the FIRST (lowest index) by construction.
+  const lastLanding = landings.reduce((a, b) => (b.frame > a.frame ? b : a), landings[0]);
+  // Cut the dead tail. Safe because a frozen die pushes `frozenPose` BY
+  // REFERENCE every subsequent step: every frame from lastLanding.frame to the
+  // end is pose-identical, so ending playback there renders exactly the pose
+  // face correction computes from kf[kf.length - 1]. At least one frame, so a
+  // zero-length playback can never be produced.
+  const motionFrames = Math.max(1, lastLanding.frame);
 
   // --- face correction: body-frame pre-rotation R per die ------------------
   // qF = final body orientation. u_body = qF^-1 * up (landed "up" in body
@@ -2213,7 +2255,11 @@ function playRoll(roll) {
     keyframes,
     sounds,
     frames: keyframes[0].length,
-    duration: (keyframes[0].length - 1) * FIXED_DT,
+    duration: motionFrames * FIXED_DT,
+    // When each die actually stopped, and which one decided it. Consumed by
+    // the settle-keyed beats; `lastLanding.timedOut` is the decline signal.
+    landings,
+    lastLanding,
     time: 0,
     soundIdx: 0,
     decalsStamped: 0, // Level 4a per-roll cap counter (the drain reads it)

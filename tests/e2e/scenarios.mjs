@@ -581,6 +581,103 @@ export const scenarios = [
     },
   },
   {
+    name: 'settle-is-when-they-stop',
+    tags: ['roll', 'perf', 'fx', 'cuj8'],
+    // THE ROLL ENDED 450 ms AFTER THE DICE DID (2026-08-09). `stillTime`
+    // accrues for SETTLE_STILL — 0.45 s, exactly 27 frames — before a die is
+    // judged landed, so the freeze test concedes 27 frames after the die
+    // actually stopped, and `duration` was the length of the whole array
+    // INCLUDING that motionless tail. Every settle-keyed beat therefore fired
+    // on a picture that had already gone still: stageHitStop's 0.3 s flash
+    // lands entirely inside the dead window.
+    //
+    // Nothing caught it because a motionless tail is invisible to a suite that
+    // asserts where dice come to REST — the final pose is identical whether
+    // you hold it for 27 frames or none. What follows is the read that isn't:
+    // the roll's own declared length against the frame its last die stopped.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+
+      const probe = async (notation) => {
+        await a.dbg(`commandRoll(${JSON.stringify(notation)})`);
+        await a.waitFor('!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.landings)',
+          { desc: `${notation}: the roll reached the client` });
+        const r = JSON.parse(await a.eval(`JSON.stringify((() => {
+          const r = window.__diceDebug.currentRoll, F = 1 / 60;
+          const durFrames = Math.round(r.duration / F);
+          const frames = r.keyframes[0].length - 1;
+          // The tie group is the dice sharing the MAX settle frame — not the
+          // whole pool. A SETTLE_CAP roll force-freezes only the dice still
+          // dynamic at the cap; anything that landed clean before it keeps its
+          // own earlier settle time and is not in the tie at all.
+          const maxF = Math.max(...r.landings.map((l) => l.frame));
+          const tied = r.landings.filter((l) => l.frame === maxF);
+          return { n: r.landings.length, frames, durFrames,
+                   lastFrame: r.lastLanding.frame,
+                   timedOut: r.lastLanding.timedOut,
+                   lastIdx: r.lastLanding.i,
+                   tieSize: tied.length,
+                   tiedLowest: Math.min(...tied.map((l) => l.i)),
+                   tailCut: frames - durFrames };
+        })())`));
+        await a.dbg('sim(9000)');
+        await a.dbg('clearTable()');
+        await a.dbg('sim(400)');
+        return r;
+      };
+
+      const runs = [];
+      for (let i = 0; i < 3; i++) runs.push(await probe('1d20'));
+
+      for (const r of runs) {
+        assert.equal(r.n, 1, `every die reports a landing (got ${r.n})`);
+        // The roll's declared length IS the frame its last die stopped. This
+        // is the whole fix in one equality.
+        assert.equal(r.durFrames, r.lastFrame,
+          `the roll ends on the frame the last die stopped `
+          + `(duration ${r.durFrames}f vs settle ${r.lastFrame}f)`);
+      }
+
+      // …and the tail it cut was real, not a rounding artefact. Only a CLEAN
+      // landing owes this: a die force-frozen at SETTLE_CAP never went still,
+      // so its settle time is the cap and there is nothing to trim.
+      const clean = runs.filter((r) => !r.timedOut);
+      assert.ok(clean.length >= 2,
+        `a single d20 lands clean rather than timing out (${clean.length}/3)`);
+      for (const r of clean) {
+        assert.ok(r.tailCut >= 24,
+          `the motionless tail is cut — SETTLE_STILL is 27 frames, so a clean `
+          + `landing should shed about that many (cut ${r.tailCut}f of ${r.frames}f)`);
+      }
+
+      // A big pool is the tie case, not an edge: 20d6 force-freezes every
+      // remaining die on one step with one identical simTime, so "which die
+      // settled last" is an N-way tie. It must resolve to the LOWEST index,
+      // deterministically, on every client — otherwise a beat that holds on
+      // the deciding die holds on a different die per browser.
+      const big = await probe('20d6');
+      assert.equal(big.n, 20, `every die of a big pool reports a landing (got ${big.n})`);
+      assert.equal(big.durFrames, big.lastFrame,
+        `a big pool also ends when its dice stop `
+        + `(duration ${big.durFrames}f vs settle ${big.lastFrame}f)`);
+      // UNCONDITIONAL. Gating this on `timedOut` made it a coin flip — the
+      // first green run of this scenario simply drew a throw that resolved
+      // before the cap, and the assertion never executed. The tie-break rule
+      // holds on every roll, tie or not: the deciding die is the LOWEST index
+      // among those sharing the last settle frame, so every client holds on
+      // the same die.
+      assert.equal(big.lastIdx, big.tiedLowest,
+        `the deciding die is the lowest index sharing the last settle frame `
+        + `(picked ${big.lastIdx}, lowest of ${big.tieSize} tied is `
+        + `${big.tiedLowest}; timedOut=${big.timedOut})`);
+      for (const r of runs) {
+        assert.equal(r.lastIdx, r.tiedLowest,
+          `single-die roll agrees with the same rule (${r.lastIdx} vs ${r.tiedLowest})`);
+      }
+    },
+  },
+  {
     name: 'cache-validator',
     tags: ['net'],
     // A STALE BUILD IS A PERMANENT ONE, unless the validator changes with the
