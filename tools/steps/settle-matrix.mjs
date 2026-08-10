@@ -58,11 +58,24 @@ const SLOW = { slowLinear: 0.1, slowAngular: 0.14 }; // the felt damping, gated
 // without solving that first; the piling is the smaller objection.
 const SLEEPIER = { speed: 0.9, time: 0.2 };
 
-// [name, physics overrides, dampgate | null, throwTarget | null, sleep | null]
+// PILE-AWARE FREEZE REFUSAL — the mechanism the first two passes pointed at.
+// Deadening wins the shake and loses the piling, and both come from the same
+// fact: on this mat dice separate AFTER landing, by bouncing and skidding
+// apart. So the pile needs the energy the bounce used to supply, delivered
+// only where separation failed. `pileScale` refuses a freeze to a die resting
+// above `flatRestHeight(type) * scale` and hands it to the nudge that already
+// exists for cocked dice, inside the same budget. 1.6 is calibrated in
+// tools/steps/pile-bar.mjs — above every accepted solo rest (worst: a d20
+// leaning on a wall at 1.20x its flat height) and below every observed pile
+// (lowest: a d8 on its neighbour at 1.73x).
+const PILE = { pileScale: 1.6 };
+
+// [name, physics overrides, dampgate | null, throwTarget | null, sleep | null,
+//  nudge | null]
 // null = leave the instrument inert. Everything is reset between variants.
 const VARIANTS = [
-  ['shipped', {}, null, null, null],
-  ['deaden', DEADEN, null, null, null],
+  ['shipped', {}, null, null, null, null],
+  ['deaden', DEADEN, null, null, null, null],
   ['gate1', {}, { gate: 1, ...SLOW }, null, null],
   ['gate4', {}, { gate: 4, ...SLOW }, null, null],
   ['deaden+gate4', DEADEN, { gate: 4, ...SLOW }, null, null],
@@ -90,6 +103,14 @@ const VARIANTS = [
   ['sleepier+deaden+t50', DEADEN, null, 0.50, SLEEPIER],
   ['sleepier+deaden+t65', DEADEN, null, 0.65, SLEEPIER],
   ['sleepier+deaden+t80', DEADEN, null, 0.80, SLEEPIER],
+  // PASS THREE. `nudgepile` is the control and should be nearly a null row:
+  // shipped physics rarely piles at medium, so a mechanism that only fires on
+  // a pile has almost nothing to fire at. If it moves anything, the bar is
+  // catching legitimate rests and the calibration is wrong.
+  ['nudgepile', {}, null, null, null, PILE],
+  ['deaden+nudgepile', DEADEN, null, null, null, PILE],
+  ['deaden+gate4+nudgepile', DEADEN, { gate: 4, ...SLOW }, null, null, PILE],
+  ['deaden+gate4+nudgepile+b5', DEADEN, { gate: 4, ...SLOW }, null, null, { ...PILE, budget: 5 }],
 ];
 
 const SHAKE_POOLS = [
@@ -138,10 +159,12 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     throwTarget: await a.dbg('throwTarget'),
     sleep: await a.dbg('sleep'),
     zoom: await a.dbg('zoom'),
+    nudge: await a.dbg('nudge'),
   };
   console.log(`inert: phys ${JSON.stringify(INERT.phys)}`);
   console.log(`       dampgate ${JSON.stringify(INERT.dampgate)}  throwTarget ${INERT.throwTarget}`
     + `  sleep ${JSON.stringify(INERT.sleep)}  zoom ${INERT.zoom}`);
+  console.log(`       nudge ${JSON.stringify(INERT.nudge)}`);
 
   const seedsOf = (n) => Array.from({ length: n }, (_, i) => 1000 + i * 7919);
 
@@ -151,15 +174,17 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     await a.dbg(`setThrowTarget(${INERT.throwTarget})`);
     await a.dbg(`setSleep(${JSON.stringify(INERT.sleep)})`);
     await a.dbg(`setZoom(${JSON.stringify(INERT.zoom)})`);
+    await a.dbg(`setNudge(${JSON.stringify(INERT.nudge)})`);
     await a.dbg('sim(200)');
   };
 
-  const apply = async ([, phys, dampgate, throwTarget, sleep]) => {
+  const apply = async ([, phys, dampgate, throwTarget, sleep, nudge]) => {
     await reset();
     if (Object.keys(phys).length) await a.dbg(`setPhysics(${JSON.stringify(phys)})`);
     if (dampgate) await a.dbg(`setDampgate(${JSON.stringify(dampgate)})`);
     if (throwTarget !== null) await a.dbg(`setThrowTarget(${throwTarget})`);
     if (sleep) await a.dbg(`setSleep(${JSON.stringify(sleep)})`);
+    if (nudge) await a.dbg(`setNudge(${JSON.stringify(nudge)})`);
   };
 
   // One throw, from the call that bakes it to an idle table.
@@ -235,7 +260,8 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
           const t = await throwOnce(types, seed, `${vname} ${pname}/${seed}`);
           const p = await a.dbg('settleProfile()');
           if (p.timedOut) capped++;
-          rows.push({ ...t, shake: p.shake, creep: p.creep, dur: p.duration });
+          rows.push({ ...t, shake: p.shake, creep: p.creep, dur: p.duration,
+            nudged: p.nudged, piled: p.piled });
           await clear();
         }
         got.set(`${vname}|${pname}`, {
@@ -244,6 +270,11 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
           dur: mean(rows.map((r) => r.dur)),
           bake: mean(rows.map((r) => r.bake)),
           wall: mean(rows.map((r) => r.wall)),
+          // What the mechanism COST and what it was aimed at: nudge rounds
+          // spent per throw, and dice still above the bar when the roll ended
+          // (the ones the budget could not save).
+          nudged: mean(rows.map((r) => r.nudged)),
+          piled: mean(rows.map((r) => r.piled)),
           capped,
         });
       }
@@ -332,6 +363,15 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
         + (r.capped ? ` !${r.capped}` : '');
     }), SHAKE_POOLS.reduce((s, [p]) => s + got.get(`${n}|${p}`).capped, 0)]));
 
+  // Nudges are watch time — every one is a die hurled back into the air — so
+  // a mechanism that buys flatness with them has to show the bill.
+  console.log(`\nnudge rounds per throw, and dice still above the pile bar at the end\n`);
+  table(['variant', ...SHAKE_POOLS.map(([p]) => `${p} nudge/left`)],
+    ran.map(([n]) => [n, ...SHAKE_POOLS.map(([p]) => {
+      const r = got.get(`${n}|${p}`);
+      return `${r.nudged.toFixed(2)}/${r.piled.toFixed(2)}`;
+    })]));
+
   // --- pile ----------------------------------------------------------------
   console.log(`\ndice resting above y=1.2, and throws that piled NOTHING,`
     + ` over ${nPile} identical seeds\n`);
@@ -357,12 +397,20 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     })]));
 
   // --- verdict -------------------------------------------------------------
+  // THE PILE GATE IS TIGHTER THAN PASS ONE'S, deliberately. It was +3pp with
+  // a one-throw allowance on the flat count, which is the right bar for
+  // "does this tuning make piling worse"; pass three is judging a mechanism
+  // whose ENTIRE PURPOSE is the pile, so it has to hold the line exactly.
+  // Creep joins as its own gate for the same reason it was printed: a
+  // mechanism that stops dice sooner can buy a still picture by freezing one
+  // mid-slide, and creep is the only column that can tell.
   console.log(`\nverdict — every gate judged against THIS run's shipped row\n`
     + `  a shake  mean reduction over ${SHAKE_GATED.join('/')} >= 20%\n`
     + `  b dur    no pool worse than shipped +5%\n`
     + `  c caps   total capped throws <= shipped's\n`
-    + `  d pile   every cell <= shipped +3pp, and 6d6@close flat-throws >= shipped -1\n`
-    + `  e clock  per-pool mean wall <= 1.5x shipped\n`);
+    + `  d pile   every cell within +/-2pp of shipped, and 6d6@close flat-throws >= shipped's\n`
+    + `  e clock  per-pool mean wall <= 1.5x shipped\n`
+    + `  f creep  no pool worse than shipped +15%\n`);
   const vrows = ran.filter(([n]) => n !== base).map(([n]) => {
     const shakeCut = mean(SHAKE_GATED.map((p) => 1 - got.get(`${n}|${p}`).shake / b(p).shake));
     const worstDur = Math.max(...SHAKE_POOLS.map(([p]) => (got.get(`${n}|${p}`).dur - b(p).dur) / b(p).dur));
@@ -372,21 +420,26 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     const worstPile = hasPile ? Math.max(...pileCells.map(([z, p]) =>
       piles.get(`${n}|${z}|${p}`).pct - piles.get(`${base}|${z}|${p}`).pct)) : NaN;
     const flatOk = hasPile
-      && piles.get(`${n}|close|6d6`).flat >= piles.get(`${base}|close|6d6`).flat - 1;
+      && piles.get(`${n}|close|6d6`).flat >= piles.get(`${base}|close|6d6`).flat;
     const worstClock = Math.max(...SHAKE_POOLS.map(([p]) => got.get(`${n}|${p}`).wall / b(p).wall));
+    const worstCreep = Math.max(...SHAKE_POOLS.map(([p]) =>
+      (got.get(`${n}|${p}`).creep - b(p).creep) / b(p).creep));
     const g = [
       [shakeCut >= 0.20, `a shake ${(shakeCut * 100).toFixed(0)}%`],
       [worstDur <= 0.05, `b dur ${worstDur >= 0 ? '+' : ''}${(worstDur * 100).toFixed(0)}%`],
       [caps <= baseCaps, `c caps ${caps}/${baseCaps}`],
-      [hasPile && worstPile <= 3 && flatOk,
+      // "within 2pp" read as ONE-SIDED: a cell that piles LESS than shipped is
+      // the point of the exercise, not a gate failure.
+      [hasPile && worstPile <= 2 && flatOk,
         `d pile ${hasPile ? `${worstPile >= 0 ? '+' : ''}${worstPile.toFixed(0)}pp` : 'n/a'}`
         + `${hasPile && !flatOk ? ' flat!' : ''}`],
       [worstClock <= 1.5, `e clock ${worstClock.toFixed(2)}x`],
+      [worstCreep <= 0.15, `f creep ${worstCreep >= 0 ? '+' : ''}${(worstCreep * 100).toFixed(0)}%`],
     ];
     return [n, ...g.map(([ok, s]) => `${ok ? 'PASS' : 'fail'} ${s}`),
       g.every(([ok]) => ok) ? 'ALL PASS' : ''];
   });
-  table(['variant', 'a', 'b', 'c', 'd', 'e', ''], vrows);
+  table(['variant', 'a', 'b', 'c', 'd', 'e', 'f', ''], vrows);
 
   if (errors.length) {
     console.log('\nerrors:');
