@@ -1771,7 +1771,7 @@ export const scenarios = [
       assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, 'collect accepted');
       for (const t of [a, b]) {
         await t.waitFor(
-          `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+          `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1)`,
           { desc: 'roll shelved' },
         );
       }
@@ -1808,7 +1808,7 @@ export const scenarios = [
       assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, 'collect accepted');
       for (const t of [a, b]) {
         await t.waitFor(
-          `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+          `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1)`,
           { desc: 'roll shelved' },
         );
       }
@@ -1856,7 +1856,7 @@ export const scenarios = [
       const hid = await a.rollId();
       await a.dbg(`collectRoll(${JSON.stringify(hid)})`);
       await a.waitFor(
-        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1)`,
         { desc: 'held roll shelved' },
       );
       const hm = (await a.dbg('shelfMarkers'))[0];
@@ -1881,7 +1881,7 @@ export const scenarios = [
       const rid = await a.rollId();
       await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
       await a.waitFor(
-        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1)`,
         { desc: 'roll shelved' },
       );
       assert.equal(await a.dbg(`peek(${JSON.stringify(rid)})`), rid, 'peek opens');
@@ -1908,7 +1908,7 @@ export const scenarios = [
       // bound to it (collect the fresh roll to peek it).
       await a.dbg(`collectRoll(${JSON.stringify(rid2)})`);
       await a.waitFor(
-        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1)`,
         { desc: 'the reroll shelves for the ± leg' },
       );
       assert.equal(await a.dbg(`peek(${JSON.stringify(rid2)})`), rid2, 'peek opens on the reroll');
@@ -1954,7 +1954,7 @@ export const scenarios = [
       await a.roll('d20');
       await a.roll('2d6');
       await a.waitFor(
-        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1)`,
         { desc: 'first roll auto-collected' },
       );
       assert.equal(await a.diceCount(), 2 + 1, 'second roll live (2 dice) + first shelved (1 die)');
@@ -1973,7 +1973,7 @@ export const scenarios = [
         const rid = await a.rollId();
         await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
         await a.waitFor(
-          `(window.__diceDebug.sim(240), window.__diceDebug.whiskingCount === 0 && window.__diceDebug.pendingCollects.length === 0)`,
+          `(window.__diceDebug.sim(240), window.__diceDebug.pendingCollects.length === 0)`,
           { desc: `collect #${i + 1} settles` },
         );
       }
@@ -2065,7 +2065,7 @@ export const scenarios = [
         const rid = await a.rollId();
         assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, `collect #${cycle + 1}`);
         await a.waitFor(
-          `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+          `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1)`,
           { desc: `shelve cycle ${cycle + 1}` },
         );
         assert.equal(await a.dbg(`clearRoll(${JSON.stringify(rid)})`), true, `clear #${cycle + 1}`);
@@ -2200,7 +2200,7 @@ export const scenarios = [
       // the handoff flows to COLLECTED — never through the banner
       assert.equal(await a.dbg('retireCeremony()'), true, 'the handoff fires');
       await a.waitFor(
-        `(window.__diceDebug.sim(160), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        `(window.__diceDebug.sim(160), window.__diceDebug.shelf.length === 1)`,
         { desc: 'flowed straight to the shelf' },
       );
       assert.ok(await a.eval(`document.getElementById('result-banner').classList.contains('hidden')`),
@@ -2232,7 +2232,7 @@ export const scenarios = [
       );
       assert.equal(await a.dbg('retireCeremony()'), true, 'the revealed card flows');
       await a.waitFor(
-        `(window.__diceDebug.sim(160), window.__diceDebug.shelf.length === 2 && window.__diceDebug.whiskingCount === 0)`,
+        `(window.__diceDebug.sim(160), window.__diceDebug.shelf.length === 2)`,
         { desc: 'the revealed roll shelved' },
       );
     },
@@ -2256,7 +2256,7 @@ export const scenarios = [
       const rid = await a.rollId();
       assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, 'collect accepted');
       await a.waitFor(
-        `(window.__diceDebug.sim(160), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        `(window.__diceDebug.sim(160), window.__diceDebug.shelf.length === 1)`,
         { desc: 'roll shelved (whisk-landing recomposite fired)' },
       );
       assert.equal(await a.dbg('floorTextureId()'), uuid0,
@@ -2898,7 +2898,7 @@ export const scenarios = [
       const rid = await a.rollId();
       await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
       await a.waitFor(
-        `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1)`,
         { desc: 'first roll shelved' },
       );
       await a.roll('2d6');
@@ -3562,7 +3562,7 @@ export const scenarios = [
 
       await a.roll('d20');
       await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter'}))`);
-      await a.waitFor(`(window.__diceDebug.sim(160), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+      await a.waitFor(`(window.__diceDebug.sim(160), window.__diceDebug.shelf.length === 1)`,
         { desc: 'Enter keeps it — collected to the shelf' });
 
       // Layers own Esc first: with the log flyout open, Esc peels it and
@@ -3986,7 +3986,7 @@ export const scenarios = [
       assert.equal(await a.dbg('autoCollectMs'), 0, 'the harness boots with the clock off');
       await a.dbg('setAutoCollectMs(250)');
       await a.roll('2d6');
-      await a.waitFor(`(window.__diceDebug.sim(60), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+      await a.waitFor(`(window.__diceDebug.sim(60), window.__diceDebug.shelf.length === 1)`,
         { desc: 'the roll collected itself' });
 
       // the folded card (2026-08-03): the marker OPENS the card; the card's
@@ -5533,7 +5533,7 @@ export const scenarios = [
       assert.equal(await a.dbg(`collectRoll(${JSON.stringify(rid)})`), true, 'collect accepted');
       await a.waitFor(
         `(window.__diceDebug.sim(120), document.querySelectorAll('.shelf-marker').length > 0`
-        + ` && window.__diceDebug.whiskingCount === 0)`,
+        + `)`,
         { desc: 'the roll reaches the shelf' });
       await hold('.shelf-marker');
       assert.equal((await a.dbg('popover')).open, true,
@@ -6360,7 +6360,7 @@ export const scenarios = [
       const wid = await a.rollId();
       await a.dbg(`collectRoll(${JSON.stringify(wid)})`);
       await a.waitFor(
-        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        `(window.__diceDebug.sim(120), window.__diceDebug.shelf.length === 1)`,
         { desc: 'warmup shelved' },
       );
       assert.equal(await a.dbg(`peek(${JSON.stringify(wid)})`), wid, 'peek opens');
@@ -6741,7 +6741,7 @@ export const scenarios = [
       assert.ok(p.bloomDiceLive >= 2, `felt bolt dice count as live bloom (got ${p.bloomDiceLive})`);
       assert.equal(await a.dbg(`collectRoll(${JSON.stringify(srid)})`), true, 'collect accepted');
       await a.waitFor(
-        `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0 && window.__diceDebug.pendingCollects.length === 0)`,
+        `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1 && window.__diceDebug.pendingCollects.length === 0)`,
         { desc: 'roll shelved, whisk finished' },
       );
       // Drain rings/shimmer (transient wake reasons live outside sim()'s
@@ -6817,7 +6817,7 @@ export const scenarios = [
       const rid = await a.rollId();
       await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
       await a.waitFor(
-        `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1 && window.__diceDebug.whiskingCount === 0)`,
+        `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1)`,
         { desc: 'roll shelved, whisk done' },
       );
       await a.dbg('sim(60)'); // 1 s of shelf-side "rest"
@@ -7331,7 +7331,7 @@ export const scenarios = [
       for (const t of [a, b]) {
         await t.waitFor(
           `(window.__diceDebug.sim(240), window.__diceDebug.shelf.length === 1`
-          + ` && window.__diceDebug.whiskingCount === 0)`,
+          + `)`,
           { desc: 'die on shelf' },
         );
       }

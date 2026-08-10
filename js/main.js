@@ -285,34 +285,35 @@ let currentFeltId = DEFAULT_FELT;
 // key requires only adding it to defaults.
 let roomSettings = { felt: DEFAULT_FELT, system: DEFAULT_SYSTEM, tableName: '', zoom: DEFAULT_ZOOM };
 
-// The collect shelf (UX §7.7, refined §7.7.1): five slot POSITIONS along the
-// bottom (front) felt edge. No permanent markings — an empty position is plain
-// felt (§7.7.1 "no casino markings"); an OCCUPIED position gets a soft warm
-// under-glow ring composited into the felt beneath its cluster, which appears
-// as the whisk lands and leaves with the roll. A collected roll's dice cluster
-// in one slot, ordered by collection (reflowShelf). Geometry is shared by the
-// glow decals, the cluster layout, the camera framing, and the marker
-// projection — one set of numbers, four readers. The slot is the pile's
-// boundary, so its size is what clusterPoses fits against; keep the slots
-// inside the felt (|x| < TABLE_W/2, SHELF_Z + D/2 < TABLE_D/2) and clear of
-// each other (W < SHELF_PITCH).
-const SHELF_SLOTS = 5;
-// SHELF_Z and the pitch between slot centers are DERIVED from TABLE_W/D — a
-// zoom preset resizes the mat and the shelf slides with it (the 1.9-unit
-// clearance from the front wall is the invariant). SHELF_SLOT_W/D stay fixed:
-// a slot holds ~3 dice abreast; sized by die-radius, not felt-fraction.
-let SHELF_Z = TABLE_D / 2 - 1.9;     // slot center (world z; wide: 6.6)
-const SHELF_SLOT_W = 5.4;            // slot decal width  (x units)
-const SHELF_SLOT_D = 3.6;            // slot decal depth  (z units)
-const SHELF_MARKER_Y = 2.4;          // marker anchor height above the slot
-let SHELF_PITCH = (TABLE_W - SHELF_SLOT_W) / (SHELF_SLOTS - 1); // wide: 6.15
-const shelfSlotX = (slot) => (slot - (SHELF_SLOTS - 1) / 2) * SHELF_PITCH;
-
-// rollId -> {rollId, seq, slot, diceCount, markerEl, glow}. Declared here —
-// not with the rest of the shelf machinery below — because the felt composite
-// reads it (drawShelfGlow) and the floor texture is built during module
-// evaluation, before the shelf section runs.
-const shelfClusters = new Map();
+// COLLECTED IS A LIST, NOT A PLACE (C25, 2026-08-09).
+//
+// The collect shelf used to be five slot POSITIONS along the front felt edge,
+// each holding one collected roll's dice as a real cluster with a static body,
+// a warm under-glow ring composited into the felt beneath it, and an invisible
+// marker pill projected above it. That shelf was sized for a 30-unit mat:
+// SHELF_SLOT_W was 5.4 and SHELF_PITCH derived from TABLE_W, so when the zoom
+// ladder took TABLE_W to 8.6 the pitch fell to 0.80 against a cluster 3.26
+// wide. **The SECOND collected roll fused with the first** — measured overlap
+// 2.46 units, three quarters of a cluster's own width — and five of them
+// rendered as one slab of interpenetrating dice. Nothing caught it: the shelf
+// scenarios asserted length, sequence order and slot compaction, and never
+// that two clusters do not occupy the same space.
+//
+// No arrangement fits. Two slots overlap at every zoom; one die abreast still
+// needs 9.0 units against a mat of 8.6 and builds the towers C24 refused; and
+// the mat cannot grow back without undoing the three tightenings that made the
+// dice readable. The felt is under five dice wide, so the felt holds the live
+// roll and nothing else — Joe's call, 2026-08-09: "keep nothing".
+//
+// What survives is the STATE, which was always the real feature: the server
+// stamps `entry.collected` with a sequence, `shelf()` returns them in order,
+// and the ROLL LOG is where a collected roll is read and reached. This map is
+// that set, client-side: rollId -> {rollId, seq}. No geometry, because there
+// is no longer anywhere for geometry to be.
+const collected = new Map();
+// Mirrors the server's SHELF_CAP: past five, the oldest collected roll is
+// cleared. Solo enforces it locally (soloCollectEntries) so both modes agree.
+const COLLECT_CAP = 5;
 
 // One 512px felt tile per base color (cached — the decal composite redraws it
 // 36 times per ceremony and regenerating the noise each time would visibly
@@ -357,66 +358,12 @@ let matDecalText = null;                    // non-null while a decal is applied
 // table center and +z (the lower felt, where the shelf lives) is +y.
 const decalPx = (v) => (v + 80) * DECAL_PX_PER_UNIT;
 
-// How far a cluster's glow reaches (world units): the pile's own footprint —
-// max horizontal spread of its poses plus each die's radius — with a soft
-// margin, so a lone d4's ring hugs it while a 9-die pile earns a wider halo.
-// clusterPoses is pure, so this matches the dice wherever the whisk is.
-function clusterGlowRadius(c) {
-  const dice = tableDice.filter((d) => d.rollId === c.rollId);
-  if (!dice.length) return SHELF_SLOT_W * 0.45;
-  const poses = clusterPoses(c.slot, dice.map((d) => ({ type: d.type, value: d.shelfValue })));
-  let r = 0;
-  dice.forEach((d, i) => {
-    const p = canonicalDiePose(d.type, d.shelfValue);
-    const reach = Math.hypot(poses[i].pos.x - shelfSlotX(c.slot), poses[i].pos.z - SHELF_Z) + p.r;
-    if (reach > r) r = reach;
-  });
-  return Math.min(Math.max(r * 1.35, 1.7), SHELF_SLOT_W * 0.55);
-}
-
-// §7.7.1 "no casino markings": nothing is drawn where nothing sits. An
-// OCCUPIED position gets a soft warm-gold radial under-glow — arcane circle,
-// not casino tray — slightly larger than its cluster's footprint, low alpha
-// so every theme keeps it quieter than the dice. A cluster mid-whisk
-// (glow=false) hasn't landed yet: its ring appears at whisk-end.
-// Each cluster's ring is tinted with its ROLLER's color, warmed toward the
-// table's gold so every tint reads as candlelight rather than neon — the
-// joiner's at-a-glance attribution (CUJ5), restored to the shelf at zero
-// chrome cost after the resting markers went invisible.
-function glowTint(rollId) {
-  const entry = log.find((e) => e.rollId === rollId);
-  const hex = entry && typeof entry.color === 'string' && /^#[0-9a-f]{6}$/i.test(entry.color)
-    ? entry.color : '#ffcd64';
-  const n = parseInt(hex.slice(1), 16);
-  const W = 0.45; // warm blend share
-  return [
-    Math.round(((n >> 16) & 255) * (1 - W) + 255 * W),
-    Math.round(((n >> 8) & 255) * (1 - W) + 205 * W),
-    Math.round((n & 255) * (1 - W) + 100 * W),
-  ];
-}
-
-function drawShelfGlow(ctx) {
-  for (const c of shelfClusters.values()) {
-    if (!c.glow || c.slot < 0) continue;
-    const cx = decalPx(shelfSlotX(c.slot));
-    const cy = decalPx(SHELF_Z);
-    // refreshes the marker-size cache too: every occupancy change lands here
-    const r = (c.glowR = clusterGlowRadius(c)) * DECAL_PX_PER_UNIT;
-    const [tr, tg, tb] = glowTint(c.rollId);
-    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-    g.addColorStop(0, `rgba(${tr}, ${tg}, ${tb}, 0.06)`);
-    g.addColorStop(0.62, `rgba(${tr}, ${tg}, ${tb}, 0.10)`);
-    g.addColorStop(0.82, `rgba(${tr}, ${tg}, ${tb}, 0.05)`);
-    g.addColorStop(1, `rgba(${tr}, ${tg}, ${tb}, 0)`);
-    ctx.save();
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-}
+// (The shelf's under-glow rings went with the felt shelf — C25. They were the
+// joiner's at-a-glance attribution: one warm ring per occupied slot, tinted
+// with its roller's colour. With nothing standing on the felt but the live
+// roll there is no occupancy to draw, and §7.7.1's "no casino markings" now
+// describes the whole felt rather than only its empty slots. The attribution
+// they carried is the roll log's, which names its roller in their colour.)
 
 // The text-free TILE layer is cached per base color: theme swaps, decal
 // clears, and every shelf recomposite reuse the same canvas instead of
@@ -495,7 +442,6 @@ function drawMatText(ctx, text) {
 function paintFloor(base, text) {
   floorCtx.clearRect(0, 0, DECAL_SIZE, DECAL_SIZE);
   floorCtx.drawImage(baseFeltCanvas(base), 0, 0);
-  drawShelfGlow(floorCtx);
   if (text) drawMatText(floorCtx, text);
   floorTexture.needsUpdate = true;
 }
@@ -512,10 +458,10 @@ function clearMatDecal() {
   paintFloor(FELT_THEMES[currentFeltId].feltBase, null);
 }
 
-// Repaint the live floor for the current shelf occupancy: same base, same mat
-// text, fresh glow rings. Called on every shelf change (reflowShelf, the
-// whisk-end landing, the corner sweep) — the same recomposite path mat text
-// already rides, so theme changes and ceremonies compose with the rings.
+// Repaint the live floor: same base, same mat text. Since C25 took the shelf
+// off the felt this composites nothing occupancy-dependent, so the callers
+// left are the theme swap and the ceremony's mat text — the felt no longer
+// changes because a roll was collected.
 function recompositeFelt() {
   paintFloor(FELT_THEMES[currentFeltId].feltBase, matDecalText);
 }
@@ -922,15 +868,12 @@ function resetTableSurface() {
   tableDice = [];
   chips.length = 0;
   chipsLayer.innerHTML = '';
-  whisking = [];
   revealing = [];
-  shelfClusters.clear();
-  // A peek is anchored to a cluster that no longer exists: it would float over
-  // the empty table with a ✕ that clears a roll already gone. The sweep takes
-  // it too (§7.7.1 — one card, and only while its roll is on the shelf).
+  collected.clear();
+  // A peek anchored to a roll that no longer exists would float there with a
+  // ✕ that clears a roll already gone (§7.7.1 — one card, and only while its
+  // roll is in the record).
   closePeek();
-  recompositeFelt(); // the swept shelf takes its glow rings with it
-  shelfLayer.innerHTML = '';
   hideBanner();
 }
 
@@ -979,7 +922,10 @@ function finishSinkingNow() {
 
 // Remove one roll's dice + their chips with the sink/fade. Other rolls'
 // dice are untouched. Returns whether anything was on the table for it.
-function removeRollDice(rollId) {
+// `instant` skips the departure entirely — a hello reconstruction is not a
+// moment, and a die that was never on this client's felt should not appear to
+// leave it. Live collects and clears both animate.
+function removeRollDice(rollId, instant = false) {
   const going = tableDice.filter((d) => d.rollId === rollId);
   if (!going.length) return false;
   tableDice = tableDice.filter((d) => d.rollId !== rollId);
@@ -995,6 +941,11 @@ function removeRollDice(rollId) {
   for (const d of going) {
     world.removeBody(d.body);
     dieLights.release(d.mesh); // a departing die takes its glow with it
+    if (instant) {
+      scene.remove(d.mesh);
+      if (d.chipEl) d.chipEl.remove();
+      continue;
+    }
     sinking.push({ mesh: d.mesh, chip: d.chipEl || null, t: 0, y0: d.mesh.position.y });
   }
   return true;
@@ -1018,25 +969,11 @@ function applyClearRoll(rollId) {
     pendingClears.add(rollId);
     return;
   }
-  // A whisk still in the air joins the sink from wherever it is.
-  whisking = whisking.filter((w) => w.die.rollId !== rollId);
-  const hadDice = removeRollDice(rollId);
-  // A shelved roll sinks marker and cluster together (§7.7 aging): the marker
-  // rides its OWN sink record so stepSinking fades and drops it dt-driven —
-  // never overwrite a die's chip ref (that stranded the die's chip in the
-  // DOM, growing #chips-layer forever on endurance runs, Tier 0e).
-  const cluster = shelfClusters.get(rollId);
-  if (cluster) {
-    shelfClusters.delete(rollId);
-    if (cluster.markerEl) {
-      cluster.markerEl.classList.add('chip-clearing');
-      if (hadDice) sinking.push({ mesh: null, chip: cluster.markerEl, t: 0, y0: 0 });
-      else cluster.markerEl.remove();
-    }
-    // The shelf closes up behind it: everything newer slides one slot left.
-    reflowShelf();
-    renderShelfMarkers();
-  }
+  removeRollDice(rollId);
+  // Leaving the collected set is bookkeeping now: no cluster to sink, no slot
+  // for the survivors to close up into, no marker to fade. An open card on
+  // this roll notices and closes itself.
+  if (collected.delete(rollId)) { renderLog(); renderPeek(); }
   // The moment leaves with its dice: banner and verdict card for THIS roll
   // close everywhere. Other rolls' surfaces are untouched.
   if (lastEntry && lastEntry.rollId === rollId) hideBanner();
@@ -1064,28 +1001,28 @@ function requestClearRoll(rollId) {
   return Promise.resolve(true);
 }
 
-// ---- the collect shelf (§7.7) ----------------------------------------------
+// ---- collecting a roll (§7.7) ----------------------------------------------
 //
-// The main felt belongs to ONE roll at a time; history lives on the shelf.
+// The felt belongs to ONE roll at a time; history lives in the roll log.
 // The server owns the state machine (on-felt → collected(seq) → cleared) and
 // clients only ever react to its 'roll-collected' / 'roll-cleared' bursts;
-// solo mode mirrors the same machine locally (soloCollectEntries). A shelved
-// roll's dice sit as a settled, deterministic cluster in its slot with one
-// compact marker floating above; its per-die chips, banner and verdict card
-// retire the moment it is collected.
+// solo mode mirrors the same machine locally (soloCollectEntries). Collecting
+// a roll takes its dice off the felt — the same departure a clear plays
+// (§7.26's lift) — and its per-die chips, banner and verdict card retire with
+// them. The two verbs differ in bookkeeping, not in motion: a collected roll
+// keeps its verbs (reroll, reveal, save as pool) and a cleared one does not.
 //
-// SLOTS ARE RANKS, not addresses: slot i holds the i-th lowest live collection
-// seq (reflowShelf), so the shelf always reads oldest → newest, left to right,
-// with no gaps. That is the only assignment that survives a resync — see
-// reflowShelf for why a remembered slot table cannot.
+// C25 TOOK THE PLACE AWAY AND KEPT THE STATE. There were five slots on the
+// felt, each holding a cluster of real dice; see the note by `collected` for
+// the measurement that ended them. Nothing about the wire changed — the server
+// never knew about slots — so everything deleted here was rendering:
+// canonicalDiePose, clusterPoses, spawnShelvedDie, placeCluster, reflowShelf,
+// the collect whisk, and the marker pills the peek used to hang from.
 
-const WHISK_S = 0.4;                  // collect whisk: slide + settle duration
-const shelfLayer = document.getElementById('shelf-layer');
 const rollStates = new Map();         // rollId -> {collected: seq|null, cleared}
-// shelfClusters (rollId -> cluster) is declared up in the felt section: the
-// floor composite reads it before this section evaluates.
+// `collected` (rollId -> {rollId, seq}) and COLLECT_CAP are declared up in the
+// felt section, where the shelf's geometry used to live.
 const pendingCollects = new Map();    // rollId -> seq, deferred like pendingClears
-let whisking = [];                    // {die, t, fromPos, fromQuat, toPos, toQuat}
 let soloCollectSeq = 0;               // solo mirror of the server's room counter
 
 // Every roll that ever touched this table gets a state row (playRoll seeds
@@ -1099,383 +1036,33 @@ function rollState(rollId) {
   return st;
 }
 
-// Canonical shelved pose for a die showing `value`: the face normal rotated
-// straight up, resting exactly on the felt (lowest rotated vertex at y=0).
-// Pure function of (type, value), so every client computes the same pose.
-// Also measures the resting die: `h` is its full height and `r` the radius of
-// its footprint, which is what lets a cluster size itself to the tray instead
-// of guessing (see clusterPoses).
-const shelfPoseCache = new Map();
-function canonicalDiePose(type, value) {
-  const key = `${type}:${value}`;
-  let p = shelfPoseCache.get(key);
-  if (p) return p;
-  const quat = new THREE.Quaternion();
-  const nV = faceNormalForValue(type, value);
-  if (nV) quat.setFromUnitVectors(nV.clone().normalize(), new THREE.Vector3(0, 1, 0));
-  const posAttr = createDieMesh(type).geometry.attributes.position; // shared cache in js/dice.js
-  const v = new THREE.Vector3();
-  let minY = Infinity;
-  let maxY = -Infinity;
-  let maxR = 0;
-  for (let i = 0; i < posAttr.count; i++) {
-    v.fromBufferAttribute(posAttr, i).applyQuaternion(quat);
-    if (v.y < minY) minY = v.y;
-    if (v.y > maxY) maxY = v.y;
-    const r = Math.hypot(v.x, v.z);
-    if (r > maxR) maxR = r;
-  }
-  p = { quat, y: -minY, h: maxY - minY, r: maxR };
-  shelfPoseCache.set(key, p);
-  return p;
-}
-
-// Deterministic tight arrangement (§7.7) for a whole roll: a pile that FITS
-// ITS TRAY. The grid is sized from the dice actually being shelved — a slot
-// holds three d6 abreast but only two d20 — and wraps into a further storey
-// once the tray floor is full, each storey exactly one die tall.
+// Collect one roll: its dice leave the felt and the roll joins the record.
+// `animate` is the departure — true for a live collect (§7.26's lift), false
+// for a hello reconstruction, where there is usually nothing on the felt and
+// any straggler should simply be gone. Idempotent: a repeat collect for an
+// already-collected or cleared roll changes nothing.
 //
-// Staying inside the tray is not cosmetic: a shelved die keeps a STATIC body,
-// so any part of the pile left standing on the active felt silently deflects
-// every roll that follows. Pure function of (slot, parts), so a live whisk and
-// a reload's reconstruction land bit-for-bit identical clusters.
-const SHELF_PACK = 0.88;    // neighbour spacing as a share of a die's width
-const SHELF_STOREY_GAP = 0.06;
-function clusterPoses(slot, parts) {
-  const poses = parts.map((p) => canonicalDiePose(p.type, p.value));
-  const rMax = Math.max(0.5, ...poses.map((p) => p.r));
-  const hMax = Math.max(...poses.map((p) => p.h));
-  const step = 2 * rMax * SHELF_PACK;
-  const fit = (span) => Math.max(1, Math.min(3, Math.floor((span - 2 * rMax) / step) + 1));
-  const cols = fit(SHELF_SLOT_W);
-  const perStorey = cols * fit(SHELF_SLOT_D);
-  return parts.map((_, i) => {
-    const storey = Math.floor(i / perStorey);
-    const k = i % perStorey;
-    const col = k % cols;
-    const row = Math.floor(k / cols);
-    // The last storey is usually partial: center what it actually holds.
-    const n = Math.min(parts.length - storey * perStorey, perStorey);
-    const rows = Math.ceil(n / cols);
-    const inRow = Math.min(cols, n - row * cols);
-    const p = poses[i];
-    return {
-      pos: new THREE.Vector3(
-        shelfSlotX(slot) + (col - (inRow - 1) / 2) * step,
-        p.y + storey * (hMax + SHELF_STOREY_GAP),
-        SHELF_Z + ((rows - 1) / 2 - row) * step
-      ),
-      quat: p.quat,
-    };
-  });
-}
-
-// The POSE a shrouded die rests in: identity correction leaves a die cocked on
-// whatever the physics left, so shrouded shelf clusters (and reconstructions)
-// borrow the canonical pose of a real face — the faces are blank, so which one
-// is up leaks nothing, but the die must still sit flat.
-function shroudPoseValue(type) {
-  return type === 'd10x' ? 10 : 1;
-}
-
-// Spawn one die settled on the shelf (hello reconstruction, or a collect for
-// an entry whose felt this client never saw). reflowShelf gives it its pose;
-// `shelfSpawn` marks it as never-having-been-on-the-felt, so it lands instantly
-// instead of whisking in from wherever the origin happens to be. No tumble, no
-// sound. `shrouded` spawns the obsidian variant for a still-hidden roll.
-function spawnShelvedDie(type, value, rollId, shrouded = false, set = null) {
-  const variant = dieVariant(shrouded, set);
-  const mesh = createDieMesh(type, variant);
-  const body = createDieBody(type, diceMat);
-  body.mass = 0;
-  body.type = CANNON.Body.STATIC;
-  body.updateMassProperties();
-  world.addBody(body);
-  scene.add(mesh);
-  const die = { type, mesh, body, rollId, shelfValue: value, shelfSpawn: true, shrouded, variant };
-  tableDice.push(die);
-  return die;
-}
-
-// Put one cluster's dice at its slot's cluster poses. The STATIC bodies are
-// parked immediately — a later fast-forward must collide with the shelf as it
-// IS, not with ghosts left at the old felt positions, and every client's
-// physics world has to match — while the meshes either whisk across (~400 ms)
-// or jump, so a reconstruction and a re-flow after an eviction cost nothing.
-function placeCluster(c, animate) {
-  const dice = tableDice.filter((d) => d.rollId === c.rollId);
-  if (!dice.length) return;
-  const poses = clusterPoses(c.slot, dice.map((d) => ({ type: d.type, value: d.shelfValue })));
-  const moving = new Set(dice);
-  whisking = whisking.filter((w) => !moving.has(w.die)); // one whisk per die
-  // A die can't flip and whisk at once: the whisk's target pose already shows
-  // the true face (materials were swapped when the reveal began).
-  revealing = revealing.filter((rv) => !moving.has(rv.die));
-  // The under-glow belongs to a LANDED cluster (§7.7.1): a cluster ARRIVING on
-  // the shelf holds its ring back until stepWhisking sees its dice land;
-  // instant placements (hello reconstruction, spawned shelved dice) glow at
-  // once. A cluster that is ALREADY lit keeps its ring through a reflow slide —
-  // its ring simply moves to the new slot with it (what reflowShelf's own
-  // recomposite promises). Dropping it would black out every surviving cluster
-  // for the whole 0.4 s whisk on each eviction or middle-marker ✕, which is
-  // exactly when the player is looking at the shelf.
-  if (!c.glow) c.glow = !(animate && dice.some((d) => !d.shelfSpawn));
-  dice.forEach((d, i) => {
-    // The shelf is the archive: lights live on FELT dice only, so a
-    // collect puts the flame out (release is a no-op for unlit dice —
-    // reflows and reconstructions pass through here too).
-    dieLights.release(d.mesh);
-    const { pos, quat } = poses[i];
-    d.body.position.set(pos.x, pos.y, pos.z);
-    d.body.quaternion.set(quat.x, quat.y, quat.z, quat.w);
-    if (animate && !d.shelfSpawn) {
-      whisking.push({
-        die: d,
-        t: 0,
-        fromPos: d.mesh.position.clone(),
-        fromQuat: d.mesh.quaternion.clone(),
-        toPos: pos,
-        toQuat: quat,
-      });
-    } else {
-      d.mesh.position.copy(pos);
-      d.mesh.quaternion.copy(quat);
-    }
-    d.shelfSpawn = false;
-  });
-}
-
-// Assign slots and place every cluster that moved. Slot i holds the i-th
-// LOWEST live seq — the shelf reads oldest → newest, left to right, and closes
-// up when a roll leaves.
-//
-// Rank, not a remembered address, because the assignment has to be a pure
-// function of the live set: a hello tells a joining client WHICH rolls are on
-// the shelf, never the order the departed ones left in, so any table that
-// remembers "this roll kept slot 3" reconstructs differently for whoever
-// reloaded — two clients rendering different tables with no event that can
-// reconcile them. (Keying the slot off the seq directly, seq % 5, is worse
-// still: one ✕ on a middle marker punches a hole in the live window, and the
-// next collect lands its dice inside an older roll's cluster with its marker —
-// and its ✕ — stacked on top, unclickable.)
-function reflowShelf(animate = true) {
-  const clusters = [...shelfClusters.values()].sort((a, b) => a.seq - b.seq);
-  clusters.forEach((c, i) => {
-    // The cap belongs to the server (and to the solo mirror): a client's live
-    // set is only ever a subset of it, because a deferred collect withholds
-    // the NEWEST roll, never an older one. The clamp is belt and braces —
-    // never address a slot the shelf does not have.
-    const slot = Math.min(i, SHELF_SLOTS - 1);
-    if (c.slot === slot && c.placed) return;
-    c.slot = slot;
-    c.placed = true;
-    placeCluster(c, animate);
-  });
-  positionShelfMarkers();
-  // Occupancy changed (a collect, an eviction, a hole closing up): the felt's
-  // glow rings follow immediately — a departed cluster's ring must never
-  // outlive it, and a landed survivor's ring moves to its new slot.
-  recompositeFelt();
-}
-
-// Move one roll onto the shelf. animate=true plays the ~400 ms whisk; false
-// (hello reconstruction) lands everything instantly. Idempotent — a repeat
-// collect for a shelved or cleared roll changes nothing.
+// A roll can be collected on a client that never saw its dice (a late joiner
+// reconstructing, a secret roll's own housekeeping). That used to mean
+// SPAWNING dice on the shelf so there was a cluster to peek at; the record is
+// the log entry now, which the client already holds, so there is nothing to
+// build and no early return to fall out of.
 function shelveRoll(rollId, seq, animate) {
   const st = rollState(rollId);
   st.collected = seq;
-  if (st.cleared || shelfClusters.has(rollId)) return;
-  const entry = log.find((e) => e.rollId === rollId) || null;
-  let dice = tableDice.filter((d) => d.rollId === rollId);
-
-  // The per-die chips retire into the one marker.
-  const going = new Set(dice);
-  for (let i = chips.length - 1; i >= 0; i--) {
-    if (going.has(chips[i].die)) {
-      chips[i].el.remove();
-      chips.splice(i, 1);
-    }
-  }
-
-  if (dice.length) {
-    // The frozen body's orientation reads the authoritative settled value —
-    // except for a shrouded die, whose identity correction would fabricate a
-    // plausible-but-wrong number: it takes the neutral shroud pose instead.
-    for (const d of dice) {
-      d.shelfValue = d.shrouded
-        ? shroudPoseValue(d.type)
-        : readValue(d.type, d.body.quaternion).value;
-    }
-  } else if (entry) {
-    const hidden = entryHidden(entry);
-    dice = entry.parts.map((p, i) => {
-      const shrouded = hidden || p.value == null;
-      return spawnShelvedDie(p.type, shrouded ? shroudPoseValue(p.type) : p.value, rollId, shrouded, entryDieSet(entry, i));
-    });
-  } else {
-    return; // nothing to show yet; the state row reconciles on the next hello
-  }
-
-  shelfClusters.set(rollId, {
-    rollId, seq, slot: -1, placed: false, diceCount: dice.length, markerEl: null, glow: false,
-  });
+  if (st.cleared || collected.has(rollId)) return;
+  collected.set(rollId, { rollId, seq });
+  removeRollDice(rollId, !animate); // the chips ride the same departure
   // The moment leaves the felt surfaces: banner and verdict card for THIS
-  // roll close everywhere; the log line and the marker carry it from here.
+  // roll close everywhere; the log line carries it from here.
   if (lastEntry && lastEntry.rollId === rollId) hideBanner();
   if (stagedVerdict && stagedVerdict.entry.rollId === rollId
       && !ceremonyLayer.classList.contains('hidden')) {
     dismissCeremonyUI();
   }
-  reflowShelf(animate);
-  renderShelfMarkers();
-  tryFlushZoom(); // a deferred zoom rides the shelf boundary too
-}
-
-// Advance collect whisks: dt-driven mesh slide with a small carry arc, easing
-// onto the exact cluster pose (the bodies are already parked there).
-function stepWhisking(dt) {
-  if (!whisking.length) return;
-  let anyDone = false;
-  for (const w of whisking) {
-    w.t += dt;
-    const p = Math.min(w.t / WHISK_S, 1);
-    const e = 1 - (1 - p) ** 3; // ease-out cubic
-    w.die.mesh.position.lerpVectors(w.fromPos, w.toPos, e);
-    w.die.mesh.position.y += Math.sin(p * Math.PI) * 1.4;
-    w.die.mesh.quaternion.slerpQuaternions(w.fromQuat, w.toQuat, e);
-    if (p >= 1) anyDone = true;
-  }
-  if (!anyDone) return;
-  whisking = whisking.filter((w) => {
-    if (w.t < WHISK_S) return true;
-    w.die.mesh.position.copy(w.toPos);
-    w.die.mesh.quaternion.copy(w.toQuat);
-    return false;
-  });
-  // Whisk-end is when a cluster's under-glow fades in (§7.7.1 "appears as the
-  // whisk lands"): light every cluster whose dice have all arrived.
-  let landed = false;
-  for (const c of shelfClusters.values()) {
-    if (!c.glow && !whisking.some((w) => w.die.rollId === c.rollId)) {
-      c.glow = true;
-      landed = true;
-    }
-  }
-  if (landed) recompositeFelt();
-}
-
-// One INVISIBLE marker per shelved roll (P1 quiet by default, taken all the
-// way): the settled cluster is its own presence, so the target draws nothing
-// at rest — no dot, no total, no lens word, and a held roll never shouts '?'.
-// Hover/tap expands the peek card (§7.7.1), which carries the full result,
-// Reveal for the authority, and the prominent clear-✕ ANY player may use
-// (§7.7 universal housekeeping). Rebuilt whole on every shelf/lens/reveal
-// change.
-
-// L6 (Tier 0e endurance): the four marker listeners attach ONCE per element
-// via a factory and read `el.dataset.rollId` at fire time. renderShelfMarkers
-// only mutates dataset/title in place — a marker's lifetime spans cluster
-// join to leave, not one render — so a hundred re-renders of the same five
-// clusters do not accrete 100×5×4 handler closures on the shelf layer.
-function createShelfMarker() {
-  const el = document.createElement('div');
-  el.className = 'shelf-marker';
-  // REACHABLE (U22, audit D5). These were tabindex-less, unlabelled <div>s,
-  // which made the table's whole history a flat 2.1.1 failure — and once a
-  // roll is shelved the peek is the ONLY door to Reveal, so a keyboard
-  // player could not reveal their own held roll at all. role=button + a tab
-  // stop + Enter/Space is the same door the click already opens; the NAME is
-  // written per-render, where the roll it stands for is known.
-  el.setAttribute('role', 'button');
-  el.tabIndex = 0;
-  el.addEventListener('keydown', (ev) => {
-    if (ev.key !== 'Enter' && ev.key !== ' ') return;
-    ev.preventDefault();
-    const rid = el.dataset.rollId;
-    if (!rid) return;
-    if (peekRollId === rid) closePeek();
-    else openPeek(rid);
-  });
-  el.addEventListener('pointerenter', (ev) => {
-    if (ev.pointerType === 'mouse' && el.dataset.rollId) schedulePeekOpen(el.dataset.rollId);
-  });
-  el.addEventListener('pointerleave', (ev) => {
-    if (ev.pointerType === 'mouse') schedulePeekClose();
-  });
-  el.addEventListener('click', (ev) => {
-    const t = ev.target;
-    if (t instanceof HTMLElement && t.closest('button')) return;
-    if (lp.took()) return; // a long-press already opened the tweaks popover
-    const rid = el.dataset.rollId;
-    if (!rid) return;
-    if (peekRollId === rid) closePeek();
-    else openPeek(rid);
-  });
-  // Look up at fire time (not render time): rolls that drop out of the
-  // 100-entry log between render and right-click resolve to null here, and
-  // canReroll(null) short-circuits — no popover, no crash.
-  const openTweaks = () => {
-    const rid = el.dataset.rollId;
-    const entry = rid ? log.find((e) => e.rollId === rid) : null;
-    if (entry && canReroll(entry)) openShelfPopover(entry, rid);
-  };
-  // U12: the touch twin. Without it a shelved roll's tweaked reroll was
-  // unreachable on iOS, where a long press never produces `contextmenu`.
-  const lp = attachLongPress(el, openTweaks);
-  el.addEventListener('contextmenu', (ev) => {
-    ev.preventDefault();
-    lp.clear(); // Android fires this first — one door wins
-    openTweaks();
-  });
-  return el;
-}
-
-function renderShelfMarkers() {
-  // Reap orphaned markers (a cluster departed): a marker's classList carries
-  // '.shelf-marker' — filter by it so future overlays on shelfLayer don't get
-  // pruned. Mid-fade markers are NOT ours to wipe: an eviction is
-  // 'roll-cleared' immediately followed by 'roll-collected', so removing them
-  // here would pop the departing marker out of existence a millisecond into
-  // its sink — stepSinking drops them when their dice are gone.
-  const liveIds = new Set(shelfClusters.keys());
-  for (const el of [...shelfLayer.children]) {
-    if (!el.classList.contains('shelf-marker')) continue;
-    if (el.classList.contains('chip-clearing')) continue;
-    const rid = el.dataset.rollId;
-    if (!rid || !liveIds.has(rid)) el.remove();
-  }
-  const clusters = [...shelfClusters.values()].sort((a, b) => a.seq - b.seq);
-  for (const c of clusters) {
-    // Reuse: the marker's four listeners stay pinned to this element for its
-    // whole cluster lifetime. `!isConnected` covers the full-sweep reset path
-    // (line ~811/817) — cluster.clear() nulls c.markerEl transitively but the
-    // guard is defensive either way.
-    let el = c.markerEl;
-    if (!el || !el.isConnected) {
-      el = createShelfMarker();
-      c.markerEl = el;
-      shelfLayer.appendChild(el);
-    }
-    el.dataset.rollId = c.rollId;
-    const entry = log.find((e) => e.rollId === c.rollId) || null;
-    // A held roll's Reveal lives in its peek card: the shelf is where a held
-    // roll spends its life (auto-collect fires on ANYONE's next roll), and
-    // the peek renders Reveal for the authority (the server enforces it
-    // regardless) — the resting marker stays a quiet dot either way.
-    el.title = entry && entry.playerName ? `${entry.playerName} · ${entry.label}`
-      : entry ? `${entry.label}`
-      : 'Collected roll';
-    // The NAME, and it has to say what pressing does — `title` alone never
-    // reached the accname algorithm here and the marker had no text at all,
-    // so the shelf announced as five identical unlabelled buttons. A held
-    // roll says so, because that is the one whose card holds Reveal.
-    const held = entry && entryHidden(entry);
-    el.setAttribute('aria-label', `${el.title}${held ? ' — hidden' : ''}. Open this roll's card.`);
-  }
-  positionShelfMarkers();
-  // An open peek re-reads whatever changed here — a reveal, a lens toggle, a
-  // reflowed slot — or closes if its roll just left the shelf.
-  renderPeek();
+  renderLog();    // the row picks up its collected dress and its verbs
+  renderPeek();   // an open card re-reads, or closes if its roll just left
+  tryFlushZoom(); // a deferred zoom rides the collect boundary too
 }
 
 // The shelf tweak path (card ± retired 2026-08-01): right-click a cluster
@@ -1496,41 +1083,6 @@ function openShelfPopover(entry, rollId) {
     rollId,
     row: peekEl,
   });
-}
-
-// A marker fully UNDER the open Pools panel must not eat the panel's
-// clicks (table labels ride above panels in the z ladder for the edge-
-// overlap case, not for full occlusion). The panel rect is CACHED — it
-// changes only on panel toggles and resizes; positionShelfMarkers runs
-// every frame and must never force layout (see measurePeek's warning).
-// (The old marker-vs-panel occlusion rect is GONE, 2026-08-04: the side
-// panel is layout, not overlay — nothing panel-shaped can stand over the
-// felt, so a marker can never be under it.)
-
-function positionShelfMarkers() {
-  const v = TMP_V1;
-  const v2 = TMP_V2;
-  for (const c of shelfClusters.values()) {
-    if (!c.markerEl) continue;
-    v.set(shelfSlotX(c.slot), SHELF_MARKER_Y, SHELF_Z);
-    v.project(camera);
-    const px = view.left + (v.x * 0.5 + 0.5) * view.width;
-    const py = (-v.y * 0.5 + 0.5) * view.height;
-    c.markerEl.style.left = `${px}px`;
-    c.markerEl.style.top = `${py}px`;
-    // The invisible target covers what the eye reads as the cluster: the
-    // same radius the under-glow paints, projected to pixels (cached — the
-    // radius only changes on reflow; drawShelfGlow refreshes the cache).
-    if (!c.glowR) c.glowR = clusterGlowRadius(c);
-    v2.set(shelfSlotX(c.slot) + c.glowR, SHELF_MARKER_Y, SHELF_Z).project(camera);
-    const d = Math.max(44, Math.round(Math.abs(v2.x - v.x) * view.width));
-    if (c.markerPx !== d) {
-      c.markerPx = d;
-      c.markerEl.style.width = `${d}px`;
-      c.markerEl.style.height = `${d}px`;
-    }
-  }
-  positionPeek(); // the open card rides its slot through reflows and reframes
 }
 
 // ---- peek cards (§7.7.1) ----------------------------------------------------
@@ -1588,13 +1140,14 @@ function closePeek() {
   peekEl.textContent = '';
 }
 
-// Open (or retarget) the peek for a shelved roll. False for anything not on
-// the shelf — a peek without a cluster has no slot to anchor to.
+// Open (or retarget) the peek for a COLLECTED roll. False for anything not in
+// the record — the card anchors to that roll's log row, and a roll with no row
+// (never collected, or cleared) has nothing to hang from.
 function openPeek(rollId) {
-  if (!shelfClusters.has(rollId)) return false;
-  // While the shelf popover is pinned to THIS card, another marker's hover
-  // must not swap the card out from under it — the popover would keep
-  // acting on the old roll while the card showed the new one.
+  if (!collected.has(rollId)) return false;
+  // While the shelf popover is pinned to THIS card, another row's hover must
+  // not swap the card out from under it — the popover would keep acting on
+  // the old roll while the card showed the new one.
   if (peekPinned() && rollId !== peekRollId) return false;
   cancelPeekTimers();
   peekRollId = rollId;
@@ -1619,13 +1172,20 @@ function peekPinned() {
   return !!(pop && pop.source === 'shelf' && peekRollId !== null);
 }
 
+// The row this card belongs to — its anchor since C25. Null when the log is
+// closed or the entry has aged past LOG_CAP, both of which mean there is
+// nowhere to put the card and it should not stand.
+function peekRow() {
+  if (peekRollId === null || !isLogFlyoutOpen()) return null;
+  return logList.querySelector(`.log-entry[data-roll-id="${CSS.escape(peekRollId)}"]`);
+}
+
 // Rebuild the open card's content from the log entry (the same source the
-// banner and log line read). Face-down unrevealed: '?' plus the marker's
+// banner and log line read). Face-down unrevealed: '?' plus the card's
 // Reveal affordance for the roller — no values leak.
 function renderPeek() {
   if (peekRollId === null) return;
-  const c = shelfClusters.get(peekRollId);
-  if (!c) {
+  if (!collected.has(peekRollId) || !peekRow()) {
     // The roll died under the card (remote clear, ⟳ replace, peek ✕): a
     // pinned peek must not zombie — release the pin (close its popover)
     // BEFORE closing, or closePeek's pin guard makes both immortal.
@@ -1645,9 +1205,9 @@ function renderPeek() {
   // role/tabindex/title: it is a shortcut, and the bar below is the control.
   const main = document.createElement('div');
   main.className = 'pk-main';
-  const rid = c.rollId;
+  const rid = peekRollId;
   // The pin release must happen before the roll dies, or a pinned peek
-  // outlives its own cluster (the immortal-peek trap this file warns about).
+  // outlives its own roll (the immortal-peek trap this file warns about).
   const peekClear = (btn) => {
     if (peekPinned()) closePopover();
     runCardClear(rid, btn, closePeek);
@@ -1730,7 +1290,7 @@ function renderPeek() {
     fold.className = 'pk-fold';
     appendCardActions(fold, entry, {
       revealClass: 'sm-reveal pk-reveal', // the one Reveal dress, small size
-      replaceShelfId: c.rollId,
+      replaceShelfId: rid,
       verb: 'clear',
       onPrimary: peekClear,
       // Not here: the peek's OWN popover already carries 'Save as pool…',
@@ -1740,7 +1300,7 @@ function renderPeek() {
     });
     peekEl.appendChild(fold); // never empty now: the primary always stands
   }
-  const peekTweaks = entry && canReroll(entry) ? () => openShelfPopover(entry, c.rollId) : null;
+  const peekTweaks = entry && canReroll(entry) ? () => openShelfPopover(entry, rid) : null;
   peekEl.oncontextmenu = peekTweaks ? (ev) => {
     ev.preventDefault();
     if (peekLp) peekLp.clear(); // Android fires this first — one door wins
@@ -1769,27 +1329,30 @@ function measurePeek() {
   peekH = peekEl.offsetHeight;
 }
 
-// Anchor the card above its slot's marker point, clamped fully on screen —
-// an edge slot at 480×360 still shows the whole card (flipping below the
-// anchor if the top would clip). Write-only: see measurePeek.
+// THE CARD ANCHORS TO ITS LOG ROW (C25). It used to hang over the roll's own
+// cluster on the felt, projected from that slot's marker point; with the felt
+// shelf gone the row in the roll log IS where the roll lives, so the card
+// stands BESIDE its row — right of the flyout where there is room (the flyout
+// hugs the felt's left edge), left of it otherwise — clamped fully on screen
+// either way. Beside and never over: the row is what the pointer is resting
+// on, and a card covering its own anchor fires pointerleave the instant it
+// opens. Write-only: see measurePeek.
 function positionPeek() {
-  if (peekRollId === null) return;
-  const c = shelfClusters.get(peekRollId);
-  if (!c) return;
-  const v = new THREE.Vector3(shelfSlotX(c.slot), SHELF_MARKER_Y, SHELF_Z).project(camera);
-  const ax = view.left + (v.x * 0.5 + 0.5) * view.width;
-  const ay = (-v.y * 0.5 + 0.5) * view.height;
+  const row = peekRow();
+  if (!row) return;
+  const r = row.getBoundingClientRect();
   const w = peekW;
   const h = peekH;
-  const left = Math.max(8, Math.min(ax - w / 2, window.innerWidth - w - 8));
-  let top = ay - 24 - h; // clear air over the cluster (panel-parity pass)
-  if (top < 8) top = ay + 24; // clipped above: sit below the marker instead
+  let left = r.right + 12;
+  if (left + w > window.innerWidth - 8) left = r.left - 12 - w;
+  left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+  let top = r.top + r.height / 2 - h / 2;
   top = Math.max(8, Math.min(top, window.innerHeight - h - 8));
   peekEl.style.left = `${left}px`;
   peekEl.style.top = `${top}px`;
 }
 
-// Crossing from the marker into the card must not close it (desktop).
+// Crossing from the row into the card must not close it (desktop).
 peekEl.addEventListener('pointerenter', (e) => {
   if (e.pointerType === 'mouse') cancelPeekTimers();
 });
@@ -1801,7 +1364,7 @@ peekEl.addEventListener('pointerleave', (e) => {
 document.addEventListener('pointerdown', (e) => {
   if (peekRollId === null) return;
   const t = e.target;
-  if (t instanceof HTMLElement && (peekEl.contains(t) || t.closest('.shelf-marker'))) return;
+  if (t instanceof HTMLElement && (peekEl.contains(t) || t.closest('.log-entry.collected'))) return;
   if (peekPinned() && t instanceof HTMLElement && t.closest('#mods-popover')) return;
   closePeek();
 });
@@ -1849,7 +1412,7 @@ function soloCollectEntries(rollIds) {
   const active = [...rollStates.entries()]
     .filter(([, st]) => st.collected && !st.cleared)
     .sort((a, b) => a[1].collected - b[1].collected);
-  const evicted = active.slice(0, Math.max(0, active.length - SHELF_SLOTS));
+  const evicted = active.slice(0, Math.max(0, active.length - COLLECT_CAP));
   for (const [rollId, st] of evicted) {
     st.cleared = true;
     applyClearRoll(rollId);
@@ -3746,7 +3309,7 @@ function mergeReveal(roll, full) {
 // finish turning (the §3.1 beat).
 function refreshRevealSurfaces(rollId) {
   renderLog();
-  renderShelfMarkers(); // includes renderPeek
+  renderPeek(); // an open card re-reads the revealed values
   const entry = log.find((e) => e.rollId === rollId) || null;
   if (entry && lastEntry && lastEntry.rollId === rollId) lastEntry = entry;
   if (lastEntry && lastEntry.rollId === rollId) {
@@ -3833,34 +3396,6 @@ function beginRevealFlip(rollId, entry) {
   if (!started) refreshRevealSurfaces(rollId);
 }
 
-// A shelved cluster reveals by re-posing: shelfValues become the true values,
-// materials swap, and the cluster re-lands on its canonical poses (the same
-// whisk placeCluster always uses).
-function revealShelvedRoll(rollId, entry) {
-  const c = shelfClusters.get(rollId);
-  const dice = tableDice.filter((d) => d.rollId === rollId);
-  dice.forEach((d, i) => {
-    if (d.shrouded) {
-      d.shrouded = false;
-      // same rule as beginRevealFlip: the reveal restores each die's OWN set
-      const ds = entryDieSet(entry, i);
-      const die = getDie(d.type, dieVariant(false, ds));
-      d.mesh.geometry = die.geometry;
-      d.mesh.material = die.materials;
-      d.variant = dieVariant(false, ds);
-      const revealSet = ds ? SETS[ds] : null;
-      if (revealSet && revealSet.post && revealSet.post.bloom) d.mesh.userData.bloom = true;
-    }
-    const p = entry.parts[i];
-    if (p && p.value != null) d.shelfValue = p.value;
-  });
-  if (c) {
-    c.placed = false;
-    placeCluster(c, true);
-    recompositeFelt();
-  }
-}
-
 // Advance reveal flips; when a roll's last die lands, its surfaces fill in.
 function stepRevealing(dt) {
   if (!revealing.length) return;
@@ -3936,8 +3471,13 @@ function applyReveal(rollId, full) {
     return;
   }
   renderLog(); // the record flips immediately; chips/verdict ride the beat
-  if (shelfClusters.has(rollId)) {
-    revealShelvedRoll(rollId, entry);
+  if (collected.has(rollId)) {
+    // A COLLECTED roll has no dice left to turn over — revealing it is purely
+    // a surface act (the log row's '?' becomes its values, an open card
+    // re-reads). This used to re-pose the shelved cluster to the true faces
+    // and re-land it; C25 took the cluster away and the whole function with
+    // it, which is the one place the deletion made a behaviour SIMPLER rather
+    // than merely smaller.
     refreshRevealSurfaces(rollId);
   } else if (tableDice.some((d) => d.rollId === rollId && d.shrouded)) {
     beginRevealFlip(rollId, entry); // staged: surfaces fill at flip end
@@ -4751,10 +4291,6 @@ function stepResting() {
   for (const d of tableDice) {
     const r = d.rest;
     if (!r || r.done || r.kind === 'still') continue;
-    // Shelf gate — the archive is quiet (same predicate as the S3 fix,
-    // and shelfClusters.set fires BEFORE placeCluster whisks, so whisk
-    // is covered here too).
-    if (shelfClusters.has(d.rollId)) continue;
     // In-flight gate — playback owns the mesh transform while its own
     // roll is still animating. Sinking dice are already dropped from
     // tableDice by removeRollDice, so no separate gate is needed.
@@ -4825,21 +4361,19 @@ function tick(dt, render = true) {
   dieLights.tick(dt, SHADER_TIME.value);
   stepPlayback(dt);
   stepSinking(dt);   // per-roll Done departures (§7.5)
-  stepWhisking(dt);  // collect whisks onto the shelf (§7.7)
   stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
   stepRevealing(dt); // reveal correction flips (goal 11)
   if (chips.length) positionChips();
-  if (shelfClusters.size) positionShelfMarkers();
+  if (isPeekOpen()) positionPeek();
   updateCornerClear();
   if (render) {
     // Level 5 bypass: the stack runs only in frames where it could show
     // something — a bloom-flagged die on the FELT, live particles, a
-    // running ring/shimmer, or the test force. Shelved dice are the
-    // archive — their iron has cooled (mirrors collectShimmerSources'
-    // shelf test below) so a shelf full of bolt-glass no longer keeps
-    // the pipeline hot forever (S3 fix, 2026-08-04).
+    // running ring/shimmer, or the test force. (The S3 fix's shelf gate
+    // retired with the felt shelf — C25: a collected roll's dice are off
+    // the table, so every bloom-flagged die on it is by definition live.)
     const need = postForced || postStack.busy() || particleField.count() > 0
-      || tableDice.some((d) => d.mesh.userData.bloom && !shelfClusters.has(d.rollId));
+      || tableDice.some((d) => d.mesh.userData.bloom);
     if (need) {
       postStack.setShimmer(collectShimmerSources(), camera);
       postStack.render(scene, camera, dt);
@@ -4849,8 +4383,8 @@ function tick(dt, render = true) {
   }
 }
 
-// Heat shimmer sources (Level 5): unshrouded dice of a shimmer set that
-// still live on the FELT — the shelf is the archive, its iron has cooled.
+// Heat shimmer sources (Level 5): unshrouded dice of a shimmer set. Every die
+// on the table is on the felt since C25, so there is no archive to exclude.
 //
 // Allocation shape (Tier 0 §0d hot-paths, 2026-08-05): the pool of
 // MAX_SHIMMER records + the outer array are hoisted to module scope and
@@ -4863,7 +4397,7 @@ function collectShimmerSources() {
   let n = 0;
   for (const d of tableDice) {
     if (n >= MAX_SHIMMER) break;
-    if (d.shrouded || shelfClusters.has(d.rollId)) continue;
+    if (d.shrouded) continue;
     const set = d.variant && SETS[d.variant];
     const s = set && set.post && set.post.shimmer;
     if (!s) continue;
@@ -4959,15 +4493,13 @@ window.__diceDebug = {
       camY: Math.round(camera.position.y * 10) / 10,
     };
   },
-  // WHAT THE FRAMING SPENDS, and on what (C25). applyCameraFraming pulls the
-  // eye back until EVERY framing point fits, so whichever point needs the
-  // most distance sets the view for everything — and the shelf contributes
-  // six of the eight. This refits against subsets and reports the die span
-  // each would give, then puts the real framing back. `dice` is the floor:
-  // what the view would be if nothing but the felt corners had to fit.
-  //   today  — the shipped framing (all eight points)
-  //   noPill — the trays must fit, but not the marker pills' 90px headroom
-  //   noShelf— only the felt corners (i.e. the shelf is not on the felt)
+  // WHAT THE FRAMING SPENDS (C25). applyCameraFraming pulls the eye back until
+  // every framing point fits, so the hungriest point sets the view. This was
+  // written to price the SHELF's share of that and answered 1.08–1.18× on a
+  // desktop, 1.00× on a phone — the measurement that stopped the camera being
+  // blamed for the shelf's cost. The shelf's points are gone, so `noShelf`
+  // now equals `today`; the probe stays because the next thing that wants to
+  // live on the felt should be priced the same way before it is believed.
   framingCost() {
     const span = () => {
       const a = new THREE.Vector3(0, 0, 0).project(camera);
@@ -4975,10 +4507,12 @@ window.__diceDebug = {
       return Math.round(Math.abs(b.x - a.x) * view.width);
     };
     const all = framingPoints();
-    const at = (filter) => { fitCameraTo(all.filter(filter)); return { span: span(), camY: Math.round(camera.position.y * 10) / 10 }; };
+    const at = (filter) => {
+      fitCameraTo(all.filter(filter));
+      return { span: span(), camY: Math.round(camera.position.y * 10) / 10 };
+    };
     const out = {
       today: at(() => true),
-      noPill: at((p) => p.of !== 'pill'),
       noShelf: at((p) => p.of === 'felt'),
       view: `${Math.round(view.width)}x${Math.round(view.height)}`,
       table: `${TABLE_W}x${TABLE_D}`,
@@ -5073,18 +4607,7 @@ window.__diceDebug = {
       right: { x: walls.right.position.x, y: walls.right.position.y, z: walls.right.position.z },
     };
   },
-  shelfPitch() { return SHELF_PITCH; },
-  shelfZ() { return SHELF_Z; },
   tableExtents() { return { w: TABLE_W, d: TABLE_D }; },
-  // World X of the first die in the first shelf cluster — the reflow proof.
-  // Null when no shelf cluster has been dice-populated yet.
-  firstShelfDieWorldX() {
-    const c = [...shelfClusters.values()].sort((a, b) => a.seq - b.seq)[0];
-    if (!c) return null;
-    const dice = tableDice.filter((d) => d.rollId === c.rollId);
-    if (!dice.length) return null;
-    return dice[0].mesh.position.x;
-  },
   openSettings() { openSettingsModal(); },
   // Your data → the file door (§G1), minus the native picker no headless run
   // can ever click. loadText() is exactly what a chosen file does once read;
@@ -5334,98 +4857,17 @@ window.__diceDebug = {
       scale: s.mesh.scale.x,
     }));
   },
-  // DOES THE SHELF STILL FIT THE MAT? (C25.) SHELF_PITCH is derived from
-  // TABLE_W while SHELF_SLOT_W is fixed, and the zoom ladder has moved
-  // TABLE_W a long way — so the question is measurable rather than arguable.
-  // Reports the band the shelf claims in z, where each cluster's dice
-  // actually sit in x, and which neighbours have run into each other.
-  get shelfFit() {
-    const bandZ0 = SHELF_Z - SHELF_SLOT_D / 2;
-    const bandZ1 = SHELF_Z + SHELF_SLOT_D / 2;
-    const r2 = (n) => Math.round(n * 100) / 100;
-    const clusters = [...shelfClusters.values()].sort((a, b) => a.slot - b.slot).map((c) => {
-      const dice = tableDice.filter((d) => d.rollId === c.rollId);
-      const xs = dice.map((d) => d.mesh.position.x);
-      const zs = dice.map((d) => d.mesh.position.z);
-      return {
-        slot: c.slot,
-        cx: r2(shelfSlotX(c.slot)),
-        x0: r2(Math.min(...xs)), x1: r2(Math.max(...xs)),
-        z0: r2(Math.min(...zs)), z1: r2(Math.max(...zs)),
-        outsideMat: Math.max(...xs.map(Math.abs)) > TABLE_W / 2
-          || Math.max(...zs.map(Math.abs)) > TABLE_D / 2,
-      };
-    });
-    const overlaps = [];
-    for (let i = 1; i < clusters.length; i++) {
-      if (clusters[i].x0 <= clusters[i - 1].x1) {
-        overlaps.push(`${clusters[i - 1].slot}↔${clusters[i].slot}`);
-      }
-    }
-    const shelved = tableDice.filter((d) => shelfClusters.has(d.rollId));
-    return {
-      tableW: TABLE_W, tableD: TABLE_D,
-      pitch: r2(SHELF_PITCH), slotW: SHELF_SLOT_W, slotD: SHELF_SLOT_D,
-      bandZ0: r2(bandZ0), bandZ1: r2(bandZ1), bandDepth: SHELF_SLOT_D,
-      bandShare: `${Math.round((SHELF_SLOT_D / TABLE_D) * 100)}%`,
-      trayX0: r2(shelfSlotX(0) - SHELF_SLOT_W / 2),
-      trayX1: r2(shelfSlotX(SHELF_SLOTS - 1) + SHELF_SLOT_W / 2),
-      clusters,
-      overlaps,
-      diceOnShelf: shelved.length,
-      stacked: shelved.filter((d) => d.mesh.position.y > 1.2).length,
-    };
-  },
-  // the collect shelf (§7.7): entry point + cluster observability
+  // COLLECTED ROLLS (§7.7): the entry point, and the record itself. `slot`,
+  // `diceCount` and `glow` went with the felt shelf (C25) — a collected roll
+  // is a rollId and its sequence, and everything else about it is read from
+  // its log entry, which is where it now lives.
   collectRoll(rollId) { return requestCollectRoll(rollId); },
   get shelf() {
-    return [...shelfClusters.values()]
+    return [...collected.values()]
       .sort((a, b) => a.seq - b.seq)
-      .map((c) => ({
-        rollId: c.rollId, seq: c.seq, slot: c.slot, diceCount: c.diceCount,
-        glow: !!c.glow, glowRadius: c.glow ? clusterGlowRadius(c) : 0,
-      }));
+      .map((c) => ({ rollId: c.rollId, seq: c.seq }));
   },
-  get whiskingCount() { return whisking.length; },
   get pendingCollects() { return [...pendingCollects.keys()]; },
-  // shelf quiet-by-default (P1): the resting markers' shape, for asserting
-  // they stay dot-only targets with no always-on total/word/✕. JSON-safe.
-  // L6 endurance pin: total live-marker element count under #shelf-layer.
-  // The reap loop only wipes stale '.shelf-marker' children, so re-rendering
-  // the same set of clusters N times must leave this count stable at
-  // shelfClusters.size (plus any mid-fade '.chip-clearing' markers still
-  // present). Excludes chip-clearing to match the shelfMarkers getter.
-  get shelfLayerChildCount() {
-    return [...shelfLayer.querySelectorAll('.shelf-marker')]
-      .filter((el) => !el.classList.contains('chip-clearing'))
-      .length;
-  },
-  // L6 endurance harness: repeatedly re-render markers to prove the reuse
-  // invariant (child count stable). Callable from e2e scenarios only.
-  rerenderShelf(n = 1) {
-    for (let i = 0; i < n; i++) renderShelfMarkers();
-    return true;
-  },
-  get shelfMarkers() {
-    return [...shelfLayer.querySelectorAll('.shelf-marker')]
-      .filter((el) => !el.classList.contains('chip-clearing'))
-      .map((el) => ({
-        rollId: el.dataset.rollId || null,
-        // bare = nothing at rest: the marker is a quiet dot that only
-        // OPENS the card (the folded-card grammar — the sweep retired
-        // 2026-08-03; the card's body is the clear target).
-        bare: el.children.length === 0,
-        text: [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(''),
-        hasTotal: !!el.querySelector('.sm-total'),
-        hasX: !!el.querySelector('.sm-x'),
-        hasSweep: !!el.querySelector('.shelf-sweep'), // always false since the retire — kept as a regression pin
-        hasReveal: !!el.querySelector('.sm-reveal'),
-        // offsetWidth/Height: the layout target size, unaffected by the
-        // chip-pop scale transform still playing when a test measures.
-        width: el.offsetWidth,
-        height: el.offsetHeight,
-      }));
-  },
   // visibility (goal 11): reveal/offer/claim entry points + redaction
   // observability. Everything returned is JSON-safe primitives.
   reveal(rollId) { requestReveal(rollId); },
@@ -5563,12 +5005,11 @@ window.__diceDebug = {
   // the tab last showed (found the hard way: 'active' frozen false while
   // rings fired). lastBloomSources stays as painted-frame curiosity.
   postInfo() {
-    // bloomDice = every bloom-flagged mesh on the table (felt + shelf) —
-    // long-standing surface, kept for existing pins. bloomDiceLive is
-    // the felt-only count that drives the gate after the S3 fix (shelved
-    // bloom dice no longer wake the pipeline).
+    // bloomDice and bloomDiceLive were the felt/shelf split the S3 fix
+    // needed; with no shelf they are the same number. Both stay, because
+    // existing pins name both and the pair costs nothing.
     const bloomDice = tableDice.filter((d) => d.mesh.userData.bloom).length;
-    const bloomDiceLive = tableDice.filter((d) => d.mesh.userData.bloom && !shelfClusters.has(d.rollId)).length;
+    const bloomDiceLive = bloomDice; // since C25 every die on the table is live
     return {
       active: postForced || postStack.busy() || particleField.count() > 0 || bloomDiceLive > 0,
       forced: postForced,
@@ -5936,19 +5377,6 @@ window.__diceDebug = {
       rect: (() => { const r = peekEl.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; })(),
     };
   },
-  // shelf geometry + the camera's own projection: how a headless check proves
-  // the trays and their markers are on screen at a given viewport (§7.7).
-  get shelfGeometry() {
-    return {
-      slots: SHELF_SLOTS,
-      z: SHELF_Z,
-      w: SHELF_SLOT_W,
-      d: SHELF_SLOT_D,
-      markerY: SHELF_MARKER_Y,
-      x: Array.from({ length: SHELF_SLOTS }, (_, i) => shelfSlotX(i)),
-      camera: camera.position.toArray(),
-    };
-  },
   project(x, y, z) {
     const v = new THREE.Vector3(x, y, z).project(camera);
     return {
@@ -5997,10 +5425,10 @@ function refitView() {
   particleField.setProjection(view.height, camera.fov);
   const px = renderer.getDrawingBufferSize(new THREE.Vector2());
   postStack.setSize(px.x, px.y);
-  applyCameraFraming(); // a narrower felt refits the table and its shelf
+  applyCameraFraming(); // a narrower felt refits the table
   positionChips();
   measurePeek(); // the card's max-width tracks the viewport (100vw - 16px)
-  positionShelfMarkers();
+  positionPeek();
 }
 window.addEventListener('resize', refitView);
 
@@ -10700,9 +10128,26 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
     const hidden = entryHidden(entry);
     const el = document.createElement('div');
     el.className = 'log-entry';
-    // The delegated ⟳ handler on #log-list resolves the entry by rollId,
-    // so the row stamps its identity here (never a closure).
+    // The delegated handlers on #log-list resolve the entry by rollId, so the
+    // row stamps its identity here (never a closure).
     el.dataset.rollId = entry.rollId || '';
+    // THE ROW IS THE COLLECTED ROLL'S DOOR (C25). A roll that is collected and
+    // not cleared still has verbs — reroll, reveal, save as pool, clear — and
+    // the peek card is where they live. That card used to hang from an
+    // invisible marker on the felt; it hangs from this row now, so the row
+    // carries the affordance: `.collected` dresses it as reachable, and
+    // role/tabindex make it the same door for a keyboard (U22's rule — the
+    // marker was an unlabelled div, and a keyboard player could not reveal
+    // their own held roll at all). Rows for on-felt and cleared rolls stay
+    // inert text: there is nothing behind them to open.
+    if (entry.rollId && collected.has(entry.rollId)) {
+      el.classList.add('collected');
+      el.setAttribute('role', 'button');
+      el.tabIndex = 0;
+      el.setAttribute('aria-label',
+        `${entry.playerName ? `${entry.playerName} · ` : ''}${entry.label}`
+        + `${hidden ? ' — hidden' : ''}. Open this roll's card.`);
+    }
     // The log leads with the DICE (GOALS 1: prefer showing real dice) — the
     // only roll surface that was still pure text. Tiny grouped tokens, xN
     // per P5; die TYPES are public even on hidden rolls (goal 11), so a
@@ -10874,6 +10319,51 @@ logList.addEventListener('click', (ev) => {
   }
 });
 
+// THE PEEK'S DOOR (C25), delegated for the same reason ⟳ is: rows are rebuilt
+// constantly and a per-row closure was the dominant cost on a saturated table.
+// Hover opens (desktop, matching the marker's old grammar), click toggles,
+// Enter/Space is the keyboard twin, and a long press / right-click reaches the
+// tweak popover exactly as the marker's did.
+const logRowRollId = (t) => {
+  const row = t instanceof HTMLElement ? t.closest('.log-entry.collected') : null;
+  return row ? row.dataset.rollId || null : null;
+};
+logList.addEventListener('pointerover', (ev) => {
+  if (ev.pointerType !== 'mouse') return;
+  const rid = logRowRollId(ev.target);
+  if (rid) schedulePeekOpen(rid);
+});
+logList.addEventListener('pointerout', (ev) => {
+  if (ev.pointerType !== 'mouse') return;
+  // Only when the pointer actually leaves the row — pointerout fires on every
+  // hop between a row's own children.
+  const to = ev.relatedTarget;
+  if (to instanceof HTMLElement && to.closest('.log-entry.collected')) return;
+  if (logRowRollId(ev.target)) schedulePeekClose();
+});
+logList.addEventListener('click', (ev) => {
+  if (ev.target instanceof HTMLElement && ev.target.closest('button')) return;
+  const rid = logRowRollId(ev.target);
+  if (!rid) return;
+  if (peekRollId === rid) closePeek();
+  else openPeek(rid);
+});
+logList.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Enter' && ev.key !== ' ') return;
+  const rid = logRowRollId(ev.target);
+  if (!rid) return;
+  ev.preventDefault();
+  if (peekRollId === rid) closePeek();
+  else openPeek(rid);
+});
+logList.addEventListener('contextmenu', (ev) => {
+  const rid = logRowRollId(ev.target);
+  if (!rid) return;
+  ev.preventDefault();
+  const entry = log.find((e) => e.rollId === rid) || null;
+  if (entry && canReroll(entry)) openShelfPopover(entry, rid);
+});
+
 // Mark the PARENT of a fresh reroll as superseded without a full rebuild.
 // Idempotent: guarded by the existing chip so a double-reroll on the same
 // parent does not stack duplicates. Only the `.log-rerolled` chip is added
@@ -10971,7 +10461,7 @@ document.getElementById('clear-log').addEventListener('click', () => {
   for (const rollId of shelved) requestClearRoll(rollId);
   renderLog();
   updateLogDroppedNote();
-  renderShelfMarkers();
+  renderPeek();
   announce(shelved.length
     ? `History cleared, and ${shelved.length} shelved roll${shelved.length === 1 ? '' : 's'} with it.`
     : 'History cleared.');
@@ -11016,6 +10506,10 @@ function openLogFlyout() {
 }
 
 function closeLogFlyout() {
+  // The card anchors to a row inside this panel (C25): closing the panel takes
+  // the card's anchor away, so the card goes too rather than floating over the
+  // felt with a ✕ that acts on a roll the player can no longer see.
+  closePeek();
   logFlyoutEl.classList.add('hidden');
   railLogBtn.setAttribute('aria-pressed', 'false');
 }
@@ -11133,7 +10627,7 @@ function onTableSystemChanged() {
 
 function rerenderInterpretation() {
   renderLog();
-  renderShelfMarkers(); // the shelf markers' meaning words re-read the lens
+  renderPeek(); // the open card's meaning words re-read the lens
   // An open ± popover carries the forecast, which reads the lens too — a
   // teammate flipping the room's system must not leave a stale spectrum
   // with no visible cause (§2l ④).
@@ -11231,11 +10725,12 @@ function tableIsBusyForZoom() {
   // A zoom must not land on a client whose physics is currently baking
   // keyframes against the OLD walls (would render the same seeded roll
   // against a different wall on different clients — the visual bump the
-  // 'DEFER to next roll boundary' rule exists to kill). Whisks and reveals
-  // are also live pose-drives that read the shelf slot X.
+  // 'DEFER to next roll boundary' rule exists to kill). A reveal flip is a
+  // live pose-drive too. (The collect whisk was the third; it retired with
+  // the felt shelf — C25.)
   if (currentRoll && !currentRoll.done) return true;
   if (rollQueue.length) return true;
-  if (whisking.length || revealing.length) return true;
+  if (revealing.length) return true;
   return false;
 }
 
@@ -11269,17 +10764,14 @@ function applyZoom(level) {
   walls.front.position.set(0, 0,  TABLE_D / 2);
   walls.left.position.set(-TABLE_W / 2, 0, 0);
   walls.right.position.set( TABLE_W / 2, 0, 0);
-  SHELF_Z = TABLE_D / 2 - 1.9;
-  SHELF_PITCH = (TABLE_W - SHELF_SLOT_W) / (SHELF_SLOTS - 1);
   updateShadowFrustum();
   CAM_EYE = { full: [...p.eyeFull], mini: [...p.eyeMini] };
   currentZoom = level;
-  // Invalidate every cluster's cached slot pose + glow radius so reflowShelf
-  // re-places to the new pitch and recompositeFelt draws rings at the new Z.
-  for (const c of shelfClusters.values()) { c.placed = false; c.glowR = 0; }
-  reflowShelf(true);   // reflows every cluster to new slot X (animated)
-  recompositeFelt();   // glows land on new SHELF_Z / pitch
-  refitView();         // camera framing + particle/post + chip/marker anchors
+  // Nothing on the felt survives a zoom but the live roll's dice, and those
+  // are physics — the walls moved above and the bodies follow. Since C25 the
+  // shelf has no slot pitch to re-derive and the felt no glow rings to
+  // redraw, so a zoom is now: walls, shadow frustum, camera.
+  refitView();         // camera framing + particle/post + chip anchors
 }
 
 // Apply a full merged settings object (join response, hello, settings-changed
@@ -12845,27 +12337,24 @@ let CAM_EYE = { full: [0, 8.1, 4.7], mini: [0, 6.7, 3.8] }; // the DEFAULT ('med
 const CAM_TARGET = new THREE.Vector3(0, 0, 0.5);
 
 // What must stay on screen, each with the NDC headroom its own chrome needs.
-// A marker is a DOM pill centered on its anchor, so it needs half its width
-// (~90 px, ~55 in compact, and it is the widest thing the shelf projects) of
-// clearance — capped at a tenth of the window, because on a phone five pills
-// cannot all fit side by side at any distance and the anchor being reachable
-// is what actually matters.
-// `of` tags who each point belongs to, so the framing can be PRICED (C25):
-// fitCameraTo takes any subset, and __diceDebug.framingCost refits with the
-// shelf's points removed to answer how much of the table's apparent distance
-// is the shelf's doing rather than the felt's.
+//
+// SINCE C25 THIS IS THE FELT AND NOTHING ELSE. Six of the eight points used to
+// be the shelf's — the two outer trays' near and far corners, and the marker
+// pills with up to 90px of half-width clearance each — and they are gone with
+// it. Worth recording what that bought, because the answer was the opposite of
+// the guess going in: `framingCost` priced it at 1.08–1.18× die size on
+// desktop, laptop and iPad, and **1.00× on a phone**, where the felt's own
+// corners bind first. The shelf was never what held the camera back. It was
+// removed for the space it took on the MAT, not in the view.
+//
+// `of` tags each point so the framing can still be priced by subset
+// (fitCameraTo takes any of them); with one class left it is a seam kept
+// deliberately open rather than a live distinction.
 function framingPoints() {
-  const outerX = shelfSlotX(SHELF_SLOTS - 1) + SHELF_SLOT_W / 2;
-  const markerX = shelfSlotX(SHELF_SLOTS - 1);
-  const w = Math.max(view.width, 1); // pills live over the FELT, not the window
-  const halfPill = Math.min(document.body.classList.contains('mini') ? 55 : 90, w / 10);
-  const pillNdc = (2 * halfPill) / w;
   const pts = [];
   for (const s of [-1, 1]) {
-    pts.push({ p: new THREE.Vector3(s * outerX, 0, SHELF_Z - SHELF_SLOT_D / 2), mx: 0.02, my: 0.02, of: 'tray' });
-    pts.push({ p: new THREE.Vector3(s * outerX, 0, SHELF_Z + SHELF_SLOT_D / 2), mx: 0.02, my: 0.02, of: 'tray' });
-    pts.push({ p: new THREE.Vector3(s * markerX, SHELF_MARKER_Y, SHELF_Z), mx: pillNdc, my: 0.06, of: 'pill' });
     pts.push({ p: new THREE.Vector3(s * TABLE_W / 2, 0, -TABLE_D / 2), mx: 0.02, my: 0.02, of: 'felt' });
+    pts.push({ p: new THREE.Vector3(s * TABLE_W / 2, 0, TABLE_D / 2), mx: 0.02, my: 0.02, of: 'felt' });
   }
   return pts;
 }
@@ -14438,7 +13927,7 @@ function handleNetEvent(type, data) {
         }
         const newest = [...entries].reverse().find((r) => !r.cleared && !r.collected);
         if (newest) replaySettledRoll(newest);
-        renderShelfMarkers();
+        renderLog();
       }
       break;
     case 'player-joined':

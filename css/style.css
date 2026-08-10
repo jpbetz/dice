@@ -3965,29 +3965,10 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
    lens words, Reveal and the clear-✕ all live in the peek card the target
    opens (detail on intent). The layer itself never eats clicks; each marker
    opts back in as the peek's target. */
-#shelf-layer { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-table-labels); }
-.shelf-marker {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  width: 76px;
-  height: 76px;
-  border-radius: 50%;
-  background: none;
-  border: none;
-  pointer-events: auto;
-  cursor: pointer;
-}
-
-/* A marker on its way out keeps its place for the fade but stops taking
-   clicks: the roll that replaced it is already sitting under it. */
-/* fully under the open panel: the invisible target yields its clicks */
-/* (.shelf-marker.occluded retired 2026-08-04: the panel is layout, not
-   overlay — no marker can sit under it anymore) */
-.shelf-marker.chip-clearing {
-  opacity: 0 !important;
-  pointer-events: none;
-  transition: opacity 0.3s ease-out;
-}
+/* (#shelf-layer and .shelf-marker retired with the felt shelf — C25. The
+   markers were invisible circular targets projected above each cluster; the
+   card they opened now hangs from the roll's LOG ROW, which is a visible,
+   labelled, keyboard-reachable thing the markers never were.) */
 .sm-dot {
   width: 12px;
   height: 12px;
@@ -4020,9 +4001,28 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
   border-color: rgba(243, 234, 215, 0.65);
 }
 .sm-reveal { font-size: 11px; padding: 2px 9px; border-radius: 6px; }
-/* compact view: the invisible target shrinks with the reframed clusters */
-body.mini .shelf-marker { width: 56px; height: 56px; }
 body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
+
+/* A COLLECTED ROLL'S LOG ROW IS ITS DOOR (C25). The felt marker was invisible
+   by design — the settled cluster was its own presence, so the target drew
+   nothing at rest. A row in a list has no cluster to stand for it, so this
+   one has to SAY it is reachable, and quietly: a hairline rule down the
+   leading edge in the table's gold, warming on hover and focus. Nothing that
+   competes with the row's own text, which is still the thing being read. */
+.log-entry.collected {
+  cursor: pointer;
+  border-left: 2px solid rgba(255, 205, 100, 0.28);
+  padding-left: 7px;
+  margin-left: -9px;
+  border-radius: 0 4px 4px 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+.log-entry.collected:hover,
+.log-entry.collected:focus-visible {
+  background: rgba(255, 205, 100, 0.06);
+  border-left-color: rgba(255, 205, 100, 0.7);
+}
+.log-entry.collected:focus-visible { outline: none; }
 
 /* ---------- peek cards (§7.7.1) ---------- */
 /* ONE expanded result card above a shelved slot: the banner's content for
