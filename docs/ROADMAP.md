@@ -1312,6 +1312,121 @@ a coincidence for anything else. A solo d20 was measured resting legitimately
 at **1.190**. Any future check that calls a die piled by height should use
 `restCeiling(type)`, not 1.2.
 
+**C30d — the sim is in slow motion, the drift was cannon's sleep, and the
+missing restitution threshold is not the fix (2026-08-10, pass four).**
+
+*Joe: dice must "really magnetize themselves to the surface once they're
+landed, no more bounding like they're on the moon."* Pass four took that
+literally and measured two mechanisms. One is a theorem and works; one is an
+emulation of a real engine feature and fails. The by-product is the answer to
+why deaden could never ship.
+
+**The moon is arithmetic.** `GRAVITY` is −110 in a world where a d6 is 1.35
+units. A d6 is ~16 mm, so a unit is ~11.9 mm and 9.81 m/s² is ~826 units/s²
+here. The world runs at 110 — **7.5× too weak** — and a trajectory's
+timescale goes as 1/√g, so everything on this table falls, bounces and
+settles **2.7× too slowly**. Joe's word is a correct reading of the number,
+not a matter of taste. Corroborated: `NUDGE.lift` 7 buys 2·7/110 = 0.13 s of
+hang time, which is a hop and reads as a float.
+
+**And the minimal correct fix is not a physics change.** Newton is invariant
+under t → t/k when g → k²g and v → k·v — identical curve, identical rest
+pose, k× sooner. `playRoll` already bakes the whole throw into keyframes
+before frame one, so the fix is a **projector speed on `stepPlayback`**: same
+film, faster. No re-bake, no determinism risk, no pile risk. Shipped inert as
+`TEMPO.k` (1 = byte-identical), applied only on a real-time frame — `tick()`
+takes a `realtime` flag, `animate()` is its one caller, so `sim(n)` and every
+e2e scenario keep stepping the film one baked frame at a time. Three theorem
+checks (`tools/steps/tempo-check.mjs`):
+
+- the **bake is untouched** at k=2 — tails (duration, frames, nudges, landing
+  frames, sound count) identical 6/6, largest pose delta 5.25e-6 against
+  1.10e-5 for a paired k=1 control, i.e. *less* than the tab moves it alone;
+- **playback tracks duration/k** — worst deviation 2.0%, mean speedup 1.980×
+  (measured in frames of real time under `holdClock`; this tab fires rAF at
+  ~50 fps and without the hold every drain read 2–10% short);
+- **`npm test` 48/48 with the default left at k=2**, then returned to 1.
+
+The click gate rides the projector too: `max(12, 35/k)` ms, so at k=1 it is
+exactly the 35 ms that shipped and at any k the *same set* of impacts
+survives — no landing thump can be dropped by construction. Past k = 35/12 ≈
+2.9 the 12 ms hard floor bites first, which is above the 2.7 the arithmetic
+asks for. **Ceremony beats are not dice**: the declare hold, the settle
+phase, reveal flips, the sink, rest cadence, camera easing and FX lifetimes
+all stay unscaled.
+
+**The floor magnet fails, and on its own axis.** cannon-es has no restitution
+threshold — Bullet and PhysX both zero restitution below an impact speed,
+because a slowly-landing die sticks rather than bounces. `MAGNET.vy` is that
+missing threshold (a die in floor contact rising slower than `vy` has vy
+zeroed), shipped inert. At vy 1/2/4 over 16 paired seeds:
+
+| | vy1 | vy2 | vy4 |
+|---|---|---|---|
+| shake, soul | **+38%** | +29% | +27% |
+| hops, soul | **+13%** | +5% | +13% |
+| dur, 8d6 | +13% | **+47%** | +15% |
+| creep, 1d20 | +9% | +46% | +28% |
+| pile, close/6d6 | +0pp | +5pp | +5pp |
+| replay | 15/16, **tail moved** | 15/16, **tail moved** | — |
+
+Every gate fails except the clock. The reason is that **zeroing vy does not
+glue a die down**: the contact solver re-supplies the push on the very next
+step, so the clamp trades one smooth ballistic arc for per-step chatter. In
+this solver what the eye reads at rest is *contact chatter, not bounce*. It
+also **adds** replay drift (seed 32676 comes back a 435-frame throw instead
+of 450) where shipped's movers are pose-only at 5e-6 — the prediction that
+quantising to zero would absorb float divergence is falsified. And
+`settle-tail` names the damage in one line: *"2 dice stopped and were refused
+a freeze"* — the clamp pins a cocked die before it can rock flat, recreating
+the exact bug C30 shipped a fix for. `dice-land-flat` is 10/10 with it armed,
+so the C24 floor survives; nothing else does.
+
+**A new instrument: `hops`.** The count of separate times a die goes back UP
+in its last 0.6 s, read off the baked keyframes in `restMotion` — the
+complaint stated literally, where `shake` cannot tell a hop from a horizontal
+jitter. Validated with a positive control: deaden moves it −17% to −38%, in
+step with its shake win. So the magnet's flat reading is the mechanism
+failing, not the meter.
+
+**THE DRIFT IS CANNON'S SLEEP.** The pass-four result that matters. Deaden's
+disqualification was that it does not replay. `tools/steps/replay-drift.mjs`,
+16 seeds, 700 throws of churn:
+
+| variant | replays | note |
+|---|---|---|
+| shipped | 14/16 | movers pose-only, 5.10e-6 / 5.25e-6 |
+| deaden | 15/16 | mover 2.267 s/137 fr → 2.600 s/157 fr |
+| **sleepoff** | **16/16** | byte-identical — *better than shipped* |
+| **deaden+sleepoff** | **16/16** | byte-identical |
+| deaden+sleepoff+gate4 | 16/16 | |
+| sleepoff+gate4 | 16/16 | |
+
+`sleepoff` beating shipped **overturns a documented belief**: the ~5e-6 pose
+noise was blamed on the SAP broadphase's axis list having seen a different
+history (`pile-refusal`'s comment says exactly that). It is the sleep
+decision. The app already has its own retirement predicate — `stillTime >=
+SETTLE_STILL`, then `freezeInPlace` — and cannon's sleep is a *second*,
+independent one running underneath it, the one that cannot be reproduced from
+a seed.
+
+**Which reopens deaden.** What sleep-off costs is the slow half (soul +31%,
+caps 7→11), and that is exactly what the damping gate was measured to buy
+back. `deaden+sleepoff+gate4`: **shake −21% to −34%, hops −19% to −40%** (the
+best numbers measured anywhere on this table), **replay 16/16**. It still
+fails on duration (8d6 +57%) and piling (medium/6d6 +8pp, flat throws 16/40
+against shipped's 33/40), plus clock 1.64× and creep +45%. **Deaden's three
+objections are now two — glide and pile — and they were always the hard two.**
+`sleepoff+gate4` on its own is nearly free (dur −1%, caps 5/7, clock 1.01×,
+pile +1pp) and replays 16/16, which makes it a *determinism* candidate with
+no shake claim attached.
+
+**Open rungs, in order.** (1) The tempo, which is done and waiting on an eye.
+(2) `sleepoff+gate4` as a determinism fix on its own merits. (3) Deaden's
+glide — grip was measured to recover 70% of it (C30c) and has never been run
+with sleep off. (4) Deaden's pile, still unsolved; the nudge is the wrong
+instrument (C30c) and the spawn geometry is the untried one.
+
 **C30b — 20d6 can still reach the cap with dice genuinely tumbling** (3 of 16
 seeds). That is real motion, so shortening `SETTLE_CAP` would truncate it and
 show dice snapping. Left alone deliberately. If big pools matter later, the

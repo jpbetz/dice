@@ -588,7 +588,7 @@ const wallMat = new CANNON.Material('wall');
 // cost nothing here. Priced by tools/steps/pile.mjs and settle-paired.mjs —
 // and note that halving the damping did NOT halve the piling.
 //
-// STILL UNCHANGED AFTER THREE MEASURED PASSES, and the reasons have moved on
+// STILL UNCHANGED AFTER FOUR MEASURED PASSES, and the reasons have moved on
 // from "it needs a wider spawn". tools/steps/settle-matrix.mjs, which judges
 // shake, duration, caps, piling, creep and the clock together, 16 paired
 // seeds and a canary that refuses the run if the rig cannot reproduce a known
@@ -622,6 +622,34 @@ const wallMat = new CANNON.Material('wall');
 //   Nudging is the wrong instrument for a crowded mat — the die comes down on
 //   another die. The machinery is here, inert, because it is sound and cheap
 //   and the next attempt should not have to rediscover it.
+//
+// PASS FOUR (2026-08-10) DID NOT CHANGE THESE NUMBERS EITHER, AND FOUND THE
+// ONE THING THAT WOULD LET SOMEBODY ELSE. Read with the TEMPO and MAGNET
+// blocks below; the full account is ROADMAP C30d.
+//
+//   THE DRIFT IS CANNON'S SLEEP, and that is the finding. Deaden's
+//   disqualification was that it does not replay: throw a seed family, churn
+//   700 unrelated throws, throw it again, and one seed in sixteen comes back
+//   a materially different throw. Set allowSleep=false on the die bodies and
+//   it replays 16/16 — byte for byte, under deaden. So does shipped, which
+//   normally replays only 14/16. That last number overturns something this
+//   file believed: the ~5e-6 pose noise was blamed on the SAP broadphase's
+//   axis list having seen a different history. It is the sleep decision, and
+//   with sleep off there is no noise at all.
+//
+//   Which matters because the app already has its own retirement predicate —
+//   stillTime >= SETTLE_STILL, then freezeInPlace. cannon's sleep is a
+//   SECOND, independent one running underneath it, and it is the one that
+//   cannot be reproduced from a seed. What turning it off costs is the slow
+//   half (soul +31%, caps 7 -> 11), which is exactly what the damping gate
+//   was measured to buy back. deaden+sleepoff+gate4: shake -21% to -34%,
+//   hops -19% to -40%, replay 16/16. Deaden's three objections are down to
+//   two, and they are the hard two — 8d6 +57% (glide) and medium/6d6 +8pp
+//   (pile).
+//
+//   AND THE MISSING RESTITUTION THRESHOLD IS NOT THE ANSWER. See MAGNET
+//   below: it fails on its own axis, because in this solver what the eye
+//   reads at rest is contact chatter, not bounce.
 const PHYS = {
   floorFriction: 0.25, floorRestitution: 0.35,
   diceFriction: 0.15, diceRestitution: 0.45,
