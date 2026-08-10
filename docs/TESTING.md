@@ -88,6 +88,22 @@ still calls. (Confirmed useful the same night by the session working on the
 contact recorder, which ran it before merging and got a clean
 `LOST: none / GAINED: ['contactStats']`.)
 
+**P7 — A key list proves a hook EXISTS; something must prove it ANSWERS.**
+P5's blind spot, found the same night it was written. A rename left four
+dangling references inside `matFit()`'s body — the key was still on the
+object, so P5 passed, and the hook threw `ReferenceError` on every call from
+the moment it landed. Three consecutive full sweeps stayed green, because its
+only caller was a tool step rather than a scenario. **The stand-in we added to
+stop stand-ins going stale had itself gone stale** (ROADMAP C27's rule, aimed
+at a check instead of at code).
+
+`debug-surface-answers` (tag `quality`) closes it: with dice on the felt, it
+calls every ZERO-ARG `__diceDebug` hook and asserts none throws. Zero-arg on
+purpose — a hook taking arguments changes state, and a smoke test has no
+business guessing what to pass. It was verified the only way this kind of
+check can be: by reintroducing a dangling reference, watching it fail, and
+restoring it. A guard nobody has seen fail is not yet a guard.
+
 **P6 — A scenario that samples an animation freezes the clock.**
 `__diceDebug.holdClock(true)` makes the world advance exactly as far as
 `sim()` says and no further. Without it, a sampling loop is racing the rAF

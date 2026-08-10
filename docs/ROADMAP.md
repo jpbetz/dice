@@ -1456,6 +1456,37 @@ gets 219px and forty dice get all forty on screen; the roll in between gets
 neither. That is the next thing worth measuring on the phone, and it is the
 roll this app is most often asked to show.
 
+### C29. The static handler serves the repo, not the app — SMALL
+
+**Noticed 2026-08-10 while verifying a deploy** by diffing every served asset
+against its commit: `curl https://<service>/server.js` returns the server's
+own source, 200. So does `/package.json`, and so does every `.mjs` under
+`tests/` and `tools/` — 530 KB of `scenarios.mjs` included.
+
+**The important half is already handled, deliberately.** `safeResolve` blocks
+traversal and every dotfile — *"no traversal, no dotfiles (keeps .git/.claude
+private)"* — so `.git/config`, `.git/HEAD` and `.deploy.config` all return
+403, and `Makefile` and `docs/*.md` 404 because their extensions are not in
+`MIME`. **No credential or config exposure.** Verified path by path.
+
+What is exposed is SOURCE: anything with a `MIME`-listed extension, anywhere
+in the tree that is not a dotfile. The rule is "the extension is servable",
+where it wants to be "the file is part of the app".
+
+**Why it is small rather than nothing.** Goal 10 already says there is no
+access control and never will be — the room key is the door — so the threat
+model does not change. But it hands a reader the server's exact validation
+logic, room and player caps, and refusal paths with no effort, and it puts
+half a megabyte of test source inside a 1 GiB/month egress allowance for no
+reason. Neither is urgent; both are avoidable.
+
+**The fix is an allowlist of roots, not a denylist of names** — serve
+`index.html`, `js/`, `css/`, `vendor/`, and whatever assets exist, and 404
+everything else. A denylist would have to grow every time a directory is
+added, which is the same shape as the constants in C28. Check before
+changing: nothing in `js/` or `index.html` fetches `package.json`, so
+narrowing costs nothing today (grepped).
+
 ### C28. Two more things the zoom ladder left behind — SMALL, both verified
 
 **C25 was not a one-off.** `TABLE_W` moved from 30 to 8.6 on 2026-08-09 and
