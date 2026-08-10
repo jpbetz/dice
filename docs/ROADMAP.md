@@ -1367,85 +1367,94 @@ table — swapping which prepared seat you occupy is a real and useful gesture,
 and it is not "drop everything and rejoin". If that is the verb, it belongs
 next to the profile picker, not under a menu item that also deletes your name.
 
-### C27. On a phone the mat does not fit the view, and the camera gives up silently — DESIGN, medium
+### C27. The framing target was never the dice — **mostly answered 2026-08-09/10**; one case left
 
-**Found 2026-08-09 by the session working on the Oracle Camera, while pricing
-C25's framing claim; confirmed independently here with `__diceDebug.matFit()`
-(`tools/steps/mat-fits.mjs`).** The four mat corners, projected through the
-live camera — |NDC| > 1 is off screen:
+**The spine of this entry, and the thing to read first: `framingPoints`
+returns four corners at `y = 0`.**
+
+```js
+new THREE.Vector3(±TABLE_W / 2, 0, ±TABLE_D / 2)
+```
+
+It is a **floor-plane frame in a world with height**. Not a missing case — a
+target that was never capable of the guarantee people read into it. "The mat
+is on screen" was only ever a *proxy* for "the dice are on screen", and C24
+already measured where the proxy breaks:
+
+| mat | 40d6 resting on another die | max height |
+| --- | --- | --- |
+| 8.6×5.2 *(today's `medium`)* | 27 of 40 | 4.7 |
+| 6.7×4.1 *(today's `close`)* | 32 of 40 | 6.3 |
+
+A die at y=4.7 near a corner projects well outside the y=0 corner beneath it.
+So `mat fits` and `the dice fit` diverge **exactly where the stacking is
+worst** — big pools on a tight mat — which is exactly where being unable to
+see a die matters most. Confirmed in the wild: desktop 1440 at 40d6 had the
+deciding die off screen while the mat reported `fits`. Two measurements taken
+weeks apart for unrelated reasons turn out to be one finding from opposite
+ends.
+
+**THE RULE, since this is its third shape tonight — *nothing fails loudly when
+a stand-in stops standing in.*** `SHELF_SLOT_W` was a constant that stopped
+tracking `TABLE_W` (C25). The spawn-spread comment was a rationale that
+stopped tracking the mat (C28 ①). This is a framing TARGET that stopped
+tracking the thing it stood for. None of the three threw an error, failed a
+test, or looked wrong in code review. `b35b411` carries the same statement in
+the code.
+
+**The landscape measurement, which is still exactly true** and is what every
+desktop and every small pool uses. `__diceDebug.matFit()`,
+`tools/steps/mat-fits.mjs`; |NDC| > 1 is off screen:
 
 | viewport | felt px | zoom | worst \|ndc.x\| | worst \|ndc.y\| | verdict |
 | --- | --- | --- | --- | --- | --- |
 | desktop 1600 | 1284×1000 | medium | 0.972 | 0.630 | fits |
-| laptop 1440 | 1124×900 | medium | 0.969 | 0.616 | fits |
 | iPad portrait 834 | 722×1112 | medium | 0.972 | 0.361 | fits |
 | **phone 390** | 278×844 | wide / medium / close | **1.279 / 1.284 / 1.292** | 0.24–0.27 | **off screen** |
 | **phone 360** | 248×780 | wide / medium / close | **1.325 / 1.330 / 1.339** | 0.24–0.27 | **off screen** |
 
-**The camera is not choosing to crop — it is failing and not saying so.**
-`fitCameraTo` scans `1 + i*0.03` for `i < 90`, topping out at ~3.67×, and its
-own comment allows the exit: *"the eye stays where the last step left it
-rather than retreating without end."* On a phone the scan is exhausted, the
-loop falls out having satisfied nothing, and the eye parks at the maximum.
-`matFit()` reports `atScanLimit: true` for all six phone rows. **A die landing
-near the left or right edge of the mat is not on screen, and has never been.**
+`fitCameraTo` scans a bounded range (~3.67×) and its own comment permits the
+exit — *"the eye stays where the last step left it rather than retreating
+without end"* — so on a phone the scan is exhausted and the loop falls out
+having satisfied nothing. `atScanLimit: true` on all six phone rows.
 
-**Three consequences, in order of how badly they were misread before:**
+Three things that read wrong before this was measured, kept because each was
+believed by someone:
 
-1. **C21/C23's three zoom tightenings could never have fixed this**, and the
-   table shows why: the overflow ratio is nearly *constant* across wide /
-   medium / close (1.279 → 1.292). Shrinking the mat moves the camera
-   proportionally closer and preserves the ratio exactly. The lever was never
-   pointed at the problem.
-2. **It explains C25's phone measurement, and makes that conclusion stronger
-   than the argument given for it.** Removing six of eight framing points
-   bought 1.00× on a phone. The stated reason — "the felt's own corners bind
-   first" — was wrong. The real reason is that the fit had already failed and
-   *no* subset of framing points could have moved a camera parked at its
-   scan limit. "The shelf was never what held the camera back" is right; on a
-   phone, nothing in the framing list can.
-3. **C24 is righter than its own reasoning.** It argued from dice piling up on
-   a shrinking mat. The stronger argument is that framing the MAT is already
-   unsatisfiable on the device the complaint came from.
+1. **C21/C23's three tightenings could never have fixed it.** The overflow
+   ratio is nearly *constant* across wide/medium/close (1.279 → 1.292):
+   shrinking the mat moves the camera proportionally closer and preserves it.
+2. **It explains C25's phone number** (removing six of eight framing points
+   bought 1.00×) and makes that conclusion stronger than its stated reason.
+   Not "the felt's corners bind first" — the fit had already failed, and no
+   subset can move a camera parked at its scan limit.
+3. **C24 is righter than its own argument**, which reasoned from dice piling
+   up rather than from a framing that is unsatisfiable.
 
-**What containing the mat would cost, measured, so the tradeoff is not an
-adjective:** retreating until the worst corner is inside costs **~24% of die
-size** — at the default on a 390px phone, 80px → 61px; at `close`, 103px →
-79px; on a 360px phone, 74px → 55px. That is a direct reversal of C21, which
-existed because *"the dice are too small, especially on a phone."* So
-"just fit the mat" is not free and is probably not right.
+**WHAT SHIPPED (`d064c04`…`b35b411`, the immersion wave).** Two answers, both
+per-viewer — the camera shows no one else anything, which is what makes it
+safe to vary by device where the MAT never can be:
 
-**The shape of the problem is a landscape mat in a portrait window,** and the
-vertical numbers say it plainly: |ndc.y| is 0.24–0.27 while |ndc.x| is 1.28.
-Roughly three quarters of a phone's viewport height is unused while the mat
-overflows sideways. The mat's aspect is 8.6/5.2 = 1.65; a 390px phone's felt
-region is 278/844 = 0.33. Mismatch factor 5.0.
+- **Rung 1 of the framing ladder descends when the deciding die is off
+  screen**, measured per roll from live positions. This is what makes "never
+  crops the die that decided it" unconditional — it does not depend on the
+  orbit engaging. 20 consecutive lone d20s on a 390px phone: **0 misses**.
+- **A quarter-turn orbit in portrait**, engaged only when landscape cannot
+  contain the mat, portrait can, and landscape is dropping dice. At 20d6 and
+  40d6 on a 390px phone every die is now on screen (**20/20 and 40/40**, was
+  19/20 and 32/40).
+- **Containing the mat was priced and declined**: it costs ~24% of die size
+  (80px → 61px at the default on a 390px phone), a direct reversal of C21.
+  Cropping on purpose, with the deciding die guaranteed, is the shipped
+  answer instead.
 
-**Candidates, with what is known about each:**
-
-- **Crop deliberately** (status quo, made honest). Cheapest, but a die that
-  lands off screen on a seeded roll is invisible to that player and visible to
-  everyone else — the shared-truth invariant reads badly here even though the
-  VALUES agree.
-- **Contain** (extend the scan). Priced above: −24% die size. Reverses C21.
-- **Rotate the view 90° in portrait** so the mat's long axis runs down the
-  screen. Rotated, the required aspect is 5.2/8.6 = 0.60 against a viewport
-  of 0.33 — mismatch factor 1.84 instead of 5.0, a 2.7× improvement before
-  any retreat. **Unpriced** — it needs the camera's up-vector and eye preset
-  changed, which is implementation, not measurement. This is the candidate
-  worth building a probe for first. It is also per-viewer, which C24 already
-  established is the safe axis to vary (the MAT cannot vary by device because
-  it is the physics walls; the camera shows no one else anything).
-- **A squarer mat.** Ruled out — the mat is the physics walls and is room-wide
-  for exactly that reason.
-
-**Not a regression, and not introduced by C25 or by the immersion work.** It
-is in the shipped `fitCameraTo` and predates both. Recorded here rather than
-fixed because the choice between cropping, containing and rotating is a design
-decision with a measured cost on each arm, and C24's instruction — price the
-lever before pulling it — applies to this one too. **If field telemetry shows
-phone sessions behaving oddly around dice near the mat edges, this is the
-cause and it is not new.**
+**WHAT IS LEFT, and it is the common case.** The orbit engages at 20d6+; the
+ladder declines to crop when nothing is being lost. So **the canonical Soul
+Deal roll — attribute + skill + motivation, three dice — gained nothing**: mat
+does not fit, mode is dice-cropped, ~75px per die on a 390px phone. A lone d20
+gets 219px and forty dice get all forty on screen; the roll in between gets
+neither. That is the next thing worth measuring on the phone, and it is the
+roll this app is most often asked to show.
 
 ### C28. Two more things the zoom ladder left behind — SMALL, both verified
 
@@ -1498,11 +1507,13 @@ practice it self-heals quickly — which is exactly why it has gone unnoticed.
 One line, and a scenario that rolls a ceremony roll, zooms mid-beat, and
 asserts `wallPositions()` matches the new preset with an empty queue.
 
-**The pattern worth naming, since this is the third instance:** a constant
-derived from `TABLE_W` follows the ladder; a constant sized *against* it in a
-comment does not, and nothing fails loudly when it stops being true. `grep -n
-"TABLE_W" js/main.js` is the audit, and it is worth running whenever the
-ladder moves again.
+**The pattern worth naming:** a constant derived from `TABLE_W` follows the
+ladder; a constant sized *against* it in a comment does not. That is one of
+three shapes of the same rule — **nothing fails loudly when a stand-in stops
+standing in** — stated in full at [C27](#c27-the-framing-target-was-never-the-dice--mostly-answered-2026-08-0910-one-case-left),
+which is where it belongs because the framing target is the clearest case.
+`grep -n "TABLE_W" js/main.js` is this shape's audit, worth running whenever
+the ladder moves again.
 
 ### C22. A versioning contract for client state — DESIGN, then small
 
