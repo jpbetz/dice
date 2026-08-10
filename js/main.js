@@ -1063,6 +1063,57 @@ const FIXED_DT = 1 / 60;
 const SETTLE_STILL = 0.45; // seconds of stillness required
 const SETTLE_CAP = 9;      // hard cap on simulated seconds per roll
 
+// THE TERMINATOR, AND WHY A VELOCITY THRESHOLD IS THE WRONG SHAPE OF TEST.
+//
+// The shipped freeze predicate is `velocity² < 0.05 && angularVelocity² < 0.05`
+// held for SETTLE_STILL — i.e. speed under 0.224 units/s for 0.45 s. That is
+// roughly NINE TIMES stricter than any shipping engine's rest test, and more
+// importantly it is the wrong KIND of test: a dithering body oscillates, and
+// an oscillation has velocity at every instant no matter how small the
+// excursion. A die twitching inside a hundredth of its own width never passes
+// a velocity gate, by construction, however long you wait.
+//
+// What actually retires a dithering die today is cannon's own sleep, which
+// hard-zeroes both velocities and so lets the die slide under the bar. That is
+// a second, independent retirement predicate running underneath ours (C30d),
+// it FLAPS — a body re-enters AWAKE the instant its combined speed crosses
+// sleepSpeedLimit once inside sleepTimeLimit, resetting its own timer — and it
+// is the whole of this table's replay drift. So the freeze gate is leaning on
+// the one mechanism we most want to remove.
+//
+// `displacement` is the standard answer: Eric Lengyel's jitter-tolerant sleep
+// condition (Game Engine Gems 2 ch.23), which is what Jolt and Rapier 0.35 both
+// ship. Track THREE points on the body — its centre of mass plus two probes
+// offset along distinct body axes — and grow one AABB per point. If any box's
+// largest extent reaches `eps`, the body moved: restart every box from the
+// current pose and restart the clock. If all three stay inside `eps` for
+// SETTLE_STILL, the body is at rest.
+//
+//   THREE POINTS, BECAUSE ONE CANNOT SEE ROTATION. A die spinning about its
+//   centre never moves its centre of mass at all. Probe 1 rides the body's
+//   local +X and probe 2 its local +Y, so a rotation about X moves probe 2, a
+//   rotation about Y moves probe 1, and a rotation about Z moves both. There
+//   is no rotation the trio is blind to.
+//
+//   THE PROBES SIT AT THE DIE'S HALF-WIDTH, so the box extents are in the same
+//   units as the tolerance and `eps` can be a pure fraction of a die's width —
+//   a d20 and a d4 are then judged by the same visual bar rather than by the
+//   same number of world units.
+//
+//   AND THE TEST IS A GUARANTEE, NOT A HEURISTIC. A die that passes has
+//   provably moved less than `eps` of a die-width — centre AND corners — over
+//   the whole window. `endDisp` records exactly that at freeze time so a
+//   scenario can assert the guarantee rather than assert "it settles faster",
+//   which is a benchmark result and not a property.
+//
+// `mode: 'velocity'` is the shipped predicate, verbatim, and is the default:
+// the boxes are still tracked (a pure read of position and quaternion — no rng
+// draw, no body mutation, no ordering change) purely so `endDisp` is a fact on
+// every row, and the still-decision consults ONLY the velocity pair. Byte-
+// identical to master; the settle-matrix canary and its determinism preamble
+// are what prove it. Driven only by __diceDebug.setSettleGate.
+const SETTLEGATE = { mode: 'velocity', eps: 0.02 };
+
 // What to do about a die that stops at an angle. `lift` is a VERTICAL HURL —
 // the die leaves the pile, flies, and lands somewhere else — so each nudge
 // buys a flat die at the cost of a second of extra throw, and it is the
@@ -1145,6 +1196,72 @@ function restCeiling(type) {
 // dice rest: 1 is the geometry, and the shipped value only adds margin.
 const piledHigh = (d) => NUDGE.pileScale > 0
   && d.body.position.y > restCeiling(d.type) * NUDGE.pileScale;
+
+// --- the three-point displacement boxes (SETTLEGATE) -----------------------
+// A die's WIDTH, by the same rule restMotion and restPlausibility use, so
+// "0.02 of a die" means the same thing in the terminator and in the meters
+// that judge it. Cached per type; DIE_DEFS is a module constant.
+const dieWidths = new Map();
+function dieWidth(type) {
+  let w = dieWidths.get(type);
+  if (w === undefined) {
+    const def = DIE_DEFS[type] || {};
+    w = def.size || (def.radius ? def.radius * 2 : 2);
+    dieWidths.set(type, w);
+  }
+  return w;
+}
+// Six floats (min xyz, max xyz) per probe, three probes, in one flat array —
+// this runs per die per step of every bake, so it allocates nothing after the
+// throw is spawned. Scratch vectors are module-level for the same reason.
+const _dispOff = new CANNON.Vec3();
+const _dispRot = new CANNON.Vec3();
+function dispInit(d) {
+  if (!d.dispBox) d.dispBox = new Float64Array(18);
+  d.dispMax = 0;
+}
+// Grow the three boxes with this frame's probe points and return the largest
+// extent, in world units. Read-only with respect to the physics world.
+function dispGrow(d) {
+  const b = d.dispBox;
+  const h = dieWidth(d.type) / 2;
+  const p = d.body.position;
+  const q = d.body.quaternion;
+  let worst = 0;
+  for (let i = 0; i < 3; i++) {
+    let x = p.x;
+    let y = p.y;
+    let z = p.z;
+    if (i > 0) {
+      // probe 1 on the body's local +X, probe 2 on its local +Y
+      _dispOff.set(i === 1 ? h : 0, i === 2 ? h : 0, 0);
+      q.vmult(_dispOff, _dispRot);
+      x += _dispRot.x; y += _dispRot.y; z += _dispRot.z;
+    }
+    const o = i * 6;
+    if (x < b[o]) b[o] = x;
+    if (y < b[o + 1]) b[o + 1] = y;
+    if (z < b[o + 2]) b[o + 2] = z;
+    if (x > b[o + 3]) b[o + 3] = x;
+    if (y > b[o + 4]) b[o + 4] = y;
+    if (z > b[o + 5]) b[o + 5] = z;
+    const e = Math.max(b[o + 3] - b[o], b[o + 4] - b[o + 1], b[o + 5] - b[o + 2]);
+    if (e > worst) worst = e;
+  }
+  d.dispMax = worst;
+  return worst;
+}
+// Restart every box from the CURRENT pose, so the window is anchored where the
+// die is now rather than losing a frame. Called when the die is judged moving,
+// and whenever a nudge hurls it back into the air.
+function dispRestart(d) {
+  const b = d.dispBox;
+  for (let i = 0; i < 3; i++) {
+    b[i * 6] = b[i * 6 + 1] = b[i * 6 + 2] = Infinity;
+    b[i * 6 + 3] = b[i * 6 + 4] = b[i * 6 + 5] = -Infinity;
+  }
+  return dispGrow(d); // re-seed at the current pose; extent 0
+}
 
 // How far a die still travels in the last `secs` BEFORE IT STOPS, in
 // die-widths, averaged over the pool — the closest number there is to "how
@@ -2103,6 +2220,7 @@ function playRoll(roll) {
   dice.forEach((d) => {
     d.stillTime = 0; d.frozen = false; d.frozenPose = null;
     d.settleTime = null; d.settleTimedOut = false; d.lastMoveTime = 0;
+    dispInit(d); dispRestart(d); // the terminator's boxes, anchored at spawn
   });
 
   // `timedOut` distinguishes the two ways a die stops being simulated, which
@@ -2132,6 +2250,13 @@ function playRoll(roll) {
     // look false when it is true.
     d.endStill = d.body.velocity.lengthSquared() < 0.05
       && d.body.angularVelocity.lengthSquared() < 0.05;
+    // The displacement twin, in DIE-WIDTHS: how far this die's centre or
+    // either probe actually travelled over the window that earned the freeze.
+    // Recorded in both modes, so the same number says "what the velocity gate
+    // let through" on a shipped row and "what the box gate guaranteed" on a
+    // displacement row — under `displacement` it is < SETTLEGATE.eps by
+    // construction, and that is the property worth asserting.
+    d.endDisp = d.dispMax / dieWidth(d.type);
     // How high it stopped, and how flat. Face correction rotates every die
     // exactly flat afterwards, so the landed pose is unreadable from outside
     // once the roll is over — these are the only record of what the freeze
@@ -2202,13 +2327,25 @@ function playRoll(roll) {
     // SETTLE_CAP fires.
     for (const d of dice) {
       if (d.frozen) continue;
-      const stillNow =
-        d.body.velocity.lengthSquared() < 0.05 &&
-        d.body.angularVelocity.lengthSquared() < 0.05;
+      // Grow the boxes FIRST and unconditionally: in `velocity` mode this is a
+      // pure observation feeding `endDisp`, in `displacement` mode it is the
+      // predicate itself. Either way it reads position and quaternion and
+      // writes nothing the solver can see.
+      const over = dispGrow(d) >= SETTLEGATE.eps * dieWidth(d.type);
+      const stillNow = SETTLEGATE.mode === 'displacement'
+        ? !over
+        : (d.body.velocity.lengthSquared() < 0.05
+          && d.body.angularVelocity.lengthSquared() < 0.05);
       // The last instant this die was doing anything. Freezing is a decision
       // we make ABOUT a die; moving is a fact about it, and the two came
       // apart — see the tail cut below.
-      if (!stillNow) d.lastMoveTime = simTime;
+      //
+      // The window restarts on the SAME condition in both modes, so `endDisp`
+      // always measures the window that earned the freeze rather than the
+      // whole flight. In `velocity` mode the box may legitimately exceed `eps`
+      // without restarting anything — a die creeping under 0.224 units/s for
+      // 0.45 s covers 0.1 units — and that gap is precisely the finding.
+      if (!stillNow) { d.lastMoveTime = simTime; dispRestart(d); }
       d.stillTime = stillNow ? d.stillTime + FIXED_DT : 0;
       if (d.stillTime >= SETTLE_STILL) {
         const r = readValue(d.type, d.body.quaternion);
@@ -2253,6 +2390,10 @@ function playRoll(roll) {
           const s = NUDGE.spin;
           d.body.angularVelocity.set((rng() - 0.5) * s, (rng() - 0.5) * s, (rng() - 0.5) * s);
           d.stillTime = 0;
+          // A nudged die is airborne; its boxes describe a rest that no longer
+          // exists. Restart them here as well as on the moving branch, so the
+          // hurl cannot be laundered into a short window on the way back down.
+          dispRestart(d);
         }
       }
       continue;
@@ -2294,6 +2435,7 @@ function playRoll(roll) {
     endY: d.endY ?? null,
     endDot: d.endDot ?? null,
     endPiled: !!d.endPiled,
+    endDisp: d.endDisp ?? null,
   }));
   // reduce, not sort: ties keep the FIRST (lowest index) by construction.
   const lastLanding = landings.reduce((a, b) => (b.frame > a.frame ? b : a), landings[0]);
@@ -2436,6 +2578,11 @@ function playRoll(roll) {
     lastLanding,
     nudges, // how many times a cocked die had to be re-thrown (settleProfile)
     magnetClamps, // floor-clamp firings this bake (0 whenever MAGNET is off)
+    // Which terminator baked this roll, recorded ON the roll rather than read
+    // live: a tool that flips the mode between the bake and the read would
+    // otherwise judge one throw by the other gate's epsilon.
+    settleMode: SETTLEGATE.mode,
+    settleEps: SETTLEGATE.eps,
     time: 0,
     soundIdx: 0,
     decalsStamped: 0, // Level 4a per-roll cap counter (the drain reads it)
@@ -5743,6 +5890,17 @@ window.__diceDebug = {
   setThrowTarget(f) { THROW_TARGET = typeof f === 'number' ? f : THROW_TARGET; return THROW_TARGET; },
   get sleep() { return { ...SLEEP }; },
   setSleep(o) { Object.assign(SLEEP, o || {}); return { ...SLEEP }; },
+  // The settle terminator (SETTLEGATE). mode 'velocity' is shipped and
+  // byte-identical; 'displacement' swaps in the three-point AABB rest test and
+  // `eps` is its tolerance, as a fraction of a die's WIDTH. Takes effect on the
+  // NEXT roll — playRoll bakes the whole throw before frame one.
+  get settleGate() { return { ...SETTLEGATE }; },
+  setSettleGate(o) {
+    const p = o || {};
+    if (p.mode === 'velocity' || p.mode === 'displacement') SETTLEGATE.mode = p.mode;
+    if (typeof p.eps === 'number' && p.eps > 0) SETTLEGATE.eps = p.eps;
+    return { ...SETTLEGATE };
+  },
   // Playback tempo (C30d): the projector speed on already-baked keyframes.
   // 1 is shipped and byte-identical; k>1 plays the same film k times faster.
   // Takes effect on the NEXT real-time frame — no reload, no re-bake.
@@ -5855,6 +6013,17 @@ window.__diceDebug = {
       // Every die that stopped on another one, capped or not — the count the
       // pile bar is there to drive to zero.
       piled: r.landings.filter((l) => l.endPiled).length,
+      // THE TERMINATOR'S OWN RECEIPT (SETTLEGATE): the worst distance any die
+      // in this roll moved over the window that earned its freeze, in
+      // die-widths. Under `displacement` this is bounded by `eps` for every
+      // die that froze cleanly — the guarantee, measurable from outside.
+      // Under `velocity` it is unbounded and reports what that gate let by.
+      maxEndDisp: Math.round(Math.max(0, ...r.landings.map((l) => l.endDisp ?? 0)) * 10000) / 10000,
+      // Dice that froze CLEANLY (not at the cap) and still moved more than the
+      // gate's own epsilon over their window. Zero by construction in
+      // `displacement` mode; a nonzero count there means the box test is not
+      // wired into the freeze path.
+      loose: r.landings.filter((l) => !l.timedOut && (l.endDisp ?? 0) >= r.settleEps).length,
       // "Slide and wiggle-move" measured directly, because duration is only
       // a proxy for it — a throw can be short and still crawl to a stop.
       // Read `shake`; `creep` is distance and cuts both ways.
