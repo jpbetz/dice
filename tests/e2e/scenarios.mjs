@@ -808,6 +808,51 @@ export const scenarios = [
     },
   },
   {
+    name: 'debug-surface-answers',
+    tags: ['quality'],
+    // A DEBUG HOOK THAT THROWS IS INVISIBLE TO THIS SUITE unless something
+    // calls it, and `__diceDebug` is the substrate almost every scenario
+    // asserts through — so a stale hook is a hole in the instrument, not just
+    // a broken tool.
+    //
+    // Found the hard way (2026-08-10): renaming CAM_TARGET to CAM_TARGET_HOME
+    // left FOUR dangling references inside C27's `matFit()`, which threw
+    // ReferenceError on every call. The full sweep stayed 133/133 across three
+    // runs, because the only caller is a tools/steps script nobody runs in CI.
+    //
+    // TESTING.md P5 diffs the KEY LIST, and it passed throughout — the key was
+    // still there; its body had gone stale. This is P5's other half: P5 proves
+    // the hooks still EXIST, this proves they still ANSWER.
+    //
+    // Zero-arg only, deliberately: those are the pure readouts, and calling
+    // them is safe. A hook that takes arguments changes state, and a smoke
+    // test has no business guessing what to pass it.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+      // With dice on the felt, so the readouts have something to read — an
+      // empty table exercises the early-return branch of half of them.
+      await a.dbg(`commandRoll("1d8+1d6+1d10")`);
+      await a.dbg('sim(9000)');
+      const probed = JSON.parse(await a.eval(`JSON.stringify((() => {
+        const d = window.__diceDebug, bad = [], ran = [];
+        for (const k of Object.keys(d)) {
+          const f = d[k];
+          if (typeof f !== 'function' || f.length !== 0) continue;
+          ran.push(k);
+          try { f(); } catch (e) { bad.push(k + ': ' + e.message); }
+        }
+        return { bad, count: ran.length };
+      })())`));
+      assert.deepEqual(probed.bad, [],
+        `every zero-argument __diceDebug hook answers without throwing`);
+      // Guard the guard: if the probe stops finding hooks it stops proving
+      // anything, which is the vacuous-pass shape this repo keeps meeting.
+      assert.ok(probed.count >= 15,
+        `…and the probe actually reached the hooks (${probed.count} called)`);
+    },
+  },
+  {
     name: 'cache-validator',
     tags: ['net'],
     // A STALE BUILD IS A PERMANENT ONE, unless the validator changes with the

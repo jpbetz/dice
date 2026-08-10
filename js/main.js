@@ -4606,17 +4606,10 @@ window.__diceDebug = {
     const eye = new THREE.Vector3(
       ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
     );
-    const maxY = CAM_TARGET.y + (eye.y - CAM_TARGET.y) * (1 + 89 * 0.03);
-    const v = new THREE.Vector3();
-    let worstX = 0;
-    let worstY = 0;
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        v.set(sx * TABLE_W / 2, 0, sz * TABLE_D / 2).project(camera);
-        worstX = Math.max(worstX, Math.abs(v.x));
-        worstY = Math.max(worstY, Math.abs(v.y));
-      }
-    }
+    const maxY = CAM_TARGET_HOME.y + (eye.y - CAM_TARGET_HOME.y) * (1 + 89 * 0.03);
+    const worst0 = matWorstNdc();
+    const worstX = worst0.x;
+    const worstY = worst0.y;
     // What CONTAINING the mat would cost, for the viewports where the scan
     // gives up. Walk further back until the worst corner is inside, then
     // report the die span there against the span now — the honest price of
@@ -4628,29 +4621,19 @@ window.__diceDebug = {
       return Math.abs(p1.x - p0.x) * view.width;
     };
     const spanNow = span();
-    const worstAt = () => {
-      let m = 0;
-      for (const sx of [-1, 1]) {
-        for (const sz of [-1, 1]) {
-          v.set(sx * TABLE_W / 2, 0, sz * TABLE_D / 2).project(camera);
-          m = Math.max(m, Math.abs(v.x), Math.abs(v.y));
-        }
-      }
-      return m;
-    };
-    const ray = eye.clone().sub(CAM_TARGET);
+    const worstAt = () => { const w = matWorstNdc(); return Math.max(w.x, w.y); };
+    const ray = eye.clone().sub(CAM_TARGET_HOME);
     let need = null;
     let spanFitted = null;
     for (let i = 0; i < 400; i++) {
-      camera.position.copy(CAM_TARGET).addScaledVector(ray, 1 + i * 0.03);
-      camera.lookAt(CAM_TARGET);
-      camera.updateMatrixWorld(true);
+      camera.position.copy(CAM_TARGET_HOME).addScaledVector(ray, 1 + i * 0.03);
+      aimCamera(CAM_TARGET_HOME);
       if (worstAt() <= 0.98) { need = 1 + i * 0.03; spanFitted = span(); break; }
     }
     applyCameraFraming();
     return {
       worstX, worstY,
-      fits: worstX <= 1 && worstY <= 1,
+      fits: worstX <= 1 && worstY <= 1, // == matOnScreen() at the live camera
       camY: camera.position.y,
       atScanLimit: Math.abs(camera.position.y - maxY) < 0.01,
       needScale: need,          // null = unreachable even at 400 steps
@@ -4722,7 +4705,7 @@ window.__diceDebug = {
       spanPx,
       roll: Math.round(camRoll * 100) / 100,
       orbit: Math.round(camOrbit * 100) / 100,
-      matFits: framingPoints().every(({ p }) => ndc(p) <= 1),
+      matFits: matOnScreen(),
       dice: live.length,
       diceOnScreen: live.filter((d) => ndc(d.body.position) <= 1).length,
       decidingOnScreen: hero ? ndc(hero.body.position) <= 1 : null,
@@ -12750,6 +12733,24 @@ function decidingDieFraming(margin = HERO_MARGIN) {
   return pts;
 }
 
+// THE ONE PLACE THAT DECIDES WHAT "THE MAT FITS" MEANS. Three readers had
+// grown their own copy of this test — the framing ladder's rung 1, the C27
+// matFit() probe, and framingInfo()'s readout — which is the shape that
+// produced most of tonight's defects. The heavyweight probe is NOT the shared
+// unit: matFit() walks 400 steps and re-frames, so it answers a different
+// question and cannot be spread into a per-frame readout. The PREDICATE is.
+function matWorstNdc() {
+  const v = new THREE.Vector3();
+  let x = 0, y = 0;
+  for (const { p } of framingPoints()) {
+    v.copy(p).project(camera);
+    x = Math.max(x, Math.abs(v.x));
+    y = Math.max(y, Math.abs(v.y));
+  }
+  return { x, y };
+}
+function matOnScreen() { const w = matWorstNdc(); return w.x <= 1 && w.y <= 1; }
+
 // Is the deciding die inside the frame the camera is currently in? Read from
 // the LIVE camera, so it answers what would be painted rather than what the
 // fit intended.
@@ -12814,7 +12815,7 @@ function framingFor(orbit) {
       : (mode === 'deciding' ? decidingDieFraming().centre : diceFramingPoints().centre),
     mode, orbit, on, span,
     hero: decidingOnScreen(),
-    matFits: framingPoints().every(({ p: q }) => { v.copy(q).project(camera); return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1; }),
+    matFits: matOnScreen(),
   };
   camOrbit = prev;
   return pose;
