@@ -11,6 +11,72 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Joe's cleanup notes — the key, the fold, the withheld verb, the departure (2026-08-09)
+
+Design authority: [UX.md](UX.md) §7.11b (amended) and §7.26. Four small
+items from one message; the two that were design rather than cleanup went to
+[ROADMAP.md](ROADMAP.md) as **C25** (the collection phase's space cost) and
+**C26** (what `Change seat…` owes before it comes back).
+
+### The hover key — SHIPPED 2026-08-09
+
+*"The reveal window highlights dice on hover, which is awesome, but it
+doesn't have any UX that maps the outline highlight color of the dice with
+the pools the color relates to."* Each pool label on the result card now
+leads with its own hue as a filled dot. The hue assignment moved into one
+function (`sourceColorMap`, keyed by source name, walked in die order) that
+both the felt shells and the card read — they used to compute nothing in
+common, which is the whole reason the highlight could teach grouping and
+never attribution. A key, not a recolor: the label keeps `--muted` small-caps
+so tier colors keep their monopoly on meaning-bearing color. The loose group
+gets its ivory dot too, and takes a label cell of its own in the ledger.
+Banner only — the peek and verdict card do not hover-outline anything, and a
+key to a highlight that never paints is decoration.
+
+`__diceDebug.cardKey` reads the painted DOM; `folded-card` and `source-read`
+pair it against `outlineState` off the shell materials, so the pin is
+cross-surface rather than one function checked against itself.
+
+### d20 pairing folds under Your Soul Deal — SHIPPED 2026-08-09
+
+*"D20 pairing is not useful for 'Your Soul Deal', remove from modification
+options."* U17 had brought it back on the reasoning that advantage decides
+WHICH DIE COUNTS and so is a fact under every system — true of the notation,
+and not a tool this chart wants. `.sec-pair` joins `.sec-sum` in the
+`pop-perdie` fold; its own class because the reason is the chart and not the
+arithmetic, and the two must be able to move apart again. It round-trips
+invisibly the way Target once did, which is the accepted cost of everything
+in that fold (notation totality is app-wide).
+
+### `Change seat…` withheld — SHIPPED 2026-08-09
+
+*"Maybe not fully thought through. Strongly consider hiding it for now."*
+`openIdentityMenu` hides it unconditionally now (it was already hidden in the
+lobby). The verb reads as "sit somewhere else at this table" and actually
+drops the seat, **deletes `LS_NAME`**, and re-enters `initNet()` — §3b/L3
+split it out of `Leave & switch seat` so that the name would travel with the
+player, then left the name-wiping verb wearing the seat-shaped label. Safe to
+withhold because C10 shipped: the door offers a returning player their
+prepared seat, so `Leave table` → the door is the same journey without the
+name loss. The button, its handler and `leaveTable()` stay — still the only
+scripted door to a `netOnline === false` state. ROADMAP C26 holds the
+redesign. `touch-doors` pins the hide at a table, `identity-lobby` in it.
+
+### How a die leaves — SHIPPED 2026-08-09
+
+*"The way dice disappear is not my favorite… the speed is good but the effect
+is not."* Speed untouched (0.3 s); the motion inside it replaced. `sink` (drop
+2.4 units, shrink to 0.65, leave by passing through the felt) gave way to
+`lift` (rise 1.15 on an ease-out, shrink to zero) — the collect whisk's carry
+arc, pointed at a second destination. Full reasoning and the alternatives
+table in [UX.md](UX.md) §7.26. `fold` and `sink` stay switchable via
+`__diceDebug.setClearStyle` so the taste call can be re-made side by side,
+and `dice-depart` uses `sink` as the proof that its `dy >= 0` assertion can
+fail — a green check that would have passed against the thing Joe asked us to
+replace is the failure mode this repo keeps hitting.
+
+---
+
 ## Joe's UI notes — the named verb and the pool rail (2026-08-07)
 
 Design authority: [UX.md](UX.md) §7.21 and §7.22. Both came out of a

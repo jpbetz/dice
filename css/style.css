@@ -3442,8 +3442,12 @@ html, body {
    d20 pairing, Target (DC), keep/drop don't change outcomes there (Joe
    2026-08-03). The sysnote's 'Show anyway' unfolds them per popover-open. */
 /* Per-die systems fold the sum-world sections away entirely — no
-   disclosure (Joe 2026-08-06). */
+   disclosure (Joe 2026-08-06). U17 narrowed this to the MODIFIER section;
+   .sec-pair rejoins it 2026-08-09 (Joe: d20 pairing is not useful for Your
+   Soul Deal) — see index.html for why that is a separate class and not a
+   re-widening of sec-sum. */
 .popover.pop-perdie .sec-sum,
+.popover.pop-perdie .sec-pair,
 .popover.pop-perdie .prow-sum { display: none; }
 
 /* ---------- crit overlay ---------- */
@@ -3838,6 +3842,30 @@ html, body {
   text-transform: uppercase;
   color: var(--muted);
 }
+/* THE HOVER KEY (Joe 2026-08-09). Hovering the result card outlines that
+   roll's dice on the felt, one hue per source pool — and nothing on the card
+   said which hue was which pool, so the read taught grouping and withheld
+   attribution. Each pool label now leads with its own hue as a filled dot.
+   A KEY, NOT A RECOLOR: the label keeps --muted small-caps, because on these
+   surfaces color already MEANS something (tier-success, tier-fail, crit) and
+   six arbitrary hues on the words would read as six more verdicts. The ring
+   is what keeps ivory (a die answering to no pool) visible on the card's own
+   pale-on-dark palette, and the dot from washing out on a light theme. */
+.src-key {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px; /* the label's own letter-spacing eats into this */
+  border-radius: 50%;
+  background: var(--src-hue, var(--muted));
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.4);
+}
+/* In the ledger the label column is right-aligned, so the dot rides INSIDE
+   the label's own box and the spine still ends flush. A loose group's cell
+   holds the dot alone — its margin would push it off the alignment the
+   labelled rows keep. */
+.oc-ledger .tally-src > .src-key:only-child { margin-right: 0; }
 /* 'quiet' is an all-quiet pool's answer (§7.9 — the answer IS the
    silence), styled as ABSENCE: it must never weigh what an outcome word
    weighs (2i-A quiet grammar). */

@@ -1468,8 +1468,27 @@ export const scenarios = [
       const colors = await a.dbg('outlineState');
       assert.equal(new Set(colors).size, 2, `Wisdom's color + ivory for the loose d4 (got: ${colors})`);
       assert.equal(colors[0], colors[1], 'the two Wisdom dice share their pool color');
+
+      // AND THE CARD SAYS WHICH COLOR IS WHICH POOL (Joe 2026-08-09). Read
+      // from two independent places on purpose: `cardKey` off the painted
+      // DOM, `outlineState` off the shell materials in the scene. Computing
+      // both from sourceColorMap would pass while the card painted nothing
+      // at all — which is exactly the state this scenario used to accept.
+      const key = await a.dbg('cardKey');
+      assert.equal(key.length, 2, `one dot per group — Wisdom and the loose d4 (got ${JSON.stringify(key)})`);
+      const wisdom = key.find((k) => k.label === 'Wisdom');
+      const loose = key.find((k) => k.label === '');
+      assert.ok(wisdom, `the Wisdom row carries a dot (got ${JSON.stringify(key)})`);
+      assert.ok(loose, 'and the unsourced d4 carries the ivory one');
+      assert.equal(wisdom.color, colors[0], "the dot beside Wisdom IS the Wisdom dice's outline");
+      assert.equal(loose.color, colors[2], 'and the loose dot IS the loose die\'s outline');
+      assert.notEqual(wisdom.color, loose.color, 'two pools, two hues');
+
       await a.dbg('hoverBanner(false)');
       assert.deepEqual(await a.dbg('outlineState'), [], 'outlines leave with the hover');
+      // The key does NOT leave with it: it is a legend, readable before you
+      // know there is anything to hover.
+      assert.equal((await a.dbg('cardKey')).length, 2, 'the key stands after the hover ends');
 
       // Bob's dismiss hides HIS card only; the dice stay for everyone
       await b.eval(`document.getElementById('banner-main').click()`);
@@ -1797,6 +1816,70 @@ export const scenarios = [
     },
   },
   {
+    name: 'dice-depart',
+    tags: ['roll', 'chrome', 'cuj8'],
+    // HOW A DIE LEAVES (Joe 2026-08-09: "the way dice disappear is not my
+    // favorite… the speed is good but the effect is not"). The replacement
+    // makes a claim that is checkable rather than merely tasteful: a die
+    // leaves by being taken OFF the table, never by passing through it. So
+    // this samples the departure mid-flight and requires dy >= 0 the whole
+    // way — and then flips to the retired 'sink' style to prove the sample
+    // can FAIL. Without that second half this is a green check that would
+    // have passed just as happily against the thing Joe asked us to replace.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+
+      const departure = async (style, rollId) => {
+        assert.equal(await a.dbg(`setClearStyle(${JSON.stringify(style)})`), true, `${style} selected`);
+        assert.equal(await a.dbg(`clearRoll(${JSON.stringify(rollId)})`), true, `${style}: clear accepted`);
+        // CLEAR_SINK_S is 0.3 s = 18 frames; 3 frames a sample walks the
+        // window in six steps and still catches the first moment of motion.
+        const frames = [];
+        for (let i = 0; i < 6; i++) {
+          await a.dbg('sim(3)');
+          const st = await a.dbg('sinkState');
+          if (st.length) frames.push(st);
+        }
+        assert.ok(frames.length >= 3, `${style}: the departure was observable (got ${frames.length} samples)`);
+        return frames;
+      };
+
+      // THE SHIPPED DEFAULT
+      assert.equal(await a.dbg('clearStyle'), 'lift', 'lift ships as the default');
+      await a.roll('3d6');
+      await a.settle();
+      const lift = await departure('lift', await a.rollId());
+      const lows = lift.flat().filter((d) => d.dy < 0);
+      assert.equal(lows.length, 0,
+        `no departing die ever goes below where it rested (got ${JSON.stringify(lows)})`);
+      assert.ok(lift.flat().some((d) => d.dy > 0.05), 'and it really is lifted, not merely not-sunk');
+      const last = lift[lift.length - 1];
+      assert.ok(last.every((d) => d.scale < 0.5),
+        `the die is most of the way gone by the end of the window (got ${JSON.stringify(last)})`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(60), window.__diceDebug.sinkingCount === 0`
+          + ` && window.__diceDebug.tableDice.length === 0)`,
+        { desc: 'the felt is empty when the window closes' },
+      );
+
+      // THE PIN THAT PROVES THE PIN. 'sink' is what shipped before — the same
+      // 0.3 s, straight DOWN through the felt. If the assertion above cannot
+      // tell the two apart it is measuring nothing.
+      await a.roll('3d6');
+      await a.settle();
+      const sink = await departure('sink', await a.rollId());
+      assert.ok(sink.flat().some((d) => d.dy < -0.05),
+        'the retired style really does drop the die through the felt');
+      await a.dbg(`setClearStyle('lift')`); // styles are per-tab, not persisted
+      await a.waitFor(
+        `(window.__diceDebug.sim(60), window.__diceDebug.sinkingCount === 0)`,
+        { desc: 'sinks drained' },
+      );
+      assert.equal(await a.dbg(`setClearStyle('nonsense')`), false,
+        'an unknown style is refused rather than silently freezing the dice');
+    },
+  },
+  {
     name: 'shelve-clear-no-chip-leak',
     tags: ['shelf', 'perf', 'cuj9'],
     // Tier 0e endurance: the shelf marker sinks on its OWN record — it must
@@ -2102,9 +2185,9 @@ export const scenarios = [
       await a.dbg(`setSystem('soul-deal')`);
       await a.waitFor(`window.__diceDebug.system === 'soul-deal'`, { desc: 'back' });
 
-      // The ± popover folds the sum-world sections under a per-die system —
-      // modifiers/pairing/Target/keep-drop AND reroll/exploding, with no
-      // note and no disclosure (Joe 2026-08-06; supersedes 'Show anyway').
+      // The ± popover folds under a per-die system — the flat bonus and d20
+      // pairing — with no note and no disclosure (Joe 2026-08-06; supersedes
+      // 'Show anyway'). What stands is asserted below, one id at a time.
       await a.dbg(`setSystem('soul-deal')`);
       await a.waitFor(`window.__diceDebug.system === 'soul-deal'`, { desc: 'per-die lens back' });
       await a.eval(`(() => {
@@ -2115,13 +2198,18 @@ export const scenarios = [
       await a.dbg(`openPopoverFor('tray')`);
       const secVisible = `[...document.querySelectorAll('#mods-popover .sec-sum, #mods-popover .prow-sum')]
         .some((el) => el.offsetParent !== null)`;
-      // U17 #29-#31: only the MODIFIER section folds now. A flat bonus is a
-      // term in a sum and has nowhere to land without one; everything else
-      // that used to fold with it came back, because a target is a stake the
-      // player declared and pairing/keep-drop/reroll/explode decide WHICH
-      // DICE COUNT — facts under every system, and ones this profile's own
-      // outcomesFor and forecastFor already honour.
+      // U17 #29-#31: the MODIFIER section folds. A flat bonus is a term in a
+      // sum and has nowhere to land without one; keep-drop/reroll/explode
+      // came back, because they decide WHICH DICE COUNT — facts under every
+      // system, and ones this profile's own outcomesFor and forecastFor
+      // already honour, and a target is a stake the player declared.
       assert.equal(await a.eval(secVisible), false, 'the Modifier section folds under per-die');
+      // d20 pairing folds WITH it since 2026-08-09 (Joe: "not useful for Your
+      // Soul Deal"). Its own class, because the reason is the chart and not
+      // the arithmetic — the two must be able to move apart again.
+      assert.equal(await a.eval(
+        `document.querySelector('#mods-popover .sec-pair').offsetParent !== null`),
+      false, 'd20 pairing folds under per-die too');
       assert.equal(await a.eval(`document.getElementById('pop-dc').offsetParent !== null`),
         true, 'but Target is authorable — a dc used to round-trip invisibly');
       assert.equal(await a.eval(`document.getElementById('pop-sw-reroll').offsetParent !== null`),
@@ -2136,6 +2224,9 @@ export const scenarios = [
       await a.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'dnd lens applied' });
       await a.dbg(`openPopoverFor('tray')`);
       assert.equal(await a.eval(secVisible), true, 'a totals system shows them by default');
+      assert.equal(await a.eval(
+        `document.querySelector('#mods-popover .sec-pair').offsetParent !== null`),
+      true, 'and pairing comes back — advantage is a d20 world habit');
       assert.equal(await a.eval(`document.getElementById('pop-sw-reroll').offsetParent !== null`),
         true, 'reroll rides the totals world');
       // per-source commit chrome has real display rules (no global .hidden
@@ -2162,10 +2253,14 @@ export const scenarios = [
       assert.equal(await a.eval(`document.getElementById('result-breakdown').textContent`), '',
         'no duplicate breakdown line under per-die');
 
-      // the hero answers per pool as ROWS (2e; soul-deal is the default lens)
+      // the hero answers per pool as ROWS (2e; soul-deal is the default lens).
+      // Three label cells, not two: since the hover key (2026-08-09) the
+      // unsourced d6's row carries a label cell too, holding nothing but its
+      // ivory dot — the spine has to stay a spine, and the one row the hover
+      // colors differently must not be the one row the key skips.
       const tallySrcs = await a.eval(
         `[...document.querySelectorAll('#result-meaning .tally-src')].map((el) => el.textContent.trim())`);
-      assert.deepEqual(tallySrcs, ['Wisdom', 'Zeal'], `rows grouped by pool (got: ${tallySrcs})`);
+      assert.deepEqual(tallySrcs, ['Wisdom', 'Zeal', ''], `rows grouped by pool (got: ${tallySrcs})`);
       assert.equal(await a.eval(
         `document.querySelectorAll('#result-meaning .tally-group').length`), 3,
         'the unsourced d6 answers in its own plain row');
@@ -2214,6 +2309,19 @@ export const scenarios = [
       const dndLabels = await a.eval(
         `[...document.querySelectorAll('#result-breakdown .log-part-label')].map((el) => el.textContent.trim())`);
       assert.deepEqual(dndLabels, ['Wisdom', 'Zeal'], 'attribution survives the sum world');
+      // …and so does the hover key. Under a sum lens the card's pool labels
+      // live in the BREAKDOWN line rather than the ledger, and the key has to
+      // follow them there — the felt outlines the same three pools either
+      // way. (folded-card pins the ledger half.)
+      const dndKey = await a.dbg('cardKey');
+      assert.deepEqual(dndKey.map((k) => k.label), ['Wisdom', 'Zeal', ''],
+        `the breakdown line carries the key too (got ${JSON.stringify(dndKey)})`);
+      await a.dbg('hoverBanner(true)');
+      const dndShells = await a.dbg('outlineState');
+      assert.equal(dndKey[0].color, dndShells[0], "Wisdom's dot is Wisdom's outline under dnd too");
+      assert.equal(dndKey[1].color, dndShells[2], "and Zeal's is Zeal's");
+      assert.equal(dndKey[2].color, dndShells[3], 'and the loose d6 keeps the ivory pair');
+      await a.dbg('hoverBanner(false)');
       await a.dbg(`setSystem('soul-deal')`);
     },
   },
@@ -5211,8 +5319,9 @@ export const scenarios = [
       };
 
       // (i) THE IDENTITY CHIP — the defect. That menu is the only door to
-      // Change name, Change seat and Leave table, so a touch-only player
-      // could not rename, re-seat or leave.
+      // Change name and Leave table, so a touch-only player could not rename
+      // or leave. ('Change seat…' was the third; it is withheld everywhere
+      // since 2026-08-09 and asserted absent below.)
       assert.equal(await a.eval(
         `!document.getElementById('identity-menu').classList.contains('hidden')`),
       false, 'the menu starts closed');
@@ -5220,15 +5329,22 @@ export const scenarios = [
       assert.equal(await a.eval(
         `!document.getElementById('identity-menu').classList.contains('hidden')`),
       true, 'a hold opens the identity menu AND THE RELEASE DOES NOT CLOSE IT');
-      // …and the three items it is the only door to are really there.
-      // Change name… · Change seat… · Leave table — the three verbs whose
-      // ONLY door this menu is (Copy invite link has a second home as a
-      // .rail-ghost when the roster is empty; these do not).
-      for (const id of ['idm-rename', 'idm-leave', 'idm-lobby']) {
+      // …and the items it is the only door to are really there.
+      // Change name… · Leave table — the verbs whose ONLY door this menu is
+      // (Copy invite link has a second home as a .rail-ghost when the roster
+      // is empty; these do not).
+      for (const id of ['idm-rename', 'idm-lobby']) {
         assert.equal(await a.eval(
           `getComputedStyle(document.getElementById(${JSON.stringify(id)})).display !== 'none'`),
         true, `${id} is reachable through the touch door`);
       }
+      // AT a table, not just in the lobby: 'Change seat…' is withheld. The
+      // lobby pin (identity-lobby) proves the table-scoped hide; this proves
+      // the newer, unconditional one. The two together are what stops a
+      // future `!IN_LOBBY` quietly restoring the verb.
+      assert.equal(await a.eval(
+        `getComputedStyle(document.getElementById('idm-leave')).display`), 'none',
+      'Change seat is withheld at a table too (Joe 2026-08-09)');
       await a.eval(`document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))`);
 
       // (ii) A NORMAL TAP still falls home rather than opening the menu —

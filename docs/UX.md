@@ -1913,6 +1913,38 @@ verb's) and red (removal's); unsourced dice wear quiet ivory. A hidden
 roll's sources are withheld with its spec, so its outlines are all
 ivory and leak nothing.
 
+**…AND THE CARD SAYS WHICH HUE IS WHICH POOL** *(amended 2026-08-09;
+Joe: the hover "doesn't have any UX that maps the outline highlight
+color of the dice with the pools the color relates to")*. Each pool
+label on the result card leads with its own hue as a small filled dot,
+so the read is a legend rather than a puzzle: WISDOM • teal, and the
+two teal dice on the felt are Wisdom's. Three rules make it safe to add
+color to a surface that already uses color for meaning:
+
+- **A key, not a recolor.** The dot carries the hue; the label keeps
+  `--muted` small-caps. Tier colors (success/fail/crit) keep their
+  monopoly on meaning-bearing color — six arbitrary hues on the *words*
+  would read as six more verdicts.
+- **The loose group gets a dot too** — ivory, the same ivory its dice
+  wear. Skipping it would leave the one row the hover colors differently
+  as the one row the key never explains. In the ledger it takes a label
+  cell of its own, holding nothing else, so the spine stays a spine.
+- **Only on the surface whose hover paints the felt.** The banner shows
+  the key; the peek and the verdict card do not. A key to a highlight
+  that never paints is decoration. Under a sum lens the pool labels live
+  in the breakdown line instead of the ledger, and the key follows them
+  there.
+
+One assignment, in `sourceColorMap`, keyed by source name and walked in
+die order — the felt and the card look the same color up rather than
+each computing their own. Hidden rolls yield an empty map: every die
+outlines ivory and the card paints no key, unchanged.
+
+Still open, recorded rather than fixed: **touch has no hover**, so the
+key stands but the highlight it explains never paints on a phone; and
+hovering ONE pool's row could isolate that pool's dice, which is the
+obvious next read and is not built.
+
 **The beacon, take two — size and air.** *(The first take's converging
 funnels looked right over an empty well but fought the rail once
 Save · Offer · Clear stood — Joe, same day. Retired.)* The well earns
@@ -3784,3 +3816,54 @@ here), and `Keep` (says nothing more this session). Changing the *table's*
 system is deliberately **not** a fourth exit: that is a room-wide act
 (goal 10) and it belongs on the settings panel where every player can see
 it, not buried in one player's rack chrome.
+
+### 7.26 How a die leaves the table (2026-08-09)
+
+*Joe: "The way dice disappear is not my favorite. Consider alternatives.
+The speed is good but the effect is not my favorite."*
+
+**The speed did not change.** `CLEAR_SINK_S` is still 0.3 s. Only the motion
+inside that window did.
+
+**What was wrong with the old one.** `sink` dropped each die 2.4 world units
+straight DOWN and stopped shrinking at 0.65× — so a departing die left by
+passing THROUGH the felt, and was disposed of by occlusion. It is the one
+moment in the app where a die violates the surface it is standing on: goal 1
+is real dice on a real surface, and the tumble, the settle and the whisk all
+honour it. Worse, it reads as the failure it resembles — an object falling
+out of the world. Frame-by-frame the mat plane slices the die in half on its
+way down.
+
+**`lift` ships.** It borrows the grammar the COLLECT whisk already
+established (§7.7: a carry arc, one motion at a time). **The table has one
+pair of hands — collecting carries a roll up and over to the shelf, clearing
+carries it up and away.** Same pluck, two destinations. The die rises 1.15
+units on an ease-out (`1-(1-p)³`) while shrinking on a slower curve
+(`1-p^1.5`) all the way to zero. Two things fall out of that for free: the
+shadow separates from the die as it rises, which is exactly what being picked
+up looks like; and because the scale really reaches zero, nothing has to
+occlude the die and no material has to fade — geometry and materials are
+shared per die type (js/dice.js), so a fade would mean cloning a material per
+departing die.
+
+| style | motion | reads as |
+| --- | --- | --- |
+| **`lift`** *(ships)* | rise 1.15, shrink to 0 | picked up off the table |
+| `fold` | no travel, shrink to 0 | taken off the board — quieter, the runner-up |
+| `sink` | drop 2.4, shrink to 0.65 | pre-2026-08-09; falls through the felt |
+
+All three stay in `CLEAR_STYLES` and switch with
+`__diceDebug.setClearStyle(name)` — a taste call should be judgeable side by
+side, and the retired one is also what makes the scenario honest: `dice-depart`
+asserts `dy >= 0` across the window and then flips to `sink` to prove that
+assertion can fail. `tools/steps/depart-and-key.mjs` walks the window under a
+held clock and shoots a still per frame, so the comparison is reproducible
+rather than remembered.
+
+**The scale floor.** A mesh scaled through zero flips its winding and renders
+inside-out for a frame; `stepSinking` clamps at 0.0001.
+
+**Unchanged:** bodies still leave the physics world immediately (a departing
+die must not deflect a later fast-forward); rolls cleared mid-playback still
+defer to `pendingClears`; the shelf marker still rides its own `mesh: null`
+sink record so its chip fade stays dt-driven.

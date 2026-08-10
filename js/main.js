@@ -738,11 +738,47 @@ let tableDice = [];        // every die on the table; settled dice have static b
 let currentRoll = null;    // active playback state (see playRoll)
 const rollQueue = [];      // rolls waiting while a playback is in flight (FIFO)
 
-// Per-roll Done (§7.5): dice leaving the table sink/fade for ~300 ms before
+// Per-roll Done (§7.5): dice leaving the table depart over ~300 ms before
 // their meshes are dropped. Bodies leave the physics world immediately —
 // a departing die must not deflect a later fast-forward. Rolls cleared while
 // still mid-playback (or queued) defer removal until their playback settles.
 const CLEAR_SINK_S = 0.3;
+
+// HOW A DIE LEAVES (Joe 2026-08-09: "the way dice disappear is not my
+// favorite… the speed is good but the effect is not"). The speed is
+// untouched — CLEAR_SINK_S stays 0.3 s — only the motion inside it changed.
+//
+// What was wrong with `sink`: it dropped the die 2.4 units straight DOWN and
+// stopped shrinking at 0.65, so the die left by passing THROUGH the felt and
+// was disposed of by occlusion. That is the one moment in the app where a die
+// violates the surface it is standing on — goal 1 is real dice on a real
+// surface, and every other motion here honours it (the tumble, the settle,
+// the whisk). It also reads as the failure mode it resembles: a physics
+// glitch, an object falling out of the world.
+//
+// `lift` is the shipped default and borrows the grammar the COLLECT whisk
+// already established (§7.7: a carry arc, one motion at a time). The table
+// has one pair of hands: collecting carries a roll up and over to the shelf,
+// clearing carries it up and away. Same pluck, two destinations. It shrinks
+// all the way to zero, so nothing has to occlude it, no material has to fade
+// (geometry and materials are shared per die type — a fade would mean a clone
+// per departing die), and the die is really gone rather than merely hidden.
+//
+// `fold` is kept as the third reading: no travel at all, just a shrink in
+// place. Quieter than `lift`; it reads as "taken off the board" rather than
+// "picked up". Judge them side by side with __diceDebug.setClearStyle().
+const CLEAR_STYLES = {
+  // p is 0→1 across the window; returns {dy, scale} relative to the die's
+  // resting position. Pure functions of p: the sim advances them dt-driven,
+  // so __diceDebug.sim() covers every one of them.
+  lift: (p) => {
+    const e = 1 - (1 - p) ** 3;        // ease-out: the pluck is immediate
+    return { dy: 1.15 * e, scale: 1 - p ** 1.5 }; // …the vanish trails it
+  },
+  fold: (p) => ({ dy: 0, scale: 1 - p ** 1.5 }),
+  sink: (p) => ({ dy: -2.4 * p, scale: 1 - 0.35 * p }), // pre-2026-08-09
+};
+let clearStyle = 'lift';
 // {mesh, chip, t, y0}. `mesh` MAY be null — a marker-only record (a shelf
 // cluster with no dice left on the felt) rides the same sink timer to keep
 // its chip fade dt-driven without stealing another record's mesh ref.
@@ -900,18 +936,23 @@ function resetTableSurface() {
 
 // ---- per-roll Done (§7.5) --------------------------------------------------
 
-// Advance the sink/fade of departing dice. dt-driven from tick() so
-// __diceDebug.sim() covers it; the chip fade is a CSS transition that only
-// decorates the same 300 ms window.
+// Advance departing dice along the active CLEAR_STYLES curve. dt-driven from
+// tick() so __diceDebug.sim() covers it; the chip fade is a CSS transition
+// that only decorates the same 300 ms window. (Named `stepSinking` from when
+// `sink` was the only style — kept because `sinkingCount` is a pinned probe.)
 function stepSinking(dt) {
   if (!sinking.length) return;
+  const style = CLEAR_STYLES[clearStyle] || CLEAR_STYLES.lift;
   let anyDone = false;
   for (const s of sinking) {
     s.t += dt;
     const p = Math.min(s.t / CLEAR_SINK_S, 1);
     if (s.mesh) {
-      s.mesh.position.y = s.y0 - p * 2.4;
-      s.mesh.scale.setScalar(1 - 0.35 * p);
+      const { dy, scale } = style(p);
+      s.mesh.position.y = s.y0 + dy;
+      // Never negative: a mesh scaled through zero flips its winding and the
+      // last frame of the departure renders inside-out.
+      s.mesh.scale.setScalar(Math.max(scale, 0.0001));
     }
     if (s.t >= CLEAR_SINK_S) anyDone = true;
   }
@@ -2443,8 +2484,34 @@ for (const ev of ['pointerup', 'pointercancel']) {
 // red (removal's); unsourced dice wear quiet ivory. A hidden roll's spec is
 // withheld, so its sources are unknowable here — every die outlines ivory,
 // and the outline leaks nothing (which dice belong to a roll is public).
+// The CARD side of this read — the dot beside each pool label that says which
+// hue is which pool — is srcSwatch, and both sides share sourceColorMap.
 // ---------------------------------------------------------------------------
 const OUTLINE_COLORS = ['#7fd1c3', '#b48ede', '#e0a458', '#8fc97f', '#6fa8dc', '#d97fa8'];
+const OUTLINE_LOOSE = '#f3ead7'; // quiet ivory: a die that answers to no pool
+
+// THE KEY (Joe 2026-08-09: the hover "doesn't have any UX that maps the
+// outline highlight color of the dice with the pools the color relates to").
+// One hue per source pool, assigned in DIE ORDER — and assigned in ONE place,
+// so the felt and the card cannot disagree. They used to compute nothing in
+// common: `outlineRollDice` grew its own Map per hover, which meant the
+// highlight could teach which dice went together and never which POOL a
+// color meant. Keyed by source NAME, so a card row and a die look the same
+// color up regardless of the order each surface happens to iterate in.
+// Hidden rolls withhold their spec, so partSource returns null throughout
+// and the map comes back empty — every die outlines ivory and the card
+// paints no key, which is the same leak-free read as before.
+function sourceColorMap(entry) {
+  const m = new Map();
+  if (!entry || !Array.isArray(entry.parts)) return m;
+  entry.parts.forEach((_, i) => {
+    const s = partSource(entry, i);
+    if (!s || m.has(s)) return;
+    m.set(s, OUTLINE_COLORS[m.size % OUTLINE_COLORS.length]);
+  });
+  return m;
+}
+
 let outlined = []; // [{mesh, shell}] — cleared on unhover and every repaint
 function outlineRollDice(on) {
   for (const o of outlined) {
@@ -2460,13 +2527,8 @@ function outlineRollDice(on) {
   if (!on || !lastEntry || !currentRoll || currentRoll.rollId !== lastEntry.rollId
       || banner.classList.contains('hidden')) return;
   const entry = lastEntry;
-  const srcColor = new Map();
-  const colorFor = (i) => {
-    const s = partSource(entry, i);
-    if (!s) return '#f3ead7';
-    if (!srcColor.has(s)) srcColor.set(s, OUTLINE_COLORS[srcColor.size % OUTLINE_COLORS.length]);
-    return srcColor.get(s);
-  };
+  const srcColor = sourceColorMap(entry);
+  const colorFor = (i) => srcColor.get(partSource(entry, i)) || OUTLINE_LOOSE;
   currentRoll.dice.forEach((d, i) => {
     if (!d.mesh || !entry.parts[i]) return;
     const shell = new THREE.Mesh(
@@ -2809,12 +2871,32 @@ function renderChips(entry, dice, staged = false) {
   positionChips();
 }
 
+// One swatch: the pool's outline hue as a filled dot, aria-hidden and
+// text-free so it costs the copy/paste and screen-reader reads nothing.
+// A KEY, NOT A RECOLOR — the label text stays --muted small-caps, because
+// tier colors (success/fail/crit) own meaning-bearing color on these
+// surfaces and six arbitrary hues competing with them would read as
+// outcomes. Returns null when there is nothing to key, so callers can
+// `if (sw) label.prepend(sw)` without branching on the roll's shape.
+function srcSwatch(colors, key) {
+  if (!colors || !colors.size) return null; // no named pool: no key to teach
+  const el = document.createElement('span');
+  el.className = 'src-key';
+  el.setAttribute('aria-hidden', 'true');
+  el.dataset.src = key || ''; // '' is the loose group; see cardKey
+  el.style.setProperty('--src-hue', colors.get(key) || OUTLINE_LOOSE);
+  return el;
+}
+
 // Attributed math (GOALS invariant): the banner's breakdown line says the same
 // thing the log line does — EVERY die (struck when it does not count, ✴ on an
 // explosion child), then the dice subtotal and the modifier tail with its
 // named sources. Shares the log's classes so both surfaces read identically.
 // A lone die with nothing to attribute stays bare; hidden rolls say nothing.
-function renderBreakdown(el, entry, hidden) {
+// `key` paints the hover legend (see srcSwatch) — the BANNER passes it,
+// because the banner is the surface whose hover outlines the felt. The peek
+// does not: a key to a highlight that never paints is decoration.
+function renderBreakdown(el, entry, hidden, key = false) {
   el.textContent = '';
   if (hidden) return;
   // Exactly the log's list, unfiltered: a +0 the player deliberately named
@@ -2849,8 +2931,14 @@ function renderBreakdown(el, entry, hidden) {
       if (!byKey.has(k)) { byKey.set(k, []); order.push(k); }
       byKey.get(k).push(p);
     });
+    const colors = key ? sourceColorMap(entry) : null;
     order.forEach((k, gi) => {
       if (gi) el.append('  \u00b7  ');
+      // The loose group ('') gets its ivory dot too \u2014 otherwise the one row
+      // of dice the hover paints in a color the card never mentions is the
+      // one the key was supposed to explain.
+      const sw = srcSwatch(colors, k);
+      if (sw) el.appendChild(sw);
       if (k) {
         const l = document.createElement('span');
         l.className = 'log-part-label';
@@ -2968,7 +3056,7 @@ function renderTally(el, entry) {
 // ALL-quiet pool says 'quiet' once instead and its chips stay bare (dash
 // and word together would mark the same silence twice). One-die rolls
 // wear `oc-solo`: the single answer word IS the verdict, at hero scale.
-function renderOutcomeRows(el, entry) {
+function renderOutcomeRows(el, entry, key = false) {
   el.textContent = '';
   const outcomes = entryOutcomes(entry);
   if (!outcomes) return false;
@@ -2986,14 +3074,21 @@ function renderOutcomeRows(el, entry) {
   // Callers add their surface classes AFTER this render (classList.add,
   // never className =), so the ledger mark set here survives.
   el.classList.toggle('oc-ledger', groups.some((g) => g.label));
+  const colors = key ? sourceColorMap(entry) : null;
   for (const g of groups) {
     const row = document.createElement('div');
     row.className = 'tally-group outcome-row';
     if (outcomes.length === 1) row.classList.add('oc-solo');
-    if (g.label) {
+    const sw = srcSwatch(colors, g.label);
+    // A loose group inside a keyed ledger still gets a label cell — holding
+    // nothing but its ivory dot — so the spine stays a spine and the one row
+    // the hover colors differently is not the one row the key skips.
+    if (g.label || sw) {
       const l = document.createElement('span');
       l.className = 'tally-src';
-      l.textContent = `${g.label} `; // real space: the grouping survives copy/paste
+      if (sw) l.appendChild(sw);
+      // real space: the grouping survives copy/paste
+      if (g.label) l.append(`${g.label} `);
       row.appendChild(l);
     }
     const cell = document.createElement('span');
@@ -3080,7 +3175,8 @@ function renderRollResults(entry, dice, fx = true) {
   // repeated every source and face the rows already carry; that duplication
   // was the muddle). Sum systems keep the meaning word + breakdown pair.
   resultMeaningEl.className = ''; // reset FIRST: renderOutcomeRows marks oc-ledger
-  const perDieRows = !hidden && renderOutcomeRows(resultMeaningEl, entry);
+  // `true` = paint the hover key: this card's hover is what outlines the felt.
+  const perDieRows = !hidden && renderOutcomeRows(resultMeaningEl, entry, true);
   if (perDieRows) {
     resultMeaningEl.classList.add('result-tally', 'result-outcomes');
     resultMeaningEl.title = 'each die reads its own outcome — the die and face beside each word';
@@ -3096,7 +3192,7 @@ function renderRollResults(entry, dice, fx = true) {
     resultMeaningEl.title = '';
   }
   if (perDieRows) resultBreakdownEl.textContent = '';
-  else renderBreakdown(resultBreakdownEl, entry, hidden);
+  else renderBreakdown(resultBreakdownEl, entry, hidden, true);
 
   // Interim dc verdict (fixed decision): above the meaning word, gold/red.
   // Hidden result, public stakes (goal 11): the DC still shows, the verdict
@@ -5125,6 +5221,25 @@ window.__diceDebug = {
   clearRoll(rollId) { return requestClearRoll(rollId); },
   get sinkingCount() { return sinking.length; },
   get pendingClears() { return [...pendingClears]; },
+  // HOW a die leaves (see CLEAR_STYLES). 'lift' ships; 'fold' and 'sink' are
+  // here to be judged against it in a live tab, and for the pin below to
+  // assert what each one actually does rather than what its name suggests.
+  get clearStyle() { return clearStyle; },
+  setClearStyle(name) {
+    if (!CLEAR_STYLES[name]) return false;
+    clearStyle = name;
+    return true;
+  },
+  // Departing dice, mid-flight: {dy, scale} relative to where each one was
+  // resting. dy >= 0 for every style but 'sink' is the surface claim — a die
+  // must leave the table by being taken OFF it, not by falling through it.
+  get sinkState() {
+    return sinking.filter((s) => s.mesh).map((s) => ({
+      p: Math.min(s.t / CLEAR_SINK_S, 1),
+      dy: s.mesh.position.y - s.y0,
+      scale: s.mesh.scale.x,
+    }));
+  },
   // the collect shelf (§7.7): entry point + cluster observability
   collectRoll(rollId) { return requestCollectRoll(rollId); },
   get shelf() {
@@ -5325,6 +5440,21 @@ window.__diceDebug = {
   // is a memory + GPU leak the hideBanner helper closes.
   get outlinedCount() { return outlined.length; },
   hoverBanner(on) { outlineRollDice(on !== false); return outlined.length; },
+  // The KEY as the player sees it — read back off the painted card, never
+  // recomputed from sourceColorMap. A test that called that function on both
+  // sides would prove only that a function is a function; the claim worth
+  // pinning is that the DOM the eye reads and the shells on the felt carry
+  // the same hue for the same pool. [{label, color}] in row order; label ''
+  // is the loose group's ivory dot. The label rides `data-src` rather than
+  // the parent's text: the ledger nests the dot inside its label span and
+  // the breakdown line does not, and a getter that had to know which is
+  // which would break the next time either is restyled.
+  get cardKey() {
+    return [...document.querySelectorAll('#result-banner .src-key')].map((sw) => ({
+      label: sw.dataset.src || '',
+      color: sw.style.getPropertyValue('--src-hue').trim(),
+    }));
+  },
   // The collapsed pool rail: what it shows, what is picked, and the state of
   // its one gold verb. Scenarios read THIS, never the .rp-* DOM.
   get railState() {
@@ -6495,14 +6625,15 @@ function updateTrayModsWord() {
   // only the tooltip). So the word follows the system and 'Tweak' stays dead.
   // U17 #32 APPLIES U11'S RULE RATHER THAN OVERTURNING IT. `± Moment` was
   // right when the popover held two of seven sections. After the fold keys
-  // off usesTotal and Target, pairing, keep/drop and reroll come back, it
-  // holds SIX of seven — and naming one of six is the same defect U11 fixed.
+  // off usesTotal and Target, keep/drop and reroll come back, it holds FIVE
+  // of seven — and naming one of five is the same defect U11 fixed.
   const full = activeSystem().usesTotal;
   trayModsBtn.textContent = '± Modify';
   trayModsBtn.title = full
     ? 'Modifiers, target, moment'
-    : 'Target, moment, visibility, keep/drop — everything but the flat bonus, '
-      + 'which needs a total this system never computes';
+    : 'Target, moment, visibility, keep/drop — everything but the flat bonus '
+      + '(which needs a total this system never computes) and d20 pairing '
+      + '(which this chart has no reading for)';
 }
 updateTrayModsWord();
 
@@ -9361,6 +9492,9 @@ function openPopover(binding) {
   // inside it — a target is a stake and must be AUTHORABLE under every
   // system. It round-tripped invisibly before: loaded by popStateFromParse,
   // emitted by popCanonical, printed into #pop-echo, and shown in no row.
+  // 2026-08-09: d20 pairing (.sec-pair) folds again — Joe, on the chart, not
+  // on the arithmetic. It round-trips invisibly the way Target once did,
+  // which is the accepted cost for everything inside this fold.
   popEl.classList.toggle('pop-perdie', !activeSystem().usesTotal);
   popEl.classList.remove('hidden');
   renderPopIdentity(); // the Sheet Pass strip (group popovers only)
@@ -13783,7 +13917,15 @@ function openIdentityMenu() {
   // THE TABLE is ABSENT in the lobby — not greyed, not a refusal on click.
   // There is no link to copy, no seat to change, and no table to leave.
   idmShow('idm-invite', !IN_LOBBY);
-  idmShow('idm-leave', !IN_LOBBY);
+  // 'Change seat…' is WITHHELD, everywhere, since 2026-08-09 (Joe: "maybe
+  // not fully thought through — strongly consider hiding it for now"). It is
+  // the one menu item that deletes LS_NAME on the way out, and since C10 the
+  // door itself offers a returning player their prepared seat, so 'Leave
+  // table' → the door is the same journey without the name loss. The button,
+  // its handler and leaveTable() all STAY: it is still the only scripted way
+  // to reach a netOnline=false state mid-scenario, and un-hiding is one
+  // boolean when the verb is thought through. See ROADMAP C26.
+  idmShow('idm-leave', false);
   idmShow('idm-lobby', !IN_LOBBY);
   document.getElementById('idm-rename-row').classList.add('hidden');
   identityMenu.classList.remove('hidden');

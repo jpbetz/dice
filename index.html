@@ -483,10 +483,14 @@ limitations under the License.
        §3b/L3 split two verbs that used to wear one label: 'Change seat…' drops
        THIS SEAT and re-prompts at the same table (what the old 'Leave & switch
        seat' actually did), while 'Leave table' goes to the lobby and KEEPS your
-       name. The three table-scoped items below are hidden outright in the
+       name. The table-scoped items below are hidden outright in the
        lobby — there is no link to copy, no seat to change, no table to leave —
        by inline display, since .idm-item's own `display:block` outranks the
-       [hidden] attribute and this codebase has no global .hidden utility. -->
+       [hidden] attribute and this codebase has no global .hidden utility.
+       'Change seat…' is hidden EVERYWHERE since 2026-08-09 (Joe) — see
+       openIdentityMenu for why, and ROADMAP C26 for what it owes before it
+       comes back. It stays in the markup: the element and leaveTable() are
+       still the scripted door to an offline state. -->
   <div id="identity-menu" class="panel hidden">
     <div class="idm-head">
       <span id="idm-who" class="idm-name"></span>
@@ -827,16 +831,18 @@ limitations under the License.
          the roll-tweak draft. Built by renderPopIdentity; group source only. -->
     <div id="pop-identity" class="hidden"></div>
     <!-- Per-die tables (Soul Deal) HIDE the sum-world sections below
-         (.sec-sum — the MODIFIER section alone since U17: a flat bonus is a
-         term in a sum and has nowhere to land without one. Target, d20
-         pairing, keep/drop and reroll/exploding all came BACK, because a
-         target is a stake the player declared and the other three decide
-         which dice count — facts under every system, and ones this profile's
-         own outcomesFor and forecastFor already honour. The fold now keys off
-         usesTotal, not the deleted usesMods. What folds still folds
-         ENTIRELY — no note, no disclosure (Joe 2026-08-06; supersedes the
-         'Show anyway' unfold of 2026-08-03). A pool's stored values ride its
-         canonical either way: notation totality is app-wide. -->
+         (.sec-sum — the MODIFIER section since U17: a flat bonus is a term
+         in a sum and has nowhere to land without one — plus .sec-pair since
+         2026-08-09, which is a judgement about the chart rather than about
+         arithmetic; see that section. Target, keep/drop and reroll/exploding
+         all came BACK, because a target is a stake the player declared and
+         the other two decide which dice count — facts under every system,
+         and ones this profile's own outcomesFor and forecastFor already
+         honour. The fold keys off usesTotal, not the deleted usesMods. What
+         folds folds ENTIRELY — no note, no disclosure (Joe 2026-08-06;
+         supersedes the 'Show anyway' unfold of 2026-08-03). A pool's stored
+         values ride its canonical either way: notation totality is
+         app-wide. -->
 
     <div class="sec sec-sum">
       <span class="plabel">Modifier</span>
@@ -851,7 +857,17 @@ limitations under the License.
       <button id="pop-add-part" class="btn tiny ghost">+ named bonus</button>
     </div>
 
-    <div class="sec tight">
+    <!-- d20 pairing folds under per-die systems too (Joe 2026-08-09: "not
+         useful for Your Soul Deal, remove from modification options"). U17
+         brought it back on the reasoning that advantage decides WHICH DIE
+         COUNTS and so is a fact under every system — true in the notation,
+         but not a tool this chart wants: a Soul Deal pool is an attribute,
+         a skill and a motivation, each die answering for its own pool, and
+         "roll the Wisdom d20 twice, keep the higher" is a sum-world habit
+         with no reading here. Same fold as .sec-sum, its own class because
+         the reason is different — one is arithmetic that has nowhere to
+         land, this one is a mechanic the chart declines. -->
+    <div class="sec tight sec-pair">
       <span class="plabel">d20 pairing</span>
       <div id="pop-seg-adv" class="seg">
         <button data-v="">Normal</button>
