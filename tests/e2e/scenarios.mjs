@@ -9785,6 +9785,296 @@ export const scenarios = [
     },
   },
   {
+    name: 'settle-displacement',
+    tags: ['roll', 'physics', 'cuj8'],
+    // A REST TEST THAT CAN SEE A DIE DITHERING IN PLACE.
+    //
+    // The shipped freeze predicate is a velocity threshold, and a velocity
+    // threshold cannot retire an oscillating body: an oscillation has velocity
+    // at every instant however small the excursion. What actually retires a
+    // dithering die today is cannon's own sleep hard-zeroing its velocities
+    // underneath us — a second retirement predicate, the one that flaps, and
+    // the whole of this table's replay drift (C30d/C30e).
+    //
+    // SETTLEGATE.mode 'displacement' is Lengyel's jitter-tolerant condition
+    // (Game Engine Gems 2 ch.23, as shipped in Jolt and Rapier): three points
+    // per die — centre of mass plus probes on the local +X and +Y at the
+    // half-width — each growing an AABB, all three inside `eps` for
+    // SETTLE_STILL meaning at rest.
+    //
+    // The mechanism is OFF in this build (mode 'velocity'). What this scenario
+    // pins is therefore the GUARANTEE and the MACHINERY, never a benchmark:
+    // "it settles faster" is a result that depends on the seed family and the
+    // machine, while "a die that froze provably moved less than eps" is a
+    // property of the predicate and either holds or does not.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      const pool = Array(20).fill('d6');
+      // 20d6 because the claim is about DITHERING and a crowded mat is where
+      // dithering happens; four seeds because each judges ~17 dice, so the
+      // sample is 60+ freezes per phase, not four.
+      const seeds = [1000, 8919, 16838, 24757];
+      const EPS = 0.02;
+
+      const throwOne = async (seed) => {
+        await a.dbg(`throwSeeded(${JSON.stringify(pool)}, ${seed})`);
+        await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+          { desc: `20d6/${seed} plays out`, timeout: 30000 });
+        const p = await a.dbg('settleProfile()');
+        const probe = await a.dbg('settleProbe()');
+        await a.dbg('clearTable()');
+        await a.dbg('sim(60)');
+        return { seed, probe, ...p };
+      };
+      const sig = (p) => `${p.duration}|${p.frames}|${p.nudged}`;
+
+      // --- 1. off is off ----------------------------------------------------
+      const gate0 = await a.dbg('settleGate');
+      assert.equal(gate0.mode, 'velocity',
+        `the shipped terminator is the velocity predicate; found mode ${gate0.mode}`);
+      const off = [];
+      for (const s of seeds) off.push(await throwOne(s));
+
+      // --- 2. the film and the mechanism are the same number ----------------
+      // settleProfile's endDisp is what the terminator SAYS it enforced.
+      // settleProbe re-derives it from the baked keyframes, which is the only
+      // way to catch a gate reporting a number it did not enforce (C27's rule,
+      // and why `hops` is read off the film rather than off a counter). This
+      // check found a real bug: the window is 28 frames, not 27 — twenty-seven
+      // additions of 1/60 sum to 0.44999999999999996 — and while the probe
+      // used 27 the two disagreed by 11% of eps on exactly this pool.
+      //
+      // Only dice whose whole window survived the tail cut can be judged: the
+      // film ends at the LAST die's settle frame, so the deciding die has none
+      // of its window on file.
+      const judgeable = (p) => p.probe.filter((x) => x.full && !x.timedOut);
+      for (const p of off) {
+        const j = judgeable(p);
+        assert.ok(j.length >= 8,
+          `seed ${p.seed}: only ${j.length} dice have a full window on film — nothing to judge`);
+        const worst = j.reduce((m, x) => Math.max(m, Math.abs(x.probe - x.endDisp)), 0);
+        assert.ok(worst < 1e-9,
+          `seed ${p.seed}: the film says ${worst.toExponential(2)} more movement than the `
+          + 'terminator reported — endDisp is a self-report, not evidence');
+      }
+
+      // --- 3. three points, because one cannot see rotation -----------------
+      // A die spinning about its centre never moves its centre at all, so a
+      // one-point rest test calls it still. The probes ride the body's local
+      // +X and +Y at the half-width; measured across these pools the worst
+      // per-seed ratio runs 1.33x to 3.43x, so a die really is moving several
+      // times further at its corners than at its middle when it stops.
+      const ratio = off.reduce((m, p) => Math.max(m, judgeable(p).reduce(
+        (n, x) => Math.max(n, x.centre > 1e-9 ? x.probe / x.centre : 0), 0)), 0);
+      assert.ok(ratio > 1.5,
+        `the worst probe/centre ratio was ${ratio.toFixed(2)} — the off-axis probes are `
+        + 'seeing no more than the centre does, so the three-point test is a one-point test');
+
+      // --- 4. the guarantee, which is the whole point -----------------------
+      await a.dbg(`setSettleGate({"mode":"displacement","eps":${EPS}})`);
+      const on = [];
+      for (const s of seeds) on.push(await throwOne(s));
+      for (const p of on) {
+        // `loose` counts CLEAN freezes whose window exceeded the gate's own
+        // epsilon. Under displacement it is zero by construction, so a nonzero
+        // count here means the box test is not wired into the freeze path.
+        assert.equal(p.loose, 0,
+          `seed ${p.seed}: ${p.loose} dice froze cleanly having moved more than eps — `
+          + 'the box test is not deciding the freeze');
+        assert.ok(p.maxEndDisp < EPS,
+          `seed ${p.seed}: worst die moved ${p.maxEndDisp} of a die-width over the window `
+          + `that earned its freeze, against an eps of ${EPS}`);
+        // …and the film agrees, on this mode too.
+        const worst = judgeable(p).reduce((m, x) => Math.max(m, Math.abs(x.probe - x.endDisp)), 0);
+        assert.ok(worst < 1e-9,
+          `seed ${p.seed}: film and mechanism disagree by ${worst.toExponential(2)} under displacement`);
+      }
+      assert.ok(seeds.some((_, i) => sig(on[i]) !== sig(off[i])),
+        'displacement left every throw identical to velocity, so claims 4 and 5 prove nothing');
+
+      // --- 5. the predicate is really consulted -----------------------------
+      // Nothing subtle: at 0.0002 of a die-width the box is tighter than this
+      // solver's own contact chatter, so no die can ever hold it and every one
+      // must run to SETTLE_CAP. A silent run means the freeze test is not
+      // reading the boxes at all. (This is the displacement twin of
+      // pile-refusal's bar-at-0.5x claim.)
+      await a.dbg('setSettleGate({"mode":"displacement","eps":0.0002})');
+      const absurd = await throwOne(seeds[0]);
+      assert.ok(absurd.timedOut > 0,
+        `eps 0.0002 still froze every die — the freeze test is not consulting the boxes`);
+
+      // --- 6. the off sentinel restores exactly, leaving no residue ---------
+      // mode 'velocity' has to mean "this code was never here", or every
+      // measurement taken against it is measuring the instrument.
+      //
+      // AND IT CANNOT BE PINNED ON 20d6, WHICH IS ITSELF A FINDING. The first
+      // version of this check re-threw the 20d6 family and failed with seed
+      // 1000 coming back 4.683 s/282 fr instead of 5.333 s/321 fr. That is not
+      // residue from the gate — it is the SHIPPED build's own replay drift,
+      // the same signature tools/steps/replay-drift.mjs reproduces on master
+      // (4 of 8 20d6 seeds move materially after churn; ROADMAP C31). Twenty
+      // dice and a dozen throws of accumulated world.time is all it takes.
+      // So the sentinel is pinned on the soul pool, whose duration and frame
+      // count DO replay (its drift is pose-only at 5e-6), and the pool that
+      // cannot hold still is left to the tool that exists to measure that.
+      await a.dbg('setSettleGate({"mode":"velocity","eps":0.02})');
+      const soul = ['d8', 'd8', 'd4', 'd6'];
+      const soulSig = async (seed) => {
+        await a.dbg(`throwSeeded(${JSON.stringify(soul)}, ${seed})`);
+        await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+          { desc: `soul/${seed} plays out`, timeout: 30000 });
+        const p = await a.dbg('settleProfile()');
+        await a.dbg('clearTable()');
+        await a.dbg('sim(60)');
+        return sig(p);
+      };
+      const soulSeeds = [1000, 8919, 16838];
+      const before = [];
+      for (const s of soulSeeds) before.push(await soulSig(s));
+      await a.dbg(`setSettleGate({"mode":"displacement","eps":${EPS}})`);
+      const during = [];
+      for (const s of soulSeeds) during.push(await soulSig(s));
+      await a.dbg('setSettleGate({"mode":"velocity","eps":0.02})');
+      const after = [];
+      for (const s of soulSeeds) after.push(await soulSig(s));
+      soulSeeds.forEach((s, i) => {
+        assert.equal(after[i], before[i],
+          `seed ${s}: returning to the velocity gate did not restore the throw `
+          + `(${before[i]} -> ${after[i]})`);
+      });
+      assert.ok(soulSeeds.some((_, i) => during[i] !== before[i]),
+        'the displacement gate changed nothing on the soul pool, so the restore proves nothing');
+    },
+  },
+  {
+    name: 'tempo-curve',
+    tags: ['roll', 'physics', 'cuj1'],
+    // THE PROJECTOR, AND WHY IT IS NOT A PHYSICS CHANGE.
+    //
+    // GRAVITY is 7.5x too weak for the scale, so everything on this table
+    // settles 2.7x too slowly (C30d). Newton is invariant under t -> t/k when
+    // g -> k^2 g, so the same film played k times faster IS the corrected
+    // world — no re-bake, no determinism risk. But a uniform k was A/B'd on
+    // the live table and refused: 2.2 is "way too fast for the main dice roll"
+    // and "fine for resolution". So the projector runs a CURVE — `flight`
+    // while the dice are still travelling, `settle` once they are down.
+    //
+    // Everything here is INERT in this build (k = 1, flight = settle = 1).
+    // What is pinned is that the mechanism cannot leak: not into the bake, not
+    // into `sim()`, and not into the click gate.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      const pool = ['d8', 'd8', 'd4', 'd6'];
+      const seeds = [1000, 8919, 16838];
+
+      // P6: every sample below reads a clock. holdClock makes the world
+      // advance exactly as far as sim() says and no further — without it this
+      // races rAF across CDP round trips and passes or fails on scheduling.
+      await a.dbg('holdClock(true)');
+
+      // --- 1. inert is inert ------------------------------------------------
+      const c0 = await a.dbg('tempoCurve');
+      assert.equal(await a.dbg('tempo'), 1, 'the shipped uniform tempo is 1');
+      assert.equal(c0.flight, 1, `the shipped curve opens at 1, found ${c0.flight}`);
+      assert.equal(c0.settle, 1, `the shipped curve ends at 1, found ${c0.settle}`);
+
+      // --- 2. the click gate at k=1 is exactly the 35 ms that shipped -------
+      // Read off the app rather than restated here: a test carrying its own
+      // copy of the number it checks passes forever.
+      const g = await a.dbg('clickGate');
+      assert.equal(g.mode, 'wall', `the shipped click gate is the wall gate, found ${g.mode}`);
+      assert.equal(g.filmGapMs, 35, `the film gap is ${g.filmGapMs}ms, not the shipped 35`);
+      assert.equal(g.wallFloorMs, 12, `the wall floor is ${g.wallFloorMs}ms, not the shipped 12`);
+
+      const throwOne = async (seed) => {
+        await a.dbg(`throwSeeded(${JSON.stringify(pool)}, ${seed})`);
+        const p = await a.dbg('settleProfile()');
+        // Drain in BAKED frames and count them. sim(n) must step the film n
+        // frames whatever the projector is set to — that is the property every
+        // other scenario in this file is silently relying on.
+        const frames = Number(await a.eval(`(() => { let f = 0;
+          while (window.__diceDebug.busy && f < 20000) { window.__diceDebug.sim(1); f++; }
+          return f; })()`));
+        await a.dbg('clearTable()');
+        await a.dbg('sim(60)');
+        return { seed, frames, ...p };
+      };
+
+      const base = [];
+      for (const s of seeds) base.push(await throwOne(s));
+
+      // --- 3. the tempo does not reach sim() --------------------------------
+      // The uniform knob first, because the curve is built on the same seat.
+      // If either leaked, every scenario that drains with sim() would silently
+      // change length and the suite would go red somewhere else entirely.
+      await a.dbg('setTempo(2)');
+      const atK = [];
+      for (const s of seeds) atK.push(await throwOne(s));
+      await a.dbg('setTempo(1)');
+      seeds.forEach((s, i) => {
+        assert.equal(atK[i].frames, base[i].frames,
+          `seed ${s}: sim() drained ${atK[i].frames} frames at k=2 against ${base[i].frames} `
+          + 'at k=1 — the projector has leaked into the debug stepper');
+        assert.equal(atK[i].duration, base[i].duration,
+          `seed ${s}: the BAKE moved at k=2 (${base[i].duration} -> ${atK[i].duration})`);
+      });
+
+      // --- 4. the anchor is a function of the film --------------------------
+      // Which is what makes the curve safe to arm: every client bakes the same
+      // film from the seed, so every client changes gear at the same instant.
+      // Re-throwing a seed must reproduce its anchor exactly.
+      seeds.forEach((s, i) => {
+        assert.equal(atK[i].tempoAnchor, base[i].tempoAnchor,
+          `seed ${s}: the same seed anchored at ${base[i].tempoAnchor} then `
+          + `${atK[i].tempoAnchor} — the anchor is not a pure function of the bake`);
+        assert.ok(base[i].tempoAnchor > 0 && base[i].tempoAnchor < base[i].duration,
+          `seed ${s}: anchor ${base[i].tempoAnchor} is not inside the film `
+          + `(duration ${base[i].duration}) — the curve would never engage`);
+      });
+
+      // --- 5. the curve is monotone and opens at exactly `flight` -----------
+      // Sampled on a LIVE roll, because tempoAt reads the current roll's own
+      // anchor. The staged candidate, not the inert default, or the samples
+      // are all 1 and the check is vacuous.
+      await a.dbg('setTempoCurve({"flight":1,"settle":2.2,"rampS":0.4})');
+      await a.dbg(`throwSeeded(${JSON.stringify(pool)}, ${seeds[0]})`);
+      const prof = await a.dbg('settleProfile()');
+      const N = 60;
+      const ks = [];
+      for (let i = 0; i <= N; i++) {
+        ks.push(Number(await a.dbg(`tempoAt(${(prof.duration * i) / N})`)));
+      }
+      await a.eval('(() => { while (window.__diceDebug.busy) window.__diceDebug.sim(120); return 1; })()');
+      await a.dbg('clearTable()');
+      await a.dbg('sim(60)');
+      await a.dbg('setTempoCurve({"flight":1,"settle":1,"rampS":0.4})');
+
+      assert.equal(ks[0], 1, `the curve opens at ${ks[0]}, not at flight (1)`);
+      for (let i = 1; i < ks.length; i++) {
+        assert.ok(ks[i] >= ks[i - 1] - 1e-12,
+          `the curve went backwards at sample ${i}: ${ks[i - 1]} -> ${ks[i]}`);
+      }
+      assert.ok(ks[ks.length - 1] > 2,
+        `the curve only reached ${ks[ks.length - 1]} by the end of the film — it never `
+        + 'changes gear, so monotonicity above proves nothing');
+
+      // --- 6. the sentinels restore, leaving no residue ---------------------
+      const backC = await a.dbg('tempoCurve');
+      assert.equal(backC.flight, 1, 'the curve did not return to flight 1');
+      assert.equal(backC.settle, 1, 'the curve did not return to settle 1');
+      const back = [];
+      for (const s of seeds) back.push(await throwOne(s));
+      seeds.forEach((s, i) => {
+        assert.equal(back[i].frames, base[i].frames,
+          `seed ${s}: the throw did not drain the same after the curve was disarmed`);
+        assert.equal(back[i].duration, base[i].duration,
+          `seed ${s}: the bake did not restore after the curve was disarmed`);
+      });
+
+      await a.dbg('holdClock(false)');
+    },
+  },
+  {
     name: 'table-name-survives-round-trip',
     tags: ['lobby', 'cuj2'],
     // §3b L3 + initNet's name restoration: an UNPREPARED room is deleted the

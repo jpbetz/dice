@@ -39,7 +39,12 @@ limitations under the License.
 // flying), but it makes 7 a distinguished value: a threshold above it ignores
 // the hop, one below it waits for it out. Both readings are printed.
 //
-//   node tools/drive.mjs tools/steps/tempo-anchor.mjs [seeds] [speeds]
+// AND IT MUST BE SWEPT TWICE. The anchor is a fraction of the PLAYED duration,
+// and the displacement terminator cuts that duration by a third to a half — so
+// "how much of the throw runs at flight" is a different question before and
+// after it. Pass `disp` to arm the candidate terminator for the sweep.
+//
+//   node tools/drive.mjs tools/steps/tempo-anchor.mjs [seeds] [speeds] [disp]
 
 const POOLS = [
   ['1d20', ['d20']],
@@ -58,10 +63,16 @@ function table(head, rows) {
   for (const r of rows) console.log(line(r));
 }
 
-export default async function run(stage, [seedCount = '8', speedArg = '2,4,5,6,8,12']) {
+export default async function run(stage, [seedCount = '8', speedArg = '2,4,5,6,8,12', disp = '']) {
   const n = Number(seedCount);
   const speeds = speedArg.split(',').map(Number);
   const a = await stage.tab('localhost', 'Anchor');
+  if (disp === 'disp') {
+    await a.dbg('setSettleGate({"mode":"displacement","eps":0.02})');
+    await a.dbg('setBodyFlags({"allowSleep":false})');
+    console.log(`terminator ARMED: ${JSON.stringify(await a.dbg('settleGate'))}`
+      + ` bodyFlags ${JSON.stringify(await a.dbg('bodyFlags'))}`);
+  }
   const seeds = Array.from({ length: n }, (_, i) => 1000 + i * 7919);
   console.log(`tempo curve (inert): ${JSON.stringify(await a.dbg('tempoCurve'))}\n`);
 

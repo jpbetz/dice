@@ -34,6 +34,19 @@ limitations under the License.
 // the drift is worth an eye — so the default now sweeps three pools and each
 // carries its own seed count.
 //
+// EACH POOL GETS ITS OWN before/churn/after CYCLE, AND THAT IS NOT TIDINESS.
+// The first pool-generalized version threw every family, churned once, and
+// re-threw every family — and in that shape SHIPPED came back 8/8 on 20d6.
+// Run 20d6 by itself and shipped is 4 of 8, with seed 8919 replaying a 5.5 s
+// throw as an 8.55 s one. The drift is a KNIFE EDGE: how much unrelated
+// history precedes a family decides which side of cannon's sleep decision it
+// lands on, so interleaving three pools quietly moved 20d6 onto the safe side
+// and reported a clean bill for a build with a live production bug (C31).
+//
+// So: a PASSING drift run is weak evidence and a FAILING one is strong. This
+// file cannot prove a tuning replays; it can only fail to catch it not
+// replaying. Judge a candidate on one pool per invocation as well as here.
+//
 //   node tools/drive.mjs tools/steps/replay-drift.mjs [variant] [seeds] [churn] [pools]
 //     variant: shipped | candidate | sleepier   (sleepier must FAIL)
 //     seeds:   overrides EVERY pool's count (default: per-pool, see POOLS)
@@ -142,71 +155,64 @@ export default async function run(stage,
     + '|' + window.__diceDebug.currentRoll.frames
     + '|' + window.__diceDebug.currentRoll.nudges`);
 
-  // One family per pool, all thrown BEFORE the churn and all re-thrown after
-  // it: the accumulated world.time has to be shared, or each pool would be
-  // measuring a different amount of history and the comparison between them
-  // would mean nothing.
-  const family = async (tag) => {
-    const out = new Map();
-    for (const w of wanted) {
-      const seeds = Array.from({ length: w.n }, (_, i) => 1000 + i * 7919);
-      const sigs = [];
-      for (const seed of seeds) {
-        await a.dbg(`throwSeeded(${JSON.stringify(w.types)}, ${seed})`);
-        await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
-          { desc: `${tag} ${w.name}/${seed}`, timeout: 60000 });
-        sigs.push(await poseOf());
-        await a.dbg('clearTable()');
-        await a.dbg('sim(60)');
-      }
-      out.set(w.name, { seeds, sigs });
+  const family = async (tag, w) => {
+    const seeds = Array.from({ length: w.n }, (_, i) => 1000 + i * 7919);
+    const sigs = [];
+    for (const seed of seeds) {
+      await a.dbg(`throwSeeded(${JSON.stringify(w.types)}, ${seed})`);
+      await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+        { desc: `${tag} ${w.name}/${seed}`, timeout: 60000 });
+      sigs.push(await poseOf());
+      await a.dbg('clearTable()');
+      await a.dbg('sim(60)');
     }
-    return out;
+    return { seeds, sigs };
   };
-
-  const before = await family('before');
   // Churn in the PAGE, fifty at a time: 900 CDP round trips would cost more
   // than the physics does, and what has to accumulate is world.time, which
   // only playRoll's bake advances.
   //
   // EACH THROW MUST BE DRAINED. playRoll QUEUES when a roll is already
   // playing, so a tight loop of throwSeeded bakes exactly one throw and pushes
-  // the rest onto rollQueue — world.time does not move, and the queue then drains
-  // into the middle of the measurement. First version of this step did that,
-  // "churned the lot in 1s", and reported a drift that was really the
-  // after-family landing on a table littered with 700 rolls' worth of dice.
+  // the rest onto rollQueue — world.time does not move, and the queue then
+  // drains into the middle of the measurement. First version of this step did
+  // that, "churned the lot in 1s", and reported a drift that was really the
+  // after-family landing on a table littered with 900 rolls' worth of dice.
   // The elapsed seconds and the leftover-dice count below are printed so that
   // failure cannot come back silently.
-  const t0 = Date.now();
-  for (let done = 0; done < churn; done += 50) {
-    const k = Math.min(50, churn - done);
-    await a.eval(`(() => { for (let i = 0; i < ${k}; i++) {
-      window.__diceDebug.throwSeeded(['d6'], 500000 + ${done} + i);
-      let guard = 0;
-      while (window.__diceDebug.busy && guard++ < 400) window.__diceDebug.sim(20);
-      window.__diceDebug.clearTable();
-      window.__diceDebug.sim(60);
-    } return true; })()`);
-  }
-  await a.dbg('sim(120)');
-  const left = await a.dbg('tableDice.length');
-  console.log(`\nchurned ${churn} unrelated throws in ${Math.round((Date.now() - t0) / 1000)}s`
-    + `, ${left} dice left on the table`);
-  if (left) throw new Error(`the churn left ${left} dice behind; the replay would measure those`);
-  const after = await family('after');
+  const churnOnce = async () => {
+    const t0 = Date.now();
+    for (let done = 0; done < churn; done += 50) {
+      const k = Math.min(50, churn - done);
+      await a.eval(`(() => { for (let i = 0; i < ${k}; i++) {
+        window.__diceDebug.throwSeeded(['d6'], 500000 + ${done} + i);
+        let guard = 0;
+        while (window.__diceDebug.busy && guard++ < 400) window.__diceDebug.sim(20);
+        window.__diceDebug.clearTable();
+        window.__diceDebug.sim(60);
+      } return true; })()`);
+    }
+    await a.dbg('sim(120)');
+    const left = await a.dbg('tableDice.length');
+    console.log(`  churned ${churn} unrelated throws in ${Math.round((Date.now() - t0) / 1000)}s`
+      + `, ${left} dice left on the table`);
+    if (left) throw new Error(`the churn left ${left} dice behind; the replay would measure those`);
+  };
 
   let allSame = true;
   const verdicts = [];
   for (const w of wanted) {
-    const { seeds, sigs } = before.get(w.name);
-    const post = after.get(w.name).sigs;
+    console.log(`\n--- ${w.name} x${w.n} ---`);
+    const { seeds, sigs } = await family('before', w);
+    await churnOnce();
+    const post = (await family('after', w)).sigs;
     let same = 0;
     const drifted = [];
     sigs.forEach((b, i) => {
       if (b === post[i]) same++;
       else drifted.push(seeds[i]);
     });
-    console.log(`\n${w.name} — replay after churn: ${same}/${w.n} byte-identical`);
+    console.log(`  replay after churn: ${same}/${w.n} byte-identical`);
     if (drifted.length) console.log(`  drifted seeds: ${drifted.join(', ')}`);
     // WHICH FIELD MOVED, not just that something did. A pose float in the
     // fifteenth decimal is float-order noise inside one client; a different
@@ -234,7 +240,9 @@ export default async function run(stage,
   const expectFail = variant === 'sleepier';
   console.log(`\n  ${allSame
     ? (expectFail ? 'IDENTICAL — but this variant is the CONTROL and was supposed to drift;'
-      + ' the instrument is not proving anything' : 'IDENTICAL on every pool — the same seed replays')
+      + ' the instrument is not proving anything'
+      : 'IDENTICAL on every pool — the same seed replays. Weak evidence: see the'
+        + ' false-negative note at the top of this file')
     : (expectFail ? 'DRIFTED — the control drifts, so the check can detect drift'
       : 'DRIFTED — this tuning does not replay; do not ship it')}`);
 }

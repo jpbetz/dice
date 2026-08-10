@@ -6007,7 +6007,12 @@ window.__diceDebug = {
   // performance.now(), which the rAF batching quantises into a click every
   // third frame at k=1. 'film' gates the recorded train instead and keeps only
   // the 12 ms wall floor. Takes effect on the NEXT impact.
-  get clickGate() { return { ...CLICKGATE }; },
+  // The two constants ride along because a scenario that wants to pin "at k=1
+  // the gate is exactly the 35 ms that shipped" must not restate 35 itself —
+  // a test carrying its own copy of the number it is checking passes forever.
+  get clickGate() {
+    return { ...CLICKGATE, filmGapMs: IMPACT_MIN_GAP_MS, wallFloorMs: IMPACT_HARD_GAP_MS };
+  },
   setClickGate(o) {
     const m = o && o.mode;
     if (m === 'wall' || m === 'film') CLICKGATE.mode = m;
@@ -6161,7 +6166,12 @@ window.__diceDebug = {
       // die-widths. Under `displacement` this is bounded by `eps` for every
       // die that froze cleanly — the guarantee, measurable from outside.
       // Under `velocity` it is unbounded and reports what that gate let by.
-      maxEndDisp: Math.round(Math.max(0, ...r.landings.map((l) => l.endDisp ?? 0)) * 10000) / 10000,
+      // SIX DECIMALS, NOT FOUR, AND THAT IS NOT FUSSiness. The guarantee is a
+      // STRICT inequality against eps, and eps is 0.02 — a worst die at
+      // 0.019953 rounded to four places reads as exactly 0.02 and makes the
+      // assertion that states the guarantee fail on the report rather than on
+      // the mechanism. `settle-displacement` caught it on the first run.
+      maxEndDisp: Math.round(Math.max(0, ...r.landings.map((l) => l.endDisp ?? 0)) * 1e6) / 1e6,
       // Dice that froze CLEANLY (not at the cap) and still moved more than the
       // gate's own epsilon over their window. Zero by construction in
       // `displacement` mode; a nonzero count there means the box test is not

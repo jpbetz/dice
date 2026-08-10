@@ -1363,12 +1363,18 @@ zeroed), shipped inert. At vy 1/2/4 over 16 paired seeds:
 
 | | vy1 | vy2 | vy4 |
 |---|---|---|---|
-| shake, soul | **+38%** | +29% | +27% |
-| hops, soul | **+13%** | +5% | +13% |
-| dur, 8d6 | +13% | **+47%** | +15% |
-| creep, 1d20 | +9% | +46% | +28% |
-| pile, close/6d6 | +0pp | +5pp | +5pp |
-| replay | 15/16, **tail moved** | 15/16, **tail moved** | — |
+| shake, soul (16 seeds) | **+38%** | +29% | +27% |
+| hops, soul (16 seeds) | **+13%** | +5% | +13% |
+| dur, 8d6 (16 seeds) | +13% | **+47%** | +15% |
+| creep, 1d20 (16 seeds) | +9% | +46% | +28% |
+| pile, close/6d6 (**10 seeds**) | +0pp | +5pp | +5pp |
+| replay, soul (16 seeds) | 15/16, **tail moved** | 15/16, **tail moved** | — |
+
+*The pile row is a TEN-seed measurement and the rest are sixteen; the table
+printed them side by side unlabelled, which reads as one run and is not.
+`settle-matrix.mjs` takes the two counts as separate arguments, so any row
+quoted from it has to carry the one it was measured at. At 40 seeds a ±2pp
+pile difference is 5 dice out of 240; at 10 it is 1 or 2, which is noise.*
 
 Every gate fails except the clock. The reason is that **zeroing vy does not
 glue a die down**: the contact solver re-supplies the push on the very next
@@ -1416,7 +1422,11 @@ back. `deaden+sleepoff+gate4`: **shake −21% to −34%, hops −19% to −40%**
 best numbers measured anywhere on this table), **replay 16/16**. It still
 fails on duration (8d6 +57%) and piling (medium/6d6 +8pp, flat throws 16/40
 against shipped's 33/40), plus clock 1.64× and creep +45%. **Deaden's three
-objections are now two — glide and pile — and they were always the hard two.**
+objections became four gates failing, not two.** This paragraph originally
+said "down to two — glide and pile", counting only the two it had a story
+for, in the same breath as naming the clock and the creep. Four of six gates
+fail; glide and pile are the two nobody has an answer to, which is a
+different sentence and the one that was meant.
 `sleepoff+gate4` on its own is nearly free (dur −1%, caps 5/7, clock 1.01×,
 pile +1pp) and replays 16/16, which makes it a *determinism* candidate with
 no shake claim attached.
@@ -1426,6 +1436,107 @@ no shake claim attached.
 glide — grip was measured to recover 70% of it (C30c) and has never been run
 with sleep off. (4) Deaden's pile, still unsolved; the nudge is the wrong
 instrument (C30c) and the spawn geometry is the untried one.
+
+**C30e — the terminator was the bug, and sleepoff's price was the terminator
+leaning on the thing it removed (2026-08-10, pass five).**
+
+The freeze predicate is `velocity² < 0.05` held for 0.45 s — speed under
+0.224 units/s, roughly **nine times stricter than any shipping engine's rest
+test**, and structurally the wrong shape. An oscillation has velocity at every
+instant however small the excursion, so a dithering die cannot pass a velocity
+bar however long it waits. What actually retires one today is **cannon's own
+sleep**, which hard-zeroes both velocities underneath us — and cannon's sleep
+flaps (a body re-enters AWAKE the instant combined speed crosses
+`sleepSpeedLimit` once inside `sleepTimeLimit`, resetting its own timer). So
+the app's retirement predicate has been leaning on the one mechanism that
+cannot be reproduced from a seed.
+
+`SETTLEGATE.mode = 'displacement'` is the standard answer — Eric Lengyel's
+jitter-tolerant sleep condition (*Game Engine Gems 2* ch. 23), as shipped in
+Jolt and in Rapier 0.35. Three points per die (centre of mass plus probes on
+the local +X and +Y at the half-width, because **one point cannot see
+rotation**), each growing an AABB; any box reaching `eps` restarts all three
+and restarts the clock; all three inside `eps` for `SETTLE_STILL` means at
+rest. `eps` is a fraction of the die's WIDTH, so a d4 and a d20 are judged by
+the same visual bar. Shipped inert (`velocity` = byte-identical).
+
+**The eps sweep**, 16 paired seeds behind a passing canary:
+
+| | soul dur | 8d6 dur | 20d6 dur | caps (of 80) |
+|---|---|---|---|---|
+| shipped | 2.26 | 2.42 | 6.58 | 7, of which 6 on 20d6 |
+| eps 0.01 | −23% | −15% | +2% | **5**, of which 5 on 20d6 |
+| **eps 0.02** | **−37%** | **−23%** | **−47%** | **0** |
+| eps 0.05 | −45% | −38% | −71% | 0, but pile +3pp |
+
+0.01 of a die-width is *under this solver's own contact chatter*, so the box
+never holds and the cap fires anyway. 0.05 wins biggest and starts piling.
+**0.02 is the pick.**
+
+**And the headline.** `sleepoff` alone reproduces its known price exactly —
+soul +31%, caps 7 → 11 — and pairing it with the box test **inverts** that:
+soul −35%, 8d6 −28%, 20d6 −43%, caps 0. The +31% was never sleep-off's cost.
+It was the freeze gate's dependence on the sleep it was removing, which is
+what pass five was written to test. `gate4` on top is **not** wanted: it
+pushes close/6d6 to +5pp with the flat count 3/10 → 2/10.
+
+**What it costs, honestly.** Two gates do not pass and neither is dismissible
+by assertion:
+
+- **Creep +114% on 20d6** — and the meter's anchor moved. `creep` reads the
+  0.6 s BEFORE each die's settle frame, so retiring a die sooner drags the
+  window back into the tumble. Asked *forward* instead of backward, the same
+  throws move their worst die **0.0200 of a die-width** over the window that
+  earned its freeze, with **zero** clean freezes over the bar; shipped's worst
+  is 0.0279 with three, and `sleepoff`'s 0.0319 with four. The end-of-film
+  discontinuity gets **smaller**. `endDisp` is not a self-report: `settleProbe`
+  re-derives it from the baked keyframes and the two agree to 6.6e-16.
+- **Pile +2.5pp at close/6d6 over 40 seeds** — 55 dice of 240 against
+  shipped's 49, with the flat-throw count level at 6/40; and medium/6d6 8 →
+  13 of 240 with flat 33/40 → 28/40. Real, and about a third of deaden's
+  (+8pp, flat 33/40 → 16/40). The mechanism is plausible: a die that freezes
+  earlier turns STATIC earlier, so a neighbour landing on it can no longer
+  shove it aside. `NUDGE.pileScale` exists for exactly this and has never been
+  run against a terminator this cheap.
+
+**A one-frame bug found on the way.** `SETTLE_STILL` is 0.45 s and every
+comment in `js/main.js` called that "exactly 27 frames". Twenty-seven
+additions of 1/60 sum to 0.44999999999999996, which is under the bar — the
+window is **28 frames**. Harmless to the sim (the loop is self-consistent) and
+not harmless to anything re-deriving it: `settleProbe` disagreed with the
+mechanism by 11% of `eps` until it was fixed.
+
+### C31. The same values, a different film — master does not replay 20d6
+
+**A live production bug, measured 2026-08-10.** Every client fast-forwards a
+roll from its seed and must agree; `perf-determinism` compares two FRESHLY
+LOADED tabs, so it cannot see a divergence that only appears once a tab has
+been open a while. `tools/steps/replay-drift.mjs` can: throw a seed family,
+churn 900 unrelated throws, throw it again.
+
+On **shipped master**, 20d6, 8 seeds, **4 of 8 come back a materially
+different throw**:
+
+| seed | before | after |
+|---|---|---|
+| 1000 | 4.683 s / 282 fr | 5.333 s / 321 fr |
+| 8919 | 5.5 s / 331 fr | **8.55 s / 514 fr** |
+| 16838 | 3.217 s / 194 fr | 3.0 s / 181 fr |
+| 24757 | 9.0 s / 541 fr | 7.067 s / 425 fr |
+
+Two players an hour apart see the same declared values over a visibly
+different throw — one of them watching three extra seconds of it. The cause is
+cannon's sleep (C30d), and the cure is `allowSleep = false`, which needs a
+terminator that does not depend on sleep to be affordable — C30e. With
+`dispgate + sleepoff` the same families replay byte-for-byte.
+
+**AND THE INSTRUMENT CAN REPORT A FALSE NEGATIVE, which is the part to
+remember.** The pool-generalized runner throws soul, then 20d6, then 8d6, then
+churns, then repeats — and in that shape shipped's 20d6 came back **8/8
+identical**. Run 20d6 on its own and it is 4/8. The drift is a knife edge, and
+how much unrelated history precedes a family decides which side it lands on.
+**A passing drift run is weak evidence; a failing one is strong.** Judge a
+candidate one pool per invocation.
 
 **C30b — 20d6 can still reach the cap with dice genuinely tumbling** (3 of 16
 seeds). That is real motion, so shortening `SETTLE_CAP` would truncate it and
