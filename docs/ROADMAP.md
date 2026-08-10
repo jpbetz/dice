@@ -1447,6 +1447,63 @@ lever before pulling it — applies to this one too. **If field telemetry shows
 phone sessions behaving oddly around dice near the mat edges, this is the
 cause and it is not new.**
 
+### C28. Two more things the zoom ladder left behind — SMALL, both verified
+
+**C25 was not a one-off.** `TABLE_W` moved from 30 to 8.6 on 2026-08-09 and
+`SHELF_SLOT_W` stayed at the 5.4 it was sized for, which is what made five
+collected rolls one interpenetrating slab. Two more constants were sized
+against the old mat and did not follow. Both found by reading
+[IMMERSION.md](IMMERSION.md) §21's build notes, both confirmed here against
+shipped code.
+
+**① `spawnDie`'s spread clamp is binding at every preset** (js/main.js, the
+`spread` line). It reads `Math.min(TABLE_W - 4.4, count * 2.6)` and its own
+comment reasons from a mat that no longer exists: *"the clamp is tighter than
+TABLE_W so the outer dice never spawn inside a wall at the CLOSE preset
+(TABLE_W=18: TABLE_W-4.4=13.6, still ample)."*
+
+| preset | TABLE_W | cap | clamp binds from | 12 dice share |
+| --- | --- | --- | --- | --- |
+| wide | 11 | 6.6 | 3 dice | 6.6 units — 3.7 die widths |
+| medium *(default)* | 8.6 | 4.2 | **2 dice** | 4.2 units — 2.3 die widths |
+| close | 6.7 | **2.3** | **1 die** | 2.3 units — **1.3 die widths** |
+
+A die is ~1.8 units across, and the intended spread is `count * 2.6` — one
+comfortable die-and-a-half per die. The clamp now overrides that from the
+*second* die at the default. Sides 2 and 3 halve it again (`offset * 0.5`).
+
+**This is upstream of the contact-recorder starvation** fixed the same night
+in `5a5a8ce`: *"20 dice interpenetrate on frame zero and dispatch 280 contacts
+in that ONE step."* The per-step cap treats the storm; the collapsed spread is
+why the storm is that violent. Widening the spread should reduce the frame-zero
+contact count directly, and `contactStats()` is already the instrument for
+measuring whether it does. Not negative in landscape (that needs
+`TABLE_W < 4.4`), so no die spawns inside a wall today — §21's "negative"
+case is the portrait `close` it was proposing, 4.1 wide.
+
+**② The ceremony path never flushes a deferred zoom.** `stepPlayback`'s
+ordinary completion ends `else tryFlushZoom()`; the ceremony branch returns at
+`ceremonyEnterSettle` and `ceremonyFinish` ends at
+`if (rollQueue.length) playRoll(rollQueue.shift())` with no `else`. So a
+room-wide zoom arriving during a ceremony roll, with nothing queued behind it,
+does not land when that ceremony ends. It waits for the next collect
+(`shelveRoll` calls it), the next non-ceremony completion, or a hello.
+
+**Why this one matters more than it looks:** the mat is the physics walls and
+is room-wide *precisely* so every client replays a seeded roll against the
+same geometry. A client sitting on the old preset while the room moved is the
+divergence the deferral exists to prevent, and the ceremony path is the one
+that skips it. Since C25 a collect fires on the next roll's arrival, so in
+practice it self-heals quickly — which is exactly why it has gone unnoticed.
+One line, and a scenario that rolls a ceremony roll, zooms mid-beat, and
+asserts `wallPositions()` matches the new preset with an empty queue.
+
+**The pattern worth naming, since this is the third instance:** a constant
+derived from `TABLE_W` follows the ladder; a constant sized *against* it in a
+comment does not, and nothing fails loudly when it stops being true. `grep -n
+"TABLE_W" js/main.js` is the audit, and it is worth running whenever the
+ladder moves again.
+
 ### C22. A versioning contract for client state — DESIGN, then small
 
 *Joe 2026-08-09: "I'd like to establish some diligence on client state… an
