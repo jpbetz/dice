@@ -92,8 +92,18 @@ const MAG4 = { vy: 4 };
 // against shipped, and do not read the verdict gates on either row.
 const SLEEPOFF = { allowSleep: false };
 
+// THE DISPLACEMENT TERMINATOR (C30e). The freeze predicate itself, swapped for
+// Lengyel's three-point AABB rest test — see the SETTLEGATE block in
+// js/main.js. `eps` is a fraction of a die's WIDTH, swept rather than guessed:
+// 0.05 is roughly what the shipped ANGULAR gate already tolerates (0.224 rad/s
+// for 0.45 s sweeps a d6's corner through 0.068 units ≈ 0.05 of its width),
+// 0.01 is five times tighter, 0.02 sits between them. The point of the test is
+// not looseness — it is that a bounded excursion is a thing an oscillating die
+// can actually satisfy and a velocity bar is not.
+const DISP = (eps) => ({ mode: 'displacement', eps });
+
 // [name, physics overrides, dampgate | null, throwTarget | null, sleep | null,
-//  nudge | null, magnet | null, bodyflags | null]
+//  nudge | null, magnet | null, bodyflags | null, settlegate | null]
 // null = leave the instrument inert. Everything is reset between variants.
 const VARIANTS = [
   ['shipped', {}, null, null, null, null],
@@ -152,6 +162,19 @@ const VARIANTS = [
   // Judge this against `sleepoff`, not against shipped.
   ['deaden+sleepoff+gate4', DEADEN, { gate: 4, ...SLOW }, null, null, null, null, SLEEPOFF],
   ['sleepoff+gate4', {}, { gate: 4, ...SLOW }, null, null, null, null, SLEEPOFF],
+  // PASS FIVE (C30e). The eps sweep first — three rows that differ in one
+  // number — and then the composite the whole pass is aimed at: the box test
+  // supplies the terminator that cannon's sleep was accidentally providing, so
+  // sleepoff should stop costing the slow half. sleepoff alone was soul +31%,
+  // caps 7 -> 11; if that does not INVERT here, the diagnosis is wrong.
+  ['disp01', {}, null, null, null, null, null, null, DISP(0.01)],
+  ['disp02', {}, null, null, null, null, null, null, DISP(0.02)],
+  ['disp05', {}, null, null, null, null, null, null, DISP(0.05)],
+  ['disp01+sleepoff', {}, null, null, null, null, null, SLEEPOFF, DISP(0.01)],
+  ['disp02+sleepoff', {}, null, null, null, null, null, SLEEPOFF, DISP(0.02)],
+  ['disp05+sleepoff', {}, null, null, null, null, null, SLEEPOFF, DISP(0.05)],
+  ['disp02+sleepoff+gate4', {}, { gate: 4, ...SLOW }, null, null, null, null, SLEEPOFF, DISP(0.02)],
+  ['disp05+sleepoff+gate4', {}, { gate: 4, ...SLOW }, null, null, null, null, SLEEPOFF, DISP(0.05)],
 ];
 
 const SHAKE_POOLS = [
@@ -203,12 +226,14 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     nudge: await a.dbg('nudge'),
     magnet: await a.dbg('magnet'),
     bodyFlags: await a.dbg('bodyFlags'),
+    settleGate: await a.dbg('settleGate'),
   };
   console.log(`inert: phys ${JSON.stringify(INERT.phys)}`);
   console.log(`       dampgate ${JSON.stringify(INERT.dampgate)}  throwTarget ${INERT.throwTarget}`
     + `  sleep ${JSON.stringify(INERT.sleep)}  zoom ${INERT.zoom}`);
   console.log(`       nudge ${JSON.stringify(INERT.nudge)}`
     + `  magnet ${JSON.stringify(INERT.magnet)}  bodyFlags ${JSON.stringify(INERT.bodyFlags)}`);
+  console.log(`       settleGate ${JSON.stringify(INERT.settleGate)}`);
 
   const seedsOf = (n) => Array.from({ length: n }, (_, i) => 1000 + i * 7919);
 
@@ -221,10 +246,11 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     await a.dbg(`setNudge(${JSON.stringify(INERT.nudge)})`);
     await a.dbg(`setMagnet(${JSON.stringify(INERT.magnet)})`);
     await a.dbg(`setBodyFlags(${JSON.stringify(INERT.bodyFlags)})`);
+    await a.dbg(`setSettleGate(${JSON.stringify(INERT.settleGate)})`);
     await a.dbg('sim(200)');
   };
 
-  const apply = async ([, phys, dampgate, throwTarget, sleep, nudge, magnet, bodyFlags]) => {
+  const apply = async ([, phys, dampgate, throwTarget, sleep, nudge, magnet, bodyFlags, settleGate]) => {
     await reset();
     if (Object.keys(phys).length) await a.dbg(`setPhysics(${JSON.stringify(phys)})`);
     if (dampgate) await a.dbg(`setDampgate(${JSON.stringify(dampgate)})`);
@@ -233,6 +259,7 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     if (nudge) await a.dbg(`setNudge(${JSON.stringify(nudge)})`);
     if (magnet) await a.dbg(`setMagnet(${JSON.stringify(magnet)})`);
     if (bodyFlags) await a.dbg(`setBodyFlags(${JSON.stringify(bodyFlags)})`);
+    if (settleGate) await a.dbg(`setSettleGate(${JSON.stringify(settleGate)})`);
   };
 
   // One throw, from the call that bakes it to an idle table.
@@ -309,7 +336,11 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
           const p = await a.dbg('settleProfile()');
           if (p.timedOut) capped++;
           rows.push({ ...t, shake: p.shake, creep: p.creep, dur: p.duration,
-            nudged: p.nudged, piled: p.piled, clamps: p.magnetClamps, hops: p.hops });
+            nudged: p.nudged, piled: p.piled, clamps: p.magnetClamps, hops: p.hops,
+            // The terminator's receipt: how far the worst die in this throw
+            // moved over the window that earned its freeze, in die-widths, and
+            // how many CLEAN freezes exceeded the gate's own epsilon.
+            disp: p.maxEndDisp, loose: p.loose });
           await clear();
         }
         got.set(`${vname}|${pname}`, {
@@ -331,6 +362,13 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
           // reading of "no more bounding" — and, unlike clamps, measured off
           // the baked film rather than reported by the mechanism.
           hops: mean(rows.map((r) => r.hops)),
+          disp: mean(rows.map((r) => r.disp)),
+          // The WORST single die in the whole cell, which is the one that
+          // matters: the film is cut at the last landing, so endDisp is also
+          // the size of the pose discontinuity a viewer could see at the end
+          // of the throw. A mean hides the outlier that would show.
+          dispMax: Math.max(...rows.map((r) => r.disp)),
+          loose: rows.reduce((s2, r) => s2 + r.loose, 0),
           capped,
         });
       }
@@ -438,6 +476,26 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
       return `${r.nudged.toFixed(2)}/${r.piled.toFixed(2)}/${r.clamps.toFixed(0)}`;
     })]));
 
+  // THE TERMINATOR'S RECEIPT, and the only honest way to read the creep column
+  // on a row that changes WHEN a die is declared still. `creep` measures the
+  // 0.6 s BEFORE each die's settle frame, so moving the settle frame earlier
+  // moves the window back into the tumble and creep rises for a die that was
+  // never touched. `disp` is the same question asked forward instead of
+  // backward: how far the worst die actually moved over the 0.45 s window that
+  // earned its freeze. Under a displacement row it is bounded by eps BY
+  // CONSTRUCTION, so a high creep with a tiny disp is the anchor moving, not a
+  // die snapped mid-slide. `loose` counts clean freezes that broke the bound —
+  // it must be 0 on every displacement row or the box test is not wired in.
+  console.log(`\nendDisp — die-widths the worst die moved over the window that`
+    + ` earned its freeze (loose = clean freezes over 0.02 of a die-width,\n`
+    + `  the same bar on every row, so a shipped row's count says what the`
+    + ` VELOCITY gate lets through)\n`);
+  table(['variant', ...SHAKE_POOLS.map(([p]) => `${p} disp/loose`)],
+    ran.map(([n]) => [n, ...SHAKE_POOLS.map(([p]) => {
+      const r = got.get(`${n}|${p}`);
+      return `${r.disp.toFixed(4)} max ${r.dispMax.toFixed(4)}/${r.loose}`;
+    })]));
+
   // --- pile ----------------------------------------------------------------
   console.log(`\ndice resting above y=1.2, and throws that piled NOTHING,`
     + ` over ${nPile} identical seeds\n`);
@@ -473,7 +531,7 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
   console.log(`\nverdict — every gate judged against THIS run's shipped row\n`
     + `  a shake  mean reduction over ${SHAKE_GATED.join('/')} >= 20%\n`
     + `  b dur    no pool worse than shipped +5%\n`
-    + `  c caps   total capped throws <= shipped's\n`
+    + `  c caps   total capped throws <= shipped's, AND 20d6 caps <= 1\n`
     + `  d pile   every cell within +/-2pp of shipped, and 6d6@close flat-throws >= shipped's\n`
     + `  e clock  per-pool mean wall <= 1.5x shipped\n`
     + `  f creep  no pool worse than shipped +15%\n`);
@@ -482,6 +540,10 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     const worstDur = Math.max(...SHAKE_POOLS.map(([p]) => (got.get(`${n}|${p}`).dur - b(p).dur) / b(p).dur));
     const caps = SHAKE_POOLS.reduce((s, [p]) => s + got.get(`${n}|${p}`).capped, 0);
     const baseCaps = SHAKE_POOLS.reduce((s, [p]) => s + b(p).capped, 0);
+    // The pool the cap actually bites on. A total that improves while 20d6
+    // still runs the full nine seconds is the regression this pass exists to
+    // kill, and a total-only gate cannot see it.
+    const caps20 = got.get(`${n}|20d6`).capped;
     const hasPile = piles.has(`${n}|${PILE_ZOOMS[0]}|${PILE_POOLS[0][0]}`);
     const worstPile = hasPile ? Math.max(...pileCells.map(([z, p]) =>
       piles.get(`${n}|${z}|${p}`).pct - piles.get(`${base}|${z}|${p}`).pct)) : NaN;
@@ -493,7 +555,7 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
     const g = [
       [shakeCut >= 0.20, `a shake ${(shakeCut * 100).toFixed(0)}%`],
       [worstDur <= 0.05, `b dur ${worstDur >= 0 ? '+' : ''}${(worstDur * 100).toFixed(0)}%`],
-      [caps <= baseCaps, `c caps ${caps}/${baseCaps}`],
+      [caps <= baseCaps && caps20 <= 1, `c caps ${caps}/${baseCaps} 20d6 ${caps20}`],
       // "within 2pp" read as ONE-SIDED: a cell that piles LESS than shipped is
       // the point of the exercise, not a gate failure.
       [hasPile && worstPile <= 2 && flatOk,
