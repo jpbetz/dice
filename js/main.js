@@ -4622,6 +4622,101 @@ window.__diceDebug = {
     applyCameraFraming(); // never leave the player looking at a probe
     return out;
   },
+  // PRICING THE ORACLE CAMERA before building it (immersion Wave 2). C25's
+  // framingCost answered "what did the shelf cost the view" — 1.00× on a
+  // phone — and the honest reading of that was "framing buys nothing." This
+  // asks a different question, and the difference is the whole item:
+  //
+  //   framingCost   fits a SUBSET OF THE MAT, and fitCameraTo only ever pulls
+  //                 the eye BACK from the preset (1 + i*0.03). A smaller
+  //                 subset can therefore only stop the retreat earlier; it can
+  //                 never come closer than the preset. On a desktop the mat
+  //                 already fits at the preset, so the answer had to be ~1.00×.
+  //   oracleProbe   fits the SETTLED DICE, and allows the eye to come CLOSER
+  //                 than the preset, which is the only way a small pool ever
+  //                 fills a phone screen.
+  //
+  // Cropping the mat is the cost, and it is the fork C25 named. It is payable
+  // HERE and nowhere else: this frames dice that have already stopped, and
+  // playRoll knows every final pose before frame one, so the AABB contains
+  // every die BY CONSTRUCTION. It crops the mat; it can never crop a die.
+  // Framing mid-tumble has no such guarantee and is a different question.
+  oracleProbe({ minScale = 0.3, margin = 1.0 } = {}) {
+    const span = () => {
+      const a = new THREE.Vector3(0, 0, 0).project(camera);
+      const b = new THREE.Vector3(1, 0, 0).project(camera);
+      return Math.round(Math.abs(b.x - a.x) * view.width);
+    };
+    const read = () => ({ span: span(), camY: Math.round(camera.position.y * 10) / 10 });
+    applyCameraFraming();
+    const today = read();
+    // DOES THE MAT ACTUALLY FIT? fitCameraTo scans 1 + i*0.03 for i < 90, so it
+    // tops out at ~3.67× and, by its own comment, "the eye stays where the last
+    // step left it rather than retreating without end". That is a silent
+    // failure mode: on a narrow viewport the loop can exhaust its range and
+    // leave the felt OVERFLOWING the view, with no error and nothing asserting
+    // it. Measure it rather than assume the fit succeeded.
+    {
+      const v0 = new THREE.Vector3();
+      const worst = framingPoints().reduce((m, { p }) => {
+        v0.copy(p).project(camera);
+        return Math.max(m, Math.abs(v0.x), Math.abs(v0.y));
+      }, 0);
+      today.matFits = worst <= 1;
+      today.matWorstNdc = Math.round(worst * 1000) / 1000; // > 1 = off screen
+    }
+    const live = tableDice.filter((d) => d.body && d.mesh && d.mesh.visible !== false);
+    if (!live.length) { applyCameraFraming(); return { today, dice: 0 }; }
+    // AABB of the settled cluster, grown by a die half-extent so a die sits
+    // INSIDE the frame rather than tangent to its edge.
+    const lo = new THREE.Vector3(Infinity, 0, Infinity);
+    const hi = new THREE.Vector3(-Infinity, 0, -Infinity);
+    for (const d of live) {
+      lo.x = Math.min(lo.x, d.body.position.x - margin);
+      lo.z = Math.min(lo.z, d.body.position.z - margin);
+      hi.x = Math.max(hi.x, d.body.position.x + margin);
+      hi.z = Math.max(hi.z, d.body.position.z + margin);
+    }
+    const pts = [];
+    for (const x of [lo.x, hi.x]) for (const z of [lo.z, hi.z]) {
+      pts.push({ p: new THREE.Vector3(x, 0, z), mx: 0.02, my: 0.02 });
+    }
+    // Same fit as fitCameraTo, but the scan STARTS BELOW 1 so the eye may
+    // approach. Deliberately a probe-local loop: the shipped framing must keep
+    // its "never closer than the preset" guarantee until this is ruled on.
+    const eye = new THREE.Vector3(
+      ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
+    );
+    const ray = eye.clone().sub(CAM_TARGET);
+    const v = new THREE.Vector3();
+    let usedScale = null;
+    for (let s = minScale; s <= 3.7; s += 0.02) {
+      camera.position.copy(CAM_TARGET).addScaledVector(ray, s);
+      camera.lookAt(CAM_TARGET);
+      camera.updateMatrixWorld(true);
+      const fits = pts.every(({ p, mx, my }) => {
+        v.copy(p).project(camera);
+        return Math.abs(v.x) <= 1 - mx && Math.abs(v.y) <= 1 - my;
+      });
+      if (fits) { usedScale = Math.round(s * 100) / 100; break; }
+    }
+    const framed = read();
+    applyCameraFraming(); // never leave the player looking at a probe
+    return {
+      dice: live.length,
+      today,
+      framed,
+      gain: Math.round((framed.span / today.span) * 100) / 100,
+      usedScale,          // < 1 means it needed to come closer than the preset
+      cluster: {
+        w: Math.round((hi.x - lo.x) * 10) / 10,
+        d: Math.round((hi.z - lo.z) * 10) / 10,
+      },
+      table: `${TABLE_W}x${TABLE_D}`,
+      view: `${Math.round(view.width)}x${Math.round(view.height)}`,
+      mini: document.body.classList.contains('mini'),
+    };
+  },
   // Uncleared rolls still on the table, and whose they are (C7 ②). A
   // projection, never the live Map — rollStates is keyed state the render
   // path owns, and handing it out would let a scenario mutate the machine
