@@ -567,9 +567,48 @@ world.broadphase = new CANNON.SAPBroadphase(world); // axisIndex=0 (x); do NOT a
 const diceMat = new CANNON.Material('dice');
 const floorMat = new CANNON.Material('floor');
 const wallMat = new CANNON.Material('wall');
-world.addContactMaterial(new CANNON.ContactMaterial(diceMat, floorMat, { friction: 0.25, restitution: 0.35 }));
-world.addContactMaterial(new CANNON.ContactMaterial(diceMat, diceMat, { friction: 0.15, restitution: 0.45 }));
-world.addContactMaterial(new CANNON.ContactMaterial(diceMat, wallMat, { friction: 0.05, restitution: 0.7 }));
+
+// FELT, NOT LINOLEUM. The originals were generic bouncy-dice numbers with
+// cannon's 0.01 default damping left in place — i.e. no damping at all, which
+// should be a choice somebody made and wasn't. A die had almost no way to
+// lose energy, so it skated and micro-bounced instead of stopping, which is
+// exactly what "slide and wiggle-move" describes.
+//
+// These are measured, not guessed, and the measurement had to be PAIRED to
+// mean anything: tools/steps/settle-paired.mjs replays identical seeds under
+// each candidate. An earlier unpaired sweep concluded materials "barely move
+// the tail" and that conclusion was variance — twelve random throws per cell
+// are a coin flip, not a comparison.
+//
+// Against the originals, over 16 seeds per pool (2026-08-10), together with
+// the permissive rest rule in NUDGE.cockedDot, which this tuning NEEDS —
+// damping alone stops dice before they topple flat, and on its own it cost
+// 8d6 +1.42s in nudges:
+//     1d20 -0.08s · Soul Deal -1.10s (-43%) · 4d6 -0.48s · 20d6 -1.63s
+// 8d6 pays +0.37s, the one regression, and no pool ends up bouncier.
+const PHYS = {
+  floorFriction: 0.6, floorRestitution: 0.15,
+  diceFriction: 0.4, diceRestitution: 0.2,
+  wallFriction: 0.2, wallRestitution: 0.5,
+  linearDamping: 0.1, angularDamping: 0.14,
+};
+const cmFloor = new CANNON.ContactMaterial(diceMat, floorMat, { friction: PHYS.floorFriction, restitution: PHYS.floorRestitution });
+const cmDice = new CANNON.ContactMaterial(diceMat, diceMat, { friction: PHYS.diceFriction, restitution: PHYS.diceRestitution });
+const cmWall = new CANNON.ContactMaterial(diceMat, wallMat, { friction: PHYS.wallFriction, restitution: PHYS.wallRestitution });
+world.addContactMaterial(cmFloor);
+world.addContactMaterial(cmDice);
+world.addContactMaterial(cmWall);
+
+// Tests + tools only (__diceDebug.setPhysics): re-tune without a reload, so a
+// sweep can price a dozen combinations in one session. Takes effect on the
+// NEXT roll — playRoll bakes the whole throw before frame one.
+function setPhysics(p = {}) {
+  Object.assign(PHYS, p);
+  cmFloor.friction = PHYS.floorFriction; cmFloor.restitution = PHYS.floorRestitution;
+  cmDice.friction = PHYS.diceFriction; cmDice.restitution = PHYS.diceRestitution;
+  cmWall.friction = PHYS.wallFriction; cmWall.restitution = PHYS.wallRestitution;
+  return { ...PHYS };
+}
 
 function addStaticPlane(material, position, euler) {
   const body = new CANNON.Body({ mass: 0, shape: new CANNON.Plane(), material });
@@ -795,6 +834,28 @@ const FIXED_DT = 1 / 60;
 const SETTLE_STILL = 0.45; // seconds of stillness required
 const SETTLE_CAP = 9;      // hard cap on simulated seconds per roll
 
+// What to do about a die that stops at an angle. `lift` is a VERTICAL HURL —
+// the die leaves the pile, flies, and lands somewhere else — so each nudge
+// buys a flat die at the cost of a second of extra throw, and it is the
+// single largest remaining term in how long a big pool takes to watch.
+// Tunable so tools/steps/nudge-cost.mjs can price budget 0 against 3.
+// `cockedDot` is how flat a die must lie to be accepted: the dot of its
+// up-most face normal against world up. 0.82 is ~35° of tilt. It reads like a
+// fairness rule and is not one — face correction rotates the target face to
+// exactly up no matter how the die landed, so this never touches the VALUE.
+// All it decides is whether a die perched on its neighbour is allowed to stay
+// there, and every refusal is paid for in nudges, which is watch time.
+// 0.82 (~35°) was the old bar and it was doing real damage: across 16 seeds
+// it made 13 of 16 20d6 throws end at SETTLE_CAP, which also meant
+// lastLanding.timedOut — the ceremony's "this roll never resolved, decline
+// the beat" signal — was firing on nearly every big roll. 0.6 (~53°) lets a
+// die rest against its neighbour the way dice actually do, and drops that to
+// 3 of 16. Measured identical to accepting ANY tilt, so nothing in normal
+// play now reads as cocked; the bar survives only as a valve for a rest no
+// die could hold.
+const NUDGE = { budget: 3, lift: 7, spread: 4, spin: 14, cockedDot: 0.6, cockedDotD4: 0.7 };
+let seedReplayN = 0; // __diceDebug.throwSeeded — keeps replayed rollIds unique
+
 // Deterministic PRNG — every client fast-forwards the same throw from the seed.
 function mulberry32(a) {
   a |= 0;
@@ -877,6 +938,8 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
   const variant = dieVariant(shrouded, set);
   const mesh = createDieMesh(type, variant);
   const body = createDieBody(type, diceMat);
+  body.linearDamping = PHYS.linearDamping;
+  body.angularDamping = PHYS.angularDamping;
 
   // line the throw up along the chosen edge of the table. The clamp is
   // tighter than TABLE_W so the outer dice never spawn inside a wall at
@@ -1689,17 +1752,37 @@ function playRoll(roll) {
   // branch); SETTLE_CAP is retained as last-resort safety at the group level.
   dice.forEach((d) => {
     d.stillTime = 0; d.frozen = false; d.frozenPose = null;
-    d.settleTime = null; d.settleTimedOut = false;
+    d.settleTime = null; d.settleTimedOut = false; d.lastMoveTime = 0;
   });
 
   // `timedOut` distinguishes the two ways a die stops being simulated, which
   // the TRUE settle frame below depends on: a clean landing earned its freeze
   // by holding still for SETTLE_STILL, so the die actually stopped that long
-  // AGO. A die force-frozen at SETTLE_CAP never went still at all, so its
-  // `stillTime` means nothing and the cap itself is the only honest answer.
+  // AGO.
+  //
+  // A die force-frozen at SETTLE_CAP used to be credited with the cap itself,
+  // on the reasoning that it "never went still at all". That reasoning was
+  // measured on 2026-08-10 and it is false. Of the dice that reached the cap
+  // across 36 throws, FIFTEEN OF SEVENTEEN were motionless when it fired —
+  // they had gone still and been REFUSED, because they read as cocked and the
+  // roll's three nudges were already spent. Crediting them with the cap
+  // charged the viewer up to nine seconds of a table where nothing moved.
+  // `lastMoveTime` is the fact underneath the decision: when this die last
+  // did anything. For a cleanly frozen die it equals simTime - stillTime
+  // exactly, so nothing about a normal landing changes.
   const freezeInPlace = (d, timedOut = false) => {
-    d.settleTime = timedOut ? simTime : Math.max(0, simTime - d.stillTime);
+    d.settleTime = timedOut ? d.lastMoveTime : Math.max(0, simTime - d.stillTime);
+    d.settleTimeOld = timedOut ? simTime : d.settleTime; // pre-2026-08-10, for settleProfile
     d.settleTimedOut = timedOut;
+    // Read the die's condition BEFORE we zero it — settleProfile's diagnosis
+    // of a capped roll depends on knowing whether it was moving or parked.
+    // The SAME predicate the freeze test uses, recorded rather than
+    // approximated. A nearby proxy (combined speed under 0.05) disagreed with
+    // it at the boundary and made "a saving always comes from a parked die"
+    // look false when it is true.
+    d.endStill = d.body.velocity.lengthSquared() < 0.05
+      && d.body.angularVelocity.lengthSquared() < 0.05;
+    d.endCocked = readValue(d.type, d.body.quaternion).dot < (d.type === 'd4' ? 0.9 : 0.82);
     d.body.velocity.setZero();
     d.body.angularVelocity.setZero();
     d.body.mass = 0;
@@ -1725,10 +1808,14 @@ function playRoll(roll) {
       const stillNow =
         d.body.velocity.lengthSquared() < 0.05 &&
         d.body.angularVelocity.lengthSquared() < 0.05;
+      // The last instant this die was doing anything. Freezing is a decision
+      // we make ABOUT a die; moving is a fact about it, and the two came
+      // apart — see the tail cut below.
+      if (!stillNow) d.lastMoveTime = simTime;
       d.stillTime = stillNow ? d.stillTime + FIXED_DT : 0;
       if (d.stillTime >= SETTLE_STILL) {
         const r = readValue(d.type, d.body.quaternion);
-        const cocked = r.dot < (d.type === 'd4' ? 0.9 : 0.82);
+        const cocked = r.dot < (d.type === 'd4' ? NUDGE.cockedDotD4 : NUDGE.cockedDot);
         if (!cocked) freezeInPlace(d);
       }
     }
@@ -1741,12 +1828,13 @@ function playRoll(roll) {
       // stuck. Frozen bodies are STATIC — filter them out (waking a static is
       // a no-op at best, a determinism hazard at worst).
       const cocked = dice.filter((d) => !d.frozen && d.stillTime >= SETTLE_STILL);
-      if (cocked.length && nudges < 3) {
+      if (cocked.length && nudges < NUDGE.budget) {
         nudges++;
         for (const d of cocked) {
           d.body.wakeUp();
-          d.body.velocity.set((rng() - 0.5) * 4, 7, (rng() - 0.5) * 4);
-          d.body.angularVelocity.set((rng() - 0.5) * 14, (rng() - 0.5) * 14, (rng() - 0.5) * 14);
+          d.body.velocity.set((rng() - 0.5) * NUDGE.spread, NUDGE.lift, (rng() - 0.5) * NUDGE.spread);
+          const s = NUDGE.spin;
+          d.body.angularVelocity.set((rng() - 0.5) * s, (rng() - 0.5) * s, (rng() - 0.5) * s);
           d.stillTime = 0;
         }
       }
@@ -1783,15 +1871,26 @@ function playRoll(roll) {
     frame: Math.min(lastFrame, Math.max(0, Math.round((d.settleTime ?? simTime) / FIXED_DT))),
     time: d.settleTime ?? simTime,
     timedOut: !!d.settleTimedOut,
+    timeOld: d.settleTimeOld ?? d.settleTime ?? simTime,
+    endStill: !!d.endStill,
+    endCocked: !!d.endCocked,
   }));
   // reduce, not sort: ties keep the FIRST (lowest index) by construction.
   const lastLanding = landings.reduce((a, b) => (b.frame > a.frame ? b : a), landings[0]);
-  // Cut the dead tail. Safe because a frozen die pushes `frozenPose` BY
-  // REFERENCE every subsequent step: every frame from lastLanding.frame to the
-  // end is pose-identical, so ending playback there renders exactly the pose
-  // face correction computes from kf[kf.length - 1]. At least one frame, so a
-  // zero-length playback can never be produced.
+  // Cut the dead tail. This USED to be justified by frozen dice pushing
+  // `frozenPose` by reference, which made every frame past the cut identical
+  // to kf[last] — true for a frozen die, and the reason the cut was safe.
+  // A die that timed out is NOT frozen, so its frames past the cut are live
+  // snapshots that may drift a little, and that justification no longer
+  // covers it. So do not rely on it: TRUNCATE. Everything downstream — the
+  // face correction, finalPos/finalQuat, the frozen bodies — reads
+  // kf[kf.length - 1], so cutting the array here makes "the pose playback
+  // ends on" and "the pose we correct from" the same object by construction,
+  // for both kinds of die. At least one frame, so a zero-length playback can
+  // never be produced.
   const motionFrames = Math.max(1, lastLanding.frame);
+  for (const kf of keyframes) kf.length = motionFrames + 1;
+  for (const l of landings) l.frame = Math.min(l.frame, motionFrames);
 
   // --- face correction: body-frame pre-rotation R per die ------------------
   // qF = final body orientation. u_body = qF^-1 * up (landed "up" in body
@@ -1906,6 +2005,7 @@ function playRoll(roll) {
     // the settle-keyed beats; `lastLanding.timedOut` is the decline signal.
     landings,
     lastLanding,
+    nudges, // how many times a cocked die had to be re-thrown (settleProfile)
     time: 0,
     soundIdx: 0,
     decalsStamped: 0, // Level 4a per-roll cap counter (the drain reads it)
@@ -5206,6 +5306,102 @@ window.__diceDebug = {
   // surface — never scrape the canvas).
   get diceSet() { return diceSet; },
   setDiceSet(id) { return setDiceSet(id); },
+  get physics() { return { ...PHYS }; },
+  setPhysics(p) { return setPhysics(p); },
+  get nudge() { return { ...NUDGE }; },
+  setNudge(p) { Object.assign(NUDGE, p || {}); return { ...NUDGE }; },
+  // Throw a chosen pool on a CHOSEN SEED. The seed decides the whole tumble
+  // (spawn side, positions, velocities), so replaying one seed under two
+  // tunings is the only way to price a physics change without variance
+  // swamping the answer — six random throws per variant is not a comparison,
+  // it is a coin flip. Values are arbitrary: face correction rewrites every
+  // die's orientation onto them regardless of how it landed.
+  throwSeeded(types, seed, values = null) {
+    const t = Array.isArray(types) ? types : [];
+    playRoll({
+      rollId: `seeded-${seed}-${t.length}-${seedReplayN++}`,
+      dice: t,
+      // valueRange returns [min, max] — a spread of real values, so the face
+      // correction these throws exercise is the one real rolls exercise.
+      values: values || t.map((k, i) => {
+        const [lo, hi] = valueRange(k);
+        return lo + (i * 3 + seed) % (hi - lo + 1);
+      }),
+      seed: seed >>> 0,
+      label: `${t.length}× seeded`,
+    });
+    return true;
+  },
+  // What the nudge is really buying, priced. Face correction rotates every
+  // die's target face to exactly up, so the READING is never at stake; what
+  // is at stake is whether the die ends up somewhere a die could be. Two
+  // measures, both in die-widths / degrees:
+  //   correctionDeg  how far correction had to twist the physics pose. A big
+  //                  twist means the die was perched and got snapped flat.
+  //   lowY           lowest vertex above the felt. < 0 is clipped THROUGH the
+  //                  table, > 0 on a lone die means it is floating.
+  restPlausibility() {
+    const up = new THREE.Vector3(0, 1, 0);
+    const out = tableDice.filter((d) => d.finalQuat && d.correction).map((d) => {
+      const def = DIE_DEFS[d.type] || {};
+      const w = def.size || (def.radius ? def.radius * 2 : 2);
+      let lowest = Infinity;
+      const g = d.mesh && d.mesh.geometry;
+      if (g && g.attributes && g.attributes.position) {
+        const pos = g.attributes.position;
+        const v = new THREE.Vector3();
+        for (let i = 0; i < pos.count; i++) {
+          v.fromBufferAttribute(pos, i).applyQuaternion(d.finalQuat).add(d.finalPos);
+          if (v.y < lowest) lowest = v.y;
+        }
+      }
+      const c = d.correction;
+      return {
+        deg: 2 * Math.acos(Math.min(1, Math.abs(c.w))) * 180 / Math.PI,
+        lowY: lowest === Infinity ? 0 : lowest / w,
+      };
+    });
+    if (!out.length) return { dice: 0, maxCorrectionDeg: 0, worstHover: 0, worstClip: 0 };
+    return {
+      dice: out.length,
+      maxCorrectionDeg: Math.round(Math.max(...out.map((o) => o.deg))),
+      meanCorrectionDeg: Math.round(out.reduce((s, o) => s + o.deg, 0) / out.length),
+      worstHover: Math.round(Math.max(...out.map((o) => o.lowY)) * 100) / 100,
+      worstClip: Math.round(Math.min(...out.map((o) => o.lowY)) * 100) / 100,
+    };
+  },
+  // How long the throw actually takes, and WHY. `duration` is the played
+  // window (the dead tail is already cut at lastLanding.frame); `settleSpread`
+  // is the gap between the first die to stop and the last, which is the part
+  // a watcher experiences as "still going". `timedOut` counts dice that never
+  // went still at all and were force-frozen at SETTLE_CAP — a nonzero count
+  // means the tail is jitter, not tumble.
+  settleProfile() {
+    const r = currentRoll;
+    if (!r) return null;
+    const fr = r.landings.map((l) => l.frame);
+    return {
+      dice: r.dice.length,
+      frames: r.frames,
+      duration: Math.round(r.duration * 1000) / 1000,
+      // What this same throw would have played before the 2026-08-10 tail
+      // cut: an exact paired before/after off one simulation, no second run
+      // and no seed to match.
+      durationOld: Math.round(Math.max(...r.landings.map((l) => l.timeOld)) * 1000) / 1000,
+      firstSettleS: Math.round((Math.min(...fr) * FIXED_DT) * 1000) / 1000,
+      settleSpreadS: Math.round(((Math.max(...fr) - Math.min(...fr)) * FIXED_DT) * 1000) / 1000,
+      timedOut: r.landings.filter((l) => l.timedOut).length,
+      nudged: r.nudges,
+      // WHY a die timed out, which is the whole diagnosis. `parked` counts
+      // dice that were motionless when the cap fired — they were not still
+      // tumbling, something REFUSED to freeze them. `moving` is the honest
+      // remainder. If parked dominates, the tail is a predicate, not physics.
+      parked: r.landings.filter((l) => l.timedOut && l.endStill).length,
+      moving: r.landings.filter((l) => l.timedOut && !l.endStill).length,
+      endCocked: r.landings.filter((l) => l.timedOut && l.endCocked).length,
+      byDie: r.landings.map((l) => Math.round(l.time * 100) / 100),
+    };
+  },
   tableDiceInfo() {
     return tableDice.map((d) => ({
       type: d.type,

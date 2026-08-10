@@ -9599,6 +9599,92 @@ export const scenarios = [
     },
   },
   {
+    name: 'settle-tail',
+    // In the smoke set despite costing ~10s: this guards how long EVERY roll
+    // takes to watch, it regressed once without anything going red, and the
+    // mechanism it guards is a predicate that reads like a fairness rule.
+    tags: ['roll', 'physics', 'cuj1', 'smoke'],
+    // THE THROW ENDS WHEN THE DICE STOP (Joe 2026-08-10: "a very slow, very
+    // shaky process by which the dice slide and wiggle-move until they are
+    // stable… it can take quite some time and it's super awkward to watch").
+    //
+    // It was not, mostly, dice moving. playRoll plays back exactly as many
+    // frames as the LAST die took to settle, and a die that read as cocked
+    // was refused a freeze — so it sat motionless while the clock ran to
+    // SETTLE_CAP and every viewer watched up to nine seconds of a still
+    // table. Measured across 36 throws: 15 of the 17 dice that reached the
+    // cap were motionless when it fired.
+    //
+    // TWO fixes landed for this and they are not additive — they are the same
+    // problem cut off at different points, so each part below pins the one it
+    // owns. Letting a die REST where it stopped (NUDGE.cockedDot 0.82 → 0.6)
+    // stops the refusal happening; cutting the tail stops a refusal that does
+    // happen from costing seconds. The second is now a BACKSTOP, and once the
+    // first landed it went quiet on ordinary throws — so a test that asserted
+    // "the cut saves time" against shipped settings would fail while both
+    // fixes were working perfectly. It has to be tested where it still bites.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      const d20 = Array(20).fill('d6');
+      const seeds = [1000, 8919, 16838, 24757, 32676, 40595, 48514, 56433];
+      // throwSeeded pins the tumble: the seed decides spawn side, positions
+      // and velocities, so this asserts against fixed throws, not a mood.
+      const throwAll = async () => {
+        const out = [];
+        for (const seed of seeds) {
+          await a.dbg(`throwSeeded(${JSON.stringify(d20)}, ${seed})`);
+          await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+            { desc: `seeded 20d6/${seed} plays out`, timeout: 30000 });
+          out.push({ seed, ...(await a.dbg('settleProfile()')) });
+          await a.dbg('clearTable()');
+          await a.dbg('sim(60)');
+        }
+        return out;
+      };
+
+      // --- 1. the rest rule: dice reach a real freeze -----------------------
+      const shipped = await throwAll();
+      const refused = shipped.reduce((n, p) => n + p.parked, 0);
+      assert.equal(refused, 0,
+        `${refused} dice stopped and were refused a freeze under the shipped rest rule`);
+      const mean = shipped.reduce((s, p) => s + p.duration, 0) / shipped.length;
+      assert.ok(mean < 7,
+        `20 dice take ${mean.toFixed(2)}s to watch (was 8.70s before 2026-08-10)`);
+
+      // --- 2. the backstop: put the refusal back and price it ---------------
+      // 0.82 is the old bar. Under it these same seeds park dice motionless
+      // and the cut is what stops them being charged to the viewer.
+      await a.dbg('setNudge({cockedDot: 0.82, cockedDotD4: 0.9})');
+      const strict = await throwAll();
+      await a.dbg('setNudge({cockedDot: 0.6, cockedDotD4: 0.7})');
+
+      let cut = 0;
+      let worst = 0;
+      for (const p of strict) {
+        assert.ok(p.duration <= p.durationOld + 1e-6,
+          `seed ${p.seed}: the cut LENGTHENED the throw (${p.duration} > ${p.durationOld})`);
+        // Where the saving comes from, which is the safety claim itself: time
+        // is only ever reclaimed from dice that had STOPPED. A throw that
+        // saved time with no parked die would mean the cut had started eating
+        // real motion — the one way this can do harm, and it would look like
+        // an improvement in every duration number if nothing asserted it.
+        if (p.duration < p.durationOld - 1e-6) {
+          cut++;
+          worst = Math.max(worst, p.durationOld - p.duration);
+          assert.ok(p.parked > 0,
+            `seed ${p.seed}: saved ${(p.durationOld - p.duration).toFixed(2)}s with no parked die`);
+        }
+      }
+      // P7: every hook above EXISTS whether or not the cut works. These are
+      // the lines that go red if it stops — restore `settleTime = simTime`
+      // for a timed-out die and both fail.
+      assert.ok(cut >= 2,
+        `the cut fired on only ${cut} of ${seeds.length} strict-rule throws — it is inert`);
+      assert.ok(worst > 0.5,
+        `best saving was ${worst.toFixed(2)}s — too small to be worth the mechanism`);
+    },
+  },
+  {
     name: 'table-name-survives-round-trip',
     tags: ['lobby', 'cuj2'],
     // §3b L3 + initNet's name restoration: an UNPREPARED room is deleted the
