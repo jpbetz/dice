@@ -2027,8 +2027,17 @@ export const scenarios = [
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
 
+      // FREEZE THE CLOCK BEFORE SAMPLING. The departure is 0.3 s of WALL time
+      // and each sample below is a CDP round trip, so without the hold the
+      // rAF loop ran the whole window out between calls and the sampler
+      // caught two frames instead of five — a ~70% failure rate, found by
+      // another session running this in isolation rather than inside a sweep
+      // where it happened to pass. The bug was the scenario's, not the app's:
+      // stepSinking is dt-driven precisely so sim() can own its clock, and
+      // this asked for that guarantee and then did not take it.
       const departure = async (style, rollId) => {
         assert.equal(await a.dbg(`setClearStyle(${JSON.stringify(style)})`), true, `${style} selected`);
+        assert.equal(await a.dbg('holdClock(true)'), true, 'the world moves only as far as sim() says');
         assert.equal(await a.dbg(`clearRoll(${JSON.stringify(rollId)})`), true, `${style}: clear accepted`);
         // CLEAR_SINK_S is 0.3 s = 18 frames; 3 frames a sample walks the
         // window in six steps and still catches the first moment of motion.
@@ -2059,6 +2068,7 @@ export const scenarios = [
           + ` && window.__diceDebug.tableDice.length === 0)`,
         { desc: 'the felt is empty when the window closes' },
       );
+      await a.dbg('holdClock(false)'); // the next roll needs a running clock
 
       // THE PIN THAT PROVES THE PIN. 'sink' is what shipped before — the same
       // 0.3 s, straight DOWN through the felt. If the assertion above cannot
@@ -2073,6 +2083,7 @@ export const scenarios = [
         `(window.__diceDebug.sim(60), window.__diceDebug.sinkingCount === 0)`,
         { desc: 'sinks drained' },
       );
+      await a.dbg('holdClock(false)'); // held clocks outlive the scenario
       assert.equal(await a.dbg(`setClearStyle('nonsense')`), false,
         'an unknown style is refused rather than silently freezing the dice');
     },
@@ -6735,25 +6746,32 @@ export const scenarios = [
         assert.ok(p.rings >= 1, `${who}: the discharge popped`);
       }
 
-      // a held roll wears obsidian: no pop, no new bloom flag. The baseline
-      // is read AFTER the previous roll has been auto-collected away (C25:
-      // a collect empties the felt), so `diceBefore` is what is really there
-      // when the held roll lands rather than a count that includes an archive.
-      await a.dbg('sim(240)');
+      // A held roll wears obsidian: no pop, no bloom flag.
+      //
+      // The baseline used to be "whatever was already blooming", because the
+      // bolt-glass roll above stayed on the felt while the held one landed
+      // beside it. It does not any more: a roll ARRIVING auto-collects the
+      // previous one (§7.7), and since C25 a collected roll's dice leave the
+      // table — so the bolt dice are gone by the time the held d20 settles.
+      // The claim survives the change and gets sharper: the felt now holds
+      // exactly the shrouded die, so the bloom mask must be EMPTY. A
+      // difference-from-baseline could have been satisfied by two bolt dice
+      // and a leak cancelling out; zero cannot.
       const ringsBefore = (await post(a)).rings;
-      const diceBefore = (await post(a)).bloomDice;
       await a.roll('d20 held');
       const hid = await a.rollId();
       await a.waitFor(shroudSettled(hid), { desc: 'held roll settles' });
+      await a.dbg('sim(120)'); // the collected roll's departure finishes
       p = await post(a);
       assert.equal(p.rings, ringsBefore, 'a shrouded roll never pops');
-      assert.equal(p.bloomDice, diceBefore, 'a shrouded die never joins the bloom mask');
+      assert.equal(await a.diceCount(), 1, 'the felt holds the shrouded die alone');
+      assert.equal(p.bloomDice, 0, 'and a shrouded die never joins the bloom mask');
 
       // the reveal restores the set's bloom right along with its materials
       await a.eval(`window.__diceDebug.reveal(${JSON.stringify(hid)})`);
       await a.waitFor(revealSettled(hid), { desc: 'reveal lands' });
       await a.waitFor(
-        `window.__diceDebug.postInfo().bloomDice >= ${diceBefore + 1}`,
+        `window.__diceDebug.postInfo().bloomDice >= 1`,
         { desc: 'the revealed die joins the bloom mask' },
       );
 

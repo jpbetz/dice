@@ -67,6 +67,38 @@ established UX — runs before a release/milestone, not per step.
 The harness picks free ports. **Port 8123 is the live preview table — no
 test may ever touch it**, scripted or interactive.
 
+**P5 — A commit that edits `window.__diceDebug` diffs its key list.**
+That object is ~300 keys of one literal in a 15k-line file, and deleting a
+region of it by index is a text operation with no compiler behind it. C25's
+shelf deletion swallowed **fourteen unrelated hooks** — `entryState`,
+`chipsVisible`, `restInfo`, `tableDiceInfo`, `fxInfo`, the offer entry
+points — and the symptom was four scenarios failing with `is not a function`
+and nothing whatsoever about shelves. Run this before committing; it takes a
+second and it names exactly what left:
+
+```bash
+git show HEAD:js/main.js > /tmp/old-main.js && python3 -c "
+import re; pat = re.compile(r'^  (?:get )?([A-Za-z_\$][\w\$]*)\s*[({]', re.M)
+o=set(pat.findall(open('/tmp/old-main.js').read())); n=set(pat.findall(open('js/main.js').read()))
+print('LOST  :', sorted(o-n)); print('GAINED:', sorted(n-o))"
+```
+
+Anything in `LOST` that you did not mean to remove is a hook some scenario
+still calls. (Confirmed useful the same night by the session working on the
+contact recorder, which ran it before merging and got a clean
+`LOST: none / GAINED: ['contactStats']`.)
+
+**P6 — A scenario that samples an animation freezes the clock.**
+`__diceDebug.holdClock(true)` makes the world advance exactly as far as
+`sim()` says and no further. Without it, a sampling loop is racing the rAF
+loop across CDP round trips: `dice-depart` sampled a 0.3 s departure over six
+round trips and caught two frames instead of five, failing ~70% of the time
+**in isolation** while passing inside a sweep where the timing happened to
+work out. Every stepped effect (`stepSinking`, `stepRevealing`,
+`particleField`, the shader clock) is dt-driven precisely so this guarantee
+exists — take it. Release the hold before anything that needs a running
+clock, and before the scenario ends.
+
 ## Running
 
 ```bash
