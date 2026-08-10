@@ -63,12 +63,13 @@ const SLEEPIER = { speed: 0.9, time: 0.2 };
 // fact: on this mat dice separate AFTER landing, by bouncing and skidding
 // apart. So the pile needs the energy the bounce used to supply, delivered
 // only where separation failed. `pileScale` refuses a freeze to a die resting
-// above `flatRestHeight(type) * scale` and hands it to the nudge that already
-// exists for cocked dice, inside the same budget. 1.6 is calibrated in
-// tools/steps/pile-bar.mjs — above every accepted solo rest (worst: a d20
-// leaning on a wall at 1.20x its flat height) and below every observed pile
-// (lowest: a d8 on its neighbour at 1.73x).
-const PILE = { pileScale: 1.6 };
+// above `restCeiling(type) * scale` and hands it to the nudge that already
+// exists for cocked dice, inside the same budget. The ceiling is the hull's
+// circumradius — the highest a convex die touching the felt can possibly hold
+// its centre — so the scale is margin on a bound rather than a guess at where
+// dice rest. Confirmed in tools/steps/pile-bar.mjs: the highest ACCEPTED rest
+// of every type lands at 0.73-0.95 of its own ceiling.
+const PILE = { pileScale: 1.05 };
 
 // [name, physics overrides, dampgate | null, throwTarget | null, sleep | null,
 //  nudge | null]

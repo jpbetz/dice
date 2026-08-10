@@ -909,33 +909,40 @@ const NUDGE = {
 };
 let seedReplayN = 0; // __diceDebug.throwSeeded — keeps replayed rollIds unique
 
-// The height a die rests at when it lies FLAT: the inradius of its own
-// collision hull (the nearest face plane to the centre). Derived rather than
-// tabulated so it cannot drift from the geometry, and cached — the hull is
-// shared by every die of a type. Measured against the throws in
-// pile-bar.mjs: d4 0.383, d8 0.606, d6 0.675, d10 0.704, d12 0.874, d20 0.993.
-const flatRestY = new Map();
-function flatRestHeight(type) {
-  let h = flatRestY.get(type);
-  if (h === undefined) {
-    const s = getDie(type).shape;
-    h = Infinity;
-    for (let i = 0; i < s.faces.length; i++) {
-      const n = s.faceNormals[i];
-      const v = s.vertices[s.faces[i][0]];
-      h = Math.min(h, Math.abs(n.x * v.x + n.y * v.y + n.z * v.z));
-    }
-    flatRestY.set(type, h);
+// THE CEILING IS A THEOREM, NOT A TUNING. A die touching the felt makes
+// contact at a point on its own hull, and the felt is y = 0 — so the centre
+// of a convex die resting on the table can never be higher than the hull's
+// circumradius, however it is balanced: flat, on an edge, leaning on a wall,
+// propped against a neighbour. Above that line it is resting on SOMETHING
+// ELSE, and the only other thing on the table is another die.
+//
+// This replaced a bar derived from the FLAT rest height, which had to be
+// calibrated and could not be made to work: the types differ by 3x in the
+// ratio between how tall they lie and how tall they can stand, so one factor
+// either refused legitimate leans (a d4 propped at 2.0x its flat height —
+// measured, and it cost the soul pool +32% in nudges) or missed real stacks.
+// Derived from the hull rather than tabulated so it cannot drift from the
+// geometry, and cached — the hull is shared by every die of a type.
+// Measured (tools/steps/pile-bar.mjs): d8 1.050, d10 1.056, d12 1.100, d4
+// 1.150, d6 1.169, d20 1.250 — and the highest ACCEPTED rest of each type
+// comes in at 0.73-0.95 of it, which is the theorem holding with room to
+// spare. It also explains the 1.2 that `dice-land-flat` has always used: that
+// is the d6 ceiling (1.169) and change, sound for the pools it rolls and a
+// coincidence for anything else — a d20 rests legitimately at 1.19.
+const hullRadius = new Map();
+function restCeiling(type) {
+  let r = hullRadius.get(type);
+  if (r === undefined) {
+    r = 0;
+    for (const v of getDie(type).shape.vertices) r = Math.max(r, v.length());
+    hullRadius.set(type, r);
   }
-  return h;
+  return r;
 }
-// A die whose centre sits above this stopped on something. The bar is a
-// MULTIPLE of the flat rest rather than one absolute number because the types
-// differ by 2.6x in height — a single bar cannot both clear a d20 (measured
-// resting legitimately at 1.19 against a wall) and catch a d8 on its
-// neighbour (1.03). See the ship comment above PHYS.
+// `pileScale` is therefore a safety factor on a bound, not a guess at where
+// dice rest: 1 is the geometry, and the shipped value only adds margin.
 const piledHigh = (d) => NUDGE.pileScale > 0
-  && d.body.position.y > flatRestHeight(d.type) * NUDGE.pileScale;
+  && d.body.position.y > restCeiling(d.type) * NUDGE.pileScale;
 
 // How far a die still travels in the last `secs` BEFORE IT STOPS, in
 // die-widths, averaged over the pool — the closest number there is to "how

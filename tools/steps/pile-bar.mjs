@@ -16,16 +16,24 @@ limitations under the License.
 
 // HOW HIGH DOES A DIE REST WHEN NOTHING IS UNDER IT?
 //
-// `dice-land-flat` and settle-matrix both call a die "piled" above y = 1.2,
-// a number nobody measured. Before a freeze predicate REFUSES a die for
-// resting too high, the bar has to sit above every legitimate solo rest —
-// including a die leaning on a wall — and below the lowest stack. This
-// throws each type ALONE (a solo die cannot be piled by construction) and
-// prints the distribution, then throws the same types at the boards
-// (throwTarget 1.8 aims outside the table, so every die ends against one)
-// for the leaning case.
+// `dice-land-flat` and settle-matrix both call a die "piled" above y = 1.2, a
+// number nobody measured. Before a freeze predicate REFUSES a die for resting
+// too high, the bar has to sit above every legitimate rest — including a die
+// leaning on a wall — and below a real stack. This throws each type ALONE (a
+// solo die cannot be piled by construction) and prints the distribution, then
+// throws them at the boards (throwTarget 1.8 aims outside the table, so every
+// die ends against one) for the leaning case, then six of a kind at `close`
+// for the stacked one.
 //
-//   node tools/drive.mjs tools/steps/pile-bar.mjs [seeds] [zooms]
+// WHAT IT FOUND. 1.2 is the d6 circumradius and change — sound for the pools
+// dice-land-flat rolls and a coincidence for anything else: a solo d20 was
+// measured resting legitimately at 1.190, 0.01 under the bar. The bar that
+// generalises is the hull's own circumradius, which is a THEOREM rather than
+// a fit — a convex die touching the felt cannot hold its centre higher than
+// that, however it is balanced — and every accepted rest measured here comes
+// in at 0.73-0.95 of it. js/main.js `restCeiling`.
+//
+//   node tools/drive.mjs tools/steps/pile-bar.mjs [seeds] [zooms] [deaden]
 
 const TYPES = ['d4', 'd6', 'd8', 'd10', 'd10x', 'd12', 'd20'];
 
@@ -58,6 +66,7 @@ export default async function run(stage, [seedCount = '12', zoomArg = 'medium,cl
   }
   const seeds = Array.from({ length: n }, (_, i) => 1000 + i * 7919);
 
+
   const throwOnce = async (types, seed, desc) => {
     await a.dbg(`throwSeeded(${JSON.stringify(types)}, ${seed})`);
     await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)', { desc, timeout: 60000 });
@@ -78,6 +87,27 @@ export default async function run(stage, [seedCount = '12', zoomArg = 'medium,cl
     return { y: l.endY, dot: l.endDot, x: d.body.position.x, z: d.body.position.z,
              timedOut: p.timedOut, nudged: p.nudged };
   })())`));
+
+  // The two numbers the hull itself dictates: how high a die lies when flat
+  // (inradius) and the highest its centre can be while still touching the
+  // felt (circumradius). The pile bar is a factor on the second — everything
+  // below is the check that real rests obey it.
+  await a.dbg(`throwSeeded(${JSON.stringify(TYPES)}, 1)`);
+  await a.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)', { desc: 'hull probe' });
+  const hulls = JSON.parse(await a.eval(`JSON.stringify(window.__diceDebug.tableDice.map((d) => {
+    const s = d.body.shapes[0];
+    let lo = Infinity, hi = 0;
+    s.faces.forEach((f, i) => {
+      const nrm = s.faceNormals[i], v = s.vertices[f[0]];
+      lo = Math.min(lo, Math.abs(nrm.x * v.x + nrm.y * v.y + nrm.z * v.z));
+    });
+    for (const v of s.vertices) hi = Math.max(hi, v.length());
+    return [d.type, lo, hi];
+  }))`));
+  console.log('\nhull geometry — flat rest (inradius) and the rest CEILING (circumradius)\n');
+  table(['type', 'flat', 'ceiling', 'ceiling/flat'],
+    hulls.map(([t, lo, hi]) => [t, lo.toFixed(3), hi.toFixed(3), (hi / lo).toFixed(2)]));
+  await clear();
 
   for (const mode of ['centre', 'walls']) {
     await a.dbg(`setThrowTarget(${mode === 'walls' ? 1.8 : inertTarget})`);
