@@ -681,8 +681,13 @@ function setPhysics(p = {}) {
 // they must die quietly instead of dithering. All three default to the
 // shipped behaviour EXACTLY — `gate: 0` skips the loop body entirely (not
 // even an assignment), THROW_TARGET is the 0.4 that was hardcoded, and SLEEP
-// holds cannon-es's own Body defaults (vendor/cannon-es.js:3403) — so master
-// and this file simulate byte-identically until a tool says otherwise.
+// holds WHAT dice.js ALREADY SETS — 0.4 / 0.35 at js/dice.js:1203-1204, which
+// are OVERRIDES of cannon-es's Body defaults (0.1 / 1), not those defaults.
+// This paragraph used to claim the stock numbers while the SLEEP block below
+// correctly claimed the overrides. Two readings of one constant in one file is
+// how an instrument gets seeded with a live physics change while advertising
+// itself as inert — which happened once, and `settle-tail` caught it. So
+// master and this file simulate byte-identically until a tool says otherwise.
 // Driven only by __diceDebug.setDampgate / setThrowTarget / setSleep.
 
 // Speed-gated damping: felt damping ONLY while a die is slow. `gate` is a
@@ -735,7 +740,12 @@ const SLEEP = { speed: 0.4, time: 0.35 };
 // same film — same trajectory, same rest positions, same pile rate, same
 // baked bytes, same seed replay — with none of the risk a gravity change
 // carries. `k` = 1 is the shipped speed and is byte-identical by
-// construction: stepPlayback multiplies by it and nothing else reads it.
+// construction, because 1 is the multiplicative identity everywhere it is
+// read — NOT because it is read in only one place. It was documented as
+// "stepPlayback multiplies by it and nothing else reads it" and that was
+// already false when written: `playImpact` divides the click gate by it, in
+// the same commit. Say what is true, because the next person to add a reader
+// will grep for that sentence and believe it.
 //
 // WHAT RIDES THE TEMPO AND WHAT DOES NOT. Scaled: the keyframe clock, and
 // therefore every event recorded against it — impact sounds, particle
@@ -745,7 +755,67 @@ const SLEEP = { speed: 0.4, time: 0.35 };
 // held declaration and a verdict unfold are reading time, not dice), the
 // reveal flip, the sink, the rest cadence, camera easing, shader/particle/
 // decal lifetimes, and every CSS transition. See stepPlayback and tick.
-const TEMPO = { k: 1 };
+//
+// AND A UNIFORM k IS DEAD AS A DEFAULT (Joe, 2026-08-10, same-seed A/B on the
+// live table): 2.7 is too fast overall, 2.2 is better but "way too fast for
+// the main dice roll" while "fine for resolution". That is not a number that
+// needs tuning, it is two different asks in one knob. The tumble is the part
+// people came to watch; the wiggle afterwards is the part they are waiting
+// out. So the projector gets a CURVE — roughly real time while the dice are
+// flying, faster once they are only resolving.
+//
+//   flight   the multiplier while the dice are still tumbling (1 = shipped)
+//   settle   the multiplier once they are down
+//   rampS    how long, in FILM seconds, the change takes
+//   anchorSpeed  where "still tumbling" ends, in units/s of centre travel
+//
+// THE ANCHOR IS A PURE FUNCTION OF THE BAKED FILM, which is what makes it
+// safe: `t_anchor` is the LAST film time at which any die's centre moves
+// faster than `anchorSpeed`, read off the keyframes after the bake. Every
+// client bakes the same film from the seed, so every client computes the same
+// anchor — no clock, no rng, no ordering. The LAST crossing rather than the
+// first makes the curve monotone by construction even when a nudge hurls a die
+// back into the air two seconds in: the hop is counted as flight, and the
+// speed-up simply starts after it.
+//
+// k(t) = flight below the anchor, smoothstep to settle over rampS above it.
+// k(0) is exactly `flight`, so the throw always opens at the speed it says.
+// The cinematic slow-mo window and a set's rate graph both multiply into this
+// rather than being replaced by it — they are relative slowdowns inside
+// whatever the projector is doing, and all three are functions of film time,
+// so they pick the same passage of the reel however fast it is running.
+//
+// flight = settle = 1 is byte-identical and is the default. `k` stays as the
+// uniform multiplier the theorem checks use; the two compose (effective =
+// k × curve), so setTempo(2) on the default curve is exactly what it was.
+const TEMPO = { k: 1, flight: 1, settle: 1, rampS: 0.4, anchorSpeed: 6 };
+
+// The last film time at which any die's CENTRE is moving faster than `speed`.
+// Centre travel, not angular: a die spinning in place has stopped travelling
+// and is in the part of the throw nobody is watching for suspense.
+function tempoAnchorOf(keyframes, speed) {
+  if (!keyframes.length || keyframes[0].length < 2) return 0;
+  const n = keyframes[0].length;
+  const bar = speed * FIXED_DT; // compare distances, not speeds — no divide
+  let last = 0;
+  for (let f = 1; f < n; f++) {
+    for (const kf of keyframes) {
+      if (kf[f].pos.distanceTo(kf[f - 1].pos) > bar) { last = f * FIXED_DT; break; }
+    }
+  }
+  return last;
+}
+// The projector's speed at this film time. Monotone in t by construction:
+// smoothstep is monotone on [0,1] and the two ends are constants.
+function tempoCurveAt(roll) {
+  const { flight, settle, rampS } = TEMPO;
+  if (flight === settle) return flight;
+  const a = roll.tempoAnchor || 0;
+  if (roll.time <= a) return flight;
+  if (!(rampS > 0)) return settle;
+  const u = Math.min(1, (roll.time - a) / rampS);
+  return flight + (settle - flight) * (u * u * (3 - 2 * u));
+}
 
 // FLOOR MAGNETIZE — BUILT, MEASURED, REFUTED, AND REMOVED (C30d, excised
 // 2026-08-10). THE CODE IS GONE; THIS IS THE KNOWLEDGE, WHICH IS THE PART
@@ -878,6 +948,33 @@ let lastSoundAt = 0;
 const IMPACT_MIN_GAP_MS = 35;   // the shipped floor, in FILM time
 const IMPACT_HARD_GAP_MS = 12;  // …and the wall-clock line nothing may cross
 
+// …EXCEPT THAT "35 ms OF FILM" IS NOT WHAT THE CODE ABOVE MEASURES, AND THE
+// DIFFERENCE DELETES CLICKS AT THE SHIPPED TEMPO (F2, 2026-08-10). `35/k` is
+// still compared against `performance.now()`, so the quantity gated is WALL
+// time — and the drain does not deliver impacts on a smooth wall clock. It
+// runs inside rAF: every impact whose `time` has passed is drained in one
+// frame, and every impact in that frame reads essentially the same
+// `performance.now()`. Frames are 16.7 ms apart on a 60 Hz display, so at k=1
+// a 35 ms wall gate can only pass a click every THIRD frame — 20 clicks a
+// second, when the film asks for up to 28.6. Two thumps 40 ms apart in the
+// film land two frames apart, 33.3 ms of wall apart, and the second is
+// silently dropped. That is happening today, at k=1, with no tempo involved.
+//
+// The fix is to gate the quantity the comment always claimed: the FILM gap
+// between the last click PLAYED and this one, straight off `roll.time`, with
+// the 12 ms wall floor kept as the only wall-clock line. Then the same set of
+// impacts survives at every tempo and on every refresh rate, because the
+// selection is a property of the recorded train rather than of the machine
+// playing it.
+//
+// SHIPPED INERT ANYWAY, because it changes which clicks a real roll plays at
+// k=1 and that is an audible change to a shipped surface, not a tunable's
+// default. 'wall' reproduces today exactly. Priced by tools/steps/
+// tempo-check.mjs, which models the rAF batching at 60 and 120 Hz rather than
+// pretending impacts arrive on a continuous clock — its first version did
+// pretend that, and it is the reason this bug survived pass four.
+const CLICKGATE = { mode: 'wall' };
+
 // IMPACT VOICE (Slice 1, Joe 2026-08-04 aesthetic pass): the per-set
 // sound identity — one function replaces the single hard-coded click
 // with five voices (chime / thud / crackle / clack / hush) modulated by
@@ -905,13 +1002,22 @@ const IMPACT_VOICES = {
   hush:    { filter: 'lowpass',  baseFreq:  700, freqSpread:  200, q: 0.9, decayShape: 0.35, gainScale: 0.018 },
 };
 
-function playImpact(strength, voice) {
-  if (!soundOn) return;
+// Returns true when a click was actually voiced, so the caller can advance its
+// FILM cursor only on a click that happened — a refusal by the 12 ms wall floor
+// must not consume the film budget, or the next impact is dropped too.
+function playImpact(strength, voice, filmTime) {
+  if (!soundOn) return false;
   const now = performance.now();
-  if (now - lastSoundAt < Math.max(IMPACT_HARD_GAP_MS, IMPACT_MIN_GAP_MS / TEMPO.k)) return;
+  if (CLICKGATE.mode === 'film' && typeof filmTime === 'number') {
+    // The wall clock keeps exactly one job: the hard floor. Everything else is
+    // decided on the film, where the impacts were recorded.
+    if (now - lastSoundAt < IMPACT_HARD_GAP_MS) return false;
+  } else if (now - lastSoundAt < Math.max(IMPACT_HARD_GAP_MS, IMPACT_MIN_GAP_MS / TEMPO.k)) {
+    return false;
+  }
   lastSoundAt = now;
   if (!audioCtx) {
-    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return; }
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return false; }
   }
   const v = voice || null;
   const body = (v && IMPACT_VOICES[v.body]) ? v.body : 'click';
@@ -955,6 +1061,7 @@ function playImpact(strength, voice) {
     osc.start();
     osc.stop(startAt + durSec);
   }
+  return true;
 }
 // Back-compat alias — every legacy call site still passes just strength;
 // the drain in stepPlayback below is the one that resolves the voice.
@@ -1377,7 +1484,8 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
   const body = createDieBody(type, diceMat);
   body.linearDamping = PHYS.linearDamping;
   body.angularDamping = PHYS.angularDamping;
-  // Inert at cannon's own defaults; see SLEEP.
+  // Inert at what dice.js already set (0.4 / 0.35), NOT at cannon's Body
+  // defaults of 0.1 / 1 — see the SLEEP block.
   body.sleepSpeedLimit = SLEEP.speed;
   body.sleepTimeLimit = SLEEP.time;
   // Attribution instrument only (BODYFLAGS); null leaves the body untouched.
@@ -2534,7 +2642,15 @@ function playRoll(roll) {
     settleMode: SETTLEGATE.mode,
     settleEps: SETTLEGATE.eps,
     time: 0,
+    // Where the tumble ends, off the baked film — see TEMPO. Computed here so
+    // it is decided once, from bytes every client agrees on, rather than
+    // re-derived per frame against a live threshold a tool may have moved.
+    tempoAnchor: tempoAnchorOf(keyframes, TEMPO.anchorSpeed),
+    tempoAnchorSpeed: TEMPO.anchorSpeed,
     soundIdx: 0,
+    // Film time of the last impact that was actually VOICED — the CLICKGATE
+    // cursor. -Infinity so the first impact of every roll always passes.
+    lastClickTime: -Infinity,
     decalsStamped: 0, // Level 4a per-roll cap counter (the drain reads it)
     ringIdx,          // Level 5: which sound event carries the shock ring
     ceremony: null,
@@ -2596,7 +2712,7 @@ function rollDice(types, label, opts = {}) {
 // It is applied to `step` alone, BELOW the two ceremony phases: a declaration
 // beat and a verdict unfold are reading time, not dice, and speeding those up
 // would be a UX change wearing a physics change's clothes.
-function stepPlayback(dt, tempo = 1) {
+function stepPlayback(dt, tempo = 1, curve = false) {
   const roll = currentRoll;
   if (!roll || roll.done) return;
   const cer = roll.ceremony;
@@ -2650,6 +2766,14 @@ function stepPlayback(dt, tempo = 1) {
   // faster projector" has to mean. Everything scheduled on roll.time — the
   // impact drain, bursts, marks, the ring — compresses with it for free.
   if (tempo !== 1) step *= tempo;
+  // The tempo CURVE, last and also multiplicative, and only on a real-time
+  // frame — `sim(n)` must keep stepping the film one baked frame at a time or
+  // every e2e scenario inherits the knob. A function of roll.time, so it picks
+  // the same passage of the reel whatever else is scaling the clock.
+  if (curve) {
+    const c = tempoCurveAt(roll);
+    if (c !== 1) step *= c;
+  }
   roll.time += step;
 
   const last = roll.frames - 1;
@@ -2686,7 +2810,19 @@ function stepPlayback(dt, tempo = 1) {
     // replaces the default click. A shrouded roll stays silent on
     // identity — obsidian rings like the legacy click (fxSet is null for
     // shrouded above, so voice falls back to the default).
-    playImpact(s.strength, fxSet && fxSet.sound ? fxSet.sound : null);
+    // THE CLICK GATE, ON FILM TIME (CLICKGATE, 'wall' by default). The cursor
+    // lives on the ROLL, so it resets with every throw by construction — a
+    // module-level film cursor would compare this roll's t=0.1 against the
+    // last roll's t=3.4 and mute the entire landing. It advances only when a
+    // click was really voiced, so a refusal by the 12 ms wall floor does not
+    // spend the film budget. Sound only: bursts, marks and the ring are keyed
+    // to the impact, not to whether it was audible.
+    const filmOk = CLICKGATE.mode !== 'film'
+      || (s.time - roll.lastClickTime) * 1000 >= IMPACT_MIN_GAP_MS;
+    if (filmOk && playImpact(s.strength, fxSet && fxSet.sound ? fxSet.sound : null,
+      CLICKGATE.mode === 'film' ? s.time : undefined)) {
+      roll.lastClickTime = s.time;
+    }
     if (fxSet && fxSet.particles && s.at) particleField.burst(fxSet.particles, s.at, s.strength);
     // Marks want floor contacts with real force, and only so many per
     // roll — the felt remembers the landing, not every tremble.
@@ -5083,7 +5219,7 @@ function tick(dt, render = true, realtime = false) {
   particleField.tick(dt, SHADER_TIME.value);
   decalField.tick(dt);
   dieLights.tick(dt, SHADER_TIME.value);
-  stepPlayback(dt, realtime ? TEMPO.k : 1);
+  stepPlayback(dt, realtime ? TEMPO.k : 1, realtime);
   stepSinking(dt);   // per-roll Done departures (§7.5)
   stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
   stepRevealing(dt); // reveal correction flips (goal 11)
@@ -5851,11 +5987,48 @@ window.__diceDebug = {
     if (typeof p.eps === 'number' && p.eps > 0) SETTLEGATE.eps = p.eps;
     return { ...SETTLEGATE };
   },
+  // The impact click gate (F2). 'wall' is shipped: 35/k ms measured against
+  // performance.now(), which the rAF batching quantises into a click every
+  // third frame at k=1. 'film' gates the recorded train instead and keeps only
+  // the 12 ms wall floor. Takes effect on the NEXT impact.
+  get clickGate() { return { ...CLICKGATE }; },
+  setClickGate(o) {
+    const m = o && o.mode;
+    if (m === 'wall' || m === 'film') CLICKGATE.mode = m;
+    return { ...CLICKGATE };
+  },
   // Playback tempo (C30d): the projector speed on already-baked keyframes.
   // 1 is shipped and byte-identical; k>1 plays the same film k times faster.
   // Takes effect on the NEXT real-time frame — no reload, no re-bake.
   get tempo() { return TEMPO.k; },
   setTempo(k) { TEMPO.k = typeof k === 'number' && k > 0 ? k : TEMPO.k; return TEMPO.k; },
+  // The tempo CURVE (2026-08-10): flight/settle/rampS/anchorSpeed. Inert at
+  // flight = settle = 1. anchorSpeed is read when a roll is BAKED, the rest
+  // when it is played, so a sweep sets anchorSpeed before throwSeeded and may
+  // set the others at any time.
+  get tempoCurve() {
+    return { flight: TEMPO.flight, settle: TEMPO.settle,
+      rampS: TEMPO.rampS, anchorSpeed: TEMPO.anchorSpeed };
+  },
+  setTempoCurve(o) {
+    const p = o || {};
+    for (const key of ['flight', 'settle', 'rampS', 'anchorSpeed']) {
+      if (typeof p[key] === 'number' && p[key] >= 0) TEMPO[key] = p[key];
+    }
+    return this.tempoCurve;
+  },
+  // What the curve would multiply by at a given film time on the CURRENT roll,
+  // and where its anchor landed. The assertion surface for monotonicity and
+  // flight-phase parity — a scenario must never have to re-derive the curve.
+  tempoAt(t) {
+    const r = currentRoll;
+    if (!r) return null;
+    const held = r.time;
+    r.time = typeof t === 'number' ? t : held;
+    const k = tempoCurveAt(r);
+    r.time = held;
+    return k;
+  },
   // Attribution only, not a ship candidate — see BODYFLAGS. null restores
   // cannon's default (dice sleep); false keeps every die awake to its freeze.
   get bodyFlags() { return { ...BODYFLAGS }; },
@@ -5951,6 +6124,11 @@ window.__diceDebug = {
       settleSpreadS: Math.round(((Math.max(...fr) - Math.min(...fr)) * FIXED_DT) * 1000) / 1000,
       timedOut: r.landings.filter((l) => l.timedOut).length,
       nudged: r.nudges,
+      // Where the tempo curve would change gear on this throw, and the bar it
+      // used. Reported even while the curve is inert: it is a fact about the
+      // film (when the dice stopped travelling), useful on its own.
+      tempoAnchor: Math.round((r.tempoAnchor ?? 0) * 1000) / 1000,
+      tempoAnchorSpeed: r.tempoAnchorSpeed ?? null,
       // WHY a die timed out, which is the whole diagnosis. `parked` counts
       // dice that were motionless when the cap fired — they were not still
       // tumbling, something REFUSED to freeze them. `moving` is the honest
@@ -5990,6 +6168,73 @@ window.__diceDebug = {
       byDie: r.landings.map((l) => Math.round(l.time * 100) / 100),
     };
   },
+  // THE TERMINATOR, RE-DERIVED FROM THE FILM. settleProfile's `endDisp` is
+  // what the mechanism says it did; this is the same quantity recomputed from
+  // the baked keyframes, which is the only way to catch a gate that reports a
+  // number it did not actually enforce (ROADMAP C27's rule, and the reason
+  // `hops` is read off the film rather than off a clamp's own counter).
+  //
+  // Per die, over the SETTLE_STILL window that FOLLOWS its settle frame — the
+  // window whose stillness earned the freeze — the excursion of the centre of
+  // mass and the worst excursion of the three probe points, both in
+  // die-widths. `frames` says how much of that window survived the tail cut:
+  // the film ends at the LAST die's settle frame, so the deciding die has none
+  // of its window on file and only dice with a full window can be judged.
+  //
+  // centre vs probe is the design claim made measurable: a die rotating in
+  // place moves no centre at all, so any die where probe materially exceeds
+  // centre is a die a one-point test would have called still.
+  settleProbe() {
+    const r = currentRoll;
+    if (!r) return null;
+    const want = Math.round(SETTLE_STILL / FIXED_DT);
+    const off = [new THREE.Vector3(), new THREE.Vector3()];
+    const p = new THREE.Vector3();
+    return r.landings.map((l, i) => {
+      const kf = r.keyframes[i];
+      const w = dieWidth(r.dice[i].type);
+      const a = Math.min(l.frame, kf.length - 1);
+      const b = Math.min(kf.length - 1, a + want);
+      const lo = [Infinity, Infinity, Infinity];
+      const hi = [-Infinity, -Infinity, -Infinity];
+      let centre = 0;
+      let probe = 0;
+      for (let k = 0; k < 2; k++) {
+        lo[0] = lo[1] = lo[2] = Infinity;
+        hi[0] = hi[1] = hi[2] = -Infinity;
+        off[k].set(k === 0 ? w / 2 : 0, k === 1 ? w / 2 : 0, 0);
+        for (let f = a; f <= b; f++) {
+          p.copy(off[k]).applyQuaternion(kf[f].quat).add(kf[f].pos);
+          lo[0] = Math.min(lo[0], p.x); hi[0] = Math.max(hi[0], p.x);
+          lo[1] = Math.min(lo[1], p.y); hi[1] = Math.max(hi[1], p.y);
+          lo[2] = Math.min(lo[2], p.z); hi[2] = Math.max(hi[2], p.z);
+        }
+        probe = Math.max(probe, hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+      }
+      lo[0] = lo[1] = lo[2] = Infinity;
+      hi[0] = hi[1] = hi[2] = -Infinity;
+      for (let f = a; f <= b; f++) {
+        const q = kf[f].pos;
+        lo[0] = Math.min(lo[0], q.x); hi[0] = Math.max(hi[0], q.x);
+        lo[1] = Math.min(lo[1], q.y); hi[1] = Math.max(hi[1], q.y);
+        lo[2] = Math.min(lo[2], q.z); hi[2] = Math.max(hi[2], q.z);
+      }
+      centre = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+      probe = Math.max(probe, centre);
+      return {
+        i,
+        frames: b - a,
+        full: b - a >= want,
+        timedOut: !!l.timedOut,
+        centre: centre / w,
+        probe: probe / w,
+        endDisp: l.endDisp,
+      };
+    });
+  },
+  // The width `eps` is a fraction OF. Tools judging the terminator need it and
+  // DIE_DEFS is not otherwise reachable from outside.
+  dieWidth(type) { return DIE_DEFS[type] ? dieWidth(type) : null; },
   tableDiceInfo() {
     return tableDice.map((d) => ({
       type: d.type,

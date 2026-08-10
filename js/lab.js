@@ -1051,6 +1051,15 @@ function tick(now) {
     if (k >= 1) { fx.done && fx.done(); active.splice(i, 1); }
   }
   if (drop) {
+    // THREE-ARGUMENT STEP: cannon's accumulator, driven by WALL-CLOCK dt.
+    // This is fine here and ONLY here — the lab drops one die for a look at a
+    // felt mark and nothing about it is ever compared between clients. It must
+    // NEVER be used to validate replay or determinism: the number of substeps
+    // taken depends on how fast the machine is, so the same seed traces a
+    // different path on a slow tab. The main table's bake uses the fixed
+    // one-argument form for exactly that reason (playRoll's loop). Left as-is
+    // rather than converted, because a fixed step here would decouple the
+    // drop from the wall clock it is animated against.
     world.step(1 / 60, dt, 4); // main-table FIXED_DT
     drop.mesh.position.copy(drop.body.position);
     drop.mesh.quaternion.copy(drop.body.quaternion);
