@@ -181,6 +181,36 @@ let camTarget = CAM_TARGET_HOME.clone();
 // frame and the app never reaches ready. (Found exactly that way.)
 let camEase = null;
 let lastFramingMode = 'mat'; // which rung of the framing ladder the frame is on
+// PORTRAIT ROLL (probe, 2026-08-10). The phone's problem is an ASPECT
+// MISMATCH, not a distance: measured, |ndc.y| is 0.24-0.27 while |ndc.x| is
+// 1.28, so three quarters of the screen height is unused while the mat spills
+// out the sides. A landscape mat (1.65) in a portrait window (0.33) is a
+// mismatch of 5.0; rolling the view 90 degrees makes the required aspect 0.60
+// against 0.33, a mismatch of 1.84 — 2.7x better BEFORE any retreat.
+//
+// Rolling the CAMERA is per-viewer: no shared state, no wire field, nothing
+// another player can see. ROADMAP item 21 proposed the same correction by
+// rotating the MAT, which is shared physics walls and priced accordingly.
+// Zero until measured and ruled on; the shipped path is untouched at 0.
+let camRoll = 0;
+// ORBIT, which is what the portrait fix actually needs. Rolling the camera
+// rotates the IMAGE — the table reads as a tilted photograph and the dice slide
+// into a corner (measured and looked at, 2026-08-10). Orbiting moves the EYE a
+// quarter turn about the mat's vertical axis, so you look down the mat's LONG
+// axis instead of across it: the 8.6-unit span runs UP the screen where a
+// portrait window has room, and the 5.2-unit span runs across it. Up stays +Y,
+// so the horizon is level and the table still reads as a table.
+let camOrbit = 0;
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+
+// Aim the camera and apply the roll. Every fit and every ease goes through
+// this, so the roll can never be half-applied — a projection that disagreed
+// with the painted frame is exactly how a framing probe lies.
+function aimCamera(target) {
+  camera.lookAt(target);
+  if (camRoll) camera.rotateZ(camRoll);
+  camera.updateMatrixWorld(true);
+}
 // Half-width of the box kept around the deciding die when nothing larger
 // fits. Measured on a 390px phone against today's flat 80px: 1.1 → 175-247px
 // but as few as 2 of 6 dice in frame; 2.2 → 80-107px, barely better than the
@@ -4658,15 +4688,31 @@ window.__diceDebug = {
   // which is what shipped before 2026-08-10. The scenario measures BOTH sides
   // through this, so "cropping bought size" is a number rather than a claim.
   setFramingLadder(on) { framingLadder = !!on; applyCameraFraming(false); return framingLadder; },
+  // The portrait-roll probe. Radians; Math.PI/2 stands the mat up on screen.
+  setCamRoll(r) { camRoll = r; applyCameraFraming(false); return camRoll; },
+  setCamOrbit(r) { camOrbit = r; applyCameraFraming(false); return camOrbit; },
   setHeroMargin(m) { HERO_MARGIN = m; applyCameraFraming(false); return HERO_MARGIN; },
   framingInfo() {
     const v = new THREE.Vector3();
+    // ROLL-AWARE die span. zoomProbe measures |x1 - x0| only, so a 90-degree
+    // roll — which maps world X onto the screen's VERTICAL axis — reads it as
+    // zero. Same convention as zoomProbe (NDC delta x viewport, so it reduces
+    // to exactly zoomProbe's number at roll 0), but taken as a 2D distance.
+    // zoomProbe itself is left alone: `zoom-syncs` pins it.
+    const spanPx = (() => {
+      const a0 = new THREE.Vector3(0, 0, 0).project(camera);
+      const a1 = new THREE.Vector3(1, 0, 0).project(camera);
+      return Math.round(Math.hypot((a1.x - a0.x) * view.width, (a1.y - a0.y) * view.height));
+    })();
     const ndc = (p) => { v.copy(p).project(camera); return Math.max(Math.abs(v.x), Math.abs(v.y)); };
     const live = tableDice.filter((d) => d.body && d.mesh && d.mesh.visible !== false);
     const l = currentRoll && currentRoll.lastLanding;
     const hero = l && live.find((t) => t.rollId === currentRoll.rollId && t.dieIndex === l.i);
     return {
       mode: lastFramingMode,
+      spanPx,
+      roll: Math.round(camRoll * 100) / 100,
+      orbit: Math.round(camOrbit * 100) / 100,
       matFits: framingPoints().every(({ p }) => ndc(p) <= 1),
       dice: live.length,
       diceOnScreen: live.filter((d) => ndc(d.body.position) <= 1).length,
@@ -12641,6 +12687,7 @@ function fitCameraTo(pts, target = camTarget) {
     ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
   );
   const ray = eye.clone().sub(target);
+  if (camOrbit) ray.applyAxisAngle(Y_AXIS, camOrbit);
   const v = new THREE.Vector3();
   // Pull back in small steps and stop at the first distance that fits — a
   // closed form would have to invert the projection for eight points at once,
@@ -12648,8 +12695,7 @@ function fitCameraTo(pts, target = camTarget) {
   // settle.
   for (let i = 0; i < 90; i++) {
     camera.position.copy(target).addScaledVector(ray, 1 + i * 0.03);
-    camera.lookAt(target);
-    camera.updateMatrixWorld(true);
+    aimCamera(target);
     const fits = pts.every(({ p, mx, my }) => {
       v.copy(p).project(camera);
       return Math.abs(v.x) <= 1 - mx && Math.abs(v.y) <= 1 - my;
@@ -12751,8 +12797,7 @@ function computeFraming() {
   };
   camera.position.copy(savedPos);
   camTarget.copy(savedTgt);
-  camera.lookAt(camTarget);
-  camera.updateMatrixWorld(true);
+  aimCamera(camTarget);
   return pose;
 }
 
@@ -12765,8 +12810,7 @@ function applyFramingPose(pose, animate) {
     camEase = null;
     camera.position.copy(pose.pos);
     camTarget.copy(pose.tgt);
-    camera.lookAt(camTarget);
-    camera.updateMatrixWorld(true);
+    aimCamera(camTarget);
     return;
   }
   camEase = {
@@ -12784,8 +12828,7 @@ function stepCamera(dt) {
   const k = 1 - Math.pow(1 - camEase.t, 3); // ease-out cubic
   camera.position.lerpVectors(camEase.fromPos, camEase.toPos, k);
   camTarget.lerpVectors(camEase.fromTgt, camEase.toTgt, k);
-  camera.lookAt(camTarget);
-  camera.updateMatrixWorld(true);
+  aimCamera(camTarget);
   if (camEase.t >= 1) camEase = null;
 }
 
