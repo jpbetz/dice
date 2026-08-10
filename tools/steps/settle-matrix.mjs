@@ -195,9 +195,16 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
   const base = 'shipped';
   // `shipped` is not optional: it is the baseline every gate is judged
   // against, so a filter selects what to compare TO it, never instead of it.
+  // Names match EXACTLY. Substring matching quietly swept siblings in — the
+  // token `sleepier` also selects `sleepier+deaden+t80` — and a measurement
+  // tool that runs rows you did not ask for is one you have to re-read the
+  // output of to know what you ran.
   const toks = filter ? filter.split(',').filter(Boolean) : null;
-  const wanted = VARIANTS.filter(([n]) =>
-    n === base || !toks || toks.some((t) => n === t || n.includes(t)));
+  const wanted = VARIANTS.filter(([n]) => n === base || !toks || toks.includes(n));
+  if (toks) {
+    const missing = toks.filter((t) => !VARIANTS.some(([n]) => n === t));
+    if (missing.length) throw new Error(`no such variant: ${missing.join(', ')}`);
+  }
   const shakeSeeds = seedsOf(nShake);
   const pileSeeds = seedsOf(nPile);
   const got = new Map();   // "variant|pool"      -> { shake, creep, dur, capped, bake, wall }
@@ -289,6 +296,20 @@ export default async function run(stage, [shakeCount = '16', pileCount = '10', f
       const d = (1 - r.shake / b(p).shake) * 100;
       return n === base ? r.shake.toFixed(3)
         : `${r.shake.toFixed(3)} ${d >= 0 ? '-' : '+'}${Math.abs(d).toFixed(0)}%`;
+    })]));
+  // Creep is here to be read AGAINST shake, and for the sleep variants it is
+  // the whole safety question. Anything that retires a die sooner risks
+  // retiring one that was still visibly moving, and a die snapped to a halt
+  // from speed covers MORE ground in its last 0.6s, not less. So shake flat +
+  // creep UP means "stopped while moving" — the artifact — while shake flat +
+  // creep flat means the die genuinely had nothing left to do.
+  console.log(`\ncreep — die-widths covered in the same window. Read against shake:`
+    + ` up, with shake flat, is a die stopped while it was still moving\n`);
+  table(['variant', ...SHAKE_POOLS.map(([p]) => `${p} creep`)],
+    ran.map(([n]) => [n, ...SHAKE_POOLS.map(([p]) => {
+      const r = got.get(`${n}|${p}`);
+      const d = ((r.creep - b(p).creep) / b(p).creep) * 100;
+      return `${r.creep.toFixed(2)}${n === base ? '' : ` ${d >= 0 ? '+' : ''}${d.toFixed(0)}%`}`;
     })]));
   console.log('');
   table(['variant', ...SHAKE_POOLS.map(([p]) => `${p} dur`), 'caps'],
