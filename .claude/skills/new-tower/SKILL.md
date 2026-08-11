@@ -31,6 +31,10 @@ first, separately) or the design is wrong.
    server.js SETTING_SPECS.
 4. The proof tools: `tools/steps/tower-fit.mjs`, `tower-occlusion.mjs`,
    `tower-probe.mjs`, `tower-resting-eye.mjs` — all take a tower id.
+   (`tower-shots.mjs` does NOT — it renders whatever skin `towerLabSkin`
+   was last left holding; set it explicitly. If you find a proof tool that
+   doesn't take the id this list claims, parameterising it is in scope —
+   that's how resting-eye got its parameter.)
 
 ## 1. Design before code
 
@@ -84,10 +88,23 @@ What the builder produces:
    object, returning one THREE.Group with ZERO colliders. Reuse the
    exported towerskin.js kit; if a helper you need isn't exported yet, the
    export refactor is its own commit with NO behavioural edit — comments
-   and `export` keywords only, and Heartwood's rendered output must be
-   byte-identical.
-2. Registry row in TOWERS: `{ id, label, skin, title, clunkVoice }`. Mind
-   the module-evaluation TDZ trap the registry comment documents.
+   and `export` keywords only. A technique that a LATER skin invented and
+   you now need (Bastion's bakeStone was the first) MOVES into
+   towerskin.js — never copy sibling-skin code into a third file. Either
+   way the owning skin's output must be unchanged, and the witness for
+   that is the BAKE FUNCTIONS run side by side on the owner's parameter
+   sets with differing pixels counted — NOT a before/after PNG compare;
+   two runs of identical code produce different PNG bytes in this harness,
+   so that red means nothing (measured on Bastion's bakes: the honest
+   witness reads 0/0/0, and moving one channel by one unit reads
+   thousands). Commit the A/B run's numbers in the commit message.
+   Put the §1.5 measurement table in the skin file's header — it is for
+   the NEXT reader, not just for you.
+2. Registry row in TOWERS: `{ id, label, skin, title, clunkVoice }`, PLUS
+   a line in the registry comment's theme-family pairing list (Heartwood ←
+   Wildwood, Bastion ← Classics, Black Anvil ← Emberforge) — the pairing
+   is part of the deliverable, not decoration. Mind the module-evaluation
+   TDZ trap the registry comment documents.
 3. Server validation: add the id to the `tower` row in SETTING_SPECS.
    (server.js changed ⇒ the live 8123 needs ONE restart at merge time,
    from the main session only.)
@@ -115,9 +132,22 @@ Two rules about the proofs themselves:
   (Bastion's first occlusion run reported hood 18/18 occluded; the truth
   was 0/18 — the project's "green check masks a broken thing" failure
   mode, inside the proof tooling itself.)
-- **Red-check every assertion you add.** Break the thing each new claim is
-  about and watch it go red before trusting the green. tower-roll's
-  comments record every red-check it has survived; keep that ledger.
+- **Red-check every assertion you add — and red-check the WITNESS too.**
+  Break the thing each new claim is about and watch it go red before
+  trusting the green; then break the CHECKER and confirm the instrument
+  can move at all. Both of the third build's best catches were instrument
+  failures, not subject failures: a nondeterministic PNG compare whose red
+  meant nothing, and a green that survived deleting the emissive bed
+  because the opacity lived in the lining behind it — the green was true
+  but about a different thing than assumed. tower-roll's comments record
+  every red-check it has survived; keep that ledger.
+- **If your model has an aperture in the facade (slit, vent, window),
+  verify it by removing EVERYTHING behind it — not just the piece that
+  fills it.** The occlusion sampling stops at r 2.0 and the bore is 2.125,
+  so a narrow facade opening can fall between sample rays; 99/99 does not
+  automatically cover it. The recess must resolve to a closed `towerSkin*`
+  occluder somewhere behind the opening, and only stripping the whole
+  stack proves which layer is doing the work.
 
 The four contract proofs:
 
@@ -145,10 +175,13 @@ Then the behavioral proofs, which are already written — run, don't rewrite:
   tower 'none' the app must be byte-for-byte the old one, proven by every
   non-tower scenario passing without edits.
 - Extend `tower-roll` with the NEW claims only (a swap passes through the
-  towerless body list; the picker styling holds at N chips; the palette
+  towerless body list; the picker layout holds at N chips; the palette
   resolves through impactVoice — and assert the other half: an ordinary
   landing still takes the die set's voice). Don't duplicate per-tower what
-  heartwood already pins; parameterize or spot-check.
+  heartwood already pins; parameterize or spot-check — and REFACTORING an
+  existing per-tower block into a registry loop IS the blessed way to
+  parameterize; that edit to a shipped scenario is not a violation of
+  "new claims only", it is how the scenario scales.
 
 ## 4. The review gate (main session, never skipped)
 
@@ -161,8 +194,11 @@ Then the behavioral proofs, which are already written — run, don't rewrite:
    and treat the film probes as the real evidence of entry; (3) the exit
    spread; (4) wide vs close idle — a statement about the tower-relative
    resting eye (they will look near-identical; that is shipped behaviour),
-   NOT about the framing ladder; (5) the other towers at the same angle
-   for family resemblance; (6) a close look-only detail shot.
+   NOT about the framing ladder; (5) ALL the other towers at the same
+   angle for family resemblance — tower-family-shots.mjs shoots the whole
+   registry; the review set's cost grows with the family, and that is the
+   price of a shelf worth returning to; (6) a close look-only detail shot,
+   including any emissive/special-material feature the tower ships.
 3. Read the load-bearing diff yourself — anything touching the shared
    drain/registry/server path, first-law eyes on.
 4. `git merge --ff-only` to master; restart 8123 iff server.js changed.
