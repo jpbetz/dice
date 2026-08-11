@@ -5289,6 +5289,7 @@ function tick(dt, render = true, realtime = false) {
   stepSinking(dt);   // per-roll Done departures (§7.5)
   stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
   stepRevealing(dt); // reveal correction flips (goal 11)
+  stepTowerLab(dt);  // tower lab (docs/TOWER.md) — inert unless towerCore(true)
   stepCamera(dt);    // eased reframing; only ever armed under a quiet picture
   if (chips.length) positionChips();
   if (isPeekOpen()) positionPeek();
@@ -5383,6 +5384,211 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) fastForwardPlayback();
 });
 
+// ---------------------------------------------------------------------------
+// TOWER LAB (docs/TOWER.md) — ghost renders of the TOWER_CORE volumes plus a
+// drop test that pours dice through the contract: scripted entry fall (no
+// physics body — hidden dice have none, per the contract), despawn at the
+// occlusion line, seeded hidden transit, then exit spawn with the engine
+// spray. Lab dice live in an ISOLATED cannon world: the main world is never
+// stepped live (playback is film) and towers are OPTIONAL — nothing here
+// runs unless towerCore(true), and nothing touches rolls, tableDice, the
+// film, or the wire. Normal rolls behave identically with the lab on.
+const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0, falling: [], hidden: [], out: [] };
+
+// The contract volumes, evaluated at the CURRENT mat. The anchor is the back
+// wall's midpoint (moves with zoom); the offsets from it are the contract.
+function towerVolumes() {
+  const z0 = -TABLE_D / 2;
+  return {
+    z0,
+    socket:  { c: [0, 5.0, z0 - 2.0], s: [5.2, 10, 4.4] },
+    apron:   { c: [0, 0.4, z0 + 0.55], s: [3.8, 0.8, 1.1] },
+    shaft:   { c: [0, 4.85, z0 - 1.6], r: 1.7, h: 5.3 },
+    aim:     { c: [0, 9.0, z0 - 1.6], s: [0.8, 0.3, 0.8] },
+    despawnY: 5.6,
+    hood:    { c: [0, 2.0, z0 + 0.25], s: [3.4, 2.4, 0.5] },
+    exit:    { p: [0, 1.6, z0 + 0.35] },
+  };
+}
+
+function towerGhost(color, opacity, geo) {
+  return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide,
+  }));
+}
+
+function towerLabBuild() {
+  const v = towerVolumes();
+  const g = new THREE.Group();
+  const box = (vol, color, opacity) => {
+    const mesh = towerGhost(color, opacity, new THREE.BoxGeometry(...vol.s));
+    mesh.position.set(...vol.c);
+    g.add(mesh);
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(mesh.geometry),
+      new THREE.LineBasicMaterial({ color, transparent: true, opacity: Math.min(1, opacity * 4) }));
+    edges.position.copy(mesh.position);
+    g.add(edges);
+  };
+  box(v.socket, 0x4488ff, 0.06);  // SOCKET — blue exterior hull
+  box(v.apron, 0xff8800, 0.25);   // APRON — orange, the one collider
+  box(v.aim, 0xffffff, 0.35);     // entry aim box
+  box(v.hood, 0x8844ff, 0.18);    // HOOD — purple occlusion pocket
+  const shaft = towerGhost(0x44cc88, 0.12,
+    new THREE.CylinderGeometry(v.shaft.r, v.shaft.r, v.shaft.h, 24, 1, true));
+  shaft.position.set(...v.shaft.c);
+  g.add(shaft);                   // MOUTH shaft — green tube
+  const line = towerGhost(0xff3333, 0.35, new THREE.CircleGeometry(v.shaft.r + 0.2, 24));
+  line.rotation.x = -Math.PI / 2;
+  line.position.set(v.shaft.c[0], v.despawnY, v.shaft.c[2]);
+  g.add(line);                    // despawn line — red disc
+  const spawn = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 8),
+    new THREE.MeshBasicMaterial({ color: 0xffdd33 }));
+  spawn.position.set(...v.exit.p);
+  g.add(spawn);                   // exit spawn point + spray direction
+  g.add(new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1),
+    new THREE.Vector3(...v.exit.p), 2.0, 0xffdd33));
+  return g;
+}
+
+// The lab's own world: floor, the CURRENT walls, ceiling, apron. It reuses
+// the shared contact materials, so setPhysics tweaks apply here too.
+function towerLabWorld() {
+  const v = towerVolumes();
+  const w = new CANNON.World();
+  w.gravity.set(0, GRAVITY, 0);
+  w.addContactMaterial(cmFloor);
+  w.addContactMaterial(cmDice);
+  w.addContactMaterial(cmWall);
+  const plane = (mat, pos, rot) => {
+    const b = new CANNON.Body({ mass: 0, material: mat, shape: new CANNON.Plane() });
+    b.position.set(...pos);
+    b.quaternion.setFromEuler(...rot);
+    w.addBody(b);
+  };
+  plane(floorMat, [0, 0, 0], [-Math.PI / 2, 0, 0]);
+  plane(wallMat, [0, 0, -TABLE_D / 2], [0, 0, 0]);
+  plane(wallMat, [0, 0, TABLE_D / 2], [0, Math.PI, 0]);
+  plane(wallMat, [-TABLE_W / 2, 0, 0], [0, Math.PI / 2, 0]);
+  plane(wallMat, [TABLE_W / 2, 0, 0], [0, -Math.PI / 2, 0]);
+  plane(wallMat, [0, 22, 0], [Math.PI / 2, 0, 0]);
+  const apron = new CANNON.Body({ mass: 0, material: wallMat,
+    shape: new CANNON.Box(new CANNON.Vec3(v.apron.s[0] / 2, v.apron.s[1] / 2, v.apron.s[2] / 2)) });
+  apron.position.set(...v.apron.c);
+  w.addBody(apron);
+  return w;
+}
+
+function towerLabSet(on = true) {
+  if (on && !TOWERLAB.on) {
+    TOWERLAB.group = towerLabBuild();
+    scene.add(TOWERLAB.group);
+    TOWERLAB.world = towerLabWorld();
+    TOWERLAB.on = true;
+  } else if (!on && TOWERLAB.on) {
+    towerLabClear();
+    scene.remove(TOWERLAB.group);
+    TOWERLAB.group = null;
+    TOWERLAB.world = null;
+    TOWERLAB.on = false;
+  }
+  return TOWERLAB.on;
+}
+
+function towerLabClear() {
+  for (const f of TOWERLAB.falling) scene.remove(f.mesh);
+  for (const h of TOWERLAB.hidden) scene.remove(h.mesh);
+  for (const o of TOWERLAB.out) { scene.remove(o.mesh); TOWERLAB.world.removeBody(o.body); }
+  TOWERLAB.falling = []; TOWERLAB.hidden = []; TOWERLAB.out = [];
+}
+
+// Pour n dice through the contract. Seeded so a look can be repeated; every
+// die's exit (transit, jitter, speed, yaw, pitch, spin) is drawn up front.
+function towerLabDrop(n = 8, seed = 42) {
+  if (!TOWERLAB.on) towerLabSet(true);
+  let s = (seed >>> 0) || 1;
+  const rng = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32);
+  const v = towerVolumes();
+  n = Math.max(1, Math.min(20, n | 0));
+  for (let i = 0; i < n; i++) {
+    const type = DIE_TYPES[(rng() * DIE_TYPES.length) | 0];
+    const mesh = createDieMesh(type, dieVariant(false, null));
+    // Stagger by spawn height: each die starts 1.4 higher, so the pour
+    // arrives as a cascade with no timer bookkeeping.
+    mesh.position.set(
+      v.aim.c[0] + (rng() - 0.5) * 0.8,
+      v.aim.c[1] + i * 1.4,
+      v.aim.c[2] + (rng() - 0.5) * 0.8);
+    mesh.quaternion.setFromEuler(new THREE.Euler(rng() * 6.28, rng() * 6.28, rng() * 6.28));
+    scene.add(mesh);
+    TOWERLAB.falling.push({
+      mesh, type, vy: 0,
+      av: [(rng() - 0.5) * 8, (rng() - 0.5) * 8, (rng() - 0.5) * 8],
+      transit: 0.45 + rng() * 0.65,
+      exit: {
+        x: (rng() - 0.5) * 1.2,
+        speed: 6 + rng() * 5,
+        yaw: (rng() - 0.5) * (Math.PI / 3),      // ±30°
+        pitch: -rng() * (Math.PI / 18),          // 0..−10°
+        av: [(rng() - 0.5) * 40, (rng() - 0.5) * 40, (rng() - 0.5) * 40],
+        rot: [rng() * 6.28, rng() * 6.28, rng() * 6.28],
+      },
+    });
+  }
+  return { dropped: n, seed };
+}
+
+const TOWERLAB_EULER = new THREE.Euler();
+function stepTowerLab(dt) {
+  if (!TOWERLAB.on || dt <= 0) return;
+  TOWERLAB.t += dt;
+  const v = towerVolumes();
+  // Scripted entry: gravity-true fall, tumbling, no body. Despawn at the line.
+  for (let i = TOWERLAB.falling.length - 1; i >= 0; i--) {
+    const f = TOWERLAB.falling[i];
+    f.vy += GRAVITY * dt;
+    f.mesh.position.y += f.vy * dt;
+    TOWERLAB_EULER.set(f.av[0] * dt, f.av[1] * dt, f.av[2] * dt);
+    f.mesh.quaternion.multiply(new THREE.Quaternion().setFromEuler(TOWERLAB_EULER));
+    if (f.mesh.position.y <= v.despawnY) {
+      scene.remove(f.mesh);
+      TOWERLAB.falling.splice(i, 1);
+      let exitAt = TOWERLAB.t + f.transit;
+      exitAt = Math.max(exitAt, TOWERLAB.lastExit + 0.08); // the stagger floor
+      TOWERLAB.lastExit = exitAt;
+      TOWERLAB.hidden.push({ mesh: f.mesh, type: f.type, exitAt, exit: f.exit });
+    }
+  }
+  // Hidden transit ends: the body first exists here, inside the walls.
+  for (let i = TOWERLAB.hidden.length - 1; i >= 0; i--) {
+    const h = TOWERLAB.hidden[i];
+    if (TOWERLAB.t < h.exitAt) continue;
+    TOWERLAB.hidden.splice(i, 1);
+    const body = createDieBody(h.type, diceMat);
+    body.linearDamping = PHYS.linearDamping;
+    body.angularDamping = PHYS.angularDamping;
+    body.allowSleep = false; // ship parity: the terminator is the predicate
+    body.position.set(v.exit.p[0] + h.exit.x, v.exit.p[1], v.exit.p[2]);
+    const cp = Math.cos(h.exit.pitch), sp = Math.sin(h.exit.pitch);
+    body.velocity.set(
+      Math.sin(h.exit.yaw) * cp * h.exit.speed,
+      sp * h.exit.speed,
+      Math.cos(h.exit.yaw) * cp * h.exit.speed);
+    body.angularVelocity.set(...h.exit.av);
+    body.quaternion.setFromEuler(...h.exit.rot);
+    TOWERLAB.world.addBody(body);
+    scene.add(h.mesh);
+    TOWERLAB.out.push({ mesh: h.mesh, body });
+  }
+  if (TOWERLAB.out.length) {
+    TOWERLAB.world.step(1 / 60, dt, 4);
+    for (const o of TOWERLAB.out) {
+      o.mesh.position.copy(o.body.position);
+      o.mesh.quaternion.copy(o.body.quaternion);
+    }
+  }
+}
+
 // manual stepping hook for automated tests (headless tabs never fire rAF)
 window.__diceDebug = {
   tick,
@@ -5402,6 +5608,11 @@ window.__diceDebug = {
   // only runs at boot, and a scenario that has to navigate to reach it is
   // testing the harness as much as the behaviour).
   purgeStale() { return purgeStaleClientState(); },
+  // Tower lab (docs/TOWER.md): ghost-render the TOWER_CORE volumes and pour
+  // seeded dice through the contract. Isolated world; rolls are untouched.
+  towerCore(on = true) { return towerLabSet(on); },
+  towerDrop(n = 8, seed = 42) { return towerLabDrop(n, seed); },
+  towerClear() { towerLabClear(); return true; },
   // How big a die actually LANDS on screen, in CSS px — the only number that
   // answers "can I see the dice". Projects a unit-radius sphere at the mat's
   // centre through the live camera, so it accounts for the preset, the
