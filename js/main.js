@@ -5411,14 +5411,19 @@ function towerVolumes() {
     aim:     { c: [0, 9.0, z0 - 1.6], s: [0.8, 0.3, 0.8] },
     cowl:    { c: [0, 7.4, z0 + 0.05], s: [4.2, 2.4, 0.3] },
     despawnY: 5.6,
-    hood:    { c: [0, 2.0, z0 + 0.25], s: [3.4, 2.4, 0.5] },
+    hood:    { c: [0, 2.0, z0 + 0.25], s: [4.6, 2.4, 0.5] },
     // Exit spawn sits a full unit INSIDE the tower: emergence must read as
     // travel through the doorway, not materialisation at the spout (first
     // lab look). y = 2.0 keeps a d20's bottom above the apron on arrival —
     // the 1.6 of the first cut overlapped the apron box at spawn, and the
     // penetration resolver's kick was the "launch" the eye caught.
-    exit:    { p: [0, 2.0, z0 - 1.2] },
-    door:    { w: 3.0, h: 3.6 },
+    // Doorway clearance is RADIUS ARITHMETIC (the stuck-dice look): worst
+    // case at the wall = 0.4 jitter + tan(12°)·0.9 travel + 1.25 d20 radius
+    // ≈ 1.84 of half-width. Door 4.0 leaves 0.16. The first cut (door 3.0,
+    // yaw ±30°, jitter ±0.6) needed ≈2.5 — dice clipped the jambs and came
+    // to rest behind the wall.
+    exit:    { p: [0, 2.0, z0 - 0.9] },
+    door:    { w: 4.0, h: 3.6 },
   };
 }
 
@@ -5560,9 +5565,9 @@ function towerLabDrop(n = 8, seed = 42) {
       av: [(rng() - 0.5) * 8, (rng() - 0.5) * 8, (rng() - 0.5) * 8],
       transit: 0.5 + rng() * 1.1,
       exit: {
-        x: (rng() - 0.5) * 1.2,
+        x: (rng() - 0.5) * 0.8,
         speed: 9 + rng() * 6,
-        yaw: (rng() - 0.5) * (Math.PI / 3),      // ±30°
+        yaw: (rng() - 0.5) * (Math.PI / 7.5),    // ±12° — chutes throw straight
         pitch: -rng() * (Math.PI / 18),          // 0..−10°
         av: [(rng() - 0.5) * 40, (rng() - 0.5) * 40, (rng() - 0.5) * 40],
         rot: [rng() * 6.28, rng() * 6.28, rng() * 6.28],
@@ -5570,6 +5575,13 @@ function towerLabDrop(n = 8, seed = 42) {
     });
   }
   return { dropped: n, seed };
+}
+
+// Is any lab die (other than `except`) occupying the doorway corridor —
+// the region an exit spawn or its first unit of flight would overlap?
+function towerDoorBlocked(v, except) {
+  return TOWERLAB.out.some((o) => o !== except
+    && o.body.position.z < v.z0 + 1.4 && Math.abs(o.body.position.x) < 2.4);
 }
 
 function stepTowerLab(dt) {
@@ -5598,7 +5610,11 @@ function stepTowerLab(dt) {
   for (let i = TOWERLAB.hidden.length - 1; i >= 0; i--) {
     const h = TOWERLAB.hidden[i];
     if (TOWERLAB.t < h.exitAt) continue;
-    TOWERLAB.hidden.splice(i, 1);
+    // THE DOORWAY IS A MUTEX (second lab look): at 0.2 s spacing a bouncer
+    // is still in the corridor when the next body spawns into it, and they
+    // wedge each other into a pile at the port. An exit waits until the
+    // corridor is clear; hidden time is invisible, so a wait costs nothing.
+    if (towerDoorBlocked(v, null)) { h.exitAt = TOWERLAB.t + 0.12; continue; }
     const body = createDieBody(h.type, diceMat);
     body.linearDamping = PHYS.linearDamping;
     body.angularDamping = PHYS.angularDamping;
@@ -5613,11 +5629,24 @@ function stepTowerLab(dt) {
     body.quaternion.setFromEuler(...h.exit.rot);
     TOWERLAB.world.addBody(body);
     scene.add(h.mesh);
-    TOWERLAB.out.push({ mesh: h.mesh, body });
+    TOWERLAB.out.push({ mesh: h.mesh, body, exit: h.exit, bornAt: TOWERLAB.t, rescued: false });
   }
   if (TOWERLAB.out.length) {
     TOWERLAB.world.step(1 / 60, dt, 4);
     for (const o of TOWERLAB.out) {
+      // THE EXIT GUARANTEE: a die may never rest hidden. Anything loitering
+      // behind the wall plane slow and old gets re-launched from the spawn,
+      // straight through the door (yaw 0) — with a skin on, this happens in
+      // the dark and reads as the die having taken a moment on a baffle.
+      if (!o.rescued && TOWERLAB.t - o.bornAt > 0.7
+          && o.body.position.z < v.z0 && o.body.velocity.length() < 1.5
+          && !towerDoorBlocked(v, o)) {
+        o.rescued = true;
+        o.body.position.set(v.exit.p[0], v.exit.p[1], v.exit.p[2]);
+        o.body.velocity.set(0, 0, o.exit.speed);
+        o.body.angularVelocity.set(...o.exit.av);
+        o.bornAt = TOWERLAB.t;
+      }
       o.mesh.position.copy(o.body.position);
       o.mesh.quaternion.copy(o.body.quaternion);
     }

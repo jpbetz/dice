@@ -74,8 +74,18 @@ as TRAVEL through the doorway, never materialisation at the spout (first
 lab look; also: y = 1.6 overlapped the apron box at spawn for a d20, and
 the penetration resolver's kick read as a launch — y = 2.0 clears it).
 Velocity seeded from: speed 9–15 u/s (6–11 read as dribbling — a tower
-exit should THROW), yaw within ±30° of +z, pitch 0° to −10°. The die dips,
-lands on the apron tray, and skips off the step onto the felt. Everything
+exit should THROW), yaw within ±12° of +z (chutes throw straight; ±30°
+clipped the door jambs — clearance is radius arithmetic: 0.4 jitter +
+tan 12°·0.9 travel + 1.25 d20 radius ≈ 1.84 against the door's 2.0),
+pitch 0° to −10°. The die dips, lands on the apron tray, and skips off
+the step onto the felt.
+
+**The EXIT GUARANTEE (second lab look):** a die may never rest hidden.
+The doorway corridor is a MUTEX — an exit is postponed while any die
+occupies it (hidden time is invisible, so the wait costs nothing), and
+any die that still ends up loitering behind the wall plane, slow and old,
+is re-launched from the spawn straight through the door. With a skin on,
+both read as the die having taken a moment on a baffle. Everything
 after spawn is the normal pipeline — real bounces, displacement
 terminator, face correction, tempo curve — untouched.
 
