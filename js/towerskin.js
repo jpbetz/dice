@@ -44,7 +44,7 @@ import * as THREE from 'three';
 // Deterministic noise kit (no dependencies, no Math.random anywhere)
 // ---------------------------------------------------------------------------
 
-function mulberry32(seed) {
+export function mulberry32(seed) {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -55,7 +55,7 @@ function mulberry32(seed) {
   };
 }
 
-function hash2(ix, iy, seed) {
+export function hash2(ix, iy, seed) {
   let h = (Math.imul(ix, 374761393) + Math.imul(iy, 668265263) + Math.imul(seed, 1442695041)) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
@@ -64,7 +64,7 @@ function hash2(ix, iy, seed) {
 // TILEABLE value noise: the lattice wraps modulo `period`, and `period`
 // scales with the octave frequency in fbm/turb below — that is the whole
 // trick that keeps a canvas seamless when the UVs repeat.
-function vnoise(x, y, period, seed) {
+export function vnoise(x, y, period, seed) {
   const p = Math.max(1, Math.round(period));
   const x0 = Math.floor(x), y0 = Math.floor(y);
   const fx = x - x0, fy = y - y0;
@@ -78,7 +78,7 @@ function vnoise(x, y, period, seed) {
   return a + (b - a) * sy;
 }
 
-function fbm(x, y, period, oct, seed) {
+export function fbm(x, y, period, oct, seed) {
   let s = 0, amp = 0.5, f = 1, norm = 0;
   for (let o = 0; o < oct; o++) {
     s += amp * vnoise(x * f, y * f, period * f, seed + o * 7919);
@@ -87,7 +87,7 @@ function fbm(x, y, period, oct, seed) {
   return s / norm;
 }
 
-function turb(x, y, period, oct, seed) {
+export function turb(x, y, period, oct, seed) {
   let s = 0, amp = 0.5, f = 1, norm = 0;
   for (let o = 0; o < oct; o++) {
     s += amp * Math.abs(2 * vnoise(x * f, y * f, period * f, seed + o * 7919) - 1);
@@ -96,15 +96,15 @@ function turb(x, y, period, oct, seed) {
   return s / norm;
 }
 
-const clamp01 = (n) => (n < 0 ? 0 : n > 1 ? 1 : n);
-function smoothstep(a, b, x) {
+export const clamp01 = (n) => (n < 0 ? 0 : n > 1 ? 1 : n);
+export function smoothstep(a, b, x) {
   const t = clamp01((x - a) / (b - a || 1e-6));
   return t * t * (3 - 2 * t);
 }
 // Asymmetric growth-ring profile: wide pale earlywood, narrow dark
 // latewood. A symmetric sin() reads as moiré at grazing angles — this is
 // the single biggest difference between "wood" and "corduroy".
-function smoothpulse(a, b, c, d, x) {
+export function smoothpulse(a, b, c, d, x) {
   return smoothstep(a, b, x) - smoothstep(c, d, x);
 }
 
@@ -120,7 +120,7 @@ const CHERRY = [[0x7a, 0x47, 0x2b], [0xa9, 0x70, 0x4c], [0xc8, 0x96, 0x78]];
 // Grooves are SHADOW, not paint: a warm near-black, never #000.
 const GROOVE = [0x0f, 0x0a, 0x08];
 
-function ramp3(stops, t) {
+export function ramp3(stops, t) {
   const u = clamp01(t);
   const [lo, hi, k] = u < 0.5 ? [stops[0], stops[1], u * 2] : [stops[1], stops[2], (u - 0.5) * 2];
   return [lo[0] + (hi[0] - lo[0]) * k, lo[1] + (hi[1] - lo[1]) * k, lo[2] + (hi[2] - lo[2]) * k];
@@ -251,7 +251,7 @@ function bakeWood({ size, stops, planks, seed, cathedral }) {
 // modulo W so the result is as seamless as its input.
 // (js/dice.js has the same routine but does not export it; duplicating ~20
 // lines beats widening that module's surface for a lab-only skin.)
-function heightToNormal(heightCanvas, strength) {
+export function heightToNormal(heightCanvas, strength) {
   const s = heightCanvas.width;
   const src = heightCanvas.getContext('2d').getImageData(0, 0, s, s).data;
   const out = document.createElement('canvas');
@@ -281,7 +281,7 @@ function heightToNormal(heightCanvas, strength) {
 // Roughness follows the height field (recessed = duller) with an
 // independent low-frequency wobble on top. Structural wood wants to sit
 // high — 0.55..0.85 — not the glassy 0.5 a naive ramp lands on.
-function roughFromHeight(heightCanvas, size, seed) {
+export function roughFromHeight(heightCanvas, size, seed) {
   const s = heightCanvas.width;
   const src = heightCanvas.getContext('2d').getImageData(0, 0, s, s).data;
   const out = document.createElement('canvas');
@@ -307,7 +307,7 @@ function roughFromHeight(heightCanvas, size, seed) {
 
 // A radial veil: transparent rim → near-black centre. Used unlit, with
 // depthWrite off, to fake the light that never gets into a deep pocket.
-function veilTexture(size, alpha) {
+export function veilTexture(size, alpha) {
   const c = document.createElement('canvas');
   c.width = c.height = size;
   const x = c.getContext('2d');
@@ -353,7 +353,7 @@ function maps() {
 // toCreasedNormals pass at all.
 // ---------------------------------------------------------------------------
 const _rbN = new THREE.Vector3();
-function roundedBox(w, h, d, radius, segments = 1) {
+export function roundedBox(w, h, d, radius, segments = 1) {
   const seg = segments * 2 + 1;             // odd: no vertex lands on an axis
   const r = Math.min(w / 2, h / 2, d / 2, radius);
   const geo = new THREE.BoxGeometry(1, 1, 1, seg, seg, seg).toNonIndexed();
@@ -379,7 +379,7 @@ function roundedBox(w, h, d, radius, segments = 1) {
 // so a plank panel keeps the same grain scale on its face and its edges.
 // `uw`/`vw` are how many world units map to one texture tile — deliberately
 // non-square and non-integer so tiling never lands on a visible grid.
-function planarUV(geo, uw, vw, uo = 0, vo = 0) {
+export function planarUV(geo, uw, vw, uo = 0, vo = 0) {
   const pos = geo.attributes.position, nor = geo.attributes.normal;
   const uv = geo.attributes.uv;
   for (let i = 0; i < pos.count; i++) {
@@ -401,7 +401,7 @@ function planarUV(geo, uw, vw, uo = 0, vo = 0) {
 // One un-enveloped noise field would read as melted plastic. Kept small
 // enough (≤3% of thickness) that the analytic normals stay honest, so this
 // never calls computeVertexNormals (which would flatten every bevel).
-function weather(geo, w, h, d, rnd) {
+export function weather(geo, w, h, d, rnd) {
   const pos = geo.attributes.position;
   const dims = [w, h, d];
   // Which axis is the board's THICKNESS? That is what gets displaced; the
@@ -440,7 +440,7 @@ const AO_MIN = [0.38, 0.40, 0.50];   // luminance ≈ 0.41 — the [0.42,1] floo
 const AO_RAYS = 8;
 const AO_DIST = 3.2;
 
-function hemisphereDirs(n) {
+export function hemisphereDirs(n) {
   // Deterministic Fibonacci hemisphere in tangent space (+Z is the normal).
   const out = [];
   const ga = Math.PI * (3 - Math.sqrt(5));
@@ -453,7 +453,7 @@ function hemisphereDirs(n) {
   return out;
 }
 
-function bakeVertexAO(parts, root) {
+export function bakeVertexAO(parts, root) {
   root.updateMatrixWorld(true);
   const boxes = parts.map((m) => {
     const b = new THREE.Box3().setFromObject(m);
