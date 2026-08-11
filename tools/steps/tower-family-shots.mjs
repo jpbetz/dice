@@ -16,11 +16,18 @@ limitations under the License.
 
 // THE REVIEW SET for a tower model (.claude/skills/new-tower/SKILL.md §4.2):
 // the six frames a human has to LOOK at before a skin merges, plus the same
-// idle frame of a sibling tower so the family resemblance can be judged
+// idle frame of every SIBLING tower so the family resemblance can be judged
 // rather than asserted. Scripted, because a visual still needs a human but
 // not a human driving a browser (docs/TESTING.md).
 //
-//   node tools/drive.mjs tools/steps/tower-family-shots.mjs [tower] [sibling]
+//   node tools/drive.mjs tools/steps/tower-family-shots.mjs [tower] [sibling…]
+//
+// SIBLINGS ARE A LIST NOW (2026-08-14, third model). It took exactly one
+// argument, so with three towers standing "the family at the same angle" was
+// two of the three and the reviewer had to run the tool twice and remember
+// which run each file came from. Default is every other registered model, in
+// registry order, so the lineup grows with the family and nobody has to type
+// it out.
 //
 // Writes shots/<tower>-*.png in the repo (gitignored).
 
@@ -32,8 +39,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SHOTS = join(ROOT, 'shots');
 
 export default async function run(stage, args) {
-  const tower = args[0] || 'bastion';
-  const sibling = args[1] || 'heartwood';
+  const tower = args[0] || 'blackanvil';
   mkdirSync(SHOTS, { recursive: true });
 
   const t = await stage.tab('localhost', 'FamilyShots');
@@ -50,6 +56,13 @@ export default async function run(stage, args) {
     await t.waitFor(`window.__diceDebug.tower === '${id}'`, { desc: `${id} socketed` });
     await t.dbg('sim(1500)');   // let the resting-eye ease finish
   };
+  // The siblings, from the registry rather than a hard-coded pair: every
+  // model with a skin that is not the one under review.
+  const registry = await t.dbg('towerRegistry()');
+  const siblings = args.length > 1
+    ? args.slice(1)
+    : registry.filter((r) => r.skin && r.id !== tower).map((r) => r.id);
+  console.log(`reviewing ${tower}; siblings ${siblings.join(', ')}\n`);
   const zoom = async (id) => {
     await t.dbg(`setZoom('${id}')`);
     await t.waitFor(`window.__diceDebug.zoom === '${id}'`, { desc: `zoom ${id}` });
@@ -98,15 +111,20 @@ export default async function run(stage, args) {
   }
   await zoom('medium');
 
-  // 6. The sibling, same idle frame, same eye. Family resemblance is a
-  //    comparison and cannot be judged from one picture.
-  await up(sibling);
-  await shot(`${sibling}-6-idle-same-angle.png`);
+  // 6. The siblings, same idle frame, same eye. Family resemblance is a
+  //    comparison and cannot be judged from one picture — and with three
+  //    models it cannot be judged from two either: what a reviewer is asked
+  //    is whether these belong to one house, which is a question about the
+  //    whole set.
+  for (const id of siblings) {
+    await up(id);
+    await shot(`${id}-6-idle-same-angle.png`);
+  }
 
   // …and one close look at each model from the look-only eye, because the
   // shipped cameras frame the MAT and an eleven-unit tower runs off the top
   // of every one of them. Nothing about the film reads the camera.
-  for (const id of [tower, sibling]) {
+  for (const id of [tower, ...siblings]) {
     await up(id);
     await t.dbg('towerEye(15, 8, 5)');
     await shot(`${id}-7-model-detail.png`);
