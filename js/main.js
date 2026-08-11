@@ -5408,19 +5408,23 @@ function towerVolumes() {
   // z0 + 1.5 — a 28° slope gravity carries dice down. Modelled as a thin
   // box rotated about x; slightly overlong so both ends embed (no lip gaps).
   const ath = Math.atan(0.8 / 1.5);
+  // S: every core dimension ×1.25 ("increase the size of EVERYTHING by
+  // maybe 25%", sixth look) — dice are fixed world-size, so clearances were
+  // tight everywhere at base scale. The slope angle is scale-invariant.
+  const S = 1.25;
   return {
-    z0,
-    socket:  { c: [0, 5.0, z0 - 2.0], s: [5.2, 10, 4.4] },
+    z0, S,
+    socket:  { c: [0, 5.0 * S, z0 - 2.0 * S], s: [5.2 * S, 10 * S, 4.4 * S] },
     // Thickness 1.0 is TUNNELING ARITHMETIC, not style: at hand-throw speed
     // (~20 u/s) a die covers ~0.33 per 60 Hz step — the 0.3-thin first ramp
     // let dice pass straight through and vanish underneath (fifth lab look).
-    apron:   { c: [0, 0.4 - 0.5 * Math.cos(ath), z0 + 0.75 - 0.5 * Math.sin(ath)],
-               s: [3.8, 1.0, 1.9], rx: ath },
-    shaft:   { c: [0, 4.85, z0 - 1.6], r: 1.7, h: 5.3 },
-    aim:     { c: [0, 9.0, z0 - 1.6], s: [0.8, 0.3, 0.8] },
-    cowl:    { c: [0, 7.4, z0 + 0.05], s: [4.2, 2.4, 0.3] },
-    despawnY: 5.6,
-    hood:    { c: [0, 2.0, z0 + 0.25], s: [4.6, 2.4, 0.5] },
+    apron:   { c: [0, (0.4 - 0.5 * Math.cos(ath)) * S, z0 + (0.75 - 0.5 * Math.sin(ath)) * S],
+               s: [3.8 * S, 1.0 * S, 1.9 * S], rx: ath },
+    shaft:   { c: [0, 4.85 * S, z0 - 1.6 * S], r: 1.7 * S, h: 5.3 * S },
+    aim:     { c: [0, 9.0 * S, z0 - 1.6 * S], s: [0.8 * S, 0.3 * S, 0.8 * S] },
+    cowl:    { c: [0, 7.4 * S, z0 + 0.05 * S], s: [4.2 * S, 2.4 * S, 0.3 * S] },
+    despawnY: 5.6 * S,
+    hood:    { c: [0, 2.0 * S, z0 + 0.25 * S], s: [4.6 * S, 2.4 * S, 0.5 * S] },
     // Exit spawn sits a full unit INSIDE the tower: emergence must read as
     // travel through the doorway, not materialisation at the spout (first
     // lab look). y = 2.0 keeps a d20's bottom above the apron on arrival —
@@ -5431,8 +5435,8 @@ function towerVolumes() {
     // ≈ 1.84 of half-width. Door 4.0 leaves 0.16. The first cut (door 3.0,
     // yaw ±30°, jitter ±0.6) needed ≈2.5 — dice clipped the jambs and came
     // to rest behind the wall.
-    exit:    { p: [0, 2.0, z0 - 0.9] },
-    door:    { w: 4.0, h: 3.6 },
+    exit:    { p: [0, 2.0 * S, z0 - 0.9 * S] },
+    door:    { w: 4.0 * S, h: 3.6 * S },
   };
 }
 
@@ -5602,11 +5606,15 @@ function towerLabDrop(n = 8, seed = 42) {
   return { dropped: n, seed };
 }
 
-// Is any lab die (other than `except`) occupying the doorway corridor —
-// the region an exit spawn or its first unit of flight would overlap?
+// Is any lab die (other than `except`) occupying the SPAWN region — where a
+// new body would materialise overlapping it? Sixth look: this used to guard
+// 1.4 units of LANDING zone too, so the first die that settled near the
+// ramp base latched the corridor forever and the pour starved (3 of 20 made
+// it out). A new exit plowing into a stray die out on the felt is natural
+// dice behaviour, not a wedge — only the spawn overlap needs the mutex.
 function towerDoorBlocked(v, except) {
   return TOWERLAB.out.some((o) => o !== except
-    && o.body.position.z < v.z0 + 1.4 && Math.abs(o.body.position.x) < 2.4);
+    && o.body.position.z < v.z0 + 0.5 && Math.abs(o.body.position.x) < 3.0);
 }
 
 function stepTowerLab(dt) {
@@ -5670,7 +5678,7 @@ function stepTowerLab(dt) {
       const lost = !isFinite(p.x + p.y + p.z) || p.y < -0.5
         || Math.abs(p.x) > TABLE_W / 2 + 2 || Math.abs(p.z) > TABLE_D / 2 + 6;
       const stalled = TOWERLAB.t - o.bornAt > 1.2
-        && p.z < v.z0 + 1.5 && o.body.velocity.length() < 0.8;
+        && p.z < v.z0 + 1.9 * v.S && o.body.velocity.length() < 0.8;
       if (o.rescues < 3 && (lost || stalled) && !towerDoorBlocked(v, o)) {
         o.rescues += 1;
         o.body.position.set(v.exit.p[0], v.exit.p[1], v.exit.p[2]);

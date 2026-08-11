@@ -9,7 +9,11 @@ the values, the visuals are theater. The tower interior is simply more film.)
 
 Scale anchors, from `js/dice.js` DIE_DEFS: the largest die is the d20,
 circumradius 1.25 → Ø 2.5 bounding sphere. d6 edge 1.35. All units are world
-units. The anchor point is `A = (0, 0, z0)` where `z0 = -TABLE_D / 2` — the
+units. **THE CORE SCALE `S = 1.25` (sixth lab look):** every dimension in
+this document is a BASE value; the shipped core is base × 1.25. Dice are
+fixed world-size, and at base scale the clearances were tight everywhere —
+the pour proved it die by die. The slope angle and all clearance arithmetic
+are scale-invariant; the tunneling thickness only gets safer. The anchor point is `A = (0, 0, z0)` where `z0 = -TABLE_D / 2` — the
 midpoint of the back wall. The anchor moves with the zoom preset; the core's
 offsets from it never do. Dice are fixed world size, so the tower is too: on
 `close` it reads big, and that is physical honesty, not a bug.
@@ -89,9 +93,14 @@ pitch 0° to −10°. The die dips, lands on the apron tray, and skips off
 the step onto the felt.
 
 **The EXIT GUARANTEE (second and fifth lab looks):** a die may never rest
-hidden and may never be lost. The doorway corridor is a MUTEX — an exit
-is postponed while any die occupies it (hidden time is invisible, so the
-wait costs nothing) — and a WATCHDOG re-launches from the spawn, straight
+hidden and may never be lost. The SPAWN REGION is a MUTEX — an exit is
+postponed while any die would overlap the materialisation point (hidden
+time is invisible, so the wait costs nothing). The mutex guards the spawn
+region ONLY — the sixth look proved the wider form wrong: guarding the
+landing zone too let the first die that settled near the ramp base latch
+the corridor forever, and the pour starved (3 of 20 out). A new exit
+plowing into a stray die on the felt is natural dice behaviour, not a
+wedge. And a WATCHDOG re-launches from the spawn, straight
 through the door, up to three times: any die LOST (out of bounds, under
 the floor, NaN pose) or STALLED anywhere on the chute, slow and old.
 With a skin on, a re-launch reads as the die having taken a moment on a
