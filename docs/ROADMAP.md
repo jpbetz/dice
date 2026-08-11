@@ -717,10 +717,10 @@ Most of §9's engineering is closed (see SHIPPED.md §9). What remains
 is art direction, one pool-icon delta, and the tumbled-resin
 geometry tier.
 
-### 9d. The dice tower — **SHIPPED 2026-08-12**; three follow-ups left
+### 9d. The dice tower — **SHIPPED 2026-08-12**; second tower + sound palette 2026-08-13; one follow-up left
 
 The lab became the product. `tower` is a room setting whose value is a
-tower id — `none` (default) and `heartwood` — and a tower roll is baked
+tower id — `none` (default), `heartwood` and `bastion` — and a tower roll is baked
 as a POUR: scripted entry, hidden transit behind the skin, exit through
 the doorway, then the ordinary settle. The contract, the socket, the bake,
 the amended camera ruling and the measurements are
@@ -730,20 +730,22 @@ Scenario `tower-roll` (tag `tower`), and the whole pre-existing suite
 passes **unchanged**, which is what THE FIRST LAW ("don't change anything
 about how the system works without a tower") means in practice.
 
-What is left, in the order it is worth doing:
+**DONE 2026-08-13 — a second tower, and the sound palette it forced.**
+`bastion` (js/towerbastion.js) is a stone turret, and it cost what the
+registry promised: a skin file, a row in TOWERS, one id in the server's
+validate list. The shared techniques moved behind `export` in
+js/towerskin.js with Heartwood's output byte-for-byte unchanged. The
+replay-safety claim is now measured rather than argued: 8 dice, seed 42,
+through heartwood and through bastion, every resting position identical
+to the last digit — which is only true because a skin adds zero colliders
+and the film never reads it. And `clunkVoice` is live: a baffle knock is
+voiced by the socketed tower (wood clacks, stone thuds), resolved at
+render time, so the bake, the film timings and the replay hashes never
+learn which model is standing. Proofs and the three findings the build
+turned up are in [TOWER.md](TOWER.md)'s STATUS.
 
-- **A sound palette per skin.** TOWER.md §6 says a model registers wood /
-  stone / metal and never timings. Today every tower knocks with the
-  default click. The film already carries the hook: baffle clunks are
-  tagged `clunk: 'baffle'` and their `at` is deliberately null, so they
-  are sound and nothing else — a palette attaches to that tag and to the
-  socketed tower id, and needs no change to the bake.
-- **A second tower.** The registry exists precisely so this costs a row
-  and a skin file, and until a second one lands that claim is untested.
-  The geometry contract is what makes it replay-safe: a model adds zero
-  colliders and the film never reads it, so a skin swap can never change
-  how a roll plays. Stone and metal are the obvious pair, and they are
-  also what would make the sound palette worth building first.
+What is left:
+
 - **`tower` in the portable YAML.** `table:` carries name/felt/system/zoom
   (js/portable.js `TABLE_KEYS`), so a prepared table cannot yet arrive
   with its tower already up — the one place the setting is not treated

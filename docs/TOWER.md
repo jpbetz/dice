@@ -1,11 +1,11 @@
 # TOWER_CORE — the tower geometry contract
 
-## STATUS — shipped as a room setting (2026-08-12)
+## STATUS — shipped as a room setting (2026-08-12), two models (2026-08-13)
 
 The lab is no longer the only place a tower exists. `tower` is a room-wide
-setting whose value is a **tower id**, never a boolean: `none` (default) and
-`heartwood` today, one `TOWERS` registry row per model after that, and the
-settings modal shows a picker under the Felt swatches rather than a switch.
+setting whose value is a **tower id**, never a boolean: `none` (default),
+`heartwood` and `bastion`, one `TOWERS` registry row per model after that, and
+the settings modal shows a picker under the Felt swatches rather than a switch.
 Room-wide because it changes the FILM — every client must bake the same pour —
 and it rides the zoom defer rule (`queueTower` / `tryFlushRoomChanges`), so a
 change made mid-roll lands at the next roll boundary and never under a film
@@ -63,12 +63,52 @@ and no others, both eased over `CAM_EASE_S`, both refused under
 the isolated world behind them. They are the experiment bench and the shipped
 socket does not read `TOWERLAB.tune` for anything but `matExtra`.
 
-**Not done, deliberately:** the sound palette per skin (§6 says models register
-one; today every tower clicks like wood on wood), `tower` in the portable YAML
-`table:` block, and a second model.
+**THE SECOND MODEL, AND WHAT IT PROVED (2026-08-13).** `bastion`
+(`js/towerbastion.js`) is a stone turret: a battered rusticated plinth, a
+drum of ashlar courses in running bond, a string course, a corbelled
+crenellated crown, a dressed sandstone gateway with a projecting hood, and one
+arrow slit. The shared techniques now live behind `export` in
+`js/towerskin.js` — noise, the Sobel height→normal pass, roughness from the
+same height field, rounded boxes, planar UVs, the vertex-AO bake, veils — and
+Heartwood's rendered output is byte-for-byte what it was, which is the whole
+point of exporting rather than forking. Three findings worth keeping:
+
+- **The front of any tower here is a flat facade.** The bore's front tangent
+  is `z0 + 0.125` and the SOCKET's face is `z0 + 0.25`: 0.125 of material,
+  full stop. Heartwood calls its front board "thin by contract"; Bastion is a
+  drum ENGAGED in the back wall for the same reason, round where radius is
+  free and flat where it is not. A model's articulation on the facade has to
+  be COLOUR, not relief. Relief belongs on the shoulders, the crown, and the
+  gate hood.
+- **Battlements decorate; a closed ring occludes.** An embrasure is a hole and
+  a hole at the top of the shaft is a sightline onto the despawn line.
+  Bastion's merlons stand on a solid parapet whose top (y 11.95) is the
+  embrasure floor — measured 99/99 on both HARD bands at every shipped eye. A
+  literal lid over the bore is NOT available to any model: the entry drop
+  starts at y = 11.25 with dice up to 1.25 in radius.
+- **Measure the bevel.** three's `ExtrudeGeometry` does not inset the body — it
+  leaves the original contour at both ends and pushes the body OUT along each
+  vertex's bisector, overshooting to `bevelSize/sin(θ/2)`. 0.041 for a 0.03
+  bevel, which put every course outside the socket until it was paid for.
+
+**THE SOUND PALETTE IS REAL (§6).** A `TOWERS` row may carry `clunkVoice` (an
+`IMPACT_VOICES` shape), and the playback sound drain voices a `clunk:'baffle'`
+event through the SOCKETED TOWER instead of the die set — heartwood a dry
+`clack`, bastion a `thud` with a longer tail. Render-time only: the knocks'
+TIMES are baked from the seed and the bake never learns which tower is
+standing, so films and replay hashes are untouched. And a towerless roll has
+no clunk event at all, so the FIRST LAW holds by construction rather than by a
+guard. The resolution lives in one named function (`impactVoice`) because the
+scenario has to ask the same function the drain asks.
+
+**Not done, deliberately:** `tower` in the portable YAML `table:` block, and a
+third model.
 
 Scenario: `tower-roll` (tag `tower`). Tools: `tools/steps/tower-pour.mjs` for
-the shipped pour, `tower-probe.mjs` / `tower-occlusion.mjs` for the lab.
+the shipped pour, `tower-probe.mjs [n] [seed] [secs] [tower]` and
+`tower-occlusion.mjs [tower]` for the lab (both take a tower id and must be
+run for every model), `tower-family-shots.mjs [tower] [sibling]` for the
+review set a human looks at before a skin merges.
 
 The engine owns one fixed core geometry; tower models are **occluding skins**
 around it. The baked film — entry drop, despawn, hidden transit, clunk times,
