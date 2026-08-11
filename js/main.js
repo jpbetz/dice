@@ -5297,7 +5297,7 @@ const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
     // during the roll") — a low frontal tower shot while dice pour in, an
     // ease back to the table framing once the last die has exited. Dials:
     // camX/camY/camDist position the tower eye; camTgtY is where it looks.
-    camMove: true, camX: 5, camY: 9, camDist: 16, camTgtY: 4.5 },
+    camMove: true, camX: 5, camY: 10.5, camDist: 21, camTgtY: 4.5 },
   camPhase: null };
 const TOWERLAB_EULER = new THREE.Euler();
 
@@ -5794,9 +5794,10 @@ function stepTowerLab(dt) {
   if (!TOWERLAB.on || dt <= 0) return;
   TOWERLAB.t += dt;
   const v = towerVolumes();
-  // Act two: the last die has left the hidden works — pull back to the table.
-  if (TOWERLAB.camPhase === 'tower'
-      && TOWERLAB.falling.length === 0 && TOWERLAB.hidden.length === 0) {
+  // Act two, cued EARLY (Joe): the moment the FIRST die exits, start the
+  // pull-back — the camera leads the dice onto the felt and is looking
+  // down by the time the spread lands. (It used to wait for the last die.)
+  if (TOWERLAB.camPhase === 'tower' && TOWERLAB.out.length > 0) {
     towerCamTo('table');
   }
   // Scripted entry: gravity-true fall, tumbling, no body. Despawn at the line.
