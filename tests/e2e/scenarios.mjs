@@ -10371,6 +10371,31 @@ export const scenarios = [
       await a.dbg('sim(400)');
       await b.settle();
 
+      // ---- a fresh boot puts the tower up before it replays anything -------
+      // A late joiner and a reload take the same path: hello.settings sockets
+      // the tower, and THEN the newest on-felt roll is replayed through
+      // playRoll. Get that order wrong and the returning player rebuilds the
+      // table's pour as a throw, against walls 4.5 units shallower than
+      // everyone else's. Asserted on the walls, which is the thing the film
+      // is baked against.
+      await a.roll('3d6');
+      await b.settle();
+      await b.reload();
+      await b.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+        { desc: 'the reloaded tab comes back with the tower up' });
+      assert.deepEqual(await b.dbg('tableExtents()'), upExtents,
+        'and on the deepened mat, not the preset one');
+      assert.deepEqual((await b.dbg('worldBodies()')).named, ORDER,
+        'with the colliders socketed before the replay ran');
+      await b.waitFor('window.__diceDebug.tableDice.length === 3',
+        { desc: 'the on-felt roll rebuilt' });
+      assert.ok(await b.eval('!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.pour)'),
+        'and the rebuild was baked as a POUR — which is only true if the socket '
+        + 'ran BEFORE playRoll, not merely at some point during hello');
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+      await b.settle();
+
       // ---- deferred, never mid-roll ---------------------------------------
       // The zoom rule (queueTower): a change that arrives while a film is
       // playing waits for the roll boundary, because socketing moves the mat

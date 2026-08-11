@@ -5058,7 +5058,18 @@ function ceremonyEnterTumble(roll) {
   const cer = roll.ceremony;
   cer.phase = 'tumble';
   cer.clock = 0;
-  for (const d of roll.dice) d.mesh.visible = true;
+  // A POUR's dice are not all in the room when the tumble starts — most are
+  // still waiting above the mouth, and showing them for the one frame before
+  // stepPlayback's next pass would flash the whole pool stacked over the
+  // tower's roof. Restore what the film says is visible at the frame playback
+  // is about to resume from (roll.time is 0 here; read it anyway rather than
+  // assume it).
+  const sp = roll.pour ? roll.pour.spans : null;
+  roll.dice.forEach((d, i) => {
+    d.mesh.visible = sp
+      ? pourVisibleAt(sp[i], Math.min(Math.floor(roll.time * 60), roll.frames - 1))
+      : true;
+  });
   renderDockStrip(roll);
   setCeremonyPhaseClass(roll, 'c-tumble');
 }
