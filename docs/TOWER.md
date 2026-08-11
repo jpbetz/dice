@@ -26,9 +26,17 @@ The tower's body stands BEHIND the back wall, outside the play volume — it
 spends apron, not felt. Nothing crosses `z0 + 0.2` toward the player except
 the APRON.
 
-**2. APRON — the only collider in the play volume, and it is a RAMP.**
-An engine-owned static box, rotated: the top surface runs from the doorway
-sill `(z0, y 0.8)` down to the felt at `z0 + 1.5` — a 28° slope
+**2. APRON — the delivery slope, and it runs the WHOLE tower floor.**
+An engine-owned static box, rotated: the top surface is a 28° slope from
+deep inside the tower (`z0 − 3.6` base, under the shaft) down through the
+doorway sill `(z0, y 0.8)` to the felt at `z0 + 1.5` — the bottom baffle
+IS the exit ramp, so the interior has no flat floor a knocked-back die
+could rest on (probe run 9). A flat slick LIP (its own box, ~5° tilt,
+0.08 proud of the felt) extends the outrun from the chute base to
+`z0 + 3.9`: the die's first flat contact levels it without eating forward
+speed, and the tilt drains parked dice — a dead-flat lip was a parking
+lot that grew until it latched the door (probe run 5). Both faces are a
+28°-family slope
 (`atan(0.8/1.5)`), width `x ∈ [-1.9, 1.9]`, and it is a SLICK CHUTE: its
 own contact material, friction 0.03, restitution 0.3 — polished slide,
 not felt. At felt friction (0.25) dice stalled on the 28° slope (fourth
@@ -109,19 +117,33 @@ margin. The die rides the chute and leaves its end at a shallow angle
 that skips across the felt — the felt itself is the shared table physics
 and is never retuned for the tower.
 
-**The EXIT GUARANTEE (second and fifth lab looks):** a die may never rest
-hidden and may never be lost. The SPAWN REGION is a MUTEX — an exit is
-postponed while any die would overlap the materialisation point (hidden
-time is invisible, so the wait costs nothing). The mutex guards the spawn
-region ONLY — the sixth look proved the wider form wrong: guarding the
-landing zone too let the first die that settled near the ramp base latch
-the corridor forever, and the pour starved (3 of 20 out). A new exit
-plowing into a stray die on the felt is natural dice behaviour, not a
-wedge. And a WATCHDOG re-launches from the spawn, straight
-through the door, up to three times: any die LOST (out of bounds, under
-the floor, NaN pose) or STALLED anywhere on the chute, slow and old.
-With a skin on, a re-launch reads as the die having taken a moment on a
-baffle. Everything
+**The EXIT GUARANTEE (probe runs 1–10):** a die may never rest hidden and
+may never be lost. Three layers, each earned by a measured failure:
+
+1. **No mutex — the pile is the mechanism.** Every wait-your-turn scheme
+   deadlocked measurably (landing-zone guard: 3/20 out; behind-wall
+   guard: pit dice blocking each other's rescue; spawn-sphere guard: a
+   propped die 0.18 past the stalled cutoff latching everything). Exits
+   never wait: a die whose lane is occupied spawns ABOVE the occupants
+   (capped under the lintel) and cascades off the pile, which is exactly
+   what a real tower's stream does to its own tray.
+2. **The interior cannot hold a die.** The chute runs the whole tower
+   floor (§2), so knocked-back dice slide back out by gravity; and a
+   WATCHDOG catches the rest — a die LOST (out of bounds, under floor,
+   NaN) or STALLED in the skin-occluded zone, slow and old, is RE-QUEUED:
+   it stops being a body and re-enters the hidden-transit queue (a
+   teleporting rescue deadlocked when its target was occupied; a die
+   that does not exist cannot conflict). With a skin on this reads as
+   time on a baffle.
+3. **The bake is the last backstop.** The lab steps live; the FEATURE
+   bakes the pour offline before frame one. A bake that ends with any
+   die hidden is discarded and re-baked with a nudged seed — the one
+   remaining lab failure class (a heavy-congestion seed leaving one die
+   creeping behind the door) is solved by construction in the product.
+
+Measured (probe, 25–45 s windows): 8-die pours CLEAN across seeds;
+20-die pours CLEAN or 1-hidden on the worst congestion seed — the class
+layer 3 exists to absorb. Everything
 after spawn is the normal pipeline — real bounces, displacement
 terminator, face correction, tempo curve — untouched.
 

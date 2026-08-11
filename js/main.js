@@ -5280,7 +5280,8 @@ function stepResting() {
 // Tower-lab state, declared ABOVE tick(): animate() starts ticking at module
 // eval, and stepTowerLab's on-check reads this — below tick it is a TDZ crash
 // on frame one (the same trap this file documents at ROOM and LS_NAME).
-const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0, falling: [], hidden: [], out: [] };
+const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
+  falling: [], hidden: [], out: [], log: [], echo: true, born: 0, dropped: 0 };
 const TOWERLAB_EULER = new THREE.Euler();
 
 function tick(dt, render = true, realtime = false) {
@@ -5418,13 +5419,34 @@ function towerVolumes() {
     // Thickness 1.0 is TUNNELING ARITHMETIC, not style: at hand-throw speed
     // (~20 u/s) a die covers ~0.33 per 60 Hz step — the 0.3-thin first ramp
     // let dice pass straight through and vanish underneath (fifth lab look).
-    apron:   { c: [0, (0.4 - 0.5 * Math.cos(ath)) * S, z0 + (0.75 - 0.5 * Math.sin(ath)) * S],
-               s: [3.8 * S, 1.0 * S, 1.9 * S], rx: ath },
+    //
+    // AND THE CHUTE RUNS THE WHOLE INTERIOR (probe run 9): the slope now
+    // climbs from the felt (z0 + 1.5 base) back through the tower to near
+    // its rear (z0 − 3.6 base). The bottom baffle IS the delivery ramp —
+    // there is no flat pit floor for a knocked-back die to rest on, so
+    // anything shed backward off the tray pile lands on slope and slides
+    // straight back out. The pit is structurally unable to hold a die.
+    apron:   { c: [0, 0.913 * S, z0 - 1.284 * S],
+               s: [3.8 * S, 1.0 * S, 5.85 * S], rx: ath },
     shaft:   { c: [0, 4.85 * S, z0 - 1.6 * S], r: 1.7 * S, h: 5.3 * S },
     aim:     { c: [0, 9.0 * S, z0 - 1.6 * S], s: [0.8 * S, 0.3 * S, 0.8 * S] },
     cowl:    { c: [0, 7.4 * S, z0 + 0.05 * S], s: [4.2 * S, 2.4 * S, 0.3 * S] },
     despawnY: 5.6 * S,
-    hood:    { c: [0, 2.0 * S, z0 + 0.25 * S], s: [4.6 * S, 2.4 * S, 0.5 * S] },
+    // Hood deepened 0.5→1.0 base (probe run 7): a die parked on the upper
+    // chute at z0+0.78 — 0.18 past the old stalled cutoff, propped by the
+    // pile, blocking the spawn sphere for good. The skin's shadow now
+    // covers the chute's upper half, so the stalled zone can too.
+    hood:    { c: [0, 2.0 * S, z0 + 0.5 * S], s: [4.6 * S, 2.4 * S, 1.0 * S] },
+    // The LIP (probe run 3): a flat slick outrun after the chute — the die
+    // comes down the slope at −28° and its first FLAT contact must level it
+    // without eating the forward speed (vertical dies in the low-restitution
+    // face contact, horizontal survives the 0.03 friction). Sits 0.08 proud
+    // of the felt: tower furniture, not a felt retune.
+    // Tilted ~5° (probe run 5): a FLAT slick lip is a parking lot — at rest,
+    // slickness does nothing and the tray pile grew until it latched the
+    // spawn. At 5°, friction 0.03 < tan 5°, so a parked die creeps forward
+    // and drains onto the felt on its own.
+    lip:     { c: [0, -0.42, z0 + 2.8], s: [4.8, 1.0, 2.2], rx: 0.09 },
     // Exit spawn sits a full unit INSIDE the tower: emergence must read as
     // travel through the doorway, not materialisation at the spout (first
     // lab look). y = 2.0 keeps a d20's bottom above the apron on arrival —
@@ -5477,6 +5499,10 @@ function towerLabBuild() {
   apEdges.position.copy(ap.position);
   apEdges.rotation.copy(ap.rotation);
   g.add(apEdges);
+  const lipGhost = towerGhost(0xff8800, 0.18, new THREE.BoxGeometry(...v.lip.s));
+  lipGhost.position.set(...v.lip.c);
+  lipGhost.rotation.x = v.lip.rx;
+  g.add(lipGhost);                // LIP — the tilted slick outrun
   box(v.aim, 0xffffff, 0.35);     // entry aim box
   box(v.hood, 0x8844ff, 0.18);    // HOOD — purple occlusion pocket
   const shaft = towerGhost(0x44cc88, 0.12,
@@ -5511,30 +5537,39 @@ function towerLabWorld() {
   w.addContactMaterial(cmFloor);
   w.addContactMaterial(cmDice);
   w.addContactMaterial(cmWall);
-  const plane = (mat, pos, rot) => {
+  const plane = (name, mat, pos, rot) => {
     const b = new CANNON.Body({ mass: 0, material: mat, shape: new CANNON.Plane() });
+    b.labName = name;
     b.position.set(...pos);
     b.quaternion.setFromEuler(...rot);
     w.addBody(b);
   };
-  plane(floorMat, [0, 0, 0], [-Math.PI / 2, 0, 0]);
-  plane(wallMat, [0, 0, TABLE_D / 2], [0, Math.PI, 0]);
-  plane(wallMat, [-TABLE_W / 2, 0, 0], [0, Math.PI / 2, 0]);
-  plane(wallMat, [TABLE_W / 2, 0, 0], [0, -Math.PI / 2, 0]);
-  plane(wallMat, [0, 22, 0], [Math.PI / 2, 0, 0]);
+  plane('felt', floorMat, [0, 0, 0], [-Math.PI / 2, 0, 0]);
+  plane('wallFront', wallMat, [0, 0, TABLE_D / 2], [0, Math.PI, 0]);
+  plane('wallLeft', wallMat, [-TABLE_W / 2, 0, 0], [0, Math.PI / 2, 0]);
+  plane('wallRight', wallMat, [TABLE_W / 2, 0, 0], [0, -Math.PI / 2, 0]);
+  plane('ceiling', wallMat, [0, 22, 0], [Math.PI / 2, 0, 0]);
   // The back wall carries the DOORWAY: two flanking boxes and a lintel with
   // a clear opening for the exit, instead of an infinite plane — the die
   // spawns inside the tower and flies out through it.
-  const boxAt = (mat, pos, half) => {
+  const boxAt = (name, mat, pos, half) => {
     const b = new CANNON.Body({ mass: 0, material: mat,
       shape: new CANNON.Box(new CANNON.Vec3(...half)) });
+    b.labName = name;
     b.position.set(...pos);
     w.addBody(b);
   };
   const z0 = v.z0, dw = v.door.w / 2, side = TABLE_W / 2 - dw;
-  boxAt(wallMat, [-(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
-  boxAt(wallMat, [(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
-  boxAt(wallMat, [0, v.door.h + (22 - v.door.h) / 2, z0 - 0.3], [dw, (22 - v.door.h) / 2, 0.3]);
+  boxAt('doorL', wallMat, [-(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
+  boxAt('doorR', wallMat, [(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
+  boxAt('lintel', wallMat, [0, v.door.h + (22 - v.door.h) / 2, z0 - 0.3], [dw, (22 - v.door.h) / 2, 0.3]);
+  // BACKSTOP (probe run 1): behind the doorway the world was open void —
+  // die2 ricocheted off a head-on and flew 5 units behind the tower. The
+  // tower pit is now enclosed: a back wall and two flanks, all in the
+  // skin-occluded region, so a deflected die rattles and comes back out.
+  boxAt('towerBack', wallMat, [0, 11, z0 - 5.2], [7, 11, 0.4]);
+  boxAt('towerL', wallMat, [-3.4, 11, z0 - 2.6], [0.4, 11, 2.6]);
+  boxAt('towerR', wallMat, [3.4, 11, z0 - 2.6], [0.4, 11, 2.6]);
   // The apron RAMP is a SLICK CHUTE — its own material, near-zero friction
   // (a polished slide, not felt): at 28° with felt friction (0.25) dice
   // stalled on the slope instead of delivering. Restitution stays low so
@@ -5543,9 +5578,36 @@ function towerLabWorld() {
   w.addContactMaterial(new CANNON.ContactMaterial(diceMat, rampMat, { friction: 0.03, restitution: 0.3 }));
   const apron = new CANNON.Body({ mass: 0, material: rampMat,
     shape: new CANNON.Box(new CANNON.Vec3(v.apron.s[0] / 2, v.apron.s[1] / 2, v.apron.s[2] / 2)) });
+  apron.labName = 'ramp';
   apron.position.set(...v.apron.c);
   apron.quaternion.setFromEuler(v.apron.rx, 0, 0);
   w.addBody(apron);
+  const lip = new CANNON.Body({ mass: 0, material: rampMat,
+    shape: new CANNON.Box(new CANNON.Vec3(v.lip.s[0] / 2, v.lip.s[1] / 2, v.lip.s[2] / 2)) });
+  lip.labName = 'lip';
+  lip.position.set(...v.lip.c);
+  lip.quaternion.setFromEuler(v.lip.rx, 0, 0);
+  w.addBody(lip);
+  // LOG ALL COLLISIONS (Joe): every contact pair, with time, midpoint and
+  // closing speed — echoed to the console and kept in a ring buffer that
+  // towerLog() returns, so a headless probe reads the same record the
+  // DevTools user watches.
+  w.addEventListener('beginContact', (e) => {
+    const a = e.bodyA, b = e.bodyB;
+    const rel = Math.hypot(
+      a.velocity.x - b.velocity.x, a.velocity.y - b.velocity.y, a.velocity.z - b.velocity.z);
+    const entry = {
+      t: Number(TOWERLAB.t.toFixed(3)),
+      a: a.labName || 'unnamed', b: b.labName || 'unnamed',
+      at: [(a.position.x + b.position.x) / 2, (a.position.y + b.position.y) / 2,
+           (a.position.z + b.position.z) / 2].map((n) => Number(n.toFixed(2))),
+      v: Number(rel.toFixed(1)),
+    };
+    TOWERLAB.log.push(entry);
+    if (TOWERLAB.log.length > 500) TOWERLAB.log.shift();
+    if (TOWERLAB.echo) console.log(
+      `[tower] t=${entry.t} ${entry.a} ✕ ${entry.b} @(${entry.at.join(',')}) v=${entry.v}`);
+  });
   return w;
 }
 
@@ -5580,6 +5642,7 @@ function towerLabDrop(n = 8, seed = 42) {
   const rng = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32);
   const v = towerVolumes();
   n = Math.max(1, Math.min(20, n | 0));
+  TOWERLAB.dropped += n;
   let entryAt = 0;
   for (let i = 0; i < n; i++) {
     const type = DIE_TYPES[(rng() * DIE_TYPES.length) | 0];
@@ -5602,17 +5665,28 @@ function towerLabDrop(n = 8, seed = 42) {
     // clearance margin.
     const def = DIE_DEFS[type];
     const r = def.radius || def.size * 0.87;
-    const speed = 14 + rng() * 6;
+    // 13–23: the wide spread is the DEPTH FAN (probe run 6) — fast dice
+    // overfly the tray onto open felt, slow ones rest close, and the pour
+    // stops stacking at a single radius in front of the door.
+    const speed = 13 + rng() * 10;
     const ath2 = -v.exit.pitch;
-    const back = v.z0 - v.exit.p[2];
-    const exitY = 0.8 * v.S + 0.15 + r + back * Math.tan(ath2)
-      + 0.5 * Math.abs(GRAVITY) * (back / (Math.cos(ath2) * speed)) ** 2;
+    // Graze height off the INTERNAL slope (probe run 9): the chute surface
+    // now runs under the spawn itself, so the height is simply surface + a
+    // radius (normal to the slope) + margin — the die kisses the chute at
+    // spawn and rides it out the door. The old run-up/gravity terms died
+    // with the flat pit.
+    const surfY = 0.8 * v.S + (v.z0 - v.exit.p[2]) * Math.tan(ath2);
+    const exitY = surfY + r / Math.cos(ath2) + 0.2;
     TOWERLAB.falling.push({
       mesh, type, vy: 0, entryAt: TOWERLAB.t + entryAt, entered: false,
       av: [(rng() - 0.5) * 8, (rng() - 0.5) * 8, (rng() - 0.5) * 8],
       transit: 0.5 + rng() * 1.1,
       exit: {
-        x: (rng() - 0.5) * 0.8,
+        // Lane spread ±0.9 (probe run 1): at ±0.4 every die flew the same
+        // corridor and head-ons at v13–14 right outside the door were the
+        // norm — die1 hit die0 mid-flight, die2 hit die1. Worst-case door
+        // clearance stays positive: 0.9 + tan12°·0.875 + 1.25 = 2.34 < 2.5.
+        x: (rng() - 0.5) * 1.8,
         speed, y: exitY,
         yaw: (rng() - 0.5) * (Math.PI / 7.5),    // ±12° — chutes throw straight
         // Pitch rides the SLOPE (seventh look): horizontal launches fell
@@ -5629,16 +5703,9 @@ function towerLabDrop(n = 8, seed = 42) {
   return { dropped: n, seed };
 }
 
-// Is any lab die (other than `except`) occupying the SPAWN region — where a
-// new body would materialise overlapping it? Sixth look: this used to guard
-// 1.4 units of LANDING zone too, so the first die that settled near the
-// ramp base latched the corridor forever and the pour starved (3 of 20 made
-// it out). A new exit plowing into a stray die out on the felt is natural
-// dice behaviour, not a wedge — only the spawn overlap needs the mutex.
-function towerDoorBlocked(v, except) {
-  return TOWERLAB.out.some((o) => o !== except
-    && o.body.position.z < v.z0 + 0.5 && Math.abs(o.body.position.x) < 3.0);
-}
+// (The exit mutex lived here through probe runs 1–8 and every form of it
+// deadlocked measurably. It is gone: exits spawn ABOVE lane occupants and
+// cascade off the pile — see the exit block.)
 
 function stepTowerLab(dt) {
   if (!TOWERLAB.on || dt <= 0) return;
@@ -5670,12 +5737,28 @@ function stepTowerLab(dt) {
     // is still in the corridor when the next body spawns into it, and they
     // wedge each other into a pile at the port. An exit waits until the
     // corridor is clear; hidden time is invisible, so a wait costs nothing.
-    if (towerDoorBlocked(v, null)) { h.exitAt = TOWERLAB.t + 0.12; continue; }
+    // NO MUTEX (probe runs 1–8, the whole saga): every wait-your-turn
+    // scheme starved the queue behind parked dice. The physical answer is
+    // what real towers do — the stream lands ON the pile and cascades off.
+    // Spawn above whatever occupies the lane; the die drops onto the pile
+    // and rolls forward down its face. Starvation is now impossible.
+    let laneTop = 0;
+    for (const o of TOWERLAB.out) {
+      const p = o.body.position;
+      if (Math.abs(p.x - (v.exit.p[0] + h.exit.x)) < 1.6
+          && p.z > v.z0 - 1.6 && p.z < v.z0 + 1.6) {
+        laneTop = Math.max(laneTop, p.y + 1.3);
+      }
+    }
+    const doorCap = v.door.h - 1.3;
+    const spawnY = Math.min(Math.max(h.exit.y, laneTop + 1.4), doorCap);
+    TOWERLAB.hidden.splice(i, 1);
     const body = createDieBody(h.type, diceMat);
+    body.labName = `die${TOWERLAB.born++}:${h.type}`;
     body.linearDamping = PHYS.linearDamping;
     body.angularDamping = PHYS.angularDamping;
     body.allowSleep = false; // ship parity: the terminator is the predicate
-    body.position.set(v.exit.p[0] + h.exit.x, h.exit.y, v.exit.p[2]);
+    body.position.set(v.exit.p[0] + h.exit.x, spawnY, v.exit.p[2]);
     const cp = Math.cos(h.exit.pitch), sp = Math.sin(h.exit.pitch);
     body.velocity.set(
       Math.sin(h.exit.yaw) * cp * h.exit.speed,
@@ -5685,31 +5768,39 @@ function stepTowerLab(dt) {
     body.quaternion.setFromEuler(...h.exit.rot);
     TOWERLAB.world.addBody(body);
     scene.add(h.mesh);
-    TOWERLAB.out.push({ mesh: h.mesh, body, exit: h.exit, bornAt: TOWERLAB.t, rescues: 0 });
+    TOWERLAB.out.push({ mesh: h.mesh, body, type: h.type, exit: h.exit,
+      bornAt: TOWERLAB.t, rescues: h.rescues || 0 });
   }
   if (TOWERLAB.out.length) {
     // 120 Hz × 8 substeps: at hand-throw exit speed, 60 Hz steps move a die
     // ~0.33 per tick — the tunneling class the fifth look photographed.
     TOWERLAB.world.step(1 / 120, dt, 8);
-    for (const o of TOWERLAB.out) {
+    for (let i = TOWERLAB.out.length - 1; i >= 0; i--) {
+      const o = TOWERLAB.out[i];
       // THE EXIT GUARANTEE: a die may never rest hidden and may never be
-      // lost. The watchdog re-launches (≤3 times, from the spawn, straight
-      // through the door) a die that is LOST — out of bounds, under the
-      // floor, or NaN — or STALLED anywhere on the chute, slow and old.
-      // With a skin on, a re-launch reads as a moment caught on a baffle.
+      // lost. The watchdog RE-QUEUES (probe run 5 — teleporting to the
+      // spawn deadlocked when the pit floor under the spawn was occupied):
+      // a LOST die (out of bounds, under the floor, NaN) or a die STALLED
+      // in the hidden zone, slow and old, stops being a body entirely and
+      // goes back into the hidden-transit queue — it re-exits properly
+      // when the spawn is clear, like any other die. No spawn conflict is
+      // possible for a die that does not exist yet. With a skin on, all of
+      // it reads as time on a baffle.
       const p = o.body.position;
       const lost = !isFinite(p.x + p.y + p.z) || p.y < -0.5
         || Math.abs(p.x) > TABLE_W / 2 + 2 || Math.abs(p.z) > TABLE_D / 2 + 6;
+      // Stalled only in the HIDDEN zone (hood-covered): a die parked
+      // visibly on the tray is a legitimate end state — the tilted lip
+      // drains it, or the next exit plows it.
       const stalled = TOWERLAB.t - o.bornAt > 1.2
-        && p.z < v.z0 + 1.9 * v.S && o.body.velocity.length() < 0.8;
-      if (o.rescues < 3 && (lost || stalled) && !towerDoorBlocked(v, o)) {
-        o.rescues += 1;
-        o.body.position.set(v.exit.p[0], o.exit.y, v.exit.p[2]);
-        o.body.velocity.set(0,
-          Math.sin(v.exit.pitch) * o.exit.speed,
-          Math.cos(v.exit.pitch) * o.exit.speed);
-        o.body.angularVelocity.set(...o.exit.av);
-        o.bornAt = TOWERLAB.t;
+        && p.z < v.z0 + 1.1 && o.body.velocity.length() < 0.8;
+      if (o.rescues < 20 && (lost || stalled)) {
+        TOWERLAB.out.splice(i, 1);
+        TOWERLAB.world.removeBody(o.body);
+        scene.remove(o.mesh);
+        TOWERLAB.hidden.push({ mesh: o.mesh, type: o.type,
+          exitAt: TOWERLAB.t + 0.5, exit: o.exit, rescues: o.rescues + 1 });
+        continue;
       }
       o.mesh.position.copy(o.body.position);
       o.mesh.quaternion.copy(o.body.quaternion);
@@ -5741,6 +5832,25 @@ window.__diceDebug = {
   towerCore(on = true) { return towerLabSet(on); },
   towerDrop(n = 8, seed = 42) { return towerLabDrop(n, seed); },
   towerClear() { towerLabClear(); return true; },
+  towerLog() { return TOWERLAB.log.slice(); },
+  towerEcho(on = true) { TOWERLAB.echo = !!on; return TOWERLAB.echo; },
+  towerState() {
+    const r1 = (n) => Number(n.toFixed(2));
+    const v = towerVolumes();
+    return {
+      t: r1(TOWERLAB.t),
+      z0: v.z0, S: v.S,
+      dropped: TOWERLAB.dropped, born: TOWERLAB.born,
+      falling: TOWERLAB.falling.length,
+      hidden: TOWERLAB.hidden.length,
+      out: TOWERLAB.out.map((o) => ({
+        name: o.body.labName,
+        p: [r1(o.body.position.x), r1(o.body.position.y), r1(o.body.position.z)],
+        v: r1(o.body.velocity.length()),
+        rescues: o.rescues,
+      })),
+    };
+  },
   // How big a die actually LANDS on screen, in CSS px — the only number that
   // answers "can I see the dice". Projects a unit-radius sphere at the mat's
   // centre through the live camera, so it accounts for the preset, the
