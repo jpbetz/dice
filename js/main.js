@@ -2695,6 +2695,10 @@ function playRoll(roll) {
       + dice.length * POUR.exitGap
     : SETTLE_CAP);
   let settleCap = capOf();
+  // The bake, as a closure, because the exit guarantee may run it again. Its
+  // body is deliberately left at the indent it had as a bare loop: this
+  // wrapper is the whole change, and re-indenting would bury it under three
+  // hundred lines of whitespace in every review and every blame.
   const bakeLoop = () => {
   for (;;) {
     stepContacts = 0; // the per-step contact budget refills; see the recorder
