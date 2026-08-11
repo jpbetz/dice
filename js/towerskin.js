@@ -305,6 +305,139 @@ export function roughFromHeight(heightCanvas, size, seed) {
   return tex;
 }
 
+// ---------------------------------------------------------------------------
+// bakeStone — coursed masonry in one pass, colour and height together
+// ---------------------------------------------------------------------------
+// WHERE THIS CAME FROM: written for Bastion (js/towerbastion.js) and moved
+// here verbatim when Black Anvil needed coursed fire-brick and coursed soot
+// stone. A pure MOVE — the only edit is that the mortar colour became a
+// parameter defaulting to the constant it used to read, so Bastion's four
+// bakes come out byte-for-byte what they were (witnessed by a before/after
+// frame compare, the same bar the towerskin export refactor had to clear).
+//
+// Both canvases come out of the same loop because they share every noise
+// lookup, and because the height field must agree with the mortar lines to
+// the pixel or the normal map fights the albedo.
+//
+// TILEABILITY is structural, not decorative: `blocks` and `courses` are whole
+// numbers, every per-block lookup is keyed on the WRAPPED indices, and the
+// noise is the tileable kit above. A seam in a wall texture on a drum is a
+// vertical scar you cannot unsee.
+//
+// The three things that stop procedural ashlar reading as graph paper:
+//   1. DROPPED JOINTS — a quarter of the vertical joints simply do not
+//      exist, which merges neighbours into long stones. Real coursed rubble
+//      is full of them; a perfect grid is a Lego wall.
+//   2. PER-BLOCK VALUE AND TEMPERATURE — each stone takes its own slice of
+//      the ramp and its own pull between the warm and cool ends. Without it
+//      every block averages to the same grey and the wall reads as concrete.
+//   3. CHIPPED ARRISES — the joint's own edge wanders under two octaves of
+//      turbulence, so the mortar bites into block corners at random. Cut
+//      stone that has stood in weather has no straight arris left.
+//
+// Degenerate settings are useful and intended: blocks:1, courses:1 with a
+// hairline joint is a single dressed slab — grain and nothing else.
+export const mod = (n, m) => ((n % m) + m) % m;
+// A warm near-black: a recess is shadow, and shadow in a warm room is never
+// #000. (Bastion's first cut ran it at full strength and printed a cartoon
+// grid, which is why the blend below is 0.80 and not 1.)
+const MORTAR = [0x3a, 0x34, 0x2c];
+
+export function bakeStone({ size, stops, blocks, courses, seed,
+  joint = 0.0056, relief = 1, chip = 0.45, speckle = 0.05, wash = 0.20,
+  mortar = MORTAR }) {
+  const W = size;
+  const cCan = document.createElement('canvas'); cCan.width = cCan.height = W;
+  const hCan = document.createElement('canvas'); hCan.width = hCan.height = W;
+  const cCtx = cCan.getContext('2d'), hCtx = hCan.getContext('2d');
+  const cImg = cCtx.createImageData(W, W), hImg = hCtx.createImageData(W, W);
+  const B = Math.max(1, blocks), C = Math.max(1, courses);
+
+  // Running bond: alternate courses step half a block, plus a little wander
+  // so the stepping is not metronomic. Constant within a course, so the
+  // canvas still tiles in u.
+  const courseOff = [];
+  for (let c = 0; c < C; c++) {
+    courseOff.push((c % 2 ? 0.5 : 0) + (hash2(0, c, seed + 5) - 0.5) * 0.16);
+  }
+
+  for (let py = 0; py < W; py++) {
+    const vv = py / W;
+    const cy = vv * C, ci = Math.floor(cy), fy = cy - ci;
+    const ciw = mod(ci, C);
+    const off = courseOff[ciw];
+    for (let px = 0; px < W; px++) {
+      const u = px / W;
+      const bxf = u * B - off;
+      const bi = Math.floor(bxf), fx = bxf - bi;
+      const biw = mod(bi, B);
+
+      // Distances to the nearest joint, in TEXTURE units so a course line
+      // and a block line get the same mortar width.
+      const live = (k) => hash2(mod(k, B), ciw, seed + 101) > 0.24;
+      const dL = live(bi) ? fx / B : 9;
+      const dR = live(bi + 1) ? (1 - fx) / B : 9;
+      const dH = Math.min(fy, 1 - fy) / C;
+      const wob = joint * chip * (0.55 * (turb(u * 96, vv * 96, 96, 3, seed + 13) * 2 - 1)
+        + 0.85 * (turb(u * 20, vv * 20, 20, 2, seed + 29) - 0.5));
+      const d = Math.min(dL, dR, dH) + wob;
+      const groove = 1 - smoothstep(0, joint, d);
+      // A bright arris just inside the joint: the edge of a cut stone catches
+      // the light the recess loses.
+      const lip = smoothstep(joint, joint * 1.8, d) * (1 - smoothstep(joint * 3.2, joint * 6.5, d));
+
+      const hb = hash2(biw, ciw, seed + 3);
+      const hb2 = hash2(biw, ciw, seed + 61);
+      const mottle = fbm(u * 7, vv * 7, 7, 4, seed + 17);
+      const t = clamp01(0.26 + 0.46 * hb + 0.30 * (mottle - 0.5));
+      let [r8, g8, b8] = ramp3(stops, t);
+      const warm = (hb2 - 0.5) * 0.09;
+      r8 *= 1 + warm; b8 *= 1 - warm;
+      const sp = turb(u * 150, vv * 150, 150, 2, seed + 77);
+      const spk = 1 + speckle * (sp * 2 - 1);
+      r8 *= spk; g8 *= spk; b8 *= spk;
+      // Rain wash: a broad, mostly-vertical drift. Slightly green in the
+      // mid-tones, which is what damp northern stone actually does.
+      const wsh = (1 - wash / 2) + wash * fbm(u * 2.2, vv * 1.05, 2, 3, seed + 41);
+      r8 *= wsh * 0.99; g8 *= wsh * 1.01; b8 *= wsh * 0.985;
+      if (groove > 0) {
+        const m = groove * 0.80;
+        r8 += (mortar[0] - r8) * m; g8 += (mortar[1] - g8) * m; b8 += (mortar[2] - b8) * m;
+      }
+      if (lip > 0) { const k = 1 + 0.075 * lip; r8 *= k; g8 *= k; b8 *= k; }
+
+      // HEIGHT: joints, arrises, the block's own pillow, and grain. Block
+      // COLOUR stays out of it — value variation in a normal map is the
+      // stone equivalent of Heartwood's corrugated-iron tell.
+      const pil = Math.sin(Math.PI * fx) * Math.sin(Math.PI * fy);
+      const h = 0.58 - 0.42 * groove + 0.05 * lip
+        + relief * 0.11 * (pil - 0.5)
+        + 0.05 * (fbm(u * 26, vv * 26, 26, 3, seed + 5) - 0.5)
+        - 0.035 * sp;
+
+      const i = (py * W + px) * 4;
+      cImg.data[i] = clamp01(r8 / 255) * 255;
+      cImg.data[i + 1] = clamp01(g8 / 255) * 255;
+      cImg.data[i + 2] = clamp01(b8 / 255) * 255;
+      cImg.data[i + 3] = 255;
+      const hv = clamp01(h) * 255;
+      hImg.data[i] = hv; hImg.data[i + 1] = hv; hImg.data[i + 2] = hv; hImg.data[i + 3] = 255;
+    }
+  }
+  cCtx.putImageData(cImg, 0, 0);
+  hCtx.putImageData(hImg, 0, 0);
+
+  const map = new THREE.CanvasTexture(cCan);
+  map.colorSpace = THREE.SRGBColorSpace;   // colour only
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.anisotropy = 4;
+  return {
+    map,
+    normalMap: heightToNormal(hCan, 1.0),
+    roughnessMap: roughFromHeight(hCan, 256, seed + 999),
+  };
+}
+
 // A radial veil: transparent rim → near-black centre. Used unlit, with
 // depthWrite off, to fake the light that never gets into a deep pocket.
 export function veilTexture(size, alpha) {
