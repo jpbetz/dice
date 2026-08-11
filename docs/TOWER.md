@@ -1,11 +1,12 @@
 # TOWER_CORE — the tower geometry contract
 
-## STATUS — shipped as a room setting (2026-08-12), two models (2026-08-13)
+## STATUS — shipped as a room setting (2026-08-12), three models (2026-08-14)
 
 The lab is no longer the only place a tower exists. `tower` is a room-wide
 setting whose value is a **tower id**, never a boolean: `none` (default),
-`heartwood` and `bastion`, one `TOWERS` registry row per model after that, and
-the settings modal shows a picker under the Felt swatches rather than a switch.
+`heartwood`, `bastion` and `blackanvil`, one `TOWERS` registry row per model
+after that, and the settings modal shows a picker under the Felt swatches
+rather than a switch.
 Room-wide because it changes the FILM — every client must bake the same pour —
 and it rides the zoom defer rule (`queueTower` / `tryFlushRoomChanges`), so a
 change made mid-roll lands at the next roll boundary and never under a film
@@ -94,23 +95,74 @@ point of exporting rather than forking. Three findings worth keeping:
 **THE SOUND PALETTE IS REAL (§6).** A `TOWERS` row may carry `clunkVoice` (an
 `IMPACT_VOICES` shape), and the playback sound drain voices a `clunk:'baffle'`
 event through the SOCKETED TOWER instead of the die set — heartwood a dry
-`clack`, bastion a `thud` with a longer tail. Render-time only: the knocks'
+`clack`, bastion a `thud` with a longer tail, blackanvil a `chime` weighted
+right down to 0.85 with a 70 ms tail, where the body's sine partial stops
+being crystal and becomes the ring off a cast-iron baffle. Every skinned model
+must carry one and no two may be the same; `tower-roll` asserts both over the
+registry. Render-time only: the knocks'
 TIMES are baked from the seed and the bake never learns which tower is
 standing, so films and replay hashes are untouched. And a towerless roll has
 no clunk event at all, so the FIRST LAW holds by construction rather than by a
 guard. The resolution lives in one named function (`impactVoice`) because the
 scenario has to ask the same function the drain asks.
 
-**Not done, deliberately:** `tower` in the portable YAML `table:` block, and a
-third model.
+**THE THIRD MODEL, AND WHAT IT PROVED (2026-08-14).** `blackanvil`
+(`js/toweranvil.js`) is the Emberforge family's forge: a soot-blackened anvil
+block whose face carries a barred furnace grate over the casting channel, a
+dark fire-brick stack strapped in oxidised bronze with one ember vent, and a
+flared crucible lip blackened at the top edge. It cost what the registry
+promised — a skin file, a row, one server id — and it moved `bakeStone` into
+`js/towerskin.js` so the kit now holds coursed masonry as well as the noise,
+the Sobel pass and the AO bake. That move was witnessed by running the
+pre-move source and the moved one side by side on Bastion's four parameter
+sets and counting differing bytes: 0 across all three canvases each, and
+red-checked by moving the mortar's blue channel by one (31067 / 33112 / 4728 /
+403 differing bytes). Four findings worth keeping:
 
-Scenario: `tower-roll` (tag `tower`). Tools: `tools/steps/tower-pour.mjs` for
-the shipped pour, `tower-probe.mjs [n] [seed] [secs] [tower]` and
-`tower-occlusion.mjs [tower]` for the lab (both take a tower id and must be
-run for every model), `tower-fit.mjs [tower…]` for proofs (a) and (d) — the
-socket hull per MESH and the collider count, which had no tool until the
-second model needed one — `tower-family-shots.mjs [tower] [sibling]` for the
-review set a human looks at before a skin merges.
+- **A GLOW IS LEGAL, AND ONLY THIS ONE.** `emissiveMap` on a
+  MeshStandardMaterial, baked from the same seeded canvas pass as the albedo
+  and the height — no light, no bloom, no ShaderMaterial. The bake
+  (`bakeEmber`) draws cracks as the CONTOUR LINES of a noise field, which is
+  why they branch and close into cells the way cooling coal does, and a
+  low-frequency heat envelope leaves most of the bed dead so the thing reads
+  as banked coals rather than a strip of orange tape. `vertexColors`
+  multiplies the diffuse only, so the AO bake darkens the char without
+  dimming the seams. Intensities are Joe's dial: 0.90 at the grate, 0.50 at
+  the vent.
+- **THE FIRST CUT WAS TOO LIGHT, AND THAT IS A VALUE PROBLEM, NOT A COLOUR
+  ONE.** Bastion's ledger records saturated buff reading as brass; Black
+  Anvil's records mid-brown brick reading as a garden wall. Every ramp came
+  down about a third and the tray came with it — a tower's delivery run was
+  the brightest object on the table. A dark tower needs its range in the
+  bottom third and its separation from TEMPERATURE, not from value.
+- **A RED CHECK CAN CORRECT WHAT A FILE CLAIMS.** Deleting the shaft vent's
+  emissive bed leaves the COWL band at 99/99 — the bed is the picture, and the
+  unlit `towerSkin*` LINING behind it is the opacity. Remove both and the
+  check goes red at all six eyes. A tool change was drafted on the first
+  reading of that green and reverted once a second run showed the shipped
+  sampling already catches a real hole: no churn in shared proof code for a
+  bug that was not there.
+- **BASTION'S ARROW LOOP IS A PICTURE FRAME.** Looked at in the three-tower
+  lineup: its `shadowStone` slot sits 0.012 BEHIND a granite facade panel that
+  spans the same x/y, so the granite is in front and the slot never shows —
+  the loop reads as a sandstone surround with plain wall inside it. Cosmetic,
+  pre-existing, not fixed here. Black Anvil CUTS its facade into panels around
+  the grate and the vent for exactly this reason.
+
+**Not done, deliberately:** `tower` in the portable YAML `table:` block.
+
+Scenario: `tower-roll` (tag `tower`), whose swap / socket / voice / pour block
+is a LOOP over the registry's skinned models, so a new row is covered the day
+it is registered rather than by copying a block. Tools:
+`tools/steps/tower-pour.mjs` for the shipped pour, `tower-probe.mjs [n] [seed]
+[secs] [tower]` and `tower-occlusion.mjs [tower]` for the lab (both take a
+tower id and must be run for every model), `tower-fit.mjs [tower…]` for proofs
+(a) and (d) — the socket hull per MESH and the collider count, which had no
+tool until the second model needed one — `tower-resting-eye.mjs [tower]`
+(parameterised 2026-08-14; it hard-coded heartwood until then) and
+`tower-family-shots.mjs [tower] [sibling…]` for the review set a human looks at
+before a skin merges, whose sibling list now defaults to every other
+registered model.
 
 The engine owns one fixed core geometry; tower models are **occluding skins**
 around it. The baked film — entry drop, despawn, hidden transit, clunk times,

@@ -717,10 +717,10 @@ Most of §9's engineering is closed (see SHIPPED.md §9). What remains
 is art direction, one pool-icon delta, and the tumbled-resin
 geometry tier.
 
-### 9d. The dice tower — **SHIPPED 2026-08-12**; second tower + sound palette 2026-08-13; one follow-up left
+### 9d. The dice tower — **SHIPPED 2026-08-12**; three models by 2026-08-14; one follow-up left
 
 The lab became the product. `tower` is a room setting whose value is a
-tower id — `none` (default), `heartwood` and `bastion` — and a tower roll is baked
+tower id — `none` (default), `heartwood`, `bastion` and `blackanvil` — and a tower roll is baked
 as a POUR: scripted entry, hidden transit behind the skin, exit through
 the doorway, then the ordinary settle. The contract, the socket, the bake,
 the amended camera ruling and the measurements are
@@ -743,6 +743,33 @@ voiced by the socketed tower (wood clacks, stone thuds), resolved at
 render time, so the bake, the film timings and the replay hashes never
 learn which model is standing. Proofs and the three findings the build
 turned up are in [TOWER.md](TOWER.md)'s STATUS.
+
+**DONE 2026-08-14 — a third tower, and the registry stopped being a claim.**
+`blackanvil` (js/toweranvil.js) is the Emberforge family's forge: a
+soot-blackened anvil block with a barred furnace grate glowing over the
+casting channel, a fire-brick stack strapped in oxidised bronze with one
+ember vent, and a flared crucible lip. Same price as the second — a skin
+file, a row, one server id — plus `bakeStone` moving into the shared kit,
+witnessed pixel-for-pixel against the pre-move source rather than asserted.
+It establishes the house's ONE legal glow: an emissive map baked from the
+same seeded canvas pass, dim, inside a recess, no light and no bloom.
+
+What the third model changed about the tooling, which is the part that
+compounds: `tower-roll`'s swap / socket / voice / pour block is now a LOOP
+over the registry's skinned models instead of a block naming one tower, so
+a fourth row is covered the day it is registered; `tower-resting-eye.mjs`
+takes a tower id like the other proofs (it hard-coded heartwood);
+`tower-family-shots.mjs` takes a LIST of siblings so the lineup is the whole
+family. And two claims are pinned that only a third model could motivate —
+every skinned row carries a `clunkVoice` and no two are the same, and the
+picker's row still LAYS OUT at four chips (the paint assertions would have
+stayed green with the chips overflowing).
+
+Recorded, not fixed: **Bastion's arrow loop does not show its dark slot** —
+the `shadowStone` sits 0.012 behind a granite facade panel spanning the same
+x/y, so the granite is in front and the loop reads as a surround with plain
+wall inside it. Cosmetic and pre-existing; Black Anvil cuts its facade into
+panels around the grate and the vent to avoid the same shape of mistake.
 
 What is left:
 

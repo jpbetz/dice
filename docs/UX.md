@@ -4163,33 +4163,51 @@ of an engine restitution threshold; failed every gate including its own),
 and uniform tempo (taste). The full pricing history is ROADMAP C30a–e; the
 engine-swap reserve position is C32.
 
-### 7.31 The tower, and what a poured roll looks like (2026-08-12; second tower 2026-08-13)
+### 7.31 The tower, and what a poured roll looks like (2026-08-12; second tower 2026-08-13; third 2026-08-14)
 
 A **Tower** picker joins Felt in the settings modal's "Everyone at the table"
-section: *None* (default), *Heartwood* and *Bastion*. Room-wide, like felt and
-zoom, and for a stronger reason than either — the tower changes the FILM, so a
-table where one player has it and another does not is two different rolls.
+section: *None* (default), *Heartwood*, *Bastion* and *Black Anvil*. Room-wide,
+like felt and zoom, and for a stronger reason than either — the tower changes
+the FILM, so a table where one player has it and another does not is two
+different rolls.
 
 The sub-line is `dice tumble down through it instead of being thrown`, and
 the option tooltips say what each is rather than selling it (house tone,
 §5): *None — dice are thrown onto the felt by hand* · *Heartwood — a wooden
 tower at the back of the table; dice pour through it* · *Bastion — a stone
-turret; dice rumble through it*.
+turret; dice rumble through it* · *Black Anvil — a cooling forge chimney; dice
+fall through it ringing*.
 
-**A picker, not a switch.** The stored value is a tower id. That bet paid on
-2026-08-13: Bastion cost a skin file and a registry row, and the picker grew a
-third chip with no change to the picker. A checkbox would have to be renamed
-the day it stopped being a yes/no, and renaming a setting people have already
-set is a cost paid later for a saving taken now.
+**A picker, not a switch.** The stored value is a tower id. That bet paid
+twice: Bastion (2026-08-13) and Black Anvil (2026-08-14) each cost a skin file
+and a registry row, and the picker grew a chip each time with no change to the
+picker. A checkbox would have to be renamed the day it stopped being a yes/no,
+and renaming a setting people have already set is a cost paid later for a
+saving taken now. The one thing that does NOT scale for free is the row's
+LAYOUT, so `tower-roll` now measures it: at four chips every chip is still
+laid out with real width and the group still does not scroll sideways.
 
 **Towers are a FAMILY, and the family resemblance is the point.** Each is
-named for a die in a theme house (Heartwood ← Wildwood, Bastion ← Classics)
-and each is built to the same house visual rules — two-tone materials, seeded
-canvas bakes with Sobel normals, beveled arrises, a baked ambient-occlusion
-pass, and no new lights. What differs is the archetype: Heartwood is a
-craftsman's hobby tower in walnut and cherry; Bastion is a weathered granite
-turret with sandstone dressings, a crenellated crown and a gate you can see
-into. Both frame the same doorway and deliver dice to the same tray.
+named for a die in a theme house (Heartwood ← Wildwood, Bastion ← Classics,
+Black Anvil ← Emberforge) and each is built to the same house visual rules —
+two-tone materials, seeded canvas bakes with Sobel normals, beveled arrises, a
+baked ambient-occlusion pass, and no new lights. What differs is the
+archetype: Heartwood is a craftsman's hobby tower in walnut and cherry;
+Bastion is a weathered granite turret with sandstone dressings, a crenellated
+crown and a gate you can see into; Black Anvil is a foundry stack, a
+soot-blackened block with a barred furnace grate glowing over the casting
+channel, a dark fire-brick chimney strapped in oxidised bronze, and a flared
+crucible lip. All three frame the same doorway and deliver dice to the same
+tray.
+
+**The one glow in the house (2026-08-14).** Black Anvil's grate and its shaft
+vent are the first and only lit-looking thing on any tower, and they are not
+lit: they are an emissive texture on ordinary material, baked from the same
+seeded canvas pass as every other surface, with no light added and no bloom.
+It is deliberately dim — banked coals with most of the bed dead, not a
+furnace running. The rule it establishes for the next model is narrow on
+purpose: a glow must be a BAKE, it must live inside a recess, and it must not
+be the brightest thing on the table.
 
 **What a poured roll is.** Dice appear above the tower's mouth, one every
 0.12–0.2 s — a pour, one motion of a hand, not a queue. Each vanishes into
@@ -4243,7 +4261,10 @@ the ruling itself (`CAM_EASE_S`), not only here.
 **Each tower has its own knock (2026-08-13).** A registry row may carry a
 `clunkVoice`, and the knocks you hear while a die is out of sight are voiced
 by the tower rather than by the dice: Heartwood a dry wooden `clack` with
-almost no tail, Bastion a lower `thud` that rings on in the shaft. It is the
+almost no tail, Bastion a lower `thud` that rings on in the shaft, Black Anvil
+a metallic ring with the longest tail of the three. Every model with a skin
+must bring one and no two may be the same — two towers that sound alike are
+one tower twice. It is the
 one thing besides the model's shape that a skin gets to change — the knock
 TIMES are baked from the seed and are the same for every tower, so this can
 never make two players watch different rolls. An ordinary landing still
@@ -4251,6 +4272,6 @@ sounds like the dice, not like the tower.
 
 **What did NOT ship.** **`tower` in the portable YAML** `table:` block, which
 carries name/felt/system/zoom — a prepared table cannot yet arrive with its
-tower already up. And a **third model**; two is enough to prove the registry
-and to show the family, and the next one should answer a want rather than an
-appetite.
+tower already up. This is now the only outstanding item on the feature, and
+with three chips in the picker it is the one a prepared table most obviously
+wants.
