@@ -5411,8 +5411,11 @@ function towerVolumes() {
   return {
     z0,
     socket:  { c: [0, 5.0, z0 - 2.0], s: [5.2, 10, 4.4] },
-    apron:   { c: [0, 0.4 - 0.15 * Math.cos(ath), z0 + 0.75 - 0.15 * Math.sin(ath)],
-               s: [3.8, 0.3, 1.9], rx: ath },
+    // Thickness 1.0 is TUNNELING ARITHMETIC, not style: at hand-throw speed
+    // (~20 u/s) a die covers ~0.33 per 60 Hz step — the 0.3-thin first ramp
+    // let dice pass straight through and vanish underneath (fifth lab look).
+    apron:   { c: [0, 0.4 - 0.5 * Math.cos(ath), z0 + 0.75 - 0.5 * Math.sin(ath)],
+               s: [3.8, 1.0, 1.9], rx: ath },
     shaft:   { c: [0, 4.85, z0 - 1.6], r: 1.7, h: 5.3 },
     aim:     { c: [0, 9.0, z0 - 1.6], s: [0.8, 0.3, 0.8] },
     cowl:    { c: [0, 7.4, z0 + 0.05], s: [4.2, 2.4, 0.3] },
@@ -5651,19 +5654,25 @@ function stepTowerLab(dt) {
     body.quaternion.setFromEuler(...h.exit.rot);
     TOWERLAB.world.addBody(body);
     scene.add(h.mesh);
-    TOWERLAB.out.push({ mesh: h.mesh, body, exit: h.exit, bornAt: TOWERLAB.t, rescued: false });
+    TOWERLAB.out.push({ mesh: h.mesh, body, exit: h.exit, bornAt: TOWERLAB.t, rescues: 0 });
   }
   if (TOWERLAB.out.length) {
-    TOWERLAB.world.step(1 / 60, dt, 4);
+    // 120 Hz × 8 substeps: at hand-throw exit speed, 60 Hz steps move a die
+    // ~0.33 per tick — the tunneling class the fifth look photographed.
+    TOWERLAB.world.step(1 / 120, dt, 8);
     for (const o of TOWERLAB.out) {
-      // THE EXIT GUARANTEE: a die may never rest hidden. Anything loitering
-      // behind the wall plane slow and old gets re-launched from the spawn,
-      // straight through the door (yaw 0) — with a skin on, this happens in
-      // the dark and reads as the die having taken a moment on a baffle.
-      if (!o.rescued && TOWERLAB.t - o.bornAt > 0.7
-          && o.body.position.z < v.z0 && o.body.velocity.length() < 1.5
-          && !towerDoorBlocked(v, o)) {
-        o.rescued = true;
+      // THE EXIT GUARANTEE: a die may never rest hidden and may never be
+      // lost. The watchdog re-launches (≤3 times, from the spawn, straight
+      // through the door) a die that is LOST — out of bounds, under the
+      // floor, or NaN — or STALLED anywhere on the chute, slow and old.
+      // With a skin on, a re-launch reads as a moment caught on a baffle.
+      const p = o.body.position;
+      const lost = !isFinite(p.x + p.y + p.z) || p.y < -0.5
+        || Math.abs(p.x) > TABLE_W / 2 + 2 || Math.abs(p.z) > TABLE_D / 2 + 6;
+      const stalled = TOWERLAB.t - o.bornAt > 1.2
+        && p.z < v.z0 + 1.5 && o.body.velocity.length() < 0.8;
+      if (o.rescues < 3 && (lost || stalled) && !towerDoorBlocked(v, o)) {
+        o.rescues += 1;
         o.body.position.set(v.exit.p[0], v.exit.p[1], v.exit.p[2]);
         o.body.velocity.set(0, 0, o.exit.speed);
         o.body.angularVelocity.set(...o.exit.av);

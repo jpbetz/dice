@@ -31,7 +31,10 @@ not felt. At felt friction (0.25) dice stalled on the 28° slope (fourth
 lab look); wall restitution (0.7) trampolined the first flat-tray cut;
 and a step's edge hop read as artificial where a slope lets gravity make
 the delivery ("let physics help us out more", third lab look). It also keeps settled dice from rolling under the exit,
-and it is thick — no tunneling class at felt-level speeds. Models may SKIN
+and it is thick: 1.0 through its face — tunneling arithmetic, since a die
+at hand-throw exit speed covers ~0.33 per 60 Hz step and the 0.3-thin
+first ramp let dice pass straight through and vanish underneath (fifth
+lab look). Sim steps near the tower run at 120 Hz for the same reason. Models may SKIN
 it (a wooden chute, a stone slide) but never alter, extend, or duplicate
 its collision. Models add zero colliders, ever; that is what makes a skin
 swap replay-safe.
@@ -85,12 +88,14 @@ tan 12°·0.9 travel + 1.25 d20 radius ≈ 1.84 against the door's 2.0),
 pitch 0° to −10°. The die dips, lands on the apron tray, and skips off
 the step onto the felt.
 
-**The EXIT GUARANTEE (second lab look):** a die may never rest hidden.
-The doorway corridor is a MUTEX — an exit is postponed while any die
-occupies it (hidden time is invisible, so the wait costs nothing), and
-any die that still ends up loitering behind the wall plane, slow and old,
-is re-launched from the spawn straight through the door. With a skin on,
-both read as the die having taken a moment on a baffle. Everything
+**The EXIT GUARANTEE (second and fifth lab looks):** a die may never rest
+hidden and may never be lost. The doorway corridor is a MUTEX — an exit
+is postponed while any die occupies it (hidden time is invisible, so the
+wait costs nothing) — and a WATCHDOG re-launches from the spawn, straight
+through the door, up to three times: any die LOST (out of bounds, under
+the floor, NaN pose) or STALLED anywhere on the chute, slow and old.
+With a skin on, a re-launch reads as the die having taken a moment on a
+baffle. Everything
 after spawn is the normal pipeline — real bounces, displacement
 terminator, face correction, tempo curve — untouched.
 
