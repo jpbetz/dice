@@ -841,13 +841,27 @@ const TEMPO = { k: 1, flight: 0.8, settle: 25, rampS: 2.0, anchorSpeed: 8 };
 // The last film time at which any die's CENTRE is moving faster than `speed`.
 // Centre travel, not angular: a die spinning in place has stopped travelling
 // and is in the part of the throw nobody is watching for suspense.
-function tempoAnchorOf(keyframes, speed) {
+// `spans` (the pour, docs/TOWER.md) is present only for a tower roll: a die's
+// list of frame ranges in which it can be SEEN. A hidden die's film pose is
+// parked, and it jumps once when the body appears at the exit — a jump nobody
+// watches, because the frame before it is behind the skin. Counting it would
+// anchor the tempo curve on a teleport. So a frame pair only counts when the
+// die is visible at both ends of it. Absent `spans`, every frame counts and
+// this is byte-for-byte the throw's own anchor.
+function tempoAnchorOf(keyframes, speed, spans = null) {
   if (!keyframes.length || keyframes[0].length < 2) return 0;
   const n = keyframes[0].length;
   const bar = speed * FIXED_DT; // compare distances, not speeds — no divide
+  const seen = (di, f) => {
+    const sp = spans[di];
+    for (let k = 0; k < sp.length; k++) if (f >= sp[k][0] && f <= sp[k][1]) return true;
+    return false;
+  };
   let last = 0;
   for (let f = 1; f < n; f++) {
-    for (const kf of keyframes) {
+    for (let di = 0; di < keyframes.length; di++) {
+      if (spans && !(seen(di, f) && seen(di, f - 1))) continue;
+      const kf = keyframes[di];
       if (kf[f].pos.distanceTo(kf[f - 1].pos) > bar) { last = f * FIXED_DT; break; }
     }
   }
@@ -1613,6 +1627,32 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
   return { type, mesh, body, variant };
 }
 
+// A POUR die (docs/TOWER.md). Same mesh, same body, same damping and sleep
+// flags as a thrown die — and deliberately NOT in the world. The body first
+// exists (physically) at the exit spawn; until then the die is a scripted
+// pose falling down a shaft, which is the contract's whole reason a skin can
+// never change a roll: there is nothing for a model to collide with.
+function spawnPourDie(type, shrouded, set) {
+  const variant = dieVariant(shrouded, set);
+  const mesh = createDieMesh(type, variant);
+  const body = pourBody(type);
+  scene.add(mesh);
+  return { type, mesh, body, variant };
+}
+
+// A body configured exactly the way spawnDie configures one. Split out because
+// the pour makes a FRESH body per bake attempt (the exit guarantee re-bakes,
+// and a body that has already been simulated and frozen is not a clean slate).
+function pourBody(type) {
+  const body = createDieBody(type, diceMat);
+  body.linearDamping = PHYS.linearDamping;
+  body.angularDamping = PHYS.angularDamping;
+  body.sleepSpeedLimit = SLEEP.speed;
+  body.sleepTimeLimit = SLEEP.time;
+  if (BODYFLAGS.allowSleep !== null) body.allowSleep = BODYFLAGS.allowSleep;
+  return body;
+}
+
 // Remove every die, chip, marker, and banner from view WITHOUT touching the
 // playback queue or the in-flight roll. The corner ✕ sweep (clearTable) is
 // the only caller now that the 40-dice whole-table wipe is retired (§7.7):
@@ -2309,8 +2349,16 @@ function playRoll(roll) {
 
   // --- spawn with seeded throw params -------------------------------------
   const rng = mulberry32(roll.seed >>> 0);
-  const side = Math.floor(rng() * 4);
-  const dice = types.map((t, i) => spawnDie(t, i, types.length, side, rng, shrouded, rollDieSet(roll, i)));
+  // A TOWER ROLL POURS INSTEAD OF BEING THROWN (docs/TOWER.md §3). The die is
+  // not hurled from a table edge: it is dropped into the mouth, vanishes, and
+  // arrives out of the doorway. So it gets no throw params and, crucially, no
+  // BODY until it exits — a hidden die has no physics at all, which is what
+  // makes a model unable to deflect an entry.
+  const pouring = towerOn();
+  const side = pouring ? 0 : Math.floor(rng() * 4);
+  const dice = pouring
+    ? types.map((t, i) => spawnPourDie(t, shrouded, rollDieSet(roll, i)))
+    : types.map((t, i) => spawnDie(t, i, types.length, side, rng, shrouded, rollDieSet(roll, i)));
   // Every die on the table is tagged with its roll (§7.5): a per-roll Done
   // removes exactly these dice and never touches a concurrent roll's.
   dice.forEach((d, i) => {
@@ -2337,8 +2385,12 @@ function playRoll(roll) {
   }
 
   // --- synchronous fast-forward, recording keyframes + sound events -------
-  const sounds = []; // {time, strength, at, di}
-  const bodyDie = new Map(dice.map((d, i) => [d.body, i]));
+  // `let`, not `const`, for the pour alone: the exit guarantee (docs/TOWER.md)
+  // may DISCARD a whole baked pour and run it again with a nudged sub-seed, and
+  // every attempt starts from empty film. A thrown roll bakes exactly once and
+  // never reassigns either.
+  let sounds = []; // {time, strength, at, di}
+  let bodyDie = new Map(dice.map((d, i) => [d.body, i]));
   let simTime = 0;
   // THE BUDGET IS TEMPORAL, NOT JUST TOTAL (2026-08-09). The 400-event cap
   // alone is spent by the SPAWN CLUSTER: 20 dice interpenetrate on frame zero
@@ -2376,13 +2428,63 @@ function playRoll(roll) {
       });
     }
   };
-  for (const d of dice) d.body.addEventListener('collide', recordCollision);
+  // A poured die's body is not in the world yet, so it gets its listener when
+  // it EXITS (pourAdmit). A thrown die has been in the world since spawnDie.
+  if (!pouring) for (const d of dice) d.body.addEventListener('collide', recordCollision);
 
   const snapshot = (d) => ({
     pos: new THREE.Vector3().copy(d.body.position),
     quat: new THREE.Quaternion().copy(d.body.quaternion),
   });
-  const keyframes = dice.map((d) => [snapshot(d)]);
+  // The pose that goes on film. A poured die that is not yet a body is a
+  // SCRIPTED pose (falling down the shaft, or parked at the despawn line while
+  // it is behind the skin) — the same shape of record, so everything
+  // downstream, face correction included, cannot tell the difference.
+  const poseOf = (d) => (d.pourPose && !d.live
+    ? { pos: d.pourPose.pos.clone(), quat: d.pourPose.quat.clone() }
+    : snapshot(d));
+
+  // ---- THE POUR MACHINE (docs/TOWER.md) ----------------------------------
+  // Inert unless `pouring`; a thrown roll never enters any of it. Everything
+  // below is a function of towerVolumes() and a stream derived from roll.seed
+  // — no Date.now, no Math.random, no read of the model — so the same roll
+  // bakes the same film on every client, and a skin swap cannot touch it.
+  const tv = pouring ? towerVolumes() : null;
+  const POUR_E = new THREE.Euler();
+  const POUR_Q = new THREE.Quaternion();
+  const frameOf = (t) => Math.round(t / FIXED_DT);
+  let plan = null;       // the drawn pour, per die
+  let lastExit = 0;      // the ≥0.2 s exit stagger floor
+  let clunkQueue = [];   // {t, di, strength}: baffle knocks waiting on the film
+  let pourAttempt = 0;
+  let pourStranded = 0;  // dice the last resort had to set down by hand
+
+  // Draw the pour and reset every die to "waiting above the mouth". Attempt 0
+  // rides the roll's own seed; a re-bake rides a nudged sub-seed of it, which
+  // is still a pure function of (roll.seed, attempt).
+  const pourDraw = () => {
+    plan = pourPlan(dice, tv,
+      mulberry32((roll.seed ^ (0x7f4a7c15 * (pourAttempt + 1))) >>> 0));
+    lastExit = 0;
+    clunkQueue = [];
+    pourStranded = 0;
+    dice.forEach((d, i) => {
+      d.live = false;
+      d.pourPhase = 'wait';
+      d.rescues = 0;
+      d.bornAt = 0;
+      d.exitAt = 0;
+      d.pourVy = 0;
+      d.visSpans = [];   // frame ranges where the mesh may be SEEN
+      d.pourPose = {
+        pos: new THREE.Vector3(...plan[i].start),
+        quat: new THREE.Quaternion().setFromEuler(new THREE.Euler(...plan[i].rot0)),
+      };
+    });
+  };
+  if (pouring) pourDraw();
+
+  let keyframes = dice.map((d) => [poseOf(d)]);
 
   // Perf pass §0a (Commit A — per-die settle): each die freezes into a STATIC
   // mass-0 body the moment it lands clean, so a group of 40 dice no longer
@@ -2392,11 +2494,18 @@ function playRoll(roll) {
   // `kf[kf.length - 1]` is the final pose — face correction runs unchanged.
   // Cocked dice stay dynamic (their `stillTime` triggers the same nudge
   // branch); SETTLE_CAP is retained as last-resort safety at the group level.
-  dice.forEach((d) => {
+  // A closure, not a straight-line block, because the pour's exit guarantee
+  // may run the bake again and every one of these carries state from the
+  // attempt before it.
+  const resetSettleState = () => dice.forEach((d) => {
     d.stillTime = 0; d.frozen = false; d.frozenPose = null;
-    d.settleTime = null; d.settleTimedOut = false; d.lastMoveTime = 0;
+    d.settleTime = null; d.settleTimeOld = null;
+    d.settleTimedOut = false; d.lastMoveTime = 0;
+    d.endStill = false; d.endCocked = false; d.endPiled = false;
+    d.endY = null; d.endDot = null; d.endDisp = null;
     dispInit(d); dispRestart(d); // the terminator's boxes, anchored at spawn
   });
+  resetSettleState();
 
   // `timedOut` distinguishes the two ways a die stops being simulated, which
   // the TRUE settle frame below depends on: a clean landing earned its freeze
@@ -2456,9 +2565,140 @@ function playRoll(roll) {
     d.frozenPose = snapshot(d); // reused every subsequent step; no alloc
   };
 
+  // The die's body first exists HERE (§5) — a full unit inside the tower, in
+  // occluded interior, already tumbling at exit speed, so emergence reads as
+  // TRAVEL through the doorway rather than materialisation at the spout.
+  const pourAdmit = (d, i, t) => {
+    const ex = plan[i].exit;
+    // NO MUTEX — THE PILE IS THE MECHANISM (probe runs 1–8). Every
+    // wait-your-turn scheme deadlocked measurably, so an exit never waits: a
+    // die whose lane is occupied spawns ABOVE the occupants, capped under the
+    // lintel, and cascades off the pile. That is what a real tower's stream
+    // does to its own tray, and starvation becomes impossible.
+    let laneTop = 0;
+    for (const o of dice) {
+      if (o === d || !o.live) continue;
+      const p = o.body.position;
+      if (Math.abs(p.x - (tv.exit.p[0] + ex.x)) < 1.6
+        && p.z > tv.z0 - 1.6 && p.z < tv.z0 + 1.6) {
+        laneTop = Math.max(laneTop, p.y + 1.3);
+      }
+    }
+    const b = d.body;
+    b.position.set(tv.exit.p[0] + ex.x,
+      Math.min(Math.max(ex.y, laneTop + 1.4), tv.door.h - 1.3), tv.exit.p[2]);
+    const cp = Math.cos(ex.pitch), sp = Math.sin(ex.pitch);
+    b.velocity.set(Math.sin(ex.yaw) * cp * ex.speed, sp * ex.speed, Math.cos(ex.yaw) * cp * ex.speed);
+    b.angularVelocity.set(...ex.av);
+    b.quaternion.setFromEuler(...ex.rot);
+    world.addBody(b);
+    b.addEventListener('collide', recordCollision);
+    d.live = true;
+    d.pourPhase = 'live';
+    d.bornAt = t;
+    d.stillTime = 0;
+    d.lastMoveTime = t;
+    dispInit(d); dispRestart(d); // the terminator's boxes anchor at the EXIT
+    d.visSpans.push([frameOf(t), frameOf(t)]);
+  };
+
+  // The scripted half of the film: entry fall, despawn, hidden transit, exit.
+  // A falling die has NO BODY — that is the contract's guarantee that a model
+  // cannot deflect an entry — so this is analytic, integrated at the film's
+  // own 1/60 so what is baked and what is played can never drift.
+  const pourAdvance = (t) => {
+    const f = frameOf(t);
+    for (let i = 0; i < dice.length; i++) {
+      const d = dice[i], pl = plan[i];
+      if (d.pourPhase === 'wait') {
+        if (t < pl.entryAt) continue;
+        d.pourPhase = 'fall';
+        d.visSpans.push([f, f]);
+      }
+      if (d.pourPhase === 'fall') {
+        d.pourVy += GRAVITY * FIXED_DT;
+        d.pourPose.pos.y += d.pourVy * FIXED_DT;
+        POUR_E.set(pl.av0[0] * FIXED_DT, pl.av0[1] * FIXED_DT, pl.av0[2] * FIXED_DT);
+        d.pourPose.quat.multiply(POUR_Q.setFromEuler(POUR_E));
+        d.visSpans[d.visSpans.length - 1][1] = f;
+        if (d.pourPose.pos.y <= tv.despawnY) {
+          // Gone, in the cowl's shadow. The hidden window opens; nothing about
+          // this die is on film again until it comes back out.
+          d.pourPhase = 'hidden';
+          const exitAt = Math.max(t + pl.transit, lastExit + POUR.exitGap);
+          lastExit = exitAt;
+          d.exitAt = exitAt;
+          for (const c of pl.clunks) {
+            clunkQueue.push({ t: t + c.u * (exitAt - t), di: i, strength: c.strength });
+          }
+          clunkQueue.sort((a, b) => a.t - b.t);
+        }
+      }
+      if (d.pourPhase === 'hidden' && t >= d.exitAt) pourAdmit(d, i, t);
+    }
+  };
+
+  // THE EXIT GUARANTEE, layer 2 (docs/TOWER.md). A die that is LOST (out of
+  // bounds, under the floor, NaN) or STALLED in the skin-occluded zone — slow
+  // and old — stops being a body entirely and goes back into the hidden queue.
+  // A teleporting rescue deadlocked when its target was occupied; a die that
+  // does not exist cannot conflict with anything. With a skin on it reads as
+  // time on a baffle.
+  const pourWatchdog = (t) => {
+    const f = frameOf(t);
+    for (const d of dice) {
+      if (!d.live || d.frozen || d.rescues >= 20) continue;
+      const p = d.body.position;
+      const lost = !isFinite(p.x + p.y + p.z) || p.y < -0.5
+        || Math.abs(p.x) > TABLE_W / 2 + 2 || Math.abs(p.z) > TABLE_D / 2 + 6;
+      const stalled = t - d.bornAt > 1.2 && p.z < tv.z0 + 1.1
+        && d.body.velocity.length() < 0.8;
+      if (!lost && !stalled) continue;
+      world.removeBody(d.body);
+      d.body.removeEventListener('collide', recordCollision);
+      d.live = false;
+      d.pourPhase = 'hidden';
+      d.rescues++;
+      d.exitAt = t + 0.5;
+      lastExit = Math.max(lastExit, d.exitAt);
+      // Park the film pose somewhere finite and inside the tower: a rescued
+      // die may be at NaN, and a NaN keyframe poisons every read downstream.
+      if (isFinite(p.x + p.y + p.z)) d.pourPose.quat.copy(d.body.quaternion);
+      d.pourPose.pos.set(tv.shaft.c[0], tv.despawnY, tv.shaft.c[2]);
+      d.visSpans[d.visSpans.length - 1][1] = f - 1; // it went back behind the skin
+    }
+  };
+
+  // Synthetic baffle knocks, pushed into the SAME array real impacts use, so
+  // the existing film-time click gate voices them with no new machinery.
+  // `at: null` on purpose — a clunk is a sound, not a place: no particle
+  // burst, no felt mark, no shock ring inside a tower nobody can see into.
+  // `clunk` tags them so a per-skin sound palette can give them their own
+  // voice and volume later without having to guess which events were real.
+  const pourClunks = (t) => {
+    while (clunkQueue.length && clunkQueue[0].t <= t) {
+      const c = clunkQueue.shift();
+      if (sounds.length < 400) {
+        sounds.push({ time: t, strength: c.strength, at: null, di: c.di, clunk: 'baffle' });
+      }
+    }
+  };
+
   let nudges = 0;
+  // The pour's clock is longer than a throw's BY CONSTRUCTION — entries are
+  // staggered, transits are hidden time, and exits are ≥0.2 s apart — so the
+  // cap adds exactly those. A pour is then judged by the same "how long after
+  // the dice stop" bar a throw is, rather than by a cap it would trip on the
+  // ceremony of arriving.
+  const capOf = () => (pouring
+    ? SETTLE_CAP + plan[plan.length - 1].entryAt + POUR.transitMax
+      + dice.length * POUR.exitGap
+    : SETTLE_CAP);
+  let settleCap = capOf();
+  const bakeLoop = () => {
   for (;;) {
     stepContacts = 0; // the per-step contact budget refills; see the recorder
+    if (pouring) pourAdvance(simTime + FIXED_DT);
     // Speed-gated damping (DAMPGATE, off by default): the ONE place dice are
     // advanced, so gating here gates the whole app. Frozen dice are STATIC
     // and their damping is meaningless; skip them.
@@ -2470,15 +2710,24 @@ function playRoll(roll) {
         d.body.angularDamping = slow ? DAMPGATE.slowAngular : PHYS.angularDamping;
       }
     }
-    world.step(FIXED_DT);
+    // SIM STEPS NEAR THE TOWER RUN AT 120 Hz (docs/TOWER.md §2): at exit speed
+    // a die covers ~0.33 of a unit per 60 Hz step, and the thin first ramp let
+    // dice pass straight through it and vanish underneath. Two explicit half
+    // steps rather than cannon's accumulator form — the film stays exactly one
+    // keyframe per 1/60, and a one-arg step leaves no hidden state behind for
+    // the next roll to inherit.
+    if (pouring) { world.step(FIXED_DT / 2); world.step(FIXED_DT / 2); }
+    else world.step(FIXED_DT);
     simTime += FIXED_DT;
+    if (pouring) pourWatchdog(simTime);
 
     // Per-die stillness accumulator + freeze test. Thresholds match the old
     // group predicate verbatim (do NOT tune here). Cocked dice never freeze —
     // they stay dynamic until the nudge branch below lands them clean or
-    // SETTLE_CAP fires.
+    // SETTLE_CAP fires. A poured die that has not exited yet has no body at
+    // all, so there is nothing here for it to be judged on.
     for (const d of dice) {
-      if (d.frozen) continue;
+      if (d.frozen || (pouring && !d.live)) continue;
       // Grow the boxes FIRST and unconditionally: in `velocity` mode this is a
       // pure observation feeding `endDisp`, in `displacement` mode it is the
       // predicate itself. Either way it reads position and quaternion and
@@ -2517,14 +2766,32 @@ function playRoll(roll) {
         // early turns it STATIC and changes what its neighbours bounce off,
         // so extending this would alter every shipped throw.
         const piled = nudges < NUDGE.budget && piledHigh(d);
-        if (!cocked && !piled) freezeInPlace(d);
+        // THE INTERIOR CANNOT HOLD A DIE (docs/TOWER.md, exit guarantee layer
+        // 2). A poured die that goes still inside the skin's shadow is REFUSED
+        // the freeze, unconditionally — otherwise it retires at SETTLE_STILL
+        // (0.45 s), which is BEFORE the watchdog's 1.2 s stalled bar, and the
+        // rescue that exists for exactly this die never gets to run. Measured
+        // the day the pour shipped: a 40d6 bake spent all five attempts with
+        // one die frozen 0.11 units past the doorway, rescued eight times and
+        // then quietly retired on the ninth.
+        const buried = pouring && d.body.position.z < tv.z0 + POUR.hidZone;
+        if (!cocked && !piled && !buried) freezeInPlace(d);
       }
     }
 
-    dice.forEach((d, i) => keyframes[i].push(d.frozen ? d.frozenPose : snapshot(d)));
+    // `poseOf` is `snapshot` for every die of a thrown roll; on a pour it is
+    // the scripted pose while the die is not a body yet.
+    const kfIdx = keyframes[0].length;
+    dice.forEach((d, i) => {
+      keyframes[i].push(d.frozen ? d.frozenPose : poseOf(d));
+      if (pouring && d.live) d.visSpans[d.visSpans.length - 1][1] = kfIdx;
+    });
+    if (pouring) pourClunks(simTime);
 
+    // A poured die that has not exited is never frozen, so it holds the roll
+    // open exactly as an airborne one does.
     const allSettled = dice.every((d) => d.frozen);
-    if (!allSettled && simTime < SETTLE_CAP) {
+    if (!allSettled && simTime < settleCap) {
       // Nudge cocked dice that have accumulated enough stillTime to be judged
       // stuck. Frozen bodies are STATIC — filter them out (waking a static is
       // a no-op at best, a determinism hazard at worst).
@@ -2550,6 +2817,17 @@ function playRoll(roll) {
       }
       continue;
     }
+    // The cap fired with a die still behind the skin — the pour ran out of
+    // clock before it ran out of dice. Set it down on the felt just outside
+    // the doorway: shipping a die nobody can see is the one thing the exit
+    // guarantee forbids, and this attempt is about to be scored BAD and
+    // re-baked anyway (layer 3).
+    if (pouring) {
+      for (let i = 0; i < dice.length; i++) {
+        const d = dice[i];
+        if (!d.live || d.body.position.z < tv.z0 + POUR.hidZone) pourStrand(d, i);
+      }
+    }
     // SETTLE_CAP fired with dice still dynamic → force-freeze so the block
     // below has a stable pose to correct. Same STATIC/mass=0 transition the
     // clean-landing branch uses; face correction rotates each to its
@@ -2557,7 +2835,146 @@ function playRoll(roll) {
     for (const d of dice) if (!d.frozen) freezeInPlace(d, true);
     break;
   }
-  for (const d of dice) d.body.removeEventListener('collide', recordCollision);
+  };
+
+  // The landing record, read off whatever attempt is being scored. Extracted
+  // from below so the pour can snapshot it PER ATTEMPT — the die objects carry
+  // this state and a re-bake overwrites it.
+  const makeLandings = (lastF) => dice.map((d, i) => ({
+    i,
+    frame: Math.min(lastF, Math.max(0, Math.round((d.settleTime ?? simTime) / FIXED_DT))),
+    time: d.settleTime ?? simTime,
+    timedOut: !!d.settleTimedOut,
+    timeOld: d.settleTimeOld ?? d.settleTime ?? simTime,
+    endStill: !!d.endStill,
+    endCocked: !!d.endCocked,
+    endY: d.endY ?? null,
+    endDot: d.endDot ?? null,
+    endPiled: !!d.endPiled,
+    endDisp: d.endDisp ?? null,
+  }));
+
+  // Last resort, and it never runs on a bake that ships clean: the cap fired
+  // with a die still inside the tower, so put it down on the felt in front of
+  // the doorway. The FILM's last frame is overwritten too — the film is what
+  // the player sees and what face correction reads, so moving only the body
+  // would set the die down in physics and leave it in the wall on screen.
+  function pourStrand(d, i) {
+    const def = DIE_DEFS[d.type];
+    const r = def.radius || def.size * 0.87;
+    d.body.position.set(tv.exit.p[0] + plan[i].exit.x, r + 0.02, tv.z0 + 1.4);
+    d.body.velocity.setZero();
+    d.body.angularVelocity.setZero();
+    pourStranded++;
+    // THE TAIL CUT MUST NOT EAT THE RESCUE. `lastMoveTime` is what
+    // freezeInPlace credits a timed-out die with, and it is what decides where
+    // the film is truncated — leave it at the die's last real motion and the
+    // cut throws away the very frame this function just fixed, putting the die
+    // back inside the tower on screen while the body sits on the felt.
+    // (Measured: one 8d6 pour in twelve shipped exactly that.)
+    d.lastMoveTime = simTime;
+    if (!d.live) {
+      world.addBody(d.body);
+      d.body.addEventListener('collide', recordCollision);
+      d.live = true;
+      d.visSpans.push([frameOf(simTime), frameOf(simTime)]);
+    }
+    const kf = keyframes[i];
+    kf[kf.length - 1] = {
+      pos: new THREE.Vector3().copy(d.body.position),
+      quat: new THREE.Quaternion().copy(d.body.quaternion),
+    };
+  }
+
+  // How many dice this bake would leave WHERE THE PLAYER CANNOT SEE THEM.
+  // Read off the film's last frame, not off the bodies: the film is what ships.
+  const pourBadCount = () => {
+    let n = 0;
+    for (let i = 0; i < dice.length; i++) {
+      const kf = keyframes[i];
+      const p = kf[kf.length - 1].pos;
+      const finite = isFinite(p.x + p.y + p.z);
+      if (!finite || p.z < tv.z0 + POUR.hidZone || p.y < -0.5 || p.y > 14
+        || Math.abs(p.x) > TABLE_W / 2 + 1 || Math.abs(p.z) > TABLE_D / 2 + 1) n++;
+    }
+    return n;
+  };
+
+  // Wind the world back to before this attempt: every body out, a fresh body
+  // per die (one that has been simulated and frozen is not a clean slate), and
+  // empty film. Add order on the next attempt is unchanged, so the body list
+  // cannot drift between clients across a differing number of attempts.
+  const pourRewind = () => {
+    for (const d of dice) {
+      if (d.live) {
+        d.body.removeEventListener('collide', recordCollision);
+        world.removeBody(d.body);
+      }
+      d.live = false;
+      d.frozen = false;
+      d.body = pourBody(d.type);
+    }
+    bodyDie = new Map(dice.map((d, i) => [d.body, i]));
+    sounds = [];
+    simTime = 0;
+    nudges = 0;
+  };
+
+  // THE BAKE IS THE LAST BACKSTOP (docs/TOWER.md, exit guarantee layer 3). The
+  // lab has to cope live; the product bakes offline, before frame one, so a
+  // pour that ends with any die hidden or out of bounds is simply DISCARDED
+  // and rolled again on a nudged sub-seed. The one lab failure class — a
+  // heavy-congestion seed leaving a die creeping behind the door — is solved
+  // by construction here. Deterministic: the attempt count is a function of
+  // the seed and the table, so every client discards the same bakes.
+  let pourBest = null;
+  if (!pouring) bakeLoop();
+  else {
+    for (;;) {
+      bakeLoop();
+      // A STRAND COUNTS AS A FAULT. It leaves no die hidden — that is its
+      // whole job — so `bad` alone would score the attempt perfect and ship a
+      // teleport. Scoring on bad + stranded means the re-bake is always
+      // preferred to the last resort, and the last resort only ships when
+      // every attempt needed one.
+      const bad = pourBadCount();
+      const fault = bad + pourStranded;
+      const film = {
+        bad, fault, stranded: pourStranded, attempt: pourAttempt,
+        keyframes, sounds, simTime, nudges,
+        landings: makeLandings(keyframes[0].length - 1),
+        spans: dice.map((d) => d.visSpans),
+        rescues: dice.reduce((a, d) => a + d.rescues, 0),
+      };
+      if (!pourBest || fault < pourBest.fault) pourBest = film;
+      pourRewind();
+      if (fault === 0 || pourAttempt >= POUR.attempts - 1) break;
+      pourAttempt++;
+      pourDraw();
+      resetSettleState();
+      keyframes = dice.map((d) => [poseOf(d)]);
+      settleCap = capOf();
+    }
+    keyframes = pourBest.keyframes;
+    sounds = pourBest.sounds;
+    simTime = pourBest.simTime;
+    nudges = pourBest.nudges;
+    dice.forEach((d, i) => { d.visSpans = pourBest.spans[i]; });
+    if (pourBest.fault > 0) {
+      // Every re-bake spent and a die is still hidden. Ship the best one — a
+      // roll must always resolve — and SAY SO: js/report.js is the only
+      // channel the field has, and a silent degradation here is exactly the
+      // green check that masks a broken thing.
+      console.warn(`tower pour: ${pourBest.bad} unseen + ${pourBest.stranded} `
+        + `set down by hand after ${POUR.attempts} bakes `
+        + `(seed ${roll.seed >>> 0}, ${dice.length} dice)`);
+    }
+    // The chosen film's bodies are gone with the rewind. Hand each die a clean
+    // one and put it in the world: the block below turns them STATIC at the
+    // corrected final pose, which is all a body is for once a roll is baked.
+    for (const d of dice) world.addBody(d.body);
+  }
+  if (!pouring) for (const d of dice) d.body.removeEventListener('collide', recordCollision);
 
   // --- the TRUE settle frame ----------------------------------------------
   // `stillTime` accrues for SETTLE_STILL (0.45 s = 28 frames, not 27 — see
@@ -2577,19 +2994,7 @@ function playRoll(roll) {
   // wants to hold on the deciding die can decline to fire on a pool that
   // merely ran out of clock rather than resolving.
   const lastFrame = keyframes[0].length - 1;
-  const landings = dice.map((d, i) => ({
-    i,
-    frame: Math.min(lastFrame, Math.max(0, Math.round((d.settleTime ?? simTime) / FIXED_DT))),
-    time: d.settleTime ?? simTime,
-    timedOut: !!d.settleTimedOut,
-    timeOld: d.settleTimeOld ?? d.settleTime ?? simTime,
-    endStill: !!d.endStill,
-    endCocked: !!d.endCocked,
-    endY: d.endY ?? null,
-    endDot: d.endDot ?? null,
-    endPiled: !!d.endPiled,
-    endDisp: d.endDisp ?? null,
-  }));
+  const landings = pourBest ? pourBest.landings : makeLandings(lastFrame);
   // reduce, not sort: ties keep the FIRST (lowest index) by construction.
   const lastLanding = landings.reduce((a, b) => (b.frame > a.frame ? b : a), landings[0]);
   // Cut the dead tail. This USED to be justified by frozen dice pushing
@@ -2614,6 +3019,35 @@ function playRoll(roll) {
   const simFrames = keyframes[0].length - 1;
   for (const kf of keyframes) kf.length = motionFrames + 1;
   for (const l of landings) l.frame = Math.min(l.frame, motionFrames);
+  // The pour's visibility spans are frame indices into the same film, so the
+  // cut applies to them too — and the LAST span is reopened to the final
+  // frame, because whatever the tail cut removed, the die is on the felt for
+  // every frame the player still sees.
+  let pourFilm = null;
+  if (pouring) {
+    const spans = dice.map((d) => {
+      const keep = d.visSpans
+        .filter((s) => s[0] <= motionFrames)
+        .map((s) => [s[0], Math.min(s[1], motionFrames)]);
+      if (keep.length) keep[keep.length - 1][1] = motionFrames;
+      else keep.push([0, motionFrames]); // never leave a die with no way to show
+      return keep;
+    });
+    // Act two's cue (see towerCamTo): the FIRST frame any die is back in the
+    // room. The camera leads the dice onto the felt rather than following them.
+    let firstExit = motionFrames;
+    for (const s of spans) if (s.length > 1) firstExit = Math.min(firstExit, s[1][0]);
+    pourFilm = {
+      tower: currentTower,
+      spans,
+      firstExitTime: firstExit * FIXED_DT,
+      attempts: pourAttempt + 1,
+      unseen: pourBest.bad,
+      stranded: pourBest.stranded,
+      rescues: pourBest.rescues,
+      clunks: sounds.filter((s) => s.clunk).length,
+    };
+  }
 
   // --- face correction: body-frame pre-rotation R per die ------------------
   // qF = final body orientation. u_body = qF^-1 * up (landed "up" in body
@@ -2664,6 +3098,9 @@ function playRoll(roll) {
   dice.forEach((d, i) => {
     d.mesh.position.copy(keyframes[i][0].pos);
     d.mesh.quaternion.copy(keyframes[i][0].quat).multiply(d.correction);
+    // On a pour, frame zero is BEFORE this die was dropped for all but the
+    // first: it has not entered the room yet, so it is not in it.
+    if (pourFilm) d.mesh.visible = pourVisibleAt(pourFilm.spans[i], 0);
   });
 
   // Level 5: a ring set's shock wave fires ONCE, from the roll's hardest
@@ -2739,8 +3176,12 @@ function playRoll(roll) {
     // Where the tumble ends, off the baked film — see TEMPO. Computed here so
     // it is decided once, from bytes every client agrees on, rather than
     // re-derived per frame against a live threshold a tool may have moved.
-    tempoAnchor: tempoAnchorOf(keyframes, TEMPO.anchorSpeed),
+    tempoAnchor: tempoAnchorOf(keyframes, TEMPO.anchorSpeed, pourFilm && pourFilm.spans),
     tempoAnchorSpeed: TEMPO.anchorSpeed,
+    // The tower's film (docs/TOWER.md) — null on every thrown roll, and the
+    // ONE thing playback reads to know a die is behind the skin.
+    pour: pourFilm,
+    pourCamDone: false,
     soundIdx: 0,
     // Film time of the last impact that was actually VOICED — the CLICKGATE
     // cursor. -Infinity so the first impact of every roll always passes.
@@ -2751,12 +3192,24 @@ function playRoll(roll) {
     done: false,
   };
 
+  // Act one of the pour's camera: look at the thing the dice are about to
+  // vanish into. Act two is cued off the film's first exit, in stepPlayback.
+  if (pourFilm) towerCamTo('tower');
+
   // Roll moments (UX §2): a Check/Cinematic attachment stages the playback.
   // Held rolls keep their FULL ceremony (goal 11): the stakes — declaration,
   // dice, dc — are public; only the result is hidden, so the verdict card
   // shows the held state (+ Reveal for the authority) instead of downgrading
   // the whole roll to Plain.
   if (currentRoll.exp) beginCeremony(currentRoll);
+}
+
+// Is this die in the room at film frame `f`? Spans are [from, to] frame
+// ranges, in order, few per die (one per emergence — two on a clean pour, one
+// more per watchdog rescue).
+function pourVisibleAt(spans, f) {
+  for (let k = 0; k < spans.length; k++) if (f >= spans[k][0] && f <= spans[k][1]) return true;
+  return false;
 }
 
 // Solo path: compose locally with the same shared mechanics the server uses
@@ -2878,6 +3331,13 @@ function stepPlayback(dt, tempo = 1, curve = false) {
 
   const dArr = roll.dice;
   const kfs = roll.keyframes;
+  // The pour's hidden windows (docs/TOWER.md §4): while a die is inside the
+  // tower it has no keyframes worth showing and the model is opaque anyway —
+  // but "anyway" is not a guarantee, and the contract's is. Playback hides the
+  // mesh outright, so a die is invisible in the shaft whatever a model does or
+  // fails to do. `roll.pour` is null on every thrown roll and this costs one
+  // property read.
+  const spans = roll.pour ? roll.pour.spans : null;
   for (let di = 0; di < dArr.length; di++) {
     const kf = kfs[di];
     const a = kf[i0];
@@ -2885,6 +3345,14 @@ function stepPlayback(dt, tempo = 1, curve = false) {
     const d = dArr[di];
     d.mesh.position.copy(a.pos).lerp(b.pos, frac);
     d.mesh.quaternion.copy(a.quat).slerp(b.quat, frac).multiply(d.correction);
+    if (spans) d.mesh.visible = pourVisibleAt(spans[di], i0);
+  }
+  // Act two of the pour's camera, cued at the FIRST exit rather than the last
+  // (Joe): the camera leads the dice onto the felt and is already looking down
+  // by the time the spread lands. Fires once per roll.
+  if (roll.pour && !roll.pourCamDone && roll.time >= roll.pour.firstExitTime) {
+    roll.pourCamDone = true;
+    towerCamTo('table');
   }
 
   // Impact drain: sounds and (for a themed roll) the set's particle bursts
@@ -2934,6 +3402,10 @@ function stepPlayback(dt, tempo = 1, curve = false) {
     for (const d of roll.dice) {
       d.mesh.position.copy(d.finalPos);
       d.mesh.quaternion.copy(d.finalQuat);
+      // The film is over: every die is on the felt, and none of them is
+      // allowed to end a roll invisible whatever its spans said (the exit
+      // guarantee, made unconditional at the one frame that outlives playback).
+      d.mesh.visible = true;
     }
     if (cer) {
       ceremonyEnterSettle(roll);
@@ -5798,6 +6270,83 @@ function towerSocket(id) {
   return currentTower;
 }
 
+// ---------------------------------------------------------------------------
+// THE POUR — the tower's film (docs/TOWER.md §3, §5, §6)
+//
+// A tower roll is baked as a POUR instead of a throw. The numbers here are the
+// contract's, and the LAB's dialed values are the same numbers: TOWERLAB.tune
+// is a live knob for experiments and this is what ships, so an experiment can
+// never change somebody else's roll.
+const POUR = {
+  stagMin: 0.12, stagMax: 0.20,      // entries pour, 0.12–0.2 s apart (§6)
+  transitMin: 0.5, transitMax: 1.6,  // hidden time behind the skin (§6)
+  exitGap: 0.2,                      // exits never closer than this (§6)
+  speedMin: 24, speedMax: 34,        // exit speed — the rolling-exit dial
+  yawSpan: Math.PI / 7.5,            // ±12°: chutes throw straight (§5)
+  pitchSpan: Math.PI / 30,           // ±3° about the chute's own slope (§5)
+  laneSpan: 1.8,                     // ±0.9 lane spread (probe run 1)
+  clunkMin: 2, clunkMax: 4,          // baffle knocks per die, in the dark (§6)
+  attempts: 5,                       // exit-guarantee re-bakes before shipping
+  hidZone: 0.6,                      // resting z < z0 + this counts as HIDDEN
+};
+
+// Draw a whole pour up front, in die order, from ONE seeded stream. Every
+// per-die quantity the film needs — when it is dropped, how it tumbles, how
+// long it is gone, how it leaves — is decided here and never again, so a bake
+// is a pure function of (seed, attempt) and replays byte-for-byte.
+function pourPlan(dice, v, prng) {
+  const plan = [];
+  const ath = -v.exit.pitch;
+  let entryAt = 0;
+  for (let i = 0; i < dice.length; i++) {
+    // Stagger by TIME, not height (§6): equal height gaps compress to ~50 ms
+    // arrival gaps at terminal speed, and the first lab cut exited all at once.
+    entryAt += i === 0 ? 0 : POUR.stagMin + prng() * (POUR.stagMax - POUR.stagMin);
+    const start = [
+      v.aim.c[0] + (prng() - 0.5) * 0.8,
+      v.aim.c[1] + prng() * 0.8,
+      v.aim.c[2] + (prng() - 0.5) * 0.8,
+    ];
+    const rot0 = [prng() * 6.28, prng() * 6.28, prng() * 6.28];
+    const av0 = [(prng() - 0.5) * 8, (prng() - 0.5) * 8, (prng() - 0.5) * 8];
+    const transit = POUR.transitMin + prng() * (POUR.transitMax - POUR.transitMin);
+    const def = DIE_DEFS[dice[i].type];
+    const r = def.radius || def.size * 0.87;
+    const speed = POUR.speedMin + prng() * (POUR.speedMax - POUR.speedMin);
+    const yaw = (prng() - 0.5) * POUR.yawSpan;
+    // GRAZE HEIGHT, per die (probe run 9): the chute surface runs under the
+    // spawn itself, so the height is surface + one radius normal to the slope
+    // + margin. One formula clears a d20 and a d4 alike; a fixed height cannot,
+    // because the radius moves the answer by more than the margin.
+    const surfY = 0.8 * v.S + (v.z0 - v.exit.p[2]) * Math.tan(ath);
+    const exit = {
+      x: (prng() - 0.5) * POUR.laneSpan,
+      y: surfY + r / Math.cos(ath) + 0.2,
+      speed, yaw,
+      pitch: v.exit.pitch + (prng() - 0.5) * POUR.pitchSpan,
+      // ROLLING EXIT (Joe, eleventh look): ω = v/r about the horizontal axis
+      // perpendicular to travel, tilted with the yaw, tumble jitter on top. A
+      // die SLIDING on felt is savaged by kinetic friction; a die ROLLING at
+      // matched spin barely feels it. This is the carry mechanism, not décor.
+      av: [
+        (speed / r) * Math.cos(yaw) + (prng() - 0.5) * 10,
+        (prng() - 0.5) * 10,
+        -(speed / r) * Math.sin(yaw) + (prng() - 0.5) * 10,
+      ],
+      rot: [prng() * 6.28, prng() * 6.28, prng() * 6.28],
+    };
+    // 2–4 knocks, at seeded fractions of this die's own hidden window. `u` is
+    // kept inside [0.1, 0.9] so a clunk never lands on the despawn or the exit
+    // frame, where it would read as the die hitting something visible.
+    const n = POUR.clunkMin + ((prng() * (POUR.clunkMax - POUR.clunkMin + 1)) | 0);
+    const clunks = [];
+    for (let c = 0; c < n; c++) clunks.push({ u: 0.1 + prng() * 0.8, strength: 3.5 + prng() * 5 });
+    clunks.sort((a, b) => a.u - b.u);
+    plan.push({ entryAt, start, rot0, av0, transit, exit, clunks });
+  }
+  return plan;
+}
+
 // Pour n dice through the contract. Seeded so a look can be repeated; every
 // die's exit (transit, jitter, speed, yaw, pitch, spin) is drawn up front.
 function towerLabDrop(n = 8, seed = 42) {
@@ -5894,9 +6443,22 @@ function towerLabDrop(n = 8, seed = 42) {
 // actually looks at the thing dice are vanishing into. 'table': hand the
 // camera back to the framing ladder (its own ease). Both moves ride the
 // existing camEase rig, so holdClock freezes them like everything else.
+// RULING ① IS AMENDED FOR TOWER ROLLS (see CAM_EASE_S). The ruling — "the
+// camera moves only under a quiet picture, never through the tumble" — was
+// written when a throw was the only way dice arrive, and its purpose is that
+// the player is never asked to track motion with a moving frame. A pour
+// inverts the premise: the interesting thing is a PLACE (the tower's mouth)
+// and then, a beat later, a different place (the felt). Both acts ease, both
+// ride the existing camEase rig, and both are refused outright under
+// prefers-reduced-motion — under which the framing ladder alone decides the
+// eye, exactly as it does for a throw.
 function towerCamTo(phase) {
   const v = towerVolumes();
   TOWERLAB.camPhase = phase;
+  if (prefersReducedMotion()) {
+    if (phase !== 'tower') applyCameraFraming(false);
+    return;
+  }
   if (phase === 'tower') {
     camEase = {
       t: 0,
@@ -6497,6 +7059,49 @@ window.__diceDebug = {
       name: b.labName,
       p: [b.position.x, b.position.y, b.position.z].map((n) => Number(n.toFixed(3))),
     }));
+  },
+  // THE POUR, as the film records it (docs/TOWER.md §3). Everything a
+  // scenario needs to prove a roll actually went THROUGH a tower rather than
+  // being thrown with a model standing behind it: the per-die hidden windows,
+  // the baffle clunks, how many bakes the exit guarantee spent, and where each
+  // die ended up relative to the hidden zone.
+  towerFilmInfo() {
+    const r = currentRoll;
+    if (!r) return null;
+    const p = r.pour;
+    const z0 = -TABLE_D / 2;
+    const rest = r.dice.map((d, i) => {
+      const kf = r.keyframes[i];
+      const q = kf[kf.length - 1].pos;
+      return {
+        i, type: d.type,
+        p: [q.x, q.y, q.z].map((n) => Number(n.toFixed(3))),
+        delivered: q.z >= z0 + POUR.hidZone && Math.abs(q.x) <= TABLE_W / 2 + 1
+          && Math.abs(q.z) <= TABLE_D / 2 + 1 && q.y >= -0.5,
+      };
+    });
+    return {
+      tower: currentTower,
+      pour: !!p,
+      z0, hidZone: POUR.hidZone,
+      frames: r.frames, duration: r.duration, seed: r.seed,
+      clunks: r.sounds.filter((s) => s.clunk).length,
+      impacts: r.sounds.length,
+      attempts: p ? p.attempts : 0,
+      unseen: p ? p.unseen : 0,
+      stranded: p ? p.stranded : 0,
+      rescues: p ? p.rescues : 0,
+      firstExitTime: p ? p.firstExitTime : null,
+      // Per die: [start, end] frame of every window in which it was BEHIND the
+      // skin. A pour with no hidden windows is a throw with scenery.
+      hidden: p ? p.spans.map((s) => {
+        const gaps = [];
+        for (let k = 1; k < s.length; k++) gaps.push([s[k - 1][1] + 1, s[k][0] - 1]);
+        return gaps;
+      }) : null,
+      spans: p ? p.spans : null,
+      rest,
+    };
   },
   wallPositions() {
     return {
@@ -14877,6 +15482,17 @@ function computeFraming() {
 
 // Ease, never cut, and only under a quiet picture — ruling ① permits the
 // camera to move once the roll has stopped, never through the tumble.
+//
+// AMENDED FOR TOWER ROLLS (docs/TOWER.md, shipped 2026-08-12). A pour has two
+// camera acts DURING playback: a low frontal tower eye when the film starts,
+// and the framing ladder handed back at the film's first exit. The ruling's
+// reason is that a player should never have to track motion with a moving
+// frame — and a pour's first second is dice falling into a fixed PLACE, not
+// dice spreading across the felt, so the frame that shows it is the still one.
+// The amendment is narrow and its boundaries are the guarantee: the two acts
+// are the ONLY camera moves a tower roll makes, both ease over CAM_EASE_S,
+// both are refused under prefers-reduced-motion, and a thrown roll is
+// untouched. See towerCamTo.
 const CAM_EASE_S = 0.42;
 
 function applyFramingPose(pose, animate) {
