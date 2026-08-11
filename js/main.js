@@ -5435,7 +5435,10 @@ function towerVolumes() {
     // ≈ 1.84 of half-width. Door 4.0 leaves 0.16. The first cut (door 3.0,
     // yaw ±30°, jitter ±0.6) needed ≈2.5 — dice clipped the jambs and came
     // to rest behind the wall.
-    exit:    { p: [0, 2.0 * S, z0 - 0.9 * S] },
+    // Spawn height 2.3 is sill arithmetic: launching parallel to the slope
+    // (pitch −28°), the die drops 0.6 crossing to the sill — 2.3·S puts a
+    // d20's bottom exactly at sill height there, grazing, never clipping.
+    exit:    { p: [0, 2.3 * S, z0 - 0.9 * S], pitch: -ath },
     door:    { w: 4.0 * S, h: 3.6 * S },
   };
 }
@@ -5597,7 +5600,12 @@ function towerLabDrop(n = 8, seed = 42) {
         x: (rng() - 0.5) * 0.8,
         speed: 14 + rng() * 6,
         yaw: (rng() - 0.5) * (Math.PI / 7.5),    // ±12° — chutes throw straight
-        pitch: -rng() * (Math.PI / 18),          // 0..−10°
+        // Pitch rides the SLOPE (seventh look): horizontal launches fell
+        // ~2 units under g=-110 and arrived nearly vertical at ~20 u/s —
+        // the normal impulse plus its friction bite ate the forward motion
+        // in one contact, and the pour jammed at its own doorstep. Parallel
+        // to the chute, first contact is a graze and the speed survives.
+        pitch: v.exit.pitch + (rng() - 0.5) * (Math.PI / 30), // slope ± 3°
         av: [(rng() - 0.5) * 40, (rng() - 0.5) * 40, (rng() - 0.5) * 40],
         rot: [rng() * 6.28, rng() * 6.28, rng() * 6.28],
       },
@@ -5682,7 +5690,9 @@ function stepTowerLab(dt) {
       if (o.rescues < 3 && (lost || stalled) && !towerDoorBlocked(v, o)) {
         o.rescues += 1;
         o.body.position.set(v.exit.p[0], v.exit.p[1], v.exit.p[2]);
-        o.body.velocity.set(0, 0, o.exit.speed);
+        o.body.velocity.set(0,
+          Math.sin(v.exit.pitch) * o.exit.speed,
+          Math.cos(v.exit.pitch) * o.exit.speed);
         o.body.angularVelocity.set(...o.exit.av);
         o.bornAt = TOWERLAB.t;
       }

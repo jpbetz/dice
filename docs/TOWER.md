@@ -89,8 +89,15 @@ the hand on a normal roll); 9–15 stalled on the ramp, 6–11 read as
 dribbling — yaw within ±12° of +z (chutes throw straight; ±30°
 clipped the door jambs — clearance is radius arithmetic: 0.4 jitter +
 tan 12°·0.9 travel + 1.25 d20 radius ≈ 1.84 against the door's 2.0),
-pitch 0° to −10°. The die dips, lands on the apron tray, and skips off
-the step onto the felt.
+pitch PARALLEL TO THE CHUTE: −28° ± 3° (seventh look — horizontal
+launches fell ~2 units under g=−110 and arrived nearly vertical at
+~20 u/s; the normal impulse plus its friction bite ate the forward
+motion in one contact, and the pour jammed at its own doorstep; grazing
+the slope, the speed survives). Spawn height is sill arithmetic: at
+slope pitch the die drops 0.6 crossing to the sill, so base y 2.3 puts a
+d20's bottom exactly at sill height there. The die rides the chute and
+leaves its end at a shallow angle that skips across the felt — the felt
+itself is the shared table physics and is never retuned for the tower.
 
 **The EXIT GUARANTEE (second and fifth lab looks):** a die may never rest
 hidden and may never be lost. The SPAWN REGION is a MUTEX — an exit is
