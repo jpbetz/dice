@@ -12795,6 +12795,14 @@ function tryFlushZoom() {
 function applyZoom(level) {
   const p = ZOOM_PRESETS[level];
   if (!p) return;
+  // A zoom assigns TABLE_D from the preset, which silently discarded the
+  // tower lab's matExtra and left the model stranded behind the wrong wall
+  // (found by the skin build's shots step). Unsocket across the change and
+  // re-socket after: the mat extension, ghost volumes, skin and lab world
+  // all rebuild against the new preset. Lab dice are cleared — a zoom
+  // mid-experiment is already a reset in spirit.
+  const towerWasOn = TOWERLAB.on;
+  if (towerWasOn) towerLabSet(false);
   TABLE_W = p.w;
   TABLE_D = p.d;
   // Move the wall bodies in place (no remove/add — SAP body-order matters).
@@ -12810,6 +12818,7 @@ function applyZoom(level) {
   // shelf has no slot pitch to re-derive and the felt no glow rings to
   // redraw, so a zoom is now: walls, shadow frustum, camera.
   refitView();         // camera framing + particle/post + chip anchors
+  if (towerWasOn) towerLabSet(true);
 }
 
 // Apply a full merged settings object (join response, hello, settings-changed
