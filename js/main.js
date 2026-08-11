@@ -5523,9 +5523,13 @@ function towerLabWorld() {
   boxAt(wallMat, [-(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
   boxAt(wallMat, [(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
   boxAt(wallMat, [0, v.door.h + (22 - v.door.h) / 2, z0 - 0.3], [dw, (22 - v.door.h) / 2, 0.3]);
-  // The apron RAMP dice land on and roll down — floor physics (restitution
-  // 0.35), not wall physics (0.7, which trampolines).
-  const apron = new CANNON.Body({ mass: 0, material: floorMat,
+  // The apron RAMP is a SLICK CHUTE — its own material, near-zero friction
+  // (a polished slide, not felt): at 28° with felt friction (0.25) dice
+  // stalled on the slope instead of delivering. Restitution stays low so
+  // the first touchdown doesn't trampoline.
+  const rampMat = new CANNON.Material('towerRamp');
+  w.addContactMaterial(new CANNON.ContactMaterial(diceMat, rampMat, { friction: 0.03, restitution: 0.3 }));
+  const apron = new CANNON.Body({ mass: 0, material: rampMat,
     shape: new CANNON.Box(new CANNON.Vec3(v.apron.s[0] / 2, v.apron.s[1] / 2, v.apron.s[2] / 2)) });
   apron.position.set(...v.apron.c);
   apron.quaternion.setFromEuler(v.apron.rx, 0, 0);
@@ -5584,7 +5588,7 @@ function towerLabDrop(n = 8, seed = 42) {
       transit: 0.5 + rng() * 1.1,
       exit: {
         x: (rng() - 0.5) * 0.8,
-        speed: 9 + rng() * 6,
+        speed: 14 + rng() * 6,
         yaw: (rng() - 0.5) * (Math.PI / 7.5),    // ±12° — chutes throw straight
         pitch: -rng() * (Math.PI / 18),          // 0..−10°
         av: [(rng() - 0.5) * 40, (rng() - 0.5) * 40, (rng() - 0.5) * 40],

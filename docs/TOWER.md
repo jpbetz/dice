@@ -25,11 +25,12 @@ the APRON.
 **2. APRON — the only collider in the play volume, and it is a RAMP.**
 An engine-owned static box, rotated: the top surface runs from the doorway
 sill `(z0, y 0.8)` down to the felt at `z0 + 1.5` — a 28° slope
-(`atan(0.8/1.5)`), width `x ∈ [-1.9, 1.9]`, with FLOOR physics
-(restitution 0.35), not wall physics — wall restitution (0.7) trampolined
-the first flat-tray cut, and a step's edge hop read as artificial where a
-slope lets gravity make the delivery ("let physics help us out more",
-third lab look). It also keeps settled dice from rolling under the exit,
+(`atan(0.8/1.5)`), width `x ∈ [-1.9, 1.9]`, and it is a SLICK CHUTE: its
+own contact material, friction 0.03, restitution 0.3 — polished slide,
+not felt. At felt friction (0.25) dice stalled on the 28° slope (fourth
+lab look); wall restitution (0.7) trampolined the first flat-tray cut;
+and a step's edge hop read as artificial where a slope lets gravity make
+the delivery ("let physics help us out more", third lab look). It also keeps settled dice from rolling under the exit,
 and it is thick — no tunneling class at felt-level speeds. Models may SKIN
 it (a wooden chute, a stone slide) but never alter, extend, or duplicate
 its collision. Models add zero colliders, ever; that is what makes a skin
@@ -76,8 +77,9 @@ in occluded interior, already tumbling at exit speed. Emergence must read
 as TRAVEL through the doorway, never materialisation at the spout (first
 lab look; also: y = 1.6 overlapped the apron box at spawn for a d20, and
 the penetration resolver's kick read as a launch — y = 2.0 clears it).
-Velocity seeded from: speed 9–15 u/s (6–11 read as dribbling — a tower
-exit should THROW), yaw within ±12° of +z (chutes throw straight; ±30°
+Velocity seeded from: speed 14–20 u/s — hand-throw speed (14–22 leaves
+the hand on a normal roll); 9–15 stalled on the ramp, 6–11 read as
+dribbling — yaw within ±12° of +z (chutes throw straight; ±30°
 clipped the door jambs — clearance is radius arithmetic: 0.4 jitter +
 tan 12°·0.9 travel + 1.25 d20 radius ≈ 1.84 against the door's 2.0),
 pitch 0° to −10°. The die dips, lands on the apron tray, and skips off
