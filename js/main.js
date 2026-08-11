@@ -5403,10 +5403,16 @@ document.addEventListener('visibilitychange', () => {
 // wall's midpoint (moves with zoom); the offsets from it are the contract.
 function towerVolumes() {
   const z0 = -TABLE_D / 2;
+  // The apron is a RAMP, not a step ("let physics help us out more"): the
+  // top surface runs from the doorway sill (z0, y 0.8) down to the felt at
+  // z0 + 1.5 — a 28° slope gravity carries dice down. Modelled as a thin
+  // box rotated about x; slightly overlong so both ends embed (no lip gaps).
+  const ath = Math.atan(0.8 / 1.5);
   return {
     z0,
     socket:  { c: [0, 5.0, z0 - 2.0], s: [5.2, 10, 4.4] },
-    apron:   { c: [0, 0.4, z0 + 0.55], s: [3.8, 0.8, 1.1] },
+    apron:   { c: [0, 0.4 - 0.15 * Math.cos(ath), z0 + 0.75 - 0.15 * Math.sin(ath)],
+               s: [3.8, 0.3, 1.9], rx: ath },
     shaft:   { c: [0, 4.85, z0 - 1.6], r: 1.7, h: 5.3 },
     aim:     { c: [0, 9.0, z0 - 1.6], s: [0.8, 0.3, 0.8] },
     cowl:    { c: [0, 7.4, z0 + 0.05], s: [4.2, 2.4, 0.3] },
@@ -5447,7 +5453,18 @@ function towerLabBuild() {
     g.add(edges);
   };
   box(v.socket, 0x4488ff, 0.06);  // SOCKET — blue exterior hull
-  box(v.apron, 0xff8800, 0.25);   // APRON — orange, the one collider
+  // APRON — orange, the one collider: a ramp, rendered rotated to match
+  // its physics body exactly.
+  const ap = towerGhost(0xff8800, 0.25, new THREE.BoxGeometry(...v.apron.s));
+  ap.position.set(...v.apron.c);
+  ap.rotation.x = v.apron.rx;
+  g.add(ap);
+  const apEdges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(ap.geometry),
+    new THREE.LineBasicMaterial({ color: 0xff8800, transparent: true, opacity: 1 }));
+  apEdges.position.copy(ap.position);
+  apEdges.rotation.copy(ap.rotation);
+  g.add(apEdges);
   box(v.aim, 0xffffff, 0.35);     // entry aim box
   box(v.hood, 0x8844ff, 0.18);    // HOOD — purple occlusion pocket
   const shaft = towerGhost(0x44cc88, 0.12,
@@ -5506,11 +5523,12 @@ function towerLabWorld() {
   boxAt(wallMat, [-(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
   boxAt(wallMat, [(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
   boxAt(wallMat, [0, v.door.h + (22 - v.door.h) / 2, z0 - 0.3], [dw, (22 - v.door.h) / 2, 0.3]);
-  // The apron is the TRAY dice land on and skip across — floor physics
-  // (restitution 0.35), not wall physics (0.7, which trampolines).
+  // The apron RAMP dice land on and roll down — floor physics (restitution
+  // 0.35), not wall physics (0.7, which trampolines).
   const apron = new CANNON.Body({ mass: 0, material: floorMat,
     shape: new CANNON.Box(new CANNON.Vec3(v.apron.s[0] / 2, v.apron.s[1] / 2, v.apron.s[2] / 2)) });
   apron.position.set(...v.apron.c);
+  apron.quaternion.setFromEuler(v.apron.rx, 0, 0);
   w.addBody(apron);
   return w;
 }

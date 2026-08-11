@@ -22,15 +22,18 @@ The tower's body stands BEHIND the back wall, outside the play volume — it
 spends apron, not felt. Nothing crosses `z0 + 0.2` toward the player except
 the APRON.
 
-**2. APRON — the only collider in the play volume.** An engine-owned static
-box: `x ∈ [-1.9, 1.9]`, `z ∈ [z0, z0 + 1.1]`, `y ∈ [0, 0.8]`, with FLOOR
-physics (restitution 0.35), not wall physics — it is the tray exiting dice
-land on and skip across, and wall restitution (0.7) trampolines them
-(first lab look). It also keeps settled dice from rolling under the exit,
+**2. APRON — the only collider in the play volume, and it is a RAMP.**
+An engine-owned static box, rotated: the top surface runs from the doorway
+sill `(z0, y 0.8)` down to the felt at `z0 + 1.5` — a 28° slope
+(`atan(0.8/1.5)`), width `x ∈ [-1.9, 1.9]`, with FLOOR physics
+(restitution 0.35), not wall physics — wall restitution (0.7) trampolined
+the first flat-tray cut, and a step's edge hop read as artificial where a
+slope lets gravity make the delivery ("let physics help us out more",
+third lab look). It also keeps settled dice from rolling under the exit,
 and it is thick — no tunneling class at felt-level speeds. Models may SKIN
-it (a tray lip, a stone step) but never alter, extend, or duplicate its
-collision. Models add zero colliders, ever; that is what makes a skin swap
-replay-safe.
+it (a wooden chute, a stone slide) but never alter, extend, or duplicate
+its collision. Models add zero colliders, ever; that is what makes a skin
+swap replay-safe.
 
 **2b. DOORWAY — the opening in the back wall.** While a tower is socketed,
 the back wall is not an unbroken plane: it carries an engine-owned clear
