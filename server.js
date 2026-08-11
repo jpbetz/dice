@@ -375,7 +375,7 @@ const SETTING_SPECS = {
   // the mat under a film already baked against the old one.
   tower: {
     default: 'none',
-    validate: (v) => typeof v === 'string' && ['none', 'heartwood'].includes(v),
+    validate: (v) => typeof v === 'string' && ['none', 'heartwood', 'bastion'].includes(v),
   },
 };
 

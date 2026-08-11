@@ -41,6 +41,7 @@ import { DecalField } from './decals.js';
 import { DieLightRig } from './dielights.js';
 import { PostStack, MAX_SHIMMER } from './post.js';
 import { buildTowerSkin } from './towerskin.js';
+import { buildBastionSkin } from './towerbastion.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -93,6 +94,14 @@ const ZOOM_LEVELS = [
 // A tower entry names its SKIN builder; the engine geometry (towerVolumes())
 // is shared by every model by contract, so a new tower is a skin file and a
 // row here.
+//
+// `clunkVoice` is the SOUND PALETTE the contract's §6 asks a model to
+// register (an IMPACT_VOICES shape: body / weight / sustain). It is the one
+// thing besides geometry a skin gets to change, and it is deliberately not a
+// set of TIMINGS: the baffle knocks are baked into the film from the seed, so
+// two clients with different towers would still be impossible — the tower is
+// a room setting — and a replay's hash cannot move. Palettes are resolved at
+// render time, in the sound drain, and nowhere else.
 const TOWERS = {
   none: {
     id: 'none', label: 'None', skin: null,
@@ -101,6 +110,14 @@ const TOWERS = {
   heartwood: {
     id: 'heartwood', label: 'Heartwood', skin: buildTowerSkin,
     title: 'Heartwood — a wooden tower at the back of the table; dice pour through it',
+    // Dry wood on wood: a short, narrow-band knock with almost no tail.
+    clunkVoice: { body: 'clack', weight: 0.35, sustain: 20 },
+  },
+  bastion: {
+    id: 'bastion', label: 'Bastion', skin: buildBastionSkin,
+    title: 'Bastion — a stone turret; dice rumble through it',
+    // Stone: heavier, lower, and it rings on in the shaft afterwards.
+    clunkVoice: { body: 'thud', weight: 0.7, sustain: 40 },
   },
 };
 const DEFAULT_TOWER = 'none';
@@ -3385,7 +3402,18 @@ function stepPlayback(dt, tempo = 1, curve = false) {
     // to the impact, not to whether it was audible.
     const filmOk = CLICKGATE.mode !== 'film'
       || (s.time - roll.lastClickTime) * 1000 >= IMPACT_MIN_GAP_MS;
-    if (filmOk && playImpact(s.strength, fxSet && fxSet.sound ? fxSet.sound : null,
+    // THE SOUND PALETTE (docs/TOWER.md §6). A baffle knock is a die hitting
+    // the TOWER, not the felt, so it is voiced by the SOCKETED TOWER's
+    // clunkVoice — wood knocks, stone thuds — and only falls back to the die
+    // set's voice when the tower registers none. Two things make this safe
+    // for the FIRST LAW by construction rather than by a guard: `clunk` is
+    // only ever set by the pour bake, and the pour bake only runs with a
+    // tower up, so a towerless roll has no event this branch can even see.
+    // And it is render-time only: the film's timings, the bake and the replay
+    // hash never learn which tower is standing.
+    const clunkVoice = s.clunk === 'baffle' ? towerClunkVoice() : null;
+    const voice = clunkVoice || (fxSet && fxSet.sound ? fxSet.sound : null);
+    if (filmOk && playImpact(s.strength, voice,
       CLICKGATE.mode === 'film' ? s.time : undefined)) {
       roll.lastClickTime = s.time;
     }
@@ -5806,6 +5834,10 @@ const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
   // ships and the contract volumes are what you switch on to argue with it
   // (__diceDebug.towerGhosts(true) / towerSkin(false)).
   skin: true, ghosts: false,
+  // Which registered tower the lab wraps around the core. Heartwood by
+  // default because it is the reference; the occlusion proof takes an id and
+  // rebuilds (__diceDebug.towerLabSkin / towerOcclusionCheck('bastion')).
+  skinId: 'heartwood',
   tune: { speedMin: 24, speedMax: 34, lipTilt: 0.1, matExtra: 4.5,
     // The pour's camera choreography (Joe: "start in one position and move
     // during the roll") — a low frontal tower shot while dice pour in, an
@@ -6069,10 +6101,13 @@ function towerLabBuild() {
     new THREE.Vector3(...v.exit.p), 2.0, 0xffdd33));
   g.visible = TOWERLAB.ghosts;
   root.add(g);
-  // The SKIN (js/towerskin.js): the wooden model that occludes the ghosts.
-  // Zero colliders and zero lights by contract — it is added to the scene
-  // graph and to nothing else.
-  const skin = buildTowerSkin(v);
+  // The SKIN: the model that occludes the ghosts. Zero colliders and zero
+  // lights by contract — it is added to the scene graph and to nothing else.
+  // WHICH skin is a lab dial (TOWERLAB.skinId), so the occlusion proof can be
+  // pointed at any registered tower instead of only the one that shipped
+  // first; the SHIPPED socket reads the room setting, never this.
+  const spec = TOWERS[TOWERLAB.skinId] || TOWERS.heartwood;
+  const skin = (spec.skin || buildTowerSkin)(v);
   skin.visible = TOWERLAB.skin;
   root.add(skin);
   return root;
@@ -6197,6 +6232,20 @@ function towerLabSet(on = true) {
   return TOWERLAB.on;
 }
 
+// Point the lab at a different registered skin. A rebuild, not a mutation:
+// the lab's group is torn down and built again, because a skin's bakes, its
+// AO pass and its lining are all decided at build time. 'none' has no skin
+// builder and is not a thing the lab can wear.
+function towerLabSkin(id) {
+  if (!TOWERS[id] || !TOWERS[id].skin) return TOWERLAB.skinId;
+  if (id === TOWERLAB.skinId) return TOWERLAB.skinId;
+  const was = TOWERLAB.on;
+  if (was) towerLabSet(false);
+  TOWERLAB.skinId = id;
+  if (was) towerLabSet(true);
+  return TOWERLAB.skinId;
+}
+
 function towerLabClear() {
   for (const f of TOWERLAB.falling) scene.remove(f.mesh);
   for (const h of TOWERLAB.hidden) scene.remove(h.mesh);
@@ -6229,6 +6278,15 @@ function towerLabClear() {
 // trap this file records at ROOM, LS_NAME and TOWERLAB.)
 
 function towerOn() { return currentTower !== 'none' && !!towerRig; }
+
+// The socketed tower's SOUND PALETTE, or null when it has none (docs/TOWER.md
+// §6). Read once per baffle event in the playback sound drain — never in the
+// bake, which is why a palette can differ between the lab and the table and
+// still leave every film byte-identical.
+function towerClunkVoice() {
+  const spec = TOWERS[currentTower];
+  return (towerOn() && spec && spec.clunkVoice) ? spec.clunkVoice : null;
+}
 
 // The mat deepening, shared by the lab and the socket (Joe, twelfth look):
 // the tray band eats ~4 units of mat depth, so a tower DEEPENS the mat by
@@ -6628,6 +6686,8 @@ window.__diceDebug = {
     if (s) s.visible = TOWERLAB.skin;
     return TOWERLAB.skin;
   },
+  // Which registered tower the LAB wears. The shipped socket is unaffected.
+  towerLabSkin(id) { return towerLabSkin(id); },
   towerGhosts(on = true) {
     TOWERLAB.ghosts = !!on;
     const g = TOWERLAB.group && TOWERLAB.group.getObjectByName('towerGhosts');
@@ -6656,14 +6716,20 @@ window.__diceDebug = {
   // nothing. The eye is translated by the anchor delta rather than re-laying
   // the mat per preset: the core's offsets from z0 never move, so that is the
   // same test with one build.
-  towerOcclusionCheck() {
+  towerOcclusionCheck(id) {
+    if (id) towerLabSkin(id);
     if (!TOWERLAB.on) towerLabSet(true);
     const v = towerVolumes();
     const skin = TOWERLAB.group.getObjectByName('towerSkin');
+    // WHAT COUNTS AS AN OCCLUDER, and it is a naming convention rather than a
+    // fixed list so a new skin needs no edit here: every NAMED `towerSkin*`
+    // child of the skin group is opaque geometry (Heartwood's wood and
+    // lining, Bastion's stone and lining). The unnamed children — gradient
+    // veils, contact shadows — are transparent and prove nothing, which is
+    // exactly why they are not allowed to answer this question.
     const targets = [];
-    for (const n of ['towerSkinWood', 'towerSkinLining']) {
-      const o = skin && skin.getObjectByName(n);
-      if (o) targets.push(o);
+    for (const o of skin ? skin.children : []) {
+      if (o.name && o.name !== 'towerSkin' && o.name.startsWith('towerSkin')) targets.push(o);
     }
     const disc = (y, out) => {
       out.push([0, y, v.shaft.c[2]]);
@@ -6719,7 +6785,7 @@ window.__diceDebug = {
         });
       }
     }
-    return { z0: v.z0, despawnY: v.despawnY, eyes };
+    return { skin: TOWERLAB.skinId, z0: v.z0, despawnY: v.despawnY, eyes };
   },
   // Live dials for the pour's feel — Joe's eye owns these numbers, the
   // same way the tempo curve was dialed. Changing the tilt rebuilds the

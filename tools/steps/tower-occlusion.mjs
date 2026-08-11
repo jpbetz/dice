@@ -30,16 +30,26 @@ limitations under the License.
 // No legal geometry occludes them; the darkness layers (black lining and
 // the doorway veil) are what the contract actually leans on there.
 //
-//   node tools/drive.mjs tools/steps/tower-occlusion.mjs
+// It proves ANY registered skin, not just the first one: pass a tower id and
+// the lab is rebuilt wearing it. Every model has to answer this question
+// before it ships, and the answer is counted rather than looked at.
+//
+//   node tools/drive.mjs tools/steps/tower-occlusion.mjs [towerId]
 
-export default async function run(stage) {
+export default async function run(stage, args) {
+  const tower = args[0] || 'heartwood';
   const a = await stage.tab('localhost', 'TowerOcclusion');
   await a.dbg('holdClock(true)');
   await a.dbg('towerEcho(false)');
   await a.dbg('towerCore(true)');
-  const res = await a.dbg('towerOcclusionCheck()');
+  const res = await a.dbg(`towerOcclusionCheck(${JSON.stringify(tower)})`);
+  if (res.skin !== tower) {
+    console.log(`BAD: asked for '${tower}', the lab is wearing '${res.skin}'`);
+    process.exitCode = 1;
+    return;
+  }
 
-  console.log(`z0=${res.z0} despawnY=${res.despawnY}\n`);
+  console.log(`skin=${res.skin} z0=${res.z0} despawnY=${res.despawnY}\n`);
   const pct = (b) => `${b.blocked}/${b.n}`;
   let bad = 0;
   for (const e of res.eyes) {
@@ -51,7 +61,7 @@ export default async function run(stage) {
       + `[exit ${pct(e.exit)}  hood ${pct(e.hood)}]`);
   }
   console.log(bad === 0
-    ? '\nCLEAN: shaft + cowl occluded at every shipped eye'
-    : `\nBAD: ${bad} eye(s) leak the shaft or the cowl`);
+    ? `\nCLEAN: ${res.skin} occludes shaft + cowl at every shipped eye`
+    : `\nBAD: ${res.skin} leaks the shaft or the cowl at ${bad} eye(s)`);
   if (bad > 0) process.exitCode = 1;
 }
