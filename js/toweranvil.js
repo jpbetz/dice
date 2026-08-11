@@ -32,7 +32,8 @@ limitations under the License.
 // lights, no bloom, no ShaderMaterial: an `emissiveMap` on a
 // MeshStandardMaterial, baked from the same seeded canvas pass as everything
 // else — ember cracks between banked coals, not a flat orange. It is dim on
-// purpose (grate 0.55, shaft vents 0.30). Coals at rest.
+// purpose (grate 0.90, shaft vent 0.50, over a bake whose own heat envelope
+// leaves most of the bed dead). Coals at rest.
 //
 // ---------------------------------------------------------------------------
 // §1.5 THE FREE VOLUME, MEASURED BEFORE ANYTHING WAS DRAWN
@@ -76,12 +77,21 @@ limitations under the License.
 //     free) carry relief the eye can measure — which is also where the
 //     silhouette is, so nothing is lost.
 //
-// A VENT IS A RECESS, NEVER A HOLE. Both shaft vents sit inside the COWL
-// band, where one leaked ray is a die seen vanishing. Their beds are opaque
-// emissive stone standing in FRONT of the facade field, not behind it, so a
-// ray that clears the iron surround stops on the bed and a ray that clears
-// the bed stops on the facade. Proven by tools/steps/tower-occlusion.mjs, not
-// argued here.
+// A VENT IS A RECESS, NEVER A HOLE — AND THE RED CHECK SAID WHICH LAYER IS
+// LOAD-BEARING. The shaft vent sits inside the COWL band, where one leaked
+// ray is a die seen vanishing. The facade is CUT around it and the cut is
+// filled by an opaque emissive bed, so the eye sees coals rather than a
+// hole. But DELETING THE BED LEAVES THE BAND AT 99/99 — measured — because
+// the unlit lining stands a hand's width behind and catches every ray the
+// bed would have. Two consequences worth writing down for whoever edits this
+// next:
+//   · the bed is the PICTURE; the lining is the OPACITY. Shortening
+//     `towerSkinLining` below yCrTop is the edit that would turn this vent
+//     into a real leak, and no amount of bed will save it.
+//   · with the lining also removed the check goes red at all six eyes
+//     (cowl 142–144 / 147, and 96–97 / 99 at the shipped sampling), so the
+//     proof CAN see a hole of this size and shape. The green above is a
+//     comparison that happened, not one that could not fail.
 
 import * as THREE from 'three';
 import {
@@ -99,30 +109,44 @@ import {
 // reading as one black blob: the stone is warm, the iron is neutral-cool, the
 // fire-brick is browner and a step lighter so the stack separates from the
 // block it stands on.
-const SOOT = [[0x2c, 0x28, 0x24], [0x45, 0x3f, 0x38], [0x64, 0x5c, 0x51]];
+//
+// LOOKED AT, THEN DARKENED — TWICE THE LESSON BASTION LEARNED ON CHROMA.
+// The first cut ran the brick at a mid brown (mean 0x54) and the tower came
+// back a garden-wall chimney with a fire in it: the stack was the brightest
+// thing on the table, so the eye read the tower as BRICK and the forge as a
+// detail. A foundry stack that has been fired is nearly black and its value
+// range lives in the bottom third. Every ramp below dropped by roughly a
+// third, and the brick furthest of all — it is now only just lighter than
+// the stone it stands on, which is exactly the separation it needs and no
+// more.
+const SOOT = [[0x28, 0x24, 0x21], [0x3e, 0x39, 0x33], [0x59, 0x52, 0x49]];
 const IRON = [[0x24, 0x23, 0x23], [0x3b, 0x3a, 0x39], [0x59, 0x56, 0x53]];
-const BRICK = [[0x39, 0x2c, 0x25], [0x54, 0x42, 0x37], [0x73, 0x5c, 0x4b]];
+const BRICK = [[0x2a, 0x20, 0x1b], [0x3e, 0x30, 0x28], [0x5c, 0x48, 0x3b]];
 // Oxidised bronze — the Emberforge family's trim accent, and the one thing on
 // the model that is lighter than the room. It is deliberately LOW-CHROMA and
 // carries verdigris: Bastion's ledger records a saturated buff reading as
 // polished brass on a brick box, which is the casino this tower exists not to
 // be. Oxidised metal is a warm grey with green in it, not gold.
-const BRONZE = [[0x40, 0x37, 0x28], [0x63, 0x56, 0x3e], [0x86, 0x76, 0x58]];
+const BRONZE = [[0x2e, 0x28, 0x1e], [0x49, 0x3f, 0x2e], [0x64, 0x58, 0x42]];
 const VERDIGRIS = [0x4c, 0x67, 0x59];
 // Foundry sand for the delivery run. It is the lightest thing here and that
 // is functional, not decorative: Emberforge dice are black iron, and a die
 // has to read against whatever it comes to rest on (Bastion's tray note).
 // Pulled greyer than Bastion's sandstone so the two families' trays do not
-// look like the same quarry.
-const SAND = [[0x55, 0x50, 0x48], [0x76, 0x70, 0x66], [0x94, 0x8e, 0x82]];
+// look like the same quarry. …and it came down with everything else in the
+// second pass: at mean 0x76 the delivery run was a white slab that owned the
+// frame, the brightest object on a dark table, and a tower's tray should not
+// be the first thing seen. Mean 0x62 still gives a black-iron die something
+// to read against, which is the only reason it is light at all.
+const SAND = [[0x45, 0x41, 0x3a], [0x62, 0x5d, 0x54], [0x80, 0x7a, 0x6f]];
 // Mortar/joint colours. A recess is shadow; shadow in a warm room is never
 // #000. Fire-brick is laid in a pale ash-lime mortar — lighter than the brick,
 // the opposite of the stone's — and that contrast is most of what says "kiln".
 const SOOT_JOINT = [0x22, 0x1e, 0x1a];
-const BRICK_JOINT = [0x6e, 0x66, 0x59];
+const BRICK_JOINT = [0x4a, 0x44, 0x3c];
 // The coal bed: char → dull red → the hot crack. Three stops, and the third
 // is short of white on purpose. White is a lava lamp.
-const EMBER = [[0x0b, 0x03, 0x01], [0x7d, 0x1c, 0x03], [0xff, 0x8e, 0x2e]];
+const EMBER = [[0x0b, 0x03, 0x01], [0x9c, 0x2c, 0x04], [0xff, 0x8e, 0x2e]];
 const CHAR = [[0x16, 0x12, 0x10], [0x24, 0x1d, 0x19], [0x38, 0x2d, 0x26]];
 
 // ---------------------------------------------------------------------------
@@ -404,15 +428,21 @@ export function buildAnvilSkin(v) {
     ironDark: metal(M.ironDark, 0.60, 0.5),
     bronze: metal(M.bronze, 0.75, 0.6),
     sand: mat(M.sand, 0.4),
-    // Dim: coals at rest. The grate is the feature and gets the brighter of
-    // the two; the shaft vents are a hint that the same fire is up there.
-    ember: emberMat(0.55),
-    emberFaint: emberMat(0.30),
+    // Dim, but PRESENT. At 0.55 the bed was a rumour behind the bars and the
+    // feature of the tower was invisible at the resting eye; the bake's own
+    // heat envelope leaves most of the bed dead, so the intensity has to
+    // carry the live seams. 0.90 at the grate, 0.50 at the vent — still
+    // coals at rest, and still the only glow in the house.
+    ember: emberMat(0.90),
+    emberFaint: emberMat(0.50),
   };
   // World units per texture tile. Non-square and non-integer against every
   // dimension in the model, so tiling never lands on a visible grid.
+  // `coalFine` exists because the vent is 0.26 wide: at the grate's tile it
+  // sampled one thin vertical strip of a single coal bed, and whether that
+  // strip crossed a live seam was luck. A slot needs its own scale.
   const UV = { soot: [7.4, 7.4], brick: [6.6, 6.6], plate: [4.9, 3.7],
-    band: [6.0, 1.0], sand: [5.3, 3.9], coal: [2.3, 1.7] };
+    band: [6.0, 1.0], sand: [5.3, 3.9], coal: [2.3, 1.7], coalFine: [0.5, 0.75] };
 
   const parts = [];
   const add = (mesh) => {
@@ -463,11 +493,21 @@ export function buildAnvilSkin(v) {
   // that lets it run the full width: below y = 1.0 the doorway has nothing to
   // obstruct, so the base can be a base instead of two thin returns.
   const yPl1 = 0.52, yPl2 = 0.92;
-  const yBlkTop = 6.36;
-  const yFil1 = 6.50;                      // the bronze fillet under the cap
-  const yCap1 = 6.88;
-  const yChmA = 8.34, yChmB = 9.68, yChmTop = 11.02;
-  const yCrA = 11.44, yCrTop = yLim - 0.08;                 // 12.42
+  // PROPORTION, AFTER LOOKING. The block ended 0.56 lower in the first cut
+  // and the tower read top-heavy: the doorway eats the block's whole middle,
+  // so its remaining mass is a frame, and a chimney taller than that frame
+  // becomes the subject. The block now runs to 6.92 and the stack is 3.6 —
+  // a furnace with a flue, rather than a flue on a doorstep.
+  const yBlkTop = 6.92;
+  const yFil1 = 7.06;                      // the bronze fillet under the cap
+  const yCap1 = 7.44;
+  const yChmA = 8.62, yChmB = 9.86, yChmTop = 11.02;
+  // The stack's straps sit LOW and HIGH with a clear field between them. The
+  // first cut spaced three of them evenly and the middle one ran straight
+  // across the vent, cutting one tall slot into two stubby ones — and three
+  // bright bands on a 3.6-unit stack was too much trim besides.
+  const yStrap0 = 7.62, yStrap1 = 10.46, strapH = 0.22;
+  const yCrA = 11.50, yCrTop = yLim - 0.08;                 // 12.42
 
   // Half-widths and back faces. Every one is checked against the socket at
   // its own height for the lean: at y the tilt costs y·sin(0.15°) of x, and
@@ -476,7 +516,7 @@ export function buildAnvilSkin(v) {
   const zPl1 = z0 - 5.05, zPl2 = z0 - 4.95, zBlk = z0 - 4.72, zCap = z0 - 4.86;
   const xChmA = 2.62, xChmB = 2.57, xChmC = 2.52;
   const zChm = z0 - 4.42;
-  const xCrA = 2.70, xCrB = 2.96;
+  const xCrA = 2.74, xCrB = 3.02;          // 3.02 + 12.42·sin(0.15°) = 3.05
   const zCrA = z0 - 4.52, zCrB = z0 - 4.72;
 
   // A RING is how every course above the plinth is made: a back slab, two
@@ -511,9 +551,12 @@ export function buildAnvilSkin(v) {
     span('soot', s * (doorX + 0.04), s * xBlk, yPl2, yBlkTop, zBlk, zFO - 0.06,
       { uv: UV.soot, r: R_TRIM, weather: true });
     // Iron strapping up the jambs — the riveted bands, where they have room
-    // to be 0.06 of real relief instead of a painted line.
-    for (const y of [1.28, 2.68, 4.06]) {
-      span('bronze', s * (doorX + 0.08), s * (xBlk - 0.04), y, y + 0.30,
+    // to be 0.06 of real relief instead of a painted line. IRON, not bronze:
+    // the first cut put the accent here too and six more bright bands turned
+    // the trim into the theme. Bronze is now the stack's straps and four
+    // beads, and nothing else.
+    for (const y of [1.28, 2.72, 4.10]) {
+      span('iron', s * (doorX + 0.08), s * (xBlk - 0.04), y, y + 0.26,
         zFO - 0.06, zFO, { uv: UV.band, band: true, r: R_THIN });
     }
   }
@@ -552,7 +595,7 @@ export function buildAnvilSkin(v) {
   // (Worth writing down: a slab merely sunk 0.012 BEHIND a field slab that
   // still spans the same x/y is invisible, which is a mistake this file was
   // built to avoid making.)
-  const gX = 1.90, gY0 = 5.12, gY1 = 6.06;
+  const gX = 1.90, gY0 = 5.12, gY1 = 6.62;
   const yFac0 = doorY + 0.42;                                // 4.92
   span('soot', -xBlk, -gX, yFac0, yBlkTop, zFI, zFF, { uv: UV.soot, r: R_THIN, seg: 2 });
   span('soot', gX, xBlk, yFac0, yBlkTop, zFI, zFF, { uv: UV.soot, r: R_THIN, seg: 2 });
@@ -567,7 +610,7 @@ export function buildAnvilSkin(v) {
   // units. They run past the opening top and bottom into the frame.
   for (let i = 0; i < 6; i++) {
     const cx = -gX + (gX * 2) * ((i + 0.5) / 6);
-    span('iron', cx - 0.065, cx + 0.065, gY0 - 0.05, gY1 + 0.05,
+    span('iron', cx - 0.055, cx + 0.055, gY0 - 0.05, gY1 + 0.05,
       zFO - 0.055, zFO - 0.005, { uv: UV.plate, r: R_THIN });
   }
   // A bronze bead around the opening: jambs and a head, proud of the field.
@@ -590,17 +633,20 @@ export function buildAnvilSkin(v) {
   ring('iron', xCap, zCap, yFil1, yCap1, { uv: UV.plate, r: R_TRIM, front: xCap });
 
   // --- THE CHIMNEY: three courses of dark fire-brick ----------------------
-  // The middle course carries the vent, so it builds its own facade in four
-  // panels instead of one (`front: 0` suppresses the ring's slab).
-  ring('brick', xChmA, zChm, yCap1, yChmA, { uv: UV.brick, r: R_TRIM, weather: true });
+  // The courses carry the BACK AND SIDES only (`front: 0`), because that is
+  // where they are visible: the stack's breathing-in shows in silhouette, and
+  // on the facade a 0.05 step of x is nothing at all. The front is ONE slab
+  // for the whole stack, cut around the vent — which also lets the vent be as
+  // tall as it wants instead of as tall as whichever course it lands in.
+  ring('brick', xChmA, zChm, yCap1, yChmA, { uv: UV.brick, r: R_TRIM, weather: true, front: 0 });
   ring('brick', xChmB, zChm + 0.04, yChmA, yChmB,
     { uv: UV.brick, r: R_TRIM, weather: true, front: 0 });
-  ring('brick', xChmC, zChm + 0.08, yChmB, yChmTop, { uv: UV.brick, r: R_TRIM, weather: true });
-  // Three riveted bronze straps, one to a course joint plus one low. They
-  // wrap: a face band, two cheeks, and a band across the back.
-  for (const [y0, xo, zb] of [[7.42, xChmA, zChm], [9.02, xChmB, zChm + 0.04],
-    [10.46, xChmC, zChm + 0.08]]) {
-    const y1 = y0 + 0.28;
+  ring('brick', xChmC, zChm + 0.08, yChmB, yChmTop,
+    { uv: UV.brick, r: R_TRIM, weather: true, front: 0 });
+  // Two riveted bronze straps, low and high. They wrap: a face band, two
+  // cheeks, and a band across the back.
+  for (const [y0, xo, zb] of [[yStrap0, xChmA, zChm], [yStrap1, xChmC, zChm + 0.08]]) {
+    const y1 = y0 + strapH;
     span('bronze', -(xo + 0.02), xo + 0.02, y0, y1, zFF, zFO,
       { uv: UV.band, band: true, r: R_THIN });
     for (const s of [-1, 1]) {
@@ -621,13 +667,14 @@ export function buildAnvilSkin(v) {
   // the difference between a vent and a hole, and a hole at this height is a
   // die seen vanishing.
   {
-    const vx0 = -1.42, vx1 = -1.14, vy0 = 8.46, vy1 = 9.58;
-    const fx = xChmB;
-    span('brick', -fx, vx0, yChmA, yChmB, zFI, zFF, { uv: UV.brick, r: R_THIN, seg: 2 });
-    span('brick', vx1, fx, yChmA, yChmB, zFI, zFF, { uv: UV.brick, r: R_THIN, seg: 2 });
-    span('brick', vx0, vx1, yChmA, vy0, zFI, zFF, { uv: UV.brick, r: R_THIN });
-    span('brick', vx0, vx1, vy1, yChmB, zFI, zFF, { uv: UV.brick, r: R_THIN });
-    span('emberFaint', vx0, vx1, vy0, vy1, zFI, zFI + 0.02, { uv: UV.coal, r: R_THIN });
+    const vx0 = -1.44, vx1 = -1.18, vy0 = 8.30, vy1 = 9.95;
+    const fx = xChmA - 0.06;                 // 2.56 — clears the r 2.0 discs
+    span('brick', -fx, vx0, yCap1, yChmTop, zFI, zFF, { uv: UV.brick, r: R_THIN, seg: 2 });
+    span('brick', vx1, fx, yCap1, yChmTop, zFI, zFF, { uv: UV.brick, r: R_THIN, seg: 2 });
+    span('brick', vx0, vx1, yCap1, vy0, zFI, zFF, { uv: UV.brick, r: R_THIN });
+    span('brick', vx0, vx1, vy1, yChmTop, zFI, zFF, { uv: UV.brick, r: R_THIN });
+    span('emberFaint', vx0, vx1, vy0, vy1, zFI, zFI + 0.02,
+      { uv: UV.coalFine, r: R_THIN });
     // The surround: two jambs and a head+sill, proud of the field, so the
     // slot is a shadowed slot and not a decal.
     span('iron', vx0 - 0.12, vx0, vy0 - 0.14, vy1 + 0.14, zFF, zFO, { uv: UV.plate, r: R_THIN });
