@@ -225,10 +225,20 @@ function maps() {
 // flat facade slab closes the same opening with the only thickness the
 // contract leaves — 0.09.
 //
-// The bevel is what keeps this from reading as chalk: ExtrudeGeometry insets
-// both contours at each end of the extrusion, which rounds every arris and
-// leaves a shadow line where two courses stack.
+// The bevel is what keeps this from reading as chalk: the arrises round off
+// and stacked courses get a shadow line between them.
+//
+// MEASURE IT, DO NOT ASSUME IT. three's ExtrudeGeometry does not inset the
+// body and taper outward the way a chamfer tool would — it puts the ORIGINAL
+// contour at both ends of the extrusion and pushes the body OUT by bevelSize
+// along each vertex's angle bisector, which at a corner overshoots to
+// bevelSize/sin(θ/2). Measured on the shaft course: 0.041 of outward bulge
+// for a 0.03 bevel. Every radius and the front clip below carry that number,
+// which is why the courses stay inside the socket instead of 0.031 outside
+// it. (The same sign flip works in our favour on the inner arc: the bore's
+// clearance grows rather than shrinking.)
 const BEVEL = 0.03;
+const BEVEL_BULGE = 0.045;
 function drumCourse(rOut, rIn, y0, y1, zc, zClip) {
   const th0 = Math.acos(Math.max(-1, Math.min(1, (zClip - zc) / rOut)));
   const sweep = 2 * Math.PI - 2 * th0;
@@ -285,7 +295,10 @@ function drumUV(geo, uw, vw, zc, zClip) {
 // ---------------------------------------------------------------------------
 
 const R_HULL = 0.055, R_TRIM = 0.030, R_THIN = 0.014;
-const TILT = 0.4 * Math.PI / 180;   // eight centuries of settling, about z
+// Eight centuries of settling, about z. Smaller than Heartwood's 0.7°: this
+// is masonry, not a glued box, and at 12 units tall every tenth of a degree
+// costs 0.02 of the socket's width at the crown.
+const TILT = 0.2 * Math.PI / 180;
 
 export function buildBastionSkin(v) {
   const M = maps();
@@ -313,7 +326,7 @@ export function buildBastionSkin(v) {
     // the surround's own shadow finishes the job on.
     shadowStone: new THREE.MeshStandardMaterial({
       color: 0x14110d, roughness: 0.96, metalness: 0,
-      envMapIntensity: 0.15, vertexColors: true,
+      envMapIntensity: 0.45, vertexColors: true,
     }),
   };
   // World units per texture tile. Non-square and non-integer against every
@@ -366,12 +379,19 @@ export function buildBastionSkin(v) {
   // the model never narrows the aperture; it opens wider than it.
   const zc = boreZ + 0.48 * S;
   const rIn = (zc - boreZ) + boreR + 0.06 * S;              // 2.80: contains the bore
-  const rOut = rIn + 0.21 * S;                              // 3.06: the shaft
-  const rPl1 = rOut + 0.13 * S, rPl2 = rOut + 0.08 * S, rPl3 = rOut + 0.03 * S;
-  const rStr = rOut + 0.11 * S;                             // string course
-  const rCor = rOut + 0.145 * S;                            // corbel table
-  const rPar = rOut + 0.11 * S;                             // parapet
-  const chord = (r) => r * Math.sin(Math.acos((zFO - zc) / r));
+  const rOut = rIn + 0.20 * S;                              // 3.05: the shaft
+  // The courses are clipped BEHIND the facade by the bevel's own bulge, so
+  // the widest thing on the model is still inside the socket. Everything the
+  // clip exposes is covered by the facade slabs, which are boxes and do not
+  // bulge.
+  const zCl = zFO - BEVEL_BULGE;
+  const chord = (r) => r * Math.sin(Math.acos((zCl - zc) / r));
+  // Crown radii carry the bulge AND the lean: at y ≈ 12 a 0.2° tilt is
+  // another 0.043 of x, and the socket's wall is at 3.25.
+  const rPl1 = rOut + 0.12 * S, rPl2 = rOut + 0.088 * S, rPl3 = rOut + 0.04 * S;
+  const rStr = rOut + 0.064 * S;                            // string course
+  const rCor = rOut + 0.088 * S;                            // corbel table
+  const rPar = rOut + 0.056 * S;                            // parapet
 
   // Elevation. The plinth stops just above the doorway sill; the parapet's
   // top is the embrasure floor and the merlons stand on it, capped under the
@@ -385,8 +405,8 @@ export function buildBastionSkin(v) {
 
   // --- THE DRUM: courses of ashlar, open across the front ------------------
   const course = (matKey, rO, rI, y0, y1, uv) => {
-    const { geo } = drumCourse(rO, rI, y0, y1, zc, zFO);
-    drumUV(geo, uv[0], uv[1], zc, zFO);
+    const { geo } = drumCourse(rO, rI, y0, y1, zc, zCl);
+    drumUV(geo, uv[0], uv[1], zc, zCl);
     const mesh = new THREE.Mesh(geo, MAT[matKey]);
     return add(mesh);
   };
@@ -495,7 +515,7 @@ export function buildBastionSkin(v) {
   // teeth are evenly spaced whether they stand on the chord or the curve —
   // spacing them by angle would bunch them across the flat front.
   {
-    const th0 = Math.acos((zFO - zc) / rPar);
+    const th0 = Math.acos((zCl - zc) / rPar);
     const arc = rPar * (2 * Math.PI - 2 * th0);
     const perim = 2 * aPar + arc;
     const N = 12, pitch = perim / N;

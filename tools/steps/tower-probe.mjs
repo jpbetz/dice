@@ -20,17 +20,26 @@ limitations under the License.
 // on the way, and how many rescues it burned. The screenshot-forensics
 // loop this replaces cost a human reload per hypothesis.
 //
-//   node tools/drive.mjs tools/steps/tower-probe.mjs [n] [seed] [secs]
+// The 4th argument is a tower id, and running it for a NEW skin is not
+// redundant: the whole claim of the contract is that a skin adds no physics,
+// so the same seed through the same core must produce the same verdict
+// whatever model is standing around it. A difference here is a collider
+// somebody smuggled in.
+//
+//   node tools/drive.mjs tools/steps/tower-probe.mjs [n] [seed] [secs] [tower]
 
 export default async function run(stage, args) {
   const n = Number(args[0]) || 8;
   const seed = Number(args[1]) || 42;
   const secs = Number(args[2]) || 14;
+  const tower = args[3] || 'heartwood';
   const a = await stage.tab('localhost', 'TowerProbe');
 
   await a.dbg('holdClock(true)');
   await a.dbg('towerEcho(false)'); // the ring buffer is the record here
   await a.dbg('towerCore(true)');
+  await a.dbg(`towerLabSkin(${JSON.stringify(tower)})`);
+  console.log(`skin=${tower} n=${n} seed=${seed}`);
   await a.dbg(`towerDrop(${n}, ${seed})`);
 
   // Step 1 s at a time; print the state line so a stall is visible AS a
