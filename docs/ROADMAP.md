@@ -717,6 +717,44 @@ Most of §9's engineering is closed (see SHIPPED.md §9). What remains
 is art direction, one pool-icon delta, and the tumbled-resin
 geometry tier.
 
+### 9d. The dice tower — **SHIPPED 2026-08-12**; three follow-ups left
+
+The lab became the product. `tower` is a room setting whose value is a
+tower id — `none` (default) and `heartwood` — and a tower roll is baked
+as a POUR: scripted entry, hidden transit behind the skin, exit through
+the doorway, then the ordinary settle. The contract, the socket, the bake,
+the amended camera ruling and the measurements are
+[TOWER.md](TOWER.md)'s STATUS section; the player-facing spec is
+[UX.md §7.31](UX.md#731-the-tower-and-what-a-poured-roll-looks-like-2026-08-12).
+Scenario `tower-roll` (tag `tower`), and the whole pre-existing suite
+passes **unchanged**, which is what THE FIRST LAW ("don't change anything
+about how the system works without a tower") means in practice.
+
+What is left, in the order it is worth doing:
+
+- **A sound palette per skin.** TOWER.md §6 says a model registers wood /
+  stone / metal and never timings. Today every tower knocks with the
+  default click. The film already carries the hook: baffle clunks are
+  tagged `clunk: 'baffle'` and their `at` is deliberately null, so they
+  are sound and nothing else — a palette attaches to that tag and to the
+  socketed tower id, and needs no change to the bake.
+- **A second tower.** The registry exists precisely so this costs a row
+  and a skin file, and until a second one lands that claim is untested.
+  The geometry contract is what makes it replay-safe: a model adds zero
+  colliders and the film never reads it, so a skin swap can never change
+  how a roll plays. Stone and metal are the obvious pair, and they are
+  also what would make the sound palette worth building first.
+- **`tower` in the portable YAML.** `table:` carries name/felt/system/zoom
+  (js/portable.js `TABLE_KEYS`), so a prepared table cannot yet arrive
+  with its tower already up — the one place the setting is not treated
+  like its neighbours.
+
+Known cost, recorded rather than hidden: a 40-die pour is ~25 s of film
+and up to five bake attempts (~3 s synchronous). Forty dice through one
+chute is forty staggered entries, forty transits and forty exits that may
+not overlap, so the length is honest; the bake cost is the exit
+guarantee's price and only the largest pool pays it.
+
 ### 9. Dice sets — art direction continues
 
 Creative brief (Joe 2026-08-03): cool-looking dice of different

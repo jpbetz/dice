@@ -1,5 +1,75 @@
 # TOWER_CORE — the tower geometry contract
 
+## STATUS — shipped as a room setting (2026-08-12)
+
+The lab is no longer the only place a tower exists. `tower` is a room-wide
+setting whose value is a **tower id**, never a boolean: `none` (default) and
+`heartwood` today, one `TOWERS` registry row per model after that, and the
+settings modal shows a picker under the Felt swatches rather than a switch.
+Room-wide because it changes the FILM — every client must bake the same pour —
+and it rides the zoom defer rule (`queueTower` / `tryFlushRoomChanges`), so a
+change made mid-roll lands at the next roll boundary and never under a film
+already baked against the other interior.
+
+**THE FIRST LAW, from Joe, verbatim: "Don't change anything about how the
+system works without a tower."** `tower: 'none'` is not a mode — it is the
+whole app, untouched. Every tower branch is guarded, and the proof is that the
+entire existing suite passes **unchanged**: 48/48, no scenario edited.
+
+**What socketing does.** Deepen the mat by `matExtra` (4.5); send the back-wall
+PLANE to z −1000 (moved, never removed — cannon's SAP enumerates pairs in body
+order, and a removed body renumbers everything behind it) so the doorway boxes
+are the back of the room; add the eight engine colliders — `doorL doorR lintel
+towerBack towerL towerR ramp lip`, in that order, always, plus the slick-chute
+contact material; add the skin. Unsocket runs it backwards and the world
+returns to exactly its towerless configuration. `applyZoom` unsockets and
+re-sockets across a preset change, because every offset here is relative to a
+z0 the preset moves. ONE builder (`towerColliders`) serves both the lab's
+isolated world and the shipped socket, so no world number is written twice.
+
+**What the bake does.** `playRoll` produces a POUR film instead of a throw
+film. Per die, from a stream derived from `roll.seed` alone: entry stagger,
+a scripted gravity fall with NO physics body from the aim box to the despawn
+line, a hidden window with 2–4 baffle clunks injected into the same `sounds`
+array real impacts use (`at: null`, tagged `clunk: 'baffle'` for a future
+per-skin palette), then the body's first existence at the exit spawn with the
+per-die graze height, lane spread, rolling spin and cascade-above-occupants
+rule. Everything after that is the ordinary pipeline: real bounces, the
+displacement terminator, nudges, face correction, values, chips, the result
+card, the log. Sim steps run at 120 Hz (two explicit half-steps per film
+frame). Playback hides the mesh outright through a hidden window — the
+contract's guarantee, not the model's opacity.
+
+**Exit guarantee, layer 3, as built.** A bake ending with any die hidden or out
+of bounds is discarded and re-baked on a nudged sub-seed, up to five, best
+kept, and a `console.warn` if all five fail. Two measured faults are recorded
+in the code: a poured die going still inside the skin's shadow used to FREEZE
+at `SETTLE_STILL` (0.45 s) — before the watchdog's 1.2 s stalled bar — so the
+rescue never ran; and the tail cut ate the last-resort strand's own frame.
+Measured after both: 1d20 / three-die / 8d6 ×10 / 20d6 all deliver every die on
+the **first** bake at ~200 ms; 40d6 delivers 40/40, worst case five bakes and
+two strands, 3.0 s of bake, 25 s of film.
+
+**Camera ruling ① is amended for tower rolls** (see `CAM_EASE_S` in
+`js/main.js`). A pour makes two camera moves DURING playback: the tower eye
+when the film starts, and the framing ladder handed back at the film's FIRST
+exit. The ruling's reason — never ask a player to track motion with a moving
+frame — does not bind here, because a pour's first second is dice falling into
+a fixed PLACE. The amendment's boundaries are its guarantee: those two moves
+and no others, both eased over `CAM_EASE_S`, both refused under
+`prefers-reduced-motion`, and a thrown roll untouched.
+
+**Still lab-only:** `__diceDebug.towerCore/towerDrop/towerTune/towerLog` and
+the isolated world behind them. They are the experiment bench and the shipped
+socket does not read `TOWERLAB.tune` for anything but `matExtra`.
+
+**Not done, deliberately:** the sound palette per skin (§6 says models register
+one; today every tower clicks like wood on wood), `tower` in the portable YAML
+`table:` block, and a second model.
+
+Scenario: `tower-roll` (tag `tower`). Tools: `tools/steps/tower-pour.mjs` for
+the shipped pour, `tower-probe.mjs` / `tower-occlusion.mjs` for the lab.
+
 The engine owns one fixed core geometry; tower models are **occluding skins**
 around it. The baked film — entry drop, despawn, hidden transit, clunk times,
 exit spawn and trajectory — is a function of TOWER_CORE and the seed only,

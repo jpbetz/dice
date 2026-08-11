@@ -4162,3 +4162,62 @@ thresholds (stops dice mid-motion, drifts), the floor magnet (the naive form
 of an engine restitution threshold; failed every gate including its own),
 and uniform tempo (taste). The full pricing history is ROADMAP C30a–e; the
 engine-swap reserve position is C32.
+
+### 7.31 The tower, and what a poured roll looks like (2026-08-12)
+
+A **Tower** picker joins Felt in the settings modal's "Everyone at the table"
+section: *None* (default) and *Heartwood*. Room-wide, like felt and zoom, and
+for a stronger reason than either — the tower changes the FILM, so a table
+where one player has it and another does not is two different rolls.
+
+The sub-line is `dice tumble down through it instead of being thrown`, and
+the option tooltips say what each is rather than selling it (house tone,
+§5): *None — dice are thrown onto the felt by hand* · *Heartwood — a wooden
+tower at the back of the table; dice pour through it*.
+
+**A picker, not a switch.** The stored value is a tower id. There is one
+model today and the whole point of the shape is that the second one costs a
+registry row. A checkbox would have to be renamed the day it stopped being
+a yes/no, and renaming a setting people have already set is a cost paid
+later for a saving taken now.
+
+**What a poured roll is.** Dice appear above the tower's mouth, one every
+0.12–0.2 s — a pour, one motion of a hand, not a queue. Each vanishes into
+the hood, knocks around inside for 0.5–1.6 s where you can hear it and not
+see it, and comes back out of the doorway already rolling, at a shallow
+angle that skips it across the felt. Everything after that is the table you
+already know: the same settle, the same face correction, the same chips,
+card and log line.
+
+**Measured** (`tools/steps/tower-pour.mjs`, headless, the shipped socket):
+
+| pool | film | bakes | dice delivered |
+|---|---|---|---|
+| 1d20 | 2.4–4.6 s | 1 | 1/1 |
+| attribute + skill + motivation | 3.5 s | 1 | 3/3 |
+| 8d6 (ten seeds) | 3.7–5.1 s | 1 | 8/8, every seed |
+| 20d6 | 6.7–7.1 s | 1 | 20/20 |
+| 40d6 | 25 s | 5 | 40/40 |
+
+Forty dice through one chute takes twenty-five seconds and that is honest
+rather than fixable: it is forty entries staggered, forty transits, and
+forty exits that may not overlap. The projector's curve compresses the tail
+of it like any other roll.
+
+**The camera moves during a pour, and it is the only roll that does.** Act
+one eases to a low frontal eye on the tower as the film starts; act two
+hands the frame back to the framing ladder the instant the FIRST die exits,
+so the camera is already looking down at the felt when the spread lands
+rather than chasing it. Both are refused under `prefers-reduced-motion`,
+under which the ladder alone decides the eye exactly as it does for a throw.
+This amends camera ruling ① and the amendment's edges are written next to
+the ruling itself (`CAM_EASE_S`), not only here.
+
+**What did NOT ship.** A per-skin **sound palette** — [TOWER.md](TOWER.md)
+§6 says a model registers wood / stone / metal and today every tower clicks
+like the felt does, with the baffle knocks tagged in the film
+(`clunk: 'baffle'`) so the palette has something to attach to when it
+arrives. **A second model**, which is the registry's whole reason to exist
+and has nobody's design behind it yet. And **`tower` in the portable YAML**
+`table:` block, which carries name/felt/system/zoom — a prepared table
+cannot yet arrive with its tower already up.
