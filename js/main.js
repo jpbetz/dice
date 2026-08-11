@@ -5277,6 +5277,12 @@ function stepResting() {
 // therefore every e2e scenario — keeps stepping the film one baked frame at a
 // time no matter what k is set to. A tempo that leaked into sim() would make
 // the whole suite's timing a function of a debug knob.
+// Tower-lab state, declared ABOVE tick(): animate() starts ticking at module
+// eval, and stepTowerLab's on-check reads this — below tick it is a TDZ crash
+// on frame one (the same trap this file documents at ROOM and LS_NAME).
+const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0, falling: [], hidden: [], out: [] };
+const TOWERLAB_EULER = new THREE.Euler();
+
 function tick(dt, render = true, realtime = false) {
   // Themed-set clocks (Tier 6 §9): the Level 2 shader uniform and the
   // Level 3 particle field advance with the same dt discipline as
@@ -5393,8 +5399,6 @@ document.addEventListener('visibilitychange', () => {
 // stepped live (playback is film) and towers are OPTIONAL — nothing here
 // runs unless towerCore(true), and nothing touches rolls, tableDice, the
 // film, or the wire. Normal rolls behave identically with the lab on.
-const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0, falling: [], hidden: [], out: [] };
-
 // The contract volumes, evaluated at the CURRENT mat. The anchor is the back
 // wall's midpoint (moves with zoom); the offsets from it are the contract.
 function towerVolumes() {
@@ -5538,7 +5542,6 @@ function towerLabDrop(n = 8, seed = 42) {
   return { dropped: n, seed };
 }
 
-const TOWERLAB_EULER = new THREE.Euler();
 function stepTowerLab(dt) {
   if (!TOWERLAB.on || dt <= 0) return;
   TOWERLAB.t += dt;
