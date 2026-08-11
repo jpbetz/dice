@@ -5285,7 +5285,9 @@ const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
   // speedMin/Max reset after the rolling exit landed: 60–80 was Joe's dial
   // for SLIDING dice punching through the friction tax; rolling dice carry
   // at a fraction of that. lipTilt 0.1 is Joe's pick.
-  tune: { speedMin: 24, speedMax: 34, lipTilt: 0.1, matExtra: 3.4 } };
+  // matExtra 4.5 is Joe's dial (thirteenth look): "with that in place
+  // everything works."
+  tune: { speedMin: 24, speedMax: 34, lipTilt: 0.1, matExtra: 4.5 } };
 const TOWERLAB_EULER = new THREE.Euler();
 
 function tick(dt, render = true, realtime = false) {

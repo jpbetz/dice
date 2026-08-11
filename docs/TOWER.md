@@ -177,7 +177,8 @@ geometric, all testable headlessly against the model's mesh.
 
 **THE TOWER BRINGS THE ROOM IT CONSUMES (twelfth look).** Its tray band
 eats ~4 units of mat depth, so socketing a tower DEEPENS the mat by
-`matExtra` (default 3.4) — walls, shadow frustum and camera framing all
+`matExtra` (4.5 — Joe's dial, thirteenth look: "with that in place
+everything works") — walls, shadow frustum and camera framing all
 follow, exactly like a zoom change — and unsocketing restores the preset.
 In the feature this rides the same room setting as tower on/off, so every
 client agrees on the walls. Measured: with the deeper mat the 20-die
