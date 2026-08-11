@@ -6719,6 +6719,13 @@ window.__diceDebug = {
   towerOcclusionCheck(id) {
     if (id) towerLabSkin(id);
     if (!TOWERLAB.on) towerLabSet(true);
+    // RAYCASTS READ matrixWorld, AND A FRESH BUILD HAS NOT BEEN RENDERED YET.
+    // Measured: asking for a skin and checking it in the same call — which is
+    // what parameterising this on a tower id made possible — read the matrices
+    // bakeVertexAO left behind and reported bands occluded that are not. One
+    // frame of rAF used to hide it, so the answer depended on how many CDP
+    // round-trips the caller happened to make first. Force it.
+    TOWERLAB.group.updateMatrixWorld(true);
     const v = towerVolumes();
     const skin = TOWERLAB.group.getObjectByName('towerSkin');
     // WHAT COUNTS AS AN OCCLUDER, and it is a naming convention rather than a
