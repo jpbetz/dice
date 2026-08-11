@@ -78,12 +78,22 @@ export default async function run(stage, args) {
   await t.dbg('sim(400)');
   await t.settle();
 
-  // 4 and 5. Both ends of the zoom ladder. Dice are fixed world-size, so the
-  //    tower reads BIG on close and small on wide — that is physical honesty
-  //    and it is exactly what a reviewer has to be shown, not told.
+  // 4 and 5. Both ends of the zoom ladder, WITH DICE ON THE FELT. The empty
+  //    felt would prove nothing here: the resting eye frames the tower itself,
+  //    so it looks near-identical at every preset. Dice hand the frame back to
+  //    the framing ladder, and the ladder is where the ladder shows — the
+  //    tower reads big on close and small on wide, which is physical honesty
+  //    (dice are fixed world-size) and exactly the thing a reviewer has to be
+  //    shown rather than told.
   for (const [z, n] of [['wide', '4-zoom-wide'], ['close', '5-zoom-close']]) {
     await zoom(z);
+    await t.dbg(`commandRoll('3d6')`);
+    await t.settle();
+    await t.dbg('sim(600)');
     await shot(`${tower}-${n}.png`);
+    await t.dbg('clearTable()');
+    await t.dbg('sim(400)');
+    await t.settle();
   }
   await zoom('medium');
 

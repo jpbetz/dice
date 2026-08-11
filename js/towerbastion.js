@@ -67,9 +67,16 @@ import {
 // grey granite for the field and a warmer sandstone for every dressed edge.
 // The mortar is a warm near-black — a recess is shadow, and shadow in a warm
 // room is never #000.
-const GRANITE = [[0x3c, 0x40, 0x46], [0x64, 0x69, 0x70], [0x8e, 0x94, 0x9b]];
-const SANDSTONE = [[0x6f, 0x5b, 0x40], [0x99, 0x80, 0x5c], [0xbe, 0xa6, 0x7e]];
-const MORTAR = [0x2b, 0x25, 0x1f];
+// LOOKED AT, THEN FIXED. The first cut used a saturated buff for the dressed
+// stone and the tower came back gilded — quoins, bands, lintel and merlons all
+// read as polished brass on a brick box, which is the casino this tower is
+// supposed to not be. Sandstone is a WARM GREY next to a cool one: the two
+// stones must differ in temperature, not in chroma. The mortar went the same
+// way — near-black at full strength printed a cartoon grid — so it is lighter
+// now and blended at 0.8, and the joints themselves are half as wide.
+const GRANITE = [[0x3e, 0x41, 0x46], [0x64, 0x68, 0x6d], [0x8a, 0x8e, 0x93]];
+const SANDSTONE = [[0x57, 0x4e, 0x42], [0x7b, 0x70, 0x5f], [0x9e, 0x92, 0x7d]];
+const MORTAR = [0x3a, 0x34, 0x2c];
 
 const mod = (n, m) => ((n % m) + m) % m;
 
@@ -96,7 +103,7 @@ const mod = (n, m) => ((n % m) + m) % m;
 //      turbulence, so the mortar bites into block corners at random. Cut
 //      stone that has stood in weather has no straight arris left.
 function bakeStone({ size, stops, blocks, courses, seed,
-  joint = 0.010, relief = 1, chip = 1, speckle = 0.05, wash = 0.20 }) {
+  joint = 0.0056, relief = 1, chip = 0.45, speckle = 0.05, wash = 0.20 }) {
   const W = size;
   const cCan = document.createElement('canvas'); cCan.width = cCan.height = W;
   const hCan = document.createElement('canvas'); hCan.width = hCan.height = W;
@@ -140,9 +147,9 @@ function bakeStone({ size, stops, blocks, courses, seed,
       const hb = hash2(biw, ciw, seed + 3);
       const hb2 = hash2(biw, ciw, seed + 61);
       const mottle = fbm(u * 7, vv * 7, 7, 4, seed + 17);
-      const t = clamp01(0.18 + 0.62 * hb + 0.40 * (mottle - 0.5));
+      const t = clamp01(0.26 + 0.46 * hb + 0.30 * (mottle - 0.5));
       let [r8, g8, b8] = ramp3(stops, t);
-      const warm = (hb2 - 0.5) * 0.18;
+      const warm = (hb2 - 0.5) * 0.09;
       r8 *= 1 + warm; b8 *= 1 - warm;
       const sp = turb(u * 150, vv * 150, 150, 2, seed + 77);
       const spk = 1 + speckle * (sp * 2 - 1);
@@ -152,7 +159,7 @@ function bakeStone({ size, stops, blocks, courses, seed,
       const wsh = (1 - wash / 2) + wash * fbm(u * 2.2, vv * 1.05, 2, 3, seed + 41);
       r8 *= wsh * 0.99; g8 *= wsh * 1.01; b8 *= wsh * 0.985;
       if (groove > 0) {
-        const m = groove * 0.94;
+        const m = groove * 0.80;
         r8 += (MORTAR[0] - r8) * m; g8 += (MORTAR[1] - g8) * m; b8 += (MORTAR[2] - b8) * m;
       }
       if (lip > 0) { const k = 1 + 0.075 * lip; r8 *= k; g8 *= k; b8 *= k; }
@@ -201,14 +208,14 @@ function maps() {
     granite: bakeStone({ size: 512, stops: GRANITE, blocks: 8, courses: 16, seed: 0xba5701 }),
     // The plinth: half as many, twice the size, deeper joints, more chipping.
     rustic: bakeStone({ size: 512, stops: GRANITE, blocks: 4, courses: 8, seed: 0x2f19c4,
-      joint: 0.016, relief: 1.8, chip: 1.5, wash: 0.26 }),
+      joint: 0.010, relief: 1.8, chip: 0.8, wash: 0.26 }),
     // Dressed sandstone: fine joints, little chipping — this is the stone the
     // mason took time over.
     sand: bakeStone({ size: 256, stops: SANDSTONE, blocks: 6, courses: 12, seed: 0x71c308,
-      joint: 0.008, relief: 0.6, chip: 0.5, speckle: 0.03 }),
+      joint: 0.0048, relief: 0.6, chip: 0.28, speckle: 0.03 }),
     // A single dressed slab: no joints at all, just grain (lintel, hood, caps).
     sandFlat: bakeStone({ size: 256, stops: SANDSTONE, blocks: 1, courses: 1, seed: 0x5a2b90,
-      joint: 0.004, relief: 0.35, chip: 0.4, speckle: 0.03, wash: 0.24 }),
+      joint: 0.0026, relief: 0.35, chip: 0.25, speckle: 0.03, wash: 0.24 }),
     veil: veilTexture(256, 0.92),
     shadow: veilTexture(256, 0.55),
   };
@@ -294,7 +301,9 @@ function drumUV(geo, uw, vw, zc, zClip) {
 // The model
 // ---------------------------------------------------------------------------
 
-const R_HULL = 0.055, R_TRIM = 0.030, R_THIN = 0.014;
+// Bevel radius scales with the part: chunky on dressed stone, hairline on
+// anything sitting in the facade's 0.09 of depth.
+const R_TRIM = 0.030, R_THIN = 0.014;
 // Eight centuries of settling, about z. Smaller than Heartwood's 0.7°: this
 // is masonry, not a glued box, and at 12 units tall every tenth of a degree
 // costs 0.02 of the socket's width at the crown.
@@ -318,10 +327,10 @@ export function buildBastionSkin(v) {
     envMapIntensity: 0.45, vertexColors: true,
   });
   const MAT = {
-    granite: mat(M.granite, 0.7),
-    rustic: mat(M.rustic, 0.85),
-    sand: mat(M.sand, 0.55),
-    sandFlat: mat(M.sandFlat, 0.45),
+    granite: mat(M.granite, 0.5),
+    rustic: mat(M.rustic, 0.62),
+    sand: mat(M.sand, 0.42),
+    sandFlat: mat(M.sandFlat, 0.35),
     // The arrow slit's floor. Not a light and not a hole — a dark stone that
     // the surround's own shadow finishes the job on.
     shadowStone: new THREE.MeshStandardMaterial({
@@ -444,7 +453,7 @@ export function buildBastionSkin(v) {
   // quoins read as colour at fifteen units, not as relief.
   for (const s of [-1, 1]) {
     span('sand', s * (aSh - 0.26), s * aSh, doorY + 0.42, yShaftTop, zFI, zFO,
-      { r: R_THIN, uv: UV.trim });
+      { r: R_THIN, uv: UV.slab });
   }
 
   // --- THE GATEWAY --------------------------------------------------------
@@ -453,7 +462,7 @@ export function buildBastionSkin(v) {
   // They also hide the seam where the flat facade meets the round shell.
   for (const s of [-1, 1]) {
     span('sand', s * (doorX + 0.02), s * (doorX + 0.54), 0, doorY + 0.80,
-      z0 - 0.75, zFO, { r: R_TRIM, weather: true, uv: UV.trim });
+      z0 - 0.75, zFO, { r: R_TRIM, weather: true, uv: UV.slab });
     span('sandFlat', s * (doorX - 0.04), s * (doorX + 0.60), doorY + 0.80, doorY + 1.00,
       z0 - 0.82, zFO, { r: R_THIN, uv: UV.slab });
   }
@@ -462,16 +471,16 @@ export function buildBastionSkin(v) {
   // face at z0+0.25. The engine's own HOOD volume runs to z0+1.25 and asks to
   // be shadowed; a gate cover flush with the wall shadows nothing. It sits
   // 3.9 units above the exit trajectory's start and carries no collider.
-  span('sandFlat', -(doorX + 0.45), doorX + 0.45, doorY, doorY + 0.44, z0 - 0.35, zFO,
+  span('sand', -(doorX + 0.45), doorX + 0.45, doorY, doorY + 0.30, z0 - 0.35, zFO,
     { r: R_TRIM, uv: UV.slab });
   {
-    const w = 2 * (doorX + 0.55), h = 0.34 * S, tilt = 14 * Math.PI / 180;
-    const zBack = z0 + 0.05, zFront = v.hood.c[2] + v.hood.s[2] / 2 - 0.28 * S;
+    const w = 2 * (doorX + 0.28), h = 0.26 * S, tilt = 14 * Math.PI / 180;
+    const zBack = z0 + 0.05, zFront = v.hood.c[2] + v.hood.s[2] / 2 - 0.44 * S;
     const d = (zFront - zBack) / Math.cos(tilt);
     const geo = roundedBox(w, h, d, R_TRIM, 1);
-    planarUV(geo, UV.slab[0], UV.slab[1], rnd() * 0.4, rnd() * 0.4);
-    const hood = new THREE.Mesh(geo, MAT.sandFlat);
-    hood.position.set(0, doorY + 0.62, (zBack + zFront) / 2);
+    planarUV(geo, UV.slab[0], UV.slab[1] * 0.6, rnd() * 0.4, rnd() * 0.4);
+    const hood = new THREE.Mesh(geo, MAT.sand);
+    hood.position.set(0, doorY + 0.52, (zBack + zFront) / 2);
     hood.rotation.x = tilt;
     add(hood);
   }
@@ -482,32 +491,35 @@ export function buildBastionSkin(v) {
   }
 
   // --- THE ARROW SLIT: a recess, not a hole -------------------------------
-  // On the front-left shoulder, where the wall has real thickness to be cut
-  // into (the facade has 0.09 and cannot host a recess at all). Off-centre
-  // and unanswered on the right: Heartwood's single iron bracket, in stone.
+  // LOOKED AT, THEN MOVED. The first cut put it on the front-left shoulder,
+  // where the wall is 0.36 thick and a real 0.10 recess fits. It was
+  // invisible: the shoulder begins only 10° past the facade's edge, so from
+  // every shipped eye it is nearly edge-on. So the slit lives on the FACADE
+  // instead, and reads the way an arrow slit actually reads at fifteen
+  // units — as a dark slot in a grey wall. Value, not depth: the surround is
+  // the 0.03 the socket allows plus the sandstone's own step, and the slot
+  // itself is a near-black stone sunk another 0.04 behind it.
+  //
+  // IT IS STILL NOT A HOLE, and that is load-bearing: it sits inside the
+  // COWL band, where a single leaked ray is a die seen vanishing. The slot's
+  // stone is opaque and the facade slab stands behind it, so a ray that gets
+  // through the sandstone surround stops on one or the other.
+  //
+  // Off-centre, and nothing on the right answers it — Heartwood's single iron
+  // bracket, in stone.
   {
-    const th = -68 * Math.PI / 180;
-    // Place a stone in the SHOULDER'S OWN FRAME: `tan` runs along the wall,
-    // `rMid` is the radius of the box's centre. Writing it any other way
-    // means trigonometry at four call sites instead of one.
-    const put = (matKey, w, hh, dep, rMid, dy, tan = 0) => {
-      const geo = roundedBox(w, hh, dep, R_THIN, 1);
-      planarUV(geo, UV.trim[0], UV.trim[1], rnd() * 0.4, rnd() * 0.4);
-      const m = new THREE.Mesh(geo, MAT[matKey]);
-      m.rotation.y = th;
-      m.position.set(rMid * Math.sin(th) + tan * Math.cos(th), dy,
-        zc + rMid * Math.cos(th) - tan * Math.sin(th));
-      return add(m);
-    };
-    const y0 = 4.95, y1 = 6.25, yc = (y0 + y1) / 2, hh = y1 - y0;
-    // The floor of the recess: its face is 0.08 back from the wall's, and
-    // 0.16 of wall still stands behind it. A ray that reaches this stone
-    // stops on it — the slit is a recess, and the whole occlusion argument
-    // depends on it never becoming a hole.
-    put('shadowStone', 0.34, hh - 0.22, 0.10, rOut - 0.13, yc);
-    for (const s of [-1, 1]) put('sand', 0.20, hh, 0.14, rOut - 0.05, yc, s * 0.27);
-    put('sand', 0.74, 0.20, 0.16, rOut - 0.04, y1 + 0.02);   // head
-    put('sand', 0.74, 0.16, 0.18, rOut - 0.03, y0 - 0.02);   // sill
+    const sx = -0.92, w = 0.30, y0 = 7.30, y1 = 8.90;
+    const jamb = 0.26, head = 0.24;
+    span('shadowStone', sx - w / 2, sx + w / 2, y0, y1, zFI, zFF - 0.012,
+      { r: R_THIN, uv: UV.trim });
+    for (const s of [-1, 1]) {
+      span('sand', sx + s * (w / 2), sx + s * (w / 2 + jamb), y0 - head, y1 + head,
+        zFI, zFO, { r: R_THIN, uv: UV.trim });
+    }
+    span('sand', sx - (w / 2 + jamb), sx + (w / 2 + jamb), y1, y1 + head, zFI, zFO,
+      { r: R_THIN, uv: UV.trim });
+    span('sand', sx - (w / 2 + jamb), sx + (w / 2 + jamb), y0 - head, y0, zFI, zFO,
+      { r: R_THIN, uv: UV.trim });
   }
 
   // --- MERLONS: decoration on a closed ring -------------------------------
@@ -524,7 +536,7 @@ export function buildBastionSkin(v) {
       const s = -perim / 2 + (k + 0.5) * pitch;
       const geo = roundedBox(w, h, dep, R_TRIM, 1);
       planarUV(geo, UV.slab[0], UV.slab[1], rnd() * 0.4, rnd() * 0.4);
-      const m = new THREE.Mesh(geo, MAT.sandFlat);
+      const m = new THREE.Mesh(geo, MAT.sand);
       if (Math.abs(s) <= aPar) {
         m.position.set(s, (yPar1 + yMer1) / 2, zFO - dep / 2);
       } else {
@@ -568,7 +580,7 @@ export function buildBastionSkin(v) {
     // against whatever they come to rest on.
     const geo = roundedBox(v.lip.s[0] + 0.15, v.lip.s[1], v.lip.s[2] + 0.1, 0.07, 1);
     planarUV(geo, UV.slab[0], UV.slab[1], 0.55, 0.2);
-    const tray = new THREE.Mesh(geo, MAT.sandFlat);
+    const tray = new THREE.Mesh(geo, MAT.sand);
     tray.position.set(...v.lip.c);
     tray.rotation.x = v.lip.rx;
     add(tray);
