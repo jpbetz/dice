@@ -149,11 +149,15 @@ function bakeWood({ size, stops, planks, seed, cathedral }) {
       tone: 1 + (rnd() - 0.5) * 0.30,
       skew: (rnd() - 0.5) * 0.42,
       lengthwise: rnd() * 11,
-      ringf: 5.2 + rnd() * 2.4,
+      ringf: 11 + rnd() * 5,
     });
   }
-  const GW = 0.030;   // groove half-width, in plank-local u
-  const LW = 0.062;   // outer edge of the bright lip just inside the groove
+  const GW = 0.026;   // groove half-width, in plank-local u
+  const LW = 0.060;   // outer edge of the bright lip just inside the groove
+  // Ring CONTRAST is the whole difference between wood and corduroy. Rings
+  // ride a narrow band of the species ramp; the plank grooves are what the
+  // eye is supposed to count, and they get the full range.
+  const RING_LO = 0.26, RING_SPAN = 0.34;
 
   for (let py = 0; py < W; py++) {
     const vv = py / W;
@@ -166,10 +170,10 @@ function bakeWood({ size, stops, planks, seed, cathedral }) {
         // board so they arch instead of stripe.
         const dx = (u - 0.42) * 0.08;
         const dy = vv - 0.5;
-        let r = 7.5 * Math.hypot(dx, dy)
-          + 0.55 * (turb(u * 3, vv * 3, 3, 4, seed + 31) * 2 - 1);
+        let r = 16 * Math.hypot(dx, dy)
+          + 0.32 * (turb(u * 3, vv * 3, 3, 4, seed + 31) * 2 - 1);
         r += 0.5 * (vnoise(r * 0.5, 3.7, 64, seed + 71) * 2 - 1);
-        value = smoothpulse(0.10, 0.55, 0.70, 0.95, r - Math.floor(r));
+        value = RING_LO + RING_SPAN * smoothpulse(0.10, 0.55, 0.70, 0.95, r - Math.floor(r));
       } else {
         const fu = u * P;
         const idx = Math.min(P - 1, Math.floor(fu));
@@ -177,10 +181,10 @@ function bakeWood({ size, stops, planks, seed, cathedral }) {
         const lu = fu - idx;                    // 0..1 across this plank
         const nv = vv + j.lengthwise;           // per-column lengthwise offset
         let r = j.ringf * (lu + j.phase) + j.skew * nv
-          + 0.65 * (turb(u * 4, vv * 1.35, 4, 4, seed + 17) * 2 - 1);
+          + 0.45 * (turb(u * 4, vv * 1.35, 4, 4, seed + 17) * 2 - 1);
         // Ring-WIDTH unevenness: real growth rings are not metronomic.
         r += 0.5 * (vnoise(r * 0.5, nv * 0.7, 64, seed + 53) * 2 - 1);
-        value = smoothpulse(0.10, 0.55, 0.70, 0.95, r - Math.floor(r));
+        value = RING_LO + RING_SPAN * smoothpulse(0.10, 0.55, 0.70, 0.95, r - Math.floor(r));
         const dEdge = Math.min(lu, 1 - lu);
         groove = 1 - smoothstep(0, GW, dEdge);
         lip = smoothstep(GW, GW + 0.012, dEdge) * (1 - smoothstep(LW, LW + 0.05, dEdge));
@@ -188,30 +192,37 @@ function bakeWood({ size, stops, planks, seed, cathedral }) {
       }
 
       // Fine pore lines: high-frequency noise stretched along the grain.
-      const pore = turb(u * 96, vv * 7, 96, 2, seed + 91);
+      const pore = turb(u * 128, vv * 9, 128, 2, seed + 91);
+      // …and a broad tonal drift across the board. Without it every plank
+      // averages to the same brown and the panel reads as painted MDF.
+      const drift = 0.86 + 0.30 * fbm(u * 1.6, vv * 1.3, 2, 3, seed + 41);
 
       let [r8, g8, b8] = ramp3(stops, value);
-      r8 *= tone; g8 *= tone; b8 *= tone;
-      const pk = 1 - 0.04 * pore;
+      const tk = tone * drift;
+      r8 *= tk; g8 *= tk; b8 *= tk;
+      const pk = 1 - 0.07 * pore;
       r8 *= pk; g8 *= pk; b8 *= pk;
       if (groove > 0) {
-        const m = groove * 0.92;
+        const m = groove * 0.95;
         r8 += (GROOVE[0] - r8) * m; g8 += (GROOVE[1] - g8) * m; b8 += (GROOVE[2] - b8) * m;
       }
       if (lip > 0) {
         const k = 1 + 0.08 * lip;
         r8 *= k; g8 *= k; b8 *= k;
       }
-      // Corner vignette over the outer 8% of the panel — a painted-in
-      // ambient darkening that survives even before the AO bake runs.
-      const vg = (1 - smoothstep(0, 0.08, Math.min(u, 1 - u)))
-        + (1 - smoothstep(0, 0.08, Math.min(vv, 1 - vv)));
-      const vk = 1 - 0.25 * clamp01(vg);
+      // A gentle tile vignette. Deliberately weak: these UVs are WORLD-scale
+      // and tile across a panel, so a strong one would print a grid rather
+      // than darken corners — the AO bake is what does corners here.
+      const vg = (1 - smoothstep(0, 0.10, Math.min(u, 1 - u)))
+        + (1 - smoothstep(0, 0.10, Math.min(vv, 1 - vv)));
+      const vk = 1 - 0.07 * clamp01(vg);
       r8 *= vk; g8 *= vk; b8 *= vk;
 
-      // HEIGHT: seams, pores, plank bevels. No ring colour.
-      let h = 0.5 - 0.34 * groove + 0.07 * lip - 0.05 * pore
-        + 0.03 * (value - 0.5) + 0.02 * (fbm(u * 8, vv * 8, 8, 3, seed + 5) - 0.5);
+      // HEIGHT: seams, pores, plank bevels. Ring colour stays OUT of it —
+      // rings in a normal map is what makes procedural wood read as
+      // corrugated iron.
+      const h = 0.5 - 0.34 * groove + 0.07 * lip - 0.05 * pore
+        + 0.02 * (fbm(u * 8, vv * 8, 8, 3, seed + 5) - 0.5);
 
       const i = (py * W + px) * 4;
       cImg.data[i] = clamp01(r8 / 255) * 255;
@@ -282,7 +293,7 @@ function roughFromHeight(heightCanvas, size, seed) {
       const sx = Math.floor((x / size) * s), sy = Math.floor((y / size) * s);
       const h = src[(sy * s + sx) * 4] / 255;
       const wob = (fbm(x / size * 5, y / size * 5, 5, 3, seed) - 0.5) * 2 * 0.08;
-      const r = clamp01(0.55 + 0.30 * (1 - h) + wob) * 255;
+      const r = clamp01(0.70 + 0.22 * (1 - h) + wob) * 255;
       const i = (y * size + x) * 4;
       img.data[i] = r; img.data[i + 1] = r; img.data[i + 2] = r; img.data[i + 3] = 255;
     }
@@ -501,7 +512,7 @@ export function buildTowerSkin(v) {
   group.add(wood);
 
   const woodMat = (m) => new THREE.MeshStandardMaterial({
-    map: m.map, normalMap: m.normalMap, normalScale: new THREE.Vector2(0.5, 0.5),
+    map: m.map, normalMap: m.normalMap, normalScale: new THREE.Vector2(0.35, 0.35),
     roughnessMap: m.roughnessMap, roughness: 1, metalness: 0,
     envMapIntensity: 0.45, vertexColors: true,
   });
@@ -520,7 +531,7 @@ export function buildTowerSkin(v) {
   // World units per texture tile, per species. Planks are 6 to a tile at
   // ~2.1 units each — about 1.55 d6 widths, the scale cue that says
   // "hobby tower", not "dollhouse".
-  const UV = { plank: [12.6, 16.4], flat: [6.3, 4.1] };
+  const UV = { plank: [12.6, 16.4], flat: [3.3, 2.1] };
 
   const parts = [];
   // THE ONLY WAY A BOX IS MADE IN THIS FILE. Everything that follows is
@@ -606,15 +617,15 @@ export function buildTowerSkin(v) {
   // --- MOUTH: a flared hopper rim on three sides, a low pouring lip at the
   // front. The front cannot flare — flare means leaning out over z0+0.25,
   // and the socket ends there. Three sides plus a lip is the honest shape.
-  const flare = 22 * Math.PI / 180;
+  const flare = 15 * Math.PI / 180;
   const rimH = 0.44 * S;
   for (const s of [-1, 1]) {
-    span('walnut', s * (inX + 0.02), s * (inX + 0.36 * S), capTop, capTop + rimH,
+    span('walnut', s * (inX + 0.02), s * (inX + 0.44 * S), capTop, capTop + rimH,
       z0 - 3.76 * S, z0, { r: R_TRIM, rz: -s * flare });
   }
   span('walnut', -(capX - 0.1), capX - 0.1, capTop, capTop + rimH,
     zBI - 0.3 * S, zBI + 0.04, { r: R_TRIM, rx: -flare });
-  span('walnut', -(capX - 0.1), capX - 0.1, capTop, capTop + rimH * 0.55, zFI, zFO,
+  span('walnut', -(capX - 0.1), capX - 0.1, capTop, capTop + rimH * 0.72, zFI, zFO,
     { r: R_THIN });
 
   // --- HOOD: the canted wedge roof over the doorway ------------------------

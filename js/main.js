@@ -5903,6 +5903,21 @@ window.__diceDebug = {
     if (g) g.visible = TOWERLAB.ghosts;
     return TOWERLAB.ghosts;
   },
+  // A LOOK-ONLY camera park, for photographing the model. The shipped eyes
+  // frame the MAT, and an 11-unit tower standing at its back edge runs off
+  // the top of every one of them — true, and not a thing you can judge a
+  // model from. Nothing about the film reads the camera; applyCameraFraming()
+  // (or any zoom) puts the player's view straight back.
+  towerEye(dist = 16, height = 9, xoff = 5) {
+    const v = towerVolumes();
+    // An armed reframe would put the eye back on the next tick — and under
+    // holdClock it never expires, so it would do it every frame forever.
+    camEase = null;
+    camera.position.set(xoff, height, v.z0 + dist);
+    camera.lookAt(0, 5.2 * v.S, v.z0 - 1.4);
+    camera.updateMatrixWorld();
+    return [camera.position.x, camera.position.y, camera.position.z];
+  },
   // DOES THE SKIN ACTUALLY HIDE WHAT THE CONTRACT SAYS IT MUST? (docs/TOWER.md
   // §4.) For every shipped camera eye, shoot a ray at a grid of sample points
   // and ask whether opaque skin geometry stands in the way. Only the wood and
