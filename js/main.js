@@ -5529,7 +5529,7 @@ function towerLabDrop(n = 8, seed = 42) {
     // ~50 ms arrival gaps at terminal speed (t = √(2h/g), and dt shrinks as
     // v grows), which is why the first cut exited "kinda all at once". A
     // poured cadence of 0.25–0.4 s per die survives the fall intact.
-    entryAt += i === 0 ? 0 : 0.25 + rng() * 0.15;
+    entryAt += i === 0 ? 0 : 0.12 + rng() * 0.08;
     mesh.position.set(
       v.aim.c[0] + (rng() - 0.5) * 0.8,
       v.aim.c[1] + rng() * 0.8,
@@ -5541,7 +5541,7 @@ function towerLabDrop(n = 8, seed = 42) {
       transit: 0.5 + rng() * 1.1,
       exit: {
         x: (rng() - 0.5) * 1.2,
-        speed: 6 + rng() * 5,
+        speed: 9 + rng() * 6,
         yaw: (rng() - 0.5) * (Math.PI / 3),      // ±30°
         pitch: -rng() * (Math.PI / 18),          // 0..−10°
         av: [(rng() - 0.5) * 40, (rng() - 0.5) * 40, (rng() - 0.5) * 40],

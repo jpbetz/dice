@@ -59,15 +59,17 @@ own motion carries it out.
 clear: width ≥ 3.0, clear height from apron top (`y = 0.8`) up to ≥ 3.4.
 Exit spawn is engine-owned and INSIDE the physics walls (hidden dice have no
 bodies; a body first exists here): `P = (x: ±0.6 seeded, y: 1.6,
-z: z0 + 0.35)`, already tumbling, velocity seeded from: speed 6–11 u/s, yaw
+z: z0 + 0.35)`, already tumbling, velocity seeded from: speed 9–15 u/s
+(6–11 read as dribbling in the lab — a tower exit should THROW), yaw
 within ±30° of +z, pitch 0° to −10°. Everything after spawn is the normal
 pipeline — real bounces, displacement terminator, face correction, tempo
 curve — untouched.
 
 **6. TRANSIT — the cadence and the sound.** All seeded. Entries POUR at
-0.25–0.4 s per die — time-staggered, never height-staggered (equal height
+0.12–0.2 s per die — time-staggered, never height-staggered (equal height
 gaps compress to ~50 ms arrival gaps at terminal speed; measured in the
-first lab cut, which exited "kinda all at once"). Hidden transit 0.5–1.6 s
+first lab cut, which exited "kinda all at once"; 0.25–0.4 s then read as
+too spread — the pour should feel like one motion of the hand). Hidden transit 0.5–1.6 s
 per die; exits staggered ≥ 0.2 s apart. 2–4 synthetic baffle clunks per die
 at seeded film times,
 injected into the same film-time click gate the table already uses. Models
