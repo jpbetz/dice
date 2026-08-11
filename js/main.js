@@ -134,10 +134,13 @@ const TOWERS = {
     // METAL, and the only voice in the palette that is not a knock. `chime`
     // is the sine-partial body — glass at its default weight — but weighted
     // right down it stops being crystal and becomes the ring a die gets out
-    // of a cast-iron baffle, and the long tail is the shaft carrying it. A
-    // FIRST TUNING and Joe's dial: 0.85 / 70 is where the partial reads as
-    // iron rather than as a bell, measured by ear against the die set's own
-    // thud, and it is the number most likely to want moving.
+    // of a cast-iron baffle, and the long tail is the shaft carrying it.
+    // A FIRST TUNING, AND NOBODY HAS HEARD IT: these three numbers were
+    // reasoned from the voice table (weight shifts the centre frequency
+    // down, sustain extends the decay) and from wanting distance between
+    // this and the Emberforge die set's own thud 0.9 / 30 — not listened
+    // to. Of everything in this tower it is the thing most likely to want
+    // moving, and it is Joe's dial.
     clunkVoice: { body: 'chime', weight: 0.85, sustain: 70 },
   },
 };
