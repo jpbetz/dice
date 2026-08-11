@@ -131,6 +131,16 @@ const TOWERS = {
   blackanvil: {
     id: 'blackanvil', label: 'Black Anvil', skin: buildAnvilSkin,
     title: 'Black Anvil — a cooling forge chimney; dice fall through it ringing',
+    // The grate glows, so the grate LIGHTS (towerLanternBuild): one faint
+    // physical-falloff point light in front of the firebox — emissive maps
+    // shine but cannot illuminate, and a forge that casts no warmth on its
+    // own tray reads as a sticker. `at` is [x, y, z offset from z0]; the
+    // grate bed sits above the door head (toweranvil.js refusal #1).
+    ember: { at: [0, 5.2, 1.9], color: '#ff6a28' },
+    // The forge's identity is DARKNESS with a glow in it — the full rake
+    // that flatters pale masonry just flattens soot. It takes the lantern
+    // at four-tenths and lets the ember carry the rest (A/B'd 2026-08-11).
+    lantern: { rake: 0.4 },
     // METAL, and the only voice in the palette that is not a knock. `chime`
     // is the sine-partial body — glass at its default weight — but weighted
     // right down it stops being crystal and becomes the ring a die gets out
@@ -5878,6 +5888,80 @@ let pendingTower = null;           // a change waiting on the roll boundary
 let towerRig = null;               // {id, group, bodies, cm} while socketed
 const TOWER_WALL_AWAY = -1000;     // where the back wall plane parks, socketed
 
+// THE TOWER LANTERN (Joe, 2026-08-11: "could we improve the lighting?").
+// The scene's key light is tuned for dice on the felt and hits the tower
+// flat-on, which is what was leaving three towers' worth of baked normal
+// maps unread — masonry needs RAKING light. So the tower brings its own,
+// exactly as it brings colliders and a clunk voice: one warm spot grazing
+// across the facade, plus (for towers whose registry row declares `ember`)
+// one faint point light that lets the emissive glow actually illuminate
+// its surroundings, breathing slowly on the tick clock. Engine-owned,
+// socket-gated (first law: no tower, no lantern, not even the objects),
+// render-only (films, bakes and replays never know), and every number is
+// a live dial: __diceDebug.towerLight(on) / towerLightTune({...}).
+// Declared above tick() for the TDZ reason TOWERLAB documents.
+const TOWERLIGHT = {
+  on: true,
+  rig: null,   // {spot, target, ember?, emberBase} while socketed and on
+  t: 0,        // breath clock — dt-driven, so holdClock freezes the coals
+  tune: {
+    rakeIntensity: 2.4, rakeColor: '#ffd9a0',
+    rakeX: -10, rakeY: 5.5, rakeOut: 7.5,     // eye: side, height, z0 + out
+    rakeAngle: 0.62, rakePenumbra: 0.6,
+    emberIntensity: 14, emberDist: 8,
+    breathDepth: 0.22, breathHz: 0.11,
+  },
+};
+
+function towerLanternDispose() {
+  const r = TOWERLIGHT.rig;
+  if (!r) return;
+  scene.remove(r.spot, r.target);
+  if (r.ember) scene.remove(r.ember);
+  TOWERLIGHT.rig = null;
+}
+
+function towerLanternBuild() {
+  towerLanternDispose();
+  if (!towerRig || !TOWERLIGHT.on) return;
+  const v = towerVolumes();
+  const t = TOWERLIGHT.tune;
+  // decay 0 / distance 0: classic non-attenuating spot, so the intensity
+  // dial means the same thing at every distance dial.
+  const spec = TOWERS[currentTower];
+  // A tower may take the rake at a fraction of the dial (Black Anvil: the
+  // forge stays dark and the ember carries it). The dial still scales it.
+  const rakeScale = spec && spec.lantern && spec.lantern.rake !== undefined ? spec.lantern.rake : 1;
+  const spot = new THREE.SpotLight(t.rakeColor, t.rakeIntensity * rakeScale, 0, t.rakeAngle, t.rakePenumbra, 0);
+  spot.position.set(t.rakeX, t.rakeY, v.z0 + t.rakeOut);
+  const target = new THREE.Object3D();
+  target.position.set(0, 4.5, v.z0);
+  spot.target = target;
+  scene.add(spot, target);
+  const rig = { spot, target, ember: null, emberBase: t.emberIntensity };
+  if (spec && spec.ember) {
+    // Physical falloff (decay 2) so the glow pools on the tray stone under
+    // the grate instead of reaching the felt's centre.
+    const ember = new THREE.PointLight(spec.ember.color, t.emberIntensity, t.emberDist, 2);
+    const at = spec.ember.at;
+    ember.position.set(at[0], at[1], v.z0 + at[2]);
+    scene.add(ember);
+    rig.ember = ember;
+  }
+  TOWERLIGHT.rig = rig;
+}
+
+// Coals at rest, not a flicker: two incommensurate slow sines, depth well
+// under half, riding the same dt clock as everything else.
+function stepTowerLantern(dt) {
+  const r = TOWERLIGHT.rig;
+  if (!r || !r.ember) return;
+  TOWERLIGHT.t += dt;
+  const w = 2 * Math.PI * TOWERLIGHT.tune.breathHz * TOWERLIGHT.t;
+  const breath = 0.65 * Math.sin(w) + 0.35 * Math.sin(2.63 * w + 1.7);
+  r.ember.intensity = r.emberBase * (1 + TOWERLIGHT.tune.breathDepth * breath);
+}
+
 function tick(dt, render = true, realtime = false) {
   // Themed-set clocks (Tier 6 §9): the Level 2 shader uniform and the
   // Level 3 particle field advance with the same dt discipline as
@@ -5891,6 +5975,7 @@ function tick(dt, render = true, realtime = false) {
   stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
   stepRevealing(dt); // reveal correction flips (goal 11)
   stepTowerLab(dt);  // tower lab (docs/TOWER.md) — inert unless towerCore(true)
+  stepTowerLantern(dt); // the ember breath — inert unless a glowing tower is up
   stepCamera(dt);    // eased reframing; only ever armed under a quiet picture
   if (chips.length) positionChips();
   if (isPeekOpen()) positionPeek();
@@ -6366,6 +6451,7 @@ function towerSocket(id) {
   // so the body list passes through the towerless configuration in between
   // and can never end up holding two models' colliders.
   if (towerRig) {
+    towerLanternDispose(); // the lantern goes down with its tower
     scene.remove(towerRig.group);
     // Reverse add order (see towerColliders): removal is a splice, and going
     // backwards keeps every surviving body's index where it was.
@@ -6390,6 +6476,7 @@ function towerSocket(id) {
     if (spec.skin) group.add(spec.skin(v));
     scene.add(group);
     towerRig.group = group;
+    towerLanternBuild(); // and the tower brings its own light
   }
   TOWER_SWAP.after = world.bodies.length;
   return currentTower;
@@ -6740,6 +6827,20 @@ window.__diceDebug = {
   },
   // Which registered tower the LAB wears. The shipped socket is unaffected.
   towerLabSkin(id) { return towerLabSkin(id); },
+  // THE LANTERN DIALS (Joe's A/B). towerLight(false) kills the rig outright;
+  // towerLightTune({rakeIntensity: 3}) patches any TOWERLIGHT.tune field and
+  // rebuilds against the socketed tower, so every number lands on the next
+  // painted frame. Both return the live state for the console.
+  towerLight(on = true) {
+    TOWERLIGHT.on = !!on;
+    towerLanternBuild();
+    return { on: TOWERLIGHT.on, rigged: !!TOWERLIGHT.rig };
+  },
+  towerLightTune(patch = {}) {
+    Object.assign(TOWERLIGHT.tune, patch);
+    towerLanternBuild();
+    return { ...TOWERLIGHT.tune, rigged: !!TOWERLIGHT.rig };
+  },
   // The last socket change, step by step (see TOWER_SWAP): a tower→tower swap
   // must pass through the towerless body list on its way.
   towerSwap() { return { ...TOWER_SWAP }; },
