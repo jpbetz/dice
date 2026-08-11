@@ -10252,7 +10252,48 @@ export const scenarios = [
           + `(both ${on.bg})`);
         assert.notEqual(on.fg, off.fg, `picker ${i}: nor lettered like them`);
       }
+      // …AND THE ROW STILL FITS. New with the fourth chip (2026-08-14): the
+      // assertions above are about PAINT and would be just as green with the
+      // chips overflowing their container or collapsed to nothing. A picker
+      // grows by one row every time the registry does, and "it looked fine at
+      // three" is not a property. Measured: every chip has real width and
+      // real height, and the group does not scroll sideways.
+      const chipBox = JSON.parse(await a.eval(`(() => {
+        const g = document.getElementById('tower-picker');
+        return JSON.stringify({
+          over: g.scrollWidth - g.clientWidth,
+          chips: [...g.querySelectorAll('[data-tower]')].map((b) => {
+            const r = b.getBoundingClientRect();
+            return { id: b.dataset.tower, w: Math.round(r.width), h: Math.round(r.height) };
+          }),
+        });
+      })()`));
+      for (const c of chipBox.chips) {
+        assert.ok(c.w > 8 && c.h > 8,
+          `the '${c.id}' chip is actually laid out at ${chipBox.chips.length} chips `
+          + `(${c.w}×${c.h} px)`);
+      }
+      assert.ok(chipBox.over <= 1,
+        `and the picker does not overflow sideways at ${chipBox.chips.length} chips `
+        + `(scrollWidth − clientWidth = ${chipBox.over}px)`);
       await a.eval(`document.getElementById('settings-modal').classList.add('hidden')`);
+
+      // ---- EVERY MODEL BRINGS A VOICE, AND ITS OWN ------------------------
+      // A registry invariant, not a per-tower fact, so it is asserted over the
+      // registry and costs nothing when a fourth model lands: a row with a
+      // skin must carry a clunkVoice (docs/TOWER.md §6), 'none' must not, and
+      // no two may be the same — two towers that sound alike are one tower
+      // twice, and the palette is the only thing besides shape a skin gets.
+      const skinned = registry.filter((t) => t.skin);
+      assert.ok(skinned.length >= 3, `three models or more to compare (${skinned.length})`);
+      for (const t of skinned) {
+        assert.ok(t.clunkVoice && t.clunkVoice.body,
+          `${t.id} registers a sound palette (${JSON.stringify(t.clunkVoice)})`);
+      }
+      const heard = skinned.map((t) => JSON.stringify(t.clunkVoice));
+      assert.equal(new Set(heard).size, heard.length,
+        `and no two models sound alike (${skinned.map((t) => `${t.id}:${t.clunkVoice.body}`)
+          .join(', ')})`);
 
       // ---- delivered / shows / hidden / clunks ----------------------------
       const pour = async (notation) => {
@@ -10327,8 +10368,8 @@ export const scenarios = [
         await a.dbg('sim(400)');
       }
 
-      // ---- the SECOND tower -------------------------------------------------
-      // Deliberately NOT a second copy of everything above. What is new when a
+      // ---- the OTHER towers -------------------------------------------------
+      // Deliberately NOT another copy of everything above. What is new when a
       // registry grows a row is exactly three things — the swap, the socket it
       // lands on, and the sound palette — and each of those has its own way to
       // fail:
@@ -10339,7 +10380,7 @@ export const scenarios = [
       //     body list and bake the same seed into a different film than the
       //     client that unsocketed first. `mid` is the only moment that is
       //     visible from outside, and it is recorded for this.
-      //   · order — fails if the second tower's socket builds anything of its
+      //   · order — fails if a later tower's socket builds anything of its
       //     own. There is one collider builder and skins add nothing.
       //   · voice — fails if the palette is not resolved from the SOCKETED
       //     TOWER. Red-checked by pointing the resolver at the die set: the
@@ -10348,64 +10389,75 @@ export const scenarios = [
       //   · pour — fails if a skin swap changed the film at all; the knocks
       //     are baked from the seed and the tower is not in the bake.
       //
+      // PARAMETERISED OVER THE REGISTRY (2026-08-14, when the third model
+      // landed). It used to name bastion and would have needed copying for
+      // Black Anvil — and a copied block is how a suite grows a per-tower tax
+      // that nobody pays attention to by the fifth one. Every skinned model
+      // that is not the starting one goes through the same four questions,
+      // and a new row is covered the day it is registered.
+      //
       // settle() first, and not as a formality: a tower change is a ROOM
       // change and rides the roll boundary (queueTower), so asking for one
       // while the table still counts as busy parks it in pendingTower and the
       // wait below would sit there until the harness gave up. clearTable()
       // does not end a roll.
-      await a.settle();
-      await b.settle();
-      await a.dbg(`setTower('bastion')`);
-      for (const t of [a, b]) {
-        await t.waitFor(`window.__diceDebug.tower === 'bastion'`,
-          { desc: 'the stone tower goes up on both tabs' });
-      }
-      const swap = await a.dbg('towerSwap()');
-      assert.equal(swap.from, 'heartwood', 'the swap started from the wooden tower');
-      assert.equal(swap.to, 'bastion', 'and landed on the stone one');
-      assert.equal(swap.mid, wasWorld.count,
-        `and passed through the TOWERLESS body list on the way — `
-        + `${swap.before} → ${swap.mid} → ${swap.after}, and ${swap.mid} is the `
-        + `${wasWorld.count} a table with no tower carries`);
-      assert.equal(swap.after, wasWorld.count + 8, 'ending on eight again, not sixteen');
-      assert.deepEqual((await a.dbg('towerBodies()')).map((x) => x.name), ORDER,
-        'the same eight engine colliders, in the same contract order');
-      assert.deepEqual(await a.dbg('tableExtents()'), upExtents,
-        'and the same room: every tower consumes the same mat');
-
-      // The sound palette (docs/TOWER.md §6) — the one thing besides geometry
-      // a skin gets to change.
-      // Asked of the drain's own resolver, with a die set that HAS a voice of
-      // its own — otherwise "the tower won" and "there was nothing to win
-      // against" look identical.
+      //
+      // The sound palette (docs/TOWER.md §6) is asked of the drain's OWN
+      // resolver, with a die set that HAS a voice of its own — otherwise "the
+      // tower won" and "there was nothing to win against" look identical.
+      // emberforge.blackanvil on purpose: it is a thud, and bastion is ALSO a
+      // thud, so a resolver that reached for the die set would fail on the
+      // weight and the tail rather than on the family. That near-miss is the
+      // one worth pinning and it is why the set is not swapped per tower.
       const voices = Object.fromEntries(registry.map((t) => [t.id, t.clunkVoice]));
-      // blackanvil on purpose: it is ALSO a thud, so a resolver that reached
-      // for the die set would fail on the weight and the tail rather than on
-      // the family — the near-miss is the one worth pinning.
       const SET = 'emberforge.blackanvil';
       const setVoice = await a.dbg(`impactVoiceFor({}, '${SET}')`);
       assert.equal(voices.none, null, 'no tower, no tower voice');
-      assert.notDeepEqual(voices.bastion, voices.heartwood,
-        'and stone does not sound like wood');
       assert.ok(setVoice, `${SET} brings a voice of its own to argue with`);
-      assert.deepEqual(await a.dbg(`impactVoiceFor({clunk:'baffle'}, '${SET}')`), voices.bastion,
-        `a baffle knock is voiced by the SOCKETED TOWER, over the die set's own `
-        + `(${JSON.stringify(voices.bastion)})`);
-      assert.deepEqual(await a.dbg(`impactVoiceFor({}, '${SET}')`), setVoice,
-        'and an ordinary landing is still the die set — the tower voices its '
-        + 'own knocks, not the whole roll');
 
-      const stone = await pour('8d6');
-      assert.ok(stone.pour, 'a stone pour is still a POUR');
-      assert.ok(stone.clunks >= 2 * stone.rest.length && stone.clunks <= 4 * stone.rest.length,
-        `with the contract's 2–4 baffle knocks per die in the film `
-        + `(${stone.clunks} for ${stone.rest.length} dice)`);
-      for (const r of stone.rest) {
-        assert.ok(r.delivered && r.visible,
-          `bastion d${r.i} (${r.type}): delivered onto open felt at (${r.p.join(', ')})`);
+      let from = 'heartwood';
+      for (const model of skinned.filter((t) => t.id !== 'heartwood')) {
+        const id = model.id;
+        await a.settle();
+        await b.settle();
+        await a.dbg(`setTower('${id}')`);
+        for (const t of [a, b]) {
+          await t.waitFor(`window.__diceDebug.tower === '${id}'`,
+            { desc: `${model.label} goes up on both tabs` });
+        }
+        const swap = await a.dbg('towerSwap()');
+        assert.equal(swap.from, from, `the swap into ${id} started from ${from}`);
+        assert.equal(swap.to, id, `and landed on ${id}`);
+        assert.equal(swap.mid, wasWorld.count,
+          `and passed through the TOWERLESS body list on the way — `
+          + `${swap.before} → ${swap.mid} → ${swap.after}, and ${swap.mid} is the `
+          + `${wasWorld.count} a table with no tower carries`);
+        assert.equal(swap.after, wasWorld.count + 8, 'ending on eight again, not sixteen');
+        assert.deepEqual((await a.dbg('towerBodies()')).map((x) => x.name), ORDER,
+          `${id}: the same eight engine colliders, in the same contract order`);
+        assert.deepEqual(await a.dbg('tableExtents()'), upExtents,
+          `${id}: and the same room — every tower consumes the same mat`);
+
+        assert.deepEqual(await a.dbg(`impactVoiceFor({clunk:'baffle'}, '${SET}')`), voices[id],
+          `${id}: a baffle knock is voiced by the SOCKETED TOWER, over the die `
+          + `set's own (${JSON.stringify(voices[id])})`);
+        assert.deepEqual(await a.dbg(`impactVoiceFor({}, '${SET}')`), setVoice,
+          `${id}: and an ordinary landing is still the die set — the tower `
+          + 'voices its own knocks, not the whole roll');
+
+        const f = await pour('8d6');
+        assert.ok(f.pour, `${id}: a pour is still a POUR`);
+        assert.ok(f.clunks >= 2 * f.rest.length && f.clunks <= 4 * f.rest.length,
+          `${id}: with the contract's 2–4 baffle knocks per die in the film `
+          + `(${f.clunks} for ${f.rest.length} dice)`);
+        for (const r of f.rest) {
+          assert.ok(r.delivered && r.visible,
+            `${id} d${r.i} (${r.type}): delivered onto open felt at (${r.p.join(', ')})`);
+        }
+        await a.dbg('clearTable()');
+        await a.dbg('sim(400)');
+        from = id;
       }
-      await a.dbg('clearTable()');
-      await a.dbg('sim(400)');
       await a.settle();
       await a.dbg(`setTower('heartwood')`);
       await a.waitFor(`window.__diceDebug.tower === 'heartwood'`,
