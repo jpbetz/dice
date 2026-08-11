@@ -7060,6 +7060,19 @@ window.__diceDebug = {
       p: [b.position.x, b.position.y, b.position.z].map((n) => Number(n.toFixed(3))),
     }));
   },
+  // THE MAIN WORLD ITSELF, not the rig's idea of it. `towerBodies()` reads
+  // towerRig, which is nulled on unsocket — so it says "clean" whether or not
+  // the world is, and a scenario that trusts it cannot see a leaked collider.
+  // (Found by red-checking `tower-roll` with one body deliberately left in.)
+  // Body ORDER here is shared truth: cannon's SAP enumerates collision pairs
+  // in body order, so two clients whose lists differ can bake one seed into
+  // two films.
+  worldBodies() {
+    return {
+      count: world.bodies.length,
+      named: world.bodies.filter((b) => b.labName).map((b) => b.labName),
+    };
+  },
   // THE POUR, as the film records it (docs/TOWER.md §3). Everything a
   // scenario needs to prove a roll actually went THROUGH a tower rather than
   // being thrown with a model standing behind it: the per-die hidden windows,
@@ -7078,6 +7091,12 @@ window.__diceDebug = {
         p: [q.x, q.y, q.z].map((n) => Number(n.toFixed(3))),
         delivered: q.z >= z0 + POUR.hidZone && Math.abs(q.x) <= TABLE_W / 2 + 1
           && Math.abs(q.z) <= TABLE_D / 2 + 1 && q.y >= -0.5,
+        // What the table SAYS this die rolled, and what the die on screen is
+        // actually showing — read off the rendered orientation, not off the
+        // array, so the two can disagree and be caught disagreeing.
+        declared: r.values ? r.values[i] : null,
+        shows: readValue(d.type, d.mesh.quaternion).value,
+        visible: d.mesh.visible !== false,
       };
     });
     return {

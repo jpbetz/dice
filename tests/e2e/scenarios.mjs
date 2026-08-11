@@ -10144,4 +10144,267 @@ export const scenarios = [
       assert.equal(peek.name, 'Round Trip', 'server-side too, for the next arrival');
     },
   },
+  {
+    name: 'tower-roll',
+    tags: ['roll', 'physics', 'tower', 'settings', 'cuj8'],
+    // THE TOWER AS A ROOM SETTING (docs/TOWER.md, shipped 2026-08-12). With
+    // `tower: 'heartwood'` a roll is baked as a POUR — scripted entry, hidden
+    // transit behind the skin, exit through the doorway — instead of a throw.
+    //
+    // Each assertion below has a way to fail, and it is named, because "the
+    // dice ended somewhere" is exactly the green check this project keeps
+    // catching itself writing:
+    //
+    //   · socketed   — fails if towerSocket never runs: the mat stays at the
+    //                  preset depth and towerBodies() is empty.
+    //   · delivered  — fails if a die rests inside the tower (z < z0 + 0.6),
+    //                  out of bounds, or under the floor. This is THE EXIT
+    //                  GUARANTEE, and it is the whole reason the bake retries.
+    //   · shows      — reads the die's RENDERED orientation, not the values
+    //                  array, so a broken face correction cannot pass by
+    //                  agreeing with itself.
+    //   · hidden     — fails if any die has no hidden window, which is what a
+    //                  throw with a model standing behind it would look like.
+    //                  A pour with no hidden windows is scenery.
+    //   · clunks     — fails if the baffle knocks are not in the film; the
+    //                  film-time click gate is what voices them, so a clunk
+    //                  that is not a film event is silence.
+    //   · replay     — same seed, same film. Fails the moment anything in the
+    //                  pour path reads Date.now or Math.random.
+    //   · restored   — fails if unsocketing leaks a body, forgets the back
+    //                  wall plane, or leaves the mat deep. THE FIRST LAW: with
+    //                  no tower the world must be byte-for-byte the one every
+    //                  other scenario in this file measures.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.settle();
+
+      // What the towerless table is, measured before anything is socketed —
+      // the restoration assertion compares against THIS rather than against
+      // numbers typed here, so a zoom-ladder retune cannot make it lie.
+      const wasExtents = await a.dbg('tableExtents()');
+      const wasWalls = await a.dbg('wallPositions()');
+      const wasWorld = await a.dbg('worldBodies()');
+      assert.equal(await a.dbg('tower'), 'none', 'no tower is the default');
+      assert.deepEqual(wasWorld.named, [],
+        'and a towerless world carries none of its colliders');
+
+      // ---- socketed ------------------------------------------------------
+      // Through the settings path, so this exercises the same code a chip
+      // click does: POST → server validation → 'settings-changed' echo.
+      await a.dbg(`setTower('heartwood')`);
+      for (const t of [a, b]) {
+        await t.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+          { desc: 'the tower goes up on both tabs' });
+      }
+      const upExtents = await a.dbg('tableExtents()');
+      assert.ok(upExtents.d > wasExtents.d,
+        `the tower brings the room it consumes — mat ${wasExtents.d} → ${upExtents.d}`);
+      assert.equal(upExtents.w, wasExtents.w, 'width is untouched; only depth pays');
+      const ORDER = ['doorL', 'doorR', 'lintel', 'towerBack', 'towerL', 'towerR', 'ramp', 'lip'];
+      assert.deepEqual((await a.dbg('towerBodies()')).map((x) => x.name), ORDER,
+        'the eight engine colliders, in contract order (SAP body order is shared truth)');
+      const upWorld = await a.dbg('worldBodies()');
+      assert.deepEqual(upWorld.named, ORDER, 'and the WORLD holds those eight, in that order');
+      assert.equal(upWorld.count, wasWorld.count + 8,
+        `eight bodies added and nothing else (${wasWorld.count} → ${upWorld.count})`);
+      const upWalls = await a.dbg('wallPositions()');
+      assert.ok(upWalls.back.z < -900,
+        `the back wall PLANE is sent away, not removed — the doorway boxes are `
+        + `the back of the room now (got z=${upWalls.back.z})`);
+
+      // ---- delivered / shows / hidden / clunks ----------------------------
+      const pour = async (notation) => {
+        await a.dbg(`commandRoll(${JSON.stringify(notation)})`);
+        await a.waitFor(
+          '!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.landings)',
+          { desc: `${notation}: the pour reached the client` });
+        // P6: freeze the rAF clock and step the film exactly as far as we say.
+        await a.dbg('holdClock(true)');
+        const f = JSON.parse(await a.eval(
+          'JSON.stringify(window.__diceDebug.towerFilmInfo())'));
+        await a.dbg(`sim(${f.frames + 240})`);
+        const after = JSON.parse(await a.eval(
+          'JSON.stringify(window.__diceDebug.towerFilmInfo())'));
+        await a.dbg('holdClock(false)');
+        return after;
+      };
+
+      // '40d6' is the STRESS pool and it earns its seconds: the pour's one
+      // measured failure — a die going still inside the skin's shadow, frozen
+      // at SETTLE_STILL before the watchdog's 1.2 s bar could rescue it — only
+      // appeared at forty dice and on rare eight-die seeds. Below twenty dice
+      // the exit guarantee is never asked a hard question, so a scenario that
+      // stopped at 8d6 would be green on the bug that shipped in this file's
+      // first draft.
+      for (const notation of ['1d20', '1d8+1d6+1d10', '8d6', '40d6']) {
+        const f = await pour(notation);
+        assert.ok(f.pour, `${notation}: the roll was baked as a POUR, not a throw`);
+
+        for (const r of f.rest) {
+          assert.ok(r.delivered,
+            `${notation} d${r.i} (${r.type}): delivered onto open felt — rests at `
+            + `(${r.p.join(', ')}), and the hidden zone is z < ${(f.z0 + f.hidZone).toFixed(2)}`);
+          assert.ok(r.visible,
+            `${notation} d${r.i}: and it is on screen when the film ends`);
+          assert.equal(r.shows, r.declared,
+            `${notation} d${r.i} (${r.type}): the die SHOWS what the table declared `
+            + `(rendered ${r.shows}, declared ${r.declared})`);
+        }
+
+        // A pour has a middle. Every die must have been behind the skin for a
+        // real stretch of film — the contract's transit floor is 0.5 s, and
+        // half of that is a bar no throw could clear by accident.
+        f.hidden.forEach((gaps, i) => {
+          const longest = gaps.reduce((m, g) => Math.max(m, g[1] - g[0] + 1), 0);
+          assert.ok(gaps.length >= 1 && longest >= 15,
+            `${notation} d${i}: went through the tower — a hidden window of `
+            + `${longest} frames (${gaps.length} in all)`);
+        });
+
+        // 2–4 clunks per die, in the film, where the click gate can find them.
+        // ABOVE THE RECORDER'S 400-EVENT BUDGET the two compete and clunks are
+        // dropped like anything else — 40d6 spends the budget on real landings
+        // and keeps 65 knocks. That is the recorder working, not the tower
+        // failing, so the per-die bound is asserted on the pools that fit and
+        // a capped pour only has to be audible at all.
+        const capped = f.impacts >= 400;
+        if (capped) {
+          assert.ok(f.clunks > 0,
+            `${notation}: the tower is still audible with the event budget spent `
+            + `(${f.clunks} knocks inside ${f.impacts} events)`);
+        } else {
+          assert.ok(f.clunks >= 2 * f.rest.length && f.clunks <= 4 * f.rest.length,
+            `${notation}: 2–4 baffle clunks per die are film events `
+            + `(${f.clunks} for ${f.rest.length} dice)`);
+        }
+        assert.ok(f.impacts > f.clunks,
+          `${notation}: and the real landings are recorded alongside them `
+          + `(${f.impacts} total events)`);
+
+        await a.dbg('clearTable()');
+        await a.dbg('sim(400)');
+      }
+
+      // ---- unseen ---------------------------------------------------------
+      // A HIDDEN WINDOW IS HIDDEN ON SCREEN, not merely recorded as such. The
+      // record above proves the bake believes a die was inside the tower; this
+      // steps the film into that window and looks at the die. Written after
+      // the record-only version was red-checked and passed with playback's
+      // `mesh.visible` line deleted — a pour with the model as the only thing
+      // hiding anything, which is exactly what §4 says a skin may never be
+      // relied on for.
+      await a.dbg('holdClock(true)');
+      await a.dbg(`commandRoll('8d6')`);
+      await a.waitFor(
+        '!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.landings)',
+        { desc: 'the pour to look inside reached the client' });
+      const look = JSON.parse(await a.eval(
+        'JSON.stringify(window.__diceDebug.towerFilmInfo())'));
+      const VIS = 'JSON.stringify(window.__diceDebug.tableDice.map((d) => d.mesh.visible !== false))';
+      // Die 0's first transit: [in, out]. The bar above guarantees ≥15 frames,
+      // so sampling two frames inside its ends cannot land on a boundary.
+      const [gapIn, gapOut] = look.hidden[0][0];
+      await a.dbg(`sim(${gapIn - 2})`);
+      let seen = JSON.parse(await a.eval(VIS));
+      assert.equal(seen[0], true,
+        `d0 is in the room on its way down the shaft (frame ${gapIn - 2})`);
+      await a.dbg(`sim(${Math.floor((gapIn + gapOut) / 2) - (gapIn - 2)})`);
+      seen = JSON.parse(await a.eval(VIS));
+      assert.equal(seen[0], false,
+        `d0 is NOT rendered while it is inside the tower (frame `
+        + `${Math.floor((gapIn + gapOut) / 2)}, of window ${gapIn}–${gapOut})`);
+      await a.dbg(`sim(${look.frames + 240})`);
+      seen = JSON.parse(await a.eval(VIS));
+      assert.ok(seen.every(Boolean), 'and every die is back in the room at the end');
+      await a.dbg('holdClock(false)');
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+
+      // ---- replay ---------------------------------------------------------
+      // Same payload, same seed, twice, on the same tab. The pour draws from a
+      // stream derived from roll.seed alone; anything reaching for the wall
+      // clock or Math.random breaks here on the first run.
+      const FILM = `(() => {
+        const r = window.__diceDebug.currentRoll;
+        const per = r.keyframes.map((arr) => arr.map((s) =>
+          [s.pos.x, s.pos.y, s.pos.z, s.quat.x, s.quat.y, s.quat.z, s.quat.w]
+            .map((f) => f.toFixed(9)).join(',')).join('|'));
+        return { hash: per.join('||'), frames: r.frames, duration: r.duration,
+                 sounds: r.sounds.length, spans: JSON.stringify(r.pour.spans) };
+      })()`;
+      const bake = async () => {
+        await a.dbg(`playRoll({ dice: ['d6','d6','d6','d6'], values: [1,2,3,4], `
+          + `seed: 20260812, rollId: 'tower-replay' })`);
+        const film = await a.eval(FILM);
+        await a.dbg('clearTable()');
+        await a.dbg('sim(400)');
+        return film;
+      };
+      const one = await bake();
+      const two = await bake();
+      assert.equal(one.frames, two.frames, `same seed, same length (${one.frames} frames)`);
+      assert.equal(one.duration, two.duration, 'same seed, same duration');
+      assert.equal(one.sounds, two.sounds, 'same seed, same impact + clunk record');
+      assert.equal(one.spans, two.spans, 'same seed, same hidden windows');
+      assert.equal(one.hash, two.hash, 'same seed, byte-identical film');
+
+      // And across CLIENTS, which is the claim that actually matters: two
+      // people watching one table watch the same pour.
+      await a.roll('4d6');
+      await b.settle();
+      const sameFilm = `(() => {
+        const r = window.__diceDebug.currentRoll;
+        if (!r || !r.pour) return null;
+        const per = r.keyframes.map((arr) => arr.map((s) =>
+          [s.pos.x, s.pos.y, s.pos.z].map((f) => f.toFixed(9)).join(',')).join('|'));
+        return { seed: r.seed, hash: per.join('||'), spans: JSON.stringify(r.pour.spans) };
+      })()`;
+      const fa = await a.eval(sameFilm);
+      const fb = await b.eval(sameFilm);
+      assert.ok(fa && fb, 'both tabs poured');
+      assert.equal(fa.seed, fb.seed, 'one seed for the table');
+      assert.equal(fa.spans, fb.spans, 'and the same die is hidden at the same frame');
+      assert.equal(fa.hash, fb.hash, 'and the same pour, keyframe for keyframe');
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+      await b.settle();
+
+      // ---- deferred, never mid-roll ---------------------------------------
+      // The zoom rule (queueTower): a change that arrives while a film is
+      // playing waits for the roll boundary, because socketing moves the mat
+      // AND the physics bodies the film was baked against.
+      await a.dbg('holdClock(true)');
+      await a.dbg(`commandRoll('6d6')`);
+      await a.waitFor('!!window.__diceDebug.busy', { desc: 'a pour is in flight' });
+      await a.dbg(`setTower('none')`);
+      await a.waitFor(`window.__diceDebug.settings.tower === 'none'`,
+        { desc: 'the change reached the client' });
+      assert.equal(await a.dbg('tower'), 'heartwood',
+        'the tower does NOT come down under a film that was baked with it');
+      assert.equal(await a.dbg('pendingTower'), 'none', 'it is queued for the boundary');
+      await a.dbg('holdClock(false)');
+      await a.settle();
+
+      // ---- restored --------------------------------------------------------
+      await a.waitFor(`window.__diceDebug.tower === 'none'`,
+        { desc: 'and lands at the roll boundary' });
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+      assert.deepEqual(await a.dbg('tableExtents()'), wasExtents,
+        'the mat is exactly the preset again');
+      assert.deepEqual(await a.dbg('wallPositions()'), wasWalls,
+        'every wall body is back where the towerless table had it');
+      const downWorld = await a.dbg('worldBodies()');
+      assert.deepEqual(downWorld.named, [],
+        'and not one collider is left in the WORLD (towerBodies() would say `none` either way)');
+      assert.equal(downWorld.count, wasWorld.count,
+        `the body list is the towerless one again, exactly `
+        + `(${wasWorld.count} before, ${downWorld.count} after)`);
+      await a.roll('2d6');
+      assert.equal(await a.eval('!!(window.__diceDebug.currentRoll.pour)'), false,
+        'a roll with no tower is a THROW again — no pour film at all');
+    },
+  },
 ];
