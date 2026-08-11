@@ -107,7 +107,9 @@ third model.
 Scenario: `tower-roll` (tag `tower`). Tools: `tools/steps/tower-pour.mjs` for
 the shipped pour, `tower-probe.mjs [n] [seed] [secs] [tower]` and
 `tower-occlusion.mjs [tower]` for the lab (both take a tower id and must be
-run for every model), `tower-family-shots.mjs [tower] [sibling]` for the
+run for every model), `tower-fit.mjs [tower…]` for proofs (a) and (d) — the
+socket hull per MESH and the collider count, which had no tool until the
+second model needed one — `tower-family-shots.mjs [tower] [sibling]` for the
 review set a human looks at before a skin merges.
 
 The engine owns one fixed core geometry; tower models are **occluding skins**

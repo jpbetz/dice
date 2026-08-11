@@ -6719,6 +6719,68 @@ window.__diceDebug = {
   // The last socket change, step by step (see TOWER_SWAP): a tower→tower swap
   // must pass through the towerless body list on its way.
   towerSwap() { return { ...TOWER_SWAP }; },
+  // SOCKET FIT + HOUSE RULES, measured on the BUILT MESH of the socketed
+  // model (docs/TOWER.md "What a model must prove", (a) and part of (d)).
+  //
+  // It measures the OCCLUDER groups only. The veils and the contact shadows
+  // are unlit quads lying flat on the felt and reaching several units onto
+  // it; folding them into the hull makes every tower fail by construction,
+  // which is how the first draft of this check managed to be red on
+  // Heartwood. Per-mesh rather than one bounding box, for the same reason:
+  // "the hull is outside the socket" is useless, "THIS piece is outside by
+  // 0.37 in +z" is a thing you can look at and either fix or defend. The
+  // legal defences are the two the contract already grants — a model may
+  // skin the APRON and the LIP, which are engine volumes outside the socket
+  // by design, and it may reach into the HOOD volume to shadow the doorway.
+  towerModelAudit() {
+    if (!towerRig || !towerRig.group) return null;
+    const root = towerRig.group;
+    root.updateMatrixWorld(true);
+    const v = towerVolumes();
+    const soc = {
+      x: v.socket.s[0] / 2, y1: v.socket.c[1] + v.socket.s[1] / 2,
+      zLo: v.socket.c[2] - v.socket.s[2] / 2, zHi: v.socket.c[2] + v.socket.s[2] / 2,
+    };
+    const r3 = (n) => Number(n.toFixed(3));
+    const hull = new THREE.Box3();
+    const bb = new THREE.Box3();
+    let meshes = 0, lights = 0;
+    const offPolicy = [], outs = [];
+    root.traverse((o) => {
+      if (o.isLight) { lights++; return; }
+      if (!o.isMesh) return;
+      let p = o, solid = false;
+      while (p) { if (p.name && p.name.startsWith('towerSkin') && p.name !== 'towerSkin') solid = true; p = p.parent; }
+      if (!solid) return;
+      meshes++;
+      const m = o.material;
+      if (m.isShaderMaterial) offPolicy.push('ShaderMaterial');
+      if (m.isMeshStandardMaterial && m.envMapIntensity !== 0.45) {
+        offPolicy.push(`envMapIntensity=${m.envMapIntensity}`);
+      }
+      if (o.userData && o.userData.bloom) offPolicy.push('userData.bloom');
+      bb.setFromObject(o);
+      hull.union(bb);
+      const over = [];
+      if (bb.min.x < -soc.x - 1e-3) over.push(`x-${r3(-soc.x - bb.min.x)}`);
+      if (bb.max.x > soc.x + 1e-3) over.push(`x+${r3(bb.max.x - soc.x)}`);
+      if (bb.min.y < -1e-3) over.push(`y-${r3(-bb.min.y)}`);
+      if (bb.max.y > soc.y1 + 1e-3) over.push(`y+${r3(bb.max.y - soc.y1)}`);
+      if (bb.min.z < soc.zLo - 1e-3) over.push(`z-${r3(soc.zLo - bb.min.z)}`);
+      if (bb.max.z > soc.zHi + 1e-3) over.push(`z+${r3(bb.max.z - soc.zHi)}`);
+      if (over.length) {
+        outs.push({ over, box: [r3(bb.min.x), r3(bb.max.x), r3(bb.min.y), r3(bb.max.y),
+          r3(bb.min.z - v.z0), r3(bb.max.z - v.z0)] });
+      }
+    });
+    return {
+      tower: currentTower, meshes, lights, offPolicy, outs,
+      hull: { x: [r3(hull.min.x), r3(hull.max.x)], y: [r3(hull.min.y), r3(hull.max.y)],
+        z: [r3(hull.min.z - v.z0), r3(hull.max.z - v.z0)] },
+      socket: { x: [r3(-soc.x), r3(soc.x)], y: [0, r3(soc.y1)],
+        z: [r3(soc.zLo - v.z0), r3(soc.zHi - v.z0)] },
+    };
+  },
   // The playback drain's OWN voice resolution, asked with a synthetic event
   // (docs/TOWER.md §6). Not a reimplementation and not a read of the
   // registry: this is the function stepPlayback calls, so a scenario can pin
