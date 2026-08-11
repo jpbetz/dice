@@ -365,6 +365,18 @@ const SETTING_SPECS = {
     default: 'wide',
     validate: (v) => typeof v === 'string' && ['wide', 'medium', 'close'].includes(v),
   },
+  // The dice tower (docs/TOWER.md). Room-wide because it changes the FILM:
+  // a tower roll is baked as a pour (scripted entry, hidden transit, exit
+  // spray) instead of a throw, and every client must bake the same one. The
+  // value is a TOWER ID, not a boolean — 'none' plus one model today, more
+  // later — and the client owns every number behind it; the wire carries only
+  // the name. Same interaction rule as zoom (main.js queueTower): a change
+  // made mid-roll defers to the next roll boundary, so no client re-sockets
+  // the mat under a film already baked against the old one.
+  tower: {
+    default: 'none',
+    validate: (v) => typeof v === 'string' && ['none', 'heartwood'].includes(v),
+  },
 };
 
 function defaultSettings() {

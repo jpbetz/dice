@@ -78,6 +78,32 @@ const ZOOM_LEVELS = [
   { id: 'medium', label: 'Medium', title: 'Medium — the default; larger dice, still room to throw' },
   { id: 'close',  label: 'Close',  title: 'Close — biggest dice, best on a phone' },
 ];
+// THE TOWER REGISTRY (docs/TOWER.md). A room setting whose value is a tower
+// ID, never a boolean — 'none' and one model today, more models later, and a
+// picker rather than a switch is what leaves room for them. Declared up here
+// with ZOOM_LEVELS for the same TDZ reason: setSound() → syncSettingsUI() →
+// renderTowerPicker() runs during MODULE EVALUATION.
+//
+// THE FIRST LAW (Joe): "Don't change anything about how the system works
+// without a tower." `none` is not a mode — it is the whole app, untouched.
+// Every tower-shaped branch in this file is guarded on `towerOn()` and does
+// nothing at all when the answer is no, which is why the existing suite is
+// the proof that the law holds.
+//
+// A tower entry names its SKIN builder; the engine geometry (towerVolumes())
+// is shared by every model by contract, so a new tower is a skin file and a
+// row here.
+const TOWERS = {
+  none: {
+    id: 'none', label: 'None', skin: null,
+    title: 'None — dice are thrown onto the felt by hand',
+  },
+  heartwood: {
+    id: 'heartwood', label: 'Heartwood', skin: buildTowerSkin,
+    title: 'Heartwood — a wooden tower at the back of the table; dice pour through it',
+  },
+};
+const DEFAULT_TOWER = 'none';
 // MEDIUM, not wide (2026-08-09). The ladder moved one step closer and `wide`
 // is now byte-for-byte the old `close` — so defaulting to `wide` would ship
 // the view a player previously had to go and choose. Measured die span at the
@@ -346,7 +372,8 @@ let currentFeltId = DEFAULT_FELT;
 // applyRoomSettings below, because setSound()'s module-eval call chain
 // (syncSettingsUI → renderZoomPicker) reads roomSettings.zoom. Adding a new
 // key requires only adding it to defaults.
-let roomSettings = { felt: DEFAULT_FELT, system: DEFAULT_SYSTEM, tableName: '', zoom: DEFAULT_ZOOM };
+let roomSettings = { felt: DEFAULT_FELT, system: DEFAULT_SYSTEM, tableName: '', zoom: DEFAULT_ZOOM,
+  tower: DEFAULT_TOWER };
 
 // COLLECTED IS A LIST, NOT A PLACE (C25, 2026-08-09).
 //
@@ -1802,7 +1829,7 @@ function shelveRoll(rollId, seq, animate) {
   }
   renderLog();    // the row picks up its collected dress and its verbs
   renderPeek();   // an open card re-reads, or closes if its roll just left
-  tryFlushZoom(); // a deferred zoom rides the collect boundary too
+  tryFlushRoomChanges(); // a deferred zoom or tower rides the collect boundary too
 }
 
 // The shelf tweak path (card ± retired 2026-08-01): right-click a cluster
@@ -2922,7 +2949,7 @@ function stepPlayback(dt, tempo = 1, curve = false) {
     runPendingCollect(roll); // a collect that arrived mid-playback lands now
     runPendingClear(roll);   // …and a clear wins over it
     if (rollQueue.length) playRoll(rollQueue.shift());
-    else tryFlushZoom();     // a room-wide zoom that arrived mid-roll lands here
+    else tryFlushRoomChanges(); // a room-wide zoom/tower that arrived mid-roll lands here
   }
 }
 
@@ -5301,6 +5328,15 @@ const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
   camPhase: null };
 const TOWERLAB_EULER = new THREE.Euler();
 
+// SHIPPED-TOWER state, declared here for the same reason TOWERLAB is: animate()
+// starts ticking at module eval and stepPlayback's pour branch reads these, so
+// a `let` further down the file is a TDZ crash on frame one. The socket itself
+// lives with the rest of the tower code (towerSocket, below the lab).
+let currentTower = DEFAULT_TOWER;  // what is SOCKETED right now
+let pendingTower = null;           // a change waiting on the roll boundary
+let towerRig = null;               // {id, group, bodies, cm} while socketed
+const TOWER_WALL_AWAY = -1000;     // where the back wall plane parks, socketed
+
 function tick(dt, render = true, realtime = false) {
   // Themed-set clocks (Tier 6 §9): the Level 2 shader uniform and the
   // Level 3 particle field advance with the same dt discipline as
@@ -5555,6 +5591,53 @@ function towerLabBuild() {
   return root;
 }
 
+// THE ENGINE-OWNED COLLIDERS (docs/TOWER.md §2, §2b, and the pit backstop).
+// ONE builder, used by BOTH the lab's isolated world and the shipped socket
+// on the main world — the contract says models add zero colliders, so this is
+// the complete and only physical tower there is. Returned in ADD ORDER, which
+// is also the order the socket removes them in reverse: cannon's SAP
+// broadphase enumerates pairs in body order, so two clients whose body lists
+// differ can bake the same seed into different films.
+//
+// ADD ORDER IS PART OF THE CONTRACT. Never reorder these eight.
+function towerColliders(w, v) {
+  const bodies = [];
+  const boxAt = (name, mat, pos, half, rx = 0) => {
+    const b = new CANNON.Body({ mass: 0, material: mat,
+      shape: new CANNON.Box(new CANNON.Vec3(...half)) });
+    b.labName = name;
+    b.position.set(...pos);
+    if (rx) b.quaternion.setFromEuler(rx, 0, 0);
+    w.addBody(b);
+    bodies.push(b);
+    return b;
+  };
+  // The back wall carries the DOORWAY: two flanking boxes and a lintel with
+  // a clear opening for the exit, instead of an infinite plane — the die
+  // spawns inside the tower and flies out through it.
+  const z0 = v.z0, dw = v.door.w / 2, side = TABLE_W / 2 - dw;
+  boxAt('doorL', wallMat, [-(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
+  boxAt('doorR', wallMat, [(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
+  boxAt('lintel', wallMat, [0, v.door.h + (22 - v.door.h) / 2, z0 - 0.3], [dw, (22 - v.door.h) / 2, 0.3]);
+  // BACKSTOP (probe run 1): behind the doorway the world was open void —
+  // die2 ricocheted off a head-on and flew 5 units behind the tower. The
+  // tower pit is now enclosed: a back wall and two flanks, all in the
+  // skin-occluded region, so a deflected die rattles and comes back out.
+  boxAt('towerBack', wallMat, [0, 11, z0 - 5.2], [7, 11, 0.4]);
+  boxAt('towerL', wallMat, [-3.4, 11, z0 - 2.6], [0.4, 11, 2.6]);
+  boxAt('towerR', wallMat, [3.4, 11, z0 - 2.6], [0.4, 11, 2.6]);
+  // The apron RAMP is a SLICK CHUTE — its own material, near-zero friction
+  // (a polished slide, not felt): at 28° with felt friction (0.25) dice
+  // stalled on the slope instead of delivering. Restitution stays low so
+  // the first touchdown doesn't trampoline.
+  const rampMat = new CANNON.Material('towerRamp');
+  const cm = new CANNON.ContactMaterial(diceMat, rampMat, { friction: 0.03, restitution: 0.3 });
+  w.addContactMaterial(cm);
+  boxAt('ramp', rampMat, v.apron.c, [v.apron.s[0] / 2, v.apron.s[1] / 2, v.apron.s[2] / 2], v.apron.rx);
+  boxAt('lip', rampMat, v.lip.c, [v.lip.s[0] / 2, v.lip.s[1] / 2, v.lip.s[2] / 2], v.lip.rx);
+  return { bodies, cm };
+}
+
 // The lab's own world: floor, the CURRENT walls, ceiling, apron. It reuses
 // the shared contact materials, so setPhysics tweaks apply here too.
 function towerLabWorld() {
@@ -5576,45 +5659,7 @@ function towerLabWorld() {
   plane('wallLeft', wallMat, [-TABLE_W / 2, 0, 0], [0, Math.PI / 2, 0]);
   plane('wallRight', wallMat, [TABLE_W / 2, 0, 0], [0, -Math.PI / 2, 0]);
   plane('ceiling', wallMat, [0, 22, 0], [Math.PI / 2, 0, 0]);
-  // The back wall carries the DOORWAY: two flanking boxes and a lintel with
-  // a clear opening for the exit, instead of an infinite plane — the die
-  // spawns inside the tower and flies out through it.
-  const boxAt = (name, mat, pos, half) => {
-    const b = new CANNON.Body({ mass: 0, material: mat,
-      shape: new CANNON.Box(new CANNON.Vec3(...half)) });
-    b.labName = name;
-    b.position.set(...pos);
-    w.addBody(b);
-  };
-  const z0 = v.z0, dw = v.door.w / 2, side = TABLE_W / 2 - dw;
-  boxAt('doorL', wallMat, [-(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
-  boxAt('doorR', wallMat, [(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
-  boxAt('lintel', wallMat, [0, v.door.h + (22 - v.door.h) / 2, z0 - 0.3], [dw, (22 - v.door.h) / 2, 0.3]);
-  // BACKSTOP (probe run 1): behind the doorway the world was open void —
-  // die2 ricocheted off a head-on and flew 5 units behind the tower. The
-  // tower pit is now enclosed: a back wall and two flanks, all in the
-  // skin-occluded region, so a deflected die rattles and comes back out.
-  boxAt('towerBack', wallMat, [0, 11, z0 - 5.2], [7, 11, 0.4]);
-  boxAt('towerL', wallMat, [-3.4, 11, z0 - 2.6], [0.4, 11, 2.6]);
-  boxAt('towerR', wallMat, [3.4, 11, z0 - 2.6], [0.4, 11, 2.6]);
-  // The apron RAMP is a SLICK CHUTE — its own material, near-zero friction
-  // (a polished slide, not felt): at 28° with felt friction (0.25) dice
-  // stalled on the slope instead of delivering. Restitution stays low so
-  // the first touchdown doesn't trampoline.
-  const rampMat = new CANNON.Material('towerRamp');
-  w.addContactMaterial(new CANNON.ContactMaterial(diceMat, rampMat, { friction: 0.03, restitution: 0.3 }));
-  const apron = new CANNON.Body({ mass: 0, material: rampMat,
-    shape: new CANNON.Box(new CANNON.Vec3(v.apron.s[0] / 2, v.apron.s[1] / 2, v.apron.s[2] / 2)) });
-  apron.labName = 'ramp';
-  apron.position.set(...v.apron.c);
-  apron.quaternion.setFromEuler(v.apron.rx, 0, 0);
-  w.addBody(apron);
-  const lip = new CANNON.Body({ mass: 0, material: rampMat,
-    shape: new CANNON.Box(new CANNON.Vec3(v.lip.s[0] / 2, v.lip.s[1] / 2, v.lip.s[2] / 2)) });
-  lip.labName = 'lip';
-  lip.position.set(...v.lip.c);
-  lip.quaternion.setFromEuler(v.lip.rx, 0, 0);
-  w.addBody(lip);
+  towerColliders(w, v);
   // LOG ALL COLLISIONS (Joe): every contact pair, with time, midpoint and
   // closing speed — echoed to the console and kept in a ring buffer that
   // towerLog() returns, so a headless probe reads the same record the
@@ -5645,17 +5690,11 @@ function towerLabWorld() {
 // the lab is on, YOUR client's walls are deeper for real rolls too — do
 // not use the lab on a shared table (the eventual feature makes this a
 // room setting so every client agrees).
-function towerLabMat(extra) {
-  TABLE_D += extra;
-  walls.back.position.set(0, 0, -TABLE_D / 2);
-  walls.front.position.set(0, 0, TABLE_D / 2);
-  updateShadowFrustum();
-  refitView();
-}
+// (The deepening itself is towerDeepenMat, shared with the shipped socket.)
 
 function towerLabSet(on = true) {
   if (on && !TOWERLAB.on) {
-    towerLabMat(TOWERLAB.tune.matExtra);
+    towerDeepenMat(TOWERLAB.tune.matExtra);
     TOWERLAB.group = towerLabBuild();
     scene.add(TOWERLAB.group);
     TOWERLAB.world = towerLabWorld();
@@ -5666,7 +5705,7 @@ function towerLabSet(on = true) {
     TOWERLAB.group = null;
     TOWERLAB.world = null;
     TOWERLAB.on = false;
-    towerLabMat(-TOWERLAB.tune.matExtra);
+    towerDeepenMat(-TOWERLAB.tune.matExtra);
   }
   return TOWERLAB.on;
 }
@@ -5676,6 +5715,87 @@ function towerLabClear() {
   for (const h of TOWERLAB.hidden) scene.remove(h.mesh);
   for (const o of TOWERLAB.out) { scene.remove(o.mesh); TOWERLAB.world.removeBody(o.body); }
   TOWERLAB.falling = []; TOWERLAB.hidden = []; TOWERLAB.out = [];
+}
+
+// ---------------------------------------------------------------------------
+// THE SHIPPED SOCKET (docs/TOWER.md) — the same core, on the MAIN world.
+//
+// The lab keeps its isolated world for experiments. This is the product: a
+// tower's colliders are SHARED PHYSICS, exactly like the walls, because the
+// film every client bakes has to see the same interior. Socketing is:
+//
+//   1. deepen the mat by matExtra (the tower brings the room it consumes),
+//   2. send the back-wall PLANE away — the doorway boxes replace it,
+//   3. add the eight engine colliders in contract order,
+//   4. add the skin (zero colliders, zero lights, pure theatre).
+//
+// Unsocketing runs it backwards and the main world returns to exactly its
+// towerless configuration: same TABLE_D, same wall body positions, same body
+// list. `tower-roll`'s last assertions are that claim, measured.
+//
+// WHEN it may run is the whole safety argument: only at a roll boundary
+// (queueTower defers a mid-roll change the way queueZoom does), so no film is
+// ever baked against one interior and played against another, and no body is
+// added or removed while a bake is stepping.
+//
+// (currentTower / pendingTower / towerRig are declared ABOVE tick() — the TDZ
+// trap this file records at ROOM, LS_NAME and TOWERLAB.)
+
+function towerOn() { return currentTower !== 'none' && !!towerRig; }
+
+// The mat deepening, shared by the lab and the socket (Joe, twelfth look):
+// the tray band eats ~4 units of mat depth, so a tower DEEPENS the mat by
+// matExtra — walls, shadow frustum and camera framing all follow, exactly
+// like a zoom — and unsocketing restores the preset.
+function towerDeepenMat(extra) {
+  TABLE_D += extra;
+  towerPlaceBackWall();
+  walls.front.position.set(0, 0, TABLE_D / 2);
+  updateShadowFrustum();
+  refitView();
+}
+
+// The back wall plane is MOVED, never removed (the SAP body-order rule at
+// `walls`): while a tower is socketed the doorway boxes are the back of the
+// room, and the plane would seal the opening the exit flies through — so it
+// goes a thousand units away and comes straight back on unsocket. Removing
+// and re-adding it would renumber every body behind it in the list.
+function towerPlaceBackWall() {
+  walls.back.position.set(0, 0, towerRig ? TOWER_WALL_AWAY : -TABLE_D / 2);
+}
+
+function towerSocket(id) {
+  const spec = TOWERS[id] || TOWERS.none;
+  if (spec.id === currentTower && !!towerRig === (spec.id !== 'none')) return currentTower;
+  // Always tear down first: a tower→tower swap is an unsocket and a socket,
+  // so the body list passes through the towerless configuration in between
+  // and can never end up holding two models' colliders.
+  if (towerRig) {
+    scene.remove(towerRig.group);
+    // Reverse add order (see towerColliders): removal is a splice, and going
+    // backwards keeps every surviving body's index where it was.
+    for (let i = towerRig.bodies.length - 1; i >= 0; i--) world.removeBody(towerRig.bodies[i]);
+    world.removeContactMaterial(towerRig.cm);
+    towerRig = null;
+    towerDeepenMat(-TOWERLAB.tune.matExtra); // restores the back wall plane too
+  }
+  currentTower = spec.id;
+  if (spec.id !== 'none') {
+    // Order matters: deepen FIRST so towerVolumes() reads the socketed z0,
+    // then build against it.
+    towerRig = { id: spec.id, group: null, bodies: [], cm: null };
+    towerDeepenMat(TOWERLAB.tune.matExtra);
+    const v = towerVolumes();
+    const rig = towerColliders(world, v);
+    towerRig.bodies = rig.bodies;
+    towerRig.cm = rig.cm;
+    const group = new THREE.Group();
+    group.name = 'towerModel';
+    if (spec.skin) group.add(spec.skin(v));
+    scene.add(group);
+    towerRig.group = group;
+  }
+  return currentTower;
 }
 
 // Pour n dice through the contract. Seeded so a look can be repeated; every
@@ -6363,6 +6483,21 @@ window.__diceDebug = {
   get zoom() { return currentZoom; },
   get pendingZoom() { return pendingZoom; },
   setZoom(id) { return selectZoom(id); },
+  // The tower (docs/TOWER.md) — the same three: what is socketed, what is
+  // waiting on the roll boundary, and the picker's own entry point.
+  get tower() { return currentTower; },
+  get pendingTower() { return pendingTower; },
+  setTower(id) { return selectTower(id); },
+  // The tower's collider set, by contract name and position, so a scenario can
+  // assert that unsocketing puts the main world back exactly as it found it
+  // (an empty list plus wallPositions() is the whole claim).
+  towerBodies() {
+    if (!towerRig) return [];
+    return towerRig.bodies.map((b) => ({
+      name: b.labName,
+      p: [b.position.x, b.position.y, b.position.z].map((n) => Number(n.toFixed(3))),
+    }));
+  },
   wallPositions() {
     return {
       back:  { x: walls.back.position.x,  y: walls.back.position.y,  z: walls.back.position.z  },
@@ -12793,6 +12928,11 @@ const ZOOM_PRESETS = {
 let pendingZoom = null; // set by queueZoom when a change arrives mid-roll
 let currentZoom = DEFAULT_ZOOM;
 
+// Named for zoom, but it is the ROOM-CHANGE gate: the tower rides it too
+// (queueTower), for a stronger version of the same reason — a tower change
+// moves the mat AND adds or removes physics bodies, and doing either while a
+// film is baking or playing would desynchronise the picture from the physics
+// it was baked against.
 function tableIsBusyForZoom() {
   // A zoom must not land on a client whose physics is currently baking
   // keyframes against the OLD walls (would render the same seeded roll
@@ -12826,6 +12966,33 @@ function tryFlushZoom() {
   applyZoom(level);
 }
 
+// The tower's half of the same rule (docs/TOWER.md: "Tower ON/OFF changes the
+// film and is a room setting with the queueZoom defer rule, never mid-roll").
+function queueTower(id) {
+  if (!TOWERS[id]) return;
+  pendingTower = id;
+  if (tableIsBusyForZoom()) {
+    if (id !== currentTower) showSettingsNote('the tower goes up after this roll');
+    return;
+  }
+  tryFlushTower();
+}
+
+function tryFlushTower() {
+  if (!pendingTower || tableIsBusyForZoom()) return;
+  const id = pendingTower;
+  pendingTower = null;
+  towerSocket(id);
+}
+
+// ONE roll boundary, both deferred room changes. Zoom first: applyZoom
+// re-sockets whatever tower is already up, so doing it the other way round
+// would build a model against the old preset and immediately rebuild it.
+function tryFlushRoomChanges() {
+  tryFlushZoom();
+  tryFlushTower();
+}
+
 function applyZoom(level) {
   const p = ZOOM_PRESETS[level];
   if (!p) return;
@@ -12835,7 +13002,13 @@ function applyZoom(level) {
   // re-socket after: the mat extension, ghost volumes, skin and lab world
   // all rebuild against the new preset. Lab dice are cleared — a zoom
   // mid-experiment is already a reset in spirit.
+  // The SHIPPED tower has exactly the same problem and the same cure: its
+  // colliders, its deepening and its model are all placed relative to z0, and
+  // a preset assignment moves z0 out from under them. Unsocket across the
+  // change, re-socket after.
   const towerWasOn = TOWERLAB.on;
+  const socketed = currentTower;
+  if (socketed !== 'none') towerSocket('none');
   if (towerWasOn) towerLabSet(false);
   TABLE_W = p.w;
   TABLE_D = p.d;
@@ -12853,6 +13026,7 @@ function applyZoom(level) {
   // redraw, so a zoom is now: walls, shadow frustum, camera.
   refitView();         // camera framing + particle/post + chip anchors
   if (towerWasOn) towerLabSet(true);
+  if (socketed !== 'none') towerSocket(socketed);
 }
 
 // Apply a full merged settings object (join response, hello, settings-changed
@@ -12890,6 +13064,15 @@ function applyRoomSettings(settings) {
     roomSettings.zoom = settings.zoom;
     if (settings.zoom !== currentZoom) queueZoom(settings.zoom);
     renderZoomPicker();
+  }
+  // The tower (docs/TOWER.md), exactly the zoom shape: an unknown id is
+  // ignored rather than defaulted, so a client that has not shipped a model
+  // yet keeps the table it has instead of silently dropping to 'none' and
+  // baking a different film from everyone else.
+  if (typeof settings.tower === 'string' && TOWERS[settings.tower]) {
+    roomSettings.tower = settings.tower;
+    if (settings.tower !== currentTower) queueTower(settings.tower);
+    renderTowerPicker();
   }
 }
 
@@ -13172,6 +13355,54 @@ function renderZoomPicker() {
   });
 }
 
+// The Tower picker (docs/TOWER.md), directly under the Felt swatches — the
+// same segmented-pill grammar as zoom and system, because it is the same kind
+// of choice: a named thing the whole table agrees on. A PICKER and not a
+// switch on purpose: the value is a tower id, and the second model should cost
+// a row in TOWERS and nothing else.
+function renderTowerPicker() {
+  const holder = document.getElementById('tower-picker');
+  if (!holder) return;
+  if (!holder.childElementCount) {
+    for (const t of Object.values(TOWERS)) {
+      const chip = document.createElement('button');
+      chip.className = 'system-chip';
+      chip.dataset.tower = t.id;
+      chip.textContent = t.label;
+      chip.title = t.title;
+      chip.setAttribute('role', 'radio');
+      chip.addEventListener('click', () => selectTower(t.id));
+      holder.appendChild(chip);
+    }
+  }
+  const active = roomSettings.tower || DEFAULT_TOWER;
+  holder.querySelectorAll('[data-tower]').forEach((b) => {
+    const on = b.dataset.tower === active;
+    b.removeAttribute('aria-pressed'); // U22: a radio's state is checked
+    b.setAttribute('aria-checked', String(on));
+    b.tabIndex = on ? 0 : -1;
+  });
+}
+
+// Chip click (and __diceDebug.setTower). Online: send the patch, apply on the
+// 'settings-changed' echo like felt/system/zoom. Solo: raise the tower now and
+// persist. A mid-flight change DEFERS via queueTower (see applyRoomSettings).
+function selectTower(id) {
+  if (!TOWERS[id]) return false;
+  if (id === roomSettings.tower && id === currentTower) return true;
+  if (netOnline && net) {
+    net.setSettings({ tower: id }).then((ok) => {
+      if (!ok) showSettingsNote('couldn’t reach the table — the tower is unchanged');
+    });
+    return true;
+  }
+  roomSettings.tower = id;
+  save(LS_ROOMSETTINGS, roomSettings);
+  queueTower(id);
+  renderTowerPicker();
+  return true;
+}
+
 // Chip click (and __diceDebug.setZoom). Online: send the patch, apply on
 // the 'settings-changed' echo like felt/system. Solo: apply the mat now and
 // persist. A mid-flight change DEFERS via queueZoom (see applyRoomSettings).
@@ -13247,6 +13478,7 @@ function syncSettingsUI() {
   renderSystemPicker();
   renderZoomPicker();
   renderFeltSwatches();
+  renderTowerPicker();
 }
 
 function openSettingsModal() {
@@ -16151,7 +16383,7 @@ function replaySettledRoll(r) {
       renderRollResults(rebuilt, tableDice.filter((d) => d.rollId === r.rollId), false);
     }
   }
-  tryFlushZoom(); // late-joiner path: hello.settings.zoom already applied
+  tryFlushRoomChanges(); // late-joiner path: hello.settings zoom/tower already applied
                   // before this replay, so this is idempotent; the hook stays
                   // to catch a settings-changed that lost the race with hello
 }
