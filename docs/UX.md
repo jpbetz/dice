@@ -4204,6 +4204,23 @@ rather than fixable: it is forty entries staggered, forty transits, and
 forty exits that may not overlap. The projector's curve compresses the tail
 of it like any other roll.
 
+**What the deeper mat costs the frame.** Socketing spends 4.5 units of mat
+depth, so the framing ladder has more to fit and sits further back. Measured
+over 36 settled 8d6 throws (a 1500×950 desktop with the rail open, six seeds
+per cell, tower on and off at each zoom):
+
+| zoom | die span, no tower | with the tower | dice framed |
+|---|---|---|---|
+| wide | 144 px | 134 px (−7%) | 8/8 every throw, both |
+| medium | 185 px | 167 px (−10%) | 8/8 every throw, both |
+| close | 237 px | 196 px (−17%) | 8/8 every throw, both |
+
+Nothing is dropped — the ladder never fell off its top rung in any of the 36
+— and the cost is dice a tenth smaller at the default. A pour also spreads
+further forward than a throw, so a die can end up kissing the frame's edge
+where a thrown one would not; the die is still framed, and this is the
+honest price of the room the tower asks for.
+
 **The camera moves during a pour, and it is the only roll that does.** Act
 one eases to a low frontal eye on the tower as the film starts; act two
 hands the frame back to the framing ladder the instant the FIRST die exits,

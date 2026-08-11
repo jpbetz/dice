@@ -10214,6 +10214,33 @@ export const scenarios = [
         `the back wall PLANE is sent away, not removed — the doorway boxes are `
         + `the back of the room now (got z=${upWalls.back.z})`);
 
+      // ---- the picker SHOWS which tower is up ------------------------------
+      // Not decoration, and not a claim about taste: a setting whose chosen
+      // value looks exactly like the values it was chosen over is a setting
+      // nobody can read. This is pinned because it was BROKEN when the Tower
+      // picker copied the Mat zoom picker's shape — U22 correctly moved
+      // role="radio" chips from aria-pressed to aria-checked, the stylesheet
+      // named only aria-pressed, and from that day the chosen zoom level was
+      // styled identically to the other two. Measured, not eyeballed: the
+      // selected chip's computed background must differ from an unselected
+      // one, in every radiogroup in the modal.
+      await a.dbg('openSettings()');
+      const chipStyles = JSON.parse(await a.eval(`JSON.stringify(
+        ['#zoom-picker', '#tower-picker'].map((sel) => [...document.querySelectorAll(sel + ' .system-chip')]
+          .map((b) => ({ on: b.getAttribute('aria-checked') === 'true',
+                         bg: getComputedStyle(b).backgroundColor,
+                         fg: getComputedStyle(b).color }))))`));
+      for (const [i, group] of chipStyles.entries()) {
+        const on = group.find((c) => c.on);
+        const off = group.find((c) => !c.on);
+        assert.ok(on && off, `picker ${i}: has both a chosen and an unchosen chip to compare`);
+        assert.notEqual(on.bg, off.bg,
+          `picker ${i}: the chosen chip is not painted like the ones it was chosen over `
+          + `(both ${on.bg})`);
+        assert.notEqual(on.fg, off.fg, `picker ${i}: nor lettered like them`);
+      }
+      await a.eval(`document.getElementById('settings-modal').classList.add('hidden')`);
+
       // ---- delivered / shows / hidden / clunks ----------------------------
       const pour = async (notation) => {
         await a.dbg(`commandRoll(${JSON.stringify(notation)})`);

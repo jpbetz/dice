@@ -3709,7 +3709,8 @@ html, body {
 }
 /* rolling-system picker (goal 6): same pill language as the felt swatches */
 #system-picker,
-#zoom-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
+#zoom-picker,
+#tower-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; }
 .system-chip {
   padding: 5px 12px;
   border-radius: 999px;
@@ -3721,7 +3722,16 @@ html, body {
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .system-chip:hover { border-color: var(--panel-border); background: rgba(255, 255, 255, 0.09); }
-.system-chip[aria-pressed="true"] {
+/* SELECTED, both ways of saying so. A `role="radio"` chip states itself with
+   aria-CHECKED and must not carry aria-pressed at all (U22), and this rule
+   named only the latter — so from U22 until 2026-08-12 the Mat zoom picker's
+   chosen level was styled EXACTLY like the two it was chosen over. Measured,
+   not guessed: selected and unselected returned the same computed background,
+   border and colour. Found while looking at the Tower picker, which is the
+   same shape and had inherited it. An accessibility fix took the visual state
+   with it because the style keyed on the attribute rather than on the state. */
+.system-chip[aria-pressed="true"],
+.system-chip[aria-checked="true"] {
   border-color: rgba(212, 175, 55, 0.55);
   background: rgba(212, 175, 55, 0.14);
   color: var(--gold-bright);
