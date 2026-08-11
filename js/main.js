@@ -42,6 +42,7 @@ import { DieLightRig } from './dielights.js';
 import { PostStack, MAX_SHIMMER } from './post.js';
 import { buildTowerSkin } from './towerskin.js';
 import { buildBastionSkin } from './towerbastion.js';
+import { buildAnvilSkin } from './toweranvil.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -95,6 +96,14 @@ const ZOOM_LEVELS = [
 // is shared by every model by contract, so a new tower is a skin file and a
 // row here.
 //
+// TOWERS ARE NAMED FOR A DIE IN A THEME HOUSE, and the pairing is the list:
+//   heartwood  ← Wildwood
+//   bastion    ← Classics
+//   blackanvil ← Emberforge
+// The tower is that family's world in furniture — Emberforge's Black Anvil
+// die is black iron with molten digits, and its tower is the forge the iron
+// came out of.
+//
 // `clunkVoice` is the SOUND PALETTE the contract's §6 asks a model to
 // register (an IMPACT_VOICES shape: body / weight / sustain). It is the one
 // thing besides geometry a skin gets to change, and it is deliberately not a
@@ -118,6 +127,18 @@ const TOWERS = {
     title: 'Bastion — a stone turret; dice rumble through it',
     // Stone: heavier, lower, and it rings on in the shaft afterwards.
     clunkVoice: { body: 'thud', weight: 0.7, sustain: 40 },
+  },
+  blackanvil: {
+    id: 'blackanvil', label: 'Black Anvil', skin: buildAnvilSkin,
+    title: 'Black Anvil — a cooling forge chimney; dice fall through it ringing',
+    // METAL, and the only voice in the palette that is not a knock. `chime`
+    // is the sine-partial body — glass at its default weight — but weighted
+    // right down it stops being crystal and becomes the ring a die gets out
+    // of a cast-iron baffle, and the long tail is the shaft carrying it. A
+    // FIRST TUNING and Joe's dial: 0.85 / 70 is where the partial reads as
+    // iron rather than as a bell, measured by ear against the die set's own
+    // thud, and it is the number most likely to want moving.
+    clunkVoice: { body: 'chime', weight: 0.85, sustain: 70 },
   },
 };
 const DEFAULT_TOWER = 'none';
