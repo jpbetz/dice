@@ -15568,7 +15568,26 @@ function reframeForFeltChange() {
   applyCameraFraming(true);
 }
 
+// THE RESTING EYE FOLLOWS THE SUBJECT (Joe, 2026-08-11): with a tower
+// socketed and nothing on the felt, the next thing that happens on this
+// table happens at the tower — so an empty felt frames the tower, and the
+// pour's act one (towerCamTo 'tower', the identical pose) becomes a no-op
+// because the camera is already there. The moment anything rests on the
+// felt, the ladder decides, exactly as before. tower 'none' never reaches
+// this branch, so a towerless table is untouched (the first law). Under
+// prefers-reduced-motion the pose still applies — it arrives as a cut via
+// applyFramingPose, which is a frame choice, not a camera move.
 function applyCameraFraming(animate = false) {
+  if (towerOn() && (!currentRoll || currentRoll.done) && !diceFramingPoints()) {
+    const v = towerVolumes();
+    lastFramingMode = 'tower';
+    applyFramingPose({
+      pos: new THREE.Vector3(TOWERLAB.tune.camX, TOWERLAB.tune.camY, v.z0 + TOWERLAB.tune.camDist),
+      tgt: new THREE.Vector3(0, TOWERLAB.tune.camTgtY, v.z0),
+      orbit: 0,
+    }, animate);
+    return;
+  }
   const pose = computeFraming();
   lastFramingMode = pose.mode;
   applyFramingPose(pose, animate);
