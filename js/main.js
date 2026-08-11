@@ -5435,10 +5435,12 @@ function towerVolumes() {
     // ≈ 1.84 of half-width. Door 4.0 leaves 0.16. The first cut (door 3.0,
     // yaw ±30°, jitter ±0.6) needed ≈2.5 — dice clipped the jambs and came
     // to rest behind the wall.
-    // Spawn height 2.3 is sill arithmetic: launching parallel to the slope
-    // (pitch −28°), the die drops 0.6 crossing to the sill — 2.3·S puts a
-    // d20's bottom exactly at sill height there, grazing, never clipping.
-    exit:    { p: [0, 2.3 * S, z0 - 0.9 * S], pitch: -ath },
+    // p[1] is NOMINAL (the ghost marker): real spawn height is PER-DIE
+    // arithmetic in towerLabDrop — sill + margin + die radius + slope drop
+    // + gravity drop at that die's seeded speed. The eighth look earned it:
+    // the first sill arithmetic forgot gravity, and dice arrived below the
+    // sill, slammed its end-face, and bounced back into the tower.
+    exit:    { p: [0, 2.3 * S, z0 - 0.7 * S], pitch: -ath },
     door:    { w: 4.0 * S, h: 3.6 * S },
   };
 }
@@ -5592,13 +5594,26 @@ function towerLabDrop(n = 8, seed = 42) {
       v.aim.c[1] + rng() * 0.8,
       v.aim.c[2] + (rng() - 0.5) * 0.8);
     mesh.quaternion.setFromEuler(new THREE.Euler(rng() * 6.28, rng() * 6.28, rng() * 6.28));
+    // Per-die spawn height (eighth look): every term measured, none hoped.
+    // sill + 0.15 margin + this die's radius + slope drop over the run-up
+    // + gravity drop at this die's seeded speed. One formula clears a d20
+    // and a d4 alike — a fixed height cannot, because the radius and the
+    // speed-dependent gravity drop both move the answer by more than the
+    // clearance margin.
+    const def = DIE_DEFS[type];
+    const r = def.radius || def.size * 0.87;
+    const speed = 14 + rng() * 6;
+    const ath2 = -v.exit.pitch;
+    const back = v.z0 - v.exit.p[2];
+    const exitY = 0.8 * v.S + 0.15 + r + back * Math.tan(ath2)
+      + 0.5 * Math.abs(GRAVITY) * (back / (Math.cos(ath2) * speed)) ** 2;
     TOWERLAB.falling.push({
       mesh, type, vy: 0, entryAt: TOWERLAB.t + entryAt, entered: false,
       av: [(rng() - 0.5) * 8, (rng() - 0.5) * 8, (rng() - 0.5) * 8],
       transit: 0.5 + rng() * 1.1,
       exit: {
         x: (rng() - 0.5) * 0.8,
-        speed: 14 + rng() * 6,
+        speed, y: exitY,
         yaw: (rng() - 0.5) * (Math.PI / 7.5),    // ±12° — chutes throw straight
         // Pitch rides the SLOPE (seventh look): horizontal launches fell
         // ~2 units under g=-110 and arrived nearly vertical at ~20 u/s —
@@ -5660,7 +5675,7 @@ function stepTowerLab(dt) {
     body.linearDamping = PHYS.linearDamping;
     body.angularDamping = PHYS.angularDamping;
     body.allowSleep = false; // ship parity: the terminator is the predicate
-    body.position.set(v.exit.p[0] + h.exit.x, v.exit.p[1], v.exit.p[2]);
+    body.position.set(v.exit.p[0] + h.exit.x, h.exit.y, v.exit.p[2]);
     const cp = Math.cos(h.exit.pitch), sp = Math.sin(h.exit.pitch);
     body.velocity.set(
       Math.sin(h.exit.yaw) * cp * h.exit.speed,
@@ -5689,7 +5704,7 @@ function stepTowerLab(dt) {
         && p.z < v.z0 + 1.9 * v.S && o.body.velocity.length() < 0.8;
       if (o.rescues < 3 && (lost || stalled) && !towerDoorBlocked(v, o)) {
         o.rescues += 1;
-        o.body.position.set(v.exit.p[0], v.exit.p[1], v.exit.p[2]);
+        o.body.position.set(v.exit.p[0], o.exit.y, v.exit.p[2]);
         o.body.velocity.set(0,
           Math.sin(v.exit.pitch) * o.exit.speed,
           Math.cos(v.exit.pitch) * o.exit.speed);

@@ -93,11 +93,21 @@ pitch PARALLEL TO THE CHUTE: −28° ± 3° (seventh look — horizontal
 launches fell ~2 units under g=−110 and arrived nearly vertical at
 ~20 u/s; the normal impulse plus its friction bite ate the forward
 motion in one contact, and the pour jammed at its own doorstep; grazing
-the slope, the speed survives). Spawn height is sill arithmetic: at
-slope pitch the die drops 0.6 crossing to the sill, so base y 2.3 puts a
-d20's bottom exactly at sill height there. The die rides the chute and
-leaves its end at a shallow angle that skips across the felt — the felt
-itself is the shared table physics and is never retuned for the tower.
+the slope, the speed survives). Spawn height is PER-DIE arithmetic
+(eighth look — the first version forgot the gravity drop over the
+run-up, and dice arrived below the sill, slammed its end-face, and
+bounced back into the tower):
+
+    y = sill + 0.15 margin + die radius
+        + runup·tan(slope)                          (slope drop)
+        + g/2 · (runup / (cos(slope)·speed))²       (gravity drop)
+
+with `speed` this die's own seeded exit speed. One formula clears a d20
+and a d4 alike; a fixed height cannot, because the radius and the
+speed-dependent gravity term both move the answer by more than the
+margin. The die rides the chute and leaves its end at a shallow angle
+that skips across the felt — the felt itself is the shared table physics
+and is never retuned for the tower.
 
 **The EXIT GUARANTEE (second and fifth lab looks):** a die may never rest
 hidden and may never be lost. The SPAWN REGION is a MUTEX — an exit is
