@@ -10225,6 +10225,19 @@ export const scenarios = [
       // selected chip's computed background must differ from an unselected
       // one, in every radiogroup in the modal.
       await a.dbg('openSettings()');
+      // The picker is generated from TOWERS and must show EVERY row — the
+      // registry is the source of truth, so this reads it rather than
+      // hard-coding three, and it fails on a tower that ships without a chip
+      // (or a chip that outlives its row).
+      const registry = await a.dbg('towerRegistry()');
+      const chipIds = JSON.parse(await a.eval(
+        `JSON.stringify([...document.querySelectorAll('#tower-picker [data-tower]')]
+          .map((b) => b.dataset.tower))`));
+      assert.deepEqual(chipIds, registry.map((t) => t.id),
+        `every registered tower has a chip, in registry order (${chipIds.join(', ')})`);
+      assert.ok(chipIds.length >= 3,
+        `and there are at least three of them — a PICKER, not a switch `
+        + `(${chipIds.length})`);
       const chipStyles = JSON.parse(await a.eval(`JSON.stringify(
         ['#zoom-picker', '#tower-picker'].map((sel) => [...document.querySelectorAll(sel + ' .system-chip')]
           .map((b) => ({ on: b.getAttribute('aria-checked') === 'true',
@@ -10313,6 +10326,92 @@ export const scenarios = [
         await a.dbg('clearTable()');
         await a.dbg('sim(400)');
       }
+
+      // ---- the SECOND tower -------------------------------------------------
+      // Deliberately NOT a second copy of everything above. What is new when a
+      // registry grows a row is exactly three things — the swap, the socket it
+      // lands on, and the sound palette — and each of those has its own way to
+      // fail:
+      //
+      //   · through-towerless — fails if towerSocket ever mutates a live rig
+      //     in place. cannon's SAP enumerates contact pairs in BODY ORDER, so
+      //     a client that swapped in place would carry a differently-ordered
+      //     body list and bake the same seed into a different film than the
+      //     client that unsocketed first. `mid` is the only moment that is
+      //     visible from outside, and it is recorded for this.
+      //   · order — fails if the second tower's socket builds anything of its
+      //     own. There is one collider builder and skins add nothing.
+      //   · voice — fails if the palette is not resolved from the SOCKETED
+      //     TOWER. Red-checked by pointing the resolver at the die set: the
+      //     assertion goes red because bastion's thud becomes heartwood's
+      //     clack the moment the tower stops being the thing that is asked.
+      //   · pour — fails if a skin swap changed the film at all; the knocks
+      //     are baked from the seed and the tower is not in the bake.
+      //
+      // settle() first, and not as a formality: a tower change is a ROOM
+      // change and rides the roll boundary (queueTower), so asking for one
+      // while the table still counts as busy parks it in pendingTower and the
+      // wait below would sit there until the harness gave up. clearTable()
+      // does not end a roll.
+      await a.settle();
+      await b.settle();
+      await a.dbg(`setTower('bastion')`);
+      for (const t of [a, b]) {
+        await t.waitFor(`window.__diceDebug.tower === 'bastion'`,
+          { desc: 'the stone tower goes up on both tabs' });
+      }
+      const swap = await a.dbg('towerSwap()');
+      assert.equal(swap.from, 'heartwood', 'the swap started from the wooden tower');
+      assert.equal(swap.to, 'bastion', 'and landed on the stone one');
+      assert.equal(swap.mid, wasWorld.count,
+        `and passed through the TOWERLESS body list on the way — `
+        + `${swap.before} → ${swap.mid} → ${swap.after}, and ${swap.mid} is the `
+        + `${wasWorld.count} a table with no tower carries`);
+      assert.equal(swap.after, wasWorld.count + 8, 'ending on eight again, not sixteen');
+      assert.deepEqual((await a.dbg('towerBodies()')).map((x) => x.name), ORDER,
+        'the same eight engine colliders, in the same contract order');
+      assert.deepEqual(await a.dbg('tableExtents()'), upExtents,
+        'and the same room: every tower consumes the same mat');
+
+      // The sound palette (docs/TOWER.md §6) — the one thing besides geometry
+      // a skin gets to change.
+      // Asked of the drain's own resolver, with a die set that HAS a voice of
+      // its own — otherwise "the tower won" and "there was nothing to win
+      // against" look identical.
+      const voices = Object.fromEntries(registry.map((t) => [t.id, t.clunkVoice]));
+      // blackanvil on purpose: it is ALSO a thud, so a resolver that reached
+      // for the die set would fail on the weight and the tail rather than on
+      // the family — the near-miss is the one worth pinning.
+      const SET = 'emberforge.blackanvil';
+      const setVoice = await a.dbg(`impactVoiceFor({}, '${SET}')`);
+      assert.equal(voices.none, null, 'no tower, no tower voice');
+      assert.notDeepEqual(voices.bastion, voices.heartwood,
+        'and stone does not sound like wood');
+      assert.ok(setVoice, `${SET} brings a voice of its own to argue with`);
+      assert.deepEqual(await a.dbg(`impactVoiceFor({clunk:'baffle'}, '${SET}')`), voices.bastion,
+        `a baffle knock is voiced by the SOCKETED TOWER, over the die set's own `
+        + `(${JSON.stringify(voices.bastion)})`);
+      assert.deepEqual(await a.dbg(`impactVoiceFor({}, '${SET}')`), setVoice,
+        'and an ordinary landing is still the die set — the tower voices its '
+        + 'own knocks, not the whole roll');
+
+      const stone = await pour('8d6');
+      assert.ok(stone.pour, 'a stone pour is still a POUR');
+      assert.ok(stone.clunks >= 2 * stone.rest.length && stone.clunks <= 4 * stone.rest.length,
+        `with the contract's 2–4 baffle knocks per die in the film `
+        + `(${stone.clunks} for ${stone.rest.length} dice)`);
+      for (const r of stone.rest) {
+        assert.ok(r.delivered && r.visible,
+          `bastion d${r.i} (${r.type}): delivered onto open felt at (${r.p.join(', ')})`);
+      }
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+      await a.settle();
+      await a.dbg(`setTower('heartwood')`);
+      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+        { desc: 'back to the wooden tower for the rest of this scenario' });
+      assert.deepEqual(await a.dbg(`impactVoiceFor({clunk:'baffle'}, '${SET}')`), voices.heartwood,
+        'and the voice follows the tower back');
 
       // ---- unseen ---------------------------------------------------------
       // A HIDDEN WINDOW IS HIDDEN ON SCREEN, not merely recorded as such. The

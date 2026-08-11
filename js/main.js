@@ -3411,9 +3411,7 @@ function stepPlayback(dt, tempo = 1, curve = false) {
     // tower up, so a towerless roll has no event this branch can even see.
     // And it is render-time only: the film's timings, the bake and the replay
     // hash never learn which tower is standing.
-    const clunkVoice = s.clunk === 'baffle' ? towerClunkVoice() : null;
-    const voice = clunkVoice || (fxSet && fxSet.sound ? fxSet.sound : null);
-    if (filmOk && playImpact(s.strength, voice,
+    if (filmOk && playImpact(s.strength, impactVoice(s, fxSet),
       CLICKGATE.mode === 'film' ? s.time : undefined)) {
       roll.lastClickTime = s.time;
     }
@@ -6288,6 +6286,23 @@ function towerClunkVoice() {
   return (towerOn() && spec && spec.clunkVoice) ? spec.clunkVoice : null;
 }
 
+// WHICH VOICE A RECORDED IMPACT GETS AT PLAYBACK. A baffle knock is a die
+// hitting the TOWER, so it takes the socketed tower's palette; everything
+// else — every real landing, and a knock under a tower that registers no
+// palette — takes the die set's, exactly as before.
+//
+// A named function and not two lines inline, because the e2e scenario has to
+// ask THIS function. A test that read towerClunkVoice() directly would stay
+// green with the drain wired straight back to the die set, which is the shape
+// of green check this project keeps catching itself writing.
+function impactVoice(s, fxSet) {
+  if (s.clunk === 'baffle') {
+    const tv = towerClunkVoice();
+    if (tv) return tv;
+  }
+  return fxSet && fxSet.sound ? fxSet.sound : null;
+}
+
 // The mat deepening, shared by the lab and the socket (Joe, twelfth look):
 // the tray band eats ~4 units of mat depth, so a tower DEEPENS the mat by
 // matExtra — walls, shadow frustum and camera framing all follow, exactly
@@ -6309,9 +6324,20 @@ function towerPlaceBackWall() {
   walls.back.position.set(0, 0, towerRig ? TOWER_WALL_AWAY : -TABLE_D / 2);
 }
 
+// The last socket change, step by step: how many bodies the world held before
+// it, BETWEEN the teardown and the build, and after. A tower→tower swap is an
+// unsocket and a socket — never an in-place mutation — because cannon's SAP
+// enumerates pairs in body order, and two clients whose body lists differ
+// bake the same seed into different films. `mid` is the only place that claim
+// is observable from outside, and tower-roll asserts on it.
+const TOWER_SWAP = { from: null, to: null, before: 0, mid: 0, after: 0 };
+
 function towerSocket(id) {
   const spec = TOWERS[id] || TOWERS.none;
   if (spec.id === currentTower && !!towerRig === (spec.id !== 'none')) return currentTower;
+  TOWER_SWAP.from = currentTower;
+  TOWER_SWAP.to = spec.id;
+  TOWER_SWAP.before = world.bodies.length;
   // Always tear down first: a tower→tower swap is an unsocket and a socket,
   // so the body list passes through the towerless configuration in between
   // and can never end up holding two models' colliders.
@@ -6324,6 +6350,7 @@ function towerSocket(id) {
     towerRig = null;
     towerDeepenMat(-TOWERLAB.tune.matExtra); // restores the back wall plane too
   }
+  TOWER_SWAP.mid = world.bodies.length;
   currentTower = spec.id;
   if (spec.id !== 'none') {
     // Order matters: deepen FIRST so towerVolumes() reads the socketed z0,
@@ -6340,6 +6367,7 @@ function towerSocket(id) {
     scene.add(group);
     towerRig.group = group;
   }
+  TOWER_SWAP.after = world.bodies.length;
   return currentTower;
 }
 
@@ -6688,6 +6716,22 @@ window.__diceDebug = {
   },
   // Which registered tower the LAB wears. The shipped socket is unaffected.
   towerLabSkin(id) { return towerLabSkin(id); },
+  // The last socket change, step by step (see TOWER_SWAP): a tower→tower swap
+  // must pass through the towerless body list on its way.
+  towerSwap() { return { ...TOWER_SWAP }; },
+  // The playback drain's OWN voice resolution, asked with a synthetic event
+  // (docs/TOWER.md §6). Not a reimplementation and not a read of the
+  // registry: this is the function stepPlayback calls, so a scenario can pin
+  // that a baffle knock takes the tower's palette AND that an ordinary
+  // landing still takes the die set's.
+  impactVoiceFor(ev, setId) { return impactVoice(ev || {}, SETS[setId] || null); },
+  // The registry as the picker sees it, so a scenario can assert the chips
+  // against the source of truth instead of a hard-coded list.
+  towerRegistry() {
+    return Object.values(TOWERS).map((t) => ({
+      id: t.id, label: t.label, skin: !!t.skin, clunkVoice: t.clunkVoice || null,
+    }));
+  },
   towerGhosts(on = true) {
     TOWERLAB.ghosts = !!on;
     const g = TOWERLAB.group && TOWERLAB.group.getObjectByName('towerGhosts');
