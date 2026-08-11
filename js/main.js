@@ -5282,7 +5282,10 @@ function stepResting() {
 // on frame one (the same trap this file documents at ROOM and LS_NAME).
 const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
   falling: [], hidden: [], out: [], log: [], echo: true, born: 0, dropped: 0,
-  tune: { speedMin: 18, speedMax: 27, lipTilt: 0.13 } };
+  // speedMin/Max reset after the rolling exit landed: 60–80 was Joe's dial
+  // for SLIDING dice punching through the friction tax; rolling dice carry
+  // at a fraction of that. lipTilt 0.1 is Joe's pick.
+  tune: { speedMin: 24, speedMax: 34, lipTilt: 0.1 } };
 const TOWERLAB_EULER = new THREE.Euler();
 
 function tick(dt, render = true, realtime = false) {
@@ -5675,6 +5678,7 @@ function towerLabDrop(n = 8, seed = 42) {
     // towerTune({speedMin, speedMax}).
     const speed = TOWERLAB.tune.speedMin
       + rng() * (TOWERLAB.tune.speedMax - TOWERLAB.tune.speedMin);
+    const exitYaw = (rng() - 0.5) * (Math.PI / 7.5);
     const ath2 = -v.exit.pitch;
     // Graze height off the INTERNAL slope (probe run 9): the chute surface
     // now runs under the spawn itself, so the height is simply surface + a
@@ -5694,14 +5698,25 @@ function towerLabDrop(n = 8, seed = 42) {
         // clearance stays positive: 0.9 + tan12°·0.875 + 1.25 = 2.34 < 2.5.
         x: (rng() - 0.5) * 1.8,
         speed, y: exitY,
-        yaw: (rng() - 0.5) * (Math.PI / 7.5),    // ±12° — chutes throw straight
+        yaw: exitYaw,                            // ±12° — chutes throw straight
         // Pitch rides the SLOPE (seventh look): horizontal launches fell
         // ~2 units under g=-110 and arrived nearly vertical at ~20 u/s —
         // the normal impulse plus its friction bite ate the forward motion
         // in one contact, and the pour jammed at its own doorstep. Parallel
         // to the chute, first contact is a graze and the speed survives.
         pitch: v.exit.pitch + (rng() - 0.5) * (Math.PI / 30), // slope ± 3°
-        av: [(rng() - 0.5) * 40, (rng() - 0.5) * 40, (rng() - 0.5) * 40],
+        // ROLLING EXIT (Joe, eleventh look — "the dice should have gained
+        // angular momentum in the tower"): a die SLIDING on felt is savaged
+        // by friction; a die ROLLING at matched spin barely feels it. This
+        // was the missing physics behind the felt-slap tax and the
+        // non-monotonic carry. ω = v/r about the horizontal axis
+        // perpendicular to travel (tilted with the yaw), tumble jitter on
+        // top — the baffles put forward roll on everything.
+        av: [
+          (speed / r) * Math.cos(exitYaw) + (rng() - 0.5) * 10,
+          (rng() - 0.5) * 10,
+          -(speed / r) * Math.sin(exitYaw) + (rng() - 0.5) * 10,
+        ],
         rot: [rng() * 6.28, rng() * 6.28, rng() * 6.28],
       },
     });

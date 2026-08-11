@@ -113,7 +113,17 @@ bounced back into the tower):
 with `speed` this die's own seeded exit speed. One formula clears a d20
 and a d4 alike; a fixed height cannot, because the radius and the
 speed-dependent gravity term both move the answer by more than the
-margin. The die rides the chute and leaves its end at a shallow angle
+margin.
+
+**DICE EXIT ROLLING (Joe, eleventh look — "the dice should have gained
+angular momentum in the tower").** Exit spin is matched to the exit
+velocity: ω = v/r about the horizontal axis perpendicular to travel
+(tilted with the yaw), tumble jitter on top. This is not decoration; it
+is the carry mechanism. A die SLIDING on felt is savaged by kinetic
+friction (the "felt-slap tax" that made carry non-monotonic in speed and
+drove the dial to 60–80); a die ROLLING at matched spin barely feels the
+felt at all. Probe, the first clean sheet of the whole campaign: 8-die
+pour, 8 exits, zero rescues, all 8 delivered to open felt, tray empty. The die rides the chute and leaves its end at a shallow angle
 that skips across the felt — the felt itself is the shared table physics
 and is never retuned for the tower.
 
