@@ -403,19 +403,25 @@ function planarUV(geo, uw, vw, uo = 0, vo = 0) {
 // never calls computeVertexNormals (which would flatten every bevel).
 function weather(geo, w, h, d, rnd) {
   const pos = geo.attributes.position;
+  const dims = [w, h, d];
+  // Which axis is the board's THICKNESS? That is what gets displaced; the
+  // other two are its face, and the envelopes below are written in face
+  // coordinates (fa = along the length, fb = across the width).
+  const n = dims.indexOf(Math.min(w, h, d));
+  const [p1, p2] = [0, 1, 2].filter((i) => i !== n);
+  const [fa, fb] = dims[p1] >= dims[p2] ? [p1, p2] : [p2, p1];
+  const G = ['getX', 'getY', 'getZ'], K = ['setX', 'setY', 'setZ'];
   const px = rnd() * 100, py = rnd() * 100;
-  const bow = (rnd() - 0.5) * 0.010 * Math.max(w, h);
-  const thin = Math.min(w, h, d);
+  const bow = (rnd() - 0.5) * 0.006 * dims[fa];
   for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
-    const ax = w > 0 ? (2 * x) / w : 0;                    // -1..1 along width
-    const ay = h > 0 ? (2 * y) / h : 0;
-    const env = 1 - ax * ax;                               // zero at the ends
-    const wander = 0.006 * Math.max(w, h) * Math.abs(ay)
-      * (vnoise(ax * 3 + px, ay * 3 + py, 16, 0x51) * 2 - 1);
-    const fine = 0.035 * thin * (vnoise(x * 6 + px, y * 6 + py, 32, 0xc3) * 2 - 1);
-    pos.setZ(i, z + bow * env + fine * 0.5);
-    pos.setY(i, y + wander * env);
+    const u = (2 * pos[G[fa]](i)) / (dims[fa] || 1);   // -1..1 along the length
+    const v = (2 * pos[G[fb]](i)) / (dims[fb] || 1);   // -1..1 across it
+    const env = 1 - u * u;                              // zero at the sawn ends
+    const wander = 0.008 * dims[fb] * Math.abs(v) * env
+      * (vnoise(u * 3 + px, v * 3 + py, 16, 0x51) * 2 - 1);
+    const fine = 0.03 * dims[n] * (vnoise(u * 9 + px, v * 9 + py, 32, 0xc3) * 2 - 1);
+    pos[K[n]](i, pos[G[n]](i) + bow * env + fine);
+    pos[K[fb]](i, pos[G[fb]](i) + wander);
   }
   pos.needsUpdate = true;
   return geo;
@@ -583,12 +589,13 @@ export function buildTowerSkin(v) {
 
   // --- PLINTH: two stepped courses, both wider than the shaft -------------
   span('walnut', -(capX + 0.13 * S), capX + 0.13 * S, 0, baseA, zBO - 0.16 * S, zFO,
-    { uv: UV.flat, r: R_HULL });
-  span('walnut', -capX, capX, baseA, baseB, zBO - 0.08 * S, zFO, { uv: UV.flat, r: R_TRIM });
+    { uv: UV.flat, r: R_HULL, weather: true });
+  span('walnut', -capX, capX, baseA, baseB, zBO - 0.08 * S, zFO,
+    { uv: UV.flat, r: R_TRIM, weather: true });
 
   // --- SHAFT: light side panels framed by dark posts and boards -----------
   for (const s of [-1, 1]) {
-    span('cherry', s * inX, s * sideX, baseB, bodyTop, zBO, zFO, { weather: true, r: R_TRIM });
+    span('cherry', s * inX, s * sideX, baseB, bodyTop, zBO, zFO, { r: R_TRIM });
   }
   span('walnut', -inX, inX, baseB, bodyTop, zBO, zBI, { weather: true, r: R_TRIM });
   // The front board is THIN by contract: the bore's front tangent sits at
@@ -608,7 +615,7 @@ export function buildTowerSkin(v) {
   const cant = 4 * Math.PI / 180;
   for (const s of [-1, 1]) {
     span('walnutFlat', s * inX, s * capX, bodyTop, capTop, zBO - 0.16 * S, zFO,
-      { uv: UV.flat, r: R_TRIM, rz: s * cant });
+      { uv: UV.flat, r: R_TRIM, rz: s * cant, weather: true });
   }
   span('walnutFlat', -capX, capX, bodyTop, capTop, zBO - 0.16 * S, zBI,
     { uv: UV.flat, r: R_TRIM, rx: -cant });
