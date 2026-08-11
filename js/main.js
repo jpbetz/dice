@@ -40,6 +40,7 @@ import { ParticleField } from './particles.js';
 import { DecalField } from './decals.js';
 import { DieLightRig } from './dielights.js';
 import { PostStack, MAX_SHIMMER } from './post.js';
+import { buildTowerSkin } from './towerskin.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -5287,6 +5288,10 @@ const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
   // at a fraction of that. lipTilt 0.1 is Joe's pick.
   // matExtra 4.5 is Joe's dial (thirteenth look): "with that in place
   // everything works."
+  // Once a SKIN exists the ghosts are scaffolding: the wooden model is what
+  // ships and the contract volumes are what you switch on to argue with it
+  // (__diceDebug.towerGhosts(true) / towerSkin(false)).
+  skin: true, ghosts: false,
   tune: { speedMin: 24, speedMax: 34, lipTilt: 0.1, matExtra: 4.5 } };
 const TOWERLAB_EULER = new THREE.Euler();
 
@@ -5481,7 +5486,9 @@ function towerGhost(color, opacity, geo) {
 
 function towerLabBuild() {
   const v = towerVolumes();
-  const g = new THREE.Group();
+  const root = new THREE.Group();
+  const g = new THREE.Group();        // the contract ghosts, toggled together
+  g.name = 'towerGhosts';
   const box = (vol, color, opacity) => {
     const mesh = towerGhost(color, opacity, new THREE.BoxGeometry(...vol.s));
     mesh.position.set(...vol.c);
@@ -5531,7 +5538,15 @@ function towerLabBuild() {
   g.add(spawn);                   // exit spawn point + spray direction
   g.add(new THREE.ArrowHelper(new THREE.Vector3(0, 0, 1),
     new THREE.Vector3(...v.exit.p), 2.0, 0xffdd33));
-  return g;
+  g.visible = TOWERLAB.ghosts;
+  root.add(g);
+  // The SKIN (js/towerskin.js): the wooden model that occludes the ghosts.
+  // Zero colliders and zero lights by contract — it is added to the scene
+  // graph and to nothing else.
+  const skin = buildTowerSkin(v);
+  skin.visible = TOWERLAB.skin;
+  root.add(skin);
+  return root;
 }
 
 // The lab's own world: floor, the CURRENT walls, ceiling, apron. It reuses
@@ -5873,6 +5888,93 @@ window.__diceDebug = {
   towerDrop(n = 8, seed = 42) { return towerLabDrop(n, seed); },
   towerClear() { towerLabClear(); return true; },
   towerLog() { return TOWERLAB.log.slice(); },
+  // The skin and the ghosts are independent layers over the same core: the
+  // wooden model ships visible, the contract volumes ship hidden, and either
+  // can be flipped to argue the other's case.
+  towerSkin(on = true) {
+    TOWERLAB.skin = !!on;
+    const s = TOWERLAB.group && TOWERLAB.group.getObjectByName('towerSkin');
+    if (s) s.visible = TOWERLAB.skin;
+    return TOWERLAB.skin;
+  },
+  towerGhosts(on = true) {
+    TOWERLAB.ghosts = !!on;
+    const g = TOWERLAB.group && TOWERLAB.group.getObjectByName('towerGhosts');
+    if (g) g.visible = TOWERLAB.ghosts;
+    return TOWERLAB.ghosts;
+  },
+  // DOES THE SKIN ACTUALLY HIDE WHAT THE CONTRACT SAYS IT MUST? (docs/TOWER.md
+  // §4.) For every shipped camera eye, shoot a ray at a grid of sample points
+  // and ask whether opaque skin geometry stands in the way. Only the wood and
+  // the black lining count — the gradient veils are transparent and prove
+  // nothing. The eye is translated by the anchor delta rather than re-laying
+  // the mat per preset: the core's offsets from z0 never move, so that is the
+  // same test with one build.
+  towerOcclusionCheck() {
+    if (!TOWERLAB.on) towerLabSet(true);
+    const v = towerVolumes();
+    const skin = TOWERLAB.group.getObjectByName('towerSkin');
+    const targets = [];
+    for (const n of ['towerSkinWood', 'towerSkinLining']) {
+      const o = skin && skin.getObjectByName(n);
+      if (o) targets.push(o);
+    }
+    const disc = (y, out) => {
+      out.push([0, y, v.shaft.c[2]]);
+      for (const r of [0.55, 1.1, 1.65, 2.0]) {
+        for (let a = 0; a < 8; a++) {
+          const th = (a / 8) * Math.PI * 2;
+          out.push([Math.cos(th) * r, y, v.shaft.c[2] + Math.sin(th) * r]);
+        }
+      }
+    };
+    // (a) the SHAFT at and just above the despawn line, (b) the COWL band,
+    // (c) the exit spawn lane, (d) the HOOD pocket in front of the wall.
+    const shaft = [], cowl = [], exit = [], hood = [];
+    for (const y of [v.despawnY, v.despawnY + 0.25, v.despawnY + 0.6]) disc(y, shaft);
+    const cb = v.cowl.c[1] - v.cowl.s[1] / 2, ct = v.cowl.c[1] + v.cowl.s[1] / 2;
+    for (const y of [cb + 0.15, (cb + ct) / 2, ct - 0.15]) disc(y, cowl);
+    for (const dx of [-0.9, 0, 0.9]) {
+      for (const dy of [-0.6, 0, 0.9]) exit.push([dx, v.exit.p[1] + dy, v.exit.p[2]]);
+    }
+    const hy = v.hood.c[1] - v.hood.s[1] / 2;
+    for (const dx of [-1.4, 0, 1.4]) {
+      for (const dy of [0.4, 1.2, 2.4]) {
+        for (const dz of [0.15, 0.9]) hood.push([dx, hy + dy, v.z0 + dz]);
+      }
+    }
+    const rc = new THREE.Raycaster();
+    const o = new THREE.Vector3(), d = new THREE.Vector3(), p = new THREE.Vector3();
+    const run = (eye, pts) => {
+      let blocked = 0;
+      for (const pt of pts) {
+        p.set(pt[0], pt[1], pt[2]);
+        o.set(eye[0], eye[1], eye[2]);
+        d.copy(p).sub(o);
+        const len = d.length();
+        rc.set(o, d.divideScalar(len));
+        rc.near = 0;
+        rc.far = len - 0.02;
+        if (rc.intersectObjects(targets, true).length) blocked++;
+      }
+      return { n: pts.length, blocked };
+    };
+    const eyes = [];
+    for (const [id, pre] of Object.entries(ZOOM_PRESETS)) {
+      const z0p = -(pre.d + TOWERLAB.tune.matExtra) / 2;
+      for (const which of ['eyeFull', 'eyeMini']) {
+        const e = pre[which];
+        const eye = [e[0], e[1], v.z0 + (e[2] - z0p)];
+        eyes.push({
+          id: `${id}.${which === 'eyeFull' ? 'full' : 'mini'}`,
+          eye: eye.map((n) => Number(n.toFixed(2))),
+          shaft: run(eye, shaft), cowl: run(eye, cowl),
+          exit: run(eye, exit), hood: run(eye, hood),
+        });
+      }
+    }
+    return { z0: v.z0, despawnY: v.despawnY, eyes };
+  },
   // Live dials for the pour's feel — Joe's eye owns these numbers, the
   // same way the tempo curve was dialed. Changing the tilt rebuilds the
   // lab (clears lab dice); speed changes apply to the next drop.

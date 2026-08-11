@@ -1,0 +1,57 @@
+/*
+Copyright 2026 The Dice Table Authors
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// DOES THE SKIN HIDE WHAT THE CONTRACT SAYS IT MUST? (docs/TOWER.md §4.)
+// Headless, geometric, no screenshots: for every shipped camera eye
+// (ZOOM_PRESETS full + mini) it shoots rays at a grid of sample points and
+// reports how many are behind opaque skin.
+//
+// Two of the four bands are HARD — the shaft around the despawn line, and
+// the cowl band over the mouth — and this step fails on either.
+//
+// EXIT and HOOD are reported, not gated, and the reason is arithmetic, not
+// laziness: both sit at or in front of the back-wall plane, seen through a
+// doorway the contract requires to stay clear from the apron top up to
+// y ≥ 3.4·S. Every shipped eye is shallow enough that its ray enters that
+// opening BELOW the head and lands on the spawn without meeting anything.
+// No legal geometry occludes them; the darkness layers (black lining and
+// the doorway veil) are what the contract actually leans on there.
+//
+//   node tools/drive.mjs tools/steps/tower-occlusion.mjs
+
+export default async function run(stage) {
+  const a = await stage.tab('localhost', 'TowerOcclusion');
+  await a.dbg('holdClock(true)');
+  await a.dbg('towerEcho(false)');
+  await a.dbg('towerCore(true)');
+  const res = await a.dbg('towerOcclusionCheck()');
+
+  console.log(`z0=${res.z0} despawnY=${res.despawnY}\n`);
+  const pct = (b) => `${b.blocked}/${b.n}`;
+  let bad = 0;
+  for (const e of res.eyes) {
+    const hardOk = e.shaft.blocked === e.shaft.n && e.cowl.blocked === e.cowl.n;
+    if (!hardOk) bad++;
+    console.log(
+      `${hardOk ? 'PASS' : 'FAIL'} ${e.id.padEnd(12)} eye=(${e.eye.join(',')})  `
+      + `shaft ${pct(e.shaft)}  cowl ${pct(e.cowl)}   `
+      + `[exit ${pct(e.exit)}  hood ${pct(e.hood)}]`);
+  }
+  console.log(bad === 0
+    ? '\nCLEAN: shaft + cowl occluded at every shipped eye'
+    : `\nBAD: ${bad} eye(s) leak the shaft or the cowl`);
+  if (bad > 0) process.exitCode = 1;
+}
