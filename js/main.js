@@ -5292,7 +5292,13 @@ const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
   // ships and the contract volumes are what you switch on to argue with it
   // (__diceDebug.towerGhosts(true) / towerSkin(false)).
   skin: true, ghosts: false,
-  tune: { speedMin: 24, speedMax: 34, lipTilt: 0.1, matExtra: 4.5 } };
+  tune: { speedMin: 24, speedMax: 34, lipTilt: 0.1, matExtra: 4.5,
+    // The pour's camera choreography (Joe: "start in one position and move
+    // during the roll") — a low frontal tower shot while dice pour in, an
+    // ease back to the table framing once the last die has exited. Dials:
+    // camX/camY/camDist position the tower eye; camTgtY is where it looks.
+    camMove: true, camX: 5, camY: 9, camDist: 16, camTgtY: 4.5 },
+  camPhase: null };
 const TOWERLAB_EULER = new THREE.Euler();
 
 function tick(dt, render = true, realtime = false) {
@@ -5681,6 +5687,8 @@ function towerLabDrop(n = 8, seed = 42) {
   const v = towerVolumes();
   n = Math.max(1, Math.min(20, n | 0));
   TOWERLAB.dropped += n;
+  // Act one: look at the tower while the dice pour into it.
+  if (TOWERLAB.tune.camMove) towerCamTo('tower');
   let entryAt = 0;
   for (let i = 0; i < n; i++) {
     const type = DIE_TYPES[(rng() * DIE_TYPES.length) | 0];
@@ -5762,10 +5770,35 @@ function towerLabDrop(n = 8, seed = 42) {
 // deadlocked measurably. It is gone: exits spawn ABOVE lane occupants and
 // cascade off the pile — see the exit block.)
 
+// The pour's two camera acts. 'tower': ease to the low frontal eye that
+// actually looks at the thing dice are vanishing into. 'table': hand the
+// camera back to the framing ladder (its own ease). Both moves ride the
+// existing camEase rig, so holdClock freezes them like everything else.
+function towerCamTo(phase) {
+  const v = towerVolumes();
+  TOWERLAB.camPhase = phase;
+  if (phase === 'tower') {
+    camEase = {
+      t: 0,
+      fromPos: camera.position.clone(),
+      toPos: new THREE.Vector3(TOWERLAB.tune.camX, TOWERLAB.tune.camY, v.z0 + TOWERLAB.tune.camDist),
+      fromTgt: camTarget.clone(),
+      toTgt: new THREE.Vector3(0, TOWERLAB.tune.camTgtY, v.z0),
+    };
+  } else {
+    applyCameraFraming(true);
+  }
+}
+
 function stepTowerLab(dt) {
   if (!TOWERLAB.on || dt <= 0) return;
   TOWERLAB.t += dt;
   const v = towerVolumes();
+  // Act two: the last die has left the hidden works — pull back to the table.
+  if (TOWERLAB.camPhase === 'tower'
+      && TOWERLAB.falling.length === 0 && TOWERLAB.hidden.length === 0) {
+    towerCamTo('table');
+  }
   // Scripted entry: gravity-true fall, tumbling, no body. Despawn at the line.
   for (let i = TOWERLAB.falling.length - 1; i >= 0; i--) {
     const f = TOWERLAB.falling[i];
