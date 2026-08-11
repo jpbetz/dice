@@ -69,31 +69,32 @@ export default async function run(stage, args) {
   await t.waitFor('!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.landings)',
     { desc: 'the pour arrived' });
   const f = JSON.parse(await t.eval('JSON.stringify(window.__diceDebug.towerFilmInfo())'));
-  const entry = Math.max(1, Math.round(f.firstExitTime * 60 * 0.35));
-  await t.dbg(`sim(${entry})`);
+  // EARLY. A die is only above the crown for about a tenth of a second — it
+  //    falls 4.25 units to the despawn line under g = −110 in 0.28 s, and the
+  //    parapet hides it for most of that. Sampling at a third of the way to
+  //    the first exit (the obvious choice, and the wrong one) lands on an
+  //    empty tower: everything is already inside.
+  await t.dbg('sim(9)');
   await shot(`${tower}-2-pour-entry.png`);
-  await t.dbg(`sim(${f.frames + 240 - entry})`);
+  await t.dbg('sim(11)');
+  await shot(`${tower}-2b-pour-entry-late.png`);
+  await t.dbg(`sim(${f.frames + 240 - 20})`);
   await shot(`${tower}-3-exit-spread.png`);
   await t.dbg('clearTable()');
   await t.dbg('sim(400)');
   await t.settle();
 
-  // 4 and 5. Both ends of the zoom ladder, WITH DICE ON THE FELT. The empty
-  //    felt would prove nothing here: the resting eye frames the tower itself,
-  //    so it looks near-identical at every preset. Dice hand the frame back to
-  //    the framing ladder, and the ladder is where the ladder shows — the
-  //    tower reads big on close and small on wide, which is physical honesty
-  //    (dice are fixed world-size) and exactly the thing a reviewer has to be
-  //    shown rather than told.
+  // 4 and 5. Both ends of the zoom ladder, on an empty felt.
+  //    THESE TWO LOOK ALIKE, AND THAT IS THE FINDING. Tried the other way
+  //    first — dice on the felt at each preset — and the framing ladder did
+  //    its job: it framed the DICE and let the tower slide out of shot, which
+  //    tells a reviewer nothing about the model. On an empty felt the resting
+  //    eye is tower-relative, so the idle frame is near-identical at wide and
+  //    at close. That IS the shipped experience: the ladder's difference shows
+  //    once dice land (shot 3), not while the table is waiting.
   for (const [z, n] of [['wide', '4-zoom-wide'], ['close', '5-zoom-close']]) {
     await zoom(z);
-    await t.dbg(`commandRoll('3d6')`);
-    await t.settle();
-    await t.dbg('sim(600)');
     await shot(`${tower}-${n}.png`);
-    await t.dbg('clearTable()');
-    await t.dbg('sim(400)');
-    await t.settle();
   }
   await zoom('medium');
 

@@ -508,8 +508,9 @@ export function buildBastionSkin(v) {
   // Off-centre, and nothing on the right answers it — Heartwood's single iron
   // bracket, in stone.
   {
-    const sx = -0.92, w = 0.30, y0 = 7.30, y1 = 8.90;
-    const jamb = 0.26, head = 0.24;
+    const sx = -0.92, w = 0.22, y0 = 7.15, y1 = 9.05;
+    // A surround as wide as the slot is a picture frame, not an arrow loop.
+    const jamb = 0.13, head = 0.13;
     span('shadowStone', sx - w / 2, sx + w / 2, y0, y1, zFI, zFF - 0.012,
       { r: R_THIN, uv: UV.trim });
     for (const s of [-1, 1]) {
