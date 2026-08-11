@@ -5409,6 +5409,7 @@ function towerVolumes() {
     apron:   { c: [0, 0.4, z0 + 0.55], s: [3.8, 0.8, 1.1] },
     shaft:   { c: [0, 4.85, z0 - 1.6], r: 1.7, h: 5.3 },
     aim:     { c: [0, 9.0, z0 - 1.6], s: [0.8, 0.3, 0.8] },
+    cowl:    { c: [0, 7.4, z0 + 0.05], s: [4.2, 2.4, 0.3] },
     despawnY: 5.6,
     hood:    { c: [0, 2.0, z0 + 0.25], s: [3.4, 2.4, 0.5] },
     exit:    { p: [0, 1.6, z0 + 0.35] },
@@ -5442,6 +5443,12 @@ function towerLabBuild() {
     new THREE.CylinderGeometry(v.shaft.r, v.shaft.r, v.shaft.h, 24, 1, true));
   shaft.position.set(...v.shaft.c);
   g.add(shaft);                   // MOUTH shaft — green tube
+  // COWL — the mouth's front occluder. Derived, not styled: the shipped
+  // cameras look in OVER the front rim, and at the `wide` eye an open-top
+  // shaft leaks the vanish (sightline reaches y≈6.4 inside the shaft, below
+  // a d20's top at despawn). Occluding the +z face up to 8.6 closes it at
+  // every shipped eye with margin.
+  box(v.cowl, 0x44cc88, 0.22);
   const line = towerGhost(0xff3333, 0.35, new THREE.CircleGeometry(v.shaft.r + 0.2, 24));
   line.rotation.x = -Math.PI / 2;
   line.position.set(v.shaft.c[0], v.despawnY, v.shaft.c[2]);
@@ -5514,21 +5521,24 @@ function towerLabDrop(n = 8, seed = 42) {
   const rng = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32);
   const v = towerVolumes();
   n = Math.max(1, Math.min(20, n | 0));
+  let entryAt = 0;
   for (let i = 0; i < n; i++) {
     const type = DIE_TYPES[(rng() * DIE_TYPES.length) | 0];
     const mesh = createDieMesh(type, dieVariant(false, null));
-    // Stagger by spawn height: each die starts 1.4 higher, so the pour
-    // arrives as a cascade with no timer bookkeeping.
+    // Stagger by TIME, not spawn height: equal height gaps compress into
+    // ~50 ms arrival gaps at terminal speed (t = √(2h/g), and dt shrinks as
+    // v grows), which is why the first cut exited "kinda all at once". A
+    // poured cadence of 0.25–0.4 s per die survives the fall intact.
+    entryAt += i === 0 ? 0 : 0.25 + rng() * 0.15;
     mesh.position.set(
       v.aim.c[0] + (rng() - 0.5) * 0.8,
-      v.aim.c[1] + i * 1.4,
+      v.aim.c[1] + rng() * 0.8,
       v.aim.c[2] + (rng() - 0.5) * 0.8);
     mesh.quaternion.setFromEuler(new THREE.Euler(rng() * 6.28, rng() * 6.28, rng() * 6.28));
-    scene.add(mesh);
     TOWERLAB.falling.push({
-      mesh, type, vy: 0,
+      mesh, type, vy: 0, entryAt: TOWERLAB.t + entryAt, entered: false,
       av: [(rng() - 0.5) * 8, (rng() - 0.5) * 8, (rng() - 0.5) * 8],
-      transit: 0.45 + rng() * 0.65,
+      transit: 0.5 + rng() * 1.1,
       exit: {
         x: (rng() - 0.5) * 1.2,
         speed: 6 + rng() * 5,
@@ -5549,6 +5559,8 @@ function stepTowerLab(dt) {
   // Scripted entry: gravity-true fall, tumbling, no body. Despawn at the line.
   for (let i = TOWERLAB.falling.length - 1; i >= 0; i--) {
     const f = TOWERLAB.falling[i];
+    if (TOWERLAB.t < f.entryAt) continue;
+    if (!f.entered) { f.entered = true; scene.add(f.mesh); }
     f.vy += GRAVITY * dt;
     f.mesh.position.y += f.vy * dt;
     TOWERLAB_EULER.set(f.av[0] * dt, f.av[1] * dt, f.av[2] * dt);
@@ -5557,7 +5569,7 @@ function stepTowerLab(dt) {
       scene.remove(f.mesh);
       TOWERLAB.falling.splice(i, 1);
       let exitAt = TOWERLAB.t + f.transit;
-      exitAt = Math.max(exitAt, TOWERLAB.lastExit + 0.08); // the stagger floor
+      exitAt = Math.max(exitAt, TOWERLAB.lastExit + 0.2); // the stagger floor
       TOWERLAB.lastExit = exitAt;
       TOWERLAB.hidden.push({ mesh: f.mesh, type: f.type, exitAt, exit: f.exit });
     }

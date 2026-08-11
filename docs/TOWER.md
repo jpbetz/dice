@@ -37,6 +37,15 @@ and the mouth has no rim colliders — so a model cannot deflect an entry.
 Aperture arithmetic: d20 radius 1.25 + aim jitter 0.4 → clear radius 1.65;
 Ø 3.4 leaves 0.05 of visual margin. Do not shrink the mouth below Ø 3.4.
 
+**The COWL (added 2026-08-12, first lab look):** the mouth's +z face must be
+occluded from `y = 6.2` up to `y ≥ 8.6`. Derived, not styled: the shipped
+cameras look in OVER the front rim, and at the `wide` eye the sightline
+reaches y ≈ 6.4 inside an open-top shaft — below a d20's top at the despawn
+line, so the vanish would be watchable. 8.6 closes the leak at every shipped
+eye with margin. A hood, a canted funnel roof, a chimney cap — any shape
+works if the +z projection covers that band. Dice remain visible falling
+from above the cowl; the despawn happens in its shadow.
+
 **4. OCCLUSION — what a skin must hide, from every shipped camera** (the
 steepest is the `close` preset's mini eye; check that one and the rest
 follow). (a) The SHAFT: a falling die is fully hidden by `y = 5.8`; despawn
@@ -55,9 +64,12 @@ within ±30° of +z, pitch 0° to −10°. Everything after spawn is the normal
 pipeline — real bounces, displacement terminator, face correction, tempo
 curve — untouched.
 
-**6. TRANSIT — the hidden time and the sound.** Per-die seeded: 0.45–1.1 s
-hidden, exits staggered ≥ 80 ms apart so a 20-die pour cascades instead of
-machine-gunning. 2–4 synthetic baffle clunks per die at seeded film times,
+**6. TRANSIT — the cadence and the sound.** All seeded. Entries POUR at
+0.25–0.4 s per die — time-staggered, never height-staggered (equal height
+gaps compress to ~50 ms arrival gaps at terminal speed; measured in the
+first lab cut, which exited "kinda all at once"). Hidden transit 0.5–1.6 s
+per die; exits staggered ≥ 0.2 s apart. 2–4 synthetic baffle clunks per die
+at seeded film times,
 injected into the same film-time click gate the table already uses. Models
 register a SOUND PALETTE (wood / stone / metal — a sample set), never
 timings.
