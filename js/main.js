@@ -5285,7 +5285,7 @@ const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
   // speedMin/Max reset after the rolling exit landed: 60–80 was Joe's dial
   // for SLIDING dice punching through the friction tax; rolling dice carry
   // at a fraction of that. lipTilt 0.1 is Joe's pick.
-  tune: { speedMin: 24, speedMax: 34, lipTilt: 0.1 } };
+  tune: { speedMin: 24, speedMax: 34, lipTilt: 0.1, matExtra: 3.4 } };
 const TOWERLAB_EULER = new THREE.Euler();
 
 function tick(dt, render = true, realtime = false) {
@@ -5615,8 +5615,24 @@ function towerLabWorld() {
   return w;
 }
 
+// The tower BRINGS the room it consumes (Joe, twelfth look): its tray band
+// eats ~4 units of mat depth, so socketing it deepens the mat by matExtra
+// (walls, shadow frustum and camera framing all follow, exactly like a
+// zoom), and tearing it down restores the preset. Local-lab caveat: while
+// the lab is on, YOUR client's walls are deeper for real rolls too — do
+// not use the lab on a shared table (the eventual feature makes this a
+// room setting so every client agrees).
+function towerLabMat(extra) {
+  TABLE_D += extra;
+  walls.back.position.set(0, 0, -TABLE_D / 2);
+  walls.front.position.set(0, 0, TABLE_D / 2);
+  updateShadowFrustum();
+  refitView();
+}
+
 function towerLabSet(on = true) {
   if (on && !TOWERLAB.on) {
+    towerLabMat(TOWERLAB.tune.matExtra);
     TOWERLAB.group = towerLabBuild();
     scene.add(TOWERLAB.group);
     TOWERLAB.world = towerLabWorld();
@@ -5627,6 +5643,7 @@ function towerLabSet(on = true) {
     TOWERLAB.group = null;
     TOWERLAB.world = null;
     TOWERLAB.on = false;
+    towerLabMat(-TOWERLAB.tune.matExtra);
   }
   return TOWERLAB.on;
 }
@@ -5858,8 +5875,10 @@ window.__diceDebug = {
   // same way the tempo curve was dialed. Changing the tilt rebuilds the
   // lab (clears lab dice); speed changes apply to the next drop.
   towerTune(o = {}) {
+    const rebuild = TOWERLAB.on && ('lipTilt' in o || 'matExtra' in o);
+    if (rebuild) towerLabSet(false); // restore the mat under the OLD tune
     Object.assign(TOWERLAB.tune, o);
-    if (TOWERLAB.on && 'lipTilt' in o) { towerLabSet(false); towerLabSet(true); }
+    if (rebuild) towerLabSet(true);
     return { ...TOWERLAB.tune };
   },
   towerEcho(on = true) { TOWERLAB.echo = !!on; return TOWERLAB.echo; },

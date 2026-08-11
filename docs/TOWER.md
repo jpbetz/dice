@@ -175,6 +175,15 @@ SHAFT and HOOD volumes from the shipped cameras; (c) it leaves the MOUTH
 and EXIT apertures clear; (d) it contributes no colliders. Four checks, all
 geometric, all testable headlessly against the model's mesh.
 
+**THE TOWER BRINGS THE ROOM IT CONSUMES (twelfth look).** Its tray band
+eats ~4 units of mat depth, so socketing a tower DEEPENS the mat by
+`matExtra` (default 3.4) — walls, shadow frustum and camera framing all
+follow, exactly like a zoom change — and unsocketing restores the preset.
+In the feature this rides the same room setting as tower on/off, so every
+client agrees on the walls. Measured: with the deeper mat the 20-die
+stress pour went fully CLEAN for the first time (15 felt / 5 tray, 4
+re-queues, none hidden).
+
 ## Consequences worth naming
 
 - Because the film never reads the model, tower SKINS are per-viewer
