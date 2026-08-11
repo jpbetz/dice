@@ -67,8 +67,8 @@ const IN_LOBBY = ROOM === null;
 // live (walls, shelf pitch, camera framing all follow). The base values here
 // are DEFAULT_ZOOM's preset and must move with it; ZOOM_PRESETS owns them all, and
 // applyZoom mutates these + the wall body positions in place.
-let TABLE_W = 8.6;           // playable width (x) — the DEFAULT ('medium')
-let TABLE_D = 5.2;           // playable depth (z)
+let TABLE_W = 11;            // playable width (x) — the DEFAULT ('medium')
+let TABLE_D = 6.7;           // playable depth (z)
 // Zoom picker labels — declared here (not next to renderZoomPicker) because
 // setSound() → syncSettingsUI() → renderZoomPicker() runs during module
 // evaluation, and the picker's early build must not read this in TDZ.
@@ -109,6 +109,17 @@ const ZOOM_LEVELS = [
 //
 // Die span at the default, for the record: 260px on a desktop with the rail,
 // 80px on a 390px phone. The first `wide` this ladder ever had was 30×17.
+//
+// AND BACK OUT ONE STEP (2026-08-12, "now that we've fully pressure tested
+// the physics, we get to BREATHE. Expand the roll space by 60%"). The ladder
+// pitch is ×0.78 linear = ×1.64 in area, so one step back out IS the asked-for
+// expansion: the new `close` is byte-for-byte the old `medium` and the new
+// `medium` the old `wide` — both already measured for 40-die containment —
+// and a genuinely roomier `wide` (14.1×8.6) continues the pitch upward. The
+// tightening era ended when the settle flip landed: dice now stop where they
+// land, so the room a throw spreads into reads as breathing space, not as
+// distance from dice that refuse to finish. Camera follows the mat one notch
+// out (the framing ladder guarantees this on its own).
 const DEFAULT_ZOOM = 'medium';
 const MAX_DICE_ON_TABLE = 40;
 const GRAVITY = -110;
@@ -12119,10 +12130,14 @@ function clearTableIdentity() {
 // way to make dice bigger, on every screen at once, and it makes the shelf
 // smaller with it (slot pitch derives from TABLE_W), which is what forces the
 // retreat on a narrow phone in the first place.
+// SHIFTED BACK OUT ONE STEP 2026-08-12 (the BREATHE expansion — see the
+// ladder history at DEFAULT_ZOOM): `close` and `medium` are byte-for-byte the
+// old `medium` and `wide`; `wide` is new, one ×0.78 pitch above the old wide,
+// eyes scaled by the same 1.28 with y/z ≈ 1.73 preserved.
 const ZOOM_PRESETS = {
-  wide:   { w: 11,  d: 6.7, eyeFull: [0, 10.4, 6.0], eyeMini: [0, 8.6, 4.8] },
-  medium: { w: 8.6, d: 5.2, eyeFull: [0,  8.1, 4.7], eyeMini: [0, 6.7, 3.8] },
-  close:  { w: 6.7, d: 4.1, eyeFull: [0,  6.3, 3.7], eyeMini: [0, 5.2, 3.0] },
+  wide:   { w: 14.1, d: 8.6, eyeFull: [0, 13.3, 7.7], eyeMini: [0, 11.0, 6.2] },
+  medium: { w: 11,   d: 6.7, eyeFull: [0, 10.4, 6.0], eyeMini: [0,  8.6, 4.8] },
+  close:  { w: 8.6,  d: 5.2, eyeFull: [0,  8.1, 4.7], eyeMini: [0,  6.7, 3.8] },
 };
 
 let pendingZoom = null; // set by queueZoom when a change arrives mid-roll
@@ -13740,7 +13755,7 @@ function panelDebugState() {
 // LET, not const: zoom rewrites the eye preset so the walker's angle stays
 // fixed (every entry keeps y/z ≈ 1.74). applyCameraFraming's step-back still
 // runs after — it just starts from the closer eye at 'medium'/'close'.
-let CAM_EYE = { full: [0, 8.1, 4.7], mini: [0, 6.7, 3.8] }; // the DEFAULT ('medium')
+let CAM_EYE = { full: [0, 10.4, 6.0], mini: [0, 8.6, 4.8] }; // the DEFAULT ('medium')
 
 // What must stay on screen, each with the NDC headroom its own chrome needs.
 //
