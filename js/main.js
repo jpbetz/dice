@@ -5281,7 +5281,8 @@ function stepResting() {
 // eval, and stepTowerLab's on-check reads this — below tick it is a TDZ crash
 // on frame one (the same trap this file documents at ROOM and LS_NAME).
 const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
-  falling: [], hidden: [], out: [], log: [], echo: true, born: 0, dropped: 0 };
+  falling: [], hidden: [], out: [], log: [], echo: true, born: 0, dropped: 0,
+  tune: { speedMin: 18, speedMax: 27, lipTilt: 0.13 } };
 const TOWERLAB_EULER = new THREE.Euler();
 
 function tick(dt, render = true, realtime = false) {
@@ -5446,7 +5447,7 @@ function towerVolumes() {
     // slickness does nothing and the tray pile grew until it latched the
     // spawn. At 5°, friction 0.03 < tan 5°, so a parked die creeps forward
     // and drains onto the felt on its own.
-    lip:     { c: [0, -0.42, z0 + 2.8], s: [4.8, 1.0, 2.2], rx: 0.09 },
+    lip:     { c: [0, -0.42, z0 + 2.8], s: [4.8, 1.0, 2.2], rx: TOWERLAB.tune.lipTilt },
     // Exit spawn sits a full unit INSIDE the tower: emergence must read as
     // travel through the doorway, not materialisation at the spout (first
     // lab look). y = 2.0 keeps a d20's bottom above the apron on arrival —
@@ -5668,7 +5669,12 @@ function towerLabDrop(n = 8, seed = 42) {
     // 13–23: the wide spread is the DEPTH FAN (probe run 6) — fast dice
     // overfly the tray onto open felt, slow ones rest close, and the pour
     // stops stacking at a single radius in front of the door.
-    const speed = 13 + rng() * 10;
+    // Floor raised 13→18 (Joe, tenth look): the SLOW TAIL is what parks in
+    // the doorway — the first dice land on a virgin tray, stop close, and
+    // wall in the pour. Fast dice were never the problem. Live-dialable:
+    // towerTune({speedMin, speedMax}).
+    const speed = TOWERLAB.tune.speedMin
+      + rng() * (TOWERLAB.tune.speedMax - TOWERLAB.tune.speedMin);
     const ath2 = -v.exit.pitch;
     // Graze height off the INTERNAL slope (probe run 9): the chute surface
     // now runs under the spawn itself, so the height is simply surface + a
@@ -5833,6 +5839,14 @@ window.__diceDebug = {
   towerDrop(n = 8, seed = 42) { return towerLabDrop(n, seed); },
   towerClear() { towerLabClear(); return true; },
   towerLog() { return TOWERLAB.log.slice(); },
+  // Live dials for the pour's feel — Joe's eye owns these numbers, the
+  // same way the tempo curve was dialed. Changing the tilt rebuilds the
+  // lab (clears lab dice); speed changes apply to the next drop.
+  towerTune(o = {}) {
+    Object.assign(TOWERLAB.tune, o);
+    if (TOWERLAB.on && 'lipTilt' in o) { towerLabSet(false); towerLabSet(true); }
+    return { ...TOWERLAB.tune };
+  },
   towerEcho(on = true) { TOWERLAB.echo = !!on; return TOWERLAB.echo; },
   towerState() {
     const r1 = (n) => Number(n.toFixed(2));
