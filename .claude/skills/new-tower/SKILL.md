@@ -1,48 +1,76 @@
 ---
 name: new-tower
-description: Ship a new dice tower (skin + registry row + sound palette) at Heartwood rigor — the contract, the four proofs, the agent split, and the review gate, in order.
+description: Ship a new dice tower (skin + registry row + sound palette) at contract rigor — the process proven by Heartwood and corrected by Bastion. The four proofs, the agent split, the review gate, and the traps, in order.
 ---
 
 # Shipping a new dice tower
 
 A tower is a SKIN over engine-owned geometry, a REGISTRY ROW, and a SOUND
-PALETTE. Nothing else. The physics, the film, the exit guarantee, the camera
-choreography and the socketing all belong to the engine and are identical for
-every tower — that is the TOWER_CORE contract, and it is what makes this
-process repeatable. If a tower seems to need engine changes, stop: either the
-contract has a gap (fix docs/TOWER.md first, separately) or the design is
-wrong.
+PALETTE (`clunkVoice`). Nothing else. The physics, the film, the exit
+guarantee, the camera choreography and the socketing all belong to the
+engine and are identical for every tower — that is the TOWER_CORE contract,
+and it is what makes this process repeatable. If a tower seems to need
+engine changes, stop: either the contract has a gap (fix docs/TOWER.md
+first, separately) or the design is wrong.
 
 ## 0. Read first, in this order
 
+0. **If you are a worktree agent: `git merge --ff-only master` before
+   anything.** The tower work all landed recently; a worktree cut from an
+   older HEAD may contain none of it — no docs/TOWER.md, no towerskin.js,
+   not even this skill. (Cost the Bastion builder its first half hour.)
 1. `docs/TOWER.md` — the contract. Every volume the skin must respect
    (SOCKET, MOUTH, COWL, SHAFT/OCCLUSION, DOORWAY, EXIT apertures) and the
    failure ledger explaining why each number is what it is.
-2. `js/towerskin.js` — Heartwood, the reference implementation. The shared
-   techniques live here: seeded canvas textures + Sobel normal maps, rounded
-   boxes, planar UVs, raycast vertex-AO bake, the black BackSide interior
-   lining, gradient veils, contact shadows.
-3. The TOWERS registry in `js/main.js` (search `const TOWERS`) and the
-   `tower` row in server.js `SETTING_SPECS`.
+2. `js/towerskin.js` (Heartwood) and `js/towerbastion.js` (Bastion) — the
+   reference skins. The shared kit is EXPORTED from towerskin.js: seeded
+   canvas bakes + Sobel normals, roundedBox, planarUV, raycast vertex-AO,
+   black BackSide lining, veils, contact shadows. Import it; never fork it.
+3. The TOWERS registry in `js/main.js` (search `const TOWERS`), the
+   `impactVoice` resolver near towerSocket, and the `tower` row in
+   server.js SETTING_SPECS.
+4. The proof tools: `tools/steps/tower-fit.mjs`, `tower-occlusion.mjs`,
+   `tower-probe.mjs`, `tower-resting-eye.mjs` — all take a tower id.
 
 ## 1. Design before code
 
-Write the tower's one-paragraph identity first: its material, its silhouette
-(three parts — base, shaft, crown — read at game camera distance), and its
-theme-family pairing (towers are named after a die in a theme family:
-Heartwood ← Wildwood). Then check it against the HOUSE VISUAL RULES:
+Write the tower's one-paragraph identity first: its material, its
+silhouette (three parts — base, shaft, crown — read at game camera
+distance), and its theme-family pairing. Towers are named after their theme
+family's world (Heartwood ← Wildwood, Bastion ← Classics); the pairing list
+lives in the TOWERS registry comment — record it there.
 
-- MeshStandardMaterial only; envMapIntensity 0.45; NO new lights, NO
-  ShaderMaterial, NO userData.bloom. Emissive maps on standard material are
-  the only glow allowed.
-- Value variation everywhere: seeded canvas textures (never solid colors),
-  normal maps derived by Sobel from the same bake, roughness variation.
+**1.5 Then measure the free volume before you draw — a settled brief can be
+geometrically impossible.** Check every design element against the numbers:
+bore radius, socket face depth (the front of the drum has ~0.125 of relief —
+every tower's front is a shallow facade, so silhouette must come from the
+shoulders and crown), entry drop (dice of radius up to 1.25 fall in at
+y≈11.25 — nothing may roof the bore), doorway aperture (decorate, never
+narrow). Ten minutes here saved an hour on Bastion, where both "a round
+drum" (front must be flat) and "a closed cap over the bore" (dice fall
+through it) died on measurement.
+
+HOUSE VISUAL RULES:
+
+- MeshStandardMaterial only; envMapIntensity 0.45 unless the material
+  argues otherwise in a comment (Heartwood's iron runs 1.0, deliberately);
+  NO new lights, NO ShaderMaterial, NO userData.bloom. Emissive maps on
+  standard material are the only glow allowed.
+- Value variation everywhere: seeded canvas textures (never solid colors,
+  never Math.random — seeded PRNG only), normal maps derived by Sobel from
+  the same bake, roughness variation.
 - Edges beveled (0.03–0.06 radius), dark warm edge tones — never pure black.
 - Fantasy, not casino.
 - OPACITY IS LOAD-BEARING. The interior is empty and the fall is a film;
   the skin's occlusion is what keeps the secret. No transparent or
   translucent shells over the SHAFT/HOOD volumes, ever (this is why clear
-  ice can never be a tower).
+  ice can never be a tower). An open crown (battlements) is legal only if
+  a closed occluder inside it blocks every sightline — prove it, don't
+  argue it.
+- NAME YOUR OCCLUDERS: every mesh group that is claimed to hide the cheat
+  must be named `towerSkin*` — the occlusion and fit proofs measure those
+  groups and ignore decoration (veils, contact shadows). An unnamed
+  occluder proves nothing.
 
 ## 2. The build, agent-shaped
 
@@ -53,72 +81,119 @@ Heartwood ← Wildwood). Then check it against the HOUSE VISUAL RULES:
 What the builder produces:
 
 1. `js/tower<name>.js` — `build<Name>Skin(v)` taking the towerVolumes()
-   object, returning one THREE.Group with ZERO colliders. Reuse
-   towerskin.js helpers by EXPORTING them — never fork them. The export
-   refactor must leave Heartwood byte-identical (adding `export` is the
-   only allowed edit near its code).
-2. Registry row in TOWERS: `{ id, label, skin, title, clunkVoice }`.
+   object, returning one THREE.Group with ZERO colliders. Reuse the
+   exported towerskin.js kit; if a helper you need isn't exported yet, the
+   export refactor is its own commit with NO behavioural edit — comments
+   and `export` keywords only, and Heartwood's rendered output must be
+   byte-identical.
+2. Registry row in TOWERS: `{ id, label, skin, title, clunkVoice }`. Mind
+   the module-evaluation TDZ trap the registry comment documents.
 3. Server validation: add the id to the `tower` row in SETTING_SPECS.
    (server.js changed ⇒ the live 8123 needs ONE restart at merge time,
    from the main session only.)
-4. Sound palette: `clunkVoice` is an IMPACT_VOICES resolution — the sound
-   drain voices `clunk:'baffle'` events through the SOCKETED TOWER's voice,
-   not the die set's. Timings stay in the film; palettes are render-time,
-   so replay hashes are untouched.
-5. Proof tooling runs (below) + screenshots into the scratchpad for the
-   reviewer to LOOK at.
+4. Sound palette: `clunkVoice` is an IMPACT_VOICES shape ({body, weight,
+   sustain}). Resolution happens in ONE named function — `impactVoice(s,
+   fxSet)` — which the e2e calls directly; inline resolution in the drain
+   is untestable (a registry-only test stays green with the drain wired
+   straight back to the die set — red-checked on Bastion). Palettes are
+   render-time only: film timings, bakes and replay hashes never learn
+   which tower is standing.
+5. Proof runs (below) + screenshots into `shots/` at the WORKTREE root
+   (gitignored; report absolute paths) for the reviewer to LOOK at.
 
-## 3. The four proofs (docs/TOWER.md "What a model must prove")
+## 3. The proofs (docs/TOWER.md "What a model must prove")
 
-All headless, all against the built mesh — run them, don't argue them:
+All headless, all against the BUILT MESH — geometry libraries do things
+source-reading cannot predict (three's ExtrudeGeometry bevel does not
+inset: it pushes the body OUTWARD by bevelSize/sin(θ/2) — measured 0.041
+for a 0.03 bevel, enough to put every drum course outside the socket).
+Two rules about the proofs themselves:
 
-- (a) SOCKET FIT — the group's bounding box stays inside the SOCKET volume.
-- (b) OCCLUSION — `tools/steps/tower-occlusion.mjs`: the SHAFT and HOOD
-  volumes are invisible from every shipped camera eye (target 99/99 rays;
-  a single leaked ray is a visible teleporting die for someone's viewport).
-- (c) APERTURES CLEAR — MOUTH and EXIT/DOORWAY unobstructed; a model may
-  decorate the doorway frame, never narrow it.
-- (d) ZERO COLLIDERS — `worldBodies()` count is identical before skin add
-  and after; the eight engine colliders are the only tower bodies.
+- **A geometric proof must force `updateMatrixWorld()` before raycasting.**
+  A freshly built skin has never been rendered; an answer that depends on
+  whether a rAF happened to run between build and query is not a proof.
+  (Bastion's first occlusion run reported hood 18/18 occluded; the truth
+  was 0/18 — the project's "green check masks a broken thing" failure
+  mode, inside the proof tooling itself.)
+- **Red-check every assertion you add.** Break the thing each new claim is
+  about and watch it go red before trusting the green. tower-roll's
+  comments record every red-check it has survived; keep that ledger.
+
+The four contract proofs:
+
+- (a) SOCKET FIT — `tools/steps/tower-fit.mjs <id>`: measures the
+  `towerSkin*` occluder groups per mesh against the SOCKET volume, and
+  knows the legal deviations (apron/lip cladding and the hood reach into
+  engine volumes a model is invited to skin; tiny foot dips from the
+  lean). A naive whole-group bounding box is red on every shipped tower —
+  contact shadows reach past the tray by design.
+- (b) OCCLUSION — `tools/steps/tower-occlusion.mjs <id>`: SHAFT and COWL
+  bands 99/99 from every shipped eye (ZOOM_PRESETS full + mini). EXIT and
+  HOOD are reported, not gated — no legal geometry can occlude them; the
+  darkness layers carry those (the tool header explains the arithmetic).
+- (c) APERTURES CLEAR — MOUTH and EXIT/DOORWAY unobstructed (tower-fit
+  reports; the pour probe is the behavioural check).
+- (d) ZERO COLLIDERS — tower-fit asserts world body count is unchanged by
+  the skin and restored to baseline on unsocket.
 
 Then the behavioral proofs, which are already written — run, don't rewrite:
 
-- `tools/steps/tower-probe.mjs` with the new tower socketed — CLEAN verdict.
+- `tools/steps/tower-probe.mjs 8 42 14 <id>` — CLEAN, and resting
+  positions byte-identical across skins (zero-physics, measured).
 - `tools/steps/tower-resting-eye.mjs` — the resting camera transitions.
 - `npm test` — and the FIRST LAW is measured by the UNTOUCHED suite: with
   tower 'none' the app must be byte-for-byte the old one, proven by every
   non-tower scenario passing without edits.
-- Extend `tower-roll` in tests/e2e/scenarios.mjs where the new tower adds a
-  NEW claim (a third picker chip, the palette resolution, tower-to-tower
-  swap passing through the towerless body list). Don't duplicate the
-  heartwood assertions per tower — parameterize or spot-check.
+- Extend `tower-roll` with the NEW claims only (a swap passes through the
+  towerless body list; the picker styling holds at N chips; the palette
+  resolves through impactVoice — and assert the other half: an ordinary
+  landing still takes the die set's voice). Don't duplicate per-tower what
+  heartwood already pins; parameterize or spot-check.
 
 ## 4. The review gate (main session, never skipped)
 
-1. Re-run `npm test` + tower tags YOURSELF in the worktree — the builder's
-   green is a claim, not a verification.
+1. Re-run `npm test`, the tower tag, occlusion and the probe YOURSELF in
+   the worktree — the builder's green is a claim, not a verification.
 2. LOOK at the screenshots before presenting (never report a visual done
-   without seeing it rendered): idle resting eye, pour entry, exit spread,
-   both zoom extremes, and one with the OTHER towers for family resemblance.
-3. `git merge --ff-only` to master; restart 8123 iff server.js changed.
-4. Update docs: TOWER.md STATUS, UX.md §7.31, ROADMAP. Registry row counts
-   as shipped only with its docs.
-5. Report with an honest ledger: what was skipped, what is debt, what is
+   without seeing it rendered). What each frame can actually show: (1) the
+   idle resting eye — the frame a player sees most; (2) pour entry at
+   ~10 ticks — a die clears the crown for only ~0.1 s, so expect a sliver,
+   and treat the film probes as the real evidence of entry; (3) the exit
+   spread; (4) wide vs close idle — a statement about the tower-relative
+   resting eye (they will look near-identical; that is shipped behaviour),
+   NOT about the framing ladder; (5) the other towers at the same angle
+   for family resemblance; (6) a close look-only detail shot.
+3. Read the load-bearing diff yourself — anything touching the shared
+   drain/registry/server path, first-law eyes on.
+4. `git merge --ff-only` to master; restart 8123 iff server.js changed.
+5. Docs land WITH the build (builder's job, reviewer confirms): TOWER.md
+   STATUS, UX.md §7.31, ROADMAP. A registry row without its docs is not
+   shipped.
+6. Report with an honest ledger: what was skipped, what is debt, what is
    pre-existing red. Production deploy (`/usr/bin/make deploy`) only when
    Joe asks.
+7. Fold what the build taught back into THIS FILE. The builder's friction
+   notes are a deliverable; a skill that doesn't absorb them repeats them.
 
 ## Known traps (each cost a real debugging session)
 
 - TDZ: renderTowerPicker runs during MODULE EVALUATION — the registry and
   anything it references must be declared above it (the ROOM/LS_NAME/
   TOWERLAB trap).
-- The occlusion cheat is absolute: cowl sightlines reach y≈6.4 inside the
-  shaft at the wide eye. If the crown is open (battlements!), the HOOD
-  occluder must still close the sightline — check (b) from ALL preset eyes,
-  both mini and full.
+- `clearTable()` does not end a roll. After a pour the table still reports
+  busy, so `setTower` parks in pendingTower and a waitFor on the new tower
+  hangs until the harness gives up. `settle()` first, then switch.
+- The occlusion cheat is absolute: sightlines reach y≈6.4 inside the shaft
+  at the wide eye. Battlements, slits and every crown opening must resolve
+  to a closed `towerSkin*` occluder behind them — check (b) from ALL
+  preset eyes, both mini and full. An arrow slit is a dark RECESS, never a
+  hole.
 - aria-checked, not aria-pressed, for picker chips (U22) — and the chosen
   chip must be PAINTED differently, which is pinned by tower-roll.
-- Do not touch `applyZoom`'s unsocket/re-socket bracket; preset changes pass
-  through the towerless configuration by design.
+- Do not touch `applyZoom`'s unsocket/re-socket bracket; preset changes
+  pass through the towerless configuration by design.
 - A tower→tower swap is unsocket + socket, never an in-place mutation (the
-  SAP body-order rule).
+  SAP body-order rule). tower-roll red-checked the mutation shape: body
+  count must return to the towerless 6 between towers.
+- `towerLabSkin` leaves the lab wearing the last skin asked for — global
+  state; a later lab step must set what it needs, not assume heartwood.
