@@ -20,9 +20,15 @@ limitations under the License.
 //   socket on empty felt → tower · dice settle → ladder ('mat') ·
 //   clear → tower again · unsocket → ladder ('mat', the first law).
 //
-//   node tools/drive.mjs tools/steps/tower-resting-eye.mjs
+// It takes a TOWER ID, like every other proof step, and defaults to
+// heartwood. It did not until the third tower was built: the skill says all
+// four tools are parameterised and this one was not, so "run the resting-eye
+// proof for your model" was a thing a builder could not do.
+//
+//   node tools/drive.mjs tools/steps/tower-resting-eye.mjs [towerId]
 
-export default async function run(stage) {
+export default async function run(stage, args) {
+  const tower = args && args[0] ? args[0] : 'heartwood';
   const a = await stage.tab('localhost', 'RestingEye');
   await a.settle();
 
@@ -38,8 +44,8 @@ export default async function run(stage) {
   if (baseline === 'tower') fail('towerless felt resting on a tower that is not there');
 
   // 1. Socket on an empty felt → the resting eye goes to the tower.
-  await a.dbg(`setTower('heartwood')`);
-  await a.waitFor(`window.__diceDebug.tower === 'heartwood'`, { desc: 'socketed' });
+  await a.dbg(`setTower('${tower}')`);
+  await a.waitFor(`window.__diceDebug.tower === '${tower}'`, { desc: 'socketed' });
   await a.dbg('sim(1500)'); // let the ease finish
   f = await info();
   console.log(`socketed idle: mode=${f.mode} target=${f.target} camY=${f.camY}`);
@@ -70,5 +76,5 @@ export default async function run(stage) {
   console.log(`unsocketed: mode=${f.mode} target=${f.target}`);
   if (f.mode !== baseline) fail(`towerless mode ${f.mode}, want ${baseline} (first law)`);
 
-  if (!process.exitCode) console.log('CLEAN: the resting eye follows the tower');
+  if (!process.exitCode) console.log(`CLEAN: the resting eye follows the tower (${tower})`);
 }
