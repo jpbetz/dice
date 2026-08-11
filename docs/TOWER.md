@@ -31,8 +31,8 @@ isolated world and the shipped socket, so no world number is written twice.
 film. Per die, from a stream derived from `roll.seed` alone: entry stagger,
 a scripted gravity fall with NO physics body from the aim box to the despawn
 line, a hidden window with 2–4 baffle clunks injected into the same `sounds`
-array real impacts use (`at: null`, tagged `clunk: 'baffle'` for a future
-per-skin palette), then the body's first existence at the exit spawn with the
+array real impacts use (`at: null`, tagged `clunk: 'baffle'` so the per-skin
+palette can voice them), then the body's first existence at the exit spawn with the
 per-die graze height, lane spread, rolling spin and cascade-above-occupants
 rule. Everything after that is the ordinary pipeline: real bounces, the
 displacement terminator, nudges, face correction, values, chips, the result
