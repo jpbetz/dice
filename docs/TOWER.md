@@ -23,11 +23,21 @@ spends apron, not felt. Nothing crosses `z0 + 0.2` toward the player except
 the APRON.
 
 **2. APRON — the only collider in the play volume.** An engine-owned static
-box: `x ∈ [-1.9, 1.9]`, `z ∈ [z0, z0 + 1.1]`, `y ∈ [0, 0.8]`. It exists so
-settled dice cannot roll under the exit or through the tower's base, and it
-is thick — no tunneling class at felt-level speeds. Models may SKIN it (a
-tray lip, a stone step) but never alter, extend, or duplicate its collision.
-Models add zero colliders, ever; that is what makes a skin swap replay-safe.
+box: `x ∈ [-1.9, 1.9]`, `z ∈ [z0, z0 + 1.1]`, `y ∈ [0, 0.8]`, with FLOOR
+physics (restitution 0.35), not wall physics — it is the tray exiting dice
+land on and skip across, and wall restitution (0.7) trampolines them
+(first lab look). It also keeps settled dice from rolling under the exit,
+and it is thick — no tunneling class at felt-level speeds. Models may SKIN
+it (a tray lip, a stone step) but never alter, extend, or duplicate its
+collision. Models add zero colliders, ever; that is what makes a skin swap
+replay-safe.
+
+**2b. DOORWAY — the opening in the back wall.** While a tower is socketed,
+the back wall is not an unbroken plane: it carries an engine-owned clear
+opening centred on `x = 0`, width 3.0, height 3.6 (wall segments flank it).
+The exit spawn sits BEHIND the wall plane, and the die flies out through
+the doorway — this is what makes emergence read as travel. A model's port
+must align with the doorway and may decorate its frame, never narrow it.
 
 **3. MOUTH — the entry.** A clear vertical shaft of aperture ≥ Ø 3.4
 centred on `(0, z0 − 1.6)`, rim top edge at `y = 7.0 ± 0.5`. The engine
@@ -55,15 +65,19 @@ down to the hood. (b) The HOOD: `x ∈ [-1.7, 1.7]`, `y ∈ [0.8, 3.2]`,
 happens. A die materialising inside the hood must not be visible until its
 own motion carries it out.
 
-**5. EXIT — the port and the spray.** The model leaves the hood's front face
-clear: width ≥ 3.0, clear height from apron top (`y = 0.8`) up to ≥ 3.4.
-Exit spawn is engine-owned and INSIDE the physics walls (hidden dice have no
-bodies; a body first exists here): `P = (x: ±0.6 seeded, y: 1.6,
-z: z0 + 0.35)`, already tumbling, velocity seeded from: speed 9–15 u/s
-(6–11 read as dribbling in the lab — a tower exit should THROW), yaw
-within ±30° of +z, pitch 0° to −10°. Everything after spawn is the normal
-pipeline — real bounces, displacement terminator, face correction, tempo
-curve — untouched.
+**5. EXIT — the spawn inside, the flight out.** The model leaves the hood's
+front face clear: width ≥ 3.0, clear height from apron top (`y = 0.8`) up
+to ≥ 3.4, aligned with the DOORWAY. The body first exists at
+`P = (x: ±0.6 seeded, y: 2.0, z: z0 − 1.2)` — a full unit INSIDE the tower,
+in occluded interior, already tumbling at exit speed. Emergence must read
+as TRAVEL through the doorway, never materialisation at the spout (first
+lab look; also: y = 1.6 overlapped the apron box at spawn for a d20, and
+the penetration resolver's kick read as a launch — y = 2.0 clears it).
+Velocity seeded from: speed 9–15 u/s (6–11 read as dribbling — a tower
+exit should THROW), yaw within ±30° of +z, pitch 0° to −10°. The die dips,
+lands on the apron tray, and skips off the step onto the felt. Everything
+after spawn is the normal pipeline — real bounces, displacement
+terminator, face correction, tempo curve — untouched.
 
 **6. TRANSIT — the cadence and the sound.** All seeded. Entries POUR at
 0.12–0.2 s per die — time-staggered, never height-staggered (equal height

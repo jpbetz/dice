@@ -5412,7 +5412,13 @@ function towerVolumes() {
     cowl:    { c: [0, 7.4, z0 + 0.05], s: [4.2, 2.4, 0.3] },
     despawnY: 5.6,
     hood:    { c: [0, 2.0, z0 + 0.25], s: [3.4, 2.4, 0.5] },
-    exit:    { p: [0, 1.6, z0 + 0.35] },
+    // Exit spawn sits a full unit INSIDE the tower: emergence must read as
+    // travel through the doorway, not materialisation at the spout (first
+    // lab look). y = 2.0 keeps a d20's bottom above the apron on arrival —
+    // the 1.6 of the first cut overlapped the apron box at spawn, and the
+    // penetration resolver's kick was the "launch" the eye caught.
+    exit:    { p: [0, 2.0, z0 - 1.2] },
+    door:    { w: 3.0, h: 3.6 },
   };
 }
 
@@ -5478,12 +5484,26 @@ function towerLabWorld() {
     w.addBody(b);
   };
   plane(floorMat, [0, 0, 0], [-Math.PI / 2, 0, 0]);
-  plane(wallMat, [0, 0, -TABLE_D / 2], [0, 0, 0]);
   plane(wallMat, [0, 0, TABLE_D / 2], [0, Math.PI, 0]);
   plane(wallMat, [-TABLE_W / 2, 0, 0], [0, Math.PI / 2, 0]);
   plane(wallMat, [TABLE_W / 2, 0, 0], [0, -Math.PI / 2, 0]);
   plane(wallMat, [0, 22, 0], [Math.PI / 2, 0, 0]);
-  const apron = new CANNON.Body({ mass: 0, material: wallMat,
+  // The back wall carries the DOORWAY: two flanking boxes and a lintel with
+  // a clear opening for the exit, instead of an infinite plane — the die
+  // spawns inside the tower and flies out through it.
+  const boxAt = (mat, pos, half) => {
+    const b = new CANNON.Body({ mass: 0, material: mat,
+      shape: new CANNON.Box(new CANNON.Vec3(...half)) });
+    b.position.set(...pos);
+    w.addBody(b);
+  };
+  const z0 = v.z0, dw = v.door.w / 2, side = TABLE_W / 2 - dw;
+  boxAt(wallMat, [-(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
+  boxAt(wallMat, [(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
+  boxAt(wallMat, [0, v.door.h + (22 - v.door.h) / 2, z0 - 0.3], [dw, (22 - v.door.h) / 2, 0.3]);
+  // The apron is the TRAY dice land on and skip across — floor physics
+  // (restitution 0.35), not wall physics (0.7, which trampolines).
+  const apron = new CANNON.Body({ mass: 0, material: floorMat,
     shape: new CANNON.Box(new CANNON.Vec3(v.apron.s[0] / 2, v.apron.s[1] / 2, v.apron.s[2] / 2)) });
   apron.position.set(...v.apron.c);
   w.addBody(apron);
