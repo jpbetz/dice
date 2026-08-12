@@ -10719,6 +10719,219 @@ export const scenarios = [
         'a roll with no tower is a THROW again — no pour film at all');
     },
   },
+  {
+    name: 'tower-hollowbole',
+    tags: ['tower', 'fx'],
+    // THE FAE VENUE'S TOWER (ROADMAP W3, docs/TOWER.md): a rotted hollow
+    // trunk with a crown moot on it. tower-roll's registry loop already
+    // covers everything a fourth row shares with the other three — the
+    // swap, the socket, the voice, the pour. What is NEW about this one is
+    // the three things no sibling has, and this scenario is only those:
+    //
+    //   · VENUE-ONLY. It has no chip and it must still socket. Both halves
+    //     matter: the picker assertion in tower-roll would be just as green
+    //     if the row had quietly stopped existing, and a row that cannot be
+    //     set is a venue that cannot be entered. Also proves the SERVER
+    //     allowlist, because setTower goes POST → validate → echo and a
+    //     missing id in SETTING_SPECS is a patch the server refuses.
+    //   · THE VALUE LADDER. Every emissive tier on this model is authored
+    //     as `target / linearLuma(hue)` against post.js's bloom threshold,
+    //     because there is no post-hoc bloom dial (fae grammar rule 3).
+    //     The attendants are TERTIARY and must never cross the threshold;
+    //     the caps are secondary; nothing in the skin may carry
+    //     `userData.bloom`, which would disable the post-stack bypass for
+    //     the whole app (techniques.md T2).
+    //   · TWO SKIES, ONE MODEL. The same skin is built under both fae
+    //     palettes, and the point of dividing by the hue's own luminance is
+    //     that the two come out at the same VALUE with different colour. If
+    //     a palette ever changes the value, the venue has two towers.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+
+      const wasWorld = await a.dbg('worldBodies()');
+
+      // ---- venue-only: no chip, and it sockets anyway ---------------------
+      await a.dbg('openSettings()');
+      const registry = await a.dbg('towerRegistry()');
+      const row = registry.find((t) => t.id === 'hollowbole');
+      assert.ok(row, 'hollowbole is a registered tower');
+      assert.equal(row.venueOnly, true, 'and it is flagged venue-only');
+      assert.ok(row.skin, 'with a skin builder');
+      const chipIds = JSON.parse(await a.eval(
+        `JSON.stringify([...document.querySelectorAll('#tower-picker [data-tower]')]
+          .map((b) => b.dataset.tower))`));
+      assert.ok(!chipIds.includes('hollowbole'),
+        `a venue tower takes no chip of its own (${chipIds.join(', ')})`);
+      await a.eval(`document.getElementById('settings-modal').classList.add('hidden')`);
+
+      // Through the settings path, so the SERVER has to accept the id.
+      await a.dbg(`setTower('hollowbole')`);
+      await a.waitFor(`window.__diceDebug.tower === 'hollowbole'`,
+        { desc: 'the server accepts the venue tower and it goes up' });
+
+      // ---- the fit report, re-derived here rather than trusted -------------
+      // tower-fit prints this for a human; the scenario gates on the same
+      // audit, because "a human ran the tool once" is not a regression test.
+      // The classifier's UNCLASSIFIED bucket is what fails: three real
+      // overruns on this model's first cut landed in it (a root leaning out
+      // of the socket sideways, a moot cap hanging in front of the socket's
+      // face, and a bracket sized as if a unit sphere were a unit wide).
+      const fit = await a.dbg('towerModelAudit()');
+      assert.equal(fit.tower, 'hollowbole', 'the audit is looking at the right model');
+      assert.ok(fit.meshes > 20,
+        `the skin is a real model, not a placeholder (${fit.meshes} occluder meshes)`);
+      assert.equal(fit.lights, 0, 'the skin brings zero lights');
+      assert.deepEqual(fit.offPolicy, [],
+        `and no off-policy material (${fit.offPolicy.join('; ')})`);
+      const unclassified = fit.outs.filter((o) => o.cls === 'UNCLASSIFIED');
+      assert.deepEqual(unclassified.map((o) => o.over.join(',')), [],
+        `every overrun of the socket is a named legal class `
+        + `(${fit.outs.length} overruns; hull x[${fit.hull.x}] y[${fit.hull.y}])`);
+      // X HAS NO SLACK: the mat's own physics wall stands at 3.35 behind the
+      // socket's 3.25, so a sideways overrun is a prop through the side of
+      // the room whatever class it claims. Asserted separately from the
+      // classifier because the classifier is allowed to forgive y and z.
+      assert.ok(fit.hull.x[0] >= -3.25 && fit.hull.x[1] <= 3.25,
+        `and nothing leaves the socket SIDEWAYS (hull x[${fit.hull.x}] `
+        + `against ±3.25)`);
+      const w = await a.dbg('worldBodies()');
+      assert.equal(w.count - wasWorld.count, 8,
+        `the skin adds no physics — the eight engine bodies and nothing else `
+        + `(${wasWorld.count} → ${w.count})`);
+
+      // ---- the moot: the value ladder, read off the live materials --------
+      const moot = await a.dbg('towerMootAudit()');
+      assert.ok(moot && moot.spec, 'the skin publishes what its moot is');
+      assert.equal(moot.spec.paletteId, 'moonrise',
+        'the table venue builds it under the default sky');
+      assert.equal(moot.spec.gap, 1, 'the ring has exactly one gap');
+      assert.equal(moot.spec.fallen, 1, 'and exactly one fallen member in it');
+      assert.ok(moot.spec.caps >= 7 && moot.spec.caps <= 9,
+        `an odd, small cap count — a moot, not a fairy light (${moot.spec.caps})`);
+      assert.equal(moot.attendants, 4,
+        `four attendants hover over it (${moot.attendants})`);
+      assert.equal(moot.bloomFlags, 0,
+        'and NOTHING in this skin carries userData.bloom — an always-on bloom '
+        + 'source disables the post-stack bypass for the whole app (T2)');
+
+      const attend = moot.roles.filter((r) => r.role === 'moot-attendant');
+      assert.equal(attend.length, 2,
+        `the attendants are merged into two swaying pairs (${attend.length} meshes)`);
+      for (const r of attend) {
+        // TERTIARY, and the bar is the one grammar rule 3 sets: the field
+        // tier never exceeds 0.25 linear, which is well under the bloom
+        // threshold read from post.js rather than retyped here.
+        assert.ok(r.lum <= 0.25,
+          `an attendant sits in the tertiary tier (${r.lum} linear, ceiling 0.25)`);
+        assert.ok(r.lum < moot.bloomThreshold,
+          `and nowhere near the bloom threshold (${r.lum} < ${moot.bloomThreshold})`);
+      }
+      const caps = moot.roles.find((r) => r.role === 'moot-caps');
+      const gills = moot.roles.find((r) => r.role === 'moot-gills');
+      const door = moot.roles.find((r) => r.role === 'door-hearth');
+      assert.ok(caps && gills && door, 'the caps, the gills and the door are all lit');
+      for (const [what, r, target] of [['caps', caps, moot.spec.tier.caps],
+        ['gills', gills, moot.spec.tier.gills], ['door', door, moot.spec.tier.door]]) {
+        assert.ok(Math.abs(r.lum - target) < 0.02,
+          `${what}: the rendered emissive lands on its authored tier `
+          + `(${r.lum} against ${target})`);
+        assert.ok(r.lum < moot.bloomThreshold,
+          `${what}: and stays under the bloom threshold (${r.lum} < ${moot.bloomThreshold})`);
+      }
+      // TIER SEPARATION (grammar rule 3): a tier may not overlap the tier
+      // above it, and the attendants are two full stops below the caps. A
+      // secondary source that crossed into primary has been promoted by
+      // accident, and that is what this catches.
+      assert.ok(caps.lum / attend[0].lum >= 3,
+        `the attendants are two stops under the caps (${attend[0].lum} vs ${caps.lum})`);
+
+      // ---- the idle motion is the sim clock and nothing else ---------------
+      // Same instrument tower-roll uses on Heartwood and for the same
+      // reason: "it moved" is satisfied by a wall clock, so the angle is
+      // checked against the FORMULA. Here it is the moot's attendants, which
+      // are the only thing on this tower that moves.
+      {
+        const after = await a.dbg('towerDressAudit()');
+        const swayAt = (s, t) => {
+          const wv = 2 * Math.PI * s.hz * t + s.phase;
+          return s.base + s.amp * (0.65 * Math.sin(wv) + 0.35 * Math.sin(2.63 * wv + 1.7));
+        };
+        assert.equal(after.state.sway.length, 4,
+          `two attendant pivots, two registrations each (${after.state.sway.length})`);
+        for (const s of after.state.sway) {
+          assert.ok(Math.abs(s.rot - swayAt(s, after.dressClock)) < 1e-6,
+            `the ${s.axis}-sway is the two-sine idiom over the sim clock at `
+            + `t=${after.dressClock} (rot ${s.rot}, formula ${swayAt(s, after.dressClock).toFixed(8)})`);
+        }
+      }
+
+      // ---- a pour actually completes through it ---------------------------
+      await a.dbg(`commandRoll('8d6')`);
+      await a.waitFor(
+        '!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.landings)',
+        { desc: 'the pour reached the client' });
+      await a.dbg('holdClock(true)');
+      const f0 = JSON.parse(await a.eval(
+        'JSON.stringify(window.__diceDebug.towerFilmInfo())'));
+      await a.dbg(`sim(${f0.frames + 240})`);
+      const f = JSON.parse(await a.eval(
+        'JSON.stringify(window.__diceDebug.towerFilmInfo())'));
+      await a.dbg('holdClock(false)');
+      assert.ok(f.pour, 'the roll was baked as a POUR');
+      assert.equal(f.rest.length, 8, `all eight dice are accounted for (${f.rest.length})`);
+      for (const r of f.rest) {
+        assert.ok(r.delivered,
+          `d${r.i} (${r.type}): delivered onto open felt at (${r.p.join(', ')}) — `
+          + `the hidden zone is z < ${(f.z0 + f.hidZone).toFixed(2)}`);
+        assert.ok(r.visible, `d${r.i}: and on screen when the film ends`);
+      }
+      f.hidden.forEach((gaps, i) => {
+        const longest = gaps.reduce((m, g) => Math.max(m, g[1] - g[0] + 1), 0);
+        assert.ok(gaps.length >= 1 && longest >= 15,
+          `d${i}: went through the trunk — a hidden window of ${longest} frames`);
+      });
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+      await a.settle();
+
+      // ---- TWO SKIES, ONE MODEL -------------------------------------------
+      // The palette is baked into the materials at build time, so this
+      // re-sockets. What must NOT change is the value: the tiers are
+      // `target / linearLuma(hue)`, so a colder or paler sky moves the HUE
+      // and leaves the luminance where the grammar put it. Without the
+      // division, foxfire's near-white cap hue would land the moot two
+      // thirds brighter than moonrise's teal and the venue would have two
+      // different moots.
+      const before = moot.roles.find((r) => r.role === 'moot-caps');
+      await a.dbg(`faeTowerPalette('foxfire')`);
+      await a.waitFor(`window.__diceDebug.tower === 'hollowbole'`,
+        { desc: 'the tower comes back up under the other sky' });
+      const fox = await a.dbg('towerMootAudit()');
+      assert.equal(fox.spec.paletteId, 'foxfire', 'built under the foxfire palette');
+      const foxCaps = fox.roles.find((r) => r.role === 'moot-caps');
+      assert.ok(Math.abs(foxCaps.lum - before.lum) < 0.02,
+        `the moot is the same VALUE under both skies (${before.lum} → ${foxCaps.lum})`);
+      assert.notEqual(foxCaps.intensity, before.intensity,
+        `and it got there by a different intensity, which is what proves the `
+        + `division happened (${before.intensity} → ${foxCaps.intensity})`);
+      assert.equal(fox.bloomFlags, 0, 'still nothing flagged for bloom');
+      for (const r of fox.roles.filter((x) => x.role === 'moot-attendant')) {
+        assert.ok(r.lum <= 0.25,
+          `and the attendants are still tertiary under the other sky (${r.lum})`);
+      }
+      await a.dbg(`faeTowerPalette(null)`);
+
+      // ---- and the first law, on the way out -------------------------------
+      await a.dbg(`setTower('none')`);
+      await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'unsocketed' });
+      const end = await a.dbg('worldBodies()');
+      assert.deepEqual(end.named, [], 'not one collider is left behind');
+      assert.equal(end.count, wasWorld.count,
+        `the body list is the towerless one again, exactly `
+        + `(${wasWorld.count} before, ${end.count} after)`);
+    },
+  },
 
   // ---------------------------------------------------------------------------
   // V1 AUDIO (docs/AUDIO.md)
