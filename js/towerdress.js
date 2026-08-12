@@ -1142,10 +1142,15 @@ export function bakeSmoke({ size = 128, seed }) {
       const u = px / size, i = (py * size + px) * 4;
       const d = Math.hypot(u - 0.5, v - 0.5) * 2;
       const puff = clamp01(1 - smoothstep(0.15, 1.0, d));
-      const n = 0.45 + 0.75 * fbm(u * 4.5, v * 4.5, 5, 4, seed);
+      // WISPS, NOT A BALL. The first cut used a low-frequency envelope and
+      // the plume came out as one white ghost hovering over the crown —
+      // legible as "something is there", illegible as smoke. Two octaves
+      // more and a stronger noise weight tears the puff into strands.
+      const n = 0.18 + 1.15 * fbm(u * 7.5, v * 5.0, 8, 5, seed);
       const a = clamp01(puff * puff * n);
-      // Desaturated warm grey — a cooling stack's smoke is not blue.
-      const g = 128 + 30 * (fbm(u * 8, v * 8, 8, 2, seed + 13) - 0.5);
+      // Desaturated warm grey, and DARK: a cooling stack over a black room
+      // is a haze the eye reads as depth, not a lantern. 128 was a ghost.
+      const g = 96 + 26 * (fbm(u * 8, v * 8, 8, 2, seed + 13) - 0.5);
       img.data[i] = g * 1.03; img.data[i + 1] = g * 0.99; img.data[i + 2] = g * 0.94;
       img.data[i + 3] = a * 255;
     }

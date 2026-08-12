@@ -102,6 +102,11 @@ import {
   heightToNormal, roughFromHeight, veilTexture,
   roundedBox, planarUV, weather, bakeVertexAO, bakeStone, bakeEmber,
 } from './towerskin.js';
+import {
+  buildHorseshoe, buildChainHanger, bakeSmoke, buildSmokePlume,
+  bakeStainSheet, buildStains, instancedField, gravityStain,
+  mergeGeos, xform, propUV, registerSmoke, ensureColor, R_PROP,
+} from './towerdress.js';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -279,6 +284,10 @@ function maps() {
     sand: bakeStone({ size: 256, stops: SAND, blocks: 1, courses: 1, seed: 0x9f2071,
       joint: 0.0022, relief: 0.3, chip: 0.2, speckle: 0.10, wash: 0.22 }),
     ember: bakeEmber({ size: 256, seed: 0xe3b011, heat: 1.0 }),
+    // The dressing's one canvas: the plume (js/towerdress.js). Warm grey, a
+    // radial puff times fbm, peak alpha 0.35 and asymptotic edges so a quad
+    // has no rectangle.
+    smoke: bakeSmoke({ size: 128, seed: 0xa15c04 }),
     veil: veilTexture(256, 0.92),
     shadow: veilTexture(256, 0.55),
   };
@@ -344,6 +353,19 @@ export function buildAnvilSkin(v) {
     ironDark: metal(M.ironDark, 0.60, 0.5),
     bronze: metal(M.bronze, 0.75, 0.6),
     sand: mat(M.sand, 0.4),
+    // WORN STEEL, and it is the dressing's one bright material — deliberately.
+    // Tools are the thing in a smithy that hands polish; the cast iron of the
+    // tower has been in the fire for a decade and the hammer was used this
+    // morning. It is also the only way the rail reads: the first cut hung
+    // the tools in MAT.iron and they were a dark shape on a dark wall at the
+    // resting eye, which is a prop that does not exist. Same plate bake,
+    // `color` and a lower roughness are the whole difference.
+    steel: (() => {
+      const m2 = metal(M.iron, 0.55, 0.72);
+      m2.color = new THREE.Color(0x9a958c);
+      m2.roughness = 0.62;
+      return m2;
+    })(),
     // Dim, but PRESENT. At 0.55 the bed was a rumour behind the bars and the
     // feature of the tower was invisible at the resting eye; the bake's own
     // heat envelope leaves most of the bed dead, so the intensity has to
@@ -456,6 +478,8 @@ export function buildAnvilSkin(v) {
   span('soot', -xPl1, xPl1, 0, yPl1, zPl1, zFO, { uv: UV.soot, r: R_HULL, weather: true });
   span('soot', -xPl2, xPl2, yPl1, yPl2, zPl2, zFO, { uv: UV.soot, r: R_HULL, weather: true });
 
+  let replacedStrap = null;    // the one unrusted band (the dressing pass)
+
   // --- THE ANVIL BLOCK: the mass the whole thing stands on -----------------
   // A shell, not a solid: back, two jambs, and the facade above the door head.
   // The jambs stand OUTSIDE the engine's opening (|x| ≥ doorX) — the frame is
@@ -472,8 +496,11 @@ export function buildAnvilSkin(v) {
     // the trim into the theme. Bronze is now the stack's straps and four
     // beads, and nothing else.
     for (const y of [1.28, 2.72, 4.10]) {
-      span('iron', s * (doorX + 0.08), s * (xBlk - 0.04), y, y + 0.26,
+      const b = span('iron', s * (doorX + 0.08), s * (xBlk - 0.04), y, y + 0.26,
         zFO - 0.06, zFO, { uv: UV.band, band: true, r: R_THIN });
+      // Held for the dressing pass: ONE of these six is the band somebody
+      // replaced, and it gets a clean material rather than a second mesh.
+      if (s > 0 && y === 2.72) replacedStrap = b;
     }
   }
 
@@ -647,7 +674,220 @@ export function buildAnvilSkin(v) {
     add(tray);
   }
 
+  // =========================================================================
+  // THE DRESSING (docs/TOWER.md, DRESSING). Four props, because this tower
+  // already owns the family's warm light — the grate is the focal point and
+  // has been since the day it shipped, so the dressing's job here is to turn
+  // that light into a WORKPLACE rather than to add a second one.
+  //
+  // The bold one is the smoke. Everything else is at the base and at eye
+  // level beside the glow, which is where the dossier puts human-scale
+  // clutter: story at the base, silhouette at the crown, and the long quiet
+  // shaft left alone between them.
+  // =========================================================================
+  const dress = new THREE.Group();
+  dress.name = 'towerSkinDress';
+  group.add(dress);
+  const fx = new THREE.Group();
+  fx.name = 'towerDressFx';
+  group.add(fx);
+  const addDress = (mesh, cast = true) => {
+    ensureColor(mesh.geometry);
+    mesh.castShadow = cast; mesh.receiveShadow = true;
+    dress.add(mesh); parts.push(mesh); return mesh;
+  };
+
+  // --- 1. THE PLUME — the bold one, and NOT a particle system --------------
+  // js/particles.js is impact-keyed by contract ("no impact, no particles"),
+  // and a chimney that emitted them would be the first thing in the app to
+  // break that rule. Six fixed quads on a loop instead: merged into one
+  // geometry, per-quad opacity carried on a `color` attribute at itemSize 4
+  // (USE_COLOR_ALPHA, G2) so nothing clones a material, MeshBasicMaterial
+  // because lit smoke is a sheet of paper, and NEVER additive — real smoke
+  // occludes, additive smoke glows, and glowing smoke is fire.
+  //
+  // It rises from z0−2.5, half a unit BEHIND the flue's axis: entry dice fall
+  // through (0, z0−2.0) and a plume dead on the axis veils them for the tenth
+  // of a second they are above the crown.
+  //
+  // IT IS THE ONE THING ON ANY TOWER THAT LEAVES THE SOCKET UPWARD, capped at
+  // y ≈ 15.2 against a ceiling of 12.5. It carries no opacity anybody needs,
+  // it is above every camera's subject, and tower-fit names it as its own
+  // legal class rather than not seeing it.
+  {
+    const plume = buildSmokePlume({
+      // y0 sits BELOW the crown's top edge so the first quad is born inside
+      // the flue and climbs out of it; born in clear air it reads as a
+      // puff appearing, which is the one thing a loop must never show.
+      //
+      // AND THE RISE IS SHORT, MEASURED RATHER THAN CHOSEN. The shipped
+      // cameras frame the MAT, and at the resting eye the crown is already
+      // near the top of the picture: a plume climbing to y 15 spends most of
+      // its life outside the frame players actually look at. 1.15 keeps the
+      // whole loop inside it and still tops out above the socket at y ≈ 14.
+      seed: 0xa15905, n: 6, w: 0.72, y0: yCrTop - 0.45, rise: 1.15,
+      drift: 0.30, period: 9, peak: 0.30, tex: M.smoke, z: z0 - 2.5,
+    });
+    fx.add(plume.mesh);
+    registerSmoke(group, plume);
+  }
+
+  // --- 2. THE HORSESHOE — the highest-value silhouette in the dossier ------
+  // MOVED, AND THE REASON IS THE HOOD. "Over the door head" is the archetype,
+  // but this door head already carries a cast lintel with a hood oversailing
+  // it to z0+0.85, and anything hung under that hood is in its shadow at
+  // every shipped eye. So the shoe hangs on the block's face to the RIGHT of
+  // the grate, inside the ember's own spill — which is where a smith would
+  // hang one anyway, and where the light makes it read.
+  {
+    const shoe = buildHorseshoe({ R: 0.235, thick: 0.082, depth: 0.05, material: MAT.steel });
+    shoe.position.set(2.42, 5.74, zFO - 0.01);
+    propUV(shoe.geometry, 1.1);
+    addDress(shoe);
+  }
+
+  // --- 3. THE WORKPLACE — a rail, a hammer, tongs, and a heap of coal ------
+  // Hung at eye level on the other side of the grate, so the two halves of
+  // the forge frame the fire. INTERRUPTED WORK BEATS TIDY WORK: the hammer
+  // hangs straight, the tongs hang crooked off the same hook, and the third
+  // hook is empty.
+  //
+  // NOTHING SITS ON THE TRAY, and that is a refusal rather than an oversight.
+  // The brief wanted tongs propped across the tray lip to catch the spill —
+  // but dice come to rest on that lip (docs/TOWER.md: a 20-die pour puts five
+  // of them there) and a skin has no colliders, so a prop in the delivery run
+  // is a prop dice pass through. The rail is the honest version of the same
+  // sentence.
+  {
+    const rail = -2.46, ry = 6.34;
+    const bar = (w, h, d) => propUV(roundedBox(w, h, d, R_PROP, 1), 1.1);
+    const tools = new THREE.Mesh(mergeGeos([
+      // the rail and its two brackets
+      { geo: bar(1.02, 0.055, 0.055), matrix: xform({ pos: [rail, ry, zFO + 0.10] }) },
+      { geo: bar(0.05, 0.05, 0.13), matrix: xform({ pos: [rail - 0.46, ry, zFO + 0.05] }) },
+      { geo: bar(0.05, 0.05, 0.13), matrix: xform({ pos: [rail + 0.46, ry, zFO + 0.05] }) },
+      // the hammer: a head and a haft, hanging plumb
+      { geo: bar(0.30, 0.125, 0.115), matrix: xform({ pos: [rail - 0.30, ry - 0.60, zFO + 0.10] }) },
+      { geo: bar(0.055, 0.62, 0.055), matrix: xform({ pos: [rail - 0.30, ry - 0.30, zFO + 0.10] }) },
+      // the tongs: two legs off one hook, crooked, and not the same length
+      { geo: bar(0.048, 0.74, 0.048),
+        matrix: xform({ pos: [rail + 0.26, ry - 0.36, zFO + 0.10], rot: [0, 0, 0.16] }) },
+      { geo: bar(0.048, 0.62, 0.048),
+        matrix: xform({ pos: [rail + 0.31, ry - 0.30, zFO + 0.08], rot: [0, 0, 0.05] }) },
+    ]), MAT.steel);
+    addDress(tools);
+
+    // The coal, clustered at ONE side of the base and touching the wall —
+    // the historic smithy inventory is forge, bellows, anvil, tongs, and a
+    // bucket of coal by the fire. Instanced: nine lumps, one draw call, and
+    // OUT of the AO parts (G8 — one InstancedMesh box would swallow the
+    // plinth's own occlusion).
+    //
+    // It keeps to |x| ≥ 2.62, outside the doorway's clear width, because the
+    // felt in front of the tower's foot is felt dice can reach.
+    const rndC = mulberry32(0xa15c0a);
+    const items = [];
+    for (let i = 0; i < 9; i++) {
+      const s = 0.13 + rndC() * 0.13;
+      // …and never past −3.20 with its own radius on: a lump 0.26 across
+      // centred on −3.10 puts its edge outside the socket wall.
+      const x = -2.92 + rndC() * 0.30;
+      const zz = zFO + 0.06 + rndC() * 0.34;
+      items.push({
+        matrix: new THREE.Matrix4().compose(
+          new THREE.Vector3(x, 0.05 + rndC() * 0.22, zz),
+          new THREE.Quaternion().setFromEuler(
+            new THREE.Euler(rndC() * 3, rndC() * 3, rndC() * 3)),
+          new THREE.Vector3(s, s * 0.8, s)),
+        // Coal is the darkest thing on a dark tower. The first tint range
+        // topped out above 1 and the heap read as crumpled paper.
+        tint: [0.28 + rndC() * 0.26, 0.26 + rndC() * 0.24, 0.25 + rndC() * 0.22],
+      });
+    }
+    fx.add(instancedField({
+      geo: new THREE.IcosahedronGeometry(1, 0), material: MAT.soot,
+      items, name: 'dressCoalHeap',
+    }));
+  }
+
+  // --- 4. WEATHERING, AND ONE BAND SOMEBODY REPLACED -----------------------
+  // Rust runs DOWN from iron, never up, and a tiling wall texture cannot know
+  // where the iron is. Seven alpha-tested quads under the bands that actually
+  // exist, three streak patterns on one canvas, merged into one draw call.
+  // They sit at zFF + 0.012 — in front of the brick field and BEHIND the iron
+  // surrounds, which is the layering rust actually has.
+  {
+    const tex = bakeStainSheet({
+      size: 256, seed: 0xa15205,
+      // LOOKED AT, THEN DARKENED BY MORE THAN HALF. The first cut ran the
+      // ramp up to 0x86,0x53,0x2a and painted what read as fresh red paint
+      // running down a black tower — the loudest thing in the frame, on a
+      // model whose whole identity is that its value lives in the bottom
+      // third (this file's own second lesson, relearnt by the dressing).
+      // Rust on soot is a BROWN a shade lighter than the brick, not an
+      // orange; and `cut` at 0.62 breaks the runs up so they are streaks
+      // rather than stripes.
+      cells: [
+        { stops: [[0x22, 0x18, 0x11], [0x33, 0x22, 0x16], [0x46, 0x2f, 0x1d]], lanes: 3, width: 0.15, reach: 0.9, cut: 0.62 },
+        { stops: [[0x1f, 0x16, 0x10], [0x2e, 0x1f, 0x15], [0x3f, 0x2a, 0x1b]], lanes: 2, width: 0.19, reach: 0.7, cut: 0.62 },
+        { stops: [[0x25, 0x1a, 0x12], [0x37, 0x25, 0x18], [0x4b, 0x33, 0x20]], lanes: 4, width: 0.11, reach: 1.0, cut: 0.66 },
+      ],
+    });
+    const zS = zFF + 0.012;
+    const defs = [
+      { cell: 0, w: 0.72, h: 1.25, pos: [-0.62, yStrap0 - 0.01, zS] },
+      { cell: 2, w: 0.50, h: 0.95, pos: [1.62, yStrap0 - 0.01, zS] },
+      { cell: 1, w: 0.62, h: 1.05, pos: [-1.92, yStrap1 - 0.01, zS] },
+      { cell: 0, w: 0.44, h: 0.80, pos: [0.94, yStrap1 - 0.01, zS] },
+      // and down the right-hand jamb, off the three iron straps that are
+      // genuinely 0.06 of relief there
+      { cell: 2, w: 0.34, h: 0.62, pos: [2.78, 4.34, zFO + 0.004] },
+      { cell: 1, w: 0.30, h: 0.55, pos: [2.66, 2.96, zFO + 0.004] },
+      { cell: 0, w: 0.28, h: 0.44, pos: [2.86, 1.52, zFO + 0.004] },
+    ];
+    addDress(buildStains({ defs, cells: 3, tex }), false);
+    // ONE REPLACEMENT BAND, unrusted: the middle strap on the right jamb, in
+    // clean iron with none of the corrosion. Somebody maintains this. It is
+    // a material swap on a mesh that already existed — no geometry at all.
+    if (replacedStrap) replacedStrap.material = MAT.steel;
+    // …and a short chain hanging off the crown lip, real links alternating
+    // 90°, which is the only reason real links are worth 80 triangles each.
+    // FOUR of them: this is the "short hanger" case the rule allows, and a
+    // long run would be a tube with a chain normal map instead.
+    const chain = buildChainHanger({
+      links: 4, R: 0.115, r: 0.032, at: [2.28, yCrTop - 0.16, zFO + 0.09], material: MAT.steel,
+    });
+    addDress(chain);
+  }
+
   bakeVertexAO(parts, group);
+
+  // --- WEATHERING IN THE VERTEX COLOURS, after the AO bake -----------------
+  // HEAT ABOVE, DAMP BELOW — the whole story of a foundry stack, and all of
+  // it gravity-correct: soot is darkest at the CRown rim and fades DOWN
+  // (rainwater carries it down, so the lip is where it never washes off),
+  // efflorescence blooms mid-shaft where the brick is still drying out, and
+  // moss lives only at the base. World space, so it knows where the rim is,
+  // which a texture tiling every 6.6 units does not.
+  gravityStain(parts, (p, n, out) => {
+    // SOOT: full at the crown rim, gone two and a half units below it.
+    const soot = clamp01((p.y - (yCrA - 1.6)) / 2.2) * clamp01(1 + n.y);
+    // EFFLORESCENCE: pale salt bloom in patches on the stack, and it
+    // BRIGHTENS — the one stain here that multiplies above 1.
+    const band = clamp01(1 - Math.abs(p.y - 9.4) / 1.9);
+    const eff = band * smoothstep(0.55, 0.78, fbm(p.x * 0.9 + 4, p.y * 0.7, 4, 3, 0xef5))
+      * clamp01(n.z * 0.6 + 0.4);
+    // MOSS at the damp foot only.
+    const damp = clamp01(1 - p.y / 1.0);
+    if (soot < 0.02 && eff < 0.02 && damp < 0.02) return false;
+    // The efflorescence BRIGHTENS, and it is kept small on purpose: at 0.30
+    // it lifted the whole stack out of the bottom third of the value range
+    // and the tower stopped being black. A salt bloom is a hint, not a coat.
+    out[0] = (1 - 0.34 * soot) * (1 + 0.11 * eff) * (1 - 0.13 * damp);
+    out[1] = (1 - 0.36 * soot) * (1 + 0.12 * eff) * (1 - 0.06 * damp);
+    out[2] = (1 - 0.38 * soot) * (1 + 0.11 * eff) * (1 - 0.17 * damp);
+    return true;
+  });
 
   // --- AO layer (b): the unlit near-black lining --------------------------
   // Everything above this point is lit; everything below is light that never

@@ -50,7 +50,7 @@ const EYES = {
     ['crown', 11, 13.0, 2.6],
   ],
   blackanvil: [
-    ['crown-smoke', 13, 13.6, 3.0],
+    ['crown-smoke', 20, 16.5, 2.0],
     ['tools', 8, 5.8, -4.2],
     ['door', 8, 3.4, 3.0],
     ['base', 9, 2.0, -5.0],
