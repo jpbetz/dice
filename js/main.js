@@ -44,6 +44,7 @@ import { buildTowerSkin } from './towerskin.js';
 import { buildBastionSkin } from './towerbastion.js';
 import { buildAnvilSkin } from './toweranvil.js';
 import { stepDress } from './towerdress.js';
+import { buildMotes, stepMotes, disposeMotes } from './motes.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -466,7 +467,30 @@ const MOOD = {
     lampAngle: 0.5, lampPenumbra: 0.75,
     fogNear: 15, fogFar: 46,
   },
+  // DUST MOTES (js/motes.js, Tier V2): specks drifting in the lamp cone. One
+  // Points draw call, rides the same accumulated clock as the dress steppers
+  // (holdClock freezes the air). Rebuilt from a FIXED seed on every
+  // applyMood, so lamp dials move the field with the lamp and every client
+  // sees the identical air.
+  motes: null, moteT: 0,
+  moteTune: {
+    on: true, count: 130, size: 0.19, peak: 0.8,
+    spread: 0.8, rMax: 4.0,                 // stay in the beam, skip its wide skirt
+    // yMax 10, NOT the full shaft: motes high on a near-horizontal camera
+    // paint the black backdrop and read as a night sky (the A/B that chose
+    // this: tools/out/motes-empty-a vs dial-empty). Dust lives over the felt.
+    yMin: 1.2, yMax: 10,
+    fall: 0.35, wander: 0.28, twinkleHz: 0.11,
+  },
 };
+const MOTE_SEED = 0x5eed0a1e;
+
+function moodMotesDown() {
+  if (!MOOD.motes) return;
+  scene.remove(MOOD.motes.points);
+  disposeMotes(MOOD.motes);
+  MOOD.motes = null;
+}
 
 function applyMood() {
   const t = MOOD.tune;
@@ -476,6 +500,7 @@ function applyMood() {
     rimLight.intensity = MOOD.base.rim;
     scene.fog = null;
     if (MOOD.lamp) { scene.remove(MOOD.lamp, MOOD.lampTarget); MOOD.lamp = MOOD.lampTarget = null; }
+    moodMotesDown();
     return;
   }
   hemiLight.intensity = t.hemi;
@@ -496,6 +521,18 @@ function applyMood() {
   MOOD.lamp.penumbra = t.lampPenumbra;
   MOOD.lamp.position.set(0, t.lampY, t.lampZ);
   MOOD.lampTarget.position.set(0, 0, 0);
+  // The motes are rebuilt, not patched: the field is a pure function of
+  // (seed, dials), and a rebuild of 160 points costs nothing. Their cone
+  // follows the lamp's, always.
+  moodMotesDown();
+  if (MOOD.moteTune.on) {
+    MOOD.motes = buildMotes(MOTE_SEED, {
+      ...MOOD.moteTune, color: t.lampColor, angle: t.lampAngle,
+      lamp: { x: 0, y: t.lampY, z: t.lampZ }, target: { x: 0, y: 0, z: 0 },
+    });
+    scene.add(MOOD.motes.points);
+    stepMotes(MOOD.motes, MOOD.moteT); // placed before the first frame renders
+  }
 }
 applyMood(); // shipped on — the room boots dark, lamp lit, horizon dissolved
 
@@ -7215,6 +7252,15 @@ function stepTowerLantern(dt) {
 // It steps BOTH the socketed model and the lab's, because tower-shots and the
 // occlusion lab wear a skin that the shipped socket is not wearing, and a
 // prop frozen at t = 0 in the lab is a prop nobody ever photographs moving.
+// The air rides the same clock discipline as the dress: accumulated dt,
+// frozen by holdClock, no wall time. Inert unless the mood (and its mote
+// switch) is on — the towerless flat room has still air by construction.
+function stepMoodMotes(dt) {
+  if (!MOOD.motes) return;
+  MOOD.moteT += dt;
+  stepMotes(MOOD.motes, MOOD.moteT);
+}
+
 const TOWERDRESS = { t: 0 };
 function stepTowerDress(dt) {
   TOWERDRESS.t += dt;
@@ -7241,6 +7287,7 @@ function tick(dt, render = true, realtime = false) {
   stepTowerLab(dt);  // tower lab (docs/TOWER.md) — inert unless towerCore(true)
   stepTowerLantern(dt); // the ember breath — inert unless a glowing tower is up
   stepTowerDress(dt);   // sway and smoke — inert unless a dressed tower is up
+  stepMoodMotes(dt);    // dust in the lamplight — inert unless the mood is up
   stepAmbience();       // the room bed's crackle lookahead — inert unless the bed is up
   stepCamera(dt);    // eased reframing; only ever armed under a quiet picture
   stepCamPeek(dt);   // the hold-drag pivot's spring home
@@ -8154,6 +8201,28 @@ window.__diceDebug = {
     Object.assign(MOOD.tune, patch);
     applyMood();
     return { ...MOOD.tune, on: MOOD.on };
+  },
+  // THE AIR (js/motes.js). motesInfo() is the truth probe the e2e keys on:
+  // `count` counts POINTS IN THE SCENE, not a config echo — when the mood is
+  // down it must be zero because the object is gone, not because a flag says
+  // so. `sample` returns real buffer positions so a scenario can watch the
+  // air move (and freeze under holdClock).
+  motesInfo(idx = [0, 1, 2]) {
+    const m = MOOD.motes;
+    if (!m || !m.points.parent) return { count: 0, sample: [] };
+    const p = m.points.geometry.attributes.position;
+    const c = m.points.geometry.attributes.color;
+    return {
+      count: p.count,
+      draws: 1,
+      t: MOOD.moteT,
+      sample: idx.map((i) => [p.getX(i), p.getY(i), p.getZ(i), c.getX(i)]),
+    };
+  },
+  motesTune(patch = {}) {
+    Object.assign(MOOD.moteTune, patch);
+    applyMood();
+    return { ...MOOD.moteTune, live: !!MOOD.motes };
   },
   // The last socket change, step by step (see TOWER_SWAP): a tower→tower swap
   // must pass through the towerless body list on its way.

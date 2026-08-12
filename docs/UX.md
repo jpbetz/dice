@@ -4348,3 +4348,15 @@ jingles, no rising pitch on a streak. The number carries the outcome.
 **The room tone is off by default** and lives behind its own switch in
 Settings → Just you, beside Sound. It is device-local mood, not table state,
 so it does not ride the portable file and no teammate inherits it.
+
+### 7.33 The air over the felt (2026-08-15)
+
+**Dust drifts in the lamplight.** With the mood on (the shipped default),
+about a hundred and thirty faint warm specks fall slowly through the lamp's
+cone — in it and only in it, from just under the beam's visible shaft down
+to the felt. Each one breathes on its own slow twinkle and fades out before
+it lands; nothing pops in or out. The field is deterministic (one fixed
+seed), so every client at a table watches the identical air, and it freezes
+with the rest of the world under a held clock. Turning the mood off stills
+the room completely — the flat comparison room has no dust by construction.
+Layer switch and dials: `__diceDebug.motesTune({on, count, size, ...})`.

@@ -11472,4 +11472,67 @@ export const scenarios = [
       assert.equal(g.bedSources, 0, 'and turning it off puts the room away again');
     },
   },
+
+  {
+    name: 'mood-motes',
+    tags: ['fx'],
+    // DUST IN THE LAMPLIGHT (js/motes.js, ROADMAP Tier V2). Four claims:
+    // the air exists under the shipped mood, it MOVES on the sim clock and
+    // freezes with it (holdClock discipline — the screenshot contract), it
+    // stays inside the lamp's cone, and mood-off REMOVES it — count comes
+    // from a scene-attached buffer, so zero means the object is gone, not
+    // that a flag went false.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+
+      // ---- the air exists, as one draw ------------------------------------
+      let m = await a.dbg('motesInfo()');
+      assert.ok(m.count > 0, `the shipped mood carries motes (${m.count} points)`);
+      assert.equal(m.draws, 1, 'as a single Points draw call');
+
+      // ---- it moves on the sim clock, and ONLY on it ----------------------
+      await a.dbg('holdClock(true)');
+      const before = await a.dbg('motesInfo([0,3,7])');
+      await a.dbg('sim(60)');
+      const after = await a.dbg('motesInfo([0,3,7])');
+      assert.notDeepEqual(after.sample, before.sample,
+        'a second of sim time visibly drifts the dust');
+      // Frozen clock, ticked hard: rendering without dt must not move air.
+      // Without this, a Date.now() hiding in the step passes every drift
+      // check above — the same trap the audio gate caught.
+      const frozen1 = await a.dbg('motesInfo([0,3,7])');
+      await a.dbg('sim(0)');
+      await a.dbg('sim(0)');
+      const frozen2 = await a.dbg('motesInfo([0,3,7])');
+      assert.deepEqual(frozen2.sample, frozen1.sample,
+        'under a held clock the air is a photograph');
+      await a.dbg('holdClock(false)');
+
+      // ---- it lives in the beam -------------------------------------------
+      // Sample a spread of motes; every one must sit inside the fall band
+      // and within the cone cap (rMax + wander slack). A regression that
+      // scatters dust across the room fails here, not in a screenshot.
+      const wide = await a.dbg('motesInfo([0,10,20,40,80,120])');
+      for (const [x, y, z] of wide.sample) {
+        assert.ok(y > 0.5 && y < 11.5, `mote height ${y.toFixed(2)} stays in the band`);
+        const r = Math.hypot(x, z - 1.5 * (1 - y / 19)); // distance to the lamp axis
+        assert.ok(r < 5.2, `mote radius ${r.toFixed(2)} stays inside the beam cap`);
+      }
+
+      // ---- mood off means NO air, object-gone, and back again -------------
+      await a.dbg('mood(false)');
+      m = await a.dbg('motesInfo()');
+      assert.equal(m.count, 0, 'the flat room has still, empty air');
+      await a.dbg('mood(true)');
+      m = await a.dbg('motesInfo()');
+      assert.ok(m.count > 0, 'and the mood brings the dust back with it');
+
+      // ---- the switch under the mood --------------------------------------
+      const tuned = await a.dbg('motesTune({on: false})');
+      assert.equal(tuned.live, false, 'motesTune({on:false}) takes the layer down alone');
+      m = await a.dbg('motesInfo()');
+      assert.equal(m.count, 0, 'gone from the scene, not dimmed');
+      await a.dbg('motesTune({on: true})');
+    },
+  },
 ];

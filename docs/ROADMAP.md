@@ -2559,10 +2559,19 @@ if the dry table ever asks for one (a shared send with `g ≤ 0.90`, never a
 ConvolverNode). And the bed does not ship on by default until Joe has
 listened to it for an hour straight.
 
-### V2. Dust motes in the lamplight — small
-The canon's highest-ratio atmosphere cue (audit §3). Generalize the
-smoke-quad pattern to an ambient layer; the impact-keyed particle contract
-stays intact by staying out of it.
+### V2. Dust motes in the lamplight — small — SHIPPED 2026-08-15
+The canon's highest-ratio atmosphere cue (audit §3). Shipped as
+[js/motes.js](../js/motes.js): one THREE.Points draw call of ~130 additive
+glints falling slowly through the mood lamp's cone, brightness-enveloped so
+no mote ever pops, riding the accumulated-dt clock (holdClock freezes the
+air). The impact-keyed particle contract stayed intact by staying out of
+it; the smoke's never-additive rule does not apply because a mote is
+visible *only* as scattered lamplight. Field is a pure function of a fixed
+seed and the mood dials — every client breathes identical air, and lamp
+dials move the cone and its dust together. Proof: `mood-motes` (tag `fx`),
+sabotage-checked; dials live at `__diceDebug.motesTune/motesInfo`. The
+band deliberately stops at y=10: motes higher up paint the black backdrop
+and read as a night sky, not dust (A/B in the commit).
 
 ### V3. Finish the wear dossier — small-medium
 Audit §2's two designed-but-unbuilt items: hand-polish roughness zones
