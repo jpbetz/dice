@@ -1894,7 +1894,7 @@ function silenceRollingVoices() {
 const ROLLING_POOL = Array.from({ length: MAX_DICE_ON_TABLE }, () => ({
   i: 0, type: '', speed: 0, angSpeed: 0, vy: 0, vTan: 0, grounded: false,
   hidden: false, phase: 'airborne', settleFrame: 0, x: 0, pan: 0,
-  load: 0, fFace: 0, targetLevel: 0,
+  load: 0, fFace: 0, roughByte: 0, surface: 0, rough: 0, targetLevel: 0,
 }));
 const ROLLING_OUT = [];
 let rollingFrame = -1;
@@ -1954,6 +1954,18 @@ function stepRollingAudio(roll, i0, realtime) {
     // Smoothed over 80 ms of FILM so a single bouncy frame cannot flicker the
     // level; `1 − exp(−dt/τ)` rather than a fixed lerp so the smoothing means
     // the same thing whatever the frame step is.
+    // THE BAKED ROUGH TRACK, if this roll has one. `grounded` from geometry
+    // is an approximation (restY is a tabulated constant per type); a
+    // recorded surface class is the sim's own answer to "is this die touching
+    // anything". They are OR'd rather than swapped: cannon emits a collide
+    // event per step while a contact persists, but a die that has gone
+    // perfectly still can stop producing them, and the geometric test is what
+    // covers that frame.
+    const rb = roll.rough && roll.rough[di] ? roll.rough[di][Math.min(i0, roll.rough[di].length - 1)] : 0;
+    slot.roughByte = rb;
+    slot.surface = rb & 3;
+    slot.rough = (rb >> 2) / 63;
+    if (slot.surface === 1 || slot.surface === 3) slot.grounded = true;
     const loadTarget = slot.grounded ? Math.max(0, 1 - Math.min(1, Math.abs(k.vy) / 8)) : 0;
     const alpha = 1 - Math.exp(-(1 / 60) / ROLL_LOAD_TAU);
     roll.audioLoad[di] += (loadTarget - roll.audioLoad[di]) * alpha;
@@ -1963,8 +1975,13 @@ function stepRollingAudio(roll, i0, realtime) {
     // FACE RATE. Below ~20 Hz this is discrete face-clacks; above it, a
     // pitched grind. One parameter, one continuous transition, no crossfade.
     slot.fFace = (k.vTan / dieWidth(slot.type)) * kTempo;
+    // The rough byte is what turns "a rumble that follows the dice" into
+    // "the pile actually grinding": a die scraping across the felt at a
+    // steady speed still has a varying contact stream, and this is that
+    // variation. Bounded so it can colour the level, never dominate it.
+    const grit = 1 + 0.6 * slot.rough;
     const lvl = phase === 'rolling'
-      ? ROLL_GAIN * load * Math.pow(Math.max(0, k.vTan) / 12, 0.75)
+      ? ROLL_GAIN * load * Math.pow(Math.max(0, k.vTan) / 12, 0.75) * grit
       : 0;
     slot.targetLevel = lvl;
     sum += lvl;
@@ -2005,7 +2022,8 @@ function stepRollingAudio(roll, i0, realtime) {
       if (Math.abs(tiltF - v.setTilt) > 10) { v.tilt.frequency.value = tiltF; v.setTilt = tiltF; }
       // Fast clacks physically overlap, so the modulation gets shallower as
       // the rate climbs — which is exactly what turns clacks into a grind.
-      v.depth.gain.value = Math.min(0.95, Math.max(0.25, 1 - s.fFace / 45)) * 0.5;
+      v.depth.gain.value = Math.min(0.95, Math.max(0.25, 1 - s.fFace / 45))
+        * (0.5 + 0.35 * s.rough);
       v.setFreq = paramTo(v.osc.frequency, v.setFreq,
         Math.min(400, Math.max(0.5, s.fFace)), ctx, 0.03);
       if (Math.abs(s.pan - v.setPan) > 0.01) { v.pan.pan.value = s.pan || 0; v.setPan = s.pan; }
@@ -3288,8 +3306,44 @@ function playRoll(roll) {
   // client keeps and drops exactly the same contacts.
   const CONTACTS_PER_STEP = 8;
   let stepContacts = 0;
+  // THE ROUGH / SURFACE TRACK (docs/AUDIO.md §3.3, increment 6). One byte per
+  // die per frame, and it is a DIFFERENT recording from `sounds` in every way
+  // that matters:
+  //
+  //   · NO VELOCITY GATE. `sounds` is an event log and the `v > 2` bar is its
+  //     "this contact happened, audibly" line. Rolling is the opposite
+  //     question — a die grinding along the felt is a continuous stream of
+  //     contacts every one of which is under the bar, which is exactly why
+  //     the middle of a throw has been silent.
+  //   · NO 400-EVENT AND NO PER-STEP CAP. It is a fixed-size array, not a
+  //     queue: one byte per die per frame, ~21 KB on a 40-die pour, and it
+  //     cannot starve anything because it takes from nothing.
+  //   · low 2 bits = surface class (0 none / 1 felt / 2 wall / 3 die);
+  //     high 6 bits = min(63, Σv·8) over the frame.
+  //
+  // `e.body.material` was being discarded here; the class is what lets a
+  // rolling voice eventually know felt from boards. Note the CEILING also
+  // carries wallMat, so class 2 means "not the floor and not another die".
+  //
+  // Deterministic by construction, like the recorder it sits inside: no rng
+  // draw, no body added, no ordering perturbed.
+  const roughAcc = dice.map(() => 0);
+  const roughCls = dice.map(() => 0);
+  // `let`, like `sounds`, and for the same reason: the pour may discard a
+  // whole baked attempt and start again from empty film. Seeded with a
+  // frame-0 byte where the keyframes are seeded, below.
+  let rough = [];
+  const classOf = (mat) => (mat === floorMat ? 1 : mat === wallMat ? 2 : mat === diceMat ? 3 : 0);
   const recordCollision = (e) => {
     const v = Math.abs(e.contact.getImpactVelocityAlongNormal());
+    const cc = e.contact;
+    const dyn = cc.bi.type === CANNON.Body.DYNAMIC ? cc.bi : cc.bj;
+    const dIdx = bodyDie.get(dyn);
+    if (dIdx !== undefined) {
+      roughAcc[dIdx] += v;
+      const cls = classOf((dyn === cc.bi ? cc.bj : cc.bi).material);
+      if (cls > roughCls[dIdx]) roughCls[dIdx] = cls;
+    }
     if (v > 2 && sounds.length < 400 && stepContacts++ < CONTACTS_PER_STEP) {
       // The contact point rides along (Level 3): playback fires the set's
       // particle burst exactly where the click sound says the die hit —
@@ -3362,6 +3416,10 @@ function playRoll(roll) {
   if (pouring) pourDraw();
 
   let keyframes = dice.map((d) => [poseOf(d)]);
+  // Frame 0 is pushed here, before the loop, so the rough track gets its own
+  // frame-0 byte in the same breath — the two arrays must be index-aligned or
+  // every level read is off by a frame for the whole throw.
+  rough = dice.map(() => [0]);
 
   // Perf pass §0a (Commit A — per-die settle): each die freezes into a STATIC
   // mass-0 body the moment it lands clean, so a group of 40 dice no longer
@@ -3665,6 +3723,11 @@ function playRoll(roll) {
     const kfIdx = keyframes[0].length;
     dice.forEach((d, i) => {
       keyframes[i].push(d.frozen ? d.frozenPose : poseOf(d));
+      // The rough byte, beside the keyframe push so the two arrays are the
+      // same length by construction rather than by arithmetic.
+      rough[i].push((Math.min(63, Math.round(roughAcc[i] * 8)) << 2) | roughCls[i]);
+      roughAcc[i] = 0;
+      roughCls[i] = 0;
       if (pouring && d.live) d.visSpans[d.visSpans.length - 1][1] = kfIdx;
     });
     if (pouring) pourClunks(simTime);
@@ -3797,6 +3860,9 @@ function playRoll(roll) {
     }
     bodyDie = new Map(dice.map((d, i) => [d.body, i]));
     sounds = [];
+    // Every attempt starts from empty film, and the rough track is film.
+    rough = dice.map(() => [0]);
+    for (let i = 0; i < dice.length; i++) { roughAcc[i] = 0; roughCls[i] = 0; }
     simTime = 0;
     nudges = 0;
   };
@@ -3822,7 +3888,7 @@ function playRoll(roll) {
       const fault = bad + pourStranded;
       const film = {
         bad, fault, stranded: pourStranded, attempt: pourAttempt,
-        keyframes, sounds, simTime, nudges,
+        keyframes, sounds, rough, simTime, nudges,
         landings: makeLandings(keyframes[0].length - 1),
         spans: dice.map((d) => d.visSpans),
         rescues: dice.reduce((a, d) => a + d.rescues, 0),
@@ -3834,10 +3900,12 @@ function playRoll(roll) {
       pourDraw();
       resetSettleState();
       keyframes = dice.map((d) => [poseOf(d)]);
+      rough = dice.map(() => [0]);
       settleCap = capOf();
     }
     keyframes = pourBest.keyframes;
     sounds = pourBest.sounds;
+    rough = pourBest.rough;
     simTime = pourBest.simTime;
     nudges = pourBest.nudges;
     dice.forEach((d, i) => { d.visSpans = pourBest.spans[i]; });
@@ -3899,6 +3967,10 @@ function playRoll(roll) {
   // than relax what it asserts.
   const simFrames = keyframes[0].length - 1;
   for (const kf of keyframes) kf.length = motionFrames + 1;
+  // The rough track is film and is cut with the film — same length, same
+  // frame indices, one Uint8Array per die. Packed only now, so a discarded
+  // pour attempt costs nothing.
+  const roughTrack = rough.map((arr) => Uint8Array.from(arr.slice(0, motionFrames + 1)));
   for (const l of landings) l.frame = Math.min(l.frame, motionFrames);
   // The pour's visibility spans are frame indices into the same film, so the
   // cut applies to them too — and the LAST span is reopened to the final
@@ -4040,6 +4112,12 @@ function playRoll(roll) {
     dice,
     keyframes,
     sounds,
+    // One Uint8Array per die, one byte per FRAME (docs/AUDIO.md §3.3): low 2
+    // bits the surface class, high 6 the summed contact velocity. Pure
+    // function of the sim — no rng draw, no body, no reordering — so it is
+    // part of the same-seed comparison, and tower-roll's replay hash was
+    // extended to cover it in the same commit that introduced it.
+    rough: roughTrack,
     frames: keyframes[0].length,
     simFrames, // frames simulated before the tail was cut; see the cut above
     duration: motionFrames * FIXED_DT,
@@ -8916,6 +8994,7 @@ window.__diceDebug = {
         angSpeed: Math.round(s.angSpeed * 1e6) / 1e6,
         grounded: s.grounded, hidden: s.hidden, phase: s.phase,
         settleFrame: s.settleFrame, x: Math.round(s.x * 1e6) / 1e6, pan: s.pan,
+        surface: s.surface, rough: Math.round(s.rough * 1e4) / 1e4,
         targetLevel: Math.round(s.targetLevel * 1e6) / 1e6,
       })),
     };
@@ -8939,6 +9018,8 @@ window.__diceDebug = {
       settledEarly: 0, unsettledAtOrAfterLanding: 0, leftSettled: 0,
       movedAfterSettle: 0, framesAfterSettle: 0,
       maxSpeedAfterSettle: 0, maxAngSpeedAfterSettle: 0, stillTailFrames: 0,
+      roughLen: r.rough && r.rough[i] ? r.rough[i].length : 0,
+      roughNonZero: 0, roughInRollingWindow: 0, surfaces: [0, 0, 0, 0],
     }));
     const spans = r.pour ? r.pour.spans : null;
     for (let di = 0; di < r.dice.length; di++) {
@@ -8954,6 +9035,10 @@ window.__diceDebug = {
           o.maxAngSpeed = Math.max(o.maxAngSpeed, k.angSpeed);
         }
         if (phase === 'rolling') { o.rollingFrames++; run++; o.longestRollingRun = Math.max(o.longestRollingRun, run); } else run = 0;
+        const rb = r.rough && r.rough[di] ? (r.rough[di][f] || 0) : 0;
+        if (rb) o.roughNonZero++;
+        o.surfaces[rb & 3]++;
+        if (phase === 'rolling' && (rb >> 2) > 0) o.roughInRollingWindow++;
         // Hidden is counted off the SPANS — the same bytes playback hides the
         // mesh from — rather than off the phase, so "every hidden frame is
         // reported hidden" compares two answers instead of restating one.

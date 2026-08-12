@@ -10579,13 +10579,19 @@ export const scenarios = [
       // Same payload, same seed, twice, on the same tab. The pour draws from a
       // stream derived from roll.seed alone; anything reaching for the wall
       // clock or Math.random breaks here on the first run.
+      // THE ROUGH TRACK IS IN THE HASH, and it went in the same day it was
+      // introduced (docs/AUDIO.md §4). A replay comparison that does not
+      // cover a new array does not merely fail to test it — it stops testing
+      // it silently, and the next change to the bake looks safe.
       const FILM = `(() => {
         const r = window.__diceDebug.currentRoll;
         const per = r.keyframes.map((arr) => arr.map((s) =>
           [s.pos.x, s.pos.y, s.pos.z, s.quat.x, s.quat.y, s.quat.z, s.quat.w]
             .map((f) => f.toFixed(9)).join(',')).join('|'));
+        const rough = (r.rough || []).map((a) => Array.from(a).join(',')).join('||');
         return { hash: per.join('||'), frames: r.frames, duration: r.duration,
-                 sounds: r.sounds.length, spans: JSON.stringify(r.pour.spans) };
+                 sounds: r.sounds.length, spans: JSON.stringify(r.pour.spans),
+                 rough, roughLens: (r.rough || []).map((a) => a.length).join(',') };
       })()`;
       const bake = async () => {
         await a.dbg(`playRoll({ dice: ['d6','d6','d6','d6'], values: [1,2,3,4], `
@@ -10602,6 +10608,13 @@ export const scenarios = [
       assert.equal(one.sounds, two.sounds, 'same seed, same impact + clunk record');
       assert.equal(one.spans, two.spans, 'same seed, same hidden windows');
       assert.equal(one.hash, two.hash, 'same seed, byte-identical film');
+      assert.equal(one.roughLens, two.roughLens,
+        `same seed, same rough-track lengths (${one.roughLens})`);
+      assert.ok(one.rough.length > 0,
+        'the rough track is non-empty — otherwise the line below compares '
+        + 'two empty strings and covers nothing');
+      assert.equal(one.rough, two.rough,
+        'same seed, byte-identical rough/surface track');
 
       // And across CLIENTS, which is the claim that actually matters: two
       // people watching one table watch the same pour.
@@ -10957,6 +10970,30 @@ export const scenarios = [
         assert.ok(d.maxSpeed < 60,
           `d${d.i} does not teleport out of the tower (peak ${d.maxSpeed} u/s)`);
       }
+
+      // ---- the baked rough / surface track ---------------------------------
+      // One byte per die per FRAME, recorded in the bake with NO velocity
+      // gate: `sounds`' `v > 2` bar is an event log's "this happened,
+      // audibly" line, and a die grinding along the felt is a stream of
+      // contacts every one of which is under it. That is why the middle of a
+      // throw was silent, and the track is the fix.
+      for (const d of scan.dice) {
+        assert.equal(d.roughLen, scan.frames,
+          `d${d.i}: one rough byte per frame, cut with the film `
+          + `(${d.roughLen} bytes for ${scan.frames} frames)`);
+      }
+      const rolled = scan.dice.filter((d) => d.rollingFrames > 0);
+      assert.ok(rolled.length > 0, 'some die rolled, so there is a window to look in');
+      for (const d of rolled) {
+        assert.ok(d.roughInRollingWindow > 0,
+          `d${d.i}: the rough bytes are non-zero somewhere in its rolling `
+          + `window (${d.roughInRollingWindow} of ${d.rollingFrames} frames)`);
+      }
+      // The surface class is the thing `e.body.material` was being thrown
+      // away for. A poured roll must show felt contacts (1) — and the pour
+      // knocks the tower's baffles, which are walls (2).
+      const felt = scan.dice.reduce((n, d) => n + d.surfaces[1], 0);
+      assert.ok(felt > 0, `dice are recorded touching the felt (${felt} frames)`);
 
       // ---- the live per-frame view -----------------------------------------
       // rollingState() answers about the frame playback last stepped, which is
