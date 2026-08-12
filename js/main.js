@@ -127,7 +127,15 @@ const TOWERS = {
     // A lit lantern implies somebody lit it tonight; an unlit one is trim.
     ember: { at: [2.575, 8.02, 0.70], color: '#ff9a44', intensity: 2.6, dist: 4.2 },
     // Dry wood on wood: a short, narrow-band knock with almost no tail.
-    clunkVoice: { body: 'clack', weight: 0.35, sustain: 20 },
+    // `shaft` is the CHUTE's colour, not the knock's (docs/AUDIO.md §2.4):
+    // a feedforward comb plus two resonant modes. A 0.4 m chute's 2.3 ms
+    // round trip is below the 128-sample feedback floor, so a true geometric
+    // model is unrepresentable here — this models the colour instead, with
+    // no feedback path and therefore no stability question.
+    clunkVoice: {
+      body: 'clack', weight: 0.35, sustain: 20,
+      shaft: { delayS: 0.0032, combGain: 0.55, mode1Hz: 430, mode2Hz: 860 },
+    },
   },
   bastion: {
     id: 'bastion', label: 'Bastion', skin: buildBastionSkin,
@@ -137,8 +145,12 @@ const TOWERS = {
     // reason it is there — a live flame beside a near-black slot is the
     // strongest value contrast a grey tower has.
     ember: { at: [-0.38, 8.03, 0.54], color: '#ff9040', intensity: 2.4, dist: 4.0 },
-    // Stone: heavier, lower, and it rings on in the shaft afterwards.
-    clunkVoice: { body: 'thud', weight: 0.7, sustain: 40 },
+    // Stone: heavier, lower, and it rings on in the shaft afterwards — a
+    // longer chute delay and lower modes than the wooden one.
+    clunkVoice: {
+      body: 'thud', weight: 0.7, sustain: 40,
+      shaft: { delayS: 0.0055, combGain: 0.5, mode1Hz: 300, mode2Hz: 600 },
+    },
   },
   blackanvil: {
     id: 'blackanvil', label: 'Black Anvil', skin: buildAnvilSkin,
@@ -163,7 +175,13 @@ const TOWERS = {
     // this and the Emberforge die set's own thud 0.9 / 30 — not listened
     // to. Of everything in this tower it is the thing most likely to want
     // moving, and it is Joe's dial.
-    clunkVoice: { body: 'chime', weight: 0.85, sustain: 70 },
+    // The shaft row is Joe's dial for the same reason and in the same breath:
+    // the tightest delay and the highest modes of the three, which is what an
+    // iron flue does to a knock.
+    clunkVoice: {
+      body: 'chime', weight: 0.85, sustain: 70,
+      shaft: { delayS: 0.0025, combGain: 0.6, mode1Hz: 520, mode2Hz: 1040 },
+    },
   },
 };
 const DEFAULT_TOWER = 'none';
@@ -1292,6 +1310,53 @@ function depthGainFor(at) {
   return 1 / (1 + DEPTH_ROLLOFF * (d / ref - 1));
 }
 
+// THE SHAFT SEND (docs/AUDIO.md §2.4) — the tower's colour on its own knocks.
+//
+//   clunk ─┬──────────────────────▶ sum ─▶ peak(mode1, Q 10, +8) ─▶ peak(mode2, Q 8, +6) ─▶ 0.9 ─▶ master
+//          └─▶ delay(delayS) ─▶ g ─▶ sum
+//
+// Five nodes, FEEDFORWARD ONLY. No feedback path, so no stability question
+// and nothing to run away — the refusal list is explicit that a feedback
+// reverb is not earning its place until the dry table is proven (§6.3).
+//
+// Built LAZILY, on the first clunk that carries a shaft row, which is why
+// `shaftBuilt` is false on a towerless table and true after a pour. The dials
+// are per-model, so a tower swap re-tunes the same five nodes rather than
+// building a second bus.
+function ensureShaft(spec) {
+  const ctx = AUDIO.ctx;
+  if (!ctx) return null;
+  if (!AUDIO.shaft) {
+    const input = ctx.createGain();
+    const delay = ctx.createDelay(0.05);
+    const comb = ctx.createGain();
+    const p1 = ctx.createBiquadFilter();
+    p1.type = 'peaking';
+    p1.Q.value = 10;
+    p1.gain.value = 8;
+    const p2 = ctx.createBiquadFilter();
+    p2.type = 'peaking';
+    p2.Q.value = 8;
+    p2.gain.value = 6;
+    const out = ctx.createGain();
+    out.gain.value = 0.9;
+    input.connect(p1);
+    input.connect(delay).connect(comb).connect(p1);
+    p1.connect(p2).connect(out).connect(AUDIO.master);
+    AUDIO.shaft = { in: input, delay, comb, p1, p2, out, tuned: null };
+  }
+  const sh = AUDIO.shaft;
+  const key = `${spec.delayS}/${spec.combGain}/${spec.mode1Hz}/${spec.mode2Hz}`;
+  if (sh.tuned !== key) {
+    sh.delay.delayTime.value = spec.delayS;
+    sh.comb.gain.value = spec.combGain;
+    sh.p1.frequency.value = spec.mode1Hz;
+    sh.p2.frequency.value = spec.mode2Hz;
+    sh.tuned = key;
+  }
+  return sh;
+}
+
 // Unlock on the first real gesture. NOT `{once: true}`: a resume() that loses
 // the race with the autoplay policy would leave the table permanently silent
 // with no way back, and the guard below makes a repeat call free. Measured in
@@ -1485,7 +1550,12 @@ function impactPresetOf(voice) {
 // no cleanup array: three nodes, started, forgotten, collected when they end.
 // `durSec` is how long the envelope runs; the source is read from a random
 // offset into the shared buffer so per-hit texture survives the sharing.
-function noiseOneShot({ preset, freq, gain, durSec, bus, attack = 1, at = 0 }) {
+// The hidden-transit muffle. −3 dB of it, and only while a die is behind the
+// skin: the exit is bright by comparison and that contrast is the point.
+const TRANSIT_LOWPASS_HZ = 2200;
+const TRANSIT_LOWPASS_TRIM = 0.71; // ≈ −3 dB
+
+function noiseOneShot({ preset, freq, gain, durSec, bus, attack = 1, at = 0, transitLowpass = 0 }) {
   const ctx = AUDIO.ctx;
   const buf = AUDIO.noise;
   const t0 = at > 0 ? at : ctx.currentTime;
@@ -1500,6 +1570,7 @@ function noiseOneShot({ preset, freq, gain, durSec, bus, attack = 1, at = 0 }) {
   // `decayShape` was the constant in exp(-i / (len·decayShape)) when the
   // envelope was written into the buffer sample by sample; the same curve is
   // an exponential ramp to gain·exp(−1/decayShape) over the voice's length.
+  if (transitLowpass > 0) gain *= TRANSIT_LOWPASS_TRIM;
   const end = Math.max(1e-4, gain * Math.exp(-1 / preset.decayShape));
   if (attack !== 1) {
     // crackle's sharp transient — 1 ms of gain bump, not a reshaped buffer.
@@ -1509,7 +1580,15 @@ function noiseOneShot({ preset, freq, gain, durSec, bus, attack = 1, at = 0 }) {
     g.gain.setValueAtTime(gain, t0);
   }
   g.gain.exponentialRampToValueAtTime(end, t0 + durSec);
-  src.connect(filter).connect(g).connect(bus);
+  if (transitLowpass > 0) {
+    const muffle = ctx.createBiquadFilter();
+    muffle.type = 'lowpass';
+    muffle.frequency.value = transitLowpass;
+    muffle.Q.value = 0.7;
+    src.connect(filter).connect(muffle).connect(g).connect(bus);
+  } else {
+    src.connect(filter).connect(g).connect(bus);
+  }
   src.start(t0, Math.random() * Math.max(0.001, buf.duration - 0.05));
   src.stop(t0 + durSec + 0.01);
   AUDIO.oneShots++;
@@ -1665,9 +1744,22 @@ function playImpact(strength, voice, filmTime, ev) {
   const gainV = Math.min(0.35, strength * preset.gainScale) * depthGainFor(ev && ev.at);
   // A baffle knock is `at: null` by design (a clunk is a sound, not a place),
   // so it is never panned by position: it comes from the tower mouth, ≈ 0.
-  const bus = busFor(ev && ev.at ? ev.at[0] : 0) || AUDIO.master;
+  // A knock with a SHAFT row goes through the chute's colour instead of
+  // straight at the master — the FIRST LAW holds by construction, because a
+  // towerless roll records no clunk event for this branch to see.
+  // `ev.clunk` is BELT AND BRACES and is red-check-inert: only a TOWERS row
+  // carries `shaft`, and only a baffle knock resolves one, so removing the
+  // clause changes nothing observable. Kept as a second lock on the send,
+  // labelled so nobody mistakes the passing test for evidence about it.
+  const sh = (v && v.shaft && ev && ev.clunk) ? ensureShaft(v.shaft) : null;
+  const bus = sh ? sh.in : (busFor(ev && ev.at ? ev.at[0] : 0) || AUDIO.master);
   const shot = noiseOneShot({
     preset, freq, gain: gainV, durSec, bus, attack: body === 'crackle' ? 1.6 : 1,
+    // A die knocking about inside the tower is heard THROUGH the tower, and
+    // the muffle is removed at the mouth: it is the contrast between the dull
+    // knocks in the dark and the bright landing on the felt that sells the
+    // model, more than the shaft colour itself does.
+    transitLowpass: sh ? TRANSIT_LOWPASS_HZ : 0,
   });
   // Chime bodies (glass, crystal, sealed resin) layer a decaying sine
   // partial ~an octave below the filter center — the resonance that

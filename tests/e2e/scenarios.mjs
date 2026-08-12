@@ -11210,4 +11210,88 @@ export const scenarios = [
       await a.settle();
     },
   },
+
+  {
+    name: 'audio-shaft',
+    tags: ['fx', 'audio', 'roll', 'tower'],
+    // THE TOWER'S COLOUR ON ITS OWN KNOCKS (docs/AUDIO.md §2.4), and THE
+    // FIRST LAW asked the only way it can honestly be asked.
+    //
+    // The palette question is put to `impactVoiceFor` — the drain's OWN
+    // resolver — and never to towerClunkVoice(). tower-roll records why: a
+    // test that reads the registry function directly stays green with the
+    // drain wired straight back to the die set, which is the shape of green
+    // check this project keeps catching itself writing.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      const SET = 'emberforge.blackanvil'; // a set with a voice of its own to argue with
+
+      // ---- towerless: no shaft anywhere ------------------------------------
+      await a.roll('4d6');
+      let g = await a.dbg('audioGraphInfo()');
+      assert.equal(g.shaftBuilt, false,
+        'a towerless roll never builds a shaft bus — it has no clunk event '
+        + 'that could reach one');
+      assert.equal((await a.dbg(`impactVoiceFor({}, '${SET}')`) || {}).shaft, undefined,
+        'and an ordinary landing carries no shaft row');
+      assert.equal(await a.dbg(`impactVoiceFor({clunk:'baffle'}, '${SET}').shaft`), undefined,
+        'nor does a baffle knock with NO TOWER UP — the FIRST LAW, asked of '
+        + 'the resolver rather than of the registry');
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+
+      // ---- every skinned tower brings its own shaft row --------------------
+      const registry = await a.dbg('towerRegistry()');
+      const skinned = registry.filter((t) => t.id !== 'none');
+      assert.ok(skinned.length >= 3, `three or more models to compare (${skinned.length})`);
+      const rows = [];
+      for (const model of skinned) {
+        await a.settle();
+        await a.dbg(`setTower('${model.id}')`);
+        await a.waitFor(`window.__diceDebug.tower === '${model.id}'`,
+          { desc: `${model.label} goes up` });
+        const voice = await a.dbg(`impactVoiceFor({clunk:'baffle'}, '${SET}')`);
+        assert.ok(voice && voice.shaft,
+          `${model.id}: a baffle knock resolves a shaft row through impactVoiceFor`);
+        assert.deepEqual(voice.shaft, model.clunkVoice.shaft,
+          `${model.id}: and it is the SOCKETED model's row, not another's`);
+        for (const k of ['delayS', 'combGain', 'mode1Hz', 'mode2Hz']) {
+          assert.equal(typeof voice.shaft[k], 'number', `${model.id}: ${k} is a number`);
+        }
+        assert.equal((await a.dbg(`impactVoiceFor({}, '${SET}')`)).shaft, undefined,
+          `${model.id}: an ordinary landing still takes the DIE SET's voice, `
+          + 'with no shaft — the tower colours its own knocks, not the roll');
+        rows.push(JSON.stringify(voice.shaft));
+      }
+      assert.equal(new Set(rows).size, rows.length,
+        `no two models share a shaft (${rows.join(' | ')}) — two towers that `
+        + 'sound alike are one tower twice');
+
+      // ---- and a pour actually builds it -----------------------------------
+      await a.settle();
+      await a.dbg(`setTower('heartwood')`);
+      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+        { desc: 'back to the wooden tower' });
+      await a.roll('6d6');
+      g = await a.dbg('audioGraphInfo()');
+      assert.equal(g.shaftBuilt, true,
+        'a POUR builds the shaft bus — the knocks went through the chute');
+
+      // ---- and coming down leaves nothing pointing at it -------------------
+      await a.settle();
+      await a.dbg(`setTower('none')`);
+      await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'the tower comes down' });
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+      assert.equal(await a.dbg(`impactVoiceFor({clunk:'baffle'}, '${SET}').shaft`), undefined,
+        'with the tower down there is no shaft to resolve again');
+      await a.roll('4d6');
+      // The bus is a permanent node and stays built — that is the lifetime
+      // rule, not a leak. What must be true is that nothing REACHES it, and
+      // the line above is the claim that says so.
+      assert.equal(await a.eval(
+        '!!(window.__diceDebug.currentRoll.sounds.find((s) => s.clunk))'), false,
+        'and a towerless roll records no clunk event at all');
+    },
+  },
 ];
