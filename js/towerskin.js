@@ -1074,10 +1074,14 @@ export function buildTowerSkin(v) {
   // bake would grow on all four sides of the tower at once); the leaves are
   // one InstancedMesh, one draw call, alpha-tested because an InstancedMesh
   // cannot sort its own instances (G4).
-  const ivyU = [-3.02, -2.32], ivyV = [0.30, 6.20];
+  // THE LEAN IS PART OF THE ARITHMETIC. −2.94 rather than −3.02: a leaf card
+  // 0.26 across, rolled 25°, has a half-diagonal of 0.18, and at y 6 the
+  // model's 0.7° lean has already spent another 0.07 of x. The socket's wall
+  // is the one boundary with a real wall behind it (the mat's, at 3.35).
+  const ivyU = [-2.94, -2.30], ivyV = [0.30, 6.20];
   {
     const paths = growIvy({
-      seed: 0x70147, start: [-2.74, 0.34], strands: 3, steps: 46, step: 0.15,
+      seed: 0x70147, start: [-2.70, 0.34], strands: 3, steps: 46, step: 0.15,
       spread: 0.30, gravity: 0.40, branchP: 0.05, uLim: ivyU, vLim: ivyV,
     });
     const stemTex = bakeStems({
@@ -1132,7 +1136,7 @@ export function buildTowerSkin(v) {
       const s = 0.16 + rndT() * 0.14;
       // …and never past x −3.05: a card 0.45 wide centred on −3.12 puts its
       // corner at −3.34, outside the socket's own wall, for a tuft of moss.
-      const x = -2.96 + rndT() * 0.62;
+      const x = -2.90 + rndT() * 0.62;
       const zj = zFO + 0.02 + rndT() * 0.05;
       items.push({
         matrix: new THREE.Matrix4().compose(
@@ -1146,7 +1150,11 @@ export function buildTowerSkin(v) {
       const s = 0.13 + rndT() * 0.10;
       items.push({
         matrix: new THREE.Matrix4().compose(
-          new THREE.Vector3(-3.0 + rndT() * 0.7, capTop + s * 0.42, zFO - 0.04 - rndT() * 0.3),
+          // −2.84, not −3.0: the whole model leans 0.7° about z, and at the
+          // cornice's height that is another 0.13 of x on top of the card's
+          // own half-width. The socket wall does not care that a tuft is
+          // decoration.
+          new THREE.Vector3(-2.84 + rndT() * 0.6, capTop + s * 0.42, zFO - 0.04 - rndT() * 0.3),
           new THREE.Quaternion().setFromEuler(new THREE.Euler(0, (rndT() - 0.5) * 1.2, 0)),
           new THREE.Vector3(s * 1.4, s, s)),
         tint: [0.75 + rndT() * 0.35, 0.8 + rndT() * 0.3, 0.7 + rndT() * 0.3],
