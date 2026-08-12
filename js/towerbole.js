@@ -71,7 +71,14 @@ export function buildStumpShell(ctx) {
   const srnd = mulberry32(seed);
   const FRONT = Math.PI / 2;
   const d = {
-    axisZ: boreZ,
+    // The axis sits BEHIND the bore, not on it. The socket allows only
+    // ~2.15 of z in front of the shaft, so an axis-on-bore trunk planes
+    // flat across its whole front (two slab frames proved it). Off-axis,
+    // the walls run thick at the back and thin at the front, the bore
+    // still fits (the interior floor below is DIRECTIONAL), and the front
+    // face curves at its natural radius — a tube grown against a wall,
+    // not a tube sliced by one.
+    axisZ: boreZ - 0.42,
     rCeil: xLim - 0.12,
     rFloor: v.shaft.r + 0.28,
     linerR: v.shaft.r + 0.13,
@@ -91,65 +98,105 @@ export function buildStumpShell(ctx) {
     despawnY: v.despawnY,
   };
 
-  const lobes = [];
-  for (let i = 0; i < 5; i++) {
-    lobes.push({
-      th: (i / 5) * Math.PI * 2 + (srnd() - 0.5) * 0.7 + 0.45,
-      amp: 0.5 + srnd() * 0.6,
-      w: 0.3 + srnd() * 0.22,
-    });
+  // =========================================================================
+  // THE FIBER BUNDLE (the stop-ship rebuild, Joe: "an unconvincing graft
+  // between a cylinder and the actual stump... back up and find a new
+  // approach"). The old field was base-cylinder + bottom lobes + cosmetic
+  // noise — three vocabularies stitched at their seams, and the seams
+  // showed. This field has ONE vocabulary: ~12 continuous vertical RIDGES,
+  // each with a single identity along its whole length —
+  //     buttress at the foot → furrow through the waist → tear-spire at
+  //     the crown, the same crest line all the way up, drifting slightly
+  //     in θ with height (the twist of grain).
+  // The crown tears ALONG the ridges (a spire is a fiber that kept going),
+  // the buttresses ARE the ridges widening at the soil, and the moss will
+  // pool in the valleys BETWEEN them — nothing is pasted onto anything.
+  // =========================================================================
+  const N_RIDGE = 12;
+  const ridges = [];
+  {
+    let thAcc = 0.45;
+    for (let i = 0; i < N_RIDGE; i++) {
+      thAcc += (Math.PI * 2 / N_RIDGE) * (0.72 + 0.56 * srnd());
+      ridges.push({
+        th: thAcc,
+        w: 0.15 + srnd() * 0.09,        // crest half-width
+        butt: 0.35 + srnd() * 0.95,     // buttress strength at the foot
+        fiber: 0.20 + srnd() * 0.24,    // mid-height relief — deep enough to SILHOUETTE
+        spire: srnd() * srnd(),         // who continues into the tear (few do)
+        lean: (srnd() - 0.5) * 0.30,    // grain twist: crest drifts with height
+      });
+    }
+    // One dominant tear, never centred: boost the ridge nearest back-left.
+    let best = ridges[0];
+    for (const R of ridges) {
+      if (angDist(R.th, FRONT + Math.PI * 0.78) < angDist(best.th, FRONT + Math.PI * 0.78)) best = R;
+    }
+    best.spire = 1.35;
   }
-  const spires = [
-    { th: FRONT + Math.PI * 0.78, amp: d.spireMax - d.rimY, w: 0.24 },
-    { th: FRONT - Math.PI * 0.72, amp: 1.9, w: 0.2 },
-    { th: FRONT + Math.PI * 1.28, amp: 1.1, w: 0.18 },
-  ];
-  // The TRUNK is round on purpose and narrower than the socket allows:
-  // the socket is 6.5 wide but only ~2.1 deep in front of the shaft, and
-  // a trunk that spends the full width gets z-crushed into a slab (the
-  // first venue frame — a black monolith with vertical edges). The cowl
-  // probe samples discs of radius ≤ 2.0, so a ~2.5 trunk still occludes
-  // everything it must; only the ROOT FLARE spends the extra x.
-  const profile = (y) => Math.min(d.rFloor + 0.15,
-    (d.rFloor + 0.5) + 1.3 * Math.exp(-y / (1.15 * S)))
-    + 1.15 * Math.exp(-y / (0.9 * S))
-    + 0.08 * Math.sin(y * 0.75 + 2.1);
-  const flare = (y) => Math.pow(Math.max(0, 1 - y / (2.1 * S)), 1.6);
+  const crestAt = (R, y) => R.th + R.lean * (y / 10);
+
+  // THE BASE CURVE — a real stump's taper, through MEASURED free volume
+  // (skill §1.5 applied harder than the declared volumes): dice DESPAWN at
+  // y 7, so below ~6.4 the shaft carries nothing and the wall may pinch to
+  // ~2.05; above 6.4 it stays outside the falling lane (2.32 floor); the
+  // shoulder swells back out to carry the shaft band and the cowl.
+  const base = (y) => 2.02
+    + 0.95 * Math.exp(-y / (1.05 * S))              // the foot
+    + 0.38 * smoothstep(5.6, 7.3, y)                 // the shaft shoulder
+    + 0.05 * Math.sin(y * 0.7 + 2.1);
+  const flare = (y) => Math.pow(Math.max(0, 1 - y / (2.3 * S)), 1.5);
+  const crownK = (y) => smoothstep(d.rimY - 2.2, d.rimY + 0.5, y);
+  const ridgeAmp = (R, y) =>
+    R.butt * 0.5 * flare(y)
+    + R.fiber * (1 - flare(y) * 0.5)
+    + R.spire * 0.22 * crownK(y);
+  // Crest profile: sharper than a gaussian — furrows, not ripples.
+  const crest = (dist, w) => Math.pow(gauss(dist, w), 0.72);
+
   const yTop = (th) => {
-    const inBlade = gauss(angDist(th, FRONT), 1.3);
-    let t = d.rimY - 0.45 * (1 - inBlade * 0.6)
-      + 0.5 * (1 - inBlade * 0.65) * fbm(th * 1.9, 3.7, 8, 3, seed + 5);
-    for (const s of spires) t += s.amp * gauss(angDist(th, s.th), s.w);
-    // Arc 1.45, not 1.18: the cowl box reaches x ±2.625 and r·sin(1.18)
-    // stops at ~2.5 — the two corner samples leaked exactly there once the
-    // lining stopped illegally catching them from outside the socket.
+    // The rim rides the fibers: high over spire-ridges, sagging in the
+    // valleys — the tear happens along the grain.
+    let t = d.rimY - 0.9 + 0.35 * fbm(th * 2.3, 3.7, 8, 3, seed + 5);
+    for (const R of ridges) {
+      const k = crest(angDist(th, crestAt(R, d.rimY)), R.w * 1.35);
+      t += (0.4 + 3.4 * R.spire) * k * R.spire;
+      t -= 0.55 * (1 - k) * (1 / N_RIDGE);          // valleys sag between fibers
+    }
+    // The cowl's hard floor across the blade arc (measured bar y 11.25):
+    // inside it the tear still varies, but only UPWARD from the floor.
     if (angDist(th, FRONT) < 1.45) {
       t = Math.max(t, d.bladeFloor
         + 0.55 * Math.abs(fbm(th * 3.1, 1.3, 8, 3, seed + 6)));
     }
     return Math.min(t, d.spireMax);
   };
+
   const radius = (th, y) => {
-    let r = profile(y);
-    for (const L of lobes) r += L.amp * gauss(angDist(th, L.th), L.w) * flare(y);
-    r += 0.075 * fbm(th * 4.2, y * 0.32, 8, 4, seed + 2)
-       + 0.028 * Math.sin(th * 26 + fbm(th, y, 4, 2, seed + 3) * 5);
+    let r = base(y);
+    for (const R of ridges) {
+      r += ridgeAmp(R, y) * crest(angDist(th, crestAt(R, y)), R.w);
+    }
+    // Fine grain only — the ridges carry the form now.
+    r += 0.045 * fbm(th * 5.1, y * 0.33, 8, 4, seed + 2);
+    // The brow over the mouth (unchanged duty, gentler hand).
     const browK = smoothstep(d.browY[0], d.browY[0] + 0.7, y)
       * (1 - smoothstep(d.browY[1] - 0.7, d.browY[1], y))
       * gauss(angDist(th, FRONT), 0.62);
-    r += 0.5 * browK;
-    // The blade band bulges FORWARD through the cowl: the probe's front
-    // samples sit exactly at z0, and an occluder must stand between them
-    // and the eye — i.e. in the socket's z0+0.25 slack, where every
-    // shipped tower's cowl face lives. (First fix leaned the wall BACK,
-    // which put it behind the ray's endpoint: occluding nothing. The
-    // sign of this term is the whole lesson.) r 3.06 → front face at
-    // ~z0+0.10, comfortably inside the plane, a burled lip on the blade.
+    r += 0.35 * browK;
+    // The cowl bulge (the sign-of-the-term lesson stands): the blade must
+    // hold real wood IN FRONT of the probe's z0-plane samples.
     const cowlK = gauss(angDist(th, FRONT), 0.8) * smoothstep(7.3, 8.0, y)
       * (1 - smoothstep(11.6, 12.1, y));
-    if (cowlK > 0.4) r = Math.max(r, 2.98 + 0.12 * cowlK);
+    if (cowlK > 0.4) r = Math.max(r, 2.62 + 0.12 * cowlK);
     r = Math.min(r, d.rCeil);
-    if (y < d.despawnY + 2.5) r = Math.max(r, d.rFloor);
+    // Measured free volume, not declared — and DIRECTIONAL, because the
+    // bore's centre sits 0.42 in front of the axis: the wall must stand
+    // farther out toward the front than toward the back to contain the
+    // same falling lane.
+    if (y > 6.35) {
+      r = Math.max(r, v.shaft.r + 0.2 + 0.42 * Math.max(0, Math.sin(th)));
+    }
     return r;
   };
   // TWO functions, one field — and the difference is the whole bug class:
@@ -189,7 +236,15 @@ export function buildStumpShell(ctx) {
   // --- the shell mesh ------------------------------------------------------
   const nTh = 128, nY = 72;
   const pos = [], col = [], uv = [], idx = [], mask = [];
-  const wood = { r: 0.95, g: 0.9, b: 0.8 };       // the atlas carries the tone
+  // The VERTICES carry the vertical value ramp (silvered top, mid trunk,
+  // dark damp foot); the atlas tiles too fast vertically to hold a
+  // gradient, and letting it try is what split the skirt from the trunk
+  // into two materials. One ramp, one organism.
+  const woodAt = (y) => {
+    const t = clamp01(y / 11);
+    const k = 0.5 + 0.38 * smoothstep(0.12, 0.75, t);
+    return { r: k * 1.06, g: k, b: k * 0.87 };
+  };
   const dark = { r: 0.08, g: 0.075, b: 0.065 };
   // Moss leans the sky's green — read from the caps material's emissive,
   // which towerhollow already built from the active palette.
@@ -210,22 +265,32 @@ export function buildStumpShell(ctx) {
       // inner band and the brow's underside darken like AO would, without
       // letting the AO pass clobber the layered colors.
       const bowlK = smoothstep(t - 1.6, t - 0.15, y) * 0.35;
+      const wood = woodAt(y);
       let cr = wood.r * (1 - bowlK), cg = wood.g * (1 - bowlK), cb = wood.b * (1 - bowlK);
       const shadeArc = gauss(angDist(th, FRONT + Math.PI * 0.85), 0.85);
+      // Moss pools in the VALLEYS between fibers; lichen crusts the
+      // crests that catch the moon. One field drives form and growth
+      // both — which is what "integrate the tree fully" means.
+      let crestK = 0;
+      for (const R of ridges) {
+        crestK = Math.max(crestK, crest(angDist(th, crestAt(R, y)), R.w));
+      }
       const mossK = clamp01((0.6 * shadeArc + 0.55 * flare(y))
-        * (0.45 + 0.55 * fbm(th * 2.2, y * 0.5, 8, 3, seed + 7)));
+        * (0.45 + 0.55 * fbm(th * 2.2, y * 0.5, 8, 3, seed + 7)))
+        * (0.35 + 0.65 * (1 - crestK));
       cr += (moss.r - cr) * mossK * 0.85;
       cg += (moss.g - cg) * mossK * 0.85;
       cb += (moss.b - cb) * mossK * 0.85;
       const lichK = clamp01((y / (7 * S / 1.25)) - 0.35)
-        * smoothstep(0.55, 0.9, fbm(th * 5.1, y * 0.9, 8, 3, seed + 11)) * 0.6;
+        * smoothstep(0.55, 0.9, fbm(th * 5.1, y * 0.9, 8, 3, seed + 11))
+        * (0.35 + 0.65 * crestK) * 0.6;
       cr += (lich.r - cr) * lichK;
       cg += (lich.g - cg) * lichK;
       cb += (lich.b - cb) * lichK;
       // The skirt is DAMP: near the soil the wood darkens and mosses
       // hard — the first venue frames rendered the flare as bone-white
       // sand under the moon pool.
-      const dampK = clamp01(1 - y / 1.6);
+      const dampK = clamp01(1 - y / 2.6) * 0.9;
       cr *= 1 - 0.45 * dampK;
       cg *= 1 - 0.35 * dampK;
       cb *= 1 - 0.42 * dampK;
@@ -267,12 +332,21 @@ export function buildStumpShell(ctx) {
   // --- the liner: the dark inside ------------------------------------------
   {
     const ln = 64, lm = 24, lpos = [], lcol = [], lidx = [], lmask = [];
-    const y0 = 0.3, y1 = d.despawnY + 1.6;
+    // The liner stops at 6.5: through the mouth at the shipped down-angle
+    // you could see its back wall all the way to 8.6, a tall glowing
+    // backdrop. Above 6.5 the lining tube's true black takes over — the
+    // shaft stays a void, the cavity stays a cavity.
+    const y0 = 0.3, y1 = 6.5;
     for (let j = 0; j <= lm; j++) {
       for (let i = 0; i <= ln; i++) {
         const th = (i / ln) * Math.PI * 2 - Math.PI / 2;
         const y = y0 + (j / lm) * (y1 - y0);
-        const r = d.linerR + 0.06 * fbm(th * 3, y * 0.5, 8, 3, seed + 21);
+        // The liner is an INNER OFFSET of the same fiber field — it
+        // follows the taper (a fixed-radius tube poked through the new
+        // waist) and inherits the furrows, so the glowing rot inside
+        // ribs like the outside does.
+        const r = radius(th, y) - 0.16
+          + 0.05 * fbm(th * 3, y * 0.5, 8, 3, seed + 21);
         const wx = r * Math.cos(th);
         const wz = r * Math.sin(th) * (Math.sin(th) > 0 ? 0.9 : 1);
         // The liner's hole is barely wider than the shell's mouth — its
@@ -318,9 +392,14 @@ export function buildStumpShell(ctx) {
     // bloom, never contest a die; it just makes the hollow READ.
     const lmat = MAT.punk.clone();
     lmat.side = THREE.DoubleSide;
-    lmat.emissive = MAT.caps.emissive.clone();
+    // 0.07, not 0.32 — and the lesson is a three.js fact worth keeping:
+    // emissive is NOT multiplied by vertex colours, so "faint glow through
+    // near-black walls" rendered as a full-brightness teal lampshade
+    // filling the whole cavity. The MATERIAL's intensity is the only knob
+    // that actually dims it.
+    lmat.emissive = MAT.gills.emissive.clone(); // glowCore — deeper than the caps' mint
     lmat.emissiveMap = lmat.map;
-    lmat.emissiveIntensity = 0.32;
+    lmat.emissiveIntensity = 0.07;
     const liner = new THREE.Mesh(lg, lmat);
     liner.name = 'boleLiner';
     add(liner);
@@ -332,10 +411,15 @@ export function buildStumpShell(ctx) {
   // displaced cone lying radially, sunk to half depth. Front ridges stop
   // short of the chute lane (|x| ≤ 1.9 slide must stay clean); the ridge
   // under the doorway is the SILL — it dips toward the felt (FOOT DIP).
-  for (const L of lobes) {
-    // Front-arc lobes get no ridge: the apron lane must stay a clean
-    // slide, and the buttress flare already grips the ground there.
-    if (Math.sin(L.th) > 0.35) continue;
+  for (const R of ridges) {
+    // Only the strong buttress-fibers run out as ground roots, and each
+    // root CONTINUES its own ridge's crest line — the same grain leaving
+    // the trunk. Front-arc ridges get none: the apron lane stays a clean
+    // slide.
+    if (R.butt < 0.75) continue;
+    const rootTh = crestAt(R, 0.2);
+    if (Math.sin(rootTh) > 0.35) continue;
+    const L = { th: rootTh, amp: R.butt * 0.8 };
     const rad = 0.34 + L.amp * 0.18;
     let along = 1.3 + L.amp * 1.3;
     // The tip must die inside the socket on every axis it travels.
@@ -366,7 +450,7 @@ export function buildStumpShell(ctx) {
   }
 
   // --- the descriptor ------------------------------------------------------
-  const R0 = profile(4.0);
+  const R0 = base(4.0);
   return {
     S, z0,
     zc: d.axisZ, rIn: d.rFloor, R0,
@@ -401,15 +485,17 @@ export function buildStumpShell(ctx) {
       aL: -(d.port.hw), aR: d.port.hw,
       yLow: d.port.y0, yTop: d.port.y1, zFace: z0 + 0.12,
     },
-    // The little door lives in the flank of the biggest front-side
-    // buttress — only the shell knows where its buttresses are.
+    // The little door lives in the flank of the strongest front-right
+    // buttress-fiber — only the shell knows where its grain runs.
     doorPad: (() => {
-      let best = lobes[0];
-      for (const L of lobes) {
-        if (Math.sin(L.th) > -0.2 && Math.cos(L.th) > 0
-          && (Math.sin(best.th) <= -0.2 || L.amp > best.amp)) best = L;
+      let best = null;
+      for (const R of ridges) {
+        const th = crestAt(R, 1.3);
+        if (Math.sin(th) > -0.2 && Math.cos(th) > 0
+          && (!best || R.butt > best.butt)) best = R;
       }
-      const [px, py, pz] = surfPoint(best.th - 0.12, 1.3, 0.05);
+      const th = crestAt(best || ridges[0], 1.3);
+      const [px, py, pz] = surfPoint(th - 0.12, 1.3, 0.05);
       return { x: px, y: py, z: pz };
     })(),
   };
