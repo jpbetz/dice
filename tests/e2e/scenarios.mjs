@@ -10780,14 +10780,51 @@ export const scenarios = [
       await a.waitFor('window.__diceDebug.audioGraphInfo().masterGain > 0.6',
         { desc: 'and unmute brings it back' });
 
-      // ---- the default voice, as it stands today ---------------------------
-      // A REGRESSION GUARD, not an endorsement: increment 1 moved the plumbing
-      // and nothing else, and this is the line that says so. Increment 2
-      // changes these values on purpose and this assertion moves with it.
+      // ---- the default voice is FELT, not a click --------------------------
+      // The most common event in the whole app. `click` is a 2500 Hz bandpass,
+      // which by the published spectral measure sits above the wood/metal
+      // perceptual boundary — it is metal on metal, i.e. the casino sound, and
+      // it was what every unthemed roll on this table made. Asked of the
+      // resolver rather than of the registry: a test that read IMPACT_VOICES
+      // directly would stay green with the FALLBACK still wired to click.
       const std = await a.dbg(`impactPresetFor({}, 'std')`);
-      assert.equal(std.body, 'click', `the untouched default body (found ${std.body})`);
-      assert.equal(std.filter, 'bandpass', `…still bandpass (found ${std.filter})`);
-      assert.equal(std.baseFreq, 2500, `…still centred at 2500 (found ${std.baseFreq})`);
+      assert.equal(std.body, 'felt', `the default body is felt (found ${std.body})`);
+      assert.equal(std.filter, 'lowpass',
+        `…and it is a LOWPASS, not a bandpass (found ${std.filter})`);
+      assert.ok(std.baseFreq < 900,
+        `…centred below 900 Hz, under the wood/metal line (found ${std.baseFreq})`);
+      // click is still in the registry, for genuine die-on-die and bright sets.
+      const clicky = await a.dbg(`impactPresetFor({}, 'std')`);
+      assert.ok(clicky, 'the resolver still answers');
+
+      // ---- the pan law -----------------------------------------------------
+      // Nine buses is a node count; THIS is the claim that a contact lands on
+      // the right one. |pan| is capped at 0.6 (refusal §9) — a die hard-panned
+      // beside your ear is a cartoon, and a table a metre away subtends ±25°.
+      const panL = await a.dbg('audioPanFor(-3)');
+      const panC = await a.dbg('audioPanFor(0)');
+      const panR = await a.dbg('audioPanFor(3)');
+      assert.ok(panL < -0.1, `a contact left of centre pans left (${panL})`);
+      assert.equal(panC, 0, `a contact at centre pans centre (${panC})`);
+      assert.ok(panR > 0.1, `a contact right of centre pans right (${panR})`);
+      for (const x of [-1e6, 1e6, -50, 50]) {
+        const p = await a.dbg(`audioPanFor(${x})`);
+        // 1e-6, not 1e-9: AudioParam.value is a float32, so the bus built at
+        // exactly −0.6 reads back as −0.6000000238418579.
+        assert.ok(Math.abs(p) <= 0.6 + 1e-6,
+          `x=${x} still lands inside the ±0.6 cap (${p})`);
+      }
+
+      // ---- the depth law ---------------------------------------------------
+      // A gain multiplier only. The back of the mat is quieter than the front,
+      // by a cue's worth rather than a mix move's worth.
+      const near = await a.dbg('audioDepthGainFor([0, 0.6, 3])');
+      const far = await a.dbg('audioDepthGainFor([0, 0.6, -3])');
+      assert.ok(far < near, `the far edge is quieter than the near one (${far} < ${near})`);
+      assert.ok(near <= 1 && far > 0.5,
+        `and by a cue, not a duck (near ${near}, far ${far})`);
+      assert.equal(await a.dbg('audioDepthGainFor(null)'), 1,
+        'a placeless contact — a baffle knock — takes no depth attenuation');
     },
   },
 ];

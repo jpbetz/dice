@@ -1270,6 +1270,26 @@ function busFor(x) {
   const idx = Math.round((pan / PAN_MAX) * ((PAN_BUSES - 1) / 2)) + (PAN_BUSES - 1) / 2;
   return AUDIO.panBuses[Math.max(0, Math.min(PAN_BUSES - 1, idx))];
 }
+// The pan a contact at world x lands on, without making a sound — the
+// assertion surface for the pan LAW (`audioPanFor`). Returns null before the
+// graph exists, which is itself a fact worth being able to read.
+function panForX(x) { const b = busFor(x); return b ? b.pan.value : null; }
+
+// DEPTH, as a gain multiplier. Inverse distance model against the
+// camera-to-mat-centre reference, rolloff 0.6 — front to back of the mat is
+// about −4 dB, which is a depth CUE rather than a mix move. No PannerNode, no
+// AudioListener, no HRTF (docs/AUDIO.md §6.2): the camera is fixed, and four
+// convolutions per source at 20 dice is the exact catastrophe the perf
+// literature exists to warn off.
+const DEPTH_ROLLOFF = 0.6;
+const DEPTH_ORIGIN = new THREE.Vector3(0, 0, 0);
+function depthGainFor(at) {
+  if (!at) return 1;
+  const ref = Math.max(1, camera.position.distanceTo(DEPTH_ORIGIN));
+  const d = Math.max(ref, Math.hypot(
+    camera.position.x - at[0], camera.position.y - at[1], camera.position.z - at[2]));
+  return 1 / (1 + DEPTH_ROLLOFF * (d / ref - 1));
+}
 
 // Unlock on the first real gesture. NOT `{once: true}`: a resume() that loses
 // the race with the autoplay policy would leave the table permanently silent
@@ -1416,6 +1436,15 @@ const CLICKGATE = { mode: 'film' };
 // decay envelope. Every voice reads on top of the impact strength gain,
 // so a heavy die still needs a hard contact to be loud.
 const IMPACT_VOICES = {
+  // THE DEFAULT, AND THE MOST IMPORTANT SOUND IN THE APP. `click` used to
+  // hold this seat, and by the published spectral measure a 2500 Hz bandpass
+  // sits at 22.5–25.5 ERB — above the ~19 ERB wood/metal perceptual boundary.
+  // It is metal on metal. It is the casino sound. And it was what every
+  // untheme d roll on this table made, which is to say most of them.
+  // `felt` is the same synthesis a full octave and a half down, lowpassed:
+  // a soft wooden knock with a little body, in a quiet warm room.
+  // DIAL FOR JOE — 700/350 is the warm/dull boundary, judged by ear.
+  felt:    { filter: 'lowpass',  baseFreq:  700, freqSpread:  350, q: 0.8, decayShape: 0.50, gainScale: 0.06 },
   click:   { filter: 'bandpass', baseFreq: 2500, freqSpread: 1800, q: 1.2, decayShape: 0.25, gainScale: 0.06 },
   chime:   { filter: 'bandpass', baseFreq: 3400, freqSpread:  700, q: 2.8, decayShape: 0.42, gainScale: 0.045, partial: true },
   thud:    { filter: 'lowpass',  baseFreq:  420, freqSpread:  200, q: 1.4, decayShape: 0.15, gainScale: 0.075 },
@@ -1427,7 +1456,18 @@ const IMPACT_VOICES = {
 // Which body a voice with no recipe of its own falls back to — the most
 // common event in the whole app, so it is the one that decides what this table
 // sounds like. Named rather than inlined so `impactPresetFor` can be asked.
-const IMPACT_DEFAULT_BODY = 'click';
+// `click` remains in the registry for genuine die-on-die and bright sets; it
+// is no longer what an ordinary landing on felt sounds like.
+const IMPACT_DEFAULT_BODY = 'felt';
+
+// ONE TIMBRE TIER, and it is about HARDNESS rather than loudness: below this
+// strength a contact is voiced duller (centre ×0.85) and longer (×1.3), not
+// merely quieter. Without it the whole strength range is one timbre at
+// different volumes, which is the single most casino-sounding thing a dice
+// app can do. One tier, not a curve — a curve is a mix system.
+const IMPACT_SOFT_STRENGTH = 3.5;
+const IMPACT_SOFT_CENTRE = 0.85;
+const IMPACT_SOFT_LENGTH = 1.3;
 
 // WHICH PRESET A VOICE RESOLVES TO. Split out of playImpact so a scenario can
 // ask the question without making a sound — `impactPresetFor` on __diceDebug
@@ -1501,13 +1541,18 @@ function playImpact(strength, voice, filmTime, ev) {
   const { body, preset } = impactPresetOf(v);
   const weight = v ? Math.max(0, Math.min(1, v.weight || 0)) : 0;
   const sustainMs = v ? Math.max(0, v.sustain || 0) : 0;
-  const durSec = (45 + sustainMs) / 1000;
+  const soft = strength < IMPACT_SOFT_STRENGTH;
+  const durSec = ((45 + sustainMs) / 1000) * (soft ? IMPACT_SOFT_LENGTH : 1);
   // Heavier = lower center; the spread is randomized per hit for texture
   // (timbre jitter is the ONLY legal wall randomness — docs/AUDIO.md §4).
-  const freqDown = 1 - 0.5 * weight;
+  const freqDown = (1 - 0.5 * weight) * (soft ? IMPACT_SOFT_CENTRE : 1);
   const freq = Math.max(80, (preset.baseFreq + Math.random() * preset.freqSpread) * freqDown);
-  const gainV = Math.min(0.35, strength * preset.gainScale);
-  const bus = AUDIO.master;
+  // Depth is a GAIN multiplier and nothing else — the air-absorption lowpass
+  // rides the sustained voices, which keeps a one-shot at three nodes.
+  const gainV = Math.min(0.35, strength * preset.gainScale) * depthGainFor(ev && ev.at);
+  // A baffle knock is `at: null` by design (a clunk is a sound, not a place),
+  // so it is never panned by position: it comes from the tower mouth, ≈ 0.
+  const bus = busFor(ev && ev.at ? ev.at[0] : 0) || AUDIO.master;
   const shot = noiseOneShot({
     preset, freq, gain: gainV, durSec, bus, attack: body === 'crackle' ? 1.6 : 1,
   });
@@ -8388,6 +8433,11 @@ window.__diceDebug = {
     const { body, preset } = impactPresetOf(impactVoice(ev || {}, SETS[setId] || null));
     return { body, ...preset };
   },
+  // The pan LAW and the depth LAW, asked without making a sound. Both are
+  // read off the same functions playImpact calls, so a scenario cannot
+  // accidentally assert a re-derivation of them.
+  audioPanFor(x) { return panForX(x); },
+  audioDepthGainFor(at) { return depthGainFor(at || null); },
   // The mute switch, WITHOUT persisting: localStorage on a shared origin
   // outlives a scenario, and a test that left the table muted would silence
   // every later scenario on `localhost` with no error anywhere.
