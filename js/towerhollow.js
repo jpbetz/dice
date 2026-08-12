@@ -18,6 +18,36 @@ limitations under the License.
 // a ROTTED HOLLOW TRUNK. A dead snag with its top torn off, its bark in
 // plates, its heartwood gone, and a moot of foxfire caps convening around
 // the broken crown. Dice fall down the hollow and come out of a root gap.
+//
+// ---------------------------------------------------------------------------
+// STATUS, 2026-08-12: THE SHELL IN HERE IS INTERIM AND IS EXPECTED TO GO
+// ---------------------------------------------------------------------------
+// The owner's reference is a broken STUMP, not a snag: stocky, a torn
+// frontal wound opening into black, splinter spires for a crown, heavy
+// buttress roots, pale barkless fibre with bark surviving only low on the
+// flanks. This file's shell cannot be that shape, and the reason is worth
+// writing down rather than attempting: it is built out of `roundedBox` and
+// lobed `ExtrudeGeometry` courses, which is the towerskin kit's whole
+// vocabulary, and a box stack reads as a rectangular tower wearing bark no
+// matter how the boxes are arranged. A parametric displaced shell — a
+// radius field r(θ, y) carrying buttress lobes, a ground flare, fibre
+// striation, splinter spires and the wound as an inward fold — is a
+// different technique, and it is being prototyped separately.
+//
+// So the shell is ONE FUNCTION behind ONE descriptor (see THE SHELL IS ONE
+// SWAPPABLE FUNCTION, below), the interim one is named
+// `towerSkinBolePlaceholder` so nobody mistakes it for the ship shape, and
+// EVERYTHING ELSE in this file is written against the descriptor rather
+// than against the shell's own numbers: the moot ring, the shelf fungus,
+// the little door and the value ladder all place themselves by (θ, y) on
+// whatever surface they are handed. Dropping the real shell in is one
+// import and one default parameter.
+//
+// What is already proven against the interim shell and carries over
+// unchanged, because none of it is geometry: the registry row and its
+// clunk voice, the ember door light, `venueOnly`, `motes: false`, the
+// server allowlist, the picker skip, the two-palette value ladder, the
+// e2e scenario and its red checks, and the four contract proofs' harness.
 // Zero colliders, zero lights, and it never reads or writes the film; every
 // number below comes out of `towerVolumes()`, so a retune of S, the mat or
 // the zoom ladder moves the model with the contract.
@@ -557,88 +587,56 @@ function maps(pal, key) {
   return out;
 }
 
-export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
-  const palId = FAE_PALETTES[paletteId] ? paletteId : 'moonrise';
-  const pal = FAE_PALETTES[palId];
-  const M = maps(pal, palId);
-  const rnd = mulberry32(0xb01e10);
-  const group = new THREE.Group();
-  group.name = 'towerSkin';
-  const bole = new THREE.Group();
-  // NAME IS CONTRACT: __diceDebug.towerOcclusionCheck() treats every named
-  // `towerSkin*` child of the skin as an OCCLUDER and everything unnamed
-  // (veils, contact shadows) as proving nothing.
-  bole.name = 'towerSkinBole';
-  group.add(bole);
 
-  const mat = (m, ns) => new THREE.MeshStandardMaterial({
-    map: m.map, normalMap: m.normalMap, normalScale: new THREE.Vector2(ns, ns),
-    roughnessMap: m.roughnessMap, roughness: 1, metalness: 0,
-    envMapIntensity: 0.45, vertexColors: true,
-  });
-  const glowMat = (m, hex, tier, side) => {
-    const s = mat(m, 0.6);
-    s.emissive = new THREE.Color(hex);
-    s.emissiveMap = m.emissiveMap;
-    s.emissiveIntensity = intensityFor(hex, tier);
-    if (side) s.side = side;
-    return s;
-  };
-  const MAT = {
-    bark: mat(M.bark, 0.85),          // deep furrows want a strong normal
-    torn: mat(M.torn, 0.72),
-    punk: mat(M.punk, 0.55),
-    // THE FUNGUS. `emissive` carries the palette hue, the BAKE carries the
-    // gill pattern, and the intensity is arithmetic against the hue's own
-    // linear luminance so both skies land on the same value tier.
-    caps: glowMat(M.foxfire, pal.glowCap, HOLLOW_TIER.caps),
-    gills: glowMat(M.foxfire, pal.glowCore, HOLLOW_TIER.gills, THREE.DoubleSide),
-    // The attendants: TERTIARY. A near-black body with a light in it, so
-    // what the eye gets is a point and not a bead.
-    attendant: new THREE.MeshStandardMaterial({
-      color: 0x0a0d0c, roughness: 0.9, metalness: 0,
-      emissive: new THREE.Color(pal.glowRim),
-      emissiveIntensity: intensityFor(pal.glowRim, HOLLOW_TIER.attendant),
-      envMapIntensity: 0.45, vertexColors: true,
-    }),
-    // THE ONE WARM ACCENT (grammar rule 1): the door's interior.
-    hearth: (() => {
-      const s = new THREE.MeshStandardMaterial({
-        map: M.hearth.map, normalMap: M.hearth.normalMap,
-        normalScale: new THREE.Vector2(0.6, 0.6),
-        roughnessMap: M.hearth.roughnessMap, roughness: 1, metalness: 0,
-        emissive: new THREE.Color(HOLLOW_EMBER), emissiveMap: M.hearth.emissiveMap,
-        emissiveIntensity: intensityFor(HOLLOW_EMBER, HOLLOW_TIER.door),
-        envMapIntensity: 0.45, vertexColors: true,
-      });
-      return s;
-    })(),
-  };
-  // World units per texture tile. Non-square and non-integer against every
-  // dimension in the model, so tiling never lands on a visible grid.
-  const UV = { bark: [4.4, 5.7], torn: [1.9, 2.3], punk: [3.1, 2.3], prop: 0.7 };
-
-  const parts = [];
-  const add = (mesh) => {
-    mesh.castShadow = true; mesh.receiveShadow = true;
-    bole.add(mesh); parts.push(mesh); return mesh;
-  };
-  // The only way a box is made in this file (Heartwood's rule, and for the
-  // same reason): stated as a min/max span so the contract arithmetic reads
-  // straight off the page.
-  const span = (matKey, x0, x1, y0, y1, z0v, z1v, opt = {}) => {
-    const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0), d = Math.abs(z1v - z0v);
-    const geo = roundedBox(w, h, d, opt.r !== undefined ? opt.r : R_TRIM, opt.seg || 1);
-    if (opt.weather) weather(geo, w, h, d, rnd);
-    const uv = opt.uv || UV.bark;
-    planarUV(geo, uv[0], uv[1], rnd() * 0.4, rnd() * 0.4);
-    const mesh = new THREE.Mesh(geo, MAT[matKey]);
-    mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0v + z1v) / 2);
-    if (opt.rx) mesh.rotation.x = opt.rx;
-    if (opt.ry) mesh.rotation.y = opt.ry;
-    return add(mesh);
-  };
-
+// ---------------------------------------------------------------------------
+// THE SHELL IS ONE SWAPPABLE FUNCTION
+// ---------------------------------------------------------------------------
+// A shell builder owns EVERY occluding surface of the trunk — the bole, the
+// crown, the flat front, the roots and the clad delivery run — and hands
+// back a SURFACE DESCRIPTOR that the dressing addresses by (θ, y) instead of
+// by box corners. That seam exists because the shell is expected to be
+// replaced: this one is a stack of lobed extrusions and rounded boxes, which
+// is the towerskin kit's vocabulary and reads as a rectangular tower wearing
+// bark, and a parametric displaced shell (a radius field r(θ, y) with
+// buttress lobes, a ground flare, fibre striation, splinter spires and the
+// wound as an inward fold) is the shape a broken STUMP actually wants.
+//
+// The contract a replacement must honour:
+//
+//   input   ctx = { v, MAT, UV, rnd, add, span, parts }
+//             · v      towerVolumes()
+//             · MAT    the material table (bark / torn / punk / …)
+//             · UV     world units per texture tile, per material
+//             · rnd    the skin's seeded PRNG — never Math.random
+//             · add    (mesh) => mesh, parents it into towerSkinBole,
+//                      turns on shadows and enrols it in the AO/weather pass
+//             · span   the min/max box helper, for anything box-shaped
+//             · parts  the AO/weather array, for meshes added by hand
+//
+//   output  a SURFACE descriptor, and every field is load-bearing:
+//             · rOut(th)          outer radius about the bole axis
+//             · at(th, y, inset)  a world point on (or inset into) the
+//                                 surface — THE call the dressing uses
+//             · inFacade(th)      true where the shell is open and the flat
+//                                 front fills the gap, so a prop knows to
+//                                 lie on a plane instead of on a curve
+//             · facade {aL,aR,yLow,yTop,zFace}  the flat front's extent
+//             · doorPad {x,y,z}   where a 0.24×0.40 door can be cut, which
+//                                 only the shell knows, because only the
+//                                 shell knows where its buttresses are
+//             · zc, rIn, yRing, yCrown, zFO, zFI, sill, doorX, doorY, xLim
+//
+// RULES A SHELL MUST KEEP (the proofs gate all four):
+//   · every occluding group is named `towerSkin*` (this one uses
+//     towerSkinBole) — tower-fit measures those and tower-occlusion counts
+//     them, and an unnamed occluder proves nothing;
+//   · zero colliders and zero lights, ever;
+//   · nothing inside the doorway (|x| ≤ 2.5 below y 4.5) and nothing
+//     outside the socket in x, which is the one axis with no slack;
+//   · the FRONT must stay opaque above y 11.25 — measured, see §1.5 note 3.
+// ---------------------------------------------------------------------------
+function buildLobedShell(ctx) {
+  const { v, MAT, UV, rnd, add, span, parts } = ctx;
   // --- contract arithmetic: every number below comes out of towerVolumes ---
   const S = v.S, z0 = v.z0;
   const boreR = v.shaft.r;                                  // 2.125
@@ -864,7 +862,7 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
     m.rotation.y = a;
     m.rotation.z = -Math.sign(sinA || 1) * lean * Math.PI / 180;
     m.castShadow = true; m.receiveShadow = true;
-    bole.add(m); parts.push(m);
+    add(m);
   }
   // THE FLARE, and it is where the "tree" read actually comes from. The bore
   // fixes the trunk's radius within about 5% (rIn must clear 2.5625 and the
@@ -895,7 +893,7 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
         zc + (rMid + out / 2) * Math.cos(a));
       m.rotation.y = a;
       m.castShadow = true; m.receiveShadow = true;
-      bole.add(m); parts.push(m);
+      add(m);
     }
   }
   // THE DOOR BUTTRESS is placed by hand rather than by azimuth, because the
@@ -946,6 +944,123 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
     tray.rotation.x = v.lip.rx;
     add(tray);
   }
+  // The descriptor. Everything the dressing needs to place a prop against
+  // this shell, and nothing about how the shell was built.
+  return {
+    rOut,
+    at: (th, y, inset = 0) => {
+      const r = rOut(th) - inset;
+      return [r * Math.sin(th), y, zc + r * Math.cos(th)];
+    },
+    inFacade: (th) => th > clip.th0m - 2 * Math.PI && th < clip.th0p,
+    facade: { aL, aR, yLow: yArchLow, yTop: yArchApex, zFace: zFO, zBack: zFI },
+    // The pad the little door is cut into. The shell owns this because only
+    // the shell knows where a buttress presents a flat face at |x| ≥ 2.5 —
+    // on this one it is the hand-placed front-left slab, and on a
+    // displaced-shell version it will be a buttress lobe's outer face.
+    doorPad: { x: -2.79, y: 1.20, z: v.z0 + 0.22 },
+    zc, rIn, R0, yRing, yCrown: yTeeth, zFO, zFI,
+    clipX: [Number(xClipL.toFixed(3)), Number(xClipR.toFixed(3))],
+    sill, doorX, doorY, xLim, S, z0,
+  };
+}
+
+export function buildHollowBoleSkin(v, { paletteId = 'moonrise', shell = buildLobedShell } = {}) {
+  const palId = FAE_PALETTES[paletteId] ? paletteId : 'moonrise';
+  const pal = FAE_PALETTES[palId];
+  const M = maps(pal, palId);
+  const rnd = mulberry32(0xb01e10);
+  const group = new THREE.Group();
+  group.name = 'towerSkin';
+  const bole = new THREE.Group();
+  // NAME IS CONTRACT: __diceDebug.towerOcclusionCheck() treats every named
+  // `towerSkin*` child of the skin as an OCCLUDER and everything unnamed
+  // (veils, contact shadows) as proving nothing.
+  // NAMED FOR WHAT IT IS. `towerSkin*` is the occluder contract and this
+  // group satisfies it — tower-fit measures it, tower-occlusion counts it —
+  // but the shell inside it is INTERIM (see THE SHELL IS ONE SWAPPABLE
+  // FUNCTION): a stack of lobed extrusions and rounded boxes, which is the
+  // towerskin kit's vocabulary and reads as a rectangular tower wearing
+  // bark. The parametric displaced shell that replaces it renames this to
+  // `towerSkinBole` and nothing else in this file moves.
+  bole.name = 'towerSkinBolePlaceholder';
+  group.add(bole);
+
+  const mat = (m, ns) => new THREE.MeshStandardMaterial({
+    map: m.map, normalMap: m.normalMap, normalScale: new THREE.Vector2(ns, ns),
+    roughnessMap: m.roughnessMap, roughness: 1, metalness: 0,
+    envMapIntensity: 0.45, vertexColors: true,
+  });
+  const glowMat = (m, hex, tier, side) => {
+    const s = mat(m, 0.6);
+    s.emissive = new THREE.Color(hex);
+    s.emissiveMap = m.emissiveMap;
+    s.emissiveIntensity = intensityFor(hex, tier);
+    if (side) s.side = side;
+    return s;
+  };
+  const MAT = {
+    bark: mat(M.bark, 0.85),          // deep furrows want a strong normal
+    torn: mat(M.torn, 0.72),
+    punk: mat(M.punk, 0.55),
+    // THE FUNGUS. `emissive` carries the palette hue, the BAKE carries the
+    // gill pattern, and the intensity is arithmetic against the hue's own
+    // linear luminance so both skies land on the same value tier.
+    caps: glowMat(M.foxfire, pal.glowCap, HOLLOW_TIER.caps),
+    gills: glowMat(M.foxfire, pal.glowCore, HOLLOW_TIER.gills, THREE.DoubleSide),
+    // The attendants: TERTIARY. A near-black body with a light in it, so
+    // what the eye gets is a point and not a bead.
+    attendant: new THREE.MeshStandardMaterial({
+      color: 0x0a0d0c, roughness: 0.9, metalness: 0,
+      emissive: new THREE.Color(pal.glowRim),
+      emissiveIntensity: intensityFor(pal.glowRim, HOLLOW_TIER.attendant),
+      envMapIntensity: 0.45, vertexColors: true,
+    }),
+    // THE ONE WARM ACCENT (grammar rule 1): the door's interior.
+    hearth: (() => {
+      const s = new THREE.MeshStandardMaterial({
+        map: M.hearth.map, normalMap: M.hearth.normalMap,
+        normalScale: new THREE.Vector2(0.6, 0.6),
+        roughnessMap: M.hearth.roughnessMap, roughness: 1, metalness: 0,
+        emissive: new THREE.Color(HOLLOW_EMBER), emissiveMap: M.hearth.emissiveMap,
+        emissiveIntensity: intensityFor(HOLLOW_EMBER, HOLLOW_TIER.door),
+        envMapIntensity: 0.45, vertexColors: true,
+      });
+      return s;
+    })(),
+  };
+  // World units per texture tile. Non-square and non-integer against every
+  // dimension in the model, so tiling never lands on a visible grid.
+  const UV = { bark: [4.4, 5.7], torn: [1.9, 2.3], punk: [3.1, 2.3], prop: 0.7 };
+
+  const parts = [];
+  const add = (mesh) => {
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    bole.add(mesh); parts.push(mesh); return mesh;
+  };
+  // The only way a box is made in this file (Heartwood's rule, and for the
+  // same reason): stated as a min/max span so the contract arithmetic reads
+  // straight off the page.
+  const span = (matKey, x0, x1, y0, y1, z0v, z1v, opt = {}) => {
+    const w = Math.abs(x1 - x0), h = Math.abs(y1 - y0), d = Math.abs(z1v - z0v);
+    const geo = roundedBox(w, h, d, opt.r !== undefined ? opt.r : R_TRIM, opt.seg || 1);
+    if (opt.weather) weather(geo, w, h, d, rnd);
+    const uv = opt.uv || UV.bark;
+    planarUV(geo, uv[0], uv[1], rnd() * 0.4, rnd() * 0.4);
+    const mesh = new THREE.Mesh(geo, MAT[matKey]);
+    mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0v + z1v) / 2);
+    if (opt.rx) mesh.rotation.x = opt.rx;
+    if (opt.ry) mesh.rotation.y = opt.ry;
+    return add(mesh);
+  };
+
+  // THE SHELL. One call, one swap point (see THE SHELL IS ONE SWAPPABLE
+  // FUNCTION above): everything below this line is DRESSING and addresses
+  // the trunk through the descriptor, never through the shell's own numbers.
+  const SURF = shell({ v, MAT, UV, rnd, add, span, parts });
+  const { zc, rIn, R0, rOut, yRing, zFO, zFI, sill, doorX, doorY, xLim, S, z0 } = SURF;
+  const { aL, aR } = SURF.facade;
+  const yArchLow = SURF.facade.yLow, yArchApex = SURF.facade.yTop;
 
   // =========================================================================
   // THE DRESSING — THE CROWN MOOT, THE SHELF FUNGUS, THE LITTLE LIT DOOR
@@ -993,15 +1108,19 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
   // grammar §5 asks for anyway ("seven are emissive paint on the flat
   // facade"). A facade cap is a blister: half-buried, 0.04 proud, and
   // 0.03 inside the FLUSH DRESS budget.
-  const inFacade = (th) => th > clip.th0m - 2 * Math.PI && th < clip.th0p;
+  //
+  // AND IT ASKS THE SHELL, NOT THE SHELL'S NUMBERS. `SURF.at` and
+  // `SURF.inFacade` are the whole interface between the moot and the trunk
+  // it grows on, so when the displaced-shell version lands the ring moves
+  // onto it with no edit here — which is the point of the seam.
   const capAt = (th, inset) => {
-    if (inFacade(th)) {
+    const y = yMoot + mootTilt * Math.cos(th - mootPhase);
+    if (SURF.inFacade(th)) {
       const x = Math.max(aL + 0.16, Math.min(aR - 0.16, rOut(th) * Math.sin(th)));
-      return [x, yMoot + mootTilt * Math.cos(th - mootPhase), zFO, true];
+      return [x, y, SURF.facade.zFace, true];
     }
-    const r = rOut(th) - inset;
-    return [r * Math.sin(th), yMoot + mootTilt * Math.cos(th - mootPhase),
-      zc + r * Math.cos(th), false];
+    const p = SURF.at(th, y, inset);
+    return [p[0], p[1], p[2], false];
   };
   const bright = [], gill = [], flesh = [];
   const jit = mulberry32(0xb01e77);
@@ -1100,8 +1219,7 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
   // sideways the socket will take at these azimuths.
   const SHELVES = [[-1.28, 5.95, 0.36], [-1.05, 7.10, 0.31], [-1.42, 8.35, 0.33]];
   for (const [th, y, s] of SHELVES) {
-    const r = rOut(th) - 0.12;
-    const p = [r * Math.sin(th), y, zc + r * Math.cos(th)];
+    const p = SURF.at(th, y, 0.12);        // through the seam, like the moot
     flesh.push({
       geo: propUV(capGeo.clone(), UV.prop),
       matrix: xform({ pos: p, rot: [0.30, th, 0.10], scale: [s, s * 0.30, s * 0.76] }),
@@ -1166,7 +1284,9 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
   // engine's aperture by 0.02 — and the registry's `ember` row puts a real
   // PointLight in front of it, because an emissive map shines and cannot
   // illuminate. Somebody is home right now.
-  const DOOR = { x: -2.79, y: 1.20, w: 0.24, h: 0.40, z: z0 + 0.22 };
+  // The pad comes from the SHELL, not from a number typed here: only the
+  // shell knows where a buttress presents a flat face outside the doorway.
+  const DOOR = { ...SURF.doorPad, w: 0.24, h: 0.40 };
   {
     // The pad the door is cut into: a flat face on a round root, so the door
     // is not floating on a curve.
@@ -1281,6 +1401,7 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
   {
     const pit = new THREE.Mesh(new THREE.PlaneGeometry(2 * rIn * 0.92, 3.6 * S), veilMat());
     pit.rotation.x = -Math.PI / 2 + v.apron.rx;
+    const boreZ = v.shaft.c[2];
     const surfY = sill + (z0 - boreZ) * Math.tan(-v.exit.pitch);
     pit.position.set(0, surfY + 0.05, boreZ);
     group.add(pit);
@@ -1316,7 +1437,7 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
     paletteId: palId, caps: mootCaps.length, gap: 1, fallen: 1, shelves: SHELVES.length,
     attendants: attendMeshes.reduce((n, m) => n + m.userData.attendants, 0),
     tier: { ...HOLLOW_TIER },
-    clipX: [Number(xClipL.toFixed(3)), Number(xClipR.toFixed(3))],
+    clipX: SURF.clipX,
   };
   return group;
 }
