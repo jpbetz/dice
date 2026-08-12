@@ -340,19 +340,21 @@ scene.add(rimLight);
 // fractions), a soft warm LAMP cone hangs over the felt so the roll area
 // pools out of the dark, and FOG the colour of the scene background swallows
 // the 160-unit floor plane's edge — the horizon is not hidden behind
-// anything, it just never resolves. Default OFF: shipped behaviour is
-// byte-identical until Joe lands numbers and asks. Live dials:
+// anything, it just never resolves. SHIPPED ON (Joe, 2026-08-11:
+// "dramatically better... lock that in") with his landed numbers — hemi 0.1,
+// fogNear 15 — after an evening of live dialing; mood(false) remains the
+// instant path back to the flat room for comparison. Live dials:
 // __diceDebug.mood(on) / moodTune({...}).
 const MOOD = {
-  on: false,
+  on: true,
   lamp: null, lampTarget: null,
   base: { hemi: hemiLight.intensity, key: keyLight.intensity, rim: rimLight.intensity },
   tune: {
-    hemi: 0.35, key: 1.7, rim: 0.4,        // room levels while the mood is on
+    hemi: 0.1, key: 1.7, rim: 0.4,         // room levels while the mood is on
     lampIntensity: 2.8, lampColor: '#ffe8c4',
     lampY: 19, lampZ: 1.5,                  // over the felt, nudged to the front
     lampAngle: 0.5, lampPenumbra: 0.75,
-    fogNear: 26, fogFar: 46,
+    fogNear: 15, fogFar: 46,
   },
 };
 
@@ -385,6 +387,7 @@ function applyMood() {
   MOOD.lamp.position.set(0, t.lampY, t.lampZ);
   MOOD.lampTarget.position.set(0, 0, 0);
 }
+applyMood(); // shipped on — the room boots dark, lamp lit, horizon dissolved
 
 // A reflection environment (Tier 6 §9, same technique the lab proved):
 // glossy themed sets — lacquer, ice, resin — need a WORLD to mirror, not

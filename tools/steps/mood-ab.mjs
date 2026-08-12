@@ -25,6 +25,10 @@ export default async function run(stage, args) {
   const a = await stage.tab('localhost', 'MoodAB');
   await a.settle();
 
+  // The mood ships ON (Joe's lock-in) — force the flat room first so the
+  // 'off' frames actually show it.
+  await a.dbg('mood(false)');
+  await a.dbg('sim(100)');
   await stage.shot(a, 'mood-off-empty');
   await a.roll('6d6');
   await a.settle();
