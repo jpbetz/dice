@@ -39,10 +39,11 @@ import { THEMES, SETS } from './themes.js';
 import { ParticleField } from './particles.js';
 import { DecalField } from './decals.js';
 import { DieLightRig } from './dielights.js';
-import { PostStack, MAX_SHIMMER } from './post.js';
+import { PostStack, MAX_SHIMMER, BLOOM_THRESHOLD } from './post.js';
 import { buildTowerSkin } from './towerskin.js';
 import { buildBastionSkin } from './towerbastion.js';
 import { buildAnvilSkin } from './toweranvil.js';
+import { buildHollowBoleSkin, HOLLOW_EMBER } from './towerhollow.js';
 import { stepDress } from './towerdress.js';
 import { buildMotes, stepMotes, disposeMotes } from './motes.js';
 import { buildFaeConcept, brightenFog, stepWisps } from './fae-lab.js';
@@ -103,9 +104,13 @@ const ZOOM_LEVELS = [
 //   heartwood  ← Wildwood
 //   bastion    ← Classics
 //   blackanvil ← Emberforge
+//   hollowbole ← the fae VENUES (Moonrise Glade / Foxfire Hollow)
 // The tower is that family's world in furniture — Emberforge's Black Anvil
 // die is black iron with molten digits, and its tower is the forge the iron
-// came out of.
+// came out of. Hollow Bole breaks the pattern on purpose and the break is
+// the point: it is named for a PLACE rather than a die, because it belongs
+// to a venue rather than to a theme house, and a venue is chosen as one
+// thing (GOALS goal 13). That is what `venueOnly` means on its row.
 //
 // `clunkVoice` is the SOUND PALETTE the contract's §6 asks a model to
 // register (an IMPACT_VOICES shape: body / weight / sustain). It is the one
@@ -188,6 +193,42 @@ const TOWERS = {
     clunkVoice: {
       body: 'chime', weight: 0.85, sustain: 70,
       shaft: { delayS: 0.0025, combGain: 0.6, mode1Hz: 520, mode2Hz: 1040 },
+    },
+  },
+  hollowbole: {
+    id: 'hollowbole', label: 'Hollow Bole', skin: (v) => buildHollowBoleSkin(v, { paletteId: faeTowerPalette() }),
+    title: 'Hollow Bole — a rotted hollow trunk; dice fall down the snag and out of a root gap',
+    // VENUE-ONLY. A venue is chosen as ONE thing (GOALS goal 13), and this
+    // tower is part of what the fae venues ARE — so it takes no chip of its
+    // own in the tower picker and `renderTowerPicker` skips it. Choosing the
+    // Moonrise Glade or the Foxfire Hollow is how it goes up; the linkage
+    // itself lives with the venue registry, not here.
+    venueOnly: true,
+    // The family trait, and this one is the whole tower's best trick: the
+    // TINY LIT DOOR on the left root buttress (js/towerhollow.js). `at` is
+    // [x, y, z offset from z0] and it sits just in front of the pane, so the
+    // warm spills onto the apron a die comes down. Low and short-reach —
+    // this is a hearth behind a 0.24-wide door, not a forge; the emissive
+    // pane is the picture and the light is what proves somebody lit it.
+    ember: { at: [-2.79, 1.22, 0.55], color: HOLLOW_EMBER, intensity: 1.6, dist: 3.5 },
+    // The cold moon rakes a dead tree GENTLY — the identity is the moot's
+    // spectral ring and the one warm door, and a full warm rake would wash
+    // both of them out of a frame whose whole value floor is in the bottom
+    // third (Black Anvil took the same decision for the opposite reason).
+    lantern: { rake: 0.5 },
+    // NO DUST. Explicit rather than absent: the fae venues run their OWN
+    // air (js/fae-lab.js's fog sheets and starfield), and a second idle
+    // particle layer inside it would be two weathers in one room.
+    motes: false,
+    // A DEAD DRUM. Deeper than Heartwood's dry clack and hollower than
+    // Bastion's stone thud: a `thud` body at middling weight with a short
+    // tail, over the longest comb in the set — 4 ms is a metre of hollow
+    // log, and the two low modes are the note an empty trunk gives back
+    // when you hit it. Joe's dial, like every other voice here: reasoned
+    // from the table (docs/AUDIO.md §2.4), not yet listened to.
+    clunkVoice: {
+      body: 'thud', weight: 0.5, sustain: 35,
+      shaft: { delayS: 0.004, combGain: 0.5, mode1Hz: 360, mode2Hz: 720 },
     },
   },
 };
@@ -7301,6 +7342,19 @@ const VENUES = {
 };
 let currentVenue = 'table';
 
+// WHICH SKY THE FAE TOWER IS STANDING UNDER (W3). Hollow Bole is one model
+// with two palettes — the venue's `paletteId`, read at BUILD time by the
+// registry row's skin thunk, because a skin builder is called with the
+// volumes and nothing else. The override exists so the proof steps and the
+// review shots can photograph both palettes without dragging a whole venue
+// in behind them; it is null in every shipped path.
+let faeTowerPaletteOverride = null;
+function faeTowerPalette() {
+  if (faeTowerPaletteOverride) return faeTowerPaletteOverride;
+  const spec = VENUES[currentVenue];
+  return (spec && spec.paletteId) || 'moonrise';
+}
+
 // THE FAE STAGE (js/fae-lab.js — W0's concept lab, now the W1 venue's
 // interim stage; W2 upgrades its fidelity in place). It borrows the MOOD
 // rig for the moon (a preset over the same dials — techniques.md §5's
@@ -8631,7 +8685,65 @@ window.__diceDebug = {
   towerRegistry() {
     return Object.values(TOWERS).map((t) => ({
       id: t.id, label: t.label, skin: !!t.skin, clunkVoice: t.clunkVoice || null,
+      // A VENUE TOWER HAS NO CHIP (renderTowerPicker skips it), so a
+      // scenario asserting the picker against the registry has to be able
+      // to see the difference here rather than hard-coding which row it is.
+      venueOnly: !!t.venueOnly,
     }));
+  },
+  // WHICH SKY THE FAE TOWER IS UNDER, and a setter for the proofs (W3).
+  // Setting it re-sockets, because a palette is baked into the skin's
+  // materials at build time and there is no live dial behind it.
+  faeTowerPalette(id) {
+    if (id !== undefined) {
+      faeTowerPaletteOverride = id || null;
+      if (currentTower === 'hollowbole') {
+        towerSocket('none');
+        towerSocket('hollowbole');
+      }
+    }
+    return faeTowerPalette();
+  },
+  // THE MOOT, READ OFF THE LIVE MATERIALS (docs/TOWER.md; fae grammar rules
+  // 2, 3 and 6). The value ladder in js/towerhollow.js is authored, not
+  // dialled — every emissive tier is `target / linearLuma(hue)` so the two
+  // palettes land on the same VALUE — and this is what lets a scenario
+  // check the rendered material against the target instead of trusting a
+  // constant that a later edit could walk away from.
+  //
+  // `lum` is the emissive contribution's LINEAR luminance: the material's
+  // own emissive colour (three keeps Color components in linear working
+  // space) times emissiveIntensity. The bloom threshold it is measured
+  // against is post.js's `uThresh`, which is the same 0.9 linear — and
+  // nothing on this model is allowed near it, because a tower that blooms
+  // is a tower that disables the post-stack bypass for the whole app.
+  towerMootAudit() {
+    if (!towerRig || !towerRig.group) return null;
+    const skin = towerRig.group.getObjectByName('towerSkin');
+    if (!skin) return null;
+    const roles = [];
+    let bloomFlags = 0, attendants = 0;
+    skin.traverse((o) => {
+      if (!o.isMesh) return;
+      if (o.userData && o.userData.bloom) bloomFlags++;
+      const role = o.userData && o.userData.mootRole;
+      if (!role) return;
+      const m = o.material;
+      const e = m.emissive || new THREE.Color(0, 0, 0);
+      const i = m.emissiveIntensity === undefined ? 1 : m.emissiveIntensity;
+      roles.push({
+        role,
+        lum: Number((i * (0.2126 * e.r + 0.7152 * e.g + 0.0722 * e.b)).toFixed(4)),
+        intensity: Number(i.toFixed(4)),
+        bloom: !!(o.userData && o.userData.bloom),
+      });
+      if (o.userData.attendants) attendants += o.userData.attendants;
+    });
+    return {
+      tower: currentTower, bloomThreshold: BLOOM_THRESHOLD,
+      bloomFlags, attendants, roles,
+      spec: skin.userData.moot || null,
+    };
   },
   towerGhosts(on = true) {
     TOWERLAB.ghosts = !!on;
@@ -16241,6 +16353,13 @@ function renderTowerPicker() {
   if (!holder) return;
   if (!holder.childElementCount) {
     for (const t of Object.values(TOWERS)) {
+      // A VENUE TOWER TAKES NO CHIP. `venueOnly` rows belong to a venue and
+      // are chosen by choosing the venue (GOALS goal 13 — a fantasy venue
+      // REPLACES the à-la-carte pickers rather than adding to them), so
+      // offering Hollow Bole beside Bastion would be offering a tree with
+      // no wood around it. The registry still carries the row, and setTower
+      // still accepts the id: this is a picker rule, not a capability.
+      if (t.venueOnly) continue;
       const chip = document.createElement('button');
       chip.className = 'system-chip';
       chip.dataset.tower = t.id;

@@ -54,6 +54,12 @@ const MAX_RINGS = 4;
 // Exported so main.js's SHIMMER_POOL sizing tracks this cap without a
 // hand-maintained magic number in two files (Tier 0 §0d hot-paths, 2026-08-05).
 export const MAX_SHIMMER = 6;
+// THE BLOOM THRESHOLD, on LINEAR pre-tonemap luminance. Exported for the
+// same reason MAX_SHIMMER is: a venue authors its emissive tiers AGAINST
+// this number (fae grammar rule 3 — "authored to the threshold, because
+// there is no post-hoc dial"), and a proof that re-typed 0.9 would stay
+// green the day this moved. Used below as the shader's own uniform.
+export const BLOOM_THRESHOLD = 0.9;
 
 const BLUR_FRAG = `
   uniform sampler2D tSrc;
@@ -162,7 +168,7 @@ export class PostStack {
       // Thresholds LINEAR pre-tonemap luminance (see the composite note):
       // emissive digits and fresnel rims run well over 1.0 there; a
       // key-lit body face shouldn't clear 0.9.
-      uniforms: { tSrc: { value: null }, uThresh: { value: 0.9 } },
+      uniforms: { tSrc: { value: null }, uThresh: { value: BLOOM_THRESHOLD } },
       vertexShader: QUAD_VERT,
       fragmentShader: THRESH_FRAG,
       depthTest: false,

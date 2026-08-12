@@ -10242,16 +10242,25 @@ export const scenarios = [
       // selected chip's computed background must differ from an unselected
       // one, in every radiogroup in the modal.
       await a.dbg('openSettings()');
-      // The picker is generated from TOWERS and must show EVERY row — the
-      // registry is the source of truth, so this reads it rather than
-      // hard-coding three, and it fails on a tower that ships without a chip
-      // (or a chip that outlives its row).
+      // The picker is generated from TOWERS and must show every row that a
+      // player can CHOOSE — the registry is the source of truth, so this
+      // reads it rather than hard-coding three, and it fails on a tower that
+      // ships without a chip (or a chip that outlives its row).
+      //
+      // …EXCEPT a `venueOnly` row (W3's Hollow Bole), which belongs to a
+      // venue and is chosen by choosing the venue — GOALS goal 13 says a
+      // fantasy venue REPLACES the à-la-carte pickers, so a chip for it in
+      // the tower row would be the à-la-carte offer the venue exists to
+      // withdraw. The exemption is read off the registry, not named here,
+      // so a second venue tower needs no edit and a row that quietly loses
+      // its chip still fails.
       const registry = await a.dbg('towerRegistry()');
       const chipIds = JSON.parse(await a.eval(
         `JSON.stringify([...document.querySelectorAll('#tower-picker [data-tower]')]
           .map((b) => b.dataset.tower))`));
-      assert.deepEqual(chipIds, registry.map((t) => t.id),
-        `every registered tower has a chip, in registry order (${chipIds.join(', ')})`);
+      assert.deepEqual(chipIds, registry.filter((t) => !t.venueOnly).map((t) => t.id),
+        `every choosable tower has a chip, in registry order (${chipIds.join(', ')}; `
+        + `venue-only: ${registry.filter((t) => t.venueOnly).map((t) => t.id).join(', ') || 'none'})`);
       assert.ok(chipIds.length >= 3,
         `and there are at least three of them — a PICKER, not a switch `
         + `(${chipIds.length})`);
