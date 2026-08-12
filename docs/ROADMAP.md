@@ -2518,6 +2518,48 @@ than a silent omission:
   family at 31px, `.corner-btn` at 28 expanded, `.btn.tiny` at 19,
   `#section-bar` cells at 26.
 
+## Tier V — The immersion audit's shortlist (2026-08-12)
+
+[IMMERSION-AUDIT.md](IMMERSION-AUDIT.md) cross-checked the detail work
+against the industry canon: seven pillars STRONG, three PARTIAL, one GAP.
+These items are that audit's ranked list; each names its pillar.
+
+### V1. Audio phase one — the pillar-sized gap, medium-large — IN PROGRESS
+The one BASELINE-tier hole in the audit (§5): mono today, no rolling
+contact, no room tone, no space. Ship: equalpower stereo panning by die
+position · a rolling-contact loop (gain from load, rate from film-derived
+speed — dice must sound like they tumble, not just land) · settling taps ·
+a faint synthesized room tone · a delay-line "shaft" color on tower clunks.
+All synthesized, zero-dep, film-deterministic; no convolution, no samples.
+(Ultracode pass kicked off 2026-08-12.)
+
+### V2. Dust motes in the lamplight — small
+The canon's highest-ratio atmosphere cue (audit §3). Generalize the
+smoke-quad pattern to an ambient layer; the impact-keyed particle contract
+stays intact by staying out of it.
+
+### V3. Finish the wear dossier — small-medium
+Audit §2's two designed-but-unbuilt items: hand-polish roughness zones
+(tray, jambs — "polished where hands and dice pass") and the arris ribbon
+(sparse chip decals that break the long straight edges). Completes "aged"
+into "aged and handled."
+
+### V4. Performance guardrails — small
+Audit §10: assert `renderer.info.render.calls` in tower-roll (a budget as
+a failing test, not a vibe) · clamp `setPixelRatio` · an idle tick
+throttle (render-on-demand proper conflicts with the breathing world; the
+applicable form is a reduced idle rate).
+
+### V5. Diegetic nudges — small, DESIGN FIRST
+Audit §11: a result echo on the felt near the deciding die; hover warmth
+on dice ("everything you can touch touches back"). The mat's painted text
+is the precedent that this is buildable without a framework.
+
+### V6. Taste items, someday — record only
+A trauma²-curve table-nudge on the heaviest single-die landing; a grade
+LUT. Both sit in the canon's hazard-adjacent column; neither moves until
+Joe asks.
+
 ## Structural risks (bets, not bugs — each gets more expensive to reverse)
 
 - **System capability flags as scattered per-surface render gates.**
