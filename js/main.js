@@ -474,8 +474,11 @@ const MOOD = {
   // sees the identical air.
   motes: null, moteT: 0,
   moteTune: {
-    on: true, count: 130, size: 0.19, peak: 0.8,
-    spread: 0.8, rMax: 4.0,                 // stay in the beam, skip its wide skirt
+    // Joe, 2026-08-15: "spread over a much wider area... more transparent,
+    // by maybe 70%" — peak 0.8 → 0.24, and the field fills the room's width
+    // (rMax 9) instead of hugging the landing zone.
+    on: true, count: 180, size: 0.19, peak: 0.24,
+    spread: 1.15, rMax: 9,
     // yMax 10, NOT the full shaft: motes high on a near-horizontal camera
     // paint the black backdrop and read as a night sky (the A/B that chose
     // this: tools/out/motes-empty-a vs dial-empty). Dust lives over the felt.

@@ -11520,15 +11520,21 @@ export const scenarios = [
         'under a held clock the air is a photograph');
       await a.dbg('holdClock(false)');
 
-      // ---- it lives in the beam -------------------------------------------
+      // ---- it lives in the bounds the dials declare -----------------------
       // Sample a spread of motes; every one must sit inside the fall band
-      // and within the cone cap (rMax + wander slack). A regression that
-      // scatters dust across the room fails here, not in a screenshot.
+      // and the radial cap — both READ from the live tune, not hardcoded,
+      // because the dials are Joe's (2026-08-15 widened rMax 4→9) and this
+      // claim is "the field obeys its dials", not "the dials are these". A
+      // regression that scatters dust past its own settings fails here, not
+      // in a screenshot.
+      const tune = await a.dbg('motesTune({})');
       const wide = await a.dbg('motesInfo([0,10,20,40,80,120])');
       for (const [x, y, z] of wide.sample) {
-        assert.ok(y > 0.5 && y < 11.5, `mote height ${y.toFixed(2)} stays in the band`);
+        assert.ok(y > tune.yMin - 0.5 && y < tune.yMax + 1.5,
+          `mote height ${y.toFixed(2)} stays in the band [${tune.yMin}, ${tune.yMax}]`);
         const r = Math.hypot(x, z - 1.5 * (1 - y / 19)); // distance to the lamp axis
-        assert.ok(r < 5.2, `mote radius ${r.toFixed(2)} stays inside the beam cap`);
+        assert.ok(r < tune.rMax + tune.wander + 0.2,
+          `mote radius ${r.toFixed(2)} stays inside the cap (rMax ${tune.rMax})`);
       }
 
       // ---- mood off means NO air, object-gone, and back again -------------
