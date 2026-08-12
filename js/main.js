@@ -308,7 +308,8 @@ function aimCamera(target) {
 let HERO_MARGIN = 1.4;
 let framingLadder = true;    // off = the pre-2026-08-10 mat-only framing
 
-scene.add(new THREE.HemisphereLight('#fff6e0', '#2a2018', 1.1));
+const hemiLight = new THREE.HemisphereLight('#fff6e0', '#2a2018', 1.1);
+scene.add(hemiLight);
 
 const keyLight = new THREE.DirectionalLight('#ffeecc', 2.9);
 keyLight.position.set(8, 30, 10);
@@ -332,6 +333,58 @@ scene.add(keyLight);
 const rimLight = new THREE.DirectionalLight('#8fb4ff', 0.7);
 rimLight.position.set(-12, 18, -14);
 scene.add(rimLight);
+
+// THE MOOD RIG (Joe, 2026-08-11: "drop the ambient light level down and
+// spotlight the roll area more... the horizon is super boring"). Three moves
+// in one toggle: the room lights fall (hemisphere, key, rim — all to dialed
+// fractions), a soft warm LAMP cone hangs over the felt so the roll area
+// pools out of the dark, and FOG the colour of the scene background swallows
+// the 160-unit floor plane's edge — the horizon is not hidden behind
+// anything, it just never resolves. Default OFF: shipped behaviour is
+// byte-identical until Joe lands numbers and asks. Live dials:
+// __diceDebug.mood(on) / moodTune({...}).
+const MOOD = {
+  on: false,
+  lamp: null, lampTarget: null,
+  base: { hemi: hemiLight.intensity, key: keyLight.intensity, rim: rimLight.intensity },
+  tune: {
+    hemi: 0.35, key: 1.7, rim: 0.4,        // room levels while the mood is on
+    lampIntensity: 2.8, lampColor: '#ffe8c4',
+    lampY: 19, lampZ: 1.5,                  // over the felt, nudged to the front
+    lampAngle: 0.5, lampPenumbra: 0.75,
+    fogNear: 26, fogFar: 46,
+  },
+};
+
+function applyMood() {
+  const t = MOOD.tune;
+  if (!MOOD.on) {
+    hemiLight.intensity = MOOD.base.hemi;
+    keyLight.intensity = MOOD.base.key;
+    rimLight.intensity = MOOD.base.rim;
+    scene.fog = null;
+    if (MOOD.lamp) { scene.remove(MOOD.lamp, MOOD.lampTarget); MOOD.lamp = MOOD.lampTarget = null; }
+    return;
+  }
+  hemiLight.intensity = t.hemi;
+  keyLight.intensity = t.key;
+  rimLight.intensity = t.rim;
+  // Fog in the BACKGROUND's colour, refreshed by applyFeltTheme on swap, so
+  // the floor fades into exactly the void it would otherwise edge against.
+  scene.fog = new THREE.Fog(scene.background.clone(), t.fogNear, t.fogFar);
+  if (!MOOD.lamp) {
+    MOOD.lamp = new THREE.SpotLight(t.lampColor, t.lampIntensity, 0, t.lampAngle, t.lampPenumbra, 0);
+    MOOD.lampTarget = new THREE.Object3D();
+    scene.add(MOOD.lamp, MOOD.lampTarget);
+    MOOD.lamp.target = MOOD.lampTarget;
+  }
+  MOOD.lamp.color.set(t.lampColor);
+  MOOD.lamp.intensity = t.lampIntensity;
+  MOOD.lamp.angle = t.lampAngle;
+  MOOD.lamp.penumbra = t.lampPenumbra;
+  MOOD.lamp.position.set(0, t.lampY, t.lampZ);
+  MOOD.lampTarget.position.set(0, 0, 0);
+}
 
 // A reflection environment (Tier 6 §9, same technique the lab proved):
 // glossy themed sets — lacquer, ice, resin — need a WORLD to mirror, not
@@ -632,6 +685,7 @@ function applyFeltTheme(id) {
   // recomposite on the new base.
   recompositeFelt();
   scene.background = new THREE.Color(theme.sceneBg);
+  if (MOOD.on) applyMood(); // the fog wears the new background's colour
   renderFeltSwatches(); // keep the settings-modal selection mirrored
   return true;
 }
@@ -6840,6 +6894,19 @@ window.__diceDebug = {
     Object.assign(TOWERLIGHT.tune, patch);
     towerLanternBuild();
     return { ...TOWERLIGHT.tune, rigged: !!TOWERLIGHT.rig };
+  },
+  // THE MOOD DIALS (Joe's A/B): room down, lamp over the felt, fogged
+  // horizon. Defaults OFF — mood(true) to try it, moodTune({hemi: 0.2,
+  // fogFar: 40, ...}) to dial, both return the live state.
+  mood(on = true) {
+    MOOD.on = !!on;
+    applyMood();
+    return { on: MOOD.on, fog: !!scene.fog };
+  },
+  moodTune(patch = {}) {
+    Object.assign(MOOD.tune, patch);
+    applyMood();
+    return { ...MOOD.tune, on: MOOD.on };
   },
   // The last socket change, step by step (see TOWER_SWAP): a tower→tower swap
   // must pass through the towerless body list on its way.
