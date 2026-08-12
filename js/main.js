@@ -312,6 +312,81 @@ function aimCamera(target) {
   if (camRoll) camera.rotateZ(camRoll);
   camera.updateMatrixWorld(true);
 }
+
+// THE PEEK PIVOT (Joe, 2026-08-12: "give me a click to pivot the camera
+// around the focus point... have it return when I let go"). Hold-drag on the
+// felt to swing the eye around camTarget — yaw ±40°, pitch −20°/+34° — and
+// it springs home on release. It is a RENDER-TIME OFFSET, applied after the
+// managed camera has done everything it does and restored before the next
+// frame's logic: the framing ladder, the eases, the pour choreography and
+// every probe that reads camera state see exactly the camera they always
+// saw. A 4-px threshold keeps plain clicks (peek cards, ceremony) intact.
+const CAMPEEK = {
+  yaw: 0, pitch: 0, active: false, sx: 0, sy: 0, id: null,
+  YAW_MAX: 0.7, PITCH_UP: 0.6, PITCH_DOWN: 0.35, GAIN: 0.006,
+};
+const _peekRight = new THREE.Vector3();
+const _peekSaved = new THREE.Vector3();
+const _peekOff = new THREE.Vector3();
+function applyCamPeek() {
+  if (!CAMPEEK.yaw && !CAMPEEK.pitch) return false;
+  _peekSaved.copy(camera.position);
+  const off = _peekOff.copy(camera.position).sub(camTarget);
+  off.applyAxisAngle(Y_AXIS, CAMPEEK.yaw);
+  _peekRight.crossVectors(off, Y_AXIS).normalize();
+  off.applyAxisAngle(_peekRight, CAMPEEK.pitch);
+  // Never below the felt's eye-line: a peek that dives under the table is a
+  // clipping tour, not a look.
+  if (camTarget.y + off.y < 1.2) off.y = 1.2 - camTarget.y;
+  camera.position.copy(camTarget).add(off);
+  aimCamera(camTarget);
+  return true;
+}
+function restoreCamPeek() {
+  camera.position.copy(_peekSaved);
+  aimCamera(camTarget);
+}
+// The spring home: exponential, ~120 ms time constant, dt-driven so a held
+// clock holds the peek too.
+function stepCamPeek(dt) {
+  if (CAMPEEK.active || (!CAMPEEK.yaw && !CAMPEEK.pitch)) return;
+  const k = Math.exp(-dt / 0.12);
+  CAMPEEK.yaw *= k; CAMPEEK.pitch *= k;
+  if (Math.abs(CAMPEEK.yaw) < 0.001 && Math.abs(CAMPEEK.pitch) < 0.001) {
+    CAMPEEK.yaw = CAMPEEK.pitch = 0;
+  }
+}
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  CAMPEEK.id = e.pointerId; CAMPEEK.sx = e.clientX; CAMPEEK.sy = e.clientY;
+});
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (CAMPEEK.id !== e.pointerId) return;
+  const dx = e.clientX - CAMPEEK.sx, dy = e.clientY - CAMPEEK.sy;
+  if (!CAMPEEK.active) {
+    if (Math.hypot(dx, dy) < 4) return; // plain clicks stay plain
+    CAMPEEK.active = true;
+    renderer.domElement.setPointerCapture(e.pointerId);
+  }
+  CAMPEEK.yaw = Math.max(-CAMPEEK.YAW_MAX, Math.min(CAMPEEK.YAW_MAX,
+    CAMPEEK.yaw - (e.movementX !== undefined ? e.movementX : dx) * CAMPEEK.GAIN));
+  CAMPEEK.pitch = Math.max(-CAMPEEK.PITCH_DOWN, Math.min(CAMPEEK.PITCH_UP,
+    CAMPEEK.pitch + (e.movementY !== undefined ? e.movementY : dy) * CAMPEEK.GAIN));
+});
+const camPeekRelease = (e) => {
+  if (CAMPEEK.id !== e.pointerId) return;
+  if (CAMPEEK.active) {
+    try { renderer.domElement.releasePointerCapture(e.pointerId); } catch { /* gone */ }
+  }
+  CAMPEEK.active = false; CAMPEEK.id = null; // stepCamPeek springs it home
+};
+renderer.domElement.addEventListener('pointerup', camPeekRelease);
+renderer.domElement.addEventListener('pointercancel', camPeekRelease);
+// A drag that pivoted must not also click what it lands on (a peek card
+// dismissal, the ceremony layer): swallow exactly that click.
+renderer.domElement.addEventListener('click', (e) => {
+  if (CAMPEEK.yaw || CAMPEEK.pitch) { e.stopPropagation(); e.preventDefault(); }
+}, true);
 // Half-width of the box kept around the deciding die when nothing larger
 // fits. Measured on a 390px phone against today's flat 80px: 1.1 → 175-247px
 // but as few as 2 of 6 dice in frame; 2.2 → 80-107px, barely better than the
@@ -6078,6 +6153,12 @@ function tick(dt, render = true, realtime = false) {
   stepTowerLantern(dt); // the ember breath — inert unless a glowing tower is up
   stepTowerDress(dt);   // sway and smoke — inert unless a dressed tower is up
   stepCamera(dt);    // eased reframing; only ever armed under a quiet picture
+  stepCamPeek(dt);   // the hold-drag pivot's spring home
+  // The peek offset wraps everything that reads the camera from here to the
+  // end of the frame — chips and cards track the pivoted view — and is
+  // restored before the next frame's logic, so the managed camera never
+  // learns it happened.
+  const peeked = applyCamPeek();
   if (chips.length) positionChips();
   if (isPeekOpen()) positionPeek();
   updateCornerClear();
@@ -6096,6 +6177,7 @@ function tick(dt, render = true, realtime = false) {
       renderer.render(scene, camera);
     }
   }
+  if (peeked) restoreCamPeek();
 }
 
 // Heat shimmer sources (Level 5): unshrouded dice of a shimmer set. Every die
