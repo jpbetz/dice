@@ -80,7 +80,13 @@ export function buildStumpShell(ctx) {
     rimY: 7.0 * S,
     bladeFloor: 11.4,            // the measured cowl bar 11.25 + margin
     spireMax: yLim - 0.16,
-    port: { hw: doorX + 0.12, y0: 0.05, y1: doorY + 0.35 },
+    // The mouth clears the dice's measured flight envelope (|x| ≤ ~1.9:
+    // 0.4 jitter + tan12°·travel + d20 radius — TOWER.md §5), NOT the
+    // engine's 5.0-wide collider gap. Cutting to the collider gap tore
+    // off the round trunk's whole lower face and the venue frame showed
+    // a black rectangle wearing a tree. The wound is tall and narrow,
+    // like the photo.
+    port: { hw: 2.05, y0: 0.05, y1: doorY + 0.35 },
     browY: [doorY + 0.5, 6.9 * S / 1.25],
     despawnY: v.despawnY,
   };
@@ -216,6 +222,16 @@ export function buildStumpShell(ctx) {
       cr += (lich.r - cr) * lichK;
       cg += (lich.g - cg) * lichK;
       cb += (lich.b - cb) * lichK;
+      // The skirt is DAMP: near the soil the wood darkens and mosses
+      // hard — the first venue frames rendered the flare as bone-white
+      // sand under the moon pool.
+      const dampK = clamp01(1 - y / 1.6);
+      cr *= 1 - 0.45 * dampK;
+      cg *= 1 - 0.35 * dampK;
+      cb *= 1 - 0.42 * dampK;
+      cr += (moss.r - cr) * dampK * 0.5;
+      cg += (moss.g - cg) * dampK * 0.5;
+      cb += (moss.b - cb) * dampK * 0.5;
       col.push(cr, cg, cb);
     }
   }
@@ -259,10 +275,19 @@ export function buildStumpShell(ctx) {
         const r = d.linerR + 0.06 * fbm(th * 3, y * 0.5, 8, 3, seed + 21);
         const wx = r * Math.cos(th);
         const wz = r * Math.sin(th) * (Math.sin(th) > 0 ? 0.9 : 1);
-        lmask.push((Math.abs(wx) < d.port.hw + 0.45 && Math.sin(th) > 0
-          && y > d.port.y0 - 0.2 && y < d.port.y1 + 0.75) ? 1 : 0);
+        // The liner's hole is barely wider than the shell's mouth — its
+        // torn rim is MEANT to peek: the glowing rot wall just inside the
+        // opening is what makes the cavity read as a cavity. (First cut
+        // was +0.45 wider "so the rim never peeks", which guaranteed the
+        // only thing visible through the mouth was the black veil.)
+        lmask.push((Math.abs(wx) < d.port.hw + 0.08 && Math.sin(th) > 0
+          && y > d.port.y0 - 0.2 && y < d.port.y1 + 0.4) ? 1 : 0);
         lpos.push(wx, y, d.axisZ + wz);
-        const k = 0.05 + 0.05 * fbm(th * 8, y, 8, 2, seed + 23);
+        // Visible torn fiber, not a void: the reference cavity catches
+        // light on its ribs. Vertical streaks ride the fbm; the floor of
+        // the brightness keeps the hollow READING as deep shadow.
+        const rib = Math.pow(Math.abs(Math.sin(th * 9 + fbm(th, y, 4, 2, seed + 24) * 3)), 3);
+        const k = 0.10 + 0.10 * fbm(th * 8, y, 8, 2, seed + 23) + 0.10 * rib;
         lcol.push(k, k * 0.92, k * 0.85);
       }
     }
@@ -282,8 +307,20 @@ export function buildStumpShell(ctx) {
     // On-policy envMapIntensity: at vertex colours ~0.05 the environment
     // contributes nothing visible, and the fit audit's material policy
     // stays a strict deepEqual([]) instead of growing an exception list.
+    //
+    // THE ROT GLOWS. No light reaches the cavity (the moon is blocked by
+    // the very trunk that makes it a cavity) and a lightless
+    // MeshStandardMaterial is a black rectangle — the exact thing Joe
+    // flagged. The venue's answer is ecological, not electrical: foxfire
+    // IS decaying wood, so the liner carries a faint emissive of the
+    // palette's glow over the punk bake's mottle. Tertiary tier (max
+    // ~0.1 linear through the near-black vertex colours) — it can never
+    // bloom, never contest a die; it just makes the hollow READ.
     const lmat = MAT.punk.clone();
     lmat.side = THREE.DoubleSide;
+    lmat.emissive = MAT.caps.emissive.clone();
+    lmat.emissiveMap = lmat.map;
+    lmat.emissiveIntensity = 0.32;
     const liner = new THREE.Mesh(lg, lmat);
     liner.name = 'boleLiner';
     add(liner);
@@ -344,8 +381,18 @@ export function buildStumpShell(ctx) {
     // deep behind the shell's own front wall (brow band reaches z0+0.13),
     // where it does its real job: a void backdrop seen only through the
     // port's ragged top.
-    zFO: z0 + 0.12, zFI: z0 - 0.6,
-    sill, doorX, doorY, xLim,
+    // z0−1.2, the third and right answer: deep enough that the lining
+    // tube's front trim opens past the mouth (no black side strips), and
+    // the doorway veil recedes INTO the throat — perspective shrinks it
+    // to a black core with glowing rot walls around it, which is exactly
+    // the reference photo's depth gradient. It still sits just in front
+    // of the exit spawn (z0−1.5), so the spawn stays veiled.
+    zFO: z0 + 0.12, zFI: z0 - 1.2,
+    // doorX narrowed to the mouth: the seam sizes the doorway VEIL off
+    // this, and a veil cut to the engine's 5-wide collider gap papered
+    // the whole mouth black. 2.05 clears the measured flight envelope
+    // (~1.9) with margin and matches the port.
+    sill, doorX: 2.05, doorY, xLim,
     at: (th, y, inset = 0) => surfPoint(th, y, inset),
     // No flat facade: the front is the wound. Props always land on the
     // curve, which is what an organic trunk wants anyway.

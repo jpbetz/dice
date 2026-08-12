@@ -7381,7 +7381,11 @@ function faeConceptStart(opts = {}) {
   FAECONCEPT.saved = { tune: { ...MOOD.tune }, bg: scene.background.clone(), moodOn: MOOD.on };
   scene.background = new THREE.Color(rig.pal.void);
   Object.assign(MOOD.tune, {
-    lampColor: rig.pal.moon, lampIntensity: 2.8, lampY: 22, lampAngle: 0.5,
+    // lampAngle 0.65 / lampZ 0.6: the moon's pool must reach the tower
+    // socket at the back of the mat, not just the felt — the first Bole
+    // frames rendered a tree the moonlight had never heard of.
+    lampColor: rig.pal.moon, lampIntensity: 2.8, lampY: 22, lampZ: 0.6,
+    lampAngle: 0.65,
     hemi: 0.12, key: 0.6, rim: 0.55, fogNear: 20, fogFar: 46,
   });
   MOOD.on = true;
