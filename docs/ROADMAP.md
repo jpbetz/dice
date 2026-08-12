@@ -2610,19 +2610,27 @@ questions (multi-dice-set venues, unbundling, portability) are recorded
 there. The engineering rules are untouched in this register: one seed one
 film, zero-dep, e2e per feature, the camera rulings, the perf budget.
 
-### W0. Research + concept — IN PROGRESS 2026-08-15
-Two dossiers (scratchpad/fae-research/): the fae visual grammar (what
-reads fae vs. generic-fantasy vs. kitsch; reference canon and palette
-structure) and the technique kit (dense ground fog, dice-lit fog, glow,
-fireflies — all zero-dep three.js r160, judged against our existing
-idioms). Then a written venue spec + 3–4 lab concept shots for Joe's eye
-BEFORE any production code.
+### W0. Research + concept — DONE 2026-08-15, JOE-APPROVED
+Two dossiers (scratchpad/fae-research/ — grammar.md's sixteen rules and
+four Vegas gates; techniques.md's fog/glow kit with two traps found in
+post.js before they shipped), the venue spec draft
+([FAE-VENUE-SPEC-DRAFT.md](FAE-VENUE-SPEC-DRAFT.md)), and four concept
+plates from the gated lab (js/fae-lab.js, four rounds of iteration).
+Joe: "That's awesome. I love them both" — BOTH palettes ship, as two
+venues over one build. Tower direction: the rotted hollow trunk (a
+natural shaft; foxfire is literally the glow of decaying wood; the moot
+stages on it), with a mirror pool as glade dressing.
 
-### W1. The venue mechanism + the set toggle — DESIGN WITH W0
-A `venue` as a first-class registry (the grounded room is venue zero);
-one full-set UX toggle that, while a fantasy venue is active, replaces
-the à-la-carte felt/dice/tower pickers (GOALS goal 13). Mechanism ships
-with the spec, not before it.
+### W1. The venue mechanism + the set toggle — SHIPPED 2026-08-15
+`VENUES` registry (table / moonrise / foxfire), `venue` as a room
+setting (server SETTING_SPECS, the tower's unknown-id rule client-side),
+a Venue picker in settings, and goal 13 enforced: while a fantasy venue
+is active the felt/tower/dice-set pickers leave the panel, and selecting
+a fantasy venue sends {venue, tower:'none'} as ONE patch so no client
+ever pours through a tower another client does not draw. The W0 lab rig
+is the interim stage — W2 upgrades fidelity in place. Proof: `venue-set`
+(settings/fx/tower), sabotage-checked on the staged-means-in-the-scene
+claim.
 
 ### W2–W6, sequenced after the spec lands
 W2 the glade room (surface, horizon, atmosphere, lighting rig) · W3 the

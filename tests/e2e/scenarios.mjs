@@ -11576,4 +11576,66 @@ export const scenarios = [
       assert.equal(m.count, 0, 'and taking the tower down stills the room');
     },
   },
+
+  {
+    name: 'venue-set',
+    tags: ['settings', 'fx', 'tower'],
+    // THE VENUE TOGGLE (GOALS goals 13–15, ROADMAP W1). Five claims: the
+    // venue is a room setting every client inherits; a fantasy venue
+    // STAGES a real scene (venueInfo counts objects, not flags); it takes
+    // the tower down with it in the same patch — one write, no race; it
+    // REPLACES the à-la-carte pickers while active (goal 13's whole
+    // point, read off computed style, not a flag); and selecting The
+    // Table restores everything, pickers included.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+
+      // ---- the grounded room is venue zero --------------------------------
+      let v = await a.dbg('venueInfo()');
+      assert.equal(v.id, 'table', 'the table boots grounded');
+      assert.equal(v.staged, false, 'with no stage in the scene');
+      assert.equal(await a.eval(
+        `document.querySelectorAll('#venue-picker [data-venue]').length`), 3,
+        'and the picker offers all three venues');
+
+      // ---- a tower first, so the venue has something to replace -----------
+      await a.dbg(`setTower('heartwood')`);
+      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`, { desc: 'Heartwood up on A' });
+      await b.waitFor(`window.__diceDebug.tower === 'heartwood'`, { desc: 'Heartwood up on B' });
+
+      // ---- one write moves the whole set ----------------------------------
+      await a.dbg(`setVenue('moonrise')`);
+      await a.waitFor(`window.__diceDebug.venueInfo().staged`, { desc: 'the glade rises on A' });
+      await b.waitFor(`window.__diceDebug.venueInfo().staged`, { desc: 'and on B, off the same setting' });
+      v = await b.dbg('venueInfo()');
+      assert.equal(v.id, 'moonrise', 'Bob inherited the venue id');
+      assert.equal(v.register, 'fantasy', 'and its register');
+      assert.ok(v.stageChildren >= 8,
+        `the stage is real scenery (${v.stageChildren} children), not a tinted room`);
+      await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'the tower left with the felt on A' });
+      await b.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'and on B' });
+
+      // ---- goal 13: the venue REPLACES the pickers ------------------------
+      for (const id of ['felt-swatches', 'tower-picker', 'diceset-row']) {
+        assert.equal(await a.eval(
+          `(window.__diceDebug.openSettings(), getComputedStyle(document.getElementById('${id}')).display)`),
+        'none', `${id} is gone from settings while the venue is fantasy`);
+      }
+
+      // ---- the table still rolls in the glade -----------------------------
+      await a.roll('2d6');
+      await a.settle();
+      assert.equal(await a.eval('window.__diceDebug.currentRoll.done'), true,
+        'a roll resolves under the venue — the stage is scenery, not physics');
+
+      // ---- and The Table is the restore path ------------------------------
+      await a.dbg(`setVenue('table')`);
+      await a.waitFor(`!window.__diceDebug.venueInfo().staged`, { desc: 'the glade strikes on A' });
+      await b.waitFor(`!window.__diceDebug.venueInfo().staged`, { desc: 'and on B' });
+      assert.equal(await a.eval(
+        `getComputedStyle(document.getElementById('felt-swatches')).display`) !== 'none', true,
+      'the felt picker returns with the room');
+    },
+  },
 ];

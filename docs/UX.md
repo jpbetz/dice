@@ -4363,3 +4363,18 @@ the identical air, and it freezes with the rest of the world under a held
 clock. The dust rises and settles through the tower socket — swap the tower
 and the air swaps with it. Turning the mood off stills the room completely.
 Layer switch and dials: `__diceDebug.motesTune({on, count, size, ...})`.
+
+### 7.34 The venue — the table travels (2026-08-15)
+
+**One choice stages everything.** Settings → Everyone at the table now
+leads with **Venue**: The Table (the grounded room), Moonrise Glade, or
+Foxfire Hollow. Picking a fantasy venue swaps the whole staging at once —
+ground, horizon, mist, moonlight, the vacated faerie moot, wisps — and the
+felt, tower and dice-set pickers leave the panel while it is active
+(GOALS goal 13: a venue must never be assembled into incoherence one
+dropdown at a time). The tower comes down in the same breath, in the same
+settings write. Picking The Table brings the room — and its pickers —
+back exactly. Room-wide like the tower; late joiners land in the venue
+the table chose. Rolls are unchanged in every way that counts: same
+physics, same films, same values on every client — the venue is scenery
+with doctrine (GOALS goals 14–15), not a rules change.

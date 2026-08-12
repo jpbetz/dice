@@ -1035,7 +1035,7 @@ limitations under the License.
         </div>
         <!-- Dice set (Tier 6 §9): your identity on the felt. Rides every
              roll you throw or claim; applies from the next roll. -->
-        <div class="prow">
+        <div class="prow" id="diceset-row">
           <span class="grow">
             <span class="prow-label">Dice set</span>
             <!-- §3b/L0: the audience half of this line is a claim, and in the
@@ -1163,14 +1163,26 @@ limitations under the License.
           </span>
         </div>
         <div id="zoom-picker" role="radiogroup" aria-label="Mat zoom"></div>
-        <span class="plabel">Felt</span>
+        <!-- Venue (GOALS goals 13-15): the whole staging as ONE choice.
+             While a fantasy venue is active it REPLACES the felt, tower
+             and dice-set pickers below (updateVenueChrome hides them) —
+             a venue must never be assembled into incoherence one dropdown
+             at a time. -->
+        <div class="prow" id="venue-row">
+          <span class="grow">
+            <span class="prow-label">Venue</span>
+            <span class="prow-sub">where the table stands — a fantasy venue stages everything at once</span>
+          </span>
+        </div>
+        <div id="venue-picker" role="radiogroup" aria-label="Venue"></div>
+        <span class="plabel" id="felt-label">Felt</span>
         <div id="felt-swatches"></div>
         <!-- Tower (docs/TOWER.md): a room setting because it changes the
              FILM — a tower roll pours instead of being thrown, and every
              client bakes the same pour. A picker rather than a switch:
              the value is a tower id and more models are meant to follow.
              A mid-flight change defers to the next roll (queueTower). -->
-        <div class="prow">
+        <div class="prow" id="tower-row">
           <span class="grow">
             <span class="prow-label">Tower</span>
             <span class="prow-sub">dice tumble down through it instead of being thrown</span>

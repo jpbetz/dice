@@ -643,7 +643,7 @@ let currentFeltId = DEFAULT_FELT;
 // (syncSettingsUI → renderZoomPicker) reads roomSettings.zoom. Adding a new
 // key requires only adding it to defaults.
 let roomSettings = { felt: DEFAULT_FELT, system: DEFAULT_SYSTEM, tableName: '', zoom: DEFAULT_ZOOM,
-  tower: DEFAULT_TOWER };
+  tower: DEFAULT_TOWER, venue: 'table' };
 
 // COLLECTED IS A LIST, NOT A PLACE (C25, 2026-08-09).
 //
@@ -7277,10 +7277,34 @@ function stepMoodMotes(dt) {
   stepMotes(MOOD.motes, MOOD.moteT);
 }
 
-// THE FAE CONCEPT SWITCH (ROADMAP W0, js/fae-lab.js). Lab-only: nothing
-// reaches it without __diceDebug.faeConcept(). It borrows the MOOD rig for
-// the moon (a preset over the same dials — techniques.md §5's argument
-// made flesh) and restores every borrowed thing on the way out.
+// THE VENUES (GOALS goals 13–15, ROADMAP Tier W). A venue is the WHOLE
+// staging of the table chosen as one thing; while a fantasy venue is
+// active the à-la-carte pickers (felt, tower, dice set) are replaced by
+// this single choice. 'table' is the grounded room and the default —
+// selecting it IS the restore path. Both fae venues run on the same
+// glade build with the palette swapped (Joe, 2026-08-15: "I love them
+// both"). Room-wide like the tower, and for the same reason once W3
+// lands a fae tower: the venue will change the film.
+const VENUES = {
+  table: {
+    id: 'table', label: 'The Table', register: 'grounded',
+    title: 'The table — felt, lamplight, the room you know',
+  },
+  moonrise: {
+    id: 'moonrise', label: 'Moonrise Glade', register: 'fantasy', paletteId: 'moonrise',
+    title: 'Moonrise Glade — a night clearing; blue mist, teal moot-light, dice burn through the fog',
+  },
+  foxfire: {
+    id: 'foxfire', label: 'Foxfire Hollow', register: 'fantasy', paletteId: 'foxfire',
+    title: 'Foxfire Hollow — older and damper; green rot-light under a cold moon',
+  },
+};
+let currentVenue = 'table';
+
+// THE FAE STAGE (js/fae-lab.js — W0's concept lab, now the W1 venue's
+// interim stage; W2 upgrades its fidelity in place). It borrows the MOOD
+// rig for the moon (a preset over the same dials — techniques.md §5's
+// argument made flesh) and restores every borrowed thing on the way out.
 const FAECONCEPT = { on: false, rig: null, t: 0, saved: null, lights: [], boosted: [] };
 
 function faeConceptStart(opts = {}) {
@@ -7369,6 +7393,30 @@ function stepFaeConcept(dt) {
       }
     });
     d.faeBoost = true;
+  }
+}
+
+// Venue application: idempotent, safe mid-session. The scene swap is
+// visual-only today (the glade does not touch physics or the film), so it
+// applies immediately like felt — the TOWER half of a venue change rides
+// its own queueTower deferral via the settings patch that carries it.
+function applyVenue(id) {
+  const spec = VENUES[id] || VENUES.table;
+  if (spec.id === currentVenue) { updateVenueChrome(); return; }
+  currentVenue = spec.id;
+  if (spec.register === 'fantasy') faeConceptStart({ paletteId: spec.paletteId });
+  else faeConceptStop();
+  updateVenueChrome();
+}
+
+// GOALS goal 13 made visible: while a fantasy venue is active, the felt,
+// tower and dice-set pickers leave the settings panel — the venue IS those
+// choices. Elements resolved by id per call (the renderFeltSwatches rule).
+function updateVenueChrome() {
+  const fantasy = (VENUES[currentVenue] || VENUES.table).register === 'fantasy';
+  for (const rowId of ['felt-label', 'felt-swatches', 'tower-row', 'tower-picker', 'diceset-row', 'diceset-picker']) {
+    const el = document.getElementById(rowId);
+    if (el) el.style.display = fantasy ? 'none' : '';
   }
 }
 
@@ -9033,6 +9081,20 @@ window.__diceDebug = {
   // The tower (docs/TOWER.md) — the same three: what is socketed, what is
   // waiting on the roll boundary, and the picker's own entry point.
   get tower() { return currentTower; },
+  // THE VENUE (GOALS goals 13–15). venueInfo counts the STAGE IN THE SCENE
+  // (the motesInfo rule): zero means the glade objects are gone, not that a
+  // flag went false.
+  get venue() { return currentVenue; },
+  setVenue(id) { return selectVenue(id); },
+  venueInfo() {
+    const spec = VENUES[currentVenue] || VENUES.table;
+    return {
+      id: currentVenue,
+      register: spec.register,
+      staged: !!(FAECONCEPT.rig && FAECONCEPT.rig.group.parent),
+      stageChildren: FAECONCEPT.rig ? FAECONCEPT.rig.group.children.length : 0,
+    };
+  },
   get pendingTower() { return pendingTower; },
   setTower(id) { return selectTower(id); },
   // The tower's collider set, by contract name and position, so a scenario can
@@ -15879,6 +15941,15 @@ function applyRoomSettings(settings) {
     if (settings.tower !== currentTower) queueTower(settings.tower);
     renderTowerPicker();
   }
+  // The venue (GOALS goals 13–15), the tower's unknown-id rule: a client
+  // that has not shipped a venue keeps the table it has. Applied AFTER the
+  // tower so a fantasy patch ({venue, tower:'none'} — selectVenue sends
+  // both) has already queued the tower down before the stage rises.
+  if (typeof settings.venue === 'string' && VENUES[settings.venue]) {
+    roomSettings.venue = settings.venue;
+    if (settings.venue !== currentVenue) applyVenue(settings.venue);
+    renderVenuePicker();
+  }
 }
 
 // Build the five felt swatch chips once, then only refresh the selected state.
@@ -16189,6 +16260,58 @@ function renderTowerPicker() {
   });
 }
 
+function renderVenuePicker() {
+  const holder = document.getElementById('venue-picker');
+  if (!holder) return;
+  if (!holder.childElementCount) {
+    for (const v of Object.values(VENUES)) {
+      const chip = document.createElement('button');
+      chip.className = 'system-chip';
+      chip.dataset.venue = v.id;
+      chip.textContent = v.label;
+      chip.title = v.title;
+      chip.setAttribute('role', 'radio');
+      chip.addEventListener('click', () => selectVenue(v.id));
+      holder.appendChild(chip);
+    }
+  }
+  const active = roomSettings.venue || 'table';
+  holder.querySelectorAll('[data-venue]').forEach((b) => {
+    const on = b.dataset.venue === active;
+    b.removeAttribute('aria-pressed');
+    b.setAttribute('aria-checked', String(on));
+    b.tabIndex = on ? 0 : -1;
+  });
+}
+
+// Chip click (and __diceDebug.setVenue). Online: ONE settings patch carries
+// the whole move — a fantasy venue sends {venue, tower:'none'} atomically,
+// because a tower is part of what the venue replaces and two racing writes
+// could leave one client pouring dice through a tower another client does
+// not draw. Solo: apply now and persist, the tower/zoom shape.
+function selectVenue(id) {
+  if (!VENUES[id]) return false;
+  if (id === roomSettings.venue && id === currentVenue) return true;
+  const fantasy = VENUES[id].register === 'fantasy';
+  if (netOnline && net) {
+    const patch = fantasy ? { venue: id, tower: 'none' } : { venue: id };
+    net.setSettings(patch).then((ok) => {
+      if (!ok) showSettingsNote('couldn’t reach the table — the venue is unchanged');
+    });
+    return true;
+  }
+  roomSettings.venue = id;
+  if (fantasy) {
+    roomSettings.tower = 'none';
+    queueTower('none');
+    renderTowerPicker();
+  }
+  save(LS_ROOMSETTINGS, roomSettings);
+  applyVenue(id);
+  renderVenuePicker();
+  return true;
+}
+
 // Chip click (and __diceDebug.setTower). Online: send the patch, apply on the
 // 'settings-changed' echo like felt/system/zoom. Solo: raise the tower now and
 // persist. A mid-flight change DEFERS via queueTower (see applyRoomSettings).
@@ -16285,6 +16408,8 @@ function syncSettingsUI() {
   renderZoomPicker();
   renderFeltSwatches();
   renderTowerPicker();
+  renderVenuePicker();
+  updateVenueChrome(); // a fantasy venue keeps the replaced pickers hidden
 }
 
 function openSettingsModal() {

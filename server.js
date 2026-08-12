@@ -378,6 +378,17 @@ const SETTING_SPECS = {
     validate: (v) => typeof v === 'string'
       && ['none', 'heartwood', 'bastion', 'blackanvil'].includes(v),
   },
+  // The venue (GOALS goals 13–15): the whole staging of the table as ONE
+  // room-wide choice — 'table' is the grounded room everyone knows; a
+  // fantasy venue replaces the à-la-carte pickers while it is active. The
+  // wire carries only the id (the zoom/tower rule); the client owns every
+  // number behind it. A client that has not shipped a venue keeps the
+  // table it has (unknown ids are ignored client-side, the tower rule).
+  venue: {
+    default: 'table',
+    validate: (v) => typeof v === 'string'
+      && ['table', 'moonrise', 'foxfire'].includes(v),
+  },
 };
 
 function defaultSettings() {
