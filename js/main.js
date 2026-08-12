@@ -45,6 +45,7 @@ import { buildBastionSkin } from './towerbastion.js';
 import { buildAnvilSkin } from './toweranvil.js';
 import { stepDress } from './towerdress.js';
 import { buildMotes, stepMotes, disposeMotes } from './motes.js';
+import { buildFaeConcept, brightenFog, stepWisps } from './fae-lab.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -7276,6 +7277,101 @@ function stepMoodMotes(dt) {
   stepMotes(MOOD.motes, MOOD.moteT);
 }
 
+// THE FAE CONCEPT SWITCH (ROADMAP W0, js/fae-lab.js). Lab-only: nothing
+// reaches it without __diceDebug.faeConcept(). It borrows the MOOD rig for
+// the moon (a preset over the same dials — techniques.md §5's argument
+// made flesh) and restores every borrowed thing on the way out.
+const FAECONCEPT = { on: false, rig: null, t: 0, saved: null, lights: [], boosted: [] };
+
+function faeConceptStart(opts = {}) {
+  if (FAECONCEPT.rig) faeConceptStop();
+  const rig = buildFaeConcept(opts);
+  FAECONCEPT.saved = { tune: { ...MOOD.tune }, bg: scene.background.clone(), moodOn: MOOD.on };
+  scene.background = new THREE.Color(rig.pal.void);
+  Object.assign(MOOD.tune, {
+    lampColor: rig.pal.moon, lampIntensity: 2.8, lampY: 22, lampAngle: 0.5,
+    hemi: 0.12, key: 0.6, rim: 0.55, fogNear: 20, fogFar: 46,
+  });
+  MOOD.on = true;
+  applyMood();
+  scene.add(rig.group);
+  // The venue's TWO dynamic die lights (grammar tier rules: the dice are
+  // primary; these follow the first two settled dice).
+  for (let i = 0; i < 2; i++) {
+    const l = new THREE.PointLight(rig.pal.glowRim, 0, 6, 2);
+    scene.add(l);
+    FAECONCEPT.lights.push(l);
+  }
+  FAECONCEPT.rig = rig;
+  FAECONCEPT.on = true;
+}
+
+function faeConceptStop() {
+  if (!FAECONCEPT.rig) return;
+  for (const b of FAECONCEPT.boosted) b.m.emissiveIntensity = b.v;
+  FAECONCEPT.boosted = [];
+  for (const d of tableDice) delete d.faeBoost;
+  for (const l of FAECONCEPT.lights) scene.remove(l);
+  FAECONCEPT.lights = [];
+  scene.remove(FAECONCEPT.rig.group);
+  FAECONCEPT.rig = null;
+  scene.background = FAECONCEPT.saved.bg;
+  Object.assign(MOOD.tune, FAECONCEPT.saved.tune);
+  MOOD.on = FAECONCEPT.saved.moodOn;
+  applyMood();
+  FAECONCEPT.on = false;
+}
+
+function stepFaeConcept(dt) {
+  if (!FAECONCEPT.on) return;
+  FAECONCEPT.t += dt;
+  const t = FAECONCEPT.t;
+  const rig = FAECONCEPT.rig;
+  for (const s of rig.sheets) {
+    s.material.map.offset.x += s.userData.drift[0] * dt;
+    s.material.map.offset.y += s.userData.drift[1] * dt;
+  }
+  stepWisps(rig.wisps, t);
+  // The dice light the fog (the venue's whole thesis): every settled die is
+  // an emitter, plus the lead wisp; the moot's pools are already folded
+  // into the sheets' base.
+  const settled = tableDice.filter((d) => d.mesh && d.mesh.position.y < 2.5).slice(0, 5);
+  const em = settled.map((d) => ({
+    x: d.mesh.position.x, z: d.mesh.position.z,
+    r: 3.2, gain: 1.1, cr: 0.38, cg: 0.62, cb: 0.58,
+  }));
+  const wpos = rig.wisps.points.geometry.attributes.position;
+  em.push({ x: wpos.getX(0), z: wpos.getZ(0), r: 2.2, gain: 0.7, cr: 0.2, cg: 0.4, cb: 0.36 });
+  brightenFog(rig.sheets, em);
+  rig.halos.children.forEach((h, i) => {
+    const d = settled[i];
+    if (d) {
+      h.position.set(d.mesh.position.x, 0.3, d.mesh.position.z);
+      h.material.opacity = 0.38;
+    } else h.material.opacity = 0;
+  });
+  FAECONCEPT.lights.forEach((l, i) => {
+    const d = settled[i];
+    if (d) {
+      l.position.set(d.mesh.position.x, d.mesh.position.y + 1.6, d.mesh.position.z);
+      l.intensity = 2.2;
+    } else l.intensity = 0;
+  });
+  // Digits burn brighter in the dark — raised once per die, restored on stop.
+  for (const d of settled) {
+    if (d.faeBoost) continue;
+    d.mesh.traverse((o) => {
+      const mats = Array.isArray(o.material) ? o.material : (o.material ? [o.material] : []);
+      for (const m of mats) {
+        if (!m.emissiveMap) continue;
+        FAECONCEPT.boosted.push({ m, v: m.emissiveIntensity });
+        m.emissiveIntensity = Math.max(m.emissiveIntensity, 1.6);
+      }
+    });
+    d.faeBoost = true;
+  }
+}
+
 const TOWERDRESS = { t: 0 };
 function stepTowerDress(dt) {
   TOWERDRESS.t += dt;
@@ -7303,6 +7399,7 @@ function tick(dt, render = true, realtime = false) {
   stepTowerLantern(dt); // the ember breath — inert unless a glowing tower is up
   stepTowerDress(dt);   // sway and smoke — inert unless a dressed tower is up
   stepMoodMotes(dt);    // dust in the lamplight — inert unless the mood is up
+  stepFaeConcept(dt);   // W0 concept lab — inert unless faeConcept() armed it
   stepAmbience();       // the room bed's crackle lookahead — inert unless the bed is up
   stepCamera(dt);    // eased reframing; only ever armed under a quiet picture
   stepCamPeek(dt);   // the hold-drag pivot's spring home
@@ -8243,6 +8340,14 @@ window.__diceDebug = {
     Object.assign(MOOD.moteTune, patch);
     applyMood();
     return { ...MOOD.moteTune, live: !!MOOD.motes };
+  },
+  // THE FAE CONCEPT LAB (ROADMAP W0): faeConcept(true, {paletteId:
+  // 'moonrise'|'foxfire'}) stages the Moonrise Glade sketch; false restores
+  // the room exactly. Concept plates only — not the venue mechanism.
+  faeConcept(on = true, opts = {}) {
+    if (on) faeConceptStart(opts);
+    else faeConceptStop();
+    return { on: FAECONCEPT.on, palette: FAECONCEPT.rig ? Object.keys(FAECONCEPT.rig.pal).length && (opts.paletteId || 'moonrise') : null };
   },
   // The last socket change, step by step (see TOWER_SWAP): a tower→tower swap
   // must pass through the towerless body list on its way.
