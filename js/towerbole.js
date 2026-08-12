@@ -71,14 +71,13 @@ export function buildStumpShell(ctx) {
   const srnd = mulberry32(seed);
   const FRONT = Math.PI / 2;
   const d = {
-    // The axis sits BEHIND the bore, not on it. The socket allows only
-    // ~2.15 of z in front of the shaft, so an axis-on-bore trunk planes
-    // flat across its whole front (two slab frames proved it). Off-axis,
-    // the walls run thick at the back and thin at the front, the bore
-    // still fits (the interior floor below is DIRECTIONAL), and the front
-    // face curves at its natural radius — a tube grown against a wall,
-    // not a tube sliced by one.
-    axisZ: boreZ - 0.42,
+    // The axis sits WELL BEHIND the bore (VENUE GROUNDS, the audit's new
+    // named class): the engine's volumes stay exactly where they are,
+    // invisible, and the body wraps AROUND them — bowl swallowing the
+    // shaft off-centre, wound framing the doorway. With the glade behind
+    // it instead of a room wall, front reach 3.05 / back 3.28 / sides
+    // 3.13: the stump is finally as deep as it is wide.
+    axisZ: boreZ - 0.9,
     rCeil: xLim - 0.12,
     rFloor: v.shaft.r + 0.28,
     linerR: v.shaft.r + 0.13,
@@ -141,9 +140,9 @@ export function buildStumpShell(ctx) {
   // y 7, so below ~6.4 the shaft carries nothing and the wall may pinch to
   // ~2.05; above 6.4 it stays outside the falling lane (2.32 floor); the
   // shoulder swells back out to carry the shaft band and the cowl.
-  const base = (y) => 2.02
-    + 0.95 * Math.exp(-y / (1.05 * S))              // the foot
-    + 0.38 * smoothstep(5.6, 7.3, y)                 // the shaft shoulder
+  const base = (y) => 2.45
+    + 1.05 * Math.exp(-y / (1.05 * S))              // the foot
+    + 0.42 * smoothstep(5.6, 7.3, y)                 // the shaft shoulder
     + 0.05 * Math.sin(y * 0.7 + 2.1);
   const flare = (y) => Math.pow(Math.max(0, 1 - y / (2.3 * S)), 1.5);
   const crownK = (y) => smoothstep(d.rimY - 2.2, d.rimY + 0.5, y);
@@ -188,14 +187,20 @@ export function buildStumpShell(ctx) {
     // hold real wood IN FRONT of the probe's z0-plane samples.
     const cowlK = gauss(angDist(th, FRONT), 0.8) * smoothstep(7.3, 8.0, y)
       * (1 - smoothstep(11.6, 12.1, y));
-    if (cowlK > 0.4) r = Math.max(r, 2.62 + 0.12 * cowlK);
-    r = Math.min(r, d.rCeil);
-    // Measured free volume, not declared — and DIRECTIONAL, because the
-    // bore's centre sits 0.42 in front of the axis: the wall must stand
-    // farther out toward the front than toward the back to contain the
-    // same falling lane.
+    if (cowlK > 0.4) r = Math.max(r, 2.98 + 0.05 * cowlK);
+    // Directional ceiling: x has the mat's wall (capped by COMPONENT —
+    // a sign-based cap leaked crests to x 3.32 on the back quarter-arcs),
+    // the BACK has the glade.
+    const xCap = (xLim - 0.15) / Math.max(0.05, Math.abs(Math.cos(th)));
+    r = Math.min(r, xCap, Math.sin(th) < -0.3 ? 3.42 : d.rCeil);
+    // Measured free volume, not declared — and DIRECTIONAL: the bore sits
+    // 0.9 in front of the axis, so the wall stands farther out toward the
+    // front (thin margin there — the front wall threads between the
+    // bore's face at z0+0.125 and the socket's at z0+0.25, as every
+    // tower's cowl always has).
     if (y > 6.35) {
-      r = Math.max(r, v.shaft.r + 0.2 + 0.42 * Math.max(0, Math.sin(th)));
+      const s = Math.max(0, Math.sin(th));
+      r = Math.max(r, v.shaft.r + 0.9 * s + 0.2 - 0.17 * s);
     }
     return r;
   };
@@ -217,13 +222,18 @@ export function buildStumpShell(ctx) {
     // socket — which is what a real trunk grown against a wall does.
     const zAvail = Math.sin(th) >= 0
       ? (zFrontLim - d.axisZ) - 0.10
-      : (d.axisZ - zBackLim) - 0.12;
+      : (d.axisZ - (z0 - 6.3)) - 0.12;   // the glade, not the socket's back
     return [r * Math.cos(th), y,
       d.axisZ + Math.sin(th) * Math.min(r, zAvail)];
   };
   const surfPoint = (th, y, inset = 0) => {
     const p = rawPoint(th, y, inset);
     p[2] = Math.min(p[2], z0 - 0.18);
+    // Anchor margin in x as well as z: a prop's own body (caps run to
+    // ~0.4) extends past its anchor, and two crown pieces crossed the
+    // mat wall by 0.07 exactly that way.
+    const xm = xLim - 0.55;
+    if (Math.abs(p[0]) > xm) p[0] = Math.sign(p[0]) * xm;
     return p;
   };
   const portMask = (wx, y, sth) => {
@@ -322,12 +332,24 @@ export function buildStumpShell(ctx) {
   geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uv), 2));
   geo.setIndex(idx);
   geo.computeVertexNormals();
+  // FRONT faces only for the bark — and a near-black unlit twin turned
+  // INWARD. The bowl's open crown pours moonlight onto the interior back
+  // wall, and a DoubleSide shell showed that wall pale THROUGH the mouth:
+  // the "pale skirt" that survived four rounds of skirt fixes was never
+  // the skirt. A hollow's inside is rot-dark whatever the sky does, so
+  // the interior is a MATERIAL fact here, not a lighting outcome.
   const shellMat = MAT.bark.clone();
-  shellMat.side = THREE.DoubleSide;
+  shellMat.side = THREE.FrontSide;
   const shell = new THREE.Mesh(geo, shellMat);
   shell.name = 'boleShell';
   add(shell);
   parts.splice(parts.indexOf(shell), 1);            // colors are load-bearing
+  const innerDark = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    color: 0x090b09, side: THREE.BackSide,
+  }));
+  innerDark.name = 'boleInnerDark';
+  add(innerDark);
+  parts.splice(parts.indexOf(innerDark), 1);
 
   // --- the liner: the dark inside ------------------------------------------
   {
@@ -348,7 +370,12 @@ export function buildStumpShell(ctx) {
         const r = radius(th, y) - 0.16
           + 0.05 * fbm(th * 3, y * 0.5, 8, 3, seed + 21);
         const wx = r * Math.cos(th);
-        const wz = r * Math.sin(th) * (Math.sin(th) > 0 ? 0.9 : 1);
+        // Same z-clamp as the shell, 0.06 tighter — the liner is the
+        // inside of the same wall and must never poke through it.
+        const zA = (Math.sin(th) >= 0
+          ? (zFrontLim - d.axisZ) - 0.16
+          : (d.axisZ - (z0 - 6.3)) - 0.18);
+        const wz = Math.sin(th) * Math.min(r, zA);
         // The liner's hole is barely wider than the shell's mouth — its
         // torn rim is MEANT to peek: the glowing rot wall just inside the
         // opening is what makes the cavity read as a cavity. (First cut
@@ -404,6 +431,35 @@ export function buildStumpShell(ctx) {
     liner.name = 'boleLiner';
     add(liner);
     parts.splice(parts.indexOf(liner), 1);          // stays void-dark
+  }
+
+  // --- the chute and tray, clad in dark rot ---------------------------------
+  // The placeholder's cladding died with the placeholder, which left the
+  // engine ramp NAKED — and the invisible collider showed as dice riding
+  // nothing. Clad exactly on the engine boxes (zero colliders), darkened
+  // INTO the trunk by vertex gradient: the mood lamp casts no shadows, so
+  // the hollow's darkness has to live in the vertices, not the light.
+  {
+    const clad = (box, uvv, gradFrom, gradTo) => {
+      const g = new THREE.BoxGeometry(box.s[0], box.s[1], box.s[2]);
+      const p = g.attributes.position;
+      const cols = new Float32Array(p.count * 3);
+      for (let i = 0; i < p.count; i++) {
+        const k = 0.07 + 0.93 * clamp01((p.getZ(i) - gradFrom) / (gradTo - gradFrom));
+        cols[i * 3] = k; cols[i * 3 + 1] = k * 0.95; cols[i * 3 + 2] = k * 0.88;
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+      const m = MAT.punk.clone();
+      m.vertexColors = true;
+      const mesh = new THREE.Mesh(g, m);
+      mesh.position.set(...box.c);
+      if (box.rx) mesh.rotation.x = box.rx;
+      add(mesh);
+      parts.splice(parts.indexOf(mesh), 1);   // the gradient is load-bearing
+      return mesh;
+    };
+    clad(v.apron, 1.7, -1.2, 2.6);            // ramp: black inside, moonlit outrun
+    clad(v.lip, 1.0, -1.4, 0.2);              // tray: mostly lit
   }
 
   // --- roots: the buttress ridges run out onto the ground -------------------

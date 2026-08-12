@@ -588,11 +588,14 @@ export function buildFaeConcept({ paletteId = 'moonrise', seed = 20260815 } = {}
   const shaft = buildMoonShaft(pal);
   const halos = buildHalos(pal);
   const treeline = buildTreeline(pal, seed);
-  // The stump stands where the tower will socket (W3), wound facing the
-  // table, moot ellipse dying at its feet — the silhouette Joe judges.
-  const stump = buildStumpShell(pal);
-  stump.position.set(0.6, 0, -8.2);
-  group.add(ground, treeline, stump, moot, wisps.points, shaft, halos, ...sheets);
+  // NO STUMP PROP. The W0 concept plates placed a lab stump at the future
+  // socket; when the real Hollow Bole shipped (W3) the venue kept
+  // planting the prop underneath it, and the two interleaved into a pale
+  // ghost skirt that ate four rounds of misdirected fixes (found by
+  // setVisibleByName forensics, not by staring). The tower is the
+  // venue's tower now; buildStumpShell survives only as the exported lab
+  // reference.
+  group.add(ground, treeline, moot, wisps.points, shaft, halos, ...sheets);
   // Fold the moot's static light into the fog base (techniques §6).
   brightenFog(sheets, moot.userData.pools);
   for (const s of sheets) s.userData.base = s.geometry.attributes.color.array.slice();

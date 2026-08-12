@@ -7381,11 +7381,13 @@ function faeConceptStart(opts = {}) {
   FAECONCEPT.saved = { tune: { ...MOOD.tune }, bg: scene.background.clone(), moodOn: MOOD.on };
   scene.background = new THREE.Color(rig.pal.void);
   Object.assign(MOOD.tune, {
-    // lampAngle 0.65 / lampZ 0.6: the moon's pool must reach the tower
-    // socket at the back of the mat, not just the felt — the first Bole
-    // frames rendered a tree the moonlight had never heard of.
-    lampColor: rig.pal.moon, lampIntensity: 2.8, lampY: 22, lampZ: 0.6,
-    lampAngle: 0.65,
+    // lampAngle 0.55: the moon POOLS — 0.65 was a floodlight that lit the
+    // whole glade through every wall (the lamp is decay-0 and shadowless),
+    // inverting the trunk's value ramp and washing its foot bone-white.
+    // The pool covers the resolve area and kisses the tower's foot; the
+    // trunk's own values carry the rest.
+    lampColor: rig.pal.moon, lampIntensity: 2.8, lampY: 22, lampZ: 1.0,
+    lampAngle: 0.55,
     hemi: 0.12, key: 0.6, rim: 0.55, fogNear: 20, fogFar: 46,
   });
   MOOD.on = true;
@@ -8461,6 +8463,14 @@ window.__diceDebug = {
     applyMood();
     return { ...MOOD.moteTune, live: !!MOOD.motes };
   },
+  // Frame forensics: hide/show any named object. When a mystery mass
+  // survives four rounds of "fix the thing I think it is", the answer is
+  // to stop thinking and start hiding (the Hollow Bole's pale skirt).
+  setVisibleByName(name, visible = false) {
+    let n = 0;
+    scene.traverse((o) => { if (o.name === name) { o.visible = !!visible; n++; } });
+    return n;
+  },
   // THE FAE CONCEPT LAB (ROADMAP W0): faeConcept(true, {paletteId:
   // 'moonrise'|'foxfire'}) stages the Moonrise Glade sketch; false restores
   // the room exactly. Concept plates only — not the venue mechanism.
@@ -8558,6 +8568,21 @@ window.__diceDebug = {
       if (isDress && b.max.z <= hoodZ + 0.02 && b.min.y >= 4.4
         && b.min.x >= -soc.x - 1e-3 && b.max.x <= soc.x + 1e-3) {
         return 'DRESS REACH — a wall-hung prop above the play volume';
+      }
+      // VENUE GROUNDS (GOALS goals 13–15; Joe, 2026-08-16: "I'm OK with
+      // invisible physics elements to make this work"): a venue-only
+      // tower stands in a GLADE, not a room — there is no back wall
+      // behind the socket plane to protect, so its body may continue
+      // BACKWARD into the scene the venue owns. Backward only (x still
+      // has the mat's physics wall; forward is still the felt), bounded
+      // at 8 units so "grounds" never means "forever", and never below
+      // the soil.
+      if (TOWERS[currentTower] && TOWERS[currentTower].venueOnly
+        && b.min.x >= -soc.x - 1e-3 && b.max.x <= soc.x + 1e-3
+        && b.max.y <= soc.y1 + 1e-3 && b.min.y > -0.15
+        && b.min.z >= v.z0 - 8
+        && over.every((s) => s.startsWith('z-') || s.startsWith('y-'))) {
+        return 'VENUE GROUNDS — behind the socket plane, spending glade';
       }
       return 'UNCLASSIFIED';
     };
