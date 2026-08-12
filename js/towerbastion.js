@@ -744,8 +744,8 @@ export function buildBastionSkin(v) {
   // every mortar course and part joint, plus dust on the battlement tops and
   // corbel ledges. Weather side matches the ivy's shaded flank.
   weatherPass(parts, {
-    edge: 0.35, grime: 1.1, dust: 0.85, drift: 0.12, weatherSide: -1,  // Joe: even more
-    edgeGate: (p, n) => clamp01(0.5 - 0.5 * n.x)
+    edge: 1.0, grime: 1.1, dust: 0.85, drift: 0.12, weatherSide: -1,  // Joe: even more, edges way up
+    edgeGate: (p, n) => 0.55 + 0.45 * clamp01(0.5 - 0.5 * n.x)
       * (0.3 + 0.7 * clamp01(1 - Math.abs(p.y - 3) / 6)),
   });
 

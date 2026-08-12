@@ -830,7 +830,7 @@ export function weatherPass(parts, {
   grime = 0.45,     // AO-driven deposit in inside corners
   dust = 0.30,      // up-facing pale film
   drift = 0.08,     // per-part tonal wander (±value, warm-biased)
-  edgeTint = [0.22, 0.20, 0.15],
+  edgeTint = [0.55, 0.48, 0.34],  // Joe: edges way up
   grimeTint = [-0.16, -0.26, -0.42],
   dustTint = [0.16, 0.21, 0.36],
   edgeGate = null,  // (pWorld, nWorld) => 0..1 — wear where light + hands reach
@@ -1351,8 +1351,8 @@ export function buildTowerSkin(v) {
   // The -x flank is the weather side (it is already the ivy's shaded side,
   // so age and growth agree about which way this tower faces the rain).
   weatherPass(parts, {
-    edge: 0.48, grime: 0.7, dust: 0.55, drift: 0.11, weatherSide: -1,  // Joe: wood -20%
-    edgeGate: (p, n) => clamp01(0.5 - 0.5 * n.x)
+    edge: 1.15, grime: 0.7, dust: 0.55, drift: 0.11, weatherSide: -1,  // Joe: wood -20%, edges way up
+    edgeGate: (p, n) => 0.55 + 0.45 * clamp01(0.5 - 0.5 * n.x)
       * (0.35 + 0.65 * clamp01(1 - Math.abs(p.y - 2.5) / 5)),
   });
 
