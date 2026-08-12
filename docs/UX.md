@@ -4378,3 +4378,36 @@ back exactly. Room-wide like the tower; late joiners land in the venue
 the table chose. Rolls are unchanged in every way that counts: same
 physics, same films, same values on every client — the venue is scenery
 with doctrine (GOALS goals 14–15), not a rules change.
+
+### 7.35 The venue tower — Hollow Bole (2026-08-12, W3)
+
+**A venue tower has no chip.** `hollowbole` is a fourth row in the tower
+registry and the first one a player cannot pick: it carries `venueOnly`,
+`renderTowerPicker` skips it, and it goes up because the Moonrise Glade or
+the Foxfire Hollow went up. That is goal 13 applied one level down — a
+fantasy venue *replaces* the à-la-carte pickers, so offering its own tower
+beside Bastion would be re-opening the à-la-carte menu the venue exists to
+close. It is a capability rule nowhere: `setTower('hollowbole')` works, the
+server accepts the id, and the pour is the same pour. Only the CHIP is
+withheld.
+
+**What it is.** A rotted hollow trunk, one model under two skies: the moot
+of foxfire caps around the broken crown, three shelf brackets climbing the
+shaded flank, and — the one warm thing in either venue — a tiny lit door
+0.24 × 0.40 in the root buttress beside the exit, with a real ember light
+in front of it so the warm falls on the apron a die comes down. Nothing in
+the skin is a colour: every hue is read from the venue's palette at build
+time, and the emissive tiers are authored as `target ÷ the hue's own linear
+luminance`, so the two skies come out at the same VALUE and differ only in
+colour. Nothing on it blooms, by construction — an always-on bloom source
+would disable the post-stack bypass for the whole app.
+
+**Not shipped yet: the shape.** The owner's reference is a broken stump —
+stocky, a torn frontal wound opening into black, splinter spires, heavy
+buttress roots, pale barkless fibre. The shell standing in the file today
+is a box-and-extrusion interim that reads as a rectangular tower wearing
+bark; it satisfies every contract proof and none of the brief's silhouette.
+It is isolated behind one function and one descriptor
+(`js/towerhollow.js`, THE SHELL IS ONE SWAPPABLE FUNCTION) so the parametric
+replacement drops in without touching the moot, the door, the palette work
+or the proofs.
