@@ -11088,4 +11088,89 @@ export const scenarios = [
       await a.settle();
     },
   },
+
+  {
+    name: 'audio-settle',
+    tags: ['fx', 'audio', 'roll'],
+    // THE SCHEDULED TAIL (docs/AUDIO.md §3.4). A die does not stop, it dies
+    // down: a geometric run of taps, each quieter and duller and closer
+    // together than the last, and then genuine silence.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      await a.dbg('holdClock(true)');
+      await a.dbg('audioForce(true)');
+
+      const bake = async (seed) => {
+        await a.dbg(`throwSeeded(['d6','d6','d6','d8'], ${seed})`);
+        await a.eval('(() => { const D = window.__diceDebug;'
+          + ' for (let f = 0; f < 1200 && D.busy; f++) D.sim(1); return 1; })()');
+        const info = await a.dbg('audioSettleInfo()');
+        await a.dbg('clearTable()');
+        await a.dbg('sim(400)');
+        return info;
+      };
+
+      // ---- one cluster per die ---------------------------------------------
+      // Before this increment the answer was zero. The LAST die is the one to
+      // watch: the film is truncated at ITS landing, so there is no settled
+      // frame after it — the design expected a special case on the
+      // roll.time >= duration branch. Measured, the frame clamp already
+      // delivers the crossing, and this count is what keeps that honest.
+      const one = await bake(31337);
+      assert.equal(one.plans.length, one.dice,
+        `one cluster per die (${one.plans.length} for ${one.dice} dice)`);
+
+      // ---- the intervals are geometric, inside the jitter band -------------
+      // ratio 0.42, jitter ±12%, so consecutive gaps must land in
+      // [0.42·0.88/1.12, 0.42·1.12/0.88] = [0.33, 0.535].
+      for (const p of one.plans) {
+        assert.ok(p.gaps.length >= 4,
+          `d${p.di}: the tail is more than a couple of ticks (${p.gaps.length} taps)`);
+        for (let k = 1; k < p.gaps.length; k++) {
+          const r = p.gaps[k] / p.gaps[k - 1];
+          assert.ok(r > 0.32 && r < 0.55,
+            `d${p.di} tap ${k}: the gap ratio stays geometric within jitter `
+            + `(${r.toFixed(3)} of ${p.gaps[k - 1].toFixed(4)}s)`);
+        }
+        for (let k = 1; k < p.amps.length; k++) {
+          assert.ok(p.amps[k] < p.amps[k - 1],
+            `d${p.di} tap ${k}: quieter than the one before it`);
+        }
+      }
+
+      // ---- THE GATE-THEFT CLAIM --------------------------------------------
+      // The tail is SUPPOSED to be denser than the hard floor. If taps went
+      // through the impact cursor, every gap under 18 ms would be a tap that
+      // never happened — which is IMMERSION §366's predicted failure wearing
+      // its usual disguise ("the new sounds are too loud/too sparse"). So:
+      // the plan must contain gaps below the floor, and must contain all of
+      // them.
+      const gate = await a.dbg('clickGate');
+      const floorS = gate.wallFloorMs / 1000;
+      const shortest = Math.min(...one.plans.map((p) => Math.min(...p.gaps)));
+      assert.ok(shortest < floorS,
+        `the tail gets denser than the ${gate.wallFloorMs} ms impact floor `
+        + `(shortest gap ${(shortest * 1000).toFixed(2)} ms) — which is only `
+        + 'possible because taps never consult the impact cursor');
+      assert.ok(one.plans.every((p) => p.gaps.length === p.amps.length),
+        'and every scheduled tap has both a time and a level');
+
+      // ---- same seed, byte-identical tail ----------------------------------
+      // Rhythm is the determinism line (docs/AUDIO.md §4): timbre may differ
+      // between two people in one room, timing may not. The schedule comes
+      // from hash(seed, di, k) and nothing else.
+      const two = await bake(31337);
+      assert.deepEqual(two.plans.map((p) => [p.di, p.gaps]),
+        one.plans.map((p) => [p.di, p.gaps]),
+        'the same seed schedules byte-identical tap times');
+      const other = await bake(31338);
+      assert.notDeepEqual(other.plans.map((p) => p.gaps), one.plans.map((p) => p.gaps),
+        'and a different seed does not — otherwise the hash is not being '
+        + 'consulted at all and the claim above is vacuous');
+
+      await a.dbg('audioForce(false)');
+      await a.dbg('holdClock(false)');
+      await a.settle();
+    },
+  },
 ];

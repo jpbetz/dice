@@ -1194,6 +1194,7 @@ const AUDIO = {
   buffersMade: 0,
   buffersAtBuild: 0,
   oneShots: 0,
+  tapClusters: 0,
 };
 
 // Per-CLASS wall-clock gate cursors. There used to be one module-global
@@ -1484,10 +1485,10 @@ function impactPresetOf(voice) {
 // no cleanup array: three nodes, started, forgotten, collected when they end.
 // `durSec` is how long the envelope runs; the source is read from a random
 // offset into the shared buffer so per-hit texture survives the sharing.
-function noiseOneShot({ preset, freq, gain, durSec, bus, attack = 1 }) {
+function noiseOneShot({ preset, freq, gain, durSec, bus, attack = 1, at = 0 }) {
   const ctx = AUDIO.ctx;
   const buf = AUDIO.noise;
-  const t0 = ctx.currentTime;
+  const t0 = at > 0 ? at : ctx.currentTime;
   const src = ctx.createBufferSource();
   src.buffer = buf;
   src.loop = true; // a long tail must never run off the end of a 2 s buffer
@@ -1513,6 +1514,118 @@ function noiseOneShot({ preset, freq, gain, durSec, bus, attack = 1 }) {
   src.stop(t0 + durSec + 0.01);
   AUDIO.oneShots++;
   return { filter, gain: g, t0, durSec };
+}
+
+// ---------------------------------------------------------------------------
+// PHASE SETTLE — the scheduled tail (docs/AUDIO.md §3.4)
+//
+// A die does not stop; it dies down. Landing fires a geometric (Zeno) run of
+// taps, each quieter, duller and closer together than the last, and then the
+// die is genuinely silent — not a floor of ticks, silence.
+//
+// THE WHOLE CLUSTER IS SCHEDULED IN ONE GO, at absolute context times, the
+// moment the film cursor crosses landings[di].frame. Two consequences that
+// are the point rather than an implementation detail:
+//
+//   · the tail is DENSER THAN THE HARD FLOOR by design. Gaps run 85, 36, 15,
+//     6.3, 2.6 ms — the last three under the 18 ms wall floor. Taps therefore
+//     use their own gate class and never consult the impact cursor; routed
+//     through it, taps 3 to 5 simply would not exist.
+//   · nothing is written into roll.sounds. That 400-event budget is shared
+//     with clunks, particles, decals and the shock ring (refusal §10).
+//
+// And the rhythm comes from hash(seed, di, k), never from Math.random: two
+// people in one room must hear the same tail. Timbre may differ between
+// clients; timing may not.
+// ---------------------------------------------------------------------------
+
+const TAP_E = 0.42;         // the geometric ratio, gaps and amplitudes alike
+const TAP_T0 = 0.085;       // seconds — the first gap
+const TAP_A0_FRAC = 0.5;    // of the landing impact's computed gain
+const TAP_MAX = 8;
+const TAP_FLOOR_FRAC = 0.01; // stop when a tap is under 1% of A0
+
+// Deterministic jitter. A finalizer hash of (seed, die, tap index) — no state,
+// no stream position, so client A and client B agree without having to have
+// drawn the same number of previous values.
+function tapHash(seed, di, k) {
+  let h = ((seed >>> 0) ^ Math.imul(di + 1, 0x9e3779b1) ^ Math.imul(k + 1, 0x85ebca6b)) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x7feb352d) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x846ca68b) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+  return h / 4294967296;
+}
+
+// The strength of the contact that BROUGHT this die down — the tail has to sit
+// under its own landing. Read off the recorded film (the last contact credited
+// to this die at or before its settle), so it is the same number everywhere.
+function landingStrengthOf(roll, di) {
+  if (!roll.audioLandStrength) roll.audioLandStrength = roll.dice.map(() => 0);
+  else if (roll.audioLandStrength[di]) return roll.audioLandStrength[di];
+  const f = roll.landings[di].frame;
+  let best = 0;
+  for (let i = 0; i < roll.sounds.length; i++) {
+    const s = roll.sounds[i];
+    if (s.di !== di) continue;
+    if (s.time > (f + 1) / 60) break;
+    best = s.strength;
+  }
+  roll.audioLandStrength[di] = best;
+  return best;
+}
+
+// Schedule one die's whole tail. Returns the plan (gaps and amplitudes) so a
+// scenario can compare two bakes of one seed byte for byte.
+function scheduleSettleCluster(roll, di) {
+  const ctx = ensureAudio();
+  if (!ctx || !soundOn) return null;
+  // THE TAP CURSOR IS AN OBSERVABLE, NOT A LIMITER, and that is deliberate.
+  // The first version put an 18 ms wall floor between clusters and it was
+  // wrong twice over: it silently dropped three of four clusters under sim()
+  // (which advances film frames back to back in wall time), and more
+  // importantly it made a RHYTHM depend on the wall clock, which §4 forbids
+  // outright. A die settles once per roll; the worst burst is one cluster per
+  // die on a shared SETTLE_CAP frame, which is one event and should sound
+  // like one. The tap class exists to keep the tail off the IMPACT cursor,
+  // not to ration clusters.
+  GATE.tap = performance.now();
+  const strength = landingStrengthOf(roll, di);
+  if (strength <= 0) return null;
+  const shrouded = roll.dice.length > 0 && roll.dice[0].shrouded === true;
+  const ds = shrouded ? null : rollDieSet(roll, di);
+  const fxSet = ds && SETS[ds] ? SETS[ds] : null;
+  const voice = impactVoice({ di }, fxSet);
+  const { preset } = impactPresetOf(voice);
+  const weight = voice ? Math.max(0, Math.min(1, voice.weight || 0)) : 0;
+  const sustainMs = voice ? Math.max(0, voice.sustain || 0) : 0;
+  const A0 = Math.min(0.35, strength * preset.gainScale) * TAP_A0_FRAC;
+  const plan = { di, gaps: [], amps: [] };
+  let t = ctx.currentTime;
+  const bus = busFor(0) || AUDIO.master;
+  for (let k = 0; k < TAP_MAX; k++) {
+    const decay = Math.pow(TAP_E, k);
+    if (decay < TAP_FLOOR_FRAC) break;
+    const gap = TAP_T0 * decay * (0.88 + 0.24 * tapHash(roll.seed, di, k));
+    const amp = A0 * decay;
+    t += gap;
+    plan.gaps.push(Math.round(gap * 1e6) / 1e6);
+    plan.amps.push(Math.round(amp * 1e9) / 1e9);
+    // The last taps are near-pure thump: the centre walks down 0.85 per tap
+    // and the tail is halved, so the tail dulls as well as fading.
+    const freq = Math.max(60, preset.baseFreq * (1 - 0.5 * weight) * Math.pow(0.85, k + 1));
+    noiseOneShot({
+      preset,
+      freq,
+      gain: Math.max(1e-4, amp),
+      durSec: ((45 + sustainMs) / 1000) * 0.5,
+      bus,
+      at: t,
+    });
+  }
+  if (!roll.audioTaps) roll.audioTaps = [];
+  roll.audioTaps.push(plan);
+  AUDIO.tapClusters++;
+  return plan;
 }
 
 // Returns true when a click was actually voiced, so the caller can advance its
@@ -1808,6 +1921,15 @@ function stepRollingAudio(roll, i0, realtime) {
     const prev = roll.audioPhase[di];
     const phase = phaseAt(roll, di, i0, prev);
     roll.audioPhase[di] = phase;
+    // THE SETTLE CLUSTER, fired on the crossing and only on the crossing.
+    // The LAST die needs no special case: the film is truncated at its own
+    // landing, so `i0` clamps to that frame and the transition happens here
+    // like every other die's. (The design expected to have to fire it from
+    // the roll.time >= duration branch; measured, the clamp already does it,
+    // and audio-settle counts one cluster per die to keep it honest.)
+    if (phase === 'settled' && prev !== 'settled' && (realtime || audioForced)) {
+      scheduleSettleCluster(roll, di);
+    }
     const k = contactKinematics(roll, di, i0);
     const kf = roll.keyframes[di];
     const p = kf[Math.min(i0, kf.length - 1)];
@@ -8878,6 +9000,20 @@ window.__diceDebug = {
       defaultBody: IMPACT_DEFAULT_BODY,
       panMax: PAN_MAX, panBuses: PAN_BUSES,
       masterGain: MASTER_GAIN,
+    };
+  },
+  // THE SETTLE TAIL (docs/AUDIO.md §3.4). Per-die cluster plans off the
+  // CURRENT roll, so two bakes of one seed can be compared byte for byte —
+  // and the tap gate cursor beside the impact one, because the whole point of
+  // a separate class is that the tail may be denser than the impact floor.
+  audioSettleInfo() {
+    const r = currentRoll;
+    return {
+      clusters: AUDIO.tapClusters,
+      dice: r ? r.dice.length : 0,
+      plans: r && r.audioTaps ? r.audioTaps.map((p) => ({ ...p })) : [],
+      gateImpact: GATE.impact,
+      gateTap: GATE.tap,
     };
   },
   // Tests only: sustained sources are gated on a REAL-TIME frame and every
