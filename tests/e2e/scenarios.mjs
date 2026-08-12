@@ -9906,15 +9906,27 @@ export const scenarios = [
         'displacement left every throw identical to velocity, so claims 4 and 5 prove nothing');
 
       // --- 5. the predicate is really consulted -----------------------------
-      // Nothing subtle: at 0.0002 of a die-width the box is tighter than this
-      // solver's own contact chatter, so no die can ever hold it and every one
-      // must run to SETTLE_CAP. A silent run means the freeze test is not
-      // reading the boxes at all. (This is the displacement twin of
-      // pile-refusal's bar-at-0.5x claim.)
-      await a.dbg('setSettleGate({"mode":"displacement","eps":0.0002})');
+      // Nothing subtle: pick a box tighter than the solver's own contact
+      // chatter, so no die can ever hold it and every one must run to
+      // SETTLE_CAP. A silent run means the freeze test is not reading the
+      // boxes at all. (This is the displacement twin of pile-refusal's
+      // bar-at-0.5x claim.)
+      //
+      // THE BAR IS 2e-6, NOT THE ORIGINAL 2e-4 — the chatter moved. When
+      // this claim shipped, 0.0002 was below what any die could hold; the
+      // Phase 4 settle work (restitution gate, sleepoff) made the solver
+      // stiller than its own test: measured 2026-08-15 (disp-floor.mjs),
+      // seed 1000 now settles all 20 dice under 2e-4, while at 2e-5 and
+      // below all 20 time out on every seed tried. This claim went red for
+      // months of table time saying "not consulting the boxes" when the
+      // truth was "consulting them against a stale constant" — the ladder
+      // (eps 2e-2→2e-6: enforcement holds maxEndDisp<eps at EVERY rung,
+      // timeouts rise as eps falls) is what separates those two readings,
+      // and it is the measurement to re-run before ever touching this bar.
+      await a.dbg('setSettleGate({"mode":"displacement","eps":0.000002})');
       const absurd = await throwOne(seeds[0]);
       assert.ok(absurd.timedOut > 0,
-        `eps 0.0002 still froze every die — the freeze test is not consulting the boxes`);
+        `eps 2e-6 still froze every die — the freeze test is not consulting the boxes`);
 
       // --- 6. the reference mode leaves no residue --------------------------
       // mode 'velocity' has to mean "the old predicate, verbatim", and
