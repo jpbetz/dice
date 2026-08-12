@@ -2599,6 +2599,39 @@ A trauma²-curve table-nudge on the heaviest single-die landing; a grade
 LUT. Both sit in the canon's hazard-adjacent column; neither moves until
 Joe asks.
 
+## Tier W — The first fantasy venue: the fae set (commissioned 2026-08-15)
+
+Joe: "go full fantasy... an entire dice/tower/background/mat set focused
+around faye/farie. No holding back... faerie moots around glowing
+mushrooms on the dice tower... dense fog that the dice swirl and light up
+with a glow." Design authority is GOALS goals 13–15 (venues, the two
+registers, atmosphere-serves-the-roll), amended the same day; the punted
+questions (multi-dice-set venues, unbundling, portability) are recorded
+there. The engineering rules are untouched in this register: one seed one
+film, zero-dep, e2e per feature, the camera rulings, the perf budget.
+
+### W0. Research + concept — IN PROGRESS 2026-08-15
+Two dossiers (scratchpad/fae-research/): the fae visual grammar (what
+reads fae vs. generic-fantasy vs. kitsch; reference canon and palette
+structure) and the technique kit (dense ground fog, dice-lit fog, glow,
+fireflies — all zero-dep three.js r160, judged against our existing
+idioms). Then a written venue spec + 3–4 lab concept shots for Joe's eye
+BEFORE any production code.
+
+### W1. The venue mechanism + the set toggle — DESIGN WITH W0
+A `venue` as a first-class registry (the grounded room is venue zero);
+one full-set UX toggle that, while a fantasy venue is active, replaces
+the à-la-carte felt/dice/tower pickers (GOALS goal 13). Mechanism ships
+with the spec, not before it.
+
+### W2–W6, sequenced after the spec lands
+W2 the glade room (surface, horizon, atmosphere, lighting rig) · W3 the
+fae tower via the new-tower skill (moot circles, glowing mushrooms) ·
+W4 the dice set (rune glow, die lights, fog response) · W5 the living
+layer (wisps, fireflies, the moot in session) · W6 the audio palette.
+Each ships with its e2e proof; the venue is judged as a WHOLE at each
+step against goal 14's internal-consistency contract.
+
 ## Structural risks (bets, not bugs — each gets more expensive to reverse)
 
 - **System capability flags as scattered per-surface render gates.**

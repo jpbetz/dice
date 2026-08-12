@@ -15,7 +15,10 @@ note).
 1. **Grounded in the physical table.** The UX looks and feels like a real
    tabletop: actual 3D dice with real physics, a felt surface, results that
    land where they're thrown. Prefer showing real dice whenever that does not
-   conflict with a higher goal.
+   conflict with a higher goal. *(Scoped 2026-08-15: this is the law of the
+   GROUNDED register — see The venues, goal 13. A fantasy venue trades
+   material realism for a different believability contract, deliberately.
+   The default table remains grounded.)*
 2. **Fantasy-forward.** Effects beyond what a physical table can do — the
    roll-moment ceremony, mat inscriptions, crit fanfare, themed dice — are
    core to the experience, not decoration. (They are, however, sequenced
@@ -87,6 +90,42 @@ note).
     view of the tabletop plus performing rolls, offering rolls, and
     visibility choices. This system is not a chat, a character sheet, or a
     campaign manager.
+
+## The venues (added 2026-08-15)
+
+13. **The table travels — as one thing.** A *venue* is the complete staging
+    of the table: surface, horizon, atmosphere (fog, light), tower family,
+    dice set, ambient life, and audio palette, chosen as ONE coherent whole.
+    Selecting a venue is a full-set toggle: while a venue is active it
+    REPLACES the à-la-carte pickers (felt theme, dice theme, tower) rather
+    than layering over them — coherence is where immersion lives, and a
+    venue must never be assembled into incoherence one dropdown at a time.
+    The shipped room (felt, wooden towers, the lamp) is itself a venue: the
+    grounded one, and the default.
+14. **Two registers of belief.** A **grounded** venue is believed the way a
+    fine miniature is believed — small object, real material, real light
+    (the LEGO case; docs/IMMERSION-AUDIT.md §9). A **fantasy** venue is a
+    place that never existed and does not apologize for it; it is believed
+    through INTERNAL CONSISTENCY instead: one light-logic, one palette, one
+    place, effects native to that place. Wonder outranks material realism
+    there — dice may glow, air may swirl, the ground need not be a table.
+    Neither register is allowed to be half-believed: a fantasy venue that
+    keeps one foot on the casino felt reads as a costume, which is why goal
+    13 makes the set atomic.
+15. **Atmosphere serves the roll.** Every invariant below binds in every
+    register, and two bind *hardest* exactly when a venue is at its most
+    atmospheric: results stay readable (fog THINS over the resolve area, or
+    settled dice burn through it — a Success you cannot read is a broken
+    roll, not a mood), and ceremonies stay skippable. Determinism is
+    unchanged: one seed, one film, every client — a venue changes what a
+    roll looks like, never what it is. If an effect cannot meet these, the
+    effect is cut, not the rule.
+
+*Punted, recorded so nobody re-litigates them by accident (2026-08-15,
+Joe: "let's punt on that sort of thing"): whether a venue can host multiple
+dice sets; whether venue pieces later unbundle for à-la-carte use; how a
+venue rides the portable YAML and the room settings. None of these block
+the first fantasy venue.*
 
 ## Invariants (every feature must preserve these)
 
@@ -175,6 +214,13 @@ are authoritative, and nothing here needs to be consulted to build.*
   Soul Deal words + DC verdicts becomes the "Your Soul Deal" system profile;
   a "D&D"-style profile (DC verdicts, nat-20/1 crits, no meaning chart) and
   a "None" profile (numbers only) join it as room settings.
+- **"Grounded everywhere" is narrowed to the grounded register
+  (2026-08-15)** by goals 13–14: the miniature-believability strategy
+  (small object, real material — no tilt-shift, no impossible light) was
+  the whole table's law; it is now the law of grounded venues only. The
+  audit rows written against it (IMMERSION-AUDIT.md §6, §9) remain correct
+  *for that register*. Joe: "go full fantasy... nothing needs to be real
+  dice on a real table."
 - **The felt keeps no marks (2026-08-03)**: Level 4's impact decals
   (frost / drying ring / scorch / smudge) shipped and were switched off
   the same evening — the ladder stayed, the residue went. The machinery is
