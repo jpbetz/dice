@@ -6022,7 +6022,7 @@ const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
     // RE-AIMED (Joe, 2026-08-12): ~5° more yaw to the viewer's right, ~5°
     // pitched up (the target rose to the mid-shaft, which also brings the
     // crown into frame at last), and a third of a tower height further back.
-    camMove: true, camX: 8, camY: 10.5, camDist: 24.5, camTgtY: 11 },
+    camMove: true, camX: 8, camY: 15.5, camDist: 24.5, camTgtY: 6.5 },
   camPhase: null };
 const TOWERLAB_EULER = new THREE.Euler();
 
