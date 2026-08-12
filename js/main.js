@@ -1574,6 +1574,144 @@ function playImpact(strength, voice, filmTime, ev) {
 }
 
 // ---------------------------------------------------------------------------
+// THE THREE-PHASE CONTACT MACHINE (docs/AUDIO.md §3)
+//
+// Per-die state, derived at playback from film data every client already
+// agrees on. The three phases are not three switched sounds — impact is the
+// transient limit, rolling the sustained middle, settle the scheduled tail.
+//
+// EVERY NUMBER HERE COMES OFF THE FILM. Nothing reads performance.now(),
+// nothing reads a painted mesh, nothing reads a live physics body: the
+// keyframes, `landings` and `pour.spans` are bytes every client has, so two
+// people watching one table derive the same phase for the same die on the
+// same frame (docs/AUDIO.md §4).
+// ---------------------------------------------------------------------------
+
+// Hysteresis, because a bare threshold flutters. A die ENTERS rolling at
+// 1.5 rad/s and does not leave until it drops below 0.9 — the gap is what
+// keeps a voice from stuttering on and off at the boundary.
+const ROLL_ENTER_ANG = 1.5;  // rad/s
+const ROLL_EXIT_ANG = 0.9;
+const GROUND_EPS = 0.15;
+
+// How high a die's centre sits when it is resting on the felt.
+// DIAL FOR JOE — the 0.75·radius polyhedron constant is an approximation and
+// is meant to be verified against a baked settle. `restCeiling()` (the hull
+// radius) is the WRONG number here: it is the maximum any rest can be, which
+// for a d6 is the half-DIAGONAL, and using it would call a die grounded while
+// it is a full die-height above the felt.
+function restY(type) {
+  const def = DIE_DEFS[type] || {};
+  return def.size ? def.size / 2 : (def.radius || 1) * 0.75;
+}
+
+const _qKinA = new THREE.Quaternion();
+const _qKinB = new THREE.Quaternion();
+
+// Central differences on RAW KEYFRAMES AT INTEGER FRAMES. Never `d.mesh`
+// (a painted frame), never the interpolated pose: `d.correction` is a
+// constant post-multiply and cancels in a difference of raw quats, but it
+// does NOT cancel once the lerp/slerp has been applied.
+//
+// The pour guard is copied from `tempoAnchorOf`: a frame pair counts only if
+// the die is visible at BOTH ends. Without it the despawn teleport — a die
+// vanishing at the occlusion line and reappearing at the doorway — reads as
+// tens of units per second and the whole scale is wrong.
+function contactKinematics(roll, di, i0) {
+  const kf = roll.keyframes[di];
+  const last = kf.length - 1;
+  const spans = roll.pour ? roll.pour.spans[di] : null;
+  let fA = Math.max(0, i0 - 1);
+  let fB = Math.min(last, i0 + 1);
+  if (spans) {
+    if (!pourVisibleAt(spans, fA)) fA = i0;
+    if (!pourVisibleAt(spans, fB)) fB = i0;
+  }
+  const span = fB - fA;
+  if (span <= 0) return { speed: 0, angSpeed: 0, vy: 0 };
+  const a = kf[fA];
+  const b = kf[fB];
+  const speed = b.pos.distanceTo(a.pos) * 60 / span;
+  const vy = (b.pos.y - a.pos.y) * 60 / span;
+  // |w| for the quaternion double cover: q and −q are the same rotation, and
+  // without the absolute value half the frames report a near-π flip.
+  const qr = _qKinA.copy(a.quat).invert().multiply(_qKinB.copy(b.quat));
+  const angSpeed = 2 * Math.acos(Math.min(1, Math.abs(qr.w))) * 60 / span;
+  return { speed, angSpeed, vy };
+}
+
+// The phase of one die at one frame, given the phase it held at the previous
+// frame (hysteresis and absorption both need it).
+//
+//   hidden   — inside the tower: forced silent, whatever else is true
+//   settled  — at or past landings[di].frame, and ABSORBING: once settled a
+//              die never leaves, which is what makes "the room goes quiet"
+//              a guarantee rather than a tendency
+//   rolling  — on the felt and turning, with hysteresis
+//   airborne — everything else; contributes no sustained sound at all, since
+//              its contacts are the baked impact events
+function phaseAt(roll, di, i0, prev) {
+  const spans = roll.pour ? roll.pour.spans[di] : null;
+  if (spans && !pourVisibleAt(spans, i0)) return 'hidden';
+  if (prev === 'settled' || i0 >= roll.landings[di].frame) return 'settled';
+  const kf = roll.keyframes[di];
+  const p = kf[Math.min(i0, kf.length - 1)];
+  const grounded = p.pos.y < restY(roll.dice[di].type) + GROUND_EPS;
+  if (!grounded) return 'airborne';
+  const k = contactKinematics(roll, di, i0);
+  const bar = prev === 'rolling' ? ROLL_EXIT_ANG : ROLL_ENTER_ANG;
+  return k.angSpeed >= bar ? 'rolling' : 'airborne';
+}
+
+// The per-frame report. Records ALIAS across frames by design (the
+// SHIMMER_POOL discipline) — callers must project, never stash.
+const ROLLING_POOL = Array.from({ length: MAX_DICE_ON_TABLE }, () => ({
+  i: 0, type: '', speed: 0, angSpeed: 0, vy: 0, grounded: false, hidden: false,
+  phase: 'airborne', settleFrame: 0, x: 0, pan: 0, targetLevel: 0,
+}));
+const ROLLING_OUT = [];
+let rollingFrame = -1;
+
+// Called from stepPlayback once per frame, after the mesh loop and before the
+// impact drain. `realtime` is threaded through from tick: the DERIVATION runs
+// on every path (so a headless sim() can assert on it), but nothing may
+// create or level a sustained source off a non-realtime frame — sim() and
+// fastForwardPlayback both drain films at a speed no ear was meant to hear.
+function stepRollingAudio(roll, i0, realtime) {
+  if (!roll.audioPhase) roll.audioPhase = roll.dice.map(() => 'airborne');
+  const n = Math.min(roll.dice.length, ROLLING_POOL.length);
+  rollingFrame = i0;
+  for (let di = 0; di < n; di++) {
+    const prev = roll.audioPhase[di];
+    const phase = phaseAt(roll, di, i0, prev);
+    roll.audioPhase[di] = phase;
+    const k = contactKinematics(roll, di, i0);
+    const kf = roll.keyframes[di];
+    const p = kf[Math.min(i0, kf.length - 1)];
+    const slot = ROLLING_POOL[di];
+    slot.i = di;
+    slot.type = roll.dice[di].type;
+    // RAW, not zeroed by phase. Reporting 0 because a die is settled would
+    // make "a settled die does not move" true by construction instead of
+    // true about the film — and the film is the thing under test (the
+    // by-reference `frozenPose` is what actually makes it hold).
+    slot.speed = k.speed;
+    slot.angSpeed = k.angSpeed;
+    slot.vy = k.vy;
+    slot.grounded = p.pos.y < restY(roll.dice[di].type) + GROUND_EPS;
+    slot.hidden = phase === 'hidden';
+    slot.phase = phase;
+    slot.settleFrame = roll.landings[di].frame;
+    slot.x = p.pos.x;
+    slot.pan = panForX(p.pos.x);
+    slot.targetLevel = 0; // rolling voices arrive in increment 4
+    ROLLING_OUT[di] = slot;
+  }
+  ROLLING_OUT.length = n;
+  void realtime;
+}
+
+// ---------------------------------------------------------------------------
 // Roll engine: simulate-ahead + keyframe playback + face correction
 //
 // playRoll(roll) synchronously fast-forwards the cannon world for the roll's
@@ -3688,7 +3826,13 @@ function rollDice(types, label, opts = {}) {
 // It is applied to `step` alone, BELOW the two ceremony phases: a declaration
 // beat and a verdict unfold are reading time, not dice, and speeding those up
 // would be a UX change wearing a physics change's clothes.
-function stepPlayback(dt, tempo = 1, curve = false) {
+// `realtime` defaults to `curve` because they have always been the same fact:
+// tick() is the only caller that passes either, and it passes its own
+// realtime flag. It is a separate parameter rather than a reuse because the
+// audio machine below is gated on it for a DIFFERENT reason than the tempo
+// curve is — sim() and fastForwardPlayback drain films at speeds no ear was
+// meant to hear, and a sustained source must never be created off one.
+function stepPlayback(dt, tempo = 1, curve = false, realtime = curve) {
   const roll = currentRoll;
   if (!roll || roll.done) return;
   const cer = roll.ceremony;
@@ -3776,6 +3920,10 @@ function stepPlayback(dt, tempo = 1, curve = false) {
     d.mesh.quaternion.copy(a.quat).slerp(b.quat, frac).multiply(d.correction);
     if (spans) d.mesh.visible = pourVisibleAt(spans[di], i0);
   }
+  // The contact machine (docs/AUDIO.md §3), after the mesh loop and before
+  // the impact drain: it reads the same frame index the meshes were just
+  // placed from, and the drain below is allowed to see the phase it decided.
+  stepRollingAudio(roll, i0, realtime);
   // Act two of the pour's camera, cued at the FIRST exit rather than the last
   // (Joe): the camera leads the dice onto the felt and is already looking down
   // by the time the spread lands. Fires once per roll.
@@ -6378,7 +6526,7 @@ function tick(dt, render = true, realtime = false) {
   particleField.tick(dt, SHADER_TIME.value);
   decalField.tick(dt);
   dieLights.tick(dt, SHADER_TIME.value);
-  stepPlayback(dt, realtime ? TEMPO.k : 1, realtime);
+  stepPlayback(dt, realtime ? TEMPO.k : 1, realtime, realtime);
   stepSinking(dt);   // per-roll Done departures (§7.5)
   stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
   stepRevealing(dt); // reveal correction flips (goal 11)
@@ -8432,6 +8580,108 @@ window.__diceDebug = {
   impactPresetFor(ev, setId) {
     const { body, preset } = impactPresetOf(impactVoice(ev || {}, SETS[setId] || null));
     return { body, ...preset };
+  },
+  // THE CONTACT MACHINE, AS OF THE LAST FRAME STEPPED (docs/AUDIO.md §3).
+  // Read from `currentRoll` and the film, never from a painted frame — the
+  // contactStats discipline. `targetLevel` is the FILM-DERIVED computed level
+  // and is reported even on a non-realtime frame, so a headless sim() run can
+  // assert on it without any sound having been made.
+  rollingState() {
+    if (!currentRoll) return null;
+    return {
+      frame: rollingFrame,
+      time: currentRoll.time,
+      dice: ROLLING_OUT.map((s) => ({
+        i: s.i, type: s.type,
+        speed: Math.round(s.speed * 1e6) / 1e6,
+        angSpeed: Math.round(s.angSpeed * 1e6) / 1e6,
+        grounded: s.grounded, hidden: s.hidden, phase: s.phase,
+        settleFrame: s.settleFrame, x: Math.round(s.x * 1e6) / 1e6, pan: s.pan,
+        targetLevel: Math.round(s.targetLevel * 1e6) / 1e6,
+      })),
+    };
+  },
+  // THE WHOLE FILM, WALKED IN ONE CALL. rollingState() answers about one
+  // frame; several of the machine's claims are about every frame of a throw
+  // (settled is absorbing; no die ever teleports; every hidden frame is
+  // silent), and asserting those a frame at a time would be hundreds of CDP
+  // round trips racing a clock. This is a PURE FUNCTION OF THE FILM — it
+  // never touches playback state, so it may be called at any time and cannot
+  // perturb what it measures.
+  audioFilmScan() {
+    const r = currentRoll;
+    if (!r || !r.keyframes) return null;
+    const last = r.frames - 1;
+    const dice = r.dice.map((d, i) => ({
+      i, type: d.type, settleFrame: r.landings[i].frame,
+      maxSpeed: 0, maxAngSpeed: 0,
+      rollingFrames: 0, longestRollingRun: 0,
+      hiddenFrames: 0, hiddenNotSilent: 0,
+      settledEarly: 0, unsettledAtOrAfterLanding: 0, leftSettled: 0,
+      movedAfterSettle: 0, framesAfterSettle: 0,
+      maxSpeedAfterSettle: 0, maxAngSpeedAfterSettle: 0, stillTailFrames: 0,
+    }));
+    const spans = r.pour ? r.pour.spans : null;
+    for (let di = 0; di < r.dice.length; di++) {
+      const o = dice[di];
+      let prev = 'airborne';
+      let run = 0;
+      let everSettled = false;
+      for (let f = 0; f <= last; f++) {
+        const phase = phaseAt(r, di, f, prev);
+        const k = contactKinematics(r, di, f);
+        if (phase !== 'hidden') {
+          o.maxSpeed = Math.max(o.maxSpeed, k.speed);
+          o.maxAngSpeed = Math.max(o.maxAngSpeed, k.angSpeed);
+        }
+        if (phase === 'rolling') { o.rollingFrames++; run++; o.longestRollingRun = Math.max(o.longestRollingRun, run); } else run = 0;
+        // Hidden is counted off the SPANS — the same bytes playback hides the
+        // mesh from — rather than off the phase, so "every hidden frame is
+        // reported hidden" compares two answers instead of restating one.
+        if (spans && !pourVisibleAt(spans[di], f)) {
+          o.hiddenFrames++;
+          if (phase !== 'hidden') o.hiddenNotSilent++;
+        }
+        if (phase === 'settled') everSettled = true;
+        else if (everSettled) o.leftSettled++;
+        if (phase === 'settled' && f < o.settleFrame) o.settledEarly++;
+        if (phase !== 'settled' && f >= o.settleFrame) o.unsettledAtOrAfterLanding++;
+        if (f > o.settleFrame) {
+          o.framesAfterSettle++;
+          if (k.speed > 0 || k.angSpeed > 0) o.movedAfterSettle++;
+          o.maxSpeedAfterSettle = Math.max(o.maxSpeedAfterSettle, k.speed);
+          o.maxAngSpeedAfterSettle = Math.max(o.maxAngSpeedAfterSettle, k.angSpeed);
+        }
+        prev = phase;
+      }
+      // How many frames at the END of the film are byte-identical to the last
+      // one. This is the by-reference `frozenPose` claim, measured where it is
+      // actually true: `landings[].frame` is the RECOVERED stop instant, which
+      // the bake rewinds by SETTLE_STILL from the freeze, so the ~27 frames
+      // between the two are real (sub-millimetre) motion and always were.
+      const kf = r.keyframes[di];
+      const end = kf[last];
+      let tail = 0;
+      for (let f = last; f >= 0; f--) {
+        if (kf[f].pos.distanceTo(end.pos) !== 0) break;
+        if (Math.abs(kf[f].quat.dot(end.quat)) !== 1) break;
+        tail++;
+      }
+      o.stillTailFrames = tail;
+    }
+    return { frames: r.frames, pour: !!r.pour, dice };
+  },
+  // The contact machine's constants, so a scenario never restates a number it
+  // is checking (a test carrying its own copy of the threshold passes forever).
+  audioTune() {
+    return {
+      rollEnterAng: ROLL_ENTER_ANG, rollExitAng: ROLL_EXIT_ANG,
+      groundEps: GROUND_EPS,
+      softStrength: IMPACT_SOFT_STRENGTH,
+      defaultBody: IMPACT_DEFAULT_BODY,
+      panMax: PAN_MAX, panBuses: PAN_BUSES,
+      masterGain: MASTER_GAIN,
+    };
   },
   // The pan LAW and the depth LAW, asked without making a sound. Both are
   // read off the same functions playImpact calls, so a scenario cannot

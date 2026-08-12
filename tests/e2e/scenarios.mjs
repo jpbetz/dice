@@ -10827,4 +10827,155 @@ export const scenarios = [
         'a placeless contact — a baffle knock — takes no depth attenuation');
     },
   },
+
+  {
+    name: 'audio-phases',
+    tags: ['fx', 'audio', 'roll'],
+    // THE THREE-PHASE CONTACT MACHINE (docs/AUDIO.md §3), asserted on the FILM
+    // rather than on a painted frame. `audioFilmScan()` walks every frame of
+    // the current roll in one call: the alternative is hundreds of CDP round
+    // trips racing the rAF clock, which P6 exists to warn about.
+    //
+    // Nothing in this scenario makes a sound. The derivation is the subject.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      await a.dbg('holdClock(true)');
+
+      // ---- 1. a rolling phase EXISTS ---------------------------------------
+      // Before the machine landed the answer was zero, always, on every film:
+      // dice went from airborne to settled with nothing in between, which is
+      // exactly why the table has no sound for the middle of a throw.
+      await a.dbg(`throwSeeded(['d6','d6','d6','d6'], 4242)`);
+      await a.dbg('sim(1)');
+      let scan = await a.dbg('audioFilmScan()');
+      assert.ok(scan, 'the film is baked and scannable');
+      const runs = scan.dice.map((d) => d.longestRollingRun);
+      assert.ok(Math.max(...runs) >= 10,
+        `at least one die rolls for ten consecutive frames (runs: ${runs.join(', ')})`);
+
+      // ---- 2. `settled` flips exactly at the landing -----------------------
+      // Two independent derivations of one fact, pinned against each other:
+      // the machine's phase, and `landings[i].frame` — the TRUE stop frame the
+      // bake recorded. Red-checked by moving the comparison one frame
+      // (`i0 > frame`), which reports exactly one unsettled frame per die.
+      //
+      // `leftSettled` is a WEAKER CLAIM THAN IT LOOKS and is labelled so
+      // rather than deleted. The code carries an absorbing clause
+      // (`prev === 'settled' || …`); removing it leaves this scenario GREEN,
+      // because the playback cursor is monotone and `settleFrame` is fixed, so
+      // `i0 >= settleFrame` is already absorbing on its own. Red-checked
+      // exactly that way. The clause stays as cheap insurance against a future
+      // span that outlives a landing (hidden is tested first), and this
+      // assertion stays as the regression pin on the ORDERING — but it is not
+      // evidence for the clause, and a green here must not be read as such.
+      for (const d of scan.dice) {
+        assert.equal(d.settledEarly, 0,
+          `d${d.i} is not reported settled before frame ${d.settleFrame} `
+          + `(${d.settledEarly} early frames)`);
+        assert.equal(d.unsettledAtOrAfterLanding, 0,
+          `d${d.i} is settled from frame ${d.settleFrame} on `
+          + `(${d.unsettledAtOrAfterLanding} frames say otherwise)`);
+        assert.equal(d.leftSettled, 0, `d${d.i} never comes back out of settled`);
+      }
+
+      // ---- 3. a settled die cannot be heard --------------------------------
+      // THE DESIGN ASKED FOR "speed === 0 && angSpeed === 0 for every frame
+      // past settle", justified by the by-reference `frozenPose` the bake
+      // pushes after a freeze. MEASURED, IT IS FALSE, and for two reasons
+      // worth writing down rather than working around:
+      //
+      //   · `landings[].frame` is the RECOVERED stop instant — the bake
+      //     rewinds it by SETTLE_STILL from the freeze it earned — so the ~27
+      //     frames between the two carry real, sub-millimetre motion. On a
+      //     4d6 at seed 4242: 24 frames after d0's settle at 52, all 24
+      //     moving, peak 0.33 u/s and 0.20 rad/s.
+      //   · the frozen tail is not in the film at all. `stillTailFrames` came
+      //     back 0, because the tail cut truncates the reel at the LAST
+      //     landing — the dead frozen frames the design wanted to exercise
+      //     are exactly the frames the cut deletes.
+      //
+      // So the claim that is actually true is weaker and more interesting: a
+      // die past its settle never gets lively enough to START rolling (it
+      // stays under the ENTER bar), and it drifts by well under a unit per
+      // second. Measured on the same throw, d3 peaks at 1.06 rad/s after its
+      // settle at frame 45 — OVER the 0.9 exit bar. Which means the absorbing
+      // rule is load-bearing rather than decorative: without it, a die the
+      // bake has already called landed would keep grinding for another half
+      // second. Claim 2 above is what proves absorption; this is what says
+      // why it had to exist. Bars read off the app, never restated here.
+      const tune = await a.dbg('audioTune()');
+      const withTail = scan.dice.filter((d) => d.framesAfterSettle > 0);
+      assert.ok(withTail.length > 0,
+        'at least one die has film left after it settled — otherwise this '
+        + 'claim is about nothing (the tail cut truncates at the LAST landing)');
+      for (const d of withTail) {
+        assert.ok(d.maxAngSpeedAfterSettle < tune.rollEnterAng,
+          `d${d.i}: over the ${d.framesAfterSettle} frames after its settle at `
+          + `${d.settleFrame} it never reaches the ${tune.rollEnterAng} rad/s `
+          + `entry bar (peak ${d.maxAngSpeedAfterSettle})`);
+        assert.ok(d.maxSpeedAfterSettle < 1,
+          `d${d.i}: …and drifts under 1 u/s (peak ${d.maxSpeedAfterSettle})`);
+      }
+      assert.ok(withTail.some((d) => d.maxAngSpeedAfterSettle > tune.rollExitAng),
+        'and at least one die is still over the EXIT bar after its recorded '
+        + 'landing — the absorbing rule is doing real work, not decoration');
+
+      // ---- 4. nobody teleports ---------------------------------------------
+      // A sanity bar on the kinematics themselves. 60 u/s is far above
+      // anything this table's gravity can produce and far below what a
+      // despawn-to-doorway jump reads as, so it separates the two cleanly.
+      for (const d of scan.dice) {
+        assert.ok(d.maxSpeed < 60,
+          `d${d.i} never exceeds 60 u/s on a plain throw (peak ${d.maxSpeed})`);
+      }
+      await a.dbg('holdClock(false)');
+      await a.settle();
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+
+      // ---- 5. under a tower: hidden frames, and STILL no teleport ----------
+      // The despawn trap. A poured die vanishes at the occlusion line and
+      // reappears at the doorway; a central difference straddling that gap
+      // reads as tens of units per second, and every level derived from it is
+      // wrong for exactly the frames a player is watching the exit.
+      await a.dbg(`setTower('heartwood')`);
+      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+        { desc: 'the tower goes up' });
+      await a.dbg('holdClock(true)');
+      await a.dbg(`commandRoll('6d6')`);
+      await a.waitFor(
+        '!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.pour)',
+        { desc: 'a pour is baked' });
+      scan = await a.dbg('audioFilmScan()');
+      assert.ok(scan.pour, 'the scan is looking at a pour');
+      const hid = scan.dice.reduce((n, d) => n + d.hiddenFrames, 0);
+      assert.ok(hid > 0, `the pour has hidden frames to be silent about (${hid})`);
+      for (const d of scan.dice) {
+        assert.equal(d.hiddenNotSilent, 0,
+          `d${d.i}: every one of its ${d.hiddenFrames} hidden frames reports `
+          + `phase 'hidden' (${d.hiddenNotSilent} do not)`);
+        assert.ok(d.maxSpeed < 60,
+          `d${d.i} does not teleport out of the tower (peak ${d.maxSpeed} u/s)`);
+      }
+
+      // ---- the live per-frame view -----------------------------------------
+      // rollingState() answers about the frame playback last stepped, which is
+      // the surface the rolling voices will be levelled from.
+      await a.dbg('sim(1)');
+      const live = await a.dbg('rollingState()');
+      assert.equal(live.dice.length, 6, 'one record per die');
+      assert.ok(live.dice.every((d) => typeof d.phase === 'string' && d.settleFrame >= 0),
+        'each carrying a phase and the frame it stops on');
+      assert.ok(live.dice.every((d) => d.targetLevel === 0),
+        'and no target level yet — rolling voices arrive in increment 4');
+
+      await a.dbg('holdClock(false)');
+      await a.settle();
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+      await a.settle();
+      await a.dbg(`setTower('none')`);
+      await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'the tower comes down' });
+    },
+  },
 ];
