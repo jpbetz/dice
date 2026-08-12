@@ -1132,7 +1132,7 @@ export function buildTowerSkin(v) {
       const s = 0.16 + rndT() * 0.14;
       // …and never past x −3.05: a card 0.45 wide centred on −3.12 puts its
       // corner at −3.34, outside the socket's own wall, for a tuft of moss.
-      const x = -3.02 + rndT() * 0.62;
+      const x = -2.96 + rndT() * 0.62;
       const zj = zFO + 0.02 + rndT() * 0.05;
       items.push({
         matrix: new THREE.Matrix4().compose(

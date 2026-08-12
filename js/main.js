@@ -6971,6 +6971,15 @@ window.__diceDebug = {
   // legal defences are the two the contract already grants — a model may
   // skin the APRON and the LIP, which are engine volumes outside the socket
   // by design, and it may reach into the HOOD volume to shadow the doorway.
+  //
+  // AND EVERY OVERRUN IS NAMED (2026-08-11, the dressing pass). The check
+  // used to list the offending boxes and leave a human to remember which
+  // ones were legal, which works exactly until a model adds a sixth kind of
+  // overrun and nobody notices. Each one is now classified against the
+  // engine volume that grants it — apron and lip cladding, the gate hood's
+  // reach, the lean's foot dip, a wall-hung prop above the play volume — and
+  // anything that matches none of them comes back UNCLASSIFIED, which
+  // tower-fit gates on. A budget nobody names is a budget nobody keeps.
   towerModelAudit() {
     if (!towerRig || !towerRig.group) return null;
     const root = towerRig.group;
@@ -6980,16 +6989,76 @@ window.__diceDebug = {
       x: v.socket.s[0] / 2, y1: v.socket.c[1] + v.socket.s[1] / 2,
       zLo: v.socket.c[2] - v.socket.s[2] / 2, zHi: v.socket.c[2] + v.socket.s[2] / 2,
     };
+    const hoodZ = v.hood.c[2] + v.hood.s[2] / 2;      // the HOOD volume's face
+    // THE LEGAL CLASSES, each one a volume the contract already grants a
+    // model. Order matters: the cladding tests are first because a chute
+    // box also satisfies "reaches forward", and the specific answer is the
+    // useful one.
+    const classify = (b, over, isDress) => {
+      if (over.every((s) => s.startsWith('y-')) && b.min.y > -0.15) {
+        return 'FOOT DIP — the model leans (docs/TOWER.md TILT)';
+      }
+      // The apron and the lip are ENGINE volumes outside the socket by
+      // design, and the contract invites a model to skin them. Both cladding
+      // boxes are rotated, so both dip a unit below the felt.
+      if (b.min.y < -0.5) {
+        return b.max.z > v.z0 + 2.0
+          ? 'LIP CLADDING — the engine outrun, skinned'
+          : 'APRON CLADDING — the engine ramp, skinned';
+      }
+      if (b.max.z <= hoodZ + 0.02 && b.min.y >= 3.4 && b.max.y <= 6.6) {
+        return 'GATE HOOD — shadows the doorway (the HOOD volume asks for it)';
+      }
+      const inX = b.min.x >= -soc.x - 1e-3 && b.max.x <= soc.x + 1e-3;
+      // FLUSH DRESS: a patch, a stain, a board lying ON the facade. It is
+      // outside the socket only because the facade itself ends 0.01 inside
+      // it, and 0.06 is the whole budget — a prop that needs more than that
+      // is standing off the wall and has to answer as one.
+      if (isDress && inX && b.max.z <= soc.zHi + 0.06 && b.min.y >= -1e-3) {
+        return 'FLUSH DRESS — lies on the facade (≤ 0.06 proud)';
+      }
+      // A wall-hung prop: forward of the facade, above everything that ever
+      // moves, no wider than the gate hood already is, and inside the socket
+      // in x — because the mat's own wall stands at 3.35 and an x overrun is
+      // a prop through the side of the room.
+      if (isDress && b.max.z <= hoodZ + 0.02 && b.min.y >= 4.4
+        && b.min.x >= -soc.x - 1e-3 && b.max.x <= soc.x + 1e-3) {
+        return 'DRESS REACH — a wall-hung prop above the play volume';
+      }
+      return 'UNCLASSIFIED';
+    };
     const r3 = (n) => Number(n.toFixed(3));
     const hull = new THREE.Box3();
     const bb = new THREE.Box3();
     let meshes = 0, lights = 0;
     const offPolicy = [], outs = [];
+    // The FX group is decoration the fit deliberately does NOT measure:
+    // InstancedMesh fields (whose union box is meaningless) and the smoke
+    // (which is the one thing on any tower that leaves the socket upward).
+    // Reported as its own named class rather than silently skipped.
+    const fxg = root.getObjectByName('towerDressFx');
+    let fx = null;
+    if (fxg) {
+      const fb = new THREE.Box3().setFromObject(fxg);
+      fx = {
+        x: [r3(fb.min.x), r3(fb.max.x)], y: [r3(fb.min.y), r3(fb.max.y)],
+        z: [r3(fb.min.z - v.z0), r3(fb.max.z - v.z0)],
+        cls: fb.max.y > soc.y1 ? 'SMOKE PLUME — rises above the socket ceiling, capped ~y 15'
+          : (fb.min.x < -soc.x - 1e-3 || fb.max.x > soc.x + 1e-3)
+            ? 'INSTANCED DRESS — but OUTSIDE the socket in x, which is the one axis with a wall behind it'
+            : 'INSTANCED DRESS — inside the socket',
+        overCeiling: r3(Math.max(0, fb.max.y - soc.y1)),
+      };
+    }
     root.traverse((o) => {
       if (o.isLight) { lights++; return; }
       if (!o.isMesh) return;
-      let p = o, solid = false;
-      while (p) { if (p.name && p.name.startsWith('towerSkin') && p.name !== 'towerSkin') solid = true; p = p.parent; }
+      let p = o, solid = false, isDress = false;
+      while (p) {
+        if (p.name === 'towerSkinDress') isDress = true;
+        if (p.name && p.name.startsWith('towerSkin') && p.name !== 'towerSkin') solid = true;
+        p = p.parent;
+      }
       if (!solid) return;
       meshes++;
       const m = o.material;
@@ -7008,12 +7077,13 @@ window.__diceDebug = {
       if (bb.min.z < soc.zLo - 1e-3) over.push(`z-${r3(soc.zLo - bb.min.z)}`);
       if (bb.max.z > soc.zHi + 1e-3) over.push(`z+${r3(bb.max.z - soc.zHi)}`);
       if (over.length) {
-        outs.push({ over, box: [r3(bb.min.x), r3(bb.max.x), r3(bb.min.y), r3(bb.max.y),
-          r3(bb.min.z - v.z0), r3(bb.max.z - v.z0)] });
+        outs.push({ over, cls: classify(bb, over, isDress),
+          box: [r3(bb.min.x), r3(bb.max.x), r3(bb.min.y), r3(bb.max.y),
+            r3(bb.min.z - v.z0), r3(bb.max.z - v.z0)] });
       }
     });
     return {
-      tower: currentTower, meshes, lights, offPolicy, outs,
+      tower: currentTower, meshes, lights, offPolicy, outs, fx,
       hull: { x: [r3(hull.min.x), r3(hull.max.x)], y: [r3(hull.min.y), r3(hull.max.y)],
         z: [r3(hull.min.z - v.z0), r3(hull.max.z - v.z0)] },
       socket: { x: [r3(-soc.x), r3(soc.x)], y: [0, r3(soc.y1)],
