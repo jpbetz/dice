@@ -235,17 +235,24 @@ function bakeBark({ size, stops, sapStops, seed, furrows = 6, plates = 5, sap = 
       const u = px / W;
       // The furrow coordinate: a count, warped so the fissures wander the
       // way a split in bark does instead of ruling a grid.
-      const warp = 0.62 * (turb(u * 3, vv * 3, 3, 4, seed + 13) * 2 - 1)
-        + 0.24 * (turb(u * 7, vv * 7, 7, 3, seed + 29) * 2 - 1);
+      // LOOKED AT, THEN CALMED. The first cut warped the furrow coordinate
+      // by ±0.86 of a furrow width, so neighbouring furrows crossed and
+      // merged and the trunk came back wearing a crazed-glaze web — marble,
+      // or lichen, but not bark. A furrow WANDERS; it does not braid. The
+      // warp is a quarter of what it was and the furrow itself is twice as
+      // wide, which is what makes the fissures read as vertical at all.
+      const warp = 0.22 * (turb(u * 3, vv * 3, 3, 4, seed + 13) * 2 - 1)
+        + 0.10 * (turb(u * 7, vv * 7, 7, 3, seed + 29) * 2 - 1);
       const fr0 = furrows * u + warp;
       const fr = fr0 - Math.floor(fr0);
-      const furrow = 1 - smoothstep(0.0, 0.085, Math.min(fr, 1 - fr));
+      const furrow = 1 - smoothstep(0.0, 0.155, Math.min(fr, 1 - fr));
       // …and the cracks across them, on their own warp, so plate ends never
-      // line up column to column.
-      const cw = 0.5 * (turb(u * 5, vv * 5, 5, 3, seed + 53) * 2 - 1);
+      // line up column to column. Weaker than the furrows on purpose: a
+      // plate is taller than it is wide.
+      const cw = 0.22 * (turb(u * 5, vv * 5, 5, 3, seed + 53) * 2 - 1);
       const cr0 = plates * vv + cw;
       const cr = cr0 - Math.floor(cr0);
-      const crack = (1 - smoothstep(0.0, 0.045, Math.min(cr, 1 - cr))) * 0.82;
+      const crack = (1 - smoothstep(0.0, 0.040, Math.min(cr, 1 - cr))) * 0.70;
       const seam = clamp01(Math.max(furrow, crack));
 
       // The plate face: mid-frequency mottle plus a broad tonal drift, so no
@@ -490,10 +497,23 @@ function maps(pal, key) {
   // night lives in the bottom third of the range, and Black Anvil's ledger
   // is right that this is a value problem and not a colour one.
   const dark = rgb(pal.deepGround), mid = rgb(pal.bark), lit = rgb(pal.moonEdge);
-  const BARK = [mixc(dark, [0, 0, 0], 0.35), mixc(mid, dark, 0.45), mixc(mid, lit, 0.25)];
+  // LOOKED AT, THEN LIFTED — the opposite correction to the tray's, and it
+  // is the same lesson from the other side. The first cut crushed the low
+  // stop 35% toward black and pulled the top stop down to the mid, and the
+  // frames came back a black rectangle with no bark in it at all: a value
+  // floor in the bottom third is not the same thing as no floor. The range
+  // is still dark (the top stop is the palette's moon-struck edge and never
+  // goes past it), it just HAS a range now.
+  const BARK = [mixc(dark, [0, 0, 0], 0.12), mixc(mid, dark, 0.15), mixc(mid, lit, 0.62)];
   const SAP = [mixc(mid, lit, 0.35), mixc(lit, [255, 255, 255], 0.10),
     mixc(lit, [255, 255, 255], 0.35)];
-  const PUNK = [mixc(dark, mid, 0.35), mixc(mid, lit, 0.20), mixc(lit, [255, 255, 255], 0.18)];
+  // LOOKED AT, THEN DARKENED — Black Anvil's ledger, third time in a row.
+  // The first cut ran the delivery run up into the palette's moon-struck
+  // top stop and the tray came back the BRIGHTEST OBJECT ON THE TABLE, a
+  // pale slab in front of a black tree. It still has to be the lightest
+  // thing on the MODEL (a die must read against what it rests on), and it
+  // is; it just does that from the bottom third of the range now.
+  const PUNK = [mixc(dark, mid, 0.20), mixc(dark, mid, 0.68), mixc(mid, lit, 0.28)];
   const MYC = [mixc(lit, [255, 255, 255], 0.30), mixc(lit, [255, 255, 255], 0.55),
     [255, 255, 255]];
   const FLESH = [mixc(mid, dark, 0.2), mixc(rgb(pal.glowCore), lit, 0.5),
@@ -631,6 +651,9 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
   const doorY = v.door.h;                                   // 4.5
 
   const zFO = zLim - 0.01;                 // z0+0.24 · the outermost face
+  const zFF = zFO - 0.045;                 // z0+0.195 · the recessed field,
+                                           // so the bark ribs have a depth
+                                           // to stand proud of (see below)
   const zFI = boreZ + boreR + 0.025;       // z0+0.15 · and the back of the
                                            // facade. 0.09 of depth, and that
                                            // is the whole articulation
@@ -687,14 +710,22 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
   // is the one thing a random list gets wrong about half the time — and one
   // tooth is simply GONE, which is the asymmetry that makes the crown read
   // as broken instead of as crenellated.
+  //
+  // AND THERE ARE THIRTEEN OF THEM, NOT SEVEN. Looked at: seven teeth over
+  // a 290° sweep is 41° each, which at the resting eye is a pair of
+  // rectangular SLABS standing on a wall — a parapet, which is the one
+  // thing this crown must not be. Thirteen narrow teeth whose heights walk
+  // rather than alternate read as a rim that TORE, because that is what a
+  // torn rim is: a run of splinters, not a run of merlons.
   {
     const sweep = clip.th0m - clip.th0p;
-    const N = 7;
-    const hs = [0.34, 0.78, 0.14, 0.58, 0.0, 0.46, 0.22];
+    const N = 13;
+    const hs = [0.30, 0.52, 0.74, 0.61, 0.20, 0.0, 0.26, 0.55, 0.88, 0.70,
+      0.41, 0.13, 0.34];
     for (let k = 0; k < N; k++) {
-      const thA = clip.th0p + sweep * (k / N) - (k ? 0.012 : 0);
-      const thB = clip.th0p + sweep * ((k + 1) / N) + (k === N - 1 ? 0 : 0.012);
-      const top = yRing + 0.06 + hs[k] * (yTeeth - yRing - 0.06);
+      const thA = clip.th0p + sweep * (k / N) - (k ? 0.010 : 0);
+      const thB = clip.th0p + sweep * ((k + 1) / N) + (k === N - 1 ? 0 : 0.010);
+      const top = yRing + 0.04 + hs[k] * (yTeeth - yRing - 0.04);
       if (top - yRing < 0.10) continue;         // the missing tooth
       const { geo } = boleRing(rOut, rIn + 0.05, yRing - 0.04, top, zc, zCl, thA, thB);
       boleUV(geo, UV.torn[0], UV.torn[1], zc, R0);
@@ -711,8 +742,14 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
   const yArchLow = doorY + 0.08, yArchApex = doorY + 0.75, archX = -0.35;
   {
     const shape = new THREE.Shape();
+    // Nine points, not five: the same argument the crown teeth lost. A
+    // five-point top is a zig-zag and reads as a cut; nine is a splinter
+    // line. The lowest point is 11.74, which is the number §1.5 note 3
+    // measured and the red check confirmed the front cannot go below.
     const topAt = [
-      [aL, 11.74], [aL * 0.52, 12.06], [-0.10, 11.80], [aR * 0.44, 12.22], [aR, 11.86],
+      [aL, 11.80], [aL * 0.74, 12.14], [aL * 0.44, 11.86], [aL * 0.16, 12.24],
+      [aR * 0.14, 11.90], [aR * 0.40, 12.30], [aR * 0.66, 11.96], [aR * 0.86, 12.18],
+      [aR, 11.84],
     ];
     shape.moveTo(aL, yArchLow);
     for (const [x, y] of topAt) shape.lineTo(x, y);
@@ -728,10 +765,58 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
       shape.lineTo(x, y);
     }
     shape.closePath();
-    const geo = new THREE.ExtrudeGeometry(shape, { depth: zFO - zFI, bevelEnabled: false });
+    // THE FIELD IS RECESSED so the ribs have somewhere to be. tower-fit
+    // caught this the honest way: the ribs were 0.007 outside the socket's
+    // face and UNCLASSIFIED, because the plate already reached zFO and the
+    // whole budget in front of it is 0.01. A rib that cannot stand proud of
+    // its field is not relief, it is a decal — so the field steps BACK to
+    // z0+0.195 and the ribs occupy the 0.053 that opens up. Same total
+    // depth, and the shadow lines are real.
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: zFF - zFI, bevelEnabled: false });
     geo.translate(0, 0, zFI);
     planarUV(geo, UV.bark[0], UV.bark[1], 0.13, 0.27);
     add(new THREE.Mesh(geo, MAT.bark));
+  }
+  // --- THE FACADE'S BARK RIBS ----------------------------------------------
+  // LOOKED AT, THEN ADDED, and this is the fix the first frames demanded.
+  // The bore leaves 0.09 of depth dead ahead, so the front of any tower here
+  // is a flat plate — which is fine for masonry (Bastion articulates it in
+  // colour) and fatal for a TREE, because the one thing a trunk must be is
+  // ROUND. The frames came back reading as a dark rectangular box.
+  //
+  // Two things fix it and neither needs depth the socket has not got.
+  // First, relief: five vertical bark ribs standing 0.028 proud, at an
+  // irregular pitch that continues the shell's own lobes across the front,
+  // so the facade has real shadow lines running up it instead of one flat
+  // field. Second, the cylindrical SHADE in the vertex colours (see
+  // gravityStain below) — a flat plate lit like a cylinder reads as a
+  // cylinder, and that costs zero triangles.
+  {
+    // SHORT AND STAGGERED, not full-height. Looked at: five ribs running the
+    // whole 7 units read as a palisade — a crate of vertical boards, which
+    // is a different wrong answer from a flat box but still not a tree. A
+    // bark PLATE is a couple of units long and its neighbours' ends never
+    // line up, which is the same rule bakeBark's horizontal cracks follow at
+    // texel scale, applied at prop scale.
+    const ribs = [
+      // [x fraction, width, y0, y1]
+      [-0.88, 0.26, 5.35, 8.10], [-0.88, 0.22, 8.55, 11.15],
+      [-0.52, 0.30, 4.95, 7.30], [-0.52, 0.24, 7.75, 10.40],
+      [-0.14, 0.22, 6.10, 9.05],
+      [0.24, 0.28, 5.10, 8.30], [0.24, 0.20, 8.80, 11.40],
+      [0.62, 0.24, 5.80, 9.60],
+      [0.88, 0.26, 4.90, 7.05], [0.88, 0.22, 7.50, 10.80],
+    ];
+    for (const [i, [f, w, y0r, y1r]] of ribs.entries()) {
+      const cx = f < 0 ? aL * -f : aR * f;
+      const geo = roundedBox(w, y1r - y0r, 0.056, R_THIN, 3);
+      weather(geo, w, y1r - y0r, 0.056, rnd);
+      planarUV(geo, UV.bark[0], UV.bark[1], rnd() * 0.4, rnd() * 0.4);
+      const m = new THREE.Mesh(geo, MAT.bark);
+      m.position.set(cx, (y0r + y1r) / 2, zFO - 0.030);
+      m.rotation.z = (i % 2 ? 1 : -1) * 0.012;       // nothing on a tree is plumb
+      add(m);
+    }
   }
   // The arch's own soffit, in torn bark: a band tucked behind the facade's
   // bottom edge so the gap reads as a hole through a THICKNESS rather than a
@@ -780,6 +865,38 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
     m.rotation.z = -Math.sign(sinA || 1) * lean * Math.PI / 180;
     m.castShadow = true; m.receiveShadow = true;
     bole.add(m); parts.push(m);
+  }
+  // THE FLARE, and it is where the "tree" read actually comes from. The bore
+  // fixes the trunk's radius within about 5% (rIn must clear 2.5625 and the
+  // socket wall is at 3.25), so a dramatically lobed shaft is not available
+  // at ANY height — but at y < 1.2 the lean costs nothing, which buys back
+  // 0.10 of x that the crown has to spend on the tilt. Eleven low humps of
+  // varying reach at the foot, and the trunk stops being a tube standing on
+  // the felt and starts being something that GREW there.
+  {
+    const F = [
+      [-8, 0.42, 1.15, 0.30], [22, 0.36, 0.92, 0.24], [52, 0.30, 1.30, 0.20],
+      [86, 0.34, 0.78, 0.16], [118, 0.40, 1.05, 0.26], [150, 0.32, 0.70, 0.22],
+      [178, 0.44, 1.20, 0.30], [-146, 0.30, 0.85, 0.24], [-112, 0.38, 1.32, 0.20],
+      [-84, 0.28, 0.66, 0.14], [-46, 0.34, 1.00, 0.26],
+    ];
+    for (const [degs, hw, top, out] of F) {
+      const a = degs * Math.PI / 180;
+      // The front humps would stand in the doorway, so they are pulled to
+      // the reveal and no further: |x| ≥ 2.5 is not negotiable below y 4.5.
+      if (Math.abs(Math.sin(a)) < 0.86 && Math.cos(a) > 0.2) continue;
+      const rMid = R0 + lobe(a) - 0.14;
+      const th = 0.36 + out;
+      const geo = roundedBox(hw * 2, top, th, R_HULL, 2);
+      weather(geo, hw * 2, top, th, rnd);
+      propUV(geo, 1.4);
+      const m = new THREE.Mesh(geo, MAT.bark);
+      m.position.set((rMid + out / 2) * Math.sin(a), top / 2 - 0.10,
+        zc + (rMid + out / 2) * Math.cos(a));
+      m.rotation.y = a;
+      m.castShadow = true; m.receiveShadow = true;
+      bole.add(m); parts.push(m);
+    }
   }
   // THE DOOR BUTTRESS is placed by hand rather than by azimuth, because the
   // corner it has to reach is not on the trunk at all: the pad face wants
@@ -912,7 +1029,17 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
       // A blister on the flat facade faces +z; a cap on the round shell
       // faces up and out. Same geometry, one extra quarter turn.
       const rot = flat ? [Math.PI / 2 + 0.22, 0, roll] : [0.34, th, roll];
-      const s = big ? 0.30 + 0.05 * jit() : 0.065 + 0.022 * jit();
+      // THE DOSSIER'S 0.06 u FLOOR ASSUMED BLOOM, AND THIS TOWER HAS NONE.
+      // grammar rule 6 gets its "emissive reads at a third the size of
+      // shaded form" from the post stack's half-res blur spreading a 1-px
+      // core into a ~5-px glow — but the bloom mask only ever contains
+      // DICE (techniques T2 forbids a tower joining it), so a cap here is
+      // exactly as big as it is. Measured off the frames: at 0.13 u a cap
+      // is a 2-px speck at the tower eye and the ring does not exist.
+      // 0.28–0.38 u across is what makes the moot read, and it is still
+      // half the modelled brackets, so the "paint vs bracket" distinction
+      // the staging rests on survives.
+      const s = big ? 0.30 + 0.05 * jit() : 0.14 + 0.05 * jit();
       mootCaps.push({ th: Number(th.toFixed(3)), s: Number(s.toFixed(3)), big, flat });
       if (big) {
         // A modelled bracket: a squashed dome on top, a flared gill skirt
@@ -927,9 +1054,25 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
             scale: [s * 0.86, s * 0.34, flat ? 0.09 : s * 0.62] }),
         });
       } else {
+        // A PAINTED CAP IS PURE LIGHT (grammar §5: seven of the nine are
+        // "emissive paint", i.e. no modelled mushroom at all) — so these
+        // glow all over and the light-from-under-the-gills rule lands on
+        // the five MODELLED ones, which have real skirts. They are still
+        // BRACKETS in proportion rather than beads: wide across, thin
+        // vertically, projecting from the wall. A sphere would read as a
+        // bauble stuck on, which is the kitsch list's "rounded and
+        // symmetric" in miniature.
         bright.push({
           geo: capGeo.clone(),
-          matrix: xform({ pos: p, rot, scale: [s, s * 0.80, flat ? 0.04 : s * 0.85] }),
+          matrix: xform({ pos: p, rot, scale: [s, s * 0.44, flat ? s * 0.52 : s * 0.78] }),
+        });
+        // …with a dimmer skirt under it, so even a painted cap sheds its
+        // light DOWNWARD onto the bark instead of floating on it.
+        gill.push({
+          geo: skirtGeo.clone(),
+          matrix: xform({ pos: flat ? [x, y - s * 0.34, z] : [x, y - s * 0.30, z],
+            rot: flat ? [0.14, 0, roll] : [0.34, th, roll],
+            scale: [s * 0.90, s * 0.30, flat ? s * 0.42 : s * 0.64] }),
         });
       }
     }
@@ -1077,15 +1220,28 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
   // bleached band where the crown broke and the weather has been getting in
   // ever since. World space, so it knows where the ground and the tear are —
   // which a tile that repeats every 4.4 units does not.
+  //
+  // …AND THE FACADE IS SHADED LIKE THE CYLINDER IT IS PRETENDING TO BE.
+  // This is the other half of the round-front fix (see THE FACADE'S BARK
+  // RIBS): a front-facing surface in the facade's 0.09 of depth takes a
+  // falloff in |x| that a real trunk's curvature would have given it for
+  // free. It is keyed on the NORMAL and the z plane, so it lands on the
+  // facade plate and its ribs and on nothing else on the model — the shell
+  // proper never has a +z normal out here, because the shell is what the
+  // facade is filling the hole in.
+  const zFace = zFO - 0.09;
   gravityStain(parts, (p, n, out) => {
     const damp = clamp01(1 - p.y / 2.6);
     const shade = clamp01(-n.x) * clamp01(1 - p.y / 5.0) * 0.6;
     const bleach = clamp01((p.y - 10.4) / 1.4) * clamp01(0.4 + 0.6 * n.y);
+    const round = (n.z > 0.80 && p.z > zFace && p.y > yArchLow - 0.4)
+      ? 0.52 + 0.48 * clamp01(1 - Math.pow(Math.min(1, Math.abs(p.x) / 2.5), 1.6))
+      : 1;
     const k = Math.max(damp * 0.9, shade);
-    if (k < 0.02 && bleach < 0.02) return false;
-    out[0] = (1 - 0.20 * k) * (1 + 0.14 * bleach);
-    out[1] = (1 - 0.11 * k) * (1 + 0.15 * bleach);
-    out[2] = (1 - 0.24 * k) * (1 + 0.13 * bleach);
+    if (k < 0.02 && bleach < 0.02 && round > 0.995) return false;
+    out[0] = round * (1 - 0.20 * k) * (1 + 0.14 * bleach);
+    out[1] = round * (1 - 0.11 * k) * (1 + 0.15 * bleach);
+    out[2] = round * (1 - 0.24 * k) * (1 + 0.13 * bleach);
     return true;
   });
 
