@@ -11294,4 +11294,80 @@ export const scenarios = [
         'and a towerless roll records no clunk event at all');
     },
   },
+
+  {
+    name: 'audio-ambience',
+    tags: ['fx', 'audio', 'roll', 'settings'],
+    // THE ROOM BED (docs/AUDIO.md §5), and the two switches over it.
+    //
+    // The mute-integrity claim is the one that matters. Everywhere else in
+    // this graph "silence" is a gain of zero on a run-forever source, and for
+    // a bed that would mean three oscillators running under a table whose
+    // switch says off — passing every test that only ever looked at
+    // one-shots. So `bedSources` counts NODES, not level.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+
+      // ---- the switch exists, and it is off --------------------------------
+      assert.equal(await a.eval(`!!document.getElementById('set-ambience')`), true,
+        'the settings modal carries a Room tone switch');
+      assert.equal(
+        await a.eval(`document.getElementById('set-ambience').getAttribute('aria-pressed')`),
+        'false', 'and it is OFF by default — a bed you did not ask for is noise');
+      assert.equal(await a.dbg('ambienceOn'), false, 'the state agrees with the paint');
+
+      // ---- off means no sources, not a quiet bed ---------------------------
+      await a.roll('2d6');
+      let g = await a.dbg('audioGraphInfo()');
+      assert.equal(g.ambienceOn, false, 'still off after a roll');
+      assert.equal(g.bedSources, 0, `and no bed sources exist at all (${g.bedSources})`);
+
+      // ---- on means a real bed ---------------------------------------------
+      await a.dbg('setAmbienceOn(true)');
+      g = await a.dbg('audioGraphInfo()');
+      assert.equal(g.ambienceOn, true, 'the switch flips');
+      assert.ok(g.bedSources > 0,
+        `and the bed is actually built (${g.bedSources} sources) — without this `
+        + 'the mute claim below is about nothing');
+      assert.equal(
+        await a.eval(`document.getElementById('set-ambience').getAttribute('aria-pressed')`),
+        'true', 'and the switch is painted on');
+
+      // ---- MUTE INTEGRITY --------------------------------------------------
+      // soundOn === false silences EVERYTHING, bed included, and it does it
+      // by taking the sources down rather than by turning them to zero.
+      await a.dbg('setSoundOn(false)');
+      g = await a.dbg('audioGraphInfo()');
+      assert.equal(g.soundOn, false, 'the table is muted');
+      assert.equal(g.ambienceOn, true, 'with the ambience preference still ON');
+      assert.equal(g.bedSources, 0,
+        `and ZERO bed sources regardless (${g.bedSources}) — the switch means `
+        + 'what it says, it does not merely turn the room down');
+      await a.dbg('setSoundOn(true)');
+      g = await a.dbg('audioGraphInfo()');
+      assert.ok(g.bedSources > 0, 'unmuting brings the room back');
+
+      // ---- the room is not table state -------------------------------------
+      // js/portable.js's settings allowlist is EXACT and six assertions in
+      // tests/portable.test.mjs key on {sound, numbers}. Ambience is
+      // device-local mood, so a teammate must not inherit your room — and
+      // this reads the REAL export, through the same textarea the `portable`
+      // scenario reads, rather than a hook that could answer differently.
+      await a.dbg('setAmbienceOn(true)');
+      await a.dbg('openSettings()');
+      await a.eval(`document.getElementById('portable-open').click()`);
+      const yaml = await a.eval(`document.getElementById('portable-text').value`);
+      assert.ok(/^\s*sound:/m.test(yaml),
+        `the export really does carry the just-you settings block `
+        + `(got: ${JSON.stringify(yaml.slice(0, 120))}) — otherwise the absence `
+        + 'below is the absence of the whole section');
+      assert.ok(!/ambience/i.test(yaml),
+        'and it says nothing whatsoever about ambience');
+      await a.eval(`document.getElementById('settings-close').click()`);
+
+      await a.dbg('setAmbienceOn(false)');
+      g = await a.dbg('audioGraphInfo()');
+      assert.equal(g.bedSources, 0, 'and turning it off puts the room away again');
+    },
+  },
 ];

@@ -250,6 +250,11 @@ const LS_HISTORY = 'dice.cmdhistory.v1'; // command-box history: shared across r
 const HISTORY_CAP = 50;
 const LS_SOUND = 'dice.sound.v1';        // "Just you" scope: sound on/off
 const LS_CHIPS = 'dice.chips.v1';        // "Just you" scope: per-die value chips (default OFF — P1)
+// The room tone (docs/AUDIO.md §5), default OFF and its own switch — never
+// bound to LS_SOUND (refusal §7) and NEVER emitted in the portable file:
+// js/portable.js's settings allowlist is exact and ambience is device-local
+// mood, not table state. A teammate must not inherit your room.
+const LS_AMBIENCE = 'dice.ambience.v1';  // "Just you" scope: room tone (default OFF)
 const LS_ROOMSETTINGS = 'dice.roomsettings.v1'; // solo-mode copy of the table settings
 const LS_DICESET = 'dice.diceset.v1';    // "Just you" scope: dice-set identity (Tier 6 §9)
 // Declared up here with the rest, not down beside initNet where it used to
@@ -1182,6 +1187,11 @@ let soundOn = load(LS_SOUND, true) !== false;
 
 // DIAL FOR JOE — the whole table's level. Everything below is a fraction of it.
 const MASTER_GAIN = 0.7;
+
+// THE ROOM TONE, declared HERE and not next to its setter, because tick()
+// reads it every frame and this file's TDZ trap (ROOM / LS_NAME / TOWERLAB)
+// has been paid for three times already.
+let ambienceOn = load(LS_AMBIENCE, false) === true;
 // Nine pooled pan buses, −0.6…+0.6 in steps of 0.15. |pan| is CAPPED at 0.6
 // (docs/AUDIO.md §7.9): a table a metre away subtends about ±25°, and a
 // hard-panned die beside your ear is a cartoon. Pooling instead of a panner
@@ -1357,6 +1367,193 @@ function ensureShaft(spec) {
   return sh;
 }
 
+// ---------------------------------------------------------------------------
+// THE ROOM BED (docs/AUDIO.md §5) — off by default, behind its own switch.
+//
+// Four layers, all synthesized, none of them a loop you can hear repeat:
+//   · pink, plus a DETUNED DOUBLE of itself at rate 0.9973 — two copies of
+//     one buffer drifting apart is what stops a 23 s loop sounding like a
+//     23 s loop;
+//   · brown, the hearth — the low end that makes a room feel enclosed;
+//   · Poisson crackle at λ = 4/s with a u³ gain, so most pops are almost
+//     nothing and one in twenty is a real tick from the fire;
+//   · three LFOs at 0.031 / 0.047 / 0.073 Hz — mutually prime, so the
+//     breathing pattern does not recur inside any sitting.
+// Buffer lengths are mutually prime for the same reason (23 s and 29 s).
+//
+// EVERYTHING HERE MAY USE Math.random (§4). The bed has no film relationship
+// at all: two people in one room hearing different crackle is unobservable,
+// and nobody should over-engineer it into a seeded stream.
+//
+// Duck direction is FIXED: the ambience ducks, the dice never. No compressor
+// does this — it is a scheduled ramp on roomDuck, −4 dB over 250 ms at roll
+// start, recovering with τ = 1.2 s from the last die's settle. Both edges are
+// slow enough to be imperceptible as gestures, and the recovery is the
+// strongest "the roll is over" cue the app has.
+// ---------------------------------------------------------------------------
+
+const BED_PINK = 0.003;      // DIAL FOR JOE
+const BED_BROWN = 0.006;     // DIAL FOR JOE
+const BED_CRACKLE = 0.02;    // DIAL FOR JOE — scaled by u³, so this is the rare peak
+const BED_CRACKLE_RATE = 4;  // pops per second, Poisson
+const BED_FADE_S = 6;        // the bed arrives over six seconds, never switches on
+const DUCK_DB = -4;          // DIAL FOR JOE
+const DUCK_ATTACK_S = 0.25;
+const DUCK_RECOVER_TAU = 1.2; // DIAL FOR JOE
+let bed = null;
+
+function pinkBuffer(ctx, seconds) {
+  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+  for (let i = 0; i < d.length; i++) {
+    const w = Math.random() * 2 - 1;
+    b0 = 0.99886 * b0 + w * 0.0555179;
+    b1 = 0.99332 * b1 + w * 0.0750759;
+    b2 = 0.96900 * b2 + w * 0.1538520;
+    b3 = 0.86650 * b3 + w * 0.3104856;
+    b4 = 0.55000 * b4 + w * 0.5329522;
+    b5 = -0.7616 * b5 - w * 0.0168980;
+    d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+    b6 = w * 0.115926;
+  }
+  return buf;
+}
+
+function brownBuffer(ctx, seconds) {
+  const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < d.length; i++) {
+    last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+    d[i] = last * 3.5;
+  }
+  return buf;
+}
+
+function bedLoop(ctx, buffer, gainV, rate, dest) {
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.loop = true;
+  src.playbackRate.value = rate;
+  const g = ctx.createGain();
+  g.gain.value = gainV;
+  src.connect(g).connect(dest);
+  src.start(0, Math.random() * buffer.duration);
+  return { src, g };
+}
+
+// A slow gain wobble on one layer. Mutually prime rates, so no two of them
+// line up again inside a session.
+function bedLfo(ctx, hz, depth, param) {
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.value = hz;
+  const g = ctx.createGain();
+  g.gain.value = depth;
+  osc.connect(g).connect(param);
+  osc.start(0);
+  return osc;
+}
+
+// THE BED IS THE ONE THING IN THIS GRAPH THAT IS TORN DOWN, and deliberately.
+// Everywhere else "silence is level → 0" because a source is single-use and
+// per-die; the bed is one object toggled rarely by hand, and `bedSources`
+// must read ZERO under mute for the switch to mean what it says.
+function bedDispose() {
+  if (!bed) return;
+  for (const n of bed.nodes) { try { n.stop(); } catch { /* already ended */ } }
+  try { bed.mix.disconnect(); } catch { /* already gone */ }
+  bed = null;
+  AUDIO.bedSources = 0;
+  AUDIO.room = null;
+}
+
+function bedBuild() {
+  const ctx = ensureAudio();
+  if (!ctx || bed) return;
+  const mix = ctx.createGain();
+  mix.gain.value = 0;
+  const duck = ctx.createGain();
+  duck.gain.value = 1;
+  const room = ctx.createGain();
+  room.gain.value = 1;
+  mix.connect(duck).connect(room).connect(AUDIO.master);
+  const pink = pinkBuffer(ctx, 23);
+  const brown = brownBuffer(ctx, 29);
+  const a = bedLoop(ctx, pink, BED_PINK, 1, mix);
+  const b = bedLoop(ctx, pink, BED_PINK, 0.9973, mix);   // the detuned double
+  const c = bedLoop(ctx, brown, BED_BROWN, 1, mix);
+  const l1 = bedLfo(ctx, 0.031, BED_PINK * 0.4, a.g.gain);
+  const l2 = bedLfo(ctx, 0.047, BED_PINK * 0.4, b.g.gain);
+  const l3 = bedLfo(ctx, 0.073, BED_BROWN * 0.35, c.g.gain);
+  bed = {
+    mix, duck, room, nodes: [a.src, b.src, c.src, l1, l2, l3],
+    nextCrackle: ctx.currentTime + 0.2, ducked: false,
+  };
+  AUDIO.room = room;
+  AUDIO.bedSources = bed.nodes.length;
+  // Six seconds. A room does not switch on.
+  mix.gain.setValueAtTime(0.0001, ctx.currentTime);
+  mix.gain.exponentialRampToValueAtTime(1, ctx.currentTime + BED_FADE_S);
+}
+
+// One crackle pop. u³ on the gain: most are inaudible, one in twenty is a
+// real tick, and none of them is on a grid.
+function bedPop(ctx, at) {
+  const u = Math.random();
+  const g = ctx.createGain();
+  const src = ctx.createBufferSource();
+  src.buffer = AUDIO.noise;
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass';
+  f.frequency.value = 900 + Math.random() * 2600;
+  f.Q.value = 3;
+  const amp = Math.max(1e-5, BED_CRACKLE * u * u * u);
+  g.gain.setValueAtTime(amp, at);
+  g.gain.exponentialRampToValueAtTime(1e-5, at + 0.03);
+  src.connect(f).connect(g).connect(bed.mix);
+  src.start(at, Math.random() * (AUDIO.noise.duration - 0.05));
+  src.stop(at + 0.04);
+}
+
+// Called from tick(). Lookahead scheduling off ctx.currentTime — not off dt,
+// and never off setInterval: a timer-driven bed stutters the moment the tab
+// throttles, and this one simply schedules further ahead.
+function stepAmbience() {
+  if (!bed || !AUDIO.ctx) return;
+  const ctx = AUDIO.ctx;
+  const horizon = ctx.currentTime + 0.5;
+  let guard = 0;
+  while (bed.nextCrackle < horizon && guard++ < 32) {
+    bedPop(ctx, bed.nextCrackle);
+    // Exponential inter-arrival — a Poisson process, not a metronome.
+    bed.nextCrackle += -Math.log(1 - Math.random()) / BED_CRACKLE_RATE;
+  }
+}
+
+// The duck. `on` at roll start, off at the last die's settle.
+function roomDuck(on) {
+  if (!bed || !AUDIO.ctx || bed.ducked === on) return;
+  bed.ducked = on;
+  const t = AUDIO.ctx.currentTime;
+  if (on) {
+    bed.duck.gain.setTargetAtTime(Math.pow(10, DUCK_DB / 20), t, DUCK_ATTACK_S / 3);
+  } else {
+    bed.duck.gain.setTargetAtTime(1, t, DUCK_RECOVER_TAU / 3);
+  }
+}
+
+// The switch. `soundOn === false` takes the bed down entirely, not merely
+// quiet: the master gain already silences it, but a table whose switch says
+// off while three oscillators run is a table that ignores its own switch.
+function setAmbience(on, persist = true) {
+  ambienceOn = !!on;
+  if (persist) save(LS_AMBIENCE, ambienceOn);
+  if (ambienceOn && soundOn) bedBuild(); else bedDispose();
+  syncSettingsUI();
+}
+
 // Unlock on the first real gesture. NOT `{once: true}`: a resume() that loses
 // the race with the autoplay policy would leave the table permanently silent
 // with no way back, and the guard below makes a repeat call free. Measured in
@@ -1367,6 +1564,7 @@ function audioUnlock() {
   if (AUDIO.ctx && AUDIO.ctx.state === 'running') return;
   const ctx = ensureAudio();
   if (ctx && ctx.state === 'suspended') { try { ctx.resume(); } catch { /* policy */ } }
+  if (ambienceOn && soundOn) bedBuild();
 }
 window.addEventListener('pointerdown', audioUnlock, { passive: true, capture: true });
 window.addEventListener('keydown', audioUnlock, { passive: true, capture: true });
@@ -3295,6 +3493,7 @@ function clearTable() {
   // levels down. A sustained source left grinding over an empty felt is the
   // exact failure the run-forever lifetime rule invites.
   silenceRollingVoices();
+  roomDuck(false);
   ROLLING_OUT.length = 0;
 }
 
@@ -4243,6 +4442,11 @@ function playRoll(roll) {
     done: false,
   };
 
+  // The room breathes in. Ducking at the START of the roll and recovering at
+  // the last settle means the recovery does the narrative work: the room
+  // coming back is the clearest signal the app has that a throw is over.
+  roomDuck(true);
+
   // Act one of the pour's camera: look at the thing the dice are about to
   // vanish into. Act two is cued off the film's first exit, in stepPlayback.
   if (pourFilm) towerCamTo('tower');
@@ -4482,6 +4686,7 @@ function stepPlayback(dt, tempo = 1, curve = false, realtime = curve) {
     // never reaches its own tail again, so a silence placed after that branch
     // would leave every ceremony roll grinding through its verdict card.
     silenceRollingVoices();
+    roomDuck(false);
     if (cer) {
       ceremonyEnterSettle(roll);
       return;
@@ -7022,6 +7227,7 @@ function tick(dt, render = true, realtime = false) {
   stepTowerLab(dt);  // tower lab (docs/TOWER.md) — inert unless towerCore(true)
   stepTowerLantern(dt); // the ember breath — inert unless a glowing tower is up
   stepTowerDress(dt);   // sway and smoke — inert unless a dressed tower is up
+  stepAmbience();       // the room bed's crackle lookahead — inert unless the bed is up
   stepCamera(dt);    // eased reframing; only ever armed under a quiet picture
   stepCamPeek(dt);   // the hold-drag pivot's spring home
   // The peek offset wraps everything that reads the camera from here to the
@@ -7121,6 +7327,23 @@ function fastForwardPlayback() {
 }
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) fastForwardPlayback();
+});
+// A HIDDEN TAB HAS NO ROOM. Ramp the bed away and suspend the context — an
+// audio graph running behind a tab nobody is looking at is a battery bill —
+// and let the next gesture (or the next roll) bring it back, over six
+// seconds, the way it arrives the first time.
+document.addEventListener('visibilitychange', () => {
+  if (!AUDIO.ctx) return;
+  if (document.hidden) {
+    if (bed) bed.mix.gain.setTargetAtTime(0.0001, AUDIO.ctx.currentTime, 0.15);
+    setTimeout(() => { if (document.hidden && AUDIO.ctx) AUDIO.ctx.suspend().catch(() => {}); }, 600);
+  } else {
+    if (AUDIO.ctx.state === 'suspended') AUDIO.ctx.resume().catch(() => {});
+    if (bed) {
+      bed.mix.gain.setValueAtTime(0.0001, AUDIO.ctx.currentTime);
+      bed.mix.gain.exponentialRampToValueAtTime(1, AUDIO.ctx.currentTime + BED_FADE_S);
+    }
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -9058,9 +9281,10 @@ window.__diceDebug = {
       perHitBufferAllocs: AUDIO.buffersMade - AUDIO.buffersAtBuild,
       oneShots: AUDIO.oneShots,
       soundOn,
-      ambienceOn: false,
+      ambienceOn,
       bedSources: AUDIO.bedSources,
-      roomDuckDb: 0,
+      roomDuckDb: bed && bed.ducked ? DUCK_DB : 0,
+      bedFading: !!bed,
     };
   },
   // Which PRESET a recorded contact would be voiced with — the resolver's own
@@ -9207,6 +9431,8 @@ window.__diceDebug = {
   // outlives a scenario, and a test that left the table muted would silence
   // every later scenario on `localhost` with no error anywhere.
   setSoundOn(on) { setSound(!!on, false); return soundOn; },
+  get ambienceOn() { return ambienceOn; },
+  setAmbienceOn(on) { setAmbience(!!on, false); return ambienceOn; },
   // Playback tempo (C30d): the projector speed on already-baked keyframes.
   // 1 is shipped and byte-identical; k>1 plays the same film k times faster.
   // Takes effect on the NEXT real-time frame — no reload, no re-bake.
@@ -15136,9 +15362,18 @@ function setSound(on, persist = true) {
   if (AUDIO.master) {
     AUDIO.master.gain.setTargetAtTime(soundOn ? MASTER_GAIN : 0, AUDIO.ctx.currentTime, 0.01);
   }
+  // …and the bed comes DOWN under mute rather than merely going quiet. A
+  // table whose switch says off while three oscillators run is a table that
+  // ignores its own switch, and `bedSources` is what a scenario can see.
+  if (!soundOn) { silenceRollingVoices(); bedDispose(); }
+  else if (ambienceOn) bedBuild();
   syncSettingsUI();
 }
 setSound(soundOn, false); // reflect the loaded preference without re-saving
+// No boot call for setAmbience: the bed is built on the first gesture at the
+// earliest (ensureAudio refuses to run before one), and audioUnlock brings it
+// up if the preference says so. Calling it here would only paint the switch,
+// which syncSettingsUI already does.
 
 // One setter for the per-die value chips preference ('Show numbers on dice',
 // settings "Just you"); persists 'dice.chips.v1'. OFF by default (P1 quiet by
@@ -15836,6 +16071,7 @@ function showSettingsNote(text) {
 function syncSettingsUI() {
   document.getElementById('set-sound').setAttribute('aria-pressed', String(soundOn));
   document.getElementById('set-chips').setAttribute('aria-pressed', String(chipsOn));
+  document.getElementById('set-ambience').setAttribute('aria-pressed', String(ambienceOn));
   renderDiceSetPicker();
   renderSystemPicker();
   renderZoomPicker();
@@ -15916,6 +16152,7 @@ document.getElementById('set-sound').addEventListener('click', () => setSound(!s
   nameInput.addEventListener('blur', commitTableName);
 }
 document.getElementById('set-chips').addEventListener('click', () => setChips(!chipsOn));
+document.getElementById('set-ambience').addEventListener('click', () => setAmbience(!ambienceOn));
 
 // ---------------------------------------------------------------------------
 // Your data (Tier 4 §5): pools + just-you settings as portable YAML — one
