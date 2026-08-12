@@ -11120,6 +11120,50 @@ export const scenarios = [
         `and clearing the table under them stops every one (${after.poolLive} left)`);
       assert.ok(after.poolSize <= 40,
         `the pool did not grow past the cap (${after.poolSize})`);
+      // ---- MUTE INTEGRITY (verifier catch, fixed at the gate) --------------
+      // The master gain already silences the OUTPUT; this pins that the
+      // sustained POOL obeys the switch too — a muted table running live
+      // rolling voices under its own mute passed every earlier test.
+      const muted = await a.eval(`(() => {
+        const D = window.__diceDebug;
+        D.setSoundOn(false);
+        D.throwSeeded(['d6','d6','d6','d6','d6','d6'], 7171);
+        let peak = 0;
+        for (let f = 0; f < 900 && D.busy; f++) {
+          D.sim(1);
+          peak = Math.max(peak, D.audioGraphInfo().poolLive);
+        }
+        D.setSoundOn(true);
+        return peak;
+      })()`);
+      assert.equal(muted, 0,
+        `soundOn=false keeps the rolling pool silent for a whole roll (peak live ${muted})`);
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+
+      // ---- THE FROZEN CLOCK FREEZES THE LOAD (verifier catch, fixed) -------
+      // Load smoothing advances by FILM FRAMES: a repeat frame (120 Hz
+      // viewers, holdClock) must not move it. tick(0) replays the same film
+      // frame; before the fix each call smoothed the load again and the
+      // level drifted under a frozen picture.
+      const frozen = await a.eval(`(() => {
+        const D = window.__diceDebug;
+        D.throwSeeded(['d6','d6','d6','d6','d6','d6'], 7171);
+        for (let f = 0; f < 900 && D.busy; f++) {
+          D.sim(1);
+          const rs = D.rollingState();
+          if (rs && rs.dice.some((d) => d.targetLevel > 0)) break;
+        }
+        const before = D.rollingState().dice.map((d) => d.targetLevel);
+        for (let i = 0; i < 30; i++) D.tick(0, false, false);
+        const afterT = D.rollingState().dice.map((d) => d.targetLevel);
+        return { before, afterT };
+      })()`);
+      assert.deepEqual(frozen.afterT, frozen.before,
+        'thirty repeat frames move no level: the load lives on the film clock, not the call count');
+
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
       await a.dbg('audioForce(false)');
       await a.dbg('holdClock(false)');
       await a.settle();
@@ -11201,10 +11245,60 @@ export const scenarios = [
         one.plans.map((p) => [p.di, p.gaps]),
         'the same seed schedules byte-identical tap times');
       const other = await bake(31338);
-      assert.notDeepEqual(other.plans.map((p) => p.gaps), one.plans.map((p) => p.gaps),
+      // SORT BY DIE (verifier catch): landing ORDER differs across seeds, so
+      // comparing the arrays as scheduled passed even with the seed severed
+      // from the hash — the witness was green for a reason it did not name.
+      // Per-die comparison is blind to order and red under exactly that
+      // sabotage (seed >>> 0 -> 0 >>> 0: byDi arrays become identical).
+      const byDi = (plans) => [...plans].sort((x, y) => x.di - y.di).map((p) => p.gaps);
+      assert.notDeepEqual(byDi(other.plans), byDi(one.plans),
         'and a different seed does not — otherwise the hash is not being '
         + 'consulted at all and the claim above is vacuous');
 
+      // ---- MUTE INTEGRITY (verifier catch, fixed at the gate) --------------
+      // The master gain already silences the OUTPUT; this pins that the
+      // sustained POOL obeys the switch too — a muted table running live
+      // rolling voices under its own mute passed every earlier test.
+      const muted = await a.eval(`(() => {
+        const D = window.__diceDebug;
+        D.setSoundOn(false);
+        D.throwSeeded(['d6','d6','d6','d6','d6','d6'], 7171);
+        let peak = 0;
+        for (let f = 0; f < 900 && D.busy; f++) {
+          D.sim(1);
+          peak = Math.max(peak, D.audioGraphInfo().poolLive);
+        }
+        D.setSoundOn(true);
+        return peak;
+      })()`);
+      assert.equal(muted, 0,
+        `soundOn=false keeps the rolling pool silent for a whole roll (peak live ${muted})`);
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+
+      // ---- THE FROZEN CLOCK FREEZES THE LOAD (verifier catch, fixed) -------
+      // Load smoothing advances by FILM FRAMES: a repeat frame (120 Hz
+      // viewers, holdClock) must not move it. tick(0) replays the same film
+      // frame; before the fix each call smoothed the load again and the
+      // level drifted under a frozen picture.
+      const frozen = await a.eval(`(() => {
+        const D = window.__diceDebug;
+        D.throwSeeded(['d6','d6','d6','d6','d6','d6'], 7171);
+        for (let f = 0; f < 900 && D.busy; f++) {
+          D.sim(1);
+          const rs = D.rollingState();
+          if (rs && rs.dice.some((d) => d.targetLevel > 0)) break;
+        }
+        const before = D.rollingState().dice.map((d) => d.targetLevel);
+        for (let i = 0; i < 30; i++) D.tick(0, false, false);
+        const afterT = D.rollingState().dice.map((d) => d.targetLevel);
+        return { before, afterT };
+      })()`);
+      assert.deepEqual(frozen.afterT, frozen.before,
+        'thirty repeat frames move no level: the load lives on the film clock, not the call count');
+
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
       await a.dbg('audioForce(false)');
       await a.dbg('holdClock(false)');
       await a.settle();

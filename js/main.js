@@ -2203,6 +2203,15 @@ function stepRollingAudio(roll, i0, realtime) {
   if (!roll.audioLoad) roll.audioLoad = roll.dice.map(() => 0);
   const n = Math.min(roll.dice.length, ROLLING_POOL.length);
   rollingFrame = i0;
+  // LOAD ADVANCES BY FILM FRAMES, NOT PER CALL (verifier catch): a 120 Hz
+  // client steps here twice per film frame, and holdClock steps with the
+  // film frozen — per-call smoothing made targetLevel a function of the
+  // viewer's refresh rate and drifted under a held clock. dFrames is the
+  // film frames actually elapsed; a repeat frame advances nothing.
+  const dFrames = roll.audioLoadFrame === undefined ? 1
+    : Math.max(0, i0 - roll.audioLoadFrame);
+  roll.audioLoadFrame = i0;
+  const loadAlpha = dFrames > 0 ? 1 - Math.exp(-(dFrames / 60) / ROLL_LOAD_TAU) : 0;
   // The projector's speed at this instant. Mandatory: TEMPO.k varies WITHIN a
   // throw (the tempo curve), so a face-clack rate derived without it drifts
   // out of sync with the picture in the second half of every roll.
@@ -2258,8 +2267,7 @@ function stepRollingAudio(roll, i0, realtime) {
     slot.rough = (rb >> 2) / 63;
     if (slot.surface === 1 || slot.surface === 3) slot.grounded = true;
     const loadTarget = slot.grounded ? Math.max(0, 1 - Math.min(1, Math.abs(k.vy) / 8)) : 0;
-    const alpha = 1 - Math.exp(-(1 / 60) / ROLL_LOAD_TAU);
-    roll.audioLoad[di] += (loadTarget - roll.audioLoad[di]) * alpha;
+    if (loadAlpha) roll.audioLoad[di] += (loadTarget - roll.audioLoad[di]) * loadAlpha;
     const load = roll.audioLoad[di];
     slot.vTan = k.vTan;
     slot.load = load;
@@ -2294,14 +2302,19 @@ function stepRollingAudio(roll, i0, realtime) {
   if (!(realtime || audioForced)) return;
   const ctx = ensureAudio();
   if (!ctx) return;
+  // MUTE SILENCES THE SUSTAINED LAYER TOO (verifier catch): the master gain
+  // already zeroes the audible output, but a muted table must not keep a
+  // live rolling pool running under its own switch — levels go to 0 and
+  // poolLive with them, so the mute-integrity check has a subject.
   let live = 0;
   for (let di = 0; di < n; di++) {
     const s = ROLLING_POOL[di];
-    if (s.targetLevel <= 0 && !rollVoices[di]) continue;   // never built, nothing to silence
-    if (s.targetLevel > 0 && !rollVoices[di]) rollVoices[di] = makeRollVoice(ctx, di);
+    const tgt = soundOn ? s.targetLevel : 0;
+    if (tgt <= 0 && !rollVoices[di]) continue;   // never built, nothing to silence
+    if (tgt > 0 && !rollVoices[di]) rollVoices[di] = makeRollVoice(ctx, di);
     const v = rollVoices[di];
     if (!v) continue;
-    if (s.targetLevel > 0) {
+    if (tgt > 0) {
       live++;
       // Smaller die = slightly brighter surface band.
       const def = DIE_DEFS[s.type] || {};
@@ -2322,8 +2335,8 @@ function stepRollingAudio(roll, i0, realtime) {
       const airF = Math.min(18000, Math.max(4500, 16000 * Math.pow(depthGainFor([s.x, 0.6, 0]), 1.2)));
       if (Math.abs(airF - v.air.frequency.value) > 200) v.air.frequency.value = airF;
     }
-    v.setLevel = paramTo(v.level.gain, v.setLevel, s.targetLevel, ctx, 0.03);
-    v.target = s.targetLevel;
+    v.setLevel = paramTo(v.level.gain, v.setLevel, tgt, ctx, 0.03);
+    v.target = tgt;
   }
   rollVoicesLive = live;
 }
