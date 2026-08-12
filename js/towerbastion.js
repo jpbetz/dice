@@ -57,9 +57,15 @@ limitations under the License.
 
 import * as THREE from 'three';
 import {
-  mulberry32, bakeStone, veilTexture,
+  mulberry32, bakeStone, bakeEmber, veilTexture, clamp01,
   roundedBox, planarUV, weather, bakeVertexAO,
 } from './towerskin.js';
+import {
+  bakeCloth, buildGonfalon, bakeShieldFace, buildHeaterShield, buildSconce,
+  bakeCage, bakeLeaf, emberMaterial, bakeStainSheet, buildStains,
+  instancedField, leafMaterial, gravityStain, mergeGeos, xform, propUV,
+  registerSway, ensureColor,
+} from './towerdress.js';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -100,6 +106,12 @@ function maps() {
     // A single dressed slab: no joints at all, just grain (lintel, hood, caps).
     sandFlat: bakeStone({ size: 256, stops: SANDSTONE, blocks: 1, courses: 1, seed: 0x5a2b90,
       joint: 0.0026, relief: 0.35, chip: 0.25, speckle: 0.03, wash: 0.24 }),
+    // Dressing bakes (js/towerdress.js): the sconce's painted cage and its
+    // fire, and the leaves of the clump at the foot of the shaded flank.
+    cage: bakeCage({ size: 128, seed: 0xba5ca9, bars: 8,
+      stops: [[0x24, 0x22, 0x20], [0x46, 0x42, 0x3a], [0x7c, 0x74, 0x62]] }),
+    coals: bakeEmber({ size: 128, seed: 0xba5f13, heat: 1.8 }),
+    leaf: bakeLeaf({ size: 64, seed: 0xba51ea }),
     veil: veilTexture(256, 0.92),
     shadow: veilTexture(256, 0.55),
   };
@@ -329,7 +341,22 @@ export function buildBastionSkin(v) {
   const aSh = chord(rOut), aStr = chord(rStr), aCor = chord(rCor), aPar = chord(rPar);
   span('granite', -aSh, aSh, doorY + 0.42, yStr0 + 0.02, zFI, zFF, { r: R_THIN, seg: 2, uv: UV.wall });
   span('sand', -aStr, aStr, yStr0 - 0.02, yStr1 + 0.02, zFI, zFO, { r: R_THIN, uv: UV.trim });
-  span('granite', -aSh, aSh, yStr1 - 0.02, yShaftTop + 0.02, zFI, zFF, { r: R_THIN, seg: 2, uv: UV.wall });
+  // THE PANEL THE ARROW LOOP LIVES IN IS CUT AROUND IT — four slabs, not one.
+  // THE BUG THIS FIXES (docs/TOWER.md, third model, finding four): the slot
+  // was a `shadowStone` slab sunk 0.012 BEHIND a granite field slab that
+  // spanned the same x and the same y. Sinking something behind an opaque
+  // thing that covers it does not make a recess; it makes it invisible. The
+  // loop read as a sandstone surround with plain wall inside it, which is a
+  // picture frame. Black Anvil cut its facade into panels around the grate
+  // and the vent for exactly this reason, and now so does this.
+  const loopX = -0.92, loopW = 0.22, loopY0 = 7.15, loopY1 = 9.05;
+  const loopJ = 0.13;                       // jamb/head width of the surround
+  const lxa = loopX - loopW / 2 - loopJ, lxb = loopX + loopW / 2 + loopJ;
+  const lya = loopY0 - loopJ, lyb = loopY1 + loopJ;
+  span('granite', -aSh, lxa, yStr1 - 0.02, yShaftTop + 0.02, zFI, zFF, { r: R_THIN, seg: 2, uv: UV.wall });
+  span('granite', lxb, aSh, yStr1 - 0.02, yShaftTop + 0.02, zFI, zFF, { r: R_THIN, seg: 2, uv: UV.wall });
+  span('granite', lxa, lxb, yStr1 - 0.02, lya, zFI, zFF, { r: R_THIN, uv: UV.wall });
+  span('granite', lxa, lxb, lyb, yShaftTop + 0.02, zFI, zFF, { r: R_THIN, uv: UV.wall });
   span('sand', -aCor, aCor, yCor0, yCor1, zFI, zFO, { r: R_THIN, uv: UV.trim });
   span('granite', -aPar, aPar, yPar0, yPar1, zFI, zFO, { r: R_THIN, seg: 2, uv: UV.wall });
   // Quoins: the warm stone up both angles of the facade, standing 0.03 proud
@@ -391,11 +418,23 @@ export function buildBastionSkin(v) {
   //
   // Off-centre, and nothing on the right answers it — Heartwood's single iron
   // bracket, in stone.
+  //
+  // WHAT MAKES IT A RECESS NOW: the field is CUT around it (above), so the
+  // slot's near-black stone is genuinely the backmost surface in that hole,
+  // and the sandstone surround stands 0.06 in FRONT of the slot rather than
+  // 0.012 behind the field. Value and a real shadow line, in the 0.09 of
+  // depth the contract leaves — which is how an arrow loop reads at fifteen
+  // units anyway.
+  //
+  // IT IS STILL NOT A HOLE, and that is load-bearing: it sits inside the
+  // COWL band, where a single leaked ray is a die seen vanishing. The slot's
+  // stone is opaque and the unlit `towerSkinLining` stands behind it, so a
+  // ray that gets through the sandstone surround stops on one or the other.
   {
-    const sx = -0.92, w = 0.22, y0 = 7.15, y1 = 9.05;
-    // A surround as wide as the slot is a picture frame, not an arrow loop.
-    const jamb = 0.13, head = 0.13;
-    span('shadowStone', sx - w / 2, sx + w / 2, y0, y1, zFI, zFF - 0.012,
+    const sx = loopX, w = loopW, y0 = loopY0, y1 = loopY1;
+    const jamb = loopJ, head = loopJ;
+    // The slot itself, at the BACK of the facade's depth.
+    span('shadowStone', sx - w / 2, sx + w / 2, y0, y1, zFI, zFI + 0.024,
       { r: R_THIN, uv: UV.trim });
     for (const s of [-1, 1]) {
       span('sand', sx + s * (w / 2), sx + s * (w / 2 + jamb), y0 - head, y1 + head,
@@ -408,6 +447,7 @@ export function buildBastionSkin(v) {
   }
 
   // --- MERLONS: decoration on a closed ring -------------------------------
+  let brokenMerlonX = 0;      // held: the water runs hardest through the gap
   // Distributed by ARC LENGTH around the parapet's own D-profile so the
   // teeth are evenly spaced whether they stand on the chord or the curve —
   // spacing them by angle would bunch them across the flat front.
@@ -416,21 +456,32 @@ export function buildBastionSkin(v) {
     const arc = rPar * (2 * Math.PI - 2 * th0);
     const perim = 2 * aPar + arc;
     const N = 12, pitch = perim / N;
-    const dep = 0.26, w = pitch * 0.63, h = yMer1 - yPar1;
+    const dep = 0.26, w = pitch * 0.63, hFull = yMer1 - yPar1;
+    // ONE TOOTH IS GONE — k = 4, which lands at s ≈ −2.31: on the front face,
+    // off centre, and not the one beside it. The cheapest history in the set,
+    // and it is only cheap if it is asymmetric; a symmetric pair of stumps
+    // reads as a design. What is left is a knee-high stump of the CORE stone
+    // (granite, not the dressed sandstone), weathered, because a merlon that
+    // has come off takes its dressing with it and leaves rubble.
+    const BROKEN = 4;
     for (let k = 0; k < N; k++) {
+      const broke = k === BROKEN;
+      const h = broke ? hFull * 0.38 : hFull;
       const s = -perim / 2 + (k + 0.5) * pitch;
       const geo = roundedBox(w, h, dep, R_TRIM, 1);
+      if (broke) weather(geo, w, h, dep, rnd);
       planarUV(geo, UV.slab[0], UV.slab[1], rnd() * 0.4, rnd() * 0.4);
-      const m = new THREE.Mesh(geo, MAT.sand);
+      const m = new THREE.Mesh(geo, broke ? MAT.granite : MAT.sand);
       if (Math.abs(s) <= aPar) {
-        m.position.set(s, (yPar1 + yMer1) / 2, zFO - dep / 2);
+        m.position.set(s, yPar1 + h / 2, zFO - dep / 2);
       } else {
         const th = Math.sign(s) * (th0 + (Math.abs(s) - aPar) / rPar);
         const rm = rPar - dep / 2;
-        m.position.set(rm * Math.sin(th), (yPar1 + yMer1) / 2, zc + rm * Math.cos(th));
+        m.position.set(rm * Math.sin(th), yPar1 + h / 2, zc + rm * Math.cos(th));
         m.rotation.y = th;
       }
       add(m);
+      if (broke) brokenMerlonX = Math.abs(s) <= aPar ? s : m.position.x;
     }
   }
 
@@ -471,7 +522,223 @@ export function buildBastionSkin(v) {
     add(tray);
   }
 
+  // =========================================================================
+  // THE DRESSING (docs/TOWER.md, DRESSING). Five props, one bold: a gonfalon
+  // off the battlement, a THIRD of the way across rather than centred, so the
+  // one silhouette break makes the outline asymmetric instead of confirming
+  // that it is not. Two shields with DIFFERENT devices (two devices are two
+  // people; a matched pair is wallpaper), a lit sconce beside the arrow loop
+  // for the darkest-dark/lightest-light adjacency that pins a focal point,
+  // one broken merlon with one fresh mortar patch far below it, and water
+  // running down out of the crenel gaps because gravity governs weathering.
+  // =========================================================================
+  const dress = new THREE.Group();
+  dress.name = 'towerSkinDress';
+  group.add(dress);
+  const fx = new THREE.Group();
+  fx.name = 'towerDressFx';
+  group.add(fx);
+  const addDress = (mesh, cast = true) => {
+    ensureColor(mesh.geometry);
+    mesh.castShadow = cast; mesh.receiveShadow = true;
+    dress.add(mesh); parts.push(mesh); return mesh;
+  };
+
+  // --- 1. THE GONFALON — the one bold silhouette break ---------------------
+  // It HANGS from a crossbar bracketed to the merlons rather than flying from
+  // a pole, and that is arithmetic, not taste: the socket's ceiling is y 12.5
+  // and the merlons already cap at 12.42, so a pole is a prop through the
+  // roof of the room. A banner hanging down the face is the same silhouette
+  // read from the one camera this table has.
+  //
+  // Cloth, not sheet metal, and the difference is two corrections most fold
+  // fields skip: it PULLS IN as it folds (the material goes into the fold),
+  // and its free hem SCALLOPS between the folds. See buildGonfalon.
+  const gonX = 1.75;
+  {
+    const clothTex = bakeCloth({
+      size: 256, seed: 0xba5f1a, hemBand: 0.14,
+      // RULE OF TINCTURE, which is a legibility constraint and not a
+      // flourish: metal on colour or colour on metal, never like on like.
+      // Azure field, a chief Or, a mullet Argent. No beasts — a beast
+      // silhouette does not survive 84 px, and this is 55.
+      arms: {
+        field: 'azure', division: 'chief', divTincture: 'or',
+        charge: 'mullet', chargeTincture: 'argent', chargeY: 0.60, chargeScale: 0.46,
+      },
+    });
+    const clothMat = new THREE.MeshStandardMaterial({
+      map: clothTex.map, normalMap: clothTex.normalMap,
+      normalScale: new THREE.Vector2(0.55, 0.55),
+      roughnessMap: clothTex.roughnessMap, roughness: 1, metalness: 0,
+      // ALPHA TEST, NEVER `transparent` — the frayed hem stays in the opaque
+      // list and cannot sort wrong against the masonry behind it.
+      alphaTest: 0.5, transparent: false, side: THREE.DoubleSide,
+      envMapIntensity: 0.45, vertexColors: true,
+    });
+    const barY = 12.16, barZ = zFO + 0.075, w = 1.34, h = 2.78;
+    const bar = new THREE.Mesh(mergeGeos([
+      { geo: propUV(roundedBox(w + 0.30, 0.075, 0.075, 0.018, 1), 1.0),
+        matrix: xform({ pos: [0, 0, 0] }) },
+      { geo: propUV(roundedBox(0.06, 0.06, 0.16, 0.016, 1), 0.6),
+        matrix: xform({ pos: [-w / 2 - 0.05, -0.02, -0.10] }) },
+      { geo: propUV(roundedBox(0.06, 0.06, 0.16, 0.016, 1), 0.6),
+        matrix: xform({ pos: [w / 2 + 0.05, -0.02, -0.10] }) },
+    ]), MAT.sandFlat);
+    bar.position.set(gonX, barY, barZ);
+    addDress(bar);
+
+    const swing = new THREE.Group();
+    swing.position.set(gonX, barY - 0.05, barZ + 0.01);
+    dress.add(swing);
+    const cloth = buildGonfalon({ w, h, seed: 0xba5c10, material: clothMat });
+    cloth.position.set(0, -h / 2, 0);
+    ensureColor(cloth.geometry);
+    swing.add(cloth); parts.push(cloth);
+    // 2.5° about the bar and 1.5° across it, out of phase and not harmonic.
+    // Tip travel ≈ 5 px at the resting eye: an indoor room has no wind, and a
+    // flag that snaps is a flag in a different game.
+    registerSway(group, swing, { amp: 1.5 * Math.PI / 180, hz: 0.055, phase: 0.4, axis: 'z' });
+    registerSway(group, swing, { amp: 2.5 * Math.PI / 180, hz: 0.043, phase: 2.2, axis: 'x' });
+  }
+
+  // --- 2. TWO SHIELDS, TWO HOUSES ------------------------------------------
+  // Unequal sizes, unequal heights, left of the doorway and clear of the
+  // string course, and never below y 5.2 — the exit lane runs out under
+  // them. A heater shield is dished, so its normals are ROTATED analytically
+  // rather than recomputed (G7); and its point is drawn short by the bevel's
+  // own overshoot, which at a 40° tip is nearly three times the bevel (G6).
+  for (const sh of [
+    { w: 0.80, x: -2.02, y: 5.74, seed: 0xba5111,
+      arms: { field: 'gules', charge: 'tower', chargeTincture: 'or', chargeScale: 0.56 } },
+    { w: 0.62, x: -1.20, y: 6.02, seed: 0xba5222,
+      arms: { field: 'argent', charge: 'cross', chargeTincture: 'sable', chargeScale: 0.62 } },
+  ]) {
+    const face = bakeShieldFace({ size: 256, seed: sh.seed, arms: sh.arms });
+    const m = buildHeaterShield({
+      w: sh.w, seed: sh.seed,
+      material: new THREE.MeshStandardMaterial({
+        map: face.map, normalMap: face.normalMap, normalScale: new THREE.Vector2(0.5, 0.5),
+        roughnessMap: face.roughnessMap, roughness: 1, metalness: 0,
+        envMapIntensity: 0.45, vertexColors: true,
+      }),
+    });
+    m.position.set(sh.x, sh.y, zFF);
+    addDress(m);
+  }
+
+  // --- 3. THE SCONCE — the family trait, beside the loop -------------------
+  // The registry's `ember` row lights it. Put next to the darkest thing on
+  // the tower on purpose: the loop's near-black slot and a live flame within
+  // half a unit of each other is the strongest value contrast the model has,
+  // and that is what makes a focal point rather than a bright spot.
+  const sconceX = -0.38, sconceY = 7.98;
+  {
+    const cageMat = new THREE.MeshStandardMaterial({
+      map: M.cage.map, normalMap: M.cage.normalMap, normalScale: new THREE.Vector2(0.9, 0.9),
+      roughnessMap: M.cage.roughnessMap, roughness: 1, metalness: 0.35,
+      envMapIntensity: 0.45, vertexColors: true,
+    });
+    const s = buildSconce({
+      seed: 0xba53c0, cageMat, fireMat: emberMaterial(M.coals, 1.6),
+      r: 0.22, bowlH: 0.30, out: 0.30,
+    });
+    s.group.position.set(sconceX, sconceY, zFO);
+    dress.add(s.group);
+    for (const p of s.parts) { p.castShadow = true; p.receiveShadow = true; parts.push(p); }
+  }
+
+  // --- 4. THE REPAIR, far below the failure --------------------------------
+  // A patch of fresh, pale mortar-and-stone low on the LEFT gateway
+  // buttress — outside |x| 2.5, so it is nowhere near the aperture — against
+  // the broken merlon eight units above it. Repair plus failure is what sets
+  // a timescale: somebody maintains this, and somebody has not got to that.
+  {
+    const patch = new THREE.Mesh(
+      planarUV(roundedBox(0.40, 0.58, 0.03, R_THIN, 1), UV.trim[0], UV.trim[1], 0.2, 0.6),
+      new THREE.MeshStandardMaterial({
+        map: M.sandFlat.map, normalMap: M.sandFlat.normalMap,
+        normalScale: new THREE.Vector2(0.28, 0.28),
+        roughnessMap: M.sandFlat.roughnessMap, roughness: 1, metalness: 0,
+        color: 0xcfc7b4, envMapIntensity: 0.45, vertexColors: true,
+      }));
+    patch.position.set(-2.80, 2.42, zFO + 0.012);
+    addDress(patch);
+  }
+
+  // --- 5. WEATHERING — water out of the gaps, growth at the foot -----------
+  // Rain leaves a castle through the crenel gaps, so the streaks start at the
+  // embrasure floor and run DOWN over the corbel table. They are alpha-tested
+  // quads merged into ONE geometry sharing ONE canvas of three different
+  // streaks, because five little planes are five draw calls and a tiling wall
+  // texture cannot know where the gaps are.
+  {
+    const tex = bakeStainSheet({
+      size: 256, seed: 0xba57a1,
+      cells: [
+        { stops: [[0x2a, 0x2c, 0x26], [0x3d, 0x40, 0x36], [0x55, 0x58, 0x4c]], lanes: 3, width: 0.20, reach: 0.85 },
+        { stops: [[0x26, 0x29, 0x24], [0x38, 0x3c, 0x32], [0x4e, 0x52, 0x45]], lanes: 2, width: 0.26, reach: 0.72 },
+        { stops: [[0x2d, 0x2e, 0x27], [0x42, 0x44, 0x39], [0x5b, 0x5d, 0x50]], lanes: 4, width: 0.14, reach: 0.95 },
+      ],
+    });
+    const yTop = yPar1 - 0.02;
+    const defs = [
+      // The widest run is under the tooth that is MISSING — the gap is twice
+      // as wide there and so is the stain. Gravity plus the story, together.
+      { cell: 1, w: 0.90, h: 2.25, pos: [brokenMerlonX, yTop, zFO + 0.014] },
+      { cell: 0, w: 0.52, h: 1.85, pos: [-1.54, yTop, zFO + 0.014] },
+      { cell: 2, w: 0.46, h: 1.55, pos: [1.54, yTop, zFO + 0.014] },
+      { cell: 0, w: 0.44, h: 1.20, pos: [0.02, yTop, zFO + 0.014] },
+      // …and one long one off the string course, which is the other lip on
+      // the model that sheds water.
+      { cell: 2, w: 0.62, h: 1.70, pos: [-2.10, yStr0 - 0.02, zFO + 0.010] },
+    ];
+    const stains = buildStains({ defs, cells: 3, tex });
+    addDress(stains, false);
+  }
+  {
+    // Growth at the foot of the shaded flank: no stems, because this is not a
+    // climb — it is the twenty-year-old clump every wall has at ground level
+    // where the damp is. Clustered on ONE side; nothing answers it.
+    const rndL = mulberry32(0xba5133);
+    const items = [];
+    const up = new THREE.Vector3(0, 0, 1);
+    const q = new THREE.Quaternion(), q2 = new THREE.Quaternion(), d3 = new THREE.Vector3();
+    for (let i = 0; i < 26; i++) {
+      const t = rndL();
+      const x = -3.02 + rndL() * 1.10;
+      const y = 0.12 + Math.pow(rndL(), 1.7) * 1.9;
+      const s = 0.14 + rndL() * 0.11;
+      d3.set(0, 0.30 + rndL() * 0.3, 1).normalize();
+      q.setFromUnitVectors(up, d3);
+      q2.setFromAxisAngle(d3, (rndL() - 0.5) * 1.0);
+      items.push({
+        matrix: new THREE.Matrix4().compose(
+          new THREE.Vector3(x, y, zFO + 0.02 + rndL() * 0.05),
+          q2.multiply(q), new THREE.Vector3(s, s, s)),
+        tint: [(0x3a + 0x24 * t) / 255, (0x54 + 0x1c * t) / 255, (0x22 + 0x14 * t) / 255],
+      });
+    }
+    fx.add(instancedField({
+      geo: new THREE.PlaneGeometry(1, 1), material: leafMaterial(M.leaf),
+      items, name: 'dressWallGrowth',
+    }));
+  }
+
   bakeVertexAO(parts, group);
+
+  // --- WEATHERING IN THE VERTEX COLOURS, after the AO bake -----------------
+  // Damp at the base, a green cast on the shaded flank, and nothing above.
+  // World space, so it knows where the ground is — which a tile that repeats
+  // every 8.8 units does not.
+  gravityStain(parts, (p, n, out) => {
+    const damp = clamp01(1 - p.y / 2.1);
+    const shade = clamp01(-n.x) * clamp01(1 - p.y / 4.5) * 0.6;
+    const k = Math.max(damp * 0.85, shade);
+    if (k < 0.02) return false;
+    out[0] = 1 - 0.15 * k; out[1] = 1 - 0.07 * k; out[2] = 1 - 0.19 * k;
+    return true;
+  });
 
   // --- AO layer (b): the unlit near-black lining --------------------------
   // Everything above this point is lit stone; everything below is light that

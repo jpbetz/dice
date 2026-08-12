@@ -132,6 +132,11 @@ const TOWERS = {
   bastion: {
     id: 'bastion', label: 'Bastion', skin: buildBastionSkin,
     title: 'Bastion — a stone turret; dice rumble through it',
+    // THE FAMILY TRAIT: the iron sconce bolted beside the arrow loop. It sits
+    // half a unit from the darkest thing on the model, which is the whole
+    // reason it is there — a live flame beside a near-black slot is the
+    // strongest value contrast a grey tower has.
+    ember: { at: [-0.38, 8.03, 0.54], color: '#ff9040', intensity: 2.4, dist: 4.0 },
     // Stone: heavier, lower, and it rings on in the shaft afterwards.
     clunkVoice: { body: 'thud', weight: 0.7, sustain: 40 },
   },
