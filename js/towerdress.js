@@ -582,62 +582,63 @@ export function bakeCage({ size = 128, seed, bars = 8, stops }) {
 // SCALE: the fitting is ~0.55 × 0.85 u, about two thirds of a d6. Smaller and
 // the cage bars stop existing even as paint; larger and it stops being
 // hardware and becomes a brazier.
+// THREE DRAW CALLS, and that is a design constraint rather than an accident:
+// the bracket (bolted, static), the hanging ironwork (swings), and the fire
+// (its own emissive material). Six separate little meshes would be six draw
+// calls for a prop two thirds of a d6 across.
 export function buildCresset({
-  seed, ironMat, cageMat, fireMat, capMat,
-  reach = 0.52, r = 0.25, basketH = 0.34, hangDrop = 0.16, wallX = 0, mount = 'z',
+  seed, ironMat, cageMat, fireMat,
+  reach = 0.52, r = 0.25, basketH = 0.34, hangDrop = 0.16,
 }) {
   const group = new THREE.Group();
   const parts = [];
   // The bracket: an arm out from the wall and a diagonal brace under it. Two
   // rounded boxes; the third one a real bracket would have is under 0.07 and
   // is therefore in the cage bake's business, not the geometry's.
-  const arm = new THREE.Mesh(roundedBox(0.075, 0.075, reach, R_PROP, 1), ironMat);
-  arm.position.set(0, 0, reach / 2);
-  propUV(arm.geometry, 0.5);
-  const brace = new THREE.Mesh(roundedBox(0.06, 0.06, reach * 0.92, R_PROP, 1), ironMat);
-  brace.position.set(0, -reach * 0.30, reach * 0.42);
-  brace.rotation.x = -38 * Math.PI / 180;
-  propUV(brace.geometry, 0.5);
-  group.add(arm, brace);
-  parts.push(arm, brace);
+  const bracket = new THREE.Mesh(mergeGeos([
+    { geo: propUV(roundedBox(0.075, 0.075, reach, R_PROP, 1), 0.5),
+      matrix: xform({ pos: [0, 0, reach / 2] }) },
+    { geo: propUV(roundedBox(0.06, 0.06, reach * 0.92, R_PROP, 1), 0.5),
+      matrix: xform({ pos: [0, -reach * 0.30, reach * 0.42], rot: [-38 * Math.PI / 180, 0, 0] }) },
+  ]), ironMat);
+  group.add(bracket); parts.push(bracket);
 
   // Everything below the arm's tip hangs, and therefore swings.
   const hanger = new THREE.Group();
   hanger.position.set(0, 0, reach - 0.04);
   group.add(hanger);
 
-  const link = new THREE.Mesh(roundedBox(0.045, hangDrop, 0.045, 0.012, 1), ironMat);
-  link.position.set(0, -hangDrop / 2, 0);
-  propUV(link.geometry, 0.4);
-  hanger.add(link); parts.push(link);
-
   const yB = -hangDrop - basketH / 2;
-  const cage = new THREE.Mesh(
-    new THREE.CylinderGeometry(r, r * 0.82, basketH, 10, 1, true), cageMat);
-  cage.position.set(0, yB, 0);
-  hanger.add(cage); parts.push(cage);
+  // A HOOP at the rim instead of a cap. LOOKED AT, THEN CUT: the first cut
+  // had the pagoda cap the dossier suggests, and from the shipped eye — which
+  // looks slightly DOWN at a prop 8 units up — the cap is a lid over the only
+  // part of the prop anybody can see. A capped cresset renders as a black
+  // bucket. The cap is 48 triangles of hiding the feature.
+  const iron = new THREE.Mesh(mergeGeos([
+    // the hanging link
+    { geo: propUV(roundedBox(0.045, hangDrop, 0.045, 0.012, 1), 0.4),
+      matrix: xform({ pos: [0, -hangDrop / 2, 0] }) },
+    // the basket — an OPEN tube whose bars live in the normal map
+    { geo: new THREE.CylinderGeometry(r, r * 0.80, basketH, 10, 1, true),
+      matrix: xform({ pos: [0, yB, 0] }) },
+    // …and its rim hoop, which is what stops the tube reading as a pipe
+    { geo: new THREE.TorusGeometry(r, 0.026, 4, 12),
+      matrix: xform({ pos: [0, -hangDrop, 0], rot: [Math.PI / 2, 0, 0] }) },
+  ]), cageMat);
+  hanger.add(iron); parts.push(iron);
 
-  // The fuel: a short closed cylinder INSIDE the cage, sitting a little
-  // below its rim so the bars cut across it. Opaque, and the bake is what
-  // makes it coals rather than a bulb.
+  // The fuel, and it stands PROUD of the rim — the bars cut across its lower
+  // half and its top is open to the sky, which is the whole read: coals in a
+  // basket, seen from above. Opaque (the anvil rule: the eye sees coals, not
+  // a hole), and the bake is what makes it fire rather than a bulb.
+  const fireH = basketH * 0.92;
   const fire = new THREE.Mesh(
-    new THREE.CylinderGeometry(r * 0.80, r * 0.68, basketH * 0.74, 10, 1, false), fireMat);
-  fire.position.set(0, yB - basketH * 0.06, 0);
+    new THREE.CylinderGeometry(r * 0.93, r * 0.66, fireH, 10, 1, false), fireMat);
+  fire.position.set(0, -hangDrop + 0.085 - fireH / 2, 0);
   hanger.add(fire); parts.push(fire);
 
-  // A pagoda cap: six-point lathe, CENTRED (G11 — LatheGeometry's origin is
-  // not its middle and an uncentred cap hangs off its own hook).
-  const pts = [];
-  for (const [px, py] of [[0.02, 0], [r * 0.55, 0.02], [r * 1.15, 0.10], [r * 1.22, 0.14],
-    [r * 0.62, 0.19], [0.03, 0.21]]) pts.push(new THREE.Vector2(px, py));
-  const capGeo = new THREE.LatheGeometry(pts, 10);
-  capGeo.center();
-  const cap = new THREE.Mesh(capGeo, capMat || ironMat);
-  cap.position.set(0, -hangDrop + 0.10, 0);
-  hanger.add(cap); parts.push(cap);
-
-  if (mount === 'x') { group.rotation.y = Math.sign(wallX) * Math.PI / 2; }
   for (const p of parts) { ensureColor(p.geometry); p.castShadow = true; p.receiveShadow = true; }
+  void seed;
   return { group, hanger, parts, fire };
 }
 
@@ -647,22 +648,21 @@ export function buildCresset({
 export function buildSconce({ seed, ironMat, cageMat, fireMat, r = 0.23, bowlH = 0.30, out = 0.34 }) {
   const group = new THREE.Group();
   const parts = [];
-  const plate = new THREE.Mesh(roundedBox(0.30, 0.46, 0.07, R_PROP, 1), ironMat);
-  plate.position.set(0, 0, 0.035);
-  propUV(plate.geometry, 0.5);
-  const arm = new THREE.Mesh(roundedBox(0.06, 0.06, out, R_PROP, 1), ironMat);
-  arm.position.set(0, -0.10, out / 2 + 0.04);
-  arm.rotation.x = -24 * Math.PI / 180;
-  propUV(arm.geometry, 0.5);
-  const bowl = new THREE.Mesh(
-    new THREE.CylinderGeometry(r, r * 0.62, bowlH, 10, 1, true), cageMat);
-  bowl.position.set(0, 0.06, out + 0.02);
+  const iron = new THREE.Mesh(mergeGeos([
+    { geo: propUV(roundedBox(0.30, 0.46, 0.07, R_PROP, 1), 0.5),
+      matrix: xform({ pos: [0, 0, 0.035] }) },
+    { geo: propUV(roundedBox(0.06, 0.06, out, R_PROP, 1), 0.5),
+      matrix: xform({ pos: [0, -0.10, out / 2 + 0.04], rot: [-24 * Math.PI / 180, 0, 0] }) },
+    { geo: new THREE.CylinderGeometry(r, r * 0.62, bowlH, 10, 1, true),
+      matrix: xform({ pos: [0, 0.06, out + 0.02] }) },
+  ]), cageMat || ironMat);
   const fire = new THREE.Mesh(
     new THREE.CylinderGeometry(r * 0.82, r * 0.66, bowlH * 0.7, 10, 1, false), fireMat);
   fire.position.set(0, 0.05, out + 0.02);
-  group.add(plate, arm, bowl, fire);
-  parts.push(plate, arm, bowl, fire);
+  group.add(iron, fire);
+  parts.push(iron, fire);
   for (const p of parts) { ensureColor(p.geometry); p.castShadow = true; p.receiveShadow = true; }
+  void seed; void ironMat;
   return { group, parts, fire };
 }
 
@@ -738,6 +738,55 @@ export function ivyLeaves({ paths, seed, every = 1.6, size = 0.19 }) {
     }
   }
   return out;
+}
+
+// THE STEMS, AND WHY THEY ARE A PANEL RATHER THAN THE WALL BAKE.
+// The dossier's advice is to rasterise ivy stems into the wall canvas: zero
+// triangles, and a tube for a 2-px feature is 294 triangles of nothing. But
+// every wall texture in this repo tiles at WORLD scale, so a stem painted into
+// the plank bake grows on all four sides of the tower at once. So the stems
+// get their own small NON-TILING panel, alpha-tested, two triangles, standing
+// a hair off the wall — which is the dossier's economics with this repo's UV
+// scheme respected.
+//
+// Two layers, because one is a scratch: a warm-dark cord and a bright lip
+// along one side of it, which is what makes a 3-px line read as round.
+export function bakeStems({
+  size = 256, paths, uRange, vRange, world, seed,
+  wStem = 0.055, cord = '#1a150e', lip = 'rgba(118,102,64,0.45)',
+}) {
+  const { c, x } = canvas2d(size);
+  const [u0, u1] = uRange, [v0, v1] = vRange;
+  const X = (u) => (u - u0) / (u1 - u0) * size;
+  const Y = (v) => size - (v - v0) / (v1 - v0) * size;
+  const lw = Math.max(2, wStem / (u1 - u0) * size);
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  const draw = (style, width, dx) => {
+    x.strokeStyle = style; x.lineWidth = width;
+    for (const p of paths) {
+      if (p.length < 2) continue;
+      x.beginPath();
+      x.moveTo(X(p[0][0]) + dx, Y(p[0][1]));
+      for (let i = 1; i < p.length; i++) x.lineTo(X(p[i][0]) + dx, Y(p[i][1]));
+      x.stroke();
+    }
+  };
+  draw(cord, lw, 0);
+  draw(lip, Math.max(1, lw * 0.24), -lw * 0.30);
+  // Rough the alpha edge so a stem is a cord and not a vector path.
+  const img = x.getImageData(0, 0, size, size);
+  const d = img.data;
+  for (let py = 0; py < size; py++) {
+    for (let px = 0; px < size; px++) {
+      const i = (py * size + px) * 4;
+      if (!d[i + 3]) continue;
+      const n = turb(px / size * 60, py / size * 22, 60, 2, seed);
+      d[i + 3] = d[i + 3] * (0.6 + 0.75 * n) > 150 ? 255 : 0;
+    }
+  }
+  x.putImageData(img, 0, 0);
+  void world;
+  return colorTexture(c);
 }
 
 // An ivy leaf, as alpha. Five lobes, a pale midrib, and the whole thing drawn

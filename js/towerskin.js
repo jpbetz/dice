@@ -39,6 +39,18 @@ limitations under the License.
 // that is the silhouette.
 
 import * as THREE from 'three';
+// The PROP kit (js/towerdress.js) imports the SURFACE kit — this file — so
+// this is a cycle. It is a benign one and deliberately so: both sides use the
+// other only from inside function bodies, never at module-evaluation time, so
+// ESM's live bindings are resolved long before anybody calls anything. Keep it
+// that way — a top-level `const` in either file that reads the other is the
+// edit that turns this into a TDZ crash on frame one.
+import {
+  buildCresset, buildRope, bakeRope, coilPoints, bakeCage, emberMaterial,
+  growIvy, ivyLeaves, bakeLeaf, bakeTuft, bakeStems, mossPass, cloneCanvas,
+  instancedField, leafMaterial, gravityStain, mergeGeos, xform, propUV,
+  registerSway, ensureColor,
+} from './towerdress.js';
 
 // ---------------------------------------------------------------------------
 // Deterministic noise kit (no dependencies, no Math.random anywhere)
@@ -565,11 +577,37 @@ export function veilTexture(size, alpha) {
 let MAPS = null;
 function maps() {
   if (MAPS) return MAPS;
+  const walnut = bakeWood({ size: 512, stops: WALNUT, planks: 6, seed: 0x7047e1, cathedral: false });
+  const walnutFlat = bakeWood({ size: 256, stops: WALNUT, planks: 1, seed: 0x51d302, cathedral: true });
+  // THE MOSS IS A SECOND PRINT OF A CANVAS THE TOWER IS ALREADY WEARING.
+  // Clone, repaint, re-derive: one extra material and not one triangle.
+  // `climb` is deliberately flat here — the tiled UVs mean canvas v has no
+  // fixed relationship to world height, so the GRAVITY logic is carried by
+  // WHICH MESHES get the mossy material (the ground course, the shaded
+  // cornice slab) rather than by a gradient inside the tile.
+  const mossy = (src, seed, amount) => {
+    const c = cloneCanvas(src.colorCanvas), h = cloneCanvas(src.heightCanvas);
+    mossPass(c, h, { seed, amount, climbFrom: 1.25, climbTo: -0.25, scale: 5 });
+    return mapsFromCanvases(c, h, seed);
+  };
   MAPS = {
-    walnut: bakeWood({ size: 512, stops: WALNUT, planks: 6, seed: 0x7047e1, cathedral: false }),
+    walnut,
     cherry: bakeWood({ size: 512, stops: CHERRY, planks: 6, seed: 0x3c9a11, cathedral: false }),
-    walnutFlat: bakeWood({ size: 256, stops: WALNUT, planks: 1, seed: 0x51d302, cathedral: true }),
+    walnutFlat,
     cherryFlat: bakeWood({ size: 256, stops: CHERRY, planks: 1, seed: 0x1a8b74, cathedral: true }),
+    walnutMoss: mossy(walnut, 0x70e577, 0.92),
+    walnutFlatMoss: mossy(walnutFlat, 0x51d377, 0.52),
+    // Dressing bakes (js/towerdress.js): the cresset's painted cage, its
+    // coals, the hoist rope, and the ivy's leaves, stems and moss tufts.
+    cage: bakeCage({ size: 128, seed: 0x70cae1, bars: 9, stops: [[0x2c, 0x26, 0x1e], [0x55, 0x49, 0x35], [0x94, 0x7e, 0x52]] }),
+    // A LIVE basket, not a banked bed: `heat` 1.8 pushes most of the crack
+    // network past the ramp's midpoint, because a cresset is 0.5 across and
+    // the anvil's own 1.0 left whichever thumbnail-sized patch the cylinder's
+    // top cap happened to sample dead as often as not.
+    coals: bakeEmber({ size: 128, seed: 0x70f13e, heat: 1.8 }),
+    rope: bakeRope({ size: 128, seed: 0x70a0be }),
+    leaf: bakeLeaf({ size: 64, seed: 0x70ea11 }),
+    tuft: bakeTuft({ size: 64, seed: 0x70b011 }),
     veil: veilTexture(256, 0.92),
     shadow: veilTexture(256, 0.55),
   };
@@ -765,6 +803,11 @@ export function buildTowerSkin(v) {
     cherry: woodMat(M.cherry),
     walnutFlat: woodMat(M.walnutFlat),
     cherryFlat: woodMat(M.cherryFlat),
+    // The same two species with moss painted into their canvases. They cost
+    // one material each and no geometry; WHICH mesh wears one is where the
+    // gravity logic lives (the dressing pass, below).
+    walnutMoss: woodMat(M.walnutMoss),
+    walnutFlatMoss: woodMat(M.walnutFlatMoss),
     // Sparse warm iron. Full metalness with a real environment to mirror is
     // what keeps this from reading as grey plastic.
     iron: new THREE.MeshStandardMaterial({
@@ -826,7 +869,9 @@ export function buildTowerSkin(v) {
   const capTop = cowlTop + 0.16 * S;
 
   // --- PLINTH: two stepped courses, both wider than the shaft -------------
-  span('walnut', -(capX + 0.13 * S), capX + 0.13 * S, 0, baseA, zBO - 0.16 * S, zFO,
+  // (The ground course is held: the dressing pass swaps its material for a
+  // mossed print of the same canvas. Water sits here.)
+  const plinthBottom = span('walnut', -(capX + 0.13 * S), capX + 0.13 * S, 0, baseA, zBO - 0.16 * S, zFO,
     { uv: UV.flat, r: R_HULL, weather: true });
   span('walnut', -capX, capX, baseA, baseB, zBO - 0.08 * S, zFO,
     { uv: UV.flat, r: R_TRIM, weather: true });
@@ -851,9 +896,11 @@ export function buildTowerSkin(v) {
 
   // --- CORNICE: a real overhang, its top canted down toward the mouth ------
   const cant = 4 * Math.PI / 180;
+  let corniceLeft = null;
   for (const s of [-1, 1]) {
-    span('walnutFlat', s * inX, s * capX, bodyTop, capTop, zBO - 0.16 * S, zFO,
+    const c = span('walnutFlat', s * inX, s * capX, bodyTop, capTop, zBO - 0.16 * S, zFO,
       { uv: UV.flat, r: R_TRIM, rz: s * cant, weather: true });
+    if (s < 0) corniceLeft = c;      // the shaded slab — the dressing mosses it
   }
   span('walnutFlat', -capX, capX, bodyTop, capTop, zBO - 0.16 * S, zBI,
     { uv: UV.flat, r: R_TRIM, rx: -cant });
@@ -953,7 +1000,249 @@ export function buildTowerSkin(v) {
     }
   }
 
+  // =========================================================================
+  // THE DRESSING (docs/TOWER.md, DRESSING). Five props, one bold: a lit
+  // cresset on the right corner post — the family trait, and the thing that
+  // makes this a tower somebody LIT tonight rather than a piece of furniture.
+  // The other four are quiet: ivy up the shaded left, moss where water sits,
+  // a hoist beam that says the thing has a job, and one repair beside one
+  // failure, which is what puts a date on a building.
+  //
+  // Everything opaque lives in `towerSkinDress` — measured by tower-fit,
+  // counted by the occlusion proof. The instanced fields live in
+  // `towerDressFx`, out of both, because bakeVertexAO's Box3.setFromObject
+  // unions every instance of an InstancedMesh into ONE box (G8) and that box
+  // would swallow the tower's own AO.
+  // =========================================================================
+  const dress = new THREE.Group();
+  dress.name = 'towerSkinDress';
+  group.add(dress);
+  const fx = new THREE.Group();
+  fx.name = 'towerDressFx';
+  group.add(fx);
+  // `cast` is a real parameter and not a tidy default: an ALPHA-TESTED plane
+  // that casts a shadow is a rectangle of darkness on the wall behind it —
+  // three's depth material does not carry the cutout reliably, and the ivy
+  // panel's first cut printed a black slab up the post with the stems showing
+  // through it as pale ghosts. Cutouts light, they do not shade.
+  const addDress = (mesh, cast = true) => {
+    ensureColor(mesh.geometry);
+    mesh.castShadow = cast; mesh.receiveShadow = true;
+    dress.add(mesh); parts.push(mesh); return mesh;
+  };
+
+  // --- 1. THE CRESSET — the bold one, and the family's warm light ----------
+  // Right corner post, upper third, ONE side only. It hangs from a bracket
+  // and it SWINGS, which is the difference between a lit lamp and a decal;
+  // the registry's `ember` row puts a point light at the coals so the glow
+  // actually spills onto the post and the cornice above (an emissive map
+  // shines but cannot illuminate).
+  //
+  // REACH IS BUDGETED. The basket's far face lands at z0+0.92 — inside the
+  // envelope Heartwood's own door hood already occupies (z0+1.02), so this
+  // adds no new class of deviation, only another member of one. Sideways was
+  // refused: the socket's x wall is 3.25 and at `close` the mat's own wall is
+  // 3.35 behind it, so an x overrun is a prop through the side of the room.
+  const cressetX = 2.575, cressetY = 8.30;
+  {
+    const cageMat = new THREE.MeshStandardMaterial({
+      map: M.cage.map, normalMap: M.cage.normalMap, normalScale: new THREE.Vector2(0.9, 0.9),
+      roughnessMap: M.cage.roughnessMap, roughness: 1, metalness: 0.35,
+      envMapIntensity: 0.45, vertexColors: true,
+    });
+    // 1.15: brighter than the forge's banked grate on purpose — this is a
+    // small basket of LIVE fire, not a bed of coals going out.
+    const fireMat = emberMaterial(M.coals, 1.6);
+    const c = buildCresset({
+      seed: 0x70c355, ironMat: MAT.iron, cageMat, fireMat,
+      reach: 0.42, r: 0.25, basketH: 0.34, hangDrop: 0.16,
+    });
+    c.group.position.set(cressetX, cressetY, zFO);
+    dress.add(c.group);
+    for (const p of c.parts) { p.castShadow = true; p.receiveShadow = true; parts.push(p); }
+    // 2.2° about z and 1.4° about x, out of phase: a hanging thing does not
+    // swing in one plane. Tip travel ≈ 5 px at the resting eye, which is the
+    // whole point — visible as life, invisible as animation.
+    registerSway(group, c.hanger, { amp: 2.2 * Math.PI / 180, hz: 0.055, phase: 0.0, axis: 'z' });
+    registerSway(group, c.hanger, { amp: 1.4 * Math.PI / 180, hz: 0.041, phase: 1.9, axis: 'x' });
+  }
+
+  // --- 2. IVY up the shaded left corner ------------------------------------
+  // A guided walk in the post face's own (x, y): keep going, wander, climb,
+  // and let gravity take more of the vote the older the strand gets. The
+  // stems are a small NON-TILING alpha panel (a stem painted into the plank
+  // bake would grow on all four sides of the tower at once); the leaves are
+  // one InstancedMesh, one draw call, alpha-tested because an InstancedMesh
+  // cannot sort its own instances (G4).
+  const ivyU = [-3.02, -2.32], ivyV = [0.30, 6.20];
+  {
+    const paths = growIvy({
+      seed: 0x70147, start: [-2.74, 0.34], strands: 3, steps: 46, step: 0.15,
+      spread: 0.30, gravity: 0.40, branchP: 0.05, uLim: ivyU, vLim: ivyV,
+    });
+    const stemTex = bakeStems({
+      size: 256, paths, uRange: ivyU, vRange: ivyV, seed: 0x70157, wStem: 0.052,
+    });
+    const panel = new THREE.Mesh(
+      new THREE.PlaneGeometry(ivyU[1] - ivyU[0], ivyV[1] - ivyV[0]),
+      new THREE.MeshStandardMaterial({
+        map: stemTex, alphaTest: 0.5, transparent: false, side: THREE.DoubleSide,
+        roughness: 0.95, metalness: 0, envMapIntensity: 0.45, vertexColors: true,
+      }));
+    panel.position.set((ivyU[0] + ivyU[1]) / 2, (ivyV[0] + ivyV[1]) / 2, zFO + 0.014);
+    addDress(panel, false);
+
+    const leaves = ivyLeaves({ paths, seed: 0x70133, every: 2.8, size: 0.20 });
+    const up = new THREE.Vector3(0, 0, 1);
+    const q = new THREE.Quaternion(), q2 = new THREE.Quaternion();
+    const dir = new THREE.Vector3();
+    const items = leaves.map((l) => {
+      dir.set(0, l.tilt, 1).normalize();
+      q.setFromUnitVectors(up, dir);
+      q2.setFromAxisAngle(dir, l.roll);
+      return {
+        matrix: new THREE.Matrix4().compose(
+          new THREE.Vector3(l.u, l.v, zFO + l.lift),
+          q2.multiply(q), new THREE.Vector3(l.scale, l.scale, l.scale)),
+        tint: l.tint,
+      };
+    });
+    fx.add(instancedField({
+      geo: new THREE.PlaneGeometry(1, 1), material: leafMaterial(M.leaf),
+      items, name: 'dressIvyLeaves',
+    }));
+  }
+
+  // --- 3. MOSS where water sits --------------------------------------------
+  // Two of the tower's own meshes take a mossed print of the canvas they were
+  // already wearing (see maps()): the ground course of the plinth, heaviest,
+  // and the LEFT cornice slab, light — the shaded side, the same side the ivy
+  // is on. Nothing on the right answers either. Zero triangles.
+  //
+  // …and tufts where an EDGE shows, because texture-space moss has no
+  // silhouette and a mossy ledge with a razor edge is a mossy ledge nobody
+  // believes. Clustered at the base on the left, and outside |x| 2.6 so
+  // nothing stands in the delivery lane.
+  plinthBottom.material = MAT.walnutMoss;
+  corniceLeft.material = MAT.walnutFlatMoss;
+  {
+    const rndT = mulberry32(0x70744f);
+    const items = [];
+    for (let i = 0; i < 9; i++) {
+      const s = 0.16 + rndT() * 0.14;
+      // …and never past x −3.05: a card 0.45 wide centred on −3.12 puts its
+      // corner at −3.34, outside the socket's own wall, for a tuft of moss.
+      const x = -3.02 + rndT() * 0.62;
+      const zj = zFO + 0.02 + rndT() * 0.05;
+      items.push({
+        matrix: new THREE.Matrix4().compose(
+          new THREE.Vector3(x, s * 0.46, zj),
+          new THREE.Quaternion().setFromEuler(new THREE.Euler(0, (rndT() - 0.5) * 0.9, (rndT() - 0.5) * 0.3)),
+          new THREE.Vector3(s * 1.5, s, s)),
+        tint: [0.8 + rndT() * 0.4, 0.85 + rndT() * 0.3, 0.75 + rndT() * 0.35],
+      });
+    }
+    for (let i = 0; i < 4; i++) {
+      const s = 0.13 + rndT() * 0.10;
+      items.push({
+        matrix: new THREE.Matrix4().compose(
+          new THREE.Vector3(-3.0 + rndT() * 0.7, capTop + s * 0.42, zFO - 0.04 - rndT() * 0.3),
+          new THREE.Quaternion().setFromEuler(new THREE.Euler(0, (rndT() - 0.5) * 1.2, 0)),
+          new THREE.Vector3(s * 1.4, s, s)),
+        tint: [0.75 + rndT() * 0.35, 0.8 + rndT() * 0.3, 0.7 + rndT() * 0.3],
+      });
+    }
+    fx.add(instancedField({
+      geo: new THREE.PlaneGeometry(1, 1), material: leafMaterial(M.tuft),
+      items, name: 'dressMossTufts',
+    }));
+  }
+
+  // --- 4. THE HOIST — the one horizontal projection, and it has a job ------
+  // A short beam off the upper front face with a slack rope and a coil hung
+  // at its end. Interrupted work beats tidy work: the rope is not on a cleat.
+  // Its reach (z0+0.96) is the door hood's class again, and it lives at
+  // y 9.3 — nine units above anything that ever moves.
+  {
+    const bx = -1.55, by = 9.30, reach = 0.72;
+    const beam = new THREE.Mesh(mergeGeos([
+      { geo: propUV(roundedBox(0.15, 0.15, reach, R_TRIM, 1), 1.2),
+        matrix: xform({ pos: [0, 0, reach / 2] }) },
+      { geo: propUV(roundedBox(0.11, 0.11, reach * 0.8, R_TRIM, 1), 1.2),
+        matrix: xform({ pos: [0, -reach * 0.26, reach * 0.36], rot: [-34 * Math.PI / 180, 0, 0] }) },
+    ]), MAT.walnut);
+    beam.position.set(bx, by, zFO);
+    addDress(beam);
+
+    const ropeMat = new THREE.MeshStandardMaterial({
+      map: M.rope.map, normalMap: M.rope.normalMap, normalScale: new THREE.Vector2(0.8, 0.8),
+      roughnessMap: M.rope.roughnessMap, roughness: 1, metalness: 0,
+      envMapIntensity: 0.45, vertexColors: true,
+    });
+    const tipZ = zFO + reach - 0.06;
+    const hang = buildRope({
+      points: [[bx, by - 0.06, tipZ], [bx - 0.02, by - 0.55, tipZ - 0.02],
+        [bx - 0.03, by - 1.05, tipZ - 0.06], [bx - 0.04, by - 1.42, tipZ - 0.12]],
+      r: 0.042, seg: 14, material: ropeMat,
+    });
+    addDress(hang);
+    const coil = buildRope({
+      points: coilPoints({ at: [bx - 0.04, by - 1.44, tipZ - 0.14], R: 0.21, turns: 2.6, drop: 0.30, n: 26 }),
+      r: 0.042, seg: 30, material: ropeMat,
+    });
+    addDress(coil);
+  }
+
+  // --- 5. ONE REPAIR AND ONE FAILURE — the pair that sets a timescale ------
+  // A pale replacement board on the front (somebody maintains this) and, at
+  // the cornice's left corner, two eaves boards sprung loose (and somebody
+  // has not got to that yet). Neither is centred; the repair is right of
+  // centre and the failure is far left, so the elevation cannot be mirrored.
+  {
+    const pale = new THREE.MeshStandardMaterial({
+      map: M.walnut.map, normalMap: M.walnut.normalMap, normalScale: new THREE.Vector2(0.35, 0.35),
+      roughnessMap: M.walnut.roughnessMap, roughness: 1, metalness: 0,
+      // Sawn last season: the same timber, none of the weather. The map is
+      // the walnut's own and `color` is what makes it new.
+      color: 0xd9bd97, envMapIntensity: 0.45, vertexColors: true,
+    });
+    const w = 0.86, y0 = 5.30, y1 = 8.60, x0 = 0.55;
+    const geo = roundedBox(w, y1 - y0, 0.026, R_THIN, 1);
+    planarUV(geo, UV.plank[0], UV.plank[1], rnd() * 0.4, rnd() * 0.4);
+    const plank = new THREE.Mesh(geo, pale);
+    plank.position.set(x0 + w / 2, (y0 + y1) / 2, zFB + 0.022);
+    addDress(plank);
+
+    // The failure: the boards on the cornice's left corner, one lifted and
+    // one shoved out of line. Two boards in ONE merged geometry — the story
+    // is the pair, and the pair is one draw call.
+    const board = (w2, d2) => propUV(roundedBox(w2, 0.075, d2, R_THIN, 1), 2.4);
+    const sprung = new THREE.Mesh(mergeGeos([
+      { geo: board(0.95, 0.62),
+        matrix: xform({ pos: [-2.42, capTop + 0.085, zFO - 0.34], rot: [-0.07, 0.05, 0.115] }) },
+      { geo: board(0.52, 0.58),
+        matrix: xform({ pos: [-1.60, capTop + 0.035, zFO - 0.40], rot: [0.02, -0.09, -0.03] }) },
+    ]), MAT.walnutFlat);
+    addDress(sprung);
+  }
+
   bakeVertexAO(parts, group);
+
+  // --- WEATHERING IN THE VERTEX COLOURS, after the AO bake -----------------
+  // GRAVITY GOVERNS ALL WEATHERING: damp at the ground, damp on the shaded
+  // flank, and nothing anywhere above. The tiled world-scale UVs cannot carry
+  // this (a stain in the tile repeats wherever the tile does), so it rides
+  // the vertex colours instead — world space, zero triangles, zero textures.
+  gravityStain(parts, (p, n, out) => {
+    // Ground damp: strongest at the felt, gone by y 1.6.
+    const damp = clamp01(1 - p.y / 1.6);
+    // The shaded flank: the ivy's side, and only surfaces actually facing it.
+    const shade = clamp01(-n.x) * clamp01(1 - p.y / 5.0) * 0.55;
+    const k = Math.max(damp * 0.9, shade);
+    if (k < 0.02) return false;
+    out[0] = 1 - 0.16 * k; out[1] = 1 - 0.07 * k; out[2] = 1 - 0.22 * k;
+    return true;
+  });
 
   // --- AO layer (b): an unlit near-black lining. Everything above this
   // point is lit wood; everything below is light that never arrives.

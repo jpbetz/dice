@@ -43,6 +43,7 @@ import { PostStack, MAX_SHIMMER } from './post.js';
 import { buildTowerSkin } from './towerskin.js';
 import { buildBastionSkin } from './towerbastion.js';
 import { buildAnvilSkin } from './toweranvil.js';
+import { stepDress } from './towerdress.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -119,6 +120,12 @@ const TOWERS = {
   heartwood: {
     id: 'heartwood', label: 'Heartwood', skin: buildTowerSkin,
     title: 'Heartwood — a wooden tower at the back of the table; dice pour through it',
+    // THE FAMILY TRAIT (docs/TOWER.md, DRESSING): every tower carries a warm
+    // focal light. Heartwood's is the cresset hanging off its right corner
+    // post — `at` is the coals, [x, y, z offset from z0], and it is what
+    // turns an emissive bake into something that lights the post beside it.
+    // A lit lantern implies somebody lit it tonight; an unlit one is trim.
+    ember: { at: [2.575, 8.02, 0.70], color: '#ff9a44', intensity: 2.6, dist: 4.2 },
     // Dry wood on wood: a short, narrow-band knock with almost no tail.
     clunkVoice: { body: 'clack', weight: 0.35, sustain: 20 },
   },
@@ -5995,11 +6002,21 @@ function towerLanternBuild() {
   target.position.set(0, 4.5, v.z0);
   spot.target = target;
   scene.add(spot, target);
-  const rig = { spot, target, ember: null, emberBase: t.emberIntensity };
+  // A ROW MAY SIZE ITS OWN FIRE, and it has to. The dial's 14-over-8 is a
+  // forge grate 3.8 units wide standing 1.9 in front of its own wall; the
+  // same numbers on Heartwood's cresset — a basket half a unit across,
+  // hanging 0.4 off a corner post — painted a two-metre searchlight up the
+  // post (looked at, 2026-08-11). Intensity and distance belong to the FIRE,
+  // not to the rig; the dial still scales what it is given.
+  const emberI = spec && spec.ember && spec.ember.intensity !== undefined
+    ? spec.ember.intensity : t.emberIntensity;
+  const emberD = spec && spec.ember && spec.ember.dist !== undefined
+    ? spec.ember.dist : t.emberDist;
+  const rig = { spot, target, ember: null, emberBase: emberI };
   if (spec && spec.ember) {
     // Physical falloff (decay 2) so the glow pools on the tray stone under
     // the grate instead of reaching the felt's centre.
-    const ember = new THREE.PointLight(spec.ember.color, t.emberIntensity, t.emberDist, 2);
+    const ember = new THREE.PointLight(spec.ember.color, emberI, emberD, 2);
     const at = spec.ember.at;
     ember.position.set(at[0], at[1], v.z0 + at[2]);
     scene.add(ember);
@@ -6019,6 +6036,27 @@ function stepTowerLantern(dt) {
   r.ember.intensity = r.emberBase * (1 + TOWERLIGHT.tune.breathDepth * breath);
 }
 
+// THE DRESS CLOCK (docs/TOWER.md, DRESSING). A dressed tower has things that
+// move without anybody touching them: a cresset that swings a couple of
+// degrees, a gonfalon that breathes, a plume off the Black Anvil's crown.
+// They ride ONE absolute clock, accumulated from tick's dt exactly like
+// SHADER_TIME and the ember breath — so `holdClock` freezes the whole tower
+// and a screenshot of it is deterministic. No Date.now anywhere in the path.
+//
+// It steps BOTH the socketed model and the lab's, because tower-shots and the
+// occlusion lab wear a skin that the shipped socket is not wearing, and a
+// prop frozen at t = 0 in the lab is a prop nobody ever photographs moving.
+const TOWERDRESS = { t: 0 };
+function stepTowerDress(dt) {
+  TOWERDRESS.t += dt;
+  const t = TOWERDRESS.t;
+  if (towerRig && towerRig.group) stepDress(towerRig.group.getObjectByName('towerSkin'), t);
+  if (TOWERLAB.group) {
+    const skin = TOWERLAB.group.getObjectByName('towerSkin');
+    if (skin) stepDress(skin, t);
+  }
+}
+
 function tick(dt, render = true, realtime = false) {
   // Themed-set clocks (Tier 6 §9): the Level 2 shader uniform and the
   // Level 3 particle field advance with the same dt discipline as
@@ -6033,6 +6071,7 @@ function tick(dt, render = true, realtime = false) {
   stepRevealing(dt); // reveal correction flips (goal 11)
   stepTowerLab(dt);  // tower lab (docs/TOWER.md) — inert unless towerCore(true)
   stepTowerLantern(dt); // the ember breath — inert unless a glowing tower is up
+  stepTowerDress(dt);   // sway and smoke — inert unless a dressed tower is up
   stepCamera(dt);    // eased reframing; only ever armed under a quiet picture
   if (chips.length) positionChips();
   if (isPeekOpen()) positionPeek();
@@ -6974,6 +7013,53 @@ window.__diceDebug = {
         z: [r3(hull.min.z - v.z0), r3(hull.max.z - v.z0)] },
       socket: { x: [r3(-soc.x), r3(soc.x)], y: [0, r3(soc.y1)],
         z: [r3(soc.zLo - v.z0), r3(soc.zHi - v.z0)] },
+    };
+  },
+  // WHAT THE DRESSING COST (docs/TOWER.md, DRESSING). Triangles and draw
+  // calls, split by group, for the SOCKETED model — because "≤ 4k triangles
+  // and ≤ 8 draw calls of dressing per tower" is a budget and an unmeasured
+  // budget is a wish. A draw call is counted per MESH, which is what three
+  // actually issues: ten props sharing a material are ten calls, and that is
+  // the number the merge helpers in js/towerdress.js exist to bring down.
+  towerDressAudit() {
+    if (!towerRig || !towerRig.group) return null;
+    const root = towerRig.group;
+    root.updateMatrixWorld(true);
+    const v = towerVolumes();
+    const r3 = (n) => Number(n.toFixed(2));
+    const skin = root.getObjectByName('towerSkin');
+    const groups = [];
+    let tris = 0, draws = 0, lights = 0;
+    const bb = new THREE.Box3();
+    const count = (o) => {
+      const g = o.geometry;
+      const n = (g.index ? g.index.count : g.attributes.position.count) / 3;
+      return n * (o.isInstancedMesh ? o.count : 1);
+    };
+    for (const child of skin ? skin.children : []) {
+      const box = new THREE.Box3();
+      let m = 0, t = 0;
+      child.traverse((o) => {
+        if (o.isLight) { lights++; return; }
+        if (!o.isMesh) return;
+        m++; t += count(o);
+        bb.setFromObject(o); box.union(bb);
+      });
+      if (!m) continue;
+      tris += t; draws += m;
+      groups.push({
+        name: child.name || '(unnamed)', meshes: m, tris: Math.round(t), draws: m,
+        x: [r3(box.min.x), r3(box.max.x)], y: [r3(box.min.y), r3(box.max.y)],
+        z: [r3(box.min.z - v.z0), r3(box.max.z - v.z0)],
+      });
+    }
+    const dress = skin && skin.userData.dress;
+    return {
+      tower: currentTower, groups, tris: Math.round(tris), draws, lights,
+      sways: dress ? dress.sways.length : 0,
+      smokes: dress ? dress.smokes.length : 0,
+      ember: !!(TOWERS[currentTower] && TOWERS[currentTower].ember),
+      dressClock: Number(TOWERDRESS.t.toFixed(3)),
     };
   },
   // The playback drain's OWN voice resolution, asked with a synthetic event
