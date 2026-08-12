@@ -4349,14 +4349,17 @@ jingles, no rising pitch on a streak. The number carries the outcome.
 Settings → Just you, beside Sound. It is device-local mood, not table state,
 so it does not ride the portable file and no teammate inherits it.
 
-### 7.33 The air over the felt (2026-08-15)
+### 7.33 The air over the felt (2026-08-15; Heartwood-only + Joe's dials same day)
 
-**Dust drifts in the lamplight.** With the mood on (the shipped default),
-about a hundred and thirty faint warm specks fall slowly through the lamp's
-cone — in it and only in it, from just under the beam's visible shaft down
-to the felt. Each one breathes on its own slow twinkle and fades out before
-it lands; nothing pops in or out. The field is deterministic (one fixed
-seed), so every client at a table watches the identical air, and it freezes
-with the rest of the world under a held clock. Turning the mood off stills
-the room completely — the flat comparison room has no dust by construction.
+**Dust drifts in Heartwood's lamplight.** The mote layer is a tower family
+trait (`TOWERS[id].motes`), not a room fixture: an old wooden tower sheds,
+so with Heartwood socketed and the mood on, two hundred very faint warm
+specks (Joe's live-dialed peak 0.07) fall slowly through the room-wide
+spread of the lamp's cone. The bare felt, Bastion's stone and the Black
+Anvil's forge-hot chimney keep clean air. Each speck breathes on its own
+slow twinkle and fades out before it lands; nothing pops in or out. The
+field is deterministic (one fixed seed), so every client at a table watches
+the identical air, and it freezes with the rest of the world under a held
+clock. The dust rises and settles through the tower socket — swap the tower
+and the air swaps with it. Turning the mood off stills the room completely.
 Layer switch and dials: `__diceDebug.motesTune({on, count, size, ...})`.

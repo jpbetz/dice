@@ -11487,19 +11487,25 @@ export const scenarios = [
 
   {
     name: 'mood-motes',
-    tags: ['fx'],
-    // DUST IN THE LAMPLIGHT (js/motes.js, ROADMAP Tier V2). Four claims:
-    // the air exists under the shipped mood, it MOVES on the sim clock and
+    tags: ['fx', 'tower'],
+    // DUST IN THE LAMPLIGHT (js/motes.js, ROADMAP Tier V2). The air is
+    // HEARTWOOD'S family trait (TOWERS registry `motes: true`, Joe
+    // 2026-08-15): a shedding wooden tower has dust; the bare felt, stone
+    // and the forge do not. Then four claims: it MOVES on the sim clock and
     // freezes with it (holdClock discipline — the screenshot contract), it
-    // stays inside the lamp's cone, and mood-off REMOVES it — count comes
-    // from a scene-attached buffer, so zero means the object is gone, not
-    // that a flag went false.
+    // stays inside the bounds its dials declare, and mood-off REMOVES it —
+    // count comes from a scene-attached buffer, so zero means the object is
+    // gone, not that a flag went false.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
 
-      // ---- the air exists, as one draw ------------------------------------
+      // ---- the bare room has still air; Heartwood brings the dust ---------
       let m = await a.dbg('motesInfo()');
-      assert.ok(m.count > 0, `the shipped mood carries motes (${m.count} points)`);
+      assert.equal(m.count, 0, 'no tower, no dust — the air is a tower trait');
+      await a.dbg(`setTower('heartwood')`);
+      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`, { desc: 'Heartwood up' });
+      m = await a.dbg('motesInfo()');
+      assert.ok(m.count > 0, `Heartwood's air carries motes (${m.count} points)`);
       assert.equal(m.draws, 1, 'as a single Points draw call');
 
       // ---- it moves on the sim clock, and ONLY on it ----------------------
@@ -11551,6 +11557,23 @@ export const scenarios = [
       m = await a.dbg('motesInfo()');
       assert.equal(m.count, 0, 'gone from the scene, not dimmed');
       await a.dbg('motesTune({on: true})');
+
+      // ---- other towers refuse the trait; the dust leaves with its tower --
+      // Registry-keyed, so this is one claim per family: stone has no idle
+      // dust, and a tower->tower swap carries the air out through the same
+      // socket that brought it in.
+      await a.dbg(`setTower('bastion')`);
+      await a.waitFor(`window.__diceDebug.tower === 'bastion'`, { desc: 'Bastion up' });
+      m = await a.dbg('motesInfo()');
+      assert.equal(m.count, 0, `Bastion's air is clean (${m.count})`);
+      await a.dbg(`setTower('heartwood')`);
+      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`, { desc: 'Heartwood again' });
+      m = await a.dbg('motesInfo()');
+      assert.ok(m.count > 0, 'returning to Heartwood restores its air');
+      await a.dbg(`setTower('none')`);
+      await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'tower down' });
+      m = await a.dbg('motesInfo()');
+      assert.equal(m.count, 0, 'and taking the tower down stills the room');
     },
   },
 ];

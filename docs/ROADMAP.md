@@ -2571,7 +2571,11 @@ seed and the mood dials — every client breathes identical air, and lamp
 dials move the cone and its dust together. Proof: `mood-motes` (tag `fx`),
 sabotage-checked; dials live at `__diceDebug.motesTune/motesInfo`. The
 band deliberately stops at y=10: motes higher up paint the black backdrop
-and read as a night sky, not dust (A/B in the commit).
+and read as a night sky, not dust (A/B in the commit). Same-day owner
+pass: Joe re-dialed the field room-wide and much fainter (peak 0.07,
+rMax 12, count 200) and scoped it to HEARTWOOD ONLY — a registry family
+trait (`TOWERS[id].motes`) set through towerSocket, so the dust rises and
+settles with its tower and every other body of air stays clean.
 
 ### V3. Finish the wear dossier — small-medium
 Audit §2's two designed-but-unbuilt items: hand-polish roughness zones

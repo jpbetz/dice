@@ -127,6 +127,11 @@ const TOWERS = {
     // turns an emissive bake into something that lights the post beside it.
     // A lit lantern implies somebody lit it tonight; an unlit one is trim.
     ember: { at: [2.575, 8.02, 0.70], color: '#ff9a44', intensity: 2.6, dist: 4.2 },
+    // Dust hangs in this tower's air and nobody else's (Joe, 2026-08-15):
+    // an old wooden tower sheds; stone and a forge-hot chimney read wrong
+    // with idle dust. The mote layer (js/motes.js) keys on this flag via
+    // towerSocket — it is a family trait like the ember, not a room fixture.
+    motes: true,
     // Dry wood on wood: a short, narrow-band knock with almost no tail.
     // `shaft` is the CHUTE's colour, not the knock's (docs/AUDIO.md §2.4):
     // a feedforward comb plus two resonant modes. A 0.4 m chute's 2.3 ms
@@ -472,7 +477,14 @@ const MOOD = {
   // (holdClock freezes the air). Rebuilt from a FIXED seed on every
   // applyMood, so lamp dials move the field with the lamp and every client
   // sees the identical air.
-  motes: null, moteT: 0,
+  //
+  // `moteHost` is WHOSE air this is: null, or the id of a socketed tower
+  // whose registry entry says `motes: true` (Heartwood only, Joe
+  // 2026-08-15). towerSocket writes it and re-applies the mood — pushed
+  // state rather than applyMood reading the tower, because applyMood runs
+  // at boot before `currentTower` exists (TDZ), and because the socket is
+  // the one choke point every tower path already goes through.
+  motes: null, moteT: 0, moteHost: null,
   moteTune: {
     // Joe's live-dialed numbers (2026-08-15, "this looks good"): peak 0.07,
     // rMax 12, count 200 — after his first pass asked for room-wide spread
@@ -528,7 +540,7 @@ function applyMood() {
   // (seed, dials), and a rebuild of 160 points costs nothing. Their cone
   // follows the lamp's, always.
   moodMotesDown();
-  if (MOOD.moteTune.on) {
+  if (MOOD.moteTune.on && MOOD.moteHost) {
     MOOD.motes = buildMotes(MOTE_SEED, {
       ...MOOD.moteTune, color: t.lampColor, angle: t.lampAngle,
       lamp: { x: 0, y: t.lampY, z: t.lampZ }, target: { x: 0, y: 0, z: 0 },
@@ -7819,6 +7831,11 @@ function towerSocket(id) {
     towerLanternBuild(); // and the tower brings its own light
   }
   TOWER_SWAP.after = world.bodies.length;
+  // The air belongs to the tower (TOWERS[id].motes — Heartwood's trait):
+  // dust rises with it and settles out with it, through the same applyMood
+  // that owns every other piece of the room's atmosphere.
+  MOOD.moteHost = spec.motes ? spec.id : null;
+  applyMood();
   return currentTower;
 }
 
