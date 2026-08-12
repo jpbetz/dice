@@ -11613,8 +11613,16 @@ export const scenarios = [
       assert.equal(v.register, 'fantasy', 'and its register');
       assert.ok(v.stageChildren >= 8,
         `the stage is real scenery (${v.stageChildren} children), not a tinted room`);
-      await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'the tower left with the felt on A' });
-      await b.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'and on B' });
+      // The venue's OWN tower, not a hardcoded 'none': today the fae tower
+      // has not shipped so venueTower reports 'none'; the day 'hollowbole'
+      // lands in TOWERS this same line starts asserting that the venue
+      // sockets it — the assertion tracks the contract, not the moment.
+      await a.waitFor(
+        `window.__diceDebug.tower === window.__diceDebug.venueInfo().venueTower`,
+        { desc: 'A wears exactly the tower the venue declares' });
+      await b.waitFor(
+        `window.__diceDebug.tower === window.__diceDebug.venueInfo().venueTower`,
+        { desc: 'and so does B' });
 
       // ---- goal 13: the venue REPLACES the pickers ------------------------
       for (const id of ['felt-swatches', 'tower-picker', 'diceset-row']) {

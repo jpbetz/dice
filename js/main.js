@@ -7290,15 +7290,29 @@ const VENUES = {
     id: 'table', label: 'The Table', register: 'grounded',
     title: 'The table — felt, lamplight, the room you know',
   },
+  // `tower` on a fantasy venue is the tower THE VENUE brings (W3's hollow
+  // trunk): a venue-only model, chosen by choosing the venue. Guarded at
+  // send time — until the model ships in TOWERS, the venue falls back to
+  // 'none' rather than having the server reject the whole patch.
   moonrise: {
     id: 'moonrise', label: 'Moonrise Glade', register: 'fantasy', paletteId: 'moonrise',
+    tower: 'hollowbole',
     title: 'Moonrise Glade — a night clearing; blue mist, teal moot-light, dice burn through the fog',
   },
   foxfire: {
     id: 'foxfire', label: 'Foxfire Hollow', register: 'fantasy', paletteId: 'foxfire',
-    title: 'Foxfire Hollow — older and damper; green rot-light under a cold moon',
+    tower: 'hollowbole',
+    title: 'Foxfire Hollow — older and damper; pale witchlight over near-black moss',
   },
 };
+
+// The tower a venue stages: its declared one if the model has shipped,
+// else none. ONE function, used by selectVenue's patch and venueInfo's
+// report, so the claim and the behavior cannot drift apart.
+function venueTowerFor(id) {
+  const spec = VENUES[id] || VENUES.table;
+  return (spec.tower && TOWERS[spec.tower]) ? spec.tower : 'none';
+}
 let currentVenue = 'table';
 
 // THE FAE STAGE (js/fae-lab.js — W0's concept lab, now the W1 venue's
@@ -9093,6 +9107,7 @@ window.__diceDebug = {
       register: spec.register,
       staged: !!(FAECONCEPT.rig && FAECONCEPT.rig.group.parent),
       stageChildren: FAECONCEPT.rig ? FAECONCEPT.rig.group.children.length : 0,
+      venueTower: spec.register === 'fantasy' ? venueTowerFor(currentVenue) : null,
     };
   },
   get pendingTower() { return pendingTower; },
@@ -16294,7 +16309,7 @@ function selectVenue(id) {
   if (id === roomSettings.venue && id === currentVenue) return true;
   const fantasy = VENUES[id].register === 'fantasy';
   if (netOnline && net) {
-    const patch = fantasy ? { venue: id, tower: 'none' } : { venue: id };
+    const patch = fantasy ? { venue: id, tower: venueTowerFor(id) } : { venue: id };
     net.setSettings(patch).then((ok) => {
       if (!ok) showSettingsNote('couldn’t reach the table — the venue is unchanged');
     });
@@ -16302,8 +16317,8 @@ function selectVenue(id) {
   }
   roomSettings.venue = id;
   if (fantasy) {
-    roomSettings.tower = 'none';
-    queueTower('none');
+    roomSettings.tower = venueTowerFor(id);
+    queueTower(roomSettings.tower);
     renderTowerPicker();
   }
   save(LS_ROOMSETTINGS, roomSettings);

@@ -52,12 +52,21 @@ export const FAE_PALETTES = {
     accent: '#ff9a44',
     moon: '#bcd2ff',
   },
+  // WITCHLIGHT FOXFIRE (Joe, 2026-08-16: "super dark greens or almost
+  // fluorescent greens... maybe lichen or something mystical... pick a
+  // palette that's extraordinary"). Both of his instincts at once: the
+  // WORLD goes near-black bog green (value floor dropped hard), and the
+  // GLOW goes pale spectral mint — lichen-toned, nearly white with a
+  // green breath. The "fluorescent" read comes from value contrast, not
+  // saturation, which is what keeps it off grammar §2's Vegas list; real
+  // foxfire is exactly this pale eerie light. The one warmth is the
+  // ember door.
   foxfire: {
-    void: '#080f0c', fogBody: '#0f1a15', deepGround: '#16241c',
-    ground: '#223528', bark: '#33492f', moonEdge: '#4a6440',
-    glowCore: '#6fd98a', glowCap: '#96eda6', glowRim: '#c6ffcf',
-    accent: '#8fb4ff',
-    moon: '#cfd9ff',
+    void: '#05080a', fogBody: '#0b1410', deepGround: '#101c14',
+    ground: '#1a2c1e', bark: '#33422c', moonEdge: '#5a7a6e',
+    glowCore: '#7dd8a8', glowCap: '#b8f5d4', glowRim: '#e8fff0',
+    accent: '#ff9a44',
+    moon: '#cfd9d4',
   },
 };
 
