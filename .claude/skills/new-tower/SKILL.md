@@ -211,6 +211,48 @@ Then the behavioral proofs, which are already written — run, don't rewrite:
 7. Fold what the build taught back into THIS FILE. The builder's friction
    notes are a deliverable; a skill that doesn't absorb them repeats them.
 
+## 5. Dressing a tower (the cosmetics pass — proven 2026-08-12)
+
+Dressing is a different discipline from building. A new tower measures the
+FREE VOLUME before drawing (§1.5); a dressing pass measures THE FRAME:
+where the top of the picture is (nothing above world y≈12.6 is visible at
+the resting eye — no crown-height prop can read in game), which faces are
+near edge-on, which surfaces the lantern rig actually reaches. Every prop
+the first dressing pass had to fix was fixed for a framing reason, not a
+geometry reason.
+
+- Read the two research dossiers first if they're available; else re-derive
+  the two rules that governed everything: the PIXEL BUDGET (at the resting
+  eye ~42 px/world-unit: model nothing under 0.07 u — paint it into the
+  bake) and the DENSITY RULE (one bold + two or three subtle per tower,
+  odd counts, clustered, weathering strictly downward, story pair of one
+  repair + one unfixed failure).
+- Shared prop code lives in `js/towerdress.js`. Watch the CYCLE: the prop
+  kit needs the surface kit, and the first skin IS the surface kit's file —
+  move a skin out of towerskin.js before a third file imports both ways.
+- Opaque props go in a `towerSkinDress` group (fit-measured, occlusion-
+  counted); InstancedMesh props and transparent fx go in `towerDressFx`,
+  EXCLUDED from bakeVertexAO parts (G8) and fit hulls.
+- The per-prop review loop is `tools/steps/dress-look.mjs` (resting eye +
+  a named close eye per cluster) — family lineups answer "does it belong",
+  only per-cluster looks answer "does this prop earn its triangles". The
+  builder is empowered to CUT a prop that doesn't.
+- X HAS NO SLACK: forward (hood) and upward (smoke, capped) are negotiable
+  socket deviations; sideways is not — the mat's physics wall stands at
+  3.35 behind the socket's 3.25.
+- The 8-draw-call budget needs merging (ten props on one material is still
+  ten draw calls unless merged) — accept a measured overrun or merge; the
+  first pass shipped 11/9/5 and reported it.
+- The A/B bake witness snapshot recipe: `git show <ref>:file > js/_ab_ref_*.js`
+  (inside js/ so relative imports resolve), sed private bakes to export,
+  run, delete — see dress-bake-ab.mjs's header.
+- COMMIT BEFORE THE FIRST RED CHECK — red-checking by patch + `git
+  checkout --` destroys uncommitted work (it did).
+- Red-check the HARNESS for held-clock claims: a backgrounded headless tab
+  gets no rAF at all, so "frozen under holdClock" can be vacuously green
+  under a wall-clock stepper. Prove the harness lets the motion happen at
+  all, then assert the angle against the formula, not against stillness.
+
 ## Known traps (each cost a real debugging session)
 
 - TDZ: renderTowerPicker runs during MODULE EVALUATION — the registry and
@@ -233,3 +275,9 @@ Then the behavioral proofs, which are already written — run, don't rewrite:
   count must return to the towerless 6 between towers.
 - `towerLabSkin` leaves the lab wearing the last skin asked for — global
   state; a later lab step must set what it needs, not assume heartwood.
+- An alpha-tested plane must not `castShadow` — three's depth material
+  does not carry the cutout; it prints a filled rectangle on the felt.
+- `vertexColors: true` over a geometry with NO `color` attribute renders
+  BLACK (the generic attribute defaults to zero), not white.
+- The model's TILT is part of the socket arithmetic for decoration too: a
+  card is measured by its rolled half-diagonal plus `y·sin(TILT)`.
