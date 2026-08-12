@@ -2524,14 +2524,40 @@ than a silent omission:
 against the industry canon: seven pillars STRONG, three PARTIAL, one GAP.
 These items are that audit's ranked list; each names its pillar.
 
-### V1. Audio phase one — the pillar-sized gap, medium-large — IN PROGRESS
+### V1. Audio phase one — the pillar-sized gap, medium-large — SHIPPED 2026-08-12
 The one BASELINE-tier hole in the audit (§5): mono today, no rolling
-contact, no room tone, no space. Ship: equalpower stereo panning by die
+contact, no room tone, no space. Shipped: equal-power stereo panning by die
 position · a rolling-contact loop (gain from load, rate from film-derived
 speed — dice must sound like they tumble, not just land) · settling taps ·
 a faint synthesized room tone · a delay-line "shaft" color on tower clunks.
 All synthesized, zero-dep, film-deterministic; no convolution, no samples.
-(Ultracode pass kicked off 2026-08-12.)
+
+Design authority is now [AUDIO.md](AUDIO.md); the player-facing surface is
+UX §7.32; the proofs carry tag `audio`. Eight increments, one commit each,
+each with a red check recorded in its commit message.
+
+**Three things the build found that the design had wrong**, kept here
+because they are facts about this codebase rather than about audio:
+
+- **`landings[].frame` is not when a die stops moving.** It is the
+  *recovered* stop instant — the bake rewinds it by SETTLE_STILL from the
+  freeze it earned — so ~27 frames of real sub-millimetre motion follow it,
+  and on a 4d6 one die is still over the rolling EXIT bar afterwards. The
+  phase machine's absorbing settle is therefore load-bearing, not tidiness.
+- **The frozen tail is not in the film.** `frozenPose` is pushed by
+  reference after a freeze, but the tail cut truncates the reel at the last
+  landing, so the byte-identical frames a check might want to exercise are
+  exactly the ones that were deleted.
+- **A rolling voice's leak is only visible mid-roll.** The end of the film
+  silences the pool on its own, so `settle() → clearTable()` is green with
+  the teardown removed. The claim has to be made with dice still turning.
+
+**Still open (phase two, none of it blocking):** hidden-transit rolling
+voices (the shaft is silent apart from clunks); the rough/surface track
+feeding wall-vs-felt *timbre* rather than only level; a stone-chamber tail
+if the dry table ever asks for one (a shared send with `g ≤ 0.90`, never a
+ConvolverNode). And the bed does not ship on by default until Joe has
+listened to it for an hour straight.
 
 ### V2. Dust motes in the lamplight — small
 The canon's highest-ratio atmosphere cue (audit §3). Generalize the

@@ -4305,3 +4305,46 @@ carries name/felt/system/zoom — a prepared table cannot yet arrive with its
 tower already up. This is now the only outstanding item on the feature, and
 with three chips in the picker it is the one a prepared table most obviously
 wants.
+
+### 7.32 What a throw sounds like (2026-08-12)
+
+Full spec in [AUDIO.md](AUDIO.md); this is the surface a player meets.
+
+**The room is felt over wood, and it is quiet.** The default impact voice is
+`felt` — a soft lowpassed knock at 700 Hz. It used to be `click`, a bandpass
+at 2500 Hz, which sits above the wood/metal perceptual boundary and is
+therefore the casino sound; it was what nearly every roll on this table made.
+`click` is still in the registry for genuine die-on-die and for bright sets.
+A contact below strength 3.5 is voiced *duller and longer*, not merely
+quieter, so a soft hit differs in hardness rather than in volume.
+
+**A throw now has a middle.** While a die is on the felt and turning it
+carries a continuous low grind whose rate comes from the film — face-clacks
+below about 20 Hz, a pitched grind above, one parameter, no crossfade. It
+follows the tempo curve, so the sound never detaches from the picture. All
+the rolling voices together are capped at a level well under a single
+landing: **a twenty-die pile can never out-shout its own landing.**
+
+**Each die dies down instead of stopping.** Landing fires a short geometric
+run of taps — about five, over 145 ms, each quieter and duller than the last
+— and then the die is silent. The taps are scheduled from the roll's seed, so
+everyone at the table hears the same rhythm.
+
+**Dice come from where they are.** A contact pans toward the side of the mat
+it happened on, capped at 0.6 — a table a metre away subtends about ±25°, and
+a die hard-panned beside your ear is a cartoon — and the far edge of the mat
+is a few dB quieter than the near one. A baffle knock inside a tower is a
+sound and not a place: it comes from the tower mouth, and it is coloured by
+that tower's shaft.
+
+**The switch is one switch.** Sound off silences everything — impacts, the
+grind, the taps, the shaft, the room bed — because every source in the graph
+passes through one gain. Nothing is inferred from the motion settings: a
+player who asked their OS to stop moving things did not ask for silence.
+
+**Nothing about the sound tells you whether you did well.** No stings, no
+jingles, no rising pitch on a streak. The number carries the outcome.
+
+**The room tone is off by default** and lives behind its own switch in
+Settings → Just you, beside Sound. It is device-local mood, not table state,
+so it does not ride the portable file and no teammate inherits it.

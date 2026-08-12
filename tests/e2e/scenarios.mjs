@@ -10978,4 +10978,114 @@ export const scenarios = [
       await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'the tower comes down' });
     },
   },
+
+  {
+    name: 'audio-rolling',
+    tags: ['fx', 'audio', 'roll'],
+    // THE SUSTAINED MIDDLE (docs/AUDIO.md §3.3). Two halves:
+    //   · the LEVEL is film-derived, so it can be asserted headless with no
+    //     sound made and no graph built at all;
+    //   · the VOICE POOL is a run-forever lifetime (AudioBufferSourceNode is
+    //     single-use, so silence is level → 0 and never stop()), which is the
+    //     shape that leaks if nothing brings it down.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      await a.dbg('holdClock(true)');
+
+      // ---- the level, derived, with no audio at all ------------------------
+      await a.dbg(`throwSeeded(['d6','d6','d6','d6'], 4242)`);
+      // Walk the film and keep the highest target level any die reached while
+      // it was rolling, plus what the phase said at that moment. One eval, no
+      // round-trip-per-frame race (P6).
+      const peak = await a.eval(`(() => {
+        const D = window.__diceDebug;
+        let best = { level: 0, phase: null, i: -1 };
+        let rollingFrames = 0, levelledFrames = 0, silentWhileRolling = 0;
+        for (let f = 0; f < 900 && D.busy; f++) {
+          D.sim(1);
+          const st = D.rollingState();
+          if (!st) break;
+          for (const d of st.dice) {
+            if (d.phase === 'rolling') {
+              rollingFrames++;
+              if (d.targetLevel > 0) levelledFrames++; else silentWhileRolling++;
+            }
+            if (d.targetLevel > best.level) best = { level: d.targetLevel, phase: d.phase, i: d.i };
+            if (d.phase !== 'rolling' && d.targetLevel > 0) return { bug: 'levelled while ' + d.phase };
+          }
+        }
+        return { best, rollingFrames, levelledFrames, silentWhileRolling };
+      })()`);
+      assert.ok(!peak.bug, `only a ROLLING die carries a level (${peak.bug})`);
+      assert.ok(peak.rollingFrames > 0,
+        `the throw has rolling frames to level (${peak.rollingFrames})`);
+      assert.ok(peak.best.level > 0,
+        `a rolling die reaches a positive target level (peak ${peak.best.level} on d${peak.best.i})`);
+      assert.equal(peak.best.phase, 'rolling', 'and the peak belongs to a rolling die');
+      // The mix ceiling. A 4d6 will not approach it; the claim is that the
+      // clamp is real and the level is a fraction, not a full-scale gain.
+      const tune = await a.dbg('audioTune()');
+      assert.ok(peak.best.level <= 0.12 + 1e-9,
+        `and stays under the summed rolling clamp (${peak.best.level})`);
+      assert.ok(tune.masterGain === 0.7, 'the ladder is still hung off master 0.7');
+
+      await a.settle();
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+
+      // ---- the pool: built for real, and brought back down -----------------
+      // audioForce is the same seat as `postForced`: sustained sources are
+      // gated on a real-time frame, and sim() is not one, so without it every
+      // claim below would be vacuously green against a pool that was never
+      // built.
+      await a.dbg('audioForce(true)');
+      await a.dbg(`throwSeeded(['d6','d6','d6','d6','d6','d6'], 909)`);
+      const live = await a.eval(`(() => {
+        const D = window.__diceDebug;
+        let maxLive = 0, maxPool = 0;
+        for (let f = 0; f < 900 && D.busy; f++) {
+          D.sim(1);
+          const g = D.audioGraphInfo();
+          maxLive = Math.max(maxLive, g.poolLive);
+          maxPool = Math.max(maxPool, g.poolSize);
+        }
+        return { maxLive, maxPool };
+      })()`);
+      assert.ok(live.maxPool > 0,
+        `the pool actually got built (${live.maxPool} voices) — without this `
+        + 'the teardown claim below is about nothing');
+      assert.ok(live.maxLive > 0, `and voices went live (${live.maxLive})`);
+      assert.ok(live.maxPool <= 40,
+        `never past the ${40}-die table cap (${live.maxPool})`);
+
+      // THE LEAK CLAIM, AND IT HAS TO BE MADE MID-ROLL. Written first as
+      // settle() → clearTable(), which stayed GREEN with clearTable's
+      // teardown deleted — because the end of the film silences the pool on
+      // its own, so that version was a check of a different thing than it
+      // claimed. The case that actually leaks is a table cleared while the
+      // dice are still turning: stepPlayback stops being called and nothing
+      // else would ever bring the levels down.
+      const mid = await a.eval(`(() => {
+        const D = window.__diceDebug;
+        D.throwSeeded(['d6','d6','d6','d6','d6','d6'], 7171);
+        for (let f = 0; f < 900 && D.busy; f++) {
+          D.sim(1);
+          if (D.audioGraphInfo().poolLive > 0) return { liveAt: f, live: D.audioGraphInfo().poolLive };
+        }
+        return { liveAt: -1, live: 0 };
+      })()`);
+      assert.ok(mid.live > 0,
+        `voices are grinding mid-flight (${mid.live} live at frame ${mid.liveAt})`);
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+      const after = await a.dbg('audioGraphInfo()');
+      assert.equal(after.poolLive, 0,
+        `and clearing the table under them stops every one (${after.poolLive} left)`);
+      assert.ok(after.poolSize <= 40,
+        `the pool did not grow past the cap (${after.poolSize})`);
+      await a.dbg('audioForce(false)');
+      await a.dbg('holdClock(false)');
+      await a.settle();
+    },
+  },
 ];

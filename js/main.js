@@ -1628,16 +1628,20 @@ function contactKinematics(roll, di, i0) {
     if (!pourVisibleAt(spans, fB)) fB = i0;
   }
   const span = fB - fA;
-  if (span <= 0) return { speed: 0, angSpeed: 0, vy: 0 };
+  if (span <= 0) return { speed: 0, angSpeed: 0, vy: 0, vTan: 0 };
   const a = kf[fA];
   const b = kf[fB];
   const speed = b.pos.distanceTo(a.pos) * 60 / span;
   const vy = (b.pos.y - a.pos.y) * 60 / span;
+  // TANGENTIAL speed — the component along the felt. This is what a rolling
+  // die's surface contact is actually doing; the vertical component belongs
+  // to the impact that is about to happen, not to the grind.
+  const vTan = Math.hypot(b.pos.x - a.pos.x, b.pos.z - a.pos.z) * 60 / span;
   // |w| for the quaternion double cover: q and −q are the same rotation, and
   // without the absolute value half the frames report a near-π flip.
   const qr = _qKinA.copy(a.quat).invert().multiply(_qKinB.copy(b.quat));
   const angSpeed = 2 * Math.acos(Math.min(1, Math.abs(qr.w))) * 60 / span;
-  return { speed, angSpeed, vy };
+  return { speed, angSpeed, vy, vTan };
 }
 
 // The phase of one die at one frame, given the phase it held at the previous
@@ -1663,11 +1667,121 @@ function phaseAt(roll, di, i0, prev) {
   return k.angSpeed >= bar ? 'rolling' : 'airborne';
 }
 
+// ---------------------------------------------------------------------------
+// PHASE ROLLING — the sustained middle (docs/AUDIO.md §3.3)
+//
+// One pooled voice per die, felt surface only in phase one (hidden transit is
+// silent; a tower interior needs no rolling voice). The chain:
+//
+//   sharedLoop(4 s, per-voice quarter offset)
+//     → surfaceBand  bandpass  fc = 380·clamp((1.25/R)^0.4, 0.9, 1.3), Q 0.8
+//     → tilt         lowpass   fc = 300 + 55·vTan, ceiling 1800
+//     → amGain       0.35 DC + pulseOsc(f_face)·depth   (AudioParam inputs add)
+//     → levelGain → airLowpass → StereoPanner → master
+//
+// f_face = (vTan / dieWidth) · tempoCurve is the one mapping that gives both
+// regimes off a single parameter: below ~20 Hz it is discrete face-clacks,
+// above it fuses into a pitched grind, continuously, with no crossfade. The
+// tempo scaling is MANDATORY — TEMPO.k varies within a single throw, and
+// without it the sound detaches from the picture.
+//
+// These voices never touch the click gate (they are continuous, not events)
+// and never write into roll.sounds (that budget belongs to clunks, particles,
+// decals and the ring).
+// ---------------------------------------------------------------------------
+
+const ROLL_GAIN = 0.05;          // DIAL FOR JOE — the grind against the landings
+const ROLL_SUM_CLAMP = 0.12;     // DIAL FOR JOE — a 20-die pile cannot out-shout its own landing
+const ROLL_LEVEL_FLOOR = 0.004;  // below this, snap to true zero — not a floor of hiss
+const ROLL_LOAD_TAU = 0.08;      // seconds of FILM clock
+const ROLL_BAND_BASE = 380;      // DIAL FOR JOE — the warm/dull boundary
+const ROLL_TILT_CEIL = 1800;     // DIAL FOR JOE
+const ROLL_REF_RADIUS = 1.25;    // the d20; every other die is brighter than it
+const AM_HARMONICS = 12;
+
+const rollVoices = [];  // pooled by die index; grows to at most MAX_DICE_ON_TABLE
+let amWave = null;
+// Tests only, and the same idea as `postForced`: sustained sources are gated
+// on a REAL-TIME frame, and every scenario drives the world through sim(),
+// which is not one. Without this the voice pool would never be built under
+// test and every claim about it would be vacuous.
+let audioForced = false;
+
+function makeRollVoice(ctx, di) {
+  if (!amWave) {
+    // A pulse, not a sine: 12 harmonics with imag[k] = 1/√k. A sine AM at
+    // 8 Hz is a tremolo; this is a train of contacts.
+    const real = new Float32Array(AM_HARMONICS + 1);
+    const imag = new Float32Array(AM_HARMONICS + 1);
+    for (let k = 1; k <= AM_HARMONICS; k++) imag[k] = 1 / Math.sqrt(k);
+    amWave = ctx.createPeriodicWave(real, imag, { disableNormalization: false });
+  }
+  const dur = AUDIO.loop.duration;
+  const src = ctx.createBufferSource();
+  src.buffer = AUDIO.loop;
+  src.loop = true;
+  const band = ctx.createBiquadFilter();
+  band.type = 'bandpass';
+  band.Q.value = 0.8;
+  const tilt = ctx.createBiquadFilter();
+  tilt.type = 'lowpass';
+  tilt.Q.value = 0.7;
+  const am = ctx.createGain();
+  am.gain.value = 0.35;             // the DC term; the oscillator ADDS to it
+  const level = ctx.createGain();
+  level.gain.value = 0;
+  const air = ctx.createBiquadFilter();
+  air.type = 'lowpass';
+  air.frequency.value = 18000;
+  const pan = ctx.createStereoPanner();
+  src.connect(band).connect(tilt).connect(am).connect(level).connect(air).connect(pan)
+    .connect(AUDIO.master);
+  const osc = ctx.createOscillator();
+  osc.setPeriodicWave(amWave);
+  osc.frequency.value = 8;
+  const depth = ctx.createGain();
+  depth.gain.value = 0.5;
+  osc.connect(depth).connect(am.gain);
+  // START ONCE, NEVER STOP. AudioBufferSourceNode and OscillatorNode are
+  // single-use — a stopped source can never be restarted — so silence is
+  // level.gain → 0 and nothing else. Quarter-offsets so a 20-die pile is not
+  // twenty copies of the same sample phase-locked together.
+  src.start(0, ((di % 4) / 4) * dur);
+  osc.start(0);
+  return {
+    src, band, tilt, am, level, air, pan, osc, depth,
+    target: 0, setLevel: -1, setFreq: -1, setTilt: -1, setBand: -1, setPan: -9,
+  };
+}
+
+// Write an AudioParam only when the target actually moved — 3 % is the bar.
+// Two automated params per voice is the budget (level and the AM frequency);
+// everything else is a plain `.value =`.
+function paramTo(param, cur, next, ctx, tau) {
+  if (cur >= 0 && Math.abs(next - cur) <= Math.abs(cur) * 0.03) return cur;
+  param.setTargetAtTime(next, ctx.currentTime, tau);
+  return next;
+}
+
+// Everything goes quiet: the roll ended, the table was cleared, or nothing is
+// playing. Cheap to call every frame — it returns immediately once silent.
+let rollVoicesLive = 0;
+function silenceRollingVoices() {
+  if (!rollVoicesLive || !AUDIO.ctx) return;
+  for (const v of rollVoices) {
+    if (!v) continue;
+    v.target = 0;
+    if (v.setLevel !== 0) { v.level.gain.setTargetAtTime(0, AUDIO.ctx.currentTime, 0.05); v.setLevel = 0; }
+  }
+  rollVoicesLive = 0;
+}
+
 // The per-frame report. Records ALIAS across frames by design (the
 // SHIMMER_POOL discipline) — callers must project, never stash.
 const ROLLING_POOL = Array.from({ length: MAX_DICE_ON_TABLE }, () => ({
-  i: 0, type: '', speed: 0, angSpeed: 0, vy: 0, grounded: false, hidden: false,
-  phase: 'airborne', settleFrame: 0, x: 0, pan: 0, targetLevel: 0,
+  i: 0, type: '', speed: 0, angSpeed: 0, vy: 0, vTan: 0, grounded: false,
+  hidden: false, phase: 'airborne', settleFrame: 0, x: 0, pan: 0,
+  load: 0, fFace: 0, targetLevel: 0,
 }));
 const ROLLING_OUT = [];
 let rollingFrame = -1;
@@ -1679,8 +1793,17 @@ let rollingFrame = -1;
 // fastForwardPlayback both drain films at a speed no ear was meant to hear.
 function stepRollingAudio(roll, i0, realtime) {
   if (!roll.audioPhase) roll.audioPhase = roll.dice.map(() => 'airborne');
+  // `load` is smoothed on the FILM clock and lives on the ROLL, not on the
+  // voice: that is what makes targetLevel identical on a client that is
+  // hearing it and one that is only stepping the film headlessly.
+  if (!roll.audioLoad) roll.audioLoad = roll.dice.map(() => 0);
   const n = Math.min(roll.dice.length, ROLLING_POOL.length);
   rollingFrame = i0;
+  // The projector's speed at this instant. Mandatory: TEMPO.k varies WITHIN a
+  // throw (the tempo curve), so a face-clack rate derived without it drifts
+  // out of sync with the picture in the second half of every roll.
+  const kTempo = realtime ? tempoCurveAt(roll) * TEMPO.k : 1;
+  let sum = 0;
   for (let di = 0; di < n; di++) {
     const prev = roll.audioPhase[di];
     const phase = phaseAt(roll, di, i0, prev);
@@ -1704,11 +1827,74 @@ function stepRollingAudio(roll, i0, realtime) {
     slot.settleFrame = roll.landings[di].frame;
     slot.x = p.pos.x;
     slot.pan = panForX(p.pos.x);
-    slot.targetLevel = 0; // rolling voices arrive in increment 4
+    // LOAD: how much of the die's weight the felt is carrying. A die skipping
+    // across the surface is not grinding on it, so vertical speed subtracts.
+    // Smoothed over 80 ms of FILM so a single bouncy frame cannot flicker the
+    // level; `1 − exp(−dt/τ)` rather than a fixed lerp so the smoothing means
+    // the same thing whatever the frame step is.
+    const loadTarget = slot.grounded ? Math.max(0, 1 - Math.min(1, Math.abs(k.vy) / 8)) : 0;
+    const alpha = 1 - Math.exp(-(1 / 60) / ROLL_LOAD_TAU);
+    roll.audioLoad[di] += (loadTarget - roll.audioLoad[di]) * alpha;
+    const load = roll.audioLoad[di];
+    slot.vTan = k.vTan;
+    slot.load = load;
+    // FACE RATE. Below ~20 Hz this is discrete face-clacks; above it, a
+    // pitched grind. One parameter, one continuous transition, no crossfade.
+    slot.fFace = (k.vTan / dieWidth(slot.type)) * kTempo;
+    const lvl = phase === 'rolling'
+      ? ROLL_GAIN * load * Math.pow(Math.max(0, k.vTan) / 12, 0.75)
+      : 0;
+    slot.targetLevel = lvl;
+    sum += lvl;
     ROLLING_OUT[di] = slot;
   }
   ROLLING_OUT.length = n;
-  void realtime;
+  // The summed clamp, applied as ONE scale so the mix between dice is
+  // preserved: a 20-die pile gets quieter per die rather than having its
+  // loudest voices shaved.
+  const scale = sum > ROLL_SUM_CLAMP ? ROLL_SUM_CLAMP / sum : 1;
+  for (let di = 0; di < n; di++) {
+    const s = ROLLING_POOL[di];
+    let v = s.targetLevel * scale;
+    if (v < ROLL_LEVEL_FLOOR) v = 0;  // true silence, not a floor of hiss
+    s.targetLevel = v;
+  }
+  // Everything above is FILM-DERIVED and runs on every path. Only the writing
+  // of it into the graph is gated on a real-time frame.
+  if (!(realtime || audioForced)) return;
+  const ctx = ensureAudio();
+  if (!ctx) return;
+  let live = 0;
+  for (let di = 0; di < n; di++) {
+    const s = ROLLING_POOL[di];
+    if (s.targetLevel <= 0 && !rollVoices[di]) continue;   // never built, nothing to silence
+    if (s.targetLevel > 0 && !rollVoices[di]) rollVoices[di] = makeRollVoice(ctx, di);
+    const v = rollVoices[di];
+    if (!v) continue;
+    if (s.targetLevel > 0) {
+      live++;
+      // Smaller die = slightly brighter surface band.
+      const def = DIE_DEFS[s.type] || {};
+      const R = def.radius || (def.size ? def.size * 0.5 : ROLL_REF_RADIUS);
+      const bandF = ROLL_BAND_BASE
+        * Math.min(1.3, Math.max(0.9, Math.pow(ROLL_REF_RADIUS / R, 0.4)));
+      if (Math.abs(bandF - v.setBand) > 1) { v.band.frequency.value = bandF; v.setBand = bandF; }
+      const tiltF = Math.min(ROLL_TILT_CEIL, 300 + 55 * s.vTan);
+      if (Math.abs(tiltF - v.setTilt) > 10) { v.tilt.frequency.value = tiltF; v.setTilt = tiltF; }
+      // Fast clacks physically overlap, so the modulation gets shallower as
+      // the rate climbs — which is exactly what turns clacks into a grind.
+      v.depth.gain.value = Math.min(0.95, Math.max(0.25, 1 - s.fFace / 45)) * 0.5;
+      v.setFreq = paramTo(v.osc.frequency, v.setFreq,
+        Math.min(400, Math.max(0.5, s.fFace)), ctx, 0.03);
+      if (Math.abs(s.pan - v.setPan) > 0.01) { v.pan.pan.value = s.pan || 0; v.setPan = s.pan; }
+      // Air absorption — the depth cue that rides the SUSTAINED voices only.
+      const airF = Math.min(18000, Math.max(4500, 16000 * Math.pow(depthGainFor([s.x, 0.6, 0]), 1.2)));
+      if (Math.abs(airF - v.air.frequency.value) > 200) v.air.frequency.value = airF;
+    }
+    v.setLevel = paramTo(v.level.gain, v.setLevel, s.targetLevel, ctx, 0.03);
+    v.target = s.targetLevel;
+  }
+  rollVoicesLive = live;
 }
 
 // ---------------------------------------------------------------------------
@@ -2872,6 +3058,12 @@ function clearTable() {
   dismissCeremonyUI();
   currentRoll = null;
   rollQueue.length = 0;
+  // The rolling pool is driven from stepPlayback, and clearing the table
+  // means stepPlayback stops being called — so nothing would ever bring the
+  // levels down. A sustained source left grinding over an empty felt is the
+  // exact failure the run-forever lifetime rule invites.
+  silenceRollingVoices();
+  ROLLING_OUT.length = 0;
 }
 
 // roll = {dice: [types], values: [...], seed, label, dc?, playerName?, color?}
@@ -3993,6 +4185,11 @@ function stepPlayback(dt, tempo = 1, curve = false, realtime = curve) {
       // guarantee, made unconditional at the one frame that outlives playback).
       d.mesh.visible = true;
     }
+    // THE FILM IS OVER, SO THE GRIND IS OVER. This runs BEFORE the ceremony
+    // return: a Check roll hands off to ceremonyEnterSettle and stepPlayback
+    // never reaches its own tail again, so a silence placed after that branch
+    // would leave every ceremony roll grinding through its verdict card.
+    silenceRollingVoices();
     if (cer) {
       ceremonyEnterSettle(roll);
       return;
@@ -8561,8 +8758,8 @@ window.__diceDebug = {
       panBuses: AUDIO.panBuses.length,
       panValues: AUDIO.panBuses.map((p) => Math.round(p.pan.value * 1000) / 1000),
       shaftBuilt: !!AUDIO.shaft,
-      poolSize: 0,
-      poolLive: 0,
+      poolSize: rollVoices.filter(Boolean).length,
+      poolLive: rollVoices.filter((v) => v && v.target > ROLL_LEVEL_FLOOR).length,
       gateCursors: { ...GATE },
       sharedNoiseBuilt: !!AUDIO.noise,
       sharedLoopBuilt: !!AUDIO.loop,
@@ -8683,6 +8880,11 @@ window.__diceDebug = {
       masterGain: MASTER_GAIN,
     };
   },
+  // Tests only: sustained sources are gated on a REAL-TIME frame and every
+  // scenario drives the world through sim(), which is not one. Without this
+  // the voice pool is never built under test and every claim about it — the
+  // leak claim especially — is vacuously green. Same seat as `postForced`.
+  audioForce(on) { audioForced = !!on; return audioForced; },
   // The pan LAW and the depth LAW, asked without making a sound. Both are
   // read off the same functions playImpact calls, so a scenario cannot
   // accidentally assert a re-derivation of them.
