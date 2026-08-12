@@ -445,6 +445,138 @@ function buildHalos(pal) {
   return group;
 }
 
+// ---------------------------------------------------------------------------
+// THE STUMP SHELL — the organic form proof (Joe's reference photo,
+// 2026-08-16: a broken hollow stump, frontal wound, splintered crown,
+// root flare). NOT the box kit: a parametric displaced shell over a
+// (θ, y) grid, because the roundedBox vocabulary that built three good
+// towers can only build rectangular towers, and the owner called it —
+// "a normal rectangular tower that just has some unconvincing bark
+// texture" is exactly what boxes produce here. Everything organic lives
+// in ONE radius field:
+//
+//   r(θ, y) = profile(y)                    the stump's silhouette curve
+//           + buttress(θ) · flare(y)        five uneven root lobes
+//           + fbm ridges                    vertical fiber striation
+//           − wound(θ, y) · fold            the torn-open front, folded
+//                                           inward and painted to black
+//
+// and the crown is a per-column height field y_top(θ) with a few tall
+// splinter spires. Vertex colours carry pale barkless wood, moss on the
+// shaded side, and the wound's interior dark — no textures needed to
+// judge the FORM, which is what this exists to prove.
+
+function fbm1(x, seed) {
+  let v = 0, a = 0.5, f = 1;
+  for (let o = 0; o < 4; o++) {
+    v += a * Math.sin(x * f * 1.7 + seed * (o + 1) * 12.9898);
+    a *= 0.5; f *= 2.1;
+  }
+  return v;
+}
+
+export function buildStumpShell(pal, {
+  seed = 7, h = 9.2, nTh = 96, nY = 56,
+  wound = { at: 1.25, arc: 1.15, y0: 1.1, y1: 5.4, fold: 0.78 },
+} = {}) {
+  const rnd = mulberry32(seed);
+  // Five buttress lobes, uneven by construction (rule 8: nothing symmetric).
+  const lobes = [];
+  for (let i = 0; i < 5; i++) {
+    lobes.push({
+      th: (i / 5) * Math.PI * 2 + (rnd() - 0.5) * 0.7,
+      amp: 0.55 + rnd() * 0.75,
+      w: 0.32 + rnd() * 0.25,
+    });
+  }
+  // Splinter spires: 4 gaussian spikes on the crown, tallest off-centre back.
+  const spires = [
+    { th: Math.PI * 0.85, amp: 2.6, w: 0.30 },  // tallest, back-left
+    { th: Math.PI * 1.35, amp: 1.7, w: 0.26 },
+    { th: Math.PI * 0.25, amp: 1.1, w: 0.22 },
+    { th: Math.PI * 1.8, amp: 0.8, w: 0.20 },
+  ];
+  const gauss = (d, w) => Math.exp(-(d * d) / (2 * w * w));
+  const angDist = (a, b) => {
+    let d = Math.abs(a - b) % (Math.PI * 2);
+    return d > Math.PI ? Math.PI * 2 - d : d;
+  };
+  const profile = (y) => {
+    // Fat rooty base, waisted middle, slight kick at the crown break.
+    const base = 2.15 + 1.15 * Math.exp(-y / 1.4);
+    return base + 0.12 * Math.sin(y * 0.9 + seed);
+  };
+  const flare = (y) => Math.pow(Math.max(0, 1 - y / 2.6), 1.6);
+  const yTop = (th) => {
+    let t = h - 1.6 + 0.55 * fbm1(th * 3, seed + 5); // ragged break line
+    for (const s of spires) t += s.amp * gauss(angDist(th, s.th), s.w);
+    return t;
+  };
+  const woundMask = (th, y) => {
+    const dTh = angDist(th, wound.at) / wound.arc;
+    if (dTh > 1) return 0;
+    const yr = (y - wound.y0) / (wound.y1 - wound.y0);
+    if (yr < 0 || yr > 1) return 0;
+    // Ragged boundary: the mask edge is noise-eaten, never a clean arch.
+    const edge = 0.18 * fbm1(th * 5 + y * 1.7, seed + 9);
+    const m = (1 - dTh + edge) * Math.sin(Math.PI * Math.min(1, Math.max(0, yr + edge * 0.5)));
+    return Math.min(1, Math.max(0, m * 1.4));
+  };
+
+  const pos = [], col = [], idx = [];
+  const wood = { r: 0.40, g: 0.34, b: 0.26 };     // weathered grey-tan, moonlit not bone
+  const dark = { r: 0.04, g: 0.035, b: 0.03 };    // the hollow's black
+  const moss = new THREE.Color(pal.glowCore).multiplyScalar(0.28); // moss leans the palette's green
+  for (let j = 0; j <= nY; j++) {
+    for (let i = 0; i <= nTh; i++) {
+      const th = (i / nTh) * Math.PI * 2;
+      const v = j / nY;
+      const y = v * yTop(th);
+      let r = profile(y);
+      for (const L of lobes) r += L.amp * gauss(angDist(th, L.th), L.w) * flare(y);
+      // Fiber striation: high-frequency ridges in θ, slow drift in y.
+      r += 0.085 * fbm1(th * 14 + y * 0.35, seed + 2) + 0.05 * fbm1(th * 2 + y * 1.2, seed + 3);
+      const m = woundMask(th, y);
+      r *= 1 - wound.fold * m;                     // the fold inward
+      pos.push(r * Math.cos(th), y, r * Math.sin(th));
+      // Colour: wood, striation-shaded, mossed on the shaded arc + roots,
+      // and pulled to black inside the wound.
+      const stri = 0.85 + 0.15 * Math.sin(th * 24 + fbm1(y, seed) * 3);
+      let cr = wood.r * stri, cg = wood.g * stri, cb = wood.b * stri;
+      const shadeArc = gauss(angDist(th, Math.PI * 1.05), 0.9);
+      const mossK = Math.min(1,
+        (0.55 * shadeArc + 0.5 * flare(y)) * (0.5 + 0.5 * fbm1(th * 6 + y, seed + 7)));
+      cr += (moss.r - cr) * mossK;
+      cg += (moss.g - cg) * mossK;
+      cb += (moss.b - cb) * mossK;
+      // The wound darkens STEEPLY — a torn mouth, not a bruise: shallow
+      // mask values already pull hard toward the interior black.
+      const mk = Math.pow(m, 0.6);
+      cr += (dark.r - cr) * mk; cg += (dark.g - cg) * mk; cb += (dark.b - cb) * mk;
+      col.push(cr, cg, cb);
+    }
+  }
+  for (let j = 0; j < nY; j++) {
+    for (let i = 0; i < nTh; i++) {
+      const a = j * (nTh + 1) + i, b = a + 1, c = a + nTh + 1, d = c + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = 'faeStumpShell';
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
 export function buildFaeConcept({ paletteId = 'moonrise', seed = 20260815 } = {}) {
   const pal = FAE_PALETTES[paletteId] || FAE_PALETTES.moonrise;
   const group = new THREE.Group();
@@ -456,7 +588,11 @@ export function buildFaeConcept({ paletteId = 'moonrise', seed = 20260815 } = {}
   const shaft = buildMoonShaft(pal);
   const halos = buildHalos(pal);
   const treeline = buildTreeline(pal, seed);
-  group.add(ground, treeline, moot, wisps.points, shaft, halos, ...sheets);
+  // The stump stands where the tower will socket (W3), wound facing the
+  // table, moot ellipse dying at its feet — the silhouette Joe judges.
+  const stump = buildStumpShell(pal);
+  stump.position.set(0.6, 0, -8.2);
+  group.add(ground, treeline, stump, moot, wisps.points, shaft, halos, ...sheets);
   // Fold the moot's static light into the fog base (techniques §6).
   brightenFog(sheets, moot.userData.pools);
   for (const s of sheets) s.userData.base = s.geometry.attributes.color.array.slice();
