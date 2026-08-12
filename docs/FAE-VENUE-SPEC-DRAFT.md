@@ -70,3 +70,15 @@ warm accent · three tiers ≥2 stops apart (primary = dice only; secondary
 Lab-gated prototype (js/fae-lab.js behind __diceDebug.faeConcept), four
 plates: Moonrise empty · Moonrise with settled glowing dice · Foxfire
 empty · Foxfire with dice. Judged by Joe before any production code.
+
+## The tower form (Joe's reference photo, 2026-08-16)
+
+A broken hollow STUMP, not a tall snag: stocky ~2:1 height-to-width over
+the full socket width; the whole front torn open into one ragged dark
+wound (the tower's mouth — doorway clearance inside its lower lip);
+a splintered crown of uneven spires, tallest never centered; heavy
+flared buttress roots gripping the ground as the tray surround; pale
+barkless weathered wood with vertical fiber striation, bark only in low
+patches — then moss sleeves, lichen, punky rot and foxfire shelves ON
+that skeleton. Dead in shape, alive in covering. The tiny ember door
+sits in a root buttress beside the wound, not on the flat face.
