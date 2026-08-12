@@ -717,7 +717,7 @@ Most of §9's engineering is closed (see SHIPPED.md §9). What remains
 is art direction, one pool-icon delta, and the tumbled-resin
 geometry tier.
 
-### 9d. The dice tower — **SHIPPED 2026-08-12**; three models by 2026-08-14; one follow-up left
+### 9d. The dice tower — **SHIPPED 2026-08-12**; three models by 2026-08-14; dressed 2026-08-11; one follow-up left
 
 The lab became the product. `tower` is a room setting whose value is a
 tower id — `none` (default), `heartwood`, `bastion` and `blackanvil` — and a tower roll is baked
@@ -765,11 +765,39 @@ every skinned row carries a `clunkVoice` and no two are the same, and the
 picker's row still LAYS OUT at four chips (the paint assertions would have
 stayed green with the chips overflowing).
 
-Recorded, not fixed: **Bastion's arrow loop does not show its dark slot** —
-the `shadowStone` sits 0.012 behind a granite facade panel spanning the same
-x/y, so the granite is in front and the loop reads as a surround with plain
-wall inside it. Cosmetic and pre-existing; Black Anvil cuts its facade into
-panels around the grate and the vent to avoid the same shape of mistake.
+Recorded, not fixed *(and then fixed — see the dressing pass below)*:
+**Bastion's arrow loop does not show its dark slot** — the `shadowStone` sits
+0.012 behind a granite facade panel spanning the same x/y, so the granite is
+in front and the loop reads as a surround with plain wall inside it. Cosmetic
+and pre-existing; Black Anvil cuts its facade into panels around the grate
+and the vent to avoid the same shape of mistake.
+
+**DONE 2026-08-11 — the dressing pass, and a fourth discipline.** Joe: "I
+like the general shape. The exterior could maybe benefit from more detail…
+2–5 cosmetics per tower." The three models were architecture and read as
+architecture: nothing on any of them had been put there by a person. Each
+now carries two to five props — one bold, the rest quiet — out of a new
+shared prop kit, `js/towerdress.js`: cloth with a real fold field, heraldry
+under the rule of tincture, heater shields, cressets and sconces, ivy as a
+guided walk, moss as a pixel pass, rope, chain, a horseshoe, and six quads of
+smoke that are not a particle system. Manifests, budgets and the traps are in
+[TOWER.md](TOWER.md) under DRESSING; the player-facing story is
+[UX.md §7.31](UX.md#731-the-tower-and-what-a-poured-roll-looks-like-2026-08-12).
+
+Three things it established that outlive it:
+
+- **A warm focal light is the FAMILY TRAIT.** Every skinned row now carries
+  `ember`, and `tower-roll` fails a row without one. Black Anvil's grate
+  stopped being one tower's feature and became the house's.
+- **Weathering belongs in the vertex colours.** Every wall texture here tiles
+  at WORLD scale, so a gravity stain painted into a tile repeats wherever the
+  tile does and cannot know where the bands are. `gravityStain` runs in world
+  space after the AO bake: zero triangles, zero textures, zero draw calls.
+- **tower-fit NAMES every overrun or goes red.** Six legal classes against the
+  engine volumes that grant them; UNCLASSIFIED fails. It caught a real gap in
+  its own taxonomy on the way in, which is the useful kind of red check.
+
+And Bastion's arrow loop is a recess again.
 
 What is left:
 

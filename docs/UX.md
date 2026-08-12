@@ -4209,6 +4209,36 @@ furnace running. The rule it establishes for the next model is narrow on
 purpose: a glow must be a BAKE, it must live inside a recess, and it must not
 be the brightest thing on the table.
 
+**…and it became the FAMILY TRAIT (dressing pass, 2026-08-11).** Every tower
+now carries a warm focal light: Heartwood a cresset hanging off its right
+corner post, Bastion an iron sconce beside the arrow loop, Black Anvil the
+grate it always had. Same rule as above — the fire is a bake — plus one
+engine-owned PointLight at the coals per tower, because an emissive map
+shines and cannot illuminate, and a fire that throws no warmth on the post
+beside it reads as a sticker. A lit lamp is the difference between furniture
+somebody uses and furniture in a catalogue.
+
+**Every tower is DRESSED (2026-08-11).** Two to five props each, one bold and
+the rest quiet, and every one of them says something: Heartwood has ivy up
+its shaded corner, moss where water sits, a hoist beam with a slack rope, one
+pale replacement board and two sprung eaves boards; Bastion flies a gonfalon
+a third of the way across its battlement, hangs two shields with DIFFERENT
+devices, has lost one merlon and gained one fresh mortar patch, and sheds
+water out of its crenel gaps; Black Anvil smokes from the crown, keeps a
+hammer and a pair of tongs on a rail beside the fire, a heap of coal at one
+foot, rust running down from every band and one band somebody has replaced.
+The pattern is deliberate and it is the house rule for the next model:
+**one repair and one failure, never centred, never mirrored** — a repair says
+somebody maintains this, a failure says somebody has not got to that, and the
+two together are what put a date on a building. The geometry, the budgets and
+the traps live in [docs/TOWER.md](TOWER.md) under DRESSING.
+
+**Bastion's arrow loop is a recess again (2026-08-11).** It had been a
+picture frame since the day it shipped — a dark slot sunk 0.012 behind a
+granite panel that covered it, so the loop read as a sandstone surround with
+plain wall inside. The facade is cut around it now and the slot is the
+backmost surface in the hole.
+
 **What a poured roll is.** Dice appear above the tower's mouth, one every
 0.12–0.2 s — a pour, one motion of a hand, not a queue. Each vanishes into
 the hood, knocks around inside for 0.5–1.6 s where you can hear it and not

@@ -148,6 +148,123 @@ red-checked by moving the mortar's blue channel by one (31067 / 33112 / 4728 /
   the loop reads as a sandstone surround with plain wall inside it. Cosmetic,
   pre-existing, not fixed here. Black Anvil CUTS its facade into panels around
   the grate and the vent for exactly this reason.
+  **FIXED 2026-08-11** by the dressing pass, the way Black Anvil said: the
+  granite field panel is cut into four around the surround, the slot's stone
+  is the backmost surface in the hole, and the sandstone stands 0.06 in FRONT
+  of the slot instead of 0.012 behind the field. Still not a hole — it is in
+  the COWL band, the slot stone is opaque, the lining stands behind it, and
+  occlusion is 99/99 at all six eyes.
+
+## DRESSING — the props every tower carries (2026-08-11)
+
+The three models were shipped as ARCHITECTURE and read as architecture: no
+tower had a single thing on it that a person had put there. Dressing is the
+pass that fixes that, and it is a distinct discipline from building a skin —
+the skin is a shape, the dressing is a sentence about who uses it.
+
+**THE FAMILY TRAIT: a warm focal light on every tower.** All three archetypes
+converge on it independently (a cresset, a sconce, a forge), and it is the
+single most-cited charm device in the reference material: *a LIT lantern
+implies somebody lit it tonight; an unlit one is decoration*. So the registry
+row's `ember` slot — added for Black Anvil's grate — is now carried by every
+skinned model, and a row without one fails `tower-roll`. The `TOWERLIGHT` rig
+turns it into a real PointLight at the coals, because an emissive map shines
+and cannot illuminate: without the light a fire is a sticker on a wall. A row
+may size its own fire (`intensity`, `dist`); the forge's 14-over-8 painted a
+two-metre searchlight up Heartwood's corner post before that existed.
+
+**Where a prop lives, and why the group name is the contract.**
+
+- `towerSkinDress` — opaque props. The `towerSkin*` prefix means tower-fit
+  MEASURES them against the socket and the occlusion proof COUNTS them as
+  occluders. Both are wanted: a prop outside the socket has to be defended by
+  name, and extra opacity can only help the cheat.
+- `towerDressFx` — InstancedMesh fields (leaves, tufts, coal) and the smoke.
+  Out of `bakeVertexAO`'s parts array, because `Box3.setFromObject` unions
+  every instance into ONE box and that box would poison the whole tower's AO;
+  and out of the fit hull, because a scattered or transparent thing measured
+  as masonry is a lie. tower-fit REPORTS the group's extent under its own
+  named class rather than skipping it.
+
+**Every overrun is a named class or the fit is red.** `towerModelAudit`
+classifies each mesh that leaves the socket against the engine volume that
+grants it: APRON CLADDING, LIP CLADDING, GATE HOOD, FOOT DIP, FLUSH DRESS
+(a patch lying on the facade, ≤0.06 proud) and DRESS REACH (a wall-hung prop
+forward of the facade, above the play volume, no further out than the gate
+hood already is). UNCLASSIFIED fails. **X IS THE ONE AXIS WITH NO SLACK:** the
+socket wall is 3.25 and at `close` the mat's own wall is 3.35, so a sideways
+prop is a prop through the side of the room. Forward and upward are
+negotiable; sideways is not.
+
+**Budgets, and the 3-px rule that sets them.** At the resting eye a world
+unit is ~42 px, so 1 px ≈ 0.024 u: a feature needs ≥0.07 u to exist at all
+and ≥0.12 u to read as a shape. Stylise up about 2×, then DELETE anything
+still under 0.07 and paint it into the canvas instead — rivets, cage bars and
+life-size ivy leaves are all textures here, never geometry. Per tower:
+≤4k added triangles and a draw-call budget that only merging can meet (ten
+props sharing a material are still ten draw calls in three; `mergeGeos`
+exists for that).
+
+**Gravity governs all weathering, and tiled UVs cannot express it.** Every
+wall texture in this repo tiles at WORLD scale, so a stain painted into the
+tile repeats wherever the tile does and cannot know where the bands are.
+Weathering therefore lives in two places: broad gravity gradients in the
+VERTEX COLOURS (`gravityStain`, world space, applied after the AO bake — zero
+triangles, zero textures, zero draw calls), and fine directional runs as
+alpha-tested quads sharing one canvas of streak patterns, merged into one
+geometry (`bakeStainSheet` / `buildStains`).
+
+**Idle motion is a function of the sim clock and nothing else.** Sway and
+smoke ride `TOWERDRESS.t`, accumulated from tick's dt exactly like
+SHADER_TIME and the ember breath, so `holdClock` freezes a dressed tower and
+its screenshot is deterministic. The idiom is `stepTowerLantern`'s verbatim —
+`0.65 sin(ωt) + 0.35 sin(2.63ωt + 1.7)`, non-harmonic so the loop never
+closes visibly. `tower-roll` checks the angle against that FORMULA rather
+than watching it change, because "it moved" is satisfied by a wall clock.
+
+**PARTICLES ARE OFF-LIMITS.** `js/particles.js` is impact-keyed by contract
+("no impact, no particles"). Black Anvil's plume is six fixed quads on a
+loop, merged to one geometry with per-quad opacity on a `color` attribute at
+itemSize 4, MeshBasicMaterial, never additive, peak alpha 0.30, zero opacity
+at birth AND death so the wrap cannot pop.
+
+**Per-tower manifests, as built.**
+
+| | Heartwood | Bastion | Black Anvil |
+|---|---|---|---|
+| bold | hanging cresset, right post, lit + swaying | gonfalon off the battlement, a third across | smoke plume off the crown |
+| | ivy up the shaded left corner (stem panel + 60 instanced leaves) | two heater shields, different devices, unequal | horseshoe beside the grate |
+| | moss on the ground course and the shaded cornice slab, + tufts | iron sconce beside the arrow loop (lit) | tool rail: hammer plumb, tongs crooked, one hook empty |
+| | hoist beam, slack rope, hung coil | one broken merlon + one pale mortar patch | coal heap at one wall-touching side of the base |
+| | one pale replacement board + two sprung eaves boards | water out of the crenel gaps, growth at the damp foot | rust below the bands, soot at the rim, efflorescence mid-shaft, one unrusted band, a 4-link chain |
+| dress meshes / tris / draws | 9 / ~1.5k / 9 | 8 / ~1.1k / 8 | 4 / ~1.4k / 4 |
+
+**What the frames said that the plan did not.** Every one of these is a
+change made after LOOKING, and they are the reusable part:
+
+- **A cap hides the only face a downward camera can see.** The dossier's
+  pagoda cap over the cresset made it render as a black bucket. Cut.
+- **A bake's heat envelope is a lottery at prop scale.** `bakeEmber` leaves
+  most of a bed dead; on a basket 0.5 across, whether the visible face
+  sampled a live seam was luck. `heat: 1.8` for small fires.
+- **An alpha-tested plane must not cast a shadow.** three's depth material
+  does not carry the cutout reliably: the ivy panel printed a black slab up
+  the post with its own stems showing through as pale ghosts. Cutouts light,
+  they do not shade.
+- **Weathering wants half the value you think.** Rust ran as red paint and
+  efflorescence lifted a deliberately-black tower out of the bottom third of
+  its range. Both roughly halved.
+- **Dark props on dark walls do not exist.** Black Anvil's tools were cast
+  iron on soot and invisible at the resting eye; worn steel is both the
+  legible answer and the honest one (hands polish what they hold).
+- **The crown is at the top of the frame.** The shipped cameras frame the
+  MAT, so a plume rising 1.9 units above the crown spends most of its life
+  outside the picture. Shortened to 1.15 — and it still reads only from the
+  wider eyes, which is recorded rather than hidden.
+- **Nothing may sit on the tray.** Dice come to rest there (a 20-die pour
+  puts five of them on it) and a skin has no colliders, so a prop in the
+  delivery run is a prop dice pass through. The brief's "tongs across the
+  tray lip" became tongs on a rail.
 
 **Not done, deliberately:** `tower` in the portable YAML `table:` block.
 
@@ -162,7 +279,15 @@ tool until the second model needed one — `tower-resting-eye.mjs [tower]`
 (parameterised 2026-08-14; it hard-coded heartwood until then) and
 `tower-family-shots.mjs [tower] [sibling…]` for the review set a human looks at
 before a skin merges, whose sibling list now defaults to every other
-registered model.
+registered model. The dressing pass added three more:
+`tower-dress.mjs [tower…]` (triangles, draw calls and idle-motion
+registrations per group — the budget, measured), `dress-look.mjs [tower]`
+(the resting eye plus a named close eye per prop cluster, because "does this
+prop earn its triangles" is a different question from "does this tower belong
+to the family" and needs a different distance), and `dress-bake-ab.mjs`
+(the byte-identity witness for a kit refactor: the bake functions run side by
+side against a snapshot of the pre-change source, differing bytes counted over
+the shipped canvases, with `--redcheck` to prove the counter can move).
 
 The engine owns one fixed core geometry; tower models are **occluding skins**
 around it. The baked film — entry drop, despawn, hidden transit, clunk times,
