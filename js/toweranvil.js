@@ -100,7 +100,7 @@ import * as THREE from 'three';
 import {
   mulberry32, hash2, fbm, turb, clamp01, smoothstep, ramp3,
   heightToNormal, roughFromHeight, veilTexture,
-  roundedBox, planarUV, weather, bakeVertexAO, bakeStone, bakeEmber,
+  roundedBox, planarUV, weather, bakeVertexAO, weatherPass, bakeStone, bakeEmber,
 } from './towerskin.js';
 import {
   buildHorseshoe, buildChainHanger, bakeSmoke, buildSmokePlume,
@@ -864,6 +864,15 @@ export function buildAnvilSkin(v) {
   }
 
   bakeVertexAO(parts, group);
+
+  // The aged base: a working forge is SWEPT — near-zero dust — but its inside
+  // corners are the grimiest in the family, and its drift runs widest (fire
+  // bricks discolour unevenly). Weather side +x, opposite the wooden tower's:
+  // the family did not all stand facing the same rain.
+  weatherPass(parts, {
+    edge: 0.3, grime: 0.6, dust: 0.08, drift: 0.15, weatherSide: 1,
+    edgeGate: (p, n) => (0.3 + 0.7 * clamp01(1 - Math.abs(p.y - 3) / 6)),
+  });
 
   // --- WEATHERING IN THE VERTEX COLOURS, after the AO bake -----------------
   // HEAT ABOVE, DAMP BELOW — the whole story of a foundry stack, and all of

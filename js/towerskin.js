@@ -648,6 +648,10 @@ export function roundedBox(w, h, d, radius, segments = 1) {
   }
   geo.attributes.position.needsUpdate = true;
   geo.attributes.normal.needsUpdate = true;
+  // The box tag: weatherPass's arris classifier (max|n|) is exact ONLY on
+  // this analytic topology — on a lathe or tube it would tint whole curved
+  // surfaces as "edge". Curved props still take grime/dust/drift.
+  geo.userData.rb = true;
   return geo;
 }
 
@@ -749,6 +753,12 @@ export function bakeVertexAO(parts, root) {
     const geo = mesh.geometry;
     const pos = geo.attributes.position, nor = geo.attributes.normal;
     const col = new Float32Array(pos.count * 3);
+    // The raw open-sky factor, kept for weatherPass: once the colour
+    // attribute has been multiplied by later passes (gravityStain), the AO
+    // cannot be recovered from it — recovering by inverting AO_MIN is an
+    // implicit-ordering dependency that ships green and looks wrong. ~15 KB
+    // per part set, never uploaded to the GPU.
+    const aoK = new Float32Array(pos.count);
     for (let i = 0; i < pos.count; i++) {
       p.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
       nrm.fromBufferAttribute(nor, i).transformDirection(mesh.matrixWorld).normalize();
@@ -768,11 +778,92 @@ export function bakeVertexAO(parts, root) {
         }
       }
       const k = 1 - hits / AO_RAYS;
+      aoK[i] = k;
       col[i * 3] = AO_MIN[0] + (1 - AO_MIN[0]) * k;
       col[i * 3 + 1] = AO_MIN[1] + (1 - AO_MIN[1]) * k;
       col[i * 3 + 2] = AO_MIN[2] + (1 - AO_MIN[2]) * k;
     }
+    geo.userData.aoK = aoK;
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  });
+}
+
+// ---------------------------------------------------------------------------
+// THE WEATHER PASS (Joe, 2026-08-12: "the models right now are pristine").
+// Substance's three mask generators, each of which this kit already knows the
+// answer to without estimating anything:
+//   · convex curvature — the analytic normals: max|n| is exactly 1 on a flat
+//     face, 0.7071 on a bevel arris, 0.5774 on a corner shell. OBJECT normal,
+//     because meshes are rotated (cant, flare, the group's lean).
+//   · concave curvature — the AO bake above, which skips self-occlusion and
+//     therefore measures exactly part-to-part inside corners.
+//   · the up vector — the WORLD normal's y.
+// Plus the layer the research ranked first and no mask drives: per-part tonal
+// DRIFT, the scale modeller's oil-dot filter — soft value/hue wander across
+// the field that destroys the factory-fresh uniformity between the stains.
+// Everything multiplies the colour attribute, exactly like gravityStain; runs
+// AFTER bakeVertexAO (needs userData.aoK) and BEFORE gravityStain (gravity
+// owns the story stains and has the last word). Zero per-frame cost.
+//
+// Magnitudes are the research's, started at HALF (docs/TOWER.md: "weathering
+// wants half the value you think"): grime crushes blue hardest (a deposit,
+// not a shadow — shadows multiply uniformly), dust LIFTS blue hardest (a
+// desaturated pale film), edge wear lifts warm (exposed substrate).
+export function weatherPass(parts, {
+  edge = 0.35,      // convex arris lightening (Wear Level)
+  grime = 0.45,     // AO-driven deposit in inside corners
+  dust = 0.30,      // up-facing pale film
+  drift = 0.08,     // per-part tonal wander (±value, warm-biased)
+  edgeTint = [0.22, 0.20, 0.15],
+  grimeTint = [-0.06, -0.11, -0.19],
+  dustTint = [0.05, 0.07, 0.13],
+  edgeGate = null,  // (pWorld, nWorld) => 0..1 — wear where light + hands reach
+  dustGate = null,
+  weatherSide = 0,  // -1: the -x flank ages harder; +1: the +x; 0: uniform
+  seed = 0x77ea1,
+  floor = 0.30,     // combined-multiplier luminance clamp: never stack to black
+} = {}) {
+  const K = 1 / (1 - 1 / Math.sqrt(3));
+  const p = new THREE.Vector3(), nO = new THREE.Vector3(), nW = new THREE.Vector3();
+  parts.forEach((mesh, mi) => {
+    const geo = mesh.geometry;
+    const pos = geo.attributes.position, nor = geo.attributes.normal;
+    let col = geo.attributes.color;
+    if (!col) {
+      col = new THREE.BufferAttribute(new Float32Array(pos.count * 3).fill(1), 3);
+      geo.setAttribute('color', col);
+    }
+    const aoK = geo.userData.aoK || null;
+    mesh.updateWorldMatrix(true, false);
+    // The drift layer: each PART takes one seeded wander. Plank walls and
+    // block courses are many parts, so this lands at exactly the blotch scale
+    // the research asks for (1/3–1/2 of a tower face) with zero canvas work.
+    const r = mulberry32(seed + mi * 7919);
+    const dv = (r() - 0.5) * 2 * drift;
+    const warm = r() * drift * 0.75;
+    const dm = [1 + dv + warm, 1 + dv + warm * 0.35, 1 + dv - warm * 0.6];
+    for (let i = 0; i < pos.count; i++) {
+      p.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+      nO.fromBufferAttribute(nor, i);
+      nW.copy(nO).transformDirection(mesh.matrixWorld);
+      const openK = aoK ? aoK[i] : 1;
+      const side = weatherSide
+        ? 1 + 0.4 * weatherSide * Math.sign(p.x) * Math.min(1, Math.abs(p.x) / 2) : 1;
+      const e = geo.userData.rb
+        ? (1 - Math.max(Math.abs(nO.x), Math.abs(nO.y), Math.abs(nO.z))) * K : 0;
+      const w = Math.max(0, e * edge * (edgeGate ? edgeGate(p, nW) : 1) * side);
+      // Thresholded: shadow is continuous, a deposit has a contact line.
+      const g = Math.max(0, smoothstep(0.25, 0.85, 1 - openK) * grime * side);
+      const d = Math.max(0, smoothstep(0.35, 0.85, nW.y)
+        * (0.35 + 0.65 * (1 - openK)) * dust * (dustGate ? dustGate(p, nW) : 1));
+      let m0 = dm[0] * (1 + edgeTint[0] * w) * (1 + grimeTint[0] * g) * (1 + dustTint[0] * d);
+      let m1 = dm[1] * (1 + edgeTint[1] * w) * (1 + grimeTint[1] * g) * (1 + dustTint[1] * d);
+      let m2 = dm[2] * (1 + edgeTint[2] * w) * (1 + grimeTint[2] * g) * (1 + dustTint[2] * d);
+      const lum = 0.299 * m0 + 0.587 * m1 + 0.114 * m2;
+      if (lum < floor) { const s = floor / lum; m0 *= s; m1 *= s; m2 *= s; }
+      col.setXYZ(i, col.getX(i) * m0, col.getY(i) * m1, col.getZ(i) * m2);
+    }
+    col.needsUpdate = true;
   });
 }
 
@@ -1235,6 +1326,16 @@ export function buildTowerSkin(v) {
   }
 
   bakeVertexAO(parts, group);
+
+  // The aged base (weatherPass): wood wears at the arrises the rake grazes
+  // and where hands and dice actually pass — the door band — not uniformly.
+  // The -x flank is the weather side (it is already the ivy's shaded side,
+  // so age and growth agree about which way this tower faces the rain).
+  weatherPass(parts, {
+    edge: 0.6, grime: 0.5, dust: 0.4, drift: 0.14, weatherSide: -1,
+    edgeGate: (p, n) => clamp01(0.5 - 0.5 * n.x)
+      * (0.35 + 0.65 * clamp01(1 - Math.abs(p.y - 2.5) / 5)),
+  });
 
   // --- WEATHERING IN THE VERTEX COLOURS, after the AO bake -----------------
   // GRAVITY GOVERNS ALL WEATHERING: damp at the ground, damp on the shaded

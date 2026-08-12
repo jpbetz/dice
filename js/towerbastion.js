@@ -58,7 +58,7 @@ limitations under the License.
 import * as THREE from 'three';
 import {
   mulberry32, bakeStone, bakeEmber, veilTexture, clamp01,
-  roundedBox, planarUV, weather, bakeVertexAO,
+  roundedBox, planarUV, weather, bakeVertexAO, weatherPass,
 } from './towerskin.js';
 import {
   bakeCloth, buildGonfalon, bakeShieldFace, buildHeaterShield, buildSconce,
@@ -726,6 +726,16 @@ export function buildBastionSkin(v) {
   }
 
   bakeVertexAO(parts, group);
+
+  // The aged base: stone takes more GRIME than edge — its arrises are
+  // already chipped in the tile, so the vertex layer's job is the deposit in
+  // every mortar course and part joint, plus dust on the battlement tops and
+  // corbel ledges. Weather side matches the ivy's shaded flank.
+  weatherPass(parts, {
+    edge: 0.25, grime: 0.55, dust: 0.3, drift: 0.07, weatherSide: -1,
+    edgeGate: (p, n) => clamp01(0.5 - 0.5 * n.x)
+      * (0.3 + 0.7 * clamp01(1 - Math.abs(p.y - 3) / 6)),
+  });
 
   // --- WEATHERING IN THE VERTEX COLOURS, after the AO bake -----------------
   // Damp at the base, a green cast on the shaded flank, and nothing above.
