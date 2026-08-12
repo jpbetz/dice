@@ -6702,7 +6702,11 @@ function pourPlan(dice, v, prng) {
     entryAt += i === 0 ? 0 : POUR.stagMin + prng() * (POUR.stagMax - POUR.stagMin);
     const start = [
       v.aim.c[0] + (prng() - 0.5) * 0.8,
-      v.aim.c[1] + prng() * 0.8,
+      // +2 above the aim volume (Joe, 2026-08-12: the raised tower eye can
+      // see the old spawn height — dice must MATERIALIZE off-frame and
+      // arrive, not pop in beside the crown). The entry is a scripted,
+      // gravity-true fall, so this only lengthens the approach.
+      v.aim.c[1] + 2 + prng() * 0.8,
       v.aim.c[2] + (prng() - 0.5) * 0.8,
     ];
     const rot0 = [prng() * 6.28, prng() * 6.28, prng() * 6.28];
@@ -6867,6 +6871,13 @@ function towerCamTo(phase) {
     };
   } else {
     applyCameraFraming(true);
+    // The look-down pan rides a SLOWER clock than every other ease (Joe,
+    // 2026-08-12: "when the camera looks down, it needs to pan more
+    // slowly"): from the raised tower eye the act-two drop covers the most
+    // ground of any move in the app, and at the shared 0.42 s it read as a
+    // lurch. Only this ease takes the long clock; reframes and the resting
+    // eye keep CAM_EASE_S.
+    if (camEase) camEase.dur = 0.7;
   }
 }
 
@@ -16213,7 +16224,7 @@ function applyFramingPose(pose, animate) {
 // scenario that freezes the clock freezes the camera with it.
 function stepCamera(dt) {
   if (!camEase) return;
-  camEase.t = Math.min(1, camEase.t + dt / CAM_EASE_S);
+  camEase.t = Math.min(1, camEase.t + dt / (camEase.dur || CAM_EASE_S));
   const k = 1 - Math.pow(1 - camEase.t, 3); // ease-out cubic
   camera.position.lerpVectors(camEase.fromPos, camEase.toPos, k);
   camTarget.lerpVectors(camEase.fromTgt, camEase.toTgt, k);
