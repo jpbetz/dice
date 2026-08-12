@@ -2632,9 +2632,29 @@ is the interim stage — W2 upgrades fidelity in place. Proof: `venue-set`
 (settings/fx/tower), sabotage-checked on the staged-means-in-the-scene
 claim.
 
-### W2–W6, sequenced after the spec lands
-W2 the glade room (surface, horizon, atmosphere, lighting rig) · W3 the
-fae tower via the new-tower skill (moot circles, glowing mushrooms) ·
+### W3. The fae tower — REGISTERED 2026-08-12, SHELL OUTSTANDING
+`hollowbole` (`js/towerhollow.js`), the first `venueOnly` tower: no chip,
+chosen by choosing the venue. Everything that is not the shell is done and
+proven — the registry row and its hollow-log clunk voice, the lit door and
+its ember light, `motes: false`, the server allowlist, the picker skip, the
+crown moot and shelf fungus authored to the bloom threshold under BOTH fae
+palettes, the scenario `tower-hollowbole` (tags tower/fx) with its red
+checks, and the four contract proofs green.
+
+**What is left is the SILHOUETTE, and it needs a technique this repo does
+not have yet.** The owner's reference is a broken stump — stocky, a torn
+frontal wound opening into black, splinter spires, heavy buttress roots,
+pale barkless fibre — and `js/towerskin.js`'s vocabulary is boxes and
+extrusions, which reads as a rectangular tower wearing bark. The shell is
+isolated behind one function and one `(θ, y)` surface descriptor
+(`buildLobedShell` → `buildHollowBoleSkin(v, { shell })`), named
+`towerSkinBolePlaceholder`, so the parametric displaced shell drops in
+without touching the moot, the door, the palette work or the proofs.
+The general finding for docs/TOWER.md: the surface kit is ARCHITECTURE,
+and organic forms want a radius field, not a box stack.
+
+### W2, W4–W6, sequenced after the spec lands
+W2 the glade room (surface, horizon, atmosphere, lighting rig) ·
 W4 the dice set (rune glow, die lights, fog response) · W5 the living
 layer (wisps, fireflies, the moot in session) · W6 the audio palette.
 Each ships with its e2e proof; the venue is judged as a WHOLE at each

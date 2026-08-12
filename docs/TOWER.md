@@ -1,5 +1,47 @@
 # TOWER_CORE — the tower geometry contract
 
+## STATUS — shipped as a room setting (2026-08-12), three models (2026-08-14), a fourth registered (2026-08-12, W3)
+
+**THE FOURTH MODEL IS REGISTERED AND ITS SHAPE IS NOT FINISHED.**
+`hollowbole` (`js/towerhollow.js`) is the fae venue's tower — a rotted
+hollow trunk, one build under both fae palettes — and it is the first
+`venueOnly` row: no chip in the tower picker, because a venue is chosen as
+one thing and its tower is part of what it is (GOALS goal 13). Everything
+that is not the SHELL is done and proven: the registry row and its
+`clunkVoice` (a `thud` at weight 0.5 / sustain 35 over the longest comb in
+the set — a hollow log), the ember light behind a 0.24 × 0.40 lit door in a
+root buttress, `lantern: {rake: 0.5}`, `motes: false` (the fae venues run
+their own air), the server allowlist, the picker skip, the two-palette
+value ladder, and the scenario `tower-hollowbole`.
+
+The SHELL is interim and named `towerSkinBolePlaceholder` so nobody mistakes
+it: the owner's reference is a broken STUMP (stocky, a torn frontal wound
+opening into black, splinter spires, heavy buttress roots, pale barkless
+fibre) and a `roundedBox` + `ExtrudeGeometry` stack cannot be that — a box
+stack reads as a rectangular tower wearing bark however the boxes are
+arranged. **The finding is the general one and it belongs in this
+document: the towerskin kit's vocabulary is ARCHITECTURE. It made three
+buildings well and it will not make an organic form.** A parametric
+displaced shell (a radius field `r(θ, y)`) is a different technique. The
+seam is explicit — one function, one SURFACE descriptor, and every prop on
+the tower places itself by `(θ, y)` through it rather than by box corners —
+so the replacement lands without touching the moot, the door, the palette
+work or the proofs.
+
+Proven against the interim shell, and the numbers carry over as the
+harness rather than as the answer: fit CLEAN (21 overruns, every one a
+named legal class; hull x[−3.15, 3.15] y[−1.15, 12.32] z(rel z0)[−5.13,
+3.99]), occlusion 99/99 on SHAFT and COWL at all six shipped eyes, probe
+8/8 CLEAN and byte-identical to Heartwood's resting sheet on the same seed,
+dressing 7 meshes / 2644 tris / 7 draws inside the ≤4k / ~8 budget.
+
+**A red check corrected this model's own header, the way Black Anvil's
+did.** The front of the COWL band is carried REDUNDANTLY by the facade
+plate and the unlit lining's back plane — each alone is 99/99, and only
+removing BOTH goes red (cowl 10–36/99 at all six eyes). The crown ring's
+height, which the file originally claimed was the load-bearing number,
+closes the flanks and not the front.
+
 ## STATUS — shipped as a room setting (2026-08-12), three models (2026-08-14)
 
 The lab is no longer the only place a tower exists. `tower` is a room-wide
