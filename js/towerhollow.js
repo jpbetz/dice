@@ -730,26 +730,31 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
   }
 
   // --- THE ROOT SPLAY: the foot ---------------------------------------------
-  // Roots are tapered boxes leaning out of the bole, seated so their heads
-  // disappear into the first course. Asymmetric by construction: the LEFT
-  // carries one heavy buttress (the one with the door in it), the right two
-  // thin ones, and there is a third on the right that has rotted off short.
-  // Nothing crosses |x| 2.5 below the door head — the frame is decorated,
-  // the aperture is never touched.
+  // MEASURED, THEN CUT BACK. The first cut leaned seven radial buttresses
+  // out of the bole and tower-fit came back UNCLASSIFIED at x −3.311: the
+  // trunk already stands at 2.80 + 0.155 of lobe and the socket wall is at
+  // 3.25, so the whole sideways budget for a root is about a fifth of a
+  // unit — and a 3-unit root leaning 9° spends 0.24 of that on the lean
+  // alone, before it projects at all. X HAS NO SLACK (docs/TOWER.md), so
+  // the splay is expressed where there IS room: the roots reach FORWARD and
+  // BACK, the side ones are shallow ribs, and every lean is ≤6°.
+  //
+  // Asymmetric by construction: the LEFT carries one heavy buttress (the one
+  // with the door in it), the right two thin ones, and one on the right has
+  // rotted off short.
   const ROOTS = [
-    // [azimuth°, halfWidth, height, reach out, lean°, thickness]
-    [-74, 0.34, 3.05, 0.34, 9, 0.62],   // the door buttress — heavy, forward
-    [-118, 0.26, 2.35, 0.30, 12, 0.50],
-    [-160, 0.22, 1.85, 0.24, 10, 0.44],
-    [72, 0.20, 2.10, 0.26, 11, 0.42],
-    [104, 0.24, 2.65, 0.30, 13, 0.46],
-    [148, 0.18, 1.35, 0.20, 8, 0.38],   // the short one — rotted off
-    [180, 0.22, 1.60, 0.22, 9, 0.40],
+    // [azimuth°, halfWidth, height, reach out, lean°, radial thickness]
+    [-118, 0.26, 2.35, 0.16, 6, 0.42],
+    [-158, 0.24, 1.95, 0.24, 6, 0.46],
+    [72, 0.20, 2.10, 0.12, 5, 0.34],
+    [104, 0.24, 2.55, 0.14, 5, 0.36],
+    [146, 0.20, 1.35, 0.22, 5, 0.40],   // the short one — rotted off
+    [180, 0.24, 1.70, 0.28, 6, 0.44],
   ];
   for (const [degs, hw, top, out, lean, th] of ROOTS) {
     const a = degs * Math.PI / 180;
     const sinA = Math.sin(a), cosA = Math.cos(a);
-    const rMid = R0 + lobe(a) - 0.06;
+    const rMid = R0 + lobe(a) - 0.10;
     const geo = roundedBox(hw * 2, top, th, R_HULL, 2);
     weather(geo, hw * 2, top, th, rnd);
     propUV(geo, 1.6);
@@ -761,6 +766,15 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
     m.castShadow = true; m.receiveShadow = true;
     bole.add(m); parts.push(m);
   }
+  // THE DOOR BUTTRESS is placed by hand rather than by azimuth, because the
+  // corner it has to reach is not on the trunk at all: the pad face wants
+  // (x −2.79, z0+0.22), which is 3.31 from the bole axis — outside the
+  // shell, inside the socket, in the front-left corner the front clip left
+  // empty. A radial root cannot get there without leaving the socket
+  // sideways on the way. So it is a leaning slab from the bole's flank out
+  // to that corner, and it is the heaviest thing at the foot.
+  span('bark', -3.12, -2.52, 0, 2.95, z0 - 1.55, z0 + 0.22,
+    { r: R_HULL, seg: 2, weather: true, uv: UV.bark });
 
   // --- THE CHUTE AND THE TRAY, clad in rotted heartwood --------------------
   // Exactly on the engine's ramp and lip, so a die rides the wood it looks
@@ -839,9 +853,23 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
   const yMoot = 10.30, mootTilt = 0.42, mootPhase = -0.7;
   const GAP_TH = -0.78;                    // front-left of centre, in radians
   const GAP_ARC = 2.4 / R0;                // 2.4 u of circumference ≈ 49°
+  // WHERE A CAP CAN ACTUALLY SIT, and this is the §1.5 refusal the moot
+  // handed back: the shell is OPEN across the front, so a cap placed on the
+  // bole's own circle anywhere inside the clip hangs in mid-air a unit in
+  // front of the socket's face (tower-fit: z+1.168, UNCLASSIFIED). Slots
+  // inside the clip therefore land on the FACADE — which is precisely what
+  // grammar §5 asks for anyway ("seven are emissive paint on the flat
+  // facade"). A facade cap is a blister: half-buried, 0.04 proud, and
+  // 0.03 inside the FLUSH DRESS budget.
+  const inFacade = (th) => th > clip.th0m - 2 * Math.PI && th < clip.th0p;
   const capAt = (th, inset) => {
+    if (inFacade(th)) {
+      const x = Math.max(aL + 0.16, Math.min(aR - 0.16, rOut(th) * Math.sin(th)));
+      return [x, yMoot + mootTilt * Math.cos(th - mootPhase), zFO, true];
+    }
     const r = rOut(th) - inset;
-    return [r * Math.sin(th), yMoot + mootTilt * Math.cos(th - mootPhase), zc + r * Math.cos(th)];
+    return [r * Math.sin(th), yMoot + mootTilt * Math.cos(th - mootPhase),
+      zc + r * Math.cos(th), false];
   };
   const bright = [], gill = [], flesh = [];
   const jit = mulberry32(0xb01e77);
@@ -851,68 +879,79 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
     // Two of the nine are the MODELLED pair and they sit on the SAME
     // shoulder rather than opposite each other — one loaded flank
     // (grammar rule 8), never a balanced pair.
+    //
+    // SIZES ARE HALF-EXTENTS, and that distinction cost a fit run: the first
+    // cut multiplied a "0.52 u bracket" by 1.65 into a unit sphere and got a
+    // 1.7-unit mushroom that left the socket sideways. A big cap is 0.60
+    // across and projects 0.22 past its seat; a small one is 0.15 across,
+    // which is still 2.5× the 0.06 u an emissive feature needs to read.
     const BIG = new Set([2, 3]);
     for (let i = 0; i < 9; i++) {
       let th = (i / 9) * Math.PI * 2 + (jit() - 0.5) * 0.3 * (2 * Math.PI / 9);
       th = ((th + Math.PI) % (2 * Math.PI)) - Math.PI;
       if (Math.abs(th - GAP_TH) < GAP_ARC / 2) continue;      // THE GAP
       const big = BIG.has(i);
-      const s = big ? 0.34 + 0.10 * jit() : 0.10 + 0.055 * jit();
-      const p = capAt(th, 0.05);
+      const [x, y, z, flat] = capAt(th, big ? 0.10 : 0.04);
+      const p = [x, y, z];
       const roll = (jit() - 0.5) * 0.5;
-      mootCaps.push({ th: Number(th.toFixed(3)), s: Number(s.toFixed(3)), big });
+      // A blister on the flat facade faces +z; a cap on the round shell
+      // faces up and out. Same geometry, one extra quarter turn.
+      const rot = flat ? [Math.PI / 2 + 0.22, 0, roll] : [0.34, th, roll];
+      const s = big ? 0.30 + 0.05 * jit() : 0.065 + 0.022 * jit();
+      mootCaps.push({ th: Number(th.toFixed(3)), s: Number(s.toFixed(3)), big, flat });
       if (big) {
         // A modelled bracket: a squashed dome on top, a flared gill skirt
         // under it. The skirt is the light.
         flesh.push({
           geo: propUV(capGeo.clone(), UV.prop),
-          matrix: xform({ pos: p, rot: [0.34, th, roll], scale: [s * 1.55, s * 0.52, s * 1.05] }),
+          matrix: xform({ pos: p, rot, scale: [s, s * 0.38, flat ? 0.10 : s * 0.72] }),
         });
         gill.push({
           geo: skirtGeo.clone(),
-          matrix: xform({ pos: [p[0], p[1] - s * 0.22, p[2]], rot: [0.34, th, roll],
-            scale: [s * 1.30, s * 0.42, s * 0.90] }),
+          matrix: xform({ pos: [x, y - s * 0.30, z], rot: flat ? [0.10, 0, roll] : [0.34, th, roll],
+            scale: [s * 0.86, s * 0.34, flat ? 0.09 : s * 0.62] }),
         });
       } else {
         bright.push({
           geo: capGeo.clone(),
-          matrix: xform({ pos: p, rot: [0.30, th, roll], scale: [s * 1.3, s * 0.75, s] }),
+          matrix: xform({ pos: p, rot, scale: [s, s * 0.80, flat ? 0.04 : s * 0.85] }),
         });
       }
     }
     // THE FALLEN MEMBER, lying in the gap: knocked over, gills UP, and the
     // brightest thing in the ring because it is the wrong way up. That is
     // the whole story — somebody's seat is empty and their cup is over.
-    const fp = capAt(GAP_TH, 0.02);
+    const [fx, fy, fz] = capAt(GAP_TH, 0.02);
     bright.push({
       geo: skirtGeo.clone(),
-      matrix: xform({ pos: [fp[0], fp[1] - 0.34, fp[2]], rot: [Math.PI + 0.45, 0, GAP_TH],
-        scale: [0.30, 0.20, 0.26] }),
+      matrix: xform({ pos: [fx, fy - 0.30, fz], rot: [Math.PI + 0.45, 0, GAP_TH],
+        scale: [0.22, 0.16, 0.20] }),
     });
     flesh.push({
       geo: propUV(capGeo.clone(), UV.prop),
-      matrix: xform({ pos: [fp[0] * 1.01, fp[1] - 0.44, fp[2] * 1.0 + 0.03],
-        rot: [Math.PI - 0.42, 0, GAP_TH], scale: [0.33, 0.15, 0.27] }),
+      matrix: xform({ pos: [fx, fy - 0.38, fz + 0.03],
+        rot: [Math.PI - 0.42, 0, GAP_TH], scale: [0.24, 0.12, 0.20] }),
     });
   }
 
   // --- THE SHELF FUNGUS: three brackets climbing one shoulder --------------
   // Clustered on the LEFT flank with nothing answering them on the right
   // (grammar rule 8, and Heartwood's single iron bracket in fungus). They
-  // are the "too large" half of the one scale wrongness: 0.44–0.52 u across,
-  // which is a dinner plate growing out of a tree.
-  const SHELVES = [[-1.28, 5.95, 0.52], [-1.05, 7.10, 0.44], [-1.42, 8.35, 0.47]];
+  // are the "too large" half of the one scale wrongness: 0.62–0.72 u across,
+  // which is a dinner plate growing out of a tree — and the widest thing
+  // sideways the socket will take at these azimuths.
+  const SHELVES = [[-1.28, 5.95, 0.36], [-1.05, 7.10, 0.31], [-1.42, 8.35, 0.33]];
   for (const [th, y, s] of SHELVES) {
-    const r = rOut(th) - 0.06;
+    const r = rOut(th) - 0.12;
     const p = [r * Math.sin(th), y, zc + r * Math.cos(th)];
     flesh.push({
       geo: propUV(capGeo.clone(), UV.prop),
-      matrix: xform({ pos: p, rot: [0.30, th, 0.10], scale: [s * 1.65, s * 0.46, s * 1.10] }),
+      matrix: xform({ pos: p, rot: [0.30, th, 0.10], scale: [s, s * 0.30, s * 0.76] }),
     });
     gill.push({
       geo: skirtGeo.clone(),
-      matrix: xform({ pos: [p[0], y - s * 0.20, p[2]], rot: [0.30, th, 0.10],
-        scale: [s * 1.38, s * 0.40, s * 0.94] }),
+      matrix: xform({ pos: [p[0], y - s * 0.26, p[2]], rot: [0.30, th, 0.10],
+        scale: [s * 0.84, s * 0.28, s * 0.64] }),
     });
   }
 
@@ -930,8 +969,12 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise' } = {}) {
   // and 2.63 is not harmonic so the loop never closes visibly. There is no
   // Date.now anywhere in this path — stepDress hands in the sim clock, so
   // holdClock freezes them and a screenshot is deterministic.
+  // dz is measured from the BOLE AXIS, and it is capped at 1.2 so the
+  // furthest attendant sits at z0−0.36 — behind the socket's face, so the
+  // fit has nothing to classify and the four of them are unambiguously at
+  // the moot rather than out over the felt.
   const ATTEND = [
-    [[0.55, 9.62, 2.55], [-1.85, 9.98, 1.62]],
+    [[0.55, 9.62, 1.20], [-1.85, 9.98, 0.55]],
     [[2.05, 9.30, -0.60], [-1.30, 9.72, -2.20]],
   ];
   const attendMeshes = [];
