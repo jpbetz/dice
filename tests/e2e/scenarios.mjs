@@ -9999,7 +9999,12 @@ export const scenarios = [
       const g = await a.dbg('clickGate');
       assert.equal(g.mode, 'film', `the shipped click gate is the film gate, found ${g.mode}`);
       assert.equal(g.filmGapMs, 35, `the film gap is ${g.filmGapMs}ms, not the shipped 35`);
-      assert.equal(g.wallFloorMs, 12, `the wall floor is ${g.wallFloorMs}ms, not the shipped 12`);
+      // 18, raised from 12 by V1 audio increment 1 (docs/AUDIO.md §3.2): two
+      // contacts closer than ~15–20 ms fuse into one perceptual event anyway,
+      // so 12 was spending a voice for no event. The pin MOVED with the
+      // constant rather than being relaxed — `audio-graph` pins it too, from
+      // the audio side, so the number has two independent witnesses.
+      assert.equal(g.wallFloorMs, 18, `the wall floor is ${g.wallFloorMs}ms, not the shipped 18`);
 
       const throwOne = async (seed) => {
         await a.dbg(`throwSeeded(${JSON.stringify(pool)}, ${seed})`);
@@ -10678,6 +10683,111 @@ export const scenarios = [
       await a.roll('2d6');
       assert.equal(await a.eval('!!(window.__diceDebug.currentRoll.pour)'), false,
         'a roll with no tower is a THROW again — no pour film at all');
+    },
+  },
+
+  // ---------------------------------------------------------------------------
+  // V1 AUDIO (docs/AUDIO.md)
+  //
+  // What makes any of this testable headless: the harness runs Chrome with
+  // `--mute-audio` and WITHOUT `--autoplay-policy=no-user-gesture-required`
+  // (tests/e2e/cdp.mjs), so the graph is built and observable while the
+  // hardware stays silent, and the suspended-until-gesture state that a real
+  // browser imposes reproduces exactly.
+  //
+  // Measured while writing these, and worth recording because it dictates the
+  // shape of every assertion below: an AudioContext created with no user
+  // gesture comes up 'suspended', and its resume() promise NEVER SETTLES —
+  // not resolved, not rejected. So nothing on a boot path may await it, and a
+  // scenario must poll the state rather than await the call.
+  // ---------------------------------------------------------------------------
+  {
+    name: 'audio-graph',
+    tags: ['fx', 'audio', 'roll'],
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      const info = () => a.dbg('audioGraphInfo()');
+
+      // ---- nothing at boot -------------------------------------------------
+      // A page nobody has touched must not have constructed an AudioContext at
+      // all. Creating one eagerly holds the audio hardware open for a player
+      // who may never roll, and on iOS it is the difference between a table
+      // that unlocks on first touch and one that never unlocks.
+      let g = await info();
+      assert.equal(g.ctxState, null, 'a page nobody has touched has no AudioContext');
+      assert.equal(g.built, false, 'and no graph');
+
+      // ---- one roll builds the whole graph, once ---------------------------
+      await a.roll('4d6');
+      g = await info();
+      assert.ok(g.built, 'a roll builds the graph');
+      assert.ok(g.masterBuilt && g.softClipBuilt,
+        'master and the tanh soft clip are both up');
+      assert.equal(g.panBuses, 9, `nine pooled pan buses, found ${g.panBuses}`);
+      assert.deepEqual(g.panValues, [-0.6, -0.45, -0.3, -0.15, 0, 0.15, 0.3, 0.45, 0.6],
+        'spanning ±0.6 in steps of 0.15 — |pan| is capped at 0.6 by refusal §9');
+      assert.ok(g.sharedNoiseBuilt && g.sharedLoopBuilt,
+        'and the two SHARED noise buffers exist');
+
+      // ---- the GC claim, with its non-vacuity partner ----------------------
+      // playImpact used to allocate and JS-fill a fresh AudioBuffer per
+      // contact. Zero allocations is only a claim if sounds actually happened,
+      // so the two are asserted together — the first half alone is satisfied
+      // by an audio system that does nothing.
+      assert.ok(g.oneShots > 0,
+        `the roll voiced impacts (${g.oneShots} one-shots) — otherwise the`
+        + ' allocation claim below is about a silent table');
+      assert.equal(g.perHitBufferAllocs, 0,
+        `not one per-hit AudioBuffer was allocated (${g.perHitBufferAllocs})`);
+
+      // ---- suspended until a REAL gesture ----------------------------------
+      assert.equal(g.ctxState, 'suspended',
+        'and the context is still SUSPENDED — sound was asked for, the browser'
+        + ' refused, and nothing in the app pretends otherwise');
+      // A trusted key event through CDP is what user activation means. F8 on
+      // purpose: the app's keydown switch has no case for it, so this grants
+      // activation without doing anything else to the table.
+      const key = (type) => a.page.browser.send('Input.dispatchKeyEvent',
+        { type, key: 'F8', code: 'F8', windowsVirtualKeyCode: 119, nativeVirtualKeyCode: 119 },
+        a.page.sessionId);
+      await key('keyDown');
+      await key('keyUp');
+      await a.waitFor(`window.__diceDebug.audioGraphInfo().ctxState === 'running'`,
+        { desc: 'one gesture unlocks the context' });
+
+      // ---- the per-class gate cursors --------------------------------------
+      g = await info();
+      assert.deepEqual(Object.keys(g.gateCursors).sort(), ['clunk', 'impact', 'tap'],
+        'three gate cursors, not one module-global lastSoundAt');
+      assert.ok(g.gateCursors.impact > 0, 'the impact cursor moved with the roll');
+      assert.equal(g.gateCursors.tap, 0,
+        'and the tap cursor did not — nothing has scheduled a settle cluster');
+
+      // ---- the hard floor, read off the app --------------------------------
+      const gate = await a.dbg('clickGate');
+      assert.equal(gate.wallFloorMs, 18,
+        `the wall floor is ${gate.wallFloorMs} ms, not the 18 ms V1 audio raised it to`);
+
+      // ---- the mute switch reaches the MASTER, not just the callers --------
+      // The regression this pins: every sustained source added after this
+      // increment routes through master, so a mute that only early-returns in
+      // playImpact would leave a rolling voice grinding under a table whose
+      // switch says off. Asserted on the node, not on the flag.
+      await a.dbg('setSoundOn(false)');
+      await a.waitFor('window.__diceDebug.audioGraphInfo().masterGain < 0.001',
+        { desc: 'mute takes the master gain to zero' });
+      await a.dbg('setSoundOn(true)');
+      await a.waitFor('window.__diceDebug.audioGraphInfo().masterGain > 0.6',
+        { desc: 'and unmute brings it back' });
+
+      // ---- the default voice, as it stands today ---------------------------
+      // A REGRESSION GUARD, not an endorsement: increment 1 moved the plumbing
+      // and nothing else, and this is the line that says so. Increment 2
+      // changes these values on purpose and this assertion moves with it.
+      const std = await a.dbg(`impactPresetFor({}, 'std')`);
+      assert.equal(std.body, 'click', `the untouched default body (found ${std.body})`);
+      assert.equal(std.filter, 'bandpass', `…still bandpass (found ${std.filter})`);
+      assert.equal(std.baseFreq, 2500, `…still centred at 2500 (found ${std.baseFreq})`);
     },
   },
 ];

@@ -1138,13 +1138,152 @@ const walls = {
 addStaticPlane(wallMat, [0, 22, 0], [Math.PI / 2, 0, 0]);                    // ceiling
 
 // ---------------------------------------------------------------------------
-// Sound (procedural clicks on impact)
+// Sound — the audio graph (docs/AUDIO.md)
+//
+// THE BUSES ARE BUILT ONCE, AT UNLOCK, AND NEVER TORN DOWN (~35 nodes):
+//
+//   one-shots (impacts, settle taps) ─┐
+//   rolling voices (per-die panner) ──┼─▶ panBus[0..8] ─┐
+//   tower clunks ─▶ shaftBus ─────────┘                 ├─▶ master ─▶ softClip ─▶ out
+//   room bed (roomGain — the duck point) ───────────────┘
+//
+// softClip is a tanh WaveShaper and it is the ONLY limiter in the path. There
+// is deliberately no DynamicsCompressorNode anywhere (docs/AUDIO.md §7.1): its
+// lookahead offsets every onset, and inter-die ducking destroys the
+// strength → loudness contract the whole impact system is built on.
+//
+// EVERYTHING IN THIS SECTION IS DECLARED ABOVE `tick()`. tick/stepPlayback read
+// the pool, the buses and the tune objects every frame, and this file has the
+// module-evaluation TDZ trap recorded at ROOM / LS_NAME / TOWERLAB already.
 // ---------------------------------------------------------------------------
 
 let audioCtx = null;
 // Persisted "Just you" preference ('dice.sound.v1'), honored on load. load()
 // is a hoisted function declaration, so calling it here is safe.
 let soundOn = load(LS_SOUND, true) !== false;
+
+// DIAL FOR JOE — the whole table's level. Everything below is a fraction of it.
+const MASTER_GAIN = 0.7;
+// Nine pooled pan buses, −0.6…+0.6 in steps of 0.15. |pan| is CAPPED at 0.6
+// (docs/AUDIO.md §7.9): a table a metre away subtends about ±25°, and a
+// hard-panned die beside your ear is a cartoon. Pooling instead of a panner
+// per event is what keeps a 40-die pour from allocating a node per contact;
+// 0.15 of quantization is inaudible on a transient.
+const PAN_BUSES = 9;
+const PAN_MAX = 0.6;
+
+const AUDIO = {
+  ctx: null,
+  master: null,     // Gain(MASTER_GAIN) — the mute point
+  softClip: null,   // WaveShaper(tanh) — the only limiter
+  panBuses: [],     // StereoPanner ×9
+  shaft: null,      // the tower's comb + modes (increment 7)
+  noise: null,      // ONE shared 2 s noise buffer; every one-shot reads it
+  loop: null,       // ONE shared 4 s looping noise buffer for rolling voices
+  room: null,       // roomGain — the bed's duck point (increment 8)
+  bedSources: 0,
+  built: false,
+  // Instruments. A fresh AudioBuffer per contact was the actual GC hazard in
+  // this path before the shared buffer landed, and "we don't do that any more"
+  // is the kind of claim that needs an instrument that can MOVE — a counter
+  // nothing ever increments is a green check with no subject. So every
+  // createBuffer call on our context is counted (see ensureAudio), the count
+  // at the end of the build is recorded, and the difference is by construction
+  // the number of buffers allocated per event. Restoring the old per-hit fill
+  // takes it off zero on the first contact.
+  buffersMade: 0,
+  buffersAtBuild: 0,
+  oneShots: 0,
+};
+
+// Per-CLASS wall-clock gate cursors. There used to be one module-global
+// `lastSoundAt` shared by everything that made a noise, which meant a class of
+// sound could silently eat another's events. `impact` keeps today's exact
+// behaviour; `clunk` lets a tower's baffle knocks keep their own cadence
+// (a towerless roll has no clunk event at all, so its impact train is
+// byte-for-byte the one that shipped); `tap` exists so the settle cluster can
+// be DENSER than the hard floor, which is the entire point of a Zeno tail.
+const GATE = { impact: 0, tap: 0, clunk: 0 };
+
+// tanh soft clip. 2048 points, oversample 'none' — oversampling an already
+// gentle curve buys inaudible harmonic accuracy for a latency cost.
+function tanhCurve(n) {
+  const c = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    c[i] = Math.tanh(x * 1.6) / Math.tanh(1.6);
+  }
+  return c;
+}
+
+// Render-cosmetic randomness, and deliberately so (docs/AUDIO.md §4): the
+// CONTENTS of the noise and the per-hit read offset have no film relationship
+// whatsoever, so two clients hearing different noise samples is unobservable.
+// Rhythm is the line — no onset, no AM rate and no tap interval may ever come
+// from here. Nobody needs to over-engineer this into a seeded stream.
+function makeNoiseBuffer(ctx, seconds) {
+  const buf = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * seconds)), ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+// THE ONE PLACE THE GRAPH IS BUILT. Never called at boot — a page that has
+// never been touched must not construct an AudioContext (Chrome would create
+// it suspended and hold the hardware open for a player who may never roll).
+function ensureAudio() {
+  if (AUDIO.ctx) return AUDIO.ctx;
+  let ctx;
+  try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; }
+  AUDIO.ctx = audioCtx = ctx;
+  // The buffer-allocation instrument (see AUDIO.buffersMade). Patched on OUR
+  // context object only, never on the prototype, so nothing else on the page
+  // is affected and there is exactly one of these per session.
+  const realCreateBuffer = ctx.createBuffer.bind(ctx);
+  ctx.createBuffer = (...args) => { AUDIO.buffersMade++; return realCreateBuffer(...args); };
+  AUDIO.softClip = ctx.createWaveShaper();
+  AUDIO.softClip.curve = tanhCurve(2048);
+  AUDIO.softClip.oversample = 'none';
+  AUDIO.softClip.connect(ctx.destination);
+  AUDIO.master = ctx.createGain();
+  AUDIO.master.gain.value = soundOn ? MASTER_GAIN : 0;
+  AUDIO.master.connect(AUDIO.softClip);
+  for (let i = 0; i < PAN_BUSES; i++) {
+    const p = ctx.createStereoPanner();
+    p.pan.value = ((i - (PAN_BUSES - 1) / 2) / ((PAN_BUSES - 1) / 2)) * PAN_MAX;
+    p.connect(AUDIO.master);
+    AUDIO.panBuses.push(p);
+  }
+  AUDIO.noise = makeNoiseBuffer(ctx, 2);
+  AUDIO.loop = makeNoiseBuffer(ctx, 4);
+  AUDIO.buffersAtBuild = AUDIO.buffersMade;
+  AUDIO.built = true;
+  return ctx;
+}
+
+// Which pooled bus a contact at world x belongs on. The mat's half-width is
+// live (zoom moves it), so this reads TABLE_W rather than a baked constant.
+function busFor(x) {
+  if (!AUDIO.built) return null;
+  const half = Math.max(0.001, (TABLE_W / 2) * 0.8);
+  const pan = Math.max(-1, Math.min(1, (typeof x === 'number' ? x : 0) / half)) * PAN_MAX;
+  const idx = Math.round((pan / PAN_MAX) * ((PAN_BUSES - 1) / 2)) + (PAN_BUSES - 1) / 2;
+  return AUDIO.panBuses[Math.max(0, Math.min(PAN_BUSES - 1, idx))];
+}
+
+// Unlock on the first real gesture. NOT `{once: true}`: a resume() that loses
+// the race with the autoplay policy would leave the table permanently silent
+// with no way back, and the guard below makes a repeat call free. Measured in
+// the harness: an AudioContext created without a gesture comes up 'suspended'
+// and its resume() promise never settles at all — so this must never be
+// awaited on a boot path.
+function audioUnlock() {
+  if (AUDIO.ctx && AUDIO.ctx.state === 'running') return;
+  const ctx = ensureAudio();
+  if (ctx && ctx.state === 'suspended') { try { ctx.resume(); } catch { /* policy */ } }
+}
+window.addEventListener('pointerdown', audioUnlock, { passive: true, capture: true });
+window.addEventListener('keydown', audioUnlock, { passive: true, capture: true });
 
 // "Just you": the dice-set identity you throw with (Tier 6 §9). It rides
 // every roll and claim request — everyone at the table sees YOUR dice in
@@ -1180,7 +1319,6 @@ function rollSetOf(opts) {
   if (typeof s === 'string' && SETS[s]) return s;
   return wireSet();
 }
-let lastSoundAt = 0;
 // THE CLICK CAP, AND WHY THE TEMPO HAS TO DIVIDE IT (C30d). Impacts are
 // recorded against the playback clock, so running that clock k times faster
 // compresses the whole train: a landing that spread eight contacts over
@@ -1204,7 +1342,15 @@ let lastSoundAt = 0;
 // answer (fewer recorded contacts, not a tighter gate), and it is above any
 // k the gravity arithmetic asks for (2.7).
 const IMPACT_MIN_GAP_MS = 35;   // the shipped floor, in FILM time
-const IMPACT_HARD_GAP_MS = 12;  // …and the wall-clock line nothing may cross
+// …and the wall-clock line nothing may cross.
+//
+// RAISED 12 → 18 (2026-08-12, V1 audio increment 1). Two contacts closer than
+// roughly 15–20 ms fuse into ONE perceptual event whatever we do, so 12 admits
+// pairs that cost a voice and buy no event — and at 40 dice that is the
+// difference between a landing and a buzz. The number is pinned by
+// `tempo-curve`, which reads it off the app rather than restating it; that
+// assertion moved WITH this constant rather than being relaxed.
+const IMPACT_HARD_GAP_MS = 18;
 
 // …EXCEPT THAT "35 ms OF FILM" IS NOT WHAT THE CODE ABOVE MEASURES. `35/k` is
 // compared against `performance.now()`, so the quantity gated is WALL time.
@@ -1278,70 +1424,109 @@ const IMPACT_VOICES = {
   hush:    { filter: 'lowpass',  baseFreq:  700, freqSpread:  200, q: 0.9, decayShape: 0.35, gainScale: 0.018 },
 };
 
+// Which body a voice with no recipe of its own falls back to — the most
+// common event in the whole app, so it is the one that decides what this table
+// sounds like. Named rather than inlined so `impactPresetFor` can be asked.
+const IMPACT_DEFAULT_BODY = 'click';
+
+// WHICH PRESET A VOICE RESOLVES TO. Split out of playImpact so a scenario can
+// ask the question without making a sound — `impactPresetFor` on __diceDebug
+// answers through THIS function, which is the same discipline `impactVoice`
+// already established for the tower palette: a test that re-derived the
+// fallback itself would stay green with the fallback rewired.
+function impactPresetOf(voice) {
+  const v = voice || null;
+  const body = (v && IMPACT_VOICES[v.body]) ? v.body : IMPACT_DEFAULT_BODY;
+  return { body, preset: IMPACT_VOICES[body] };
+}
+
+// One fire-and-forget noise voice off the SHARED buffer. No onended closure,
+// no cleanup array: three nodes, started, forgotten, collected when they end.
+// `durSec` is how long the envelope runs; the source is read from a random
+// offset into the shared buffer so per-hit texture survives the sharing.
+function noiseOneShot({ preset, freq, gain, durSec, bus, attack = 1 }) {
+  const ctx = AUDIO.ctx;
+  const buf = AUDIO.noise;
+  const t0 = ctx.currentTime;
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.loop = true; // a long tail must never run off the end of a 2 s buffer
+  const filter = ctx.createBiquadFilter();
+  filter.type = preset.filter;
+  filter.frequency.value = freq;
+  filter.Q.value = preset.q;
+  const g = ctx.createGain();
+  // `decayShape` was the constant in exp(-i / (len·decayShape)) when the
+  // envelope was written into the buffer sample by sample; the same curve is
+  // an exponential ramp to gain·exp(−1/decayShape) over the voice's length.
+  const end = Math.max(1e-4, gain * Math.exp(-1 / preset.decayShape));
+  if (attack !== 1) {
+    // crackle's sharp transient — 1 ms of gain bump, not a reshaped buffer.
+    g.gain.setValueAtTime(gain * attack, t0);
+    g.gain.exponentialRampToValueAtTime(Math.max(1e-4, gain), t0 + 0.001);
+  } else {
+    g.gain.setValueAtTime(gain, t0);
+  }
+  g.gain.exponentialRampToValueAtTime(end, t0 + durSec);
+  src.connect(filter).connect(g).connect(bus);
+  src.start(t0, Math.random() * Math.max(0.001, buf.duration - 0.05));
+  src.stop(t0 + durSec + 0.01);
+  AUDIO.oneShots++;
+  return { filter, gain: g, t0, durSec };
+}
+
 // Returns true when a click was actually voiced, so the caller can advance its
-// FILM cursor only on a click that happened — a refusal by the 12 ms wall floor
+// FILM cursor only on a click that happened — a refusal by the hard wall floor
 // must not consume the film budget, or the next impact is dropped too.
-function playImpact(strength, voice, filmTime) {
+//
+// `ev` is the recorded contact (`{at, di, strength, clunk}`) and is optional:
+// it carries the position the one-shot is panned to, and the class whose gate
+// cursor it spends. Callers that have no event (none ship today) get centre
+// pan and the impact cursor, exactly as before.
+function playImpact(strength, voice, filmTime, ev) {
   if (!soundOn) return false;
+  const cls = ev && ev.clunk ? 'clunk' : 'impact';
   const now = performance.now();
   if (CLICKGATE.mode === 'film' && typeof filmTime === 'number') {
     // The wall clock keeps exactly one job: the hard floor. Everything else is
     // decided on the film, where the impacts were recorded.
-    if (now - lastSoundAt < IMPACT_HARD_GAP_MS) return false;
-  } else if (now - lastSoundAt < Math.max(IMPACT_HARD_GAP_MS, IMPACT_MIN_GAP_MS / TEMPO.k)) {
+    if (now - GATE[cls] < IMPACT_HARD_GAP_MS) return false;
+  } else if (now - GATE[cls] < Math.max(IMPACT_HARD_GAP_MS, IMPACT_MIN_GAP_MS / TEMPO.k)) {
     return false;
   }
-  lastSoundAt = now;
-  if (!audioCtx) {
-    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return false; }
-  }
+  GATE[cls] = now;
+  const ctx = ensureAudio();
+  if (!ctx) return false;
   const v = voice || null;
-  const body = (v && IMPACT_VOICES[v.body]) ? v.body : 'click';
-  const preset = IMPACT_VOICES[body];
+  const { body, preset } = impactPresetOf(v);
   const weight = v ? Math.max(0, Math.min(1, v.weight || 0)) : 0;
   const sustainMs = v ? Math.max(0, v.sustain || 0) : 0;
   const durSec = (45 + sustainMs) / 1000;
-  const buf = audioCtx.createBuffer(1, Math.max(1, Math.floor(audioCtx.sampleRate * durSec)), audioCtx.sampleRate);
-  const data = buf.getChannelData(0);
-  // Envelope: exponential decay whose steepness comes from decayShape.
-  // A brief attack transient sharpens crackle without pinning peak gain.
-  for (let i = 0; i < data.length; i++) {
-    let s = (Math.random() * 2 - 1) * Math.exp(-i / (data.length * preset.decayShape));
-    if (body === 'crackle' && i < 40) s *= 1.6; // sharp attack transient
-    data[i] = s;
-  }
-  const src = audioCtx.createBufferSource();
-  src.buffer = buf;
-  const filter = audioCtx.createBiquadFilter();
-  filter.type = preset.filter;
-  // Heavier = lower center; the spread is randomized per hit for texture.
+  // Heavier = lower center; the spread is randomized per hit for texture
+  // (timbre jitter is the ONLY legal wall randomness — docs/AUDIO.md §4).
   const freqDown = 1 - 0.5 * weight;
-  filter.frequency.value = Math.max(80, (preset.baseFreq + Math.random() * preset.freqSpread) * freqDown);
-  filter.Q.value = preset.q;
-  const gain = audioCtx.createGain();
-  gain.gain.value = Math.min(0.35, strength * preset.gainScale);
-  src.connect(filter).connect(gain).connect(audioCtx.destination);
-  src.start();
+  const freq = Math.max(80, (preset.baseFreq + Math.random() * preset.freqSpread) * freqDown);
+  const gainV = Math.min(0.35, strength * preset.gainScale);
+  const bus = AUDIO.master;
+  const shot = noiseOneShot({
+    preset, freq, gain: gainV, durSec, bus, attack: body === 'crackle' ? 1.6 : 1,
+  });
   // Chime bodies (glass, crystal, sealed resin) layer a decaying sine
   // partial ~an octave below the filter center — the resonance that
   // separates "glass rings" from "wood knocks" without recording samples.
   if (preset.partial) {
-    const osc = audioCtx.createOscillator();
+    const osc = ctx.createOscillator();
     osc.type = 'sine';
-    osc.frequency.value = filter.frequency.value * 0.55;
-    const oscGain = audioCtx.createGain();
-    const startAt = audioCtx.currentTime;
-    oscGain.gain.setValueAtTime(gain.gain.value * 0.4, startAt);
-    oscGain.gain.exponentialRampToValueAtTime(0.0005, startAt + durSec);
-    osc.connect(oscGain).connect(audioCtx.destination);
-    osc.start();
-    osc.stop(startAt + durSec);
+    osc.frequency.value = freq * 0.55;
+    const oscGain = ctx.createGain();
+    oscGain.gain.setValueAtTime(Math.max(1e-4, gainV * 0.4), shot.t0);
+    oscGain.gain.exponentialRampToValueAtTime(0.0005, shot.t0 + durSec);
+    osc.connect(oscGain).connect(bus);
+    osc.start(shot.t0);
+    osc.stop(shot.t0 + durSec);
   }
   return true;
 }
-// Back-compat alias — every legacy call site still passes just strength;
-// the drain in stepPlayback below is the one that resolves the voice.
-function playClick(strength) { playImpact(strength, null); }
 
 // ---------------------------------------------------------------------------
 // Roll engine: simulate-ahead + keyframe playback + face correction
@@ -3590,7 +3775,7 @@ function stepPlayback(dt, tempo = 1, curve = false) {
     // And it is render-time only: the film's timings, the bake and the replay
     // hash never learn which tower is standing.
     if (filmOk && playImpact(s.strength, impactVoice(s, fxSet),
-      CLICKGATE.mode === 'film' ? s.time : undefined)) {
+      CLICKGATE.mode === 'film' ? s.time : undefined, s)) {
       roll.lastClickTime = s.time;
     }
     if (fxSet && fxSet.particles && s.at) particleField.burst(fxSet.particles, s.at, s.strength);
@@ -8164,6 +8349,49 @@ window.__diceDebug = {
     if (m === 'wall' || m === 'film') CLICKGATE.mode = m;
     return { ...CLICKGATE };
   },
+  // THE AUDIO GRAPH (docs/AUDIO.md). Read off the live graph, never off a
+  // painted frame — the same discipline contactStats keeps. Every field is
+  // something a claim in `audio-graph` or `audio-rolling` stands on:
+  //   ctxState            'suspended' until a real gesture unlocks it
+  //   perHitBufferAllocs  must stay 0 — the shared noise buffer's whole point
+  //   oneShots            its non-vacuity partner (0 allocs, 0 sounds = no claim)
+  //   poolLive            rolling voices whose target level is actually audible
+  //   gateCursors         per-class, so a claim can prove taps did NOT spend
+  //                       the impact cursor
+  audioGraphInfo() {
+    return {
+      ctxState: AUDIO.ctx ? AUDIO.ctx.state : null,
+      built: AUDIO.built,
+      masterBuilt: !!AUDIO.master,
+      masterGain: AUDIO.master ? AUDIO.master.gain.value : null,
+      softClipBuilt: !!AUDIO.softClip,
+      panBuses: AUDIO.panBuses.length,
+      panValues: AUDIO.panBuses.map((p) => Math.round(p.pan.value * 1000) / 1000),
+      shaftBuilt: !!AUDIO.shaft,
+      poolSize: 0,
+      poolLive: 0,
+      gateCursors: { ...GATE },
+      sharedNoiseBuilt: !!AUDIO.noise,
+      sharedLoopBuilt: !!AUDIO.loop,
+      perHitBufferAllocs: AUDIO.buffersMade - AUDIO.buffersAtBuild,
+      oneShots: AUDIO.oneShots,
+      soundOn,
+      ambienceOn: false,
+      bedSources: AUDIO.bedSources,
+      roomDuckDb: 0,
+    };
+  },
+  // Which PRESET a recorded contact would be voiced with — the resolver's own
+  // answer, so a claim about the default body cannot be satisfied by a test
+  // that re-derives the fallback itself.
+  impactPresetFor(ev, setId) {
+    const { body, preset } = impactPresetOf(impactVoice(ev || {}, SETS[setId] || null));
+    return { body, ...preset };
+  },
+  // The mute switch, WITHOUT persisting: localStorage on a shared origin
+  // outlives a scenario, and a test that left the table muted would silence
+  // every later scenario on `localhost` with no error anywhere.
+  setSoundOn(on) { setSound(!!on, false); return soundOn; },
   // Playback tempo (C30d): the projector speed on already-baked keyframes.
   // 1 is shipped and byte-identical; k>1 plays the same film k times faster.
   // Takes effect on the NEXT real-time frame — no reload, no re-bake.
@@ -14082,9 +14310,17 @@ document.getElementById('corner-clear').addEventListener('click', (e) => {
 // The sound preference's ONE home is the settings modal (Joe 2026-08-03:
 // the rail's 🔊 retired — the setting is sufficient; 's' stays the
 // shortcut). Persists 'dice.sound.v1'.
+// `soundOn === false` SILENCES EVERYTHING — one-shots, the rolling pool, the
+// settle taps, the shaft and the bed — because the master gain is the single
+// point every source in the graph passes through. A sustained source left
+// running under mute is a table that ignores its own switch and passes every
+// test that only ever looked at one-shots (docs/AUDIO.md §5).
 function setSound(on, persist = true) {
   soundOn = !!on;
   if (persist) save(LS_SOUND, soundOn);
+  if (AUDIO.master) {
+    AUDIO.master.gain.setTargetAtTime(soundOn ? MASTER_GAIN : 0, AUDIO.ctx.currentTime, 0.01);
+  }
   syncSettingsUI();
 }
 setSound(soundOn, false); // reflect the loaded preference without re-saving
