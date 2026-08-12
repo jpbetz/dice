@@ -10445,6 +10445,32 @@ export const scenarios = [
           `${id}: and an ordinary landing is still the die set — the tower `
           + 'voices its own knocks, not the whole roll');
 
+        // ---- the DRESSING, asked of every skinned model in the same loop ---
+        // Three claims, all new (docs/TOWER.md, DRESSING):
+        //   · the two groups exist and the opaque one carries geometry. The
+        //     names are the contract — `towerSkinDress` is measured by
+        //     tower-fit and counted by the occlusion proof; `towerDressFx`
+        //     is deliberately in neither.
+        //   · the row carries `ember`. A warm focal light is the FAMILY
+        //     trait, so a new model without one is a model that does not
+        //     belong to the family, and that is a registry claim rather than
+        //     a per-tower one.
+        //   · nothing is inside out: the fit audit reports zero lights and no
+        //     off-policy material a skin's props could have introduced.
+        const dr = await a.dbg('towerDressAudit()');
+        const names = dr.groups.map((g) => g.name);
+        assert.ok(names.includes('towerSkinDress'),
+          `${id}: the opaque props live in towerSkinDress (groups: ${names.join(', ')})`);
+        const dg = dr.groups.find((g) => g.name === 'towerSkinDress');
+        assert.ok(dg.meshes > 0 && dg.tris > 0,
+          `${id}: …and it carries geometry (${dg.meshes} meshes, ${dg.tris} tris)`);
+        assert.ok(dr.ember,
+          `${id}: the registry row carries the family trait — a warm focal light`);
+        assert.equal(dr.lights, 0, `${id}: and the skin still brings zero lights`);
+        assert.ok(dr.sways + dr.smokes > 0,
+          `${id}: something on it moves when nobody is touching it `
+          + `(${dr.sways} sways, ${dr.smokes} plumes)`);
+
         const f = await pour('8d6');
         assert.ok(f.pour, `${id}: a pour is still a POUR`);
         assert.ok(f.clunks >= 2 * f.rest.length && f.clunks <= 4 * f.rest.length,
@@ -10464,6 +10490,50 @@ export const scenarios = [
         { desc: 'back to the wooden tower for the rest of this scenario' });
       assert.deepEqual(await a.dbg(`impactVoiceFor({clunk:'baffle'}, '${SET}')`), voices.heartwood,
         'and the voice follows the tower back');
+
+      // ---- the dress clock -------------------------------------------------
+      // THE IDLE MOTION IS A FUNCTION OF THE SIM CLOCK AND NOTHING ELSE, which
+      // is what makes a screenshot of a dressed tower deterministic.
+      //
+      // THE FIRST VERSION OF THIS WAS FURNITURE, and it is worth recording
+      // why: it asserted that a HELD clock leaves the sway angle unchanged
+      // across a quarter second of real time. Red-checked by driving the
+      // stepper off Date.now — and it stayed GREEN, because a headless tab
+      // that is not in front gets no requestAnimationFrame at all, so nothing
+      // ticks either way and "frozen" is true for the wrong reason. A green
+      // that cannot go red is not a check.
+      //
+      // So the angle is checked against the FORMULA instead: two sines, 2.63
+      // apart, over the dt-accumulated clock. Any other clock lands somewhere
+      // else immediately, and a stepper that never runs lands on the base
+      // angle while the clock says otherwise.
+      {
+        const before = await a.dbg('towerDressAudit()');
+        await a.dbg('sim(60)');
+        const after = await a.dbg('towerDressAudit()');
+        assert.ok(Math.abs((after.dressClock - before.dressClock) - 1) < 1e-6,
+          `sim(60) advances the dress clock by exactly one second `
+          + `(${before.dressClock} → ${after.dressClock})`);
+        const swayAt = (s, t) => {
+          const w = 2 * Math.PI * s.hz * t + s.phase;
+          return s.base + s.amp * (0.65 * Math.sin(w) + 0.35 * Math.sin(2.63 * w + 1.7));
+        };
+        assert.ok(after.state.sway.length > 0, 'heartwood has something that sways');
+        for (const s of after.state.sway) {
+          assert.ok(Math.abs(s.rot - swayAt(s, after.dressClock)) < 1e-6,
+            `the ${s.axis}-sway is exactly the two-sine idiom over the sim clock `
+            + `at t=${after.dressClock} (rot ${s.rot}, formula ${swayAt(s, after.dressClock).toFixed(8)})`);
+          assert.notEqual(s.rot, s.base,
+            `and it is not sitting at its rest angle (${s.base}) — the stepper ran`);
+        }
+        // …and the clock itself does not run while it is held.
+        await a.dbg('holdClock(true)');
+        const held = await a.dbg('towerDressAudit()');
+        await new Promise((r) => setTimeout(r, 250));
+        assert.equal((await a.dbg('towerDressAudit()')).dressClock, held.dressClock,
+          'and a held clock does not advance on its own');
+        await a.dbg('holdClock(false)');
+      }
 
       // ---- unseen ---------------------------------------------------------
       // A HIDDEN WINDOW IS HIDDEN ON SCREEN, not merely recorded as such. The

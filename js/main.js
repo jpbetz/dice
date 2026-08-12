@@ -7134,7 +7134,28 @@ window.__diceDebug = {
       sways: dress ? dress.sways.length : 0,
       smokes: dress ? dress.smokes.length : 0,
       ember: !!(TOWERS[currentTower] && TOWERS[currentTower].ember),
-      dressClock: Number(TOWERDRESS.t.toFixed(3)),
+      // SIX PLACES, not three. The scenario checks the sway angle against the
+      // formula at this t, and at 0.055 Hz the angle moves ~0.02 rad per
+      // second — so a clock rounded to a millisecond is a 1e-5 disagreement
+      // with a check that wants to be tight to 1e-6.
+      dressClock: Number(TOWERDRESS.t.toFixed(6)),
+      // The idle motion's LIVE STATE — the angle each swaying thing is
+      // actually at, WITH the parameters that are supposed to produce it, so
+      // a scenario can check the angle against the formula instead of merely
+      // watching it change. That distinction is the whole point: "it moved"
+      // is satisfied by a prop driven off the wall clock, and a prop driven
+      // off the wall clock is a screenshot that is different every time.
+      state: dress ? {
+        sway: dress.sways.map((s) => ({
+          axis: s.axis, hz: s.hz,
+          amp: Number(s.amp.toFixed(8)), phase: Number(s.phase.toFixed(8)),
+          base: Number(s.base.toFixed(8)),
+          rot: Number(s.obj.rotation[s.axis].toFixed(8)),
+        })),
+        smokeY: dress.smokes.length
+          ? Number(dress.smokes[0].mesh.geometry.attributes.position.getY(0).toFixed(4))
+          : null,
+      } : null,
     };
   },
   // The playback drain's OWN voice resolution, asked with a synthetic event
