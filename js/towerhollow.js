@@ -183,6 +183,7 @@ import {
   registerSway, ensureColor,
 } from './towerdress.js';
 import { FAE_PALETTES } from './fae-lab.js';
+import { buildStumpShell } from './towerbole.js';
 
 // ---------------------------------------------------------------------------
 // Palette plumbing
@@ -965,7 +966,7 @@ function buildLobedShell(ctx) {
   };
 }
 
-export function buildHollowBoleSkin(v, { paletteId = 'moonrise', shell = buildLobedShell } = {}) {
+export function buildHollowBoleSkin(v, { paletteId = 'moonrise', shell = buildStumpShell } = {}) {
   const palId = FAE_PALETTES[paletteId] ? paletteId : 'moonrise';
   const pal = FAE_PALETTES[palId];
   const M = maps(pal, palId);
@@ -983,7 +984,9 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise', shell = buildLo
   // towerskin kit's vocabulary and reads as a rectangular tower wearing
   // bark. The parametric displaced shell that replaces it renames this to
   // `towerSkinBole` and nothing else in this file moves.
-  bole.name = 'towerSkinBolePlaceholder';
+  // The organic shell landed (js/towerbole.js): the placeholder name and
+  // its apology retire together.
+  bole.name = 'towerSkinBole';
   group.add(bole);
 
   const mat = (m, ns) => new THREE.MeshStandardMaterial({

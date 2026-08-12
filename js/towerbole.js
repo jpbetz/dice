@@ -14,46 +14,40 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// THE HOLLOW BOLE — the fae venue's tower (ROADMAP W3): a broken hollow
-// stump, built to Joe's reference photo. The FOURTH tower, and the first
-// that is not boxes: the trunk is a parametric displaced shell over a
-// (θ, y) grid whose radius field carries the whole organism — silhouette
-// curve, five uneven buttress lobes, fiber striation, a brow bulge — and
-// whose index buffer carries the TORN PORT: the doorway is a real hole
-// with a ragged fringe, cut by dropping quads, never by narrowing the
-// engine's aperture.
+// THE STUMP SHELL — the organic half of the Hollow Bole (ROADMAP W3).
+// js/towerhollow.js owns the CONTRACT and the DRESSING and takes its shell
+// through one seam (`shell(ctx) → SURFACE descriptor`); this module is
+// that shell, built to Joe's reference photo: a broken hollow stump —
+// frontal wound, splintered crown, root flare — as a parametric displaced
+// surface over a (θ, y) grid, because the box kit's vocabulary is
+// architecture and the owner called its output in advance ("a normal
+// rectangular tower that just has some unconvincing bark texture").
 //
-// HOW THE DICE GET IN AND OUT (the two problems Joe named):
-//   IN — the crown is a bowl between splinter spires. The FRONT of the
-//   rim rises as one broad torn bark blade spanning the mouth and the
-//   cowl band (y 6.2S…8.6S): dice pour visibly into the bowl and vanish
-//   in the blade's shadow (despawn y 5.6S). The blade is the contract's
-//   cowl wearing the reference photo's torn-plate crown.
-//   OUT — the wound's lower band is an open mouth aligned with the
-//   engine DOORWAY, fringed OUTSIDE the clear aperture. A BROW bulge
-//   overhangs it (the ragged upper wound), killing the shipped cameras'
-//   sightline down into the interior, and a near-black LINER shell sits
-//   inside (outside the engine shaft, port-hole aligned) so the hole
-//   reads as hollow depth. The exit spawn (z0 − 1.2S, inside) is behind
-//   brow + liner shadow; emergence reads as flight out of the dark.
+// Everything organic is ONE radius field
+//     r(θ, y) = profile(y) + buttress(θ)·flare(y) + fiber fbm + brow(θ,y)
+// with a per-column crown height y_top(θ) (splinter spires + a torn front
+// BLADE), and the PORT — the doorway — cut from the index buffer as a
+// ragged real hole, never a narrowed aperture.
 //
-// Contract (docs/TOWER.md): zero colliders; MOUTH ≥ Ø3.4S kept clear by
-// construction (bowl inner radius floor); DOORWAY never narrowed (hole
-// mask ≥ aperture + margin); SOCKET respected via radius ceilings taken
-// from v, not constants. Occlusion is proved by the existing probes, not
-// claimed here.
+// The four numbers the proofs forced (all measured, none styled):
+//   · the blade arc carries a HARD floor at y 11.4 — the front must stay
+//     opaque above y 11.25 (occlusion probe, wide eyeFull), and a gaussian
+//     that is tall on average still leaked exactly one ray;
+//   · the port mask is front-arc only — the first cut cheerfully tore a
+//     matching hole in the BACK of the tree;
+//   · the port boundary starts at |x| 2.62 with rag eating OUTWARD, so the
+//     doorway's 2.5 half-width is never narrowed by a fiber;
+//   · the liner's +z half squeezes ×0.9 — a round liner crossed the socket
+//     front plane by 0.044 and the fit probe said so.
+//
+// This mesh is EXCLUDED from the AO/weather enrollment on purpose:
+// bakeVertexAO REPLACES the color attribute, and this shell's vertex
+// colors are load-bearing (moss arc, lichen freckles, torn-fiber rim, the
+// wound's steep pull to interior black). Its self-shadowing is built into
+// the field instead — the fold and the bowl darken by construction.
 
 import * as THREE from 'three';
-import {
-  mulberry32, fbm, turb, clamp01, smoothstep, ramp3,
-  mapsFromCanvases, planarUV, bakeVertexAO, veilTexture,
-} from './towerskin.js';
-import { FAE_PALETTES } from './fae-lab.js';
-import { registerSway } from './towerdress.js';
-
-// ---------------------------------------------------------------------------
-// THE RADIUS FIELD
-// ---------------------------------------------------------------------------
+import { mulberry32, fbm, clamp01, smoothstep } from './towerskin.js';
 
 function angDist(a, b) {
   let d = Math.abs(a - b) % (Math.PI * 2);
@@ -61,146 +55,170 @@ function angDist(a, b) {
 }
 const gauss = (d, w) => Math.exp(-(d * d) / (2 * w * w));
 
-// One object holds every number the form needs, derived from v once, so
-// the fit harness argues with THIS and not with scattered literals.
-function boleDims(v) {
-  const S = v.S;
-  const axisZ = v.shaft.c[2];                      // the trunk stands on the shaft
-  const sockX = v.socket.s[0] / 2 - 0.12;          // radius ceiling, x
-  const sockBack = axisZ - (v.socket.c[2] - v.socket.s[2] / 2) - 0.12;
-  const sockFront = (v.socket.c[2] + v.socket.s[2] / 2) - axisZ - 0.10;
-  return {
-    S, axisZ,
-    ellipse: { x: 1.0, zb: sockBack / sockX, zf: sockFront / sockX },
-    rCeil: sockX,
-    rFloor: v.shaft.r + 0.28,                      // shell never pinches the shaft
-    linerR: v.shaft.r + 0.13,                      // the dark inside, shaft-hugging
-    rimY: 7.0 * S,                                 // mouth rim top (contract ±0.5)
-    bladeTop: 8.6 * S + 0.6,                       // cowl band top 8.6S + real margin
-    spireMax: 10 * S - 0.15,                       // socket height ceiling
-    port: {                                        // DOORWAY + fringe margin
-      hw: 1.5 * S + 0.42,                          // clear 1.875 + torn margin
-      y0: 0.45, y1: 3.4 * S + 0.55,                // sill…lintel + margin
-    },
-    browY: [3.4 * S + 0.3, 5.4 * S],               // the overhang band
+export function buildStumpShell(ctx) {
+  const { v, MAT, UV, rnd, add, parts } = ctx;
+  const S = v.S, z0 = v.z0;
+  const boreZ = v.shaft.c[2];
+  const xLim = v.socket.s[0] / 2;
+  const zFrontLim = v.socket.c[2] + v.socket.s[2] / 2;
+  const zBackLim = v.socket.c[2] - v.socket.s[2] / 2;
+  const yLim = v.socket.c[1] + v.socket.s[1] / 2;
+  const sill = v.hood.c[1] - v.hood.s[1] / 2;
+  const doorX = v.door.w / 2;
+  const doorY = v.door.h;
+
+  const seed = 0x57e9;
+  const srnd = mulberry32(seed);
+  const FRONT = Math.PI / 2;
+  const d = {
+    axisZ: boreZ,
+    rCeil: xLim - 0.12,
+    rFloor: v.shaft.r + 0.28,
+    linerR: v.shaft.r + 0.13,
+    ezF: ((zFrontLim - boreZ) - 0.10) / (xLim - 0.12),
+    ezB: ((boreZ - zBackLim) - 0.12) / (xLim - 0.12),
+    rimY: 7.0 * S,
+    bladeFloor: 11.4,            // the measured cowl bar 11.25 + margin
+    spireMax: yLim - 0.16,
+    port: { hw: doorX + 0.12, y0: 0.05, y1: doorY + 0.35 },
+    browY: [doorY + 0.5, 6.9 * S / 1.25],
     despawnY: v.despawnY,
   };
-}
-
-// The port mask in WORLD coordinates on the front face — ragged via fbm,
-// 1 fully inside the hole, 0 outside. The engine aperture (|x| ≤ 1.875S,
-// y ≤ 3.4S over the sill) must sit strictly inside mask === 1 territory:
-// the rag eats OUTWARD only, from a boundary already a margin beyond it.
-function portMask(d, wx, y, seed) {
-  const rag = 0.34 * fbm(wx * 0.9 + 7, y * 0.8, 8, 4, seed);
-  const inX = Math.abs(wx) < d.port.hw + rag;
-  const inY = y > d.port.y0 && y < d.port.y1 + rag * 1.4;
-  return inX && inY ? 1 : 0;
-}
-
-export function buildBoleShell(v, pal, seed = 0xb01e) {
-  const d = boleDims(v);
-  const rnd = mulberry32(seed);
-  const nTh = 128, nY = 72;
 
   const lobes = [];
   for (let i = 0; i < 5; i++) {
     lobes.push({
-      th: (i / 5) * Math.PI * 2 + (rnd() - 0.5) * 0.7 + 0.45,
-      amp: 0.5 + rnd() * 0.6,
-      w: 0.3 + rnd() * 0.22,
+      th: (i / 5) * Math.PI * 2 + (srnd() - 0.5) * 0.7 + 0.45,
+      amp: 0.5 + srnd() * 0.6,
+      w: 0.3 + srnd() * 0.22,
     });
   }
-  // The crown: the broad FRONT BLADE (cowl duty) plus three thin spires,
-  // tallest at back-left — never symmetric, never centred.
-  const FRONT = Math.PI / 2;
   const spires = [
-    // The front BLADE is broad on purpose — the cowl band must be opaque
-    // from every shipped eye, and the occlusion probe failed a narrow
-    // blade at 67/99. The reference photo agrees: its front face is one
-    // big torn wall. Raggedness comes from the rim noise, kept small
-    // inside the blade arc so no dip re-opens the leak.
-    { th: FRONT, amp: d.bladeTop - d.rimY, w: 1.55, blade: true },
     { th: FRONT + Math.PI * 0.78, amp: d.spireMax - d.rimY, w: 0.24 },
     { th: FRONT - Math.PI * 0.72, amp: 1.9, w: 0.2 },
     { th: FRONT + Math.PI * 1.28, amp: 1.1, w: 0.18 },
   ];
-  const profile = (y) => {
-    const base = (d.rFloor + 0.55) + 1.35 * Math.exp(-y / (1.15 * d.S));
-    return base + 0.1 * Math.sin(y * 0.75 + 2.1);
-  };
-  const flare = (y) => Math.pow(Math.max(0, 1 - y / (2.1 * d.S)), 1.6);
+  // The TRUNK is round on purpose and narrower than the socket allows:
+  // the socket is 6.5 wide but only ~2.1 deep in front of the shaft, and
+  // a trunk that spends the full width gets z-crushed into a slab (the
+  // first venue frame — a black monolith with vertical edges). The cowl
+  // probe samples discs of radius ≤ 2.0, so a ~2.5 trunk still occludes
+  // everything it must; only the ROOT FLARE spends the extra x.
+  const profile = (y) => Math.min(d.rFloor + 0.15,
+    (d.rFloor + 0.5) + 1.3 * Math.exp(-y / (1.15 * S)))
+    + 1.15 * Math.exp(-y / (0.9 * S))
+    + 0.08 * Math.sin(y * 0.75 + 2.1);
+  const flare = (y) => Math.pow(Math.max(0, 1 - y / (2.1 * S)), 1.6);
   const yTop = (th) => {
-    // Rim raggedness shrinks inside the blade arc: a torn edge that never
-    // dips into the cowl band it exists to cover.
     const inBlade = gauss(angDist(th, FRONT), 1.3);
     let t = d.rimY - 0.45 * (1 - inBlade * 0.6)
       + 0.5 * (1 - inBlade * 0.65) * fbm(th * 1.9, 3.7, 8, 3, seed + 5);
     for (const s of spires) t += s.amp * gauss(angDist(th, s.th), s.w);
-    // The blade arc carries a HARD floor at the cowl top: a gaussian can
-    // be tall on average and still leak one ray at the arc's edge (the
-    // probe found exactly one sample under it at every eye). The floor is
-    // the contract; the torn edge tears UPWARD from it.
-    if (angDist(th, FRONT) < 1.18) {
-      t = Math.max(t, 8.6 * d.S + 0.15
-        + 0.6 * Math.abs(fbm(th * 3.1, 1.3, 8, 3, seed + 6)));
+    // Arc 1.45, not 1.18: the cowl box reaches x ±2.625 and r·sin(1.18)
+    // stops at ~2.5 — the two corner samples leaked exactly there once the
+    // lining stopped illegally catching them from outside the socket.
+    if (angDist(th, FRONT) < 1.45) {
+      t = Math.max(t, d.bladeFloor
+        + 0.55 * Math.abs(fbm(th * 3.1, 1.3, 8, 3, seed + 6)));
     }
     return Math.min(t, d.spireMax);
   };
+  const radius = (th, y) => {
+    let r = profile(y);
+    for (const L of lobes) r += L.amp * gauss(angDist(th, L.th), L.w) * flare(y);
+    r += 0.075 * fbm(th * 4.2, y * 0.32, 8, 4, seed + 2)
+       + 0.028 * Math.sin(th * 26 + fbm(th, y, 4, 2, seed + 3) * 5);
+    const browK = smoothstep(d.browY[0], d.browY[0] + 0.7, y)
+      * (1 - smoothstep(d.browY[1] - 0.7, d.browY[1], y))
+      * gauss(angDist(th, FRONT), 0.62);
+    r += 0.5 * browK;
+    // The blade band bulges FORWARD through the cowl: the probe's front
+    // samples sit exactly at z0, and an occluder must stand between them
+    // and the eye — i.e. in the socket's z0+0.25 slack, where every
+    // shipped tower's cowl face lives. (First fix leaned the wall BACK,
+    // which put it behind the ray's endpoint: occluding nothing. The
+    // sign of this term is the whole lesson.) r 3.06 → front face at
+    // ~z0+0.10, comfortably inside the plane, a burled lip on the blade.
+    const cowlK = gauss(angDist(th, FRONT), 0.8) * smoothstep(7.3, 8.0, y)
+      * (1 - smoothstep(11.6, 12.1, y));
+    if (cowlK > 0.4) r = Math.max(r, 2.98 + 0.12 * cowlK);
+    r = Math.min(r, d.rCeil);
+    if (y < d.despawnY + 2.5) r = Math.max(r, d.rFloor);
+    return r;
+  };
+  // TWO functions, one field — and the difference is the whole bug class:
+  // rawPoint is the SURFACE (the mesh's own vertices; the cowl bulge must
+  // genuinely reach z0+0.13 to stand in front of the probe's samples), and
+  // surfPoint is the PROP ANCHOR the descriptor exports, clamped 0.18
+  // behind the front plane so a prop's own body never crosses the socket.
+  // The first draft ran the mesh through the clamped version — which
+  // quietly pulled the shell's whole front face behind the very samples
+  // it existed to occlude, and no amount of radius arithmetic could
+  // matter after that.
+  const rawPoint = (th, y, inset = 0) => {
+    const r = radius(th, y) - inset;
+    // Z-CLAMP, not z-scale: the old ellipse multiplied every z by 0.687,
+    // which flattened the WHOLE front into a plane even where the radius
+    // had room to curve. Clamping instead keeps the trunk round wherever
+    // it fits and flattens only the arc that would actually leave the
+    // socket — which is what a real trunk grown against a wall does.
+    const zAvail = Math.sin(th) >= 0
+      ? (zFrontLim - d.axisZ) - 0.10
+      : (d.axisZ - zBackLim) - 0.12;
+    return [r * Math.cos(th), y,
+      d.axisZ + Math.sin(th) * Math.min(r, zAvail)];
+  };
+  const surfPoint = (th, y, inset = 0) => {
+    const p = rawPoint(th, y, inset);
+    p[2] = Math.min(p[2], z0 - 0.18);
+    return p;
+  };
+  const portMask = (wx, y, sth) => {
+    if (sth < -0.1) return 0;                       // FRONT arc only
+    const rag = 0.34 * Math.abs(fbm(wx * 0.9 + 7, y * 0.8, 8, 4, seed));
+    return (Math.abs(wx) < d.port.hw + rag
+      && y > d.port.y0 && y < d.port.y1 + rag * 1.4) ? 1 : 0;
+  };
 
-  const pos = [], col = [], uv = [], idx = [];
-  const mask = [];                                  // per-vertex port mask
-  const wood = { r: 0.78, g: 0.72, b: 0.62 };       // multiplies the bark atlas
-  const dark = { r: 0.10, g: 0.09, b: 0.08 };
-  const moss = new THREE.Color(pal.glowCore).multiplyScalar(0.5);
-  const lich = { r: 0.86, g: 0.95, b: 0.88 };       // pale lichen wash
-
+  // --- the shell mesh ------------------------------------------------------
+  const nTh = 128, nY = 72;
+  const pos = [], col = [], uv = [], idx = [], mask = [];
+  const wood = { r: 0.95, g: 0.9, b: 0.8 };       // the atlas carries the tone
+  const dark = { r: 0.08, g: 0.075, b: 0.065 };
+  // Moss leans the sky's green — read from the caps material's emissive,
+  // which towerhollow already built from the active palette.
+  const mossC = MAT.caps.emissive.clone().multiplyScalar(0.55);
+  const moss = { r: Math.min(0.5, mossC.r + 0.1), g: Math.min(0.62, mossC.g + 0.16), b: Math.min(0.5, mossC.b + 0.1) };
+  const lich = { r: 0.92, g: 1.0, b: 0.94 };
   for (let j = 0; j <= nY; j++) {
     for (let i = 0; i <= nTh; i++) {
       const th = (i / nTh) * Math.PI * 2 - Math.PI / 2; // seam at the BACK
       const t = yTop(th);
       const y = (j / nY) * t;
-      let r = profile(y);
-      for (const L of lobes) r += L.amp * gauss(angDist(th, L.th), L.w) * flare(y);
-      r += 0.075 * fbm(th * 4.2, y * 0.32, 8, 4, seed + 2)
-         + 0.05 * Math.sin(th * 26 + fbm(th, y, 4, 2, seed + 3) * 5) * 0.55;
-      // The BROW: the wound's upper lip bulges outward over the mouth.
-      const browK = smoothstep(d.browY[0], d.browY[0] + 0.7, y)
-        * (1 - smoothstep(d.browY[1] - 0.7, d.browY[1], y))
-        * gauss(angDist(th, FRONT), 0.62);
-      r += 0.5 * browK;
-      // Ceilings and floors, in that order: never out the socket, never
-      // into the shaft.
-      const ez = th > -Math.PI / 2 && th < Math.PI / 2 ? 1 : 1; // ellipse handled below
-      r = Math.min(r, d.rCeil);
-      if (y < d.despawnY + 2.5) r = Math.max(r, d.rFloor);
-      // Elliptical squeeze in z: the socket is shallower than it is wide.
-      const cz = Math.sin(th) >= 0 ? d.ellipse.zf : d.ellipse.zb;
-      const wx = r * Math.cos(th);
-      const wz = r * Math.sin(th) * Math.min(1, cz);
-      const m = portMask(d, wx, y, seed);
+      const [wx, wy, wz] = rawPoint(th, y);
+      const m = portMask(wx, y, Math.sin(th));
       mask.push(m);
-      pos.push(wx, y, d.axisZ + wz);
-      uv.push(i / nTh, y / (10 * d.S));
-      // Vertex colour: wood base, moss on the shaded arc + roots, lichen
-      // freckles high on the weather side, torn-fiber pale at the port rim.
-      let cr = wood.r, cg = wood.g, cb = wood.b;
+      pos.push(wx, wy, wz);
+      uv.push((th + Math.PI / 2) * 2.8 / UV.bark[0], y / UV.bark[1]);
+      // Bowl interior + wound shade by construction: the crown bowl's
+      // inner band and the brow's underside darken like AO would, without
+      // letting the AO pass clobber the layered colors.
+      const bowlK = smoothstep(t - 1.6, t - 0.15, y) * 0.35;
+      let cr = wood.r * (1 - bowlK), cg = wood.g * (1 - bowlK), cb = wood.b * (1 - bowlK);
       const shadeArc = gauss(angDist(th, FRONT + Math.PI * 0.85), 0.85);
       const mossK = clamp01((0.6 * shadeArc + 0.55 * flare(y))
         * (0.45 + 0.55 * fbm(th * 2.2, y * 0.5, 8, 3, seed + 7)));
       cr += (moss.r - cr) * mossK * 0.85;
       cg += (moss.g - cg) * mossK * 0.85;
       cb += (moss.b - cb) * mossK * 0.85;
-      const lichK = clamp01((y / (7 * d.S)) - 0.25)
-        * smoothstep(0.55, 0.9, fbm(th * 5.1, y * 0.9, 8, 3, seed + 11)) * 0.7;
+      const lichK = clamp01((y / (7 * S / 1.25)) - 0.35)
+        * smoothstep(0.55, 0.9, fbm(th * 5.1, y * 0.9, 8, 3, seed + 11)) * 0.6;
       cr += (lich.r - cr) * lichK;
       cg += (lich.g - cg) * lichK;
       cb += (lich.b - cb) * lichK;
       col.push(cr, cg, cb);
     }
   }
-  // Faces: drop every quad fully inside the port (the hole), and brighten
-  // the fringe ring (vertices where the mask CHANGES across the quad).
   const at = (j, i) => j * (nTh + 1) + i;
   for (let j = 0; j < nY; j++) {
     for (let i = 0; i < nTh; i++) {
@@ -208,11 +226,10 @@ export function buildBoleShell(v, pal, seed = 0xb01e) {
       const inside = mask[a] + mask[b] + mask[c] + mask[e];
       if (inside === 4) continue;                   // the torn mouth
       if (inside > 0) {
-        // Torn fiber rim: exposed pale wood, brighter than weathered skin.
-        for (const vi of [a, b, c, e]) {
-          col[vi * 3] = Math.min(1, col[vi * 3] * 1.45 + 0.1);
-          col[vi * 3 + 1] = Math.min(1, col[vi * 3 + 1] * 1.4 + 0.08);
-          col[vi * 3 + 2] = Math.min(1, col[vi * 3 + 2] * 1.25 + 0.05);
+        for (const vi of [a, b, c, e]) {            // torn-fiber rim, pale
+          col[vi * 3] = Math.min(1, col[vi * 3] * 1.5 + 0.12);
+          col[vi * 3 + 1] = Math.min(1, col[vi * 3 + 1] * 1.45 + 0.1);
+          col[vi * 3 + 2] = Math.min(1, col[vi * 3 + 2] * 1.3 + 0.06);
         }
       }
       idx.push(a, c, b, b, c, e);
@@ -224,136 +241,129 @@ export function buildBoleShell(v, pal, seed = 0xb01e) {
   geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uv), 2));
   geo.setIndex(idx);
   geo.computeVertexNormals();
-  return { geo, dims: d, yTop, lobes, FRONT };
-}
-
-// The dark inside: a shaft-hugging cylinder shell, port hole aligned
-// (cut wider, so the outer fringe is always the visible edge), black-brown
-// with the faintest fiber so a wandering eye reads CAVITY, not void paint.
-function buildLiner(v, d, seed) {
-  const nTh = 64, nY = 24;
-  const pos = [], col = [], idx = [];
-  const maskArr = [];
-  const y0 = 0.3, y1 = d.despawnY + 1.6;
-  for (let j = 0; j <= nY; j++) {
-    for (let i = 0; i <= nTh; i++) {
-      const th = (i / nTh) * Math.PI * 2 - Math.PI / 2;
-      const y = y0 + (j / nY) * (y1 - y0);
-      const r = d.linerR + 0.06 * fbm(th * 3, y * 0.5, 8, 3, seed + 21);
-      // The +z half squeezes to stay inside the socket's front plane —
-      // the fit probe caught the round liner crossing z0+0.25 by 0.044.
-      const wx = r * Math.cos(th);
-      const wz = r * Math.sin(th) * (Math.sin(th) > 0 ? 0.9 : 1);
-      // The liner's hole is WIDER than the shell's: its rim must never
-      // peek through the outer fringe.
-      const m = (Math.abs(wx) < d.port.hw + 0.55 && y > d.port.y0 - 0.2
-        && y < d.port.y1 + 0.75 && Math.sin(th) > 0) ? 1 : 0;
-      maskArr.push(m);
-      pos.push(wx, y, d.axisZ + wz);
-      const k = 0.05 + 0.05 * fbm(th * 8, y, 8, 2, seed + 23);
-      col.push(k, k * 0.9, k * 0.8);
-    }
-  }
-  const at = (j, i) => j * (nTh + 1) + i;
-  for (let j = 0; j < nY; j++) {
-    for (let i = 0; i < nTh; i++) {
-      const a = at(j, i), b = at(j, i + 1), c = at(j + 1, i), e = at(j + 1, i + 1);
-      if (maskArr[a] + maskArr[b] + maskArr[c] + maskArr[e] === 4) continue;
-      idx.push(a, c, b, b, c, e);
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(col), 3));
-  geo.setIndex(idx);
-  geo.computeVertexNormals();
-  return geo;
-}
-
-// ---------------------------------------------------------------------------
-// THE BARK ATLAS — one cylindrical print, world-height v, so vertical
-// logic (weathering pales upward, rot pools low) lives IN the canvas.
-// ---------------------------------------------------------------------------
-function bakeBark(seed) {
-  const W = 1024, H = 512;
-  const c = document.createElement('canvas'); c.width = W; c.height = H;
-  const h = document.createElement('canvas'); h.width = W; h.height = H;
-  const cx = c.getContext('2d'), hx = h.getContext('2d');
-  const ci = cx.createImageData(W, H), hi = hx.createImageData(W, H);
-  const STOPS = [[0x4a, 0x40, 0x33], [0x8a, 0x7d, 0x69], [0xc9, 0xbd, 0xa6]];
-  for (let py = 0; py < H; py++) {
-    const vv = 1 - py / H;                            // canvas up = world up
-    for (let px = 0; px < W; px++) {
-      const u = px / W;
-      // Striation: turbulence stretched hard in v — fibers, not marble.
-      const s = turb(u * 46, vv * 4.2, 46, 4, seed);
-      const drift = fbm(u * 6, vv * 2.2, 6, 3, seed + 1);
-      // Weathered silver rises up the trunk; rot pools in the low third.
-      const silver = clamp01(vv * 1.25 - 0.12 + 0.25 * (drift - 0.5));
-      const rot = smoothstep(0.62, 0.95,
-        fbm(u * 5.2, vv * 3.1, 5.2, 4, seed + 4)) * (1 - smoothstep(0.25, 0.6, vv));
-      let t = clamp01(0.28 + 0.5 * s + 0.28 * silver - 0.55 * rot);
-      const [r, g, b] = ramp3(STOPS, t);
-      const i4 = (py * W + px) * 4;
-      ci.data[i4] = r; ci.data[i4 + 1] = g; ci.data[i4 + 2] = b; ci.data[i4 + 3] = 255;
-      const hh = clamp01(0.5 + 0.45 * (s - 0.5) - 0.5 * rot);
-      hi.data[i4] = hi.data[i4 + 1] = hi.data[i4 + 2] = hh * 255; hi.data[i4 + 3] = 255;
-    }
-  }
-  cx.putImageData(ci, 0, 0); hx.putImageData(hi, 0, 0);
-  return mapsFromCanvases(c, h, seed);
-}
-
-// ---------------------------------------------------------------------------
-// THE SKIN
-// ---------------------------------------------------------------------------
-let ATLAS = null;
-
-export function buildBoleSkin(v, paletteId = 'foxfire') {
-  const pal = FAE_PALETTES[paletteId] || FAE_PALETTES.foxfire;
-  const seed = 0xb01e;
-  const group = new THREE.Group();
-  group.name = 'towerSkin';
-  const wood = new THREE.Group();
-  wood.name = 'towerSkinWood';
-  group.add(wood);
-
-  if (!ATLAS) ATLAS = bakeBark(seed);
-  const shellMat = new THREE.MeshStandardMaterial({
-    map: ATLAS.map, normalMap: ATLAS.normalMap,
-    normalScale: new THREE.Vector2(0.5, 0.5),
-    roughnessMap: ATLAS.roughnessMap, roughness: 1, metalness: 0,
-    envMapIntensity: 0.45, vertexColors: true, side: THREE.DoubleSide,
-  });
-
-  const { geo, dims } = buildBoleShell(v, pal, seed);
+  const shellMat = MAT.bark.clone();
+  shellMat.side = THREE.DoubleSide;
   const shell = new THREE.Mesh(geo, shellMat);
   shell.name = 'boleShell';
-  shell.castShadow = true; shell.receiveShadow = true;
-  wood.add(shell);
+  add(shell);
+  parts.splice(parts.indexOf(shell), 1);            // colors are load-bearing
 
-  const linerMat = new THREE.MeshStandardMaterial({
-    color: 0xffffff, vertexColors: true, roughness: 1, metalness: 0,
-    envMapIntensity: 0, side: THREE.DoubleSide,
-  });
-  const liner = new THREE.Mesh(buildLiner(v, dims, seed), linerMat);
-  liner.name = 'boleLiner';
-  wood.add(liner);
+  // --- the liner: the dark inside ------------------------------------------
+  {
+    const ln = 64, lm = 24, lpos = [], lcol = [], lidx = [], lmask = [];
+    const y0 = 0.3, y1 = d.despawnY + 1.6;
+    for (let j = 0; j <= lm; j++) {
+      for (let i = 0; i <= ln; i++) {
+        const th = (i / ln) * Math.PI * 2 - Math.PI / 2;
+        const y = y0 + (j / lm) * (y1 - y0);
+        const r = d.linerR + 0.06 * fbm(th * 3, y * 0.5, 8, 3, seed + 21);
+        const wx = r * Math.cos(th);
+        const wz = r * Math.sin(th) * (Math.sin(th) > 0 ? 0.9 : 1);
+        lmask.push((Math.abs(wx) < d.port.hw + 0.45 && Math.sin(th) > 0
+          && y > d.port.y0 - 0.2 && y < d.port.y1 + 0.75) ? 1 : 0);
+        lpos.push(wx, y, d.axisZ + wz);
+        const k = 0.05 + 0.05 * fbm(th * 8, y, 8, 2, seed + 23);
+        lcol.push(k, k * 0.92, k * 0.85);
+      }
+    }
+    const lat = (j, i) => j * (ln + 1) + i;
+    for (let j = 0; j < lm; j++) {
+      for (let i = 0; i < ln; i++) {
+        const a = lat(j, i), b = lat(j, i + 1), c = lat(j + 1, i), e = lat(j + 1, i + 1);
+        if (lmask[a] + lmask[b] + lmask[c] + lmask[e] === 4) continue;
+        lidx.push(a, c, b, b, c, e);
+      }
+    }
+    const lg = new THREE.BufferGeometry();
+    lg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(lpos), 3));
+    lg.setAttribute('color', new THREE.BufferAttribute(new Float32Array(lcol), 3));
+    lg.setIndex(lidx);
+    lg.computeVertexNormals();
+    // On-policy envMapIntensity: at vertex colours ~0.05 the environment
+    // contributes nothing visible, and the fit audit's material policy
+    // stays a strict deepEqual([]) instead of growing an exception list.
+    const lmat = MAT.punk.clone();
+    lmat.side = THREE.DoubleSide;
+    const liner = new THREE.Mesh(lg, lmat);
+    liner.name = 'boleLiner';
+    add(liner);
+    parts.splice(parts.indexOf(liner), 1);          // stays void-dark
+  }
 
-  // The chute, skinned as the hollow's own punky floor (the contract's
-  // "models may SKIN it" — same box, zero colliders).
-  const chuteGeo = new THREE.BoxGeometry(v.apron.s[0], v.apron.s[1], v.apron.s[2]);
-  planarUV(chuteGeo, 8, 8);
-  const chute = new THREE.Mesh(chuteGeo, new THREE.MeshStandardMaterial({
-    map: ATLAS.map, roughnessMap: ATLAS.roughnessMap, roughness: 1,
-    color: 0x6b6157, metalness: 0, envMapIntensity: 0.45,
-  }));
-  chute.position.set(...v.apron.c);
-  chute.rotation.x = v.apron.rx;
-  chute.castShadow = false; chute.receiveShadow = true;
-  wood.add(chute);
+  // --- roots: the buttress ridges run out onto the ground -------------------
+  // (Joe: "Roots?") Each big lobe extends as a low tapering ridge — a
+  // displaced cone lying radially, sunk to half depth. Front ridges stop
+  // short of the chute lane (|x| ≤ 1.9 slide must stay clean); the ridge
+  // under the doorway is the SILL — it dips toward the felt (FOOT DIP).
+  for (const L of lobes) {
+    // Front-arc lobes get no ridge: the apron lane must stay a clean
+    // slide, and the buttress flare already grips the ground there.
+    if (Math.sin(L.th) > 0.35) continue;
+    const rad = 0.34 + L.amp * 0.18;
+    let along = 1.3 + L.amp * 1.3;
+    // The tip must die inside the socket on every axis it travels.
+    const r0 = radius(L.th, 0.3) - 0.4;
+    const cz = Math.sin(L.th) >= 0 ? d.ezF : d.ezB;
+    const maxX = (d.rCeil - 0.05 - r0 * Math.abs(Math.cos(L.th))) / (Math.abs(Math.cos(L.th)) || 1);
+    const maxZ = ((Math.sin(L.th) >= 0 ? d.ezF : d.ezB) * d.rCeil - 0.05
+      - r0 * Math.abs(Math.sin(L.th)) * cz) / ((Math.abs(Math.sin(L.th)) * cz) || 1);
+    along = Math.min(along, Math.max(0.6, Math.min(maxX, maxZ)));
+    const rg = new THREE.ConeGeometry(rad, along, 7, 4);
+    rg.rotateZ(-Math.PI / 2);                       // +y cone → lying along +x
+    const p = rg.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const px = p.getX(i), py = p.getY(i), pz = p.getZ(i);
+      const k = 1 + 0.28 * fbm(px * 1.8, pz * 2.1 + i * 0.003, 6, 3, seed + 31);
+      p.setXYZ(i, px, py * 0.55 * k, pz * k);       // squashed: a ridge, not a log
+    }
+    rg.computeVertexNormals();
+    const ridge = new THREE.Mesh(rg, MAT.bark);
+    const dist = r0 + along / 2 - 0.35;
+    // Lifted so the squashed cone's belly grazes the ground instead of
+    // sinking through it — the fit probe found two ridges at y −0.18.
+    ridge.position.set(
+      Math.cos(L.th) * dist, rad * 0.78,
+      d.axisZ + Math.sin(L.th) * dist * cz);
+    ridge.rotation.y = -L.th;                       // +x swung to the lobe's angle
+    add(ridge);
+  }
 
-  group.userData.dims = dims;
-  group.userData.pal = pal;
-  return group;
+  // --- the descriptor ------------------------------------------------------
+  const R0 = profile(4.0);
+  return {
+    S, z0,
+    zc: d.axisZ, rIn: d.rFloor, R0,
+    rOut: (th) => radius(th, 4.0),
+    yRing: d.bladeFloor,
+    // zFI is "the back of the front plane" in the seam's semantics — the
+    // lining tube trims its front arc at acos((zFI−zc)/r) and its black
+    // back plane sits at zFI−0.012. Two wrong answers taught its range:
+    // the liner's outer z (z0+0.255) hung the lining out the socket, and
+    // z0+0.02 hung the naked black plane IN FRONT of the shell — the
+    // whole trunk rendered as a black monolith. z0−0.6 tucks the black
+    // deep behind the shell's own front wall (brow band reaches z0+0.13),
+    // where it does its real job: a void backdrop seen only through the
+    // port's ragged top.
+    zFO: z0 + 0.12, zFI: z0 - 0.6,
+    sill, doorX, doorY, xLim,
+    at: (th, y, inset = 0) => surfPoint(th, y, inset),
+    // No flat facade: the front is the wound. Props always land on the
+    // curve, which is what an organic trunk wants anyway.
+    inFacade: () => false,
+    facade: {
+      aL: -(d.port.hw), aR: d.port.hw,
+      yLow: d.port.y0, yTop: d.port.y1, zFace: z0 + 0.12,
+    },
+    // The little door lives in the flank of the biggest front-side
+    // buttress — only the shell knows where its buttresses are.
+    doorPad: (() => {
+      let best = lobes[0];
+      for (const L of lobes) {
+        if (Math.sin(L.th) > -0.2 && Math.cos(L.th) > 0
+          && (Math.sin(best.th) <= -0.2 || L.amp > best.amp)) best = L;
+      }
+      const [px, py, pz] = surfPoint(best.th - 0.12, 1.3, 0.05);
+      return { x: px, y: py, z: pz };
+    })(),
+  };
 }

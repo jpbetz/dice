@@ -8837,6 +8837,7 @@ window.__diceDebug = {
     const o = new THREE.Vector3(), d = new THREE.Vector3(), p = new THREE.Vector3();
     const run = (eye, pts) => {
       let blocked = 0;
+      const missed = [];
       for (const pt of pts) {
         p.set(pt[0], pt[1], pt[2]);
         o.set(eye[0], eye[1], eye[2]);
@@ -8846,8 +8847,12 @@ window.__diceDebug = {
         rc.near = 0;
         rc.far = len - 0.02;
         if (rc.intersectObjects(targets, true).length) blocked++;
+        // WHICH rays leak, not just how many — a probe that names the
+        // point turns "97/99 somewhere" into one geometry edit (learned
+        // on the Hollow Bole's two stubborn cowl samples).
+        else missed.push(pt.map((n) => Number(n.toFixed(2))));
       }
-      return { n: pts.length, blocked };
+      return { n: pts.length, blocked, missed };
     };
     const eyes = [];
     for (const [id, pre] of Object.entries(ZOOM_PRESETS)) {
