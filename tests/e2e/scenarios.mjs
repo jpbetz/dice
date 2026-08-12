@@ -11038,6 +11038,7 @@ export const scenarios = [
         const D = window.__diceDebug;
         let best = { level: 0, phase: null, i: -1 };
         let rollingFrames = 0, levelledFrames = 0, silentWhileRolling = 0;
+        for (let w = 0; w < 600 && !D.busy; w++) D.sim(1);
         for (let f = 0; f < 900 && D.busy; f++) {
           D.sim(1);
           const st = D.rollingState();
@@ -11080,6 +11081,7 @@ export const scenarios = [
       const live = await a.eval(`(() => {
         const D = window.__diceDebug;
         let maxLive = 0, maxPool = 0;
+        for (let w = 0; w < 600 && !D.busy; w++) D.sim(1);
         for (let f = 0; f < 900 && D.busy; f++) {
           D.sim(1);
           const g = D.audioGraphInfo();
@@ -11105,6 +11107,7 @@ export const scenarios = [
       const mid = await a.eval(`(() => {
         const D = window.__diceDebug;
         D.throwSeeded(['d6','d6','d6','d6','d6','d6'], 7171);
+        for (let w = 0; w < 600 && !D.busy; w++) D.sim(1);
         for (let f = 0; f < 900 && D.busy; f++) {
           D.sim(1);
           if (D.audioGraphInfo().poolLive > 0) return { liveAt: f, live: D.audioGraphInfo().poolLive };
@@ -11129,6 +11132,7 @@ export const scenarios = [
         D.setSoundOn(false);
         D.throwSeeded(['d6','d6','d6','d6','d6','d6'], 7171);
         let peak = 0;
+        for (let w = 0; w < 600 && !D.busy; w++) D.sim(1);
         for (let f = 0; f < 900 && D.busy; f++) {
           D.sim(1);
           peak = Math.max(peak, D.audioGraphInfo().poolLive);
@@ -11149,6 +11153,7 @@ export const scenarios = [
       const frozen = await a.eval(`(() => {
         const D = window.__diceDebug;
         D.throwSeeded(['d6','d6','d6','d6','d6','d6'], 7171);
+        for (let w = 0; w < 600 && !D.busy; w++) D.sim(1);
         for (let f = 0; f < 900 && D.busy; f++) {
           D.sim(1);
           const rs = D.rollingState();
@@ -11184,6 +11189,7 @@ export const scenarios = [
       const bake = async (seed) => {
         await a.dbg(`throwSeeded(['d6','d6','d6','d8'], ${seed})`);
         await a.eval('(() => { const D = window.__diceDebug;'
+          + ' for (let w = 0; w < 600 && !D.busy; w++) D.sim(1);'
           + ' for (let f = 0; f < 1200 && D.busy; f++) D.sim(1); return 1; })()');
         const info = await a.dbg('audioSettleInfo()');
         await a.dbg('clearTable()');
@@ -11264,6 +11270,7 @@ export const scenarios = [
         D.setSoundOn(false);
         D.throwSeeded(['d6','d6','d6','d6','d6','d6'], 7171);
         let peak = 0;
+        for (let w = 0; w < 600 && !D.busy; w++) D.sim(1);
         for (let f = 0; f < 900 && D.busy; f++) {
           D.sim(1);
           peak = Math.max(peak, D.audioGraphInfo().poolLive);
@@ -11284,6 +11291,7 @@ export const scenarios = [
       const frozen = await a.eval(`(() => {
         const D = window.__diceDebug;
         D.throwSeeded(['d6','d6','d6','d6','d6','d6'], 7171);
+        for (let w = 0; w < 600 && !D.busy; w++) D.sim(1);
         for (let f = 0; f < 900 && D.busy; f++) {
           D.sim(1);
           const rs = D.rollingState();
