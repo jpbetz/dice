@@ -6019,7 +6019,10 @@ const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
     // during the roll") — a low frontal tower shot while dice pour in, an
     // ease back to the table framing once the last die has exited. Dials:
     // camX/camY/camDist position the tower eye; camTgtY is where it looks.
-    camMove: true, camX: 5, camY: 10.5, camDist: 21, camTgtY: 4.5 },
+    // RE-AIMED (Joe, 2026-08-12): ~5° more yaw to the viewer's right, ~5°
+    // pitched up (the target rose to the mid-shaft, which also brings the
+    // crown into frame at last), and a third of a tower height further back.
+    camMove: true, camX: 8, camY: 10.5, camDist: 24.5, camTgtY: 6.5 },
   camPhase: null };
 const TOWERLAB_EULER = new THREE.Euler();
 
