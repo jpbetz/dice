@@ -79,12 +79,27 @@ limitations under the License.
 //     cannot dip freely either. Measured against the wide `eyeFull` (y 13.3,
 //     the only shipped eye ABOVE the COWL band): a ray to the deepest,
 //     highest cowl sample (0, 10.6, z0−4.0) crosses the facade plane at
-//     y 11.22, so a wall that stops below that is a sightline onto the
+//     y 11.22, so a front that stops below that is a sightline onto the
 //     despawn line. The CLOSED ring therefore runs to 11.62 all the way
 //     round — 0.40 of margin — and the tear is seven crown teeth ABOVE it,
 //     11.68 … 12.34, jittered, with one tooth missing entirely. Bastion's
 //     parapet rule in a dead tree's clothes: the teeth decorate, the ring
 //     occludes, and tower-occlusion is what says so.
+//
+//     AND THE RED CHECK CORRECTED WHICH LAYER IS LOAD-BEARING — the same
+//     way Black Anvil's did. Four runs of tower-occlusion, the full 2×2:
+//       facade top 11.74 + lining top 11.62 → 99/99 (ships)
+//       facade top 11.74 + lining top 10.20 → 99/99  the FACADE carries it
+//       facade top 10.70 + lining top 11.62 → 99/99  the LINING carries it
+//       facade top  8.40 + lining top  8.30 → RED at all six eyes
+//                                             (cowl 10/99 … 36/99)
+//     So the front of the COWL band is carried REDUNDANTLY: the facade
+//     plate and the unlit `towerSkinLining` back plane each suffice alone,
+//     which is a margin worth knowing about and NOT a licence to shorten
+//     either. Note what this also says: the crown RING's height is not
+//     what closes the front at all — it closes the flanks, and the teeth
+//     are decoration on top of it. Shortening BOTH front layers is the one
+//     edit that turns this tower into a leak, and the proof can see it.
 //  4. "Mushrooms too large for the ground" (grammar rule 10 — scale wrong in
 //     exactly ONE direction). The trunk is honest and the fungus is not: the
 //     moot's two modelled caps and the three shelf brackets run 0.34–0.52 u,
