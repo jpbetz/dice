@@ -616,13 +616,13 @@ function maps() {
   // as they were — mossy areas are already busy). Grime seats in the grain
   // grooves across every board; dust films only the flat tiles, which are
   // the predominantly-horizontal surfaces.
-  for (const [p, s, amt] of [[MAPS.walnut, 0x9e11, 1], [MAPS.cherry, 0x9e12, 1],
-    [MAPS.walnutFlat, 0x9e13, 1], [MAPS.cherryFlat, 0x9e14, 1]]) {
+  for (const [p, s, amt] of [[MAPS.walnut, 0x9e11, 0.8], [MAPS.cherry, 0x9e12, 0.8],
+    [MAPS.walnutFlat, 0x9e13, 0.8], [MAPS.cherryFlat, 0x9e14, 0.8]]) {
     grimePass(p.colorCanvas, p.heightCanvas, { seed: s, amount: amt,
       stops: [[0x16, 0x11, 0x0b], [0x2c, 0x23, 0x16], [0x48, 0x3a, 0x26]] });
   }
-  dustPass(MAPS.walnutFlat.colorCanvas, MAPS.walnutFlat.heightCanvas, { seed: 0x9e15, amount: 0.8 });
-  dustPass(MAPS.cherryFlat.colorCanvas, MAPS.cherryFlat.heightCanvas, { seed: 0x9e16, amount: 0.8 });
+  dustPass(MAPS.walnutFlat.colorCanvas, MAPS.walnutFlat.heightCanvas, { seed: 0x9e15, amount: 0.65 });
+  dustPass(MAPS.cherryFlat.colorCanvas, MAPS.cherryFlat.heightCanvas, { seed: 0x9e16, amount: 0.65 });
   for (const [p, s] of [[MAPS.walnut, 0x9e11], [MAPS.cherry, 0x9e12],
     [MAPS.walnutFlat, 0x9e13], [MAPS.cherryFlat, 0x9e14]]) {
     Object.assign(p, mapsFromCanvases(p.colorCanvas, p.heightCanvas, s));
@@ -1351,7 +1351,7 @@ export function buildTowerSkin(v) {
   // The -x flank is the weather side (it is already the ivy's shaded side,
   // so age and growth agree about which way this tower faces the rain).
   weatherPass(parts, {
-    edge: 0.6, grime: 0.85, dust: 0.7, drift: 0.14, weatherSide: -1,
+    edge: 0.48, grime: 0.7, dust: 0.55, drift: 0.11, weatherSide: -1,  // Joe: wood -20%
     edgeGate: (p, n) => clamp01(0.5 - 0.5 * n.x)
       * (0.35 + 0.65 * clamp01(1 - Math.abs(p.y - 2.5) / 5)),
   });

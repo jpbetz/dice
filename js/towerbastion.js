@@ -120,10 +120,10 @@ function maps() {
   // proof and asked for the lime's coverage in stone's colours), pale dust
   // filmed over the dressed flats.
   for (const [pr, sd] of [[MAPS.granite, 0xba91], [MAPS.rustic, 0xba92], [MAPS.sand, 0xba93], [MAPS.sandFlat, 0xba94]]) {
-    grimePass(pr.colorCanvas, pr.heightCanvas, { seed: sd, amount: 1.6 });
+    grimePass(pr.colorCanvas, pr.heightCanvas, { seed: sd, amount: 2.3 });  // Joe: even more wear
   }
-  dustPass(MAPS.sand.colorCanvas, MAPS.sand.heightCanvas, { seed: 0xba96, amount: 1.1 });
-  dustPass(MAPS.sandFlat.colorCanvas, MAPS.sandFlat.heightCanvas, { seed: 0xba95, amount: 1.2 });
+  dustPass(MAPS.sand.colorCanvas, MAPS.sand.heightCanvas, { seed: 0xba96, amount: 1.5 });
+  dustPass(MAPS.sandFlat.colorCanvas, MAPS.sandFlat.heightCanvas, { seed: 0xba95, amount: 1.6 });
   for (const [pr, sd] of [[MAPS.granite, 0xba91], [MAPS.rustic, 0xba92], [MAPS.sand, 0xba93], [MAPS.sandFlat, 0xba94]]) {
     Object.assign(pr, mapsFromCanvases(pr.colorCanvas, pr.heightCanvas, sd));
   }
@@ -744,7 +744,7 @@ export function buildBastionSkin(v) {
   // every mortar course and part joint, plus dust on the battlement tops and
   // corbel ledges. Weather side matches the ivy's shaded flank.
   weatherPass(parts, {
-    edge: 0.25, grime: 0.9, dust: 0.65, drift: 0.09, weatherSide: -1,
+    edge: 0.35, grime: 1.1, dust: 0.85, drift: 0.12, weatherSide: -1,  // Joe: even more
     edgeGate: (p, n) => clamp01(0.5 - 0.5 * n.x)
       * (0.3 + 0.7 * clamp01(1 - Math.abs(p.y - 3) / 6)),
   });

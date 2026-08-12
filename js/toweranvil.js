@@ -294,9 +294,13 @@ function maps() {
   // The texel aged base: heavy grime in the courses (the family's dirtiest
   // inside), NO dust — a working forge is swept (dossier C).
   for (const [pr, sd] of [[MAPS.soot, 0xa191], [MAPS.brick, 0xa192]]) {
-    grimePass(pr.colorCanvas, pr.heightCanvas, { seed: sd, amount: 1.7 });
-    // ASH, not dust: the swept-forge rule bends where Joe pushed it — a pale
-    // grey film reads as ash on a foundry, and ash is honest here.
+    grimePass(pr.colorCanvas, pr.heightCanvas, { seed: sd, amount: 1.9 });
+    // SOOT under the ash (Joe: "some soot is needed"): a second, DARKER
+    // deposit — cool near-black patches the ash then films over, so the
+    // stack carries both the fire's smoke and its cold fallout.
+    grimePass(pr.colorCanvas, pr.heightCanvas, { seed: sd + 17, amount: 0.75,
+      stops: [[0x0e, 0x0d, 0x0c], [0x1c, 0x1a, 0x18], [0x30, 0x2c, 0x28]] });
+    // ASH: the pale film, over everything.
     dustPass(pr.colorCanvas, pr.heightCanvas, { seed: sd + 9, amount: 0.85 });
     Object.assign(pr, mapsFromCanvases(pr.colorCanvas, pr.heightCanvas, sd));
   }
