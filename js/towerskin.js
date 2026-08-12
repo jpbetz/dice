@@ -126,11 +126,33 @@ export function ramp3(stops, t) {
   return [lo[0] + (hi[0] - lo[0]) * k, lo[1] + (hi[1] - lo[1]) * k, lo[2] + (hi[2] - lo[2]) * k];
 }
 
+// The tail every bake shares: the three textures a MeshStandardMaterial
+// wants, derived from the two canvases the pixel loop painted. Factored out
+// (2026-08-11, the dressing pass) so a caller can take the CANVASES, paint
+// weathering into them, and re-derive the maps — moss and soot are cheaper as
+// pixels than as geometry, and they must agree with the height field or the
+// normal map fights them. A pure extraction: the four lines each bake used to
+// end with, in the order it used to run them.
+export function mapsFromCanvases(cCan, hCan, seed) {
+  const map = new THREE.CanvasTexture(cCan);
+  map.colorSpace = THREE.SRGBColorSpace;   // colour only
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.anisotropy = 4;
+  return {
+    map,
+    normalMap: heightToNormal(hCan, 1.0),
+    roughnessMap: roughFromHeight(hCan, 256, seed + 999),
+  };
+}
+
 // One pass paints BOTH the colour canvas and the height canvas, because
 // they share every noise lookup — the height field carries seams, pores and
 // plank bevels ONLY (never the ring colour: ring colour in a normal map is
 // the classic "wood made of corrugated iron" tell).
-function bakeWood({ size, stops, planks, seed, cathedral }) {
+//
+// EXPORTED (2026-08-11): the dressing pass grows moss on Heartwood, and moss
+// is a pixel pass over the same plank canvas rather than a second material.
+export function bakeWood({ size, stops, planks, seed, cathedral }) {
   const W = size;
   const cCan = document.createElement('canvas'); cCan.width = cCan.height = W;
   const hCan = document.createElement('canvas'); hCan.width = hCan.height = W;
@@ -236,14 +258,9 @@ function bakeWood({ size, stops, planks, seed, cathedral }) {
   cCtx.putImageData(cImg, 0, 0);
   hCtx.putImageData(hImg, 0, 0);
 
-  const map = new THREE.CanvasTexture(cCan);
-  map.colorSpace = THREE.SRGBColorSpace;   // colour only
-  map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.anisotropy = 4;
-
-  const normalMap = heightToNormal(hCan, 1.0);
-  const roughnessMap = roughFromHeight(hCan, 256, seed + 999);
-  return { map, normalMap, roughnessMap };
+  // …and the canvases come back with the maps, so a dressing pass can repaint
+  // them (js/towerdress.js) instead of adding a second material.
+  return { ...mapsFromCanvases(cCan, hCan, seed), colorCanvas: cCan, heightCanvas: hCan };
 }
 
 // Sobel a height sketch into a tangent-space normal map (OpenGL +Y). LINEAR
@@ -427,14 +444,102 @@ export function bakeStone({ size, stops, blocks, courses, seed,
   cCtx.putImageData(cImg, 0, 0);
   hCtx.putImageData(hImg, 0, 0);
 
-  const map = new THREE.CanvasTexture(cCan);
-  map.colorSpace = THREE.SRGBColorSpace;   // colour only
-  map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.anisotropy = 4;
+  return { ...mapsFromCanvases(cCan, hCan, seed), colorCanvas: cCan, heightCanvas: hCan };
+}
+
+// ---------------------------------------------------------------------------
+// bakeEmber — a bed of banked coals, and the only glow in the house
+// ---------------------------------------------------------------------------
+// WHERE THIS CAME FROM: written for Black Anvil (js/toweranvil.js) and moved
+// here verbatim when the dressing pass gave Heartwood a cresset and Bastion a
+// sconce — a warm focal light is the family trait now (docs/TOWER.md
+// DRESSING), so the bake that makes one belongs to the kit rather than to the
+// forge. A pure MOVE, with one addition: the ember ramp became a parameter
+// defaulting to the constant it used to read, so Black Anvil's bake comes out
+// byte-for-byte what it was and a cresset can burn a different fuel.
+//
+// Four canvases from one loop: albedo (char), height, roughness, and the
+// EMISSIVE map. The cracks are the contour lines of a noise field — where the
+// field crosses its own midpoint — which is why they branch and close into
+// cells the way cooling coal actually does, instead of reading as a painted
+// lightning bolt. Two fields at different frequencies, the finer one weaker,
+// give a network rather than a single seam.
+//
+// The heat is NOT uniform across the bed: a broad low-frequency envelope
+// leaves parts of it dead and parts of it live, which is the whole difference
+// between "coals at rest" and "a strip of orange tape".
+//
+// The colour lives in the BAKE, never in `emissive` — see the emberMat comment
+// in js/toweranvil.js for why (a flat tint throws away the ramp).
+export const EMBER = [[0x0b, 0x03, 0x01], [0x9c, 0x2c, 0x04], [0xff, 0x8e, 0x2e]];
+const CHAR = [[0x16, 0x12, 0x10], [0x24, 0x1d, 0x19], [0x38, 0x2d, 0x26]];
+
+export function bakeEmber({ size, seed, heat = 1, stops = EMBER }) {
+  const W = size;
+  const cCan = document.createElement('canvas'); cCan.width = cCan.height = W;
+  const hCan = document.createElement('canvas'); hCan.width = hCan.height = W;
+  const eCan = document.createElement('canvas'); eCan.width = eCan.height = W;
+  const cImg = cCan.getContext('2d').createImageData(W, W);
+  const hImg = hCan.getContext('2d').createImageData(W, W);
+  const eImg = eCan.getContext('2d').createImageData(W, W);
+
+  for (let py = 0; py < W; py++) {
+    const vv = py / W;
+    for (let px = 0; px < W; px++) {
+      const u = px / W;
+      const f1 = fbm(u * 5.5, vv * 5.5, 6, 4, seed);
+      const f2 = fbm(u * 13, vv * 13, 13, 3, seed + 911);
+      const crack = Math.max(
+        1 - smoothstep(0, 0.055, Math.abs(f1 - 0.5)),
+        0.65 * (1 - smoothstep(0, 0.032, Math.abs(f2 - 0.5))));
+      // Where the bed is still alive. Banked coals go out in patches.
+      const bed = clamp01(0.18 + 1.05 * fbm(u * 2.1, vv * 2.4, 2, 3, seed + 37));
+      const hot = clamp01(crack * bed * heat);
+
+      // ALBEDO: char. A faint warm bleed beside a live crack, because the
+      // ash next to a hot seam is genuinely browner.
+      const grain = turb(u * 70, vv * 70, 70, 2, seed + 61);
+      const ct = clamp01(0.30 + 0.55 * f1 + 0.30 * (grain - 0.5) - 0.35 * crack);
+      let [r8, g8, b8] = ramp3(CHAR, ct);
+      const bleed = 0.55 * hot;
+      r8 += (0x6a - r8) * bleed * 0.5;
+      g8 += (0x36 - g8) * bleed * 0.35;
+      b8 += (0x1c - b8) * bleed * 0.2;
+
+      // EMISSIVE: the ramp, then multiplied by the heat again so cold coal is
+      // genuinely black rather than dim orange. Two multiplications is what
+      // keeps the bed dark between the seams.
+      const [er, eg, eb] = ramp3(stops, hot);
+      const ek = hot * hot;
+
+      // HEIGHT: coals bulge, cracks sink.
+      const h = 0.60 + 0.16 * (f1 - 0.5) - 0.34 * crack
+        + 0.05 * (grain - 0.5);
+
+      const i = (py * W + px) * 4;
+      cImg.data[i] = clamp01(r8 / 255) * 255;
+      cImg.data[i + 1] = clamp01(g8 / 255) * 255;
+      cImg.data[i + 2] = clamp01(b8 / 255) * 255;
+      cImg.data[i + 3] = 255;
+      eImg.data[i] = clamp01((er * ek) / 255) * 255;
+      eImg.data[i + 1] = clamp01((eg * ek) / 255) * 255;
+      eImg.data[i + 2] = clamp01((eb * ek) / 255) * 255;
+      eImg.data[i + 3] = 255;
+      const hv = clamp01(h) * 255;
+      hImg.data[i] = hv; hImg.data[i + 1] = hv; hImg.data[i + 2] = hv; hImg.data[i + 3] = 255;
+    }
+  }
+  cCan.getContext('2d').putImageData(cImg, 0, 0);
+  hCan.getContext('2d').putImageData(hImg, 0, 0);
+  eCan.getContext('2d').putImageData(eImg, 0, 0);
+
+  const emissiveMap = new THREE.CanvasTexture(eCan);
+  emissiveMap.colorSpace = THREE.SRGBColorSpace;
+  emissiveMap.wrapS = emissiveMap.wrapT = THREE.RepeatWrapping;
+  emissiveMap.anisotropy = 4;
   return {
-    map,
-    normalMap: heightToNormal(hCan, 1.0),
-    roughnessMap: roughFromHeight(hCan, 256, seed + 999),
+    ...mapsFromCanvases(cCan, hCan, seed),
+    emissiveMap, colorCanvas: cCan, heightCanvas: hCan, emissiveCanvas: eCan,
   };
 }
 

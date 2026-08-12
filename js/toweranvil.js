@@ -25,8 +25,11 @@ limitations under the License.
 // height→normal pass, roughness off the same height field, `bakeStone` for
 // coursed masonry, rounded boxes, planar UVs, the raycast vertex-AO bake, the
 // unlit near-black lining, gradient veils, contact shadows. What is new here
-// is `bakeMetal` (plate pitting, verdigris, rivet bosses in the height
-// channel) and `bakeEmber` — the coal bed, which paints a fourth canvas.
+// is `bakeMetal` — plate pitting, verdigris, rivet bosses in the height
+// channel. `bakeEmber` (the coal bed, which paints a fourth canvas) was
+// written here and MOVED into the kit when the dressing pass lit a cresset on
+// Heartwood and a sconce on Bastion: a warm focal light is the family trait,
+// so the bake that makes one is everybody's.
 //
 // THE GLOW IS THE FEATURE, AND IT IS THE ONLY GLOW THE HOUSE ALLOWS. No
 // lights, no bloom, no ShaderMaterial: an `emissiveMap` on a
@@ -97,7 +100,7 @@ import * as THREE from 'three';
 import {
   mulberry32, hash2, fbm, turb, clamp01, smoothstep, ramp3,
   heightToNormal, roughFromHeight, veilTexture,
-  roundedBox, planarUV, weather, bakeVertexAO, bakeStone,
+  roundedBox, planarUV, weather, bakeVertexAO, bakeStone, bakeEmber,
 } from './towerskin.js';
 
 // ---------------------------------------------------------------------------
@@ -144,10 +147,10 @@ const SAND = [[0x45, 0x41, 0x3a], [0x62, 0x5d, 0x54], [0x80, 0x7a, 0x6f]];
 // the opposite of the stone's — and that contrast is most of what says "kiln".
 const SOOT_JOINT = [0x22, 0x1e, 0x1a];
 const BRICK_JOINT = [0x4a, 0x44, 0x3c];
-// The coal bed: char → dull red → the hot crack. Three stops, and the third
-// is short of white on purpose. White is a lava lamp.
-const EMBER = [[0x0b, 0x03, 0x01], [0x9c, 0x2c, 0x04], [0xff, 0x8e, 0x2e]];
-const CHAR = [[0x16, 0x12, 0x10], [0x24, 0x1d, 0x19], [0x38, 0x2d, 0x26]];
+// (The coal bed's own ramp — char → dull red → the hot crack, the third stop
+// short of white on purpose because white is a lava lamp — moved into
+// js/towerskin.js with `bakeEmber` when the dressing pass gave every tower a
+// warm light. It is that function's default and this file asks for no other.)
 
 // ---------------------------------------------------------------------------
 // bakeMetal — plate, pitting, verdigris and rivets, in one pass
@@ -240,93 +243,6 @@ function bakeMetal({ size, stops, seed, rivets = 0, patina = 0,
   map.anisotropy = 4;
   return {
     map,
-    normalMap: heightToNormal(hCan, 1.0),
-    roughnessMap: roughFromHeight(hCan, 256, seed + 999),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// bakeEmber — a bed of banked coals, and the only glow in the house
-// ---------------------------------------------------------------------------
-// Four canvases from one loop: albedo (char), height, roughness, and the
-// EMISSIVE map. The cracks are the contour lines of a noise field — where the
-// field crosses its own midpoint — which is why they branch and close into
-// cells the way cooling coal actually does, instead of reading as a painted
-// lightning bolt. Two fields at different frequencies, the finer one weaker,
-// give a network rather than a single seam.
-//
-// The heat is NOT uniform across the bed: a broad low-frequency envelope
-// leaves parts of it dead and parts of it live, which is the whole difference
-// between "coals at rest" and "a strip of orange tape".
-function bakeEmber({ size, seed, heat = 1 }) {
-  const W = size;
-  const cCan = document.createElement('canvas'); cCan.width = cCan.height = W;
-  const hCan = document.createElement('canvas'); hCan.width = hCan.height = W;
-  const eCan = document.createElement('canvas'); eCan.width = eCan.height = W;
-  const cImg = cCan.getContext('2d').createImageData(W, W);
-  const hImg = hCan.getContext('2d').createImageData(W, W);
-  const eImg = eCan.getContext('2d').createImageData(W, W);
-
-  for (let py = 0; py < W; py++) {
-    const vv = py / W;
-    for (let px = 0; px < W; px++) {
-      const u = px / W;
-      const f1 = fbm(u * 5.5, vv * 5.5, 6, 4, seed);
-      const f2 = fbm(u * 13, vv * 13, 13, 3, seed + 911);
-      const crack = Math.max(
-        1 - smoothstep(0, 0.055, Math.abs(f1 - 0.5)),
-        0.65 * (1 - smoothstep(0, 0.032, Math.abs(f2 - 0.5))));
-      // Where the bed is still alive. Banked coals go out in patches.
-      const bed = clamp01(0.18 + 1.05 * fbm(u * 2.1, vv * 2.4, 2, 3, seed + 37));
-      const hot = clamp01(crack * bed * heat);
-
-      // ALBEDO: char. A faint warm bleed beside a live crack, because the
-      // ash next to a hot seam is genuinely browner.
-      const grain = turb(u * 70, vv * 70, 70, 2, seed + 61);
-      const ct = clamp01(0.30 + 0.55 * f1 + 0.30 * (grain - 0.5) - 0.35 * crack);
-      let [r8, g8, b8] = ramp3(CHAR, ct);
-      const bleed = 0.55 * hot;
-      r8 += (0x6a - r8) * bleed * 0.5;
-      g8 += (0x36 - g8) * bleed * 0.35;
-      b8 += (0x1c - b8) * bleed * 0.2;
-
-      // EMISSIVE: the ramp, then multiplied by the heat again so cold coal is
-      // genuinely black rather than dim orange. Two multiplications is what
-      // keeps the bed dark between the seams.
-      const [er, eg, eb] = ramp3(EMBER, hot);
-      const ek = hot * hot;
-
-      // HEIGHT: coals bulge, cracks sink.
-      const h = 0.60 + 0.16 * (f1 - 0.5) - 0.34 * crack
-        + 0.05 * (grain - 0.5);
-
-      const i = (py * W + px) * 4;
-      cImg.data[i] = clamp01(r8 / 255) * 255;
-      cImg.data[i + 1] = clamp01(g8 / 255) * 255;
-      cImg.data[i + 2] = clamp01(b8 / 255) * 255;
-      cImg.data[i + 3] = 255;
-      eImg.data[i] = clamp01((er * ek) / 255) * 255;
-      eImg.data[i + 1] = clamp01((eg * ek) / 255) * 255;
-      eImg.data[i + 2] = clamp01((eb * ek) / 255) * 255;
-      eImg.data[i + 3] = 255;
-      const hv = clamp01(h) * 255;
-      hImg.data[i] = hv; hImg.data[i + 1] = hv; hImg.data[i + 2] = hv; hImg.data[i + 3] = 255;
-    }
-  }
-  cCan.getContext('2d').putImageData(cImg, 0, 0);
-  hCan.getContext('2d').putImageData(hImg, 0, 0);
-  eCan.getContext('2d').putImageData(eImg, 0, 0);
-
-  const map = new THREE.CanvasTexture(cCan);
-  map.colorSpace = THREE.SRGBColorSpace;
-  map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.anisotropy = 4;
-  const emissiveMap = new THREE.CanvasTexture(eCan);
-  emissiveMap.colorSpace = THREE.SRGBColorSpace;
-  emissiveMap.wrapS = emissiveMap.wrapT = THREE.RepeatWrapping;
-  emissiveMap.anisotropy = 4;
-  return {
-    map, emissiveMap,
     normalMap: heightToNormal(hCan, 1.0),
     roughnessMap: roughFromHeight(hCan, 256, seed + 999),
   };
