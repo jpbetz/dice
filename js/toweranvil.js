@@ -774,6 +774,17 @@ export function buildAnvilSkin(v) {
         matrix: xform({ pos: [rail + 0.26, ry - 0.36, zFO + 0.10], rot: [0, 0, 0.16] }) },
       { geo: bar(0.048, 0.62, 0.048),
         matrix: xform({ pos: [rail + 0.31, ry - 0.30, zFO + 0.08], rot: [0, 0, 0.05] }) },
+      // A SHORT CHAIN, and it hangs HERE rather than off the crown lip.
+      // MOVED AFTER LOOKING: at the crown it was 320 triangles for a nine-pixel
+      // feature at the very top edge of a frame that frames the MAT — I could
+      // not find it in a single one of the eight review shots. On the rail it
+      // is in the ember's light beside the tools, which is also where a smith
+      // would actually keep one. Real links alternating 90° are only worth 80
+      // triangles each when somebody can see them turn.
+      { geo: buildChainHanger({
+        links: 4, R: 0.105, r: 0.030, at: [rail + 0.47, ry - 0.14, zFO + 0.10],
+        material: MAT.steel,
+      }).geometry },
     ]), MAT.steel);
     addDress(tools);
 
@@ -850,14 +861,6 @@ export function buildAnvilSkin(v) {
     // clean iron with none of the corrosion. Somebody maintains this. It is
     // a material swap on a mesh that already existed — no geometry at all.
     if (replacedStrap) replacedStrap.material = MAT.steel;
-    // …and a short chain hanging off the crown lip, real links alternating
-    // 90°, which is the only reason real links are worth 80 triangles each.
-    // FOUR of them: this is the "short hanger" case the rule allows, and a
-    // long run would be a tube with a chain normal map instead.
-    const chain = buildChainHanger({
-      links: 4, R: 0.115, r: 0.032, at: [2.28, yCrTop - 0.16, zFO + 0.09], material: MAT.steel,
-    });
-    addDress(chain);
   }
 
   bakeVertexAO(parts, group);
