@@ -47,7 +47,7 @@ import * as THREE from 'three';
 // edit that turns this into a TDZ crash on frame one.
 import {
   buildCresset, buildRope, bakeRope, coilPoints, bakeCage, emberMaterial,
-  growIvy, ivyLeaves, bakeLeaf, bakeTuft, bakeStems, mossPass, cloneCanvas,
+  growIvy, ivyLeaves, bakeLeaf, bakeTuft, bakeStems, mossPass, grimePass, dustPass, cloneCanvas,
   instancedField, leafMaterial, gravityStain, mergeGeos, xform, propUV,
   registerSway, ensureColor,
 } from './towerdress.js';
@@ -611,6 +611,22 @@ function maps() {
     veil: veilTexture(256, 0.92),
     shadow: veilTexture(256, 0.55),
   };
+  // THE TEXEL HALF OF THE AGED BASE, applied to the field prints IN PLACE
+  // and re-derived (the moss prints cloned from pristine walnut above stay
+  // as they were — mossy areas are already busy). Grime seats in the grain
+  // grooves across every board; dust films only the flat tiles, which are
+  // the predominantly-horizontal surfaces.
+  for (const [p, s, amt] of [[MAPS.walnut, 0x9e11, 1], [MAPS.cherry, 0x9e12, 1],
+    [MAPS.walnutFlat, 0x9e13, 1], [MAPS.cherryFlat, 0x9e14, 1]]) {
+    grimePass(p.colorCanvas, p.heightCanvas, { seed: s, amount: amt,
+      stops: [[0x16, 0x11, 0x0b], [0x2c, 0x23, 0x16], [0x48, 0x3a, 0x26]] });
+  }
+  dustPass(MAPS.walnutFlat.colorCanvas, MAPS.walnutFlat.heightCanvas, { seed: 0x9e15, amount: 0.8 });
+  dustPass(MAPS.cherryFlat.colorCanvas, MAPS.cherryFlat.heightCanvas, { seed: 0x9e16, amount: 0.8 });
+  for (const [p, s] of [[MAPS.walnut, 0x9e11], [MAPS.cherry, 0x9e12],
+    [MAPS.walnutFlat, 0x9e13], [MAPS.cherryFlat, 0x9e14]]) {
+    Object.assign(p, mapsFromCanvases(p.colorCanvas, p.heightCanvas, s));
+  }
   return MAPS;
 }
 
@@ -815,7 +831,7 @@ export function weatherPass(parts, {
   dust = 0.30,      // up-facing pale film
   drift = 0.08,     // per-part tonal wander (±value, warm-biased)
   edgeTint = [0.22, 0.20, 0.15],
-  grimeTint = [-0.16, -0.26, -0.42],  // Joe: "turn them way up" — deposit, LOUD
+  grimeTint = [-0.16, -0.26, -0.42],
   dustTint = [0.16, 0.21, 0.36],
   edgeGate = null,  // (pWorld, nWorld) => 0..1 — wear where light + hands reach
   dustGate = null,

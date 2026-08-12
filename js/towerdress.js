@@ -893,6 +893,74 @@ export function mossPass(cCan, hCan, {
   hx.putImageData(hImg, 0, 0);
 }
 
+// GRIME — the texel half of the aged base (Joe, 2026-08-12: "I can't see any
+// of the grime"). The vertex layer can only put deposit at PART corners (a
+// flat face carries four vertices); the dirt a viewer actually sees lives in
+// the FIELD, at texel scale, seated in the grooves the bake already painted.
+// Ochre and umber, never grey — a deposit has a colour — and the height goes
+// DOWN (grime FILLS; moss stands proud), which hands the roughness increase
+// to roughFromHeight for free.
+const GRIME = [[0x2a, 0x22, 0x18], [0x46, 0x38, 0x25], [0x63, 0x51, 0x35]];
+export function grimePass(cCan, hCan, { seed, amount = 0.7, scale = 6, stops = GRIME }) {
+  const W = cCan.width;
+  const cx = cCan.getContext('2d'), hx = hCan.getContext('2d');
+  const cImg = cx.getImageData(0, 0, W, W), hImg = hx.getImageData(0, 0, W, W);
+  const cd = cImg.data, hd = hImg.data;
+  for (let py = 0; py < W; py++) {
+    const v = py / W;
+    for (let px = 0; px < W; px++) {
+      const u = px / W, i = (py * W + px) * 4;
+      const patch = smoothstep(0.34, 0.7, fbm(u * scale, v * scale, scale, 4, seed + 311));
+      // Breakup two octaves DOWN from texel scale (the research's rule: noise
+      // at the scale of features, not texels — ~46 cycles ≈ 11 px blotches).
+      const grain = 0.55 + 0.9 * turb(u * 46, v * 46, 46, 2, seed + 29);
+      const groove = clamp01(1 - hd[i] / 255 * 1.55);
+      const m = clamp01(patch * grain * (0.30 + 0.70 * groove) * amount);
+      if (m <= 0.002) continue;
+      const [r8, g8, b8] = ramp3(stops, fbm(u * 12, v * 12, 12, 3, seed + 31));
+      cd[i] += (r8 - cd[i]) * m;
+      cd[i + 1] += (g8 - cd[i + 1]) * m;
+      cd[i + 2] += (b8 - cd[i + 2]) * m;
+      const h = Math.max(0, hd[i] - 0.03 * 255 * m);
+      hd[i] = h; hd[i + 1] = h; hd[i + 2] = h;
+    }
+  }
+  cx.putImageData(cImg, 0, 0);
+  hx.putImageData(hImg, 0, 0);
+}
+
+// DUST — the pale film for the predominantly-horizontal prints (the *Flat
+// tiles: tray, cornice slabs, parapet walk). A desaturated warm pale pulled
+// over the surface in broad patches; NEVER on the wall tiles, which also
+// dress cheeks and faces where a film would read as mould.
+const DUST_PALE = [0xb6, 0xae, 0x9d];
+export function dustPass(cCan, hCan, { seed, amount = 0.6, scale = 5 }) {
+  const W = cCan.width;
+  const cx = cCan.getContext('2d'), hx = hCan.getContext('2d');
+  const cImg = cx.getImageData(0, 0, W, W), hImg = hx.getImageData(0, 0, W, W);
+  const cd = cImg.data, hd = hImg.data;
+  for (let py = 0; py < W; py++) {
+    const v = py / W;
+    for (let px = 0; px < W; px++) {
+      const u = px / W, i = (py * W + px) * 4;
+      const patch = 0.3 + 0.7 * fbm(u * scale, v * scale, scale, 3, seed + 517);
+      const grain = 0.5 + 0.9 * turb(u * 38, v * 38, 38, 2, seed + 41);
+      // Dust settles INTO the texture's hollows first (the height read is
+      // inverted from grime's use: low spots fill before crowns).
+      const hollow = 0.45 + 0.55 * clamp01(1 - hd[i] / 255 * 1.2);
+      const m = clamp01(patch * grain * hollow * amount) * 0.55;
+      if (m <= 0.002) continue;
+      cd[i] += (DUST_PALE[0] - cd[i]) * m;
+      cd[i + 1] += (DUST_PALE[1] - cd[i + 1]) * m;
+      cd[i + 2] += (DUST_PALE[2] - cd[i + 2]) * m;
+      const h = Math.max(0, hd[i] - 0.02 * 255 * m); // matte: rough rides height
+      hd[i] = h; hd[i + 1] = h; hd[i + 2] = h;
+    }
+  }
+  cx.putImageData(cImg, 0, 0);
+  hx.putImageData(hImg, 0, 0);
+}
+
 // ---------------------------------------------------------------------------
 // WEATHERING IN THE VERTEX-COLOUR CHANNEL
 // ---------------------------------------------------------------------------

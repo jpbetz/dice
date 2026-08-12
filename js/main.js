@@ -6980,6 +6980,26 @@ window.__diceDebug = {
   // reach, the lean's foot dip, a wall-hung prop above the play volume — and
   // anything that matches none of them comes back UNCLASSIFIED, which
   // tower-fit gates on. A budget nobody names is a budget nobody keeps.
+  // Does the weathering DATA reach the RENDER? Per mesh: is there a colour
+  // attribute, what is its luminance spread, and is material.vertexColors
+  // actually true — data with the flag off is invisible by construction.
+  towerVC() {
+    if (!towerRig || !towerRig.group) return null;
+    const out = [];
+    towerRig.group.traverse((m) => {
+      if (!m.isMesh || !m.geometry) return;
+      const col = m.geometry.attributes.color;
+      let lo = 1, hi = 0;
+      if (col) for (let i = 0; i < col.count; i += 7) {
+        const l = 0.299 * col.getX(i) + 0.587 * col.getY(i) + 0.114 * col.getZ(i);
+        lo = Math.min(lo, l); hi = Math.max(hi, l);
+      }
+      out.push({ n: m.name || (m.parent && m.parent.name) || '?',
+        vc: !!m.material.vertexColors, col: !!col,
+        lo: +lo.toFixed(3), hi: +hi.toFixed(3) });
+    });
+    return out;
+  },
   towerModelAudit() {
     if (!towerRig || !towerRig.group) return null;
     const root = towerRig.group;

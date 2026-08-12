@@ -58,11 +58,11 @@ limitations under the License.
 import * as THREE from 'three';
 import {
   mulberry32, bakeStone, bakeEmber, veilTexture, clamp01,
-  roundedBox, planarUV, weather, bakeVertexAO, weatherPass,
+  roundedBox, planarUV, weather, bakeVertexAO, weatherPass, mapsFromCanvases,
 } from './towerskin.js';
 import {
   bakeCloth, buildGonfalon, bakeShieldFace, buildHeaterShield, buildSconce,
-  bakeCage, bakeLeaf, emberMaterial, bakeStainSheet, buildStains,
+  bakeCage, bakeLeaf, emberMaterial, bakeStainSheet, buildStains, grimePass, dustPass,
   instancedField, leafMaterial, gravityStain, mergeGeos, xform, propUV,
   registerSway, ensureColor,
 } from './towerdress.js';
@@ -115,6 +115,18 @@ function maps() {
     veil: veilTexture(256, 0.92),
     shadow: veilTexture(256, 0.55),
   };
+  // The texel half of the aged base (see towerskin.js maps()): grime seated
+  // in the mortar and block faces at full amount (Joe A/B'd it via the lime
+  // proof and asked for the lime's coverage in stone's colours), pale dust
+  // filmed over the dressed flats.
+  for (const [pr, sd] of [[MAPS.granite, 0xba91], [MAPS.rustic, 0xba92], [MAPS.sand, 0xba93], [MAPS.sandFlat, 0xba94]]) {
+    grimePass(pr.colorCanvas, pr.heightCanvas, { seed: sd, amount: 1.6 });
+  }
+  dustPass(MAPS.sand.colorCanvas, MAPS.sand.heightCanvas, { seed: 0xba96, amount: 1.1 });
+  dustPass(MAPS.sandFlat.colorCanvas, MAPS.sandFlat.heightCanvas, { seed: 0xba95, amount: 1.2 });
+  for (const [pr, sd] of [[MAPS.granite, 0xba91], [MAPS.rustic, 0xba92], [MAPS.sand, 0xba93], [MAPS.sandFlat, 0xba94]]) {
+    Object.assign(pr, mapsFromCanvases(pr.colorCanvas, pr.heightCanvas, sd));
+  }
   return MAPS;
 }
 

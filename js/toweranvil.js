@@ -99,12 +99,12 @@ limitations under the License.
 import * as THREE from 'three';
 import {
   mulberry32, hash2, fbm, turb, clamp01, smoothstep, ramp3,
-  heightToNormal, roughFromHeight, veilTexture,
+  heightToNormal, roughFromHeight, veilTexture, mapsFromCanvases,
   roundedBox, planarUV, weather, bakeVertexAO, weatherPass, bakeStone, bakeEmber,
 } from './towerskin.js';
 import {
   buildHorseshoe, buildChainHanger, bakeSmoke, buildSmokePlume,
-  bakeStainSheet, buildStains, instancedField, gravityStain,
+  bakeStainSheet, buildStains, instancedField, gravityStain, grimePass, dustPass,
   mergeGeos, xform, propUV, registerSmoke, ensureColor, R_PROP,
 } from './towerdress.js';
 
@@ -291,6 +291,15 @@ function maps() {
     veil: veilTexture(256, 0.92),
     shadow: veilTexture(256, 0.55),
   };
+  // The texel aged base: heavy grime in the courses (the family's dirtiest
+  // inside), NO dust — a working forge is swept (dossier C).
+  for (const [pr, sd] of [[MAPS.soot, 0xa191], [MAPS.brick, 0xa192]]) {
+    grimePass(pr.colorCanvas, pr.heightCanvas, { seed: sd, amount: 1.7 });
+    // ASH, not dust: the swept-forge rule bends where Joe pushed it — a pale
+    // grey film reads as ash on a foundry, and ash is honest here.
+    dustPass(pr.colorCanvas, pr.heightCanvas, { seed: sd + 9, amount: 0.85 });
+    Object.assign(pr, mapsFromCanvases(pr.colorCanvas, pr.heightCanvas, sd));
+  }
   return MAPS;
 }
 
