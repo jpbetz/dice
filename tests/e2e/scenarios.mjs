@@ -10738,7 +10738,7 @@ export const scenarios = [
         'master and the tanh soft clip are both up');
       assert.equal(g.panBuses, 9, `nine pooled pan buses, found ${g.panBuses}`);
       assert.deepEqual(g.panValues, [-0.6, -0.45, -0.3, -0.15, 0, 0.15, 0.3, 0.45, 0.6],
-        'spanning ±0.6 in steps of 0.15 — |pan| is capped at 0.6 by refusal §9');
+        'spanning ±0.6 in steps of 0.15 — |pan| is capped at 0.6 by AUDIO.md refusal 9');
       assert.ok(g.sharedNoiseBuilt && g.sharedLoopBuilt,
         'and the two SHARED noise buffers exist');
 
@@ -10812,7 +10812,7 @@ export const scenarios = [
 
       // ---- the pan law -----------------------------------------------------
       // Nine buses is a node count; THIS is the claim that a contact lands on
-      // the right one. |pan| is capped at 0.6 (refusal §9) — a die hard-panned
+      // the right one. |pan| is capped at 0.6 (AUDIO.md refusal 9) — a die hard-panned
       // beside your ear is a cartoon, and a table a metre away subtends ±25°.
       const panL = await a.dbg('audioPanFor(-3)');
       const panC = await a.dbg('audioPanFor(0)');

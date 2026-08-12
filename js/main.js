@@ -251,7 +251,7 @@ const HISTORY_CAP = 50;
 const LS_SOUND = 'dice.sound.v1';        // "Just you" scope: sound on/off
 const LS_CHIPS = 'dice.chips.v1';        // "Just you" scope: per-die value chips (default OFF — P1)
 // The room tone (docs/AUDIO.md §5), default OFF and its own switch — never
-// bound to LS_SOUND (refusal §7) and NEVER emitted in the portable file:
+// bound to LS_SOUND (AUDIO.md refusal 7) and NEVER emitted in the portable file:
 // js/portable.js's settings allowlist is exact and ambience is device-local
 // mood, not table state. A teammate must not inherit your room.
 const LS_AMBIENCE = 'dice.ambience.v1';  // "Just you" scope: room tone (default OFF)
@@ -1171,7 +1171,7 @@ addStaticPlane(wallMat, [0, 22, 0], [Math.PI / 2, 0, 0]);                    // 
 //   room bed (roomGain — the duck point) ───────────────┘
 //
 // softClip is a tanh WaveShaper and it is the ONLY limiter in the path. There
-// is deliberately no DynamicsCompressorNode anywhere (docs/AUDIO.md §7.1): its
+// is deliberately no DynamicsCompressorNode anywhere (docs/AUDIO.md §6.1): its
 // lookahead offsets every onset, and inter-die ducking destroys the
 // strength → loudness contract the whole impact system is built on.
 //
@@ -1193,7 +1193,7 @@ const MASTER_GAIN = 0.7;
 // has been paid for three times already.
 let ambienceOn = load(LS_AMBIENCE, false) === true;
 // Nine pooled pan buses, −0.6…+0.6 in steps of 0.15. |pan| is CAPPED at 0.6
-// (docs/AUDIO.md §7.9): a table a metre away subtends about ±25°, and a
+// (docs/AUDIO.md §6.9): a table a metre away subtends about ±25°, and a
 // hard-panned die beside your ear is a cartoon. Pooling instead of a panner
 // per event is what keeps a 40-die pour from allocating a node per contact;
 // 0.15 of quantization is inaudible on a transient.
@@ -1327,7 +1327,8 @@ function depthGainFor(at) {
 //
 // Five nodes, FEEDFORWARD ONLY. No feedback path, so no stability question
 // and nothing to run away — the refusal list is explicit that a feedback
-// reverb is not earning its place until the dry table is proven (§6.3).
+// reverb is not earning its place until the dry table is proven (AUDIO.md
+// refusal 3).
 //
 // Built LAZILY, on the first clunk that carries a shaft row, which is why
 // `shaftBuilt` is false on a towerless table and true after a pour. The dials
@@ -1809,7 +1810,7 @@ function noiseOneShot({ preset, freq, gain, durSec, bus, attack = 1, at = 0, tra
 //     use their own gate class and never consult the impact cursor; routed
 //     through it, taps 3 to 5 simply would not exist.
 //   · nothing is written into roll.sounds. That 400-event budget is shared
-//     with clunks, particles, decals and the shock ring (refusal §10).
+//     with clunks, particles, decals and the shock ring (AUDIO.md refusal 10).
 //
 // And the rhythm comes from hash(seed, di, k), never from Math.random: two
 // people in one room must hear the same tail. Timbre may differ between
