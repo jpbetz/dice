@@ -815,8 +815,8 @@ export function weatherPass(parts, {
   dust = 0.30,      // up-facing pale film
   drift = 0.08,     // per-part tonal wander (±value, warm-biased)
   edgeTint = [0.22, 0.20, 0.15],
-  grimeTint = [-0.06, -0.11, -0.19],
-  dustTint = [0.05, 0.07, 0.13],
+  grimeTint = [-0.16, -0.26, -0.42],  // Joe: "turn them way up" — deposit, LOUD
+  dustTint = [0.16, 0.21, 0.36],
   edgeGate = null,  // (pWorld, nWorld) => 0..1 — wear where light + hands reach
   dustGate = null,
   weatherSide = 0,  // -1: the -x flank ages harder; +1: the +x; 0: uniform
@@ -853,9 +853,12 @@ export function weatherPass(parts, {
         ? (1 - Math.max(Math.abs(nO.x), Math.abs(nO.y), Math.abs(nO.z))) * K : 0;
       const w = Math.max(0, e * edge * (edgeGate ? edgeGate(p, nW) : 1) * side);
       // Thresholded: shadow is continuous, a deposit has a contact line.
-      const g = Math.max(0, smoothstep(0.25, 0.85, 1 - openK) * grime * side);
-      const d = Math.max(0, smoothstep(0.35, 0.85, nW.y)
-        * (0.35 + 0.65 * (1 - openK)) * dust * (dustGate ? dustGate(p, nW) : 1));
+      // (Widened from 0.25–0.85 / 0.35–0.85: with 8 AO rays the occlusion is
+      // quantised to eighths, and the first cut only let the deepest corners
+      // qualify — Joe couldn't see it from the felt.)
+      const g = Math.max(0, smoothstep(0.08, 0.6, 1 - openK) * grime * side);
+      const d = Math.max(0, smoothstep(0.2, 0.75, nW.y)
+        * (0.45 + 0.55 * (1 - openK)) * dust * (dustGate ? dustGate(p, nW) : 1));
       let m0 = dm[0] * (1 + edgeTint[0] * w) * (1 + grimeTint[0] * g) * (1 + dustTint[0] * d);
       let m1 = dm[1] * (1 + edgeTint[1] * w) * (1 + grimeTint[1] * g) * (1 + dustTint[1] * d);
       let m2 = dm[2] * (1 + edgeTint[2] * w) * (1 + grimeTint[2] * g) * (1 + dustTint[2] * d);
@@ -1332,7 +1335,7 @@ export function buildTowerSkin(v) {
   // The -x flank is the weather side (it is already the ivy's shaded side,
   // so age and growth agree about which way this tower faces the rain).
   weatherPass(parts, {
-    edge: 0.6, grime: 0.5, dust: 0.4, drift: 0.14, weatherSide: -1,
+    edge: 0.6, grime: 0.85, dust: 0.7, drift: 0.14, weatherSide: -1,
     edgeGate: (p, n) => clamp01(0.5 - 0.5 * n.x)
       * (0.35 + 0.65 * clamp01(1 - Math.abs(p.y - 2.5) / 5)),
   });

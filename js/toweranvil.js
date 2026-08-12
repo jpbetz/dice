@@ -870,7 +870,7 @@ export function buildAnvilSkin(v) {
   // bricks discolour unevenly). Weather side +x, opposite the wooden tower's:
   // the family did not all stand facing the same rain.
   weatherPass(parts, {
-    edge: 0.3, grime: 0.6, dust: 0.08, drift: 0.15, weatherSide: 1,
+    edge: 0.3, grime: 0.95, dust: 0.15, drift: 0.15, weatherSide: 1,
     edgeGate: (p, n) => (0.3 + 0.7 * clamp01(1 - Math.abs(p.y - 3) / 6)),
   });
 
