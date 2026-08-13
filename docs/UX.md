@@ -4400,6 +4400,21 @@ while the venue stands. The set takes no chip in any picker
 (`venueOnly`): offering it à la carte is the incoherence goal 13 exists
 to prevent. Proof: `venue-dice`.
 
+**W2b–W2c (2026-08-13): from set pieces to one scene.** Joe's two
+verdicts ("good set pieces… the scene lacks integration"; "an item set
+on a table, not a stump that grew out of the ground") drove the
+composition law (docs/VENUE-COMPOSITION.md, rules 1–13, normative per
+GOALS 14) and its application: the stump grows its ground (round 6 —
+earthen berm over the exact delivery collider, root fingers, moss
+creep; the machine may not show), the pool sits IN frame with palette-
+owned water value, a scenery tier ties the flow (fallen branch, bank
+stones, a foreground corner wing), and the ground answers every base
+with soil. A venue palette flip re-dresses the standing tower in place
+(`towerReskin` — visual-only; the film never moves), and venue towers
+nearly silence the grounded room's env so baked palette colors read as
+baked. Proofs: `venue-set` (placement law + scenery tier + cross-flip
+re-dress, all off the stage contract).
+
 ### 7.35 The venue tower — Hollow Bole (2026-08-12, W3)
 
 **A venue tower has no chip.** `hollowbole` is a fourth row in the tower

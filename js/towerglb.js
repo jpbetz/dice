@@ -58,6 +58,12 @@ import { GLTFLoader } from '../vendor/GLTFLoader.js';
 // are applied HERE rather than asked for in the recipe: a recipe cannot write
 // envMapIntensity into a glTF at all, and a rule that lives only in a document
 // is a rule the next model breaks.
+//
+// 0.45 is the GROUNDED-ROOM baseline. towerSocket re-applies the venue
+// register's policy at socket time (towerEnvPolicy — a fantasy venue drops
+// the foreign env to 0.08 so baked palette colors read as baked; the W2c
+// foxfire blue-berm lesson). This loader stays register-blind on purpose:
+// the template is shared, the socketed CLONE wears the venue.
 const ENV_MAP_INTENSITY = 0.45;
 
 export const TOWERGLB = {

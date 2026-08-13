@@ -12817,6 +12817,37 @@ export const scenarios = [
         `window.__diceDebug.tower === window.__diceDebug.venueInfo().venueTower`,
         { desc: 'and so does B' });
 
+      // ---- W2c: a palette change re-dresses the STANDING tower ------------
+      // NEW CLAIMS 2026-08-13. The two fae venues share tower id
+      // 'hollowbole', so applyRoomSettings never queues a socket for a
+      // palette flip — the moonrise model stood in the foxfire world for
+      // two rounds before round 6's earth berm (baked in each palette's
+      // soil family) made it visible. towerReskin now swaps the skin in
+      // place (visual-only: variants share portals and geometry digest,
+      // so bodies and the film never move). The berm's baked vertex-color
+      // means are the discriminator: the same mean across venues was the
+      // smoking gun that caught the bug, so its NEGATION is the claim.
+      const bermMoon = await a.dbg(`meshColors('towerSkinBoleBerm')`);
+      assert.ok(bermMoon && bermMoon.colors, 'the berm reports baked colors');
+      await a.dbg(`setVenue('foxfire')`);
+      await a.waitFor(`window.__diceDebug.venue === 'foxfire'`, { desc: 'foxfire staged on A' });
+      await a.waitFor(
+        `(() => { const c = window.__diceDebug.meshColors('towerSkinBoleBerm');
+           return c && c.colors && c.mean[1] > c.mean[2]; })()`,
+        { desc: 'the berm re-dresses into the green family (g > b — the reskin landed)' });
+      const bermFox = await a.dbg(`meshColors('towerSkinBoleBerm')`);
+      assert.ok(bermFox.mean.join(',') !== bermMoon.mean.join(','),
+        `the two skies bake different earth (moonrise ${bermMoon.mean} vs `
+        + `foxfire ${bermFox.mean}) — identical means is exactly this bug`);
+      assert.deepEqual((await a.dbg('worldBodies()')).named, [...(await b.dbg('worldBodies()')).named],
+        'and the reskin moved NO bodies — both tabs still share one collider list');
+      await a.dbg(`setVenue('moonrise')`);
+      await a.waitFor(`window.__diceDebug.venue === 'moonrise'`, { desc: 'moonrise restored on A' });
+      await a.waitFor(
+        `(() => { const c = window.__diceDebug.meshColors('towerSkinBoleBerm');`
+        + ` return c && c.colors && c.mean.join(',') === ${JSON.stringify(bermMoon.mean.join(','))}; })()`,
+        { desc: 'and back — the moonrise earth returns' });
+
       // ---- goal 13: the venue REPLACES the pickers ------------------------
       for (const id of ['felt-swatches', 'tower-picker', 'diceset-row']) {
         assert.equal(await a.eval(

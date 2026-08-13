@@ -7579,6 +7579,9 @@ function applyVenue(id) {
   currentVenue = spec.id;
   if (spec.register === 'fantasy') faeConceptStart({ paletteId: spec.paletteId });
   else faeConceptStop();
+  // The standing tower follows the sky it is now under: palette variant
+  // reskin (visual-only, shared portals) + the register's env policy.
+  towerReskin();
   updateVenueChrome();
   // The venue stages the table's dice (W4): every prospective chip —
   // palette tiles, tray, pool strips — re-dresses to what a roll will
@@ -8621,6 +8624,73 @@ function towerPlaceBackWall() {
 // is observable from outside, and tower-roll asserts on it.
 const TOWER_SWAP = { from: null, to: null, before: 0, mid: 0, after: 0 };
 
+// The env-map policy for a socketed tower's materials, by venue register:
+// the grounded room keeps the C5 house rule (0.45 — the value every classic
+// tower was tuned against), a fantasy venue nearly silences the room's env
+// so baked palette colors read as baked (the foxfire blue-berm lesson, W2c).
+// ONE source of truth: towerSocket applies it, towerModelAudit asserts it.
+function towerEnvPolicy() {
+  return (VENUES[currentVenue] || VENUES.table).register === 'fantasy' ? 0.08 : 0.45;
+}
+
+function towerApplyEnvPolicy(root) {
+  const envW = towerEnvPolicy();
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) if (m && m.isMeshStandardMaterial) m.envMapIntensity = envW;
+  });
+}
+
+// THE PALETTE RESKIN (W2c). A venue palette change keeps the tower ID, so
+// applyRoomSettings never queues a socket — and the moonrise model went on
+// standing in the foxfire world. Round 5 got away with it (both variants
+// pale wood); round 6's earth berm is baked in each palette's soil family
+// and turned the miss visible from across the room. A variant swap is
+// VISUAL-ONLY by contract — glbUrls variants share portals and geometry
+// digest, so volumes, colliders and the film are identical — which is why
+// this swaps the skin in place and never touches bodies or rides the roll
+// boundary. The old skin stands until the new bytes are ready (late felt
+// beats never felt), and a variant whose portals disagree is refused loudly
+// rather than socketed into a film it would lie about.
+function towerReskin() {
+  const rig = towerRig;
+  if (!rig || !rig.group || rig.id !== currentTower) {
+    // No model up (or mid-swap): nothing to re-dress. The standing group
+    // still owes the CURRENT register its env policy on venue changes.
+    if (rig && rig.group) towerApplyEnvPolicy(rig.group);
+    return;
+  }
+  const spec = TOWERS[rig.id];
+  towerApplyEnvPolicy(rig.group); // register flip matters even url-unchanged
+  const want = towerGlbUrlActive(spec);
+  if (!want || want === rig.skinUrl) return;
+  towerGlbEnsure(want).then((e) => {
+    // The venue may have moved again while the bytes travelled; only the
+    // variant that is STILL the active answer gets to dress the tower.
+    if (!towerRig || towerRig !== rig || rig.id !== currentTower) return;
+    if (towerGlbUrlActive(TOWERS[rig.id]) !== want) return;
+    if (!e || e.status !== 'ready') {
+      console.warn(`[tower] palette reskin: ${want} did not load (${e && e.status}); `
+        + `keeping the standing skin`);
+      return;
+    }
+    if (spec.portals && e.portals && !towerPortalsMatch(spec.portals, e.portals)) {
+      console.warn(`[tower] palette reskin REFUSED: ${want} declares different `
+        + `portals than the socketed spec — a visual swap would stand a model `
+        + `over a film built for another mouth`);
+      return;
+    }
+    const old = rig.group.getObjectByName('towerSkin');
+    if (!old) { console.warn('[tower] palette reskin: no towerSkin child to swap'); return; }
+    const v = towerVolumes(towerPortalsOf(rig.id));
+    rig.group.remove(old); // clone shares template geometry/materials — no dispose
+    rig.group.add(spec.skin(v));
+    towerApplyEnvPolicy(rig.group);
+    rig.skinUrl = want;
+  });
+}
+
 function towerSocket(id) {
   const spec = TOWERS[id] || TOWERS.none;
   if (spec.id === currentTower && !!towerRig === (spec.id !== 'none')) return currentTower;
@@ -8668,8 +8738,20 @@ function towerSocket(id) {
     const group = new THREE.Group();
     group.name = 'towerModel';
     if (spec.skin) group.add(spec.skin(v));
+    // THE TOWER REFLECTS THE ROOM IT STANDS IN (W2c). scene.environment is
+    // the grounded room's env, and a DARK surface is mostly reflection —
+    // round 6's earth berm (albedo ~0.025) took a visible blue cast from
+    // the untinted env specular at the grounded 0.45. In a fantasy venue
+    // the register's own lights carry; the foreign env drops to a whisper
+    // (towerEnvPolicy — the single source the audit's offPolicy check
+    // reads too). Re-applied on venue changes by towerReskin.
+    towerApplyEnvPolicy(group);
     scene.add(group);
     towerRig.group = group;
+    // Which VARIANT dressed this socket. A venue palette change keeps the
+    // tower id, so towerReskin compares this against towerGlbUrlActive to
+    // know the standing skin is from the other sky. Null for code skins.
+    towerRig.skinUrl = towerGlbUrlActive(spec);
     towerLanternBuild(); // and the tower brings its own light
   }
   TOWER_SWAP.after = world.bodies.length;
@@ -9097,6 +9179,56 @@ window.__diceDebug = {
     scene.traverse((o) => { if (o.name === name) { o.visible = !!visible; n++; } });
     return n;
   },
+  // Material forensics for LOOK debugging (W2c: the foxfire berm rendered
+  // BLUE out of a green bake — a dark albedo is mostly reflection, and the
+  // reflection is whatever scene.environment holds, which no frame shows
+  // directly). First mesh matching `name`: the material facts that decide
+  // what a surface actually reflects, plus whether an env map is active.
+  meshInfo(name) {
+    let out = null;
+    scene.traverse((o) => {
+      if (out || !o.isMesh || o.name !== name) return;
+      const m = Array.isArray(o.material) ? o.material[0] : o.material;
+      out = {
+        name,
+        material: m.type,
+        roughness: m.roughness ?? null,
+        metalness: m.metalness ?? null,
+        envMapIntensity: m.envMapIntensity ?? null,
+        vertexColors: !!m.vertexColors,
+        color: m.color ? `#${m.color.getHexString()}` : null,
+        hasOwnEnvMap: !!m.envMap,
+      };
+    });
+    return { found: !!out, ...out, sceneEnv: !!scene.environment };
+  },
+  // Baked vertex colors, sampled off the LIVE geometry (W2c forensics
+  // sibling of meshInfo): when a surface renders the wrong family, the
+  // first question is whether the wrong bytes are IN the attribute or the
+  // pipeline made them wrong — and no rendered frame can answer that.
+  // Returns n evenly-strided samples plus the channel means.
+  meshColors(name, n = 8) {
+    let out = null;
+    scene.traverse((o) => {
+      if (out || !o.isMesh || o.name !== name) return;
+      const attr = o.geometry && o.geometry.getAttribute('color');
+      if (!attr) { out = { found: true, colors: false }; return; }
+      const stride = Math.max(1, Math.floor(attr.count / n));
+      const samples = [];
+      const mean = [0, 0, 0];
+      for (let i = 0; i < attr.count; i += stride) {
+        const c = [attr.getX(i), attr.getY(i), attr.getZ(i)];
+        if (samples.length < n) samples.push(c.map((v) => +v.toFixed(4)));
+        mean[0] += c[0]; mean[1] += c[1]; mean[2] += c[2];
+      }
+      const m = Math.ceil(attr.count / stride);
+      out = {
+        found: true, colors: true, count: attr.count,
+        mean: mean.map((v) => +(v / m).toFixed(4)), samples,
+      };
+    });
+    return out || { found: false };
+  },
   // World point → screen, through the LIVE camera (W2c, composition rule
   // 6 as amended: the triangle is judged in screen space, so the tools
   // need the same projection the frame gets). ndc in [-1, 1] (y up),
@@ -9265,8 +9397,8 @@ window.__diceDebug = {
       meshes++;
       const m = o.material;
       if (m.isShaderMaterial) offPolicy.push('ShaderMaterial');
-      if (m.isMeshStandardMaterial && m.envMapIntensity !== 0.45) {
-        offPolicy.push(`envMapIntensity=${m.envMapIntensity}`);
+      if (m.isMeshStandardMaterial && m.envMapIntensity !== towerEnvPolicy()) {
+        offPolicy.push(`envMapIntensity=${m.envMapIntensity} (want ${towerEnvPolicy()})`);
       }
       if (o.userData && o.userData.bloom) offPolicy.push('userData.bloom');
       bb.setFromObject(o);

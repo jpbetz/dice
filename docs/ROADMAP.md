@@ -2831,7 +2831,7 @@ The work, in order:
    goal 14 points at the dossier as the venue-scene law. Chosen fork of
    Joe's either/or on the stump: GROUND-INTEGRATION, not fog-blend —
    the tower is the hero (rule 1) and a hero dissolved into fog forfeits
-   the frame.
+   the frame. **DONE (1939666).**
 2. **The stump grows its ground (hollowbole round 6)** — the model owns
    its transition: the wooden tongue re-authored as an EARTHEN BERM
    (crest exactly on the ramp collider plane inside the dice lane;
@@ -2839,13 +2839,43 @@ The work, in order:
    below-sill rag is buried, not squared); root-flare fingers diving
    into the soil; moss-creep vertex color low on the trunk blending
    toward each palette's ground. Venue side: the contact ring retuned
-   tight and dark, a disturbed-soil ring.
+   tight and dark, a disturbed-soil ring. **DONE (d088bf9 + promotion).**
+   A first candidate re-built the RAMP with parapets and was rejected at
+   review (Joe caught it live); the accepted mound is a heightfield with
+   the lane carved through it — the trap and construction are recorded
+   in the recipe header and the skill.
 3. **Re-flow at the eye + the scenery tier** — the pool into frame and
    up a value step; angular-size and overlap contrast between the
    three; foreground-band scenery (dark tufts, a stone, framing the
    bottom corners) and mid-ground connective bits (a fallen mossy
    branch, bank stones) — value-quiet, zero new sources; every moved
    placement lands as a documented new claim in `venue-set`.
+   **DONE (c4c2f17)** — with a probe-driven correction: `worldToScreen`
+   showed the resting eye crops nearly the whole front band, so the
+   fore tier is ONE bottom-left corner wing (near-corner legality =
+   outside the dice BOX, past the front wall OR the x wall).
+
+**Two bugs the round surfaced, both fixed with red-checked claims:**
+- **The palette flip that never re-dressed.** The two fae venues share
+  tower id `hollowbole`, so a palette change queued no socket and the
+  moonrise model stood in the foxfire world — invisible for two rounds
+  of pale wood, loud the moment the berm carried baked soil. Fix:
+  `towerReskin()` — visual-only in-place skin swap on venue change
+  (variants share portals + geometry digest, so bodies and the film
+  never move), guarded by a portal-match refusal. `venue-set` asserts
+  the berm's baked vertex-color means DIFFER across the flip (identical
+  means was the smoking gun) and that no body moved.
+- **The grounded env on venue towers.** scene.environment stays the
+  grounded room's env in every register, and a dark surface is mostly
+  reflection — the berm (albedo ~0.025) took a visible foreign blue
+  cast at the C5 house-rule 0.45. Fix: `towerEnvPolicy()` — 0.45
+  grounded, 0.08 fantasy, applied at socket + reskin, asserted by the
+  audit's offPolicy check from the same function.
+
+**Ledger — next tower round (not W2c):** the pale MACHINED FACE at the
+shell's x-clamp plane (x 3.13, y 0.70–0.85, z 0..−0.4) reads as a sawn
+plank in side views; pre-existing (round 5 renders it identically,
+A/B'd), and more visible now that everything around it is organic.
 
 ### W4. The dice set — DONE 2026-08-13 (pending Joe's LOOK verdict)
 Moonmoot Witchlight (THEMES.md §10; js/themes.js): tumbled labradorite,

@@ -99,7 +99,16 @@ current tower loudly rather than degrading to 'none'. The fetch is
 a body-less 304 — because a re-bake ships under the SAME url and a warm
 browser must see it (`force-cache` shipped first and pinned round-4 mouths
 on every returning browser, 2026-08-13; `tower-glb-freshness` is the
-warm-cache proof the always-cold harness cannot give for free).
+warm-cache proof the always-cold harness cannot give for free). Palette
+VARIANTS (`glbUrls`) swap by RESKIN, not socket: a venue palette flip
+keeps the tower id, so `towerReskin()` swaps the standing skin in place —
+legal precisely because variants share portals and geometry digest
+(volumes, colliders and the film are identical; a variant with different
+portals is refused loudly). Materials wear the venue register's env
+policy (`towerEnvPolicy`: 0.45 grounded, 0.08 fantasy — a dark baked
+surface is mostly reflection, and the reflection must not be the grounded
+room), applied at socket + reskin and asserted by the audit from the same
+function. Proof for both: `venue-set`'s cross-flip berm claims.
 
 **What v2 changes about the film — a superseded decision.** The film is now
 a function of (portal spec, seed) instead of (one fixed geometry, seed).
