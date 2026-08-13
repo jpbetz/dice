@@ -57,6 +57,13 @@ export default async function run(stage, args) {
   const st = await a.dbg('towerState()');
   const log = await a.dbg('towerLog()');
   const z0 = st.z0;
+  // The cut lines come from the SPEC, not from literals: a portal tower may
+  // put its sill and outrun elsewhere, and grading its dice against the
+  // classic chute would call a delivered die TRAY (or worse). For a classic
+  // tower these are exactly the old z0+0.6 and z0+3.9.
+  const spec = await a.dbg(`towerPortalSpec(${JSON.stringify(tower)})`);
+  const hidCut = z0 + (spec ? spec.derived.hidZone : 0.6);
+  const trayCut = spec ? spec.derived.lipFrontZ : z0 + 3.9;
 
   console.log('\n--- collisions ---');
   for (const e of log) console.log(`t=${e.t} ${e.a} x ${e.b} @(${e.at.join(',')}) v=${e.v}`);
@@ -70,8 +77,8 @@ export default async function run(stage, args) {
   const counts = { FELT: 0, TRAY: 0, HIDDEN: 0, MOVING: 0 };
   for (const o of st.out) {
     const cls = o.v >= 0.6 ? 'MOVING'
-      : o.p[2] < z0 + 0.6 ? 'HIDDEN'
-      : o.p[2] < z0 + 3.9 ? 'TRAY' : 'FELT';
+      : o.p[2] < hidCut ? 'HIDDEN'
+      : o.p[2] < trayCut ? 'TRAY' : 'FELT';
     counts[cls]++;
     console.log(`${o.name}: ${cls} p=(${o.p.join(',')}) v=${o.v} rescues=${o.rescues}`);
   }
