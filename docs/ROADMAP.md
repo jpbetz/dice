@@ -2982,7 +2982,38 @@ distinction rather than banking an approval nobody gave.
 
 Two arcs, and he picked the model first.
 
-**① Round 7 — the stump.** THE HELMET READ IS THE BRIEF, and the
+**① Round 7 — the stump. DONE 2026-08-13** (Joe, on the frames:
+*"Beautiful"*). Shipped: a crown SHEAR (y_top 11.55 left vs 9.50 right, a
+2.05 gap against the 2.00 floor) so the break is a monotone diagonal to
+ONE shard at +0.83 rad instead of two peaks at the silhouette edges; the
+mouth's lintel a monotone tear climbing 1.03 across the throat with the
+periodic term deleted; the taper inverted back to a stump — base(y)
+strictly decreasing, outline half-width 3.08 at the felt → 2.48 at the
+rim, 23.8%, widest row at y 1.50; and the x-clamp face broken up with
+noise so max|x| is 3.083 rather than a hard plane at 3.130. 7956/8000
+tris, watertight, 25/25 on both approach and exit rays, both palettes
+from one bake with the SHARED geometry digest `set=3c13ab67b2f42533`,
+digests reproduced by an independent re-bake at the review gate.
+
+**The round's own lesson, and it outlives the model:** the three new
+gates — `assert_silhouette_is_not_a_face`, `assert_taper_is_a_stump`,
+`assert_lintel_is_a_tear` — are stated in the FRAME and bin the built
+mesh's edges into a projected outline, and all three are red-checked
+against round 6's field, which fails them on seven counts. A gate phrased
+in plan could not have caught any of this, because round 6 already
+satisfied every plan-space claim it was asked for.
+
+**Residuals, recorded rather than fixed.** The cheek's fibre is
+low-frequency and reads as soft shading in the forge rig — but the rig's
+key is not the app's, and at the resting eye under the moon and the fog
+it reads as weathered wood, so this is closed unless Joe says otherwise.
+The taper is compliant but not dramatic, and it cannot become dramatic
+without a different budget: XLIM 3.13 clamps the foot and clearR 2.20
+plus the wall floors the crown, so both ends are pinned. From dead front
+the trunk is still columnar, with two darks and a light between them —
+now a parallelogram rather than a face.
+
+*(the brief, for the record:)* THE HELMET READ IS THE BRIEF, and the
 x-clamp facet ledgered in W2c is now the small half of it. Diagnosed
 shape of the problem, to be confirmed against fresh isolated frames: the
 trunk is close to a body of revolution, so its silhouette is near-mirror

@@ -171,6 +171,68 @@ against the trunk's bark band rather than by reading the paint (see
 TONGUE_GAIN), and proved to be colour-only by the `set` digest, which must
 still be 76d898635b069ed2.
 
+WHAT ROUND 7 CHANGED, and it is a SHAPE round — the first since round 3.
+Joe, on the round-6 bake: "the dice tower looks like a demonic helmet more
+than it looks like a stump. It's too symmetrical, and the opening looks too
+much like either a gaping mouth or like the face opening of a helmet." And,
+separately: "did you notice how the stump is not particularly wide at the
+bottom and gets much wider near the top? Most stumps are dramatically wider
+at the bottom. This needs work."
+
+Both are the same fault seen from two sides, and neither was a taste call:
+the model was assembled from THREE HORIZONTAL BANDS on a vertical near-
+revolution that got WIDER as it rose. Brow, cheek, mouth; and a profile that
+flares at the top is a helmet's, while a profile that flares at the bottom is
+a stump's. Every gate this file carried was green, because every one of them
+read the PLAN. Round 6 fought symmetry in plan — four ranked spires, the
+tallest forced to -1.05 rad — and the PROJECTION put it straight back:
+measured off that bake, the outline carried two peaks, at (-2.44, 12.32) and
+(+2.30, 11.81), 0.14 from mirrored and 0.51 apart in height. That is
+docs/VENUE-COMPOSITION.md rule 6 (judge the frame, not the plan) found inside
+a model instead of inside a scene.
+
+THE LAW FOR ROUND 7 IS THEREFORE STATED IN THE FRAME: no horizontal boundary
+and no mirrored pair in the SILHOUETTE at the tower eye, and the silhouette is
+widest where it meets the ground and narrows all the way up. Three new gates
+measure exactly that, on the built mesh, by walking its EDGES and binning the
+projection — assert_silhouette_is_not_a_face, assert_taper_is_a_stump,
+assert_lintel_is_a_tear. All three are red-checked against round 6's own
+field, which fails them on seven counts.
+
+  1 THE CROWN SHEARS. A linear tilt, SHEAR_AMP*cos(phi - SHEAR_DIR), applied
+    before any spire: a snapped trunk breaks along a slanted plane, and one
+    such term destroys the left/right mirror that four ranked spires could
+    not. y_top(+pi/2) - y_top(-pi/2) = 2.05 where round 6 measured -0.52.
+  2 THE TEAR'S LOW POINT COMES OFF THE AXIS to phi -0.35, with ramps of 0.25
+    rad one side and 0.95 the other, so the brow has no axis to mirror about.
+  3 ONE DOMINANT SHARD at +0.95 and nothing to pair with it: the second goes
+    BEHIND at +2.55, and the last two are rim events on the low left. Spire
+    heights are now absolute TIPS, because with a 2.7-unit slant "1.05 above
+    the rim" means two different things on the two sides.
+  4 THE LINTEL IS A DIAGONAL TEAR: it climbs 1.03 across the opening (round 6:
+    0.093), carries three hanging splinters, and has no periodic term on it at
+    all. Round 6's dip spacings were 0.76/0.77/0.79/0.92/0.52 — a comb, which
+    is what "teeth" was.
+  5 THE OPENING IS 0.158 RAD WIDER ON THE RIGHT. Less than the brief's 0.75 of
+    arc asked for, and the reason is measured: see W_SIDE_L.
+  6 THE CHEEK IS GROOVED AND CROSSED BY A DIAGONAL BAND. The weakest item of
+    the eight, and it is weak because item 8 spent the wall it needed — see
+    CHEEK_Y for the numbers and the ledger for the honest read.
+  7 THE MAT WALL IS TORN, not milled: x_limit subtracts noise from the socket
+    clamp, so the face that lands on it is rippled instead of sawn.
+  8 THE TAPER IS THE RIGHT WAY UP. base(y) is strictly decreasing, 2.90 to
+    2.27, and the outline goes 3.08 at the felt to 2.48 at the rim (23.8%)
+    where round 6 went 3.13 to 2.98 (5.2%) with a bulge from y 6 to y 8.
+    wall(y) was re-cut to buy the crown room the narrowing costs, and moving
+    the bore in by 0.35 forced the occlusion CURTAIN out of it and into the
+    wall — see CURTAIN_RIN, which is the round's most surprising knock-on.
+
+Measured at the round-7 bake: 7956 tris, watertight, 25/25 on both throats and
+the approach column, cowl 99/99 and shaft 99/99 at all six eyes, crown tear
+9.40..12.30, one outline peak at x +1.61 with prominence 0.74, stance 2.00:1,
+6 roots, 4 spires, 11 shelf brackets placed and 1 refused, both palettes
+sharing geometry digest set=3c13ab67b2f42533 and differing only in COLOR_0.
+
 MEASURED, NOT ASSUMED. Every dimensional claim above is re-derived from the
 built vertices at bake time: assert_throat_clear and assert_approach_clear
 cast rays at the finished triangles (not at the constants that generated
@@ -276,6 +338,8 @@ SHELL_FLOOR = -0.09                # the shell's buried row. -0.30 read as
 ZFRONT = 0.22                      # the socket's front plane
 ZBACK = -6.30                      # venue grounds: the glade, not a wall
 BUDGET = 8000
+SPLAY = 0.07                       # how far both crown surfaces lean out above
+#                                    the rim (was 0.16; see r_out and item 8)
 
 SEED = 0x50B3
 
@@ -450,6 +514,62 @@ FINGER_LEN = 0.62                  # ...and gone by y 0.53, well under the
 # front of the socket plane from here on.
 TOE_CREEP = 0.0
 
+# --------------------------------------------------------------------------
+# THE CROWN SHEAR — round 7, and it is the round's whole thesis
+# --------------------------------------------------------------------------
+# Joe, on round 6: "the dice tower looks like a demonic helmet more than it
+# looks like a stump. It's too symmetrical, and the opening looks too much
+# like either a gaping mouth or like the face opening of a helmet."
+#
+# The face was assembled from three HORIZONTAL bands on a vertical near-
+# revolution — brow/horns, a smooth cheek, a mouth — and every one of them
+# was symmetric about x = 0 in the PROJECTION even where the plan was not.
+# That is docs/VENUE-COMPOSITION.md rule 6 (judge the frame, not the plan)
+# found inside a model instead of inside a scene. The law for round 7 is
+# therefore stated in the frame: NO HORIZONTAL BOUNDARY AND NO MIRRORED PAIR
+# IN THE SILHOUETTE AT THE TOWER EYE, and it is gated by
+# assert_silhouette_is_not_a_face, which measures the projected outline.
+#
+# A snapped trunk breaks along a SLANTED plane. So before any spire is
+# applied, the crown carries a linear tilt — SHEAR_AMP * cos(phi - SHEAR_DIR),
+# which for SHEAR_DIR near pi/2 is very nearly a plane tilted about z, i.e.
+# linear in x. That one term does what four ranked spires could not: it
+# destroys the left/right mirror in the outline, because the outline's height
+# now depends on which side of the tower a point is on.
+#
+# THE ARITHMETIC IS TIGHT AND IT IS WORTH STATING, because it is what limits
+# how dominant the shard is allowed to be. rimY 9.40 is the declared low
+# point and CROWN_MAX 12.35 is the VENUE GROUNDS ceiling: the whole crown
+# lives in 2.95 units. The round-7 brief requires y_top(+pi/2) - y_top(-pi/2)
+# >= 2.0, and the cheapest way to buy that gap is to let the LOW flank sit on
+# the rim floor — so the high flank must stand at 11.4+, which is 2.0 of the
+# 2.95 spent before a single spire exists. The shard therefore tops the high
+# flank by ~0.5 and no more; its RELIEF is bought from below instead, by the
+# two bays that flank it (SHARD_BAY) and by a rim rag that is deep on the
+# torn low side and quiet on the clean high side. Measured, not eyeballed:
+# the numbers this file prints at bake time are the ones to argue with.
+SHEAR_DIR = 1.45                   # the high side of the break, rad
+SHEAR_AMP = 1.325                  # half the swing of the tilt
+SHEAR_LIFT = 0.90                  # ...and where its middle sits above rimY
+RIM_RAG = 0.75                     # rim chew, at full strength on the low side
+RIM_RAG_CLEAN = 0.30               # ...and this fraction of it on the high one
+TEAR_PHI = -0.35                   # the crown tear's LOW point: off centre
+TEAR_W_HI = 0.25                   # rad — it climbs fast on the +phi side...
+TEAR_W_LO = 0.95                   # ...and long and slow on the -phi side
+# The two bays that flank the shard: the fibres either side of a standing
+# splinter are the ones that tore away lowest. Kept clear of +-pi/2 so they
+# cannot eat the gap measurement (0.95 + 0.33 + 0.18 = 1.46 < 1.5708).
+SHARD_BAY_OFF = 0.33
+SHARD_BAY_W = (0.20, 0.18)
+SHARD_BAY_D = 0.45
+FLOOR_RUBBLE = 0.45                # breaks the clamped rim; see y_top
+# (heading, ABSOLUTE tip height). See build_ridges for why these are tips.
+SPIRES = ((+0.95, 12.33),          # the one dominant shard
+          (+2.55, 10.45),          # the second, BEHIND: 1.60 rad from it
+          (-2.75, 10.05),          # ...and the last two are rim events, not
+          (-1.20, 9.90))           #    peaks: kept low enough that nothing on
+#                                       the left can pair with the shard
+
 
 def build_ridges():
     ridges = []
@@ -468,6 +588,7 @@ def build_ridges():
             "fib": 0.095 + 0.130 * h01(i, 61),
             "lean": (h01(i, 71) - 0.5) * 0.22,    # grain twist with height
             "spire": 0.0,
+            "spire_tip": None,     # absolute tip height, round 7 (see SPIRES)
             "root": False,
             "toe_len": 0.0,        # how far the foot runs out, world radius
             "toe_w": 0.0,          # its angular half-width, rad
@@ -517,27 +638,43 @@ def build_ridges():
                         * smoothstep(abs(th), FRONT_KEEP_TOE, 0.94))
         R["toe_w"] = 0.23 + 0.09 * h01(i, 133)
         R["toe_off"] = (h01(i, 137) - 0.5) * 0.26
-    # THE CROWN TEARS ALONG THE GRAIN. Five ridges keep going past the rim;
-    # the tallest is forced onto the ridge nearest phi = -1.05 rad so it is
-    # plainly off-centre in the frame (and never on the seam).
-    # FOUR spires, not five, and a wider height spread. Five broad blades
-    # evenly spread around the rim is a tiara; four uneven ones with long
-    # stretches of broken rim between them is a stump.
-    order = sorted((i for i in range(N_RIDGE) if abs(ridges[i]["th"]) > 0.80),
-                   key=lambda i: -h01(i, 41))[:4]
-    # Ranked heights, not sampled ones: hashing gave two of the four within
-    # 0.2 of each other and a matched pair reads as symmetry, which is the
-    # one thing a broken crown must not have.
-    for rank, i in enumerate(order):
-        ridges[i]["spire"] = (2.35, 1.55, 1.05, 0.72)[rank]
-    tall = min(range(N_RIDGE), key=lambda i: angdist(ridges[i]["th"], -1.05))
-    # 2.80, NOT 3.30 — the socket's ceiling, not a taste call. VENUE GROUNDS
-    # requires max.y' <= 12.5 and the audit's box adds max.x*sin to it, so the
-    # tallest tear may reach CROWN_MAX 12.35 and no further. Measured on the
-    # field: 3.30 tops out at 12.815 (0.325 outside), 2.80 at 12.326. The
-    # ladder under it is untouched — 12.33 / 11.81 / 11.11 / 10.63 / 10.11 —
-    # so the tallest is still 0.52 clear of the next and still at -55 deg.
-    ridges[tall]["spire"] = 2.80
+    # THE CROWN TEARS ALONG THE GRAIN — and since round 7 it tears along a
+    # SLANT as well (see THE CROWN SHEAR). Four ridges keep going past the
+    # broken plane, and all four are now placed by HEADING rather than by hash
+    # rank, for the same reason the roots were in round 2: what the hash picks
+    # is not what the frame needs.
+    #
+    # ROUND 7 PLACES THEM AGAINST THE SILHOUETTE, NOT AGAINST THE PLAN.
+    # Round 6 fought symmetry in plan — four ranked heights, the tallest forced
+    # to -1.05 rad — and the PROJECTION put it back: measured off that bake the
+    # outline carried two peaks, (-2.44, 12.32) and (+2.30, 11.81), prominence
+    # 2.41 and 2.01. A pair of peaks at the two silhouette edges with a dark
+    # dip between them is a horned helmet, and the model's own field said so
+    # before any render did. So:
+    #   · the ONE dominant shard sits at +0.95, on the high side of the shear,
+    #     0.62 rad clear of +pi/2 (a spire ON the silhouette edge is a horn),
+    #   · the second goes BEHIND (+2.55) — 1.60 rad from the shard, inside the
+    #     1.2-2.2 window the brief sets, and from the table it is hidden by the
+    #     front rim, so it cannot pair with anything,
+    #   · the last two are nubs on the low left, events on the rim rather than
+    #     peaks over it.
+    # assert_silhouette_is_not_a_face measures the result on the projected
+    # outline and refuses a second peak or a mirrored pair.
+    #
+    # HEIGHTS ARE ABSOLUTE TIPS, not heights above the rim, and that is forced
+    # by the shear: the break plane swings 2.7 units around the ring, so "1.05
+    # above the rim" means two completely different tips on the two sides. A
+    # tip is what the silhouette reads. y_top raises the broken surface TO the
+    # tip at the crest and leaves it alone where the surface is already higher,
+    # so a spire on the high side of the shear simply does not exist.
+    taken = set()
+    for th, tip in SPIRES:
+        i = min((j for j in range(N_RIDGE) if j not in taken),
+                key=lambda j: angdist(ridges[j]["th"], th))
+        taken.add(i)
+        ridges[i]["spire_tip"] = tip
+        ridges[i]["spire"] = tip - PORTAL_IN["rimY"]      # for report_form
+    tall = max(range(N_RIDGE), key=lambda i: ridges[i]["spire_tip"] or 0.0)
     ridges[tall]["w"] = max(ridges[tall]["w"], 0.17)
     ridges[tall]["tallest"] = True
     return ridges
@@ -586,8 +723,17 @@ def flare(y):
     where it touches the soil, and the web takes over as the foot dies and
     climbs to the waist. The shoulder at 0.05-0.62 is where they hand off,
     and it is what lets each be budgeted against XLIM on its own.
+
+    ROUND 7 STRETCHED ITS REACH. At 3.30 with a 1.55 power the web was dead
+    by y 3.3 and had spent most of itself under y 1.5, which is a ring of
+    bumps at the ankle rather than a base that flares — and a flare living in
+    one unit of height cannot read as the bottom of a taper that runs twelve.
+    4.60 with a 1.30 power spreads the same wood over three times the height:
+    0.83 / 0.60 / 0.25 at y 0.62 / 1.5 / 3.0 where it used to be 0.72 / 0.39 /
+    0.02. Re-budgeted against XLIM in build_ridges, whose head allowance reads
+    the (fatter) base(0), so no root reaches further into the mat than before.
     """
-    return smoothstep(y, 0.05, 0.62) * max(0.0, 1.0 - y / 3.30) ** 1.55
+    return smoothstep(y, 0.05, 0.62) * max(0.0, 1.0 - y / 4.60) ** 1.30
 
 
 def toe_h(y):
@@ -618,26 +764,94 @@ def toe_h(y):
 # over a 6.4 root spread is 1.95:1 — the molar, not the chimney.
 
 def base(y):
-    # The BASE curve is deliberately slim at the foot. All of the spread
-    # down there belongs to the buttress lobes: a fat base curve plus lobes
-    # is a bucket with bumps, while a slim one plus strong lobes leaves deep
-    # VALLEYS between the roots, and it is the valleys that read as roots.
-    # MASS LIKE A MOLAR. The first profile ran 2.62 / 2.53 / 2.82 from foot
-    # to crown — a 10% swing, which is a cylinder wearing a story. This one
-    # swings 17%: a heavy foot, a real waist at 3.6, and a crown that flares
-    # back out before the spires take over.
-    return (2.42
-            + 0.32 * math.exp(-y / 1.90)
-            + 0.48 * smoothstep(y, 4.2, 9.0)
-            - 0.20 * smoothstep(y, 10.2, 12.6))
+    # ROUND 7 — THE TAPER WAS INVERTED, and it was arithmetic, not taste.
+    #
+    # Joe: "did you notice how the stump is not particularly wide at the
+    # bottom and gets much wider near the top? Most stumps are dramatically
+    # wider at the bottom." The round-6 curve read 2.74 at the foot, 2.46 at
+    # the waist and 2.90 at the shoulder — the shoulder was 6% WIDER THAN THE
+    # GROUND, which is a vase, not a stump. Worse, it fed the helmet: a helmet
+    # flares at the top and a stump flares at the bottom, so the profile was
+    # arguing for the reading the whole round exists to destroy. (The old
+    # comment claimed "a heavy foot… a crown that flares back out"; the heavy
+    # foot was 0.32 of exponential and the crown flare was 0.48 of smoothstep.
+    # The prose described the opposite of what the numbers did. That is the
+    # trap: read the curve, not the comment above it.)
+    #
+    # MONOTONE, AND THE NARROWING IS MOSTLY AT THE TOP. The foot cannot grow
+    # much — XLIM 3.13 is the mat wall and the trunk's own fibre crests
+    # already stand at 3.12 there, so any more and the socket clamp planes the
+    # whole lower flank into the machined face item 7 exists to remove. So the
+    # swing is bought at the crown instead, which is also where the eye judges
+    # it. Measured on this curve: 2.90 / 2.72 / 2.60 / 2.48 / 2.43 / 2.38 /
+    # 2.36 at y 0 / 1 / 2 / 4 / 6 / 9.4 / 12 — strictly decreasing, 23% from
+    # foot to crown, no local maximum anywhere above the ground.
+    # assert_taper_is_a_stump gates both halves of that sentence on the
+    # SILHOUETTE, not on this curve, because the silhouette is what a player
+    # sees and the ridges and the splay ride on top of it.
+    # The last term is the crown's own taper, and it is not decoration: the
+    # splay above the rim adds SPLAY to both surfaces over the top three
+    # units, and without something taking it back the outline widens again at
+    # y 10.5-11.5 — the inverted taper returning through the back door, on the
+    # one stretch of the profile that is entirely in the frame.
+    return (2.40
+            + 0.50 * math.exp(-y / 2.20)
+            - 0.045 * smoothstep(y, 6.6, 11.6)
+            - 0.090 * smoothstep(y, 8.4, 12.4))
 
 
 def wall(y):
-    """Wall thickness by height. Thick at the foot, thinner as it rises."""
+    """Wall thickness by height. Thick at the foot, thinner as it rises.
+
+    ROUND 7 RE-CUT IT TO BUY CROWN ROOM. Narrowing base(y) at the top runs
+    into a hard floor that has nothing to do with looks: PORTAL_IN declares
+    clearR 2.20 at rimY 9.40, assert_approach_clear fires 25 rays down a disc
+    of radius 2.09 from y 11.90 to 7.65, and the INNER surface is base - wall.
+    So every unit taken off the crown's outer radius has to be found in the
+    wall or it comes out of the doorway the engine drops dice through.
+    The taper through 5.2-7.6 is where it is found: above the wound (whose
+    cut faces ARE the wall thickness the eye reads at the mouth — R1) and
+    below the approach column. The wound band keeps 0.60..0.44, unchanged
+    within a hair of round 6; the crown runs 0.21 down to 0.15, and wall_at
+    takes it to a knife edge at each column's own tear anyway.
+    Measured margins at the bake: r_in 2.169 at rimY against a 2.09 ray.
+    """
     return (0.60
-            - 0.16 * smoothstep(y, 0.9, 6.0)
-            - 0.06 * smoothstep(y, 6.0, 9.4)
-            - 0.20 * smoothstep(y, 9.4, 12.4))
+            - 0.14 * smoothstep(y, 0.9, 5.2)
+            - 0.25 * smoothstep(y, 5.2, 7.6)
+            - 0.06 * smoothstep(y, 7.6, 11.4))
+
+
+# THE CHEEK — round 7, item 6.
+#
+# Between the mouth's lintel and the crown tear there was a large, smooth,
+# uniform pale panel with no value break in it: the face's cheek, and the
+# quietest surface in the model exactly where the eye rests longest. What it
+# needs is vertical grain deep enough to read AT THE TOWER EYE, which is a
+# silhouette-scale demand, not a shading one.
+#
+# IT IS BOUGHT BY CUTTING, NEVER BY RAISING, and that is item 8's law talking:
+# the outline's half-width at each row is set by the fibre CRESTS, and the
+# taper must not have a local maximum above the foot. Raising the crests in
+# this band would put one there — measured, +0.046 at y 7 against a 0.010
+# margin. So the grooves between the crests go deeper instead: same relief,
+# same grain, and the crest line (hence the outline) is untouched.
+#
+# HOW DEEP IS SET BY THE WALL, NOT BY TASTE, and this is the round's one real
+# collision between two items. Item 8 spent the wall to buy crown room for the
+# narrowed base, so through the upper cheek there is only 0.19-0.24 of wall to
+# groove into, and a groove may not eat it: CHEEK_WALL_KEEP is the floor.
+# Measured depth by height: 0.28 at y 5-6, 0.20 at 6.5, 0.13 at 7, 0.10 at 8.
+# So the lower cheek gets real geometry and the upper cheek is carried by the
+# paint's striation and its diagonal band. Recorded rather than hidden.
+CHEEK_Y = (4.10, 6.20, 8.60, 10.80)
+CHEEK_CUT = 0.28
+CHEEK_WALL_KEEP = 0.105
+
+
+def cheek_w(y):
+    return (smoothstep(y, CHEEK_Y[0], CHEEK_Y[1])
+            * (1.0 - smoothstep(y, CHEEK_Y[2], CHEEK_Y[3])))
 
 
 def wall_at(phi, y):
@@ -665,21 +879,68 @@ SPLIT_OFF = 0.075                  # rad off the crest — one column's worth
 SPLIT_W = 0.115                    # rad; wide enough for a column to land in
 
 
+def shear_at(phi):
+    """The slanted break plane, as a height above rimY. Round 7's thesis."""
+    return SHEAR_LIFT + SHEAR_AMP * math.cos(phi - SHEAR_DIR)
+
+
+def front_ramp(phi):
+    """How much of the crown survives at this heading — 0 at the tear's low
+    point, 1 away from it, and DELIBERATELY LOPSIDED.
+
+    Round 6 used smoothstep(|phi|, 0.30, 0.80): symmetric about the front by
+    construction, which put the low point dead centre and a matching shoulder
+    on each side of it. Read at the tower eye that is a visor slot. The low
+    point moves to TEAR_PHI and the two ramps get different widths, so the
+    crown climbs out of the tear fast on one side and slowly on the other and
+    the brow has no axis to be mirrored about.
+    """
+    d = phi - TEAR_PHI
+    d = (d + math.pi) % (2.0 * math.pi) - math.pi
+    return (smoothstep(d, 0.0, TEAR_W_HI) if d >= 0.0
+            else smoothstep(-d, 0.0, TEAR_W_LO))
+
+
 def y_top(phi):
-    """Per-column crown height: the LOW rim on the front, spires elsewhere.
+    """Per-column crown height: a SLANTED broken plane, one dominant shard on
+    it, and the tear's low point off centre.
 
     Clamped at or above rimY so the declared portal number is the honest
     low point of the tear and not an average with a hole under it.
     """
+    # THE BROKEN SURFACE FIRST: the slant, plus the rim's own chew. The chew
+    # is deep where the trunk tore DOWN (the low side of the shear) and quiet
+    # where it sheared clean, which is both what splintering wood does and
+    # what keeps the high flank predictable enough to budget against the
+    # ceiling.
+    sn = 0.5 + 0.5 * math.cos(phi - SHEAR_DIR)            # 1 high, 0 low
+    rag_a = RIM_RAG * (RIM_RAG_CLEAN + (1.0 - RIM_RAG_CLEAN) * (1.0 - sn))
+    t = shear_at(phi) + rag_a * (fbm_ring(phi, 0.0, 2.6, SEED + 5, 3) - 0.55)
+    # THE SPIRES RAISE THAT SURFACE TO THEIR OWN TIP, and never past it.
+    #
     # MAX, not sum: two spire ridges close in phi summed to a 14.0 monolith
     # on the first bake. Each blade is its own fiber and keeps its own
     # height, so the tallest number in the recipe is the tallest in the mesh.
-    t = 0.0
+    # Since round 7 the number in the recipe is an absolute TIP, so a blade
+    # standing on the high side of the shear is short and one on the low side
+    # is long — which is what a slanted break through parallel fibres does —
+    # and the ceiling is enforced by construction: at the crest the surface is
+    # exactly (tip - rimY), everywhere else it is between that and the plane.
     for R in RIDGES:
-        if R["spire"] <= 0:
+        if not R["spire_tip"]:
             continue
         k = blade(angdist(phi, crest_at(R, 10.5)), R["w"] * 1.50)
-        t = max(t, R["spire"] * k)
+        t = max(t, t + (R["spire_tip"] - PORTAL_IN["rimY"] - t) * k)
+    # THE BAYS EITHER SIDE OF THE SHARD. Its relief cannot be bought upward
+    # (the ceiling is 0.5 over the high flank; see THE CROWN SHEAR), so it is
+    # bought downward: the two fibres flanking a standing splinter are the
+    # ones that tore away lowest.
+    if TALL is not None:
+        c = crest_at(TALL, 10.5)
+        t -= SHARD_BAY_D * blade(angdist(phi, c - SHARD_BAY_OFF),
+                                 SHARD_BAY_W[0])
+        t -= SHARD_BAY_D * blade(angdist(phi, c + SHARD_BAY_OFF),
+                                 SHARD_BAY_W[1])
     # THE TALLEST TIP IS SPLIT.
     #
     # A blade profile has one smooth summit, and at NPHI 72 the columns fall
@@ -695,21 +956,32 @@ def y_top(phi):
     if TALL is not None:
         t -= SPLIT_D * blade(angdist(phi, crest_at(TALL, 10.5) + SPLIT_OFF),
                              SPLIT_W)
-    # the rim between spires still tears: sag in the valleys, ragged on top
-    t += 0.42 * fbm_ring(phi, 0.0, 2.6, SEED + 5, 3) - 0.12
-    # The front IS the low point — the crown tear reaches down toward the
-    # wound there, and rimY is quoted off it. The front band is driven to
-    # zero and then given its own small ragged lift with the -0.05 bias, so
-    # the tear still varies across the brow but genuinely TOUCHES 9.40
-    # instead of hovering above it. assert_rim_is_low measures this.
-    # The ramp ends at 0.80 rad, not 1.30: a wider one docked the tallest
-    # spire (at -58 deg) to 80% of its declared height, so the number in the
-    # recipe stopped being the number in the mesh.
-    back = smoothstep(abs(phi), 0.30, 0.80)
+    # THE TEAR'S LOW POINT, and it is not on the axis. The front band is
+    # driven to zero at TEAR_PHI and then given its own small ragged lift with
+    # the -0.05 bias, so the tear still varies across the brow but genuinely
+    # TOUCHES 9.40 instead of hovering above it. assert_rim_is_low measures
+    # this; the ramp widths are front_ramp's business.
+    back = front_ramp(phi)
     t *= back
     t += (1.0 - back) * (0.34 * abs(2.0 * fbm_ring(phi, 0.0, 6.0, SEED + 6, 2)
                                     - 1.0) - 0.05)
-    return PORTAL_IN["rimY"] + max(0.0, t)
+    t = max(0.0, t)
+    # THE FLOOR IS NOT A LINE — and this is the trap the shear walked into.
+    #
+    # A slanted break drives the low flank BELOW rimY over a wide arc, and
+    # max(0, t) then returns exactly 9.40 for every column in it. Measured on
+    # the first round-7 field: 0.70 rad of crown, from -1.92 to -1.22, at the
+    # identical height to three decimal places. That is a horizontal boundary
+    # in the silhouette, arriving on the very rim that was supposed to abolish
+    # one. So the clamped rim gets rubble ON TOP of the floor: positive-only,
+    # from max(0, fbm - 0.44), which is EXACTLY zero over the ~half of the
+    # ring where the noise is below its threshold — so the declared rimY is
+    # still genuinely touched (assert_rim_is_low re-measures it) and the flat
+    # is broken everywhere else. Faded out where the rim already stands proud,
+    # so it can never add to a spire.
+    t += (FLOOR_RUBBLE * max(0.0, fbm_ring(phi, 0.0, 11.0, SEED + 9, 2) - 0.44)
+          * (1.0 - smoothstep(t, 0.05, 0.55)))
+    return PORTAL_IN["rimY"] + t
 
 
 def valley(phi, y):
@@ -812,7 +1084,13 @@ def r_out(phi, y):
     # The spires lean OUT above the rim. Two duties in one term: torn fibers
     # splay rather than curl in, and the approach column stays clear without
     # having to be defended by a clamp.
-    r += 0.16 * smoothstep(y, PORTAL_IN["rimY"] - 0.5, PORTAL_IN["rimY"] + 2.4)
+    # 0.11, not 0.16, since round 7: a splay that reaches 0.16 over the last
+    # three units puts a LOCAL MAXIMUM back into the outline above the waist,
+    # which is precisely the inverted taper item 8 removes — measured, the
+    # outline's half-width at y 11 came back 0.02 wider than at y 6. The
+    # liner's copy of the term moves with it (see r_in) so the rim strip
+    # cannot re-open at the tip.
+    r += SPLAY * smoothstep(y, PORTAL_IN["rimY"] - 0.5, PORTAL_IN["rimY"] + 2.4)
     # Fine flutes: the striation the eye reads as grain, riding above the
     # ridges. k=9 is the ceiling, not a taste call — at 72 columns a ring
     # frequency past ~14 aliases into mush instead of resolving as grain,
@@ -824,6 +1102,16 @@ def r_out(phi, y):
     # fade over the same last unit, in r_in.
     r += ((0.085 * fbm_ring(phi, y * 0.30, 9.0, SEED + 2, 3) - 0.034)
           * (1.0 - smoothstep(y, y_top(phi) - 0.95, y_top(phi) - 0.10)))
+    # THE CHEEK'S GROOVES (see CHEEK_Y). Subtractive only — the crest line is
+    # the outline, and item 8 forbids a local maximum above the foot.
+    cw = cheek_w(y)
+    if cw > 0.0:
+        ck = 0.0
+        for R in RIDGES:
+            ck = max(ck, crest(angdist(phi, crest_at(R, y)), R["w"] * 1.15))
+        groove = (1.0 - ck) * (0.42 + 0.58 * fbm_ring(phi, y * 0.55, 13.0,
+                                                      SEED + 65, 3))
+        r -= cw * groove * min(CHEEK_CUT, max(0.0, wall(y) - CHEEK_WALL_KEEP))
     return r
 
 
@@ -842,7 +1130,7 @@ def r_in(phi, y):
     # 1 noted. Splitting the summit could not fix it because the summit was
     # never the problem — the two surfaces were drifting apart under it.
     # A torn fiber splays on BOTH faces, so the same term goes on both.
-    r += 0.16 * smoothstep(y, PORTAL_IN["rimY"] - 0.5, PORTAL_IN["rimY"] + 2.4)
+    r += SPLAY * smoothstep(y, PORTAL_IN["rimY"] - 0.5, PORTAL_IN["rimY"] + 2.4)
     # ...and the liner's rib noise fades out as the column nears its tear.
     # 0.085 of wobble on each surface INDEPENDENTLY is four times the 0.022
     # the wall tapers to, so without this the two faces can simply swap over
@@ -881,17 +1169,42 @@ def build_fingers():
 FINGERS.extend(build_fingers())
 
 
-def clamp_point(r, phi, front, back):
+CLAMP_TEAR = 0.115                 # how far the mat wall itself is chewed
+
+
+def x_limit(phi, y):
+    """THE MAT WALL, TORN — round 7, item 7.
+
+    The socket clamp is a hard min against a constant, so wherever the field
+    runs past it the surface becomes a PLANE at exactly x = +-XLIM. Joe read
+    the result off the side views as a sawn plank: a pale machined face at
+    x 3.13, y 0.70-0.85, z 0..-0.4, on a model whose whole subject is torn
+    wood. The plane is not avoidable — the mat is a real wall and the audit
+    measures it — but its FLATNESS is, because the limit does not have to be
+    a constant. Subtracting noise from it can only ever move wood INWARD, so
+    XLIM stays the ceiling it was and assert_envelope is unaffected, while the
+    face that lands on the wall comes out rippled and vertically grained
+    instead of milled. The noise is deliberately long in y (features about two
+    units) and short in phi, so what the clamp leaves reads as fibre running
+    up the flank rather than as a dent.
+    """
+    return XLIM - CLAMP_TEAR * (0.22 + 0.78 * fbm_ring(phi * 2.7, y * 1.20,
+                                                       4.0, SEED + 63, 3))
+
+
+def clamp_point(r, phi, y, front, back):
     """Polar -> app frame, with the socket clamps applied to the POINT.
 
     A z-CLAMP, not a z-scale: the trunk stays round wherever it fits and
     flattens only the arc that would actually leave the socket, which is
     what a trunk grown against a wall does. The x cap is by COMPONENT — a
     sign-based cap leaks crests past the mat wall on the back quarter-arcs.
+    Both surfaces read the SAME torn limit at the same (phi, y), so the wall
+    keeps its thickness across the clamped face.
     """
     sp, cp = math.sin(phi), math.cos(phi)
     if abs(sp) > 0.06:
-        r = min(r, XLIM / abs(sp))
+        r = min(r, x_limit(phi, y) / abs(sp))
     z = AXIS_Z + max(back, min(front, r * cp))
     return (r * sp, z)
 
@@ -908,12 +1221,13 @@ def z_front(y):
 
 
 def out_point(phi, y):
-    x, z = clamp_point(r_out(phi, y), phi, z_front(y) - AXIS_Z, ZBACK - AXIS_Z)
+    x, z = clamp_point(r_out(phi, y), phi, y, z_front(y) - AXIS_Z,
+                       ZBACK - AXIS_Z)
     return (x, y, z)
 
 
 def in_point(phi, y):
-    x, z = clamp_point(r_in(phi, y), phi,
+    x, z = clamp_point(r_in(phi, y), phi, y,
                        ZFRONT - AXIS_Z - 0.16, ZBACK - AXIS_Z + 0.10)
     return (x, y, z)
 
@@ -959,10 +1273,45 @@ def floor_y(phi):
 # The wood between the rag's local minima is what juts into the opening as a
 # splinter tooth — real geometry, not paint.
 
-W_PHI0 = 1.30          # half-width in phi at the widest (74.5 deg) — was
-#                        1.40 for the 5.00 door; the 4.20 throat's
-#                        outermost ray sits at phi 1.086 and the wound
-#                        keeps the same measured jamb allowance beyond it.
+W_PHI0 = 1.46          # half-width in phi at the widest, ON THE RIGHT.
+W_SIDE_L = 0.892       # ...and the LEFT jamb comes in to 0.892 of that, phi
+#                        1.302. Round 7, item 5: the visible tear must not be
+#                        mirror-symmetric about x = 0.
+#
+# WHY THE ASYMMETRY IS 0.158 RAD AND NOT MORE, measured the hard way. The
+# throat's outermost ray leaves z -1.5 at x -1.995, which is heading
+# atan2(1.995, 1.05) = 1.086 rad, and it sweeps back to 0.512 as it runs
+# forward. Every one of those headings needs the lintel above the box top at
+# 4.4125. Narrowing a jamb does not just move its corner: it moves the whole
+# arch inboard, so the same HEADING lands nearer the corner and lower. At
+# W_SIDE_L 0.86 the left arch came down to 4.365 at phi 1.086 — measured, and
+# check.py's ray found it before this comment existed. 1.302 is the width
+# that puts the left arch back on round 6's own 4.55 there. So the opening is
+# 0.158 rad (0.43 of world arc) wider on the right, not the 0.75 the brief
+# asked for, and the rest of item 5 is carried by the lintel instead.
+W_TILT = 1.30          # world units the LINTEL is lifted at the right end...
+W_TILT_LO = 0.34       # ...and pressed down at the left, BUT NEVER PAST ITS
+#                        OWN HEADROOM. The right-hand lift is an expansion and
+#                        can only remove wood; the press is the one contracting
+#                        move in this loop, and the first round-7 cut made it a
+#                        flat 0.36 and duly put the lintel at 4.375 inside a
+#                        throat box that stops at 4.4125 — check.py's ray found
+#                        it. So the press is now clipped to whatever headroom
+#                        the point actually has over THROAT_Y1 + LINTEL_FLOOR:
+#                        deep near the middle where the arch is 0.5 clear,
+#                        exactly zero out at the exit fan's edge where it is
+#                        not. Self-limiting by construction rather than by a
+#                        constant somebody has to keep in sync.
+LINTEL_FLOOR = 0.16    # headroom the press must leave over the throat box
+# TWO OR THREE LONG SPLINTERS, hanging DOWN off the lintel at irregular phi.
+# (phi, length, half-width in rad). Lengths and places are constrained by the
+# throat, not by taste: inside |x| <= 1.995 the lintel may not come below
+# 4.4125, so the long ones live where the lintel has been lifted (the right)
+# or outside the throat's x band, and the one near the middle is short.
+# assert_lintel_clears_the_throat re-measures every one of them on the loop.
+W_SPLINTERS = ((+0.72, 0.60, 0.145),
+               (-0.34, 0.26, 0.115),
+               (+1.06, 0.36, 0.160))
 W_YC = 2.925           # the wound's centre height (was 4.30)
 W_YUP = 2.025          # -> torn arch tops out at 4.95 — the rag above the
 #                        3.50 door's lintel (4.50) tightens from +1.35 to
@@ -1007,9 +1356,24 @@ W_LOOP_M = 124         # boundary samples, uniform in ARC LENGTH — scaled
 # corners square the wall was cut away out to |x| 2.93 at sill height, so the
 # tongue's back face stood in open air beside the mouth and rendered as a
 # black rectangle. Filled corners give it something to hide behind.
-W_CORNER_U0 = 0.870    # fillet starts at phi 1.131 — 0.045 over the new
-#                        throat ray at 1.086, the same margin the 5.00
-#                        door carried (1.197 vs 1.155).
+# ROUND 7 STATES IT IN PHI, NOT IN u, and it has to: with the two jambs at
+# different half-widths a fixed u threshold means two different headings, and
+# the one that matters is the heading, because that is what the throat ray
+# knows about. The fillet starts at 1.131 rad on BOTH sides — 0.045 over the
+# outermost throat ray at 1.086 — and runs to that side's own outer limit, so
+# the narrow (left) jamb has less room to sweep up in and gets a proportionally
+# smaller haunch rather than a near-vertical one. A fillet that outruns its
+# span is how the loop self-intersects and annihilates the shell (see build()).
+W_CORNER_PHI0 = 1.131
+W_CORNER_SPAN = 0.24   # the span a FULL lift wants; less room, less lift.
+#                        Calibrated on round 6, which swept 0.92 of sill up
+#                        over 0.247 rad without the loop self-intersecting, so
+#                        that is the span a full haunch is known to fit in. At
+#                        0.32 the left haunch came out 0.20 shallower than
+#                        round 6's and assert_no_hole_below_the_crest caught it
+#                        immediately: 21 sight lines into the cavity under the
+#                        bank's crest at x -2.99. The corner fillet is not
+#                        decoration — it is what the berm's wings hide behind.
 W_CORNER_LIFT = 0.92   # world units the sill rises at the extreme corner
 #                        (was 1.55 — scaled with the door height so the
 #                        corner fillet keeps its proportion of the mouth)
@@ -1059,7 +1423,15 @@ def build_wound_loop(m=W_LOOP_M):
     pts, arcs = [], [0.0]
     for i in range(dense):
         a = 2.0 * math.pi * i / dense
-        pts.append(uv_to_world(*w_base(a)))
+        u, v = w_base(a)
+        # THE TWO JAMBS ARE NOT THE SAME WIDTH (round 7, item 5). The scale is
+        # applied HERE, to the smooth boundary, so everything downstream —
+        # the arc-length resample, the outward normals, the rag, the table
+        # in_wound reads — inherits one asymmetric shape instead of each
+        # deriving its own. smoothstep from u = 0 means there is no kink on
+        # the axis where the two halves meet.
+        u *= 1.0 - (1.0 - W_SIDE_L) * smoothstep(-u, 0.0, 0.55)
+        pts.append(uv_to_world(u, v))
     for i in range(dense):
         p, q = pts[i], pts[(i + 1) % dense]
         arcs.append(arcs[-1] + math.hypot(q[0] - p[0], q[1] - p[1]))
@@ -1092,6 +1464,22 @@ def build_wound_loop(m=W_LOOP_M):
         # which is what a splinter is.
         ph = 2.0 * math.pi * s / W_TOOTH_LAM + 4.0 * n1p(2 * math.pi * s / total, 5, SEED + 83)
         lobe = 1.0 - (0.5 + 0.5 * math.cos(ph)) ** 3.4
+        # ...AND THE UPPER LIP GETS NO PERIODIC TERM AT ALL (round 7, item 4c).
+        #
+        # The cosine above has a FIXED WAVELENGTH. Down the jambs and along
+        # the buried threshold that is invisible; along the near-horizontal
+        # lintel it is a scallop, and a regular scallop over a dark opening is
+        # a row of teeth — half of what Joe read as a mouth. Phase noise does
+        # not fix it, because the eye reads the SPACING, and the spacing was
+        # still 0.86 everywhere. So the lintel's rag is built from three
+        # value-noise octaves at mutually incommensurate rates, on a domain
+        # that is itself warped: there is no wavelength in it to find.
+        sw = s + 0.85 * n1(s * 0.47, SEED + 95)
+        rag = (0.55 * n1(sw * 1.23, SEED + 87)
+               + 0.30 * n1(sw * 2.87 + 11.0, SEED + 89)
+               + 0.15 * n1(sw * 5.31 + 3.0, SEED + 93))
+        upper = smoothstep((ay - W_YC) / W_YUP, 0.12, 0.55)
+        lobe = lerp(lobe, smoothstep(rag, 0.26, 0.80), upper)
         gain = 0.34 + 0.66 * n1p(2 * math.pi * s / total, 11, SEED + 85)
         wander = 0.16 * n1p(2 * math.pi * s / total, 6, SEED + 81)
         # WHERE the fringe belongs. The brief asks for splinters on the two
@@ -1114,18 +1502,50 @@ def build_wound_loop(m=W_LOOP_M):
         low = 0.45 + 0.55 * smoothstep((ay - W_YC) / W_YDN, -0.92, -0.30)
         d = W_TOOTH_AMP * (lobe * gain + wander) * lips * low
         bx, by = ax + dx * d, ay + dy * d
-        # THE CORNER FILLET (see W_CORNER_U0). The threshold sweeps UP toward
-        # each jamb, so the mouth loses its square bottom corners and gains
-        # two haunches of solid wood. It is applied AFTER the rag so the
+        # THE LINTEL IS A DIAGONAL TEAR, NOT AN ARCH (round 7, item 4a).
+        #
+        # A superellipse top is an arch: it peaks on the axis and falls away
+        # equally on both sides, which is a mouth however ragged you make its
+        # edge. A trunk tears ONE WAY. So the lintel climbs monotonically
+        # across the opening, with the same handedness as the crown shear —
+        # both rise toward +x — and the two boundaries stop being parallel
+        # horizontals: the wood between them is a band that slants, and the
+        # cheek stops being a panel between two ledges.
+        #
+        # The lift on the right is an EXPANSION (wood removed, always legal).
+        # The press on the left is the one move in this file that contracts
+        # the opening, so it is bounded by measurement rather than by taste
+        # and assert_lintel_clears_the_throat re-proves it on the built loop.
+        phi_b = bx / W_ARC
+        uu = abs(bx) / W_ARC / W_PHI0
+        if by > W_YC:
+            vv = (by - W_YC) / W_YUP
+            w = smoothstep(vv, 0.05, 0.40)
+            us = bx / W_ARC / W_PHI0
+            by += w * W_TILT * max(0.0, us)
+            head = max(0.0, by - (THROAT_Y1 + LINTEL_FLOOR))
+            by -= min(w * W_TILT_LO * smoothstep(-us, 0.10, 0.70), head)
+            # THE SPLINTERS. A tent, not a bell: blade() has a rounded summit
+            # and a splinter has a point.
+            for sp_phi, sp_len, sp_w in W_SPLINTERS:
+                dd = abs(phi_b - sp_phi)
+                if dd < sp_w:
+                    by -= sp_len * w * (1.0 - dd / sp_w) ** 0.85
+        # THE CORNER FILLET (see W_CORNER_PHI0). The threshold sweeps UP
+        # toward each jamb, so the mouth loses its square bottom corners and
+        # gains two haunches of solid wood. It is applied AFTER the rag so the
         # fringe rides the new sill instead of being flattened by it, and it
         # only ever moves the boundary UP — the loop stays simple, and wood
         # is only ever added to the lower corners, never taken from the
-        # doorway.
-        uu = abs(bx) / W_ARC / W_PHI0
-        if by < W_YC:
-            by += (W_CORNER_LIFT
-                   * smoothstep(uu, W_CORNER_U0, 1.06)
-                   * smoothstep((W_YC - by) / W_YDN, 0.20, 0.92))
+        # doorway. The span is that side's own, so the narrow jamb gets a
+        # smaller haunch instead of a vertical one.
+        elif by < W_YC:
+            lim = W_PHI0 * (W_SIDE_L if bx < 0 else 1.0) * 1.06
+            span = lim - W_CORNER_PHI0
+            if span > 0.02:
+                by += (W_CORNER_LIFT * min(1.0, span / W_CORNER_SPAN)
+                       * smoothstep(abs(phi_b), W_CORNER_PHI0, lim)
+                       * smoothstep((W_YC - by) / W_YDN, 0.20, 0.92))
         loop.append(world_to_uv(bx, by))
     return loop
 
@@ -1557,8 +1977,17 @@ LANE_RELEASE = (2.95, 3.62)
 BERM_LOBES = (
     # cx,    cz,   ax,   az,   rot,  amp,  edge-noise k, seed
     (0.00,  1.05, 3.02, 2.70, 0.00, 0.82, 3.1, 161),    # the body
-    (-2.52, 0.24, 1.32, 1.45, -0.16, 1.20, 4.2, 163),   # left wing, broad
-    (2.48,  0.32, 1.48, 1.26, 0.14, 1.26, 4.8, 165),    # right wing, narrower
+    # THE WINGS FOLLOWED THE FOOT OUT (round 7, item 8). Fattening base(0)
+    # from 2.74 to 2.90 moved the wound's flank corners from |x| 2.87-2.96 to
+    # 3.03-3.04, and assert_no_hole_below_the_crest went straight from 16 open
+    # sight lines to 21: the bank was covering where the threshold USED to be.
+    # +0.10 of centre and +0.10 of amplitude on each wing takes it to 6, which
+    # is better than the mound this round inherited. Measured, and the middle
+    # of that search is worth recording: moving the wings out WITHOUT the
+    # amplitude opened two INNER lines (0 is the cap) — a wing that reaches
+    # further while staying the same height is thinner where the lane is.
+    (-2.62, 0.24, 1.32, 1.45, -0.16, 1.30, 4.2, 163),   # left wing, broad
+    (2.58,  0.32, 1.48, 1.26, 0.14, 1.36, 4.8, 165),    # right wing, narrower
     (0.62,  3.02, 2.00, 0.95, 0.11, 0.32, 3.6, 167),    # the trailing toe
 )
 # The two wings sit at z 0.22 / 0.30 and not further forward, and that is the
@@ -1807,8 +2236,21 @@ def build_berm(name):
 CURTAIN_BOT = 8.60         # under the lowest tear (9.40): no slot to see through
 CURTAIN_TOP = 12.05
 CURTAIN_TEAR = 0.16        # the top edge is torn DOWN from that, never up
-CURTAIN_INSET = 0.10       # how far inside the liner's own surface it stands
-CURTAIN_WALL = 0.14        # its thickness
+# ROUND 7 MOVED IT OUT OF THE BORE AND INTO THE WALL, and item 8 is the whole
+# reason. Narrowing the crown took the liner's radius from 2.52 to 2.17, and
+# the approach column is 2.09: the annulus a curtain used to live in — inside
+# the liner, 0.24 of it — simply stopped existing. Measured on the round-7
+# field, r_in runs 2.168-2.230 through the whole band while r_out runs
+# 2.365-2.458, so the only 0.15 of room left is INSIDE THE WALL. So that is
+# where it goes: a constant-radius band at 2.235-2.310, enclosed by the shell
+# below each column's tear (invisible, and it has no work to do there — the
+# shell is doing it) and emerging above the tear where it does. Capped against
+# r_out so it can never break the skin, and the cap is measured at every
+# sample rather than assumed. The first round-7 bake put the old inset curtain
+# 11 rays deep into the approach column; that is the failure this replaces.
+CURTAIN_RIN = 2.235        # its INNER face. The approach column is 2.09.
+CURTAIN_WALL = 0.075       # its thickness
+CURTAIN_CLEAR = 0.055      # ...and how far it stays inside the trunk's skin
 CURTAIN_ZF = 0.00          # its front plane, 0.06 behind the liner's clamp
 CURTAIN_M = 20             # columns: 18 deg, sagitta 0.03 at r 2.8 — under the
 #                            0.07 floor, and this is the coarseness the tri
@@ -1825,19 +2267,24 @@ def curtain_top_at(phi):
     return t - CURTAIN_TEAR * fbm_ring(phi, 0.0, 5.0, SEED + 71, 2)
 
 
-def curtain_r(phi, y, inset):
-    """The liner's radius, pulled in — and held off the socket plane.
+def curtain_ro(phi, y):
+    """The curtain's OUTER radius: a constant band, capped so it can never
+    break the trunk's skin or cross the socket plane.
 
     The front is a RADIUS rule, not a z-clamp. clamp_point flattens both of a
     wall's surfaces onto the same plane, which is fine for the shell (its two
     clamps are 0.16 apart) and fatal for a thin band: both faces would land on
-    one plane and the solid would collapse to a sheet. min() against
-    (zf - AXIS_Z)/cos keeps the two faces CURTAIN_WALL apart everywhere,
-    including across the flat front plate it produces inside |phi| < 24 deg.
+    one plane and the solid would collapse to a sheet. Deriving the inner face
+    from the outer one keeps the two CURTAIN_WALL apart everywhere by
+    construction, including across the flat front plate.
     """
-    zf = CURTAIN_ZF - (inset - CURTAIN_INSET)
-    return min(r_in(phi, y) - inset,
-               (zf - AXIS_Z) / max(0.25, math.cos(phi)))
+    return min(CURTAIN_RIN + CURTAIN_WALL,
+               r_out(phi, y) - CURTAIN_CLEAR,
+               (CURTAIN_ZF - AXIS_Z) / max(0.25, math.cos(phi)))
+
+
+def curtain_r(phi, y, inset):
+    return curtain_ro(phi, y) - inset
 
 
 def build_curtain(name):
@@ -1851,8 +2298,7 @@ def build_curtain(name):
         ys = [lerp(CURTAIN_BOT, top, k / (CURTAIN_ROWS - 1.0))
               for k in range(CURTAIN_ROWS)]
         loop = []
-        for inset, seq in ((CURTAIN_INSET, ys),
-                           (CURTAIN_INSET + CURTAIN_WALL, list(reversed(ys)))):
+        for inset, seq in ((0.0, ys), (CURTAIN_WALL, list(reversed(ys)))):
             for y in seq:
                 r = curtain_r(phi, y, inset)
                 loop.append((r * math.sin(phi), y, AXIS_Z + r * math.cos(phi)))
@@ -2148,6 +2594,15 @@ SOIL_K = 0.72
 # seam": the bank's flanks and its forward spread wear the tone the ground
 # disc wears, so the two meet in a value the eye cannot find.
 BERM_MOSS = 0.70
+# THE DIAGONAL SCAR BAND (round 7, item 6). 0.52 rad is 30 degrees off
+# vertical; the half-width is in the same world units as the unrolled surface,
+# so a 1.35 band is about 2.7 units of wood measured across itself.
+BAND_TILT = 0.52
+BAND_P0 = -2.35
+BAND_HALF = 1.55
+BAND_BARK = 0.68
+BAND_MOSS = 0.50
+CHEEK_GAIN = 1.75        # striation contrast through the cheek band
 
 
 def make_paint(pal):
@@ -2244,6 +2699,16 @@ def make_paint(pal):
         lum = (0.16 + 0.84 * crestk) * (0.55 + 0.45 * (1.0 - furrow) ** 0.6)
         lum *= 0.62 + 0.55 * smoothstep(streak, 0.30, 0.76)
         lum *= 0.86 + 0.28 * fine
+        # THE CHEEK'S GRAIN IS PUSHED, NOT REPAINTED (round 7, item 6). The
+        # geometry can only groove this band as deep as the wall allows —
+        # 0.28 at y 5.5 but 0.10 by y 8, because item 8 spent the wall on
+        # crown room — so above the waist the striation has to be carried by
+        # value. Same field, more contrast: the mid holds and the ends spread,
+        # so nothing new is invented and the furrows simply stop being
+        # suggestions. Contrast, not brightness: the band's mean is unchanged.
+        cwk = cheek_w(y)
+        if cwk > 0.0:
+            lum = lerp(lum, (lum - 0.5) * CHEEK_GAIN + 0.5, cwk)
         c = lerp3(pal["wood_mid"], pal["wood_hi"], min(1.0, max(0.0, lum)))
         c = lerp3(pal["wood_low"], c, smoothstep(y, -0.1, 1.9) * 0.62 + 0.38)
 
@@ -2291,6 +2756,33 @@ def make_paint(pal):
                    * smoothstep(fbm_ring(phi, y * 1.3, 8.0, SEED + 59, 3),
                                 0.30, 0.66))
         c = lerp3(c, pal["creep"], CREEP_K * creepk)
+
+        # THE DIAGONAL SCAR BAND (round 7, item 6) — the cheek's value break,
+        # and the one rule about it is that it must not be another horizontal.
+        #
+        # Everything else that crosses this trunk runs level: the bark
+        # remnants are a height band, the moss creep is a height band, the
+        # lichen is a height band. Three level bands over a level mouth is
+        # what built the face. This one runs at BAND_TILT off vertical, on
+        # the perpendicular coordinate of the unrolled (arc, y) surface, so
+        # it cuts the cheek corner to corner. Its centre line wanders with
+        # noise and a second field punches holes through it, so it is a run
+        # of old bark and moss down a scar, not a painted stripe.
+        #
+        # Windowed off the seam by construction (fw falls to 0 by |phi| 1.45)
+        # — arc is discontinuous at +-pi and a band that reached it would zip.
+        arc = phi * 2.85
+        pcoord = (arc * math.cos(BAND_TILT) - y * math.sin(BAND_TILT)
+                  + 0.62 * fbm_ring(phi, y * 0.42, 2.2, SEED + 67, 3))
+        bandk = (1.0 - smoothstep(abs(pcoord - BAND_P0), BAND_HALF * 0.45,
+                                  BAND_HALF))
+        fw = max(0.0, 1.0 - (abs(phi) / 1.45) ** 2)
+        bandk *= fw * smoothstep(y, 3.10, 4.60) * (1.0 - smoothstep(y, 9.6, 11.2))
+        bandk *= 0.22 + 0.78 * smoothstep(
+            fbm_ring(phi * 1.6, y * 0.75, 6.0, SEED + 69, 3), 0.30, 0.62)
+        if bandk > 0.0:
+            c = lerp3(c, pal["bark"], BAND_BARK * bandk)
+            c = lerp3(c, pal["moss"], BAND_MOSS * bandk * (0.30 + 0.70 * (1.0 - crestk)))
 
         # the torn edges: punky rot in the fringe, pale exposed fiber ON it
         if q < 1.9:
@@ -2979,6 +3471,331 @@ def assert_rim_is_low():
           f"(spires {hi - lo:.2f} above the rim; ceiling {CROWN_MAX})")
 
 
+# --------------------------------------------------------------------------
+# THE ROUND-7 GATES — stated in the FRAME, measured on the built mesh
+# --------------------------------------------------------------------------
+# Round 6 fought symmetry in PLAN and shipped a helmet, because every gate it
+# had read the plan too. These three read the PROJECTION: bin the shell's own
+# vertices by screen x (the outline) or by height (the taper) and judge what
+# comes out. An orthographic front bin is not the tower eye's perspective
+# frame, but it is the same topology of outline — a peak is a peak and a
+# mirrored pair is a mirrored pair — and it costs milliseconds.
+SIL_BINS = 72            # one per mesh column: finer bins alias into a comb
+SIL_YMIN = PORTAL_IN["rimY"] - 1.2   # only CROWN vertices are the skyline
+SIL_PROM = 0.30          # what counts as a peak at all
+# WHAT COUNTS AS DOMINANT, AND WHY IT IS NOT A BIGGER NUMBER. The shard's
+# prominence in the outline is capped by arithmetic, not by nerve. rimY 9.40
+# and CROWN_MAX 12.35 leave 2.95; the brief's shear gap spends 2.05 of it on
+# the right flank, and phi = +pi/2 is the outline's own right-hand END, so the
+# shard can never stand more than 12.35 - 11.55 = 0.80 above the rim beside
+# it. Measured on this bake: 0.74. Anything over 0.60 is therefore the single
+# tallest thing in the frame by the widest margin the socket allows.
+SIL_DOMINANT = 0.60
+SIL_MIRROR_X = 0.55      # two peaks this close to mirrored positions...
+SIL_MIRROR_Y = 0.60      # ...and this close in height are a horned pair
+SIL_FLAT_RUN = 0.90      # the longest horizontal the outline may carry
+SIL_GAP = 2.00           # y_top(+pi/2) - y_top(-pi/2), the brief's floor
+TAPER_BIN = 0.25         # height bin for the profile walk
+TAPER_TOL = 0.045        # how much a row may widen over the one below it.
+#                          Not slack: x_limit's own tear is 0.115 deep and the
+#                          fibre crests fall where they fall, so two adjacent
+#                          bins in the clamped band legitimately differ by a
+#                          few hundredths. A tolerance under the noise floor
+#                          fails on the noise instead of on the shape.
+TAPER_SWING = 0.20       # foot/rim - 1
+
+
+def outline_of(ob, nb=SIL_BINS, ymin=SIL_YMIN):
+    """The CROWN's own front outline: the highest vertex in each x bin.
+
+    THREE THINGS THIS HAD TO LEARN, and all three were measured, not guessed.
+
+    The vertex filter is not tidiness: with the whole shell in, a bin that no
+    crown vertex happens to land in reports the LINTEL at 5.79 instead, and
+    the skyline comes back as a comb of four-unit "peaks" that are really the
+    mouth. ymin keeps it to the crown.
+
+    Bin one per mesh column: at the crown two neighbouring columns are up to
+    0.21 apart in x, and binning finer than the geometry is how a smooth rim
+    becomes a sawtooth.
+
+    And walk EDGES, not vertices. A silhouette is the boundary of the
+    projected SURFACE; binning vertices alone under-fills it, and the first
+    cut of this gate duly reported an outline alternating 10.0 / 9.0 / 10.0 /
+    9.0 across the whole crown — five "dominant peaks" that were the sampling
+    talking, not the model. Every edge with an end above ymin is rasterised
+    into the bins it spans. The rim strip's own edges (outer surface to inner
+    surface, both at that column's y_top) are what actually paint the
+    skyline, which is exactly right: that strip IS the top of the tower.
+    """
+    top = [None] * nb
+    step = 2.0 * XLIM / nb
+
+    def put(x, y):
+        k = int((x + XLIM) / (2.0 * XLIM) * nb)
+        if 0 <= k < nb and (top[k] is None or y > top[k]):
+            top[k] = y
+
+    vs = [app_of(v.co) for v in ob.data.vertices]
+    for e in ob.data.edges:
+        a, b = vs[e.vertices[0]], vs[e.vertices[1]]
+        if a[1] < ymin and b[1] < ymin:
+            continue
+        n = max(1, int(abs(a[0] - b[0]) / step) + 1)
+        for i in range(n + 1):
+            f = i / n
+            y = a[1] + (b[1] - a[1]) * f
+            if y >= ymin:
+                put(a[0] + (b[0] - a[0]) * f, y)
+    return [(-XLIM + 2.0 * XLIM * (k + 0.5) / nb, t)
+            for k, t in enumerate(top) if t is not None]
+
+
+def outline_peaks(prof, prom):
+    ys = [p[1] for p in prof]
+    n = len(ys)
+    out = []
+    for i in range(1, n - 1):
+        if ys[i] < ys[i - 1] or ys[i] < ys[i + 1]:
+            continue
+        drops = []
+        for d in (-1, 1):
+            j, mn = i + d, ys[i]
+            while 0 <= j < n and ys[j] <= ys[i]:
+                mn = min(mn, ys[j])
+                j += d
+            drops.append(ys[i] - mn)
+        p = min(drops)                       # true prominence: the lesser side
+        if p >= prom:
+            if out and abs(prof[i][0] - out[-1][0]) < 0.25:
+                if ys[i] > out[-1][1]:
+                    out[-1] = (prof[i][0], ys[i], p)
+            else:
+                out.append((prof[i][0], ys[i], p))
+    return out
+
+
+def assert_silhouette_is_not_a_face(shell):
+    """NO HORIZONTAL BOUNDARY AND NO MIRRORED PAIR IN THE OUTLINE.
+
+    RED-CHECKED AGAINST THE THING IT EXISTS TO REFUSE: round 6's own field
+    projects to peaks at (-2.44, 12.32) and (+2.30, 11.81) — 0.14 from
+    mirrored in x, 0.51 apart in height, prominence 2.41 and 2.01 — and this
+    gate fails it on all three counts. That bake was green on every other
+    check in this file.
+    """
+    prof = outline_of(shell)
+    peaks = outline_peaks(prof, SIL_PROM)
+    dom = [p for p in peaks if p[2] >= SIL_DOMINANT]
+    bad = []
+    if len(dom) != 1:
+        bad.append("%d dominant peaks (want exactly 1): %s" % (
+            len(dom), ", ".join("x %+.2f y %.2f prom %.2f" % p for p in dom)))
+    for i, a in enumerate(peaks):
+        for b in peaks[i + 1:]:
+            if (abs(a[0] + b[0]) < SIL_MIRROR_X
+                    and abs(a[1] - b[1]) < SIL_MIRROR_Y):
+                bad.append("mirrored pair at x %+.2f / %+.2f, y %.2f / %.2f"
+                           % (a[0], b[0], a[1], b[1]))
+    run_x0, run_y = prof[0]
+    worst = (0.0, 0.0)
+    for x, y in prof[1:]:
+        if abs(y - run_y) < 0.05:
+            if x - run_x0 > worst[0]:
+                worst = (x - run_x0, y)
+        else:
+            run_x0, run_y = x, y
+    if worst[0] > SIL_FLAT_RUN:
+        bad.append("a %.2f-wide horizontal at y %.2f" % worst)
+    gap = y_top(math.pi / 2) - y_top(-math.pi / 2)
+    if gap < SIL_GAP:
+        bad.append("the crown shear is only %.3f (want %.2f): y_top(+pi/2) "
+                   "%.3f vs y_top(-pi/2) %.3f"
+                   % (gap, SIL_GAP, y_top(math.pi / 2), y_top(-math.pi / 2)))
+    print("[bole] outline: %d peak(s) %s | shear gap %.2f | longest flat %.2f"
+          % (len(peaks),
+             " ".join("(x%+.2f y%.2f p%.2f)" % p for p in peaks), gap, worst[0]))
+    if bad:
+        raise RuntimeError("the silhouette still reads as a face:\n       "
+                           + "\n       ".join(bad))
+
+
+def assert_taper_is_a_stump(shell):
+    """WIDEST AT THE GROUND, NARROWING ALL THE WAY UP (round 7, item 8).
+
+    Joe: "the stump is not particularly wide at the bottom and gets much
+    wider near the top. Most stumps are dramatically wider at the bottom."
+    Round 6 measured base(y) 2.74 / 2.46 / 2.90 foot / waist / shoulder — an
+    inverted taper, and a helmet flares at the top exactly where a stump does
+    not. Measured HERE on the outline's half-width per row, because the base
+    curve is only one of four things that set it (the ridges, the buttress
+    web, the crown splay and the socket clamp are the others, and three of
+    them broke this law at some point during the round).
+    """
+    # EDGES, NOT VERTEX ROWS, for the same reason the outline uses them: the
+    # mesh's rows are 1.0 apart at the waist and the crown's are lerped to
+    # each column's own tear, so any fixed y bin lands on a row in one place
+    # and between two rows in another — measured, that alone reported the
+    # profile "widening" at y 6.0, 10.0 and 11.5 on a model that does nothing
+    # of the kind. An edge walk covers every height continuously.
+    rows = {}
+    vs = [app_of(v.co) for v in shell.data.vertices]
+    for e in shell.data.edges:
+        a, b = vs[e.vertices[0]], vs[e.vertices[1]]
+        n = max(1, int(abs(a[1] - b[1]) / TAPER_BIN) + 1)
+        for i in range(n + 1):
+            f = i / n
+            y = a[1] + (b[1] - a[1]) * f
+            k = int(math.floor(y / TAPER_BIN))
+            rows[k] = max(rows.get(k, 0.0), abs(a[0] + (b[0] - a[0]) * f))
+    ks = sorted(rows)
+    prof = [(k * TAPER_BIN, rows[k]) for k in ks if rows[k] > 0.2]
+    bad = []
+    top_k = max(range(len(prof)), key=lambda i: prof[i][1])
+    # THE FOOT IS A CLAMPED WALL, not a point: the socket's x limit holds the
+    # flanks at the same width from the felt to about y 1.8, so "widest at the
+    # ground" is a tie over that band rather than a single row.
+    if prof[top_k][0] > 1.9:
+        bad.append("widest row is y %.2f, not the ground" % prof[top_k][0])
+    prof = prof[top_k:]
+    for i in range(1, len(prof)):
+        if prof[i][1] > prof[i - 1][1] + TAPER_TOL:
+            bad.append("widens at y %.1f: %.3f -> %.3f"
+                       % (prof[i][0], prof[i - 1][1], prof[i][1]))
+    # ...and the swing is quoted at the RIM, not at the last sliver of the
+    # tallest shard: above rimY the profile is one blade and its width is a
+    # statement about that blade, not about the trunk.
+    rim = min((p for p in prof if p[0] >= PORTAL_IN["rimY"]),
+              key=lambda p: p[0], default=prof[-1])
+    swing = prof[0][1] / rim[1] - 1.0
+    if swing < TAPER_SWING:
+        bad.append("foot/crown swing is only %.1f%% (want %.0f%%)"
+                   % (swing * 100, TAPER_SWING * 100))
+    print("[bole] taper: half-width %.2f at the felt -> %.2f at the rim "
+          "(%.1f%%) -> %.2f at the top; widest at y %.2f"
+          % (prof[0][1], rim[1], swing * 100, prof[-1][1],
+             prof[0][0]))
+    if bad:
+        raise RuntimeError("the taper is not a stump's:\n       "
+                           + "\n       ".join(bad))
+
+
+def lintel_points():
+    """The wound's upper branch in world (x, y) — the LINTEL, which is what
+    the eye reads as the top of the mouth."""
+    out = []
+    for u, v in WOUND_LOOP:
+        if v <= 0.02:
+            continue
+        phi = W_PHI0 * u
+        y = W_YC + W_YUP * v
+        x, _z = clamp_point(r_out(phi, y), phi, y,
+                            z_front(y) - AXIS_Z, ZBACK - AXIS_Z)
+        out.append((x, y, phi))
+    out.sort()
+    return out
+
+
+def assert_lintel_is_a_tear(objs):
+    """THE MOUTH'S TOP EDGE: a diagonal tear, not an arch, and not a mouth.
+
+    Three claims, three measurements.
+
+    (a) IT CLIMBS. At +-THROAT_HALF_W — the same x the exit gate probes, so
+        the number means something — the right side must stand at least 0.90
+        above the left. Round 6 read 5.07 / 4.98: a nine-centimetre "climb"
+        on a five-metre-wide opening, which is an arch.
+    (b) IT NEVER TRESPASSES. The lift on the right adds nothing to the model's
+        risk (it only removes wood) but the press on the left contracts the
+        opening, so the loop's lowest lintel point inside the throat's own x
+        band is measured against the top of the throat box. assert_throat_
+        clear fires real rays at the triangles afterwards; this one names the
+        cause when it is the lintel.
+    (c) IT HAS NO RHYTHM. A regular scallop over a dark opening is a row of
+        teeth, and half of what Joe read as a mouth was exactly that. The
+        measurement is the SPACING and DEPTH of the lintel's dips, as
+        coefficients of variation: teeth are evenly spaced and the same size,
+        so a scallop's CV is small and a tear's is large.
+
+        A DFT was tried first and refused the job. Round 6's periodic term
+        carries 4 rad of phase noise, which smears its 0.86 wavelength across
+        bins: worst bin 26.6% of the edge's energy, LOWER than round 7's own
+        30.5%. A spectral test that both rounds pass is not a gate, it is a
+        decoration. The dips discriminate on the first try — round 6 spacings
+        0.76 / 0.77 / 0.79 / 0.92 / 0.52 (CV 0.17, depth CV 0.26) against
+        round 7's 1.94 / 1.05 / 0.43 / 1.15 / 0.43 (CV 0.56, depth CV 0.63).
+        That is the difference between a comb and a break, and it is exactly
+        what the eye was reading.
+    """
+    pts = lintel_points()
+    bad = []
+
+    def at(x):
+        near = [p[1] for p in pts if abs(p[0] - x) < 0.34]
+        return max(near) if near else None
+    left, right = at(-THROAT_HALF_W), at(THROAT_HALF_W)
+    rise = right - left
+    if rise < LINTEL_RISE:
+        bad.append("the lintel climbs only %.3f across the opening (%.2f at "
+                   "x %.2f, %.2f at x %+.2f); want %.2f"
+                   % (rise, left, -THROAT_HALF_W, right, THROAT_HALF_W,
+                      LINTEL_RISE))
+    # IN HEADING, NOT IN x — and that distinction cost a bake. The exit ray is
+    # a LINE THROUGH THE MODEL, not a point: the one at x -1.995 leaves z -1.5
+    # at heading -1.086 and sweeps to -0.512 as it runs forward, so what it
+    # needs is the lintel above the box at every heading in that fan. Phrased
+    # in x, this check happily passed a lintel point at 4.375 because that
+    # point's own |x| was 2.09 and so "outside the throat" — while the ray
+    # reached its heading anyway, 0.5 deep into the tower.
+    fan = math.atan2(THROAT_HALF_W, THROAT_Z0 - AXIS_Z)
+    inb = [p for p in pts if abs(p[2]) <= fan + 0.02]
+    low = min(inb, key=lambda p: p[1])
+    if low[1] < THROAT_Y1 + LINTEL_KEEP:
+        bad.append("a lintel point sits at y %.3f, heading %+.3f (the exit fan "
+                   "reaches %.3f) — that is inside the throat box, top %.4f"
+                   % (low[1], low[2], fan, THROAT_Y1))
+    # (c) the scallop test: how regular are the dips in this edge?
+    ys = [p[1] for p in pts]
+    n = len(ys)
+    trend = [sum(ys[max(0, i - 3):i + 4]) / len(ys[max(0, i - 3):i + 4])
+             for i in range(n)]
+    res = [ys[i] - trend[i] for i in range(n)]
+    dips = [(pts[i][0], -res[i]) for i in range(1, n - 1)
+            if res[i] < res[i - 1] and res[i] < res[i + 1] and -res[i] > 0.03]
+    cv_sp = cv_dp = 9.9
+    if len(dips) >= 3:
+        sp = [dips[i + 1][0] - dips[i][0] for i in range(len(dips) - 1)]
+        dp = [d for _x, d in dips]
+        cv_sp, cv_dp = coeff_var(sp), coeff_var(dp)
+        if cv_sp < SCALLOP_CV or cv_dp < SCALLOP_CV:
+            bad.append("the lintel is a scallop: %d dips, spacing CV %.2f and "
+                       "depth CV %.2f against a %.2f floor — evenly spaced "
+                       "dips of equal size ARE teeth"
+                       % (len(dips), cv_sp, cv_dp, SCALLOP_CV))
+    print("[bole] lintel: %.2f at x %+.2f -> %.2f at x %+.2f (climb %.2f), "
+          "apex %.2f, lowest in the exit fan %.2f at heading %+.2f, %d dips "
+          "(spacing CV %.2f, depth CV %.2f)"
+          % (left, -THROAT_HALF_W, right, THROAT_HALF_W, rise,
+             max(ys), low[1], low[2], len(dips), cv_sp, cv_dp))
+    if bad:
+        raise RuntimeError("the mouth's top edge is still a mouth:\n       "
+                           + "\n       ".join(bad))
+
+
+LINTEL_RISE = 0.90       # world units, measured at +-THROAT_HALF_W
+LINTEL_KEEP = 0.10       # headroom the lintel keeps over the throat box
+SCALLOP_CV = 0.35        # the least irregular a torn edge's dips may be
+#                          (round 6 measured 0.17 / 0.26, round 7 0.56 / 0.63)
+
+
+def coeff_var(vs):
+    m = sum(vs) / len(vs)
+    if abs(m) < 1e-9:
+        return 9.9
+    var = sum((v - m) ** 2 for v in vs) / len(vs)
+    return math.sqrt(var) / abs(m)
+
+
 def app_of(co):
     return (co.x, co.z, -co.y)
 
@@ -3179,7 +3996,7 @@ def report_form():
     for i in range(360):
         p = -math.pi + 2 * math.pi * i / 360
         for y in (0.02, 0.30, 0.62, 1.05):
-            x, z = clamp_point(r_out(p, y), p, z_front(y) - AXIS_Z,
+            x, z = clamp_point(r_out(p, y), p, y, z_front(y) - AXIS_Z,
                                ZBACK - AXIS_Z)
             xs.append(x)
             zs.append(z)
@@ -3336,6 +4153,9 @@ def build(variant):
         "boleShelves", "Col", 0.72,
         emissive=tuple(c * 0.11 for c in pal["glow_core"])))
 
+    assert_silhouette_is_not_a_face(shell)
+    assert_taper_is_a_stump(shell)
+    assert_lintel_is_a_tear(meshes)
     assert_throat_clear(meshes)
     assert_approach_clear(meshes)
     assert_shelves_bite()
