@@ -149,6 +149,16 @@ the bake that every gate here had passed:
      did. Height measured off the binding ray (wide.eyeFull to the deepest,
      highest sample: it crosses at 11.779), not off the brief's 11.5.
 
+WHAT ROUND 4 CHANGED — one painter, no geometry. The app's look pass called
+the delivery tongue a near-white slab, brighter than the trunk it comes out
+of, which inverts the tertiary-field law. It is the only thing round 4
+touches: make_tongue_paint drops the plate to 0.39 of its value and pulls it
+warm and dirty with the palette's own punky rot, and the lit-fiber term
+doubles so the grain survives the drop. Proved by measuring RENDERED pixels
+against the trunk's bark band rather than by reading the paint (see
+TONGUE_GAIN), and proved to be colour-only by the `set` digest, which must
+still be 76d898635b069ed2.
+
 MEASURED, NOT ASSUMED. Every dimensional claim above is re-derived from the
 built vertices at bake time: assert_throat_clear and assert_approach_clear
 cast rays at the finished triangles (not at the constants that generated
@@ -1824,6 +1834,53 @@ def make_paint(pal):
     return paint
 
 
+# ROUND 4 — THE TONGUE IS TOO BRIGHT, and the number that fixes it is not the
+# one the value table predicted.
+#
+# Round 2 already held this surface UNDER the trunk in albedo — measured off
+# the paint, tongue max 0.076 linear against the shell's 0.196 — and it still
+# came back from the app's own frames as the brightest thing on the model: a
+# near-white slab under a mid-value stump, which inverts the tertiary-field
+# law the venue is built on. Albedo was never the quantity in question. The
+# tongue is a broad plane facing straight UP at a key that sits above the
+# venue; the trunk is curved, raking and half self-shadowed. Equal albedo is
+# not equal value, and neither is half.
+#
+# So round 4 compensates for the ORIENTATION, and the compensation is
+# measured in the RENDER, not in the paint: rays cast through look.html's own
+# camera classify each sampled pixel by the MESH it lands on, so "tongue" and
+# "bark band" (shell, y 0.5-3.0, front-facing) are facts about the model
+# rather than rectangles somebody drew on a screenshot. Medians, moonrise:
+#
+#     lum median      front34   front   restingeye   14-tongue
+#     r3  tongue       0.2009  0.1996      0.2005      0.2040
+#     r3  bark         0.1493  0.1579      0.1720      0.1602
+#     r4  tongue       0.1196  0.1190      0.1196      0.1207
+#     r4  bark         0.1493  0.1579      0.1720      0.1600   (untouched)
+#
+# — the plate goes from 1.35x the lit bark band to 0.80x it at the worst
+# view, and foxfire lands at 0.74x on the same run.
+#
+# TONGUE_GAIN is 0.39, not the 0.5 the brief estimated, because the render is
+# not linear in albedo: sRGB compresses hard down here, and the dielectric
+# specular floor arrives whatever the albedo is. Two bakes at 0.50 and 0.30
+# gave medians 0.1353 and 0.1036; solving lum_linear = spec + gain*diffuse on
+# them measures spec 0.00186 and diffuse 0.02915, so the 0.01330 linear that
+# puts the plate 20% under the darkest bark band asks for 0.39. It predicted
+# that bake's median as 0.1194 and the bake measured 0.1193.
+#
+# A scalar gain is deliberate — it preserves the fiber streaks' RATIOS
+# exactly. What it does not preserve is what the EYE reads, which is why the
+# lit-fiber term above is doubled; see there.
+TONGUE_GAIN = 0.39
+# ...and it is worn WET ROOT-WOOD, not a bare plank. The palette's own punky
+# rot carries the plate warm and dirty; it is mixed in harder in the furrows
+# than on the ridges, so the streak pattern gains chroma variation at the same
+# time as it loses value, and the two palettes stay coherent because the
+# colour comes from each one's own table.
+TONGUE_DIRT = 0.55
+
+
 def make_tongue_paint(pal):
     def paint(_poly, co):
         x, y, z = co.x, co.z, -co.y
@@ -1844,12 +1901,23 @@ def make_tongue_paint(pal):
         # preview-rig artefact to wave away.
         lum = (0.22 + 0.55 * smoothstep(st, 0.30, 0.76)) * (0.55 + 0.45 * ridge)
         c = lerp3(pal["wood_low"], pal["wood_mid"], min(1.0, lum * 0.72))
-        c = lerp3(c, pal["wood_hi"], 0.10 * ridge * smoothstep(st, 0.5, 0.9))
+        # 0.20, not round 2's 0.10 — the streaks are paid for TWICE now. A
+        # scalar gain preserves relative contrast in LINEAR light, which is
+        # what the eye does not read: sRGB compresses hard down here, and the
+        # first 0.39 bake measured the plate's visible streak spread (p75 -
+        # median) at 0.009 against round 3's 0.024. Lifting the lit fiber
+        # alone puts the grain back at the top of the distribution without
+        # moving the median that had to come down.
+        c = lerp3(c, pal["wood_hi"], 0.20 * ridge * smoothstep(st, 0.5, 0.9))
         # dark where it leaves the mouth, mossy-damp at the felt end
         c = lerp3(pal["wood_low"], c, smoothstep(z, -0.05, 1.6) * 0.68 + 0.32)
         c = lerp3(c, pal["moss"], 0.55 * smoothstep(z, 2.0, 3.9)
                   * (0.4 + 0.6 * n1(x * 2.2 + z, SEED + 65)))
-        return c
+        # ROUND 4, and it is the last two lines on purpose: everything above
+        # is round 2's structure, untouched, and this takes the whole plate
+        # down and warms it without disturbing a single relative value.
+        c = lerp3(c, pal["punk"], TONGUE_DIRT * (1.0 - 0.50 * ridge))
+        return tuple(v * TONGUE_GAIN for v in c)
     return paint
 
 
