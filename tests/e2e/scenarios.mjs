@@ -22,7 +22,44 @@ limitations under the License.
 // fits). If a scenario needs app state a script can't reach, add a hook to
 // window.__diceDebug rather than scraping fragile DOM.
 
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { assert, Table } from './harness.mjs';
+
+// THE FROZEN ENGINE CONTRACT (docs/TOWER.md; captured by
+// tools/steps/tower-contract-capture.mjs). Read from disk rather than imported
+// as a module so it stays a DATA fixture — a JSON import would tie the suite
+// to an import-assertion syntax and, worse, invite somebody to make it a .mjs
+// that computes what it is supposed to be remembering.
+const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
+const TOWER_CONTRACT_GOLDEN = JSON.parse(
+  readFileSync(join(FIXTURES, 'tower-contract.golden.json'), 'utf8'));
+
+// The ONE expression the capture tool and the check both evaluate, so the
+// golden and the assertion can never drift into asking different questions.
+const TOWER_SNAP = 'JSON.stringify(window.__diceDebug.towerContractSnapshot())';
+
+// Name the FIRST field that moved, with both values. A bare string compare of
+// two 1000-line snapshots reports "they differ" and leaves a human to diff
+// them by eye; the whole value of a byte-level freeze is that when it goes red
+// it says `apron.c[1]: 1.14125 → 1.1425` and the edit is obvious.
+function firstDiff(live, want, path = '') {
+  if (Object.is(live, want)) return null;
+  if (live === null || want === null || typeof live !== 'object' || typeof want !== 'object') {
+    return `${path || '(root)'}: got ${JSON.stringify(live)}, golden ${JSON.stringify(want)}`;
+  }
+  const keys = [...new Set([...Object.keys(want), ...Object.keys(live)])];
+  for (const k of keys) {
+    const p = Array.isArray(want) ? `${path}[${k}]` : (path ? `${path}.${k}` : k);
+    if (!(k in live)) return `${p}: missing from the live snapshot`;
+    if (!(k in want)) return `${p}: present live (${JSON.stringify(live[k])}) and not in the golden`;
+    const d = firstDiff(live[k], want[k], p);
+    if (d) return d;
+  }
+  return null;
+}
 
 // Wait for a hidden roll's shrouded playback to land on a tab: the log line
 // exists, the dice are on the felt, and nothing is still animating.
@@ -10159,6 +10196,93 @@ export const scenarios = [
         `http://127.0.0.1:${ctx.port}/api/table?room=${encodeURIComponent(key)}`,
       ).then((r) => r.json());
       assert.equal(peek.name, 'Round Trip', 'server-side too, for the next arrival');
+    },
+  },
+  {
+    name: 'tower-contract-freeze',
+    tags: ['tower'],
+    // THE ENGINE CONTRACT, TO THE BIT (docs/TOWER.md, "The six engine-owned
+    // volumes"). towerVolumes() is being turned from six fixed literals into a
+    // function of a per-tower PORTAL SPEC, and the promise of that seam is that
+    // a CLASSIC tower comes out the other side unchanged. Not "close enough" —
+    // unchanged, on the same double, because every one of these numbers feeds
+    // a BAKE: the film is a pure function of the core and the seed, and a
+    // despawn line 1e-9 lower is two clients rendering one seed as two films.
+    //
+    // So the check is a byte comparison against a golden captured BEFORE the
+    // refactor (tools/steps/tower-contract-capture.mjs), not a tolerance. An
+    // epsilon here would pass exactly the change this exists to catch, because
+    // "algebraically equivalent" is precisely what a rearranged floating-point
+    // expression is not.
+    //
+    // Six rows: three zoom presets × {unsocketed, socketed}. The preset moves
+    // z0 and every volume hangs off it; socketing deepens the mat by matExtra,
+    // moving z0 again, and is the only state in which the eight collider
+    // bodies exist to be read at all.
+    //
+    // THE GOLDEN IS GUARDED BEFORE IT IS TRUSTED. A fixture that got truncated
+    // to `{}`, or whose six rows are six copies of one row, compares green
+    // against anything — this project's dominant failure mode wearing a new
+    // hat. So the shape, the body list and the z0 spread are asserted first,
+    // and only then is the live snapshot held against it.
+    //
+    //   RED CHECKS (each run, seen red, reverted, seen green again):
+    //   · despawnY `5.6 * S` → `5.61 * S` in towerVolumes: RED on all six rows
+    //     — `despawnY: got 7.0125, golden 7`. Reverted: green.
+    //   · a stray field added to the snapshot's projection: RED with
+    //     "present live and not in the golden", which is the guard that keeps
+    //     the projection honest in the other direction.
+    //   · deleting a row from the golden: RED on the six-row shape guard,
+    //     before any comparison runs.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+
+      // ---- the golden is worth comparing against --------------------------
+      const keys = Object.keys(TOWER_CONTRACT_GOLDEN);
+      assert.equal(keys.length, 6,
+        `the golden holds three presets × {unsocketed, socketed} (${keys.join(', ')})`);
+      const ORDER = ['doorL', 'doorR', 'lintel', 'towerBack', 'towerL', 'towerR', 'ramp', 'lip'];
+      const z0s = new Set();
+      for (const key of keys) {
+        const g = TOWER_CONTRACT_GOLDEN[key];
+        z0s.add(g.z0);
+        assert.equal(typeof g.despawnY, 'number', `${key}: the golden row has real numbers in it`);
+        if (key.endsWith('.none')) {
+          assert.equal(g.bodies, null, `${key}: a towerless row has no colliders to record`);
+        } else {
+          assert.deepEqual(g.bodies.map((b) => b.name), ORDER,
+            `${key}: the golden froze the eight engine colliders in contract order`);
+        }
+      }
+      assert.equal(z0s.size, 6,
+        `and all six rows are DIFFERENT anchors — six copies of one row would `
+        + `compare green against a broken engine (${[...z0s].join(', ')})`);
+
+      // ---- and the engine still lands on it, to the bit --------------------
+      for (const key of keys) {
+        const [preset, tower] = key.split('.');
+        await a.dbg(`setZoom('${preset}')`);
+        await a.waitFor(`window.__diceDebug.zoom === '${preset}'`,
+          { desc: `${key}: the mat is at the ${preset} preset` });
+        await a.dbg(`setTower('${tower}')`);
+        await a.waitFor(`window.__diceDebug.tower === '${tower}'`,
+          { desc: `${key}: the tower is '${tower}'` });
+
+        const live = JSON.parse(await a.eval(TOWER_SNAP));
+        const want = TOWER_CONTRACT_GOLDEN[key];
+        const diff = firstDiff(live, want);
+        assert.equal(diff, null,
+          `${key}: the engine contract is byte-identical to the frozen one — ${diff}`);
+        // Belt and braces on the walker itself: a firstDiff that returned null
+        // for everything would make every line above vacuous.
+        assert.equal(JSON.stringify(live), JSON.stringify(want),
+          `${key}: …and so is the serialisation, character for character`);
+      }
+      // The walker CAN say no — asserted against the golden's own rows, which
+      // differ from each other by construction (the z0 guard above).
+      assert.ok(firstDiff(TOWER_CONTRACT_GOLDEN[keys[0]], TOWER_CONTRACT_GOLDEN[keys[1]]),
+        'and the comparison has a way to fail: two different rows do not match');
     },
   },
   {

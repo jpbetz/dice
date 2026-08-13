@@ -8723,6 +8723,55 @@ window.__diceDebug = {
   // that a baffle knock takes the tower's palette AND that an ordinary
   // landing still takes the die set's.
   impactVoiceFor(ev, setId) { return impactVoice(ev || {}, SETS[setId] || null); },
+  // THE ENGINE CONTRACT, PROJECTED (docs/TOWER.md, "The six engine-owned
+  // volumes"). Everything towerVolumes() decides, plus what those numbers
+  // become in the WORLD: the eight collider bodies at full precision, in add
+  // order. Frozen against tests/e2e/fixtures/tower-contract.golden.json by the
+  // `tower-contract-freeze` scenario, so a refactor of the volume arithmetic
+  // has to prove byte-identity rather than claim it.
+  //
+  // THE PROJECTION IS THE POINT, and it is why every field is written out by
+  // hand instead of spread. A snapshot that copied the whole return value
+  // would freeze the SHAPE of towerVolumes() rather than the CONTRACT — and
+  // then every commit that adds a field (a portal spec's door sill, a pit, an
+  // eye offset) would have to re-capture the golden, which is the same as
+  // having no golden at all. Unknown fields are ignored, at every level.
+  //
+  // FULL DOUBLES, NEVER ROUNDED. The comparison is byte-for-byte and the whole
+  // question it answers is whether a rewritten expression lands on the SAME
+  // double; a toFixed(3) here would wave through exactly the 1e-9 drift that
+  // an "algebraically equivalent" rearrangement produces.
+  towerContractSnapshot() {
+    const v = towerVolumes();
+    const xyz = (a) => [a[0], a[1], a[2]];   // caps at three: no array grows here
+    // The bodies as cannon holds them, not as towerBodies() rounds them —
+    // this is the only place the collider set is read at contract precision,
+    // and the quaternion is in it because the ramp and the lip are the two
+    // bodies whose ROTATION is a derived number (see towerColliders).
+    const bodies = towerRig && towerRig.bodies ? towerRig.bodies.map((b) => {
+      const h = b.shapes[0] && b.shapes[0].halfExtents;
+      return {
+        name: b.labName,
+        position: [b.position.x, b.position.y, b.position.z],
+        quaternion: [b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w],
+        half: h ? [h.x, h.y, h.z] : null,
+      };
+    }) : null;
+    return {
+      z0: v.z0, S: v.S,
+      socket: { c: xyz(v.socket.c), s: xyz(v.socket.s) },
+      apron: { c: xyz(v.apron.c), s: xyz(v.apron.s), rx: v.apron.rx },
+      shaft: { c: xyz(v.shaft.c), r: v.shaft.r, h: v.shaft.h },
+      aim: { c: xyz(v.aim.c), s: xyz(v.aim.s) },
+      cowl: { c: xyz(v.cowl.c), s: xyz(v.cowl.s) },
+      despawnY: v.despawnY,
+      hood: { c: xyz(v.hood.c), s: xyz(v.hood.s) },
+      lip: { c: xyz(v.lip.c), s: xyz(v.lip.s), rx: v.lip.rx },
+      exit: { p: xyz(v.exit.p), pitch: v.exit.pitch },
+      door: { w: v.door.w, h: v.door.h },
+      bodies,
+    };
+  },
   // The registry as the picker sees it, so a scenario can assert the chips
   // against the source of truth instead of a hard-coded list.
   towerRegistry() {
