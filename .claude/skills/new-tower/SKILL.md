@@ -69,6 +69,12 @@ fixed volumes, you are choosing where the volumes go.
 - Check every number against TOWER_PORTAL_LIMITS *while designing* — the
   bake gate and the loader both refuse violations, but a refused bake is an
   hour late to a decision a sketch could have made.
+- The limits are NECESSARY, not sufficient: the ENVELOPE decides what can
+  be BUILT around a legal spec. The composite arithmetic (derived five
+  pinch-rounds deep in tower_fixture.py's header): body half-width ≥
+  |in.x| + clearR + side wall; interior depth ≥ the bore's whole diameter
+  + two walls; and at max clearR the envelope PINS in.z to ~classic. Run
+  that arithmetic at sketch time.
 - The model is authored with z = 0 at the back-wall socket plane, y up,
   +z toward the player, world units (d20 radius 1.25). The engine seats it
   at the live z0. Hull stays inside x ±3.25 (X HAS NO SLACK — the mat's
@@ -147,8 +153,12 @@ audits against the loaded scene graph). Rules about proofs themselves:
 The gates and proofs, in order:
 
 - (bake) `check.py --tower`: portals present/legal, approach + exit throats
-  clear by raycast (ramp-aware), towerSkin* present, budget, plus the
-  standard mesh gates. Red-checked planted defects live in its history.
+  clear by raycast (ramp-aware), the SOCKET ENVELOPE per mesh node
+  (tilt-aware — pass your skin's lean via --tower-tilt-deg), towerSkin*
+  present, budget, plus the standard mesh gates. Red-checked planted
+  defects live in its history. "Bake gates green" and "the model fits"
+  used to be different sentences; the envelope gate exists because the
+  first shipped bake proved it.
 - (load) js/towerglb.js re-validates portals and applies house rules; a bad
   model is REFUSED loudly and the table keeps its current tower.
 - (a) FIT — `tools/steps/tower-fit.mjs <id>`: hull vs the room envelope,
@@ -234,6 +244,19 @@ colors arrive final.
   BLACK. The loader sets the flag from the attribute — keep it that way.
 - Two n-gons sharing a diagonal can leave FOUR faces on one edge after
   canonicalize+triangulate (forge trap 12) — poke the hazard faces.
+- Upward-facing surfaces out-value walls at EQUAL albedo (they aim at the
+  key light): the hollowbole tongue's attributes measured under the shell's
+  yet rendered brightest on the model. Compensate in the bake, and verify
+  by RENDER measurement — pixel probes classified by raycast against the
+  live meshes — never by comparing attribute values.
+- A scalar albedo gain preserves LINEAR contrast and flattens what the eye
+  reads (sRGB compression): the tongue's streak spread went 0.024 → 0.009
+  under a pure gain and needed the fiber term doubled as a second lever.
+- The occlusion COWL band over a high-rimmed open crown is carried by the
+  interior liner's upper CURTAIN (rays through crown notches die on dark
+  liner), not by wall — and the curtain's required height is a RAY
+  CROSSING to measure, not a number to estimate (the estimate leaked;
+  the measurement said 11.78, built 12.03).
 
 ## Appendix — the classic code-skin path (maintenance only)
 
