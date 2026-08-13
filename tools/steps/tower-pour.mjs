@@ -24,9 +24,13 @@ limitations under the License.
 
 export default async function run(stage, args) {
   const pools = (args[0] || '1d20,1d8+1d6+1d10,8d6').split(',');
+  // args[1] is a tower id — the shipped pour must be runnable against every
+  // registered model, not just the first one built (parameterised 2026-08-13;
+  // it hard-coded heartwood until then, the same debt resting-eye carried).
+  const tower = args[1] || 'heartwood';
   const a = await stage.tab('localhost', 'TowerPour');
   await a.dbg('holdClock(true)');
-  await a.dbg(`setTower('heartwood')`);
+  await a.dbg(`setTower(${JSON.stringify(tower)})`);
   await a.dbg('sim(30)');
   console.log('tower =', await a.dbg('tower'), ' extents =',
     JSON.stringify(await a.dbg('tableExtents()')));

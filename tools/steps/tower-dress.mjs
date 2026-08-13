@@ -27,9 +27,12 @@ limitations under the License.
 //   node tools/drive.mjs tools/steps/tower-dress.mjs [tower…]
 
 export default async function run(stage, args) {
-  const towers = args.length ? args : ['heartwood', 'bastion', 'blackanvil'];
   const a = await stage.tab('localhost', 'TowerDress');
   await a.settle();
+  // Every skinned registry row by default — the typed three-tower list was
+  // already one model stale (hollowbole) when this line replaced it.
+  const towers = args.length ? args
+    : (await a.dbg('towerRegistry()')).filter((t) => t.skin).map((t) => t.id);
 
   let bad = 0;
   for (const id of towers) {

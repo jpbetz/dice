@@ -44,9 +44,13 @@ limitations under the License.
 //   node tools/drive.mjs tools/steps/tower-fit.mjs [tower…]
 
 export default async function run(stage, args) {
-  const towers = args.length ? args : ['heartwood', 'bastion', 'blackanvil'];
   const a = await stage.tab('localhost', 'TowerFit');
   await a.settle();
+  // Default to EVERY skinned registry row (the tower-family-shots idiom) —
+  // a typed list goes stale the day a model registers, and this one had:
+  // it said three towers while the registry held four.
+  const towers = args.length ? args
+    : (await a.dbg('towerRegistry()')).filter((t) => t.skin).map((t) => t.id);
 
   const base = await a.dbg('worldBodies()');
   console.log(`towerless world: ${base.count} bodies, named=[${base.named}]\n`);

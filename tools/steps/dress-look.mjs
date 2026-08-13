@@ -76,6 +76,14 @@ export default async function run(stage, args) {
   // 1. THE VERDICT FRAME: the resting eye, which is the distance every prop
   //    has to survive. Everything after this is diagnosis.
   await shot(`dress-${tower}-0-resting-eye.png`);
+  // A tower with no EYES entry gets the resting eye + sway frames only —
+  // SAY so instead of degrading silently (the per-cluster looks are the
+  // whole point of this tool; an id missing here is a review set with a
+  // hole in it, and somebody should be told to add the entry).
+  if (!EYES[tower]) {
+    console.log(`NOTE: no per-cluster EYES entry for '${tower}' — add one to `
+      + 'tools/steps/dress-look.mjs when its dress ships; resting eye only.');
+  }
   for (const [name, d, h, x] of EYES[tower] || []) {
     await t.dbg(`towerEye(${d}, ${h}, ${x})`);
     await shot(`dress-${tower}-${name}.png`);
