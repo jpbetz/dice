@@ -7884,6 +7884,12 @@ document.addEventListener('visibilitychange', () => {
 // back out in portal terms, and it is what every registered tower resolves to
 // today. That is load-bearing — see the delta arithmetic in towerVolumes.
 const TOWER_S = 1.25;
+// A DIE'S RADIUS, in the world units dice are actually fixed at — the same
+// 1.25 the mouth's clear radius is built from (1.25 + 0.4 of aim jitter =
+// 1.65). It is here because the occlusion contract needs it: a die vanishes
+// when its CENTRE crosses despawnY, so "the vanish is unwatchable" is the
+// claim that nothing below despawnY + this is visible. See v.cowlY.
+const TOWER_DIE_R = 1.25;
 // The lab's lip-tilt dial, frozen as the SHIPPED number. Until now
 // towerVolumes read TOWERLAB.tune.lipTilt directly, which put a live debug
 // knob inside a collider that films are baked against — a determinism hole
@@ -8040,6 +8046,7 @@ function towerVolumes(spec) {
   const D = DEFAULT_PORTALS;
   const dInX = spec.in.x - D.in.x;
   const dRim = spec.in.rimY - D.in.rimY;
+  const rimY = spec.in.rimY;
   const dOutX = spec.out.x - D.out.x, dSill = spec.out.sillY - D.out.sillY;
   const dW = spec.out.w - D.out.w, dH = spec.out.clearH - D.out.clearH;
   // The apron is a RAMP, not a step ("let physics help us out more"): the
@@ -8050,6 +8057,9 @@ function towerVolumes(spec) {
   // mat depth the tower already bought), so raising the sill by dSill steepens
   // the same triangle: rise 0.8 + dSill/S over run 1.5, in base units.
   const ath = Math.atan(0.8 / 1.5 + dSill / (1.5 * S));
+  // Hoisted because v.cowlY is derived FROM it: inside the object literal
+  // `despawnY` is a key, not a binding, and reading it there is a ReferenceError.
+  const despawnY = 5.6 * S + dRim;
   return {
     z0, S,
     // THE SOCKET IS NOT PORTAL-DERIVED, and that is the point of it: it is the
@@ -8090,7 +8100,7 @@ function towerVolumes(spec) {
                s: [4.2 * S, 2.4 * S, 0.3 * S] },
     // The vanish happens a fixed distance under the rim: raise the mouth and
     // the despawn line goes up with it, or the fall gets longer in the open.
-    despawnY: 5.6 * S + dRim,
+    despawnY,
     // Hood deepened 0.5→1.0 base (probe run 7): a die parked on the upper
     // chute at z0+0.78 — 0.18 past the old stalled cutoff, propped by the
     // pile, blocking the spawn sphere for good. The skin's shadow now
@@ -8166,7 +8176,36 @@ function towerVolumes(spec) {
     // portal-relative units, so it takes the bore's radius RATIO and the
     // door's width delta rather than re-deriving either. kR is exactly 1.0 at
     // the default — c/c is 1 for any finite non-zero c, and r*1.0 === r.
+    // …and the COWL BAND'S SAMPLE HEIGHTS, capped at THE TOP OF A DESPAWNING
+    // DIE. The band's own box rides 1.6*S above the mouth, which is right for
+    // an architectural tower — its mouth is hooded, so "above the rim" is
+    // still inside the building — and wrong for a tower whose mouth is open
+    // sky. Measured on the Hollow Bole (rimY 9.40): of the rays its cowl
+    // curtain was the only thing carrying, EVERY ONE was at y 9.90 or 11.25,
+    // above the rim, in the air over a broken crown, where a die is still
+    // visibly falling in and is MEANT to be seen. The shaft band held 99/99 at
+    // all six eyes with the curtain muted, so the despawn never leaned on it.
+    //
+    // What the band is FOR is stated in docs/TOWER.md's own COWL paragraph:
+    // the sightline into the bore must not reach "a d20's top at the despawn
+    // line, so the vanish would be watchable". That is the law, and it is
+    // arithmetic rather than taste — a die vanishes when its CENTRE crosses
+    // despawnY (see the pour's 'fall' arm), so it is fully hidden by then only
+    // if everything below despawnY + a die's radius is hidden. Above that
+    // line a die is in open air, falling, and visible on purpose.
+    //
+    // The band keeps its height and hangs down from that cap. Classic: top
+    // sample 10.60 -> 8.10. Hollow Bole: 11.25 -> 8.75.
+    cowlY: (() => {
+      const ct = Math.min(7.4 * S + dRim + 1.2 * S, despawnY + TOWER_DIE_R);
+      const cb = ct - 2.4 * S;
+      return [cb + 0.15, (cb + ct) / 2, ct - 0.15];
+    })(),
     smp: { kR: spec.in.clearR / D.in.clearR, dW },
+    // The declared rim, promoted to an output so the sampler and the proof
+    // tools stop re-deriving it from despawnY. Additive: towerContractSnapshot
+    // projects a fixed field list, so a new key cannot move the golden.
+    rimY,
   };
 }
 
@@ -9961,6 +10000,45 @@ window.__diceDebug = {
     camera.updateMatrixWorld();
     return [camera.position.x, camera.position.y, camera.position.z];
   },
+  // WHICH SURFACE CARRIES WHICH BAND? Occlusion comes back as a count, and a
+  // count cannot say whether a band is held by the wall, the lining, or one
+  // extra piece added only to hold it. This drops named `towerSkin*` nodes out
+  // of the occluder set (by un-prefixing the name — the set is a naming
+  // convention) so the check can be re-run WITHOUT them and the difference
+  // read off. Pass no argument to put every muted node back.
+  //
+  // It exists because `visible = false` is NOT the same experiment: three.js
+  // stopped testing `visible` in intersectObject, so an invisible mesh still
+  // blocks a ray. Muting has to work on the name, or the probe measures a
+  // surface the player cannot see and calls the band covered.
+  //
+  // Re-run with `towerOcclusionCheck()` and NO id — passing one re-skins the
+  // bench and rebuilds the names you just muted.
+  // It TRAVERSES, because a GLB tower's own meshes are nested one level down
+  // (the bake is parented into `towerSkinBole`) while the raycast reaches them
+  // through intersectObjects(..., true). Muting only the top row would report
+  // "nothing muted" and a clean pass — the same answer as "muted and the band
+  // still holds", which is the answer that matters.
+  towerOccluderMute(sub) {
+    const skin = TOWERLAB.group && TOWERLAB.group.getObjectByName('towerSkin');
+    if (!skin) return null;
+    const muted = [], seen = [];
+    skin.traverse((o) => {
+      if (!o.name || o === skin) return;
+      seen.push(o.name);
+      if (sub == null) {
+        if (o.name.startsWith('muted:')) o.name = o.name.slice(6);
+      } else if (o.name.startsWith('towerSkin') && o.name.includes(sub)) {
+        o.name = `muted:${o.name}`;
+      }
+      // A muted node has to stop being an occluder for BOTH readers: the
+      // name walk that builds the target list, and the recursive raycast
+      // that reaches it through its parent regardless of name.
+      if (o.name.startsWith('muted:')) { o.layers.set(1); muted.push(o.name.slice(6)); }
+      else o.layers.set(0);
+    });
+    return { muted, seen };
+  },
   // DOES THE SKIN ACTUALLY HIDE WHAT THE CONTRACT SAYS IT MUST? (docs/TOWER.md
   // §4.) For every shipped camera eye, shoot a ray at a grid of sample points
   // and ask whether opaque skin geometry stands in the way. Only the wood and
@@ -10020,8 +10098,11 @@ window.__diceDebug = {
     // (c) the exit spawn lane, (d) the HOOD pocket in front of the wall.
     const shaft = [], cowl = [], exit = [], hood = [];
     for (const y of [v.despawnY, v.despawnY + 0.25, v.despawnY + 0.6]) disc(y, shaft);
-    const cb = v.cowl.c[1] - v.cowl.s[1] / 2, ct = v.cowl.c[1] + v.cowl.s[1] / 2;
-    for (const y of [cb + 0.15, (cb + ct) / 2, ct - 0.15]) disc(y, cowl);
+    // THE COWL BAND IS SAMPLED IN THE BORE, NOT OVER IT (see v.cowlY). The
+    // heights are derived there so this reads them rather than re-deriving the
+    // band off the cowl VOLUME — the volume marks where a facade occluder
+    // belongs, which was never the same place as the points being shot at.
+    for (const y of v.cowlY) disc(y, cowl);
     for (const dx of [-0.9, 0, 0.9]) {
       for (const dy of [-0.6, 0, 0.9]) exit.push([dx, v.exit.p[1] + dy, v.exit.p[2]]);
     }
@@ -10493,6 +10574,10 @@ window.__diceDebug = {
         // before it is on felt the whole table shares.
         lipFrontZ: v.lip.c[2] + v.lip.s[2] / 2,
         hidZone: POUR.hidZone,
+        // The rim, and the three heights the COWL band is sampled at — capped
+        // at the rim, so a model reads off what it actually owes rather than
+        // guessing the band from the cowl volume's box (which sits above it).
+        rimY: v.rimY, cowlY: v.cowlY,
         eye: v.eye, cls: v.cls,
       },
     };

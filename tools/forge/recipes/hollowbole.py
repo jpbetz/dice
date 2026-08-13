@@ -553,7 +553,15 @@ SHEAR_AMP = 1.325                  # half the swing of the tilt
 SHEAR_LIFT = 0.90                  # ...and where its middle sits above rimY
 RIM_RAG = 0.75                     # rim chew, at full strength on the low side
 RIM_RAG_CLEAN = 0.30               # ...and this fraction of it on the high one
-TEAR_PHI = -0.35                   # the crown tear's LOW point: off centre
+# ROUND 8 MOVED THE NOTCH OFF THE SIGHTLINE. At -0.35 the tear's low point sat
+# 20 deg left of front, and the two occlusion rays that would not close crossed
+# the crown at phi -0.38 — the dip was parked exactly where the highest eye
+# looks in, so the eye went over the rim and down to y 8.75 at the back of the
+# bore, 0.15 under the top of a despawning die. Nothing about the model was
+# wrong except WHERE the low point was; swinging it onto the left flank puts
+# full-height crown across the front, which is both what closes the rays and
+# what stops the brow reading as a dip centred over the wound.
+TEAR_PHI = -0.95                   # the crown tear's LOW point: on the flank
 TEAR_W_HI = 0.25                   # rad — it climbs fast on the +phi side...
 TEAR_W_LO = 0.95                   # ...and long and slow on the -phi side
 # The two bays that flank the shard: the fibres either side of a standing
@@ -2256,15 +2264,64 @@ CURTAIN_M = 20             # columns: 18 deg, sagitta 0.03 at r 2.8 — under th
 #                            0.07 floor, and this is the coarseness the tri
 #                            budget buys instead of taking tris off the crown
 CURTAIN_ROWS = 3
+# ROUND 8 BURIES IT, and the reason is that it was never buying anything a
+# player could perceive — it was buying RAYS, and the rays were aimed wrong.
+#
+# Joe, on the round-7 frame: "I don't think we need the black cylinder visibly
+# sticking out the top of the stump." He was right, and the measurement is
+# unambiguous. Muting this object in the app and re-running towerOcclusionCheck
+# named every ray it was the sole carrier of: all of them at y 9.90 or 11.25,
+# against a declared rimY of 9.40. Every one was ABOVE THE RIM — a point in
+# open air over a broken crown, where a die is still visibly falling in and is
+# MEANT to be seen. The SHAFT band, which is the one that actually proves the
+# despawn is unwatchable, held 99/99 at all six eyes with this object gone.
+#
+# The band was mis-derived rather than mis-built: it rides 1.6*S above the
+# mouth, which is inside the building for a hooded architectural tower and is
+# SKY for a stump. js/main.js now caps the sampled band at the rim (v.cowlY),
+# so what this object owes is nothing, and what it must not do is show.
+#
+# So its top is clamped UNDER the shell's own crown at its own heading. It is
+# radially inside the skin already (CURTAIN_CLEAR), so once it is also under
+# the tear it is enclosed on every sightline: the liner stands between it and
+# any eye looking into the bore, and above the liner it has stopped existing.
+# Invisible BY CONSTRUCTION — which is the only honest kind here, because
+# three.js does not test `visible` in intersectObject: a mesh hidden with
+# `visible = false` still blocks the occlusion raycast, so "invisible" and
+# "occluding" cannot both be true of the same surface. assert_curtain measures
+# the burial on the built mesh.
+CURTAIN_BURY = 0.12        # how far under the crown its top edge stays
+# ...and the floor the GATE holds it to, which is deliberately not the same
+# number. Clamping to exactly CURTAIN_BURY puts the top row ON the gate's
+# threshold, where the comparison is decided by the last bit of a float — the
+# first run of this gate failed with "breaks the skyline by 0.000". A gate
+# whose verdict is a rounding artefact tests nothing, so it holds the mesh to
+# half the clamp: the design keeps 0.12, the refusal fires at 0.06, and
+# deleting the clamp entirely still fails it by more than two units.
+CURTAIN_BURY_MIN = 0.06
 
 
 def curtain_top_at(phi):
-    """Tall across the front, gone by the flanks — the rays that leak all
-    cross between -40 and +45 deg, so that is where the wood goes."""
+    """Tall across the front, gone by the flanks — then clamped UNDER the
+    crown so no part of it can break the skyline (see ROUND 8 BURIES IT).
+
+    The clamp takes the MINIMUM of y_top over the arc this column spans, not
+    y_top at the column itself. The curtain is swept at 20 columns and the
+    shell at 72: a top edge that only cleared the crown at its own heading
+    would still cut through it in between, where the quad's straight top edge
+    runs over a dip the coarse sweep never sampled.
+    """
     a = abs(phi)
     t = CURTAIN_TOP - 0.34 * smoothstep(a, 0.30, 0.95)
     t -= (t - 8.90) * smoothstep(a, 1.05, 1.50)
-    return t - CURTAIN_TEAR * fbm_ring(phi, 0.0, 5.0, SEED + 71, 2)
+    t -= CURTAIN_TEAR * fbm_ring(phi, 0.0, 5.0, SEED + 71, 2)
+    step = 2.0 * math.pi / CURTAIN_M
+    crown = min(y_top(phi + step * (k / 8.0 - 1.0)) for k in range(17))
+    # …and never below the bottom edge: a column whose crown sits under
+    # CURTAIN_BOT collapses the band to a sheet rather than merely shortening
+    # it, and a zero-height quad ring is the degenerate the manifold gate
+    # would have to catch downstream instead of here.
+    return max(CURTAIN_BOT + 0.05, min(t, crown - CURTAIN_BURY))
 
 
 def curtain_ro(phi, y):
@@ -3362,23 +3419,46 @@ def assert_mesh_envelopes(shell, berm, curtain, shelves):
 
 
 def assert_curtain(curtain):
-    b = app_box(curtain)
-    if b[3] < 11.45:
-        raise RuntimeError(f"the curtain tops out at {b[3]:.3f}, under the "
-                           f"11.45 the cowl band needs")
+    """THE CURTAIN MUST NOT SHOW. Round 7's gate asked the opposite — that it
+    reach 11.45, high enough to catch cowl rays that were being fired into the
+    sky — and the thing it built was the black cylinder standing over the
+    crown that Joe called out on the frame.
+
+    The claim is now stated where the complaint was: on the SILHOUETTE. Every
+    vertex must sit under the shell's crown at its own heading, so no part of
+    this object can appear against the sky or over the tear from any eye. It is
+    measured on the built mesh rather than asserted of curtain_top_at, because
+    the clamp lives in one function and the vertices are what render.
+    """
+    worst, worst_at = -1e9, None
+    for v in curtain.data.vertices:
+        x, y, z = app_of(v.co)
+        phi = math.atan2(x, z - AXIS_Z)
+        over = y - (y_top(phi) - CURTAIN_BURY_MIN)
+        if over > worst:
+            worst, worst_at = over, (phi, y, y_top(phi))
+    if worst > 0.0:
+        phi, y, crown = worst_at
+        raise RuntimeError(
+            f"the curtain breaks the skyline by {worst:.3f} at phi "
+            f"{phi:+.2f}: its vertex stands at y {y:.3f} where the crown is "
+            f"{crown:.3f} — it would render as a wall over the tear")
     rmin = min(math.hypot(app_of(v.co)[0], app_of(v.co)[2] - AXIS_Z)
                for v in curtain.data.vertices)
     if rmin < PORTAL_IN["clearR"] * 0.95 + 0.10:
         raise RuntimeError(f"the curtain reaches r {rmin:.3f} of the bore "
                            f"axis — inside the approach column "
                            f"({PORTAL_IN['clearR'] * 0.95:.3f})")
-    print(f"[bole] curtain top {b[3]:.2f} (needs 11.45+), nearest approach "
-          f"r {rmin:.2f}, y {b[2]:.2f}..{b[3]:.2f}")
+    b = app_box(curtain)
+    print(f"[bole] curtain buried: deepest vertex sits {-worst:.3f} under the "
+          f"crown (needs > 0), nearest approach r {rmin:.2f}, "
+          f"y {b[2]:.2f}..{b[3]:.2f}")
 
 
 # The engine's own occlusion grid, restated so the recipe and js/main.js
 # cannot drift: three discs on the BORE AXIS per band, 33 points each.
 S_CORE = 1.25
+DIE_R = 1.25          # world-fixed; the same radius the mouth is sized from
 COWL_C_Y = 7.4 * S_CORE + (PORTAL_IN["rimY"] - 7.0 * S_CORE)
 COWL_H = 2.4 * S_CORE
 SMP_KR = PORTAL_IN["clearR"] / (1.7 * S_CORE)
@@ -3403,7 +3483,16 @@ def occlusion_samples():
                 pts.append((PORTAL_IN["x"] + math.cos(th) * r, y,
                             PORTAL_IN["z"] + math.sin(th) * r))
         return pts
-    cb, ct = COWL_C_Y - COWL_H / 2.0, COWL_C_Y + COWL_H / 2.0
+    # CAPPED AT THE TOP OF A DESPAWNING DIE, mirroring js/main.js's v.cowlY.
+    # The band's box rides 1.6*S over the mouth — inside the building for a
+    # hooded tower, open sky for a stump. What the band is for is that the
+    # VANISH is unwatchable, and a die vanishes when its centre crosses
+    # DESPAWN_Y, so the line that matters is DESPAWN_Y + a die's radius. Above
+    # it a die is in open air and meant to be seen. For this model the top
+    # sample moves 11.25 -> 8.75, which is what deletes the two discs at 9.90
+    # and 11.25 that the cowl curtain existed to catch.
+    ct = min(COWL_C_Y + COWL_H / 2.0, DESPAWN_Y + DIE_R)
+    cb = ct - COWL_H
     bands = {"cowl": [cb + 0.15, (cb + ct) / 2.0, ct - 0.15],
              "shaft": [DESPAWN_Y, DESPAWN_Y + 0.25, DESPAWN_Y + 0.6]}
     return {k: [p for y in ys for p in disc(y)] for k, ys in bands.items()}
@@ -3448,8 +3537,14 @@ def assert_cowl_occluded(objs):
                 lines.append(f"{band} {n}/{len(smp[band])} leak at {eid}, "
                              f"first ({first[0]:+.2f}, {first[1]:.2f}, "
                              f"{first[2]:+.2f})")
-        raise RuntimeError("the occlusion grid leaks — raise curtain_top_at "
-                           "or widen its arc:\n       " + "\n       ".join(lines))
+        # The old guidance here was "raise curtain_top_at", and following it is
+        # how the black cylinder got built. The band is capped at the rim now,
+        # so a leak is a hole in the BORE — the shell's wall or the liner —
+        # and raising a band over the crown cannot legitimately fix one.
+        raise RuntimeError("the occlusion grid leaks — every sample is inside "
+                           "the bore under the tear, so close the WALL "
+                           "(wall_at / r_in), never raise a curtain over the "
+                           "crown:\n       " + "\n       ".join(lines))
     print(f"[bole] occlusion {len(smp['cowl'])}/{len(smp['cowl'])} cowl and "
           f"{len(smp['shaft'])}/{len(smp['shaft'])} shaft, at all "
           f"{len(ZOOM_EYES)} shipped eyes")
