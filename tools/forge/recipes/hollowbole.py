@@ -27,6 +27,14 @@ closed by construction, and there is no "far side" for a sightline through
 the wound or the crown to reach. Anything you can see through either
 opening is the inside of this same solid, painted near-black.
 
+...THROUGH THE WOUND. Round 3 found the other half of that sentence to be
+false, and the engine found it, not a render: over the CROWN there is no
+solid to see, because the tear's low point is the declared rimY and the
+engine's cowl band reaches 2.0 above it. So a fourth mesh — the CURTAIN —
+carries the liner up past the tear, a band around the bore and never a lid.
+It is the one part of this model that is a separate piece of geometry, and
+the reason is written where it is built.
+
 The wound is one boolean: a radial window cutter whose (phi, y) boundary is
 a ragged closed loop, so the mouth's edge is torn everywhere and the wood
 between the rag's local minima juts into the opening as real splinter
@@ -117,19 +125,53 @@ WHAT ROUND 2 CHANGED, all five items from the review gate:
      exact height wall_at was tapering it to 0.02. Both surfaces splay now,
      and both noise fields die into the tear.
 
+WHAT ROUND 3 CHANGED, and it is all fit and occlusion — the round-2 look
+(wound, roots, crown character, palettes, specular interior) is ACCEPTED and
+untouched. The app integration ran the proof battery and the ENGINE refused
+the bake that every gate here had passed:
+
+  F1 the crown was 12.815 and the audit reads max.y' = max.y + max.x*sin
+     (0.45 deg of lean), so the socket's 12.5 ceiling was 0.325 away. The
+     tallest spire comes down to 2.80 (crown 12.326) and |x| to 3.13 by the
+     same arithmetic — one budget, spent height-first. The ground line pays
+     0.10 of root spread for it: 6.46 wide becomes 6.26, stance 1.97:1.
+  F2 the SHELL is one mesh box and VENUE GROUNDS admits z- and y- overruns
+     and nothing else. TOE_CREEP to 0 (z +0.597 -> +0.220) and the buried
+     row from -0.30 to -0.09 (min.y' -0.325 -> -0.115, class floor -0.15).
+  F3 the TONGUE fell in the dead band between FOOT DIP (min.y > -0.15) and
+     CLADDING (min.y < -0.5) at -0.373 and came back UNCLASSIFIED. Its
+     skirt sinks to -0.62 and its nose comes back to 3.84, inside the lip
+     collider it clads. Neither is visible: both are under the felt.
+  F4 the COWL band leaked 354 of 594 rays. Its 99 samples per eye are DISCS
+     ON THE BORE AXIS at y 8.55 / 9.90 / 11.25, and no torn crown can hide
+     a point floating 1.85 above its own rim — so the liner is carried up
+     as a near-black CURTAIN to 12.05, the way the old JS shell's lining
+     did. Height measured off the binding ray (wide.eyeFull to the deepest,
+     highest sample: it crosses at 11.779), not off the brief's 11.5.
+
 MEASURED, NOT ASSUMED. Every dimensional claim above is re-derived from the
 built vertices at bake time: assert_throat_clear and assert_approach_clear
 cast rays at the finished triangles (not at the constants that generated
 them), assert_envelope reads the real bounds, assert_rim_is_low proves the
-declared rimY is the actual low point of the crown, and report_form refuses
-a stance outside 1.7-2.25:1 (it measures 2.00:1) and a crown whose tallest
-spire is centred. A gate that reads constants only restates its own
-assumptions.
+declared rimY is the actual low point of the crown and refuses a crown past
+CROWN_MAX, and report_form refuses a stance outside 1.7-2.25:1 and a crown
+whose tallest spire is centred. A gate that reads constants only restates
+its own assumptions.
 
-Measured at the last bake: 7600 tris, watertight, 25/25 on both throats,
-x within +-3.23, tallest spire 12.80, stance 1.98:1, 6 roots, 5 spires,
-10 shelf brackets placed and 2 refused, both palettes byte-identical in
-geometry (shared `set` digest) and different only in COLOR_0.
+AND SINCE ROUND 3, THE ENGINE'S OWN TWO PROOFS RUN HERE TOO, because both
+of the things it caught were invisible to check.py: assert_mesh_envelopes
+puts every mesh's WORLD box through towerModelAudit's corner arithmetic
+against the class that has to grant it, and assert_cowl_occluded fires the
+full occlusion grid — 6 shipped eyes x 198 samples — at the built
+triangles. A browser found these in thirty minutes; the bake finds them in
+eight seconds.
+
+Measured at the last bake: 7828 tris (curtain 228), watertight, 25/25 on
+both throats and the approach column, cowl 99/99 and shaft 99/99 at all six
+eyes, x within +-3.13, tallest spire 12.31, curtain top 12.03, stance
+1.97:1, 6 roots, 5 spires, 10 shelf brackets placed and 2 refused, both
+palettes byte-identical in geometry (shared `set` digest 76d898635b069ed2,
+schema v2) and different only in COLOR_0.
 
     tools/forge/bake.sh tools/forge/recipes/hollowbole.py \
         --tower --expect-colors --max-tris 8000
