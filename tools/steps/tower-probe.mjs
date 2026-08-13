@@ -38,8 +38,24 @@ export default async function run(stage, args) {
   await a.dbg('holdClock(true)');
   await a.dbg('towerEcho(false)'); // the ring buffer is the record here
   await a.dbg('towerCore(true)');
-  await a.dbg(`towerLabSkin(${JSON.stringify(tower)})`);
-  console.log(`skin=${tower} n=${n} seed=${seed}`);
+  // A BAKED ROW MAY NOT BE HERE YET (C6). towerLabSkin returns what the bench
+  // is ACTUALLY wearing, which for a GLB row whose model is still in flight is
+  // the PREVIOUS skin — so wait for it, and then label the run with the return
+  // value rather than with what was asked for. Printing the argument is how a
+  // probe run of one tower gets filed under another.
+  let worn = await a.dbg(`towerLabSkin(${JSON.stringify(tower)})`);
+  for (let i = 0; worn !== tower && i < 40; i++) {
+    await new Promise((r) => setTimeout(r, 250));
+    worn = await a.dbg(`towerLabSkin(${JSON.stringify(tower)})`);
+  }
+  if (worn !== tower) {
+    const st = await a.dbg(`towerModelStatus(${JSON.stringify(tower)})`);
+    console.log(`BAD: asked for '${tower}', the lab is wearing '${worn}' `
+      + `(${JSON.stringify(st)})`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`skin=${worn} n=${n} seed=${seed}`);
   await a.dbg(`towerDrop(${n}, ${seed})`);
 
   // Step 1 s at a time; print the state line so a stall is visible AS a
