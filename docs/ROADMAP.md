@@ -2899,10 +2899,73 @@ red-checked; suite 48/48; fx+settings+tower 23/23. throwSeeded now
 records the set a real roll would (absent for std — every existing
 record byte-identical), so look-drivers photograph the product's dice.
 
-### W5–W6, sequenced
-W5 the living layer (wisps, fireflies, the moot in session) · W6 the
-audio palette. Each ships with its e2e proof; the venue is judged as a
-WHOLE at each step against goal 14's internal-consistency contract.
+### W5. The living layer — DONE 2026-08-13 (pending Joe's LOOK verdict)
+
+The glade is inhabited, and it minds the table. [js/faelife.js](../js/faelife.js)
+is venue-generic — a FIELD of fireflies that says the place is alive and
+a WISP PROCESSION that says somebody lives here — and the glade supplies
+only composition data: four zones where life is legal, and a ten-waypoint
+route that rides the eye's own circuit (rule 7). The vacated moot stays
+vacated and gains VISITORS: a pulse travels cap to cap, the fallen one
+answers out of turn, and the ring lifts when the procession is standing
+in it. Doctrine is [VENUE-COMPOSITION.md](VENUE-COMPOSITION.md) rule 14.
+
+**THE ONE LAW: nothing alive ever crosses the dice box** — held by
+construction, not by good waypoints. Members are seated outside the
+widest mat's walls with their own wander included, a runtime clamp
+backstops the seat, and both counters must read zero. Rule 1, goal 15 and
+the placement law collapse into that one sentence.
+
+**The budget shaped it more than taste did.** A census counts NINE
+countable sources against a ceiling of nine, and two glow hues plus one
+warm accent against a limit of exactly that — so the field is tertiary
+and grayscale-per-point (the hue lives in one material, which is what
+keeps a field exempt from the count), and the wisps are a procession
+rather than a swarm: one bright lead, which REPLACES the lead the stage
+has carried since W0, plus three followers at the field's ceiling. Net
+new countable sources: zero.
+
+**The governor** is what makes it serve the roll instead of decorating
+it: the glade withdraws while the film runs (fast — startled is quick)
+and leans back in once dice are readable (slow, cautious), where the lean
+is dwell and value on the route's near arc and never a step toward the
+table. One crit beat, keyed to `entryCritCeremony` and never `entryCrit`
+— U18's lesson is that a per-die system calls about half of all pools a
+crit.
+
+**Two findings worth more than the feature.** (1) A TIER IS A LUMINANCE
+and an authored scalar is not one: the field was written at 0.22 "against
+a ceiling of 0.25" and rendered at 0.09, because the palette's teal
+carries a luma of 0.416 — two thirds of the budget unspent, and the gate
+would have passed it (rule 8 as amended; the probe now reports the
+product). (2) A `THREE.Points` size is world units scaled by
+halfHeight/depth, so 0.20 at ~17 units is about two device pixels: the
+census said fifty-one lit fireflies were in frame while the frame showed
+two, and no brightness change was ever going to fix it. A size ladder at
+0.2/0.5/0.9 picked 0.5 — 0.9 makes blobs that contest the moot's caps.
+
+**Three bugs it surfaced, none of them W5's:** the stage clock never
+reset across a restage (so a client that had toggled venues breathed
+differently from one that had not, and no screenshot after a toggle
+reproduced); a POURED die parked inside the tower was lighting a fog
+pocket from inside the trunk; and the sixth halo slot had been built and
+never written to on every fae frame since W0.
+
+Proof: `venue-life` (tags fx, settings) — the law over every member at
+six points around the route, the tiers as RENDERED, the sim-clock freeze,
+a re-staged glade breathing identically, the governor under a seeded
+throw, the ring waking and quieting across a lap under the bloom
+threshold, and the two skies dressing the life differently (the P9
+content check — every other number the hook reports is
+palette-independent by construction). Six red checks recorded in the
+commits. `tools/steps/life-look.mjs` is the look loop: a static room is
+fair to photograph once, a moving one is not.
+
+### W6. The venue's audio palette
+The last step of the tier. Ships with its e2e proof; the venue is judged
+as a WHOLE against goal 14's internal-consistency contract. Note the
+standing debt it inherits: every fae voice reasoned so far — the four
+tower clunks and the Witchlight chime — has never been LISTENED to.
 
 ## Structural risks (bets, not bugs — each gets more expensive to reverse)
 

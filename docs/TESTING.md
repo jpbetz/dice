@@ -140,6 +140,26 @@ diagnostic that settles "wrong bytes or wrong pipeline" is sampling the
 BAKED attribute off the live geometry (`__diceDebug.meshColors`); no
 rendered frame can answer it, because the frame is the pipeline.
 
+**P10 — Gate the RENDERED quantity, never the authored one.** W5's firefly
+field was written at 0.22 against a declared tertiary ceiling of 0.25 and
+rendered at 0.09, because the scalar multiplies a teal whose own luma is
+0.416 — the tier gate, had it been written against the dial, would have
+passed a field nobody could see, forever, while reporting a number that
+looked deliberate. A gate on an authored value only ever re-states the
+author's intent back to them; the same failure shape as a bake check that
+reads constants instead of built vertices (`/forge-model` §1). Ask what
+UNIT the doctrine is written in — a tier is a luminance, a budget is
+pixels, a size is device pixels after projection — convert, and have the
+probe report the converted product. `venue-life` asserts `fliesLuma` and
+`wispLuma`, never the peaks they came from.
+
+And when the quantity is a SIZE, measure it with a ladder rather than
+arithmetic: the same field was invisible at `THREE.Points` size 0.20
+because a point's pixels go as size × halfHeight / depth, and the census
+happily reported fifty-one lit members in frame. Three renders at
+0.2/0.5/0.9 settled in one pass what two rounds of brightness reasoning
+had not.
+
 ## Running
 
 ```bash

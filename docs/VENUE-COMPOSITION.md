@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# VENUE COMPOSITION — how a scene becomes ONE scene (W2b–W2c, 2026-08-13)
+# VENUE COMPOSITION — how a scene becomes ONE scene (W2b–W5, 2026-08-13)
 
 Commissioned by Joe's W2 verdict, verbatim in ROADMAP W2b: good set
 pieces, no integration — "setting them next to each other in this way is
@@ -85,6 +85,16 @@ constraint than games get, and it is why the rules can be mechanical.
    grayscale — direction lives in the placement of light against dark
    (the strongest tool the craft names), not in hue. CHECK: desaturate
    the resting frame; walk rule 2's trace again.
+   **A TIER IS A LUMINANCE, and a scalar is not one** (amended
+   2026-08-13, W5). The gates name tiers as numbers — tertiary ≤0.25,
+   secondary 0.35–0.6 — and those are luminances, so an authored
+   scalar has to be multiplied by the LUMA OF THE COLOUR IT WEARS
+   before it can be compared to them. The glade's firefly field was
+   written at 0.22 "against a ceiling of 0.25" and rendered at 0.09,
+   because the palette's teal carries a luma of 0.416; two thirds of
+   the budget went unspent and the field read as absent. CHECK: state
+   every tier claim as scalar × luma(colour), and have the probe
+   report that product rather than the dial.
 9. **Nothing floats.** Every feature sits IN the ground: contact
    darkening, a skirt, disturbed soil, a bank. CHECK: every base, at the
    eye's distance, transitions rather than terminates.
@@ -137,6 +147,33 @@ constraint than games get, and it is why the rules can be mechanical.
     eye; zero means the set pieces are exhibits again; any bit the eye
     visits FIRST is in the wrong tier; every fore bit proves itself
     in-frame with worldToScreen before it ships.
+14. **The living layer answers to the table** (2026-08-13, W5). A venue
+    may have inhabitants — a FIELD that says the place is alive, a few
+    CHARACTERS that say somebody lives here. They sit below scenery in
+    attention and above it in risk, because they MOVE, and the eye
+    follows movement before it follows anything else in a frame. Two
+    laws are what make them legal rather than merely pretty.
+    (a) **Nothing alive crosses the dice box** — ever, and held by
+    CONSTRUCTION rather than by good waypoints: members are seated
+    outside the widest mat's walls with their own wander already
+    included, and a runtime clamp backstops the seat. Rule 1, GOALS
+    goal 15 and the placement law all collapse into that one sentence
+    — nothing can sit between the eye and a result if nothing is ever
+    over the felt.
+    (b) **The layer dims while dice are the event**, and leans back in
+    once they are readable: withdrawing fast, returning slow. The lean
+    is DWELL and VALUE on a route the layer already walks, never a step
+    toward the table, so the gesture cannot trade law (a) away for a
+    better-looking one. A living layer that holds its brightness
+    through a roll has made the venue argue with the thing it exists to
+    serve.
+    CHECK: sample EVERY member's plan position across a full cycle of
+    its motion — not three of them, and not at one instant — and count
+    how many sit inside the box; the only passing number is zero. Then
+    photograph the frame mid-film and at rest and require that the two
+    differ, because the withdrawal is a claim about PIXELS: a mood
+    variable easing correctly while nothing on screen changes is the
+    same green check masking the same broken thing.
 
 ## The glade, diagnosed (what W2b changes)
 

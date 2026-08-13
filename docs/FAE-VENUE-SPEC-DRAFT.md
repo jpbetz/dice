@@ -12,8 +12,11 @@ approves the concept.
 > numbers — the fog retreat (22/60), the moonbeam landed on the resolve
 > area, the moot re-staged beside (not under) the tower, and the mirror
 > pool from the W0 approval note. The venue-set scenario asserts the
-> placement law; ROADMAP Tier W tracks what remains (W4 dice, W5 living
-> layer, W6 audio). The sections below stand as the design record.
+> placement law; W4 shipped the dice set and W5 the LIVING LAYER
+> (js/faelife.js — the field, the procession, the moot's visitors, and
+> the governor that steps the glade back while dice are in the air).
+> ROADMAP Tier W tracks what remains: W6, the audio palette. The
+> sections below stand as the design record.
 
 ## The place
 
@@ -63,6 +66,12 @@ warm accent · three tiers ≥2 stops apart (primary = dice only; secondary
   fog-light folded into the sheets' base array at build time.
 - Wisps: motes.js sibling — box wander, blink envelope power ~6, fog:true,
   ONE lead wisp with the venue's single dynamic light and a heading.
+  DELIVERED at W5 with three amendments the build earned: the blink
+  power is 4, not 6 (at 6 the duty cycle was so low the field read as
+  absent); the wanderers walk a shared ROUTE rather than a box, because
+  independent random walks read as bugs in a jar; and the followers are
+  held at the field's tertiary tier so the lead stays the only countable
+  source the layer spends.
 - Traps honored: post.js maskHide patch FIRST (T1); no userData.bloom on
   venue props (T2); floor material swap past fogFar (free perf, §7.4).
 

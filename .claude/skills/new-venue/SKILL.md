@@ -1,6 +1,6 @@
 ---
 name: new-venue
-description: Compose or integrate a venue's scene — the diorama discipline. The thirteen composition rules, the eye-first process, the placement law, the connective-tissue idioms, and the gates, in order.
+description: Compose or integrate a venue's scene — the diorama discipline. The fourteen composition rules, the eye-first process, the placement law, the connective-tissue idioms, and the gates, in order.
 ---
 
 # The venue skill — one scene, not set pieces
@@ -14,10 +14,12 @@ portal arithmetic.
 
 ## Read first, in this order
 
-1. **docs/VENUE-COMPOSITION.md** — the THIRTEEN RULES with their CHECKs
+1. **docs/VENUE-COMPOSITION.md** — the FOURTEEN RULES with their CHECKs
    (10 composition + 11 grown-not-placed, 12 engine-furniture-wears-the-
-   world, 13 the scenery tier). They are the law of this skill; this
-   file is the procedure.
+   world, 13 the scenery tier, 14 the living layer answers to the
+   table). They are the law of this skill; this file is the procedure.
+   Note rule 8's amendment before you write any tier number down: a
+   tier is a LUMINANCE, and an authored scalar is not one.
 2. docs/FAE-VENUE-SPEC-DRAFT.md — palette law, the four Vegas gates,
    legibility laws (fog under die tops, ≥2.5:1 face contrast).
 3. GOALS goals 13–15 — the venue doctrine (atomic set, two registers,
@@ -34,8 +36,11 @@ portal arithmetic.
    `node tools/drive.mjs tools/steps/glade-look.mjs` (add `probe` for
    hide-one-at-a-time element forensics — when a frame won't cohere,
    stop theorizing and start hiding). Judge everything at these eyes;
-   plan-view reasoning is only for the triangle check.
-2. **Diagnose against the ten rules.** Walk the dossier's CHECKs in
+   plan-view reasoning is only for the triangle check. Once a venue has
+   a LIVING layer, `tools/steps/life-look.mjs` is its own loop: a static
+   room is fair to photograph once, a moving one is not — it shoots two
+   unrelated phases plus the idle / mid-film / settled trio.
+2. **Diagnose against the fourteen rules.** Walk the dossier's CHECKs in
    order and write numbered findings (the W2b glade diagnosis in the
    dossier is the worked example). Rule 8's check is a grayscale pass —
    desaturate the frame (`magick shot.png -colorspace Gray …` or judge
@@ -80,16 +85,29 @@ portal arithmetic.
    wall OR past the x wall, since the box is the walls' intersection.
    Nothing in the tier may be the first thing the eye visits, emit
    light, or enter a dice lane.
-7. **Move a placement, move its claim.** Any position change lands in
+7. **Populate the living layer LAST** (rule 14), because it is the
+   tier the eye visits first and the only one that can undo the other
+   thirteen. A field for "this place is alive", a few characters for
+   "somebody lives here", and both bounded by the two laws: nothing
+   alive ever crosses the dice box (seat members outside it WITH their
+   wander, and keep a runtime clamp as the backstop — count both), and
+   the layer dims while the film runs and leans in when dice are
+   readable. js/faelife.js is venue-generic: a new venue supplies
+   zones, a route and a box, not a new module. Two traps that cost a
+   whole LOOK round in the glade: a tier is a LUMINANCE (rule 8), and
+   a THREE.Points size is world units scaled by halfHeight/depth — a
+   fifth of a unit at fifteen units out is about two device pixels, so
+   shoot a size ladder before believing any brightness diagnosis.
+8. **Move a placement, move its claim.** Any position change lands in
    `venue-set`'s assertions as a DOCUMENTED NEW CLAIM (the layout comes
    off `venueInfo().stage`, so the scenario reads the contract — keep
    it that way).
-8. **The LOOK loop.** Re-render both palettes after every increment; a
+9. **The LOOK loop.** Re-render both palettes after every increment; a
    composition change that reads in moonrise can die in foxfire's value
    floor. Judge: the circuit (rule 2 trace), the rims (rule 4), the
    FRAME triangle (rule 6 as amended — screen space, not plan), the
    dissenters (rule 7 list), the seams (rule 11 silhouette trace).
-9. **Gates.** `npm test` + `--only fx,settings`; the Vegas gates at
+10. **Gates.** `npm test` + `--only fx,settings,tower`; the Vegas gates at
    LOOK (≤8% bloom, ≤2 glow hues + 1 warm accent, tier separation,
    countable sources); the placement law green in `venue-set`.
 

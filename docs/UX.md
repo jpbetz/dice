@@ -4459,3 +4459,34 @@ convention the old shell inverted is fixed, so the moot gap finally faces
 front-left as authored. Four review-gated bake rounds; the battery:
 fit CLEAN, occlusion 99/99 shaft+cowl at all six eyes, probe 6/6, pour
 29/29, tower tag 8/8.
+
+### 7.36 The glade is inhabited (2026-08-13, W5)
+
+The venue's third register, after the room and its weather: **the things
+that live there.** A glade that never moves is a diorama in a case; what
+W5 adds is a FIELD of fireflies that says the place is alive, and a small
+WISP PROCESSION — one bright lead and three followers — that says
+somebody lives here. They keep a route: in from the mist behind the moot,
+along the ground's own moss trail, past the tower's root flare at their
+nearest approach, across to the pool's bank and home through the back
+band. It is the eye's own circuit, walked.
+
+And the vacated moot gains **visitors**. The ring stays what it always
+was — an interrupted moot, one gap, one fallen cap still lit — but now a
+pulse travels round it seat by seat, the way a word goes round a circle,
+the fallen one answering out of turn; and when the procession is standing
+in the ring, the whole thing lifts. The faeries were never modelled. They
+are the wisps, and the moot is in session when they are there.
+
+**The glade minds the table**, and that is the part that matters at a
+game. Throw, and the life steps back: the fireflies dim, the ring settles,
+the air empties, because for those two seconds the dice are the only
+event in the frame. Let them come to rest, and it all comes back out —
+slower than it left — and drifts toward the clearing to look at what you
+rolled, without ever crossing over the felt. On a critical the ring runs
+one fast lap and the wisps bloom once, and then it is night again.
+
+Nothing here can ever sit between you and a result: no living thing
+crosses the dice box, at any instant, by construction rather than by
+care. That is [VENUE-COMPOSITION.md](VENUE-COMPOSITION.md) rule 14, and
+`venue-life` holds it over every member rather than over a sample.
