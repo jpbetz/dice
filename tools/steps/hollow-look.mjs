@@ -105,7 +105,73 @@ export default async function run(stage, args) {
     await shot(`hollow-${venue}-6-in-venue-tower-eye.png`);
     await t.dbg(`setZoom('medium')`);
     await t.dbg('sim(1200)');
+    await shootPour(t, shot, venue);
   }
   await t.dbg(`setVenue('table')`);
   console.log(`\nwrote ${SHOTS}/hollow-*.png`);
+}
+
+// THE FRAMES NOBODY HAD EVER TAKEN. The W3 handoff named this explicitly —
+// "dice actually falling in and exiting out has NEVER been visually verified"
+// — and it stayed named rather than shot because the entry is SHORT: about
+// 0.28 s of fall under g = -110, which is ~17 frames out of a film several
+// hundred long. tower-family-shots samples it with a hard-coded sim(9) and
+// says so; a third of the way to firstExitTime lands on an empty tower.
+//
+// SO THE FILM IS ASKED WHERE ITS OWN ENTRY IS. towerFilmInfo().spans[i][0] is
+// [materialise, despawn] in frame indices for die i — the exact window in
+// which that die exists above the crown and has not yet gone dark behind the
+// cowl. A frame at 55% of that window is mid-flight BY CONSTRUCTION rather
+// than by arithmetic somebody tuned once and nobody re-checked. Entries
+// stagger 0.12-0.20 s apart, so the LAST die's window is the fullest sky and
+// gets its own frame.
+async function shootPour(t, shot, label) {
+  await t.dbg(`commandRoll('8d6')`);
+  await t.waitFor('!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.landings)',
+    { desc: `${label}: the pour reached the client` });
+  const f = JSON.parse(await t.eval('JSON.stringify(window.__diceDebug.towerFilmInfo())'));
+  if (!f || !f.pour || !f.spans || !f.spans.length) {
+    console.log(`NOTE: ${label}: no pour film to sample (pour=${f && f.pour}) — skipping mid-flight`);
+    return;
+  }
+  // sim() only ever goes forward, so the playhead is tracked rather than
+  // recomputed — asking for a frame already passed must be a no-op, not a
+  // negative sim() that silently does nothing while the caller believes it
+  // moved.
+  let at = 0;
+  const to = async (frame) => {
+    const want = Math.max(0, Math.round(frame));
+    if (want > at) { await t.dbg(`sim(${want - at})`); at = want; }
+  };
+  const midOf = (span, k = 0.55) => span[0] + (span[1] - span[0]) * k;
+
+  // 7. THE FIRST DIE IN THE MOUTH, from just above and outside the crown —
+  //    the angle that can actually see down the bore. Expect a sliver: the
+  //    die is inside a dark throat and the point is whether the throat READS
+  //    as a throat with something falling into it.
+  await t.dbg('towerEye(10, 12.0, 3.0)');
+  await to(midOf(f.spans[0][0]));
+  await shot(`hollow-${label}-7-pour-midflight-mouth.png`);
+
+  // 8. THE SAME MOMENT FROM THE RESTING EYE — the frame a player actually
+  //    gets. If the entry only reads from a camera nobody sits at, it does
+  //    not read.
+  await t.dbg(`setZoom('medium')`);
+  const last = f.spans.length - 1;
+  await to(midOf(f.spans[last][0]));
+  await shot(`hollow-${label}-8-pour-midflight-resting.png`);
+
+  // 9. THE EXIT — dice coming out of the doorway onto the felt, which is the
+  //    other half of the pour and the half the exit guarantee is about.
+  await to(f.firstExitTime * 60 + 8);
+  await shot(`hollow-${label}-9-first-exit.png`);
+
+  // 10. THE SPREAD, settled: what the roll looks like when the film ends.
+  await to(f.frames + 240);
+  await shot(`hollow-${label}-10-spread.png`);
+  console.log(`  ${label}: entry window d0=[${f.spans[0][0]}] `
+    + `d${last}=[${f.spans[last][0]}] firstExit=${f.firstExitTime}s frames=${f.frames}`);
+
+  await t.dbg('clearTable()');
+  await t.dbg('sim(400)');
 }

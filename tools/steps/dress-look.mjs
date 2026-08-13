@@ -55,6 +55,26 @@ const EYES = {
     ['door', 8, 3.4, 3.0],
     ['base', 9, 2.0, -5.0],
   ],
+  // THE FIRST BAKED TOWER, so these four eyes are split across the two things
+  // that now build it: the WOUND and the TONGUE are the GLB's (the torn mouth
+  // and the delivery ramp came out of Blender), the CROWN MOOT and the DOOR
+  // are still code-side dress placed through the surface descriptor. A frame
+  // that disagrees with the one beside it is the seam showing, which is
+  // exactly what these are for.
+  hollowbole: [
+    // The torn front, close and low: the mouth's ragged lintel and whether
+    // the interior behind it still reads as depth rather than as a hole.
+    ['wound', 7, 4.2, 2.2],
+    // The crown moot — the ring of fungus, its one gap and its one fallen
+    // member. Same eye hollow-look uses, so the two sets are comparable.
+    ['crown-moot', 9, 12.5, 3.2],
+    // The little lit door on the left root buttress, the tower's one warm
+    // accent and the only place the ember lands.
+    ['door', 7, 3.0, -3.6],
+    // The tongue: the baked ramp where dice come out onto the felt. Low and
+    // off to the right, along the line a die actually travels.
+    ['tongue', 8, 2.2, 4.4],
+  ],
 };
 
 export default async function run(stage, args) {

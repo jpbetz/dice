@@ -11010,8 +11010,22 @@ export const scenarios = [
         assert.ok(dr.ember,
           `${id}: the registry row carries the family trait — a warm focal light`);
         assert.equal(dr.lights, 0, `${id}: and the skin still brings zero lights`);
-        assert.ok(dr.sways + dr.smokes > 0,
-          `${id}: something on it moves when nobody is touching it `
+        // V2 ADAPTATION (W3). NEW CLAIM: the row DECLARES whether it dresses
+        // itself, and the declaration is checked in both directions.
+        // OLD: `assert.ok(dr.sways + dr.smokes > 0)` for every skinned row.
+        // WHY IT MOVED: under /new-tower v2 a baked tower bakes its STATIC
+        // dress into the GLB and keeps only idle MOTION code-side, so "every
+        // model must move" stopped being a property of the registry and became
+        // a property each row states (`dress`). Classic rows are unaffected by
+        // construction — they are not `glb`, so `expectMotion` is true for them
+        // exactly as before, and this line still fails if heartwood's ivy stops
+        // swaying. The biconditional is STRONGER than the old one-way check: a
+        // baked row that declares no dress must now have NOTHING moving, so a
+        // stray sway cannot hide behind a missing declaration either.
+        const expectMotion = !model.glb || !!model.dress;
+        assert.equal(dr.sways + dr.smokes > 0, expectMotion,
+          `${id}: declares dress=${!!model.dress} (glb=${model.glb}), so it must `
+          + `${expectMotion ? 'have' : 'have NO'} idle motion when nobody is touching it `
           + `(${dr.sways} sways, ${dr.smokes} plumes)`);
 
         // ---- the PORTAL SPEC this model resolves to ------------------------
@@ -11024,8 +11038,19 @@ export const scenarios = [
         // registry, so the day a row declares portals this line is what
         // notices.
         const ps = await a.dbg(`towerPortalSpec('${id}')`);
-        assert.equal(ps.source, 'default',
-          `${id}: resolves to the classic portals (source '${ps.source}')`);
+        // V2 ADAPTATION (W3, the day the comment above was written for).
+        // NEW CLAIM: `default` for a classic row, `model` for a baked one.
+        // OLD: `assert.equal(ps.source, 'default')` unconditionally — true
+        // while every registered row was code-built. hollowbole is now a GLB
+        // row and reads 'model', which is the WIN this line exists to notice,
+        // not a regression: the paragraph above says in as many words that
+        // "the day a row declares portals this line is what notices". The
+        // claim is strictly stronger than the old one — each row is now
+        // asserted to resolve from the source it actually has, so a baked row
+        // that silently fell back to the classic core still fails here.
+        assert.equal(ps.source, model.glb ? 'model' : 'default',
+          `${id}: resolves to the ${model.glb ? 'portals declared by its model' : 'classic portals'} `
+          + `(source '${ps.source}')`);
         assert.equal(ps.id, id, `${id}: and says which tower it answered for`);
         assert.equal(ps.derived.door.sill, ps.portals.out.sillY,
           `${id}: the engine's door sill IS the portal's sill — the derivation `
@@ -11063,6 +11088,24 @@ export const scenarios = [
       await a.dbg(`setTower('heartwood')`);
       await a.waitFor(`window.__diceDebug.tower === 'heartwood'`,
         { desc: 'back to the wooden tower for the rest of this scenario' });
+      // AND THE SECOND TAB TOO — a race this line did not used to be able to
+      // lose. Everything below bakes films on BOTH tabs and compares them
+      // keyframe for keyframe, but only tab A was ever waited on here, so tab
+      // B could still be applying the change when the comparison ran. That was
+      // harmless for as long as every registered tower resolved to the SAME
+      // classic core: a lagging tab baked a byte-identical film and no
+      // assertion could see the lag.
+      //
+      // hollowbole is the first row whose core genuinely differs (portals
+      // in.rimY 9.40 / in.z -2.55 against the classic 8.75 / -2.00), and the
+      // loop above leaves it standing — so a lagging tab B baked the whole
+      // film 0.65 high and 0.55 back, which is exactly those two deltas and
+      // nothing else. The films then differed while the SPANS still matched,
+      // because a uniform translation of the core moves the despawn line with
+      // the dice. Measured, not guessed: Δy 0.649999618 = 9.399999618 - 8.75,
+      // Δz -0.549999952 = -2.549999952 + 2.00, to the last digit.
+      await b.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+        { desc: 'and the second tab has applied it before any film is compared' });
       assert.deepEqual(await a.dbg(`impactVoiceFor({clunk:'baffle'}, '${SET}')`), voices.heartwood,
         'and the voice follows the tower back');
 
@@ -11518,9 +11561,49 @@ export const scenarios = [
       // thirds brighter than moonrise's teal and the venue would have two
       // different moots.
       const before = moot.roles.find((r) => r.role === 'moot-caps');
+      // NEW CLAIM (W3 GLB rebuild): the palette now swaps the MODEL, not just
+      // the materials. OLD: this block re-socketed and compared emissive
+      // luminance only, because one code-built skin was tinted two ways.
+      // WHY IT MOVED: the trunk is baked, so moonrise and foxfire are two
+      // FILES, and "two skies, one model" has a second half that can now
+      // break — the row must resolve to the other url while both stay loaded
+      // and while the portals stay identical. A palette flip that re-entered
+      // the loading wait, or that quietly kept the first file, would still
+      // pass every luminance assertion below it.
+      const vMoon = await a.dbg(`towerVariants('hollowbole')`);
+      assert.equal(vMoon.variant, 'moonrise', 'the row reports the live variant');
+      assert.match(vMoon.active, /hollowbole_moonrise\.glb$/,
+        `and resolves to the moonrise file (${vMoon.active})`);
+      assert.equal(vMoon.urls.length, 2, 'the row names both palettes');
+      assert.deepEqual(vMoon.statuses, ['ready', 'ready'],
+        `and BOTH are loaded before either is needed — a venue flip must not `
+        + `re-enter a wait the player already served (${vMoon.statuses.join(', ')})`);
+      assert.deepEqual(vMoon.mismatch, [],
+        'and the two bakes declare identical portals — a mismatch is a BAKE '
+        + 'error, and half the venues would deliver dice through a doorway the '
+        + 'other half\'s engine never cut');
+      const psMoon = await a.dbg(`towerPortalSpec('hollowbole')`);
+      assert.equal(psMoon.source, 'model',
+        'the engine reads its core from the MODEL now, not from the classic '
+        + 'defaults (source \'' + psMoon.source + '\')');
+      assert.deepEqual(psMoon.portals.in, { x: 0, rimY: 9.399999618530273, z: -2.549999952316284, clearR: 2.2 },
+        'the mouth is the one the recipe declared, read off the glTF empties');
+
       await a.dbg(`faeTowerPalette('foxfire')`);
       await a.waitFor(`window.__diceDebug.tower === 'hollowbole'`,
         { desc: 'the tower comes back up under the other sky' });
+      const vFox = await a.dbg(`towerVariants('hollowbole')`);
+      assert.match(vFox.active, /hollowbole_foxfire\.glb$/,
+        `the flip resolved to the OTHER file (${vFox.active})`);
+      assert.notEqual(vFox.active, vMoon.active, 'which is a different url, not the same one');
+      // The portals are the engine's whole core, so they must come out
+      // identical across the flip — same geometry, different paint. Captured
+      // BEFORE the flip (psMoon, above the faeTowerPalette call) and compared
+      // after, because a spec compared against itself is a green check that
+      // cannot fail.
+      assert.deepEqual(await a.dbg(`towerPortalSpec('hollowbole')`), psMoon,
+        'and the engine core is identical across the swap — the flip changes '
+        + 'the paint, never the doorway');
       const fox = await a.dbg('towerMootAudit()');
       assert.equal(fox.spec.paletteId, 'foxfire', 'built under the foxfire palette');
       const foxCaps = fox.roles.find((r) => r.role === 'moot-caps');
