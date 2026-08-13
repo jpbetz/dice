@@ -124,11 +124,19 @@ constraint than games get, and it is why the rules can be mechanical.
     carries small non-focal scenery — stones, snags, tufts, litter,
     fallen wood — whose job is connective flow and inhabitedness, never
     attention. Value-quiet, zero new light sources, placed in the
-    between-space, the flanks, and the FOREGROUND band (in front of the
-    front wall — dice-free by construction, and the one band where
-    projected depth is cheap). CHECK: count scenery bits at the resting
+    between-space, the flanks, and the FOREGROUND band. The band's
+    reality is measured, not assumed (probed 2026-08-13 via the
+    `worldToScreen` debug hook): the resting eye crops most of the near
+    field below frame — the glade's visible sliver is the bottom-LEFT
+    corner only — so foreground framing is usually ONE wing, not a
+    symmetric pair, and its bits go where the projection says they
+    read. Legality at a near corner is outside the DICE BOX at every
+    point; the box is the INTERSECTION of the walls, so a bit clears it
+    past the front wall (z − rz > front) OR past the x wall
+    (|x| − rx > half-width). CHECK: count scenery bits at the resting
     eye; zero means the set pieces are exhibits again; any bit the eye
-    visits FIRST is in the wrong tier.
+    visits FIRST is in the wrong tier; every fore bit proves itself
+    in-frame with worldToScreen before it ships.
 
 ## The glade, diagnosed (what W2b changes)
 

@@ -59,6 +59,11 @@ export const FAE_PALETTES = {
     glowCore: '#3fbfb4', glowCap: '#5fdccb', glowRim: '#8ff0e2',
     accent: '#ff9a44',
     moon: '#bcd2ff',
+    // How far the pool's water lifts toward moonEdge (W2c): foxfire's
+    // value floor is lower, so its water needs a longer lift to stay a
+    // pool instead of a hole. Palette-owned because it IS the palette's
+    // floor answering — not a shared constant to split the difference on.
+    waterLift: 0.34,
   },
   // WITCHLIGHT FOXFIRE (Joe, 2026-08-16: "super dark greens or almost
   // fluorescent greens... maybe lichen or something mystical... pick a
@@ -75,6 +80,7 @@ export const FAE_PALETTES = {
     glowCore: '#7dd8a8', glowCap: '#b8f5d4', glowRim: '#e8fff0',
     accent: '#ff9a44',
     moon: '#cfd9d4',
+    waterLift: 0.42, // see moonrise — the darker world lifts further
   },
 };
 
@@ -140,7 +146,7 @@ function buildGround(pal, seed) {
   // moss walk the ground from the tower's socket to each flank feature,
   // so the space between features is designed rather than dead. World →
   // canvas: 1 world unit = size/120 px, +z = +canvas-y. Positions match
-  // the features' shipped placements (moot −6.8,−6.6 · pool 7.2,−7.4 ·
+  // the features' shipped placements (moot −6.8,−6.6 · pool 6.2,−6.6 ·
   // socket foot ≈ 0,−4.5); alpha stays bed-tier — a trail is value, not
   // a glow.
   const w2c = (wx, wz) => [size / 2 + wx * (size / 120), size / 2 + wz * (size / 120)];
@@ -160,7 +166,7 @@ function buildGround(pal, seed) {
     }
   };
   lobe(-1.5, -4.5, -6.2, -6.4, 14); // socket → moot
-  lobe(1.5, -4.5, 6.6, -7.0, 14);   // socket → pool
+  lobe(1.5, -4.5, 5.7, -6.3, 14);   // socket → pool (W2c seat)
   // BASE TRANSITIONS (rule 9 — nothing floats): a damp dark ring where
   // the pool sits, a trampled pale ring under the moot. Baked into the
   // ground rather than skirted onto the props, because the ground is
@@ -175,8 +181,27 @@ function buildGround(pal, seed) {
     x.fillRect(px - pr, py - pr, pr * 2, pr * 2);
   };
   const damp = new THREE.Color(pal.void).lerp(new THREE.Color(pal.fogBody), 0.5);
-  ring(7.2, -7.4, 4.2, damp, 0.30);  // the pool's wet margin
+  ring(6.2, -6.6, 4.2, damp, 0.30);  // the pool's wet margin (W2c seat)
   ring(-6.8, -6.6, 4.0, bed, 0.16);  // the moot's trampled court
+  // THE GROUND'S ANSWER TO THE STUMP (W2c, rule 11): the model grows its
+  // roots and berm; the ground answers with soil. A tight dark contact
+  // ring hugging the socket foot — the W2b rings were too soft and wide
+  // to survive exposure, which is exactly the seam Joe named — plus a
+  // scatter of dark clods in the root annulus, so the flare's fingers
+  // land in disturbed earth rather than on untouched moss.
+  const soil = new THREE.Color(pal.void).lerp(new THREE.Color(pal.deepGround), 0.55);
+  ring(0, -4.7, 3.6, soil, 0.42);
+  for (let i = 0; i < 30; i++) {
+    const a = rnd() * Math.PI * 2, rr = 2.1 + rnd() * 1.6;
+    const wx = rr * Math.cos(a) * 1.15, wz = -4.7 + rr * Math.sin(a) * 0.7;
+    const [px, py] = w2c(wx, wz);
+    const s = 3 + rnd() * 6;
+    const bg = x.createRadialGradient(px, py, 0, px, py, s);
+    bg.addColorStop(0, `rgba(${(soil.r * 255) | 0}, ${(soil.g * 255) | 0}, ${(soil.b * 255) | 0}, ${0.16 + rnd() * 0.14})`);
+    bg.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = bg;
+    x.fillRect(px - s, py - s, s * 2, s * 2);
+  }
   const geo = new THREE.CircleGeometry(60, 48);
   const mat = new THREE.MeshStandardMaterial({
     map: tex(c), roughness: 0.95, metalness: 0,
@@ -452,14 +477,21 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
 // and two supports at mirrored depth read as bookends, rule 6): deeper
 // into the mist so the background layer gains a tenant (rule 5), still
 // dice-unreachable by 1.3 beyond the widest wall at its nearest edge.
-function buildMirrorPool(pal, seed, at = { x: 7.2, z: -7.4 }) {
+function buildMirrorPool(pal, seed, at = { x: 6.2, z: -6.6 }) {
+  // W2c re-seat: (7.2, -7.4) was W2b's plan-space "depth break", and at
+  // the resting eye it photographed as a half-cropped smudge — the frame
+  // lost its third feature. (6.2, -6.6) holds the law with margin
+  // (nearest edge x 3.6 > 3.3, z -4.85 < -4.3) and puts the whole pool
+  // back inside the frame, nearer and larger by projection.
   const size = 256;
   const { c, x } = canvas2d(size);
   const rnd = mulberry32(seed ^ 0xb007);
   // Night water mirrors the SKY, not the ground: it sits a step PALER
   // than the dark banks around it (first plate read as a void cutout at
-  // 0.14 — a hole in the world, not a pool holding the moon).
-  const water = new THREE.Color(pal.void).lerp(new THREE.Color(pal.moonEdge), 0.30);
+  // 0.14 — a hole in the world, not a pool holding the moon). The lift
+  // is palette-owned (waterLift): foxfire's floor sank the pool to
+  // near-invisible at the shared 0.30.
+  const water = new THREE.Color(pal.void).lerp(new THREE.Color(pal.moonEdge), pal.waterLift);
   const bank = new THREE.Color(pal.moonEdge);
   // Water body: an ellipse with a soft irregular edge.
   x.translate(size / 2, size / 2);
@@ -485,8 +517,9 @@ function buildMirrorPool(pal, seed, at = { x: 7.2, z: -7.4 }) {
   // W2b re-aimed the axis AT THE TOWER'S FOOT (rule 7 — it copied the
   // beam's tilt and pointed at nothing, the frame's one dissenting
   // arrow; every directional element rides the circuit or argues with
-  // it).
-  x.rotate(0.62);
+  // it). W2c: the pool moved a unit nearer the tower, so the bearing to
+  // the foot opens slightly — 0.62 → 0.68, re-derived from the new seat.
+  x.rotate(0.68);
   const pale = new THREE.Color(pal.moon).lerp(new THREE.Color('#ffffff'), 0.45);
   const dashes = 9;
   for (let i = 0; i < dashes; i++) {
@@ -529,6 +562,123 @@ function buildMirrorPool(pal, seed, at = { x: 7.2, z: -7.4 }) {
   // The water breathes a little cool light into the fog above it.
   mesh.userData.emitter = { x: at.x, z: at.z, r: 2.4, gain: 0.45, cr: 0.14, cg: 0.20, cb: 0.24 };
   return mesh;
+}
+
+// THE SCENERY TIER (W2c, rule 13). Small non-focal bits whose job is
+// connective flow and inhabitedness, never attention: sedge tufts and a
+// stone in the FOREGROUND band (in front of the front wall — dice-free
+// by construction, and the one band where projected depth is cheap, the
+// lever plan-space moves never had), a fallen mossy branch riding the
+// moot→tower lobe, two stones on the pool's near bank. Value-quiet by
+// material: tufts are MeshBasic near-silhouettes, nothing carries
+// emissive, nothing lights. Every item reports {x,z,rx,rz,band} so
+// venue-set can hold the placement law over the whole tier.
+function buildSceneryBits(pal, seed) {
+  const rnd = mulberry32(seed ^ 0x5ce9);
+  const group = new THREE.Group();
+  group.name = 'faeScenery';
+  const items = [];
+  const dark = new THREE.Color(pal.void).lerp(new THREE.Color(pal.ground), 0.5);
+  const stoneTone = new THREE.Color(pal.deepGround).lerp(new THREE.Color(pal.moonEdge), 0.18);
+  const barkTone = new THREE.Color(pal.bark).lerp(new THREE.Color(pal.void), 0.45);
+  const mossTone = new THREE.Color(pal.ground).lerp(new THREE.Color(pal.bark), 0.45);
+
+  // A tuft: a fan of tapered blades, anchored at the base, leaning out.
+  // MeshBasic dark — a near-silhouette that frames without competing
+  // (the foreground's job is depth, not detail).
+  const tuft = (wx, wz, blades, hMax, name) => {
+    const g = new THREE.Group();
+    g.name = name;
+    const mat = new THREE.MeshBasicMaterial({
+      color: dark, side: THREE.DoubleSide, fog: true,
+    });
+    for (let i = 0; i < blades; i++) {
+      const h = hMax * (0.55 + rnd() * 0.45);
+      const geo = new THREE.PlaneGeometry(0.05 + rnd() * 0.04, h);
+      geo.translate(0, h / 2, 0);
+      const b = new THREE.Mesh(geo, mat);
+      b.rotation.y = rnd() * Math.PI * 2;
+      b.rotation.z = (rnd() - 0.5) * 0.55;
+      b.rotation.x = (rnd() - 0.5) * 0.2;
+      b.position.set((rnd() - 0.5) * 0.5, 0, (rnd() - 0.5) * 0.4);
+      g.add(b);
+    }
+    g.position.set(wx, 0.02, wz);
+    group.add(g);
+    return g;
+  };
+  const stone = (wx, wz, r, name) => {
+    const s = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(r, 0),
+      new THREE.MeshStandardMaterial({ color: stoneTone, roughness: 0.92, metalness: 0 }));
+    s.scale.y = 0.55 + rnd() * 0.15;
+    s.rotation.y = rnd() * Math.PI * 2;
+    s.position.set(wx, r * 0.32, wz);
+    s.castShadow = s.receiveShadow = true;
+    s.name = name;
+    group.add(s);
+    return s;
+  };
+
+  // THE FOREGROUND WING (worldToScreen-probed, 2026-08-13): the resting
+  // eye crops nearly the whole front band below the frame — the visible
+  // sliver is the bottom-LEFT corner only (x ≲ −6, z ≈ 4.5–5.2). So the
+  // fore tier is ONE corner wing there, blades tall enough to rise into
+  // frame, and the right side leans on the pool + bank stones instead
+  // (asymmetric near-framing is the diorama's norm, not a compromise).
+  // Legality at a corner is OUTSIDE THE DICE BOX AT EVERY POINT — the
+  // box is the INTERSECTION of the walls, so a bit clears it past the
+  // front wall (z − rz > 4.3) OR past the x wall (|x| − rx > 7.05).
+  // These clear via the x wall.
+  tuft(-8.2, 4.7, 10, 1.5, 'faeSceneryTuftL');
+  items.push({ x: -8.2, z: 4.7, rx: 0.8, rz: 0.8, band: 'fore' });
+  tuft(-8.0, 5.2, 6, 1.1, 'faeSceneryTuftL2');
+  items.push({ x: -8.0, z: 5.2, rx: 0.6, rz: 0.6, band: 'fore' });
+
+  // The fallen branch (back band): lies on the moot→socket lobe, its
+  // heading agreeing with the circuit — it points at the berm's toe,
+  // one more arrow riding the same line (rule 7).
+  const branch = new THREE.Group();
+  branch.name = 'faeSceneryBranch';
+  const wood = new THREE.MeshStandardMaterial({ color: barkTone, roughness: 0.9, metalness: 0 });
+  const limb = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.15, 2.6, 7, 1), wood);
+  limb.rotation.z = Math.PI / 2;
+  limb.castShadow = limb.receiveShadow = true;
+  branch.add(limb);
+  const mossStripe = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.1, 0.155, 1.7, 7, 1, false, 0, Math.PI * 0.9),
+    new THREE.MeshStandardMaterial({ color: mossTone, roughness: 0.95, metalness: 0 }));
+  mossStripe.rotation.z = Math.PI / 2;
+  mossStripe.position.y = 0.015;
+  branch.add(mossStripe);
+  // Two dark caps at the rot end — the moot spill's vocabulary with the
+  // light left out (the scenery tier emits nothing; the spill's lit
+  // strays already carry that budget).
+  const capMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(pal.glowCap).lerp(new THREE.Color(pal.void), 0.72),
+    roughness: 0.7, metalness: 0,
+  });
+  for (let i = 0; i < 2; i++) {
+    const r = 0.09 - i * 0.025;
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(r, 8, 6), capMat);
+    cap.scale.y = 0.62;
+    cap.position.set(-1.05 - i * 0.22, 0.12 + r * 0.3, 0.1 * (i ? -1 : 1));
+    cap.castShadow = true;
+    branch.add(cap);
+  }
+  branch.position.set(-4.8, 0.14, -5.5);
+  branch.rotation.y = -0.446; // local +X → toward the berm toe (0, -3.2)
+  group.add(branch);
+  items.push({ x: -4.8, z: -5.5, rx: 1.35, rz: 0.75, band: 'back' });
+
+  // Two stones on the pool's near bank, where the damp margin meets the
+  // moss — the pool's edge reaching toward the clearing (rule 4).
+  stone(4.5, -6.0, 0.28, 'faeSceneryStoneBankA');
+  items.push({ x: 4.5, z: -6.0, rx: 0.32, rz: 0.32, band: 'back' });
+  stone(5.0, -6.35, 0.2, 'faeSceneryStoneBankB');
+  items.push({ x: 5.0, z: -6.35, rx: 0.24, rz: 0.24, band: 'back' });
+
+  return { group, items };
 }
 
 // THE MIST BAND (W2 — the horizon's missing middle tier). The treeline's
@@ -905,6 +1055,7 @@ export function buildFaeConcept({ paletteId = 'moonrise', seed = 20260815 } = {}
   const halos = buildHalos(pal);
   const treeline = buildTreeline(pal, seed);
   const mist = buildMistBand(pal, seed);
+  const scenery = buildSceneryBits(pal, seed);
   // NO STUMP PROP. The W0 concept plates placed a lab stump at the future
   // socket; when the real Hollow Bole shipped (W3) the venue kept
   // planting the prop underneath it, and the two interleaved into a pale
@@ -912,7 +1063,7 @@ export function buildFaeConcept({ paletteId = 'moonrise', seed = 20260815 } = {}
   // setVisibleByName forensics, not by staring). The tower is the
   // venue's tower now; buildStumpShell survives only as the exported lab
   // reference.
-  group.add(ground, clearing, mist, treeline, moot, pool, wisps.points, shaft, halos, ...sheets);
+  group.add(ground, clearing, mist, treeline, moot, pool, scenery.group, wisps.points, shaft, halos, ...sheets);
   // Fold the static light — the moot's pools and the mirror pool's cool
   // breath — into the fog base (techniques §6).
   brightenFog(sheets, [...moot.userData.pools, pool.userData.emitter]);
@@ -929,6 +1080,12 @@ export function buildFaeConcept({ paletteId = 'moonrise', seed = 20260815 } = {}
     shaft: { x: shaft.position.x, z: shaft.position.z },
     sheetYs: sheets.map((s) => s.position.y),
     veilHole: 7,
+    // The scenery tier (W2c, rule 13): every bit carries its band so the
+    // law can be asserted per band — 'back' bits clear the back wall AND
+    // the tower envelope; 'fore' bits sit wholly in front of the front
+    // wall. The list living here (not in the scenario) is the same
+    // contract discipline as the rest of the stage.
+    scenery: scenery.items,
   };
   return { group, pal, sheets, wisps, halos, moot, pool, mist, layout };
 }

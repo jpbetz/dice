@@ -67,10 +67,14 @@ portal arithmetic.
    and wings stay outside the lane. Write the one-sentence material
    story for each functional surface before modeling it.
 6. **Populate the scenery tier** (rule 13): small, value-quiet,
-   non-focal bits in the between-space and the FOREGROUND band (in
-   front of the front wall — dice-free by construction, the cheapest
-   projected depth on the table). Nothing in the tier may be the
-   first thing the eye visits, emit light, or enter a dice lane.
+   non-focal bits in the between-space and the FOREGROUND band — but
+   PROBE the band first: `__diceDebug.worldToScreen(x, y, z)` says what
+   the resting eye actually keeps in frame (most of the near field is
+   cropped; expect one corner wing, not a symmetric pair). Near-corner
+   legality is outside the dice box at every point — past the front
+   wall OR past the x wall, since the box is the walls' intersection.
+   Nothing in the tier may be the first thing the eye visits, emit
+   light, or enter a dice lane.
 7. **Move a placement, move its claim.** Any position change lands in
    `venue-set`'s assertions as a DOCUMENTED NEW CLAIM (the layout comes
    off `venueInfo().stage`, so the scenario reads the contract — keep

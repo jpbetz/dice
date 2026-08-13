@@ -12783,6 +12783,28 @@ export const scenarios = [
         `three dense sheets below every die top (${s.sheetYs.join(', ')})`);
       assert.equal(Math.max(...s.sheetYs), 3.4, 'and one veil at its height');
       assert.equal(s.veilHole, 7, 'with its baked clearing hole');
+      // ---- W2c: the scenery tier holds the same law, per band ----------
+      // NEW CLAIMS 2026-08-13 (rule 13): the tier exists (zero bits means
+      // the set pieces are exhibits again), 'back' bits clear the back
+      // wall AND the tower envelope exactly as the flank features do, and
+      // 'fore' bits sit wholly outside the DICE BOX — the box is the
+      // INTERSECTION of the walls, so a near-corner bit is unreachable
+      // past the widest front wall (z − rz > 4.3) OR past the x wall
+      // (|x| − rx > 7.05, wide w 14.1). The list comes off the stage, so
+      // a future placement move is a contract change here, never a
+      // silent drift.
+      assert.ok(Array.isArray(s.scenery) && s.scenery.length >= 5,
+        `the scenery tier is populated (${(s.scenery || []).length} bits)`);
+      for (const bit of s.scenery) {
+        if (bit.band === 'back') {
+          assert.ok(bit.z + bit.rz < -4.3 && Math.abs(bit.x) - bit.rx > 3.3,
+            `back-band scenery is dice-unreachable (${bit.x}, ${bit.z})`);
+        } else {
+          assert.equal(bit.band, 'fore', `scenery declares its band (${JSON.stringify(bit)})`);
+          assert.ok(bit.z - bit.rz > 4.3 || Math.abs(bit.x) - bit.rx > 7.05,
+            `fore-band scenery clears the dice box at every point (${bit.x}, ${bit.z})`);
+        }
+      }
 
       // The venue's OWN tower, not a hardcoded 'none': today the fae tower
       // has not shipped so venueTower reports 'none'; the day 'hollowbole'

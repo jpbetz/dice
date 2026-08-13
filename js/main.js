@@ -9097,6 +9097,18 @@ window.__diceDebug = {
     scene.traverse((o) => { if (o.name === name) { o.visible = !!visible; n++; } });
     return n;
   },
+  // World point → screen, through the LIVE camera (W2c, composition rule
+  // 6 as amended: the triangle is judged in screen space, so the tools
+  // need the same projection the frame gets). ndc in [-1, 1] (y up),
+  // px in CSS pixels (y down), `in` = inside the frustum with z in front.
+  worldToScreen(x, y, z) {
+    const v = new THREE.Vector3(x, y, z).project(camera);
+    return {
+      ndc: { x: v.x, y: v.y, z: v.z },
+      px: { x: (v.x + 1) / 2 * view.width, y: (1 - v.y) / 2 * view.height },
+      in: v.z > -1 && v.z < 1 && Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1,
+    };
+  },
   // THE FAE CONCEPT LAB (ROADMAP W0): faeConcept(true, {paletteId:
   // 'moonrise'|'foxfire'}) stages the Moonrise Glade sketch; false restores
   // the room exactly. Concept plates only — not the venue mechanism.
