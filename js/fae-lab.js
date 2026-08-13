@@ -797,7 +797,10 @@ const GLADE_LIFE_ZONES = [
   // where parallax lives, and it is the one band a flying speck can
   // occupy without standing on anything. Proved in-frame by
   // worldToScreen before it shipped (rule 13).
-  { x: -9.0, z: 4.9, rx: 1.3, rz: 1.6, y0: 0.15, y1: 1.15, w: 12 },
+  // x −9.4 rather than −9.0: at −9.0 the near lobe of this ellipse reached
+  // inside the box-plus-wander and the build had to reseat one member. A
+  // zone that needs seating is a zone authored wrong, so it moved.
+  { x: -9.4, z: 4.9, rx: 1.15, rz: 1.6, y0: 0.15, y1: 1.15, w: 12 },
 ];
 
 // THE ROUTE. A closed loop that rides the composition's own circuit

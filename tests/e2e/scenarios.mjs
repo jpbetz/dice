@@ -12916,7 +12916,7 @@ export const scenarios = [
       await a.dbg('holdClock(true)');
       assert.deepEqual(L.box, { hx: 7.05, hz: 4.3, margin: 0.35 },
         'the box is the widest mat, which is the case that binds');
-      let fliesPeak = 0, wispPeak = 0, gray = true;
+      let fliesLuma = 0, wispLuma = 0, gray = true;
       for (let k = 0; k < 6; k++) {
         if (k) await a.dbg('sim(780)');   // 13 s a step — most of one lap by the end
         const s = await a.dbg('lifeInfo()');
@@ -12926,21 +12926,27 @@ export const scenarios = [
         assert.equal(s.clamped, 0,
           'and the runtime backstop never fired — the route obeys the law on its own, '
           + 'which is what makes the clamp a backstop rather than a mechanism');
-        fliesPeak = Math.max(fliesPeak, s.fliesPeak);
-        wispPeak = Math.max(wispPeak, s.wispPeak);
+        fliesLuma = Math.max(fliesLuma, s.fliesLuma);
+        wispLuma = Math.max(wispLuma, s.wispLuma);
         gray = gray && s.gray;
       }
 
       // ---- ② the tiers, as rendered ---------------------------------------
       // The Vegas gates (FAE-VENUE-SPEC-DRAFT §gates) put the field in the
-      // tertiary tier and the procession in the secondary one, and the
-      // glade's countable-source budget was already full before W5 — so
-      // the field may only stay exempt while it is MONOCHROME. Peak is
-      // read off the colour buffer, i.e. what actually rendered.
-      assert.ok(fliesPeak > 0.02 && fliesPeak <= 0.25,
-        `the field lights, and stays tertiary (peak ${fliesPeak} ≤ 0.25)`);
-      assert.ok(wispPeak > 0.10 && wispPeak <= 0.60,
-        `the procession stays secondary (peak ${wispPeak} ≤ 0.60)`);
+      // tertiary tier (≤0.25) and the procession in the secondary one
+      // (0.35–0.6), and the glade's countable-source budget was already
+      // full before W5 — so the field may only stay exempt while it is
+      // MONOCHROME.
+      //
+      // These are LUMINANCES, not vertex scalars, and the difference is a
+      // real finding rather than pedantry: the field was first authored at
+      // "0.22 against a ceiling of 0.25" and rendered at 0.09, because the
+      // scalar multiplies a teal carrying a luma of 0.416. Gating on the
+      // scalar would have passed a field nobody could see.
+      assert.ok(fliesLuma > 0.03 && fliesLuma <= 0.25,
+        `the field lights, and stays tertiary (luma ${fliesLuma} ≤ 0.25)`);
+      assert.ok(wispLuma > 0.20 && wispLuma <= 0.60,
+        `the procession reaches the secondary tier without leaving it (luma ${wispLuma})`);
       assert.equal(gray, true,
         'and every member is written grayscale — the hue lives in ONE material, '
         + 'which is the whole reason a field is exempt from the source count');
@@ -13021,6 +13027,24 @@ export const scenarios = [
       assert.ok(capMax > 0 && capMax < 0.9,
         `and never wakes past the bloom threshold (brightest cap ${capMax})`);
       await a.dbg('holdClock(false)');
+
+      // ---- the two skies dress the life differently -----------------------
+      // Every other number this hook reports is palette-INDEPENDENT by
+      // construction — same seed, same zones, same dials, so positions,
+      // peaks and mood are identical in both venues — which means the hue
+      // is the only field that can tell the skies apart. Identical values
+      // across a flip is precisely the shape of the W2c berm bug, and
+      // TESTING.md P9 is the rule that says to pair a stability check with
+      // a content one.
+      const hueMoon = (await a.dbg('lifeInfo()')).hue;
+      await a.dbg(`setVenue('foxfire')`);
+      await a.waitFor(`window.__diceDebug.venue === 'foxfire'`, { desc: 'foxfire staged' });
+      const hueFox = (await a.dbg('lifeInfo()')).hue;
+      assert.notDeepEqual(hueFox, hueMoon,
+        `the two skies dress the living layer differently `
+        + `(moonrise ${JSON.stringify(hueMoon)} vs foxfire ${JSON.stringify(hueFox)})`);
+      await a.dbg(`setVenue('moonrise')`);
+      await a.waitFor(`window.__diceDebug.venue === 'moonrise'`, { desc: 'moonrise restored' });
 
       // ---- the layer is an OBJECT, and it leaves with its venue -----------
       const off = await a.dbg('lifeTune({on: false})');

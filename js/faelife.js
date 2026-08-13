@@ -136,22 +136,48 @@ function keepOut(p, box) {
 // The dials, with the reasoning that picked them. The caller copies this
 // into a mutable tune so `lifeTune()` can move any of it live — the
 // numbers below are a starting position, not a contract.
+// THE PEAKS ARE VERTEX SCALARS, AND THE TIERS ARE LUMINANCE. Not the same
+// number, and the first LOOK pass proved it: the field was authored at
+// 0.22 "against a ceiling of 0.25" and rendered at 0.09, because the
+// scalar multiplies a TEAL whose own linear luma is 0.416. A third of the
+// budget, spent by arithmetic nobody had done. Every peak here is chosen
+// so that scalar × the palette's luma lands inside its tier, and lifeInfo
+// reports the LUMA so the gate measures what the eye gets.
 export const LIFE_TUNE = {
   // THE FIELD
-  count: 110,          // enough that ~15 are lit at once at blinkPow 6
-  size: 0.17,          // a firefly is a point; the halo belongs to wisps
-  peak: 0.22,          // TERTIARY CEILING is 0.25 — this is the gate, not taste
-  blinkPow: 6,         // the spec's own number: dark ~5/6 of the cycle
+  count: 260,          // in-frame density, not total: the zones are wide and
+                       // most of a blink cycle is dark, so 110 put about two
+                       // lit specks in the resting frame
+  // SIZE WAS THE WHOLE PROBLEM, and no brightness was going to fix it. At
+  // 0.20 the census said 51 lit fireflies were in frame and the frame
+  // showed two: gl_PointSize scales as size × (halfHeight / depth), so a
+  // fifth of a unit at ~17 units out is about two device pixels, and a
+  // two-pixel glint under a radial falloff is nothing. Ladder shot at
+  // 0.2 / 0.5 / 0.9 — 0.5 reads as drifting specks, 0.9 makes blobs that
+  // contest the moot's own caps (rule 1).
+  size: 0.50,
+  peak: 0.42,          // → ~0.17 luma, under the TERTIARY ceiling of 0.25
+  blinkPow: 4,         // dark ~3/4 of the cycle. The spec said ~6; at 6 the
+                       // duty cycle was so low the field read as absent, and
+                       // these are faerie lights, not literal beetles
   blinkHz: 0.22,       // ×0.6–1.5 per fly → a flash every 3–8 s
   wander: 0.45,        // slow drift; the blink does the work, not the travel
   // THE PROCESSION
   wispCount: 4,        // one lead + three followers. A fifth would be a swarm
-  wispSize: 0.46,
-  leadPeak: 0.55,      // SECONDARY — and it replaces the stage's old lead,
-  wispPeak: 0.20,      // so the countable-source census does not move
+  wispSize: 1.15,      // a lantern with a halo, at the same ladder's reading
+  leadPeak: 0.95,      // → ~0.40 luma: inside SECONDARY (0.35–0.6), where the
+                       // stage's old lead was supposed to be and never was
+  wispPeak: 0.38,      // → ~0.16 luma: followers stay in the field's tier, so
+                       // the countable-source census does not move
   wispLoopSec: 78,     // one lap; slow enough to be a route, not a track
   wispLampRange: 5.5,  // the lead's light grazes the moss it passes over
-  wispLampGain: 2.2,   // → ~1.1 intensity, under the tower ember's 1.25–1.95
+  wispLampGain: 2.2,   // → ~2.0 measured intensity once the lead reached its
+                       // tier: the same class as the die-followers' 2.2 and
+                       // above the tower ember's 1.25–1.95. It reads as a
+                       // lantern rather than a second moon because the range
+                       // is 5.5 with decay 2, and the governor dims it with
+                       // the wisp it belongs to. First dial to move if Joe
+                       // finds it loud.
   nearArcU: 0.3,       // overridden by the venue: where its route comes near
   leanGain: 0.35,      // how much brighter at the near arc when dice are down
   leanDwell: 0.55,     // phase warp; must stay < 1 or the route reverses

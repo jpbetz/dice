@@ -9300,6 +9300,13 @@ window.__diceDebug = {
     const fc = L.fireflies.geometry.attributes.color;
     const wp = L.wispPoints.geometry.attributes.position;
     const wc = L.wispPoints.geometry.attributes.color;
+    const peakOf = (a) => {
+      let m = 0;
+      for (let i = 0; i < a.count; i++) m = Math.max(m, a.getX(i));
+      return Number(m.toFixed(4));
+    };
+    // Rec.709 luma over the LINEAR working-space colour three.js holds.
+    const lumaOf = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
     let inBox = 0, worst = null;
     const scan = (p, tag) => {
       for (let i = 0; i < p.count; i++) {
@@ -9326,10 +9333,27 @@ window.__diceDebug = {
       inBox,
       worst,
       lamp: Number(L.lamp.intensity.toFixed(4)),
-      // Peak brightness actually WRITTEN this frame, per population — the
-      // tier gates are about what renders, not about what a dial says.
-      fliesPeak: (() => { let m = 0; for (let i = 0; i < fc.count; i++) m = Math.max(m, fc.getX(i)); return Number(m.toFixed(4)); })(),
-      wispPeak: (() => { let m = 0; for (let i = 0; i < wc.count; i++) m = Math.max(m, wc.getX(i)); return Number(m.toFixed(4)); })(),
+      // Peak brightness actually WRITTEN this frame, per population…
+      fliesPeak: peakOf(fc),
+      wispPeak: peakOf(wc),
+      // …and what that peak is WORTH, which is the number the tier gates
+      // are actually about. The vertex scalar multiplies the palette's own
+      // colour, and a teal carries a luma of its own (moonrise's glowCore
+      // is 0.416) — so a field authored at "0.22 against a ceiling of
+      // 0.25" renders at 0.09 and reads as absent. That was the first
+      // LOOK pass's finding, and reporting the product is what stops the
+      // gate from being a number nobody converted.
+      fliesLuma: Number((peakOf(fc) * lumaOf(L.fireflies.material.color)).toFixed(4)),
+      wispLuma: Number((peakOf(wc) * lumaOf(L.wispPoints.material.color)).toFixed(4)),
+      // The palette DISCRIMINATOR. Two venues reporting the same hue means
+      // the layer never re-dressed — the shape of the W2c berm bug, and
+      // the reason TESTING.md P9 says to pair a stability check with a
+      // content one. Every other number here is palette-independent by
+      // design, so this is the only field that can tell the skies apart.
+      hue: {
+        field: `#${L.fireflies.material.color.getHexString()}`,
+        wisp: `#${L.wispPoints.material.color.getHexString()}`,
+      },
       // A field is exempt from the countable-source budget only while it
       // stays MONOCHROME. Per-point colour is written grayscale so the hue
       // lives in one material; this proves it, rather than trusting it.
