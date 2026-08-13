@@ -145,12 +145,18 @@ async function shootPour(t, shot, label) {
   };
   const midOf = (span, k = 0.55) => span[0] + (span[1] - span[0]) * k;
 
-  // 7. THE FIRST DIE IN THE MOUTH, from just above and outside the crown —
-  //    the angle that can actually see down the bore. Expect a sliver: the
-  //    die is inside a dark throat and the point is whether the throat READS
-  //    as a throat with something falling into it.
-  await t.dbg('towerEye(10, 12.0, 3.0)');
-  await to(midOf(f.spans[0][0]));
+  // 7. THE FIRST DIE ENTERING THE MOUTH. Two framing lessons, both from
+  //    looking at the first cut rather than reasoning about it:
+  //    · towerEye(10, 12.0, 3.0) put the camera against the trunk — the
+  //      crown filled the frame and the die was outside it entirely. The
+  //      eye has a FIXED lookAt (0, 5.2*S, z0-1.4), so the only way to get
+  //      the rim and the sky above it into one frame is to back off.
+  //    · 55% of the entry window is already BELOW the rim on this tower
+  //      (the window runs materialise -> despawn, and despawn is 1.75 under
+  //      the rim). 30% is where the die is still above the crown and
+  //      visibly falling into it, which is the moment worth photographing.
+  await t.dbg('towerEye(14, 13.5, 4.5)');
+  await to(midOf(f.spans[0][0], 0.30));
   await shot(`hollow-${label}-7-pour-midflight-mouth.png`);
 
   // 8. THE SAME MOMENT FROM THE RESTING EYE — the frame a player actually

@@ -31,6 +31,14 @@ export default async function run(stage, args) {
   const a = await stage.tab('localhost', 'TowerPour');
   await a.dbg('holdClock(true)');
   await a.dbg(`setTower(${JSON.stringify(tower)})`);
+  // A BAKED ROW DOES NOT SOCKET IN THE TICK IT IS ASKED FOR. Without this the
+  // header printed `tower = none` for hollowbole while the pours below still
+  // went through the tower — a report that contradicts its own numbers, and
+  // the milder version of the trap the skill names: a tool that measures a row
+  // whose model has not arrived is measuring the CLASSIC core under a name it
+  // did not build. Wait for the socket, not for a fixed number of frames.
+  await a.waitFor(`window.__diceDebug.tower === ${JSON.stringify(tower)}`,
+    { desc: `${tower} socketed (its model, if it has one, has arrived)` });
   await a.dbg('sim(30)');
   console.log('tower =', await a.dbg('tower'), ' extents =',
     JSON.stringify(await a.dbg('tableExtents()')));
