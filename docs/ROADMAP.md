@@ -2788,6 +2788,65 @@ venueInfo().stage — no scenario edit needed for the move, which is what
 reading the contract instead of constants buys. Suite 48/48;
 fx+settings 21/21; LOOK both palettes.
 
+### W2c. Grown, not placed — the aesthetic goals (2026-08-13, Joe)
+
+Joe's verdict on the integrated W2b room, verbatim: *"When I look at the
+scene, I see three set pieces, the mushroom ring, the stump tower, and
+the pond. They are placed next to each other in a line in the most basic
+way. There is no aesthetic to it, there is no visual continuity
+transforming them from set pieces into a unified scene with a flow. Part
+of the problem is the seams around the stump. It's not part of its
+environment. It lacks a convincing connection to the ground. It looks
+like an item set on a table, not a stump that grew out of the ground. It
+needs to either blend into the fog fully, or the ground needs to be
+visible and it needs to better integrate with it via roots or something.
+The other part of the problem is that the ramp out of the stump is not
+part of the immersion and instead plays against it. Making it look like
+part of the ground (dirt, maybe moss, maybe roots) that happens to be
+placed in the right location, would work far better. It's also weird
+that the exit hole extends below the ramp's highest point…"* And the
+directive: *"use this information to build out the design aesthetic
+goals for all venues so we track this for future builds."*
+
+**The post-mortem W2b owes, recorded so the doctrine can absorb it:**
+W2b moved features in PLAN, and the resting eye compresses the placement
+law's back band (features live behind z −4.3 in a strip a few units
+deep) into one horizontal screen band — so plan-depth moves cannot break
+a line-reading. Rule 6's check was run in the wrong space. The levers
+that exist at the eye are angular-size contrast, silhouette overlap,
+terrain, and the untouched FOREGROUND band (in front of the front wall,
+dice-free by construction). Fresh frames confirm the rest: the stump's
+base meets the moss in a clean seam (the W2b lobes are too soft to read
+at exposure); the baked wooden tongue reads as a gangplank propped
+against a prop — round 4 already tried paint (make_tongue_paint, a 0.39
+value drop) and a tinted prop is still a prop; the wound's ragged
+threshold (0.90, teeth lower) shows below the ramp crest (sill 1.00);
+and the pool is half-cropped out of the resting frame and near-invisible
+in foxfire.
+
+The work, in order:
+1. **Doctrine** — VENUE-COMPOSITION.md gains rules 11–13 (grown-not-
+   placed; engine furniture wears the world; the scenery tier) and rule
+   6's check moves to SCREEN space; `/new-venue` absorbs them; GOALS
+   goal 14 points at the dossier as the venue-scene law. Chosen fork of
+   Joe's either/or on the stump: GROUND-INTEGRATION, not fog-blend —
+   the tower is the hero (rule 1) and a hero dissolved into fog forfeits
+   the frame.
+2. **The stump grows its ground (hollowbole round 6)** — the model owns
+   its transition: the wooden tongue re-authored as an EARTHEN BERM
+   (crest exactly on the ramp collider plane inside the dice lane;
+   lumpy wings outside it, pressed flush into the wound base so the
+   below-sill rag is buried, not squared); root-flare fingers diving
+   into the soil; moss-creep vertex color low on the trunk blending
+   toward each palette's ground. Venue side: the contact ring retuned
+   tight and dark, a disturbed-soil ring.
+3. **Re-flow at the eye + the scenery tier** — the pool into frame and
+   up a value step; angular-size and overlap contrast between the
+   three; foreground-band scenery (dark tufts, a stone, framing the
+   bottom corners) and mid-ground connective bits (a fallen mossy
+   branch, bank stones) — value-quiet, zero new sources; every moved
+   placement lands as a documented new claim in `venue-set`.
+
 ### W4. The dice set — DONE 2026-08-13 (pending Joe's LOOK verdict)
 Moonmoot Witchlight (THEMES.md §10; js/themes.js): tumbled labradorite,
 all the light in the deep-carved numerals — "rune glow" delivered as

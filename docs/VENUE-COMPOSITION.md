@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# VENUE COMPOSITION — how a scene becomes ONE scene (W2b, 2026-08-13)
+# VENUE COMPOSITION — how a scene becomes ONE scene (W2b–W2c, 2026-08-13)
 
 Commissioned by Joe's W2 verdict, verbatim in ROADMAP W2b: good set
 pieces, no integration — "setting them next to each other in this way is
@@ -64,11 +64,19 @@ constraint than games get, and it is why the rules can be mechanical.
    behind the one in front. A support pushed INTO the background band
    couples the layers. CHECK: assign every feature a layer; no empty
    layer; the band visibly passes BEHIND every midground silhouette.
-6. **Triangles, not rows.** Supports and hero form a depth-asymmetric
-   triangle in plan — unequal distances, unequal depths, never two
-   features at the same range reading as bookends — with the resolve
-   area held inside it. CHECK: draw the plan triangle; no
-   near-collinearity; no two features within ~10% of the same depth.
+6. **Triangles, not rows — measured AT THE EYE.** Supports and hero form
+   a depth-asymmetric triangle — unequal distances, unequal depths,
+   never two features reading as bookends — with the resolve area held
+   inside it. The plan triangle is NECESSARY, NOT SUFFICIENT (amended
+   2026-08-13, the W2c lesson): the resting eye's low angle compresses
+   the placement law's back band into one horizontal screen strip, so a
+   triangle that exists only in plan still photographs as beads on a
+   line. The levers that survive projection are angular-size contrast,
+   silhouette overlap, terrain relief, and the foreground band. CHECK:
+   draw the plan triangle, THEN verify on the resting FRAME — no two
+   features within ~10% of the same angular size sitting on the same
+   horizontal band, and at least one pair separated by overlap or a
+   clear vertical offset, not merely by gap.
 7. **Every directional element agrees.** Leading lines are the circuit's
    rails: ramps, beams, gap-facings, glints, headings. Each points INTO
    the circuit; none points off-stage. CHECK: list every directional
@@ -85,6 +93,42 @@ constraint than games get, and it is why the rules can be mechanical.
     the tower envelope), the beam on the resolve area, sheets below die
     tops, results readable. venue-set asserts it; composition never
     argues with it. CHECK: the venue-set scenario stays green.
+11. **Grown, not placed** (2026-08-13, Joe's W2c verdict). Every feature
+    must read as if it grew where it stands or was shaped by the place.
+    The tell is the SEAM: a base that meets the ground in a clean
+    silhouette line is a prop on a mat, however good the prop. Material
+    continuity runs BOTH directions — the ground reaches up (soil
+    mounding, disturbed texture, root shadows) and the feature reaches
+    down (roots, banks, skirts, moss creeping onto its lower surfaces).
+    Rule 9's contact darkening is the floor, not the standard — and
+    paint alone cannot deliver it: a re-tinted prop is still a prop
+    (the delivery tongue took a 0.39 value drop in round 4 and still
+    read as a gangplank). Where a feature is a baked model, the MODEL
+    owns its transition geometry; the venue owns the ground's answer.
+    CHECK: at the resting eye, trace every base's full silhouette; any
+    stretch where feature pixels sit directly on undisturbed ground
+    pixels is a seam finding.
+12. **Engine furniture wears the world.** Surfaces the engine owns —
+    the delivery ramp, the lip, the jamb margins — are dressed as
+    terrain NATIVE to the venue (earth, moss, root), never as apparatus
+    (a plank, a chute, a slide). Physics is untouchable: inside the
+    dice lane the visible surface matches the collider plane exactly;
+    lumps, wings and roots live outside the lane. If the machine can be
+    seen as a machine, the venue has failed at exactly the spot every
+    roll ends. CHECK: state each functional surface's material story in
+    one sentence of the venue's fiction — "it is a ramp" is a failing
+    sentence; "the ground rises in a root-bound bank to the tear in the
+    trunk" passes.
+13. **A scenery tier below the set pieces.** Set pieces (≤3, on the
+    circuit) are not the only physical things in a place. The venue
+    carries small non-focal scenery — stones, snags, tufts, litter,
+    fallen wood — whose job is connective flow and inhabitedness, never
+    attention. Value-quiet, zero new light sources, placed in the
+    between-space, the flanks, and the FOREGROUND band (in front of the
+    front wall — dice-free by construction, and the one band where
+    projected depth is cheap). CHECK: count scenery bits at the resting
+    eye; zero means the set pieces are exhibits again; any bit the eye
+    visits FIRST is in the wrong tier.
 
 ## The glade, diagnosed (what W2b changes)
 
@@ -110,6 +154,39 @@ lobes of moss/detail connecting the socket to each flank; both features
 gain base transitions (damp bank ring, trampled ring); the mist band's
 bites bias thinner over the moot (the circuit's release point) and
 denser behind the pool.
+
+## The glade, re-diagnosed (W2c — why W2b's fix didn't land)
+
+Joe's verdict on the INTEGRATED room (ROADMAP W2c, verbatim there):
+still three set pieces in a line, no visual continuity; the stump "an
+item set on a table, not a stump that grew out of the ground"; the ramp
+"not part of the immersion"; the exit hole visibly continuing below the
+ramp's crest. The post-mortem, owned:
+
+- **Rule 6 was checked in the wrong space.** The W2b fix moved the pool
+  in PLAN (bookend depth "broken", +0.8 z) — but at the resting eye the
+  whole back band projects to one horizontal strip, and the move
+  photographed as nothing. Worse, it pushed the pool half out of frame
+  and further under foxfire's value floor. Plan reasoning is for the
+  placement law; composition verdicts belong to the FRAME (rule 6 as
+  amended).
+- **Rules 11/12 did not exist, and their absence is the seam.** The
+  contact rings and lobes were painted VALUE with soft edges — too soft
+  to survive exposure — while the stump's silhouette line stayed clean
+  and the tongue stayed a wooden slab on the collider. No amount of
+  ground-side paint grounds a model whose own geometry ends in a
+  prop edge.
+- **Rule 13 did not exist**: with only three physical objects on an
+  empty plane, the eye has nothing connective to ride and the reading
+  "exhibits on a mat" is structurally forced.
+
+The W2c fixes ride the new rules: the model grows its transition
+(hollowbole round 6 — earthen berm for the tongue with its crest on the
+collider plane, root fingers, moss creep), the ground answers (tight
+contact ring, disturbed soil), the pool comes into frame and up a value
+step, and a scenery tier populates the foreground band and the
+between-space. Placement moves land as documented new claims in
+`venue-set`.
 
 ## Sources
 

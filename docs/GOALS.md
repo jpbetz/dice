@@ -111,7 +111,12 @@ note).
     there — dice may glow, air may swirl, the ground need not be a table.
     Neither register is allowed to be half-believed: a fantasy venue that
     keeps one foot on the casino felt reads as a costume, which is why goal
-    13 makes the set atomic.
+    13 makes the set atomic. *How a venue's SCENE earns internal
+    consistency is law elsewhere: docs/VENUE-COMPOSITION.md (the thirteen
+    rules — hierarchy, flow, depth, grown-not-placed, engine furniture
+    wearing the world, the scenery tier) is normative for every venue
+    build, enforced through the `/new-venue` process (added 2026-08-13,
+    Joe's W2c directive).*
 15. **Atmosphere serves the roll.** Every invariant below binds in every
     register, and two bind *hardest* exactly when a venue is at its most
     atmospheric: results stay readable (fog THINS over the resolve area, or
