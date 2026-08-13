@@ -805,6 +805,20 @@ What is left:
   (js/portable.js `TABLE_KEYS`), so a prepared table cannot yet arrive
   with its tower already up — the one place the setting is not treated
   like its neighbours.
+- **The exit portal's minimum height is too generous** *(Joe 2026-08-13:
+  "The hole in the stump for the dice to exit is too tall. We really need
+  to figure out what a good minimum height is (might require updating the
+  skill for towers).")* The evidence is the Hollow Bole itself: its
+  doorway ships at `clearH 4.50` — exactly `TOWER_PORTAL_LIMITS`'
+  `clearHMin` (3.6·S) — and still reads too tall, so the floor itself is
+  wrong, not the model. The floor was inherited from the classic spec's
+  numbers, never probed downward. Finding the true minimum is a probe
+  campaign (lower `clearH`/`sillY` fixtures through the full probe
+  matrix + pours, multiple seeds, all zooms — the exit-jam class the
+  bounds exist to prevent), and the answer must land in THREE mirrored
+  places at once: `TOWER_PORTAL_LIMITS` (js/main.js), check.py's
+  `--tower` limits (tools/forge), and the `/new-tower` skill's portal
+  arithmetic — plus a Hollow Bole re-bake to wear it.
 
 Known cost, recorded rather than hidden: a 40-die pour is ~25 s of film
 and up to five bake attempts (~3 s synchronous). Forty dice through one
@@ -2721,11 +2735,47 @@ fast look loop with element forensics. Both palettes LOOK-gated at the
 resting eye and in the spread; suite 48/48, tower+fx 15/15 with the
 contract freeze untouched.
 
+### W2b. Scene integration and the venue skill — TRACKED 2026-08-13 (Joe)
+
+Joe's verdict on the W2 room, verbatim: *"The scene is arranged as three
+set pieces… The tower, the mushroom ring, and the pool. They are good
+set pieces overall, but the scene lacks integration. And setting them
+next to each other in this way is simplistic. Please consider the visual
+flow of the scene as a whole. You might need to research design a bit
+for this and start to build out a venue skill that defines how to reason
+about layout, flow… you did great on a theme and a color palette."*
+
+So: theme ✓, palette ✓, **composition is the open craft.** The shape of
+the work, in order:
+
+1. **Research the discipline** — scene composition and visual flow for
+   staged environments (leading lines, depth layering and overlap,
+   grouping/rhythm vs. the three-islands failure, negative space, how
+   ground cover and light carry the eye between features). Distill to a
+   dossier the way fae-research/grammar.md distilled palette law.
+2. **A venue skill** (`/new-venue` or similar) that encodes HOW TO
+   REASON about layout and flow — the composition counterpart to
+   `/new-tower`'s portal arithmetic: what gets placed where and why,
+   what connects features (paths, spill, roots, mist gradients,
+   shared edges), what the eye should do from the resting eye, and the
+   gates that check it (occlusion/overlap between features, sightline
+   probes, the placement law W2 shipped).
+3. **Apply it to the glade** — integrate tower, moot and pool into ONE
+   scene (candidates to evaluate under the researched doctrine, not
+   commitments: moss/ground-cover gradients that flow between features,
+   the moot's spill trailing toward the tower's roots, the pool catching
+   the tower's silhouette, mist density carrying the eye, overlap
+   instead of adjacency).
+
+Sequenced AFTER W4 per Joe ("track these issues for later; go ahead with
+the dice").
+
 ### W4–W6, sequenced
-W4 the dice set (rune glow, die lights, fog response) · W5 the living
-layer (wisps, fireflies, the moot in session) · W6 the audio palette.
-Each ships with its e2e proof; the venue is judged as a WHOLE at each
-step against goal 14's internal-consistency contract.
+W4 the dice set (rune glow, die lights, fog response) — **IN FLIGHT
+2026-08-13** · W5 the living layer (wisps, fireflies, the moot in
+session) · W6 the audio palette. Each ships with its e2e proof; the
+venue is judged as a WHOLE at each step against goal 14's
+internal-consistency contract.
 
 ## Structural risks (bets, not bugs — each gets more expensive to reverse)
 
