@@ -79,12 +79,25 @@ the contract. The tongue therefore starts at z = -0.06 (top y 1.046, a
 Inside the mouth the chute is unclad and dark, which is what "the wound
 interior is hollow there" asks for anyway. Recorded as kit friction.
 
+ROUGHNESS IS LOAD-BEARING — see bole_material. Blender's Principled ships
+0.5 and forge.vertex_color_material never touches it, so the first three
+bakes wore a 4% specular haze that WAS the value at these albedos: the
+interior would not go dark at any paint value, and the trunk read as
+smooth pale soap. Every material judgement made before that was found is
+worthless. Rotten wood is 0.96.
+
 MEASURED, NOT ASSUMED. Every dimensional claim above is re-derived from the
 built vertices at bake time: assert_throat_clear and assert_approach_clear
 cast rays at the finished triangles (not at the constants that generated
-them), assert_envelope reads the real bounds, and assert_rim_is_low proves
-the declared rimY is the actual low point of the crown. A gate that reads
-constants only restates its own assumptions.
+them), assert_envelope reads the real bounds, assert_rim_is_low proves the
+declared rimY is the actual low point of the crown, and report_form refuses
+a stance outside 1.7-2.25:1 (it measures 2.00:1) and a crown whose tallest
+spire is centred. A gate that reads constants only restates its own
+assumptions.
+
+Measured at the last bake: 7116 tris, watertight, 25/25 on both throats,
+x within +-3.23, tallest spire 12.89, both palettes byte-identical in
+geometry (shared `set` digest) and different only in COLOR_0.
 
     tools/forge/bake.sh tools/forge/recipes/hollowbole.py \
         --tower --expect-colors --max-tris 8000
@@ -355,7 +368,7 @@ def wall_at(phi, y):
     — the tall blades and the low broken rim alike — an edge that thins out
     as it approaches its end.
     """
-    return min(wall(y), 0.035 + 0.40 * max(0.0, y_top(phi) - y))
+    return min(wall(y), 0.022 + 0.40 * max(0.0, y_top(phi) - y))
 
 
 # Built here, not at its own definition: each root's strength is budgeted
@@ -410,8 +423,11 @@ def r_out(phi, y):
     # splay rather than curl in, and the approach column stays clear without
     # having to be defended by a clamp.
     r += 0.16 * smoothstep(y, PORTAL_IN["rimY"] - 0.5, PORTAL_IN["rimY"] + 2.4)
-    # fine flutes: the striation the eye reads as grain, above the ridges
-    r += 0.055 * fbm_ring(phi, y * 0.30, 9.0, SEED + 2, 3) - 0.022
+    # Fine flutes: the striation the eye reads as grain, riding above the
+    # ridges. k=9 is the ceiling, not a taste call — at 72 columns a ring
+    # frequency past ~14 aliases into mush instead of resolving as grain,
+    # and anything finer than that belongs in COLOR_0 by the 0.07 rule.
+    r += 0.085 * fbm_ring(phi, y * 0.30, 9.0, SEED + 2, 3) - 0.034
     return r
 
 
