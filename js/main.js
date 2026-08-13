@@ -8285,6 +8285,20 @@ function towerLabSet(on = true) {
 function towerLabSkin(id) {
   if (!TOWERS[id] || !TOWERS[id].skin) return TOWERLAB.skinId;
   if (id === TOWERLAB.skinId) return TOWERLAB.skinId;
+  // A BAKED ROW WHOSE MODEL IS NOT HERE YET (C6). The lab's skin builders are
+  // synchronous like everything else, so this cannot await — and it must not
+  // pretend either: returning the id that was ASKED for while the bench still
+  // wears the previous model is how a human ends up photographing one tower
+  // and filing the shots under another. So it returns what the lab is ACTUALLY
+  // wearing, kicks the preload, and says so. Tools poll towerModelStatus(id)
+  // and ask again.
+  if (TOWERS[id].glbUrl && !towerModelReady(id)) {
+    towerModelEnsure(id);
+    console.warn(`[tower] lab: '${id}' has no model yet `
+      + `(${towerGlbStatus(TOWERS[id].glbUrl)}) — the bench is still wearing `
+      + `'${TOWERLAB.skinId}'. Poll __diceDebug.towerModelStatus('${id}') and ask again.`);
+    return TOWERLAB.skinId;
+  }
   const was = TOWERLAB.on;
   if (was) towerLabSet(false);
   TOWERLAB.skinId = id;
@@ -9318,6 +9332,17 @@ window.__diceDebug = {
   // the mat per preset: the core's offsets from z0 never move, so that is the
   // same test with one build.
   towerOcclusionCheck(id) {
+    // PENDING IS NOT A VERDICT (C6). towerLabSkin refuses to dress the bench in
+    // a model that has not arrived — correctly — but the refusal is silent to
+    // anything downstream, so without this the probe would go on and grade
+    // whatever the lab happens to be wearing and hand back a full, plausible,
+    // WRONG answer under the id that was asked for. A pass on the previous
+    // tower is worse than no answer at all: it is the one result nobody would
+    // think to re-check. Say pending, kick the preload, let the caller poll.
+    if (id && TOWERS[id] && TOWERS[id].glbUrl && !towerModelReady(id)) {
+      towerModelEnsure(id);
+      return { pending: true, id };
+    }
     if (id) towerLabSkin(id);
     if (!TOWERLAB.on) towerLabSet(true);
     // RAYCASTS READ matrixWorld, AND A FRESH BUILD HAS NOT BEEN RENDERED YET.

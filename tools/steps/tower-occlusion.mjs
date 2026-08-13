@@ -42,7 +42,21 @@ export default async function run(stage, args) {
   await a.dbg('holdClock(true)');
   await a.dbg('towerEcho(false)');
   await a.dbg('towerCore(true)');
-  const res = await a.dbg(`towerOcclusionCheck(${JSON.stringify(tower)})`);
+  let res = await a.dbg(`towerOcclusionCheck(${JSON.stringify(tower)})`);
+  // A BAKED ROW MAY NOT BE HERE YET (C6). The probe answers {pending} rather
+  // than grading whatever the bench is wearing, so this waits for the model
+  // instead of reporting it as the wrong skin — which is what the `res.skin`
+  // guard below would otherwise say, naming 'undefined' as the tower.
+  for (let i = 0; res && res.pending && i < 40; i++) {
+    await new Promise((r) => setTimeout(r, 250));
+    res = await a.dbg(`towerOcclusionCheck(${JSON.stringify(tower)})`);
+  }
+  if (res && res.pending) {
+    const st = await a.dbg(`towerModelStatus(${JSON.stringify(tower)})`);
+    console.log(`BAD: '${tower}' never loaded its model (${JSON.stringify(st)})`);
+    process.exitCode = 1;
+    return;
+  }
   if (res.skin !== tower) {
     console.log(`BAD: asked for '${tower}', the lab is wearing '${res.skin}'`);
     process.exitCode = 1;

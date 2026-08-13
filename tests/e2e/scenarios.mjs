@@ -10364,6 +10364,15 @@ export const scenarios = [
     //     not started fetching reads 'idle'. Recorded because it is the more
     //     interesting failure and the tripwire is upstream of it: nothing
     //     downstream had to be reached for the gate to be caught.
+    //   · (C6) towerOcclusionCheck's `{pending}` early return deleted: RED,
+    //     and the diff is the argument for the guard existing. Asked about
+    //     'glbslow' — a row whose model 404s — the probe came back with a
+    //     complete, plausible, PASSING grade: `shaft {blocked: 99, n: 99,
+    //     missed: []}` on every eye, quietly labelled `skin: 'glbreal'`,
+    //     because towerLabSkin had correctly refused to dress the bench and
+    //     the probe went on to grade the tower it was already wearing. A
+    //     human reading 99/99 files that as glbslow passing its occlusion
+    //     proof. Reverted: green.
     async fn(ctx) {
       const a = await lobbyTab(ctx, { clean: ['dice.roomsettings.v1'] });
 
@@ -10539,6 +10548,59 @@ export const scenarios = [
       assert.deepEqual((await a.dbg('worldBodies()')).named, ORDER,
         'a tower→tower swap through TWO baked models still lands on the eight');
 
+      // ---- the audits RUN on a baked model (C6) ----------------------------
+      // SHAPE, NOT VERDICTS. tower-fit's thresholds and the occlusion pass
+      // mark belong to a real shipped tower, and this fixture is a plain
+      // monolith that was never authored to satisfy them — grading it here
+      // would pin a number nobody chose. What IS worth pinning is that the
+      // audits can read a baked model at all: every one of them was written
+      // against code-built skins, walks `towerSkin*` names, and would return
+      // an empty or null answer for a GLB if the loader had named things
+      // differently. An audit that quietly reports zero meshes is the same
+      // green check as an audit that passes.
+      const audit = await a.dbg('towerModelAudit()');
+      assert.ok(audit && audit.meshes > 0,
+        `the audit SEES the baked geometry — ${audit && audit.meshes} mesh(es). `
+        + `Zero here would mean the towerSkin* naming did not survive the GLB, `
+        + `and every fit and occlusion answer after it would be vacuous`);
+      assert.equal(audit.lights, 0,
+        'and the model brings NO lights: the tower\'s one warm focal light is the '
+        + 'registry row\'s ember, built by the engine against the socketed core');
+      assert.deepEqual(audit.offPolicy, [],
+        'house rules hold on a material that came out of a glTF translation — '
+        + 'MeshStandardMaterial at envMapIntensity 0.45, no ShaderMaterial, no bloom');
+      assert.equal(audit.tower, 'glbreal', 'and it audited the model that is up');
+
+      const occ = await a.dbg(`towerOcclusionCheck('glbreal')`);
+      assert.ok(occ && !occ.pending, 'the probe runs against a loaded model');
+      assert.ok(Array.isArray(occ.eyes) && occ.eyes.length === 6,
+        `six shipped eyes — three presets x {full, mini} (got ${occ.eyes && occ.eyes.length})`);
+      for (const band of ['shaft', 'cowl', 'exit', 'hood']) {
+        assert.ok(occ.eyes.every((e) => e[band] && e[band].n > 0
+          && typeof e[band].blocked === 'number'),
+          `every eye reports the ${band} band with a real sample count — the `
+          + `structure a verdict will later be read from`);
+      }
+      assert.equal(occ.despawnY, 9.75 - 1.75,
+        'and the probe sampled against the FIXTURE\'s despawn line, not the classic '
+        + 'one — its grids follow the bore (v.smp.kR), which is the whole reason '
+        + 'a moved portal can be graded at all');
+
+      // The other half of C6: a row whose model has NOT arrived gets `pending`
+      // rather than a plausible answer about whatever the bench is wearing.
+      await a.dbg(`towerRegisterGlb('glbslow', '/no/such/model.glb')`);
+      assert.deepEqual(await a.dbg(`towerOcclusionCheck('glbslow')`),
+        { pending: true, id: 'glbslow' },
+        'a probe of an unloaded row is PENDING, never a pass on the previous '
+        + 'skin — that is the one result nobody would think to re-check');
+
+      // PUT THE BENCH AWAY. towerLabSet deepens the mat by matExtra exactly as
+      // the socket does (it is the same towerDeepenMat), so a lab left standing
+      // would make the restoration assertion at the end measure the lab rather
+      // than the tower. Leaving it up is also just wrong: the probe is a tool,
+      // not a state this scenario is entitled to hand to the next one.
+      assert.equal(await a.dbg('towerCore(false)'), false, 'the lab comes down');
+
       await a.dbg(`setTower('none')`);
       await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'down again' });
       await a.dbg(`setTower('glbmin')`);
@@ -10603,10 +10665,12 @@ export const scenarios = [
         `the mat is the preset again to within a rounding (off by ${drift})`);
       assert.equal(downExtents.d, 6.7 + 4.5 - 4.5,
         `and the error is EXACTLY one up-and-down of matExtra — SATURATED, not `
-        + `cumulative. This tab socketed and unsocketed seven times; if the drift `
-        + `compounded, the mat would walk away from the preset a little further `
-        + `every time a player changed their mind about a tower, and that would `
-        + `be a different and much worse bug than the one that is here.`);
+        + `cumulative. This tab moved the mat a dozen times (four towers, two `
+        + `tower→tower swaps, and a LAB cycle nested inside a socketed tower), `
+        + `and 6.699999999999999 + 4.5 - 4.5 maps to itself: the drift is a fixed `
+        + `point, not a ratchet. Were it cumulative, the mat would walk further `
+        + `from the preset every time a player changed their mind about a tower, `
+        + `and that would be a different and much worse bug than the one here.`);
       const downWorld = await a.dbg('worldBodies()');
       assert.deepEqual(downWorld.named, [], 'not one collider left in the WORLD');
       assert.equal(downWorld.count, wasWorld.count,
