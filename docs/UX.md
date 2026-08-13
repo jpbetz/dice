@@ -4389,6 +4389,17 @@ stand only where no die can rest and no tower stands — beyond the back
 wall at every zoom, outside the tower envelope — asserted by `venue-set`
 off `venueInfo().stage`, so scenery can never crowd a result.
 
+**W4 (2026-08-13): the venue deals the dice.** While a fantasy venue is
+active every roll is MADE with the venue's set — Moonmoot Witchlight
+(THEMES.md §10), staged at roll creation so the roll record carries it
+and every client, replay and late joiner agree for free. Your own set is
+never rewritten: it resumes with the room, and dice already on the felt
+keep the skin they landed with (a roll is a record). Prospective
+surfaces — palette tiles, tray, pool strips — preview the staged dice
+while the venue stands. The set takes no chip in any picker
+(`venueOnly`): offering it à la carte is the incoherence goal 13 exists
+to prevent. Proof: `venue-dice`.
+
 ### 7.35 The venue tower — Hollow Bole (2026-08-12, W3)
 
 **A venue tower has no chip.** `hollowbole` is a fourth row in the tower

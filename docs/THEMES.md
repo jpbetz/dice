@@ -81,6 +81,13 @@ sapamber as its two poles: living and preserved). The full workflow
 output — audits, vocabulary explorations, per-theme stacks, critique
 rounds — lives in the session transcript.
 
+**W4 (2026-08-13): 11 houses, 18 sets — and the first STAGED house.**
+Moonmoot (§10 below) joined outside the picker entirely: its set is
+`venueOnly` and the fae venues deal it at roll creation (ROADMAP W4,
+UX §7.34). It also added two recipe fields — `fog` (what a settled die
+breathes into a venue's fog lattice) and `venueOnly` — documented in
+js/themes.js's header.
+
 ---
 
 # The taxonomy (original brief)
@@ -271,6 +278,37 @@ must still whisper it).
     glint travels across the faces, once.
   - **Standard raise** *(the house acclaims)* — on a crit, a brief
     vertical shaft of warm light stands over the die for half a second.
+
+## 10. Moonmoot — the fae court at night (W4, 2026-08-13)
+
+The nocturnal counterpart of Wildwood's living things — the venue spec's
+"cold nocturnal light-logic" house, and the first house a player cannot
+pick: the fae venues STAGE it (GOALS goal 13 — the venue is the dice
+choice while it stands). It earned its place under this file's own rule
+by not fitting any of the nine: Wildwood is sunlit and warm by charter,
+and no other house's light lives inside a cold stone.
+
+- **Palette**: twilight stone `#2f3b4c` · witchlight `#d9fbee` · spectral
+  rim `#8ff0e2` · labradorescence `#6fd8c8`
+- **Material**: tumbled labradorite — deep cool stone, soft fillets, worn
+  corners; ALL the light in the deep-carved numerals (the Black Anvil
+  value structure inverted to cold). The digit color sits between the two
+  venue palettes' rims so one set serves both skies.
+- **Signature effects**
+  - **Rune glow** *(the carving holds the light)* — engraved digits
+    filled with witchlight, blooming in the dark. Deliberately NOT a
+    runic alphabet: numbers stay readable (the legibility invariant);
+    the glyph library remains a later slice.
+  - **Labradorescence** *(the stone's internal flash)* — a cold rim at
+    glancing angles, the same under either sky: it is the stone's light,
+    not the venue's.
+  - **Fog breath** *(the mist knows them)* — a settled die exhales a
+    paler, stronger pocket into the venue fog lattice (the `fog` recipe
+    field; the venue's whole thesis made per-set).
+  - **The court holds its breath** *(fae time)* — the last 12% of a roll
+    retimes to 0.7×, a faint hover before the verdict.
+- **Voice**: a long faint cold chime — glass struck in another room.
+  Reasoned from the table, never listened to; Joe's dial.
 
 ---
 

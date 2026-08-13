@@ -2770,12 +2770,32 @@ the work, in order:
 Sequenced AFTER W4 per Joe ("track these issues for later; go ahead with
 the dice").
 
-### W4–W6, sequenced
-W4 the dice set (rune glow, die lights, fog response) — **IN FLIGHT
-2026-08-13** · W5 the living layer (wisps, fireflies, the moot in
-session) · W6 the audio palette. Each ships with its e2e proof; the
-venue is judged as a WHOLE at each step against goal 14's
-internal-consistency contract.
+### W4. The dice set — DONE 2026-08-13 (pending Joe's LOOK verdict)
+Moonmoot Witchlight (THEMES.md §10; js/themes.js): tumbled labradorite,
+all the light in the deep-carved numerals — "rune glow" delivered as
+carving + witchlight rather than a runic alphabet (a recorded refusal:
+the legibility invariant outranks the brief's word, and the glyph
+library stays the later slice themes.js already names). One set serves
+both skies (its digit color sits between the two palettes' rims). The
+venue STAGES it at roll creation — venueDiceSet through wireSet/
+rollSetOf/draftDieSets, the GOALS 13 punt delivered — so the roll
+RECORD carries the set: replay, late joiners and every client agree off
+the record, dice on the felt keep the skin they landed with, and your
+own choice resumes with the room. `venueOnly` (no chip anywhere) and
+`fog` (per-set venue fog breath) joined the recipe language. Voice: a
+long cold chime, reasoned and NEVER LISTENED TO (Joe's dial, same
+ledger as every tower clunk). Die lights deliberately absent: the venue
+lights its dice (followers, halos, fog) and a set light would
+double-glow — restraint recorded in the recipe. Proof: `venue-dice`
+(record-level, both tabs, release-on-exit, picker refusal),
+red-checked; suite 48/48; fx+settings+tower 23/23. throwSeeded now
+records the set a real roll would (absent for std — every existing
+record byte-identical), so look-drivers photograph the product's dice.
+
+### W5–W6, sequenced
+W5 the living layer (wisps, fireflies, the moot in session) · W6 the
+audio palette. Each ships with its e2e proof; the venue is judged as a
+WHOLE at each step against goal 14's internal-consistency contract.
 
 ## Structural risks (bets, not bugs — each gets more expensive to reverse)
 
