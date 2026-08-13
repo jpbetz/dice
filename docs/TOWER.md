@@ -94,7 +94,12 @@ z=0 at the socket plane and seated at the live z0. Loading is asynchronous
 but SOCKETING IS NOT: `towerModelReady(id)` gates the roll-boundary flush,
 a late-joining replay is HELD until the model arrives (then socket-first,
 replay-second — the hello ordering law), and a failed load keeps the
-current tower loudly rather than degrading to 'none'.
+current tower loudly rather than degrading to 'none'. The fetch is
+`cache: 'no-cache'` — always revalidate, answered by server.js's ETag with
+a body-less 304 — because a re-bake ships under the SAME url and a warm
+browser must see it (`force-cache` shipped first and pinned round-4 mouths
+on every returning browser, 2026-08-13; `tower-glb-freshness` is the
+warm-cache proof the always-cold harness cannot give for free).
 
 **What v2 changes about the film — a superseded decision.** The film is now
 a function of (portal spec, seed) instead of (one fixed geometry, seed).

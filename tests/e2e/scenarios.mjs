@@ -46,7 +46,7 @@ const TOWER_SNAP = 'JSON.stringify(window.__diceDebug.towerContractSnapshot())';
 // fixture's portals ARE, so the assertion and the asset cannot drift — an
 // inlined blob is a copy that goes stale the first time somebody changes a
 // number in the generator and forgets there are two of them.
-const { minTowerDataUrl, MIN_TOWER_PORTALS } =
+const { minTowerDataUrl, minTowerGlb, MIN_TOWER_PORTALS } =
   await import('./fixtures/make-min-tower.mjs');
 
 // Name the FIRST field that moved, with both values. A bare string compare of
@@ -10683,6 +10683,120 @@ export const scenarios = [
       assert.equal(downWorld.count, wasWorld.count,
         `the body list is the towerless one again, exactly `
         + `(${wasWorld.count} before, ${downWorld.count} after)`);
+    },
+  },
+  {
+    name: 'tower-glb-freshness',
+    tags: ['tower', 'glb'],
+    // A RE-BAKED MODEL MUST REACH A WARM BROWSER (js/towerglb.js, 2026-08-13).
+    // The loader fetched with `cache: 'force-cache'`, which serves ANY stored
+    // copy without revalidating — so the first browser to cache a model kept
+    // it across every reload, every re-bake, and even a hard refresh (a hard
+    // refresh bypasses the cache only for requests made DURING the reload;
+    // this fetch fires later, at the settings boundary). server.js had
+    // already learned this lesson from the other side — the frozen-mtime 304
+    // disaster ("THE VALIDATOR IS A CONTENT HASH") — and serves the app tree
+    // no-cache + ETag precisely so browsers revalidate. force-cache silently
+    // opted back out, client-side.
+    //
+    // Found LIVE, not by a test: round 5 tightened the hollowbole mouth on
+    // disk and on the wire, and the one browser with a warm cache — the
+    // user's — kept round 4. Every harness profile is COLD, which is why no
+    // scenario had ever seen it; this one manufactures the warm-cache case.
+    //
+    // The throwaway origin below rotates bytes under ONE url and speaks the
+    // contract server.js speaks (ETag over bytes, Cache-Control: no-cache,
+    // body-less 304 on If-None-Match), plus CORS because the page sees it as
+    // a foreign origin. The two bodies are the suite's two existing models,
+    // whose declared portals differ everywhere — rimY is the discriminator
+    // asserted, 8.0 (min tower) vs 9.75 (bake fixture).
+    //
+    // RED CHECKS (each run, seen red, reverted, seen green again):
+    //   · js/towerglb.js fetch flipped back to `cache: 'force-cache'`: RED at
+    //     the load-2 rim — `8 !== 9.75` — the reload wore the STALE model,
+    //     which is the live bug reproduced. The hits ledger agrees: the
+    //     browser never contacted the server again ({full: 1, notModified: 0}
+    //     where load 2 expects a second full fetch).
+    //   · the discriminator guard: MIN_TOWER_PORTALS.in.rimY changed to 9.75
+    //     would gut every rim assertion at once, so it is asserted unequal
+    //     up front rather than trusted.
+    async fn(ctx) {
+      const { createServer } = await import('node:http');
+      const { createHash } = await import('node:crypto');
+
+      assert.notEqual(MIN_TOWER_PORTALS.in.rimY, 9.75,
+        'the discriminator discriminates: the two models declare different rims');
+
+      const v1 = minTowerGlb().glb;
+      const v2 = readFileSync(join(FIXTURES, 'tower_fixture.glb'));
+      let body = v1;
+      const hits = { full: 0, notModified: 0 };
+      const srv = createServer((req, res) => {
+        const etag = `"${createHash('sha1').update(body).digest('base64url').slice(0, 27)}"`;
+        const head = { ETag: etag, 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' };
+        const inm = req.headers['if-none-match'];
+        if (inm && inm.split(',').some((t) => t.trim() === etag)) {
+          hits.notModified += 1;
+          res.writeHead(304, head);
+          return res.end();
+        }
+        hits.full += 1;
+        res.writeHead(200, { ...head, 'Content-Type': 'model/gltf-binary', 'Content-Length': body.length });
+        res.end(body);
+      });
+      await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
+      const url = `http://127.0.0.1:${srv.address().port}/rebaked.glb`;
+
+      try {
+        const a = await lobbyTab(ctx, { clean: ['dice.roomsettings.v1'] });
+        // Table.reload() settles on netReady.online — a ROOM rejoin — which
+        // the lobby never reaches (netOnline false is what makes it the
+        // lobby), so it times out against a perfectly healthy page. Same
+        // sentinel discipline, settled on the lobby's own ready instead.
+        const reloadLobby = async () => {
+          await a.eval(`window.__reloading = true; location.reload(); true`).catch(() => {});
+          await settleNavigation(a,
+            `!window.__reloading && !!window.__diceDebug `
+            + `&& (window.__diceDebug.identity || {}).lobby === true`,
+            'the lobby reloads');
+        };
+        // One socket cycle: tune the ladder, mint the row, raise it, read the
+        // spec the engine derived. Repeated verbatim after each reload
+        // because a debug row is per-page state — and the reload IS the test.
+        const socket = async () => {
+          await a.dbg(`towerGlbTune({ retryMs: [10, 20, 40], holdMaxMs: 400 })`);
+          await a.dbg(`towerRegisterGlb('glbfresh', ${JSON.stringify(url)})`);
+          await a.dbg(`setTower('glbfresh')`);
+          await a.waitFor(`window.__diceDebug.tower === 'glbfresh'`, { desc: 'the model sockets' });
+          return a.dbg(`towerPortalSpec('glbfresh')`);
+        };
+
+        const s1 = await socket();
+        assert.equal(s1.portals.in.rimY, MIN_TOWER_PORTALS.in.rimY, 'load 1 wears v1');
+        assert.deepEqual(hits, { full: 1, notModified: 0 },
+          'one full fetch primed the browser cache');
+
+        body = v2; // the re-bake: same url, new bytes
+        await reloadLobby();
+        const s2 = await socket();
+        assert.equal(s2.portals.in.rimY, 9.75,
+          'THE CLAIM: the next load REVALIDATES and wears the new bytes — a '
+          + 'warm cache must never pin a re-baked model to its old mouth');
+        assert.equal(s2.derived.despawnY, 9.75 - 1.75,
+          'and the new rim reached towerVolumes, not merely the parse');
+        assert.deepEqual(hits, { full: 2, notModified: 0 },
+          'the ETag mismatch cost one full fetch — the price of a re-bake');
+
+        await reloadLobby(); // nothing has changed since
+        const s3 = await socket();
+        assert.equal(s3.portals.in.rimY, 9.75, 'unchanged bytes, unchanged tower');
+        assert.deepEqual(hits, { full: 2, notModified: 1 },
+          'an unchanged model costs a BODY-LESS 304, not a refetch — freshness '
+          + 'is one conditional round-trip per load, never a download');
+      } finally {
+        srv.closeAllConnections?.();
+        srv.close();
+      }
     },
   },
   {

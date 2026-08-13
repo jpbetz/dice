@@ -131,7 +131,18 @@ export function towerGlbEnsure(url) {
         await sleep(TOWERGLB.retryMs[i - 1]);
       }
       try {
-        const res = await fetch(url, { cache: 'force-cache' });
+        // 'no-cache' = always revalidate, never skip it. This was
+        // 'force-cache', which serves ANY stored copy without asking the
+        // server — so a re-baked model under the same URL stayed stale in
+        // every returning browser, and even a hard refresh couldn't evict it
+        // (hard refresh bypasses the cache only for requests made during the
+        // reload; this fetch fires later, at the settings/roll boundary).
+        // Found live on 2026-08-13: the round-5 mouth, tightened on disk and
+        // on the wire, invisible on the one browser with a warm cache. The
+        // harness never sees this class — its profile is always cold.
+        // server.js answers the revalidation with a body-less 304 (ETag over
+        // bytes), so freshness costs one conditional round-trip per session.
+        const res = await fetch(url, { cache: 'no-cache' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const buf = await res.arrayBuffer();
         // parse() rather than load(): the fetch is ours (so the retry ladder
