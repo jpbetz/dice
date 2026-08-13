@@ -4379,6 +4379,16 @@ the table chose. Rolls are unchanged in every way that counts: same
 physics, same films, same values on every client — the venue is scenery
 with doctrine (GOALS goals 14–15), not a rules change.
 
+**W2 (2026-08-13) upgraded the glade room's fidelity in place.** What a
+player sees from the resting eye: a moonbeam column landing where dice
+resolve, a pale mist band the treeline and the tower silhouette against,
+mossed ground with detail concentrated in the lit clearing, the vacated
+moot on the left flank with its gap facing the table, and a mirror pool
+holding the moon's broken glint on the right. Placement law: glade props
+stand only where no die can rest and no tower stands — beyond the back
+wall at every zoom, outside the tower envelope — asserted by `venue-set`
+off `venueInfo().stage`, so scenery can never crowd a result.
+
 ### 7.35 The venue tower — Hollow Bole (2026-08-12, W3)
 
 **A venue tower has no chip.** `hollowbole` is a fourth row in the tower

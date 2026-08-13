@@ -28,6 +28,13 @@ limitations under the License.
 > and item 5 (LISTENING to the clunk voice) still wait on Joe/the main
 > session; item 9 stands (no deploy unasked). The hard-won lessons below
 > all held — the port-mask/flight-envelope one twice.
+>
+> **Later the same day:** item 1 CLOSED — Joe restarted 8123 himself
+> (07:44, from the main tree, postdating the allowlist commit) and poured
+> through the venue live. Item 8's first half landed: **W2 the glade room
+> is DONE** (ROADMAP W2 — mist-band horizon, landed moonbeam, re-staged
+> moot, the mirror pool, placement-law assertions); W4–W6 remain. Item 5
+> is now a two-click audition on the live table and stays Joe's ears.
 
 **Written:** 2026-08-12, main session pausing for compaction/handoff.
 **Where the work lives:** main worktree `/home/jpbetz/projects/dice`, branch

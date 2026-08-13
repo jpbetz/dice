@@ -2693,8 +2693,35 @@ the ITERATION rig and port the converged radius/displacement field back
 into the existing `(θ, y)` descriptor seam — zero new runtime deps, and
 the field math is the same either way.)*
 
-### W2, W4–W6, sequenced after the spec lands
-W2 the glade room (surface, horizon, atmosphere, lighting rig) ·
+### W2. The glade room — DONE 2026-08-13
+The interim W0 rig upgraded in place at the resting eye (the frame a
+player lives in), all four named dimensions: **horizon** — a wrap-safe
+pale MIST BAND inside the treeline, whose void-coloured canopy against a
+void sky over void-tinted fog had never read at any eye (the silhouette
+finally has something to stand against, and so does the tower's dark
+trunk); **atmosphere** — fog retreat to the spec's own numbers (22/60)
+and real billow structure in the sheets (three octaves of wrapped blobs
+over a continuous bed); **lighting** — the moonbeam narrowed from
+frame-wide haze into a column that LANDS on the resolve area (grammar
+12; a beam is visible where it ISN'T — probed by hide-one-at-a-time
+before tuning); **surface** — two-scale moss and a clearing-detail
+layer where grammar 14 puts the one place of detail. The moot re-staged
+out from under the W3 tower (the W0 ellipse stood "where a tower will
+stand", and then one did) onto the left flank, ring rotated so the gap
+and the fallen cap face the clearing; and the MIRROR POOL — Joe's
+approved W0 dressing, finally built — holds the right: night water a
+step PALER than its banks (it mirrors the sky), the moon's glint a
+broken column of wavelet dashes, unlit by design (a mirror's light is
+its bake). Placement law ships as `venue-set` assertions off
+`venueInfo().stage` — flank props dice-unreachable at their NEAREST
+point beyond the widest back wall and clear of the tower envelope, beam
+on the clearing, three dense sheets below every die top — red-checked
+on the beam's old wrong position. `tools/steps/glade-look.mjs` is the
+fast look loop with element forensics. Both palettes LOOK-gated at the
+resting eye and in the spread; suite 48/48, tower+fx 15/15 with the
+contract freeze untouched.
+
+### W4–W6, sequenced
 W4 the dice set (rune glow, die lights, fog response) · W5 the living
 layer (wisps, fireflies, the moot in session) · W6 the audio palette.
 Each ships with its e2e proof; the venue is judged as a WHOLE at each

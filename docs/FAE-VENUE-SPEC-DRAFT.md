@@ -5,6 +5,16 @@ palette tables, moot stagings), fae-research/techniques.md (the kit, the
 traps, repo measurements). This document graduates to docs/ when Joe
 approves the concept.
 
+> **STATUS 2026-08-13: approved and largely BUILT.** W0 plates approved
+> ("I love them both" — both palettes ship); W1 shipped the venue
+> mechanism; W3 replaced the tower-form section's stand-in with the baked
+> Hollow Bole (docs/TOWER.md); W2 shipped the glade room at this spec's
+> numbers — the fog retreat (22/60), the moonbeam landed on the resolve
+> area, the moot re-staged beside (not under) the tower, and the mirror
+> pool from the W0 approval note. The venue-set scenario asserts the
+> placement law; ROADMAP Tier W tracks what remains (W4 dice, W5 living
+> layer, W6 audio). The sections below stand as the design record.
+
 ## The place
 
 A night glade. No felt, no table edge, no room — mossy ground ringed by
