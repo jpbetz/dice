@@ -71,6 +71,58 @@ THROAT_MARGIN = 0.95      # probe 95% of the declared aperture
 EXIT_CLAD_ALLOW = 0.15    # ramp cladding proudness + margin above the slope line
 RAY_EPS = 1e-6
 
+# THE ENVELOPE (added 2026-08-13, after the first shipped bake exceeded it on
+# five faces and nothing file-side could see it). Mirrors towerVolumes'
+# SOCKET plus the audit's legal-overrun classes, coarsely: every mesh node
+# must be IN-SOCKET, or a backward VENUE-GROUNDS spender, or a CLADDING
+# piece sunk below the felt. The app's tower-fit audit remains the judge —
+# this gate exists so "bake gates green" and "the model fits" stop being
+# different sentences. The x test carries the TILT term: skins lean the
+# whole group (hollowbole 0.45°, classics 0.7°), so a box at |x| with top y
+# lands at |x| + y·sin(tilt) — pass your skin's tilt via --tower-tilt-deg.
+ENV_SOCKET_X = 3.25       # ±, the mat's own wall is 3.35 — X HAS NO SLACK
+ENV_SOCKET_Y_TOP = 12.5
+ENV_FOOT_DIP = -0.145     # audit's foot-dip floor is -0.15
+ENV_SOCKET_Z = (-5.25, 0.25)
+ENV_VENUE_Z_BACK = -8.0   # venueOnly towers may spend glade this far back
+ENV_CLAD_MIN_Y = -0.5     # the audit's cladding classes require dipping this far
+ENV_CLAD_MAX_Z = 3.85     # lip front is 3.9
+ENV_CLAD_MAX_Y = 3.4
+
+
+def envelope_check(scene, tilt_deg):
+    """Classify every mesh node's world box against the socket. -> failures[]"""
+    import trimesh.transformations as tt  # noqa: F401  (documents the dep)
+    sin_t = math.sin(math.radians(tilt_deg))
+    fails, notes = [], []
+    for node in scene.graph.nodes_geometry:
+        mtx, gname = scene.graph[node]
+        g = scene.geometry[gname]
+        v = np.asarray(g.vertices, dtype=np.float64)
+        v = v @ np.asarray(mtx)[:3, :3].T + np.asarray(mtx)[:3, 3]
+        lo, hi = v.min(axis=0), v.max(axis=0)
+        x_eff = max(abs(lo[0]), abs(hi[0])) + hi[1] * sin_t
+        box = (f"[{lo[0]:.2f},{lo[1]:.2f},{lo[2]:.2f}]..[{hi[0]:.2f},"
+               f"{hi[1]:.2f},{hi[2]:.2f}] x_eff {x_eff:.3f}")
+        x_ok = x_eff <= ENV_SOCKET_X + 1e-6
+        y_ok = lo[1] >= ENV_FOOT_DIP and hi[1] <= ENV_SOCKET_Y_TOP + 1e-6
+        if x_ok and y_ok and lo[2] >= ENV_SOCKET_Z[0] and hi[2] <= ENV_SOCKET_Z[1] + 1e-6:
+            continue                          # IN-SOCKET
+        if x_ok and y_ok and lo[2] >= ENV_VENUE_Z_BACK and hi[2] <= ENV_SOCKET_Z[1] + 1e-6:
+            notes.append(f"{node}: spends venue grounds (z to {lo[2]:.2f}) — "
+                         "legal only on a venueOnly row; the fit audit decides")
+            continue                          # BACKWARD
+        if (lo[1] <= ENV_CLAD_MIN_Y and hi[1] <= ENV_CLAD_MAX_Y
+                and hi[2] <= ENV_CLAD_MAX_Z + 1e-6
+                and max(abs(lo[0]), abs(hi[0])) <= ENV_SOCKET_X + 1e-6):
+            continue                          # CLADDING
+        fails.append(
+            f"{node}: outside every envelope class — {box}; in-socket needs "
+            f"x_eff<={ENV_SOCKET_X} (tilt {tilt_deg}°), y [{ENV_FOOT_DIP},"
+            f"{ENV_SOCKET_Y_TOP}], z [{ENV_SOCKET_Z[0]},{ENV_SOCKET_Z[1]}]; "
+            f"cladding needs min.y<={ENV_CLAD_MIN_Y}, max.z<={ENV_CLAD_MAX_Z}")
+    return fails, notes
+
 
 def exit_ray_start_z(py, sill_y, oz):
     """Deepest z a ray at height `py` may probe without entering ramp space."""
@@ -304,7 +356,7 @@ def tower_check(j, tris):
     return info, fails
 
 
-def inspect(path, tower=False):
+def inspect(path, tower=False, tower_tilt_deg=0.45):
     out = {"file": path, "file_kb": None}
     import os
     out["file_kb"] = round(os.path.getsize(path) / 1024, 1)
@@ -346,6 +398,9 @@ def inspect(path, tower=False):
         tris = (np.asarray(scene.to_mesh().triangles, dtype=np.float64)
                 if geoms else np.zeros((0, 3, 3)))
         out["tower"], out["tower_failures"] = tower_check(j, tris)
+        env_fails, env_notes = envelope_check(scene, tower_tilt_deg)
+        out["tower_failures"].extend(env_fails)
+        out["envelope_notes"] = env_notes
     return out
 
 
@@ -359,14 +414,17 @@ def main():
     ap.add_argument("--tower", action="store_true",
                     help="gate the dice-tower portal contract (portalIn / "
                          "portalOut nodes, engine limits, clear throats, "
-                         "towerSkin* occluders)")
+                         "towerSkin* occluders, socket envelope)")
+    ap.add_argument("--tower-tilt-deg", type=float, default=0.45,
+                    help="the skin's lean, for the envelope's x arithmetic "
+                         "(hollowbole 0.45, classics 0.7)")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
 
     failures = []
     reports = []
     for path in a.glb:
-        r = inspect(path, tower=a.tower)
+        r = inspect(path, tower=a.tower, tower_tilt_deg=a.tower_tilt_deg)
         reports.append(r)
 
         def fail(msg):
