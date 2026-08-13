@@ -2899,7 +2899,7 @@ red-checked; suite 48/48; fx+settings+tower 23/23. throwSeeded now
 records the set a real roll would (absent for std — every existing
 record byte-identical), so look-drivers photograph the product's dice.
 
-### W5. The living layer — DONE 2026-08-13 (pending Joe's LOOK verdict)
+### W5. The living layer — BUILT 2026-08-13; its own LOOK read still open (see W7)
 
 The glade is inhabited, and it minds the table. [js/faelife.js](../js/faelife.js)
 is venue-generic — a FIELD of fireflies that says the place is alive and
@@ -2960,6 +2960,53 @@ content check — every other number the hook reports is
 palette-independent by construction). Six red checks recorded in the
 commits. `tools/steps/life-look.mjs` is the look loop: a static room is
 fair to photograph once, a moving one is not.
+
+### W7. The stump stops being a helmet, and the scene stops being staged — 2026-08-13 (Joe)
+
+Joe's verdict on the W5 frames, verbatim: *"Looks too staged. The gesture
+is not right. I want the dice tower to be in a scene, not the centerpiece
+of it in a symmetrical and formal way. Consider moving the mushroom ring
+more to the foreground (Don't worry about where the dice land too much),
+and maybe move the pool backward and completely change it's size.. Also
+more mushrooms throughout the scene would help.. Lastly, the dice tower
+looks like a demonic helmet more than it looks like stump. It's too
+symmetrical, and the opening looks too much like either a gaping mouth or
+like the face opening of a helmet."*
+
+**Read it for what it is: he answered a question about the LIVING LAYER
+and talked about the composition and the model.** The fireflies and the
+procession are not what he responded to — nothing in the verdict is about
+them — so W5's own read is still genuinely open and should be re-asked on
+frames where the staging is no longer the loudest problem. Recording that
+distinction rather than banking an approval nobody gave.
+
+Two arcs, and he picked the model first.
+
+**① Round 7 — the stump.** THE HELMET READ IS THE BRIEF, and the
+x-clamp facet ledgered in W2c is now the small half of it. Diagnosed
+shape of the problem, to be confirmed against fresh isolated frames: the
+trunk is close to a body of revolution, so its silhouette is near-mirror
+about the view axis; the crown's break line reads as EVEN CRENELLATION
+rather than as splintered wood; and the wound is a large, centred,
+symmetrically-framed dark aperture with a scalloped upper edge — pale
+wood on both sides of a dark hole with teeth is a visor, and the eye
+resolves faces first. **The hard constraint is that the wound IS the
+doorway**: `TOWER_PORTAL_LIMITS` bounds its clear aperture and the film
+is baked against it, so the fix has to make the wound's silhouette
+asymmetric and torn OUTSIDE the clear box while leaving the box itself
+untouched — an overhanging splinter that intrudes on it is a die
+collision, not a detail.
+
+**② The staging.** The moot moves toward the FOREGROUND, the pool moves
+back and changes size outright, and mushrooms spread through the scene
+instead of pooling in one ring. Note what his parenthesis licenses and
+what it does not: *"don't worry about where the dice land too much"*
+relaxes the composition's deference to the mat, but the placement law is
+about LEGIBILITY — the stage carries no colliders, so a die that comes to
+rest inside a mushroom is unreadable rather than merely untidy. The
+foreground band (in front of the front wall) is dice-free by construction
+and is where a forward moot can go while still obeying it; take that
+first and only spend the licence if the frame still refuses.
 
 ### W6. The venue's audio palette
 The last step of the tier. Ships with its e2e proof; the venue is judged
