@@ -10529,20 +10529,27 @@ export const scenarios = [
       const real = await a.dbg(`towerPortalSpec('glbreal')`);
       assert.equal(real.source, 'model', 'off the mesh, again');
       // The recipe's header declares these (tools/forge/recipes/tower_fixture.py).
-      // rimY/z/clearR/sillY/w/clearH are binary fractions and survive Blender's
-      // float32 node translation exactly; x 0.80 does NOT, and comes back as
-      // 0.800000011920929. That is correct for a baked asset — every client
-      // reads the same double out of the same bytes — but it is why this leg
-      // asserts nearness on x and equality on the other seven.
+      // NEW CLAIM 2026-08-13 (the envelope round): check.py --tower grew a
+      // socket-envelope gate, the fixture's first cut was far outside it, and
+      // four portal numbers moved with the slim — in.x 0.80→0.25, in.z
+      // −2.75→−2.50 (PINNED by the depth arithmetic at max bore; see the
+      // recipe header), clearR 2.25→2.20, out.x −0.50→−0.15, w 5.25→5.15.
+      // Binary fractions (in.x 0.25, in.z −2.5, rimY, sillY, clearH) survive
+      // Blender's float32 node translation exactly; 2.20 / −0.15 / 5.15 do
+      // NOT and come back as the float32-rounded doubles — correct for a
+      // baked asset (every client reads the same double out of the same
+      // bytes), which is why those three assert nearness.
+      assert.equal(real.portals.in.x, 0.25, 'declared in.x 0.25');
       assert.equal(real.portals.in.rimY, 9.75, 'declared rimY 9.75');
-      assert.equal(real.portals.in.z, -2.75, 'declared in.z -2.75');
-      assert.equal(real.portals.in.clearR, 2.25, 'declared clearR 2.25');
-      assert.equal(real.portals.out.x, -0.5, 'declared out.x -0.50');
+      assert.equal(real.portals.in.z, -2.5, 'declared in.z -2.50');
       assert.equal(real.portals.out.sillY, 1.25, 'declared sillY 1.25');
-      assert.equal(real.portals.out.w, 5.25, 'declared door width 5.25');
       assert.equal(real.portals.out.clearH, 4.75, 'declared clearH 4.75');
-      assert.ok(Math.abs(real.portals.in.x - 0.8) < 1e-6,
-        `declared in.x 0.80, through float32 (got ${real.portals.in.x})`);
+      assert.ok(Math.abs(real.portals.in.clearR - 2.2) < 1e-6,
+        `declared clearR 2.20, through float32 (got ${real.portals.in.clearR})`);
+      assert.ok(Math.abs(real.portals.out.x - -0.15) < 1e-6,
+        `declared out.x -0.15, through float32 (got ${real.portals.out.x})`);
+      assert.ok(Math.abs(real.portals.out.w - 5.15) < 1e-6,
+        `declared door width 5.15, through float32 (got ${real.portals.out.w})`);
       assert.equal(real.derived.despawnY, 9.75 - 1.75,
         'and the fixture\'s off-classic rim moves the despawn line with it');
       assert.deepEqual((await a.dbg('worldBodies()')).named, ORDER,

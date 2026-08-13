@@ -16,25 +16,49 @@ DECLARED PORTALS (app frame: y up, +z toward the player, z=0 the back-wall
 socket plane; S = 1.25 = d20 radius). Classic in brackets — every value
 differs, none is near a bound:
 
-    portalIn   x      +0.80    (classic 0)        limit [-1.25, +1.25]
+    portalIn   x      +0.25    (classic 0)        limit [-1.25, +1.25]
                rimY    9.75    (8.75)  = 7.8*S   limit [ 7.25, 10.25]
-               z      -2.75    (-2.00) = -2.2*S  limit [-3.25, -1.25]
-               clearR  2.25    (2.125) = 1.8*S   limit >= 2.125
-    portalOut  x      -0.50    (0)               limit [-0.75, +0.75]
+               z      -2.50    (-2.50) = -2.0*S  PINNED — see below
+               clearR  2.20    (2.125) = 1.76*S  limit >= 2.125
+    portalOut  x      -0.15    (0)               limit [-0.75, +0.75]
                sillY   1.25    (1.00)  = 1.0*S   limit [0.625, 1.375]
-               w       5.25    (5.00)  = 4.2*S   limit >= 5.0
+               w       5.15    (5.00)  = 4.12*S  limit >= 5.0
                clearH  4.75    (4.50)  = 3.8*S   limit >= 4.5
 
 derived: despawnY = rimY - 1.4*S = 8.00.
 
-THE SHAPE, and why it is that shape. A rough leaning monolith: broad, squat,
-faceted, with a bore up the middle and a mouth at its foot. It is fat because
-the contract makes it fat — a 5.25-wide door and a 4.5-wide bore cannot live
-inside a slender chimney — and squat because rimY caps the height. The
-silhouette leans in X only; the front face stays a plumb plane at z = 0,
-because that face IS the socket plane the model seats against, and a doorway
-cut through a leaning face would be a doorway that changes width with height.
-The lean therefore had to go somewhere it costs nothing, and X was free.
+(2026-08-13, envelope round: check.py --tower grew a SOCKET-ENVELOPE gate
+after the first shipped bake exceeded the socket unseen, and this fixture's
+first cut — half-width 3.95, lean 1.15, depth to −6.08 — was itself far
+outside it. The body slimmed to the envelope; FOUR portal numbers moved
+with it, and the reasons are the finding: a 5.25 door at x −0.50 leaves a
+0.045 jamb beside a 3.15-half-width body (w→5.15, out.x→−0.15 — −0.25 left a −0.002 jamb), and a bore
+at in.x 0.80 needs body to x 0.80+2.25+0.35 = 3.40 — the per-field limits
+permit portal combos the ENVELOPE cannot build. The composite truth,
+demonstrated by FIVE pinch rounds of assert_column_clear (1.574, 1.888,
+1.950 — the interior FRONT wall, measured not theorized —, 2.129, 2.211):
+the bore must clear the INTERIOR on every side, so the body needs
+    half-width >= |in.x| + clearR + side wall
+    depth      >= 2*clearR + 2*wall            (the bore's whole diameter)
+    in.z       in [-(wall+clearR), -(depth-wall-clearR)]
+and at the envelope's depth that window is ±0.05 around the CLASSIC z when
+clearR maxes out — in.z is the one number the envelope pins, so it sits at
+classic −2.50 by arithmetic, not by imitation, and the stress lives in the
+other seven. clearR eased 2.25→2.20 to buy real margins over the back
+shoulder's facet chords (WALL 0.35→0.24). All eight numbers remain
+off-classic; tower-glb-loader's float-exact assertions updated in the same
+commit as documented new claims.)
+
+THE SHAPE, and why it is that shape. A rough monolith with a modest lean:
+broad, squat, faceted, with a bore up the middle and a mouth at its foot. It
+is as fat as the ENVELOPE allows because the contract makes it fat — a
+5.15-wide door and a 4.5-wide bore barely live inside x ±3.15 — and squat
+because rimY caps the height. The silhouette leans in X only; the front face
+stays a plumb plane at z = 0, because that face IS the socket plane the
+model seats against, and a doorway cut through a leaning face would be a
+doorway that changes width with height. The lean is capped by the envelope's
+tilt arithmetic (|x| + y·sin(tilt) ≤ 3.25), which is why it is now a nod
+rather than a stagger.
 
 It is a genuinely CLOSED shell with exactly two openings, not a facade with
 holes: one solid, minus a bore that runs from the interior floor out through
@@ -56,14 +80,17 @@ import forge as F  # noqa: E402
 
 S = 1.25                       # d20 radius: the unit the contract is quoted in
 
-PORTAL_IN = {"x": 0.80, "rimY": 7.8 * S, "z": -2.2 * S, "clearR": 1.8 * S}
-PORTAL_OUT = {"x": -0.50, "sillY": 1.0 * S, "w": 4.2 * S, "clearH": 3.8 * S}
+PORTAL_IN = {"x": 0.25, "rimY": 7.8 * S, "z": -2.0 * S, "clearR": 1.76 * S}
+PORTAL_OUT = {"x": -0.15, "sillY": 1.0 * S, "w": 4.12 * S, "clearH": 3.8 * S}
 DESPAWN_Y = PORTAL_IN["rimY"] - 1.4 * S
 
 HEIGHT = PORTAL_IN["rimY"]     # the rim IS the top edge, so they are one number
-WALL = 0.35                    # front/back wall thickness; also, directly, the
+WALL = 0.24                    # front/back wall thickness; also, directly, the
 #                                approach clearance at the tightest point —
-#                                see assert_column_clear
+#                                see assert_column_clear. 0.35 until the
+#                                envelope slim: the bore's diameter + two
+#                                walls must fit the interior depth, so the
+#                                wall thinned to open the in.z window.
 BORE_FLOOR = 1.25              # interior floor
 BUDGET = 2000
 
@@ -117,14 +144,30 @@ def hash01(a, b):
 
 def ring_params(y):
     t = min(1.0, max(0.0, y / HEIGHT))
-    half_w = 3.95 - 0.20 * t
-    depth = 5.95 - 0.25 * t
+    # Envelope arithmetic (the 2026-08-13 slim): worst case is the crown —
+    # cx 0.18 + half_w 2.90 + facet swell ~0.07 = 3.15, and 3.15 + 9.75·sin
+    # (0.45°) = 3.23 ≤ 3.25. Depth 5.15 + swell stays inside the socket's
+    # rear plane at −5.25 (this fixture is not venueOnly and must not need
+    # the venue-grounds note to pass).
+    # The rough swell reaches +0.18 past these numbers (hash01 spans
+    # -0.08..+0.18) and the envelope measures the SWOLLEN hull — the fourth
+    # pinch round was exactly that margin. 3.00 + 0.18 swell + crown lean
+    # 0.18 = 3.36... no: lean and swell do not stack at the same vertex
+    # (the lean is cx, shared by the whole ring) — worst hull x =
+    # cx + half_w + swell = 0.18 + 2.80 + 0.18 = 3.16 at the crown, and
+    # 3.16 + 9.75*sin(0.45°) = 3.24 <= 3.25.
+    half_w = 3.00 - 0.20 * t
+    # Depth carries NO taper since the envelope slim: the top ring's back
+    # shoulder was the third pinch (2.129 at y 10.35) — the bore needs its
+    # full diameter all the way up, and the socket's rear plane at -5.25
+    # (minus the 0.18 rough swell) caps the constant at 5.06.
+    depth = 5.06
     # The lean, all of it in X, and steep rather than linear on purpose: the
     # door needs stone on both sides of it up to y = 6, so the section that
     # carries the door has to stand nearly plumb. t**2.5 keeps the lean out
     # of the doorway's way and spends all of it on the top third, where it is
-    # the only thing you can see.
-    cx = 1.15 * t ** 2.5
+    # the only thing you can see. Capped by the envelope's tilt term.
+    cx = 0.18 * t ** 2.5
     return cx, half_w, depth
 
 
@@ -135,8 +178,10 @@ def x_inset(y):
     clear of the bore wall — let them cross and the union puts a tangency
     exactly where two surfaces graze, which is trap #7 and a sliver factory.
     Thin at the crown because the approach column has to fit through, and at
-    1.25 of side wall it does not."""
-    return 1.25 - 0.85 * smoothstep(y, 6.2, 7.6)
+    1.25 of side wall it does not. (0.32 at the crown since the envelope
+    slim: the back shoulder's radius is half_w minus this, and 0.40 left it
+    0.01 short of clearR at the top ring.)"""
+    return 1.25 - 0.93 * smoothstep(y, 6.2, 7.6)
 
 
 def ring_points(y, hollow=False, rough=True):
