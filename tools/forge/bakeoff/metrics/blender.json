@@ -1,0 +1,110 @@
+{
+  "tool": "Blender headless (bpy scripting)",
+  "version": "4.5.12 LTS (hash 84afd5f785f7, build 2026-07-21)",
+  "install": {
+    "method": "portable-tarball",
+    "minutes": 3,
+    "disk_mb": 1131,
+    "issues": [
+      "No issues installing. One environment trap worth stating up front: `blender -b --python script.py` exits 0 even when the script dies on an uncaught traceback. Every bake here runs with `--python-exit-code 1`; without it a broken bake is indistinguishable from a clean one in CI."
+    ]
+  },
+  "items": [
+    {
+      "id": "B1",
+      "status": "done",
+      "authoring_minutes": 10,
+      "attempts": 4,
+      "bake_seconds": 1.99,
+      "tris": 4966,
+      "watertight": true,
+      "file_kb": 138.7,
+      "color_support": "vertex",
+      "export_path": "native-glb",
+      "notes": "TRUE ROUNDED FILLET (Bevel modifier, offset 0.10, 3 segments, profile 0.5 = circular arc, MITER_ARC corners), not a flat chamfer. Pips are 21 UV spheres r 0.22 with centres at 1.14 from the die centre, so the bite is exactly 1.22-1.14 = 0.08 deep; one EXACT boolean takes all 21 at once. Sphere poles are rotated onto each face normal so a dent's rim is a clean 28-gon circle rather than a lat/long mess. Smoothing at 32 deg is chosen so the fillet (30 deg per bevel step) reads smooth while the dent rims (~50 deg break) stay crisp. COLOUR: the boolean's TRANSFER material mode stamps the cutter's material slot onto exactly the faces the cut creates, which is a free exact tag for 'this face is inside a pip'; that tag is converted to COLOR_0 and the slots collapsed to one material. Two real materials also work and look identical, but glTF splits a mesh into one primitive per material and the harness then sees two OPEN surfaces and reports watertight=false — measured. Hence COLOR_0. This item absorbed the shared setup cost: API introspection, the axis check, and the determinism fix below. Attempts: 2-material (not watertight), vertex-colour (non-deterministic), +triangulate (still non-deterministic), +canonicalize (clean)."
+    },
+    {
+      "id": "B2",
+      "status": "done",
+      "authoring_minutes": 5,
+      "attempts": 3,
+      "bake_seconds": 0.83,
+      "tris": 1596,
+      "watertight": true,
+      "file_kb": 47.4,
+      "color_support": "material",
+      "export_path": "native-glb",
+      "notes": "One solid of revolution (shaft UNION flared base), then ONE collection-mode DIFFERENCE with 13 cutters: the bore, 8 crenel gaps, 3 arrow slits, the doorway. Crenellations are CUT, not stacked: unioning merlon blocks onto the rim puts their faces coplanar and co-cylindrical with the shaft, the fragile case; subtracting the gaps has every cutter crossing the wall transversally. Slits are recesses only (cutter reaches inward to R_OUT-0.12, cannot pierce the 0.35 wall). Doorway is a tunnel into a hollow bore with a visible interior return. INTERPRETATION: 'total height 10.0' is read as including the merlons, so the shaft runs to 9.3 and merlon tops to 10.0. The shaft is a tube open at both ends (still a closed manifold), so the doorway opens into the interior without notching a floor slab. TWO REAL BUGS: (1) v1 built slit/door cutters as box + tangent half-cylinder; a half-cylinder of radius w/2 on a box of width w touches along a line, and that zero-width contact left 20 degenerate faces and 18 non-manifold edges. Replaced with a single arched prism per opening. (2) v2 still had 2 non-manifold 4-face pinches, both sitting exactly on the doorway's mirror plane x=0 — 96 is divisible by 4, so a shaft facet edge lay exactly on it. Spinning the polygon half a segment off phase so x=0 crosses the MIDDLE of a facet fixed it. 1596 tris is well under the 15k ceiling because the tower needs no vertical subdivision."
+    },
+    {
+      "id": "B3",
+      "status": "done",
+      "authoring_minutes": 2,
+      "attempts": 1,
+      "bake_seconds": 0.65,
+      "tris": 2856,
+      "watertight": true,
+      "file_kb": 86.0,
+      "color_support": "material",
+      "export_path": "native-glb",
+      "notes": "Blender's NATIVE sweep, first attempt, no fighting: a POLY curve for the helix, a second closed POLY curve as its bevel_object (the 8-point U-channel section), use_fill_caps=True for the planar end cuts, twist_mode='Z_UP' so the channel floor stays level instead of rolling with the helix. Evaluated to mesh through new_from_object (no operator context needed). Watertight straight out. Density knob is STEPS_PER_TURN=72; at 2.25 turns that is 162 sections for 2856 tris against a 22k ceiling, so this could carry 8x the resolution. NOTE ON THE SPEC'S NUMBERS: helix radius 1.55 to floor centre with floor width 1.2 puts the chute's inner edge at r 0.95, and the column is r 0.5 — they do not touch, so the chute is a second, separate watertight solid rather than being unioned to the column. The profile plane is perpendicular to the path (that is what a sweep means), so the side walls lean back by the helix slope, 14.9 deg; the floor stays horizontal across the channel."
+    },
+    {
+      "id": "B4",
+      "status": "done",
+      "authoring_minutes": 7,
+      "attempts": 5,
+      "bake_seconds": 1.52,
+      "tris": 27120,
+      "watertight": true,
+      "file_kb": 636.9,
+      "color_support": "vertex",
+      "export_path": "native-glb",
+      "notes": "No booleans anywhere, so there is no hard CSG edge to find. One closed surface of revolution: a profile polyline (dished sawn top, rim round-over, swelling trunk, root zone, bottom round-over) that is Laplacian-relaxed 6 times before it is spun, which is what stops the stretch joins reading as creases. Root flares are an angular sum of 5 gaussians added to the radius, faded out by height 1.05. Bark is two Displace modifiers over native Clouds textures (IMPROVED_PERLIN, positional, no seed, deterministic): scale 0.34 amplitude 0.08 as specced, plus a slow scale-1.15 amplitude-0.10 layer for the silhouette. A vertex-group mask keeps the flat underside undisplaced so the stump still sits level. THE BUG WORTH REPORTING: v1-v2 were built with the ring quads wound the wrong way. The result was watertight, had the right silhouette, passed every number in this contract, and rendered fine in Blender because the viewport material is double-sided — and it was INSIDE OUT (signed volume -7.40), i.e. invisible in three.js, which culls back faces. Nothing in the metrics contract catches that, so _forge.assert_outward now refuses to export a negative-volume solid. The same inverted normals silently killed the second colour too, because the sawn-top test keyed off poly.normal.z. Colour is now a smoothstep on VERTEX POSITION only; keying it off a face normal gave a hard sawtooth boundary, since a face normal is constant across a face and neighbouring faces disagreed at shared corners. Feature scale is bounded below by mesh density here: 120 segments at r~1.4 is a 0.073 chord, right at the spec's 0.07 floor."
+    },
+    {
+      "id": "B5",
+      "status": "done",
+      "authoring_minutes": 9,
+      "attempts": 6,
+      "bake_seconds": 2.02,
+      "tris": 10484,
+      "watertight": true,
+      "file_kb": 238.4,
+      "color_support": "material",
+      "export_path": "native-glb",
+      "notes": "The grammar itself is trivial and pleasant: one recursive grow() emits a parallel-transported swept tube per branch and calls itself once per child with radius *0.75. Trunk -> 3 arms at 40 deg -> 6 tips, each tip carrying a lathed drip-pan and cup, sockets bored afterwards. 26 solids from ~40 lines of recursion. THE COST WAS ALL IN THE CSG, and it took four separate fixes, each found by bisecting the union with a manifold check after every operand: (1) a branch that stops exactly at its fork shares a cap CENTRE POINT with its parent's end cap — degenerate; branches now overshoot their own fork by 0.055 and children start at the fork. (2) Siblings then shared a start-cap centre with each other; each child now steps 0.045 along its own heading. (3) The fork blend ball was a UV sphere, and a branch is a circular tube coaxial with the fork, so the intersection circle ran almost exactly along one latitude ring — a near-tangential intersection, 6 faces of ~1e-10 area per fork. Switched to an ICOsphere, which has no ring for that circle to shadow. (4) Two sibling tubes of EQUAL radius whose axes cross are tangent to each other at the crossing, a genuine singularity; siblings are now nudged 0.022 sideways so their axes are skew, not crossing. Radii stay exactly on the spec's x0.75 taper — only launch points moved, inside a blend sphere that hides them. After all four, 153 non-manifold edges remained, and an explicit weld+dissolve REPAIR PASS (clean_slivers) took it to 0. I first blamed collection-mode UNION and was wrong — unioning one at a time changed nothing; the fault was in the model. Junctions show no seams (true union, plus knop blends); they are rounded knops rather than true fillets, which is the honest limit of union-plus-sphere."
+    },
+    {
+      "id": "B6",
+      "status": "done",
+      "authoring_minutes": 3,
+      "attempts": 2,
+      "bake_seconds": 0.87,
+      "tris": 1920,
+      "watertight": true,
+      "file_kb": 58.9,
+      "color_support": "material",
+      "export_path": "native-glb",
+      "notes": "Everything is expressed against the bow radius, which is what makes the engraving follow the curve: blank r 3.75..4.06; remove r>4.00 inside the border to leave a 0.06 raised frame; remove r>3.95 inside the letters to engrave 0.05. THE POINT OF THE ITEM: a flat text prism cannot engrave constant depth into a bowed face — across the 1.5-unit width of 'DICE' the face falls away 0.08, more than the 0.05 depth, so a flat cutter misses the surface entirely at the ends. Cutter = (extruded FONT text) MINUS (cylinder r 3.95), giving a text-shaped solid whose floor is bowed exactly like the face. Text is Blender's built-in Bfont via a FONT curve, resolution_u 12, evaluated to mesh and its placement baked into the vertices. No union anywhere: the frame is what SURVIVES the recess cut, not a part stuck on, which dodges a coplanar-face union along the plaque edges. INTERPRETATION: '0.25 thick' is held as constant material thickness, so the back is bowed too and the bounding box is 0.54 deep; a flat back would instead thin the edges to 0.096. Clean first attempt; the second was only raising letter-outline resolution, since 1536 tris against a 14k ceiling left room."
+    },
+    {
+      "id": "B7",
+      "status": "done",
+      "authoring_minutes": 2,
+      "attempts": 1,
+      "bake_seconds": 8.38,
+      "tris": 62440,
+      "watertight": true,
+      "file_kb": 1277.5,
+      "color_support": "material",
+      "export_path": "native-glb",
+      "notes": "Clean first attempt, NO REPAIR NEEDED. All 121 cutters (120 spheres at 32x16 = 61,446 cutter faces, plus the 25-deg-yawed 3x3x3 box) go through ONE collection-mode Boolean modifier, since A-B-C == A-(B|C) makes overlapping cutters harmless for DIFFERENCE. Straight out of the boolean: 0 non-manifold edges, 28,589 faces, signed volume +12.4670. 8.38s total wall clock, of which the boolean itself is 5.34s with the EXACT solver. SOLVER COMPARISON: Blender 4.5's new MANIFOLD solver does the identical job in 0.32s — 17x faster — for the same volume to 4 decimals (12.4670), same watertightness, and 28,585 vs 28,589 faces; total wall clock 3.57s vs 8.38s. Shipped with EXACT as the conservative choice, but MANIFOLD is the better default for closed inputs like these. Sphere coordinates are given in the spec's Y-up frame and mapped through spec_to_blender on the way in; the yaw about spec +Y is a yaw about Blender +Z with the same sign, since the export mapping is a proper rotation. Bounds land exactly on (-1.5,0,-1.5)..(1.5,3,1.5)."
+    }
+  ],
+  "iteration_loop": {
+    "edit_to_glb_seconds_typical": 2.0,
+    "error_quality_notes": "Two very different halves. PYTHON-LEVEL errors are excellent: full tracebacks with line numbers, and RNA gives exact, checkable answers — `bpy.ops.export_scene.gltf.get_rna_type().properties` and `Modifier.bl_rna.properties` list every argument and every enum value, so nothing has to be guessed from stale API memory. That introspection step took ~8 minutes up front and prevented every API-name error for the rest of the battery; it also caught that `Mesh.set_sharp_from_angle` does not exist in 4.5 and that shading is now the `sharp_edge` flag. GEOMETRY-LEVEL errors are the opposite: near-silent. A boolean that produces a pinched, sliver-ridden, non-manifold solid returns success and prints nothing. The only hint Blender volunteers is a one-line 'Mesh X is not valid, and may be exported wrongly' from the glTF exporter, after the fact, with no location. Every geometric defect in this battery was found by MY OWN assertions, not by Blender: non-manifold edge counts, signed volume, degenerate-face area. The single most valuable tool was bisecting a union with `boolean_each` plus a manifold check after each operand, which makes the offending part name itself. Also: `blender -b --python` exits 0 after an uncaught traceback unless you pass `--python-exit-code 1`."
+  },
+  "overall_notes": "ALL SEVEN DONE, all watertight, all 0 degenerate faces, all inside their tri ceilings, all exported as native GLB, and every one byte-identical across two full runs (verified by md5 on a final back-to-back sweep, not asserted). Total ~38 minutes of authoring for the whole battery. DETERMINISM NEEDED WORK AND IS WORTH FLAGGING: Blender's EXACT boolean emits the same solid with a different vertex/face ORDER on every run — identical positions and identical triangle set, different indexing — so every GLB came out byte-different at first. `-t 1` does not help, so it is container/address ordering rather than thread scheduling. A `canonicalize()` pass (sort vertices by coordinate, sort faces by their remapped index tuple with each cycle rotated to start at its lowest index so winding survives) makes the whole pipeline reproducible without touching the shape. I diagnosed this by printing two digests per bake, one order-sensitive and one order-independent; the order-independent one never changed, which is what proved the geometry was fine and only the indexing moved. AXIS CONVENTION was verified empirically rather than trusted: an asymmetric 1x2x3 box exported to bounds (0,0,-2)..(1,3,0), confirming Blender (x,y,z) -> glTF (x, z, -y), so spec Y is Blender Z and spec +Z (front) is Blender -Y. THE MOST IMPORTANT FINDING IS B4's: a hand-built mesh with reversed winding was watertight, correctly shaped, correctly sized, and inside out — invisible in three.js, which culls back faces — and NOTHING in this metrics contract detects it. `watertight` in particular does not. The export path now refuses a negative signed volume. Anyone scoring these files should treat winding as a separate check. HARNESS CAVEAT: `has_vertex_colors` reads false for B1 and B4 even though both DO carry COLOR_0 — verified by parsing the GLB JSON directly (B4 has two colour clusters, 10121 bark corners and 3781 pale-top corners). trimesh classifies any glTF primitive that has a material as TextureVisuals, so `visual.kind` returns 'texture' and the flag misses the vertex colours sitting in `visual.vertex_attributes`. The colour is really there. DENSITY CONTROL is complete in both directions and every script exposes it as a named constant at the top (segment counts, profile samples, curve resolution_u, bevel segments, sphere subdivisions); Decimate and Remesh modifiers exist for after the fact but were not needed — no budget here was met by post-hoc decimation. FIVE OF SEVEN ITEMS needed no repair pass; B5 and B6 call clean_slivers, and only B5 actually had anything to clean (153 non-manifold edges -> 0). Renders of every item were inspected before calling any of them done; three defects (B2's smoothing angle blurring the flare junction into a false curve, B4's absent second colour, B4's sawtooth colour boundary) were caught by looking, not by measuring."
+}

@@ -1,0 +1,114 @@
+{
+  "tool": "OpenSCAD",
+  "version": "2026.08.09 (git cbe6eacf) dev snapshot, Manifold 3.5.1, CGAL 6.1, lib3mf 2.4.1",
+  "install": {
+    "method": "dev-snapshot AppImage from files.openscad.org/snapshots (newest x86_64 was 2026.08.09), curl + chmod +x. FUSE was available so --appimage-extract was not needed. No sudo, no runtime deps, single self-contained file.",
+    "minutes": 4,
+    "disk_mb": 81,
+    "issues": [
+      "Latest STABLE (2021.01) predates the Manifold backend entirely; the snapshot is not optional for this workload -- see B7, where CGAL took 212s against Manifold's 1.4s (147x).",
+      "--backend=manifold is already the DEFAULT in this snapshot; passing it explicitly is still worth doing since 2021.01 silently ignores the flag.",
+      "'--enable lazy-union' exists and works (top-level objects stay separate for multi-object 3MF); not needed for STL.",
+      "--info prints a harmless Qt timer warning under headless CLI use.",
+      "Fonts come from the host fontconfig, not the AppImage; text() worked because DejaVu Sans was installed. On a bare container text() would silently fall back or fail."
+    ]
+  },
+  "items": [
+    {
+      "id": "B1",
+      "status": "done",
+      "authoring_minutes": 5,
+      "attempts": 4,
+      "bake_seconds": 0.42,
+      "tris": 6770,
+      "watertight": true,
+      "file_kb": 160.5,
+      "color_support": "none",
+      "export_path": "stl-convert",
+      "notes": "TRUE rounded fillet, not a chamfer. Used hull() of 8 corner spheres rather than minkowski(); for a CONVEX body the two are mathematically identical and I verified it -- both give volume 7.909994 and bounds [-1.0,-0.9975,-0.9975]..[1.0,0.9975,0.9975]. Cost note the brief asked for: with the Manifold backend minkowski is NOT the classic trap any more -- cube+sphere took 0.24s vs hull's 0.24s (both dominated by 0.22s AppImage startup), and even minkowski of a NON-convex body was 0.27s on Manifold vs 0.74s on CGAL. Pips are 21 spherical dents, sphere r0.22 with its centre 0.14 outside the face -> exactly 0.08 deep, 0.17 rim radius, well inside the 0.90 flat. Density is one chord budget ($fa=6,$fs=0.045) for the whole file: 14 fragments on the fillet, 31 on a pip. First bake at $fs=0.035 came in at 12170 tris (over the 8k ceiling); two sweep bakes found 0.045. Real dimensional caveat: OpenSCAD's sphere() puts no vertex at the poles, so the polyhedral sphere INSCRIBES and the die measures 1.994 across in z (bounds 0.003..1.997) instead of 2.000. x is exact because a fragment lands on the axis. COLOR: see overall_notes -- OpenSCAD can do this, the harness cannot read it."
+    },
+    {
+      "id": "B2",
+      "status": "done",
+      "authoring_minutes": 3,
+      "attempts": 1,
+      "bake_seconds": 0.26,
+      "tris": 2484,
+      "watertight": true,
+      "file_kb": 70.4,
+      "color_support": "none",
+      "export_path": "stl-convert",
+      "notes": "Correct on the first bake. The whole shell is ONE rotate_extrude() of a 6-point wall section, so the flare, the molding band, the shaft and the uniform 0.35 wall come out with no boolean at all. Merlons and arrow slits are also rotate_extrude(angle=...) of the wall rectangle, which makes them follow the cylinder instead of being flat cubes stuck on a curve -- verified numerically: every slit's floor sits at r=1.480 exactly (= 1.60-0.12) across its full width, and never reaches the 1.25 bore, so it cannot pierce. Doorway is a 2D arched profile pushed radially from inside the cavity outward, so it tunnels the near wall only; z-sections at 0.6/1.0/2.0 show a single open C-loop at the front and a closed annulus again at 2.4. Genus 1, as a pierced tube should be. Cheapest item in the battery at 2484 tris -- rotate_extrude is very economical."
+    },
+    {
+      "id": "B3",
+      "status": "done",
+      "authoring_minutes": 4,
+      "attempts": 1,
+      "bake_seconds": 0.41,
+      "tris": 6178,
+      "watertight": true,
+      "file_kb": 161.1,
+      "color_support": "none",
+      "export_path": "stl-convert",
+      "notes": "THE HONEST PAIN: OpenSCAD has no sweep operator, and the suggested linear_extrude(twist=) route does not work for a U-channel. It IS a helical sweep, but the profile it sweeps lies in the HORIZONTAL plane and is only sheared into place, so a shape's vertical size comes out as tangential_extent * pitch/(2*PI*r) -- a factor that depends on r. Tuning the floor slab to 0.12 at mid-radius yields 0.196 at the inner edge and 0.087 at the outer, and the two side walls end up different heights. Worked that out on paper and discarded it. What shipped is the idiomatic substitute: hull() between consecutive stations of the profile, 64 stations per turn. The trap there is that hull() is CONVEX, so a U-channel swept as one piece has its channel filled solid; the U must be split into floor + two walls and each convex piece swept separately, then unioned. Walls deliberately start at w=-0.12 so they OVERLAP the floor rather than touching it (coplanar contact is where robustness goes to die). Clean planar end cuts come from box cutters bounded in z -- a true half-space would also slice the chute where it passes the same plane on its other two turns. Genus -1 = two closed components: the chute does not touch the column, which is what the spec's own numbers (helix floor inner edge at r=0.95, column r=0.50) require."
+    },
+    {
+      "id": "B4",
+      "status": "done",
+      "authoring_minutes": 5,
+      "attempts": 2,
+      "bake_seconds": 1.59,
+      "tris": 21120,
+      "watertight": true,
+      "file_kb": 488.3,
+      "color_support": "none",
+      "export_path": "stl-convert",
+      "notes": "The hard one, and it came out genuinely organic. Approach: ONE generated polyhedron(), 120x88 grid, zero booleans -- so there is no hard CSG edge anywhere by construction. Value noise is written in OpenSCAD's own expression language (hash2 via frac(sin(...)*43758.5453), smoothstep-interpolated, lattice wrapped modulo lt so the theta=0 seam closes). Rejected surface(): a heightmap can only make a terrain patch, it cannot close a solid of revolution. Rejected hull-chained spheres: smooth blends but hull() output is convex per link, so high-frequency bark is impossible. First bake looked like a stump but the bark read as an axis-aligned GRID -- plain value noise on a square lattice does that. Second attempt added a domain warp (push the sample point around with a slower, still-periodic noise) and it now reads as vertical bark furrows. Feature scales 0.31u and 0.16u, both above the 0.07u floor; amplitude 0.08 as specced, plus a separate 0.14 low-frequency gnarl term that breaks the surface of revolution. 5 root flares (cos^1.8 lobes decaying with height) give a 2.86 x 2.97 base spread. Noise fades to zero at the apex so the single apex vertex cannot pucker, and its VERTICAL component fades to zero at the ground so the base ring stays exactly on z=0. Winding: OpenSCAD wants faces CLOCKWISE seen from OUTSIDE, the opposite of the usual convention -- confirmed correct by positive exported volume (6.47) and is_winding_consistent. Height 2.68 vs the ~2.6 target (noise on the shoulder)."
+    },
+    {
+      "id": "B5",
+      "status": "done",
+      "authoring_minutes": 4,
+      "attempts": 2,
+      "bake_seconds": 0.59,
+      "tris": 13890,
+      "watertight": true,
+      "file_kb": 345.0,
+      "color_support": "none",
+      "export_path": "stl-convert",
+      "notes": "Recursion is genuinely pleasant here. One recursive module limb(p0, azim, tilt, len, rad, gen) plus one closed-form arc function (tilt linear in arc length = a circular arc, integrated analytically) expresses base -> trunk -> 3 arms -> 2 arms each -> 6 sconces. Radii x0.75 per generation, spread 42 deg (inside the 35-45 band), AZ_SPLIT=54 chosen so the six pans land ~60 deg apart on a 0.65 circle with 0.09 clear between rims. Junctions are blended by dropping a sphere of 1.18x the child radius at each fork. Height 3.192 vs the ~3.2 target. THE BUG WORTH RECORDING: the first bake rendered perfectly, exported cleanly, reported Status: NoError -- and had genus 60. The sconce was written as difference(union(pan, cup), dish_cutter, bore); the dish cutter is a solid cone wider than the cup, so it sliced every candle cup into a floating ring. Nothing in the render at that scale showed it and nothing in OpenSCAD's output flagged it; only the genus/Euler readout did. Fixed by hollowing pan and cup separately and unioning after -- genus 0. Second bug in the same pass: the trunk's own end-sphere (r 0.22) poked below z=0 under the base. 2 near-zero-area triangles survive in the final GLB but it is still watertight."
+    },
+    {
+      "id": "B6",
+      "status": "done",
+      "authoring_minutes": 4,
+      "attempts": 4,
+      "bake_seconds": 0.37,
+      "tris": 3452,
+      "watertight": true,
+      "file_kb": 97.2,
+      "color_support": "none",
+      "export_path": "stl-convert",
+      "notes": "text() + linear_extrude is native and painless; projecting onto the bow is the interesting part and it has a clean answer: build EVERYTHING from radius bands of one cylindrical shell parked 4 units behind the face. Body = 3.75..4.00, raised frame = 4.00..4.06, engraving cutter = 3.95..4.00 intersected with the text prism. Depth is then a true 0.05 measured along the surface normal and the letters follow the bow for free; the only distortion is the 2.6% arc-length stretch at x=+-0.9 from pushing the text prism straight through. Text orientation needed checking rather than assuming: an observer on -Y looking toward +Y has +X on their right, so text drawn in XY and stood up with rotate([90,0,0]) reads correctly with no mirror. Four attempts: (1) clipping the shell in x/z only kept BOTH branches of the cylinder -- the front arc near y=0 and the back arc near y=8 -- and the export quietly contained a second component 8 units deep; (2) after the y clamp, still not watertight; (3) the cause was two operands ending on the SAME plane (shell top at z=1.8 and clip box top at z=1.8), which made Manifold emit 53 zero-area triangles along that seam. Fix was to make every trim plane owned by exactly one operand: bands run over-height, the border ring's outer edge is oversized, and the frame band starts EPS inside the face. (4) text size 0.62 -> 0.54 for margin. Note that OpenSCAD reported Status: NoError and Genus: 0 through all of that."
+    },
+    {
+      "id": "B7",
+      "status": "done",
+      "authoring_minutes": 2,
+      "attempts": 1,
+      "bake_seconds": 1.31,
+      "tris": 91920,
+      "watertight": true,
+      "file_kb": 2249.7,
+      "color_support": "none",
+      "export_path": "stl-convert",
+      "notes": "Trivially easy and very fast. Cube minus 120 spheres minus the rotated 3-cube, in one difference() over a for-loop -- 12 lines. Manifold: 1.31-1.50s wall including 0.22s AppImage startup, i.e. ~1.1-1.3s of actual work. CGAL backend on the identical file: 212s (3:31), a 147x gap, and it produced a different tri count (75060 vs 91920). NO REPAIR NEEDED: watertight straight out, 0 degenerate faces, genus 30, bounds exactly [-1.5,0,-1.5]..[1.5,3,1.5]. The sphere list is generated by gen_spheres.py into B7_spheres.scad and left in the harness's glTF frame; the axis change happens once, in-model, via gltf_to_scad(). Density is the same chord budget as everywhere else ($fs=0.05), which gives 20 fragments on the smallest sphere and 56 on the largest -- equal facet SIZE rather than equal facet count, so the sponge surface is uniform."
+    }
+  ],
+  "iteration_loop": {
+    "edit_to_glb_seconds_typical": 1.9,
+    "error_quality_notes": "Split verdict, and the bad half is the dangerous half. Hard syntax errors are excellent: 'ERROR: Parser error: syntax error in file p4.scad, line 1' plus exit code 1. Everything else exits 0 and writes a file. A typo'd module name gives 'WARNING: Ignoring unknown module' and exports the rest silently. A typo'd VARIABLE gives 'WARNING: Ignoring unknown variable \"WIDHT\"' and then 'Unable to convert cube(size=[1, undef, 1]...)' -- and still exports a valid 1x1x1 cube, i.e. plausible geometry of entirely the wrong size, exit 0. Worst: a polyhedron() with inconsistent face winding produced NO diagnostic at all under the Manifold backend and exported happily. So an agent that gates on exit status alone will ship broken models. What saves you is that the CLI prints a free per-render summary -- Status, Genus, Vertices, Facets -- and Genus/Euler is a real assertion: it is what caught B5's sliced candle cups and it flags the whole class of accidental-tunnel bugs. Timing: OpenSCAD process is 0.26-1.6s for six of seven items (~0.22s of that is AppImage startup); the STL->GLB harness step is 1.3-2.3s and actually DOMINATES the loop for small models. Preview (OpenCSG) vs full render on B7: 0.63s vs 1.74s, so the preview shortcut barely matters once Manifold is doing the CSG. Geometry cache is per-process, so a CLI-only loop gets no reuse between edits."
+  },
+  "overall_notes": "SEVEN OF SEVEN DONE, no DNFs, all watertight, all inside their tri ceilings (B1 6770/8k, B2 2484/15k, B3 6178/22k, B4 21120/30k, B5 13890/20k, B6 3452/14k). Zero syntax/compile failures across the whole battery -- every .scad parsed and rendered on its first run; all 11 corrective bakes were geometry or topology, never the language.\n\nDETERMINISM: verified, not assumed. Two independent renders of each of the seven files produced byte-identical binary STLs (md5). No rands() anywhere; B4's noise is a fixed hash.\n\nDENSITY CONTROL: full control UP and down, but only at generation time. $fa (angular cap), $fs (chord-length cap) and $fn (explicit segment count) combine as n = max(5, ceil(min(360/$fa, 2*PI*r/$fs))) -- both are caps and the smaller wins. Setting $fa/$fs ONCE at file scope is the right discipline: every primitive then gets the same facet SIZE rather than the same facet COUNT, which is why B1's 0.10 fillet gets 14 fragments and its 0.22 pips get 31 from one knob. There is no decimation and no retessellation of an existing mesh -- OpenSCAD never holds a mesh to decimate, it re-evaluates from source. (An experimental 'discretization-by-error' feature exists in this snapshot; not exercised.) THE FOOTGUN the brief warned about is real and worse than it looks: $fn/$fa/$fs are dynamically scoped specials AND OpenSCAD variables are last-assignment-wins for the entire scope, so a stray '$fn = 12;' near the bottom of a file silently re-tessellates code ABOVE it. Sprinkling $fn on individual primitives is how density drifts; one block at the top is how you stop it.\n\nCOLOR: recorded as \"none\" for every item, but the reason is the harness, not the tool -- and the tool is better than expected. This snapshot writes PER-TRIANGLE colour indices into 3MF (<m:colorgroup> + <triangle ... pid p1>), and colour PROPAGATES THROUGH CSG: difference(){ color(A) cube; color(B) sphere; } exports 30 body-coloured triangles and 142 cutter-coloured ones, i.e. the dent surfaces really do carry the cutter's colour. That is exactly what B1's darker pips and B4's cut top need, and it works. It cannot reach the deliverable: OpenSCAD's export list is stl/off/wrl/amf/3mf/dxf/svg/png/... with no OBJ/PLY/GLB, the shared read-only venv's trimesh cannot open 3MF at all (ModuleNotFoundError: lxml), and stl2glb.py's force=\"mesh\" would concatenate multi-object scenes and drop materials regardless. So: mechanism present and verified, path to GLB absent.\n\nBACKEND: --backend=manifold is decisive, not cosmetic. B7 1.4s vs 212s on CGAL (147x); non-convex minkowski 0.27s vs 0.74s. It also changes results -- CGAL gave 75060 tris on B7 where Manifold gave 91920.\n\nORIENTATION: OpenSCAD is Z-up and the converter's --zup maps (x,y,z)_scad -> (x,z,-y)_gltf, so 'front toward +Z' means the front must face -Y in the model and 'rotate about glTF +Y' means rotate([0,0,a]). That is stated once in dice_common.scad and gltf_to_scad() is the only place B7's coordinates get touched; hand-converting 120 spheres would have been the obvious way to lose the battery.\n\nSOURCES: eval/src/openscad/{dice_common.scad, B1_die, B2_turret, B3_helix, B4_gnarl, B5_candelabra, B6_plaque, B7_storm}.scad plus gen_spheres.py and the generated B7_spheres.scad.\n\nVERIFICATION METHOD: geometry was checked numerically (trimesh sections, vertex-radius probes, volume sign, genus/Euler) and visually via OpenSCAD's own --render PNG export -- no browser was used, and nothing was called done on a green check alone. Note rtree is missing from the shared venv, so trimesh's contains() is unavailable; section loops were used instead.\n\nTIMING HONESTY: authoring_minutes are wall-clock AGENT minutes, reconstructed from source-file mtimes and command timestamps (first source written 20:03, last bake 20:32 = 29 min for all seven items). They sum to 27; the remaining ~5 min went to cross-cutting probes that belong to no single item (minkowski-vs-hull timing, the 3MF colour experiment, the CGAL-vs-Manifold B7 run, the error-quality probes, the determinism sweep) and are deliberately NOT attributed to any item. These are not human minutes; a human writing the same seven files would take far longer, and the ratio between items is the meaningful signal, not the absolute value. Attempts count every bake that produced a candidate deliverable, including the ones that were wrong: 15 bakes for 7 items."
+}

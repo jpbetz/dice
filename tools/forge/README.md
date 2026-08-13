@@ -45,8 +45,10 @@ sizes; gzip on the wire does the rest).
 
 Six tools implemented the same 7-model battery under an honest-metrics
 contract; all 42 GLBs were gated mechanically and judged visually in the
-app's own three.js build. Full report + scorecard in the session that built
-this (headline table below). Blender was the only tool that delivered every
+app's own three.js build. Full report, per-tool evidence, research annexes
+and the re-open protocol: [docs/FORGE-BAKEOFF.md](../../docs/FORGE-BAKEOFF.md);
+raw materials (battery spec, rubric, every tool's sources and metrics) in
+`bakeoff/` (headline table below). Blender was the only tool that delivered every
 capability at spec AND a defect-free GLB pipeline: true fillets, native
 sweeps, font text on curved faces, noise displacement, recursion in plain
 Python, materials + per-vertex COLOR_0, correct normals, native Y-up GLB.

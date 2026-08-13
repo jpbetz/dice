@@ -2653,6 +2653,18 @@ without touching the moot, the door, the palette work or the proofs.
 The general finding for docs/TOWER.md: the surface kit is ARCHITECTURE,
 and organic forms want a radius field, not a box stack.
 
+*(2026-08-12, recorded for whoever owns the shell: the missing technique
+now exists in-repo. The forge pipeline —
+[FORGE-BAKEOFF.md](FORGE-BAKEOFF.md), tools/forge/, the `/forge-model`
+skill — was built exactly for organic-beyond-boxes, and its battery
+includes a gnarled root-flared stump (tools/forge/recipes/B4_gnarl.py)
+that is most of this brief. Two routes, owner's choice: bake the shell to
+GLB (needs the app's first GLTFLoader vendoring — deliberately not done
+yet, see tools/forge/README.md integration note), or use forge/Blender as
+the ITERATION rig and port the converged radius/displacement field back
+into the existing `(θ, y)` descriptor seam — zero new runtime deps, and
+the field math is the same either way.)*
+
 ### W2, W4–W6, sequenced after the spec lands
 W2 the glade room (surface, horizon, atmosphere, lighting rig) ·
 W4 the dice set (rune glow, die lights, fog response) · W5 the living

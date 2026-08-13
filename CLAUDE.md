@@ -58,4 +58,7 @@ priced shelves, dice drawn inside the price) · `js/portable.js` (pools/settings
 portable YAML — the ONLY rack transport; the `#g=` URL codec was dropped
 2026-08-04, GOALS §7, and the URL now carries no user state beyond
 `?room=`) · `js/net.js` (SSE/fetch client) · `tests/` (unit + fuzz +
-`e2e/`).
+`e2e/`) · `tools/forge/` (complex 3D models are BAKED to GLB via pinned
+headless Blender, never hand-written as three.js geometry — use the
+`/forge-model` skill; docs/FORGE-BAKEOFF.md is the decision record; the
+app itself loads no GLBs yet).

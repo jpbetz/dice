@@ -1,0 +1,114 @@
+{
+  "tool": "manifold-3d (JS/WASM kernel; manifoldCAD library route, manifold-cad CLI cross-checked)",
+  "version": "3.5.1 (node 24.14.1, npm 11.11.0)",
+  "install": {
+    "method": "npm init -y && npm i manifold-3d  (plus npm i opentype.js for B6 text)",
+    "minutes": 0.05,
+    "disk_mb": 58,
+    "issues": [
+      "install itself was 2.4 s, 41 packages, 0 vulnerabilities, no build step, no native toolchain",
+      "manifold-3d's own payload is 3 MB (541 KB wasm); the other 51 MB is the CLI/exporter dependency tree - @img/sharp 27 MB, esbuild-wasm 14 MB, @gltf-transform 4 MB",
+      "opentype.js adds 4 MB and is only needed for B6",
+      "no docs shipped beyond .d.ts files; the 54 KB manifold-encapsulated-types.d.ts IS the manual and is good"
+    ]
+  },
+  "items": [
+    {
+      "id": "B1",
+      "status": "done",
+      "authoring_minutes": 5,
+      "attempts": 2,
+      "bake_seconds": 0.12,
+      "tris": 3678,
+      "watertight": true,
+      "file_kb": 184.3,
+      "color_support": "vertex",
+      "export_path": "native-glb",
+      "notes": "Body is hull() of 8 corner spheres: TRUE rounded fillets (exact quarter-spheres and cylinders), flat faces stay flat, 3.7k tris. Pips are sphere dents subtracted. Colour is the standout: the cutter spheres are painted with setProperties BEFORE the boolean and Manifold carries vertex properties through the subtraction, so the dent walls come out dark with no face selection - inspect_glb reports has_vertex_colors=true, exactly 2 distinct COLOR_0 values (1969 dark verts / 1384 bone). Attempt 2 only added asOriginal(): without it the body and pip runs export as two glTF primitives, i.e. two open half-meshes. The levelSet route to the same die is kept in B1_die_sdf.mjs for comparison: 11.6k tris at edge 0.09 (already over the 8k budget and visibly coarse) or 46.7k at 0.045, so SDF loses to hull here on both accuracy and budget. Also re-baked byte-for-byte identical geometry through the manifold-cad CLI (cli_check.ts) to check the two routes agree."
+    },
+    {
+      "id": "B2",
+      "status": "done",
+      "authoring_minutes": 5.5,
+      "attempts": 3,
+      "bake_seconds": 0.11,
+      "tris": 1430,
+      "watertight": true,
+      "file_kb": 71.0,
+      "color_support": "material",
+      "export_path": "native-glb",
+      "notes": "Plain CSG plus host loops; the cheapest item in the battery at 1430 tris. Slit cutters run from r 1.48 outward so the recess bottoms out 0.12 into a 0.35 wall and provably cannot pierce. calculateNormals(3, 30) keeps the 64-segment shaft smooth while merlon corners and slit rims stay hard. COST A REAL BUG: writing the optional args out in full, Manifold.extrude(profile, len, 0, 0, 1, false), silently truncated the doorway - manifold-3d declares scaleTop as 'Vec2 | number' but the binding reads a scalar s as [s, 0], so the tunnel tapered to a knife edge and stopped inside the wall. No throw, no warning; the volume just comes out exactly half. Verified with a minimal case (extrude(unit square, 2, 0, 0, 1) -> volume 1.0, [1,1] -> 2.0). 29/29 point-containment checks pass in verify_b2.py."
+    },
+    {
+      "id": "B3",
+      "status": "done",
+      "authoring_minutes": 2,
+      "attempts": 1,
+      "bake_seconds": 0.17,
+      "tris": 8360,
+      "watertight": true,
+      "file_kb": 378.4,
+      "color_support": "material",
+      "export_path": "native-glb",
+      "notes": "No sweep operator exists, and none is needed: extrude the U-channel dead straight with nDivisions slices, then warp() every vertex onto the helix (length -> arc length, x -> radial offset, y -> vertical). First bake was correct - 38/38 checks in verify_b3.py, including floor/trough/both walls sampled at five points along the sweep and both end cuts. Seam quality is excellent because there IS no seam: the channel is one extrusion, and the only boolean is the union with the column. warp() moves existing vertices only, so SLICES_PER_TURN (128) is an exact, predictable density dial. The spec's radii leave a 0.45 gap between column and chute, so the profile carries a 0.12 tongue that bridges it; without it the export is two disconnected shells."
+    },
+    {
+      "id": "B4",
+      "status": "done",
+      "authoring_minutes": 8,
+      "attempts": 6,
+      "bake_seconds": 1.65,
+      "tris": 24624,
+      "watertight": true,
+      "file_kb": 722.9,
+      "color_support": "vertex",
+      "export_path": "native-glb",
+      "notes": "The strength item. One SDF: tapered capsules for trunk and 5 roots blended with polynomial smooth-min, dished on top with smooth-max, displaced by seeded fbm value noise, meshed by levelSet at edge 0.062 in 1.65 s. No boolean in the form, therefore no hard CSG edge: measured dihedral p50 6.9 deg, p99 48 deg, only 2.6% of edges over 45 deg (bark crevices). Measured bark relief 0.109 peak-to-peak at mid-trunk with feature scale 0.14-0.21u (spec: amplitude ~0.08, features >= 0.07u). Two colours chosen per vertex from the GRADIENT of the same SDF - the cut-wood colour lands on 473 verts spanning height 2.56-2.60, i.e. exactly the sawn top, with no UVs or face picking. Iterations: relief was 0.033 p2p at first because interpolated value noise never reaches its extremes (needed a 2.3x gain and a clamp); the ground plane had to move out of the SDF and become an exact boolean; and asOriginal() was needed after that cut to stop the exporter writing two primitives."
+    },
+    {
+      "id": "B5",
+      "status": "done",
+      "authoring_minutes": 8,
+      "attempts": 5,
+      "bake_seconds": 3.22,
+      "tris": 19536,
+      "watertight": true,
+      "file_kb": 545.7,
+      "color_support": "material",
+      "export_path": "native-glb",
+      "notes": "Grammar written as a grammar: grow() recurses and only pushes tapered segments onto a list; no Manifold object is created inside the recursion. The 54 segments become one smooth-min SDF, so every fork is a fillet by construction and there are no junction seams at all. Pans and cups are the deliberate exception - turned parts, so exact CSG unioned on, one primitive reused 6 times. 48/48 checks in verify_b5.py (six bored cups, six dished pans, base and trunk radii). Density: levelSet edge 0.048 gives 36.8k tris, and simplify(0.0035) takes that to 19.5k in 0.07 s with the bounding box unchanged - better shape per triangle than just coarsening the grid to 0.068. Cost 3 wrong bakes: a tilt() helper I never called (arms grew straight up), capsule 'pans' that were really spheres, and the big one - near-tangential contacts. Manifold happily reports genus 0 / NoError for surfaces that merely graze, because it keeps its own merge vectors; a consumer that welds by position sees non-manifold edges. All 43 of them sat on the base rim where the SDF met the ground plane."
+    },
+    {
+      "id": "B6",
+      "status": "done",
+      "authoring_minutes": 6.5,
+      "attempts": 3,
+      "bake_seconds": 0.11,
+      "tris": 1594,
+      "watertight": true,
+      "file_kb": 72.7,
+      "color_support": "material",
+      "export_path": "native-glb",
+      "notes": "Manifold has zero text support, so opentype.js parses a TTF and 30 lines flatten the quadratic outlines into contours for CrossSection.ofPolygons(..., 'EvenOdd') - counters become holes without caring about winding. Bridge cost: about 15 minutes of the item, and two dead ends first (opentype's loadSync is deprecated and silently returns undefined; ot.parse throws 'lookupType: 6 substFormat: 2 not supported' on both DejaVu faces, fine on Liberation/FreeSans/Noto). The bow needs no warping: the plate is a slice of a cylindrical SHELL so front and back are both curved at a true 0.25 thickness, and the engraving is a straight text prism INTERSECTED with a second 0.05-thick shell, which makes the letter floors exactly concentric rather than approximately so. verify_b6.py measures it: 532 verts on the letter floors at depth 0.0500-0.0505, 678 on the face at r 4.00, 168 on the raised frame at r 4.06, nothing cut deeper than 0.05, and a probe row across the face spells out D-I-C-E. One wrong bake: clipping the ring by chord width only kept the far side of the cylinder as a second shell."
+    },
+    {
+      "id": "B7",
+      "status": "done",
+      "authoring_minutes": 3,
+      "attempts": 1,
+      "bake_seconds": 1.33,
+      "tris": 40918,
+      "watertight": true,
+      "file_kb": 1272.6,
+      "color_support": "material",
+      "export_path": "native-glb",
+      "notes": "Home turf, first try, no repair needed and none available or wanted. 121 subtractions handed over as ONE batch Manifold.difference([...]) took 0.559 s and produced 42616 tris, genus 30, status NoError, watertight; building the 120 spheres at 32 segments each cost 0.081 s. Total wall time including WASM boot, normals and GLB write: 1.33 s. simplify(tolerance) is the budget dial and it is cheap: 0.004 -> 40918 tris (-4%, 0.068 s), 0.012 -> 35994 (-15.5%), 0.03 -> 25994 (-39%), all in under 0.09 s. 41/41 checks in verify_b7.py: 25 sphere centres carved out, 12 searched interior points still solid, slab corner gone. The one trap is frames, not robustness - spheres.json is in the exported Y-up world frame and Manifold authors Z-up, so every centre needs (x, y, z) -> (x, -z, y)."
+    }
+  ],
+  "iteration_loop": {
+    "edit_to_glb_seconds_typical": 0.26,
+    "error_quality_notes": "Two different stories. Compile/API errors are excellent: it is plain Node, so a typo is a normal JS stack trace in 0.2 s, the .d.ts files give real editor completion, and the CLI adds source-mapped traces. Geometry errors are the opposite - the library almost never throws, it hands back an empty or inverted solid. Probed deliberately: sphere(-1) -> empty (status does say InvalidConstruction); cube([NaN,1,1]) -> empty, NoError; levelSet whose SDF returns NaN -> empty, no complaint; a self-intersecting polygon -> silently resolved; warp() that mirrors a cube -> volume -1, genus 0, status NoError, i.e. an inside-out solid the API calls healthy. Add the scalar-scaleTop bug from B2 and the rule is: never trust status() alone, always assert on numTri(), volume() sign, genus() and bounding box. The flip side is that those introspectors are all one cheap call away, which is why every model here prints them and why six of seven items ship with a point-containment checker.  Bake times: 0.26 s edit-to-GLB for the CSG items (B1/B2/B3/B6), 1.9-3.2 s for the levelSet ones; the manifold-cad CLI adds ~0.5 s of esbuild bundling per run.",
+    "routes_compared": "Node library route (import from 'manifold-3d/manifoldCAD' + the package's own scene-builder/export-model helpers) used for all seven items: no bundler, node:fs available for spheres.json and the TTF, 0.26 s round trip. The first-party manifold-cad CLI was cross-checked on the B1 die (src/manifold/cli_check.ts) and produced identical geometry - same 3678 tris, same bounds - in 0.75 s, so the choice is convenience, not capability. The CLI is the better answer if you want TypeScript and CDN imports without an npm install; the library route is the better answer for a build pipeline."
+  },
+  "overall_notes": "All 7 items done, all watertight per harness/inspect_glb.py, all inside their tri budgets (B1 3678/8k, B2 1430/15k, B3 8360/22k, B4 24624/30k, B5 19536/20k, B6 1594/14k, B7 40918 unbudgeted), all standing on y=0 with the front toward +Z, and all deterministic: every model re-baked to a byte-identical GLB on a second run (sha256 compared). Export is native GLB with no conversion step. Two facts about the exporter that every model here has to know, neither of them documented outside the source: (1) manifoldCAD authors Z-up and wraps the scene in a node rotated -90 about X, so authoring (x,y,z) lands at world (x, z, -y) and the spec's '+Z front' is authoring -Y; (2) it treats authoring units as MILLIMETRES and puts a 1/1000 scale on that same wrapper node. Cancelling (2) by scaling the geometry x1000 works and renders identically, but it leaves raw vertex values in the thousands, and any consumer that welds with an absolute epsilon then over-merges by three orders of magnitude and calls a good solid non-manifold - that cost two false 'not watertight' verdicts before the scale was moved onto the node transform where it belongs. The other recurring lesson: cut flat surfaces with booleans and curve them with fields. Meeting a plane inside an SDF makes the field graze it, and marching tetrahedra answers a graze with sliver triangles that Manifold accepts (its merge vectors keep it manifold, genus 0, NoError) but that weld into non-manifold edges downstream. File sizes are the one weak metric: the GLB writer emits uncompressed float32 with no quantisation and duplicates the index buffer for the EXT_mesh_manifold extension, so 24.6k tris costs 723 KB where a lean exporter would spend half that. Verification artefacts live beside the sources: verify_b2/b3/b4/b5/b6/b7.py and verify_colors.py, 156 point-containment and measurement checks in total, all passing on the shipped files."
+}

@@ -1,0 +1,113 @@
+{
+  "tool": "SDF (fogleman/sdf f-rep library + skimage marching cubes, Python/numpy)",
+  "version": "sdf 0.1 @ git d58a6fc; numpy 2.5.2, scikit-image 0.26.0, trimesh 5.0.0, fast-simplification 0.2.0, Python 3.13.5",
+  "install": {
+    "method": "uv venv ~/opt/dice-forge/venv-sdf --python 3.13; uv pip install numpy scikit-image trimesh; uv pip install 'sdf @ git+https://github.com/fogleman/sdf'; uv pip install fast-simplification",
+    "minutes": 5,
+    "disk_mb": 313,
+    "issues": [
+      "ROUTE TAKEN: the real fogleman/sdf library installed clean on the first try (~35 s including its matplotlib/meshio pull), so this is NOT the hand-rolled fallback kit. Used its primitives, smooth booleans, circular_array, TrueType text SDF and threaded batch mesher throughout.",
+      "sdf pulls matplotlib + meshio + rich as hard deps it never needs for meshing; that is most of the 313 MB.",
+      "trimesh's simplify_quadric_decimation needs fast-simplification, which is not a trimesh dependency - one extra install to get any density control at all.",
+      "No pinned release: 'sdf' on PyPI is an unrelated package, so the git URL is mandatory and the version is a commit hash."
+    ]
+  },
+  "items": [
+    {
+      "id": "B1",
+      "status": "done",
+      "authoring_minutes": 10,
+      "attempts": 8,
+      "bake_seconds": 2.05,
+      "tris": 8000,
+      "watertight": true,
+      "file_kb": 214.2,
+      "color_support": "vertex",
+      "export_path": "native-glb",
+      "notes": "TRUE rounded fillet, not a chamfer: rounded_box(2.0, r=0.10) is one argument. 21 pip dents = subtract 21 spheres, so every rim is an exact circle of intersection and the layout is a loop over face normals. Grid step 0.02 -> 118,732 raw tris, decimated 15:1 to the 8k ceiling. Pip rims read as ~14-gons at 4x game zoom, clean at game distance. Colour: per-vertex, painted by asking the pip field where it is zero, so the dark region IS the dent and cannot drift. This item is where the shared kit's two repairs were found (see overall_notes): a single 40:1 quadric pass turned 2 of every 4 pips into volcanoes and streaked the flat faces."
+    },
+    {
+      "id": "B2",
+      "status": "done",
+      "authoring_minutes": 5,
+      "attempts": 3,
+      "bake_seconds": 8.32,
+      "tris": 15000,
+      "watertight": true,
+      "file_kb": 469.5,
+      "color_support": "none",
+      "export_path": "native-glb",
+      "notes": "Hollow shell (capped_cylinder minus inner cylinder, floor slab left in), flared base as a capped_cone, 8 merlons via circular_array (folds the query angle into one sector - O(1), not 8 instances), 3 blind 0.12-deep slits, arched doorway as box|cylinder swept radially through the wall with a visible interior return. Total height 10.0 read as INCLUDING the 0.7 merlons, so the wall crest is at 9.3. Step 0.03 -> 546,510 raw, decimated 36:1: the harshest ratio in the battery and it shows as slight softness on the merlon arrises. Sharp convex arrises survive better than expected because marching cubes places vertices exactly on planar faces; what it loses is the corner point where three planes meet."
+    },
+    {
+      "id": "B3",
+      "status": "done",
+      "authoring_minutes": 7,
+      "attempts": 13,
+      "bake_seconds": 2.91,
+      "tris": 22000,
+      "watertight": true,
+      "file_kb": 890.8,
+      "color_support": "none",
+      "export_path": "native-glb",
+      "notes": "No sweep operator exists, so the sweep is written: a helical solid is invariant under its screw motion, so every point unwinds onto ONE 2D cross-section (dr from the helix radius, dz from the helix height at that angle), atan2 is disambiguated by trying 4 turn indices and taking the min, and the two planar end cuts are arc-length half-spaces max-ed in. ~20 lines. Payoff: the U-channel profile is data, walls are exactly 0.12 thick everywhere, and turns/pitch are free parameters. WEAKEST RESULT of the battery: the 0.12-wide wall crest sawtooths under decimation. Measured the tradeoff - artifact severity tracks the decimation RATIO, not the final count (step 0.026/508k raw -> 22k is visibly worse than step 0.040/214k raw -> 22k; even 45k tris from the 508k mesh is worse than 22k from the 214k mesh). Shipped 0.040 (9.7:1), the cleanest under the ceiling. Undecimated at 214k it is perfect. Quadric collapse also pinched the 0.12 sheet into 4 non-manifold edges at first; fixed by redoing the final rung at lower aggression, not by spending triangles."
+    },
+    {
+      "id": "B4",
+      "status": "done",
+      "authoring_minutes": 4,
+      "attempts": 2,
+      "bake_seconds": 4.34,
+      "tris": 30000,
+      "watertight": true,
+      "file_kb": 763.0,
+      "color_support": "vertex",
+      "export_path": "native-glb",
+      "notes": "BEST RESULT. 5 root flares + 3 secondary toes are just more tapered capsules dropped into union(k=0.34); a blend radius is one number and there is no seam to clean up because a seam is not expressible. Bark is literally `field - fbm(p)`: displacing a surface is displacing a number. Stretching the noise lookup 1/0.42 in z turns blobs into vertical fibre. Octaves 0.36/0.18/0.09 (finest above the 0.07 floor), amplitudes summing to 0.08, plus a separate low-frequency 0.065 lump term for silhouette gnarl. Saw-cut top = smooth-difference of a big sphere (k=0.05) so the rim rounds instead of creasing, and the noise is applied to the bark only so the cut face stays smooth. Colour ramp is driven by the SAME cutting sphere's distance, so the bark/heartwood boundary is the geometric boundary by construction. Normals from the field gradient, not the mesh. Step 0.022 -> 111,208 raw, only 3.7:1 to budget - the gentlest ratio here, which is exactly why it survives. sparse=False because noise breaks the Lipschitz bound the mesher's batch-skip test assumes."
+    },
+    {
+      "id": "B5",
+      "status": "done",
+      "authoring_minutes": 4,
+      "attempts": 4,
+      "bake_seconds": 12.58,
+      "tris": 20000,
+      "watertight": true,
+      "file_kb": 469.5,
+      "color_support": "none",
+      "export_path": "native-glb",
+      "notes": "The grammar item, and the second-best result. `grow()` is an ordinary recursive Python function returning an SDF for its whole subtree; the taper is `radius * TAPER` on the recursive call and the fork direction is a Rodrigues rotation of the parent's tip direction about its own radial axis, so the 6 tips ring evenly. ~50 primitives total. Junction seams are impossible: union(k=0.075). Learned to use TWO blend radii - inside an arm the chained round cones already share endpoint and radius, so applying the junction blend there beads the arm like a string of sausages; SEG_BLEND=0.02 there, 0.075 at forks. Height 3.212 (spec ~3.2), spread 41 deg (spec 35-45), candle-cup wall 0.07 exactly at the visibility floor. Bug caught by the watertight check, not by any error: the trunk's start cap is a sphere that poked below the sample box and got clipped by the grid wall; `& slab(z0=0)` fixed it. Step 0.015 -> 167,752 raw, 8.4:1."
+    },
+    {
+      "id": "B6",
+      "status": "done",
+      "authoring_minutes": 6,
+      "attempts": 12,
+      "bake_seconds": 1.87,
+      "tris": 14000,
+      "watertight": true,
+      "file_kb": 441.4,
+      "color_support": "none",
+      "export_path": "native-glb",
+      "notes": "The bow is not modelled, it is a coordinate system: every query point is re-expressed as (rad, arc-length-u, height-v) about a vertical axis 4.0 behind the plaque, and in those coordinates the panel, the 0.18 border ring and the engraved glyphs are all flat 2D drawings that follow the bow for free. Text comes from the library's TrueType->raster->distance-transform SDF (DejaVu Sans Bold), engraved 0.05 by intersecting the glyph field with a radial shell. Legible and correctly oriented. Constant 0.25 radial thickness means the bbox is 0.51 deep (both faces follow R=4), which is what 'cylinder radius ~4' on a 2.6-wide plaque implies. HONEST WEAKNESS: at the 14k ceiling the raised border ledge and the glyph rims fray into visible hairs - same disease as B3, an 8:1 quadric ratio on a narrow ledge. Undecimated (111k) it is flawless; ~40k is where it stops being visible. Tried step 0.011/0.013/0.016/0.022 and aggression 2/3/7 x ladder 2/3/4; none of them buys the ledge back at 14k."
+    },
+    {
+      "id": "B7",
+      "status": "done",
+      "authoring_minutes": 2,
+      "attempts": 5,
+      "bake_seconds": 24.39,
+      "tris": 1273070,
+      "watertight": true,
+      "file_kb": 31616.9,
+      "color_support": "none",
+      "export_path": "native-glb",
+      "notes": "NO REPAIR NEEDED, NO FAILURES, FIRST TRY. 121 subtractions is 121 numpy passes; a field cannot self-intersect and there is no boolean solver to fall over. 12 lines of model code. Wall time 24.4 s at step 0.014, of which essentially all is field evaluation (15.6M samples x 120 spheres). Watertight, 11 degenerate faces out of 1.27M (float32 GLB rounding), volume 12.36 of the original 27. THE COST IS TRIANGLES AND BYTES: 1,273,070 tris / 31.6 MB, because a uniform grid has no concept of 'this face is flat, two triangles will do'. Measured tradeoff: step 0.028 -> 314,690 tris / 7.8 MB / 4.7 s; 0.020 -> 623,066 / 15.4 MB / 7.5 s; 0.014 -> 1,273,070 / 31.6 MB / 19.8 s (bake only). Decimating the 0.014 mesh toward 80k costs +25 s, lands at 97,976 (the ladder cannot reach 80k), and LOSES watertightness - so the cheap way to a small B7 here is a coarser grid, not decimation."
+    }
+  ],
+  "iteration_loop": {
+    "edit_to_glb_seconds_typical": 4.0,
+    "error_quality_notes": "Python tracebacks: exact file, line and expression, and every model is a plain script, so `python B4_gnarl.py` is the whole loop - no project, no scene, no headless flags. Typical edit->GLB is 2-4 s (B5 12.6 s, B7 24.4 s). THE REAL PROBLEM IS THE OPPOSITE: a wrong field almost never raises. It silently returns a wrong or open surface and the mesher is perfectly happy. Both real bugs this session were silent - B5's trunk cap poking through the sample-box wall, B6's back face clipped by bounds that were too tight in y - and BOTH were caught only by inspect_glb reporting watertight=false, never by an exception. Corollary: sample bounds are a load-bearing input that nothing validates. The library's own bounds estimator is a sampling heuristic, so I passed explicit bounds everywhere and got burned twice anyway. Second-order annoyance: `union(a, b, k=...)` silently accepts k=None and gives a hard min, so a typo'd blend just quietly stops blending."
+  },
+  "overall_notes": "SETUP: fogleman/sdf installed first try, so this is the real library route, not the hand-rolled fallback. Everything is authored in its native Z-up frame (its cylinders, extrusions, twists and circular_array are all about Z) and rotated -90 deg about X once, in the shared kit's bake(), which is the only frame conversion anywhere. All 7 items done, all watertight, all sitting on y=0, all exported native GLB via trimesh. DETERMINISM VERIFIED: two full back-to-back runs of all 7 scripts produced byte-identical GLBs (sha256 match on all 7). Noise is integer-hash value noise with a fixed seed; the one np.random use (B4 root placement) is a seeded default_rng consumed at import.\n\nDENSITY CONTROL, BOTH DIRECTIONS: yes, and it is the central tension of this tool. UP is free - halve the grid step. DOWN is not: the grid step is bounded below by the thinnest feature in the model, so a model with 0.12 walls (B3) or a 0.06 ledge (B6) is FORCED to a fine grid, which produces 10-40x more triangles than the budget, which forces quadric decimation, which is exactly what eats the thin feature. Decimation was used on B1-B6 (never on B7) and is recorded per item. The measured law: artifact severity tracks the decimation RATIO, not the final triangle count. B4 at 3.7:1 is beautiful; B3 at 9.7:1 and B6 at 7.9:1 fray; B2 at 36:1 softens. Where the two constraints do not collide - B4, B5, B7 - the results are as good as anything a mesh tool would produce.\n\nTWO KIT REPAIRS THAT MADE THE DIFFERENCE, both only possible because the model is a field and can be re-queried at any time: (1) snap_to_surface() Newton-projects every vertex back onto f=0 after each decimation rung, which restores exact planarity that the quadric optimiser had drifted off; (2) the decimation LADDER, 3:1 per rung with a snap between rungs instead of one big pass. Before these, B1's flat faces streaked and half its pips became volcanoes. A third, normals='hybrid', takes the field-gradient normal wherever it agrees with the mesh normal within 32 deg and keeps the mesh normal across creases - this removed the soft vertical seams decimation slivers had left down B2's cylinder. A mesh tool has no equivalent of any of the three; once its mesh is wrong it is just wrong.\n\nCOLOUR: per-vertex only (trimesh writes vertex colours into the GLB; no per-part materials without splitting the mesh and breaking single-body watertightness). Attempted and delivered on both items the spec asks for. Both use the SAME field that made the geometry to decide the colour - B1 asks the pip field where it is zero, B4 ramps on distance to the cutting sphere - so the colour boundary IS the geometric boundary and cannot slip.\n\nSOURCES: eval/src/sdfpy/{sdfkit.py, B1..B7}.py. sdfkit.py is ~250 lines and carries all seven; the model scripts are 60-110 lines each and contain no meshing, framing or export code."
+}

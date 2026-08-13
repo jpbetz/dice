@@ -1,0 +1,113 @@
+{
+  "tool": "JSCAD (@jscad/modeling, JavaScript CSG)",
+  "version": "@jscad/modeling 2.13.0, @jscad/stl-serializer 2.1.23, @jscad/3mf-serializer 2.1.17, @jscad/obj-serializer 2.1.23; node v24.14.1, npm 11.11.0",
+  "install": {
+    "method": "npm init -y; npm i @jscad/modeling @jscad/stl-serializer @jscad/3mf-serializer @jscad/obj-serializer",
+    "minutes": 0.05,
+    "disk_mb": 7,
+    "issues": [
+      "2.7 s wall, 8 packages, zero native/binary deps - the cheapest install imaginable",
+      "@jscad/modeling v2 is CommonJS: `import { primitives } from '@jscad/modeling'` throws at parse time under ESM; you must default-import and destructure. Cost one failed run before any modelling started.",
+      "No glTF/GLB serializer exists in the JSCAD org at all, so every item went out as STL and through the harness converter (export_path=stl-convert).",
+      "Colour is a modelling-level feature (colorize) that only survives to 3MF and OBJ. The OBJ writer emits `usemtl crimson` but writes no .mtl, so the colour names resolve to nothing; the 3MF is a real material file but trimesh cannot read 3MF in this venv (no lxml). STL drops colour entirely."
+    ]
+  },
+  "items": [
+    {
+      "id": "B1",
+      "status": "done",
+      "authoring_minutes": 5,
+      "attempts": 1,
+      "bake_seconds": 0.76,
+      "tris": 5194,
+      "watertight": true,
+      "file_kb": 145.5,
+      "color_support": "vertex",
+      "export_path": "stl-convert",
+      "notes": "TRUE rounded fillet, not a chamfer: roundedCuboid({roundRadius:0.10}) is a primitive, so the hardest part of the item is one argument. 21 pips subtracted as spheres r 0.22 centred 1.14 out (dent 0.08 deep, rim dia 0.34, 18 segments -> 0.06u facets on the rim). This item's booleans are fully manifold (0 open edges) because every cut lands on a flat face - contrast B2/B3/B5/B7, where cuts cross faceted curved surfaces. Colour: body and pips are separate solids (pip = a cap 0.001 smaller than the void it sits in, so the dent stays concave and reads dark), each converted with the harness --color and merged. Density knobs: BODY_SEG / PIP_SEG, both free to move up or down."
+    },
+    {
+      "id": "B2",
+      "status": "done",
+      "authoring_minutes": 8,
+      "attempts": 7,
+      "bake_seconds": 0.34,
+      "tris": 1504,
+      "watertight": false,
+      "file_kb": 40.3,
+      "color_support": "none",
+      "export_path": "stl-convert",
+      "notes": "Body is ONE solid of revolution from a 7-point profile - skirt, 0.35 wall, bore and interior floor with no boolean at all; crenels are 8 pie-wedge subtracts, plus 3 blind slits and an arched door tunnel. Raycast-verified: slits bottom at r=1.48 leaving 0.23 of wall (they do not pierce), the doorway is open at z=1.0 and solid at z=2.6, merlons measure 0.56 arc at mid-wall, skirt 2.058 at z=0.1. 4 of the 7 attempts were a manifoldness bisection: subtract(cylinder, coaxial cylinder) is already non-watertight, and so is box-into-cylinder (12 open edges). JSCAD's BSP leaves T-junctions wherever a cut plane crosses a faceted curved surface; retessellate/snap/generalize do not fix it and the tool has no repair. 194 open edges = 8.2% of edges here. Density: SEG=64 gives 1504 tris against a 15k ceiling."
+    },
+    {
+      "id": "B3",
+      "status": "partial",
+      "authoring_minutes": 3,
+      "attempts": 2,
+      "bake_seconds": 0.65,
+      "tris": 5126,
+      "watertight": false,
+      "file_kb": 147.6,
+      "color_support": "none",
+      "export_path": "stl-convert",
+      "notes": "PARTIAL only against the spec's explicit 'watertight solid': the sweep itself is clean, the union with the column is not (174 open edges, 2.2%). extrudeHelical is a true native sweep - one 10-point U-profile, pitch 2.6, 2.25 turns, planar end caps for free, 3 lines of code. Gotcha worth flagging: it stands the profile up with rotateX(-90), so profile +y becomes -z and the channel sweeps upside-down and below the floor unless you mirror the profile first (nothing in the docs says so; the doc example is a symmetric circle, which hides it). Deliberate deviation: floor plate carried inboard to r=0.42 so the chute welds to the column - the spec's own numbers (floor 0.95..2.15 vs column r 0.5) leave a 0.45 gap. Verified by raycast: floor tops at 1.72 / 4.32 / 6.92 at bearing 0, i.e. pitch exactly 2.6, top end at 7.92 just under the 8.0 column."
+    },
+    {
+      "id": "B4",
+      "status": "done",
+      "authoring_minutes": 4,
+      "attempts": 4,
+      "bake_seconds": 0.30,
+      "tris": 17916,
+      "watertight": true,
+      "file_kb": 450.9,
+      "color_support": "vertex",
+      "export_path": "stl-convert",
+      "notes": "JSCAD has no noise, no displacement, no subdivision - nothing native to reach for. Honest route: compute radius(theta, z) = taper + 5 root flares + 2-octave value noise in JS and hand extrudeFromSlices 58 rings x 112 points. Zero booleans, so zero hard edges, and the loft is fully manifold. Noise is sampled at the 3D surface position so it wraps with no seam at theta=0; measured fbm peaks +-0.8, scaled by 0.10 to land the relief at the spec's +-0.08, finest octave 0.22u against 0.06u vertex spacing. Second colour = a 0.014-thick shell generated by the same dish function, so bark and cut face mate exactly. Trap caught by measurement, not by eye: a 112-gon ring of radius 0.01 at the dish bottom earcut into one degenerate triangle, which the converter silently dropped and opened a hole - floor the ring at 7% of the rim. Also caught: the closed-loop shell came out inside-out (signed volume negative) and had to be geom3.invert-ed."
+    },
+    {
+      "id": "B5",
+      "status": "done",
+      "authoring_minutes": 3,
+      "attempts": 2,
+      "bake_seconds": 0.76,
+      "tris": 6707,
+      "watertight": false,
+      "file_kb": 173.6,
+      "color_support": "none",
+      "export_path": "stl-convert",
+      "notes": "The grammar item, and JSCAD's best showing: one RULES table (out/rise/tilt/children/fan per generation), one recursive grow(), one bezier helper, and the whole 1-3-6 tree falls out in ~30 lines. hullChain of tapering spheres is exactly the right primitive for limbs - consecutive links share surface, so no open seams anywhere. What is NOT achievable: a true blend at a branch junction. Children overlap their parent, which joins without a gap but with a crease; JSCAD's only 3D rounding is expand() on a whole solid (verified: it offsets the entire body, not selected edges). 6 tips verified present, one connected component, 6707 tris at SPHERE_SEG=10 against a 20k ceiling. Bbox is not x/z symmetric because 3-fold symmetry never is; the symmetry axis is on the origin."
+    },
+    {
+      "id": "B6",
+      "status": "partial",
+      "authoring_minutes": 4,
+      "attempts": 4,
+      "bake_seconds": 0.39,
+      "tris": 1992,
+      "watertight": false,
+      "file_kb": 54.1,
+      "color_support": "none",
+      "export_path": "stl-convert",
+      "notes": "PARTIAL, and this is the item that exposes the tool. (1) JSCAD's text is a STROKE font: vectorChar returns polylines, so a glyph is not a solid until expand() gives the strokes width - outline fonts/TTF are not supported. (2) There is no bend, warp, deform or shrink-wrap, so an engraving CANNOT follow a curved face: a flat cutter across the 2.0-wide word would miss by 0.13 on a face that bows 0.217. Approximation shipped: each LETTER is cut as its own flat prism rotated about the cylinder axis to its own arc position, so every glyph is engraved on its local tangent plane; residual depth error inside one 0.45 glyph is w^2/8R = 0.006, a tenth of the cut. Verified by rasterising the finished face into a depth map (harness/probe raycast): it reads DICE cleanly, cut depth mean 0.048 / max 0.051 against a 0.05 target, border stands 0.060-0.063 proud. Body is 2D-section-and-extrude (manifold); the 74 open edges come from the frame subtract. Third gotcha: vectorChar's `height` is a font size, not cap height - glyphs come out 1.5x it, and at the naive setting the word was 3.05 wide and ran under the frame."
+    },
+    {
+      "id": "B7",
+      "status": "done",
+      "authoring_minutes": 3,
+      "attempts": 1,
+      "bake_seconds": 54.82,
+      "tris": 54133,
+      "watertight": false,
+      "file_kb": 1360.8,
+      "color_support": "none",
+      "export_path": "stl-convert",
+      "notes": "One subtract() call, 121 operands, no crash, no fallback, correct answer - robustness is real. Performance is the story: 54.8 s wall (repeatable: 54.82 / 55.59 on two passes) at sphere segments=24, versus 0.3-0.8 s for every other item in the battery. JSCAD folds subtractions sequentially into a growing BSP, so cost climbs with the accumulated result, not just the operand count. NO REPAIR APPLIED and none is available in-tool: 7636 open edges (9.0% of edges) are T-junctions, but winding is consistent and there are zero degenerate faces, so the mesh renders correctly and only fails a strict manifold test. Verified: all 120 sphere centres are now empty, 40/40 sampled clear points are still solid, 25/25 points inside the rotated reveal box are empty. Density knob is the sphere segments argument (also the main time lever)."
+    }
+  ],
+  "iteration_loop": {
+    "edit_to_glb_seconds_typical": 2.0,
+    "error_quality_notes": "Two very different halves. Argument validation is genuinely good and specific - 'startRadius must be an array of X and Y values', 'The number of segments per rotation needs to be at least 3', 'numberOfSlices must be 2 or more' - typed at you before anything runs. Past that the tool is silent: it never reports non-manifold output, inverted solids, self-intersection or degenerate faces. All three of the expensive bugs in this battery produced a clean exit and a plausible file: a helix swept upside-down below the floor (undocumented rotateX(-90) inside extrudeHelical), a shell built inside-out (only visible as a negative signed volume), and one degenerate triangle that the STL->GLB step dropped, turning a watertight stump into a holed one. measurements.measureBoundingBox / measureVolume plus an external inspector are the only safety net, and the loop is fast enough (~2 s edit-to-GLB, 56 s for B7) that measuring after every change is cheap."
+  },
+  "overall_notes": "Determinism: every item was baked twice; all 7 STL sha256 hashes are identical across passes (no RNG in the library, and B4's noise is a seeded hash function). Density control: up AND down, everywhere - `segments` on every primitive, `segmentsPerRotation` on the helical sweep, my own ring/radial counts on the lofts. There is no tessellation tolerance (segments are counts, not error bounds) and no decimation, so density is chosen before the boolean, never after; nothing here was decimated. Every item came in well under its ceiling (5194/8k, 1504/15k, 5126/22k, 17916/30k, 6707/20k, 1992/14k) with room to raise segment counts several fold. Fillets: rounded PRIMITIVES exist (roundedCuboid, roundedCylinder, roundedRectangle) and 2D offset/expand takes corners:'round', which covered B1 exactly; what does not exist is a per-edge fillet on an arbitrary solid or a blend at a branch junction - expand() on a geom3 offsets the whole body (verified: a 2-cube becomes 2.2 with rounded corners), so B5's junctions are creases and B2's crenel edges are sharp. The single biggest structural finding: JSCAD's BSP booleans leave T-JUNCTIONS wherever a cutting plane crosses a faceted curved surface. Bisected in isolation - subtract(box, box) is manifold, subtract(cylinder, coaxial cylinder) is not (108 open edges), subtract(cylinder, small box) is not (12), extrudeLinear of a 2D annulus is (0). modifiers.snap / retessellate / generalize do not repair it. That is why 5 of 7 items report watertight=false while B1 (cuts into flat faces only) and B4 (pure loft, no booleans) are clean, and it is why the two structural workarounds worth knowing are: build bodies of revolution as ONE extrudeRotate profile, and build tubes as extrusions of 2D shapes with holes rather than as subtractions. For a three.js consumer this is cosmetically harmless (winding is consistent, normals are fine, no visible cracks at game distance), but any downstream step that needs manifold input - shelling, physics convex decomposition, 3D print prep - would need an external T-junction weld. Total battery: 37 minutes wall clock, 30 minutes of authoring across 7 items, 21 model runs."
+}

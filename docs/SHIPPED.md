@@ -11,6 +11,30 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## Forge — the mesh-bake pipeline and its bake-off (2026-08-12)
+
+Tooling, not a player-facing feature; recorded here because it settles a
+standing question ("how do complex 3D models get built?") with evidence.
+Six scriptable mesh tools implemented an identical 7-model battery under an
+honest-metrics contract; all 42 GLBs were gated mechanically and judged
+visually in the vendored three r160. **Blender headless won 87/100** — the
+only entry delivering every capability AND a defect-free GLB pipeline —
+and `tools/forge/` now ships its proven kit (deterministic bakes via
+canonicalize, inside-out/watertight/COLOR_0/NORMAL refusal gates, preview
+harness, the battery as living worked examples), with `/forge-model` as
+the procedure. Dogfooded same-day: `fae_arch` (49-shell ruined archway,
+5,272 tris, byte-reproducible), whose first bake found a real kit bug
+(canonicalize dropped color attributes) and whose review look found what
+the builder's Cycles self-check could not (joint gaps glowing in-engine
+against the dark table — fixed with tower-style mortar cores). Decision
+record, per-tool evidence, research annexes and the re-open protocol:
+[FORGE-BAKEOFF.md](FORGE-BAKEOFF.md). Commits `c6c8f14`, `3300495`,
+`cd27f4d`. The app still loads no GLBs — that integration is deliberately
+its own future feature (README's integration note); ROADMAP W3 records the
+first likely customer.
+
+---
+
 ## C25 Stage 1 — the shelf comes off the felt (2026-08-09)
 
 Design authority: [UX.md](UX.md) §7.27 (and the amendments at §7.7 / §7.7.1).

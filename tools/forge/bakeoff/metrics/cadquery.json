@@ -1,0 +1,321 @@
+{
+ "tool": "cadquery",
+ "version": "2.8.0 (cadquery-ocp 7.9.3.1.1 = OCCT 7.9.3, CPython 3.13.5)",
+ "install": {
+  "method": "uv venv ~/opt/dice-forge/venv-cq --python 3.13 && uv pip install cadquery trimesh numpy",
+  "minutes": 0.3,
+  "disk_mb": 1638,
+  "issues": [
+   "None. The Python 3.13 OCP wheel exists (cadquery-ocp 7.9.3.1.1), so no fallback to 3.11 was needed; import cadquery worked first try.",
+   "18 s wall for the whole venv, but uv's cache was partly warm from sibling venvs in ~/opt/dice-forge (numpy, trimesh). cadquery-ocp itself was a first fetch on this machine.",
+   "1638 MB is mostly not the CAD kernel: OCCT is 265 MB (OCP 164 + cadquery_ocp.libs 101). VTK, pulled in as a hard dependency for the viewer and the VRML/VTKJS exporters, is 639 MB on its own, plus trame. A headless bake never touches any of it.",
+   "rtree was added afterwards for the verification harness (trimesh.contains needs it); not required to build or export."
+  ]
+ },
+ "items": [
+  {
+   "id": "B1",
+   "status": "done",
+   "authoring_minutes": 7,
+   "attempts": 5,
+   "bake_seconds": 0.53,
+   "tris": 6356,
+   "watertight": false,
+   "file_kb": 148.8,
+   "color_support": "material",
+   "export_path": "native-glb",
+   "notes": "TRUE rounded fillet r0.10 on all 12 edges from a single .edges().fillet(0.1) -- OCCT builds the 8 corner patches itself. Pips are r0.22 sphere dents 0.08 deep, rim radius 0.170. EXPORT HEAD-TO-HEAD (all three files kept): stock Assembly.export GLB writes one glTF primitive PER B-REP FACE = 99 meshes, all open; the same writer with RWGltf_CafWriter.SetMergeFaces(True) gives 2 meshes / 2 materials (shipped); stl2glb gives 1 mesh, watertight, no colour. watertight=false here is NOT a hole: the mesh is closed (Euler 2 body, 42 for the 21 caps) but OCCT's triangulator emits zero-area facets at sphere poles (2/sphere) and fillet corner patches (8/box) -- measured on isolated primitives. stl2glb drops them, which is the only reason the STL route scores watertight. Native normals come off the B-rep surface so the fillet reads tangent-smooth and the pip rims stay crisp with no crease guessing.",
+   "build_seconds": 0.48,
+   "export_seconds": 0.05,
+   "tessellation": {
+    "tolerance": 0.012,
+    "angularTolerance": 0.5
+   },
+   "bounds_min": [
+    -1.0,
+    0.0,
+    -1.0
+   ],
+   "bounds_max": [
+    1.0,
+    2.0,
+    1.0
+   ],
+   "meshes": 2,
+   "materials": 2,
+   "degenerate_faces": 22,
+   "stl_route_compare": {
+    "file": "_B1_stlroute.glb",
+    "file_kb": 155.8,
+    "meshes": 1,
+    "tris": 6334,
+    "verts": 4323,
+    "watertight": true,
+    "has_normals": true,
+    "has_vertex_colors": false,
+    "volume": 7.9458,
+    "inverted": false,
+    "materials": 0,
+    "bounds_min": [
+     -1.0,
+     -0.0,
+     -1.0
+    ],
+    "bounds_max": [
+     1.0,
+     2.0,
+     1.0
+    ],
+    "degenerate_faces": 0,
+    "export_seconds": 1.24
+   },
+   "stock_native_compare": {
+    "file": "_B1_stock_native.glb",
+    "file_kb": 190.9,
+    "meshes": 99,
+    "tris": 6356,
+    "verts": 4687,
+    "watertight": false,
+    "has_normals": true,
+    "has_vertex_colors": false,
+    "volume": 7.9458,
+    "inverted": false,
+    "materials": 2,
+    "bounds_min": [
+     -1.0,
+     0.0,
+     -1.0
+    ],
+    "bounds_max": [
+     1.0,
+     2.0,
+     1.0
+    ],
+    "degenerate_faces": 22,
+    "export_seconds": 0.65
+   }
+  },
+  {
+   "id": "B2",
+   "status": "done",
+   "authoring_minutes": 2,
+   "attempts": 2,
+   "bake_seconds": 1.26,
+   "tris": 1316,
+   "watertight": true,
+   "file_kb": 36.2,
+   "color_support": "none",
+   "export_path": "stl-convert",
+   "notes": "Fuse + cut only, no fillets. Merlons intersected with the wall annulus so they follow the curve. Slits blind by construction (cutter inner face r 1.48 vs bore 1.25). Doorway is a rect + threePointArc profile extruded radially through the wall only. Colour: shipped via the STL route, so the file carries no material. CadQuery does have per-part colour (cq.Assembly + glTF materials, shown on B1 and B4); it rides the native GLB route only, and that route is the one that loses watertightness.",
+   "build_seconds": 0.61,
+   "export_seconds": 0.66,
+   "tessellation": {
+    "tolerance": 0.0015,
+    "angularTolerance": 0.35
+   },
+   "bounds_min": [
+    -2.096,
+    0.0,
+    -2.099
+   ],
+   "bounds_max": [
+    2.1,
+    10.0,
+    2.099
+   ],
+   "meshes": 1,
+   "materials": 0,
+   "degenerate_faces": 0
+  },
+  {
+   "id": "B3",
+   "status": "done",
+   "authoring_minutes": 2,
+   "attempts": 1,
+   "bake_seconds": 0.56,
+   "tris": 3204,
+   "watertight": true,
+   "file_kb": 82.9,
+   "color_support": "none",
+   "export_path": "stl-convert",
+   "notes": "One native sweep: cq.Wire.makeHelix + MakePipeShell in Frenet mode. Exact helical spine, banked channel, planar end cuts for free. Column and chute are disjoint by 0.33 because that is what r1.55 / floor 1.2 / column r0.5 imply; shipped as one compound. Colour: shipped via the STL route, so the file carries no material. CadQuery does have per-part colour (cq.Assembly + glTF materials, shown on B1 and B4); it rides the native GLB route only, and that route is the one that loses watertightness.",
+   "build_seconds": 0.02,
+   "export_seconds": 0.53,
+   "tessellation": {
+    "tolerance": 0.004,
+    "angularTolerance": 0.3
+   },
+   "bounds_min": [
+    -2.269,
+    -0.0,
+    -2.27
+   ],
+   "bounds_max": [
+    2.27,
+    8.21,
+    2.269
+   ],
+   "meshes": 1,
+   "materials": 0,
+   "degenerate_faces": 0
+  },
+  {
+   "id": "B4",
+   "status": "done",
+   "authoring_minutes": 5,
+   "attempts": 2,
+   "bake_seconds": 6.02,
+   "tris": 8404,
+   "watertight": true,
+   "file_kb": 172.5,
+   "color_support": "material",
+   "export_path": "native-glb",
+   "notes": "No displacement in OCCT: bark is an analytic r(theta,z) field sampled 24x96, each ring a periodic B-spline, one makeLoft to skin them (1.0 s). Bark amplitude 0.082, finest wavelength ~0.35u. Five root flares. Concave top cut with a pole-rotated sphere. Two glTF materials (bark / cut top lens). rim fillet r0.05 FAILED (StdFail_NotDone)",
+   "build_seconds": 4.94,
+   "export_seconds": 1.08,
+   "tessellation": {
+    "tolerance": 0.006,
+    "angularTolerance": 0.3
+   },
+   "bounds_min": [
+    -1.396,
+    0.0,
+    -1.454
+   ],
+   "bounds_max": [
+    1.396,
+    2.6,
+    1.454
+   ],
+   "meshes": 2,
+   "materials": 2,
+   "degenerate_faces": 0
+  },
+  {
+   "id": "B5",
+   "status": "done",
+   "authoring_minutes": 13,
+   "attempts": 5,
+   "bake_seconds": 2.42,
+   "tris": 18530,
+   "watertight": true,
+   "file_kb": 442.2,
+   "color_support": "none",
+   "export_path": "stl-convert",
+   "notes": "Recursion is plain Python: one grow() that forks 3 then 2 and tapers x0.75 per generation. 9 swept tubes + 4 joint spheres + 6 finials, one fuse -- the fuse itself never complained. Real blends DO work and are SHIPPED (fillet r=0.03 on the 42 seam edges), but the working window is narrow and undiscoverable without probing, so every attempt was run in a child process under a 40 s watchdog: junction-only r=0.09 (42 edges): TIMEOUT >40s; junction-only r=0.06 (42 edges): FAILED StdFail_NotDone in 0.4s; junction-only r=0.03 (42 edges): ok in 0.4s; all-edges r=0.09 (144 edges): FAILED StdFail_NotDone in 0.7s; all-edges r=0.06 (144 edges): FAILED StdFail_NotDone in 0.7s; all-edges r=0.03 (144 edges): FAILED StdFail_NotDone in 0.6s. Note the shape of that: the same operation times out at 0.09, raises at 0.06 and succeeds at 0.03, and widening the selection to all 144 edges fails at every radius. There is no error message anywhere in there that tells you which knob to turn. Colour: shipped via the STL route, so the file carries no material. CadQuery does have per-part colour (cq.Assembly + glTF materials, shown on B1 and B4); it rides the native GLB route only, and that route is the one that loses watertightness.",
+   "build_seconds": 1.62,
+   "export_seconds": 0.8,
+   "tessellation": {
+    "tolerance": 0.005,
+    "angularTolerance": 0.35
+   },
+   "bounds_min": [
+    -0.893,
+    -0.0,
+    -0.81
+   ],
+   "bounds_max": [
+    0.893,
+    3.283,
+    0.81
+   ],
+   "meshes": 1,
+   "materials": 0,
+   "degenerate_faces": 0,
+   "fillet_attempts": 6,
+   "fillet_failures": 4,
+   "fillet_timeouts": 1,
+   "fillet_shipped_radius": 0.03,
+   "fillet_log": [
+    "junction-only r=0.09 (42 edges): TIMEOUT >40s",
+    "junction-only r=0.06 (42 edges): FAILED StdFail_NotDone in 0.4s",
+    "junction-only r=0.03 (42 edges): ok in 0.4s",
+    "all-edges r=0.09 (144 edges): FAILED StdFail_NotDone in 0.7s",
+    "all-edges r=0.06 (144 edges): FAILED StdFail_NotDone in 0.7s",
+    "all-edges r=0.03 (144 edges): FAILED StdFail_NotDone in 0.6s"
+   ]
+  },
+  {
+   "id": "B6",
+   "status": "done",
+   "authoring_minutes": 5,
+   "attempts": 1,
+   "bake_seconds": 1.26,
+   "tris": 2042,
+   "watertight": true,
+   "file_kb": 53.6,
+   "color_support": "none",
+   "export_path": "stl-convert",
+   "notes": "Bowed body/frame/skin are all cylinder shells (axis vertical at y=3.875, R 4.0 front), so the bow is exact rather than modelled. CadQuery has NO text-on-curved-face operation; .text() is planar. Wrapped it by intersecting a 1.2-deep text prism with the 0.05 skin shell, which makes the cut exactly 0.05 normal to the bow. Cost: 3% horizontal foreshortening on the outer glyphs and 0.0486 instead of 0.05 depth there. DejaVu Sans Bold via fontconfig. Colour: shipped via the STL route, so the file carries no material. CadQuery does have per-part colour (cq.Assembly + glTF materials, shown on B1 and B4); it rides the native GLB route only, and that route is the one that loses watertightness.",
+   "build_seconds": 0.61,
+   "export_seconds": 0.66,
+   "tessellation": {
+    "tolerance": 0.002,
+    "angularTolerance": 0.3
+   },
+   "bounds_min": [
+    -1.3,
+    -0.0,
+    -0.271
+   ],
+   "bounds_max": [
+    1.3,
+    1.8,
+    0.271
+   ],
+   "meshes": 1,
+   "materials": 0,
+   "degenerate_faces": 0
+  },
+  {
+   "id": "B7",
+   "status": "done",
+   "authoring_minutes": 4,
+   "attempts": 2,
+   "bake_seconds": 5.59,
+   "tris": 42148,
+   "watertight": true,
+   "file_kb": 1032.1,
+   "color_support": "none",
+   "export_path": "stl-convert",
+   "notes": "120/120 spheres subtracted in ONE multi-tool BRepAlgoAPI_Cut in 3.73s, then the 25-degree knife box in 0.26s. BRepCheck_Analyzer valid=True, no repair pass run. Doing the same cuts one at a time is 2.1x slower (measured on the first 20). Colour: shipped via the STL route, so the file carries no material. CadQuery does have per-part colour (cq.Assembly + glTF materials, shown on B1 and B4); it rides the native GLB route only, and that route is the one that loses watertightness.",
+   "build_seconds": 4.64,
+   "export_seconds": 0.95,
+   "tessellation": {
+    "tolerance": 0.01,
+    "angularTolerance": 0.4
+   },
+   "bounds_min": [
+    -1.5,
+    -0.0,
+    -1.5
+   ],
+   "bounds_max": [
+    1.5,
+    3.0,
+    1.5
+   ],
+   "meshes": 1,
+   "materials": 0,
+   "degenerate_faces": 0,
+   "spheres_total": 120,
+   "spheres_cut": 120,
+   "seconds_120_sphere_cut": 3.73,
+   "seconds_knife_cut": 0.26,
+   "seconds_validity_check": 0.15,
+   "brepcheck_valid": true,
+   "needed_repair": false,
+   "solids_out": 1,
+   "faces_out": 141,
+   "loop_n": 20,
+   "seconds_sequential": 0.48,
+   "seconds_multitool": 0.23,
+   "speedup_vs_loop": 2.1
+  }
+ ],
+ "iteration_loop": {
+  "edit_to_glb_seconds_typical": 4.0,
+  "error_quality_notes": "Two tiers, and the gap between them is the story. Python-level mistakes are excellent: real tracebacks, real line numbers, and the API is typed enough that a wrong argument fails immediately and legibly. Kernel-level failures are the opposite. Everything OCCT refuses arrives as the same bare `StdFail_NotDone` with no message, no offending edge, no suggested radius -- B4's rim fillet and eight of B5's blend attempts were all that one string. Worse, failure is not even guaranteed to be an exception: B5's junction fillet at r=0.09 ran 13 minutes at 100% CPU without returning or raising, so blends have to be run under a watchdog. Silent-wrong is rare though -- the boolean results were valid every time (BRepCheck_Analyzer clean on B7's 120-sphere sponge), so when it says it worked, it worked. Cost of a cycle: 1.9 s of that is just `import cadquery`."
+ },
+ "overall_notes": "7/7 done, no DNF, all within budget, all byte-identical on a second full re-bake (vertex-hash compared; no RNG is used anywhere -- B4's 'noise' is a closed-form sum of sinusoids). 32 geometric assertions in src/cadquery/_check.py pass: point-in-solid probes for all 21 pip dents, the pierced doorway, the arrow slits that must NOT pierce, an 8-merlon count, the 2.25-turn helix verified at two azimuths, bark relief, 6 candle cups, the bow direction, and B7's knife cut.\n\nEXPORT. CadQuery exports GLB natively and it was tried on B1 as instructed, with a real finding: stock `Assembly.export('.glb')` writes one glTF primitive PER B-REP FACE -- 99 meshes for one die, each an open patch, so it scores not-watertight. OCCT's writer has SetMergeFaces, which CadQuery does not expose; calling it directly (see _forge._export_native) collapses that to 2 meshes / 2 materials. Even then the native route cannot be watertight for anything containing a sphere or a fillet corner: OCCT's mesher emits zero-area facets at parametric poles (measured in isolation: 2 per sphere, 8 per filleted box), and only stl2glb's degenerate-face cull removes them. So B1 and B4 ship native for the colour the spec asks for there, everything else ships stl-convert for watertightness. B4 gets both, by rotating the dish sphere 90 degrees so its poles fall outside the cut region.\n\nDENSITY. Fully controllable in both directions and continuously: the (tolerance, angularTolerance) pair goes straight to BRepMesh_IncrementalMesh, chord deviation in model units and facet angle in radians. Tessellation happens at export from an exact B-rep, so the same source at a different tolerance is a different mesh of the SAME shape -- B1 went 16,846 -> 6,356 tris by moving two numbers, with no remodelling and no decimation. It also spends triangles well: the whole 10-unit turret is 1,316 tris because a cylinder wall needs subdivision around its axis and none along it.\n\nWHERE IT IS WEAK. Organic is the honest one. There is no displacement, no noise, no subdivision anywhere in OCCT; B4 is a 24x96 analytic radius field lofted through periodic B-splines, which works and is watertight and reads as bark, but it is visibly coherent -- you cannot get the aperiodic detail that one Perlin modifier gives a mesh tool. And fillets on branching geometry are a coin flip with no diagnostics: on B5 the SAME operation times out at r=0.09, raises at r=0.06, succeeds at r=0.03, and fails at every radius if the selection is widened from 42 seam edges to all 144."
+}
