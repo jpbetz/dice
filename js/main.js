@@ -44,6 +44,9 @@ import { buildTowerSkin } from './towerskin.js';
 import { buildBastionSkin } from './towerbastion.js';
 import { buildAnvilSkin } from './toweranvil.js';
 import { buildHollowBoleSkin, HOLLOW_EMBER } from './towerhollow.js';
+import {
+  TOWERGLB, towerGlbInit, towerGlbEnsure, towerGlbStatus, towerGlbAsset, towerGlbSkin,
+} from './towerglb.js';
 import { stepDress } from './towerdress.js';
 import { buildMotes, stepMotes, disposeMotes } from './motes.js';
 import { buildFaeConcept, brightenFog, stepWisps } from './fae-lab.js';
@@ -7215,6 +7218,13 @@ let pendingTower = null;           // a change waiting on the roll boundary
 let towerRig = null;               // {id, group, bodies, cm} while socketed
 const TOWER_WALL_AWAY = -1000;     // where the back wall plane parks, socketed
 
+// A SETTLED ROLL WAITING FOR A TOWER TO ARRIVE (see towerReleaseHeldReplay).
+// Declared beside pendingTower because it is the same fact seen from the other
+// side: pendingTower is a tower with no model yet, heldReplay is the roll that
+// must not be rebuilt until it has one.
+let heldReplay = null;             // the roll stashed by replaySettledRoll
+let heldReplayTimer = null;        // the holdMaxMs escape hatch
+
 // THE TOWER LANTERN (Joe, 2026-08-11: "could we improve the lighting?").
 // The scene's key light is tuned for dice on the felt and hits the tower
 // flat-on, which is what was leaving three towers' worth of baked normal
@@ -7711,6 +7721,47 @@ const TOWER_PORTAL_LIMITS = Object.freeze({
          sillY: [0.5 * TOWER_S, 1.1 * TOWER_S], x: [-0.6 * TOWER_S, 0.6 * TOWER_S] },
 });
 
+// THE SMELL TEST, EXECUTED. Returns a list of human-readable violations, empty
+// for a legal spec. It lives HERE, next to the limits it reads, because this
+// file owns them — they are arithmetic about the engine's volumes, not about
+// files — and js/towerglb.js gets it handed over through towerGlbInit() rather
+// than importing it, which would be a cycle (this file imports that one).
+//
+// A model whose portals fail this is REFUSED, not clamped. Clamping would give
+// the player a tower that is subtly not the one the modeller proved: the forge
+// fires rays down the declared column and out through the declared door before
+// the GLB is allowed to exist (tools/forge/check.py --tower), so a number moved
+// after that gate is a number nothing has ever checked the geometry against.
+//
+// The message names the number, the bound and the field, because the reader is
+// somebody looking at a Blender file trying to work out which of eight values
+// to move.
+function towerPortalValidate(spec) {
+  const L = TOWER_PORTAL_LIMITS;
+  const out = [];
+  const range = (path, v, [lo, hi]) => {
+    if (!(v >= lo && v <= hi)) out.push(`${path}=${v} outside [${lo}, ${hi}]`);
+  };
+  const atLeast = (path, v, min) => {
+    if (!(v >= min)) out.push(`${path}=${v} below the minimum ${min}`);
+  };
+  if (!spec || !spec.in || !spec.out) return ['the spec has no in/out portals at all'];
+  range('in.x', spec.in.x, L.in.x);
+  range('in.rimY', spec.in.rimY, L.in.rimY);
+  range('in.z', spec.in.z, L.in.z);
+  atLeast('in.clearR', spec.in.clearR, L.in.clearRMin);
+  range('out.x', spec.out.x, L.out.x);
+  range('out.sillY', spec.out.sillY, L.out.sillY);
+  atLeast('out.w', spec.out.w, L.out.wMin);
+  atLeast('out.clearH', spec.out.clearH, L.out.clearHMin);
+  return out;
+}
+
+// Hand the loader its validator, once, at module evaluation. (Both names are
+// function declarations or module-scope consts already assigned above this
+// line — the TDZ trap this file records at ROOM, LS_NAME and TOWERLAB.)
+towerGlbInit({ validate: towerPortalValidate, warn: (...a) => console.warn(...a) });
+
 // The contract volumes, evaluated at the CURRENT mat. The anchor is the back
 // wall's midpoint (moves with zoom); the offsets from it are the contract.
 //
@@ -7894,6 +7945,115 @@ function towerPortalsOf(id) {
   if (row.portals) return row.portals;
   if (row.glbUrl) console.warn(`[tower] ${id}: portals not loaded — classic volumes substituted`);
   return DEFAULT_PORTALS;
+}
+
+// ---------------------------------------------------------------------------
+// THE MODEL GATE (js/towerglb.js). A baked tower arrives over the network and
+// socketing does not wait for anything — so between "the room says blackspire"
+// and "blackspire is standing" there is now a period, and every path that can
+// build a tower has to be able to see it.
+//
+// A row with no glbUrl is READY BY DEFINITION and always was: that is what
+// keeps all four shipped towers, and every scenario that drives them, on the
+// exact code path they had before this existed. The gate is one predicate and
+// it answers `true` for them without consulting anything.
+//
+// `row.portals` is in the test as well as the loader's status, and not
+// redundantly: the portals are what towerVolumes() reads, and they are copied
+// onto the row only after the asset validated. A model whose bytes arrived but
+// whose doorway is illegal is 'error', never 'ready' — but a row that somehow
+// held a status without portals would socket the CLASSIC core under a baked
+// mesh, which is the "tower dice fly into the wall beside" failure that
+// towerPortalsOf's warning already describes. Two conditions, one meaning.
+function towerModelReady(id) {
+  const row = TOWERS[id];
+  return !row || !row.glbUrl || (!!row.portals && towerGlbStatus(row.glbUrl) === 'ready');
+}
+
+// Kick the preload for a row that needs one. Idempotent at every level:
+// towerGlbEnsure returns the same promise for a url already in flight, and a
+// row that already holds portals never asks again.
+//
+// The .then is where the model becomes PART OF THE ENGINE — the portals are
+// frozen onto the row, which is what makes towerPortalsOf return them and
+// towerVolumes derive a core from them — and then both waiting parties are
+// released: the queued socket (tryFlushRoomChanges) and the held replay. In
+// that order, and the order is the hello-ordering law: the tower goes up, THEN
+// the roll is rebuilt against it. Reverse them and a returning player rebuilds
+// the table's pour as a throw, against walls 4.5 units shallower than
+// everyone else's.
+function towerModelEnsure(id) {
+  const row = TOWERS[id];
+  if (!row || !row.glbUrl || row.portals) return;
+  towerGlbEnsure(row.glbUrl).then((entry) => {
+    if (entry.status === 'ready') {
+      row.portals = Object.freeze(entry.portals);
+    } else {
+      // NEVER DEGRADE TO 'none'. pendingTower stays set, so a model that turns
+      // up on a later retry (or a later boot) still raises the tower — and
+      // until then this client keeps the table it has rather than silently
+      // becoming the one client in the room baking throws while everybody
+      // else bakes pours.
+      console.warn(`[tower] ${id}: its model did not load, so it will not be `
+        + `socketed. The table keeps '${currentTower}' and the pending change stays `
+        + `queued. Films on this client may diverge from other clients in this room.`);
+    }
+    tryFlushRoomChanges();
+    // A LATE FELT BEATS A NEVER FELT: released on failure too, so a broken
+    // model costs the returning player a tower, not the roll on the table.
+    towerReleaseHeldReplay();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// THE HELD REPLAY — the hello-ordering law, made safe against a load.
+//
+// tower-roll pins this law and has since the socket shipped: on a reload,
+// hello.settings sockets the tower and THEN the newest on-felt roll is replayed
+// through playRoll. Get the order wrong and the returning player rebuilds the
+// table's pour as a THROW, against walls 4.5 units shallower than everyone
+// else's — a divergence they cannot see and cannot fix.
+//
+// That law was free while every tower was a synchronous function call: both
+// happen inside one hello handler, in source order, and nothing could get
+// between them. A model that arrives over the network breaks it not by
+// reordering anything but by making the first step UNFINISHED when the second
+// runs. So the second step waits — explicitly, with a deadline — instead of
+// racing and losing quietly.
+//
+// It is a hold, not a drop: the roll is kept and replayed, either when the
+// model lands or when the wait runs out. The only thing that can be lost is
+// the tower, and losing the tower is already the documented outcome of a model
+// that never arrives.
+function towerReplayBlocked() {
+  // The one exception is the release itself (below): by then the waiting is
+  // over by decision, and re-asking this question would stash the same roll
+  // again and arm a second deadline, forever.
+  if (heldReplayReleasing) return false;
+  return !!pendingTower && !towerModelReady(pendingTower);
+}
+
+let heldReplayReleasing = false;
+
+// Fired from all three ends of the wait: the preload succeeding, the preload
+// failing terminally, and the deadline. Idempotent — with nothing held it just
+// clears the timer.
+function towerReleaseHeldReplay() {
+  if (heldReplayTimer) { clearTimeout(heldReplayTimer); heldReplayTimer = null; }
+  const roll = heldReplay;
+  heldReplay = null;
+  if (!roll) return;
+  // THE ORDER IS THE LAW. Socket first — this is the same tryFlushRoomChanges
+  // the roll boundary calls, and by now the gate it was failing has usually
+  // opened — and only then rebuild the roll, so playRoll bakes against the
+  // interior the rest of the room is baking against.
+  tryFlushRoomChanges();
+  heldReplayReleasing = true;
+  try {
+    replaySettledRoll(roll);
+  } finally {
+    heldReplayReleasing = false;
+  }
 }
 
 // THE LAB'S volumes: the skin the bench is wearing, plus the ONE dial that is
@@ -8223,6 +8383,20 @@ const TOWER_SWAP = { from: null, to: null, before: 0, mid: 0, after: 0 };
 function towerSocket(id) {
   const spec = TOWERS[id] || TOWERS.none;
   if (spec.id === currentTower && !!towerRig === (spec.id !== 'none')) return currentTower;
+  // DEFENCE IN DEPTH, AND IT HAS TO BE BEFORE THE TEARDOWN. Every caller is
+  // gated on towerModelReady() already; this is the backstop for the one that
+  // is added later and forgets. It matters that it returns HERE rather than
+  // three lines down: past the teardown the world has no back wall plane, no
+  // colliders and a shallower mat, and `spec.skin(v)` would then throw out of
+  // towerGlbSkin — leaving the table in a state no unsocket ever produced.
+  // Bail before touching anything and the socket is a no-op, which is what a
+  // gate is supposed to feel like.
+  if (spec.glbUrl && !towerModelReady(spec.id)) {
+    console.warn(`[tower] towerSocket('${spec.id}') refused: its model is `
+      + `'${towerGlbStatus(spec.glbUrl)}', not ready. Callers must gate on `
+      + `towerModelReady() — the table keeps '${currentTower}'.`);
+    return currentTower;
+  }
   TOWER_SWAP.from = currentTower;
   TOWER_SWAP.to = spec.id;
   TOWER_SWAP.before = world.bodies.length;
@@ -8997,7 +9171,69 @@ window.__diceDebug = {
       // scenario asserting the picker against the registry has to be able
       // to see the difference here rather than hard-coding which row it is.
       venueOnly: !!t.venueOnly,
+      // WHETHER THIS ROW IS BAKED, and whether it dresses itself. A GLB row
+      // does not socket in the same tick it is asked for, so a scenario
+      // walking the registry has to be able to tell which rows can be driven
+      // synchronously and which need a towerModelStatus poll first. No row
+      // ships `glb: true` today; the flag exists so the loop that walks them
+      // can be written once rather than retrofitted the day one does.
+      glb: !!t.glbUrl, dress: !!t.dress,
     }));
+  },
+  // WHERE A ROW'S MODEL HAS GOT TO (js/towerglb.js). `ready` is the GATE every
+  // socket path consults, and it is deliberately the whole predicate rather
+  // than a status echo: a caller that reads `status === 'ready'` and sockets on
+  // it would socket a validated mesh whose portals never made it onto the row.
+  // A row with no model reads {ready: true, status: null} — there is nothing to
+  // wait for, which is what keeps the four shipped towers on their old path.
+  towerModelStatus(id = currentTower) {
+    const row = TOWERS[id];
+    if (!row) return null;
+    return {
+      ready: towerModelReady(id),
+      status: row.glbUrl ? towerGlbStatus(row.glbUrl) : null,
+      url: row.glbUrl || null,
+      portals: !!row.portals,
+      retries: row.glbUrl && towerGlbAsset(row.glbUrl) ? towerGlbAsset(row.glbUrl).retries : 0,
+    };
+  },
+  // PROOFS ONLY, exactly like towerLabSkin's parameterisation: this MINTS a
+  // registry row so the loader half of the tower pipeline can be proven before
+  // any real baked tower exists to prove it with. It is not a way to ship a
+  // tower — a shipped row is authored in TOWERS with a voice, an ember and a
+  // title somebody chose, and the server's settings validator allowlists its
+  // id, which is why a row minted here is only ever reachable from a SOLO tab.
+  //
+  // The trimmings are the minimum the socket path touches (a voice so the
+  // sound drain has something to resolve, an ember so the lantern builds), and
+  // they are deliberately plain: a fixture that looked good would tempt
+  // somebody to ship it.
+  towerRegisterGlb(id, url, opts = {}) {
+    if (!id || !url) return false;
+    TOWERS[id] = {
+      id, label: opts.label || id, glbUrl: url,
+      skin: (v) => towerGlbSkin(url, v),
+      title: opts.title || 'test',
+      clunkVoice: opts.clunkVoice || { body: 'clack', weight: 0.4, sustain: 22 },
+      ember: opts.ember || { at: [0, 5, 0.5], color: '#ff9a44' },
+    };
+    return true;
+  },
+  // PROOFS ONLY. The retry ladder is 10.5 s of deliberate backoff, which is
+  // the right answer for a player on a bad connection and the wrong one for a
+  // scenario proving the terminal-failure path — it would spend that time in
+  // sleeps, four times over, to reach an outcome it already knows the shape
+  // of. Patching the numbers exercises the SAME ladder, the same number of
+  // attempts, the same terminal branch. `holdMaxMs` is here for the same
+  // reason: the deadline is worth proving, and it is not worth ten seconds.
+  towerGlbTune(patch = {}) {
+    if (Array.isArray(patch.retryMs)) TOWERGLB.retryMs = patch.retryMs.slice();
+    if (typeof patch.holdMaxMs === 'number') TOWERGLB.holdMaxMs = patch.holdMaxMs;
+    return { retryMs: [...TOWERGLB.retryMs], holdMaxMs: TOWERGLB.holdMaxMs };
+  },
+  // Is a settled roll being held for a model? (See towerReleaseHeldReplay.)
+  towerHeldReplay() {
+    return { held: heldReplay ? heldReplay.rollId : null, armed: !!heldReplayTimer };
   },
   // WHICH SKY THE FAE TOWER IS UNDER, and a setter for the proofs (W3).
   // Setting it re-sockets, because a palette is baked into the skin's
@@ -16329,8 +16565,21 @@ function tryFlushZoom() {
 function queueTower(id) {
   if (!TOWERS[id]) return;
   pendingTower = id;
+  // The preload starts the moment the id is known, not when the boundary
+  // arrives: the wait for a roll to finish and the wait for a file to arrive
+  // should overlap, and for the common case (a change made at an idle table)
+  // the fetch IS the whole wait.
+  towerModelEnsure(id);
   if (tableIsBusyForZoom()) {
     if (id !== currentTower) showSettingsNote('the tower goes up after this roll');
+    return;
+  }
+  // TWO WAITS, TWO NOTES. "after this roll" and "when its model arrives" are
+  // different promises to the player, and a model-blocked change that borrowed
+  // the busy note would tell somebody at a perfectly idle table to finish a
+  // roll they are not making.
+  if (!towerModelReady(id)) {
+    if (id !== currentTower) showSettingsNote('the tower goes up when its model arrives');
     return;
   }
   tryFlushTower();
@@ -16338,6 +16587,10 @@ function queueTower(id) {
 
 function tryFlushTower() {
   if (!pendingTower || tableIsBusyForZoom()) return;
+  // The model gate is in the FLUSH as well as the queue, because the flush has
+  // three other callers (the roll boundary, the zoom, the preload's own
+  // completion) and only one of them came through queueTower.
+  if (!towerModelReady(pendingTower)) return;
   const id = pendingTower;
   pendingTower = null;
   towerSocket(id);
@@ -19807,6 +20060,22 @@ function replaySettledRoll(r) {
   if (tableDice.some((d) => d.rollId === r.rollId)) return;
   if (currentRoll && !currentRoll.done) return; // a live playback outranks a replay
   if (rollQueue.some((q) => q.rollId === r.rollId)) return;
+  // …and AFTER those, because a roll this client already holds must be dropped
+  // rather than held: stashing one would arm a deadline whose only effect is to
+  // run the same three guards again ten seconds later.
+  //
+  // The tower this room asked for has a model that has not arrived. Hold the
+  // roll rather than rebuild it against the wrong interior (see
+  // towerReplayBlocked). Classic towers never reach this — towerModelReady is
+  // true by definition for a row with no glbUrl — so the reload-ordering
+  // assertions in tower-roll take exactly the path they always did.
+  if (towerReplayBlocked()) {
+    heldReplay = r;
+    if (!heldReplayTimer) {
+      heldReplayTimer = setTimeout(towerReleaseHeldReplay, TOWERGLB.holdMaxMs);
+    }
+    return;
+  }
   playRoll({
     rollId: r.rollId,
     t: r.t,

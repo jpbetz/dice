@@ -41,6 +41,14 @@ const TOWER_CONTRACT_GOLDEN = JSON.parse(
 // golden and the assertion can never drift into asking different questions.
 const TOWER_SNAP = 'JSON.stringify(window.__diceDebug.towerContractSnapshot())';
 
+// THE HAND-WRITTEN MINIMUM TOWER (tower-glb-loader). Imported rather than
+// inlined as a base64 blob: the generator is the only statement of what the
+// fixture's portals ARE, so the assertion and the asset cannot drift — an
+// inlined blob is a copy that goes stale the first time somebody changes a
+// number in the generator and forgets there are two of them.
+const { minTowerDataUrl, MIN_TOWER_PORTALS } =
+  await import('./fixtures/make-min-tower.mjs');
+
 // Name the FIRST field that moved, with both values. A bare string compare of
 // two 1000-line snapshots reports "they differ" and leaves a human to diff
 // them by eye; the whole value of a byte-level freeze is that when it goes red
@@ -10283,6 +10291,327 @@ export const scenarios = [
       // differ from each other by construction (the z0 guard above).
       assert.ok(firstDiff(TOWER_CONTRACT_GOLDEN[keys[0]], TOWER_CONTRACT_GOLDEN[keys[1]]),
         'and the comparison has a way to fail: two different rows do not match');
+    },
+  },
+  {
+    name: 'tower-glb-loader',
+    tags: ['tower', 'glb'],
+    // A TOWER THAT ARRIVES OVER THE NETWORK (js/towerglb.js, C5). Every tower
+    // before this one was a function call: towerSocket() asked for a group and
+    // got one in the same tick. A baked model is bytes that have to turn up
+    // first, and the whole of this scenario is the seam that makes that safe.
+    //
+    // A SOLO TAB, and not for convenience. server.js:376 allowlists the tower
+    // ids it will accept in a settings patch, so a row minted by
+    // towerRegisterGlb is unreachable from a joined table BY DESIGN — the wire
+    // carries a name every client must already know. The lobby is the app with
+    // netOnline false, where selectTower takes its solo branch and queueTower
+    // is reached through the same settings path a chip click uses.
+    //
+    // WHAT EACH LEG WOULD CATCH, because "the tower went up" is exactly the
+    // green check this project keeps writing:
+    //
+    //   · source     — 'model' vs 'default' is the difference between a tower
+    //                  and a wall with dice behind it. A loader that failed to
+    //                  read the empties would still socket, still look fine,
+    //                  and quietly bake the CLASSIC core under a mesh whose
+    //                  door is somewhere else.
+    //   · portals    — deep-equal against the generator's own numbers, all
+    //                  eight off-classic. Reading translations in the wrong
+    //                  order, or extras from the wrong node, lands on values
+    //                  that are still inside the limits and still socket.
+    //   · bodies     — the eight engine colliders in contract order, and the
+    //                  world count up by exactly eight. SAP order is shared
+    //                  truth: two clients whose lists differ bake one seed
+    //                  into two films.
+    //   · extents    — identical to a CLASSIC tower's. matExtra is engine
+    //                  -fixed, so a model that moved the mat would mean the
+    //                  socket envelope had started following the model.
+    //   · despawnY   — rimY - 1.75, checked against the DECLARED rim. This is
+    //                  the number the film's vanish is baked against, and the
+    //                  one that proves the portals reached towerVolumes rather
+    //                  than merely reaching the registry row.
+    //   · delivered  — the exit guarantee, through a door this app has never
+    //                  seen before.
+    //   · failure    — a model that 404s must cost a tower, never the table:
+    //                  pendingTower survives, currentTower does not move, the
+    //                  console says why, and a classic id still recovers.
+    //   · restored   — THE FIRST LAW, from a GLB row: with no tower the world
+    //                  is byte-for-byte the one every other scenario measures.
+    //
+    //   RED CHECKS (each run, seen red, reverted, seen green again):
+    //   · js/towerglb.js readPortals, in.rimY and in.z swapped: RED at the
+    //     socket gate — "timeout waiting for: the tower goes up once its model
+    //     arrives". The VALIDATOR caught it before the assertion could: rimY
+    //     -1.5 and z 8.0 are both outside TOWER_PORTAL_LIMITS, so the model was
+    //     refused and the gate never opened. Reverted: green.
+    //   · readPortals, out.w and out.clearH swapped — a subtler break, because
+    //     5.5 and 5.0 BOTH stay legal (w >= 5.0, clearH >= 4.5), so the tower
+    //     sockets and looks fine: RED on the portals deep-equal, naming both
+    //     fields (`clearH: 5.5 vs 5`, `w: 5 vs 5.5`). Reverted: green.
+    //   · THE ONE THAT WAS NOT A DRILL. Before `group.position.z = v.z0`
+    //     existed in towerGlbSkin, this scenario passed every assertion it had
+    //     — portals, colliders, mat depth, delivered dice — with the tower
+    //     standing in the middle of the felt: a GLB is authored with z=0 at
+    //     the socket plane and nothing had shifted it. The seated-hull
+    //     assertion was written to catch it and did: hull.z [1.6, 5.6] against
+    //     an authored [-4, 0]. That is why the frame is asserted at all.
+    //   · towerModelReady() made to `return true` at the top: RED on the very
+    //     first gate assertion — "it is NOT ready in the tick it was
+    //     registered", true !== false. Reverted: green.
+    //   · the same gate loosened to `status !== 'loading'` (a FAILED model
+    //     counts as ready): RED at the same assertion, because a row that has
+    //     not started fetching reads 'idle'. Recorded because it is the more
+    //     interesting failure and the tripwire is upstream of it: nothing
+    //     downstream had to be reached for the gate to be caught.
+    async fn(ctx) {
+      const a = await lobbyTab(ctx, { clean: ['dice.roomsettings.v1'] });
+
+      // The harness only records console.error (harness collectErrors), and
+      // every refusal in this seam is deliberately a WARN — loud, not fatal.
+      // So tap the real console.warn rather than assert on a proxy for it.
+      await a.eval(`(() => {
+        window.__warnTap = [];
+        const real = console.warn.bind(console);
+        console.warn = (...args) => {
+          try { window.__warnTap.push(args.map((x) => String(x)).join(' ')); } catch { /* ignore */ }
+          real(...args);
+        };
+        return true;
+      })()`);
+      const warnsMatching = async (needle) => a.eval(
+        `window.__warnTap.filter((w) => w.indexOf(${JSON.stringify(needle)}) !== -1).length`);
+
+      // The retry ladder is 10.5s of deliberate backoff for a player on a bad
+      // connection. Exercising the SAME four attempts and the same terminal
+      // branch at 10ms costs nothing and buys back the wall clock.
+      const tuned = await a.dbg(`towerGlbTune({ retryMs: [10, 20, 40], holdMaxMs: 400 })`);
+      assert.deepEqual(tuned.retryMs, [10, 20, 40], 'the ladder is patched for the proof');
+
+      // ---- what a towerless table is, measured -----------------------------
+      const wasExtents = await a.dbg('tableExtents()');
+      const wasWorld = await a.dbg('worldBodies()');
+      assert.equal(await a.dbg('tower'), 'none', 'the lobby starts towerless');
+      assert.deepEqual(wasWorld.named, [], 'and carries none of the tower colliders');
+
+      // ---- and what a CLASSIC tower does to it, for the comparison ---------
+      // The GLB row is held against THIS rather than against numbers typed
+      // here: matExtra is engine-fixed, and the claim is that a baked model
+      // consumes exactly the room a code-built one does.
+      await a.dbg(`setTower('heartwood')`);
+      await a.waitFor(`window.__diceDebug.tower === 'heartwood'`, { desc: 'a classic tower, for scale' });
+      const classicExtents = await a.dbg('tableExtents()');
+      assert.ok(classicExtents.d > wasExtents.d, 'which deepens the mat');
+      assert.deepEqual(await a.dbg(`towerModelStatus('heartwood')`),
+        { ready: true, status: null, url: null, portals: false, retries: 0 },
+        'a row with no model is READY BY DEFINITION — that is what keeps the '
+        + 'four shipped towers on the path they had before the loader existed');
+      await a.dbg(`setTower('none')`);
+      await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'and back down' });
+
+      // ---- (1) a hand-written GLB becomes a socketed tower -----------------
+      const MIN_URL = minTowerDataUrl();
+      assert.equal(await a.dbg(`towerRegisterGlb('glbmin', ${JSON.stringify(MIN_URL)})`), true,
+        'the proofs-only row is minted');
+      assert.equal((await a.dbg(`towerModelStatus('glbmin')`)).ready, false,
+        'and it is NOT ready in the tick it was registered — which is the whole '
+        + 'reason this seam exists');
+
+      await a.dbg(`setTower('glbmin')`);
+      await a.waitFor(`window.__diceDebug.tower === 'glbmin'`,
+        { desc: 'the tower goes up once its model arrives' });
+      assert.deepEqual(await a.dbg(`towerModelStatus('glbmin')`),
+        { ready: true, status: 'ready', url: MIN_URL, portals: true, retries: 0 },
+        'first attempt, no retries');
+
+      const spec = await a.dbg(`towerPortalSpec('glbmin')`);
+      assert.equal(spec.source, 'model',
+        `the portals came OFF THE MESH, not out of a registry row or the classic `
+        + `default (got '${spec.source}')`);
+      assert.deepEqual(spec.portals, MIN_TOWER_PORTALS,
+        'and they are the eight numbers the generator declared, exactly — every '
+        + 'one of them off-classic, so a loader that lost them could not pass');
+
+      const ORDER = ['doorL', 'doorR', 'lintel', 'towerBack', 'towerL', 'towerR', 'ramp', 'lip'];
+      assert.deepEqual((await a.dbg('towerBodies()')).map((x) => x.name), ORDER,
+        'the eight engine colliders, in contract order, for a baked model too');
+      const upWorld = await a.dbg('worldBodies()');
+      assert.deepEqual(upWorld.named, ORDER, 'and the WORLD holds those eight, in that order');
+      assert.equal(upWorld.count, wasWorld.count + 8,
+        `eight bodies added and nothing else (${wasWorld.count} → ${upWorld.count})`);
+      assert.deepEqual(await a.dbg('tableExtents()'), classicExtents,
+        'the mat is EXACTLY the classic tower\'s — the socket envelope is the '
+        + 'engine\'s, and a model moving it would mean the envelope had started '
+        + 'following the model');
+
+      // The model's own node name SURVIVED the loader and the two portal
+      // empties did NOT. Both halves matter and neither is cosmetic: the
+      // `towerSkin*` convention is what towerOcclusionCheck walks to decide
+      // what counts as an occluder (an unnamed mesh proves nothing), and a
+      // portal empty left in the scene is a named node inside the socket that
+      // every audit then has to explain. setVisibleByName returns how many
+      // objects in the SCENE carry the name, which is the honest count.
+      assert.equal(await a.dbg(`setVisibleByName('towerSkinTest', true)`), 1,
+        'the Blender node name reached the scene — the occluder convention '
+        + 'travels with the model, not with a code-built skin file');
+      for (const empty of ['portalIn', 'portalOut']) {
+        assert.equal(await a.dbg(`setVisibleByName('${empty}', true)`), 0,
+          `${empty} was stripped: it is metadata that happens to be shaped like `
+          + `scene graph, and it does not belong in the socket`);
+      }
+
+      // THE FRAME, AND IT IS THE ONE THING A NAME CHECK CANNOT SEE. A GLB is
+      // authored with z = 0 AT the back-wall socket plane (tools/forge/README.md
+      // "Tower portals"), while a code-built skin bakes the world's z0 into its
+      // own vertices — buildTowerSkin opens with `const z0 = v.z0`. So the two
+      // kinds of skin arrive in DIFFERENT frames and the loader owes the model
+      // that offset. Get it wrong and everything above still passes: the
+      // portals are right, the colliders are right, the mat is right, and the
+      // tower is standing in the middle of the felt.
+      //
+      // towerModelAudit reports its hull's z RELATIVE to z0, so a correctly
+      // seated model reads back its own authored extent. The generator's box
+      // is x [-3, 3], y [0, 8], z [-4, 0].
+      const seated = await a.dbg('towerModelAudit()');
+      assert.deepEqual(seated.hull.z, [-4, 0],
+        `the model is seated ON the socket plane, not at the mat's origin — its `
+        + `authored z extent [-4, 0] read back through the audit's z0-relative `
+        + `hull (got ${JSON.stringify(seated.hull.z)}; an unshifted model reads `
+        + `about [1.6, 5.6], which is a tower standing on the felt)`);
+      assert.deepEqual(seated.hull.x, [-3, 3], 'and unmoved in x');
+      assert.deepEqual(seated.hull.y, [0, 8], 'and standing on the floor');
+
+      // ---- (2) a pour through a door nobody has poured through -------------
+      const rimY = MIN_TOWER_PORTALS.in.rimY;
+      assert.equal(spec.derived.despawnY, rimY - 1.75,
+        `the vanish follows the DECLARED rim: despawnY ${spec.derived.despawnY} `
+        + `= rimY ${rimY} - 1.4*S. This is the number the film is baked against, `
+        + `and it is the proof the portals reached towerVolumes rather than just `
+        + `the registry row`);
+      assert.equal(spec.derived.door.w, MIN_TOWER_PORTALS.out.w, 'and the door is the declared width');
+      assert.equal(spec.derived.door.sill, MIN_TOWER_PORTALS.out.sillY, 'at the declared sill');
+
+      await a.roll('3d6');
+      const film = await a.dbg('towerFilmInfo()');
+      assert.equal(film.filmTower, 'glbmin',
+        'the film records WHICH tower it was baked with, and it is this one');
+      assert.ok(film.pour, 'a tower roll is a POUR, not a throw with scenery behind it');
+      assert.equal(film.rest.length, 3, 'three dice');
+      assert.ok(film.rest.every((d) => d.delivered),
+        `every die came out onto the felt — the EXIT GUARANTEE, through a door `
+        + `this app has never seen before (${JSON.stringify(film.rest.map((d) => d.p))})`);
+      assert.ok(film.rest.every((d) => d.shows === d.declared),
+        'and each die SHOWS what the table says it rolled');
+      assert.ok(film.spans && film.spans.every((s) => s.length > 0),
+        'each die has at least one hidden window — a pour with none is scenery');
+
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+
+      // ---- (3) the REAL bake, off the real static path ---------------------
+      // tower_fixture.glb is served by server.js from the page origin
+      // (tests/static-cache.test.mjs pins the 200), so this leg is the whole
+      // production path: HTTP, GLB container, Blender's own glTF output.
+      const FIX_URL = '/tests/e2e/fixtures/tower_fixture.glb';
+      await a.dbg(`towerRegisterGlb('glbreal', ${JSON.stringify(FIX_URL)})`);
+      await a.dbg(`setTower('glbreal')`);
+      await a.waitFor(`window.__diceDebug.tower === 'glbreal'`,
+        { desc: 'the baked fixture sockets from a real HTTP fetch' });
+      const real = await a.dbg(`towerPortalSpec('glbreal')`);
+      assert.equal(real.source, 'model', 'off the mesh, again');
+      // The recipe's header declares these (tools/forge/recipes/tower_fixture.py).
+      // rimY/z/clearR/sillY/w/clearH are binary fractions and survive Blender's
+      // float32 node translation exactly; x 0.80 does NOT, and comes back as
+      // 0.800000011920929. That is correct for a baked asset — every client
+      // reads the same double out of the same bytes — but it is why this leg
+      // asserts nearness on x and equality on the other seven.
+      assert.equal(real.portals.in.rimY, 9.75, 'declared rimY 9.75');
+      assert.equal(real.portals.in.z, -2.75, 'declared in.z -2.75');
+      assert.equal(real.portals.in.clearR, 2.25, 'declared clearR 2.25');
+      assert.equal(real.portals.out.x, -0.5, 'declared out.x -0.50');
+      assert.equal(real.portals.out.sillY, 1.25, 'declared sillY 1.25');
+      assert.equal(real.portals.out.w, 5.25, 'declared door width 5.25');
+      assert.equal(real.portals.out.clearH, 4.75, 'declared clearH 4.75');
+      assert.ok(Math.abs(real.portals.in.x - 0.8) < 1e-6,
+        `declared in.x 0.80, through float32 (got ${real.portals.in.x})`);
+      assert.equal(real.derived.despawnY, 9.75 - 1.75,
+        'and the fixture\'s off-classic rim moves the despawn line with it');
+      assert.deepEqual((await a.dbg('worldBodies()')).named, ORDER,
+        'a tower→tower swap through TWO baked models still lands on the eight');
+
+      await a.dbg(`setTower('none')`);
+      await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'down again' });
+      await a.dbg(`setTower('glbmin')`);
+      await a.waitFor(`window.__diceDebug.tower === 'glbmin'`,
+        { desc: 'and a second socket of an already-loaded model is same-tick' });
+
+      // ---- (4) a model that is not there -----------------------------------
+      assert.equal(await warnsMatching('/no/such/file.glb'), 0, 'nothing has failed yet');
+      await a.dbg(`towerRegisterGlb('badtower', '/no/such/file.glb')`);
+      await a.dbg(`setTower('badtower')`);
+      await a.waitFor(`window.__diceDebug.towerModelStatus('badtower').status === 'error'`,
+        { desc: 'the retry ladder runs out' });
+      assert.equal((await a.dbg(`towerModelStatus('badtower')`)).retries, 3,
+        'three retries after the first attempt — the whole ladder ran');
+      assert.equal(await a.dbg('tower'), 'glbmin',
+        'THE TABLE KEEPS THE TOWER IT HAS. A model that never arrives costs a '
+        + 'tower, never the one standing');
+      assert.equal(await a.dbg('pendingTower'), 'badtower',
+        'and the change stays QUEUED rather than degrading to none — a later '
+        + 'retry or a later boot can still raise it');
+      assert.deepEqual((await a.dbg('worldBodies()')).named, ORDER,
+        'the socketed colliders were never touched');
+      assert.ok(await warnsMatching('/no/such/file.glb') > 0,
+        'and the console says so — the player watching a tower that never comes '
+        + 'up deserves a reason to exist in the log');
+      assert.ok(await warnsMatching('badtower') > 0, 'naming the row, not just the url');
+
+      // …and a classic id still recovers, over the top of the stuck pending one.
+      await a.dbg(`setTower('bastion')`);
+      await a.waitFor(`window.__diceDebug.tower === 'bastion'`,
+        { desc: 'a classic tower recovers the table' });
+      assert.equal(await a.dbg('pendingTower'), null, 'and the queue is clear');
+
+      // ---- (5) restored ----------------------------------------------------
+      await a.dbg(`setTower('none')`);
+      await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'the tower comes down' });
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+      const downExtents = await a.dbg('tableExtents()');
+      assert.equal(downExtents.w, wasExtents.w, 'width is untouched; only depth ever pays');
+      // NOT deepEqual, AND THAT IS A FINDING RATHER THAN A CONCESSION.
+      //
+      // towerDeepenMat is `TABLE_D += extra` up and `TABLE_D += -extra` down,
+      // and at this preset that round trip is not the identity: 6.7 + 4.5 -
+      // 4.5 === 6.699999999999999, one ulp low. Measured for all three
+      // presets — wide (8.6) is EXACT, medium (6.7) and close (5.2) each lose
+      // one ulp — which is precisely why no tower scenario has ever seen it:
+      // they all run ONLINE, and the server's settings default is zoom 'wide'
+      // (server.js:365), so hello reassigns TABLE_D from the preset before
+      // anything sockets. This scenario is solo, so it stands at the client
+      // default 'medium' and is the first thing in the suite to unsocket
+      // there.
+      //
+      // It matters because z0 = -TABLE_D/2 and z0 anchors every collider the
+      // film is baked against — so two clients in one room at 'medium', one
+      // of whom has raised and lowered a tower, can compute the same seed
+      // against interiors that differ in the last bit. Out of scope here (the
+      // arithmetic is towerDeepenMat's, not the loader's) and filed; what this
+      // scenario CAN prove is the part that decides how bad it is:
+      const drift = Math.abs(downExtents.d - wasExtents.d);
+      assert.ok(drift < 1e-12,
+        `the mat is the preset again to within a rounding (off by ${drift})`);
+      assert.equal(downExtents.d, 6.7 + 4.5 - 4.5,
+        `and the error is EXACTLY one up-and-down of matExtra — SATURATED, not `
+        + `cumulative. This tab socketed and unsocketed seven times; if the drift `
+        + `compounded, the mat would walk away from the preset a little further `
+        + `every time a player changed their mind about a tower, and that would `
+        + `be a different and much worse bug than the one that is here.`);
+      const downWorld = await a.dbg('worldBodies()');
+      assert.deepEqual(downWorld.named, [], 'not one collider left in the WORLD');
+      assert.equal(downWorld.count, wasWorld.count,
+        `the body list is the towerless one again, exactly `
+        + `(${wasWorld.count} before, ${downWorld.count} after)`);
     },
   },
   {
