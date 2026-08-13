@@ -56,16 +56,35 @@ of the deliverable). Then:
 the free volume" step, and it is cheaper: you are not fitting a skin around
 fixed volumes, you are choosing where the volumes go.
 
-- portalIn (the mouth): where dice fall in. `clearR ≥ 1.7·S` is dice
-  arithmetic, not taste. The approach column (disc of clearR, from
-  rimY + 2.5 down to rimY − 1.4·S) must be genuinely open — crown
-  decoration leans OUT of it. Entry is scripted (no colliders), so the
-  mouth cannot deflect a die; it only has to be visually believable and
-  contractually clear.
+- portalIn (the mouth): where dice fall in. `clearR ≥ 1.6·S = 2.0` is
+  dice arithmetic, not taste — and it is MEASURED arithmetic (2026-08-13
+  portal-floors campaign): entry is a scripted fall whose worst-case
+  reach is exactly aim jitter 0.566 + d20 circumradius 1.25 = 1.816, so
+  the floor keeps a 0.18 reserve and nothing more. The approach column
+  (disc of clearR, from rimY + 2.5 down to rimY − 1.4·S) must be
+  genuinely open — crown decoration leans OUT of it. Entry is scripted
+  (no colliders), so the mouth cannot deflect a die; it only has to be
+  visually believable and contractually clear.
 - portalOut (the doorway): where dice fly out. Near-classic sill is the
   cheap path ("entry cheap, exit reopens the probe campaign" — the limits
   exist so the tuned delivery physics generalizes, and any off-classic exit
-  answers to the probe matrix).
+  answers to the probe matrix). THE HEIGHT FLOOR IS ABOUT PILE-UPS, NOT
+  THE BIG DIE (the campaign's central finding): a lone d20 needs only
+  r·(1 + 1/cos(pitch)) + 0.2 ≈ 2.85 over the sill and cleared a 2.6 door
+  single-file in every probe, but dice climbing dice at the doorway push
+  higher, and exit-guarantee retries turn up at 3.0. `clearH ≥ 2.7·S =
+  3.375` runs every realistic pool clean; a door AT the floor makes 20+
+  dice pools spend occasional extra offline bakes, and 40d6 already
+  exhausted the guarantee at the classic 4.5 door (the recorded worst
+  case — the floor did not create it). `w ≥ 3.2·S = 4.0`: jambs CHANNEL
+  rather than jam (a wide die deflects inboard and leaves), so the width
+  floor is about giving congestion somewhere to shed under a low lintel,
+  not about fitting one die. Design the WOUND to the floor, not above it,
+  when the form wants a tight mouth — that is what the floor is for.
+- Re-probing an exit: `node tools/drive.mjs tools/steps/portal-probe.mjs`
+  (baseline/sweep/confirm) measures envelopes and retry knees against any
+  candidate spec via `towerProbePortals` — the campaign is repeatable
+  whenever the pour physics or the spawn formula changes.
 - Check every number against TOWER_PORTAL_LIMITS *while designing* — the
   bake gate and the loader both refuse violations, but a refused bake is an
   hour late to a decision a sketch could have made.

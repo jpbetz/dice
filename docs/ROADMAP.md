@@ -805,20 +805,20 @@ What is left:
   (js/portable.js `TABLE_KEYS`), so a prepared table cannot yet arrive
   with its tower already up — the one place the setting is not treated
   like its neighbours.
-- **The exit portal's minimum height is too generous** *(Joe 2026-08-13:
-  "The hole in the stump for the dice to exit is too tall. We really need
-  to figure out what a good minimum height is (might require updating the
-  skill for towers).")* The evidence is the Hollow Bole itself: its
-  doorway ships at `clearH 4.50` — exactly `TOWER_PORTAL_LIMITS`'
-  `clearHMin` (3.6·S) — and still reads too tall, so the floor itself is
-  wrong, not the model. The floor was inherited from the classic spec's
-  numbers, never probed downward. Finding the true minimum is a probe
-  campaign (lower `clearH`/`sillY` fixtures through the full probe
-  matrix + pours, multiple seeds, all zooms — the exit-jam class the
-  bounds exist to prevent), and the answer must land in THREE mirrored
-  places at once: `TOWER_PORTAL_LIMITS` (js/main.js), check.py's
-  `--tower` limits (tools/forge), and the `/new-tower` skill's portal
-  arithmetic — plus a Hollow Bole re-bake to wear it.
+- ~~**The exit portal's minimum height is too generous**~~ — **RESOLVED
+  2026-08-13, same day.** The portal-floors campaign
+  (tools/steps/portal-probe.mjs; ~420 pours over film-scan envelopes,
+  below-floor candidate specs via `towerProbePortals`, retry knees off
+  the exit guarantee) measured the true floors and re-derived
+  `TOWER_PORTAL_LIMITS` in all three mirrored places + the skill:
+  `clearH 3.6·S→2.7·S` (the old door carried ~58% more height than any
+  die used; the binding case is CONGESTION at the doorway, not the lone
+  d20 — solo need is 2.85, retries turn up at 3.0), `w 4.0·S→3.2·S`
+  (jambs channel, they don't jam), `clearR 1.7·S→1.6·S` (entry is
+  scripted; envelope exactly 1.816). Full derivation in docs/TOWER.md
+  "THE MINIMUMS". Floors only moved down — classic stays legal, the
+  freeze golden untouched. The Hollow Bole re-bake to wear the floor is
+  the arc's last step.
 
 Known cost, recorded rather than hidden: a 40-die pour is ~25 s of film
 and up to five bake attempts (~3 s synchronous). Forty dice through one

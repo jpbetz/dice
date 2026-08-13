@@ -41,16 +41,23 @@ import trimesh
 S = 1.25          # d20 radius: the unit every tower bound is quoted in
 
 # MIRRORS js/main.js TOWER_PORTAL_LIMITS — keep in sync.
+# The aperture floors are MEASURED, not inherited (2026-08-13 portal-floors
+# campaign, tools/steps/portal-probe.mjs; evidence in docs/TOWER.md "THE
+# MINIMUMS"): entry is a scripted fall with an exact 1.816 worst-case reach
+# (clearR floor 2.0 keeps a reserve); the exit's binding case is dice
+# climbing dice at the doorway, not the lone d20 (solo need 2.85, retries
+# turn up at 3.0, floor 3.375); jambs channel rather than jam (width floor
+# 4.0 keeps shed room under a low lintel).
 TOWER_PORTAL_LIMITS = {
     "In": {
-        "clearR_min": 1.7 * S,
+        "clearR_min": 1.6 * S,
         "rimY": (5.8 * S, 8.2 * S),
         "x": (-1.0 * S, 1.0 * S),
         "z": (-2.6 * S, -1.0 * S),
     },
     "Out": {
-        "w_min": 4.0 * S,
-        "clearH_min": 3.6 * S,
+        "w_min": 3.2 * S,
+        "clearH_min": 2.7 * S,
         "sillY": (0.5 * S, 1.1 * S),
         "x": (-0.6 * S, 0.6 * S),
     },

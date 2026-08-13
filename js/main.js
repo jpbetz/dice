@@ -7805,10 +7805,41 @@ const DEFAULT_PORTALS = Object.freeze({
 //     probe run 5 measured.
 //   out.x — the doorway is cut in the back wall between two flanking boxes,
 //     so it may slide only as far as the wall segments stay real.
+// THE FLOORS ARE MEASURED, NOT INHERITED (2026-08-13, the portal-floors
+// campaign — tools/steps/portal-probe.mjs; the numbers and their evidence
+// are docs/TOWER.md "THE MINIMUMS"). v2 shipped with the classic spec's
+// own values as the floors; Joe called the door too tall and asked for
+// first principles, and the films agreed:
+//
+//   in.clearR  ENTRY IS SCRIPTED, so its envelope is exact arithmetic:
+//              ±0.4 xz aim jitter → 0.566 radial, + the d20 circumradius
+//              1.25 = 1.816 worst-case reach (measured p100 across 420
+//              pour-dice: 1.805). Floor 1.6·S = 2.0 keeps a 0.18 reserve
+//              for future entry-path wobble. There is no physics gate on
+//              this axis — the declared column just has to admit the fall.
+//   out.clearH THE BINDING CASE IS CONGESTION, NOT THE BIG DIE. A lone
+//              d20 needs r·(1 + 1/cos(pitch)) + 0.2 spawn margin ≈ 2.85
+//              over the sill (analytic = measured), and single-file pours
+//              cleared a 2.6 door in every probe — but dice climbing dice
+//              at the doorway use more, and the exit-guarantee retry rate
+//              turns up at 3.0. Floor 2.7·S = 3.375: clean across 36/36
+//              realistic pours (4×d20, 8d6, mixed 8); 20d6 occasionally
+//              spends extra bakes (offline cost only); 40d6 is unchanged
+//              in kind from the classic door, where it already exhausted
+//              the guarantee (the ROADMAP known-cost note).
+//   out.w      JAMBS CHANNEL, THEY DON'T JAM: narrowing to 3.4 produced
+//              zero faults — wide dice deflect inboard and leave. Floor
+//              3.2·S = 4.0 keeps shed room for congestion under a low
+//              lintel (the two axes interact at the pile-up) and the
+//              delivery fan; the combined-floor runs added nothing to
+//              the retry profile over clearH alone.
+//
+// Floors only moved DOWN: every shipped spec (classic included) remains
+// legal, and the tower-contract-freeze golden is untouched by contract.
 const TOWER_PORTAL_LIMITS = Object.freeze({
-  in:  { clearRMin: 1.7 * TOWER_S, rimY: [5.8 * TOWER_S, 8.2 * TOWER_S],
+  in:  { clearRMin: 1.6 * TOWER_S, rimY: [5.8 * TOWER_S, 8.2 * TOWER_S],
          x: [-1.0 * TOWER_S, 1.0 * TOWER_S], z: [-2.6 * TOWER_S, -1.0 * TOWER_S] },
-  out: { wMin: 4.0 * TOWER_S, clearHMin: 3.6 * TOWER_S,
+  out: { wMin: 3.2 * TOWER_S, clearHMin: 2.7 * TOWER_S,
          sillY: [0.5 * TOWER_S, 1.1 * TOWER_S], x: [-0.6 * TOWER_S, 0.6 * TOWER_S] },
 });
 
@@ -8030,7 +8061,15 @@ function towerVolumes(spec) {
 // silently get the classic core, and a tower whose door is somewhere else than
 // the engine thinks is a tower dice fly into the wall beside. Loud, then
 // classic, so the table still works while somebody fixes it.
+// PROOFS-ONLY portal override (the portal-floors campaign, ROADMAP §9d):
+// while set, every resolution — bake, colliders, camera, audits — derives
+// from this spec instead of the socketed row's, and TOWER_PORTAL_LIMITS is
+// deliberately NOT consulted, because the campaign's whole job is probing
+// BELOW the shipped floor to find the true one. Null in every shipped path
+// (the faeTowerPaletteOverride pattern); the caller resockets to apply.
+let towerProbeOverride = null;
 function towerPortalsOf(id) {
+  if (towerProbeOverride) return towerProbeOverride;
   const row = TOWERS[id];
   if (!row) return DEFAULT_PORTALS;
   if (row.portals) return row.portals;
@@ -10146,6 +10185,77 @@ window.__diceDebug = {
       spans: p ? p.spans : null,
       rest,
     };
+  },
+  // THE ENVELOPE SCAN (portal-floors campaign, ROADMAP §9d): what the LAST
+  // pour's film actually USED of the portals, die by die — exit headroom
+  // over the sill at each door-plane crossing, jamb reach, entry radial at
+  // the rim — with each die's circumscribed radius as the orientation
+  // worst-case bound. The film IS the physics, so scanning films across
+  // seeds and pools is the measurement; the shipped floors were inherited
+  // from the classic numbers, never derived from this.
+  towerPourEnvelope() {
+    const r0 = currentRoll;
+    if (!r0 || !r0.pour || !r0.keyframes) return null;
+    const spec = towerPortalsOf(r0.pour.tower);
+    const v = towerVolumes(spec);
+    const zDoor = v.z0;
+    const rimY = spec.in.rimY;
+    const inC = { x: spec.in.x, z: v.z0 + spec.in.z };
+    const dies = r0.dice.map((d, i) => {
+      const def = DIE_DEFS[d.type];
+      const rad = def.radius || def.size * 0.87;
+      const kf = r0.keyframes[i];
+      let entry = null;
+      const exits = [];
+      for (let k = 1; k < kf.length; k++) {
+        const a = kf[k - 1].pos, b = kf[k].pos;
+        // entry: the first downward crossing of the rim plane
+        if (!entry && a.y > rimY && b.y <= rimY) {
+          const t = (a.y - rimY) / (a.y - b.y);
+          const px = a.x + (b.x - a.x) * t, pz = a.z + (b.z - a.z) * t;
+          entry = {
+            radial: Number((Math.hypot(px - inC.x, pz - inC.z) + rad).toFixed(4)),
+            frame: k,
+          };
+        }
+        // exit: every +z crossing of the door plane (a die can be knocked
+        // back in and cross again — each pass must clear)
+        if (a.z < zDoor && b.z >= zDoor) {
+          const t = (zDoor - a.z) / (b.z - a.z);
+          const py = a.y + (b.y - a.y) * t, px = a.x + (b.x - a.x) * t;
+          exits.push({
+            headroom: Number((py + rad - spec.out.sillY).toFixed(4)),
+            lateral: Number((Math.abs(px - spec.out.x) + rad).toFixed(4)),
+            frame: k,
+          });
+        }
+      }
+      const worstExit = exits.reduce(
+        (m, e) => (!m || e.headroom > m.headroom ? e : m), null);
+      return { i, type: d.type, rad, entry, exitCount: exits.length, worstExit };
+    });
+    const heads = dies.filter((d) => d.worstExit).map((d) => d.worstExit.headroom);
+    const lats = dies.filter((d) => d.worstExit).map((d) => d.worstExit.lateral);
+    const entries = dies.filter((d) => d.entry).map((d) => d.entry.radial);
+    return {
+      tower: r0.pour.tower, seed: r0.seed,
+      attempts: r0.pour.attempts, unseen: r0.pour.unseen, stranded: r0.pour.stranded,
+      spec: {
+        clearR: spec.in.clearR, rimY: spec.in.rimY,
+        w: spec.out.w, clearH: spec.out.clearH, sillY: spec.out.sillY,
+      },
+      worstHead: heads.length ? Math.max(...heads) : null,
+      worstLat: lats.length ? Math.max(...lats) : null,
+      worstEntry: entries.length ? Math.max(...entries) : null,
+      dies,
+    };
+  },
+  // The campaign's other half: force a candidate portal spec through every
+  // derivation (bake, colliders, camera) regardless of TOWER_PORTAL_LIMITS.
+  // Proofs-only; pass null to clear; resocket (setTower/zoom) to apply.
+  towerProbePortals(spec) {
+    towerProbeOverride = spec ? JSON.parse(JSON.stringify(spec)) : null;
+    return towerProbeOverride ? towerVolumes(towerProbeOverride).z0 !== undefined : null;
   },
   wallPositions() {
     return {

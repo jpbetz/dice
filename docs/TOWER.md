@@ -30,15 +30,45 @@ written anchor ⊕ delta so classic identity is structural: every delta is
 DO NOT algebraically rearrange an anchor expression; the comment above
 towerVolumes says why.
 
-**Limits** (`TOWER_PORTAL_LIMITS`, provisional — the per-model proofs are
-the real gate): `clearR ≥ 1.7·S` (aperture arithmetic: d20 1.25 + jitter
-0.4 + margin); `rimY ∈ [5.8, 8.2]·S`; `in.x ∈ ±1.0·S`, `in.z ∈ [−2.6,
-−1.0]·S` (the bore stands over the fixed chute, inside the pit flanks);
-`w ≥ 4.0·S` (the doorway radius arithmetic — note the ORIGINAL §2b text
-below says "width 3.0", which was doc drift even then: the shipped door has
-been 4.0·S since the jamb-clipping fix); `clearH ≥ 3.6·S`; `sillY ∈ [0.5,
-1.1]·S` (the 28°-family ramp must still reach the felt inside the FIXED
-matExtra spend); `out.x ∈ ±0.6·S`.
+**THE MINIMUMS — measured, 2026-08-13** (`TOWER_PORTAL_LIMITS`; the
+per-model proofs remain the real gate). v2 shipped its aperture floors as
+the classic spec's own values, inherited rather than derived; Joe called
+the Hollow Bole's door too tall — it sat AT the floor — and asked for
+first principles. The portal-floors campaign
+(`tools/steps/portal-probe.mjs`: film-scan envelopes via
+`towerPourEnvelope()`, candidate specs below the floor via
+`towerProbePortals()`, retry/fault knees off the exit guarantee; ~420
+pours across seeds × pools × candidates) measured what dice actually use:
+
+- `in.clearR ≥ 1.6·S = 2.0` — ENTRY IS SCRIPTED, so its envelope is
+  exact: ±0.4 xz aim jitter (0.566 radial) + d20 circumradius 1.25 =
+  1.816 worst-case reach; measured p100 1.805. The floor keeps a 0.18
+  reserve. No physics gate exists on this axis at all.
+- `out.clearH ≥ 2.7·S = 3.375` — THE BINDING CASE IS CONGESTION, NOT THE
+  BIG DIE. A lone d20 needs `r·(1 + 1/cos(pitch)) + 0.2` ≈ 2.85 over the
+  sill (analytic = measured to ±0.03) and single-file pours cleared even
+  a 2.6 door; but dice climbing dice at the doorway push higher, and the
+  exit-guarantee retry rate turns up at 3.0. At 3.375 every realistic
+  pool (4×d20, 8d6, mixed 8) ran 36/36 with attempts=1; 20d6 spends
+  occasional extra offline bakes; 40d6 is unchanged in kind from the
+  classic door, where it already exhausted the guarantee (the known-cost
+  note). The old 3.6·S = 4.5 floor carried ~58% more height than any die
+  ever used.
+- `out.w ≥ 3.2·S = 4.0` — JAMBS CHANNEL, THEY DON'T JAM: narrowing to
+  3.4 produced zero faults (wide dice deflect inboard and leave). The
+  floor keeps shed room for congestion under a low lintel — the two
+  axes meet at the pile-up — and preserves the delivery fan. Combined
+  floor runs added nothing to the retry profile over clearH alone.
+
+Unchanged, still position bounds rather than aperture floors: `rimY ∈
+[5.8, 8.2]·S`; `in.x ∈ ±1.0·S`, `in.z ∈ [−2.6, −1.0]·S` (the bore stands
+over the fixed chute, inside the pit flanks); `sillY ∈ [0.5, 1.1]·S` (the
+28°-family ramp must still reach the felt inside the FIXED matExtra
+spend); `out.x ∈ ±0.6·S`. (Historical note kept from v2: the ORIGINAL
+§2b text below says "width 3.0", which was doc drift even then — the
+shipped classic door has been 4.0·S since the jamb-clipping fix.)
+Floors only moved DOWN, so every shipped spec remains legal and the
+`tower-contract-freeze` golden is untouched by construction.
 
 **What stays engine-fixed, on purpose:** the SOCKET envelope (the room's
 budget, not the model's), the pit walls, `matExtra` (every tower consumes
