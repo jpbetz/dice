@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+<!-- Single-model GLB viewer for forge bakes. Serve via preview/serve.py, then
+     ?m=/tools/forge/out/slug.glb  &mode=lit|normal|wire  &az=35 &el=22
+     window.__shot(w) force-renders and returns a PNG data URL even in a
+     hidden pane (rAF never fires there). Lighting carries shadow bias tuned
+     so acne never masquerades as model damage (it fooled the bake-off once). -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>forge viewer</title>
+<style>
+  html,body{margin:0;height:100%;background:#16161c;color:#cfcfe0;font:12px monospace}
+  #hud{position:fixed;top:8px;left:10px;white-space:pre;pointer-events:none;text-shadow:0 1px 2px #000}
+  canvas{display:block}
+</style>
+<script type="importmap">{"imports":{"three":"/vendor/three.module.js"}}</script>
+</head>
+<body>
+<div id="hud">loading…</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from './GLTFLoader.js';
+
+const q = new URLSearchParams(location.search);
+const modelPath = q.get('m');
+const mode = q.get('mode') || 'lit';
+const az = (parseFloat(q.get('az') ?? 35)) * Math.PI / 180;
+const el = (parseFloat(q.get('el') ?? 22)) * Math.PI / 180;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x16161c);
+const cam = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.01, 500);
+
+scene.add(new THREE.HemisphereLight(0x9aa7c0, 0x2a241e, 0.9));
+const key = new THREE.DirectionalLight(0xfff2dd, 2.2); key.position.set(4, 7, 5);
+key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+key.shadow.bias = -0.0002; key.shadow.normalBias = 0.05;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x88aaff, 0.7); rim.position.set(-5, 3, -4);
+scene.add(rim);
+scene.add(new THREE.GridHelper(20, 20, 0x333344, 0x24242e));
+
+const hud = document.getElementById('hud');
+window.__viewerReady = false;
+window.__viewerStats = null;
+
+function frame(obj) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const radius = Math.max(size.length() / 2, 0.5);
+  const dist = radius / Math.tan(cam.fov * Math.PI / 360) * 1.25;
+  cam.position.set(
+    center.x + dist * Math.cos(el) * Math.sin(az),
+    center.y + dist * Math.sin(el),
+    center.z + dist * Math.cos(el) * Math.cos(az));
+  cam.lookAt(center);
+  cam.updateProjectionMatrix();
+  return box;
+}
+
+if (modelPath) {
+  new GLTFLoader().load(modelPath, (g) => {
+    const root = g.scene;
+    let tris = 0, meshes = 0, hasVC = false, mats = new Set();
+    root.traverse((o) => {
+      if (o.isMesh) {
+        meshes++; o.castShadow = o.receiveShadow = true;
+        const idx = o.geometry.index;
+        tris += (idx ? idx.count : o.geometry.attributes.position.count) / 3;
+        if (o.geometry.attributes.color) hasVC = true;
+        mats.add(o.material);
+        if (mode === 'normal') o.material = new THREE.MeshNormalMaterial();
+        if (mode === 'wire') o.material = new THREE.MeshBasicMaterial({ color: 0x77ff99, wireframe: true });
+        if (mode === 'lit' && o.material.isMeshStandardMaterial) o.material.envMapIntensity = 0.45;
+      }
+    });
+    scene.add(root);
+    const box = frame(root);
+    window.__viewerStats = { tris, meshes, hasVC, mats: mats.size,
+      min: [box.min.x, box.min.y, box.min.z].map(v => +v.toFixed(2)),
+      max: [box.max.x, box.max.y, box.max.z].map(v => +v.toFixed(2)) };
+    hud.textContent = `${modelPath}\n${tris} tris  ${meshes} mesh  vc:${hasVC}  mats:${mats.size}\n` +
+      `min ${window.__viewerStats.min}  max ${window.__viewerStats.max}  [${mode}]`;
+    window.__viewerReady = true;
+  }, undefined, (err) => { hud.textContent = 'LOAD ERROR: ' + err; window.__viewerReady = 'error'; });
+} else {
+  hud.textContent = 'pass ?m=/tools/forge/out/slug.glb (&mode=lit|normal|wire &az &el)';
+}
+
+(function loop() { requestAnimationFrame(loop); renderer.render(scene, cam); })();
+
+window.__shot = (w = 900) => {
+  renderer.render(scene, cam);
+  const src = renderer.domElement;
+  const h = Math.round(w * src.height / src.width);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(src, 0, 0, w, h);
+  return c.toDataURL('image/png');
+};
+</script>
+</body>
+</html>

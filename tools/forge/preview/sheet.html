@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<!-- Copyright 2026 The Dice Table Authors — SPDX-License-Identifier: Apache-2.0 -->
+<!-- Contact sheet: renders each GLB and POSTs a PNG to serve.py's /save.
+     ?models=/tools/forge/out/a.glb,/tools/forge/out/b.glb&prefix=name&mode=lit|normal
+     Works in a hidden Browser pane (explicit renders, no rAF dependency);
+     poll window.__sheetDone / __sheetResults. -->
+<html>
+<head>
+<meta charset="utf-8">
+<title>forge contact sheet</title>
+<style>html,body{margin:0;background:#16161c;color:#cfcfe0;font:12px monospace}#log{padding:10px;white-space:pre}</style>
+<script type="importmap">{"imports":{"three":"/vendor/three.module.js"}}</script>
+</head>
+<body>
+<div id="log">running…</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from './GLTFLoader.js';
+
+const q = new URLSearchParams(location.search);
+const models = (q.get('models') || '').split(',').filter(Boolean);
+const prefix = q.get('prefix') || 'shot';
+const mode = q.get('mode') || 'lit';
+const W = 760, H = 560;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+renderer.domElement.style.display = 'none';
+
+const log = document.getElementById('log');
+const loader = new GLTFLoader();
+window.__sheetDone = false;
+window.__sheetResults = [];
+
+function buildScene() {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x16161c);
+  scene.add(new THREE.HemisphereLight(0x9aa7c0, 0x2a241e, 0.9));
+  const key = new THREE.DirectionalLight(0xfff2dd, 2.2); key.position.set(4, 7, 5);
+  key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+  key.shadow.bias = -0.0002; key.shadow.normalBias = 0.05;
+  scene.add(key);
+  const rim = new THREE.DirectionalLight(0x88aaff, 0.7); rim.position.set(-5, 3, -4);
+  scene.add(rim);
+  scene.add(new THREE.GridHelper(20, 20, 0x333344, 0x24242e));
+  return scene;
+}
+
+async function shoot(path) {
+  const g = await loader.loadAsync(path);
+  const scene = buildScene();
+  const root = g.scene;
+  let tris = 0;
+  root.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = o.receiveShadow = true;
+      const idx = o.geometry.index;
+      tris += (idx ? idx.count : o.geometry.attributes.position.count) / 3;
+      if (mode === 'normal') o.material = new THREE.MeshNormalMaterial();
+      else if (o.material.isMeshStandardMaterial) o.material.envMapIntensity = 0.45;
+    }
+  });
+  scene.add(root);
+  const box = new THREE.Box3().setFromObject(root);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const radius = Math.max(size.length() / 2, 0.5);
+  const cam = new THREE.PerspectiveCamera(38, W / H, 0.01, 500);
+  const az = 35 * Math.PI / 180, el = 22 * Math.PI / 180;
+  const dist = radius / Math.tan(cam.fov * Math.PI / 360) * 1.2;
+  cam.position.set(center.x + dist * Math.cos(el) * Math.sin(az),
+                   center.y + dist * Math.sin(el),
+                   center.z + dist * Math.cos(el) * Math.cos(az));
+  cam.lookAt(center);
+  renderer.render(scene, cam);
+  const name = prefix + '_' + path.split('/').pop().replace(/\.glb$/, '') + (mode === 'normal' ? '_n' : '') + '.png';
+  const r = await fetch('/save?name=' + name, { method: 'POST', body: renderer.domElement.toDataURL('image/png') });
+  const txt = await r.text();
+  root.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); } });
+  return { path, name, tris: Math.round(tris), saved: txt };
+}
+
+for (const p of models) {
+  try {
+    const res = await shoot(p);
+    window.__sheetResults.push(res);
+    log.textContent += `\n${res.name}  ${res.tris} tris  ${res.saved}`;
+  } catch (e) {
+    window.__sheetResults.push({ path: p, error: String(e) });
+    log.textContent += `\n${p}  ERROR ${e}`;
+  }
+}
+window.__sheetDone = true;
+log.textContent += '\nDONE';
+</script>
+</body>
+</html>
