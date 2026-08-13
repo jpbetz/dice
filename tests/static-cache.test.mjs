@@ -248,6 +248,30 @@ try {
     assert.equal(buf.toString('ascii', 0, 4), 'glTF', 'and the bytes are a GLB container');
   });
 
+  // THE FIRST SHIPPED TOWER MODEL, and the reason this test exists at all.
+  // server.js has no manifest: safeResolve serves anything under ROOT, so
+  // models/towers/ needed no server change to be reachable — which is exactly
+  // why nothing but a test would notice the day one of these files failed to
+  // get committed. The registry row names both urls; a 404 on either is a
+  // venue that never raises its tower, reported only as a console warning.
+  //
+  // Both palettes are asserted separately and BY BYTES, not by listing a
+  // directory: the two-variant row is the thing that can half-ship.
+  for (const pal of ['moonrise', 'foxfire']) {
+    await t(`/models/towers/hollowbole_${pal}.glb is served as a GLB`, async () => {
+      const res = await fetch(`${base}/models/towers/hollowbole_${pal}.glb`);
+      assert.equal(res.status, 200, `the ${pal} model must be fetchable from the page origin`);
+      // octet-stream, like the fixture above: `.glb` is not in MIME and does
+      // not need to be — GLTFLoader fetches an arraybuffer and sniffs the
+      // magic. Pinned so the fallback is a decision, not an accident.
+      assert.equal(res.headers.get('content-type'), 'application/octet-stream');
+      assert.equal(res.headers.get('cache-control'), 'no-cache', 'not vendor/, so it revalidates');
+      const buf = Buffer.from(await res.arrayBuffer());
+      assert.equal(buf.toString('ascii', 0, 4), 'glTF', 'and the bytes are a GLB container');
+      assert.ok(buf.byteLength > 100000, `and the real model (${buf.byteLength} bytes), not a stub`);
+    });
+  }
+
   // ---- HEAD requests still behave --------------------------------------
 
   await t('HEAD /vendor/ still declares immutable without a body', async () => {
