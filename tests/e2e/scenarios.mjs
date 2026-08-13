@@ -12703,4 +12703,67 @@ export const scenarios = [
       'the felt picker returns with the room');
     },
   },
+
+  {
+    name: 'venue-dice',
+    tags: ['fx', 'settings'],
+    // THE VENUE STAGES THE DICE (ROADMAP W4 — the GOALS 13 punt
+    // delivered). Four claims: the staged set overrides the player's own
+    // AT ROLL CREATION, so the ROLL RECORD carries it and both tabs agree
+    // off the record, not off a render remap; the override releases with
+    // the venue (your own set resumes); the fae set is real in SETS but
+    // takes NO chip in the picker (venueOnly — a venue is chosen as one
+    // thing); and the venue reports what it stages so this scenario reads
+    // the contract, not a constant.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+
+      // ---- the picker refuses to offer the fae set ------------------------
+      // (Registry + server presence are proven harder below: the roll's
+      // record carries the id end-to-end, which only a SET_IDS member can.)
+      await a.eval('window.__diceDebug.openSettings()');
+      await a.eval(`document.querySelector('#diceset-picker .set-select').click()`);
+      assert.equal(await a.eval(
+        `document.querySelectorAll('.set-menu [data-set^="moonmoot."]').length`), 0,
+        'no Moonmoot chip anywhere a player picks — the venue stages it');
+      assert.ok(await a.eval(
+        `document.querySelectorAll('.set-menu [data-set]').length`) > 3,
+        'while the menu itself is alive and full');
+      await a.eval(`document.activeElement && document.activeElement.blur(),
+        document.body.click()`);
+
+      // ---- your own set, chosen honestly, before the venue ----------------
+      await a.dbg(`setDiceSet('tidewrack.seaglass')`);
+      await a.roll('2d6');
+      await a.settle();
+      assert.equal(await a.eval('window.__diceDebug.currentRoll.set'), 'tidewrack.seaglass',
+        'the grounded room rolls YOUR set');
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+
+      // ---- the venue overrides at roll creation ---------------------------
+      await a.dbg(`setVenue('moonrise')`);
+      await a.waitFor(`window.__diceDebug.venueInfo().staged`, { desc: 'the glade rises' });
+      await b.waitFor(`window.__diceDebug.venueInfo().staged`, { desc: 'on both tabs' });
+      assert.equal(await a.eval(`window.__diceDebug.venueInfo().venueDiceSet`),
+        'moonmoot.witchlight', 'the venue declares the set it stages');
+      await a.roll('3d6');
+      await a.settle();
+      assert.equal(await a.eval('window.__diceDebug.currentRoll.set'), 'moonmoot.witchlight',
+        "the roll RECORD carries the venue's set — not Alice's seaglass");
+      await b.waitFor(`window.__diceDebug.currentRoll
+        && window.__diceDebug.currentRoll.set === 'moonmoot.witchlight'`,
+      { desc: "Bob's copy of the record agrees — the wire carried it" });
+
+      // ---- the override releases with the venue ---------------------------
+      await a.settle();
+      await a.dbg(`setVenue('table')`);
+      await a.waitFor(`!window.__diceDebug.venueInfo().staged`, { desc: 'the room returns' });
+      await a.roll('2d6');
+      await a.settle();
+      assert.equal(await a.eval('window.__diceDebug.currentRoll.set'), 'tidewrack.seaglass',
+        'your own set resumes with the room — the venue never rewrote your identity');
+    },
+  },
 ];
