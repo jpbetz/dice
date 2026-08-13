@@ -35,10 +35,17 @@ game distance, its material story. Then fix the NUMBERS before modelling:
   ≤500. Pick it now; `check.py --max-tris` enforces it later.
 - Color plan: vertex colors (COLOR_0, one primitive, stays watertight) vs
   per-part materials (splits primitives — each part must close itself).
-  House look: MeshStandardMaterial, value variation over flat color,
-  fantasy-not-casino.
+  COLOR_0 is LINEAR: author every palette value as the linear of the sRGB
+  you intend (0.545 "mid grey" displays at sRGB 0.76 — cost fae_arch a full
+  bake+look cycle). House look: MeshStandardMaterial, value variation over
+  flat color, fantasy-not-casino.
 - Orientation: author Z-up in Blender; export is Y-up; front faces -Y in
   Blender (= +Z in glTF). `forge.spec_to_blender()` converts.
+- Every dimensional design input becomes an assertion that measures the
+  BUILT VERTICES, never the constants. fae_arch's constants-based opening
+  check passed while three separate parts intruded into the corridor; the
+  vertex-reading version failed instantly and named the plinth. A gate that
+  reads constants re-states your assumptions back to you.
 
 ## 2. The bake loop
 
@@ -49,15 +56,21 @@ tools/forge/bake.sh tools/forge/recipes/<name>.py [--max-tris N] [--expect-color
 
 Recipe shape: import the kit (`sys.path.insert(0, ...); import forge as F`),
 `F.reset()`, build with bmesh/pydata/modifiers, end with `F.finish(slug,
-objs, budget=N, smooth_deg=32, vertex_colors=...)` — finish runs the proven
-tail: canonicalize + triangulate (byte-stable), smoothing, manifold gate,
-grounding, budget, export. Deviate from finish() only with a reason in a
-comment.
+objs, budget=N, smooth_deg=..., vertex_colors=...)` — finish runs the
+proven tail: canonicalize + triangulate (byte-stable), smoothing, manifold
+gate, grounding, budget, export. Colors painted before finish() survive it
+(canonicalize carries color attributes — fixed after the first dogfood
+found it silently dropping them). The battery recipes' hand-written tails
+(B1/B4 order) remain legal with a reason in a comment. smooth_deg: 32 suits
+organic; architectural/faceted work wants 12–16 (fae_arch uses 14 — 32
+domed every displaced stone face into soap).
 
 Non-negotiables the kit enforces — do not work around them:
 - Bake twice before calling anything done; the `[forge] digest` lines must
   match run to run (canonicalize exists because exact booleans reorder
-  vertices every run).
+  vertices every run). `order` includes color attributes, `set` is geometry
+  only — a color-only edit moves `order` alone, which is how you tell a
+  look change from a shape change.
 - Non-manifold edges are a stop, not a note. Bisect with `F.boolean_each` +
   `F.manifold_report` until the offending operand names itself; the fix is
   in the MODEL (tangent contacts, shared cap centres, mirror planes on
@@ -76,7 +89,17 @@ PNGs to `tools/forge/shots/` via the /save endpoint. Never report a visual
 done without having seen it rendered (the project rule exists because a
 green check masked a broken thing more than once — including inside this
 very pipeline's bake-off, twice: shadow acne read as model damage, and a
-tool's storm-item normals shipped as position data and rendered black).
+tool's normals shipped as position data and rendered black).
+
+A builder agent without the Browser pane self-checks by rendering headlessly
+in Blender (re-import the exported GLB — that also proves colors survived —
+sun+sky, hero/front/detail/game-distance/unlit-albedo; fae_arch's dogfood
+established the pattern). Know what that proxy CANNOT show: the first
+fae_arch passed its friendly-sky Cycles look while the three.js viewer
+showed joint gaps glowing against the dark table. The main-session viewer
+look is binding; the proxy is triage. And do not over-polish to the viewer
+either — its light rig is not the app's; residuals that depend on the rig
+go in the ledger for the feature that ships the asset.
 
 ## 4. Review gate (main session, when a builder agent baked)
 

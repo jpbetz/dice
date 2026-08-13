@@ -27,13 +27,11 @@ VENVPY="${FORGE_VENV_PY:-$HOME/opt/dice-forge/venv/bin/python}"
 export FORGE_OUT="${FORGE_OUT:-$HERE/out}"
 mkdir -p "$FORGE_OUT"
 
-before=$(ls "$FORGE_OUT"/*.glb 2>/dev/null || true)
 "$BLENDER" -b --factory-startup --python-exit-code 1 --python "$RECIPE"
-after=$(ls "$FORGE_OUT"/*.glb 2>/dev/null || true)
 
-# gate every GLB the recipe just (re)wrote — newest first
-new=$(ls -t "$FORGE_OUT"/*.glb 2>/dev/null | head -3)
-[ -n "$new" ] || { echo "recipe produced no GLB in $FORGE_OUT" >&2; exit 3; }
-newest=$(echo "$new" | head -1)
+# gate the newest GLB (recipes write one asset; multi-GLB recipes gate the rest
+# by hand with check.py)
+newest=$(ls -t "$FORGE_OUT"/*.glb 2>/dev/null | head -1)
+[ -n "$newest" ] || { echo "recipe produced no GLB in $FORGE_OUT" >&2; exit 3; }
 echo "--- gate: $newest"
 "$VENVPY" "$HERE/check.py" "$newest" "$@"

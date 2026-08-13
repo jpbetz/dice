@@ -203,21 +203,53 @@ def canonicalize(obj):
     for new_i, old_i in enumerate(order):
         remap[old_i] = new_i
 
+    # Color attributes ride along (the first fae_arch bake proved the hard
+    # way that dropping them makes finish(vertex_colors=True) export a
+    # silently colourless GLB — README trap #4, previously inside this kit).
+    attrs = []
+    for ca in me.color_attributes:
+        if ca.domain == "CORNER":
+            per_poly = [[tuple(ca.data[li].color) for li in p.loop_indices]
+                        for p in me.polygons]
+        elif ca.domain == "POINT":
+            per_poly = [tuple(tuple(ca.data[v].color) for v in range(len(me.vertices)))]
+        else:
+            print(f"[forge] WARNING canonicalize: dropping color attr "
+                  f"{ca.name} on unsupported domain {ca.domain}")
+            continue
+        attrs.append((ca.name, ca.data_type, ca.domain, per_poly))
+
     faces = []
-    for p in me.polygons:
+    for pi, p in enumerate(me.polygons):
         idx = [remap[i] for i in p.vertices]
         k = idx.index(min(idx))
-        faces.append((tuple(idx[k:] + idx[:k]), p.material_index))
-    faces.sort()
+        faces.append((tuple(idx[k:] + idx[:k]), p.material_index, pi, k))
+    faces.sort(key=lambda t: (t[0], t[1]))
 
     mats = list(me.materials)
     new_me = bpy.data.meshes.new(me.name)
-    new_me.from_pydata([keys[i] for i in order], [], [f for f, _ in faces])
+    new_me.from_pydata([keys[i] for i in order], [], [f for f, _, _, _ in faces])
     new_me.update()
     for m in mats:
         new_me.materials.append(m)
-    for p, (_, mi) in zip(new_me.polygons, faces):
+    for p, (_, mi, _, _) in zip(new_me.polygons, faces):
         p.material_index = mi
+
+    for name, dtype, domain, per_poly in attrs:
+        nca = new_me.color_attributes.new(name=name, type=dtype, domain=domain)
+        if domain == "CORNER":
+            # each new polygon's loops follow its (rotated) vertex order, so
+            # the old loop colors rotate by the same k the face cycle did
+            for p, (_, _, pi, k) in zip(new_me.polygons, faces):
+                old = per_poly[pi]
+                rot = old[k:] + old[:k]
+                for li, col in zip(p.loop_indices, rot):
+                    nca.data[li].color = col
+        else:  # POINT
+            flat = per_poly[0]
+            for new_i, old_i in enumerate(order):
+                nca.data[new_i].color = flat[old_i]
+
     obj.data = new_me
     if me.users == 0:
         bpy.data.meshes.remove(me)
@@ -482,10 +514,13 @@ def export_glb(slug, objs=None, vertex_colors=False):
 def geometry_digest(objs, label=""):
     """Two hashes of the mesh as Blender holds it, printed for run-to-run diffing.
 
-    `order` includes vertex/face ordering; `set` is order-independent (sorted
-    rounded vertices, sorted faces keyed by vertex position). If `set` matches
-    across runs but `order` does not, the geometry is the same shape and only
-    the emission order moved.
+    `order` includes vertex/face ordering AND color attributes; `set` is
+    order-independent (sorted rounded vertices, sorted faces keyed by vertex
+    position). If `set` matches across runs but `order` does not, the
+    geometry is the same shape and only the emission order moved. Colors are
+    in `order` because a color-only edit must move the digest — the fae_arch
+    dogfood made three color-only edits that the old geometry-only digest
+    could not see.
     """
     import hashlib
 
@@ -501,6 +536,10 @@ def geometry_digest(objs, label=""):
             ordered.update(repr(idx).encode())
             fset.append(tuple(sorted(tuple(round(c, 6) + 0.0 for c in me.vertices[i].co)
                                      for i in idx)))
+        for ca in me.color_attributes:
+            ordered.update(ca.name.encode())
+            for item in ca.data:
+                ordered.update(repr(tuple(round(c, 5) for c in item.color)).encode())
     unordered = hashlib.md5()
     for t in sorted(vset):
         unordered.update(repr(t).encode())
