@@ -1408,14 +1408,21 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise', shell = buildSt
   const lining = new THREE.Group();
   lining.name = 'towerSkinLining';
   {
-    const rL = rIn - 0.02;
-    const th0 = Math.acos(Math.max(-1, Math.min(1, (zFI - zc) / rL)));
     const yTop = yRing, yBot = sill - 0.5;
-    const tube = new THREE.Mesh(
-      new THREE.CylinderGeometry(rL, rL, yTop - yBot, 40, 1, true, th0, 2 * Math.PI - 2 * th0),
-      dark);
-    tube.position.set(0, (yTop + yBot) / 2, zc);
-    lining.add(tube);
+    // A BAKED SHELL DECLINES THE TUBE (SURF.liningTube === false). Its radius
+    // is derived from the bore, which on a code shell is comfortably inside
+    // the bark and on a baked one lands ON the outer wall — z-fighting below
+    // the tear and standing proud of it above. The bake paints its own
+    // interior near-black, so it owns this layer; see js/towerglbshell.js.
+    if (SURF.liningTube !== false) {
+      const rL = rIn - 0.02;
+      const th0 = Math.acos(Math.max(-1, Math.min(1, (zFI - zc) / rL)));
+      const tube = new THREE.Mesh(
+        new THREE.CylinderGeometry(rL, rL, yTop - yBot, 40, 1, true, th0, 2 * Math.PI - 2 * th0),
+        dark);
+      tube.position.set(0, (yTop + yBot) / 2, zc);
+      lining.add(tube);
+    }
     // …and a flat back to the facade, from the arch's springing up. It stops
     // AT the arch on purpose: an opaque plane across the gap would make an
     // exiting die pop into existence at the wall instead of travelling out

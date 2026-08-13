@@ -250,10 +250,27 @@ export function glbShellFor(url) {
       rIn: v.shaft.r + 0.28,
       R0,
       rOut: (th) => radiusAt(th, R0_Y),
-      // The top of the closed ring — the height above which the front must
-      // stay opaque (docs/TOWER.md §1.5 note 3: the measured cowl bar is
-      // 11.25). A bar the occlusion proof sets, not a number the model owns.
-      yRing: 11.4,
+      // THE CLOSED RING NOW FOLLOWS THE MODEL'S CROWN, and this used to be a
+      // flat 11.4 "bar the occlusion proof sets". That bar is gone: the cowl
+      // band no longer samples over the rim (js/main.js v.cowlY), so nothing
+      // above the tear has anything to stay opaque FOR — and 11.4 stood 2.0
+      // units above this model's 9.40 tear, which is precisely the black slab
+      // Joe called out on the round-7 and round-8 frames. Hiding
+      // `towerSkinLining` was what named it, and towerOcclusionCheck reports
+      // 99/99 on both bands at all six eyes with the whole thing muted.
+      //
+      // Buried under the tear it still backs the doorway, which is the job it
+      // actually does for a player.
+      yRing: v.rimY,
+      // ...AND NO TUBE. It sat at rIn - 0.02 = 2.46, which on a baked trunk is
+      // the OUTER wall (inner 2.17, outer 2.46) — so it z-fought the bark
+      // below the tear and stood proud of it above. There is no radius that
+      // works: between the approach column (2.09) and the bake's own liner
+      // (2.17) there is 0.08, which is the same squeeze that drove the recipe's
+      // curtain into the wall. The bake paints its interior near-black already
+      // (make_curtain_paint / the liner gradient), so the tube is redundant as
+      // well as impossible. A code skin over a code shell still gets one.
+      liningTube: false,
       zFO, zFI: z0 - 1.2,
       sill: v.hood.c[1] - v.hood.s[1] / 2,
       // THE MOUTH, not the collider gap. 2.05 clears the measured flight

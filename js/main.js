@@ -10000,6 +10000,25 @@ window.__diceDebug = {
     camera.updateMatrixWorld();
     return [camera.position.x, camera.position.y, camera.position.z];
   },
+  // HIDE-ONE-AT-A-TIME, on the SOCKETED tower — /new-venue's probe idiom
+  // ("when a frame won't cohere, stop theorising and start hiding") applied to
+  // a model instead of a scene. Returns every name it walked, so a caller can
+  // discover the tree rather than guess at it. Pass nothing to restore.
+  //
+  // This one is honestly `visible`, unlike towerOccluderMute below: it asks a
+  // question about the FRAME, and the frame is exactly what `visible` decides.
+  towerHideNamed(sub) {
+    if (!towerRig || !towerRig.group) return null;
+    const seen = [], hidden = [];
+    towerRig.group.traverse((o) => {
+      if (!o.name) return;
+      seen.push(o.name);
+      if (sub == null) o.visible = true;
+      else if (o.name.includes(sub)) o.visible = false;
+      if (o.visible === false) hidden.push(o.name);
+    });
+    return { seen, hidden };
+  },
   // WHICH SURFACE CARRIES WHICH BAND? Occlusion comes back as a count, and a
   // count cannot say whether a band is held by the wall, the lining, or one
   // extra piece added only to hold it. This drops named `towerSkin*` nodes out
