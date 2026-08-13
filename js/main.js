@@ -9535,12 +9535,60 @@ window.__diceDebug = {
   // The tower's collider set, by contract name and position, so a scenario can
   // assert that unsocketing puts the main world back exactly as it found it
   // (an empty list plus wallPositions() is the whole claim).
+  //
+  // `q` is UNROUNDED, unlike `p`. Two of these eight bodies are rotated (the
+  // ramp and the lip) and their angle is a derived number a film is baked
+  // against — the lip's used to come from a live debug dial. A quaternion
+  // rounded to three places cannot tell 0.1 from 0.1004, which is exactly the
+  // size of the question.
   towerBodies() {
     if (!towerRig) return [];
     return towerRig.bodies.map((b) => ({
       name: b.labName,
       p: [b.position.x, b.position.y, b.position.z].map((n) => Number(n.toFixed(3))),
+      q: [b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w],
     }));
+  },
+  // THE PORTAL SPEC A TOWER RESOLVES TO, and what the engine derives from it
+  // (docs/TOWER.md §3, §5). This is the surface a new model is authored
+  // against: ask what your portals are, ask where the engine put the door sill
+  // and the despawn line as a result, and check both against the limits.
+  //
+  // `source` is the honest provenance and it is not decoration — 'default'
+  // means this row declares no portals and got the classic core, 'row' means
+  // the registry states them, 'model' means they came off a baked mesh. A
+  // model whose portals silently failed to load reads 'default' here, which is
+  // the difference between a tower and a wall with dice behind it.
+  //
+  // 'none' is null: there is no tower, so there are no portals, and returning
+  // the classic core for it would invite somebody to treat the towerless table
+  // as a tower with default openings. The FIRST LAW is that 'none' is not a
+  // mode. An unregistered id is null for the same reason.
+  //
+  // `derived` is evaluated at the CURRENT mat — z0 moves with the zoom preset
+  // and with whether a tower is socketed at all — so read it for the shape of
+  // the answer, not as an absolute a fixture can pin.
+  towerPortalSpec(id = currentTower) {
+    const row = TOWERS[id];
+    if (!row || id === 'none') return null;
+    const portals = towerPortalsOf(id);
+    const v = towerVolumes(portals);
+    return {
+      id,
+      source: row.portals ? (row.glbUrl ? 'model' : 'row') : 'default',
+      portals,
+      limits: TOWER_PORTAL_LIMITS,
+      derived: {
+        z0: v.z0, S: v.S, despawnY: v.despawnY,
+        door: { w: v.door.w, h: v.door.h, sill: v.door.sill },
+        exit: { p: v.exit.p, pitch: v.exit.pitch },
+        // Where the slick outrun ENDS — the last engine surface a die touches
+        // before it is on felt the whole table shares.
+        lipFrontZ: v.lip.c[2] + v.lip.s[2] / 2,
+        hidZone: POUR.hidZone,
+        eye: v.eye, cls: v.cls,
+      },
+    };
   },
   // THE MAIN WORLD ITSELF, not the rig's idea of it. `towerBodies()` reads
   // towerRig, which is nulled on unsocket — so it says "clean" whether or not
@@ -9583,6 +9631,14 @@ window.__diceDebug = {
     });
     return {
       tower: currentTower,
+      // WHICH TOWER THE FILM WAS BAKED WITH, as opposed to which one is
+      // standing NOW. The bake has recorded this since pourFilm was written
+      // and nothing has ever read it back, so the two could disagree and
+      // nobody would see. They disagree exactly when a socket change beat the
+      // roll boundary it is supposed to wait for (queueTower), or when a
+      // client applied a tower id its build does not know — and either way the
+      // pour on this screen was baked against a core other clients did not use.
+      filmTower: p ? p.tower : null,
       pour: !!p,
       z0, hidZone: POUR.hidZone,
       frames: r.frames, duration: r.duration, seed: r.seed,
@@ -16375,6 +16431,18 @@ function applyRoomSettings(settings) {
     roomSettings.tower = settings.tower;
     if (settings.tower !== currentTower) queueTower(settings.tower);
     renderTowerPicker();
+  } else if (typeof settings.tower === 'string') {
+    // KEEPING THE TABLE IS THE RIGHT CALL, AND IT IS NOT FREE. Ignoring the id
+    // means this client goes on baking against whatever tower it has while the
+    // rest of the room bakes against one it has never heard of — the pour is a
+    // pure function of the CORE and the seed, so the films genuinely diverge
+    // and the replay hashes with them. Silently was the wrong part: a player
+    // watching different dice from everyone else deserves a reason to exist in
+    // the console, and whoever ships the next model deserves to see the id
+    // that a stale build could not resolve.
+    console.warn(`[tower] unknown tower id '${settings.tower}' — this build cannot `
+      + `socket it, keeping '${currentTower}'. Films on this client may diverge `
+      + `from other clients in this room.`);
   }
   // The venue (GOALS goals 13–15), the tower's unknown-id rule: a client
   // that has not shipped a venue keeps the table it has. Applied AFTER the

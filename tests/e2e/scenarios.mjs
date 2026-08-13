@@ -10621,8 +10621,40 @@ export const scenarios = [
           `${id}: something on it moves when nobody is touching it `
           + `(${dr.sways} sways, ${dr.smokes} plumes)`);
 
+        // ---- the PORTAL SPEC this model resolves to ------------------------
+        // Every model shipped so far declares no portals and therefore gets
+        // the classic core, and asserting that is not a tautology: `source`
+        // is how a model whose portals silently failed to load tells you so.
+        // A tower reading 'default' when it meant to state its own openings is
+        // a doorway the engine put somewhere the model did not — dice flying
+        // into the wall beside a door that is drawn open. Read off the
+        // registry, so the day a row declares portals this line is what
+        // notices.
+        const ps = await a.dbg(`towerPortalSpec('${id}')`);
+        assert.equal(ps.source, 'default',
+          `${id}: resolves to the classic portals (source '${ps.source}')`);
+        assert.equal(ps.id, id, `${id}: and says which tower it answered for`);
+        assert.equal(ps.derived.door.sill, ps.portals.out.sillY,
+          `${id}: the engine's door sill IS the portal's sill — the derivation `
+          + `is the spec, not a second copy of it (${ps.derived.door.sill})`);
+        assert.ok(ps.portals.out.w >= ps.limits.out.wMin,
+          `${id}: its doorway clears the radius arithmetic `
+          + `(w ${ps.portals.out.w} ≥ ${ps.limits.out.wMin})`);
+        assert.ok(ps.portals.in.clearR >= ps.limits.in.clearRMin,
+          `${id}: and its mouth is not narrower than a d20 plus the aim jitter `
+          + `(clearR ${ps.portals.in.clearR} ≥ ${ps.limits.in.clearRMin})`);
+
         const f = await pour('8d6');
         assert.ok(f.pour, `${id}: a pour is still a POUR`);
+        // THE FILM RECORDS WHICH TOWER IT WAS BAKED WITH, and until now
+        // nothing read it back. `tower` is what is standing now; `filmTower`
+        // is what the bake actually used. They disagree exactly when a socket
+        // change beat the roll boundary it is supposed to wait for, or when a
+        // client applied an id its build cannot resolve — and in both cases
+        // this screen is showing a pour nobody else in the room is watching.
+        assert.equal(f.filmTower, id,
+          `${id}: the film was baked with THIS tower, not merely played while `
+          + `it happened to be standing (film ${f.filmTower}, socketed ${f.tower})`);
         assert.ok(f.clunks >= 2 * f.rest.length && f.clunks <= 4 * f.rest.length,
           `${id}: with the contract's 2–4 baffle knocks per die in the film `
           + `(${f.clunks} for ${f.rest.length} dice)`);
@@ -10640,6 +10672,65 @@ export const scenarios = [
         { desc: 'back to the wooden tower for the rest of this scenario' });
       assert.deepEqual(await a.dbg(`impactVoiceFor({clunk:'baffle'}, '${SET}')`), voices.heartwood,
         'and the voice follows the tower back');
+
+      // ---- A DEBUG DIAL CANNOT REACH A SHIPPED COLLIDER --------------------
+      // Once, not per model: this is a claim about the engine, not about a
+      // skin. docs/TOWER.md:107 says "the shipped socket does not read
+      // TOWERLAB.tune for anything but matExtra" — and until the portal-spec
+      // seam landed that sentence was FALSE. towerVolumes read
+      // TOWERLAB.tune.lipTilt straight into the `lip` volume, which
+      // towerColliders builds as one of the eight bodies on the MAIN world, so
+      // one player poking a debug knob in DevTools baked films against a
+      // differently-angled outrun than everybody else in the room. Films are a
+      // pure function of the core and the seed; the core is not allowed a live
+      // knob in it.
+      //
+      // THIS ASSERTION WOULD BE RED ON PRE-SEAM CODE — verified by reverting
+      // the one line (`rx: TOWER_LIP_TILT` back to `rx: TOWERLAB.tune.lipTilt`)
+      // and watching the lip body arrive at 0.3. Sabotage-checked in the other
+      // direction too, by moving the constant itself: the recovered angle
+      // follows it, so this is reading the real body and not a cached copy.
+      //
+      // The zoom round trip is the point of the shape: applyZoom unsockets and
+      // re-sockets across a preset change, which is the shipped path that
+      // re-derives every volume from scratch. A dial that leaked would leak
+      // exactly there, and only there — asserting on a socket that was never
+      // rebuilt would pass on the broken code too.
+      {
+        const lipOf = async (when) => {
+          const b = (await a.dbg('towerBodies()')).find((x) => x.name === 'lip');
+          assert.ok(b, `the lip collider exists ${when}`);
+          return b;
+        };
+        // A quaternion from setFromEuler(rx, 0, 0) is (sin(rx/2), 0, 0, cos(rx/2)).
+        const angleOf = (b) => 2 * Math.atan2(b.q[0], b.q[3]);
+        const was = await lipOf('before the dial is touched');
+        assert.ok(Math.abs(angleOf(was) - 0.1) < 1e-12,
+          `the shipped lip sits at the frozen 0.1 rad (${angleOf(was)})`);
+
+        const zoomWas = await a.dbg('zoom');
+        await a.dbg('towerTune({lipTilt: 0.3})');
+        assert.equal((await a.dbg('towerTune({})')).lipTilt, 0.3,
+          'the lab dial really did move — otherwise this proves nothing');
+        for (const z of ['close', zoomWas]) {
+          await a.dbg(`setZoom('${z}')`);
+          await a.waitFor(`window.__diceDebug.zoom === '${z}'`,
+            { desc: `the mat goes to ${z} (unsocket + re-socket)` });
+        }
+        const now = await lipOf('after the unsocket/re-socket round trip');
+        assert.ok(Math.abs(angleOf(now) - 0.1) < 1e-12,
+          `and it is STILL 0.1 with the dial at 0.3 — the shipped core does not `
+          + `read TOWERLAB.tune (${angleOf(now)})`);
+        assert.deepEqual(now.q, was.q,
+          'byte-for-byte the same rotation it was rebuilt from, not merely close');
+        assert.notEqual(Math.round(angleOf(now) * 1e6), Math.round(0.3 * 1e6),
+          'and emphatically not the dialled 0.3');
+
+        await a.dbg('towerTune({lipTilt: 0.1})');
+        assert.deepEqual(await a.dbg('tableExtents()'), upExtents,
+          'and the zoom round trip put the room back where the rest of this '
+          + 'scenario expects it');
+      }
 
       // ---- the dress clock -------------------------------------------------
       // THE IDLE MOTION IS A FUNCTION OF THE SIM CLOCK AND NOTHING ELSE, which
