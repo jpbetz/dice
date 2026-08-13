@@ -60,5 +60,7 @@ portable YAML — the ONLY rack transport; the `#g=` URL codec was dropped
 `?room=`) · `js/net.js` (SSE/fetch client) · `tests/` (unit + fuzz +
 `e2e/`) · `tools/forge/` (complex 3D models are BAKED to GLB via pinned
 headless Blender, never hand-written as three.js geometry — use the
-`/forge-model` skill; docs/FORGE-BAKEOFF.md is the decision record; the
-app itself loads no GLBs yet).
+`/forge-model` skill; docs/FORGE-BAKEOFF.md is the decision record) ·
+`js/towerglb.js` (the app's GLB loader — tower models declare dice-in/out
+PORTALS as glTF nodes and the engine derives its volumes from them,
+docs/TOWER.md; new towers go through `/new-tower`).

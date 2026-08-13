@@ -389,19 +389,31 @@ def material(name, rgb, roughness=0.6, metallic=0.0):
     return mat
 
 
-def vertex_color_material(name, attr_name):
+def vertex_color_material(name, attr_name, roughness=None):
     """A material whose base colour is the mesh colour attribute.
 
     The glTF exporter only writes COLOR_0 under `export_vertex_color='MATERIAL'`
     when some material actually reads the attribute, so this node wiring is
     load-bearing, not decoration.
+
+    `roughness=None` keeps Blender's Principled default (0.5) — the historical
+    behaviour, which every battery recipe bakes against. PASS A VALUE for
+    anything whose albedo story matters: at 0.5 every surface reflects the
+    environment through a tight 4% lobe, and at low albedos that sheen IS the
+    value — the hollowbole build measured a "pale glowing" interior whose
+    diffuse contribution was (3,3,1) out of (84,104,155). Matte forms (wood,
+    stone, rot) want 0.85-0.96; the judgement made through the sheen is a
+    judgement made through a haze.
     """
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     nt = mat.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
     node = nt.nodes.new("ShaderNodeVertexColor")
     node.layer_name = attr_name
-    nt.links.new(node.outputs["Color"], nt.nodes["Principled BSDF"].inputs["Base Color"])
+    nt.links.new(node.outputs["Color"], bsdf.inputs["Base Color"])
+    if roughness is not None:
+        bsdf.inputs["Roughness"].default_value = float(roughness)
     return mat
 
 

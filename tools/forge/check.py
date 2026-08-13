@@ -60,7 +60,25 @@ APPROACH_START = 2.5      # approach rays start this far above the rim
 EXIT_BACK = 1.5           # exit rays start this far behind the door plane
 EXIT_FRONT = 1.0          # ... and must reach this far in front of it
 THROAT_MARGIN = 0.95      # probe 95% of the declared aperture
+# The exit throat is NOT a flat box: the engine's delivery ramp climbs from
+# the sill backward at the 28°-family slope (rise 0.8/1.5 in base units, plus
+# the sill's own offset — the same formula towerVolumes uses), and the die
+# RIDES that surface. A ray hugging the sill at z −1.5 is probing space the
+# ramp legitimately owns, so a model that clads the chute (a tongue, a slide)
+# would fail a gate about a die path no die takes. Each ray therefore starts
+# where its height clears the ramp line plus the cladding allowance — skins
+# sit up to ~0.10 proud of the collider face, plus margin.
+EXIT_CLAD_ALLOW = 0.15    # ramp cladding proudness + margin above the slope line
 RAY_EPS = 1e-6
+
+
+def exit_ray_start_z(py, sill_y, oz):
+    """Deepest z a ray at height `py` may probe without entering ramp space."""
+    tan_slope = 0.8 / 1.5 + (sill_y - 0.8 * S) / (1.5 * S)
+    head = py - sill_y - EXIT_CLAD_ALLOW
+    if head <= 0 or tan_slope <= 0:
+        return oz  # at/below the clad sill line: probe only from the plane out
+    return oz - min(EXIT_BACK, head / tan_slope)
 
 
 def glb_json(path):
@@ -250,16 +268,21 @@ def tower_check(j, tris):
                 f"disc of radius {clear_r * THROAT_MARGIN:.2f} must fall clear "
                 f"from y {y_top:.2f} to despawnY {despawn_y:.2f}")
 
-    # (d) the EXIT throat is really clear, inside the tower to past the door
+    # (d) the EXIT throat is really clear, inside the tower to past the door.
+    # Each ray starts at exit_ray_start_z(py) — the flat-box version of this
+    # gate condemned any model that clads the engine ramp (the hollowbole
+    # build hit it and had to leave the interior chute bare from z −1.5 to
+    # −0.1 for no player-visible reason).
     if w > 0 and clear_h > 0:
         pad = clear_h * (1.0 - THROAT_MARGIN) / 2.0
         blocked = []
         for px, py in rect_probes(ox, sill_y + pad, w * THROAT_MARGIN,
                                   clear_h * THROAT_MARGIN):
-            t = hit_distance(tris, np.array([px, py, oz - EXIT_BACK]),
-                             np.array([0.0, 0.0, 1.0]), EXIT_BACK + EXIT_FRONT)
+            z_start = exit_ray_start_z(py, sill_y, oz)
+            t = hit_distance(tris, np.array([px, py, z_start]),
+                             np.array([0.0, 0.0, 1.0]), (oz + EXIT_FRONT) - z_start)
             if t is not None:
-                blocked.append((oz - EXIT_BACK + t, px, py))
+                blocked.append((z_start + t, px, py))
         info["exit_blocked"] = len(blocked)
         if blocked:
             hz, px, py = min(blocked)
@@ -267,7 +290,9 @@ def tower_check(j, tris):
                 f"portalOut: exit throat blocked — {len(blocked)}/25 probes hit "
                 f"mesh, nearest at z {hz:.2f} (x {px:.2f}, y {py:.2f}); the "
                 f"{w * THROAT_MARGIN:.2f} x {clear_h * THROAT_MARGIN:.2f} door "
-                f"must be clear from z {oz - EXIT_BACK:.2f} to {oz + EXIT_FRONT:.2f}")
+                f"must be clear above the ramp line out to z {oz + EXIT_FRONT:.2f} "
+                f"(rays start at the slope + {EXIT_CLAD_ALLOW} cladding allowance, "
+                f"deepest z {oz - EXIT_BACK:.2f})")
 
     # (e) the engine's occluder prefix
     skins = [n.get("name", "") for n in j.get("nodes", [])

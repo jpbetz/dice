@@ -80,7 +80,11 @@ js/main.js — **keep the two in sync**); the APPROACH column really clear, by
 really clear, by 25 rays out through the door; and at least one `towerSkin*`
 mesh node. The two ray gates are the point: a model can declare a perfect
 doorway and wall it up behind the declaration, and the numbers alone would
-never notice.
+never notice. The exit rays are RAMP-AWARE (2026-08-13): each starts where
+its height clears the engine chute's slope line plus a 0.15 cladding
+allowance, so a model may skin the delivery ramp (a tongue, a slide) without
+tripping a gate about a die path no die takes — while a shelf 0.5 above the
+slope still fails (red-checked both ways).
 
 **The fixture.** `recipes/tower_fixture.py` bakes
 `tests/e2e/fixtures/tower_fixture.glb` — a deliberately plain leaning
@@ -140,13 +144,28 @@ exist in 4.5; forge.smooth_by_angle writes `sharp_edge` flags directly.
    tuned bias; verify shading claims in mode=normal.
 10. A hidden Browser pane never fires rAF → viewer/sheet render explicitly
     and POST pixels to serve.py.
+11. Blender's Principled default roughness 0.5 makes every low-albedo surface
+    a specular haze — the sheen IS the value, and painting cannot darken it
+    (the hollowbole interior read pale at albedo (0,0,0)) →
+    vertex_color_material takes a roughness arg; matte forms want 0.85-0.96,
+    and any value judgement made before setting it was made through the haze.
+12. canonicalize + triangulate can leave FOUR faces on one edge when a pair
+    of n-gons shares a diagonal (or one n-gon claims a segment that already
+    exists as an edge); EAR_CLIP triangulation makes it worse, not better →
+    poke only the hazard faces (find them by indexing non-adjacent vertex
+    pairs; the hollowbole recipe carries the working implementation). And
+    clean_slivers' default dist=2e-5 is below what a displaced organic shell
+    produces — the same build needed 3e-4.
 
-## Integration note (deliberately not done yet)
+## Integration (live since 2026-08-13)
 
-The app does not load GLBs today; towers/props are code-built. When the
-first baked asset ships: vendor three r160's GLTFLoader.js +
-BufferGeometryUtils.js into `vendor/` (preview/ carries reference copies),
-add a small loader helper, and load the GLB as a named group — house rules
-(MeshStandardMaterial, envMapIntensity 0.45, towerSkin* naming for occluders,
-zero colliders) apply to baked assets exactly as to coded ones. That change
-belongs to the feature that needs it, with its own proofs.
+The app loads tower GLBs: `vendor/GLTFLoader.js` + `BufferGeometryUtils.js`
+are vendored (preview/ keeps its own copies), `js/towerglb.js` is the loader
+(fetch/parse/cache, portal-extras extraction, load-time validation against
+TOWER_PORTAL_LIMITS, house-rules pass — MeshStandardMaterial params,
+envMapIntensity 0.45, shadow flags, baked lights stripped), and a TOWERS
+registry row opts in with `glbUrl`. A model is authored with z=0 at the
+back-wall socket plane; the loader seats it at the live `z0`. Socketing
+stays synchronous — loading is gated at the roll boundary (`towerModelReady`),
+and a late-joining replay WAITS for the model rather than baking without it.
+See docs/TOWER.md for the portal contract and `/new-tower` for the process.
