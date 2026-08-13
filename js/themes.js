@@ -88,6 +88,15 @@
 //   `ring` {amp, jolt?, speed?} fires ONE screen-space shock wave from a
 //   roll's hardest recorded impact (negative amp implodes — Umbra);
 //   `shimmer` {radius, strength} wobbles the air above the settled die.
+// · `fog` (W4, venue fog response): {color, gain} — what a settled die of
+//   this set breathes into a fantasy venue's fog lattice (js/fae-lab.js
+//   brightenFog). Read by the venue's step, only while a venue is staged;
+//   sets without `fog` get the venue's default breath. Outside a venue
+//   the field is inert.
+// · `venueOnly` (W4, mirrors the tower flag): the set ships in SETS (it
+//   must resolve for materials, voices and the wire) but takes NO chip in
+//   the picker — a venue stages it by overriding the table's dice at roll
+//   creation (GOALS goal 13; the override lives in main.js venueDiceSet).
 // · `rest` — the settled-die cadence (Slice 3, Joe 2026-08-04): sub-mm
 //   motion at rest on the FELT that says "this material is buoyant /
 //   creaking / sealed / remembering" without any new textures or lights.
@@ -483,6 +492,76 @@ export const THEMES = {
       },
     },
   },
+  // THE FAE COURT (W4, 2026-08-13). The nocturnal counterpart of
+  // Wildwood's sunlit living things — the spec draft's "cold nocturnal
+  // light-logic" house, staged by the fae venues rather than picked
+  // (FAE-VENUE-SPEC-DRAFT: the venue's set overrides per-player choice
+  // while active — the GOALS 13 punt, delivered).
+  moonmoot: {
+    label: 'Moonmoot',
+    line: 'the fae court at night — witchlight over still water',
+    sets: {
+      witchlight: {
+        label: 'Witchlight',
+        // TUMBLED LABRADORITE, WITCHLIGHT IN THE CARVINGS. A deep
+        // twilight stone whose light lives inside — the Black Anvil value
+        // structure inverted to cold: the body stays a quiet step above
+        // the venue's void floor and the carved numerals carry ALL the
+        // light (grammar rule 2: the dice are Ori, brightest by
+        // construction under either palette). The digit color sits
+        // BETWEEN moonrise's teal rim and foxfire's mint rim so one set
+        // serves both skies without re-baking.
+        body: '#2f3b4c', text: '#d9fbee', accent: '#8ff0e2',
+        glow: { color: '#7fc9b8', intensity: 0.06 },
+        feel: { rough: 0.3, metal: 0.05 },
+        // "RUNE GLOW" WITHOUT A RUNIC ALPHABET — a deliberate refusal,
+        // recorded: real runes for 1..20 would trade the one invariant a
+        // set may never touch (numbers stay readable, GOALS legibility;
+        // the glyph library note at the top of this file stands). The
+        // rune-ness is the CARVING and the LIGHT: digits engraved deep
+        // (digitDepth 0.7) into faintly banded stone, filled with
+        // witchlight (digitGlow) that blooms in the dark.
+        maps: {
+          digitGlow: { color: '#d9fbee', intensity: 0.95 },
+          relief: { pattern: 'grain', strength: 0.35, digitDepth: 0.7 },
+        },
+        // Labradorescence: the stone's internal cold flash at glancing
+        // angles — one voice, the same under both venues (it is the
+        // STONE's light, not the sky's). Modest per the aesthetic-pass
+        // law: the digit emissive and this rim are the only two signals.
+        shader: { fresnel: { color: '#6fd8c8', power: 2.6, intensity: 0.5 } },
+        spec: { ior: 1.56, envMapIntensity: 0.9 },
+        // Tumbled by the court for a hundred seasons: soft fillets, worn
+        // corners, cushioned faces; edges deepen into the stone's own
+        // dark, never a black scar.
+        geo: { bevel: 0.11, profile: 'round', wear: 0.35, pillow: 0.3,
+          tint: '#141c26', ink: 0.2 },
+        // NO particles and NO parented light, on purpose: the VENUE
+        // lights its dice (two followers, halos, the fog lattice) and a
+        // set light inside that rig would double-glow every landing.
+        // Restraint is also identity — the court does not shed.
+        post: { bloom: true }, // the runes burn in the dark
+        // A long faint cold ring — glass struck in another room. Distinct
+        // from focuscrystal (nearer, brighter) and seaglass (wetter,
+        // shorter). REASONED FROM THE TABLE, NEVER LISTENED TO — Joe's
+        // dial, same honesty as every tower clunkVoice.
+        sound: { body: 'chime', weight: 0.22, sustain: 65 },
+        // The court holds its breath: the last 12% of a roll retimes to
+        // 0.7× — a faint hover before the verdict, subtler than
+        // heartwood's vine catch. Playback clock only; physics untouched.
+        rate: { rate: 0.7, window: 0.12 },
+        // Cold stone is STILL; the light does the living (the venue's
+        // halos and fog breathe around it — the die itself never moves).
+        rest: { kind: 'still' },
+        // The set's breath into the venue fog (the W4 "fog response"):
+        // paler and a touch stronger than the venue default, so a settled
+        // witchlight die visibly owns its pocket of mist.
+        fog: { color: '#9ff0dc', gain: 1.25 },
+        venueOnly: true,
+      },
+    },
+  },
+
   gildhall: {
     label: 'Gildhall',
     line: 'royal & heraldic — oxblood lacquer, gold leaf',

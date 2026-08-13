@@ -1719,7 +1719,12 @@ function setDiceSet(id, persist = true) {
 }
 // What rides the wire: absent for standard (a plain roll's payload stays
 // byte-for-byte what it always was — the server's present-or-absent rule).
+// A fantasy venue's staged set OVERRIDES yours at this seam (W4): the
+// override is part of roll CREATION, so the record — and therefore every
+// client, replay and late joiner — carries the venue's dice.
 function wireSet() {
+  const v = venueDiceSet();
+  if (v) return v;
   return diceSet !== 'std' ? diceSet : undefined;
 }
 // The set a ROLL wears (§9 saved-pool override): an explicit opts.set wins —
@@ -1728,7 +1733,11 @@ function wireSet() {
 // Callers only pass opts.set when a pool rolls as itself (the rail quick
 // list; a staged draft rides per-die `sets` via draftDieSets instead);
 // rerolls, claims and plain notation stay on wireSet.
+// The venue outranks even a pool's pinned set (GOALS 13: the venue IS the
+// dice choice while it stands — a pool's identity resumes with the room).
 function rollSetOf(opts) {
+  const v = venueDiceSet();
+  if (v) return v;
   const s = opts && opts.set;
   if (s === 'std') return undefined;
   if (typeof s === 'string' && SETS[s]) return s;
@@ -7378,14 +7387,21 @@ const VENUES = {
   // trunk): a venue-only model, chosen by choosing the venue. Guarded at
   // send time — until the model ships in TOWERS, the venue falls back to
   // 'none' rather than having the server reject the whole patch.
+  // `diceSet` on a fantasy venue is the set THE VENUE stages (W4 — the
+  // GOALS 13 punt delivered): while the venue is active every roll is
+  // MADE with this set at roll creation (venueDiceSet → wireSet/
+  // rollSetOf), so the roll RECORD carries it and replay, late joiners
+  // and every client agree for free. Dice already on the felt keep the
+  // skin they landed with — a roll is a record, same as a player
+  // changing their own set.
   moonrise: {
     id: 'moonrise', label: 'Moonrise Glade', register: 'fantasy', paletteId: 'moonrise',
-    tower: 'hollowbole',
+    tower: 'hollowbole', diceSet: 'moonmoot.witchlight',
     title: 'Moonrise Glade — a night clearing; blue mist, teal moot-light, dice burn through the fog',
   },
   foxfire: {
     id: 'foxfire', label: 'Foxfire Hollow', register: 'fantasy', paletteId: 'foxfire',
-    tower: 'hollowbole',
+    tower: 'hollowbole', diceSet: 'moonmoot.witchlight',
     title: 'Foxfire Hollow — older and damper; pale witchlight over near-black moss',
   },
 };
@@ -7398,6 +7414,17 @@ function venueTowerFor(id) {
   return (spec.tower && TOWERS[spec.tower]) ? spec.tower : 'none';
 }
 let currentVenue = 'table';
+
+// The set the ACTIVE venue stages, or null when the table's own choice
+// rules (grounded room, or a fantasy venue whose set has not shipped).
+// Consulted at ROLL CREATION (wireSet/rollSetOf/draftDieSets) and by the
+// prospective-art surfaces — never at render of an existing roll, because
+// a roll is a record and keeps the skin it landed with.
+function venueDiceSet() {
+  const spec = VENUES[currentVenue];
+  return (spec && spec.register === 'fantasy' && spec.diceSet && SETS[spec.diceSet])
+    ? spec.diceSet : null;
+}
 
 // WHICH SKY THE FAE TOWER IS STANDING UNDER (W3). Hollow Bole is one model
 // with two palettes — the venue's `paletteId`, read at BUILD time by the
@@ -7417,6 +7444,23 @@ function faeTowerPalette() {
 // rig for the moon (a preset over the same dials — techniques.md §5's
 // argument made flesh) and restores every borrowed thing on the way out.
 const FAECONCEPT = { on: false, rig: null, t: 0, saved: null, lights: [], boosted: [] };
+
+// Per-set venue fog breath (W4), parsed once per variant — the step runs
+// per frame and must not allocate. null = the venue's default breath.
+const FAEFOG = new Map();
+function faeFogFor(variant) {
+  if (!FAEFOG.has(variant)) {
+    const f = variant && SETS[variant] && SETS[variant].fog;
+    if (f && typeof f.color === 'string') {
+      const c = new THREE.Color(f.color);
+      FAEFOG.set(variant, {
+        cr: c.r, cg: c.g, cb: c.b,
+        gain: typeof f.gain === 'number' ? f.gain : 1.1,
+      });
+    } else FAEFOG.set(variant, null);
+  }
+  return FAEFOG.get(variant);
+}
 
 function faeConceptStart(opts = {}) {
   if (FAECONCEPT.rig) faeConceptStop();
@@ -7479,12 +7523,18 @@ function stepFaeConcept(dt) {
   stepWisps(rig.wisps, t);
   // The dice light the fog (the venue's whole thesis): every settled die is
   // an emitter, plus the lead wisp; the moot's pools are already folded
-  // into the sheets' base.
+  // into the sheets' base. A die whose SET declares a fog breath (the W4
+  // `fog` recipe field — witchlight's pale exhale) colours its own pocket;
+  // everything else breathes the venue default.
   const settled = tableDice.filter((d) => d.mesh && d.mesh.position.y < 2.5).slice(0, 5);
-  const em = settled.map((d) => ({
-    x: d.mesh.position.x, z: d.mesh.position.z,
-    r: 3.2, gain: 1.1, cr: 0.38, cg: 0.62, cb: 0.58,
-  }));
+  const em = settled.map((d) => {
+    const f = faeFogFor(d.variant);
+    return {
+      x: d.mesh.position.x, z: d.mesh.position.z, r: 3.2,
+      gain: f ? f.gain : 1.1,
+      cr: f ? f.cr : 0.38, cg: f ? f.cg : 0.62, cb: f ? f.cb : 0.58,
+    };
+  });
   const wpos = rig.wisps.points.geometry.attributes.position;
   em.push({ x: wpos.getX(0), z: wpos.getZ(0), r: 2.2, gain: 0.7, cr: 0.2, cg: 0.4, cb: 0.36 });
   brightenFog(rig.sheets, em);
@@ -7528,6 +7578,10 @@ function applyVenue(id) {
   if (spec.register === 'fantasy') faeConceptStart({ paletteId: spec.paletteId });
   else faeConceptStop();
   updateVenueChrome();
+  // The venue stages the table's dice (W4): every prospective chip —
+  // palette tiles, tray, pool strips — re-dresses to what a roll will
+  // actually wear now, and back again when the room returns.
+  refreshDieArt();
 }
 
 // GOALS goal 13 made visible: while a fantasy venue is active, the felt,
@@ -9952,6 +10006,8 @@ window.__diceDebug = {
       staged: !!(FAECONCEPT.rig && FAECONCEPT.rig.group.parent),
       stageChildren: FAECONCEPT.rig ? FAECONCEPT.rig.group.children.length : 0,
       venueTower: spec.register === 'fantasy' ? venueTowerFor(currentVenue) : null,
+      // W4: the set the venue stages (null = the table's own choice rules).
+      venueDiceSet: venueDiceSet(),
       // W2: the stage's layout + the fog retreat, so proofs assert
       // placement law (flanks beyond the widest back wall, clear of the
       // tower envelope; the beam on the clearing) off the stage itself.
@@ -10689,6 +10745,11 @@ window.__diceDebug = {
         return lo + (i * 3 + seed) % (hi - lo + 1);
       }),
       seed: seed >>> 0,
+      // The set a REAL roll would record right now (W4): absent for std —
+      // the record stays byte-identical for every pre-venue caller — and
+      // the venue's staged set inside one, so look-drivers photograph the
+      // dice the product actually deals.
+      set: wireSet(),
       label: `${t.length}× seeded`,
     });
     return true;
@@ -11489,6 +11550,10 @@ let traySpent = false;
 // (source label, type) — one stage call shares one override, which makes
 // the pair a stable key. Returns null when no die carries an override.
 function draftDieSets(dice, sources) {
+  // A fantasy venue stages ONE set for every die (W4): suppress per-die
+  // overrides so the roll rides wireSet's venue answer uniformly — which
+  // is also what lets uniformRollRate apply the staged set's cadence.
+  if (venueDiceSet()) return null;
   if (!traySets.some(Boolean) || traySets.length !== tray.length) return null;
   const byKey = new Map();
   tray.forEach((t, i) => {
@@ -11551,7 +11616,9 @@ const offerDraftBtn = document.getElementById('offer-draft');
 // and the CSS ::before diamond keeps the tile legible — art never gates
 // function.
 function decorateDieBtn(btn, label, artType) {
-  const url = dieArtURL(artType, diceSet);
+  // Prospective surfaces show what a roll WILL wear — in a fantasy venue
+  // that is the venue's staged set (W4), everywhere at once.
+  const url = dieArtURL(artType, venueDiceSet() || diceSet);
   if (url) {
     btn.classList.add('has-art');
     const img = document.createElement('img');
@@ -11574,7 +11641,10 @@ function refreshDieArt() {
   for (const img of document.querySelectorAll('img.die-art[data-art-type]')) {
     // data-art-set pins a chip to a POOL's own set (§9 override) — it
     // re-dresses only when its pool re-renders, never with your set.
-    const u = dieArtURL(img.dataset.artType, img.dataset.artSet || diceSet);
+    // The venue outranks both (W4): while it stands, every prospective
+    // chip previews the dice the venue will actually deal.
+    const u = dieArtURL(img.dataset.artType,
+      venueDiceSet() || img.dataset.artSet || diceSet);
     if (u) img.src = u;
   }
 }
@@ -13118,7 +13188,7 @@ function buildDieStrip(types, cap, { grouped = false, set = null } = {}) {
     : types.map((t) => [t, 1]);
   const shown = units.slice(0, cap);
   for (const [type, n] of shown) {
-    const url = dieArtURL(type, variant || diceSet);
+    const url = dieArtURL(type, venueDiceSet() || variant || diceSet);
     if (url) {
       const img = document.createElement('img');
       img.className = 'die-art strip-die';
@@ -17016,12 +17086,17 @@ function openSetMenuFor(anchor, { value, allowDefault, pick }) {
     allowDefault ? 'Pin the table classics — even when you wear a house set'
       : 'The table classics — one color per die type');
   for (const [houseId, house] of Object.entries(THEMES)) {
+    // venueOnly sets take no chip anywhere a player picks (W4 — the
+    // tower flag's twin): a venue stages them; offering one à la carte
+    // is exactly the incoherence GOALS 13 exists to prevent.
+    const pickable = Object.entries(house.sets).filter(([, r]) => !r.venueOnly);
+    if (!pickable.length) continue;
     const head = document.createElement('div');
     head.className = 'set-house-head';
     head.textContent = house.label;
     head.title = house.line;
     menu.appendChild(head);
-    for (const [setId, recipe] of Object.entries(house.sets)) {
+    for (const [setId, recipe] of pickable) {
       const id = `${houseId}.${setId}`;
       addRow(id, recipe.label, setSwatchInfo(id), `${house.label} · ${recipe.label}`);
     }

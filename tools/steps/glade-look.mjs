@@ -56,6 +56,16 @@ export default async function run(stage, args) {
     await t.waitFor(`window.__diceDebug.tower === 'hollowbole'`, { desc: 'tower up' });
     await t.dbg('sim(1500)');
     await shot(`glade-${venue}-resting.png`);
+    // W4: the venue's own dice — the roll is MADE with the staged set
+    // (venueDiceSet → wireSet), pours through the tower, and settles as
+    // witchlight in the fog. The frame the set lives or dies in.
+    await t.dbg(`throwSeeded(['d20','d8','d6','d6','d6','d4'], 4242)`);
+    await t.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
+      { desc: `dice settle in ${venue}`, timeout: 60000 });
+    await t.dbg('sim(400)');
+    await shot(`glade-${venue}-dice.png`);
+    await t.dbg('clearTable()');
+    await t.dbg('sim(200)');
     if (probe) {
       for (const name of probeNames) {
         await t.dbg(`setVisibleByName('${name}', false)`);
