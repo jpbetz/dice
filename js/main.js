@@ -208,11 +208,13 @@ const TOWERS = {
     // a player back in the wait they already served.
     //
     // IDENTICAL PORTALS ARE A CLAIM THIS ROW MAKES AND towerModelEnsure CHECKS:
-    // in {x 0, z -2.55, rimY 9.40, clearR 2.20}, out {x 0, sillY 1.00, w 5.00,
-    // clearH 4.50}, one geometry digest across both bakes. The engine derives
+    // in {x 0, z -2.55, rimY 9.40, clearR 2.20}, out {x 0, sillY 1.00, w 4.20,
+    // clearH 3.50}, one geometry digest across both bakes. The engine derives
     // its whole core from those eight numbers, so two variants that disagreed
     // would be one venue delivering dice through a doorway the other one's
-    // engine did not cut.
+    // engine did not cut. (The mouth tightened to the measured floor
+    // 2026-08-13 — was 5.00 x 4.50, sitting AT the old inherited limits;
+    // see TOWER.md "THE MINIMUMS" and the recipe's derivation.)
     glbUrls: {
       moonrise: '/models/towers/hollowbole_moonrise.glb',
       foxfire: '/models/towers/hollowbole_foxfire.glb',

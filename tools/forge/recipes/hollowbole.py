@@ -58,9 +58,21 @@ S = 1.25 = d20 radius). Limits from check.py TOWER_PORTAL_LIMITS:
                clearR  2.20     limit >= 2.125
     portalOut  x       0.00     limit [-0.75, +0.75]
                sillY   1.00     limit [0.625, 1.375]
-               w       5.00     limit >= 5.0
-               clearH  4.50     limit >= 4.5
+               w       4.20     limit >= 4.0   (floor measured 2026-08-13)
+               clearH  3.50     limit >= 3.375 (floor measured 2026-08-13)
     derived    despawnY = rimY - 1.4*S = 7.65
+
+THE MOUTH TIGHTENED TO THE MEASURED FLOOR (2026-08-13, Joe: "the hole in
+the stump for the dice to exit is too tall"). The first bake's 5.00 x 4.50
+door sat AT the old limits, which were the classic spec's numbers rather
+than anything a die had asked for; the portal-floors campaign
+(tools/steps/portal-probe.mjs, docs/TOWER.md "THE MINIMUMS") measured the
+true floors — congestion at the doorway, not the lone d20, is what sets
+the height — and this bake wears them with a little grace: 4.20 x 3.50
+(floors 4.00 x 3.375). The wound loop re-derives around the smaller
+throat with the same measured jamb margins; the rag above the lintel
+tightens from +1.35 to +0.45 so the VISIBLE hole shrinks with the
+contractual one instead of re-creating the tall read as torn wood.
 
 sillY is 1.00 and not the "organic 1.1-1.25" the brief invited, and that is
 a MEASURED refusal, not timidity. The delivery tongue's top surface has to
@@ -76,7 +88,7 @@ THE THROAT, and the one place this model refuses the brief
 ----------------------------------------------------------
 check.py --tower fires 25 rays out through the door: the box
 
-    |x| <= 2.375,  1.1125 <= y <= 5.3875,  -1.5 <= z <= +1.0
+    |x| <= 1.995,  1.0875 <= y <= 4.4125,  -1.5 <= z <= +1.0
 
 must contain NO geometry. The engine's own apron collider does — its top
 surface stands at y 1.79 at z -1.5, climbing backward through the tower.
@@ -209,14 +221,14 @@ S = 1.25
 AXIS_Z = -2.55                     # the trunk axis, app frame
 
 PORTAL_IN = {"x": 0.0, "rimY": 9.40, "z": AXIS_Z, "clearR": 2.20}
-PORTAL_OUT = {"x": 0.0, "sillY": 1.00, "w": 5.00, "clearH": 4.50, "z": 0.0}
+PORTAL_OUT = {"x": 0.0, "sillY": 1.00, "w": 4.20, "clearH": 3.50, "z": 0.0}
 DESPAWN_Y = PORTAL_IN["rimY"] - 1.4 * S              # 7.65
 
 # The throat box the exit gate probes, restated here so the in-recipe gate
-# and check.py cannot drift: THROAT_MARGIN 0.95 of a 5.00 x 4.50 door.
-THROAT_HALF_W = 0.95 * PORTAL_OUT["w"] / 2.0         # 2.375
-THROAT_Y0 = PORTAL_OUT["sillY"] + PORTAL_OUT["clearH"] * 0.025    # 1.1125
-THROAT_Y1 = THROAT_Y0 + PORTAL_OUT["clearH"] * 0.95              # 5.3875
+# and check.py cannot drift: THROAT_MARGIN 0.95 of a 4.20 x 3.50 door.
+THROAT_HALF_W = 0.95 * PORTAL_OUT["w"] / 2.0         # 1.995
+THROAT_Y0 = PORTAL_OUT["sillY"] + PORTAL_OUT["clearH"] * 0.025    # 1.0875
+THROAT_Y1 = THROAT_Y0 + PORTAL_OUT["clearH"] * 0.95              # 4.4125
 THROAT_Z0, THROAT_Z1 = -1.5, 1.0
 
 # The engine volumes this model has to skin (js/main.js towerVolumes()).
@@ -361,7 +373,7 @@ FRONT_KEEP = 0.62                  # no buttress FIN inside |phi| < this: a
 #                                    in half
 FRONT_KEEP_TOE = 0.66              # ...but a TOE lives entirely UNDER the
 #                                    threshold (it dies at y 0.78, and the
-#                                    exit gate's floor is 1.1125), so it may
+#                                    exit gate's floor is 1.0875), so it may
 #                                    come far round the front and run out
 #                                    onto the felt beside the tongue. Round 1
 #                                    fined and toed off the same fade and so
@@ -541,7 +553,7 @@ def toe_h(y):
     meets the felt, and it has to END — the shoulder at 0.78 is what lets the
     valley beside it be a valley.
 
-    0.92 is also a clearance: the exit gate's floor is 1.1125, so no toe can
+    0.92 is also a clearance: the exit gate's floor is 1.0875, so no toe can
     ever be the thing that blocks the door. It was 0.78 until the first
     round-2 look — the feet were there and correct and simply too low to
     clear the delivery tongue's own shoulder, which stands at 0.5-1.0 across
@@ -836,7 +848,7 @@ def floor_y(phi):
     the bank is the first thing the eye meets through the mouth, it occludes
     everything behind it at any angle, and punk piled in a hollow stump is
     what is actually there. Capped at 0.96 — the exit gate's floor is
-    1.1125 and this has to stay under it with room to spare.
+    1.0875 and this has to stay under it with room to spare.
     """
     z = AXIS_Z + r_in(phi, 1.2) * math.cos(phi)
     # A LOW, LUMPY floor, not a bank. Piling the debris high against the
@@ -861,13 +873,20 @@ def floor_y(phi):
 # The wood between the rag's local minima is what juts into the opening as a
 # splinter tooth — real geometry, not paint.
 
-W_PHI0 = 1.40          # half-width in phi at the widest (80.2 deg)
-W_YC = 4.30            # the wound's centre height
-W_YUP = 2.55           # -> torn arch tops out at 6.85, teeth-max 7.49, and
-#                        that ceiling is load-bearing: despawnY is 7.65 and
-#                        a wound that reached past it would show a die
-#                        vanishing in mid-air to a low camera.
-W_YDN = 3.40           # -> threshold sits at 0.90
+W_PHI0 = 1.30          # half-width in phi at the widest (74.5 deg) — was
+#                        1.40 for the 5.00 door; the 4.20 throat's
+#                        outermost ray sits at phi 1.086 and the wound
+#                        keeps the same measured jamb allowance beyond it.
+W_YC = 2.925           # the wound's centre height (was 4.30)
+W_YUP = 2.025          # -> torn arch tops out at 4.95 — the rag above the
+#                        3.50 door's lintel (4.50) tightens from +1.35 to
+#                        +0.45, because the VISIBLE hole is the rag, not
+#                        the contract rectangle, and the tall read Joe
+#                        called lived in that slack. Teeth-max ~5.6 stays
+#                        far under the despawnY 7.65 ceiling (the old
+#                        mid-air-vanish constraint, now with 2.0 of room).
+W_YDN = 2.025          # -> threshold sits at 0.90, exactly as before —
+#                        the tongue relationship (R4) is untouched.
 
 
 def w_exp(a):
@@ -879,28 +898,35 @@ def w_exp(a):
 W_ARC = 2.75           # phi -> world arc length at the wound's radius
 W_TOOTH_LAM = 0.86     # splinter wavelength, WORLD units
 W_TOOTH_AMP = 0.42     # deepest splinter bay, WORLD units
-W_LOOP_M = 152         # boundary samples, uniform in ARC LENGTH
+W_LOOP_M = 124         # boundary samples, uniform in ARC LENGTH — scaled
+#                        with the tightened wound's ~20% shorter perimeter
+#                        so tooth SAMPLING DENSITY matches round 4 (152 on
+#                        the old loop); also what pays the tri budget for
+#                        the extra wall the smaller wound leaves standing.
 
 # THE LOWER CORNERS COME IN — R2, and the room it is allowed to use is
 # MEASURED, not guessed.
 #
-# check.py fires the exit rays along +z from z = -1.5 at |x| <= 2.375. The
-# outermost of them, at x = 2.375, is at phi = atan2(2.375, 1.05) = 1.155 rad
-# where it is deepest, and it never reaches a larger |phi| than that anywhere
-# along its run. So every radian of the wound beyond |phi| 1.155 is invisible
-# to the gate, and the wound runs to 1.40 plus its rag. That is 0.25 rad of
-# jamb on each side — 0.73 of arc at the trunk's radius, about a fifth of the
-# mouth's width — which can be filled with solid wood without the contract
-# noticing. W_CORNER_U0 0.855 starts the fillet at phi 1.197, keeping 0.04
-# rad of margin over the ray, and assert_throat_clear re-proves it on the
-# triangles.
+# check.py fires the exit rays along +z from z = -1.5 at |x| <= 1.995 (the
+# 4.20 door). The outermost of them, at x = 1.995, is at phi =
+# atan2(1.995, 1.05) = 1.086 rad where it is deepest, and it never reaches
+# a larger |phi| than that anywhere along its run. So every radian of the
+# wound beyond |phi| 1.086 is invisible to the gate, and the wound runs to
+# 1.30 plus its rag — jamb wood the contract never probes. W_CORNER_U0
+# 0.870 starts the fillet at phi 1.131, keeping 0.045 rad of margin over
+# the ray (the same allowance the 5.00 door carried at 1.197 vs 1.155),
+# and assert_throat_clear re-proves it on the triangles.
 #
 # This is also what buries the delivery tongue's end cap (R4b): with the
 # corners square the wall was cut away out to |x| 2.93 at sill height, so the
 # tongue's back face stood in open air beside the mouth and rendered as a
 # black rectangle. Filled corners give it something to hide behind.
-W_CORNER_U0 = 0.855
-W_CORNER_LIFT = 1.55   # world units the sill rises at the extreme corner
+W_CORNER_U0 = 0.870    # fillet starts at phi 1.131 — 0.045 over the new
+#                        throat ray at 1.086, the same margin the 5.00
+#                        door carried (1.197 vs 1.155).
+W_CORNER_LIFT = 0.92   # world units the sill rises at the extreme corner
+#                        (was 1.55 — scaled with the door height so the
+#                        corner fillet keeps its proportion of the mouth)
 
 
 def w_base(a):
@@ -2627,6 +2653,18 @@ def build(variant):
     print(f"[bole] after wound: {nm} non-manifold, volume {vol:.2f}")
     if nm:
         raise RuntimeError(f"wound cut left {nm} non-manifold edges")
+    # AN EMPTY RESULT HAS ZERO NON-MANIFOLD EDGES. The floors campaign
+    # found this the hard way: a self-intersecting wound loop (corner
+    # LIFT out of proportion to the shrunken Y spans) annihilated the
+    # whole shell, and every downstream gate passed vacuously — 25/25
+    # throat rays "clear" through a tower that no longer existed. The
+    # green check that masks a broken thing, in one line. Volume is the
+    # check manifoldness cannot make.
+    if vol < 50:
+        raise RuntimeError(
+            f"wound cut left volume {vol:.2f} (< 50): the cutter consumed "
+            f"the shell — check W_CORNER_LIFT against W_YDN (the loop "
+            f"self-intersects when the fillet outruns the span)")
     F.boolean(shell, door_cutter(), op="DIFFERENCE")
     print(f"[bole] after door:  {F.manifold_report(shell)[0]} non-manifold")
 
