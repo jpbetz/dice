@@ -177,7 +177,38 @@ LIP_C = (0.0, -0.42, 2.8)
 LIP_S = (4.8, 1.0, 2.2)
 LIP_RX = 0.1
 
-XLIM = 3.23                        # the mat wall is physics-real at 3.35
+# THE ENGINE ENVELOPE, AND THE LEVER ARM THAT PUTS THE MODEL INSIDE IT (r3).
+#
+# The socket is |x| <= 3.25, y in [0, 12.5], z in [z0-5.25, z0+0.25], and the
+# audit measures a mesh's WORLD box after the skin group's 0.45 deg lean about
+# z (sin 0.00785). three's Box3.setFromObject rotates the local AABB's CORNERS,
+# so the penalty is the box's, not any vertex's:
+#
+#     min.x' = min.x*cos - max.y*sin      max.y' = max.y*cos + max.x*sin
+#     min.y' = min.y*cos + min.x*sin      z' = z
+#
+# Round 2 measured x +-3.23 with a 12.80 crown and the audit read min.x' as
+# -3.33: 0.08 outside the wall, on a corner the model never occupies. The two
+# numbers are therefore ONE budget, and it is spent height-first because the
+# crown is what a player sees:
+#
+#     crown 12.35 -> |x| <= 3.25 - 12.35*0.00785 = 3.153, taken to 3.13
+#     |x| 3.13    -> max.y' = 12.35 + 0.025 = 12.375  (socket 12.5)
+#
+# The ground-line root spread pays the 0.10: it was 6.46 wide and is 6.26.
+# Keeping 3.23 was available only by moving the feet into the cladding mesh,
+# and the feet are lobes in the SAME radius field as the fiber ridges — the
+# one thing this model refuses to paste on. Measured cost at the felt: the
+# outermost toe crest moves inboard by 0.10 on a 3.1 radius, 3%.
+SOCKET_X = 3.25
+SOCKET_Y1 = 12.5
+TILT_SIN = 0.00785                 # sin 0.45 deg, the engine's lean about z
+XLIM = 3.13                        # was 3.23; see the arithmetic above
+CROWN_MAX = 12.35                  # tallest spire ceiling (VENUE GROUNDS)
+SHELL_FLOOR = -0.09                # the shell's buried row. -0.30 read as
+#                                    min.y' -0.325 and the class needs > -0.15;
+#                                    -0.09 - 3.13*0.00785 = -0.115. Everything
+#                                    under y 0 is felt-covered either way.
 ZFRONT = 0.22                      # the socket's front plane
 ZBACK = -6.30                      # venue grounds: the glade, not a wall
 BUDGET = 8000
@@ -301,11 +332,22 @@ FRONT_KEEP_TOE = 0.66              # ...but a TOE lives entirely UNDER the
 # table leg no matter how ragged the surface on top of it is.
 ROOT_HEADINGS = (-1.00, +0.92, -1.55, +1.75, -2.75, +2.20)
 
-# How far in front of the socket plane a TOE may creep. The trunk itself
-# stops at ZFRONT; its feet do not, because the brief asks for roots "as the
-# tray surround" running out around the tongue. Only wood below y 0.55 is
-# allowed forward of ZFRONT, which is 0.56 under the exit gate's floor.
-TOE_CREEP = 0.85
+# How far in front of the socket plane a TOE may creep. ZERO since r3, and
+# the number that made it cheap is a measurement rather than a preference.
+#
+# The shell has to classify as VENUE GROUNDS — "behind the socket plane,
+# spending glade" — and that class admits z- and y- overruns and NOTHING
+# forward. Round 2's creep put the shell's box at z +0.597, so the whole mesh
+# fell through to UNCLASSIFIED and the fit went red.
+#
+# What 0.85 of creep was actually buying, measured over the ring at each row:
+# at y -0.30 it reached z 0.597 (that row is under the felt), at y 0.02 it
+# reached 0.375 and at y 0.14 it reached 0.308 — so above the felt the creep
+# was worth at most 0.16 of forward wood, over 28 deg of arc, in the two
+# front-diagonal toes. At the resting eye that is under two pixels. The
+# tongue — cladding, and allowed forward to the lip — carries the wood in
+# front of the socket plane from here on.
+TOE_CREEP = 0.0
 
 
 def build_ridges():
@@ -388,7 +430,13 @@ def build_ridges():
     for rank, i in enumerate(order):
         ridges[i]["spire"] = (2.35, 1.55, 1.05, 0.72)[rank]
     tall = min(range(N_RIDGE), key=lambda i: angdist(ridges[i]["th"], -1.05))
-    ridges[tall]["spire"] = 3.30
+    # 2.80, NOT 3.30 — the socket's ceiling, not a taste call. VENUE GROUNDS
+    # requires max.y' <= 12.5 and the audit's box adds max.x*sin to it, so the
+    # tallest tear may reach CROWN_MAX 12.35 and no further. Measured on the
+    # field: 3.30 tops out at 12.815 (0.325 outside), 2.80 at 12.326. The
+    # ladder under it is untouched — 12.33 / 11.81 / 11.11 / 10.63 / 10.11 —
+    # so the tallest is still 0.52 clear of the next and still at -55 deg.
+    ridges[tall]["spire"] = 2.80
     ridges[tall]["w"] = max(ridges[tall]["w"], 0.17)
     ridges[tall]["tallest"] = True
     return ridges
@@ -699,16 +747,12 @@ def clamp_point(r, phi, front, back):
 
 
 def z_front(y):
-    """The socket's front plane — but only for wood the player can walk into.
+    """The socket's front plane, flat — TOE_CREEP is 0 since r3 (see there).
 
-    The TRUNK stops at ZFRONT; its FEET do not. The brief asks for buttress
-    roots working "as the tray surround", which means wood that comes forward
-    of the trunk and lies on the felt on either side of the delivery tongue,
-    and a flat clamp at ZFRONT shears exactly that off. The relaxation is
-    height-gated and small: TOE_CREEP 0.85 forward, gone by y 0.55, which is
-    0.56 clear of the exit gate's floor at 1.1125 — so nothing that moves
-    here can ever be the thing that blocks the door. assert_throat_clear
-    re-proves that against the built triangles rather than this argument.
+    The shape of the relaxation is kept because the constant is the thing
+    that changed: if a future round wins the shell a cladding-classed foot
+    mesh, the creep comes back by setting one number, and every gate that
+    watches the front plane still measures it.
     """
     return ZFRONT + TOE_CREEP * max(0.0, 1.0 - y / 0.55) ** 1.25
 
@@ -1047,7 +1091,7 @@ NPHI = 72
 # a ramp. 0.14 / 0.46 / 0.80 give the shoulder somewhere to happen. They cost
 # 3 x NPHI quads = 432 tris, which is most of round 1's headroom, and the
 # roots were told to spend it.
-OUT_FIXED = [-0.30, 0.02, 0.14, 0.30, 0.46, 0.62, 0.80, 1.05, 1.60,
+OUT_FIXED = [SHELL_FLOOR, 0.02, 0.14, 0.30, 0.46, 0.62, 0.80, 1.05, 1.60,
              2.30, 3.15, 4.10, 5.10, 6.10, 7.00]
 OUT_CROWN = 5                      # rows from 7.00 up to y_top(phi)
 IN_CROWN = 3                       # rows from y_top(phi) down to 7.00
@@ -1256,7 +1300,20 @@ def _lip_plane():
 
 LIP_Y, LIP_K = _lip_plane()
 TONGUE_Z0 = -0.10
-TONGUE_Z1 = LIP_C[2] + LIP_S[2] / 2.0 + 0.06
+# -0.06, not +0.06: the lip collider's front face is z 3.90 and the audit's
+# LIP CLADDING class is "the engine outrun, skinned", so the skin ends INSIDE
+# the thing it clads. Round 2 ran to 3.96 and the fit read z+3.71 past the
+# socket face. Nothing rides the last 0.06 — the lip's top surface has already
+# fallen to y -0.03 there, under the felt.
+TONGUE_Z1 = LIP_C[2] + LIP_S[2] / 2.0 - 0.06
+# THE CLADDING HAS TO DIP A HALF-UNIT UNDER THE FELT, and that is a
+# classification requirement rather than a modelling one: towerModelAudit
+# grants APRON/LIP CLADDING only to a mesh with min.y < -0.5 (the engine's own
+# clad boxes dip a unit), and round 2's -0.35 skirt measured min.y' -0.373 —
+# too deep for FOOT DIP (> -0.15), too shallow for cladding, so the tongue came
+# back UNCLASSIFIED and the whole fit went red on it. -0.62 reads as -0.643
+# after the lean. Nothing about it is visible: the felt is at y 0.
+CLAD_FLOOR = -0.62
 
 
 def tongue_top(z):
@@ -1304,7 +1361,7 @@ def build_tongue(name):
         # not as the bevel of a paving stone
         ring.append((hw * 1.008, top - 0.13, z))
         for u in (0.99, 0.5, -0.5, -0.99):
-            ring.append((u * hw, -0.35, z))
+            ring.append((u * hw, CLAD_FLOOR, z))
         ring.append((-hw * 1.008, top - 0.13, z))
         rings.append(len(verts))
         for p in ring:
@@ -1317,6 +1374,107 @@ def build_tongue(name):
     faces.append(tuple(range(rings[0], rings[0] + n)))
     last = rings[-1]
     faces.append(tuple(range(last + n - 1, last - 1, -1)))
+    ob = F.obj_from_pydata(name, verts, faces)
+    F.recalc_normals(ob)
+    return ob
+
+
+# --------------------------------------------------------------------------
+# THE COWL CURTAIN — the liner, carried up past the tear
+# --------------------------------------------------------------------------
+# WHAT THE ENGINE ACTUALLY ASKS FOR, which is not what the volume table reads
+# like. towerOcclusionCheck fires 99 rays per eye at the COWL band, and those
+# 99 points are three horizontal DISCS ON THE BORE AXIS — radius 2.07, at
+# y 8.55 / 9.90 / 11.25 — not points on the facade slab the band is named
+# after. The band is that tall because it is derived: cowl.c[1] = 7.4*S +
+# (rimY - 7.0*S), height 2.4*S, so declaring rimY 9.40 lifts the top sample to
+# rimY + 1.85. Every one of them, from all six shipped eyes, must die on
+# towerSkin* geometry, and round 2 leaked 354 of the 594.
+#
+# A point floating at y 11.25 over an open crown can only be hidden by
+# geometry BETWEEN it and the eye, and every shipped eye is in front of and
+# above the tower. So the model owes a wall around the FRONT of the bore
+# reaching ~2.4 above the tear — and the splintered crown cannot be that wall,
+# because the front IS the low point of the tear. That is what rimY 9.40
+# declares, and F5 keeps the portals fixed.
+#
+# So the LINER goes up instead, which is how the old JS shell closed the same
+# band; its red check is why we know the layer suffices alone — "facade top
+# 10.70 + lining top 11.62 -> 99/99, the LINING carries it"
+# (js/towerhollow.js). It stands INSIDE the crown, it is painted at the
+# liner's deep value, and seen through a notch it is the same dark the notch
+# was showing before. It is NOT a lid: it is a band around the bore, and the
+# approach column (r 2.09 about the axis, y 7.65 .. 11.90) stays 25/25 clear
+# because the curtain's nearest surface is 2.41 out.
+#
+# HOW TALL — measured, not estimated. The binding ray is wide.eyeFull (y 13.3,
+# the only shipped eye above the band) to the deepest, highest cowl sample
+# (0, 11.25, z0-4.62): it crosses this surface at y 11.779. Round 3's brief
+# said "y ~= 11.5" from the facade-plane reading of the band; the discs put it
+# 0.28 higher, and 11.5 would have shipped a leak the recipe's own gate now
+# refuses. 12.05 with a 0.16 tear is 11.89 at worst — 0.11 of margin — and
+# still 0.28 under the tallest spire, so the crown keeps the skyline.
+CURTAIN_BOT = 8.60         # under the lowest tear (9.40): no slot to see through
+CURTAIN_TOP = 12.05
+CURTAIN_TEAR = 0.16        # the top edge is torn DOWN from that, never up
+CURTAIN_INSET = 0.10       # how far inside the liner's own surface it stands
+CURTAIN_WALL = 0.14        # its thickness
+CURTAIN_ZF = 0.00          # its front plane, 0.06 behind the liner's clamp
+CURTAIN_M = 20             # columns: 18 deg, sagitta 0.03 at r 2.8 — under the
+#                            0.07 floor, and this is the coarseness the tri
+#                            budget buys instead of taking tris off the crown
+CURTAIN_ROWS = 3
+
+
+def curtain_top_at(phi):
+    """Tall across the front, gone by the flanks — the rays that leak all
+    cross between -40 and +45 deg, so that is where the wood goes."""
+    a = abs(phi)
+    t = CURTAIN_TOP - 0.34 * smoothstep(a, 0.30, 0.95)
+    t -= (t - 8.90) * smoothstep(a, 1.05, 1.50)
+    return t - CURTAIN_TEAR * fbm_ring(phi, 0.0, 5.0, SEED + 71, 2)
+
+
+def curtain_r(phi, y, inset):
+    """The liner's radius, pulled in — and held off the socket plane.
+
+    The front is a RADIUS rule, not a z-clamp. clamp_point flattens both of a
+    wall's surfaces onto the same plane, which is fine for the shell (its two
+    clamps are 0.16 apart) and fatal for a thin band: both faces would land on
+    one plane and the solid would collapse to a sheet. min() against
+    (zf - AXIS_Z)/cos keeps the two faces CURTAIN_WALL apart everywhere,
+    including across the flat front plate it produces inside |phi| < 24 deg.
+    """
+    zf = CURTAIN_ZF - (inset - CURTAIN_INSET)
+    return min(r_in(phi, y) - inset,
+               (zf - AXIS_Z) / max(0.25, math.cos(phi)))
+
+
+def build_curtain(name):
+    """A closed band: outer surface up, over the torn top edge, inner surface
+    down, across the bottom edge. Swept full circle it needs no caps."""
+    verts, faces = [], []
+    cols = []
+    for i in range(CURTAIN_M):
+        phi = -math.pi + 2.0 * math.pi * i / CURTAIN_M
+        top = curtain_top_at(phi)
+        ys = [lerp(CURTAIN_BOT, top, k / (CURTAIN_ROWS - 1.0))
+              for k in range(CURTAIN_ROWS)]
+        loop = []
+        for inset, seq in ((CURTAIN_INSET, ys),
+                           (CURTAIN_INSET + CURTAIN_WALL, list(reversed(ys)))):
+            for y in seq:
+                r = curtain_r(phi, y, inset)
+                loop.append((r * math.sin(phi), y, AXIS_Z + r * math.cos(phi)))
+        cols.append(len(verts))
+        for p in loop:
+            verts.append(bl(p))
+    n = 2 * CURTAIN_ROWS
+    for i in range(CURTAIN_M):
+        a, b = cols[i], cols[(i + 1) % CURTAIN_M]
+        for j in range(n):
+            k = (j + 1) % n
+            faces.append((a + j, a + k, b + k, b + j))
     ob = F.obj_from_pydata(name, verts, faces)
     F.recalc_normals(ob)
     return ob
@@ -1653,6 +1811,29 @@ def make_tongue_paint(pal):
     return paint
 
 
+def make_curtain_paint(pal):
+    """The curtain is a HOLE, painted — round 2's interior discipline applied
+    to a surface that is ALWAYS the far side of an opening.
+
+    It never carries the liner's lit end. The liner's own gradient runs from
+    1.0 at the mouth down to 0.040 with depth because the near part of it is
+    genuinely near the light; this surface is only ever seen THROUGH a tear,
+    so it starts at 0.16 of the liner and goes blacker as it rises — the top
+    of it is what a player reads against the night sky through a notch, and
+    the one thing it must not do is out-value the sky and become a wall.
+    """
+    def paint(_poly, co):
+        x, y, z = co.x, co.z, -co.y
+        phi = math.atan2(x, z - AXIS_Z)
+        dep = smoothstep(ZFRONT - z, 1.0, 4.8)
+        occ = lerp(0.16, 0.040, dep) * lerp(1.0, 0.45,
+                                            smoothstep(y, 9.6, 11.4))
+        c = lerp3(pal["liner"], pal["liner_hi"],
+                  0.35 * fbm_ring(phi, y * 0.6, 6.0, SEED + 73, 2))
+        return tuple(v * occ for v in c)
+    return paint
+
+
 def make_shelf_paint(pal):
     """Cap vs gills, by POSITION: find the bracket this corner belongs to and
     read its height within it. The cap carries the palette's pale glow (the
@@ -1865,6 +2046,179 @@ def assert_envelope(objs):
           f"top y {y1:.2f}")
 
 
+def app_box(ob):
+    """One mesh's APP-FRAME local box, from its own vertices."""
+    xs, ys, zs = [], [], []
+    for v in ob.data.vertices:
+        x, y, z = app_of(v.co)
+        xs.append(x)
+        ys.append(y)
+        zs.append(z)
+    return (min(xs), max(xs), min(ys), max(ys), min(zs), max(zs))
+
+
+def world_box(ob):
+    """...and what towerModelAudit will read: the AABB of that box's CORNERS
+    after the skin group's 0.45 deg lean about z. three's Box3.setFromObject
+    takes the non-precise path, so this is the box's penalty, not the mesh's —
+    reproduced here exactly rather than approximated, because round 2 was
+    called red on a corner no vertex occupies."""
+    x0, x1, y0, y1, z0, z1 = app_box(ob)
+    c, s = math.sqrt(1.0 - TILT_SIN ** 2), TILT_SIN
+    xs = [x * c - y * s for x in (x0, x1) for y in (y0, y1)]
+    ys = [x * s + y * c for x in (x0, x1) for y in (y0, y1)]
+    return (min(xs), max(xs), min(ys), max(ys), z0, z1)
+
+
+def assert_mesh_envelopes(shell, tongue, curtain, shelves):
+    """THE FIT AUDIT, run here instead of thirty minutes later in a browser.
+
+    check.py cannot see this: it gates the model's hull against the socket,
+    while towerModelAudit classifies EVERY MESH BOX separately against the
+    engine volume that grants its overruns. Round 2 passed the bake and came
+    back red on two of them at once —
+
+      towerSkinBoleShell   y-0.325  y+0.324  x-0.08  z+0.347  -> UNCLASSIFIED
+      towerSkinBoleTongue  y-0.373                            -> UNCLASSIFIED
+
+    — the shell because VENUE GROUNDS admits z- and y- and nothing else (and
+    needs min.y > -0.15), the tongue because a dip of 0.373 is too deep for
+    FOOT DIP (> -0.15) and too shallow for CLADDING (< -0.5). The dead band
+    between those two classes is the trap, and it is invisible from inside a
+    bake unless something here measures it.
+    """
+    ok = True
+
+    def report(ob, cls, *checks):
+        nonlocal ok
+        b = world_box(ob)
+        bad = [why for good, why in checks if not good(b)]
+        print(f"[bole] {ob.name:<26} world x {b[0]:+.3f}..{b[1]:+.3f}  "
+              f"y {b[2]:+.3f}..{b[3]:+.3f}  z {b[4]:+.3f}..{b[5]:+.3f}  "
+              f"-> {cls}" + ("" if not bad else "   *** " + "; ".join(bad)))
+        if bad:
+            ok = False
+
+    # VENUE GROUNDS: inside x, under the socket top, not below -0.15, no wood
+    # forward of the socket face, and not deeper than the glade.
+    grounds = (
+        (lambda b: b[0] >= -SOCKET_X + 0.02, "min.x outside the socket wall"),
+        (lambda b: b[1] <= SOCKET_X - 0.02, "max.x outside the socket wall"),
+        (lambda b: b[2] > -0.145, "min.y past the FOOT DIP floor (-0.15)"),
+        (lambda b: b[3] <= 12.45, "max.y past the socket top (12.5)"),
+        (lambda b: b[5] <= 0.25, "z+ overrun: VENUE GROUNDS admits none"),
+        (lambda b: b[4] >= -8.0, "deeper than the glade (z0 - 8)"),
+    )
+    report(shell, "VENUE GROUNDS", *grounds)
+    report(curtain, "VENUE GROUNDS", *grounds)
+    report(shelves, "VENUE GROUNDS", *grounds)
+    report(tongue, "LIP CLADDING",
+           (lambda b: b[2] <= -0.55, "min.y is not under the cladding floor "
+                                     "(-0.5) — UNCLASSIFIED, as in round 2"),
+           (lambda b: b[5] <= 3.85, "max.z past the lip's front face (3.90)"),
+           (lambda b: b[5] > 2.0, "max.z inside the LIP/APRON split (z0+2.0)"),
+           (lambda b: b[0] >= -SOCKET_X + 0.02, "min.x outside the socket wall"),
+           (lambda b: b[1] <= SOCKET_X - 0.02, "max.x outside the socket wall"))
+    if not ok:
+        raise RuntimeError("a mesh box is outside the class that has to grant "
+                           "it — towerModelAudit would return UNCLASSIFIED "
+                           "and tower-fit is red (see the lines marked ***)")
+
+
+def assert_curtain(curtain):
+    b = app_box(curtain)
+    if b[3] < 11.45:
+        raise RuntimeError(f"the curtain tops out at {b[3]:.3f}, under the "
+                           f"11.45 the cowl band needs")
+    rmin = min(math.hypot(app_of(v.co)[0], app_of(v.co)[2] - AXIS_Z)
+               for v in curtain.data.vertices)
+    if rmin < PORTAL_IN["clearR"] * 0.95 + 0.10:
+        raise RuntimeError(f"the curtain reaches r {rmin:.3f} of the bore "
+                           f"axis — inside the approach column "
+                           f"({PORTAL_IN['clearR'] * 0.95:.3f})")
+    print(f"[bole] curtain top {b[3]:.2f} (needs 11.45+), nearest approach "
+          f"r {rmin:.2f}, y {b[2]:.2f}..{b[3]:.2f}")
+
+
+# The engine's own occlusion grid, restated so the recipe and js/main.js
+# cannot drift: three discs on the BORE AXIS per band, 33 points each.
+S_CORE = 1.25
+COWL_C_Y = 7.4 * S_CORE + (PORTAL_IN["rimY"] - 7.0 * S_CORE)
+COWL_H = 2.4 * S_CORE
+SMP_KR = PORTAL_IN["clearR"] / (1.7 * S_CORE)
+MAT_EXTRA = 4.5
+# (id, that preset's table depth, its eye). The app anchors each eye to the
+# LIVE back wall — eye.z = z0 + (e.z - z0_of_that_preset) — so in the model's
+# own frame (z = 0 at the socket plane) the z0s cancel and the eye stands at
+# e.z + (depth + matExtra)/2, whatever zoom the lab is wearing.
+ZOOM_EYES = [
+    ("wide.full", 8.6, (0.0, 13.3, 7.7)), ("wide.mini", 8.6, (0.0, 11.0, 6.2)),
+    ("medium.full", 6.7, (0.0, 10.4, 6.0)), ("medium.mini", 6.7, (0.0, 8.6, 4.8)),
+    ("close.full", 5.2, (0.0, 8.1, 4.7)), ("close.mini", 5.2, (0.0, 6.7, 3.8)),
+]
+
+
+def occlusion_samples():
+    def disc(y):
+        pts = [(PORTAL_IN["x"], y, PORTAL_IN["z"])]
+        for r in (0.55 * SMP_KR, 1.1 * SMP_KR, 1.65 * SMP_KR, 2.0 * SMP_KR):
+            for a in range(8):
+                th = a / 8.0 * 2.0 * math.pi
+                pts.append((PORTAL_IN["x"] + math.cos(th) * r, y,
+                            PORTAL_IN["z"] + math.sin(th) * r))
+        return pts
+    cb, ct = COWL_C_Y - COWL_H / 2.0, COWL_C_Y + COWL_H / 2.0
+    bands = {"cowl": [cb + 0.15, (cb + ct) / 2.0, ct - 0.15],
+             "shaft": [DESPAWN_Y, DESPAWN_Y + 0.25, DESPAWN_Y + 0.6]}
+    return {k: [p for y in ys for p in disc(y)] for k, ys in bands.items()}
+
+
+def assert_cowl_occluded(objs):
+    """THE PROOF THE ROUND-2 BAKE DID NOT HAVE, on the built triangles.
+
+    tower-occlusion demands 99/99 on SHAFT and COWL at all six shipped eyes,
+    and a bake that cannot see the grid ships a leak that only a browser finds
+    — which is exactly what happened. The eyes and the sample discs are the
+    engine's, re-derived from the portal spec; the model is the thing that
+    LEANS, so the eyes and points are rotated by -TILT into the model's frame
+    rather than the mesh being rotated into theirs.
+    """
+    import numpy as np
+    tris = tri_array(objs)
+    c, s = math.sqrt(1.0 - TILT_SIN ** 2), TILT_SIN
+
+    def to_model(p):
+        x, y, z = p
+        return np.array([x * c + y * s, -x * s + y * c, z])
+
+    smp = occlusion_samples()
+    worst = {}
+    for eid, depth, e in ZOOM_EYES:
+        eye = to_model((e[0], e[1], e[2] + (depth + MAT_EXTRA) / 2.0))
+        for band, pts in smp.items():
+            missed = []
+            for pt in pts:
+                p = to_model(pt)
+                d = p - eye
+                L = float(np.linalg.norm(d))
+                if ray_hit(tris, eye, d / L, L - 0.02) is None:
+                    missed.append(pt)
+            if missed:
+                worst.setdefault(band, []).append((eid, len(missed), missed[0]))
+    if worst:
+        lines = []
+        for band, rows in worst.items():
+            for eid, n, first in rows:
+                lines.append(f"{band} {n}/{len(smp[band])} leak at {eid}, "
+                             f"first ({first[0]:+.2f}, {first[1]:.2f}, "
+                             f"{first[2]:+.2f})")
+        raise RuntimeError("the occlusion grid leaks — raise curtain_top_at "
+                           "or widen its arc:\n       " + "\n       ".join(lines))
+    print(f"[bole] occlusion {len(smp['cowl'])}/{len(smp['cowl'])} cowl and "
+          f"{len(smp['shaft'])}/{len(smp['shaft'])} shaft, at all "
+          f"{len(ZOOM_EYES)} shipped eyes")
+
+
 def assert_rim_is_low():
     tops = [y_top(-math.pi + 2 * math.pi * i / 720) for i in range(720)]
     lo, hi = min(tops), max(tops)
@@ -1872,8 +2226,13 @@ def assert_rim_is_low():
         raise RuntimeError(
             f"declared rimY {PORTAL_IN['rimY']} is not the crown's low point "
             f"({lo:.3f}) — the portal number must be honest")
+    if hi > CROWN_MAX:
+        raise RuntimeError(
+            f"the tallest tear reaches {hi:.3f}, past the {CROWN_MAX} ceiling: "
+            f"the audit reads max.y' = {hi:.3f} + {XLIM}*{TILT_SIN} = "
+            f"{hi + XLIM * TILT_SIN:.3f} against a socket top of {SOCKET_Y1}")
     print(f"[bole] crown tear {lo:.2f} .. {hi:.2f}  "
-          f"(spires {hi - lo:.2f} above the rim)")
+          f"(spires {hi - lo:.2f} above the rim; ceiling {CROWN_MAX})")
 
 
 def app_of(co):
@@ -2162,9 +2521,10 @@ def build(variant):
     print(f"[bole] after door:  {F.manifold_report(shell)[0]} non-manifold")
 
     tongue = build_tongue("towerSkinBoleTongue")
+    curtain = build_curtain("towerSkinBoleCurtain")
     shelves = build_shelves("towerSkinBoleShelves")
 
-    meshes = [shell, tongue, shelves]
+    meshes = [shell, tongue, curtain, shelves]
     for ob in meshes:
         # RECORDED REPAIR, with its receipt. Straight out of the wound
         # boolean the shell is manifold (0 non-manifold edges) but carries
@@ -2200,6 +2560,11 @@ def build(variant):
     F.single_material(shell, bole_material("bole", "Col", 0.96, spec=0.10))
     F.paint_corners(tongue, "Col", make_tongue_paint(pal))
     F.single_material(tongue, bole_material("boleTongue", "Col", 0.97, spec=0.10))
+    F.paint_corners(curtain, "Col", make_curtain_paint(pal))
+    # 0.02, where the wood gets 0.10: this surface has no story to tell about
+    # light at all, and F0 0.0016 is what keeps the sky's 4% off the one thing
+    # in the model whose whole job is to be a hole.
+    F.single_material(curtain, bole_material("boleCurtain", "Col", 0.99, spec=0.02))
     F.paint_corners(shelves, "Col", make_shelf_paint(pal))
     # the caps are the one damp thing on a dead tree: a little sheen, and a
     # low emissive tinted to the palette's glow — accents, not lamps
@@ -2212,6 +2577,9 @@ def build(variant):
     assert_shelves_bite()
     assert_tongue_seated()
     assert_envelope(meshes)
+    assert_curtain(curtain)
+    assert_mesh_envelopes(shell, tongue, curtain, shelves)
+    assert_cowl_occluded(meshes)
 
     pin, pout = F.tower_portals(PORTAL_IN, PORTAL_OUT)
     F.assert_budget(meshes, BUDGET)
