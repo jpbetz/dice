@@ -3779,7 +3779,7 @@ function playRoll(roll) {
   // below is a function of towerVolumes() and a stream derived from roll.seed
   // — no Date.now, no Math.random, no read of the model — so the same roll
   // bakes the same film on every client, and a skin swap cannot touch it.
-  const tv = pouring ? towerVolumes() : null;
+  const tv = pouring ? towerVolumes(towerPortalsOf(currentTower)) : null;
   const POUR_E = new THREE.Euler();
   const POUR_Q = new THREE.Quaternion();
   const frameOf = (t) => Math.round(t / FIXED_DT);
@@ -7251,7 +7251,7 @@ function towerLanternDispose() {
 function towerLanternBuild() {
   towerLanternDispose();
   if (!towerRig || !TOWERLIGHT.on) return;
-  const v = towerVolumes();
+  const v = towerVolumes(towerPortalsOf(currentTower));
   const t = TOWERLIGHT.tune;
   // decay 0 / distance 0: classic non-attenuating spot, so the intensity
   // dial means the same thing at every distance dial.
@@ -7650,21 +7650,122 @@ document.addEventListener('visibilitychange', () => {
 // stepped live (playback is film) and towers are OPTIONAL — nothing here
 // runs unless towerCore(true), and nothing touches rolls, tableDice, the
 // film, or the wire. Normal rolls behave identically with the lab on.
+// THE PORTAL SPEC — the two openings a tower model owns, and the ONLY thing a
+// model may say about the engine's geometry (docs/TOWER.md §3, §5).
+//
+// `in` is the MOUTH: where dice are dropped and how wide the bore is.
+// `out` is the DOORWAY: where they come back into the room.
+// Everything else the engine computes — the shaft, the aim box, the cowl, the
+// despawn line, the apron's slope, the hood, the lip, the exit spawn — is a
+// FUNCTION of those two, so a model that wants its door somewhere else asks
+// for the door and gets a whole consistent core, rather than editing six
+// volumes and hoping they still agree with each other.
+//
+// DEFAULT_PORTALS is not "a sensible default": it is the classic core, written
+// back out in portal terms, and it is what every registered tower resolves to
+// today. That is load-bearing — see the delta arithmetic in towerVolumes.
+const TOWER_S = 1.25;
+// The lab's lip-tilt dial, frozen as the SHIPPED number. Until now
+// towerVolumes read TOWERLAB.tune.lipTilt directly, which put a live debug
+// knob inside a collider that films are baked against — a determinism hole
+// docs/TOWER.md:107 claims does not exist ("the shipped socket does not read
+// TOWERLAB.tune for anything but matExtra"). It does now: the shipped path
+// reads this constant and the lab override lives in towerLabVolumes().
+const TOWER_LIP_TILT = 0.1;
+const DEFAULT_PORTALS = Object.freeze({
+  in:  Object.freeze({ x: 0, z: -1.6 * TOWER_S, rimY: 7.0 * TOWER_S, clearR: 1.7 * TOWER_S }),
+  out: Object.freeze({ x: 0, sillY: 0.8 * TOWER_S, w: 4.0 * TOWER_S, clearH: 3.6 * TOWER_S }),
+});
+
+// WHERE A PORTAL MAY GO. PROVISIONAL — these are the arithmetic that is
+// already written down in docs/TOWER.md turned into numbers, and they are a
+// smell test, not the gate. The real gate is a per-model proof: fit, occlusion,
+// the probe, and the pour. A spec inside these limits can still be a bad tower;
+// a spec outside them is one we already know the reason for.
+//
+//   in.clearR ≥ 1.7*S — aperture arithmetic (§3): d20 radius 1.25 + aim jitter
+//     0.4 = 1.65 clear radius, and Ø3.4 leaves 0.05 of visual margin. Do not
+//     shrink the mouth.
+//   in.rimY ∈ [5.8*S, 8.2*S] — the floor is the despawn line staying above the
+//     door head, so the vanish never happens in the doorway's sightline; the
+//     ceiling is the socket's own 10*S roof with a cowl still under it.
+//   in.x, in.z — the bore has to stand over the fixed chute and inside the pit
+//     flanks, whose inner faces are at ±3.0: |in.x| + in.clearR ≤ 3.0 − margin.
+//     z is bounded forward by the doorway it must not open onto and backward by
+//     the pit's back wall at z0 − 5.2.
+//   out.w ≥ 4.0*S — door clearance is RADIUS ARITHMETIC (§5): 0.4 jitter +
+//     tan(12°)·0.9 of travel + 1.25 d20 radius ≈ 1.84 of half-width. 4.0*S
+//     leaves 0.16, and the first cut at 3.0 put dice into the jambs.
+//   out.clearH ≥ 3.6*S — a d20 tumbling out of a hood 2.4*S tall.
+//   out.sillY ∈ [0.5*S, 1.1*S] — the apron is a 28°-FAMILY ramp that must
+//     still reach the felt inside the mat depth the tower already bought
+//     (matExtra, fixed): raise the sill and the slope steepens against a run
+//     that cannot grow, lower it and the chute flattens toward the parking lot
+//     probe run 5 measured.
+//   out.x — the doorway is cut in the back wall between two flanking boxes,
+//     so it may slide only as far as the wall segments stay real.
+const TOWER_PORTAL_LIMITS = Object.freeze({
+  in:  { clearRMin: 1.7 * TOWER_S, rimY: [5.8 * TOWER_S, 8.2 * TOWER_S],
+         x: [-1.0 * TOWER_S, 1.0 * TOWER_S], z: [-2.6 * TOWER_S, -1.0 * TOWER_S] },
+  out: { wMin: 4.0 * TOWER_S, clearHMin: 3.6 * TOWER_S,
+         sillY: [0.5 * TOWER_S, 1.1 * TOWER_S], x: [-0.6 * TOWER_S, 0.6 * TOWER_S] },
+});
+
 // The contract volumes, evaluated at the CURRENT mat. The anchor is the back
 // wall's midpoint (moves with zoom); the offsets from it are the contract.
-function towerVolumes() {
+//
+// `spec` is REQUIRED and this function is PURE in (spec, TABLE_D, module
+// consts). It reads no TOWERLAB — a debug dial must never reach a number a
+// film is baked against — and callers name their spec through towerPortalsOf()
+// or towerLabVolumes(). No default parameter, deliberately: a missing spec
+// throws here rather than silently baking the classic core for a model that
+// asked for something else.
+//
+// EVERY DERIVED NUMBER IS `anchor ⊕ delta`, AND THAT SHAPE IS THE PROOF.
+// The anchor is today's literal token sequence, untouched; the delta is a
+// function of (spec.field − DEFAULT_PORTALS.field). A classic tower resolves
+// to DEFAULT_PORTALS itself, so every delta is `x − x` = +0.0 on the same
+// double, and IEEE754 guarantees `y + 0.0 === y` bit-for-bit — which is why
+// tower-contract-freeze passes without the golden being re-captured. Ratios
+// use ×1.0 the same way (`c/c` is exactly 1 for finite non-zero c).
+//
+// DO NOT ALGEBRAICALLY REARRANGE AN ANCHOR. `5.6 * S + dRim` is not
+// interchangeable with `S * (5.6 + dRim/S)`: the second is a different sequence
+// of roundings and lands on a different double, which is a different despawn
+// line, which is two clients rendering one seed as two films.
+function towerVolumes(spec) {
   const z0 = -TABLE_D / 2;
+  // S: every core dimension ×1.25 ("increase the size of EVERYTHING by
+  // maybe 25%", sixth look) — dice are fixed world-size, so clearances were
+  // tight everywhere at base scale. The slope angle is scale-invariant.
+  const S = TOWER_S;
+  // THE DELTAS, computed once. Each is `spec − default`, and at the default it
+  // is +0.0 on the same double. Read the comment above towerVolumes before
+  // touching any expression these appear in.
+  // (in.z and in.clearR have no delta form here on purpose: the shaft and the
+  // aim box take those two ABSOLUTELY — `z0 + spec.in.z` is bit-equal to the
+  // old `z0 - 1.6 * S` and `spec.in.clearR` to `1.7 * S` — and the sampler
+  // wants clearR as a ratio rather than a difference.)
+  const D = DEFAULT_PORTALS;
+  const dInX = spec.in.x - D.in.x;
+  const dRim = spec.in.rimY - D.in.rimY;
+  const dOutX = spec.out.x - D.out.x, dSill = spec.out.sillY - D.out.sillY;
+  const dW = spec.out.w - D.out.w, dH = spec.out.clearH - D.out.clearH;
   // The apron is a RAMP, not a step ("let physics help us out more"): the
   // top surface runs from the doorway sill (z0, y 0.8) down to the felt at
   // z0 + 1.5 — a 28° slope gravity carries dice down. Modelled as a thin
   // box rotated about x; slightly overlong so both ends embed (no lip gaps).
-  const ath = Math.atan(0.8 / 1.5);
-  // S: every core dimension ×1.25 ("increase the size of EVERYTHING by
-  // maybe 25%", sixth look) — dice are fixed world-size, so clearances were
-  // tight everywhere at base scale. The slope angle is scale-invariant.
-  const S = 1.25;
+  // THE SLOPE FOLLOWS THE SILL. The run to the felt is fixed (1.5 base, the
+  // mat depth the tower already bought), so raising the sill by dSill steepens
+  // the same triangle: rise 0.8 + dSill/S over run 1.5, in base units.
+  const ath = Math.atan(0.8 / 1.5 + dSill / (1.5 * S));
   return {
     z0, S,
+    // THE SOCKET IS NOT PORTAL-DERIVED, and that is the point of it: it is the
+    // ENGINE's envelope — the room the tower is allowed to occupy, which is a
+    // fact about the mat and the back wall, not about where this model put its
+    // door. A model that moves a portal gets a moved core inside the SAME hull,
+    // and tower-fit measures it against the same numbers it always did.
     socket:  { c: [0, 5.0 * S, z0 - 2.0 * S], s: [5.2 * S, 10 * S, 4.4 * S] },
     // Thickness 1.0 is TUNNELING ARITHMETIC, not style: at hand-throw speed
     // (~20 u/s) a die covers ~0.33 per 60 Hz step — the 0.3-thin first ramp
@@ -7676,17 +7777,35 @@ function towerVolumes() {
     // there is no flat pit floor for a knocked-back die to rest on, so
     // anything shed backward off the tray pile lands on slope and slides
     // straight back out. The pit is structurally unable to hold a die.
-    apron:   { c: [0, 0.913 * S, z0 - 1.284 * S],
+    //
+    // The ramp's FRONT end is pinned to the felt and its SILL end rises with
+    // the doorway, so the box's midpoint climbs half of dSill while its length
+    // is unchanged and its tilt is the steepened `ath` above.
+    apron:   { c: [0 + dOutX, 0.913 * S + 0.5 * dSill, z0 - 1.284 * S],
                s: [3.8 * S, 1.0 * S, 5.85 * S], rx: ath },
-    shaft:   { c: [0, 4.85 * S, z0 - 1.6 * S], r: 1.7 * S, h: 5.3 * S },
-    aim:     { c: [0, 9.0 * S, z0 - 1.6 * S], s: [0.8 * S, 0.3 * S, 0.8 * S] },
-    cowl:    { c: [0, 7.4 * S, z0 + 0.05 * S], s: [4.2 * S, 2.4 * S, 0.3 * S] },
-    despawnY: 5.6 * S,
+    // The bore stands where the MOUTH says, at the width the mouth says.
+    // `z0 + spec.in.z` is the same double as the old `z0 - 1.6 * S`: the spec
+    // holds the offset already negated, and IEEE a + (−b) ≡ a − b exactly.
+    // The shaft's TOP tracks the rim and its BOTTOM stays on the despawn line,
+    // so the height takes the whole of dRim and the centre takes half.
+    shaft:   { c: [spec.in.x, 4.85 * S + 0.5 * dRim, z0 + spec.in.z],
+               r: spec.in.clearR, h: 5.3 * S + dRim },
+    aim:     { c: [spec.in.x, 9.0 * S + dRim, z0 + spec.in.z],
+               s: [0.8 * S, 0.3 * S, 0.8 * S] },
+    // The cowl rides the rim (it is the rim's front occluder) but stays on the
+    // FACADE in z — the front of any tower here is a flat plane 0.125 thick,
+    // so this one does not follow the bore backward.
+    cowl:    { c: [0 + dInX, 7.4 * S + dRim, z0 + 0.05 * S],
+               s: [4.2 * S, 2.4 * S, 0.3 * S] },
+    // The vanish happens a fixed distance under the rim: raise the mouth and
+    // the despawn line goes up with it, or the fall gets longer in the open.
+    despawnY: 5.6 * S + dRim,
     // Hood deepened 0.5→1.0 base (probe run 7): a die parked on the upper
     // chute at z0+0.78 — 0.18 past the old stalled cutoff, propped by the
     // pile, blocking the spawn sphere for good. The skin's shadow now
     // covers the chute's upper half, so the stalled zone can too.
-    hood:    { c: [0, 2.0 * S, z0 + 0.5 * S], s: [4.6 * S, 2.4 * S, 1.0 * S] },
+    hood:    { c: [0 + dOutX, 2.0 * S + dSill, z0 + 0.5 * S],
+               s: [4.6 * S + dW, 2.4 * S, 1.0 * S] },
     // The LIP (probe run 3): a flat slick outrun after the chute — the die
     // comes down the slope at −28° and its first FLAT contact must level it
     // without eating the forward speed (vertical dies in the low-restitution
@@ -7696,7 +7815,11 @@ function towerVolumes() {
     // slickness does nothing and the tray pile grew until it latched the
     // spawn. At 5°, friction 0.03 < tan 5°, so a parked die creeps forward
     // and drains onto the felt on its own.
-    lip:     { c: [0, -0.42, z0 + 2.8], s: [4.8, 1.0, 2.2], rx: TOWERLAB.tune.lipTilt },
+    // rx is the CONSTANT, not the lab dial — the shipped socket builds this box
+    // as a collider and a film is baked against it. towerLabVolumes() puts the
+    // dial back for the bench, and nothing else may see it.
+    lip:     { c: [0 + dOutX, -0.42, z0 + 2.8], s: [4.8 + dW, 1.0, 2.2],
+               rx: TOWER_LIP_TILT },
     // Exit spawn sits a full unit INSIDE the tower: emergence must read as
     // travel through the doorway, not materialisation at the spout (first
     // lab look). y = 2.0 keeps a d20's bottom above the apron on arrival —
@@ -7712,8 +7835,91 @@ function towerVolumes() {
     // + gravity drop at that die's seeded speed. The eighth look earned it:
     // the first sill arithmetic forgot gravity, and dice arrived below the
     // sill, slammed its end-face, and bounced back into the tower.
-    exit:    { p: [0, 2.3 * S, z0 - 0.7 * S], pitch: -ath },
-    door:    { w: 4.0 * S, h: 3.6 * S },
+    exit:    { p: [0 + dOutX, 2.3 * S + dSill, z0 - 0.7 * S], pitch: -ath },
+    // `sill` is the doorway's FLOOR, and it is new here only in the sense that
+    // it was previously written as the literal `0.8 * v.S` in the two places
+    // that compute a graze height (pourPlan and towerLabDrop). Both now read
+    // it, so a moved sill moves the spawn with it instead of leaving the dice
+    // grazing a chute that is no longer where they think it is.
+    door:    { w: spec.out.w, h: spec.out.clearH, sill: spec.out.sillY },
+    // THE PIT (probe run 1) — the backstop boxes, moved here out of
+    // towerColliders so that builder is 100% volume-driven and no world number
+    // is written in two places. These are HALF-extents, not sizes like `s`
+    // above, because that is how they were authored and a doubling round trip
+    // buys nothing. Not portal-derived: the pit is the engine's enclosure.
+    pit: {
+      back:  { c: [0, 11, z0 - 5.2], h: [7, 11, 0.4] },
+      left:  { c: [-3.4, 11, z0 - 2.6], h: [0.4, 11, 2.6] },
+      right: { c: [3.4, 11, z0 - 2.6], h: [0.4, 11, 2.6] },
+    },
+    // THE TOWER EYE'S OFFSET. The camera dials themselves stay in
+    // TOWERLAB.tune (render-only — see towerEyePose), but WHERE the tower's
+    // subject is is geometry: a mouth that moved sideways or up moves what the
+    // act-one shot is looking at, and the resting eye has to agree with it or
+    // the pour's "identical pose" no-op stops being a no-op.
+    eye: { dx: dInX, dy: dRim },
+    // THE CLASSIFIER'S LADDER (towerModelAudit). These were literals inside
+    // classify(); they are here because three of them are portal-derived — the
+    // gate hood's band follows the door head and the rim, and a wall-hung
+    // prop's floor follows the door's clear height. A model that raises its
+    // doorway would otherwise have its own legal gate hood come back
+    // UNCLASSIFIED. The hood-face threshold is NOT here: it already reads the
+    // derived v.hood, which is the right answer.
+    cls: {
+      footDipY: -0.15, cladY: -0.5, lipSplitZ: 2.0,
+      gateLoY: 3.4 + dH, gateHiY: 6.6 + dRim,
+      flushProud: 0.06, reachLoY: 4.4 + dH, gladeDepth: 8,
+    },
+    // WHAT THE OCCLUSION SAMPLER NEEDS to follow a moved portal. The sampler
+    // lives outside this function (towerOcclusionCheck) and its grids are in
+    // portal-relative units, so it takes the bore's radius RATIO and the
+    // door's width delta rather than re-deriving either. kR is exactly 1.0 at
+    // the default — c/c is 1 for any finite non-zero c, and r*1.0 === r.
+    smp: { kR: spec.in.clearR / D.in.clearR, dW },
+  };
+}
+
+// WHICH PORTALS A REGISTERED TOWER ASKS FOR. The classic models declare none,
+// so they resolve to DEFAULT_PORTALS — the same object, which is what makes
+// every delta in towerVolumes a literal zero rather than a small number.
+//
+// The glbUrl arm is for the baked models still to come (tools/forge): a row
+// that names a mesh but has not had its portals read out of it yet would
+// silently get the classic core, and a tower whose door is somewhere else than
+// the engine thinks is a tower dice fly into the wall beside. Loud, then
+// classic, so the table still works while somebody fixes it.
+function towerPortalsOf(id) {
+  const row = TOWERS[id];
+  if (!row) return DEFAULT_PORTALS;
+  if (row.portals) return row.portals;
+  if (row.glbUrl) console.warn(`[tower] ${id}: portals not loaded — classic volumes substituted`);
+  return DEFAULT_PORTALS;
+}
+
+// THE LAB'S volumes: the skin the bench is wearing, plus the ONE dial that is
+// allowed to reach a volume — and it reaches it HERE, after towerVolumes has
+// returned, so no shipped caller can see it. This is the determinism fix
+// docs/TOWER.md:107 already claimed: before it, TOWERLAB.tune.lipTilt fed a
+// collider on the main world, so two clients with different debug state could
+// bake one seed into two films.
+function towerLabVolumes() {
+  const v = towerVolumes(towerPortalsOf(TOWERLAB.skinId));
+  v.lip.rx = TOWERLAB.tune.lipTilt;   // LAB-ONLY override — the only read of the dial
+  return v;
+}
+
+// THE TOWER EYE, in one place. Both the pour's act one (towerCamTo) and the
+// resting eye (applyCameraFraming) must land on the IDENTICAL pose, because
+// that identity is what makes act one a no-op when the felt is already empty —
+// two copies of this expression is one edit away from a camera that lurches at
+// the start of every pour. The DIALS stay in TOWERLAB.tune: they are
+// render-only and never feed a film, which is exactly why they are allowed to
+// stay a live knob while lipTilt was not.
+function towerEyePose(v) {
+  return {
+    pos: new THREE.Vector3(TOWERLAB.tune.camX + v.eye.dx,
+      TOWERLAB.tune.camY + v.eye.dy, v.z0 + TOWERLAB.tune.camDist),
+    tgt: new THREE.Vector3(v.eye.dx, TOWERLAB.tune.camTgtY + v.eye.dy, v.z0),
   };
 }
 
@@ -7724,7 +7930,7 @@ function towerGhost(color, opacity, geo) {
 }
 
 function towerLabBuild() {
-  const v = towerVolumes();
+  const v = towerLabVolumes();
   const root = new THREE.Group();
   const g = new THREE.Group();        // the contract ghosts, toggled together
   g.name = 'towerGhosts';
@@ -7823,9 +8029,11 @@ function towerColliders(w, v) {
   // die2 ricocheted off a head-on and flew 5 units behind the tower. The
   // tower pit is now enclosed: a back wall and two flanks, all in the
   // skin-occluded region, so a deflected die rattles and comes back out.
-  boxAt('towerBack', wallMat, [0, 11, z0 - 5.2], [7, 11, 0.4]);
-  boxAt('towerL', wallMat, [-3.4, 11, z0 - 2.6], [0.4, 11, 2.6]);
-  boxAt('towerR', wallMat, [3.4, 11, z0 - 2.6], [0.4, 11, 2.6]);
+  // (The numbers moved to towerVolumes' `pit` so this builder is 100%
+  // volume-driven — one place decides where a wall is.)
+  boxAt('towerBack', wallMat, v.pit.back.c, v.pit.back.h);
+  boxAt('towerL', wallMat, v.pit.left.c, v.pit.left.h);
+  boxAt('towerR', wallMat, v.pit.right.c, v.pit.right.h);
   // The apron RAMP is a SLICK CHUTE — its own material, near-zero friction
   // (a polished slide, not felt): at 28° with felt friction (0.25) dice
   // stalled on the slope instead of delivering. Restitution stays low so
@@ -7841,7 +8049,7 @@ function towerColliders(w, v) {
 // The lab's own world: floor, the CURRENT walls, ceiling, apron. It reuses
 // the shared contact materials, so setPhysics tweaks apply here too.
 function towerLabWorld() {
-  const v = towerVolumes();
+  const v = towerLabVolumes();
   const w = new CANNON.World();
   w.gravity.set(0, GRAVITY, 0);
   w.addContactMaterial(cmFloor);
@@ -8038,7 +8246,7 @@ function towerSocket(id) {
     // then build against it.
     towerRig = { id: spec.id, group: null, bodies: [], cm: null };
     towerDeepenMat(TOWERLAB.tune.matExtra);
-    const v = towerVolumes();
+    const v = towerVolumes(towerPortalsOf(spec.id));
     const rig = towerColliders(world, v);
     towerRig.bodies = rig.bodies;
     towerRig.cm = rig.cm;
@@ -8110,7 +8318,7 @@ function pourPlan(dice, v, prng) {
     // spawn itself, so the height is surface + one radius normal to the slope
     // + margin. One formula clears a d20 and a d4 alike; a fixed height cannot,
     // because the radius moves the answer by more than the margin.
-    const surfY = 0.8 * v.S + (v.z0 - v.exit.p[2]) * Math.tan(ath);
+    const surfY = v.door.sill + (v.z0 - v.exit.p[2]) * Math.tan(ath);
     const exit = {
       x: (prng() - 0.5) * POUR.laneSpan,
       y: surfY + r / Math.cos(ath) + 0.2,
@@ -8145,7 +8353,7 @@ function towerLabDrop(n = 8, seed = 42) {
   if (!TOWERLAB.on) towerLabSet(true);
   let s = (seed >>> 0) || 1;
   const rng = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32);
-  const v = towerVolumes();
+  const v = towerLabVolumes();
   n = Math.max(1, Math.min(20, n | 0));
   TOWERLAB.dropped += n;
   // Act one: look at the tower while the dice pour into it.
@@ -8188,7 +8396,7 @@ function towerLabDrop(n = 8, seed = 42) {
     // radius (normal to the slope) + margin — the die kisses the chute at
     // spawn and rides it out the door. The old run-up/gravity terms died
     // with the flat pit.
-    const surfY = 0.8 * v.S + (v.z0 - v.exit.p[2]) * Math.tan(ath2);
+    const surfY = v.door.sill + (v.z0 - v.exit.p[2]) * Math.tan(ath2);
     const exitY = surfY + r / Math.cos(ath2) + 0.2;
     TOWERLAB.falling.push({
       mesh, type, vy: 0, entryAt: TOWERLAB.t + entryAt, entered: false,
@@ -8245,19 +8453,22 @@ function towerLabDrop(n = 8, seed = 42) {
 // prefers-reduced-motion — under which the framing ladder alone decides the
 // eye, exactly as it does for a throw.
 function towerCamTo(phase) {
-  const v = towerVolumes();
+  const v = towerVolumes(towerPortalsOf(currentTower));
   TOWERLAB.camPhase = phase;
   if (prefersReducedMotion()) {
     if (phase !== 'tower') applyCameraFraming(false);
     return;
   }
   if (phase === 'tower') {
+    // The SAME expression applyCameraFraming's tower branch uses — see
+    // towerEyePose for why that identity is the feature and not a tidy-up.
+    const eye = towerEyePose(v);
     camEase = {
       t: 0,
       fromPos: camera.position.clone(),
-      toPos: new THREE.Vector3(TOWERLAB.tune.camX, TOWERLAB.tune.camY, v.z0 + TOWERLAB.tune.camDist),
+      toPos: eye.pos,
       fromTgt: camTarget.clone(),
-      toTgt: new THREE.Vector3(0, TOWERLAB.tune.camTgtY, v.z0),
+      toTgt: eye.tgt,
     };
   } else {
     applyCameraFraming(true);
@@ -8274,7 +8485,7 @@ function towerCamTo(phase) {
 function stepTowerLab(dt) {
   if (!TOWERLAB.on || dt <= 0) return;
   TOWERLAB.t += dt;
-  const v = towerVolumes();
+  const v = towerLabVolumes();
   // Act two, cued EARLY (Joe): the moment the FIRST die exits, start the
   // pull-back — the camera leads the dice onto the felt and is looking
   // down by the time the spread lands. (It used to wait for the last die.)
@@ -8528,7 +8739,7 @@ window.__diceDebug = {
     if (!towerRig || !towerRig.group) return null;
     const root = towerRig.group;
     root.updateMatrixWorld(true);
-    const v = towerVolumes();
+    const v = towerVolumes(towerPortalsOf(currentTower));
     const soc = {
       x: v.socket.s[0] / 2, y1: v.socket.c[1] + v.socket.s[1] / 2,
       zLo: v.socket.c[2] - v.socket.s[2] / 2, zHi: v.socket.c[2] + v.socket.s[2] / 2,
@@ -8538,19 +8749,24 @@ window.__diceDebug = {
     // model. Order matters: the cladding tests are first because a chute
     // box also satisfies "reaches forward", and the specific answer is the
     // useful one.
+    // The ladder's thresholds come from the volumes (v.cls), not from literals
+    // here: three of them are portal-derived, so a model that raised its
+    // doorway would otherwise have its own perfectly legal gate hood come back
+    // UNCLASSIFIED and fail tower-fit.
+    const K = v.cls;
     const classify = (b, over, isDress) => {
-      if (over.every((s) => s.startsWith('y-')) && b.min.y > -0.15) {
+      if (over.every((s) => s.startsWith('y-')) && b.min.y > K.footDipY) {
         return 'FOOT DIP — the model leans (docs/TOWER.md TILT)';
       }
       // The apron and the lip are ENGINE volumes outside the socket by
       // design, and the contract invites a model to skin them. Both cladding
       // boxes are rotated, so both dip a unit below the felt.
-      if (b.min.y < -0.5) {
-        return b.max.z > v.z0 + 2.0
+      if (b.min.y < K.cladY) {
+        return b.max.z > v.z0 + K.lipSplitZ
           ? 'LIP CLADDING — the engine outrun, skinned'
           : 'APRON CLADDING — the engine ramp, skinned';
       }
-      if (b.max.z <= hoodZ + 0.02 && b.min.y >= 3.4 && b.max.y <= 6.6) {
+      if (b.max.z <= hoodZ + 0.02 && b.min.y >= K.gateLoY && b.max.y <= K.gateHiY) {
         return 'GATE HOOD — shadows the doorway (the HOOD volume asks for it)';
       }
       const inX = b.min.x >= -soc.x - 1e-3 && b.max.x <= soc.x + 1e-3;
@@ -8558,14 +8774,14 @@ window.__diceDebug = {
       // outside the socket only because the facade itself ends 0.01 inside
       // it, and 0.06 is the whole budget — a prop that needs more than that
       // is standing off the wall and has to answer as one.
-      if (isDress && inX && b.max.z <= soc.zHi + 0.06 && b.min.y >= -1e-3) {
+      if (isDress && inX && b.max.z <= soc.zHi + K.flushProud && b.min.y >= -1e-3) {
         return 'FLUSH DRESS — lies on the facade (≤ 0.06 proud)';
       }
       // A wall-hung prop: forward of the facade, above everything that ever
       // moves, no wider than the gate hood already is, and inside the socket
       // in x — because the mat's own wall stands at 3.35 and an x overrun is
       // a prop through the side of the room.
-      if (isDress && b.max.z <= hoodZ + 0.02 && b.min.y >= 4.4
+      if (isDress && b.max.z <= hoodZ + 0.02 && b.min.y >= K.reachLoY
         && b.min.x >= -soc.x - 1e-3 && b.max.x <= soc.x + 1e-3) {
         return 'DRESS REACH — a wall-hung prop above the play volume';
       }
@@ -8580,7 +8796,7 @@ window.__diceDebug = {
       if (TOWERS[currentTower] && TOWERS[currentTower].venueOnly
         && b.min.x >= -soc.x - 1e-3 && b.max.x <= soc.x + 1e-3
         && b.max.y <= soc.y1 + 1e-3 && b.min.y > -0.15
-        && b.min.z >= v.z0 - 8
+        && b.min.z >= v.z0 - K.gladeDepth
         && over.every((s) => s.startsWith('z-') || s.startsWith('y-'))) {
         return 'VENUE GROUNDS — behind the socket plane, spending glade';
       }
@@ -8659,7 +8875,7 @@ window.__diceDebug = {
     if (!towerRig || !towerRig.group) return null;
     const root = towerRig.group;
     root.updateMatrixWorld(true);
-    const v = towerVolumes();
+    const v = towerVolumes(towerPortalsOf(currentTower));
     const r3 = (n) => Number(n.toFixed(2));
     const skin = root.getObjectByName('towerSkin');
     const groups = [];
@@ -8742,7 +8958,7 @@ window.__diceDebug = {
   // double; a toFixed(3) here would wave through exactly the 1e-9 drift that
   // an "algebraically equivalent" rearrangement produces.
   towerContractSnapshot() {
-    const v = towerVolumes();
+    const v = towerVolumes(towerPortalsOf(currentTower));
     const xyz = (a) => [a[0], a[1], a[2]];   // caps at three: no array grows here
     // The bodies as cannon holds them, not as towerBodies() rounds them —
     // this is the only place the collider set is read at contract precision,
@@ -8849,7 +9065,7 @@ window.__diceDebug = {
   // model from. Nothing about the film reads the camera; applyCameraFraming()
   // (or any zoom) puts the player's view straight back.
   towerEye(dist = 16, height = 9, xoff = 5) {
-    const v = towerVolumes();
+    const v = towerVolumes(towerPortalsOf(currentTower));
     // An armed reframe would put the eye back on the next tick — and under
     // holdClock it never expires, so it would do it every frame forever.
     camEase = null;
@@ -8875,7 +9091,7 @@ window.__diceDebug = {
     // frame of rAF used to hide it, so the answer depended on how many CDP
     // round-trips the caller happened to make first. Force it.
     TOWERLAB.group.updateMatrixWorld(true);
-    const v = towerVolumes();
+    const v = towerLabVolumes();
     const skin = TOWERLAB.group.getObjectByName('towerSkin');
     // WHAT COUNTS AS AN OCCLUDER, and it is a naming convention rather than a
     // fixed list so a new skin needs no edit here: every NAMED `towerSkin*`
@@ -8887,12 +9103,18 @@ window.__diceDebug = {
     for (const o of skin ? skin.children : []) {
       if (o.name && o.name !== 'towerSkin' && o.name.startsWith('towerSkin')) targets.push(o);
     }
+    // THE GRIDS FOLLOW THE BORE. Radii scale by the mouth's clear-radius ratio
+    // and the discs centre on the shaft, so a model with a wider or moved
+    // mouth is sampled over ITS mouth rather than over where the classic one
+    // used to be — which would quietly grade a bigger tower on a smaller hole.
+    // v.smp.kR is exactly 1.0 for a classic tower, so these are the same points.
+    const kR = v.smp.kR;
     const disc = (y, out) => {
-      out.push([0, y, v.shaft.c[2]]);
-      for (const r of [0.55, 1.1, 1.65, 2.0]) {
+      out.push([v.shaft.c[0], y, v.shaft.c[2]]);
+      for (const r of [0.55, 1.1, 1.65, 2.0].map((n) => n * kR)) {
         for (let a = 0; a < 8; a++) {
           const th = (a / 8) * Math.PI * 2;
-          out.push([Math.cos(th) * r, y, v.shaft.c[2] + Math.sin(th) * r]);
+          out.push([v.shaft.c[0] + Math.cos(th) * r, y, v.shaft.c[2] + Math.sin(th) * r]);
         }
       }
     };
@@ -8906,7 +9128,10 @@ window.__diceDebug = {
       for (const dy of [-0.6, 0, 0.9]) exit.push([dx, v.exit.p[1] + dy, v.exit.p[2]]);
     }
     const hy = v.hood.c[1] - v.hood.s[1] / 2;
-    for (const dx of [-1.4, 0, 1.4]) {
+    // …and the hood grid follows the DOOR's width the same way (dW is the
+    // door's growth, so half of it per side). 1.4 exactly for a classic tower.
+    const hx = 1.4 + v.smp.dW / 2;
+    for (const dx of [-hx, 0, hx]) {
       for (const dy of [0.4, 1.2, 2.4]) {
         for (const dz of [0.15, 0.9]) hood.push([dx, hy + dy, v.z0 + dz]);
       }
@@ -8961,7 +9186,7 @@ window.__diceDebug = {
   towerEcho(on = true) { TOWERLAB.echo = !!on; return TOWERLAB.echo; },
   towerState() {
     const r1 = (n) => Number(n.toFixed(2));
-    const v = towerVolumes();
+    const v = towerLabVolumes();
     return {
       t: r1(TOWERLAB.t),
       z0: v.z0, S: v.S,
@@ -18089,13 +18314,10 @@ function reframeForFeltChange() {
 // applyFramingPose, which is a frame choice, not a camera move.
 function applyCameraFraming(animate = false) {
   if (towerOn() && (!currentRoll || currentRoll.done) && !diceFramingPoints()) {
-    const v = towerVolumes();
+    const v = towerVolumes(towerPortalsOf(currentTower));
     lastFramingMode = 'tower';
-    applyFramingPose({
-      pos: new THREE.Vector3(TOWERLAB.tune.camX, TOWERLAB.tune.camY, v.z0 + TOWERLAB.tune.camDist),
-      tgt: new THREE.Vector3(0, TOWERLAB.tune.camTgtY, v.z0),
-      orbit: 0,
-    }, animate);
+    const eye = towerEyePose(v);
+    applyFramingPose({ pos: eye.pos, tgt: eye.tgt, orbit: 0 }, animate);
     return;
   }
   const pose = computeFraming();
