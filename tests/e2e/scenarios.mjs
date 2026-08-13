@@ -12771,8 +12771,15 @@ export const scenarios = [
       // clearing hole.
       const s = v.stage;
       assert.ok(s, 'the stage reports its layout');
-      assert.ok(s.moot.z + s.moot.rz < -4.3 && Math.abs(s.moot.x) - s.moot.rx > 3.3,
-        `the moot holds a dice-unreachable flank (${s.moot.x}, ${s.moot.z})`);
+      // W7 NEW CLAIM: the ring came FORWARD (Joe — "moving the mushroom
+      // ring more to the foreground"), so it is held to the fore rule
+      // rather than the back-wall one it can no longer meet. Same law,
+      // different wall: outside the dice BOX at every point, which at a
+      // near seat means past the x wall. It declares its band so this
+      // cannot silently become a weaker test for a back-band feature.
+      assert.equal(s.moot.band, 'fore', 'the ring declares which band it is in');
+      assert.ok(s.moot.z - s.moot.rz > 4.3 || Math.abs(s.moot.x) - s.moot.rx > 7.05,
+        `the ring clears the dice box at every point (${s.moot.x}, ${s.moot.z})`);
       assert.ok(s.pool.z + s.pool.rz < -4.3 && Math.abs(s.pool.x) - s.pool.rx > 3.3,
         `the mirror pool holds the other flank (${s.pool.x}, ${s.pool.z})`);
       assert.ok(Math.abs(s.shaft.x) < 2 && s.shaft.z > 0 && s.shaft.z < 2.5,
@@ -12795,7 +12802,12 @@ export const scenarios = [
       // silent drift.
       assert.ok(Array.isArray(s.scenery) && s.scenery.length >= 5,
         `the scenery tier is populated (${(s.scenery || []).length} bits)`);
-      for (const bit of s.scenery) {
+      // W7 NEW CLAIM: mushrooms through the scene, and every clump holds
+      // the same law as the ring it spread from — the population is what
+      // the law covers, not the two features that used to carry it all.
+      assert.ok(Array.isArray(s.shrooms) && s.shrooms.length >= 6,
+        `fungus grows through the scene (${(s.shrooms || []).length} clumps)`);
+      for (const bit of [...s.scenery, ...s.shrooms]) {
         if (bit.band === 'back') {
           assert.ok(bit.z + bit.rz < -4.3 && Math.abs(bit.x) - bit.rx > 3.3,
             `back-band scenery is dice-unreachable (${bit.x}, ${bit.z})`);

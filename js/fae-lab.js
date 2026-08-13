@@ -64,7 +64,7 @@ export const FAE_PALETTES = {
     // value floor is lower, so its water needs a longer lift to stay a
     // pool instead of a hole. Palette-owned because it IS the palette's
     // floor answering — not a shared constant to split the difference on.
-    waterLift: 0.34,
+    waterLift: 0.40, // W7: raised with the pond's new size and depth
   },
   // WITCHLIGHT FOXFIRE (Joe, 2026-08-16: "super dark greens or almost
   // fluorescent greens... maybe lichen or something mystical... pick a
@@ -81,7 +81,7 @@ export const FAE_PALETTES = {
     glowCore: '#7dd8a8', glowCap: '#b8f5d4', glowRim: '#e8fff0',
     accent: '#ff9a44',
     moon: '#cfd9d4',
-    waterLift: 0.42, // see moonrise — the darker world lifts further
+    waterLift: 0.48, // see moonrise — the darker world lifts further
   },
 };
 
@@ -166,8 +166,12 @@ function buildGround(pal, seed) {
       x.fillRect(px - s, py - s, s * 2, s * 2);
     }
   };
-  lobe(-1.5, -4.5, -6.2, -6.4, 14); // socket → moot
-  lobe(1.5, -4.5, 5.7, -6.3, 14);   // socket → pool (W2c seat)
+  lobe(-1.5, -4.5, -6.2, -6.4, 14); // socket → the old court
+  lobe(1.8, -4.6, 6.6, -7.6, 16);   // socket → the pond (W7 seat)
+  // W7: the corridor trail. The ring did not teleport to the foreground —
+  // the ground shows where it walked, down the frame's left edge, and this
+  // is the gradient that carries the eye the same way (rules 2 and 4).
+  lobe(-7.2, -6.6, -8.9, 2.9, 22);
   // BASE TRANSITIONS (rule 9 — nothing floats): a damp dark ring where
   // the pool sits, a trampled pale ring under the moot. Baked into the
   // ground rather than skirted onto the props, because the ground is
@@ -182,8 +186,9 @@ function buildGround(pal, seed) {
     x.fillRect(px - pr, py - pr, pr * 2, pr * 2);
   };
   const damp = new THREE.Color(pal.void).lerp(new THREE.Color(pal.fogBody), 0.5);
-  ring(6.2, -6.6, 4.2, damp, 0.30);  // the pool's wet margin (W2c seat)
-  ring(-6.8, -6.6, 4.0, bed, 0.16);  // the moot's trampled court
+  ring(9.0, -9.2, 6.8, damp, 0.28);  // the pond's wet margin (W7 seat)
+  ring(-6.9, -6.7, 3.0, bed, 0.14);  // the court the ring left behind
+  ring(-8.6, 3.2, 2.3, bed, 0.18);   // and the one it trampled arriving
   // THE GROUND'S ANSWER TO THE STUMP (W2c, rule 11): the model grows its
   // roots and berm; the ground answers with soil. A tight dark contact
   // ring hugging the socket foot — the W2b rings were too soft and wide
@@ -366,10 +371,17 @@ export function brightenFog(sheets, emitters) {
 // was swallowed under the roots — caps peeking from under a stump instead
 // of a story. It now holds the LEFT flank beyond the back wall, and the
 // whole ring is rotated so the gap and the fallen cap face the clearing.
-function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
+// W7: the ring takes its ellipse, its cap scale and its name as arguments,
+// because the glade now stands TWO of them — a near ring in the frame's
+// foreground pocket and the remnant it spread from. `spill` is the walk of
+// strays toward the tower and belongs only to the ring that is near it.
+function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55, opt = {}) {
+  const {
+    rx = 2.8, rz = 1.7, capScale = 1.0, name = 'faeMoot', spill = true,
+  } = opt;
   const rnd = mulberry32(seed ^ 0x51de);
   const group = new THREE.Group();
-  group.name = 'faeMoot';
+  group.name = name;
   const capGeo = new THREE.SphereGeometry(1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2);
   const stemGeo = new THREE.CylinderGeometry(0.28, 0.36, 1, 8);
   const glow = new THREE.Color(pal.glowCap);
@@ -386,8 +398,8 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
   for (let i = 0; i < 11; i++) {
     const th = (i / 11) * Math.PI * 2 + (rnd() - 0.5) * 0.25 + rot;
     if (i === 4) continue; // THE GAP — turned toward the clearing by `rot`
-    const ex = at.x + 2.8 * Math.cos(th), ez = at.z + 1.7 * Math.sin(th);
-    const s = 0.22 + rnd() * 0.16; // a step larger — the flank is farther from the eye
+    const ex = at.x + rx * Math.cos(th), ez = at.z + rz * Math.sin(th);
+    const s = (0.22 + rnd() * 0.16) * capScale;
     const dark = (i === 7 || i === 9);
     const fallen = i === 5;
     // Secondary tier, not primary: the caps must never contest a die
@@ -418,7 +430,7 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
     group.add(stem, cap);
     if (!dark) {
       caps.push({ mat: capMat, base: capMat.emissiveIntensity, i: k, fallen });
-      pools.push({ x: ex, z: ez, r: 1.6 + s, cr: 0.10, cg: 0.30, cb: 0.27, gain: fallen ? 0.9 : 0.5 });
+      pools.push({ x: ex, z: ez, r: (1.6 + s) * capScale, cr: 0.10, cg: 0.30, cb: 0.27, gain: fallen ? 0.9 : 0.5 });
     }
     k++; // seats, not speakers: the dark caps are silences in the wave
   }
@@ -455,6 +467,7 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
   // and the two lit ones are DIM — a spill must never read as new
   // sources (the countable-sources gate).
   const spillTo = { x: -3.5, z: -5.9 }; // just shy of the root flare
+  if (spill) {
   const edge = { x: at.x + 2.3, z: at.z + 0.6 };
   for (let i = 0; i < 5; i++) {
     const t = (i + 0.7) / 5.7;
@@ -477,6 +490,7 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
     cap.position.set(sx, s * 0.85, sz);
     group.add(stem, cap);
   }
+  }
   group.userData.pools = pools; // static fog emitters, folded in at build
   group.userData.at = at;       // reported via venueInfo().stage
   // W5's handles: the lit members, their ground pools, and how many SEATS
@@ -485,6 +499,8 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
   group.userData.caps = caps;
   group.userData.discs = discs;
   group.userData.seats = k;
+  group.userData.rx = rx;   // W7: the layout reports the BUILT extents
+  group.userData.rz = rz;
   return group;
 }
 
@@ -499,7 +515,7 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
 // and two supports at mirrored depth read as bookends, rule 6): deeper
 // into the mist so the background layer gains a tenant (rule 5), still
 // dice-unreachable by 1.3 beyond the widest wall at its nearest edge.
-function buildMirrorPool(pal, seed, at = { x: 6.2, z: -6.6 }) {
+function buildMirrorPool(pal, seed, at = { x: 6.2, z: -6.6 }, dims = { rx: 2.6, rz: 1.75 }) {
   // W2c re-seat: (7.2, -7.4) was W2b's plan-space "depth break", and at
   // the resting eye it photographed as a half-cropped smudge — the frame
   // lost its third feature. (6.2, -6.6) holds the law with margin
@@ -541,7 +557,13 @@ function buildMirrorPool(pal, seed, at = { x: 6.2, z: -6.6 }) {
   // arrow; every directional element rides the circuit or argues with
   // it). W2c: the pool moved a unit nearer the tower, so the bearing to
   // the foot opens slightly — 0.62 → 0.68, re-derived from the new seat.
-  x.rotate(0.68);
+  // W7 re-derivation. The glint's column runs along canvas +y, which the
+  // mesh's scale turns into world (−sinθ·rx, cosθ·rz) — so the angle that
+  // aims it at the tower's foot depends on the pool's ASPECT as well as
+  // its seat, and both just changed. From (9.2, −10.8) to the foot at
+  // (0, −3.2) the offset is (−9.2, +7.6); solving
+  // (sinθ·5.6)/(cosθ·3.0) = 9.2/7.6 gives tanθ = 0.6485.
+  x.rotate(0.575);
   const pale = new THREE.Color(pal.moon).lerp(new THREE.Color('#ffffff'), 0.45);
   const dashes = 9;
   for (let i = 0; i < dashes; i++) {
@@ -576,13 +598,13 @@ function buildMirrorPool(pal, seed, at = { x: 6.2, z: -6.6 }) {
     new THREE.MeshBasicMaterial({
       map: tex(c), transparent: true, depthWrite: false, fog: true,
     }));
-  mesh.scale.set(2.6, 1.75, 1);
+  mesh.scale.set(dims.rx, dims.rz, 1);
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.set(at.x, 0.045, at.z);
   mesh.renderOrder = 2;
   mesh.name = 'faeMirrorPool';
   // The water breathes a little cool light into the fog above it.
-  mesh.userData.emitter = { x: at.x, z: at.z, r: 2.4, gain: 0.45, cr: 0.14, cg: 0.20, cb: 0.24 };
+  mesh.userData.emitter = { x: at.x, z: at.z, r: 0.92 * dims.rx, gain: 0.45, cr: 0.14, cg: 0.20, cb: 0.24 };
   return mesh;
 }
 
@@ -703,6 +725,62 @@ function buildSceneryBits(pal, seed) {
   return { group, items };
 }
 
+// MUSHROOMS THROUGH THE SCENE (W7, Joe: "more mushrooms throughout the
+// scene would help"). The glade had exactly two places fungus existed —
+// the ring and its five-cap spill — which is what made the ring read as a
+// SET PIECE rather than as the densest part of something that grows here.
+// This scatters small clumps across the legal ground: mostly DARK, a
+// handful dim, none of them a new countable source (same discipline as
+// the spill, and the reason the budget does not move). Every clump
+// declares itself to the layout so venue-set holds the placement law over
+// the whole population rather than over the two rings.
+function buildMushroomScatter(pal, seed, clumps) {
+  const rnd = mulberry32(seed ^ 0x5140);
+  const group = new THREE.Group();
+  group.name = 'faeShrooms';
+  const capGeo = new THREE.SphereGeometry(1, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2);
+  const stemGeo = new THREE.CylinderGeometry(0.28, 0.36, 1, 6);
+  const glow = new THREE.Color(pal.glowCap);
+  const dim = new THREE.Color(pal.bark);
+  const items = [];
+  for (const c of clumps) {
+    const n = c.n || 3;
+    let far = 0;
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * (c.r || 0.9);
+      const sx = c.x + Math.cos(a) * r, sz = c.z + Math.sin(a) * r * 0.7;
+      const s = (0.10 + rnd() * 0.13) * (c.scale || 1);
+      // At most ONE lit member per clump, and only where the clump asks
+      // for it: scattered light is how a field turns into a constellation
+      // of sources nobody counted.
+      const lit = c.lit && i === 0;
+      const cap = new THREE.Mesh(capGeo, new THREE.MeshStandardMaterial({
+        color: lit ? new THREE.Color(pal.glowCore) : dim,
+        emissive: lit ? glow : '#000000',
+        emissiveIntensity: lit ? 0.16 : 0,
+        roughness: 0.75,
+      }));
+      const stem = new THREE.Mesh(stemGeo,
+        new THREE.MeshStandardMaterial({ color: pal.bark, roughness: 0.9 }));
+      cap.scale.setScalar(s);
+      stem.scale.set(s, s * 0.85, s);
+      if (rnd() < 0.18) {                       // one in five has fallen over
+        cap.rotation.z = Math.PI * (0.75 + rnd() * 0.4);
+        cap.position.set(sx + 0.12, s * 0.4, sz + 0.08);
+        stem.rotation.z = Math.PI / 2.2;
+        stem.position.set(sx - 0.1, s * 0.3, sz);
+      } else {
+        stem.position.set(sx, s * 0.45, sz);
+        cap.position.set(sx, s * 0.9, sz);
+      }
+      group.add(stem, cap);
+      far = Math.max(far, Math.abs(Math.cos(a) * r));
+    }
+    items.push({ x: c.x, z: c.z, rx: (c.r || 0.9) + 0.2, rz: (c.r || 0.9) * 0.7 + 0.2, band: c.band });
+  }
+  return { group, items };
+}
+
 // THE MIST BAND (W2 — the horizon's missing middle tier). The treeline's
 // canopy is deliberately void-coloured, and the sky and the distance fog
 // are the same void — so the silhouette had nothing to stand against and
@@ -785,22 +863,24 @@ function buildMistBand(pal, seed) {
 // buildLife seats each member outside the dice box including its own
 // wander, so a zone edited for a better picture cannot quietly put a
 // firefly over the felt.
+// W7 re-seat: the life follows the staging. The ring moved into the
+// frame's near-left pocket, the pond went out to the treeline, and the
+// zones went with them — a firefly field authored around features that
+// have moved is a field over empty ground.
 const GLADE_LIFE_ZONES = [
-  // The moot's court and the pool's bank: the two supports, where a
-  // glade's life would actually be — over damp ground and under caps.
-  { x: -6.9, z: -7.0, rx: 3.2, rz: 1.7, y0: 0.20, y1: 1.90, w: 30 },
-  { x: 6.3, z: -7.0, rx: 3.0, rz: 1.7, y0: 0.20, y1: 1.70, w: 24 },
+  // The ring's court, near and left: the densest air in the frame, right
+  // where the eye now enters.
+  { x: -9.1, z: 3.0, rx: 1.2, rz: 1.4, y0: 0.15, y1: 1.30, w: 26 },
+  // The left corridor the fungus trail walks — it carries the eye from
+  // the back band forward to the ring, and the life carries it too.
+  { x: -9.8, z: 0.0, rx: 1.0, rz: 3.2, y0: 0.20, y1: 1.60, w: 18 },
+  // The old court, where the ring used to stand and the scatter still does.
+  { x: -7.4, z: -7.2, rx: 3.0, rz: 1.7, y0: 0.20, y1: 1.90, w: 24 },
+  // The pond's far bank.
+  { x: 8.4, z: -8.9, rx: 3.4, rz: 1.9, y0: 0.20, y1: 1.70, w: 18 },
   // The back band, under the treeline — depth, and the layer the mist
   // band already owns (rule 5: every layer occupied).
-  { x: 0, z: -9.6, rx: 9.0, rz: 2.4, y0: 0.35, y1: 2.60, w: 34 },
-  // The foreground wing, beside the scenery tufts: the near field is
-  // where parallax lives, and it is the one band a flying speck can
-  // occupy without standing on anything. Proved in-frame by
-  // worldToScreen before it shipped (rule 13).
-  // x −9.4 rather than −9.0: at −9.0 the near lobe of this ellipse reached
-  // inside the box-plus-wander and the build had to reseat one member. A
-  // zone that needs seating is a zone authored wrong, so it moved.
-  { x: -9.4, z: 4.9, rx: 1.15, rz: 1.6, y0: 0.15, y1: 1.15, w: 12 },
+  { x: 0, z: -10.2, rx: 8.0, rz: 2.0, y0: 0.35, y1: 2.60, w: 24 },
 ];
 
 // THE ROUTE. A closed loop that rides the composition's own circuit
@@ -811,19 +891,27 @@ const GLADE_LIFE_ZONES = [
 // and it is where the wisps dwell when dice are down — the closest the
 // living layer ever comes to a result, and still 1.5 units behind the
 // widest back wall.
+// W7: the route follows the ring. It now runs the frame's LEFT CORRIDOR
+// forward into the near pocket — the only lane that reaches the
+// foreground without crossing the dice box — dwells at the ring, and
+// returns the long way over the pond and the back band. The near arc is
+// genuinely near now: waypoint 4 is in front of the front wall, which the
+// old route could never be.
 const GLADE_LIFE_LOOP = [
-  [-8.8, 1.55, -9.0],  // 0 the mist behind the moot
-  [-7.0, 1.00, -7.0],  // 1 over the ring          ← the session station
-  [-4.6, 0.90, -6.1],  // 2 the lobe, over the fallen branch
-  [-1.5, 1.30, -6.0],  // 3 the root flare         ← THE NEAR ARC
-  [1.9, 1.20, -6.1],   // 4 right of the trunk
-  [4.9, 0.95, -6.6],   // 5 the pool's near bank
-  [7.7, 1.45, -7.8],   // 6 out over the water
-  [6.0, 2.35, -9.6],   // 7 rising into the mist
-  [0.8, 2.60, -10.4],  // 8 the back band
-  [-4.6, 2.25, -9.9],  // 9 coming home
+  [-9.9, 1.50, -8.8],   //  0 the mist behind the old court
+  [-10.3, 1.15, -5.2],  //  1 turning into the corridor
+  [-10.0, 0.95, -1.6],  //  2 coming forward, outside the x wall
+  [-9.7, 0.85, 1.8],    //  3
+  [-9.0, 0.80, 3.2],    //  4 the ring           ← THE NEAR ARC / session
+  [-10.4, 1.40, 6.8],   //  5 past it and turning
+  [-12.0, 2.10, 1.5],   //  6 the long way back, wide
+  [-11.4, 2.35, -5.0],  //  7
+  [-4.5, 2.55, -10.0],  //  8 the back band
+  [3.0, 1.90, -10.8],   //  9
+  [9.0, 1.45, -9.6],    // 10 over the pond
+  [10.6, 2.20, -12.4],  // 11 out into the treeline mist
 ];
-const GLADE_NEAR_ARC_U = 3 / GLADE_LIFE_LOOP.length;
+const GLADE_NEAR_ARC_U = 4 / GLADE_LIFE_LOOP.length;
 
 // THE TREELINE — the value structure the second plate proved missing: a
 // ring of near-void forest silhouette around the glade, melting into the
@@ -1073,8 +1161,39 @@ export function buildFaeConcept({
   const ground = buildGround(pal, seed);
   const clearing = buildClearingDetail(pal, seed);
   const sheets = buildFogSheets(pal, seed);
-  const moot = buildMoot(pal, seed);
-  const pool = buildMirrorPool(pal, seed);
+  // THE RING COMES FORWARD (W7, Joe: "moving the mushroom ring more to the
+  // foreground"). It sits in the frame's own near pocket — measured, not
+  // guessed: at the resting eye the near field is cropped everywhere
+  // except a bottom-LEFT wedge (x −10…−5 at z +3…+5), which is why this is
+  // a left-hand move and not a symmetric one. Smaller in the world and
+  // much LARGER on screen, which is the angular-size contrast rule 6 says
+  // is one of the few levers that survives this projection — and the reason
+  // the tower stops being the only near thing in the picture.
+  //
+  // Legality is the x wall, not the front one: |x| − rx = 7.40 clears the
+  // widest mat's 7.05, where z − rz would need z > 6.0 and z 6 is out of
+  // frame entirely. That conflict is what Joe's "(don't worry about where
+  // the dice land too much)" anticipated; it is answered here without
+  // spending the licence.
+  // First seat (−9.0, 4.6) put the ring's left half outside the frame —
+  // the same half-cropped mistake W2b made with the pool, caught the same
+  // way, by looking. The frame map says z +4 keeps x −10…−3, so the ring
+  // moves right and forward into the middle of that wedge and its extents
+  // are trimmed to fit: |x| − rx = 7.35 still clears the widest mat's 7.05.
+  const moot = buildMoot(pal, seed, { x: -8.6, z: 3.2 }, 0.55,
+    { rx: 1.35, rz: 0.95, capScale: 0.72, spill: false });
+  // THE POOL GOES BACK AND GROWS UP. It was a puddle at the tower's right
+  // hand, the same size and depth as the ring on the left — the bookend
+  // that survived W2b because plan-space moves cannot break a bookend the
+  // eye reads in screen space. As a wide sheet of water out at the
+  // treeline it stops being the ring's sibling and becomes the background
+  // layer's own tenant (rule 5).
+  // …and out at −10.8 the water read as a dark hole rather than a pond —
+  // the exact failure the W0 plate recorded at lift 0.14. Nearer, and the
+  // palette lifts further (below), because a bigger sheet further back
+  // takes more fog and needs more value to stay water.
+  const pool = buildMirrorPool(pal, seed, { x: 9.0, z: -9.2 },
+    { rx: 5.2, rz: 2.8 });
   // THE LIVING LAYER (W5). The caller owns the dials and the dice box —
   // the box is the table's, not the glade's, and a venue must never carry
   // its own copy of the mat's numbers (the C25/C28 class of bug: a
@@ -1090,6 +1209,22 @@ export function buildFaeConcept({
   const treeline = buildTreeline(pal, seed);
   const mist = buildMistBand(pal, seed);
   const scenery = buildSceneryBits(pal, seed);
+  // W7: MUSHROOMS THROUGH THE SCENE, and the trail that explains the ring.
+  // The clumps run from the old court, down the frame's left corridor, to
+  // the ring's new seat — so the ring reads as the densest part of
+  // something that grows here rather than as an object that was placed.
+  // Every clump clears the dice box: the back-band ones past the back wall
+  // AND the tower envelope, the corridor ones past the x wall.
+  const shrooms = buildMushroomScatter(pal, seed, [
+    { x: -6.8, z: -6.6, r: 1.7, n: 6, lit: true, band: 'back' },
+    { x: -5.0, z: -5.8, r: 1.1, n: 4, band: 'back' },
+    { x: -10.5, z: -8.5, r: 1.4, n: 5, band: 'back' },
+    { x: 5.0, z: -8.2, r: 1.2, n: 4, band: 'back' },
+    { x: 8.5, z: -6.2, r: 1.0, n: 3, lit: true, band: 'back' },
+    { x: -9.6, z: -1.5, r: 1.0, n: 4, band: 'fore' },
+    { x: -9.9, z: 1.6, r: 0.9, n: 3, lit: true, band: 'fore' },
+    { x: -9.5, z: 3.2, r: 0.9, n: 3, band: 'fore' },
+  ]);
   // NO STUMP PROP. The W0 concept plates placed a lab stump at the future
   // socket; when the real Hollow Bole shipped (W3) the venue kept
   // planting the prop underneath it, and the two interleaved into a pale
@@ -1097,7 +1232,8 @@ export function buildFaeConcept({
   // setVisibleByName forensics, not by staring). The tower is the
   // venue's tower now; buildStumpShell survives only as the exported lab
   // reference.
-  group.add(ground, clearing, mist, treeline, moot, pool, scenery.group, alive.group, shaft, halos, ...sheets);
+  group.add(ground, clearing, mist, treeline, moot, pool, shrooms.group,
+    scenery.group, alive.group, shaft, halos, ...sheets);
   // Fold the static light — the moot's pools and the mirror pool's cool
   // breath — into the fog base (techniques §6).
   brightenFog(sheets, [...moot.userData.pools, pool.userData.emitter]);
@@ -1109,8 +1245,18 @@ export function buildFaeConcept({
   const layout = {
     // rx/rz are the props' ground half-extents, so the placement law can
     // be asserted about the NEAREST point, not the centre.
-    moot: { x: moot.userData.at.x, z: moot.userData.at.z, rx: 2.8, rz: 1.7 },
+    // W7: the ring is a FORE-band feature now, so it carries its band and
+    // is held to the fore rule (outside the dice box at every point) rather
+    // than to the back-wall one it could no longer meet. Reported off the
+    // built ring's own extents, not from a constant beside it.
+    moot: {
+      x: moot.userData.at.x, z: moot.userData.at.z,
+      rx: moot.userData.rx, rz: moot.userData.rz, band: 'fore',
+    },
     pool: { x: pool.position.x, z: pool.position.z, rx: pool.scale.x, rz: pool.scale.y },
+    // Every mushroom clump, banded, so the law covers the whole population
+    // and not just the ring (W7).
+    shrooms: shrooms.items,
     shaft: { x: shaft.position.x, z: shaft.position.z },
     sheetYs: sheets.map((s) => s.position.y),
     veilHole: 7,
@@ -1121,5 +1267,5 @@ export function buildFaeConcept({
     // contract discipline as the rest of the stage.
     scenery: scenery.items,
   };
-  return { group, pal, sheets, life: alive, halos, moot, pool, mist, layout };
+  return { group, pal, sheets, life: alive, halos, moot, pool, mist, shrooms, layout };
 }
