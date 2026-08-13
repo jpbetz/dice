@@ -2997,6 +2997,29 @@ asymmetric and torn OUTSIDE the clear box while leaving the box itself
 untouched — an overhanging splinter that intrudes on it is a die
 collision, not a detail.
 
+**AND THE TAPER IS INVERTED** (Joe, same day: *"did you notice how the
+stump is not particularly wide at the bottom and gets much wider near the
+top? Most stumps are dramatically wider at the bottom… This needs
+work"*). Arithmetic, not taste — `base(y)` evaluates to **2.74 at the
+foot, 2.47 at the waist, 2.90 at the shoulder**, so the shoulder is 6%
+wider than the ground. That is a vase, and it feeds the helmet read
+directly, because a helmet flares at the top and a stump flares at the
+bottom. Two constraints make it non-trivial and both hold: XLIM 3.13
+(plus the tilt term) caps the foot, which is why the answer is mostly to
+NARROW THE CROWN rather than to fatten the foot; and `PORTAL_IN`'s
+clearR 2.20 at rimY 9.40 is an INNER radius, so crown room has to be
+bought by retuning `wall(y)`. The buttress web also dies by y 3.3, which
+makes the flare a skirt at the ankle instead of a base that flares.
+
+**A LESSON WORTH MORE THAN THE FIX:** the comment above `base` says
+"heavy foot… a crown that flares back out". The heavy foot is 0.32 of
+exponential and the crown flare is 0.48 of smoothstep — **the comment
+describes the opposite of what the numbers do**, and it survived four
+review-gated rounds because everyone who looked at that function read the
+prose. Same family as "never write a comment claiming a check passed",
+and the reason the correction was sent as EVALUATED VALUES at named
+heights rather than as a curve someone would have to trust.
+
 **② The staging.** The moot moves toward the FOREGROUND, the pool moves
 back and changes size outright, and mushrooms spread through the scene
 instead of pooling in one ring. Note what his parenthesis licenses and
