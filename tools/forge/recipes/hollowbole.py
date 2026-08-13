@@ -86,6 +86,37 @@ interior would not go dark at any paint value, and the trunk read as
 smooth pale soap. Every material judgement made before that was found is
 worthless. Rotten wood is 0.96.
 
+AND ROUGHNESS WAS ONLY HALF OF IT (round 2). Roughness spreads the
+specular lobe; it does not remove the specular. F0 stays 0.04 whatever you
+do, and 0.04 of a 2.2 key is ~0.07 sRGB that arrives REGARDLESS OF ALBEDO
+— which is why the deepest part of the cavity was still glowing after the
+liner had been taken down 5x and then another 2.75x. The tell was colour:
+the pixel measured (19, 17, 15), warm, in the ratio of the key's own
+0xfff2dd, on a surface painted (0.00017, 0.00023, 0.00031), cool and
+essentially black. Diffuse cannot make that. Specular IOR Level 0.10 (F0
+0.008, exported as KHR_materials_specular) took it to 0.016, and cost the
+LIT exterior 2-4% — measured over the model's pixels, front34 / restingeye
+/ side.
+
+WHAT ROUND 2 CHANGED, all five items from the review gate:
+  R1 the roots were chosen by hash rank and every one of them landed at
+     |phi| >= 88 deg — the whole front-facing arc, the only part a player
+     sees, was bare cone (radius climbing 2.76 -> 3.28 with NO local
+     minimum). Now chosen by HEADING, with feet that are compact, low,
+     budgeted against the mat, and separated by valleys that are CUT.
+  R2 the wound's bottom corners were square out to |x| 2.93; a fillet from
+     |phi| 1.197 (the exit rays never reach past 1.155) plus a jamb swell
+     and a sill apron give the lower front real mass.
+  R3 the liner is 5x darker, multiplied down a further 25x with depth, and
+     the specular that was actually lighting it is gone.
+  R4 shelves read the LOCAL surface and refuse to place where they cannot
+     bite (2 of 12 refused); the tongue's edge no longer overhangs the
+     crevice that was frame 11's black rectangle.
+  R5 the tip's flat facet was never the summit — r_out splayed 0.16 above
+     the rim and r_in did not, so the rim strip grew back to 0.20 at the
+     exact height wall_at was tapering it to 0.02. Both surfaces splay now,
+     and both noise fields die into the tear.
+
 MEASURED, NOT ASSUMED. Every dimensional claim above is re-derived from the
 built vertices at bake time: assert_throat_clear and assert_approach_clear
 cast rays at the finished triangles (not at the constants that generated
@@ -95,8 +126,9 @@ a stance outside 1.7-2.25:1 (it measures 2.00:1) and a crown whose tallest
 spire is centred. A gate that reads constants only restates its own
 assumptions.
 
-Measured at the last bake: 7116 tris, watertight, 25/25 on both throats,
-x within +-3.23, tallest spire 12.89, both palettes byte-identical in
+Measured at the last bake: 7600 tris, watertight, 25/25 on both throats,
+x within +-3.23, tallest spire 12.80, stance 1.98:1, 6 roots, 5 spires,
+10 shelf brackets placed and 2 refused, both palettes byte-identical in
 geometry (shared `set` digest) and different only in COLOR_0.
 
     tools/forge/bake.sh tools/forge/recipes/hollowbole.py \
@@ -104,6 +136,11 @@ geometry (shared `set` digest) and different only in COLOR_0.
     # then gate the second variant by hand:
     ~/opt/dice-forge/venv/bin/python tools/forge/check.py \
         tools/forge/out/hollowbole_foxfire.glb --tower --expect-colors --max-tris 8000
+    # and the interior value order, on the renders (hollowbole_look.js
+    # shoots the named angles; 19-probe is the frame this reads):
+    ~/opt/dice-forge/venv/bin/python tools/forge/recipes/hollowbole_probe.py \
+        tools/forge/out/hollowbole_moonrise.glb \
+        tools/forge/shots/final-moonrise-19-probe.png --assert
 """
 
 import math
@@ -235,8 +272,40 @@ def angdist(a, b):
 # BETWEEN them, so nothing is pasted onto anything.
 
 N_RIDGE = 11
-FRONT_KEEP = 0.62                  # no root lobes inside |phi| < this: the
-#                                    tongue lane must stay a clean slide
+FRONT_KEEP = 0.62                  # no buttress FIN inside |phi| < this: a
+#                                    fin on the front face would be a fin in
+#                                    the doorway, and the wound would saw it
+#                                    in half
+FRONT_KEEP_TOE = 0.66              # ...but a TOE lives entirely UNDER the
+#                                    threshold (it dies at y 0.78, and the
+#                                    exit gate's floor is 1.1125), so it may
+#                                    come far round the front and run out
+#                                    onto the felt beside the tongue. Round 1
+#                                    fined and toed off the same fade and so
+#                                    had neither, anywhere the player looks.
+
+# THE SIX HEADINGS THE GROUND LINE NEEDS.
+#
+# Round 1 chose its roots by hash rank among every ridge past 49 degrees. The
+# hash drew 1, 2, 3, 4, 5, 6 — headings +92, +124, +160, -162, -124, -88 —
+# so every root it built sat on the flanks or the BACK, and the whole
+# front-facing arc, which is the only part a player at the table ever sees,
+# was left as bare cone. Measured off that bake: the outer radius from -90 to
+# +90 climbed from 2.76 to 3.28 monotonically, with no local minimum
+# anywhere. That is not a stump with roots; that is a cylinder.
+#
+# So the set is chosen by COVERAGE — two front diagonals, two flanks, two on
+# the back quarters — and the hash is demoted to jittering reach and width.
+# The targets are deliberately UNEVEN (the pair that lands on the back is
+# -162/+124, not a mirror) because a mirrored root plan reads as a turned
+# table leg no matter how ragged the surface on top of it is.
+ROOT_HEADINGS = (-1.00, +0.92, -1.55, +1.75, -2.75, +2.20)
+
+# How far in front of the socket plane a TOE may creep. The trunk itself
+# stops at ZFRONT; its feet do not, because the brief asks for roots "as the
+# tray surround" running out around the tongue. Only wood below y 0.55 is
+# allowed forward of ZFRONT, which is 0.56 under the exit gate's floor.
+TOE_CREEP = 0.85
 
 
 def build_ridges():
@@ -245,8 +314,6 @@ def build_ridges():
     for i in range(N_RIDGE):
         acc += (2.0 * math.pi / N_RIDGE) * (0.66 + 0.68 * h01(i, 11))
         th = ((acc + math.pi) % (2.0 * math.pi)) - math.pi
-        # front fade: a buttress on the front face would be a buttress in
-        # the doorway, and the wound would saw it in half
         ff = smoothstep(abs(th), FRONT_KEEP, 0.98)
         ridges.append({
             "th": th,
@@ -258,23 +325,55 @@ def build_ridges():
             "fib": 0.095 + 0.130 * h01(i, 61),
             "lean": (h01(i, 71) - 0.5) * 0.22,    # grain twist with height
             "spire": 0.0,
+            "root": False,
+            "toe_len": 0.0,        # how far the foot runs out, world radius
+            "toe_w": 0.0,          # its angular half-width, rad
+            "toe_off": 0.0,        # the foot wanders off its own fin's crest
         })
-    # SIX ridges become heavy buttress roots, CHOSEN rather than hoped for:
-    # a threshold on a hash gave three on the first bake and the count is a
-    # form requirement, not a distribution.
-    cand = sorted((i for i in range(N_RIDGE) if abs(ridges[i]["th"]) > 0.86),
-                  key=lambda i: -h01(i, 31))[:6]
-    for rank, i in enumerate(cand):
-        th = ridges[i]["th"]
-        # A root reaches as far as the MAT lets it. x is capped at 3.23 and
-        # a buttress on the flank runs out of x long before one on the
-        # diagonal does, so each root's strength is budgeted from its own
-        # heading instead of being clamped flat against the wall later —
-        # which is also, for free, the asymmetry the reference has.
-        room = XLIM / max(0.34, abs(math.sin(th))) - base(0.0) - 0.10
-        ridges[i]["butt"] = (min(0.92, max(0.30, room)) * (1.0 - 0.09 * rank)
-                             * smoothstep(abs(th), FRONT_KEEP, 0.98))
-        ridges[i]["w"] = max(ridges[i]["w"], 0.16)
+    # SIX ridges become heavy buttress roots, chosen by heading (above).
+    used = set()
+    for rank, want in enumerate(ROOT_HEADINGS):
+        i = min((j for j in range(N_RIDGE) if j not in used),
+                key=lambda j: angdist(ridges[j]["th"], want))
+        used.add(i)
+        R = ridges[i]
+        th = R["th"]
+        # A root reaches as far as the MAT lets it. x is capped at 3.23 and a
+        # buttress on the flank runs out of x long before one on the diagonal
+        # does, so each root's reach is budgeted from its OWN heading rather
+        # than clamped flat against the wall later — which is also, for free,
+        # part of the asymmetry the reference has.
+        # The fiber ridge rides on top of everything and is NOT free: round 2
+        # forgot it in the first budget and every front-diagonal foot came
+        # out 0.20 over the wall.
+        head = base(0.0) + R["fib"] + 0.06
+        room_x = XLIM / max(0.30, abs(math.sin(th))) - head
+        cz = math.cos(th)
+        room_z = (((ZFRONT + TOE_CREEP - AXIS_Z) / cz - head)
+                  if cz > 0.25 else 9.9)
+        # ONE BUDGET FOR THE WHOLE ROOT, and it is the mat that sets it.
+        # Round 2's first cut budgeted the foot and the web separately, both
+        # peaking on the felt, and their sum overshot XLIM: the clamp then
+        # planed the pair into a flat vertical wall over ten degrees of arc
+        # at each front diagonal — machined, not grown. flare() now holds the
+        # web off the ground so the two pieces of wood take turns, and grip
+        # is the single number they share.
+        grip = max(0.34, min(1.52, min(room_x, room_z) - 0.11))
+        R["root"] = True
+        R["butt"] = min(0.95, grip * (0.82 + 0.22 * h01(i, 139))
+                        * (1.0 - 0.06 * rank)
+                        * smoothstep(abs(th), FRONT_KEEP, 0.98))
+        R["w"] = max(R["w"], 0.16)
+        # A TOE IS NARROW. Round 1's foot was a gaussian 2.3x the fin's
+        # width: at the tightest root spacing here (31 degrees) two such
+        # feet still stood at half strength where they met, so six feet
+        # summed into one continuous skirt. Compact support at 0.23-0.32 rad
+        # puts a true zero between neighbours — and 0.23 rad is still 5.3
+        # columns at NPHI 72, so the foot is a mass and not a spike.
+        R["toe_len"] = (grip * (0.86 + 0.19 * h01(i, 131))
+                        * smoothstep(abs(th), FRONT_KEEP_TOE, 0.94))
+        R["toe_w"] = 0.23 + 0.09 * h01(i, 133)
+        R["toe_off"] = (h01(i, 137) - 0.5) * 0.26
     # THE CROWN TEARS ALONG THE GRAIN. Five ridges keep going past the rim;
     # the tallest is forced onto the ridge nearest phi = -1.05 rad so it is
     # plainly off-centre in the frame (and never on the seam).
@@ -291,6 +390,7 @@ def build_ridges():
     tall = min(range(N_RIDGE), key=lambda i: angdist(ridges[i]["th"], -1.05))
     ridges[tall]["spire"] = 3.30
     ridges[tall]["w"] = max(ridges[tall]["w"], 0.17)
+    ridges[tall]["tallest"] = True
     return ridges
 
 
@@ -316,14 +416,38 @@ def blade(d, w):
 
 
 def flare(y):
-    """Buttress reach with height. Taller and harder than the first cut:
-    at 2.10/1.5 the roots died before they were visible and the tower met
-    the felt like a bucket."""
-    return max(0.0, 1.0 - y / 3.30) ** 1.7
+    """Buttress WEB reach with height — and it deliberately does NOT peak on
+    the ground.
+
+    The web and the foot are two different pieces of wood and they were
+    fighting over the same radius: both at full strength on the felt, their
+    sum ran past the mat's x limit and the clamp planed the pair flat. Real
+    buttresses do not look like that either — the foot is the whole story
+    where it touches the soil, and the web takes over as the foot dies and
+    climbs to the waist. The shoulder at 0.05-0.62 is where they hand off,
+    and it is what lets each be budgeted against XLIM on its own.
+    """
+    return smoothstep(y, 0.05, 0.62) * max(0.0, 1.0 - y / 3.30) ** 1.55
 
 
-def toe(y):
-    return max(0.0, 1.0 - y / 1.15) ** 1.35           # the root's own foot
+def toe_h(y):
+    """The FOOT, and it is a different animal from the fin.
+
+    Round 1 faded the foot over 1.15 units with a 1.35 power, which is the
+    skirt of a cone: at y 0.6 it was still at half strength, so the mass it
+    added was at the ANKLE, not on the ground, and the ground line itself
+    barely moved. A buttress toe is a finger of wood LYING ON THE SOIL. It
+    has to be low enough that the silhouette event happens where the model
+    meets the felt, and it has to END — the shoulder at 0.78 is what lets the
+    valley beside it be a valley.
+
+    0.92 is also a clearance: the exit gate's floor is 1.1125, so no toe can
+    ever be the thing that blocks the door. It was 0.78 until the first
+    round-2 look — the feet were there and correct and simply too low to
+    clear the delivery tongue's own shoulder, which stands at 0.5-1.0 across
+    the whole front and hid them from the one camera that has to see them.
+    """
+    return max(0.0, 1.0 - y / 0.92) ** 0.85
 
 
 # --------------------------------------------------------------------------
@@ -368,13 +492,17 @@ def wall_at(phi, y):
     — the tall blades and the low broken rim alike — an edge that thins out
     as it approaches its end.
     """
-    return min(wall(y), 0.022 + 0.40 * max(0.0, y_top(phi) - y))
+    return min(wall(y), 0.010 + 0.42 * max(0.0, y_top(phi) - y))
 
 
 # Built here, not at its own definition: each root's strength is budgeted
 # from base(0) and the mat's x limit, so the ridges cannot exist before the
 # profile they are measured against.
 RIDGES = build_ridges()
+TALL = next((R for R in RIDGES if R.get("tallest")), None)
+SPLIT_D = 0.80                     # how deep the tall tip's fray cuts
+SPLIT_OFF = 0.075                  # rad off the crest — one column's worth
+SPLIT_W = 0.115                    # rad; wide enough for a column to land in
 
 
 def y_top(phi):
@@ -392,6 +520,21 @@ def y_top(phi):
             continue
         k = blade(angdist(phi, crest_at(R, 10.5)), R["w"] * 1.50)
         t = max(t, R["spire"] * k)
+    # THE TALLEST TIP IS SPLIT.
+    #
+    # A blade profile has one smooth summit, and at NPHI 72 the columns fall
+    # every 5 degrees: the tall spire's crest sits between two of them, both
+    # 2.7 degrees off centre, both therefore at 0.971 of full height. Two
+    # equal-height columns joined across the top IS the flat facet round 1
+    # noted at the tip — it was never a shading artefact, it was the sampling
+    # meeting a symmetric peak. Torn fiber ends in a fray, so a narrow nick
+    # is taken out just to one side of the crest: the near column drops 0.78
+    # and the far one does not, which turns one flat summit into two unequal
+    # points with a notch between them. Three silhouette events where there
+    # was one, and it costs no triangles.
+    if TALL is not None:
+        t -= SPLIT_D * blade(angdist(phi, crest_at(TALL, 10.5) + SPLIT_OFF),
+                             SPLIT_W)
     # the rim between spires still tears: sag in the valleys, ragged on top
     t += 0.42 * fbm_ring(phi, 0.0, 2.6, SEED + 5, 3) - 0.12
     # The front IS the low point — the crown tear reaches down toward the
@@ -409,16 +552,94 @@ def y_top(phi):
     return PORTAL_IN["rimY"] + max(0.0, t)
 
 
+def valley(phi, y):
+    """How much wood the soil takes back BETWEEN the feet.
+
+    Compact feet are necessary and not sufficient: at base(0) = 2.74, six
+    feet standing 1.0 proud still leave a ground line whose minimum is the
+    trunk's own circle, and a circle with lumps on it is a circle. The
+    valleys have to be CUT.
+
+    Subtracted from the inner surface as well as the outer, for two reasons.
+    The wall then keeps its thickness, so no valley can become the thin spot
+    a boolean fails on. And it costs nothing to be honest: every valley lives
+    under y 0.78 and the debris floor caps at 0.86, so no part of the liner
+    this touches is ever visible.
+
+    Gated to |phi| > 0.66 — the lower-front mass is R2's business and must
+    not be hollowed out to make R1's valleys.
+    """
+    th_ = toe_h(y)
+    if th_ <= 0.0:
+        return 0.0
+    tmax = 0.0
+    for R in RIDGES:
+        if not R["root"]:
+            continue
+        dt = angdist(phi, crest_at(R, y) + R["toe_off"])
+        tmax = max(tmax, blade(dt, R["toe_w"] * 1.35))
+    return 0.52 * th_ * (1.0 - tmax) * smoothstep(abs(phi), 0.66, 1.02)
+
+
 def r_out(phi, y):
     r = base(y)
-    fl, to = flare(y), toe(y)
+    fl = flare(y)
     for R in RIDGES:
         d = angdist(phi, crest_at(R, y))
         fib = R["fib"] * (1.0 - 0.55 * smoothstep(y, 7.5, 10.5))
-        amp = R["butt"] * fl + fib * (0.35 + 0.65 * (1.0 - fl))
-        r += amp * crest(d, R["w"])
-        if R["butt"] > 0.26:                       # only the heavy ones grip
-            r += R["butt"] * 0.78 * to * crest(d, R["w"] * 2.30)
+        # THE WEB IS COMPACT, THE GRAIN IS NOT. A gaussian crest is the right
+        # profile for a fiber furrow and the wrong one for a buttress: at the
+        # tightest root spacing here (31 degrees) two gaussian webs still
+        # stood at half strength where they met, which is how six buttresses
+        # add up to one cone. The web gets blade()'s hard shoulder; the fiber
+        # ridge keeps crest(), because a furrow that ends is a scar.
+        r += R["butt"] * fl * blade(d, R["w"] * 1.75)
+        r += fib * (0.35 + 0.65 * (1.0 - fl)) * crest(d, R["w"])
+    # THE FEET, compactly supported so that "no foot here" is a real zero.
+    th_ = toe_h(y)
+    if th_ > 0.0:
+        for R in RIDGES:
+            if not R["root"]:
+                continue
+            dt = angdist(phi, crest_at(R, y) + R["toe_off"])
+            r += R["toe_len"] * th_ * blade(dt, R["toe_w"])
+    r -= valley(phi, y)
+    # THE JAMBS ARE THICK. The wound's side faces are radial, so the wall's
+    # thickness at the jamb IS the depth the eye reads at the mouth's edge.
+    # Round 1 measured 0.30 sRGB on the cut face against 0.23 on the liner
+    # an inch away: a 1.28x step, which is no step, which is why the front
+    # read as two pale boards with a dark curtain between them instead of a
+    # stump with a hole in it. Swelling the trunk in a band around |phi| 1.28
+    # deepens that face where it is seen and puts real shoulders of wood
+    # outside the mouth's lower corners.
+    # It is held OFF THE GROUND on purpose. |phi| 1.30 is also where the
+    # valley between each front-diagonal foot and its flank neighbour falls,
+    # and a swell that reached the felt filled that valley back in — R2
+    # quietly undoing R1. Coming in at y 0.55 and peaking through 1.3-2.4
+    # puts the wood exactly where the mouth's lower corners are and nowhere
+    # near the feet.
+    jam = math.exp(-0.5 * ((abs(phi) - 1.30) / 0.28) ** 2)
+    r += (0.34 * jam * smoothstep(y, 0.55, 1.30)
+          * (1.0 - smoothstep(y, 2.6, 5.8)))
+    # THE SILL APRON — two lobes of wood flanking the doorway just under the
+    # threshold, and it does three jobs at once.
+    #
+    # It is the lower-front MASS R2 asks for, put where a hollow stump
+    # actually keeps it (beside the opening, not across it). It SEATS the
+    # delivery tongue: measured on round 1, the tongue's rolled shoulder
+    # overhung a 0.6-1.3 crevice all along its outer edge because the trunk's
+    # wall at |x| 2.6 stood almost a unit further back, and that shadowed
+    # slot is where frame 11's black rectangle was. And it is centred at
+    # |phi| 0.84 rather than at 0 so the front face never touches ZFRONT —
+    # a swell across the middle would be planed into a flat board by the
+    # socket clamp, which is the failure this whole model exists to undo.
+    # 0.84 at |phi| 0.90, and both numbers are the measurement talking: the
+    # crevice at the junction was 0.49 deep with a 0.52 apron centred at
+    # 0.84, and moving the centre out is what keeps phi 0.5 off the ZFRONT
+    # clamp while the lobe still reaches the tongue's edge heading.
+    ap = math.exp(-0.5 * ((abs(phi) - 0.90) / 0.28) ** 2)
+    r += (0.84 * ap * smoothstep(y, 0.35, 0.85)
+          * (1.0 - smoothstep(y, 0.60, 1.55)))
     # The spires lean OUT above the rim. Two duties in one term: torn fibers
     # splay rather than curl in, and the approach column stays clear without
     # having to be defended by a clamp.
@@ -427,7 +648,13 @@ def r_out(phi, y):
     # ridges. k=9 is the ceiling, not a taste call — at 72 columns a ring
     # frequency past ~14 aliases into mush instead of resolving as grain,
     # and anything finer than that belongs in COLOR_0 by the 0.07 rule.
-    r += 0.085 * fbm_ring(phi, y * 0.30, 9.0, SEED + 2, 3) - 0.034
+    # ...and they die into the tear. The flutes are +-0.05 of independent
+    # wobble on the OUTER surface; the wall is tapering to 0.02 up there, so
+    # left running they are twice the thing they are riding on and the tip
+    # keeps a chisel edge however hard the summit is split. The liner's ribs
+    # fade over the same last unit, in r_in.
+    r += ((0.085 * fbm_ring(phi, y * 0.30, 9.0, SEED + 2, 3) - 0.034)
+          * (1.0 - smoothstep(y, y_top(phi) - 0.95, y_top(phi) - 0.10)))
     return r
 
 
@@ -436,8 +663,24 @@ def r_in(phi, y):
     letting the outer furrows subtract from the wall is how a wall gets
     thin where it is already carrying a spire."""
     r = base(y) - wall_at(phi, y)
-    r += 0.085 * fbm_ring(phi + 1.7, y * 0.45, 6.0, SEED + 21, 2) - 0.034
-    return r
+    # THE LINER LEANS OUT WITH THE SPIRES — and this is R5's real cause.
+    #
+    # wall_at tapers the wall to 0.022 at each column's own tear so that a
+    # spire ends in an edge rather than a machined cap. r_out then adds 0.16
+    # of splay above the rim and r_in did not, so the rim strip came back to
+    # ~0.20 at exactly the height it was supposed to vanish: the tallest tip
+    # measured 0.31 of flat top across a 0.42 blade, which is the facet round
+    # 1 noted. Splitting the summit could not fix it because the summit was
+    # never the problem — the two surfaces were drifting apart under it.
+    # A torn fiber splays on BOTH faces, so the same term goes on both.
+    r += 0.16 * smoothstep(y, PORTAL_IN["rimY"] - 0.5, PORTAL_IN["rimY"] + 2.4)
+    # ...and the liner's rib noise fades out as the column nears its tear.
+    # 0.085 of wobble on each surface INDEPENDENTLY is four times the 0.022
+    # the wall tapers to, so without this the two faces can simply swap over
+    # at a tip and the rim strip turns inside out.
+    r += ((0.085 * fbm_ring(phi + 1.7, y * 0.45, 6.0, SEED + 21, 2) - 0.034)
+          * (1.0 - smoothstep(y, y_top(phi) - 0.95, y_top(phi) - 0.10)))
+    return r - valley(phi, y)
 
 
 def clamp_point(r, phi, front, back):
@@ -455,8 +698,23 @@ def clamp_point(r, phi, front, back):
     return (r * sp, z)
 
 
+def z_front(y):
+    """The socket's front plane — but only for wood the player can walk into.
+
+    The TRUNK stops at ZFRONT; its FEET do not. The brief asks for buttress
+    roots working "as the tray surround", which means wood that comes forward
+    of the trunk and lies on the felt on either side of the delivery tongue,
+    and a flat clamp at ZFRONT shears exactly that off. The relaxation is
+    height-gated and small: TOE_CREEP 0.85 forward, gone by y 0.55, which is
+    0.56 clear of the exit gate's floor at 1.1125 — so nothing that moves
+    here can ever be the thing that blocks the door. assert_throat_clear
+    re-proves that against the built triangles rather than this argument.
+    """
+    return ZFRONT + TOE_CREEP * max(0.0, 1.0 - y / 0.55) ** 1.25
+
+
 def out_point(phi, y):
-    x, z = clamp_point(r_out(phi, y), phi, ZFRONT - AXIS_Z, ZBACK - AXIS_Z)
+    x, z = clamp_point(r_out(phi, y), phi, z_front(y) - AXIS_Z, ZBACK - AXIS_Z)
     return (x, y, z)
 
 
@@ -526,6 +784,27 @@ W_ARC = 2.75           # phi -> world arc length at the wound's radius
 W_TOOTH_LAM = 0.86     # splinter wavelength, WORLD units
 W_TOOTH_AMP = 0.42     # deepest splinter bay, WORLD units
 W_LOOP_M = 152         # boundary samples, uniform in ARC LENGTH
+
+# THE LOWER CORNERS COME IN — R2, and the room it is allowed to use is
+# MEASURED, not guessed.
+#
+# check.py fires the exit rays along +z from z = -1.5 at |x| <= 2.375. The
+# outermost of them, at x = 2.375, is at phi = atan2(2.375, 1.05) = 1.155 rad
+# where it is deepest, and it never reaches a larger |phi| than that anywhere
+# along its run. So every radian of the wound beyond |phi| 1.155 is invisible
+# to the gate, and the wound runs to 1.40 plus its rag. That is 0.25 rad of
+# jamb on each side — 0.73 of arc at the trunk's radius, about a fifth of the
+# mouth's width — which can be filled with solid wood without the contract
+# noticing. W_CORNER_U0 0.855 starts the fillet at phi 1.197, keeping 0.04
+# rad of margin over the ray, and assert_throat_clear re-proves it on the
+# triangles.
+#
+# This is also what buries the delivery tongue's end cap (R4b): with the
+# corners square the wall was cut away out to |x| 2.93 at sill height, so the
+# tongue's back face stood in open air beside the mouth and rendered as a
+# black rectangle. Filled corners give it something to hide behind.
+W_CORNER_U0 = 0.855
+W_CORNER_LIFT = 1.55   # world units the sill rises at the extreme corner
 
 
 def w_base(a):
@@ -626,7 +905,20 @@ def build_wound_loop(m=W_LOOP_M):
         # ever cuts DOWNWARD — the exit gate's floor is above it
         low = 0.45 + 0.55 * smoothstep((ay - W_YC) / W_YDN, -0.92, -0.30)
         d = W_TOOTH_AMP * (lobe * gain + wander) * lips * low
-        loop.append(world_to_uv(ax + dx * d, ay + dy * d))
+        bx, by = ax + dx * d, ay + dy * d
+        # THE CORNER FILLET (see W_CORNER_U0). The threshold sweeps UP toward
+        # each jamb, so the mouth loses its square bottom corners and gains
+        # two haunches of solid wood. It is applied AFTER the rag so the
+        # fringe rides the new sill instead of being flattened by it, and it
+        # only ever moves the boundary UP — the loop stays simple, and wood
+        # is only ever added to the lower corners, never taken from the
+        # doorway.
+        uu = abs(bx) / W_ARC / W_PHI0
+        if by < W_YC:
+            by += (W_CORNER_LIFT
+                   * smoothstep(uu, W_CORNER_U0, 1.06)
+                   * smoothstep((W_YC - by) / W_YDN, 0.20, 0.92))
+        loop.append(world_to_uv(bx, by))
     return loop
 
 
@@ -749,7 +1041,14 @@ def bl(p):
 
 
 NPHI = 72
-OUT_FIXED = [-0.30, 0.02, 0.30, 0.62, 1.05, 1.60, 2.30, 3.15, 4.10, 5.10, 6.10, 7.00]
+# THREE ROWS BOUGHT FOR THE FEET. The toes live entirely under y 0.78 and
+# round 1's schedule put two rows in that band (0.02 and 0.30), so a foot
+# with a hard shoulder was being sampled by a mesh that could only draw it as
+# a ramp. 0.14 / 0.46 / 0.80 give the shoulder somewhere to happen. They cost
+# 3 x NPHI quads = 432 tris, which is most of round 1's headroom, and the
+# roots were told to spend it.
+OUT_FIXED = [-0.30, 0.02, 0.14, 0.30, 0.46, 0.62, 0.80, 1.05, 1.60,
+             2.30, 3.15, 4.10, 5.10, 6.10, 7.00]
 OUT_CROWN = 5                      # rows from 7.00 up to y_top(phi)
 IN_CROWN = 3                       # rows from y_top(phi) down to 7.00
 # The inner wall's rows are DENSE through the wound's height band on
@@ -766,7 +1065,12 @@ def column(phi):
     top = y_top(phi)
     outer = [out_point(phi, y) for y in OUT_FIXED]
     for k in range(1, OUT_CROWN + 1):
-        outer.append(out_point(phi, lerp(7.00, top, k / OUT_CROWN)))
+        # Crown rows BUNCHED toward the tip. Evenly spaced, the top quad on
+        # the tall spire was 1.18 units of unbroken flat; the 0.72 power
+        # halves that for free, which is the other half of R5's fix — a split
+        # summit still reads as a facet if the facet under it is a metre of
+        # untouched quad.
+        outer.append(out_point(phi, lerp(7.00, top, (k / OUT_CROWN) ** 0.72)))
     inner = [in_point(phi, top)]
     for k in range(1, IN_CROWN + 1):
         inner.append(in_point(phi, lerp(top, 7.00, k / IN_CROWN)))
@@ -1026,20 +1330,43 @@ def build_tongue(name):
 # --------------------------------------------------------------------------
 SHELF_CLUSTERS = [
     (2.62, 4.85, 3),      # phi, y, count — the shaded back-left flank
-    (-1.62, 3.05, 5),     # beside the wound's left jamb
-    (1.55, 6.35, 1),      # a lone bracket high on the right jamb
+    (-1.72, 3.05, 5),     # beside the wound's left jamb
+    (1.62, 6.35, 1),      # a lone bracket high on the right jamb
     (3.02, 2.15, 3),      # low on the back
 ]
+
+SHELF_EMBED = 0.11    # how far the attachment arc sits INSIDE the surface
 
 
 SHELVES = []          # (x, y, z, thick) per bracket, filled by build_shelves
 #                       so the paint pass can tell a cap from its gills by
 #                       POSITION alone — the same rule the trunk paint uses.
 
+SHELF_PROBES = []     # every ring vertex, app frame, for assert_shelves_bite
+SHELF_DROPPED = []    # brackets refused, with the reason
+
 
 def build_shelves(name):
+    """Brackets that BITE INTO the trunk, and are dropped when they cannot.
+
+    Two round-1 defects, one cause. Every ring vertex took its radius from
+    r_out AT THE CLUSTER'S CENTRE — so where a bracket spanned a fiber furrow
+    (the ridge field swings 0.2 over a fifth of a radian) its ends stood off
+    a surface that had receded under them, and at least two slivers floated
+    clear of the shell in the round-1 renders. And the -1.62 cluster's jitter
+    put brackets past |phi| 1.4, which is INSIDE the wound: those had no
+    surface under them at all, only the opening.
+
+    So: every vertex reads the LOCAL r_out at its own (phi, y), the whole
+    footprint is tested against the wound and against the ember door, and a
+    bracket that cannot bite is dropped and named rather than shipped
+    hovering. Kit trap 7 says overlap by epsilon and never go tangent; this
+    is that rule made into a construction and then into a gate.
+    """
     verts, faces = [], []
     SHELVES.clear()
+    SHELF_PROBES.clear()
+    SHELF_DROPPED.clear()
     idn = 0
     for (cphi, cy, cnt) in SHELF_CLUSTERS:
         for s in range(cnt):
@@ -1053,31 +1380,50 @@ def build_shelves(name):
             wide = 0.44 + 0.34 * h01(idn, 115)
             out = 0.13 + 0.11 * h01(idn, 117)
             thick = 0.030 + 0.030 * h01(idn, 119)
-            r0 = r_out(phi, y) - 0.09
+            r0 = r_out(phi, y)
+            half = wide / r0
+            # REFUSE before building: the footprint (plus a margin) must sit
+            # on wood, clear of the wound's rag and clear of the ember door.
+            span = [(phi + half * 1.12 * (2.0 * t / 8 - 1.0), y + dy)
+                    for t in range(9) for dy in (-0.09, 0.0, 0.09)]
+            qmin = min(in_wound(p, yy) for p, yy in span)
+            dmin = min(max(angdist(p, DOOR_PHI) / (DOOR_W / 2.0 / 2.95 + 0.10),
+                           abs(yy - DOOR_Y) / (DOOR_H / 2.0 + 0.10))
+                       for p, yy in span)
+            if qmin < 1.06 or dmin < 1.0:
+                SHELF_DROPPED.append(
+                    (idn, math.degrees(phi), y,
+                     "in the wound (q %.3f)" % qmin if qmin < 1.06
+                     else "on the ember door"))
+                continue
             ring = []
             m = 9
             for k in range(m):
                 f = k / (m - 1)
                 ang = math.pi * (f - 0.5)
-                dphi = math.sin(ang) * (wide / r0)
+                dphi = math.sin(ang) * half
                 dr = math.cos(ang) * out * (0.72 + 0.28 * h01(idn * 17 + k, 121))
                 dy = -0.045 * math.cos(ang) + 0.03 * (h01(idn * 19 + k, 123) - 0.5)
                 p = phi + dphi
-                rr = r0 + dr
+                # LOCAL, and always inside the surface before dr lifts it:
+                # at the ends cos(ang) is 0, so the lip vertex lands exactly
+                # SHELF_EMBED under the wood it grows out of.
+                rr = r_out(p, y + dy) - SHELF_EMBED + dr
                 ring.append((rr * math.sin(p), y + dy, AXIS_Z + rr * math.cos(p)))
             for k in range(m - 1, -1, -1):              # back along the trunk
                 if k in (0, m - 1):
                     continue
                 f = k / (m - 1)
                 ang = math.pi * (f - 0.5)
-                dphi = math.sin(ang) * (wide / r0) * 0.92
+                dphi = math.sin(ang) * half * 0.92
                 p = phi + dphi
-                rr = r_out(p, y) - 0.16
+                rr = r_out(p, y - 0.01) - 0.17
                 ring.append((rr * math.sin(p), y - 0.01,
                              AXIS_Z + rr * math.cos(p)))
             b = len(verts)
             for p in ring:
                 verts.append(bl(p))
+            SHELF_PROBES.append(list(ring))
             nr = len(ring)
             cxu = sum(p[0] for p in ring) / nr
             cyu = sum(p[1] for p in ring) / nr
@@ -1119,8 +1465,13 @@ PALETTES = {
         "moss": (0.030, 0.062, 0.055),
         "lichen": (0.176, 0.206, 0.200),
         "punk": (0.052, 0.038, 0.026),
-        "liner": (0.013, 0.018, 0.026),
-        "liner_hi": (0.030, 0.043, 0.052),
+        # FIVE TIMES DARKER THAN ROUND 1, and the factor is measured, not
+        # chosen: the lit inner wall rendered at 0.230 sRGB = 0.042 linear
+        # against lips at 0.30-0.78, and it has to lose to them by a margin
+        # a viewer reads as "hole", not "grey". The painted occlusion in
+        # make_paint takes the deep end down a further 9x on top of this.
+        "liner": (0.0026, 0.0036, 0.0052),
+        "liner_hi": (0.0072, 0.0100, 0.0126),
         "glow": srgb("#5fdccb"),
         "glow_core": srgb("#3fbfb4"),
         "ember": (0.130, 0.052, 0.016),
@@ -1133,8 +1484,8 @@ PALETTES = {
         "moss": (0.026, 0.058, 0.031),
         "lichen": (0.190, 0.212, 0.186),
         "punk": (0.050, 0.039, 0.025),
-        "liner": (0.011, 0.017, 0.013),
-        "liner_hi": (0.026, 0.040, 0.030),
+        "liner": (0.0022, 0.0034, 0.0026),
+        "liner_hi": (0.0062, 0.0096, 0.0072),
         "glow": srgb("#b8f5d4"),
         "glow_core": srgb("#7dd8a8"),
         "ember": (0.130, 0.052, 0.016),
@@ -1152,26 +1503,65 @@ def make_paint(pal):
         dx, dz = x, z - AXIS_Z
         r = math.hypot(dx, dz)
         phi = math.atan2(dx, dz)
-        rmid = base(y) - wall_at(phi, y) * 0.5
+        # THE WALL'S TRUE MIDLINE, from both surfaces. base - wall*0.5 was
+        # right in the middle of the trunk and wrong at the crown, where
+        # wall_at tapers to 0.022 and the liner's own 0.05 rib noise carries
+        # the inner surface OUTSIDE the midline — so the top of the cavity
+        # was being painted as exterior wood. Averaging the two fields cannot
+        # drift from them, and the valley groove cancels out of it.
+        rmid = 0.5 * (r_in(phi, y) + r_out(phi, y))
         q = in_wound(phi, y)
 
         # --- the interior: the liner, dark by MATERIAL not by lighting ----
         if r < rmid:
-            # The FLOOR gets its own near-black, not the wall's. It is the
-            # only interior surface facing the sky through the open crown,
-            # so at the wall's value it collected light and read through the
-            # mouth as a pale dome — a floodlit cave floor.
+            # PAINTED OCCLUSION — the thing albedo alone could not buy.
+            #
+            # Round 1's liner was already near-black (0.013-0.030 linear) and
+            # the mouth still rendered LIT: measured off that bake, the inner
+            # wall beside the left jamb came out at 0.230 sRGB against 0.295
+            # on the torn wood next to it, a 1.28x step that is no step at
+            # all. The reason is that value through a mouth is albedo times
+            # what the key does to the NORMAL, and this cavity's two side
+            # walls face +-x while the key sits at (4, 7, 5): the -x wall
+            # takes 43% of a 2.2 key and the debris floor takes 75%. The
+            # deepest surfaces were the brightest ones.
+            #
+            # There is no albedo that fixes that and stays a colour rather
+            # than a hole, because the FIX IS A GRADIENT, not a level: light
+            # entering a rot pocket dies with distance, and a renderer with
+            # one directional light and no bounce will not do that for you.
+            # So it is painted. dep is depth behind the wound's front plane,
+            # and the liner is multiplied down to 11% across it.
+            # 0.040, not 0.11: measured on the first round-2 bake, the top of
+            # the back wall — the deepest thing visible through the mouth and
+            # the one the open crown lights directly — still came back at
+            # 0.105 sRGB against a 0.145 median lip. Three-quarters of the
+            # lip's value is not "a faint high rim". 0.040 puts it at 0.03.
+            dep = smoothstep(ZFRONT - z, 1.0, 4.8)
+            occ = lerp(1.0, 0.040, dep)
+            # The FLOOR gets its own near-black, not the wall's, and it is
+            # the lowest value in the model: it is the one interior surface
+            # facing straight up into both the key and the open crown.
             if y < floor_y(phi) + 0.22:
-                g = 0.006 + 0.010 * fbm_ring(phi, y, 5.0, SEED + 27, 2)
+                g = (0.0016 + 0.0026 * fbm_ring(phi, y, 5.0, SEED + 27, 2)) * occ
                 return (g * 1.05, g, g * 0.92)
             rib = abs(math.sin(phi * 11.0 + 3.0 * fbm_ring(phi, y, 3.0, SEED + 24, 2)))
             k = rib ** 3
             c = lerp3(pal["liner"], pal["liner_hi"],
                       0.25 * k + 0.45 * fbm_ring(phi, y * 0.7, 7.0, SEED + 23, 2))
-            # the glowing rot just inside the opening: what makes a cavity
-            # read as a cavity instead of a black veil
-            near = max(0.0, 1.0 - abs(q - 1.0) / 0.55) if q < 1.6 else 0.0
-            c = lerp3(c, pal["glow_core"], 0.055 * near)
+            c = tuple(v * occ for v in c)
+            # THE FAINT HIGH RIM the verdict allows the crown to keep: light
+            # falling in from the open top may reach the last unit of the
+            # inner wall below each tear, and nothing else.
+            hi = max(0.0, 1.0 - (y_top(phi) - y) / 1.10) ** 1.6
+            c = lerp3(c, pal["liner_hi"], 0.55 * hi)
+            # The glowing rot just inside the opening — what makes a cavity
+            # read as a cavity instead of a black veil. Narrowed from 0.55 to
+            # 0.26: at the old width it was not a line of foxfire at the tear
+            # but a lit WEDGE running a foot back into the jamb, which is
+            # half of what the verdict was pointing at.
+            near = max(0.0, 1.0 - abs(q - 1.0) / 0.26) if q < 1.4 else 0.0
+            c = lerp3(c, pal["glow_core"], 0.040 * near)
             return c
 
         # --- the ember door recess ---------------------------------------
@@ -1371,6 +1761,95 @@ def assert_approach_clear(objs):
             f"y {max(b[2] for b in bad):.2f} — a spire is leaning into the "
             f"drop; check r_in at the crown vs clearR {PORTAL_IN['clearR']}")
     print("[bole] approach column 25/25 clear")
+
+
+def assert_shelves_bite():
+    """Every bracket overlaps the trunk. Kit trap 7, as a measurement.
+
+    Round 1 shipped at least two slivers floating clear of the shell, and a
+    render is a poor place to notice a 0.03-thick fleck. The rule is the
+    construction's: each ring vertex is r_out(its own phi, its own y) minus
+    SHELF_EMBED plus its outward lift, so the two END vertices of every
+    bracket — where the lift is zero — must sit exactly SHELF_EMBED inside
+    the wood. This reads them back out of the built ring.
+    """
+    worst, bad = None, []
+    for ring in SHELF_PROBES:
+        best = -1e9
+        for (x, y, z) in ring:
+            dz = z - AXIS_Z
+            r = math.hypot(x, dz)
+            phi = math.atan2(x, dz)
+            best = max(best, r_out(phi, y) - r)      # + means embedded
+            if in_wound(phi, y) < 1.0:
+                bad.append(("in the wound", x, y, z))
+        if best < 0.04:
+            bad.append(("floating, deepest bite %.3f" % best,
+                        ring[0][0], ring[0][1], ring[0][2]))
+        worst = best if worst is None else min(worst, best)
+    if bad:
+        raise RuntimeError(
+            "%d shelf bracket(s) do not bite the trunk: first %s at app "
+            "(%.2f, %.2f, %.2f)" % (len(bad), bad[0][0], *bad[0][1:]))
+    print(f"[bole] shelves {len(SHELF_PROBES)} placed, "
+          f"{len(SHELF_DROPPED)} refused, every bracket bites "
+          f"(shallowest {worst:.3f})")
+    for idn, ph, y, why in SHELF_DROPPED:
+        print(f"[bole]   dropped bracket {idn} at phi {ph:+.1f} deg y {y:.2f}: {why}")
+
+
+def assert_tongue_seated():
+    """No open crevice between the tongue's outer edge and the trunk.
+
+    THE BLACK RECTANGLE, named. Round 1's frame 11 carried an isolated
+    17x26-pixel near-black blob at the left lip — not the mouth (that
+    component is 271x356 and lives elsewhere in the frame), not the tongue's
+    own faces (isolating the tongue mesh in the viewer finds no dark pixel
+    where it is the front-most surface), but the SHADOWED SLOT between the
+    tongue's rolled shoulder and the trunk's lower-front wall, which stood
+    almost a unit further back at that x. A gap you can see into, lit by
+    nothing, reads as a hole punched in the model.
+
+    So it is measured rather than admired: along the tongue's outer edge, the
+    trunk's own front surface must come forward to within SEAT_MAX of the
+    edge, over the stretch where the two are supposed to be one piece of
+    wood. R1's front-diagonal feet and R2's jamb swell are what close it.
+    """
+    # Scoped to the JUNCTION — the stretch where the tongue leaves the mouth
+    # and the artefact was. Further out the tongue is a plate lying on the
+    # felt with felt behind it; there is no pocket to see into, and asking
+    # the trunk to reach z 1.0 would put the socket clamp back in charge of
+    # the front face. hollowbole_probe.py --blobs tests the symptom itself
+    # on the finished renders, which is the check that cannot be argued with.
+    SEAT_MAX = 0.35
+    bad = []
+    for i in range(13):
+        z = TONGUE_Z0 + (0.30 - TONGUE_Z0) * i / 12.0
+        hw = tongue_hw(z) * 1.008
+        y = min(tongue_top(z), 0.92)
+        for sx in (-hw, hw):
+            # where the trunk's outer surface crosses this (x, y), going
+            # forward: bisect on the field, never on a remembered plane
+            lo, hi = AXIS_Z, ZFRONT + 3.2
+            for _ in range(48):
+                mid = 0.5 * (lo + hi)
+                dz = mid - AXIS_Z
+                if math.hypot(sx, dz) <= r_out(math.atan2(sx, dz), y):
+                    lo = mid
+                else:
+                    hi = mid
+            gap = z - lo
+            if gap > SEAT_MAX:
+                bad.append((sx, y, z, lo, gap))
+    if bad:
+        w = max(bad, key=lambda b: b[4])
+        raise RuntimeError(
+            f"the tongue's edge overhangs a {w[4]:.2f} crevice at x {w[0]:+.2f} "
+            f"y {w[1]:.2f}: its edge is at z {w[2]:.2f} and the trunk's wall "
+            f"is back at z {w[3]:.2f} — that slot is round 1's black "
+            f"rectangle ({len(bad)}/26 samples over {SEAT_MAX})")
+    print("[bole] tongue seated: no edge sample overhangs more than "
+          f"{SEAT_MAX} of unfilled crevice")
 
 
 def assert_envelope(objs):
@@ -1578,7 +2057,7 @@ def diagnose_nonmanifold(ob):
 
 
 def report_form():
-    roots = [R for R in RIDGES if R["butt"] > 0.26]
+    roots = [R for R in RIDGES if R["root"]]
     spires = [R for R in RIDGES if R["spire"] > 0]
     tall = max(spires, key=lambda R: R["spire"])
     print(f"[bole] ridges {N_RIDGE}  roots {len(roots)}  spires {len(spires)}"
@@ -1597,7 +2076,8 @@ def report_form():
     for i in range(360):
         p = -math.pi + 2 * math.pi * i / 360
         for y in (0.02, 0.30, 0.62, 1.05):
-            x, z = clamp_point(r_out(p, y), p, ZFRONT - AXIS_Z, ZBACK - AXIS_Z)
+            x, z = clamp_point(r_out(p, y), p, z_front(y) - AXIS_Z,
+                               ZBACK - AXIS_Z)
             xs.append(x)
             zs.append(z)
     w = max(xs) - min(xs)
@@ -1613,7 +2093,7 @@ def report_form():
 # the bake
 # --------------------------------------------------------------------------
 
-def bole_material(name, attr, rough, emissive=None):
+def bole_material(name, attr, rough, emissive=None, spec=None):
     """vertex_color_material + ROUGHNESS, and optionally a low emissive.
 
     THE ROUGHNESS IS NOT A GARNISH — it was the single biggest thing wrong
@@ -1631,12 +2111,37 @@ def bole_material(name, attr, rough, emissive=None):
     and why the fiber striation would not show no matter how hard it was
     painted. Rotten wood is roughness ~0.95.
 
+    ROUGHNESS WAS ONLY HALF OF IT — round 2's finding, and it is the same
+    fault one level down. Roughness spreads the specular lobe; it does not
+    remove the specular. F0 stays at 0.04 whatever you do to roughness, and
+    0.04 of a 2.2 key is ~0.07 sRGB of light that ARRIVES REGARDLESS OF
+    ALBEDO. That is exactly what was still lighting the deepest part of the
+    cavity after the liner had been taken down 5x and then another 2.75x:
+    the pixel measured (19, 17, 15) — WARM, in the ratio of the key's own
+    0xfff2dd, on a surface painted (0.00017, 0.00023, 0.00031), which is
+    cool and essentially black. Diffuse cannot produce that colour. The
+    liner was never the thing that was glowing.
+    -> Specular IOR Level 0.10 (F0 0.008) on the wood, exported as
+    KHR_materials_specular and honoured by the vendored three r160 loader
+    (GLTFLoader.js:1205). The shelf caps keep theirs: they are the one damp
+    thing on a dead tree and the sheen is the point.
+
     Recipe-local rather than a kit change: the kit is not mine to edit, and
-    the finding is written up for whoever owns it.
+    both findings are written up for whoever owns it.
     """
     mat = F.vertex_color_material(name, attr)
     bsdf = mat.node_tree.nodes["Principled BSDF"]
     bsdf.inputs["Roughness"].default_value = rough
+    if spec is not None:
+        # 4.x renamed this socket; do not guess which build is on the machine
+        for key in ("Specular IOR Level", "Specular"):
+            if key in bsdf.inputs:
+                bsdf.inputs[key].default_value = spec
+                break
+        else:
+            raise RuntimeError("no specular socket on Principled BSDF — the "
+                               "pin moved and this recipe's darkest surfaces "
+                               "would silently go back to 0.07")
     if emissive is not None:
         bsdf.inputs["Emission Color"].default_value = (*emissive, 1.0)
         bsdf.inputs["Emission Strength"].default_value = 1.0
@@ -1692,9 +2197,9 @@ def build(variant):
     # paint-after-canonicalize), then collapse to one material per object so
     # each mesh stays a single closed glTF primitive
     F.paint_corners(shell, "Col", make_paint(pal))
-    F.single_material(shell, bole_material("bole", "Col", 0.96))
+    F.single_material(shell, bole_material("bole", "Col", 0.96, spec=0.10))
     F.paint_corners(tongue, "Col", make_tongue_paint(pal))
-    F.single_material(tongue, bole_material("boleTongue", "Col", 0.97))
+    F.single_material(tongue, bole_material("boleTongue", "Col", 0.97, spec=0.10))
     F.paint_corners(shelves, "Col", make_shelf_paint(pal))
     # the caps are the one damp thing on a dead tree: a little sheen, and a
     # low emissive tinted to the palette's glow — accents, not lamps
@@ -1704,6 +2209,8 @@ def build(variant):
 
     assert_throat_clear(meshes)
     assert_approach_clear(meshes)
+    assert_shelves_bite()
+    assert_tongue_seated()
     assert_envelope(meshes)
 
     pin, pout = F.tower_portals(PORTAL_IN, PORTAL_OUT)
