@@ -14,19 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// THE FAE CONCEPT LAB (ROADMAP W0) — a throwaway staging of the Moonrise
-// Glade for Joe's judgment, gated behind __diceDebug.faeConcept(). NOTHING
-// here is the venue mechanism; it exists to put the two dossiers
-// (scratchpad fae-research/) on screen: the palette tables from grammar.md
-// and the fog/glow kit from techniques.md, composed under the sixteen
-// rules. When the venue proper ships (W2+), this file's learnings move
-// into real modules and this file dies.
+// THE GLADE STAGE (ROADMAP W0 → W2). Born as the W0 concept lab for Joe's
+// judgment behind __diceDebug.faeConcept(); W1 made it the venue's interim
+// stage; W2 (2026-08-13) upgraded its fidelity IN PLACE — the horizon mist
+// band (the canopy silhouette was void-on-void and had never read), mossed
+// ground plus a clearing-detail layer where the moon pools, real billow
+// structure in the sheets, the moonbeam landed on the resolve area, the
+// moot re-staged out from under the W3 tower, and the mirror pool (Joe's
+// approved W0 dressing). Still one honest kit: baked canvases + vertex
+// data, no fetched textures, no lights beyond main.js's venue pair.
 //
-// Honest to the rules even as a sketch:
+// Placement law for glade props: BEYOND the back wall (z < −4.3, the wide
+// mat's edge) and clear of the tower envelope (|x| > 3.3 world) — scenery
+// may never stand where a die can rest or a tower does.
+//
+// Honest to the rules:
 //   · grammar 2  — dice are the brightest thing; everything here is value.
 //   · grammar 4  — the starfield is monochrome teal, tertiary tier ≤0.25.
-//   · grammar 7  — the moot ring: 11 caps, jittered, one gap, one fallen.
+//   · grammar 7  — the moot ring: 11 caps, jittered, one gap, one fallen,
+//     the gap turned toward the clearing (the interruption is the story).
 //   · grammar 12 — ONE moon shaft, landing on the resolve area.
+//   · grammar 14 — masses everywhere, detail in one place: the clearing.
 //   · techniques §1 — three dense sheets below y 0.68, one veil with a
 //     baked clearing hole; per-vertex lattice brightened by lit dice.
 //   · techniques T2 — nothing here carries userData.bloom; the concept
@@ -88,7 +96,7 @@ function tex(c) {
 // covers the felt and the 160-unit floor alike — the venue rule (grammar
 // 16): no felt survives into the frame.
 function buildGround(pal, seed) {
-  const size = 512;
+  const size = 1024; // W2: 512 read as a featureless gradient at the eye
   const { c, x } = canvas2d(size);
   const rnd = mulberry32(seed);
   // Dark by default — the MOON makes the pool of light, not the albedo.
@@ -102,13 +110,28 @@ function buildGround(pal, seed) {
   g.addColorStop(1, pal.void);
   x.fillStyle = g;
   x.fillRect(0, 0, size, size);
-  // Moss mottling: sparse soft blobs, mid tone, centre-weighted.
-  for (let i = 0; i < 240; i++) {
-    const a = rnd() * Math.PI * 2, r = Math.pow(rnd(), 1.6) * size * 0.42;
+  // Moss in two scales (W2). Broad soft beds first — value patches that
+  // break the gradient without contesting the moon pool…
+  const bed = new THREE.Color(pal.ground).lerp(new THREE.Color(pal.bark), 0.45);
+  for (let i = 0; i < 90; i++) {
+    const a = rnd() * Math.PI * 2, r = (0.10 + Math.pow(rnd(), 1.3) * 0.36) * size;
     const px = size / 2 + r * Math.cos(a), py = size / 2 + r * Math.sin(a);
-    const s = 3 + rnd() * 9;
+    const s = 20 + rnd() * 26;
     const bg = x.createRadialGradient(px, py, 0, px, py, s);
-    bg.addColorStop(0, `rgba(51, 67, 108, ${0.10 + rnd() * 0.12})`);
+    bg.addColorStop(0, `rgba(${(bed.r * 255) | 0}, ${(bed.g * 255) | 0}, ${(bed.b * 255) | 0}, ${0.08 + rnd() * 0.10})`);
+    bg.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = bg;
+    x.fillRect(px - s, py - s, s * 2, s * 2);
+  }
+  // …then small clumps with a moonlit edge tone (moonEdge, never the glow
+  // teal — scattered teal on the floor would read as uncounted sources).
+  const lit = new THREE.Color(pal.moonEdge);
+  for (let i = 0; i < 260; i++) {
+    const a = rnd() * Math.PI * 2, r = Math.pow(rnd(), 1.5) * size * 0.44;
+    const px = size / 2 + r * Math.cos(a), py = size / 2 + r * Math.sin(a);
+    const s = 4 + rnd() * 9;
+    const bg = x.createRadialGradient(px, py, 0, px, py, s);
+    bg.addColorStop(0, `rgba(${(lit.r * 255) | 0}, ${(lit.g * 255) | 0}, ${(lit.b * 255) | 0}, ${0.05 + rnd() * 0.09})`);
     bg.addColorStop(1, 'rgba(0,0,0,0)');
     x.fillStyle = bg;
     x.fillRect(px - s, py - s, s * 2, s * 2);
@@ -125,34 +148,84 @@ function buildGround(pal, seed) {
   return mesh;
 }
 
+// The clearing's own detail layer (W2, grammar 14: detail in ONE place —
+// where the moon pools and the dice resolve). A small transparent disc
+// over the ground: lichen flecks and pebble glints at a texel density the
+// big disc cannot afford. Standard material so the lamp and the dice
+// shadows land on it like the ground it decorates.
+function buildClearingDetail(pal, seed) {
+  const size = 512, R = 12;
+  const { c, x } = canvas2d(size);
+  const rnd = mulberry32(seed ^ 0xc1ea);
+  const lit = new THREE.Color(pal.moonEdge);
+  const pale = new THREE.Color(pal.moonEdge).lerp(new THREE.Color('#ffffff'), 0.25);
+  for (let i = 0; i < 150; i++) {
+    const a = rnd() * Math.PI * 2, r = Math.pow(rnd(), 0.8) * size * 0.46;
+    const px = size / 2 + r * Math.cos(a), py = size / 2 + r * Math.sin(a);
+    const s = 1.5 + rnd() * 4.5;
+    const tone = rnd() < 0.25 ? pale : lit;
+    const alpha = (0.10 + rnd() * 0.16) * (1 - r / (size * 0.5));
+    const bg = x.createRadialGradient(px, py, 0, px, py, s);
+    bg.addColorStop(0, `rgba(${(tone.r * 255) | 0}, ${(tone.g * 255) | 0}, ${(tone.b * 255) | 0}, ${alpha})`);
+    bg.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = bg;
+    x.fillRect(px - s, py - s, s * 2, s * 2);
+  }
+  const mesh = new THREE.Mesh(
+    new THREE.CircleGeometry(R, 32),
+    new THREE.MeshStandardMaterial({
+      map: tex(c), transparent: true, roughness: 0.92, metalness: 0,
+      depthWrite: false,
+    }));
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.y = 0.035;
+  mesh.renderOrder = 2;
+  mesh.receiveShadow = true;
+  mesh.name = 'faeClearing';
+  return mesh;
+}
+
 // Fog sheets, the techniques §1 recipe at concept fidelity: 4 subdivided
 // planes, itemSize-4 vertex colour, three dense below the die line and one
 // veil with the baked clearing hole. Base alpha lives in userData so the
 // per-frame emitter pass is memcpy + add.
 const SHEET = [
-  { y: 0.12, a: 0.22 }, { y: 0.35, a: 0.18 }, { y: 0.62, a: 0.14 },
+  { y: 0.12, a: 0.26 }, { y: 0.35, a: 0.22 }, { y: 0.62, a: 0.14 },
   { y: 3.4, a: 0.05, hole: 7 },
 ];
 
 function buildFogSheets(pal, seed) {
   const sheets = [];
+  // W2: real billow structure. The old per-pixel noise blurred to a nearly
+  // uniform field, so the drifting map.offset had nothing to show. Three
+  // octaves of soft discs give the sheets actual clouds to drift.
   const noise = (() => {
     const size = 256;
     const { c, x } = canvas2d(size);
     const rnd = mulberry32(seed ^ 0x9e37);
-    const img = x.createImageData(size, size);
-    for (let i = 0; i < size * size; i++) {
-      const v = 150 + 105 * rnd();
-      img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = 255;
-      img.data[i * 4 + 3] = v;
-    }
-    x.putImageData(img, 0, 0);
-    const t0 = tex(c);
-    // Blur by downscale-upscale: soft billows, not static.
-    const { c: c2, x: x2 } = canvas2d(size);
-    x2.filter = 'blur(6px)';
-    x2.drawImage(c, 0, 0);
-    return tex(c2);
+    // A continuous bed first — the billows are structure ON mist, not
+    // cotton balls floating in nothing.
+    x.fillStyle = 'rgba(255,255,255,0.45)';
+    x.fillRect(0, 0, size, size);
+    const blob = (px, py, s, a) => {
+      const bg = x.createRadialGradient(px, py, 0, px, py, s);
+      bg.addColorStop(0, `rgba(255,255,255,${a})`);
+      bg.addColorStop(1, 'rgba(255,255,255,0)');
+      x.fillStyle = bg;
+      x.fillRect(px - s, py - s, s * 2, s * 2);
+    };
+    // The canvas tiles (RepeatWrapping): draw each blob at its wrapped
+    // twin positions so the seams stay invisible under drift.
+    const wrapped = (px, py, s, a) => {
+      for (const ox of [-size, 0, size]) for (const oy of [-size, 0, size]) {
+        if (px + ox > -s * 2 && px + ox < size + s * 2
+          && py + oy > -s * 2 && py + oy < size + s * 2) blob(px + ox, py + oy, s, a);
+      }
+    };
+    for (let i = 0; i < 22; i++) wrapped(rnd() * size, rnd() * size, 44 + rnd() * 46, 0.32 + rnd() * 0.2);
+    for (let i = 0; i < 60; i++) wrapped(rnd() * size, rnd() * size, 15 + rnd() * 26, 0.20 + rnd() * 0.16);
+    for (let i = 0; i < 130; i++) wrapped(rnd() * size, rnd() * size, 4 + rnd() * 10, 0.12 + rnd() * 0.12);
+    return tex(c);
   })();
   for (const [si, s] of SHEET.entries()) {
     const segX = 40, segZ = 30;
@@ -221,7 +294,12 @@ export function brightenFog(sheets, emitters) {
 
 // The vacated moot (grammar §5 staging 2): 11 caps on an ellipse, two dark,
 // one fallen and lit from its gills. Emissive only — zero lights (T2, §6).
-function buildMoot(pal, seed, at = { x: -2.2, z: -6.5 }) {
+// W2 re-staged it: the W0 ellipse stood where the spec said a tower would
+// ("sits where a tower will stand in W3") and when Hollow Bole shipped it
+// was swallowed under the roots — caps peeking from under a stump instead
+// of a story. It now holds the LEFT flank beyond the back wall, and the
+// whole ring is rotated so the gap and the fallen cap face the clearing.
+function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
   const rnd = mulberry32(seed ^ 0x51de);
   const group = new THREE.Group();
   group.name = 'faeMoot';
@@ -231,10 +309,10 @@ function buildMoot(pal, seed, at = { x: -2.2, z: -6.5 }) {
   const dim = new THREE.Color(pal.bark);
   const pools = [];
   for (let i = 0; i < 11; i++) {
-    const th = (i / 11) * Math.PI * 2 + (rnd() - 0.5) * 0.25;
-    if (i === 4) continue; // THE GAP (front-left) — the interruption is the story
+    const th = (i / 11) * Math.PI * 2 + (rnd() - 0.5) * 0.25 + rot;
+    if (i === 4) continue; // THE GAP — turned toward the clearing by `rot`
     const ex = at.x + 2.8 * Math.cos(th), ez = at.z + 1.7 * Math.sin(th);
-    const s = 0.18 + rnd() * 0.14;
+    const s = 0.22 + rnd() * 0.16; // a step larger — the flank is farther from the eye
     const dark = (i === 7 || i === 9);
     const fallen = i === 5;
     // Secondary tier, not primary: the caps must never contest a die
@@ -287,7 +365,144 @@ function buildMoot(pal, seed, at = { x: -2.2, z: -6.5 }) {
     group.add(disc);
   }
   group.userData.pools = pools; // static fog emitters, folded in at build
+  group.userData.at = at;       // reported via venueInfo().stage
   return group;
+}
+
+// THE MIRROR POOL (W2 — Joe's approved W0 dressing: "a mirror pool as
+// glade dressing"). Still water on the RIGHT flank, beyond the back wall
+// where no die can stand in it. The reflection is baked, not rendered:
+// near-void water, a thin moonlit bank, one elongated moon glint laid
+// along the shaft's own tilt, and three faint wisp-lights — a mirror by
+// value structure, at zero render-target cost. A low-roughness standard
+// material lets the venue lamp add the one live sheen.
+function buildMirrorPool(pal, seed, at = { x: 6.6, z: -6.4 }) {
+  const size = 256;
+  const { c, x } = canvas2d(size);
+  const rnd = mulberry32(seed ^ 0xb007);
+  // Night water mirrors the SKY, not the ground: it sits a step PALER
+  // than the dark banks around it (first plate read as a void cutout at
+  // 0.14 — a hole in the world, not a pool holding the moon).
+  const water = new THREE.Color(pal.void).lerp(new THREE.Color(pal.moonEdge), 0.30);
+  const bank = new THREE.Color(pal.moonEdge);
+  // Water body: an ellipse with a soft irregular edge.
+  x.translate(size / 2, size / 2);
+  x.beginPath();
+  for (let a = 0; a <= 64; a++) {
+    const th = (a / 64) * Math.PI * 2;
+    const wob = 1 + 0.06 * Math.sin(th * 3 + seed) + 0.04 * Math.sin(th * 7 + seed * 2);
+    const px = Math.cos(th) * size * 0.46 * wob, py = Math.sin(th) * size * 0.44 * wob;
+    if (a === 0) x.moveTo(px, py); else x.lineTo(px, py);
+  }
+  x.closePath();
+  x.fillStyle = `rgba(${(water.r * 255) | 0}, ${(water.g * 255) | 0}, ${(water.b * 255) | 0}, 0.92)`;
+  x.fill();
+  // The moonlit bank: the same path, stroked thin and faded.
+  x.strokeStyle = `rgba(${(bank.r * 255) | 0}, ${(bank.g * 255) | 0}, ${(bank.b * 255) | 0}, 0.38)`;
+  x.lineWidth = 3;
+  x.stroke();
+  // The moon's glint: a BROKEN column of thin wavelet streaks along the
+  // shaft's tilt — the first bake drew one fat soft ellipse and it read
+  // as a glowing egg under the water, not the moon ON it. A glint is
+  // structure: short horizontal dashes, near-white, ragged, thinning as
+  // they fall away from the moon's point.
+  x.rotate(0.22);
+  const pale = new THREE.Color(pal.moon).lerp(new THREE.Color('#ffffff'), 0.45);
+  const dashes = 9;
+  for (let i = 0; i < dashes; i++) {
+    const v = i / (dashes - 1);
+    const py = -size * 0.19 + v * size * 0.33;
+    const w = (0.045 + rnd() * 0.05) * size * (1 - 0.45 * v);
+    const hgt = 2 + rnd() * 2.2;
+    const px = size * 0.03 + (rnd() - 0.5) * size * 0.05 * (0.4 + v);
+    const a = 0.72 * (1 - 0.55 * v) * (0.75 + rnd() * 0.25);
+    const dg = x.createLinearGradient(px - w / 2, 0, px + w / 2, 0);
+    dg.addColorStop(0, 'rgba(0,0,0,0)');
+    dg.addColorStop(0.5, `rgba(${(pale.r * 255) | 0}, ${(pale.g * 255) | 0}, ${(pale.b * 255) | 0}, ${a})`);
+    dg.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = dg;
+    x.fillRect(px - w / 2, py - hgt / 2, w, hgt);
+  }
+  // Three reflected wisps: faint, cool, still.
+  for (let i = 0; i < 3; i++) {
+    const px = (rnd() - 0.5) * size * 0.6, py = (rnd() - 0.5) * size * 0.5;
+    const bg = x.createRadialGradient(px, py, 0, px, py, 3.5);
+    bg.addColorStop(0, `rgba(${(bank.r * 255) | 0}, ${(bank.g * 255) | 0}, ${(bank.b * 255) | 0}, 0.22)`);
+    bg.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = bg;
+    x.fillRect(px - 4, py - 4, 8, 8);
+  }
+  const mesh = new THREE.Mesh(
+    new THREE.CircleGeometry(1, 40),
+    // UNLIT by design: a mirror's light is what it reflects, and the bake
+    // IS the reflection — routing it through scene lighting turned the
+    // whole pool into whatever the distant lamp made of it (a dark disc
+    // with a lit lump). MeshBasic + scene fog keeps the bake's values.
+    new THREE.MeshBasicMaterial({
+      map: tex(c), transparent: true, depthWrite: false, fog: true,
+    }));
+  mesh.scale.set(2.6, 1.75, 1);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(at.x, 0.045, at.z);
+  mesh.renderOrder = 2;
+  mesh.name = 'faeMirrorPool';
+  // The water breathes a little cool light into the fog above it.
+  mesh.userData.emitter = { x: at.x, z: at.z, r: 2.4, gain: 0.45, cr: 0.14, cg: 0.20, cb: 0.24 };
+  return mesh;
+}
+
+// THE MIST BAND (W2 — the horizon's missing middle tier). The treeline's
+// canopy is deliberately void-coloured, and the sky and the distance fog
+// are the same void — so the silhouette had nothing to stand against and
+// the horizon read as nothing at all. This ring of pale moonlit mist sits
+// INSIDE the treeline and BEHIND the glade: canopy humps cut into its top,
+// the tower's dark trunk stands against its body. fog:false — it IS the
+// atmosphere's backdrop, and letting scene fog eat it would re-create the
+// void-on-void it exists to break. Value: tertiary, sub-bloom, monochrome.
+function buildMistBand(pal, seed) {
+  const w = 1024, h = 128;
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  const rnd = mulberry32(seed ^ 0x715b);
+  // Vertical profile: nothing at the ground line, a soft peak low, gone by
+  // the top — canvas TOP maps to the cylinder's top edge.
+  const g = x.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0.0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.45, 'rgba(255,255,255,0.10)');
+  g.addColorStop(0.72, 'rgba(255,255,255,0.30)');
+  g.addColorStop(0.92, 'rgba(255,255,255,0.10)');
+  g.addColorStop(1.0, 'rgba(255,255,255,0)');
+  x.fillStyle = g;
+  x.fillRect(0, 0, w, h);
+  // Horizontal unevenness: broad dark bites so the band is weather, not a
+  // painted stripe. Each bite is drawn at its wrapped twin too — the band
+  // is a closed cylinder, and an unwrapped bite leaves a seam at u=0.
+  x.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 26; i++) {
+    const px = rnd() * w, py = h * (0.3 + rnd() * 0.6), s = 40 + rnd() * 90;
+    const a = 0.10 + rnd() * 0.22; // one roll per bite — twins must match
+    for (const ox of [-w, 0, w]) {
+      if (px + ox < -s * 2 || px + ox > w + s * 2) continue;
+      const bg = x.createRadialGradient(px + ox, py, 0, px + ox, py, s);
+      bg.addColorStop(0, `rgba(0,0,0,${a})`);
+      bg.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = bg;
+      x.fillRect(px + ox - s, py - s, s * 2, s * 2);
+    }
+  }
+  x.globalCompositeOperation = 'source-over';
+  const t = tex(c);
+  const geo = new THREE.CylinderGeometry(21.5, 21.5, 7.2, 48, 1, true);
+  const mat = new THREE.MeshBasicMaterial({
+    map: t, color: pal.moonEdge, transparent: true, depthWrite: false,
+    side: THREE.BackSide, fog: false,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.y = 4.4;
+  mesh.name = 'faeMistBand';
+  mesh.renderOrder = 0;
+  return mesh;
 }
 
 // Tertiary starfield + one lead wisp (grammar 4, 9): monochrome, ≤0.25,
@@ -391,27 +606,34 @@ function buildTreeline(pal, seed) {
 function buildMoonShaft(pal) {
   const { c, x } = canvas2d(128);
   const g = x.createLinearGradient(0, 0, 0, 128);
-  g.addColorStop(0, 'rgba(255,255,255,0.17)');
-  g.addColorStop(0.75, 'rgba(255,255,255,0.08)');
+  g.addColorStop(0, 'rgba(255,255,255,0.26)');
+  g.addColorStop(0.75, 'rgba(255,255,255,0.13)');
   g.addColorStop(1, 'rgba(255,255,255,0)');
   x.fillStyle = g; x.fillRect(0, 0, 128, 128);
-  // Horizontal falloff: multiply alpha toward zero at the left/right edges.
+  // Horizontal falloff: multiply alpha toward zero at the left/right
+  // edges. The exponent is the beam's LEGIBILITY: at 1.4 over a 15-wide
+  // quad the wash covered the whole frame and read as weather, not a
+  // beam — a beam is visible where it ISN'T. Tighter curve, narrower quad.
   const img = x.getImageData(0, 0, 128, 128);
   for (let py = 0; py < 128; py++) {
     for (let px = 0; px < 128; px++) {
       const u = px / 127;
-      const k = Math.pow(Math.sin(Math.PI * u), 1.4);
+      const k = Math.pow(Math.sin(Math.PI * u), 2.4);
       img.data[(py * 128 + px) * 4 + 3] *= k;
     }
   }
   x.putImageData(img, 0, 0);
-  const geo = new THREE.PlaneGeometry(13, 26);
+  const geo = new THREE.PlaneGeometry(9, 26);
   const mat = new THREE.MeshBasicMaterial({
     map: tex(c), color: pal.moon, transparent: true, depthWrite: false,
     blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false,
   });
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(1.5, 12, -2);
+  // W2: the beam LANDS ON THE RESOLVE AREA (grammar 12 — it used to hang
+  // at z −2, backlighting the tower instead of blessing the clearing).
+  // Its foot sits in the lamp's pool; the baked gradient dies before die
+  // height, so the beam lives in the air and can never haze a result.
+  mesh.position.set(0.7, 11, 1.0);
   mesh.rotation.z = 0.22;         // the tilt is the moon vector
   mesh.name = 'faeMoonShaft';
   mesh.renderOrder = 9;
@@ -582,12 +804,15 @@ export function buildFaeConcept({ paletteId = 'moonrise', seed = 20260815 } = {}
   const group = new THREE.Group();
   group.name = 'faeConcept';
   const ground = buildGround(pal, seed);
+  const clearing = buildClearingDetail(pal, seed);
   const sheets = buildFogSheets(pal, seed);
   const moot = buildMoot(pal, seed);
+  const pool = buildMirrorPool(pal, seed);
   const wisps = buildWisps(pal, seed);
   const shaft = buildMoonShaft(pal);
   const halos = buildHalos(pal);
   const treeline = buildTreeline(pal, seed);
+  const mist = buildMistBand(pal, seed);
   // NO STUMP PROP. The W0 concept plates placed a lab stump at the future
   // socket; when the real Hollow Bole shipped (W3) the venue kept
   // planting the prop underneath it, and the two interleaved into a pale
@@ -595,9 +820,21 @@ export function buildFaeConcept({ paletteId = 'moonrise', seed = 20260815 } = {}
   // setVisibleByName forensics, not by staring). The tower is the
   // venue's tower now; buildStumpShell survives only as the exported lab
   // reference.
-  group.add(ground, treeline, moot, wisps.points, shaft, halos, ...sheets);
-  // Fold the moot's static light into the fog base (techniques §6).
-  brightenFog(sheets, moot.userData.pools);
+  group.add(ground, clearing, mist, treeline, moot, pool, wisps.points, shaft, halos, ...sheets);
+  // Fold the static light — the moot's pools and the mirror pool's cool
+  // breath — into the fog base (techniques §6).
+  brightenFog(sheets, [...moot.userData.pools, pool.userData.emitter]);
   for (const s of sheets) s.userData.base = s.geometry.attributes.color.array.slice();
-  return { group, pal, sheets, wisps, halos, moot };
+  // The layout, reported through venueInfo() so proofs read placement
+  // numbers off the stage instead of hardcoding them (the tower-probe
+  // lesson): flank props must sit beyond the widest back wall and clear
+  // of the tower envelope; the beam must land on the clearing.
+  const layout = {
+    moot: { x: moot.userData.at.x, z: moot.userData.at.z },
+    pool: { x: pool.position.x, z: pool.position.z },
+    shaft: { x: shaft.position.x, z: shaft.position.z },
+    sheetYs: sheets.map((s) => s.position.y),
+    veilHole: 7,
+  };
+  return { group, pal, sheets, wisps, halos, moot, pool, mist, layout };
 }

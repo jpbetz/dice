@@ -7431,7 +7431,11 @@ function faeConceptStart(opts = {}) {
     // trunk's own values carry the rest.
     lampColor: rig.pal.moon, lampIntensity: 2.8, lampY: 22, lampZ: 1.0,
     lampAngle: 0.55,
-    hemi: 0.12, key: 0.6, rim: 0.55, fogNear: 20, fogFar: 46,
+    // fogNear 22 / fogFar 60 — the spec's own retreat numbers
+    // (FAE-VENUE-SPEC-DRAFT §kit): the clearing stays clean, and the W2
+    // horizon (mist band + treeline) is designed against this depth, not
+    // fog-eaten by the tighter 20/46 the interim stage shipped with.
+    hemi: 0.12, key: 0.6, rim: 0.55, fogNear: 22, fogFar: 60,
   });
   MOOD.on = true;
   applyMood();
@@ -9948,6 +9952,13 @@ window.__diceDebug = {
       staged: !!(FAECONCEPT.rig && FAECONCEPT.rig.group.parent),
       stageChildren: FAECONCEPT.rig ? FAECONCEPT.rig.group.children.length : 0,
       venueTower: spec.register === 'fantasy' ? venueTowerFor(currentVenue) : null,
+      // W2: the stage's layout + the fog retreat, so proofs assert
+      // placement law (flanks beyond the widest back wall, clear of the
+      // tower envelope; the beam on the clearing) off the stage itself.
+      stage: FAECONCEPT.rig ? {
+        ...FAECONCEPT.rig.layout,
+        fog: { near: MOOD.tune.fogNear, far: MOOD.tune.fogFar },
+      } : null,
     };
   },
   get pendingTower() { return pendingTower; },
