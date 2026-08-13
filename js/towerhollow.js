@@ -1134,8 +1134,22 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise', shell = buildSt
   // `SURF.inFacade` are the whole interface between the moot and the trunk
   // it grows on, so when the displaced-shell version lands the ring moves
   // onto it with no edit here — which is the point of the seam.
+  // …AND THE RING IS CLAMPED TO THE CROWN, not slaved to it. `yMoot` was
+  // authored against a level 11.6 rim; round 7 replaced that with a tear
+  // running 9.40 to 13.85, so across most of the sweep the authored height is
+  // OVER the wood — and `SURF.at` answers a point above the crown with the
+  // nominal radius, which is how the caps came to hang in mid-air (Joe, on the
+  // round-8 frame: "there's some floating mushrooms in the air now").
+  //
+  // Following the crown exactly would swing the ring 4.4 units and stop it
+  // being a ring. Clamping keeps the authored, tipped ring wherever there is
+  // trunk to hold it and drops it just under the rim where there is not — so
+  // the caps convene AROUND the break, which is what the ring was always for.
+  const MOOT_DROP = 0.34;
   const capAt = (th, inset) => {
-    const y = yMoot + mootTilt * Math.cos(th - mootPhase);
+    let y = yMoot + mootTilt * Math.cos(th - mootPhase);
+    const top = SURF.topAt ? SURF.topAt(th) : null;
+    if (top !== null && top !== undefined) y = Math.min(y, top - MOOT_DROP);
     if (SURF.inFacade(th)) {
       const x = Math.max(aL + 0.16, Math.min(aR - 0.16, rOut(th) * Math.sin(th)));
       return [x, y, SURF.facade.zFace, true];

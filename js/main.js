@@ -9453,6 +9453,35 @@ window.__diceDebug = {
     scene.traverse((o) => { if (o.name === name) { o.visible = !!visible; n++; } });
     return n;
   },
+  // DOES IT TOUCH THE GROUND? Scenery is authored as "put a cap at height h"
+  // and h is arithmetic on a scale factor, so a member whose scale changed
+  // floats or sinks silently — nothing throws, and at the resting eye a
+  // 0.2-unit gap on a small prop is invisible until someone widens the range
+  // and it becomes a 1.0-unit gap. Walks a named group and reports each mesh's
+  // world-space lowest point, so "floating" is a number rather than a squint.
+  groundGaps(groupName, tol = 0.06) {
+    const root = [];
+    scene.traverse((o) => { if (o.name === groupName) root.push(o); });
+    if (!root.length) return null;
+    const box = new THREE.Box3();
+    const out = [];
+    for (const g of root) {
+      g.updateMatrixWorld(true);
+      g.traverse((o) => {
+        if (!o.isMesh) return;
+        box.setFromObject(o);
+        out.push({
+          minY: Number(box.min.y.toFixed(3)),
+          x: Number(((box.min.x + box.max.x) / 2).toFixed(2)),
+          z: Number(((box.min.z + box.max.z) / 2).toFixed(2)),
+          w: Number((box.max.x - box.min.x).toFixed(3)),
+        });
+      });
+    }
+    out.sort((a, b) => b.minY - a.minY);
+    return { group: groupName, n: out.length,
+             floating: out.filter((m) => m.minY > tol), all: out };
+  },
   // Material forensics for LOOK debugging (W2c: the foxfire berm rendered
   // BLUE out of a green bake — a dark albedo is mostly reflection, and the
   // reflection is whatever scene.environment holds, which no frame shows

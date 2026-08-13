@@ -207,6 +207,34 @@ export function glbShellFor(url) {
     // (caps run to ~0.4) never crosses the socket. This shell only ever
     // publishes the anchor — the mesh is the GLB's business, and it was gated
     // by check.py --tower before the file was allowed to exist.
+    // topAt(θ): HOW HIGH IS THE WOOD at this heading — the crown's own profile,
+    // read off the mesh by casting DOWN instead of in.
+    //
+    // It exists because `radiusAt` cannot answer this and says so: above the
+    // crown it falls back to the nominal radius, on the reasoning that a
+    // nominal radius beats stacking props on the centreline. True, and still
+    // not a surface — a prop placed there hangs in the air at r = R0. That is
+    // exactly what the crown moot did after round 7 sheared the crown from a
+    // level 11.6 ring to a tear running 9.40 to 13.85: the ring's authored
+    // y 10.30 was above the wood across most of the sweep, and Joe found the
+    // caps floating over the stump.
+    //
+    // Cast INSIDE the wall (the outer face is a knife edge at the tear and a
+    // ray down its skin skips off), and walk inward if the first radius misses.
+    const topAt = (th) => {
+      const rOuter = radiusAt(th, v.rimY - 0.5);
+      for (const k of [0.12, 0.30, 0.55]) {
+        const r = rOuter - k;
+        if (r < 0.2) break;
+        origin.set(Math.cos(th) * r, v.socket.c[1] + v.socket.s[1], zc + Math.sin(th) * r);
+        dir.set(0, -1, 0);
+        ray.set(origin, dir);
+        const hits = ray.intersectObjects(targets, true);
+        if (hits.length) return origin.y - hits[0].distance;
+      }
+      return null;
+    };
+
     const xm = (v.socket.s[0] / 2) - 0.55;
     const at = (th, y, inset = 0) => {
       const r = Math.max(0.05, radiusAt(th, y) - inset);
@@ -262,6 +290,7 @@ export function glbShellFor(url) {
       // Buried under the tear it still backs the doorway, which is the job it
       // actually does for a player.
       yRing: v.rimY,
+      topAt,
       // ...AND NO TUBE. It sat at rIn - 0.02 = 2.46, which on a baked trunk is
       // the OUTER wall (inner 2.17, outer 2.46) — so it z-fought the bark
       // below the tear and stood proud of it above. There is no radius that

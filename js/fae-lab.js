@@ -394,12 +394,22 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55, opt = {}) 
   // gap. Recording the BASE intensity here is what lets the session
   // modulate without ever losing the authored value.
   const caps = [];
+  let capMax = 0;
   let k = 0;
   for (let i = 0; i < 11; i++) {
     const th = (i / 11) * Math.PI * 2 + (rnd() - 0.5) * 0.25 + rot;
     if (i === 4) continue; // THE GAP — turned toward the clearing by `rot`
     const ex = at.x + rx * Math.cos(th), ez = at.z + rz * Math.sin(th);
-    const s = (0.22 + rnd() * 0.16) * capScale;
+    // BIGGER, AND WITH A RANGE (Joe: "the dice are massive compared to the
+    // mushrooms... increase our range of mushroom size and generally go
+    // bigger"). It was 0.22-0.38 of capScale — caps 0.32-0.55 ACROSS against
+    // a d20 that is 2.50 across, so every mushroom in the glade was a fifth
+    // of a die. The range roughly doubles and widens; the ring cannot take
+    // the whole correction because it is space-bound (see the scatter, which
+    // has room), and because capScale also drives the ground POOLS and those
+    // feed brightenFog — growing the caps through capScale would have moved
+    // the bloom budget rather than the mushrooms.
+    const s = (0.34 + rnd() * 0.42) * capScale;
     const dark = (i === 7 || i === 9);
     const fallen = i === 5;
     // Secondary tier, not primary: the caps must never contest a die
@@ -417,6 +427,7 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55, opt = {}) 
     const stem = new THREE.Mesh(stemGeo, stemMat);
     cap.scale.setScalar(s);
     stem.scale.set(s, s * 0.9, s);
+    capMax = Math.max(capMax, s);
     if (fallen) {
       cap.rotation.z = Math.PI * 0.9;             // gills up, still lit —
       cap.material.emissiveIntensity = 0.5;       // the brightest, wrong way up
@@ -499,8 +510,15 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55, opt = {}) 
   group.userData.caps = caps;
   group.userData.discs = discs;
   group.userData.seats = k;
-  group.userData.rx = rx;   // W7: the layout reports the BUILT extents
-  group.userData.rz = rz;
+  // W7: the layout reports the BUILT extents — and since 2026-08-13 they
+  // include THE CAPS. The ring's rx/rz are the seat circle; a cap standing on
+  // a seat reaches capMax further, and the placement law is about the nearest
+  // POINT. Under-declared it was already off by a cap radius (7.25 of margin
+  // against a 7.05 bar, with 0.27 of cap hanging past it); at the new sizes
+  // that gap would have been half a unit of mushroom inside the dice box with
+  // a green check over it.
+  group.userData.rx = rx + capMax;
+  group.userData.rz = rz + capMax;
   return group;
 }
 
@@ -734,27 +752,83 @@ function buildSceneryBits(pal, seed) {
 // the spill, and the reason the budget does not move). Every clump
 // declares itself to the layout so venue-set holds the placement law over
 // the whole population rather than over the two rings.
+// FIVE SHAPES, because one silhouette repeated forty times is a texture and
+// not a population. Each kind is a scale of one of three cheap geometries —
+// a hemisphere, a fuller ball, and a cone — so the variety costs nothing in
+// draw calls or triangles and lives entirely in the proportions:
+//
+//   dome     the shipped one, a plain button
+//   parasol  wide and thin on a long stem — the one that reads at distance
+//   cone     a tall pointed ink-cap
+//   bulb     a fat ball barely off the ground
+//   funnel   an upturned chanterelle, apex down into the stem
+//
+// `ride` is where the cap's origin sits above the ground in units of its own
+// size, and it differs per kind because a cone meets its stem at its base
+// while a ball meets it a third of the way up. `stem` is the stem's height,
+// same units — a parasol on a dome's stubby stem is a button again.
+const SHROOM_KINDS = [
+  { k: 'dome',    geo: 'hemi',  xz: 1.00, y: 1.00, ride: 0.86, stem: 0.95, w: 3 },
+  { k: 'parasol', geo: 'hemi',  xz: 1.55, y: 0.38, ride: 1.30, stem: 1.45, w: 3 },
+  { k: 'cone',    geo: 'cone',  xz: 0.80, y: 1.85, ride: 0.62, stem: 0.70, w: 2 },
+  { k: 'bulb',    geo: 'ball',  xz: 1.05, y: 1.05, ride: 0.55, stem: 0.45, w: 2 },
+  { k: 'funnel',  geo: 'cone',  xz: 1.25, y: 0.85, ride: 1.05, stem: 1.10, w: 1 },
+];
+const SHROOM_W = SHROOM_KINDS.reduce((t, k) => t + k.w, 0);
+
+// THE FURTHER BACK, THE BIGGER (Joe). This is perspective arithmetic, not a
+// stylisation: the resting eye is ~16 units out, so a cap at z −10 subtends
+// roughly half the angle of the same cap at z +3, and a background population
+// built at foreground sizes reads as gravel. Growing them with depth is what
+// keeps the back band a LAYER rather than a texture — and it is the same
+// argument the mist band and the treeline already make in value.
+//
+// Tuned so the fore band is unchanged (gain 1.0 at z +3) and the deepest
+// clumps roughly double. It multiplies the clump's own scale, so a clump can
+// still refuse the growth where the placement law has no room for it.
+function shroomDepthGain(z) {
+  const t = Math.max(0, Math.min(1, (3.0 - z) / 13.0));
+  return 1 + 1.05 * t;
+}
+
 function buildMushroomScatter(pal, seed, clumps) {
   const rnd = mulberry32(seed ^ 0x5140);
   const group = new THREE.Group();
   group.name = 'faeShrooms';
-  const capGeo = new THREE.SphereGeometry(1, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2);
+  const GEO = {
+    hemi: new THREE.SphereGeometry(1, 8, 5, 0, Math.PI * 2, 0, Math.PI / 2),
+    ball: new THREE.SphereGeometry(1, 8, 6, 0, Math.PI * 2, 0, Math.PI * 0.78),
+    cone: new THREE.ConeGeometry(1, 1.4, 9),
+  };
   const stemGeo = new THREE.CylinderGeometry(0.28, 0.36, 1, 6);
   const glow = new THREE.Color(pal.glowCap);
   const dim = new THREE.Color(pal.bark);
   const items = [];
+  const pickKind = () => {
+    let t = rnd() * SHROOM_W;
+    for (const K of SHROOM_KINDS) { t -= K.w; if (t <= 0) return K; }
+    return SHROOM_KINDS[0];
+  };
   for (const c of clumps) {
     const n = c.n || 3;
-    let far = 0;
+    const gain = shroomDepthGain(c.z) * (c.scale || 1);
+    let capMax = 0;
     for (let i = 0; i < n; i++) {
       const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * (c.r || 0.9);
       const sx = c.x + Math.cos(a) * r, sz = c.z + Math.sin(a) * r * 0.7;
-      const s = (0.10 + rnd() * 0.13) * (c.scale || 1);
+      // THE RANGE (Joe: "increase our range of mushroom size and generally go
+      // bigger"). It was a flat 0.10-0.23 — every cap within a whisker of
+      // every other and all of them a fifth of a die. rnd()*rnd() SKEWS it, so
+      // most caps stay modest and roughly one in nine passes 0.8: a clump
+      // reads as a few big ones among many small, rather than as a uniform
+      // sprinkle that merely got bigger.
+      const s = (0.20 + 0.85 * rnd() * rnd()) * gain;
+      const K = pickKind();
       // At most ONE lit member per clump, and only where the clump asks
       // for it: scattered light is how a field turns into a constellation
       // of sources nobody counted.
       const lit = c.lit && i === 0;
-      const cap = new THREE.Mesh(capGeo, new THREE.MeshStandardMaterial({
+      const cap = new THREE.Mesh(GEO[K.geo], new THREE.MeshStandardMaterial({
         color: lit ? new THREE.Color(pal.glowCore) : dim,
         emissive: lit ? glow : '#000000',
         emissiveIntensity: lit ? 0.16 : 0,
@@ -762,21 +836,40 @@ function buildMushroomScatter(pal, seed, clumps) {
       }));
       const stem = new THREE.Mesh(stemGeo,
         new THREE.MeshStandardMaterial({ color: pal.bark, roughness: 0.9 }));
-      cap.scale.setScalar(s);
-      stem.scale.set(s, s * 0.85, s);
+      cap.scale.set(s * K.xz, s * K.y, s * K.xz);
+      // A funnel is a cone standing on its point.
+      if (K.k === 'funnel') cap.rotation.x = Math.PI;
+      const stemH = s * K.stem;
+      stem.scale.set(s * 0.9, stemH, s * 0.9);
+      // The REACH is the cap's own half-width, which is no longer s: a
+      // parasol is half again as wide as its size says, and the placement law
+      // is asserted about the widest point of the widest member.
+      capMax = Math.max(capMax, s * K.xz);
       if (rnd() < 0.18) {                       // one in five has fallen over
+        // The toppled offsets are IN UNITS OF s. They were absolute (0.12 /
+        // 0.1 / 0.08), which is invisible on a 0.15 cap and pulls a 1.1 cap
+        // clean off its own stem.
         cap.rotation.z = Math.PI * (0.75 + rnd() * 0.4);
-        cap.position.set(sx + 0.12, s * 0.4, sz + 0.08);
+        cap.position.set(sx + s * 0.55, s * 0.4, sz + s * 0.36);
         stem.rotation.z = Math.PI / 2.2;
-        stem.position.set(sx - 0.1, s * 0.3, sz);
+        stem.position.set(sx - s * 0.45, s * 0.3, sz);
       } else {
-        stem.position.set(sx, s * 0.45, sz);
-        cap.position.set(sx, s * 0.9, sz);
+        stem.position.set(sx, stemH / 2, sz);
+        cap.position.set(sx, s * K.ride, sz);
       }
       group.add(stem, cap);
-      far = Math.max(far, Math.abs(Math.cos(a) * r));
     }
-    items.push({ x: c.x, z: c.z, rx: (c.r || 0.9) + 0.2, rz: (c.r || 0.9) * 0.7 + 0.2, band: c.band });
+    // THE DECLARED EXTENT CARRIES THE CAPS, not a 0.2 pad that happened to
+    // exceed them. rx/rz are what the placement law is asserted about, and the
+    // law is about the nearest POINT — a clump whose caps reach 1.2 while it
+    // declares 0.2 is the extents-lie-of-centres trap with the numbers moved
+    // one level down.
+    items.push({
+      x: c.x, z: c.z,
+      rx: (c.r || 0.9) + capMax,
+      rz: (c.r || 0.9) * 0.7 + capMax,
+      band: c.band,
+    });
   }
   return { group, items };
 }
@@ -1180,8 +1273,15 @@ export function buildFaeConcept({
   // way, by looking. The frame map says z +4 keeps x −10…−3, so the ring
   // moves right and forward into the middle of that wedge and its extents
   // are trimmed to fit: |x| − rx = 7.35 still clears the widest mat's 7.05.
-  const moot = buildMoot(pal, seed, { x: -8.6, z: 3.2 }, 0.55,
-    { rx: 1.35, rz: 0.95, capScale: 0.72, spill: false });
+  // ...AND THE RING TRADES SEAT CIRCLE FOR CAP SIZE (2026-08-13), because it
+  // cannot buy the caps with reach. It is pinned on both sides: the dice box
+  // takes everything right of |x| − rx = 7.05, and the frame map takes
+  // everything left of x −10, which left the shipped ring with 0.2 of slack
+  // in total. So the seats pull in (1.35/0.95 → 1.10/0.80) while the caps
+  // roughly double, and the whole thing reaches 0.18 further left than before
+  // instead of 0.6. A denser, chunkier ring on the same ground.
+  const moot = buildMoot(pal, seed, { x: -8.9, z: 3.2 }, 0.55,
+    { rx: 1.10, rz: 0.80, capScale: 0.72, spill: false });
   // THE POOL GOES BACK AND GROWS UP. It was a puddle at the tower's right
   // hand, the same size and depth as the ring on the left — the bookend
   // that survived W2b because plan-space moves cannot break a bookend the
@@ -1215,15 +1315,30 @@ export function buildFaeConcept({
   // something that grows here rather than as an object that was placed.
   // Every clump clears the dice box: the back-band ones past the back wall
   // AND the tower envelope, the corridor ones past the x wall.
+  //
+  // EVERY POSITION HERE MOVED WITH THE SIZE (2026-08-13), and the moves are
+  // the law talking rather than taste: a clump now declares its caps in its
+  // extents, so the two that sat nearest the tower (-5.0 and +5.0) and the
+  // two nearest the back wall stopped clearing the box the moment the caps
+  // grew. Each is pushed just far enough out to hold its own rule at the new
+  // reach, and the two with the least room keep the smallest fungus.
   const shrooms = buildMushroomScatter(pal, seed, [
-    { x: -6.8, z: -6.6, r: 1.7, n: 6, lit: true, band: 'back' },
-    { x: -5.0, z: -5.8, r: 1.1, n: 4, band: 'back' },
-    { x: -10.5, z: -8.5, r: 1.4, n: 5, band: 'back' },
-    { x: 5.0, z: -8.2, r: 1.2, n: 4, band: 'back' },
-    { x: 8.5, z: -6.2, r: 1.0, n: 3, lit: true, band: 'back' },
-    { x: -9.6, z: -1.5, r: 1.0, n: 4, band: 'fore' },
-    { x: -9.9, z: 1.6, r: 0.9, n: 3, lit: true, band: 'fore' },
-    { x: -9.5, z: 3.2, r: 0.9, n: 3, band: 'fore' },
+    { x: -6.9, z: -7.2, r: 1.7, n: 6, scale: 0.55, lit: true, band: 'back' },
+    { x: -5.6, z: -6.0, r: 1.1, n: 4, scale: 0.40, band: 'back' },
+    { x: -10.8, z: -9.0, r: 1.8, n: 6, scale: 0.75, band: 'back' },
+    { x: 5.8, z: -8.6, r: 1.3, n: 5, scale: 0.50, band: 'back' },
+    { x: 8.8, z: -6.8, r: 1.1, n: 4, scale: 0.55, lit: true, band: 'back' },
+    // FOUR NEW ONES, all deep (Joe: "more of them further back"). They are
+    // the population the depth gain exists for — at z −9 to −12 a cap is
+    // roughly twice the size it would be at the ring, which is what keeps
+    // the back band a layer instead of gravel.
+    { x: -13.0, z: -6.1, r: 1.2, n: 4, scale: 0.55, band: 'back' },
+    { x: 12.2, z: -9.6, r: 1.5, n: 5, scale: 0.70, band: 'back' },
+    { x: -8.2, z: -11.5, r: 1.6, n: 5, scale: 0.80, band: 'back' },
+    { x: 7.7, z: -12.0, r: 1.5, n: 5, scale: 0.80, band: 'back' },
+    { x: -9.6, z: -1.5, r: 1.0, n: 4, scale: 0.75, band: 'fore' },
+    { x: -9.9, z: 1.6, r: 0.9, n: 3, scale: 0.70, lit: true, band: 'fore' },
+    { x: -9.5, z: 3.2, r: 0.9, n: 3, scale: 0.65, band: 'fore' },
   ]);
   // NO STUMP PROP. The W0 concept plates placed a lab stump at the future
   // socket; when the real Hollow Bole shipped (W3) the venue kept
