@@ -115,6 +115,31 @@ work out. Every stepped effect (`stepSinking`, `stepRevealing`,
 exists — take it. Release the hold before anything that needs a running
 clock, and before the scenario ends.
 
+**P8 — The harness's blind spots are POPULATIONS: warm profiles and state
+TRANSITIONS.** Two instances in one day (2026-08-13). The GLB loader's
+`force-cache` pinned re-baked models on every returning browser — invisible
+to every scenario because a harness profile is born with an empty HTTP
+cache, so the entire cache-policy dimension was untested by construction.
+Same day: a venue palette flip never re-dressed the standing tower —
+invisible because every scenario and look-driver goes COLD into one venue,
+so the flip path had zero coverage until a loudly-pigmented model stood
+under the wrong sky. Cold-boot coverage proves nothing about what a warm or
+switching client sees. The cure is a MANUFACTURED case, not a bigger sweep:
+`tower-glb-freshness` rotates bytes under one url behind a throwaway origin
+speaking server.js's exact contract; `venue-set` flips venues mid-session
+and asserts the re-dress. When a feature has cache behavior or follows a
+mode switch, its scenario must include the warm/switched leg explicitly.
+
+**P9 — A determinism gate proves STABILITY, never CORRECTNESS.** The round-6
+double-bake reproduced both GLBs byte-for-byte while the app was showing the
+wrong palette's model — the gate was green because it only ever promised
+"same answer again". Pair every determinism claim with a CONTENT claim
+(venue-set's berm discriminator: the two skies' baked vertex-color means
+must DIFFER — identical means was the smoking gun that found the bug). The
+diagnostic that settles "wrong bytes or wrong pipeline" is sampling the
+BAKED attribute off the live geometry (`__diceDebug.meshColors`); no
+rendered frame can answer it, because the frame is the pipeline.
+
 ## Running
 
 ```bash

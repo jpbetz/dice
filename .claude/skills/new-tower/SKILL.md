@@ -123,6 +123,43 @@ HOUSE VISUAL RULES (enforced by the loader + audits, so design to them):
   Blender (names survive the GLB). check.py refuses a model with none; the
   audits measure only named groups.
 
+## 1b. Grounding geometry — where the model meets the ground (W2c)
+
+The MODEL owns its transition into the venue's floor (composition rule 11;
+the venue paints only the ground's answer). The construction that works,
+learned by rejecting the one that doesn't (hollowbole round 6's first berm
+was an extruded profile with parapet rails — a ramp in a dirt costume):
+
+- **The pile is the object; the functional surface is CARVED through it.**
+  Build terrain as a HEIGHTFIELD over a footprint of 3–4 overlapping
+  noisy-rim lobes (each falling to zero at its own boundary — no end-cap
+  face can exist), then carve the dice lane: collider plane EXACT inside
+  the lane, a capped shoulder blend that keeps the throat gate clear by
+  construction, pure mound beyond. Never model the lane and decorate its
+  edges — that ordering is the ramp trap regardless of paint.
+- **Silhouette law**: no straight outline run over ~0.8 u in any rendered
+  view; the crest visibly broken by asymmetric shoulders. Trace it on your
+  own sheets before returning.
+- **Feather under the floor** (top y just below the venue ground plane at
+  every outer edge); part-sunk clods where skirts meet ground — but every
+  solid stays OUT of collider footprints and dice lanes; expect the
+  aesthetic spec to meet the gates and resolve TOWARD the gate, recording
+  each collision as a reversible decision in the recipe.
+- **Paint is the finisher, never the fix** (a 0.39 value drop left round
+  4's tongue a plank). Earth sits near the venue's soil family, below the
+  trunk's value; ground-moss constants MIRROR the venue's builder tones
+  with a cross-referenced drift warning; no material story may be
+  "it is a ramp".
+- **Judge value against the venue's floor**: the forge rig has no ground,
+  so add a disc of the venue's floor tone under the model in preview —
+  "no color seam with the glade" is unjudgeable without one. Measure
+  (rendered-pixel ratios vs floor and trunk), don't argue.
+- **Palette variants carry palette earth** — and the APP swaps them by
+  RESKIN on venue flip (towerReskin; variants must share portals + geometry
+  digest or the swap is refused). If your variants differ only subtly,
+  test the flip anyway: pale-wood rounds hid a never-re-dressed bug for
+  two rounds (TESTING.md P8).
+
 ## 2. The build, agent-shaped
 
 - Model builder agent (opus) iterates the RECIPE in a worktree via the

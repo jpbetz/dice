@@ -60,6 +60,11 @@ portal arithmetic.
    to the feature (roots, berms, skirts, creep) goes in the MODEL's
    recipe — the venue paints only the ground's answer. Canvas value
    alone cannot ground a model whose geometry ends in a prop edge.
+   PALETTE-OWNED DIALS: when the two palettes need different tuning
+   (foxfire's value floor sank the pool at the shared water lift), the
+   knob goes IN the palette table (`waterLift`) with a why-comment —
+   never a shared constant splitting the difference, never an if on the
+   palette id at the use site.
 5. **Dress engine furniture as terrain** (rule 12). The ramp, lip and
    jamb margins wear the venue's own ground story; inside the dice
    lane the visible surface IS the collider plane (dice ride physics —

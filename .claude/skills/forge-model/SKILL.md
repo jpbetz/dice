@@ -101,10 +101,31 @@ look is binding; the proxy is triage. And do not over-polish to the viewer
 either — its light rig is not the app's; residuals that depend on the rig
 go in the ledger for the feature that ships the asset.
 
+Two W2c additions to the look itself:
+- **A model judged against a venue is judged ON that venue's floor**: the
+  forge rig has no ground, so stand the model on a disc of the venue's own
+  floor tone in the preview scene — color-seam and value claims ("earth
+  darker than the glade floor") are unjudgeable against void. Report value
+  as measured pixel RATIOS (vs floor, vs the model's own mid), not
+  adjectives.
+- **Baked palette VARIANTS get their sheets side by side** — one palette's
+  LOOK is half a LOOK for a two-palette asset, and the app-side flip has
+  its own bug history (TESTING.md P8).
+
 ## 4. Review gate (main session, when a builder agent baked)
 
+- **Shape work STOPS at contact sheets.** For anything judgment-heavy
+  (organic forms, grounding geometry, silhouettes), the builder renders
+  sheets and STOPS for the main session's LOOK verdict BEFORE running the
+  long battery or committing — an agent iterating a shape to "done" alone
+  ships the wrong shape with green gates (W2c's first berm: a ramp with
+  parapets, caught by the user, not the gates). Course corrections are
+  CONSTRUCTION SPECS — footprints, fields, caps, laws with numbers — never
+  adjectives; an agent given a mood re-delivers the same shape politely.
 - Re-run the bake + gates yourself; the builder's green is a claim.
-- Diff the two digests across your rerun — determinism is part of done.
+- Diff the two digests across your rerun — determinism is part of done,
+  and it proves STABILITY only: pair it with a content check on what the
+  bytes SAY (TESTING.md P9 — a bake can reproduce the wrong thing forever).
 - LOOK at the renders before presenting; screenshot paths in the report.
 - Deliverables: recipe (Apache header, header comment with the brief and
   the measured numbers), gated GLB, shots, honest ledger (what was skipped,
