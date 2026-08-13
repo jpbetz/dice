@@ -830,8 +830,10 @@ export function buildFaeConcept({ paletteId = 'moonrise', seed = 20260815 } = {}
   // lesson): flank props must sit beyond the widest back wall and clear
   // of the tower envelope; the beam must land on the clearing.
   const layout = {
-    moot: { x: moot.userData.at.x, z: moot.userData.at.z },
-    pool: { x: pool.position.x, z: pool.position.z },
+    // rx/rz are the props' ground half-extents, so the placement law can
+    // be asserted about the NEAREST point, not the centre.
+    moot: { x: moot.userData.at.x, z: moot.userData.at.z, rx: 2.8, rz: 1.7 },
+    pool: { x: pool.position.x, z: pool.position.z, rx: pool.scale.x, rz: pool.scale.y },
     shaft: { x: shaft.position.x, z: shaft.position.z },
     sheetYs: sheets.map((s) => s.position.y),
     veilHole: 7,

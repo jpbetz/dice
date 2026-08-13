@@ -12645,6 +12645,31 @@ export const scenarios = [
       assert.equal(v.register, 'fantasy', 'and its register');
       assert.ok(v.stageChildren >= 8,
         `the stage is real scenery (${v.stageChildren} children), not a tinted room`);
+
+      // ---- W2: the glade room's placement law, off the stage itself ------
+      // Flank props stand BEYOND the widest back wall (wide zoom d 8.6 →
+      // z −4.3) at their NEAREST point and clear of the tower envelope
+      // (|x| 3.3): scenery may never stand where a die can rest or a
+      // tower does. The moonbeam LANDS on the resolve area (grammar 12).
+      // The fog retreats to the spec's numbers under the glade, and the
+      // sheet heights are the legibility law as numbers: three dense
+      // sheets below every die top (0.68), one veil at 3.4 with its
+      // clearing hole.
+      const s = v.stage;
+      assert.ok(s, 'the stage reports its layout');
+      assert.ok(s.moot.z + s.moot.rz < -4.3 && Math.abs(s.moot.x) - s.moot.rx > 3.3,
+        `the moot holds a dice-unreachable flank (${s.moot.x}, ${s.moot.z})`);
+      assert.ok(s.pool.z + s.pool.rz < -4.3 && Math.abs(s.pool.x) - s.pool.rx > 3.3,
+        `the mirror pool holds the other flank (${s.pool.x}, ${s.pool.z})`);
+      assert.ok(Math.abs(s.shaft.x) < 2 && s.shaft.z > 0 && s.shaft.z < 2.5,
+        `the moonbeam lands on the resolve area (${s.shaft.x}, ${s.shaft.z})`);
+      assert.deepEqual(s.fog, { near: 22, far: 60 },
+        'the glade preset retreats the fog to the spec numbers');
+      assert.equal(s.sheetYs.filter((y) => y < 0.68).length, 3,
+        `three dense sheets below every die top (${s.sheetYs.join(', ')})`);
+      assert.equal(Math.max(...s.sheetYs), 3.4, 'and one veil at its height');
+      assert.equal(s.veilHole, 7, 'with its baked clearing hole');
+
       // The venue's OWN tower, not a hardcoded 'none': today the fae tower
       // has not shipped so venueTower reports 'none'; the day 'hollowbole'
       // lands in TOWERS this same line starts asserting that the venue
