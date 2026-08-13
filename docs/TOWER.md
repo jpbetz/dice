@@ -1,5 +1,108 @@
 # TOWER_CORE — the tower geometry contract
 
+## THE PORTAL CONTRACT — v2, 2026-08-13 (supersedes the fixed six volumes as LAW; the numbers survive as the CLASSIC SPEC)
+
+A tower model now declares exactly two things about the engine's geometry —
+its **dice-in portal** (the mouth) and its **dice-out portal** (the doorway)
+— and the engine derives everything else: shaft, aim box, cowl, despawn
+line, apron slope, hood, lip, exit spawn, pit walls, camera eye, audit
+thresholds, occlusion sample grids. One function owns the derivation:
+`towerVolumes(spec)` in js/main.js, pure in (spec, mat depth, engine
+constants). This is the "TOWER_CORE v2 portals" promise recorded in
+docs/handoff/2026-08-12-w3-hollowbole.md item 7, delivered.
+
+**The spec** (world units; z relative to the back-wall anchor z0):
+`in: {x, z, rimY, clearR}` — a vertical entry aperture dice fall into;
+`out: {x, sillY, w, clearH}` — a front-facing exit rectangle in the wall
+plane. That shape is the v1 portal model, deliberately: one vertical mouth,
+one forward door. Angled throats, side mouths and multiple bores are out of
+contract (the film and the occlusion sampler assume this shape).
+
+**The classic spec.** `DEFAULT_PORTALS` = `in {x 0, z −1.6·S, rimY 7.0·S,
+clearR 1.7·S}`, `out {x 0, sillY 0.8·S, w 4.0·S, clearH 3.6·S}` (S = 1.25).
+Every registered tower that declares no portals resolves to it, and
+`towerVolumes(DEFAULT_PORTALS)` reproduces the pre-v2 volumes and all eight
+collider poses BIT-FOR-BIT — proven, not claimed, by the
+`tower-contract-freeze` scenario against a golden captured from the pre-v2
+code (tests/e2e/fixtures/tower-contract.golden.json). The derivations are
+written anchor ⊕ delta so classic identity is structural: every delta is
+`spec − default`, which is `+0.0` on the same double for a classic tower.
+DO NOT algebraically rearrange an anchor expression; the comment above
+towerVolumes says why.
+
+**Limits** (`TOWER_PORTAL_LIMITS`, provisional — the per-model proofs are
+the real gate): `clearR ≥ 1.7·S` (aperture arithmetic: d20 1.25 + jitter
+0.4 + margin); `rimY ∈ [5.8, 8.2]·S`; `in.x ∈ ±1.0·S`, `in.z ∈ [−2.6,
+−1.0]·S` (the bore stands over the fixed chute, inside the pit flanks);
+`w ≥ 4.0·S` (the doorway radius arithmetic — note the ORIGINAL §2b text
+below says "width 3.0", which was doc drift even then: the shipped door has
+been 4.0·S since the jamb-clipping fix); `clearH ≥ 3.6·S`; `sillY ∈ [0.5,
+1.1]·S` (the 28°-family ramp must still reach the felt inside the FIXED
+matExtra spend); `out.x ∈ ±0.6·S`.
+
+**What stays engine-fixed, on purpose:** the SOCKET envelope (the room's
+budget, not the model's), the pit walls, `matExtra` (every tower consumes
+the same mat — the tower-roll assertion "every tower consumes the same mat"
+stays true), the eight named colliders in their contract add order (spec
+moves them, never adds or removes them), the apron/lip dialed furniture,
+and the camera dials (render-only). The lab's `lipTilt` dial no longer
+reaches the shipped socket — `TOWER_LIP_TILT` is a frozen constant and the
+dial exists only behind `towerLabVolumes()` — so the "Still lab-only" claim
+below is now true by construction (it was not, before v2: the dial fed a
+shipped collider).
+
+**How a model carries its portals.** A forge-baked GLB declares them as two
+scene-root nodes, `portalIn`/`portalOut` — node translation = position,
+node extras = scalars (tools/forge/README.md "Tower portals";
+`forge.tower_portals()` authors them, `check.py --tower` gates them at bake
+time with limit checks and throat raycasts). The app's loader
+(js/towerglb.js) re-validates at load, applies the house rules, and freezes
+the portals onto the registry row; `towerPortalsOf(id)` resolves them and
+`__diceDebug.towerPortalSpec(id)` is the debug surface tools read instead
+of literals. A registry row opts in with `glbUrl`; models are authored with
+z=0 at the socket plane and seated at the live z0. Loading is asynchronous
+but SOCKETING IS NOT: `towerModelReady(id)` gates the roll-boundary flush,
+a late-joining replay is HELD until the model arrives (then socket-first,
+replay-second — the hello ordering law), and a failed load keeps the
+current tower loudly rather than degrading to 'none'.
+
+**What v2 changes about the film — a superseded decision.** The film is now
+a function of (portal spec, seed) instead of (one fixed geometry, seed).
+The old consequence "tower SKINS are per-viewer cosmetic candidates …
+swapping skins can never change how a roll plays or replays" (still written
+near the end of this doc) NARROWS to: towers sharing a portal spec — which
+is all four classic towers — cannot change the film; towers with different
+specs bake different films. Determinism is unchanged where it matters
+(GOALS goal 15): the tower id is room state applied at roll boundaries, so
+one seed still means one film on every client in the room. The residual
+divergence risk is a stale client meeting an unknown tower id (it keeps its
+own, now with a loud console.warn) — the same accepted class as tower
+on/off before v2, bounded by the server's id allowlist. The film pins its
+baking tower into `towerFilmInfo().filmTower` so a divergence is nameable.
+
+**Proofs under v2** — same four, portal-derived inputs: (a) fits the room
+envelope (tower-fit; classify thresholds now come from `v.cls`); (b)
+occludes the derived transit regions from every shipped eye
+(towerOcclusionCheck's grids recenter on the declared bore and scale with
+`clearR`); (c) portal apertures meet limits and their throats are really
+clear (check.py --tower at bake time; the loader at load time; the probe
+matrix behaviorally); (d) zero colliders from the model — unchanged. The
+proof TOOLS read `towerPortalSpec()` instead of reciting classic numbers
+(tower-probe's HIDDEN/TRAY cut lines, tower-pour's tower argument,
+registry-driven default lists). One instrument correction, measured during
+the v2 build: tower-probe's collision timestamps and residual velocities
+are NOISY across identical runs (A/A on unchanged code differs), so "the
+probe sheet is byte-identical" claims below should be read as "the probe
+VERDICTS are stable"; the byte-level determinism proof lives in
+tower-roll's replay block (same seed → identical film, cross-client).
+
+**The first portal-declared assets:** `tests/e2e/fixtures/tower_fixture.glb`
+(the stress fixture — all eight numbers off-classic, all inside limits;
+never a picker row) and the rebuilt `hollowbole` shell (in progress at this
+writing; its STATUS section below is updated as it lands).
+
+---
+
 ## STATUS — shipped as a room setting (2026-08-12), three models (2026-08-14), a fourth registered (2026-08-12, W3)
 
 **THE FOURTH MODEL IS REGISTERED AND ITS SHAPE IS NOT FINISHED.**
@@ -104,7 +207,11 @@ and no others, both eased over `CAM_EASE_S`, both refused under
 
 **Still lab-only:** `__diceDebug.towerCore/towerDrop/towerTune/towerLog` and
 the isolated world behind them. They are the experiment bench and the shipped
-socket does not read `TOWERLAB.tune` for anything but `matExtra`.
+socket does not read `TOWERLAB.tune` for anything but `matExtra`. *(This
+sentence was ASPIRATIONAL until v2: `tune.lipTilt` fed the shipped lip
+collider through towerVolumes. The portal seam froze the shipped value as
+`TOWER_LIP_TILT` and confined the dial to `towerLabVolumes()`; a tower-tag
+assertion now proves a dialed lab cannot move a shipped body.)*
 
 **THE SECOND MODEL, AND WHAT IT PROVED (2026-08-13).** `bastion`
 (`js/towerbastion.js`) is a stone turret: a battered rusticated plinth, a
@@ -349,7 +456,15 @@ midpoint of the back wall. The anchor moves with the zoom preset; the core's
 offsets from it never do. Dice are fixed world size, so the tower is too: on
 `close` it reads big, and that is physical honesty, not a bug.
 
-## The six engine-owned volumes
+## The six engine-owned volumes — since v2, the CLASSIC SPEC's derivation
+
+*(v2 note: these numbers stopped being law and became the classic spec —
+what `towerVolumes(DEFAULT_PORTALS)` derives, frozen bit-for-bit by the
+contract golden. A portal tower gets the same STRUCTURE with its own
+mouth/door numbers. Read this section for the reasoning each number
+carries; read the portal contract section at the top for what a new model
+actually declares. One correction: §2b's "width 3.0" was drift even before
+v2 — the shipped door is 4.0·S, per the radius arithmetic in §5.)*
 
 **1. SOCKET — the maximum exterior hull.** Every vertex of a model lives
 inside: `x ∈ [-2.6, 2.6]`, `z ∈ [z0 − 4.2, z0 + 0.2]`, `y ∈ [0, 10]`.
@@ -518,10 +633,12 @@ re-queues, none hidden).
 
 ## Consequences worth naming
 
-- Because the film never reads the model, tower SKINS are per-viewer
-  cosmetic candidates (ruling ② pattern — like the camera, invisible to
-  other players). Tower ON/OFF, by contrast, changes the film and is a
-  room setting with the queueZoom defer rule (never mid-roll).
+- *(NARROWED by v2 — see the portal contract section.)* Because the film
+  never reads the model — only its portal SPEC — towers sharing a spec are
+  per-viewer cosmetic candidates (ruling ② pattern), and all four classic
+  towers share `DEFAULT_PORTALS`. Towers with DIFFERENT specs bake
+  different films, exactly as tower ON/OFF always did, and ride the same
+  room-setting defer rule (never mid-roll).
 - The mouth/shaft sit behind the back wall plane. Scripted entries never
   touch physics, so the wall never sees them; the one body that ever exists
   near the wall is the exit spawn, placed inside it and moving away.
