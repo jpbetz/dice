@@ -11630,6 +11630,112 @@ export const scenarios = [
     },
   },
 
+  {
+    name: 'tower-hollowbole-replay',
+    tags: ['tower', 'glb', 'fx'],
+    // THE HELD REPLAY, ON A REAL ROW (js/main.js towerReleaseHeldReplay).
+    //
+    // tower-roll pins the hello-ordering law for a CODE tower: on a reload,
+    // hello.settings sockets the tower and THEN the newest on-felt roll is
+    // replayed, because getting that backwards rebuilds the table's pour as a
+    // THROW against walls 4.5 units shallower than everybody else's. For a
+    // code tower the law is free — both steps happen in one hello handler, in
+    // source order, and nothing can get between them.
+    //
+    // A BAKED tower breaks it without reordering anything: it makes the first
+    // step UNFINISHED when the second runs. So the replay is HELD, with a
+    // deadline, and released when the model lands. That is a genuinely
+    // asynchronous path and this scenario is the only thing that walks it with
+    // a shipped row — tower-glb-loader proves the loader on a minted fixture in
+    // a SOLO tab, which cannot reload into a room.
+    //
+    // AND IT COVERS A CHANGE THE TWO-VARIANT ROW MADE: the release now fires
+    // once per url rather than once, because hollowbole ensures two files.
+    // Releasing twice must be a no-op, not a second stashed replay.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await a.settle();
+      const wasExtents = await a.dbg('tableExtents()');
+
+      // The venue is how this tower goes up — it has no chip of its own.
+      await a.dbg(`setVenue('moonrise')`);
+      for (const t of [a, b]) {
+        await t.waitFor(`window.__diceDebug.tower === 'hollowbole'`,
+          { desc: 'the venue raises its tower on both tabs' });
+      }
+      const upExtents = await a.dbg('tableExtents()');
+      assert.notDeepEqual(upExtents, wasExtents,
+        'and the mat deepened for it, so the reload has something to get wrong');
+      const ORDER = (await a.dbg('towerBodies()')).map((x) => x.name);
+      assert.equal(ORDER.length, 8, 'eight engine colliders are standing');
+
+      // A pour on the felt, which is what the reloading tab has to rebuild.
+      await a.roll('3d6');
+      await b.settle();
+      assert.ok(await a.eval('!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.pour)'),
+        'the roll on the table is a POUR');
+
+      // ---- the reload, which is where the model is not there yet -----------
+      await b.reload();
+      await b.waitFor(`window.__diceDebug.tower === 'hollowbole'`,
+        { desc: 'the reloaded tab raises the tower once its model arrives' });
+      const st = await b.dbg(`towerModelStatus('hollowbole')`);
+      assert.equal(st.ready, true, 'and the row reports ready');
+      assert.equal(st.status, 'ready',
+        `with BOTH variants loaded, not just the one standing (${st.status})`);
+      const vars = await b.dbg(`towerVariants('hollowbole')`);
+      assert.deepEqual(vars.statuses, ['ready', 'ready'],
+        `both files present after a cold boot (${vars.statuses.join(', ')})`);
+      assert.deepEqual(vars.mismatch, [],
+        'and they agree about where the doorway is');
+
+      // THE ORDER, asserted the way tower-roll asserts it — on the walls and
+      // on the film, because those are what the ordering actually decides.
+      assert.deepEqual(await b.dbg('tableExtents()'), upExtents,
+        'the replay ran against the DEEPENED mat, not the preset one');
+      assert.deepEqual((await b.dbg('worldBodies()')).named, ORDER,
+        'with the colliders socketed before the replay ran');
+      await b.waitFor('window.__diceDebug.tableDice.length === 3',
+        { desc: 'the on-felt roll is rebuilt after the model lands' });
+      assert.ok(await b.eval('!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.pour)'),
+        'and the rebuild was baked as a POUR — which is only true if the socket '
+        + 'ran BEFORE playRoll. A replay released early would rebuild it as a '
+        + 'THROW and nothing else on this tab would look wrong');
+      const f = JSON.parse(await b.eval('JSON.stringify(window.__diceDebug.towerFilmInfo())'));
+      assert.equal(f.filmTower, 'hollowbole',
+        `the film names the tower it was baked with (${f.filmTower})`);
+      assert.equal(f.z0, (await a.eval('window.__diceDebug.towerFilmInfo().z0')),
+        'and both tabs baked against the same back wall');
+
+      // LEAVING A FANTASY VENUE DOES NOT LOWER ITS TOWER, and that is the
+      // shipped rule rather than an oversight: selectVenue patches
+      // {venue, tower} only for the FANTASY register (js/main.js), so going
+      // back to the table changes the room and leaves the tower the player is
+      // looking at standing. Asserted rather than worked around — the first
+      // draft of this scenario waited for 'none' here and timed out, which is
+      // how the rule got read.
+      await a.dbg('clearTable()');
+      await a.dbg('sim(400)');
+      await a.dbg(`setVenue('table')`);
+      for (const t of [a, b]) {
+        await t.waitFor(`window.__diceDebug.venue === 'table'`,
+          { desc: 'both tabs are back in the table room' });
+      }
+      assert.equal(await a.dbg('tower'), 'hollowbole',
+        'and the tower it raised is still standing — only the fantasy register '
+        + 'patches the tower with the venue');
+
+      await a.dbg(`setTower('none')`);
+      for (const t of [a, b]) {
+        await t.waitFor(`window.__diceDebug.tower === 'none'`,
+          { desc: 'and it comes down when it is actually asked to' });
+      }
+      assert.deepEqual((await a.dbg('worldBodies()')).named, [],
+        'not one collider is left behind');
+    },
+  },
+
   // ---------------------------------------------------------------------------
   // V1 AUDIO (docs/AUDIO.md)
   //

@@ -8110,10 +8110,25 @@ function towerModelEnsure(id) {
       tryFlushRoomChanges();
       // A LATE FELT BEATS A NEVER FELT: released on failure too, so a broken
       // model costs the returning player a tower, not the roll on the table.
-      // Both are safe to call once per variant: the flush is gated on
-      // towerModelReady (still false until the LAST file lands, so the earlier
-      // ones are no-ops) and the release is idempotent by construction.
-      towerReleaseHeldReplay();
+      //
+      // BUT NOT UNTIL EVERY VARIANT HAS SETTLED, and this is the one place the
+      // two-variant row genuinely changed the shape of a promise rather than
+      // just its plumbing. The flush is safe to call per variant because it is
+      // gated on towerModelReady, which stays false until the LAST file lands.
+      // The RELEASE is not gated on anything — it is the give-up path — so
+      // firing it when the first of two files arrived let the replay out while
+      // the tower was still un-socketed, and the returning player's pour was
+      // rebuilt as a THROW against the shallow mat. That is precisely the
+      // hello-ordering law this hold exists to keep, broken by the hold's own
+      // release. Caught by tower-hollowbole-replay on the first run.
+      //
+      // 'ready' OR 'error' — a variant that failed terminally has settled too,
+      // or one bad file out of two would hold the roll until the deadline.
+      const settled = urls.every((u) => {
+        const s = towerGlbStatus(u);
+        return s === 'ready' || s === 'error';
+      });
+      if (settled) towerReleaseHeldReplay();
     });
   }
 }
