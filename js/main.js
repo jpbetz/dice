@@ -50,7 +50,8 @@ import {
 import { glbShellFor } from './towerglbshell.js';
 import { stepDress } from './towerdress.js';
 import { buildMotes, stepMotes, disposeMotes } from './motes.js';
-import { buildFaeConcept, brightenFog, stepWisps } from './fae-lab.js';
+import { buildFaeConcept, brightenFog } from './fae-lab.js';
+import { LIFE_TUNE, stepLife, stepMootSession, disposeLife } from './faelife.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -7445,7 +7446,24 @@ function faeTowerPalette() {
 // interim stage; W2 upgrades its fidelity in place). It borrows the MOOD
 // rig for the moon (a preset over the same dials — techniques.md §5's
 // argument made flesh) and restores every borrowed thing on the way out.
-const FAECONCEPT = { on: false, rig: null, t: 0, saved: null, lights: [], boosted: [] };
+const FAECONCEPT = {
+  on: false, rig: null, t: 0, saved: null, lights: [], boosted: [],
+  // THE LIVING LAYER's dials and its eased mood (W5, js/faelife.js).
+  // `tune` is a live copy so lifeTune() can move any dial without a
+  // rebuild; `mood` is the only state in the layer that integrates —
+  // everything else is a pure function of `t`, so a held clock (dt 0)
+  // freezes the glade whole.
+  tune: JSON.parse(JSON.stringify(LIFE_TUNE)),
+  mood: { life: 1, lean: 0, flare: 0, session: 0 },
+};
+// Dials the layer reads once, at build — how many members, how bright each
+// was dealt, and how far one may wander (which is baked into the seat it
+// was given). lifeTune restages when one of these moves, because a dial
+// that silently does nothing is worse than no dial at all.
+const LIFE_BUILD_KEYS = new Set([
+  'count', 'size', 'blinkHz', 'wander',
+  'wispCount', 'wispSize', 'leadPeak', 'wispPeak', 'wispLampRange',
+]);
 
 // Per-set venue fog breath (W4), parsed once per variant — the step runs
 // per frame and must not allocate. null = the venue's default breath.
@@ -7466,7 +7484,29 @@ function faeFogFor(variant) {
 
 function faeConceptStart(opts = {}) {
   if (FAECONCEPT.rig) faeConceptStop();
-  const rig = buildFaeConcept(opts);
+  // THE CLOCK STARTS AT ZERO. Found while building W5 (2026-08-13): the
+  // stage's `t` was never reset, so a venue toggled off and back on
+  // resumed the air at whatever phase the last one left — two clients
+  // that toggled differently breathed differently, and a screenshot
+  // taken after a toggle was not reproducible. Everything ambient here
+  // is f(t), so this one line is the whole determinism story.
+  FAECONCEPT.t = 0;
+  FAECONCEPT.mood = { life: 1, lean: 0, flare: 0, session: 0 };
+  // Whatever verdict is already on screen is not news: seed the crit
+  // latch so entering the venue mid-session cannot fire the beat, and
+  // neither can a late joiner's replay of somebody else's old roll.
+  FAECONCEPT.seenEntry = (stagedVerdict && stagedVerdict.entry) || lastEntry;
+  const rig = buildFaeConcept({
+    ...opts,
+    // The living layer is bounded by the TABLE's widest walls, not by a
+    // number the venue keeps its own copy of (C25/C28: a constant sized
+    // against the mat that stops following it is this repo's most-shipped
+    // bug shape). Margin is the standoff beyond the wall.
+    life: {
+      box: { hx: ZOOM_PRESETS.wide.w / 2, hz: ZOOM_PRESETS.wide.d / 2, margin: 0.35 },
+      tune: FAECONCEPT.tune,
+    },
+  });
   FAECONCEPT.saved = { tune: { ...MOOD.tune }, bg: scene.background.clone(), moodOn: MOOD.on };
   scene.background = new THREE.Color(rig.pal.void);
   Object.assign(MOOD.tune, {
@@ -7505,12 +7545,21 @@ function faeConceptStop() {
   for (const l of FAECONCEPT.lights) scene.remove(l);
   FAECONCEPT.lights = [];
   scene.remove(FAECONCEPT.rig.group);
+  if (FAECONCEPT.rig.life) disposeLife(FAECONCEPT.rig.life);
   FAECONCEPT.rig = null;
   scene.background = FAECONCEPT.saved.bg;
   Object.assign(MOOD.tune, FAECONCEPT.saved.tune);
   MOOD.on = FAECONCEPT.saved.moodOn;
   applyMood();
   FAECONCEPT.on = false;
+}
+
+// One-pole ease toward a target: framerate-independent, and at dt 0 it
+// returns `cur` EXACTLY — which is what keeps a held clock a photograph
+// even though the mood is the one thing here that integrates.
+function faeEase(cur, target, dt, tau) {
+  if (!(dt > 0)) return cur;
+  return cur + (target - cur) * (1 - Math.exp(-dt / tau));
 }
 
 function stepFaeConcept(dt) {
@@ -7522,13 +7571,70 @@ function stepFaeConcept(dt) {
     s.material.map.offset.x += s.userData.drift[0] * dt;
     s.material.map.offset.y += s.userData.drift[1] * dt;
   }
-  stepWisps(rig.wisps, t);
+  // WHAT THE TABLE IS DOING — the governor (W5). Read before anything
+  // ambient moves, because the living layer's whole legality is that it
+  // steps back while dice are the brightest thing in the frame (rule 1)
+  // and leans in once they are readable (goal 15).
+  //
+  // `visible` in this filter matters and was missing (found by the W5
+  // inventory): during a POUR a die parked inside the tower sits at
+  // y < 2.5 and hidden, and was lighting a fog pocket inside the trunk.
+  const settled = tableDice
+    .filter((d) => d.mesh && d.mesh.visible && d.mesh.position.y < 2.5).slice(0, 5);
+  const roll = currentRoll;
+  const phase = roll && roll.ceremony ? roll.ceremony.phase : null;
+  // THE FILM IS RUNNING: a plain roll playing, or a ceremony's tumble.
+  // 'declare' holds playback with every die hidden, and 'settle' stages a
+  // verdict over dice already at rest — neither is motion, and counting
+  // them as motion would duck the glade for a whole ceremony.
+  const filmRunning = !!(roll && !roll.done) && phase !== 'declare' && phase !== 'settle';
+  // Withdraw FAST, return SLOW. Startled is quick; coming back out is
+  // cautious. The asymmetry is the whole character of the gesture, and it
+  // is one argument to each call.
+  FAECONCEPT.mood.life = faeEase(FAECONCEPT.mood.life,
+    filmRunning ? 0 : 1, dt, filmRunning ? 0.30 : 1.7);
+  FAECONCEPT.mood.lean = faeEase(FAECONCEPT.mood.lean,
+    (!filmRunning && settled.length > 0) ? 1 : 0, dt, 1.2);
+  // THE CRIT BEAT — entryCritCeremony, never entryCrit: the RATIONED
+  // one. U18's lesson is that a per-die system calls about half of all
+  // pools a crit, and a glade that flares every other roll has stopped
+  // saying anything. WHAT it reacts to comes off the entry (server
+  // values; every client agrees); only WHEN is local, the same way the
+  // dice landing is already local. The latch is seeded at stage-up so
+  // arriving with a crit already on screen is not an event.
+  const shown = (stagedVerdict && stagedVerdict.entry) || lastEntry;
+  if (shown && shown !== FAECONCEPT.seenEntry) {
+    FAECONCEPT.seenEntry = shown;
+    if (entryCritCeremony(shown)) FAECONCEPT.mood.flare = 1;
+  }
+  FAECONCEPT.mood.flare = faeEase(FAECONCEPT.mood.flare, 0, dt, 0.42);
+
+  // THE LIVING LAYER (W5). Everything in it is f(t) except the eased
+  // mood, so this whole call freezes under a held clock.
+  stepLife(rig.life, t, FAECONCEPT.mood);
+  // THE MOOT IS IN SESSION WHEN THE WISPS ARE STANDING IN IT. Measured,
+  // not scheduled: the nearest wisp's plan distance to the ring, eased so
+  // the ring wakes and settles rather than switching. The faeries are the
+  // wisps — there is no second population of attendants on the ground,
+  // and the ring stays a VACATED moot (grammar §5 staging 2, "the
+  // interruption is the story") that has visitors.
+  const wp = rig.life.wispPoints.geometry.attributes.position;
+  const at = rig.moot.userData.at;
+  let near = Infinity;
+  for (let i = 0; i < wp.count; i++) {
+    const dx = wp.getX(i) - at.x, dz = wp.getZ(i) - at.z;
+    const d = Math.hypot(dx, dz);
+    if (d < near) near = d;
+  }
+  const mt = FAECONCEPT.tune.moot;
+  const visit = Math.max(0, Math.min(1, (mt.nearOut - near) / (mt.nearOut - mt.nearIn)));
+  FAECONCEPT.mood.session = faeEase(FAECONCEPT.mood.session, visit, dt, 1.4);
+  FAECONCEPT.mootGain = stepMootSession(rig.moot, t, FAECONCEPT.mood, FAECONCEPT.tune.moot);
   // The dice light the fog (the venue's whole thesis): every settled die is
   // an emitter, plus the lead wisp; the moot's pools are already folded
   // into the sheets' base. A die whose SET declares a fog breath (the W4
   // `fog` recipe field — witchlight's pale exhale) colours its own pocket;
   // everything else breathes the venue default.
-  const settled = tableDice.filter((d) => d.mesh && d.mesh.position.y < 2.5).slice(0, 5);
   const em = settled.map((d) => {
     const f = faeFogFor(d.variant);
     return {
@@ -7537,8 +7643,15 @@ function stepFaeConcept(dt) {
       cr: f ? f.cr : 0.38, cg: f ? f.cg : 0.62, cb: f ? f.cb : 0.58,
     };
   });
-  const wpos = rig.wisps.points.geometry.attributes.position;
-  em.push({ x: wpos.getX(0), z: wpos.getZ(0), r: 2.2, gain: 0.7, cr: 0.2, cg: 0.4, cb: 0.36 });
+  // The lead wisp breathes its own pocket into the fog — the same ONE
+  // emitter the stage has carried since W0, now riding the route. Its
+  // gain follows the mood, so a withdrawn glade withdraws in the fog too
+  // and not only in the sprites.
+  em.push({
+    x: wp.getX(0), z: wp.getZ(0), r: 2.2,
+    gain: 0.7 * (0.35 + 0.65 * FAECONCEPT.mood.life),
+    cr: 0.2, cg: 0.4, cb: 0.36,
+  });
   brightenFog(rig.sheets, em);
   rig.halos.children.forEach((h, i) => {
     const d = settled[i];
@@ -9170,6 +9283,104 @@ window.__diceDebug = {
     Object.assign(MOOD.moteTune, patch);
     applyMood();
     return { ...MOOD.moteTune, live: !!MOOD.motes };
+  },
+  // THE LIVING LAYER (js/faelife.js, W5). Same rule as motesInfo: counts
+  // come from BUFFERS IN THE SCENE, so zero means the objects are gone,
+  // not that a flag went false.
+  //
+  // `inBox` is the one that matters. The layer's whole legality rests on
+  // nothing alive ever crossing the dice box, and a three-member sample
+  // cannot prove a law about a hundred and fourteen members — so the
+  // check runs over EVERY member, every call, in-page, and reports the
+  // count and the deepest offender. It must be 0.
+  lifeInfo(idx = [0, 1, 2]) {
+    const L = FAECONCEPT.rig && FAECONCEPT.rig.life;
+    if (!L || !L.group.parent) return { flies: 0, wisps: 0, inBox: 0, sample: [] };
+    const fp = L.fireflies.geometry.attributes.position;
+    const fc = L.fireflies.geometry.attributes.color;
+    const wp = L.wispPoints.geometry.attributes.position;
+    const wc = L.wispPoints.geometry.attributes.color;
+    let inBox = 0, worst = null;
+    const scan = (p, tag) => {
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), z = p.getZ(i);
+        const dx = L.box.hx - Math.abs(x), dz = L.box.hz - Math.abs(z);
+        if (dx > 0 && dz > 0) {
+          inBox++;
+          const depth = Math.min(dx, dz);
+          if (!worst || depth > worst.depth) worst = { tag, i, x, z, depth };
+        }
+      }
+    };
+    scan(fp, 'fly');
+    scan(wp, 'wisp');
+    return {
+      flies: fp.count,
+      wisps: wp.count,
+      draws: 2,
+      t: FAECONCEPT.t,
+      mood: { ...FAECONCEPT.mood },
+      box: { ...L.box },
+      seated: L.seated,     // members a zone put over the felt at BUILD
+      clamped: L.clamped,   // members the runtime backstop caught this step
+      inBox,
+      worst,
+      lamp: Number(L.lamp.intensity.toFixed(4)),
+      // Peak brightness actually WRITTEN this frame, per population — the
+      // tier gates are about what renders, not about what a dial says.
+      fliesPeak: (() => { let m = 0; for (let i = 0; i < fc.count; i++) m = Math.max(m, fc.getX(i)); return Number(m.toFixed(4)); })(),
+      wispPeak: (() => { let m = 0; for (let i = 0; i < wc.count; i++) m = Math.max(m, wc.getX(i)); return Number(m.toFixed(4)); })(),
+      // A field is exempt from the countable-source budget only while it
+      // stays MONOCHROME. Per-point colour is written grayscale so the hue
+      // lives in one material; this proves it, rather than trusting it.
+      gray: (() => {
+        for (const a of [fc, wc]) {
+          for (let i = 0; i < a.count; i++) {
+            if (a.getX(i) !== a.getY(i) || a.getY(i) !== a.getZ(i)) return false;
+          }
+        }
+        return true;
+      })(),
+      // THE MOOT IN SESSION, as numbers: the ring's live gain, and the
+      // brightest cap it is currently driving. The cap peak is what the
+      // bloom threshold cares about — a ring that wakes past it would be
+      // a new primary source, which is the failure this reports so it
+      // cannot happen quietly.
+      moot: (() => {
+        const caps = FAECONCEPT.rig.moot.userData.caps || [];
+        let peak = 0;
+        for (const c of caps) peak = Math.max(peak, c.mat.emissiveIntensity);
+        return {
+          gain: Number((FAECONCEPT.mootGain || 0).toFixed(4)),
+          capPeak: Number(peak.toFixed(4)),
+          caps: caps.length,
+          seats: FAECONCEPT.rig.moot.userData.seats || 0,
+        };
+      })(),
+      sample: idx.map((i) => [fp.getX(i), fp.getY(i), fp.getZ(i), fc.getX(i)]),
+      wispSample: Array.from({ length: wp.count }, (_, i) => [wp.getX(i), wp.getY(i), wp.getZ(i), wc.getX(i)]),
+    };
+  },
+  lifeTune(patch = {}) {
+    const { moot, ...rest } = patch;
+    Object.assign(FAECONCEPT.tune, rest);
+    if (moot) Object.assign(FAECONCEPT.tune.moot, moot);
+    // `on` takes the layer out of the SCENE, so lifeInfo reads zero for
+    // the reason the count is trustworthy in the first place.
+    if (typeof patch.on === 'boolean' && FAECONCEPT.rig && FAECONCEPT.rig.life) {
+      const g = FAECONCEPT.rig.life.group;
+      if (patch.on && !g.parent) FAECONCEPT.rig.group.add(g);
+      if (!patch.on && g.parent) FAECONCEPT.rig.group.remove(g);
+    }
+    // Some dials are read at BUILD (how many members, how bright each was
+    // dealt, how far each may wander from a seat chosen around that
+    // wander) and some per step. A dial that silently does nothing is
+    // worse than no dial, so a build-time change restages.
+    if (FAECONCEPT.on && Object.keys(rest).some((k) => LIFE_BUILD_KEYS.has(k))) {
+      const spec = VENUES[currentVenue];
+      faeConceptStart({ paletteId: (spec && spec.paletteId) || 'moonrise' });
+    }
+    return { ...FAECONCEPT.tune, live: !!(FAECONCEPT.rig && FAECONCEPT.rig.life) };
   },
   // Frame forensics: hide/show any named object. When a mystery mass
   // survives four rounds of "fix the thing I think it is", the answer is

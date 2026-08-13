@@ -12872,6 +12872,171 @@ export const scenarios = [
   },
 
   {
+    name: 'venue-life',
+    tags: ['fx', 'settings'],
+    // THE LIVING LAYER (js/faelife.js, ROADMAP W5): a firefly FIELD that
+    // says the place is alive and a WISP PROCESSION that says somebody
+    // lives here, with the vacated moot waking when they stand in it.
+    // Six claims, and the first is the one everything else rests on.
+    //
+    // ① THE ONE LAW — nothing alive ever crosses the dice box. It is
+    //    checked over EVERY member, at points spread around the wisps'
+    //    78-second route, because a three-point sample cannot prove a
+    //    law about a hundred-odd members, and this layer's legality
+    //    under composition rule 1 and GOALS goal 15 IS that law: stay
+    //    out of the volume dice occupy and nothing alive can ever sit
+    //    between the eye and a result.
+    // ② The tiers hold AS RENDERED, not as declared.
+    // ③ It moves on the sim clock and freezes with it.
+    // ④ A re-staged glade breathes identically.
+    // ⑤ The governor: the glade withdraws while the film runs, and
+    //    leans in once the dice are readable.
+    // ⑥ The moot wakes when the wisps visit — and never past bloom.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+
+      // ---- the grounded room keeps no life of its own ---------------------
+      let L = await a.dbg('lifeInfo()');
+      assert.equal(L.flies, 0, 'the table is a room, not a glade — nothing lives in it');
+
+      await a.dbg(`setVenue('moonrise')`);
+      await a.waitFor(`window.__diceDebug.venueInfo().staged`, { desc: 'the glade rises' });
+      L = await a.dbg('lifeInfo()');
+      assert.ok(L.flies > 50, `the field is populated (${L.flies} fireflies)`);
+      assert.ok(L.wisps >= 3 && L.wisps <= 5,
+        `a procession, not a swarm (${L.wisps} wisps)`);
+      assert.equal(L.draws, 2, 'in two draw calls — a field is one buffer, not one object each');
+      assert.equal(L.seated, 0,
+        `every zone is authored clear of the felt: ${L.seated} members had to be pushed out at build`);
+
+      // ---- ① THE ONE LAW, over the whole population and the whole route ---
+      // The box comes off the LAYER, which took it from the widest zoom
+      // preset — the binding case, since a tighter mat only moves the
+      // walls inward.
+      await a.dbg('holdClock(true)');
+      assert.deepEqual(L.box, { hx: 7.05, hz: 4.3, margin: 0.35 },
+        'the box is the widest mat, which is the case that binds');
+      let fliesPeak = 0, wispPeak = 0, gray = true;
+      for (let k = 0; k < 6; k++) {
+        if (k) await a.dbg('sim(780)');   // 13 s a step — most of one lap by the end
+        const s = await a.dbg('lifeInfo()');
+        assert.equal(s.inBox, 0,
+          `nothing alive is over the felt at t=${s.t.toFixed(1)}s `
+          + `(worst offender ${JSON.stringify(s.worst)})`);
+        assert.equal(s.clamped, 0,
+          'and the runtime backstop never fired — the route obeys the law on its own, '
+          + 'which is what makes the clamp a backstop rather than a mechanism');
+        fliesPeak = Math.max(fliesPeak, s.fliesPeak);
+        wispPeak = Math.max(wispPeak, s.wispPeak);
+        gray = gray && s.gray;
+      }
+
+      // ---- ② the tiers, as rendered ---------------------------------------
+      // The Vegas gates (FAE-VENUE-SPEC-DRAFT §gates) put the field in the
+      // tertiary tier and the procession in the secondary one, and the
+      // glade's countable-source budget was already full before W5 — so
+      // the field may only stay exempt while it is MONOCHROME. Peak is
+      // read off the colour buffer, i.e. what actually rendered.
+      assert.ok(fliesPeak > 0.02 && fliesPeak <= 0.25,
+        `the field lights, and stays tertiary (peak ${fliesPeak} ≤ 0.25)`);
+      assert.ok(wispPeak > 0.10 && wispPeak <= 0.60,
+        `the procession stays secondary (peak ${wispPeak} ≤ 0.60)`);
+      assert.equal(gray, true,
+        'and every member is written grayscale — the hue lives in ONE material, '
+        + 'which is the whole reason a field is exempt from the source count');
+
+      // ---- ③ it moves on the sim clock, and only on it --------------------
+      const before = await a.dbg('lifeInfo([0, 40, 90])');
+      await a.dbg('sim(60)');
+      const after = await a.dbg('lifeInfo([0, 40, 90])');
+      assert.notDeepEqual(after.sample, before.sample,
+        'a second of sim time visibly moves the glade');
+      // Real frames keep arriving under the hold (tick runs with dt 0), so
+      // this is not a no-op: a Date.now() hidden in the step passes every
+      // drift check above and fails right here.
+      const frozen1 = await a.dbg('lifeInfo([0, 40, 90])');
+      await a.dbg('sim(0)');
+      const frozen2 = await a.dbg('lifeInfo([0, 40, 90])');
+      assert.deepEqual(frozen2.sample, frozen1.sample,
+        'under a held clock the glade is a photograph');
+      assert.deepEqual(frozen2.wispSample, frozen1.wispSample,
+        'and so is the procession');
+
+      // ---- ④ a re-staged glade breathes identically -----------------------
+      // The stage clock starts at ZERO. Before W5 it did not: `FAECONCEPT.t`
+      // survived a restage, so a client that had toggled venues resumed the
+      // air at whatever phase the last stage left, two clients breathed
+      // differently, and no screenshot taken after a toggle reproduced.
+      // faeConcept() arms the stage directly, so this is one tab's own
+      // history rather than a room-wide flip.
+      await a.dbg('faeConcept(false)');
+      await a.dbg(`faeConcept(true, {paletteId: 'moonrise'})`);
+      await a.dbg('sim(240)');
+      const runA = await a.dbg('lifeInfo([0, 40, 90])');
+      await a.dbg('faeConcept(false)');
+      await a.dbg(`faeConcept(true, {paletteId: 'moonrise'})`);
+      await a.dbg('sim(240)');
+      const runB = await a.dbg('lifeInfo([0, 40, 90])');
+      assert.deepEqual(runB.sample, runA.sample,
+        'the same glade, staged twice and stepped the same, breathes identically');
+      assert.deepEqual(runB.wispSample, runA.wispSample, 'the procession included');
+
+      // ---- ⑤ the governor: the glade minds the table ----------------------
+      // Rule 1 as BEHAVIOUR rather than as a hope: while dice are in the
+      // air the living layer steps back, and once they are readable it
+      // leans toward the clearing — without ever entering the box, because
+      // the lean is dwell and value, never a step onto the table.
+      await a.dbg(`throwSeeded(['d6','d6','d6'], 4242)`);
+      await a.dbg('sim(40)');
+      const mid = await a.dbg('lifeInfo()');
+      assert.ok(mid.mood.life < 0.35,
+        `the glade withdraws while the film runs (life ${mid.mood.life.toFixed(2)})`);
+      await a.dbg('sim(600)');
+      const rest = await a.dbg('lifeInfo()');
+      assert.ok(rest.mood.life > 0.85,
+        `and comes back out once the dice are down (life ${rest.mood.life.toFixed(2)})`);
+      assert.ok(rest.mood.lean > 0.85,
+        `leaning toward the clearing (lean ${rest.mood.lean.toFixed(2)})`);
+      assert.equal(rest.inBox, 0,
+        'and STILL nothing alive is over the felt — the lean cannot trade the law away');
+
+      // ---- ⑥ the moot wakes when the procession stands in it --------------
+      // The ring stays a VACATED moot (grammar §5 staging 2 — the
+      // interruption is the story); what W5 adds is visitors. Its gain
+      // must MOVE across a lap, and its brightest cap must never reach the
+      // bloom threshold: a ring that bloomed would be a new primary source
+      // arguing with the dice.
+      await a.dbg('clearTable()');
+      let lo = Infinity, hi = -Infinity, capMax = 0;
+      for (let k = 0; k < 16; k++) {
+        await a.dbg('sim(180)');
+        const s = await a.dbg('lifeInfo()');
+        lo = Math.min(lo, s.moot.gain);
+        hi = Math.max(hi, s.moot.gain);
+        capMax = Math.max(capMax, s.moot.capPeak);
+      }
+      assert.ok(hi - lo > 0.08,
+        `the ring wakes and quiets as the procession comes and goes `
+        + `(gain ${lo.toFixed(3)}–${hi.toFixed(3)})`);
+      assert.ok(capMax > 0 && capMax < 0.9,
+        `and never wakes past the bloom threshold (brightest cap ${capMax})`);
+      await a.dbg('holdClock(false)');
+
+      // ---- the layer is an OBJECT, and it leaves with its venue -----------
+      const off = await a.dbg('lifeTune({on: false})');
+      assert.equal(off.live, true, 'the layer is still built…');
+      assert.equal((await a.dbg('lifeInfo()')).flies, 0,
+        '…and gone from the scene, not dimmed');
+      await a.dbg('lifeTune({on: true})');
+      assert.ok((await a.dbg('lifeInfo()')).flies > 50, 'and back again');
+      await a.dbg(`setVenue('table')`);
+      await a.waitFor(`!window.__diceDebug.venueInfo().staged`, { desc: 'the glade strikes' });
+      assert.equal((await a.dbg('lifeInfo()')).flies, 0,
+        'the life leaves with the glade it belongs to');
+    },
+  },
+
+  {
     name: 'venue-dice',
     tags: ['fx', 'settings'],
     // THE VENUE STAGES THE DICE (ROADMAP W4 — the GOALS 13 punt

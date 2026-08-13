@@ -41,6 +41,7 @@ limitations under the License.
 //     runs WITHOUT the post stack (glow = emissive + halos + lights).
 
 import * as THREE from 'three';
+import { buildLife } from './faelife.js';
 
 function mulberry32(a) {
   return function () {
@@ -374,6 +375,14 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
   const glow = new THREE.Color(pal.glowCap);
   const dim = new THREE.Color(pal.bark);
   const pools = [];
+  // W5: the ring records its lit members so the LIVING LAYER can wake it
+  // (js/faelife.js stepMootSession — a pulse travelling cap to cap). The
+  // seat index `k` counts only the members that stand, so the wave runs
+  // round the ring the way a conversation does and does not stall in the
+  // gap. Recording the BASE intensity here is what lets the session
+  // modulate without ever losing the authored value.
+  const caps = [];
+  let k = 0;
   for (let i = 0; i < 11; i++) {
     const th = (i / 11) * Math.PI * 2 + (rnd() - 0.5) * 0.25 + rot;
     if (i === 4) continue; // THE GAP — turned toward the clearing by `rot`
@@ -407,7 +416,11 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
       cap.position.set(ex, s * 0.9, ez);
     }
     group.add(stem, cap);
-    if (!dark) pools.push({ x: ex, z: ez, r: 1.6 + s, cr: 0.10, cg: 0.30, cb: 0.27, gain: fallen ? 0.9 : 0.5 });
+    if (!dark) {
+      caps.push({ mat: capMat, base: capMat.emissiveIntensity, i: k, fallen });
+      pools.push({ x: ex, z: ez, r: 1.6 + s, cr: 0.10, cg: 0.30, cb: 0.27, gain: fallen ? 0.9 : 0.5 });
+    }
+    k++; // seats, not speakers: the dark caps are silences in the wave
   }
   // Merged glow pools on the ground beneath the lit caps.
   const poolTexC = (() => {
@@ -418,7 +431,8 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
     x.fillStyle = g; x.fillRect(0, 0, 64, 64);
     return tex(c);
   })();
-  for (const p of pools) {
+  const discs = [];
+  for (const [j, p] of pools.entries()) {
     const disc = new THREE.Mesh(
       new THREE.CircleGeometry(p.r, 20),
       new THREE.MeshBasicMaterial({
@@ -429,6 +443,8 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
     disc.position.set(p.x, 0.06, p.z);
     disc.renderOrder = 3;
     group.add(disc);
+    // The pool under a cap answers the cap: same seat, same phase.
+    discs.push({ mesh: disc, base: 0.42, i: caps[j] ? caps[j].i : j });
   }
   // THE SPILL (W2b, rule 4 — the space between features is designed):
   // five strays walk from the ring's tower-side edge toward the root
@@ -463,6 +479,12 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
   }
   group.userData.pools = pools; // static fog emitters, folded in at build
   group.userData.at = at;       // reported via venueInfo().stage
+  // W5's handles: the lit members, their ground pools, and how many SEATS
+  // the ring has (the wave's modulus — lit caps alone would not close the
+  // circle, because two of them are dark and one is on the floor).
+  group.userData.caps = caps;
+  group.userData.discs = discs;
+  group.userData.seats = k;
   return group;
 }
 
@@ -747,64 +769,58 @@ function buildMistBand(pal, seed) {
   return mesh;
 }
 
-// Tertiary starfield + one lead wisp (grammar 4, 9): monochrome, ≤0.25,
-// and the one bright point has a heading (it works toward the moot gap).
-function buildWisps(pal, seed, n = 46) {
-  const rnd = mulberry32(seed ^ 0xf1e5);
-  const pos = new Float32Array(n * 3);
-  const col = new Float32Array(n * 3);
-  const geo = new THREE.BufferGeometry();
-  const statics = [];
-  const glow = new THREE.Color(pal.glowCore);
-  for (let i = 0; i < n; i++) {
-    statics.push({
-      x: (rnd() - 0.5) * 40, y: 0.6 + rnd() * 6.5, z: (rnd() - 0.5) * 30,
-      p1: rnd() * 6.28, p2: rnd() * 6.28, p3: rnd() * 6.28,
-      lead: i === 0,
-    });
-    const v = i === 0 ? 0.55 : 0.06 + 0.14 * rnd(); // tertiary; lead is secondary
-    col[i * 3] = glow.r * v; col[i * 3 + 1] = glow.g * v; col[i * 3 + 2] = glow.b * v;
-  }
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const { c } = (() => {
-    const o = canvas2d(32);
-    const g = o.x.createRadialGradient(16, 16, 0, 16, 16, 16);
-    g.addColorStop(0, 'rgba(255,255,255,1)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    o.x.fillStyle = g; o.x.fillRect(0, 0, 32, 32);
-    return o;
-  })();
-  const mat = new THREE.PointsMaterial({
-    size: 0.3, map: tex(c), vertexColors: true, transparent: true,
-    blending: THREE.AdditiveBlending, depthWrite: false, fog: true,
-    sizeAttenuation: true,
-  });
-  const points = new THREE.Points(geo, mat);
-  points.frustumCulled = false;
-  points.name = 'faeWisps';
-  return { points, statics };
-}
+// WHERE THE GLADE'S LIFE LIVES (W5). The populations themselves are
+// js/faelife.js — venue-generic, and it takes these as a table, because
+// WHERE life is legal in a place is composition data and belongs beside
+// the moot's and the pool's own coordinates, not inside a shared module.
+//
+// The W0 spec asked for "a motes.js sibling — box wander… ONE lead wisp
+// with the venue's single dynamic light and a heading", and until W5 the
+// stage answered with 46 points scattered through a 40×30 box: a
+// STARFIELD (its own comment said so), with one point translating slowly
+// across it. It read as weather, never as inhabitants. What replaces it
+// is a field that blinks and a procession that walks a route.
+//
+// Every zone is authored for the FRAME; legality is not authored at all —
+// buildLife seats each member outside the dice box including its own
+// wander, so a zone edited for a better picture cannot quietly put a
+// firefly over the felt.
+const GLADE_LIFE_ZONES = [
+  // The moot's court and the pool's bank: the two supports, where a
+  // glade's life would actually be — over damp ground and under caps.
+  { x: -6.9, z: -7.0, rx: 3.2, rz: 1.7, y0: 0.20, y1: 1.90, w: 30 },
+  { x: 6.3, z: -7.0, rx: 3.0, rz: 1.7, y0: 0.20, y1: 1.70, w: 24 },
+  // The back band, under the treeline — depth, and the layer the mist
+  // band already owns (rule 5: every layer occupied).
+  { x: 0, z: -9.6, rx: 9.0, rz: 2.4, y0: 0.35, y1: 2.60, w: 34 },
+  // The foreground wing, beside the scenery tufts: the near field is
+  // where parallax lives, and it is the one band a flying speck can
+  // occupy without standing on anything. Proved in-frame by
+  // worldToScreen before it shipped (rule 13).
+  { x: -9.0, z: 4.9, rx: 1.3, rz: 1.6, y0: 0.15, y1: 1.15, w: 12 },
+];
 
-export function stepWisps(w, t) {
-  const pos = w.points.geometry.attributes.position;
-  for (const [i, s] of w.statics.entries()) {
-    if (s.lead) {
-      // A heading: a slow figure through the glade toward the moot gap.
-      const u = (t * 0.05) % 1;
-      pos.setXYZ(i,
-        8 - 12 * u + 1.2 * Math.sin(t * 0.7 + s.p1),
-        1.4 + 0.8 * Math.sin(t * 0.5 + s.p2),
-        2 - 8 * u + 0.9 * Math.sin(t * 0.6 + s.p3));
-      continue;
-    }
-    pos.setXYZ(i,
-      s.x + 0.8 * Math.sin(t * 0.21 + s.p1) + 0.4 * Math.sin(t * 0.53 + s.p2),
-      s.y + 0.5 * Math.sin(t * 0.17 + s.p2),
-      s.z + 0.8 * Math.sin(t * 0.19 + s.p3) + 0.4 * Math.sin(t * 0.47 + s.p1));
-  }
-  pos.needsUpdate = true;
-}
+// THE ROUTE. A closed loop that rides the composition's own circuit
+// (rule 7 — every directional element agrees): in from the mist behind
+// the moot, along the socket→moot lobe, past the root flare at its
+// nearest approach to the clearing, across to the pool's bank, out over
+// the water and home through the back band. Waypoint 3 is the NEAR ARC,
+// and it is where the wisps dwell when dice are down — the closest the
+// living layer ever comes to a result, and still 1.5 units behind the
+// widest back wall.
+const GLADE_LIFE_LOOP = [
+  [-8.8, 1.55, -9.0],  // 0 the mist behind the moot
+  [-7.0, 1.00, -7.0],  // 1 over the ring          ← the session station
+  [-4.6, 0.90, -6.1],  // 2 the lobe, over the fallen branch
+  [-1.5, 1.30, -6.0],  // 3 the root flare         ← THE NEAR ARC
+  [1.9, 1.20, -6.1],   // 4 right of the trunk
+  [4.9, 0.95, -6.6],   // 5 the pool's near bank
+  [7.7, 1.45, -7.8],   // 6 out over the water
+  [6.0, 2.35, -9.6],   // 7 rising into the mist
+  [0.8, 2.60, -10.4],  // 8 the back band
+  [-4.6, 2.25, -9.9],  // 9 coming home
+];
+const GLADE_NEAR_ARC_U = 3 / GLADE_LIFE_LOOP.length;
 
 // THE TREELINE — the value structure the second plate proved missing: a
 // ring of near-void forest silhouette around the glade, melting into the
@@ -882,15 +898,19 @@ function buildMoonShaft(pal) {
   return mesh;
 }
 
-// Halo discs under lit dice (techniques §3): one merged mesh, 6 slots,
-// rewritten per frame; unused slots alpha 0.
+// Halo discs under lit dice (techniques §3): one merged mesh, 5 slots,
+// rewritten per frame; unused slots alpha 0. Five because that is what
+// the caller drives — it takes the first five settled dice, and the sixth
+// slot built here was never once written to (found by the W5 inventory,
+// 2026-08-13; it cost one draw call of nothing on every fae frame since
+// W0).
 function buildHalos(pal) {
   const { c, x } = canvas2d(64);
   const g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
   g.addColorStop(0, 'rgba(255,255,255,0.55)');
   g.addColorStop(1, 'rgba(255,255,255,0)');
   x.fillStyle = g; x.fillRect(0, 0, 64, 64);
-  const slots = 6;
+  const slots = 5;
   const geos = [];
   for (let i = 0; i < slots; i++) geos.push(new THREE.CircleGeometry(3.0, 18));
   // Simple group of discs (concept fidelity — the ship version merges).
@@ -1041,7 +1061,9 @@ export function buildStumpShell(pal, {
   return mesh;
 }
 
-export function buildFaeConcept({ paletteId = 'moonrise', seed = 20260815 } = {}) {
+export function buildFaeConcept({
+  paletteId = 'moonrise', seed = 20260815, life = {},
+} = {}) {
   const pal = FAE_PALETTES[paletteId] || FAE_PALETTES.moonrise;
   const group = new THREE.Group();
   group.name = 'faeConcept';
@@ -1050,7 +1072,16 @@ export function buildFaeConcept({ paletteId = 'moonrise', seed = 20260815 } = {}
   const sheets = buildFogSheets(pal, seed);
   const moot = buildMoot(pal, seed);
   const pool = buildMirrorPool(pal, seed);
-  const wisps = buildWisps(pal, seed);
+  // THE LIVING LAYER (W5). The caller owns the dials and the dice box —
+  // the box is the table's, not the glade's, and a venue must never carry
+  // its own copy of the mat's numbers (the C25/C28 class of bug: a
+  // constant sized against TABLE_W that stops following it).
+  const alive = buildLife(pal, seed ^ 0xf1e5, {
+    zones: GLADE_LIFE_ZONES,
+    loop: GLADE_LIFE_LOOP,
+    box: life.box,
+    tune: { ...life.tune, nearArcU: GLADE_NEAR_ARC_U },
+  });
   const shaft = buildMoonShaft(pal);
   const halos = buildHalos(pal);
   const treeline = buildTreeline(pal, seed);
@@ -1063,7 +1094,7 @@ export function buildFaeConcept({ paletteId = 'moonrise', seed = 20260815 } = {}
   // setVisibleByName forensics, not by staring). The tower is the
   // venue's tower now; buildStumpShell survives only as the exported lab
   // reference.
-  group.add(ground, clearing, mist, treeline, moot, pool, scenery.group, wisps.points, shaft, halos, ...sheets);
+  group.add(ground, clearing, mist, treeline, moot, pool, scenery.group, alive.group, shaft, halos, ...sheets);
   // Fold the static light — the moot's pools and the mirror pool's cool
   // breath — into the fog base (techniques §6).
   brightenFog(sheets, [...moot.userData.pools, pool.userData.emitter]);
@@ -1087,5 +1118,5 @@ export function buildFaeConcept({ paletteId = 'moonrise', seed = 20260815 } = {}
     // contract discipline as the rest of the stage.
     scenery: scenery.items,
   };
-  return { group, pal, sheets, wisps, halos, moot, pool, mist, layout };
+  return { group, pal, sheets, life: alive, halos, moot, pool, mist, layout };
 }
