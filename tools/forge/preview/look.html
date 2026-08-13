@@ -1,0 +1,142 @@
+<!-- Copyright 2026 The Dice Table Authors
+     SPDX-License-Identifier: Apache-2.0 -->
+<!-- BATCH look page. viewer.html renders ONE auto-framed view per page load,
+     which is the right tool for "does it load"; judging a hero model needs a
+     dozen angles plus close-ups, and a dozen page loads per bake is how a
+     look loop turns into an afternoon.
+
+     ?m=/tools/forge/out/slug.glb  then, from the console:
+       await __views([{name:'a.png', az:35, el:18},
+                      {name:'b.png', az:0, el:6, mode:'normal'},
+                      {name:'c.png', az:20, el:4, tx:0, ty:3, tz:0, dist:9}])
+
+     Each view: az/el degrees, optional mode (lit|normal|wire), optional
+     target tx/ty/tz + dist for a close-up, optional fov. Renders EXPLICITLY
+     and POSTs the PNG to serve.py /save — a hidden Browser pane never fires
+     rAF, which is trap #10. -->
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; height: 100%; background: #16161c; }
+  #hud { position: fixed; left: 8px; top: 8px; font: 12px monospace;
+         color: #9fb; white-space: pre; z-index: 5; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three.module.js" } }
+</script>
+<body>
+<div id="hud">loading…</div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from './GLTFLoader.js';
+
+const q = new URLSearchParams(location.search);
+const modelPath = q.get('m');
+const W = parseInt(q.get('w') || '1100', 10);
+const H = parseInt(q.get('h') || '900', 10);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x16161c);
+const cam = new THREE.PerspectiveCamera(38, W / H, 0.01, 500);
+
+// Same rig as viewer.html, deliberately: this page exists to shoot MORE of
+// the same look, not a different one. Shadow bias pre-tuned so acne never
+// reads as model damage.
+scene.add(new THREE.HemisphereLight(0x9aa7c0, 0x2a241e, 0.9));
+const key = new THREE.DirectionalLight(0xfff2dd, 2.2); key.position.set(4, 7, 5);
+key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+key.shadow.bias = -0.0002; key.shadow.normalBias = 0.05;
+key.shadow.camera.left = -10; key.shadow.camera.right = 10;
+key.shadow.camera.top = 16; key.shadow.camera.bottom = -4;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x88aaff, 0.7); rim.position.set(-5, 3, -4);
+scene.add(rim);
+const grid = new THREE.GridHelper(20, 20, 0x333344, 0x24242e);
+scene.add(grid);
+
+const hud = document.getElementById('hud');
+let root = null, litMats = new Map(), box = null;
+window.__viewerReady = false;
+
+new GLTFLoader().load(modelPath, (g) => {
+  root = g.scene;
+  let tris = 0, meshes = 0, hasVC = false;
+  const names = [];
+  root.traverse((o) => {
+    if (o.isMesh) {
+      meshes++; o.castShadow = o.receiveShadow = true;
+      names.push(o.name);
+      const idx = o.geometry.index;
+      tris += (idx ? idx.count : o.geometry.attributes.position.count) / 3;
+      if (o.geometry.attributes.color) hasVC = true;
+      if (o.material.isMeshStandardMaterial) o.material.envMapIntensity = 0.45;
+      litMats.set(o, o.material);
+    }
+  });
+  box = new THREE.Box3().setFromObject(root);
+  scene.add(root);
+  window.__viewerStats = { tris, meshes, hasVC, names,
+    min: box.min.toArray().map(v => +v.toFixed(2)),
+    max: box.max.toArray().map(v => +v.toFixed(2)) };
+  hud.textContent = `${modelPath}\n${tris} tris  ${meshes} mesh  vc:${hasVC}\n` +
+    `${names.join(' ')}\nmin ${window.__viewerStats.min}  max ${window.__viewerStats.max}`;
+  window.__viewerReady = true;
+}, undefined, (e) => { hud.textContent = 'LOAD ERROR: ' + e; window.__viewerReady = 'error'; });
+
+function setMode(mode) {
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    if (mode === 'normal') o.material = new THREE.MeshNormalMaterial();
+    else if (mode === 'wire') o.material = new THREE.MeshBasicMaterial({ color: 0x77ff99, wireframe: true });
+    else o.material = litMats.get(o);
+  });
+  grid.visible = mode !== 'normal';
+}
+
+// FORENSICS. When a frame will not cohere, hide one mesh at a time — the
+// W3 handoff's first hard-won lesson, and it is only useful if the handle
+// exists. __show(null) restores everything; __show(['towerSkinBoleShell'])
+// leaves just that one visible.
+window.__show = (names) => {
+  const seen = [];
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    o.visible = !names || names.includes(o.name);
+    seen.push(o.name + (o.visible ? '' : ' [hidden]'));
+  });
+  return seen;
+};
+
+window.__views = async (views) => {
+  const out = [];
+  for (const v of views) {
+    setMode(v.mode || 'lit');
+    const size = box.getSize(new THREE.Vector3());
+    const centre = v.tx === undefined
+      ? box.getCenter(new THREE.Vector3())
+      : new THREE.Vector3(v.tx, v.ty, v.tz);
+    cam.fov = v.fov || 38;
+    const dist = v.dist !== undefined ? v.dist
+      : Math.max(size.length() / 2, 0.5) / Math.tan(cam.fov * Math.PI / 360) * 1.18;
+    const az = (v.az || 0) * Math.PI / 180, el = (v.el || 0) * Math.PI / 180;
+    cam.position.set(centre.x + dist * Math.cos(el) * Math.sin(az),
+                     centre.y + dist * Math.sin(el),
+                     centre.z + dist * Math.cos(el) * Math.cos(az));
+    cam.lookAt(centre);
+    cam.updateProjectionMatrix();
+    renderer.render(scene, cam);
+    const r = await fetch('/save?name=' + v.name, {
+      method: 'POST', body: renderer.domElement.toDataURL('image/png') });
+    out.push(v.name + ' ' + (await r.text()));
+  }
+  setMode('lit');
+  return out;
+};
+</script>
+</body>
