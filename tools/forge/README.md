@@ -23,8 +23,9 @@ tools/forge/bake.sh tools/forge/recipes/B1_die.py --expect-colors --max-tris 800
   0 on a traceback) + `check.py` gate on the newest GLB.
 - `check.py` — refuses inverted winding, un-watertight-after-weld, degenerate
   faces, blown tri budgets, missing COLOR_0 when expected, and broken NORMAL
-  accessors. Every gate exists because a green bake shipped that exact defect
-  during the bake-off. Red-checked: it fails on planted defects.
+  accessors; `--tower` adds the portal contract (below). Every gate exists
+  because a green bake shipped that exact defect during the bake-off.
+  Red-checked: it fails on planted defects.
 - `preview/` — three.js viewer (same vendored r160 the app uses) + contact
   sheet + serve.py with a /save endpoint so a hidden Browser pane can still
   write PNGs to `shots/`. Lit/normal/wire modes; shadow bias pre-tuned so
@@ -40,6 +41,53 @@ feature 0.07u), author Z-up in Blender, export is Y-up GLB, front toward
 +Z (Blender -Y). Budgets: hero prop 3k–8k tris, mid prop ≤2k, scatter ≤500.
 Uncompressed GLB; no Draco/meshopt (decoder cost outweighs savings at our
 sizes; gzip on the wire does the rest).
+
+## Tower portals
+
+A tower model does not ship colliders, cameras or a film plane. It ships two
+PORTALS and the engine derives the rest from them. See
+[docs/TOWER.md](../../docs/TOWER.md) for the contract itself — what the engine
+owns, and what it promises a model in return.
+
+**Frame.** Portal numbers are APP-FRAME: y up, +z toward the player, z=0 the
+back-wall socket plane, so the model mostly lives at z<0. Units are table
+units (d20 radius 1.25). You author in that frame and `spec_to_blender` puts
+it on Blender's Z-up axes; `export_yup=True` brings it back, so a glTF node
+translation IS the app-frame position with no conversion at either end.
+
+**Authoring.** `forge.tower_portals(in_spec, out_spec)` returns two empties:
+
+```python
+pin, pout = F.tower_portals(
+    {"x": 0.0, "rimY": 8.75, "z": -2.0, "clearR": 2.125},
+    {"x": 0.0, "sillY": 1.0, "w": 5.0, "clearH": 4.5})
+F.export_glb("my_tower", [skin, pin, pout], vertex_colors=True)
+```
+
+One datum, one home: the node NAME says which portal it is, the node
+TRANSLATION says where it is (visible in Blender's viewport and in any glTF
+viewer, with no second copy to fall out of sync), and node EXTRAS carry the
+scalars. Pass the empties to `finish()`/`export_glb()` alongside the meshes —
+they join the selection, every geometry gate steps over them, and grounding
+shifts them with the model. Mesh nodes an occluder must hide behind get the
+engine's `towerSkin*` prefix, exactly as for code-built skins.
+
+**Gating.** `check.py --tower` (via `bake.sh <recipe> --tower ...`) adds five
+refusals to the usual ones: both portals declared at the scene root with
+parseable extras; every number inside `TOWER_PORTAL_LIMITS` (mirrored from
+js/main.js — **keep the two in sync**); the APPROACH column really clear, by
+25 rays down the entry disc from above the rim to despawnY; the EXIT throat
+really clear, by 25 rays out through the door; and at least one `towerSkin*`
+mesh node. The two ray gates are the point: a model can declare a perfect
+doorway and wall it up behind the declaration, and the numbers alone would
+never notice.
+
+**The fixture.** `recipes/tower_fixture.py` bakes
+`tests/e2e/fixtures/tower_fixture.glb` — a deliberately plain leaning
+monolith whose eight portal numbers are ALL off the shipped defaults and all
+inside the limits, so anything that quietly assumes the classic values fails
+on it. It is a TEST ASSET, never a picker row. Its header carries the
+declared values and the three defects its own measurements caught.
 
 ## Why Blender (bake-off, 2026-08-12)
 

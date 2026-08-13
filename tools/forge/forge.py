@@ -460,14 +460,107 @@ def sit_on_ground(objs, center_xy=True):
     """Centre in X/Y and drop so the lowest point rests on Blender z=0.
 
     That is the spec's "centred on origin, standing ON y=0" once exported.
+
+    Bounds come from the MESHES only — an empty's bound_box is its display
+    gizmo, and letting a portal marker vote on where the ground is would move
+    the model to suit the annotation. Every object passed still gets the
+    shift, so portals stay welded to the geometry they describe.
     """
-    lo, hi = world_bounds(objs)
+    meshes = [o for o in objs if o.type == "MESH"]
+    lo, hi = world_bounds(meshes or objs)
     mid = (lo + hi) * 0.5
     shift = Vector((-mid.x, -mid.y, -lo.z)) if center_xy else Vector((0, 0, -lo.z))
     for ob in objs:
         ob.matrix_world = Matrix.Translation(shift) @ ob.matrix_world
     bpy.context.view_layer.update()
     return shift
+
+
+# --------------------------------------------------------------------------
+# tower portals (the model's contract with the engine)
+# --------------------------------------------------------------------------
+#
+# A tower model does not ship colliders, cameras or a film plane; it ships two
+# PORTALS and the engine derives the rest. Each portal is one glTF node, and
+# each datum has exactly ONE home:
+#
+#   node NAME        -> which portal it is  (`portalIn` / `portalOut`)
+#   node TRANSLATION -> where it is         (so Blender's viewport and any
+#                                            glTF viewer show it, for free)
+#   node EXTRAS      -> its scalars         (Blender custom properties,
+#                                            exported under export_extras)
+#
+# Nothing is written twice, so nothing can disagree with itself. The app reads
+# object.position and object.userData off the loaded node; check.py --tower
+# reads the same two places out of the GLB JSON and gates them.
+#
+# Arguments are APP-FRAME (y up, +z toward the player, z=0 the back-wall
+# socket plane); spec_to_blender puts them on Blender's Z-up axes, and
+# export_yup=True turns them back. Author in the frame you reason in.
+
+PORTAL_IN = "portalIn"
+PORTAL_OUT = "portalOut"
+
+
+def _empty(name, app_pos, props, display_size):
+    ob = bpy.data.objects.new(name, None)     # None object data == empty
+    ob.empty_display_type = "PLAIN_AXES"
+    ob.empty_display_size = float(display_size)
+    ob.location = spec_to_blender(*app_pos)
+    for k, v in props.items():
+        ob[k] = float(v)
+    bpy.context.collection.objects.link(ob)
+    return ob
+
+
+def tower_portals(in_spec, out_spec):
+    """Create the `portalIn` / `portalOut` empties. Returns (in_ob, out_ob).
+
+    Both specs are plain dicts of APP-FRAME numbers:
+
+        in_spec  = {"x":.., "rimY":.., "z":.., "clearR":..}
+            the entry aperture: a horizontal disc the engine drops dice
+            through, centred (x, rimY, z), clear to radius clearR.
+        out_spec = {"x":.., "sillY":.., "w":.., "clearH":.., "z": 0.0}
+            the exit door: a rectangle in the socket plane facing +z, its
+            bottom edge (the sill) at sillY, w wide and clearH tall.
+            `z` is optional and defaults to 0.0 — the doorway lives in the
+            back-wall plane unless a model has a reason to inset it.
+
+    Pass the empties to finish()/export_glb() alongside the meshes. The
+    engine's own bounds live in check.py (TOWER_PORTAL_LIMITS); this helper
+    only refuses specs it cannot encode, so that "is this a legal tower?"
+    has one answer, given by the gate, and not two that can drift apart.
+    """
+    def need(spec, keys, which):
+        missing = [k for k in keys if k not in spec]
+        if missing:
+            raise RuntimeError(
+                f"tower_portals: {which} spec missing {missing} "
+                f"(got {sorted(spec)})")
+        for k in keys:
+            if not isinstance(spec[k], (int, float)) or isinstance(spec[k], bool):
+                raise RuntimeError(
+                    f"tower_portals: {which}['{k}'] must be a number, "
+                    f"got {spec[k]!r}")
+
+    need(in_spec, ("x", "rimY", "z", "clearR"), PORTAL_IN)
+    need(out_spec, ("x", "sillY", "w", "clearH"), PORTAL_OUT)
+
+    pin = _empty(PORTAL_IN,
+                 (in_spec["x"], in_spec["rimY"], in_spec["z"]),
+                 {"clearR": in_spec["clearR"]},
+                 display_size=in_spec["clearR"])
+    pout = _empty(PORTAL_OUT,
+                  (out_spec["x"], out_spec["sillY"], out_spec.get("z", 0.0)),
+                  {"w": out_spec["w"], "clearH": out_spec["clearH"]},
+                  display_size=0.5 * max(out_spec["w"], out_spec["clearH"]))
+    print(f"[forge] portals  in=(x {in_spec['x']:.3f}, y {in_spec['rimY']:.3f}, "
+          f"z {in_spec['z']:.3f}) clearR {in_spec['clearR']:.3f}  |  "
+          f"out=(x {out_spec['x']:.3f}, y {out_spec['sillY']:.3f}, "
+          f"z {out_spec.get('z', 0.0):.3f}) w {out_spec['w']:.3f} "
+          f"clearH {out_spec['clearH']:.3f}")
+    return pin, pout
 
 
 # --------------------------------------------------------------------------
@@ -480,7 +573,11 @@ def export_glb(slug, objs=None, vertex_colors=False):
     path = os.path.join(OUT_DIR, f"{slug}.glb")
     if os.path.exists(path):
         os.remove(path)
-    assert_outward(objs or [o for o in bpy.data.objects if o.type == "MESH"])
+    # `objs` may mix meshes with non-mesh nodes (portal empties). Everything
+    # joins the selection so it lands in the GLB; the geometry gates only ever
+    # look at the meshes.
+    all_objs = objs if objs is not None else list(bpy.data.objects)
+    assert_outward([o for o in all_objs if o.type == "MESH"])
     if objs is not None:
         bpy.ops.object.select_all(action="DESELECT")
         for ob in objs:
@@ -497,14 +594,16 @@ def export_glb(slug, objs=None, vertex_colors=False):
         export_texcoords=False,
         export_materials="EXPORT",
         export_vertex_color="MATERIAL" if vertex_colors else "NONE",
+        export_extras=True,         # object custom props -> node extras: the
+                                    # ONLY carrier for portal scalars
         export_animations=False,
         export_cameras=False,
         export_lights=False,
     )
     if not os.path.exists(path):
         raise RuntimeError(f"export produced no file: {path}")
-    geometry_digest(objs or [o for o in bpy.data.objects if o.type == "MESH"], slug)
-    tris = sum(len(o.data.loop_triangles) for o in (objs or bpy.data.objects)
+    geometry_digest(all_objs, slug)
+    tris = sum(len(o.data.loop_triangles) for o in all_objs
                if o.type == "MESH" and (o.data.calc_loop_triangles() or True))
     print(f"[forge] {slug}.glb  {os.path.getsize(path) / 1024:.1f} kB  "
           f"~{tris} tris (blender count)  {time.time() - _T0:.1f}s in-script")
@@ -521,11 +620,25 @@ def geometry_digest(objs, label=""):
     in `order` because a color-only edit must move the digest — the fae_arch
     dogfood made three color-only edits that the old geometry-only digest
     could not see.
+
+    Non-mesh nodes (the portal empties) are SHIPPING DATA, not geometry: name,
+    placement and custom props go into `order` so that moving a portal moves
+    the hash, and stay out of `set` so that `set` keeps meaning exactly one
+    thing — "is this the same solid?".
     """
     import hashlib
 
     ordered, vset, fset = hashlib.md5(), [], []
     for ob in sorted(objs, key=lambda o: o.name):
+        if ob.type != "MESH":
+            ordered.update(ob.name.encode())
+            t = tuple(round(c, 6) + 0.0 for c in ob.matrix_world.translation)
+            ordered.update(repr(t).encode())
+            for k in sorted(k for k in ob.keys() if not k.startswith("_")):
+                v = ob[k]
+                v = round(float(v), 6) + 0.0 if isinstance(v, (int, float)) else v
+                ordered.update(repr((k, v)).encode())
+            continue
         me = ob.data
         for v in me.vertices:
             t = tuple(round(c, 6) + 0.0 for c in v.co)
@@ -588,8 +701,13 @@ def finish(slug, objs, *, budget=None, smooth_deg=None, vertex_colors=False,
     canonicalize + triangulate (byte-stable output), optional smooth-by-angle,
     optional sliver repair (record WHY if you pass repair=True), ground the
     model, gate on budget and winding, export. Returns the GLB path.
+
+    `objs` may include non-mesh nodes (tower portal empties); they skip every
+    geometry step and simply ride the grounding shift and the export.
     """
     for ob in objs:
+        if ob.type != "MESH":
+            continue
         canonicalize(ob)
         triangulate(ob)
         if smooth_deg is not None:
