@@ -63,6 +63,10 @@ scene.add(grid);
 const hud = document.getElementById('hud');
 let root = null, litMats = new Map(), box = null;
 window.__viewerReady = false;
+// The probe handle (hollowbole round-2 friction): a pixel/ray probe driven
+// over CDP needs the live objects, not a re-derivation of the camera in
+// Python. Everything a probe needs, one object, set before ready flips.
+window.__lookScene = { THREE, scene, camera: cam, renderer, getRoot: () => root };
 
 new GLTFLoader().load(modelPath, (g) => {
   root = g.scene;
