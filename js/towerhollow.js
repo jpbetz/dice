@@ -1101,7 +1101,25 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise', shell = buildSt
   // not the front, which is what the eye actually reads at the tower eye.
   // Spacing is jittered ±15%; one 2.4 u arc is EMPTY.
   const yMoot = 10.30, mootTilt = 0.42, mootPhase = -0.7;
-  const GAP_TH = -0.78;                    // front-left of centre, in radians
+
+  // ---- THE θ CONVENTION BRIDGE -------------------------------------------
+  // Every heading CONSTANT below was authored against buildLobedShell, whose
+  // descriptor puts x = r·sin θ with θ = 0 at the FRONT. Both shells that
+  // actually ship — buildStumpShell and the baked glbShellFor — publish the
+  // other convention: x = r·cos θ, front at +π/2. Nobody noticed, because a
+  // heading that is wrong by a quarter turn still lands ON the trunk: the
+  // moot's one gap simply faced BACK-RIGHT instead of front-left, and all
+  // three shelf fungi grew where no shipped eye can see them.
+  //
+  // `head()` converts an authored heading into the shell's frame. A prop's
+  // own y-ROTATION is deliberately NOT converted: rotating +z onto the
+  // outward normal needs π/2 − θ_shell, and that is exactly the authored θ
+  // again. So positions move and orientations stay, which is why the props
+  // still sit flat against the bark after the flip.
+  const head = (th) => Math.PI / 2 - th;
+
+  const GAP_AUTH = -0.78;                  // as designed: front-left of centre
+  const GAP_TH = head(GAP_AUTH);           // …and where that actually is
   const GAP_ARC = 2.4 / R0;                // 2.4 u of circumference ≈ 49°
   // WHERE A CAP CAN ACTUALLY SIT, and this is the §1.5 refusal the moot
   // handed back: the shell is OPEN across the front, so a cap placed on the
@@ -1139,7 +1157,14 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise', shell = buildSt
     // 1.7-unit mushroom that left the socket sideways. A big cap is 0.60
     // across and projects 0.22 past its seat; a small one is 0.15 across,
     // which is still 2.5× the 0.06 u an emissive feature needs to read.
-    const BIG = new Set([2, 3]);
+    // MOVED WITH THE GAP (θ bridge). Slot i sits at (i/9)·2π, and that number
+    // is the same in both frames while its MEANING is a quarter turn apart —
+    // so once the gap moved to its designed front-left, slots 2 and 3 fell
+    // either side of it and one of the two modelled caps was being skipped
+    // entirely. 1 and 2 put the loaded flank front-RIGHT, opposite the gap and
+    // in view, which is what "one loaded flank, never a balanced pair" asked
+    // for in the first place.
+    const BIG = new Set([1, 2]);
     for (let i = 0; i < 9; i++) {
       let th = (i / 9) * Math.PI * 2 + (jit() - 0.5) * 0.3 * (2 * Math.PI / 9);
       th = ((th + Math.PI) % (2 * Math.PI)) - Math.PI;
@@ -1204,13 +1229,13 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise', shell = buildSt
     const [fx, fy, fz] = capAt(GAP_TH, 0.02);
     bright.push({
       geo: skirtGeo.clone(),
-      matrix: xform({ pos: [fx, fy - 0.30, fz], rot: [Math.PI + 0.45, 0, GAP_TH],
+      matrix: xform({ pos: [fx, fy - 0.30, fz], rot: [Math.PI + 0.45, 0, GAP_AUTH],
         scale: [0.22, 0.16, 0.20] }),
     });
     flesh.push({
       geo: propUV(capGeo.clone(), UV.prop),
       matrix: xform({ pos: [fx, fy - 0.38, fz + 0.03],
-        rot: [Math.PI - 0.42, 0, GAP_TH], scale: [0.24, 0.12, 0.20] }),
+        rot: [Math.PI - 0.42, 0, GAP_AUTH], scale: [0.24, 0.12, 0.20] }),
     });
   }
 
@@ -1220,16 +1245,21 @@ export function buildHollowBoleSkin(v, { paletteId = 'moonrise', shell = buildSt
   // are the "too large" half of the one scale wrongness: 0.62–0.72 u across,
   // which is a dinner plate growing out of a tree — and the widest thing
   // sideways the socket will take at these azimuths.
+  // Headings AS AUTHORED (lobed frame) — left flank, slightly front. Read
+  // through head() for position and used raw for orientation; see the θ
+  // CONVENTION BRIDGE above. Unconverted, these three landed at z ≈ −0.96·r:
+  // the BACK of the trunk, where no shipped eye has ever seen them.
   const SHELVES = [[-1.28, 5.95, 0.36], [-1.05, 7.10, 0.31], [-1.42, 8.35, 0.33]];
-  for (const [th, y, s] of SHELVES) {
+  for (const [thA, y, s] of SHELVES) {
+    const th = head(thA);
     const p = SURF.at(th, y, 0.12);        // through the seam, like the moot
     flesh.push({
       geo: propUV(capGeo.clone(), UV.prop),
-      matrix: xform({ pos: p, rot: [0.30, th, 0.10], scale: [s, s * 0.30, s * 0.76] }),
+      matrix: xform({ pos: p, rot: [0.30, thA, 0.10], scale: [s, s * 0.30, s * 0.76] }),
     });
     gill.push({
       geo: skirtGeo.clone(),
-      matrix: xform({ pos: [p[0], y - s * 0.26, p[2]], rot: [0.30, th, 0.10],
+      matrix: xform({ pos: [p[0], y - s * 0.26, p[2]], rot: [0.30, thA, 0.10],
         scale: [s * 0.84, s * 0.28, s * 0.64] }),
     });
   }
