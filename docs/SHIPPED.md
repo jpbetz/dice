@@ -11,6 +11,59 @@ organization → secrecy → systems literacy → effects → customization).
 
 ---
 
+## TOWER_CORE v2 — the portal contract, the GLB tower path, and the rebuilt Hollow Bole (2026-08-13)
+
+The redesign the W3 handoff promised as its item 7, delivered end to end.
+A tower model now DECLARES its two portals — the dice-in mouth and the
+dice-out doorway — and the engine derives everything else from them
+(volumes, film, colliders, camera, audit thresholds, occlusion grids)
+through one pure function, `towerVolumes(spec)`. The classic numbers
+became `DEFAULT_PORTALS`, and classic byte-identity is STRUCTURAL: every
+derivation is anchor ⊕ delta with deltas exactly +0.0 for classic rows,
+frozen by an exact-string golden (`tower-contract-freeze`) captured from
+the pre-v2 code — the whole shipped suite passed with zero scenario edits
+(commits `011a906..fae3d22`). Along the way the seam closed a real
+determinism hole (the lab's lipTilt dial fed a shipped collider films are
+baked against; now a frozen constant, with a red-check proving the old
+leak) and pinned the film's baking tower into `towerFilmInfo().filmTower`.
+
+The GLB path is the app's first: GLTFLoader vendored, `js/towerglb.js`
+(fetch/cache/validate/house-rules; LOADING IS NOT SOCKETING — the
+roll-boundary gate `towerModelReady`, and a late-joiner's replay is HELD
+until the model arrives, socket-first replay-second), portals riding as
+glTF nodes authored by `forge.tower_portals()` and gated at bake time by
+`check.py --tower` (limits, throat raycasts, and — after the first
+shipped bake exceeded the socket unseen — a tilt-aware envelope gate).
+The stress fixture (`tests/e2e/fixtures/tower_fixture.glb`, all portals
+off-classic) exercises the contract's ranges in e2e; its envelope slim
+demonstrated a composite truth now in its header: at max bore the
+envelope PINS in.z to the classic value by arithmetic.
+
+The dogfood is the rebuilt **Hollow Bole** — Joe's call on the W3
+handoff: the stump re-authored "mostly from scratch" through the forge.
+Four review-gated bake rounds (`tools/forge/recipes/hollowbole.py`):
+form; roots/lower-mass/interior-darkness (where the pale cavity turned
+out to be the SPECULAR FLOOR, not paint — F0 0.04 glows under any key
+regardless of albedo, named by the hue of the residual, fixed via
+KHR_materials_specular and now a kit parameter + trap); envelope fit +
+the cowl CURTAIN (the liner's upper band carries the occlusion the
+splintered crown cannot); tongue albedo. Two palette variants from one
+deterministic run with a SHARED geometry digest. The W3 dressing
+survived the shell swap through a raycast-synthesized surface descriptor
+(`js/towerglbshell.js`), and its θ-convention debt died in the process.
+Battery: fit CLEAN, occlusion 99/99 shaft+cowl at all six eyes, probe
+matrix 6/6, pour 29/29, suite 48/48, tower tag 8/8 (including the new
+held-replay scenario, which caught a real release-ordering bug on its
+first run). The never-verified W3 items got their frames: pour
+mid-flight through the mouth, both palettes, in venue.
+
+Process notes that outlive the arc: `/new-tower` is rewritten around this
+path (portal planning → forge bake gates → registry row → in-app proofs →
+LOOK), docs/TOWER.md carries the v2 contract with the superseded-decision
+note ("skins never change the film" narrows to towers sharing a spec),
+and the forge digest is schema v2 (materials hash into `order` — a
+specular change once moved the render while both digests held still).
+
 ## Forge — the mesh-bake pipeline and its bake-off (2026-08-12)
 
 Tooling, not a player-facing feature; recorded here because it settles a

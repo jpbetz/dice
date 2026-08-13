@@ -4402,12 +4402,24 @@ luminance`, so the two skies come out at the same VALUE and differ only in
 colour. Nothing on it blooms, by construction — an always-on bloom source
 would disable the post-stack bypass for the whole app.
 
-**Not shipped yet: the shape.** The owner's reference is a broken stump —
-stocky, a torn frontal wound opening into black, splinter spires, heavy
-buttress roots, pale barkless fibre. The shell standing in the file today
-is a box-and-extrusion interim that reads as a rectangular tower wearing
-bark; it satisfies every contract proof and none of the brief's silhouette.
-It is isolated behind one function and one descriptor
-(`js/towerhollow.js`, THE SHELL IS ONE SWAPPABLE FUNCTION) so the parametric
-replacement drops in without touching the moot, the door, the palette work
-or the proofs.
+**The shape shipped 2026-08-13, and it is the app's first BAKED model.**
+The owner's reference — a broken stump: stocky ~2:1, one ragged torn wound
+opening into black, five uneven splinter spires (tallest never centered),
+six buttress roots gripping the ground, pale barkless fibre with the life
+painted on — is now a forge-baked GLB (`tools/forge/recipes/hollowbole.py`
+→ `models/towers/hollowbole_{moonrise,foxfire}.glb`), two palette variants
+from one deterministic bake with a SHARED geometry digest (one solid, two
+paints; palette is a bake input because COLOR_0 is baked data). It rides
+the TOWER_CORE v2 portal contract (docs/TOWER.md): the model declares its
+mouth (rim 9.40, clearR 2.20) and its doorway (near-classic sill), and the
+engine derives the core around them. The interior is its own sealed dark
+throat — a liner whose upper CURTAIN carries the cowl band behind the
+splintered crown, so the vanish stays invisible from every shipped eye
+without a lid. The swappable-function seam did exactly what it promised:
+the moot, the shelf brackets, the lit door and both palettes survived the
+shell swap unchanged, placed through a surface descriptor now synthesized
+by raycasting the loaded mesh (`js/towerglbshell.js`) — and the θ
+convention the old shell inverted is fixed, so the moot gap finally faces
+front-left as authored. Four review-gated bake rounds; the battery:
+fit CLEAN, occlusion 99/99 shaft+cowl at all six eyes, probe 6/6, pour
+29/29, tower tag 8/8.

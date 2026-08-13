@@ -97,13 +97,39 @@ VERDICTS are stable"; the byte-level determinism proof lives in
 tower-roll's replay block (same seed → identical film, cross-client).
 
 **The first portal-declared assets:** `tests/e2e/fixtures/tower_fixture.glb`
-(the stress fixture — all eight numbers off-classic, all inside limits;
-never a picker row) and the rebuilt `hollowbole` shell (in progress at this
-writing; its STATUS section below is updated as it lands).
+(the stress fixture — its portals off-classic within limits, its header
+carrying the composite-buildability derivation the envelope forced; never
+a picker row) and the rebuilt `hollowbole` shell (below).
 
 ---
 
-## STATUS — shipped as a room setting (2026-08-12), three models (2026-08-14), a fourth registered (2026-08-12, W3)
+## STATUS — shipped as a room setting (2026-08-12), three models (2026-08-14), the fourth model BAKED (2026-08-13, TOWER_CORE v2)
+
+**THE FOURTH MODEL IS THE FIRST BAKED ONE, AND ITS SHAPE IS DONE.**
+`hollowbole`'s shell is a forge-baked GLB under the portal contract
+(recipe `tools/forge/recipes/hollowbole.py` → `models/towers/
+hollowbole_{moonrise,foxfire}.glb`, one deterministic run, shared geometry
+digest, palette as a bake input): the stump at 1.97:1, one ragged wound
+with the doorway inside its lower lip, five uneven spires (tallest at
+−58°), six gripping buttress roots, the delivery ramp baked as a root
+TONGUE cladding the engine chute, and the interior a sealed dark throat
+whose upper CURTAIN carries the cowl band behind the splintered crown
+(rays through any crown notch die on dark liner — the same redundant-
+carrier mechanism the old shell used, in mesh form). Declared portals:
+in (0, −2.55, rim 9.40, clearR 2.20), out (0, sill 1.00, 5.00 × 4.50).
+Battery on the baked shell: fit CLEAN (shell VENUE GROUNDS, tongue LIP
+CLADDING), occlusion 99/99 SHAFT+COWL at all six eyes, probe matrix 6/6
+CLEAN, pour 29/29, tower tag 8/8. The W3 dressing (moot, shelves, door,
+veils) survived the swap through a raycast-synthesized surface descriptor
+(`js/towerglbshell.js`) — and its θ convention is FIXED: the moot gap
+faces front-left as designed (it sat back-right under the old shell's
+convention for its whole life).
+
+*(The section that follows is the PRE-BAKE status, kept as history — its
+"shape is not finished" claim resolved 2026-08-13, and its general
+finding — the towerskin kit's vocabulary is ARCHITECTURE; organic forms
+want a different technique — is exactly what the portal contract + forge
+path now provide.)*
 
 **THE FOURTH MODEL IS REGISTERED AND ITS SHAPE IS NOT FINISHED.**
 `hollowbole` (`js/towerhollow.js`) is the fae venue's tower — a rotted
@@ -135,7 +161,11 @@ Proven against the interim shell, and the numbers carry over as the
 harness rather than as the answer: fit CLEAN (21 overruns, every one a
 named legal class; hull x[−3.15, 3.15] y[−1.15, 12.32] z(rel z0)[−5.13,
 3.99]), occlusion 99/99 on SHAFT and COWL at all six shipped eyes, probe
-8/8 CLEAN and byte-identical to Heartwood's resting sheet on the same seed,
+8/8 CLEAN and byte-identical to Heartwood's resting sheet on the same seed
+*(v2 correction: "byte-identical" overclaims — the probe's collision
+timestamps and residual velocities have a measured noise floor even A/A on
+unchanged code; the stable claim is identical VERDICTS, and byte-level
+determinism is proven where it lives, in tower-roll's replay block)*,
 dressing 7 meshes / 2644 tris / 7 draws inside the ≤4k / ~8 budget.
 
 **A red check corrected this model's own header, the way Black Anvil's

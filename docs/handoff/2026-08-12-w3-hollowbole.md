@@ -16,6 +16,19 @@ limitations under the License.
 
 # Handoff — W3 Hollow Bole (fae venue tower) and the venue arc
 
+> **TAKEN OVER 2026-08-13, and the arc is closed.** Joe's call on §"The
+> forge changes everything": re-author through the forge. That decision
+> grew into the TOWER_CORE v2 PORTAL CONTRACT (item 7 of the open-work
+> list below — promised here, delivered there) and the shell shipped as
+> the app's first baked GLB tower after four review-gated rounds. See
+> docs/SHIPPED.md "TOWER_CORE v2", docs/TOWER.md "THE PORTAL CONTRACT",
+> and ROADMAP W3 for the resolution. Of the open-work list: items 2-4, 6
+> and 7 are done (verdict via the rebuild, pours WATCHED in both palettes
+> mid-flight, docs reconciled, portals shipped); item 1 (the 8123 restart)
+> and item 5 (LISTENING to the clunk voice) still wait on Joe/the main
+> session; item 9 stands (no deploy unasked). The hard-won lessons below
+> all held — the port-mask/flight-envelope one twice.
+
 **Written:** 2026-08-12, main session pausing for compaction/handoff.
 **Where the work lives:** main worktree `/home/jpbetz/projects/dice`, branch
 `master`. My last commit is `7a02706` ("W3 rebuild, stage 2: the ghost in

@@ -2632,7 +2632,35 @@ is the interim stage — W2 upgrades fidelity in place. Proof: `venue-set`
 (settings/fx/tower), sabotage-checked on the staged-means-in-the-scene
 claim.
 
-### W3. The fae tower — REGISTERED 2026-08-12, SHELL OUTSTANDING
+### W3. The fae tower — RESOLVED 2026-08-13: the shell is the first forge-baked GLB tower
+
+**The route-1 ending.** The radius-field JS shell (route 2) landed on
+2026-08-12 and its proofs went green, but Joe's verdict on the LOOK was
+still open at the handoff (docs/handoff/2026-08-12-w3-hollowbole.md), and
+his call came back: re-author through the forge, "mostly from scratch, an
+organic looking model of the stump, turned into a dice tower in a clean
+way". The clean way became a whole arc — **the TOWER_CORE v2 PORTAL
+CONTRACT** (the handoff's own item 7, promised and now delivered; see
+docs/TOWER.md "THE PORTAL CONTRACT" and docs/SHIPPED.md): a tower model
+declares its dice-in/dice-out portals and the engine derives volumes,
+film, colliders, camera and proofs from them, with the classic numbers as
+the byte-frozen default spec.
+
+The shell shipped after four review-gated bake rounds (form → roots/mass/
+interior darkness → envelope fit + the cowl curtain → tongue value): two
+palette variants from one deterministic recipe (`tools/forge/recipes/
+hollowbole.py`, shared geometry digest, palette as bake input), 7.8k tris,
+served from models/towers/ through js/towerglb.js, seated by the loader,
+dressed through a raycast-synthesized surface descriptor so the
+Joe-approved moot/attendants/door survived the shell swap (and the
+θ-convention debt died with it — the moot gap finally faces front-left).
+Battery: fit CLEAN (shell VENUE GROUNDS, tongue LIP CLADDING), occlusion
+99/99 shaft+cowl at all six eyes (the interior liner's cowl CURTAIN
+carries the band over the splintered crown), probe matrix 6/6, pour
+29/29, suite 48/48, tower tag 8/8 with the new held-replay scenario.
+The original W3 text below stands as history.
+
+*(original entry, for the record:)* REGISTERED 2026-08-12, SHELL OUTSTANDING
 `hollowbole` (`js/towerhollow.js`), the first `venueOnly` tower: no chip,
 chosen by choosing the venue. Everything that is not the shell is done and
 proven — the registry row and its hollow-log clunk voice, the lit door and
