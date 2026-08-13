@@ -47,6 +47,7 @@ import { buildHollowBoleSkin, HOLLOW_EMBER } from './towerhollow.js';
 import {
   TOWERGLB, towerGlbInit, towerGlbEnsure, towerGlbStatus, towerGlbAsset, towerGlbSkin,
 } from './towerglb.js';
+import { glbShellFor } from './towerglbshell.js';
 import { stepDress } from './towerdress.js';
 import { buildMotes, stepMotes, disposeMotes } from './motes.js';
 import { buildFaeConcept, brightenFog, stepWisps } from './fae-lab.js';
@@ -199,7 +200,39 @@ const TOWERS = {
     },
   },
   hollowbole: {
-    id: 'hollowbole', label: 'Hollow Bole', skin: (v) => buildHollowBoleSkin(v, { paletteId: faeTowerPalette() }),
+    id: 'hollowbole', label: 'Hollow Bole',
+    // THE FIRST SHIPPED GLB TOWER (ROADMAP W3, /new-tower v2). One geometry,
+    // two palettes: the trunk is BAKED (tools/forge/recipes/hollowbole.py) and
+    // the venue picks which paint is standing. Both files are ensured together
+    // and readiness is over the pair (towerGlbUrls) — a venue flip must not put
+    // a player back in the wait they already served.
+    //
+    // IDENTICAL PORTALS ARE A CLAIM THIS ROW MAKES AND towerModelEnsure CHECKS:
+    // in {x 0, z -2.55, rimY 9.40, clearR 2.20}, out {x 0, sillY 1.00, w 5.00,
+    // clearH 4.50}, one geometry digest across both bakes. The engine derives
+    // its whole core from those eight numbers, so two variants that disagreed
+    // would be one venue delivering dice through a doorway the other one's
+    // engine did not cut.
+    glbUrls: {
+      moonrise: '/models/towers/hollowbole_moonrise.glb',
+      foxfire: '/models/towers/hollowbole_foxfire.glb',
+    },
+    glbVariant: () => faeTowerPalette(),
+    // THE BAKE REPLACED THE SHELL, NOT THE DRESS. buildHollowBoleSkin still
+    // places the crown moot, the attendants, the little lit door, the veils and
+    // the stains — Joe-approved W3 work — through the SURFACE descriptor
+    // (js/towerhollow.js:592). What changed is who answers "where is the bark
+    // at (θ, y)": glbShellFor raycasts the loaded mesh instead of evaluating a
+    // radius field. The seam is the whole reason that swap costs one argument.
+    skin: (v) => buildHollowBoleSkin(v, {
+      paletteId: faeTowerPalette(),
+      shell: glbShellFor(towerGlbUrlActive(TOWERS.hollowbole)),
+    }),
+    // MOVING DRESS, DECLARED (/new-tower v2 §5): static props bake into the
+    // GLB, only idle motion stays code-side — and the row says so, so the
+    // registry loop knows to demand a sway of this tower and not of a model
+    // that legitimately has none.
+    dress: true,
     title: 'Hollow Bole — a rotted hollow trunk; dice fall down the snag and out of a root gap',
     // VENUE-ONLY. A venue is chosen as ONE thing (GOALS goal 13), and this
     // tower is part of what the fae venues ARE — so it takes no chip of its
@@ -7943,9 +7976,59 @@ function towerPortalsOf(id) {
   const row = TOWERS[id];
   if (!row) return DEFAULT_PORTALS;
   if (row.portals) return row.portals;
-  if (row.glbUrl) console.warn(`[tower] ${id}: portals not loaded — classic volumes substituted`);
+  if (towerGlbUrls(row).length) console.warn(`[tower] ${id}: portals not loaded — classic volumes substituted`);
   return DEFAULT_PORTALS;
 }
+
+// ---------------------------------------------------------------------------
+// ONE ROW, POSSIBLY SEVERAL FILES (W3). Hollow Bole ships ONE geometry painted
+// in two palettes — moonrise and foxfire — and which one is standing is the
+// venue's business, not the row's. So a row may name a MAP of urls plus the
+// function that says which key is live, and every path below asks these two
+// helpers instead of reading `glbUrl` directly. A single-model row keeps
+// `glbUrl` and resolves through the identical code, which is the point: there
+// is no "variant path" to keep in step with the normal one.
+//
+// THE GATE IS ALL OF THEM; THE SKIN IS ONE. Readiness and the preload cover
+// the WHOLE set, because a venue flip mid-session changes which file is
+// socketed and a flip must not re-enter the wait — the player already waited
+// once, and a second spinner for a model that is a palette away from one
+// already in memory would be a regression they can feel. The skin resolves the
+// single variant the venue is currently under.
+function towerGlbUrls(row) {
+  if (!row) return [];
+  if (row.glbUrls) return Object.values(row.glbUrls);
+  return row.glbUrl ? [row.glbUrl] : [];
+}
+
+// The url to actually build from, right now. `glbVariant()` is the row's own
+// question (for Hollow Bole it is faeTowerPalette()); an unknown key falls back
+// to the first declared variant rather than to null, because a missing palette
+// should stand the tower under the wrong sky, not refuse to stand it at all.
+function towerGlbUrlActive(row) {
+  if (!row) return null;
+  if (!row.glbUrls) return row.glbUrl || null;
+  const keys = Object.keys(row.glbUrls);
+  const key = row.glbVariant ? row.glbVariant() : keys[0];
+  return row.glbUrls[key] || row.glbUrls[keys[0]] || null;
+}
+
+// The eight numbers, compared as numbers. Object.freeze does not make two
+// portal specs comparable with ===, and JSON.stringify would make key ORDER
+// load-bearing, which is a false alarm waiting to happen.
+function towerPortalsMatch(a, b) {
+  if (!a || !b) return false;
+  for (const [side, keys] of [['in', ['x', 'rimY', 'z', 'clearR']],
+    ['out', ['x', 'sillY', 'w', 'clearH']]]) {
+    for (const k of keys) if (a[side][k] !== b[side][k]) return false;
+  }
+  return true;
+}
+
+// Which urls already have a preload wired to them. Without it, a row asked to
+// ensure twice while its files are in flight stacks a second .then on the same
+// promise and releases the held replay twice.
+const towerGlbWired = new Set();
 
 // ---------------------------------------------------------------------------
 // THE MODEL GATE (js/towerglb.js). A baked tower arrives over the network and
@@ -7967,7 +8050,13 @@ function towerPortalsOf(id) {
 // towerPortalsOf's warning already describes. Two conditions, one meaning.
 function towerModelReady(id) {
   const row = TOWERS[id];
-  return !row || !row.glbUrl || (!!row.portals && towerGlbStatus(row.glbUrl) === 'ready');
+  if (!row) return true;
+  const urls = towerGlbUrls(row);
+  // EVERY variant, not the active one. See towerGlbUrls: the flip between two
+  // palettes of one model happens inside a venue change and cannot be allowed
+  // to land back in the not-ready state, so the row is ready when the whole
+  // set is.
+  return !urls.length || (!!row.portals && urls.every((u) => towerGlbStatus(u) === 'ready'));
 }
 
 // Kick the preload for a row that needs one. Idempotent at every level:
@@ -7984,25 +8073,49 @@ function towerModelReady(id) {
 // everyone else's.
 function towerModelEnsure(id) {
   const row = TOWERS[id];
-  if (!row || !row.glbUrl || row.portals) return;
-  towerGlbEnsure(row.glbUrl).then((entry) => {
-    if (entry.status === 'ready') {
-      row.portals = Object.freeze(entry.portals);
-    } else {
-      // NEVER DEGRADE TO 'none'. pendingTower stays set, so a model that turns
-      // up on a later retry (or a later boot) still raises the tower — and
-      // until then this client keeps the table it has rather than silently
-      // becoming the one client in the room baking throws while everybody
-      // else bakes pours.
-      console.warn(`[tower] ${id}: its model did not load, so it will not be `
-        + `socketed. The table keeps '${currentTower}' and the pending change stays `
-        + `queued. Films on this client may diverge from other clients in this room.`);
-    }
-    tryFlushRoomChanges();
-    // A LATE FELT BEATS A NEVER FELT: released on failure too, so a broken
-    // model costs the returning player a tower, not the roll on the table.
-    towerReleaseHeldReplay();
-  });
+  if (!row) return;
+  const urls = towerGlbUrls(row);
+  if (!urls.length) return;
+  for (const url of urls) {
+    if (towerGlbWired.has(url)) continue;
+    towerGlbWired.add(url);
+    towerGlbEnsure(url).then((entry) => {
+      if (entry.status === 'ready') {
+        // FIRST ONE WINS, AND THE REST MUST AGREE. Two palettes of one model are
+        // the SAME geometry — the bake proves it with a digest — so the second
+        // file to land is not allowed to move the doorway. If it does, the two
+        // variants were baked from different recipes and half the venues would
+        // deliver dice to a place the engine did not cut a hole: exactly the
+        // "wall beside the door" failure towerPortalsOf warns about, except
+        // intermittent and palette-dependent, which is worse. Loud, and recorded
+        // on the row so a proof can read it back instead of scraping a console.
+        if (!row.portals) row.portals = Object.freeze(entry.portals);
+        else if (!towerPortalsMatch(row.portals, entry.portals)) {
+          (row.portalMismatch || (row.portalMismatch = [])).push(url);
+          console.error(`[tower] ${id}: ${url} declares DIFFERENT portals than the `
+            + `variant already frozen onto this row. Two palettes of one model must be `
+            + `one geometry — this is a BAKE error, not a load error. Frozen: `
+            + `${JSON.stringify(row.portals)} — this file: ${JSON.stringify(entry.portals)}`);
+        }
+      } else {
+        // NEVER DEGRADE TO 'none'. pendingTower stays set, so a model that turns
+        // up on a later retry (or a later boot) still raises the tower — and
+        // until then this client keeps the table it has rather than silently
+        // becoming the one client in the room baking throws while everybody
+        // else bakes pours.
+        console.warn(`[tower] ${id}: its model did not load, so it will not be `
+          + `socketed. The table keeps '${currentTower}' and the pending change stays `
+          + `queued. Films on this client may diverge from other clients in this room.`);
+      }
+      tryFlushRoomChanges();
+      // A LATE FELT BEATS A NEVER FELT: released on failure too, so a broken
+      // model costs the returning player a tower, not the roll on the table.
+      // Both are safe to call once per variant: the flush is gated on
+      // towerModelReady (still false until the LAST file lands, so the earlier
+      // ones are no-ops) and the release is idempotent by construction.
+      towerReleaseHeldReplay();
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -8292,10 +8405,10 @@ function towerLabSkin(id) {
   // and filing the shots under another. So it returns what the lab is ACTUALLY
   // wearing, kicks the preload, and says so. Tools poll towerModelStatus(id)
   // and ask again.
-  if (TOWERS[id].glbUrl && !towerModelReady(id)) {
+  if (towerGlbUrls(TOWERS[id]).length && !towerModelReady(id)) {
     towerModelEnsure(id);
     console.warn(`[tower] lab: '${id}' has no model yet `
-      + `(${towerGlbStatus(TOWERS[id].glbUrl)}) — the bench is still wearing `
+      + `(${towerGlbUrls(TOWERS[id]).map((u) => towerGlbStatus(u)).join('/')}) — the bench is still wearing `
       + `'${TOWERLAB.skinId}'. Poll __diceDebug.towerModelStatus('${id}') and ask again.`);
     return TOWERLAB.skinId;
   }
@@ -8405,9 +8518,9 @@ function towerSocket(id) {
   // towerGlbSkin — leaving the table in a state no unsocket ever produced.
   // Bail before touching anything and the socket is a no-op, which is what a
   // gate is supposed to feel like.
-  if (spec.glbUrl && !towerModelReady(spec.id)) {
+  if (towerGlbUrls(spec).length && !towerModelReady(spec.id)) {
     console.warn(`[tower] towerSocket('${spec.id}') refused: its model is `
-      + `'${towerGlbStatus(spec.glbUrl)}', not ready. Callers must gate on `
+      + `'${towerGlbUrls(spec).map((u) => towerGlbStatus(u)).join('/')}', not ready. Callers must gate on `
       + `towerModelReady() — the table keeps '${currentTower}'.`);
     return currentTower;
   }
@@ -9191,7 +9304,7 @@ window.__diceDebug = {
       // synchronously and which need a towerModelStatus poll first. No row
       // ships `glb: true` today; the flag exists so the loop that walks them
       // can be written once rather than retrofitted the day one does.
-      glb: !!t.glbUrl, dress: !!t.dress,
+      glb: towerGlbUrls(t).length > 0, dress: !!t.dress,
     }));
   },
   // WHERE A ROW'S MODEL HAS GOT TO (js/towerglb.js). `ready` is the GATE every
@@ -9203,12 +9316,43 @@ window.__diceDebug = {
   towerModelStatus(id = currentTower) {
     const row = TOWERS[id];
     if (!row) return null;
+    const urls = towerGlbUrls(row);
+    const sts = urls.map((u) => towerGlbStatus(u));
     return {
       ready: towerModelReady(id),
-      status: row.glbUrl ? towerGlbStatus(row.glbUrl) : null,
-      url: row.glbUrl || null,
+      // AGGREGATED ACROSS EVERY VARIANT, worst-first, because `ready` is the
+      // whole set and a status that reported only the active file would say
+      // 'ready' while the row was still waiting on its other palette. For a
+      // one-model row this is that model's status, unchanged.
+      status: !urls.length ? null
+        : (sts.includes('error') ? 'error'
+          : (sts.every((s) => s === 'ready') ? 'ready'
+            : (sts.includes('loading') ? 'loading' : 'idle'))),
+      url: towerGlbUrlActive(row),
       portals: !!row.portals,
-      retries: row.glbUrl && towerGlbAsset(row.glbUrl) ? towerGlbAsset(row.glbUrl).retries : 0,
+      retries: urls.reduce((m, u) => Math.max(m, towerGlbAsset(u) ? towerGlbAsset(u).retries : 0), 0),
+    };
+  },
+  // THE MULTI-VARIANT VIEW, kept OUT of towerModelStatus deliberately. That
+  // object's exact shape is deep-equalled by tower-glb-loader, and a proof that
+  // has to be edited every time an unrelated field is added is a proof that
+  // gets edited carelessly. This is the second question — "one row, several
+  // files: do they agree?" — and it has its own hook.
+  //
+  // `mismatch` non-empty means two palettes of one model declared DIFFERENT
+  // portals, which is a bake error rather than a load error (towerModelEnsure
+  // says so loudly at the console too).
+  towerVariants(id = currentTower) {
+    const row = TOWERS[id];
+    if (!row) return null;
+    const urls = towerGlbUrls(row);
+    return {
+      id,
+      active: towerGlbUrlActive(row),
+      urls,
+      statuses: urls.map((u) => towerGlbStatus(u)),
+      mismatch: row.portalMismatch ? row.portalMismatch.slice() : [],
+      variant: row.glbVariant ? row.glbVariant() : null,
     };
   },
   // PROOFS ONLY, exactly like towerLabSkin's parameterisation: this MINTS a
@@ -9339,7 +9483,7 @@ window.__diceDebug = {
     // WRONG answer under the id that was asked for. A pass on the previous
     // tower is worse than no answer at all: it is the one result nobody would
     // think to re-check. Say pending, kick the preload, let the caller poll.
-    if (id && TOWERS[id] && TOWERS[id].glbUrl && !towerModelReady(id)) {
+    if (id && TOWERS[id] && towerGlbUrls(TOWERS[id]).length && !towerModelReady(id)) {
       towerModelEnsure(id);
       return { pending: true, id };
     }
@@ -9836,7 +9980,7 @@ window.__diceDebug = {
     const v = towerVolumes(portals);
     return {
       id,
-      source: row.portals ? (row.glbUrl ? 'model' : 'row') : 'default',
+      source: row.portals ? (towerGlbUrls(row).length ? 'model' : 'row') : 'default',
       portals,
       limits: TOWER_PORTAL_LIMITS,
       derived: {
