@@ -201,6 +201,53 @@ try {
     assert.equal((await res.arrayBuffer()).byteLength, 0);
   });
 
+  // ---- the two loader files the app now imports ---------------------------
+  //
+  // THE RULE IS A PATH PREFIX, AND THIS IS THE PART THAT IS NOT OBVIOUS.
+  // `isVendor` tests `absPath.startsWith(VENDOR_DIR + sep)` and `safeResolve`
+  // has no allowlist, so a file dropped into vendor/ is served — and served
+  // immutable — with nothing to register it in. That is a good property and it
+  // is also why nothing above would have noticed if GLTFLoader.js had never
+  // been copied at all: every other assertion in this file names a file that
+  // was already there. js/towerglb.js imports these two at module scope, so a
+  // 404 on either is a blank table, not a missing tower.
+  for (const f of ['GLTFLoader.js', 'BufferGeometryUtils.js']) {
+    await t(`/vendor/${f} is served, immutable, as a module`, async () => {
+      const res = await fetch(`${base}/vendor/${f}`);
+      assert.equal(res.status, 200, `${f} must exist under vendor/`);
+      assert.equal(res.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+      // text/javascript, not octet-stream: a module served with the wrong
+      // content-type is refused by the browser's module loader outright.
+      assert.equal(res.headers.get('content-type'), 'text/javascript; charset=utf-8');
+      const body = await res.text();
+      assert.ok(body.length > 1000, `${f} is the real file (${body.length} bytes)`);
+      // The bare specifier has to survive vendoring: it is what index.html's
+      // importmap resolves. A rewritten './three.module.js' would still parse
+      // and still 200, and would load a SECOND copy of three — the duplicate
+      // -evaluation failure the harness already logs as a boot retry.
+      assert.match(body, /from 'three'/, `${f} still imports three as a bare specifier`);
+    });
+  }
+
+  await t('/vendor/GLTFLoader.js reaches BufferGeometryUtils by a flat local path', async () => {
+    const body = await (await fetch(`${base}/vendor/GLTFLoader.js`)).text();
+    assert.match(body, /from '\.\/BufferGeometryUtils\.js'/,
+      'the one upstream edit — ../utils/ would 404 under vendor/');
+  });
+
+  // The forge's baked test asset. `.glb` is deliberately absent from MIME, so
+  // this pins what actually happens rather than what one might assume: a 200
+  // with the octet-stream fallback. GLTFLoader fetches arraybuffer and sniffs
+  // the glTF magic, so the type is not load-bearing — but a 404 would be, and
+  // the tower-glb-loader scenario loads this exact path through the app.
+  await t('tests/e2e/fixtures/*.glb is reachable (the e2e fixture path)', async () => {
+    const res = await fetch(`${base}/tests/e2e/fixtures/tower_fixture.glb`);
+    assert.equal(res.status, 200, 'the fixture must be fetchable from the page origin');
+    assert.equal(res.headers.get('cache-control'), 'no-cache', 'and it is NOT vendor/, so it revalidates');
+    const buf = Buffer.from(await res.arrayBuffer());
+    assert.equal(buf.toString('ascii', 0, 4), 'glTF', 'and the bytes are a GLB container');
+  });
+
   // ---- HEAD requests still behave --------------------------------------
 
   await t('HEAD /vendor/ still declares immutable without a body', async () => {
