@@ -136,6 +136,47 @@ function buildGround(pal, seed) {
     x.fillStyle = bg;
     x.fillRect(px - s, py - s, s * 2, s * 2);
   }
+  // THE CONNECTIVE LOBES (W2b, rules 3/4): two gradient trails of denser
+  // moss walk the ground from the tower's socket to each flank feature,
+  // so the space between features is designed rather than dead. World →
+  // canvas: 1 world unit = size/120 px, +z = +canvas-y. Positions match
+  // the features' shipped placements (moot −6.8,−6.6 · pool 7.2,−7.4 ·
+  // socket foot ≈ 0,−4.5); alpha stays bed-tier — a trail is value, not
+  // a glow.
+  const w2c = (wx, wz) => [size / 2 + wx * (size / 120), size / 2 + wz * (size / 120)];
+  const lobe = (x0, z0, x1, z1, n) => {
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1);
+      const wx = x0 + (x1 - x0) * t + (rnd() - 0.5) * 1.6;
+      const wz = z0 + (z1 - z0) * t + (rnd() - 0.5) * 1.4;
+      const [px, py] = w2c(wx, wz);
+      const s = (10 + rnd() * 12) * (1 - 0.35 * t);
+      const tone = rnd() < 0.3 ? lit : bed;
+      const bg = x.createRadialGradient(px, py, 0, px, py, s);
+      bg.addColorStop(0, `rgba(${(tone.r * 255) | 0}, ${(tone.g * 255) | 0}, ${(tone.b * 255) | 0}, ${0.10 + rnd() * 0.08})`);
+      bg.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = bg;
+      x.fillRect(px - s, py - s, s * 2, s * 2);
+    }
+  };
+  lobe(-1.5, -4.5, -6.2, -6.4, 14); // socket → moot
+  lobe(1.5, -4.5, 6.6, -7.0, 14);   // socket → pool
+  // BASE TRANSITIONS (rule 9 — nothing floats): a damp dark ring where
+  // the pool sits, a trampled pale ring under the moot. Baked into the
+  // ground rather than skirted onto the props, because the ground is
+  // what a base disturbs.
+  const ring = (wx, wz, wr, tone, alpha) => {
+    const [px, py] = w2c(wx, wz);
+    const pr = wr * (size / 120);
+    const bg = x.createRadialGradient(px, py, pr * 0.35, px, py, pr);
+    bg.addColorStop(0, `rgba(${(tone.r * 255) | 0}, ${(tone.g * 255) | 0}, ${(tone.b * 255) | 0}, ${alpha})`);
+    bg.addColorStop(1, 'rgba(0,0,0,0)');
+    x.fillStyle = bg;
+    x.fillRect(px - pr, py - pr, pr * 2, pr * 2);
+  };
+  const damp = new THREE.Color(pal.void).lerp(new THREE.Color(pal.fogBody), 0.5);
+  ring(7.2, -7.4, 4.2, damp, 0.30);  // the pool's wet margin
+  ring(-6.8, -6.6, 4.0, bed, 0.16);  // the moot's trampled court
   const geo = new THREE.CircleGeometry(60, 48);
   const mat = new THREE.MeshStandardMaterial({
     map: tex(c), roughness: 0.95, metalness: 0,
@@ -364,6 +405,37 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
     disc.renderOrder = 3;
     group.add(disc);
   }
+  // THE SPILL (W2b, rule 4 — the space between features is designed):
+  // five strays walk from the ring's tower-side edge toward the root
+  // flare, sizes falling, most of them dark — the vacated court's path
+  // back to the tree, and the tissue that connects the moot to the hero
+  // instead of leaving it an island. Same placement law as the ring
+  // (all z well beyond the widest wall; |x| outside the tower envelope),
+  // and the two lit ones are DIM — a spill must never read as new
+  // sources (the countable-sources gate).
+  const spillTo = { x: -3.5, z: -5.9 }; // just shy of the root flare
+  const edge = { x: at.x + 2.3, z: at.z + 0.6 };
+  for (let i = 0; i < 5; i++) {
+    const t = (i + 0.7) / 5.7;
+    const sx = edge.x + (spillTo.x - edge.x) * t + (rnd() - 0.5) * 0.7;
+    const sz = edge.z + (spillTo.z - edge.z) * t + (rnd() - 0.5) * 0.6;
+    const s = (0.16 - 0.016 * i) * (0.85 + rnd() * 0.3);
+    const lit = i === 1 || i === 3;
+    const capMat = new THREE.MeshStandardMaterial({
+      color: lit ? new THREE.Color(pal.glowCore) : dim,
+      emissive: lit ? glow : '#000000',
+      emissiveIntensity: lit ? 0.18 : 0,
+      roughness: 0.75,
+    });
+    const stemMat = new THREE.MeshStandardMaterial({ color: pal.bark, roughness: 0.9 });
+    const cap = new THREE.Mesh(capGeo, capMat);
+    const stem = new THREE.Mesh(stemGeo, stemMat);
+    cap.scale.setScalar(s);
+    stem.scale.set(s, s * 0.8, s);
+    stem.position.set(sx, s * 0.4, sz);
+    cap.position.set(sx, s * 0.85, sz);
+    group.add(stem, cap);
+  }
   group.userData.pools = pools; // static fog emitters, folded in at build
   group.userData.at = at;       // reported via venueInfo().stage
   return group;
@@ -376,7 +448,11 @@ function buildMoot(pal, seed, at = { x: -6.8, z: -6.6 }, rot = -1.55) {
 // along the shaft's own tilt, and three faint wisp-lights — a mirror by
 // value structure, at zero render-target cost. A low-roughness standard
 // material lets the venue lamp add the one live sheen.
-function buildMirrorPool(pal, seed, at = { x: 6.6, z: -6.4 }) {
+// W2b moved it back and out (was 6.6, −6.4 — the same depth as the moot,
+// and two supports at mirrored depth read as bookends, rule 6): deeper
+// into the mist so the background layer gains a tenant (rule 5), still
+// dice-unreachable by 1.3 beyond the widest wall at its nearest edge.
+function buildMirrorPool(pal, seed, at = { x: 7.2, z: -7.4 }) {
   const size = 256;
   const { c, x } = canvas2d(size);
   const rnd = mulberry32(seed ^ 0xb007);
@@ -406,7 +482,11 @@ function buildMirrorPool(pal, seed, at = { x: 6.6, z: -6.4 }) {
   // as a glowing egg under the water, not the moon ON it. A glint is
   // structure: short horizontal dashes, near-white, ragged, thinning as
   // they fall away from the moon's point.
-  x.rotate(0.22);
+  // W2b re-aimed the axis AT THE TOWER'S FOOT (rule 7 — it copied the
+  // beam's tilt and pointed at nothing, the frame's one dissenting
+  // arrow; every directional element rides the circuit or argues with
+  // it).
+  x.rotate(0.62);
   const pale = new THREE.Color(pal.moon).lerp(new THREE.Color('#ffffff'), 0.45);
   const dashes = 9;
   for (let i = 0; i < dashes; i++) {
@@ -478,14 +558,26 @@ function buildMistBand(pal, seed) {
   // Horizontal unevenness: broad dark bites so the band is weather, not a
   // painted stripe. Each bite is drawn at its wrapped twin too — the band
   // is a closed cylinder, and an unwrapped bite leaves a seam at u=0.
+  // W2b (rule 2): the bites take an azimuth WEIGHTING — the band thins
+  // over the moot (the circuit's release point, where the eye rises off
+  // the glow into sky) and stays dense behind the pool (whose coupling
+  // to the background is the point of its depth). The two u-fractions
+  // were settled by LOOK, not derived — the cylinder's uv origin is not
+  // worth an equation when one render answers it.
+  const U_THIN = 0.63, U_DENSE = 0.40;
+  const biteW = (px) => {
+    const d = (u0) => Math.min(Math.abs(px / w - u0), 1 - Math.abs(px / w - u0));
+    return (1 + 0.9 * Math.exp(-((d(U_THIN) / 0.09) ** 2)))
+      * (1 - 0.6 * Math.exp(-((d(U_DENSE) / 0.10) ** 2)));
+  };
   x.globalCompositeOperation = 'destination-out';
   for (let i = 0; i < 26; i++) {
     const px = rnd() * w, py = h * (0.3 + rnd() * 0.6), s = 40 + rnd() * 90;
-    const a = 0.10 + rnd() * 0.22; // one roll per bite — twins must match
+    const a = (0.10 + rnd() * 0.22) * biteW(px); // one roll per bite — twins match
     for (const ox of [-w, 0, w]) {
       if (px + ox < -s * 2 || px + ox > w + s * 2) continue;
       const bg = x.createRadialGradient(px + ox, py, 0, px + ox, py, s);
-      bg.addColorStop(0, `rgba(0,0,0,${a})`);
+      bg.addColorStop(0, `rgba(0,0,0,${Math.min(0.4, a)})`);
       bg.addColorStop(1, 'rgba(0,0,0,0)');
       x.fillStyle = bg;
       x.fillRect(px + ox - s, py - s, s * 2, s * 2);

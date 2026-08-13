@@ -2770,6 +2770,24 @@ the work, in order:
 Sequenced AFTER W4 per Joe ("track these issues for later; go ahead with
 the dice").
 
+**DONE 2026-08-13 — all three steps.** (1) The doctrine is
+[VENUE-COMPOSITION.md](VENUE-COMPOSITION.md): ten rules with CHECKs,
+grounded in the one fact that makes them mechanical — a venue is a
+DIORAMA, watched from one composed eye. (2) The skill is `/new-venue`
+(eyes before opinions, diagnose by CHECK, triangle inside the placement
+law, tissue in the stage's own idioms, both-palette LOOK, the trap
+list). (3) The glade integrated per its own diagnosis: pool moved back
+and out (7.2, −7.4 — bookend depth broken, background layer gains a
+tenant), its glint re-aimed at the tower's foot (the one dissenting
+arrow), a five-cap SPILL walking from the moot toward the root flare,
+two connective moss lobes baked into the ground (socket→moot,
+socket→pool), base transitions (damp pool margin, trampled court), and
+the mist band's bites azimuth-weighted (thin at the circuit's release,
+dense behind the pool). Placement-law claims held as inequalities off
+venueInfo().stage — no scenario edit needed for the move, which is what
+reading the contract instead of constants buys. Suite 48/48;
+fx+settings 21/21; LOOK both palettes.
+
 ### W4. The dice set — DONE 2026-08-13 (pending Joe's LOOK verdict)
 Moonmoot Witchlight (THEMES.md §10; js/themes.js): tumbled labradorite,
 all the light in the deep-carved numerals — "rune glow" delivered as
