@@ -389,7 +389,7 @@ def material(name, rgb, roughness=0.6, metallic=0.0):
     return mat
 
 
-def vertex_color_material(name, attr_name, roughness=None):
+def vertex_color_material(name, attr_name, roughness=None, specular_level=None):
     """A material whose base colour is the mesh colour attribute.
 
     The glTF exporter only writes COLOR_0 under `export_vertex_color='MATERIAL'`
@@ -404,6 +404,15 @@ def vertex_color_material(name, attr_name, roughness=None):
     diffuse contribution was (3,3,1) out of (84,104,155). Matte forms (wood,
     stone, rot) want 0.85-0.96; the judgement made through the sheen is a
     judgement made through a haze.
+
+    `specular_level` is the SAME FAULT ONE LEVEL DOWN, and the harder one:
+    roughness spreads the 4% specular lobe but does not remove it (F0 stays
+    0.04), so a cavity painted literally black still glows at ~0.07 sRGB
+    under a 2.2 key — and no albedo change can reveal the cause; only the
+    HUE of the residual can (it arrives in the key's colour, not the
+    paint's). Principled's "Specular IOR Level" 0.5 = F0 0.04; pass ~0.1
+    (F0 0.008) for deep interiors that must actually go dark. Exports as
+    KHR_materials_specular, honoured by the app's r160 loader.
     """
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
@@ -414,6 +423,8 @@ def vertex_color_material(name, attr_name, roughness=None):
     nt.links.new(node.outputs["Color"], bsdf.inputs["Base Color"])
     if roughness is not None:
         bsdf.inputs["Roughness"].default_value = float(roughness)
+    if specular_level is not None:
+        bsdf.inputs["Specular IOR Level"].default_value = float(specular_level)
     return mat
 
 
@@ -652,6 +663,29 @@ def geometry_digest(objs, label=""):
                 ordered.update(repr((k, v)).encode())
             continue
         me = ob.data
+        # MATERIALS enter `order` (digest schema v2, 2026-08-13). The hollowbole
+        # round-2 build changed Specular IOR Level — the render moved
+        # substantially — and BOTH digests stayed identical, which broke the
+        # digest's one promise ("tells you what changed"). Principled inputs
+        # that reach the glTF: base color, metallic, roughness, specular level,
+        # emission. `set` stays geometry-only, deliberately. This bump moves
+        # every recorded order digest once; older records are pre-v2.
+        for slot in ob.material_slots:
+            m = slot.material
+            if not m:
+                continue
+            ordered.update(m.name.encode())
+            if m.use_nodes and "Principled BSDF" in m.node_tree.nodes:
+                b = m.node_tree.nodes["Principled BSDF"]
+                for inp in ("Base Color", "Metallic", "Roughness",
+                            "Specular IOR Level", "Emission Color",
+                            "Emission Strength"):
+                    v = b.inputs[inp].default_value
+                    try:
+                        t = tuple(round(float(c), 6) + 0.0 for c in v)
+                    except TypeError:
+                        t = round(float(v), 6) + 0.0
+                    ordered.update(repr((inp, t)).encode())
         for v in me.vertices:
             t = tuple(round(c, 6) + 0.0 for c in v.co)
             ordered.update(repr(t).encode())
