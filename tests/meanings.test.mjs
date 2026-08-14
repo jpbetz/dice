@@ -61,12 +61,76 @@ t('percentile dice have no rank column — always quiet', () => {
 
 t('discarded and child dice never speak', () => {
   const os = sd.outcomesFor(entry([
-    die('d20', 20, { counts: false }),
-    die('d6', 6, { child: true }),
+    die('d20', 20, { counts: false, reason: 'drop' }),
+    die('d6', 6, { child: true, origin: 2 }),
     die('d12', 12),
   ]));
+  // Two ROWS — one per die the player threw, the child riding its base die.
+  assert.equal(os.length, 2);
+  assert.equal(os.filter((o) => o.word).length, 1);
+  assert.equal(os.find((o) => !o.struck).word, 'Critical Success');
+  // …and the discarded natural 20 is present, marked, and wordless.
+  assert.equal(os[0].struck, 'drop');
+  assert.equal(os[0].value, 20);
+  assert.equal(os[0].word, null);
+  assert.equal(os[0].tier, null);
+});
+
+// §1, 2026-08-15. The old gate (`if (!p.counts || p.child …) return`) hid the
+// struck die on the banner, the verdict hero and the peek at once, because
+// renderOutcomeRows prints exactly what this returns. GOALS' *Attributed
+// math* asks for struck dice on every surface that shows the dice.
+t('a struck die is a ROW, carrying the mechanic that set it aside', () => {
+  const os = sd.outcomesFor(entry([
+    die('d6', 1, { counts: false, reason: 'reroll' }),
+    die('d6', 5, { origin: 0 }),
+  ]));
+  assert.equal(os.length, 2);
+  assert.deepEqual(os.map((o) => o.struck), ['reroll', null]);
+  assert.deepEqual(os.map((o) => o.word), [null, 'Success']);
+  // A reroll REPLACEMENT is not a child: it is a full die with its own
+  // reading, and only the die it replaced is struck.
+  assert.equal(os[1].children, null);
+});
+
+t('4d6dl1 shows four dice with exactly one struck', () => {
+  const os = sd.outcomesFor(entry([
+    die('d6', 2, { counts: false, reason: 'drop' }),
+    die('d6', 4), die('d6', 5), die('d6', 6),
+  ]));
+  assert.equal(os.length, 4, 'four dice were thrown, four rows');
+  assert.equal(os.filter((o) => o.struck).length, 1, 'exactly one struck');
+  assert.deepEqual(os.map((o) => o.word),
+    [null, 'Partial Success', 'Success', 'Success & Bonus']);
+});
+
+t('a struck die never gets a word — not even a hidden one', () => {
+  // A dropped d6 showing 5 is not a Success. Computing the word and then
+  // withholding it is the mistake U17 named for the total: a value in the
+  // DOM held back only by CSS is not held back.
+  const os = sd.outcomesFor(entry([die('d6', 5, { counts: false, reason: 'drop' }), die('d6', 3)]));
+  assert.equal(os[0].word, null);
+  assert.equal(os[0].tier, null);
+});
+
+t('an explosion child rides its base die, chain and all', () => {
+  // 1d6! landing 6 → 6 → 3: ONE reading, three faces of evidence. Giving the
+  // children readings of their own would make a 1-die pool a 3-die pool and
+  // contradict forecastFor, which forecasts spec.dice.
+  const os = sd.outcomesFor(entry([
+    die('d6', 6),
+    die('d6', 6, { child: true, origin: 0 }),
+    die('d6', 3, { child: true, origin: 1 }),
+  ]));
   assert.equal(os.length, 1);
-  assert.equal(os[0].word, 'Critical Success');
+  assert.equal(os[0].word, 'Success & Bonus');
+  assert.deepEqual(os[0].children, [6, 3]);
+});
+
+t('a child whose origin cannot be chased costs a face, never the paint', () => {
+  const os = sd.outcomesFor(entry([die('d6', 4), die('d6', 2, { child: true })]));
+  assert.equal(os.length, 1);
+  assert.equal(os[0].children, null);
 });
 
 t('crit fanfare fires when ANY die lands a crit row', () => {
@@ -95,11 +159,27 @@ t('the wash needs a majority of the CRIT-CAPABLE dice, not just one', () => {
   // not stop the table for either of them.
   assert.equal(sd.critCeremony(entry([die('d10', 10), die('d10', 1)])), false);
 
-  // Discarded and child dice are already out of outcomesFor, so they cannot
-  // pad the denominator into refusing a real crit.
+  // Struck and child dice must not pad the denominator into refusing a real
+  // crit. §1 put struck dice INTO outcomesFor (they are rows now), so this is
+  // no longer true by omission — critCeremony filters `!o.struck` explicitly,
+  // and this is the assertion that catches it if that filter is ever lost.
   assert.equal(sd.critCeremony(entry([
-    die('d10', 10), die('d10', 5, { counts: false }), die('d10', 5, { child: true }),
+    die('d10', 10),
+    die('d10', 5, { counts: false, reason: 'drop' }),
+    die('d10', 5, { child: true, origin: 0 }),
   ])), true);
+  // The sharp case: 4d10kh1 fields four eligible dice and ONE reading. If the
+  // struck three counted, a genuine crit could never clear a majority.
+  assert.equal(sd.critCeremony(entry([
+    die('d10', 10),
+    die('d10', 3, { counts: false, reason: 'drop' }),
+    die('d10', 4, { counts: false, reason: 'drop' }),
+    die('d10', 2, { counts: false, reason: 'drop' }),
+  ])), true);
+  // …and a struck natural crit does not fire the fanfare at all.
+  assert.equal(sd.critFor(entry([
+    die('d10', 10, { counts: false, reason: 'adv' }), die('d10', 5),
+  ])), null);
 
   // No crit at all, and no eligible die at all.
   assert.equal(sd.critCeremony(entry([die('d10', 5), die('d10', 7)])), false);
@@ -303,9 +383,19 @@ t('end to end: forecast segments match outcomesFor word frequencies (seeded MC)'
     for (let i = 0; i < N; i++) {
       const r = composeRoll(dice, mods, rng);
       const parts = r.dice.map((type, j) => ({
-        type, value: r.values[j], counts: r.perDie[j].counts, child: r.perDie[j].childOf !== null,
+        type,
+        value: r.values[j],
+        counts: r.perDie[j].counts,
+        reason: r.perDie[j].reason,
+        child: r.perDie[j].childOf !== null,
+        origin: [r.perDie[j].pairOf, r.perDie[j].rerollOf, r.perDie[j].childOf]
+          .find((x) => x !== null && x !== undefined) ?? null,
       }));
+      // The forecast describes the dice that READ, so the tally must too.
+      // Struck dice are rows now (§1) and carry no word; folding them in
+      // would inflate the denominator and distort the quiet band.
       for (const o of sd.outcomesFor({ parts }) || []) {
+        if (o.struck) continue;
         tally.set(o.word, (tally.get(o.word) || 0) + 1);
         outcomes++;
       }

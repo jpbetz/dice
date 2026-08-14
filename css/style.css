@@ -5963,3 +5963,45 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
    pane's own verdict call a success a refusal. The ⚠ and the count carry the
    read; the class carries only the colour. */
 .portable-status.caution { color: var(--amber); }
+
+/* ---------- a die that landed and is not in play (§1, attributed math) ----
+   THE FOURTH CHIP READ, and deliberately a DRESS on `.oc-chip` rather than a
+   new grammar: the chip is one die's evidence either way, and exactly one bit
+   changed — whether that die is in play. The dress is the one this app
+   already spends on that bit, `.value-chip.discarded` on the felt (:4272)
+   and `.log-discarded` in the log row, so the three surfaces that can show a
+   struck die now spell it the same way.
+
+   --dim-off IS this case: the token's own definition names "a discarded die"
+   as its exemplar. Taken at its value rather than lifted toward the text
+   floor, because the STRIKE and the reason word carry the read while the
+   opacity carries only the RANK — and it sits below .oc-quiet's 0.55 on
+   purpose, since a die the pool discarded ranks under a die that counted and
+   had nothing to say.
+
+   No grayscale, unlike the felt chip: a struck chip has no tier hue to drain,
+   because meanings.js never computes its word in the first place. */
+.oc-chip.oc-struck { opacity: var(--dim-off); }
+.oc-struck .oc-die { text-decoration: line-through; }
+/* The mechanic that set the die aside — a TAG, not a reading. Every property
+   here is chosen to be unmistakable for `.oc-word` (display serif, 15px, 700,
+   tier-coloured): the small tracked label at --muted, tracked TIGHTER than
+   --label-sm-track because this is an inline tag inside a row rather than a
+   head standing over a region — the token layer's own rule for the two. */
+.oc-why {
+  font-family: var(--font-ui);
+  font-size: var(--label-sm);
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+/* `.oc-boom` — an explosion child's face riding its base die's evidence
+   (`d6 6 ✴3`) — carries NO rule on purpose and is not dead markup: it lives
+   inside `.oc-die` and must inherit that span's mono evidence register
+   exactly, because the child COUNTED. It is simply not a reading of its own,
+   so it must never take the struck dress. The class stands as the hook a
+   scenario queries. */
+/* …and the hero scale belongs to the READING. A one-die roll with a struck
+   partner — `1d20 adv` is the common one — keeps its 26px verdict word while
+   the die it discarded stays at ordinary row scale beside it. */
+.oc-solo .oc-chip.oc-struck { padding: 2px 9px 3px; }
+.oc-solo .oc-struck .oc-die { font-size: 11px; }

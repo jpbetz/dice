@@ -5710,8 +5710,13 @@ function renderBreakdown(el, entry, hidden, key = false) {
 // active system is a sum system or every die was quiet.
 function renderTally(el, entry) {
   el.textContent = '';
-  const outcomes = entryOutcomes(entry);
-  if (!outcomes) return false;
+  const all = entryOutcomes(entry);
+  if (!all) return false;
+  // The TALLY is what the roll said, so it is over the dice that spoke. §1
+  // put struck dice into outcomesFor for the ROWS, which show the evidence;
+  // folding them in here would add a wordless die to a line that only counts
+  // words, and would call a pool 'quiet' because its dice were discarded.
+  const outcomes = all.filter((o) => !o.struck);
   if (!tallyOutcomes(outcomes).length) {
     el.textContent = 'a quiet roll'; // every die landed a null cell
     el.className = el.className.replace(/tier-\S+/g, '').trim();
@@ -5761,6 +5766,17 @@ function renderTally(el, entry) {
   return true;
 }
 
+// Why a die that landed is not in play. The PROFILE answers with the
+// mechanic ('drop' | 'adv' | 'reroll' — meanings.js); the surface spells it,
+// so no rulebook holds player-facing English for mechanics no system owns.
+// Both words are already the app's: 'rerolled' is the log's own qualifier
+// (§7.15) and 'dropped' is what the verdict card's DL1 attribution card has
+// always said. 'not kept' covers both advantage and disadvantage — the loser
+// of the pairing either way — and stays plain rather than clever (§7.16:
+// unsurprising over cute). The `|| 'struck'` fallback in the caller means a
+// fourth mechanic shows up as a marked die rather than as a silent one.
+const STRUCK_WORDS = { drop: 'dropped', reroll: 'rerolled', adv: 'not kept' };
+
 // 2e — THE ORGANIZED PER-DIE READ (Joe 2026-08-03: the reveal surfaces got
 // muddled — the tally line and the breakdown line repeated the same source
 // labels at the same weight, and reading WHICH die said WHAT meant
@@ -5783,6 +5799,30 @@ function renderTally(el, entry) {
 // ALL-quiet pool says 'quiet' once instead and its chips stay bare (dash
 // and word together would mark the same silence twice). One-die rolls
 // wear `oc-solo`: the single answer word IS the verdict, at hero scale.
+//
+// THE FOURTH READ — A DIE THAT LANDED AND IS NOT IN PLAY (§1, 2026-08-15).
+// `4d6dl1` showed three chips where four dice were thrown, because
+// outcomesFor dropped struck dice; that is a live half of GOALS' *Attributed
+// math* ("discarded dice stay visible (struck)") and it was broken on the
+// banner, the verdict hero and the peek at once. It is a DRESS on `oc-chip`,
+// not a new grammar: the chip is still one die's evidence and exactly one bit
+// changed — whether it is in play. The dress is the one this app already
+// owns for that bit, `.value-chip.discarded` on the felt and `.log-discarded`
+// in the log: strike the face, take the out-of-play tier. A player who has
+// read the log has already learned the row.
+//
+// IT CANNOT BE READ AS `oc-quiet`, in three channels at once — the answer
+// slot is the one that matters. Quiet's slot holds a DASH ('this die counted
+// and the chart has no word for it'); struck's holds a WORD naming the
+// mechanic that set it aside ('dropped' / 'rerolled' / 'not kept'). The
+// other two are the strike on the face and the dimmer tier. Copy and a
+// screen reader get `d6 1 dropped`, which is the whole fact — the same rule
+// that put a real '—' in the quiet slot rather than leaving it to CSS.
+//
+// AND `oc-solo` COUNTS READINGS, NOT CHIPS. `1d20 adv` is two physical d20s
+// with one struck: keying the hero scale off chip count would have dropped
+// the most common Soul Deal advantage roll from a 26px verdict word to a
+// 15px one, silently, as a side effect of showing the die it discards.
 function renderOutcomeRows(el, entry, key = false) {
   el.textContent = '';
   const outcomes = entryOutcomes(entry);
@@ -5805,7 +5845,7 @@ function renderOutcomeRows(el, entry, key = false) {
   for (const g of groups) {
     const row = document.createElement('div');
     row.className = 'tally-group outcome-row';
-    if (outcomes.length === 1) row.classList.add('oc-solo');
+    if (outcomes.filter((o) => !o.struck).length === 1) row.classList.add('oc-solo');
     const sw = srcSwatch(colors, g.label);
     // A loose group inside a keyed ledger still gets a label cell — holding
     // nothing but its ivory dot — so the spine stays a spine and the one row
@@ -5820,15 +5860,37 @@ function renderOutcomeRows(el, entry, key = false) {
     }
     const cell = document.createElement('span');
     cell.className = 'oc-cell';
-    const worded = tallyOutcomes(g.os).length > 0;
+    // The quiet grammar is a question about the dice that SPOKE: a pool
+    // whose only wordless dice are struck ones is not a quiet pool.
+    const reading = g.os.filter((o) => !o.struck);
+    const worded = tallyOutcomes(reading).length > 0;
     for (const o of g.os) {
       const chip = document.createElement('span');
-      chip.className = 'oc-chip' + (o.word ? ` oc-b-${o.tier}` : ' oc-quiet');
+      chip.className = 'oc-chip' + (o.struck ? ' oc-struck'
+        : o.word ? ` oc-b-${o.tier}` : ' oc-quiet');
       const ev = document.createElement('span');
       ev.className = 'oc-die';
       ev.textContent = `${o.type} ${o.value}`; // the evidence, in the text layer
+      // An explosion child rides the die it came from (meanings.js): it is
+      // more of that die, not a die of its own, so it joins the EVIDENCE and
+      // never the answer slot. Inside `.oc-die` on purpose — that span is the
+      // nowrap unit, so a face never separates from the die it belongs to.
+      for (const v of o.children || []) {
+        const kid = document.createElement('span');
+        kid.className = 'oc-boom';
+        kid.textContent = ` ✴${v}`; // real text: copy reads the explosion too
+        ev.appendChild(kid);
+      }
       chip.appendChild(ev);
-      if (o.word) {
+      if (o.struck) {
+        // The answer slot names the MECHANIC instead of a reading — the one
+        // channel that makes this un-confusable with a quiet die's dash.
+        chip.append(' ');
+        const why = document.createElement('span');
+        why.className = 'oc-why';
+        why.textContent = STRUCK_WORDS[o.struck] || 'struck';
+        chip.appendChild(why);
+      } else if (o.word) {
         chip.append(' ');
         const w = document.createElement('span');
         w.className = `oc-word tier-${o.tier}`;
@@ -5844,7 +5906,11 @@ function renderOutcomeRows(el, entry, key = false) {
       cell.appendChild(chip);
       cell.append(' '); // copyable separator (flex ignores whitespace boxes)
     }
-    if (!worded) {
+    // …and `reading.length` guards it: a pool whose dice were ALL struck
+    // (`2d6[Might]+1d6[Zeal] dl2` can drop both Might dice) would otherwise
+    // be called quiet, which claims the chart had nothing to say about dice
+    // it was never asked about.
+    if (!worded && reading.length) {
       const q = document.createElement('span');
       q.className = 'tally-quiet';
       q.textContent = 'quiet'; // the pool's answer IS the silence (§7.9)
@@ -12949,6 +13015,49 @@ window.__diceDebug = {
       foot: read(holder.querySelector('.banner-foot')),
       reroll: read(holder.querySelector('.pk-strip')),
     };
+  },
+  // WHAT A PER-DIE SURFACE IS ACTUALLY SHOWING (§1). Read back off the
+  // RENDERED chips, never off outcomesFor — the bug this hook exists to catch
+  // lived between the two: the profile knew about the dropped die all along
+  // and one line in it stopped every surface from drawing one. A scenario
+  // asserting "four dice, one struck" has to fail when the RENDER loses a
+  // die, not only when the model does.
+  // `surface` is 'banner' | 'verdict' | 'peek', matching cardActs above. The
+  // strike and the dim come back as COMPUTED style rather than class names
+  // (§7.21's lesson): a class that stopped resolving to a dress is exactly
+  // the regression a class-name assertion cannot see.
+  outcomeRows(surface) {
+    const el = document.querySelector(
+      surface === 'verdict' ? '#verdict-hero'
+      : surface === 'peek' ? '#peek-card .pk-total'
+      : '#result-meaning');
+    if (!el) return null;
+    return [...el.querySelectorAll('.outcome-row')].map((row) => ({
+      src: (row.querySelector('.tally-src') || { textContent: '' }).textContent.trim(),
+      solo: row.classList.contains('oc-solo'),
+      quiet: !!row.querySelector('.tally-quiet'),
+      chips: [...row.querySelectorAll('.oc-chip')].map((c) => {
+        const ev = c.querySelector('.oc-die');
+        const word = c.querySelector('.oc-word');
+        const why = c.querySelector('.oc-why');
+        const evStyle = ev ? getComputedStyle(ev) : null;
+        return {
+          // the base die's own evidence, with any ✴ children split back out
+          die: ev ? ev.textContent.replace(/\s*✴\d+/g, '').trim() : '',
+          children: ev ? [...ev.querySelectorAll('.oc-boom')]
+            .map((k) => Number(k.textContent.replace(/\D/g, ''))) : [],
+          word: word ? word.textContent : null,
+          why: why ? why.textContent : null,
+          struck: !!why || c.classList.contains('oc-struck'),
+          dash: !!c.querySelector('.oc-dash'),
+          // the READ, not the class: strike-through and the out-of-play tier
+          line: evStyle ? evStyle.textDecorationLine : '',
+          opacity: getComputedStyle(c).opacity,
+          // the whole chip as copy/paste and a screen reader get it
+          text: c.textContent.replace(/\s+/g, ' ').trim(),
+        };
+      }),
+    }));
   },
   setChipsVisible(on) { setChips(on); return chipsOn; },
   get chipCount() { return chips.length; },
