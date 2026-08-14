@@ -5756,6 +5756,28 @@ export const scenarios = [
       // (iii) The log's button says which thing it clears.
       assert.equal(await a.eval(`document.getElementById('clear-log').textContent`),
         'Clear history', 'the log button names its own scope');
+
+      // (iv) …AND THE OTHER HALF OF ITS SCOPE, WHICH IS THE PERMANENT ONE
+      // (C14). Two different scopes ride this one button: the list is emptied
+      // LOCALLY (online the server owns the log and the next reconnect hands
+      // every row back), while every put-away roll is cleared THROUGH THE
+      // SERVER — permanently, for everyone at the table, and they need not be
+      // yours. The label named neither. With nothing put away the word must
+      // stay off, or it would promise a reach the press does not have.
+      assert.ok(!(await a.dbg('record')).clearLabel.includes('for everyone'),
+        'with an empty record the button claims no reach beyond this browser');
+      for (const label of ['Kept one', 'Kept two']) {
+        await a.roll(`2d6 # ${label}`);
+        const rid = await a.rollId();
+        await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
+      }
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.length === 2)`,
+        { desc: 'two rolls are put away' });
+      const label = (await a.dbg('record')).clearLabel;
+      assert.ok(label.includes('clears 2 for everyone'),
+        `the button counts what it will reach past this browser (got ${JSON.stringify(label)})`);
+      assert.ok(label.startsWith('Clear history'),
+        `while still naming the thing it is (got ${JSON.stringify(label)})`);
     },
   },
 
@@ -15322,6 +15344,313 @@ export const scenarios = [
       const names = (await p.dbg('profiles.list')).map((x) => x.name);
       assert.ok(names.includes('Bo'), `and it is theirs now (got ${JSON.stringify(names)})`);
       assert.ok(names.length >= 2, 'beside whatever they already had — nothing was overwritten');
+    },
+  },
+
+  // ---- C25 Stage 2 + C14 · the record, and finding a roll in it ----------
+  //
+  // Stage 1 took the shelf off the felt and deliberately left one thing worse:
+  // with the log closed, a put-away roll had NO ambient presence at all. The
+  // count it did have lived in a `title` and in a debug hook — and the ≣'s
+  // `aria-label` was the static string "Roll log", which OUTRANKS `title` in
+  // the accessible-name algorithm, so the one channel the count had was the
+  // one channel a screen reader ignores. A scenario asserting on a badge
+  // number would have been green through all of it.
+  {
+    name: 'record-at-rest',
+    tags: ['log', 'shelf', 'chrome', 'cuj9'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: a count nobody can perceive. The assertion is on
+    // `spoken` — the ≣ button's COMPUTED accessible name — because that is the
+    // channel the defect lived in, and because a spine of coloured ranks and a
+    // spoken sentence are the same fact at two scales. `spine` and `panels` are
+    // element counts off the rendered DOM for the same reason: a record that
+    // knows about five rolls and draws none of them is the failure this
+    // surface exists to undo.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.47', name: 'Ada' });
+      assert.equal((await a.dbg('logFlyout')).open, false,
+        'the flyout starts CLOSED — that is the state with the defect in it');
+
+      for (const n of ['one', 'two', 'three', 'four']) await a.roll(`2d6 # ${n}`);
+      await a.settle();
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.length === 3)`,
+        { desc: 'three finished rolls tidy themselves away' });
+
+      const rec = await a.dbg('record');
+      assert.equal((await a.dbg('logFlyout')).open, false, 'and the panel is still shut');
+      assert.ok(rec.spoken.includes('3 rolls put away'),
+        `the closed rail SAYS what the record holds (got ${JSON.stringify(rec.spoken)})`);
+      assert.ok(rec.spoken.includes('3 new since you looked'),
+        `and how much of it is new (got ${JSON.stringify(rec.spoken)})`);
+      assert.ok(rec.spoken.startsWith('Roll log'),
+        `still named, not replaced by its own count (got ${JSON.stringify(rec.spoken)})`);
+      // THE SPINE IS DRAWN, not merely known: one rank per put-away roll.
+      assert.equal(rec.spine, 3, 'three ranks on the closed scale');
+      assert.deepEqual(rec.ranks.map((r) => r.unread), [true, true, true],
+        'all three arrived while nobody was looking');
+
+      // OPENING THE PANEL IS THE READING. Not a badge driven to zero — the
+      // ranks persist and dim; history is reference, not an inbox.
+      await a.dbg('setLogFlyout(true)');
+      await a.waitFor(`window.__diceDebug.record.ranks.every((r) => !r.unread)`,
+        { desc: 'looking is what marks them read' });
+      const open = await a.dbg('record');
+      assert.equal(open.panels, 3, 'the open scale draws the same three, as panels');
+      assert.equal(open.spine, 3, 'and the spine does not empty — it dims');
+      assert.ok(!open.spoken.includes('new since you looked'),
+        `nothing is new any more (got ${JSON.stringify(open.spoken)})`);
+      assert.ok(open.spoken.includes('3 rolls put away'), 'while the count itself persists');
+      assert.deepEqual(open.ranks.map((r) => r.rank), [1, 2, 3], 'ranked oldest to newest');
+      assert.deepEqual(open.ranks.map((r) => r.readout), ['one', 'two', 'three'],
+        'and a per-die system reads each panel by what the roll was CALLED — '
+        + 'insisting on a total would print an em dash on every roll of the default profile');
+      await a.dbg('setLogFlyout(false)');
+    },
+  },
+  {
+    name: 'record-awaiting',
+    tags: ['log', 'shelf', 'visibility', 'cuj9', 'cuj10'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: `awaiting` is sharper than `hidden`, and the sharpness
+    // is the whole point — a roll you have no authority to reveal is not
+    // waiting on YOU. The retired marker wrote "— hidden" into its aria-label
+    // and NOWHERE else, so a screen-reader user was told which put-away roll
+    // awaited its reveal and a sighted player was not. Both channels carry it
+    // now, and the second tab is what proves the distinction is real rather
+    // than a rename: same roll, same record, `hidden` true on both, `awaiting`
+    // true on exactly one.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.48', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.49', name: 'Bram' });
+
+      await a.roll('d20 held # Behind the screen');
+      const held = await a.rollId();
+      await b.waitFor(shroudSettled(held), { desc: 'the shroud reaches Bram' });
+      // A second roll retires the first into the record.
+      await a.roll('2d6 # After');
+      await a.settle();
+      for (const [t, who] of [[a, 'Ada'], [b, 'Bram']]) {
+        await t.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.length === 1)`,
+          { desc: `the held roll is in ${who}'s record` });
+      }
+
+      const ra = (await a.dbg('record')).ranks;
+      assert.equal(ra.length, 1, 'one roll in the record');
+      assert.equal(ra[0].rollId, held, 'and it is the held one');
+      assert.equal(ra[0].hidden, true, 'the roller cannot read their own held roll either');
+      assert.equal(ra[0].awaiting, true, 'but it is waiting on THEM');
+      assert.equal(ra[0].readout, '?', 'so the panel reads ?, not a number it does not have');
+      assert.equal((await a.dbg('record')).ranks.filter((r) => r.awaiting).length, 1,
+        'exactly one thing is waiting to be revealed');
+      assert.ok((await a.dbg('record')).spoken.includes('1 waiting to be revealed'),
+        `and the closed rail says so out loud (got ${JSON.stringify((await a.dbg('record')).spoken)})`);
+
+      const rb = (await b.dbg('record')).ranks;
+      assert.equal(rb[0].rollId, held, 'the same roll is in the bystander’s record');
+      assert.equal(rb[0].hidden, true, 'still hidden for him');
+      assert.equal(rb[0].awaiting, false,
+        'and NOT waiting on him — he has no authority to reveal it');
+      assert.ok(!(await b.dbg('record')).spoken.includes('waiting'),
+        `so his rail does not ask him for something he cannot do `
+        + `(got ${JSON.stringify((await b.dbg('record')).spoken)})`);
+
+      // The reveal clears it on both, from the one seat that holds it.
+      await a.dbg(`reveal(${JSON.stringify(held)})`);
+      for (const [t, who] of [[a, 'Ada'], [b, 'Bram']]) {
+        await t.waitFor(`(window.__diceDebug.sim(240),
+          window.__diceDebug.record.ranks.every((r) => !r.hidden && !r.awaiting))`,
+        { desc: `the record stops withholding for ${who}` });
+        assert.notEqual((await t.dbg('record')).ranks[0].readout, '?',
+          `${who}'s panel now carries the roll's own read`);
+      }
+    },
+  },
+  {
+    name: 'record-find',
+    tags: ['log', 'shelf', 'visibility', 'cuj9', 'cuj10'],
+    timeout: 150000,
+    // WHAT THIS CATCHES — two things, and the second is a goal-11 leak with a
+    // text box in front of it.
+    //
+    // (1) A FILTER IS A CLAIM ABOUT WHAT THE LIST IS SHOWING, so an ARRIVAL has
+    //     to be judged by it. Otherwise the one row that ignores the filter is
+    //     the newest one, which is the row a player is most likely to be
+    //     looking at.
+    // (2) THE FILTER MATCHES ON A TOTAL — and a hidden roll's total is a number
+    //     nobody at that seat may see. A filter that matched it would answer a
+    //     question the card refuses, by the oldest trick there is: type a guess
+    //     and watch what survives.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.50', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.51', name: 'Bram' });
+      const c = await ctx.newTable({ origin: '127.0.0.52', name: 'Cass' });
+      for (const t of [b, c]) {
+        await t.waitFor(`window.__diceDebug.players.length === 3`, { desc: 'three seats' });
+      }
+      // A totals system, because a total is the thing being protected here.
+      for (const t of [a, b, c]) await t.dbg(`setSystem('dnd')`);
+      for (const t of [a, b, c]) {
+        await t.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'totals lens' });
+      }
+      for (const t of [a, b, c]) await t.dbg('setLogFlyout(true)');
+
+      // ---- (1) the arrival is judged by the filter ------------------------
+      await a.roll('2d6 # Errand');
+      await a.roll('2d6 # Digging');
+      await a.settle();
+      assert.equal(await a.dbg(`setLogFind('errand')`), 'errand', 'the query lands lowercased');
+      assert.equal((await a.dbg('logFind')).shown, 1, 'one of two rows survives it');
+      await a.roll('2d6 # Unrelated');
+      await a.settle();
+      assert.equal((await a.dbg('logFind')).total, 3, 'a third roll is in the log');
+      assert.equal((await a.dbg('logFind')).shown, 1,
+        'and the filter judged it on arrival — the newest row is not exempt');
+      assert.ok((await a.dbg('logFind')).note.includes('1 of 3'),
+        `and the count says so (got ${JSON.stringify((await a.dbg('logFind')).note)})`);
+      await a.dbg(`setLogFind('')`);
+      assert.equal((await a.dbg('logFind')).shown, 3, 'clearing it shows everything again');
+
+      // ---- (2) a hidden total is not searchable ---------------------------
+      // A whisper: Cass may read it, Bram may not. Bram's log holds exactly one
+      // row, so "did the filter match" needs no disambiguation at all.
+      await b.waitFor(`(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount === 3 && !window.__diceDebug.busy)`,
+        { desc: 'the three open rolls reach Bram' });
+      await a.roll('4d10 w:Cass # For Cass');
+      const whisper = await a.rollId();
+      await c.waitFor(`(window.__diceDebug.sim(120), (window.__diceDebug.entryState(${JSON.stringify(whisper)}) || {}).hidden === false)`,
+        { desc: 'the audience reads it' });
+      await b.waitFor(`(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(whisper)}))`,
+        { desc: 'the bystander learns it happened' });
+      await b.settle();
+      const total = (await c.entryState(whisper)).total;
+      assert.equal(typeof total, 'number', 'the audience has a real number to search for');
+      assert.equal((await b.entryState(whisper)).total, null, 'and the bystander has none');
+
+      // THE POSITIVE CONTROL FIRST: a readable total IS searchable, or the
+      // negative below proves nothing.
+      await c.dbg(`setLogFind(${JSON.stringify(String(total))})`);
+      assert.ok((await c.dbg('logFind')).shown >= 1,
+        `the audience can find their own roll by its total (${total})`);
+
+      // THE NEGATIVE. Bram's whisper row must not answer to the number.
+      await b.dbg(`setLogFind(${JSON.stringify(String(total))})`);
+      const hit = await b.eval(`(() => {
+        const row = document.querySelector('#log-list .log-entry[data-roll-id="'
+          + ${JSON.stringify(whisper)} + '"]');
+        return row ? !row.classList.contains('log-filtered') : null;
+      })()`);
+      assert.equal(hit, false,
+        `guessing the total does not reveal that the guess was right (${total})`);
+      // …while the fields goal 11 DOES allow still match the same row.
+      await b.dbg(`setLogFind('ada')`);
+      const byName = await b.eval(`(() => {
+        const row = document.querySelector('#log-list .log-entry[data-roll-id="'
+          + ${JSON.stringify(whisper)} + '"]');
+        return row ? !row.classList.contains('log-filtered') : null;
+      })()`);
+      assert.equal(byName, true,
+        'the roller’s name is not a secret, so the shrouded row is still findable');
+      for (const t of [a, b, c]) { await t.dbg(`setLogFind('')`); await t.dbg(`setSystem('soul-deal')`); }
+    },
+  },
+  {
+    name: 'peek-retires',
+    tags: ['log', 'shelf', 'chrome', 'cuj9'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: the peek closed on NOTHING a player expects — not a
+    // new roll, not a ceremony, not the log — while sitting at z 30 above all
+    // three. A card standing over the table for a roll two rolls ago is the
+    // same staleness a new roll retires the banner for, and it is how two cards
+    // came to wear `✕ Clear` for two different rolls with nothing marking which
+    // was live.
+    //
+    // Four legs, and the fourth is the one a naive "close it on everything"
+    // fix breaks: a card with its ± popover OPEN is being EDITED, and a new
+    // roll landing behind it must not pull the editor out from under the
+    // player's hands.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.53', name: 'Ada' });
+      const peekOpen = () => a.eval(
+        `!document.getElementById('peek-card').classList.contains('hidden')`);
+
+      const putAway = async (label) => {
+        await a.roll(`2d6 # ${label}`);
+        const rid = await a.rollId();
+        await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
+        await a.waitFor(`(window.__diceDebug.sim(240),
+          window.__diceDebug.record.ranks.some((r) => r.rollId === ${JSON.stringify(rid)}))`,
+        { desc: `'${label}' reaches the record` });
+        return rid;
+      };
+      const first = await putAway('First');
+      await a.dbg('setLogFlyout(true)');
+
+      // (i) A NEW ROLL RETIRES A STALE CARD…
+      assert.equal(await a.dbg(`peek(${JSON.stringify(first)})`), first, 'the card is up');
+      assert.equal(await peekOpen(), true, 'and on screen');
+      await a.roll('1d4 # Second');
+      await a.settle();
+      assert.equal(await a.dbg('peekState'), null,
+        'a new roll retires a card that was about an older one');
+      assert.equal(await peekOpen(), false, 'and it is gone from the screen, not merely forgotten');
+
+      // (ii) …BUT NOT THE ROLL'S OWN CARD. A reroll landing under its parent's
+      // card is not a stale card.
+      const own = await a.rollId();
+      await a.dbg(`collectRoll(${JSON.stringify(own)})`);
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.some(
+        (r) => r.rollId === ${JSON.stringify(own)}))`, { desc: 'Second is put away' });
+      assert.equal(await a.dbg(`peek(${JSON.stringify(own)})`), own, 'its own card is up');
+      await a.eval(`document.querySelector('#peek-card .pk-again').click()`);
+      await a.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy
+        && window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.rollId !== ${JSON.stringify(own)})`,
+      { desc: 'the reroll lands' });
+      await a.settle();
+
+      // (iii) A CEREMONY RAISES A LAYER OVER THE WHOLE TABLE, and the card must
+      // let go the moment that layer appears — every path that raises it (roll,
+      // offer claim, resync replay) converges on the one class this watches.
+      const third = await putAway('Third');
+      assert.equal(await a.dbg(`peek(${JSON.stringify(third)})`), third, 'the card is up again');
+      await a.dbg(`commandRoll('1d20 check # Steady')`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(30), ['declare','tumble'].includes((window.__diceDebug.ceremonyState || {}).phase))`,
+        { desc: 'the ceremony declares' });
+      assert.equal(await peekOpen(), false, 'the card let go when the ceremony rose over it');
+      await a.waitFor(`(window.__diceDebug.skipCeremony(), window.__diceDebug.sim(60),
+        (window.__diceDebug.ceremonyState || {}).phase === 'done')`, { desc: 'ceremony done' });
+      await a.dbg('retireCeremony()');
+      await a.settle();
+
+      // (iv) THE CARD GOES WITH THE LOG. It anchors to a row inside that panel,
+      // so closing the panel takes its anchor away — a card floating over the
+      // felt with a ✕ that acts on a roll you can no longer see is worse than
+      // no card.
+      assert.equal(await a.dbg(`peek(${JSON.stringify(third)})`), third, 'up once more');
+      await a.dbg('setLogFlyout(false)');
+      assert.equal(await a.dbg('peekState'), null, 'closing the record closes the card');
+
+      // (v) A PINNED ± POPOVER IS AN EDITOR, AND A NEW ROLL MUST NOT TAKE IT.
+      // The peek pins while its own popover lives; closePeek returns early on
+      // a pinned card precisely so this leg is true. Without it, "retire the
+      // card on every new roll" would be a fix that closes an open editor
+      // mid-keystroke every time somebody else at the table rolls.
+      await a.dbg('setLogFlyout(true)');
+      await a.dbg(`peek(${JSON.stringify(third)})`);
+      await a.eval(`document.querySelector('#log-list .log-entry.collected')
+        .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`);
+      await a.waitFor(`window.__diceDebug.popover.open === true`,
+        { desc: 'the card’s ± popover opens' });
+      assert.equal(await peekOpen(), true, 'with the card standing as its anchor');
+      await a.roll('1d4 # Interrupting');
+      await a.settle();
+      assert.equal(await a.dbg('popover.open'), true,
+        'a roll landing behind an open editor does NOT close it');
+      assert.equal(await peekOpen(), true, 'nor the card it is anchored to');
+      await a.dbg('closePopover()');
+      await a.dbg('peek(null)');
+      await a.dbg('setLogFlyout(false)');
     },
   },
 ];
