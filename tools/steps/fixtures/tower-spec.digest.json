@@ -1,0 +1,368 @@
+{
+  "state": {
+    "zoom": "medium",
+    "socket": "none"
+  },
+  "towers": {
+    "none": {
+      "hash": "74234e98afe7498f",
+      "spec": null
+    },
+    "heartwood": {
+      "hash": "947778ad40ab6bfd",
+      "spec": {
+        "derived": {
+          "S": 1.25,
+          "cls": {
+            "cladY": -0.5,
+            "flushProud": 0.06,
+            "footDipY": -0.15,
+            "gateHiY": 6.6,
+            "gateLoY": 3.4,
+            "gladeDepth": 8,
+            "lipSplitZ": 2,
+            "reachLoY": 4.4
+          },
+          "cowlY": [
+            5.4,
+            6.75,
+            8.1
+          ],
+          "despawnY": 7,
+          "door": {
+            "h": 4.5,
+            "sill": 1,
+            "w": 5
+          },
+          "exit": {
+            "pRelZ0": [
+              0,
+              2.875,
+              -0.875
+            ],
+            "pitch": -0.48996
+          },
+          "eye": {
+            "dx": 0,
+            "dy": 0
+          },
+          "hidZone": 0.6,
+          "lipFrontDz": 3.9,
+          "rimY": 8.75
+        },
+        "id": "heartwood",
+        "limits": {
+          "in": {
+            "clearRMin": 2,
+            "rimY": [
+              7.25,
+              10.25
+            ],
+            "x": [
+              -1.25,
+              1.25
+            ],
+            "z": [
+              -3.25,
+              -1.25
+            ]
+          },
+          "out": {
+            "clearHMin": 3.375,
+            "sillY": [
+              0.625,
+              1.375
+            ],
+            "wMin": 4,
+            "x": [
+              -0.75,
+              0.75
+            ]
+          }
+        },
+        "portals": {
+          "in": {
+            "clearR": 2.125,
+            "rimY": 8.75,
+            "x": 0,
+            "z": -2
+          },
+          "out": {
+            "clearH": 4.5,
+            "sillY": 1,
+            "w": 5,
+            "x": 0
+          }
+        },
+        "source": "default"
+      }
+    },
+    "bastion": {
+      "hash": "fa859e037c1a01ac",
+      "spec": {
+        "derived": {
+          "S": 1.25,
+          "cls": {
+            "cladY": -0.5,
+            "flushProud": 0.06,
+            "footDipY": -0.15,
+            "gateHiY": 6.6,
+            "gateLoY": 3.4,
+            "gladeDepth": 8,
+            "lipSplitZ": 2,
+            "reachLoY": 4.4
+          },
+          "cowlY": [
+            5.4,
+            6.75,
+            8.1
+          ],
+          "despawnY": 7,
+          "door": {
+            "h": 4.5,
+            "sill": 1,
+            "w": 5
+          },
+          "exit": {
+            "pRelZ0": [
+              0,
+              2.875,
+              -0.875
+            ],
+            "pitch": -0.48996
+          },
+          "eye": {
+            "dx": 0,
+            "dy": 0
+          },
+          "hidZone": 0.6,
+          "lipFrontDz": 3.9,
+          "rimY": 8.75
+        },
+        "id": "bastion",
+        "limits": {
+          "in": {
+            "clearRMin": 2,
+            "rimY": [
+              7.25,
+              10.25
+            ],
+            "x": [
+              -1.25,
+              1.25
+            ],
+            "z": [
+              -3.25,
+              -1.25
+            ]
+          },
+          "out": {
+            "clearHMin": 3.375,
+            "sillY": [
+              0.625,
+              1.375
+            ],
+            "wMin": 4,
+            "x": [
+              -0.75,
+              0.75
+            ]
+          }
+        },
+        "portals": {
+          "in": {
+            "clearR": 2.125,
+            "rimY": 8.75,
+            "x": 0,
+            "z": -2
+          },
+          "out": {
+            "clearH": 4.5,
+            "sillY": 1,
+            "w": 5,
+            "x": 0
+          }
+        },
+        "source": "default"
+      }
+    },
+    "blackanvil": {
+      "hash": "cafb33c5cad9ecd2",
+      "spec": {
+        "derived": {
+          "S": 1.25,
+          "cls": {
+            "cladY": -0.5,
+            "flushProud": 0.06,
+            "footDipY": -0.15,
+            "gateHiY": 6.6,
+            "gateLoY": 3.4,
+            "gladeDepth": 8,
+            "lipSplitZ": 2,
+            "reachLoY": 4.4
+          },
+          "cowlY": [
+            5.4,
+            6.75,
+            8.1
+          ],
+          "despawnY": 7,
+          "door": {
+            "h": 4.5,
+            "sill": 1,
+            "w": 5
+          },
+          "exit": {
+            "pRelZ0": [
+              0,
+              2.875,
+              -0.875
+            ],
+            "pitch": -0.48996
+          },
+          "eye": {
+            "dx": 0,
+            "dy": 0
+          },
+          "hidZone": 0.6,
+          "lipFrontDz": 3.9,
+          "rimY": 8.75
+        },
+        "id": "blackanvil",
+        "limits": {
+          "in": {
+            "clearRMin": 2,
+            "rimY": [
+              7.25,
+              10.25
+            ],
+            "x": [
+              -1.25,
+              1.25
+            ],
+            "z": [
+              -3.25,
+              -1.25
+            ]
+          },
+          "out": {
+            "clearHMin": 3.375,
+            "sillY": [
+              0.625,
+              1.375
+            ],
+            "wMin": 4,
+            "x": [
+              -0.75,
+              0.75
+            ]
+          }
+        },
+        "portals": {
+          "in": {
+            "clearR": 2.125,
+            "rimY": 8.75,
+            "x": 0,
+            "z": -2
+          },
+          "out": {
+            "clearH": 4.5,
+            "sillY": 1,
+            "w": 5,
+            "x": 0
+          }
+        },
+        "source": "default"
+      }
+    },
+    "hollowbole": {
+      "hash": "c0bf8912ffd27888",
+      "spec": {
+        "derived": {
+          "S": 1.25,
+          "cls": {
+            "cladY": -0.5,
+            "flushProud": 0.06,
+            "footDipY": -0.15,
+            "gateHiY": 7.25,
+            "gateLoY": 2.4,
+            "gladeDepth": 8,
+            "lipSplitZ": 2,
+            "reachLoY": 3.4
+          },
+          "cowlY": [
+            6.05,
+            7.4,
+            8.75
+          ],
+          "despawnY": 7.65,
+          "door": {
+            "h": 3.5,
+            "sill": 1,
+            "w": 4.2
+          },
+          "exit": {
+            "pRelZ0": [
+              0,
+              2.875,
+              -0.875
+            ],
+            "pitch": -0.48996
+          },
+          "eye": {
+            "dx": 0,
+            "dy": 0.65
+          },
+          "hidZone": 0.6,
+          "lipFrontDz": 3.9,
+          "rimY": 9.4
+        },
+        "id": "hollowbole",
+        "limits": {
+          "in": {
+            "clearRMin": 2,
+            "rimY": [
+              7.25,
+              10.25
+            ],
+            "x": [
+              -1.25,
+              1.25
+            ],
+            "z": [
+              -3.25,
+              -1.25
+            ]
+          },
+          "out": {
+            "clearHMin": 3.375,
+            "sillY": [
+              0.625,
+              1.375
+            ],
+            "wMin": 4,
+            "x": [
+              -0.75,
+              0.75
+            ]
+          }
+        },
+        "portals": {
+          "in": {
+            "clearR": 2.2,
+            "rimY": 9.4,
+            "x": 0,
+            "z": -2.55
+          },
+          "out": {
+            "clearH": 3.5,
+            "sillY": 1,
+            "w": 4.2,
+            "x": 0
+          }
+        },
+        "source": "model"
+      }
+    }
+  }
+}

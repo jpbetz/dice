@@ -7,7 +7,14 @@ it can never touch the live table on 8123.
 
 ```bash
 node tools/drive.mjs tools/steps/<step>.mjs [args…]
+node tools/drive.mjs --steps a.mjs,b.mjs,c.mjs [args…]   # one stage, many steps
 ```
+
+`--steps` runs a CHAIN against a single stage: one server boot, one Chrome
+launch, every step run even after one of them fails, and a non-zero exit if
+any did. Each step gets its **own room** over that shared browser — tower,
+zoom and felt are room settings, and a step joining the room the last one
+left behind would grade whatever it was wearing.
 
 A step file default-exports `async (stage, args) => { … }`:
 
@@ -26,6 +33,46 @@ Canned steps:
 
 Add new step files here (Apache header, like everything first-party) rather
 than writing one-off inline scripts — repeatable work belongs in the repo.
+
+## The tower steps
+
+There are a dozen of them and until now this file indexed none, so "which
+proofs does my change owe?" was answered by reading `ls`. Each row says what
+the step COSTS — whether it **measures** the built world (geometry, counts,
+projection: seconds, deterministic) or **simulates** dice (a pour per case:
+tens of seconds, and the only reason to spend it is a change that could move
+physics) — and which class of change should trigger it.
+
+**A cosmetic change never needs a simulation.** A tower model is theatre over
+invisible engine colliders and portals; physics and the pour film are a
+function of (portal spec, engine constants, seed) and nothing else. So a
+mesh-only edit owes the measuring steps and the LOOK sheets, and owes the
+simulating ones NOTHING — `tower-spec-digest` is what turns that from a claim
+into a check.
+
+```bash
+npm run gate:cosmetic -- <tower>     # the whole measuring set + model sheets
+```
+
+| step | what it answers | COST | run it when |
+| --- | --- | --- | --- |
+| `tower-spec-digest.mjs [--write]` | do the eight portal numbers (and the core the engine derives from them) still hash to what was committed, per tower | **measures** — no dice, no browser work beyond reading a hook | **every** tower change: it is the proof that a cosmetic change was cosmetic. `--write` re-pins and is not a way to go green |
+| `tower-fit.mjs [tower…]` | does the model sit inside the socket (every overrun a named legal class), and did the skin add colliders or lights | **measures** the built mesh + the world's body list | a new or re-baked model, new dressing, a change to the audit's classes |
+| `tower-occlusion.mjs [tower]` | is the shaft and the cowl band hidden at all six shipped eyes; which exit/hood sightlines the declared doorway does not explain | **measures** — raycasts against the built skin | anything that moves the silhouette: a re-bake, a lining, a curtain, a portal |
+| `tower-dress.mjs [tower…]` | triangles, draw calls, sways, ember, lights per group against the dressing budget | **measures** | dressing added, merged or retired |
+| `tower-shots.mjs [tower] [seed]` | the model from four look-only eyes plus a lab pour, for a human | **looks** (+ a lab pour, offline) | any visual change to a skin |
+| `dress-look.mjs [tower]` | does each prop earn its triangles, with the subject located and its on-screen size printed | **looks** + **measures** (projection) | dressing changes; a prop moved or retired |
+| `tower-room-shots.mjs [tower]` | the same tower from the PLAYER's cameras, across the zoom ladder and a real pour | **looks** + **simulates** (three pours) | camera/framing changes, a venue change, the first review of a new model |
+| `tower-family-shots.mjs [tower] [sibling…]` | does it belong to the family — the same idle frame of every model | **looks** + **simulates** (one pour) | a new model, or a family-wide material/lighting change |
+| `hollow-look.mjs [tower]` / `glade-look.mjs [probe]` | the Hollow Bole and the glade under both palettes, in the venue they actually live in | **looks** + **simulates** | changes to hollowbole, the fae palettes, or the venue |
+| `tower-lantern-ab.mjs [tower…]` | does the raking lantern wake the baked normals; does the ember warm the tray | **looks** | lighting, lantern or ember changes |
+| `tower-resting-eye.mjs [tower]` | the camera rests on the tower on an empty felt, hands the frame back when dice land, and the towerless table is unchanged | **simulates** (one roll) | camera/framing changes; a new model inherits it free |
+| `tower-probe.mjs [n] [seed] [secs] [tower]` | the lab pour, die by die: delivered, parked, hidden, rescues, every collision | **simulates** | engine/collider/pour changes. A cosmetic change must leave this IDENTICAL — that is the claim, not the gate |
+| `tower-pour.mjs ["pools"] [tower]` | the SHIPPED film: exit-guarantee bakes, hidden windows, clunks, per pool | **simulates** (a pour per pool) | pour, tempo, audio-film or exit-guarantee changes |
+| `portal-probe.mjs baseline\|sweep` | what dice actually use of a portal, and where the physics pushes back below the floors | **simulates**, heavily (the floors campaign) | changing `TOWER_PORTAL_LIMITS` — and nothing else |
+| `tower-contract-capture.mjs` | re-captures `tests/e2e/fixtures/tower-contract.golden.json` | **measures**, and WRITES a golden | only a deliberate renegotiation of the engine contract; never to fix a red freeze |
+| `engine-contract.mjs` | emits `tools/forge/engine_contract.json` — the constants the forge tools must stop re-typing | **measures**, and WRITES the file | an engine constant, volume or limit moved |
+| `dress-bake-ab.mjs [--redcheck]` | byte-identity of a kit's baked canvases across a refactor | **measures** (canvas compare) | a bake function moved or was re-plumbed |
 
 ## Contact sheets (2i-F)
 
