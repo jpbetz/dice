@@ -3123,6 +3123,25 @@ def assert_cowl_occluded(objs):
           f"{len(TG.ENGINE_MIRROR['zoomEyes'])} shipped eyes")
 
 
+def assert_front_carries_the_dark(objs):
+    """A die vanishes INSIDE the stump, never in mid-air over it.
+
+    ARMED 2026-08-14, and the reason it was not is worth keeping: the gate
+    wanted a scalar `front_top`, a slab tower's honest answer (nullstone hands
+    over cleave_y(0, 0)) and a torn stump's impossible one. So this recipe
+    quietly never called it, and the strongest claim about a shipped tower
+    went unmade for weeks while every other gate was green — the same shape as
+    every other entry in this file's history, an unarmed gate reading exactly
+    like a passing one.
+
+    `front_top=None` makes the gate MEASURE the sight line off the built
+    triangles instead, which is better evidence than the proxy ever was.
+    Measured here before arming (so this is a pin, not a hope): the worst eye
+    loses a die at y 9.975 against a mouth of 9.40 — 0.575 inside the stump.
+    """
+    K.gate_front_carries_the_dark(objs, SPEC, "bole", None)
+
+
 def assert_rim_is_low():
     tops = [y_top(-math.pi + 2 * math.pi * i / 720) for i in range(720)]
     lo, hi = min(tops), max(tops)
@@ -3967,6 +3986,7 @@ def build(variant):
     assert_curtain(curtain)
     assert_mesh_envelopes(shell, curtain, shelves)
     assert_cowl_occluded(meshes)
+    assert_front_carries_the_dark(meshes)
     assert_every_gate_ran()
 
     pin, pout = F.tower_portals(PORTAL_IN, PORTAL_OUT)

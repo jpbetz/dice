@@ -245,10 +245,40 @@ def gate_front_carries_the_dark(occluder_meshes, spec, tag, front_top):
                 f"ray reaches y {ct:.2f} on the bore axis unobstructed. The front "
                 f"has to be solid to y {need:.3f} (towerplan.py section 7) — and "
                 f"raising a decoration instead only moves the leak.")
-    if front_top < need:
+    # `front_top` IS OPTIONAL, AND FOR AN ORGANIC MODEL IT SHOULD BE ABSENT.
+    # It is a scalar standing in for "how tall the front is", which a slab
+    # tower can answer honestly (nullstone hands over cleave_y(0, 0)) and a
+    # torn stump cannot: hollowbole's front is a curved shell with a wound in
+    # it and there is no number in the recipe that means this. That is why the
+    # stump ran the whole battery for weeks with the front gate SKIPPED — the
+    # gate asked for a parameter the model could not produce, so the model
+    # simply did not call it, and no one noticed the strongest claim about a
+    # shipped tower was never being made.
+    #
+    # So when it is absent the die-vanish claim below is MEASURED off the
+    # built triangles instead of derived from the proxy. That is strictly the
+    # better evidence — it is the same ray the player's eye casts — and the
+    # scalar comparison is skipped rather than faked. The disc-wide coverage
+    # this loses is gate_occlusion's job (99 samples over the whole band); the
+    # bore axis is where the DIE is, which is what this claim is about.
+    if front_top is not None and front_top < need:
         raise RuntimeError(f"the front stands at {front_top:.2f}, under the "
                            f"binding sight line {need:.3f} from {eid_need} "
                            f"(towerplan.py section 7 prints both floors)")
+
+    def seen_to_at(eye):
+        """The highest point on the bore axis this eye cannot see. -> y or None."""
+        if front_top is not None:
+            return eye[1] + (front_top - eye[1]) * (eye[2] - pin["z"]) / eye[2]
+        y = pin["rimY"] + 4.0          # above any legal crown, so the answer is
+        floor_y = despawn_y(spec) - 0.5  # found rather than clipped by the search
+        o = np.array(eye, dtype=float)
+        while y > floor_y:
+            p = np.array([pin["x"], y, pin["z"]])
+            if ray_hit(tris, o, p - o, 0.999) is not None:
+                return y
+            y -= 0.005
+        return None
     # THE DIE-VANISH CLAIM, ASKED DIRECTLY — and its floor comes from the same
     # function the plan prints, never a second derivation. It used to be an
     # independent inequality here: `need` was the occlusion crossing alone, so
@@ -257,25 +287,30 @@ def gate_front_carries_the_dark(occluder_meshes, spec, tag, front_top):
     # over the published one. Keeping the direct check AND deriving the floor
     # from the shared arithmetic is the point: if they ever disagree, the
     # assertion below fires instead of a modeller's afternoon.
+    worst = None
     for eid, e in TG.shipped_eyes():
         floor = TG.front_vanish_floor(spec, e)
         if floor is None:
             continue
-        seen_to = e[1] + (front_top - e[1]) * (e[2] - pin["z"]) / e[2]
-        if seen_to < pin["rimY"]:
+        seen_to = seen_to_at(e)
+        if seen_to is None or seen_to < pin["rimY"]:
+            where = f"y {seen_to:.2f}" if seen_to is not None else "nowhere on the drop"
             raise RuntimeError(
                 f"the front hides the drop ABOVE the declared mouth: from {eid} a "
-                f"die is lost at y {seen_to:.2f}, mouth {pin['rimY']} — dice must "
+                f"die is lost at {where}, mouth {pin['rimY']} — dice must "
                 f"vanish inside a building, not in mid-air over it. The front has "
                 f"to reach y {floor:.3f} for this eye (towerplan.py section 7).")
-        assert front_top < floor or seen_to >= pin["rimY"] - 1e-9, (
-            f"front_vanish_floor and the direct check disagree at {eid}: floor "
-            f"{floor:.4f}, front {front_top:.3f}, seen_to {seen_to:.3f}")
-    eid, e = max(TG.shipped_eyes(), key=lambda p: p[1][1])
-    seen_to = e[1] + (front_top - e[1]) * (e[2] - pin["z"]) / e[2]
+        if worst is None or seen_to < worst[1]:
+            worst = (eid, seen_to)
+        if front_top is not None:
+            assert front_top < floor or seen_to >= pin["rimY"] - 1e-9, (
+                f"front_vanish_floor and the direct check disagree at {eid}: floor "
+                f"{floor:.4f}, front {front_top:.3f}, seen_to {seen_to:.3f}")
+    stands = f"a front at {front_top:.2f}" if front_top is not None \
+        else "a front measured off the built triangles"
     print(f"[{tag}] the mass carries the dark: binding sight line {need:.2f} "
-          f"({eid_need}) under a front at {front_top:.2f}; a die stays visible "
-          f"to y {seen_to:.2f}, mouth {pin['rimY']}")
+          f"({eid_need}) under {stands}; the worst eye ({worst[0]}) loses a die "
+          f"at y {worst[1]:.2f}, mouth {pin['rimY']}")
 
 
 def run_battery(meshes, spec, *, tag, tilt_deg=0.0, bare=(), x_lim, crown_max,

@@ -3343,6 +3343,18 @@ is approving a diff rather than remembering three files.
   model built to it passes. Cost: the stress fixture's crown 10.27 → 10.43,
   re-baked and re-pinned; nullstone re-bakes byte-identical (its front stands
   at 11.14) and every shipped tower was always above the true floor.
+  **The fix immediately found its own next instance:** hollowbole had NEVER
+  RUN this gate. It wanted a scalar `front_top`, which a slab tower can answer
+  honestly and a torn stump cannot, so the recipe quietly never called it —
+  the strongest claim about a shipped tower going unmade for weeks while
+  fourteen other gates were green, an unarmed gate reading exactly like a
+  passing one for the fourth time in this file. `front_top` is optional now
+  and the die-vanish claim is MEASURED off the built triangles when it is
+  absent, which is better evidence than the proxy ever was (it is the ray the
+  player's eye casts). Measured before arming: hollowbole's worst eye loses a
+  die at y 9.92 against a mouth of 9.40, so arming cost ZERO model change —
+  both variants re-bake with digests matching the baseline. Red-checked by
+  handing the gate the mushroom shelves instead of the shell.
 - **`tower-occlusion`'s SOLID exit/hood classification is still a printed
   report.** MEASURED while arming (a): the 18 points are THREE samples
   (x −0.9, 0, +0.9 at y 3.77, z −7.42) seen from six eyes, crossing the wall
