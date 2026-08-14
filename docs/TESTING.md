@@ -23,6 +23,15 @@ this document defines how we check them.
    browser cannot wait out three 20 s heartbeats. It lives here rather than in
    e2e for that reason alone — the browser half is the `seat-closed-tab`
    scenario.
+   `schema.test.mjs` is C22's versioning contract, and it is the suite whose
+   failure costs a real person their data: its centre is the literal bytes a
+   browser in the field is holding for `dice.profiles.v1` — **no version stamp
+   at all** — and the assertion that those still LOAD. Everything else there
+   guards the asymmetry (older data migrates, newer data refuses out loud),
+   which is easy to write backwards and impossible to notice once shipped.
+   It also pins the two deliberate copies of the version number: `js/report.js`
+   hard-codes it because a crash reporter that imported the module graph would
+   share the fate of the thing it reports on.
 2. **Fuzz** (`npm run test:fuzz`, ~1 s) — property-based notation fuzzing.
 3. **Scripted e2e** (`npm run test:e2e`, seconds) — headless Chrome driven
    over raw CDP by the zero-dependency harness in `tests/e2e/` (Node ≥ 22's
