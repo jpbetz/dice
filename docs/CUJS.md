@@ -99,10 +99,14 @@ listed to go back to.
 *Actor:* a table mid-session.
 **Done when:** a child table exists, is listed to the parent's players, and
 carries a way back.
-*Surfaces:* none yet.
-*Proof:* **none.**
-**OPEN** — ROADMAP `L4` holds the design. The only journey with no code and
-no scenario at all.
+*Surfaces:* `Split table…` (identity menu), `Breakouts ▾` and `↩ Main table`
+(the presence row), `POST /api/split`.
+*Proof:* **none yet** — the code shipped 2026-08-14 with its
+`__diceDebug.subtables` / `.split()` hooks and a server suite
+(`tests/subtables.test.mjs`), but the e2e scenarios are still owed.
+**CODE SHIPPED, SCENARIOS OPEN** — [UX §7.45](UX.md) is the spec (it decides
+the two questions ROADMAP `L4` left open); `L4` holds the sequencing. This was
+the only journey with no code at all until that pass.
 
 ### CUJ6 — "Before game night I want to build the characters."
 
@@ -250,8 +254,10 @@ many part-scenarios and no composed walk is still the gap **C1** names.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | scenarios | 4 | 5 | 10 | 1 | **0** | 16 | 6 | 32 | 17 | 14 | 1 | 6 | 6 |
 
-**CUJ5 is the zero** — sub-tables have no code and no test, as this file has
-said since it was written. **CUJ4 and CUJ11 are thin**: leaving a table and
+**CUJ5 is the zero** — and it is still zero in this table after 2026-08-14,
+but for a different reason than when it was measured: sub-tables now have code
+(UX §7.45) and a server suite, and what is missing is the e2e walk. **CUJ4 and
+CUJ11 are thin**: leaving a table and
 being present without rolling each rest on a single scenario, and neither has
 a composed walk.
 
@@ -297,7 +303,9 @@ Joe's call (2026-08-08): one journey covering 60% of the app cannot tell you
 what is missing, which is the failure being fixed. → **C1**.
 
 **B. CUJ5 has no code and no scenario.** Known (`L4`), listed here so the
-zero shows in the same table as everything else.
+zero shows in the same table as everything else. *(Half-closed 2026-08-14: the
+code shipped — UX §7.45, `POST /api/split`, `tests/subtables.test.mjs`. The
+scenario half stands.)*
 
 **C. CUJ13 is one-directional.** Export exists; restore does not. → **C2**.
 

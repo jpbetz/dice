@@ -13637,6 +13637,34 @@ window.__diceDebug = {
   // §7.20 per-seat link (what an unclaimed chair copies): base + &as=Name.
   // Null in the lobby, exactly as inviteUrl() is.
   seatInviteUrl(name) { return seatInviteUrl(name); },
+  // SUB-TABLES (§3b L4, CUJ5). One JSON projection of the whole feature's
+  // state, read from the SERVER's answer rather than from the DOM — `parent`
+  // and `children` are what the room says they are, so a scenario asserting on
+  // them is asserting that the split actually landed on the server, not that a
+  // button was drawn. The presence row's ghost is covered by `presenceRow`
+  // above, which is the right seam for the chrome half.
+  get subtables() {
+    return {
+      room: ROOM,
+      parent: roomParent ? { ...roomParent } : null,
+      children: roomChildren.map((c) => ({ ...c })),
+      // Whether the AUTHORING verb is on offer here — the one piece of this
+      // that is a judgment (lobby / solo / already a breakout all withhold it).
+      canSplit: !IN_LOBBY && netOnline && !roomParent,
+    };
+  },
+  // Drive the split without the menu — the same function the prompt's Create
+  // button calls, minus the navigation, so a scenario can read the parent's
+  // directory at the moment of truth and THEN walk into the breakout itself.
+  // It leaves the sessionStorage carry behind exactly as the real verb does,
+  // so navigating this tab to the returned key completes the journey (the
+  // child declares its parent and inherits the felt). Returns the minted key,
+  // or null if the server refused — the key is the door, so a scenario needs
+  // it handed back.
+  async split(name = '') {
+    const key = mintRoomKey(name);
+    return (await splitTable(key, name, { navigate: false })) ? key : null;
+  },
   get shroudedCount() { return tableDice.filter((d) => d.shrouded).length; },
   get revealingCount() { return revealing.length; },
   get pendingReveals() { return [...pendingReveals.keys()]; },
@@ -14900,6 +14928,16 @@ let poolsOwner = null;  // a player id, or null = your own rack
 // 'table-setup'. The §G5 seat picker reads profiles out of it after the
 // join; §G6's re-push compares its rev against the one this client pushed.
 let roomSetup = null;
+// SUB-TABLES (§3b L4, CUJ5). `roomParent` is {room, name} when THIS table is a
+// breakout of another — the way back — and null otherwise. `roomChildren` is
+// the breakouts running off this table, [{room, name, at}]. Both are seeded
+// from the join response, tracked on 'hello' (present-or-absent, so an absent
+// key means the room genuinely holds none) and on 'table-split'. Server-held
+// rather than client-remembered on purpose: the second player into a breakout
+// arrived by a link and knows nothing about where it came from, and one shared
+// truth (goal 8) is the whole point of holding it in the room.
+let roomParent = null;
+let roomChildren = [];
 // §11: the mismatch acknowledgement — set when the player has been told their
 // profile's system is not this table's and answered "Keep". Per session and per
 // room by construction (a module `let` in a page that reloads to change rooms),
@@ -22993,6 +23031,34 @@ function renderPresenceExits(othersCount) {
   }
   if (!netOnline || !net) return; // asked for a table, got no server — see initNet
 
+  // THE OTHER TABLES OF THIS GAME (§3b L4). One slot, two faces, and it exists
+  // only while this table is actually part of a split — a table that never
+  // splits carries not one pixel of new chrome, which is the whole of how a
+  // DIRECTORY (standing chrome by nature, §7.9) earns a place in a row whose
+  // rule is quiet.
+  //
+  // It belongs in THIS row rather than behind the identity chip because it is
+  // roster news: when three of five players walk into a breakout, this row
+  // loses three pills, and the ghost that appears is the honest answer to the
+  // question the emptying roster just raised. The chip keeps the AUTHORING
+  // verb (Split table…) — rare, deliberate, one click away — while the row
+  // keeps the NAVIGATION, which is the thing a split group does repeatedly.
+  //
+  // Deliberately NOT a summon (goal 12): a door appears on the screens of
+  // people already at this table. Nobody is called, nothing is sent, and
+  // walking through it is a choice made here.
+  if (roomParent) {
+    rosterEl.appendChild(railGhost('↩ Main table',
+      roomParent.name ? `Back to ${roomParent.name}` : 'Back to the table this one broke out of',
+      () => gotoTable(roomParent.room)));
+  } else if (roomChildren.length) {
+    const b = railGhost('Breakouts ▾', 'The breakouts running off this table',
+      (e) => openBreakoutsMenu(e.currentTarget));
+    b.setAttribute('aria-haspopup', 'menu');
+    b.setAttribute('aria-expanded', 'false');
+    rosterEl.appendChild(b);
+  }
+
   // A PREPARED TABLE SHOWS ITS EMPTY CHAIRS FOR AS LONG AS THEY ARE EMPTY —
   // NOT only while you are alone. The first arrival must not take the other
   // five chairs off the wall: an organizer with six prepared seats and two
@@ -23116,12 +23182,23 @@ function openRailMenu(anchor, build) {
 // name left behind by an abandoned create must not haunt a later visit.
 const pendingNameKey = (room) => `dice.newtable.v1:${room}`;
 
-// "+ New table" — name it, land in it. The key is MINTED, never the name:
-// this app has no access control by design (goal 10), so the key is the door,
-// and `?room=soulseal` would be a door anyone can guess. A blank name is
-// allowed — it makes an unnamed table, exactly as one made by hand.
-function openNewTable(e) {
-  const anchor = e.currentTarget;
+// Where a breakout's wiring waits out the same navigation (§3b L4). Separate
+// key from the name above because they are consumed by different steps and one
+// may legitimately be absent: a follower who clicks a directory row carries the
+// parent but no name (the table already has one).
+const pendingSplitKey = (room) => `dice.subtable.v1:${room}`;
+
+// NAME A TABLE, MINT ITS KEY, GO THERE. Shared by "+ New table" in the lobby
+// and "Split table…" at a table (§3b L1 and L4) — one menu, one input, one
+// minting rule, because the second verb is the first verb plus a pointer, and
+// two copies of this would drift the first time the cap or the placeholder
+// moved. `onCreate(key, name)` owns everything after the mint.
+//
+// The key is MINTED, never the name: this app has no access control by design
+// (goal 10), so the key is the door, and `?room=soulseal` would be a door
+// anyone can guess. A blank name is allowed — it makes an unnamed table,
+// exactly as one made by hand.
+function openTableMint(anchor, { verb, placeholder }, onCreate) {
   // Toggle, like the Tables pill: without this a second click on the anchor
   // (pointerdown-away deliberately exempts it) rebuilt the menu and threw away
   // a half-typed table name.
@@ -23131,11 +23208,11 @@ function openNewTable(e) {
     input.className = 'tin';
     input.type = 'text';
     input.maxLength = 28; // mirrors the server's table-name cap
-    input.placeholder = 'Table name…';
+    input.placeholder = placeholder;
     input.autocomplete = 'off';
     const go = document.createElement('button');
     go.className = 'btn confirm';
-    go.textContent = 'Create';
+    go.textContent = verb;
     const row = document.createElement('div');
     row.className = 'btn-row';
     row.appendChild(input);
@@ -23146,7 +23223,7 @@ function openNewTable(e) {
       const key = mintRoomKey(name);
       try { sessionStorage.setItem(pendingNameKey(key), name); } catch { /* a nameless table still works */ }
       closeRailMenu();
-      gotoTable(key);
+      onCreate(key, name);
     };
     go.addEventListener('click', create);
     input.addEventListener('keydown', (ev) => {
@@ -23154,6 +23231,88 @@ function openNewTable(e) {
     });
   });
   menu.querySelector('input').focus();
+}
+
+// "+ New table" — name it, land in it.
+function openNewTable(e) {
+  openTableMint(e.currentTarget, { verb: 'Create', placeholder: 'Table name…' },
+    (key) => gotoTable(key));
+}
+
+// WHAT A BREAKOUT INHERITS (§3b L4, open question 1 — decided: the game, not
+// the identity). Felt, system, zoom, tower and venue are what the table is
+// PLAYING; carrying them means a group that steps into a side room is still in
+// the same session, reading dice by the same rulebook (goal 6 — a d20 read as
+// Soul Deal words because the breakout came up on the default is a silent
+// wrong answer, not a cosmetic one) and standing in the same place (goals
+// 13–15 — a venue is atomic, and walking from a dreamscape onto green felt
+// mid-session is the costume failure goal 14 names).
+//
+// It is a COPY, not a link. The parent's felt changing later must not reach in
+// and repaint a breakout that deliberately changed its own — that would make
+// the child a satellite of the parent, which is a role wearing a settings
+// patch (goal 10). Divergence after the split is allowed and expected.
+//
+// NOT carried: tableName (the breakout names itself; the server refuses it
+// outright) and the prepared setup (§G4 — a setup is one organizer's push with
+// its own rev, and copying it would also buy every breakout SETUP_TTL_MS of
+// linger, turning a split into a twelve-hour MAX_ROOMS reservation).
+// `experiences` is absent for a duller reason: this client keeps no copy of it
+// (the editor has not shipped), so there is nothing here to carry — when it
+// does, it belongs on this list.
+function inheritedTableSettings() {
+  const out = {};
+  for (const key of ['felt', 'system', 'zoom', 'tower', 'venue']) {
+    if (typeof roomSettings[key] === 'string' && roomSettings[key]) out[key] = roomSettings[key];
+  }
+  return out;
+}
+
+// "Split table…" — the same mint, plus the two ends of the split. Registering
+// with the parent is AWAITED before the navigation: a breakout the main table
+// cannot see is the one failure that leaves the group worse off than not
+// splitting, so a refusal stops here (net.js's refusal channel says why) rather
+// than stranding people in an unlisted room.
+async function splitTable(key, name, { navigate = true } = {}) {
+  if (!net || !netOnline) return false;
+  const done = await net.split({ child: key, childName: name });
+  if (!done) return false;
+  // The child's half rides sessionStorage across the navigation, exactly as the
+  // pending name does — the tab that splits is the tab that lands.
+  try {
+    sessionStorage.setItem(pendingSplitKey(key), JSON.stringify({
+      parent: ROOM,
+      parentName: roomSettings.tableName || '',
+      settings: inheritedTableSettings(),
+    }));
+  } catch { /* the breakout still works, it just starts on its own felt */ }
+  if (navigate) gotoTable(key);
+  return true;
+}
+
+function openSplitTable(anchor) {
+  openTableMint(anchor, { verb: 'Split', placeholder: 'Breakout name…' },
+    (key, name) => { splitTable(key, name); });
+}
+
+// Read-and-clear, like takePendingTableName: the carry is consumed by the first
+// join that lands on its room, so a reload never re-declares a parent the table
+// has since settled (the server would refuse it anyway — first writer wins).
+function takePendingSplit() {
+  if (IN_LOBBY) return null;
+  try {
+    const k = pendingSplitKey(ROOM);
+    const raw = sessionStorage.getItem(k);
+    if (!raw) return null;
+    sessionStorage.removeItem(k);
+    const v = JSON.parse(raw);
+    if (!v || typeof v !== 'object' || typeof v.parent !== 'string' || !v.parent) return null;
+    return {
+      parent: v.parent,
+      parentName: typeof v.parentName === 'string' ? v.parentName : '',
+      settings: v.settings && typeof v.settings === 'object' && !Array.isArray(v.settings) ? v.settings : {},
+    };
+  } catch { return null; }
 }
 
 // "Tables ▾" — the tables THIS BROWSER has been to (§3b's no-global-directory
@@ -23192,6 +23351,48 @@ function openTablesMenu(anchor) {
   // Focus lands INSIDE the menu, so the arrows and Esc have somewhere to act
   // from — and so a keyboard player is not left on an anchor behind an open
   // menu (the failure openSetMenuFor avoids by focusing its selected row).
+  const first = menu.querySelector('.idm-item');
+  if (first) first.focus();
+}
+
+// "Breakouts ▾" — THE ONE DIRECTORY IN THE SYSTEM (§3b L4, Joe: "sub-tables
+// are public to the top-level table"). Same component as the lobby's Tables
+// menu on purpose: both answer "where else can I go from here", and the only
+// difference is who wrote the list. This one is the server's, scoped to this
+// table, in memory on a room it already holds — never global, because with no
+// access control (goal 10) a global list would make every game in progress
+// walk-in-able by anyone who loaded the deployment.
+//
+// A row carries the SAME two pieces of sessionStorage the splitter wrote, so
+// the journey survives the splitter never arriving: whoever walks in first
+// declares the parent and the name, and everyone after them reads both off the
+// server. A row is never removed for pointing at an empty room — the key is a
+// door, and walking into a breakout nobody is in yet is how you get there
+// first, not an error to hide.
+function openBreakoutsMenu(anchor) {
+  if (isRailMenuOpen() && railMenuState.anchor === anchor) { closeRailMenu(true); return; }
+  const menu = openRailMenu(anchor, (el) => {
+    for (const c of roomChildren) {
+      const go = document.createElement('button');
+      go.className = 'idm-item';
+      go.setAttribute('role', 'menuitem');
+      go.textContent = c.name || c.room; // user text: textContent only
+      go.title = `Go to ${c.name || c.room}`;
+      go.addEventListener('click', () => {
+        closeRailMenu();
+        try {
+          if (c.name) sessionStorage.setItem(pendingNameKey(c.room), c.name);
+          sessionStorage.setItem(pendingSplitKey(c.room), JSON.stringify({
+            parent: ROOM,
+            parentName: roomSettings.tableName || '',
+            settings: inheritedTableSettings(),
+          }));
+        } catch { /* the breakout still opens; it just starts bare */ }
+        gotoTable(c.room);
+      });
+      el.appendChild(go);
+    }
+  });
   const first = menu.querySelector('.idm-item');
   if (first) first.focus();
 }
@@ -23460,6 +23661,14 @@ function openIdentityMenu() {
   // boolean when the verb is thought through. See ROADMAP C26.
   idmShow('idm-leave', false);
   idmShow('idm-lobby', !IN_LOBBY);
+  // 'Split table…' (§3b L4) is table-scoped like the invite, and ABSENT rather
+  // than disabled in the three places it cannot mean anything: the lobby (no
+  // table), a solo table (no server to hold a directory, and no one to list it
+  // to), and inside a breakout — one level, so the server would refuse it and
+  // an item that only ever refuses is worse than no item (goal 10's rule is
+  // that every capability belongs to everyone; it is not a licence to offer
+  // one the table cannot have).
+  idmShow('idm-split', !IN_LOBBY && info.online && !roomParent);
   document.getElementById('idm-rename-row').classList.add('hidden');
   identityMenu.classList.remove('hidden');
 }
@@ -23660,6 +23869,18 @@ document.getElementById('idm-invite').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   await shareInvite(inviteUrl(), btn, 'Copy invite link');
   setTimeout(closeIdentityMenu, 900);
+});
+
+// Split table… (§3b L4). The identity menu closes and hands the naming prompt
+// to the rail menu anchored on the chip — one menu app-wide (openRailMenu
+// enforces it), and the same input the lobby's "+ New table" uses.
+document.getElementById('idm-split').addEventListener('click', () => {
+  // Anchored on the CHIP, not on the menu item that was clicked: closing the
+  // identity menu hides that item, and a hidden anchor measures 0×0 — the rail
+  // menu would place itself in the top-left corner of the window.
+  const anchor = document.getElementById('identity-chip');
+  closeIdentityMenu();
+  openSplitTable(anchor);
 });
 
 updateIdentityChip(); // seed the chip before the join resolves
@@ -23902,6 +24123,12 @@ function handleNetEvent(type, data) {
       // hello can outrun initNet's `net =` assignment — maybeRepushTable
       // no-ops then, and initNet's own call right after the join covers it.)
       roomSetup = data.setup || null;
+      // Same present-or-absent rule for the sub-table wiring (§3b L4): a
+      // restarted server that forgot the split says so by omission, and this
+      // must fall to empty rather than keep the last thing seen — the ↩ Main
+      // table ghost has to be a live read, not a memory of one.
+      roomParent = data.parent || null;
+      roomChildren = data.children || [];
       // NOW the presence row can be drawn: roster and setup are both current,
       // so the unclaimed chairs describe the room this hello just described.
       renderPlayers();
@@ -24059,6 +24286,24 @@ function handleNetEvent(type, data) {
         showSettingsNote(`${data.byName || 'someone'} prepared the table`);
       }
       break;
+    case 'table-split': {
+      // Both halves ride every event (§3b L4) so a client never has to work out
+      // which end moved — adopt what the room says and repaint the row.
+      const gained = (data.children || []).length > roomChildren.length;
+      roomParent = data.parent || null;
+      roomChildren = data.children || [];
+      renderPlayers();
+      // The same quiet note grammar 'table-setup' uses, and only for the half
+      // that is news to a bystander: a breakout appearing is a door that was
+      // not there a second ago, and a row that changes silently is the thing
+      // U5 exists to stop (it also reaches a screen reader, which the ghost
+      // alone does not). Nothing is said about your own press, and nothing at
+      // all in the child — being told what table you are in is not news.
+      if (gained && data.byId && net && data.byId !== net.playerId) {
+        showSettingsNote(`${data.byName || 'someone'} opened a breakout`);
+      }
+      break;
+    }
   }
 }
 
@@ -25087,6 +25332,10 @@ async function initNet() {
       try { localStorage.setItem(LS_NAME, me.name); } catch { /* ignore */ }
     }
     roomSetup = conn.setup || null; // the prepared table rides the join (§G4)
+    // …and the sub-table wiring (§3b L4), before the first renderPlayers below,
+    // because the presence row draws the ↩ Main table / Breakouts ghost from it.
+    roomParent = conn.parent || null;
+    roomChildren = conn.children || [];
     renderPlayers(); // the rail roster fills in (solo it is simply empty)
     renderGroups();  // the owner switcher appears once the roster is known
     publishPools();  // share the rack (display copy; localStorage stays truth)
@@ -25137,6 +25386,15 @@ async function initNet() {
     const wanted = takePendingTableName() || (remembered && remembered.name) || '';
     if (wanted && !roomSettings.tableName && net) net.setSettings({ tableName: wanted });
     rememberTable(ROOM, roomSettings.tableName || wanted || '');
+    // THE CHILD END OF A SPLIT (§3b L4). Whoever walked in through a breakout
+    // link — the splitter, or a follower who beat them here — tells the room
+    // what it is a breakout of, and hands it the felt and system to inherit.
+    // Fire-and-forget by design: the answer arrives as everyone's 'table-split'
+    // event, applied on the echo like every other room-wide write, and a client
+    // that loses the race (somebody declared first, the table has already been
+    // rolled at) has nothing to do about it.
+    const carry = takePendingSplit();
+    if (carry && !roomParent && net) net.declareParent(carry);
   } else {
     netOnline = false;
     roomSetup = null;

@@ -1107,10 +1107,11 @@ per-roll choices — §3.3.)
 Two principles arrived from Joe after §1–§6 were drafted. They are binding;
 where they touch earlier sections, this addendum wins.
 
-> **NEXT FREE SECTION NUMBER: §7.45.**
+> **NEXT FREE SECTION NUMBER: §7.46.**
 > *(§7.39–§7.44 were all claimed on 2026-08-14/15 by six parallel passes:
 > the door on the phone, restore, the token layer, the record, the struck
-> die, the ledger sheet. Four of the six first wrote themselves as §7.39.)*
+> die, the ledger sheet. Four of the six first wrote themselves as §7.39.
+> §7.45 — sub-tables — was claimed 2026-08-14 by the L4 pass.)*
 > Claim it here in the same commit that writes the section, before you write
 > it. This document ASSIGNS these numbers, so this line is the only place a
 > branch that has been out for a week can see what is taken (ROADMAP C4).
@@ -5437,3 +5438,163 @@ belong to another owner's file):
   that is exceeded sets `over` on both; `setPoolsEditMode(false)` leaves
   `ledgerSheet === null`; and a reload leaves the target gone (session-only —
   the assertion that would catch a stray `localStorage` write).
+
+### 7.45 Sub-tables — splitting the party, and coming back (2026-08-14)
+
+**This is the authoritative section for the split verb, the scoped directory
+and the way back.** It is [ROADMAP §3b](ROADMAP.md) `L4` and it serves
+**[CUJ5](CUJS.md)** — *"we need to split into two groups for a bit, then come
+back"* — which had zero code and zero scenarios before this pass. §13 of the
+ROADMAP ("breakout rooms") is the same feature under an older name and was
+folded into `L4` on 2026-08-07.
+
+#### The shape
+
+> A breakout is **a table**. It has its own key, its own felt, its own log and
+> its own seats. Two pieces of wiring make it a breakout rather than an
+> unrelated room: the parent **lists** it, and it **carries a way back**.
+
+Three surfaces, and the split between them is the doctrine:
+
+| Surface | Where | Why there |
+|---|---|---|
+| `Split table…` | identity menu (`#idm-split`) | AUTHORING. Rare, deliberate, one click behind the chip — where `Copy invite link` and `Leave table` already live. Zero standing chrome. |
+| `↩ Main table` | presence row (`railGhost`) | NAVIGATION, in a breakout. The thing a split group does repeatedly. |
+| `Breakouts ▾` | presence row (`railGhost` + `openRailMenu`) | The DIRECTORY, at the parent. Same component as the lobby's `Tables ▾`. |
+
+**A directory is standing chrome, and this one earns the row anyway.** The
+row's rule is quiet (§7.9 killed the permanent Invite pill for exactly this).
+Two things pay for it: it exists **only while this table is actually part of a
+split** — a table that never splits carries not one new pixel — and it is
+**roster news**. When three of five players walk into a breakout this row loses
+three pills, and the ghost that appears is the honest answer to the question
+the emptying roster just raised. The chip could not do that job: it is the
+right home for a verb and the wrong home for a live read.
+
+**Not a summon** (goal 12). A door appears on the screens of people already
+seated at this table. Nobody is called, nothing is sent, and walking through is
+a choice made locally. The `table-split` event carries a one-line note in the
+same grammar `table-setup` uses (*"Bo opened a breakout"*) and only to
+bystanders at the parent — not to the breakout, where being told what table you
+are in is not news.
+
+#### The two open questions ROADMAP L4 left, decided
+
+**① A child inherits the parent's felt and system — and the zoom, tower and
+venue with them.** *Decided: yes, as a COPY.*
+
+The system is not cosmetic: it decides what a roll MEANS (goal 6), so a
+breakout that comes up on the default reads a d20 under a different rulebook
+from the campaign it just walked out of — a silent wrong answer, not a colour
+mismatch. The staging is not cosmetic either: goals 13–15 make a venue an
+atomic set, and stepping from a dreamscape onto green felt mid-session is the
+costume failure goal 14 names. Both argue the same way, so the inheritance is
+"what this table is PLAYING", spelled `felt · system · zoom · tower · venue`.
+
+It is a **copy, not a link**: the parent changing its felt an hour later must
+not reach in and repaint a breakout that deliberately changed its own. A live
+link would make the child a satellite of the parent, which is a role wearing a
+settings patch (goal 10). Divergence after the split is allowed and expected —
+anyone in the breakout may change any of it, because everyone always can.
+
+Two things are deliberately **not** inherited. `tableName` — a breakout names
+itself, and the server refuses an inherited one outright (`bad_setting`);
+two tables called "Vault Heist" in one recents list is the failure. And the
+prepared setup (§G4) — it is one organizer's push with its own `rev`, and
+copying it would also buy every breakout `SETUP_TTL_MS` of linger, turning a
+split into a twelve-hour `MAX_ROOMS` reservation. `experiences` is absent for a
+duller reason: the client keeps no copy of it (the editor has not shipped), so
+there is nothing to carry — when it does, it joins the list.
+
+**② An orphaned child is a table whose way back still works.** *Decided, and
+this SHARPENS the roadmap's "just a table" rather than agreeing with it.*
+
+The roadmap's answer implies the child stops being a child when the parent's
+linger expires — which would need the server to notice one room's death, mutate
+another, and broadcast the change: a cross-room lifecycle coupling, invented to
+solve a problem that does not exist. **The pointer is a room KEY, not a
+handle.** Following it walks into a room with that key, freshly created if need
+be, exactly as any invite link does (`getRoom`). So the back-link never
+dangles, the child stays a child, and there is nothing for a reaper to clean.
+
+What *does* end with the parent is its **directory**. `lingerRoom` clears
+`children` alongside `log` and `offers`, because tonight's breakouts are
+session, not preparation — every one of them is an unprepared room that died
+when its own last player left, so a room that came back eleven hours later
+listing them would be offering doors onto empty rooms and calling them the
+game. That is the roster's rule, not the log's: presence is asserted, never
+inferred, and a server that has forgotten the table cannot assert where its
+people went. The mitigation is already shipped and client-side — a breakout you
+personally walked into is in your own recents (§7.20).
+
+`parent` is **kept** through a linger, and that is the one that looks like
+session but is not: being a breakout of the vault heist is what this table IS,
+the same kind of fact as its name, which linger also keeps.
+
+#### One level
+
+A table that already has a parent may not register children (403
+`already_a_subtable`, and `Split table…` is absent rather than disabled). The
+verb is *split, then come back*, and the way back is **the** main table,
+singular. A chain of parents is a navigation structure and building one is what
+goal 12 refuses; it also keeps the directory's meaning exact — "the breakouts
+of this table", never "somewhere in a tree below it".
+
+#### Why the directory is safe to send whole
+
+The projection discipline says `projectEntryFor` is the only path a roll entry
+leaves by, and that redaction is absent data, never hidden data. `parent` and
+`children` ride `roomSnapshot` present-or-absent (so a table that never split
+sends today's payload byte for byte) and are sent **unprojected**, on the same
+two-part test `setup` passes:
+
+1. **Nothing here is roll-shaped.** A room key, a display name, a millisecond.
+   No values, no dice, no notation, no `playerId`, nothing per-viewer — so
+   there is nothing any viewer is not entitled to, and nothing to redact.
+2. **Publishing a key IS granting entry**, and here that is the ruling rather
+   than a leak. Joe: *"sub-tables are public to the top-level table."* To read
+   the directory you must already hold the parent's key and be seated at it,
+   which is a strictly larger permission than walking into one of its
+   breakouts. What stays refused is a GLOBAL list of live rooms — the other
+   §3b ruling — and nothing here builds one.
+
+#### The wire
+
+One route, two ends, because a split has two ends and each is authorized where
+it happens (`lookup` on a live seat, and nothing else — goal 10):
+
+```
+POST /api/split {room, playerId, child, childName}              — at the PARENT
+POST /api/split {room, playerId, parent, parentName, settings}  — at the CHILD
+```
+
+`table-split` broadcasts BOTH halves every time, so no client has to work out
+which end moved. The child's declaration is **first writer wins** and is
+refused once the table has a log or a setup: a stranger may not hang a parent —
+or a felt — on a game already in progress.
+
+**This endpoint creates no room.** The child is minted by the splitter's
+ordinary `/api/join`, through the ordinary door, under the ordinary `MAX_ROOMS`
+cap and the ordinary §0j creation throttle. `tests/subtables.test.mjs` pins
+that with a `/health` room count either side of a split, because the whole
+rate-budget argument rests on it.
+
+#### Seams, recorded so they are not rediscovered as bugs
+
+- **A solo splitter loses their own directory.** An unprepared room is deleted
+  the moment its last player leaves, so one person alone at a table who splits
+  and walks out kills the parent; returning through `↩ Main table` lands in a
+  fresh room with an empty `Breakouts ▾`. This is ② working as decided, and the
+  journey it costs is narrow — a *split* implies at least one person stays, and
+  when everyone reconvenes nobody needs the list. The general heal exists and
+  is client-side: the breakout is in your recents. The fix if it ever matters
+  is the shape §G6 already uses — the client that IS in the breakout re-registers
+  it on arrival at the parent — deliberately NOT built here, because a heal
+  nobody needs is a second writer to reason about.
+- **The row's order puts the breakout ghost ahead of the unclaimed chairs**,
+  because the chairs branch returns. Both are "people who are not on this
+  roster", so it reads, but it was not chosen — it is where a surgical insert
+  could go without re-cutting `renderPresenceExits`'s shipped branches.
+- **`Tables ▾` is lobby-only**, so a player at a table cannot reach their
+  recents without leaving. Unchanged by this pass and unrelated to it, but it
+  is the reason the seam above is felt at all.

@@ -521,6 +521,13 @@ limitations under the License.
     </div>
     <button id="idm-leave" class="idm-item" title="Drop this seat and sit down again at this same table">Change seat…</button>
     <button id="idm-lobby" class="idm-item" title="Leave this table and go back to the lobby — your name and pools come with you">Leave table</button>
+    <!-- §3b L4 (CUJ5): the AUTHORING half of a split lives behind the chip
+         with the other table verbs — rare, deliberate, and no standing chrome.
+         The navigation half (↩ Main table / Breakouts ▾) is in the presence
+         row, where it can be a live read of where the table's people went.
+         Withheld in the lobby (no table to split) and in a breakout (one
+         level — server.js handleSplit refuses a second). -->
+    <button id="idm-split" class="idm-item" title="Take part of the table into a side room — everyone here gets a link to it, and it carries a way back">Split table…</button>
     <button id="idm-invite" class="idm-item" title="This room’s link — invites a player. Pools travel via Settings → Your data → Export">Copy invite link</button>
   </div>
 
