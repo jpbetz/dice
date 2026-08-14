@@ -242,6 +242,34 @@ async function createTableFromLobby(t, tableName) {
   return landedAtTable(t);
 }
 
+// A portable file written BY HAND rather than by `exportYaml` — for the C15
+// cases a real snapshot cannot reach: thirty-two profiles, a name that appears
+// in two sections, a section from a version that does not exist yet. Written
+// to js/portable.js's grammar (a shelf key at the block's own indent, its
+// pools two deeper behind '- '), so a grammar change breaks these scenarios
+// loudly instead of leaving them testing a file nobody could ever produce.
+//
+// `n` counts PROFILES: the top-level `pools:` rack, named by `profile:`, plus
+// n − 1 blocks under `players:`. That asymmetry is the format's, not a
+// convenience — one rack has exactly one home in the document.
+function bigPortableFile(n) {
+  const lines = [
+    '# Dice Table — the prepared table',
+    'version:', "  schema: '2.0.0'",
+    'profile:', "  name: 'Zero'", "  system: 'soul-deal'",
+  ];
+  if (n > 1) {
+    lines.push('players:');
+    for (let i = 1; i < n; i++) {
+      lines.push(`  'Char ${i}':`, "    system: 'soul-deal'", '    pools:',
+        '      Attributes:', `        - 'Body': '${1 + (i % 6)}d6'`);
+    }
+  }
+  lines.push('pools:', '  Attributes:', "    - 'Body': '3d6'",
+    'settings:', '  sound: true', '  numbers: false');
+  return `${lines.join('\n')}\n`;
+}
+
 export const scenarios = [
   {
     name: 'shared-roll',
@@ -14556,6 +14584,449 @@ export const scenarios = [
       for (const t of [a, b]) {
         await t.waitFor(`window.__diceDebug.system === 'soul-deal'`, { desc: 'the table restored' });
       }
+    },
+  },
+
+  // =========================================================================
+  // PART B — the scenarios eight parallel build steps shipped hooks for and
+  // could not write, because this file has one owner. Grouped by the item that
+  // owes them, in THE ORDER's order.
+  // =========================================================================
+
+  // ---- C15 · restore: reading back the file this app writes (CUJ13) -------
+  //
+  // CUJ13's done-when is "a library can be written to a file they hold, and
+  // RESTORED FROM THAT FILE onto a fresh browser". Until C15 the restore half
+  // did not exist: `Add all` is additive by contract, so a file landing on a
+  // browser that has ever been used renames on collision and leaves the file's
+  // own `profile:` pointer — which records WHICH character was in hand — on
+  // the floor. These prove Replace is exact where Add is additive, that the
+  // arm names what it destroys, and that every refusal leaves the old library
+  // whole.
+
+  // A portable file written by HAND rather than by exportYaml. The round trip
+  // below uses the app's own snapshot, which is the right instrument for a
+  // round trip; this one exists for the cases a snapshot cannot reach — 32
+  // profiles, a name that appears in two sections, a section from the future.
+  // Written to js/portable.js's grammar (shelf key at the block's indent,
+  // pools two deeper with '- '), so a grammar change breaks it loudly rather
+  // than letting these scenarios quietly test a file nobody could produce.
+  {
+    name: 'restore-library',
+    tags: ['portable', 'profiles', 'table-file', 'cuj13'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: the whole restore, against the Add-all path it had to
+    // be distinguished from — and the distinction is asserted rather than
+    // described. On a browser holding a character called 'Nessa', a file whose
+    // own 'Nessa' is a different character is the case where every quiet
+    // failure lives: Add lands it as 'Nessa 2' beside the original and leaves
+    // the player holding the wrong one, silently and forever. Replace must
+    // land THREE profiles, spelled exactly as the file spells them, with the
+    // file's `profile:` key in hand and the file's pools inside it.
+    async fn(ctx) {
+      // ---- one browser writes the file ---------------------------------
+      const dm = await ctx.newTable({ origin: '127.0.0.36', name: 'Author' });
+      await dm.dbg(`profiles.reset('soul-deal')`);
+      const nessa = (await dm.dbg('profiles.active')).id;
+      await dm.dbg(`profiles.rename(${JSON.stringify(nessa)}, 'Nessa')`);
+      await dm.dbg(`setGroups([{name: 'Body', notation: '3d6', category: 'Attributes'}])`);
+      for (const [name, pool] of [['Bram', '2d8'], ['Tola', '1d20']]) {
+        const made = await dm.dbg(`profiles.create(${JSON.stringify(name)}, 'soul-deal')`);
+        assert.equal(made.ok, true, made.status);
+        await dm.dbg(`setGroups([{name: 'Body', notation: '${pool}', category: 'Attributes'}])`);
+      }
+      // Nessa back in hand: THAT is what the file's `profile:` key records.
+      await dm.dbg(`profiles.use(${JSON.stringify(nessa)})`);
+      const text = await dm.dbg('portable.snapshot()');
+      assert.ok(text.includes('profile:') && text.includes("name: 'Nessa'"),
+        `the file records who was holding the rack (got ${JSON.stringify(text.slice(0, 120))})`);
+
+      // ---- another browser, already holding a different 'Nessa' ----------
+      const player = await ctx.newTable({ origin: '127.0.0.37', name: 'Player' });
+      const openBox = async () => {
+        await player.dbg('openSettings("stuff")');
+        await player.eval(`document.getElementById('portable-open').click()`);
+      };
+      const seedOwnNessa = async () => {
+        await player.dbg(`profiles.reset('soul-deal')`);
+        const own = (await player.dbg('profiles.active')).id;
+        await player.dbg(`profiles.rename(${JSON.stringify(own)}, 'Nessa')`);
+        await player.dbg(`setGroups([{name: 'Mine', notation: '4d4', category: 'Attributes'}])`);
+      };
+      await seedOwnNessa();
+      await openBox();
+
+      // (a) ADD ALL — additive by contract, and this is what that costs on the
+      //     one journey where the file is the only copy.
+      let v = await player.dbg(`portable.loadText(${JSON.stringify(text)})`);
+      assert.equal(v.ok, true, v.status);
+      const added = await player.dbg('portable.adoptAll()');
+      assert.equal(added.ok, true, added.status);
+      const afterAdd = (await player.dbg('profiles.list')).map((p) => p.name).sort();
+      assert.deepEqual(afterAdd, ['Bram', 'Nessa', 'Nessa 2', 'Tola'],
+        'Add all renames on collision — the file’s Nessa lands beside theirs as a copy');
+      assert.equal((await player.dbg('profiles.active')).name, 'Nessa',
+        'and the file’s own pointer is ignored…');
+      assert.deepEqual((await player.dbg('groups')).map((g) => g.notation), ['4d4'],
+        '…so the player is left holding the character they already had, not the file’s');
+
+      // (b) REPLACE — the same file, the same collision, restored.
+      await seedOwnNessa();
+      v = await player.dbg(`portable.loadText(${JSON.stringify(text)})`);
+      assert.equal(v.ok, true, v.status);
+      const rep = await player.dbg('portable.replace()');
+      assert.equal(rep.ok, true, rep.status);
+      const names = (await player.dbg('profiles.list')).map((p) => p.name);
+      assert.deepEqual([...names].sort(), ['Bram', 'Nessa', 'Tola'],
+        'exactly the file’s three profiles, and nothing of the old library');
+      assert.equal(names.length, 3, 'the count is the file’s count, not the file plus what was here');
+      assert.ok(!names.some((n) => /\s\d+$/.test(n)),
+        `no name landed with a copy suffix (got ${JSON.stringify(names)})`);
+      assert.equal((await player.dbg('profiles.active')).name, 'Nessa',
+        'and the profile the file says was in hand is the one in hand');
+      assert.deepEqual((await player.dbg('groups')).map((g) => g.notation), ['3d6'],
+        'holding the FILE’s Nessa — the pools came with the name');
+      assert.ok(rep.status.includes("'Nessa'"),
+        `the receipt says whose rack you are holding (got ${rep.status})`);
+      // On disk, not merely on screen: a restore that only moved a pointer in
+      // memory would survive every assertion above and none of a reload.
+      const stored = JSON.parse(await player.eval(`localStorage.getItem('dice.profiles.v1')`));
+      assert.equal(stored.profiles.length, 3, 'the library on disk is the file’s library');
+      assert.equal(stored.profiles.find((p) => p.id === stored.activeId).name, 'Nessa',
+        'and disk and screen agree about which one is in hand');
+    },
+  },
+  {
+    name: 'restore-fresh-browser',
+    tags: ['portable', 'profiles', 'table-file', 'cuj13'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: the cap arithmetic, on the exact journey C15 exists
+    // for. A full library is 32 profiles and a browser that has ever been
+    // opened already holds one dealt profile — so ADDING a full file can never
+    // fit, by one. Replace starts from empty, so 32 fit exactly; if it ever
+    // stops starting from empty, this is the scenario that says so, and it
+    // says it in the one number nobody can argue with. The second half is the
+    // half a count cannot see: the dealt profile the browser was born with has
+    // to be GONE, not sitting at the bottom of the list as a 33rd.
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.38', name: 'Fresh' });
+      await t.dbg(`profiles.reset('soul-deal')`);
+      const dealt = (await t.dbg('profiles.active')).name;
+      await t.dbg('openSettings("stuff")');
+      await t.eval(`document.getElementById('portable-open').click()`);
+
+      const text = bigPortableFile(32);
+      const v = await t.dbg(`portable.loadText(${JSON.stringify(text)})`);
+      assert.equal(v.ok, true, v.status);
+      assert.equal((await t.dbg('portable.profiles()')).length, 31,
+        'thirty-one in players:, plus the top-level rack — thirty-two profiles');
+
+      // Add all CANNOT fit it, and the shape of the failure is the point: it
+      // is additive, so 1 (the dealt one) + 32 is 33 against a ceiling of 32.
+      // It lands 31, stops out loud, and leaves the library one character
+      // short of the file with no way to tell which one from the list itself.
+      const add = await t.dbg('portable.adoptAll()');
+      assert.equal(add.ok, true, 'Add all is a partial success, not a refusal');
+      assert.ok(add.status.includes('31 profiles added'),
+        `thirty-one of thirty-two landed (got ${add.status})`);
+      assert.ok(add.status.includes('then stopped'),
+        `and it says it stopped (got ${add.status})`);
+      const partial = (await t.dbg('profiles.list')).map((p) => p.name);
+      assert.equal(partial.length, 32, 'the library is at the ceiling');
+      assert.ok(!partial.includes('Char 31'),
+        'and the file’s last character is simply not there');
+      assert.ok(partial.includes(dealt),
+        'while the profile this browser was born with took one of the 32 seats');
+
+      // Replace starts from empty, so it fits exactly.
+      await t.dbg(`profiles.reset('soul-deal')`);
+      await t.dbg(`portable.loadText(${JSON.stringify(text)})`);
+      const rep = await t.dbg('portable.replace()');
+      assert.equal(rep.ok, true, rep.status);
+      const names = (await t.dbg('profiles.list')).map((p) => p.name);
+      assert.equal(names.length, 32, 'thirty-two land, exactly');
+      assert.ok(!names.includes(dealt),
+        `and the profile this browser was born with is gone (${dealt} still present)`);
+      assert.equal((await t.dbg('profiles.active')).name, 'Zero',
+        'with the file’s own `profile:` key in hand');
+      // NOTHING WAS RENAMED TO FIT, stated as set equality rather than as a
+      // suffix regex: these names END in numbers, so a `/ \d+$/` test cannot
+      // tell 'Char 7' from a deduped 'Char 7 2' without knowing what the file
+      // said. The file is the only thing that knows, so ask it.
+      const want = ['Zero'];
+      for (let i = 1; i <= 31; i++) want.push(`Char ${i}`);
+      assert.deepEqual([...names].sort(), want.sort(),
+        'the library is the file’s names, exactly, with no copy suffixes invented');
+    },
+  },
+  {
+    name: 'restore-arm',
+    tags: ['portable', 'profiles', 'cuj13'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: the confirm, which is the only thing standing between
+    // a mis-tap and a library that existed in one browser. Three claims, each
+    // of which has a silent failure: the armed state must NAME the profiles it
+    // is about to delete (a count is a number nobody can check against their
+    // own memory), Download must be offered INSIDE the armed state (the thing
+    // being replaced may be the only copy, so the offer has to arrive before
+    // the commit), and the arm must EXPIRE — an armed destructive verb left
+    // standing is a trap for the next press of the same button.
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.39', name: 'Armed' });
+      await t.dbg(`profiles.reset('soul-deal')`);
+      const own = (await t.dbg('profiles.active')).id;
+      await t.dbg(`profiles.rename(${JSON.stringify(own)}, 'Nessa')`);
+      for (const n of ['Bram', 'Tola', 'Wren', 'Ilm']) {
+        assert.equal((await t.dbg(`profiles.create(${JSON.stringify(n)}, 'soul-deal')`)).ok, true);
+      }
+      await t.dbg('openSettings("stuff")');
+      await t.eval(`document.getElementById('portable-open').click()`);
+      await t.dbg(`portable.loadText(${JSON.stringify(bigPortableFile(3))})`);
+
+      // At rest: offered, unarmed, no Download in sight.
+      let s = await t.dbg('portable.replaceState');
+      assert.equal(s.offered, true, 'the verb is offered once the file carries profiles');
+      assert.equal(s.armed, false, 'and it is not armed at rest');
+      assert.equal(s.downloadOffered, false, 'nor is the copy-first offer shouting yet');
+      assert.equal(s.label, 'Replace my library…', 'it says what it is');
+      assert.equal(s.mine.length, 5, 'five of theirs stand to be deleted');
+      assert.equal(s.fromFile.length, 3, 'and three would land');
+
+      // The first press ARMS, and the armed state names the dead.
+      s = await t.dbg('portable.armReplace()');
+      assert.equal(s.armed, true, 'the first press arms rather than commits');
+      assert.equal((await t.dbg('profiles.list')).length, 5,
+        'and nothing whatsoever has happened to the library');
+      assert.ok(/'Nessa'/.test(s.names) && /'Bram'/.test(s.names) && /'Tola'/.test(s.names),
+        `the armed state NAMES what it will delete (got ${JSON.stringify(s.names)})`);
+      assert.ok(/2 more/.test(s.names),
+        `the first three, then a count — 32 names is a wall, not a read (got ${JSON.stringify(s.names)})`);
+      assert.ok(s.names.includes('only place they exist'),
+        `and says why that matters (got ${JSON.stringify(s.names)})`);
+      assert.equal(s.downloadOffered, true,
+        'Download is offered INSIDE the arm — the copy is offered before the commit, not after');
+      assert.equal(s.label, 'Replace with 3 from this file',
+        'and the button states the next act rather than asking one (C19)');
+
+      // A KEYSTROKE IN THE BOX DISARMS IT. An armed Replace is a promise about
+      // a specific list of names on both sides; one edit and the file it named
+      // is no longer the file it would take.
+      await t.eval(`(() => {
+        const box = document.getElementById('portable-text');
+        box.value = box.value + "\\n# a thought";
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      assert.equal((await t.dbg('portable.replaceState')).armed, false,
+        'editing the box disarms the verb it was armed against');
+
+      // …AND IT EXPIRES. 8 s, where a row's Delete uses 3 and the corner ✕
+      // uses 4: this one asks you to read a list of names and possibly take a
+      // copy first, and three seconds does not buy that.
+      s = await t.dbg('portable.armReplace()');
+      assert.equal(s.armed, true, 're-armed');
+      await sleep(5000);
+      assert.equal((await t.dbg('portable.replaceState')).armed, true,
+        'still armed at 5 s — the window is long enough to read five names in');
+      await sleep(3600);
+      assert.equal((await t.dbg('portable.replaceState')).armed, false,
+        'and gone by 8.6 s, so a stale arm is never lying in wait');
+      assert.equal((await t.dbg('profiles.list')).length, 5,
+        'through all of which the library never moved');
+    },
+  },
+  {
+    name: 'restore-refuses',
+    tags: ['portable', 'profiles', 'cuj13'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: every way the restore can fail, and the one property
+    // all of them must share — THE OLD LIBRARY IS LEFT BYTE-IDENTICAL. This is
+    // the destructive verb in an app whose durable copy is one localStorage
+    // key, so a refusal that got halfway is data loss with a ✗ next to it. The
+    // storage jam is the case that cannot happen by accident and is the one
+    // that matters most: `saveProfileStore` is called with the REPLACEMENT
+    // store before anything in the tab points at it, precisely so a browser
+    // that refuses the write leaves the old library whole in memory AND on
+    // disk. Assert the disk.
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.40', name: 'Refuser' });
+      await t.dbg(`profiles.reset('soul-deal')`);
+      const own = (await t.dbg('profiles.active')).id;
+      await t.dbg(`profiles.rename(${JSON.stringify(own)}, 'Keeper')`);
+      await t.dbg(`setGroups([{name: 'Mine', notation: '4d4', category: 'Attributes'}])`);
+      await t.dbg('openSettings("stuff")');
+      await t.eval(`document.getElementById('portable-open').click()`);
+      const disk = () => t.eval(`localStorage.getItem('dice.profiles.v1')`);
+
+      // (1) A BROWSER THAT WILL NOT STORE IT.
+      await t.dbg(`portable.loadText(${JSON.stringify(bigPortableFile(3))})`);
+      const before = await disk();
+      await t.dbg('jamStorage(true)');
+      const jammed = await t.dbg('portable.replace()');
+      await t.dbg('jamStorage(false)');
+      assert.equal(jammed.ok, false, `a refused write refuses the restore (got ${jammed.status})`);
+      assert.ok(jammed.status.includes('nothing was replaced'),
+        `and says so in those words (got ${jammed.status})`);
+      assert.equal(await disk(), before,
+        'the library on disk is byte-identical — persist first, swap second');
+      assert.equal((await t.dbg('profiles.active')).name, 'Keeper',
+        'and the player is still holding their own character');
+      assert.deepEqual((await t.dbg('groups')).map((g) => g.notation), ['4d4'],
+        'with their own pools in it');
+
+      // (2) A FILE THAT NAMES ONE CHARACTER TWICE. `profile:` and `players:`
+      // are different sections of the same document and nothing in the parser
+      // compares them, so this seam is where a "unique by construction" claim
+      // stops being true — the restore refuses rather than deduping, because a
+      // library that silently held 'Wren' and 'Wren 2' after a restore is not
+      // the library the file describes.
+      const twice = bigPortableFile(3).replace("  name: 'Zero'", "  name: 'Char 1'");
+      const v = await t.dbg(`portable.loadText(${JSON.stringify(twice)})`);
+      assert.equal(v.ok, true, 'the file itself parses — the collision is across sections');
+      const dup = await t.dbg('portable.replace()');
+      assert.equal(dup.ok, false, `a name in two places refuses (got ${dup.status})`);
+      assert.ok(/twice/.test(dup.status), `and names the problem (got ${dup.status})`);
+      assert.equal(await disk(), before, 'nothing was written');
+
+      // (3) AN EMPTY FILE IS A FAILED RESTORE. It used to read as a silent
+      // success: the box went blank, the status line went blank, and the
+      // verdict said ok — while a file of nothing but comments refused
+      // properly, so the two doors disagreed about the same emptiness.
+      const empty = await t.dbg(
+        `portable.acceptFile(new File([''], 'mine.yaml', {type: 'text/yaml'}))`);
+      assert.equal(empty.ok, false, `an empty file refuses (got ${JSON.stringify(empty.status)})`);
+      assert.ok(empty.status.startsWith('✗ '), `in the pane’s refusal grammar (got ${empty.status})`);
+      assert.ok(empty.status.includes('mine.yaml'), `naming the file (got ${empty.status})`);
+
+      // …AND AN EMPTY BOX STAYS SILENT. Clearing the textarea is the pane's
+      // resting state; painting a ✗ at somebody who is about to paste would be
+      // the same rule applied where it does not belong.
+      const quiet = await t.dbg(`portable.loadText('')`);
+      assert.equal(quiet.status, '', 'an empty BOX says nothing at all');
+      assert.equal(quiet.canApply, false, 'and arms nothing');
+      assert.equal(await disk(), before, 'and after all four, the library is untouched');
+    },
+  },
+  {
+    name: 'import-unknown-section',
+    tags: ['portable', 'profiles', 'cuj13'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: forward tolerance losing data quietly. A section this
+    // version cannot read is STEPPED OVER rather than aborting the document
+    // (PROFILES §9 decision 4) — which is right, and which costs the player
+    // whatever was in it. Before C15 the preview said a clean '✓' about a file
+    // it had silently thrown a section away from. The assertion is on
+    // `warnings`, not on the wording: a '✓' beside a non-empty warnings list is
+    // the exact state that used to read as clean. And the dress must be
+    // `caution`, NOT `warn` — the parse genuinely succeeded and Apply is
+    // legitimately armed, so a red line would say "this failed" about a file
+    // that did not.
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.41', name: 'Tolerant' });
+      await t.dbg(`profiles.reset('soul-deal')`);
+      await t.dbg(`setGroups([{name: 'Mine', notation: '4d4', category: 'Attributes'}])`);
+      await t.dbg('openSettings("stuff")');
+      await t.eval(`document.getElementById('portable-open').click()`);
+
+      // Anchored on '\npools:' so the substitution lands on the TOP-LEVEL
+      // section and not on a player's own indented `    pools:` four lines up.
+      const fromTheFuture = bigPortableFile(3).replace(
+        '\npools:\n', "\ncampaign:\n  arc: 'winter'\n  session: 12\npools:\n");
+      const v = await t.dbg(`portable.loadText(${JSON.stringify(fromTheFuture)})`);
+      assert.equal(v.warnings.length, 1,
+        `the skipped section is COUNTED, not shrugged off (got ${JSON.stringify(v.warnings)})`);
+      assert.ok(v.warnings[0].includes('campaign'),
+        `and named (got ${JSON.stringify(v.warnings[0])})`);
+      assert.ok(v.status.startsWith('⚠ '),
+        `the preview leads with the loss (got ${JSON.stringify(v.status)})`);
+      assert.ok(v.status.includes('✓'),
+        `while still saying the parse succeeded (got ${JSON.stringify(v.status)})`);
+      assert.equal(v.ok, true, 'and the verdict is not a failure');
+      assert.equal(v.canApply, true, 'Apply stays armed — the file is usable');
+      // THE DRESS, READ OFF THE ELEMENT: `caution` and not `warn`. Two classes
+      // that both exist and mean opposite things about the same line.
+      const dress = await t.eval(`(() => {
+        const el = document.getElementById('portable-status');
+        return JSON.stringify({ caution: el.classList.contains('caution'),
+                                warn: el.classList.contains('warn') });
+      })()`);
+      assert.deepEqual(JSON.parse(dress), { caution: true, warn: false },
+        'the line wears caution, never the refusal red');
+
+      // And the restore still works through it: tolerance that blocked the
+      // restore would be a different way to lose the file.
+      const rep = await t.dbg('portable.replace()');
+      assert.equal(rep.ok, true, rep.status);
+      assert.equal((await t.dbg('profiles.list')).length, 3,
+        'the readable half of the file restored');
+    },
+  },
+  {
+    name: 'boot-loss-withholds-write',
+    tags: ['portable', 'profiles', 'cuj13'],
+    timeout: 120000,
+    // WHAT THIS CATCHES — and it is the sharpest assertion in this group. Boot
+    // heals `dice.profiles.v1` through normalizeStore, which is LOSSY: past 32
+    // profiles it drops the rest. The first paint then wrote the healed,
+    // smaller store back over the original — so a DISPLAY limit became DATA
+    // LOSS before the player had touched anything, and the only evidence was a
+    // library that had quietly got shorter.
+    //
+    // Three claims, and the third is the one no count can make: the drop is
+    // REPORTED by name, the banner SAYS it, and `localStorage` STILL HOLDS ALL
+    // 35 — because the boot write is withheld while the notice stands. Until
+    // the player makes a change, they can close the tab, or open the app in a
+    // version that reads the whole key, and lose nothing.
+    async fn(ctx) {
+      const seeded = { v: 3, seq: 40, activeId: 'p1', profiles: [] };
+      for (let i = 1; i <= 35; i++) {
+        seeded.profiles.push({
+          id: `p${i}`, name: `Char ${i}`, system: 'soul-deal', at: 0,
+          pools: [{ id: 1, name: 'Body', notation: '2d6', category: 'Attributes' }],
+        });
+      }
+      const t = await tableTab(ctx, {
+        origin: '127.0.0.42',
+        seed: { 'dice.name.v1': 'Overfull', 'dice.profiles.v1': JSON.stringify(seeded) },
+      });
+      await t.waitOnline();
+
+      const loss = await t.dbg('bootLoss');
+      assert.equal(loss.overflow.length, 3,
+        `three profiles past the 32 ceiling did not load (got ${JSON.stringify(loss.overflow)})`);
+      assert.deepEqual(loss.overflow, ['Char 33', 'Char 34', 'Char 35'],
+        'and they are named, in the order the key held them');
+      assert.equal(loss.any, true, 'boot knows something was lost');
+      assert.equal((await t.dbg('profiles.list')).length, 32, 'the library in memory is the 32 that fit');
+
+      // The player is TOLD, in names rather than a count.
+      const banner = await t.dbg('dataBanner');
+      assert.equal(banner.shown, true, 'the notice stands');
+      assert.ok(banner.text.includes('Not all of it loaded'),
+        `and says what happened (got ${JSON.stringify(banner.text)})`);
+      assert.ok(banner.text.includes("'Char 33'"),
+        `naming one of the profiles that did not load (got ${JSON.stringify(banner.text)})`);
+      assert.ok(banner.text.includes('Nothing has been overwritten'),
+        `and promising the key is intact (got ${JSON.stringify(banner.text)})`);
+
+      // THE PROMISE, CHECKED. This is the assertion that fails on the pre-C15
+      // tree: an unconditional saveGroups() at boot wrote the healed 32 over
+      // the stored 35 before the banner had been read.
+      const onDisk = JSON.parse(await t.eval(`localStorage.getItem('dice.profiles.v1')`));
+      assert.equal(onDisk.profiles.length, 35,
+        'the key still holds every profile it held — the boot write was withheld');
+      assert.equal(onDisk.profiles[34].name, 'Char 35',
+        'including the last one, byte for byte');
+
+      // …and the notice comes down inside the first write that makes it false,
+      // because that write IS the overwrite it promised had not happened.
+      assert.equal((await t.dbg(`profiles.create('Newcomer', 'soul-deal')`)).ok, false,
+        'a full library refuses a 33rd rather than dropping one');
+      await t.dbg(`profiles.remove('p2')`);
+      await t.waitFor(`window.__diceDebug.dataBanner.shown === false`,
+        { desc: 'the notice retires with the write that overwrites the key' });
+      assert.equal(
+        JSON.parse(await t.eval(`localStorage.getItem('dice.profiles.v1')`)).profiles.length, 31,
+        'and the key is now what the screen says it is');
     },
   },
 ];
