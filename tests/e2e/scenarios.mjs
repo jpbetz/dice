@@ -15653,4 +15653,299 @@ export const scenarios = [
       await a.dbg('setLogFlyout(false)');
     },
   },
+
+  // ---- C28 ② · a deferred room change rides the PREDICATE, not a call site --
+  //
+  // The mat is the PHYSICS WALLS. A seeded roll replayed against different
+  // walls lands differently, so a zoom or a tower may not land mid-roll — it
+  // waits for a boundary. `tableIsBusyForZoom()` names three things that hold
+  // one back (an in-flight roll, a queued roll, a reveal flip), and hanging the
+  // flush off each place a roll can END was tried and MISSED FOUR:
+  // ceremonyFinish, clearTable, stepRevealing's last flip, and the skip drain.
+  // All four fail the same silent way — a client sits on the old preset while
+  // the room has moved — which is exactly the divergence the deferral exists to
+  // prevent. Three scenarios, one per release path that had no completion hook.
+  {
+    name: 'defer-ceremony-zoom',
+    tags: ['settings', 'zoom', 'roll', 'ceremony', 'cuj12'],
+    timeout: 150000,
+    // WHAT THIS CATCHES, and it is the one ROADMAP C28 ② names: a zoom that
+    // arrives while a CEREMONY is running. `queueLength === 0` is the assertion
+    // that makes it specific — the queue is empty, so the only thing holding
+    // the change back is the ceremony's own in-flight roll, and a flush hung
+    // off the roll QUEUE draining would fire immediately and land the new walls
+    // under a film baked against the old ones.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.54', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.55', name: 'Bram' });
+      for (const t of [a, b]) {
+        await t.waitFor(`window.__diceDebug.zoom === 'wide'`, { desc: 'both start wide' });
+      }
+
+      // Ada is INSIDE a ceremony. Headless never fires rAF, so the world only
+      // advances where this scenario says `sim()` — the beat holds.
+      await a.dbg(`commandRoll('1d20 check # Steady the rope')`);
+      await a.waitFor(
+        `['declare','tumble'].includes((window.__diceDebug.ceremonyState || {}).phase)`,
+        { desc: 'the ceremony is running on Ada' });
+
+      // Bram changes the room's zoom.
+      await b.dbg(`setZoom('close')`);
+      await b.waitFor(`window.__diceDebug.zoom === 'close'`, { desc: 'it lands on Bram' });
+      await a.waitFor(`window.__diceDebug.pendingZoom === 'close'`,
+        { desc: 'and PARKS on Ada rather than landing mid-film' });
+
+      assert.equal(await a.dbg('queueLength'), 0,
+        'nothing is queued — the ceremony itself is what is holding the change');
+      assert.equal(await a.dbg('zoom'), 'wide', 'so Ada is still on the old preset…');
+      const wide = await a.dbg(`zoomPreset('wide')`);
+      let wp = await a.dbg('wallPositions()');
+      assert.ok(Math.abs(wp.right.x - wide.w / 2) < 1e-6,
+        `…and so are her WALLS, which is the half that matters (got ${wp.right.x})`);
+
+      // The beat ends. The flush is asked once a frame rather than wired to
+      // this particular ending, so skipping is a release path like any other.
+      await a.waitFor(
+        `(window.__diceDebug.skipCeremony(), window.__diceDebug.sim(60),
+          window.__diceDebug.pendingZoom === null && !window.__diceDebug.busy)`,
+        { desc: 'the deferred zoom lands when the beat ends' });
+      assert.equal(await a.dbg('zoom'), 'close', 'Ada is on the room’s preset now');
+
+      const want = await a.dbg(`zoomPreset('close')`);
+      for (const [t, tag] of [[a, 'Ada'], [b, 'Bram']]) {
+        wp = await t.dbg('wallPositions()');
+        assert.ok(Math.abs(wp.right.x - want.w / 2) < 1e-6,
+          `${tag}: right wall at the close preset (${wp.right.x} vs ${want.w / 2})`);
+        assert.ok(Math.abs(wp.back.z + want.d / 2) < 1e-6,
+          `${tag}: back wall too (${wp.back.z} vs ${-want.d / 2})`);
+      }
+      assert.deepEqual(await a.dbg('wallPositions()'), await b.dbg('wallPositions()'),
+        'and the two players are standing in the same room again');
+      await a.dbg('retireCeremony()');
+    },
+  },
+  {
+    name: 'defer-clear-zoom',
+    tags: ['settings', 'zoom', 'roll', 'cuj12'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: `clearTable()` sets `done` and empties the queue in
+    // one act, so it ends a roll WITHOUT passing through any of the completion
+    // paths a per-call-site flush would have been wired to. A deferred zoom
+    // parked behind a roll that is then swept off the felt used to sit there
+    // until the NEXT roll ended — and if nobody rolled again, forever.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.56', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.57', name: 'Bram' });
+
+      await a.dbg(`commandRoll('4d6 # Mid-flight')`);
+      await a.waitFor(`!!window.__diceDebug.currentRoll && !window.__diceDebug.currentRoll.done`,
+        { desc: 'a roll is in flight on Ada' });
+      await b.dbg(`setZoom('close')`);
+      await a.waitFor(`window.__diceDebug.pendingZoom === 'close'`,
+        { desc: 'the zoom parks behind it' });
+      assert.equal(await a.dbg('queueLength'), 0, 'with nothing queued behind it either');
+
+      // Bram is watching the same roll, so HIS zoom is parked behind his own
+      // copy of it — which is the deferral working per client, and the reason
+      // the comparison at the end has to let him finish too.
+      assert.equal(await b.dbg('pendingZoom'), 'close',
+        'the spectator defers his own change behind his own playback');
+
+      // The sweep. Not a completion — an interruption.
+      await a.dbg('clearTable()');
+      await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.pendingZoom === null)`,
+        { desc: 'the swept roll releases the deferred zoom' });
+      assert.equal(await a.dbg('zoom'), 'close', 'Ada caught up with the room');
+      assert.equal(await a.diceCount(), 0, 'and the felt is what the sweep left');
+      await b.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.pendingZoom === null)`,
+        { desc: 'and Bram’s lands when his own playback ends' });
+      assert.deepEqual(await a.dbg('wallPositions()'), await b.dbg('wallPositions()'),
+        'both players are in the same room');
+    },
+  },
+  {
+    name: 'defer-reveal-zoom',
+    tags: ['settings', 'zoom', 'visibility', 'cuj12'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: a REVEAL FLIP is a live pose-drive — dice are being
+    // rotated to their real faces — so it holds a zoom back for the same reason
+    // a tumble does. And it is the busy source with NO completion hook at all:
+    // there is no ceremonyFinish, no queue drain, no roll ending. Nothing to
+    // hang a flush off, which is the argument for asking the predicate once a
+    // frame instead.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.58', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.59', name: 'Bram' });
+
+      await a.roll('4d20 held # Behind the screen');
+      const held = await a.rollId();
+      await a.settle();
+      assert.equal(await a.dbg('busy'), false, 'the roll itself is finished');
+
+      await a.dbg(`reveal(${JSON.stringify(held)})`);
+      await a.waitFor(`window.__diceDebug.revealingCount > 0`,
+        { desc: 'the flip is running' });
+      await b.dbg(`setZoom('close')`);
+      await a.waitFor(`window.__diceDebug.pendingZoom === 'close'`,
+        { desc: 'the zoom parks behind the flip' });
+
+      // The discriminator: nothing else is busy. A flush wired to "a roll
+      // ended" would have fired already and moved the walls under the flip.
+      assert.equal(await a.dbg('queueLength'), 0, 'no queued roll is holding it');
+      assert.equal(await a.eval(`(window.__diceDebug.currentRoll || { done: true }).done`), true,
+        'and no roll is in flight — the flip is the only thing holding it');
+      assert.equal(await a.dbg('zoom'), 'wide', 'so Ada is still on the old preset');
+
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), window.__diceDebug.revealingCount === 0
+          && window.__diceDebug.pendingZoom === null)`,
+        { desc: 'the last flip releases the deferred zoom' });
+      assert.equal(await a.dbg('zoom'), 'close', 'Ada caught up with the room');
+      await b.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.pendingZoom === null)`,
+        { desc: 'Bram’s own copy of the flip releases his' });
+      assert.deepEqual(await a.dbg('wallPositions()'), await b.dbg('wallPositions()'),
+        'and the walls agree, which is what the deferral is protecting');
+      assert.equal((await a.entryState(held)).hidden, false, 'the reveal itself still landed');
+    },
+  },
+  {
+    name: 'spawn-inside-walls',
+    tags: ['roll', 'perf', 'cuj8'],
+    timeout: 300000,
+    // C28 ① — NO DIE IS BORN INSIDE A WALL, and the ROADMAP's own diagnosis of
+    // this was wrong in a way worth keeping in front of whoever reads the
+    // scenario. It checked the X axis, found the spread never went negative
+    // there, and concluded the bug did not exist. But `Math.min(TABLE_W - 4.4,
+    // …)` was applied to all FOUR throw sides, and two of them spread along Z,
+    // where the mat is 6.7 rather than 11. Measured over 144 paired throws: 16
+    // started a die through a wall plane, worst 0.29 units in — invisible in
+    // the film and a frame-zero contact storm in the recorder.
+    //
+    // So this scenario carries a NEGATIVE CONTROL, and it is not decoration:
+    // `clear` is a derived number, and a probe that always answers ≥ 0 —
+    // because the sign convention flipped, say, or because the line stopped
+    // being recorded at all — would pass this scenario forever while measuring
+    // nothing. `axis: 'width'` is the pre-2026-08-14 formula, still reachable
+    // through setSpawn precisely so the instrument can be shown to work.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.60', name: 'Ada' });
+      // The tightest mat, which is where the room to spread is smallest.
+      await a.dbg(`setZoom('close')`);
+      await a.waitFor(`window.__diceDebug.zoom === 'close'`, { desc: 'the close mat' });
+
+      const sweep = async (seeds) => {
+        const out = [];
+        for (let i = 0; i < seeds; i++) {
+          await a.roll('3d20');
+          const line = await a.dbg('spawnLine()');
+          assert.equal(line.length, 3, `every die of throw ${i} is on the line`);
+          out.push(...line);
+          await a.dbg('clearTable()');
+          await a.dbg('sim(240)');
+        }
+        return out;
+      };
+
+      // THE SHIPPED THROW. d20s, because a big die's hull is what eats the
+      // clearance, and the clamp works per die off that die's own hull.
+      const shipped = await sweep(12);
+      const worst = Math.min(...shipped.map((d) => d.clear));
+      assert.ok(shipped.length === 36, `36 dice measured (got ${shipped.length})`);
+      assert.ok(worst >= 0,
+        `no die is born inside a wall over 12 seeds (worst clearance ${worst}, `
+        + `offenders ${JSON.stringify(shipped.filter((d) => d.clear < 0))})`);
+      assert.ok(shipped.some((d) => d.side === 0 || d.side === 1),
+        'and the sweep reached the sides that spread along Z, which is where the bug was');
+
+      // THE NEGATIVE CONTROL. The old formula, on the same mat, with the same
+      // dice: if this does not produce a die through a wall, the measurement
+      // above is not measuring anything.
+      await a.dbg(`setSpawn({axis: 'width'})`);
+      try {
+        const old = await sweep(20);
+        const bad = old.filter((d) => d.clear < 0);
+        assert.ok(bad.length > 0,
+          `the pre-fix formula still puts dice through walls, so the probe works `
+          + `(0 of ${old.length} negative — if this is ever 0, the instrument is broken, `
+          + `not the fix vindicated)`);
+      } finally {
+        await a.dbg(`setSpawn({axis: 'clamp'})`);
+      }
+      assert.equal((await a.dbg('spawn')).axis, 'clamp', 'and the shipped throw is restored');
+    },
+  },
+  {
+    name: 'one-seed-one-film',
+    tags: ['roll', 'perf', 'resync', 'cuj8'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: goal 8's claim about the table is "the same dice at
+    // the same poses", and the viewport is the input most likely to leak into
+    // the film by accident — the framing ladder reads `view.width`, the orbit
+    // rule branches on whether the mat fits, and both of those run on the same
+    // frames the physics does. A camera decision that reached the throw would
+    // put two players at the same table watching the same seeded roll land
+    // differently, on the one axis nobody thinks to vary.
+    //
+    // 390 and 1600 are a phone and a desktop: the two ends of the ladder,
+    // which is the thing being ruled out.
+    async fn(ctx) {
+      const phone = await ctx.newTable({ origin: '127.0.0.61', name: 'Phone' });
+      const desk = await ctx.newTable({ origin: '127.0.0.62', name: 'Desk' });
+      await phone.page.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 390, height: 844, deviceScaleFactor: 1, mobile: false }, phone.page.sessionId);
+      await desk.page.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false }, desk.page.sessionId);
+      try {
+        await desk.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+        // Confirm the two really are framing differently, or the claim below
+        // is about two identical tabs.
+        const fp = await phone.dbg('framingInfo()');
+        const fd = await desk.dbg('framingInfo()');
+        assert.notEqual(fp.view, fd.view, `the two tabs are different sizes (${fp.view} / ${fd.view})`);
+
+        await phone.roll('3d20 # One film');
+        const rid = await phone.rollId();
+        await desk.waitFor(shroudSettled(rid, 3).replace('shroudedCount', 'tableDice.length'),
+          { desc: 'the roll plays out on the desktop too' });
+        await phone.settle();
+        await desk.settle();
+
+        const a = await phone.dbg('feltPoses()');
+        const b = await desk.dbg('feltPoses()');
+        assert.equal(a.length, 3, 'three dice on the phone’s felt');
+        assert.deepEqual(a, b,
+          'the same dice at the same poses, quantised — the viewport is not an input to the film');
+        assert.equal(JSON.stringify(a), JSON.stringify(b),
+          'byte-identical as strings, which is the form two clients can actually compare');
+      } finally {
+        for (const t of [phone, desk]) {
+          await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId)
+            .catch(() => {});
+        }
+      }
+    },
+  },
+  {
+    name: 'framing-inert',
+    tags: ['fx', 'look'],
+    // C27's RESIDUAL SHIPPED AS AN INSTRUMENT, NOT A DEFAULT, and this is the
+    // cheap pin that it stayed one. The measurement refused the change for the
+    // common case (three dice on a 390px phone already span most of the mat, so
+    // letting the eye approach buys 0px there) and found the real gain on
+    // devices where the mat FITS — which is exactly where taking it would crop
+    // the felt on every small roll. So `FRAMING` ships inert and the frame is
+    // bit-identical with it off.
+    //
+    // An authored default flipping to true is a one-character change with no
+    // failing test anywhere near it: every framing scenario would go on
+    // passing, because they all measure what the ladder DID rather than what it
+    // was allowed to do. This costs a few milliseconds and no dice — which is
+    // why it can carry `look`, and why it is a scenario rather than a comment.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.63', name: 'Inert' });
+      assert.deepEqual(await a.dbg('framing'), { preferDice: false, floor: 1, gain: 1.15 },
+        'the C27 dials ship inert — preferDice off, and the floor at the preset '
+        + 'so the eye may never come closer than the zoom says');
+    },
+  },
 ];
