@@ -376,7 +376,7 @@ const SETTING_SPECS = {
   tower: {
     default: 'none',
     validate: (v) => typeof v === 'string'
-      && ['none', 'heartwood', 'bastion', 'blackanvil', 'hollowbole'].includes(v),
+      && ['none', 'heartwood', 'bastion', 'blackanvil', 'nullstone', 'hollowbole'].includes(v),
   },
   // The venue (GOALS goals 13–15): the whole staging of the table as ONE
   // room-wide choice — 'table' is the grounded room everyone knows; a

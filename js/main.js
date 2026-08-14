@@ -109,6 +109,7 @@ const ZOOM_LEVELS = [
 //   heartwood  ← Wildwood
 //   bastion    ← Classics
 //   blackanvil ← Emberforge
+//   nullstone  ← Umbra (Void Grain)
 //   hollowbole ← the fae VENUES (Moonrise Glade / Foxfire Hollow)
 // The tower is that family's world in furniture — Emberforge's Black Anvil
 // die is black iron with molten digits, and its tower is the forge the iron
@@ -249,6 +250,64 @@ const TOWERS = {
       clunkVoice: {
         body: 'chime', weight: 0.85, sustain: 70,
         shaft: { delayS: 0.0025, combGain: 0.6, mode1Hz: 520, mode2Hz: 1040 },
+      },
+    },
+  },
+  nullstone: {
+    id: 'nullstone',
+    // THE PHYSICAL HALF, and it declares the HOLLOW BOLE's portals — the same
+    // eight numbers, field for field. That is the cosmetic/physics split
+    // being spent rather than described: a tower that reuses a shipped spec
+    // bakes a film that has already been probed, so `towerFilmDigest` returns
+    // one hash for both towers and this row shipped with ZERO dice
+    // simulations in its validation. The portals are not written here either
+    // — the bake declares them and towerModelEnsure freezes them on, so the
+    // one claim a MODEL cannot make about itself is the only one authored.
+    physical: {
+      // NOT bare, and the opposite of the Bole's ruling for the opposite
+      // reason: that tower stands in a glade whose own ground dresses the
+      // engine's apron, and this one stands in the grounded room where
+      // nothing else will. An unclad ramp there is a die riding an invisible
+      // plane with felt showing under it, so the model clads both colliders —
+      // the fallen shard IS the ramp — and check.py's lane gate measures the
+      // cladding against the collider planes (81/81 ramp, 162/162 lip).
+    },
+    cosmetic: {
+      label: 'Nullstone',
+      // ONE FILE, no palette variants: this house has one sky.
+      glbUrl: '/models/towers/nullstone.glb',
+      skin: (v) => towerGlbSkin('/models/towers/nullstone.glb', v),
+      title: 'Nullstone — a cleaved block of black stone; dice fall into the cut and out of the bite',
+      // THE FAMILY TRAIT, and this house has no fire to light it with. Every
+      // other tower's ember is a flame somebody struck; Umbra's whole claim is
+      // that it gives nothing back, so the light at the door is the UNMAKING
+      // itself — the die set's own witchlight (#cfe98c, the dissolve shader's
+      // burning edge), cold, low and short-reach, raking down the doorway's
+      // reveal and onto the shard a die arrives on. `at` is [x, y, z offset
+      // from z0] and matches the bake's `doorPad` marker.
+      ember: { at: [-1.55, 3.95, -0.34], color: '#cfe98c', intensity: 2.4, dist: 4.4 },
+      // A BLACK SURFACE IS MOSTLY REFLECTION, so the rake that flatters pale
+      // masonry would just put the room on it. Black Anvil took 0.4 for the
+      // same reason; this one goes lower still — the identity is a hole in the
+      // light, and every lumen the lantern adds is arguing with it.
+      lantern: { rake: 0.45 },
+      // NO DUST. Stone that has never worn does not shed, and the mote layer
+      // is Heartwood's trait (js/motes.js keys on this flag).
+      motes: false,
+      // NO MOVING DRESS: nothing on this tower sways, smokes or grows. The
+      // registry loop reads this flag and asks for what a row declares, so
+      // "no dress" is a claim rather than an omission.
+      dress: false,
+      // A SUBTRACTED CLICK. `hush` is the Void Grain die's own voice (js/
+      // themes.js) and this is the tower it came out of: the body is that
+      // hush at stone weight, and the shaft is the tightest, deadest comb in
+      // the set — a bore through solid rock returns almost nothing, so the
+      // comb gain is the lowest here and the two modes are low and close
+      // together. Reasoned from the table (docs/AUDIO.md §2.4), not yet
+      // listened to — Joe's dial, like every other voice in this registry.
+      clunkVoice: {
+        body: 'hush', weight: 0.75, sustain: 25,
+        shaft: { delayS: 0.0045, combGain: 0.34, mode1Hz: 240, mode2Hz: 430 },
       },
     },
   },

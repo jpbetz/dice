@@ -257,9 +257,11 @@ try {
   //
   // Both palettes are asserted separately and BY BYTES, not by listing a
   // directory: the two-variant row is the thing that can half-ship.
-  for (const pal of ['moonrise', 'foxfire']) {
-    await t(`/models/towers/hollowbole_${pal}.glb is served as a GLB`, async () => {
-      const res = await fetch(`${base}/models/towers/hollowbole_${pal}.glb`);
+  // Nullstone rides the same list: one file, no palettes, and the same way to
+  // half-ship it (a registry row pointing at a url nobody committed).
+  for (const pal of ['hollowbole_moonrise', 'hollowbole_foxfire', 'nullstone']) {
+    await t(`/models/towers/${pal}.glb is served as a GLB`, async () => {
+      const res = await fetch(`${base}/models/towers/${pal}.glb`);
       assert.equal(res.status, 200, `the ${pal} model must be fetchable from the page origin`);
       // octet-stream, like the fixture above: `.glb` is not in MIME and does
       // not need to be — GLTFLoader fetches an arraybuffer and sniffs the

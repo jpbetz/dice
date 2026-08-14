@@ -11123,11 +11123,26 @@ export const scenarios = [
         //     off-policy material a skin's props could have introduced.
         const dr = await a.dbg('towerDressAudit()');
         const names = dr.groups.map((g) => g.name);
-        assert.ok(names.includes('towerSkinDress'),
-          `${id}: the opaque props live in towerSkinDress (groups: ${names.join(', ')})`);
-        const dg = dr.groups.find((g) => g.name === 'towerSkinDress');
-        assert.ok(dg.meshes > 0 && dg.tris > 0,
-          `${id}: …and it carries geometry (${dg.meshes} meshes, ${dg.tris} tris)`);
+        // V2 ADAPTATION, SECOND HALF (nullstone, 2026-08-13). NEW CLAIM: the
+        // dress GROUP is asked for only where the row says it dresses itself.
+        // OLD: `assert.ok(names.includes('towerSkinDress'))` for every skinned
+        // row. WHY IT MOVED: the motion half below already reads `row.dress`,
+        // but this half still demanded the group unconditionally — so the
+        // first tower to bake ALL of its dress into the GLB and declare
+        // `dress: false` failed a scenario for owning no code-side props,
+        // which is the thing /new-tower v2 asks a baked tower to do. Written
+        // as a BICONDITIONAL for the same reason as the motion line: a row
+        // that declares no dress must carry no dress group either, so an
+        // empty group cannot hide behind the declaration.
+        const dressed = !model.glb || !!model.dress;
+        assert.equal(names.includes('towerSkinDress'), dressed,
+          `${id}: declares dress=${!!model.dress} (glb=${model.glb}), so it must `
+          + `${dressed ? 'carry' : 'carry NO'} towerSkinDress (groups: ${names.join(', ')})`);
+        if (dressed) {
+          const dg = dr.groups.find((g) => g.name === 'towerSkinDress');
+          assert.ok(dg.meshes > 0 && dg.tris > 0,
+            `${id}: …and it carries geometry (${dg.meshes} meshes, ${dg.tris} tris)`);
+        }
         assert.ok(dr.ember,
           `${id}: the registry row carries the family trait — a warm focal light`);
         assert.equal(dr.lights, 0, `${id}: and the skin still brings zero lights`);
