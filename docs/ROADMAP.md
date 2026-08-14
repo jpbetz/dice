@@ -15,30 +15,29 @@ none of them mints one.
 ## How this file is sequenced — read this before THE ORDER
 
 **Two tracks run in parallel, and pretending otherwise is what made this file
-stop being read.** For six weeks GOALS' ladder (core mechanics → organization
-→ secrecy → systems literacy → effects → customization) was the whole
-sequencing story. It is not what happened. Everything that landed between
-2026-08-11 and 2026-08-15 — Tiers W, T, N, B, V — is the *last* band of that
-ladder, and every line of it was commissioned by Joe directly. Meanwhile this
-file went on calling Tier 0 "highest priority" and Tier 2 "the biggest
-experience gap" while neither moved.
+stop being read.** Track A is the debt — correctness, capture, organization,
+ops — sequenced by GOALS' ladder. Track B is the owner's track — venues,
+towers, dice art, immersion — sequenced by what Joe asks for next and by
+*finishing what is in flight*.
 
-Neither half of that is wrong. The venue and tower work is the owner steering,
-which outranks a document. The debt is real debt. What was wrong was a single
-ranked list that described neither.
+**On 2026-08-15 fifteen of the previous ORDER's sixteen entries were worked in
+one batch** (record in [SHIPPED.md](SHIPPED.md)). That changed the shape of
+this file more than it changed its length, and three things follow:
 
-- **Track A — the debt.** Correctness, capture, organization, ops. Sequenced
-  by GOALS' ladder, worked when the owner is not steering elsewhere.
-- **Track B — the owner's track.** Venues, towers, dice art, the immersion
-  shortlist. Sequenced by what Joe asks for next, and by *finishing what is in
-  flight* before opening the next tier.
-
-**THE ORDER below interleaves them and is the real answer to "what next".**
-It cites sections; the sections hold the reasoning.
-
-**One judgement call still Joe's**, carried from the library pass: "pools and
-settings" was read as name + system + dice set + pools, leaving sound and
-chips device-global on js/portable.js's existing reasoning.
+1. **Track A no longer has a data-loss hole or an ops hole.** Restore ships,
+   `/health` ships, the static handler serves the app, the room-creation budget
+   is in. What is left on this track is one large unbuilt feature, one
+   accessibility gap, and a long tail of design-first items.
+2. **Track B is now almost entirely blocked on Joe's eyes and ears, and it grew
+   today.** Five LOOK verdicts outstanding, five voices reasoned from a table
+   and never heard, one framing call and one composition call that no
+   measurement can make. **Nothing on Track B advances until that queue moves**,
+   which makes it the single highest-leverage hour in this file.
+3. **Twenty of this file's own claims were false when checked against the
+   tree** — see SHIPPED.md's table. They were not sloppy; each was true when
+   written and had stopped being true. The rule that follows is not "write more
+   carefully", it is **re-derive before you build**, and every entry below that
+   rests on a measurement now says when it was taken.
 
 ---
 
@@ -46,38 +45,25 @@ chips device-global on js/portable.js's existing reasoning.
 
 | # | Item | Why it is here | Size | Track |
 | --- | --- | --- | --- | --- |
-| 1 | [**C15** — restore a library from its file](#c15-restore-the-file-this-app-writes-cannot-be-read-back--cuj13-small-medium) | The only **data-loss** hole open. Export works; restore does not exist. A player holding the file still cannot get their characters back. Goal 7's whole persistence story rests on this one verb, and the design is already written against the tree. | small-med | A |
-| 2 | [**§0j** — per-IP room-creation throttle](#0j-operational-going-online-deploy-side) | A script burns all 500 `MAX_ROOMS` slots and locks a real game out with `server_full`. Cloud Armor rule, not in-server (§0d's F1 lesson). Also the named **blocker on §3b L4**. | small | A |
-| 3 | [**§0j** — `/health` + `GIT_SHA`](#0j-operational-going-online-deploy-side) | No way to say which commit is live. This is the operational half of the frozen-mtime incident that already cost a production debugging session. | tiny | A |
-| 4 | [**W5 look**, **W6**, **W7 ②**](#tier-w--the-first-fantasy-venue-the-fae-set) | Tier W is the only tier in flight. Finishing it beats opening anything. W5's own read is genuinely unasked (W7 answered a different question); W6 is the tier's last step; W7 ② is the staging Joe named. | med | B |
-| 5 | [**C25 Stage 2**](#c25-the-physical-shelf-does-not-fit-the-mat-any-more--stage-2-open) | The hole in the middle of **CUJ9**: with the log closed a collected roll has no ambient presence at all. **Absorbs U20 and C13** rather than solving the same surface three times. The store is already correct — this is a VIEW. | med | A |
-| 6 | [**C1** + **C3**'s open half](#c1-cuj8cuj11--the-session-named-and-then-walked--medium) | Composed scenarios for CUJ8–CUJ11 (and CUJ2, CUJ4, CUJ12). Measured, not theoretical: `prepared-seat` was green for weeks while CUJ3/CUJ7 were broken for **every returning player**. Every part passed; the journey did not. | med | A |
-| 7 | [**C11** + **C12**](#c11-the-seat-picker-is-unusable-on-the-phone-it-is-designed-for--cuj7-small) | CUJ7 on the device the link actually arrives on. The picker overflows a phone with no scroll — **and no scenario ever clicks a real `.seat-btn`**, so all six CUJ7 scenarios are green through it. | small | A |
-| 8 | [**C27** residual (merge **C24**)](#c27-the-framing-target-was-never-the-dice--one-case-left) | The canonical Soul Deal roll — attribute + skill + motivation, three dice — gained nothing from either shipped framing fix, on the device Joe named. It is the roll this app is most often asked to show. | med | A |
-| 9 | [**C14**](#c14-finding-and-repeating-a-roll--cuj9-small-medium) | CUJ9's other half. The log is the only path to "ten minutes ago" and has no search, filter or anchor; the ≣ unread count exists only as a `title` that touch and screen readers never get. | small-med | A |
-| 10 | [**C29**, **C28**, **C22**](#c29-the-static-handler-serves-the-repo-not-the-app--small) | The verified-small batch. Static allowlist; the spawn clamp that stopped tracking `TABLE_W`; the ceremony path that never flushes a deferred zoom (a real determinism seam); a versioning contract for client state. | small each | A |
-| 11 | [**U23** — the token layer](#u23-a-token-layer-for-the-doctrine--design-first-medium) | Structural. It is what makes U6, U9 and U10 *stay* fixed: `[aria-pressed="true"]` resolves to nine dresses across four hue families, selected by DOM ancestry. Also the vocabulary C25 Stage 2 needs. | med | A |
-| 12 | [**§1** re-audit](#1-notation-totality-closeout--re-audit-first) + [**§2l** ⑤–⑦](#2l-pool-analysis--the-ledger-sheet-and-the-sum-read--⑤⑦-open) | §1 is mostly stale — GOALS records both headline violations CLOSED and the tree agrees. Re-audit what is genuinely left before building. §2l's ledger sheet is the typed session target C8 deliberately did not ship. | small | A |
-| 13 | [**§3** re-derivation](#3-table-organization--concurrency--needs-re-derivation-post-c25) | Goal 5's tier. **Written before C25 took the shelf off the felt**, so per-roll chips and landing zones may be largely moot. The live half is **table resync**: a reload shows an empty felt while everyone else sees dice — a goal 8 divergence on every reload. | med | A |
-| 14 | [**U25**, **U26**](#u25-the-tables-smaller-seams--batch-small-medium) | The two audit batches. Each item is small; together they are what a first table night runs into. U26's spectator bullet is **CUJ11's first item**. | small-med | A |
-| 15 | [**T15**](#t15-re-bake-the-three-classic-skins-through-the-forge--large-scoped-2026-08-14) | Owner-commissioned off T14's measurement, and explicitly **not a side quest**: every round is a `/new-tower`-shaped job and a half-migrated tower is a fourth way of building one. Do it deliberately or not at all. | large | B |
-| 16 | [**L4** / CUJ5](#3b-the-lobby-and-the-table-flow--l2-and-l4-open) | The only journey with **zero code and zero scenarios**. Blocked on #2, and nobody has asked for it — which is why it sits below work that is being felt. | med | A |
-| — | everything else | Design-first, record-only, or deliberately deferred. Named in its tier below with the reason it is not above this line. | | |
+| 1 | [**Joe's LOOK and LISTEN queue**](#tier-w--the-first-fantasy-venue-the-fae-set) | **Not a build item, and that is why it is first.** Five LOOK verdicts (W5's living layer, W7 ②'s staging, the Witchlight art, the round-6 stump, C25 Stage 2's record) and five unheard voices. No tower or venue is *done* before its frame is seen, so **every Track B item below is queued behind this**, and it is minutes of Joe's time against weeks of built work that cannot be called finished. | — | B |
+| 2 | [**§2l ⑥** — the sum read](#2l-pool-analysis--⑤-shipped-⑥-the-sum-read-is-the-open-half) | The largest unbuilt thing in this file, and goal 4 names *summing values* as toil the system owes the player. `forecastFor` returns `null` for `dnd`/`none`. Also the **blocker on §5's local statistics** — §2l's engine is the only source of an *expected* value in the tree. | large | A |
+| 3 | [**`#name-modal` has no `aria-modal` and no focus trap**](#3b-the-lobby-and-the-table-flow--l4-shipped-l2-is-a-judgment-call) | Found 2026-08-15, not previously on this list. `a11y-modals` proves those two ship together or neither does, and the picker is absent from its list — a blocking overlay with no modality annotation and no trap, on **the one screen in the app that exists for a phone**. | small | A |
+| 4 | [**C22's `room.setup` stamp**](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15) | Half a contract is worse than none. The stamp must come from the WRITER (`maybeRepushTable`); a stamp only the server writes is a stamp nobody can trust. ~10 lines once someone owns that site. | small | A |
+| 5 | [**§5** — roll-log export](#5-capture-mechanisms) | Goal 7's last uncapturable surface: the online log cannot be copied or downloaded. Reuses `portableDownload()` rather than inventing a second save path. Small, and it is the half of §5 that does **not** wait on #2. | small | A |
+| 6 | [**9d follow-up** — `tower` in the portable YAML](#9d-follow-up-tower-and-venue-in-the-portable-yaml) | `TABLE_KEYS` is still `{name, felt, system, zoom}`, so a prepared table cannot arrive with its tower up — the one place these settings are not treated like their neighbours. **Ship `tower` alone**; GOALS punted how a venue rides the file. | small | A |
+| 7 | [**C30 residual** — deaden + grip, with sleep off](#c30-residual-deaden--the-only-lever-that-touches-the-dithering) | `deaden+sleepoff+gate4` buys the **best shake and hop numbers measured anywhere on this table** and fails four of six gates. Grip recovers 70% of the glide and **has never been run with sleep off** — that is the untried experiment. The pile's untried lever is spawn geometry, which moved on 2026-08-15, so the pairing is worth re-running. | med | A |
+| 8 | [**§3b L2**](#3b-the-lobby-and-the-table-flow--l4-shipped-l2-is-a-judgment-call) | Judgment, not plumbing: should the pre-join peek say how many people are here? Cheap, answers "did I follow the right link?", and runs straight into `handleTableInfo`'s deliberate privacy omission. | small | A |
+| 9 | [**U16**, **U21**, **C26**](#u16-draft-intent-in-the-well--design-first-medium) | The design-first trio, and they are stuck for the same reason: each needs a doctrine call before any code is right. U16 — the live draft has no carrier for intent. U21 — the collapsed rail deletes multiplayer. C26 — `Change seat…` wears a seat-shaped label on a name-wiping verb. | med | A |
+| 10 | [**B1** / identity persistence](#tier-b--the-closed-beta) | The structural bet whose bill arrived: `dice.name.v1` is origin-global and `playerId` is minted per-join, and both are load-bearing for **authority** and **routing**. B1 is the feature that needs a stable *who*. Unchanged by today's batch, and now the oldest un-actioned item here. | med | A |
+| 11 | [**T15**](#t15-re-bake-the-three-classic-skins-through-the-forge--large-scoped-2026-08-14) | Owner-commissioned, explicitly **not a side quest**: every round is a `/new-tower`-shaped job and a half-migrated tower is a fourth way of building one. **Queued behind #1** — its bar is Joe's eye, and starting it while five verdicts are outstanding adds to that queue instead of clearing it. | large | B |
+| 12 | [**§4b**, **V3–V5**, **U28b**'s near-misses, the small findings below](#4b-visibility-refinements) | The tail. Each is real, none is urgent, and several are one line. The new findings from the 2026-08-15 batch are listed under [What the batch left behind](#what-the-2026-08-15-batch-left-behind). | small each | A |
+| — | everything else | Design-first, record-only, or deliberately deferred. Named in its tier with the reason. | | |
 
-**Three standing calls that are not build items** and should be made before
-the work they gate:
-
-- **Identity.** `dice.name.v1` is origin-global, `playerId` is minted
-  per-join, and both are load-bearing for **authority** (`revealAuthority`)
-  and **routing** (the seat door). GOALS §7 defers persistent identity to "a
-  later pass" — and **B1 is the feature that needs it**. Schedule the pass
-  before the next one arrives. See [Structural risks](#structural-risks-bets-not-bugs--each-gets-more-expensive-to-reverse).
-- **What comes out of beta** ([B3](#tier-b--the-closed-beta)) — no criterion
-  exists and none should be invented before there is a second beta feature to
-  generalise from.
-- **Joe's LOOK and LISTEN queue** is the real critical path on Track B: four
-  outstanding LOOK verdicts and five voices reasoned from a table and never
-  heard. No tower or venue is *done* before its frame is seen.
+**Two standing calls that are not build items:** what comes out of beta
+([B3](#tier-b--the-closed-beta)) — no criterion exists and none should be
+invented before there is a second beta feature to generalise from; and the
+"pools and settings" reading carried from the library pass, left as name +
+system + dice set + pools with sound and chips device-global.
 
 ---
 
@@ -130,83 +116,84 @@ were not.
 
 ### 0j. Operational going-online (deploy-side)
 
-- **Add `/health` + bake `GIT_SHA` into deploy** — verified absent
-  2026-08-14: neither string appears in `server.js` or the Makefile. There is
-  no way to confirm which commit is live without triggering known behavior,
-  which is exactly the position the frozen-mtime bug left us in. Small code +
-  Makefile change (`--set-env-vars GIT_SHA=$(git rev-parse HEAD)`).
-- **Per-IP room-creation throttle** — a script can burn all 500 `MAX_ROOMS`
-  slots and lock friends out with `server_full`. **Cloud Armor rate rule, not
-  in-server buckets**: §0d's killed F1 established that
-  `req.socket.remoteAddress` collapses to a single value behind Cloud Run's
-  proxy. This is the named blocker on §3b L4.
+**`/health` + `GIT_SHA` and the room-creation budget SHIPPED 2026-08-15**
+(SHIPPED.md). What is left is one decision and a short list.
+
+**THE DECISION, and it is Joe's: do NOT buy Cloud Armor yet.** The entry above
+said "Cloud Armor rate rule, not in-server buckets", and both halves needed
+re-deriving:
+
+- §0d's F1 objection — that `req.socket.remoteAddress` collapses behind the
+  proxy — **was already stale**. `clientAddr()` has parsed `X-Forwarded-For`
+  leftmost for weeks and `handleClientError` already shipped a per-IP limiter
+  keyed off it. So an in-server budget went in.
+- The **real** objection, which this file never stated, is that Cloud Run
+  *appends* to client-supplied XFF, so the leftmost hop is forgeable —
+  evadable by rotation, and abusable to spend a victim's budget. That is why
+  the shipped rule fails OPEN and is defence in depth, not a boundary.
+- Cloud Armor attaches to a **backend service**, so it means a global external
+  ALB (~$18–25/mo — the same one DEPLOY.md already refused on cost), plus
+  ~$5/mo policy and ~$1/mo/rule, plus replacing the domain mapping, **and the
+  `run.app` URL bypasses all of it** unless ingress changes too. Against an
+  attack that is not persistent (unprepared rooms die on empty; a streamless
+  joiner is reaped in ~60 s), detect-and-respond wins. The free log-based-metric
+  alert is written up in DEPLOY.md; running it is a `gcloud` act only Joe can do.
 
 **Nice-to-have:** memory>80% Cloud Monitoring alert, `make logs-tail`,
 `X-Robots-Tag: noindex` on HTML, `/admin/rooms` behind a shared secret, a
 DEPLOY footnote for "if you leave Cloud Run", and a DEPLOY note that an OOM
 restart silently wipes rooms.
 
+**Two small things the C29 pass found and did not own:** `.gcloudignore`'s
+comment omits `models/` (which does ship), and `gpu-trace.csv` is tracked at
+top level and uploaded to production for no reason.
+
 ---
 
 ## Tier 1 — Core mechanics completion
 
-### 1. Notation totality closeout — RE-AUDIT FIRST
+### 1. Notation totality closeout — SHIPPED 2026-08-15
 
-**Mostly stale, verified 2026-08-14.** [GOALS.md](GOALS.md)'s Notation
-totality invariant records both audited violations as **closed and
-re-verified**, and the tree agrees: `js/notation.js` carries `check`/
-`cinematic`/`held`/`secret`/`w:` in `FLAG_KEYWORDS`, the `# Title | Subtitle`
-pipe split with escaping, and `exp` in both parse results and canonical
-output. `skipPlainPlayback` exists. Reveal state is projected on every egress
-(`revealed:` in `projectEntryFor`).
-
-**What is left is the small-batch remainder, and it needs re-auditing rather
-than building from this list**, which was written before four passes touched
-these surfaces:
-
-- **struck dice and ✴ children in the banner breakdown** — genuinely open, and
-  narrower than written: U17's build record establishes that `4d6dl1`'s
-  dropped die returned to the **verdict card only**; `renderOutcomeRows`
-  prints only the dice `outcomesFor` returns, so the banner and the peek still
-  show no struck die *under a per-die lens*. That is a live half of GOALS'
-  *Attributed math* and it belongs to whoever next touches
-  `renderOutcomeRows`.
-- `/api/join` carrying `offers` — verify against `joinSnapshot` before
-  scheduling.
+**CLOSED, both bullets.** `/api/join` carrying `offers` was already closed
+(`joinSnapshot` returns them). The struck-die half shipped: the gate was one
+line in the SYSTEM PROFILE, not the renderer. Record in [SHIPPED.md](SHIPPED.md);
+the surface is UX §7.43.
 
 ### 2b follow-ups (from prior shipped passes)
 
 - **720×480 e2e sweep.** The Pools Rack's small-window pass was never landed;
   dense chip line + dots-only switcher + sticky headers need a headless pin at
-  phone-narrow. *(Related and sharper: [C11](#c11-the-seat-picker-is-unusable-on-the-phone-it-is-designed-for--cuj7-small)
+  phone-narrow. *(Related and sharper: [C11](#c11-the-seat-picker-on-the-phone-it-is-designed-for--shipped-2026-08-15)
   — the picker's rendered surface is unproven at any width.)*
 - **Drag-and-drop staging as an additive affordance** *(Joe 2026-08-03 play
   notes)*: tap-to-stage was hard to discover. Tap stays primary; DnD is the
   intuition players arrive with.
 
-### 2l. Pool analysis — the ledger sheet and the sum read — ⑤–⑦ OPEN
+### 2l. Pool analysis — ⑤ SHIPPED, **⑥ THE SUM READ IS THE OPEN HALF**
 
-Full detail: [POOL-ANALYSIS.md](POOL-ANALYSIS.md) — the reasoning, the
-generated data, and what was killed and why. Every figure is reproducible:
-`node tools/pool-analysis-data.mjs`. Serves **CUJ6** and **CUJ8**.
+Full detail: [POOL-ANALYSIS.md](POOL-ANALYSIS.md). Every figure is
+reproducible: `node tools/pool-analysis-data.mjs`. Serves **CUJ6** and
+**CUJ8**. Slices ①–④ shipped 2026-08-06; **⑤ the ledger sheet shipped
+2026-08-15** (UX §7.44 — the typed session target, `placeAnchored` extracted
+rather than copied, and a target the player types may price a shelf the system
+does not, which does *not* contradict C8: C8 stopped the APP inventing a
+ceiling, and a number the player typed invents nothing).
 
-Slices ①–④ shipped 2026-08-06 (math floor, honest preview, profile seam,
-dice-value ledger, spectrum bars, polish wave); pinned by `pool-forecast` and
-`rack-dice-value`.
-
-**Still to build:** ⑤ the ledger sheet (`placeAnchored` extracted from
-`openSetMenuFor`, not ported; session-only target) · ⑥ the sum read · ⑦
-verification + docs.
-
-⑤ is the **typed session target** C8 deliberately did not ship: C8 put the
-*system's* budget on the shelf head (`SYSTEMS['soul-deal'].budget`, `100/100`)
-and left "I am building to 80 tonight" to this slice.
+**⑥ the sum read is genuinely unbuilt, and it is the largest single unbuilt
+thing in this file.** `forecastFor` still returns `null` for `dnd`/`none`. It
+is a full math build — exact convolution, an order-statistic DP for keep/drop,
+two refusals (mixed-type keep/drop, adv+explode), unit vectors, and a rendering
+in `#pop-preview` — comfortably larger than everything ⑤ and §1 did together.
+**Goal 4 names summing values as toil the system owes the player**, which is
+why it stays on the list rather than being cut.
 
 **Decisions still open** (POOL-ANALYSIS §9): whether the parser stops
 collapsing `2d20kh1` · portable-YAML forward compatibility · which popover
-doors forecast · what a pool-scope forecast forecasts, given `stageGroup`
-drops mods while the rail rolls them · the offer card · the e2e tag · where
-the rack figure lives, given `#pools-head` is deliberately non-sticky.
+doors forecast · what a pool-scope forecast forecasts, given `stageGroup` drops
+mods while the rail rolls them · the offer card · mixed adv+explode. *Two were
+taken by ⑤: where the rack figure lives (the head; the figure IS the door, and
+altitude rather than location is what answers the scroll problem) and the e2e
+tag (none — `groups` + `meanings` + `chrome` carried it).*
 
 **GOALS: 4** (goal 4 names *summing values* as toil the system owes the
 player) · **5** · **6** · **7** (render-time, client-side) · **12** closed by
@@ -216,34 +203,16 @@ the session-only ruling.
 
 ## Tier 2 — Organization (goal 5)
 
-### 3. Table organization & concurrency — NEEDS RE-DERIVATION POST-C25
+### 3. Table organization & concurrency — SHIPPED / DEAD 2026-08-15
 
-**Written before C25 Stage 1 took the shelf off the felt**, and that changed
-the premise. The felt now holds one roll at a time with prior rolls
-auto-collected, so "a new roll erases every older roll's chips while its dice
-remain" may no longer be reachable. **Re-derive against the shipped felt
-before building any of this.** What each bullet is worth today:
+**Table resync shipped**, and three of the four bullets turned out to be dead
+post-C25 — the felt holds one roll, so per-roll chips lifetime, per-roll landing
+zones and ordered eviction have nothing left to organise. Record in
+[SHIPPED.md](SHIPPED.md). *If [§12](#12-per-player-roll-mats) or
+[6b](#6b-dice-on-card--bg3-cinematics--the-seated-shelf--decisions-pending) ever
+needs landing zones, they are unbuilt — this section is not where that lives.*
 
-- **Per-roll chips lifetime** (chips keyed by rollId, kept until Done/evicted)
-  — likely moot; verify.
-- **Per-roll landing zones** (deterministic allocation from the roll
-  seed/order) — likely moot for concurrency, but it is the machinery
-  [§12](#12-per-player-roll-mats) and [6b](#6b-dice-on-card--bg3-cinematics--the-seated-shelf--decisions-pending)
-  both assume exists.
-- **Ordered eviction, not the 40-dice wipe** — evict oldest settled rolls one
-  at a time via the existing sink/fade, ordered by server roll time so all
-  clients converge; kill the client-relative full reset.
-- **Table resync — THE LIVE HALF, and it is a goal 8 defect.** Hello does not
-  carry which logged rolls still sit on the table, so joining or reloading
-  shows an empty felt while everyone else still sees dice. `replaySettledRoll`
-  already exists (built for the tower's held-replay path) and is most of the
-  mechanism; the missing piece is the hello payload and the settled (final
-  pose, no tumble) replay path for the general case.
-
-*§3 is ONE felt's organization. Organizing across tables is §3b, which shares
-only the word "table".*
-
-### 3b. The lobby and the table flow — L2 and L4 open
+### 3b. The lobby and the table flow — L4 SHIPPED, L2 is a judgment call
 
 The journeys this serves are **CUJ1–CUJ5**; `Ln` builds `CUJ(n+1)`. L0, L1 and
 L3 shipped 2026-08-07 (detail in SHIPPED.md §3b).
@@ -257,20 +226,28 @@ right link?"). Note the constraint C10's first attempt found the hard way —
 `handleTableInfo` deliberately omits the roster (server.js — *"No players, no
 roster, no log, no offers"*), and that is a privacy decision, not an oversight.
 
-**L4. Sub-tables (CUJ5) — the only journey with zero code and zero
-scenarios.** Split creates a child room, listed to the parent's players (the
-scoped directory below) and carrying a parent pointer, so "return to the main
-table" is a link rather than a thing you have to remember. **§13's hard part
-turns out not to be hard:** the display name is origin-global
-(`dice.name.v1`) and so are the pools, so identity walks into a breakout for
-free; the seat being per-room is *correct* — a child table mints its own.
-Open: whether a child inherits the parent's felt and system (probably — same
-game), and what an orphaned child is when the parent's linger expires
-(answer: just a table).
+**L4. Sub-tables (CUJ5) — SHIPPED 2026-08-15.** UX §7.46,
+`POST /api/split`, `tests/subtables.test.mjs`. §13's claim that identity walks
+into a breakout for free was **verified true**: `dice.name.v1`,
+`dice.groups.v1` and `dice.profiles.v1` carry no room suffix and
+`dice.seat.v1:<room>` does. Both open questions were decided and argued in
+SHIPPED.md: the child inherits `felt·system·zoom·tower·venue` **as a copy,
+never a link**, and refuses the parent's *name*; and the orphan needs no
+reaping at all, because **the pointer is a room KEY, not a handle** — following
+it walks into a room with that key exactly as any invite link does. What ends
+with the parent is its *directory*, which `lingerRoom` clears beside `log` and
+`offers`, because a room returning eleven hours later listing dead doors would
+be lying.
 
-**BLOCKER before any of this is exposed publicly: [§0j](#0j-operational-going-online-deploy-side)'s
-per-IP room-creation throttle.** L1 turned room creation into an
-unauthenticated write; 500 slots are burnable by a script today.
+*The blocker this section named — §0j's room-creation throttle — landed the
+same day. A split mints no room: the child is created by the splitter's
+ordinary `/api/join` under the same budget, and a split-specific allowance
+would be strictly weaker, since joining is never throttled.*
+
+**Two seams recorded rather than hidden:** a *solo* splitter loses their own
+directory when the parent dies with them (a split implies someone stays, and
+the §G6-shaped heal would be a second writer nobody needs), and the breakout
+ghost renders ahead of the unclaimed-seat chairs because that branch returns.
 
 **Joe's three standing rulings, recorded so the review does not re-litigate
 them:**
@@ -353,7 +330,7 @@ the ladder.
 
 *The file door, the table file and "persistent identity and saves" left this
 tier into Tier G and shipped (SHIPPED.md). The restore half is
-[C15](#c15-restore-the-file-this-app-writes-cannot-be-read-back--cuj13-small-medium),
+[C15](#c15-restore-the-file-this-app-writes-cannot-be-read-back--shipped-2026-08-15),
 which is #1 in THE ORDER.*
 
 ### 5b. Persistence beyond the file — DEFERRED, and the cut is a decision
@@ -424,7 +401,7 @@ meshes. Four routes were priced; three lost:
   peek doing the talking; a standing card per collected roll is louder
   standing chrome. New contract vs. a middle state (card fades in on approach,
   seats the dice always). Doctrine change — Joe's call, not a drive-by.
-- **Felt real estate.** Seated cards occupy zones; [§3](#3-table-organization--concurrency--needs-re-derivation-post-c25)
+- **Felt real estate.** Seated cards occupy zones; [§3](#3-table-organization--concurrency--shipped--dead-2026-08-15)
   should land first or together, and eviction must know how to retire a card.
 - **Ceremony surface ownership.** Recommendation: keep the HTML cards as the
   type layer (a11y unchanged, aria-live intact), let the plane be pure stage.
@@ -521,7 +498,7 @@ optional delight, never required toil.
 
 Visual skin over §3's zone machinery; mat color per-player, visible to all.
 
-### 13. Breakout rooms — MOVED to §3b L4
+### 13. Breakout rooms — SHIPPED 2026-08-15 as §3b L4
 
 Section number kept so cross-references resolve.
 
@@ -551,7 +528,7 @@ what a person ends up holding rather than about a widget.
 
 ### C2 / C15. Restore a library from the file it was written to — see C15
 
-C2 was the sketch; [C15](#c15-restore-the-file-this-app-writes-cannot-be-read-back--cuj13-small-medium)
+C2 was the sketch; [C15](#c15-restore-the-file-this-app-writes-cannot-be-read-back--shipped-2026-08-15)
 is the measured shape and supersedes it. Number kept so links resolve.
 
 ### C3. One composed scenario per journey — tags SHIPPED, composed scenarios open
@@ -569,177 +546,49 @@ and CUJ12 have parts but no walk). Plus a line in [TESTING.md](TESTING.md): a
 journey's composed scenario is a release gate, and a feature that changes a
 journey updates it in the same commit.
 
-### C4. One owner per numbering namespace — small, mostly done
+### C4. One owner per numbering namespace — SHIPPED 2026-08-15
 
-CUJS.md owns CUJ numbers (done — it says so at the top). **What is left:** the
-matching line in UX.md §7 stating the next free section number in the document
-that assigns them, so a branch that is out for a week can see what is taken.
-`UX.md §7.24` was written **twice in the same week** by two branches and only
-caught at merge; `CUJ2` collided across three documents. Same root cause, no
-owner. Also repoint the stale citations that say "CUJ2" meaning CUJ7.
+UX.md §7 now carries a NEXT FREE SECTION NUMBER line. It earned itself the same
+afternoon: eight parallel passes claimed §7.39–§7.46, four first wrote themselves
+as §7.39 and two more independently claimed §7.45.
 
-### C5. CUJ5 has zero code and zero scenarios — see L4
+### C5. CUJ5 has zero code and zero scenarios — SHIPPED 2026-08-15
 
-Not a new item — [L4](#3b-the-lobby-and-the-table-flow--l2-and-l4-open) holds
-the design — listed so the zero appears in the same table as everything else.
+L4 shipped: `POST /api/split`, the parent pointer, the scoped directory, and the
+way back. CUJ5 has code; its scenarios are the open half.
 
-### C11. The seat picker is unusable on the phone it is designed for — CUJ7, small
+### C11. The seat picker on the phone it is designed for — SHIPPED 2026-08-15
 
-*CUJ7, step 1 — the link arrives in Discord and is opened on a phone.*
-`#name-panel` is `width: 320px` with **no `max-height` and no `overflow`**,
-inside a centred flex overlay — centred overflow, where the top clips and
-becomes unreachable. `#settings-panel` got exactly this fix with a comment
-explaining why, so the pattern is known and the picker was simply not
-revisited when it grew to hold six seats plus a profile list (seats cap at 12,
-profiles render uncapped to 32). Compounding: `promptName` focuses the input
-unconditionally *before* the peek resolves, and the viewport meta carries
-`interactive-widget=resizes-content`, so the keyboard halves the viewport at
-the exact moment the seats arrive. No `@media` rule touches `#name-panel`.
-`.seat-btn` computes to ~31px, under the 34/44 floor U28 established.
+UX §7.39. `#name-panel` scrolls, the picker family is 44px at coarse, `#name-input`
+is 16px so iOS stops zooming, and focus waits for `(pointer: fine)`.
 
-**Why the suite is green through this:** no scenario ever clicks a real
-`.seat-btn` — every seat act goes through `__diceDebug`. The picker's
-*rendered* surface is unproven by all six CUJ7 scenarios.
+### C12. Three smaller arrival gaps — SHIPPED 2026-08-15
 
-### C12. Three smaller arrival gaps — CUJ7, batch, small
+UX §7.39. Esc + ✕ out of the picker (dismissing to `null` — you are LOOKING, not
+sitting), `Stay as ⟨name⟩` carries the pick and says so, and `⚄ Random` mints only
+at join. **Two claims in this entry were wrong** — see SHIPPED.md.
 
-- **No way out of the picker.** `#name-modal` is not a rung in the Esc ladder
-  (settings, three menus, the popover, the peek and the flyout all are) and
-  has no ✕ and no cancel. You cannot look at the table before committing.
-- **"Stay as ⟨your name⟩" silently forfeits the prepared character**, one line
-  under a hint that says the link offers it. Recovery exists — Settings → Your
-  profiles → *At this table* → `Copy` — three levels down, unnamed at the
-  door, and `Copy` does not activate, so it takes a second act.
-- **`⚄ Random` at the door mints and persists on the tap**, with no undo, to
-  the 32 cap; it is the row pre-selected for a first-timer, i.e. the one Enter
-  aims at, and the only row in that block that is not a lossless pointer move.
+### C13. What a shelf marker owes, past U20 — SHIPPED 2026-08-15
 
-### C13. What a shelf marker owes, past U20 — CUJ9, design → FOLD INTO C25 Stage 2
+Folded into C25 Stage 2 as designed. Rank renders, waiting-on-you is visible to a
+sighted player, and the ring comment that would have stopped the next person is gone.
 
-*Do not solve this surface three times.* CUJS.md and C25 both say C13 and U20
-fold into [C25 Stage 2](#c25-the-physical-shelf-does-not-fit-the-mat-any-more--stage-2-open).
-The three facts C13 contributes that U20's text does not name:
+### C14. Finding and repeating a roll — SHIPPED 2026-08-15
 
-- **Rank.** Slots are ranks oldest→newest — the single most useful fact for
-  "find what happened earlier" — and nothing renders it.
-- **Waiting-on-you.** A held roll's Reveal exists *only* in its peek; the
-  marker writes `— hidden` into its **`aria-label`** and nowhere else. A
-  screen-reader user is told which shelved roll awaits its reveal and a
-  sighted player is not. That inversion is the sharpest evidence the read was
-  decided and half-shipped.
-- **The glow is claimed as the substitute and is not.** The roller-tinted ring
-  blends 45% toward gold and caps alpha at 0.10 — two players' rings differ by
-  ~10/255 on dark felt. The code comment calling it "the joiner's at-a-glance
-  attribution, restored at zero chrome cost" is what would stop the next
-  person from fixing it.
+UX §7.42. `Find a roll…`, the at-cap note, `Clear history`'s real scope, and the ≣'s
+accessible name written every render.
 
-*Note the C25 Stage 1 shift: the marker itself is gone. These are now claims
-about what the log row and the ambient signal owe.*
+### C15. Restore: the file this app writes cannot be read back — SHIPPED 2026-08-15
 
-### C14. Finding and repeating a roll — CUJ9, small-medium
+**The data-loss hole is closed.** `Replace my library…`, plus the four defects in the
+same journey. UX §7.40, PROFILES §12, `js/profiles.js` `rebuildStore`.
 
-- **The log has no search, filter or anchor** (verified 2026-08-14: no such
-  input exists). It is the only path to "ten minutes ago": a 300px column of
-  three-line rows, capped at 100 both ends. Four hours × five players blows
-  100. A late joiner gets the last 100 with `logDroppedTotal` at 0, so they
-  are told nothing about what already fell off.
-- **`Clear history` scope** — re-verify: since C6 the handler *does* clear
-  shelved rolls server-side (`requestClearRoll`), but `log = []` is still
-  local-only, so ordinary logged rolls return on the next `hello`. The label
-  still carries no scope word either way.
-- **The ≣ unread count exists only as a `title`** — U20's exact failure in a
-  second place. `aria-label="Roll log"` is static and *overrides* `title` in
-  the accname algorithm, so screen readers never get the count and touch gets
-  nothing. `__diceDebug` exposes the number, so tests can assert a signal no
-  user can perceive.
-- **Reroll carries state correctly; finding it is the problem.** `r` repeats
-  `lastEntry`, which auto-collect replaced 3 s ago, so the real path is ≣ →
-  hover the row → `⟳`, and `.log-again` is `opacity:0` until hover. Two
-  adjacent notes: `canReroll` refuses hidden entries, so the roller cannot
-  repeat their own unrevealed held roll; and the server substantiates
-  `rerollOfId` on parent existence alone with no same-roller check, so
-  rerolling Bob's roll stamps *Bob's* row `rerolled` in everyone's log.
+### C22. A versioning contract for client state — SHIPPED 2026-08-15
 
-### C15. Restore: the file this app writes cannot be read back — CUJ13, small-medium
-
-**#1 in THE ORDER.** Export is complete and whole-library. Restore is three
-paths and none of them is one: **Apply import** merges only the file's
-top-level `pools:` and ignores `players:` entirely; **Add** and **Add all N**
-run every name through `uniqueName`, so a restored "Nessa" lands as "Nessa 2".
-A fresh browser deals one profile at boot, so `Add all` on a 32-profile file
-needs 32 slots against a cap of 32 and lands **31 of your characters, renamed
-on collision, beside a stranger's dealt profile, with the wrong one in hand.**
-
-**Design (verified against the tree; still absent 2026-08-14 —
-`grep 'Replace my library'` finds nothing):** one verb, `Replace my library…`,
-in the `#import-profiles` block, using the app's existing two-step in-place
-destructive confirm — armed state **names what is destroyed**, not just counts
-it, and offers `Download` inline first, since the thing being replaced may be
-the only copy. Build the replacement store from `importableProfiles()` via
-`emptyStore()` + `addProfile()` with **no `uniqueName`** (the file's names are
-already unique by `parsePortable`), persist it and **check the return** before
-swapping the live pointer, then `adoptRack()` the profile the file's
-`profile:` key names — the pointer every current path silently drops. The cap
-problem dissolves: replacing starts from empty, so 32 fit exactly.
-
-**This is an explicit, separately-named verb — never a sharper Apply.** The
-distinction is the whole safety property: Apply merges and deletes nothing,
-which is what makes it safe to press on a rack you care about. Union-only,
-preview-then-merge is the load-bearing lesson of the `#g=` post-mortem.
-
-Also in this journey, and separate:
-
-- **`parsePortable`'s `warnings` are dead end to end** — produced,
-  unit-tested, returned, and read by nothing. PROFILES §3.1 states the
-  requirement in so many words: *"the warning must reach the preview status
-  line, not vanish."* A file from a newer version silently loses sections and
-  reads as a clean `✓`.
-- **An empty file reads as success-with-nothing-said** (blank status line),
-  while a comments-only file refuses properly. Inconsistent.
-- **Boot normalization is lossy and the loss is written back**: profiles past
-  32, pools past 40 and duplicate lowercase names are dropped *silently*,
-  `STORE_VERSION` is written but never checked, and the normalized result is
-  persisted on the first paint before the user touches anything.
-- **`LS_GROUPS` is a fossil sold as a recovery path.** The comment calls it
-  "the one recovery path if the library is ever cleared"; it is read once at
-  boot and never written again. For anyone whose first visit postdates the
-  library, the key does not exist.
-
-### C22. A versioning contract for client state — DESIGN, then small
-
-*Joe 2026-08-09, written after the frozen-mtime bug put months-old clients in
-front of a current server with nobody able to say what they were carrying.*
-
-**Three numbers, `epoch.major.minor`, on every stored blob and every wire
-payload that carries state** (`dice.profiles.v1`, the portable file's
-`version:`, `room.setup`).
-
-| Part | Means | Reader's duty when it does not match |
-| --- | --- | --- |
-| **epoch** | *A different data model.* No compatibility offered or implied. | **Purge it**, unless a converter is registered for that exact epoch. A registered converter runs once and rewrites forward. |
-| **major** | *New capabilities exist in this data.* | A reader supporting a LOWER major must **refuse and say so to the user** — never load it partially. Older data with a lower major loads normally. |
-| **minor** | *A compatible change.* Tracking only. | Load it. Nothing branches on minor; it exists so a bug report names a build. |
-
-**The asymmetry is the point, and it is easy to get backwards.** *Older* data
-is a migration problem — the reader knows more than the writer did. *Newer*
-data is a refusal — the reader knows less, and loading it means silently
-dropping what it did not understand. **The loud door is where a human is
-standing.**
-
-**What exists today:** `dice.schema.v1 = 2` does the purge half only.
-`STORE_VERSION` is written into the profile store and **never read**.
-`normalizeStore`/`migrateGroup` are the lossless-migration path and the right
-home for *major*. The portable file has no version field at all.
-
-**Build order.** (1) Fold `dice.schema.v1` into one `{epoch, major, minor}`
-stamp read in one place. (2) Give it a converter registry (`epoch N → N+1`) at
-boot; the purge stays the default. (3) Make **major** refuse out loud with the
-app's `✗ …` grammar, and say what to do. (4) Put the same triple in the
-portable file and `room.setup`. (5) Report the numbers with every crash
-(js/report.js) so the field log says which build wrote the state that broke.
-
-**Not for this:** the live wire protocol. A live client can be told to reload,
-which stored data cannot.
+`js/schema.js`, one `ver: 'E.M.m'` string on the store, the portable file and the
+crash report. **One half is open and it is not small:** `room.setup`'s stamp must
+come from the WRITER (`maybeRepushTable`), and a stamp only the server writes is a
+stamp nobody can trust. ~10 lines once someone owns that site.
 
 ### C24 → merged into C27. The mat cannot keep shrinking
 
@@ -752,9 +601,20 @@ tightenings and one refused fourth — dice at rest counted above y=1.2:
 
 | mat | 6d6 | 12d6 | 20d6 | 40d6 | max height |
 | --- | --- | --- | --- | --- | --- |
-| 8.6×5.2 *(`medium`)* | 1 | 2 | 9/20 | 27/40 | 4.7 |
-| 6.7×4.1 *(`close`)* | 2 | 5 | 15/20 | 32/40 | 6.3 |
+| 8.6×5.2 | 1 | 2 | 9/20 | 27/40 | 4.7 |
+| 6.7×4.1 | 2 | 5 | 15/20 | 32/40 | 6.3 |
 | 5.2×3.2 *(a fourth notch, refused)* | 3 | 10/12 | 17/20 | 32/40 | **9.0** |
+
+**The PRESET NAMES that were in this table are gone, and that is the point.**
+It labelled 8.6×5.2 as `medium` and 6.7×4.1 as `close`. **The ladder shifted
+out on 2026-08-12**: today `wide/medium/close` = **14.1 / 11 / 8.6**, so the
+row this entry called `medium` is today's **`close`**, and the row it called
+`close` does not ship at all. Every mat now in the app is *larger* than the two
+it measured. The measurement and the instruction still bind — a smaller mat
+puts dice off the felt, and the mat is the physics walls so it cannot vary by
+device — but **do not quote a preset name out of this table.** This is the same
+shape as C28 ①'s stale preset table and C27's stand-in that stopped standing
+in: a number that kept its label after the thing it named moved.
 
 A 12-die pool at the proposed fourth notch had ten of twelve dice off the
 felt. That breaks goal 5 and goal 1, and the camera is framed for a flat mat,
@@ -763,40 +623,12 @@ every client, because a seeded roll replayed against different walls lands
 differently — so it cannot vary by device and must hold the largest pool
 anyone rolls. `dice-land-flat` is the pin.
 
-### C25. The physical shelf does not fit the mat any more — STAGE 2 OPEN
+### C25. The physical shelf does not fit the mat any more — SHIPPED 2026-08-15
 
-**Stage 1 shipped 2026-08-09** (SHIPPED.md): the 3D shelf is gone, collecting
-takes dice off the felt via §7.26's lift, and the roll log is the record — a
-collected roll's ROW is the door to the peek card its felt marker used to
-open. Zero wire change, ~220 lines and one invariant deleted.
-
-**STAGE 2 — OPEN, and it is the creative half.** Joe's sketch, unchanged:
-*"previous N rolls as panels across the bottom… maybe we just show the roll
-log briefly and then show it collapse into a UI element that expands the roll
-log… we'd need UI that goes beyond basic buttons and has some elements that
-visually fit together. We'd need to get creative."*
-
-**Stage 1 deliberately left one thing worse and it is the thing Stage 2
-fixes: with the log closed, a collected roll has no ambient presence at all.**
-The ≣ button carries an unread count in its `title` and nothing else. (The bar
-is lower than it sounds — the marker it replaced drew *nothing* at rest
-either — but a row inside a closed panel is a step further away.)
-
-**What Stage 2 takes as settled by Stage 1:** the store exists and is already
-correct, so this is a VIEW; the card is reusable verbatim; and anchoring to a
-DOM row rather than a projected 3D point is what made the whole thing cheap.
-**[C13](#c13-what-a-shelf-marker-owes-past-u20--cuj9-design--fold-into-c25-stage-2)
-and [U20](#u20-the-shelfs-read-at-rest-and-the-peeks-lifetime--design-first--fold-into-c25-stage-2)
-fold in here rather than being solved twice**, and
-[U23](#u23-a-token-layer-for-the-doctrine--design-first-medium)'s token layer
-is the vocabulary for "elements that visually fit together" — this is its
-first real customer.
-
-**What must not regress:** the tidy-away (a finished roll leaves the middle of
-the table on its own) is load-bearing and nobody has complained about it;
-§7.7's collect/clear state machine and its `rollStates` rows are wire, not
-rendering; CUJ9's find-and-repeat ([C14](#c14-finding-and-repeating-a-roll--cuj9-small-medium))
-currently walks the shelf and must walk the record instead.
+**Stage 2 shipped.** UX §7.42, and it absorbed U20 and C13 as designed. Joe's literal
+felt strip was **refused with arithmetic** — five panels across a 390px phone is 78px
+each, which is C24's smudge applied to UI — and `rec-phone-open.png` +
+`rec-five-open.png` are the pair that let him overrule that in one look.
 
 ### C26. `Change seat…` — WITHHELD, owes a design before it returns
 
@@ -818,100 +650,61 @@ table. Swapping which prepared seat you occupy is a real and useful gesture,
 and it is not "drop everything and rejoin". If that is the verb, it belongs
 next to the profile picker, not under a menu item that also deletes your name.
 
-### C27. The framing target was never the dice — ONE CASE LEFT
+### C27. The framing target was never the dice — **INSTRUMENT SHIPPED, THE CALL IS JOE'S**
 
-**The spine: `framingPoints` returns four corners at `y = 0`** — a
-floor-plane frame in a world with height. "The mat is on screen" was only ever
-a *proxy* for "the dice are on screen", and it diverges **exactly where the
-stacking is worst**. Confirmed in the wild: desktop 1440 at 40d6 had the
-deciding die off screen while the mat reported `fits`.
+**The spine still stands:** `framingPoints` returns four corners at `y = 0` — a
+floor-plane frame in a world with height — so "the mat is on screen" was only
+ever a proxy for "the dice are on screen", and it diverges exactly where the
+stacking is worst. Rung 1's descent and the portrait quarter-turn shipped in
+the immersion wave; containing the mat was priced and declined at ~24% of die
+size.
 
-**WHAT SHIPPED (the immersion wave, `d064c04`…`b35b411`)**, both per-viewer —
-the camera shows no one else anything, which is what makes it safe to vary by
-device where the MAT never can be: rung 1 of the framing ladder descends when
-the deciding die is off screen (20 consecutive lone d20s on a 390px phone: 0
-misses); a quarter-turn orbit in portrait when landscape cannot contain the
-mat (20d6 and 40d6 on a 390px phone: 20/20 and 40/40, was 19/20 and 32/40).
-Containing the mat was priced and **declined** — it costs ~24% of die size.
+**What 2026-08-15 changed is that this entry's residual was measured, and it is
+NOT a phone problem.** Die span in px, one fixed seed per pool:
 
-**WHAT IS LEFT, and it is the common case.** The orbit engages at 20d6+; the
-ladder declines to crop when nothing is being lost. So **the canonical Soul
-Deal roll — attribute + skill + motivation, three dice — gained nothing**: mat
-does not fit, mode is dice-cropped, ~75px per die on a 390px phone. A lone d20
-gets 219px and forty dice get all forty on screen; the roll in between gets
-neither. **That is the roll this app is most often asked to show**, and it is
-#8 in THE ORDER.
+| pool | 390px phone | with `preferDice` | iPad-p 834 | desktop 1600 |
+| --- | --- | --- | --- | --- |
+| 1d20 | 266 | 266 | — | — |
+| **3d6** *(the canonical Soul Deal roll)* | **85** | **85** | **119 → 242** | **200 → 245** |
+| 6d6 | 62 | 62 | — | 200 → 236 |
+| 12d6 | 59 | 68 | — | — |
+| 40d6 | 59 | 59 | — | **200 → 184 (worse)** |
+
+**At 390px the option gains nothing at all** — three dice span 3.9×3.0 of an
+11×6.7 mat, so nothing is being cropped and the ladder correctly declines to
+act. The win is on a tablet and a desktop, and at 40d6 it is a loss.
+
+**So it shipped as an instrument, not a default.** `__diceDebug.setFraming({
+preferDice: true })` (add `floor: 0.55` for the aggressive version) is inert
+until Joe says otherwise, and `framing-instrument-is-inert` pins that it stayed
+that way. **The question is not measurable and is his: does a cropped felt
+still read as a table?** Roll 3d6, then 6d6, then 40d6 with it on.
+
+**The rail, not the camera, is the phone's real lever** — a 390px phone gives
+the felt 278px — but the two only pay off together: a full-width felt makes the
+mat *fit*, which sends the frame back to rung 1 and makes dice **smaller**
+(85 → 66).
 
 **THE RULE this entry named, in its third shape — *nothing fails loudly when a
-stand-in stops standing in*.** `SHELF_SLOT_W` was a constant that stopped
-tracking `TABLE_W` (C25). The spawn-spread comment was a rationale that
-stopped tracking the mat (C28 ①). This was a framing TARGET that stopped
-tracking the thing it stood for. None of the three threw an error, failed a
-test, or looked wrong in code review. `grep -n "TABLE_W" js/main.js` is this
-shape's audit, worth running whenever the ladder moves again.
+stand-in stops standing in*.** `SHELF_SLOT_W` stopped tracking `TABLE_W` (C25).
+The spawn-spread comment stopped tracking the mat (C28 ①). This was a framing
+TARGET that stopped tracking the thing it stood for. **And on 2026-08-15 the
+shape recurred twice in this very file** — C28 ①'s preset table and C24's mat
+table both kept their labels a full notch after the ladder moved.
+`grep -n "TABLE_W" js/main.js` is this shape's audit.
 
-### C28. Two more things the zoom ladder left behind — SMALL, both verified open
+### C28. Two more things the zoom ladder left behind — SHIPPED 2026-08-15
 
-**① `spawnDie`'s spread clamp is binding at every preset** (js/main.js:3163 —
-`Math.min(TABLE_W - 4.4, count * 2.6)`, unchanged as of 2026-08-14). Its own
-comment reasons from a mat that no longer exists (*"TABLE_W=18:
-TABLE_W-4.4=13.6, still ample"*).
+Both. The spawn clamp asked the wrong axis and **16 of 144 throws started a die
+through the z-wall**; the deferred room change now flushes on the predicate, because
+there were **four** release paths, not the two named. Two of this entry's claims were
+wrong — see SHIPPED.md.
 
-| preset | TABLE_W | cap | clamp binds from | 12 dice share |
-| --- | --- | --- | --- | --- |
-| wide | 11 | 6.6 | 3 dice | 6.6 units — 3.7 die widths |
-| medium *(default)* | 8.6 | 4.2 | **2 dice** | 4.2 units — 2.3 die widths |
-| close | 6.7 | **2.3** | **1 die** | 2.3 units — **1.3 die widths** |
+### C29. The static handler serves the repo, not the app — SHIPPED 2026-08-15
 
-A die is ~1.8 units across and the intended spread is `count * 2.6`. The clamp
-overrides that from the *second* die at the default. **This is upstream of the
-contact-recorder starvation** fixed in `5a5a8ce` (*"20 dice interpenetrate on
-frame zero and dispatch 280 contacts in that ONE step"*): widening the spread
-should reduce the frame-zero contact count directly, and `contactStats()` is
-already the instrument. *(Caution: this is also the lever C30c/C33 name for
-piling — measure paired, with `throwSeeded`.)*
-
-**② The ceremony path never flushes a deferred room change** (verified
-2026-08-14). `stepPlayback`'s ordinary completion ends `else
-tryFlushRoomChanges()`; `ceremonyFinish` ends at `if (rollQueue.length)
-playRoll(rollQueue.shift())` **with no `else`**. So a room-wide zoom or tower
-arriving during a ceremony roll, with nothing queued behind it, does not land
-when that ceremony ends. It waits for the next collect, the next non-ceremony
-completion, or a hello.
-
-**Why this matters more than it looks:** the mat is the physics walls and is
-room-wide *precisely* so every client replays a seeded roll against the same
-geometry. A client sitting on the old preset while the room moved is the
-divergence the deferral exists to prevent, and the ceremony path is the one
-that skips it. Since C25 a collect fires on the next roll's arrival, so it
-self-heals quickly — which is exactly why it has gone unnoticed. One line,
-plus a scenario that rolls a ceremony roll, zooms mid-beat, and asserts
-`wallPositions()` matches the new preset with an empty queue.
-
-### C29. The static handler serves the repo, not the app — SMALL
-
-**The important half is already handled, deliberately.** `safeResolve` blocks
-traversal and every dotfile, so `.git/config`, `.git/HEAD` and
-`.deploy.config` all return 403, and `Makefile` and `docs/*.md` 404 because
-their extensions are not in `MIME`. **No credential or config exposure**,
-verified path by path.
-
-What is exposed is SOURCE: `curl https://<service>/server.js` returns the
-server's own source, 200. So does `/package.json`, and every `.mjs` under
-`tests/` and `tools/` — 530 KB of `scenarios.mjs` included. The rule is "the
-extension is servable", where it wants to be "the file is part of the app".
-
-**Why small rather than nothing.** Goal 10 already says there is no access
-control — the room key is the door — so the threat model does not change. But
-it hands a reader the server's exact validation logic, room and player caps
-and refusal paths with no effort, and puts half a megabyte of test source
-inside a 1 GiB/month egress allowance for no reason.
-
-**The fix is an allowlist of roots, not a denylist of names** — serve
-`index.html`, `js/`, `css/`, `vendor/`, `models/` and whatever assets exist,
-404 everything else. A denylist would have to grow every time a directory is
-added, which is the same shape as the constants in C28. Nothing in `js/` or
-`index.html` fetches `package.json`, so narrowing costs nothing today.
+Allowlist of roots. **This entry's "no credential or config exposure, verified path by
+path" was false in two ways** and one of them was serving `deploy/config.mk` with the
+billing account in it to any local reader — see SHIPPED.md.
 
 ### C30 residual. Deaden — the only lever that touches the dithering
 
@@ -926,7 +719,7 @@ clock 1.64× and creep +45%. **Four of six gates fail; glide and pile are the
 two nobody has an answer to.** Grip was measured to recover 70% of the glide
 (C30c) and has **never been run with sleep off** — that is the untried
 experiment. The pile's untried lever is spawn geometry (see
-[C28 ①](#c28-two-more-things-the-zoom-ladder-left-behind--small-both-verified-open)),
+[C28 ①](#c28-two-more-things-the-zoom-ladder-left-behind--shipped-2026-08-15)),
 not the nudge — `NUDGE.pileScale` was measured and takes a die off the pile
 once in 24 seeds.
 
@@ -973,43 +766,17 @@ and the answer on a card whose whole virtue is *the name, the answer, the
 exits*. That is a hierarchy call. It is the one residual asymmetry in UX.md
 §7.24's eight-surface table.
 
-### U17 residuals — three sites still disagree with the shipped rule — small
+### U17 residuals — ALL THREE STALE, closed 2026-08-15
 
-*The rule ("a stake renders on every surface under every system; its
-adjudication renders only where the system produces a single number to
-compare") shipped in steps 1–4 and lives in UX.md §7.24. Three sites did not
-follow, and they are the exact shape of the structural risk below.*
+Every one was fixed in `68fdc7a` — *the commit that wrote §7.24* — and neither the
+entry nor §7.24's own *Not closed* paragraph was re-read against the diff beside it.
+Kept as a record because that is the failure mode this file keeps paying for.
 
-- **`modsSummary`'s `values` option was never added** — `renderOffers` still
-  calls `modsSummary(o.mods)` with no options, so **an offer card still prints
-  the flat `+5`** under a per-die lens while the intent card it becomes drops
-  it. The last declaration surface on the wrong side of the split.
-- **The log's total column still answers `?`** for a held roll under a per-die
-  lens — the same mute gold glyph step 2 removed from the banner and the peek,
-  making the same claim of a withheld sum that will never exist.
-- **Step 6, the LOOK, is open.** Per the repo's standing rule U17 is not
-  "done" before it: the verdict card's stake-line rhythm and the peek's
-  `.pk-held` word have not been seen rendered.
+### U20. The shelf's read at rest, and the peek's lifetime — SHIPPED 2026-08-15
 
-*(The struck-die half is filed under [§1](#1-notation-totality-closeout--re-audit-first),
-where the attributed-math invariant lives.)*
-
-### U20. The shelf's read at rest, and the peek's lifetime — DESIGN FIRST → FOLD INTO C25 Stage 2
-
-*Audit F1, F2 (moderate).* The shelf half is superseded by C25 Stage 1 (the
-markers are gone) and its *question* is what Stage 2 answers: how much read
-does a collected roll owe at rest.
-
-**The peek half is still live and independent.** It closes on nothing a player
-expects — not a new roll, not a ceremony, not the log — and at z 30 outranks
-all of them (the repo's own capture run shows it standing through an entire
-Check); two cards can wear a red `✕ Clear` for two different rolls with
-nothing marking which is live; in `body.mini` the banner's top edge cuts into
-the peek; and one roll gets three presentations by arrival path (dressed
-`top:3vh` for 7 s, plain `bottom:26px` for 3 s, reloaded Check comes back
-plain because `replaySettledRoll` passes `exp:null`).
-
-**Do not change the collect-on-arrival rule** — see Refuted.
+Folded into C25 Stage 2. The peek now retires on a new roll, on a ceremony and with
+the log. **The `body.mini` bullet was not reproducible** and a different occlusion is
+open in its place — see the new findings below.
 
 ### U21. What the launcher owes the table — DESIGN FIRST, medium
 
@@ -1027,83 +794,30 @@ swap that is Alice's pools, unlabelled, rolling under your name.
 **Decide the minimum social state a launcher owes.** At least: a browse-mode
 signal, and clearing `poolsOwner` on collapse.
 
-### U23. A token layer for the doctrine — DESIGN FIRST, medium
+### U23. A token layer for the doctrine — SHIPPED 2026-08-15
 
-*Audit C2–C6, and the structural-risk read.* `--dim-rest`/`--dim-off`/
-`--drain`, `--on-fill`/`--on-ink`/`--on-ring`, three die-art sizes, one
-`--label-sm` recipe. **This is what makes U6, U9 and U10 stay fixed.** The
-evidence that it is needed and not taste: thirteen `:disabled` recipes with
-six missing grayscale; `[aria-pressed="true"]` resolving to **nine distinct
-dresses across four hue families**, selected by DOM ancestry rather than by
-kind of choice; and three `.rp-*`/`.seg` cascade ties in three commits, all
-silently winning against the rail block, from one 4.5k-line stylesheet with no
-token layer. **Cascade ties — not file size — are the measured cost of the CSS
-as it stands.** Also the vocabulary C25 Stage 2 needs.
+UX §7.41. **THE KIND OF CHOICE PICKS THE DRESS, DOM ANCESTRY DOES NOT.** Two thirds of
+this entry's evidence was stale and the third was right by coincidence — SHIPPED.md.
 
-### U25. The table's smaller seams — batch, small-medium
+### U25. The table's smaller seams — SHIPPED 2026-08-15
 
-*Audit E4.* Each is small; together they are what a first table night runs
-into.
+UX §7.45. Five of six; **"a room that dies says nothing" was deliberately dropped** and
+is below.
 
-- **Copying the invite link has no primary gesture.** At a table with one
-  other person the Invite chair is gone and the link lives behind
-  right-click/long-press on a chip whose left-click is a visible no-op; the
-  manual is a `title` touch never renders; no keyboard shortcut touches the
-  table at all.
-- **Roster pills shrink to unreadable stubs before `+N` folds** (bare dots
-  plus *two* overflow pills).
-- **`publishPools` broadcasts your entire rack on every edit with no
-  disclosure**, while the one tooltip about pool sharing asserts the opposite
-  ("Pools travel via Settings → Your data → Export").
-- **The change note never names the setting** — "Alice changed the table" for
-  a system flip that reinterprets every result.
-- **An unnamed table renders its minted key** (`drive egw19x`) as the
-  nameplate and tab title, against its own markup comment ("else NOTHING").
-  The marginal *security* cost is nil; the presentation is wrong by its own
-  rule.
-- **A room that dies says nothing** to the group whose link it was (12 h
-  linger, `--min-instances 0`).
+### U26. Lifecycle reads, transport door, terminology — SHIPPED 2026-08-15
 
-### U26. Lifecycle reads, transport door, and the terminology sweep — batch, small-medium
+UX §7.45. **The first bullet — the one CUJS.md names as CUJ11's first item — was
+stale**: §7.28 deleted the auto-collect clock on 2026-08-10, four days after the
+audit found it. CUJ11's first item shipped by deletion before the journey was named.
 
-*Audit F3, plus the two closing results.*
+### U28b. Touch findings — TWO SHIPPED, the near-misses still open
 
-- **The spectator's banner hover-hold silently does nothing** — `armAutoCollect`
-  bails on `!mine`, so the roller's 3 s clock yanks the card a spectator is
-  reading. **This is CUJ11's first item**, and it was found by reading code
-  because no journey named the spectator.
-- **The log row duplicates every source label across two lines** — the
-  diagnosis §7.12 wrote and fixed on the other three surfaces, unfixed here.
-- **A shelved roll whose log row is gone renders a peek with a live body-click
-  and no named verb** — the pre-§7.21 defect surviving in an edge state.
-- **Spectator reroll is deliberate and defensible, but nothing signals the
-  attribution flip or the shelf eviction it causes.**
-- **The whisper sub-line "others see you rolled, not what"** describes a
-  deliberate, thrice-documented stakes-are-public leak in four words that read
-  as the opposite; the offer-context tooltip specified for Only-me was never
-  built.
-- **The terminology sweep found one real contradiction** — one button labelled
-  "shelf" with a tooltip saying "category" — but **the durable half is the
-  suite**: the e2e's banned-word regex omits "category" and sweeps none of the
-  result surfaces.
+`.rd-cell` and the rim wrap shipped (UX §7.45), both coarse-only.
 
-*(U26's transport bullet was re-scoped and is now
-[C15](#c15-restore-the-file-this-app-writes-cannot-be-read-back--cuj13-small-medium):
-the unit is the **library**, not the rack.)*
-
-### U28b. Two smaller touch findings, deliberately deferred — batch, small
-
-- **`.rd-cell`'s 86px cannot hold art + name + remover** at the longest
-  labels; the grown `.rd-x` overlaps a 34px lane of the name. The stylesheet
-  refuses to fix this in cascade — the answer is markup in `renderRailDice`.
-- **The rim is a no-wrap flex row.** At coarse the four tools come to ~240px
-  of the expanded panel's 260 — fine on a tablet, but it already overflows
-  below a ~320px viewport. `flex-wrap` on `.draft-actions`, or a narrower
-  phone dress.
-- **Near-misses the size pass did not take**, because a blanket coarse `.btn`
-  bump touches ~30 surfaces and bumping `#section-bar` spends U30's rack
-  budget directly: the `.btn.ghost` family at 31px, `.corner-btn` at 28
-  expanded, `.btn.tiny` at 19, `#section-bar` cells at 26.
+**Still open, and the reasons still bind:** a blanket coarse `.btn` bump touches ~30
+surfaces and bumping `#section-bar` spends U30's rack budget directly. The families
+are `.btn.ghost` at 31px, `.corner-btn` at 28 expanded, `.btn.tiny` at 19,
+`#section-bar` cells at 26. **Raise by family with the measurement, never in bulk.**
 
 ---
 
@@ -1167,37 +881,25 @@ nobody gave.** Re-ask it on frames where the staging is no longer the loudest
 problem. `tools/steps/life-look.mjs` is the loop; a static room is fair to
 photograph once, a moving one is not.
 
-### W7 ②. The staging — OPEN
+### W7 ②. The staging — SHIPPED 2026-08-13, VERIFIED 2026-08-15, LOOK OPEN
 
-*Joe 2026-08-13: "Looks too staged. The gesture is not right. I want the dice
-tower to be in a scene, not the centerpiece of it in a symmetrical and formal
-way. Consider moving the mushroom ring more to the foreground (Don't worry
-about where the dice land too much), and maybe move the pool backward and
-completely change it's size.. Also more mushrooms throughout the scene would
-help."*
+**This entry said "② has not started". It shipped on 2026-08-13** (`583b569`,
+`c67977f`) with `venue-set` claims. What had never happened was frame-space
+verification or a LOOK, and both were the point.
 
-① (the stump — crown shear, monotone lintel tear, inverted taper) shipped and
-Joe called the frames *"Beautiful"*. ② has not started: the moot moves toward
-the FOREGROUND, the pool moves back and changes size outright, and mushrooms
-spread through the scene instead of pooling in one ring.
+`tools/steps/glade-frame.mjs` now states the claim **in the FRAME**: seven geometry
+gates through the live camera at the resting eye plus one on rendered pixels, each
+run twice — over the live stage and over a frozen W2c table — and **the step refuses
+to pass unless at least three discriminate**. Two defects nobody had seen: the
+mushroom scatter, authored to look irregular in plan, **projected into three mirror
+pairs across the tower** — "symmetrical and formal", arrived at by accident; and the
+foreground wing sat at 58% and 17% of its own footprint in frame.
 
-**Note what his parenthesis licenses and what it does not.** *"Don't worry
-about where the dice land too much"* relaxes the composition's deference to
-the mat, but the placement law is about **LEGIBILITY** — the stage carries no
-colliders, so a die that comes to rest inside a mushroom is unreadable rather
-than merely untidy. **The foreground band (in front of the front wall) is
-dice-free by construction** and is where a forward moot can go while still
-obeying it; take that first and only spend the licence if the frame still
-refuses.
-
-**The lesson round 7 earned, and it outlives the model:** the three new gates
-(`assert_silhouette_is_not_a_face`, `assert_taper_is_a_stump`,
-`assert_lintel_is_a_tear`) are stated **in the FRAME** and bin the built mesh's
-edges into a projected outline. A gate phrased in plan could not have caught
-any of it, because round 6 already satisfied every plan-space claim it was
-asked for. Same for W2b: rule 6's check was run in the wrong space —
-plan-depth moves cannot break a line-reading at an eye that compresses the
-back band into one horizontal screen strip.
+**OPEN, and it is Joe's:** `shots/glade-before-{moonrise,foxfire}-resting.png` →
+`glade-{moonrise,foxfire}-resting.png`. One reservation worth his eye: the after is
+dimmer overall — most new mass reads as dark silhouette and the only strongly-lit
+cluster is bottom-left and clipped by the frame edge. That is either "in a scene" or
+a value problem, and the gates cannot tell him which.
 
 ### W6. The venue's audio palette — the tier's last step
 
@@ -1408,6 +1110,61 @@ dice on screen from the seat beside it.*
 
 ---
 
+## What the 2026-08-15 batch left behind
+
+*Found while shipping, owned by nobody, none of them previously on this list.
+Small unless marked. Listed so they are not re-discovered by a sixth audit.*
+
+**Defects**
+
+- **`#name-modal` has no `aria-modal` and no focus trap.** `a11y-modals`
+  proves those two ship together or neither does; the picker is absent from its
+  list. **#3 in THE ORDER.**
+- **On `body.mini` the log flyout sits over the result banner and covers it
+  entirely** (`--z-flyout` above `--z-banner`). This replaces U20's
+  "banner cuts into the peek", which is no longer reproducible post-C25.
+- **`.log-discarded` spells `opacity: 0.5`** where `--dim-off` is 0.45 — a
+  token-layer miss on the token's own named exemplar (a discarded die).
+- **A room that dies still says nothing** to the group whose link it was.
+  Deliberately dropped from U25 because the resync work owns that surface;
+  it is nobody's now.
+- **`.gcloudignore`'s comment omits `models/`** (which ships), and
+  `gpu-trace.csv` is uploaded to production for no reason.
+
+**Things that are true but should not be**
+
+- **`.roster-name`'s own comment says it wears "the shared aria-pressed steel
+  dress the panel's seg controls already use". It does not, and never has** —
+  warm ivory inside a column that was re-dressed cool. Moving `.rp-item`'s
+  three cool overrides up to `#left-panel` finishes the temperature schism and
+  makes the comment true.
+- **`.mchip` is a PICK wearing gold** — the last place kind and dress disagree,
+  because U6 enumerated `.seg` and `.mchip` is not one.
+- **`--panel-bg` and `--gold-dim` are `var()`-referenced with fallbacks and
+  never defined anywhere**, so the fallback always wins. Defining them would
+  move pixels, which is why they were left.
+- **`panel-anatomy`'s "a chosen key IS a chosen name" premise survives only
+  because the harness key is not minted-shaped.** `tools/stage.mjs` mints
+  `drive-<6 base36>`; production mints a 16-char tail. The scenario is passing
+  for a reason unrelated to what it asserts.
+- **A solo splitter loses their own breakout directory** when the parent dies
+  with them, and **the breakout ghost renders ahead of the unclaimed-seat
+  chairs** because that branch returns. Both recorded in UX §7.46.
+
+**Method, and it outlives the items**
+
+- **A gate can certify the frame it was written to refuse.** Four plausible
+  composition measures all *pass* the W2c frame Joe rejected, and footprint
+  mass says it was **better**. Rule 15 now requires a composition gate to fail
+  the rejected frame before it may pass anything.
+- **The `usesTotal` inversion the structural risk proposes should not be
+  done** — 20 reads are four questions, 2 of them run before any entry exists,
+  and §1's real bug was the *inverse* shape: a supplier over-filtering took
+  four surfaces down in one line, invisible to a grep of the render sites. See
+  SHIPPED.md. **The structural risk below is amended by this, not deleted.**
+
+---
+
 ## Structural risks (bets, not bugs — each gets more expensive to reverse)
 
 - **System capability flags as scattered per-surface render gates.**
@@ -1419,7 +1176,7 @@ dice on screen from the seat beside it.*
   durable fix is an inversion: the profile should *supply* the renderers (as
   it already does for `forecastFor` and `outcomesFor`) rather than surfaces
   querying booleans. **Three live instances are open right now** — see
-  [U17 residuals](#u17-residuals--three-sites-still-disagree-with-the-shipped-rule--small).
+  [U17 residuals](#u17-residuals--all-three-stale-closed-2026-08-15).
   Until the inversion, every new result surface re-litigates what a per-die
   system shows, and loses somewhere.
 - **Identity anchored to browser-storage shape — and the bill has arrived.**
@@ -1439,7 +1196,7 @@ dice on screen from the seat beside it.*
   structure has produced two self-documented shipped-on-superseded-doctrine
   incidents and four more stale-authority findings. **The document, not the
   code, is the structure actively generating defects.** U4's WHAT IS TRUE
-  TODAY table shipped as the mitigation; [C4](#c4-one-owner-per-numbering-namespace--small-mostly-done)'s
+  TODAY table shipped as the mitigation; [C4](#c4-one-owner-per-numbering-namespace--shipped-2026-08-15)'s
   remaining half (a next-free-section-number line in the document that assigns
   them) is the other half.
 - **ROADMAP.md was becoming the same failure.** It reached 3,723 lines, of
@@ -1483,7 +1240,7 @@ dice on screen from the seat beside it.*
 - **Do not make import destructive.** Union-only, preview-then-merge is the
   load-bearing lesson of the `#g=` post-mortem and it held under every stance.
   The missing operation is an explicit, separately-named replace
-  ([C15](#c15-restore-the-file-this-app-writes-cannot-be-read-back--cuj13-small-medium)),
+  ([C15](#c15-restore-the-file-this-app-writes-cannot-be-read-back--shipped-2026-08-15)),
   not a sharper Apply.
 - **Do not split js/main.js as a reflex, and do not reach for a framework.**
   Zero-dependency single-file is upholding its end — the audit traversed it six
@@ -1514,7 +1271,9 @@ dice on screen from the seat beside it.*
 
 ---
 
-## Where things went (2026-08-14 cleanup)
+## Where things went
+
+**2026-08-14 cleanup**
 
 | Was | Now |
 | --- | --- |
@@ -1533,3 +1292,19 @@ dice on screen from the seat beside it.*
 | C24's prescription | **shipped as C27**; the measurement and the "do not shrink the mat" instruction stay |
 | U20's shelf half, C13 | **fold into C25 Stage 2**; U20's peek half stays independent |
 | §1's two headline violations | closed per GOALS and verified in the tree; §1 is now a re-audit item |
+
+**2026-08-15 batch** — fifteen of sixteen ORDER entries worked in one pass.
+
+| Was | Now |
+| --- | --- |
+| §1, §3, C4, C5, C11, C12, C13, C14, C15, C22, C25, C28, C29, U17, U20, U23, U25, U26, §13 | **SHIPPED** — each keeps a pointer line here; the record and the corrections are in SHIPPED.md |
+| §0j's two bullets | shipped; §0j now holds one **decision** (do not buy Cloud Armor yet, with the pricing) and the nice-to-haves |
+| §2l ⑤ | shipped; **⑥ the sum read is the open half** and is now #2 in THE ORDER |
+| §3b L4 / CUJ5 | shipped; L2's judgment call is all that is left of §3b |
+| C27's residual | **measured and refused as a default** — 0 px gain at 390, a loss at 40d6. Shipped as an inert instrument; the call is Joe's |
+| C24's mat table | **its preset LABELS were a full notch stale** and are struck; the measurement still binds |
+| W7 ② | had already shipped 2026-08-13 — what landed 2026-08-15 was the frame-space verification it never had, plus two defects it found |
+| U28b | two shipped; the near-miss size families still open with their reasons |
+| C1, C3 | the composed-scenario half — see Tier C |
+| ~20 claims in this file | **verified FALSE against the tree** — the table in SHIPPED.md is the durable record |
+
