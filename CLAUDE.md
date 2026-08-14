@@ -47,6 +47,11 @@ you read first is the one that is wrong.
   ("Copyright 2026 The Dice Table Authors").
 - Work in small increments with git commits — long-running agents can die
   mid-task; committed work survives.
+- **This shell aliases `cp` and `mv` to their interactive forms**, so an
+  overwrite inside a chained command waits forever on a prompt nobody sees
+  (measured: one 2-minute timeout, 2026-08-13). Scripts and one-liners use
+  `command cp -f`. `zsh` also has `noclobber` set: a heredoc into an existing
+  path fails with "file exists" — `rm -f` first, or write somewhere new.
 
 ## Layout
 

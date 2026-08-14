@@ -3136,6 +3136,49 @@ cosmetic claim anchored to an aggregate over the `towerSkin*` subtree
 rather than one deletable mesh name — `venue-set` breaking on a deleted
 berm is the precedent that named the rule.
 
+### T10. The look loop — SHIPPED 2026-08-13 (nullstone's postmortem, made mechanical)
+Building Nullstone measured where a tower's time actually goes: the gates
+cost four minutes of machine time across seven bakes and caught five real
+defects, and **the look loop cost more than everything else in the job put
+together.** Two causes, both now fixed rather than noted:
+
+- **`tools/steps/tower-try.mjs`** + `__diceDebug.lookSheet()` — six views of a
+  bake, rendered through the SHIPPED path (same tick, post stack, lights and
+  tone map a player gets), composited into ONE labelled sheet, with the fit
+  and occlusion verdicts printed above it. It sockets a raw
+  `tools/forge/out/*.glb` through `towerRegisterGlb`, so nothing is promoted
+  or committed to be judged and a rejected round leaves no trace. Judging in
+  the FORGE PREVIEW — whose rig is not the room's — cost four rounds of value
+  decisions that were all retaken the moment an app frame existed.
+- **`tools/forge/towerplan.py`** — what a portal spec leaves you room to
+  BUILD, before you model: per-heading reach with the wall floor under it and
+  the inset budget between them, the doorway's jambs and probe box, the
+  lane's two collider planes, and how tall the front must be for the
+  occlusion proof to pass (9.568 for the classic-family rim — the number that
+  is otherwise invisible until a browser finds it). Four of nullstone's five
+  gate failures were answerable from that table.
+- **`tools/forge/towerkit.py`** — `tri_array`, the ray caster and the seven
+  gates every recipe was copying, wrapped around `towergates`.
+  `run_battery()` returns the gates it ran, so "every gate ran" is a
+  comparison rather than a hand-kept manifest. Proven a pure lift: nullstone
+  re-baked on it to a byte-identical digest.
+
+**The finding worth keeping**, recorded in `/new-tower` §1.9: nullstone round
+1 passed every refusal in the contract — occlusion 99/99 at six eyes, lane
+clad 243/243, throats clear — and rendered as a picket fence around a bucket.
+The contract proves a tower is LEGAL; only a frame says it is a tower. Still
+open from the same pass: `hollowbole.py` has not been moved onto the kit (it
+carries its own copy of both helpers), and nothing yet renders CANDIDATE
+massings side by side, which is T11.
+
+### T11. Judge three massings at once, not one after another — small, needs the call
+The remaining serial cost in the loop is mine, not the tools': nullstone was
+refined one shape at a time — author, look, rewrite, look. Baking three
+candidate massings and judging them on one sheet picks a direction from
+evidence instead of converging on a guess, for roughly the same token spend
+and a third of the wall time. Needs Joe's say-so because it means fanning out
+agents, which is why it is written down rather than done.
+
 ### T5. Recipe authorship is the new bottleneck — DESIGN FIRST, medium
 The headline finding of the whole pass. With gates at 30s and 1m47s,
 machine time is no longer what a tower costs; a "five-minute mesh" is still

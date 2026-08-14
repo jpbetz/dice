@@ -22,7 +22,22 @@ A step file default-exports `async (stage, args) => { … }`:
   `settle`, `waitFor`, `logTop`, …). Distinct origins (`localhost`,
   `127.0.0.1`, `127.0.0.2`, …) seat distinct players in the same room.
 - `stage.shot(table, 'name.png')` → PNG into `tools/out/` (gitignored).
+- `stage.out('name.png')` → a PATH under `tools/out/`, for a step that writes
+  its own bytes. **Not** a promise; `await`ing it yields a string either way,
+  which is how it looks correct and writes to `undefined`.
 - `stage.ctx` / `stage.port` / `stage.room` for anything lower-level.
+
+Two things that cost a run each when they were undocumented (2026-08-13):
+
+- **`t.dbg('expr')` evaluates `window.__diceDebug.expr`**, not arbitrary page
+  script — `t.dbg('foo()')` calls the hook `foo`, and `t.eval('…')` is the one
+  that takes a whole expression. `t.eval` awaits a returned promise
+  (`awaitPromise`), so an async debug hook is fine and returns by value.
+- **Read the hook's shape before printing it.** `towerModelAudit()` answers
+  `{tower, meshes, lights, offPolicy, outs, fx, hull, socket}` and
+  `towerOcclusionCheck()` answers per-EYE (`{eyes: [{id, shaft:{n,blocked},
+  cowl, exit, hood}]}`) — a report line written against a guessed shape
+  prints an empty summary and looks like a passing check.
 
 Canned steps:
 
@@ -54,12 +69,32 @@ into a check.
 npm run gate:cosmetic -- <tower>     # the whole measuring set + model sheets
 ```
 
+**THE LOOP FOR A NEW TOWER, in the order that costs least** (nullstone's own
+postmortem, 2026-08-13 — its look loop cost more than the rest of the job put
+together, and both halves of the fix are here):
+
+```bash
+~/opt/dice-forge/venv/bin/python tools/forge/towerplan.py --recipe <recipe>.py
+tools/forge/bake.sh <recipe>.py --tower --expect-colors --max-tris 15000
+node tools/drive.mjs tools/steps/tower-try.mjs tools/forge/out/<slug>.glb
+```
+
+`towerplan.py` prints what the portal spec leaves you room to BUILD before you
+model anything — per-heading reach, the wall floor under it, the doorway's
+jambs, the lane's two collider planes, and how tall the front must be for the
+occlusion proof to pass. Four of nullstone's five gate failures were
+answerable from that table. `tower-try.mjs` then judges the bake in the app's
+own light on ONE sheet, with no promotion and nothing committed: the forge
+preview's rig is not this room's, and value decisions taken there had to be
+retaken the first time an app frame existed.
+
 | step | what it answers | COST | run it when |
 | --- | --- | --- | --- |
 | `tower-spec-digest.mjs [--write]` | do the eight portal numbers (and the core the engine derives from them) still hash to what was committed, per tower | **measures** — no dice, no browser work beyond reading a hook | **every** tower change: it is the proof that a cosmetic change was cosmetic. `--write` re-pins and is not a way to go green |
 | `tower-fit.mjs [tower…]` | does the model sit inside the socket (every overrun a named legal class), and did the skin add colliders or lights | **measures** the built mesh + the world's body list | a new or re-baked model, new dressing, a change to the audit's classes |
 | `tower-occlusion.mjs [tower]` | is the shaft and the cowl band hidden at all six shipped eyes; which exit/hood sightlines the declared doorway does not explain | **measures** — raycasts against the built skin | anything that moves the silhouette: a re-bake, a lining, a curtain, a portal |
 | `tower-dress.mjs [tower…]` | triangles, draw calls, sways, ember, lights per group against the dressing budget | **measures** | dressing added, merged or retired |
+| `tower-try.mjs <glb\|id>` | what a bake looks like IN THE ROOM, six views on one sheet, with its fit and occlusion verdicts printed above it | **looks** — no dice; sockets the model and renders through the shipped path | **the look loop for a new tower.** Takes a raw `tools/forge/out/*.glb`, so nothing is promoted or committed to be judged |
 | `tower-shots.mjs [tower] [seed]` | the model from four look-only eyes plus a lab pour, for a human | **looks** (+ a lab pour, offline) | any visual change to a skin |
 | `dress-look.mjs [tower]` | does each prop earn its triangles, with the subject located and its on-screen size printed | **looks** + **measures** (projection) | dressing changes; a prop moved or retired |
 | `tower-room-shots.mjs [tower]` | the same tower from the PLAYER's cameras, across the zoom ladder and a real pour | **looks** + **simulates** (three pours) | camera/framing changes, a venue change, the first review of a new model |

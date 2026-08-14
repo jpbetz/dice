@@ -160,11 +160,58 @@ was an extruded profile with parapet rails — a ramp in a dirt costume):
   test the flip anyway: pale-wood rounds hid a never-re-dressed bug for
   two rounds (TESTING.md P8).
 
+## 1.9 THE LOOP — plan, bake, look in the room. In that order.
+
+This replaced "iterate in the forge preview" on 2026-08-13, and the reason is
+measured rather than preferred: on the nullstone build the LOOK LOOP COST MORE
+THAN EVERYTHING ELSE IN THE JOB PUT TOGETHER — more than reading the contract,
+authoring the recipe, integrating it and proving it, combined. The gates cost
+four minutes of machine time across seven bakes and caught five real defects.
+The loop is the thing to make cheap.
+
+```bash
+# 1. what does this spec leave me room to BUILD?      (seconds, no Blender)
+~/opt/dice-forge/venv/bin/python tools/forge/towerplan.py --recipe <recipe>.py
+# 2. bake + the nine refusals                          (~30 s)
+tools/forge/bake.sh <recipe>.py --tower --expect-colors --max-tris 15000
+# 3. six views IN THE ROOM, one sheet, gates printed   (~40 s)
+node tools/drive.mjs tools/steps/tower-try.mjs tools/forge/out/<slug>.glb
+```
+
+- **PLAN FIRST.** Four of nullstone's five gate failures were pure arithmetic
+  on the socket and the spec — a rear facet inset past its budget until the
+  outer skin was inside the bore, splinters 2.08 from the axis inside a 2.20
+  drop. `towerplan.py` prints the per-heading budget, the doorway's jambs, the
+  lane's planes, and **how tall the front must be** for occlusion to pass.
+  Read the table; do not discover it one refusal at a time.
+- **NEVER JUDGE VALUE IN THE FORGE PREVIEW.** Its rig is not the room's. Four
+  rounds of nullstone's colour were decided there and every one was retaken
+  the moment an app frame existed: at an albedo that read as black stone under
+  the preview's lamps, the model was a cut-out in the grounded room with no
+  facets, no fissures, and an ember lighting nothing. The preview answers "did
+  it bake"; only `tower-try` answers "is it a tower". Use the preview for
+  geometry sanity and nothing else.
+- **ONE SHEET, NOT SIX FRAMES.** "This reads as a wastebasket" is a judgement
+  about the whole object and no single frame carries it. `tower-try` sockets a
+  raw `tools/forge/out/*.glb` through a throwaway registry row — nothing is
+  promoted, nothing is committed — so a rejected round leaves no trace.
+- **THE GATES CANNOT SEE A WASTEBASKET.** nullstone round 1 passed every
+  refusal in the contract (occlusion 99/99 at six eyes, lane clad 243/243,
+  throats clear) and rendered as a picket fence around a bucket. The contract
+  proves a tower is LEGAL. Only a frame says it is a tower.
+- **MASS, THEN DETAIL.** What fixed that round was one solid with grooves cut
+  INTO it, replacing parts arranged around a void. Get the silhouette and the
+  massing right on the sheet before spending a round on paint.
+
 ## 2. The build, agent-shaped
 
 - Model builder agent (opus) iterates the RECIPE in a worktree via the
-  `/forge-model` skill: brief → recipe → `bake.sh <recipe> --tower
-  --expect-colors --max-tris 8000` → preview LOOK sheets → repeat. Budget:
+  `/forge-model` skill: brief → **towerplan** → recipe → `bake.sh <recipe>
+  --tower --expect-colors --max-tris 15000` → **tower-try sheet in the room**
+  → repeat (§1.9 — the preview is for geometry, never for value). A recipe is
+  a SHAPE and a PAINT: the battery comes from `towerkit.run_battery`, which
+  returns the gates it ran so nothing is asserted by a hand-kept manifest.
+  Budget:
   hero ≤ 8k tris including liner/roots/cladding; min feature 0.07 u.
   Digest-stable across consecutive bakes. The chute may be skinned INTO the
   model (the exit gate is ramp-aware); a model may clad the engine apron/lip

@@ -99,6 +99,23 @@ on the venv (no bpy) — neither can import the other, both import
 `towergates`. Tower models bake to a 15000-tri budget (Joe, 2026-08-13); the
 hero-prop numbers above are for props.
 
+**Plan before you model.** `towerplan.py` takes a portal spec (or reads one
+out of a recipe) and prints what it leaves you room to build: the socket, the
+clear disc the bore owes, per-heading reach with the wall floor under it and
+the inset budget between them, the doorway's jambs and probe box, the lane's
+two collider planes and what cladding them costs, and — the number that is
+otherwise invisible until a browser finds it — how tall the model's front
+must be for the occlusion proof to pass. Four of nullstone's five gate
+failures were answerable from that table before a vertex existed.
+
+**The battery, once.** `towerkit.py` holds what every tower recipe was
+copying: `tri_array`, a Möller-Trumbore caster, and the seven gates
+(approach, throat, occlusion, hole-below-the-sill, lane/cladding, the front
+that carries the dark, socket envelopes) wrapped around `towergates`.
+`K.run_battery(meshes, SPEC, …)` returns the gate names it ran, so "every
+gate ran" is a comparison rather than a hand-maintained manifest. Geometry
+stays out of it on purpose: the shape is what a recipe is FOR.
+
 **The fixture.** `recipes/tower_fixture.py` bakes
 `tests/e2e/fixtures/tower_fixture.glb` — a deliberately plain leaning
 monolith whose eight portal numbers are ALL off the shipped defaults and all

@@ -89,6 +89,11 @@ import forge as F  # noqa: E402
 # engine's collider planes, so the cladding is built on the engine's arithmetic
 # instead of a copy of it.
 import towergates as TG  # noqa: E402
+# …and the battery every tower runs, in one implementation (2026-08-13). This
+# file carried its own tri_array, its own Möller-Trumbore and five gate
+# wrappers; hollowbole.py carried the same two. They live in towerkit now, so
+# a recipe is a SHAPE and a PAINT and nothing else.
+import towerkit as K  # noqa: E402
 
 S = 1.25
 AX, AZ = 0.0, -2.55                # the bore axis, app frame
@@ -587,160 +592,6 @@ def paint_shard(_poly, co):
 # --------------------------------------------------------------------------
 # MEASUREMENT — every claim re-derived from the BUILT triangles
 # --------------------------------------------------------------------------
-RAN = []
-
-
-def tri_array(objs):
-    import numpy as np
-    tris = []
-    for ob in objs:
-        me = ob.data
-        me.calc_loop_triangles()
-        vs = [(v.co.x, v.co.z, -v.co.y) for v in me.vertices]   # -> app frame
-        for lt in me.loop_triangles:
-            tris.append([vs[i] for i in lt.vertices])
-    return np.asarray(tris, dtype=float)
-
-
-def ray_hit(tris, origin, direction, t_max):
-    import numpy as np
-    v0, v1, v2 = tris[:, 0], tris[:, 1], tris[:, 2]
-    e1, e2 = v1 - v0, v2 - v0
-    p = np.cross(direction, e2)
-    det = np.einsum("ij,ij->i", e1, p)
-    ok = np.abs(det) > 1e-12
-    inv = np.zeros_like(det)
-    inv[ok] = 1.0 / det[ok]
-    tv = origin - v0
-    u = np.einsum("ij,ij->i", tv, p) * inv
-    q = np.cross(tv, e1)
-    v = (q @ direction) * inv
-    t = np.einsum("ij,ij->i", e2, q) * inv
-    hit = (ok & (u >= -1e-9) & (v >= -1e-9) & (u + v <= 1.0 + 1e-9)
-           & (t > 1e-6) & (t < t_max))
-    return float(t[hit].min()) if hit.any() else None
-
-
-def assert_approach_clear(objs):
-    """Nothing leans into the drop, from above the rim down to the vanish."""
-    import numpy as np
-    tris = tri_array(objs)
-    y_top = PORTAL_IN["rimY"] + 2.5
-    bad = []
-    for px, pz in TG.disc_probes(PORTAL_IN["x"], PORTAL_IN["z"], PORTAL_IN["clearR"]):
-        t = ray_hit(tris, np.array([px, y_top, pz]), np.array([0.0, -1.0, 0.0]),
-                    y_top - DESPAWN_Y)
-        if t is not None:
-            bad.append((px, pz, y_top - t))
-    if bad:
-        raise RuntimeError(
-            f"approach column blocked at {len(bad)}/25 probes "
-            f"{[(round(b[0], 2), round(b[1], 2), round(b[2], 2)) for b in bad]}"
-            f", highest y {max(b[2] for b in bad):.2f} — stone is inside the "
-            f"drop; check BORE_R_HI {BORE_R_HI} and the splinters' inner face against "
-            f"clearR {PORTAL_IN['clearR']}")
-    print("[null] approach column 25/25 clear")
-    RAN.append("assert_approach_clear")
-
-
-def assert_throat_clear(objs):
-    """The doorway is a hole, ramp-aware, on check.py's own start line."""
-    import numpy as np
-    tris = tri_array(objs)
-    hw = TG.THROAT_MARGIN * PORTAL_OUT["w"] / 2.0
-    y0 = PORTAL_OUT["sillY"] + PORTAL_OUT["clearH"] * (1 - TG.THROAT_MARGIN) / 2
-    bad = []
-    for px, py in TG.rect_probes(PORTAL_OUT["x"], y0, 2 * hw,
-                                 PORTAL_OUT["clearH"] * TG.THROAT_MARGIN):
-        pz = TG.exit_ray_start_z(py, PORTAL_OUT["sillY"], 0.0, SPEC)
-        t = ray_hit(tris, np.array([px, py, pz]), np.array([0.0, 0.0, 1.0]),
-                    TG.EXIT_FRONT - pz)
-        if t is not None:
-            bad.append((px, py, pz + t))
-    if bad:
-        raise RuntimeError(
-            f"exit throat blocked at {len(bad)}/25 probes, first at x "
-            f"{bad[0][0]:.2f} y {bad[0][1]:.2f} z {bad[0][2]:.2f} — widen the "
-            f"door cut (DOOR_HW {DOOR_HW}, DOOR_Y1 {DOOR_Y1}) or drop the "
-            f"shard (SHARD_PROUD {SHARD_PROUD})")
-    print("[null] exit throat 25/25 clear")
-    RAN.append("assert_throat_clear")
-
-
-def assert_occluded(objs):
-    fails, counts = TG.occlusion_failures(tri_array(objs), SPEC, 0.0)
-    if fails:
-        raise RuntimeError(fails[0].replace("; ", "\n       "))
-    print(f"[null] occlusion {counts['cowl']}/{counts['cowl']} cowl and "
-          f"{counts['shaft']}/{counts['shaft']} shaft, at all six shipped eyes")
-    RAN.append("assert_occluded")
-
-
-def assert_no_hole_below_the_sill(objs):
-    fails, tested, leaks = TG.hole_below_sill_failures(tri_array(objs), SPEC, 0.0)
-    if fails:
-        raise RuntimeError(fails[0])
-    print(f"[null] no sight line into the hollow below the sill "
-          f"({leaks}/{tested} of the flank rays)")
-    RAN.append("assert_no_hole_below_the_sill")
-
-
-def assert_lane_is_clad(objs):
-    """The whole reason this tower clads rather than declares bare."""
-    fails, info = TG.lane_failures(tri_array(objs), SPEC)
-    if fails:
-        raise RuntimeError(fails[0])
-    ramp, lip = info["clad"]["ramp"], info["clad"]["lip"]
-    print(f"[null] lane clear; ramp clad {ramp[0]}/{ramp[1]}, "
-          f"lip clad {lip[0]}/{lip[1]}, x {info['lane_x']} z {info['lane_z']}")
-    RAN.append("assert_lane_is_clad")
-
-
-def assert_the_mass_carries_the_dark(objs):
-    """THE OCCLUDER OF RECORD, measured rather than asserted.
-
-    Two claims the header makes, both about the cleave, and both of which a
-    taller splinter would hide until somebody moved one:
-
-      (a) the sight line from every shipped eye to the TOP cowl sample is
-          stopped by the MASS — not by a splinter, not by the rim band; and
-      (b) a falling die is still visible below the declared mouth, so the
-          vanish happens inside a building rather than in mid-air.
-    """
-    import numpy as np
-    tris = tri_array([ob for ob in objs if ob.name == "towerSkinNullMass"])
-    ct = DESPAWN_Y + TG.ENGINE_MIRROR["dieR"]
-    worst = (-1e9, None)
-    for eid, e in TG.shipped_eyes():
-        if e[1] <= ct:
-            continue                     # this eye looks UP; the wall has it
-        f = e[2] / (e[2] - PORTAL_IN["z"])
-        y_cross = e[1] + (ct - e[1]) * f
-        if y_cross > worst[0]:
-            worst = (y_cross, eid)
-        d = np.array([PORTAL_IN["x"] - e[0], ct - e[1], PORTAL_IN["z"] - e[2]])
-        if ray_hit(tris, np.array(e), d, 0.999) is None:
-            raise RuntimeError(
-                f"the MASS does not hide the top cowl sample from {eid}: the "
-                f"ray reaches y {ct:.2f} on the bore axis unobstructed. Raise "
-                f"CLEAVE_LO (now {CLEAVE_LO}) — do not fix this with a "
-                f"splinter.")
-    front = cleave_y(0.0, 0.0)
-    if worst[0] > front:
-        raise RuntimeError(f"the cleave's front lip {front:.2f} is under the "
-                           f"binding sight line {worst[0]:.2f} from {worst[1]}")
-    eid, e = max(TG.shipped_eyes(), key=lambda p: p[1][1])
-    seen_to = e[1] + (front - e[1]) * (e[2] - PORTAL_IN["z"]) / e[2]
-    if seen_to < PORTAL_IN["rimY"]:
-        raise RuntimeError(
-            f"the cleave hides the drop above the declared mouth: from {eid} "
-            f"a die is lost at y {seen_to:.2f}, mouth {PORTAL_IN['rimY']}")
-    print(f"[null] the mass carries the dark: binding sight line crosses at y "
-          f"{worst[0]:.2f} ({worst[1]}) under a front lip at {front:.2f}; a "
-          f"die stays visible to y {seen_to:.2f}, mouth {PORTAL_IN['rimY']}")
-    RAN.append("assert_the_mass_carries_the_dark")
-
-
 def assert_the_crown_is_a_cleave(_objs):
     """The silhouette law, on the crown: one cut with a real fall across it,
     broken by splinters that clear it — not a level ring, not a fringe."""
@@ -765,43 +616,9 @@ def assert_the_crown_is_a_cleave(_objs):
     print(f"[null] the crown is a cleave: it falls {hi - lo:.2f} "
           f"({hi:.2f} -> {lo:.2f}), {flat:.0%} clamped, {len(over)} splinters "
           f"standing over it at facets {over}")
-    RAN.append("assert_the_crown_is_a_cleave")
 
 
-def assert_mesh_envelopes(objs):
-    """The socket, per mesh node, exactly as check.py classifies it."""
-    for ob in objs:
-        lo, hi = F.world_bounds([ob])
-        a = (min(lo.x, hi.x), min(lo.z, hi.z), -max(lo.y, hi.y))
-        b = (max(lo.x, hi.x), max(lo.z, hi.z), -min(lo.y, hi.y))
-        name = ob.name
-        if max(abs(a[0]), abs(b[0])) > XLIM + 1e-6:
-            raise RuntimeError(f"{name}: |x| {max(abs(a[0]), abs(b[0])):.3f} > {XLIM}")
-        if b[1] > CROWN_MAX + 1e-6:
-            raise RuntimeError(f"{name}: top {b[1]:.3f} > {CROWN_MAX}")
-        if name == "towerSkinNullShard":
-            if a[1] > -0.5 or b[2] > 3.85 or b[1] > 3.4:
-                raise RuntimeError(
-                    f"{name}: not a CLADDING box — needs min.y <= -0.5 (is "
-                    f"{a[1]:.3f}), max.z <= 3.85 (is {b[2]:.3f}), max.y <= 3.4")
-        elif a[2] < ZBACK or b[2] > ZFRONT + 1e-6 or a[1] < -0.145:
-            raise RuntimeError(
-                f"{name}: not IN-SOCKET — z [{a[2]:.3f},{b[2]:.3f}] vs "
-                f"[{ZBACK},{ZFRONT}], min.y {a[1]:.3f}")
-        print(f"[null] envelope ok {name}: x±{max(abs(a[0]), abs(b[0])):.2f} "
-              f"y {a[1]:.2f}..{b[1]:.2f} z {a[2]:.2f}..{b[2]:.2f}")
-    RAN.append("assert_mesh_envelopes")
 
-
-def assert_every_gate_ran():
-    want = {"assert_approach_clear", "assert_throat_clear", "assert_occluded",
-            "assert_no_hole_below_the_sill", "assert_lane_is_clad",
-            "assert_the_mass_carries_the_dark", "assert_the_crown_is_a_cleave",
-            "assert_mesh_envelopes"}
-    missing = want - set(RAN)
-    if missing:
-        raise RuntimeError(f"gates declared but never invoked: {sorted(missing)}")
-    print(f"[null] gate manifest {len(want)}/{len(want)} invoked")
 
 
 # --------------------------------------------------------------------------
@@ -837,15 +654,18 @@ def main():
     F.single_material(shard, F.vertex_color_material(
         "nullShard", "Col", roughness=0.90, specular_level=0.15))
 
-    assert_approach_clear(meshes)
-    assert_throat_clear(meshes)
-    assert_occluded(meshes)
-    assert_no_hole_below_the_sill(meshes)
-    assert_lane_is_clad(meshes)
-    assert_the_mass_carries_the_dark(meshes)
+    # THE CONTRACT'S BATTERY, from the kit — approach, throat, occlusion, the
+    # hollow, the lane, the front, the socket. The occluder handed to the
+    # front gate is the MASS ALONE: a splinter must never be able to cover for
+    # a wall that stopped being one.
+    ran = K.run_battery(meshes, SPEC, tag="null", tilt_deg=0.0,
+                        x_lim=XLIM, crown_max=CROWN_MAX,
+                        clad={"towerSkinNullShard"},
+                        occluder=[mass], front_top=cleave_y(0.0, 0.0))
+    # …and THIS tower's own shape claim, which no kit can own.
     assert_the_crown_is_a_cleave(meshes)
-    assert_mesh_envelopes(meshes)
-    assert_every_gate_ran()
+    if len(ran) != 7:
+        raise RuntimeError(f"the battery ran {len(ran)} gates, not 7: {ran}")
 
     pin, pout = F.tower_portals(PORTAL_IN, PORTAL_OUT)
     # WHERE THE LIGHT GOES, said once, by the recipe, from the mesh. The house
