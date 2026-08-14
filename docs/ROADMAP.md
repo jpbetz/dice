@@ -3269,15 +3269,41 @@ an otherwise autonomous tower build stops dead. Refinement: a `promote`
 step that performs all three edits as one reviewed diff, so the human act
 is approving a diff rather than remembering three files.
 
-### T8. Two gates that cannot be armed yet — small, each needs one declaration
-- **`tower_fixture.py` is RED on the new bake-side occlusion gate** (cowl
-  11/99 at `wide.full`) — a genuine leak in a test asset, invisible until
-  bake-side occlusion existed. Waive it by flag or rebuild the fixture.
-- **`tower-occlusion`'s SOLID exit/hood classification stays a printed
-  report**, because hollowbole's declared `clearH` 3.5 understates its real
-  torn opening: 18 points read SOLID at all six eyes, legally, since a
-  portal is a MINIMUM. A hard gate here needs a registry-declared
-  allowance in the `bareColliders` idiom.
+### T8. Two gates that cannot be armed yet — (a) ARMED 2026-08-13, (b) designed
+- **`tower_fixture.py` was RED on the bake-side occlusion gate** (cowl 11/99
+  at `wide.full`) — REBUILT, not waived. The cause was one line and it
+  generalises: `HEIGHT = PORTAL_IN["rimY"]`, "the rim IS the top edge, so they
+  are one number". THE RIM IS NOT A HEIGHT CAP. The cowl band's top is
+  despawnY + a die's radius, and a high eye's ray to it crosses the model's
+  front plane ABOVE the rim, so a model as tall as its own mouth cannot hide
+  the vanish — by construction, however closed the rest of the shell is. The
+  fixture now builds its front to `front_height_needed() + 0.15`. Building to
+  that number the first time still left 1/99, which was the second finding:
+  both hand-written copies of that arithmetic measured the sample on the BORE
+  AXIS, while the binding one is the deepest point of the widest disc (9.854
+  vs 10.120 here) — a planning number a compliant model fails is worse than
+  none, so it moved into `towergates.front_height_rows` and both callers ask
+  it. The in-app half is a VERDICT now too: `tower-glb-loader` asserts shaft
+  and cowl fully blocked at all six eyes, red-checked against the old bytes
+  (87/99 at wide.full). It could not have carried that assertion before — a
+  leaking asset cannot police the leak.
+- **`tower-occlusion`'s SOLID exit/hood classification is still a printed
+  report.** MEASURED while arming (a): the 18 points are THREE samples
+  (x −0.9, 0, +0.9 at y 3.77, z −7.42) seen from six eyes, crossing the wall
+  plane at |x| ≤ 0.85 and y ∈ [4.04, 4.32] — just over a declared head of 3.5,
+  in a narrow central column. Legal: Hollow Bole's torn arch really does top
+  out at 4.95 (`W_YC + W_YUP`), and a portal is a MINIMUM.
+  **The design, and why it is not done:** the allowance must be a MEASURED
+  aperture, not a typed rectangle. Hand-writing "the opening is 4.0 × 4.05" on
+  the registry row means fitting the number to the leak, which is how a gate
+  gets neutered; and the wound is a radial window on a curved surface, so its
+  wall-plane span is not a constant anybody can read off the recipe. The right
+  shape is the one the portals already use: the RECIPE knows its cutter loop
+  exactly, so it should export the real opening as GLB extras beside
+  portalOut, the loader should carry it, and the tool should refuse any SOLID
+  crossing outside it (plus a consistency check that the aperture CONTAINS the
+  portal). That is a forge-helper + loader + tool change and a re-bake of both
+  palettes — worth doing deliberately, not bolted onto this pass.
 
 ### T9. The classic three are still code skins — record only
 `js/towerskin.js` is a second construction path kept alive for heartwood,
@@ -3285,6 +3311,30 @@ bastion and blackanvil. They work, they are pinned by the classic spec, and
 re-baking them through the forge is pure cost until something forces it.
 Recorded so "why are there two ways to build a tower" has an answer on
 paper; do not spend on it.
+
+### T13. `clearH` is quoted from two different datums — DOCS, and it is a trap
+The engine is unambiguous: `towerColliders` puts the lintel's underside at
+`v.door.h`, which is `spec.out.clearH`, measured from the FELT. `sillY` is
+also absolute. So the height a die actually gets is `clearH − sillY`.
+
+The prose is not. THE MINIMUMS section of docs/TOWER.md argues the 3.375 floor
+against "≈2.85 **over the sill**", and calls the old 4.5 floor "~58% more
+height than any die ever used" — 2.85 × 1.58 = 4.5, which only works if 4.5 is
+being read as an over-the-sill number too. Both readings appear in one
+paragraph. Taken literally, a legal spec of `sillY 1.375, clearH 3.375` leaves
+2.0 over the sill, which that same paragraph says is under what a lone d20
+needs.
+
+Nothing is broken in the field: the floors campaign measured the real engine
+whatever the prose said, and Hollow Bole ships `clearH 3.5` over `sillY 1.0` —
+2.5 of over-sill height — and delivers clean in every probe and every shipped
+pour. So this is a documentation defect, not a physics one. But it is the kind
+that ships a bad tower: an author who reads "clearH ≥ 3.375 over the sill" and
+raises their sill to 1.375 builds a door 0.85 shorter than they think they
+did, and the limits will not stop them. Fix shape: state the datum once, in
+the contract, next to the limits; re-quote every number in THE MINIMUMS
+against it; and decide whether the FLOOR should be over-sill (in which case
+`clearHMin` becomes a function of `sillY` and the validator gains a rule).
 
 ### T12. There is no MAXIMUM door width — small, needs a measured ceiling
 Found while fixing T2. `TOWER_PORTAL_LIMITS` floors `out.w` at 3.2·S = 4.0 and
