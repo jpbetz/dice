@@ -3388,6 +3388,42 @@ measuring (at what width does the lintel stop channelling? does a door wider
 than the flight envelope buy anything at all?). The inequality is written down
 beside the limits in js/main.js so the next person meets it before the bug.
 
+## Tier B — The closed beta (2026-08-14)
+
+Joe: *"I consider the dice towers and the stages to be in closed Beta. I don't
+know how to properly hide this from others. Maybe we just require
+`?stability=beta` in the URL? I'm okay with something simple."*
+
+**Shipped** (UX §7.38, `js/stability.js`, e2e `stability-gate`): two channels,
+redeemed by `?stability=beta` and revoked by `?stability=stable`, persisted
+per browser and stripped from the address bar. The gate takes the venue and
+tower rows off the Staging destination and drops those two keys from your own
+solo settings on restore. **It gates the OFFER and never the CAPABILITY** —
+goal 15 forbids anything else, since a client that refused the room's tower
+would bake a different film and put different dice on screen from the seat
+beside it.
+
+Left open, deliberately:
+
+- **B1. The server does not know about channels, and cannot.** There is no
+  identity to attach an entitlement to, so the allowlist still accepts any
+  registered tower id from any client. This is a DISCOVERABILITY gate, not a
+  security boundary, and calling it one would be the lie. It becomes possible
+  the day seats have durable identity (goal 7's later pass); until then a
+  determined player can set a tower through the console, which costs nothing
+  and tells us nothing we did not already accept when `setTower` became a
+  debug hook.
+- **B2. Nothing tells a beta tester how to leave.** The revoke link exists and
+  is proven; no surface offers it. A one-line "you are on the beta channel"
+  row with the stable link in it belongs in Your stuff — but the panel is at
+  its measured cap (§7.38: two designs were abandoned this pass for 24px and
+  21px), so it costs something else its place. Worth doing when the panel next
+  gains room, not before.
+- **B3. What comes OUT of beta, and how it is decided.** Towers and venues
+  leave the channel when Joe says they are finished; there is no criterion
+  written down and no reason to invent one before there is a second beta
+  feature to generalise from.
+
 ## Structural risks (bets, not bugs — each gets more expensive to reverse)
 
 - **System capability flags as scattered per-surface render gates.**

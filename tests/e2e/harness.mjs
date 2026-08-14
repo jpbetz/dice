@@ -412,7 +412,20 @@ export class Ctx {
         // which leaves every tab sitting at the seat modal waiting for a join
         // that never comes. A test tab is not a legacy client. `schema-reset`
         // is where the purge itself is proven, by clearing this on purpose.
-        + ` localStorage.setItem('dice.schema.v1','2'); } catch {}`,
+        + ` localStorage.setItem('dice.schema.v1','2');`
+        // …and A TEST TAB IS A BETA TAB (js/stability.js). Towers and venues
+        // are closed beta, so a production tab is not offered their pickers —
+        // and the suite's job includes the work that has not been released.
+        // Seeded rather than queried so no scenario has to opt in and none
+        // can silently forget.
+        //
+        // THE STABLE POPULATION IS NOT THEREBY UNTESTED, which is the trap
+        // this default would otherwise be (`prepared-seat` was green for
+        // weeks while seeding only first-timers). `stability-gate` reaches it
+        // through bootTab, whose `clean` runs after this seed: a tab with
+        // `clean: ['dice.stability.v1']` is a browser that has never heard of
+        // the beta, which is the population that actually has to be right.
+        + ` localStorage.setItem('dice.stability.v1','beta'); } catch {}`,
       );
       if (name) {
         await page.addInitScript(

@@ -58,7 +58,10 @@ you read first is the one that is wrong.
 `server.js` (zero-dep Node, in-memory rooms, SSE) · `js/main.js` (scene,
 engine, ceremonies, UI) · `js/notation.js` (Roll20-dialect parser) ·
 `js/rollspec.js` (shared roll mechanics, server + solo) · `js/meanings.js`
-(interpretation system registry) · `js/seed.js` (the dealt starting rack —
+(interpretation system registry) · `js/stability.js` (the closed-beta channel:
+`?stability=beta` decides what the settings panel OFFERS — towers and stages —
+and NEVER what works, because the film is a function of the core and the seed;
+UX §7.38) · `js/seed.js` (the dealt starting rack —
 priced shelves, dice drawn inside the price) · `js/portable.js` (pools/settings ⇄
 portable YAML — the ONLY rack transport; the `#g=` URL codec was dropped
 2026-08-04, GOALS §7, and the URL now carries no user state beyond

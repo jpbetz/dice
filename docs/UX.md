@@ -4595,3 +4595,67 @@ overshoots (a 1.4 control point), so a frame measured while the panel opens is
 340×461 against a resting 320×442. Both are fixed by asking the thing itself —
 wait for the paint to settle, wait for `getAnimations()` to finish — never by
 sleeping on a guess.
+
+### 7.38 The stability channel — what a production player is offered (2026-08-14)
+
+Joe: *"I consider the dice towers and the stages to be in closed Beta. I don't
+know how to properly hide this from others. Maybe we just require
+`?stability=beta` in the URL? I'm okay with something simple."* This is that,
+and the simple part survived contact.
+
+**A browser is on one of two channels.** `?stability=beta` puts it on the beta
+channel; `?stability=stable` puts it back. Nothing else in the app can change
+one — there is no switch in the panel, because a switch would be an
+advertisement for the thing being hidden.
+
+**THE ONE LAW: the channel gates the OFFER, never the CAPABILITY.** A stable
+client that walks into a beta player's room sockets that room's tower, raises
+its venue, and bakes the same film — it simply cannot pick one. This is not
+courtesy, it is goal 15. The pour is a pure function of (portal spec, engine
+constants, seed), so a client that refused the room's tower would put
+*different dice* on screen from the seat beside it. `applyRoomSettings`
+already carries this reasoning for unknown tower ids ("keeping the table is
+the right call, and it is not free"); a channel is the same situation with a
+different cause and gets the same answer.
+
+The shape was already in the registry: `venueOnly` is *"a CATALOGUE rule about
+how this tower is chosen… a picker rule, not a capability."* The channel is a
+second catalogue rule on the same axis, and `panelRowShown` is the one
+predicate both the venue and the channel ask, so neither can un-hide the
+other's rows.
+
+**Where it bites:** the venue and tower rows leave the Staging destination
+(`BETA_ROWS`), and `ownSettingsForChannel` drops `tower`/`venue` from YOUR OWN
+saved solo settings on restore — filtered on the LOAD path and nowhere else,
+so room state cannot pass through it even by mistake. A browser that leaves
+the beta stops socketing a tower whose picker it can no longer reach; nothing
+is erased, and redeeming the link again restores the lot.
+
+**Felt stays in Staging, and that was a measurement.** Felt is room-wide, so
+blast radius alone (§7.37) argues it belongs in Table once no venue is on
+offer to own it. Moved there it stood **483px against a 459px panel** — 24px
+over, §7.37's entire defect re-grown one channel across. Left where it is,
+Staging under the stable channel is a destination holding the felt, which is
+what staging a table has always meant, and nothing scrolls on either channel
+(measured: `settings-shots.mjs <prefix> both`).
+
+**The mark is a tag on a heading, not a line of its own.** A beta tester who
+does not know they are one files unfinished work as broken, so the Staging
+heading wears `CLOSED BETA`. As its own `.hint` paragraph it cost 21px and put
+Staging 21px over the same 459px panel — the second design this pass had to
+abandon to keep §7.37 true. The panel is at its cap; anything added to it now
+has to take something out.
+
+**The param is a key, not a setting** — redeemed once, written to
+localStorage, and stripped from the URL (GOALS §7's amendment has the why: the
+share flow hands out `location.href`). It also survives the schema purge,
+because it is an entitlement rather than app state and its loss would be
+silent.
+
+**Testing.** Every harness tab is a beta tab; the stable population is reached
+by `clean: ['dice.stability.v1']` (a browser that has never heard of the beta)
+or `query: '&stability=stable'`. `stability-gate` is the scenario, and its
+expensive leg — two tabs, one room, one pour, both films compared — is the
+point rather than the overhead: the obvious wrong implementation passes every
+visibility assertion in the file and breaks the table only when two people are
+watching.

@@ -28,6 +28,7 @@ import { composeRoll, validateMods, budgetOf } from './rollspec.js';
 import { previewOf, countingPmfs } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealStartingRack, dealRack, dealName } from './seed.js';
+import { resolveChannel, PARAM as STABILITY_PARAM } from './stability.js';
 import { exportYaml, parsePortable, planImport, profileToImport } from './portable.js';
 import {
   MAX_PROFILES, MAX_POOLS, knownSystem, emptyStore, normalizeStore, profilesOf, findProfile,
@@ -74,6 +75,36 @@ import { LIFE_TUNE, stepLife, stepMootSession, disposeLife } from './faelife.js'
 // this pair is in TDZ when they read it, and the whole module dies at eval.
 const ROOM = new URLSearchParams(window.location.search).get('room') || null;
 const IN_LOBBY = ROOM === null;
+
+// THE STABILITY CHANNEL (js/stability.js — read its header for the law).
+// Towers and venues are in closed beta; this decides whether this browser is
+// OFFERED them. It never decides whether they WORK: a stable client in a beta
+// player's room sockets that room's tower exactly as before, because the film
+// is a pure function of the core and the seed and a client that opted out
+// would bake different dice from everyone else at the table.
+//
+// Up here with ROOM for the same reason ROOM is up here: setSound() →
+// syncSettingsUI() runs the pickers during MODULE EVALUATION, and the chrome
+// they paint now depends on the channel. Down beside the other LS_ constants
+// this would be in TDZ when they read it.
+const LS_STABILITY = 'dice.stability.v1';
+const STABILITY = (() => {
+  let stored = null;
+  try { stored = localStorage.getItem(LS_STABILITY); } catch { /* a browser that will not store is production */ }
+  const url = new URL(window.location.href);
+  const d = resolveChannel({ stored, param: url.searchParams.get(STABILITY_PARAM) });
+  if (d.write) { try { localStorage.setItem(LS_STABILITY, d.write); } catch { /* ignore */ } }
+  if (d.strip) {
+    // REDEEMED, THEN GONE. The param is a key, not a setting: leaving it in
+    // the bar would put user state back in the URL (GOALS §7 dropped `#g=`
+    // for that) and would enrol everyone a beta host shares their room link
+    // with, since the share flow hands out location.href.
+    url.searchParams.delete(STABILITY_PARAM);
+    try { history.replaceState(null, '', url.pathname + url.search + url.hash); } catch { /* ignore */ }
+  }
+  return d.channel;
+})();
+const IS_BETA = STABILITY === 'beta';
 
 // Mat extents — LET, not const: the room-wide zoom setting resizes the mat
 // live (walls, shelf pitch, camera framing all follow). The base values here
@@ -7898,15 +7929,37 @@ function applyVenue(id) {
   refreshDieArt();
 }
 
+// The rows the CLOSED-BETA CHANNEL takes off the panel (js/stability.js).
+// The pickers ARE the offer; taking them away is the whole gate, and nothing
+// about the tower or the venue stops working — see ownSettingsForChannel.
+const BETA_ROWS = ['venue-row', 'venue-picker', 'tower-row', 'tower-picker'];
+
+// ONE ANSWER TO "IS THIS ROW ON SCREEN", asked by the two things that hide
+// rows for entirely different reasons: the venue (goal 13 — it IS those
+// choices) and the channel (they are not offered to this browser at all).
+// Two owners of one element's `display` is how a row comes back from the
+// dead the next time the other owner runs — a fantasy venue going down would
+// have handed a production player the tower picker. A shared predicate is
+// why that cannot happen.
+function panelRowShown(rowId) {
+  if (!IS_BETA && BETA_ROWS.includes(rowId)) return false;
+  const venue = VENUES[currentVenue] || VENUES.table;
+  return venue.register !== 'fantasy';
+}
+
 // GOALS goal 13 made visible: while a fantasy venue is active, the felt,
 // tower and dice-set pickers leave the settings panel — the venue IS those
 // choices. Elements resolved by id per call (the renderFeltSwatches rule).
 function updateVenueChrome() {
   const venue = VENUES[currentVenue] || VENUES.table;
   const fantasy = venue.register === 'fantasy';
-  for (const rowId of ['felt-label', 'felt-swatches', 'tower-row', 'tower-picker', 'diceset-row', 'diceset-picker']) {
+  // venue-row/venue-picker join the list the day a channel can hide them:
+  // the venue never hides its own picker, but the channel does, and the loop
+  // is where a row's visibility is decided.
+  for (const rowId of ['venue-row', 'venue-picker', 'felt-label', 'felt-swatches',
+    'tower-row', 'tower-picker', 'diceset-row', 'diceset-picker']) {
     const el = document.getElementById(rowId);
-    if (el) el.style.display = fantasy ? 'none' : '';
+    if (el) el.style.display = panelRowShown(rowId) ? '' : 'none';
   }
   // AND SAY WHAT TOOK THEM (UX §7.36). Until this pass three controls simply
   // vanished when a fantasy venue went up — correct behaviour (goal 13: the
@@ -11675,6 +11728,21 @@ window.__diceDebug = {
   // doing nothing.
   openSettings(at) { openSettingsModal(at); },
   settingsDest(at) { return at === undefined ? settingsDest : showSettingsDest(at); },
+  // THE CHANNEL, AS THIS BOOT RESOLVED IT (js/stability.js). A REPORT, not a
+  // setter: a channel is redeemed at boot from the URL and there is no
+  // in-app way to change one, so a hook that flipped it live would be
+  // testing a path no player can walk. A scenario changes channel the way a
+  // person does — `query: '&stability=stable'` on a fresh tab.
+  // `offers` is what the channel actually gates, so an assertion can read
+  // the CONSEQUENCE rather than re-deriving it from the channel name.
+  stability() {
+    return {
+      channel: STABILITY,
+      beta: IS_BETA,
+      offers: { staging: IS_BETA, tower: IS_BETA, venue: IS_BETA },
+      gated: [...BETA_SETTINGS],
+    };
+  },
   // Your data → the file door (§G1), minus the native picker no headless run
   // can ever click. loadText() is exactly what a chosen file does once read;
   // acceptFile() takes a real File so the size and read refusals are assertable
@@ -13020,6 +13088,15 @@ function load(key, fallback) {
 // is the door for "the writer was a version we cannot identify".
 const SCHEMA = 2;
 const LS_SCHEMA = 'dice.schema.v1';
+// TWO KEYS SURVIVE THE BREAK, AND NEITHER OF THEM IS APP STATE. The schema
+// stamp is the purge's own bookkeeping. `dice.stability.v1` is an
+// ENTITLEMENT: one enum with two values, so there is no shape an
+// unidentifiable old build could have left it in — the reason for the purge
+// does not reach it — and its loss would be SILENT, a beta tester demoted to
+// production with the staging pickers gone and nothing on screen to say why.
+// Anything added here needs that same pair of arguments; the purge is
+// deliberately blunt and this is the only exemption list it gets.
+const PURGE_KEEPS = new Set([LS_SCHEMA, LS_STABILITY]);
 function purgeStaleClientState() {
   try {
     const seen = Number(localStorage.getItem(LS_SCHEMA) || 0);
@@ -13029,7 +13106,7 @@ function purgeStaleClientState() {
       const k = localStorage.key(i);
       // `dice.` only — this origin may be shared with something else, and a
       // reset of OUR data is not a licence to clear anyone else's.
-      if (k && k.startsWith('dice.') && k !== LS_SCHEMA) doomed.push(k);
+      if (k && k.startsWith('dice.') && !PURGE_KEEPS.has(k)) doomed.push(k);
     }
     for (const k of doomed) localStorage.removeItem(k);
     localStorage.setItem(LS_SCHEMA, String(SCHEMA));
@@ -18428,6 +18505,33 @@ function applyZoom(level) {
   if (socketed !== 'none') towerSocket(socketed);
 }
 
+// The room settings that belong to the closed beta (js/stability.js).
+const BETA_SETTINGS = ['tower', 'venue'];
+
+// YOUR OWN saved settings, read through the channel — and ONLY your own.
+//
+// This sits on the SOLO RESTORE path and nowhere else, which is the whole
+// design: a browser that leaves the beta must not go on socketing a tower it
+// can no longer reach a picker for, but a browser that WALKS INTO A ROOM
+// wearing one must, or its film diverges from every other seat (see
+// js/stability.js, and applyRoomSettings' unknown-id note below for the same
+// reasoning arriving from the other direction). Filtering the LOAD rather
+// than the APPLY is what makes that structural instead of remembered: there
+// is no argument at the funnel that could be got wrong, because room state
+// never passes through here.
+//
+// Dropping the keys silently is deliberate. They are re-offered in full the
+// moment the browser redeems the beta link again — nothing is erased, it is
+// just not restored — and a "your tower was put away" notice on a channel
+// whose whole point is that these features are not being talked about yet
+// would be the announcement instead of the feature.
+function ownSettingsForChannel(settings) {
+  if (IS_BETA || !settings || typeof settings !== 'object') return settings;
+  const kept = { ...settings };
+  for (const key of BETA_SETTINGS) delete kept[key];
+  return kept;
+}
+
 // Apply a full merged settings object (join response, hello, settings-changed
 // echo, or the solo localStorage copy). Unknown keys/values are ignored.
 function applyRoomSettings(settings) {
@@ -18995,6 +19099,26 @@ document.getElementById('settings-nav').addEventListener('click', (e) => {
   const cell = e.target.closest('[data-dest]');
   if (cell) showSettingsDest(cell.dataset.dest);
 });
+
+// THE CHANNEL'S ONE PIECE OF CHROME (js/stability.js): the beta mark on the
+// Staging heading. Everything else it gates is ROWS, and rows are hidden by
+// panelRowShown below — one owner, because there are now two reasons a row
+// leaves this panel and they must not be able to resurrect each other's.
+//
+// FELT STAYS PUT, and that was a measurement, not a preference. Staging owns
+// the felt rows because a fantasy venue TAKES the felt (GOALS goal 13), and
+// with no venue on offer that argument thins — felt is room-wide, so blast
+// radius alone would send it to Table. Moved there it stood 483px against a
+// 459px panel: 24px over, which is precisely the defect §7.36 existed to
+// remove, re-grown one channel across. Left where it is, Staging under the
+// stable channel is a destination holding the felt, which is what staging a
+// table has always meant, and nothing scrolls on either channel.
+function applyStabilityChrome() {
+  const tag = document.getElementById('staging-beta');
+  if (tag) tag.hidden = !IS_BETA;
+  updateVenueChrome(); // the rows, via the one predicate that decides them
+}
+applyStabilityChrome();
 
 function syncSettingsUI() {
   document.getElementById('set-sound').setAttribute('aria-pressed', String(soundOn));
@@ -22983,7 +23107,7 @@ async function initNet() {
   if (IN_LOBBY) {
     netOnline = false;
     roomSetup = null;
-    applyRoomSettings(load(LS_ROOMSETTINGS, null)); // your own felt, kept
+    applyRoomSettings(ownSettingsForChannel(load(LS_ROOMSETTINGS, null))); // your own felt, kept
     clearTableIdentity(); // ...but never a table NAME (see the function)
     renderPlayers();      // the presence row draws the lobby's exits
     updateIdentityChip();
@@ -23105,7 +23229,7 @@ async function initNet() {
     // Safe in the shared-transient channel too: with no server, no settings
     // event can fire and steal the slot.
     setPill('solo', 'solo');
-    applyRoomSettings(load(LS_ROOMSETTINGS, null)); // solo keeps its own felt
+    applyRoomSettings(ownSettingsForChannel(load(LS_ROOMSETTINGS, null))); // solo keeps its own felt
     renderPlayers(); // genuinely all three branches now — it early-returns here
   }
   // §11 R6, stated literally: "when they join a table they should use the last

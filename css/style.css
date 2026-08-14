@@ -4627,6 +4627,23 @@ body.mini #result-verdict { font-size: 11px; }
   text-transform: uppercase;
   color: var(--muted);
 }
+/* THE CLOSED-BETA MARK (js/stability.js), worn by a section heading that was
+   already on the page. Deliberately NOT its own line: as a `.hint` paragraph
+   it stood 21px tall and pushed Staging 21px past a 459px panel, which is the
+   overflow §7.36 was the whole job of removing. It borrows the plabel's own
+   tracking so it reads as part of the heading, and takes the tertiary amber
+   rather than the ROLL gold — this is a label, not an act. */
+.beta-tag {
+  margin-left: 8px;
+  padding: 1px 5px;
+  border: 1px solid rgba(198, 154, 78, 0.35);
+  border-radius: 4px;
+  font-size: 8.5px;
+  letter-spacing: 0.16em;
+  color: #a98a55;
+  vertical-align: 1px;
+}
+.beta-tag[hidden] { display: none; }
 .prow { display: flex; align-items: center; gap: 8px; }
 .prow + .prow { margin-top: 8px; }
 .prow .grow, .grow { flex: 1; min-width: 0; }

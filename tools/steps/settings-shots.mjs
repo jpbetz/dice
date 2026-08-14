@@ -14,9 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// THE SETTINGS PANEL, ONE SHOT PER DESTINATION (UX §7.36).
+// THE SETTINGS PANEL, ONE SHOT PER DESTINATION (UX §7.36) — ON BOTH
+// STABILITY CHANNELS (§7.37, js/stability.js).
 //
-//   node tools/drive.mjs tools/steps/settings-shots.mjs [prefix]
+//   node tools/drive.mjs tools/steps/settings-shots.mjs [prefix] [channel]
+//
+// channel: 'beta' (default), 'stable', or 'both'. It matters because the
+// channel changes the panel: on the stable channel Staging loses the venue
+// and tower rows and keeps the felt. Both channels have to be measured, not
+// just the developer's own — the felt was very nearly moved to Table for the
+// stable channel and that put Table 24px over a 459px panel, which is §7.36's
+// entire defect wearing a different hat. A tool that could only photograph
+// the channel its author sits on would not have said so.
 //
 // It exists because the panel's defect was a MEASUREMENT — 45 controls in a
 // 320px column that scrolled 1004px inside a 647px window — and a restructure
@@ -31,11 +40,29 @@ limitations under the License.
 // is for the eye.
 
 const DESTS = ['table', 'staging', 'you', 'stuff'];
+// The harness seeds every tab onto the beta channel, so 'stable' is reached
+// by the URL param — the same door a player uses, and the param beats the
+// store by design.
+const CHANNELS = { beta: '', stable: '&stability=stable' };
+const ORIGINS = { beta: 'localhost', stable: '127.0.0.41' };
 
 export default async function run(stage, args) {
   const prefix = args[0] || 'settings';
-  const a = await stage.tab('localhost', 'Settings');
+  const want = (args[1] || 'beta').toLowerCase();
+  const channels = want === 'both' ? ['beta', 'stable'] : [want];
+  for (const chan of channels) {
+    if (!(chan in CHANNELS)) throw new Error(`unknown channel '${chan}' (beta | stable | both)`);
+    await shoot(stage, channels.length > 1 ? `${prefix}-${chan}` : prefix, chan);
+  }
+}
+
+async function shoot(stage, prefix, chan) {
+  const a = await stage.ctx.newTable({
+    origin: ORIGINS[chan], name: 'Settings', query: CHANNELS[chan],
+  });
   await a.settle();
+  const live = await a.dbg('stability()');
+  if (live.channel !== chan) throw new Error(`asked for '${chan}', got '${live.channel}'`);
 
   const rows = [];
   for (const dest of DESTS) {
@@ -62,7 +89,8 @@ export default async function run(stage, args) {
     await stage.shot(a, `${prefix}-${dest}.png`);
   }
 
-  console.log('\ndestination   scroll  client  OVERFLOW  reachable');
+  console.log(`\n=== ${chan} channel ===`);
+  console.log('destination   scroll  client  OVERFLOW  reachable');
   for (const [dest, m] of rows) {
     console.log(`  ${dest.padEnd(11)} ${String(m.scrollH).padStart(5)}   `
       + `${String(m.clientH).padStart(5)}   ${String(m.over).padStart(6)}   `

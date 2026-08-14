@@ -65,6 +65,15 @@ note).
    import's preview-and-merge. The codec, its module, its tests and its
    links are gone. The URL addresses a TABLE — `?room=` — and carries no
    user state at all. Persistent identity and saves are a later pass.)*
+
+   *(Amended 2026-08-14: `?stability=beta|stable` is the ONE other parameter
+   the app reads, and it is a KEY rather than a setting — redeemed once into
+   localStorage and then **stripped from the address bar** (`js/stability.js`,
+   UX §7.38). So the rule above still holds literally: nothing durable rides
+   the URL. The strip is not tidiness. The share flow hands out
+   `location.href`, so a channel left in the query string would enrol every
+   player a beta host invited — the closed beta leaking through its own
+   invite link.)*
 8. **One shared truth.** Every player sees the same values, attribution, and
    log. Presentation *pacing* is client-local (skips, ceremony timing);
    *information* never diverges except through deliberate visibility

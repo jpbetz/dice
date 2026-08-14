@@ -135,6 +135,13 @@ async function bootTab(ctx, {
       // same stamp; `schema-reset` is where the purge is proven, by clearing
       // it on purpose.
       `localStorage.setItem('dice.schema.v1','2');`,
+      // A TEST TAB IS A BETA TAB, the same rule newTable carries (js/
+      // stability.js): towers and venues are closed beta and the suite's job
+      // includes unreleased work. Written FIRST so a scenario can overrule it
+      // from either side — `seed: {'dice.stability.v1':'stable'}` lands after
+      // this line, and `clean: ['dice.stability.v1']` produces the population
+      // that matters most, a browser that has never heard of the beta.
+      `localStorage.setItem('dice.stability.v1','beta');`,
       ...clean.map((k) => `localStorage.removeItem(${JSON.stringify(k)});`),
       ...Object.entries(seed).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`),
     ];
@@ -175,9 +182,14 @@ const lobbyTab = (ctx, opts = {}) => bootTab(ctx, {
 // A tab AT THIS SCENARIO'S TABLE via bootTab — for flows that later navigate
 // and therefore need the one-shot seeding (newTable seeds per document).
 // Callers still await t.waitOnline().
+// `query` appends to the room URL, newTable's spelling — and it is an OPTION
+// rather than a caller-supplied `path` because `path` is written after the
+// spread and would be silently overwritten. (It was, for one debugging round:
+// a `&stability=beta` that never reached the address bar and a redemption
+// that looked broken.)
 const tableTab = (ctx, opts = {}) => bootTab(ctx, {
   ...opts,
-  path: `/?room=${encodeURIComponent(ctx.room)}`,
+  path: `/?room=${encodeURIComponent(ctx.room)}${opts.query || ''}`,
   readyExpr: `!!window.__diceDebug && window.__diceDebug.netReady`,
   readyDesc: `table tab up (${opts.origin || 'localhost'})`,
 });
@@ -10496,6 +10508,247 @@ export const scenarios = [
         `document.getElementById('portable-zone').classList.contains('hidden')`),
       '…and the text tool is still folded — arriving at your profiles must not '
       + 'hand you a YAML editor');
+    },
+  },
+  {
+    name: 'stability-gate',
+    tags: ['settings', 'chrome', 'tower', 'stability'],
+    // THE CLOSED-BETA CHANNEL (js/stability.js). Towers and venues are
+    // shipped, working, and not finished being decided; a production player
+    // should not meet them by accident.
+    //
+    // THE ONE LAW, AND THE ONLY CLAIM HERE THAT COSTS DICE: the channel gates
+    // the OFFER, never the CAPABILITY. A stable client that walks into a beta
+    // player's room still sockets that room's tower and bakes the same film.
+    // That is not courtesy, it is goal 15 — the pour is a pure function of
+    // (core, seed), so a client that opted out would put DIFFERENT DICE on
+    // screen from the seat next to it. A gate written the obvious way (refuse
+    // the setting) passes every visibility assertion in this file and breaks
+    // the table, silently, only when two people are watching. So the two tabs
+    // and the roll are the point of the scenario, not its overhead.
+    //
+    // WHAT WOULD MAKE EACH FAIL:
+    //   · a browser that has never heard of the beta seeing it — the virgin
+    //     tab, `clean`ed of the key the harness seeds for everything else.
+    //     This is the population the feature exists for and the one a
+    //     beta-by-default suite would otherwise never boot.
+    //   · the gate reaching the film — the two-tab pour. Deleting the
+    //     IS_BETA guard from ownSettingsForChannel and applying it in
+    //     applyRoomSettings instead leaves every other line here green.
+    //   · felt going down with the stage — it is not experimental, and it
+    //     must be REACHABLE (offsetParent, not merely present: the §7.21
+    //     rule, and instance 2 of the green-check ledger).
+    //   · a hidden row coming back from the dead — the venue and the channel
+    //     both hide rows, for unrelated reasons. Raise a fantasy venue on a
+    //     production client and take it down again: two owners of one
+    //     `display` hand the tower picker back, and only this leg would see
+    //     it. (It is why panelRowShown exists.)
+    //   · the panel losing its measurement — §7.36's whole point was that
+    //     nothing scrolls, and this pass has already had to abandon one
+    //     design (felt moving to Table: 483px against a 459px panel) and one
+    //     beta notice (its own line: 21px over) to keep it true.
+    //   · the key leaking into the URL — redeem, then strip. `?room=` has to
+    //     survive the rewrite, and `?stability=` must not, or every player a
+    //     beta host invites is enrolled by the share link.
+    async fn(ctx) {
+      // ---- ① a browser that has never heard of the beta ------------------
+      const prod = await tableTab(ctx, {
+        origin: '127.0.0.21',
+        seed: { 'dice.name.v1': 'Pat' },
+        clean: ['dice.stability.v1'],
+      });
+      await prod.waitOnline();
+
+      const chan = await prod.dbg('stability()');
+      assert.equal(chan.channel, 'stable',
+        'no key and no param is PRODUCTION — the default has to be the safe '
+        + `one, and it is the only one a new player can arrive on (got ${chan.channel})`);
+      assert.equal(chan.beta, false, 'and it does not think it is beta');
+      assert.deepEqual(chan.gated, ['tower', 'venue'],
+        'the gated set is tower + venue, named by the app rather than by this test');
+
+      await prod.dbg('openSettings("staging")');
+      // OFFSETPARENT, not the attribute or the markup. A row that is present,
+      // labelled and `display:none` reads as success to anything that asks
+      // the DOM what it holds — instance 2 of the green-check ledger, where a
+      // figure was built and never shown for weeks behind a passing test.
+      for (const id of ['venue-row', 'venue-picker', 'tower-row', 'tower-picker']) {
+        assert.equal(await prod.eval(`document.getElementById('${id}').offsetParent`), null,
+          `${id} is unreachable — the pickers ARE the offer, and the offer is what a `
+          + 'channel gates');
+      }
+      assert.equal(await prod.eval(
+        `getComputedStyle(document.getElementById('staging-beta')).display`), 'none',
+      'and the panel does not call itself a beta to somebody who is not in one');
+
+      // FELT IS NOT EXPERIMENTAL — the stage it stands on is. It rides in
+      // Staging because a fantasy venue takes it (goal 13); it stays there on
+      // this channel because moving it to Table put that destination 24px
+      // over a 459px panel, and §7.36 is a measurement before it is a taste.
+      assert.notEqual(await prod.eval(
+        `getComputedStyle(document.getElementById('felt-swatches')).display`), 'none',
+      'the felt swatches are still on screen for a production player');
+      assert.ok(await prod.eval(
+        `document.getElementById('dest-staging').contains(document.getElementById('felt-swatches'))`),
+      '…in Staging, where staging the table has always meant choosing the felt');
+
+      // §7.36's measurement, on the channel that had rows taken out of it.
+      const over = JSON.parse(await prod.eval(`(() => {
+        const p = document.getElementById('settings-panel');
+        const out = {};
+        for (const d of ['table', 'staging', 'you', 'stuff']) {
+          window.__diceDebug.settingsDest(d);
+          out[d] = Math.max(0, p.scrollHeight - p.clientHeight);
+        }
+        return JSON.stringify(out);
+      })()`));
+      for (const [dest, px] of Object.entries(over)) {
+        assert.equal(px, 0, `${dest} still does not scroll on the stable channel (${px}px over)`);
+      }
+
+      // ---- ② the beta browser IS offered them ----------------------------
+      // The control leg: without it every assertion above would also pass on
+      // a build that had simply deleted the pickers.
+      const beta = await ctx.newTable({ origin: 'localhost', name: 'Ada' });
+      await beta.settle();
+      assert.equal((await beta.dbg('stability()')).channel, 'beta',
+        'the harness default seats a beta browser');
+      await beta.dbg('openSettings("staging")');
+      for (const id of ['venue-picker', 'tower-picker', 'felt-swatches', 'staging-beta']) {
+        assert.notEqual(await beta.eval(`document.getElementById('${id}').offsetParent`), null,
+          `${id} is offered on the beta channel`);
+      }
+      const betaOver = JSON.parse(await beta.eval(`(() => {
+        const p = document.getElementById('settings-panel');
+        window.__diceDebug.settingsDest('staging');
+        return String(Math.max(0, p.scrollHeight - p.clientHeight));
+      })()`));
+      assert.equal(betaOver, 0,
+        `Staging does not scroll with the beta rows AND the mark on it (${betaOver}px over) — `
+        + 'the mark is a tag on a heading and not a line of its own for exactly this reason');
+      await beta.dbg('closeSettingsModal()');
+
+      // ---- ③ THE LAW: the gate never reaches the film --------------------
+      await beta.dbg("setTower('heartwood')");
+      await beta.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+        { desc: 'the beta host sockets a tower' });
+      // The stable client is IN THIS ROOM and must follow it. Nothing about
+      // its channel may be visible in what it renders.
+      await prod.waitFor(`window.__diceDebug.tower === 'heartwood'`,
+        { desc: 'the production client sockets the room\'s tower anyway' });
+
+      await beta.dbg("commandRoll('6d6')");
+      for (const t of [beta, prod]) {
+        await t.waitFor('!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.landings)',
+          { desc: 'the pour reached both clients' });
+      }
+      const films = await Promise.all([beta, prod].map(async (t) => JSON.parse(
+        await t.eval('JSON.stringify(window.__diceDebug.towerFilmInfo())'))));
+      for (const [i, f] of films.entries()) {
+        assert.equal(f.filmTower, 'heartwood',
+          `${i ? 'the production' : 'the beta'} client BAKED against the tower `
+          + `(film ${f.filmTower}) — 'tower' says what is standing, 'filmTower' says `
+          + 'what the dice were computed through, and only the second one is the law');
+      }
+      assert.equal(films[0].seed, films[1].seed, 'one seed');
+      assert.equal(films[0].frames, films[1].frames, 'one film length');
+      // THE FILM, NOT THE FRAME. `rest` carries two fields that are read off
+      // the live meshes at the instant of the call — `visible` (a die inside
+      // the tower is not drawn) and `shows` (the rendered orientation) — so
+      // two tabs a few ticks apart in the SAME film disagree about them
+      // honestly. They were the first thing this assertion caught, which is
+      // the good version of that mistake: comparing everything and then
+      // narrowing to what the claim is actually about. What the claim is
+      // about is where the dice END UP, and that is baked, not rendered.
+      const filmOf = (f) => f.rest.map(({ i, type, p, declared, delivered }) =>
+        ({ i, type, p, declared, delivered }));
+      assert.deepEqual(filmOf(films[1]), filmOf(films[0]),
+        'ONE FILM: every die is computed to the same resting place on both screens. This '
+        + 'is the assertion the obvious implementation of a feature gate fails — refusing '
+        + 'the room\'s tower on the stable client would leave every visibility claim '
+        + 'above green and put different dice in front of the two players');
+
+      // ---- ④ a row hidden twice stays hidden -----------------------------
+      // The venue hides these rows because it IS those choices; the channel
+      // hides them because they are not on offer here. Both write the same
+      // `display`, so the venue coming back down is the moment a naive gate
+      // hands a production player the tower picker — a bug that needs a
+      // fantasy venue, a stable client and a return trip to show itself, and
+      // therefore one nobody would meet before a player did.
+      await beta.dbg("setVenue('moonrise')");
+      await prod.waitFor(`window.__diceDebug.venueInfo().id === 'moonrise'`,
+        { desc: 'the production client follows the room into the glade' });
+      await prod.dbg('openSettings("staging")');
+      // SHOWN *AND* SAYING SOMETHING. `display` alone passes an empty note —
+      // the element's visibility and its text are set by two different lines,
+      // and blanking the text left this assertion green (caught by breaking
+      // it on purpose). An explanation nobody can read is the absence it was
+      // written to fix.
+      const note = JSON.parse(await prod.eval(`JSON.stringify({
+        display: getComputedStyle(document.getElementById('venue-staged')).display,
+        text: document.getElementById('venue-staged').textContent.trim(),
+      })`));
+      assert.notEqual(note.display, 'none',
+        'the venue says what it took, on the stable channel too — the note is how a '
+        + 'control that vanishes stops being a defect');
+      assert.match(note.text, /Moonrise Glade/,
+        `…and it names the venue that took them (${JSON.stringify(note.text)})`);
+      await beta.dbg("setVenue('table')");
+      await prod.waitFor(`window.__diceDebug.venueInfo().id === 'table'`,
+        { desc: 'and back out again' });
+      for (const id of ['venue-picker', 'tower-picker']) {
+        assert.equal(await prod.eval(`document.getElementById('${id}').offsetParent`), null,
+          `${id} is STILL gone after a venue came and went — the channel's hide must `
+          + 'survive the venue\'s un-hide, which is what one shared predicate buys');
+      }
+      assert.notEqual(await prod.eval(
+        `getComputedStyle(document.getElementById('felt-swatches')).display`), 'none',
+      '…and the felt came back, because that one really was the venue\'s to take');
+
+      // ---- ⑤ the key is redeemed, then gone ------------------------------
+      // A real enrolment: the link arrives, the browser keeps it, the URL does
+      // not. The share flow hands out location.href, so a param left behind
+      // enrols everybody the host invites — the failure this feature exists
+      // to prevent, arriving through the front door.
+      const joined = await tableTab(ctx, {
+        origin: '127.0.0.22',
+        query: '&stability=beta',
+        seed: { 'dice.name.v1': 'Rue' },
+        clean: ['dice.stability.v1'],
+      });
+      await joined.waitOnline();
+      assert.equal((await joined.dbg('stability()')).channel, 'beta',
+        'the link redeemed on a browser that had nothing stored');
+      assert.equal(await joined.eval(`localStorage.getItem('dice.stability.v1')`), 'beta',
+        '…and it stuck, so the next boot needs no link');
+      // PARSED, not grepped. A substring test for 'stability' matches this
+      // scenario's own room name (`e2e-stability-gate-…`) and fails a strip
+      // that worked perfectly — the assertion has to ask the same question
+      // the app asks.
+      const search = await joined.eval('location.search');
+      assert.equal(await joined.eval(
+        `new URLSearchParams(location.search).get('stability')`), null,
+      `the param is stripped from the address bar (${search})`);
+      assert.equal(await joined.eval(
+        `new URLSearchParams(location.search).get('room')`), ctx.room,
+      `…and ?room= survives the rewrite (${search}) — the URL still addresses a table`);
+
+      // Revocation is the same door in the other direction, and it PERSISTS:
+      // a one-way beta would make "show me what my players see" impossible.
+      const back = await tableTab(ctx, {
+        origin: '127.0.0.23',
+        query: '&stability=stable',
+        seed: { 'dice.name.v1': 'Wren' }, // …and the harness's beta seed stands
+      });
+      await back.waitOnline();
+      assert.equal((await back.dbg('stability()')).channel, 'stable',
+        'the param beats the store, so a beta browser can be shown production');
+      assert.equal(await back.eval(`localStorage.getItem('dice.stability.v1')`), 'stable',
+        '…and the store followed it, so leaving the beta is not one boot deep');
+      await back.dbg('openSettings("staging")');
+      assert.equal(await back.eval(`document.getElementById('tower-picker').offsetParent`), null,
+        'and the panel obeys the param on the very boot that carried it — the revoke '
+        + 'link has to SHOW you production, not merely promise it for next time');
     },
   },
   {
