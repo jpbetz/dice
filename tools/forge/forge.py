@@ -390,7 +390,8 @@ def material(name, rgb, roughness=0.6, metallic=0.0):
     return mat
 
 
-def vertex_color_material(name, attr_name, roughness=None, specular_level=None):
+def vertex_color_material(name, attr_name, roughness=None, specular_level=None,
+                          emission=None):
     """A material whose base colour is the mesh colour attribute.
 
     The glTF exporter only writes COLOR_0 under `export_vertex_color='MATERIAL'`
@@ -414,6 +415,26 @@ def vertex_color_material(name, attr_name, roughness=None, specular_level=None):
     paint's). Principled's "Specular IOR Level" 0.5 = F0 0.04; pass ~0.1
     (F0 0.008) for deep interiors that must actually go dark. Exports as
     KHR_materials_specular, honoured by the app's r160 loader.
+
+    `emission` is a LINEAR (r, g, b) written straight to Emission Color at
+    Strength 1, which the exporter turns into glTF `emissiveFactor` — linear
+    at both ends, so what you type is what `material.emissive` holds in the
+    app. TWO THINGS ABOUT IT THAT ARE EASY TO FORGET AND EXPENSIVE TO LEARN:
+
+      · EMISSIVE IS NOT MULTIPLIED BY COLOR_0. One material means one glow
+        value over the whole mesh, so a glow that has to VARY is a separate
+        MESH (a separate object gets a separate material), or it is a
+        gradient built out of GEOMETRY — how much emitting surface a given
+        eye can see. Without a texture there is no third option.
+      · IT IS NOT A LIGHT. Nothing near an emissive face is illuminated by
+        it, so a glow the shipped eyes cannot see DIRECTLY contributes
+        exactly zero pixels (js/towerhollow.js learned this on a gill that
+        faced the floor). Emitters go where they are looked at.
+
+    The ceiling is the app's bloom threshold, js/post.js `uThresh` = 0.9 on
+    linear luminance, and it is enforced here: a tower mesh over it would
+    burn, and a permanently burning tower disables the post-stack bypass for
+    the whole app (js/towerhollow.js's value-ladder paragraph).
     """
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
@@ -426,6 +447,17 @@ def vertex_color_material(name, attr_name, roughness=None, specular_level=None):
         bsdf.inputs["Roughness"].default_value = float(roughness)
     if specular_level is not None:
         bsdf.inputs["Specular IOR Level"].default_value = float(specular_level)
+    if emission is not None:
+        r, g, b = (float(c) for c in emission)
+        lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        if lum >= 0.9:
+            raise RuntimeError(
+                f"{name}: emission luminance {lum:.3f} is at or over the app's "
+                f"bloom threshold (0.9 linear) — this mesh would burn, and a "
+                f"tower that burns disables the post-stack bypass for the "
+                f"whole app")
+        bsdf.inputs["Emission Color"].default_value = (r, g, b, 1.0)
+        bsdf.inputs["Emission Strength"].default_value = 1.0
     return mat
 
 

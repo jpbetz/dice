@@ -332,15 +332,22 @@ const TOWERS = {
       // other tower's ember is a flame somebody struck; Umbra's whole claim is
       // that it gives nothing back, so the light at the door is the UNMAKING
       // itself — the die set's own witchlight (#cfe98c, the dissolve shader's
-      // burning edge), cold, low and short-reach, raking down the doorway's
-      // reveal and onto the shard a die arrives on. `at` is [x, y, z offset
+      // burning edge), cold, low and short-reach. `at` is [x, y, z offset
       // from z0] and matches the bake's `doorPad` marker.
-      ember: { at: [-1.55, 3.95, -0.34], color: '#cfe98c', intensity: 2.4, dist: 4.4 },
+      //
+      // IT IS INSIDE THE MOUTH (round 6), not on its lip. At the doorway's
+      // upper-left corner it lit a lintel and left the pocket — 2.3 of depth,
+      // the most-looked-at square on the tower — reading as a black rectangle
+      // with a smear along its top edge. 1.6 back inside it lights what is in
+      // there: the back wall the bake's veins climb, both jambs' reveals, the
+      // floor. What escapes reaches the shard as SPILL from a mouth, which is
+      // the thing a lamp aimed at a facade can never look like.
+      ember: { at: [-0.30, 1.06, -1.82], color: '#cfe98c', intensity: 2.8, dist: 4.0 },
       // A BLACK SURFACE IS MOSTLY REFLECTION, so the rake that flatters pale
       // masonry would just put the room on it. Black Anvil took 0.4 for the
       // same reason; this one goes lower still — the identity is a hole in the
       // light, and every lumen the lantern adds is arguing with it.
-      lantern: { rake: 0.45 },
+      lantern: { rake: 0.32 },
       // NO DUST. Stone that has never worn does not shed, and the mote layer
       // is Heartwood's trait (js/motes.js keys on this flag).
       motes: false,
