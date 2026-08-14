@@ -124,153 +124,243 @@ const ZOOM_LEVELS = [
 // two clients with different towers would still be impossible — the tower is
 // a room setting — and a replay's hash cannot move. Palettes are resolved at
 // render time, in the sound drain, and nowhere else.
+//
+// ---------------------------------------------------------------------------
+// A ROW HAS TWO HALVES, AND THE SPLIT IS THE CHARTER (D1).
+//
+// Joe's charter: a tower model is 100% COSMETIC over invisible engine
+// colliders and portals; physics and the pour film are a function of (portal
+// spec, engine constants, seed) and nothing else. That sentence is only worth
+// anything if "I only touched cosmetic" is MECHANICAL — checkable by looking
+// at which half of a row a diff lands in — rather than a thing an author
+// asserts about their own patch. So:
+//
+//   physical:  the portal spec, and the declarations that are ABOUT the
+//              engine's colliders (bareColliders). Touch this and you have
+//              moved the film; towerFilmDigest will say so.
+//   cosmetic:  the label, the title, the skin builder, the baked model files
+//              and which variant is live, the sound palette, the ember, the
+//              lantern rake, the dust, the dressing flag. Touch any of it and
+//              the film is provably unmoved.
+//
+// `id` and `venueOnly` stay at the top level on purpose: they are neither
+// paint nor physics. An id is the row's name in the settings protocol, and
+// `venueOnly` is a CATALOGUE rule about how this tower is chosen (the picker
+// skips it; the venue raises it), which is a fact about the offer rather than
+// about the object.
+//
+// Readers go through towerPhys()/towerCos(), which answer "declares nothing"
+// for a half that is absent rather than throwing — a row is data somebody
+// hand-writes, and a missing half should degrade to the classic core the way
+// a missing portal spec always has.
 const TOWERS = {
   none: {
-    id: 'none', label: 'None', skin: null,
-    title: 'None — dice are thrown onto the felt by hand',
+    id: 'none',
+    // Not a mode — the whole app, untouched (THE FIRST LAW above). It has no
+    // physical half because there is nothing to give portals to, and its
+    // cosmetic half is two strings for a chip.
+    cosmetic: {
+      label: 'None', skin: null,
+      title: 'None — dice are thrown onto the felt by hand',
+    },
   },
   heartwood: {
-    id: 'heartwood', label: 'Heartwood', skin: buildTowerSkin,
-    title: 'Heartwood — a wooden tower at the back of the table; dice pour through it',
-    // THE FAMILY TRAIT (docs/TOWER.md, DRESSING): every tower carries a warm
-    // focal light. Heartwood's is the cresset hanging off its right corner
-    // post — `at` is the coals, [x, y, z offset from z0], and it is what
-    // turns an emissive bake into something that lights the post beside it.
-    // A lit lantern implies somebody lit it tonight; an unlit one is trim.
-    ember: { at: [2.575, 8.02, 0.70], color: '#ff9a44', intensity: 2.6, dist: 4.2 },
-    // Dust hangs in this tower's air and nobody else's (Joe, 2026-08-15):
-    // an old wooden tower sheds; stone and a forge-hot chimney read wrong
-    // with idle dust. The mote layer (js/motes.js) keys on this flag via
-    // towerSocket — it is a family trait like the ember, not a room fixture.
-    motes: true,
-    // Dry wood on wood: a short, narrow-band knock with almost no tail.
-    // `shaft` is the CHUTE's colour, not the knock's (docs/AUDIO.md §2.4):
-    // a feedforward comb plus two resonant modes. A 0.4 m chute's 2.3 ms
-    // round trip is below the 128-sample feedback floor, so a true geometric
-    // model is unrepresentable here — this models the colour instead, with
-    // no feedback path and therefore no stability question.
-    clunkVoice: {
-      body: 'clack', weight: 0.35, sustain: 20,
-      shaft: { delayS: 0.0032, combGain: 0.55, mode1Hz: 430, mode2Hz: 860 },
+    id: 'heartwood',
+    // NO PORTALS, DECLARED. An empty physical half is not an oversight:
+    // this row asks for DEFAULT_PORTALS — the classic core, which is what
+    // makes every delta in towerVolumes a literal +0.0 — and saying so is
+    // the difference between a tower that CHOSE the classic mouth and a
+    // baked one whose portals silently failed to load into the same place.
+    physical: {},
+    cosmetic: {
+      label: 'Heartwood', skin: buildTowerSkin,
+      title: 'Heartwood — a wooden tower at the back of the table; dice pour through it',
+      // THE FAMILY TRAIT (docs/TOWER.md, DRESSING): every tower carries a warm
+      // focal light. Heartwood's is the cresset hanging off its right corner
+      // post — `at` is the coals, [x, y, z offset from z0], and it is what
+      // turns an emissive bake into something that lights the post beside it.
+      // A lit lantern implies somebody lit it tonight; an unlit one is trim.
+      ember: { at: [2.575, 8.02, 0.70], color: '#ff9a44', intensity: 2.6, dist: 4.2 },
+      // Dust hangs in this tower's air and nobody else's (Joe, 2026-08-15):
+      // an old wooden tower sheds; stone and a forge-hot chimney read wrong
+      // with idle dust. The mote layer (js/motes.js) keys on this flag via
+      // towerSocket — it is a family trait like the ember, not a room fixture.
+      motes: true,
+      // Dry wood on wood: a short, narrow-band knock with almost no tail.
+      // `shaft` is the CHUTE's colour, not the knock's (docs/AUDIO.md §2.4):
+      // a feedforward comb plus two resonant modes. A 0.4 m chute's 2.3 ms
+      // round trip is below the 128-sample feedback floor, so a true geometric
+      // model is unrepresentable here — this models the colour instead, with
+      // no feedback path and therefore no stability question.
+      clunkVoice: {
+        body: 'clack', weight: 0.35, sustain: 20,
+        shaft: { delayS: 0.0032, combGain: 0.55, mode1Hz: 430, mode2Hz: 860 },
+      },
     },
   },
   bastion: {
-    id: 'bastion', label: 'Bastion', skin: buildBastionSkin,
-    title: 'Bastion — a stone turret; dice rumble through it',
-    // THE FAMILY TRAIT: the iron sconce bolted beside the arrow loop. It sits
-    // half a unit from the darkest thing on the model, which is the whole
-    // reason it is there — a live flame beside a near-black slot is the
-    // strongest value contrast a grey tower has.
-    ember: { at: [-0.38, 8.03, 0.54], color: '#ff9040', intensity: 2.4, dist: 4.0 },
-    // Stone: heavier, lower, and it rings on in the shaft afterwards — a
-    // longer chute delay and lower modes than the wooden one.
-    clunkVoice: {
-      body: 'thud', weight: 0.7, sustain: 40,
-      shaft: { delayS: 0.0055, combGain: 0.5, mode1Hz: 300, mode2Hz: 600 },
+    id: 'bastion',
+    physical: {},   // the classic core, by declaration (see heartwood)
+    cosmetic: {
+      label: 'Bastion', skin: buildBastionSkin,
+      title: 'Bastion — a stone turret; dice rumble through it',
+      // THE FAMILY TRAIT: the iron sconce bolted beside the arrow loop. It sits
+      // half a unit from the darkest thing on the model, which is the whole
+      // reason it is there — a live flame beside a near-black slot is the
+      // strongest value contrast a grey tower has.
+      ember: { at: [-0.38, 8.03, 0.54], color: '#ff9040', intensity: 2.4, dist: 4.0 },
+      // Stone: heavier, lower, and it rings on in the shaft afterwards — a
+      // longer chute delay and lower modes than the wooden one.
+      clunkVoice: {
+        body: 'thud', weight: 0.7, sustain: 40,
+        shaft: { delayS: 0.0055, combGain: 0.5, mode1Hz: 300, mode2Hz: 600 },
+      },
     },
   },
   blackanvil: {
-    id: 'blackanvil', label: 'Black Anvil', skin: buildAnvilSkin,
-    title: 'Black Anvil — a cooling forge chimney; dice fall through it ringing',
-    // The grate glows, so the grate LIGHTS (towerLanternBuild): one faint
-    // physical-falloff point light in front of the firebox — emissive maps
-    // shine but cannot illuminate, and a forge that casts no warmth on its
-    // own tray reads as a sticker. `at` is [x, y, z offset from z0]; the
-    // grate bed sits above the door head (toweranvil.js refusal #1).
-    ember: { at: [0, 5.2, 1.9], color: '#ff6a28' },
-    // The forge's identity is DARKNESS with a glow in it — the full rake
-    // that flatters pale masonry just flattens soot. It takes the lantern
-    // at four-tenths and lets the ember carry the rest (A/B'd 2026-08-11).
-    lantern: { rake: 0.4 },
-    // METAL, and the only voice in the palette that is not a knock. `chime`
-    // is the sine-partial body — glass at its default weight — but weighted
-    // right down it stops being crystal and becomes the ring a die gets out
-    // of a cast-iron baffle, and the long tail is the shaft carrying it.
-    // A FIRST TUNING, AND NOBODY HAS HEARD IT: these three numbers were
-    // reasoned from the voice table (weight shifts the centre frequency
-    // down, sustain extends the decay) and from wanting distance between
-    // this and the Emberforge die set's own thud 0.9 / 30 — not listened
-    // to. Of everything in this tower it is the thing most likely to want
-    // moving, and it is Joe's dial.
-    // The shaft row is Joe's dial for the same reason and in the same breath:
-    // the tightest delay and the highest modes of the three, which is what an
-    // iron flue does to a knock.
-    clunkVoice: {
-      body: 'chime', weight: 0.85, sustain: 70,
-      shaft: { delayS: 0.0025, combGain: 0.6, mode1Hz: 520, mode2Hz: 1040 },
+    id: 'blackanvil',
+    physical: {},   // the classic core, by declaration (see heartwood)
+    cosmetic: {
+      label: 'Black Anvil', skin: buildAnvilSkin,
+      title: 'Black Anvil — a cooling forge chimney; dice fall through it ringing',
+      // The grate glows, so the grate LIGHTS (towerLanternBuild): one faint
+      // physical-falloff point light in front of the firebox — emissive maps
+      // shine but cannot illuminate, and a forge that casts no warmth on its
+      // own tray reads as a sticker. `at` is [x, y, z offset from z0]; the
+      // grate bed sits above the door head (toweranvil.js refusal #1).
+      ember: { at: [0, 5.2, 1.9], color: '#ff6a28' },
+      // The forge's identity is DARKNESS with a glow in it — the full rake
+      // that flatters pale masonry just flattens soot. It takes the lantern
+      // at four-tenths and lets the ember carry the rest (A/B'd 2026-08-11).
+      lantern: { rake: 0.4 },
+      // METAL, and the only voice in the palette that is not a knock. `chime`
+      // is the sine-partial body — glass at its default weight — but weighted
+      // right down it stops being crystal and becomes the ring a die gets out
+      // of a cast-iron baffle, and the long tail is the shaft carrying it.
+      // A FIRST TUNING, AND NOBODY HAS HEARD IT: these three numbers were
+      // reasoned from the voice table (weight shifts the centre frequency
+      // down, sustain extends the decay) and from wanting distance between
+      // this and the Emberforge die set's own thud 0.9 / 30 — not listened
+      // to. Of everything in this tower it is the thing most likely to want
+      // moving, and it is Joe's dial.
+      // The shaft row is Joe's dial for the same reason and in the same breath:
+      // the tightest delay and the highest modes of the three, which is what an
+      // iron flue does to a knock.
+      clunkVoice: {
+        body: 'chime', weight: 0.85, sustain: 70,
+        shaft: { delayS: 0.0025, combGain: 0.6, mode1Hz: 520, mode2Hz: 1040 },
+      },
     },
   },
   hollowbole: {
-    id: 'hollowbole', label: 'Hollow Bole',
-    // THE FIRST SHIPPED GLB TOWER (ROADMAP W3, /new-tower v2). One geometry,
-    // two palettes: the trunk is BAKED (tools/forge/recipes/hollowbole.py) and
-    // the venue picks which paint is standing. Both files are ensured together
-    // and readiness is over the pair (towerGlbUrls) — a venue flip must not put
-    // a player back in the wait they already served.
-    //
-    // IDENTICAL PORTALS ARE A CLAIM THIS ROW MAKES AND towerModelEnsure CHECKS:
-    // in {x 0, z -2.55, rimY 9.40, clearR 2.20}, out {x 0, sillY 1.00, w 4.20,
-    // clearH 3.50}, one geometry digest across both bakes. The engine derives
-    // its whole core from those eight numbers, so two variants that disagreed
-    // would be one venue delivering dice through a doorway the other one's
-    // engine did not cut. (The mouth tightened to the measured floor
-    // 2026-08-13 — was 5.00 x 4.50, sitting AT the old inherited limits;
-    // see TOWER.md "THE MINIMUMS" and the recipe's derivation.)
-    glbUrls: {
-      moonrise: '/models/towers/hollowbole_moonrise.glb',
-      foxfire: '/models/towers/hollowbole_foxfire.glb',
-    },
-    glbVariant: () => faeTowerPalette(),
-    // THE BAKE REPLACED THE SHELL, NOT THE DRESS. buildHollowBoleSkin still
-    // places the crown moot, the attendants, the little lit door, the veils and
-    // the stains — Joe-approved W3 work — through the SURFACE descriptor
-    // (js/towerhollow.js:592). What changed is who answers "where is the bark
-    // at (θ, y)": glbShellFor raycasts the loaded mesh instead of evaluating a
-    // radius field. The seam is the whole reason that swap costs one argument.
-    skin: (v) => buildHollowBoleSkin(v, {
-      paletteId: faeTowerPalette(),
-      shell: glbShellFor(towerGlbUrlActive(TOWERS.hollowbole)),
-    }),
-    // MOVING DRESS, DECLARED (/new-tower v2 §5): static props bake into the
-    // GLB, only idle motion stays code-side — and the row says so, so the
-    // registry loop knows to demand a sway of this tower and not of a model
-    // that legitimately has none.
-    dress: true,
-    title: 'Hollow Bole — a rotted hollow trunk; dice fall down the snag and out of a root gap',
-    // VENUE-ONLY. A venue is chosen as ONE thing (GOALS goal 13), and this
-    // tower is part of what the fae venues ARE — so it takes no chip of its
-    // own in the tower picker and `renderTowerPicker` skips it. Choosing the
-    // Moonrise Glade or the Foxfire Hollow is how it goes up; the linkage
-    // itself lives with the venue registry, not here.
+    id: 'hollowbole',
+    // VENUE-ONLY, and it lives at the TOP LEVEL because it is neither paint
+    // nor physics: a venue is chosen as ONE thing (GOALS goal 13) and this
+    // tower is part of what the fae venues ARE, so it takes no chip of its own
+    // and `renderTowerPicker` skips it. Choosing the Moonrise Glade or the
+    // Foxfire Hollow is how it goes up; the linkage itself lives with the
+    // venue registry, not here. A rule about the OFFER, not about the object.
     venueOnly: true,
-    // The family trait, and this one is the whole tower's best trick: the
-    // TINY LIT DOOR on the left root buttress (js/towerhollow.js). `at` is
-    // [x, y, z offset from z0] and it sits just in front of the pane, so the
-    // warm spills onto the apron a die comes down. Low and short-reach —
-    // this is a hearth behind a 0.24-wide door, not a forge; the emissive
-    // pane is the picture and the light is what proves somebody lit it.
-    ember: { at: [-2.79, 1.22, 0.55], color: HOLLOW_EMBER, intensity: 1.6, dist: 3.5 },
-    // The cold moon rakes a dead tree GENTLY — the identity is the moot's
-    // spectral ring and the one warm door, and a full warm rake would wash
-    // both of them out of a frame whose whole value floor is in the bottom
-    // third (Black Anvil took the same decision for the opposite reason).
-    lantern: { rake: 0.5 },
-    // NO DUST. Explicit rather than absent: the fae venues run their OWN
-    // air (js/fae-lab.js's fog sheets and starfield), and a second idle
-    // particle layer inside it would be two weathers in one room.
-    motes: false,
-    // A DEAD DRUM. Deeper than Heartwood's dry clack and hollower than
-    // Bastion's stone thud: a `thud` body at middling weight with a short
-    // tail, over the longest comb in the set — 4 ms is a metre of hollow
-    // log, and the two low modes are the note an empty trunk gives back
-    // when you hit it. Joe's dial, like every other voice here: reasoned
-    // from the table (docs/AUDIO.md §2.4), not yet listened to.
-    clunkVoice: {
-      body: 'thud', weight: 0.5, sustain: 35,
-      shaft: { delayS: 0.004, combGain: 0.5, mode1Hz: 360, mode2Hz: 720 },
+    // THE PHYSICAL HALF, and this is the only row that has one worth
+    // reading. `portals` is not written here: the bake declares it and
+    // towerModelEnsure freezes it onto this half when the file lands
+    // (identical across both palettes, which the loader checks) — so what
+    // is authored is the one claim a MODEL cannot make about itself.
+    physical: {
+      // BARENESS IS DECLARED, NEVER ACCIDENTAL (B3; Joe's ruling). The
+      // engine's ramp and lip are outside the socket by design and the
+      // contract INVITES a model to clad them — Heartwood and Bastion do.
+      // Hollow Bole does not, and that is a choice: a rotted trunk sitting
+      // in soil has no carpentry to lay over an outrun, and a clad apron
+      // read as a plank ramp bolted to a tree. Undeclared, that choice is
+      // indistinguishable from a modeller forgetting; declared, it is a
+      // claim towerCladAudit measures from every shipped eye and fails on
+      // when the measurement and the declaration disagree — in EITHER
+      // direction, so a stray mesh drifting over the ramp is caught too.
+      bareColliders: ['ramp', 'lip'],
+    },
+    cosmetic: {
+      label: 'Hollow Bole',
+      // THE FIRST SHIPPED GLB TOWER (ROADMAP W3, /new-tower v2). One geometry,
+      // two palettes: the trunk is BAKED (tools/forge/recipes/hollowbole.py) and
+      // the venue picks which paint is standing. Both files are ensured together
+      // and readiness is over the pair (towerGlbUrls) — a venue flip must not put
+      // a player back in the wait they already served.
+      //
+      // IDENTICAL PORTALS ARE A CLAIM THIS ROW MAKES AND towerModelEnsure CHECKS:
+      // in {x 0, z -2.55, rimY 9.40, clearR 2.20}, out {x 0, sillY 1.00, w 4.20,
+      // clearH 3.50}, one geometry digest across both bakes. The engine derives
+      // its whole core from those eight numbers, so two variants that disagreed
+      // would be one venue delivering dice through a doorway the other one's
+      // engine did not cut. (The mouth tightened to the measured floor
+      // 2026-08-13 — was 5.00 x 4.50, sitting AT the old inherited limits;
+      // see TOWER.md "THE MINIMUMS" and the recipe's derivation.)
+      glbUrls: {
+        moonrise: '/models/towers/hollowbole_moonrise.glb',
+        foxfire: '/models/towers/hollowbole_foxfire.glb',
+      },
+      glbVariant: () => faeTowerPalette(),
+      // THE BAKE REPLACED THE SHELL, NOT THE DRESS. buildHollowBoleSkin still
+      // places the crown moot, the attendants, the little lit door, the veils and
+      // the stains — Joe-approved W3 work — through the SURFACE descriptor
+      // (js/towerhollow.js:592). What changed is who answers "where is the bark
+      // at (θ, y)": glbShellFor raycasts the loaded mesh instead of evaluating a
+      // radius field. The seam is the whole reason that swap costs one argument.
+      skin: (v) => buildHollowBoleSkin(v, {
+        paletteId: faeTowerPalette(),
+        shell: glbShellFor(towerGlbUrlActive(TOWERS.hollowbole)),
+      }),
+      // MOVING DRESS, DECLARED (/new-tower v2 §5): static props bake into the
+      // GLB, only idle motion stays code-side — and the row says so, so the
+      // registry loop knows to demand a sway of this tower and not of a model
+      // that legitimately has none.
+      dress: true,
+      title: 'Hollow Bole — a rotted hollow trunk; dice fall down the snag and out of a root gap',
+      // The family trait, and this one is the whole tower's best trick: the
+      // TINY LIT DOOR on the left root buttress (js/towerhollow.js). `at` is
+      // [x, y, z offset from z0] and it sits just in front of the pane, so the
+      // warm spills onto the apron a die comes down. Low and short-reach —
+      // this is a hearth behind a 0.24-wide door, not a forge; the emissive
+      // pane is the picture and the light is what proves somebody lit it.
+      ember: { at: [-2.79, 1.22, 0.55], color: HOLLOW_EMBER, intensity: 1.6, dist: 3.5 },
+      // The cold moon rakes a dead tree GENTLY — the identity is the moot's
+      // spectral ring and the one warm door, and a full warm rake would wash
+      // both of them out of a frame whose whole value floor is in the bottom
+      // third (Black Anvil took the same decision for the opposite reason).
+      lantern: { rake: 0.5 },
+      // NO DUST. Explicit rather than absent: the fae venues run their OWN
+      // air (js/fae-lab.js's fog sheets and starfield), and a second idle
+      // particle layer inside it would be two weathers in one room.
+      motes: false,
+      // A DEAD DRUM. Deeper than Heartwood's dry clack and hollower than
+      // Bastion's stone thud: a `thud` body at middling weight with a short
+      // tail, over the longest comb in the set — 4 ms is a metre of hollow
+      // log, and the two low modes are the note an empty trunk gives back
+      // when you hit it. Joe's dial, like every other voice here: reasoned
+      // from the table (docs/AUDIO.md §2.4), not yet listened to.
+      clunkVoice: {
+        body: 'thud', weight: 0.5, sustain: 35,
+        shaft: { delayS: 0.004, combGain: 0.5, mode1Hz: 360, mode2Hz: 720 },
+      },
     },
   },
 };
+// THE TWO HALVES, READ THROUGH ONE FUNCTION EACH. Every reader in this file
+// goes through these, which is what makes the split enforceable rather than
+// decorative: `grep towerPhys` is the complete list of code that can see a
+// physics fact about a row, and it is short.
+//
+// A missing half answers "declares nothing" instead of throwing. Rows are data
+// somebody hand-writes — a row minted by a proof, a row half-typed at 2am —
+// and the established failure mode for a missing declaration is to fall back
+// to the classic core loudly (towerPortalsOf), not to take the table down.
+const TOWER_NO_FACTS = Object.freeze({});
+const towerPhys = (row) => (row && row.physical) || TOWER_NO_FACTS;
+const towerCos = (row) => (row && row.cosmetic) || TOWER_NO_FACTS;
+// …and the one WRITER. towerModelEnsure freezes a bake's portals onto the row,
+// which is the only time anything mutates a registry entry, so the half is
+// created on demand exactly here and nowhere else.
+const towerPhysOwn = (row) => row.physical || (row.physical = {});
 const DEFAULT_TOWER = 'none';
 // MEDIUM, not wide (2026-08-09). The ladder moved one step closer and `wide`
 // is now byte-for-byte the old `close` — so defaulting to `wide` would ship
@@ -3967,8 +4057,11 @@ function playRoll(roll) {
       }
     }
     const b = d.body;
+    // The lintel clamp is v.flight.capY — the same expression, derived once in
+    // towerVolumes, so the envelope this bake actually spends is the envelope
+    // towerPortalSpec publishes and a mask is sized against.
     b.position.set(tv.exit.p[0] + ex.x,
-      Math.min(Math.max(ex.y, laneTop + 1.4), tv.door.h - 1.3), tv.exit.p[2]);
+      Math.min(Math.max(ex.y, laneTop + 1.4), tv.flight.capY), tv.exit.p[2]);
     const cp = Math.cos(ex.pitch), sp = Math.sin(ex.pitch);
     b.velocity.set(Math.sin(ex.yaw) * cp * ex.speed, sp * ex.speed, Math.cos(ex.yaw) * cp * ex.speed);
     b.angularVelocity.set(...ex.av);
@@ -7232,8 +7325,12 @@ const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
   // speedMin/Max reset after the rolling exit landed: 60–80 was Joe's dial
   // for SLIDING dice punching through the friction tax; rolling dice carry
   // at a fraction of that. lipTilt 0.1 is Joe's pick.
-  // matExtra 4.5 is Joe's dial (thirteenth look): "with that in place
-  // everything works."
+  // matExtra is LAB-ONLY now, exactly like lipTilt: the shipped socket deepens
+  // by the TOWER_MAT_EXTRA constant and this dial reaches nothing but the
+  // bench's own mat (towerLabSet) and the occlusion sampler's eye translation.
+  // It starts at the shipped 4.5 so an untouched bench is the shipped room —
+  // and it is still Joe's dial (thirteenth look: "with that in place
+  // everything works"); moving it moves the constant, not this.
   // Once a SKIN exists the ghosts are scaffolding: the wooden model is what
   // ships and the contract volumes are what you switch on to argue with it
   // (__diceDebug.towerGhosts(true) / towerSkin(false)).
@@ -7310,10 +7407,13 @@ function towerLanternBuild() {
   const t = TOWERLIGHT.tune;
   // decay 0 / distance 0: classic non-attenuating spot, so the intensity
   // dial means the same thing at every distance dial.
-  const spec = TOWERS[currentTower];
+  // Both of the row facts this reads — the lantern rake and the ember — are
+  // COSMETIC by declaration (D1), which is the honest place for them: the
+  // lantern is render-only and films, bakes and replays never know it exists.
+  const spec = towerCos(TOWERS[currentTower]);
   // A tower may take the rake at a fraction of the dial (Black Anvil: the
   // forge stays dark and the ember carries it). The dial still scales it.
-  const rakeScale = spec && spec.lantern && spec.lantern.rake !== undefined ? spec.lantern.rake : 1;
+  const rakeScale = spec.lantern && spec.lantern.rake !== undefined ? spec.lantern.rake : 1;
   const spot = new THREE.SpotLight(t.rakeColor, t.rakeIntensity * rakeScale, 0, t.rakeAngle, t.rakePenumbra, 0);
   spot.position.set(t.rakeX, t.rakeY, v.z0 + t.rakeOut);
   const target = new THREE.Object3D();
@@ -7326,12 +7426,12 @@ function towerLanternBuild() {
   // hanging 0.4 off a corner post — painted a two-metre searchlight up the
   // post (looked at, 2026-08-11). Intensity and distance belong to the FIRE,
   // not to the rig; the dial still scales what it is given.
-  const emberI = spec && spec.ember && spec.ember.intensity !== undefined
+  const emberI = spec.ember && spec.ember.intensity !== undefined
     ? spec.ember.intensity : t.emberIntensity;
-  const emberD = spec && spec.ember && spec.ember.dist !== undefined
+  const emberD = spec.ember && spec.ember.dist !== undefined
     ? spec.ember.dist : t.emberDist;
   const rig = { spot, target, ember: null, emberBase: emberI };
-  if (spec && spec.ember) {
+  if (spec.ember) {
     // Physical falloff (decay 2) so the glow pools on the tray stone under
     // the grate instead of reaching the felt's centre.
     const ember = new THREE.PointLight(spec.ember.color, emberI, emberD, 2);
@@ -7897,6 +7997,46 @@ const TOWER_DIE_R = 1.25;
 // TOWERLAB.tune for anything but matExtra"). It does now: the shipped path
 // reads this constant and the lab override lives in towerLabVolumes().
 const TOWER_LIP_TILT = 0.1;
+// THE MAT THE TOWER BRINGS WITH IT, frozen as the SHIPPED number for exactly
+// the reason lipTilt was. Socketing deepens the mat by this (towerDeepenMat),
+// which moves TABLE_D and therefore z0 — and z0 is the anchor EVERY volume,
+// every collider and every frame of the film hangs off. The shipped socket read
+// TOWERLAB.tune.matExtra until now, so docs/TOWER.md:284's carve-out ("the
+// shipped socket does not read TOWERLAB.tune for anything but matExtra") was
+// naming the last live debug knob inside the physics, not an exemption that
+// cost nothing: two clients with different dials had different TABLE_D, a
+// different z0, a different despawn line and a different door, and baked one
+// seed into two films. There is no carve-out now.
+//
+// The lab KEEPS its dial. TOWERLAB.tune.matExtra is read only by the lab world
+// path — towerLabSet's deepen/restore pair and the occlusion sampler's eye
+// translation — both of which live on one person's bench and never reach a
+// body on the main world. Same shape as lipTilt: constant ships, dial benches.
+// Joe's dial, thirteenth look: "with that in place everything works."
+const TOWER_MAT_EXTRA = 4.5;
+// THE POUR'S OWN CONSTANTS (docs/TOWER.md §3, §5, §6). A tower roll is baked
+// as a POUR instead of a throw, and these are the numbers that bake it: the
+// LAB's dialed values are the same numbers, so an experiment can never change
+// somebody else's roll.
+//
+// They sit HERE, with the rest of the engine constants, rather than down with
+// pourPlan where they were written — because towerVolumes derives the flight
+// envelope (v.flight) from them, and towerVolumes is reachable from the
+// synchronous `animate()` at module evaluation. The charter agrees with the
+// TDZ: physics is a function of (portal spec, engine constants, seed), and
+// this is the second of those three.
+const POUR = {
+  stagMin: 0.12, stagMax: 0.20,      // entries pour, 0.12–0.2 s apart (§6)
+  transitMin: 0.5, transitMax: 1.6,  // hidden time behind the skin (§6)
+  exitGap: 0.2,                      // exits never closer than this (§6)
+  speedMin: 24, speedMax: 34,        // exit speed — the rolling-exit dial
+  yawSpan: Math.PI / 7.5,            // ±12°: chutes throw straight (§5)
+  pitchSpan: Math.PI / 30,           // ±3° about the chute's own slope (§5)
+  laneSpan: 1.8,                     // ±0.9 lane spread (probe run 1)
+  clunkMin: 2, clunkMax: 4,          // baffle knocks per die, in the dark (§6)
+  attempts: 5,                       // exit-guarantee re-bakes before shipping
+  hidZone: 0.6,                      // resting z < z0 + this counts as HIDDEN
+};
 const DEFAULT_PORTALS = Object.freeze({
   in:  Object.freeze({ x: 0, z: -1.6 * TOWER_S, rimY: 7.0 * TOWER_S, clearR: 1.7 * TOWER_S }),
   out: Object.freeze({ x: 0, sillY: 0.8 * TOWER_S, w: 4.0 * TOWER_S, clearH: 3.6 * TOWER_S }),
@@ -8060,6 +8200,11 @@ function towerVolumes(spec) {
   // Hoisted because v.cowlY is derived FROM it: inside the object literal
   // `despawnY` is a key, not a binding, and reading it there is a ReferenceError.
   const despawnY = 5.6 * S + dRim;
+  // Hoisted for the same reason: v.flight measures its run from the exit spawn
+  // plane to the door plane, and a travel derived from a re-typed copy of this
+  // expression is a number that can quietly stop being the spawn it starts at.
+  // Same double as the literal it replaces — one expression, evaluated once.
+  const exitZ = z0 - 0.7 * S;
   return {
     z0, S,
     // THE SOCKET IS NOT PORTAL-DERIVED, and that is the point of it: it is the
@@ -8132,17 +8277,73 @@ function towerVolumes(spec) {
     // yaw ±30°, jitter ±0.6) needed ≈2.5 — dice clipped the jambs and came
     // to rest behind the wall.
     // p[1] is NOMINAL (the ghost marker): real spawn height is PER-DIE
-    // arithmetic in towerLabDrop — sill + margin + die radius + slope drop
-    // + gravity drop at that die's seeded speed. The eighth look earned it:
-    // the first sill arithmetic forgot gravity, and dice arrived below the
-    // sill, slammed its end-face, and bounced back into the tower.
-    exit:    { p: [0 + dOutX, 2.3 * S + dSill, z0 - 0.7 * S], pitch: -ath },
+    // arithmetic in pourPlan — sill + margin + die radius + slope drop. The
+    // eighth look earned it: the first sill arithmetic forgot gravity, and
+    // dice arrived below the sill, slammed its end-face, and bounced back
+    // into the tower.
+    exit:    { p: [0 + dOutX, 2.3 * S + dSill, exitZ], pitch: -ath },
     // `sill` is the doorway's FLOOR, and it is new here only in the sense that
     // it was previously written as the literal `0.8 * v.S` in the two places
     // that compute a graze height (pourPlan and towerLabDrop). Both now read
     // it, so a moved sill moves the spawn with it instead of leaving the dice
     // grazing a chute that is no longer where they think it is.
     door:    { w: spec.out.w, h: spec.out.clearH, sill: spec.out.sillY },
+    // THE FLIGHT ENVELOPE — where a DIE actually goes, as opposed to where the
+    // engine cut its collider gap.
+    //
+    // The exit comment three lines up has been doing this arithmetic in prose
+    // since the stuck-dice look ("0.4 jitter + tan(12°)·0.9 travel + 1.25 d20
+    // radius ≈ 1.84 of half-width"), and the engine has published the COLLIDER
+    // answer (door.w) ever since — but never the MESH one. So every model that
+    // had to leave a hole for dice to be seen coming through sized that hole by
+    // hand: towerglbshell's doorX 2.05 is a guess, and the black-rectangle
+    // class of bug is what a guess looks like when it is too small. There is an
+    // engine-side number now, and it is a function of (portal spec, POUR, die
+    // radius) like everything else here.
+    //
+    // WHAT IT IS: the box a die's SURFACE can reach in the door plane (z = z0),
+    // over the whole shipped die set, across the film's own jitter bands.
+    //   halfW  the lane's half-span (POUR.laneSpan/2), plus the widest yaw's
+    //          drift over the run to the door, plus a d20's radius.
+    //   top    from the highest a die can be spawned — the congestion clamp
+    //          capY, not the scripted graze height — carried down the shallowest
+    //          legal pitch, plus a radius.
+    //   bottom from the scripted graze height carried down the steepest legal
+    //          pitch, at r → 0: the bottom is MONOTONE INCREASING in radius
+    //          (the graze puts a big die up by r/cos θ and only takes r back),
+    //          so the smallest die in the set sits lowest and the limit is the
+    //          honest floor for an aperture that has to clear all of them.
+    // Gravity's sag over this run is ~0.07 at the film's slowest exit and is
+    // deliberately NOT in it: the drop below the spawn line is the apron's
+    // business, and an aperture bound wants the kinematic box, not the arc.
+    //
+    // IT IS A REPORT, NOT A GATE. halfW is 2.336 at the classic spec against a
+    // 2.5 door half-width, and 2.336 against Hollow Bole's 2.10 — legal, and
+    // the portal-floors campaign says why (JAMBS CHANNEL, THEY DON'T JAM: a
+    // wide die deflects inboard and leaves). What a model may not do is let the
+    // player SEE that happen against nothing, which is what this number sizes.
+    flight: (() => {
+      const travel = z0 - exitZ;              // spawn plane → door plane
+      const halfW = POUR.laneSpan / 2 + Math.tan(POUR.yawSpan / 2) * travel + TOWER_DIE_R;
+      // The scripted graze height, per pourPlan, at r → 0 and at a d20.
+      const surfY = spec.out.sillY + travel * Math.tan(ath);
+      const spawnLo = surfY + 0.2;
+      const spawnHi = surfY + TOWER_DIE_R / Math.cos(ath) + 0.2;
+      // The congestion clamp the exit code applies (pourPlan's consumer, and
+      // the lab's): a die spawning onto a pile is raised, never past this.
+      const capY = spec.out.clearH - 1.3;
+      const dyHi = travel * Math.tan(-ath + POUR.pitchSpan / 2);  // shallowest
+      const dyLo = travel * Math.tan(-ath - POUR.pitchSpan / 2);  // steepest
+      return {
+        travel, cx: 0 + dOutX, halfW,
+        top: Math.max(spawnHi, capY) + dyHi + TOWER_DIE_R,
+        bottom: spawnLo + dyLo,
+        spawnY: spawnHi, capY, r: TOWER_DIE_R,
+        // Echoed so a reader sizing a hole does not have to go and find POUR
+        // — and so the snapshot records WHICH bands produced these bounds.
+        laneSpan: POUR.laneSpan, yawSpan: POUR.yawSpan, pitchSpan: POUR.pitchSpan,
+      };
+    })(),
     // THE PIT (probe run 1) — the backstop boxes, moved here out of
     // towerColliders so that builder is 100% volume-driven and no world number
     // is written in two places. These are HALF-extents, not sizes like `s`
@@ -8196,8 +8397,18 @@ function towerVolumes(spec) {
     //
     // The band keeps its height and hangs down from that cap. Classic: top
     // sample 10.60 -> 8.10. Hollow Bole: 11.25 -> 8.75.
+    //
+    // ONE TERM, NOT A MIN. This was written as
+    // `Math.min(7.4*S + dRim + 1.2*S, despawnY + TOWER_DIE_R)` — the cowl
+    // VOLUME's own top against the despawn cap — and the first argument could
+    // never win at any legal rim: BOTH carry dRim, so their difference is the
+    // constant 8.6*S − (5.6*S + 1.25) = 2.5, for every spec, forever. A
+    // Math.min whose first argument is unreachable reads as "either of these
+    // could decide the band" about a law with exactly one author, and the next
+    // person to move the cowl volume would reasonably expect the band to
+    // follow. THE LAW, stated once: the band's top is A DESPAWNING DIE'S TOP.
     cowlY: (() => {
-      const ct = Math.min(7.4 * S + dRim + 1.2 * S, despawnY + TOWER_DIE_R);
+      const ct = despawnY + TOWER_DIE_R;
       const cb = ct - 2.4 * S;
       return [cb + 0.15, (cb + ct) / 2, ct - 0.15];
     })(),
@@ -8229,9 +8440,29 @@ function towerPortalsOf(id) {
   if (towerProbeOverride) return towerProbeOverride;
   const row = TOWERS[id];
   if (!row) return DEFAULT_PORTALS;
-  if (row.portals) return row.portals;
+  if (towerPhys(row).portals) return towerPhys(row).portals;
   if (towerGlbUrls(row).length) console.warn(`[tower] ${id}: portals not loaded — classic volumes substituted`);
   return DEFAULT_PORTALS;
+}
+
+// …AND WHERE THAT ANSWER CAME FROM. One function because two callers ask —
+// towerPortalSpec and the contract snapshot — and a provenance that disagreed
+// with itself would be worse than no provenance at all.
+//
+//   'probe'   the portal-floors override is armed, so NOTHING on this client
+//             is the shipped answer (towerProbeOverride). It comes first for
+//             that reason: the override wins over the row, so the label has to
+//             as well, or a probe run reads as a shipped measurement.
+//   'model'   read off a baked mesh and frozen onto the row.
+//   'row'     the registry states them outright.
+//   'default' this row declares none and got the classic core. A model whose
+//             portals silently failed to load reads 'default' here, which is
+//             the difference between a tower and a wall with dice behind it.
+function towerPortalSource(id) {
+  if (towerProbeOverride) return 'probe';
+  const row = TOWERS[id];
+  if (!towerPhys(row).portals) return 'default';
+  return towerGlbUrls(row).length ? 'model' : 'row';
 }
 
 // ---------------------------------------------------------------------------
@@ -8251,8 +8482,9 @@ function towerPortalsOf(id) {
 // single variant the venue is currently under.
 function towerGlbUrls(row) {
   if (!row) return [];
-  if (row.glbUrls) return Object.values(row.glbUrls);
-  return row.glbUrl ? [row.glbUrl] : [];
+  const c = towerCos(row);
+  if (c.glbUrls) return Object.values(c.glbUrls);
+  return c.glbUrl ? [c.glbUrl] : [];
 }
 
 // The url to actually build from, right now. `glbVariant()` is the row's own
@@ -8261,10 +8493,11 @@ function towerGlbUrls(row) {
 // should stand the tower under the wrong sky, not refuse to stand it at all.
 function towerGlbUrlActive(row) {
   if (!row) return null;
-  if (!row.glbUrls) return row.glbUrl || null;
-  const keys = Object.keys(row.glbUrls);
-  const key = row.glbVariant ? row.glbVariant() : keys[0];
-  return row.glbUrls[key] || row.glbUrls[keys[0]] || null;
+  const c = towerCos(row);
+  if (!c.glbUrls) return c.glbUrl || null;
+  const keys = Object.keys(c.glbUrls);
+  const key = c.glbVariant ? c.glbVariant() : keys[0];
+  return c.glbUrls[key] || c.glbUrls[keys[0]] || null;
 }
 
 // The eight numbers, compared as numbers. Object.freeze does not make two
@@ -8310,7 +8543,7 @@ function towerModelReady(id) {
   // palettes of one model happens inside a venue change and cannot be allowed
   // to land back in the not-ready state, so the row is ready when the whole
   // set is.
-  return !urls.length || (!!row.portals && urls.every((u) => towerGlbStatus(u) === 'ready'));
+  return !urls.length || (!!towerPhys(row).portals && urls.every((u) => towerGlbStatus(u) === 'ready'));
 }
 
 // Kick the preload for a row that needs one. Idempotent at every level:
@@ -8343,13 +8576,14 @@ function towerModelEnsure(id) {
         // "wall beside the door" failure towerPortalsOf warns about, except
         // intermittent and palette-dependent, which is worse. Loud, and recorded
         // on the row so a proof can read it back instead of scraping a console.
-        if (!row.portals) row.portals = Object.freeze(entry.portals);
-        else if (!towerPortalsMatch(row.portals, entry.portals)) {
-          (row.portalMismatch || (row.portalMismatch = [])).push(url);
+        const phys = towerPhysOwn(row);   // the one mutation of a registry row
+        if (!phys.portals) phys.portals = Object.freeze(entry.portals);
+        else if (!towerPortalsMatch(phys.portals, entry.portals)) {
+          (phys.portalMismatch || (phys.portalMismatch = [])).push(url);
           console.error(`[tower] ${id}: ${url} declares DIFFERENT portals than the `
             + `variant already frozen onto this row. Two palettes of one model must be `
             + `one geometry — this is a BAKE error, not a load error. Frozen: `
-            + `${JSON.stringify(row.portals)} — this file: ${JSON.stringify(entry.portals)}`);
+            + `${JSON.stringify(phys.portals)} — this file: ${JSON.stringify(entry.portals)}`);
         }
       } else {
         // NEVER DEGRADE TO 'none'. pendingTower stays set, so a model that turns
@@ -8533,7 +8767,7 @@ function towerLabBuild() {
   // pointed at any registered tower instead of only the one that shipped
   // first; the SHIPPED socket reads the room setting, never this.
   const spec = TOWERS[TOWERLAB.skinId] || TOWERS.heartwood;
-  const skin = (spec.skin || buildTowerSkin)(v);
+  const skin = (towerCos(spec).skin || buildTowerSkin)(v);
   skin.visible = TOWERLAB.skin;
   root.add(skin);
   return root;
@@ -8665,7 +8899,7 @@ function towerLabSet(on = true) {
 // AO pass and its lining are all decided at build time. 'none' has no skin
 // builder and is not a thing the lab can wear.
 function towerLabSkin(id) {
-  if (!TOWERS[id] || !TOWERS[id].skin) return TOWERLAB.skinId;
+  if (!towerCos(TOWERS[id]).skin) return TOWERLAB.skinId;
   if (id === TOWERLAB.skinId) return TOWERLAB.skinId;
   // A BAKED ROW WHOSE MODEL IS NOT HERE YET (C6). The lab's skin builders are
   // synchronous like everything else, so this cannot await — and it must not
@@ -8702,7 +8936,8 @@ function towerLabClear() {
 // tower's colliders are SHARED PHYSICS, exactly like the walls, because the
 // film every client bakes has to see the same interior. Socketing is:
 //
-//   1. deepen the mat by matExtra (the tower brings the room it consumes),
+//   1. deepen the mat by TOWER_MAT_EXTRA (the tower brings the room it
+//      consumes — the CONSTANT, never TOWERLAB.tune's dial of the same name),
 //   2. send the back-wall PLANE away — the doorway boxes replace it,
 //   3. add the eight engine colliders in contract order,
 //   4. add the skin (zero colliders, zero lights, pure theatre).
@@ -8727,7 +8962,7 @@ function towerOn() { return currentTower !== 'none' && !!towerRig; }
 // still leave every film byte-identical.
 function towerClunkVoice() {
   const spec = TOWERS[currentTower];
-  return (towerOn() && spec && spec.clunkVoice) ? spec.clunkVoice : null;
+  return (towerOn() && towerCos(spec).clunkVoice) ? towerCos(spec).clunkVoice : null;
 }
 
 // WHICH VOICE A RECORDED IMPACT GETS AT PLAYBACK. A baffle knock is a die
@@ -8827,7 +9062,8 @@ function towerReskin() {
         + `keeping the standing skin`);
       return;
     }
-    if (spec.portals && e.portals && !towerPortalsMatch(spec.portals, e.portals)) {
+    const phys = towerPhys(spec);
+    if (phys.portals && e.portals && !towerPortalsMatch(phys.portals, e.portals)) {
       console.warn(`[tower] palette reskin REFUSED: ${want} declares different `
         + `portals than the socketed spec — a visual swap would stand a model `
         + `over a film built for another mouth`);
@@ -8837,7 +9073,7 @@ function towerReskin() {
     if (!old) { console.warn('[tower] palette reskin: no towerSkin child to swap'); return; }
     const v = towerVolumes(towerPortalsOf(rig.id));
     rig.group.remove(old); // clone shares template geometry/materials — no dispose
-    rig.group.add(spec.skin(v));
+    rig.group.add(towerCos(spec).skin(v));
     towerApplyEnvPolicy(rig.group);
     rig.skinUrl = want;
   });
@@ -8874,7 +9110,11 @@ function towerSocket(id) {
     for (let i = towerRig.bodies.length - 1; i >= 0; i--) world.removeBody(towerRig.bodies[i]);
     world.removeContactMaterial(towerRig.cm);
     towerRig = null;
-    towerDeepenMat(-TOWERLAB.tune.matExtra); // restores the back wall plane too
+    // THE CONSTANT, NOT THE DIAL (TOWER_MAT_EXTRA). Symmetry matters here as
+    // much as determinism: a socket that deepened by a dial and undeepened by
+    // whatever the dial says LATER leaves TABLE_D permanently off by the
+    // difference, and every volume in the room with it.
+    towerDeepenMat(-TOWER_MAT_EXTRA); // restores the back wall plane too
   }
   TOWER_SWAP.mid = world.bodies.length;
   currentTower = spec.id;
@@ -8882,14 +9122,14 @@ function towerSocket(id) {
     // Order matters: deepen FIRST so towerVolumes() reads the socketed z0,
     // then build against it.
     towerRig = { id: spec.id, group: null, bodies: [], cm: null };
-    towerDeepenMat(TOWERLAB.tune.matExtra);
+    towerDeepenMat(TOWER_MAT_EXTRA);
     const v = towerVolumes(towerPortalsOf(spec.id));
     const rig = towerColliders(world, v);
     towerRig.bodies = rig.bodies;
     towerRig.cm = rig.cm;
     const group = new THREE.Group();
     group.name = 'towerModel';
-    if (spec.skin) group.add(spec.skin(v));
+    if (towerCos(spec).skin) group.add(towerCos(spec).skin(v));
     // THE TOWER REFLECTS THE ROOM IT STANDS IN (W2c). scene.environment is
     // the grounded room's env, and a DARK surface is mostly reflection —
     // round 6's earth berm (albedo ~0.025) took a visible blue cast from
@@ -8910,7 +9150,7 @@ function towerSocket(id) {
   // The air belongs to the tower (TOWERS[id].motes — Heartwood's trait):
   // dust rises with it and settles out with it, through the same applyMood
   // that owns every other piece of the room's atmosphere.
-  MOOD.moteHost = spec.motes ? spec.id : null;
+  MOOD.moteHost = towerCos(spec).motes ? spec.id : null;
   applyMood();
   return currentTower;
 }
@@ -8918,22 +9158,14 @@ function towerSocket(id) {
 // ---------------------------------------------------------------------------
 // THE POUR — the tower's film (docs/TOWER.md §3, §5, §6)
 //
-// A tower roll is baked as a POUR instead of a throw. The numbers here are the
-// contract's, and the LAB's dialed values are the same numbers: TOWERLAB.tune
-// is a live knob for experiments and this is what ships, so an experiment can
-// never change somebody else's roll.
-const POUR = {
-  stagMin: 0.12, stagMax: 0.20,      // entries pour, 0.12–0.2 s apart (§6)
-  transitMin: 0.5, transitMax: 1.6,  // hidden time behind the skin (§6)
-  exitGap: 0.2,                      // exits never closer than this (§6)
-  speedMin: 24, speedMax: 34,        // exit speed — the rolling-exit dial
-  yawSpan: Math.PI / 7.5,            // ±12°: chutes throw straight (§5)
-  pitchSpan: Math.PI / 30,           // ±3° about the chute's own slope (§5)
-  laneSpan: 1.8,                     // ±0.9 lane spread (probe run 1)
-  clunkMin: 2, clunkMax: 4,          // baffle knocks per die, in the dark (§6)
-  attempts: 5,                       // exit-guarantee re-bakes before shipping
-  hidZone: 0.6,                      // resting z < z0 + this counts as HIDDEN
-};
+// (The POUR constants themselves live UP with TOWER_S and TOWER_MAT_EXTRA, in
+// the engine-constants block above towerVolumes. They moved there when
+// towerVolumes started deriving v.flight from them — a function reachable from
+// the synchronous `animate()` at module eval may not read a const declared
+// nine hundred lines below it, which is the TDZ trap this file records at ROOM,
+// LS_NAME and TOWERLAB. It is also the truer home: the charter says physics is
+// a function of (portal spec, engine constants, seed), and these are the
+// engine constants.)
 
 // Draw a whole pour up front, in die order, from ONE seeded stream. Every
 // per-die quantity the film needs — when it is dropped, how it tumbles, how
@@ -8996,8 +9228,157 @@ function pourPlan(dice, v, prng) {
   return plan;
 }
 
+// ---------------------------------------------------------------------------
+// THE FILM, AS ONE NUMBER (__diceDebug.towerFilmDigest).
+//
+// The charter says a tower model is 100% cosmetic over invisible colliders and
+// portals, and that physics and the pour film are a function of (portal spec,
+// engine constants, seed) and NOTHING else. That is a claim somebody has to be
+// able to CHECK in one line, or every cosmetic edit costs a pour simulation and
+// an argument about whether the dice landed "the same". So: hash the inputs and
+// the drawn plan, and compare the number before and after.
+//
+// The seed and the pool are FIXED and shared so two digests are commensurable
+// by construction. The pool is one of each shipped type plus a repeat, because
+// half the exit arithmetic is radius-dependent (the graze height is surface +
+// r/cos θ) and a single-type pool would not notice a die-radius term moving.
+const TOWER_DIGEST_SEED = 0xd1ce;
+const TOWER_DIGEST_POOL = ['d20', 'd6', 'd4', 'd10', 'd10x', 'd12', 'd8', 'd20'];
+
+// Canonical text for a plain tree of numbers, strings, arrays and objects.
+// Keys are SORTED rather than trusted in insertion order: the digest's whole
+// job is to be identical across two runs of two builds, and an object literal's
+// key order is one careless edit away from moving without any value moving.
+//
+// The two escapes JSON.stringify would silently eat, both of which are real
+// answers here: NEGATIVE ZERO (`0 + dOutX` is -0 for a left-shifted door, and
+// -0 and 0 are different doubles that print the same) and NON-FINITE values (a
+// NaN in a volume is the single most important thing a digest could report, and
+// JSON turns it into `null`).
+function towerCanon(x) {
+  if (typeof x === 'number') {
+    if (!Number.isFinite(x)) return String(x);
+    return Object.is(x, -0) ? '-0' : String(x);
+  }
+  if (Array.isArray(x)) return `[${x.map(towerCanon).join(',')}]`;
+  if (x && typeof x === 'object') {
+    return `{${Object.keys(x).sort()
+      .map((k) => `${JSON.stringify(k)}:${towerCanon(x[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(x) ?? 'null';
+}
+
+// FNV-1a, 32 bits, hand-written because this app has no dependencies and is not
+// about to take one for nine lines of arithmetic. It does not need to be
+// cryptographic — nobody is attacking a dice tower — it needs to be STABLE
+// across clients and SENSITIVE to one moved double, and FNV-1a is both.
+//
+// Math.imul is load-bearing: a plain `*` by the 16777619 prime leaves the
+// int32 range within a few characters, the mantissa starts rounding, and the
+// "hash" quietly stops distinguishing inputs — a green check masking a broken
+// thing, in nine lines.
+function towerHash32(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+// ---------------------------------------------------------------------------
+// THE INVISIBLE-MESH LAW (A6), in one place because it is ONE law.
+//
+// A mesh the player cannot see may count neither as an occluder nor as a
+// target: every proof in this file that fires a ray at a tower is answering a
+// question about the FRAME, and the frame is what `visible` decides. three.js
+// stopped testing `.visible` in intersectObject, so without this a liner
+// switched off for a look goes on blocking rays and every band comes back
+// green over a picture with a die falling through open air.
+//
+// Layers rather than a filtered target list, because the casts are RECURSIVE:
+// a hidden child of a visible named parent is reached through the parent no
+// matter what the top-level list says. Layer 1 is not tested by a default
+// raycaster. The previous mask is SAVED and put back rather than reset to 0 —
+// towerOccluderMute parks nodes on layer 1 too, and a blanket restore would
+// silently unmute the experiment its caller is in the middle of.
+//
+// The whole skin hidden (`towerSkin(false)`) drops everything and every proof
+// reads zero. That is not a malfunction: with no skin standing there is
+// nothing to cover anything, and a probe that said otherwise would be
+// reporting the ghosts.
+function towerVeilHidden(root) {
+  const veiled = [];
+  const unseen = (o) => {
+    for (let p = o; p; p = p.parent) if (p.visible === false) return true;
+    return false;
+  };
+  if (root) {
+    root.traverse((o) => {
+      if (!o.isMesh || !unseen(o)) return;
+      veiled.push({ o, mask: o.layers.mask,
+        name: o.name || (o.parent && o.parent.name) || '?' });
+      o.layers.set(1);
+    });
+  }
+  return {
+    unseen,
+    names: veiled.map((w) => w.name),
+    restore() { for (const w of veiled) w.o.layers.mask = w.mask; },
+  };
+}
+
+// WHAT COUNTS AS SOLID GEOMETRY, shared by the occlusion proof and the
+// cladding audit so the two can never disagree about what a surface is. A
+// naming convention rather than a fixed list, so a new skin needs no edit
+// here: every NAMED `towerSkin*` child of the skin group is opaque (the wood,
+// the stone, the black linings). The UNNAMED children — gradient veils,
+// contact shadows — are transparent and prove nothing, which is exactly why
+// they are not allowed to answer either question. Hidden ones are dropped by
+// the law above; this drops them from the list as well, so the reported set is
+// honest and not merely harmless.
+function towerCastTargets(skin, veil) {
+  const targets = [];
+  for (const o of skin ? skin.children : []) {
+    if (o.name && o.name !== 'towerSkin' && o.name.startsWith('towerSkin')
+      && !veil.unseen(o)) targets.push(o);
+  }
+  return targets;
+}
+
+// THE SHIPPED EYES, as world positions at the CURRENT mat. Both ray proofs
+// grade a model from the six places a player can actually be — three zoom
+// presets x {full, mini} — and both need the same translation: a preset's eye
+// is authored relative to ITS OWN back wall, so what carries over to another
+// preset (or to a deepened room) is the OFFSET from z0, never the absolute z.
+//
+// `extra` is which mat deepening the caller is standing in: the lab's dial for
+// the bench, the TOWER_MAT_EXTRA constant for the socketed table. It only ever
+// affects which preset the identity case is.
+function towerShippedEyes(z0, extra) {
+  const eyes = [];
+  for (const [id, pre] of Object.entries(ZOOM_PRESETS)) {
+    const z0p = -(pre.d + extra) / 2;
+    for (const which of ['eyeFull', 'eyeMini']) {
+      const e = pre[which];
+      eyes.push({ id: `${id}.${which === 'eyeFull' ? 'full' : 'mini'}`,
+        at: [e[0], e[1], z0 + (e[2] - z0p)] });
+    }
+  }
+  return eyes;
+}
+
 // Pour n dice through the contract. Seeded so a look can be repeated; every
 // die's exit (transit, jitter, speed, yaw, pitch, spin) is drawn up front.
+//
+// THE BENCH DRAWS THE SHIPPED FILM, through pourPlan, and that is the whole
+// point of the bench. It used to hand-copy five of POUR's numbers — the
+// stagger band (0.12 + 0.08), the transit band (0.5 + 1.1), the lane span
+// (1.8), the yaw span (π/7.5) and the pitch span (π/30) — with a comment
+// asserting they were the same numbers and nothing whatsoever measuring it.
+// Five literals is five ways for a look to be judging a pour no player will
+// ever get, which is the exact failure the lab exists to prevent. There is
+// one draw now, and it is the product's.
 function towerLabDrop(n = 8, seed = 42) {
   if (!TOWERLAB.on) towerLabSet(true);
   let s = (seed >>> 0) || 1;
@@ -9007,78 +9388,36 @@ function towerLabDrop(n = 8, seed = 42) {
   TOWERLAB.dropped += n;
   // Act one: look at the tower while the dice pour into it.
   if (TOWERLAB.tune.camMove) towerCamTo('tower');
-  let entryAt = 0;
+  // Types first, in one pass, so the plan's own draws are a contiguous run of
+  // the seeded stream and a given seed keeps giving a given bench.
+  const types = [];
+  for (let i = 0; i < n; i++) types.push(DIE_TYPES[(rng() * DIE_TYPES.length) | 0]);
+  const plan = pourPlan(types.map((type) => ({ type })), v, rng);
+  // THE ONE DIAL THAT SURVIVES, and it survives as a POST-MULTIPLIER rather
+  // than as a second draw. TOWERLAB.tune.speedMin/Max is a BAND and the plan
+  // has already drawn a speed inside POUR's band, so the dial applies as the
+  // ratio of the two bands' midpoints — exactly 1.0 at the shipped dials
+  // (58/58, on the same double), which means an untouched bench is running the
+  // shipped exit and not an arithmetically-equivalent restatement of it.
+  //
+  // It scales the ANGULAR budget with the linear one because the rolling exit
+  // IS ω = v/r (Joe, eleventh look): a die dialed faster that left spinning at
+  // the old rate would be sliding, and sliding is the friction tax the rolling
+  // exit was invented to stop. The tumble jitter rides along, which is a
+  // deliberate approximation — at the shipped dials it is multiplied by one.
+  const kSpeed = (TOWERLAB.tune.speedMin + TOWERLAB.tune.speedMax)
+    / (POUR.speedMin + POUR.speedMax);
   for (let i = 0; i < n; i++) {
-    const type = DIE_TYPES[(rng() * DIE_TYPES.length) | 0];
-    const mesh = createDieMesh(type, dieVariant(false, null));
-    // Stagger by TIME, not spawn height: equal height gaps compress into
-    // ~50 ms arrival gaps at terminal speed (t = √(2h/g), and dt shrinks as
-    // v grows), which is why the first cut exited "kinda all at once". A
-    // poured cadence of 0.25–0.4 s per die survives the fall intact.
-    entryAt += i === 0 ? 0 : 0.12 + rng() * 0.08;
-    mesh.position.set(
-      v.aim.c[0] + (rng() - 0.5) * 0.8,
-      v.aim.c[1] + rng() * 0.8,
-      v.aim.c[2] + (rng() - 0.5) * 0.8);
-    mesh.quaternion.setFromEuler(new THREE.Euler(rng() * 6.28, rng() * 6.28, rng() * 6.28));
-    // Per-die spawn height (eighth look): every term measured, none hoped.
-    // sill + 0.15 margin + this die's radius + slope drop over the run-up
-    // + gravity drop at this die's seeded speed. One formula clears a d20
-    // and a d4 alike — a fixed height cannot, because the radius and the
-    // speed-dependent gravity drop both move the answer by more than the
-    // clearance margin.
-    const def = DIE_DEFS[type];
-    const r = def.radius || def.size * 0.87;
-    // 13–23: the wide spread is the DEPTH FAN (probe run 6) — fast dice
-    // overfly the tray onto open felt, slow ones rest close, and the pour
-    // stops stacking at a single radius in front of the door.
-    // Floor raised 13→18 (Joe, tenth look): the SLOW TAIL is what parks in
-    // the doorway — the first dice land on a virgin tray, stop close, and
-    // wall in the pour. Fast dice were never the problem. Live-dialable:
-    // towerTune({speedMin, speedMax}).
-    const speed = TOWERLAB.tune.speedMin
-      + rng() * (TOWERLAB.tune.speedMax - TOWERLAB.tune.speedMin);
-    const exitYaw = (rng() - 0.5) * (Math.PI / 7.5);
-    const ath2 = -v.exit.pitch;
-    // Graze height off the INTERNAL slope (probe run 9): the chute surface
-    // now runs under the spawn itself, so the height is simply surface + a
-    // radius (normal to the slope) + margin — the die kisses the chute at
-    // spawn and rides it out the door. The old run-up/gravity terms died
-    // with the flat pit.
-    const surfY = v.door.sill + (v.z0 - v.exit.p[2]) * Math.tan(ath2);
-    const exitY = surfY + r / Math.cos(ath2) + 0.2;
+    const p = plan[i];
+    const mesh = createDieMesh(types[i], dieVariant(false, null));
+    mesh.position.set(...p.start);
+    mesh.quaternion.setFromEuler(new THREE.Euler(...p.rot0));
     TOWERLAB.falling.push({
-      mesh, type, vy: 0, entryAt: TOWERLAB.t + entryAt, entered: false,
-      av: [(rng() - 0.5) * 8, (rng() - 0.5) * 8, (rng() - 0.5) * 8],
-      transit: 0.5 + rng() * 1.1,
-      exit: {
-        // Lane spread ±0.9 (probe run 1): at ±0.4 every die flew the same
-        // corridor and head-ons at v13–14 right outside the door were the
-        // norm — die1 hit die0 mid-flight, die2 hit die1. Worst-case door
-        // clearance stays positive: 0.9 + tan12°·0.875 + 1.25 = 2.34 < 2.5.
-        x: (rng() - 0.5) * 1.8,
-        speed, y: exitY,
-        yaw: exitYaw,                            // ±12° — chutes throw straight
-        // Pitch rides the SLOPE (seventh look): horizontal launches fell
-        // ~2 units under g=-110 and arrived nearly vertical at ~20 u/s —
-        // the normal impulse plus its friction bite ate the forward motion
-        // in one contact, and the pour jammed at its own doorstep. Parallel
-        // to the chute, first contact is a graze and the speed survives.
-        pitch: v.exit.pitch + (rng() - 0.5) * (Math.PI / 30), // slope ± 3°
-        // ROLLING EXIT (Joe, eleventh look — "the dice should have gained
-        // angular momentum in the tower"): a die SLIDING on felt is savaged
-        // by friction; a die ROLLING at matched spin barely feels it. This
-        // was the missing physics behind the felt-slap tax and the
-        // non-monotonic carry. ω = v/r about the horizontal axis
-        // perpendicular to travel (tilted with the yaw), tumble jitter on
-        // top — the baffles put forward roll on everything.
-        av: [
-          (speed / r) * Math.cos(exitYaw) + (rng() - 0.5) * 10,
-          (rng() - 0.5) * 10,
-          -(speed / r) * Math.sin(exitYaw) + (rng() - 0.5) * 10,
-        ],
-        rot: [rng() * 6.28, rng() * 6.28, rng() * 6.28],
-      },
+      mesh, type: types[i], vy: 0, entryAt: TOWERLAB.t + p.entryAt, entered: false,
+      av: p.av0, transit: p.transit,
+      exit: { ...p.exit,
+        speed: p.exit.speed * kSpeed,
+        av: p.exit.av.map((a) => a * kSpeed) },
     });
   }
   return { dropped: n, seed };
@@ -9154,7 +9493,8 @@ function stepTowerLab(dt) {
       scene.remove(f.mesh);
       TOWERLAB.falling.splice(i, 1);
       let exitAt = TOWERLAB.t + f.transit;
-      exitAt = Math.max(exitAt, TOWERLAB.lastExit + 0.2); // the stagger floor
+      // POUR.exitGap, not a sixth hand-copied 0.2 (see towerLabDrop).
+      exitAt = Math.max(exitAt, TOWERLAB.lastExit + POUR.exitGap); // the stagger floor
       TOWERLAB.lastExit = exitAt;
       TOWERLAB.hidden.push({ mesh: f.mesh, type: f.type, exitAt, exit: f.exit });
     }
@@ -9180,7 +9520,7 @@ function stepTowerLab(dt) {
         laneTop = Math.max(laneTop, p.y + 1.3);
       }
     }
-    const doorCap = v.door.h - 1.3;
+    const doorCap = v.flight.capY;   // the engine's clamp, not a second copy
     const spawnY = Math.min(Math.max(h.exit.y, laneTop + 1.4), doorCap);
     TOWERLAB.hidden.splice(i, 1);
     const body = createDieBody(h.type, diceMat);
@@ -9623,6 +9963,9 @@ window.__diceDebug = {
       // The apron and the lip are ENGINE volumes outside the socket by
       // design, and the contract invites a model to skin them. Both cladding
       // boxes are rotated, so both dip a unit below the felt.
+      // (WHETHER a model took the invitation is towerCladAudit's question,
+      // measured against the row's declared `bareColliders` — this classifier
+      // only says that a box which IS here is legally here.)
       if (b.min.y < K.cladY) {
         return b.max.z > v.z0 + K.lipSplitZ
           ? 'LIP CLADDING — the engine outrun, skinned'
@@ -9655,7 +9998,7 @@ window.__diceDebug = {
       // has the mat's physics wall; forward is still the felt), bounded
       // at 8 units so "grounds" never means "forever", and never below
       // the soil.
-      if (TOWERS[currentTower] && TOWERS[currentTower].venueOnly
+      if (TOWERS[currentTower] && TOWERS[currentTower].venueOnly   // top-level: a catalogue rule
         && b.min.x >= -soc.x - 1e-3 && b.max.x <= soc.x + 1e-3
         && b.max.y <= soc.y1 + 1e-3 && b.min.y > -0.15
         && b.min.z >= v.z0 - K.gladeDepth
@@ -9727,6 +10070,134 @@ window.__diceDebug = {
         z: [r3(soc.zLo - v.z0), r3(soc.zHi - v.z0)] },
     };
   },
+  // IS THE ENGINE SHOWING? (B3.) The apron ramp and the outrun lip are the two
+  // engine colliders that live OUTSIDE the socket by design — a die comes down
+  // the chute and across the slick lip in full view of the player — and the
+  // contract invites a model to skin them (towerModelAudit's APRON CLADDING and
+  // LIP CLADDING classes are that invitation, written down). Heartwood and
+  // Bastion take it. Hollow Bole does not, and that is a decision: a rotted
+  // trunk standing in soil has no carpentry to lay over an outrun.
+  //
+  // THE PROBLEM WITH A DECISION NOBODY WROTE DOWN is that it is
+  // indistinguishable from an oversight, and the two want opposite responses.
+  // So bareness is DECLARED, on the row's physical half (`bareColliders`), and
+  // this measures the declaration from the six places a player can be. It
+  // fails in EITHER direction — a declared-bare collider that turns out clad
+  // is a mesh that drifted over the ramp, which is as much a finding as a
+  // declared-clad one that is bare.
+  //
+  // HOW A SAMPLE IS CLASSIFIED, from one eye:
+  //   CLAD    the nearest visible solid surface along the ray sits within
+  //           [0, +0.10] in FRONT of the collider's top face — i.e. a skin
+  //           lying ON it. 0.10 is the cladding budget: the shipped boxes are
+  //           thin plates set flush, and anything further out is not cladding
+  //           this collider, it is furniture standing over it.
+  //   HIDDEN  something solid is in the way much earlier — the tower's own
+  //           body, a buttress. The collider is not visible from here, so
+  //           cladding it is moot and this eye has no opinion.
+  //   BARE    no solid surface between the eye and the collider's top face.
+  //           The player is looking at the engine.
+  // A collider's verdict is BARE if ANY sample from ANY eye is BARE, because
+  // one bare corner in one preset is a frame with the engine in it.
+  //
+  // The samples are on the collider's TOP FACE, rotated with the box (both are
+  // tilted — the ramp by the apron's slope, the lip by TOWER_LIP_TILT), and
+  // pulled in to 0.8 of each half-extent: both boxes are deliberately overlong
+  // so their ends embed, and grading a model on a face buried inside the felt
+  // would be grading it on the engine's own construction trick.
+  towerCladAudit() {
+    if (!towerRig || !towerRig.group) return null;
+    const root = towerRig.group;
+    root.updateMatrixWorld(true);
+    const v = towerVolumes(towerPortalsOf(currentTower));
+    const skin = root.getObjectByName('towerSkin');
+    const veil = towerVeilHidden(skin);           // the A6 law, here too
+    const targets = towerCastTargets(skin, veil);
+    // The SOCKETED mat, so the shipped constant rather than the lab's dial.
+    const eyes = towerShippedEyes(v.z0, TOWER_MAT_EXTRA);
+    const CLAD_BUDGET = 0.10;
+    const CLAD_FLUSH = 0.02;   // the tolerance a coincident face needs (below)
+    // WHERE DICE ACTUALLY TOUCH, which is where cladding has to be — the
+    // CENTRE lane, not the flight envelope. v.flight.halfW is how far a die's
+    // SURFACE reaches at the door plane; a die whose surface grazes that edge
+    // has its contact patch a full radius inboard, and grading a model on the
+    // strip beside every die it ever delivers would fail a tower for not
+    // panelling floor nothing has ever slid across. So: halfW minus a radius,
+    // read off the engine's own envelope rather than typed again here.
+    const contact = v.flight.halfW - v.flight.r;
+    // A point on the box's top face, in world. Local (lx, +s[1]/2, lz) rotated
+    // about x by the box's own rx — the same Euler towerColliders hands cannon,
+    // so this samples the surface a die actually slides on.
+    const faceAt = (vol, dx, kz) => {
+      const rx = vol.rx || 0;
+      const c = Math.cos(rx), s = Math.sin(rx);
+      const ly = vol.s[1] / 2, lz = kz * vol.s[2] / 2;
+      return [vol.c[0] + dx, vol.c[1] + ly * c - lz * s, vol.c[2] + ly * s + lz * c];
+    };
+    const rc = new THREE.Raycaster();
+    const o = new THREE.Vector3(), d = new THREE.Vector3(), p = new THREE.Vector3();
+    const grade = (name, vol) => {
+      const pts = [];
+      for (const k of [-1, -0.5, 0, 0.5, 1]) {
+        const dx = k * contact;
+        for (const kz of [-0.8, -0.4, 0, 0.4, 0.8]) pts.push(faceAt(vol, dx, kz));
+      }
+      let clad = 0, hidden = 0;
+      const bare = [];
+      const perEye = [];
+      for (const e of eyes) {
+        let c = 0, h = 0, b = 0;
+        for (const pt of pts) {
+          p.set(pt[0], pt[1], pt[2]);
+          o.set(e.at[0], e.at[1], e.at[2]);
+          d.copy(p).sub(o);
+          const len = d.length();
+          rc.set(o, d.divideScalar(len));
+          rc.near = 0;
+          // A HAIR PAST THE SURFACE, and this is the whole measurement. The
+          // shipped cladding is FLUSH — Heartwood's tray is a box at the lip's
+          // own centre, rotation and thickness (js/towerskin.js) — so its face
+          // is COINCIDENT with the collider's top and a ray stopped short of
+          // the sample point misses it entirely. Stopping short reported every
+          // clad tower bare, which is the failure mode a clad audit exists to
+          // avoid: a proof that cannot see the thing it is looking for.
+          rc.far = len + CLAD_FLUSH;
+          const hit = rc.intersectObjects(targets, true)[0];
+          const gap = hit ? len - hit.distance : Infinity;
+          if (hit && gap <= CLAD_BUDGET) { c++; clad++; } else if (hit) { h++; hidden++; } else {
+            b++;
+            bare.push({ eye: e.id, at: pt.map((n) => Number(n.toFixed(2))) });
+          }
+        }
+        perEye.push({ eye: e.id, clad: c, hidden: h, bare: b });
+      }
+      return {
+        name, samples: pts.length * eyes.length,
+        clad, hidden, bare: bare.length,
+        verdict: bare.length ? 'BARE' : 'CLAD',
+        // Which rays saw engine, and from where. A count says "not clad"; this
+        // says which corner of which collider, from which preset — the
+        // difference between a verdict and an afternoon.
+        leaks: bare.slice(0, 12),
+        perEye,
+      };
+    };
+    const colliders = [grade('ramp', v.apron), grade('lip', v.lip)];
+    veil.restore();
+    const measured = colliders.filter((c) => c.verdict === 'BARE').map((c) => c.name).sort();
+    const declared = (towerPhys(TOWERS[currentTower]).bareColliders || []).slice().sort();
+    return {
+      tower: currentTower, budget: CLAD_BUDGET,
+      declared, measured,
+      // THE ASSERTION, PRE-MADE. A caller that had to diff two arrays itself
+      // would eventually diff them wrongly; this is the sentence the proof
+      // exists to say, and `ok` is the only field a gate needs to read.
+      ok: declared.length === measured.length
+        && declared.every((n, i) => n === measured[i]),
+      dropped: veil.names,
+      colliders,
+    };
+  },
   // WHAT THE DRESSING COST (docs/TOWER.md, DRESSING). Triangles and draw
   // calls, split by group, for the SOCKETED model — because "≤ 4k triangles
   // and ≤ 8 draw calls of dressing per tower" is a budget and an unmeasured
@@ -9770,7 +10241,7 @@ window.__diceDebug = {
       tower: currentTower, groups, tris: Math.round(tris), draws, lights,
       sways: dress ? dress.sways.length : 0,
       smokes: dress ? dress.smokes.length : 0,
-      ember: !!(TOWERS[currentTower] && TOWERS[currentTower].ember),
+      ember: !!towerCos(TOWERS[currentTower]).ember,
       // SIX PLACES, not three. The scenario checks the sway angle against the
       // formula at this t, and at 0.055 Hz the angle moves ~0.02 rad per
       // second — so a clock rounded to a millisecond is a 1e-5 disagreement
@@ -9820,7 +10291,8 @@ window.__diceDebug = {
   // double; a toFixed(3) here would wave through exactly the 1e-9 drift that
   // an "algebraically equivalent" rearrangement produces.
   towerContractSnapshot() {
-    const v = towerVolumes(towerPortalsOf(currentTower));
+    const p = towerPortalsOf(currentTower);
+    const v = towerVolumes(p);
     const xyz = (a) => [a[0], a[1], a[2]];   // caps at three: no array grows here
     // The bodies as cannon holds them, not as towerBodies() rounds them —
     // this is the only place the collider set is read at contract precision,
@@ -9836,6 +10308,18 @@ window.__diceDebug = {
       };
     }) : null;
     return {
+      // THE QUESTION, BEFORE THE ANSWER. Every number below is
+      // `anchor ⊕ (spec − default)`, and a golden that froze the derived core
+      // without the spec froze an answer with its question missing: one
+      // despawn line is a classic tower AND a baked model whose portals
+      // silently failed to load and fell back to the classic core, and those
+      // are different bugs wearing identical volumes. `source` is what tells
+      // them apart (towerPortalSource).
+      portals: {
+        in: { x: p.in.x, z: p.in.z, rimY: p.in.rimY, clearR: p.in.clearR },
+        out: { x: p.out.x, sillY: p.out.sillY, w: p.out.w, clearH: p.out.clearH },
+      },
+      source: towerPortalSource(currentTower),
       z0: v.z0, S: v.S,
       socket: { c: xyz(v.socket.c), s: xyz(v.socket.s) },
       apron: { c: xyz(v.apron.c), s: xyz(v.apron.s), rx: v.apron.rx },
@@ -9847,14 +10331,116 @@ window.__diceDebug = {
       lip: { c: xyz(v.lip.c), s: xyz(v.lip.s), rx: v.lip.rx },
       exit: { p: xyz(v.exit.p), pitch: v.exit.pitch },
       door: { w: v.door.w, h: v.door.h },
+      // THE FLIGHT ENVELOPE (B2). The collider gap has been frozen here since
+      // the golden was captured; the box a DIE reaches was never in it, so a
+      // change to the lane span or the yaw fan moved every aperture a model
+      // has to leave and the freeze stayed green. Same projection discipline:
+      // a fixed field list, full doubles.
+      flight: {
+        travel: v.flight.travel, cx: v.flight.cx, halfW: v.flight.halfW,
+        top: v.flight.top, bottom: v.flight.bottom,
+        spawnY: v.flight.spawnY, capY: v.flight.capY, r: v.flight.r,
+      },
+      // THE FILM'S OWN CONSTANTS (A1), and this was a hole big enough to drive
+      // every tower through. POUR decides the stagger, the hidden transit, the
+      // exit speed, the yaw and pitch fans, the lane, the baffle knocks and the
+      // re-bake budget — so an edit to any one of them moves EVERY tower's film
+      // on every seed. Exactly one field of it has ever escaped into a proof
+      // (hidZone, through towerPortalSpec), and the golden never held even
+      // that: the freeze could watch the volumes to the bit while the picture
+      // they carry moved underneath, and stay green. A snapshot of the room
+      // that omits the choreography is a green check over a moved picture,
+      // which is this project's dominant failure mode.
+      //
+      // Written out by hand like everything else here: the projection is the
+      // point, so a POUR field added tomorrow does not silently re-golden.
+      pour: {
+        stagMin: POUR.stagMin, stagMax: POUR.stagMax,
+        transitMin: POUR.transitMin, transitMax: POUR.transitMax,
+        exitGap: POUR.exitGap,
+        speedMin: POUR.speedMin, speedMax: POUR.speedMax,
+        yawSpan: POUR.yawSpan, pitchSpan: POUR.pitchSpan, laneSpan: POUR.laneSpan,
+        clunkMin: POUR.clunkMin, clunkMax: POUR.clunkMax,
+        attempts: POUR.attempts, hidZone: POUR.hidZone,
+      },
       bodies,
+    };
+  },
+  // THE FILM, AS ONE NUMBER (A1 — see towerCanon / towerHash32 above).
+  //
+  // Everything a pour is a function of, hashed: the resolved portal spec and
+  // its provenance, the volumes the engine derives from it, POUR, and the plan
+  // pourPlan actually draws at a FIXED seed for a FIXED pool. Two digests that
+  // agree are a proof that the film did not move; two that differ name the
+  // commit that moved it. That turns "I only changed the model" from a claim
+  // into a one-line assertion, which is the charter's whole point.
+  //
+  // WHAT IS DELIBERATELY NOT IN IT: v.cls (the model audit's classifier
+  // ladder) and v.smp (the occlusion sampler's grid). Both are proof
+  // scaffolding rather than film inputs, and a digest that cried wolf when a
+  // classifier threshold moved would be a digest people learn to re-baseline
+  // without reading.
+  //
+  // IT SOCKETS NOTHING and touches no body: it resolves portals for the id it
+  // is handed, derives volumes at the CURRENT mat, and draws a plan. So it is
+  // safe to ask about a tower that is not standing — but z0 moves with the zoom
+  // preset AND with whether any tower is socketed at all, so two digests are
+  // comparable only when taken in the same room. That is stated rather than
+  // defended against: pinning a mat in here would make the number a lie about
+  // the table it was asked on. `z0` comes back with it so a mismatched pair is
+  // recognisable as one.
+  towerFilmDigest(id = currentTower, seed = TOWER_DIGEST_SEED) {
+    // 'none' is null, for towerPortalSpec's reason: there is no tower, so there
+    // is no film, and handing back the classic core's digest would invite
+    // somebody to treat the towerless table as a tower that happens to be
+    // invisible. The FIRST LAW is that 'none' is not a mode.
+    if (!TOWERS[id] || id === 'none') return null;
+    const portals = towerPortalsOf(id);
+    const vol = towerVolumes(portals);
+    delete vol.cls;   // proof scaffolding, not a film input (see above)
+    delete vol.smp;
+    const plan = pourPlan(TOWER_DIGEST_POOL.map((type) => ({ type })), vol,
+      mulberry32(seed >>> 0));
+    // THE ID AND THE PROVENANCE ARE NOT HASHED, and that is the charter in one
+    // decision. Renaming a tower is a cosmetic act; if the id were an input,
+    // renaming one would "move the film" and the digest would be measuring
+    // labels. What IS hashed is exactly the charter's triple — the portal spec,
+    // the engine constants (the volumes derived from that spec, and POUR), and
+    // the seed — so two towers declaring identical portals get identical
+    // digests, which is TRUE: they deliver identical films. Heartwood and
+    // Bastion agreeing here is the proof working, not a bug in it.
+    const canon = towerCanon({
+      seed: seed >>> 0, pool: TOWER_DIGEST_POOL, portals, vol, pour: POUR, plan,
+    });
+    return {
+      // Alongside, never inside: what was asked, and where its spec came from,
+      // so a differing pair can be diagnosed without re-deriving anything.
+      id, source: towerPortalSource(id), seed: seed >>> 0, z0: vol.z0,
+      digest: towerHash32(canon),
+      // A SECOND, INDEPENDENT WIDTH. A 32-bit hash has collisions and this one
+      // will be read as a pass/fail by tools that never look further, so the
+      // canonical form's length rides along: two different films agreeing on
+      // both a 32-bit hash and a byte count is not a thing to plan around, and
+      // `bytes` also moves when a field is ADDED to the digest's inputs, which
+      // a hash comparison alone would report as an ordinary difference.
+      bytes: canon.length,
     };
   },
   // The registry as the picker sees it, so a scenario can assert the chips
   // against the source of truth instead of a hard-coded list.
+  //
+  // FLAT, ON PURPOSE, EVEN THOUGH THE ROWS ARE NOT (D1). Six tools and three
+  // scenarios read `t.label` / `t.skin` / `t.clunkVoice` off this projection,
+  // and re-shaping a proof surface to mirror an internal refactor is how a
+  // refactor gets to break proofs it never touched. The split is enforced
+  // where it MEANS something — in the rows and in the readers — and reported
+  // here through `physical`, which is the half a caller has to be able to see
+  // to say "nothing physical moved".
   towerRegistry() {
     return Object.values(TOWERS).map((t) => ({
-      id: t.id, label: t.label, skin: !!t.skin, clunkVoice: t.clunkVoice || null,
+      id: t.id,
+      label: towerCos(t).label, skin: !!towerCos(t).skin,
+      clunkVoice: towerCos(t).clunkVoice || null,
       // A VENUE TOWER HAS NO CHIP (renderTowerPicker skips it), so a
       // scenario asserting the picker against the registry has to be able
       // to see the difference here rather than hard-coding which row it is.
@@ -9865,7 +10451,18 @@ window.__diceDebug = {
       // synchronously and which need a towerModelStatus poll first. No row
       // ships `glb: true` today; the flag exists so the loop that walks them
       // can be written once rather than retrofitted the day one does.
-      glb: towerGlbUrls(t).length > 0, dress: !!t.dress,
+      glb: towerGlbUrls(t).length > 0, dress: !!towerCos(t).dress,
+      // THE PHYSICAL HALF, WHOLE. Portals are in it because they are the
+      // question every derived number in towerContractSnapshot answers, and a
+      // registry walk that could not see them could not tell a row that CHOSE
+      // the classic mouth from a baked row whose portals never loaded. Null
+      // rather than {} when the row declares none, so "this row has physics
+      // facts" is a truthiness test.
+      physical: towerPhys(t) === TOWER_NO_FACTS ? null : {
+        portals: towerPhys(t).portals || null,
+        bareColliders: towerPhys(t).bareColliders
+          ? towerPhys(t).bareColliders.slice() : null,
+      },
     }));
   },
   // WHERE A ROW'S MODEL HAS GOT TO (js/towerglb.js). `ready` is the GATE every
@@ -9890,7 +10487,7 @@ window.__diceDebug = {
           : (sts.every((s) => s === 'ready') ? 'ready'
             : (sts.includes('loading') ? 'loading' : 'idle'))),
       url: towerGlbUrlActive(row),
-      portals: !!row.portals,
+      portals: !!towerPhys(row).portals,
       retries: urls.reduce((m, u) => Math.max(m, towerGlbAsset(u) ? towerGlbAsset(u).retries : 0), 0),
     };
   },
@@ -9912,8 +10509,8 @@ window.__diceDebug = {
       active: towerGlbUrlActive(row),
       urls,
       statuses: urls.map((u) => towerGlbStatus(u)),
-      mismatch: row.portalMismatch ? row.portalMismatch.slice() : [],
-      variant: row.glbVariant ? row.glbVariant() : null,
+      mismatch: towerPhys(row).portalMismatch ? towerPhys(row).portalMismatch.slice() : [],
+      variant: towerCos(row).glbVariant ? towerCos(row).glbVariant() : null,
     };
   },
   // PROOFS ONLY, exactly like towerLabSkin's parameterisation: this MINTS a
@@ -9929,12 +10526,21 @@ window.__diceDebug = {
   // somebody to ship it.
   towerRegisterGlb(id, url, opts = {}) {
     if (!id || !url) return false;
+    // Two halves like any authored row (D1), including the EMPTY physical one:
+    // a minted row's portals arrive off the bake exactly as a shipped row's do,
+    // and towerPhysOwn would create the half anyway — writing it here keeps
+    // "every row declares both" true, which is what makes the split readable
+    // as a rule instead of as a convention four rows happen to follow.
     TOWERS[id] = {
-      id, label: opts.label || id, glbUrl: url,
-      skin: (v) => towerGlbSkin(url, v),
-      title: opts.title || 'test',
-      clunkVoice: opts.clunkVoice || { body: 'clack', weight: 0.4, sustain: 22 },
-      ember: opts.ember || { at: [0, 5, 0.5], color: '#ff9a44' },
+      id,
+      physical: {},
+      cosmetic: {
+        label: opts.label || id, glbUrl: url,
+        skin: (v) => towerGlbSkin(url, v),
+        title: opts.title || 'test',
+        clunkVoice: opts.clunkVoice || { body: 'clack', weight: 0.4, sustain: 22 },
+        ember: opts.ember || { at: [0, 5, 0.5], color: '#ff9a44' },
+      },
     };
     return true;
   },
@@ -10055,10 +10661,18 @@ window.__diceDebug = {
   // convention) so the check can be re-run WITHOUT them and the difference
   // read off. Pass no argument to put every muted node back.
   //
-  // It exists because `visible = false` is NOT the same experiment: three.js
+  // It exists because `visible = false` was NOT the same experiment: three.js
   // stopped testing `visible` in intersectObject, so an invisible mesh still
-  // blocks a ray. Muting has to work on the name, or the probe measures a
-  // surface the player cannot see and calls the band covered.
+  // blocked a ray. Muting had to work on the name, or the probe measured a
+  // surface the player cannot see and called the band covered.
+  //
+  // A6 CLOSED THAT GAP AT THE OTHER END: towerOcclusionCheck now drops every
+  // hidden mesh out of the cast itself, so the two tools finally agree about
+  // what a hidden thing is worth (nothing). This one stays, and is still the
+  // right instrument for the question it asks — muting names a SPECIFIC
+  // surface without touching the frame, which is what you want when the
+  // question is "which of these carries the band" rather than "what does the
+  // player actually see".
   //
   // Re-run with `towerOcclusionCheck()` and NO id — passing one re-skins the
   // bench and rebuilds the names you just muted.
@@ -10107,7 +10721,26 @@ window.__diceDebug = {
       return { pending: true, id };
     }
     if (id) towerLabSkin(id);
-    if (!TOWERLAB.on) towerLabSet(true);
+    // THE BENCH IS NOT OURS TO KEEP (A6 BLOCKER). towerLabSet(true) deepens the
+    // mat by matExtra — the SAME towerDeepenMat the shipped socket uses — and
+    // this probe used to turn it on and walk away. Over a standing tower that
+    // is a room deepened twice and never given back: TABLE_D +4.5, z0 moved
+    // 2.25 under a set of colliders that were built against the old one, and
+    // the next pour spawning dice behind the tower they are supposed to come
+    // out of. Nobody would connect the two events.
+    //
+    // BRACKETED RATHER THAN REFUSED, and the choice is worth the sentence.
+    // Refusing over a socketed tower would be the cleaner-sounding rule, but
+    // the measurement over one is genuinely VALID: every eye is placed as
+    // `v.z0 + (presetEyeZ − presetZ0)`, an offset from the back wall, and the
+    // lab's skin is built at the same v.z0 — so a deeper room translates the
+    // eye and the tower together and occlusion is a tower-relative question.
+    // What was never valid is leaving the room like that. So whatever this
+    // turns on, it turns off; a bench the caller raised themselves (every
+    // tool does: `towerCore(true)` first) is left standing, which is what
+    // keeps the mute-and-re-run workflow working.
+    const labWas = TOWERLAB.on;
+    if (!labWas) towerLabSet(true);
     // RAYCASTS READ matrixWorld, AND A FRESH BUILD HAS NOT BEEN RENDERED YET.
     // Measured: asking for a skin and checking it in the same call — which is
     // what parameterising this on a tower id made possible — read the matrices
@@ -10123,10 +10756,23 @@ window.__diceDebug = {
     // lining, Bastion's stone and lining). The unnamed children — gradient
     // veils, contact shadows — are transparent and prove nothing, which is
     // exactly why they are not allowed to answer this question.
-    const targets = [];
-    for (const o of skin ? skin.children : []) {
-      if (o.name && o.name !== 'towerSkin' && o.name.startsWith('towerSkin')) targets.push(o);
-    }
+    //
+    // …AND AN INVISIBLE MESH IS NOT ONE. THE LAW (A6): a mesh the player cannot
+    // see may count neither as an occluder nor as a target — this proof
+    // measures what the EYE measures, or it measures nothing.
+    //
+    // three.js stopped testing `.visible` in intersectObject, so an invisible
+    // liner still blocks a ray. Both halves of that are wrong here and in
+    // opposite directions: a hidden mesh in the target list is counted as
+    // covering a band the player is looking straight through, and a hidden
+    // mesh ANYWHERE under a visible parent is reached by the recursive cast
+    // and blocks the ray on its way. Either one turns "the vanish is
+    // unwatchable" green over a frame with a die falling through open air —
+    // and hiding things is precisely how this bench is used (towerHideNamed,
+    // the /new-venue probe idiom), so the trap is armed every time somebody
+    // investigates.
+    const veil = towerVeilHidden(skin);
+    const targets = towerCastTargets(skin, veil);
     // THE GRIDS FOLLOW THE BORE. Radii scale by the mouth's clear-radius ratio
     // and the discs centre on the shaft, so a model with a wider or moved
     // mouth is sampled over ITS mouth rather than over where the classic one
@@ -10151,16 +10797,32 @@ window.__diceDebug = {
     // band off the cowl VOLUME — the volume marks where a facade occluder
     // belongs, which was never the same place as the points being shot at.
     for (const y of v.cowlY) disc(y, cowl);
-    for (const dx of [-0.9, 0, 0.9]) {
-      for (const dy of [-0.6, 0, 0.9]) exit.push([dx, v.exit.p[1] + dy, v.exit.p[2]]);
+    // THE EXIT LANE IS THE FILM'S LANE, AND IT MOVES WITH THE DOOR (A6). This
+    // read `[-0.9, 0, 0.9]` about world x = 0: a hand-copy of POUR.laneSpan/2
+    // stapled to an origin the doorway is not obliged to sit on. `out.x` is
+    // legal to ±0.6·S = ±0.75, so a model that slid its door as far as the
+    // contract allows was graded on a lane 0.75 to one side of the one its
+    // dice actually fly down — the far jamb never sampled, the near one
+    // sampled through solid wall. Centre on the exit spawn, span from POUR.
+    const lane = POUR.laneSpan / 2;
+    for (const dx of [-lane, 0, lane]) {
+      for (const dy of [-0.6, 0, 0.9]) {
+        exit.push([v.exit.p[0] + dx, v.exit.p[1] + dy, v.exit.p[2]]);
+      }
     }
     const hy = v.hood.c[1] - v.hood.s[1] / 2;
-    // …and the hood grid follows the DOOR's width the same way (dW is the
-    // door's growth, so half of it per side). 1.4 exactly for a classic tower.
+    // …and the hood pocket the same way: centred on the HOOD volume (which
+    // rides dOutX with the door) rather than on the origin. Its 1.4 half-span
+    // is the POCKET's own reach and deliberately not the lane — the hood is
+    // wider than the stream because dice arrive in it off a pile — and it
+    // still follows the DOOR's width through dW (half of the growth per side).
+    // 1.4 exactly for a classic tower, and the centre is 0 for every shipped
+    // model today: this is the case that has never been exercised, which is
+    // exactly the kind that ships broken.
     const hx = 1.4 + v.smp.dW / 2;
     for (const dx of [-hx, 0, hx]) {
       for (const dy of [0.4, 1.2, 2.4]) {
-        for (const dz of [0.15, 0.9]) hood.push([dx, hy + dy, v.z0 + dz]);
+        for (const dz of [0.15, 0.9]) hood.push([v.hood.c[0] + dx, hy + dy, v.z0 + dz]);
       }
     }
     const rc = new THREE.Raycaster();
@@ -10184,21 +10846,32 @@ window.__diceDebug = {
       }
       return { n: pts.length, blocked, missed };
     };
-    const eyes = [];
-    for (const [id, pre] of Object.entries(ZOOM_PRESETS)) {
-      const z0p = -(pre.d + TOWERLAB.tune.matExtra) / 2;
-      for (const which of ['eyeFull', 'eyeMini']) {
-        const e = pre[which];
-        const eye = [e[0], e[1], v.z0 + (e[2] - z0p)];
-        eyes.push({
-          id: `${id}.${which === 'eyeFull' ? 'full' : 'mini'}`,
-          eye: eye.map((n) => Number(n.toFixed(2))),
-          shaft: run(eye, shaft), cowl: run(eye, cowl),
-          exit: run(eye, exit), hood: run(eye, hood),
-        });
-      }
-    }
-    return { skin: TOWERLAB.skinId, z0: v.z0, despawnY: v.despawnY, eyes };
+    // The bench's mat, so the dial is what decides which preset is the
+    // identity case here (towerShippedEyes; the socketed audits pass the
+    // constant instead).
+    const eyes = towerShippedEyes(v.z0, TOWERLAB.tune.matExtra).map(({ id: eid, at }) => ({
+      id: eid,
+      eye: at.map((n) => Number(n.toFixed(2))),
+      shaft: run(at, shaft), cowl: run(at, cowl),
+      exit: run(at, exit), hood: run(at, hood),
+    }));
+    // Put the layers back before anything else can read them, and give the
+    // bench back the way it was found (see labWas above).
+    veil.restore();
+    if (!labWas) towerLabSet(false);
+    return {
+      skin: TOWERLAB.skinId, z0: v.z0, despawnY: v.despawnY, eyes,
+      // WHAT WAS DROPPED FOR BEING INVISIBLE, by name. A count of blocked rays
+      // cannot say "and eleven meshes were excluded because somebody left a
+      // liner switched off", and that sentence is the difference between a
+      // verdict and a puzzle. Empty on a clean bench — a non-empty `dropped`
+      // on a shipped model is itself the finding.
+      dropped: veil.names,
+      // Whether the bench was already standing. A caller who raised it keeps
+      // it (mute-and-re-run); a caller who did not gets it taken away again,
+      // and either way the mat is exactly as deep as it was.
+      labWas,
+    };
   },
   // Live dials for the pour's feel — Joe's eye owns these numbers, the
   // same way the tempo curve was dialed. Changing the tilt rebuilds the
@@ -10590,11 +11263,9 @@ window.__diceDebug = {
   // against: ask what your portals are, ask where the engine put the door sill
   // and the despawn line as a result, and check both against the limits.
   //
-  // `source` is the honest provenance and it is not decoration — 'default'
-  // means this row declares no portals and got the classic core, 'row' means
-  // the registry states them, 'model' means they came off a baked mesh. A
-  // model whose portals silently failed to load reads 'default' here, which is
-  // the difference between a tower and a wall with dice behind it.
+  // `source` is the honest provenance and it is not decoration — see
+  // towerPortalSource, which the contract snapshot asks the same question of
+  // so the two can never give different answers about one resolution.
   //
   // 'none' is null: there is no tower, so there are no portals, and returning
   // the classic core for it would invite somebody to treat the towerless table
@@ -10611,7 +11282,7 @@ window.__diceDebug = {
     const v = towerVolumes(portals);
     return {
       id,
-      source: row.portals ? (towerGlbUrls(row).length ? 'model' : 'row') : 'default',
+      source: towerPortalSource(id),
       portals,
       limits: TOWER_PORTAL_LIMITS,
       derived: {
@@ -10622,6 +11293,11 @@ window.__diceDebug = {
         // before it is on felt the whole table shares.
         lipFrontZ: v.lip.c[2] + v.lip.s[2] / 2,
         hidZone: POUR.hidZone,
+        // THE FLIGHT ENVELOPE (v.flight) — the box a die's surface reaches in
+        // the door plane. This is the number a model sizes its visible opening
+        // against, and it is here rather than in a modeller's head because a
+        // hole guessed a little too small is the black-rectangle bug.
+        flight: v.flight,
         // The rim, and the three heights the COWL band is sampled at — capped
         // at the rim, so a model reads off what it actually owes rather than
         // guessing the band from the cowl volume's box (which sits above it).
@@ -17901,8 +18577,8 @@ function renderTowerPicker() {
       const chip = document.createElement('button');
       chip.className = 'system-chip';
       chip.dataset.tower = t.id;
-      chip.textContent = t.label;
-      chip.title = t.title;
+      chip.textContent = towerCos(t).label;
+      chip.title = towerCos(t).title;
       chip.setAttribute('role', 'radio');
       chip.addEventListener('click', () => selectTower(t.id));
       holder.appendChild(chip);
