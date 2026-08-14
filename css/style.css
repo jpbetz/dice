@@ -5631,3 +5631,245 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
 #seat-mine.hidden { display: none; }
 #seat-mine-rows { display: flex; flex-direction: column; gap: 6px; }
 .seat-btn.seat-deal { border-style: dashed; }
+
+/* ===========================================================================
+   THE RECORD — a put-away roll's presence at rest (C25 Stage 2, UX §7.39)
+   ===========================================================================
+   ONE OBJECT AT TWO SCALES. Open, the record is a row of panels in the roll
+   log's head; closed, those same panels collapse to a three-pixel spine along
+   the base of the ≣. Same order (oldest→newest), same roller colours, same
+   held dress, same land beat — so the collapse reads as the same thing
+   getting smaller rather than as two unrelated controls.
+
+   Why not a strip across the felt, which is what the sketch asked for: C25
+   measured that space and it does not exist. Five panels across a 390px phone
+   is 78px each, which is C24's "a tower reads as a smudge" applied to UI, and
+   §7.9's redesign left the felt with zero standing chrome on purpose. The
+   rail already exists at every width, so the record lives there.
+
+   Colours are written as var(--token, #literal) against U23's token layer: if
+   that layer has landed these pick it up, and if it has not the literals are
+   the shipped values. --rank-ink is the ROLLER's own colour, set per element
+   by renderRecord and never a token — attribution is data, not theme. */
+
+/* ---- the closed scale: the ≣'s spine ---------------------------------- */
+/* Absolutely positioned INSIDE the button, so the rail's width budget is
+   untouched: the collapsed foot is measured to the pixel (css:2259 — "the
+   four come to ~80px and the row has slack") and a spine that added width
+   would push the contextual ✕ under the divider strip. Ranks flex to share
+   whatever the button has — ~4px each expanded, ~3px in the collapsed rail. */
+.rl-spine {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 3px;
+  height: 3px;
+  display: none;
+  gap: 1px;
+  pointer-events: none; /* the button stays the one target (P1) */
+}
+.rl-spine.rl-spine-on { display: flex; }
+.rl-rank {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 1px;
+  background: var(--rank-ink, #d4af37);
+  /* AT REST, NOT ABSENT. This is an index, not an inbox badge: a rank that
+     has been read dims (--dim-rest) and stays, rather than disappearing the
+     way a count that exists to reach zero would. */
+  opacity: 0.4;
+  transition: opacity 0.2s, box-shadow 0.2s;
+}
+#rail-log:hover .rl-rank { opacity: 0.72; }
+/* Arrived while the log was shut. The ONLY perceptible unread channel before
+   this was a `title` string — never on touch, and overridden by a static
+   aria-label for screen readers, so the count reached tests and nobody else. */
+.rl-rank.rk-unread {
+  opacity: 1;
+  box-shadow: 0 0 4px var(--rank-ink, #d4af37);
+}
+.rl-rank.rk-hidden { opacity: 0.22; }
+/* WAITING ON YOU (C13). A held roll's Reveal lives only in its card, and the
+   only surface that ever said which roll was waiting was an aria-label. */
+.rl-rank.rk-awaiting {
+  background: var(--gold-bright, #ffd766);
+  opacity: 1;
+  animation: rank-wait 2.1s ease-in-out infinite;
+}
+.rl-rank.rk-land { animation: rank-land 0.5s var(--ease-plant, ease-out); }
+@keyframes rank-wait {
+  0%, 100% { box-shadow: 0 0 3px rgba(255, 215, 102, 0.5); }
+  50% { box-shadow: 0 0 8px rgba(255, 215, 102, 0.95); }
+}
+/* The collapse beat: a rank arrives by dropping into its slot. Transform and
+   opacity only — nothing here can reflow the rail. */
+@keyframes rank-land {
+  0% { opacity: 0; transform: scaleX(0.2) translateY(-5px); }
+  60% { opacity: 1; transform: scaleX(1) translateY(0); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* ---- the open scale: the flyout's panels ------------------------------- */
+/* The head, the record and the find box are the log's INSTRUMENTS and the
+   list is its content, so the scroll moves off the panel and onto the list.
+   Before this the whole flyout scrolled: with a full log you had to scroll
+   100 rows to reach the "N earlier rolls rolled off the end" note, which is
+   the one line a player who has lost history needs first. */
+#log-flyout {
+  display: flex;
+  flex-direction: column;
+  overflow-y: hidden;
+}
+#log-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.lf-record {
+  display: none;
+  gap: 4px;
+  padding: 4px 0 6px;
+  border-bottom: 1px solid var(--hair, rgba(255, 255, 255, 0.07));
+}
+.lf-record.lf-record-on { display: flex; }
+/* A PANEL PER PUT-AWAY ROLL — the sketch's "previous N rolls as panels", at
+   the scale the record can actually afford. Roller colour along the top edge
+   (the under-glow ring it replaces blended 45% toward gold and capped alpha
+   at 0.10: two players differed by ~10/255 and it could not be read at all),
+   the rank under it, the total in the middle. */
+.rec-panel {
+  /* Shares the width with its siblings, but never grows past a panel's worth:
+     ONE put-away roll stretched edge to edge read as a banner announcing the
+     row printed directly beneath it. Five shrink to ~50px, which is the case
+     the size was chosen for. */
+  flex: 1 1 0;
+  max-width: 68px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 3px 2px 4px;
+  cursor: pointer;
+  font-family: var(--font-display, Georgia, serif);
+  background: var(--dim-off, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--hair, rgba(255, 255, 255, 0.07));
+  border-top: 2px solid var(--rank-ink, #d4af37);
+  border-radius: 2px 2px 6px 6px;
+  opacity: 0.62;
+  transition: opacity 0.15s, background 0.15s, transform 0.15s;
+}
+.rec-panel:hover,
+.rec-panel:focus-visible {
+  opacity: 1;
+  outline: none;
+  background: var(--on-fill, rgba(255, 205, 100, 0.08));
+  transform: translateY(-1px);
+}
+.rec-panel:focus-visible { border-color: var(--on-ring, rgba(255, 205, 100, 0.7)); }
+.rec-panel.rk-unread { opacity: 1; }
+.rec-panel.rk-land { animation: rank-land 0.5s var(--ease-plant, ease-out); }
+.rec-panel.rk-awaiting {
+  opacity: 1;
+  border-top-color: var(--gold-bright, #ffd766);
+  animation: rank-wait 2.1s ease-in-out infinite;
+}
+.rec-rank {
+  font-size: var(--label-sm, 9px);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: var(--dim-rest, #7d7365);
+}
+.rec-total {
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--gold-bright, #ffd766);
+}
+/* A per-die system has no sum, so the panel names the roll instead — text,
+   not a numeral, and sized like text. */
+.rec-total.rec-word { font-size: 11px; font-weight: 600; letter-spacing: 0.01em; }
+.rec-panel.rk-hidden .rec-total { color: var(--drain, #8d8375); }
+.rec-panel.rk-awaiting .rec-total { color: var(--gold-bright, #ffd766); }
+.rec-who {
+  font-size: var(--label-sm, 9px);
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dim-rest, #7d7365);
+}
+
+/* ---- finding a roll (C14) --------------------------------------------- */
+.lf-find { display: flex; align-items: center; gap: 6px; padding: 6px 0 4px; }
+.lf-find-in { flex: 1 1 auto; font-size: 11px; padding: 4px 8px; }
+.lf-find-count {
+  flex: none;
+  font-size: var(--label-sm, 10px);
+  color: var(--dim-rest, #7d7365);
+  font-variant-numeric: tabular-nums;
+}
+.lf-find-count:empty { display: none; }
+/* Hidden, never removed: markSuperseded, the cap prune and the card's anchor
+   all resolve rows out of #log-list by id. */
+.log-entry.log-filtered { display: none; }
+/* The anchor's landing light — a rank was clicked and this is the row it
+   meant. Loud for a beat, because the point is to be findable by eye in a
+   300px column, then gone. */
+.log-entry.log-anchored {
+  animation: log-anchor 1.1s ease-out;
+}
+@keyframes log-anchor {
+  0%, 55% { background: var(--on-fill, rgba(255, 205, 100, 0.16)); }
+  100% { background: transparent; }
+}
+/* An empty <p> still carries .hint's margin, and no bare .hidden rule exists
+   in this stylesheet (css:2655) — so the dropped note reserved a gap it never
+   used. It is a foot now (see the scroll move above) and is always in view. */
+#log-dropped { flex: none; }
+#log-dropped:empty { display: none; }
+/* The scope word the clear button never carried: this press clears every
+   put-away roll THROUGH THE SERVER, for everyone. Quiet, second line, because
+   the verb is still `Clear history` and this is what comes with it. */
+.lf-clear-scope {
+  display: block;
+  font-size: var(--label-sm, 9px);
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--drain, #8d8375);
+}
+.lf-clear-scope:empty { display: none; }
+/* The head is `ROLL LOG · Clear history · ✕` and the middle item is the only
+   one that grows. Left to itself the scope line wrapped it to three lines and
+   made a secondary control the tallest thing in the panel. */
+#clear-log { line-height: 1.2; padding-top: 3px; padding-bottom: 3px; }
+
+/* ---- the card names its rank (U20 / C13) ------------------------------ */
+/* Since §7.28 the banner stands until the next roll, so a banner and a peek
+   could both wear a red ✕ Clear for two different rolls with nothing saying
+   which was which. The banner is always the live roll and has no rank; a
+   peek is always a put-away roll and now always shows one. */
+.pk-rank {
+  flex: none;
+  min-width: 15px;
+  padding: 0 4px;
+  border: 1px solid var(--on-ring, rgba(255, 205, 100, 0.45));
+  border-radius: 4px;
+  font-size: var(--label-sm, 10px);
+  line-height: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--on-ink, #ffd766);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-rank.rk-land, .rec-panel.rk-land,
+  .rl-rank.rk-awaiting, .rec-panel.rk-awaiting,
+  .log-entry.log-anchored { animation: none; }
+  .log-entry.log-anchored { background: var(--on-fill, rgba(255, 205, 100, 0.16)); }
+}

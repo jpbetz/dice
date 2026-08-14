@@ -3591,6 +3591,23 @@ function renderPeek() {
   // color dot was redundant beside it
   const head = document.createElement('div');
   head.className = 'pk-head';
+  // WHICH CARD IS LIVE (U20). Since §7.28 the result banner stands until the
+  // next roll, so a banner for roll A and a peek for roll B could both wear a
+  // red `✕ Clear` with nothing saying which roll either one acted on. The
+  // rank is the difference and it is a fact the card owed anyway (C13): the
+  // banner is always the live roll and never has one; a peek is always a
+  // put-away roll and always does.
+  {
+    const seq = [...collected.values()].sort((a, b) => a.seq - b.seq)
+      .findIndex((c) => c.rollId === peekRollId) + 1;
+    if (seq > 0) {
+      const rk = document.createElement('span');
+      rk.className = 'pk-rank';
+      rk.textContent = String(seq);
+      rk.title = `Put away — ${seq}${seq === 1 ? 'st' : seq === 2 ? 'nd' : seq === 3 ? 'rd' : 'th'} in the record`;
+      head.appendChild(rk);
+    }
+  }
   const who = document.createElement('span');
   who.className = 'pk-who';
   if (entry && entry.playerName) {
@@ -3729,6 +3746,14 @@ function positionPeek() {
     // the rail. Below if there is no room above.
     left = (window.innerWidth - w) / 2;
     top = r.top - 10 - h;
+    // U20: THE BANNER'S TOP EDGE CUT INTO THE CARD. In body.mini the banner
+    // sits at bottom:44px — inside the exact band this branch lifts the card
+    // into — and the two overlapped with the banner drawn on top. Lift clear
+    // of it. Free: the row rect above already flushed layout and nothing
+    // writes style between the two reads, so this costs no extra reflow.
+    const bn = document.getElementById('result-banner');
+    const br = bn && !bn.classList.contains('hidden') ? bn.getBoundingClientRect() : null;
+    if (br && br.height && top + h > br.top - 8 && top < br.bottom) top = br.top - 8 - h;
     if (top < 8) top = r.bottom + 10;
   }
   left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
@@ -3744,6 +3769,30 @@ peekEl.addEventListener('pointerenter', (e) => {
 peekEl.addEventListener('pointerleave', (e) => {
   if (e.pointerType === 'mouse') schedulePeekClose();
 });
+
+// A CEREMONY TAKES THE CARD WITH IT (U20). The peek "closes on nothing a
+// player expects — not a new roll, not a ceremony, not the log", and at
+// --z-peek it outranks all three: the repo's own capture run has a peek
+// standing through an entire Check, over the declaration it is meant to be
+// watched. The log half closes in closeLogFlyout and the new-roll half in
+// addLogEntry; this is the ceremony half, and it is an observer rather than a
+// call inside the ceremony because the card must let go the moment the layer
+// APPEARS, and every path that raises it (roll, offer claim, resync replay)
+// converges on this one class. One element, one attribute — the cheapest
+// observer this DOM can carry. (Resolved by id, not through `ceremonyLayer`:
+// that binding is declared 3000 lines below this one and would be in its
+// temporal dead zone at module init.)
+{
+  const layer = document.getElementById('ceremony-layer');
+  if (layer) {
+    new MutationObserver(() => {
+      if (peekRollId !== null && !layer.classList.contains('hidden')) {
+        if (peekPinned()) closePopover(); // a pinned card is immortal otherwise
+        closePeek();
+      }
+    }).observe(layer, { attributes: true, attributeFilter: ['class'] });
+  }
+}
 
 // Tap-away (touch) and click-away (desktop) both collapse the open peek.
 document.addEventListener('pointerdown', (e) => {
@@ -12837,6 +12886,40 @@ window.__diceDebug = {
     if (open) openLogFlyout(); else closeLogFlyout();
     return isLogFlyoutOpen();
   },
+  // THE RECORD AT REST (§7.39). Deliberately reports what is RENDERED, not
+  // just the model: `spine`/`panels` are element counts and `spoken` is the
+  // ≣'s computed accessible name, because the defect this surface exists to
+  // fix was a count that only ever lived in a debug hook and a `title`.
+  // Assert on `spoken` and a scenario cannot go green over an invisible read.
+  get record() {
+    const btn = document.getElementById('rail-log');
+    const strip = document.getElementById('log-record');
+    return {
+      ranks: recordRanks().map((r) => ({
+        rollId: r.rollId, rank: r.rank, hidden: r.hidden, awaiting: r.awaiting,
+        color: r.color, readout: r.readout, name: r.name,
+        unread: recordUnread.has(r.rollId),
+      })),
+      spine: btn ? btn.querySelectorAll('.rl-spine .rl-rank').length : 0,
+      panels: strip ? strip.querySelectorAll('.rec-panel').length : 0,
+      spoken: btn ? btn.getAttribute('aria-label') : null,
+      clearLabel: (document.getElementById('clear-log') || { textContent: '' }).textContent,
+    };
+  },
+  // C14's anchor: jump to a roll by id (scroll + light + open its card).
+  anchorRecord(rollId) { return anchorRecord(rollId); },
+  // C14's find. `shown` counts rows the filter left standing, so a scenario
+  // asserts on what the list SHOWS rather than on the predicate.
+  get logFind() {
+    return {
+      query: logFilter,
+      total: log.length,
+      shown: [...logList.children].filter((r) => !r.classList.contains('log-filtered')).length,
+      note: (document.getElementById('log-filter-count') || { textContent: '' }).textContent,
+      dropped: (document.getElementById('log-dropped') || { textContent: '' }).textContent,
+    };
+  },
+  setLogFind(q) { setLogFilter(q); return logFilter; },
   // the draft cluster (P1): what the Pools panel's draft row shows now.
   // The draft's INTENT, as boxExtras holds it (U1). A scenario asserts on
   // this rather than on the canonical string, because the string is the
@@ -17780,8 +17863,17 @@ function updateLogDroppedNote() {
   const el = document.getElementById('log-dropped');
   if (!el) return;
   const n = logDroppedTotal;
-  el.textContent = n ? `${n} earlier roll${n === 1 ? '' : 's'} rolled off the end of the log` : '';
-  el.classList.toggle('hidden', !n);
+  // C14: a LATE JOINER is handed the last LOG_CAP rolls with logDroppedTotal
+  // at 0, so a table four hours deep looked complete to the person least able
+  // to know otherwise. The client cannot learn the true number — the server
+  // caps at the same 100 and does not report what it dropped (server.js:1748)
+  // — so this says the honest thing instead of a confident wrong one.
+  el.textContent = n
+    ? `${n} earlier roll${n === 1 ? '' : 's'} rolled off the end of the log`
+    : log.length >= LOG_CAP
+      ? `Showing the most recent ${LOG_CAP} rolls — this table may go back further`
+      : '';
+  el.classList.toggle('hidden', !el.textContent);
 }
 
 function fmtTime(t) {
@@ -17957,6 +18049,265 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
     return el;
 }
 
+// ---------------------------------------------------------------------------
+// THE RECORD — what a put-away roll looks like AT REST (C25 Stage 2, §7.39)
+// ---------------------------------------------------------------------------
+//
+// Stage 1 took the felt shelf away and made the log row the door. It left one
+// thing deliberately worse and this is it: with the flyout CLOSED, a put-away
+// roll had no presence anywhere on screen. The ≣ carried an unread count in
+// its `title` and nothing else — a channel touch never renders and screen
+// readers never reach (a static `aria-label` outranks `title` in the accname
+// algorithm), while `__diceDebug` exposed the number, so the suite could
+// assert a signal no user could perceive. That is this repo's dominant
+// failure mode, in two places at once (U20, C14).
+//
+// THE RECORD IS ONE OBJECT AT TWO SCALES. Open, it is a row of panels in the
+// flyout's head — one per roll, oldest→newest, the roller's colour along the
+// top, the total in the middle. Closed, those same panels collapse to a
+// hairline SPINE across the base of the ≣: same order, same colours, same
+// held dress, three pixels tall. That is Joe's sketch's shape ("show the roll
+// log briefly and then show it collapse into a UI element that expands the
+// roll log") without its location: a standing strip across the felt is what
+// C25 measured as impossible — five panels across a 390px phone is 78px each,
+// which is C24's "reads as a smudge" — and the felt keeps zero standing
+// chrome (§7.9). The rail already exists at every width.
+//
+// WHAT IT IS NOT: a notification badge. Joe's 2026-07 ruling stands — history
+// is reference, not an inbox, and there is still no `#log-badge` element. A
+// count bubble exists to be driven to zero; the spine persists, shows what
+// the record HOLDS, and dims rather than disappears once you have looked.
+const RECORD_ANCHOR_MS = 1100;   // how long an anchored row stays lit
+const recordSeen = new Set();    // rollIds already drawn — gates the land beat
+const recordUnread = new Set();  // …that joined the record with the flyout shut
+
+// Is the flyout open? Read from the DOM rather than through isLogFlyoutOpen(),
+// which closes over a `const` declared further down the file: renderLog() runs
+// at module init, well before that binding initialises.
+const recordFlyoutOpen = () => {
+  const el = document.getElementById('log-flyout');
+  return !!el && !el.classList.contains('hidden');
+};
+
+// One rank per roll in the record, oldest→newest. `collected` is the store and
+// Stage 1 settled that it is already correct — this is purely a READ.
+function recordRanks() {
+  const byId = new Map();
+  for (const e of log) if (e.rollId) byId.set(e.rollId, e);
+  return [...collected.values()]
+    .sort((a, b) => a.seq - b.seq)
+    .map((c, i) => {
+      const entry = byId.get(c.rollId) || null;
+      const hidden = !entry || entryHidden(entry);
+      return {
+        rollId: c.rollId,
+        // RANK (C13's first item): slots were ranks oldest→newest — the single
+        // most useful fact for "find what happened earlier" — and after the
+        // shelf went, nothing rendered it at all.
+        rank: i + 1,
+        entry,
+        hidden,
+        // WAITING ON YOU (C13's second item, and the inversion it named): the
+        // retired marker wrote `— hidden` into its aria-label and NOWHERE
+        // else, so a screen-reader user was told which put-away roll awaited
+        // its reveal and a sighted player was not. Both channels carry it now,
+        // and it is sharper than `hidden` was: a roll you have no authority to
+        // reveal is not waiting on YOU.
+        awaiting: !!(entry && hidden && canReveal(entry)),
+        name: (entry && entry.playerName) || '',
+        // ATTRIBUTION AT FULL STRENGTH (C13's third item). The under-glow ring
+        // this replaces blended 45% toward gold and capped alpha at 0.10 — two
+        // players' rings differed by ~10/255 on dark felt, which is why it
+        // could be claimed as the substitute and never was one. A rank wears
+        // its roller's colour undiluted, on rail-dark.
+        color: (entry && entry.color) || '',
+        label: (entry && entry.label) || 'roll',
+        // THE PANEL'S ONE READ. A sum system has a total and that is the most
+        // recognisable thing about a roll; a PER-DIE system computes no sum
+        // (§7.24), so a panel that insisted on a number printed an em dash on
+        // every roll of the default profile — an index column that identified
+        // nothing. It falls back to what the roll was CALLED, which is what
+        // the row is titled with and therefore what you are scanning for.
+        readout: !entry || hidden ? '?' : activeSystem().usesTotal ? String(entry.total) : (entry.label || '·'),
+        isWord: !!(entry && !hidden && !activeSystem().usesTotal),
+      };
+    });
+}
+
+// The rank's spoken form — one sentence, used by both scales so the two never
+// drift. Deliberately says the same things the dress says.
+function recordRankLabel(r) {
+  return `${r.rank}. ${r.name ? `${r.name} · ` : ''}${r.label}`
+    + (r.awaiting ? ' — waiting to be revealed'
+      : r.hidden ? ' — hidden'
+        : r.isWord ? '' : ` — ${r.readout}`)
+    + '. Open this roll’s card.';
+}
+
+// Both scales, the ≣'s accessible name, and the Clear button's scope word.
+// Called from renderLog() (the record changed) and renderLogBadge() (the
+// unread dress changed) — never from each other.
+function renderRecord() {
+  const ranks = recordRanks();
+  const open = recordFlyoutOpen();
+  // Anything that joined while the panel was shut is unread; opening the panel
+  // IS the reading. (The count in `logUnread` counts log arrivals, which is a
+  // different and larger set — this one is about the record.)
+  for (const r of ranks) if (!recordSeen.has(r.rollId) && !open) recordUnread.add(r.rollId);
+  if (open) recordUnread.clear();
+  const fresh = ranks.filter((r) => !recordSeen.has(r.rollId)).map((r) => r.rollId);
+  const live = new Set(ranks.map((r) => r.rollId));
+  for (const id of [...recordSeen]) if (!live.has(id)) recordSeen.delete(id);
+  for (const id of [...recordUnread]) if (!live.has(id)) recordUnread.delete(id);
+
+  // ---- the closed scale: the ≣'s spine --------------------------------
+  const btn = document.getElementById('rail-log');
+  const spine = btn && btn.querySelector('.rl-spine');
+  if (spine) {
+    spine.textContent = '';
+    for (const r of ranks) {
+      const t = document.createElement('span');
+      t.className = 'rl-rank';
+      if (r.color) t.style.setProperty('--rank-ink', r.color);
+      if (r.hidden) t.classList.add('rk-hidden');
+      if (r.awaiting) t.classList.add('rk-awaiting');
+      if (recordUnread.has(r.rollId)) t.classList.add('rk-unread');
+      if (fresh.includes(r.rollId)) t.classList.add('rk-land');
+      spine.appendChild(t);
+    }
+    spine.classList.toggle('rl-spine-on', ranks.length > 0);
+  }
+  if (btn) {
+    // THE ACCESSIBLE NAME IS WRITTEN PER RENDER. It was the static string
+    // "Roll log", which outranks `title` in the accname algorithm — so the
+    // one channel the count had was the one channel a screen reader ignored.
+    const waiting = ranks.filter((r) => r.awaiting).length;
+    btn.setAttribute('aria-label', ['Roll log',
+      ranks.length ? `${ranks.length} roll${ranks.length === 1 ? '' : 's'} put away` : '',
+      recordUnread.size ? `${recordUnread.size} new since you looked` : '',
+      waiting ? `${waiting} waiting to be revealed` : '',
+    ].filter(Boolean).join(', '));
+  }
+
+  // ---- the open scale: the flyout's panels -----------------------------
+  const strip = document.getElementById('log-record');
+  if (strip) {
+    strip.textContent = '';
+    for (const r of ranks) {
+      const b = document.createElement('button');
+      b.className = 'rec-panel';
+      b.dataset.rollId = r.rollId;
+      if (r.color) b.style.setProperty('--rank-ink', r.color);
+      if (r.hidden) b.classList.add('rk-hidden');
+      if (r.awaiting) b.classList.add('rk-awaiting');
+      if (recordUnread.has(r.rollId)) b.classList.add('rk-unread');
+      if (fresh.includes(r.rollId)) b.classList.add('rk-land');
+      // The same sentence on both channels. A 50px panel truncates a long
+      // label, so the whole one is a hover away — as a SUPPLEMENT to the
+      // accessible name, never as the channel (which is the failure this
+      // surface exists to undo).
+      b.setAttribute('aria-label', recordRankLabel(r));
+      b.title = recordRankLabel(r);
+      const n = document.createElement('span');
+      n.className = 'rec-rank';
+      n.textContent = String(r.rank);
+      const v = document.createElement('span');
+      v.className = r.isWord && !r.awaiting ? 'rec-total rec-word' : 'rec-total';
+      v.textContent = r.awaiting ? '!' : r.readout;
+      // Names are user-supplied: textContent only, never innerHTML.
+      const w = document.createElement('span');
+      w.className = 'rec-who';
+      w.textContent = r.name || r.label;
+      b.append(n, v, w);
+      strip.appendChild(b);
+    }
+    strip.classList.toggle('lf-record-on', ranks.length > 0);
+  }
+
+  // ---- the Clear button's missing scope word ---------------------------
+  // Verified 2026-08-14 against this tree: `log = []` is local-only online
+  // (the server owns the log and the next `hello` restores every row), while
+  // requestClearRoll on each put-away roll is permanent AND table-wide — it
+  // reaches rolls that are not yours. The label named neither half.
+  const clearBtn = document.getElementById('clear-log');
+  const scope = clearBtn && clearBtn.querySelector('.lf-clear-scope');
+  if (scope) {
+    scope.textContent = ranks.length ? ` · clears ${ranks.length} for everyone` : '';
+  }
+
+  for (const r of ranks) recordSeen.add(r.rollId);
+}
+
+// A rank is a DOOR — C14's missing anchor. The log had no search, no filter
+// and no anchor of any kind, and it is the only path to "ten minutes ago".
+// Scroll the row into view, light it long enough to find with your eye, and
+// open its card (which is the same card the row itself opens).
+function anchorRecord(rollId) {
+  if (!rollId) return false;
+  const row = logList.querySelector(`.log-entry[data-roll-id="${CSS.escape(rollId)}"]`);
+  if (!row) return false;
+  // A filtered-out row cannot be scrolled to or measured; the anchor wins over
+  // the filter, because the player just asked for THIS roll by name.
+  if (row.classList.contains('log-filtered')) setLogFilter('');
+  row.scrollIntoView({ block: 'nearest' });
+  for (const lit of logList.querySelectorAll('.log-anchored')) lit.classList.remove('log-anchored');
+  row.classList.add('log-anchored');
+  clearTimeout(anchorRecord.timer);
+  anchorRecord.timer = setTimeout(() => row.classList.remove('log-anchored'), RECORD_ANCHOR_MS);
+  openPeek(rollId);
+  return true;
+}
+anchorRecord.timer = null;
+
+// ---- finding a roll (C14) ---------------------------------------------------
+//
+// The log was a 300px column of three-line rows capped at 100 both ends with
+// NO input element of any kind — four hours × five players blows that cap.
+// Rows are hidden, never removed: markSuperseded, the cap prune and the peek's
+// anchor all resolve rows out of #log-list by id, and a filter that deleted
+// nodes would break all three.
+let logFilter = '';
+
+function logEntryMatches(entry) {
+  if (!logFilter) return true;
+  const hidden = entryHidden(entry);
+  const bits = [entry.playerName, entry.label, entry.notation];
+  // A hidden roll's VALUES stay hidden here too (goal 11): matching on a total
+  // nobody may see would let the filter answer a question the card refuses.
+  if (!hidden && activeSystem().usesTotal && typeof entry.total === 'number') bits.push(String(entry.total));
+  return bits.filter(Boolean).join(' ').toLowerCase().includes(logFilter);
+}
+
+function applyLogFilter() {
+  const byId = new Map();
+  for (const e of log) if (e.rollId) byId.set(e.rollId, e);
+  let shown = 0;
+  for (const row of logList.children) {
+    const entry = byId.get(row.dataset.rollId);
+    const hit = !entry || logEntryMatches(entry);
+    row.classList.toggle('log-filtered', !hit);
+    if (hit) shown++;
+  }
+  const count = document.getElementById('log-filter-count');
+  if (count) count.textContent = logFilter ? `${shown} of ${log.length}` : '';
+  // The card anchors to a row's box; a display:none row has none, so a filter
+  // that hides the open card's anchor takes the card with it.
+  if (peekRollId !== null) {
+    const row = logList.querySelector(`.log-entry[data-roll-id="${CSS.escape(peekRollId)}"]`);
+    if (row && row.classList.contains('log-filtered')) closePeek();
+  }
+}
+
+function setLogFilter(q) {
+  const next = String(q || '').trim().toLowerCase();
+  if (next === logFilter) return logFilter;
+  logFilter = next;
+  const input = document.getElementById('log-filter');
+  if (input && input.value.trim().toLowerCase() !== logFilter) input.value = q || '';
+  applyLogFilter();
+  return logFilter;
+}
+
 function renderLog() {
   logList.innerHTML = '';
   logEmpty.style.display = log.length ? 'none' : 'block';
@@ -17977,6 +18328,9 @@ function renderLog() {
   for (let i = log.length - 1; i >= 0; i--) {
     logList.appendChild(buildLogEntryEl(log[i], { supersededIds, byId }));
   }
+  applyLogFilter();  // a rebuild must not silently drop an active filter
+  renderRecord();    // …nor the record strip that indexes it (§7.39)
+  updateLogDroppedNote();
 }
 renderLog();
 
@@ -18120,6 +18474,19 @@ function addLogEntry(entry) {
       logList.lastElementChild.remove();
     }
   }
+  // A filter is a claim about what this list is showing, so an arrival has to
+  // be judged by it too — otherwise the one row that ignores the filter is the
+  // newest one. Only pay the O(N) pass when a filter is actually on.
+  if (logFilter) applyLogFilter();
+  updateLogDroppedNote(); // the at-cap note appears the moment the cap binds
+  // U20: THE PEEK CLOSED ON NOTHING A PLAYER EXPECTS — not a new roll, not a
+  // ceremony, not the log — while sitting at z 30 above all of them. A new
+  // roll retires the banner and the dice (§7.28); a card standing over the
+  // table for a roll two rolls ago is the same staleness with a red ✕ on it,
+  // and it is how two cards came to wear `✕ Clear` for two different rolls
+  // with nothing marking which was live. The roll's OWN card survives — a
+  // reroll landing under its parent's card is not a stale card.
+  if (peekRollId !== null && entry.rollId !== peekRollId) closePeek();
   // An entry landing while the flyout is closed counts as unread on the
   // rail's ≣ badge (the dedupe above already returned for re-deliveries).
   if (!isLogFlyoutOpen()) setLogUnread(logUnread + 1);
@@ -18146,13 +18513,21 @@ document.getElementById('clear-log').addEventListener('click', () => {
   logDroppedTotal = 0; // …and the dropped note goes with the thing it counted
   if (!netOnline) save(LS_LOG, log);
   closePeek();
+  setLogFilter(''); // a filter over an empty list is a control with nothing to say
   for (const rollId of shelved) requestClearRoll(rollId);
   renderLog();
   updateLogDroppedNote();
   renderPeek();
+  // WHAT THIS PRESS ACTUALLY DID, re-verified 2026-08-14 and said out loud.
+  // Two different scopes ride one button and the label named neither: the
+  // put-away rolls are cleared THROUGH THE SERVER, permanently, for everyone
+  // at the table, and they need not be yours; the list itself is emptied
+  // locally only — online the server owns the log and the next `hello`
+  // (any reconnect) hands every row back. `.lf-clear-scope` carries the first
+  // half on the button; this carries both.
   announce(shelved.length
-    ? `History cleared, and ${shelved.length} shelved roll${shelved.length === 1 ? '' : 's'} with it.`
-    : 'History cleared.');
+    ? `History cleared here, and ${shelved.length} put-away roll${shelved.length === 1 ? '' : 's'} cleared for everyone.`
+    : netOnline ? 'History cleared from this list.' : 'History cleared.');
 });
 
 // ---------------------------------------------------------------------------
@@ -18173,13 +18548,19 @@ let logUnread = 0; // entries that arrived while the flyout was closed
 
 function isLogFlyoutOpen() { return !logFlyoutEl.classList.contains('hidden'); }
 
-// NO visual badge (user call, 2026-07): history is reference material, not
-// an inbox, and a standing count-bubble nags like one. The since-you-looked
-// count survives only in the hover title (still the accessible name), and
-// the internal counter still drives it.
+// NO count BUBBLE (user call, 2026-07): history is reference material, not an
+// inbox, and a standing count-bubble nags like one. That ruling stands —
+// `#log-badge` still does not exist. What changed is the claim in the last
+// sentence of its rationale: the count "survives only in the hover title
+// (still the accessible name)" was false, and provably so — `aria-label`
+// outranks `title` in the accname algorithm, so the title was not the
+// accessible name and the count reached nobody who could not hover. §7.39's
+// spine carries the record itself, and renderRecord writes the accessible
+// name; the title keeps the count as a convenience, not as the channel.
 function renderLogBadge() {
   const shown = logUnread > 9 ? '9+' : String(logUnread);
   railLogBtn.title = logUnread > 0 ? `Roll log — l · ${shown} new since you looked` : 'Roll log — l';
+  renderRecord(); // the unread dress and the spoken name move with this count
 }
 
 function setLogUnread(n) {
@@ -18209,6 +18590,30 @@ function toggleLogFlyout() {
 
 railLogBtn.addEventListener('click', toggleLogFlyout);
 document.getElementById('log-close').addEventListener('click', closeLogFlyout);
+
+// The record strip's panels are DOORS (§7.39): delegated for the same reason
+// the rows' handlers are — the strip is rebuilt on every collect, reveal, lens
+// toggle and clear, and a closure per panel would stack one per rebuild.
+document.getElementById('log-record').addEventListener('click', (ev) => {
+  const b = ev.target instanceof HTMLElement ? ev.target.closest('.rec-panel') : null;
+  if (b && b.dataset.rollId) anchorRecord(b.dataset.rollId);
+});
+
+// The find box. No debounce: the list is capped at 100 rows and the pass is a
+// class toggle per row, which is cheaper than the timer would be.
+{
+  const input = document.getElementById('log-filter');
+  input.addEventListener('input', () => setLogFilter(input.value));
+  // Esc inside the box clears the FILTER and stops there — the central Esc
+  // chain would otherwise close the flyout out from under someone who was
+  // only abandoning a search, which is the flyout's own pinned-means-pinned
+  // rule read from the wrong end.
+  input.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape' || !logFilter) return;
+    ev.stopPropagation();
+    setLogFilter('');
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Rail + corner controls
