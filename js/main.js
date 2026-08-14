@@ -10694,6 +10694,58 @@ window.__diceDebug = {
     camera.updateMatrixWorld();
     return [camera.position.x, camera.position.y, camera.position.z];
   },
+  // ONE SHEET, NOT SIX FRAMES — and rendered by the SHIPPED path, in the
+  // room's own light.
+  //
+  // WHY IT EXISTS (nullstone, 2026-08-13). A tower's look loop is bake →
+  // judge → rewrite, and both halves of "judge" were costing more than the
+  // rewrite. The frames were judged in the FORGE PREVIEW, whose rig is not
+  // this room's key, ambient or env: four rounds of value decisions taken
+  // there were wrong by about a stop and a half and had to be retaken the
+  // first time an app frame existed. And they were read ONE PNG AT A TIME, so
+  // "this reads as a wastebasket" — a judgement about the whole object —
+  // waited for the second round to arrive.
+  //
+  // So: every view goes through `tick(0, true, false)`, the same call
+  // tower-shots uses and therefore the same post stack, the same lights and
+  // the same tone map a player gets. The grabs are one synchronous burst
+  // (a WebGL canvas may be composited away between tasks), and only the
+  // compositing waits on decode.
+  //
+  // `views` are [label, dist, height, xoff] in towerEye's own arguments.
+  async lookSheet(views, opts = {}) {
+    const el = renderer.domElement;
+    const shots = [];
+    for (const [label, dist, height, xoff] of views) {
+      this.towerEye(dist, height, xoff);
+      this.tick(0, true, false);
+      shots.push([label, el.toDataURL('image/png')]);
+    }
+    const cols = opts.cols || Math.min(3, shots.length);
+    const rows = Math.ceil(shots.length / cols);
+    const tw = opts.tile || 640;
+    const th = Math.round(tw * el.height / el.width);
+    const sheet = document.createElement('canvas');
+    sheet.width = cols * tw;
+    sheet.height = rows * th;
+    const g = sheet.getContext('2d');
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, sheet.width, sheet.height);
+    for (let i = 0; i < shots.length; i++) {
+      const img = new Image();
+      await new Promise((res, rej) => {
+        img.onload = res; img.onerror = rej; img.src = shots[i][1];
+      });
+      const x = (i % cols) * tw, y = Math.floor(i / cols) * th;
+      g.drawImage(img, x, y, tw, th);
+      g.font = '16px monospace';
+      g.fillStyle = '#cfe98c';
+      g.fillText(shots[i][0], x + 10, y + 24);
+      g.strokeStyle = '#222';
+      g.strokeRect(x + 0.5, y + 0.5, tw - 1, th - 1);
+    }
+    return sheet.toDataURL('image/png');
+  },
   // HIDE-ONE-AT-A-TIME, on the SOCKETED tower — /new-venue's probe idiom
   // ("when a frame won't cohere, stop theorising and start hiding") applied to
   // a model instead of a scene. Returns every name it walked, so a caller can
