@@ -209,6 +209,11 @@ export default async function run(stage) {
       + "tower's world and rebased on z0 here.",
       'POUR (speeds, tempo, the exit guarantee\'s retry budget) is not here: no '
       + 'hook exposes it and no forge tool needs it yet.',
+      "towerEye's lookAt is fixed at (0, 5.2*S, z0-1.4) and is not exposed, so a "
+      + 'tool that wants to FRAME a named feature cannot aim — it can only choose a '
+      + 'standoff. dress-look works around this by searching poses and measuring the '
+      + 'result through worldToScreen; a hook returning the eye pose would remove the '
+      + 'search.',
     ],
     portalLimits: classic.limits,
     towers,

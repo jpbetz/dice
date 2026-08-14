@@ -179,7 +179,8 @@
   "gaps": [
     "leans: each skin's TILT is a module const in js/towerskin.js (0.7°), js/towerbastion.js (0.2°), js/toweranvil.js (0.15°) and the Hollow Bole bake (0.45°), applied as group.rotation.z. No debug hook reports it, so check.py's --tower-tilt-deg stays hand-passed until one exists.",
     "ZOOM_PRESETS.eyeFull/eyeMini are not exposed directly; `eyes` carries them as the occlusion probe hands them over — already translated into the tower's world and rebased on z0 here.",
-    "POUR (speeds, tempo, the exit guarantee's retry budget) is not here: no hook exposes it and no forge tool needs it yet."
+    "POUR (speeds, tempo, the exit guarantee's retry budget) is not here: no hook exposes it and no forge tool needs it yet.",
+    "towerEye's lookAt is fixed at (0, 5.2*S, z0-1.4) and is not exposed, so a tool that wants to FRAME a named feature cannot aim — it can only choose a standoff. dress-look works around this by searching poses and measuring the result through worldToScreen; a hook returning the eye pose would remove the search."
   ],
   "portalLimits": {
     "in": {
