@@ -9135,9 +9135,22 @@ export const scenarios = [
           assert.equal(await back.eval(
             `getComputedStyle(document.getElementById('seat-keep-name')).display !== 'none'`),
           true, 'the returning player is offered their own name back');
+          // TWO CLAIMS, SEPARATELY (C12). The button carries a primary label
+          // AND a sub-label naming the character that rides along — "the
+          // forfeit that used to be silent". Asserting the CONCATENATION is
+          // what made a real accessible-name defect (the two spans ran
+          // together as 'Stay as Wandererwith Rill') look like a string-compare
+          // nit, so the label and the carried pick are asked for one at a time
+          // — the pick through the hook, which cannot go stale on a class name.
           assert.equal(await back.eval(
-            `document.getElementById('seat-keep-name').textContent`), 'Stay as Wanderer',
-          'by name');
+            `document.getElementById('seat-keep-name').querySelector('span').textContent`),
+          'Stay as Wanderer', 'by name');
+          assert.equal((await back.dbg('seatPicker')).keepName.carries, 'with Rill',
+            'and it says which prepared character comes with them');
+          // …and the whole accessible name still reads as words, not one word.
+          assert.equal(await back.eval(
+            `document.getElementById('seat-keep-name').textContent`),
+          'Stay as Wanderer with Rill', 'with a real space between the two spans');
           // Taking it joins as themselves, NOT as the seat.
           await back.eval(`document.getElementById('seat-keep-name').click()`);
           await back.waitFor(`!!window.__diceDebug && window.__diceDebug.netReady`,
