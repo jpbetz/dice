@@ -27,6 +27,20 @@ limitations under the License.
 //   node tools/drive.mjs tools/steps/tower-spec-digest.mjs           # gate
 //   node tools/drive.mjs tools/steps/tower-spec-digest.mjs --write   # re-pin
 //
+// WHAT IS PINNED IS THE DECLARATION, NOT THE DERIVATION (2026-08-13, T3). The
+// fixture holds each row's `portals`, its `source` and the `limits` they were
+// judged against — the eight numbers a MODEL chooses — and nothing the engine
+// computes from them. It used to hold the derived core too, and that was a
+// slow leak: an engine-constant change moved every row's digest at once, on
+// work that had renegotiated no portal at all, and a gate that goes red for
+// reasons its readers learn to wave through is a gate that has stopped
+// working. Derivation drift has two better owners, both byte-level: the
+// `tower-contract-freeze` scenario now freezes every registered tower's whole
+// derived core, and `towerFilmDigest` covers spec + volumes + POUR + the plan
+// pourPlan actually draws. The derived numbers are still READ here (they are
+// what the zoom-invariance proof below is taken over, and the report prints
+// them) — they are simply not what this fixture remembers.
+//
 // WHAT IS HASHED, AND WHY IT IS NOT THE RAW OBJECT. Two normalisations, both
 // forced by what the numbers ARE:
 //
@@ -113,6 +127,17 @@ export function normalizeSpec(spec) {
   });
 }
 
+// THE HALF THAT IS PINNED: what the tower DECLARED, and the limits it was
+// judged against. Everything the engine derives is dropped here rather than in
+// normalizeSpec, because the zoom-invariance proof below needs the derived
+// numbers — they are the only mat-dependent things in the object, so a
+// rebasing that quietly stopped working would be undetectable without them.
+export function declaredOf(norm) {
+  if (!norm) return null;
+  const { derived, ...declared } = norm;
+  return declared;
+}
+
 const hashOf = (o) => createHash('sha256').update(JSON.stringify(o)).digest('hex').slice(0, 16);
 
 // Every leaf that differs, as `path: was → now`. Walks both sides, so a field
@@ -191,23 +216,25 @@ export default async function run(stage, args) {
   await a.waitFor(`window.__diceDebug.zoom === '${READ_ZOOM}'`, { desc: `zoom ${READ_ZOOM}` });
 
   const towers = {};
-  for (const id of ids) towers[id] = { hash: hashOf(live[id]), spec: live[id] };
+  for (const id of ids) towers[id] = { hash: hashOf(declaredOf(live[id])), spec: declaredOf(live[id]) };
 
   // 3. THE REPORT. The eight portal numbers are the whole input to the engine
   //    core, so they are printed in full beside the hash — a reviewer reading
   //    a red diff should not have to open the fixture to see what a tower is
-  //    asking for.
+  //    asking for. The derived line is printed FOR CONTEXT and is not pinned
+  //    (see the header): it is the freeze scenario's and the film digest's.
   console.log('');
   for (const id of ids) {
     const s = towers[id].spec;
     if (!s) { console.log(`${id.padEnd(12)} ${towers[id].hash}  (no portals — not a mode)`); continue; }
     const { in: pin, out } = s.portals;
+    const d = live[id].derived;
     console.log(`${id.padEnd(12)} ${towers[id].hash}  source=${s.source}`);
     console.log(`  in  x=${pin.x} z=${pin.z} rimY=${pin.rimY} clearR=${pin.clearR}`);
     console.log(`  out x=${out.x} sillY=${out.sillY} w=${out.w} clearH=${out.clearH}`);
-    console.log(`  derived despawnY=${s.derived.despawnY} rimY=${s.derived.rimY} `
-      + `door=${s.derived.door.w}×${s.derived.door.h}@${s.derived.door.sill} `
-      + `cowlY=[${s.derived.cowlY}] exit(rel z0)=[${s.derived.exit.pRelZ0}]`);
+    console.log(`  (not pinned) despawnY=${d.despawnY} rimY=${d.rimY} `
+      + `door=${d.door.w}×${d.door.h}@${d.door.sill} `
+      + `cowlY=[${d.cowlY}] exit(rel z0)=[${d.exit.pRelZ0}]`);
   }
 
   const out = { state: { zoom: READ_ZOOM, socket: 'none' }, towers };

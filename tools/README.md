@@ -65,6 +65,17 @@ mesh-only edit owes the measuring steps and the LOOK sheets, and owes the
 simulating ones NOTHING — `tower-spec-digest` is what turns that from a claim
 into a check.
 
+Three instruments carry that claim, and each answers a different question, so
+none of them is redundant: `tower-spec-digest` pins what every tower
+**declared** (the eight portal numbers, the source, the limits);
+`tower-contract-freeze` (e2e) pins the whole **derived** core of every
+registered tower, byte for byte; `towerFilmDigest` hashes spec + volumes +
+POUR + the plan `pourPlan` actually draws at a fixed seed — the **picture**.
+The digest deliberately stopped pinning derived numbers (T3, 2026-08-13): an
+engine-constant change moved every row at once on work that renegotiated no
+portal, and a gate that reds for reasons its readers wave through has stopped
+being a gate.
+
 ```bash
 npm run gate:cosmetic -- <tower>     # the whole measuring set + model sheets
 ```
@@ -90,7 +101,7 @@ retaken the first time an app frame existed.
 
 | step | what it answers | COST | run it when |
 | --- | --- | --- | --- |
-| `tower-spec-digest.mjs [--write]` | do the eight portal numbers (and the core the engine derives from them) still hash to what was committed, per tower | **measures** — no dice, no browser work beyond reading a hook | **every** tower change: it is the proof that a cosmetic change was cosmetic. `--write` re-pins and is not a way to go green |
+| `tower-spec-digest.mjs [--write]` | do the eight portal numbers a tower DECLARES (plus its source and the limits it was judged against) still hash to what was committed, per tower | **measures** — no dice, no browser work beyond reading a hook | **every** tower change: it is the proof that a cosmetic change was cosmetic. `--write` re-pins and is not a way to go green |
 | `tower-fit.mjs [tower…]` | does the model sit inside the socket (every overrun a named legal class), and did the skin add colliders or lights | **measures** the built mesh + the world's body list | a new or re-baked model, new dressing, a change to the audit's classes |
 | `tower-occlusion.mjs [tower]` | is the shaft and the cowl band hidden at all six shipped eyes; which exit/hood sightlines the declared doorway does not explain | **measures** — raycasts against the built skin | anything that moves the silhouette: a re-bake, a lining, a curtain, a portal |
 | `tower-dress.mjs [tower…]` | triangles, draw calls, sways, ember, lights per group against the dressing budget | **measures** | dressing added, merged or retired |

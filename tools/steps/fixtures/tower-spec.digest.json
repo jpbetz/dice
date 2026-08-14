@@ -9,60 +9,8 @@
       "spec": null
     },
     "heartwood": {
-      "hash": "98128847f4736bd2",
+      "hash": "5635191ee545badb",
       "spec": {
-        "derived": {
-          "S": 1.25,
-          "cls": {
-            "cladY": -0.5,
-            "flushProud": 0.06,
-            "footDipY": -0.15,
-            "gateHiY": 6.6,
-            "gateLoY": 3.4,
-            "gladeDepth": 8,
-            "lipSplitZ": 2,
-            "reachLoY": 4.4
-          },
-          "cowlY": [
-            5.4,
-            6.75,
-            8.1
-          ],
-          "despawnY": 7,
-          "door": {
-            "h": 4.5,
-            "sill": 1,
-            "w": 5
-          },
-          "exit": {
-            "pRelZ0": [
-              0,
-              2.875,
-              -0.875
-            ],
-            "pitch": -0.48996
-          },
-          "eye": {
-            "dx": 0,
-            "dy": 0
-          },
-          "flight": {
-            "bottom": 1.13941,
-            "capY": 3.2,
-            "cx": 0,
-            "halfW": 2.33599,
-            "laneSpan": 1.8,
-            "pitchSpan": 0.10472,
-            "r": 1.25,
-            "spawnY": 3.08333,
-            "top": 4.04063,
-            "travel": 0.875,
-            "yawSpan": 0.41888
-          },
-          "hidZone": 0.6,
-          "lipFrontDz": 3.9,
-          "rimY": 8.75
-        },
         "id": "heartwood",
         "limits": {
           "in": {
@@ -111,60 +59,8 @@
       }
     },
     "bastion": {
-      "hash": "fc168fe4b7c72c62",
+      "hash": "9716df6b7f06aade",
       "spec": {
-        "derived": {
-          "S": 1.25,
-          "cls": {
-            "cladY": -0.5,
-            "flushProud": 0.06,
-            "footDipY": -0.15,
-            "gateHiY": 6.6,
-            "gateLoY": 3.4,
-            "gladeDepth": 8,
-            "lipSplitZ": 2,
-            "reachLoY": 4.4
-          },
-          "cowlY": [
-            5.4,
-            6.75,
-            8.1
-          ],
-          "despawnY": 7,
-          "door": {
-            "h": 4.5,
-            "sill": 1,
-            "w": 5
-          },
-          "exit": {
-            "pRelZ0": [
-              0,
-              2.875,
-              -0.875
-            ],
-            "pitch": -0.48996
-          },
-          "eye": {
-            "dx": 0,
-            "dy": 0
-          },
-          "flight": {
-            "bottom": 1.13941,
-            "capY": 3.2,
-            "cx": 0,
-            "halfW": 2.33599,
-            "laneSpan": 1.8,
-            "pitchSpan": 0.10472,
-            "r": 1.25,
-            "spawnY": 3.08333,
-            "top": 4.04063,
-            "travel": 0.875,
-            "yawSpan": 0.41888
-          },
-          "hidZone": 0.6,
-          "lipFrontDz": 3.9,
-          "rimY": 8.75
-        },
         "id": "bastion",
         "limits": {
           "in": {
@@ -213,60 +109,8 @@
       }
     },
     "blackanvil": {
-      "hash": "118c796aa8592f07",
+      "hash": "b97105f266391392",
       "spec": {
-        "derived": {
-          "S": 1.25,
-          "cls": {
-            "cladY": -0.5,
-            "flushProud": 0.06,
-            "footDipY": -0.15,
-            "gateHiY": 6.6,
-            "gateLoY": 3.4,
-            "gladeDepth": 8,
-            "lipSplitZ": 2,
-            "reachLoY": 4.4
-          },
-          "cowlY": [
-            5.4,
-            6.75,
-            8.1
-          ],
-          "despawnY": 7,
-          "door": {
-            "h": 4.5,
-            "sill": 1,
-            "w": 5
-          },
-          "exit": {
-            "pRelZ0": [
-              0,
-              2.875,
-              -0.875
-            ],
-            "pitch": -0.48996
-          },
-          "eye": {
-            "dx": 0,
-            "dy": 0
-          },
-          "flight": {
-            "bottom": 1.13941,
-            "capY": 3.2,
-            "cx": 0,
-            "halfW": 2.33599,
-            "laneSpan": 1.8,
-            "pitchSpan": 0.10472,
-            "r": 1.25,
-            "spawnY": 3.08333,
-            "top": 4.04063,
-            "travel": 0.875,
-            "yawSpan": 0.41888
-          },
-          "hidZone": 0.6,
-          "lipFrontDz": 3.9,
-          "rimY": 8.75
-        },
         "id": "blackanvil",
         "limits": {
           "in": {
@@ -315,60 +159,8 @@
       }
     },
     "nullstone": {
-      "hash": "49487ff8f09a615b",
+      "hash": "03ceb72ce02443f8",
       "spec": {
-        "derived": {
-          "S": 1.25,
-          "cls": {
-            "cladY": -0.5,
-            "flushProud": 0.06,
-            "footDipY": -0.15,
-            "gateHiY": 7.25,
-            "gateLoY": 2.4,
-            "gladeDepth": 8,
-            "lipSplitZ": 2,
-            "reachLoY": 3.4
-          },
-          "cowlY": [
-            6.05,
-            7.4,
-            8.75
-          ],
-          "despawnY": 7.65,
-          "door": {
-            "h": 3.5,
-            "sill": 1,
-            "w": 4.2
-          },
-          "exit": {
-            "pRelZ0": [
-              0,
-              2.875,
-              -0.875
-            ],
-            "pitch": -0.48996
-          },
-          "eye": {
-            "dx": 0,
-            "dy": 0.65
-          },
-          "flight": {
-            "bottom": 1.13941,
-            "capY": 2.2,
-            "cx": 0,
-            "halfW": 2.33599,
-            "laneSpan": 1.8,
-            "pitchSpan": 0.10472,
-            "r": 1.25,
-            "spawnY": 3.08333,
-            "top": 3.92397,
-            "travel": 0.875,
-            "yawSpan": 0.41888
-          },
-          "hidZone": 0.6,
-          "lipFrontDz": 3.9,
-          "rimY": 9.4
-        },
         "id": "nullstone",
         "limits": {
           "in": {
@@ -417,60 +209,8 @@
       }
     },
     "hollowbole": {
-      "hash": "0c60c8fdcdbfa49d",
+      "hash": "103be128c3be0992",
       "spec": {
-        "derived": {
-          "S": 1.25,
-          "cls": {
-            "cladY": -0.5,
-            "flushProud": 0.06,
-            "footDipY": -0.15,
-            "gateHiY": 7.25,
-            "gateLoY": 2.4,
-            "gladeDepth": 8,
-            "lipSplitZ": 2,
-            "reachLoY": 3.4
-          },
-          "cowlY": [
-            6.05,
-            7.4,
-            8.75
-          ],
-          "despawnY": 7.65,
-          "door": {
-            "h": 3.5,
-            "sill": 1,
-            "w": 4.2
-          },
-          "exit": {
-            "pRelZ0": [
-              0,
-              2.875,
-              -0.875
-            ],
-            "pitch": -0.48996
-          },
-          "eye": {
-            "dx": 0,
-            "dy": 0.65
-          },
-          "flight": {
-            "bottom": 1.13941,
-            "capY": 2.2,
-            "cx": 0,
-            "halfW": 2.33599,
-            "laneSpan": 1.8,
-            "pitchSpan": 0.10472,
-            "r": 1.25,
-            "spawnY": 3.08333,
-            "top": 3.92397,
-            "travel": 0.875,
-            "yawSpan": 0.41888
-          },
-          "hidZone": 0.6,
-          "lipFrontDz": 3.9,
-          "rimY": 9.4
-        },
         "id": "hollowbole",
         "limits": {
           "in": {

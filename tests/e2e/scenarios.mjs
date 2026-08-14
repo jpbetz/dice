@@ -10223,16 +10223,26 @@ export const scenarios = [
     // "algebraically equivalent" is precisely what a rearranged floating-point
     // expression is not.
     //
-    // Six rows: three zoom presets × {unsocketed, socketed}. The preset moves
-    // z0 and every volume hangs off it; socketing deepens the mat by matExtra,
-    // moving z0 again, and is the only state in which the eight collider
-    // bodies exist to be read at all.
+    // TWO AXES (see the capture tool's header). Z0: three zoom presets ×
+    // {unsocketed, heartwood} — the preset moves z0 and every volume hangs off
+    // it, socketing moves it again and is the only state in which the eight
+    // collider bodies exist to be read at all. SPEC: every other registered
+    // tower at one preset, which freezes the PORTAL SPEC each one asks for and
+    // the core derived from it. Until the spec axis existed this scenario
+    // watched one spec six times and Hollow Bole was frozen nowhere.
+    //
+    // AND A NEW TOWER MUST BE FROZEN TOO. The registry is read live and every
+    // id has to have a row, so registering a tower without capturing its
+    // contract is RED. That re-capture is the one legitimate kind — purely
+    // ADDITIVE, every existing number untouched, which `git diff --stat` on the
+    // fixture says out loud (`N insertions(+), 0 deletions(-)`). A deletion is
+    // the classic core moving, and shipping a tower is not that.
     //
     // THE GOLDEN IS GUARDED BEFORE IT IS TRUSTED. A fixture that got truncated
-    // to `{}`, or whose six rows are six copies of one row, compares green
-    // against anything — this project's dominant failure mode wearing a new
-    // hat. So the shape, the body list and the z0 spread are asserted first,
-    // and only then is the live snapshot held against it.
+    // to `{}`, or whose rows are copies of one row, compares green against
+    // anything — this project's dominant failure mode wearing a new hat. So the
+    // shape, the body list, the z0 spread and the spec spread are asserted
+    // first, and only then is the live snapshot held against it.
     //
     //   RED CHECKS (each run, seen red, reverted, seen green again):
     //   · despawnY `5.6 * S` → `5.61 * S` in towerVolumes: RED on all six rows
@@ -10240,22 +10250,26 @@ export const scenarios = [
     //   · a stray field added to the snapshot's projection: RED with
     //     "present live and not in the golden", which is the guard that keeps
     //     the projection honest in the other direction.
-    //   · deleting a row from the golden: RED on the six-row shape guard,
-    //     before any comparison runs.
+    //   · deleting a row from the golden: RED on the shape guard, before any
+    //     comparison runs — and deleting `wide.hollowbole` specifically is RED
+    //     on the registry sweep, which is the new-tower gate.
+    //   · every spec-axis row's portals hand-edited to the classic numbers:
+    //     RED on the spec-spread guard, which is what stops the axis from
+    //     being six more photographs of the same tower.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       await a.settle();
 
       // ---- the golden is worth comparing against --------------------------
       const keys = Object.keys(TOWER_CONTRACT_GOLDEN);
-      assert.equal(keys.length, 6,
-        `the golden holds three presets × {unsocketed, socketed} (${keys.join(', ')})`);
       const ORDER = ['doorL', 'doorR', 'lintel', 'towerBack', 'towerL', 'towerR', 'ramp', 'lip'];
-      const z0s = new Set();
+      const specs = new Set();
       for (const key of keys) {
         const g = TOWER_CONTRACT_GOLDEN[key];
-        z0s.add(g.z0);
         assert.equal(typeof g.despawnY, 'number', `${key}: the golden row has real numbers in it`);
+        assert.ok(g.portals && g.source,
+          `${key}: the golden row records the QUESTION (portals + source), not just the answer`);
+        specs.add(JSON.stringify(g.portals));
         if (key.endsWith('.none')) {
           assert.equal(g.bodies, null, `${key}: a towerless row has no colliders to record`);
         } else {
@@ -10263,9 +10277,32 @@ export const scenarios = [
             `${key}: the golden froze the eight engine colliders in contract order`);
         }
       }
+
+      // The Z0 axis: three presets × {unsocketed, heartwood}, six distinct anchors.
+      const z0Keys = [];
+      for (const preset of ['wide', 'medium', 'close']) {
+        for (const tower of ['none', 'heartwood']) z0Keys.push(`${preset}.${tower}`);
+      }
+      for (const key of z0Keys) {
+        assert.ok(TOWER_CONTRACT_GOLDEN[key], `the golden holds the z0-axis row ${key}`);
+      }
+      const z0s = new Set(z0Keys.map((k) => TOWER_CONTRACT_GOLDEN[k].z0));
       assert.equal(z0s.size, 6,
-        `and all six rows are DIFFERENT anchors — six copies of one row would `
-        + `compare green against a broken engine (${[...z0s].join(', ')})`);
+        `and all six z0-axis rows are DIFFERENT anchors — six copies of one row `
+        + `would compare green against a broken engine (${[...z0s].join(', ')})`);
+
+      // The SPEC axis: every registered tower is frozen somewhere, and the axis
+      // holds more than one spec (otherwise it is the z0 axis with extra rows).
+      const registry = await a.dbg('towerRegistry()');
+      const frozenIds = new Set(keys.map((k) => k.split('.')[1]));
+      const unfrozen = registry.map((r) => r.id).filter((id) => !frozenIds.has(id));
+      assert.deepEqual(unfrozen, [],
+        `every registered tower is frozen: ${unfrozen.join(', ')} ${unfrozen.length === 1 ? 'is' : 'are'} not. `
+        + `A new tower re-captures the golden (tools/steps/tower-contract-capture.mjs) — `
+        + `an ADDITIVE diff, 0 deletions, or the classic core moved and this is not a re-pin`);
+      assert.ok(specs.size >= 2,
+        `and the golden holds more than one portal spec (${specs.size}) — one spec `
+        + `photographed N times cannot catch a spec that stopped propagating`);
 
       // ---- and the engine still lands on it, to the bit --------------------
       for (const key of keys) {
@@ -10274,8 +10311,12 @@ export const scenarios = [
         await a.waitFor(`window.__diceDebug.zoom === '${preset}'`,
           { desc: `${key}: the mat is at the ${preset} preset` });
         await a.dbg(`setTower('${tower}')`);
+        // A BAKED row does not socket in the tick it is asked for — the flush
+        // waits on the model — so this waits for the id to land rather than
+        // assuming it did. Reading the snapshot one tick early would photograph
+        // the PREVIOUS tower's core under this row's name.
         await a.waitFor(`window.__diceDebug.tower === '${tower}'`,
-          { desc: `${key}: the tower is '${tower}'` });
+          { desc: `${key}: the tower is '${tower}' (a baked row waits for its model)` });
 
         const live = JSON.parse(await a.eval(TOWER_SNAP));
         const want = TOWER_CONTRACT_GOLDEN[key];

@@ -3111,19 +3111,31 @@ lane. No shipped tower exercises it; `tower-occlusion` prints a NOTE when
 Deciding is the item — keeping it means engine work *plus* a probe campaign
 for off-centre exits, which is the cost the ±0.75 range was meant to buy.
 
-### T3. Re-pin the two fixtures — and decide what the spec digest is FOR — small
-Both proof fixtures are red right now, for the same benign reason: each was
-captured in a worktree before the merge added fields.
-`tower-contract-freeze` gained `pour`/`portals`/`flight`/`source`;
-`tower-spec-digest` reports four towers moved and the entire diff is
-`derived.flight` appearing. Re-pin with a reviewed diff, and parameterize
-the freeze over the whole registry (hollowbole is frozen nowhere today).
-**The refinement underneath:** the spec digest hashes DERIVED fields as
-well as the eight declared numbers, so any engine-constant change reds it —
-churn on work that never renegotiated a portal, and churn is how a gate
-gets re-pinned without being read. Proposal: the spec digest covers the
-declared spec + limits only; derivation drift is `towerFilmDigest`'s job
-and it already covers it.
+### T3. Re-pin the two fixtures — and decide what the spec digest is FOR — SHIPPED 2026-08-13
+Both proof fixtures were red, for the same benign reason: each was captured
+in a worktree before the merge added fields. Re-pinned with a mechanically
+reviewed diff — `git diff --stat` on the contract golden reads *0 deletions*,
+and a walk over the old fixture confirmed **no value moved**, only fields
+appeared. Three things came out of it that were not just a re-pin:
+
+- **The freeze now runs on two axes.** Z0: three presets × {unsocketed,
+  heartwood}, as before. SPEC: every OTHER registered tower at one preset,
+  which freezes the portal spec each one asks for and the core derived from
+  it. Hollow Bole was frozen nowhere at all until this; a baked row whose
+  portals silently failed to load and fell back to the classic core is a
+  different bug wearing identical volumes, and `source` (`model` vs
+  `default`) is now frozen next to the numbers that tell them apart.
+- **A new tower must be frozen too.** The registry is read live and every id
+  must have a row, so registering a tower without capturing its contract is
+  RED — with the message saying that this re-capture is the legitimate,
+  purely-additive kind. Red-checked by deleting `wide.hollowbole`.
+- **The spec digest stopped pinning DERIVED fields.** It covers the declared
+  spec + source + limits only. An engine-constant change used to move every
+  row at once on work that renegotiated no portal, and churn is how a gate
+  gets re-pinned without being read. Derivation drift has two better owners,
+  both byte-level: the freeze above (whole derived core, every tower) and
+  `towerFilmDigest` (spec + volumes + POUR + the plan pourPlan draws).
+  Red-checked: a declared `out.w` edit still reports `portals.out.w: 4.6 → 4.2`.
 
 ### T4. Split the cosmetic lane in the e2e suite — small-medium
 The policy exists in the tools (`gate:cosmetic`) but not yet in
