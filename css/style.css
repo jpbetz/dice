@@ -6005,3 +6005,112 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
    the die it discarded stays at ordinary row scale beside it. */
 .oc-solo .oc-chip.oc-struck { padding: 2px 9px 3px; }
 .oc-solo .oc-struck .oc-die { font-size: 11px; }
+
+/* ---------- the ledger sheet (§2l ⑤) ----------
+   The whole ledger at once, flown out of the rack figure in #pools-head, and
+   the one place a player types their own budget for tonight.
+
+   IT RIDES --z-set-menu, joining that rung rather than minting one: it is the
+   same KIND of object the rung was cut for — a surface that flew out of a
+   control inside a panel and must clear the popover and the modal that its
+   anchor's own panel sits under. A second name for one altitude is how a z
+   ladder stops being a ladder (GOALS P2).
+
+   --lift-float is the elevation for exactly this ("a menu that flew out of
+   something"), --surface-card the body, --panel-border the rim: the token
+   layer's whole point is that a new floating surface looks up what the set
+   menu and the peek card already are instead of copying whichever it sat
+   beside. Nothing here is gold — HUE = ACT, and a ledger is a reading. */
+.ledger-sheet {
+  position: fixed;
+  z-index: var(--z-set-menu);
+  min-width: 236px;
+  max-width: 320px;
+  padding: 10px 12px 9px;
+  background: var(--surface-card);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  box-shadow: var(--lift-float);
+}
+/* One right-flush figure column, the same ledger idea the shelf heads share:
+   rows are `display: contents` so every figure lands on the same x whatever
+   its shelf is called. The rule spans all three columns as a cell of its own
+   — a border on the row's CHILDREN would break across the column gaps, and a
+   row element cannot draw one while it is `contents`. */
+.lg-rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  column-gap: 10px;
+  row-gap: 6px;
+}
+.lg-row { display: contents; }
+.lg-word {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--label-sm);
+  letter-spacing: var(--label-sm-track);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.lg-fig {
+  justify-self: end;
+  color: var(--ivory);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+/* OVER BUDGET — the same reading-weight red the shelf head spends
+   (`.pool-sec-head .psh-fig.over`), for the same reason: under-budget is an
+   ordinary moment in building a character and colouring it would nag at
+   every step of the thing the figure exists to help. */
+.lg-fig.over { color: var(--red); }
+.lg-rule { grid-column: 1 / -1; border-top: 1px solid var(--hair); margin: 2px 0 1px; }
+.lg-total .lg-word { color: var(--ivory); }
+.lg-target {
+  width: 54px;
+  padding: 3px 6px;
+  background: var(--surface-sunk);
+  border: 1px solid var(--hair);
+  border-radius: 6px;
+  color: var(--ivory);
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+/* The placeholder is not decoration here: it is the SYSTEM's number, so an
+   empty field reads as "the rulebook's budget is in force" rather than as a
+   blank. It takes the rest-dim tier, which carries the text floor, because it
+   is a number the player is meant to read and not merely see. */
+.lg-target::placeholder { color: var(--muted); opacity: var(--dim-rest); }
+.lg-target:focus { outline: none; border-color: var(--on-ring); background: var(--well); }
+.lg-legend {
+  margin: 9px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+/* THE FIGURE IS A BUTTON NOW (§2l ⑤) — it opens the sheet. It must keep
+   reading as the figure it always was, so the control resets to nothing and
+   earns its pressability on hover/focus alone: a rack total that suddenly
+   wore a button's chrome would be a new object in the head, which is exactly
+   what "no new control" was protecting. */
+#pools-head button.ph-fig {
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+#pools-head button.ph-fig:hover,
+#pools-head button.ph-fig:focus-visible,
+#pools-head button.ph-fig[aria-expanded="true"] {
+  border-color: var(--hair);
+  background: rgba(243, 234, 215, 0.04);
+}
+#pools-head button.ph-fig:focus-visible { outline: none; border-color: var(--on-ring); }

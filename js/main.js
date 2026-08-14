@@ -13148,6 +13148,44 @@ window.__diceDebug = {
         .map((sec) => ({ label: sec.label, value: shelfDiceValue(sec.pools) })),
     };
   },
+  // §2l ⑤ — the ledger sheet. NOT the names POOL-ANALYSIS §10 pencilled in
+  // (`forecastSheet` / `openForecastSheet` / `setForecastTarget`): those were
+  // written when ⑤ was imagined as one sheet carrying both reads, and this
+  // one carries the LEDGER only — the forecast bars still live in
+  // `#pop-preview`, where §9b's icon strip is reserving room above them. A
+  // hook named for a surface it does not open is the kind of small lie that
+  // sends the next reader looking for a spectrum in here.
+  openLedgerSheet() {
+    const fig = document.querySelector('#pools-head .ph-fig');
+    if (!fig) return false; // rest state or a foreign rack: there is no door
+    if (!ledgerState) openLedgerSheet(fig);
+    return !!ledgerState;
+  },
+  closeLedgerSheet() { closeLedgerSheet(); return !ledgerState; },
+  // Read back off the RENDERED sheet, not off sessionTargets: the point of
+  // the sheet is that the ledger and the shelf heads agree, and a hook that
+  // read the Map could not tell you they had stopped.
+  get ledgerSheet() {
+    if (!ledgerState) return null;
+    return {
+      rows: [...ledgerState.el.querySelectorAll('.lg-row')].map((r) => ({
+        label: r.querySelector('.lg-word').textContent,
+        figure: r.querySelector('.lg-fig').textContent,
+        over: r.querySelector('.lg-fig').classList.contains('over'),
+        // '' = the system's number is in force; the placeholder says which
+        typed: (r.querySelector('.lg-target') || { value: null }).value,
+        placeholder: (r.querySelector('.lg-target') || { placeholder: null }).placeholder,
+      })),
+      legend: ledgerState.el.querySelector('.lg-legend').textContent,
+    };
+  },
+  // 0 clears back to the system's number. Returns what is in force after.
+  setShelfTarget(label, n) {
+    const v = setShelfTarget(label, Number(n));
+    renderGroups();
+    if (ledgerState) { const a = ledgerState.anchor; closeLedgerSheet(); openLedgerSheet(a); }
+    return { typed: v, inForce: shelfBudget(label) };
+  },
   // scenario seeding: replace the rack wholesale (validated + persisted).
   // Scenarios share one browser profile per origin, so a test must never
   // depend on the rack an earlier scenario left behind.
@@ -15896,6 +15934,155 @@ function refreshPoolsPresence() {
   renderPlayers(); // rebuilds pills; aria-pressed reflects poolsOwner
 }
 
+// ---------------------------------------------------------------------------
+// THE LEDGER SHEET (§2l ⑤, 2026-08-15) — the whole ledger at once, and the
+// place a player types their own budget.
+//
+// WHY A FLOWN-OUT SHEET RATHER THAN A SECOND FIGURE SOMEWHERE ELSE.
+// POOL-ANALYSIS §9 left "where the rack figure lives" open, between the head
+// (entry bracket) and the ✎ toolbar foot (exit bracket), because #pools-head
+// is deliberately NOT sticky — "a second pinned band would steal
+// tray-adjacent pixels" — so a rack total there scrolls away during exactly
+// the task it exists for. Answered without moving it and without pinning
+// anything (ROADMAP's Refuted list is explicit that the section bar must not
+// become sticky): the figure STAYS in the head, where C8 put it and where the
+// right-flush ledger column already pays for the standing word once, and the
+// FIGURE ITSELF IS THE DOOR. A surface that flew out of a control does not
+// scroll with the rack, so the reading you opened stays put while you scroll
+// shelves under it — the scroll problem is answered by the sheet's altitude,
+// not by a third pinned rung. No new control either, which is §5's rule.
+//
+// The surface stays NAMELESS, as the ± popover is (POOL-ANALYSIS §7 killed
+// "Assay" and "Rack" as player-visible words). Its accessible name is the
+// standing word the door already spends, `dice value` — not a new noun.
+let ledgerState = null; // {el, anchor} — session-scoped, like the set menu
+
+function closeLedgerSheet(refocus = false) {
+  if (!ledgerState) return;
+  const { el, anchor } = ledgerState;
+  ledgerState = null;
+  el.remove();
+  document.removeEventListener('pointerdown', ledgerAway, true);
+  if (anchor && anchor.isConnected) {
+    anchor.setAttribute('aria-expanded', 'false');
+    if (refocus) anchor.focus();
+  }
+}
+
+function ledgerAway(e) {
+  if (!ledgerState) return;
+  const t = e.target;
+  if (t instanceof Node
+    && (ledgerState.el.contains(t) || (ledgerState.anchor && ledgerState.anchor.contains(t)))) return;
+  closeLedgerSheet();
+}
+
+// One row per shelf, the rack total under a rule, and the legend paid once.
+// Rebuilt only on OPEN: a target edit repaints the figures in place, because
+// rebuilding the rows would take the focus out of the field being typed in.
+function buildLedgerSheet() {
+  const el = document.createElement('div');
+  el.className = 'ledger-sheet';
+  el.setAttribute('role', 'group');
+  el.setAttribute('aria-label', 'dice value');
+  // ONE grid, rows as `display: contents`, so every figure lands on one
+  // right-flush column — the same ledger idea the shelf heads and the rack
+  // head already share. The legend and the rule stay OUT of the row set: a
+  // stray item inside a contents-row grid shears the columns (POOL-ANALYSIS
+  // §7 refuted widening `.oc-ledger` for exactly that reason), so the rule is
+  // a full-span cell of its own and the legend is a sibling of the grid.
+  const list = document.createElement('div');
+  list.className = 'lg-rows';
+  el.appendChild(list);
+  const rows = [];
+  const sections = buildSections(groups, { ensureTrio: true });
+  // Recomputed rather than cached: a cached integer is a second authority on
+  // what a shelf costs, and this file's own lesson is that the second one
+  // stops tracking. It is `budgetOf` over a handful of parsed pools.
+  const paint = () => {
+    for (const r of rows) {
+      const spent = shelfDiceValue(r.pools);
+      const target = shelfBudget(r.label);
+      r.fig.textContent = target ? `${spent}/${target}` : String(spent);
+      r.fig.classList.toggle('over', !!target && spent > target);
+    }
+  };
+  for (const sec of sections) {
+    const row = document.createElement('div');
+    row.className = 'lg-row';
+    const word = document.createElement('span');
+    word.className = 'lg-word';
+    word.textContent = sec.label; // user-supplied shelf name: textContent only
+    const fig = document.createElement('span');
+    fig.className = 'lg-fig';
+    // THE TYPED TARGET. Empty means "the number this system names", shown as
+    // the placeholder — so an empty field is a visible statement about whose
+    // budget is in force rather than a blank. A shelf the system does not
+    // price shows an em dash there, and typing still gives it a target.
+    const sysTarget = systemShelfBudget(sec.label);
+    const inp = document.createElement('input');
+    inp.className = 'lg-target';
+    inp.type = 'text'; // not `number`: a spinner in a 54px field is noise,
+    inp.inputMode = 'numeric'; // and this keeps the phone keypad without it
+    inp.maxLength = 4; // setShelfTarget clamps; this stops the field growing
+    inp.spellcheck = false;
+    inp.placeholder = sysTarget ? String(sysTarget) : '—';
+    inp.value = sessionTargets.get(sec.label) ? String(sessionTargets.get(sec.label)) : '';
+    inp.setAttribute('aria-label', `Your budget for ${sec.label} this session`);
+    inp.title = 'Your budget for tonight — blank uses the number this system names. Not saved.';
+    inp.addEventListener('input', () => {
+      setShelfTarget(sec.label, parseInt(inp.value, 10));
+      paint();
+      renderGroups(); // the shelf heads read the same accessor
+    });
+    inp.addEventListener('keydown', (e) => {
+      e.stopPropagation(); // a typed digit must not fire a table shortcut
+      if (e.key === 'Escape') closeLedgerSheet(true);
+    });
+    row.append(word, fig, inp);
+    list.appendChild(row);
+    rows.push({ label: sec.label, pools: sec.pools, fig });
+  }
+  const rule = document.createElement('div');
+  rule.className = 'lg-rule';
+  list.appendChild(rule);
+  const foot = document.createElement('div');
+  foot.className = 'lg-row lg-total';
+  const fw = document.createElement('span');
+  fw.className = 'lg-word';
+  // Not "rack": POOL-ANALYSIS §7 refuted `Rack` (and `Assay`) as
+  // player-visible words — the chrome word is *pools*, and the surface stays
+  // nameless. `shelf` is the noun this region already says out loud, in
+  // `＋ New shelf…` directly below.
+  fw.textContent = 'All shelves';
+  const ff = document.createElement('span');
+  ff.className = 'lg-fig';
+  // The rack total takes no target: the system prices SHELVES, so a
+  // whole-rack budget would be a number with nothing to be compared against
+  // — the same reason C8 refused to invent one for Motivations.
+  ff.textContent = String(shelfDiceValue(groups));
+  foot.append(fw, ff);
+  list.appendChild(foot);
+  const legend = document.createElement('p');
+  legend.className = 'lg-legend';
+  legend.textContent = DICE_VALUE_LEGEND;
+  el.appendChild(legend);
+  paint();
+  return el;
+}
+
+function openLedgerSheet(anchor) {
+  closeLedgerSheet();
+  const el = buildLedgerSheet();
+  document.body.appendChild(el);
+  placeAnchored(el, anchor); // EXTRACTED from openSetMenuFor, never copied
+  anchor.setAttribute('aria-expanded', 'true');
+  ledgerState = { el, anchor };
+  document.addEventListener('pointerdown', ledgerAway, true);
+  const first = el.querySelector('.lg-target');
+  if (first) first.focus();
+}
+
 // A teammate's rack: the standing banner-chip (also the way back), then
 // stage-only tiles. Staging SNAPSHOTS name+notation — a later
 // pools-changed rewrites these tiles, never an already-staged chip.
@@ -15971,15 +16158,46 @@ function renderForeignPools(owner) {
 // directions: 4d6dl1 values 24 and caps at 18, 1d6! values 6 and reaches
 // 24. The one legend sentence rides as the title.
 const DICE_VALUE_LEGEND = 'dice value — the sum of every die’s highest face; modifiers, drops and explosions are not counted';
-// What this shelf is allowed to cost under the rack's own system, or 0 when
-// the system names no budget. The PROFILE's system, like the trio shelves —
-// a character is priced by the rulebook it was built for, not by whichever
-// table it is briefly sitting at.
-function shelfBudget(label) {
+// THE SESSION TARGET (§2l ⑤): "I am building to 80 tonight." Module-level,
+// dies with the tab — no localStorage, no portable field, no wire key, no
+// `dice.*.v1` (POOL-ANALYSIS §8.3, and goal 12: this is not a character
+// sheet). A point budget is a field the dice never read, so nothing about a
+// roll changes if it is lost, which is what makes losing it the right
+// default rather than a gap.
+// Keyed by shelf LABEL, like SYSTEMS[…].budget, so the two answer the same
+// question in the same terms and one can simply take precedence.
+const sessionTargets = new Map();
+function setShelfTarget(label, n) {
+  // 0 / null / NaN all mean "give it back to the system" — one clearing
+  // gesture, whatever the player typed to express it.
+  if (!Number.isFinite(n) || n <= 0) sessionTargets.delete(label);
+  else sessionTargets.set(label, Math.min(9999, Math.round(n)));
+  return sessionTargets.get(label) || 0;
+}
+
+// What this shelf is allowed to cost: YOUR number for tonight if you typed
+// one, else the rack's own system, else 0 when neither names a budget. The
+// PROFILE's system, like the trio shelves — a character is priced by the
+// rulebook it was built for, not by whichever table it is briefly sitting at.
+//
+// A TYPED TARGET MAY PRICE A SHELF THE SYSTEM DOES NOT, and that does not
+// overturn C8. C8 left Motivations budgetless because "the system does not
+// define 30 as a ceiling, so printing X/30 would invent a rule and then mark
+// you in red for breaking it" — that is about the APP inventing a rule. A
+// number the player typed for their own shelf invents nothing; it is the
+// player declaring the budget, which is the whole of what ⑤ is for.
+// Split in two so the sheet can show whose number is in force WITHOUT having
+// to unset the override to ask — the placeholder needs the system's answer
+// while the figure needs the effective one, and a function that could only be
+// asked the second question would have been read by peeking at the Map.
+function systemShelfBudget(label) {
   const sysId = (activeProfile(profileStore) || {}).system || tableSystem();
   const sys = SYSTEMS[sysId] || null;
   const b = sys && sys.budget;
   return (b && Number.isFinite(b[label])) ? b[label] : 0;
+}
+function shelfBudget(label) {
+  return sessionTargets.get(label) || systemShelfBudget(label);
 }
 
 function shelfDiceValue(pools) {
@@ -16057,16 +16275,37 @@ function renderGroups() {
   // The head has to STAND to show it (C9) — see the :not(.ledgered) rule.
   poolsHead.classList.toggle('ledgered', !foreign && poolsEdit);
   if (!foreign && poolsEdit) {
-    const fig = document.createElement('span');
+    // …AND THE FIGURE IS THE DOOR (§2l ⑤). A button, not a span: it opens the
+    // ledger sheet — the whole ledger at once, and where a session target is
+    // typed. No new control was added for it, which is §5's one-gate rule;
+    // the reading you already look at is the thing you press.
+    const fig = document.createElement('button');
+    fig.type = 'button';
     fig.className = 'ph-fig';
-    fig.title = DICE_VALUE_LEGEND;
+    fig.title = `${DICE_VALUE_LEGEND} — open the ledger`;
+    fig.setAttribute('aria-haspopup', 'true');
+    fig.setAttribute('aria-expanded', String(!!ledgerState));
     const w = document.createElement('span');
     w.className = 'phf-word';
     w.textContent = 'dice value';
     const num = document.createElement('b');
     num.textContent = String(shelfDiceValue(groups));
     fig.append(w, num);
+    fig.addEventListener('click', () => {
+      if (ledgerState) closeLedgerSheet(true);
+      else openLedgerSheet(fig);
+    });
     poolsHead.appendChild(fig);
+    // This head is rebuilt on every render, so an open sheet's anchor has
+    // just been replaced under it. Re-point rather than close: a target edit
+    // repaints the rack, and closing the sheet on its own keystroke would
+    // make the field unusable.
+    if (ledgerState) ledgerState.anchor = fig;
+  } else {
+    // The gate closed (Done, or a walk to a teammate's rack): the sheet is
+    // manage-mode furniture and goes with it. Left standing it would be a
+    // floating editor for a budget with no ledger under it.
+    closeLedgerSheet();
   }
   // The rail tracks the same truth — and it has to be updated ABOVE the
   // foreign-rack return, or navigating to a teammate's rack leaves the
@@ -19055,6 +19294,24 @@ function setMenuAway(e) {
   closeSetMenu();
 }
 
+// Place a floating surface below its anchor, clamped to the viewport, flipped
+// above when the room runs out. EXTRACTED from openSetMenuFor rather than
+// copied for the ledger sheet (§2l ⑤, ROADMAP's own instruction): a second
+// copy is how this codebase gets constants that stop tracking what they stood
+// for — the 12px viewport margin and the 6px gap are one decision about how
+// far a flown-out surface sits from the thing it flew out of, and two copies
+// would be two decisions the moment either is tuned.
+// The element must already be in the document (offsetHeight is read).
+function placeAnchored(el, anchor) {
+  const r = anchor.getBoundingClientRect();
+  let top = r.bottom + 6;
+  if (top + el.offsetHeight > window.innerHeight - 12) {
+    top = Math.max(12, r.top - el.offsetHeight - 6);
+  }
+  el.style.left = `${Math.max(12, Math.min(Math.round(r.left), window.innerWidth - el.offsetWidth - 12))}px`;
+  el.style.top = `${Math.round(top)}px`;
+}
+
 function openSetMenuFor(anchor, { value, allowDefault, pick }) {
   closeSetMenu();
   const menu = document.createElement('div');
@@ -19112,15 +19369,7 @@ function openSetMenuFor(anchor, { value, allowDefault, pick }) {
     else if (e.key === 'Tab') closeSetMenu();
   });
   document.body.appendChild(menu);
-  // place below the anchor, clamped to the viewport; flip above when the
-  // room runs out (the menu itself scrolls past ~340px)
-  const r = anchor.getBoundingClientRect();
-  let top = r.bottom + 6;
-  if (top + menu.offsetHeight > window.innerHeight - 12) {
-    top = Math.max(12, r.top - menu.offsetHeight - 6);
-  }
-  menu.style.left = `${Math.max(12, Math.min(Math.round(r.left), window.innerWidth - menu.offsetWidth - 12))}px`;
-  menu.style.top = `${Math.round(top)}px`;
+  placeAnchored(menu, anchor);
   anchor.setAttribute('aria-expanded', 'true');
   setMenuState = { el: menu, anchor };
   document.addEventListener('pointerdown', setMenuAway, true);
