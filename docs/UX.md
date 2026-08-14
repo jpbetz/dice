@@ -4169,13 +4169,31 @@ speeds were A/B'd and refused twice; the shipped shape is the hurl a touch
 clicks are gated in film time (`CLICKGATE 'film'`) so the sound survives any
 speed — measured: zero loud clicks lost across six display/tempo configs.
 
+**5. No die is born inside a wall** (added 2026-08-14, ROADMAP C28 ①). A throw
+lines its pool up along one edge, and the clamp that keeps the outer dice off
+the walls was taken off `TABLE_W` on all four sides — including the two that
+spread along **z**, where the mat is 6.7 rather than 11. A hand-written
+`offset * 0.5` had been standing in for the ratio since a much larger mat.
+Measured over 144 paired throws: **16 of them started a die through a wall
+plane**, worst 0.29 units in, and the solver shoved it out on frame zero. Each
+die is now clamped into the room its own hull leaves. The general-looking fix —
+re-deriving the whole line off `TABLE_D` — was measured and **refused**: it is
+equally legal and it piles, because `close` then has 0.8 units of legal spread
+and six dice start on top of each other (20 → 17 flat throws in 24, against 21
+for the clamp). Nothing else moves: the jitter is drawn before the clamp, so
+every spawn that was already legal is bit-identical and the two hand-picked
+flat seeds `pile-refusal` pins still land flat.
+
 **What did NOT ship, and why it never will in this form:** restitution
 deadening (fixes shake, but glides on 8d6, piles, and — pre-sleepoff — broke
 replay), gated damping (zero shake benefit, drifts alone), raised sleep
 thresholds (stops dice mid-motion, drifts), the floor magnet (the naive form
 of an engine restitution threshold; failed every gate including its own),
-and uniform tempo (taste). The full pricing history is ROADMAP C30a–e; the
-engine-swap reserve position is C32.
+uniform tempo (taste), and a wider spawn spread as a cure for the frame-zero
+contact storm — that storm was already capped in `5a5a8ce`, and measured today
+`firstFrame` is 1.5–10.2 contacts with every spread formula inside the others'
+noise. The full pricing history is ROADMAP C30a–e; the engine-swap reserve
+position is C32.
 
 ### 7.31 The tower, and what a poured roll looks like (2026-08-12; second tower 2026-08-13; third 2026-08-14)
 

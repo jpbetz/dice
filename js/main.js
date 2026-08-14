@@ -139,6 +139,13 @@ const ZOOM_LEVELS = [
   { id: 'medium', label: 'Medium', title: 'Medium — the default; larger dice, still room to throw' },
   { id: 'close',  label: 'Close',  title: 'Close — biggest dice, best on a phone' },
 ];
+// A zoom waiting on the roll boundary. Declared up here with ZOOM_LEVELS for
+// the same TDZ reason, in its second shape: tick() now asks tryFlushRoomChanges
+// once a frame (C28 ②), and `animate()` runs its FIRST tick during MODULE
+// EVALUATION — before the zoom block far below has been reached. A `let` down
+// there would throw on the very first frame of every page load. `pendingTower`
+// is already declared above tick, so only this one had to move.
+let pendingZoom = null; // set by queueZoom when a change arrives mid-roll
 // THE TOWER REGISTRY (docs/TOWER.md). A room setting whose value is a tower
 // ID, never a boolean — 'none' and one model today, more models later, and a
 // picker rather than a switch is what leaves room for them. Declared up here
@@ -1309,6 +1316,56 @@ const DAMPGATE = { gate: 0, slowLinear: 0, slowAngular: 0 };
 // converges on the same small box regardless of where it spawned — a second
 // cause of piling, independent of the spawn line's `TABLE_W - 4.4` clamp.
 let THROW_TARGET = 0.4;
+
+// WHERE THE THROW LINES UP, made tunable — and NOT inert, because measuring it
+// found a real one (C28 ①). spawnDie lines the pool up along one edge and
+// clamps the span so the outer dice do not come into existence inside a wall.
+// `axis` decides which mat extent that clamp is taken off:
+//
+//   'width'  the pre-2026-08-14 formula — TABLE_W for all four sides, with the
+//            two sides that spread along Z multiplied by a hand-written 0.5,
+//            and no per-die clamp. This is the throw as it shipped.
+//   'own'    the extent of the axis the side actually spreads along: TABLE_W
+//            for sides 0/1 (x), TABLE_D for sides 2/3 (z), and no 0.5.
+//   'clamp'  'width's line, with each die's position clamped into the room its
+//            OWN hull leaves. Minimal: bit-identical wherever 'width' was legal.
+//
+// `pad` is the total clearance the clamp reserves (2.2 per side: 0.6 of jitter
+// plus a d20's 1.25 circumradius plus a little), and `per` is the spacing the
+// spread WANTS before the mat refuses it.
+// SHIPPED 'clamp', 2026-08-14, and 'own' was measured and REFUSED. 24 paired
+// seeds per cell over 3d6 / 6d6 / 3d20 at medium and close
+// (tools/steps/spawn-clear.mjs):
+//
+//                       dice born inside a wall   worst clear   close 6d6 flat
+//   width (as shipped)            16 / 144            −0.29         20 / 24
+//   own   (per-axis spread)        0 / 144            +0.36         17 / 24
+//   clamp (per-die position)       0 / 144            +0.05         21 / 24
+//
+// Both cures end the wall births. 'own' pays for it with piling, because
+// re-deriving the whole line off TABLE_D leaves the Z sides 0.8 units of legal
+// spread at `close` and six dice start on top of each other. 'clamp' moves only
+// the dice that were illegal — every legal spawn is bit-identical, since the
+// jitter is drawn first and clamped after — so it buys the same legality for
+// nothing. The general-looking fix was the worse one; the measurement is the
+// only reason we know.
+//
+// WHAT THIS DID NOT BUY, recorded so nobody re-derives the hope: ROADMAP C28 ①
+// predicted the spread was upstream of the frame-zero contact storm. It is not.
+// Measured, `firstFrame` is 1.5–10.2 contacts on these pools and all three
+// formulas sit inside each other's noise (medium 6d6: 8.3 / 7.9 / 8.2). The 280
+// in 5a5a8ce was a PRE-CAP number; the per-step cap already cured it. Nor is
+// the clamp a piling lever in either direction — see C30c, which had the same
+// hope from the other end and also measured it away.
+const SPAWN = { axis: 'clamp', pad: 4.4, per: 2.6 };
+
+// THE SPAWN LINE OF THE MOST RECENT THROW, kept because this is the one part of
+// a throw whose failure is completely silent: the film still plays, the dice
+// still land on their baked faces, and the only symptom is a contact storm on
+// the step with no time to absorb it. `clear` is the gap between a die's hull
+// circumradius and the nearest wall on the axis its side spread along —
+// NEGATIVE means it spawned INSIDE the wall plane. Read by __diceDebug.spawnLine.
+let spawnLine = [];
 
 // cannon's native sleep, made tunable. world.allowSleep is already true, so
 // bodies sleep at these thresholds today; the question is whether a coarser
@@ -3170,17 +3227,60 @@ function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
   // Attribution instrument only (BODYFLAGS); null leaves the body untouched.
   if (BODYFLAGS.allowSleep !== null) body.allowSleep = BODYFLAGS.allowSleep;
 
-  // line the throw up along the chosen edge of the table. The clamp is
-  // tighter than TABLE_W so the outer dice never spawn inside a wall at
-  // the CLOSE preset (TABLE_W=18: TABLE_W-4.4=13.6, still ample).
-  const spread = Math.min(TABLE_W - 4.4, count * 2.6);
+  // LINE THE THROW UP ALONG THE CHOSEN EDGE. The clamp reserves SPAWN.pad off
+  // the mat so the outer dice do not come into existence inside a wall.
+  //
+  // IT WAS THE WRONG AXIS ON HALF THE THROWS (C28 ①, measured 2026-08-14). The
+  // clamp was `TABLE_W - 4.4` for all four sides, and sides 2/3 spread along Z,
+  // where the mat is 6.7 rather than 11 — a hand-written `offset * 0.5` stood in
+  // for the ratio and stopped standing in when the zoom ladder moved. Measured
+  // over 144 paired throws: 16 of them put a die through a wall plane, worst
+  // −0.29 units at `close`. The old comment here reasoned from TABLE_W=18, a mat
+  // that has not existed since 2026-08-09; its successor (ROADMAP C28 ①) checked
+  // only the X axis, where `TABLE_W - 4.4` never goes negative, and concluded no
+  // die spawns inside a wall today. The other axis was never asked.
+  //
+  // THE SPREAD IS NOT WHERE THIS GETS FIXED, and that is the finding. Re-deriving
+  // the whole line off TABLE_D ('own') is legal and PILES — 0.8 units of spread
+  // at `close` starts six dice on top of each other, close/6d6 20→17 flat throws
+  // in 24. The cure is per DIE and after the fact: see `fit` below. Sides 0/1
+  // keep the width they always had, and `offset * 0.5` stays, because with the
+  // clamp behind it, it is no longer standing in for anything.
+  const alongZ = side >= 2;
+  const extent = SPAWN.axis === 'own' && alongZ ? TABLE_D : TABLE_W;
+  const spread = Math.min(extent - SPAWN.pad, count * SPAWN.per);
   const offset = count === 1 ? 0 : -spread / 2 + (spread * index) / (count - 1);
+  const lateral = SPAWN.axis === 'own' ? offset : offset * 0.5;
   const jitter = () => (rng() - 0.5) * 1.2;
+  // THE LAST WORD, AND THE MINIMAL ONE ('clamp'). The spread is a line for the
+  // whole pool; this is per DIE and uses that die's OWN hull, so it moves only
+  // the dice that would otherwise be born through a wall and leaves every legal
+  // spawn bit-identical. It draws no rng of its own — the jitter is consumed
+  // first and clamped after — which is what makes 'clamp' provably the SAME
+  // FILM as the old formula everywhere the old formula was legal.
+  const room = (alongZ ? TABLE_D : TABLE_W) / 2 - restCeiling(type) - 0.05;
+  const fit = (v) => (SPAWN.axis === 'width' ? v : Math.max(-room, Math.min(room, v)));
 
-  if (side === 0) body.position.set(offset + jitter(), 6 + rng() * 4 + index * 0.9, TABLE_D / 2 - 2.2);
-  else if (side === 1) body.position.set(offset + jitter(), 6 + rng() * 4 + index * 0.9, -TABLE_D / 2 + 2.2);
-  else if (side === 2) body.position.set(-TABLE_W / 2 + 2.2, 6 + rng() * 4 + index * 0.9, offset * 0.5 + jitter());
-  else body.position.set(TABLE_W / 2 - 2.2, 6 + rng() * 4 + index * 0.9, offset * 0.5 + jitter());
+  if (side === 0) body.position.set(fit(offset + jitter()), 6 + rng() * 4 + index * 0.9, TABLE_D / 2 - 2.2);
+  else if (side === 1) body.position.set(fit(offset + jitter()), 6 + rng() * 4 + index * 0.9, -TABLE_D / 2 + 2.2);
+  else if (side === 2) body.position.set(-TABLE_W / 2 + 2.2, 6 + rng() * 4 + index * 0.9, fit(lateral + jitter()));
+  else body.position.set(TABLE_W / 2 - 2.2, 6 + rng() * 4 + index * 0.9, fit(lateral + jitter()));
+
+  // The spawn line, recorded for the one instrument that can see this failing
+  // (spawnLine / spawn-clear.mjs). `index === 0` is the throw boundary: playRoll
+  // maps spawnDie over the pool in order, so the first die starts a fresh line.
+  if (index === 0) spawnLine = [];
+  {
+    const r = restCeiling(type);
+    const half = alongZ ? TABLE_D / 2 : TABLE_W / 2;
+    const at = alongZ ? body.position.z : body.position.x;
+    spawnLine.push({
+      type, side, index,
+      x: body.position.x, z: body.position.z,
+      spread: Math.round(spread * 100) / 100,
+      clear: Math.round((half - Math.abs(at) - r) * 100) / 100,
+    });
+  }
 
   // hurl it toward a random point near the middle of the table (THROW_TARGET
   // is the width of that box as a fraction of the table; 0.4 = shipped)
@@ -3984,6 +4084,10 @@ function playRoll(roll) {
   // makes a model unable to deflect an entry.
   const pouring = towerOn();
   const side = pouring ? 0 : Math.floor(rng() * 4);
+  // A pour never touches spawnDie, so nothing would clear the last THROWN
+  // roll's spawn line and the instrument would report a stale one as this
+  // roll's. Empty is the honest answer: a poured die has no body until it exits.
+  if (pouring) spawnLine = [];
   const dice = pouring
     ? types.map((t, i) => spawnPourDie(t, shrouded, rollDieSet(roll, i)))
     : types.map((t, i) => spawnDie(t, i, types.length, side, rng, shrouded, rollDieSet(roll, i)));
@@ -8069,6 +8173,26 @@ function tick(dt, render = true, realtime = false) {
   stepSinking(dt);   // per-roll Done departures (§7.5)
   stepResting();     // Slice 3: sub-mm cadence on settled-on-felt dice
   stepRevealing(dt); // reveal correction flips (goal 11)
+  // A DEFERRED ROOM CHANGE RIDES THE PREDICATE, NOT THE CALL SITE (C28 ②).
+  // `tableIsBusyForZoom()` names three things that hold a zoom or a tower back
+  // — an in-flight roll, a queued roll, a reveal flip — and every one of them
+  // stops advancing in one of the two lines above. Hanging the flush off each
+  // place a roll can END was tried and it MISSED FOUR: ceremonyFinish (the one
+  // ROADMAP C28 ② names), clearTable (which sets done and empties the queue),
+  // stepRevealing's last flip (a reveal is a busy source with no completion
+  // hook at all), and fastForwardPlayback's skipCeremony drain. All four fail
+  // the same silent way — a client sits on the old preset while the room has
+  // moved, which is exactly the divergence the deferral exists to prevent,
+  // since the mat is the PHYSICS WALLS and a seeded roll replayed against
+  // different walls lands differently.
+  //
+  // So ask once a frame instead. It costs two truthiness checks when nothing is
+  // pending (tryFlushZoom/tryFlushTower both return on a null pending), it is
+  // NOT dt-gated so a held clock still reaches it, and it cannot fire early:
+  // the predicate is the same one queueZoom consults. stepPlayback keeps its
+  // own `else tryFlushRoomChanges()` so the common path still lands in the
+  // SAME frame the roll ends rather than the next one.
+  tryFlushRoomChanges();
   stepTowerLab(dt);  // tower lab (docs/TOWER.md) — inert unless towerCore(true)
   stepTowerLantern(dt); // the ember breath — inert unless a glowing tower is up
   stepTowerDress(dt);   // sway and smoke — inert unless a dressed tower is up
@@ -11392,6 +11516,13 @@ window.__diceDebug = {
   // which is what shipped before 2026-08-10. The scenario measures BOTH sides
   // through this, so "cropping bought size" is a number rather than a claim.
   setFramingLadder(on) { framingLadder = !!on; applyCameraFraming(false); return framingLadder; },
+  // C27's residual, as a switch rather than a default — see FRAMING. Inert as
+  // shipped; `{preferDice: true}` lets rung 2 run where rung 1 already
+  // succeeded, and `{floor: 0.55}` lets it come closer than the preset. Both
+  // are per-viewer like the rest of the ladder, so flipping one shows nobody
+  // else anything. Re-frames immediately so a console flip is visible.
+  get framing() { return { ...FRAMING }; },
+  setFraming(o) { Object.assign(FRAMING, o || {}); applyCameraFraming(false); return { ...FRAMING }; },
   // The portrait-roll probe. Radians; Math.PI/2 stands the mat up on screen.
   setCamRoll(r) { camRoll = r; applyCameraFraming(false); return camRoll; },
   setCamOrbit(r) { camOrbit = r; applyCameraFraming(false); return camOrbit; },
@@ -11423,6 +11554,12 @@ window.__diceDebug = {
       decidingOnScreen: hero ? ndc(hero.body.position) <= 1 : null,
       easing: !!camEase,
       target: [Math.round(camTarget.x * 10) / 10, Math.round(camTarget.z * 10) / 10],
+      // HOW FAR ALONG ITS OWN EYE RAY THE CAMERA ENDED UP, as a multiple of the
+      // preset distance — the number that tells a rung apart from a retreat.
+      // Before the approach shipped this could only ever be >= 1, and a rung-2
+      // frame at exactly 1.00 is C27's residual made visible: the frame
+      // recentred on the dice and did not resize.
+      camScale: Math.round(camScaleNow() * 100) / 100,
       camY: Math.round(camera.position.y * 10) / 10,
       view: `${Math.round(view.width)}x${Math.round(view.height)}`,
     };
@@ -11520,6 +11657,71 @@ window.__diceDebug = {
       table: `${TABLE_W}x${TABLE_D}`,
       view: `${Math.round(view.width)}x${Math.round(view.height)}`,
       mini: document.body.classList.contains('mini'),
+    };
+  },
+  // PRICING THE ROLL IN BETWEEN (C27's residual). oracleProbe answers the wrong
+  // question for the case that is left, and it answers it with a null: it fits
+  // the cluster FROM CAM_TARGET_HOME, so on a phone nothing in 0.3…3.7 fits and
+  // it returns usedScale null with a `framed` span that is just the reading at
+  // the scan's end. The ladder does not fit from home — it fits from the
+  // CLUSTER'S OWN CENTRE — and that is the difference between "no answer" and
+  // an answer.
+  //
+  // This runs the dice rung four ways: each orientation, each with the scan
+  // starting at the preset (what shipped) and at a floor below it (an
+  // approach). It is a PROBE and restores the shipped framing before returning,
+  // so a tool can price a candidate without the app ever wearing it.
+  framingProbe({ margin = 1.0, floor = 0.55 } = {}) {
+    const savedPos = camera.position.clone();
+    const savedTgt = camTarget.clone();
+    const savedOrbit = camOrbit;
+    const v = new THREE.Vector3();
+    const span = () => {
+      const a = new THREE.Vector3(0, 0, 0).project(camera);
+      const b = new THREE.Vector3(1, 0, 0).project(camera);
+      return Math.round(Math.hypot((b.x - a.x) * view.width, (b.y - a.y) * view.height));
+    };
+    const live = () => tableDice.filter((d) => d.body && d.mesh && d.mesh.visible !== false);
+    const onScreen = () => live().filter((d) => {
+      v.copy(d.body.position).project(camera);
+      return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1;
+    }).length;
+    const n = live().length;
+    if (!n) return { dice: 0 };
+    const box = diceFramingPoints(margin);
+    const eye = new THREE.Vector3(
+      ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
+    );
+    const rayLen = eye.clone().sub(box.centre).length();
+    const cases = [];
+    for (const orbit of [0, Math.PI / 2]) {
+      camOrbit = orbit;
+      for (const from of [1, floor]) {
+        const pts = diceFramingPoints(margin);
+        const fits = fitCameraTo(pts, pts.centre, from);
+        cases.push({
+          orbit: orbit ? 'portrait' : 'landscape',
+          from,
+          fits,
+          span: span(),
+          on: onScreen(),
+          scale: Math.round((camera.position.distanceTo(pts.centre) / rayLen) * 100) / 100,
+          matFits: matOnScreen(),
+        });
+      }
+    }
+    camOrbit = savedOrbit;
+    camera.position.copy(savedPos);
+    camTarget.copy(savedTgt);
+    aimCamera(camTarget);
+    applyCameraFraming(); // never leave the player looking at a probe
+    return {
+      dice: n,
+      cluster: { w: Math.round((box[2].p.x - box[0].p.x) * 10) / 10,
+        d: Math.round((box[1].p.z - box[0].p.z) * 10) / 10 },
+      cases,
+      view: `${Math.round(view.width)}x${Math.round(view.height)}`,
+      table: `${TABLE_W}x${TABLE_D}`,
     };
   },
   // Uncleared rolls still on the table, and whose they are (C7 ②). A
@@ -12305,6 +12507,17 @@ window.__diceDebug = {
   setThrowTarget(f) { THROW_TARGET = typeof f === 'number' ? f : THROW_TARGET; return THROW_TARGET; },
   get sleep() { return { ...SLEEP }; },
   setSleep(o) { Object.assign(SLEEP, o || {}); return { ...SLEEP }; },
+  // THE SPAWN LINE (C28 ①). Unlike the three above this one is NOT inert —
+  // `axis: 'clamp'` is what ships — so a tool that wants the pre-2026-08-14
+  // throw asks for `axis: 'width'` explicitly. Takes effect on the NEXT roll,
+  // like every other throw parameter: playRoll bakes the film before frame one.
+  get spawn() { return { ...SPAWN }; },
+  setSpawn(o) { Object.assign(SPAWN, o || {}); return { ...SPAWN }; },
+  // The most recent throw's spawn line, with each die's clearance from the wall
+  // on the axis it spread along. A negative `clear` is a die born inside a wall
+  // plane — invisible in the film, and a frame-zero contact storm in the
+  // recorder. Empty for a POUR (a poured die has no body until it exits).
+  spawnLine() { return spawnLine.map((s) => ({ ...s })); },
   // The settle terminator (SETTLEGATE). mode 'displacement' is shipped — the
   // three-point AABB rest test, `eps` its tolerance as a fraction of a die's
   // WIDTH; 'velocity' restores the pre-2026-08-11 predicate. Takes effect on
@@ -19047,7 +19260,7 @@ const ZOOM_PRESETS = {
   close:  { w: 8.6,  d: 5.2, eyeFull: [0,  8.1, 4.7], eyeMini: [0,  6.7, 3.8] },
 };
 
-let pendingZoom = null; // set by queueZoom when a change arrives mid-roll
+// pendingZoom is declared at module top with ZOOM_LEVELS (TDZ — see there).
 let currentZoom = DEFAULT_ZOOM;
 
 // Named for zoom, but it is the ROOM-CHANGE gate: the tower rides it too
@@ -21209,7 +21422,15 @@ function framingPoints() {
 // last step, and the felt overflowed the view with nothing reporting it. That
 // is also why C25's shelf framing priced at 1.00× on a phone: no subset of
 // points can move a camera already parked at its maximum.
-function fitCameraTo(pts, target = camTarget) {
+//
+// `from` IS WHERE THE SCAN STARTS, AND 1 IS A PROMISE. At `from = 1` the
+// expression below is literally `1 + i * 0.03` for i in 0…89, so the mat rung
+// is bit-for-bit the fit that shipped — a desktop's frame does not move because
+// this parameter exists. Only the DICE rung passes anything else, and only ever
+// downwards: see framingFor's APPROACH block for why that is payable there and
+// nowhere else. The ceiling stays 3.67× whatever the floor is, so no caller can
+// buy a longer retreat by asking to start closer.
+function fitCameraTo(pts, target = camTarget, from = 1) {
   const eye = new THREE.Vector3(
     ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
   );
@@ -21220,8 +21441,10 @@ function fitCameraTo(pts, target = camTarget) {
   // closed form would have to invert the projection for eight points at once,
   // and this runs only on resize, on the compact-view toggle, and once per
   // settle.
-  for (let i = 0; i < 90; i++) {
-    camera.position.copy(target).addScaledVector(ray, 1 + i * 0.03);
+  for (let i = 0; ; i++) {
+    const s = from + i * 0.03;
+    if (s > 3.671) return false; // == the old `i < 90` when from is 1
+    camera.position.copy(target).addScaledVector(ray, s);
     aimCamera(target);
     const fits = pts.every(({ p, mx, my }) => {
       v.copy(p).project(camera);
@@ -21229,7 +21452,6 @@ function fitCameraTo(pts, target = camTarget) {
     });
     if (fits) return true;
   }
-  return false;
 }
 
 // Every die on the felt, as an AABB grown by a die half-extent so a die sits
@@ -21286,6 +21508,19 @@ function matWorstNdc() {
 }
 function matOnScreen() { const w = matWorstNdc(); return w.x <= 1 && w.y <= 1; }
 
+// Where the eye sits along its own ray, as a multiple of the preset distance —
+// the same `s` fitCameraTo scans. 1.00 is the preset exactly; > 1 is a retreat;
+// < 1 is an approach, which only the dice rung is allowed to ask for. Read from
+// the LIVE camera and the LIVE target, so it reports what is painted.
+function camScaleNow() {
+  const eye = new THREE.Vector3(
+    ...(document.body.classList.contains('mini') ? CAM_EYE.mini : CAM_EYE.full)
+  );
+  const ray = eye.clone().sub(camTarget);
+  const len = ray.length();
+  return len > 1e-6 ? camera.position.distanceTo(camTarget) / len : 1;
+}
+
 // Is the deciding die inside the frame the camera is currently in? Read from
 // the LIVE camera, so it answers what would be painted rather than what the
 // fit intended.
@@ -21312,6 +21547,53 @@ function decidingOnScreen() {
 //      says what may not.
 //
 // Returns the pose rather than moving the camera, so the caller can ease to it.
+//
+// RUNG 1 IS A TERMINATOR, NOT A COMPARISON, AND THAT IS C27'S RESIDUAL
+// (measured 2026-08-14, tools/steps/frame-price.mjs, one seed per pool, medium):
+//
+//   viewport      pool   shipped   the dice rung, if it were allowed to run
+//   phone 390     3d6      85 px     85 px  (already at rung 2, and retreating)
+//   ipad-p 834    3d6     119 px    242 px
+//   desktop 1600  3d6     200 px    245 px  (350 px if the eye may approach)
+//   desktop 1600  40d6    200 px    184 px  (a big pool is WORSE off there)
+//
+// The roll C27 says gained nothing gains nothing ON A PHONE, and the reason is
+// not the camera: three dice at rest span 3.9 x 3.0 of an 11 x 6.7 mat, and with
+// the AABB's margin the dice frame is 5.9 x 5.0 — three quarters of the mat's
+// DEPTH. Framing the dice IS framing the mat at that pool size, so the eye ends
+// up at 2.5x the preset either way, and an approach floor cannot help something
+// that is retreating. C24's premise — a compact settled cluster — is not what
+// three dice do on this mat.
+//
+// The 2x IS there, on every device where the mat FITS, which is the one place
+// the ladder never descends. Taking it means a desktop crops the felt on every
+// small roll, which is a taste call and Joe's: C27 priced CONTAINING the mat and
+// declined; this is the mirror image and nobody has looked at it. So it is an
+// instrument, not a default. `preferDice` runs rung 2 even when rung 1 succeeded
+// and keeps it only if it shows every die and beats rung 1 by `gain`; `floor`
+// lets the dice rung's scan start below the preset (1 = the shipped promise that
+// the eye never comes closer). Inert at preferDice false — the block below does
+// not execute at all — so the shipped frame is bit-identical.
+//
+//   __diceDebug.setFraming({preferDice: true})            // the +23%/+103% frame
+//   __diceDebug.setFraming({preferDice: true, floor: 0.55}) // and let it approach
+const FRAMING = { preferDice: false, floor: 1, gain: 1.15 };
+
+// HOW GOOD IS THE FRAME THE CAMERA IS IN RIGHT NOW — dice kept, and how big a
+// world unit lands in CSS px (roll-aware: a quarter turn maps world x onto the
+// screen's vertical, so this is a 2D length, not |Δx|). Read from the LIVE
+// camera, never from what a fit intended. One function because the ladder now
+// asks the question twice per candidate and two copies of a comparison is how
+// the last three defects in this file got in.
+function framingScore() {
+  const v = new THREE.Vector3();
+  const on = tableDice.filter((d) => d.body && d.mesh && d.mesh.visible !== false)
+    .filter((d) => { v.copy(d.body.position).project(camera); return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1; }).length;
+  const a0 = new THREE.Vector3(0, 0, 0).project(camera);
+  const a1 = new THREE.Vector3(1, 0, 0).project(camera);
+  return { on, span: Math.hypot((a1.x - a0.x) * view.width, (a1.y - a0.y) * view.height) };
+}
+
 function framingFor(orbit) {
   const prev = camOrbit;
   camOrbit = orbit;
@@ -21336,14 +21618,25 @@ function framingFor(orbit) {
       if (hero && fitCameraTo(hero, hero.centre)) mode = 'deciding';
       else mode = 'mat-overflow';
     }
+  } else if (framingLadder && FRAMING.preferDice && mode === 'mat') {
+    // RUNG 1 SUCCEEDED — ask rung 2 anyway (the C27 instrument above). Kept
+    // only if it is better by BOTH of the measures the ladder already trusts:
+    // no die may leave the frame, and the dice must actually get bigger by a
+    // margin, or this trades the whole felt for noise. Restores rung 1's eye
+    // when it is refused, because fitCameraTo leaves the camera where it looked.
+    const held = camera.position.clone();
+    const before = framingScore();
+    const dice = diceFramingPoints();
+    let kept = false;
+    if (dice && fitCameraTo(dice, dice.centre, FRAMING.floor)) {
+      const after = framingScore();
+      kept = after.on >= before.on && after.span >= before.span * FRAMING.gain;
+      if (kept) mode = 'dice';
+    }
+    if (!kept) { camera.position.copy(held); aimCamera(home); }
   }
   // Score the candidate from the LIVE camera it just set up.
-  const v = new THREE.Vector3();
-  const on = tableDice.filter((d) => d.body && d.mesh && d.mesh.visible !== false)
-    .filter((d) => { v.copy(d.body.position).project(camera); return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1; }).length;
-  const a0 = new THREE.Vector3(0, 0, 0).project(camera);
-  const a1 = new THREE.Vector3(1, 0, 0).project(camera);
-  const span = Math.hypot((a1.x - a0.x) * view.width, (a1.y - a0.y) * view.height);
+  const { on, span } = framingScore();
   const pose = {
     pos: camera.position.clone(),
     tgt: (mode === 'mat' || mode === 'mat-overflow') ? home.clone()
@@ -21392,9 +21685,21 @@ function computeFraming() {
   //   · landscape is actually dropping dice that portrait would show — which is
   //     what keeps a lone d20 in landscape at 212px instead of turning for a
   //     completeness it already had.
+  //
+  // AND `matFits` STOPS BEING A USABLE PROXY UNDER preferDice. That instrument
+  // deliberately gives up the mat to make the dice bigger, so the portrait
+  // candidate can come back with matFits FALSE and be refused — which is how a
+  // first run of it put 12d6 on a 390px phone into the DECIDING rung and showed
+  // one die of twelve. The intent behind the proxy is "portrait changes the kind
+  // of frame available"; with cropping already conceded, that intent is just
+  // completeness, then size. Written as a branch rather than as a replacement so
+  // the shipped rule stays exactly the rule that was measured.
   if (framingLadder && !land.matFits) {
     const port = framingFor(Math.PI / 2);
-    if (port.matFits && port.on > land.on) best = port;
+    const better = FRAMING.preferDice
+      ? (port.on > land.on || (port.on === land.on && port.span > land.span))
+      : (port.matFits && port.on > land.on);
+    if (better) best = port;
   }
   camera.position.copy(savedPos);
   camTarget.copy(savedTgt);
