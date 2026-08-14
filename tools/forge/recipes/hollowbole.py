@@ -181,8 +181,8 @@ touches: make_tongue_paint drops the plate to 0.39 of its value and pulls it
 warm and dirty with the palette's own punky rot, and the lit-fiber term
 doubles so the grain survives the drop. Proved by measuring RENDERED pixels
 against the trunk's bark band rather than by reading the paint (see
-TONGUE_GAIN), and proved to be colour-only by the `set` digest, which must
-still be 76d898635b069ed2.
+TONGUE_GAIN), and proved to be colour-only by the `set` digest — the first
+use in this file of the mechanism that is now gated (see THE RECORD below).
 
 WHAT ROUND 7 CHANGED, and it is a SHAPE round — the first since round 3.
 Joe, on the round-6 bake: "the dice tower looks like a demonic helmet more
@@ -240,12 +240,6 @@ field, which fails them on seven counts.
     the bore in by 0.35 forced the occlusion CURTAIN out of it and into the
     wall — see CURTAIN_RIN, which is the round's most surprising knock-on.
 
-Measured at the round-7 bake: 7956 tris, watertight, 25/25 on both throats and
-the approach column, cowl 99/99 and shaft 99/99 at all six eyes, crown tear
-9.40..12.30, one outline peak at x +1.61 with prominence 0.74, stance 2.00:1,
-6 roots, 4 spires, 11 shelf brackets placed and 1 refused, both palettes
-sharing geometry digest set=3c13ab67b2f42533 and differing only in COLOR_0.
-
 MEASURED, NOT ASSUMED. Every dimensional claim above is re-derived from the
 built vertices at bake time: assert_throat_clear and assert_approach_clear
 cast rays at the finished triangles (not at the constants that generated
@@ -263,20 +257,37 @@ full occlusion grid — 6 shipped eyes x 198 samples — at the built
 triangles. A browser found these in thirty minutes; the bake finds them in
 eight seconds.
 
-Measured at the last bake: 7828 tris (curtain 228), watertight, 25/25 on
-both throats and the approach column, cowl 99/99 and shaft 99/99 at all six
-eyes, x within +-3.13, tallest spire 12.31, curtain top 12.03, stance
-1.97:1, 6 roots, 5 spires, 10 shelf brackets placed and 2 refused, both
-palettes byte-identical in geometry (shared `set` digest 76d898635b069ed2,
-schema v2) and different only in COLOR_0.
+THE RECORD, and there is exactly ONE of it (2026-08-13). This header used to
+carry three "measured at the bake" paragraphs from three different rounds,
+quoting 7956 tris, then 7828, then a `set` digest of 76d898635b069ed2 that a
+fourth line said "must still" be. The shipped GLBs measured 7270 and
+5278316c43df21ca — matching none of them. Three records is zero records, and
+prose cannot be gated, so the numbers that a machine can check now live where
+a machine checks them:
+
+    tools/forge/digests.json      the geometry digest pair and tri count,
+                                  per shipped slug. bake.sh diffs every bake
+                                  against it (digestdiff.py) and a drift is a
+                                  refusal, not a paragraph nobody re-read.
+    check.py --tower              everything about the FILE: portals, limits,
+                                  throats, lane, occlusion, sill holes,
+                                  envelope, budget, and the digest's presence.
+    the [bole] lines of a bake    everything about the BUILD, printed by the
+                                  gate that measured it, every run.
+
+What that leaves here is the SHAPE OF THE CLAIMS rather than their values:
+one closed solid plus a curtain and shelves, both palettes sharing geometry
+and differing only in COLOR_0, 25/25 on both throats and the approach column,
+99/99 cowl and shaft at all six shipped eyes, zero sight lines into the
+hollow under the ramp's crest, and every assert_ in this file invoked (the
+gate manifest refuses otherwise). If you want today's numbers, run it:
 
     tools/forge/bake.sh tools/forge/recipes/hollowbole.py \
-        --tower --expect-colors --max-tris 8000
-    # then gate the second variant by hand:
-    ~/opt/dice-forge/venv/bin/python tools/forge/check.py \
-        tools/forge/out/hollowbole_foxfire.glb --tower --expect-colors --max-tris 8000
-    # and the interior value order, on the renders (hollowbole_look.js
-    # shoots the named angles; 19-probe is the frame this reads):
+        --tower --expect-colors --max-tris 15000 --bare-colliders ramp,lip
+
+    # ...which bakes BOTH palettes and gates BOTH (it used to gate the newer
+    # file only). And the interior value order, on the renders
+    # (hollowbole_look.js shoots the named angles; 19-probe is the frame):
     ~/opt/dice-forge/venv/bin/python tools/forge/recipes/hollowbole_probe.py \
         tools/forge/out/hollowbole_moonrise.glb \
         tools/forge/shots/final-moonrise-19-probe.png --assert

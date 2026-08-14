@@ -72,19 +72,32 @@ they join the selection, every geometry gate steps over them, and grounding
 shifts them with the model. Mesh nodes an occluder must hide behind get the
 engine's `towerSkin*` prefix, exactly as for code-built skins.
 
-**Gating.** `check.py --tower` (via `bake.sh <recipe> --tower ...`) adds five
+**Gating.** `check.py --tower` (via `bake.sh <recipe> --tower ...`) adds nine
 refusals to the usual ones: both portals declared at the scene root with
-parseable extras; every number inside `TOWER_PORTAL_LIMITS` (mirrored from
-js/main.js — **keep the two in sync**); the APPROACH column really clear, by
+parseable extras; every number inside the engine's portal limits, with
+`portalOut`'s dead z knob pinned to 0.0; the APPROACH column really clear, by
 25 rays down the entry disc from above the rim to despawnY; the EXIT throat
-really clear, by 25 rays out through the door; and at least one `towerSkin*`
-mesh node. The two ray gates are the point: a model can declare a perfect
-doorway and wall it up behind the declaration, and the numbers alone would
-never notice. The exit rays are RAMP-AWARE (2026-08-13): each starts where
-its height clears the engine chute's slope line plus a 0.15 cladding
-allowance, so a model may skin the delivery ramp (a tongue, a slide) without
-tripping a gate about a die path no die takes — while a shelf 0.5 above the
-slope still fails (red-checked both ways).
+really clear, by 25 rays out through the door; the LANE clear of the die's
+band from the sill to the lip's front face, with each outrun collider either
+clad within tolerance of its plane or named in `--bare-colliders`; the
+OCCLUSION grid (SHAFT + COWL, three discs each, six shipped eyes) not
+leaking; no sight line into the hollow below the sill outside the door; the
+scene carrying its geometry digest; and at least one `towerSkin*` mesh node.
+The ray gates are the point: a model can declare a perfect doorway and wall
+it up behind the declaration, and the numbers alone would never notice. The
+exit rays are RAMP-AWARE (2026-08-13): each starts where its height clears
+the engine chute's slope line plus a 0.15 cladding allowance, so a model may
+skin the delivery ramp (a tongue, a slide) without tripping a gate about a
+die path no die takes — while a shelf 0.5 above the slope still fails
+(red-checked both ways).
+
+Every engine number these read is in ONE dict, `towergates.ENGINE_MIRROR`,
+which round 2 replaces with an `engine_contract.json` the app emits. The gate
+implementations live beside it because a bake RECIPE has to run the same
+questions and runs inside Blender's Python (no trimesh) while check.py runs
+on the venv (no bpy) — neither can import the other, both import
+`towergates`. Tower models bake to a 15000-tri budget (Joe, 2026-08-13); the
+hero-prop numbers above are for props.
 
 **The fixture.** `recipes/tower_fixture.py` bakes
 `tests/e2e/fixtures/tower_fixture.glb` — a deliberately plain leaning
