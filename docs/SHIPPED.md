@@ -4911,3 +4911,209 @@ floor (bf96213).
   ("Roll 3 pools: Wisdom, Swordplay, Zeal"); both real menus complete down to
   focus restoration on close.
 
+
+---
+
+# The 2026-08-15 batch — sixteen roadmap items, worked in ORDER
+
+*Fifteen of THE ORDER's sixteen entries, worked in parallel and merged one at a
+time. What each shipped is below; **what each proved WRONG about this file's
+own claims is the more valuable half**, and is collected at the end.*
+
+## What shipped
+
+- **C15 — restore a library from its file** (ORDER #1). `Replace my library…`
+  in `#import-profiles`, the app's existing two-step in-place arm, naming what
+  it destroys and offering `Download` inline first. `rebuildStore` builds from
+  `emptyStore()` + `addProfile()` with **no `uniqueName`**, compares each
+  landed name to the file's rather than assuming, persists and **checks the
+  return** before swapping the live pointer, then adopts the profile the file's
+  `profile:` key names. Plus the four defects in the same journey:
+  `parsePortable`'s warnings now reach the status line as `⚠` with a `.caution`
+  class (never `.warn` — `ok` reads `.warn`, and a skipped section is not a
+  failed load), an empty file refuses at the file door, boot normalization
+  reports what it dropped **and withholds the first write while it holds
+  anything**, and `LS_GROUPS`'s comment stopped calling a fossil a recovery
+  path. `js/profiles.js` `rebuildStore`; UX §7.40; PROFILES §12.
+
+- **§0j — `/health` + `GIT_SHA`, and a room-creation budget** (ORDER #2, #3).
+  `/health` reports cardinalities only — no room key (goal 10: the key IS the
+  door), no name, no log line — and **validates rather than echoes** `GIT_SHA`,
+  so a secret typed into that var reports `unknown`. `make deploy` bakes the
+  sha with `--update-env-vars` (not `--set`, which would wipe a
+  `DICE_LOG_LEVEL` set to diagnose something mid-investigation) and appends
+  `-dirty` when the uploaded working tree was not HEAD, because `--source .`
+  ships the directory rather than the commit. The throttle is a **RATE, not an
+  ownership cap** — if the key ever collapses to one value, a rate degrades to
+  "10 new tables/min for everyone" while an ownership cap degrades to "no new
+  tables at all" — guarded at half of `MAX_ROOMS` so a refusal can never happen
+  while 250 slots are free, refusing with 429 `room_rate_limited` (never
+  `server_full`, which would make every future capacity report ambiguous), and
+  never on `/api/events` (§0d F3's stream storm).
+
+- **C29 — the static handler serves the app, not the repo** (ORDER #10).
+  `APP_DIRS` / `APP_FILES` / `isAppPath` on the resolved absolute path; 404 for
+  everything else. `tests/static-cache.test.mjs` grew 22 → 51 assertions,
+  naming each refused path.
+
+- **C11 + C12 — arrival on the phone it is designed for** (ORDER #7).
+  `#name-panel` scrolls instead of overflowing upward (the same fix
+  `#settings-panel` carries, with the same comment); a coarse-pointer block
+  puts the picker family at 44px and `#name-input` at 16px so iOS stops
+  zooming; focus is conditional on `(pointer: fine)`; `#name-modal` joins the
+  Esc ladder and gains a ✕, dismissing to **`null` — you are LOOKING, not
+  sitting** — with `Take a seat` in the presence row as the way back. `&as=`
+  became the default pick again, `Stay as ⟨name⟩` carries the pick and says so,
+  and `⚄ Random`'s hook stopped minting. UX §7.39.
+
+- **U23 — the token layer** (ORDER #11). Three degrees of not-active
+  (`--dim-rest` available / `--dim-off` out of play / `--drain` + `--drain-fx`
+  unavailable) and three kinds of ON, under one rule: **THE KIND OF CHOICE
+  PICKS THE DRESS, DOM ANCESTRY DOES NOT.** SWITCH (a bar cell turning a region
+  on — no ring, state carried by weight), PICK (choosing *is* the work — ivory
+  or steel, never gold; the default when you cannot tell), DIAL (changes the
+  whole table and stays changed — gold, the one family where gold is not the
+  roll verb). Nine copied dresses became one expression with thirteen greppable
+  one-line overrides. Proved mechanically rather than trusted: 1046 selectors,
+  none changed specificity; 1041 rule instances resolve byte-identical after
+  recursive `var()` substitution **including ancestor overrides** — the trap
+  being that `#left-panel` re-declares `--panel`/`--hair`/`--muted`, so a
+  `:root` alias of any of them would freeze the root value and silently stop
+  tracking the override with no symptom at the call site. UX §7.41.
+
+- **C25 Stage 2 + C14 — the record** (ORDER #5, #9). One object at two scales:
+  open, a row of rank panels in the log's head; closed, the same panels as a
+  three-pixel spine along the base of the ≣ — same order, same roller colours,
+  same held dress, so the collapse reads as one thing getting smaller. Clicking
+  a panel anchors its row and opens its card. C13's three facts land here:
+  **rank** renders, **waiting-on-you** is a gold tick a sighted player can see
+  (it was in an `aria-label` and nowhere else), and the ring that was "claimed
+  as the substitute and is not" lost the comment defending it. Plus `Find a
+  roll…` with the filter judging arrivals, the at-cap note for late joiners,
+  `Clear history` naming its scope, and the ≣'s **accessible name** written
+  every render. The felt strip Joe sketched was **refused with arithmetic** —
+  five panels across a 390px phone is 78px each — and the frames to overrule
+  that are `rec-phone-open.png` + `rec-five-open.png`. UX §7.42.
+
+- **C27 + C28 — framing and the spawn line** (ORDER #8, #10). C28 ①: the spawn
+  clamp asked the wrong axis, and **16 of 144 throws started a die through the
+  z-wall** — the standing claim that none did had only ever checked X. Fixed by
+  clamping illegal dice only, so every legal spawn stays bit-identical. C28 ②:
+  the deferred room change now flushes on the predicate rather than at a call
+  site, because there were **four** release paths, not the two named. C27
+  shipped as an **instrument, not a default** — every gain costs cropping the
+  felt where it currently fits, which is the mirror of the crop C27 already
+  priced and declined. `setFraming({preferDice:true})` is inert until Joe says
+  otherwise.
+
+- **§3 resync + C22 — the version stamp** (ORDER #13, #10). Resync needed **no
+  new wire field**: an entry with neither `collected` nor `cleared` is on the
+  felt, at most one can qualify, and riding the log inherits `projectEntryFor`
+  for free. Two real defects fell out — `replaySettledRoll` **dropped** the roll
+  when a playback was live, and since `hello` is one-shot a reconnect landing
+  mid-playback left the felt permanently short; and the client kept only half of
+  `joinSnapshot`'s promise, rendering the log and leaving the felt bare. C22
+  shipped as `js/schema.js` + one `ver: 'E.M.m'` string: an absent stamp loads
+  (never purges), a newer **major** refuses out loud **and locks the key**, and
+  the portable file carries `version:` as a *section* rather than a top-level
+  key, because field readers refuse an unknown top-level line but skip an
+  unknown section.
+
+- **§1 + §2l ⑤ + U17 — the die a pool discarded, and the ledger sheet**
+  (ORDER #12). A struck die is a **dress on `oc-chip`, not a fourth grammar** —
+  one bit changed, and this app already owns that dress for that bit. It is not
+  confusable with `oc-quiet` because the **answer slot** decides: quiet holds a
+  dash, struck holds the mechanic's word (`dropped` / `rerolled` / `not kept`).
+  Its word is **never computed** — a dropped d6 showing 5 is not a Success.
+  ✴ children get no reading of their own; the child's face rides its base die's
+  evidence (`d6 6 ✴3`), because a chart word for it would turn `1d6!` into a
+  two-die pool and move U18's crit denominator. Two things that would have
+  broken quietly, both pinned: `critCeremony`'s crit-capable denominator was
+  true only by omission, and `oc-solo` counted **chips**, so `1d20 adv` would
+  have silently dropped from a 26px verdict word to 15px. §2l ⑤ shipped the
+  typed session target with `placeAnchored` **extracted** rather than copied.
+  UX §7.43, §7.44.
+
+- **U25 + U26 + U28b — the seams a first table night runs into** (ORDER #14).
+  The log row says each pool once; the `rerolled` chip names the rerollER when
+  attribution flipped; the whisper sub-line names the leak it was describing
+  backwards; `Split table…`'s neighbour `Copy invite link` gained a Settings row
+  and key `i`; roster pills have a 76px floor; `publishPools` is disclosed on
+  both sides; the change note names the setting; an unnamed table stops wearing
+  its minted key; a counted rail row drops its die art on coarse.
+
+- **W7 ② + the frame gates** (ORDER #4). See the Tier W record below.
+
+- **L4 / CUJ5 — sub-tables** (ORDER #16). `POST /api/split`, a parent pointer
+  and a scoped in-memory directory, `↩ Main table` and `Breakouts ▾` in the
+  presence row, `Split table…` behind the chip. The child inherits
+  `felt·system·zoom·tower·venue` **as a copy, never a link** — the system
+  decides what a roll MEANS, so a breakout on the default reads a d20 under a
+  different rulebook; and a live link would make the child a satellite, which is
+  a role wearing a settings patch. It refuses the parent's *name* and the §G4
+  setup. A split **mints no room** — the child is created by the splitter's
+  ordinary `/api/join` under the same budget — so no new accounting; a
+  split-specific allowance would be strictly weaker, since joining is never
+  throttled and an attacker would mint a seat and spend the trusted budget from
+  inside it. UX §7.46.
+
+- **C4 — UX.md names its own next free section number.** §7's head now carries
+  a NEXT FREE line. It earned itself immediately: eight parallel passes claimed
+  §7.39–§7.46, **four of them first wrote themselves as §7.39** and two more
+  independently claimed §7.45. Every one of them read the line before writing —
+  they were reading eight different copies of it.
+
+## What the roadmap and the audits got WRONG, verified against the tree
+
+*This is the durable half. Every entry below was written from a reading that
+was true when it was made and had stopped being true — which is the failure the
+2026-08-14 cleanup was supposed to treat and clearly only half did.*
+
+| Claim | What is actually true |
+| --- | --- |
+| **C29: "no credential or config exposure, verified path by path"** | Two errors. There is **no MIME-based refusal anywhere** — `/Makefile`, `/README.md`, `/LICENSE` and `/docs/*.md` all returned **200 with their real bytes**. And the file it names as safe, `.deploy.config`, **does not exist**; the real one is `deploy/config.mk`, which has no dot-prefixed segment, so `safeResolve` waved it through — `GET /deploy/config.mk` returned 200 **with the billing account in the body**. Production was never exposed (`.gcloudignore` drops `deploy/`), but every local `node server.js` served it. |
+| **§0j / §0d F1: in-server rate limiting cannot work behind Cloud Run's proxy** | Stale. `clientAddr()` has parsed `X-Forwarded-For` leftmost for weeks and `handleClientError` already shipped a per-IP limiter keyed off it. The **real** objection, which the roadmap never stated, is that Cloud Run *appends* to client-supplied XFF, so the leftmost hop is forgeable — evadable by rotation and abusable to spend a victim's budget. That is why the in-server rule is soft and fails OPEN. |
+| **C12: "`⚄ Random` mints and persists on the tap, with no undo"** | False for the control since 2026-08-09 — and **true of `__diceDebug.chooseDealtProfile()`**, the hook a scenario would reach for. A test hook was doing the thing the control had been fixed not to do, and no scenario called it, so it never lied out loud. |
+| **C11: "no scenario ever clicks a real `.seat-btn`"** | False — `join-door` clicks real rows. The conclusion survives for a better reason: those are `el.click()`, which fires on a node no finger could reach, at a headless viewport where `(pointer: coarse)` does not match at all. The picker's coarse rules were never exercised and its geometry was never read. |
+| **Not in the roadmap at all** | **`&as=` had silently stopped pre-selecting anything.** §G5 documents it as "a highlight and a focus, so Enter takes it"; the highlight lived in a `#seat-list` loop retired 2026-08-09. A per-seat invite link was landing on a picker that pre-selected the player's *last-used* profile. |
+| **U23's evidence** | Two of three claims stale. The thirteen `:disabled` recipes are **nine**, collapsed by U6; the three `.rp-*`/`.seg` cascade ties are **zero**, closed by U9. The nine `[aria-pressed]` dresses across four families is **exactly right — but not the same nine**: U6 moved `.seg` out of gold into ivory and the count landed back on nine by coincidence. |
+| **§1: `/api/join` carrying `offers`** | Closed. `joinSnapshot` returns them and the comment above it records the fix in so many words. |
+| **§1: struck dice, "narrower than written"** | Narrower still: the gate is **one line in the system profile**, not the renderer — `js/meanings.js`'s `if (!p.counts \|\| p.child …) return`. `renderOutcomeRows` prints only what `outcomesFor` returns, so one line hid the struck die on the banner, the verdict hero and the peek at once. Also: `p.child` is **explosion only**, not reroll offspring. |
+| **U17's three residuals** | **All three false.** `modsSummary`'s `values` option landed in `68fdc7a` — *the very commit that wrote §7.24*, whose own message lists it under "three gaps the docs pass found in the build". The log's `?` total was fixed there too and is pinned by `held-roll`. Step 6's LOOK was done there. Both the ROADMAP entry and §7.24's own *Not closed* paragraph were written from the audit and never re-read against the diff beside them. |
+| **§3: "hello does not carry which logged rolls still sit on the table"** | False since `a7f1d89`. Three of §3's four bullets are **dead** post-C25: per-roll chips lifetime (`removeRollDice` takes the chips with the dice), per-roll landing zones (one roll on the felt), and ordered eviction (already server-ordered; `playRoll` carries the tombstone). |
+| **U20: "in `body.mini` the banner's top edge cuts into the peek"** | Not reproducible post-C25 — the card anchors to a log row now. In its place: on `body.mini` the **flyout sits over the banner** and covers it entirely. |
+| **U26's first bullet — CUJS.md's own "CUJ11's first item"** | Stale. `armAutoCollect` does not exist; §7.28 deleted the whole auto-collect clock on 2026-08-10, four days after the audit found it. **CUJ11's first item shipped by deletion before the journey was named.** |
+| **U25's `drive egw19x` example** | Never a production key. `tools/stage.mjs` mints `drive-<6 base36>` for the harness; production keys carry a 16-char tail. The defect was real; the evidence cited for it was a look frame of the test tooling. |
+| **U25: "`publishPools` broadcasts your entire rack"** | It broadcasts the whole profile **library** (C17). And there were **two** false sentences about pool transport, not one — the invite tooltip and Help's *Your data* said the same thing. |
+| **C28 ①'s preset table, and C24's mat table** | Both one notch stale. The ladder shifted out 2026-08-12: today `wide/medium/close` = **14.1 / 11 / 8.6**. C24's row labelled `medium` (8.6×5.2) is today's **`close`**, and its `close` (6.7×4.1) does not exist. C24's measurement and its instruction still bind; its labels do not. |
+| **C28 ②: "the ceremony path never flushes"** | Two paths named; there are **four** (`ceremonyFinish`, `clearTable`, `stepRevealing`'s last flip, `fastForwardPlayback`'s skip drain), three of them proven to fail with the fix backed out. |
+| **C28 ①: "widening the spread should reduce the frame-zero contact count"** | Refuted. `firstFrame` is 1.5–10.2 today and all three spread formulas sit inside each other's noise; the 280 contacts in `5a5a8ce` were pre-cap. |
+| **C27's residual "on a 390px phone"** | Not a phone problem: the option gains **0 px** at 390. The win is elsewhere — iPad-portrait 3d6 **119 → 242**, desktop 1600 3d6 200 → 245, and 40d6 gets **worse** (200 → 184). |
+| **W7 ②: "has not started"** | It shipped 2026-08-13 (`583b569`, `c67977f`) with `venue-set` claims. What had never happened was **frame-space verification or a LOOK**. |
+| **GOALS goal 14: "the thirteen rules"** | Fifteen. Rules 14 and 15 had both landed. GOALS wins ties, so a stale count there is worse than anywhere else. |
+| **§3b's blocker, and four line refs** | The throttle it names as owed **landed**. `initNet`, `dice.name.v1`, `MAX_ROOMS` and `renderSeatChoices` were all cited at line numbers that had moved. |
+| **POOL-ANALYSIS §6.1's two timings** | Do not reproduce, and their *ordering is impossible* — `poolBars` calls `spectrum`, yet the doc has it faster. Unwarmed-JIT noise, never measurements, in a document whose first rule is that every number is generated. |
+
+## Two findings about method, worth more than any single fix
+
+**A gate can certify the frame it was written to refuse.** Four measures that
+read like the obvious composition gates — whole-frame ink balance, staging-band
+balance, near-band ink share, footprint mass balance — all *pass* the W2c frame
+Joe rejected, and footprint mass says it was **better**, because a wide dim pond
+weighs the same as a small lit ring. A gate on any of them would have certified
+the rejected picture to three decimals in the exact language of the complaint.
+This is why rule 15 requires a composition gate to **fail the frame that was
+rejected** before it is allowed to pass anything.
+
+**The inversion the structural risk proposes should not be done.** `usesTotal`'s
+20 live reads are not one question but four: 8 ask whether a sum exists, 3
+whether an adjudication does, 6 are about arithmetic in a breakdown, and 2 run
+*before any roll exists*, so there is no entry to pass. A `readFor(entry)`
+supplier answers 11 and cannot touch 9 — shipping it would leave a boolean gate
+alive beside a supplier, which is worse than either. And §1's actual bug was the
+**inverse shape**: a supplier over-filtered and took four surfaces down in one
+line, invisible to a grep of the render sites. Inversion makes single-line
+multi-surface failures *more* likely and *harder* to locate. What is cheap is
+the pattern the two shipped call sites already use — `modsSummary(mods,
+{values})` and `attributionCards(…, {arithmetic})` take the answer from the
+caller and never query the system, at one line each.
