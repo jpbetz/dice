@@ -108,13 +108,30 @@ const revealSettled = (rollId) =>
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+//   device/coarse — applied BEFORE the first navigation, which is the whole
+//     reason they are options here rather than two lines in a scenario. The
+//     seat picker decides whether to raise the keyboard by asking
+//     `(pointer: coarse)` INSIDE promptName, at boot; a scenario that boots
+//     the tab and then turns touch emulation on has already missed the
+//     question it came to ask, and measures a panel laid out at the desktop
+//     width besides.
 async function bootTab(ctx, {
   origin = 'localhost', path = '/', clean = [], seed = {}, recordApi = false,
+  device = null, coarse = false,
   readyExpr, readyDesc,
 } = {}) {
   for (let attempt = 0; ; attempt++) {
     const page = await ctx.browser.newPage();
     await page.addInitScript('window.__diceTestMode = true;');
+    if (device) {
+      await ctx.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: device.w, height: device.h, deviceScaleFactor: 1, mobile: false },
+        page.sessionId);
+    }
+    if (coarse) {
+      await ctx.browser.send('Emulation.setTouchEmulationEnabled',
+        { enabled: true, maxTouchPoints: 5 }, page.sessionId);
+    }
     if (recordApi) {
       await page.addInitScript(`(() => {
         window.__apiCalls = [];
@@ -240,6 +257,23 @@ async function createTableFromLobby(t, tableName) {
     })()`);
   } catch { /* the context can die inside the click — that IS the navigation */ }
   return landedAtTable(t);
+}
+
+// A PRESS A FINGER COULD HAVE MADE (C11). `el.click()` fires a DOM event at a
+// node whatever its position — six CUJ7 scenarios stayed green with the seat
+// picker's rendered surface off the top of the screen, because a synthetic
+// click has no coordinates to be wrong. This drives the browser's real input
+// pipeline at a point in CLIENT space, which is the space `seatPickerBox`
+// reports and the space CDP takes, so no conversion can hide a miss: if the
+// coordinate is off-screen or something else is on top of it, nothing happens
+// and the scenario waits and fails. Same reason `Table.hover` exists.
+async function realTap(t, x, y) {
+  const at = { x: Math.round(x), y: Math.round(y), button: 'left', clickCount: 1 };
+  const send = (type, buttons) => t.page.browser.send(
+    'Input.dispatchMouseEvent', { type, ...at, buttons }, t.page.sessionId);
+  await send('mouseMoved', 0);
+  await send('mousePressed', 1);
+  await send('mouseReleased', 0);
 }
 
 // A portable file written BY HAND rather than by `exportYaml` — for the C15
@@ -15027,6 +15061,267 @@ export const scenarios = [
       assert.equal(
         JSON.parse(await t.eval(`localStorage.getItem('dice.profiles.v1')`)).profiles.length, 31,
         'and the key is now what the screen says it is');
+    },
+  },
+
+  // ---- C11 + C12 · the door, on the phone it is designed for -------------
+  //
+  // Six CUJ7 scenarios were green while `#name-panel` had no max-height and no
+  // overflow inside a centred flex overlay — because every seat act in the
+  // suite goes through a `__diceDebug` verb, and a verb cannot see that the
+  // top of the panel is off the top of the screen. `el.click()` cannot see it
+  // either: the DOM fires a click on a node no finger could reach. So the two
+  // scenarios below aim REAL `Input.dispatchMouseEvent` at coordinates the
+  // page itself reports, at a viewport a phone actually has.
+  {
+    name: 'seat-picker-reach',
+    tags: ['seat', 'prepared-seat', 'chrome', 'cuj3', 'cuj7'],
+    timeout: 150000,
+    // WHAT THIS CATCHES, in one number: `seatPickerBox.clippedTop`. A centred
+    // flex child taller than its container overflows in BOTH directions, and
+    // the TOP is the half with no scrollbar — so a returning player with a
+    // full library met a door whose name field and Join button were above the
+    // top of the screen with no gesture that brought them back. Measured at
+    // −182px before the fix. Every existing CUJ7 scenario passes in that
+    // state, because a verb does not have a position and `el.click()` does not
+    // need one.
+    //
+    // The 44px floor is the platform's number, not the 34 the seat rows had.
+    // And the keyboard is the player's to open: a coarse pointer must NOT find
+    // the field holding focus when the seats land, because the software
+    // keyboard halves the layout viewport in the same frame the panel grows.
+    async fn(ctx) {
+      // A prepared table, so a returning player meets the door at all.
+      const organizer = await ctx.rawPlayer('Organizer');
+      await ctx.api('/api/table', {
+        playerId: organizer.playerId,
+        rev: 1,
+        table: { tableName: 'Session 3' },
+        profiles: [{ name: 'Rill', pools: [{ name: 'Agility', notation: '2d8' }] }],
+      });
+
+      // A FULL LIBRARY. 32 is the ceiling and a person with two campaigns'
+      // worth of characters is exactly who meets the tallest version of this
+      // panel — which is the population the defect was invisible to.
+      const store = { v: 3, seq: 32, activeId: 'p1', profiles: [] };
+      for (let i = 1; i <= 32; i++) {
+        store.profiles.push({
+          id: `p${i}`, name: `Char ${i}`, system: 'soul-deal', at: 0,
+          pools: [{ id: 1, name: 'Body', notation: '2d6', category: 'Attributes' }],
+        });
+      }
+
+      for (const [w, h, why] of [
+        [390, 844, 'the phone the door is designed for'],
+        [720, 480, 'ROADMAP §2b’s sweep size, which never landed'],
+      ]) {
+        // Device metrics and the coarse pointer BEFORE the first navigation:
+        // promptName asks `(pointer: coarse)` at boot to decide whether to
+        // raise the keyboard, so a tab that turns touch on afterwards has
+        // already answered the question wrong.
+        const p = await bootTab(ctx, {
+          origin: '127.0.0.43',
+          path: `/?room=${encodeURIComponent(ctx.room)}&as=Rill`,
+          seed: { 'dice.name.v1': 'Returning', 'dice.profiles.v1': JSON.stringify(store) },
+          device: { w, h },
+          coarse: true,
+          readyExpr: `document.getElementById('name-modal')?.classList.contains('hidden') === false`,
+          readyDesc: `the door opens at ${w}x${h}`,
+        });
+        try {
+          // The picker re-renders when the peek lands; wait for the seats
+          // rather than for a frame count.
+          await p.waitFor(`window.__diceDebug.seatPicker.seats.length === 1`,
+            { desc: `the prepared seat reaches the door at ${w}x${h}` });
+          await p.waitFor(`window.__diceDebug.seatPickerBox.rows.length >= 33`,
+            { desc: `all 32 characters plus the offered seat are listed at ${w}x${h}` });
+
+          const box = await p.dbg('seatPickerBox');
+          assert.deepEqual(box.viewport, { w, h }, `measuring at ${w}x${h} (${why})`);
+          // THE ASSERTION. Pre-fix this is true, with panel.top around −182.
+          assert.equal(box.clippedTop, false,
+            `the top of the door is on screen at ${w}x${h} (panel.top ${box.panel.top})`);
+          assert.equal(box.scrolls, true,
+            'the overflow is a scroller, which is the half that has a gesture');
+          assert.ok(box.panel.top >= 0,
+            `and nothing above it is out of reach (top ${box.panel.top})`);
+
+          // The two controls a person must be able to touch to get in at all.
+          assert.equal(box.nameInput.hit, true,
+            `the name field is the topmost thing at its own centre (${JSON.stringify(box.nameInput)})`);
+          assert.equal(box.join.hit, true,
+            `and so is Join (${JSON.stringify(box.join)})`);
+          assert.equal(box.close.hit, true, 'and so is the way out');
+
+          // THE TOUCH FLOOR, on every row, at both sizes.
+          const short = box.rows.filter((r) => r.h < 44);
+          assert.deepEqual(short, [],
+            `every seat row clears the 44px floor at ${w}x${h} (short: ${JSON.stringify(short.map((r) => [r.name, r.h]))})`);
+
+          // THE KEYBOARD IS THE PLAYER'S TO OPEN.
+          assert.notEqual(box.focused, 'name-input',
+            'a coarse pointer does not have the door raise its keyboard for it');
+
+          // A REAL PRESS, at coordinates the page reported, on the row a finger
+          // would aim at. `el.click()` here proves nothing — it is the gesture
+          // that six green scenarios were using while this surface was broken.
+          const row = box.rows.find((r) => r.hit && r.kind === 'mine');
+          assert.ok(row, `some character row is actually touchable (${JSON.stringify(box.rows.slice(0, 3))})`);
+          await realTap(p, row.cx, row.cy);
+          await p.waitFor(
+            `(window.__diceDebug.seatPicker.profilePick || '') !== ''`,
+            { desc: `a real press on a real row marks it at ${w}x${h}` });
+          assert.equal(await p.dbg('seatPicker.open'), true,
+            'and marking is not joining — browsing a list must not seat you');
+        } finally {
+          await p.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, p.page.sessionId)
+            .catch(() => {});
+          await p.emulateCoarsePointer(false).catch(() => {});
+          await p.close();
+        }
+      }
+    },
+  },
+  {
+    name: 'seat-picker-dismiss',
+    tags: ['seat', 'prepared-seat', 'chrome', 'cuj3'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: `#name-modal` was the one blocking overlay with no
+    // rung in the Esc ladder, no ✕ and no cancel — you could not look at the
+    // table before committing to a seat at it. The fix has a failure mode
+    // sharper than the defect: dismissing resolves the prompt with `null`, and
+    // `null` through `setItem` persists the STRING "null" as this browser's
+    // display name for good. That is a permanent, silent corruption of the one
+    // key an origin has for who you are, and nothing on screen would show it —
+    // so it is asserted directly.
+    //
+    // A FOCUSED INPUT OWNS Esc (the global ladder returns early on `typing`),
+    // so the press is dispatched at the field, which on a fine pointer is
+    // where the focus already is. Escape from anywhere else is a weaker test.
+    async fn(ctx) {
+      const host = await ctx.newTable({ origin: '127.0.0.44', name: 'Host' });
+      const organizer = await ctx.rawPlayer('Organizer');
+      await ctx.api('/api/table', {
+        playerId: organizer.playerId,
+        rev: 1,
+        table: { tableName: 'Session 3' },
+        profiles: [{ name: 'Rill', pools: [{ name: 'Agility', notation: '2d8' }] }],
+      });
+      // The raw organizer holds a seat of its own, so the claim is that the
+      // roster does not GROW — a fixed count would be asserting how the
+      // fixture was built rather than what the dismissal did.
+      const seatedBefore = (await host.dbg('players')).length;
+
+      const p = await ctx.newTable({ origin: '127.0.0.45', anon: true, query: '&as=Rill' });
+      // By NAME, not by count: a seated player publishes their own library to
+      // the room and the peek offers those seats too, so a count here would be
+      // asserting how many characters the host happens to be carrying.
+      await p.waitFor(
+        `window.__diceDebug.seatPicker.seats.some((s) => s.name === 'Rill')`,
+        { desc: 'the door is up with the seat the link names' });
+      assert.equal(await p.dbg('seatPickerBox.focused'), 'name-input',
+        'a fine pointer keeps the focus — typing your name is the whole point of the field');
+
+      // Esc, from inside the field that owns it.
+      await p.eval(`document.getElementById('name-input').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`);
+      await p.waitFor(`window.__diceDebug.seatPicker.open === false`,
+        { desc: 'Escape inside the focused field closes the door' });
+      assert.equal(await p.dbg('seatPicker.declined'), true,
+        'and the app knows this is LOOKING, not joining — `open:false` alone cannot tell them apart');
+
+      // THE STRING "null" NEVER REACHES THE KEY.
+      const stored = await p.eval(`localStorage.getItem('dice.name.v1')`);
+      assert.notEqual(stored, 'null',
+        'the dismissal sentinel never becomes this browser’s display name');
+      assert.equal(stored, null, 'nothing was stored at all — you did not sit down');
+
+      // NOBODY AT THE TABLE WAS TOLD ANYONE CAME TO THE DOOR.
+      await sleep(500);
+      assert.equal((await host.dbg('players')).length, seatedBefore,
+        'the host’s roster never grew — looking is not arriving');
+      assert.equal(await p.dbg('net.playerId'), null, 'and no join was ever sent');
+
+      // …AND THE DOOR IS STILL OPEN. The way back is the presence row's own
+      // slot, which is where "what you can do about your presence" lives.
+      const row = await p.dbg('presenceRow');
+      assert.ok(row.ghosts.some((g) => g.label === 'Take a seat'),
+        `the way back in stands where you left it (got ${JSON.stringify(row.ghosts.map((g) => g.label))})`);
+      // And the felt is the player's own: a dismissed door leaves the same
+      // state a `?room=` with no server already lands in.
+      await p.roll('2d6');
+      assert.ok(await p.diceCount() > 0, 'they can still roll their own dice while they look');
+      await sleep(500);
+      assert.equal((await host.dbg('players')).length, seatedBefore,
+        'and rolling did not seat them either');
+    },
+  },
+  {
+    name: 'seat-picker-carries-pick',
+    tags: ['seat', 'prepared-seat', 'profiles', 'cuj7'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: 'Stay as ⟨name⟩' is the door U3 built for exactly the
+    // population an invite link is sent to — somebody who has used the app
+    // before — and it FORFEITED the character the link offered, silently, one
+    // line under a hint that says the link offers one. It called takeFreeSeat
+    // directly, and only promptName's own `submit` copies the pending pick
+    // across the join. And `&as=` had stopped pre-selecting anything at all:
+    // the highlight lived in a loop over the retired `#seat-list`.
+    //
+    // Both halves land in one place — the sub-label — so both are asserted
+    // through it: the link's seat is the default pick, the door SAYS which
+    // character is riding along, and pressing it puts that character in your
+    // hands under your own name.
+    async fn(ctx) {
+      const organizer = await ctx.rawPlayer('Organizer');
+      await ctx.api('/api/table', {
+        playerId: organizer.playerId,
+        rev: 1,
+        table: { tableName: 'Session 3' },
+        profiles: [
+          { name: 'Ada', pools: [{ name: 'Wit', notation: '3d6' }] },
+          { name: 'Bo', pools: [{ name: 'Agility', notation: '2d8' }] },
+        ],
+      });
+
+      const p = await ctx.newTable({
+        origin: '127.0.0.46', name: 'Joe', anon: true, query: '&as=Bo',
+      });
+      await p.waitFor(`window.__diceDebug.seatPicker.seats.length === 2`,
+        { desc: 'both prepared seats reach the door' });
+      const picker = await p.dbg('seatPicker');
+      assert.equal(picker.preselect, 'Bo', 'the link pre-selects the seat it names');
+      assert.equal(picker.profilePick, 'copy:Bo',
+        'and that is what the door is holding for you — pre-fix this is null');
+      assert.equal(picker.chosen, null, 'while nothing is taken for you');
+
+      // THE SUB-LABEL. The forfeit that used to be silent, said at the door.
+      assert.ok(picker.keepName, 'the returning player is offered their own name back');
+      assert.equal(picker.keepName.carries, 'with Bo',
+        `and the door says which character comes with it (got ${JSON.stringify(picker.keepName)})`);
+      assert.ok(picker.keepName.label.includes('Stay as Joe'),
+        `under the name they arrived with (got ${JSON.stringify(picker.keepName.label)})`);
+
+      // Pressing it: their own NAME, the link's CHARACTER. Pre-fix this lands
+      // as Joe with no Bo at all.
+      await p.eval(`document.getElementById('seat-keep-name').click()`);
+      await p.waitOnline();
+      // No preview on this door, deliberately: preview-then-apply guards a
+      // rack you RECEIVE without asking, and this player pressed a button
+      // whose own sub-label says which character is coming. The pick is
+      // settled once the roster is up, because the peek knows a character's
+      // name and pool COUNT and never its pools — the copy cannot be made
+      // until `hello` brings the real thing.
+      await p.waitFor(`(window.__diceDebug.profiles.active || {}).name === 'Bo'`,
+        { desc: 'the character the door named lands in their hands' });
+
+      assert.equal((await p.dbg('identity')).name, 'Joe',
+        'seated under the name they already use');
+      assert.deepEqual((await p.dbg('groups')).map((g) => g.notation), ['2d8'],
+        'holding the character the link offered');
+      const names = (await p.dbg('profiles.list')).map((x) => x.name);
+      assert.ok(names.includes('Bo'), `and it is theirs now (got ${JSON.stringify(names)})`);
+      assert.ok(names.length >= 2, 'beside whatever they already had — nothing was overwritten');
     },
   },
 ];
