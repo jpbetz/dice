@@ -8352,6 +8352,26 @@ function towerPortalsOf(id) {
   return DEFAULT_PORTALS;
 }
 
+// …AND WHERE THAT ANSWER CAME FROM. One function because two callers ask —
+// towerPortalSpec and the contract snapshot — and a provenance that disagreed
+// with itself would be worse than no provenance at all.
+//
+//   'probe'   the portal-floors override is armed, so NOTHING on this client
+//             is the shipped answer (towerProbeOverride). It comes first for
+//             that reason: the override wins over the row, so the label has to
+//             as well, or a probe run reads as a shipped measurement.
+//   'model'   read off a baked mesh and frozen onto the row.
+//   'row'     the registry states them outright.
+//   'default' this row declares none and got the classic core. A model whose
+//             portals silently failed to load reads 'default' here, which is
+//             the difference between a tower and a wall with dice behind it.
+function towerPortalSource(id) {
+  if (towerProbeOverride) return 'probe';
+  const row = TOWERS[id];
+  if (!row || !row.portals) return 'default';
+  return towerGlbUrls(row).length ? 'model' : 'row';
+}
+
 // ---------------------------------------------------------------------------
 // ONE ROW, POSSIBLY SEVERAL FILES (W3). Hollow Bole ships ONE geometry painted
 // in two palettes — moonrise and foxfire — and which one is standing is the
@@ -9109,6 +9129,64 @@ function pourPlan(dice, v, prng) {
     plan.push({ entryAt, start, rot0, av0, transit, exit, clunks });
   }
   return plan;
+}
+
+// ---------------------------------------------------------------------------
+// THE FILM, AS ONE NUMBER (__diceDebug.towerFilmDigest).
+//
+// The charter says a tower model is 100% cosmetic over invisible colliders and
+// portals, and that physics and the pour film are a function of (portal spec,
+// engine constants, seed) and NOTHING else. That is a claim somebody has to be
+// able to CHECK in one line, or every cosmetic edit costs a pour simulation and
+// an argument about whether the dice landed "the same". So: hash the inputs and
+// the drawn plan, and compare the number before and after.
+//
+// The seed and the pool are FIXED and shared so two digests are commensurable
+// by construction. The pool is one of each shipped type plus a repeat, because
+// half the exit arithmetic is radius-dependent (the graze height is surface +
+// r/cos θ) and a single-type pool would not notice a die-radius term moving.
+const TOWER_DIGEST_SEED = 0xd1ce;
+const TOWER_DIGEST_POOL = ['d20', 'd6', 'd4', 'd10', 'd10x', 'd12', 'd8', 'd20'];
+
+// Canonical text for a plain tree of numbers, strings, arrays and objects.
+// Keys are SORTED rather than trusted in insertion order: the digest's whole
+// job is to be identical across two runs of two builds, and an object literal's
+// key order is one careless edit away from moving without any value moving.
+//
+// The two escapes JSON.stringify would silently eat, both of which are real
+// answers here: NEGATIVE ZERO (`0 + dOutX` is -0 for a left-shifted door, and
+// -0 and 0 are different doubles that print the same) and NON-FINITE values (a
+// NaN in a volume is the single most important thing a digest could report, and
+// JSON turns it into `null`).
+function towerCanon(x) {
+  if (typeof x === 'number') {
+    if (!Number.isFinite(x)) return String(x);
+    return Object.is(x, -0) ? '-0' : String(x);
+  }
+  if (Array.isArray(x)) return `[${x.map(towerCanon).join(',')}]`;
+  if (x && typeof x === 'object') {
+    return `{${Object.keys(x).sort()
+      .map((k) => `${JSON.stringify(k)}:${towerCanon(x[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(x) ?? 'null';
+}
+
+// FNV-1a, 32 bits, hand-written because this app has no dependencies and is not
+// about to take one for nine lines of arithmetic. It does not need to be
+// cryptographic — nobody is attacking a dice tower — it needs to be STABLE
+// across clients and SENSITIVE to one moved double, and FNV-1a is both.
+//
+// Math.imul is load-bearing: a plain `*` by the 16777619 prime leaves the
+// int32 range within a few characters, the mantissa starts rounding, and the
+// "hash" quietly stops distinguishing inputs — a green check masking a broken
+// thing, in nine lines.
+function towerHash32(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
 }
 
 // Pour n dice through the contract. Seeded so a look can be repeated; every
@@ -9903,7 +9981,8 @@ window.__diceDebug = {
   // double; a toFixed(3) here would wave through exactly the 1e-9 drift that
   // an "algebraically equivalent" rearrangement produces.
   towerContractSnapshot() {
-    const v = towerVolumes(towerPortalsOf(currentTower));
+    const p = towerPortalsOf(currentTower);
+    const v = towerVolumes(p);
     const xyz = (a) => [a[0], a[1], a[2]];   // caps at three: no array grows here
     // The bodies as cannon holds them, not as towerBodies() rounds them —
     // this is the only place the collider set is read at contract precision,
@@ -9919,6 +9998,18 @@ window.__diceDebug = {
       };
     }) : null;
     return {
+      // THE QUESTION, BEFORE THE ANSWER. Every number below is
+      // `anchor ⊕ (spec − default)`, and a golden that froze the derived core
+      // without the spec froze an answer with its question missing: one
+      // despawn line is a classic tower AND a baked model whose portals
+      // silently failed to load and fell back to the classic core, and those
+      // are different bugs wearing identical volumes. `source` is what tells
+      // them apart (towerPortalSource).
+      portals: {
+        in: { x: p.in.x, z: p.in.z, rimY: p.in.rimY, clearR: p.in.clearR },
+        out: { x: p.out.x, sillY: p.out.sillY, w: p.out.w, clearH: p.out.clearH },
+      },
+      source: towerPortalSource(currentTower),
       z0: v.z0, S: v.S,
       socket: { c: xyz(v.socket.c), s: xyz(v.socket.s) },
       apron: { c: xyz(v.apron.c), s: xyz(v.apron.s), rx: v.apron.rx },
@@ -9940,7 +10031,89 @@ window.__diceDebug = {
         top: v.flight.top, bottom: v.flight.bottom,
         spawnY: v.flight.spawnY, capY: v.flight.capY, r: v.flight.r,
       },
+      // THE FILM'S OWN CONSTANTS (A1), and this was a hole big enough to drive
+      // every tower through. POUR decides the stagger, the hidden transit, the
+      // exit speed, the yaw and pitch fans, the lane, the baffle knocks and the
+      // re-bake budget — so an edit to any one of them moves EVERY tower's film
+      // on every seed. Exactly one field of it has ever escaped into a proof
+      // (hidZone, through towerPortalSpec), and the golden never held even
+      // that: the freeze could watch the volumes to the bit while the picture
+      // they carry moved underneath, and stay green. A snapshot of the room
+      // that omits the choreography is a green check over a moved picture,
+      // which is this project's dominant failure mode.
+      //
+      // Written out by hand like everything else here: the projection is the
+      // point, so a POUR field added tomorrow does not silently re-golden.
+      pour: {
+        stagMin: POUR.stagMin, stagMax: POUR.stagMax,
+        transitMin: POUR.transitMin, transitMax: POUR.transitMax,
+        exitGap: POUR.exitGap,
+        speedMin: POUR.speedMin, speedMax: POUR.speedMax,
+        yawSpan: POUR.yawSpan, pitchSpan: POUR.pitchSpan, laneSpan: POUR.laneSpan,
+        clunkMin: POUR.clunkMin, clunkMax: POUR.clunkMax,
+        attempts: POUR.attempts, hidZone: POUR.hidZone,
+      },
       bodies,
+    };
+  },
+  // THE FILM, AS ONE NUMBER (A1 — see towerCanon / towerHash32 above).
+  //
+  // Everything a pour is a function of, hashed: the resolved portal spec and
+  // its provenance, the volumes the engine derives from it, POUR, and the plan
+  // pourPlan actually draws at a FIXED seed for a FIXED pool. Two digests that
+  // agree are a proof that the film did not move; two that differ name the
+  // commit that moved it. That turns "I only changed the model" from a claim
+  // into a one-line assertion, which is the charter's whole point.
+  //
+  // WHAT IS DELIBERATELY NOT IN IT: v.cls (the model audit's classifier
+  // ladder) and v.smp (the occlusion sampler's grid). Both are proof
+  // scaffolding rather than film inputs, and a digest that cried wolf when a
+  // classifier threshold moved would be a digest people learn to re-baseline
+  // without reading.
+  //
+  // IT SOCKETS NOTHING and touches no body: it resolves portals for the id it
+  // is handed, derives volumes at the CURRENT mat, and draws a plan. So it is
+  // safe to ask about a tower that is not standing — but z0 moves with the zoom
+  // preset AND with whether any tower is socketed at all, so two digests are
+  // comparable only when taken in the same room. That is stated rather than
+  // defended against: pinning a mat in here would make the number a lie about
+  // the table it was asked on. `z0` comes back with it so a mismatched pair is
+  // recognisable as one.
+  towerFilmDigest(id = currentTower, seed = TOWER_DIGEST_SEED) {
+    // 'none' is null, for towerPortalSpec's reason: there is no tower, so there
+    // is no film, and handing back the classic core's digest would invite
+    // somebody to treat the towerless table as a tower that happens to be
+    // invisible. The FIRST LAW is that 'none' is not a mode.
+    if (!TOWERS[id] || id === 'none') return null;
+    const portals = towerPortalsOf(id);
+    const vol = towerVolumes(portals);
+    delete vol.cls;   // proof scaffolding, not a film input (see above)
+    delete vol.smp;
+    const plan = pourPlan(TOWER_DIGEST_POOL.map((type) => ({ type })), vol,
+      mulberry32(seed >>> 0));
+    // THE ID AND THE PROVENANCE ARE NOT HASHED, and that is the charter in one
+    // decision. Renaming a tower is a cosmetic act; if the id were an input,
+    // renaming one would "move the film" and the digest would be measuring
+    // labels. What IS hashed is exactly the charter's triple — the portal spec,
+    // the engine constants (the volumes derived from that spec, and POUR), and
+    // the seed — so two towers declaring identical portals get identical
+    // digests, which is TRUE: they deliver identical films. Heartwood and
+    // Bastion agreeing here is the proof working, not a bug in it.
+    const canon = towerCanon({
+      seed: seed >>> 0, pool: TOWER_DIGEST_POOL, portals, vol, pour: POUR, plan,
+    });
+    return {
+      // Alongside, never inside: what was asked, and where its spec came from,
+      // so a differing pair can be diagnosed without re-deriving anything.
+      id, source: towerPortalSource(id), seed: seed >>> 0, z0: vol.z0,
+      digest: towerHash32(canon),
+      // A SECOND, INDEPENDENT WIDTH. A 32-bit hash has collisions and this one
+      // will be read as a pass/fail by tools that never look further, so the
+      // canonical form's length rides along: two different films agreeing on
+      // both a 32-bit hash and a byte count is not a thing to plan around, and
+      // `bytes` also moves when a field is ADDED to the digest's inputs, which
+      // a hash comparison alone would report as an ordinary difference.
+      bytes: canon.length,
     };
   },
   // The registry as the picker sees it, so a scenario can assert the chips
@@ -10683,11 +10856,9 @@ window.__diceDebug = {
   // against: ask what your portals are, ask where the engine put the door sill
   // and the despawn line as a result, and check both against the limits.
   //
-  // `source` is the honest provenance and it is not decoration — 'default'
-  // means this row declares no portals and got the classic core, 'row' means
-  // the registry states them, 'model' means they came off a baked mesh. A
-  // model whose portals silently failed to load reads 'default' here, which is
-  // the difference between a tower and a wall with dice behind it.
+  // `source` is the honest provenance and it is not decoration — see
+  // towerPortalSource, which the contract snapshot asks the same question of
+  // so the two can never give different answers about one resolution.
   //
   // 'none' is null: there is no tower, so there are no portals, and returning
   // the classic core for it would invite somebody to treat the towerless table
@@ -10704,7 +10875,7 @@ window.__diceDebug = {
     const v = towerVolumes(portals);
     return {
       id,
-      source: row.portals ? (towerGlbUrls(row).length ? 'model' : 'row') : 'default',
+      source: towerPortalSource(id),
       portals,
       limits: TOWER_PORTAL_LIMITS,
       derived: {
