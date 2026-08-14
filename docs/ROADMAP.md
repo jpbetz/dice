@@ -3088,18 +3088,32 @@ mesh-only change. Rounds 2–4 of the lock (harness surgery, descriptor
 purge, docs/skills) are sequenced separately; T3 and T4 below are their
 first two items, recorded here because this file is the durable copy.
 
-### T1. `TABLE_D` drifts a float on every tower swap — CORRECTNESS, small
+### T1. `TABLE_D` drifts a float on every tower swap — FIXED 2026-08-13
 Found by the occlusion probe, not by a failing test. `towerDeepenMat(+4.5)`
-followed by `(−4.5)` does not return: z0 goes −6.55 → −6.550000000000001,
-once per swap, and `towerSocket` does this on every change of tower. z0 is
-the anchor every volume, collider and keyframe hangs off, so two clients
-with different socket histories can bake one seed into two films — goal
-15's exact failure. `applyZoom` re-assigns `TABLE_D` from the preset, which
-is why nothing has shown in the field. Fix shape: make the deepening
-ABSOLUTE (preset depth + socket extra + lab extra) rather than incremental.
-Red check: swap towers N times on one client and none on another, compare
-`towerFilmDigest` — it must be the same hash and today is not guaranteed to
-be.
+followed by `(−4.5)` did not return: at 'medium' the mat came back
+6.699999999999999, one ulp low, once per unsocket. z0 is −TABLE_D/2 and z0 is
+the anchor every volume, collider and keyframe hangs off, so two clients with
+different socket histories could bake one seed against interiors differing in
+the last bit — goal 15's exact failure, hidden because `applyZoom` re-assigns
+`TABLE_D` from the preset and every ONLINE client takes a zoom at hello.
+
+Fixed as designed: depth is a SUM of named layers (`MAT_DEPTH` = base + socket
++ lab), re-derived by `towerMatDepth(layer, extra)`, which takes what a layer
+IS rather than how much to add. Putting a layer away restores the base
+exactly, and the sum's fixed order means a room reached by different routes is
+the same double either way. It also closed a second hole for free: the LAB
+used to undeepen by whatever its dial said later, so moving the dial
+mid-session left the mat permanently off by the difference.
+
+Two witnesses, both pre-existing and both moved from documenting the bug to
+refusing it: `tower-glb-loader`'s restoration assertion was literally
+`assert.equal(downExtents.d, 6.7 + 4.5 - 4.5)` — the hardest tab in the suite
+(four towers, two tower→tower swaps, a lab cycle nested inside a socketed
+tower) — and is now `deepEqual` against the preset; and
+`tower-contract-freeze` went RED on `medium.none` and `close.none`. That
+re-capture is the deliberate kind: 13 fields moved, every one of them by
+exactly one ulp (max 8.9e-16), no field added or dropped, and every new value
+is the exact preset-derived number.
 
 ### T2. The doorway ignores the portal it belongs to — small, DECIDE FIRST
 `doorL`/`doorR`/`lintel` are built centred at x=0 while the apron, lip and

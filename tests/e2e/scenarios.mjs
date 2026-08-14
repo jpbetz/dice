@@ -10687,38 +10687,39 @@ export const scenarios = [
       await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'the tower comes down' });
       await a.dbg('clearTable()');
       await a.dbg('sim(400)');
+      // THE MAT COMES BACK TO THE PRESET ON THE SAME DOUBLE (T1), and this is
+      // where that stopped being a hope.
+      //
+      // The deepening used to be `TABLE_D += extra` up and `TABLE_D += -extra`
+      // down, and at this preset that round trip is not the identity:
+      // 6.7 + 4.5 - 4.5 === 6.699999999999999, one ulp low. (Measured for all
+      // three presets — 'wide' happens to be exact, 'medium' and 'close' each
+      // lose a bit.) No tower scenario had ever seen it because they all run
+      // ONLINE, where the server's settings default is zoom 'wide'
+      // (server.js:365) and hello reassigns TABLE_D from the preset before
+      // anything sockets; this scenario is solo, stands at the client default
+      // 'medium', and is the first thing in the suite to unsocket there.
+      //
+      // It mattered because z0 = -TABLE_D/2 anchors every collider the film is
+      // baked against: two clients in one room at 'medium', one of whom had
+      // raised and lowered a tower, could bake one seed against interiors
+      // differing in the last bit — goal 15's exact failure, hidden behind a
+      // default. Depth is now a SUM of layers, re-derived (MAT_DEPTH /
+      // towerMatDepth), so putting a layer away restores the base rather than
+      // subtracting its way back to somewhere near it.
+      //
+      // deepEqual, deliberately: this assertion was `6.7 + 4.5 - 4.5` and went
+      // RED on the fix, which is the red check for it. This tab is the hardest
+      // case in the suite to survive — it moved the mat a dozen times (four
+      // towers, two tower→tower swaps, and a LAB cycle nested INSIDE a
+      // socketed tower, which is the only place two layers are ever up at
+      // once), and it lands on the preset exactly.
       const downExtents = await a.dbg('tableExtents()');
-      assert.equal(downExtents.w, wasExtents.w, 'width is untouched; only depth ever pays');
-      // NOT deepEqual, AND THAT IS A FINDING RATHER THAN A CONCESSION.
-      //
-      // towerDeepenMat is `TABLE_D += extra` up and `TABLE_D += -extra` down,
-      // and at this preset that round trip is not the identity: 6.7 + 4.5 -
-      // 4.5 === 6.699999999999999, one ulp low. Measured for all three
-      // presets — wide (8.6) is EXACT, medium (6.7) and close (5.2) each lose
-      // one ulp — which is precisely why no tower scenario has ever seen it:
-      // they all run ONLINE, and the server's settings default is zoom 'wide'
-      // (server.js:365), so hello reassigns TABLE_D from the preset before
-      // anything sockets. This scenario is solo, so it stands at the client
-      // default 'medium' and is the first thing in the suite to unsocket
-      // there.
-      //
-      // It matters because z0 = -TABLE_D/2 and z0 anchors every collider the
-      // film is baked against — so two clients in one room at 'medium', one
-      // of whom has raised and lowered a tower, can compute the same seed
-      // against interiors that differ in the last bit. Out of scope here (the
-      // arithmetic is towerDeepenMat's, not the loader's) and filed; what this
-      // scenario CAN prove is the part that decides how bad it is:
-      const drift = Math.abs(downExtents.d - wasExtents.d);
-      assert.ok(drift < 1e-12,
-        `the mat is the preset again to within a rounding (off by ${drift})`);
-      assert.equal(downExtents.d, 6.7 + 4.5 - 4.5,
-        `and the error is EXACTLY one up-and-down of matExtra — SATURATED, not `
-        + `cumulative. This tab moved the mat a dozen times (four towers, two `
-        + `tower→tower swaps, and a LAB cycle nested inside a socketed tower), `
-        + `and 6.699999999999999 + 4.5 - 4.5 maps to itself: the drift is a fixed `
-        + `point, not a ratchet. Were it cumulative, the mat would walk further `
-        + `from the preset every time a player changed their mind about a tower, `
-        + `and that would be a different and much worse bug than the one here.`);
+      assert.deepEqual(downExtents, wasExtents,
+        `the mat is the preset again, to the bit — width and depth `
+        + `(${JSON.stringify(downExtents)} vs ${JSON.stringify(wasExtents)})`);
+      assert.equal(downExtents.d, 6.7,
+        'and it is the literal preset depth, not a value that merely rounds to it');
       const downWorld = await a.dbg('worldBodies()');
       assert.deepEqual(downWorld.named, [], 'not one collider left in the WORLD');
       assert.equal(downWorld.count, wasWorld.count,

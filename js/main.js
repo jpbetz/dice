@@ -80,7 +80,26 @@ const IN_LOBBY = ROOM === null;
 // are DEFAULT_ZOOM's preset and must move with it; ZOOM_PRESETS owns them all, and
 // applyZoom mutates these + the wall body positions in place.
 let TABLE_W = 11;            // playable width (x) — the DEFAULT ('medium')
-let TABLE_D = 6.7;           // playable depth (z)
+let TABLE_D = 6.7;           // playable depth (z) — DERIVED; see MAT_DEPTH
+// THE MAT'S DEPTH IS A SUM OF LAYERS, RE-DERIVED — NEVER ACCUMULATED (T1).
+// A tower brings its own mat with it (TOWER_MAT_EXTRA) and so does the lab
+// bench, and both used to be applied as `TABLE_D += extra` and taken back as
+// `TABLE_D -= extra`. That round trip is not the identity in floating point:
+// at the 'medium' preset 6.7 + 4.5 − 4.5 is 6.699999999999999, one ulp low
+// (measured for all three presets — 'wide' happens to be exact, 'medium' and
+// 'close' each lose a bit). z0 is −TABLE_D/2 and z0 anchors every volume,
+// every collider and every keyframe of the film, so two clients in one room —
+// one of whom raised and lowered a tower — could bake one seed against
+// interiors that differ in the last bit. That is goal 15's exact failure, and
+// nothing had caught it because every online client is reassigned TABLE_D from
+// the zoom preset at hello, which washes the drift out before it can be seen.
+//
+// So depth is a FUNCTION of which layers are up, summed in a fixed order:
+// arriving at a state can no longer depend on the route taken to it. Socketing
+// is `base + extra + 0` (bit-equal to what the accumulator produced going UP —
+// `x + 0.0` is `x`), and unsocketing is `base + 0 + 0`, which is base itself
+// rather than base ± an ulp. towerMatDepth() is the only writer.
+const MAT_DEPTH = { base: TABLE_D, socket: 0, lab: 0 };
 // Zoom picker labels — declared here (not next to renderZoomPicker) because
 // setSound() → syncSettingsUI() → renderZoomPicker() runs during module
 // evaluation, and the picker's early build must not read this in TDZ.
@@ -8057,7 +8076,7 @@ const TOWER_DIE_R = 1.25;
 // reads this constant and the lab override lives in towerLabVolumes().
 const TOWER_LIP_TILT = 0.1;
 // THE MAT THE TOWER BRINGS WITH IT, frozen as the SHIPPED number for exactly
-// the reason lipTilt was. Socketing deepens the mat by this (towerDeepenMat),
+// the reason lipTilt was. Socketing deepens the mat by this (towerMatDepth),
 // which moves TABLE_D and therefore z0 — and z0 is the anchor EVERY volume,
 // every collider and every frame of the film hangs off. The shipped socket read
 // TOWERLAB.tune.matExtra until now, so docs/TOWER.md:284's carve-out ("the
@@ -8933,11 +8952,11 @@ function towerLabWorld() {
 // the lab is on, YOUR client's walls are deeper for real rolls too — do
 // not use the lab on a shared table (the eventual feature makes this a
 // room setting so every client agrees).
-// (The deepening itself is towerDeepenMat, shared with the shipped socket.)
+// (The deepening itself is towerMatDepth, shared with the shipped socket.)
 
 function towerLabSet(on = true) {
   if (on && !TOWERLAB.on) {
-    towerDeepenMat(TOWERLAB.tune.matExtra);
+    towerMatDepth('lab', TOWERLAB.tune.matExtra);
     TOWERLAB.group = towerLabBuild();
     scene.add(TOWERLAB.group);
     TOWERLAB.world = towerLabWorld();
@@ -8948,7 +8967,7 @@ function towerLabSet(on = true) {
     TOWERLAB.group = null;
     TOWERLAB.world = null;
     TOWERLAB.on = false;
-    towerDeepenMat(-TOWERLAB.tune.matExtra);
+    towerMatDepth('lab', 0);
   }
   return TOWERLAB.on;
 }
@@ -9045,13 +9064,28 @@ function impactVoice(s, fxSet) {
 // the tray band eats ~4 units of mat depth, so a tower DEEPENS the mat by
 // matExtra — walls, shadow frustum and camera framing all follow, exactly
 // like a zoom — and unsocketing restores the preset.
-function towerDeepenMat(extra) {
-  TABLE_D += extra;
+//
+// ONE LAYER AT A TIME, AND THE DEPTH IS RE-DERIVED (see MAT_DEPTH). A caller
+// says what a layer IS now ('socket' is 4.5, or it is 0), never how much to
+// add — so putting a layer away restores the preset exactly instead of
+// subtracting its way back to one ulp below it, and the depth no longer
+// depends on the order the layers went up in. It also closes a second hole the
+// socket path had already been fixed for by hand: the lab used to undeepen by
+// whatever `TOWERLAB.tune.matExtra` said LATER, so moving the dial mid-session
+// left the mat permanently off by the difference. There is no subtraction to
+// get wrong now.
+function towerMatDepth(layer, extra) {
+  MAT_DEPTH[layer] = extra;
+  TABLE_D = towerMatSum();
   towerPlaceBackWall();
   walls.front.position.set(0, 0, TABLE_D / 2);
   updateShadowFrustum();
   refitView();
 }
+
+// The sum, in ONE fixed order, so a room reached by different routes is the
+// same double either way. applyZoom reads it too (a preset moves `base`).
+function towerMatSum() { return MAT_DEPTH.base + MAT_DEPTH.socket + MAT_DEPTH.lab; }
 
 // The back wall plane is MOVED, never removed (the SAP body-order rule at
 // `walls`): while a tower is socketed the doorway boxes are the back of the
@@ -9173,7 +9207,7 @@ function towerSocket(id) {
     // much as determinism: a socket that deepened by a dial and undeepened by
     // whatever the dial says LATER leaves TABLE_D permanently off by the
     // difference, and every volume in the room with it.
-    towerDeepenMat(-TOWER_MAT_EXTRA); // restores the back wall plane too
+    towerMatDepth('socket', 0); // restores the back wall plane too
   }
   TOWER_SWAP.mid = world.bodies.length;
   currentTower = spec.id;
@@ -9181,7 +9215,7 @@ function towerSocket(id) {
     // Order matters: deepen FIRST so towerVolumes() reads the socketed z0,
     // then build against it.
     towerRig = { id: spec.id, group: null, bodies: [], cm: null };
-    towerDeepenMat(TOWER_MAT_EXTRA);
+    towerMatDepth('socket', TOWER_MAT_EXTRA);
     const v = towerVolumes(towerPortalsOf(spec.id));
     const rig = towerColliders(world, v);
     towerRig.bodies = rig.bodies;
@@ -10833,7 +10867,7 @@ window.__diceDebug = {
     }
     if (id) towerLabSkin(id);
     // THE BENCH IS NOT OURS TO KEEP (A6 BLOCKER). towerLabSet(true) deepens the
-    // mat by matExtra — the SAME towerDeepenMat the shipped socket uses — and
+    // mat by matExtra — the SAME towerMatDepth the shipped socket uses — and
     // this probe used to turn it on and walk away. Over a standing tower that
     // is a room deepened twice and never given back: TABLE_D +4.5, z0 moved
     // 2.25 under a set of colliders that were built against the old one, and
@@ -18298,7 +18332,12 @@ function applyZoom(level) {
   if (socketed !== 'none') towerSocket('none');
   if (towerWasOn) towerLabSet(false);
   TABLE_W = p.w;
-  TABLE_D = p.d;
+  // The preset is the mat's BASE layer, not the mat: the unsocket above has
+  // already put the tower's and the lab's layers away, so this is `p.d + 0 + 0`
+  // — but writing it as a layer keeps the invariant true no matter what a
+  // future caller has standing (see MAT_DEPTH).
+  MAT_DEPTH.base = p.d;
+  TABLE_D = towerMatSum();
   // Move the wall bodies in place (no remove/add — SAP body-order matters).
   walls.back.position.set(0, 0, -TABLE_D / 2);
   walls.front.position.set(0, 0,  TABLE_D / 2);
