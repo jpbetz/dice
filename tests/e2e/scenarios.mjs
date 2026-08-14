@@ -15948,4 +15948,309 @@ export const scenarios = [
         + 'so the eye may never come closer than the zoom says');
     },
   },
+
+  // ---- §3 · table resync, and C22 · the version stamp --------------------
+  //
+  // Goal 8's claim about the table is "the same dice at the same poses", and
+  // until `feltPoses()` existed nothing could say the second half: one hook
+  // answered identity, another answered deltas from a per-client archive pose.
+  // A resync that rebuilt the right dice in the wrong places would have passed
+  // every scenario in the file.
+  {
+    name: 'resync-felt-poses',
+    tags: ['resync', 'roll', 'cuj8'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: `/api/join`'s response and the SSE `hello` carry the
+    // identical room shape on purpose, and until §3 landed only hello acted on
+    // it — the join path rendered the log and left the FELT BARE. So the
+    // server's promise that the two doors show the same table was true on the
+    // wire and false in the app, and a reloading player came back to an empty
+    // mat while everyone else was still looking at dice.
+    //
+    // The comparison is on quantised poses as STRINGS, because that is the form
+    // two clients can actually compare: a settled replay and a watched throw
+    // have to land on the same numbers or the resync is decorative.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.64', name: 'Ada' });
+      const b = await tableTab(ctx, { origin: '127.0.0.65', seed: { 'dice.name.v1': 'Bram' } });
+      await b.waitOnline();
+
+      await a.roll('3d6 # On the felt');
+      const rid = await a.rollId();
+      await a.settle();
+      await b.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 3
+        && !window.__diceDebug.busy)`, { desc: 'Bram watched it land' });
+      const watched = await a.dbg('feltPoses()');
+      assert.equal(watched.length, 3, 'three dice on the felt');
+      assert.equal(JSON.stringify(await b.dbg('feltPoses()')), JSON.stringify(watched),
+        'the two who watched it agree first — the baseline, before anything reloads');
+
+      // The reload. Same tab, same browsing context, exactly as F5 is.
+      await b.reload();
+      await b.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.tableDice.length === 3
+        && !window.__diceDebug.busy)`, { desc: 'the felt comes back' });
+      await b.settle();
+
+      const rebuilt = await b.dbg('feltPoses()');
+      assert.equal(JSON.stringify(rebuilt), JSON.stringify(watched),
+        'a rebuilt felt is byte-identical to the watched one — same dice, same poses');
+      assert.equal(rebuilt[0].rollId, rid, 'and it is the same roll');
+      assert.equal(await b.logCount(), 1, 'with the log it belongs to');
+      assert.equal(await a.logTop(), await b.logTop(), 'reading the same line as everyone else');
+    },
+  },
+  {
+    name: 'resync-hello-mid-playback',
+    tags: ['resync', 'roll', 'cuj8'],
+    timeout: 150000,
+    // WHAT THIS CATCHES, and it is the sharpest bug in §3: `replaySettledRoll`
+    // used to `return` when a playback was live. hello is a ONE-SHOT and
+    // nothing re-sends it, so a stream blip that reconnected while an older
+    // roll was still playing left that client's felt PERMANENTLY short of the
+    // roll everyone else was looking at — until somebody rolled again. It is
+    // reachable on any table with a flaky proxy: the reconnect backoff is 1 s
+    // and a playback runs about four.
+    //
+    // The instant matters and a real reconnect only reaches it by luck, so the
+    // event is delivered by hand through the same door net.js uses. The local
+    // playback that makes the stage busy goes through `playRoll` rather than a
+    // roll: a roll would post to the server, and the server's auto-collect
+    // would then make the held roll STALE, which is a different (and also
+    // correct) outcome — this scenario is about the case where the room has
+    // not moved on.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.66', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.67', name: 'Bram' });
+
+      await a.roll('3d6 # Still on the felt');
+      const rid = await a.rollId();
+      await a.settle();
+      await b.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 3
+        && !window.__diceDebug.busy)`, { desc: 'Bram sees it' });
+      const truth = JSON.stringify(await a.dbg('feltPoses()'));
+
+      // The snapshot the room would hand a reconnecting client right now.
+      const joined = await ctx.api('/api/join', { name: 'Witness' });
+      assert.equal(joined.ok, true, 'a bare client can ask the room what it holds');
+      const snap = JSON.stringify(joined.data);
+      assert.ok(joined.data.log.some((r) => r.rollId === rid),
+        'and the on-felt roll is in it');
+
+      // Bram loses the roll — the aftermath of a blip — and is mid-playback of
+      // something else at the moment the reconnect lands. Both in ONE eval, so
+      // nothing can arrive on the stream between them.
+      await b.eval(`(() => {
+        const d = window.__diceDebug;
+        d.clearTable();
+        d.playRoll({ dice: ['d6'], values: [4], seed: 99, label: 'local' });
+        d.netEvent('hello', ${snap});
+      })()`);
+
+      // HELD, NOT DROPPED. Pre-fix `held` is null here and the felt below
+      // never comes back.
+      const info = await b.dbg('idleReplayInfo');
+      assert.equal(info.held, rid,
+        `the arriving roll is stashed rather than thrown away (got ${JSON.stringify(info)})`);
+      assert.equal(info.armed, true, 'with a deadline to re-attempt it on');
+      assert.equal(await b.dbg('busy'), true, 'because the stage was busy at that instant');
+
+      // …AND IT LANDS. A poll, not a completion hook, deliberately: a roll
+      // finishes down two paths and a hook on one of them is the half-fix that
+      // passes its own test.
+      await b.waitFor(`(window.__diceDebug.sim(240), !window.__diceDebug.busy
+        && window.__diceDebug.idleReplayInfo.held === null
+        && window.__diceDebug.tableDice.some((d) => d.rollId === ${JSON.stringify(rid)}))`,
+      { desc: 'the stashed roll is rebuilt once the stage clears' });
+      await b.settle();
+      const felt = await b.dbg('feltPoses()');
+      const mine = felt.filter((d) => d.rollId === rid);
+      assert.equal(mine.length, 3, 'all three dice came back');
+      assert.equal(JSON.stringify(mine), truth,
+        'at the poses everyone else is looking at — a rebuild, not a re-throw');
+    },
+  },
+  {
+    name: 'resync-idempotent',
+    tags: ['resync', 'roll', 'cuj8'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: hello fires on EVERY stream (re)open, and `/api/join`
+    // answers the same shape, so the resync runs more than once against state
+    // the client already holds. Every step of it has to no-op — otherwise a
+    // reconnect doubles the felt, or re-collects a roll, or re-appends the log.
+    // Idempotence is the property that lets both doors call it and lets them
+    // arrive in either order; it is asserted by doing it twice and diffing
+    // everything the client can be asked about.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.68', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.69', name: 'Bram' });
+      await a.roll('2d6 # Kept');
+      const kept = await a.rollId();
+      await a.dbg(`collectRoll(${JSON.stringify(kept)})`);
+      await a.roll('3d8 # Standing');
+      await a.settle();
+      await b.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.tableDice.length === 3
+        && window.__diceDebug.record.ranks.length === 1 && !window.__diceDebug.busy)`,
+      { desc: 'Bram holds one put away and one standing' });
+
+      const joined = await ctx.api('/api/join', { name: 'Witness' });
+      const snap = JSON.stringify(joined.data);
+      const state = async (t) => JSON.stringify({
+        felt: await t.dbg('feltPoses()'),
+        log: await t.logCount(),
+        ranks: (await t.dbg('record')).ranks.map((r) => r.rollId),
+        onTable: await t.dbg('onTable'),
+      });
+
+      const before = await state(b);
+      await b.eval(`window.__diceDebug.netEvent('hello', ${snap})`);
+      await b.settle();
+      const once = await state(b);
+      assert.equal(once, before, 'feeding the room’s own snapshot back changes nothing');
+      await b.eval(`window.__diceDebug.netEvent('hello', ${snap})`);
+      await b.settle();
+      assert.equal(await state(b), once, 'and feeding it a second time changes nothing either');
+      assert.equal(await b.dbg('tableDice.length'), 3,
+        'three dice, not six — the felt did not double');
+      assert.equal(await a.logCount(), await b.logCount(),
+        'and the log is still the one the room agrees on');
+    },
+  },
+  {
+    name: 'resync-shrouded-reload',
+    tags: ['resync', 'visibility', 'cuj10'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: a rebuild is a second chance to leak. The felt is
+    // reconstructed from the projected log, and a bystander's projection of a
+    // held roll carries no values at all — so if the rebuild ever reached for
+    // the real faces (to place the dice "correctly", say), goal 11 would fail
+    // on exactly the path nobody watches, and only after a refresh.
+    //
+    // `values === [null, null]` rather than a truthiness check: an array of two
+    // nulls and an empty array both read as "no values", and only one of them
+    // is a die the player can see sitting face down.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.70', name: 'Ada' });
+      const b = await tableTab(ctx, { origin: '127.0.0.71', seed: { 'dice.name.v1': 'Bram' } });
+      await b.waitOnline();
+
+      await a.roll('2d6 held # Behind the screen');
+      const held = await a.rollId();
+      await b.waitFor(shroudSettled(held, 2), { desc: 'the shroud lands for Bram' });
+
+      await b.reload();
+      await b.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.shroudedCount === 2
+        && !window.__diceDebug.busy)`, { desc: 'the shrouded roll is rebuilt' });
+      const s = await b.entryState(held);
+      assert.equal(s.hidden, true, 'still hidden after a refresh');
+      assert.deepEqual(s.values, [null, null],
+        `two dice, neither of them readable (got ${JSON.stringify(s.values)})`);
+      assert.equal(s.total, null, 'and no total came back with them');
+      assert.equal(s.canReveal, false, 'nor any authority to open it');
+      // Chips are quiet by default (P1), so the visible channel is opted into
+      // here — the claim is what it SAYS when it is on, and a rebuilt tab must
+      // not be the one place it says a number.
+      await b.dbg('setChipsVisible(true)');
+      await b.dbg('sim(120)');
+      assert.deepEqual(await b.chips(), ['?', '?'], 'the chips over the dice still read ?');
+      assert.equal(await b.dbg('tableDice.length'), 2, 'while the dice themselves are on his felt');
+
+      // And the reveal reaches the rebuilt client, which is the other half of
+      // the same claim: the rebuild left it upgradeable rather than inert.
+      await a.dbg(`reveal(${JSON.stringify(held)})`);
+      await b.waitFor(revealSettled(held), { desc: 'the reveal reaches the rebuilt tab' });
+      const after = await b.entryState(held);
+      assert.equal(after.hidden, false, 'now it is readable');
+      assert.equal(after.values.filter((v) => typeof v === 'number').length, 2,
+        'with both faces');
+      assert.deepEqual(after, await a.entryState(held), 'and both tabs hold the identical entry');
+    },
+  },
+  {
+    name: 'schema-stamp',
+    tags: ['profiles', 'groups', 'cuj13'],
+    timeout: 150000,
+    // C22 — THE ASYMMETRY, WHICH IS EASY TO WRITE BACKWARDS AND IMPOSSIBLE TO
+    // NOTICE ONCE SHIPPED. Older data migrates; NEWER data refuses out loud and
+    // is left alone. Three claims:
+    //
+    //  · the stamp this build writes is the stamp it reads (a store written
+    //    today must not be refused tomorrow by the same build);
+    //  · an ABSENT stamp still loads — every browser in the field is holding
+    //    one right now, and purging on absence would delete a returning
+    //    player's whole library on the boot that shipped this;
+    //  · a HIGHER major refuses, says so in the app's refusal grammar, and —
+    //    the half that protects the data — LOCKS the key. normalizeStore is a
+    //    whitelist, so any save would write a truncated copy of the store back
+    //    over the original. The refusal is worth nothing without the lock, and
+    //    the lock is invisible except as bytes.
+    async fn(ctx) {
+      // (1) What this build writes is what this build reads.
+      const now = await ctx.newTable({ origin: '127.0.0.72', name: 'Now' });
+      await now.dbg(`profiles.reset('soul-deal')`);
+      const st = await now.dbg('schemaState');
+      assert.equal(st.stamp, '2.0.0', 'the build stamps 2.0.0');
+      assert.equal(st.storeStamp, '2.0.0', 'and the store it just wrote carries it');
+      assert.equal(st.refused, null, 'nothing is refused');
+      assert.equal(st.locked, false, 'and the key is writable');
+      assert.equal(
+        JSON.parse(await now.eval(`localStorage.getItem('dice.profiles.v1')`)).ver, '2.0.0',
+        'on disk as well as in the hook');
+
+      // (2) AN ABSENT STAMP IS THIS EPOCH'S OLDEST DATA, and it loads. This is
+      // the field-compatibility claim, and the population it protects is
+      // everyone who has ever opened the app.
+      const unstamped = {
+        v: 3,
+        seq: 2,
+        activeId: 'p1',
+        profiles: [
+          { id: 'p1', name: 'Nessa', system: 'soul-deal', at: 0,
+            pools: [{ id: 1, name: 'Body', notation: '3d6', category: 'Attributes' }] },
+          { id: 'p2', name: 'Bram', system: 'soul-deal', at: 0, pools: [] },
+        ],
+      };
+      assert.equal('ver' in unstamped, false, 'the fixture genuinely has no version field');
+      const old = await tableTab(ctx, {
+        origin: '127.0.0.73',
+        seed: { 'dice.name.v1': 'Old', 'dice.profiles.v1': JSON.stringify(unstamped) },
+      });
+      await old.waitOnline();
+      assert.equal((await old.dbg('schemaState')).refused, null,
+        'an unstamped library is not refused');
+      assert.deepEqual((await old.dbg('profiles.list')).map((p) => p.name), ['Nessa', 'Bram'],
+        'it loads, whole');
+      assert.deepEqual((await old.dbg('groups')).map((g) => g.notation), ['3d6'],
+        'with the rack that was in hand');
+
+      // (3) A NEWER MAJOR REFUSES, AND LOCKS.
+      const future = JSON.stringify({ ...unstamped, ver: '2.1.0' });
+      const ahead = await tableTab(ctx, {
+        origin: '127.0.0.74',
+        seed: { 'dice.name.v1': 'Ahead', 'dice.profiles.v1': future },
+      });
+      await ahead.waitOnline();
+      const refused = await ahead.dbg('schemaState');
+      assert.ok(refused.refused, 'a store from a newer build is refused');
+      assert.match(refused.refused, /^✗ /,
+        `in the app’s refusal grammar (got ${JSON.stringify(refused.refused)})`);
+      assert.ok(refused.refused.includes('2.1.0') && refused.refused.includes('2.0.0'),
+        `naming both numbers, which is what a bug report needs (got ${refused.refused})`);
+      assert.equal(refused.locked, true, 'and the key is locked');
+
+      // THE LOCK, AS BYTES. This is the assertion that matters: a refusal that
+      // still permitted a write would replace a library this build cannot read
+      // with a truncated copy of itself, which is the data loss the refusal
+      // exists to prevent — and nothing on screen would show it.
+      assert.equal(await ahead.eval(`localStorage.getItem('dice.profiles.v1')`), future,
+        'the stored library is byte-identical to what the newer build wrote');
+      const made = await ahead.dbg(`profiles.create('Interloper', 'soul-deal')`);
+      assert.equal(made.ok, false, `and a write is refused rather than attempted (${made.status})`);
+      assert.equal(await ahead.eval(`localStorage.getItem('dice.profiles.v1')`), future,
+        'still byte-identical after something tried to write');
+      // The player is told, through the standing banner that already carries
+      // 'Download my data' — the same true sentence a jammed browser gets.
+      assert.equal((await ahead.dbg('dataBanner')).shown, true,
+        'and the player is told their work is not being saved');
+    },
+  },
 ];
