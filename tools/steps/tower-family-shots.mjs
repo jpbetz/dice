@@ -82,16 +82,51 @@ export default async function run(stage, args) {
   await t.waitFor('!!(window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.landings)',
     { desc: 'the pour arrived' });
   const f = JSON.parse(await t.eval('JSON.stringify(window.__diceDebug.towerFilmInfo())'));
-  // EARLY. A die is only above the crown for about a tenth of a second — it
-  //    falls 4.25 units to the despawn line under g = −110 in 0.28 s, and the
-  //    parapet hides it for most of that. Sampling at a third of the way to
-  //    the first exit (the obvious choice, and the wrong one) lands on an
-  //    empty tower: everything is already inside.
-  await t.dbg('sim(9)');
-  await shot(`${tower}-2-pour-entry.png`);
-  await t.dbg('sim(11)');
-  await shot(`${tower}-2b-pour-entry-late.png`);
-  await t.dbg(`sim(${f.frames + 240 - 20})`);
+  // THE FILM IS ASKED WHERE ITS OWN ENTRY IS. A die is above the crown for
+  //    about a tenth of a second, which used to be sampled with a hard-coded
+  //    sim(9) + sim(11) — two numbers tuned once against ONE tower's rim and
+  //    never re-checked, so a model with a higher or lower mouth got frames of
+  //    an empty tower under the name "pour entry". towerFilmInfo().spans[i][0]
+  //    is [materialise, despawn] in frames for die i: the exact window that
+  //    die exists above the crown and has not yet gone dark. 30% into it is
+  //    still visibly falling in; the LAST die's window is the fullest sky and
+  //    gets the second frame. (Ported from hollow-look, where this was fixed
+  //    and never carried back.)
+  let at = 0;
+  const to = async (frame) => {
+    const want = Math.max(0, Math.round(frame));
+    if (want > at) { await t.dbg(`sim(${want - at})`); at = want; }
+  };
+  const spans = f && f.spans && f.spans.length ? f.spans : null;
+  if (!spans) {
+    console.log('NOTE: no pour film to sample (no spans) — the entry frames are '
+      + 'wherever 9 and 20 frames land, which is not a claim about this tower');
+    await to(9);
+    await shot(`${tower}-2-pour-entry.png`);
+    await to(20);
+    await shot(`${tower}-2b-pour-entry-late.png`);
+  } else {
+    const mid = (s, k) => s[0] + (s[1] - s[0]) * k;
+    // …AND THE LATE FRAME STAYS IN ACT ONE. hollow-look takes the LAST die's
+    //    window because it parks its own eye; this tool is on the SHIPPED
+    //    camera, which leaves the tower for the exit at firstExitTime. Sampled
+    //    at the last die whose whole entry window is still before that beat,
+    //    so the frame is a die in the sky over the crown rather than a felt
+    //    the camera has already panned to (looked at: the unclamped version
+    //    came out as the tower's foot with a settled d6 and no die in shot).
+    const exitF = f.firstExitTime * 60;
+    let late = spans.length - 1;
+    for (let i = spans.length - 1; i >= 0; i--) {
+      if (spans[i][0][1] <= exitF) { late = i; break; }
+    }
+    console.log(`  entry windows: d0=[${spans[0][0]}] d${late}=[${spans[late][0]}] `
+      + `firstExit=${f.firstExitTime}s (frame ${Math.round(exitF)}) frames=${f.frames}`);
+    await to(mid(spans[0][0], 0.30));
+    await shot(`${tower}-2-pour-entry.png`);
+    await to(mid(spans[late][0], 0.55));
+    await shot(`${tower}-2b-pour-entry-late.png`);
+  }
+  await to(f.frames + 240);
   await shot(`${tower}-3-exit-spread.png`);
   await t.dbg('clearTable()');
   await t.dbg('sim(400)');
