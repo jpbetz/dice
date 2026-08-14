@@ -6282,3 +6282,15 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
 @media (pointer: coarse) {
   .rd-cell.rd-counted .rd-item .rp-dice { display: none; }
 }
+
+/* ---- a key named inside a settings sub-line (U25) ----
+   The invite row teaches its shortcut where the control is, and `<code>` had
+   no dress outside `.cheatsheet`, so it fell to the browser's default
+   monospace at the wrong size. Same recipe as the cheatsheet's, at the
+   sub-line's own scale. */
+.prow-sub code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--gold-bright);
+  white-space: nowrap;
+}
