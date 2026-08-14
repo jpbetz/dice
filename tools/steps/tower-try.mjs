@@ -19,6 +19,9 @@ limitations under the License.
 //
 //   node tools/drive.mjs tools/steps/tower-try.mjs tools/forge/out/<slug>.glb
 //   node tools/drive.mjs tools/steps/tower-try.mjs nullstone      # a shipped id
+//   node tools/drive.mjs tools/steps/tower-try.mjs out/x.glb 42 \
+//     '{"ember":{"at":[-1.55,3.95,-0.34],"color":"#cfe98c","intensity":2.4,
+//       "dist":4.4},"lantern":{"rake":0.45}}'                     # …and its lamps
 //
 // Writes ONE sheet, tools/out/try-<slug>.png, plus the fit and occlusion
 // verdicts for the same model in the same run.
@@ -57,7 +60,31 @@ const VIEWS = [
   ['far — is it a silhouette?', 24, 9.5, 8],
 ];
 
-export default async function run(stage, [target = '', seed = '42']) {
+// THE RIG A RAW BAKE GETS IS NOT THE RIG IT WILL SHIP IN, and judging value
+// under the wrong lamps is the exact mistake this tool exists to stop — one
+// level up. Two paths, and between them they cover every bake:
+//
+//   · the slug MATCHES a registered id (bake `nullstone.glb`, look at
+//     `nullstone`): `towerRegisterGlb` now inherits that row's ember,
+//     lantern, motes and dress. Nothing to pass. This is the case that was
+//     silently broken, and the fix is in the hook so it holds for every
+//     caller, not just this one.
+//   · the slug does NOT (bake `nullstone_umbra.glb`): there is no row to
+//     inherit from, so the third argument states the lamps. It is the SHIPPED
+//     row's own `ember`/`lantern` object, copied out of the registry — the
+//     rake rides on `lantern.rake` exactly as an authored row's does, so
+//     there is no second copy of the arithmetic to drift.
+//
+// Omit it and nothing changes for callers that do not care.
+export default async function run(stage, [target = '', seed = '42', light = '']) {
+  let row = {};
+  if (light) {
+    try { row = JSON.parse(light); } catch (e) {
+      console.log(`BAD: the third argument is the row's light as JSON — ${e.message}`);
+      process.exitCode = 1;
+      return;
+    }
+  }
   if (!target) {
     console.log('BAD: needs a GLB path (tools/forge/out/x.glb) or a registered tower id');
     process.exitCode = 1;
@@ -77,14 +104,32 @@ export default async function run(stage, [target = '', seed = '42']) {
   // models/towers/ to be looked at, so a rejected round leaves no trace.
   if (isPath) {
     const url = `/${target.replace(/^\.?\//, '')}`;
+    const opts = { label: slug, title: 'tower-try' };
+    for (const key of ['ember', 'lantern', 'motes', 'dress', 'clunkVoice']) {
+      if (row[key] !== undefined) opts[key] = row[key];
+    }
     const ok = await t.dbg(`towerRegisterGlb('${slug}', ${JSON.stringify(url)}, `
-      + `{ label: ${JSON.stringify(slug)}, title: 'tower-try' })`);
+      + `${JSON.stringify(opts)})`);
     if (!ok) {
       console.log(`BAD: towerRegisterGlb refused '${slug}' → ${url}`);
       process.exitCode = 1;
       return;
     }
     console.log(`registered ${slug} → ${url} (throwaway row, never a picker chip)`);
+    // SAY WHOSE LAMPS THESE ARE, on the sheet's own transcript. A frame lit by
+    // a default is not wrong — it is unlabelled, and unlabelled is how four
+    // rounds of value decisions got taken through an orange point light that
+    // nobody had chosen.
+    // eval, not dbg: `dbg` prefixes `window.__diceDebug.` and this is an
+    // expression over the registry, not a hook call.
+    const lit = await t.eval(`(() => { const c = window.__diceDebug.towerRegistry()
+      .find((r) => r.id === ${JSON.stringify(slug)}); return c ? JSON.stringify(
+        { ember: c.ember, lantern: c.lantern }) : 'null'; })()`);
+    const src = Object.keys(opts).some((k) => k !== 'label' && k !== 'title')
+      ? 'stated on the command line'
+      : (lit && !/#ff9a44/.test(lit) ? `inherited from the registered '${slug}' row`
+        : 'THE PLAIN DEFAULT — no row of this name, and none stated');
+    console.log(`lamps: ${src}\n  ${lit}`);
   }
 
   await t.dbg(`setZoom('medium')`);

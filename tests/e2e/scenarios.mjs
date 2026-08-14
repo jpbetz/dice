@@ -10869,6 +10869,26 @@ export const scenarios = [
         assert.ok(dr.ember,
           `${id}: the registry row carries the family trait — a warm focal light`);
         assert.equal(dr.lights, 0, `${id}: and the skin still brings zero lights`);
+        // …AND THE ROW'S LAMPS ARE READABLE, by value. Nothing could read
+        // these back until 2026-08-14, which is exactly how towerRegisterGlb
+        // spent a day replacing a shipped row's whole light story with a warm
+        // default and nobody saw: tower-try, the tool documented as "the only
+        // honest place to judge light", was lighting the cold nullstone with
+        // an orange point lamp at full rake. It was found by two people
+        // looking at a picture. A value nobody can read is a value nobody can
+        // check, so the sweep reads them.
+        assert.ok(model.ember && model.ember.color,
+          `${id}: the ember is readable AS A VALUE, not just as a boolean `
+          + `(${JSON.stringify(model.ember)})`);
+        // The lantern is OPTIONAL and its absence is a real declaration:
+        // `spec.lantern.rake` is a SCALE on the room's rake, so a row without
+        // one runs at 1.0 — which is heartwood, the pale original the rake was
+        // tuned against. The three dark towers lower it (0.4/0.45/0.5) because
+        // a black surface is mostly reflection. So the claim is that a
+        // declared rake is a NUMBER, not that every row declares one.
+        assert.ok(model.lantern === null || typeof model.lantern.rake === 'number',
+          `${id}: a declared lantern carries a numeric rake `
+          + `(${JSON.stringify(model.lantern)})`);
 
         // (5) IDLE MOTION, where the row declares it. Same biconditional shape
         // as (2): a row that declares no dress must have nothing moving.
@@ -10878,6 +10898,31 @@ export const scenarios = [
           + `${expectMotion ? 'have' : 'have NO'} idle motion when nobody is touching it `
           + `(${dr.sways} sways, ${dr.smokes} plumes)`);
       }
+
+      // ---- A RE-BAKE OF A ROW THAT EXISTS INHERITS ITS LIGHT --------------
+      // The regression itself, and the reason it is here rather than in a
+      // tool's printed output. `tower-try` mints a throwaway row for a raw
+      // `tools/forge/out/<slug>.glb` and the slug is the FILENAME — so baking
+      // `nullstone.glb` mints over the shipped nullstone row. Before the fix
+      // that replaced its ember (#cfe98c cold, at the doorway) with the plain
+      // default (#ff9a44 warm, on the bore axis) and dropped its 0.45 rake to
+      // 1.0, which is how a day of value judgements got taken through a lamp
+      // nobody chose.
+      const lit = registry.find((t) => t.id === 'nullstone');
+      assert.ok(lit && lit.ember, 'nullstone is the witness and it declares an ember');
+      await a.dbg(`towerRegisterGlb('nullstone', '/models/towers/nullstone.glb', `
+        + `{ label: 'remint', title: 'tower-dressing' })`);
+      const after = (await a.dbg('towerRegistry()')).find((t) => t.id === 'nullstone');
+      assert.deepEqual(after.ember, lit.ember,
+        're-minting a REGISTERED id keeps its ember — a bake is looked at in the '
+        + `room it will stand in, or the tool is lying (was ${JSON.stringify(lit.ember)}, `
+        + `now ${JSON.stringify(after.ember)})`);
+      assert.deepEqual(after.lantern, lit.lantern,
+        '…and its lantern rake, which is a SCALE on the room\'s and so silently '
+        + 'doubles the key light when it goes missing');
+      assert.equal(after.label, 'remint',
+        'while the parts the caller DID state still take effect — inheritance is a '
+        + 'fallback, not an override, or a fixture could never be given its own lamps');
 
       // And the lane's own promise, stated where a reader will meet it: this
       // whole sweep socketed every model in the registry, read its geometry,

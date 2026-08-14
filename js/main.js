@@ -10648,6 +10648,16 @@ window.__diceDebug = {
       id: t.id,
       label: towerCos(t).label, skin: !!towerCos(t).skin,
       clunkVoice: towerCos(t).clunkVoice || null,
+      // THE ROW'S LIGHT, BY VALUE — the same reason clunkVoice is by value.
+      // Nothing could read these back, so nothing could notice when
+      // towerRegisterGlb silently replaced a shipped row's whole light story
+      // with a warm default (2026-08-14): the tool documented as "the only
+      // honest place to judge light" spent a day lighting a cold tower with
+      // an orange lamp, and the way that was eventually FOUND was two people
+      // looking at a picture. A value nobody can read is a value nobody can
+      // check.
+      ember: towerCos(t).ember || null,
+      lantern: towerCos(t).lantern || null,
       // A VENUE TOWER HAS NO CHIP (renderTowerPicker skips it), so a
       // scenario asserting the picker against the registry has to be able
       // to see the difference here rather than hard-coding which row it is.
@@ -10733,6 +10743,29 @@ window.__diceDebug = {
   // somebody to ship it.
   towerRegisterGlb(id, url, opts = {}) {
     if (!id || !url) return false;
+    // A RE-BAKE OF A ROW THAT ALREADY EXISTS INHERITS ITS LIGHT.
+    //
+    // tower-try mints a throwaway row for a raw `tools/forge/out/*.glb` so a
+    // bake can be LOOKED at before it is promoted, and its slug is the file's
+    // basename — so baking `nullstone.glb` mints over the SHIPPED nullstone
+    // row and the plain trimmings below silently replaced its whole light
+    // story. Measured 2026-08-14: the sheet documented as "the only honest
+    // place to judge light" was lighting a cold witchlight tower (#cfe98c,
+    // i 2.4, d 4.4, at the doorway, lantern raked to 0.45) with a WARM ORANGE
+    // point light (#ff9a44, i 14, d 8) hanging in mid-air off the front face
+    // at full rake. Every value judgement taken off that sheet was taken
+    // through the wrong lamp — which is the exact mistake the tool exists to
+    // prevent, one level up. Found independently by two agents on the same
+    // afternoon, which is how much it showed.
+    //
+    // Plain defaults SURVIVE for an id nobody has authored: a fixture that
+    // flattered itself would tempt somebody to ship it, and there is no row
+    // to inherit from anyway. An explicit `opts` beats both — that is how a
+    // raw bake whose filename does NOT collide with a registered id says what
+    // lamps it expects (tower-try's third argument).
+    const prev = TOWERS[id] ? towerCos(TOWERS[id]) : null;
+    const inherit = (key, fallback) => (opts[key] !== undefined ? opts[key]
+      : (prev && prev[key] !== undefined ? prev[key] : fallback));
     // Two halves like any authored row (D1), including the EMPTY physical one:
     // a minted row's portals arrive off the bake exactly as a shipped row's do,
     // and towerPhysOwn would create the half anyway — writing it here keeps
@@ -10745,8 +10778,16 @@ window.__diceDebug = {
         label: opts.label || id, glbUrl: url,
         skin: (v) => towerGlbSkin(url, v),
         title: opts.title || 'test',
-        clunkVoice: opts.clunkVoice || { body: 'clack', weight: 0.4, sustain: 22 },
-        ember: opts.ember || { at: [0, 5, 0.5], color: '#ff9a44' },
+        clunkVoice: inherit('clunkVoice', { body: 'clack', weight: 0.4, sustain: 22 }),
+        ember: inherit('ember', { at: [0, 5, 0.5], color: '#ff9a44' }),
+        // The rake, the dust and the idle dress are the rest of the light
+        // story. `lantern` in particular is read by towerLanternBuild as a
+        // SCALE on the room's rake (spec.lantern.rake), so a row that omits
+        // it renders at 1.0 — two stops hotter than any tower that declares
+        // one, which is all three of them.
+        lantern: inherit('lantern', undefined),
+        motes: inherit('motes', undefined),
+        dress: inherit('dress', undefined),
       },
     };
     return true;
