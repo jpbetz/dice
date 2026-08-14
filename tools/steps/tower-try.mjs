@@ -57,7 +57,21 @@ const VIEWS = [
   ['far — is it a silhouette?', 24, 9.5, 8],
 ];
 
-export default async function run(stage, [target = '', seed = '42']) {
+// THE RIG A RAW BAKE GETS IS NOT THE RIG IT WILL SHIP IN, and that is a value
+// judgement made under the wrong lamps — the exact mistake this tool exists to
+// stop (see the header above), one level up. `towerRegisterGlb` mints a row
+// with a DEFAULT ember (warm #ff9a44 on the bore axis) and no `lantern`, so
+// the rake runs at scale 1; a tower whose shipped row declares a cold ember at
+// 0.45 rake renders here two stops warmer and brighter than it ever will on a
+// table. So the third argument carries the row's own light:
+//
+//   node tools/drive.mjs tools/steps/tower-try.mjs tools/forge/out/x.glb 42 \
+//     '{"ember":{"at":[-1.55,3.95,-0.34],"color":"#cfe98c","intensity":2.4,
+//       "dist":4.4},"lantern":{"rake":0.45}}'
+//
+// Omit it and nothing changes for callers that do not care.
+export default async function run(stage, [target = '', seed = '42', light = '']) {
+  const row = light ? JSON.parse(light) : {};
   if (!target) {
     console.log('BAD: needs a GLB path (tools/forge/out/x.glb) or a registered tower id');
     process.exitCode = 1;
@@ -77,8 +91,10 @@ export default async function run(stage, [target = '', seed = '42']) {
   // models/towers/ to be looked at, so a rejected round leaves no trace.
   if (isPath) {
     const url = `/${target.replace(/^\.?\//, '')}`;
+    const opts = { label: slug, title: 'tower-try' };
+    if (row.ember) opts.ember = row.ember;
     const ok = await t.dbg(`towerRegisterGlb('${slug}', ${JSON.stringify(url)}, `
-      + `{ label: ${JSON.stringify(slug)}, title: 'tower-try' })`);
+      + `${JSON.stringify(opts)})`);
     if (!ok) {
       console.log(`BAD: towerRegisterGlb refused '${slug}' → ${url}`);
       process.exitCode = 1;
@@ -107,6 +123,16 @@ export default async function run(stage, [target = '', seed = '42']) {
     console.log(`BAD: asked for '${slug}', the table wears '${worn}' (${JSON.stringify(st)})`);
     process.exitCode = 1;
     return;
+  }
+
+  // …and the rake, which no `towerRegisterGlb` option can carry: read the live
+  // dial and scale it exactly as towerLanternBuild scales a row's own, so the
+  // number here is the row's `lantern.rake` and not a second copy of 2.4.
+  if (row.lantern && typeof row.lantern.rake === 'number') {
+    const tune = await t.dbg('towerLightTune({})');
+    await t.dbg(`towerLightTune({rakeIntensity: ${tune.rakeIntensity * row.lantern.rake}})`);
+    console.log(`lantern: rake ${row.lantern.rake} → rakeIntensity `
+      + `${(tune.rakeIntensity * row.lantern.rake).toFixed(2)}`);
   }
 
   // THE GATES COME WITH THE SHEET. Judging a frame while its fit or occlusion
