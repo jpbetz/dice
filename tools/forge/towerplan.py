@@ -56,13 +56,48 @@ CLS = EM["auditClasses"]
 def parse_spec(args):
     if args.recipe:
         src = open(args.recipe).read()
+        # THE RECIPE'S OWN CONSTANTS, harvested rather than guessed. A portal
+        # spec is written in the names the recipe thinks in — nullstone says
+        # `AX, AZ`, hollowbole says `AXIS_Z` — and this used to carry a hand-
+        # kept namespace of three of them, so `towerplan --recipe` DIED with a
+        # NameError on hollowbole: one of the three shipped baked towers could
+        # not be planned at all, and the tool said so in a traceback that
+        # looked like a bug in the plan rather than a gap in its reader.
+        # Every simple module-level `NAME = <expr>` is fair game; anything
+        # that will not evaluate against what came before it is skipped, which
+        # is most of a recipe (it imports bpy).
+        env = {"S": 1.25, "math": math}
+        for name, expr in re.findall(r"^([A-Z][A-Z0-9_]*)\s*=\s*([^\n=][^\n]*)$",
+                                     src, re.M):
+            try:
+                env[name] = eval(expr, dict(env))  # noqa: S307
+            except Exception:
+                continue                            # not a constant we can read
+        # `AX, AZ = 0.0, -2.55` and friends: tuple targets the line-wise pass
+        # above cannot see, and nullstone's bore axis is exactly this shape.
+        for names, exprs in re.findall(r"^([A-Z][A-Z0-9_]*(?:\s*,\s*[A-Z][A-Z0-9_]*)+)"
+                                       r"\s*=\s*([^\n=][^\n]*)$", src, re.M):
+            try:
+                vals = eval(exprs, dict(env))       # noqa: S307
+                for n, v in zip([n.strip() for n in names.split(",")], vals):
+                    env[n] = v
+            except Exception:
+                continue
+
         def grab(name):
             m = re.search(name + r"\s*=\s*\{([^}]*)\}", src)
             if not m:
                 raise SystemExit(f"towerplan: {args.recipe} has no {name}")
             d = {}
             for k, v in re.findall(r'"(\w+)"\s*:\s*([^,}]+)', m.group(1)):
-                d[k] = eval(v, {"S": 1.25, "math": math, "AX": 0.0, "AZ": -2.55})  # noqa: S307
+                try:
+                    d[k] = eval(v, dict(env))  # noqa: S307
+                except NameError as e:
+                    raise SystemExit(
+                        f"towerplan: {args.recipe}'s {name}.{k} is `{v.strip()}` "
+                        f"and {e} — the reader harvests module-level CONSTANTS, "
+                        f"so a portal field computed from a function call or a "
+                        f"local has to be spelled as a literal or a constant.")
             return d
         return {"in": grab("PORTAL_IN"), "out": grab("PORTAL_OUT")}
     if args.in_ or args.out:
@@ -211,22 +246,64 @@ def main():
     print(f"   a clad mesh reaches past z {Z_FRONT}, so it must satisfy the CLADDING")
     print(f"   envelope class: dip to y <= {CLS['cladMinY']} and stop by z {CLS['cladMaxZ']}")
 
-    print("\n7. HOW TALL THE FRONT MUST BE — the occlusion proof, in advance")
+    print("\n7. HOW TALL THE FRONT MUST BE — both proofs, in advance")
     ct, rows = front_height_floor(spec)
     print(f"   the highest cowl sample sits at y {ct:.3f} (the band is capped at")
     print(f"   despawnY + a die's radius, and the top disc sits 0.15 under that)")
-    print("   each eye's ray to the band's WORST sample — the deepest point of the")
-    print("   widest disc, not the bore axis — crosses the socket plane (z = 0) at:")
-    need = 0.0
-    for eid, y, note in rows:
-        if y is None:
-            print(f"     {eid:<12}    —      {note}")
-        else:
-            need = max(need, y)
-            print(f"     {eid:<12} y {y:6.3f}  {note}")
+    print("   TWO floors land on this one wall, and either can be the binding one:")
+    print("     HIDE   the eye's ray to the band's WORST sample — the deepest point")
+    print("            of the widest disc, not the bore axis — crossing z = 0")
+    print("     VANISH the front reaching high enough that a die blinks out AT OR")
+    print(f"            BELOW the mouth (rimY {pin['rimY']}), never in mid-air over it")
+    print("     eye            HIDE    VANISH     need")
+    need, need_eid, need_which = 0.0, None, None
+    for r in rows:
+        if r["need"] is None:
+            print(f"     {r['eid']:<12}    —        —         —    {r['note']}")
+            continue
+        if r["need"] > need:
+            need, need_eid = r["need"], r["eid"]
+            need_which = "VANISH" if r["vanish"] is not None and \
+                r["vanish"] >= (r["occl"] or -1e9) else "HIDE"
+        print(f"     {r['eid']:<12} {r['occl']:7.3f}  {r['vanish']:7.3f}  "
+              f"{r['need']:7.3f}  {r['note']}")
     print(f"   SO: the model's front must be solid to y {need:.3f} over the door's")
-    print(f"   width, or the occlusion proof fails at that eye. Build over it and the")
-    print(f"   proof passes with no die simulated — which is the whole cosmetic lane.")
+    print(f"   width — set by {need_eid} on the {need_which} floor. Build over it and")
+    print(f"   both proofs pass with no die simulated, which is the whole cosmetic")
+    print(f"   lane. UNDER it the bake refuses an hour after you started.")
+    print(f"   (VANISH used to be enforced and never published — a modeller building")
+    print(f"   to the HIDE column alone was short by {need - max(r['occl'] or 0 for r in rows):.3f} here.)")
+
+    # THE PLAN PROVES THE NUMBER IT PUBLISHES. A floor is only worth printing
+    # if a model built exactly to it passes the gate that will judge it — the
+    # whole defect this section was carrying was a published number that the
+    # bake refused. So: evaluate the gate's own inequality at `need`, and at
+    # the number this section used to print, and say what each does. Cheap
+    # (six eyes of arithmetic), and it fails loudly here rather than an hour
+    # into somebody's bake.
+    def worst_vanish(top):
+        w = None
+        for eid, e in TG.shipped_eyes():
+            if e[2] <= 0.0:
+                continue
+            seen = e[1] + (top - e[1]) * (e[2] - pin["z"]) / e[2]
+            if w is None or seen < w[1]:
+                w = (eid, seen)
+        return w
+    weid, wseen = worst_vanish(need)
+    if wseen < pin["rimY"] - 1e-9:
+        print(f"   BAD: a front at the published floor {need:.3f} still loses a die at "
+              f"y {wseen:.3f} from {weid} — this section is lying again.")
+        bad.append(f"front floor {need:.3f} does not satisfy the vanish gate")
+    else:
+        old = max((r["occl"] or 0.0) for r in rows)
+        oeid, oseen = worst_vanish(old)
+        verdict = ("and the HIDE column alone would have been REFUSED "
+                   f"(die lost at y {oseen:.3f} from {oeid})"
+                   if oseen < pin["rimY"] - 1e-9 else
+                   "and the HIDE column alone would also have passed, this spec")
+        print(f"   checked: a front at {need:.3f} loses a die at y {wseen:.3f} from "
+              f"{weid}, at or under the mouth — {verdict}.")
 
     if bad:
         print(f"\nBAD: {len(bad)} field(s) outside the contract:")

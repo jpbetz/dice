@@ -182,8 +182,14 @@ node tools/drive.mjs tools/steps/tower-try.mjs tools/forge/out/<slug>.glb
   on the socket and the spec — a rear facet inset past its budget until the
   outer skin was inside the bore, splinters 2.08 from the axis inside a 2.20
   drop. `towerplan.py` prints the per-heading budget, the doorway's jambs, the
-  lane's planes, and **how tall the front must be** for occlusion to pass.
-  Read the table; do not discover it one refusal at a time.
+  lane's planes, and **how tall the front must be**. Read the table; do not
+  discover it one refusal at a time. §7's front-height table has TWO columns
+  and `need` is their max: HIDE (the occlusion ray) and VANISH (a die must
+  blink out at or below the mouth, never in mid-air over it). Either can
+  bind — on nullstone VANISH wins at every eye, and while it went unprinted a
+  model built exactly to the published figure was refused by its own bake.
+  The section proves its answer against the gate's inequality before printing
+  it, so if that line ever says BAD, believe it over the table above it.
 - **NEVER JUDGE VALUE IN THE FORGE PREVIEW.** Its rig is not the room's. Four
   rounds of nullstone's colour were decided there and every one was retaken
   the moment an app frame existed: at an albedo that read as black stone under

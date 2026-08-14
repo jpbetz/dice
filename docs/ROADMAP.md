@@ -3326,6 +3326,23 @@ is approving a diff rather than remembering three files.
   and cowl fully blocked at all six eyes, red-checked against the old bytes
   (87/99 at wide.full). It could not have carried that assertion before — a
   leaking asset cannot police the leak.
+  **And a THIRD time, 2026-08-14** — same shape, one layer deeper, found by
+  the Nullstone divergence agent that tried to open a hole in the front and
+  was refused by a number it could not look up. `front_height_needed` was the
+  OCCLUSION floor alone, while `gate_front_carries_the_dark` also required a
+  die to VANISH at or below the mouth: a second, independent floor that no
+  tool computed and towerplan never printed. On nullstone it binds higher at
+  **every** eye — 9.992 against the published 9.864 — so the occlusion column
+  was never the binding one, and **a model built exactly to the published
+  number was refused by the bake** (proved: a front at 9.864 loses a die at
+  y 9.249 against a mouth of 9.4). The number that is documented being the
+  number that fails is the worst arrangement available. Both floors are now
+  columns in towerplan §7, `need` is their max, the gate derives its own
+  inequality from the same function, and **the plan checks its answer against
+  that inequality before printing it** — a floor is only worth publishing if a
+  model built to it passes. Cost: the stress fixture's crown 10.27 → 10.43,
+  re-baked and re-pinned; nullstone re-bakes byte-identical (its front stands
+  at 11.14) and every shipped tower was always above the true floor.
 - **`tower-occlusion`'s SOLID exit/hood classification is still a printed
   report.** MEASURED while arming (a): the 18 points are THREE samples
   (x −0.9, 0, +0.9 at y 3.77, z −7.42) seen from six eyes, crossing the wall

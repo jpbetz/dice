@@ -91,18 +91,26 @@ def despawn_y(spec):
 
 
 def front_height_needed(spec):
-    """The lowest the model's front may be and still pass occlusion.
+    """The lowest the model's front may be and still pass the FRONT gate.
 
     Returns (y, eye_id). towerplan.py prints the whole per-eye table before you
     model; this returns the binding number so a recipe can BUILD to it — see
     tower_fixture.py, whose front used to stop at its own entry rim and leaked
     the cowl band for exactly that reason. The arithmetic is TG's, so the plan,
-    the recipe and the gate cannot answer differently."""
+    the recipe and the gate cannot answer differently.
+
+    IT IS THE MAX OF TWO FLOORS (2026-08-14). This used to return the
+    occlusion crossing alone, while gate_front_carries_the_dark ALSO enforced
+    that a die vanishes at or below the mouth — a second, independent floor
+    that no tool computed and nothing printed. On nullstone it binds 0.128
+    higher than the one that was published. Found by the divergence agent that
+    tried to open a hole in the front and got refused by a number it could not
+    look up. See TG.front_height_rows."""
     _, rows = TG.front_height_rows(spec)
     best = (-1e9, None)
-    for eid, y, _note in rows:
-        if y is not None and y > best[0]:
-            best = (y, eid)
+    for r in rows:
+        if r["need"] is not None and r["need"] > best[0]:
+            best = (r["need"], r["eid"])
     return best
 
 
@@ -239,14 +247,32 @@ def gate_front_carries_the_dark(occluder_meshes, spec, tag, front_top):
                 f"raising a decoration instead only moves the leak.")
     if front_top < need:
         raise RuntimeError(f"the front stands at {front_top:.2f}, under the "
-                           f"binding sight line {need:.3f} from {eid_need}")
+                           f"binding sight line {need:.3f} from {eid_need} "
+                           f"(towerplan.py section 7 prints both floors)")
+    # THE DIE-VANISH CLAIM, ASKED DIRECTLY — and its floor comes from the same
+    # function the plan prints, never a second derivation. It used to be an
+    # independent inequality here: `need` was the occlusion crossing alone, so
+    # this clause was the ONLY thing that knew about the second floor and the
+    # only way to learn the number was to fail. On nullstone it binds 0.128
+    # over the published one. Keeping the direct check AND deriving the floor
+    # from the shared arithmetic is the point: if they ever disagree, the
+    # assertion below fires instead of a modeller's afternoon.
+    for eid, e in TG.shipped_eyes():
+        floor = TG.front_vanish_floor(spec, e)
+        if floor is None:
+            continue
+        seen_to = e[1] + (front_top - e[1]) * (e[2] - pin["z"]) / e[2]
+        if seen_to < pin["rimY"]:
+            raise RuntimeError(
+                f"the front hides the drop ABOVE the declared mouth: from {eid} a "
+                f"die is lost at y {seen_to:.2f}, mouth {pin['rimY']} — dice must "
+                f"vanish inside a building, not in mid-air over it. The front has "
+                f"to reach y {floor:.3f} for this eye (towerplan.py section 7).")
+        assert front_top < floor or seen_to >= pin["rimY"] - 1e-9, (
+            f"front_vanish_floor and the direct check disagree at {eid}: floor "
+            f"{floor:.4f}, front {front_top:.3f}, seen_to {seen_to:.3f}")
     eid, e = max(TG.shipped_eyes(), key=lambda p: p[1][1])
     seen_to = e[1] + (front_top - e[1]) * (e[2] - pin["z"]) / e[2]
-    if seen_to < pin["rimY"]:
-        raise RuntimeError(
-            f"the front hides the drop ABOVE the declared mouth: from {eid} a die "
-            f"is lost at y {seen_to:.2f}, mouth {pin['rimY']} — dice must vanish "
-            f"inside a building, not in mid-air over it")
     print(f"[{tag}] the mass carries the dark: binding sight line {need:.2f} "
           f"({eid_need}) under a front at {front_top:.2f}; a die stays visible "
           f"to y {seen_to:.2f}, mouth {pin['rimY']}")

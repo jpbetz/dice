@@ -104,9 +104,8 @@ DESPAWN_Y = PORTAL_IN["rimY"] - 1.4 * S
 #
 # So the front is built to the requirement instead of to the rim, and the
 # requirement is asked for rather than typed: front_height_needed() returns the
-# binding eye's crossing (10.120 at wide.full for this spec) and 0.15 of margin
-# sits on top, putting the crown at 10.27 against a rim of 9.75. If the shipped
-# eyes move or the cowl cap is re-derived, this follows them.
+# binding eye's floor and 0.15 of margin sits on top. If the shipped eyes move
+# or the cowl cap is re-derived, this follows them.
 #
 # Building to it the first time still left 1/99 leaking, and that was the SECOND
 # finding: front_height_needed measured the sample on the BORE AXIS, while the
@@ -114,6 +113,16 @@ DESPAWN_Y = PORTAL_IN["rimY"] - 1.4 * S
 # flatter ray and a taller wall (9.854 vs 10.120 here). Both copies of that
 # arithmetic now live in towergates.front_height_rows, so the plan, the recipe
 # and the gate cannot disagree again.
+#
+# THE THIRD FINDING (2026-08-14) is why this crown moved 10.27 -> 10.43, and it
+# is the same shape a third time: front_height_needed was the OCCLUSION floor
+# alone, while gate_front_carries_the_dark ALSO required a die to vanish at or
+# below the mouth — a second floor that no tool computed and towerplan never
+# printed. It binds higher on every eye of this spec. A model built exactly to
+# the published number was refused by the bake, which is the worst possible
+# arrangement: the number that is documented is the number that fails. Both
+# floors are columns in towerplan section 7 now, `need` is their max, and the
+# plan checks its own answer against the gate's inequality before printing it.
 FRONT_NEED, FRONT_EYE = K.front_height_needed(SPEC)
 HEIGHT = max(PORTAL_IN["rimY"], FRONT_NEED + 0.15)
 WALL = 0.24                    # front/back wall thickness; also, directly, the
