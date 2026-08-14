@@ -93,19 +93,15 @@ def despawn_y(spec):
 def front_height_needed(spec):
     """The lowest the model's front may be and still pass occlusion.
 
-    The cowl band's top is despawnY + a die's radius, every shipped eye is in
-    FRONT of the tower, so what hides that sample is the model's own front and
-    the binding number is where the highest eye's ray to it crosses the socket
-    plane. Returns (y, eye_id). towerplan.py prints this before you model;
-    this returns it so a recipe can gate on it after."""
-    ct = despawn_y(spec) + EM["dieR"]
+    Returns (y, eye_id). towerplan.py prints the whole per-eye table before you
+    model; this returns the binding number so a recipe can BUILD to it — see
+    tower_fixture.py, whose front used to stop at its own entry rim and leaked
+    the cowl band for exactly that reason. The arithmetic is TG's, so the plan,
+    the recipe and the gate cannot answer differently."""
+    _, rows = TG.front_height_rows(spec)
     best = (-1e9, None)
-    for eid, e in TG.shipped_eyes():
-        if e[1] <= ct:
-            continue                       # this eye looks UP; the wall has it
-        f = e[2] / (e[2] - spec["in"]["z"])
-        y = e[1] + (ct - e[1]) * f
-        if y > best[0]:
+    for eid, y, _note in rows:
+        if y is not None and y > best[0]:
             best = (y, eid)
     return best
 

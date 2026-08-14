@@ -40,8 +40,8 @@ limitations under the License.
 //
 // What is computed instead, for each missed point: where the eye→point ray
 // crosses the back-wall plane, and whether that crossing is inside the
-// doorway the ENGINE actually cut (|x| ≤ door.w/2, y ≤ door.h — the doorL /
-// doorR / lintel boxes, which are centred at x 0 whatever out.x says).
+// doorway the ENGINE actually cut (|x − door.x| ≤ door.w/2, y ≤ door.h — the
+// doorL / doorR / lintel boxes, which follow the declared out.x since T2).
 //
 //   · IN FRONT  the point is at or forward of the wall plane, so no ray to it
 //               ever crosses solid. Nothing legal can occlude it.
@@ -68,7 +68,7 @@ const r2 = (n) => Number(n.toFixed(2));
 
 // Where the eye→point ray meets the back-wall plane, and what that says about
 // the miss. Pure arithmetic on numbers the engine handed over — no literals.
-function classify(eye, p, { z0, head, halfW }) {
+function classify(eye, p, { z0, head, halfW, cx }) {
   if (p[2] >= z0 - 1e-9) return { cls: 'front' };
   const t = (z0 - eye[2]) / (p[2] - eye[2]);
   // An eye at or behind the wall plane is not a shipped camera; say so rather
@@ -76,7 +76,7 @@ function classify(eye, p, { z0, head, halfW }) {
   if (!(t > 0 && t < 1)) return { cls: 'odd' };
   const x = eye[0] + (p[0] - eye[0]) * t;
   const y = eye[1] + (p[1] - eye[1]) * t;
-  const through = Math.abs(x) <= halfW + 1e-9 && y <= head + 1e-9 && y >= -1e-9;
+  const through = Math.abs(x - cx) <= halfW + 1e-9 && y <= head + 1e-9 && y >= -1e-9;
   return { cls: through ? 'doorway' : 'solid', x: r2(x), y: r2(y) };
 }
 
@@ -116,7 +116,7 @@ export default async function run(stage, args) {
     return;
   }
   const door = spec.derived.door;
-  const geom = { z0: res.z0, head: door.h, halfW: door.w / 2 };
+  const geom = { z0: res.z0, head: door.h, halfW: door.w / 2, cx: door.x };
   // The probe runs on the LAB's mat and the spec is evaluated at the current
   // one. They are the same mat here (the lab is up), and if they ever are not
   // the plane below is the wrong plane — so say it rather than assume it.
@@ -125,8 +125,8 @@ export default async function run(stage, args) {
       + "the doorway plane follows the PROBE's mat");
   }
   if (spec.portals.out.x !== 0) {
-    console.log(`NOTE: out.x=${spec.portals.out.x} moves the exit lane, but the engine's own `
-      + 'doorway boxes are centred at x 0 — the aperture below follows the doorway as BUILT');
+    console.log(`NOTE: out.x=${spec.portals.out.x} — the exit lane AND the engine's doorway `
+      + 'boxes both sit there (T2); the aperture below is measured about that centreline');
   }
   // The engine may grow fields (the invisible-carrier masking pass adds one).
   // Name anything this step does not know about instead of ignoring it: a
@@ -164,7 +164,8 @@ export default async function run(stage, args) {
         if (c.cls === 'solid') {
           solid++;
           solidLines.push(`  ${e.id.padEnd(12)} ${band} (${p}) crosses the wall at `
-            + `x=${c.x} y=${c.y} — above the ${door.h} head or outside the ±${door.w / 2} jambs`);
+            + `x=${c.x} y=${c.y} — above the ${door.h} head or outside the `
+            + `${door.w} jambs centred at x=${door.x}`);
         }
       }
     }

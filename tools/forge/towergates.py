@@ -393,6 +393,48 @@ def occlusion_samples(spec):
     return {k: [p for y in ys for p in disc(y)] for k, ys in bands.items()}
 
 
+def front_height_rows(spec):
+    """How tall the model's front must be, per eye. -> (band_top, rows).
+
+    THE NUMBER THAT IS INVISIBLE UNTIL A BROWSER FINDS IT. The occlusion gate
+    demands the whole cowl band be hidden from all six shipped eyes; every eye
+    is in FRONT of the tower, so what hides it is the model's own front, and
+    the binding number is where an eye's ray to the WORST sample crosses the
+    socket plane (z = 0). Below that the front is a hole in the proof; above
+    it, by any margin, the proof passes with no die simulated.
+
+    IT IS TAKEN OVER THE WHOLE BAND, NOT THE AXIS, and that correction is why
+    this function exists here instead of twice in the callers. Both earlier
+    copies used the sample on the BORE AXIS at the band's top, which is not
+    the binding one: the disc reaches 2*clearR/(1.7*S) behind the axis, and a
+    DEEPER sample is seen over a LOWER crossing — the further back it sits,
+    the flatter the ray and the higher the wall it needs. The gap is not
+    academic. The portal-stress fixture was built exactly to the axis figure
+    (9.854), and the bake gate still found a leak: 1/99 at wide.full, on a
+    sample at z -4.57, which wanted 10.7. A planning number that a compliant
+    model fails is worse than no planning number.
+
+    Ignores the skin's lean (the gate applies it; a fraction of a degree moves
+    this by ~0.01) — so it is a floor to build over, not a target to hit."""
+    smp = occlusion_samples(spec)["cowl"]
+    ct = max(p[1] for p in smp)
+    rows = []
+    for eid, e in shipped_eyes():
+        best = None
+        for p in smp:
+            if p[2] >= 0.0 or e[2] <= 0.0:
+                continue                   # not a sample this eye looks past
+            t = e[2] / (e[2] - p[2])       # where the ray crosses z = 0
+            y = e[1] + (p[1] - e[1]) * t
+            if best is None or y > best:
+                best = y
+        if best is None:
+            rows.append((eid, None, "stands behind the socket plane — not a shipped view"))
+        else:
+            rows.append((eid, best, "" if e[1] > ct else "(looks UP at the band)"))
+    return ct, rows
+
+
 def occlusion_failures(tris, spec, tilt_deg):
     """-> (failures[], counts{}). Every sample hidden from every shipped eye."""
     to_model = tilt_frame(tilt_deg)

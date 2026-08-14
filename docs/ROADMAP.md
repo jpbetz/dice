@@ -3115,7 +3115,32 @@ re-capture is the deliberate kind: 13 fields moved, every one of them by
 exactly one ulp (max 8.9e-16), no field added or dropped, and every new value
 is the exact preset-derived number.
 
-### T2. The doorway ignores the portal it belongs to — small, DECIDE FIRST
+### T2. The doorway ignores the portal it belongs to — DECIDED + FIXED 2026-08-13
+**The decision: keep the knob and make it coherent.** Deleting `out.x` the way
+`out.z` was deleted was the other honest end, and it lost: the freedom is
+already 80% built — apron, lip, hood, exit spawn and the flight envelope all
+follow `out.x` — so the bug was never the knob, it was three bodies that had
+not been told. And it was not hypothetical: BOTH committed test fixtures
+declare an off-centre exit (the portal-stress fixture −0.15, the min-tower
+fixture +0.25), so each had a jamb standing 0.15–0.25 inside its own modelled
+opening, where a die grazing the edge meets an invisible wall.
+
+`doorL`/`doorR`/`lintel` now derive from `v.door.x`, written `anchor ⊕ delta`
+like the rest of `towerVolumes` (`+ ox / 2` is `+ 0 / 2` at the classic spec,
+and `x + 0.0` is `x`), so no classic body moved and the freeze needed only an
+additive `door.x` re-capture — no value moved, proved by a key-by-key walk.
+`tower-occlusion`'s doorway classifier follows the same centreline; its old
+NOTE apologised for the mismatch and is now a statement of where the aperture
+is. Red-checked by forcing `ox` back to 0: RED on the lintel and both jamb
+edges.
+
+**What this does NOT buy:** shipping a tower with an off-centre exit still
+owes the probe matrix, exactly as an off-classic sill does. What is proven
+today is that the door is coherent and that a 3d6 pour delivers through
+`out.x` 0.25 (`tower-glb-loader`); a real off-centre product tower wants
+`portal-probe` across seeds and pool sizes before the sill is called final.
+
+### T2 (original entry, kept for the reasoning) — small, DECIDE FIRST
 `doorL`/`doorR`/`lintel` are built centred at x=0 while the apron, lip and
 exit spawn all follow `portals.out.x` (legal range ±0.75). The first tower
 to use that freedom gets a doorway that does not line up with its own exit
@@ -3260,6 +3285,19 @@ bastion and blackanvil. They work, they are pinned by the classic spec, and
 re-baking them through the forge is pure cost until something forces it.
 Recorded so "why are there two ways to build a tower" has an answer on
 paper; do not spend on it.
+
+### T12. There is no MAXIMUM door width — small, needs a measured ceiling
+Found while fixing T2. `TOWER_PORTAL_LIMITS` floors `out.w` at 3.2·S = 4.0 and
+never caps it, but the doorway is cut out of the back wall by two flanking
+boxes, so the narrower jamb is `TABLE_W/2 − w/2 − |out.x|` and goes NEGATIVE
+once `w + 2|out.x| > TABLE_W`. At the 'close' preset (TABLE_W 8.6) with the x
+knob at its limit that is `w > 7.1`, against a widest shipped door of 5.0 — so
+nothing can reach it and it is filed rather than clamped. Clamping would hand
+a player a doorway the modeller never proved, and picking a ceiling by taste
+is what the portal FLOORS campaign exists to argue against: the number wants
+measuring (at what width does the lintel stop channelling? does a door wider
+than the flight envelope buy anything at all?). The inequality is written down
+beside the limits in js/main.js so the next person meets it before the bug.
 
 ## Structural risks (bets, not bugs — each gets more expensive to reverse)
 

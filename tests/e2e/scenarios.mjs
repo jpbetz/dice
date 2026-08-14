@@ -10233,10 +10233,14 @@ export const scenarios = [
     //
     // AND A NEW TOWER MUST BE FROZEN TOO. The registry is read live and every
     // id has to have a row, so registering a tower without capturing its
-    // contract is RED. That re-capture is the one legitimate kind — purely
-    // ADDITIVE, every existing number untouched, which `git diff --stat` on the
-    // fixture says out loud (`N insertions(+), 0 deletions(-)`). A deletion is
-    // the classic core moving, and shipping a tower is not that.
+    // contract is RED. That re-capture is the one routine kind — purely
+    // ADDITIVE: every number the two fixtures SHARE is identical and only new
+    // keys appear. Establish that with a key-by-key walk, not with the line
+    // count; a key added inside a nested object reflows its neighbours (adding
+    // `door.x` read as 20 insertions and 10 deletions, with no value moved).
+    // A moved value can still be right — T1's ulp fix moved 13 on purpose —
+    // but it is a change to what every client bakes, and it is named in the
+    // commit rather than absorbed into a fixture chore.
     //
     // THE GOLDEN IS GUARDED BEFORE IT IS TRUSTED. A fixture that got truncated
     // to `{}`, or whose rows are copies of one row, compares green against
@@ -10541,6 +10545,30 @@ export const scenarios = [
       assert.equal(spec.derived.door.w, MIN_TOWER_PORTALS.out.w, 'and the door is the declared width');
       assert.equal(spec.derived.door.sill, MIN_TOWER_PORTALS.out.sillY, 'at the declared sill');
 
+      // AND WHERE THE PORTAL PUT IT (T2). doorL/doorR/lintel were the last
+      // bodies built at a hard x=0 while the apron, lip, hood, exit spawn and
+      // flight envelope all followed `out.x` — so a tower using that freedom
+      // got a jamb standing inside its own modelled opening, and a die grazing
+      // there met an invisible wall. This fixture declares out.x 0.25, which
+      // makes it the case: the gap the three bodies cut must be exactly the
+      // declared opening, on both edges.
+      //
+      //   RED CHECK: `ox` forced back to 0 in towerColliders — RED on the
+      //   lintel line (`0 !== 0.25`) and on both jamb edges. Reverted: green.
+      const ox = MIN_TOWER_PORTALS.out.x, dw = MIN_TOWER_PORTALS.out.w / 2;
+      const bodyByName = Object.fromEntries(
+        (await a.dbg('towerContractSnapshot()')).bodies.map((b) => [b.name, b]));
+      assert.equal(bodyByName.lintel.position[0], ox,
+        'the lintel is centred on the declared doorway, not on the room');
+      assert.equal(bodyByName.doorL.position[0] + bodyByName.doorL.half[0], ox - dw,
+        `the left jamb ENDS at the opening's left edge (${ox} - ${dw})`);
+      assert.equal(bodyByName.doorR.position[0] - bodyByName.doorR.half[0], ox + dw,
+        `and the right jamb BEGINS at its right edge (${ox} + ${dw})`);
+      assert.equal(2 * (bodyByName.doorL.half[0] + bodyByName.doorR.half[0]) + 2 * dw,
+        (await a.dbg('tableExtents()')).w,
+        'and the two jambs plus the opening still span the whole back wall — '
+        + 'an off-centre door moves the gap, it does not add or lose wall');
+
       await a.roll('3d6');
       const film = await a.dbg('towerFilmInfo()');
       assert.equal(film.filmTower, 'glbmin',
@@ -10597,10 +10625,11 @@ export const scenarios = [
         'a tower→tower swap through TWO baked models still lands on the eight');
 
       // ---- the audits RUN on a baked model (C6) ----------------------------
-      // SHAPE, NOT VERDICTS. tower-fit's thresholds and the occlusion pass
-      // mark belong to a real shipped tower, and this fixture is a plain
-      // monolith that was never authored to satisfy them — grading it here
-      // would pin a number nobody chose. What IS worth pinning is that the
+      // SHAPE FIRST. tower-fit's thresholds belong to a real shipped tower, and
+      // this fixture is a plain monolith that was never authored to satisfy
+      // them — grading it on those would pin a number nobody chose. (The two
+      // HARD occlusion bands are a different matter now: see below.) What IS
+      // worth pinning is that the
       // audits can read a baked model at all: every one of them was written
       // against code-built skins, walks `towerSkin*` names, and would return
       // an empty or null answer for a GLB if the loader had named things
@@ -10634,6 +10663,27 @@ export const scenarios = [
         + 'one — its grids follow the bore (v.smp.kR), which is the whole reason '
         + 'a moved portal can be graded at all');
 
+      // AND THE TWO HARD BANDS ARE A VERDICT, NOT A SHAPE (ROADMAP T8). This
+      // used to be shape-only for a good reason and a bad one. The good one
+      // stands: exit and hood are SOFT bands a portal is a MINIMUM for, and
+      // grading them needs a per-tower allowance. The bad one was that the
+      // fixture LEAKED — 11/99 of the cowl band at the highest eye — because
+      // its front was capped at its own entry rim, and a leaking asset cannot
+      // carry the assertion that would have caught it. It does not leak now
+      // (the recipe builds the front to front_height_needed), so the claim the
+      // bake gate makes about the file is also made about the SOCKETED model,
+      // which is the only version a player would ever see.
+      for (const e of occ.eyes) {
+        assert.equal(e.shaft.blocked, e.shaft.n,
+          `${e.id}: the shaft band is fully hidden (${e.shaft.blocked}/${e.shaft.n}) — `
+          + `a die's fall must not be watchable from a shipped camera`);
+        assert.equal(e.cowl.blocked, e.cowl.n,
+          `${e.id}: and so is the cowl band (${e.cowl.blocked}/${e.cowl.n}), which is `
+          + `where the VANISH happens. This is the band a front built only to the `
+          + `entry rim cannot cover: the ray to it crosses the socket plane above `
+          + `the rim, so "my model is as tall as its mouth" is a leak by construction`);
+      }
+
       // The other half of C6: a row whose model has NOT arrived gets `pending`
       // rather than a plausible answer about whatever the bench is wearing.
       await a.dbg(`towerRegisterGlb('glbslow', '/no/such/model.glb')`);
@@ -10643,7 +10693,7 @@ export const scenarios = [
         + 'skin — that is the one result nobody would think to re-check');
 
       // PUT THE BENCH AWAY. towerLabSet deepens the mat by matExtra exactly as
-      // the socket does (it is the same towerDeepenMat), so a lab left standing
+      // the socket does (it is the same towerMatDepth, one layer over), so a lab left standing
       // would make the restoration assertion at the end measure the lab rather
       // than the tower. Leaving it up is also just wrong: the probe is a tool,
       // not a state this scenario is entitled to hand to the next one.

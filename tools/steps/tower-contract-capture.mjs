@@ -29,10 +29,18 @@ limitations under the License.
 // and say so in the commit.
 //
 // THE ONE LEGITIMATE RE-CAPTURE is ADDITIVE: a new tower registers, or the
-// snapshot's projection gains a field. Both leave every existing number where
-// it was, so the review is mechanical — `git diff --stat` on the fixture must
-// read `N insertions(+), 0 deletions(-)`. A deletion is the contract moving,
-// and no commit message makes that a re-pin.
+// snapshot's projection gains a field. Both leave every existing NUMBER where
+// it was, and that — not the line count — is what a review has to establish:
+// walk the old fixture against the new one key by key and every leaf they
+// share must be identical, with only new keys appearing. `git diff --stat`
+// reading `0 deletions(-)` is a good first sniff but it is not the rule; a key
+// added inside a nested object reflows the lines around it (adding `door.x`
+// showed as 20 insertions and 10 deletions, with not one value moved).
+//
+// A MOVED VALUE IS THE CONTRACT MOVING, and no commit message makes that a
+// re-pin. It can still be right — T1's ulp fix moved 13 numbers on purpose —
+// but then say which ones and by how much, because that is a change to what
+// every client bakes, not a fixture chore.
 //
 // TWO AXES, and each earns its rows:
 //   Z0    three zoom presets × {unsocketed, heartwood}. z0 is -TABLE_D/2 and

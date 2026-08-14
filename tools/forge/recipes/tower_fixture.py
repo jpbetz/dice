@@ -10,7 +10,13 @@ shipped defaults fails here, which is the whole point.
 
     blender -b --factory-startup --python-exit-code 1 --python tower_fixture.py
     tools/forge/bake.sh tools/forge/recipes/tower_fixture.py \
-        --tower --expect-colors --max-tris 2000
+        --tower --expect-colors --max-tris 2000 --bare-colliders ramp,lip
+
+(The two bare colliders are a DECLARATION, not a waiver: a plain monolith
+clads neither the ramp nor the lip, so the lane gate is told so by name
+instead of being left red for a reader to interpret. Everything else in the
+nine refusals passes outright — including the occlusion grid, which it did
+not until the front stopped being capped at the entry rim.)
 
 DECLARED PORTALS (app frame: y up, +z toward the player, z=0 the back-wall
 socket plane; S = 1.25 = d20 radius). Classic in brackets — every value
@@ -53,7 +59,9 @@ THE SHAPE, and why it is that shape. A rough monolith with a modest lean:
 broad, squat, faceted, with a bore up the middle and a mouth at its foot. It
 is as fat as the ENVELOPE allows because the contract makes it fat — a
 5.15-wide door and a 4.5-wide bore barely live inside x ±3.15 — and squat
-because rimY caps the height. The silhouette leans in X only; the front face
+because the entry rim is low. It used to be squat because rimY was TAKEN as
+the height cap, which is the mistake that left it leaking the cowl band; see
+HEIGHT below. The silhouette leans in X only; the front face
 stays a plumb plane at z = 0, because that face IS the socket plane the
 model seats against, and a doorway cut through a leaning face would be a
 doorway that changes width with height. The lean is capped by the envelope's
@@ -77,14 +85,37 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import forge as F  # noqa: E402
+import towerkit as K  # noqa: E402
 
 S = 1.25                       # d20 radius: the unit the contract is quoted in
 
 PORTAL_IN = {"x": 0.25, "rimY": 7.8 * S, "z": -2.0 * S, "clearR": 1.76 * S}
 PORTAL_OUT = {"x": -0.15, "sillY": 1.0 * S, "w": 4.12 * S, "clearH": 3.8 * S}
+SPEC = {"in": PORTAL_IN, "out": PORTAL_OUT}
 DESPAWN_Y = PORTAL_IN["rimY"] - 1.4 * S
 
-HEIGHT = PORTAL_IN["rimY"]     # the rim IS the top edge, so they are one number
+# THE RIM IS NOT A HEIGHT CAP, and believing it was is what left this fixture
+# leaking the cowl band at 11/99 from the highest eye (ROADMAP T8). HEIGHT used
+# to be `PORTAL_IN["rimY"]` with the comment "the rim IS the top edge, so they
+# are one number" — but the cowl band's TOP is despawnY + a die's radius, and
+# the ray from a high eye to that sample crosses the model's front plane ABOVE
+# the rim. A model whose front stops at its own rim therefore CANNOT hide the
+# vanish, no matter how honestly closed the rest of the shell is.
+#
+# So the front is built to the requirement instead of to the rim, and the
+# requirement is asked for rather than typed: front_height_needed() returns the
+# binding eye's crossing (10.120 at wide.full for this spec) and 0.15 of margin
+# sits on top, putting the crown at 10.27 against a rim of 9.75. If the shipped
+# eyes move or the cowl cap is re-derived, this follows them.
+#
+# Building to it the first time still left 1/99 leaking, and that was the SECOND
+# finding: front_height_needed measured the sample on the BORE AXIS, while the
+# binding sample is the deepest point of the widest disc — further back means a
+# flatter ray and a taller wall (9.854 vs 10.120 here). Both copies of that
+# arithmetic now live in towergates.front_height_rows, so the plan, the recipe
+# and the gate cannot disagree again.
+FRONT_NEED, FRONT_EYE = K.front_height_needed(SPEC)
+HEIGHT = max(PORTAL_IN["rimY"], FRONT_NEED + 0.15)
 WALL = 0.24                    # front/back wall thickness; also, directly, the
 #                                approach clearance at the tightest point —
 #                                see assert_column_clear. 0.35 until the

@@ -8184,6 +8184,16 @@ const TOWER_PORTAL_LIMITS = Object.freeze({
   out: { wMin: 3.2 * TOWER_S, clearHMin: 2.7 * TOWER_S,
          sillY: [0.5 * TOWER_S, 1.1 * TOWER_S], x: [-0.6 * TOWER_S, 0.6 * TOWER_S] },
 });
+// THERE IS NO MAXIMUM DOOR WIDTH, and one day there will have to be. The
+// doorway is cut out of the back wall by two flanking boxes, so the narrower
+// jamb is (TABLE_W/2 − w/2 − |out.x|) wide and goes NEGATIVE once
+// w + 2|out.x| > TABLE_W — at the 'close' preset (TABLE_W 8.6) that is w > 7.1
+// with the x knob at its limit, against a widest shipped door of 5.0 and a
+// floor of 4.0. So nothing can reach it today, and inventing a ceiling is a
+// contract decision that deserves what the portal FLOORS got: a measured
+// campaign, not a number somebody liked. Filed as ROADMAP T12 with the
+// inequality, rather than clamped here — a clamp would hand a player a
+// doorway the modeller never proved.
 
 // THE SMELL TEST, EXECUTED. Returns a list of human-readable violations, empty
 // for a legal spec. It lives HERE, next to the limits it reads, because this
@@ -8365,7 +8375,15 @@ function towerVolumes(spec) {
     // that compute a graze height (pourPlan and towerLabDrop). Both now read
     // it, so a moved sill moves the spawn with it instead of leaving the dice
     // grazing a chute that is no longer where they think it is.
-    door:    { w: spec.out.w, h: spec.out.clearH, sill: spec.out.sillY },
+    // `x` is the doorway's CENTRELINE, and it is here because the three bodies
+    // that cut the opening used to be built at a hard 0 while the apron, the
+    // lip, the hood and the exit spawn all followed `out.x` (T2). A tower using
+    // that freedom got a doorway that did not line up with its own exit lane —
+    // and one already does: the portal-stress fixture declares out.x −0.15 and
+    // the min-tower fixture 0.25, so the jamb sat inside the modelled opening
+    // and a die grazing there met an invisible wall. Same double as the
+    // `0 + dOutX` the neighbours above use, since the classic out.x is 0.
+    door:    { w: spec.out.w, h: spec.out.clearH, sill: spec.out.sillY, x: spec.out.x },
     // THE FLIGHT ENVELOPE — where a DIE actually goes, as opposed to where the
     // engine cut its collider gap.
     //
@@ -8875,10 +8893,20 @@ function towerColliders(w, v) {
   // The back wall carries the DOORWAY: two flanking boxes and a lintel with
   // a clear opening for the exit, instead of an infinite plane — the die
   // spawns inside the tower and flies out through it.
-  const z0 = v.z0, dw = v.door.w / 2, side = TABLE_W / 2 - dw;
-  boxAt('doorL', wallMat, [-(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
-  boxAt('doorR', wallMat, [(TABLE_W / 2 + dw) / 2, 11, z0 - 0.3], [side / 2, 11, 0.3]);
-  boxAt('lintel', wallMat, [0, v.door.h + (22 - v.door.h) / 2, z0 - 0.3], [dw, (22 - v.door.h) / 2, 0.3]);
+  //
+  // AND THE OPENING IS WHERE THE PORTAL SAYS (T2). These three were the last
+  // bodies built at a hard x=0 while every other consumer of the exit — apron,
+  // lip, hood, spawn point, flight envelope — followed `out.x`. The jamb ate
+  // into the modelled opening on any tower that used the freedom, which both
+  // committed test fixtures do. Written as `anchor ⊕ delta` like everything in
+  // towerVolumes: at the classic out.x of 0 the added terms are `+ 0 / 2`, and
+  // `x + 0.0` is `x` on the same double, so the classic bodies do not move.
+  const z0 = v.z0, dw = v.door.w / 2, side = TABLE_W / 2 - dw, ox = v.door.x;
+  boxAt('doorL', wallMat, [-(TABLE_W / 2 + dw) / 2 + ox / 2, 11, z0 - 0.3],
+    [side / 2 + ox / 2, 11, 0.3]);
+  boxAt('doorR', wallMat, [(TABLE_W / 2 + dw) / 2 + ox / 2, 11, z0 - 0.3],
+    [side / 2 - ox / 2, 11, 0.3]);
+  boxAt('lintel', wallMat, [ox, v.door.h + (22 - v.door.h) / 2, z0 - 0.3], [dw, (22 - v.door.h) / 2, 0.3]);
   // BACKSTOP (probe run 1): behind the doorway the world was open void —
   // die2 ricocheted off a head-on and flew 5 units behind the tower. The
   // tower pit is now enclosed: a back wall and two flanks, all in the
@@ -10423,7 +10451,7 @@ window.__diceDebug = {
       hood: { c: xyz(v.hood.c), s: xyz(v.hood.s) },
       lip: { c: xyz(v.lip.c), s: xyz(v.lip.s), rx: v.lip.rx },
       exit: { p: xyz(v.exit.p), pitch: v.exit.pitch },
-      door: { w: v.door.w, h: v.door.h },
+      door: { w: v.door.w, h: v.door.h, x: v.door.x },
       // THE FLIGHT ENVELOPE (B2). The collider gap has been frozen here since
       // the golden was captured; the box a DIE reaches was never in it, so a
       // change to the lane span or the yaw fan moved every aperture a model
@@ -11432,7 +11460,7 @@ window.__diceDebug = {
       limits: TOWER_PORTAL_LIMITS,
       derived: {
         z0: v.z0, S: v.S, despawnY: v.despawnY,
-        door: { w: v.door.w, h: v.door.h, sill: v.door.sill },
+        door: { w: v.door.w, h: v.door.h, sill: v.door.sill, x: v.door.x },
         exit: { p: v.exit.p, pitch: v.exit.pitch },
         // Where the slick outrun ENDS — the last engine surface a die touches
         // before it is on felt the whole table shares.

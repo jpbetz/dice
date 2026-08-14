@@ -112,23 +112,12 @@ def reach(phi, ax, az):
 def front_height_floor(spec):
     """THE NUMBER THAT IS INVISIBLE UNTIL A BROWSER FINDS IT.
 
-    The occlusion proof demands the top of the cowl band — despawnY + a die's
-    radius — be hidden from all six shipped eyes. Every one of those eyes is
-    in FRONT of the tower, so what hides that sample is the model's own front,
-    and the binding case is simply where each eye's ray to it crosses the
-    socket plane. Below that height the front is a hole in the proof; above
-    it, by any margin, the proof passes without a single die being simulated.
+    One line, because the arithmetic lives in towergates now: the gate, this
+    plan and the recipes must all be answering with the same number, and they
+    were not — see TG.front_height_rows for what the two hand-written copies
+    had wrong and what it cost.
     """
-    pin = spec["in"]
-    ct = pin["rimY"] - EM["despawnDrop"] + EM["dieR"]
-    rows = []
-    for eid, e in TG.shipped_eyes():
-        if e[1] <= ct:
-            rows.append((eid, None, "looks UP at the band — the wall has it"))
-            continue
-        f = e[2] / (e[2] - pin["z"])
-        rows.append((eid, e[1] + (ct - e[1]) * f, ""))
-    return ct, rows
+    return TG.front_height_rows(spec)
 
 
 def main():
@@ -203,8 +192,8 @@ def main():
     r_at_jamb = math.hypot(jamb_x - ax, 0.0 - az)
     print(f"   the far jamb stands {r_at_jamb:.3f} from the bore axis, so any plan whose")
     print(f"   radius there is under that has no stone beside its own door")
-    print(f"   NOTE the engine builds doorL/doorR/lintel centred on x = 0 regardless of")
-    print(f"   out.x (ROADMAP T2) — an off-centre door does not move them yet")
+    print(f"   the engine's doorL/doorR/lintel follow out.x, so the gap they cut is")
+    print(f"   exactly the opening declared above (T2, 2026-08-13)")
 
     print("\n6. THE LANE — what cladding the outrun costs")
     v = TG.engine_volumes(spec)
@@ -224,15 +213,17 @@ def main():
 
     print("\n7. HOW TALL THE FRONT MUST BE — the occlusion proof, in advance")
     ct, rows = front_height_floor(spec)
-    print(f"   the cowl band's top is despawnY + a die's radius = {ct:.3f}")
-    print("   each eye's ray to it crosses the socket plane (z = 0) at:")
+    print(f"   the highest cowl sample sits at y {ct:.3f} (the band is capped at")
+    print(f"   despawnY + a die's radius, and the top disc sits 0.15 under that)")
+    print("   each eye's ray to the band's WORST sample — the deepest point of the")
+    print("   widest disc, not the bore axis — crosses the socket plane (z = 0) at:")
     need = 0.0
     for eid, y, note in rows:
         if y is None:
             print(f"     {eid:<12}    —      {note}")
         else:
             need = max(need, y)
-            print(f"     {eid:<12} y {y:6.3f}")
+            print(f"     {eid:<12} y {y:6.3f}  {note}")
     print(f"   SO: the model's front must be solid to y {need:.3f} over the door's")
     print(f"   width, or the occlusion proof fails at that eye. Build over it and the")
     print(f"   proof passes with no die simulated — which is the whole cosmetic lane.")

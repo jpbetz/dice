@@ -64,7 +64,17 @@ Unchanged, still position bounds rather than aperture floors: `rimY ∈
 [5.8, 8.2]·S`; `in.x ∈ ±1.0·S`, `in.z ∈ [−2.6, −1.0]·S` (the bore stands
 over the fixed chute, inside the pit flanks); `sillY ∈ [0.5, 1.1]·S` (the
 28°-family ramp must still reach the felt inside the FIXED matExtra
-spend); `out.x ∈ ±0.6·S`. (Historical note kept from v2: the ORIGINAL
+spend); `out.x ∈ ±0.6·S` — and since 2026-08-13 (T2) that knob moves the
+DOORWAY too. `doorL`/`doorR`/`lintel` were the last bodies built at a hard
+x = 0 while the apron, the lip, the hood, the exit spawn and the flight
+envelope all followed `out.x`, so a tower using the freedom got a jamb
+standing inside its own modelled opening; both committed test fixtures
+declare an off-centre exit and had exactly that. The opening the three
+bodies cut is now `out.x ± out.w/2` on both edges. There is still no
+MAXIMUM door width, and the jamb goes negative once `w + 2|out.x| >
+TABLE_W` — unreachable today (that is `w > 7.1` at the narrowest preset,
+against a widest shipped door of 5.0) and filed as T12 rather than
+clamped. (Historical note kept from v2: the ORIGINAL
 §2b text below says "width 3.0", which was doc drift even then — the
 shipped classic door has been 4.0·S since the jamb-clipping fix.)
 Floors only moved DOWN, so every shipped spec remains legal and the
