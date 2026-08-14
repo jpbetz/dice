@@ -9963,6 +9963,9 @@ window.__diceDebug = {
       // The apron and the lip are ENGINE volumes outside the socket by
       // design, and the contract invites a model to skin them. Both cladding
       // boxes are rotated, so both dip a unit below the felt.
+      // (WHETHER a model took the invitation is towerCladAudit's question,
+      // measured against the row's declared `bareColliders` — this classifier
+      // only says that a box which IS here is legally here.)
       if (b.min.y < K.cladY) {
         return b.max.z > v.z0 + K.lipSplitZ
           ? 'LIP CLADDING — the engine outrun, skinned'
