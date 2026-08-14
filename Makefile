@@ -43,8 +43,23 @@ BILLING_ACCOUNT ?=
 
 GCLOUD := gcloud --project $(PROJECT)
 
-.PHONY: help init status setup deploy url logs verify-domain domain \
-        domain-status cleanup-policy require-config require-domain
+# THE BUILD STAMP baked into every deploy, read back from /health (ROADMAP §0j,
+# docs/DEPLOY.md "Which commit is live"). Before this there was no way to say
+# which commit a running service was, which is exactly the hole the frozen-mtime
+# incident left us standing in.
+#
+# `-dirty` is not decoration. `gcloud run deploy --source .` uploads the WORKING
+# TREE, not HEAD, so on a dirty checkout a bare sha would name a build that was
+# never deployed — the stamp would be confidently wrong, which is worse than
+# absent. server.js accepts exactly `[0-9a-f]{7,40}(-dirty)?` and reports
+# `unknown` for anything else, so a git call that fails here degrades honestly
+# rather than publishing whatever string it produced.
+GIT_REV   := $(shell git rev-parse --short=12 HEAD 2>/dev/null)
+GIT_DIRTY := $(shell test -n "$$(git status --porcelain 2>/dev/null)" && echo dirty)
+GIT_SHA   := $(if $(GIT_REV),$(GIT_REV)$(if $(GIT_DIRTY),-dirty),unknown)
+
+.PHONY: help init status setup deploy url logs health print-sha verify-domain \
+        domain domain-status cleanup-policy require-config require-domain
 
 help:
 	@echo "Dice Table deployment (Google Cloud Run) — runbook in docs/DEPLOY.md"
@@ -61,6 +76,7 @@ help:
 	@echo "Any time:"
 	@echo "  make status                what is done, what is next — start here when lost"
 	@echo "  make url                   print the service URL"
+	@echo "  make health                ask the live service which commit it is running"
 	@echo "  make logs                  read recent server logs"
 	@echo "  make domain-status         mapping + TLS certificate detail"
 	@echo ""
@@ -192,11 +208,19 @@ setup: require-config
 # 1 full vCPU (fractional CPU forces concurrency=1, which cannot hold a
 # room's worth of SSE streams), and the 60-minute platform-maximum timeout
 # (each SSE stream is cut hourly; the client reconnects silently).
+#
+# --update-env-vars, deliberately NOT --set-env-vars (which ROADMAP §0j
+# suggested): --set replaces the service's whole environment, so it would
+# silently wipe a DICE_LOG_LEVEL=debug or DICE_ROOM_GUARD that had been set on
+# the live service to diagnose something — the next deploy would undo the
+# diagnosis mid-investigation. --update touches this one key and leaves the rest.
 deploy: require-config
+	@echo "deploying $(GIT_SHA)"
 	$(GCLOUD) run deploy $(SERVICE) --source . --region $(REGION) \
 	  --allow-unauthenticated \
 	  --cpu 1 --memory 512Mi --concurrency 80 --timeout 3600 \
 	  --min-instances 0 --max-instances 1 --cpu-boost \
+	  --update-env-vars GIT_SHA=$(GIT_SHA) \
 	  --quiet
 	@echo ""
 	@echo "Live at:"
@@ -205,6 +229,15 @@ deploy: require-config
 url: require-config
 	@$(GCLOUD) run services describe $(SERVICE) --region $(REGION) \
 	  --format='value(status.url)'
+
+# What is actually running out there. `sha` should equal `make -s print-sha`
+# after a clean deploy; a `-dirty` suffix means the tree that shipped was not
+# HEAD, and `unknown` means the deploy did not come through this Makefile.
+health: require-config
+	@curl -fsS "$$($(MAKE) -s url)/health" && echo
+
+print-sha:
+	@echo $(GIT_SHA)
 
 logs: require-config
 	$(GCLOUD) run services logs read $(SERVICE) --region $(REGION) --limit=100

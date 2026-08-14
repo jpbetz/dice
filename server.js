@@ -49,6 +49,25 @@ import { SET_IDS } from './js/themes.js';
 const PORT = Number(process.env.PORT) || 8123;
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
+// WHICH COMMIT IS THIS (ROADMAP §0j). Baked by `make deploy`
+// (`--update-env-vars GIT_SHA=…`); absent for `node server.js` on a laptop and
+// for anyone deploying by hand, and this must NOT invent one. `unknown` is a true
+// answer; a guessed sha is the frozen-mtime incident again, where the only way
+// to tell which build was live was to trigger known behavior and infer.
+//
+// VALIDATED RATHER THAN ECHOED. /health is public and unauthenticated like
+// every other door here (goal 10), so whatever lands in this env var is
+// published to the internet — a typo that puts a token in GIT_SHA must produce
+// `unknown`, not a disclosure. Only a hex object name survives, optionally
+// carrying the `-dirty` marker the Makefile appends when the tree it uploaded
+// was not HEAD (`gcloud run deploy --source .` ships the WORKING TREE, so on a
+// dirty checkout the bare sha would name a build that was never deployed).
+const GIT_SHA = (() => {
+  const raw = String(process.env.GIT_SHA || '').trim();
+  return /^[0-9a-f]{7,40}(-dirty)?$/.test(raw) ? raw : 'unknown';
+})();
+const STARTED_AT = Date.now();
+
 const MAX_BODY = 64 * 1024;       // reject bodies larger than this
 const MAX_DICE = 40;
 // A roll label carries the notation's '# comment' text when present, so this
@@ -917,6 +936,93 @@ function keepColor(room, wanted) {
   return next;
 }
 
+// THE ROOM-CREATION THROTTLE (ROADMAP §0j). Room creation is the one door that
+// ALLOCATES out of MAX_ROOMS, so it is the one a script uses to lock a real
+// table out with `server_full`. Cloud Armor is still the authority (DEPLOY.md
+// "Bounding room creation" holds the runbook) because it sees an IP nobody can
+// forge; this is defence in depth for the day the rule is off, mis-scoped, or
+// the app is running somewhere else entirely.
+//
+// THE ROADMAP'S REASON FOR KILLING F1 IS STALE, verified 2026-08-14.
+// `req.socket.remoteAddress` does collapse to the proxy behind Cloud Run — but
+// nothing has read it alone since `clientAddr` landed, and `clientAddr` already
+// keys the /api/clienterror limiter that ships today. So the objection is
+// answered; what survives is the WEAKER, sharper one below.
+//
+// X-FORWARDED-FOR IS NOT A CREDENTIAL. Cloud Run's front end APPENDS to
+// whatever the client sent, so the leftmost entry `clientAddr` returns is the
+// real client only when the client sent no header of its own. An attacker
+// rotates it to evade this, and can aim it at a victim's address to spend the
+// victim's budget. Both are fatal to a HARD control and survivable by a soft
+// one, which is what fixes the shape of this rule:
+//
+//   * CREATION ONLY. `rooms.has(roomName)` short-circuits it, so joining or
+//     resuming a table that exists is never rate-limited. Even a wholly
+//     mis-keyed player can always sit down where their friends already are.
+//   * NEVER /api/events (§0d F3: a 429 on the event stream is a self-inflicted
+//     stream storm — every refused client reconnects immediately).
+//   * ARMED ONLY UNDER PRESSURE. Below the guard there are hundreds of free
+//     slots, so nobody can be locked out and nobody is refused. A real table
+//     never reaches this branch; the e2e suite (158 scenarios, rooms deleted
+//     the moment they empty) never comes close either.
+//   * A RATE, NOT AN OWNERSHIP CAP — and that choice is the whole safety
+//     argument. If the key ever collapses to one value for everyone (the F1
+//     failure, e.g. a platform that stops sending the header), an ownership cap
+//     would refuse every new table above the guard, while a rate merely spends
+//     ROOM_CREATE_PER_MIN across everyone — an order of magnitude above what
+//     this app's real demand has ever been.
+//
+// The attack it actually defeats: 500 unthrottled creations arrive in seconds;
+// throttled, one key adds 10/min past the guard, and each of those rooms is
+// deleted 60 s later (JOIN_GRACE_MS) unless the attacker also holds an SSE
+// stream answering heartbeats. A spoofing attacker evades it — that is Cloud
+// Armor's half, and it is why the runbook is not optional.
+const ROOM_CREATE_PER_MIN = 10;
+// Half the table. Below it a refusal cannot be preventing a lockout, because
+// there are 250 free slots; above it every creation is contested.
+// DICE_ROOM_GUARD overrides it, read once at boot exactly as DICE_SETUP_TTL_MS
+// is and for the same reason: a test cannot stand up 250 live rooms to watch
+// one refusal, and a test-only route or query parameter would put a lever on
+// the live HTTP surface that exists for nobody but the tests. 0 means "always
+// armed"; junk or a negative falls back to the default.
+// The empty-string check is not pedantry: `Number('')` is 0, so a var that is
+// SET BUT BLANK would otherwise arm the throttle for everyone — the one reading
+// of an unset knob that must never happen silently.
+const ROOM_CREATE_GUARD = (() => {
+  const raw = String(process.env.DICE_ROOM_GUARD ?? '').trim();
+  const n = Number(raw);
+  if (!raw || !Number.isFinite(n) || n < 0) return Math.floor(MAX_ROOMS / 2);
+  return Math.min(n, MAX_ROOMS);
+})();
+const roomCreateHits = new Map(); // ip -> {n, min}
+
+// True if this request may mint a new room. FAILS OPEN at every step: below the
+// guard, without a usable key, or on any surprise, the answer is yes.
+function takeRoomCreateBudget(req) {
+  if (rooms.size < ROOM_CREATE_GUARD) return true;
+  const key = clientAddr(req);
+  if (!key || key === '?') return true; // no address to bound: never refuse
+  const min = Math.floor(Date.now() / 60000);
+  const hit = roomCreateHits.get(key);
+  if (hit && hit.min === min) {
+    if (hit.n >= ROOM_CREATE_PER_MIN) {
+      // Logged at info, not debug: "why can nobody make a table" is answered by
+      // reading the log, and a rule that fires silently is one nobody can
+      // verify from the outside (DEPLOY.md says to grep for exactly this).
+      log(`room throttled: ${logField('ip', key)} rooms=${rooms.size}`);
+      return false;
+    }
+    hit.n++;
+    return true;
+  }
+  roomCreateHits.set(key, { n: 1, min });
+  // Same prune as clientErrorHits: last minute's keys are dead weight.
+  if (roomCreateHits.size > 500) {
+    for (const [k, v] of roomCreateHits) if (v.min !== min) roomCreateHits.delete(k);
+  }
+  return true;
+}
+
 async function handleJoin(req, res) {
   const body = await readJsonBody(req);
   if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
@@ -953,6 +1059,13 @@ async function handleJoin(req, res) {
     }
     log(`resume  ${logField('room', roomName)} ${logField('name', name)} color=${seat.color} players=${seatRoom.players.size}`);
     return sendJson(res, 200, joinSnapshot(seatRoom, seat));
+  }
+
+  // The creation throttle (see takeRoomCreateBudget) sits AHEAD of the caps
+  // below on purpose: a refused key must not get as far as evictLingeringRoom,
+  // or a script that cannot create rooms could still destroy prepared ones.
+  if (!rooms.has(roomName) && !takeRoomCreateBudget(req)) {
+    return sendError(res, 429, 'too many new rooms from this address — try again in a minute', 'room_rate_limited');
   }
 
   // Entity caps: an unauthenticated client must not be able to allocate
@@ -2747,6 +2860,57 @@ function handleTableInfo(req, res, url) {
 }
 
 // ---------------------------------------------------------------------------
+// Operations
+// ---------------------------------------------------------------------------
+
+// GET /health — what is running here, and is it coping (ROADMAP §0j).
+//
+// The question it exists to answer is "which commit is live", asked from a
+// phone with curl. Before this there was no way to answer it except by
+// triggering known behavior and inferring, which is the position the
+// frozen-mtime bug left this project in for a whole debugging session.
+//
+// WHAT IT DISCLOSES, AND WHY EACH FIELD IS SAFE. Goals 7 and 12 bind: the
+// server holds no persistent state and is not a place anyone's data lives, and
+// nothing here may leak what little it holds in memory. So:
+//   * `sha` / `node` / `uptimeSec` — facts about the BINARY, not about anyone.
+//   * `rooms` / `players` / `streams` / `rssMb` — CARDINALITIES. Counts name
+//     nobody: not a room key (which is the table's only access control, goal
+//     10 — a leaked name is a leaked door), not a player name, not a roll, not
+//     a log line, not a setting, not an address. There is no field here from
+//     which any of those can be reconstructed.
+//   * `maxRooms` — the denominator the numerator is useless without; it is the
+//     number that decides whether a `server_full` report is real.
+// It is deliberately NOT a room listing. `/admin/rooms behind a shared secret`
+// is a separate §0j nice-to-have precisely because it would disclose keys, and
+// that is the line this endpoint stays on the safe side of.
+//
+// UNAUTHENTICATED, like every other door (goal 10) — a health check that needs
+// a secret is one the operator cannot run from wherever they happen to be. It
+// is a bounded, allocation-free read, so it is not a lever worth throttling:
+// the walk below is O(players) over caps of 500 × 40, and `sendJson` already
+// sends `no-store` so no proxy can serve a stale answer as a fresh one.
+function handleHealth(req, res) {
+  let players = 0;
+  let streams = 0;
+  for (const room of rooms.values()) {
+    players += room.players.size;
+    for (const player of room.players.values()) streams += player.clients.size;
+  }
+  sendJson(res, 200, {
+    ok: true,
+    sha: GIT_SHA,
+    node: process.versions.node,
+    uptimeSec: Math.round((Date.now() - STARTED_AT) / 1000),
+    rooms: rooms.size,
+    maxRooms: MAX_ROOMS,
+    players,
+    streams,
+    rssMb: Math.round(process.memoryUsage.rss() / (1024 * 1024)),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Static files
 // ---------------------------------------------------------------------------
 
@@ -2782,6 +2946,72 @@ function isVendor(absPath) {
   return absPath === VENDOR_DIR || absPath.startsWith(VENDOR_DIR + path.sep);
 }
 
+// WHAT IS THE APP, AND WHAT IS MERELY IN THE DIRECTORY (C29).
+//
+// The rule was "the file exists" where it wanted to be "the file is part of the
+// app". safeResolve below stops traversal and every DOTFILE, and that is the
+// whole of what it stopped: `.git/config` and `.git/HEAD` 403, and everything
+// else under ROOT was served — `GET /server.js` returned this file, 200, and so
+// did `/package.json` and every `.mjs` under `tests/` and `tools/`, half a
+// megabyte of `scenarios.mjs` among them.
+//
+// TWO CLAIMS IN ROADMAP C29 ARE WRONG, measured against the pre-allowlist
+// server on 2026-08-14 and worth recording because they are the reason this
+// looked smaller than it was:
+//   * "`Makefile` and `docs/*.md` 404 because their extensions are not in
+//     MIME" — they did not. There is no MIME-based refusal anywhere;
+//     streamFile falls back to `application/octet-stream`, so `/Makefile`,
+//     `/CLAUDE.md`, `/docs/ROADMAP.md`, `/LICENSE` and `/gpu-trace.csv` all
+//     returned 200 with their real bytes.
+//   * "no credential or config exposure, verified path by path" — the file it
+//     names, `.deploy.config`, does not exist in this repo. The real one is
+//     `deploy/config.mk` (PROJECT, BILLING_ACCOUNT, DOMAIN), it has no
+//     dot-prefixed segment, and `GET /deploy/config.mk` returned 200 with the
+//     billing account in the body. Production never had it — `.gcloudignore`
+//     drops `deploy/` from the upload — but every local `node server.js`,
+//     including the preview table, served it to anything that could reach the
+//     port. Pinned in tests/static-cache.test.mjs.
+//
+// AN ALLOWLIST OF ROOTS, NOT A DENYLIST OF NAMES. A denylist grows a new entry
+// every time a directory is added and is silently wrong until someone notices —
+// the same failure shape as C28's stand-in constants. An allowlist's failure is
+// a 404 on something the page needs, which is loud, immediate, and covered by
+// the test below.
+//
+// The list was derived by reading index.html and grepping every origin-relative
+// path the client and the tooling fetch (2026-08-14) — not guessed:
+//   index.html      css/style.css, js/main.js, js/report.js, and the importmap's
+//                   two vendor modules; js/main.js reaches models/towers/*.glb.
+//   lab.html        the dice lab, dev chrome rather than player UI — but
+//                   `tools/lab-shots.mjs`, `tools/geo-bench-shots.mjs` and one
+//                   e2e scenario all navigate the served origin to it, so it
+//                   stays servable. It only loads js/ and vendor/, which are
+//                   public anyway, so serving it discloses nothing new.
+//   chrome-lab.html the 2D counterpart (tools/README §), which iframes
+//                   index.html. `.gcloudignore` already keeps it out of the
+//                   deployed image; this keeps it working locally.
+//   tests/e2e/fixtures/  the harness fetches tower_fixture.glb THROUGH THE PAGE
+//                   ORIGIN (the tower-glb-loader scenario), so a 404 here is a
+//                   red suite. Inert in production: `.gcloudignore` excludes
+//                   tests/ entirely, so the path is simply absent there.
+// Everything else — server.js, package.json, README.md, LICENSE, Makefile,
+// docs/, tools/, tests/*.mjs — 404s. Nothing in js/ or index.html fetches any
+// of them; verified, so narrowing costs nothing today.
+//
+// 404 rather than 403, because "forbidden" would confirm the file exists.
+const APP_DIRS = ['js', 'css', 'vendor', 'models', 'tests/e2e/fixtures']
+  .map((rel) => path.join(ROOT, ...rel.split('/')));
+const APP_FILES = new Set(['index.html', 'lab.html', 'chrome-lab.html']
+  .map((rel) => path.join(ROOT, rel)));
+
+// Rides the RESOLVED absolute path, never the URL — the same reason isVendor
+// does: %2f and non-canonical spellings must not be able to smuggle a path past
+// the gate that the filesystem then honors.
+function isAppPath(absPath) {
+  if (APP_FILES.has(absPath)) return true;
+  return APP_DIRS.some((dir) => absPath === dir || absPath.startsWith(dir + path.sep));
+}
+
 // Resolve a URL path to a file inside ROOT, or null if it escapes.
 function safeResolve(urlPath) {
   let decoded;
@@ -2802,6 +3032,7 @@ async function serveStatic(req, res, url) {
   }
   const file = safeResolve(url.pathname);
   if (!file) return sendError(res, 403, 'forbidden', 'forbidden');
+  if (!isAppPath(file)) return sendError(res, 404, 'not found', 'not_found');
 
   let stat;
   try {
@@ -2899,6 +3130,13 @@ const server = http.createServer((req, res) => {
 
   const route = url.pathname;
   const handle = async () => {
+    // First in the chain, and outside /api/, on purpose: the one route whose
+    // job is to answer when everything else is in doubt should not depend on
+    // how the rest of the table is routed today. HEAD works too — Node drops
+    // the body for a HEAD response itself — so `curl -I` is a liveness probe.
+    if (route === '/health' && (req.method === 'GET' || req.method === 'HEAD')) {
+      return handleHealth(req, res);
+    }
     if (route === '/api/join' && req.method === 'POST') return handleJoin(req, res);
     if (route === '/api/events' && req.method === 'GET') return handleEvents(req, res, url);
     if (route === '/api/pong' && req.method === 'POST') return handlePong(req, res);

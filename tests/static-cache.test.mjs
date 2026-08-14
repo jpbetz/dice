@@ -14,14 +14,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// tests/static-cache.test.mjs — ROADMAP §0b bandwidth pass. streamFile must:
+// tests/static-cache.test.mjs — the HTTP surface server.js presents to a
+// browser: what it serves, what it refuses, and what it says about itself.
+//
+// ROADMAP §0b (bandwidth) — streamFile must:
 //   * hand /vendor/ a year-long immutable Cache-Control (frozen third-party)
 //   * keep no-cache on the mutable app tree so browsers revalidate
-//   * answer If-Modified-Since >= mtime with a body-less 304
-//   * refuse to short-circuit on a malformed IMS (Number.isFinite guard)
+//   * validate with an ETag over the CONTENT, never a build-frozen timestamp
 //   * still work for a directory URL that resolves to index.html
+// ROADMAP C29 (the allowlist) — the static handler serves the APP, not the
+//   repo it happens to live in: `/server.js` and `/tests/e2e/scenarios.mjs` are
+//   404, dotfiles are still 403, and every root the page really fetches is 200.
+// ROADMAP §0j (operations) — `/health` names the running build without leaking
+//   a room key, a player name or anything else goals 7 and 12 protect; the
+//   room-creation throttle refuses a script without ever refusing a player.
 //
-// A real server.js child on an ephemeral port — never 8123 (Joe's live table).
+// Real server.js children on ephemeral ports — never 8123 (Joe's live table).
 
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
@@ -45,9 +53,14 @@ async function freePort() {
   });
 }
 
-async function startServer(port) {
+// `extra` overrides the boot-time env. The §0j blocks need it: DICE_ROOM_GUARD
+// arms the creation throttle without standing up 250 live rooms first, and
+// GIT_SHA is the whole subject of the /health build-stamp assertions. Same
+// reasoning server.js gives for the override existing at all — a test-only
+// route or query parameter would put a lever on the live HTTP surface.
+async function startServer(port, extra = {}) {
   const proc = spawn(process.execPath, [join(ROOT, 'server.js')], {
-    env: { ...process.env, PORT: String(port) },
+    env: { ...process.env, PORT: String(port), ...extra },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let out = '';
@@ -86,8 +99,22 @@ async function t(name, fn) {
 }
 
 const port = await freePort();
-const proc = await startServer(port);
+// GIT_SHA and DICE_ROOM_GUARD are pinned EMPTY rather than left to the ambient
+// environment: this server is the "nothing configured" baseline, and a stray
+// GIT_SHA in Joe's shell must not decide whether the build-stamp block passes.
+const proc = await startServer(port, { GIT_SHA: '', DICE_ROOM_GUARD: '' });
 const base = `http://127.0.0.1:${port}`;
+
+const postJoin = (b, room, name = 'probe') => fetch(`${b}/api/join`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ room, name }),
+});
+
+// Mirrors server.js's ROOM_CREATE_PER_MIN. Kept in lockstep by hand — the
+// server does not export it, and importing server.js here would bind a port.
+// Raise one and this file goes red on the other, which is the intent.
+const ROOM_CREATE_PER_MIN = 10;
 
 try {
   // ---- Cache-Control ------------------------------------------------------
@@ -325,8 +352,266 @@ try {
     const body = await res.arrayBuffer();
     assert.equal(body.byteLength, 0);
   });
+
+  // ---- C29: the allowlist -------------------------------------------------
+  //
+  // Both halves, because only asserting the happy half is this project's
+  // dominant failure mode — an allowlist that serves everything passes every
+  // "is it reachable" test ever written. So the REFUSALS are the point, and
+  // each named path is one that returned 200 before the allowlist landed.
+  //
+  // WHAT MAKES IT FAIL: add a directory the page fetches from and forget to
+  // allowlist it (the first block goes red on the file that 404s), or widen
+  // APP_DIRS back toward ROOT (the second block goes red on server.js).
+
+  const ALLOWED = [
+    ['/', 'the root document'],
+    ['/index.html', 'the app itself'],
+    ['/js/main.js', 'js/ — the app tree'],
+    ['/css/style.css', 'css/'],
+    ['/vendor/three.module.js', 'vendor/ — the frozen third-party tree'],
+    ['/models/towers/nullstone.glb', 'models/ — baked GLB towers'],
+    // Not part of the deployed app (.gcloudignore drops tests/ from the upload),
+    // but the tower-glb-loader scenario fetches it THROUGH THE PAGE ORIGIN, so
+    // a 404 here is a red e2e suite rather than a production change.
+    ['/tests/e2e/fixtures/tower_fixture.glb', 'the e2e GLB fixture'],
+    // Dev chrome, deliberately kept servable: tools/lab-shots.mjs,
+    // tools/geo-bench-shots.mjs and one e2e scenario all navigate to it.
+    ['/lab.html', 'the dice lab'],
+    ['/chrome-lab.html', 'the 2D lab that iframes index.html'],
+  ];
+  for (const [p, why] of ALLOWED) {
+    await t(`allowlist serves ${p} (${why})`, async () => {
+      const res = await fetch(`${base}${p}`);
+      assert.equal(res.status, 200, `${p} must be served — ${why}`);
+      await res.arrayBuffer();
+    });
+  }
+
+  // Every one of these returned 200 with real content before C29. The rule was
+  // "the extension is servable"; it is now "the file is part of the app".
+  const REFUSED = [
+    ['/server.js', 'the server\'s own source, validation logic and caps'],
+    ['/package.json', 'nothing in js/ or index.html has ever fetched it'],
+    ['/tests/e2e/scenarios.mjs', '530 KB of test source inside a 1 GiB egress allowance'],
+    ['/tests/static-cache.test.mjs', 'this file'],
+    ['/tools/drive.mjs', 'the whole tools/ tree rode the same .mjs MIME entry'],
+    ['/Makefile', 'no MIME entry today — pinned so a new one cannot expose it'],
+    ['/docs/GOALS.md', 'same: .md is unservable by accident, not by rule'],
+    ['/README.md', ''],
+    ['/LICENSE', ''],
+  ];
+  for (const [p, why] of REFUSED) {
+    await t(`allowlist refuses ${p}${why ? ` (${why})` : ''}`, async () => {
+      const res = await fetch(`${base}${p}`);
+      // 404, not 403: "forbidden" would confirm the file is there.
+      assert.equal(res.status, 404, `${p} must not be served`);
+      await res.arrayBuffer();
+    });
+  }
+
+  await t('deploy/ is closed — this one WAS a real config exposure', async () => {
+    // ROADMAP C29 said "no credential or config exposure, verified path by
+    // path", and named `.deploy.config` as the file it checked. THERE IS NO
+    // SUCH FILE. The real settings file is `deploy/config.mk` — gitignored,
+    // holding PROJECT and BILLING_ACCOUNT — and it has no dot-prefixed segment,
+    // so safeResolve waved it through and `.mk` fell to the octet-stream MIME
+    // default. Measured 2026-08-14 against the pre-allowlist server:
+    // `GET /deploy/config.mk` returned 200 with the billing account in the body.
+    //
+    // Production was never exposed (.gcloudignore drops deploy/ from the
+    // upload), but every local `node server.js` — including the preview table
+    // on 8123 — served it to anyone who could reach the port.
+    //
+    // config.mk itself cannot be the assertion: it is absent on a fresh
+    // checkout, so the check would pass by having nothing to find. The
+    // COMMITTED example sitting beside it proves the root is closed.
+    const res = await fetch(`${base}/deploy/config.example.mk`);
+    assert.equal(res.status, 404, 'deploy/ must not be servable at all');
+    await res.arrayBuffer();
+    const json = await fetch(`${base}/deploy/artifact-cleanup.json`);
+    assert.equal(json.status, 404, 'including the files whose extension IS in MIME');
+    await json.arrayBuffer();
+  });
+
+  await t('dotfiles are still refused before the allowlist is even consulted', async () => {
+    // The important half of C29 was ALREADY handled by safeResolve, and this
+    // pins that the allowlist did not disturb it: no credential or config
+    // exposure, and the refusal happens at the resolver so a future allowlist
+    // entry cannot accidentally re-open .git/.
+    for (const p of ['/.git/config', '/.git/HEAD', '/.deploy.config', '/.gcloudignore']) {
+      const res = await fetch(`${base}${p}`);
+      assert.equal(res.status, 403, `${p} must be forbidden at the resolver`);
+      await res.arrayBuffer();
+    }
+  });
+
+  await t('traversal out of ROOT is still refused', async () => {
+    for (const p of ['/../server.js', '/js/../server.js', '/%2e%2e/server.js']) {
+      const res = await fetch(`${base}${p}`);
+      assert.ok(res.status === 403 || res.status === 404,
+        `${p} must not reach outside the app (got ${res.status})`);
+      await res.arrayBuffer();
+    }
+  });
+
+  // ---- §0j: /health -------------------------------------------------------
+
+  await t('/health answers with the operational shape', async () => {
+    const res = await fetch(`${base}/health`);
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get('cache-control'), 'no-store',
+      'a cached health answer is a lie about a running process');
+    const body = await res.json();
+    assert.equal(body.ok, true);
+    assert.equal(typeof body.node, 'string');
+    assert.equal(typeof body.uptimeSec, 'number');
+    assert.equal(body.maxRooms, 500, 'the denominator server_full is measured against');
+    for (const k of ['rooms', 'players', 'streams', 'rssMb']) {
+      assert.equal(typeof body[k], 'number', `${k} is a count`);
+    }
+  });
+
+  await t('no GIT_SHA reports "unknown" rather than inventing one', async () => {
+    // The whole value of the stamp is that it cannot be confidently wrong. A
+    // deploy that did not come through the Makefile must say so.
+    const body = await (await fetch(`${base}/health`)).json();
+    assert.equal(body.sha, 'unknown');
+  });
+
+  await t('HEAD /health is a body-less liveness probe', async () => {
+    const res = await fetch(`${base}/health`, { method: 'HEAD' });
+    assert.equal(res.status, 200);
+    assert.equal((await res.arrayBuffer()).byteLength, 0);
+  });
+
+  await t('/health discloses no room key and no player name (goals 7, 12)', async () => {
+    // THE ASSERTION THAT WOULD CATCH THE TEMPTING VERSION. A room listing is
+    // the obvious next field to add to a health endpoint, and a room key IS
+    // this table's only access control (goal 10) — publishing one is
+    // publishing a door. So a room and a player with unmistakable names are
+    // created first, and the whole body is searched for them.
+    const room = 'zz-health-secret-room';
+    const name = 'ZZHealthSecretPlayer';
+    const joined = await postJoin(base, room, name);
+    assert.equal(joined.status, 200, 'the probe room was created');
+    await joined.json();
+
+    const raw = await (await fetch(`${base}/health`)).text();
+    assert.ok(!raw.includes(room), `/health leaked a room key: ${raw}`);
+    assert.ok(!raw.includes(name), `/health leaked a player name: ${raw}`);
+    const body = JSON.parse(raw);
+    assert.ok(body.rooms >= 1, 'but the COUNT is there — that is the operational half');
+    assert.ok(body.players >= 1);
+  });
+
+  // ---- §0j: the room-creation throttle, and who it must never refuse ------
+
+  await t('below the guard, a burst of new rooms is never refused', async () => {
+    // THE FAIL-OPEN PROPERTY, asserted on the DEFAULT configuration — this
+    // server runs with no DICE_ROOM_GUARD, so the guard is MAX_ROOMS/2 and a
+    // real table can never meet the rule. A throttle that fires here would be
+    // refusing players to protect capacity that is 95% free.
+    for (let i = 0; i < ROOM_CREATE_PER_MIN + 5; i++) {
+      const res = await postJoin(base, `zz-guard-${i}`);
+      assert.equal(res.status, 200,
+        `creation ${i + 1} was refused with the server nearly empty`);
+      await res.json();
+    }
+  });
 } finally {
   await stopServer(proc);
+}
+
+// ---- §0j: the throttle ARMED, and the build stamp, on their own servers ----
+//
+// Separate children because both knobs are read once at boot, exactly as
+// DICE_SETUP_TTL_MS is. DICE_ROOM_GUARD=0 arms the rule from the first room so
+// the refusal is reachable without standing up 250 live ones.
+
+{
+  const port2 = await freePort();
+  const proc2 = await startServer(port2, {
+    GIT_SHA: 'ffff0000ffff-dirty',
+    DICE_ROOM_GUARD: '0',
+  });
+  const b2 = `http://127.0.0.1:${port2}`;
+  try {
+    await t('/health reports the baked sha verbatim, -dirty marker included', async () => {
+      const body = await (await fetch(`${b2}/health`)).json();
+      assert.equal(body.sha, 'ffff0000ffff-dirty',
+        'the Makefile appends -dirty when the tree that shipped was not HEAD; '
+        + 'dropping the marker would report a commit that was never deployed');
+    });
+
+    await t('the throttle refuses the 11th new room from one address', async () => {
+      for (let i = 0; i < ROOM_CREATE_PER_MIN; i++) {
+        const res = await postJoin(b2, `zz-burst-${i}`);
+        assert.equal(res.status, 200, `creation ${i + 1} is inside the budget`);
+        await res.json();
+      }
+      const res = await postJoin(b2, 'zz-burst-over');
+      assert.equal(res.status, 429, 'the budget is spent');
+      const body = await res.json();
+      assert.equal(body.code, 'room_rate_limited',
+        'and NOT server_full — the server is not full, and saying so would '
+        + 'make every future server_full report ambiguous');
+    });
+
+    await t('a throttled address can still JOIN a room that exists', async () => {
+      // THE PROPERTY THAT MAKES THE RULE SAFE TO SHIP. The key is the leftmost
+      // X-Forwarded-For entry, which the client can set — so it can be wrong,
+      // and a wrongly-keyed player must still be able to sit down at the table
+      // their friends are already at. `rooms.has(roomName)` is what guarantees
+      // it; delete that condition and this goes red.
+      const res = await postJoin(b2, 'zz-burst-0', 'second-player');
+      assert.equal(res.status, 200, 'joining an existing room is never throttled');
+      await res.json();
+    });
+
+    await t('the throttle never touches /api/events (§0d F3)', async () => {
+      // A 429 on the event stream is a self-inflicted stream storm: every
+      // refused client reconnects at once. Twenty requests — twice the whole
+      // per-minute budget — must not produce one.
+      for (let i = 0; i < 20; i++) {
+        const res = await fetch(`${b2}/api/events?room=zz-burst-0&playerId=nobody-${i}`);
+        assert.equal(res.status, 404, 'unknown player, as always');
+        assert.notEqual(res.status, 429, 'the stream door is not rate-limited');
+        await res.arrayBuffer();
+      }
+    });
+
+    await t('the throttle never touches the pre-join peek', async () => {
+      // GET /api/table cannot create a room (it uses rooms.get), so it must not
+      // spend or be refused by a creation budget. This goes red the day someone
+      // lifts the throttle into a per-request middleware.
+      const res = await fetch(`${b2}/api/table?room=zz-burst-0`);
+      assert.equal(res.status, 200);
+      await res.json();
+    });
+  } finally {
+    await stopServer(proc2);
+  }
+}
+
+{
+  const port3 = await freePort();
+  // A GIT_SHA that is not a commit — a typo, a shell expansion that failed, or
+  // a secret pasted into the wrong variable.
+  const proc3 = await startServer(port3, { GIT_SHA: 'AWS_SECRET_ACCESS_KEY=hunter2' });
+  const b3 = `http://127.0.0.1:${port3}`;
+  try {
+    await t('a GIT_SHA that is not a sha is never echoed to the public', async () => {
+      // /health is unauthenticated (goal 10), so this env var is published to
+      // the internet. Validate-then-report, never echo: the failure mode of the
+      // obvious one-liner is a disclosure, not a cosmetic bug.
+      const raw = await (await fetch(`${b3}/health`)).text();
+      assert.ok(!raw.includes('hunter2'), `/health echoed its env var: ${raw}`);
+      assert.equal(JSON.parse(raw).sha, 'unknown');
+    });
+  } finally {
+    await stopServer(proc3);
+  }
 }
 
 if (failed === 0) console.log(`static-cache.test: ${n} passed`);
