@@ -84,20 +84,33 @@ towerVolumes()' apron box, not copied from its comment). The threshold
 still reads as raised: the tongue falls away in front of it and the wound's
 lower lip is ragged wood at 0.90-1.02 on both sides of it.
 
-THE THROAT, and the one place this model refuses the brief
+THE THROAT, and the conflict that turned out not to be one
 ----------------------------------------------------------
-check.py --tower fires 25 rays out through the door: the box
+check.py --tower fires 25 rays out through the door, at 5 x 5 points over
 
-    |x| <= 1.995,  1.0875 <= y <= 4.4125,  -1.5 <= z <= +1.0
+    |x| <= 1.995,  1.0875 <= y <= 4.4125,   out to z = +1.0
 
-must contain NO geometry. The engine's own apron collider does — its top
-surface stands at y 1.79 at z -1.5, climbing backward through the tower.
-So a model CANNOT clad the chute inside the throat and pass the gate: the
-two requirements are in direct conflict, and the gate wins because it is
-the contract. The tongue therefore starts at z = -0.06 (top y 1.046, a
-0.067 margin under the bar) and runs forward over the apron and the lip.
-Inside the mouth the chute is unclad and dark, which is what "the wound
-interior is hollow there" asks for anyway. Recorded as kit friction.
+and each ray must reach the front clear. It is NOT a box in z, and the day
+it was one is the day this file recorded a refusal it no longer needs. Every
+ray then started at a flat z = -1.5, inside the volume the engine's own apron
+collider occupies — the ramp's top surface stands at y 1.79 back there,
+climbing through the tower — so a model could not clad the chute AND pass,
+and the note here called that kit friction and left the interior chute bare.
+
+The gate learned the ramp instead (2026-08-13): each ray starts where its own
+height clears the slope line plus a 0.15 cladding allowance, so a model may
+skin the chute with a tongue or a slide, while a shelf half a unit above the
+slope still fails. This recipe's own copy of the gate was the last flat one
+left, and it was therefore STRICTER than the authority it exists to
+anticipate; it now calls the same towergates.exit_ray_start_z check.py does.
+
+What the interior actually wears is a separate decision, and it stands: the
+chute inside the mouth is unclad and dark, which is what "the wound interior
+is hollow there" asks for. The delivery ramp and the outrun lip are DELIBER-
+ATELY BARE (Joe, 2026-08-13) — the mound that used to cover them is deleted
+and the wound opens onto felt — which the bake now declares rather than
+leaves to be inferred: `--bare-colliders ramp,lip`, refused if the model
+turns out to have clad them after all.
 
 ROUGHNESS IS LOAD-BEARING — see bole_material. Blender's Principled ships
 0.5 and forge.vertex_color_material never touches it, so the first three
@@ -275,6 +288,13 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 import forge as F  # noqa: E402
+# The contract's gates, in the ONE implementation check.py also runs. Anything
+# derived from the portal spec + the engine's own numbers — the exit ray's
+# ramp-aware start line, the occlusion grid, the hole-into-the-hollow question
+# — lives there and is called from here, so a gate cannot be strict in the
+# recipe and lax on the file (or the other way round, which is what actually
+# happened: this file's flat exit box refused cladding check.py allows).
+import towergates as TG  # noqa: E402
 
 # --------------------------------------------------------------------------
 # the contract
@@ -291,6 +311,13 @@ DESPAWN_Y = PORTAL_IN["rimY"] - 1.4 * S              # 7.65
 THROAT_HALF_W = 0.95 * PORTAL_OUT["w"] / 2.0         # 1.995
 THROAT_Y0 = PORTAL_OUT["sillY"] + PORTAL_OUT["clearH"] * 0.025    # 1.0875
 THROAT_Y1 = THROAT_Y0 + PORTAL_OUT["clearH"] * 0.95              # 4.4125
+# THE THROAT IS NOT A BOX IN z, and that is the correction of 2026-08-13.
+# THROAT_Z0 is the DEEPEST any exit ray starts — the top ray's, which clears
+# the engine ramp's slope line with 1.5 to spare — not a plane every ray
+# starts on. A low ray starts where its own height clears that slope plus the
+# cladding allowance (towergates.exit_ray_start_z, which check.py and this
+# file now share). THROAT_Z0 survives as the LINTEL FAN's anchor below, where
+# "how deep does the deepest ray reach" is exactly the question.
 THROAT_Z0, THROAT_Z1 = -1.5, 1.0
 
 # The engine volumes this model has to skin (js/main.js towerVolumes()).
@@ -3130,7 +3157,15 @@ def ray_hit(tris, origin, direction, t_max):
 def assert_throat_clear(objs):
     """The exit gate, on the finished triangles. check.py proves it again
     and is the authority; this exists so a bad parameter fails HERE, with
-    the offending probe named, instead of thirty seconds later as a count."""
+    the offending probe named, instead of thirty seconds later as a count.
+
+    RAMP-AWARE, sharing check.py's own start line (towergates). This gate used
+    to fire every ray from a flat THROAT_Z0 = -1.5, which is STRICTER than the
+    authority it claims to anticipate: check.py legalised cladding over the
+    engine chute in 2026-08-13, and the flat version would have refused the
+    very ramp skin the file gate now permits — a bake failing here for a die
+    path no die takes, with a message about widening the wound.
+    """
     import numpy as np
     tris = tri_array(objs)
     bad = []
@@ -3138,17 +3173,19 @@ def assert_throat_clear(objs):
         for k in range(5):
             px = -THROAT_HALF_W + 2 * THROAT_HALF_W * i / 4
             py = THROAT_Y0 + (THROAT_Y1 - THROAT_Y0) * k / 4
-            t = ray_hit(tris, np.array([px, py, THROAT_Z0]),
-                        np.array([0.0, 0.0, 1.0]), THROAT_Z1 - THROAT_Z0)
+            pz = TG.exit_ray_start_z(py, PORTAL_OUT["sillY"], 0.0)
+            t = ray_hit(tris, np.array([px, py, pz]),
+                        np.array([0.0, 0.0, 1.0]), THROAT_Z1 - pz)
             if t is not None:
-                bad.append((px, py, THROAT_Z0 + t))
+                bad.append((px, py, pz + t))
     if bad:
         raise RuntimeError(
             f"exit throat blocked at {len(bad)}/25 probes, first at "
             f"x {bad[0][0]:.2f} y {bad[0][1]:.2f} z {bad[0][2]:.2f} — widen "
             f"the wound (W_PHI0 {W_PHI0}) or lower its threshold "
             f"(W_YC-W_YDN = {W_YC - W_YDN:.2f})")
-    print("[bole] exit throat 25/25 clear")
+    print("[bole] exit throat 25/25 clear (rays start on the ramp line + "
+          f"{TG.EXIT_CLAD_ALLOW}, deepest z {THROAT_Z0})")
 
 
 def assert_approach_clear(objs):
@@ -3588,47 +3625,13 @@ def assert_curtain(curtain):
           f"y {b[2]:.2f}..{b[3]:.2f}")
 
 
-# The engine's own occlusion grid, restated so the recipe and js/main.js
-# cannot drift: three discs on the BORE AXIS per band, 33 points each.
-S_CORE = 1.25
-DIE_R = 1.25          # world-fixed; the same radius the mouth is sized from
-COWL_C_Y = 7.4 * S_CORE + (PORTAL_IN["rimY"] - 7.0 * S_CORE)
-COWL_H = 2.4 * S_CORE
-SMP_KR = PORTAL_IN["clearR"] / (1.7 * S_CORE)
-MAT_EXTRA = 4.5
-# (id, that preset's table depth, its eye). The app anchors each eye to the
-# LIVE back wall — eye.z = z0 + (e.z - z0_of_that_preset) — so in the model's
-# own frame (z = 0 at the socket plane) the z0s cancel and the eye stands at
-# e.z + (depth + matExtra)/2, whatever zoom the lab is wearing.
-ZOOM_EYES = [
-    ("wide.full", 8.6, (0.0, 13.3, 7.7)), ("wide.mini", 8.6, (0.0, 11.0, 6.2)),
-    ("medium.full", 6.7, (0.0, 10.4, 6.0)), ("medium.mini", 6.7, (0.0, 8.6, 4.8)),
-    ("close.full", 5.2, (0.0, 8.1, 4.7)), ("close.mini", 5.2, (0.0, 6.7, 3.8)),
-]
-
-
-def occlusion_samples():
-    def disc(y):
-        pts = [(PORTAL_IN["x"], y, PORTAL_IN["z"])]
-        for r in (0.55 * SMP_KR, 1.1 * SMP_KR, 1.65 * SMP_KR, 2.0 * SMP_KR):
-            for a in range(8):
-                th = a / 8.0 * 2.0 * math.pi
-                pts.append((PORTAL_IN["x"] + math.cos(th) * r, y,
-                            PORTAL_IN["z"] + math.sin(th) * r))
-        return pts
-    # CAPPED AT THE TOP OF A DESPAWNING DIE, mirroring js/main.js's v.cowlY.
-    # The band's box rides 1.6*S over the mouth — inside the building for a
-    # hooded tower, open sky for a stump. What the band is for is that the
-    # VANISH is unwatchable, and a die vanishes when its centre crosses
-    # DESPAWN_Y, so the line that matters is DESPAWN_Y + a die's radius. Above
-    # it a die is in open air and meant to be seen. For this model the top
-    # sample moves 11.25 -> 8.75, which is what deletes the two discs at 9.90
-    # and 11.25 that the cowl curtain existed to catch.
-    ct = min(COWL_C_Y + COWL_H / 2.0, DESPAWN_Y + DIE_R)
-    cb = ct - COWL_H
-    bands = {"cowl": [cb + 0.15, (cb + ct) / 2.0, ct - 0.15],
-             "shaft": [DESPAWN_Y, DESPAWN_Y + 0.25, DESPAWN_Y + 0.6]}
-    return {k: [p for y in ys for p in disc(y)] for k, ys in bands.items()}
+# The portal spec in the shape towergates takes. The occlusion grid, the eyes,
+# the cowl band's arithmetic and a die's radius all USED to be re-typed here —
+# nine constants and two functions copied out of js/main.js — and check.py had
+# none of them, so the engine's hardest obligation was enforced by this one
+# recipe and by no gate on any shipped GLB. They live in towergates.
+# ENGINE_MIRROR now; this is what is left of the copy.
+SPEC = {"in": PORTAL_IN, "out": PORTAL_OUT}
 
 
 def assert_cowl_occluded(objs):
@@ -3637,50 +3640,23 @@ def assert_cowl_occluded(objs):
     tower-occlusion demands 99/99 on SHAFT and COWL at all six shipped eyes,
     and a bake that cannot see the grid ships a leak that only a browser finds
     — which is exactly what happened. The eyes and the sample discs are the
-    engine's, re-derived from the portal spec; the model is the thing that
-    LEANS, so the eyes and points are rotated by -TILT into the model's frame
-    rather than the mesh being rotated into theirs.
+    ENGINE's, re-derived from the portal spec by the shared implementation;
+    the model is the thing that LEANS, so eyes and points are rotated into the
+    model's frame rather than the mesh being rotated into theirs.
+
+    Kept as a call rather than deleted in favour of check.py's copy, because
+    the two answer different questions at different costs: this one fails
+    BEFORE a GLB exists, with the leaking eye named, eight seconds into a
+    bake; that one fails on any file anybody hands it, including one this
+    recipe never wrote.
     """
-    import numpy as np
-    tris = tri_array(objs)
-    c, s = math.sqrt(1.0 - TILT_SIN ** 2), TILT_SIN
-
-    def to_model(p):
-        x, y, z = p
-        return np.array([x * c + y * s, -x * s + y * c, z])
-
-    smp = occlusion_samples()
-    worst = {}
-    for eid, depth, e in ZOOM_EYES:
-        eye = to_model((e[0], e[1], e[2] + (depth + MAT_EXTRA) / 2.0))
-        for band, pts in smp.items():
-            missed = []
-            for pt in pts:
-                p = to_model(pt)
-                d = p - eye
-                L = float(np.linalg.norm(d))
-                if ray_hit(tris, eye, d / L, L - 0.02) is None:
-                    missed.append(pt)
-            if missed:
-                worst.setdefault(band, []).append((eid, len(missed), missed[0]))
-    if worst:
-        lines = []
-        for band, rows in worst.items():
-            for eid, n, first in rows:
-                lines.append(f"{band} {n}/{len(smp[band])} leak at {eid}, "
-                             f"first ({first[0]:+.2f}, {first[1]:.2f}, "
-                             f"{first[2]:+.2f})")
-        # The old guidance here was "raise curtain_top_at", and following it is
-        # how the black cylinder got built. The band is capped at the rim now,
-        # so a leak is a hole in the BORE — the shell's wall or the liner —
-        # and raising a band over the crown cannot legitimately fix one.
-        raise RuntimeError("the occlusion grid leaks — every sample is inside "
-                           "the bore under the tear, so close the WALL "
-                           "(wall_at / r_in), never raise a curtain over the "
-                           "crown:\n       " + "\n       ".join(lines))
-    print(f"[bole] occlusion {len(smp['cowl'])}/{len(smp['cowl'])} cowl and "
-          f"{len(smp['shaft'])}/{len(smp['shaft'])} shaft, at all "
-          f"{len(ZOOM_EYES)} shipped eyes")
+    fails, counts = TG.occlusion_failures(tri_array(objs), SPEC,
+                                          math.degrees(math.asin(TILT_SIN)))
+    if fails:
+        raise RuntimeError(fails[0].replace("; ", "\n       "))
+    print(f"[bole] occlusion {counts['cowl']}/{counts['cowl']} cowl and "
+          f"{counts['shaft']}/{counts['shaft']} shaft, at all "
+          f"{len(TG.ENGINE_MIRROR['zoomEyes'])} shipped eyes")
 
 
 def assert_rim_is_low():
