@@ -11839,14 +11839,112 @@ window.__diceDebug = {
       })),
       profilePick: seatProfilePicked,
       profileDefault: lastUsedFor(profileStore, seatSystem()),
+      // C12: dismissed the door and looking at the table instead of sitting
+      // at it. `open:false` alone cannot tell that from "joined".
+      declined: seatDeclined,
+      // What 'Stay as ⟨name⟩' will carry — the forfeit that used to be silent.
+      keepName: (() => {
+        const b = document.getElementById('seat-keep-name');
+        return b && !b.classList.contains('hidden')
+          ? { label: b.textContent, carries: seatPickWord() } : null;
+      })(),
+    };
+  },
+  // THE PICKER'S RENDERED GEOMETRY (C11), and it is the hook that had to
+  // exist. Six CUJ7 scenarios were green while `#name-panel` had no
+  // max-height and no overflow inside a centred flex overlay — because every
+  // seat act in the suite goes through the verbs below, and a verb cannot
+  // see that the top of the panel is off the top of the screen. `el.click()`
+  // cannot see it either: the DOM fires a click on a node no finger could
+  // reach. So the numbers a phone actually cares about are published here,
+  // and a scenario aims a REAL Input.dispatchMouseEvent at `rows[i].cx/cy`.
+  //
+  // Coordinates are CLIENT coordinates (getBoundingClientRect), which is the
+  // space CDP's mouse events take — no conversion, and no scroll offset to
+  // get wrong.
+  get seatPickerBox() {
+    const modal = document.getElementById('name-modal');
+    if (modal.classList.contains('hidden')) return null;
+    const panel = document.getElementById('name-panel');
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // offsetWidth/Height for SIZE (the entrance animation scales the rect —
+    // touch-targets learned this the hard way), the rect for POSITION.
+    const box = (el) => {
+      if (!el || el.offsetParent === null) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        w: el.offsetWidth,
+        h: el.offsetHeight,
+        top: Math.round(r.top),
+        bottom: Math.round(r.bottom),
+        cx: Math.round(r.left + r.width / 2),
+        cy: Math.round(r.top + r.height / 2),
+        // Hittable = on screen AND the topmost thing at its own centre. The
+        // second half is what catches a row scrolled under the panel's own
+        // clipped edge, which is invisible to a bounds check.
+        onScreen: r.top >= 0 && r.bottom <= vh && r.left >= 0 && r.right <= vw,
+        hit: (() => {
+          const cx = r.left + r.width / 2;
+          const cy = r.top + r.height / 2;
+          if (cx < 0 || cy < 0 || cx > vw || cy > vh) return false;
+          const top = document.elementFromPoint(cx, cy);
+          return !!top && (top === el || el.contains(top));
+        })(),
+      };
+    };
+    const pr = panel.getBoundingClientRect();
+    return {
+      viewport: { w: vw, h: vh },
+      panel: {
+        ...box(panel),
+        scrollHeight: panel.scrollHeight,
+        clientHeight: panel.clientHeight,
+        scrollTop: panel.scrollTop,
+      },
+      // THE FAILURE THIS EXISTS TO NAME: a centred flex child taller than its
+      // container overflows in BOTH directions, and the TOP is the half with
+      // no scrollbar. `clippedTop` true means the name field and Join are
+      // off the top of the screen with no gesture that brings them back.
+      clippedTop: pr.top < 0,
+      clippedBottom: pr.bottom > vh,
+      scrolls: panel.scrollHeight > panel.clientHeight + 1,
+      rows: [...document.querySelectorAll('#seat-mine-rows .seat-btn')].map((el) => ({
+        name: (el.firstChild && el.firstChild.textContent) || '',
+        kind: el.classList.contains('seat-deal') ? 'random'
+          : (el.classList.contains('seat-foreign') ? 'offered' : 'mine'),
+        preselected: el.classList.contains('preselected'),
+        ...box(el),
+      })),
+      nameInput: box(document.getElementById('name-input')),
+      join: box(document.getElementById('name-join')),
+      close: box(document.getElementById('seat-close')),
+      keepName: box(document.getElementById('seat-keep-name')),
+      // The keyboard is the player's to open (C11): on a coarse pointer the
+      // door must NOT be holding focus when the seats land.
+      focused: document.activeElement ? document.activeElement.id || null : null,
     };
   },
   chooseMyProfile(id) { return chooseMyProfile(id); },
-  chooseDealtProfile() { return chooseDealtProfile(); },
+  // MARKS, LIKE THE BUTTON — it used to MINT, like the button no longer does.
+  // The row deferred its deal to the join on 2026-08-09 and this verb did not
+  // follow, so the hook a scenario reaches for did something the control it
+  // stands in for stopped doing: the suite could have proved the old bug
+  // fixed while proving nothing about the row. No scenario called it, which is
+  // the only reason it never lied out loud.
+  chooseDealtProfile() {
+    if (seatPhase !== 'pick') return { ok: false, status: '✗ the seat picker is not open' };
+    seatProfilePicked = 'random';
+    renderSeatMine();
+    return { ok: true, status: '✓ Random selected — the deal happens at Join' };
+  },
   chooseSeat(name) { return takeSeat(name); },
   chooseSomeoneElse(name) { return takeFreeSeat(name); },
   applySeatImport() { return applySeatChoice(); },
   dismissSeatImport() { return dismissSeatChoice(); },
+  // C12: the ✕ / Esc verb. Answers the same verdict shape, so its refusals
+  // ('the join is already out') are assertable strings like every other door.
+  dismissSeatPicker() { return dismissSeatPicker(); },
   // §11: the library. One JSON-safe projection plus one verb per act, every
   // verb answering {ok, status} so the refusal strings themselves are
   // assertable. `list` carries pool COUNTS, not pools: 32 racks through a CDP
@@ -21029,6 +21127,7 @@ document.addEventListener('keydown', (e) => {
     else if (isKbdOpen()) closeKbd();
     else if (isPaletteOpen()) closePalette();
     else if (!settingsModal.classList.contains('hidden')) closeSettingsModal();
+    else if (isSeatPickerOpen()) dismissSeatPicker(); // C12: the door was the one overlay with no way out
     else if (isIdentityMenuOpen()) closeIdentityMenu();
     else if (isOfferMenuOpen()) closeOfferMenu();
     else if (isRailMenuOpen()) closeRailMenu(true); // the lobby's New table / Tables ▾
@@ -21379,6 +21478,17 @@ function renderPresenceExits(othersCount) {
       b.setAttribute('aria-expanded', 'false');
       rosterEl.appendChild(b);
     }
+    return;
+  }
+  // A FOURTH PRESENCE STATE (C12): at the door, looking, not seated. The
+  // picker can be dismissed now, and a dismissal with no way back would just
+  // be the old trap wearing a ✕. Ordered above the no-server return because
+  // this one HAS an action to offer, which is this row's whole ordering rule.
+  if (seatDeclined) {
+    rosterEl.appendChild(railGhost('Take a seat', 'Join this table — pick a name and a character', () => {
+      seatDeclined = false;
+      netReady = initNet(); // re-runs the join flow: the picker, then the join
+    }));
     return;
   }
   if (!netOnline || !net) return; // asked for a table, got no server — see initNet
@@ -22544,6 +22654,14 @@ let seatVerdict = { ok: true, status: '', canApply: false };
 let seatResolve = null;   // promptName's resolver while the modal waits
 let seatCleanup = null;   // detaches the live prompt's input listeners
 let seatProfilePicked = null; // §11: the profile picked at THIS prompt, or null = the default
+// The link's own seat is applied as the default pick ONCE per prompt (C12).
+// Latched rather than tested against `seatProfilePicked === null`, because the
+// peek lands after the first render: without the latch the default would be
+// re-applied over a row the player had already tapped in the meantime.
+let seatDefaulted = false;
+// The player dismissed the door and is LOOKING rather than sitting (C12). Read
+// by renderPresenceExits, which is what offers the way back in.
+let seatDeclined = false;
 
 // Which rulebook this table reads, BEFORE the join. The room's settings do not
 // reach this client until the join answers, so `currentSystemId` is still this
@@ -22576,6 +22694,44 @@ function seatChoices() {
     }));
 }
 
+// THE LINK'S SEAT IS THE PRE-SELECTION, AND IT HAD STOPPED BEING ONE (C12).
+// §G5 documents `&as=Alice` as "a highlight and a focus, so Enter takes it",
+// and that stopped being true on 2026-08-09: the highlight lived in the
+// `#seat-list` loop that was retired that day (renderSeatChoices' dead tail
+// below still holds it), and renderSeatMine only marks a foreign row when
+// `seatProfilePicked` names it. So a per-seat link has been landing on a
+// picker that pre-selects the player's own last-used profile — or Random —
+// while a hint line one row up says the link offers a character.
+//
+// Naming it here fixes that AND is what makes "Stay as ⟨name⟩" stop
+// forfeiting the character: both doors read seatProfilePicked, so the pick the
+// link made travels with whichever one you press.
+//
+// Runs from renderSeatChoices, which is the one function that always runs and
+// always runs before renderSeatMine paints the rows.
+function seatDefaultPick() {
+  // A DEFAULT NEVER OUTRANKS A TAP. The peek lands on a SECOND render, and by
+  // then the player may already have pressed Random or one of their own — both
+  // of which are on screen before any seat is. `seatProfilePicked !== null` is
+  // the real guard; the latch says "once per prompt" out loud.
+  if (seatDefaulted || seatProfilePicked !== null) return;
+  const wanted = seatPreselect(); // null until the peek lands, and null without &as=
+  if (!wanted) return;
+  seatDefaulted = true;
+  seatProfilePicked = `copy:${wanted}`;
+}
+
+// What the pending pick will actually leave you holding, in three words, for
+// the sub-label on a door that would otherwise say only what it COSTS.
+function seatPickWord() {
+  const p = seatProfilePicked;
+  if (!p) return 'no character';
+  if (p === 'random') return 'with a dealt character';
+  if (typeof p === 'string' && p.startsWith('copy:')) return `with ${p.slice(5)}`;
+  const rec = findProfile(profileStore, p);
+  return rec ? `with ${rec.name}` : 'no character';
+}
+
 // MY profiles at the join (§11.5 ①, Joe's R9). The row that will be used is
 // pre-selected: whatever this session has picked, else the last one this
 // SYSTEM saw (R6). Picking one switches immediately and shows no preview —
@@ -22604,6 +22760,11 @@ function renderSeatMine() {
   // Nothing to choose between and nothing to deal → the whole block is absent.
   zone.classList.toggle('hidden', !mine.length && !canDeal);
   rows.textContent = '';
+  // The keep-name row reads the same pick every other row writes, so whoever
+  // changed it refreshes that sub-label (C12). Above the early return: a full
+  // library with nothing for this system hides the zone, and 'Stay as ⟨name⟩'
+  // is still standing and still has to say what it carries.
+  renderSeatKeepSub();
   if (!mine.length && !canDeal) return;
   const chosen = seatProfilePicked || lastUsedFor(profileStore, sys);
   // HEADS, like the switcher over the rack (Joe 2026-08-09: "the selection of
@@ -22713,13 +22874,11 @@ function chooseMyProfile(id) {
   return v;
 }
 
-function chooseDealtProfile() {
-  const v = dealNewProfile(seatSystem());
-  if (v.ok) seatProfilePicked = profileStore.activeId;
-  seatPickNote(v);
-  renderSeatMine();
-  return v;
-}
+// `chooseDealtProfile()` stood here and MINTED a profile on the spot. Its one
+// caller was __diceDebug, and the ⚄ Random row stopped minting on 2026-08-09
+// (see the deal row in renderSeatMine) — so what remained was a test hook that
+// did the thing the control it stands in for had been fixed not to do. Deleted
+// rather than left dead: the hook now marks, exactly as the row does.
 
 // R6: take the last-used profile for THIS table's system, with no click. Runs
 // at the end of every join, on both arrival paths.
@@ -22768,6 +22927,7 @@ function renderSeatChoices() {
   nameLine.textContent = tn; // user text: textContent only
   nameLine.classList.toggle('hidden', !tn);
   list.textContent = '';
+  seatDefaultPick(); // before the rows paint — it decides which one is marked
   renderSeatMine();
   // #seat-list IS RETIRED (2026-08-09). It listed the same prepared seats
   // renderSeatMine now lists WITH attribution, so every character at the
@@ -22819,9 +22979,37 @@ function renderSeatReturning() {
   const r = seatReturning;
   btn.classList.toggle('hidden', !r || !r.name);
   if (!r || !r.name) return;
-  btn.textContent = `Stay as ${r.name}`;
-  btn.title = `Join this table under the name you already use — not the ${r.seat} seat`;
+  btn.textContent = '';
+  const nm = document.createElement('span');
+  nm.textContent = `Stay as ${r.name}`;
+  btn.appendChild(nm);
+  const ct = document.createElement('span');
+  ct.className = 'seat-count';
+  btn.appendChild(ct);
+  renderSeatKeepSub();
   hint.textContent = `This link offers the ${r.seat} seat, with their prepared pools.`;
+}
+
+// WHAT THIS DOOR COSTS, SAID AT THE DOOR (C12). "Stay as ⟨name⟩" is about the
+// NAME — the link named a seat and you would rather keep the name you already
+// use — and the character was never the same decision. It used to drop the
+// character silently, because it called takeFreeSeat() directly and only
+// promptName's own `submit` copies seatProfilePicked into seatPending; so it
+// forfeited not just the link's offered seat but any row the player had just
+// tapped, one line under a hint that says the link offers a character.
+//
+// Both halves are answered in one act now: the click carries the pick (below),
+// and this sub-label says which character is riding along — so the offer is
+// never sticky without saying so, which is the thing that would have made
+// carrying it worse than dropping it.
+function renderSeatKeepSub() {
+  const btn = document.getElementById('seat-keep-name');
+  if (!btn || btn.classList.contains('hidden')) return;
+  const ct = btn.querySelector('.seat-count');
+  const r = seatReturning;
+  if (!ct || !r) return;
+  ct.textContent = seatPickWord();
+  btn.title = `Join as ${r.name}, ${seatPickWord()} — the ${r.seat} seat's NAME is what you are declining`;
 }
 
 // Phase → which halves of the panel exist. The pick furniture and the
@@ -23056,6 +23244,53 @@ function dismissSeatChoice() {
   return { ok: true, status: '✓ seat kept — your own profiles were left alone', canApply: false };
 }
 
+function isSeatPickerOpen() {
+  return !document.getElementById('name-modal').classList.contains('hidden');
+}
+
+// THE WAY OUT OF THE DOOR (C12) — the ✕, Esc and the debug verb, one function.
+// This modal was the only overlay in the app that was not a rung on the Esc
+// ladder and had no ✕ and no cancel: settings, all three menus, the popover,
+// the peek and the log flyout all peel, and the one surface a stranger meets
+// FIRST did not. So a link opened in Discord put a blocking prompt between the
+// player and a table they were not allowed to look at before committing a name
+// to it.
+//
+// WHAT DISMISSING MEANS, and it is the whole decision: you are LOOKING, not
+// sitting. The prompt resolves with `null` — a sentinel no display name can
+// ever be, where '' is ambiguous with takeFreeSeat's own refusal — and
+// initNet's single caller reads it as "do not join": nothing is written to
+// localStorage, no /api/join is sent, nobody at the table is told you arrived,
+// and the felt is your own the way a server-less `?room=` already is. The
+// three alternatives were all worse. Joining under a blank name would have the
+// server clean it into something and seat a stranger nobody invited. Leaving
+// the promise pending hangs `netReady`, which the whole module awaits.
+// Re-opening the modal on the next act would make "look at the table" a thing
+// you get exactly one glance at.
+//
+// The way back in is the presence row's 'Take a seat' (renderPresenceExits) —
+// §7.20 put "what you can do about your presence" in that one slot, and this
+// is a fourth thing you can do about it.
+function dismissSeatPicker() {
+  // In the preview phase the seat is already TAKEN and the only thing left to
+  // decline is its pools — which is exactly what 'Not now' already says.
+  if (seatPhase === 'preview') return dismissSeatChoice();
+  if (seatPhase === 'joining') {
+    return { ok: false, status: '✗ the join is already out — wait for it', canApply: false };
+  }
+  if (seatPhase !== 'pick' || !seatResolve) {
+    return { ok: false, status: '✗ the seat picker is not open', canApply: false };
+  }
+  const resolve = seatResolve;
+  seatResolve = null;
+  seatPending = null; // browsing is not committing, and neither is walking away
+  if (seatCleanup) { seatCleanup(); seatCleanup = null; }
+  closeSeatModal();
+  resolve(null);
+  return { ok: true, status: '✓ looking first — nobody at the table sees you yet', canApply: false };
+}
+document.getElementById('seat-close').addEventListener('click', () => dismissSeatPicker());
+
 // peek: a promise from net.js peekTable (or null on the solo re-prompt path).
 // The modal renders NOW; the peek only ever adds furniture.
 function promptName(peek) {
@@ -23073,6 +23308,8 @@ function promptName(peek) {
     seatSetFlip = null;
     seatVerdict = { ok: true, status: '', canApply: false };
     seatProfilePicked = null;
+    seatDefaulted = false; // the link's seat is re-applied per prompt, once
+    seatDeclined = false;  // re-opening the door retracts the last dismissal
     seatResolve = resolve;
     renderSeatChoices();
     renderSeatReturning();
@@ -23103,7 +23340,15 @@ function promptName(peek) {
       seatPending = seatProfilePicked;
       takeFreeSeat(input.value);
     };
-    const onKey = (e) => { if (e.key === 'Enter') submit(); };
+    // A FOCUSED INPUT OWNS Esc (the global ladder returns early on `typing`,
+    // js/main.js's keydown handler), so the picker's rung has to be spelled
+    // here too or Esc would work only when the field happens not to be
+    // focused — which on a fine pointer is never, since we focus it below.
+    // Same shape the palette input uses: close yourself, and stop.
+    const onKey = (e) => {
+      if (e.key === 'Enter') { submit(); return; }
+      if (e.key === 'Escape') { e.stopPropagation(); dismissSeatPicker(); }
+    };
     // 'Leave & switch' re-opens this modal, so listeners must not stack
     // across prompts: whichever door resolves this prompt detaches them
     // (seatCleanup is called by takeSeat and takeFreeSeat alike).
@@ -23116,7 +23361,17 @@ function promptName(peek) {
     update();
     joinBtn.addEventListener('click', submit);
     input.addEventListener('keydown', onKey);
-    input.focus();
+    // THE KEYBOARD IS THE PLAYER'S TO OPEN (C11). This focus was
+    // unconditional, and on a phone it is not a focus — it is a software
+    // keyboard, raised BEFORE the peek has resolved. The viewport meta carries
+    // `interactive-widget=resizes-content`, so the keyboard shrinks the layout
+    // viewport by roughly half at the exact moment the seats arrive into it:
+    // the panel grows and the viewport halves in the same frame, and the top
+    // of a centred overlay is what goes. The max-height/overflow fix makes
+    // that survivable; not stealing the keyboard makes it not happen.
+    // A fine pointer keeps the focus — there is no keyboard to raise, and
+    // typing your name immediately is the whole point of the field.
+    if (!window.matchMedia('(pointer: coarse)').matches) input.focus();
     if (peek && typeof peek.then === 'function') {
       peek.then((info) => {
         // Stale answers keep quiet: the prompt may have resolved (or been
@@ -23135,7 +23390,15 @@ function promptName(peek) {
 // path with the typing already done, so it lands on takeFreeSeat exactly as
 // "Someone else…" does — no second join door to keep in sync.
 document.getElementById('seat-keep-name').addEventListener('click', () => {
-  if (seatReturning && seatReturning.name) takeFreeSeat(seatReturning.name);
+  if (!seatReturning || !seatReturning.name) return;
+  // …and it carries the PICK, which it silently dropped until C12. `submit`
+  // above is the only other place that copies seatProfilePicked into
+  // seatPending, so this door — the one U3 built for exactly the population an
+  // invite link is sent to — forfeited the character offered by the link AND
+  // any row the player had just tapped. Two doors, one hand-off; the row's
+  // sub-label (renderSeatKeepSub) says which character is coming with you.
+  seatPending = seatProfilePicked;
+  takeFreeSeat(seatReturning.name);
 });
 document.getElementById('seat-apply').addEventListener('click', () => applySeatChoice());
 document.getElementById('seat-skip').addEventListener('click', () => dismissSeatChoice());
@@ -23201,6 +23464,23 @@ async function initNet() {
     // on every failure inside its own short timeout, so no server and no
     // setup both leave today's plain prompt, and the join never hangs on it).
     name = await promptName(peeked ? Promise.resolve(peeked) : peekTable(ROOM));
+    // DISMISSED (C12). `null` is dismissSeatPicker's sentinel and it means
+    // LOOK FIRST, not join anonymously: nothing is stored (a `null` through
+    // setItem would persist the string "null" as this browser's display name
+    // for good), nothing is joined, and the room is never told anyone came to
+    // the door. The felt is your own — the same state a `?room=` with no
+    // server already lands in — and the presence row offers the way back.
+    if (name === null) {
+      seatDeclined = true;
+      netOnline = false;
+      roomSetup = null;
+      applyRoomSettings(ownSettingsForChannel(load(LS_ROOMSETTINGS, null)));
+      renderPlayers();       // draws 'Take a seat' — the door, standing open
+      ensureProfileForTable();
+      updateIdentityChip();
+      updateTrayButtons();   // no table, so no Offer verb on the draft
+      return { online: false };
+    }
     try { localStorage.setItem(LS_NAME, name); } catch { /* ignore */ }
   }
 

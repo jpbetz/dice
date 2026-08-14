@@ -3805,6 +3805,20 @@ html, body {
 #name-panel {
   width: 320px;
   text-align: center;
+  /* THE SAME FIX #settings-panel GOT, AND FOR THE SAME REASON (C11). This
+     panel is centred in a flex overlay, and a centred child that outgrows its
+     container overflows in BOTH directions — the top goes off the top of the
+     screen and there is no scrollbar to bring it back, so the name field and
+     the Join button (which lead the modal) become literally unreachable. It
+     was written when the picker was a name and a button; it now holds up to
+     12 prepared seats plus an UNCAPPED profile list (to the 32 library cap),
+     which is ~1000px of rows against a 480px landscape phone.
+     100vh, not 100dvh: the viewport meta carries
+     `interactive-widget=resizes-content`, so the software keyboard shrinks
+     the LAYOUT viewport and vh already tracks it. */
+  position: relative; /* the ✕ anchors here */
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   animation: modal-pop 0.3s cubic-bezier(0.2, 1.4, 0.4, 1);
 }
 @keyframes modal-pop {
@@ -3881,6 +3895,51 @@ html, body {
    and asserts phase state, which was correct the whole time. */
 #seat-pick.hidden,
 #seat-preview.hidden { display: none; }
+
+/* ---- the door on the phone it is designed for (C11 / C12, UX §7.39) ----
+   CUJ7 step 1 is "the link arrives in Discord and is opened on a phone", and
+   until this block NO `@media` rule in the file touched #name-panel at all. */
+
+/* The way out (C12). Absolutely placed so the centred <h2> keeps its exact
+   position — a flex head would have left-aligned the one word this modal
+   says. It rides INSIDE the scroll box, so on a 32-profile library it
+   scrolls away with the top of the panel; Esc is its always-present twin and
+   the name row you have to come back to anyway sits beside it. */
+#seat-close { position: absolute; top: 6px; right: 6px; z-index: 1; }
+
+@media (pointer: coarse) {
+  /* 320x~31 -> 320x44 (U28's list, which never named this family). U28b's
+     finding is why this is `.seat-btn` and not `.btn`: a blanket coarse bump
+     on `.btn` reaches ~30 surfaces. 44 rather than the 34 floor because the
+     picker is the one screen in the app that exists FOR a phone, and its
+     height budget is now free — the panel scrolls (above).
+     Padding-block, not a bare min-height: `align-items: baseline` puts the
+     name/count baseline group at cross-START of a stretched line, so a row
+     grown by min-height alone would hang its text at the top. Symmetric
+     padding centres it; the min-height is the floor for a shorter font.
+     padding-INLINE is deliberately untouched, so the row's dress stays
+     whoever's it is. */
+  .seat-btn { min-height: 44px; padding-block: 13px; }
+  #name-input { min-height: 44px; font-size: 16px; }
+  /* 16px is not a size choice: below it, focusing an input makes mobile
+     Safari ZOOM the page, and this is the first field of the first screen. */
+  #name-join { min-height: 44px; }
+  /* WIDTH ONLY, and that is the argument. `.pop-close` already takes a coarse
+     bump app-wide (9px/13px pad at 16px = ~37 tall, over U28's 34 floor), and
+     a second 7px of height would push this absolutely-placed box down over the
+     <h2> and the italic table name — where a mis-tap costs you the door
+     instead of costing you nothing. 44 across, 37 down, both over the floor. */
+  #seat-close { min-width: 44px; }
+}
+
+/* A 320px fixed panel on a 320px phone is edge to edge, and #name-modal has
+   no padding of its own to save it. Below the narrowest common handset the
+   panel gives up its fixed width instead of its margins. */
+@media (max-width: 380px) {
+  #name-modal { padding: 12px; }
+  #name-panel { width: auto; max-width: 100%; }
+}
+
 .roller-name { font-weight: 700; }
 
 /* scrollbars */
