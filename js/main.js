@@ -7232,8 +7232,12 @@ const TOWERLAB = { on: false, group: null, world: null, t: 0, lastExit: 0,
   // speedMin/Max reset after the rolling exit landed: 60–80 was Joe's dial
   // for SLIDING dice punching through the friction tax; rolling dice carry
   // at a fraction of that. lipTilt 0.1 is Joe's pick.
-  // matExtra 4.5 is Joe's dial (thirteenth look): "with that in place
-  // everything works."
+  // matExtra is LAB-ONLY now, exactly like lipTilt: the shipped socket deepens
+  // by the TOWER_MAT_EXTRA constant and this dial reaches nothing but the
+  // bench's own mat (towerLabSet) and the occlusion sampler's eye translation.
+  // It starts at the shipped 4.5 so an untouched bench is the shipped room —
+  // and it is still Joe's dial (thirteenth look: "with that in place
+  // everything works"); moving it moves the constant, not this.
   // Once a SKIN exists the ghosts are scaffolding: the wooden model is what
   // ships and the contract volumes are what you switch on to argue with it
   // (__diceDebug.towerGhosts(true) / towerSkin(false)).
@@ -7897,6 +7901,23 @@ const TOWER_DIE_R = 1.25;
 // TOWERLAB.tune for anything but matExtra"). It does now: the shipped path
 // reads this constant and the lab override lives in towerLabVolumes().
 const TOWER_LIP_TILT = 0.1;
+// THE MAT THE TOWER BRINGS WITH IT, frozen as the SHIPPED number for exactly
+// the reason lipTilt was. Socketing deepens the mat by this (towerDeepenMat),
+// which moves TABLE_D and therefore z0 — and z0 is the anchor EVERY volume,
+// every collider and every frame of the film hangs off. The shipped socket read
+// TOWERLAB.tune.matExtra until now, so docs/TOWER.md:284's carve-out ("the
+// shipped socket does not read TOWERLAB.tune for anything but matExtra") was
+// naming the last live debug knob inside the physics, not an exemption that
+// cost nothing: two clients with different dials had different TABLE_D, a
+// different z0, a different despawn line and a different door, and baked one
+// seed into two films. There is no carve-out now.
+//
+// The lab KEEPS its dial. TOWERLAB.tune.matExtra is read only by the lab world
+// path — towerLabSet's deepen/restore pair and the occlusion sampler's eye
+// translation — both of which live on one person's bench and never reach a
+// body on the main world. Same shape as lipTilt: constant ships, dial benches.
+// Joe's dial, thirteenth look: "with that in place everything works."
+const TOWER_MAT_EXTRA = 4.5;
 const DEFAULT_PORTALS = Object.freeze({
   in:  Object.freeze({ x: 0, z: -1.6 * TOWER_S, rimY: 7.0 * TOWER_S, clearR: 1.7 * TOWER_S }),
   out: Object.freeze({ x: 0, sillY: 0.8 * TOWER_S, w: 4.0 * TOWER_S, clearH: 3.6 * TOWER_S }),
@@ -8196,8 +8217,18 @@ function towerVolumes(spec) {
     //
     // The band keeps its height and hangs down from that cap. Classic: top
     // sample 10.60 -> 8.10. Hollow Bole: 11.25 -> 8.75.
+    //
+    // ONE TERM, NOT A MIN. This was written as
+    // `Math.min(7.4*S + dRim + 1.2*S, despawnY + TOWER_DIE_R)` — the cowl
+    // VOLUME's own top against the despawn cap — and the first argument could
+    // never win at any legal rim: BOTH carry dRim, so their difference is the
+    // constant 8.6*S − (5.6*S + 1.25) = 2.5, for every spec, forever. A
+    // Math.min whose first argument is unreachable reads as "either of these
+    // could decide the band" about a law with exactly one author, and the next
+    // person to move the cowl volume would reasonably expect the band to
+    // follow. THE LAW, stated once: the band's top is A DESPAWNING DIE'S TOP.
     cowlY: (() => {
-      const ct = Math.min(7.4 * S + dRim + 1.2 * S, despawnY + TOWER_DIE_R);
+      const ct = despawnY + TOWER_DIE_R;
       const cb = ct - 2.4 * S;
       return [cb + 0.15, (cb + ct) / 2, ct - 0.15];
     })(),
@@ -8702,7 +8733,8 @@ function towerLabClear() {
 // tower's colliders are SHARED PHYSICS, exactly like the walls, because the
 // film every client bakes has to see the same interior. Socketing is:
 //
-//   1. deepen the mat by matExtra (the tower brings the room it consumes),
+//   1. deepen the mat by TOWER_MAT_EXTRA (the tower brings the room it
+//      consumes — the CONSTANT, never TOWERLAB.tune's dial of the same name),
 //   2. send the back-wall PLANE away — the doorway boxes replace it,
 //   3. add the eight engine colliders in contract order,
 //   4. add the skin (zero colliders, zero lights, pure theatre).
@@ -8874,7 +8906,11 @@ function towerSocket(id) {
     for (let i = towerRig.bodies.length - 1; i >= 0; i--) world.removeBody(towerRig.bodies[i]);
     world.removeContactMaterial(towerRig.cm);
     towerRig = null;
-    towerDeepenMat(-TOWERLAB.tune.matExtra); // restores the back wall plane too
+    // THE CONSTANT, NOT THE DIAL (TOWER_MAT_EXTRA). Symmetry matters here as
+    // much as determinism: a socket that deepened by a dial and undeepened by
+    // whatever the dial says LATER leaves TABLE_D permanently off by the
+    // difference, and every volume in the room with it.
+    towerDeepenMat(-TOWER_MAT_EXTRA); // restores the back wall plane too
   }
   TOWER_SWAP.mid = world.bodies.length;
   currentTower = spec.id;
@@ -8882,7 +8918,7 @@ function towerSocket(id) {
     // Order matters: deepen FIRST so towerVolumes() reads the socketed z0,
     // then build against it.
     towerRig = { id: spec.id, group: null, bodies: [], cm: null };
-    towerDeepenMat(TOWERLAB.tune.matExtra);
+    towerDeepenMat(TOWER_MAT_EXTRA);
     const v = towerVolumes(towerPortalsOf(spec.id));
     const rig = towerColliders(world, v);
     towerRig.bodies = rig.bodies;
@@ -8998,6 +9034,15 @@ function pourPlan(dice, v, prng) {
 
 // Pour n dice through the contract. Seeded so a look can be repeated; every
 // die's exit (transit, jitter, speed, yaw, pitch, spin) is drawn up front.
+//
+// THE BENCH DRAWS THE SHIPPED FILM, through pourPlan, and that is the whole
+// point of the bench. It used to hand-copy five of POUR's numbers — the
+// stagger band (0.12 + 0.08), the transit band (0.5 + 1.1), the lane span
+// (1.8), the yaw span (π/7.5) and the pitch span (π/30) — with a comment
+// asserting they were the same numbers and nothing whatsoever measuring it.
+// Five literals is five ways for a look to be judging a pour no player will
+// ever get, which is the exact failure the lab exists to prevent. There is
+// one draw now, and it is the product's.
 function towerLabDrop(n = 8, seed = 42) {
   if (!TOWERLAB.on) towerLabSet(true);
   let s = (seed >>> 0) || 1;
@@ -9007,78 +9052,36 @@ function towerLabDrop(n = 8, seed = 42) {
   TOWERLAB.dropped += n;
   // Act one: look at the tower while the dice pour into it.
   if (TOWERLAB.tune.camMove) towerCamTo('tower');
-  let entryAt = 0;
+  // Types first, in one pass, so the plan's own draws are a contiguous run of
+  // the seeded stream and a given seed keeps giving a given bench.
+  const types = [];
+  for (let i = 0; i < n; i++) types.push(DIE_TYPES[(rng() * DIE_TYPES.length) | 0]);
+  const plan = pourPlan(types.map((type) => ({ type })), v, rng);
+  // THE ONE DIAL THAT SURVIVES, and it survives as a POST-MULTIPLIER rather
+  // than as a second draw. TOWERLAB.tune.speedMin/Max is a BAND and the plan
+  // has already drawn a speed inside POUR's band, so the dial applies as the
+  // ratio of the two bands' midpoints — exactly 1.0 at the shipped dials
+  // (58/58, on the same double), which means an untouched bench is running the
+  // shipped exit and not an arithmetically-equivalent restatement of it.
+  //
+  // It scales the ANGULAR budget with the linear one because the rolling exit
+  // IS ω = v/r (Joe, eleventh look): a die dialed faster that left spinning at
+  // the old rate would be sliding, and sliding is the friction tax the rolling
+  // exit was invented to stop. The tumble jitter rides along, which is a
+  // deliberate approximation — at the shipped dials it is multiplied by one.
+  const kSpeed = (TOWERLAB.tune.speedMin + TOWERLAB.tune.speedMax)
+    / (POUR.speedMin + POUR.speedMax);
   for (let i = 0; i < n; i++) {
-    const type = DIE_TYPES[(rng() * DIE_TYPES.length) | 0];
-    const mesh = createDieMesh(type, dieVariant(false, null));
-    // Stagger by TIME, not spawn height: equal height gaps compress into
-    // ~50 ms arrival gaps at terminal speed (t = √(2h/g), and dt shrinks as
-    // v grows), which is why the first cut exited "kinda all at once". A
-    // poured cadence of 0.25–0.4 s per die survives the fall intact.
-    entryAt += i === 0 ? 0 : 0.12 + rng() * 0.08;
-    mesh.position.set(
-      v.aim.c[0] + (rng() - 0.5) * 0.8,
-      v.aim.c[1] + rng() * 0.8,
-      v.aim.c[2] + (rng() - 0.5) * 0.8);
-    mesh.quaternion.setFromEuler(new THREE.Euler(rng() * 6.28, rng() * 6.28, rng() * 6.28));
-    // Per-die spawn height (eighth look): every term measured, none hoped.
-    // sill + 0.15 margin + this die's radius + slope drop over the run-up
-    // + gravity drop at this die's seeded speed. One formula clears a d20
-    // and a d4 alike — a fixed height cannot, because the radius and the
-    // speed-dependent gravity drop both move the answer by more than the
-    // clearance margin.
-    const def = DIE_DEFS[type];
-    const r = def.radius || def.size * 0.87;
-    // 13–23: the wide spread is the DEPTH FAN (probe run 6) — fast dice
-    // overfly the tray onto open felt, slow ones rest close, and the pour
-    // stops stacking at a single radius in front of the door.
-    // Floor raised 13→18 (Joe, tenth look): the SLOW TAIL is what parks in
-    // the doorway — the first dice land on a virgin tray, stop close, and
-    // wall in the pour. Fast dice were never the problem. Live-dialable:
-    // towerTune({speedMin, speedMax}).
-    const speed = TOWERLAB.tune.speedMin
-      + rng() * (TOWERLAB.tune.speedMax - TOWERLAB.tune.speedMin);
-    const exitYaw = (rng() - 0.5) * (Math.PI / 7.5);
-    const ath2 = -v.exit.pitch;
-    // Graze height off the INTERNAL slope (probe run 9): the chute surface
-    // now runs under the spawn itself, so the height is simply surface + a
-    // radius (normal to the slope) + margin — the die kisses the chute at
-    // spawn and rides it out the door. The old run-up/gravity terms died
-    // with the flat pit.
-    const surfY = v.door.sill + (v.z0 - v.exit.p[2]) * Math.tan(ath2);
-    const exitY = surfY + r / Math.cos(ath2) + 0.2;
+    const p = plan[i];
+    const mesh = createDieMesh(types[i], dieVariant(false, null));
+    mesh.position.set(...p.start);
+    mesh.quaternion.setFromEuler(new THREE.Euler(...p.rot0));
     TOWERLAB.falling.push({
-      mesh, type, vy: 0, entryAt: TOWERLAB.t + entryAt, entered: false,
-      av: [(rng() - 0.5) * 8, (rng() - 0.5) * 8, (rng() - 0.5) * 8],
-      transit: 0.5 + rng() * 1.1,
-      exit: {
-        // Lane spread ±0.9 (probe run 1): at ±0.4 every die flew the same
-        // corridor and head-ons at v13–14 right outside the door were the
-        // norm — die1 hit die0 mid-flight, die2 hit die1. Worst-case door
-        // clearance stays positive: 0.9 + tan12°·0.875 + 1.25 = 2.34 < 2.5.
-        x: (rng() - 0.5) * 1.8,
-        speed, y: exitY,
-        yaw: exitYaw,                            // ±12° — chutes throw straight
-        // Pitch rides the SLOPE (seventh look): horizontal launches fell
-        // ~2 units under g=-110 and arrived nearly vertical at ~20 u/s —
-        // the normal impulse plus its friction bite ate the forward motion
-        // in one contact, and the pour jammed at its own doorstep. Parallel
-        // to the chute, first contact is a graze and the speed survives.
-        pitch: v.exit.pitch + (rng() - 0.5) * (Math.PI / 30), // slope ± 3°
-        // ROLLING EXIT (Joe, eleventh look — "the dice should have gained
-        // angular momentum in the tower"): a die SLIDING on felt is savaged
-        // by friction; a die ROLLING at matched spin barely feels it. This
-        // was the missing physics behind the felt-slap tax and the
-        // non-monotonic carry. ω = v/r about the horizontal axis
-        // perpendicular to travel (tilted with the yaw), tumble jitter on
-        // top — the baffles put forward roll on everything.
-        av: [
-          (speed / r) * Math.cos(exitYaw) + (rng() - 0.5) * 10,
-          (rng() - 0.5) * 10,
-          -(speed / r) * Math.sin(exitYaw) + (rng() - 0.5) * 10,
-        ],
-        rot: [rng() * 6.28, rng() * 6.28, rng() * 6.28],
-      },
+      mesh, type: types[i], vy: 0, entryAt: TOWERLAB.t + p.entryAt, entered: false,
+      av: p.av0, transit: p.transit,
+      exit: { ...p.exit,
+        speed: p.exit.speed * kSpeed,
+        av: p.exit.av.map((a) => a * kSpeed) },
     });
   }
   return { dropped: n, seed };
@@ -9154,7 +9157,8 @@ function stepTowerLab(dt) {
       scene.remove(f.mesh);
       TOWERLAB.falling.splice(i, 1);
       let exitAt = TOWERLAB.t + f.transit;
-      exitAt = Math.max(exitAt, TOWERLAB.lastExit + 0.2); // the stagger floor
+      // POUR.exitGap, not a sixth hand-copied 0.2 (see towerLabDrop).
+      exitAt = Math.max(exitAt, TOWERLAB.lastExit + POUR.exitGap); // the stagger floor
       TOWERLAB.lastExit = exitAt;
       TOWERLAB.hidden.push({ mesh: f.mesh, type: f.type, exitAt, exit: f.exit });
     }
