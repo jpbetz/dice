@@ -77,9 +77,23 @@ export default async function run(stage, args) {
   // put its sill and outrun elsewhere, and grading its dice against the
   // classic chute would call a delivered die TRAY (or worse). For a classic
   // tower these are exactly the old z0+0.6 and z0+3.9.
+  //
+  // NO FALLBACK, DELIBERATELY. The first cut wrote `spec ? spec.derived.x :
+  // <classic literal>` immediately under that paragraph — which is the exact
+  // grading-against-classic-literals the paragraph forbids, kept alive as a
+  // silent default. A null spec means 'none', an unregistered id, or a typo
+  // in the argument; every one of those makes the verdicts below meaningless,
+  // and a run that prints FELT/TRAY/HIDDEN against the wrong chute is worse
+  // than no run.
   const spec = await a.dbg(`towerPortalSpec(${JSON.stringify(tower)})`);
-  const hidCut = z0 + (spec ? spec.derived.hidZone : 0.6);
-  const trayCut = spec ? spec.derived.lipFrontZ : z0 + 3.9;
+  if (!spec) {
+    console.log(`BAD: '${tower}' has no portal spec (unregistered, or 'none' — which is not `
+      + 'a mode) — there is no chute to grade these dice against');
+    process.exitCode = 1;
+    return;
+  }
+  const hidCut = z0 + spec.derived.hidZone;
+  const trayCut = spec.derived.lipFrontZ;
 
   console.log('\n--- collisions ---');
   for (const e of log) console.log(`t=${e.t} ${e.a} x ${e.b} @(${e.at.join(',')}) v=${e.v}`);

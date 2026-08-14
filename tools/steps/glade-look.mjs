@@ -67,8 +67,18 @@ export default async function run(stage, args) {
     await t.dbg('clearTable()');
     await t.dbg('sim(200)');
     if (probe) {
+      // setVisibleByName RETURNS THE COUNT IT HID, and the count is the whole
+      // proof that the A/B happened: a renamed or retired element hides
+      // nothing, the frame comes out IDENTICAL to the one beside it, and a
+      // reviewer reads that as "this element contributes nothing" — the
+      // opposite of the truth. n=0 gets a NOTE rather than a silent pair.
       for (const name of probeNames) {
-        await t.dbg(`setVisibleByName('${name}', false)`);
+        const n = await t.dbg(`setVisibleByName('${name}', false)`);
+        console.log(`hid n=${n} (${name})`);
+        if (n === 0) {
+          console.log(`NOTE: nothing in the scene is named '${name}' — the frame below is `
+            + 'the same picture as the one before it, not evidence about that element');
+        }
         await shot(`glade-${venue}-no-${name}.png`);
         await t.dbg(`setVisibleByName('${name}', true)`);
       }

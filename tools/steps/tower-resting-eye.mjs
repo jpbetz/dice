@@ -48,9 +48,21 @@ export default async function run(stage, args) {
   await a.waitFor(`window.__diceDebug.tower === '${tower}'`, { desc: 'socketed' });
   await a.dbg('sim(1500)'); // let the ease finish
   f = await info();
-  console.log(`socketed idle: mode=${f.mode} target=${f.target} camY=${f.camY}`);
+  // WHERE THE RESTING EYE LOOKS IS z0, EXACTLY (towerEyePose: tgt.z = v.z0),
+  // so this asks for that number instead of the bare `> -4` it used to. The
+  // literal was a different assertion than it looked: -4 is neither the back
+  // wall nor a bound on it, it is one preset's z0 (-4.3 at medium, unsocketed)
+  // rounded off — so it passed on a mat two units deep and would have gone on
+  // passing with the eye parked anywhere behind the middle of the table.
+  // Tolerance is 0.06 because framingInfo rounds target to a tenth.
+  const spec = await a.dbg(`towerPortalSpec(${JSON.stringify(tower)})`);
+  if (!spec) { fail(`'${tower}' has no portal spec — nothing to check the eye against`); return; }
+  const z0 = spec.derived.z0;
+  console.log(`socketed idle: mode=${f.mode} target=${f.target} camY=${f.camY} z0=${z0}`);
   if (f.mode !== 'tower') fail(`socketed empty felt mode ${f.mode}, want tower`);
-  if (f.target[1] > -4) fail(`target z=${f.target[1]} is not at the tower's back`);
+  if (Math.abs(f.target[1] - z0) > 0.06) {
+    fail(`target z=${f.target[1]} is not the tower's back wall z0=${z0}`);
+  }
 
   // 2. A pour lands dice → the ladder takes the frame back.
   await a.roll('3d6');
