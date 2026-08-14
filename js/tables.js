@@ -213,3 +213,25 @@ export function mintRoomKey(name) {
   const rand = randBase36(KEY_RANDOM_LEN);
   return slug ? `${slug}-${rand}` : rand;
 }
+
+// Was this key MINTED, or did a person choose it? (U25, audit E4.) The
+// nameplate's rule — its own markup comment — is "the tableName, else the
+// ?room= key when someone CHOSE one, ELSE NOTHING", because an unnamed table
+// wears no placeholder. It had no way to tell the two apart, so a minted key
+// read as a chosen name and an unnamed table put `drive egw19x` on the plate
+// and in the tab title. This is the missing predicate, and it lives here
+// because the shape it recognises is the shape mintRoomKey writes: a
+// KEY_RANDOM_LEN base36 tail, on its own or after a slug and one hyphen.
+//
+// It is a PRESENTATION test and nothing else — the key is still the door
+// (goal 10) and is still in the address bar either way. Deliberately strict
+// rather than clever: exactly the minted shape, so a hand-typed
+// `?room=our-tuesday-game` is a chosen name and stays on the plate. A person
+// who types 16 random letters gets no plate, which is the correct answer to
+// a name that looks like nothing.
+export function isMintedKey(key) {
+  if (typeof key !== 'string') return false;
+  const tail = new RegExp(`^[a-z0-9]{${KEY_RANDOM_LEN}}$`);
+  const i = key.lastIndexOf('-');
+  return tail.test(i === -1 ? key : key.slice(i + 1));
+}
