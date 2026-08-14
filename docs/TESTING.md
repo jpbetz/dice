@@ -236,10 +236,12 @@ Chrome. Serialize that work; do not overlap it.
 
 ## Tags → areas
 
-Three kinds. **Area tags** (below) say what a scenario touches. **Journey tags**
+Four kinds. **Area tags** (below) say what a scenario touches. **Journey tags**
 (`cuj1`…`cuj13`, [CUJS.md](CUJS.md)) say which user journey it walks, so
-`--only cuj7` runs the journey rather than a surface. And one **lane tag**,
-`look`, which is the only tag with a RULE attached.
+`--only cuj7` runs the journey rather than a surface. **`journey`** is the
+gate tag: it marks the ONE composed walk per journey (the table above), and
+`--only journey` is the pre-release selector. And one **lane tag**, `look`,
+which is the only tag with a RULE attached.
 
 **The `look` lane (ROADMAP T4).** A tower model is theatre over invisible
 engine colliders: physics and the pour film are a function of (portal spec,
@@ -270,6 +272,43 @@ scenarios in the same commit — the same rule UX.md's WHAT IS TRUE TODAY table
 already applies to surfaces. A journey's **composed** scenario (one that walks
 it the way a person does, like `profile-dm-prepares`) is a pre-release gate.
 
+**And the rule stated as a gate, because a rule with no selector is a wish
+(ROADMAP C1 + C3's open half, 2026-08-14).** Every journey that has code owns
+exactly one scenario tagged **`journey`**, and `node tests/e2e/run.mjs --only
+journey` is a release gate that must be green before a milestone ships. **A
+feature that changes a journey updates that journey's composed scenario IN THE
+SAME COMMIT** — not its part-scenarios instead of it, and not in a follow-up.
+The part-scenarios cannot enforce this and never could: a journey with no
+end-to-end scenario passes in every part and fails as a whole, which is what
+`prepared-seat` did for weeks while CUJ3/CUJ7 were broken for every returning
+player.
+
+A composed scenario is recognisable rather than merely tagged. It walks the
+journey's own **done when** sentence from CUJS.md in order, it uses the
+controls a person uses (a tap on the palette, the ± popover's fields, the
+recents row) rather than the notation shortcut that makes a part-scenario
+cheap, and its closing assertions are about **what somebody ends up holding** —
+the pools in their hand, the three log counts at three seats, the bytes a
+fourth player's stream did not carry. `journey-who-sees-this` ends on a raw SSE
+stream; `journey-follow-along`'s fixture is a player who never rolls. An
+assertion that a widget exists belongs in a part-scenario.
+
+| journey | composed scenario |
+| --- | --- |
+| CUJ1 | `lobby-no-prompt` |
+| CUJ2 | `journey-call-the-game` |
+| CUJ3 | `prepared-seat` |
+| CUJ4 | `journey-between-games` |
+| CUJ5 | **none — no code and no scenario** (CUJS.md gap B) |
+| CUJ6 | `soul-seed` |
+| CUJ7 | `profile-dm-prepares` |
+| CUJ8 | `journey-roll-this-thing` |
+| CUJ9 | `journey-legible-evening` |
+| CUJ10 | `journey-who-sees-this` |
+| CUJ11 | `journey-follow-along` |
+| CUJ12 | `journey-different-game` |
+| CUJ13 | `profile-file` |
+
 Scenarios with **no** `cuj` tag are deliberate: they are cross-cutting quality
 gates that apply to every journey rather than walking one — `a11y-modals`,
 `touch-targets`, `terminology`, `resync`, `perf-determinism`, `announced`,
@@ -291,6 +330,7 @@ gates that apply to every journey rather than walking one — `a11y-modals`,
 | `groups`   | Saved pools: inline row editor and popover update write back by id, save-as-variant stays additive (the tag keeps the `groups` spelling, like the code) |
 | `profiles` | The profile library (§11): the lossless switch (`profile-library`, in smoke), the store surviving a reload with the same profile in hand, the system binding and the mismatch that is labelled rather than swapped, the join-time picker filtered to the table's system with last-used pre-selected (`profile-join-pick`, in smoke), Random per system, copying a teammate's published profile, and the whole library round-tripping through the file with exactly ONE home per rack |
 | `tower`    | The dice tower as a room setting ([TOWER.md](TOWER.md)): `tower-roll` sockets `heartwood`, pours four pools through it, and proves the exit guarantee, the hidden windows *on screen*, the baffle clunks, same-seed and cross-client replay, the mid-roll defer, and — THE FIRST LAW — that coming back down leaves the world byte-for-byte the towerless one. It carries a 40d6 stress pool on purpose: the pour's one measured failure never appeared below twenty dice |
+| `journey`  | The GATE lane: the one composed walk per journey (table above), run as `--only journey` before a release. A journey with parts and no walk passes everywhere and fails as a whole |
 | `look`     | The COSMETIC lane (rule above; no dice, enforced). `tower-dressing` walks every skinned registry row and asserts the dress groups each one DECLARES, that the skin is visible as an aggregate over the `towerSkin*` subtree, the dressing TRIANGLE budget (≤4k, art restraint) and the WHOLE TOWER's draw budget (≤20 — frame cost is total draws, not dress draws; the three code-built classics carry named, valued, self-cleaning overruns at 49/61/88, ROADMAP T14 and T15), and the family traits: an ember on the row with its lamps readable by value, zero lights in the skin |
 | `audio`    | V1 sound ([AUDIO.md](AUDIO.md)): the graph built once at unlock and suspended until a real gesture (`audio-graph`), the three-phase contact machine derived off the film (`audio-phases`), the rolling voice pool and its teardown (`audio-rolling`), the settle cluster's seeded schedule and its own gate cursor (`audio-settle`), the tower shaft send and the FIRST LAW asked of `impactVoiceFor` (`audio-shaft`), and the room bed's two switches (`audio-ambience`). Every scenario also carries `fx` and `roll`. What makes it testable headless: Chrome runs `--mute-audio` WITHOUT `--autoplay-policy=no-user-gesture-required`, so the graph is fully observable while the hardware stays silent and the suspended-until-gesture state reproduces exactly |
 | `stability` | The closed-beta channel (UX §7.38, `js/stability.js`): what the settings panel OFFERS a production browser, and — the leg that costs dice — that the offer is ALL it gates. `stability-gate` puts a stable client and a beta client in one room, pours, and compares both films: refusing the room's tower on the stable client passes every visibility assertion in the file and puts different dice in front of the two players. **Every harness tab is a beta tab** (towers and venues are unreleased and the suite's job includes them), so the population that matters is reached deliberately — `clean: ['dice.stability.v1']` for a browser that has never heard of the beta, `query: '&stability=stable'` for the revoke link. A default that only ever booted one channel is `prepared-seat`'s failure with a new subject |

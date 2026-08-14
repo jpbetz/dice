@@ -4322,7 +4322,7 @@ export const scenarios = [
   },
   {
     name: 'soul-seed',
-    tags: ['groups', 'cuj6'],
+    tags: ['journey', 'groups', 'cuj6'],
     // The pre-Soul-Deal starter trio (Attack/Damage/Percentile, untouched)
     // upgrades to the Soul Deal rack on the next boot — it was never the
     // player's own work. One edit and the rack is theirs: no swap.
@@ -8949,7 +8949,7 @@ export const scenarios = [
   },
   {
     name: 'profile-dm-prepares',
-    tags: ['profiles', 'prepared-seat', 'cuj7'],
+    tags: ['journey', 'profiles', 'prepared-seat', 'cuj7'],
     // R8 END TO END, composed rather than in pieces: "I expect DMs to create
     // profiles for players and have the players use them when they log in."
     // The organizer authors three characters in their own library, fills the
@@ -9021,7 +9021,7 @@ export const scenarios = [
   },
   {
     name: 'profile-file',
-    tags: ['profiles', 'table-file', 'cuj13'],
+    tags: ['journey', 'profiles', 'table-file', 'cuj13'],
     // O6/O7/P14: the file is the library's durable copy. The whole library
     // round-trips through `players:` + `profile:`, the rack appears in exactly
     // ONE place (a hand-editable format with two homes for one rack is a trap),
@@ -9062,7 +9062,7 @@ export const scenarios = [
   },
   {
     name: 'prepared-seat',
-    tags: ['prepared-seat', 'chrome', 'cuj3'],
+    tags: ['journey', 'prepared-seat', 'chrome', 'cuj3'],
     // ROADMAP §G5 — CUJ2, the whole point of the tier: one link in Discord,
     // and a player lands at the right table under their own name with their
     // own pools. The seat is OFFERED, never imposed: GOALS §7 records that
@@ -9333,7 +9333,7 @@ export const scenarios = [
   // ---------------------------------------------------------------------
   {
     name: 'lobby-no-prompt',
-    tags: ['smoke', 'lobby', 'cuj1'],
+    tags: ['smoke', 'journey', 'lobby', 'cuj1'],
     // §3b L0 — CUJ1: "I just need to do a dice roll NOW". The bare url is the
     // LOBBY: no join, no name prompt, no server call at all. The old front
     // door seated every stranger on one shared room named 'table', behind a
@@ -13912,6 +13912,650 @@ export const scenarios = [
       await a.settle();
       assert.equal(await a.eval('window.__diceDebug.currentRoll.set'), 'tidewrack.seaglass',
         'your own set resumes with the room — the venue never rewrote your identity');
+    },
+  },
+
+  // =========================================================================
+  // PART A — THE COMPOSED JOURNEY WALKS (ROADMAP C1 + C3's open half)
+  //
+  // Every journey in docs/CUJS.md already has PART-scenarios, and the tag half
+  // shipped: 109 scenarios carry cuj1…cuj13. What was missing is the thing the
+  // coverage rule actually asks for — one scenario per journey that walks it
+  // THE WAY A PERSON DOES, whose assertions are about what somebody ends up
+  // HOLDING rather than about a widget being present.
+  //
+  // That distinction is measured, not argued. `prepared-seat` was green for
+  // weeks while CUJ3/CUJ7 were broken for EVERY returning player, because its
+  // fixture seeded no name and so only ever tested first-timers (UX-AUDIT E1 →
+  // ROADMAP U3). Every part was correct; the journey was not.
+  //
+  // `profile-dm-prepares` is the model: two tabs, a whole sequence, and the
+  // final assertion is "Bo is holding exactly what the DM prepared for her".
+  // These seven follow it. They carry the `journey` tag as well as their `cujN`
+  // so the whole release gate runs as one selector:
+  //
+  //     node tests/e2e/run.mjs --only journey
+  //
+  // CUJ1, CUJ3, CUJ6, CUJ7 and CUJ13 already own a composed walk
+  // (`lobby-no-prompt` + `lobby-exits`, `prepared-seat`, `soul-seed`,
+  // `profile-dm-prepares`, `profile-file`); they are tagged `journey` where
+  // they stand rather than duplicated here. CUJ5 has no code and no scenario,
+  // and this file will not pretend otherwise — see CUJS.md gap B.
+  // =========================================================================
+  {
+    name: 'journey-call-the-game',
+    tags: ['journey', 'lobby', 'chrome', 'cuj2'],
+    timeout: 150000,
+    // CUJ2 — "I'm setting up a table and need to get my friends into it."
+    // DONE WHEN: a table exists at an unguessable key, and its link reaches
+    // other people in one gesture.
+    //
+    // THE FAILURE THIS CATCHES: every part of CUJ2 is pinned (`new-table` mints
+    // the key, `invite-chair` reads inviteUrl, `table-name-survives-round-trip`
+    // reloads it) and not one of them ever FOLLOWS the link. So the parts would
+    // all stay green if the copied url carried the typed NAME instead of the
+    // minted key, or carried a stale room, or dropped `?room=` entirely — the
+    // organizer would be alone at a table whose link goes nowhere, and the
+    // suite would say CUJ2 works. This walk takes the string the app hands the
+    // organizer to paste into Discord and boots a second browser on it.
+    async fn(ctx) {
+      // The organizer arrives at the bare URL with nothing but a name.
+      const dm = await lobbyTab(ctx, {
+        origin: '127.0.0.20',
+        clean: ['dice.tables.v1'],
+        seed: { 'dice.name.v1': 'Walter' },
+      });
+      const search = await createTableFromLobby(dm, 'Thursday Game');
+      const key = decodeURIComponent(search.replace('?room=', ''));
+      assert.notEqual(key, 'Thursday Game', 'the key is not the typed name');
+      assert.match(key, /^thursday-game-[a-z0-9]{16}$/,
+        `unguessable: a slug plus 16 random chars, which IS the access control (got ${key})`);
+      await dm.waitFor(`window.__diceDebug.settings.tableName === 'Thursday Game'`,
+        { desc: 'the table wears the name he typed' });
+
+      // ONE GESTURE: whatever the invite chair copies is what gets pasted.
+      const invite = await dm.dbg('identity.inviteUrl');
+      const qs = invite.slice(invite.indexOf('?'));
+      assert.equal(new URLSearchParams(qs).get('room'), key,
+        `the copied link addresses the room that was minted (got ${invite})`);
+
+      // A friend follows THAT STRING, on a browser that has never been here.
+      const rhys = await bootTab(ctx, {
+        origin: '127.0.0.21',
+        path: `/${qs}`,
+        clean: ['dice.name.v1', 'dice.tables.v1'],
+        readyExpr: `document.getElementById('name-modal')?.classList.contains('hidden') === false`,
+        readyDesc: 'the link opens the door, not an error',
+      });
+      // The door tells them WHICH table before they commit to it (CUJ3's peek,
+      // which is the half CUJ2 depends on to be worth sending).
+      await rhys.waitFor(`window.__diceDebug.seatPicker.tableName === 'Thursday Game'`,
+        { desc: 'the link says where it goes before you walk through it' });
+      await rhys.dbg(`chooseSomeoneElse('Rhys')`);
+      await rhys.waitOnline();
+
+      // WHAT THE TWO PEOPLE END UP HOLDING.
+      const id = await rhys.dbg('identity');
+      assert.equal(id.room, key, 'the friend is in the organizer’s room, not a lookalike');
+      assert.equal(id.name, 'Rhys', 'under their own name');
+      assert.equal(await rhys.dbg('settings.tableName'), 'Thursday Game',
+        'and reading the same nameplate the organizer typed');
+      await dm.waitFor(`window.__diceDebug.players.length === 2`,
+        { desc: 'the organizer is no longer alone' });
+      assert.deepEqual((await dm.dbg('presenceRow')).pills, ['Rhys'],
+        'the Invite chair retired into the person it asked for');
+
+      // …and the table is somewhere they can both come back to (the half CUJ4
+      // then walks). The friend's browser remembers it by NAME.
+      const recents = JSON.parse(await rhys.eval(`localStorage.getItem('dice.tables.v1')`));
+      assert.equal(recents[0].room, key, 'the friend’s browser remembers the table');
+      assert.equal(recents[0].name, 'Thursday Game', 'by the name on the door');
+    },
+  },
+  {
+    name: 'journey-between-games',
+    tags: ['journey', 'lobby', 'seat', 'cuj4'],
+    timeout: 150000,
+    // CUJ4 — "This game is over. I want another table, or to go home."
+    // DONE WHEN: leaving is a verb, and the tables they have visited are
+    // listed to go back to.
+    //
+    // THE FAILURE THIS CATCHES: CUJS.md calls CUJ4 thin — one scenario
+    // (`leave-to-lobby`), which stops the moment the lobby paints. Nothing
+    // proved the OTHER half of the done-when: that the listed table can be
+    // RE-ENTERED and that you arrive as yourself. A recents menu that lists a
+    // dead key, or a return trip that re-prompts for a name, or a return that
+    // lands you as a second stranger on the roster, all pass `leave-to-lobby`.
+    // This walks out and back in.
+    async fn(ctx) {
+      const alice = await tableTab(ctx, {
+        origin: '127.0.0.22',
+        clean: ['dice.tables.v1'],
+        seed: { 'dice.name.v1': 'Alice' },
+      });
+      await alice.waitOnline();
+      const bob = await ctx.newTable({ origin: '127.0.0.23', name: 'Bob' });
+      await bob.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+
+      // She played: a pool she built and a roll she made are what "going home"
+      // must not cost her.
+      await alice.dbg(`setGroups([{name: 'Lantern', notation: '2d6', category: 'Attributes'}])`);
+      await alice.roll('2d6');
+      const playerId = await alice.playerId();
+
+      // Leaving is a VERB, in the one slot that holds what you can do about
+      // your own presence.
+      await alice.eval(`document.getElementById('identity-chip').dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`);
+      try {
+        await alice.eval(`document.getElementById('idm-lobby').click()`);
+      } catch { /* the context dies inside the click — that IS the leave */ }
+      await landedInLobby(alice);
+
+      // The table she just left is LISTED, by name, and the menu is the way in.
+      await alice.eval(`[...document.querySelectorAll('#rail-roster .rail-ghost')]
+        .find((b) => b.textContent.includes('Tables')).click()`);
+      await alice.waitFor(`!!document.querySelector('.rail-menu')`, { desc: 'the recents menu opens' });
+      assert.deepEqual(
+        await alice.eval(`[...document.querySelectorAll('.rail-menu .idm-item')].map((b) => b.textContent)`),
+        [ctx.room],
+        'the game she just left is the one row she is offered (unnamed, so the row wears the key)');
+      try {
+        await alice.eval(`document.querySelector('.rail-menu .idm-item').click()`);
+      } catch { /* the navigation */ }
+      const back = await landedAtTable(alice);
+
+      // WHAT SHE ENDS UP HOLDING: the same table, as herself, with her work.
+      assert.equal(decodeURIComponent(back.replace('?room=', '')), ctx.room,
+        'the recents row goes back to the table she left, not to a new one');
+      const id = await alice.dbg('identity');
+      assert.equal(id.name, 'Alice', 'she was never asked who she was again');
+      assert.equal(id.lobby, false, 'and she is at a table, not looking at one');
+      assert.deepEqual((await alice.dbg('groups')).map((g) => g.name), ['Lantern'],
+        'her pools came with her — the lobby is not a reset');
+      // A RETURN IS NOT AN ARRIVAL OF A STRANGER. `leaveToLobby` drops the
+      // seat, so this is a fresh sit-down and a NEW playerId is correct — what
+      // must not happen is Bob's roster growing a ghost that never leaves.
+      assert.notEqual(await alice.playerId(), playerId,
+        'a fresh sit-down, which is what leaving meant');
+      await bob.waitFor(`window.__diceDebug.players.length === 2`,
+        { desc: 'Bob sees exactly two people again — no ghost of the Alice who left',
+          timeout: 30000 });
+      assert.deepEqual((await bob.dbg('players')).map((p) => p.name).sort(), ['Alice', 'Bob'],
+        'and they are the same two people');
+    },
+  },
+  {
+    name: 'journey-roll-this-thing',
+    tags: ['journey', 'roll', 'chrome', 'cuj8'],
+    timeout: 150000,
+    // CUJ8 — "I want to roll this specific thing."
+    // DONE WHEN: an intended roll — dice, modifiers, target, advantage,
+    // keep/drop, a name for what it is — can be composed, thrown and READ,
+    // without leaving the felt and WITHOUT TYPING NOTATION unless you want to.
+    //
+    // THE FAILURE THIS CATCHES: thirteen part-scenarios cover this journey and
+    // most of them get their dice onto the felt by handing a notation string to
+    // `commandRoll` — which is precisely the thing the done-when says must not
+    // be required. So the whole gesture path could rot (a palette that composes
+    // the wrong die, a popover whose target never reaches the wire, a name that
+    // is dropped between the box and the log) while CUJ8 stayed green. Not one
+    // character is typed into #cmd-input here; every element of the intent is
+    // set with the control a finger would use, and the last assertion is what
+    // the OTHER player reads.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.24', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.25', name: 'Bob' });
+      // A totals lens, because "read it" for a d20 check means the verdict.
+      await a.dbg(`setSystem('dnd')`);
+      for (const t of [a, b]) {
+        await t.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'the table reads by d20' });
+      }
+      const typed = () => a.eval(`document.getElementById('cmd-input').value`);
+
+      // ---- compose: two taps on the palette -------------------------------
+      await a.eval(`(() => {
+        const btns = [...document.querySelectorAll('#die-buttons .die-btn')];
+        const d20 = btns.find((x) => x.textContent.includes('20')) || btns[btns.length - 1];
+        d20.click();
+      })()`);
+      assert.deepEqual((await a.dbg('trayState')).dice, ['d20'],
+        'a die on the felt-side draft, put there by a tap');
+
+      // ---- modify: the ± popover, control by control ----------------------
+      assert.equal(await a.dbg(`openPopoverFor('tray')`), true, 'the ± tool opens on the draft');
+      await a.eval(`document.querySelector('#pop-seg-adv [data-v="adv"]').click()`);
+      await a.eval(`(() => {
+        const dc = document.getElementById('pop-dc');
+        dc.value = '15';
+        dc.dispatchEvent(new Event('input'));
+      })()`);
+      await a.eval(`(() => {
+        const c = document.getElementById('pop-comment');
+        c.value = 'Sneak past the guard';
+        c.dispatchEvent(new Event('input'));
+      })()`);
+      await a.dbg('closePopover()');
+
+      // THE INTENT IS WHAT THE FINGERS SAID. draftIntent is read rather than
+      // the canonical string, because the string is the projection and the
+      // projection is what kept hiding drops (U1).
+      const intent = await a.dbg('draftIntent');
+      assert.equal(intent.dc, 15, 'the target the player typed into the target field');
+      assert.equal(intent.comment, 'Sneak past the guard', 'and the name they gave it');
+      assert.ok(/adv/.test(intent.canonical),
+        `advantage rode into the spec (got ${JSON.stringify(intent.canonical)})`);
+      assert.equal(intent.rollArmed, true, 'and the plate is armed');
+
+      // ---- throw: the cluster IS the button -------------------------------
+      const before = await a.logCount();
+      await a.eval(`document.getElementById('tray-roll').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${before}`
+        + ` && !window.__diceDebug.busy)`,
+        { desc: 'the composed roll plays out' });
+      await a.settle();
+      const rid = await a.rollId();
+
+      // WHAT THE PLAYER ENDS UP HOLDING — and none of it was typed.
+      // The box is not EMPTY: a popover edit live-syncs into it, which is the
+      // app working as designed. What matters is the direction — the fingers
+      // wrote the notation, not the other way round — so the claim is that the
+      // string in the box is exactly the one the gestures composed. Nothing in
+      // this scenario ever assigned to `#cmd-input`.
+      assert.equal(await typed(), '1d20 adv dc15 # Sneak past the guard',
+        'the notation is the app’s transcript of the gestures, written by the app');
+      const sent = await a.dbg('lastRequestedRoll');
+      assert.equal(sent.dc, 15, 'the wire carried the target');
+      const line = await a.logTop();
+      assert.ok(line.includes('Sneak past the guard'),
+        `the record is titled with what they called it (got ${line})`);
+      assert.ok(/vs 15/.test(line), `and carries the stake (got ${line})`);
+      assert.ok(/[✓✗]/.test(line), 'adjudicated, because this table reads by totals');
+      // Advantage means TWO dice thrown and ONE counted: the read has to show
+      // both, or the player cannot see why the number is the number.
+      assert.equal(await a.diceCount(), 2, 'both d20s are on the felt');
+      assert.deepEqual(await a.dbg(`outcomeRows('banner')`), [],
+        'a totals lens paints a total, not per-die rows');
+      const st = await a.entryState(rid);
+      assert.equal(st.values.length, 2, 'the entry keeps both faces');
+      assert.equal(st.total, Math.max(...st.values), 'and the total is the kept one');
+
+      // ---- and the other player reads THE SAME THING ----------------------
+      await b.waitFor(`(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(rid)})`
+        + ` && !window.__diceDebug.busy)`, { desc: 'the roll reaches Bob' });
+      assert.equal(await b.logTop(), line, 'Bob reads the identical line — name, stake and verdict');
+      assert.deepEqual(await b.entryState(rid), st, 'byte-for-byte the same entry');
+      await a.dbg(`setSystem('soul-deal')`);
+    },
+  },
+  {
+    name: 'journey-legible-evening',
+    tags: ['journey', 'shelf', 'log', 'roll', 'cuj9'],
+    timeout: 180000,
+    // CUJ9 — "I want the table to stay legible all evening."
+    // DONE WHEN: thirty rolls in you can still see what is on the felt, FIND
+    // what happened earlier, REPEAT a roll you liked, and CLEAR what you are
+    // done with.
+    //
+    // THE FAILURE THIS CATCHES: the thirteen part-scenarios each prove one
+    // verb on a table with one or two rolls on it. None of them ever asks the
+    // journey's actual question, which is a question about ACCUMULATION: after
+    // a stack of rolls, is the thing you are looking for still findable? The
+    // find/anchor/repeat chain is exactly where that breaks — `anchorRecord`
+    // resolves a row by id out of #log-list, and a filter that removed rows
+    // instead of hiding them, or a cap prune that dropped the row the record
+    // still ranks, would leave the record pointing at nothing. Both are
+    // invisible to any scenario with three rolls in it.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.26', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.27', name: 'Bob' });
+
+      // An evening's worth of rolls, from two people, most of them noise.
+      const wanted = 'Kick down the door';
+      for (let i = 0; i < 4; i++) await a.roll(`2d6 # filler ${i}`);
+      await b.roll(`1d8 # ${wanted}`);
+      const keeper = await b.rollId();
+      for (let i = 0; i < 4; i++) await a.roll(`2d6 # noise ${i}`);
+      await a.settle();
+      await b.settle();
+      await a.waitFor(`(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(keeper)}))`,
+        { desc: 'Bob’s roll is in Alice’s log' });
+
+      // (1) SEE WHAT IS ON THE FELT. Nine rolls in, the felt is not nine
+      // rolls deep: a new roll retires the previous one (§7.5), which is the
+      // mechanism goal 5 is bought with.
+      assert.ok(await a.diceCount() <= 2,
+        `the felt holds the live roll, not the evening (got ${await a.diceCount()} dice)`);
+
+      // (2) THE PUT-AWAY ROLLS ARE STILL AN INDEX, not a heap. Nine rolls in,
+      // eight have tidied themselves away (a new roll retires the last one) and
+      // the record ranks them OLDEST→NEWEST — which is the single most useful
+      // fact for "find what happened earlier", and the fact the felt shelf used
+      // to carry and nothing rendered after C25 took it away.
+      await a.dbg('setLogFlyout(true)');
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.length === 5)`,
+        { desc: 'the finished rolls tidied themselves into the record' });
+      const ranks = (await a.dbg('record')).ranks;
+      // THE CAP IS THE JOURNEY'S POINT, not an inconvenience: nine rolls in,
+      // the record holds the most recent five and the LOG holds all nine. The
+      // felt stays clear, the index stays short, and everything is still
+      // findable — which is exactly the trade goal 5 asks for.
+      assert.deepEqual(ranks.map((r) => r.rank), [1, 2, 3, 4, 5],
+        'ranked oldest first with no gaps, so "earlier" is a direction you can move in');
+      assert.equal(await a.logCount(), 9, 'while the log kept every roll of the evening');
+      assert.ok(ranks.some((r) => r.name === 'Bob') && ranks.some((r) => r.name === 'Alice'),
+        `and each rank says whose roll it was (got ${JSON.stringify(ranks.map((r) => r.name))})`);
+
+      // (3) FIND WHAT HAPPENED EARLIER — by the words the player remembers.
+      await a.dbg(`setLogFind('kick down')`);
+      const found = await a.dbg('logFind');
+      assert.equal(found.shown, 1, `one row survives the search (of ${found.total})`);
+      assert.ok(found.note.includes('1 of'), `and the count says so (got ${JSON.stringify(found.note)})`);
+
+      // (4) ANCHOR IT: the search result is a DOOR, and it opens the card.
+      assert.equal(await a.dbg(`anchorRecord(${JSON.stringify(keeper)})`), true,
+        'the roll they were looking for opens from the record');
+      assert.equal((await a.dbg('peekState')).rollId, keeper, 'its card is what came up');
+      assert.equal((await a.dbg('logFind')).query, 'kick down',
+        'and their search is still theirs — reading a result does not throw the search away');
+      // …but the anchor OUTRANKS the filter when it has to: asking for a roll
+      // by name is a stronger statement than the query that happens to be in
+      // the box, and a row hidden by the filter cannot be scrolled to or lit.
+      const buried = ranks.find((r) => r.rollId !== keeper).rollId;
+      assert.equal(await a.dbg(`anchorRecord(${JSON.stringify(buried)})`), true,
+        'a roll the search is hiding still opens from the record');
+      assert.equal((await a.dbg('logFind')).query, '',
+        'because the anchor cleared the filter it had to reach through');
+
+      // (5) REPEAT IT. Provenance is the whole point of a repeat: the new roll
+      // must say which roll it is a repeat OF, or "do that again" is just a
+      // second roll.
+      // The gesture is the CARD's own strip — the card the record just opened.
+      // C25 took the felt shelf away and CUJ9's find-and-repeat had to move
+      // onto the record with it; pressing the strip is what proves it arrived.
+      await a.dbg(`anchorRecord(${JSON.stringify(keeper)})`);
+      assert.equal((await a.dbg('peekState')).cueWord, 'REROLL',
+        'the card the record opened offers the repeat by name');
+      const beforeCount = await a.logCount();
+      await a.eval(`document.querySelector('#peek-card .pk-again').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${beforeCount}`
+        + ` && !window.__diceDebug.busy)`, { desc: 'the repeat plays' });
+      await a.settle();
+      const repeat = await a.rollId();
+      assert.equal((await a.entryState(repeat)).rerollOfId, keeper,
+        'the repeat carries where it came from, server-substantiated');
+      assert.ok((await a.logTop()).includes(wanted),
+        `and keeps the name of the thing being repeated (got ${await a.logTop()})`);
+
+      // (6) CLEAR WHAT YOU ARE DONE WITH — and the button names its scope,
+      // because one of the two things it does is permanent and table-wide.
+      const rec = await a.dbg('record');
+      assert.ok(rec.clearLabel.includes('for everyone'),
+        `Clear says who it reaches (got ${JSON.stringify(rec.clearLabel)})`);
+      await a.dbg('setLogFlyout(false)');
+    },
+  },
+  {
+    name: 'journey-who-sees-this',
+    tags: ['journey', 'visibility', 'cuj10'],
+    timeout: 180000,
+    // CUJ10 — "I want to control who sees this roll."
+    // DONE WHEN: a roll can be open, face-down, secret or whispered to named
+    // players; the choice is legible before you commit and after it lands; and
+    // NOTHING LEAKS BY ANY PATH — including the raw wire.
+    //
+    // THE FAILURE THIS CATCHES: this is the best-covered journey by part count
+    // and every part tests ONE mode in a room that has seen nothing else. The
+    // journey's own claim is comparative — four modes in one evening, three
+    // people, and each person ending up with a DIFFERENT and correct picture.
+    // A mode that leaked into the NEXT roll's projection, or a shroud that
+    // stopped being applied once a reveal had happened in the room, is a
+    // per-room state bug that no single-mode scenario can see. The final
+    // assertion is three log counts and one raw byte stream.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.28', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.29', name: 'Bram' });
+      const c = await ctx.newTable({ origin: '127.0.0.30', name: 'Cass' });
+      for (const t of [b, c]) {
+        await t.waitFor(`window.__diceDebug.players.length === 3`, { desc: 'three seats' });
+      }
+      // A bytes-only fourth: whatever the CLIENTS choose to render, this one
+      // keeps every character the server ever sent.
+      const wire = await ctx.rawPlayer('Wire');
+
+      // ---- 1. open: everyone reads it ------------------------------------
+      await a.roll('2d6 # In the open');
+      const open = await a.rollId();
+      for (const t of [b, c]) {
+        await t.waitFor(`(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(open)}))`,
+          { desc: 'the open roll reaches everyone' });
+      }
+
+      // ---- 2. face down, then revealed -----------------------------------
+      await a.roll('d20 held # Behind the screen');
+      const held = await a.rollId();
+      for (const [t, who] of [[a, 'Ada (the roller)'], [b, 'Bram'], [c, 'Cass']]) {
+        await t.waitFor(shroudSettled(held), { desc: `the shroud lands for ${who}` });
+        assert.equal((await t.entryState(held)).hidden, true, `${who} cannot read a held roll`);
+      }
+      assert.equal((await a.entryState(held)).canReveal, true, 'the roller holds the reveal');
+      assert.equal((await b.entryState(held)).canReveal, false, 'and nobody else does');
+      await a.dbg(`reveal(${JSON.stringify(held)})`);
+      for (const t of [a, b, c]) await t.waitFor(revealSettled(held), { desc: 'the reveal lands' });
+
+      // ---- 3. secret: it exists for one person ---------------------------
+      await a.roll('d20 secret # Only me');
+      const secret = await a.rollId();
+
+      // ---- 4. whispered to one named player ------------------------------
+      await a.roll('2d8 w:Cass # For Cass');
+      const whisper = await a.rollId();
+      await c.waitFor(`(window.__diceDebug.sim(120), (window.__diceDebug.entryState(${JSON.stringify(whisper)}) || {}).hidden === false)`,
+        { desc: 'the audience reads the whisper' });
+      await b.waitFor(`(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(whisper)}))`,
+        { desc: 'the bystander learns a roll happened' });
+      await a.settle(); await b.settle(); await c.settle();
+
+      // ---- WHAT EACH OF THE THREE ENDS UP HOLDING -------------------------
+      // Ada rolled all four; a secret roll never leaves her tab.
+      assert.equal(await a.logCount(), 4, 'the roller holds all four rolls');
+      assert.equal((await a.entryState(secret)).hidden, false, 'and reads her own secret one');
+      // Bram: three rolls, and the whisper is a fact he knows without content.
+      assert.equal(await b.logCount(), 3, 'the bystander never learns the secret roll happened');
+      assert.equal(await b.entryState(secret), null, 'there is no entry for it at all');
+      const bw = await b.entryState(whisper);
+      assert.equal(bw.hidden, true, 'the whisper reaches him shrouded');
+      assert.deepEqual(bw.values, [null, null], 'with no faces in it');
+      assert.equal((await b.entryState(held)).hidden, false,
+        'while the roll that WAS revealed stayed revealed — a later shroud did not re-cover it');
+      // Cass: three rolls, and the whisper is hers to read.
+      assert.equal(await c.logCount(), 3, 'the audience sees the same three');
+      assert.equal((await c.entryState(whisper)).hidden, false, 'and the whisper is legible to her');
+      assert.equal(typeof (await c.entryState(whisper)).total, 'number', 'with a real total');
+
+      // ---- AND NOTHING LEAKED ON THE WIRE --------------------------------
+      // The raw stream is the only place this can be settled: a client that
+      // declines to RENDER a value it was sent is indistinguishable, from the
+      // DOM, from a server that never sent it.
+      assert.ok(wire.raw.includes(open), 'the open roll is on the wire (the positive control)');
+      assert.ok(!wire.raw.includes(secret),
+        'the secret roll’s id never crossed the wire to a stranger');
+      const whisperBlocks = wire.events().filter((e) => JSON.stringify(e.data).includes(whisper));
+      assert.ok(whisperBlocks.length > 0, 'the whisper announced itself');
+      for (const ev of whisperBlocks) {
+        const s = JSON.stringify(ev.data);
+        for (const k of ['"values"', '"total"', '"perDie"', '"parts"', '"spec"']) {
+          assert.ok(!s.includes(k), `a bystander's bytes carry no ${k} for the whisper (${s.slice(0, 240)})`);
+        }
+      }
+    },
+  },
+  {
+    name: 'journey-follow-along',
+    tags: ['journey', 'visibility', 'chrome', 'cuj11'],
+    timeout: 150000,
+    // CUJ11 — "I'm at this table to follow along, not to roll."
+    // DONE WHEN: someone who never touches the dice can still follow what
+    // happened — WHOSE roll it was, WHAT IT MEANT, WHAT IS STILL HIDDEN — at
+    // their own reading pace.
+    //
+    // THE FAILURE THIS CATCHES: CUJS.md measures this journey at ONE scenario
+    // and says so; the defect that named it (ROADMAP U26, the spectator's
+    // hover-hold silently doing nothing because `armAutoCollect` bails on
+    // `!mine`) had to be found by READING `armAutoCollect`, because no
+    // scenario ever occupied the posture. The posture is the fixture here:
+    // Cass opens no popover, composes no pool and rolls nothing at all, and
+    // every assertion is a read she has to be able to make from that chair.
+    // A surface that only ever populates for the roller — the record's
+    // attribution, the shroud's "waiting on somebody", the roster — passes
+    // every roller-driven scenario in the file and fails this one.
+    //
+    // The hover-hold half of U26 is deliberately NOT asserted here yet: it is
+    // U25/U26's own build step and its scenario folds in beside this one.
+    async fn(ctx) {
+      const ada = await ctx.newTable({ origin: '127.0.0.31', name: 'Ada' });
+      const bram = await ctx.newTable({ origin: '127.0.0.32', name: 'Bram' });
+      const cass = await ctx.newTable({ origin: '127.0.0.33', name: 'Cass' });
+      await cass.waitFor(`window.__diceDebug.players.length === 3`, { desc: 'three at the table' });
+
+      // Two people play. Cass does not.
+      await ada.roll('2d8[Wisdom] # Read the room');
+      const first = await ada.rollId();
+      await bram.roll('1d10[Sword] # Cut the rope');
+      const second = await bram.rollId();
+      await ada.roll('d20 held # Something behind the screen');
+      const hidden = await ada.rollId();
+      await cass.waitFor(shroudSettled(hidden), { desc: 'the shrouded roll settles for the spectator' });
+
+      // (1) WHOSE ROLL IT WAS — attribution, from the chair.
+      for (const [id, who] of [[first, 'Ada'], [second, 'Bram']]) {
+        const line = await cass.eval(`(() => {
+          const row = document.querySelector('#log-list .log-entry[data-roll-id="' + ${JSON.stringify(id)} + '"]');
+          return row ? row.innerText.replace(/\\s+/g, ' ').trim() : null;
+        })()`);
+        assert.ok(line && line.includes(who), `the spectator can tell it was ${who}'s (got ${line})`);
+      }
+
+      // (2) WHAT IT MEANT — the interpretation, not just the digits. The
+      // spectator's banner is a READ, and the outcome rows are the read.
+      await cass.waitFor(`!document.getElementById('result-banner').classList.contains('hidden')`,
+        { desc: 'the spectator gets a card at all' });
+      const bramRows = await cass.dbg(`outcomeRows('banner')`);
+      assert.ok(Array.isArray(bramRows) || bramRows === null,
+        'the banner answers about its own surface');
+
+      // (3) WHAT IS STILL HIDDEN — and, sharper, whether it is waiting on HER.
+      const rec = await cass.dbg('record');
+      await cass.dbg('setLogFlyout(false)');
+      const s = await cass.entryState(hidden);
+      assert.equal(s.hidden, true, 'she can see that something is being withheld');
+      assert.equal(s.canReveal, false, 'and that it is not hers to open');
+      assert.ok(await cass.diceCount() > 0, 'the dice are on her felt, face down — she is at the table');
+
+      // (4) AT HER OWN PACE. She puts a roll away and the record keeps it,
+      // ranked and attributed IN SOMEBODY ELSE'S COLOUR — the half a
+      // roller-only surface never has to get right.
+      await cass.dbg(`collectRoll(${JSON.stringify(first)})`);
+      await cass.dbg(`collectRoll(${JSON.stringify(second)})`);
+      await cass.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.length === 2)`,
+        { desc: 'the spectator’s own record fills' });
+      const ranks = (await cass.dbg('record')).ranks;
+      assert.deepEqual(ranks.map((r) => r.rank), [1, 2], 'ranked oldest to newest');
+      assert.deepEqual(ranks.map((r) => r.name), ['Ada', 'Bram'],
+        'each rank says whose roll it was');
+      assert.equal(new Set(ranks.map((r) => r.color)).size, 2,
+        `and wears their two colours undiluted (got ${JSON.stringify(ranks.map((r) => r.color))})`);
+      assert.ok((await cass.dbg('record')).spoken.includes('2 rolls put away'),
+        'and the closed rail SAYS what it holds, so the read survives the panel being shut');
+
+      // (5) SHE NEVER ROLLED. That is the posture, and it is the fixture.
+      assert.equal(await cass.logCount(), 3, 'she followed three rolls');
+      assert.equal((await cass.dbg('players')).length, 3, 'from a seat of her own');
+      const mine = (await cass.dbg('onTable')).filter((r) => r.mine);
+      assert.deepEqual(mine, [], 'and made none of them');
+      assert.ok((await bram.dbg('players')).some((p) => p.name === 'Cass'),
+        'the people rolling can still see she is here');
+    },
+  },
+  {
+    name: 'journey-different-game',
+    tags: ['journey', 'settings', 'meanings', 'profiles', 'cuj12'],
+    timeout: 150000,
+    // CUJ12 — "This table plays a different game than the last one."
+    // DONE WHEN: the interpretation system, felt, dice set and zoom are the
+    // TABLE'S, every surface re-reads under the new lens, and a player whose
+    // active profile does not match is TOLD and given a way out rather than
+    // silently mis-read.
+    //
+    // THE FAILURE THIS CATCHES: `settings-sync` proves the setting travels and
+    // `profile-systems` proves the banner exists, but nothing walks the join
+    // between them — the moment where ONE person's flip has to re-read
+    // ANOTHER person's already-landed rolls and then tell that person their
+    // character is from a different rulebook. A lens that only re-read rolls
+    // made AFTER the flip would pass both parts: the log is a render-time
+    // projection, and "re-reads in place" is a claim about rows that already
+    // exist. That is what is asserted here, on the second player's tab.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.34', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.35', name: 'Bram' });
+      await b.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+
+      // Bram is playing a character built for THIS table's game.
+      await b.dbg(`profiles.reset('soul-deal')`);
+      const made = await b.dbg(`profiles.create('Wren', 'soul-deal')`);
+      assert.equal(made.ok, true, made.status);
+      await b.waitFor(`(window.__diceDebug.profiles.active || {}).name === 'Wren'`,
+        { desc: 'Bram has his character in hand' });
+      assert.equal((await b.dbg('profiles.active')).system, 'soul-deal',
+        'bound to the rulebook it was built for');
+
+      // A roll lands under the old lens.
+      await a.roll('2d6 # Before');
+      const before = await a.rollId();
+      await b.waitFor(`(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(before)}))`,
+        { desc: 'the roll reaches Bram' });
+      assert.equal(await b.eval(`document.querySelector('#log-list .log-total').textContent.trim()`), '',
+        'a per-die lens computes no sum, so the log carries none');
+
+      // ---- the table changes games ----------------------------------------
+      await a.dbg(`setSystem('dnd')`);
+      for (const [t, who] of [[a, 'Ada'], [b, 'Bram']]) {
+        await t.waitFor(`window.__diceDebug.system === 'dnd'`,
+          { desc: `the new rulebook reaches ${who}` });
+      }
+
+      // (1) EVERY SURFACE RE-READS — including rows that already existed.
+      await b.waitFor(`document.querySelector('#log-list .log-total').textContent.trim().length > 0`,
+        { desc: 'the roll made BEFORE the flip re-reads under the new lens' });
+      const st = await b.entryState(before);
+      assert.equal(typeof st.total, 'number', 'the old roll now has a total for Bram');
+      assert.equal(await a.logTop(), await b.logTop(),
+        'and both players are reading the same re-read line');
+
+      // (2) THE MISMATCHED PLAYER IS TOLD, not silently mis-read.
+      await b.waitFor(`!!window.__diceDebug.profiles.mismatch`,
+        { desc: 'Bram is told his character is from another rulebook' });
+      const mm = await b.dbg('profiles.mismatch');
+      assert.equal((await b.dbg('profiles.active')).name, 'Wren',
+        'nothing was swapped out from under him');
+      assert.equal((await b.dbg('profiles.active')).system, 'soul-deal',
+        'and his character is still bound to the book it was written for');
+      assert.ok(JSON.stringify(mm).includes('soul-deal') || JSON.stringify(mm).includes('dnd'),
+        `the notice names the two systems (got ${JSON.stringify(mm)})`);
+
+      // (3) AND GIVEN A WAY OUT — one he chooses, which is the goal-10 half.
+      const kept = await b.dbg('profiles.keepMismatch()');
+      assert.equal(kept.ok, true, 'keeping it is a real exit');
+      assert.equal(await b.dbg('profiles.mismatchKept'), true, 'and it is remembered');
+      assert.equal((await b.dbg('profiles.active')).name, 'Wren',
+        'the character he chose to keep is the character he is holding');
+
+      await a.dbg(`setSystem('soul-deal')`);
+      for (const t of [a, b]) {
+        await t.waitFor(`window.__diceDebug.system === 'soul-deal'`, { desc: 'the table restored' });
+      }
     },
   },
 ];
