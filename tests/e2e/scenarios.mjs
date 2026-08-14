@@ -115,13 +115,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 //     the tab and then turns touch emulation on has already missed the
 //     question it came to ask, and measures a panel laid out at the desktop
 //     width besides.
+//   netLog — every RESPONSE the browser received on this tab, straight off
+//     CDP (`{url, status, type}`), enabled before the first navigation because
+//     `Network.enable` only reports what it was listening for. recordApi
+//     watches what the PAGE asked for from inside the page; this watches what
+//     the NETWORK answered, which is the only place a 404 on a `<script src>`
+//     or an @import shows up at all.
 async function bootTab(ctx, {
   origin = 'localhost', path = '/', clean = [], seed = {}, recordApi = false,
-  device = null, coarse = false,
+  device = null, coarse = false, netLog = false,
   readyExpr, readyDesc,
 } = {}) {
   for (let attempt = 0; ; attempt++) {
     const page = await ctx.browser.newPage();
+    const responses = [];
+    if (netLog) {
+      await ctx.browser.send('Network.enable', {}, page.sessionId);
+      ctx.browser.on('Network.responseReceived', (p) => {
+        responses.push({ url: p.response.url, status: p.response.status, type: p.type });
+      }, page.sessionId);
+    }
     await page.addInitScript('window.__diceTestMode = true;');
     if (device) {
       await ctx.browser.send('Emulation.setDeviceMetricsOverride',
@@ -182,6 +195,7 @@ async function bootTab(ctx, {
       await t.close().catch(() => {});
       continue;
     }
+    t.responses = responses;
     ctx.tables.push(t);
     return t;
   }
@@ -257,6 +271,22 @@ async function createTableFromLobby(t, tableName) {
     })()`);
   } catch { /* the context can die inside the click — that IS the navigation */ }
   return landedAtTable(t);
+}
+
+// Roll `notation` until the banner's outcome rows satisfy `want`, or give up.
+// For the mechanics that only fire on a face: `1d6!` explodes on a 6 and
+// `1d6 ro<=2` rerolls on a 1 or a 2, so a single throw is a coin flip and a
+// scenario that asserted on one would be red a third of the time. Bounded and
+// LOUD — it returns null rather than the last rows, so a caller cannot mistake
+// "never fired" for "fired and looked like this".
+async function rollUntil(t, notation, want, tries = 40) {
+  for (let i = 0; i < tries; i++) {
+    await t.roll(notation);
+    await t.settle();
+    const rows = await t.dbg(`outcomeRows('banner')`);
+    if (want(rows)) return rows;
+  }
+  return null;
 }
 
 // A PRESS A FINGER COULD HAVE MADE (C11). `el.click()` fires a DOM event at a
@@ -16251,6 +16281,276 @@ export const scenarios = [
       // 'Download my data' — the same true sentence a jammed browser gets.
       assert.equal((await ahead.dbg('dataBanner')).shown, true,
         'and the player is told their work is not being saved');
+    },
+  },
+
+  // ---- §1 · struck dice · and §2l ⑤ · the ledger sheet -------------------
+  {
+    name: 'struck-dice',
+    tags: ['meanings', 'chrome', 'cuj8'],
+    timeout: 180000,
+    // THE HEADLINE, and it is the assertion that fails on the pre-2026-08-15
+    // tree: `4d6dl1` under a per-die lens rendered THREE chips. The gate was
+    // one line in the SOUL DEAL PROFILE, so the profile knew about the dropped
+    // die all along and every SURFACE lost it — a player throwing four dice
+    // was shown three, with no mark saying a fourth had happened. GOALS' own
+    // "attributed math" is the thing that was missing.
+    //
+    // Read back off the RENDERED chips rather than off `outcomesFor`, because
+    // the bug lived exactly between the two. And the strike comes back as
+    // COMPUTED `text-decoration-line`, never as a class name: a class that
+    // stopped resolving to a dress is precisely the regression a class-name
+    // assertion cannot see (§7.21's lesson).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.75', name: 'Ada' });
+      assert.equal(await a.dbg('system'), 'soul-deal', 'the per-die lens is the default');
+
+      // ---- one row per die the player THREW --------------------------------
+      await a.roll('4d6dl1 # Ability');
+      const rid = await a.rollId();
+      await a.settle();
+      const rows = await a.dbg(`outcomeRows('banner')`);
+      assert.equal(rows.length, 1, 'one row for the pool');
+      assert.equal(rows[0].chips.length, 4,
+        `FOUR chips for four dice — pre-fix this is 3 (got ${JSON.stringify(rows[0].chips.map((c) => c.text))})`);
+      const struck = rows[0].chips.filter((c) => c.struck);
+      assert.equal(struck.length, 1, 'exactly one of them was set aside');
+      assert.equal(struck[0].why, 'dropped',
+        `and the MECHANIC that set it aside is in the answer slot (got ${JSON.stringify(struck[0].why)})`);
+      assert.equal(struck[0].word, null,
+        'a die that does not count is not read — the word is absent, not hidden');
+      assert.equal(struck[0].line, 'line-through',
+        `the evidence is struck through, computed rather than claimed (got ${JSON.stringify(struck[0].line)})`);
+      assert.ok(/dropped/.test(struck[0].text),
+        `and copy/paste and a screen reader get the same sentence (got ${JSON.stringify(struck[0].text)})`);
+      const counting = rows[0].chips.filter((c) => !c.struck);
+      assert.equal(counting.length, 3, 'the three that count are read as usual');
+      assert.ok(counting.every((c) => c.line !== 'line-through'), 'and none of them is struck');
+      assert.ok(Number(struck[0].opacity) < Number(counting[0].opacity),
+        `the out-of-play tier sits below the ordinary one `
+        + `(${struck[0].opacity} vs ${counting[0].opacity})`);
+
+      // ---- THE SAME ON THE PEEK, which is a different builder --------------
+      await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.some(
+        (r) => r.rollId === ${JSON.stringify(rid)}))`, { desc: 'the roll is put away' });
+      assert.equal(await a.dbg(`peek(${JSON.stringify(rid)})`), rid, 'its card opens');
+      const peek = await a.dbg(`outcomeRows('peek')`);
+      assert.equal(peek[0].chips.length, 4, 'four chips on the card too');
+      assert.equal(peek[0].chips.filter((c) => c.struck).length, 1, 'one struck');
+      assert.equal(peek[0].chips.find((c) => c.struck).why, 'dropped', 'for the same reason');
+      await a.dbg('peek(null)');
+      await a.dbg('setLogFlyout(false)');
+
+      // ---- ADVANTAGE: two dice thrown, one reading -------------------------
+      // `oc-solo` counts READINGS, not chips — otherwise the struck die makes
+      // this look like a two-die roll and the 26px hero word is lost.
+      await a.roll('1d20 adv # Sneak');
+      await a.settle();
+      const adv = await a.dbg(`outcomeRows('banner')`);
+      assert.equal(adv[0].chips.length, 2, 'both d20s are shown');
+      assert.equal(adv[0].chips.filter((c) => c.struck).length, 1, 'one of them did not count');
+      assert.equal(adv[0].chips.find((c) => c.struck).why, 'not kept',
+        `named by ITS mechanic, not by 'dropped' (got ${JSON.stringify(adv[0].chips.find((c) => c.struck).why)})`);
+      assert.equal(adv[0].solo, true,
+        'and it still reads as a ONE-DIE roll, because one die is being read');
+
+      // ---- AN EXPLOSION IS MORE OF ITS DIE, not a die of its own -----------
+      const exploded = await rollUntil(a, '1d6! # Boom',
+        (r) => r && r[0] && r[0].chips.some((c) => c.children.length), 40);
+      assert.ok(exploded, 'a d6 exploded within 40 throws');
+      assert.equal(exploded[0].chips.length, 1,
+        `ONE chip, however far the chain ran (got ${JSON.stringify(exploded[0].chips.map((c) => c.text))})`);
+      assert.ok(exploded[0].chips[0].text.includes('✴'),
+        `with the child riding its parent's evidence (got ${JSON.stringify(exploded[0].chips[0].text)})`);
+      assert.equal(exploded[0].chips[0].struck, false,
+        'an explosion child is not a die that was set aside');
+
+      // ---- A REROLL REPLACEMENT IS A FULL COUNTING DIE --------------------
+      const rerolled = await rollUntil(a, '1d6 ro<=2 # Second wind',
+        (r) => r && r[0] && r[0].chips.length === 2, 40);
+      assert.ok(rerolled, 'a reroll fired within 40 throws');
+      const gone = rerolled[0].chips.filter((c) => c.struck);
+      assert.equal(gone.length, 1, 'the die it replaced is struck');
+      assert.equal(gone[0].why, 'rerolled', `and named as such (got ${JSON.stringify(gone[0].why)})`);
+      assert.equal(rerolled[0].chips.filter((c) => !c.struck).length, 1,
+        'while the replacement counts like any other die');
+
+      // ---- AND A TOTALS LENS PAINTS NO ROWS AT ALL -------------------------
+      await a.dbg(`setSystem('dnd')`);
+      await a.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'totals lens' });
+      assert.deepEqual(await a.dbg(`outcomeRows('banner')`), [],
+        'a totals system reads a sum, and per-die rows are not its grammar');
+      await a.dbg(`setSystem('soul-deal')`);
+    },
+  },
+  {
+    name: 'ledger-sheet',
+    tags: ['groups', 'chrome', 'cuj6'],
+    timeout: 150000,
+    // §2l ⑤ — "I am building to 80 tonight." The rule: the SYSTEM prices a
+    // shelf, YOU may price it differently for tonight, and the shelf head
+    // reads whichever is in force THROUGH ONE ACCESSOR — so the ledger and the
+    // heads cannot disagree. Both figures are read off the rendered surfaces
+    // for exactly that reason; a hook that read the Map could not tell you the
+    // two had stopped agreeing.
+    //
+    // AND IT IS SESSION-ONLY, by ruling: no localStorage, no portable field,
+    // no wire key, no `dice.*.v1`. A point budget is a field the dice never
+    // read, so nothing about a roll changes if it is lost — which is what
+    // makes losing it the right default rather than a gap. The reload leg is
+    // the assertion that catches a stray write, and it is the only way to
+    // catch one: a persisted target looks identical until the next session.
+    async fn(ctx) {
+      const a = await tableTab(ctx, { origin: '127.0.0.76', seed: { 'dice.name.v1': 'Ada' } });
+      await a.waitOnline();
+      await a.dbg(`setGroups([
+        {name: 'Claws', notation: '1d6', category: 'Attributes'},
+        {name: 'Fangs', notation: '2d8', category: 'Attributes'},
+        {name: 'Edge', notation: '1d20 adv', category: 'Skills'}])`);
+
+      // The door exists only under ✎, on your own rack (§7.18's gate).
+      assert.equal(await a.dbg('openLedgerSheet()'), false,
+        'at rest there is no door — the figure the sheet hangs from is not built');
+      await a.dbg('setPoolsEditMode(true)');
+      assert.equal(await a.dbg('openLedgerSheet()'), true, 'manage mode opens it');
+
+      const sheet = await a.dbg('ledgerSheet');
+      const row = (l) => sheet.rows.find((r) => r.label === l);
+      assert.ok(row('Attributes') && row('Skills'), 'one row per shelf');
+      assert.equal(row('Attributes').figure, '22/100',
+        `the system's price is in force to begin with (got ${row('Attributes').figure})`);
+      assert.equal(row('Attributes').typed, '',
+        'with an empty field — nothing has been declared for tonight');
+      assert.equal(row('Attributes').placeholder, '100',
+        'and the placeholder says whose number is standing in');
+      assert.equal(row('Motivations').placeholder, '—',
+        'a shelf the system does not price says so rather than inventing a rule');
+      assert.ok(sheet.legend.includes('dice value'),
+        `the one legend sentence names the unit (got ${JSON.stringify(sheet.legend)})`);
+      assert.ok(sheet.legend.includes('modifiers, drops and explosions are not counted'),
+        'and says what it does not count, because "ceiling" is false in both directions');
+
+      // ---- YOUR NUMBER, IN FORCE ON BOTH SURFACES -------------------------
+      const headFig = () => a.eval(`(() => {
+        const h = [...document.querySelectorAll('.pool-sec-head')]
+          .find((el) => el.textContent.startsWith('Attributes'));
+        const f = h && h.querySelector('.psh-fig');
+        return f ? { text: f.textContent, over: f.classList.contains('over') } : null;
+      })()`);
+      assert.deepEqual(await headFig(), { text: '22/100', over: false },
+        'the shelf head agrees before anything is typed');
+
+      const forced = await a.dbg(`setShelfTarget('Attributes', 80)`);
+      assert.deepEqual(forced, { typed: 80, inForce: 80 }, 'the typed number takes precedence');
+      assert.deepEqual(await headFig(), { text: '22/80', over: false },
+        'the SHELF HEAD moved to tonight’s number');
+      assert.equal((await a.dbg('ledgerSheet')).rows.find((r) => r.label === 'Attributes').figure,
+        '22/80', 'and so did the sheet — one accessor, so they cannot disagree');
+      assert.equal((await a.dbg('ledgerSheet')).rows.find((r) => r.label === 'Attributes').typed,
+        '80', 'with the field showing what was typed rather than the placeholder');
+      assert.equal((await a.dbg('ledgerSheet')).rows.find((r) => r.label === 'Skills').figure,
+        '40/100', 'while the shelf nobody re-priced keeps the system’s number');
+
+      // Over is the only state worth a hue, and it lands on both figures.
+      await a.dbg(`setShelfTarget('Attributes', 10)`);
+      assert.deepEqual(await headFig(), { text: '22/10', over: true }, 'over on the head');
+      assert.equal((await a.dbg('ledgerSheet')).rows.find((r) => r.label === 'Attributes').over,
+        true, 'and over on the sheet');
+
+      // 0 gives the shelf back to the system — one clearing gesture, whatever
+      // the player typed to express it.
+      assert.deepEqual(await a.dbg(`setShelfTarget('Attributes', 0)`),
+        { typed: 0, inForce: 100 }, 'zero hands it back');
+      assert.deepEqual(await headFig(), { text: '22/100', over: false },
+        'and the rulebook’s number is in force again');
+
+      // The sheet lives inside the gate it was opened in.
+      await a.dbg(`setShelfTarget('Attributes', 80)`);
+      await a.dbg('setPoolsEditMode(false)');
+      assert.equal(await a.dbg('ledgerSheet'), null,
+        'closing manage mode takes the sheet with it');
+
+      // ---- AND IT DIES WITH THE TAB ---------------------------------------
+      // A stray localStorage write would be invisible here and would show up
+      // as a number nobody remembers typing, next week.
+      const keys = JSON.parse(await a.eval(
+        `JSON.stringify(Object.keys(localStorage).filter((k) => /target|budget/i.test(k)))`));
+      assert.deepEqual(keys, [], `no key claims to hold a target (got ${JSON.stringify(keys)})`);
+      await a.reload();
+      await a.dbg('setPoolsEditMode(true)');
+      assert.equal(await a.dbg('openLedgerSheet()'), true, 'the sheet opens on the fresh session');
+      const after = (await a.dbg('ledgerSheet')).rows.find((r) => r.label === 'Attributes');
+      assert.equal(after.typed, '', 'and tonight’s number is gone, as designed');
+      assert.equal(after.figure, '22/100', 'with the system’s price back in force');
+      await a.dbg('setPoolsEditMode(false)');
+    },
+  },
+  // ---- C29 · the static allowlist, asked of the RUNNING PAGE -------------
+  {
+    name: 'static-allowlist',
+    tags: ['smoke', 'quality'],
+    timeout: 120000,
+    // WHAT THIS CATCHES that the unit test cannot. `tests/static-cache.test.mjs`
+    // proves every root somebody THOUGHT OF is open and every path they thought
+    // of is closed — which is a statement about the author's imagination. Only
+    // the running page can prove the list is COMPLETE, because only the page
+    // knows what it actually fetches: the importmap's vendor modules, the GLB
+    // the tower loader reaches for, the stylesheet, `js/report.js` as a classic
+    // script before the module graph. This is the assertion that goes red the
+    // day somebody adds `assets/` and forgets APP_DIRS — and the failure it
+    // prevents is the worst kind, because a missing static root is a 404 on a
+    // page that otherwise looks like it booted.
+    //
+    // Collected from CDP `Network.responseReceived` rather than from inside the
+    // page: a `<script>` or `@import` that 404s never reaches any JS the page
+    // could be asked about, and js/report.js exists precisely because the most
+    // valuable failure is main.js failing to load at all.
+    async fn(ctx) {
+      const t = await bootTab(ctx, {
+        origin: 'localhost',
+        path: `/?room=${encodeURIComponent(ctx.room)}`,
+        seed: { 'dice.name.v1': 'Static' },
+        netLog: true,
+        readyExpr: `!!window.__diceDebug && window.__diceDebug.netReady`,
+        readyDesc: 'the page boots',
+      });
+      await t.waitOnline();
+      // Roll once so the lazily-fetched paths are actually asked for.
+      await t.roll('2d6');
+      await t.settle();
+
+      const seen = t.responses;
+      assert.ok(seen.length > 5,
+        `the tab really did fetch things (got ${seen.length} responses)`);
+      assert.ok(seen.some((r) => /\/js\/main\.js$/.test(r.url) && r.status === 200),
+        'the module graph itself is served');
+      assert.ok(seen.some((r) => /\/css\//.test(r.url) && r.status === 200),
+        'and the stylesheet');
+      assert.ok(seen.some((r) => /\/vendor\//.test(r.url) && r.status === 200),
+        'and the vendored modules the importmap names');
+
+      // THE CLAIM. `/api/` is excluded on purpose: the pre-join peek 404s by
+      // design when a room holds no prepared table, and that is an answer
+      // rather than a missing file. Everything else the page asked for is a
+      // static asset, and a static asset that 404s is a hole in APP_DIRS.
+      // `/favicon.ico` is excluded too, and it is worth naming rather than
+      // quietly filtering: index.html declares no icon, so this request is
+      // Chrome's own speculative one and 404 is the correct answer to a file
+      // that does not exist. It is NOT an allowlist hole — nothing on the page
+      // asked for it — and it costs nothing in the field, because js/report.js
+      // listens for resource errors on ELEMENTS and a browser-initiated icon
+      // fetch is not one. If the app ever ships an icon, this exclusion should
+      // go with the same commit.
+      const missing = seen.filter((r) => r.status === 404
+        && !r.url.includes('/api/') && !r.url.endsWith('/favicon.ico'));
+      assert.deepEqual(missing, [],
+        `nothing the page asked for is missing — a 404 here is a root the `
+        + `allowlist forgot (got ${JSON.stringify(missing)})`);
+      // …and nothing was refused outright either, which is the other shape the
+      // same mistake takes.
+      const refused = seen.filter((r) => r.status === 403);
+      assert.deepEqual(refused, [], `and nothing was forbidden (got ${JSON.stringify(refused)})`);
     },
   },
 ];
