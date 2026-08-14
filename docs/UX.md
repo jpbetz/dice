@@ -4681,3 +4681,97 @@ expensive leg — two tabs, one room, one pour, both films compared — is the
 point rather than the overhead: the obvious wrong implementation passes every
 visibility assertion in the file and breaks the table only when two people are
 watching.
+
+### 7.39 The door on the phone it is designed for (2026-08-14)
+
+CUJ7 step 1 is *"the link arrives in Discord and is opened on a phone"*, and
+until this pass **no `@media` rule in the stylesheet touched `#name-panel` at
+all**. This is C11 and C12 together, because they are one surface.
+
+**The panel overflowed upward, which is the half with no scrollbar.**
+`#name-panel` was `width: 320px` with no `max-height` and no `overflow`,
+centred in a flex overlay. A centred child taller than its container overflows
+in *both* directions, so the top — the name field and Join, which the
+2026-08-09 reorder deliberately put first — went off the top of the screen with
+no gesture that brings it back. `#settings-panel` carries the identical fix
+with the identical comment; the picker was simply never revisited after it grew
+to hold 12 prepared seats plus an **uncapped** profile list (to the 32 library
+cap): ~1300px of rows against a 480px landscape phone. Same fix, same reason:
+`max-height: calc(100vh - 32px)` + `overflow-y: auto`. `100vh` rather than
+`100dvh` on purpose — the viewport meta carries `interactive-widget=
+resizes-content`, so the software keyboard shrinks the *layout* viewport and
+`vh` already tracks it.
+
+**And the keyboard was not the player's to open.** `promptName` focused the
+input unconditionally, *before the peek resolved* — so the keyboard halved the
+viewport in the same frame the seats arrived into it. Focus is now conditional
+on `(pointer: fine)`: a mouse pays nothing for it, a finger pays half a screen.
+The overflow fix makes the collision survivable; this makes it not happen.
+
+**`.seat-btn` was ~31px against U28's 34/44 floor**, and U28's own near-miss
+list never named the family. Bumped to **44** — the platform number, not the
+34px minimum — because this is the one screen in the app that exists *for* a
+phone and its height budget is now free. `padding-block` plus a `min-height`
+floor rather than `min-height` alone: `align-items: baseline` puts the
+name/count baseline group at cross-*start* of a stretched flex line, so a row
+grown by min-height alone hangs its text at the top. And it is `.seat-btn`, not
+`.btn` — U28b measured a blanket coarse `.btn` bump at ~30 surfaces.
+
+**The door had no way out.** `#name-modal` was the only overlay in the app that
+was not a rung on the Esc ladder and had no ✕ and no cancel — settings, three
+menus, the popover, the peek and the log flyout all peel. So a link opened in
+Discord put a blocking prompt between a stranger and a table they were not
+allowed to *look at* before committing a name to it.
+
+**What dismissing resolves to, which is the whole decision: you are LOOKING,
+not sitting.** The prompt resolves with `null` — a sentinel no display name can
+be, where `''` is ambiguous with `takeFreeSeat`'s own refusal — and `initNet`'s
+single caller reads it as *do not join*: nothing written to localStorage, no
+`/api/join`, and the room never told anyone came to the door. The three
+alternatives were worse. A blank-name join has the server clean it into
+something and seats a stranger nobody invited. A promise left pending hangs
+`netReady`, which the module awaits. Re-opening on the next act makes "look at
+the table" a thing you get one glance at. **The way back is the presence row's
+`Take a seat`** — §7.20 put "what you can do about your presence" in that one
+slot, and this is a fourth thing you can do about it. In the *preview* phase Esc
+means what `Not now` already means, so one rung has two honest readings.
+
+*Known seam:* the identity chip still reads `…` ("a name is coming") for a
+first-timer who dismissed, and none is. Left alone deliberately —
+`updateIdentityChip` is called during module evaluation, so reading the
+`seatDeclined` binding from it is a TDZ fault, and moving the declaration is a
+bigger edit than the wart.
+
+**"Stay as ⟨name⟩" forfeited more than the roadmap said.** It called
+`takeFreeSeat` directly, and only `promptName`'s own `submit` copies
+`seatProfilePicked` into `seatPending` — so it dropped not just the link's
+offered character but **any row the player had just tapped**, silently, one
+line under a hint saying the link offers a character. The name and the
+character were never the same decision. Both doors hand the pick over now, and
+the row grew a sub-label saying which character rides along, because an offer
+made sticky without saying so would be worse than the forfeit.
+
+**`&as=` had stopped pre-selecting anything.** §G5 documents it as *"a
+highlight and a focus, so Enter takes it"*; the highlight lived in the
+`#seat-list` loop retired on 2026-08-09, and `renderSeatMine` marks a foreign
+row only when `seatProfilePicked` names it. So a per-seat link landed on a
+picker pre-selecting the player's own last-used profile — or Random. The link's
+seat is the default pick again (once per prompt, and never over a tap the
+player already made), which is also the mechanism that makes the paragraph
+above work.
+
+**What made six green CUJ7 scenarios meaningless**, and it is not what the
+roadmap recorded. `join-door` *does* click real `.seat-btn` elements — but
+through `el.click()`, which fires on a node no finger could reach, at a
+headless desktop viewport where `(pointer: coarse)` does not even match. A
+verb cannot see that the top of the panel is off the top of the screen and
+neither can a synthetic click. `__diceDebug.seatPickerBox` publishes the
+numbers a phone cares about — client-space centres, `clippedTop`/`clippedBottom`,
+`scrolls`, per-row `hit` via `elementFromPoint` — so a scenario can aim a real
+`Input.dispatchMouseEvent` at a row and fail when it is unreachable.
+
+*Also found and fixed:* `__diceDebug.chooseDealtProfile()` still **minted** a
+profile on the tap, months after the ⚄ Random row stopped doing so. No scenario
+called it, which is the only reason it never lied out loud — a hook that does
+what the control it stands in for was fixed *not* to do is this project's
+dominant failure mode with a test harness attached.

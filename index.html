@@ -1287,6 +1287,13 @@ limitations under the License.
        renders and the modal is exactly the plain prompt it always was. -->
   <div id="name-modal" class="hidden">
     <div class="panel" id="name-panel">
+      <!-- THE DOOR HAS A WAY BACK OUT (C12). It was the one overlay in the app
+           with no ✕, no cancel and no rung on the Esc ladder, so a link opened
+           in Discord put a modal between you and a table you could not even
+           look at. Dismissing does NOT join you anonymously — it leaves you at
+           the door as a spectator, and the presence row's 'Take a seat' is the
+           way back in (js/main.js, promptName / renderPresenceExits). -->
+      <button id="seat-close" class="pop-close" title="Look at the table first — Esc">✕</button>
       <h2>Join</h2>
       <p id="seat-table-name" class="hint seat-table-name hidden"></p>
       <div id="seat-pick">
@@ -1301,7 +1308,10 @@ limitations under the License.
              in one press rather than retyped — and it belongs HERE, beside
              the field it fills, not under the profile lists where it used to
              sit. Absent for everyone else. -->
-        <button id="seat-keep-name" class="btn seat-keep hidden"></button>
+        <!-- `seat-btn` since C12: this row is one of the picker's choices and
+             is dressed as one, so it inherits the two-span name/sub-label
+             layout AND the coarse hit target the others got. -->
+        <button id="seat-keep-name" class="btn seat-btn seat-keep hidden"></button>
         <div class="btn-row seat-name-row">
           <input id="name-input" type="text" placeholder="Display name…" maxlength="24" autocomplete="off">
           <button id="name-join" class="btn confirm" disabled>Join</button>
