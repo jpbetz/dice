@@ -29,12 +29,13 @@ import { previewOf, countingPmfs } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealStartingRack, dealRack, dealName } from './seed.js';
 import { resolveChannel, PARAM as STABILITY_PARAM } from './stability.js';
+import { EPOCH as SCHEMA_EPOCH, STAMP as SCHEMA_STAMP, judgeStamp, convert as schemaConvert } from './schema.js';
 import { exportYaml, parsePortable, planImport, profileToImport } from './portable.js';
 import {
   MAX_PROFILES, MAX_POOLS, knownSystem, emptyStore, normalizeStore, profilesOf, findProfile,
   activeProfile, profilesFor, lastUsedFor, isFull, nameProfile, uniqueName,
   addProfile, renameProfile, deleteProfile, setActive, writeActivePools,
-  setActiveSystem, setProfileSet, migrateLegacy, toWire, fromWire,
+  setActiveSystem, setProfileSet, migrateLegacy, toWire, fromWire, readStore,
 } from './profiles.js';
 import { THEMES, SETS } from './themes.js';
 import { ParticleField } from './particles.js';
@@ -12608,6 +12609,18 @@ window.__diceDebug = {
   get idleReplayInfo() {
     return { held: idleReplay ? idleReplay.rollId : null, armed: !!idleReplayTimer };
   },
+  // C22's state, as this boot resolved it. `refused` is the whole sentence, so
+  // a scenario asserts on what the player is actually told rather than on a
+  // flag; `locked` is the half that protects the data.
+  get schemaState() {
+    return {
+      stamp: SCHEMA_STAMP,
+      epoch: SCHEMA_EPOCH,
+      refused: storeRefusal,
+      locked: !!storeRefusal,
+      storeStamp: (profileStore && profileStore.ver) || null,
+    };
+  },
   // Slice 3 assertion surface: per-die cadence state + the LIVE deltas
   // (mesh pose minus the frozen archive pose) that let a scenario prove
   // "sea-glass swells", "sap-amber does not shift", "scrimshaw settles
@@ -13171,7 +13184,16 @@ function load(key, fallback) {
 // RAISE THIS ONLY for a break that cannot be migrated. Every ordinary shape
 // change belongs in normalizeStore / migrateGroup, which are lossless; this
 // is the door for "the writer was a version we cannot identify".
-const SCHEMA = 2;
+//
+// C22 FOLDED IT: this number is now js/schema.js's EPOCH, and there is no
+// second copy to disagree with it. The origin-wide purge below and the
+// per-blob stamp are the SAME epoch seen at two scales — this one is blunt
+// (every `dice.*` key at once, when the origin has never seen this epoch), the
+// stamp is per-blob (this library, this file). Keeping them in lockstep is
+// what lets judgeStamp treat an unstamped blob as this epoch's oldest data
+// instead of guessing: by the time anything reads a stamp, this has already
+// dropped everything written below EPOCH.
+const SCHEMA = SCHEMA_EPOCH;
 const LS_SCHEMA = 'dice.schema.v1';
 // TWO KEYS SURVIVE THE BREAK, AND NEITHER OF THEM IS APP STATE. The schema
 // stamp is the purge's own bookkeeping. `dice.stability.v1` is an
@@ -14358,7 +14380,41 @@ if (/[#&]g=/.test(location.hash)) {
 // A library has somewhere to put both, so migrateLegacy keeps both: the stash
 // becomes your profile and the rack in front of it becomes 'Recovered'. This is
 // the one place this pass gains data rather than merely moving it.
-let profileStore = normalizeStore(load(LS_PROFILES, null));
+//
+// C22: A LIBRARY FROM A NEWER BUILD IS REFUSED, NOT PARTIALLY LOADED. `major`
+// says new capabilities exist in this data, and normalizeStore is a whitelist
+// — it would happily return a store with whatever it did not recognise
+// quietly missing, and then saveGroups() four lines below would write that
+// truncated store back over the real one. So the refusal has TWO halves and
+// the mechanical one matters more than the sentence: load nothing, and LOCK
+// the key so this build can never overwrite data it cannot read. The player
+// gets an empty library for this session and their real one is still on disk
+// when they reload into a build that understands it.
+const storeRead = readStore(load(LS_PROFILES, null));
+const storeRefusal = storeRead.ok ? null : storeRead.message;
+let profileStore = normalizeStore(storeRead.ok ? storeRead.raw : null);
+if (storeRefusal) {
+  // Deferred by one turn on purpose: this runs during module evaluation, and
+  // the surfaces that say things (setPill's element, the settings note) are
+  // consts declared thousands of lines below — reaching them from here is a
+  // TDZ error, i.e. a blank page in place of an explanation.
+  // Three surfaces, each in its own try: the sentence is the point, and one
+  // of them being unavailable must not swallow the other two. The STANDING
+  // half is the 'Not saving' banner, which saveProfileStore's false already
+  // raises — that is the state; this is the explanation.
+  setTimeout(() => {
+    for (const say of [
+      () => setPill(storeRefusal, 'notice'),
+      () => announce(storeRefusal),
+      () => showSettingsNote(storeRefusal),
+    ]) {
+      try { say(); } catch { /* next surface */ }
+    }
+  }, 0);
+  // The field log gets the numbers, which is what minor is FOR: "which build
+  // wrote the state that broke" is unanswerable without them.
+  if (window.__diceReport) window.__diceReport(`profile store refused: ${storeRefusal}`);
+}
 if (!profilesOf(profileStore).length) {
   // First boot on the library. Everything below runs ONCE — after this the
   // store is non-empty forever (deleteProfile refuses the last one), so the
@@ -14480,11 +14536,25 @@ function setStorageJammed(on) {
   storageJammed = on;
   const el = document.getElementById('storage-banner');
   if (el) el.classList.toggle('hidden', !on);
-  // The two it suppresses have to be repainted either way: on, to stand
-  // down; off, to come back if they still apply.
-  updateProfileBanner();
-  updateOfferBanner();
-  if (on) announce('Your changes are not being saved. Download your data.');
+  // …AND THE DEPENDENT REPAINTS GO ON THE NEXT TURN, because this is reachable
+  // during MODULE EVALUATION and they are not. saveGroups() runs at boot, so a
+  // browser that refuses storage at boot — Safari private browsing, a full
+  // disk, and since C22 a library this build must not overwrite — landed here
+  // with `tableSystem` still in its temporal dead zone: `updateProfileBanner`
+  // threw, module evaluation ABORTED, and the app died at the exact moment it
+  // was trying to explain itself. Deferring costs one frame on a banner that
+  // has nothing to repaint yet, and makes this callable from anywhere.
+  // The banner above stays synchronous: it is the statement, and it only
+  // touches the DOM.
+  setTimeout(() => {
+    try {
+      // The two it suppresses have to be repainted either way: on, to stand
+      // down; off, to come back if they still apply.
+      updateProfileBanner();
+      updateOfferBanner();
+      if (on) announce('Your changes are not being saved. Download your data.');
+    } catch { /* a repaint is never worth a boot */ }
+  }, 0);
 }
 
 // Persist the library. Returns false when storage refused it, so the callers
@@ -14493,6 +14563,12 @@ function setStorageJammed(on) {
 // needed a read-back to get, kept where it is still cheap.
 let forceStorageFail = false; // test hook only — see __diceDebug.jamStorage
 function saveProfileStore() {
+  // C22's refusal, enforced. A store this build could not read is a store this
+  // build must not WRITE — every path here would replace it with a truncated
+  // copy of itself. Returning false routes through the same standing 'Not
+  // saving — your work is only on screen' banner a jammed browser gets, which
+  // is the same true statement and already carries 'Download my data'.
+  if (storeRefusal) return false;
   try {
     if (forceStorageFail) throw new Error('storage jammed (test)');
     localStorage.setItem(LS_PROFILES, JSON.stringify(profileStore));

@@ -26,6 +26,7 @@ limitations under the License.
 
 import assert from 'node:assert/strict';
 import { exportYaml, parsePortable, planImport, profileToImport } from '../js/portable.js';
+import { STAMP as SCHEMA_STAMP, EPOCH, MAJOR } from '../js/schema.js';
 
 let n = 0;
 const t = (name, fn) => {
@@ -264,6 +265,10 @@ t('the today-format file still parses, and still exports byte-identically', () =
   assert.deepEqual(parsed.profiles, []);
   assert.deepEqual(parsed.warnings, []);
   assert.equal('table' in parsed, false, 'table is absent unless the text set it');
+  // C22: an UNVERSIONED file is every file this app wrote before the stamp
+  // existed, and it must read exactly as it always did — no warning, no
+  // refusal, no version key invented for it.
+  assert.equal('version' in parsed, false, 'no version is claimed for a file that carries none');
   const again = exportYaml({
     groups: [
       { id: 1, name: 'Body', notation: '3d6', category: 'Attributes' },
@@ -271,7 +276,14 @@ t('the today-format file still parses, and still exports byte-identically', () =
     ],
     settings: parsed.settings,
   });
-  assert.equal(again, text);
+  // The emitter STAMPS now (C22 build order 4) — that is the one difference,
+  // and it is two lines in a place an older reader skips. Everything else is
+  // byte-for-byte what it was, which is what this test is really guarding.
+  const stamped = text.replace(
+    "# paste back via Settings → Your data (import previews; Apply is explicit)\n",
+    `# paste back via Settings → Your data (import previews; Apply is explicit)\nversion:\n  schema: '${SCHEMA_STAMP}'\n`,
+  );
+  assert.equal(again, stamped);
 });
 
 t('export → parse → export is a fixed point WITH table: and players:', () => {
@@ -664,6 +676,66 @@ t('profileToImport hands planImport a whole parsed shape, settings included', ()
   // and a seat with nothing in it plans nothing rather than throwing
   const none = planImport([], profileToImport(undefined));
   assert.deepEqual([none.adds.length, none.updates.length, none.unchanged], [0, 0, 0]);
+});
+
+// ---- C22: the file carries its version -------------------------------------
+
+const withVersion = (stamp, body) => [
+  'version:',
+  `  schema: '${stamp}'`,
+  ...body,
+].join('\n') + '\n';
+const BODY = ['pools:', '  Pools:', "    - 'Body': '3d6'", 'settings:', '  sound: true', '  numbers: false'];
+
+t('C22: a file stamped with THIS build imports, and reports its stamp', () => {
+  const parsed = parsePortable(withVersion(SCHEMA_STAMP, BODY));
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.deepEqual(parsed.version, { epoch: EPOCH, major: MAJOR, minor: 0 });
+  assert.deepEqual(parsed.warnings, []);
+  assert.equal(parsed.shelves.length, 1, 'and the document still parses whole');
+});
+
+t('C22: a LOWER major loads normally — older data is a migration, not a refusal', () => {
+  const parsed = parsePortable(withVersion(`${EPOCH}.${MAJOR}.0`, BODY));
+  assert.equal(parsed.ok, true, parsed.error);
+  // A minor difference changes nothing at all: nothing branches on minor.
+  const older = parsePortable(withVersion(`${EPOCH}.${MAJOR}.${0}`, BODY));
+  assert.equal(older.ok, true, older.error);
+});
+
+t('C22: a HIGHER major is REFUSED at its line, and nothing is imported', () => {
+  const parsed = parsePortable(withVersion(`${EPOCH}.${MAJOR + 1}.0`, BODY));
+  assert.equal(parsed.ok, false, 'a file newer than this reader must not import');
+  assert.equal(parsed.line, 2, 'refused at the line the version sits on');
+  assert.match(parsed.error, /newer version/i);
+  assert.match(parsed.error, /silently drop/i, 'and says WHY, not just that it said no');
+  assert.equal('shelves' in parsed, false, 'no partial document comes back');
+});
+
+t('C22: a different EPOCH with no converter refuses rather than half-reading', () => {
+  const parsed = parsePortable(withVersion(`${EPOCH + 1}.0.0`, BODY));
+  assert.equal(parsed.ok, false);
+  assert.match(parsed.error, /different data model/);
+});
+
+t('C22: an unreadable stamp is refused, and a nonsense key inside only warns', () => {
+  assert.equal(parsePortable(withVersion('banana', BODY)).ok, false, 'junk in the version field is not a version');
+  const odd = parsePortable(['version:', "  schema: '" + SCHEMA_STAMP + "'", '  future: 1', ...BODY].join('\n') + '\n');
+  assert.equal(odd.ok, true, odd.error);
+  assert.equal(odd.warnings.length, 1, 'an unknown key INSIDE version: warns rather than refusing');
+});
+
+t('C22: an OLD reader skips the version block — the emitted section is section-shaped', () => {
+  // The compatibility claim the section shape exists for, proved the only way
+  // it can be proved here: the block obeys the skip rule (column-0 key ending
+  // in ':', body indented), which is what a pre-C22 parsePortable does with
+  // any section it does not know.
+  const emitted = exportYaml({ groups: [{ id: 1, name: 'Body', notation: '3d6' }], settings: {} });
+  const lines = emitted.split('\n');
+  const at = lines.indexOf('version:');
+  assert.ok(at > 0, 'the file carries a version: section');
+  assert.match(lines[at + 1], /^ {2}schema: '\d+\.\d+\.\d+'$/, 'its body is indented — an old reader skips to the next column-0 line');
+  assert.equal(lines[at + 2].startsWith(' '), false, 'and the block is exactly one line long');
 });
 
 if (process.exitCode) process.exit(process.exitCode);

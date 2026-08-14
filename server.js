@@ -1198,8 +1198,14 @@ async function handleClientError(req, res) {
   }
   const v = body.value;
   const f = (k, n) => String(v[k] === undefined || v[k] === null ? '' : v[k]).slice(0, n).replace(/\s+/g, ' ');
+  // `ver` is C22's epoch.major.minor — the state model the reporting build
+  // reads. It is the field that makes the field log answer "which build wrote
+  // the state that broke", which is the question the frozen-mtime bug could
+  // not be asked. Truncated like everything else here: it is a claim by an
+  // unauthenticated client, not a fact.
   log(`clienterr ${logField('ip', ip)} ${logField('kind', f('kind', 16))} `
-    + `${logField('sid', f('sid', 12))} ${logField('up', f('up', 8))}s `
+    + `${logField('sid', f('sid', 12))} ${logField('ver', f('ver', 16))} `
+    + `${logField('up', f('up', 8))}s `
     + `${logField('view', f('view', 12))} ${logField('msg', f('message', 300))} `
     + `${logField('at', `${f('source', 200)}:${f('line', 8)}:${f('col', 8)}`)} `
     + `${logField('ua', f('ua', 200))}`);

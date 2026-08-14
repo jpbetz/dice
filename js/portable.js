@@ -86,7 +86,21 @@
 // inside. That tolerance is for sections this version does not know —
 // a section it DOES know stays strict to the character.
 
+// THE FILE CARRIES ITS VERSION (ROADMAP C22). A file crosses versions by
+// definition — it is the one artefact meant to outlive a browser — so it is
+// the site the contract most needs, and the site where the refusal has the
+// best chance of a human in front of it.
+//
+// IT IS A SECTION, NOT A TOP-LEVEL KEY, AND THAT IS A COMPATIBILITY DECISION.
+// `version: '2.0.0'` at column 0 is not section-shaped, and every reader
+// already in the field REFUSES an unknown top-level line ("unknown top-level
+// line …"). A `version:` SECTION with the numbers indented under it takes the
+// forward-tolerance path instead (PROFILES §9 decision 4): an older reader
+// skips the block with a warning and reads the rest of the document exactly as
+// it always did. So this build's exports stay importable by last month's
+// build, which is the entire point of putting a version on a file.
 import { parseNotation, cutText } from './notation.js';
+import { STAMP as SCHEMA_STAMP, judgeStamp } from './schema.js';
 import { SETS } from './themes.js'; // import-free data — still runs under Node
 
 const TRIO = ['attributes', 'skills', 'motivations'];
@@ -210,6 +224,9 @@ export function exportYaml({ groups = [], settings = {}, table = null, profiles 
     prepared ? '# Dice Table — the prepared table' : '# Dice Table — pools & just-you settings',
     '# paste back via Settings → Your data (import previews; Apply is explicit)',
   ];
+  // FIRST, so a human opening the file in a text editor sees what wrote it
+  // before they see anything they might be tempted to hand-edit.
+  lines.push('version:', `  schema: ${quote(SCHEMA_STAMP)}`);
   if (tableLines.length) lines.push('table:', ...tableLines);
   if (meLines.length) lines.push('profile:', ...meLines);
   if (seats.length) {
@@ -356,7 +373,8 @@ export function parsePortable(text) {
   const meSeen = new Set();
   let table = null;
   let me = null;      // the `profile:` section — whose the top-level pools are
-  let section = null; // 'pools' | 'settings' | 'table' | 'players' | 'profile' | 'skip'
+  let version = null; // C22's {epoch, major, minor}; null when the file predates it
+  let section = null; // 'pools' | 'settings' | 'table' | 'players' | 'profile' | 'version' | 'skip'
   let seat = null;    // the player block being read
   const rows = text.split(/\r\n?|\n/);
 
@@ -376,6 +394,7 @@ export function parsePortable(text) {
       if (raw === 'table:') { section = 'table'; continue; }
       if (raw === 'players:') { section = 'players'; continue; }
       if (raw === 'profile:') { section = 'profile'; continue; }
+      if (raw === 'version:') { section = 'version'; continue; }
       // Forward tolerance (PROFILES §9 decision 4): a SECTION this version
       // does not know is skipped with a warning rather than breaking the
       // document. A top-level line that is not even section-shaped is still
@@ -385,7 +404,28 @@ export function parsePortable(text) {
         warnings.push(`line ${lineNo}: skipped unknown section ${JSON.stringify(raw.slice(0, 30))}`);
         continue;
       }
-      return fail(lineNo, `unknown top-level line ${JSON.stringify(raw.slice(0, 30))} — expected "pools:", "settings:", "table:", "profile:" or "players:"`);
+      return fail(lineNo, `unknown top-level line ${JSON.stringify(raw.slice(0, 30))} — expected "pools:", "settings:", "table:", "profile:", "players:" or "version:"`);
+    }
+
+    if (section === 'version') {
+      // C22. Exactly one key today; unknown keys inside are SKIPPED rather
+      // than refused, for the same reason the section itself is skippable by
+      // an older reader — the version block must never be the thing that makes
+      // a document unreadable.
+      const m = /^ {2}schema:(.*)$/.exec(raw);
+      if (!m) { warnings.push(`line ${lineNo}: ignored unknown version key ${JSON.stringify(raw.trim().slice(0, 30))}`); continue; }
+      const sv = readScalar(m[1].trim());
+      if (!sv || sv.rest.trim() !== '') return fail(lineNo, 'expected one value after "schema:"');
+      // THE LOUD DOOR. A file from a NEWER build is refused AT ITS LINE and
+      // nothing is imported: the alternative is a preview that quietly shows
+      // the subset this parser happens to understand, and an Apply that
+      // overwrites a real library with it. Older (or absent — every file this
+      // app has written until today) reads exactly as it always did.
+      const verdict = judgeStamp(sv.value.trim(), 'this file');
+      if (verdict.action === 'refuse') return fail(lineNo, verdict.message.replace(/^✗ /, ''));
+      if (verdict.action === 'purge') return fail(lineNo, verdict.reason);
+      version = verdict.stamp;
+      continue;
     }
 
     if (section === 'settings') {
@@ -543,7 +583,15 @@ export function parsePortable(text) {
       ? `no pools, settings, table or players found (${warnings.length} unknown section${warnings.length > 1 ? 's' : ''} skipped)`
       : 'no pools and no settings found');
   }
-  return { ok: true, shelves, settings, profiles, warnings, ...(table ? { table } : {}), ...(me ? { profile: me } : {}) };
+  // `version` is present-or-absent (C22): absent is every file this app wrote
+  // before today, and a caller that does not care about it sees the exact
+  // object it always saw.
+  return {
+    ok: true, shelves, settings, profiles, warnings,
+    ...(table ? { table } : {}),
+    ...(me ? { profile: me } : {}),
+    ...(version ? { version } : {}),
+  };
 }
 
 // One parsed profile → exactly what planImport (and the preview status line)
