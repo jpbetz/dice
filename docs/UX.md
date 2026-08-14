@@ -1107,17 +1107,18 @@ per-roll choices — §3.3.)
 Two principles arrived from Joe after §1–§6 were drafted. They are binding;
 where they touch earlier sections, this addendum wins.
 
-> **NEXT FREE SECTION NUMBER: §7.41.**
+> **NEXT FREE SECTION NUMBER: §7.42.**
 > Claim it here in the same commit that writes the section, before you write
 > it. This document ASSIGNS these numbers, so this line is the only place a
 > branch that has been out for a week can see what is taken (ROADMAP C4).
 > Two collisions are on record and both were caught at merge, not before:
 > **§7.24 was written twice in the same week** by two branches, and on
-> 2026-08-14 **§7.39 was written twice in one afternoon** — the seat-picker
-> pass and the restore pass, running in parallel, each appending to the end of
-> a file whose numbering neither could see the other reading. Renumbering at
-> merge is cheap; two sections silently claiming one number is what §7.22 and
-> §7.23 were built on top of.
+> 2026-08-14 **§7.39 was written THREE times in one afternoon** — the
+> seat-picker pass, the restore pass and the token-layer pass, running in
+> parallel, each appending to the end of a file whose numbering none of them
+> could see the others reading. They landed as §7.39, §7.40 and §7.41.
+> Renumbering at merge is cheap; two sections silently claiming one number is
+> what §7.22 and §7.23 were built on top of.
 
 ### WHAT IS TRUE TODAY (2026-08-08)
 
@@ -1149,6 +1150,7 @@ a stale row is worse than no table.
 | ± popover | §7.10 — a pure editor, and where an edit lands by source · §7.14.2 — Done, click-away, the ring · §7.9's SHEET PASS identity strip · **§7.24** — only **Modifier** folds under a per-die lens; Target, d20 pairing, keep/drop and reroll/exploding are authorable under every system, and the rim reads `± Modify` in both | §7.10's "reroll and explode stay… behind the sysnote's *Show anyway*" — superseded 2026-08-06, no note and no disclosure; the accurate record is the comment over the popover's sections in `index.html` · any account of the fold in which Target or keep/drop hides under a per-die system: that was `usesMods`, deleted 2026-08-08 · ROADMAP U11's `± Moment` — its rule survived, its word did not (§7.24) |
 | Identity chip · roster · nameplate | §7.17 — the rail pill is the one per-player surface, left-click toggles the rack, right-click / long-press opens the menu, and the quiet nameplate · §7.9's ORDER IS THE CONTRACT · §7.22 for the collapsed dress | §7.9's "Identity is on the table" paragraph, where left-click opened the menu |
 | Settings | No single section. §7.9 for the *Just you* scope (chips off by default, the dice-set select) · §7.13 for *Your data* · §7.17 for the table name; the room-wide keys are `SETTING_SPECS` in `server.js` | §2.1 / §2.3's experience record and its editor — never built, and `/api/table` refuses the key |
+| **Any control's ON / OFF / UNAVAILABLE dress** (not a surface — the rule that governs all of them) | **§7.39** — the token layer. THE KIND OF CHOICE PICKS THE DRESS: switch / pick / dial, three degrees of not-active, and the override rule that makes a disagreement one greppable line. The values of record are the `:root` block in `css/style.css` | Copying the nearest neighbour's numbers, which is what produced nine `[aria-pressed="true"]` dresses across four hue families (audit C3) · any reading in which `#left-panel` scoping is what makes a dress right — 2i-C and U6 both had to un-scope a law twice for the same reason |
 
 ### 7.1 Physical pool building (supersedes the button grid as the primary path)
 
@@ -4846,3 +4848,166 @@ did.` The jam wins when both hold. What makes the sentence true is the boot
 write being **withheld** while it stands, and what takes it down is the first
 successful write — which is the write that overwrites, and the moment it stops
 being true.
+### 7.41 The token layer — the kind of choice picks the dress (2026-08-14)
+
+*ROADMAP U23. Everything below lives in `css/style.css`'s `:root`, in one
+commented block, and none of it needs a build step.*
+
+**Why this exists is a mechanism, not a taste.** Three pieces of doctrine
+were being carried by copied NUMBERS instead of names, and every one of them
+has already shipped a defect: the disabled code (audit C4 — thirteen recipes,
+six with no grayscale, two colliding with the reveal tier's own resting
+0.45), the pressed dress (audit C3 — `[aria-pressed="true"]` resolving to
+**nine dresses across four hue families**, chosen by DOM ancestry) and the
+rest-dim tier (audit C2 — 0.42 in the build against 0.45 in the doc, both
+failing WCAG 1.4.3). U6, U9 and U10 fixed those instances. What they could
+not fix is the reason a new control kept re-creating them: there was nothing
+to look up, so the only available move was to copy the nearest neighbour.
+
+#### THE THREE DEGREES OF "NOT CURRENTLY ACTIVE"
+
+One ladder. The ordering is a fact of the numbers rather than a convention,
+so a fourth state cannot be invented by accident.
+
+| Token | Value | It means | Pick it over its neighbour when |
+|---|---|---|---|
+| `--dim-rest` | `0.78` | **Available** — simply not the thing you are doing. | The control is fine to press right now. Never use it to say "you can't". Where this dim is the ONLY ink a WORD has it carries 1.4.3's 4.5:1 floor; 0.78 on `--muted` measures 4.67:1, which is why the tier is not free to drift down. |
+| `--dim-off` | `0.45` | **Out of play** — present, often still pressable, but not applicable to this roll, system or state. | A discarded die, a reveal tier you cannot use, a stepper the active system ignores. The CONTENT is not needed, so it may sit below the text floor — which is exactly why it must never dress a control that is someone's only route back to a state. That was C2. |
+| `--drain` + `--drain-fx` | `0.3` + `grayscale(1)` | **Unavailable.** | The DOM says `disabled`. Hue is the signal being spent, so the third code can never be read as the second. Below every rest-dim above. |
+
+`--drain`/`--drain-fx` are the two numbers of THE DISABLED RECIPE, which
+still lives in exactly one rule; what the tokens add is that the *rung* has a
+name, so the next honest exception is written `opacity: var(--drain)` rather
+than as a fresh 0.35.
+
+#### WHAT A SELECTED CONTROL WEARS
+
+**THE KIND OF CHOICE PICKS THE DRESS. DOM ANCESTRY DOES NOT.** That sentence
+is the whole fix. `[aria-pressed="true"]` used to resolve by where a control
+happened to live, which is how the same kind of choice wore gold in a
+body-level popover and ivory three inches away inside the panel. There are
+exactly three kinds, and a new control is one of them before it is anything
+else.
+
+| Kind | What it is | Dress | Shipped members |
+|---|---|---|---|
+| **SWITCH** | A cell in a bar that turns a REGION of the app on, or picks which of two lists a column shows. Nearly always on, and never the thing you came for. | `--sw-fill` + `--on-ink`, and **no ring**. The missing ring is not an omission — it is the difference between a bar you flick past and a pick you made. The state is really carried by WEIGHT (`--dim-rest` → 1). An exclusive switch adds a rule under the active cell; that mark, not a hue, is what says "only one" (U10). | `#section-bar`, `#rail-mode` |
+| **PICK** | One item, or a few, chosen from a list of peers, where the choosing IS the work. **This is the default: if you cannot tell which kind you have, you have a pick.** | `--on-fill` + `--on-ink` + `--on-ring`. A tool act, so ivory or steel and **never gold** — §7.16 2i-C rations gold to the roll verb. | `.seg button`, `.rp-item`, `.roster-name`, `.pid-cat`, `.pid-rank` |
+| **DIAL** | A setting that changes what the whole table looks like or means and STAYS changed after you leave. | `--dial-fill` + `--dial-ink` + `--dial-ring`. Gold — **and this is the one family where gold is not the roll verb.** It is an exception that predates HUE = ACT and has never been re-litigated; it is written down so the next setting joins it instead of inventing a tenth dress. | `.felt-swatch`, `.set-swatch`, `.set-select`, `.system-chip`, `.sw` |
+
+**The ring is a COLOUR, not a recipe.** An element with a resting border
+spends it on `border-color`; one without spends it on `box-shadow: inset 0 0
+0 1px`. That is why a ring which REPLACES a hairline needs more alpha than
+one which appears out of nothing, and it is the only *structural* reason a
+surface may override `--on-ring`.
+
+#### THE OVERRIDE RULE — how nine dresses became one expression
+
+The nine dresses were **not** converged onto one set of numbers, because
+converging them is a visible change and the pass that found them could not
+look at it. Instead: **if your value is not the token's value, do not write a
+fresh number into the dress — override the TOKEN on your own element, on one
+line, with the reason.** Every `[aria-pressed]` rule in the file now spells
+the same three declarations, and
+
+```
+grep -n -- '--on-fill:\|--on-ring:\|--on-ink:\|--dial-fill:\|--dial-ring:' css/style.css
+```
+
+is the list of every place the app still disagrees with itself. There are
+**thirteen such lines across seven surfaces**, each carrying the one-line
+diff that converges it. The two that matter:
+
+- **`.roster-name`** — the block above it says it wears "the shared
+  aria-pressed steel dress the panel's seg controls already use". It does
+  not, and never has: it is warm ivory inside a column that was re-dressed
+  cool, at a third pair of numbers. The right long-term home for `.rp-item`'s
+  three cool overrides is `#left-panel` itself, one level up, beside the
+  `--panel` / `--panel-border` / `--hair` / `--muted` re-declarations that
+  2i-D's temperature schism already put there. Moving them finishes the
+  schism and makes that comment true — and it is the one change that also
+  re-dresses the roster pill.
+- **`.mchip`** — a ±2 chip and a whisper-audience chip are PICKs (you are
+  authoring a roll, not changing the table), and they wear gold. **This is
+  the only place left where kind and dress disagree.** The mechanical
+  explanation: U6 enumerated `.seg` when it un-gilded the popover ("Every
+  `.seg` in the app was enumerated first") and `.mchip` is not a `.seg`, so
+  it sat three inches from the controls U6 corrected and kept the roll hue.
+  The flip is: delete the two override lines and swap `--dial-*` for
+  `--on-*`.
+
+#### DIE ART: FOUR RUNGS, BY ROLE
+
+The roadmap sketched three; the sheet had **six `.die-art` sizes across eight
+rules** — seven die glyphs if you count `.log-die`'s 15px — and four of them
+are genuinely different jobs. A die's size says what you may do with it, so
+the ladder is named for the role and not the surface.
+
+`--die-draft: 34px` the dice you are about to throw · `--die-tile: 28px` a
+die you can PICK UP (the palette tile, a pool strip — and `.die-art`'s own
+default) · `--die-card: 24px` a die inside a card you are editing ·
+`--die-row: 18px` a die quoted inside a dense list row.
+
+`.pid-rank`'s 26px and `.src-chip`'s 22px fit no rung and stayed literal:
+they are tuned to the box that holds them (a 38px rank button, a source
+chip's cap height) rather than to a role, and rounding them would move two
+surfaces by 2px for tidiness.
+
+#### `--label-sm`, and why the TRACKING is not one number
+
+Fourteen rules had spelled `font-size: 10px` independently. The **size** is
+one token now. The **tracking** deliberately is not: `--label-sm-track`
+(0.18em) is a HEAD standing over a region, while an inline TAG inside a row
+runs tighter (0.10–0.14em) so it fits beside its content. Take the token for
+a head; spell a tag's tracking locally and it will read as the choice it is.
+
+#### SURFACE AND LIFT — the vocabulary C25 Stage 2 needs
+
+`--surface-card` (a card standing over the FELT — the peek card's body) ·
+`--surface-sunk` (a track recessed INTO a surface) · `--lift-card` (chrome
+resting on chrome) · `--lift-deep` (chrome standing over the felt) ·
+`--lift-float` (a menu that flew out of something). **These three lifts are
+the only elevations this app has; a fourth shadow is a new altitude and needs
+an argument.**
+
+The EDGES already had names and are deliberately not re-spelled: `--hair` is
+the line inside one object *and* the seam between two siblings in a stack,
+`--panel-border` is the outer rim of a floating object, `--well` is a recess
+deep enough to hold an input. For "which panel in the stack am I looking at",
+take the PICK tokens; for the ones behind it, `--dim-rest`; for a panel's
+head, `--label-sm` + `--label-sm-track`.
+
+**The trap that governs all of this, and it has no symptom at the call
+site:** never define a token as `var(--x)` where `--x` is re-declared in a
+subtree. `--panel`, `--panel-border`, `--hair` and `--muted` all are, on
+`#left-panel`. A custom property is substituted where it is DEFINED, so
+`--edge-rim: var(--panel-border)` in `:root` would freeze the tavern-gold
+value and quietly stop tracking the column's graphite override — the alias
+would look right in the token block and be wrong on half the app.
+`--on-ink: var(--ivory)` is safe only because `--ivory` is declared exactly
+once.
+
+#### The one pixel this pass moved on purpose
+
+`.pm-row:disabled` spelled its own `opacity: 0.45; cursor: default` and no
+grayscale, while its own comment claimed to be spelling "the
+grayscale-unavailable dress": at (0,2,0) it beat THE DISABLED RECIPE's
+(0,1,1), so an unavailable profile row landed on **exactly the reveal tier's
+resting number with its hue intact** — the collision audit C4 exists to end,
+re-committed after U6 had cleared the other twelve. The rule is retired and
+the recipe carries it. An off-system row in the profile picker goes 0.45 →
+0.30 and loses its colour.
+
+#### What was proved, and what was not
+
+Proved mechanically rather than by eye: 1046 distinct selectors and **none
+changed specificity**; **no rule added, exactly one removed** (the line
+above); and every surviving rule resolves to **byte-identical declarations**
+after full `var()` substitution, resolving local and ancestor token overrides
+the way the cascade does. Not proved: that any of it LOOKS right. Nobody
+looked. The computed-value assertions the suite already carries
+(`.reveal-tier` at 0.45, `.tray-roll .die-art` ≥ 34px, `#rail-roll:disabled`
+not drained) all read *resolved* values, so they are unaffected by
+construction — which is also why a green suite here would prove nothing about
+the dress, and the two scenarios this section owes assert the token layer
+itself rather than any one surface.

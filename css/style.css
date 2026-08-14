@@ -32,6 +32,145 @@ limitations under the License.
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --ease-plant: cubic-bezier(0.22, 1, 0.36, 1);
 
+  /* ================= THE TOKEN LAYER (U23, 2026-08-14) =================
+     WHY THIS BLOCK EXISTS. Three pieces of doctrine were being carried by
+     copied NUMBERS instead of names, and every one of them has already
+     shipped a defect: the disabled code (audit C4 — thirteen recipes, six
+     with no grayscale, two colliding with the reveal tier's resting 0.45),
+     the pressed dress (`[aria-pressed="true"]` resolving to nine dresses
+     across four hue families, chosen by DOM ancestry) and the rest-dim tier
+     (0.42 in the build against 0.45 in the doc, both failing WCAG 1.4.3).
+     U6/U9/U10 fixed those instances one at a time. This fixes the
+     MECHANISM, which was that a new control had nothing to look up and so
+     copied its nearest neighbour.
+
+     TWO RULES FOR USING IT.
+     1. Pick a token by the QUESTION it answers, never by which surface you
+        are on. If your value is not the token's value, do NOT write a fresh
+        number into the dress — override the TOKEN on your own element, on
+        one line, with the reason. Then `grep -n -- '--on-fill:'` lists
+        every place the app still disagrees with itself, which is the report
+        this block owes and the thing nine copied dresses could not give.
+     2. Never define a token here as `var(--x)` where `--x` is re-declared
+        in a subtree (`--panel`, `--panel-border`, `--hair` and `--muted`
+        all are, on `#left-panel`). A custom property is substituted where
+        it is DEFINED, so the alias would freeze the :root value and quietly
+        stop tracking the override — a divergence with no symptom at the
+        call site. `--on-ink: var(--ivory)` is safe only because --ivory is
+        declared exactly once.
+
+     ---- THE THREE DEGREES OF "NOT CURRENTLY ACTIVE" --------------------
+     One ladder, and the ordering is a fact of the numbers rather than a
+     convention, so a fourth state cannot be invented by accident. */
+  --dim-rest: 0.78;  /* AVAILABLE — simply not the thing you are doing.
+                        Never says "you can't". Where this dim is the ONLY
+                        ink a WORD has, it carries 1.4.3's 4.5:1 floor: 0.78
+                        on --muted measures 4.67:1, which is why the tier is
+                        not free to drift down (C2 shipped it at 0.42). */
+  --dim-off: 0.45;   /* OUT OF PLAY — present, often still pressable, but
+                        not applicable to this roll, system or state: a
+                        discarded die, a reveal tier you cannot use, a
+                        stepper the active system ignores. The CONTENT is
+                        not needed, so it may sit below the text floor —
+                        which is exactly why it must never dress a control
+                        that is someone's only route back to a state. */
+  --drain: 0.3;      /* UNAVAILABLE. Always with --drain-fx: hue is the
+                        signal being spent, so the third code can never be
+                        read as the second. Below every rest-dim above. */
+  --drain-fx: grayscale(1);
+
+  /* ---- WHAT A SELECTED CONTROL WEARS ----------------------------------
+     THE KIND OF CHOICE PICKS THE DRESS. DOM ANCESTRY DOES NOT. That
+     sentence is the whole fix: `[aria-pressed="true"]` used to resolve by
+     where a control happened to live, so the same kind of choice wore gold
+     in a body-level popover and ivory three inches away inside the panel
+     (audit C3). There are exactly three kinds, and a new control is one of
+     them before it is anything else:
+
+       SWITCH  a cell in a bar that turns a REGION of the app on, or picks
+               which of two lists a column shows. Nearly always on, and
+               never the thing you came for. Wears --sw-fill + --on-ink and
+               NO RING — the missing ring is what keeps it quiet, and the
+               state is really carried by WEIGHT (--dim-rest → 1). An
+               exclusive switch adds a rule under the active cell; that
+               mark, not a hue, is what says "only one" (U10).
+               Today: #section-bar, #rail-mode.
+
+       PICK    one item, or a few, chosen from a list of peers, where the
+               choosing IS the work. A tool act, so ivory or steel and
+               NEVER gold — §7.16 2i-C rations gold to the roll verb.
+               Wears --on-fill + --on-ink + --on-ring. This is the default:
+               if you cannot tell which kind you have, you have a pick.
+               Today: .seg button, .rp-item, .roster-name, .pid-cat,
+               .pid-rank.
+
+       DIAL    a setting that changes what the whole table looks like or
+               means and STAYS changed after you leave: the felt, the dice
+               set, the rolling system, the tower, the sound. Wears
+               --dial-* — gold, and this is the one family where gold is
+               not the roll verb. It is an exception that predates HUE =
+               ACT and has never been re-litigated; it is written down here
+               so the next setting joins it instead of inventing a tenth
+               dress. Today: .felt-swatch, .set-swatch, .set-select,
+               .system-chip, .sw.
+
+     The RING is a COLOUR, not a recipe: an element with a resting border
+     spends it on `border-color`, one without spends it on
+     `box-shadow: inset 0 0 0 1px`. That is why a ring which REPLACES a
+     hairline needs more alpha than one which appears out of nothing, and
+     it is the only structural reason a surface may override --on-ring. */
+  --on-fill: rgba(243, 234, 215, 0.13);
+  --on-ink: var(--ivory);
+  --on-ring: rgba(243, 234, 215, 0.45);
+  --sw-fill: rgba(255, 255, 255, 0.05); /* the faintest recess the panel can hold */
+  --dial-fill: rgba(212, 175, 55, 0.14);
+  --dial-ink: var(--gold-bright);
+  --dial-ring: rgba(212, 175, 55, 0.55);
+
+  /* ---- DIE ART: FOUR RUNGS, BY ROLE -----------------------------------
+     A die's size says what you may do with it, so the ladder is named for
+     the role and not for the surface. (The roadmap sketched three; the
+     shipped stylesheet had SIX .die-art sizes across eight rules — seven
+     die glyphs if you count .log-die's 15px — and four of them are
+     genuinely different jobs.) */
+  --die-draft: 34px; /* the dice you are about to throw — the well's cluster */
+  --die-tile: 28px;  /* a die you can PICK UP: the palette tile, a pool strip.
+                        This is .die-art's own default. */
+  --die-card: 24px;  /* a die inside a card you are editing — rack tile, composer */
+  --die-row: 18px;   /* a die QUOTED inside a dense list row */
+
+  /* ---- THE SMALL TRACKED LABEL ----------------------------------------
+     The SIZE is one number (fourteen rules shipped 10px independently).
+     The TRACKING is not, and that is deliberate: 0.18em is a HEAD standing
+     over a region, while an inline TAG inside a row runs tighter (0.10 —
+     0.14em) so it fits beside its content. Take --label-sm-track for a
+     head; spell a tag's tracking locally and it will read as the choice it
+     is. Ink is var(--muted) unless the label names something you own. */
+  --label-sm: 10px;
+  --label-sm-track: 0.18em;
+
+  /* ---- SURFACE AND LIFT -----------------------------------------------
+     The vocabulary for a STACK of related panels over the felt — C25 Stage
+     2's "elements that visually fit together". Every value is lifted from
+     the shipped felt-side card language, so a new stack matches the peek
+     card, the log flyout and the set menu instead of copying whichever one
+     it sat next to. THESE THREE LIFTS ARE THE ONLY ELEVATIONS THIS APP HAS;
+     a fourth shadow is a new altitude and needs an argument.
+     The EDGES already have names and are deliberately not re-spelled here:
+     `--hair` is the line inside one object and the seam between two
+     siblings in a stack (and it re-dresses cool inside #left-panel, which a
+     :root alias would silently stop tracking — see rule 2 above);
+     `--panel-border` is the outer rim of a floating object; `--well` is a
+     recess deep enough to hold an input. For "which panel in the stack am I
+     looking at", take the PICK tokens; for the ones behind it, --dim-rest;
+     for a panel's head, --label-sm + --label-sm-track. */
+  --surface-card: rgba(18, 14, 9, 0.94);  /* a card standing over the FELT */
+  --surface-sunk: rgba(0, 0, 0, 0.28);    /* a track recessed INTO a surface */
+  --lift-card: 0 6px 24px rgba(0, 0, 0, 0.5);   /* chrome resting on chrome */
+  --lift-deep: 0 6px 24px rgba(0, 0, 0, 0.65);  /* chrome standing over the FELT */
+  --lift-float: 0 10px 32px rgba(0, 0, 0, 0.5); /* a menu that flew out of something */
+  /* ============ end of the token layer — surfaces follow ============== */
+
   /* THE SIDE PANEL (2026-08-04): a real layout column, never an overlay.
      --table-left is the felt's left edge = the panel's current width; JS
      keeps it in sync (refitView) and the canvas + felt-anchored overlays
@@ -125,7 +264,7 @@ html, body {
   border-radius: 10px;
   padding: 14px;
   backdrop-filter: blur(6px);
-  box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+  box-shadow: var(--lift-card);
 }
 
 .panel h2 {
@@ -368,12 +507,20 @@ html, body {
        READABLE while their affordance is off.
      · `.draft-actions .btn:disabled` / `#tray-mods:disabled` — keeps only
        `box-shadow: none`; an unlit plate is not a raised object. It takes
-       the drain from here like everything else. */
+       the drain from here like everything else.
+   The two numbers are --drain / --drain-fx in :root now (U23). The recipe
+   is still spelled exactly once; what the tokens add is that the RUNG has
+   a name, so the next exception is written `opacity: var(--drain)` instead
+   of as a fresh 0.35 — and `grep -- '--drain'` is the list of everything
+   that claims to be unavailable. One rule DID get away between U6 and U23
+   by spelling its own number: `.pm-row:disabled` said 0.45 with no drain
+   at all, which is the exact collision this recipe exists to end. It is
+   retired below. */
 :is(button, input, select, textarea):disabled,
 .rp-item.rp-bad {
-  opacity: 0.3;
+  opacity: var(--drain);
   cursor: default;
-  filter: grayscale(1);
+  filter: var(--drain-fx);
 }
 
 .btn.primary {
@@ -467,7 +614,7 @@ html, body {
 .die-btn.has-art::before { display: none; }
 .die-art {
   display: block;
-  width: 28px; height: 28px;   /* rendered at 192px (2x+) — crisp on retina */
+  width: var(--die-tile); height: var(--die-tile); /* rendered at 192px (2x+) — crisp on retina */
   pointer-events: none;         /* the BUTTON is the target; art never eats the click */
   -webkit-touch-callout: none;  /* no long-press image sheet on iOS — it's a button */
   user-select: none;
@@ -597,11 +744,15 @@ html, body {
    Full opacity since C2 (was 0.78): the recess is unchanged and still the
    faintest the panel can hold, so the cell is not louder as an OBJECT —
    only its word is, and it is the word that has to out-read a neighbour
-   that just became legible. 13.3:1. */
+   that just became legible. 13.3:1.
+   THIS IS THE SWITCH DRESS (U23): --sw-fill + --on-ink and no ring. The
+   absent ring is not an omission — it is the difference between a bar you
+   flick past and a PICK you made, and it is why `box-shadow: none` is
+   written rather than left to the cascade. */
 #left-panel :is(.section-seg, #rail-mode) button[aria-pressed="true"] {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--sw-fill);
   box-shadow: none;
-  color: var(--ivory);
+  color: var(--on-ink);
 }
 /* THE WEIGHT LADDER, HELD CLEAR OF :disabled. Both selectors above carry
    an id's weight, so a bare `opacity` in either of them outranks THE
@@ -614,7 +765,7 @@ html, body {
    source order, this one would have been lost to id weight. Same finding —
    a dress written where it cannot be beaten by the rule that should beat
    it.) */
-#left-panel :is(.section-seg, #rail-mode) button:not(:disabled) { opacity: 0.78; }
+#left-panel :is(.section-seg, #rail-mode) button:not(:disabled) { opacity: var(--dim-rest); }
 #left-panel :is(.section-seg, #rail-mode) button[aria-pressed="true"]:not(:disabled) { opacity: 1; }
 #left-panel :is(.section-seg, #rail-mode) button:hover:not(:disabled) {
   opacity: 1;
@@ -903,7 +1054,7 @@ html, body {
 .tray-line2 .tray-roll:hover:not(:disabled) .strip-more { opacity: 1; }
 /* larger dice in the WELL only — the draft is the star; pool rows keep 28
    (three classes deep: .pool-roll .die-art's later 28px must lose here) */
-.tray-line2 .tray-roll .die-art { width: 34px; height: 34px; }
+.tray-line2 .tray-roll .die-art { width: var(--die-draft); height: var(--die-draft); }
 /* (the well's cue size lives on .tray-line2 .roll-cue — ONE rule covers
    the ghost and the button so the states can never disagree) */
 /* THE WELL (§7.14). The draft is a FIELD — the same --well token as
@@ -1242,7 +1393,7 @@ html, body {
 .roll-cue i.l2 { opacity: 0.55; }
 .roll-cue i.l3 { opacity: 0.9; }
 .tray-cluster:has(.die-x:hover) .tray-roll .roll-cue { opacity: 0; }
-.pool-roll .die-art { width: 28px; height: 28px; pointer-events: none; }
+.pool-roll .die-art { width: var(--die-tile); height: var(--die-tile); pointer-events: none; }
 .strip-dot {
   width: 11px; height: 11px;
   border-radius: 3px;
@@ -1378,8 +1529,8 @@ html, body {
 }
 #pools-head.hidden { display: none; }
 #pools-head .ph-word {
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  font-size: var(--label-sm);
+  letter-spacing: var(--label-sm-track);
   text-transform: uppercase;
   color: var(--muted);
   white-space: nowrap;
@@ -1392,7 +1543,7 @@ html, body {
 #pools-head .ph-tag {
   display: none;
   flex: none;
-  font-size: 10px;
+  font-size: var(--label-sm);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1521,8 +1672,8 @@ html, body {
   white-space: nowrap;
 }
 #pools-head .ph-fig .phf-word {
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  font-size: var(--label-sm);
+  letter-spacing: var(--label-sm-track);
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -1560,7 +1711,7 @@ html, body {
    where the face is a plus sign and a noun: pure affordance, nothing to
    keep readable, so it takes the base drain like everything else.) */
 .tile-art { display: flex; align-items: center; gap: 3px; pointer-events: none; }
-.tile-art .die-art { width: 24px; height: 24px; }
+.tile-art .die-art { width: var(--die-card); height: var(--die-card); }
 .tile-name {
   max-width: 100%;
   font-family: var(--font-display);
@@ -1693,10 +1844,15 @@ html, body {
   cursor: pointer;
 }
 .pid-cat:hover { color: var(--ivory); }
+/* A PICK (U23) — which shelf this pool sits on. Ring is :root's; the fill
+   still runs lighter than --on-fill and the override is here so the
+   disagreement is one greppable line rather than a fourth copied dress.
+   Converging it = delete the --on-fill line (wash 0.08 → 0.13). */
 .pid-cat[aria-pressed="true"] {
-  color: var(--ivory);
-  border-color: rgba(243, 234, 215, 0.45);
-  background: rgba(243, 234, 215, 0.08);
+  --on-fill: rgba(243, 234, 215, 0.08);
+  color: var(--on-ink);
+  border-color: var(--on-ring);
+  background: var(--on-fill);
 }
 .pid-cat .oc-name { max-width: 90px; }
 .pid-cat-new { padding: 3px 7px; }
@@ -1716,12 +1872,23 @@ html, body {
   background: none;
   cursor: pointer;
 }
+/* 26 and 22 are the two die sizes that fit no rung (U23): they are tuned to
+   the box that holds them — a 38px rank button and a source chip's cap
+   height — not to a role. Left literal and named here rather than rounded
+   onto --die-tile/--die-card, which would move both by 2px on surfaces
+   nobody could look at in that pass. */
 .pid-rank .die-art { width: 26px; height: 26px; }
 .pid-rank .strip-dot { margin: 7px; }
 .pid-rank:hover { border-color: var(--hair); background: rgba(255, 255, 255, 0.04); }
+/* A PICK (U23) — the current rank. Both numbers still differ from :root's:
+   this ring stands against a TRANSPARENT resting border rather than a
+   hairline, so it was tuned up. Converging it = delete the two override
+   lines (ring 0.55 → 0.45, wash 0.07 → 0.13). */
 .pid-rank[aria-pressed="true"] {
-  border-color: rgba(243, 234, 215, 0.55);
-  background: rgba(243, 234, 215, 0.07);
+  --on-ring: rgba(243, 234, 215, 0.55);
+  --on-fill: rgba(243, 234, 215, 0.07);
+  border-color: var(--on-ring);
+  background: var(--on-fill);
 }
 .pid-count {
   position: absolute;
@@ -1771,7 +1938,7 @@ html, body {
 }
 .ghost-add .ghost-plus { font-size: 18px; line-height: 1; color: var(--ivory); opacity: 0.4; }
 .ghost-add .ghost-noun {
-  font-size: 10px;
+  font-size: var(--label-sm);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1826,7 +1993,7 @@ html, body {
   background: rgba(243, 234, 215, 0.05);
   cursor: pointer;
 }
-.cc-unit .die-art { width: 24px; height: 24px; }
+.cc-unit .die-art { width: var(--die-card); height: var(--die-card); }
 .cc-unit:hover { border-color: var(--red); background: rgba(226, 73, 59, 0.12); }
 .cc-empty { font-size: 11px; font-style: italic; color: var(--muted); }
 .creation-card .cc-row { display: flex; gap: 6px; align-items: center; }
@@ -1947,7 +2114,7 @@ html, body {
 }
 #pools-toolbar .pt-label {
   flex: 1;
-  font-size: 10px;
+  font-size: var(--label-sm);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ivory);
@@ -1981,7 +2148,7 @@ html, body {
 #profile-banner .pb-label {
   flex: 1;
   min-width: 0;
-  font-size: 10px;
+  font-size: var(--label-sm);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
@@ -2066,7 +2233,7 @@ html, body {
 #storage-banner .sb-label b {
   color: var(--red);
   font-weight: 700;
-  font-size: 10px;
+  font-size: var(--label-sm);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -2489,7 +2656,7 @@ html, body {
    a little weight, and the synthetic 'Pools' catch-all is the only one
    suppressed (a heading over uncategorized pools names nothing). */
 .rp-shelf-head {
-  font-size: 10px;
+  font-size: var(--label-sm);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -2524,12 +2691,23 @@ html, body {
 /* SELECTED is steel — picking is a tool act; gold belongs to the bar that
    rolls. And because it is now the ONLY box in the column, one signal does
    what four were doing: the ring, the fill, the inset glow and a ✓ were all
-   competing to out-shout a background of boxes that no longer exists. */
+   competing to out-shout a background of boxes that no longer exists.
+   A PICK (U23), re-dressed COOL rather than warm — which is not a fourth
+   dress but the temperature schism 2i-D already ran on this column, where
+   --panel / --panel-border / --hair / --muted are all re-declared cool on
+   #left-panel (:150). The right long-term home for these three lines is
+   that same block, one level up: moving them there finishes the schism and
+   is the ONE change that also re-dresses .roster-name, whose own comment
+   already claims (falsely, today) to wear the panel's steel pressed dress.
+   Left here because it moves no pixels and that call wants an eye on it. */
 .rp-item[aria-pressed="true"] {
-  border-color: #8c98a6;
-  background: rgba(140, 152, 166, 0.16);
+  --on-ring: #8c98a6;
+  --on-fill: rgba(140, 152, 166, 0.16);
+  --on-ink: #fff;
+  border-color: var(--on-ring);
+  background: var(--on-fill);
 }
-.rp-item[aria-pressed="true"] .rp-name { color: #fff; }
+.rp-item[aria-pressed="true"] .rp-name { color: var(--on-ink); }
 /* (.rp-item.rp-bad's local dress retired into THE DISABLED RECIPE —
    audit C4. A broken row is also `disabled` in the DOM, so the base
    rule reaches it by both names; its 0.45 was the second of the two
@@ -2549,7 +2727,7 @@ html, body {
   text-overflow: ellipsis;
   white-space: nowrap; /* horizontal and clipped — never rotated */
 }
-.rp-dice .die-art { width: 18px; height: 18px; }
+.rp-dice .die-art { width: var(--die-row); height: var(--die-row); }
 .rp-dice .strip-count { font-size: 9px; }
 .rp-empty { font-size: 10.5px; color: var(--muted); padding: 10px 6px; opacity: 0.7; }
 /* the digit shortcut, mirroring .pool-ord's rest state exactly (0 → 0.8 on
@@ -2828,9 +3006,19 @@ html, body {
   background: rgba(255, 255, 255, 0.09);
   border-color: rgba(255, 255, 255, 0.22);
 }
+/* A PICK (U23) — whose rack you are browsing. The block above says it wears
+   "the shared aria-pressed steel dress the panel's seg controls already
+   use"; it does not, and never has — it is warm ivory inside a column that
+   was re-dressed cool, at a third pair of numbers. Both disagreements are
+   the two override lines below, and the second inner glow has no sibling
+   anywhere. Converging it = delete the overrides (wash 0.10 → 0.13, ring
+   0.42 → 0.45) and, if the cool re-dress moves up to #left-panel, the pill
+   goes steel with the rows it sits above. */
 .roster-name[aria-pressed="true"] {
-  background: rgba(243, 234, 215, 0.10);
-  border-color: rgba(243, 234, 215, 0.42);
+  --on-fill: rgba(243, 234, 215, 0.10);
+  --on-ring: rgba(243, 234, 215, 0.42);
+  background: var(--on-fill);
+  border-color: var(--on-ring);
   box-shadow: inset 0 0 0 1px rgba(243, 234, 215, 0.14);
 }
 /* (.roster-name:disabled retired into THE DISABLED RECIPE — audit C4. Manage mode is the only state that disables a pill, and
@@ -3605,8 +3793,8 @@ html, body {
 .portable-profiles { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
 .portable-profiles.hidden { display: none; }
 .portable-profiles .pp-head {
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  font-size: var(--label-sm);
+  letter-spacing: var(--label-sm-track);
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -3629,7 +3817,7 @@ html, body {
 }
 .pp-row .pp-count { flex: 1; font-size: 11px; color: var(--muted); white-space: nowrap; }
 .pp-row .pp-tag {
-  font-size: 10px;
+  font-size: var(--label-sm);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ivory);
@@ -3672,10 +3860,15 @@ html, body {
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.45);
 }
+/* A DIAL (U23) — the felt is the table's, it persists, and it is chosen
+   once. The pill language below (.set-swatch, .set-select, .system-chip,
+   and the set-menu's selected row) is the SAME dress and is now the same
+   three tokens; four selectors, one dress, and a fifth setting joins it by
+   writing --dial-* rather than by copying whichever of them it sat near. */
 .felt-swatch[aria-pressed="true"] {
-  border-color: rgba(212, 175, 55, 0.55);
-  background: rgba(212, 175, 55, 0.14);
-  color: var(--gold-bright);
+  border-color: var(--dial-ring);
+  background: var(--dial-fill);
+  color: var(--dial-ink);
 }
 /* dice-set select (Tier 6 §9): ONE compact control everywhere a set is
    picked — the settings row and the pool popover's identity strip. The
@@ -3691,8 +3884,8 @@ html, body {
 }
 .set-select .ss-caret { opacity: 0.55; font-size: 10px; margin-left: 1px; }
 .set-select[aria-expanded="true"] {
-  border-color: rgba(212, 175, 55, 0.55);
-  background: rgba(212, 175, 55, 0.14);
+  border-color: var(--dial-ring);
+  background: var(--dial-fill);
 }
 .pid-set .set-select { max-width: 100%; }
 .set-menu {
@@ -3708,13 +3901,13 @@ html, body {
   border-radius: 10px;
   border: 1px solid var(--panel-border);
   background: var(--panel-bg, rgba(24, 22, 19, 0.97));
-  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--lift-float);
 }
 .set-menu .set-swatch { border-radius: 8px; width: 100%; justify-content: flex-start; }
 .set-menu .set-swatch[aria-selected="true"] {
-  border-color: rgba(212, 175, 55, 0.55);
-  background: rgba(212, 175, 55, 0.14);
-  color: var(--gold-bright);
+  border-color: var(--dial-ring);
+  background: var(--dial-fill);
+  color: var(--dial-ink);
 }
 .set-menu .set-house-head { margin: 6px 4px 2px; }
 .set-house-head {
@@ -3751,9 +3944,9 @@ html, body {
   box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.35);
 }
 .set-swatch[aria-pressed="true"] {
-  border-color: rgba(212, 175, 55, 0.55);
-  background: rgba(212, 175, 55, 0.14);
-  color: var(--gold-bright);
+  border-color: var(--dial-ring);
+  background: var(--dial-fill);
+  color: var(--dial-ink);
 }
 /* rolling-system picker (goal 6): same pill language as the felt swatches */
 #system-picker,
@@ -3780,9 +3973,9 @@ html, body {
    with it because the style keyed on the attribute rather than on the state. */
 .system-chip[aria-pressed="true"],
 .system-chip[aria-checked="true"] {
-  border-color: rgba(212, 175, 55, 0.55);
-  background: rgba(212, 175, 55, 0.14);
-  color: var(--gold-bright);
+  border-color: var(--dial-ring);
+  background: var(--dial-fill);
+  color: var(--dial-ink);
 }
 /* transient "Nyx changed the table" line; collapses when empty */
 /* PANEL-LEVEL since §7.36 (it used to sit inside the room section): the
@@ -4073,8 +4266,11 @@ body.mini #crit-text { font-size: clamp(28px, 12vw, 64px); }
 }
 
 /* ---------- roll mechanics display ---------- */
+/* OUT OF PLAY, not unavailable: a dropped die still has a face worth
+   reading, so it takes --dim-off and only a PARTIAL drain. The full
+   grayscale(1) belongs to THE DISABLED RECIPE and to nothing else. */
 .value-chip.discarded {
-  opacity: 0.45;
+  opacity: var(--dim-off);
   text-decoration: line-through;
   filter: grayscale(0.6);
 }
@@ -4162,10 +4358,10 @@ body.mini .sm-reveal { font-size: 9px; padding: 0 4px; }
   min-width: 300px;
   max-width: min(460px, calc(100vw - 16px));
   padding: 10px 12px 10px;
-  background: rgba(18, 14, 9, 0.94);
+  background: var(--surface-card);
   border: 1px solid var(--panel-border);
   border-radius: 10px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.65);
+  box-shadow: var(--lift-deep);
   font-family: var(--font-display);
   color: var(--ivory);
   text-align: center;
@@ -4307,7 +4503,7 @@ body.mini .pk-breakdown { font-size: 10px; }
 /* Rest-DIM, not invisible (Joe 2026-08-04: the reserved fold read as a
    dead void on both panels): the tier's verbs stand quiet at rest — P6,
    same grammar as the well cue — and brighten on approach. */
-.reveal-tier { opacity: 0.45; transition: opacity 0.12s; }
+.reveal-tier { opacity: var(--dim-off); transition: opacity 0.12s; }
 #result-banner:hover .reveal-tier,
 #result-banner:focus-within .reveal-tier,
 #verdict-card:hover .reveal-tier,
@@ -4681,8 +4877,8 @@ body.mini #result-verdict { font-size: 11px; }
 .plabel {
   display: block;
   margin-bottom: 7px;
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  font-size: var(--label-sm);
+  letter-spacing: var(--label-sm-track);
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -4712,7 +4908,12 @@ body.mini #result-verdict { font-size: 11px; }
 .pfield { margin-top: 8px; }
 .pfield > .plabel { margin-bottom: 4px; }
 
-.seg { display: flex; gap: 2px; padding: 2px; border: 1px solid var(--hair); border-radius: 9px; background: rgba(0, 0, 0, 0.28); }
+/* --on-ring at 0.28 rather than :root's 0.45 is the STRUCTURAL override the
+   token layer allows for (U23): a seg cell has `border: 0`, so its ring
+   appears out of nothing as an inset shadow, where every other PICK spends
+   the ring replacing a hairline border that was already there. Same dress,
+   same expression, one number, and it is greppable as a disagreement. */
+.seg { --on-ring: rgba(243, 234, 215, 0.28); display: flex; gap: 2px; padding: 2px; border: 1px solid var(--hair); border-radius: 9px; background: var(--surface-sunk); }
 .seg button {
   flex: 1;
   font-family: inherit;
@@ -4752,9 +4953,9 @@ body.mini #result-verdict { font-size: 11px; }
    the chosen zoom level was styled identically to the other two". The chosen
    cell of a radio seg was unpainted for exactly as long as one existed. */
 .seg button:is([aria-pressed="true"], [aria-checked="true"]) {
-  background: rgba(243, 234, 215, 0.13);
-  color: var(--ivory);
-  box-shadow: inset 0 0 0 1px rgba(243, 234, 215, 0.28);
+  background: var(--on-fill);
+  color: var(--on-ink);
+  box-shadow: inset 0 0 0 1px var(--on-ring);
 }
 .seg.mono button { font-family: var(--font-mono); font-size: 10.5px; }
 
@@ -4772,10 +4973,22 @@ body.mini #result-verdict { font-size: 11px; }
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .mchip:hover { color: var(--ivory); background: rgba(255, 255, 255, 0.1); }
+/* KIND AND DRESS DISAGREE HERE, AND THIS IS THE ONLY PLACE LEFT (U23).
+   A ±2 chip and a whisper-audience chip are PICKs — you are authoring a
+   roll, not changing the table — so by the rule at the top of this file
+   they should wear --on-*. They wear gold because U6 enumerated `.seg`
+   when it un-gilded the popover ("Every .seg in the app was enumerated
+   first") and .mchip is not a .seg, so it sat three inches away from the
+   controls U6 corrected and kept the roll hue. Recorded rather than
+   flipped, because the flip is a visible change and nobody could look at
+   it in the pass that found it. THE FLIP IS THIS: delete the two override
+   lines and swap --dial-* for --on-*. */
 .mchip[aria-pressed="true"] {
-  color: var(--gold-bright);
-  border-color: rgba(212, 175, 55, 0.45);
-  background: rgba(212, 175, 55, 0.16);
+  --dial-ring: rgba(212, 175, 55, 0.45);
+  --dial-fill: rgba(212, 175, 55, 0.16);
+  color: var(--dial-ink);
+  border-color: var(--dial-ring);
+  background: var(--dial-fill);
 }
 
 /* Whisper audience multi-select (goal 11): roster chips inside the ± popover.
@@ -4792,7 +5005,7 @@ body.mini #result-verdict { font-size: 11px; }
   font-family: var(--font-ui, inherit);
 }
 
-.stepper { display: inline-flex; align-items: center; border: 1px solid var(--hair); border-radius: 8px; background: rgba(0, 0, 0, 0.28); flex: none; }
+.stepper { display: inline-flex; align-items: center; border: 1px solid var(--hair); border-radius: 8px; background: var(--surface-sunk); flex: none; }
 .stepper button { width: 23px; height: 24px; border: 0; background: none; color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; }
 .stepper button:hover { color: var(--gold-bright); }
 .stepper output {
@@ -4803,8 +5016,10 @@ body.mini #result-verdict { font-size: 11px; }
   font-variant-numeric: tabular-nums;
   color: var(--ivory);
 }
-.stepper.dim { opacity: 0.45; }
-.pfield.dim { opacity: 0.45; }
+/* `.dim` IS --dim-off, spelled as a class: a field the active system does
+   not consult is out of play, not unavailable — it never gets the drain. */
+.stepper.dim { opacity: var(--dim-off); }
+.pfield.dim { opacity: var(--dim-off); }
 
 .sw {
   width: 30px;
@@ -4829,8 +5044,12 @@ body.mini #result-verdict { font-size: 11px; }
   background: var(--muted);
   transition: left 0.16s var(--ease-plant), background 0.16s;
 }
-.sw[aria-pressed="true"] { background: rgba(212, 175, 55, 0.26); border-color: rgba(212, 175, 55, 0.5); }
-.sw[aria-pressed="true"]::after { left: 15px; background: var(--gold-bright); }
+/* A DIAL (U23) — sound on, chips on: it persists and it changes the table.
+   The track runs hotter than a pill because it has no word to carry the
+   state, only 30×17 of colour; that is the structural reason for the two
+   overrides, and the knob takes --dial-ink like every other dial's ink. */
+.sw[aria-pressed="true"] { --dial-fill: rgba(212, 175, 55, 0.26); --dial-ring: rgba(212, 175, 55, 0.5); background: var(--dial-fill); border-color: var(--dial-ring); }
+.sw[aria-pressed="true"]::after { left: 15px; background: var(--dial-ink); }
 
 .tin {
   width: 100%;
@@ -5281,7 +5500,7 @@ body.mini .popover { width: min(94vw, 312px); }
 
 .margin-line {
   margin-top: 6px;
-  font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+  font-size: var(--label-sm); letter-spacing: 0.2em; text-transform: uppercase;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
@@ -5539,7 +5758,10 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
 .value-chip.staged.discarded { animation-name: chip-pop-dim; }
 @keyframes chip-pop-dim {
   0% { opacity: 0; margin-top: 10px; }
-  100% { opacity: 0.45; margin-top: 0; }
+  /* lands exactly ON the out-of-play rung — the chip arrives already
+     discarded, so the animation must end where .value-chip.discarded rests
+     or the die brightens for one frame after it settles. */
+  100% { opacity: var(--dim-off); margin-top: 0; }
 }
 
 /* ---- compact view is immersive (UX §7.4) ----
@@ -5606,7 +5828,7 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
   background: none;
   color: var(--ivory);
   font: inherit;
-  font-size: 10px;
+  font-size: var(--label-sm);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -5671,8 +5893,8 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
    column on the right and the group heading */
 .pm-head {
   padding: 4px 8px 2px;
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  font-size: var(--label-sm);
+  letter-spacing: var(--label-sm-track);
   text-transform: uppercase;
   color: var(--muted);
 }
@@ -5680,9 +5902,17 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
 .pm-row .pm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pm-row .pm-sub { flex: none; font-size: 11px; color: var(--muted); }
 .pm-row[aria-checked="true"] .pm-name { color: var(--gold); }
-/* Off-system rows are disabled, not absent. .idm-item:disabled has no shared
-   rule yet, so the grayscale-unavailable dress §7.23 uses is spelled here. */
-.pm-row:disabled { opacity: 0.45; cursor: default; }
+/* Off-system rows are disabled, not absent — and THE DISABLED RECIPE
+   (:504) says what that looks like. This rule used to spell its own
+   `opacity: 0.45; cursor: default` and NO grayscale, while its comment
+   claimed to be spelling "the grayscale-unavailable dress": (0,2,0) beat
+   the recipe's (0,1,1), so an unavailable profile row came out at exactly
+   the reveal tier's resting number with its hue intact — the one collision
+   audit C4 exists to end, re-committed after U6 had cleared the other
+   twelve. Retired here rather than re-tuned (U23): the recipe carries both
+   declarations, and the row now drains like everything else.
+   VISIBLE CHANGE: an off-system row in the profile picker goes 0.45 → 0.30
+   and loses its colour. It is the only pixel this pass moved on purpose. */
 .pm-row:disabled:hover { background: none; }
 
 /* the join modal's own-profile rows are .seat-btn verbatim; Random is the same
