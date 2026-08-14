@@ -19,82 +19,70 @@ Gates (each one exists because a green bake shipped a broken file once):
 --tower adds the dice-tower portal contract (see forge.tower_portals):
   - `portalIn` / `portalOut` nodes exist, sit at the scene root, and carry
     their scalars in node extras
-  - every declared number inside TOWER_PORTAL_LIMITS below
+  - every declared number inside the engine's portal limits, portalOut's
+    dead z knob pinned to 0.0
   - the APPROACH column is really clear (rays down the entry aperture) and
     the EXIT throat is really clear (rays out through the door) — because a
     model can declare a perfect doorway and still wall it up behind the
     declaration, and the numbers alone would never notice
+  - the LANE is clear and the outrun's colliders are clad or declared bare
+  - the OCCLUSION grid (SHAFT + COWL, six shipped eyes) does not leak, and
+    no sight line reaches the hollow below the sill outside the door
   - at least one mesh node named `towerSkin*`, the engine's occluder prefix
+  - every mesh box inside an envelope class the app's fit audit will grant
 """
 import argparse
 import json
 import math
+import os
 import struct
 import sys
 
 import numpy as np
 import trimesh
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # --------------------------------------------------------------------------
-# the tower portal contract
+# THE ENGINE MIRROR AND THE GATES LIVE IN tools/forge/towergates.py
 # --------------------------------------------------------------------------
-S = 1.25          # d20 radius: the unit every tower bound is quoted in
+# Every number copied out of js/main.js is in ONE dict — towergates.
+# ENGINE_MIRROR — and every gate that reasons about triangles is implemented
+# ONCE beside it. The module is there rather than here because a bake RECIPE
+# has to run the same gates and it runs inside Blender's Python, which has no
+# trimesh; this file runs on the forge venv, which has no bpy. Neither can
+# import the other, both can import a module that imports neither.
+#
+# Round 2 of the tower-contract work replaces ENGINE_MIRROR with an
+# `engine_contract.json` emitted by js/main.js itself. Until then: no engine
+# number gets a second copy anywhere under tools/forge — it goes in that dict
+# and everything reads it from there. That includes this file: the names below
+# are BINDINGS into the mirror, not copies of it.
+from towergates import (ENGINE_MIRROR, APPROACH_START, EXIT_FRONT,  # noqa: E402
+                        THROAT_MARGIN, EXIT_CLAD_ALLOW, EXIT_BACK,
+                        disc_probes, exit_ray_start_z, hit_distance,
+                        hole_below_sill_failures, lane_failures,
+                        occlusion_failures, rect_probes)
 
-# MIRRORS js/main.js TOWER_PORTAL_LIMITS — keep in sync.
-# The aperture floors are MEASURED, not inherited (2026-08-13 portal-floors
-# campaign, tools/steps/portal-probe.mjs; evidence in docs/TOWER.md "THE
-# MINIMUMS"): entry is a scripted fall with an exact 1.816 worst-case reach
-# (clearR floor 2.0 keeps a reserve); the exit's binding case is dice
-# climbing dice at the doorway, not the lone d20 (solo need 2.85, retries
-# turn up at 3.0, floor 3.375); jambs channel rather than jam (width floor
-# 4.0 keeps shed room under a low lintel).
-TOWER_PORTAL_LIMITS = {
-    "In": {
-        "clearR_min": 1.6 * S,
-        "rimY": (5.8 * S, 8.2 * S),
-        "x": (-1.0 * S, 1.0 * S),
-        "z": (-2.6 * S, -1.0 * S),
-    },
-    "Out": {
-        "w_min": 3.2 * S,
-        "clearH_min": 2.7 * S,
-        "sillY": (0.5 * S, 1.1 * S),
-        "x": (-0.6 * S, 0.6 * S),
-    },
-}
-DESPAWN_DROP = 1.4 * S    # despawnY = rimY - this; the column must be clear
-APPROACH_START = 2.5      # approach rays start this far above the rim
-EXIT_BACK = 1.5           # exit rays start this far behind the door plane
-EXIT_FRONT = 1.0          # ... and must reach this far in front of it
-THROAT_MARGIN = 0.95      # probe 95% of the declared aperture
-# The exit throat is NOT a flat box: the engine's delivery ramp climbs from
-# the sill backward at the 28°-family slope (rise 0.8/1.5 in base units, plus
-# the sill's own offset — the same formula towerVolumes uses), and the die
-# RIDES that surface. A ray hugging the sill at z −1.5 is probing space the
-# ramp legitimately owns, so a model that clads the chute (a tongue, a slide)
-# would fail a gate about a die path no die takes. Each ray therefore starts
-# where its height clears the ramp line plus the cladding allowance — skins
-# sit up to ~0.10 proud of the collider face, plus margin.
-EXIT_CLAD_ALLOW = 0.15    # ramp cladding proudness + margin above the slope line
-RAY_EPS = 1e-6
+S = ENGINE_MIRROR["S"]    # d20 radius: the unit every tower bound is quoted in
+TOWER_PORTAL_LIMITS = ENGINE_MIRROR["portalLimits"]
+DESPAWN_DROP = ENGINE_MIRROR["despawnDrop"]
 
 # THE ENVELOPE (added 2026-08-13, after the first shipped bake exceeded it on
-# five faces and nothing file-side could see it). Mirrors towerVolumes'
-# SOCKET plus the audit's legal-overrun classes, coarsely: every mesh node
-# must be IN-SOCKET, or a backward VENUE-GROUNDS spender, or a CLADDING
-# piece sunk below the felt. The app's tower-fit audit remains the judge —
-# this gate exists so "bake gates green" and "the model fits" stop being
-# different sentences. The x test carries the TILT term: skins lean the
-# whole group (hollowbole 0.45°, classics 0.7°), so a box at |x| with top y
-# lands at |x| + y·sin(tilt) — pass your skin's tilt via --tower-tilt-deg.
-ENV_SOCKET_X = 3.25       # ±, the mat's own wall is 3.35 — X HAS NO SLACK
-ENV_SOCKET_Y_TOP = 12.5
-ENV_FOOT_DIP = -0.145     # audit's foot-dip floor is -0.15
-ENV_SOCKET_Z = (-5.25, 0.25)
-ENV_VENUE_Z_BACK = -8.0   # venueOnly towers may spend glade this far back
-ENV_CLAD_MIN_Y = -0.5     # the audit's cladding classes require dipping this far
-ENV_CLAD_MAX_Z = 3.85     # lip front is 3.9
-ENV_CLAD_MAX_Y = 3.4
+# five faces and nothing file-side could see it): every mesh node must be
+# IN-SOCKET, or a backward VENUE-GROUNDS spender, or a CLADDING piece sunk
+# below the felt. The x test carries the TILT term: skins lean the whole group
+# (hollowbole 0.45°, classics 0.7°), so a box at |x| with top y lands at
+# |x| + y·sin(tilt) — pass your skin's tilt via --tower-tilt-deg.
+_SOCK, _CLS = ENGINE_MIRROR["socket"], ENGINE_MIRROR["auditClasses"]
+ENV_SOCKET_X = _SOCK["s"][0] / 2.0     # ±, the mat's own wall is 3.35 — NO SLACK
+ENV_SOCKET_Y_TOP = _SOCK["c"][1] + _SOCK["s"][1] / 2.0
+ENV_SOCKET_Z = (_SOCK["c"][2] - _SOCK["s"][2] / 2.0,
+                _SOCK["c"][2] + _SOCK["s"][2] / 2.0)
+ENV_FOOT_DIP = _CLS["footDip"]
+ENV_VENUE_Z_BACK = _CLS["venueZBack"]
+ENV_CLAD_MIN_Y = _CLS["cladMinY"]
+ENV_CLAD_MAX_Z = _CLS["cladMaxZ"]
+ENV_CLAD_MAX_Y = _CLS["cladMaxY"]
 
 
 def envelope_check(scene, tilt_deg):
@@ -131,15 +119,6 @@ def envelope_check(scene, tilt_deg):
     return fails, notes
 
 
-def exit_ray_start_z(py, sill_y, oz):
-    """Deepest z a ray at height `py` may probe without entering ramp space."""
-    tan_slope = 0.8 / 1.5 + (sill_y - 0.8 * S) / (1.5 * S)
-    head = py - sill_y - EXIT_CLAD_ALLOW
-    if head <= 0 or tan_slope <= 0:
-        return oz  # at/below the clad sill line: probe only from the plane out
-    return oz - min(EXIT_BACK, head / tan_slope)
-
-
 def glb_json(path):
     with open(path, "rb") as f:
         raw = f.read()
@@ -166,59 +145,6 @@ def normal_sanity(j, raw, bin_start):
                 arr = np.stack(rows)
             worst = max(worst, float(np.abs(1.0 - np.linalg.norm(arr, axis=1)).max()))
     return worst
-
-
-def hit_distance(tris, origin, direction, t_max):
-    """Nearest two-sided ray/triangle hit in (RAY_EPS, t_max), else None.
-
-    Möller-Trumbore, vectorised over triangles. Written here rather than
-    handed to trimesh because BOTH trimesh ray backends need a package this
-    venv does not have (ray_triangle wants rtree, ray_pyembree wants embreex)
-    and the house rule is no new dependencies. At 25 rays against a few
-    thousand triangles that costs nothing, and a caster that lives in the
-    repo cannot vary with what happens to be pip-installed on the machine.
-
-    Two-sided on purpose: a plug across the doorway blocks a die whichever
-    way its faces point, and back-face culling would wave it through.
-    """
-    if len(tris) == 0:
-        return None
-    v0, v1, v2 = tris[:, 0], tris[:, 1], tris[:, 2]
-    e1, e2 = v1 - v0, v2 - v0
-    p = np.cross(direction, e2)
-    det = np.einsum("ij,ij->i", e1, p)
-    ok = np.abs(det) > 1e-12
-    inv = np.zeros_like(det)
-    inv[ok] = 1.0 / det[ok]
-    tv = origin - v0
-    u = np.einsum("ij,ij->i", tv, p) * inv
-    q = np.cross(tv, e1)
-    v = (q @ direction) * inv
-    t = np.einsum("ij,ij->i", e2, q) * inv
-    hit = (ok & (u >= -1e-9) & (v >= -1e-9) & (u + v <= 1.0 + 1e-9)
-           & (t > RAY_EPS) & (t < t_max))
-    return float(t[hit].min()) if hit.any() else None
-
-
-def disc_probes(cx, cz, r):
-    """25 points over a disc: centre, a mid ring, and a ring ON the rim.
-
-    Rings rather than a spiral because the rim is where a throat actually
-    pinches, and a sampler that only averages the interior would miss a
-    shelf growing in from one side.
-    """
-    pts = [(cx, cz)]
-    for count, frac, phase in ((8, 0.55, 0.0), (16, 1.0, math.pi / 16)):
-        for i in range(count):
-            a = phase + 2.0 * math.pi * i / count
-            pts.append((cx + r * frac * math.cos(a), cz + r * frac * math.sin(a)))
-    return pts
-
-
-def rect_probes(cx, y0, w, h, n=5):
-    """25 points over a rectangle, the extremes sitting ON its edges."""
-    return [(cx - w / 2 + w * i / (n - 1), y0 + h * k / (n - 1))
-            for i in range(n) for k in range(n)]
 
 
 def node_translation(node):
@@ -248,7 +174,7 @@ def read_portals(j):
     return found
 
 
-def tower_check(j, tris):
+def tower_check(j, tris, tilt_deg=0.45, bare_colliders=()):
     """The --tower gate. Returns (info, failures)."""
     info, fails = {}, []
     found = read_portals(j)
@@ -307,6 +233,19 @@ def tower_check(j, tris):
     floor_("Out", "clearH", clear_h, lout["clearH_min"])
     span("Out", "sillY", sill_y, lout["sillY"])
     span("Out", "x", ox, lout["x"])
+    # ...and the DEAD KNOB. portalOut once took an optional z "unless a model
+    # has a reason to inset the doorway", and no model ever did, because the
+    # engine reads exactly two things off portalOut — x and sillY — and builds
+    # the doorway plane from the SOCKET. A declared z therefore moved nothing
+    # in the app and one thing here: this file's own 25-ray exit probe, which
+    # anchored itself to a number the engine discards. Pinned to 0.0 by
+    # forge.tower_portals (2026-08-13, Joe's ruling) and refused here, because
+    # the pin is only worth what a gate on the FILE makes it worth.
+    if abs(oz) > 1e-6:
+        fails.append(
+            f"portalOut: z {oz:.3f} must be 0.0 — the engine reads only x and "
+            "sillY from portalOut and derives the doorway plane from the "
+            "socket, so a nonzero z moves nothing but this file's exit probe")
 
     # (c) the APPROACH column is really clear, top of the fall to despawn
     if clear_r > 0:
@@ -353,7 +292,31 @@ def tower_check(j, tris):
                 f"(rays start at the slope + {EXIT_CLAD_ALLOW} cladding allowance, "
                 f"deepest z {oz - EXIT_BACK:.2f})")
 
-    # (e) the engine's occluder prefix
+    # (e) THE LANE — the outrun, which until now was gated in neither
+    # direction. The exit probe above stops at oz + 1.0 and the engine's lip
+    # box runs out to z 3.9; in between, nothing refused a lobe standing up
+    # through the delivery ramp, and nothing refused a collider left bare.
+    spec = {"in": info["in"], "out": info["out"]}
+    lane_f, lane_info = lane_failures(tris, spec, bare_colliders)
+    info["lane"] = lane_info
+    fails.extend(lane_f)
+
+    # (f) OCCLUSION, and it is the reason this section exists at all. The
+    # obligation ("the vanish is unwatchable") was enforced by exactly one
+    # RECIPE and by no gate on any shipped GLB, so a second tower — or the
+    # same tower re-baked from a recipe that forgot — could ship a leak that
+    # only a browser finds, thirty minutes at a time.
+    occ_f, occ_counts = occlusion_failures(tris, spec, tilt_deg)
+    info["occlusion"] = occ_counts
+    fails.extend(occ_f)
+
+    # ...and its low counterpart: under the sill, outside the door, the shell
+    # is supposed to be SOLID. See towergates.hole_below_sill_failures.
+    hole_f, tested, holes = hole_below_sill_failures(tris, spec, tilt_deg)
+    info["sill_holes"] = {"tested": tested, "open": holes}
+    fails.extend(hole_f)
+
+    # (g) the engine's occluder prefix
     skins = [n.get("name", "") for n in j.get("nodes", [])
              if "mesh" in n and str(n.get("name", "")).startswith("towerSkin")]
     info["towerSkin_nodes"] = skins
@@ -363,9 +326,8 @@ def tower_check(j, tris):
     return info, fails
 
 
-def inspect(path, tower=False, tower_tilt_deg=0.45):
+def inspect(path, tower=False, tower_tilt_deg=0.45, bare_colliders=()):
     out = {"file": path, "file_kb": None}
-    import os
     out["file_kb"] = round(os.path.getsize(path) / 1024, 1)
     j, raw, bin_start = glb_json(path)
     out["has_vertex_colors"] = b'"COLOR_0"' in raw
@@ -404,7 +366,8 @@ def inspect(path, tower=False, tower_tilt_deg=0.45):
         # the raw per-geometry vertices do not carry
         tris = (np.asarray(scene.to_mesh().triangles, dtype=np.float64)
                 if geoms else np.zeros((0, 3, 3)))
-        out["tower"], out["tower_failures"] = tower_check(j, tris)
+        out["tower"], out["tower_failures"] = tower_check(
+            j, tris, tilt_deg=tower_tilt_deg, bare_colliders=bare_colliders)
         env_fails, env_notes = envelope_check(scene, tower_tilt_deg)
         out["tower_failures"].extend(env_fails)
         out["envelope_notes"] = env_notes
@@ -425,13 +388,23 @@ def main():
     ap.add_argument("--tower-tilt-deg", type=float, default=0.45,
                     help="the skin's lean, for the envelope's x arithmetic "
                          "(hollowbole 0.45, classics 0.7)")
+    ap.add_argument("--bare-colliders", default="",
+                    help="comma-separated engine surfaces this model "
+                         "DELIBERATELY leaves unclad (ramp, lip). Leaving one "
+                         "bare is a legitimate choice — hollowbole's wound "
+                         "opens onto felt and the mound that used to cover the "
+                         "outrun was deleted — but it is a choice, and an "
+                         "undeclared bare collider is indistinguishable from "
+                         "a cladding somebody forgot to build")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
 
+    bare = [s for s in (p.strip() for p in a.bare_colliders.split(",")) if s]
     failures = []
     reports = []
     for path in a.glb:
-        r = inspect(path, tower=a.tower, tower_tilt_deg=a.tower_tilt_deg)
+        r = inspect(path, tower=a.tower, tower_tilt_deg=a.tower_tilt_deg,
+                    bare_colliders=bare)
         reports.append(r)
 
         def fail(msg):
@@ -475,6 +448,17 @@ def main():
                       f"clearH {t['out']['clearH']:.2f}  "
                       f"exit {25 - t.get('exit_blocked', 0)}/25 clear  "
                       f"skins {t.get('towerSkin_nodes', [])}")
+                ln, occ = t.get("lane", {}), t.get("occlusion", {})
+                sh = t.get("sill_holes", {})
+                clad = ", ".join(f"{k} {v[0]}/{v[1]}"
+                                 for k, v in sorted(ln.get("clad", {}).items()))
+                print(f"  lane      |x|<={ln.get('lane_halfwidth')} z "
+                      f"{ln.get('lane_z')}  clad {clad or 'n/a'}  bare "
+                      f"{ln.get('bare_colliders', [])}")
+                print("  occlusion " + "  ".join(
+                    f"{b} {n}/{n}" for b, n in sorted(occ.items()))
+                    + f" at 6 eyes   sill holes {sh.get('open')}/"
+                      f"{sh.get('tested')} sight lines")
     if failures:
         print("\nCHECK FAILED:", file=sys.stderr)
         for f in failures:
