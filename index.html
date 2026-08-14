@@ -453,10 +453,22 @@ limitations under the License.
          pair (Joe 2026-08-06). -->
     <div id="rail-foot">
       <button id="toggle-settings" class="btn ghost" title="Settings" aria-label="Settings">⚙</button>
-      <!-- No notification bubble on the log (user call, 2026-07): history is
-           reference material, not an inbox — the since-you-looked count rides
-           only the hover title. -->
-      <button id="rail-log" class="btn ghost" title="Roll log — l" aria-label="Roll log" aria-pressed="false">≣</button>
+      <!-- No notification COUNT BUBBLE on the log (user call, 2026-07):
+           history is reference material, not an inbox, and a number that
+           exists to be zeroed nags like one. That ruling stands and there is
+           still no `#log-badge` in this document.
+           What C25 changed underneath it (§7.42): the log is no longer merely
+           reference — since Stage 1 it is where a put-away roll LIVES, and
+           with the flyout closed that roll had no presence anywhere. So the ≣
+           carries THE SPINE: one hairline rank per roll in the record,
+           oldest→newest, in its roller's colour, rendered by renderRecord().
+           It is an index, not an inbox — it does not count at you and it does
+           not go to zero when you look; it says what the record holds. The
+           accessible name is written per render beside it, because a `title`
+           is not a channel (aria-label overrides it in the accname algorithm,
+           which is exactly how the old unread count reached tests and no
+           user). -->
+      <button id="rail-log" class="btn ghost" title="Roll log — l" aria-label="Roll log" aria-pressed="false"><span class="rl-glyph" aria-hidden="true">≣</span><span class="rl-spine" aria-hidden="true"></span></button>
       <button id="rail-help" class="btn ghost" title="Help" aria-label="Help">?</button>
       <button id="rail-palette" class="btn ghost" title="Quick roll ( / )" aria-label="Quick roll">❯</button>
       <div id="corner-controls" class="hidden">
@@ -532,9 +544,32 @@ limitations under the License.
            WHOLE TABLE, and a button labelled Clear sat inside the one
            deliberately un-modal surface — so `c` pressed while looking at a
            button that says Clear cleared the other thing. Same word, two
-           scopes, one local-and-recoverable and one permanent solo. -->
-      <button id="clear-log" class="btn tiny ghost">Clear history</button>
+           scopes, one local-and-recoverable and one permanent solo.
+           C14 amendment (§7.42): since C6 this handler ALSO calls
+           requestClearRoll on every put-away roll, which is a permanent,
+           TABLE-WIDE act on rolls that may be other people's — and the label
+           said nothing about it. `.lf-clear-scope` fills with that count and
+           that scope whenever there is one; it is empty (and the label reads
+           exactly `Clear history`) when the press only touches your list. -->
+      <button id="clear-log" class="btn tiny ghost">Clear history<span class="lf-clear-scope"></span></button>
       <button id="log-close" class="pop-close" title="Close">✕</button>
+    </div>
+    <!-- THE RECORD, EXPANDED (§7.42). The same object as the ≣'s spine at the
+         scale the flyout affords: one panel per put-away roll, oldest→newest,
+         so RANK is finally rendered (C13's first item — the most useful fact
+         for "find what happened earlier" and nothing drew it). A panel is a
+         door: it scrolls its row into view, flashes it and opens its card,
+         which is C14's missing ANCHOR. Sticky, because a 300px column that
+         scrolls its own index away has not got one. -->
+    <div id="log-record" class="lf-record" role="group" aria-label="Rolls put away — oldest first"></div>
+    <!-- C14's missing FIND. The log was the only path to "ten minutes ago"
+         and had no input element of any kind; four hours × five players blows
+         the 100-entry cap. Matches roller, label, notation and (only where a
+         roll is readable — goal 11) its total. -->
+    <div class="lf-find">
+      <input id="log-filter" class="tin lf-find-in" type="search" placeholder="Find a roll…"
+             autocomplete="off" spellcheck="false" aria-label="Find a roll in the log">
+      <span id="log-filter-count" class="lf-find-count" aria-live="polite"></span>
     </div>
     <div id="log-list"></div>
     <p id="log-empty" class="hint">No rolls yet.</p>

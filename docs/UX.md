@@ -1107,7 +1107,7 @@ per-roll choices — §3.3.)
 Two principles arrived from Joe after §1–§6 were drafted. They are binding;
 where they touch earlier sections, this addendum wins.
 
-> **NEXT FREE SECTION NUMBER: §7.42.**
+> **NEXT FREE SECTION NUMBER: §7.43.**
 > Claim it here in the same commit that writes the section, before you write
 > it. This document ASSIGNS these numbers, so this line is the only place a
 > branch that has been out for a week can see what is taken (ROADMAP C4).
@@ -1144,13 +1144,13 @@ a stale row is worse than no table.
 | Intent card · dock strip (the declaration) | §2.4's staging timeline, phases 1–8 · §7.6 for the moment flags and `# Title \| Subtitle` · **§7.24** — the target renders under every system and the profile only NAMES it (`targetWord`); the flat `+5` is arithmetic and does not; `#intent-notation` stays a whole verbatim canonical, `dc15` included | §2.4 phase 0's user-held dwell and Roll button (shipped: a fixed `CEREMONY_DECLARE_S = 1.35` s, no button) · §2.1 / §2.3's experience records — the moment ships as notation flags · any reading in which the badge's label is a fixed string |
 | Result banner | §7.11b — the folded card, the hover read, the beacon · **§7.28** — neither the card nor the dice are on a clock; the next roll retires both · §7.21 — the named primary verb, the retired watermark · **§7.24** — `VS DC 15` renders under every system, the adjudication only where a sum does, and the hero slot names the rung (`Face down` / `Whispered`) where the mute gold `?` used to sit | §7.9's Done-at-rest and its ~6 s clock (the shipped clock is 3 s) · §7.7.2's ⟳ / Collect / ✕ trio · §2.5 (retired 2026-08-08) |
 | Verdict card | §7.16's THE FLOW TO COLLECTED — a folded card whose clock shelves the roll · §7.21 — `❯❯ Skip` repaints to `✕ Clear` when the beat lands · **§7.24** — the stake goes into `#verdict-margin`, written ONCE above and outside every branch; the hero holds the reading and the two never share a slot | §7.7.2's verdict half (struck there) · §2.4 phase 0's user-held dwell and Roll button (shipped: a 1.35 s timer, no button) · §2.5's one hero slot — retired, struck there. **The card has no subtitle element under any system** (§7.24's deferral); do not read the eight-surface table as though it does |
-| Peek | §7.7.1 for what a peek is · §7.11b's "folded card, shelf edition" · §7.21 — its primary is always `✕ Clear`, housekeeping being anyone's · **§7.24** — the stake, and the held word in the total slot (the `?` survives only for `!entry`, and under a totals lens) | §7.15's one-✕ rule — retired, struck below · §7.9's "the peek carries a prominent ✕ at its base" amendment · §2.5 (retired) |
-| Roll log | No single section. §7.9 for the rail-foot flyout and key `l` · §7.12 for the compact grouped line (the per-die ROWS belong to the other three surfaces) · §7.15's "The log says so" for `reroll` / `rerolled` · **§7.24** — `vs 15` with no `✓`/`✗` where nothing sums, and no dangling `+5` feeding an empty total column | §2.5 (retired) |
-| Shelf | §7.7 — slots, collect, FIFO ranks, universal housekeeping, resync · §7.7.1 — no casino markings, left-to-right compaction | The marker's resting read in §7.7 and §7.9, amended below: it ships invisible. ROADMAP U20 owns the redesign |
+| Peek | §7.7.1 for what a peek is · §7.11b's "folded card, shelf edition" · §7.21 — its primary is always `✕ Clear`, housekeeping being anyone's · **§7.24** — the stake, and the held word in the total slot (the `?` survives only for `!entry`, and under a totals lens) · §7.27 — it anchors to a log ROW, not a felt point · **§7.42** — it names its RANK, and it retires on a new roll, on a ceremony and with the log | §7.15's one-✕ rule — retired, struck below · §7.9's "the peek carries a prominent ✕ at its base" amendment · §2.5 (retired) · any reading in which the card outlives the roll that replaced it |
+| Roll log | **§7.42** — the record: the ≣'s spine, the flyout's rank panels and their anchor, `Find a roll…`, the scroll on `#log-list`, and what `Clear history` actually reaches · §7.27 for the row-as-door · §7.9 for the rail-foot flyout and key `l` · §7.12 for the compact grouped line (the per-die ROWS belong to the other three surfaces) · §7.15's "The log says so" for `reroll` / `rerolled` · **§7.24** — `vs 15` with no `✓`/`✗` where nothing sums, and no dangling `+5` feeding an empty total column | §2.5 (retired) · §7.9's "the count rides only the hover title (still the accessible name)" — the parenthesis was false and is why the count reached nobody (§7.42) · any reading in which `Clear history` is local-only |
+| Shelf | **RETIRED as a place.** §7.27 — a put-away roll lives in the log and its ROW is the door · **§7.42** — what it looks like at rest, open and closed · §7.7 for the collect/clear state machine, which is wire and survives verbatim | §7.7's slots, geometry and marker read · §7.7.1's compaction · ROADMAP U20/C13's "decide how much read the shelf owes" — answered by §7.42 |
 | ± popover | §7.10 — a pure editor, and where an edit lands by source · §7.14.2 — Done, click-away, the ring · §7.9's SHEET PASS identity strip · **§7.24** — only **Modifier** folds under a per-die lens; Target, d20 pairing, keep/drop and reroll/exploding are authorable under every system, and the rim reads `± Modify` in both | §7.10's "reroll and explode stay… behind the sysnote's *Show anyway*" — superseded 2026-08-06, no note and no disclosure; the accurate record is the comment over the popover's sections in `index.html` · any account of the fold in which Target or keep/drop hides under a per-die system: that was `usesMods`, deleted 2026-08-08 · ROADMAP U11's `± Moment` — its rule survived, its word did not (§7.24) |
 | Identity chip · roster · nameplate | §7.17 — the rail pill is the one per-player surface, left-click toggles the rack, right-click / long-press opens the menu, and the quiet nameplate · §7.9's ORDER IS THE CONTRACT · §7.22 for the collapsed dress | §7.9's "Identity is on the table" paragraph, where left-click opened the menu |
 | Settings | No single section. §7.9 for the *Just you* scope (chips off by default, the dice-set select) · §7.13 for *Your data* · §7.17 for the table name; the room-wide keys are `SETTING_SPECS` in `server.js` | §2.1 / §2.3's experience record and its editor — never built, and `/api/table` refuses the key |
-| **Any control's ON / OFF / UNAVAILABLE dress** (not a surface — the rule that governs all of them) | **§7.39** — the token layer. THE KIND OF CHOICE PICKS THE DRESS: switch / pick / dial, three degrees of not-active, and the override rule that makes a disagreement one greppable line. The values of record are the `:root` block in `css/style.css` | Copying the nearest neighbour's numbers, which is what produced nine `[aria-pressed="true"]` dresses across four hue families (audit C3) · any reading in which `#left-panel` scoping is what makes a dress right — 2i-C and U6 both had to un-scope a law twice for the same reason |
+| **Any control's ON / OFF / UNAVAILABLE dress** (not a surface — the rule that governs all of them) | **§7.41** — the token layer. THE KIND OF CHOICE PICKS THE DRESS: switch / pick / dial, three degrees of not-active, and the override rule that makes a disagreement one greppable line. The values of record are the `:root` block in `css/style.css` | Copying the nearest neighbour's numbers, which is what produced nine `[aria-pressed="true"]` dresses across four hue families (audit C3) · any reading in which `#left-panel` scoping is what makes a dress right — 2i-C and U6 both had to un-scope a law twice for the same reason |
 
 ### 7.1 Physical pool building (supersedes the button grid as the primary path)
 
@@ -5011,3 +5011,109 @@ not drained) all read *resolved* values, so they are unaffected by
 construction — which is also why a green suite here would prove nothing about
 the dress, and the two scenarios this section owes assert the token layer
 itself rather than any one surface.
+### 7.42 The record — a put-away roll's presence at rest (2026-08-14)
+
+*C25 Stage 2, with C13 and U20's shelf half folded in. Supersedes §7.27's
+closing "Still open" paragraph, which named exactly this hole.*
+
+Stage 1 took the felt shelf away and made **the log ROW the door** to a
+put-away roll's card. It said out loud what it left worse: *with the flyout
+closed, a put-away roll has no ambient presence at all* — the ≣ carried an
+unread count in its `title` and nothing else. Three defects were the same
+defect. C13: rank is the most useful fact for "find what happened earlier" and
+nothing rendered it; a held roll's "waiting on you" reached an `aria-label`
+and no sighted player; the roller-tinted glow that was claimed as the
+attribution substitute blended 45% toward gold at alpha 0.10, so two players
+differed by ~10/255. C14: the ≣'s unread count lived only in a `title`, which
+touch never renders and which a static `aria-label` **overrides** in the
+accname algorithm — so it reached `__diceDebug` and the suite, and no user.
+
+**THE RECORD IS ONE OBJECT AT TWO SCALES.**
+
+| | closed (the ≣'s **spine**) | open (the flyout's **panels**) |
+| --- | --- | --- |
+| what | one 3px rank per put-away roll, oldest→newest | one ~50px panel per roll, same order |
+| colour | the roller's own, undiluted, on rail-dark | the same colour as the panel's top edge |
+| unread | lit; read ranks dim to `--dim-rest` and stay | full opacity vs. 0.62 |
+| held | dimmed | `?`, drained readout |
+| waiting on you | gold, slow pulse | gold top edge + glow + `!` |
+| arriving | `rank-land` — drops into its slot | the same keyframe |
+| reachable | the button, one target (no nested button) | each panel is a button and a tab stop |
+| what it does | opens the log | **anchors**: scrolls its row in, lights it, opens its card |
+
+The spine is absolutely positioned **inside** the button so the rail's width
+budget is untouched — the collapsed foot is measured to the pixel (css:2259)
+and anything that added width would push the contextual ✕ under the divider.
+Ranks flex to share whatever the button has: ~4px expanded, ~3px collapsed.
+
+**Why not a strip across the bottom of the felt**, which is the shape Joe's
+sketch reached for. C25 measured that space and it is not there: five panels
+across a 390px phone is 78px each, which is C24's *"a tower reads as a
+smudge"* applied to UI, and §7.9's redesign left the felt with **zero standing
+chrome** deliberately. The rail exists at every width and already is where
+information lives (P3). **The sketch's other half is built literally**: the
+panels collapse into the element that expands the log.
+
+**It is an index, not an inbox.** Joe's 2026-07 ruling — no count bubble,
+"history is reference material" — stands, and `#log-badge` still does not
+exist. What that ruling's rationale got wrong is its last clause: the count
+"survives only in the hover title (still the accessible name)" was false, and
+that is why the signal reached nobody. `renderRecord` writes the ≣'s
+accessible name every render (`Roll log, 5 rolls put away, 2 new since you
+looked, 1 waiting to be revealed`); the title keeps the count as a
+convenience, never as the channel. A rank that has been read **dims and
+stays** — the opposite of a number that exists to be driven to zero.
+
+**The panel's one read** is the total where a system computes one, `?` where
+the roll is hidden, `!` where it is waiting on you, and otherwise the roll's
+own **label** — a per-die system (§7.24) has no sum, and insisting on a
+numeral printed an em dash on every roll of the default profile.
+
+#### The card, and the two U20 items that were real
+
+- **A peek now names its RANK** (`.pk-rank`, in the header). Since §7.28 the
+  banner stands until the next roll, so a banner for roll A and a card for
+  roll B could both wear a red `✕ Clear` with nothing saying which roll either
+  acted on. The banner is always the live roll and has no rank; a card is
+  always a put-away roll and always has one.
+- **The card lets go of things it should never have outlived.** It closed on
+  nothing a player expects and sat at `--z-peek` above all of them. Now: a new
+  roll's log entry retires it (`addLogEntry` — the roll's own card survives, so
+  a reroll landing under its parent is not a stale card); a ceremony raising
+  `#ceremony-layer` retires it (a `MutationObserver` on that one class, because
+  the card must let go the moment the layer *appears* and every path that
+  raises it converges there); closing the log already did.
+
+#### Finding a roll (C14)
+
+`Find a roll…` sits under the panels and matches roller, label, notation, and
+— only where the roll is readable, goal 11 — its total. Rows are **hidden,
+never removed**: `markSuperseded`, the cap prune and the card's anchor all
+resolve rows out of `#log-list` by id. `N of M` stands beside the box; Esc
+inside the box clears the filter and stops there, rather than closing the
+flyout out from under someone who was only abandoning a search.
+
+The **scroll moved off the panel and onto `#log-list`**, so the head, the
+panels, the find box and the dropped-note foot all stay in view. Before this
+you had to scroll 100 rows to reach *"N earlier rolls rolled off the end"* —
+the one line a player who has lost history needs first.
+
+**What `Clear history` actually does, verified 2026-08-14 and now said.** Two
+scopes ride one button and the label named neither: `requestClearRoll` on each
+put-away roll is **permanent, server-side and table-wide**, and reaches rolls
+that are not yours; `log = []` is **local only** — online the server owns the
+log and the next `hello` hands every row back. The button keeps its verb and
+grows a second line, `· clears N for everyone`, which is empty (and the label
+reads exactly `Clear history`) when the press touches only your list. The
+announcement carries both halves.
+
+**The late joiner is told what he cannot be told.** `logDroppedTotal` is 0 for
+someone handed the last 100 rolls, and the client cannot learn the true number
+— the server caps at the same 100 and does not report what it dropped
+(`server.js:1748`). At cap the note says *"Showing the most recent 100 rolls —
+this table may go back further"* rather than a confident wrong number.
+
+**Debug surface:** `__diceDebug.record` (ranks, `spine`/`panels` element
+counts, `spoken` = the ≣'s computed accessible name, `clearLabel`),
+`anchorRecord(rollId)`, `logFind`, `setLogFind(q)`. `spoken` is the one to
+assert on: it is the read that used to exist only in a hook.
