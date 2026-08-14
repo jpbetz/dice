@@ -1001,196 +1001,269 @@ limitations under the License.
   </div>
 
   <!-- Settings modal (roadmap §2): "Just you" locals + room-wide table settings -->
+  <!-- THE SETTINGS PANEL — everything that is not a roll.
+       Reorganised 2026-08-14 (UX §7.36) after it grew to 45 controls in a
+       320px column that scrolled 1004px inside a 647px window. The trouble was
+       never the number of controls; it was that THREE KINDS OF WORK shared one
+       scroll — flipping a switch (seconds), staging the table (a decision
+       everyone here sees), and managing belongings (a 32-row library and a
+       text tool with seven buttons). The most common job, flipping a switch,
+       required scrolling past a YAML workspace.
+       So the panel has THREE DESTINATIONS, cut first by BLAST RADIUS — because
+       "does this change the game for everyone?" is the question that must
+       never be ambiguous — and then by kind of work:
+         TABLE       room-wide, broadcast, socially significant
+         YOU         this device (plus the one setting with an audience)
+         YOUR STUFF  the workspace: profiles, export, import, files
+       THE RULE for anything new: it goes where its blast radius says, and if
+       it needs more than a row it goes in Your stuff. -->
   <div id="settings-modal" class="hidden">
     <div class="panel" id="settings-panel">
       <div class="settings-head">
         <h2 id="settings-title">Settings</h2>
         <button id="settings-close" class="pop-close" title="Close">✕</button>
       </div>
-      <div class="settings-sec">
-        <span class="plabel">Just you</span>
-        <div class="prow">
-          <span class="grow">
-            <span class="prow-label">Sound</span>
-            <span class="prow-sub">dice impact clicks</span>
-          </span>
-          <button id="set-sound" class="sw" aria-pressed="true" title="Sound"></button>
-        </div>
-        <div class="prow">
-          <span class="grow">
-            <span class="prow-label">Show numbers on dice</span>
-            <span class="prow-sub">floating value chips over the felt</span>
-          </span>
-          <button id="set-chips" class="sw" aria-pressed="false" title="Show numbers on dice"></button>
-        </div>
-        <!-- The room tone (docs/AUDIO.md §5). Its OWN switch, never bound to
-             Sound, and OFF by default — a bed you did not ask for is noise.
-             Device-local mood: it is deliberately not in the portable file. -->
-        <div class="prow">
-          <span class="grow">
-            <span class="prow-label">Room tone</span>
-            <span class="prow-sub">a quiet room behind the dice</span>
-          </span>
-          <button id="set-ambience" class="sw" aria-pressed="false" title="Room tone"></button>
-        </div>
-        <!-- Dice set (Tier 6 §9): your identity on the felt. Rides every
-             roll you throw or claim; applies from the next roll. -->
-        <div class="prow" id="diceset-row">
-          <span class="grow">
-            <span class="prow-label">Dice set</span>
-            <!-- §3b/L0: the audience half of this line is a claim, and in the
-                 lobby it is false; syncSettingsUI rewrites it there. -->
-            <span class="prow-sub" id="set-diceset-sub">the dice everyone sees you roll — from your next roll</span>
-          </span>
-        </div>
-        <div id="diceset-picker"></div>
+      <!-- The destination bar. RADIO semantics, not the pools bar's checkbox
+           multi-toggle (§7.23): these are exclusive, and aria-checked is the
+           spelling U22 settled for exclusive chips. It sits above what it
+           reveals so the bar and the stack read in the same order. -->
+      <div id="settings-nav" class="seg" role="radiogroup" aria-label="Settings sections">
+        <button id="snav-table" data-dest="table" role="radio" aria-checked="true"
+                title="What everyone at this table sees">Table</button>
+        <button id="snav-staging" data-dest="staging" role="radio" aria-checked="false"
+                title="How the table looks — venue, felt, tower">Staging</button>
+        <button id="snav-you" data-dest="you" role="radio" aria-checked="false"
+                title="Your own settings, on this device">You</button>
+        <button id="snav-stuff" data-dest="stuff" role="radio" aria-checked="false"
+                title="Your profiles, and getting them in and out">Your stuff</button>
       </div>
-      <!-- Your data (Tier 4 §5): pools + just-you settings as portable YAML.
-           ONE textarea, two directions — Export fills it (copy it anywhere);
-           pasting/editing re-parses live and the status line previews what
-           Apply would do. Apply is explicit, merges by name, deletes
-           nothing. Strict subset parser (js/portable.js), fail-closed. -->
-      <div class="settings-sec">
-        <span class="plabel">Your data</span>
-        <div class="prow">
-          <span class="grow">
-            <span class="prow-label">Pools &amp; settings as text</span>
-            <span class="prow-sub">copy it out, keep it anywhere, paste one back</span>
-          </span>
-          <button id="portable-open" class="btn tiny">Export / import…</button>
-        </div>
-        <div id="portable-zone" class="portable-zone hidden">
-          <textarea id="portable-text" class="portable-text" rows="9" spellcheck="false"
-            placeholder="paste an export here to import…"></textarea>
-          <div class="btn-row portable-row">
-            <button id="portable-export" class="btn tiny">Fill with my data</button>
-            <button id="portable-copy" class="btn tiny">Copy</button>
-            <button id="portable-apply" class="btn tiny confirm" disabled>Apply import</button>
-          </div>
-          <!-- The file door (ROADMAP §G1): the same two directions aimed at
-               disk instead of the clipboard, because a room evaporates and a
-               paste blob is not a backup. Open only FILLS the box above — the
-               preview-then-Apply gate still decides what lands (GOALS §7). The
-               picker itself is a mechanism, hidden; the button is the control. -->
-          <div class="btn-row portable-row">
-            <button id="portable-download" class="btn tiny">Download</button>
-            <button id="portable-openfile" class="btn tiny">Open file…</button>
-            <!-- Apply to table (ROADMAP §G4/§G6): push the box's table: +
-                 players: to the room so joiners are offered the seats. The
-                 file stays the truth; the room holds a replaceable copy. -->
-            <button id="portable-push" class="btn tiny"
-                    title="Offer this file’s table settings and seats to everyone at this room">Apply to table</button>
-            <input id="portable-file" class="portable-file" type="file"
-              accept=".yaml,.yml,.txt,text/plain">
-          </div>
-          <p id="portable-status" class="hint portable-status"></p>
-          <!-- What the BOX holds (PROFILES §11 O7/P14): the players: section of
-               whatever file is pasted or opened above, one Add per profile plus
-               one Add all for a DM's six-character file. An ADD, never a
-               replace — names dedupe and nothing of the player's is touched.
-               Absent when the box carries no players:. -->
-          <div id="import-profiles" class="portable-profiles hidden">
-            <span class="pp-head">Profiles in this file
-              <button id="import-adopt-all" class="btn tiny"
-                      title="Add every profile in this file to your library">Add all</button></span>
-            <div id="import-profile-rows"></div>
-          </div>
-        </div>
-      </div>
-      <!-- THE LIBRARY (PROFILES §11.5 ③). Manage-frequency work lives here
-           rather than in the picker menu over the rack, for two reasons found
-           by building the alternative: a menu that closes on focus-out is the
-           wrong container for a rename field, and a 32-row list with a scroller
-           is a panel wearing a menu's clothes. The picker switches; this
-           creates, renames, deletes, duplicates and copies.
 
-           'At this table' below it is the prepared seats plus the teammates'
-           published racks — each one Copy away from being yours. Absent when
-           there is nothing at the table, because a heading over no rows is the
-           prose "empty renders nothing" exists to refuse. -->
-      <div class="settings-sec">
-        <span class="plabel">Your profiles <span id="profile-count" class="pp-count"></span></span>
-        <div id="profile-rows"></div>
-        <div class="pp-new">
-          <input id="profile-newname" type="text" maxlength="24"
-                 placeholder="new profile name…" spellcheck="false">
-          <button id="profile-new" class="btn tiny"
-                  title="A new, empty profile for this table’s system — build its pools with ✎">＋ New</button>
-          <button id="profile-deal" class="btn tiny"
-                  title="Deal a whole profile at random for this table’s system">⚄ Random</button>
+      <!-- ① TABLE — room-wide. §3b/L0: this section's heading is a CLAIM and
+           in the lobby it is a false one, so openSettingsModal relabels it.
+           Every control here has a working local branch, which is exactly why
+           the label has to be honest: with no table they silently become
+           personal. Table name has no roomless meaning at all and is hidden. -->
+      <section class="settings-dest" id="dest-table">
+        <div class="settings-sec">
+          <span class="plabel" id="set-room-label">Everyone at the table</span>
+          <!-- Table name (anatomy pass): the rail nameplate's rename path —
+               management stands behind the settings gate (P6), room-wide
+               like felt/system. Empty = unnamed (no plate). -->
+          <div class="prow" id="set-table-name-row">
+            <span class="grow">
+              <span class="prow-label">Table name</span>
+              <span class="prow-sub">shows at the top of everyone’s panel</span>
+            </span>
+            <input id="set-table-name" class="tin" maxlength="28" placeholder="unnamed">
+          </div>
+          <div class="prow">
+            <span class="grow">
+              <span class="prow-label">Rolling system</span>
+              <span class="prow-sub">how the table reads a result</span>
+            </span>
+          </div>
+          <div id="system-picker"></div>
+          <!-- Mat zoom (Joe 2026-08-04): three presets — Wide (default),
+               Medium, Close — the closer levels shrink the physics mat so
+               dice occupy a bigger fraction of a small screen. A mid-flight
+               change defers to the next roll boundary (queueZoom). -->
+          <div class="prow">
+            <span class="grow">
+              <span class="prow-label">Mat zoom</span>
+              <span class="prow-sub">smaller mat, larger dice — better on small screens</span>
+            </span>
+          </div>
+          <div id="zoom-picker" role="radiogroup" aria-label="Mat zoom"></div>
         </div>
-        <p id="profile-status" class="hint portable-status"></p>
-        <div id="table-profiles" class="portable-profiles hidden">
-          <span class="pp-head">At this table</span>
-          <div id="table-profile-rows"></div>
+      </section>
+
+      <!-- ② STAGING — also room-wide, and its own destination for a measured
+           reason: with staging inside Table that destination stood 710px tall
+           and overflowed a 459px window by 251px, which is the defect this
+           whole pass exists to remove, surviving one level down. Split, the
+           worst destination is ~425px and nothing scrolls. The two room-wide
+           cells sit FIRST and together on the bar, so the blast-radius reading
+           survives the split: the left pair changes the game for everyone, the
+           right pair is yours.
+           STAGING — one concern, and a HIERARCHY rather than three peers.
+             GOALS goal 13: a fantasy venue IS the felt and the tower, so it
+             leads and they are its detail; while one is active
+             updateVenueChrome hides them and #venue-staged says what took
+             them, because a control that vanishes with no explanation is its
+             own defect (they used to just disappear). Felt was a `plabel`
+             SECTION heading until this pass — a heading pretending to be a
+             peer of "Just you" while being one control inside staging. -->
+      <section class="settings-dest hidden" id="dest-staging">
+        <div class="settings-sec">
+          <span class="plabel">Staging</span>
+          <div class="prow" id="venue-row">
+            <span class="grow">
+              <span class="prow-label">Venue</span>
+              <span class="prow-sub">where the table stands — a fantasy venue stages everything at once</span>
+            </span>
+          </div>
+          <div id="venue-picker" role="radiogroup" aria-label="Venue"></div>
+          <p id="venue-staged" class="hint venue-staged hidden"></p>
+          <div class="prow" id="felt-label">
+            <span class="grow">
+              <span class="prow-label">Felt</span>
+              <span class="prow-sub">the surface everyone rolls on</span>
+            </span>
+          </div>
+          <div id="felt-swatches"></div>
+          <!-- Tower (docs/TOWER.md): a room setting because it changes the
+               FILM — a tower roll pours instead of being thrown, and every
+               client bakes the same pour. A picker rather than a switch:
+               the value is a tower id and more models are meant to follow.
+               A mid-flight change defers to the next roll (queueTower). -->
+          <div class="prow" id="tower-row">
+            <span class="grow">
+              <span class="prow-label">Tower</span>
+              <span class="prow-sub">dice tumble down through it instead of being thrown</span>
+            </span>
+          </div>
+          <div id="tower-picker" role="radiogroup" aria-label="Tower"></div>
         </div>
-      </div>
-      <!-- §3b/L0: this section's heading is a CLAIM, and in the lobby it is a
-           false one. All four controls have working local branches, so with no
-           table they silently become personal while the heading still says
-           "Everyone at the table" and the felt tooltip still says "everyone at
-           the table sees this". Felt, system and zoom genuinely ARE just you
-           with no table, so the lobby drops the heading (rather than repeat
-           "Just you" and label two sections the same) and hides Table name,
-           which has no roomless meaning at all. -->
-      <div class="settings-sec">
-        <span class="plabel" id="set-room-label">Everyone at the table</span>
-        <!-- Table name (anatomy pass): the rail nameplate's rename path —
-             management stands behind the settings gate (P6), room-wide
-             like felt/system. Empty = unnamed (no plate). -->
-        <div class="prow" id="set-table-name-row">
-          <span class="grow">
-            <span class="prow-label">Table name</span>
-            <span class="prow-sub">shows at the top of everyone’s panel</span>
-          </span>
-          <input id="set-table-name" class="tin" maxlength="28" placeholder="unnamed">
+      </section>
+
+      <!-- ② YOU — this device. Dice set is the one exception and it says so
+           in its own sub-line: it is chosen by you and seen by everyone. -->
+      <section class="settings-dest hidden" id="dest-you">
+        <div class="settings-sec">
+          <span class="plabel">Just you</span>
+          <div class="prow">
+            <span class="grow">
+              <span class="prow-label">Sound</span>
+              <span class="prow-sub">dice impact clicks</span>
+            </span>
+            <button id="set-sound" class="sw" aria-pressed="true" title="Sound"></button>
+          </div>
+          <div class="prow">
+            <span class="grow">
+              <span class="prow-label">Show numbers on dice</span>
+              <span class="prow-sub">floating value chips over the felt</span>
+            </span>
+            <button id="set-chips" class="sw" aria-pressed="false" title="Show numbers on dice"></button>
+          </div>
+          <!-- The room tone (docs/AUDIO.md §5). Its OWN switch, never bound to
+               Sound, and OFF by default — a bed you did not ask for is noise.
+               Device-local mood: it is deliberately not in the portable file. -->
+          <div class="prow">
+            <span class="grow">
+              <span class="prow-label">Room tone</span>
+              <span class="prow-sub">a quiet room behind the dice</span>
+            </span>
+            <button id="set-ambience" class="sw" aria-pressed="false" title="Room tone"></button>
+          </div>
+          <!-- Dice set (Tier 6 §9): your identity on the felt. Rides every
+               roll you throw or claim; applies from the next roll. Hidden by
+               a fantasy venue like felt and tower — #venue-staged-you says
+               so, for the same reason its twin does. -->
+          <div class="prow" id="diceset-row">
+            <span class="grow">
+              <span class="prow-label">Dice set</span>
+              <!-- §3b/L0: the audience half of this line is a claim, and in the
+                   lobby it is false; syncSettingsUI rewrites it there. -->
+              <span class="prow-sub" id="set-diceset-sub">the dice everyone sees you roll — from your next roll</span>
+            </span>
+          </div>
+          <div id="diceset-picker"></div>
+          <p id="venue-staged-you" class="hint venue-staged hidden"></p>
         </div>
-        <div class="prow">
-          <span class="grow">
-            <span class="prow-label">Rolling system</span>
-            <span class="prow-sub">how the table reads a result</span>
-          </span>
+      </section>
+
+      <!-- ③ YOUR STUFF — the workspace. Manage-frequency work, and the reason
+           the panel needed destinations at all: a 32-row library and a
+           seven-button text tool are not rows in a preferences list. -->
+      <section class="settings-dest hidden" id="dest-stuff">
+        <!-- THE LIBRARY (PROFILES §11.5 ③). Manage-frequency work lives here
+             rather than in the picker menu over the rack, for two reasons found
+             by building the alternative: a menu that closes on focus-out is the
+             wrong container for a rename field, and a 32-row list with a scroller
+             is a panel wearing a menu's clothes. The picker switches; this
+             creates, renames, deletes, duplicates and copies.
+
+             'At this table' below it is the prepared seats plus the teammates'
+             published racks — each one Copy away from being yours. Absent when
+             there is nothing at the table, because a heading over no rows is the
+             prose "empty renders nothing" exists to refuse. -->
+        <div class="settings-sec">
+          <span class="plabel">Your profiles <span id="profile-count" class="pp-count"></span></span>
+          <div id="profile-rows"></div>
+          <div class="pp-new">
+            <input id="profile-newname" type="text" maxlength="24"
+                   placeholder="new profile name…" spellcheck="false">
+            <button id="profile-new" class="btn tiny"
+                    title="A new, empty profile for this table’s system — build its pools with ✎">＋ New</button>
+            <button id="profile-deal" class="btn tiny"
+                    title="Deal a whole profile at random for this table’s system">⚄ Random</button>
+          </div>
+          <p id="profile-status" class="hint portable-status"></p>
+          <div id="table-profiles" class="portable-profiles hidden">
+            <span class="pp-head">At this table</span>
+            <div id="table-profile-rows"></div>
+          </div>
         </div>
-        <div id="system-picker"></div>
-        <!-- Mat zoom (Joe 2026-08-04): three presets — Wide (default),
-             Medium, Close — the closer levels shrink the physics mat so
-             dice occupy a bigger fraction of a small screen. A mid-flight
-             change defers to the next roll boundary (queueZoom). -->
-        <div class="prow">
-          <span class="grow">
-            <span class="prow-label">Mat zoom</span>
-            <span class="prow-sub">smaller mat, larger dice — better on small screens</span>
-          </span>
+        <!-- Your data (Tier 4 §5): pools + just-you settings as portable YAML.
+             ONE textarea, two directions — Export fills it (copy it anywhere);
+             pasting/editing re-parses live and the status line previews what
+             Apply would do. Apply is explicit, merges by name, deletes
+             nothing. Strict subset parser (js/portable.js), fail-closed. -->
+        <div class="settings-sec">
+          <span class="plabel">In and out</span>
+          <div class="prow">
+            <span class="grow">
+              <span class="prow-label">Pools &amp; settings as text</span>
+              <span class="prow-sub">copy it out, keep it anywhere, paste one back</span>
+            </span>
+            <button id="portable-open" class="btn tiny">Export / import…</button>
+          </div>
+          <div id="portable-zone" class="portable-zone hidden">
+            <textarea id="portable-text" class="portable-text" rows="9" spellcheck="false"
+              placeholder="paste an export here to import…"></textarea>
+            <div class="btn-row portable-row">
+              <button id="portable-export" class="btn tiny">Fill with my data</button>
+              <button id="portable-copy" class="btn tiny">Copy</button>
+              <button id="portable-apply" class="btn tiny confirm" disabled>Apply import</button>
+            </div>
+            <!-- The file door (ROADMAP §G1): the same two directions aimed at
+                 disk instead of the clipboard, because a room evaporates and a
+                 paste blob is not a backup. Open only FILLS the box above — the
+                 preview-then-Apply gate still decides what lands (GOALS §7). The
+                 picker itself is a mechanism, hidden; the button is the control. -->
+            <div class="btn-row portable-row">
+              <button id="portable-download" class="btn tiny">Download</button>
+              <button id="portable-openfile" class="btn tiny">Open file…</button>
+              <!-- Apply to table (ROADMAP §G4/§G6): push the box's table: +
+                   players: to the room so joiners are offered the seats. The
+                   file stays the truth; the room holds a replaceable copy. -->
+              <button id="portable-push" class="btn tiny"
+                      title="Offer this file’s table settings and seats to everyone at this room">Apply to table</button>
+              <input id="portable-file" class="portable-file" type="file"
+                accept=".yaml,.yml,.txt,text/plain">
+            </div>
+            <p id="portable-status" class="hint portable-status"></p>
+            <!-- What the BOX holds (PROFILES §11 O7/P14): the players: section of
+                 whatever file is pasted or opened above, one Add per profile plus
+                 one Add all for a DM's six-character file. An ADD, never a
+                 replace — names dedupe and nothing of the player's is touched.
+                 Absent when the box carries no players:. -->
+            <div id="import-profiles" class="portable-profiles hidden">
+              <span class="pp-head">Profiles in this file
+                <button id="import-adopt-all" class="btn tiny"
+                        title="Add every profile in this file to your library">Add all</button></span>
+              <div id="import-profile-rows"></div>
+            </div>
+          </div>
         </div>
-        <div id="zoom-picker" role="radiogroup" aria-label="Mat zoom"></div>
-        <!-- Venue (GOALS goals 13-15): the whole staging as ONE choice.
-             While a fantasy venue is active it REPLACES the felt, tower
-             and dice-set pickers below (updateVenueChrome hides them) —
-             a venue must never be assembled into incoherence one dropdown
-             at a time. -->
-        <div class="prow" id="venue-row">
-          <span class="grow">
-            <span class="prow-label">Venue</span>
-            <span class="prow-sub">where the table stands — a fantasy venue stages everything at once</span>
-          </span>
-        </div>
-        <div id="venue-picker" role="radiogroup" aria-label="Venue"></div>
-        <span class="plabel" id="felt-label">Felt</span>
-        <div id="felt-swatches"></div>
-        <!-- Tower (docs/TOWER.md): a room setting because it changes the
-             FILM — a tower roll pours instead of being thrown, and every
-             client bakes the same pour. A picker rather than a switch:
-             the value is a tower id and more models are meant to follow.
-             A mid-flight change defers to the next roll (queueTower). -->
-        <div class="prow" id="tower-row">
-          <span class="grow">
-            <span class="prow-label">Tower</span>
-            <span class="prow-sub">dice tumble down through it instead of being thrown</span>
-          </span>
-        </div>
-        <div id="tower-picker" role="radiogroup" aria-label="Tower"></div>
-        <div id="settings-note"></div>
-      </div>
+      </section>
+
+      <!-- THE NOTE IS PANEL-LEVEL, not per-destination, and that is
+           load-bearing: showSettingsNote is the refusal channel for zoom,
+           tower, system, venue and felt, and a refusal that lands on a
+           destination you are not looking at is UX-AUDIT D2 again — a notice
+           channel silent by construction. -->
+      <div id="settings-note"></div>
     </div>
   </div>
 

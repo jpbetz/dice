@@ -4490,3 +4490,108 @@ Nothing here can ever sit between you and a result: no living thing
 crosses the dice box, at any instant, by construction rather than by
 care. That is [VENUE-COMPOSITION.md](VENUE-COMPOSITION.md) rule 14, and
 `venue-life` holds it over every member rather than over a sample.
+
+### 7.37 The settings panel — four destinations, not one scroll (2026-08-14)
+
+*Joe: "Let's fix the setting panel. It's ballooned into chaos. Please rethink
+the UX from first principles and define a new organizational structure better
+aligned with all features and then implement."*
+
+**THE DEFECT, MEASURED.** 45 controls in a 320px column that scrolled
+**1004px inside a 647px window** — 357px of overflow before anyone had done
+anything. Five headings, one of which ("Felt") was a section heading
+pretending to be a peer of "Just you" while actually being one control inside
+the table's staging.
+
+**And the count was not the problem.** THREE KINDS OF WORK shared one scroll:
+
+1. **flipping a switch** — Sound, Room tone, numbers on dice. Seconds, this
+   device, set once and forgotten.
+2. **staging the table** — venue, felt, tower, system, name, zoom. A decision,
+   and everyone at the table sees it.
+3. **managing belongings** — a 32-row profile library and a text tool with
+   seven buttons. Minutes, a workspace.
+
+The most common job, (1), required scrolling past a YAML editor to reach a
+toggle. That is what "ballooned into chaos" is made of, and no amount of
+re-labelling one column fixes it.
+
+**THE FIRST CUT IS BLAST RADIUS**, because "does this change the game for
+everyone?" is the question that must never be ambiguous — it is the same
+concern UX-AUDIT E4 raises about the change note that says only "Alice changed
+the table" for a system flip that reinterprets every result. **The second cut
+is kind of work.** Together they give four destinations and, more importantly,
+one unambiguous answer to *where does a new control go*:
+
+| destination | who it changes | what lives there |
+| --- | --- | --- |
+| **Table** | everyone here | table name, rolling system, mat zoom |
+| **Staging** | everyone here | venue → (felt, tower) |
+| **You** | this device | sound, room tone, numbers on dice, dice set |
+| **Your stuff** | your belongings | the profile library, `At this table`, export/import/file |
+
+**THE RULE, for the next ten features:** a control goes where its blast radius
+says; if it needs more than a row, it goes in Your stuff.
+
+**The bar's ORDER is the blast-radius reading.** The two room-wide cells come
+first and together, the two personal ones after — so the split into four does
+not cost the structure its first principle. It is a `.seg` (the app's own
+segmented control, §7.23's grammar) with `role="radiogroup"` and
+**aria-checked**, not aria-pressed: these cells are exclusive, and U22 settled
+that spelling. The stylesheet was taught **both** spellings in the same commit,
+because naming only aria-pressed is exactly the defect `tower-roll` records
+against the zoom picker — a chosen radio cell painted identically to the
+others, for as long as one existed.
+
+**Why staging is its own destination and not a section inside Table.** It was
+a section, and Table then stood 710px tall and overflowed a 459px window by
+251px — the defect this pass exists to remove, surviving one level down. Split,
+the four destinations measure **347 / 451 / 331 / 291** and *nothing scrolls*.
+
+**One frame.** The dialog is sized to the tallest destination and does not
+resize as you move between them; a panel that shrinks under the cursor walks
+its own close button 160px up the screen for the crime of pressing "You". It
+yields to `max-height` on a short window, where scrolling one destination is
+the lesser evil.
+
+**The note is panel-level**, outside the switched regions. `showSettingsNote`
+is the refusal channel for zoom, tower, system, venue and felt, and a refusal
+that lands on a destination you are not looking at is UX-AUDIT D2 again — a
+notice channel silent by construction.
+
+**Venue leads; felt and tower are its detail.** GOALS goal 13 already said a
+fantasy venue REPLACES those choices, and `updateVenueChrome` already hid
+them — but it hid them *silently*, which reads as a bug to anyone who does not
+know the rule. They now sit under Venue as its subordinates, and when a venue
+takes them a line says so by name (*"Moonrise Glade stages this — felt, tower
+and dice are its own."*). Dice set is the same story one destination over.
+
+**Two things this deleted.** `openSettingsAtLibrary()` — which opened the panel
+and then *clicked a disclosure button* to reach its own destination, the
+clearest available sign that the library was in the wrong place (C16 had
+already unhooked its last caller, because the picker row promising a new
+character was delivering a text editor). With the library as a destination,
+`openSettings('stuff')` **is** the deep link. And the library row's own
+clipping: at 291px of row the name, system tag, pool count, `in hand`, `Copy`
+and `✕` needed 316, so Copy was cut in half and ✕ was off the edge — a
+destructive action rendered as a sliver. It wraps now.
+
+**Proofs.** `settings-destinations` (tags `settings`, `chrome`, **`look`** —
+every claim is geometry, grouping and ARIA state, so it pays for no dice, and
+the T4 runner enforces that) asserts the inventory (every known control in
+exactly one destination, and nothing in two), the bar's order, exclusivity,
+the *painted* chosen cell, zero overflow per destination, one frame across all
+four, and that arriving at Your stuff puts the library in front of you with
+the text tool still folded. `tools/steps/settings-shots.mjs` prints the
+measurement beside the frames, because a restructure that fixes a measurement
+should be able to show the measurement moving.
+
+**Two traps this pass hit, both worth the next person's time**: the `.seg`'s
+150ms fade means `getComputedStyle` right after a switch returns the
+*interpolated* colour — read at t≈0 the chosen cell is still transparent and
+the old one still lit, which fooled a screenshot AND an assertion into
+reporting a state bug that was a photograph of a transition. And `modal-pop`
+overshoots (a 1.4 control point), so a frame measured while the panel opens is
+340×461 against a resting 320×442. Both are fixed by asking the thing itself —
+wait for the paint to settle, wait for `getAnimations()` to finish — never by
+sleeping on a guess.

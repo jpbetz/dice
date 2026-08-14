@@ -7902,10 +7902,25 @@ function applyVenue(id) {
 // tower and dice-set pickers leave the settings panel — the venue IS those
 // choices. Elements resolved by id per call (the renderFeltSwatches rule).
 function updateVenueChrome() {
-  const fantasy = (VENUES[currentVenue] || VENUES.table).register === 'fantasy';
+  const venue = VENUES[currentVenue] || VENUES.table;
+  const fantasy = venue.register === 'fantasy';
   for (const rowId of ['felt-label', 'felt-swatches', 'tower-row', 'tower-picker', 'diceset-row', 'diceset-picker']) {
     const el = document.getElementById(rowId);
     if (el) el.style.display = fantasy ? 'none' : '';
+  }
+  // AND SAY WHAT TOOK THEM (UX §7.36). Until this pass three controls simply
+  // vanished when a fantasy venue went up — correct behaviour (goal 13: the
+  // venue IS those choices) delivered as an unexplained absence, which reads
+  // as a bug to anybody who does not already know the rule. Two lines because
+  // the controls now live in two destinations: felt and tower under Staging,
+  // dice set under You.
+  const said = fantasy ? `${venue.label} stages this — felt, tower and dice are its own.` : '';
+  for (const id of ['venue-staged', 'venue-staged-you']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.textContent = id === 'venue-staged-you' && fantasy
+      ? `${venue.label} chooses the dice too.` : said;
+    el.classList.toggle('hidden', !fantasy);
   }
 }
 
@@ -11345,7 +11360,7 @@ window.__diceDebug = {
   closeHelpDialog() { return closeHelpDialog(); },
   toggleKbd() { return toggleKbd(); },
   closeKbd() { return closeKbd(); },
-  openSettingsModal() { return openSettingsModal(); },
+  openSettingsModal(at) { return openSettingsModal(at); },
   closeSettingsModal() { return closeSettingsModal(); },
   // U19: vacate the seat NOW, skipping DISCONNECT_GRACE_MS. Closing the page
   // would get there too, five seconds later — a scenario about what the table
@@ -11653,7 +11668,13 @@ window.__diceDebug = {
   // answer: a scenario that claims to be about appearance may not be paying
   // for physics. Monotone by construction — there is no way to give one back.
   diceEverMade() { return DICE_MADE; },
-  openSettings() { openSettingsModal(); },
+  // `at` is the destination (UX §7.36): 'table' | 'you' | 'stuff'. A tool or a
+  // scenario that drives a control has to name where that control LIVES, which
+  // is the structure asserting itself — a click on a destination that is not in
+  // hand hits a display:none element and fails, loudly, rather than silently
+  // doing nothing.
+  openSettings(at) { openSettingsModal(at); },
+  settingsDest(at) { return at === undefined ? settingsDest : showSettingsDest(at); },
   // Your data → the file door (§G1), minus the native picker no headless run
   // can ever click. loadText() is exactly what a chosen file does once read;
   // acceptFile() takes a real File so the size and read refusals are assertable
@@ -18934,6 +18955,47 @@ function showSettingsNote(text) {
   }
 }
 
+// THE THREE DESTINATIONS (UX §7.36). The panel holds three kinds of work —
+// staging the table (everyone sees it), your own switches (this device), and
+// the belongings workspace — and they are shown one at a time. `settingsDest`
+// is the one in hand; it is deliberately NOT persisted: a settings panel that
+// opens somewhere different each time because of what you did last week is a
+// panel you have to read before you can use.
+// Room-wide first and together (table, staging), then yours (you, stuff) —
+// the bar's order IS the blast-radius reading, and it is the reason a split
+// into four cells does not cost the structure its first principle.
+const SETTINGS_DESTS = ['table', 'staging', 'you', 'stuff'];
+let settingsDest = 'table';
+
+// Show one destination. Named rather than inlined in the click handler because
+// three other things call it: opening the panel, the library deep link, and
+// the debug hook the scenarios drive.
+function showSettingsDest(dest) {
+  if (!SETTINGS_DESTS.includes(dest)) return settingsDest;
+  settingsDest = dest;
+  for (const d of SETTINGS_DESTS) {
+    const sec = document.getElementById(`dest-${d}`);
+    if (sec) sec.classList.toggle('hidden', d !== dest);
+    const cell = document.getElementById(`snav-${d}`);
+    // aria-CHECKED, not aria-pressed: these cells are exclusive (U22's rule),
+    // and the stylesheet was taught both spellings in the same commit — a seg
+    // dressed only for aria-pressed paints the chosen radio cell like the
+    // other two, which is the zoom-picker bug tower-roll records.
+    if (cell) cell.setAttribute('aria-checked', String(d === dest));
+  }
+  // A destination change re-tops the scroll: the panel scrolls inside itself,
+  // and arriving at a new section already scrolled down is the "map that lies"
+  // §7.23 fixed for the pools bar.
+  const panel = document.getElementById('settings-panel');
+  if (panel) panel.scrollTop = 0;
+  return settingsDest;
+}
+
+document.getElementById('settings-nav').addEventListener('click', (e) => {
+  const cell = e.target.closest('[data-dest]');
+  if (cell) showSettingsDest(cell.dataset.dest);
+});
+
 function syncSettingsUI() {
   document.getElementById('set-sound').setAttribute('aria-pressed', String(soundOn));
   document.getElementById('set-chips').setAttribute('aria-pressed', String(chipsOn));
@@ -18947,7 +19009,13 @@ function syncSettingsUI() {
   updateVenueChrome(); // a fantasy venue keeps the replaced pickers hidden
 }
 
-function openSettingsModal() {
+// `at` names the destination to open on (UX §7.36). It DEFAULTS TO TABLE, and
+// that is a choice with a reason: the panel's title is "Settings" on a shared
+// table, and the room's own state is both the half people come to change
+// together and the half with consequences for everyone. The other two are one
+// click away and named on the bar, which is the whole point of naming them.
+function openSettingsModal(at = 'table') {
+  showSettingsDest(at);
   renderProfileLibrary(); // §11: the library and 'At this table', fresh per open
   // The table-name prefill lives HERE, not in syncSettingsUI: setSound()
   // calls syncSettingsUI during module evaluation, before roomSettings'
@@ -19779,15 +19847,13 @@ function showProfileNote(v) {
   return v;
 }
 
-function openSettingsAtLibrary() {
-  openSettings();
-  const zone = document.getElementById('portable-zone');
-  if (zone && zone.classList.contains('hidden')) {
-    document.getElementById('portable-open').click();
-  }
-  const input = document.getElementById('profile-newname');
-  if (input) input.focus();
-}
+// (openSettingsAtLibrary lived here and is DELETED by §7.36. It opened the
+// panel and then clicked a disclosure button to reach its own destination,
+// which was the clearest available sign that the library was in the wrong
+// place; C16 had already removed its last caller for a related reason — the
+// picker row that promises a new character was delivering a text editor. With
+// the library as a destination the helper has nothing left to do:
+// `openSettings('stuff')` IS the deep link.)
 
 // ---------------------------------------------------------------------------
 // The library list (§11.5 ③) — Settings → Your data

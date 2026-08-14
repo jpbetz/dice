@@ -4914,7 +4914,7 @@ export const scenarios = [
       await a.dbg(`setGroups([{name: 'Body', notation: '3d6', category: 'Attributes'},
         {name: 'Damage', notation: '3d4'},
         {name: 'Hunt', notation: '2d6 # To the death'}])`);
-      await a.dbg('openSettings()');
+      await a.dbg('openSettings("stuff")');
       await a.eval(`document.getElementById('portable-open').click()`);
       assert.equal(await a.eval(`document.getElementById('portable-zone').classList.contains('hidden')`),
         false, 'the zone unfolds');
@@ -7418,7 +7418,7 @@ export const scenarios = [
         `an override-free pool follows the roller's set (got ${follows.map((d) => d.variant).join(',')})`);
 
       // the settings row wears the compact select; a pick commits and closes
-      await a.eval(`window.__diceDebug.openSettings()`);
+      await a.eval(`window.__diceDebug.openSettings("you")`);
       await a.eval(`document.querySelector('#diceset-picker .set-select').click()`);
       const menu = JSON.parse(await a.eval(`JSON.stringify((() => {
         const m = document.querySelector('.set-menu');
@@ -8961,7 +8961,7 @@ export const scenarios = [
       assert.equal((await dm.dbg('profiles.list')).length, 4, 'three players plus the DM’s own');
 
       // Fill the box from the library, then offer it to the room.
-      await dm.dbg('openSettings()');
+      await dm.dbg('openSettings("stuff")');
       await dm.eval(`document.getElementById('portable-open').click()`);
       await dm.eval(`document.getElementById('portable-export').click()`);
       const push = await dm.dbg('portable.pushToTable()');
@@ -10339,6 +10339,166 @@ export const scenarios = [
     },
   },
   {
+    name: 'settings-destinations',
+    tags: ['settings', 'chrome', 'look'],
+    // THE PANEL HAS FOUR DESTINATIONS, NOT ONE SCROLL (UX §7.36). The defect
+    // this replaced was a MEASUREMENT — 45 controls in a 320px column that
+    // scrolled 1004px inside a 647px window — so the assertions are
+    // measurements too, not a list of ids in a list of sections.
+    //
+    // `look`: every claim here is geometry, grouping and ARIA state, and not
+    // one of them needs a die. The runner enforces that (noDiceGuard).
+    //
+    // WHAT WOULD MAKE EACH FAIL:
+    //   · a control that lost its home — the inventory sweep, which walks the
+    //     union of all four destinations and demands every known control be
+    //     in exactly one. A control deleted, or dropped into two sections by
+    //     a bad merge, fails here rather than by going quietly missing.
+    //   · the blast-radius order — room-wide cells FIRST and together. The
+    //     bar's order IS the claim that a player can tell "everyone sees
+    //     this" from "only I do" without reading a word of prose.
+    //   · exclusivity — two destinations visible at once means the split
+    //     bought nothing.
+    //   · the PAINT — U22's rule and the bug tower-roll already records: the
+    //     chosen cell must be visibly different, not merely `aria-checked`.
+    //     A stylesheet that names only aria-pressed leaves a radio seg with
+    //     four identical cells, which is what shipped for the zoom picker.
+    //   · one frame — the dialog must not resize as you move between
+    //     destinations.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+
+      const DESTS = ['table', 'staging', 'you', 'stuff'];
+      // Every control the panel is responsible for, and the destination that
+      // owns it. This list is the INVENTORY — a new setting adds a line here
+      // the day it is added to the panel, which is the point: the structure
+      // has a home for everything or it is not a structure.
+      const HOME = {
+        table: ['set-table-name', 'system-picker', 'zoom-picker'],
+        staging: ['venue-picker', 'felt-swatches', 'tower-picker'],
+        you: ['set-sound', 'set-chips', 'set-ambience', 'diceset-picker'],
+        stuff: ['profile-rows', 'profile-newname', 'profile-new', 'profile-deal',
+                'portable-open', 'portable-zone'],
+      };
+
+      await a.dbg('openSettings()');
+      assert.equal(await a.dbg('settingsDest()'), 'table',
+        'the panel opens on TABLE — the room\'s own state is the half people '
+        + 'come to change together, and the half with consequences for everyone');
+
+      // ---- the bar reads room-wide first ----------------------------------
+      const cells = JSON.parse(await a.eval(
+        `JSON.stringify([...document.querySelectorAll('#settings-nav button')]
+          .map((b) => b.dataset.dest))`));
+      assert.deepEqual(cells, DESTS,
+        `four destinations, room-wide pair first (${cells.join(' · ')}) — the `
+        + `bar's ORDER is how "everyone sees this" is told from "only I do"`);
+      assert.equal(await a.eval(
+        `document.getElementById('settings-nav').getAttribute('role')`), 'radiogroup',
+      'and they are exclusive by declaration, not just by behaviour');
+
+      // ---- every control has exactly one home ------------------------------
+      const seen = new Map();
+      for (const dest of DESTS) {
+        const ids = JSON.parse(await a.eval(
+          `JSON.stringify([...document.querySelectorAll('#dest-${dest} [id]')].map((e) => e.id))`));
+        for (const id of ids) {
+          if (seen.has(id)) {
+            assert.fail(`${id} lives in BOTH ${seen.get(id)} and ${dest} — `
+              + 'one home per control, or the panel is a junk drawer again');
+          }
+          seen.set(id, dest);
+        }
+      }
+      for (const [dest, ids] of Object.entries(HOME)) {
+        for (const id of ids) {
+          assert.equal(seen.get(id), dest,
+            `${id} lives in '${dest}' (found in '${seen.get(id) || 'nowhere'}')`);
+        }
+      }
+
+      // ---- one at a time, and the chosen cell is PAINTED --------------------
+      let firstFrame = null;
+      for (const dest of DESTS) {
+        await a.dbg(`openSettings("${dest}")`);
+        await a.waitFor(`window.__diceDebug.settingsDest() === '${dest}'`,
+          { desc: `${dest} is in hand` });
+        // WAIT FOR THE PAINT TO SETTLE, then assert it. `.seg button`
+        // transitions its background over 150ms, and getComputedStyle during a
+        // transition returns the INTERPOLATED value — read at t≈0 the chosen
+        // cell is still transparent and the old one still lit, which is a
+        // photograph of a fade being read as a state bug. (It fooled the
+        // screenshot step the same afternoon.) The claim is about the settled
+        // state; this waits for it, and a paint that never settles still goes
+        // red, here, with this sentence.
+        await a.waitFor(`(() => {
+          const bg = (d) => getComputedStyle(document.getElementById('snav-' + d)).backgroundColor;
+          const mine = bg('${dest}');
+          return ${JSON.stringify(DESTS)}.filter((d) => d !== '${dest}')
+            .every((d) => bg(d) !== mine);
+        })()`, { desc: `${dest}: the chosen cell's paint lands` });
+        // …and the panel's own OPEN animation. `modal-pop` is a 0.3s
+        // cubic-bezier that OVERSHOOTS (the 1.4 control point), so a frame
+        // measured while it runs is bigger than the frame that lands — the
+        // first reading came back 340×461 against a resting 320×442, and the
+        // "one frame" claim failed against the animation rather than against
+        // the layout. Asked of the animation itself, not slept on.
+        await a.waitFor(`document.getElementById('settings-panel')
+          .getAnimations().every((an) => an.playState === 'finished')`,
+        { desc: `${dest}: the panel's pop has landed` });
+        const state = JSON.parse(await a.eval(`(() => {
+          const vis = ${JSON.stringify(DESTS)}.filter(
+            (d) => !document.getElementById('dest-' + d).classList.contains('hidden'));
+          const cell = (d) => document.getElementById('snav-' + d);
+          const p = document.getElementById('settings-panel');
+          return JSON.stringify({
+            vis,
+            checked: ${JSON.stringify(DESTS)}.filter((d) => cell(d).getAttribute('aria-checked') === 'true'),
+            paint: ${JSON.stringify(DESTS)}.map((d) => getComputedStyle(cell(d)).backgroundColor),
+            frame: [p.getBoundingClientRect().width, p.getBoundingClientRect().height].map(Math.round),
+            over: Math.max(0, p.scrollHeight - p.clientHeight),
+          });
+        })()`));
+        assert.deepEqual(state.vis, [dest],
+          `${dest}: exactly one destination is on screen (${state.vis.join(', ')})`);
+        assert.deepEqual(state.checked, [dest],
+          `${dest}: and exactly one cell is aria-checked (${state.checked.join(', ')})`);
+        const mine = state.paint[DESTS.indexOf(dest)];
+        const others = state.paint.filter((_, i) => i !== DESTS.indexOf(dest));
+        assert.ok(others.every((c) => c !== mine),
+          `${dest}: the chosen cell is PAINTED differently (${mine} vs `
+          + `${others.join(', ')}) — aria-checked with identical pixels is the `
+          + `zoom-picker bug, and the stylesheet has to name BOTH spellings`);
+        assert.equal(state.over, 0,
+          `${dest}: and it does not scroll (${state.over}px over). The whole `
+          + `defect was 357px of overflow in one column`);
+        if (!firstFrame) firstFrame = state.frame;
+        else {
+          assert.deepEqual(state.frame, firstFrame,
+            `${dest}: the dialog keeps ONE frame across destinations — a panel `
+            + `that resizes under the cursor walks its close button up the screen`);
+        }
+      }
+
+      // ---- the workspace is reachable in ONE act ---------------------------
+      // The claim that killed openSettingsAtLibrary(). Manage-frequency work
+      // used to be behind the panel AND a disclosure button — the helper
+      // existed to click that button for you, and C16 had already unhooked its
+      // last caller because "the one row in the picker that promises a new
+      // character delivered a text editor". Landing on the destination must
+      // put the LIBRARY in front of you, with the YAML box still folded away.
+      await a.dbg('openSettings("stuff")');
+      assert.ok(await a.eval(
+        `document.getElementById('profile-rows').offsetParent !== null`),
+      'the profile library is on screen the moment you arrive');
+      assert.ok(await a.eval(
+        `document.getElementById('portable-zone').classList.contains('hidden')`),
+      '…and the text tool is still folded — arriving at your profiles must not '
+      + 'hand you a YAML editor');
+    },
+  },
+  {
     name: 'tower-dressing',
     tags: ['tower', 'look'],
     // THE COSMETIC LANE (ROADMAP T4). Every claim here is about GEOMETRY,
@@ -11109,7 +11269,7 @@ export const scenarios = [
       // styled identically to the other two. Measured, not eyeballed: the
       // selected chip's computed background must differ from an unselected
       // one, in every radiogroup in the modal.
-      await a.dbg('openSettings()');
+      await a.dbg('openSettings("staging")');
       // The picker is generated from TOWERS and must show every row that a
       // player can CHOOSE — the registry is the source of truth, so this
       // reads it rather than hard-coding three, and it fails on a tower that
@@ -11722,7 +11882,7 @@ export const scenarios = [
       const wasWorld = await a.dbg('worldBodies()');
 
       // ---- venue-only: no chip, and it sockets anyway ---------------------
-      await a.dbg('openSettings()');
+      await a.dbg('openSettings("staging")');
       const registry = await a.dbg('towerRegistry()');
       const row = registry.find((t) => t.id === 'hollowbole');
       assert.ok(row, 'hollowbole is a registered tower');
@@ -12812,7 +12972,7 @@ export const scenarios = [
       // this reads the REAL export, through the same textarea the `portable`
       // scenario reads, rather than a hook that could answer differently.
       await a.dbg('setAmbienceOn(true)');
-      await a.dbg('openSettings()');
+      await a.dbg('openSettings("stuff")');
       await a.eval(`document.getElementById('portable-open').click()`);
       const yaml = await a.eval(`document.getElementById('portable-text').value`);
       assert.ok(/^\s*sound:/m.test(yaml),
@@ -13292,7 +13452,7 @@ export const scenarios = [
       // ---- the picker refuses to offer the fae set ------------------------
       // (Registry + server presence are proven harder below: the roll's
       // record carries the id end-to-end, which only a SET_IDS member can.)
-      await a.eval('window.__diceDebug.openSettings()');
+      await a.eval('window.__diceDebug.openSettings("you")');
       await a.eval(`document.querySelector('#diceset-picker .set-select').click()`);
       assert.equal(await a.eval(
         `document.querySelectorAll('.set-menu [data-set^="moonmoot."]').length`), 0,
