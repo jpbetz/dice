@@ -4780,9 +4780,10 @@ diff that converges it. The two that matter:
 
 #### DIE ART: FOUR RUNGS, BY ROLE
 
-The roadmap sketched three; the sheet had **seven sizes across eight rules**,
-and four of them are genuinely different jobs. A die's size says what you may
-do with it, so the ladder is named for the role and not the surface.
+The roadmap sketched three; the sheet had **six `.die-art` sizes across eight
+rules** — seven die glyphs if you count `.log-die`'s 15px — and four of them
+are genuinely different jobs. A die's size says what you may do with it, so
+the ladder is named for the role and not the surface.
 
 `--die-draft: 34px` the dice you are about to throw · `--die-tile: 28px` a
 die you can PICK UP (the palette tile, a pool strip — and `.die-art`'s own

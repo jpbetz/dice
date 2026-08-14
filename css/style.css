@@ -130,8 +130,9 @@ limitations under the License.
   /* ---- DIE ART: FOUR RUNGS, BY ROLE -----------------------------------
      A die's size says what you may do with it, so the ladder is named for
      the role and not for the surface. (The roadmap sketched three; the
-     shipped stylesheet had SEVEN sizes across eight rules, and four of them
-     are genuinely different jobs.) */
+     shipped stylesheet had SIX .die-art sizes across eight rules — seven
+     die glyphs if you count .log-die's 15px — and four of them are
+     genuinely different jobs.) */
   --die-draft: 34px; /* the dice you are about to throw — the well's cluster */
   --die-tile: 28px;  /* a die you can PICK UP: the palette tile, a pool strip.
                         This is .die-art's own default. */
