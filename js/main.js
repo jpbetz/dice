@@ -3967,8 +3967,11 @@ function playRoll(roll) {
       }
     }
     const b = d.body;
+    // The lintel clamp is v.flight.capY — the same expression, derived once in
+    // towerVolumes, so the envelope this bake actually spends is the envelope
+    // towerPortalSpec publishes and a mask is sized against.
     b.position.set(tv.exit.p[0] + ex.x,
-      Math.min(Math.max(ex.y, laneTop + 1.4), tv.door.h - 1.3), tv.exit.p[2]);
+      Math.min(Math.max(ex.y, laneTop + 1.4), tv.flight.capY), tv.exit.p[2]);
     const cp = Math.cos(ex.pitch), sp = Math.sin(ex.pitch);
     b.velocity.set(Math.sin(ex.yaw) * cp * ex.speed, sp * ex.speed, Math.cos(ex.yaw) * cp * ex.speed);
     b.angularVelocity.set(...ex.av);
@@ -7918,6 +7921,29 @@ const TOWER_LIP_TILT = 0.1;
 // body on the main world. Same shape as lipTilt: constant ships, dial benches.
 // Joe's dial, thirteenth look: "with that in place everything works."
 const TOWER_MAT_EXTRA = 4.5;
+// THE POUR'S OWN CONSTANTS (docs/TOWER.md §3, §5, §6). A tower roll is baked
+// as a POUR instead of a throw, and these are the numbers that bake it: the
+// LAB's dialed values are the same numbers, so an experiment can never change
+// somebody else's roll.
+//
+// They sit HERE, with the rest of the engine constants, rather than down with
+// pourPlan where they were written — because towerVolumes derives the flight
+// envelope (v.flight) from them, and towerVolumes is reachable from the
+// synchronous `animate()` at module evaluation. The charter agrees with the
+// TDZ: physics is a function of (portal spec, engine constants, seed), and
+// this is the second of those three.
+const POUR = {
+  stagMin: 0.12, stagMax: 0.20,      // entries pour, 0.12–0.2 s apart (§6)
+  transitMin: 0.5, transitMax: 1.6,  // hidden time behind the skin (§6)
+  exitGap: 0.2,                      // exits never closer than this (§6)
+  speedMin: 24, speedMax: 34,        // exit speed — the rolling-exit dial
+  yawSpan: Math.PI / 7.5,            // ±12°: chutes throw straight (§5)
+  pitchSpan: Math.PI / 30,           // ±3° about the chute's own slope (§5)
+  laneSpan: 1.8,                     // ±0.9 lane spread (probe run 1)
+  clunkMin: 2, clunkMax: 4,          // baffle knocks per die, in the dark (§6)
+  attempts: 5,                       // exit-guarantee re-bakes before shipping
+  hidZone: 0.6,                      // resting z < z0 + this counts as HIDDEN
+};
 const DEFAULT_PORTALS = Object.freeze({
   in:  Object.freeze({ x: 0, z: -1.6 * TOWER_S, rimY: 7.0 * TOWER_S, clearR: 1.7 * TOWER_S }),
   out: Object.freeze({ x: 0, sillY: 0.8 * TOWER_S, w: 4.0 * TOWER_S, clearH: 3.6 * TOWER_S }),
@@ -8081,6 +8107,11 @@ function towerVolumes(spec) {
   // Hoisted because v.cowlY is derived FROM it: inside the object literal
   // `despawnY` is a key, not a binding, and reading it there is a ReferenceError.
   const despawnY = 5.6 * S + dRim;
+  // Hoisted for the same reason: v.flight measures its run from the exit spawn
+  // plane to the door plane, and a travel derived from a re-typed copy of this
+  // expression is a number that can quietly stop being the spawn it starts at.
+  // Same double as the literal it replaces — one expression, evaluated once.
+  const exitZ = z0 - 0.7 * S;
   return {
     z0, S,
     // THE SOCKET IS NOT PORTAL-DERIVED, and that is the point of it: it is the
@@ -8153,17 +8184,73 @@ function towerVolumes(spec) {
     // yaw ±30°, jitter ±0.6) needed ≈2.5 — dice clipped the jambs and came
     // to rest behind the wall.
     // p[1] is NOMINAL (the ghost marker): real spawn height is PER-DIE
-    // arithmetic in towerLabDrop — sill + margin + die radius + slope drop
-    // + gravity drop at that die's seeded speed. The eighth look earned it:
-    // the first sill arithmetic forgot gravity, and dice arrived below the
-    // sill, slammed its end-face, and bounced back into the tower.
-    exit:    { p: [0 + dOutX, 2.3 * S + dSill, z0 - 0.7 * S], pitch: -ath },
+    // arithmetic in pourPlan — sill + margin + die radius + slope drop. The
+    // eighth look earned it: the first sill arithmetic forgot gravity, and
+    // dice arrived below the sill, slammed its end-face, and bounced back
+    // into the tower.
+    exit:    { p: [0 + dOutX, 2.3 * S + dSill, exitZ], pitch: -ath },
     // `sill` is the doorway's FLOOR, and it is new here only in the sense that
     // it was previously written as the literal `0.8 * v.S` in the two places
     // that compute a graze height (pourPlan and towerLabDrop). Both now read
     // it, so a moved sill moves the spawn with it instead of leaving the dice
     // grazing a chute that is no longer where they think it is.
     door:    { w: spec.out.w, h: spec.out.clearH, sill: spec.out.sillY },
+    // THE FLIGHT ENVELOPE — where a DIE actually goes, as opposed to where the
+    // engine cut its collider gap.
+    //
+    // The exit comment three lines up has been doing this arithmetic in prose
+    // since the stuck-dice look ("0.4 jitter + tan(12°)·0.9 travel + 1.25 d20
+    // radius ≈ 1.84 of half-width"), and the engine has published the COLLIDER
+    // answer (door.w) ever since — but never the MESH one. So every model that
+    // had to leave a hole for dice to be seen coming through sized that hole by
+    // hand: towerglbshell's doorX 2.05 is a guess, and the black-rectangle
+    // class of bug is what a guess looks like when it is too small. There is an
+    // engine-side number now, and it is a function of (portal spec, POUR, die
+    // radius) like everything else here.
+    //
+    // WHAT IT IS: the box a die's SURFACE can reach in the door plane (z = z0),
+    // over the whole shipped die set, across the film's own jitter bands.
+    //   halfW  the lane's half-span (POUR.laneSpan/2), plus the widest yaw's
+    //          drift over the run to the door, plus a d20's radius.
+    //   top    from the highest a die can be spawned — the congestion clamp
+    //          capY, not the scripted graze height — carried down the shallowest
+    //          legal pitch, plus a radius.
+    //   bottom from the scripted graze height carried down the steepest legal
+    //          pitch, at r → 0: the bottom is MONOTONE INCREASING in radius
+    //          (the graze puts a big die up by r/cos θ and only takes r back),
+    //          so the smallest die in the set sits lowest and the limit is the
+    //          honest floor for an aperture that has to clear all of them.
+    // Gravity's sag over this run is ~0.07 at the film's slowest exit and is
+    // deliberately NOT in it: the drop below the spawn line is the apron's
+    // business, and an aperture bound wants the kinematic box, not the arc.
+    //
+    // IT IS A REPORT, NOT A GATE. halfW is 2.336 at the classic spec against a
+    // 2.5 door half-width, and 2.336 against Hollow Bole's 2.10 — legal, and
+    // the portal-floors campaign says why (JAMBS CHANNEL, THEY DON'T JAM: a
+    // wide die deflects inboard and leaves). What a model may not do is let the
+    // player SEE that happen against nothing, which is what this number sizes.
+    flight: (() => {
+      const travel = z0 - exitZ;              // spawn plane → door plane
+      const halfW = POUR.laneSpan / 2 + Math.tan(POUR.yawSpan / 2) * travel + TOWER_DIE_R;
+      // The scripted graze height, per pourPlan, at r → 0 and at a d20.
+      const surfY = spec.out.sillY + travel * Math.tan(ath);
+      const spawnLo = surfY + 0.2;
+      const spawnHi = surfY + TOWER_DIE_R / Math.cos(ath) + 0.2;
+      // The congestion clamp the exit code applies (pourPlan's consumer, and
+      // the lab's): a die spawning onto a pile is raised, never past this.
+      const capY = spec.out.clearH - 1.3;
+      const dyHi = travel * Math.tan(-ath + POUR.pitchSpan / 2);  // shallowest
+      const dyLo = travel * Math.tan(-ath - POUR.pitchSpan / 2);  // steepest
+      return {
+        travel, cx: 0 + dOutX, halfW,
+        top: Math.max(spawnHi, capY) + dyHi + TOWER_DIE_R,
+        bottom: spawnLo + dyLo,
+        spawnY: spawnHi, capY, r: TOWER_DIE_R,
+        // Echoed so a reader sizing a hole does not have to go and find POUR
+        // — and so the snapshot records WHICH bands produced these bounds.
+        laneSpan: POUR.laneSpan, yawSpan: POUR.yawSpan, pitchSpan: POUR.pitchSpan,
+      };
+    })(),
     // THE PIT (probe run 1) — the backstop boxes, moved here out of
     // towerColliders so that builder is 100% volume-driven and no world number
     // is written in two places. These are HALF-extents, not sizes like `s`
@@ -8954,22 +9041,14 @@ function towerSocket(id) {
 // ---------------------------------------------------------------------------
 // THE POUR — the tower's film (docs/TOWER.md §3, §5, §6)
 //
-// A tower roll is baked as a POUR instead of a throw. The numbers here are the
-// contract's, and the LAB's dialed values are the same numbers: TOWERLAB.tune
-// is a live knob for experiments and this is what ships, so an experiment can
-// never change somebody else's roll.
-const POUR = {
-  stagMin: 0.12, stagMax: 0.20,      // entries pour, 0.12–0.2 s apart (§6)
-  transitMin: 0.5, transitMax: 1.6,  // hidden time behind the skin (§6)
-  exitGap: 0.2,                      // exits never closer than this (§6)
-  speedMin: 24, speedMax: 34,        // exit speed — the rolling-exit dial
-  yawSpan: Math.PI / 7.5,            // ±12°: chutes throw straight (§5)
-  pitchSpan: Math.PI / 30,           // ±3° about the chute's own slope (§5)
-  laneSpan: 1.8,                     // ±0.9 lane spread (probe run 1)
-  clunkMin: 2, clunkMax: 4,          // baffle knocks per die, in the dark (§6)
-  attempts: 5,                       // exit-guarantee re-bakes before shipping
-  hidZone: 0.6,                      // resting z < z0 + this counts as HIDDEN
-};
+// (The POUR constants themselves live UP with TOWER_S and TOWER_MAT_EXTRA, in
+// the engine-constants block above towerVolumes. They moved there when
+// towerVolumes started deriving v.flight from them — a function reachable from
+// the synchronous `animate()` at module eval may not read a const declared
+// nine hundred lines below it, which is the TDZ trap this file records at ROOM,
+// LS_NAME and TOWERLAB. It is also the truer home: the charter says physics is
+// a function of (portal spec, engine constants, seed), and these are the
+// engine constants.)
 
 // Draw a whole pour up front, in die order, from ONE seeded stream. Every
 // per-die quantity the film needs — when it is dropped, how it tumbles, how
@@ -9184,7 +9263,7 @@ function stepTowerLab(dt) {
         laneTop = Math.max(laneTop, p.y + 1.3);
       }
     }
-    const doorCap = v.door.h - 1.3;
+    const doorCap = v.flight.capY;   // the engine's clamp, not a second copy
     const spawnY = Math.min(Math.max(h.exit.y, laneTop + 1.4), doorCap);
     TOWERLAB.hidden.splice(i, 1);
     const body = createDieBody(h.type, diceMat);
@@ -9851,6 +9930,16 @@ window.__diceDebug = {
       lip: { c: xyz(v.lip.c), s: xyz(v.lip.s), rx: v.lip.rx },
       exit: { p: xyz(v.exit.p), pitch: v.exit.pitch },
       door: { w: v.door.w, h: v.door.h },
+      // THE FLIGHT ENVELOPE (B2). The collider gap has been frozen here since
+      // the golden was captured; the box a DIE reaches was never in it, so a
+      // change to the lane span or the yaw fan moved every aperture a model
+      // has to leave and the freeze stayed green. Same projection discipline:
+      // a fixed field list, full doubles.
+      flight: {
+        travel: v.flight.travel, cx: v.flight.cx, halfW: v.flight.halfW,
+        top: v.flight.top, bottom: v.flight.bottom,
+        spawnY: v.flight.spawnY, capY: v.flight.capY, r: v.flight.r,
+      },
       bodies,
     };
   },
@@ -10626,6 +10715,11 @@ window.__diceDebug = {
         // before it is on felt the whole table shares.
         lipFrontZ: v.lip.c[2] + v.lip.s[2] / 2,
         hidZone: POUR.hidZone,
+        // THE FLIGHT ENVELOPE (v.flight) — the box a die's surface reaches in
+        // the door plane. This is the number a model sizes its visible opening
+        // against, and it is here rather than in a modeller's head because a
+        // hole guessed a little too small is the black-rectangle bug.
+        flight: v.flight,
         // The rim, and the three heights the COWL band is sampled at — capped
         // at the rim, so a model reads off what it actually owes rather than
         // guessing the band from the cowl volume's box (which sits above it).
