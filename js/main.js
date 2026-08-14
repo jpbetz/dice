@@ -10448,10 +10448,18 @@ window.__diceDebug = {
   // convention) so the check can be re-run WITHOUT them and the difference
   // read off. Pass no argument to put every muted node back.
   //
-  // It exists because `visible = false` is NOT the same experiment: three.js
+  // It exists because `visible = false` was NOT the same experiment: three.js
   // stopped testing `visible` in intersectObject, so an invisible mesh still
-  // blocks a ray. Muting has to work on the name, or the probe measures a
-  // surface the player cannot see and calls the band covered.
+  // blocked a ray. Muting had to work on the name, or the probe measured a
+  // surface the player cannot see and called the band covered.
+  //
+  // A6 CLOSED THAT GAP AT THE OTHER END: towerOcclusionCheck now drops every
+  // hidden mesh out of the cast itself, so the two tools finally agree about
+  // what a hidden thing is worth (nothing). This one stays, and is still the
+  // right instrument for the question it asks — muting names a SPECIFIC
+  // surface without touching the frame, which is what you want when the
+  // question is "which of these carries the band" rather than "what does the
+  // player actually see".
   //
   // Re-run with `towerOcclusionCheck()` and NO id — passing one re-skins the
   // bench and rebuilds the names you just muted.
@@ -10500,7 +10508,26 @@ window.__diceDebug = {
       return { pending: true, id };
     }
     if (id) towerLabSkin(id);
-    if (!TOWERLAB.on) towerLabSet(true);
+    // THE BENCH IS NOT OURS TO KEEP (A6 BLOCKER). towerLabSet(true) deepens the
+    // mat by matExtra — the SAME towerDeepenMat the shipped socket uses — and
+    // this probe used to turn it on and walk away. Over a standing tower that
+    // is a room deepened twice and never given back: TABLE_D +4.5, z0 moved
+    // 2.25 under a set of colliders that were built against the old one, and
+    // the next pour spawning dice behind the tower they are supposed to come
+    // out of. Nobody would connect the two events.
+    //
+    // BRACKETED RATHER THAN REFUSED, and the choice is worth the sentence.
+    // Refusing over a socketed tower would be the cleaner-sounding rule, but
+    // the measurement over one is genuinely VALID: every eye is placed as
+    // `v.z0 + (presetEyeZ − presetZ0)`, an offset from the back wall, and the
+    // lab's skin is built at the same v.z0 — so a deeper room translates the
+    // eye and the tower together and occlusion is a tower-relative question.
+    // What was never valid is leaving the room like that. So whatever this
+    // turns on, it turns off; a bench the caller raised themselves (every
+    // tool does: `towerCore(true)` first) is left standing, which is what
+    // keeps the mute-and-re-run workflow working.
+    const labWas = TOWERLAB.on;
+    if (!labWas) towerLabSet(true);
     // RAYCASTS READ matrixWorld, AND A FRESH BUILD HAS NOT BEEN RENDERED YET.
     // Measured: asking for a skin and checking it in the same call — which is
     // what parameterising this on a tower id made possible — read the matrices
@@ -10516,9 +10543,47 @@ window.__diceDebug = {
     // lining, Bastion's stone and lining). The unnamed children — gradient
     // veils, contact shadows — are transparent and prove nothing, which is
     // exactly why they are not allowed to answer this question.
+    //
+    // …AND AN INVISIBLE MESH IS NOT ONE. THE LAW (A6): a mesh the player cannot
+    // see may count neither as an occluder nor as a target — this proof
+    // measures what the EYE measures, or it measures nothing.
+    //
+    // three.js stopped testing `.visible` in intersectObject, so an invisible
+    // liner still blocks a ray. Both halves of that are wrong here and in
+    // opposite directions: a hidden mesh in the target list is counted as
+    // covering a band the player is looking straight through, and a hidden
+    // mesh ANYWHERE under a visible parent is reached by the recursive cast
+    // and blocks the ray on its way. Either one turns "the vanish is
+    // unwatchable" green over a frame with a die falling through open air —
+    // and hiding things is precisely how this bench is used (towerHideNamed,
+    // the /new-venue probe idiom), so the trap is armed every time somebody
+    // investigates.
+    const veiled = [];
+    const unseen = (o) => { for (let p = o; p; p = p.parent) if (p.visible === false) return true; return false; };
     const targets = [];
     for (const o of skin ? skin.children : []) {
-      if (o.name && o.name !== 'towerSkin' && o.name.startsWith('towerSkin')) targets.push(o);
+      if (o.name && o.name !== 'towerSkin' && o.name.startsWith('towerSkin')
+        && !unseen(o)) targets.push(o);
+    }
+    // The recursive half: park every hidden mesh on layer 1, which the
+    // raycaster (layer 0) does not test. Layers rather than a filtered list
+    // because the cast REACHES a hidden child through its visible parent no
+    // matter what the top-level list says. The previous mask is SAVED and put
+    // back, not reset to 0 — towerOccluderMute parks nodes on layer 1 too, and
+    // a blanket restore would silently unmute the experiment the caller is in
+    // the middle of running.
+    //
+    // If the whole skin is hidden (`towerSkin(false)`) this drops everything
+    // and every band reads 0 blocked. That is not a malfunction: with no skin
+    // on the bench there is nothing to occlude anything, and a probe that said
+    // otherwise would be reporting the ghosts.
+    if (skin) {
+      skin.traverse((o) => {
+        if (!o.isMesh || !unseen(o)) return;
+        veiled.push({ o, mask: o.layers.mask,
+          name: o.name || (o.parent && o.parent.name) || '?' });
+        o.layers.set(1);
+      });
     }
     // THE GRIDS FOLLOW THE BORE. Radii scale by the mouth's clear-radius ratio
     // and the discs centre on the shaft, so a model with a wider or moved
@@ -10544,16 +10609,32 @@ window.__diceDebug = {
     // band off the cowl VOLUME — the volume marks where a facade occluder
     // belongs, which was never the same place as the points being shot at.
     for (const y of v.cowlY) disc(y, cowl);
-    for (const dx of [-0.9, 0, 0.9]) {
-      for (const dy of [-0.6, 0, 0.9]) exit.push([dx, v.exit.p[1] + dy, v.exit.p[2]]);
+    // THE EXIT LANE IS THE FILM'S LANE, AND IT MOVES WITH THE DOOR (A6). This
+    // read `[-0.9, 0, 0.9]` about world x = 0: a hand-copy of POUR.laneSpan/2
+    // stapled to an origin the doorway is not obliged to sit on. `out.x` is
+    // legal to ±0.6·S = ±0.75, so a model that slid its door as far as the
+    // contract allows was graded on a lane 0.75 to one side of the one its
+    // dice actually fly down — the far jamb never sampled, the near one
+    // sampled through solid wall. Centre on the exit spawn, span from POUR.
+    const lane = POUR.laneSpan / 2;
+    for (const dx of [-lane, 0, lane]) {
+      for (const dy of [-0.6, 0, 0.9]) {
+        exit.push([v.exit.p[0] + dx, v.exit.p[1] + dy, v.exit.p[2]]);
+      }
     }
     const hy = v.hood.c[1] - v.hood.s[1] / 2;
-    // …and the hood grid follows the DOOR's width the same way (dW is the
-    // door's growth, so half of it per side). 1.4 exactly for a classic tower.
+    // …and the hood pocket the same way: centred on the HOOD volume (which
+    // rides dOutX with the door) rather than on the origin. Its 1.4 half-span
+    // is the POCKET's own reach and deliberately not the lane — the hood is
+    // wider than the stream because dice arrive in it off a pile — and it
+    // still follows the DOOR's width through dW (half of the growth per side).
+    // 1.4 exactly for a classic tower, and the centre is 0 for every shipped
+    // model today: this is the case that has never been exercised, which is
+    // exactly the kind that ships broken.
     const hx = 1.4 + v.smp.dW / 2;
     for (const dx of [-hx, 0, hx]) {
       for (const dy of [0.4, 1.2, 2.4]) {
-        for (const dz of [0.15, 0.9]) hood.push([dx, hy + dy, v.z0 + dz]);
+        for (const dz of [0.15, 0.9]) hood.push([v.hood.c[0] + dx, hy + dy, v.z0 + dz]);
       }
     }
     const rc = new THREE.Raycaster();
@@ -10591,7 +10672,23 @@ window.__diceDebug = {
         });
       }
     }
-    return { skin: TOWERLAB.skinId, z0: v.z0, despawnY: v.despawnY, eyes };
+    // Put the layers back before anything else can read them, and give the
+    // bench back the way it was found (see labWas above).
+    for (const w of veiled) w.o.layers.mask = w.mask;
+    if (!labWas) towerLabSet(false);
+    return {
+      skin: TOWERLAB.skinId, z0: v.z0, despawnY: v.despawnY, eyes,
+      // WHAT WAS DROPPED FOR BEING INVISIBLE, by name. A count of blocked rays
+      // cannot say "and eleven meshes were excluded because somebody left a
+      // liner switched off", and that sentence is the difference between a
+      // verdict and a puzzle. Empty on a clean bench — a non-empty `dropped`
+      // on a shipped model is itself the finding.
+      dropped: veiled.map((w) => w.name),
+      // Whether the bench was already standing. A caller who raised it keeps
+      // it (mute-and-re-run); a caller who did not gets it taken away again,
+      // and either way the mat is exactly as deep as it was.
+      labWas,
+    };
   },
   // Live dials for the pour's feel — Joe's eye owns these numbers, the
   // same way the tempo curve was dialed. Changing the tilt rebuilds the
