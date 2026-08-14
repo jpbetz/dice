@@ -108,13 +108,43 @@ const revealSettled = (rollId) =>
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+//   device/coarse — applied BEFORE the first navigation, which is the whole
+//     reason they are options here rather than two lines in a scenario. The
+//     seat picker decides whether to raise the keyboard by asking
+//     `(pointer: coarse)` INSIDE promptName, at boot; a scenario that boots
+//     the tab and then turns touch emulation on has already missed the
+//     question it came to ask, and measures a panel laid out at the desktop
+//     width besides.
+//   netLog — every RESPONSE the browser received on this tab, straight off
+//     CDP (`{url, status, type}`), enabled before the first navigation because
+//     `Network.enable` only reports what it was listening for. recordApi
+//     watches what the PAGE asked for from inside the page; this watches what
+//     the NETWORK answered, which is the only place a 404 on a `<script src>`
+//     or an @import shows up at all.
 async function bootTab(ctx, {
   origin = 'localhost', path = '/', clean = [], seed = {}, recordApi = false,
+  device = null, coarse = false, netLog = false,
   readyExpr, readyDesc,
 } = {}) {
   for (let attempt = 0; ; attempt++) {
     const page = await ctx.browser.newPage();
+    const responses = [];
+    if (netLog) {
+      await ctx.browser.send('Network.enable', {}, page.sessionId);
+      ctx.browser.on('Network.responseReceived', (p) => {
+        responses.push({ url: p.response.url, status: p.response.status, type: p.type });
+      }, page.sessionId);
+    }
     await page.addInitScript('window.__diceTestMode = true;');
+    if (device) {
+      await ctx.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: device.w, height: device.h, deviceScaleFactor: 1, mobile: false },
+        page.sessionId);
+    }
+    if (coarse) {
+      await ctx.browser.send('Emulation.setTouchEmulationEnabled',
+        { enabled: true, maxTouchPoints: 5 }, page.sessionId);
+    }
     if (recordApi) {
       await page.addInitScript(`(() => {
         window.__apiCalls = [];
@@ -165,6 +195,7 @@ async function bootTab(ctx, {
       await t.close().catch(() => {});
       continue;
     }
+    t.responses = responses;
     ctx.tables.push(t);
     return t;
   }
@@ -240,6 +271,259 @@ async function createTableFromLobby(t, tableName) {
     })()`);
   } catch { /* the context can die inside the click — that IS the navigation */ }
   return landedAtTable(t);
+}
+
+// ---------------------------------------------------------------------------
+// SCREEN-SPACE COMPOSITION (ROADMAP W7 ②, VENUE-COMPOSITION rule 15). Lifted
+// from tools/steps/glade-frame.mjs so the scenario and the step ask the frame
+// the same questions in the same units — a gate that drifted from the tool a
+// person uses while MOVING things would be a second opinion, not a check.
+//
+// A feature is a ground ellipse; its frame footprint is the ndc bounding box of
+// 24 rim samples. Ground only, deliberately: the stage declares (x, z, rx, rz)
+// and nothing else, so a gate needing a height nobody authored would compare
+// one invented number against another. The footprint is also the right noun for
+// the complaint — "beads on a line" and "mirrored about the centre" are both
+// statements about where things SIT in the picture.
+// ---------------------------------------------------------------------------
+
+const RIM = 24;
+
+function rimPoints(f, y = 0) {
+  const pts = [];
+  for (let i = 0; i < RIM; i++) {
+    const a = (i / RIM) * Math.PI * 2;
+    pts.push([f.x + f.rx * Math.cos(a), y, f.z + f.rz * Math.sin(a)]);
+  }
+  return pts;
+}
+
+// Frame coordinates: fx, fy in [0, 1] with the origin at the TOP-LEFT of the
+// canvas — the frame a viewer sees, so "left third" means the left third.
+const toFrame = (ndc) => ({ fx: (ndc.x + 1) / 2, fy: (1 - ndc.y) / 2 });
+
+function boxOf(projected) {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const p of projected) {
+    const f = toFrame(p.ndc);
+    x0 = Math.min(x0, f.fx); x1 = Math.max(x1, f.fx);
+    y0 = Math.min(y0, f.fy); y1 = Math.max(y1, f.fy);
+  }
+  const w = x1 - x0, h = y1 - y0;
+  // The VISIBLE fraction: how much of the footprint the frame keeps. Two
+  // half-cropped features were found by LOOKING rather than by measuring; this
+  // is the number that would have found them.
+  const vx = Math.max(0, Math.min(1, x1) - Math.max(0, x0));
+  const vy = Math.max(0, Math.min(1, y1) - Math.max(0, y0));
+  return {
+    x0, x1, y0, y1, w, h,
+    cx: (x0 + x1) / 2, cy: (y0 + y1) / 2,
+    area: w * h,
+    inFrac: w * h > 0 ? (vx * vy) / (w * h) : 0,
+  };
+}
+
+// One page round trip for a whole batch of world points.
+const projectPoints = async (t, pts) => JSON.parse(await t.eval(
+  `JSON.stringify(${JSON.stringify(pts)}`
+  + `.map((p) => window.__diceDebug.worldToScreen(p[0], p[1], p[2])))`));
+
+// "THE SAME HORIZONTAL BAND", MEASURED IN THE FEATURES' OWN HEIGHTS. The first
+// mechanisation of this used an absolute 0.05 of frame height — which cleared
+// the rejected pair by 0.092 and would have certified the exact frame the rule
+// was written to refuse. A band is not a fixed number of pixels: two features
+// whose screen boxes nearly overlap vertically ARE on one band, however tall
+// they are. Same family as "a tier is a luminance, and an authored scalar is
+// not one" — the constant has to be expressed in the units of what it judges.
+const sameBand = (a, b) => Math.abs(a.box.cy - b.box.cy) <= 0.6 * (a.box.h + b.box.h);
+const sizeRatio = (a, b) =>
+  Math.max(a.box.w, b.box.w) / Math.max(1e-9, Math.min(a.box.w, b.box.w));
+
+// THE FROZEN W2c LAYOUT — js/fae-lab.js at 9f1e592, the frame Joe judged as
+// "symmetrical and formal". Ground footprints only, exactly the shape
+// venueInfo().stage reports today, so the two runs differ in COORDINATES and
+// in nothing else. It is a hand-frozen MODEL of coordinates that no longer
+// exist and it is not maintained against the code: that is the point, because
+// its only job is to be the red check the shipped frame is graded against.
+const W2C_LAYOUT = {
+  moot: { x: -6.8, z: -6.6, rx: 2.8, rz: 1.7, band: 'back' },
+  pool: { x: 6.2, z: -6.6, rx: 2.6, rz: 1.75 },
+  // W2c had no scatter: fungus existed in exactly two places, the ring and the
+  // five-cap spill that walked from it toward the root flare. The spill is
+  // modelled as the one clump it was — that IS what the thirds gate reports.
+  shrooms: [
+    { x: -6.8, z: -6.6, rx: 3.1, rz: 2.0, band: 'back' },
+    { x: -4.0, z: -5.95, rx: 0.7, rz: 0.4, band: 'back' },
+  ],
+  scenery: [
+    { x: -8.2, z: 4.7, rx: 0.8, rz: 0.8, band: 'fore' },
+    { x: -8.0, z: 5.2, rx: 0.6, rz: 0.6, band: 'fore' },
+    { x: -4.8, z: -5.5, rx: 1.35, rz: 0.75, band: 'back' },
+    { x: 4.5, z: -6.0, rx: 0.32, rz: 0.32, band: 'back' },
+    { x: 5.0, z: -6.35, rx: 0.24, rz: 0.24, band: 'back' },
+  ],
+};
+
+// Six gates over a projected layout, each { id, ok, got }. The seventh gate the
+// tool carries (hero contact) is deliberately absent: both frames pass it, so
+// it is a floor, and VENUE-COMPOSITION rule 15 says a gate the rejected frame
+// also passes is not evidence. The hero's POSITION is not a gate either — the
+// door sits on x 0 by portal spec and the resting eye looks down the mat, so
+// the tower is pinned to the centreline by construction.
+function frameGates(L) {
+  const cast = L.supports.concat(L.fungus);
+  const all = L.supports.concat(L.fungus, L.scenery);
+  const out = [];
+
+  // F1 — SYMMETRY, which is Joe's own word. A pair is a MIRROR TWIN when one
+  // sits where the other's reflection in the frame's centreline would be, on
+  // the same band, at a comparable angular size. The axis is the HERO's
+  // projected centre rather than the canvas centre: the resting eye is offset,
+  // so a pair that straddles the TOWER is what a viewer reads as reflected.
+  {
+    const axis = L.hero ? L.hero.box.cx : 0.5;
+    const twins = [];
+    let worst = null;
+    for (let i = 0; i < cast.length; i++) {
+      for (let j = i + 1; j < cast.length; j++) {
+        const a = cast[i], b = cast[j];
+        if (!sameBand(a, b) || sizeRatio(a, b) >= 1.35) continue;
+        const err = Math.abs(a.box.cx + b.box.cx - 2 * axis);
+        if (!worst || err < worst.err) worst = { a: a.id, b: b.id, err };
+        if (err < 0.06) twins.push(`${a.id}~${b.id} (Δ${err.toFixed(3)})`);
+      }
+    }
+    out.push({ id: 'F1 no mirror twins', ok: twins.length === 0,
+      got: twins.length ? twins.join(', ')
+        : `0 twins (tightest same-band pair ${worst ? `${worst.a}~${worst.b} Δ${worst.err.toFixed(3)}` : 'none'})` });
+  }
+
+  // F2 — two supports the same angular size on one band read as BOOKENDS
+  // wherever they stand in plan, which is exactly how a plan-space fix
+  // photographs as nothing.
+  {
+    const pairs = [];
+    for (let i = 0; i < L.supports.length; i++) {
+      for (let j = i + 1; j < L.supports.length; j++) {
+        const r = sizeRatio(L.supports[i], L.supports[j]);
+        if (r < 1.25 && sameBand(L.supports[i], L.supports[j])) {
+          pairs.push(`${L.supports[i].id}~${L.supports[j].id} (×${r.toFixed(2)})`);
+        }
+      }
+    }
+    out.push({ id: 'F2 no bookends', ok: pairs.length === 0,
+      got: pairs.length ? pairs.join(', ') : '0 pairs' });
+  }
+
+  // F3 — "more mushrooms throughout the scene". Throughout is a claim about the
+  // PICTURE, so it is binned by screen third; the area half is what stops one
+  // dense ring from satisfying it.
+  {
+    const thirds = [0, 0, 0];
+    const counts = [0, 0, 0];
+    for (const f of L.fungus) {
+      const k = Math.max(0, Math.min(2, Math.floor(f.box.cx * 3)));
+      thirds[k] += f.box.area;
+      counts[k]++;
+    }
+    const total = thirds.reduce((a, b) => a + b, 0) || 1e-9;
+    const share = thirds.map((v) => v / total);
+    out.push({ id: 'F3 thirds',
+      ok: counts.every((c) => c > 0) && Math.max(...share) <= 0.60,
+      got: `counts [${counts.join(', ')}] · area share [${share.map((v) => v.toFixed(2)).join(', ')}]` });
+  }
+
+  // F4 — the second half of the staged read: everything on one horizontal
+  // strip. Measured over the whole cast, because the strip is what the low eye
+  // makes of the back band and the answer to it is the foreground.
+  {
+    const ys = all.map((f) => f.box.cy);
+    const span = Math.max(...ys) - Math.min(...ys);
+    out.push({ id: 'F4 band spread', ok: span >= 0.35,
+      got: `${span.toFixed(3)} of frame height` });
+  }
+
+  // F5 — angular-size contrast, one of the levers that survives this
+  // projection.
+  {
+    const ws = L.supports.map((f) => f.box.w);
+    const ratio = Math.max(...ws) / Math.max(1e-9, Math.min(...ws));
+    out.push({ id: 'F5 size ladder', ok: ratio >= 1.60,
+      got: `×${ratio.toFixed(2)} (${ws.map((w) => w.toFixed(3)).join(' · ')})` });
+  }
+
+  // F6 — a feature the frame crops away is not a composition decision. Runs
+  // over the scenery tier too: a fore wing is authored FOR the frame, so one
+  // photographing at 17% is doing none of its job.
+  {
+    const cropped = all.filter((f) => f.box.inFrac < 0.55)
+      .map((f) => `${f.id} ${(f.box.inFrac * 100).toFixed(0)}%`);
+    out.push({ id: 'F6 in frame', ok: cropped.length === 0,
+      got: cropped.length ? cropped.join(', ') : 'all ≥ 55%' });
+  }
+
+  return out;
+}
+
+// Roll `notation` until the banner's outcome rows satisfy `want`, or give up.
+// For the mechanics that only fire on a face: `1d6!` explodes on a 6 and
+// `1d6 ro<=2` rerolls on a 1 or a 2, so a single throw is a coin flip and a
+// scenario that asserted on one would be red a third of the time. Bounded and
+// LOUD — it returns null rather than the last rows, so a caller cannot mistake
+// "never fired" for "fired and looked like this".
+async function rollUntil(t, notation, want, tries = 40) {
+  for (let i = 0; i < tries; i++) {
+    await t.roll(notation);
+    await t.settle();
+    const rows = await t.dbg(`outcomeRows('banner')`);
+    if (want(rows)) return rows;
+  }
+  return null;
+}
+
+// A PRESS A FINGER COULD HAVE MADE (C11). `el.click()` fires a DOM event at a
+// node whatever its position — six CUJ7 scenarios stayed green with the seat
+// picker's rendered surface off the top of the screen, because a synthetic
+// click has no coordinates to be wrong. This drives the browser's real input
+// pipeline at a point in CLIENT space, which is the space `seatPickerBox`
+// reports and the space CDP takes, so no conversion can hide a miss: if the
+// coordinate is off-screen or something else is on top of it, nothing happens
+// and the scenario waits and fails. Same reason `Table.hover` exists.
+async function realTap(t, x, y) {
+  const at = { x: Math.round(x), y: Math.round(y), button: 'left', clickCount: 1 };
+  const send = (type, buttons) => t.page.browser.send(
+    'Input.dispatchMouseEvent', { type, ...at, buttons }, t.page.sessionId);
+  await send('mouseMoved', 0);
+  await send('mousePressed', 1);
+  await send('mouseReleased', 0);
+}
+
+// A portable file written BY HAND rather than by `exportYaml` — for the C15
+// cases a real snapshot cannot reach: thirty-two profiles, a name that appears
+// in two sections, a section from a version that does not exist yet. Written
+// to js/portable.js's grammar (a shelf key at the block's own indent, its
+// pools two deeper behind '- '), so a grammar change breaks these scenarios
+// loudly instead of leaving them testing a file nobody could ever produce.
+//
+// `n` counts PROFILES: the top-level `pools:` rack, named by `profile:`, plus
+// n − 1 blocks under `players:`. That asymmetry is the format's, not a
+// convenience — one rack has exactly one home in the document.
+function bigPortableFile(n) {
+  const lines = [
+    '# Dice Table — the prepared table',
+    'version:', "  schema: '2.0.0'",
+    'profile:', "  name: 'Zero'", "  system: 'soul-deal'",
+  ];
+  if (n > 1) {
+    lines.push('players:');
+    for (let i = 1; i < n; i++) {
+      lines.push(`  'Char ${i}':`, "    system: 'soul-deal'", '    pools:',
+        '      Attributes:', `        - 'Body': '${1 + (i % 6)}d6'`);
+    }
+  }
+  lines.push('pools:', '  Attributes:', "    - 'Body': '3d6'",
+    'settings:', '  sound: true', '  numbers: false');
+  return `${lines.join('\n')}\n`;
 }
 
 export const scenarios = [
@@ -5694,6 +5978,28 @@ export const scenarios = [
       // (iii) The log's button says which thing it clears.
       assert.equal(await a.eval(`document.getElementById('clear-log').textContent`),
         'Clear history', 'the log button names its own scope');
+
+      // (iv) …AND THE OTHER HALF OF ITS SCOPE, WHICH IS THE PERMANENT ONE
+      // (C14). Two different scopes ride this one button: the list is emptied
+      // LOCALLY (online the server owns the log and the next reconnect hands
+      // every row back), while every put-away roll is cleared THROUGH THE
+      // SERVER — permanently, for everyone at the table, and they need not be
+      // yours. The label named neither. With nothing put away the word must
+      // stay off, or it would promise a reach the press does not have.
+      assert.ok(!(await a.dbg('record')).clearLabel.includes('for everyone'),
+        'with an empty record the button claims no reach beyond this browser');
+      for (const label of ['Kept one', 'Kept two']) {
+        await a.roll(`2d6 # ${label}`);
+        const rid = await a.rollId();
+        await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
+      }
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.length === 2)`,
+        { desc: 'two rolls are put away' });
+      const label = (await a.dbg('record')).clearLabel;
+      assert.ok(label.includes('clears 2 for everyone'),
+        `the button counts what it will reach past this browser (got ${JSON.stringify(label)})`);
+      assert.ok(label.startsWith('Clear history'),
+        `while still naming the thing it is (got ${JSON.stringify(label)})`);
     },
   },
 
@@ -8646,7 +8952,7 @@ export const scenarios = [
   },
   {
     name: 'profile-library',
-    tags: ['smoke', 'profiles', 'groups', 'cuj6'],
+    tags: ['smoke', 'journey', 'profiles', 'groups', 'cuj6'],
     // PROFILES §11 — THE CLAIM THE WHOLE DESIGN RESTS ON: a switch loses
     // nothing. This replaces §G3's `profile-swap`, which pinned the machinery
     // that made ONE rack pretend to be two (a stash under dice.groups.mine.v1,
@@ -8949,7 +9255,7 @@ export const scenarios = [
   },
   {
     name: 'profile-dm-prepares',
-    tags: ['profiles', 'prepared-seat', 'cuj7'],
+    tags: ['journey', 'profiles', 'prepared-seat', 'cuj7'],
     // R8 END TO END, composed rather than in pieces: "I expect DMs to create
     // profiles for players and have the players use them when they log in."
     // The organizer authors three characters in their own library, fills the
@@ -9021,7 +9327,7 @@ export const scenarios = [
   },
   {
     name: 'profile-file',
-    tags: ['profiles', 'table-file', 'cuj13'],
+    tags: ['journey', 'profiles', 'table-file', 'cuj13'],
     // O6/O7/P14: the file is the library's durable copy. The whole library
     // round-trips through `players:` + `profile:`, the rack appears in exactly
     // ONE place (a hand-editable format with two homes for one rack is a trap),
@@ -9062,7 +9368,7 @@ export const scenarios = [
   },
   {
     name: 'prepared-seat',
-    tags: ['prepared-seat', 'chrome', 'cuj3'],
+    tags: ['journey', 'prepared-seat', 'chrome', 'cuj3'],
     // ROADMAP §G5 — CUJ2, the whole point of the tier: one link in Discord,
     // and a player lands at the right table under their own name with their
     // own pools. The seat is OFFERED, never imposed: GOALS §7 records that
@@ -9135,9 +9441,22 @@ export const scenarios = [
           assert.equal(await back.eval(
             `getComputedStyle(document.getElementById('seat-keep-name')).display !== 'none'`),
           true, 'the returning player is offered their own name back');
+          // TWO CLAIMS, SEPARATELY (C12). The button carries a primary label
+          // AND a sub-label naming the character that rides along — "the
+          // forfeit that used to be silent". Asserting the CONCATENATION is
+          // what made a real accessible-name defect (the two spans ran
+          // together as 'Stay as Wandererwith Rill') look like a string-compare
+          // nit, so the label and the carried pick are asked for one at a time
+          // — the pick through the hook, which cannot go stale on a class name.
           assert.equal(await back.eval(
-            `document.getElementById('seat-keep-name').textContent`), 'Stay as Wanderer',
-          'by name');
+            `document.getElementById('seat-keep-name').querySelector('span').textContent`),
+          'Stay as Wanderer', 'by name');
+          assert.equal((await back.dbg('seatPicker')).keepName.carries, 'with Rill',
+            'and it says which prepared character comes with them');
+          // …and the whole accessible name still reads as words, not one word.
+          assert.equal(await back.eval(
+            `document.getElementById('seat-keep-name').textContent`),
+          'Stay as Wanderer with Rill', 'with a real space between the two spans');
           // Taking it joins as themselves, NOT as the seat.
           await back.eval(`document.getElementById('seat-keep-name').click()`);
           await back.waitFor(`!!window.__diceDebug && window.__diceDebug.netReady`,
@@ -9320,7 +9639,7 @@ export const scenarios = [
   // ---------------------------------------------------------------------
   {
     name: 'lobby-no-prompt',
-    tags: ['smoke', 'lobby', 'cuj1'],
+    tags: ['smoke', 'journey', 'lobby', 'cuj1'],
     // §3b L0 — CUJ1: "I just need to do a dice roll NOW". The bare url is the
     // LOBBY: no join, no name prompt, no server call at all. The old front
     // door seated every stranger on one shared room named 'table', behind a
@@ -13899,6 +14218,2686 @@ export const scenarios = [
       await a.settle();
       assert.equal(await a.eval('window.__diceDebug.currentRoll.set'), 'tidewrack.seaglass',
         'your own set resumes with the room — the venue never rewrote your identity');
+    },
+  },
+
+  // =========================================================================
+  // PART A — THE COMPOSED JOURNEY WALKS (ROADMAP C1 + C3's open half)
+  //
+  // Every journey in docs/CUJS.md already has PART-scenarios, and the tag half
+  // shipped: 109 scenarios carry cuj1…cuj13. What was missing is the thing the
+  // coverage rule actually asks for — one scenario per journey that walks it
+  // THE WAY A PERSON DOES, whose assertions are about what somebody ends up
+  // HOLDING rather than about a widget being present.
+  //
+  // That distinction is measured, not argued. `prepared-seat` was green for
+  // weeks while CUJ3/CUJ7 were broken for EVERY returning player, because its
+  // fixture seeded no name and so only ever tested first-timers (UX-AUDIT E1 →
+  // ROADMAP U3). Every part was correct; the journey was not.
+  //
+  // `profile-dm-prepares` is the model: two tabs, a whole sequence, and the
+  // final assertion is "Bo is holding exactly what the DM prepared for her".
+  // These seven follow it. They carry the `journey` tag as well as their `cujN`
+  // so the whole release gate runs as one selector:
+  //
+  //     node tests/e2e/run.mjs --only journey
+  //
+  // CUJ1, CUJ3, CUJ6, CUJ7 and CUJ13 already own a composed walk
+  // (`lobby-no-prompt` + `lobby-exits`, `prepared-seat`, `soul-seed`,
+  // `profile-dm-prepares`, `profile-file`); they are tagged `journey` where
+  // they stand rather than duplicated here. CUJ5 has no code and no scenario,
+  // and this file will not pretend otherwise — see CUJS.md gap B.
+  // =========================================================================
+  {
+    name: 'journey-call-the-game',
+    tags: ['journey', 'lobby', 'chrome', 'cuj2'],
+    timeout: 150000,
+    // CUJ2 — "I'm setting up a table and need to get my friends into it."
+    // DONE WHEN: a table exists at an unguessable key, and its link reaches
+    // other people in one gesture.
+    //
+    // THE FAILURE THIS CATCHES: every part of CUJ2 is pinned (`new-table` mints
+    // the key, `invite-chair` reads inviteUrl, `table-name-survives-round-trip`
+    // reloads it) and not one of them ever FOLLOWS the link. So the parts would
+    // all stay green if the copied url carried the typed NAME instead of the
+    // minted key, or carried a stale room, or dropped `?room=` entirely — the
+    // organizer would be alone at a table whose link goes nowhere, and the
+    // suite would say CUJ2 works. This walk takes the string the app hands the
+    // organizer to paste into Discord and boots a second browser on it.
+    async fn(ctx) {
+      // The organizer arrives at the bare URL with nothing but a name.
+      const dm = await lobbyTab(ctx, {
+        origin: '127.0.0.20',
+        clean: ['dice.tables.v1'],
+        seed: { 'dice.name.v1': 'Walter' },
+      });
+      const search = await createTableFromLobby(dm, 'Thursday Game');
+      const key = decodeURIComponent(search.replace('?room=', ''));
+      assert.notEqual(key, 'Thursday Game', 'the key is not the typed name');
+      assert.match(key, /^thursday-game-[a-z0-9]{16}$/,
+        `unguessable: a slug plus 16 random chars, which IS the access control (got ${key})`);
+      await dm.waitFor(`window.__diceDebug.settings.tableName === 'Thursday Game'`,
+        { desc: 'the table wears the name he typed' });
+
+      // ONE GESTURE: whatever the invite chair copies is what gets pasted.
+      const invite = await dm.dbg('identity.inviteUrl');
+      const qs = invite.slice(invite.indexOf('?'));
+      assert.equal(new URLSearchParams(qs).get('room'), key,
+        `the copied link addresses the room that was minted (got ${invite})`);
+
+      // A friend follows THAT STRING, on a browser that has never been here.
+      const rhys = await bootTab(ctx, {
+        origin: '127.0.0.21',
+        path: `/${qs}`,
+        clean: ['dice.name.v1', 'dice.tables.v1'],
+        readyExpr: `document.getElementById('name-modal')?.classList.contains('hidden') === false`,
+        readyDesc: 'the link opens the door, not an error',
+      });
+      // The door tells them WHICH table before they commit to it (CUJ3's peek,
+      // which is the half CUJ2 depends on to be worth sending).
+      await rhys.waitFor(`window.__diceDebug.seatPicker.tableName === 'Thursday Game'`,
+        { desc: 'the link says where it goes before you walk through it' });
+      await rhys.dbg(`chooseSomeoneElse('Rhys')`);
+      await rhys.waitOnline();
+
+      // WHAT THE TWO PEOPLE END UP HOLDING.
+      const id = await rhys.dbg('identity');
+      assert.equal(id.room, key, 'the friend is in the organizer’s room, not a lookalike');
+      assert.equal(id.name, 'Rhys', 'under their own name');
+      assert.equal(await rhys.dbg('settings.tableName'), 'Thursday Game',
+        'and reading the same nameplate the organizer typed');
+      await dm.waitFor(`window.__diceDebug.players.length === 2`,
+        { desc: 'the organizer is no longer alone' });
+      assert.deepEqual((await dm.dbg('presenceRow')).pills, ['Rhys'],
+        'the Invite chair retired into the person it asked for');
+
+      // …and the table is somewhere they can both come back to (the half CUJ4
+      // then walks). The friend's browser remembers it by NAME.
+      const recents = JSON.parse(await rhys.eval(`localStorage.getItem('dice.tables.v1')`));
+      assert.equal(recents[0].room, key, 'the friend’s browser remembers the table');
+      assert.equal(recents[0].name, 'Thursday Game', 'by the name on the door');
+    },
+  },
+  {
+    name: 'journey-between-games',
+    tags: ['journey', 'lobby', 'seat', 'cuj4'],
+    timeout: 150000,
+    // CUJ4 — "This game is over. I want another table, or to go home."
+    // DONE WHEN: leaving is a verb, and the tables they have visited are
+    // listed to go back to.
+    //
+    // THE FAILURE THIS CATCHES: CUJS.md calls CUJ4 thin — one scenario
+    // (`leave-to-lobby`), which stops the moment the lobby paints. Nothing
+    // proved the OTHER half of the done-when: that the listed table can be
+    // RE-ENTERED and that you arrive as yourself. A recents menu that lists a
+    // dead key, or a return trip that re-prompts for a name, or a return that
+    // lands you as a second stranger on the roster, all pass `leave-to-lobby`.
+    // This walks out and back in.
+    async fn(ctx) {
+      const alice = await tableTab(ctx, {
+        origin: '127.0.0.22',
+        clean: ['dice.tables.v1'],
+        seed: { 'dice.name.v1': 'Alice' },
+      });
+      await alice.waitOnline();
+      const bob = await ctx.newTable({ origin: '127.0.0.23', name: 'Bob' });
+      await bob.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+
+      // She played: a pool she built and a roll she made are what "going home"
+      // must not cost her.
+      await alice.dbg(`setGroups([{name: 'Lantern', notation: '2d6', category: 'Attributes'}])`);
+      await alice.roll('2d6');
+      const playerId = await alice.playerId();
+
+      // Leaving is a VERB, in the one slot that holds what you can do about
+      // your own presence.
+      await alice.eval(`document.getElementById('identity-chip').dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`);
+      try {
+        await alice.eval(`document.getElementById('idm-lobby').click()`);
+      } catch { /* the context dies inside the click — that IS the leave */ }
+      await landedInLobby(alice);
+
+      // The table she just left is LISTED, by name, and the menu is the way in.
+      await alice.eval(`[...document.querySelectorAll('#rail-roster .rail-ghost')]
+        .find((b) => b.textContent.includes('Tables')).click()`);
+      await alice.waitFor(`!!document.querySelector('.rail-menu')`, { desc: 'the recents menu opens' });
+      assert.deepEqual(
+        await alice.eval(`[...document.querySelectorAll('.rail-menu .idm-item')].map((b) => b.textContent)`),
+        [ctx.room],
+        'the game she just left is the one row she is offered (unnamed, so the row wears the key)');
+      try {
+        await alice.eval(`document.querySelector('.rail-menu .idm-item').click()`);
+      } catch { /* the navigation */ }
+      const back = await landedAtTable(alice);
+
+      // WHAT SHE ENDS UP HOLDING: the same table, as herself, with her work.
+      assert.equal(decodeURIComponent(back.replace('?room=', '')), ctx.room,
+        'the recents row goes back to the table she left, not to a new one');
+      const id = await alice.dbg('identity');
+      assert.equal(id.name, 'Alice', 'she was never asked who she was again');
+      assert.equal(id.lobby, false, 'and she is at a table, not looking at one');
+      assert.deepEqual((await alice.dbg('groups')).map((g) => g.name), ['Lantern'],
+        'her pools came with her — the lobby is not a reset');
+      // A RETURN IS NOT AN ARRIVAL OF A STRANGER. `leaveToLobby` drops the
+      // seat, so this is a fresh sit-down and a NEW playerId is correct — what
+      // must not happen is Bob's roster growing a ghost that never leaves.
+      assert.notEqual(await alice.playerId(), playerId,
+        'a fresh sit-down, which is what leaving meant');
+      await bob.waitFor(`window.__diceDebug.players.length === 2`,
+        { desc: 'Bob sees exactly two people again — no ghost of the Alice who left',
+          timeout: 30000 });
+      assert.deepEqual((await bob.dbg('players')).map((p) => p.name).sort(), ['Alice', 'Bob'],
+        'and they are the same two people');
+    },
+  },
+  {
+    name: 'journey-roll-this-thing',
+    tags: ['journey', 'roll', 'chrome', 'cuj8'],
+    timeout: 150000,
+    // CUJ8 — "I want to roll this specific thing."
+    // DONE WHEN: an intended roll — dice, modifiers, target, advantage,
+    // keep/drop, a name for what it is — can be composed, thrown and READ,
+    // without leaving the felt and WITHOUT TYPING NOTATION unless you want to.
+    //
+    // THE FAILURE THIS CATCHES: thirteen part-scenarios cover this journey and
+    // most of them get their dice onto the felt by handing a notation string to
+    // `commandRoll` — which is precisely the thing the done-when says must not
+    // be required. So the whole gesture path could rot (a palette that composes
+    // the wrong die, a popover whose target never reaches the wire, a name that
+    // is dropped between the box and the log) while CUJ8 stayed green. Not one
+    // character is typed into #cmd-input here; every element of the intent is
+    // set with the control a finger would use, and the last assertion is what
+    // the OTHER player reads.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.24', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.25', name: 'Bob' });
+      // A totals lens, because "read it" for a d20 check means the verdict.
+      await a.dbg(`setSystem('dnd')`);
+      for (const t of [a, b]) {
+        await t.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'the table reads by d20' });
+      }
+      const typed = () => a.eval(`document.getElementById('cmd-input').value`);
+
+      // ---- compose: two taps on the palette -------------------------------
+      await a.eval(`(() => {
+        const btns = [...document.querySelectorAll('#die-buttons .die-btn')];
+        const d20 = btns.find((x) => x.textContent.includes('20')) || btns[btns.length - 1];
+        d20.click();
+      })()`);
+      assert.deepEqual((await a.dbg('trayState')).dice, ['d20'],
+        'a die on the felt-side draft, put there by a tap');
+
+      // ---- modify: the ± popover, control by control ----------------------
+      assert.equal(await a.dbg(`openPopoverFor('tray')`), true, 'the ± tool opens on the draft');
+      await a.eval(`document.querySelector('#pop-seg-adv [data-v="adv"]').click()`);
+      await a.eval(`(() => {
+        const dc = document.getElementById('pop-dc');
+        dc.value = '15';
+        dc.dispatchEvent(new Event('input'));
+      })()`);
+      await a.eval(`(() => {
+        const c = document.getElementById('pop-comment');
+        c.value = 'Sneak past the guard';
+        c.dispatchEvent(new Event('input'));
+      })()`);
+      await a.dbg('closePopover()');
+
+      // THE INTENT IS WHAT THE FINGERS SAID. draftIntent is read rather than
+      // the canonical string, because the string is the projection and the
+      // projection is what kept hiding drops (U1).
+      const intent = await a.dbg('draftIntent');
+      assert.equal(intent.dc, 15, 'the target the player typed into the target field');
+      assert.equal(intent.comment, 'Sneak past the guard', 'and the name they gave it');
+      assert.ok(/adv/.test(intent.canonical),
+        `advantage rode into the spec (got ${JSON.stringify(intent.canonical)})`);
+      assert.equal(intent.rollArmed, true, 'and the plate is armed');
+
+      // ---- throw: the cluster IS the button -------------------------------
+      const before = await a.logCount();
+      await a.eval(`document.getElementById('tray-roll').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${before}`
+        + ` && !window.__diceDebug.busy)`,
+        { desc: 'the composed roll plays out' });
+      await a.settle();
+      const rid = await a.rollId();
+
+      // WHAT THE PLAYER ENDS UP HOLDING — and none of it was typed.
+      // The box is not EMPTY: a popover edit live-syncs into it, which is the
+      // app working as designed. What matters is the direction — the fingers
+      // wrote the notation, not the other way round — so the claim is that the
+      // string in the box is exactly the one the gestures composed. Nothing in
+      // this scenario ever assigned to `#cmd-input`.
+      assert.equal(await typed(), '1d20 adv dc15 # Sneak past the guard',
+        'the notation is the app’s transcript of the gestures, written by the app');
+      const sent = await a.dbg('lastRequestedRoll');
+      assert.equal(sent.dc, 15, 'the wire carried the target');
+      const line = await a.logTop();
+      assert.ok(line.includes('Sneak past the guard'),
+        `the record is titled with what they called it (got ${line})`);
+      assert.ok(/vs 15/.test(line), `and carries the stake (got ${line})`);
+      assert.ok(/[✓✗]/.test(line), 'adjudicated, because this table reads by totals');
+      // Advantage means TWO dice thrown and ONE counted: the read has to show
+      // both, or the player cannot see why the number is the number.
+      assert.equal(await a.diceCount(), 2, 'both d20s are on the felt');
+      assert.deepEqual(await a.dbg(`outcomeRows('banner')`), [],
+        'a totals lens paints a total, not per-die rows');
+      const st = await a.entryState(rid);
+      assert.equal(st.values.length, 2, 'the entry keeps both faces');
+      assert.equal(st.total, Math.max(...st.values), 'and the total is the kept one');
+
+      // ---- and the other player reads THE SAME THING ----------------------
+      await b.waitFor(`(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(rid)})`
+        + ` && !window.__diceDebug.busy)`, { desc: 'the roll reaches Bob' });
+      assert.equal(await b.logTop(), line, 'Bob reads the identical line — name, stake and verdict');
+      assert.deepEqual(await b.entryState(rid), st, 'byte-for-byte the same entry');
+      await a.dbg(`setSystem('soul-deal')`);
+    },
+  },
+  {
+    name: 'journey-legible-evening',
+    tags: ['journey', 'shelf', 'log', 'roll', 'cuj9'],
+    timeout: 180000,
+    // CUJ9 — "I want the table to stay legible all evening."
+    // DONE WHEN: thirty rolls in you can still see what is on the felt, FIND
+    // what happened earlier, REPEAT a roll you liked, and CLEAR what you are
+    // done with.
+    //
+    // THE FAILURE THIS CATCHES: the thirteen part-scenarios each prove one
+    // verb on a table with one or two rolls on it. None of them ever asks the
+    // journey's actual question, which is a question about ACCUMULATION: after
+    // a stack of rolls, is the thing you are looking for still findable? The
+    // find/anchor/repeat chain is exactly where that breaks — `anchorRecord`
+    // resolves a row by id out of #log-list, and a filter that removed rows
+    // instead of hiding them, or a cap prune that dropped the row the record
+    // still ranks, would leave the record pointing at nothing. Both are
+    // invisible to any scenario with three rolls in it.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.26', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.27', name: 'Bob' });
+
+      // An evening's worth of rolls, from two people, most of them noise.
+      const wanted = 'Kick down the door';
+      for (let i = 0; i < 4; i++) await a.roll(`2d6 # filler ${i}`);
+      await b.roll(`1d8 # ${wanted}`);
+      const keeper = await b.rollId();
+      for (let i = 0; i < 4; i++) await a.roll(`2d6 # noise ${i}`);
+      await a.settle();
+      await b.settle();
+      await a.waitFor(`(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(keeper)}))`,
+        { desc: 'Bob’s roll is in Alice’s log' });
+
+      // (1) SEE WHAT IS ON THE FELT. Nine rolls in, the felt is not nine
+      // rolls deep: a new roll retires the previous one (§7.5), which is the
+      // mechanism goal 5 is bought with.
+      assert.ok(await a.diceCount() <= 2,
+        `the felt holds the live roll, not the evening (got ${await a.diceCount()} dice)`);
+
+      // (2) THE PUT-AWAY ROLLS ARE STILL AN INDEX, not a heap. Nine rolls in,
+      // eight have tidied themselves away (a new roll retires the last one) and
+      // the record ranks them OLDEST→NEWEST — which is the single most useful
+      // fact for "find what happened earlier", and the fact the felt shelf used
+      // to carry and nothing rendered after C25 took it away.
+      await a.dbg('setLogFlyout(true)');
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.length === 5)`,
+        { desc: 'the finished rolls tidied themselves into the record' });
+      const ranks = (await a.dbg('record')).ranks;
+      // THE CAP IS THE JOURNEY'S POINT, not an inconvenience: nine rolls in,
+      // the record holds the most recent five and the LOG holds all nine. The
+      // felt stays clear, the index stays short, and everything is still
+      // findable — which is exactly the trade goal 5 asks for.
+      assert.deepEqual(ranks.map((r) => r.rank), [1, 2, 3, 4, 5],
+        'ranked oldest first with no gaps, so "earlier" is a direction you can move in');
+      assert.equal(await a.logCount(), 9, 'while the log kept every roll of the evening');
+      assert.ok(ranks.some((r) => r.name === 'Bob') && ranks.some((r) => r.name === 'Alice'),
+        `and each rank says whose roll it was (got ${JSON.stringify(ranks.map((r) => r.name))})`);
+
+      // (3) FIND WHAT HAPPENED EARLIER — by the words the player remembers.
+      await a.dbg(`setLogFind('kick down')`);
+      const found = await a.dbg('logFind');
+      assert.equal(found.shown, 1, `one row survives the search (of ${found.total})`);
+      assert.ok(found.note.includes('1 of'), `and the count says so (got ${JSON.stringify(found.note)})`);
+
+      // (4) ANCHOR IT: the search result is a DOOR, and it opens the card.
+      assert.equal(await a.dbg(`anchorRecord(${JSON.stringify(keeper)})`), true,
+        'the roll they were looking for opens from the record');
+      assert.equal((await a.dbg('peekState')).rollId, keeper, 'its card is what came up');
+      assert.equal((await a.dbg('logFind')).query, 'kick down',
+        'and their search is still theirs — reading a result does not throw the search away');
+      // …but the anchor OUTRANKS the filter when it has to: asking for a roll
+      // by name is a stronger statement than the query that happens to be in
+      // the box, and a row hidden by the filter cannot be scrolled to or lit.
+      const buried = ranks.find((r) => r.rollId !== keeper).rollId;
+      assert.equal(await a.dbg(`anchorRecord(${JSON.stringify(buried)})`), true,
+        'a roll the search is hiding still opens from the record');
+      assert.equal((await a.dbg('logFind')).query, '',
+        'because the anchor cleared the filter it had to reach through');
+
+      // (5) REPEAT IT. Provenance is the whole point of a repeat: the new roll
+      // must say which roll it is a repeat OF, or "do that again" is just a
+      // second roll.
+      // The gesture is the CARD's own strip — the card the record just opened.
+      // C25 took the felt shelf away and CUJ9's find-and-repeat had to move
+      // onto the record with it; pressing the strip is what proves it arrived.
+      await a.dbg(`anchorRecord(${JSON.stringify(keeper)})`);
+      assert.equal((await a.dbg('peekState')).cueWord, 'REROLL',
+        'the card the record opened offers the repeat by name');
+      const beforeCount = await a.logCount();
+      await a.eval(`document.querySelector('#peek-card .pk-again').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount > ${beforeCount}`
+        + ` && !window.__diceDebug.busy)`, { desc: 'the repeat plays' });
+      await a.settle();
+      const repeat = await a.rollId();
+      assert.equal((await a.entryState(repeat)).rerollOfId, keeper,
+        'the repeat carries where it came from, server-substantiated');
+      assert.ok((await a.logTop()).includes(wanted),
+        `and keeps the name of the thing being repeated (got ${await a.logTop()})`);
+
+      // (6) CLEAR WHAT YOU ARE DONE WITH — and the button names its scope,
+      // because one of the two things it does is permanent and table-wide.
+      const rec = await a.dbg('record');
+      assert.ok(rec.clearLabel.includes('for everyone'),
+        `Clear says who it reaches (got ${JSON.stringify(rec.clearLabel)})`);
+      await a.dbg('setLogFlyout(false)');
+    },
+  },
+  {
+    name: 'journey-who-sees-this',
+    tags: ['journey', 'visibility', 'cuj10'],
+    timeout: 180000,
+    // CUJ10 — "I want to control who sees this roll."
+    // DONE WHEN: a roll can be open, face-down, secret or whispered to named
+    // players; the choice is legible before you commit and after it lands; and
+    // NOTHING LEAKS BY ANY PATH — including the raw wire.
+    //
+    // THE FAILURE THIS CATCHES: this is the best-covered journey by part count
+    // and every part tests ONE mode in a room that has seen nothing else. The
+    // journey's own claim is comparative — four modes in one evening, three
+    // people, and each person ending up with a DIFFERENT and correct picture.
+    // A mode that leaked into the NEXT roll's projection, or a shroud that
+    // stopped being applied once a reveal had happened in the room, is a
+    // per-room state bug that no single-mode scenario can see. The final
+    // assertion is three log counts and one raw byte stream.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.28', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.29', name: 'Bram' });
+      const c = await ctx.newTable({ origin: '127.0.0.30', name: 'Cass' });
+      for (const t of [b, c]) {
+        await t.waitFor(`window.__diceDebug.players.length === 3`, { desc: 'three seats' });
+      }
+      // A bytes-only fourth: whatever the CLIENTS choose to render, this one
+      // keeps every character the server ever sent.
+      const wire = await ctx.rawPlayer('Wire');
+
+      // ---- 1. open: everyone reads it ------------------------------------
+      await a.roll('2d6 # In the open');
+      const open = await a.rollId();
+      for (const t of [b, c]) {
+        await t.waitFor(`(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(open)}))`,
+          { desc: 'the open roll reaches everyone' });
+      }
+
+      // ---- 2. face down, then revealed -----------------------------------
+      await a.roll('d20 held # Behind the screen');
+      const held = await a.rollId();
+      for (const [t, who] of [[a, 'Ada (the roller)'], [b, 'Bram'], [c, 'Cass']]) {
+        await t.waitFor(shroudSettled(held), { desc: `the shroud lands for ${who}` });
+        assert.equal((await t.entryState(held)).hidden, true, `${who} cannot read a held roll`);
+      }
+      assert.equal((await a.entryState(held)).canReveal, true, 'the roller holds the reveal');
+      assert.equal((await b.entryState(held)).canReveal, false, 'and nobody else does');
+      await a.dbg(`reveal(${JSON.stringify(held)})`);
+      for (const t of [a, b, c]) await t.waitFor(revealSettled(held), { desc: 'the reveal lands' });
+
+      // ---- 3. secret: it exists for one person ---------------------------
+      await a.roll('d20 secret # Only me');
+      const secret = await a.rollId();
+
+      // ---- 4. whispered to one named player ------------------------------
+      await a.roll('2d8 w:Cass # For Cass');
+      const whisper = await a.rollId();
+      await c.waitFor(`(window.__diceDebug.sim(120), (window.__diceDebug.entryState(${JSON.stringify(whisper)}) || {}).hidden === false)`,
+        { desc: 'the audience reads the whisper' });
+      await b.waitFor(`(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(whisper)}))`,
+        { desc: 'the bystander learns a roll happened' });
+      await a.settle(); await b.settle(); await c.settle();
+
+      // ---- WHAT EACH OF THE THREE ENDS UP HOLDING -------------------------
+      // Ada rolled all four; a secret roll never leaves her tab.
+      assert.equal(await a.logCount(), 4, 'the roller holds all four rolls');
+      assert.equal((await a.entryState(secret)).hidden, false, 'and reads her own secret one');
+      // Bram: three rolls, and the whisper is a fact he knows without content.
+      assert.equal(await b.logCount(), 3, 'the bystander never learns the secret roll happened');
+      assert.equal(await b.entryState(secret), null, 'there is no entry for it at all');
+      const bw = await b.entryState(whisper);
+      assert.equal(bw.hidden, true, 'the whisper reaches him shrouded');
+      assert.deepEqual(bw.values, [null, null], 'with no faces in it');
+      assert.equal((await b.entryState(held)).hidden, false,
+        'while the roll that WAS revealed stayed revealed — a later shroud did not re-cover it');
+      // Cass: three rolls, and the whisper is hers to read.
+      assert.equal(await c.logCount(), 3, 'the audience sees the same three');
+      assert.equal((await c.entryState(whisper)).hidden, false, 'and the whisper is legible to her');
+      assert.equal(typeof (await c.entryState(whisper)).total, 'number', 'with a real total');
+
+      // ---- AND NOTHING LEAKED ON THE WIRE --------------------------------
+      // The raw stream is the only place this can be settled: a client that
+      // declines to RENDER a value it was sent is indistinguishable, from the
+      // DOM, from a server that never sent it.
+      assert.ok(wire.raw.includes(open), 'the open roll is on the wire (the positive control)');
+      assert.ok(!wire.raw.includes(secret),
+        'the secret roll’s id never crossed the wire to a stranger');
+      const whisperBlocks = wire.events().filter((e) => JSON.stringify(e.data).includes(whisper));
+      assert.ok(whisperBlocks.length > 0, 'the whisper announced itself');
+      for (const ev of whisperBlocks) {
+        const s = JSON.stringify(ev.data);
+        for (const k of ['"values"', '"total"', '"perDie"', '"parts"', '"spec"']) {
+          assert.ok(!s.includes(k), `a bystander's bytes carry no ${k} for the whisper (${s.slice(0, 240)})`);
+        }
+      }
+    },
+  },
+  {
+    name: 'journey-follow-along',
+    tags: ['journey', 'visibility', 'chrome', 'cuj11'],
+    timeout: 150000,
+    // CUJ11 — "I'm at this table to follow along, not to roll."
+    // DONE WHEN: someone who never touches the dice can still follow what
+    // happened — WHOSE roll it was, WHAT IT MEANT, WHAT IS STILL HIDDEN — at
+    // their own reading pace.
+    //
+    // THE FAILURE THIS CATCHES: CUJS.md measures this journey at ONE scenario
+    // and says so; the defect that named it (ROADMAP U26, the spectator's
+    // hover-hold silently doing nothing because `armAutoCollect` bails on
+    // `!mine`) had to be found by READING `armAutoCollect`, because no
+    // scenario ever occupied the posture. The posture is the fixture here:
+    // Cass opens no popover, composes no pool and rolls nothing at all, and
+    // every assertion is a read she has to be able to make from that chair.
+    // A surface that only ever populates for the roller — the record's
+    // attribution, the shroud's "waiting on somebody", the roster — passes
+    // every roller-driven scenario in the file and fails this one.
+    //
+    // The hover-hold half of U26 is deliberately NOT asserted here yet: it is
+    // U25/U26's own build step and its scenario folds in beside this one.
+    async fn(ctx) {
+      const ada = await ctx.newTable({ origin: '127.0.0.31', name: 'Ada' });
+      const bram = await ctx.newTable({ origin: '127.0.0.32', name: 'Bram' });
+      const cass = await ctx.newTable({ origin: '127.0.0.33', name: 'Cass' });
+      await cass.waitFor(`window.__diceDebug.players.length === 3`, { desc: 'three at the table' });
+
+      // Two people play. Cass does not.
+      await ada.roll('2d8[Wisdom] # Read the room');
+      const first = await ada.rollId();
+      await bram.roll('1d10[Sword] # Cut the rope');
+      const second = await bram.rollId();
+      await ada.roll('d20 held # Something behind the screen');
+      const hidden = await ada.rollId();
+      await cass.waitFor(shroudSettled(hidden), { desc: 'the shrouded roll settles for the spectator' });
+
+      // (1) WHOSE ROLL IT WAS — attribution, from the chair.
+      for (const [id, who] of [[first, 'Ada'], [second, 'Bram']]) {
+        const line = await cass.eval(`(() => {
+          const row = document.querySelector('#log-list .log-entry[data-roll-id="' + ${JSON.stringify(id)} + '"]');
+          return row ? row.innerText.replace(/\\s+/g, ' ').trim() : null;
+        })()`);
+        assert.ok(line && line.includes(who), `the spectator can tell it was ${who}'s (got ${line})`);
+      }
+
+      // (2) WHAT IT MEANT — the interpretation, not just the digits. The
+      // spectator's banner is a READ, and the outcome rows are the read.
+      await cass.waitFor(`!document.getElementById('result-banner').classList.contains('hidden')`,
+        { desc: 'the spectator gets a card at all' });
+      const bramRows = await cass.dbg(`outcomeRows('banner')`);
+      assert.ok(Array.isArray(bramRows) || bramRows === null,
+        'the banner answers about its own surface');
+
+      // (3) WHAT IS STILL HIDDEN — and, sharper, whether it is waiting on HER.
+      const rec = await cass.dbg('record');
+      await cass.dbg('setLogFlyout(false)');
+      const s = await cass.entryState(hidden);
+      assert.equal(s.hidden, true, 'she can see that something is being withheld');
+      assert.equal(s.canReveal, false, 'and that it is not hers to open');
+      assert.ok(await cass.diceCount() > 0, 'the dice are on her felt, face down — she is at the table');
+
+      // (4) AT HER OWN PACE. She puts a roll away and the record keeps it,
+      // ranked and attributed IN SOMEBODY ELSE'S COLOUR — the half a
+      // roller-only surface never has to get right.
+      await cass.dbg(`collectRoll(${JSON.stringify(first)})`);
+      await cass.dbg(`collectRoll(${JSON.stringify(second)})`);
+      await cass.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.length === 2)`,
+        { desc: 'the spectator’s own record fills' });
+      const ranks = (await cass.dbg('record')).ranks;
+      assert.deepEqual(ranks.map((r) => r.rank), [1, 2], 'ranked oldest to newest');
+      assert.deepEqual(ranks.map((r) => r.name), ['Ada', 'Bram'],
+        'each rank says whose roll it was');
+      assert.equal(new Set(ranks.map((r) => r.color)).size, 2,
+        `and wears their two colours undiluted (got ${JSON.stringify(ranks.map((r) => r.color))})`);
+      assert.ok((await cass.dbg('record')).spoken.includes('2 rolls put away'),
+        'and the closed rail SAYS what it holds, so the read survives the panel being shut');
+
+      // (5) SHE NEVER ROLLED. That is the posture, and it is the fixture.
+      assert.equal(await cass.logCount(), 3, 'she followed three rolls');
+      assert.equal((await cass.dbg('players')).length, 3, 'from a seat of her own');
+      const mine = (await cass.dbg('onTable')).filter((r) => r.mine);
+      assert.deepEqual(mine, [], 'and made none of them');
+      assert.ok((await bram.dbg('players')).some((p) => p.name === 'Cass'),
+        'the people rolling can still see she is here');
+    },
+  },
+  {
+    name: 'journey-different-game',
+    tags: ['journey', 'settings', 'meanings', 'profiles', 'cuj12'],
+    timeout: 150000,
+    // CUJ12 — "This table plays a different game than the last one."
+    // DONE WHEN: the interpretation system, felt, dice set and zoom are the
+    // TABLE'S, every surface re-reads under the new lens, and a player whose
+    // active profile does not match is TOLD and given a way out rather than
+    // silently mis-read.
+    //
+    // THE FAILURE THIS CATCHES: `settings-sync` proves the setting travels and
+    // `profile-systems` proves the banner exists, but nothing walks the join
+    // between them — the moment where ONE person's flip has to re-read
+    // ANOTHER person's already-landed rolls and then tell that person their
+    // character is from a different rulebook. A lens that only re-read rolls
+    // made AFTER the flip would pass both parts: the log is a render-time
+    // projection, and "re-reads in place" is a claim about rows that already
+    // exist. That is what is asserted here, on the second player's tab.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.34', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.35', name: 'Bram' });
+      await b.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+
+      // Bram is playing a character built for THIS table's game.
+      await b.dbg(`profiles.reset('soul-deal')`);
+      const made = await b.dbg(`profiles.create('Wren', 'soul-deal')`);
+      assert.equal(made.ok, true, made.status);
+      await b.waitFor(`(window.__diceDebug.profiles.active || {}).name === 'Wren'`,
+        { desc: 'Bram has his character in hand' });
+      assert.equal((await b.dbg('profiles.active')).system, 'soul-deal',
+        'bound to the rulebook it was built for');
+
+      // A roll lands under the old lens.
+      await a.roll('2d6 # Before');
+      const before = await a.rollId();
+      await b.waitFor(`(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(before)}))`,
+        { desc: 'the roll reaches Bram' });
+      assert.equal(await b.eval(`document.querySelector('#log-list .log-total').textContent.trim()`), '',
+        'a per-die lens computes no sum, so the log carries none');
+
+      // ---- the table changes games ----------------------------------------
+      await a.dbg(`setSystem('dnd')`);
+      for (const [t, who] of [[a, 'Ada'], [b, 'Bram']]) {
+        await t.waitFor(`window.__diceDebug.system === 'dnd'`,
+          { desc: `the new rulebook reaches ${who}` });
+      }
+
+      // (1) EVERY SURFACE RE-READS — including rows that already existed.
+      await b.waitFor(`document.querySelector('#log-list .log-total').textContent.trim().length > 0`,
+        { desc: 'the roll made BEFORE the flip re-reads under the new lens' });
+      const st = await b.entryState(before);
+      assert.equal(typeof st.total, 'number', 'the old roll now has a total for Bram');
+      assert.equal(await a.logTop(), await b.logTop(),
+        'and both players are reading the same re-read line');
+
+      // (2) THE MISMATCHED PLAYER IS TOLD, not silently mis-read.
+      await b.waitFor(`!!window.__diceDebug.profiles.mismatch`,
+        { desc: 'Bram is told his character is from another rulebook' });
+      const mm = await b.dbg('profiles.mismatch');
+      assert.equal((await b.dbg('profiles.active')).name, 'Wren',
+        'nothing was swapped out from under him');
+      assert.equal((await b.dbg('profiles.active')).system, 'soul-deal',
+        'and his character is still bound to the book it was written for');
+      assert.ok(JSON.stringify(mm).includes('soul-deal') || JSON.stringify(mm).includes('dnd'),
+        `the notice names the two systems (got ${JSON.stringify(mm)})`);
+
+      // (3) AND GIVEN A WAY OUT — one he chooses, which is the goal-10 half.
+      const kept = await b.dbg('profiles.keepMismatch()');
+      assert.equal(kept.ok, true, 'keeping it is a real exit');
+      assert.equal(await b.dbg('profiles.mismatchKept'), true, 'and it is remembered');
+      assert.equal((await b.dbg('profiles.active')).name, 'Wren',
+        'the character he chose to keep is the character he is holding');
+
+      await a.dbg(`setSystem('soul-deal')`);
+      for (const t of [a, b]) {
+        await t.waitFor(`window.__diceDebug.system === 'soul-deal'`, { desc: 'the table restored' });
+      }
+    },
+  },
+
+  // =========================================================================
+  // PART B — the scenarios eight parallel build steps shipped hooks for and
+  // could not write, because this file has one owner. Grouped by the item that
+  // owes them, in THE ORDER's order.
+  // =========================================================================
+
+  // ---- C15 · restore: reading back the file this app writes (CUJ13) -------
+  //
+  // CUJ13's done-when is "a library can be written to a file they hold, and
+  // RESTORED FROM THAT FILE onto a fresh browser". Until C15 the restore half
+  // did not exist: `Add all` is additive by contract, so a file landing on a
+  // browser that has ever been used renames on collision and leaves the file's
+  // own `profile:` pointer — which records WHICH character was in hand — on
+  // the floor. These prove Replace is exact where Add is additive, that the
+  // arm names what it destroys, and that every refusal leaves the old library
+  // whole.
+
+  // A portable file written by HAND rather than by exportYaml. The round trip
+  // below uses the app's own snapshot, which is the right instrument for a
+  // round trip; this one exists for the cases a snapshot cannot reach — 32
+  // profiles, a name that appears in two sections, a section from the future.
+  // Written to js/portable.js's grammar (shelf key at the block's indent,
+  // pools two deeper with '- '), so a grammar change breaks it loudly rather
+  // than letting these scenarios quietly test a file nobody could produce.
+  {
+    name: 'restore-library',
+    tags: ['portable', 'profiles', 'table-file', 'cuj13'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: the whole restore, against the Add-all path it had to
+    // be distinguished from — and the distinction is asserted rather than
+    // described. On a browser holding a character called 'Nessa', a file whose
+    // own 'Nessa' is a different character is the case where every quiet
+    // failure lives: Add lands it as 'Nessa 2' beside the original and leaves
+    // the player holding the wrong one, silently and forever. Replace must
+    // land THREE profiles, spelled exactly as the file spells them, with the
+    // file's `profile:` key in hand and the file's pools inside it.
+    async fn(ctx) {
+      // ---- one browser writes the file ---------------------------------
+      const dm = await ctx.newTable({ origin: '127.0.0.36', name: 'Author' });
+      await dm.dbg(`profiles.reset('soul-deal')`);
+      const nessa = (await dm.dbg('profiles.active')).id;
+      await dm.dbg(`profiles.rename(${JSON.stringify(nessa)}, 'Nessa')`);
+      await dm.dbg(`setGroups([{name: 'Body', notation: '3d6', category: 'Attributes'}])`);
+      for (const [name, pool] of [['Bram', '2d8'], ['Tola', '1d20']]) {
+        const made = await dm.dbg(`profiles.create(${JSON.stringify(name)}, 'soul-deal')`);
+        assert.equal(made.ok, true, made.status);
+        await dm.dbg(`setGroups([{name: 'Body', notation: '${pool}', category: 'Attributes'}])`);
+      }
+      // Nessa back in hand: THAT is what the file's `profile:` key records.
+      await dm.dbg(`profiles.use(${JSON.stringify(nessa)})`);
+      const text = await dm.dbg('portable.snapshot()');
+      assert.ok(text.includes('profile:') && text.includes("name: 'Nessa'"),
+        `the file records who was holding the rack (got ${JSON.stringify(text.slice(0, 120))})`);
+
+      // ---- another browser, already holding a different 'Nessa' ----------
+      const player = await ctx.newTable({ origin: '127.0.0.37', name: 'Player' });
+      const openBox = async () => {
+        await player.dbg('openSettings("stuff")');
+        await player.eval(`document.getElementById('portable-open').click()`);
+      };
+      const seedOwnNessa = async () => {
+        await player.dbg(`profiles.reset('soul-deal')`);
+        const own = (await player.dbg('profiles.active')).id;
+        await player.dbg(`profiles.rename(${JSON.stringify(own)}, 'Nessa')`);
+        await player.dbg(`setGroups([{name: 'Mine', notation: '4d4', category: 'Attributes'}])`);
+      };
+      await seedOwnNessa();
+      await openBox();
+
+      // (a) ADD ALL — additive by contract, and this is what that costs on the
+      //     one journey where the file is the only copy.
+      let v = await player.dbg(`portable.loadText(${JSON.stringify(text)})`);
+      assert.equal(v.ok, true, v.status);
+      const added = await player.dbg('portable.adoptAll()');
+      assert.equal(added.ok, true, added.status);
+      const afterAdd = (await player.dbg('profiles.list')).map((p) => p.name).sort();
+      assert.deepEqual(afterAdd, ['Bram', 'Nessa', 'Nessa 2', 'Tola'],
+        'Add all renames on collision — the file’s Nessa lands beside theirs as a copy');
+      assert.equal((await player.dbg('profiles.active')).name, 'Nessa',
+        'and the file’s own pointer is ignored…');
+      assert.deepEqual((await player.dbg('groups')).map((g) => g.notation), ['4d4'],
+        '…so the player is left holding the character they already had, not the file’s');
+
+      // (b) REPLACE — the same file, the same collision, restored.
+      await seedOwnNessa();
+      v = await player.dbg(`portable.loadText(${JSON.stringify(text)})`);
+      assert.equal(v.ok, true, v.status);
+      const rep = await player.dbg('portable.replace()');
+      assert.equal(rep.ok, true, rep.status);
+      const names = (await player.dbg('profiles.list')).map((p) => p.name);
+      assert.deepEqual([...names].sort(), ['Bram', 'Nessa', 'Tola'],
+        'exactly the file’s three profiles, and nothing of the old library');
+      assert.equal(names.length, 3, 'the count is the file’s count, not the file plus what was here');
+      assert.ok(!names.some((n) => /\s\d+$/.test(n)),
+        `no name landed with a copy suffix (got ${JSON.stringify(names)})`);
+      assert.equal((await player.dbg('profiles.active')).name, 'Nessa',
+        'and the profile the file says was in hand is the one in hand');
+      assert.deepEqual((await player.dbg('groups')).map((g) => g.notation), ['3d6'],
+        'holding the FILE’s Nessa — the pools came with the name');
+      assert.ok(rep.status.includes("'Nessa'"),
+        `the receipt says whose rack you are holding (got ${rep.status})`);
+      // On disk, not merely on screen: a restore that only moved a pointer in
+      // memory would survive every assertion above and none of a reload.
+      const stored = JSON.parse(await player.eval(`localStorage.getItem('dice.profiles.v1')`));
+      assert.equal(stored.profiles.length, 3, 'the library on disk is the file’s library');
+      assert.equal(stored.profiles.find((p) => p.id === stored.activeId).name, 'Nessa',
+        'and disk and screen agree about which one is in hand');
+    },
+  },
+  {
+    name: 'restore-fresh-browser',
+    tags: ['portable', 'profiles', 'table-file', 'cuj13'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: the cap arithmetic, on the exact journey C15 exists
+    // for. A full library is 32 profiles and a browser that has ever been
+    // opened already holds one dealt profile — so ADDING a full file can never
+    // fit, by one. Replace starts from empty, so 32 fit exactly; if it ever
+    // stops starting from empty, this is the scenario that says so, and it
+    // says it in the one number nobody can argue with. The second half is the
+    // half a count cannot see: the dealt profile the browser was born with has
+    // to be GONE, not sitting at the bottom of the list as a 33rd.
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.38', name: 'Fresh' });
+      await t.dbg(`profiles.reset('soul-deal')`);
+      const dealt = (await t.dbg('profiles.active')).name;
+      await t.dbg('openSettings("stuff")');
+      await t.eval(`document.getElementById('portable-open').click()`);
+
+      const text = bigPortableFile(32);
+      const v = await t.dbg(`portable.loadText(${JSON.stringify(text)})`);
+      assert.equal(v.ok, true, v.status);
+      assert.equal((await t.dbg('portable.profiles()')).length, 31,
+        'thirty-one in players:, plus the top-level rack — thirty-two profiles');
+
+      // Add all CANNOT fit it, and the shape of the failure is the point: it
+      // is additive, so 1 (the dealt one) + 32 is 33 against a ceiling of 32.
+      // It lands 31, stops out loud, and leaves the library one character
+      // short of the file with no way to tell which one from the list itself.
+      const add = await t.dbg('portable.adoptAll()');
+      assert.equal(add.ok, true, 'Add all is a partial success, not a refusal');
+      assert.ok(add.status.includes('31 profiles added'),
+        `thirty-one of thirty-two landed (got ${add.status})`);
+      assert.ok(add.status.includes('then stopped'),
+        `and it says it stopped (got ${add.status})`);
+      const partial = (await t.dbg('profiles.list')).map((p) => p.name);
+      assert.equal(partial.length, 32, 'the library is at the ceiling');
+      assert.ok(!partial.includes('Char 31'),
+        'and the file’s last character is simply not there');
+      assert.ok(partial.includes(dealt),
+        'while the profile this browser was born with took one of the 32 seats');
+
+      // Replace starts from empty, so it fits exactly.
+      await t.dbg(`profiles.reset('soul-deal')`);
+      await t.dbg(`portable.loadText(${JSON.stringify(text)})`);
+      const rep = await t.dbg('portable.replace()');
+      assert.equal(rep.ok, true, rep.status);
+      const names = (await t.dbg('profiles.list')).map((p) => p.name);
+      assert.equal(names.length, 32, 'thirty-two land, exactly');
+      assert.ok(!names.includes(dealt),
+        `and the profile this browser was born with is gone (${dealt} still present)`);
+      assert.equal((await t.dbg('profiles.active')).name, 'Zero',
+        'with the file’s own `profile:` key in hand');
+      // NOTHING WAS RENAMED TO FIT, stated as set equality rather than as a
+      // suffix regex: these names END in numbers, so a `/ \d+$/` test cannot
+      // tell 'Char 7' from a deduped 'Char 7 2' without knowing what the file
+      // said. The file is the only thing that knows, so ask it.
+      const want = ['Zero'];
+      for (let i = 1; i <= 31; i++) want.push(`Char ${i}`);
+      assert.deepEqual([...names].sort(), want.sort(),
+        'the library is the file’s names, exactly, with no copy suffixes invented');
+    },
+  },
+  {
+    name: 'restore-arm',
+    tags: ['portable', 'profiles', 'cuj13'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: the confirm, which is the only thing standing between
+    // a mis-tap and a library that existed in one browser. Three claims, each
+    // of which has a silent failure: the armed state must NAME the profiles it
+    // is about to delete (a count is a number nobody can check against their
+    // own memory), Download must be offered INSIDE the armed state (the thing
+    // being replaced may be the only copy, so the offer has to arrive before
+    // the commit), and the arm must EXPIRE — an armed destructive verb left
+    // standing is a trap for the next press of the same button.
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.39', name: 'Armed' });
+      await t.dbg(`profiles.reset('soul-deal')`);
+      const own = (await t.dbg('profiles.active')).id;
+      await t.dbg(`profiles.rename(${JSON.stringify(own)}, 'Nessa')`);
+      for (const n of ['Bram', 'Tola', 'Wren', 'Ilm']) {
+        assert.equal((await t.dbg(`profiles.create(${JSON.stringify(n)}, 'soul-deal')`)).ok, true);
+      }
+      await t.dbg('openSettings("stuff")');
+      await t.eval(`document.getElementById('portable-open').click()`);
+      await t.dbg(`portable.loadText(${JSON.stringify(bigPortableFile(3))})`);
+
+      // At rest: offered, unarmed, no Download in sight.
+      let s = await t.dbg('portable.replaceState');
+      assert.equal(s.offered, true, 'the verb is offered once the file carries profiles');
+      assert.equal(s.armed, false, 'and it is not armed at rest');
+      assert.equal(s.downloadOffered, false, 'nor is the copy-first offer shouting yet');
+      assert.equal(s.label, 'Replace my library…', 'it says what it is');
+      assert.equal(s.mine.length, 5, 'five of theirs stand to be deleted');
+      assert.equal(s.fromFile.length, 3, 'and three would land');
+
+      // The first press ARMS, and the armed state names the dead.
+      s = await t.dbg('portable.armReplace()');
+      assert.equal(s.armed, true, 'the first press arms rather than commits');
+      assert.equal((await t.dbg('profiles.list')).length, 5,
+        'and nothing whatsoever has happened to the library');
+      assert.ok(/'Nessa'/.test(s.names) && /'Bram'/.test(s.names) && /'Tola'/.test(s.names),
+        `the armed state NAMES what it will delete (got ${JSON.stringify(s.names)})`);
+      assert.ok(/2 more/.test(s.names),
+        `the first three, then a count — 32 names is a wall, not a read (got ${JSON.stringify(s.names)})`);
+      assert.ok(s.names.includes('only place they exist'),
+        `and says why that matters (got ${JSON.stringify(s.names)})`);
+      assert.equal(s.downloadOffered, true,
+        'Download is offered INSIDE the arm — the copy is offered before the commit, not after');
+      assert.equal(s.label, 'Replace with 3 from this file',
+        'and the button states the next act rather than asking one (C19)');
+
+      // A KEYSTROKE IN THE BOX DISARMS IT. An armed Replace is a promise about
+      // a specific list of names on both sides; one edit and the file it named
+      // is no longer the file it would take.
+      await t.eval(`(() => {
+        const box = document.getElementById('portable-text');
+        box.value = box.value + "\\n# a thought";
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      assert.equal((await t.dbg('portable.replaceState')).armed, false,
+        'editing the box disarms the verb it was armed against');
+
+      // …AND IT EXPIRES. 8 s, where a row's Delete uses 3 and the corner ✕
+      // uses 4: this one asks you to read a list of names and possibly take a
+      // copy first, and three seconds does not buy that.
+      s = await t.dbg('portable.armReplace()');
+      assert.equal(s.armed, true, 're-armed');
+      await sleep(5000);
+      assert.equal((await t.dbg('portable.replaceState')).armed, true,
+        'still armed at 5 s — the window is long enough to read five names in');
+      await sleep(3600);
+      assert.equal((await t.dbg('portable.replaceState')).armed, false,
+        'and gone by 8.6 s, so a stale arm is never lying in wait');
+      assert.equal((await t.dbg('profiles.list')).length, 5,
+        'through all of which the library never moved');
+    },
+  },
+  {
+    name: 'restore-refuses',
+    tags: ['portable', 'profiles', 'cuj13'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: every way the restore can fail, and the one property
+    // all of them must share — THE OLD LIBRARY IS LEFT BYTE-IDENTICAL. This is
+    // the destructive verb in an app whose durable copy is one localStorage
+    // key, so a refusal that got halfway is data loss with a ✗ next to it. The
+    // storage jam is the case that cannot happen by accident and is the one
+    // that matters most: `saveProfileStore` is called with the REPLACEMENT
+    // store before anything in the tab points at it, precisely so a browser
+    // that refuses the write leaves the old library whole in memory AND on
+    // disk. Assert the disk.
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.40', name: 'Refuser' });
+      await t.dbg(`profiles.reset('soul-deal')`);
+      const own = (await t.dbg('profiles.active')).id;
+      await t.dbg(`profiles.rename(${JSON.stringify(own)}, 'Keeper')`);
+      await t.dbg(`setGroups([{name: 'Mine', notation: '4d4', category: 'Attributes'}])`);
+      await t.dbg('openSettings("stuff")');
+      await t.eval(`document.getElementById('portable-open').click()`);
+      const disk = () => t.eval(`localStorage.getItem('dice.profiles.v1')`);
+
+      // (1) A BROWSER THAT WILL NOT STORE IT.
+      await t.dbg(`portable.loadText(${JSON.stringify(bigPortableFile(3))})`);
+      const before = await disk();
+      await t.dbg('jamStorage(true)');
+      const jammed = await t.dbg('portable.replace()');
+      await t.dbg('jamStorage(false)');
+      assert.equal(jammed.ok, false, `a refused write refuses the restore (got ${jammed.status})`);
+      assert.ok(jammed.status.includes('nothing was replaced'),
+        `and says so in those words (got ${jammed.status})`);
+      assert.equal(await disk(), before,
+        'the library on disk is byte-identical — persist first, swap second');
+      assert.equal((await t.dbg('profiles.active')).name, 'Keeper',
+        'and the player is still holding their own character');
+      assert.deepEqual((await t.dbg('groups')).map((g) => g.notation), ['4d4'],
+        'with their own pools in it');
+
+      // (2) A FILE THAT NAMES ONE CHARACTER TWICE. `profile:` and `players:`
+      // are different sections of the same document and nothing in the parser
+      // compares them, so this seam is where a "unique by construction" claim
+      // stops being true — the restore refuses rather than deduping, because a
+      // library that silently held 'Wren' and 'Wren 2' after a restore is not
+      // the library the file describes.
+      const twice = bigPortableFile(3).replace("  name: 'Zero'", "  name: 'Char 1'");
+      const v = await t.dbg(`portable.loadText(${JSON.stringify(twice)})`);
+      assert.equal(v.ok, true, 'the file itself parses — the collision is across sections');
+      const dup = await t.dbg('portable.replace()');
+      assert.equal(dup.ok, false, `a name in two places refuses (got ${dup.status})`);
+      assert.ok(/twice/.test(dup.status), `and names the problem (got ${dup.status})`);
+      assert.equal(await disk(), before, 'nothing was written');
+
+      // (3) AN EMPTY FILE IS A FAILED RESTORE. It used to read as a silent
+      // success: the box went blank, the status line went blank, and the
+      // verdict said ok — while a file of nothing but comments refused
+      // properly, so the two doors disagreed about the same emptiness.
+      const empty = await t.dbg(
+        `portable.acceptFile(new File([''], 'mine.yaml', {type: 'text/yaml'}))`);
+      assert.equal(empty.ok, false, `an empty file refuses (got ${JSON.stringify(empty.status)})`);
+      assert.ok(empty.status.startsWith('✗ '), `in the pane’s refusal grammar (got ${empty.status})`);
+      assert.ok(empty.status.includes('mine.yaml'), `naming the file (got ${empty.status})`);
+
+      // …AND AN EMPTY BOX STAYS SILENT. Clearing the textarea is the pane's
+      // resting state; painting a ✗ at somebody who is about to paste would be
+      // the same rule applied where it does not belong.
+      const quiet = await t.dbg(`portable.loadText('')`);
+      assert.equal(quiet.status, '', 'an empty BOX says nothing at all');
+      assert.equal(quiet.canApply, false, 'and arms nothing');
+      assert.equal(await disk(), before, 'and after all four, the library is untouched');
+    },
+  },
+  {
+    name: 'import-unknown-section',
+    tags: ['portable', 'profiles', 'cuj13'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: forward tolerance losing data quietly. A section this
+    // version cannot read is STEPPED OVER rather than aborting the document
+    // (PROFILES §9 decision 4) — which is right, and which costs the player
+    // whatever was in it. Before C15 the preview said a clean '✓' about a file
+    // it had silently thrown a section away from. The assertion is on
+    // `warnings`, not on the wording: a '✓' beside a non-empty warnings list is
+    // the exact state that used to read as clean. And the dress must be
+    // `caution`, NOT `warn` — the parse genuinely succeeded and Apply is
+    // legitimately armed, so a red line would say "this failed" about a file
+    // that did not.
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.41', name: 'Tolerant' });
+      await t.dbg(`profiles.reset('soul-deal')`);
+      await t.dbg(`setGroups([{name: 'Mine', notation: '4d4', category: 'Attributes'}])`);
+      await t.dbg('openSettings("stuff")');
+      await t.eval(`document.getElementById('portable-open').click()`);
+
+      // Anchored on '\npools:' so the substitution lands on the TOP-LEVEL
+      // section and not on a player's own indented `    pools:` four lines up.
+      const fromTheFuture = bigPortableFile(3).replace(
+        '\npools:\n', "\ncampaign:\n  arc: 'winter'\n  session: 12\npools:\n");
+      const v = await t.dbg(`portable.loadText(${JSON.stringify(fromTheFuture)})`);
+      assert.equal(v.warnings.length, 1,
+        `the skipped section is COUNTED, not shrugged off (got ${JSON.stringify(v.warnings)})`);
+      assert.ok(v.warnings[0].includes('campaign'),
+        `and named (got ${JSON.stringify(v.warnings[0])})`);
+      assert.ok(v.status.startsWith('⚠ '),
+        `the preview leads with the loss (got ${JSON.stringify(v.status)})`);
+      assert.ok(v.status.includes('✓'),
+        `while still saying the parse succeeded (got ${JSON.stringify(v.status)})`);
+      assert.equal(v.ok, true, 'and the verdict is not a failure');
+      assert.equal(v.canApply, true, 'Apply stays armed — the file is usable');
+      // THE DRESS, READ OFF THE ELEMENT: `caution` and not `warn`. Two classes
+      // that both exist and mean opposite things about the same line.
+      const dress = await t.eval(`(() => {
+        const el = document.getElementById('portable-status');
+        return JSON.stringify({ caution: el.classList.contains('caution'),
+                                warn: el.classList.contains('warn') });
+      })()`);
+      assert.deepEqual(JSON.parse(dress), { caution: true, warn: false },
+        'the line wears caution, never the refusal red');
+
+      // And the restore still works through it: tolerance that blocked the
+      // restore would be a different way to lose the file.
+      const rep = await t.dbg('portable.replace()');
+      assert.equal(rep.ok, true, rep.status);
+      assert.equal((await t.dbg('profiles.list')).length, 3,
+        'the readable half of the file restored');
+    },
+  },
+  {
+    name: 'boot-loss-withholds-write',
+    tags: ['portable', 'profiles', 'cuj13'],
+    timeout: 120000,
+    // WHAT THIS CATCHES — and it is the sharpest assertion in this group. Boot
+    // heals `dice.profiles.v1` through normalizeStore, which is LOSSY: past 32
+    // profiles it drops the rest. The first paint then wrote the healed,
+    // smaller store back over the original — so a DISPLAY limit became DATA
+    // LOSS before the player had touched anything, and the only evidence was a
+    // library that had quietly got shorter.
+    //
+    // Three claims, and the third is the one no count can make: the drop is
+    // REPORTED by name, the banner SAYS it, and `localStorage` STILL HOLDS ALL
+    // 35 — because the boot write is withheld while the notice stands. Until
+    // the player makes a change, they can close the tab, or open the app in a
+    // version that reads the whole key, and lose nothing.
+    async fn(ctx) {
+      const seeded = { v: 3, seq: 40, activeId: 'p1', profiles: [] };
+      for (let i = 1; i <= 35; i++) {
+        seeded.profiles.push({
+          id: `p${i}`, name: `Char ${i}`, system: 'soul-deal', at: 0,
+          pools: [{ id: 1, name: 'Body', notation: '2d6', category: 'Attributes' }],
+        });
+      }
+      const t = await tableTab(ctx, {
+        origin: '127.0.0.42',
+        seed: { 'dice.name.v1': 'Overfull', 'dice.profiles.v1': JSON.stringify(seeded) },
+      });
+      await t.waitOnline();
+
+      const loss = await t.dbg('bootLoss');
+      assert.equal(loss.overflow.length, 3,
+        `three profiles past the 32 ceiling did not load (got ${JSON.stringify(loss.overflow)})`);
+      assert.deepEqual(loss.overflow, ['Char 33', 'Char 34', 'Char 35'],
+        'and they are named, in the order the key held them');
+      assert.equal(loss.any, true, 'boot knows something was lost');
+      assert.equal((await t.dbg('profiles.list')).length, 32, 'the library in memory is the 32 that fit');
+
+      // The player is TOLD, in names rather than a count.
+      const banner = await t.dbg('dataBanner');
+      assert.equal(banner.shown, true, 'the notice stands');
+      assert.ok(banner.text.includes('Not all of it loaded'),
+        `and says what happened (got ${JSON.stringify(banner.text)})`);
+      assert.ok(banner.text.includes("'Char 33'"),
+        `naming one of the profiles that did not load (got ${JSON.stringify(banner.text)})`);
+      assert.ok(banner.text.includes('Nothing has been overwritten'),
+        `and promising the key is intact (got ${JSON.stringify(banner.text)})`);
+
+      // THE PROMISE, CHECKED. This is the assertion that fails on the pre-C15
+      // tree: an unconditional saveGroups() at boot wrote the healed 32 over
+      // the stored 35 before the banner had been read.
+      const onDisk = JSON.parse(await t.eval(`localStorage.getItem('dice.profiles.v1')`));
+      assert.equal(onDisk.profiles.length, 35,
+        'the key still holds every profile it held — the boot write was withheld');
+      assert.equal(onDisk.profiles[34].name, 'Char 35',
+        'including the last one, byte for byte');
+
+      // …and the notice comes down inside the first write that makes it false,
+      // because that write IS the overwrite it promised had not happened.
+      assert.equal((await t.dbg(`profiles.create('Newcomer', 'soul-deal')`)).ok, false,
+        'a full library refuses a 33rd rather than dropping one');
+      await t.dbg(`profiles.remove('p2')`);
+      await t.waitFor(`window.__diceDebug.dataBanner.shown === false`,
+        { desc: 'the notice retires with the write that overwrites the key' });
+      assert.equal(
+        JSON.parse(await t.eval(`localStorage.getItem('dice.profiles.v1')`)).profiles.length, 31,
+        'and the key is now what the screen says it is');
+    },
+  },
+
+  // ---- C11 + C12 · the door, on the phone it is designed for -------------
+  //
+  // Six CUJ7 scenarios were green while `#name-panel` had no max-height and no
+  // overflow inside a centred flex overlay — because every seat act in the
+  // suite goes through a `__diceDebug` verb, and a verb cannot see that the
+  // top of the panel is off the top of the screen. `el.click()` cannot see it
+  // either: the DOM fires a click on a node no finger could reach. So the two
+  // scenarios below aim REAL `Input.dispatchMouseEvent` at coordinates the
+  // page itself reports, at a viewport a phone actually has.
+  {
+    name: 'seat-picker-reach',
+    tags: ['seat', 'prepared-seat', 'chrome', 'cuj3', 'cuj7'],
+    timeout: 150000,
+    // WHAT THIS CATCHES, in one number: `seatPickerBox.clippedTop`. A centred
+    // flex child taller than its container overflows in BOTH directions, and
+    // the TOP is the half with no scrollbar — so a returning player with a
+    // full library met a door whose name field and Join button were above the
+    // top of the screen with no gesture that brought them back. Measured at
+    // −182px before the fix. Every existing CUJ7 scenario passes in that
+    // state, because a verb does not have a position and `el.click()` does not
+    // need one.
+    //
+    // The 44px floor is the platform's number, not the 34 the seat rows had.
+    // And the keyboard is the player's to open: a coarse pointer must NOT find
+    // the field holding focus when the seats land, because the software
+    // keyboard halves the layout viewport in the same frame the panel grows.
+    async fn(ctx) {
+      // A prepared table, so a returning player meets the door at all.
+      const organizer = await ctx.rawPlayer('Organizer');
+      await ctx.api('/api/table', {
+        playerId: organizer.playerId,
+        rev: 1,
+        table: { tableName: 'Session 3' },
+        profiles: [{ name: 'Rill', pools: [{ name: 'Agility', notation: '2d8' }] }],
+      });
+
+      // A FULL LIBRARY. 32 is the ceiling and a person with two campaigns'
+      // worth of characters is exactly who meets the tallest version of this
+      // panel — which is the population the defect was invisible to.
+      const store = { v: 3, seq: 32, activeId: 'p1', profiles: [] };
+      for (let i = 1; i <= 32; i++) {
+        store.profiles.push({
+          id: `p${i}`, name: `Char ${i}`, system: 'soul-deal', at: 0,
+          pools: [{ id: 1, name: 'Body', notation: '2d6', category: 'Attributes' }],
+        });
+      }
+
+      for (const [w, h, why] of [
+        [390, 844, 'the phone the door is designed for'],
+        [720, 480, 'ROADMAP §2b’s sweep size, which never landed'],
+      ]) {
+        // Device metrics and the coarse pointer BEFORE the first navigation:
+        // promptName asks `(pointer: coarse)` at boot to decide whether to
+        // raise the keyboard, so a tab that turns touch on afterwards has
+        // already answered the question wrong.
+        const p = await bootTab(ctx, {
+          origin: '127.0.0.43',
+          path: `/?room=${encodeURIComponent(ctx.room)}&as=Rill`,
+          seed: { 'dice.name.v1': 'Returning', 'dice.profiles.v1': JSON.stringify(store) },
+          device: { w, h },
+          coarse: true,
+          readyExpr: `document.getElementById('name-modal')?.classList.contains('hidden') === false`,
+          readyDesc: `the door opens at ${w}x${h}`,
+        });
+        try {
+          // The picker re-renders when the peek lands; wait for the seats
+          // rather than for a frame count.
+          await p.waitFor(`window.__diceDebug.seatPicker.seats.length === 1`,
+            { desc: `the prepared seat reaches the door at ${w}x${h}` });
+          await p.waitFor(`window.__diceDebug.seatPickerBox.rows.length >= 33`,
+            { desc: `all 32 characters plus the offered seat are listed at ${w}x${h}` });
+
+          const box = await p.dbg('seatPickerBox');
+          assert.deepEqual(box.viewport, { w, h }, `measuring at ${w}x${h} (${why})`);
+          // THE ASSERTION. Pre-fix this is true, with panel.top around −182.
+          assert.equal(box.clippedTop, false,
+            `the top of the door is on screen at ${w}x${h} (panel.top ${box.panel.top})`);
+          assert.equal(box.scrolls, true,
+            'the overflow is a scroller, which is the half that has a gesture');
+          assert.ok(box.panel.top >= 0,
+            `and nothing above it is out of reach (top ${box.panel.top})`);
+
+          // The two controls a person must be able to touch to get in at all.
+          assert.equal(box.nameInput.hit, true,
+            `the name field is the topmost thing at its own centre (${JSON.stringify(box.nameInput)})`);
+          assert.equal(box.join.hit, true,
+            `and so is Join (${JSON.stringify(box.join)})`);
+          assert.equal(box.close.hit, true, 'and so is the way out');
+
+          // THE TOUCH FLOOR, on every row, at both sizes.
+          const short = box.rows.filter((r) => r.h < 44);
+          assert.deepEqual(short, [],
+            `every seat row clears the 44px floor at ${w}x${h} (short: ${JSON.stringify(short.map((r) => [r.name, r.h]))})`);
+
+          // THE KEYBOARD IS THE PLAYER'S TO OPEN.
+          assert.notEqual(box.focused, 'name-input',
+            'a coarse pointer does not have the door raise its keyboard for it');
+
+          // A REAL PRESS, at coordinates the page reported, on the row a finger
+          // would aim at. `el.click()` here proves nothing — it is the gesture
+          // that six green scenarios were using while this surface was broken.
+          const row = box.rows.find((r) => r.hit && r.kind === 'mine');
+          assert.ok(row, `some character row is actually touchable (${JSON.stringify(box.rows.slice(0, 3))})`);
+          await realTap(p, row.cx, row.cy);
+          await p.waitFor(
+            `(window.__diceDebug.seatPicker.profilePick || '') !== ''`,
+            { desc: `a real press on a real row marks it at ${w}x${h}` });
+          assert.equal(await p.dbg('seatPicker.open'), true,
+            'and marking is not joining — browsing a list must not seat you');
+        } finally {
+          await p.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, p.page.sessionId)
+            .catch(() => {});
+          await p.emulateCoarsePointer(false).catch(() => {});
+          await p.close();
+        }
+      }
+    },
+  },
+  {
+    name: 'seat-picker-dismiss',
+    tags: ['seat', 'prepared-seat', 'chrome', 'cuj3'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: `#name-modal` was the one blocking overlay with no
+    // rung in the Esc ladder, no ✕ and no cancel — you could not look at the
+    // table before committing to a seat at it. The fix has a failure mode
+    // sharper than the defect: dismissing resolves the prompt with `null`, and
+    // `null` through `setItem` persists the STRING "null" as this browser's
+    // display name for good. That is a permanent, silent corruption of the one
+    // key an origin has for who you are, and nothing on screen would show it —
+    // so it is asserted directly.
+    //
+    // A FOCUSED INPUT OWNS Esc (the global ladder returns early on `typing`),
+    // so the press is dispatched at the field, which on a fine pointer is
+    // where the focus already is. Escape from anywhere else is a weaker test.
+    async fn(ctx) {
+      const host = await ctx.newTable({ origin: '127.0.0.44', name: 'Host' });
+      const organizer = await ctx.rawPlayer('Organizer');
+      await ctx.api('/api/table', {
+        playerId: organizer.playerId,
+        rev: 1,
+        table: { tableName: 'Session 3' },
+        profiles: [{ name: 'Rill', pools: [{ name: 'Agility', notation: '2d8' }] }],
+      });
+      // The raw organizer holds a seat of its own, so the claim is that the
+      // roster does not GROW — a fixed count would be asserting how the
+      // fixture was built rather than what the dismissal did.
+      const seatedBefore = (await host.dbg('players')).length;
+
+      const p = await ctx.newTable({ origin: '127.0.0.45', anon: true, query: '&as=Rill' });
+      // By NAME, not by count: a seated player publishes their own library to
+      // the room and the peek offers those seats too, so a count here would be
+      // asserting how many characters the host happens to be carrying.
+      await p.waitFor(
+        `window.__diceDebug.seatPicker.seats.some((s) => s.name === 'Rill')`,
+        { desc: 'the door is up with the seat the link names' });
+      assert.equal(await p.dbg('seatPickerBox.focused'), 'name-input',
+        'a fine pointer keeps the focus — typing your name is the whole point of the field');
+
+      // Esc, from inside the field that owns it.
+      await p.eval(`document.getElementById('name-input').dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`);
+      await p.waitFor(`window.__diceDebug.seatPicker.open === false`,
+        { desc: 'Escape inside the focused field closes the door' });
+      assert.equal(await p.dbg('seatPicker.declined'), true,
+        'and the app knows this is LOOKING, not joining — `open:false` alone cannot tell them apart');
+
+      // THE STRING "null" NEVER REACHES THE KEY.
+      const stored = await p.eval(`localStorage.getItem('dice.name.v1')`);
+      assert.notEqual(stored, 'null',
+        'the dismissal sentinel never becomes this browser’s display name');
+      assert.equal(stored, null, 'nothing was stored at all — you did not sit down');
+
+      // NOBODY AT THE TABLE WAS TOLD ANYONE CAME TO THE DOOR.
+      await sleep(500);
+      assert.equal((await host.dbg('players')).length, seatedBefore,
+        'the host’s roster never grew — looking is not arriving');
+      assert.equal(await p.dbg('net.playerId'), null, 'and no join was ever sent');
+
+      // …AND THE DOOR IS STILL OPEN. The way back is the presence row's own
+      // slot, which is where "what you can do about your presence" lives.
+      const row = await p.dbg('presenceRow');
+      assert.ok(row.ghosts.some((g) => g.label === 'Take a seat'),
+        `the way back in stands where you left it (got ${JSON.stringify(row.ghosts.map((g) => g.label))})`);
+      // And the felt is the player's own: a dismissed door leaves the same
+      // state a `?room=` with no server already lands in.
+      await p.roll('2d6');
+      assert.ok(await p.diceCount() > 0, 'they can still roll their own dice while they look');
+      await sleep(500);
+      assert.equal((await host.dbg('players')).length, seatedBefore,
+        'and rolling did not seat them either');
+    },
+  },
+  {
+    name: 'seat-picker-carries-pick',
+    tags: ['seat', 'prepared-seat', 'profiles', 'cuj7'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: 'Stay as ⟨name⟩' is the door U3 built for exactly the
+    // population an invite link is sent to — somebody who has used the app
+    // before — and it FORFEITED the character the link offered, silently, one
+    // line under a hint that says the link offers one. It called takeFreeSeat
+    // directly, and only promptName's own `submit` copies the pending pick
+    // across the join. And `&as=` had stopped pre-selecting anything at all:
+    // the highlight lived in a loop over the retired `#seat-list`.
+    //
+    // Both halves land in one place — the sub-label — so both are asserted
+    // through it: the link's seat is the default pick, the door SAYS which
+    // character is riding along, and pressing it puts that character in your
+    // hands under your own name.
+    async fn(ctx) {
+      const organizer = await ctx.rawPlayer('Organizer');
+      await ctx.api('/api/table', {
+        playerId: organizer.playerId,
+        rev: 1,
+        table: { tableName: 'Session 3' },
+        profiles: [
+          { name: 'Ada', pools: [{ name: 'Wit', notation: '3d6' }] },
+          { name: 'Bo', pools: [{ name: 'Agility', notation: '2d8' }] },
+        ],
+      });
+
+      const p = await ctx.newTable({
+        origin: '127.0.0.46', name: 'Joe', anon: true, query: '&as=Bo',
+      });
+      await p.waitFor(`window.__diceDebug.seatPicker.seats.length === 2`,
+        { desc: 'both prepared seats reach the door' });
+      const picker = await p.dbg('seatPicker');
+      assert.equal(picker.preselect, 'Bo', 'the link pre-selects the seat it names');
+      assert.equal(picker.profilePick, 'copy:Bo',
+        'and that is what the door is holding for you — pre-fix this is null');
+      assert.equal(picker.chosen, null, 'while nothing is taken for you');
+
+      // THE SUB-LABEL. The forfeit that used to be silent, said at the door.
+      assert.ok(picker.keepName, 'the returning player is offered their own name back');
+      assert.equal(picker.keepName.carries, 'with Bo',
+        `and the door says which character comes with it (got ${JSON.stringify(picker.keepName)})`);
+      assert.ok(picker.keepName.label.includes('Stay as Joe'),
+        `under the name they arrived with (got ${JSON.stringify(picker.keepName.label)})`);
+
+      // Pressing it: their own NAME, the link's CHARACTER. Pre-fix this lands
+      // as Joe with no Bo at all.
+      await p.eval(`document.getElementById('seat-keep-name').click()`);
+      await p.waitOnline();
+      // No preview on this door, deliberately: preview-then-apply guards a
+      // rack you RECEIVE without asking, and this player pressed a button
+      // whose own sub-label says which character is coming. The pick is
+      // settled once the roster is up, because the peek knows a character's
+      // name and pool COUNT and never its pools — the copy cannot be made
+      // until `hello` brings the real thing.
+      await p.waitFor(`(window.__diceDebug.profiles.active || {}).name === 'Bo'`,
+        { desc: 'the character the door named lands in their hands' });
+
+      assert.equal((await p.dbg('identity')).name, 'Joe',
+        'seated under the name they already use');
+      assert.deepEqual((await p.dbg('groups')).map((g) => g.notation), ['2d8'],
+        'holding the character the link offered');
+      const names = (await p.dbg('profiles.list')).map((x) => x.name);
+      assert.ok(names.includes('Bo'), `and it is theirs now (got ${JSON.stringify(names)})`);
+      assert.ok(names.length >= 2, 'beside whatever they already had — nothing was overwritten');
+    },
+  },
+
+  // ---- C25 Stage 2 + C14 · the record, and finding a roll in it ----------
+  //
+  // Stage 1 took the shelf off the felt and deliberately left one thing worse:
+  // with the log closed, a put-away roll had NO ambient presence at all. The
+  // count it did have lived in a `title` and in a debug hook — and the ≣'s
+  // `aria-label` was the static string "Roll log", which OUTRANKS `title` in
+  // the accessible-name algorithm, so the one channel the count had was the
+  // one channel a screen reader ignores. A scenario asserting on a badge
+  // number would have been green through all of it.
+  {
+    name: 'record-at-rest',
+    tags: ['log', 'shelf', 'chrome', 'cuj9'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: a count nobody can perceive. The assertion is on
+    // `spoken` — the ≣ button's COMPUTED accessible name — because that is the
+    // channel the defect lived in, and because a spine of coloured ranks and a
+    // spoken sentence are the same fact at two scales. `spine` and `panels` are
+    // element counts off the rendered DOM for the same reason: a record that
+    // knows about five rolls and draws none of them is the failure this
+    // surface exists to undo.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.47', name: 'Ada' });
+      assert.equal((await a.dbg('logFlyout')).open, false,
+        'the flyout starts CLOSED — that is the state with the defect in it');
+
+      for (const n of ['one', 'two', 'three', 'four']) await a.roll(`2d6 # ${n}`);
+      await a.settle();
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.length === 3)`,
+        { desc: 'three finished rolls tidy themselves away' });
+
+      const rec = await a.dbg('record');
+      assert.equal((await a.dbg('logFlyout')).open, false, 'and the panel is still shut');
+      assert.ok(rec.spoken.includes('3 rolls put away'),
+        `the closed rail SAYS what the record holds (got ${JSON.stringify(rec.spoken)})`);
+      assert.ok(rec.spoken.includes('3 new since you looked'),
+        `and how much of it is new (got ${JSON.stringify(rec.spoken)})`);
+      assert.ok(rec.spoken.startsWith('Roll log'),
+        `still named, not replaced by its own count (got ${JSON.stringify(rec.spoken)})`);
+      // THE SPINE IS DRAWN, not merely known: one rank per put-away roll.
+      assert.equal(rec.spine, 3, 'three ranks on the closed scale');
+      assert.deepEqual(rec.ranks.map((r) => r.unread), [true, true, true],
+        'all three arrived while nobody was looking');
+
+      // OPENING THE PANEL IS THE READING. Not a badge driven to zero — the
+      // ranks persist and dim; history is reference, not an inbox.
+      await a.dbg('setLogFlyout(true)');
+      await a.waitFor(`window.__diceDebug.record.ranks.every((r) => !r.unread)`,
+        { desc: 'looking is what marks them read' });
+      const open = await a.dbg('record');
+      assert.equal(open.panels, 3, 'the open scale draws the same three, as panels');
+      assert.equal(open.spine, 3, 'and the spine does not empty — it dims');
+      assert.ok(!open.spoken.includes('new since you looked'),
+        `nothing is new any more (got ${JSON.stringify(open.spoken)})`);
+      assert.ok(open.spoken.includes('3 rolls put away'), 'while the count itself persists');
+      assert.deepEqual(open.ranks.map((r) => r.rank), [1, 2, 3], 'ranked oldest to newest');
+      assert.deepEqual(open.ranks.map((r) => r.readout), ['one', 'two', 'three'],
+        'and a per-die system reads each panel by what the roll was CALLED — '
+        + 'insisting on a total would print an em dash on every roll of the default profile');
+      await a.dbg('setLogFlyout(false)');
+    },
+  },
+  {
+    name: 'record-awaiting',
+    tags: ['log', 'shelf', 'visibility', 'cuj9', 'cuj10'],
+    timeout: 120000,
+    // WHAT THIS CATCHES: `awaiting` is sharper than `hidden`, and the sharpness
+    // is the whole point — a roll you have no authority to reveal is not
+    // waiting on YOU. The retired marker wrote "— hidden" into its aria-label
+    // and NOWHERE else, so a screen-reader user was told which put-away roll
+    // awaited its reveal and a sighted player was not. Both channels carry it
+    // now, and the second tab is what proves the distinction is real rather
+    // than a rename: same roll, same record, `hidden` true on both, `awaiting`
+    // true on exactly one.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.48', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.49', name: 'Bram' });
+
+      await a.roll('d20 held # Behind the screen');
+      const held = await a.rollId();
+      await b.waitFor(shroudSettled(held), { desc: 'the shroud reaches Bram' });
+      // A second roll retires the first into the record.
+      await a.roll('2d6 # After');
+      await a.settle();
+      for (const [t, who] of [[a, 'Ada'], [b, 'Bram']]) {
+        await t.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.length === 1)`,
+          { desc: `the held roll is in ${who}'s record` });
+      }
+
+      const ra = (await a.dbg('record')).ranks;
+      assert.equal(ra.length, 1, 'one roll in the record');
+      assert.equal(ra[0].rollId, held, 'and it is the held one');
+      assert.equal(ra[0].hidden, true, 'the roller cannot read their own held roll either');
+      assert.equal(ra[0].awaiting, true, 'but it is waiting on THEM');
+      assert.equal(ra[0].readout, '?', 'so the panel reads ?, not a number it does not have');
+      assert.equal((await a.dbg('record')).ranks.filter((r) => r.awaiting).length, 1,
+        'exactly one thing is waiting to be revealed');
+      assert.ok((await a.dbg('record')).spoken.includes('1 waiting to be revealed'),
+        `and the closed rail says so out loud (got ${JSON.stringify((await a.dbg('record')).spoken)})`);
+
+      const rb = (await b.dbg('record')).ranks;
+      assert.equal(rb[0].rollId, held, 'the same roll is in the bystander’s record');
+      assert.equal(rb[0].hidden, true, 'still hidden for him');
+      assert.equal(rb[0].awaiting, false,
+        'and NOT waiting on him — he has no authority to reveal it');
+      assert.ok(!(await b.dbg('record')).spoken.includes('waiting'),
+        `so his rail does not ask him for something he cannot do `
+        + `(got ${JSON.stringify((await b.dbg('record')).spoken)})`);
+
+      // The reveal clears it on both, from the one seat that holds it.
+      await a.dbg(`reveal(${JSON.stringify(held)})`);
+      for (const [t, who] of [[a, 'Ada'], [b, 'Bram']]) {
+        await t.waitFor(`(window.__diceDebug.sim(240),
+          window.__diceDebug.record.ranks.every((r) => !r.hidden && !r.awaiting))`,
+        { desc: `the record stops withholding for ${who}` });
+        assert.notEqual((await t.dbg('record')).ranks[0].readout, '?',
+          `${who}'s panel now carries the roll's own read`);
+      }
+    },
+  },
+  {
+    name: 'record-find',
+    tags: ['log', 'shelf', 'visibility', 'cuj9', 'cuj10'],
+    timeout: 150000,
+    // WHAT THIS CATCHES — two things, and the second is a goal-11 leak with a
+    // text box in front of it.
+    //
+    // (1) A FILTER IS A CLAIM ABOUT WHAT THE LIST IS SHOWING, so an ARRIVAL has
+    //     to be judged by it. Otherwise the one row that ignores the filter is
+    //     the newest one, which is the row a player is most likely to be
+    //     looking at.
+    // (2) THE FILTER MATCHES ON A TOTAL — and a hidden roll's total is a number
+    //     nobody at that seat may see. A filter that matched it would answer a
+    //     question the card refuses, by the oldest trick there is: type a guess
+    //     and watch what survives.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.50', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.51', name: 'Bram' });
+      const c = await ctx.newTable({ origin: '127.0.0.52', name: 'Cass' });
+      for (const t of [b, c]) {
+        await t.waitFor(`window.__diceDebug.players.length === 3`, { desc: 'three seats' });
+      }
+      // A totals system, because a total is the thing being protected here.
+      for (const t of [a, b, c]) await t.dbg(`setSystem('dnd')`);
+      for (const t of [a, b, c]) {
+        await t.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'totals lens' });
+      }
+      for (const t of [a, b, c]) await t.dbg('setLogFlyout(true)');
+
+      // ---- (1) the arrival is judged by the filter ------------------------
+      await a.roll('2d6 # Errand');
+      await a.roll('2d6 # Digging');
+      await a.settle();
+      assert.equal(await a.dbg(`setLogFind('errand')`), 'errand', 'the query lands lowercased');
+      assert.equal((await a.dbg('logFind')).shown, 1, 'one of two rows survives it');
+      await a.roll('2d6 # Unrelated');
+      await a.settle();
+      assert.equal((await a.dbg('logFind')).total, 3, 'a third roll is in the log');
+      assert.equal((await a.dbg('logFind')).shown, 1,
+        'and the filter judged it on arrival — the newest row is not exempt');
+      assert.ok((await a.dbg('logFind')).note.includes('1 of 3'),
+        `and the count says so (got ${JSON.stringify((await a.dbg('logFind')).note)})`);
+      await a.dbg(`setLogFind('')`);
+      assert.equal((await a.dbg('logFind')).shown, 3, 'clearing it shows everything again');
+
+      // ---- (2) a hidden total is not searchable ---------------------------
+      // A whisper: Cass may read it, Bram may not. Bram's log holds exactly one
+      // row, so "did the filter match" needs no disambiguation at all.
+      await b.waitFor(`(window.__diceDebug.sim(120), document.getElementById('log-list').childElementCount === 3 && !window.__diceDebug.busy)`,
+        { desc: 'the three open rolls reach Bram' });
+      await a.roll('4d10 w:Cass # For Cass');
+      const whisper = await a.rollId();
+      await c.waitFor(`(window.__diceDebug.sim(120), (window.__diceDebug.entryState(${JSON.stringify(whisper)}) || {}).hidden === false)`,
+        { desc: 'the audience reads it' });
+      await b.waitFor(`(window.__diceDebug.sim(120), !!window.__diceDebug.entryState(${JSON.stringify(whisper)}))`,
+        { desc: 'the bystander learns it happened' });
+      await b.settle();
+      const total = (await c.entryState(whisper)).total;
+      assert.equal(typeof total, 'number', 'the audience has a real number to search for');
+      assert.equal((await b.entryState(whisper)).total, null, 'and the bystander has none');
+
+      // THE POSITIVE CONTROL FIRST: a readable total IS searchable, or the
+      // negative below proves nothing.
+      await c.dbg(`setLogFind(${JSON.stringify(String(total))})`);
+      assert.ok((await c.dbg('logFind')).shown >= 1,
+        `the audience can find their own roll by its total (${total})`);
+
+      // THE NEGATIVE. Bram's whisper row must not answer to the number.
+      await b.dbg(`setLogFind(${JSON.stringify(String(total))})`);
+      const hit = await b.eval(`(() => {
+        const row = document.querySelector('#log-list .log-entry[data-roll-id="'
+          + ${JSON.stringify(whisper)} + '"]');
+        return row ? !row.classList.contains('log-filtered') : null;
+      })()`);
+      assert.equal(hit, false,
+        `guessing the total does not reveal that the guess was right (${total})`);
+      // …while the fields goal 11 DOES allow still match the same row.
+      await b.dbg(`setLogFind('ada')`);
+      const byName = await b.eval(`(() => {
+        const row = document.querySelector('#log-list .log-entry[data-roll-id="'
+          + ${JSON.stringify(whisper)} + '"]');
+        return row ? !row.classList.contains('log-filtered') : null;
+      })()`);
+      assert.equal(byName, true,
+        'the roller’s name is not a secret, so the shrouded row is still findable');
+      for (const t of [a, b, c]) { await t.dbg(`setLogFind('')`); await t.dbg(`setSystem('soul-deal')`); }
+    },
+  },
+  {
+    name: 'peek-retires',
+    tags: ['log', 'shelf', 'chrome', 'cuj9'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: the peek closed on NOTHING a player expects — not a
+    // new roll, not a ceremony, not the log — while sitting at z 30 above all
+    // three. A card standing over the table for a roll two rolls ago is the
+    // same staleness a new roll retires the banner for, and it is how two cards
+    // came to wear `✕ Clear` for two different rolls with nothing marking which
+    // was live.
+    //
+    // Four legs, and the fourth is the one a naive "close it on everything"
+    // fix breaks: a card with its ± popover OPEN is being EDITED, and a new
+    // roll landing behind it must not pull the editor out from under the
+    // player's hands.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.53', name: 'Ada' });
+      const peekOpen = () => a.eval(
+        `!document.getElementById('peek-card').classList.contains('hidden')`);
+
+      const putAway = async (label) => {
+        await a.roll(`2d6 # ${label}`);
+        const rid = await a.rollId();
+        await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
+        await a.waitFor(`(window.__diceDebug.sim(240),
+          window.__diceDebug.record.ranks.some((r) => r.rollId === ${JSON.stringify(rid)}))`,
+        { desc: `'${label}' reaches the record` });
+        return rid;
+      };
+      const first = await putAway('First');
+      await a.dbg('setLogFlyout(true)');
+
+      // (i) A NEW ROLL RETIRES A STALE CARD…
+      assert.equal(await a.dbg(`peek(${JSON.stringify(first)})`), first, 'the card is up');
+      assert.equal(await peekOpen(), true, 'and on screen');
+      await a.roll('1d4 # Second');
+      await a.settle();
+      assert.equal(await a.dbg('peekState'), null,
+        'a new roll retires a card that was about an older one');
+      assert.equal(await peekOpen(), false, 'and it is gone from the screen, not merely forgotten');
+
+      // (ii) …BUT NOT THE ROLL'S OWN CARD. A reroll landing under its parent's
+      // card is not a stale card.
+      const own = await a.rollId();
+      await a.dbg(`collectRoll(${JSON.stringify(own)})`);
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.some(
+        (r) => r.rollId === ${JSON.stringify(own)}))`, { desc: 'Second is put away' });
+      assert.equal(await a.dbg(`peek(${JSON.stringify(own)})`), own, 'its own card is up');
+      await a.eval(`document.querySelector('#peek-card .pk-again').click()`);
+      await a.waitFor(`(window.__diceDebug.sim(120), !window.__diceDebug.busy
+        && window.__diceDebug.currentRoll && window.__diceDebug.currentRoll.rollId !== ${JSON.stringify(own)})`,
+      { desc: 'the reroll lands' });
+      await a.settle();
+
+      // (iii) A CEREMONY RAISES A LAYER OVER THE WHOLE TABLE, and the card must
+      // let go the moment that layer appears — every path that raises it (roll,
+      // offer claim, resync replay) converges on the one class this watches.
+      const third = await putAway('Third');
+      assert.equal(await a.dbg(`peek(${JSON.stringify(third)})`), third, 'the card is up again');
+      await a.dbg(`commandRoll('1d20 check # Steady')`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(30), ['declare','tumble'].includes((window.__diceDebug.ceremonyState || {}).phase))`,
+        { desc: 'the ceremony declares' });
+      assert.equal(await peekOpen(), false, 'the card let go when the ceremony rose over it');
+      await a.waitFor(`(window.__diceDebug.skipCeremony(), window.__diceDebug.sim(60),
+        (window.__diceDebug.ceremonyState || {}).phase === 'done')`, { desc: 'ceremony done' });
+      await a.dbg('retireCeremony()');
+      await a.settle();
+
+      // (iv) THE CARD GOES WITH THE LOG. It anchors to a row inside that panel,
+      // so closing the panel takes its anchor away — a card floating over the
+      // felt with a ✕ that acts on a roll you can no longer see is worse than
+      // no card.
+      assert.equal(await a.dbg(`peek(${JSON.stringify(third)})`), third, 'up once more');
+      await a.dbg('setLogFlyout(false)');
+      assert.equal(await a.dbg('peekState'), null, 'closing the record closes the card');
+
+      // (v) A PINNED ± POPOVER IS AN EDITOR, AND A NEW ROLL MUST NOT TAKE IT.
+      // The peek pins while its own popover lives; closePeek returns early on
+      // a pinned card precisely so this leg is true. Without it, "retire the
+      // card on every new roll" would be a fix that closes an open editor
+      // mid-keystroke every time somebody else at the table rolls.
+      await a.dbg('setLogFlyout(true)');
+      await a.dbg(`peek(${JSON.stringify(third)})`);
+      await a.eval(`document.querySelector('#log-list .log-entry.collected')
+        .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`);
+      await a.waitFor(`window.__diceDebug.popover.open === true`,
+        { desc: 'the card’s ± popover opens' });
+      assert.equal(await peekOpen(), true, 'with the card standing as its anchor');
+      await a.roll('1d4 # Interrupting');
+      await a.settle();
+      assert.equal(await a.dbg('popover.open'), true,
+        'a roll landing behind an open editor does NOT close it');
+      assert.equal(await peekOpen(), true, 'nor the card it is anchored to');
+      await a.dbg('closePopover()');
+      await a.dbg('peek(null)');
+      await a.dbg('setLogFlyout(false)');
+    },
+  },
+
+  // ---- C28 ② · a deferred room change rides the PREDICATE, not a call site --
+  //
+  // The mat is the PHYSICS WALLS. A seeded roll replayed against different
+  // walls lands differently, so a zoom or a tower may not land mid-roll — it
+  // waits for a boundary. `tableIsBusyForZoom()` names three things that hold
+  // one back (an in-flight roll, a queued roll, a reveal flip), and hanging the
+  // flush off each place a roll can END was tried and MISSED FOUR:
+  // ceremonyFinish, clearTable, stepRevealing's last flip, and the skip drain.
+  // All four fail the same silent way — a client sits on the old preset while
+  // the room has moved — which is exactly the divergence the deferral exists to
+  // prevent. Three scenarios, one per release path that had no completion hook.
+  {
+    name: 'defer-ceremony-zoom',
+    tags: ['settings', 'zoom', 'roll', 'ceremony', 'cuj12'],
+    timeout: 150000,
+    // WHAT THIS CATCHES, and it is the one ROADMAP C28 ② names: a zoom that
+    // arrives while a CEREMONY is running. `queueLength === 0` is the assertion
+    // that makes it specific — the queue is empty, so the only thing holding
+    // the change back is the ceremony's own in-flight roll, and a flush hung
+    // off the roll QUEUE draining would fire immediately and land the new walls
+    // under a film baked against the old ones.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.54', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.55', name: 'Bram' });
+      for (const t of [a, b]) {
+        await t.waitFor(`window.__diceDebug.zoom === 'wide'`, { desc: 'both start wide' });
+      }
+
+      // Ada is INSIDE a ceremony. Headless never fires rAF, so the world only
+      // advances where this scenario says `sim()` — the beat holds.
+      await a.dbg(`commandRoll('1d20 check # Steady the rope')`);
+      await a.waitFor(
+        `['declare','tumble'].includes((window.__diceDebug.ceremonyState || {}).phase)`,
+        { desc: 'the ceremony is running on Ada' });
+
+      // Bram changes the room's zoom.
+      await b.dbg(`setZoom('close')`);
+      await b.waitFor(`window.__diceDebug.zoom === 'close'`, { desc: 'it lands on Bram' });
+      await a.waitFor(`window.__diceDebug.pendingZoom === 'close'`,
+        { desc: 'and PARKS on Ada rather than landing mid-film' });
+
+      assert.equal(await a.dbg('queueLength'), 0,
+        'nothing is queued — the ceremony itself is what is holding the change');
+      assert.equal(await a.dbg('zoom'), 'wide', 'so Ada is still on the old preset…');
+      const wide = await a.dbg(`zoomPreset('wide')`);
+      let wp = await a.dbg('wallPositions()');
+      assert.ok(Math.abs(wp.right.x - wide.w / 2) < 1e-6,
+        `…and so are her WALLS, which is the half that matters (got ${wp.right.x})`);
+
+      // The beat ends. The flush is asked once a frame rather than wired to
+      // this particular ending, so skipping is a release path like any other.
+      await a.waitFor(
+        `(window.__diceDebug.skipCeremony(), window.__diceDebug.sim(60),
+          window.__diceDebug.pendingZoom === null && !window.__diceDebug.busy)`,
+        { desc: 'the deferred zoom lands when the beat ends' });
+      assert.equal(await a.dbg('zoom'), 'close', 'Ada is on the room’s preset now');
+
+      const want = await a.dbg(`zoomPreset('close')`);
+      for (const [t, tag] of [[a, 'Ada'], [b, 'Bram']]) {
+        wp = await t.dbg('wallPositions()');
+        assert.ok(Math.abs(wp.right.x - want.w / 2) < 1e-6,
+          `${tag}: right wall at the close preset (${wp.right.x} vs ${want.w / 2})`);
+        assert.ok(Math.abs(wp.back.z + want.d / 2) < 1e-6,
+          `${tag}: back wall too (${wp.back.z} vs ${-want.d / 2})`);
+      }
+      assert.deepEqual(await a.dbg('wallPositions()'), await b.dbg('wallPositions()'),
+        'and the two players are standing in the same room again');
+      await a.dbg('retireCeremony()');
+    },
+  },
+  {
+    name: 'defer-clear-zoom',
+    tags: ['settings', 'zoom', 'roll', 'cuj12'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: `clearTable()` sets `done` and empties the queue in
+    // one act, so it ends a roll WITHOUT passing through any of the completion
+    // paths a per-call-site flush would have been wired to. A deferred zoom
+    // parked behind a roll that is then swept off the felt used to sit there
+    // until the NEXT roll ended — and if nobody rolled again, forever.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.56', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.57', name: 'Bram' });
+
+      await a.dbg(`commandRoll('4d6 # Mid-flight')`);
+      await a.waitFor(`!!window.__diceDebug.currentRoll && !window.__diceDebug.currentRoll.done`,
+        { desc: 'a roll is in flight on Ada' });
+      await b.dbg(`setZoom('close')`);
+      await a.waitFor(`window.__diceDebug.pendingZoom === 'close'`,
+        { desc: 'the zoom parks behind it' });
+      assert.equal(await a.dbg('queueLength'), 0, 'with nothing queued behind it either');
+
+      // Bram is watching the same roll, so HIS zoom is parked behind his own
+      // copy of it — which is the deferral working per client, and the reason
+      // the comparison at the end has to let him finish too.
+      assert.equal(await b.dbg('pendingZoom'), 'close',
+        'the spectator defers his own change behind his own playback');
+
+      // The sweep. Not a completion — an interruption.
+      await a.dbg('clearTable()');
+      await a.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.pendingZoom === null)`,
+        { desc: 'the swept roll releases the deferred zoom' });
+      assert.equal(await a.dbg('zoom'), 'close', 'Ada caught up with the room');
+      assert.equal(await a.diceCount(), 0, 'and the felt is what the sweep left');
+      await b.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.pendingZoom === null)`,
+        { desc: 'and Bram’s lands when his own playback ends' });
+      assert.deepEqual(await a.dbg('wallPositions()'), await b.dbg('wallPositions()'),
+        'both players are in the same room');
+    },
+  },
+  {
+    name: 'defer-reveal-zoom',
+    tags: ['settings', 'zoom', 'visibility', 'cuj12'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: a REVEAL FLIP is a live pose-drive — dice are being
+    // rotated to their real faces — so it holds a zoom back for the same reason
+    // a tumble does. And it is the busy source with NO completion hook at all:
+    // there is no ceremonyFinish, no queue drain, no roll ending. Nothing to
+    // hang a flush off, which is the argument for asking the predicate once a
+    // frame instead.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.58', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.59', name: 'Bram' });
+
+      await a.roll('4d20 held # Behind the screen');
+      const held = await a.rollId();
+      await a.settle();
+      assert.equal(await a.dbg('busy'), false, 'the roll itself is finished');
+
+      await a.dbg(`reveal(${JSON.stringify(held)})`);
+      await a.waitFor(`window.__diceDebug.revealingCount > 0`,
+        { desc: 'the flip is running' });
+      await b.dbg(`setZoom('close')`);
+      await a.waitFor(`window.__diceDebug.pendingZoom === 'close'`,
+        { desc: 'the zoom parks behind the flip' });
+
+      // The discriminator: nothing else is busy. A flush wired to "a roll
+      // ended" would have fired already and moved the walls under the flip.
+      assert.equal(await a.dbg('queueLength'), 0, 'no queued roll is holding it');
+      assert.equal(await a.eval(`(window.__diceDebug.currentRoll || { done: true }).done`), true,
+        'and no roll is in flight — the flip is the only thing holding it');
+      assert.equal(await a.dbg('zoom'), 'wide', 'so Ada is still on the old preset');
+
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), window.__diceDebug.revealingCount === 0
+          && window.__diceDebug.pendingZoom === null)`,
+        { desc: 'the last flip releases the deferred zoom' });
+      assert.equal(await a.dbg('zoom'), 'close', 'Ada caught up with the room');
+      await b.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.pendingZoom === null)`,
+        { desc: 'Bram’s own copy of the flip releases his' });
+      assert.deepEqual(await a.dbg('wallPositions()'), await b.dbg('wallPositions()'),
+        'and the walls agree, which is what the deferral is protecting');
+      assert.equal((await a.entryState(held)).hidden, false, 'the reveal itself still landed');
+    },
+  },
+  {
+    name: 'spawn-inside-walls',
+    tags: ['roll', 'perf', 'cuj8'],
+    timeout: 300000,
+    // C28 ① — NO DIE IS BORN INSIDE A WALL, and the ROADMAP's own diagnosis of
+    // this was wrong in a way worth keeping in front of whoever reads the
+    // scenario. It checked the X axis, found the spread never went negative
+    // there, and concluded the bug did not exist. But `Math.min(TABLE_W - 4.4,
+    // …)` was applied to all FOUR throw sides, and two of them spread along Z,
+    // where the mat is 6.7 rather than 11. Measured over 144 paired throws: 16
+    // started a die through a wall plane, worst 0.29 units in — invisible in
+    // the film and a frame-zero contact storm in the recorder.
+    //
+    // So this scenario carries a NEGATIVE CONTROL, and it is not decoration:
+    // `clear` is a derived number, and a probe that always answers ≥ 0 —
+    // because the sign convention flipped, say, or because the line stopped
+    // being recorded at all — would pass this scenario forever while measuring
+    // nothing. `axis: 'width'` is the pre-2026-08-14 formula, still reachable
+    // through setSpawn precisely so the instrument can be shown to work.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.60', name: 'Ada' });
+      // The tightest mat, which is where the room to spread is smallest.
+      await a.dbg(`setZoom('close')`);
+      await a.waitFor(`window.__diceDebug.zoom === 'close'`, { desc: 'the close mat' });
+
+      const sweep = async (seeds) => {
+        const out = [];
+        for (let i = 0; i < seeds; i++) {
+          await a.roll('3d20');
+          const line = await a.dbg('spawnLine()');
+          assert.equal(line.length, 3, `every die of throw ${i} is on the line`);
+          out.push(...line);
+          await a.dbg('clearTable()');
+          await a.dbg('sim(240)');
+        }
+        return out;
+      };
+
+      // THE SHIPPED THROW. d20s, because a big die's hull is what eats the
+      // clearance, and the clamp works per die off that die's own hull.
+      const shipped = await sweep(12);
+      const worst = Math.min(...shipped.map((d) => d.clear));
+      assert.ok(shipped.length === 36, `36 dice measured (got ${shipped.length})`);
+      assert.ok(worst >= 0,
+        `no die is born inside a wall over 12 seeds (worst clearance ${worst}, `
+        + `offenders ${JSON.stringify(shipped.filter((d) => d.clear < 0))})`);
+      assert.ok(shipped.some((d) => d.side === 0 || d.side === 1),
+        'and the sweep reached the sides that spread along Z, which is where the bug was');
+
+      // THE NEGATIVE CONTROL. The old formula, on the same mat, with the same
+      // dice: if this does not produce a die through a wall, the measurement
+      // above is not measuring anything.
+      await a.dbg(`setSpawn({axis: 'width'})`);
+      try {
+        const old = await sweep(20);
+        const bad = old.filter((d) => d.clear < 0);
+        assert.ok(bad.length > 0,
+          `the pre-fix formula still puts dice through walls, so the probe works `
+          + `(0 of ${old.length} negative — if this is ever 0, the instrument is broken, `
+          + `not the fix vindicated)`);
+      } finally {
+        await a.dbg(`setSpawn({axis: 'clamp'})`);
+      }
+      assert.equal((await a.dbg('spawn')).axis, 'clamp', 'and the shipped throw is restored');
+    },
+  },
+  {
+    name: 'one-seed-one-film',
+    tags: ['roll', 'perf', 'resync', 'cuj8'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: goal 8's claim about the table is "the same dice at
+    // the same poses", and the viewport is the input most likely to leak into
+    // the film by accident — the framing ladder reads `view.width`, the orbit
+    // rule branches on whether the mat fits, and both of those run on the same
+    // frames the physics does. A camera decision that reached the throw would
+    // put two players at the same table watching the same seeded roll land
+    // differently, on the one axis nobody thinks to vary.
+    //
+    // 390 and 1600 are a phone and a desktop: the two ends of the ladder,
+    // which is the thing being ruled out.
+    async fn(ctx) {
+      const phone = await ctx.newTable({ origin: '127.0.0.61', name: 'Phone' });
+      const desk = await ctx.newTable({ origin: '127.0.0.62', name: 'Desk' });
+      await phone.page.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 390, height: 844, deviceScaleFactor: 1, mobile: false }, phone.page.sessionId);
+      await desk.page.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 1600, height: 900, deviceScaleFactor: 1, mobile: false }, desk.page.sessionId);
+      try {
+        await desk.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+        // Confirm the two really are framing differently, or the claim below
+        // is about two identical tabs.
+        const fp = await phone.dbg('framingInfo()');
+        const fd = await desk.dbg('framingInfo()');
+        assert.notEqual(fp.view, fd.view, `the two tabs are different sizes (${fp.view} / ${fd.view})`);
+
+        await phone.roll('3d20 # One film');
+        const rid = await phone.rollId();
+        await desk.waitFor(shroudSettled(rid, 3).replace('shroudedCount', 'tableDice.length'),
+          { desc: 'the roll plays out on the desktop too' });
+        await phone.settle();
+        await desk.settle();
+
+        const a = await phone.dbg('feltPoses()');
+        const b = await desk.dbg('feltPoses()');
+        assert.equal(a.length, 3, 'three dice on the phone’s felt');
+        assert.deepEqual(a, b,
+          'the same dice at the same poses, quantised — the viewport is not an input to the film');
+        assert.equal(JSON.stringify(a), JSON.stringify(b),
+          'byte-identical as strings, which is the form two clients can actually compare');
+      } finally {
+        for (const t of [phone, desk]) {
+          await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId)
+            .catch(() => {});
+        }
+      }
+    },
+  },
+  {
+    name: 'framing-inert',
+    tags: ['fx', 'look'],
+    // C27's RESIDUAL SHIPPED AS AN INSTRUMENT, NOT A DEFAULT, and this is the
+    // cheap pin that it stayed one. The measurement refused the change for the
+    // common case (three dice on a 390px phone already span most of the mat, so
+    // letting the eye approach buys 0px there) and found the real gain on
+    // devices where the mat FITS — which is exactly where taking it would crop
+    // the felt on every small roll. So `FRAMING` ships inert and the frame is
+    // bit-identical with it off.
+    //
+    // An authored default flipping to true is a one-character change with no
+    // failing test anywhere near it: every framing scenario would go on
+    // passing, because they all measure what the ladder DID rather than what it
+    // was allowed to do. This costs a few milliseconds and no dice — which is
+    // why it can carry `look`, and why it is a scenario rather than a comment.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.63', name: 'Inert' });
+      assert.deepEqual(await a.dbg('framing'), { preferDice: false, floor: 1, gain: 1.15 },
+        'the C27 dials ship inert — preferDice off, and the floor at the preset '
+        + 'so the eye may never come closer than the zoom says');
+    },
+  },
+
+  // ---- §3 · table resync, and C22 · the version stamp --------------------
+  //
+  // Goal 8's claim about the table is "the same dice at the same poses", and
+  // until `feltPoses()` existed nothing could say the second half: one hook
+  // answered identity, another answered deltas from a per-client archive pose.
+  // A resync that rebuilt the right dice in the wrong places would have passed
+  // every scenario in the file.
+  {
+    name: 'resync-felt-poses',
+    tags: ['resync', 'roll', 'cuj8'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: `/api/join`'s response and the SSE `hello` carry the
+    // identical room shape on purpose, and until §3 landed only hello acted on
+    // it — the join path rendered the log and left the FELT BARE. So the
+    // server's promise that the two doors show the same table was true on the
+    // wire and false in the app, and a reloading player came back to an empty
+    // mat while everyone else was still looking at dice.
+    //
+    // The comparison is on quantised poses as STRINGS, because that is the form
+    // two clients can actually compare: a settled replay and a watched throw
+    // have to land on the same numbers or the resync is decorative.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.64', name: 'Ada' });
+      const b = await tableTab(ctx, { origin: '127.0.0.65', seed: { 'dice.name.v1': 'Bram' } });
+      await b.waitOnline();
+
+      await a.roll('3d6 # On the felt');
+      const rid = await a.rollId();
+      await a.settle();
+      await b.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 3
+        && !window.__diceDebug.busy)`, { desc: 'Bram watched it land' });
+      const watched = await a.dbg('feltPoses()');
+      assert.equal(watched.length, 3, 'three dice on the felt');
+      assert.equal(JSON.stringify(await b.dbg('feltPoses()')), JSON.stringify(watched),
+        'the two who watched it agree first — the baseline, before anything reloads');
+
+      // The reload. Same tab, same browsing context, exactly as F5 is.
+      await b.reload();
+      await b.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.tableDice.length === 3
+        && !window.__diceDebug.busy)`, { desc: 'the felt comes back' });
+      await b.settle();
+
+      const rebuilt = await b.dbg('feltPoses()');
+      assert.equal(JSON.stringify(rebuilt), JSON.stringify(watched),
+        'a rebuilt felt is byte-identical to the watched one — same dice, same poses');
+      assert.equal(rebuilt[0].rollId, rid, 'and it is the same roll');
+      assert.equal(await b.logCount(), 1, 'with the log it belongs to');
+      assert.equal(await a.logTop(), await b.logTop(), 'reading the same line as everyone else');
+    },
+  },
+  {
+    name: 'resync-hello-mid-playback',
+    tags: ['resync', 'roll', 'cuj8'],
+    timeout: 150000,
+    // WHAT THIS CATCHES, and it is the sharpest bug in §3: `replaySettledRoll`
+    // used to `return` when a playback was live. hello is a ONE-SHOT and
+    // nothing re-sends it, so a stream blip that reconnected while an older
+    // roll was still playing left that client's felt PERMANENTLY short of the
+    // roll everyone else was looking at — until somebody rolled again. It is
+    // reachable on any table with a flaky proxy: the reconnect backoff is 1 s
+    // and a playback runs about four.
+    //
+    // The instant matters and a real reconnect only reaches it by luck, so the
+    // event is delivered by hand through the same door net.js uses. The local
+    // playback that makes the stage busy goes through `playRoll` rather than a
+    // roll: a roll would post to the server, and the server's auto-collect
+    // would then make the held roll STALE, which is a different (and also
+    // correct) outcome — this scenario is about the case where the room has
+    // not moved on.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.66', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.67', name: 'Bram' });
+
+      await a.roll('3d6 # Still on the felt');
+      const rid = await a.rollId();
+      await a.settle();
+      await b.waitFor(`(window.__diceDebug.sim(120), window.__diceDebug.tableDice.length === 3
+        && !window.__diceDebug.busy)`, { desc: 'Bram sees it' });
+      const truth = JSON.stringify(await a.dbg('feltPoses()'));
+
+      // The snapshot the room would hand a reconnecting client right now.
+      const joined = await ctx.api('/api/join', { name: 'Witness' });
+      assert.equal(joined.ok, true, 'a bare client can ask the room what it holds');
+      const snap = JSON.stringify(joined.data);
+      assert.ok(joined.data.log.some((r) => r.rollId === rid),
+        'and the on-felt roll is in it');
+
+      // Bram loses the roll — the aftermath of a blip — and is mid-playback of
+      // something else at the moment the reconnect lands. All of it in ONE
+      // eval, so nothing can arrive on the stream between the steps.
+      //
+      // THE SWEEP ON THE LOCAL ROLL IS LOAD-BEARING, and finding out why cost a
+      // flaky run worth writing down: `playRoll` does NOT wipe the felt (§7.7
+      // retired the overflow wipe — auto-collect keeps it to one roll), so a
+      // film is baked against whatever bodies are standing. Leaving this
+      // fixture's die there gave Bram a WORLD no other client had, and two of
+      // the three replayed dice bounced off it and came to rest somewhere else
+      // — a real property of the engine, arrived at through an unreal setup.
+      // The deferred per-roll clear lands when the local playback ends, which
+      // is before the drain, so the rebuild bakes against the same empty felt
+      // every other client has.
+      await b.eval(`(() => {
+        const d = window.__diceDebug;
+        d.clearTable();
+        d.playRoll({ rollId: 'local-busy', dice: ['d6'], values: [4], seed: 99, label: 'local' });
+        d.netEvent('roll-cleared', { rollId: 'local-busy' });
+        d.netEvent('hello', ${snap});
+      })()`);
+
+      // HELD, NOT DROPPED. Pre-fix `held` is null here and the felt below
+      // never comes back.
+      const info = await b.dbg('idleReplayInfo');
+      assert.equal(info.held, rid,
+        `the arriving roll is stashed rather than thrown away (got ${JSON.stringify(info)})`);
+      assert.equal(info.armed, true, 'with a deadline to re-attempt it on');
+      assert.equal(await b.dbg('busy'), true, 'because the stage was busy at that instant');
+
+      // …AND IT LANDS. A poll, not a completion hook, deliberately: a roll
+      // finishes down two paths and a hook on one of them is the half-fix that
+      // passes its own test.
+      await b.waitFor(`(window.__diceDebug.sim(240), !window.__diceDebug.busy
+        && window.__diceDebug.idleReplayInfo.held === null
+        && window.__diceDebug.tableDice.length === 3
+        && window.__diceDebug.tableDice.every((d) => d.rollId === ${JSON.stringify(rid)}))`,
+      { desc: 'the stashed roll is rebuilt once the stage clears' });
+      await b.settle();
+      const felt = await b.dbg('feltPoses()');
+      assert.equal(felt.length, 3, 'all three dice came back, and nothing else is standing');
+      assert.equal(JSON.stringify(felt), truth,
+        'at the poses everyone else is looking at — a rebuild, not a re-throw');
+    },
+  },
+  {
+    name: 'resync-idempotent',
+    tags: ['resync', 'roll', 'cuj8'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: hello fires on EVERY stream (re)open, and `/api/join`
+    // answers the same shape, so the resync runs more than once against state
+    // the client already holds. Every step of it has to no-op — otherwise a
+    // reconnect doubles the felt, or re-collects a roll, or re-appends the log.
+    // Idempotence is the property that lets both doors call it and lets them
+    // arrive in either order; it is asserted by doing it twice and diffing
+    // everything the client can be asked about.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.68', name: 'Ada' });
+      const b = await ctx.newTable({ origin: '127.0.0.69', name: 'Bram' });
+      await a.roll('2d6 # Kept');
+      const kept = await a.rollId();
+      await a.dbg(`collectRoll(${JSON.stringify(kept)})`);
+      await a.roll('3d8 # Standing');
+      await a.settle();
+      await b.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.tableDice.length === 3
+        && window.__diceDebug.record.ranks.length === 1 && !window.__diceDebug.busy)`,
+      { desc: 'Bram holds one put away and one standing' });
+
+      const joined = await ctx.api('/api/join', { name: 'Witness' });
+      const snap = JSON.stringify(joined.data);
+      const state = async (t) => JSON.stringify({
+        felt: await t.dbg('feltPoses()'),
+        log: await t.logCount(),
+        ranks: (await t.dbg('record')).ranks.map((r) => r.rollId),
+        onTable: await t.dbg('onTable'),
+      });
+
+      const before = await state(b);
+      await b.eval(`window.__diceDebug.netEvent('hello', ${snap})`);
+      await b.settle();
+      const once = await state(b);
+      assert.equal(once, before, 'feeding the room’s own snapshot back changes nothing');
+      await b.eval(`window.__diceDebug.netEvent('hello', ${snap})`);
+      await b.settle();
+      assert.equal(await state(b), once, 'and feeding it a second time changes nothing either');
+      assert.equal(await b.dbg('tableDice.length'), 3,
+        'three dice, not six — the felt did not double');
+      assert.equal(await a.logCount(), await b.logCount(),
+        'and the log is still the one the room agrees on');
+    },
+  },
+  {
+    name: 'resync-shrouded-reload',
+    tags: ['resync', 'visibility', 'cuj10'],
+    timeout: 150000,
+    // WHAT THIS CATCHES: a rebuild is a second chance to leak. The felt is
+    // reconstructed from the projected log, and a bystander's projection of a
+    // held roll carries no values at all — so if the rebuild ever reached for
+    // the real faces (to place the dice "correctly", say), goal 11 would fail
+    // on exactly the path nobody watches, and only after a refresh.
+    //
+    // `values === [null, null]` rather than a truthiness check: an array of two
+    // nulls and an empty array both read as "no values", and only one of them
+    // is a die the player can see sitting face down.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.70', name: 'Ada' });
+      const b = await tableTab(ctx, { origin: '127.0.0.71', seed: { 'dice.name.v1': 'Bram' } });
+      await b.waitOnline();
+
+      await a.roll('2d6 held # Behind the screen');
+      const held = await a.rollId();
+      await b.waitFor(shroudSettled(held, 2), { desc: 'the shroud lands for Bram' });
+
+      await b.reload();
+      await b.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.shroudedCount === 2
+        && !window.__diceDebug.busy)`, { desc: 'the shrouded roll is rebuilt' });
+      const s = await b.entryState(held);
+      assert.equal(s.hidden, true, 'still hidden after a refresh');
+      assert.deepEqual(s.values, [null, null],
+        `two dice, neither of them readable (got ${JSON.stringify(s.values)})`);
+      assert.equal(s.total, null, 'and no total came back with them');
+      assert.equal(s.canReveal, false, 'nor any authority to open it');
+      // Chips are quiet by default (P1), so the visible channel is opted into
+      // here — the claim is what it SAYS when it is on, and a rebuilt tab must
+      // not be the one place it says a number.
+      await b.dbg('setChipsVisible(true)');
+      await b.dbg('sim(120)');
+      assert.deepEqual(await b.chips(), ['?', '?'], 'the chips over the dice still read ?');
+      assert.equal(await b.dbg('tableDice.length'), 2, 'while the dice themselves are on his felt');
+
+      // And the reveal reaches the rebuilt client, which is the other half of
+      // the same claim: the rebuild left it upgradeable rather than inert.
+      await a.dbg(`reveal(${JSON.stringify(held)})`);
+      await b.waitFor(revealSettled(held), { desc: 'the reveal reaches the rebuilt tab' });
+      const after = await b.entryState(held);
+      assert.equal(after.hidden, false, 'now it is readable');
+      assert.equal(after.values.filter((v) => typeof v === 'number').length, 2,
+        'with both faces');
+      assert.deepEqual(after, await a.entryState(held), 'and both tabs hold the identical entry');
+    },
+  },
+  {
+    name: 'schema-stamp',
+    tags: ['profiles', 'groups', 'cuj13'],
+    timeout: 150000,
+    // C22 — THE ASYMMETRY, WHICH IS EASY TO WRITE BACKWARDS AND IMPOSSIBLE TO
+    // NOTICE ONCE SHIPPED. Older data migrates; NEWER data refuses out loud and
+    // is left alone. Three claims:
+    //
+    //  · the stamp this build writes is the stamp it reads (a store written
+    //    today must not be refused tomorrow by the same build);
+    //  · an ABSENT stamp still loads — every browser in the field is holding
+    //    one right now, and purging on absence would delete a returning
+    //    player's whole library on the boot that shipped this;
+    //  · a HIGHER major refuses, says so in the app's refusal grammar, and —
+    //    the half that protects the data — LOCKS the key. normalizeStore is a
+    //    whitelist, so any save would write a truncated copy of the store back
+    //    over the original. The refusal is worth nothing without the lock, and
+    //    the lock is invisible except as bytes.
+    async fn(ctx) {
+      // (1) What this build writes is what this build reads.
+      const now = await ctx.newTable({ origin: '127.0.0.72', name: 'Now' });
+      await now.dbg(`profiles.reset('soul-deal')`);
+      const st = await now.dbg('schemaState');
+      assert.equal(st.stamp, '2.0.0', 'the build stamps 2.0.0');
+      assert.equal(st.storeStamp, '2.0.0', 'and the store it just wrote carries it');
+      assert.equal(st.refused, null, 'nothing is refused');
+      assert.equal(st.locked, false, 'and the key is writable');
+      assert.equal(
+        JSON.parse(await now.eval(`localStorage.getItem('dice.profiles.v1')`)).ver, '2.0.0',
+        'on disk as well as in the hook');
+
+      // (2) AN ABSENT STAMP IS THIS EPOCH'S OLDEST DATA, and it loads. This is
+      // the field-compatibility claim, and the population it protects is
+      // everyone who has ever opened the app.
+      const unstamped = {
+        v: 3,
+        seq: 2,
+        activeId: 'p1',
+        profiles: [
+          { id: 'p1', name: 'Nessa', system: 'soul-deal', at: 0,
+            pools: [{ id: 1, name: 'Body', notation: '3d6', category: 'Attributes' }] },
+          { id: 'p2', name: 'Bram', system: 'soul-deal', at: 0, pools: [] },
+        ],
+      };
+      assert.equal('ver' in unstamped, false, 'the fixture genuinely has no version field');
+      const old = await tableTab(ctx, {
+        origin: '127.0.0.73',
+        seed: { 'dice.name.v1': 'Old', 'dice.profiles.v1': JSON.stringify(unstamped) },
+      });
+      await old.waitOnline();
+      assert.equal((await old.dbg('schemaState')).refused, null,
+        'an unstamped library is not refused');
+      assert.deepEqual((await old.dbg('profiles.list')).map((p) => p.name), ['Nessa', 'Bram'],
+        'it loads, whole');
+      assert.deepEqual((await old.dbg('groups')).map((g) => g.notation), ['3d6'],
+        'with the rack that was in hand');
+
+      // (3) A NEWER MAJOR REFUSES, AND LOCKS.
+      const future = JSON.stringify({ ...unstamped, ver: '2.1.0' });
+      const ahead = await tableTab(ctx, {
+        origin: '127.0.0.74',
+        seed: { 'dice.name.v1': 'Ahead', 'dice.profiles.v1': future },
+      });
+      await ahead.waitOnline();
+      const refused = await ahead.dbg('schemaState');
+      assert.ok(refused.refused, 'a store from a newer build is refused');
+      assert.match(refused.refused, /^✗ /,
+        `in the app’s refusal grammar (got ${JSON.stringify(refused.refused)})`);
+      assert.ok(refused.refused.includes('2.1.0') && refused.refused.includes('2.0.0'),
+        `naming both numbers, which is what a bug report needs (got ${refused.refused})`);
+      assert.equal(refused.locked, true, 'and the key is locked');
+
+      // THE LOCK, AS BYTES. This is the assertion that matters: a refusal that
+      // still permitted a write would replace a library this build cannot read
+      // with a truncated copy of itself, which is the data loss the refusal
+      // exists to prevent — and nothing on screen would show it.
+      assert.equal(await ahead.eval(`localStorage.getItem('dice.profiles.v1')`), future,
+        'the stored library is byte-identical to what the newer build wrote');
+      const made = await ahead.dbg(`profiles.create('Interloper', 'soul-deal')`);
+      assert.equal(made.ok, false, `and a write is refused rather than attempted (${made.status})`);
+      assert.equal(await ahead.eval(`localStorage.getItem('dice.profiles.v1')`), future,
+        'still byte-identical after something tried to write');
+      // The player is told, through the standing banner that already carries
+      // 'Download my data' — the same true sentence a jammed browser gets.
+      assert.equal((await ahead.dbg('dataBanner')).shown, true,
+        'and the player is told their work is not being saved');
+    },
+  },
+
+  // ---- §1 · struck dice · and §2l ⑤ · the ledger sheet -------------------
+  {
+    name: 'struck-dice',
+    tags: ['meanings', 'chrome', 'cuj8'],
+    timeout: 180000,
+    // THE HEADLINE, and it is the assertion that fails on the pre-2026-08-15
+    // tree: `4d6dl1` under a per-die lens rendered THREE chips. The gate was
+    // one line in the SOUL DEAL PROFILE, so the profile knew about the dropped
+    // die all along and every SURFACE lost it — a player throwing four dice
+    // was shown three, with no mark saying a fourth had happened. GOALS' own
+    // "attributed math" is the thing that was missing.
+    //
+    // Read back off the RENDERED chips rather than off `outcomesFor`, because
+    // the bug lived exactly between the two. And the strike comes back as
+    // COMPUTED `text-decoration-line`, never as a class name: a class that
+    // stopped resolving to a dress is precisely the regression a class-name
+    // assertion cannot see (§7.21's lesson).
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.75', name: 'Ada' });
+      assert.equal(await a.dbg('system'), 'soul-deal', 'the per-die lens is the default');
+
+      // ---- one row per die the player THREW --------------------------------
+      await a.roll('4d6dl1 # Ability');
+      const rid = await a.rollId();
+      await a.settle();
+      const rows = await a.dbg(`outcomeRows('banner')`);
+      assert.equal(rows.length, 1, 'one row for the pool');
+      assert.equal(rows[0].chips.length, 4,
+        `FOUR chips for four dice — pre-fix this is 3 (got ${JSON.stringify(rows[0].chips.map((c) => c.text))})`);
+      const struck = rows[0].chips.filter((c) => c.struck);
+      assert.equal(struck.length, 1, 'exactly one of them was set aside');
+      assert.equal(struck[0].why, 'dropped',
+        `and the MECHANIC that set it aside is in the answer slot (got ${JSON.stringify(struck[0].why)})`);
+      assert.equal(struck[0].word, null,
+        'a die that does not count is not read — the word is absent, not hidden');
+      assert.equal(struck[0].line, 'line-through',
+        `the evidence is struck through, computed rather than claimed (got ${JSON.stringify(struck[0].line)})`);
+      assert.ok(/dropped/.test(struck[0].text),
+        `and copy/paste and a screen reader get the same sentence (got ${JSON.stringify(struck[0].text)})`);
+      const counting = rows[0].chips.filter((c) => !c.struck);
+      assert.equal(counting.length, 3, 'the three that count are read as usual');
+      assert.ok(counting.every((c) => c.line !== 'line-through'), 'and none of them is struck');
+      assert.ok(Number(struck[0].opacity) < Number(counting[0].opacity),
+        `the out-of-play tier sits below the ordinary one `
+        + `(${struck[0].opacity} vs ${counting[0].opacity})`);
+
+      // ---- THE SAME ON THE PEEK, which is a different builder --------------
+      await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
+      await a.waitFor(`(window.__diceDebug.sim(240), window.__diceDebug.record.ranks.some(
+        (r) => r.rollId === ${JSON.stringify(rid)}))`, { desc: 'the roll is put away' });
+      assert.equal(await a.dbg(`peek(${JSON.stringify(rid)})`), rid, 'its card opens');
+      const peek = await a.dbg(`outcomeRows('peek')`);
+      assert.equal(peek[0].chips.length, 4, 'four chips on the card too');
+      assert.equal(peek[0].chips.filter((c) => c.struck).length, 1, 'one struck');
+      assert.equal(peek[0].chips.find((c) => c.struck).why, 'dropped', 'for the same reason');
+      await a.dbg('peek(null)');
+      await a.dbg('setLogFlyout(false)');
+
+      // ---- ADVANTAGE: two dice thrown, one reading -------------------------
+      // `oc-solo` counts READINGS, not chips — otherwise the struck die makes
+      // this look like a two-die roll and the 26px hero word is lost.
+      await a.roll('1d20 adv # Sneak');
+      await a.settle();
+      const adv = await a.dbg(`outcomeRows('banner')`);
+      assert.equal(adv[0].chips.length, 2, 'both d20s are shown');
+      assert.equal(adv[0].chips.filter((c) => c.struck).length, 1, 'one of them did not count');
+      assert.equal(adv[0].chips.find((c) => c.struck).why, 'not kept',
+        `named by ITS mechanic, not by 'dropped' (got ${JSON.stringify(adv[0].chips.find((c) => c.struck).why)})`);
+      assert.equal(adv[0].solo, true,
+        'and it still reads as a ONE-DIE roll, because one die is being read');
+
+      // ---- AN EXPLOSION IS MORE OF ITS DIE, not a die of its own -----------
+      const exploded = await rollUntil(a, '1d6! # Boom',
+        (r) => r && r[0] && r[0].chips.some((c) => c.children.length), 40);
+      assert.ok(exploded, 'a d6 exploded within 40 throws');
+      assert.equal(exploded[0].chips.length, 1,
+        `ONE chip, however far the chain ran (got ${JSON.stringify(exploded[0].chips.map((c) => c.text))})`);
+      assert.ok(exploded[0].chips[0].text.includes('✴'),
+        `with the child riding its parent's evidence (got ${JSON.stringify(exploded[0].chips[0].text)})`);
+      assert.equal(exploded[0].chips[0].struck, false,
+        'an explosion child is not a die that was set aside');
+
+      // ---- A REROLL REPLACEMENT IS A FULL COUNTING DIE --------------------
+      const rerolled = await rollUntil(a, '1d6 ro<=2 # Second wind',
+        (r) => r && r[0] && r[0].chips.length === 2, 40);
+      assert.ok(rerolled, 'a reroll fired within 40 throws');
+      const gone = rerolled[0].chips.filter((c) => c.struck);
+      assert.equal(gone.length, 1, 'the die it replaced is struck');
+      assert.equal(gone[0].why, 'rerolled', `and named as such (got ${JSON.stringify(gone[0].why)})`);
+      assert.equal(rerolled[0].chips.filter((c) => !c.struck).length, 1,
+        'while the replacement counts like any other die');
+
+      // ---- AND A TOTALS LENS PAINTS NO ROWS AT ALL -------------------------
+      await a.dbg(`setSystem('dnd')`);
+      await a.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'totals lens' });
+      assert.deepEqual(await a.dbg(`outcomeRows('banner')`), [],
+        'a totals system reads a sum, and per-die rows are not its grammar');
+      await a.dbg(`setSystem('soul-deal')`);
+    },
+  },
+  {
+    name: 'ledger-sheet',
+    tags: ['groups', 'chrome', 'cuj6'],
+    timeout: 150000,
+    // §2l ⑤ — "I am building to 80 tonight." The rule: the SYSTEM prices a
+    // shelf, YOU may price it differently for tonight, and the shelf head
+    // reads whichever is in force THROUGH ONE ACCESSOR — so the ledger and the
+    // heads cannot disagree. Both figures are read off the rendered surfaces
+    // for exactly that reason; a hook that read the Map could not tell you the
+    // two had stopped agreeing.
+    //
+    // AND IT IS SESSION-ONLY, by ruling: no localStorage, no portable field,
+    // no wire key, no `dice.*.v1`. A point budget is a field the dice never
+    // read, so nothing about a roll changes if it is lost — which is what
+    // makes losing it the right default rather than a gap. The reload leg is
+    // the assertion that catches a stray write, and it is the only way to
+    // catch one: a persisted target looks identical until the next session.
+    async fn(ctx) {
+      const a = await tableTab(ctx, { origin: '127.0.0.76', seed: { 'dice.name.v1': 'Ada' } });
+      await a.waitOnline();
+      await a.dbg(`setGroups([
+        {name: 'Claws', notation: '1d6', category: 'Attributes'},
+        {name: 'Fangs', notation: '2d8', category: 'Attributes'},
+        {name: 'Edge', notation: '1d20 adv', category: 'Skills'}])`);
+
+      // The door exists only under ✎, on your own rack (§7.18's gate).
+      assert.equal(await a.dbg('openLedgerSheet()'), false,
+        'at rest there is no door — the figure the sheet hangs from is not built');
+      await a.dbg('setPoolsEditMode(true)');
+      assert.equal(await a.dbg('openLedgerSheet()'), true, 'manage mode opens it');
+
+      const sheet = await a.dbg('ledgerSheet');
+      const row = (l) => sheet.rows.find((r) => r.label === l);
+      assert.ok(row('Attributes') && row('Skills'), 'one row per shelf');
+      assert.equal(row('Attributes').figure, '22/100',
+        `the system's price is in force to begin with (got ${row('Attributes').figure})`);
+      assert.equal(row('Attributes').typed, '',
+        'with an empty field — nothing has been declared for tonight');
+      assert.equal(row('Attributes').placeholder, '100',
+        'and the placeholder says whose number is standing in');
+      assert.equal(row('Motivations').placeholder, '—',
+        'a shelf the system does not price says so rather than inventing a rule');
+      assert.ok(sheet.legend.includes('dice value'),
+        `the one legend sentence names the unit (got ${JSON.stringify(sheet.legend)})`);
+      assert.ok(sheet.legend.includes('modifiers, drops and explosions are not counted'),
+        'and says what it does not count, because "ceiling" is false in both directions');
+
+      // ---- YOUR NUMBER, IN FORCE ON BOTH SURFACES -------------------------
+      const headFig = () => a.eval(`(() => {
+        const h = [...document.querySelectorAll('.pool-sec-head')]
+          .find((el) => el.textContent.startsWith('Attributes'));
+        const f = h && h.querySelector('.psh-fig');
+        return f ? { text: f.textContent, over: f.classList.contains('over') } : null;
+      })()`);
+      assert.deepEqual(await headFig(), { text: '22/100', over: false },
+        'the shelf head agrees before anything is typed');
+
+      const forced = await a.dbg(`setShelfTarget('Attributes', 80)`);
+      assert.deepEqual(forced, { typed: 80, inForce: 80 }, 'the typed number takes precedence');
+      assert.deepEqual(await headFig(), { text: '22/80', over: false },
+        'the SHELF HEAD moved to tonight’s number');
+      assert.equal((await a.dbg('ledgerSheet')).rows.find((r) => r.label === 'Attributes').figure,
+        '22/80', 'and so did the sheet — one accessor, so they cannot disagree');
+      assert.equal((await a.dbg('ledgerSheet')).rows.find((r) => r.label === 'Attributes').typed,
+        '80', 'with the field showing what was typed rather than the placeholder');
+      assert.equal((await a.dbg('ledgerSheet')).rows.find((r) => r.label === 'Skills').figure,
+        '40/100', 'while the shelf nobody re-priced keeps the system’s number');
+
+      // Over is the only state worth a hue, and it lands on both figures.
+      await a.dbg(`setShelfTarget('Attributes', 10)`);
+      assert.deepEqual(await headFig(), { text: '22/10', over: true }, 'over on the head');
+      assert.equal((await a.dbg('ledgerSheet')).rows.find((r) => r.label === 'Attributes').over,
+        true, 'and over on the sheet');
+
+      // 0 gives the shelf back to the system — one clearing gesture, whatever
+      // the player typed to express it.
+      assert.deepEqual(await a.dbg(`setShelfTarget('Attributes', 0)`),
+        { typed: 0, inForce: 100 }, 'zero hands it back');
+      assert.deepEqual(await headFig(), { text: '22/100', over: false },
+        'and the rulebook’s number is in force again');
+
+      // The sheet lives inside the gate it was opened in.
+      await a.dbg(`setShelfTarget('Attributes', 80)`);
+      await a.dbg('setPoolsEditMode(false)');
+      assert.equal(await a.dbg('ledgerSheet'), null,
+        'closing manage mode takes the sheet with it');
+
+      // ---- AND IT DIES WITH THE TAB ---------------------------------------
+      // A stray localStorage write would be invisible here and would show up
+      // as a number nobody remembers typing, next week.
+      const keys = JSON.parse(await a.eval(
+        `JSON.stringify(Object.keys(localStorage).filter((k) => /target|budget/i.test(k)))`));
+      assert.deepEqual(keys, [], `no key claims to hold a target (got ${JSON.stringify(keys)})`);
+      await a.reload();
+      await a.dbg('setPoolsEditMode(true)');
+      assert.equal(await a.dbg('openLedgerSheet()'), true, 'the sheet opens on the fresh session');
+      const after = (await a.dbg('ledgerSheet')).rows.find((r) => r.label === 'Attributes');
+      assert.equal(after.typed, '', 'and tonight’s number is gone, as designed');
+      assert.equal(after.figure, '22/100', 'with the system’s price back in force');
+      await a.dbg('setPoolsEditMode(false)');
+    },
+  },
+  // ---- C29 · the static allowlist, asked of the RUNNING PAGE -------------
+  {
+    name: 'static-allowlist',
+    tags: ['smoke', 'quality'],
+    timeout: 120000,
+    // WHAT THIS CATCHES that the unit test cannot. `tests/static-cache.test.mjs`
+    // proves every root somebody THOUGHT OF is open and every path they thought
+    // of is closed — which is a statement about the author's imagination. Only
+    // the running page can prove the list is COMPLETE, because only the page
+    // knows what it actually fetches: the importmap's vendor modules, the GLB
+    // the tower loader reaches for, the stylesheet, `js/report.js` as a classic
+    // script before the module graph. This is the assertion that goes red the
+    // day somebody adds `assets/` and forgets APP_DIRS — and the failure it
+    // prevents is the worst kind, because a missing static root is a 404 on a
+    // page that otherwise looks like it booted.
+    //
+    // Collected from CDP `Network.responseReceived` rather than from inside the
+    // page: a `<script>` or `@import` that 404s never reaches any JS the page
+    // could be asked about, and js/report.js exists precisely because the most
+    // valuable failure is main.js failing to load at all.
+    async fn(ctx) {
+      const t = await bootTab(ctx, {
+        origin: 'localhost',
+        path: `/?room=${encodeURIComponent(ctx.room)}`,
+        seed: { 'dice.name.v1': 'Static' },
+        netLog: true,
+        readyExpr: `!!window.__diceDebug && window.__diceDebug.netReady`,
+        readyDesc: 'the page boots',
+      });
+      await t.waitOnline();
+      // Roll once so the lazily-fetched paths are actually asked for.
+      await t.roll('2d6');
+      await t.settle();
+
+      const seen = t.responses;
+      assert.ok(seen.length > 5,
+        `the tab really did fetch things (got ${seen.length} responses)`);
+      assert.ok(seen.some((r) => /\/js\/main\.js$/.test(r.url) && r.status === 200),
+        'the module graph itself is served');
+      assert.ok(seen.some((r) => /\/css\//.test(r.url) && r.status === 200),
+        'and the stylesheet');
+      assert.ok(seen.some((r) => /\/vendor\//.test(r.url) && r.status === 200),
+        'and the vendored modules the importmap names');
+
+      // THE CLAIM. `/api/` is excluded on purpose: the pre-join peek 404s by
+      // design when a room holds no prepared table, and that is an answer
+      // rather than a missing file. Everything else the page asked for is a
+      // static asset, and a static asset that 404s is a hole in APP_DIRS.
+      // `/favicon.ico` is excluded too, and it is worth naming rather than
+      // quietly filtering: index.html declares no icon, so this request is
+      // Chrome's own speculative one and 404 is the correct answer to a file
+      // that does not exist. It is NOT an allowlist hole — nothing on the page
+      // asked for it — and it costs nothing in the field, because js/report.js
+      // listens for resource errors on ELEMENTS and a browser-initiated icon
+      // fetch is not one. If the app ever ships an icon, this exclusion should
+      // go with the same commit.
+      const missing = seen.filter((r) => r.status === 404
+        && !r.url.includes('/api/') && !r.url.endsWith('/favicon.ico'));
+      assert.deepEqual(missing, [],
+        `nothing the page asked for is missing — a 404 here is a root the `
+        + `allowlist forgot (got ${JSON.stringify(missing)})`);
+      // …and nothing was refused outright either, which is the other shape the
+      // same mistake takes.
+      const refused = seen.filter((r) => r.status === 403);
+      assert.deepEqual(refused, [], `and nothing was forbidden (got ${JSON.stringify(refused)})`);
+    },
+  },
+
+  // ---- Tier W · the staging, measured in the FRAME (W7 ②) ----------------
+  {
+    name: 'venue-frame',
+    tags: ['fx', 'look'],
+    timeout: 150000,
+    // Joe's verdict was a SCREEN-SPACE claim — "I want the dice tower to be in
+    // a scene, not the centerpiece of it in a symmetrical and formal way" — and
+    // every previous answer to it was authored and checked in PLAN. W2c already
+    // recorded what that costs: the resting eye's low angle compresses the
+    // whole back band into one horizontal strip, so a plan-space move can be
+    // large, correct, and photograph as nothing. The two features W2c put
+    // thirteen units apart on a perfectly legal triangle project to within
+    // 0.006 of frame width of being each other's mirror.
+    //
+    // THE `look` TAG IS EARNED, not borrowed. Every number here is a geometry
+    // read through the live camera: the stage declares its own ground extents,
+    // `worldToScreen` projects them, and nothing about a die is an input. The
+    // runner proves it by reading `diceEverMade()` afterwards.
+    //
+    // AND IT IS SELF-RED-CHECKING, which is the part that makes it evidence
+    // rather than a floor. The frozen W2c layout — the arrangement Joe
+    // rejected — is projected through the SAME camera in the same run, and the
+    // scenario fails unless the rejected frame fails at least three gates. A
+    // suite the rejected frame passes is measuring something both frames happen
+    // to satisfy, and shipping that is this project's own dominant failure mode
+    // with a composition on it. (VENUE-COMPOSITION rule 15; the same red check
+    // tools/steps/glade-frame.mjs runs, kept here so it costs seconds in a
+    // sweep rather than a hand-run.)
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.77', name: 'Frame' });
+      await t.page.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 1500, height: 950, deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
+      try {
+        await t.dbg('holdClock(true)');
+        await t.dbg(`setVenue('moonrise')`);
+        await t.waitFor(`window.__diceDebug.venueInfo().staged`, { desc: 'the glade rises' });
+        await t.dbg(`setTower('hollowbole')`);
+        await t.waitFor(`window.__diceDebug.tower === 'hollowbole'`, { desc: 'the hero is up' });
+        // THE RESTING EYE IS AN EASE, NOT A JUMP. Measuring before it lands
+        // grades a camera halfway between two frames — the venue-life lesson.
+        await t.dbg('sim(1500)');
+        await t.eval('window.__diceDebug.tick(0, true, false)');
+
+        const stage = await t.dbg('venueInfo().stage');
+        assert.ok(stage, 'the stage reports its layout');
+
+        // THE HERO, off the BUILT shell rather than a remembered number, so a
+        // re-baked trunk moves the gates with it. Sampled at the felt and again
+        // at the declared rim, because the trunk leans and the crown is what
+        // the eye reads against.
+        const shell = await t.dbg(`groundGaps('towerSkinBoleShell')`);
+        assert.ok(shell && shell.all.length, 'the hollowbole shell is in the scene');
+        const spec = await t.dbg(`towerPortalSpec('hollowbole')`);
+        const m = shell.all[0];
+        const heroF = { id: 'hero', x: m.x, z: m.z, rx: m.w / 2, rz: m.w / 2 };
+        const hero = {
+          ...heroF,
+          box: boxOf(await projectPoints(t, [
+            ...rimPoints(heroF, 0),
+            ...rimPoints(heroF, spec ? spec.derived.rimY : 9.4),
+          ])),
+        };
+        // THE HERO IS PINNED BY CONSTRUCTION and that is a finding rather than
+        // an omission: the door sits on x 0 by portal spec and the resting eye
+        // looks down the mat's centreline, so no composition move can take the
+        // tower off the frame's middle. Everything Joe asked for has to be
+        // bought with the rest of the scene, which is what every gate measures.
+        assert.ok(Math.abs(hero.box.cx - 0.5) < 0.08,
+          `the hero projects to the centreline (frame x ${hero.box.cx.toFixed(3)})`);
+
+        const layouts = {
+          shipped: {
+            hero,
+            supports: [{ id: 'moot', ...stage.moot }, { id: 'pool', ...stage.pool }],
+            // The ring IS fungus as well as a support: asking where the
+            // mushrooms are and leaving the densest patch of them out of the
+            // census would be the question answered about everything except
+            // its subject.
+            fungus: (stage.shrooms || []).map((f, i) => ({ id: `shroom${i}`, ...f }))
+              .concat([{ id: 'ring', x: stage.moot.x, z: stage.moot.z,
+                rx: stage.moot.rx, rz: stage.moot.rz }]),
+            scenery: (stage.scenery || []).map((f, i) => ({ id: `scenery${i}`, ...f })),
+          },
+          rejected: {
+            hero,
+            supports: [{ id: 'moot', ...W2C_LAYOUT.moot }, { id: 'pool', ...W2C_LAYOUT.pool }],
+            fungus: W2C_LAYOUT.shrooms.map((f, i) => ({ id: `shroom${i}`, ...f })),
+            scenery: W2C_LAYOUT.scenery.map((f, i) => ({ id: `scenery${i}`, ...f })),
+          },
+        };
+
+        const graded = {};
+        for (const [name, L] of Object.entries(layouts)) {
+          const flat = [...L.supports, ...L.fungus, ...L.scenery];
+          const pts = [];
+          const spans = [];
+          for (const f of flat) {
+            const p = rimPoints(f);
+            spans.push([pts.length, p.length]);
+            pts.push(...p);
+          }
+          // ONE round trip for every point of every feature: worldToScreen
+          // reads the LIVE camera, and the camera must not move between
+          // samples.
+          const all = await projectPoints(t, pts);
+          const projected = flat.map((f, i) => {
+            const [at, n] = spans[i];
+            return { ...f, box: boxOf(all.slice(at, at + n)) };
+          });
+          let at = 0;
+          graded[name] = frameGates({
+            hero: L.hero,
+            supports: projected.slice(at, at += L.supports.length),
+            fungus: projected.slice(at, at += L.fungus.length),
+            scenery: projected.slice(at, at += L.scenery.length),
+          });
+        }
+
+        // ---- the shipped frame passes every gate --------------------------
+        const bad = graded.shipped.filter((g) => !g.ok);
+        assert.deepEqual(bad.map((g) => `${g.id}: ${g.got}`), [],
+          'the shipped composition holds every screen-space gate');
+
+        // ---- THE RED CHECK ------------------------------------------------
+        const discriminating = graded.rejected.filter((g) => !g.ok);
+        assert.ok(discriminating.length >= 3,
+          `the frame Joe rejected fails at least three of these gates — otherwise `
+          + `they are a floor rather than evidence (failed ${discriminating.length}/`
+          + `${graded.rejected.length}: ${JSON.stringify(graded.rejected.map((g) => `${g.id}=${g.ok ? 'pass' : 'FAIL'}`))})`);
+        // And name the ones that DO discriminate, so a gate quietly becoming a
+        // floor is visible in the failure text of whatever breaks next.
+        for (const id of ['F1 no mirror twins', 'F3 thirds', 'F5 size ladder']) {
+          const g = graded.rejected.find((x) => x.id === id);
+          assert.equal(g.ok, false,
+            `${id} tells the two frames apart (the rejected frame got: ${g.got})`);
+        }
+      } finally {
+        await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId)
+          .catch(() => {});
+      }
     },
   },
 ];
