@@ -1107,6 +1107,18 @@ per-roll choices — §3.3.)
 Two principles arrived from Joe after §1–§6 were drafted. They are binding;
 where they touch earlier sections, this addendum wins.
 
+> **NEXT FREE SECTION NUMBER: §7.41.**
+> Claim it here in the same commit that writes the section, before you write
+> it. This document ASSIGNS these numbers, so this line is the only place a
+> branch that has been out for a week can see what is taken (ROADMAP C4).
+> Two collisions are on record and both were caught at merge, not before:
+> **§7.24 was written twice in the same week** by two branches, and on
+> 2026-08-14 **§7.39 was written twice in one afternoon** — the seat-picker
+> pass and the restore pass, running in parallel, each appending to the end of
+> a file whose numbering neither could see the other reading. Renumbering at
+> merge is cheap; two sections silently claiming one number is what §7.22 and
+> §7.23 were built on top of.
+
 ### WHAT IS TRUE TODAY (2026-08-08)
 
 The subsections below run in **commit order**, not surface order, and they
