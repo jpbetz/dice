@@ -723,6 +723,9 @@ over the current roster (recipient chips: player dot + name), and a
 whisper with nobody named disables both verbs rather than rolling wide.
 With `Only me` selected the Offer button's tooltip names what an offered
 only-me roll is: *Dice tower — they roll, only you see the result*.
+*(Built 2026-08-14, §7.43 — on the RIM's `#offer-draft`, because the
+popover's own Roll/Offer buttons retired with `popVis` and the line follows
+the verb rather than the surface it was written against.)*
 
 **Not sticky, and therefore un-badged.** The picker starts from the
 notation it was opened on, every time — there is no remembered per-player
@@ -781,8 +784,12 @@ Two consequences bind the implementation. First, **wire words stay
 dialect and must not churn. Second, **UI labels never render "Secret",
 "Blind", "GM" or "Private" as a mode name**, because each one reads as its
 own opposite to somebody at the table; the labels are *Open* · *Face down*
-· *Only me* ("no one else sees that you rolled") · *Whisper to…* ("others
-see you rolled, not what"), and an offer's restricted mode is *Dice tower*
+· *Only me* ("no one else sees that you rolled") · *Whisper to…* (~~"others
+see you rolled, not what"~~ **amended 2026-08-14, §7.43: "the table sees the
+dice and the stakes — only they see the result"** — the old four words
+described the deliberate stakes-are-public leak the paragraph BELOW this one
+calls our largest difference from Roll20 and Foundry, and they read as its
+opposite), and an offer's restricted mode is *Dice tower*
 ("they roll — only you see the result"). Both consequences are applied:
 the picker and sublabels read exactly those words, `/gmroll`, `/gmr` and
 `/selfroll` all normalize to `secret`, `/sr` refuses with a teaching
@@ -1107,10 +1114,11 @@ per-roll choices — §3.3.)
 Two principles arrived from Joe after §1–§6 were drafted. They are binding;
 where they touch earlier sections, this addendum wins.
 
-> **NEXT FREE SECTION NUMBER: §7.45.**
-> *(§7.39–§7.44 were all claimed on 2026-08-14/15 by six parallel passes:
-> the door on the phone, restore, the token layer, the record, the struck
-> die, the ledger sheet. Four of the six first wrote themselves as §7.39.)*
+> **NEXT FREE SECTION NUMBER: §7.46.**
+> *(§7.39–§7.45 were all claimed on 2026-08-14/15 by seven parallel
+> passes: the door on the phone, restore, the token layer, the record,
+> the struck die, the ledger sheet, the first-night seams. FOUR of the
+> seven first wrote themselves as §7.39.)*
 > Claim it here in the same commit that writes the section, before you write
 > it. This document ASSIGNS these numbers, so this line is the only place a
 > branch that has been out for a week can see what is taken (ROADMAP C4).
@@ -1142,17 +1150,17 @@ a stale row is worse than no table.
 | Section bar (`Dice · 2d6 · Pools`) | §7.23, as amended 2026-08-08 — three independent switches, all-off legal, two state objects; the DRESS of record is the comment over `#left-panel :is(.section-seg, #rail-mode)` in `css/style.css` | §7.9's "ONE input view at a time" and the two-value `dice.inputmode.v1` |
 | Die palette (`#die-buttons`) | §7.23 — it is a section now, switched by the `Dice` cell · §7.16's 2i-D for the steel tile body · §7.10's identity strip for the one build-dice idiom shared with the creation card | §7.1 entire: the felt die shelf was never built and its "the buttons become the fallback" demotion never took effect. GOALS moved physical pool-building to the delight tier |
 | Notation box (`#cmd`) | §1.1 grammar · §1.2 parser API · §1.6 server parse · §7.23 for where it sits and what switches it on | §1.3's placement paragraph (see the §1 banner). **No section yet records ROADMAP U1/U2**, shipped 2026-08-08 in `07099a7`: staging carries intent, and a box that stops parsing disarms the plate |
-| Saved-pools rack + shelves | §7.9's THE SHEET PASS — identity edits by id, creation-as-editing, the ✎ row — and its DEALT RACK amendment · §7.18 for what the ✎ gate covers · **§7.43** — the rack figure is a BUTTON that opens the ledger sheet, and a shelf's target may be the system's or one you typed for tonight | §7.17's region head, amended below: `SAVED POOLS` no longer stands over your own rack · POOL-ANALYSIS §9's "where the rack figure lives" — taken in §7.43; it stays in the head |
-| Collapsed launcher (the rail) | §7.22 — 112px, a row is a word, the standing verb, 2i-G · §7.23's "The collapsed column" — the source switch, the dice list, the plate at rail scale | §7.9's collapsed paragraph: it predates the second source list and describes a column that holds only pools (its 56px history is already struck there) |
+| Saved-pools rack + shelves | §7.9's THE SHEET PASS — identity edits by id, creation-as-editing, the ✎ row — and its DEALT RACK amendment · §7.18 for what the ✎ gate covers · **§7.44** — the rack figure is a BUTTON that opens the ledger sheet, and a shelf's target may be the system's or one you typed for tonight | §7.17's region head, amended below: `SAVED POOLS` no longer stands over your own rack · POOL-ANALYSIS §9's "where the rack figure lives" — taken in §7.44; it stays in the head |
+| Collapsed launcher (the rail) | **§7.45** — on a COARSE pointer a counted dice row drops its die art, which is the 86px budget's only honest answer and the `.rd-counted` markup hook that pays for it · §7.22 — 112px, a row is a word, the standing verb, 2i-G · §7.23's "The collapsed column" — the source switch, the dice list, the plate at rail scale | §7.9's collapsed paragraph: it predates the second source list and describes a column that holds only pools (its 56px history is already struck there) |
 | Intent card · dock strip (the declaration) | §2.4's staging timeline, phases 1–8 · §7.6 for the moment flags and `# Title \| Subtitle` · **§7.24** — the target renders under every system and the profile only NAMES it (`targetWord`); the flat `+5` is arithmetic and does not; `#intent-notation` stays a whole verbatim canonical, `dc15` included | §2.4 phase 0's user-held dwell and Roll button (shipped: a fixed `CEREMONY_DECLARE_S = 1.35` s, no button) · §2.1 / §2.3's experience records — the moment ships as notation flags · any reading in which the badge's label is a fixed string |
 | Result banner | §7.11b — the folded card, the hover read, the beacon · **§7.28** — neither the card nor the dice are on a clock; the next roll retires both · §7.21 — the named primary verb, the retired watermark · **§7.24** — `VS DC 15` renders under every system, the adjudication only where a sum does, and the hero slot names the rung (`Face down` / `Whispered`) where the mute gold `?` used to sit · **§7.43** — the outcome rows show EVERY die that was thrown, struck ones included | §7.24 s *Not closed* list, which is stale in all three bullets — read the struck-through block, not the paragraphs it replaced · §7.9's Done-at-rest and its ~6 s clock (the shipped clock is 3 s) · §7.7.2's ⟳ / Collect / ✕ trio · §2.5 (retired 2026-08-08) |
 | Verdict card | §7.16's THE FLOW TO COLLECTED — a folded card whose clock shelves the roll · §7.21 — `❯❯ Skip` repaints to `✕ Clear` when the beat lands · **§7.24** — the stake goes into `#verdict-margin`, written ONCE above and outside every branch; the hero holds the reading and the two never share a slot · **§7.43** — the hero rows show every die thrown, so a `4d6dl1` dropped die is in the rows AND in its `DL1` attribution card | §7.7.2's verdict half (struck there) · §2.4 phase 0's user-held dwell and Roll button (shipped: a 1.35 s timer, no button) · §2.5's one hero slot — retired, struck there. **The card has no subtitle element under any system** (§7.24's deferral); do not read the eight-surface table as though it does |
-| Peek | §7.7.1 for what a peek is · §7.11b's "folded card, shelf edition" · §7.21 — its primary is always `✕ Clear`, housekeeping being anyone's · **§7.24** — the stake, and the held word in the total slot (the `?` survives only for `!entry`, and under a totals lens) · §7.27 — it anchors to a log ROW, not a felt point · **§7.42** — it names its RANK, and it retires on a new roll, on a ceremony and with the log · **§7.43** — its rows show every die thrown, at `.pk-outcomes` scale | §7.15's one-✕ rule — retired, struck below · §7.9's "the peek carries a prominent ✕ at its base" amendment · §2.5 (retired) · any reading in which the card outlives the roll that replaced it |
-| Roll log | **§7.42** — the record: the ≣'s spine, the flyout's rank panels and their anchor, `Find a roll…`, the scroll on `#log-list`, and what `Clear history` actually reaches · §7.27 for the row-as-door · §7.9 for the rail-foot flyout and key `l` · §7.12 for the compact grouped line (the per-die ROWS belong to the other three surfaces) · §7.15's "The log says so" for `reroll` / `rerolled` · **§7.24** — `vs 15` with no `✓`/`✗` where nothing sums, and no dangling `+5` feeding an empty total column | §2.5 (retired) · §7.9's "the count rides only the hover title (still the accessible name)" — the parenthesis was false and is why the count reached nobody (§7.42) · any reading in which `Clear history` is local-only |
+| Peek | **§7.45** — no log entry, no card: it returns before it renders, so the entry-less "live body-click, no named verb" state is unreachable by construction rather than by luck · §7.7.1 for what a peek is · §7.11b's "folded card, shelf edition" · §7.21 — its primary is always `✕ Clear`, housekeeping being anyone's · **§7.24** — the stake, and the held word in the total slot (the `?` survives only for `!entry`, and under a totals lens) · §7.27 — it anchors to a log ROW, not a felt point · **§7.42** — it names its RANK, and it retires on a new roll, on a ceremony and with the log · **§7.43** — its rows show every die thrown, at `.pk-outcomes` scale | §7.15's one-✕ rule — retired, struck below · §7.9's "the peek carries a prominent ✕ at its base" amendment · §2.5 (retired) · any reading in which the card outlives the roll that replaced it |
+| Roll log | **§7.45** — the row's ONE labelled group per pool (label, evidence, answer — §7.12's fix, finally applied here) and the `rerolled` chip that names the rerollER when attribution flipped · **§7.42** — the record: the ≣'s spine, the flyout's rank panels and their anchor, `Find a roll…`, the scroll on `#log-list`, and what `Clear history` actually reaches · §7.27 for the row-as-door · §7.9 for the rail-foot flyout and key `l` · §7.12 for the compact grouped line (the per-die ROWS belong to the other three surfaces) · §7.15's "The log says so" for `reroll` / `rerolled` · **§7.24** — `vs 15` with no `✓`/`✗` where nothing sums, and no dangling `+5` feeding an empty total column | §2.5 (retired) · §7.9's "the count rides only the hover title (still the accessible name)" — the parenthesis was false and is why the count reached nobody (§7.42) · any reading in which `Clear history` is local-only |
 | Shelf | **RETIRED as a place.** §7.27 — a put-away roll lives in the log and its ROW is the door · **§7.42** — what it looks like at rest, open and closed · §7.7 for the collect/clear state machine, which is wire and survives verbatim | §7.7's slots, geometry and marker read · §7.7.1's compaction · ROADMAP U20/C13's "decide how much read the shelf owes" — answered by §7.42 |
-| ± popover | §7.10 — a pure editor, and where an edit lands by source · §7.14.2 — Done, click-away, the ring · §7.9's SHEET PASS identity strip · **§7.24** — only **Modifier** folds under a per-die lens; Target, d20 pairing, keep/drop and reroll/exploding are authorable under every system, and the rim reads `± Modify` in both | §7.10's "reroll and explode stay… behind the sysnote's *Show anyway*" — superseded 2026-08-06, no note and no disclosure; the accurate record is the comment over the popover's sections in `index.html` · any account of the fold in which Target or keep/drop hides under a per-die system: that was `usesMods`, deleted 2026-08-08 · ROADMAP U11's `± Moment` — its rule survived, its word did not (§7.24) |
-| Identity chip · roster · nameplate | §7.17 — the rail pill is the one per-player surface, left-click toggles the rack, right-click / long-press opens the menu, and the quiet nameplate · §7.9's ORDER IS THE CONTRACT · §7.22 for the collapsed dress | §7.9's "Identity is on the table" paragraph, where left-click opened the menu |
-| Settings | No single section. §7.9 for the *Just you* scope (chips off by default, the dice-set select) · §7.13 for *Your data* · §7.17 for the table name; the room-wide keys are `SETTING_SPECS` in `server.js` | §2.1 / §2.3's experience record and its editor — never built, and `/api/table` refuses the key |
+| ± popover | **§7.43** — the visibility sub-lines, and the whisper rung's amended words (§3.2's old quotation is struck there) · §7.10 — a pure editor, and where an edit lands by source · §7.14.2 — Done, click-away, the ring · §7.9's SHEET PASS identity strip · **§7.24** — only **Modifier** folds under a per-die lens; Target, d20 pairing, keep/drop and reroll/exploding are authorable under every system, and the rim reads `± Modify` in both | §7.10's "reroll and explode stay… behind the sysnote's *Show anyway*" — superseded 2026-08-06, no note and no disclosure; the accurate record is the comment over the popover's sections in `index.html` · any account of the fold in which Target or keep/drop hides under a per-die system: that was `usesMods`, deleted 2026-08-08 · ROADMAP U11's `± Moment` — its rule survived, its word did not (§7.24) |
+| Identity chip · roster · nameplate | **§7.43** — a MINTED `?room=` key is not a chosen name (`isMintedKey`, so an unnamed table wears no plate and no tab title), the roster's 76px pill floor and its two differently-worded folds, and the invite link's four doors · §7.17 — the rail pill is the one per-player surface, left-click toggles the rack, right-click / long-press opens the menu, and the quiet nameplate · §7.9's ORDER IS THE CONTRACT · §7.22 for the collapsed dress | §7.9's "Identity is on the table" paragraph, where left-click opened the menu |
+| Settings | No single section. **§7.43** for the Table destination's `Copy invite link` row and the pool-broadcast disclosure over *At this table* · §7.9 for the *Just you* scope (chips off by default, the dice-set select) · §7.13 for *Your data* · §7.17 for the table name; the room-wide keys are `SETTING_SPECS` in `server.js` | §2.1 / §2.3's experience record and its editor — never built, and `/api/table` refuses the key |
 | **Any control's ON / OFF / UNAVAILABLE dress** (not a surface — the rule that governs all of them) | **§7.41** — the token layer. THE KIND OF CHOICE PICKS THE DRESS: switch / pick / dial, three degrees of not-active, and the override rule that makes a disagreement one greppable line. The values of record are the `:root` block in `css/style.css` | Copying the nearest neighbour's numbers, which is what produced nine `[aria-pressed="true"]` dresses across four hue families (audit C3) · any reading in which `#left-panel` scoping is what makes a dress right — 2i-C and U6 both had to un-scope a law twice for the same reason |
 
 ### 7.1 Physical pool building (supersedes the button grid as the primary path)
@@ -5437,3 +5445,216 @@ belong to another owner's file):
   that is exceeded sets `over` on both; `setPoolsEditMode(false)` leaves
   `ledgerSheet === null`; and a reload leaves the target gone (session-only —
   the assertion that would catch a stray `localStorage` write).
+### 7.45 The seams a first table night runs into (2026-08-14)
+
+*U25 (audit E4) + U26 (audit F3) + U28b's two touch findings. Fourteen small
+things, judged one at a time. Two of them were **already closed** by later
+work, and are recorded here so the next reader stops re-opening them.*
+
+#### The two that were already true
+
+**The spectator's banner hover-hold is not broken — the clock it fought is
+gone.** F3's first bullet (and through it [CUJS.md](CUJS.md)'s CUJ11 first
+item) says `armAutoCollect` bails on `!mine`, so the roller's 3 s clock yanks
+the card a spectator is reading. That was accurate on 2026-08-08. **§7.28
+deleted the clock outright on 2026-08-10** — there is no `armAutoCollect`, no
+`setBannerRetireMs`, and no timed exit of any kind: what retires the card is
+the next roll or your own dismissal, for the roller and the spectator alike,
+and a spectator reads at whatever pace they like. CUJ11's first item is
+**shipped, by a deletion, four days before the journey was named.** The
+journey's requirement is unchanged and still owes a composed scenario.
+
+**A shelved roll whose log row is gone renders no peek at all.** F3's third
+bullet describes a card with a live body-click and no named verb. §7.27 made
+the log ROW the card's anchor and `renderPeek` refuses when the row is
+missing; rows leave only through the cap prune, which takes the entry with
+them. The `if (entry)` fold is therefore never skipped. What this pass added
+is the *structure* rather than the coincidence: an entry-less peek now
+returns before it renders anything, because the branches that drew that card
+(a `?` and no verbs) are still standing below it, and a future anchor that is
+not the row would make them reachable again.
+
+#### The log row said every pool's name twice
+
+§7.12's diagnosis was **duplication at equal weight** — a tally run and a
+breakdown run that each led every group with its source label, so learning
+WHICH die said WHAT meant cross-referencing two lists of the same words. It
+was fixed on the banner, the verdict card and the peek by folding the two
+runs into one labelled row per pool. The log was left out on the correct
+grounds that its density is a **list line, not a ledger** — and then went on
+printing `WISDOM d8 7 + d8 2 · ZEAL d6 3 · WISDOM Success · ZEAL Fail`.
+
+A list line can carry the structure without becoming a ledger: **label once,
+then the evidence, then the answer, per pool** —
+`WISDOM d8 7 + d8 2 → Success · ZEAL d6 3 → Fail`. Both runs group on
+`partSource`, so a group can never hold one and not the other. The separate
+`.log-meaning` span still stands where there is **nothing to merge**: an
+unsourced roll, whose single run never repeated anything, and which keeps
+`renderTally`'s whole-roll *"a quiet roll"* voice.
+
+#### A reroll says who, when who changed
+
+**Spectator reroll stays.** `server.js` has no same-roller check on
+`rerollOfId`, deliberately and with the reasoning at the call site: rerolling
+someone else's visible roll is a legitimate table action, and goal 10 has no
+role to appeal to. What was missing is that **nothing said so afterwards.**
+The child's chip has always named its parent in a `title`; the parent's chip
+named nobody, so *"Bob's row says rerolled"* could not say Alice did it, and
+the record eviction a reroll causes had no voice on either row.
+
+The **attribution flip** is the half that goes in the ink, because it is the
+half that is not recoverable from anything else on screen: the row is Bob's,
+the replacement is Alice's, and every surface will now show Alice's numbers
+under a roll Bob made. Rerolling your **own** roll keeps the bare word — this
+is a qualifier, not a badge, and §7.15's *at most ONE per row* still binds.
+Both producers (`buildLogEntryEl`, `markSuperseded`) build the chip through
+one function, because the incremental append and the full rebuild have a
+byte-identical contract; `supersededIds` became a Map parentId → child, and
+the FIRST child wins on both paths.
+
+#### The whisper line said the opposite of what ships
+
+*"others see you rolled, not what"* — four words for the reverse of the
+doctrine. On every rung but `secret`, existence is public **and so are the
+stakes**: the dice land shrouded but real, so their TYPES and COUNT are
+public, and §7.24 renders the target, the moment and the subtitle to everyone
+under every system. Only the VALUES are withheld. "not what" is exactly the
+sentence a player would use to justify hiding a stake inside a whisper, and
+§3.2 calls this our largest behavioural difference from Roll20 and Foundry,
+where a non-recipient sees nothing at all. It now reads **"the table sees the
+dice and the stakes — only they see the result"**, and §3.2's quotation of
+the old string is amended in place.
+
+**And the offer-context tooltip §3.2 specified is built.** An offered
+*Only me* roll is not an only-me roll: the claimant rolls it and only the
+OFFERER reads the result — the GM-screen roll without a GM. §3.2 pinned the
+words to the popover's own Offer button, which retired with `popVis`; the
+verb lives on the rim now, so `#offer-draft` reads **"Dice tower — they roll,
+only you see the result"** whenever the draft carries `secret`, and the plain
+title otherwise. The line follows the verb rather than dying with the surface
+it was written against.
+
+#### The terminology sweep's one contradiction
+
+`＋ New shelf…` had `title="Add a category of pools"`. `category` is the
+stored field and stays one — renaming it breaks every saved rack, the same
+rule that keeps `dice.groups.v1` and `id="tray"` — and this was the only
+place it reached a player. The **durable half is the suite**: the banned-word
+regex omits `category` and sweeps none of the result surfaces. The string
+this pass fixed is one instance; the sweep is what stops the next one, and
+its exact shape is specified in the ROADMAP hand-off.
+
+#### publishPools: the broadcast is right, the words were the lie
+
+`publishPools` sends **your whole library** — every profile's name, system
+and pools — to the room on every edit, and has since C17. Two sentences in
+the app said the opposite: the invite tooltip's *"Pools travel via Settings →
+Your data → Export"* and Help's *"Pools travel by export and import"*.
+
+**The broadcast stays**, and this is the argument, because goal 7 is the one
+that looks like it forbids it. Goal 7 says the server holds no persistent
+state and that **capture is a thing the player DOES**. The broadcast is not
+capture: it is a room-scoped display copy that evaporates with the room —
+`localStorage` stays the truth, nothing anyone copies changes yours, and no
+copy becomes anyone's *saved* pool without their own explicit Copy or Apply.
+The file is still the only way a pool LEAVES a table, which is what "travel"
+was reaching for. Killing the broadcast would take CUJ6, CUJ7 and the
+teammate-pill browse with it — an organizer's six prepared characters are
+offered "with no push and no YAML pane" precisely because of this wire.
+
+Goal 11's *principle* is what was actually violated: privacy is a choice, not
+a privilege, and a choice you were never told about is not one. Goal 10 says
+everyone can already browse everyone — the hidden part was the only part out
+of step. So: **both sentences are made true, and the sending half gets a
+standing disclosure** in Settings → Your profiles, immediately above *At this
+table*, which is the receiving half. One glance shows the symmetry. It stands
+at a table only; announcing a broadcast to a solo player is a lie in the
+other direction.
+
+#### The link, the plate, the note, the fold
+
+- **The invite link gets a primary gesture.** Its only pointer door was
+  right-click / long-press on the identity chip — invisible, taught by a
+  `title` touch never renders, on a chip whose LEFT-click is a visible no-op
+  when you are already on your own rack — plus an Invite chair that retires
+  the moment the second person arrives, which is exactly when a third is
+  being fetched. **That retirement is right** (§7.20: a pill retired by its
+  own success) and the rail is not where this belongs. Two standing doors
+  join it: a **Settings → Table row beside the table's name**, because naming
+  a table and handing out its link are the same errand and this is the one
+  surface a first-time player is told to open; and **key `i`**, the first
+  shortcut in the app that acts on the TABLE rather than on the panel, which
+  was E4's finding word for word. All four doors go through `shareInvite`, so
+  the `Copied!` grammar and the clipboard-refused fallback cannot drift. The
+  lobby has no link, so the row hides and the key refuses out loud rather
+  than fabricating one.
+- **A minted key is not a chosen name.** The nameplate's rule is its own
+  markup comment — *tableName, else the `?room=` key when someone CHOSE one,
+  else NOTHING* — and it had no test for "chose", so `+ New table` minted
+  `<slug>-<16 random>` and an unnamed table wore `drive egw19x` on the plate
+  and in the tab title: a placeholder, and precisely the standing generic
+  word the removed `Pools` title taught us to kill. `isMintedKey` lives in
+  `js/tables.js` because the shape it recognises is the shape `mintRoomKey`
+  writes. It is deliberately strict: a hand-typed `?room=our-tuesday-game` is
+  a chosen name and keeps its plate. The security cost is nil either way —
+  the address bar carries the key regardless; this was always presentation.
+- **The change note names the setting.** *"Alice changed the table"* was the
+  note for a **system flip**, which re-reads every result on screen under a
+  different lens. Every other event on this channel names its subject ("Bo
+  left"). The verb is diffed against what we hold **before** the apply
+  overwrites it, so the note describes the delta and not the envelope (the
+  server broadcasts the full merged object every time); two or more at once
+  fall back to the plural, because a rename plus a felt change is one press
+  of Apply, not two sentences.
+- **The roster's two folds no longer both read `+N`.** Past `ROSTER_MAX` the
+  row can carry the people fold and the free-seats fold at once, identically
+  dressed, reading `+2` `+3` — two counts of two different things with only a
+  hover title to tell them apart. The seats fold takes the word (`+3 free`),
+  because `+3` beside a roster reads as three more PEOPLE.
+- **And a pill can no longer shrink past its own text.** `.roster-name`
+  carries `overflow: hidden` for its ellipsis, and for a flex item that sets
+  the automatic minimum size to **zero** — `min-width: auto` resolves to 0
+  instead of min-content — so pills shrank past their own padding to bare 8px
+  dots while still four short of the fold that was supposed to answer
+  crowding. A 76px floor (dot + gap + padding + ~4 characters) means a pill
+  either says a name or is ellipsised to something recognisable; `#rail` is
+  already `flex-wrap: wrap`, so the row absorbs the rest by WRAPPING, which
+  is the growth mode it was built with (T9).
+
+#### Two touch findings (U28b)
+
+- **The rim wraps before it overflows.** `.draft-actions` is a no-wrap flex
+  row whose four coarse tools come to ~240px of the expanded panel's 260 —
+  fine on a tablet, overflowing below a ~320px viewport with nothing saying
+  so. `flex-wrap` on coarse only: a second 36px row is a visible, complete
+  answer, and on a fine pointer the row has never overflowed.
+- **A counted dice row spends its art on its remover.** The measurement,
+  twice refused in cascade and correctly: 8 + 18 art + 6 gap + 42 (`10d10x`
+  at 12.5px) + 34 (the coarse remover's lane) + 8 = **116px in an 86px row.**
+  It does not fit and never would; both refusals named the same two candidate
+  answers, *drop the art on a counted row* or *move the count out of the
+  name*. **THE COUNT IS THE LABEL** is §7.23's ruling with Joe's name and the
+  wire payload on it, so the art is what goes — and only on **coarse**, which
+  is what makes it affordable. On a fine pointer the ✕ is `opacity: 0` until
+  you hover: nothing overlaps at rest, and while you hover you are aiming at
+  the ✕ rather than reading the label. On coarse it stands permanently over
+  the tail of every counted label; without the art the text runs x=8→50, the
+  lane starts at 52 and its glyph inks 64–74, so every reachable label fits
+  on the increment side of the boundary. The cost is that the first tap
+  trades a die picture for a count and a remover — the row changing state,
+  not losing its identity: it is lit, and it now reads as notation (`3d6`),
+  which is what the art stood in for while the row said only `d6`.
+
+**Deliberately not done.** The near-miss size families (`.btn.ghost` 31px,
+`.corner-btn` 28, `.btn.tiny` 19, `#section-bar` cells 26) stay put: a
+blanket coarse `.btn` bump touches ~30 surfaces and bumping the section bar
+spends U30's rack budget directly. Raising any of them is a per-family change
+with its own measurement, never a sweep. **A room that dies still says
+nothing** — that bullet belongs with the table-resync work in flight and
+would have been written twice.
+
+**Debug surface:** `__diceDebug.logRow(rollId)` (the row as a projection —
+`labels`, `tallySrcs`, `answers`, `rerolled`, `rerolledTitle`),
+`tablePlate` (`name` / `hidden` / `title` / `minted`), `presenceRow.folds`
+and `.pillWidths`, `poolsSharedNote`, `settingsChangeVerb(next)`, `visSubs`,
+`offerTitle`.

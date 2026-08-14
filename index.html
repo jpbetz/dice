@@ -521,7 +521,13 @@ limitations under the License.
     </div>
     <button id="idm-leave" class="idm-item" title="Drop this seat and sit down again at this same table">Change seat…</button>
     <button id="idm-lobby" class="idm-item" title="Leave this table and go back to the lobby — your name and pools come with you">Leave table</button>
-    <button id="idm-invite" class="idm-item" title="This room’s link — invites a player. Pools travel via Settings → Your data → Export">Copy invite link</button>
+    <!-- U25: the tooltip used to end "Pools travel via Settings → Your data →
+         Export", which was false — publishPools shares your library with the
+         room the moment you join. The link is what this button copies, so the
+         link is what it describes; the pool-sharing disclosure has a standing
+         home in Settings → Your profiles rather than a tooltip touch never
+         renders. -->
+    <button id="idm-invite" class="idm-item" title="This room’s link — anyone holding it can join this table">Copy invite link</button>
   </div>
 
   <!-- Targeted offers (4b): the ▾ menu — one name, one claimant ("Bo, roll
@@ -603,6 +609,10 @@ limitations under the License.
           <tr><td><code>c</code></td><td>clear <em>your</em> rolls · again to clear everyone's</td></tr>
           <tr><td><code>n</code> or <code>m</code></td><td>collapse / expand the side panel (the divider chevron too)</td></tr>
           <tr><td><code>l</code></td><td>roll log flyout</td></tr>
+          <!-- U25: the first shortcut that touches the TABLE rather than the
+               panel. The audit's finding was literally "no keyboard shortcut
+               touches the table at all". -->
+          <tr><td><code>i</code></td><td>copy this table's invite link</td></tr>
           <tr><td><code>s</code></td><td>sound on/off</td></tr>
           <tr><td><code>/</code> or <code>Ctrl/Cmd K</code></td><td>quick roll palette</td></tr>
           <tr><td><code>Space</code></td><td>skip the roll in flight (click the table works too)</td></tr>
@@ -722,9 +732,19 @@ limitations under the License.
           <p>Your pools live in your browser, per site — there are no
             accounts. A room lives in server memory while the table stands
             and evaporates afterwards; its log is the room's record for as
-            long as it lasts. Pools travel by export and import: a small
-            portable text file you hand around yourself. Links carry a room
-            name and nothing else about you.</p>
+            long as it lasts. Links carry a room name and nothing else about
+            you.</p>
+          <!-- U25: this paragraph used to say pools travel by file and stop
+               there, which was not true of a table. Both halves now stand. -->
+          <p>At a table, everyone can see your profiles and the pools in
+            them, and can copy them — that is how a prepared table hands you
+            your character, and how you browse a teammate's pools. It is a
+            copy the room holds while it lasts, never a copy of your browser:
+            nothing you keep is stored on the server, and nothing anyone
+            copies changes yours.</p>
+          <p>To move pools <em>off</em> a table — to another browser, or to
+            keep them — use export and import: a small portable text file you
+            hand around yourself.</p>
         </section>
       </div>
     </div>
@@ -1091,6 +1111,26 @@ limitations under the License.
             </span>
             <input id="set-table-name" class="tin" maxlength="28" placeholder="unnamed">
           </div>
+          <!-- THE INVITE LINK GETS A PRIMARY GESTURE (U25, audit E4). Its only
+               pointer door was right-click / long-press on the identity chip —
+               invisible, and the chip's LEFT-click is a visible no-op when you
+               are already on your own rack — plus an Invite chair that retires
+               the moment the second person arrives, which is exactly when a
+               third is being fetched. That retirement is right (§7.20: a pill
+               retired by its own success) and the rail is not where this
+               belongs; this is. It sits beside the table's NAME because
+               naming a table and handing out its link are the same errand,
+               and it is a standing, tappable, focusable control on the one
+               surface a first-time player is told to open. The identity menu
+               keeps its item (one copy path — both go through shareInvite);
+               key `i` is the fast door. -->
+          <div class="prow" id="set-invite-row">
+            <span class="grow">
+              <span class="prow-label">Invite link</span>
+              <span class="prow-sub">anyone holding it can join this table — press <code>i</code> anywhere</span>
+            </span>
+            <button id="set-invite" class="btn tiny">Copy invite link</button>
+          </div>
           <div class="prow">
             <span class="grow">
               <span class="prow-label">Rolling system</span>
@@ -1243,6 +1283,18 @@ limitations under the License.
                     title="Deal a whole profile at random for this table’s system">⚄ Random</button>
           </div>
           <p id="profile-status" class="hint portable-status"></p>
+          <!-- THE BROADCAST, SAID OUT LOUD (U25, audit E4). publishPools sends
+               your whole library — every profile's name, system and pools — to
+               the room on every edit, and has since C17, because that is what
+               makes "At this table" below it work in both directions and what
+               CUJ6/CUJ7 stand on. Nothing said so, and the app's two sentences
+               about pool sharing said the opposite ("Pools travel via Settings
+               → Your data → Export"). Both are now true and this is the
+               disclosure: it stands where the receiving half already stands, so
+               the symmetry is legible in one glance. At a table only —
+               announcing a broadcast to a solo player is a lie in the other
+               direction. -->
+          <p id="pools-shared-note" class="hint hidden"></p>
           <div id="table-profiles" class="portable-profiles hidden">
             <span class="pp-head">At this table</span>
             <div id="table-profile-rows"></div>

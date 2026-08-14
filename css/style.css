@@ -6366,3 +6366,82 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
   background: rgba(243, 234, 215, 0.04);
 }
 #pools-head button.ph-fig:focus-visible { outline: none; border-color: var(--on-ring); }
+
+/* ==========================================================================
+   U25 / U26 / U28b — the table's smaller seams
+   Appended at the end per the house rule. Every rule here overrides a block
+   further up on purpose, so each one is written to out-SPECIFY rather than
+   merely follow (the three-cascade-ties lesson at .rd-cell).
+   ========================================================================== */
+
+/* ---- the roster reads, or it folds — never both badly (U25, audit E4) ----
+   `.roster-name` carries `overflow: hidden` for its ellipsis, and for a FLEX
+   item that sets the automatic minimum size to ZERO: `min-width: auto`
+   resolves to 0 instead of min-content, so `#rail`'s pills shrank past their
+   own text and past their own padding until an eighth player left a row of
+   bare 8px dots — visibly present, unreadable, and still four pills short of
+   the +6 fold that was supposed to be the answer to crowding.
+   A floor, not a rewrite: 76px is the dot (8) + gap (6) + padding (20) +
+   border (2) + about four characters, so a pill either says a name or is
+   ellipsised to something a person can recognise. `#rail` is already
+   `flex-wrap: wrap`, so the row absorbs the rest by WRAPPING, which is the
+   growth mode it was built with (T9) — the pills stop paying for it. */
+#rail .roster-name { min-width: 76px; }
+
+/* ---- the 'rerolled' qualifier grew a name (U26) ----
+   The head is a space-between flex row with the total on the right. The group
+   cell gets permission to shrink and wrap so a long "rerolled by <name>"
+   costs a second line rather than pushing the number off the row; the chip
+   itself never breaks mid-phrase. */
+.log-head .log-group { min-width: 0; }
+.log-rerolled { white-space: nowrap; }
+
+/* ---- the rim wraps before it overflows (U28b) ----
+   `.draft-actions` is a no-wrap flex row and on a coarse pointer its four
+   tools come to ~240px of the expanded panel's 260 — comfortable on a tablet,
+   overflowing below a ~320px viewport, where the last tool leaves the panel
+   with nothing saying it did. Wrapping is the failure direction this file
+   picks everywhere else (#rail wraps, the roster wraps): a second 36px row is
+   a visible, complete answer, and `min-height` on the container already
+   guarantees the first row's height either way. Coarse-only — on a fine
+   pointer the row has never overflowed and a stray wrap there would move
+   standing furniture for nothing. */
+@media (pointer: coarse) {
+  .draft-actions { flex-wrap: wrap; }
+}
+
+/* ---- a counted dice row spends its art on its remover (U28b) ----
+   THE MEASUREMENT, which is why this is markup and not more cascade: the row
+   is 86px, and 8 (pad) + 18 (art) + 6 (gap) + 42 ('10d10x' at 12.5px) + 34
+   (the coarse remover's lane) + 8 (pad) = 116. It does not fit, it was never
+   going to fit, and the two blocks above that refused to fake it both named
+   the same two candidate answers: drop the art on a counted row, or move the
+   count out of the name. THE COUNT IS THE LABEL is a ruling with Joe's name
+   on it (§7.23) and the wire payload riding on it, so the art is what goes.
+   COARSE ONLY, and that is the whole reason this is affordable. On a fine
+   pointer the ✕ is `opacity: 0` until you hover the row — at rest nothing
+   overlaps anything, and while you hover you are aiming at the ✕ rather than
+   reading the label. On a coarse pointer it STANDS, permanently, 34px wide at
+   `right: 0`, over the tail of every counted label. Without the art the text
+   starts at x=8 and the longest label ends at x=50; the lane starts at 52 and
+   its glyph inks 64-74. Nothing overlaps, and every reachable label fits on
+   the increment side of the boundary.
+   What it costs: on touch, the first tap trades a die picture for a count and
+   a remover. That is the row changing state, not the row losing its identity
+   — it is lit, and it now reads as notation ('3d6'), which is what the art
+   was standing in for while the row said only 'd6'. */
+@media (pointer: coarse) {
+  .rd-cell.rd-counted .rd-item .rp-dice { display: none; }
+}
+
+/* ---- a key named inside a settings sub-line (U25) ----
+   The invite row teaches its shortcut where the control is, and `<code>` had
+   no dress outside `.cheatsheet`, so it fell to the browser's default
+   monospace at the wrong size. Same recipe as the cheatsheet's, at the
+   sub-line's own scale. */
+.prow-sub code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--gold-bright);
+  white-space: nowrap;
+}

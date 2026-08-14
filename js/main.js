@@ -22,7 +22,7 @@ import * as CANNON from 'cannon-es';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, SHADER_TIME } from './dice.js';
 import { dieArtURL } from './diceart.js';
 import { connect, forgetSeat, peekTable } from './net.js';
-import { recentTables, rememberTable, forgetTable, mintRoomKey } from './tables.js';
+import { recentTables, rememberTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, validateMods, budgetOf } from './rollspec.js';
 import { previewOf, countingPmfs } from './odds.js';
@@ -3681,7 +3681,21 @@ function renderPeek() {
     return;
   }
   const entry = log.find((e) => e.rollId === peekRollId) || null;
-  const hidden = !entry || entryHidden(entry);
+  // NO ENTRY, NO CARD (U26, audit F3 — the pre-§7.21 defect in its last edge
+  // state). The fold below is built `if (entry)`, and the body's click-clear
+  // is not: an entry-less card was a live destructive target advertising no
+  // verb at all. C25 closed the ROUTE — the card hangs off a log row and the
+  // guard above already refuses when the row is gone, and a row exists only
+  // where an entry does — so this is unreachable today. It is written as a
+  // structure rather than left as a coincidence, because the branches that
+  // rendered that card ('?' with no verbs) are still standing below and a
+  // future anchor that is not the row would make them reachable again.
+  if (!entry) {
+    if (peekPinned()) closePopover();
+    closePeek();
+    return;
+  }
+  const hidden = entryHidden(entry);
   peekEl.textContent = '';
 
   // THE FOLDED CARD, shelf edition (Joe 2026-08-03: 'roughly the same as
@@ -13632,8 +13646,69 @@ window.__diceDebug = {
         dot: !!b.querySelector('.rg-dot'),
       })),
       pills: [...rosterEl.querySelectorAll('.roster-name')].map((el) => el.textContent.trim()),
+      // U25: the folds, in row order. Two of them can stand at once (people
+      // past ROSTER_MAX, then seats still free) and they used to read `+2`
+      // `+3` with only a title to tell them apart. A scenario asserts the
+      // WORDS, not the count of spans.
+      folds: [...rosterEl.querySelectorAll('.roster-more')].map((el) => el.textContent.trim()),
+      // …and whether a pill can still be read at this width. The defect was
+      // a flex item with `overflow: hidden` shrinking past its own text to a
+      // bare dot, so the assertion has to be a measured BOX, not a class.
+      pillWidths: [...rosterEl.querySelectorAll('.roster-name')]
+        .map((el) => Math.round(el.getBoundingClientRect().width)),
     };
   },
+  // U25 — THE NAMEPLATE'S OWN RULE, ASSERTABLE. `name` is what the plate and
+  // the tab title show; `minted` says whether the ?room= key was minted (and
+  // therefore is not a chosen name). An unnamed table with a minted key must
+  // show NOTHING in both channels.
+  get tablePlate() {
+    const el = document.getElementById('table-name');
+    return {
+      name: el ? el.textContent : '',
+      hidden: !!(el && el.classList.contains('hidden')),
+      title: document.title,
+      room: ROOM,
+      minted: ROOM ? isMintedKey(ROOM) : false,
+    };
+  },
+  // U25 — the note that names the setting. The phrase only, without the
+  // roller's name in front of it, so a scenario need not fixture a name.
+  settingsChangeVerb(next) { return settingsChangeVerb(next); },
+  // U25 — the broadcast disclosure (Settings → Your profiles). Empty string
+  // when it is not standing, which is the solo case.
+  get poolsSharedNote() {
+    const el = document.getElementById('pools-shared-note');
+    return el && !el.classList.contains('hidden') ? el.textContent.trim() : '';
+  },
+  // U26 — ONE LOG ROW, as a projection. The row's two runs used to repeat
+  // every source label; the assertion is that a pool's name appears ONCE in
+  // the row, and that the answer sits inside the same group as its evidence.
+  logRow(rollId) {
+    const el = logList.querySelector(`.log-entry[data-roll-id="${CSS.escape(String(rollId))}"]`);
+    if (!el) return null;
+    const detail = el.querySelector('.log-detail');
+    return {
+      group: (el.querySelector('.log-group') || { textContent: '' }).textContent.trim(),
+      detail: detail ? detail.textContent.replace(/\s+/g, ' ').trim() : '',
+      // the evidence run's labels …
+      labels: [...el.querySelectorAll('.log-detail .log-part-label')].map((n) => n.textContent.trim()),
+      // … and the answer run's, which must now be EMPTY on a sourced roll:
+      // the tally no longer leads its groups with a second copy of the name.
+      tallySrcs: [...el.querySelectorAll('.log-detail .tally-src')].map((n) => n.textContent.trim()),
+      answers: [...el.querySelectorAll('.log-detail .log-meaning')].map((n) => n.textContent.trim()),
+      reroll: (el.querySelector('.log-reroll') || { textContent: '' }).textContent.trim(),
+      rerollTitle: (el.querySelector('.log-reroll') || { title: '' }).title,
+      // U26: the parent's chip names the rerollER when attribution flipped.
+      rerolled: (el.querySelector('.log-rerolled') || { textContent: '' }).textContent.trim(),
+      rerolledTitle: (el.querySelector('.log-rerolled') || { title: '' }).title,
+    };
+  },
+  // U26 — the visibility sub-lines, by rung. The whisper line is the one
+  // that described the stakes-are-public leak as though there were none.
+  get visSubs() { return { ...POP_VIS_SUBS }; },
+  // U26 — the rim's Offer verb reads its context (§3.2's dice-tower line).
+  get offerTitle() { return offerDraftBtn.title; },
   // §7.20 per-seat link (what an unclaimed chair copies): base + &as=Name.
   // Null in the lobby, exactly as inviteUrl() is.
   seatInviteUrl(name) { return seatInviteUrl(name); },
@@ -14271,6 +14346,19 @@ function updateTrayButtons() {
   // additionally needs someone to target — it waits for a teammate.
   offerDraftBtn.classList.toggle('hidden', !netOnline);
   offerDraftBtn.disabled = !usable;
+  // THE OFFER-CONTEXT TOOLTIP §3.2 SPECIFIED AND NOBODY BUILT (U26, audit
+  // F3). An offered ONLY-ME roll is not an only-me roll: the claimant rolls
+  // it and only the OFFERER reads the result — the GM-screen roll without a
+  // GM (goal 11), and the one place where the same word means two different
+  // things depending on which verb spends it. §3.2 pinned the words ("Dice
+  // tower — they roll, only you see the result") to the popover's own Offer
+  // button, which retired with popVis; the verb lives on the rim now, so the
+  // line follows the verb rather than dying with the surface it was written
+  // against. The other rungs keep the plain title: they mean what they say.
+  const draftVis = boxExtras && boxExtras.visibility ? boxExtras.visibility.mode : null;
+  offerDraftBtn.title = draftVis === 'secret'
+    ? 'Dice tower — they roll, only you see the result'
+    : 'Offer this roll to the table — anyone can take it';
   const hasTargets = netOnline && net && players.some((p) => p.id !== net.playerId && p.name);
   // A whisper draft is already ADDRESSED (Joe 2026-08-03): the server
   // derives the claim gate from its audience, so the ▾ has nothing to
@@ -17168,7 +17256,17 @@ function renderRailDiceInner() {
   for (const type of RAIL_DIE_TYPES) {
     const n = railDice.filter((t) => t === type).length;
     const cell = document.createElement('div');
-    cell.className = 'rd-cell';
+    // A COUNTED ROW SAYS SO IN ITS MARKUP (U28b). The stylesheet refused this
+    // one twice, with the arithmetic each time: 8 + 18 art + 6 gap + 42
+    // ('10d10x' at 12.5px) + the remover + 8 does not fit 86px, and a
+    // reserved lane in cascade only ellipsises the notation, which IS the
+    // label here. Both refusals name the same answer — "the real answers are
+    // markup: drop the art on a counted row, or move the count out of the
+    // name" — and the count is the label (§7.23, Joe's own call), so it is
+    // the art. The class is the hook; the stylesheet spends it on coarse
+    // pointers only, where the remover STANDS at 34px, and where the
+    // measurement actually bites. See the rule at the end of style.css.
+    cell.className = n ? 'rd-cell rd-counted' : 'rd-cell';
     const b = document.createElement('button');
     b.className = 'rp-item rd-item';
     b.setAttribute('aria-pressed', n ? 'true' : 'false');
@@ -17512,7 +17610,12 @@ function buildNewShelfRow() {
   const b = document.createElement('button');
   b.className = 'pt-toggle new-shelf';
   b.textContent = '＋ New shelf…';
-  b.title = 'Add a category of pools';
+  // THE ONE REAL TERMINOLOGY CONTRADICTION THE SWEEP FOUND (U26): the button
+  // says shelf and its tooltip said "category". `category` is the stored
+  // field and stays one (renaming it breaks every saved rack, the same rule
+  // that keeps `dice.groups.v1` and `id="tray"`); it is not a word a player
+  // reads. This is the only place it reached one.
+  b.title = 'Add a shelf of pools';
   b.addEventListener('click', () => {
     const input = document.createElement('input');
     input.className = 'new-shelf-input';
@@ -18124,11 +18227,22 @@ function popVisBlocked() {
 // Sublabels for the visibility picker (UX.md §3.2's terminology note: the
 // labels are Open · Face down · Only me · Whisper to…, never "Secret"/
 // "Blind"/"GM"/"Private" — each reads as its own opposite somewhere).
+// AND THE WHISPER LINE NAMES THE LEAK IT HAS (U26, audit F3). It read
+// *"others see you rolled, not what"*, which is four words for the opposite
+// of what ships: on every rung but `secret`, existence is public AND SO ARE
+// THE STAKES — the dice land shrouded but real, so their TYPES and COUNT are
+// public, and §7.24 renders the target, the moment and the subtitle to
+// everyone under every system. Only the VALUES are withheld. "not what" is
+// exactly the sentence a player would use to justify hiding a stake in a
+// whisper, and §3.2 calls that our largest behavioural difference from
+// Roll20/Foundry, where a non-recipient sees nothing at all. It is the one
+// place in the app where the doctrine was documented three times and the
+// four words a player actually reads said the reverse.
 const POP_VIS_SUBS = {
   open: '',
   held: 'face down for everyone — hidden until you reveal',
   secret: 'no one else sees that you rolled',
-  whisper: 'others see you rolled, not what',
+  whisper: 'the table sees the dice and the stakes — only they see the result',
 };
 
 // A SEG IS A CHOICE, NOT A ROW OF SWITCHES (U22, audit D5). Every seg here
@@ -18780,6 +18894,38 @@ function escapeHtml(t) {
 // list rebuild was O(N) per arrival and dominated a saturated table). Both
 // paths call THIS builder — a single source of truth keeps the incremental
 // row identical to the full-render row on any future markup edit.
+// THE 'rerolled' CHIP, BOTH PRODUCERS (U26, audit F3). Spectator reroll is
+// deliberate and stays: server.js has NO same-roller check on `rerollOfId`,
+// on purpose and said so at the call site — rerolling someone else's visible
+// roll is a legitimate table action, and goal 10 has no roles to appeal to.
+// What was missing is that nothing SAID SO afterwards. The child's chip has
+// always named its parent in a title; the parent's chip named nobody, so
+// "Bob's row says rerolled" could not say Alice did it, and the record
+// eviction a reroll causes (the child takes the parent's place) had no voice
+// on either row.
+//
+// The ATTRIBUTION FLIP is the half that goes in the INK, because it is the
+// half that is not recoverable from anything else on screen: the row is
+// Bob's, the replacement is Alice's, and every other surface will now show
+// Alice's numbers under a roll Bob made. Rerolling your OWN roll is the
+// unsurprising case and keeps the bare word — this is a qualifier, not a
+// badge, and §7.15's "at most ONE per row" still binds.
+// Both producers call this so the incremental append and the full rebuild
+// cannot drift (the byte-identical contract markSuperseded documents).
+function rerolledChip(parent, child) {
+  const q = document.createElement('span');
+  q.className = 'log-rerolled';
+  const by = child && child.playerName ? child.playerName : '';
+  q.textContent = 'rerolled';
+  // Names are user-supplied: append() takes a STRING and makes a text node,
+  // which is the textContent rule, not an innerHTML exception to it.
+  if (by && parent && parent.playerName && by !== parent.playerName) q.append(` by ${by}`);
+  q.title = by
+    ? `Rerolled by ${by} — their roll took this one's place in the record`
+    : 'A later roll replaced this one';
+  return q;
+}
+
 function buildLogEntryEl(entry, { supersededIds, byId }) {
     const hidden = entryHidden(entry);
     const el = document.createElement('div');
@@ -18847,6 +18993,31 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
     } else if (entry.modifier && activeSystem().usesTotal) {
       modHtml = ` <span class="log-mod">${entry.modifier > 0 ? '+' : '−'}${Math.abs(entry.modifier)}</span>`;
     }
+    const outcomes = entryOutcomes(entry); // per-die lens (Soul Deal)
+    // THE LOG SAID EVERY POOL'S NAME TWICE (U26, audit F3). §7.12's diagnosis
+    // was *duplication at equal weight*: a tally run and a breakdown run that
+    // each led every group with its source label, so learning WHICH die said
+    // WHAT meant cross-referencing two lists of the same words. It was fixed
+    // on the banner, the verdict card and the peek by folding the two runs
+    // into ONE labelled row per pool — and the log was left out on the
+    // correct grounds that its density is a LIST LINE, not a ledger.
+    // A list line can still carry the structure: label once, then the
+    // evidence, then the answer, per pool. So the two runs MERGE here rather
+    // than standing side by side ('WISDOM d8 7 + d8 2 → Success · Fail'), and
+    // the separate `.log-meaning` span below now stands only where there is
+    // nothing to merge — an unsourced roll, whose single run never repeated
+    // anything, and which keeps renderTally's whole-roll 'a quiet roll' voice.
+    const mergeTally = !hidden && !!outcomes && !!entrySources(entry);
+    // One group's outcomes as the compact worded answer. Same grammar as
+    // renderTally's per-group half ('2× Fail', 'quiet'), which is what lets
+    // the two read as one system; renderTally keeps the DOM path because it
+    // is shared with surfaces this string is not.
+    const tallyHtml = (os) => {
+      const t = tallyOutcomes(os);
+      if (!t.length) return '<span class="tally-quiet">quiet</span>';
+      return t.map((x) => `<span class="tier-${escapeHtml(x.tier)}">`
+        + `${escapeHtml(x.n > 1 ? `${x.n}× ${x.word}` : x.word)}</span>`).join(' · ');
+    };
     const detail = hidden
       ? `<span class="log-hidden">${entry.visMode === 'whisper' ? 'whispered' : 'face down'}</span>`
       : (() => {
@@ -18865,8 +19036,21 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
             if (!byKey.has(k)) { byKey.set(k, []); order.push(k); }
             byKey.get(k).push(p);
           });
+          // \u2026and the ANSWER, grouped on the same key the evidence is. Both
+          // loops resolve a die through partSource, so a group can never end
+          // up holding one run and not the other.
+          const osByKey = new Map();
+          if (mergeTally) {
+            for (const o of outcomes) {
+              const k = partSource(entry, o.dieIndex) || '';
+              if (!osByKey.has(k)) osByKey.set(k, []);
+              osByKey.get(k).push(o);
+            }
+          }
           return order.map((k) => (k ? `<span class="log-part-label">${escapeHtml(k)}</span> ` : '')
-            + byKey.get(k).map(partHtml).join(' + ')).join('  \u00b7  ') + modHtml;
+            + byKey.get(k).map(partHtml).join(' + ')
+            + (mergeTally ? ` \u2192 <span class="log-meaning">${tallyHtml(osByKey.get(k) || [])}</span>` : ''))
+            .join('  \u00b7  ') + modHtml;
         })();
     // interim dc verdict (fixed decision): "vs N ✓/✗". Stakes stay public on
     // a hidden roll (goal 11): the target shows, the ✓/✗ waits for the reveal.
@@ -18878,8 +19062,7 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
       : !dcAdjudicated
         ? `<span class="log-verdict">vs <span class="stake-num">${entry.dc}</span></span>`
         : `<span class="log-verdict ${entry.total >= entry.dc ? 'ok' : 'bad'}">vs ${entry.dc} ${entry.total >= entry.dc ? '✓' : '✗'}</span>`;
-    const outcomes = entryOutcomes(entry); // per-die lens (Soul Deal)
-    const meaningHtml = outcomes ? '<span class="log-meaning"></span>' : '';
+    const meaningHtml = outcomes && !mergeTally ? '<span class="log-meaning"></span>' : '';
     el.innerHTML = `
       <div class="log-head">
         <span class="log-group"></span>
@@ -18918,10 +19101,7 @@ function buildLogEntryEl(entry, { supersededIds, byId }) {
       groupEl.appendChild(q);
       el.classList.add('is-reroll');
     } else if (supersededIds.has(entry.rollId)) {
-      const q = document.createElement('span');
-      q.className = 'log-rerolled';
-      q.textContent = 'rerolled';
-      groupEl.appendChild(q);
+      groupEl.appendChild(rerolledChip(entry, supersededIds.get(entry.rollId)));
     }
     // The ⟳ button is markup-only: the delegated handler on #log-list
     // resolves the entry via el.dataset.rollId. A rollId-less entry would
@@ -19207,10 +19387,14 @@ function renderLog() {
   // their logs never contain the reference; the birth gate keeps a secret
   // PARENT unnamed entirely).
   const byId = new Map();
-  const supersededIds = new Set();
+  // parentId → the CHILD entry that replaced it (U26): a Map, not a Set, so
+  // the chip can name who rerolled. `.has()` reads identically, and the
+  // FIRST child wins because that is the one markSuperseded's
+  // already-has-a-chip guard keeps on the incremental path.
+  const supersededIds = new Map();
   for (const e of log) {
     if (e.rollId) byId.set(e.rollId, e);
-    if (e.rerollOfId) supersededIds.add(e.rerollOfId);
+    if (e.rerollOfId && !supersededIds.has(e.rerollOfId)) supersededIds.set(e.rerollOfId, e);
   }
   // Reverse index loop — the log renders newest-first without the [...log]
   // copy that used to allocate a whole array per render.
@@ -19301,7 +19485,7 @@ logList.addEventListener('contextmenu', (ev) => {
 // — `.is-reroll` at buildLogEntryEl is set when the row ITSELF is a reroll,
 // which markSuperseded's target is not; touching it here would drift the
 // CSS class state away from what full renderLog() produces.
-function markSuperseded(parentRollId) {
+function markSuperseded(parentRollId, child) {
   if (!parentRollId) return;
   const row = logList.querySelector(`.log-entry[data-roll-id="${CSS.escape(parentRollId)}"]`);
   if (!row) return;
@@ -19312,10 +19496,9 @@ function markSuperseded(parentRollId) {
   if (row.classList.contains('is-reroll')) return;
   const groupEl = row.querySelector('.log-group');
   if (!groupEl || groupEl.querySelector('.log-rerolled')) return;
-  const q = document.createElement('span');
-  q.className = 'log-rerolled';
-  q.textContent = 'rerolled';
-  groupEl.appendChild(q);
+  // The parent entry is what decides whether the reroll FLIPPED attribution,
+  // so look it up rather than dressing the chip from the child alone.
+  groupEl.appendChild(rerolledChip(log.find((e) => e.rollId === parentRollId) || null, child));
 }
 
 function addLogEntry(entry) {
@@ -19347,10 +19530,10 @@ function addLogEntry(entry) {
     // byte-identical to a full rebuild (parent-tooltip lookup + supersede
     // set both derived from the client's log).
     const byId = new Map();
-    const supersededIds = new Set();
+    const supersededIds = new Map(); // parentId → the child that replaced it
     for (const e of log) {
       if (e.rollId) byId.set(e.rollId, e);
-      if (e.rerollOfId) supersededIds.add(e.rerollOfId);
+      if (e.rerollOfId && !supersededIds.has(e.rerollOfId)) supersededIds.set(e.rerollOfId, e);
     }
     const el = buildLogEntryEl(entry, { supersededIds, byId });
     // The list renders reversed (newest first): prepend the new row; the
@@ -19358,7 +19541,7 @@ function addLogEntry(entry) {
     // history is no longer jerked to the top when a new roll lands.
     logList.prepend(el);
     // Refresh the parent row's chip in place, then prune from the tail.
-    if (entry.rerollOfId) markSuperseded(entry.rerollOfId);
+    if (entry.rerollOfId) markSuperseded(entry.rerollOfId, entry);
     for (let i = 0; i < dropped && logList.lastElementChild; i++) {
       logList.lastElementChild.remove();
     }
@@ -19667,7 +19850,16 @@ function renderTableName() {
   // title. `tableName` is room state; it has no business surviving into a
   // roomless session. clearTableIdentity() below is what enforces that at boot;
   // this guard is the render-side belt to its braces.
-  const key = !IN_LOBBY && netOnline ? ROOM.replace(/[-_]+/g, ' ') : '';
+  // …AND A MINTED KEY IS NOT A CHOSEN NAME (U25, audit E4). The rule above
+  // is this function's own — "else the ?room= key when someone CHOSE one…
+  // else NOTHING" — and it had no test for "chose", so `+ New table` minted
+  // `drive-<16 random>` and the unnamed table wore `drive egw19x` on the
+  // plate and in the tab title: a placeholder, and precisely the standing
+  // generic word the removed 'Pools' title taught us to kill. The marginal
+  // secrecy cost of showing it is nil (the address bar has it either way);
+  // it is wrong as PRESENTATION, by the rule written directly above it.
+  const chosenKey = !IN_LOBBY && netOnline && !isMintedKey(ROOM);
+  const key = chosenKey ? ROOM.replace(/[-_]+/g, ' ') : '';
   const name = IN_LOBBY ? '' : (roomSettings.tableName || key);
   el.textContent = name;
   // No title in the lobby: 'this table, solo' asserts a table where there is
@@ -20390,6 +20582,34 @@ let settingsPillTimer = null; // status-pill note
 // Subtle note when ANOTHER player changes a table setting: a transient line
 // in the modal if it is open, otherwise the existing status pill. No new
 // notification framework.
+// WHAT DID THEY CHANGE? (U25, audit E4.) The note said "Alice changed the
+// table" for every room-wide key alike — including a SYSTEM flip, which
+// re-reads every result on screen under a different lens: the words change,
+// the totals appear or vanish, and the only notice was four words that named
+// nothing. Every other event on this channel names its subject ("Bo left"),
+// and the setting is the one fact the reader needs to decide whether to care.
+//
+// Diffed against what we hold, so the note describes the DELTA and not the
+// broadcast: the server sends the full merged object on every push, so
+// "changed the felt" must not appear because the felt was in the envelope.
+// It has to run BEFORE applyRoomSettings, which overwrites the values it is
+// diffed against. Two or more at once fall back to the plural — a rename +
+// a felt change is one press of Apply, not two sentences.
+const SETTING_WORDS = {
+  tableName: 'renamed the table',
+  felt: 'changed the felt',
+  system: 'changed the interpretation system',
+  zoom: 'changed the table zoom',
+  tower: 'changed the dice tower',
+  venue: 'changed the venue',
+};
+function settingsChangeVerb(next) {
+  if (!next || typeof next !== 'object') return 'changed the table';
+  const changed = Object.keys(SETTING_WORDS)
+    .filter((k) => next[k] !== undefined && next[k] !== roomSettings[k]);
+  return changed.length === 1 ? SETTING_WORDS[changed[0]] : 'changed the table';
+}
+
 function showSettingsNote(text) {
   const noteEl = document.getElementById('settings-note');
   // U5: whichever surface carries it visually, it is SAID once. The pill is a
@@ -20514,6 +20734,11 @@ function openSettingsModal(at = 'table') {
   document.getElementById('set-room-label').textContent = IN_LOBBY
     ? 'This table' : 'Everyone at the table';
   document.getElementById('set-table-name-row').style.display = IN_LOBBY ? 'none' : '';
+  // …and the link row with it: a lobby has no table, so it has no link, and a
+  // standing button whose only outcome is a refusal is the roomless intruder
+  // L0 cleared out of this section (the `i` key still refuses out loud, since
+  // a key cannot be hidden).
+  document.getElementById('set-invite-row').style.display = IN_LOBBY ? 'none' : '';
   document.getElementById('portable-push').style.display = IN_LOBBY ? 'none' : '';
   document.getElementById('set-diceset-sub').textContent = IN_LOBBY
     ? 'the dice you roll in — from your next roll'
@@ -21648,6 +21873,16 @@ function renderTableProfiles() {
       rec: { name: pl.profile || pl.name, system: pl.system || null, set: pl.set || null, pools: pl.pools },
     });
   }
+  // …and the SENDING half, disclosed (U25). One line, standing, at a table
+  // only — see the markup comment for why it lives here and not in a tooltip.
+  const shared = document.getElementById('pools-shared-note');
+  if (shared) {
+    const n = profilesOf(profileStore).length;
+    shared.textContent = `Everyone at this table can see your ${n === 1 ? 'profile' : `${n} profiles`}`
+      + ' and copy the pools in them. Nothing of yours is stored on the server —'
+      + ' the room forgets it when the table ends.';
+    shared.classList.toggle('hidden', !netOnline);
+  }
   zone.classList.toggle('hidden', !offers.length);
   if (!offers.length) return;
   for (const o of offers) {
@@ -22698,6 +22933,10 @@ document.addEventListener('keydown', (e) => {
     case 'b':
     case 'g': setPanel('pools', !panelsOpen.pools); return;
     case 'l': toggleLogFlyout(); return; // the roll log is a rail flyout now, not a panel
+    // U25: the ONE key that acts on the table rather than on the panel — the
+    // audit's finding was that none did. Copy, never send: handing the link
+    // over is still the player's own act.
+    case 'i': copyInviteLink(null, null); return;
     case 's': setSound(!soundOn); return;
     case 'Enter': {
       // A focused button owns Enter (it activates); the table takes the
@@ -23014,7 +23253,14 @@ function renderPresenceExits(othersCount) {
     if (free.length > room) {
       const more = document.createElement('span');
       more.className = 'roster-more';
-      more.textContent = `+${free.length - room}`;
+      // TWO FOLDS, TWO MEANINGS (U25, audit E4: "bare dots plus TWO overflow
+      // pills"). Past ROSTER_MAX this row can carry the people fold and this
+      // one at once, identically dressed, reading `+2` `+3` — two counts of
+      // two different things, side by side, with only a hover title (which
+      // touch never renders) to tell them apart. The empty chairs are the
+      // one that needs the word, because "+3" beside a roster reads as three
+      // more PEOPLE, which is the opposite of what it counts.
+      more.textContent = `+${free.length - room} free`;
       more.title = `Seats still free: ${free.slice(room).join(', ')}`;
       rosterEl.appendChild(more);
     }
@@ -23653,9 +23899,33 @@ window.addEventListener('pagehide', (e) => {
   net.leave();
 });
 
-// One copy path, two doors. The menu item and the presence row's Invite chair
-// share shareInvite(), so the feedback grammar ('Copied!', 900 ms, restore) and
-// the clipboard-refused fallback cannot drift apart.
+// ONE COPY PATH, NOW FOUR DOORS (U25, audit E4). The link had no primary
+// gesture: the presence row's Invite chair retires as soon as anyone arrives
+// (correct — §7.20 — but that is exactly when you are fetching a third
+// person), which left right-click / long-press on the identity chip, taught
+// only by a `title` that touch never renders. Two doors join it, both
+// standing: a Settings → Table row beside the table's name, and key `i` —
+// the first shortcut in the app that acts on the TABLE rather than the panel.
+// All four go through shareInvite(), so the feedback grammar ('Copied!',
+// 900 ms, restore) and the clipboard-refused fallback cannot drift apart.
+//
+// The lobby has no table and therefore no link — inviteUrl() returns null
+// there — so the key REFUSES with the exit named, rather than copying
+// nothing or fabricating a link to the shared room called 'table' (the
+// single most misleading affordance L0 was built to kill).
+async function copyInviteLink(btn, restoreLabel) {
+  const url = inviteUrl();
+  if (!url) { showSettingsNote('No table to invite anyone to — start one first'); return; }
+  await shareInvite(url, btn, restoreLabel);
+  // shareInvite's own feedback is the button's label swap, which a keyboard
+  // press has no button for and a screen reader never sees either way.
+  if (!btn) showSettingsNote('Invite link copied');
+  else announce('Invite link copied');
+}
+
+document.getElementById('set-invite').addEventListener('click', (e) =>
+  copyInviteLink(e.currentTarget, 'Copy invite link'));
+
 document.getElementById('idm-invite').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   await shareInvite(inviteUrl(), btn, 'Copy invite link');
@@ -24035,14 +24305,18 @@ function handleNetEvent(type, data) {
       offers = offers.filter((o) => o.offerId !== data.offerId);
       renderOffers();
       break;
-    case 'settings-changed':
+    case 'settings-changed': {
       // The server broadcasts the FULL merged object — our own click applies
       // here too (the echo), which is why selectFelt never applies optimistically.
+      // U25: the note NAMES the setting, and the diff has to be taken before
+      // the apply overwrites the values it is taken against.
+      const verb = settingsChangeVerb(data.settings);
       applyRoomSettings(data.settings);
       if (data.byId && net && data.byId !== net.playerId) {
-        showSettingsNote(`${data.byName || 'someone'} changed the table`);
+        showSettingsNote(`${data.byName || 'someone'} ${verb}`);
       }
       break;
+    }
     case 'table-setup':
       // A winning push (§G4): adopt the room's new prepared table. Settings
       // inside the push arrive on their own 'settings-changed' echo, so this
