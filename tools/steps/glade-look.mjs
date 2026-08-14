@@ -19,11 +19,16 @@ limitations under the License.
 // this renders just the frame the glade lives or dies in: the resting eye
 // in the venue, both palettes, tower up. ~30 s against minutes.
 //
-//   node tools/drive.mjs tools/steps/glade-look.mjs           # 2 frames
+//   node tools/drive.mjs tools/steps/glade-look.mjs           # 4 frames
 //   node tools/drive.mjs tools/steps/glade-look.mjs probe     # + element
 //     A/B forensics: each named glade element hidden one at a time (the
 //     W3 ghost lesson — when a frame won't cohere, stop theorizing and
 //     start hiding).
+//   node tools/drive.mjs tools/steps/glade-look.mjs tag=before
+//     Writes shots/glade-before-*.png instead. The point is A/B pairs: check
+//     an older js/fae-lab.js out, run with a tag, restore, run without, and
+//     the reviewer gets two frames of the same room instead of one frame and
+//     a paragraph asking them to remember the last one (W7 ②, 2026-08-14).
 //
 // Writes shots/glade-*.png.
 
@@ -36,6 +41,8 @@ const SHOTS = join(ROOT, 'shots');
 
 export default async function run(stage, args) {
   const probe = args.includes('probe');
+  const tagArg = (args.find((a) => a.startsWith('tag=')) || '').slice(4);
+  const tag = tagArg ? `${tagArg}-` : '';
   const probeNames = ['faeMoonShaft', 'faeMistBand', 'faeMirrorPool'];
   mkdirSync(SHOTS, { recursive: true });
 
@@ -55,7 +62,7 @@ export default async function run(stage, args) {
     await t.dbg(`setTower('hollowbole')`);
     await t.waitFor(`window.__diceDebug.tower === 'hollowbole'`, { desc: 'tower up' });
     await t.dbg('sim(1500)');
-    await shot(`glade-${venue}-resting.png`);
+    await shot(`glade-${tag}${venue}-resting.png`);
     // W4: the venue's own dice — the roll is MADE with the staged set
     // (venueDiceSet → wireSet), pours through the tower, and settles as
     // witchlight in the fog. The frame the set lives or dies in.
@@ -63,7 +70,7 @@ export default async function run(stage, args) {
     await t.waitFor('(window.__diceDebug.sim(120), !window.__diceDebug.busy)',
       { desc: `dice settle in ${venue}`, timeout: 60000 });
     await t.dbg('sim(400)');
-    await shot(`glade-${venue}-dice.png`);
+    await shot(`glade-${tag}${venue}-dice.png`);
     await t.dbg('clearTable()');
     await t.dbg('sim(200)');
     if (probe) {
@@ -79,11 +86,11 @@ export default async function run(stage, args) {
           console.log(`NOTE: nothing in the scene is named '${name}' — the frame below is `
             + 'the same picture as the one before it, not evidence about that element');
         }
-        await shot(`glade-${venue}-no-${name}.png`);
+        await shot(`glade-${tag}${venue}-no-${name}.png`);
         await t.dbg(`setVisibleByName('${name}', true)`);
       }
     }
   }
   await t.dbg(`setVenue('table')`);
-  console.log(`\nwrote ${SHOTS}/glade-*.png`);
+  console.log(`\nwrote ${SHOTS}/glade-${tag}*.png`);
 }
