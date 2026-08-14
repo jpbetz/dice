@@ -121,11 +121,13 @@ note).
     Neither register is allowed to be half-believed: a fantasy venue that
     keeps one foot on the casino felt reads as a costume, which is why goal
     13 makes the set atomic. *How a venue's SCENE earns internal
-    consistency is law elsewhere: docs/VENUE-COMPOSITION.md (the thirteen
-    rules — hierarchy, flow, depth, grown-not-placed, engine furniture
-    wearing the world, the scenery tier) is normative for every venue
-    build, enforced through the `/new-venue` process (added 2026-08-13,
-    Joe's W2c directive).*
+    consistency is law elsewhere: docs/VENUE-COMPOSITION.md (fifteen rules
+    as of 2026-08-14 — hierarchy, flow, depth, grown-not-placed, engine
+    furniture wearing the world, the scenery tier, the living layer, and
+    rule 15: a composition gate is stated in the FRAME) is normative for
+    every venue build, enforced through the `/new-venue` process (added
+    2026-08-13, Joe's W2c directive). Do not quote the count from memory —
+    it was written here as "thirteen" while the file held fifteen.*
 15. **Atmosphere serves the roll.** Every invariant below binds in every
     register, and two bind *hardest* exactly when a venue is at its most
     atmospheric: results stay readable (fog THINS over the resolve area, or
