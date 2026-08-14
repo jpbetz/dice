@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 -->
 
-# VENUE COMPOSITION — how a scene becomes ONE scene (W2b–W5, 2026-08-13)
+# VENUE COMPOSITION — how a scene becomes ONE scene (W2b–W7, 2026-08-14)
 
 Commissioned by Joe's W2 verdict, verbatim in ROADMAP W2b: good set
 pieces, no integration — "setting them next to each other in this way is
@@ -77,6 +77,26 @@ constraint than games get, and it is why the rules can be mechanical.
    features within ~10% of the same angular size sitting on the same
    horizontal band, and at least one pair separated by overlap or a
    clear vertical offset, not merely by gap.
+   **THE BAND IS MEASURED IN THE FEATURES' OWN HEIGHTS** (amended
+   2026-08-14, W7 ②). "The same horizontal band" was first mechanised as
+   an absolute — 0.05 of frame height — and the W2c pair cleared it by
+   0.092, so the CHECK as written certified the exact frame it had been
+   written to refuse. Two features are on one band when their projected
+   boxes nearly overlap vertically: |Δcentre| ≤ 0.6·(hₐ + h_b). Same
+   family as rule 8's amendment — a constant has to be expressed in the
+   units of the thing it judges, or it is a number about the viewport
+   rather than about the composition.
+   **AND SYMMETRY IS A MIRROR PAIR, ABOUT THE HERO** (added 2026-08-14).
+   The sharpest form of "symmetrical and formal" is a pair sitting where
+   the other's reflection would be: |cxₐ + cx_b − 2·cx_hero| < 0.06, on
+   one band, within ×1.35 of each other's angular size. The axis is the
+   HERO's projected centre and not the canvas centre, because the eye is
+   offset — in the glade world x 0 lands at frame x 0.529 — and the
+   difference is bigger than the tolerance. W2c's moot and pool stand 13
+   units apart on a legal plan triangle and photograph 0.052 of frame
+   width from being each other's mirror; and the W7 mushroom SCATTER,
+   authored to look thoroughly irregular in plan, produced three such
+   pairs by accident. Nothing in plan space can see either.
 7. **Every directional element agrees.** Leading lines are the circuit's
    rails: ramps, beams, gap-facings, glints, headings. Each points INTO
    the circuit; none points off-stage. CHECK: list every directional
@@ -174,6 +194,40 @@ constraint than games get, and it is why the rules can be mechanical.
     differ, because the withdrawal is a claim about PIXELS: a mood
     variable easing correctly while nothing on screen changes is the
     same green check masking the same broken thing.
+15. **A composition gate is stated in the FRAME — and it has to fail the
+    frame that was rejected** (2026-08-14, W7 ②). Every verdict this
+    venue has collected has been a screen-space claim ("three set pieces
+    in a line", "symmetrical and formal"), and every answer to one has
+    been authored and checked in plan. Round 7 ① settled the method on
+    the model: its three gates bin the built mesh into a projected
+    outline and go red against a round-6 field that satisfied every
+    plan-space claim asked of it. Composition owes the same. The venue's
+    instrument is `tools/steps/glade-frame.mjs` — mirror twins, bookends,
+    thirds occupancy, band spread, size ladder, in-frame fraction, hero
+    contact — each run twice in one pass, once over `venueInfo().stage`
+    and once over the frozen layout that was rejected, through the SAME
+    camera. Three things it cost to learn, all of them general:
+    (a) **A gate the rejected frame also passes is a floor, not
+    evidence**, and must print itself as one. The suite fails if fewer
+    than three gates discriminate.
+    (b) **Global pixel statistics are floors here.** Whole-frame ink
+    balance about the hero: +0.570 rejected vs +0.580 shipped. Over the
+    staging band alone: +0.409 vs +0.433. Near-band ink share: 0.505 vs
+    0.584. The ground disc, the fog sheets, the treeline and the beam are
+    most of the lit pixels and no placement move touches any of them, so
+    every one of those numbers would have certified the rejected frame to
+    three decimals in the exact language of the complaint. What DOES
+    discriminate is the staging's own light, isolated by hiding every
+    feature group and differencing the two frames: its centroid moved
+    (0.397, 0.732) → (0.254, 0.846) and its total ink ×2.37.
+    (c) **A footprint is not a mass.** Summing projected ground area by
+    side made the rejected frame look better than the shipped one
+    (+0.379 vs −0.015), because a wide dim pond weighs the same as a
+    small lit ring. Rule 8's lesson one level up: weigh a feature by the
+    light it puts in the picture, or do not weigh it.
+    CHECK: state the claim as a number computed through the LIVE camera;
+    run it against the layout that was rejected in the same pass; and
+    report which gates discriminate and which are floors.
 
 ## The glade, diagnosed (what W2b changes)
 
@@ -234,6 +288,44 @@ contact ring, disturbed soil), the pool comes into frame and up a value
 step, and a scenery tier populates the foreground band and the
 between-space. Placement moves land as documented new claims in
 `venue-set`.
+
+## The glade, measured (W7 ② — the staging, in the frame)
+
+Joe's verdict on the W5 frames (ROADMAP W7, verbatim there): *"Looks too
+staged… I want the dice tower to be in a scene, not the centerpiece of it
+in a symmetrical and formal way."* The three moves he named — the moot
+forward, the pool back and resized, mushrooms through the scene — landed
+as plan coordinates. What was missing was any way to tell whether they
+had answered a screen-space complaint. Rule 15 is that instrument; these
+are its numbers, W2c → shipped, at the resting eye:
+
+| gate | rejected (W2c) | shipped |
+| --- | --- | --- |
+| F1 mirror twins | moot~pool Δ0.052, ×1.11 | none (tightest Δ0.067) |
+| F2 bookends | ×1.11 on one band | none (×2.73) |
+| F3 fungus by third | counts [1, 1, 0], 0.95 in one | [7, 2, 4], worst 0.45 |
+| F4 band spread | 0.306 of frame height | 0.367 |
+| F5 size ladder | ×1.11 | ×2.73 |
+| F6 in frame | fore tuft at 17% | all ≥ 55% |
+| F7 hero contact | pass | pass — a FLOOR |
+| P1 staging ink centroid | (0.397, 0.732) | (0.254, 0.846), ink ×2.37 |
+
+**THE HERO IS PINNED, and that is the constraint the whole tier works
+inside.** The tower is the delivery machine: `door.x` is 0 by portal
+spec and the resting eye looks down the mat, so it projects to frame x
+0.529 and NO composition move can take it off the centreline. "Don't
+make it the centrepiece" therefore cannot be answered by moving the
+hero; it is bought entirely with the rest of the scene, which is why
+every gate above excludes the hero's position and why the two that
+matter most (F1, P1) are stated relative to it.
+
+**Two defects the gates found that nobody had seen.** The mushroom
+scatter — twelve clumps, authored to look irregular — projected into
+three mirror pairs across the tower (Δ0.051, Δ0.008, Δ0.042); three
+clumps moved. And the foreground wing rule 13 introduced, probed into
+place in 2026-08-13, sat at the lip of the visible sliver and
+photographed at 58% and 17% of its own footprint — a wing doing almost
+none of its job, fixed by pulling it from z 4.7/5.2 back to 4.0/4.4.
 
 ## Sources
 

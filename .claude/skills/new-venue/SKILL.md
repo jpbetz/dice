@@ -1,6 +1,6 @@
 ---
 name: new-venue
-description: Compose or integrate a venue's scene — the diorama discipline. The fourteen composition rules, the eye-first process, the placement law, the connective-tissue idioms, and the gates, in order.
+description: Compose or integrate a venue's scene — the diorama discipline. The fifteen composition rules, the eye-first process, the placement law, the connective-tissue idioms, and the gates, in order.
 ---
 
 # The venue skill — one scene, not set pieces
