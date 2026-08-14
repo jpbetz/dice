@@ -124,153 +124,243 @@ const ZOOM_LEVELS = [
 // two clients with different towers would still be impossible — the tower is
 // a room setting — and a replay's hash cannot move. Palettes are resolved at
 // render time, in the sound drain, and nowhere else.
+//
+// ---------------------------------------------------------------------------
+// A ROW HAS TWO HALVES, AND THE SPLIT IS THE CHARTER (D1).
+//
+// Joe's charter: a tower model is 100% COSMETIC over invisible engine
+// colliders and portals; physics and the pour film are a function of (portal
+// spec, engine constants, seed) and nothing else. That sentence is only worth
+// anything if "I only touched cosmetic" is MECHANICAL — checkable by looking
+// at which half of a row a diff lands in — rather than a thing an author
+// asserts about their own patch. So:
+//
+//   physical:  the portal spec, and the declarations that are ABOUT the
+//              engine's colliders (bareColliders). Touch this and you have
+//              moved the film; towerFilmDigest will say so.
+//   cosmetic:  the label, the title, the skin builder, the baked model files
+//              and which variant is live, the sound palette, the ember, the
+//              lantern rake, the dust, the dressing flag. Touch any of it and
+//              the film is provably unmoved.
+//
+// `id` and `venueOnly` stay at the top level on purpose: they are neither
+// paint nor physics. An id is the row's name in the settings protocol, and
+// `venueOnly` is a CATALOGUE rule about how this tower is chosen (the picker
+// skips it; the venue raises it), which is a fact about the offer rather than
+// about the object.
+//
+// Readers go through towerPhys()/towerCos(), which answer "declares nothing"
+// for a half that is absent rather than throwing — a row is data somebody
+// hand-writes, and a missing half should degrade to the classic core the way
+// a missing portal spec always has.
 const TOWERS = {
   none: {
-    id: 'none', label: 'None', skin: null,
-    title: 'None — dice are thrown onto the felt by hand',
+    id: 'none',
+    // Not a mode — the whole app, untouched (THE FIRST LAW above). It has no
+    // physical half because there is nothing to give portals to, and its
+    // cosmetic half is two strings for a chip.
+    cosmetic: {
+      label: 'None', skin: null,
+      title: 'None — dice are thrown onto the felt by hand',
+    },
   },
   heartwood: {
-    id: 'heartwood', label: 'Heartwood', skin: buildTowerSkin,
-    title: 'Heartwood — a wooden tower at the back of the table; dice pour through it',
-    // THE FAMILY TRAIT (docs/TOWER.md, DRESSING): every tower carries a warm
-    // focal light. Heartwood's is the cresset hanging off its right corner
-    // post — `at` is the coals, [x, y, z offset from z0], and it is what
-    // turns an emissive bake into something that lights the post beside it.
-    // A lit lantern implies somebody lit it tonight; an unlit one is trim.
-    ember: { at: [2.575, 8.02, 0.70], color: '#ff9a44', intensity: 2.6, dist: 4.2 },
-    // Dust hangs in this tower's air and nobody else's (Joe, 2026-08-15):
-    // an old wooden tower sheds; stone and a forge-hot chimney read wrong
-    // with idle dust. The mote layer (js/motes.js) keys on this flag via
-    // towerSocket — it is a family trait like the ember, not a room fixture.
-    motes: true,
-    // Dry wood on wood: a short, narrow-band knock with almost no tail.
-    // `shaft` is the CHUTE's colour, not the knock's (docs/AUDIO.md §2.4):
-    // a feedforward comb plus two resonant modes. A 0.4 m chute's 2.3 ms
-    // round trip is below the 128-sample feedback floor, so a true geometric
-    // model is unrepresentable here — this models the colour instead, with
-    // no feedback path and therefore no stability question.
-    clunkVoice: {
-      body: 'clack', weight: 0.35, sustain: 20,
-      shaft: { delayS: 0.0032, combGain: 0.55, mode1Hz: 430, mode2Hz: 860 },
+    id: 'heartwood',
+    // NO PORTALS, DECLARED. An empty physical half is not an oversight:
+    // this row asks for DEFAULT_PORTALS — the classic core, which is what
+    // makes every delta in towerVolumes a literal +0.0 — and saying so is
+    // the difference between a tower that CHOSE the classic mouth and a
+    // baked one whose portals silently failed to load into the same place.
+    physical: {},
+    cosmetic: {
+      label: 'Heartwood', skin: buildTowerSkin,
+      title: 'Heartwood — a wooden tower at the back of the table; dice pour through it',
+      // THE FAMILY TRAIT (docs/TOWER.md, DRESSING): every tower carries a warm
+      // focal light. Heartwood's is the cresset hanging off its right corner
+      // post — `at` is the coals, [x, y, z offset from z0], and it is what
+      // turns an emissive bake into something that lights the post beside it.
+      // A lit lantern implies somebody lit it tonight; an unlit one is trim.
+      ember: { at: [2.575, 8.02, 0.70], color: '#ff9a44', intensity: 2.6, dist: 4.2 },
+      // Dust hangs in this tower's air and nobody else's (Joe, 2026-08-15):
+      // an old wooden tower sheds; stone and a forge-hot chimney read wrong
+      // with idle dust. The mote layer (js/motes.js) keys on this flag via
+      // towerSocket — it is a family trait like the ember, not a room fixture.
+      motes: true,
+      // Dry wood on wood: a short, narrow-band knock with almost no tail.
+      // `shaft` is the CHUTE's colour, not the knock's (docs/AUDIO.md §2.4):
+      // a feedforward comb plus two resonant modes. A 0.4 m chute's 2.3 ms
+      // round trip is below the 128-sample feedback floor, so a true geometric
+      // model is unrepresentable here — this models the colour instead, with
+      // no feedback path and therefore no stability question.
+      clunkVoice: {
+        body: 'clack', weight: 0.35, sustain: 20,
+        shaft: { delayS: 0.0032, combGain: 0.55, mode1Hz: 430, mode2Hz: 860 },
+      },
     },
   },
   bastion: {
-    id: 'bastion', label: 'Bastion', skin: buildBastionSkin,
-    title: 'Bastion — a stone turret; dice rumble through it',
-    // THE FAMILY TRAIT: the iron sconce bolted beside the arrow loop. It sits
-    // half a unit from the darkest thing on the model, which is the whole
-    // reason it is there — a live flame beside a near-black slot is the
-    // strongest value contrast a grey tower has.
-    ember: { at: [-0.38, 8.03, 0.54], color: '#ff9040', intensity: 2.4, dist: 4.0 },
-    // Stone: heavier, lower, and it rings on in the shaft afterwards — a
-    // longer chute delay and lower modes than the wooden one.
-    clunkVoice: {
-      body: 'thud', weight: 0.7, sustain: 40,
-      shaft: { delayS: 0.0055, combGain: 0.5, mode1Hz: 300, mode2Hz: 600 },
+    id: 'bastion',
+    physical: {},   // the classic core, by declaration (see heartwood)
+    cosmetic: {
+      label: 'Bastion', skin: buildBastionSkin,
+      title: 'Bastion — a stone turret; dice rumble through it',
+      // THE FAMILY TRAIT: the iron sconce bolted beside the arrow loop. It sits
+      // half a unit from the darkest thing on the model, which is the whole
+      // reason it is there — a live flame beside a near-black slot is the
+      // strongest value contrast a grey tower has.
+      ember: { at: [-0.38, 8.03, 0.54], color: '#ff9040', intensity: 2.4, dist: 4.0 },
+      // Stone: heavier, lower, and it rings on in the shaft afterwards — a
+      // longer chute delay and lower modes than the wooden one.
+      clunkVoice: {
+        body: 'thud', weight: 0.7, sustain: 40,
+        shaft: { delayS: 0.0055, combGain: 0.5, mode1Hz: 300, mode2Hz: 600 },
+      },
     },
   },
   blackanvil: {
-    id: 'blackanvil', label: 'Black Anvil', skin: buildAnvilSkin,
-    title: 'Black Anvil — a cooling forge chimney; dice fall through it ringing',
-    // The grate glows, so the grate LIGHTS (towerLanternBuild): one faint
-    // physical-falloff point light in front of the firebox — emissive maps
-    // shine but cannot illuminate, and a forge that casts no warmth on its
-    // own tray reads as a sticker. `at` is [x, y, z offset from z0]; the
-    // grate bed sits above the door head (toweranvil.js refusal #1).
-    ember: { at: [0, 5.2, 1.9], color: '#ff6a28' },
-    // The forge's identity is DARKNESS with a glow in it — the full rake
-    // that flatters pale masonry just flattens soot. It takes the lantern
-    // at four-tenths and lets the ember carry the rest (A/B'd 2026-08-11).
-    lantern: { rake: 0.4 },
-    // METAL, and the only voice in the palette that is not a knock. `chime`
-    // is the sine-partial body — glass at its default weight — but weighted
-    // right down it stops being crystal and becomes the ring a die gets out
-    // of a cast-iron baffle, and the long tail is the shaft carrying it.
-    // A FIRST TUNING, AND NOBODY HAS HEARD IT: these three numbers were
-    // reasoned from the voice table (weight shifts the centre frequency
-    // down, sustain extends the decay) and from wanting distance between
-    // this and the Emberforge die set's own thud 0.9 / 30 — not listened
-    // to. Of everything in this tower it is the thing most likely to want
-    // moving, and it is Joe's dial.
-    // The shaft row is Joe's dial for the same reason and in the same breath:
-    // the tightest delay and the highest modes of the three, which is what an
-    // iron flue does to a knock.
-    clunkVoice: {
-      body: 'chime', weight: 0.85, sustain: 70,
-      shaft: { delayS: 0.0025, combGain: 0.6, mode1Hz: 520, mode2Hz: 1040 },
+    id: 'blackanvil',
+    physical: {},   // the classic core, by declaration (see heartwood)
+    cosmetic: {
+      label: 'Black Anvil', skin: buildAnvilSkin,
+      title: 'Black Anvil — a cooling forge chimney; dice fall through it ringing',
+      // The grate glows, so the grate LIGHTS (towerLanternBuild): one faint
+      // physical-falloff point light in front of the firebox — emissive maps
+      // shine but cannot illuminate, and a forge that casts no warmth on its
+      // own tray reads as a sticker. `at` is [x, y, z offset from z0]; the
+      // grate bed sits above the door head (toweranvil.js refusal #1).
+      ember: { at: [0, 5.2, 1.9], color: '#ff6a28' },
+      // The forge's identity is DARKNESS with a glow in it — the full rake
+      // that flatters pale masonry just flattens soot. It takes the lantern
+      // at four-tenths and lets the ember carry the rest (A/B'd 2026-08-11).
+      lantern: { rake: 0.4 },
+      // METAL, and the only voice in the palette that is not a knock. `chime`
+      // is the sine-partial body — glass at its default weight — but weighted
+      // right down it stops being crystal and becomes the ring a die gets out
+      // of a cast-iron baffle, and the long tail is the shaft carrying it.
+      // A FIRST TUNING, AND NOBODY HAS HEARD IT: these three numbers were
+      // reasoned from the voice table (weight shifts the centre frequency
+      // down, sustain extends the decay) and from wanting distance between
+      // this and the Emberforge die set's own thud 0.9 / 30 — not listened
+      // to. Of everything in this tower it is the thing most likely to want
+      // moving, and it is Joe's dial.
+      // The shaft row is Joe's dial for the same reason and in the same breath:
+      // the tightest delay and the highest modes of the three, which is what an
+      // iron flue does to a knock.
+      clunkVoice: {
+        body: 'chime', weight: 0.85, sustain: 70,
+        shaft: { delayS: 0.0025, combGain: 0.6, mode1Hz: 520, mode2Hz: 1040 },
+      },
     },
   },
   hollowbole: {
-    id: 'hollowbole', label: 'Hollow Bole',
-    // THE FIRST SHIPPED GLB TOWER (ROADMAP W3, /new-tower v2). One geometry,
-    // two palettes: the trunk is BAKED (tools/forge/recipes/hollowbole.py) and
-    // the venue picks which paint is standing. Both files are ensured together
-    // and readiness is over the pair (towerGlbUrls) — a venue flip must not put
-    // a player back in the wait they already served.
-    //
-    // IDENTICAL PORTALS ARE A CLAIM THIS ROW MAKES AND towerModelEnsure CHECKS:
-    // in {x 0, z -2.55, rimY 9.40, clearR 2.20}, out {x 0, sillY 1.00, w 4.20,
-    // clearH 3.50}, one geometry digest across both bakes. The engine derives
-    // its whole core from those eight numbers, so two variants that disagreed
-    // would be one venue delivering dice through a doorway the other one's
-    // engine did not cut. (The mouth tightened to the measured floor
-    // 2026-08-13 — was 5.00 x 4.50, sitting AT the old inherited limits;
-    // see TOWER.md "THE MINIMUMS" and the recipe's derivation.)
-    glbUrls: {
-      moonrise: '/models/towers/hollowbole_moonrise.glb',
-      foxfire: '/models/towers/hollowbole_foxfire.glb',
-    },
-    glbVariant: () => faeTowerPalette(),
-    // THE BAKE REPLACED THE SHELL, NOT THE DRESS. buildHollowBoleSkin still
-    // places the crown moot, the attendants, the little lit door, the veils and
-    // the stains — Joe-approved W3 work — through the SURFACE descriptor
-    // (js/towerhollow.js:592). What changed is who answers "where is the bark
-    // at (θ, y)": glbShellFor raycasts the loaded mesh instead of evaluating a
-    // radius field. The seam is the whole reason that swap costs one argument.
-    skin: (v) => buildHollowBoleSkin(v, {
-      paletteId: faeTowerPalette(),
-      shell: glbShellFor(towerGlbUrlActive(TOWERS.hollowbole)),
-    }),
-    // MOVING DRESS, DECLARED (/new-tower v2 §5): static props bake into the
-    // GLB, only idle motion stays code-side — and the row says so, so the
-    // registry loop knows to demand a sway of this tower and not of a model
-    // that legitimately has none.
-    dress: true,
-    title: 'Hollow Bole — a rotted hollow trunk; dice fall down the snag and out of a root gap',
-    // VENUE-ONLY. A venue is chosen as ONE thing (GOALS goal 13), and this
-    // tower is part of what the fae venues ARE — so it takes no chip of its
-    // own in the tower picker and `renderTowerPicker` skips it. Choosing the
-    // Moonrise Glade or the Foxfire Hollow is how it goes up; the linkage
-    // itself lives with the venue registry, not here.
+    id: 'hollowbole',
+    // VENUE-ONLY, and it lives at the TOP LEVEL because it is neither paint
+    // nor physics: a venue is chosen as ONE thing (GOALS goal 13) and this
+    // tower is part of what the fae venues ARE, so it takes no chip of its own
+    // and `renderTowerPicker` skips it. Choosing the Moonrise Glade or the
+    // Foxfire Hollow is how it goes up; the linkage itself lives with the
+    // venue registry, not here. A rule about the OFFER, not about the object.
     venueOnly: true,
-    // The family trait, and this one is the whole tower's best trick: the
-    // TINY LIT DOOR on the left root buttress (js/towerhollow.js). `at` is
-    // [x, y, z offset from z0] and it sits just in front of the pane, so the
-    // warm spills onto the apron a die comes down. Low and short-reach —
-    // this is a hearth behind a 0.24-wide door, not a forge; the emissive
-    // pane is the picture and the light is what proves somebody lit it.
-    ember: { at: [-2.79, 1.22, 0.55], color: HOLLOW_EMBER, intensity: 1.6, dist: 3.5 },
-    // The cold moon rakes a dead tree GENTLY — the identity is the moot's
-    // spectral ring and the one warm door, and a full warm rake would wash
-    // both of them out of a frame whose whole value floor is in the bottom
-    // third (Black Anvil took the same decision for the opposite reason).
-    lantern: { rake: 0.5 },
-    // NO DUST. Explicit rather than absent: the fae venues run their OWN
-    // air (js/fae-lab.js's fog sheets and starfield), and a second idle
-    // particle layer inside it would be two weathers in one room.
-    motes: false,
-    // A DEAD DRUM. Deeper than Heartwood's dry clack and hollower than
-    // Bastion's stone thud: a `thud` body at middling weight with a short
-    // tail, over the longest comb in the set — 4 ms is a metre of hollow
-    // log, and the two low modes are the note an empty trunk gives back
-    // when you hit it. Joe's dial, like every other voice here: reasoned
-    // from the table (docs/AUDIO.md §2.4), not yet listened to.
-    clunkVoice: {
-      body: 'thud', weight: 0.5, sustain: 35,
-      shaft: { delayS: 0.004, combGain: 0.5, mode1Hz: 360, mode2Hz: 720 },
+    // THE PHYSICAL HALF, and this is the only row that has one worth
+    // reading. `portals` is not written here: the bake declares it and
+    // towerModelEnsure freezes it onto this half when the file lands
+    // (identical across both palettes, which the loader checks) — so what
+    // is authored is the one claim a MODEL cannot make about itself.
+    physical: {
+      // BARENESS IS DECLARED, NEVER ACCIDENTAL (B3; Joe's ruling). The
+      // engine's ramp and lip are outside the socket by design and the
+      // contract INVITES a model to clad them — Heartwood and Bastion do.
+      // Hollow Bole does not, and that is a choice: a rotted trunk sitting
+      // in soil has no carpentry to lay over an outrun, and a clad apron
+      // read as a plank ramp bolted to a tree. Undeclared, that choice is
+      // indistinguishable from a modeller forgetting; declared, it is a
+      // claim towerCladAudit measures from every shipped eye and fails on
+      // when the measurement and the declaration disagree — in EITHER
+      // direction, so a stray mesh drifting over the ramp is caught too.
+      bareColliders: ['ramp', 'lip'],
+    },
+    cosmetic: {
+      label: 'Hollow Bole',
+      // THE FIRST SHIPPED GLB TOWER (ROADMAP W3, /new-tower v2). One geometry,
+      // two palettes: the trunk is BAKED (tools/forge/recipes/hollowbole.py) and
+      // the venue picks which paint is standing. Both files are ensured together
+      // and readiness is over the pair (towerGlbUrls) — a venue flip must not put
+      // a player back in the wait they already served.
+      //
+      // IDENTICAL PORTALS ARE A CLAIM THIS ROW MAKES AND towerModelEnsure CHECKS:
+      // in {x 0, z -2.55, rimY 9.40, clearR 2.20}, out {x 0, sillY 1.00, w 4.20,
+      // clearH 3.50}, one geometry digest across both bakes. The engine derives
+      // its whole core from those eight numbers, so two variants that disagreed
+      // would be one venue delivering dice through a doorway the other one's
+      // engine did not cut. (The mouth tightened to the measured floor
+      // 2026-08-13 — was 5.00 x 4.50, sitting AT the old inherited limits;
+      // see TOWER.md "THE MINIMUMS" and the recipe's derivation.)
+      glbUrls: {
+        moonrise: '/models/towers/hollowbole_moonrise.glb',
+        foxfire: '/models/towers/hollowbole_foxfire.glb',
+      },
+      glbVariant: () => faeTowerPalette(),
+      // THE BAKE REPLACED THE SHELL, NOT THE DRESS. buildHollowBoleSkin still
+      // places the crown moot, the attendants, the little lit door, the veils and
+      // the stains — Joe-approved W3 work — through the SURFACE descriptor
+      // (js/towerhollow.js:592). What changed is who answers "where is the bark
+      // at (θ, y)": glbShellFor raycasts the loaded mesh instead of evaluating a
+      // radius field. The seam is the whole reason that swap costs one argument.
+      skin: (v) => buildHollowBoleSkin(v, {
+        paletteId: faeTowerPalette(),
+        shell: glbShellFor(towerGlbUrlActive(TOWERS.hollowbole)),
+      }),
+      // MOVING DRESS, DECLARED (/new-tower v2 §5): static props bake into the
+      // GLB, only idle motion stays code-side — and the row says so, so the
+      // registry loop knows to demand a sway of this tower and not of a model
+      // that legitimately has none.
+      dress: true,
+      title: 'Hollow Bole — a rotted hollow trunk; dice fall down the snag and out of a root gap',
+      // The family trait, and this one is the whole tower's best trick: the
+      // TINY LIT DOOR on the left root buttress (js/towerhollow.js). `at` is
+      // [x, y, z offset from z0] and it sits just in front of the pane, so the
+      // warm spills onto the apron a die comes down. Low and short-reach —
+      // this is a hearth behind a 0.24-wide door, not a forge; the emissive
+      // pane is the picture and the light is what proves somebody lit it.
+      ember: { at: [-2.79, 1.22, 0.55], color: HOLLOW_EMBER, intensity: 1.6, dist: 3.5 },
+      // The cold moon rakes a dead tree GENTLY — the identity is the moot's
+      // spectral ring and the one warm door, and a full warm rake would wash
+      // both of them out of a frame whose whole value floor is in the bottom
+      // third (Black Anvil took the same decision for the opposite reason).
+      lantern: { rake: 0.5 },
+      // NO DUST. Explicit rather than absent: the fae venues run their OWN
+      // air (js/fae-lab.js's fog sheets and starfield), and a second idle
+      // particle layer inside it would be two weathers in one room.
+      motes: false,
+      // A DEAD DRUM. Deeper than Heartwood's dry clack and hollower than
+      // Bastion's stone thud: a `thud` body at middling weight with a short
+      // tail, over the longest comb in the set — 4 ms is a metre of hollow
+      // log, and the two low modes are the note an empty trunk gives back
+      // when you hit it. Joe's dial, like every other voice here: reasoned
+      // from the table (docs/AUDIO.md §2.4), not yet listened to.
+      clunkVoice: {
+        body: 'thud', weight: 0.5, sustain: 35,
+        shaft: { delayS: 0.004, combGain: 0.5, mode1Hz: 360, mode2Hz: 720 },
+      },
     },
   },
 };
+// THE TWO HALVES, READ THROUGH ONE FUNCTION EACH. Every reader in this file
+// goes through these, which is what makes the split enforceable rather than
+// decorative: `grep towerPhys` is the complete list of code that can see a
+// physics fact about a row, and it is short.
+//
+// A missing half answers "declares nothing" instead of throwing. Rows are data
+// somebody hand-writes — a row minted by a proof, a row half-typed at 2am —
+// and the established failure mode for a missing declaration is to fall back
+// to the classic core loudly (towerPortalsOf), not to take the table down.
+const TOWER_NO_FACTS = Object.freeze({});
+const towerPhys = (row) => (row && row.physical) || TOWER_NO_FACTS;
+const towerCos = (row) => (row && row.cosmetic) || TOWER_NO_FACTS;
+// …and the one WRITER. towerModelEnsure freezes a bake's portals onto the row,
+// which is the only time anything mutates a registry entry, so the half is
+// created on demand exactly here and nowhere else.
+const towerPhysOwn = (row) => row.physical || (row.physical = {});
 const DEFAULT_TOWER = 'none';
 // MEDIUM, not wide (2026-08-09). The ladder moved one step closer and `wide`
 // is now byte-for-byte the old `close` — so defaulting to `wide` would ship
@@ -7317,10 +7407,13 @@ function towerLanternBuild() {
   const t = TOWERLIGHT.tune;
   // decay 0 / distance 0: classic non-attenuating spot, so the intensity
   // dial means the same thing at every distance dial.
-  const spec = TOWERS[currentTower];
+  // Both of the row facts this reads — the lantern rake and the ember — are
+  // COSMETIC by declaration (D1), which is the honest place for them: the
+  // lantern is render-only and films, bakes and replays never know it exists.
+  const spec = towerCos(TOWERS[currentTower]);
   // A tower may take the rake at a fraction of the dial (Black Anvil: the
   // forge stays dark and the ember carries it). The dial still scales it.
-  const rakeScale = spec && spec.lantern && spec.lantern.rake !== undefined ? spec.lantern.rake : 1;
+  const rakeScale = spec.lantern && spec.lantern.rake !== undefined ? spec.lantern.rake : 1;
   const spot = new THREE.SpotLight(t.rakeColor, t.rakeIntensity * rakeScale, 0, t.rakeAngle, t.rakePenumbra, 0);
   spot.position.set(t.rakeX, t.rakeY, v.z0 + t.rakeOut);
   const target = new THREE.Object3D();
@@ -7333,12 +7426,12 @@ function towerLanternBuild() {
   // hanging 0.4 off a corner post — painted a two-metre searchlight up the
   // post (looked at, 2026-08-11). Intensity and distance belong to the FIRE,
   // not to the rig; the dial still scales what it is given.
-  const emberI = spec && spec.ember && spec.ember.intensity !== undefined
+  const emberI = spec.ember && spec.ember.intensity !== undefined
     ? spec.ember.intensity : t.emberIntensity;
-  const emberD = spec && spec.ember && spec.ember.dist !== undefined
+  const emberD = spec.ember && spec.ember.dist !== undefined
     ? spec.ember.dist : t.emberDist;
   const rig = { spot, target, ember: null, emberBase: emberI };
-  if (spec && spec.ember) {
+  if (spec.ember) {
     // Physical falloff (decay 2) so the glow pools on the tray stone under
     // the grate instead of reaching the felt's centre.
     const ember = new THREE.PointLight(spec.ember.color, emberI, emberD, 2);
@@ -8347,7 +8440,7 @@ function towerPortalsOf(id) {
   if (towerProbeOverride) return towerProbeOverride;
   const row = TOWERS[id];
   if (!row) return DEFAULT_PORTALS;
-  if (row.portals) return row.portals;
+  if (towerPhys(row).portals) return towerPhys(row).portals;
   if (towerGlbUrls(row).length) console.warn(`[tower] ${id}: portals not loaded — classic volumes substituted`);
   return DEFAULT_PORTALS;
 }
@@ -8368,7 +8461,7 @@ function towerPortalsOf(id) {
 function towerPortalSource(id) {
   if (towerProbeOverride) return 'probe';
   const row = TOWERS[id];
-  if (!row || !row.portals) return 'default';
+  if (!towerPhys(row).portals) return 'default';
   return towerGlbUrls(row).length ? 'model' : 'row';
 }
 
@@ -8389,8 +8482,9 @@ function towerPortalSource(id) {
 // single variant the venue is currently under.
 function towerGlbUrls(row) {
   if (!row) return [];
-  if (row.glbUrls) return Object.values(row.glbUrls);
-  return row.glbUrl ? [row.glbUrl] : [];
+  const c = towerCos(row);
+  if (c.glbUrls) return Object.values(c.glbUrls);
+  return c.glbUrl ? [c.glbUrl] : [];
 }
 
 // The url to actually build from, right now. `glbVariant()` is the row's own
@@ -8399,10 +8493,11 @@ function towerGlbUrls(row) {
 // should stand the tower under the wrong sky, not refuse to stand it at all.
 function towerGlbUrlActive(row) {
   if (!row) return null;
-  if (!row.glbUrls) return row.glbUrl || null;
-  const keys = Object.keys(row.glbUrls);
-  const key = row.glbVariant ? row.glbVariant() : keys[0];
-  return row.glbUrls[key] || row.glbUrls[keys[0]] || null;
+  const c = towerCos(row);
+  if (!c.glbUrls) return c.glbUrl || null;
+  const keys = Object.keys(c.glbUrls);
+  const key = c.glbVariant ? c.glbVariant() : keys[0];
+  return c.glbUrls[key] || c.glbUrls[keys[0]] || null;
 }
 
 // The eight numbers, compared as numbers. Object.freeze does not make two
@@ -8448,7 +8543,7 @@ function towerModelReady(id) {
   // palettes of one model happens inside a venue change and cannot be allowed
   // to land back in the not-ready state, so the row is ready when the whole
   // set is.
-  return !urls.length || (!!row.portals && urls.every((u) => towerGlbStatus(u) === 'ready'));
+  return !urls.length || (!!towerPhys(row).portals && urls.every((u) => towerGlbStatus(u) === 'ready'));
 }
 
 // Kick the preload for a row that needs one. Idempotent at every level:
@@ -8481,13 +8576,14 @@ function towerModelEnsure(id) {
         // "wall beside the door" failure towerPortalsOf warns about, except
         // intermittent and palette-dependent, which is worse. Loud, and recorded
         // on the row so a proof can read it back instead of scraping a console.
-        if (!row.portals) row.portals = Object.freeze(entry.portals);
-        else if (!towerPortalsMatch(row.portals, entry.portals)) {
-          (row.portalMismatch || (row.portalMismatch = [])).push(url);
+        const phys = towerPhysOwn(row);   // the one mutation of a registry row
+        if (!phys.portals) phys.portals = Object.freeze(entry.portals);
+        else if (!towerPortalsMatch(phys.portals, entry.portals)) {
+          (phys.portalMismatch || (phys.portalMismatch = [])).push(url);
           console.error(`[tower] ${id}: ${url} declares DIFFERENT portals than the `
             + `variant already frozen onto this row. Two palettes of one model must be `
             + `one geometry — this is a BAKE error, not a load error. Frozen: `
-            + `${JSON.stringify(row.portals)} — this file: ${JSON.stringify(entry.portals)}`);
+            + `${JSON.stringify(phys.portals)} — this file: ${JSON.stringify(entry.portals)}`);
         }
       } else {
         // NEVER DEGRADE TO 'none'. pendingTower stays set, so a model that turns
@@ -8671,7 +8767,7 @@ function towerLabBuild() {
   // pointed at any registered tower instead of only the one that shipped
   // first; the SHIPPED socket reads the room setting, never this.
   const spec = TOWERS[TOWERLAB.skinId] || TOWERS.heartwood;
-  const skin = (spec.skin || buildTowerSkin)(v);
+  const skin = (towerCos(spec).skin || buildTowerSkin)(v);
   skin.visible = TOWERLAB.skin;
   root.add(skin);
   return root;
@@ -8803,7 +8899,7 @@ function towerLabSet(on = true) {
 // AO pass and its lining are all decided at build time. 'none' has no skin
 // builder and is not a thing the lab can wear.
 function towerLabSkin(id) {
-  if (!TOWERS[id] || !TOWERS[id].skin) return TOWERLAB.skinId;
+  if (!towerCos(TOWERS[id]).skin) return TOWERLAB.skinId;
   if (id === TOWERLAB.skinId) return TOWERLAB.skinId;
   // A BAKED ROW WHOSE MODEL IS NOT HERE YET (C6). The lab's skin builders are
   // synchronous like everything else, so this cannot await — and it must not
@@ -8866,7 +8962,7 @@ function towerOn() { return currentTower !== 'none' && !!towerRig; }
 // still leave every film byte-identical.
 function towerClunkVoice() {
   const spec = TOWERS[currentTower];
-  return (towerOn() && spec && spec.clunkVoice) ? spec.clunkVoice : null;
+  return (towerOn() && towerCos(spec).clunkVoice) ? towerCos(spec).clunkVoice : null;
 }
 
 // WHICH VOICE A RECORDED IMPACT GETS AT PLAYBACK. A baffle knock is a die
@@ -8966,7 +9062,8 @@ function towerReskin() {
         + `keeping the standing skin`);
       return;
     }
-    if (spec.portals && e.portals && !towerPortalsMatch(spec.portals, e.portals)) {
+    const phys = towerPhys(spec);
+    if (phys.portals && e.portals && !towerPortalsMatch(phys.portals, e.portals)) {
       console.warn(`[tower] palette reskin REFUSED: ${want} declares different `
         + `portals than the socketed spec — a visual swap would stand a model `
         + `over a film built for another mouth`);
@@ -8976,7 +9073,7 @@ function towerReskin() {
     if (!old) { console.warn('[tower] palette reskin: no towerSkin child to swap'); return; }
     const v = towerVolumes(towerPortalsOf(rig.id));
     rig.group.remove(old); // clone shares template geometry/materials — no dispose
-    rig.group.add(spec.skin(v));
+    rig.group.add(towerCos(spec).skin(v));
     towerApplyEnvPolicy(rig.group);
     rig.skinUrl = want;
   });
@@ -9032,7 +9129,7 @@ function towerSocket(id) {
     towerRig.cm = rig.cm;
     const group = new THREE.Group();
     group.name = 'towerModel';
-    if (spec.skin) group.add(spec.skin(v));
+    if (towerCos(spec).skin) group.add(towerCos(spec).skin(v));
     // THE TOWER REFLECTS THE ROOM IT STANDS IN (W2c). scene.environment is
     // the grounded room's env, and a DARK surface is mostly reflection —
     // round 6's earth berm (albedo ~0.025) took a visible blue cast from
@@ -9053,7 +9150,7 @@ function towerSocket(id) {
   // The air belongs to the tower (TOWERS[id].motes — Heartwood's trait):
   // dust rises with it and settles out with it, through the same applyMood
   // that owns every other piece of the room's atmosphere.
-  MOOD.moteHost = spec.motes ? spec.id : null;
+  MOOD.moteHost = towerCos(spec).motes ? spec.id : null;
   applyMood();
   return currentTower;
 }
@@ -9816,7 +9913,7 @@ window.__diceDebug = {
       // has the mat's physics wall; forward is still the felt), bounded
       // at 8 units so "grounds" never means "forever", and never below
       // the soil.
-      if (TOWERS[currentTower] && TOWERS[currentTower].venueOnly
+      if (TOWERS[currentTower] && TOWERS[currentTower].venueOnly   // top-level: a catalogue rule
         && b.min.x >= -soc.x - 1e-3 && b.max.x <= soc.x + 1e-3
         && b.max.y <= soc.y1 + 1e-3 && b.min.y > -0.15
         && b.min.z >= v.z0 - K.gladeDepth
@@ -9931,7 +10028,7 @@ window.__diceDebug = {
       tower: currentTower, groups, tris: Math.round(tris), draws, lights,
       sways: dress ? dress.sways.length : 0,
       smokes: dress ? dress.smokes.length : 0,
-      ember: !!(TOWERS[currentTower] && TOWERS[currentTower].ember),
+      ember: !!towerCos(TOWERS[currentTower]).ember,
       // SIX PLACES, not three. The scenario checks the sway angle against the
       // formula at this t, and at 0.055 Hz the angle moves ~0.02 rad per
       // second — so a clock rounded to a millisecond is a 1e-5 disagreement
@@ -10118,9 +10215,19 @@ window.__diceDebug = {
   },
   // The registry as the picker sees it, so a scenario can assert the chips
   // against the source of truth instead of a hard-coded list.
+  //
+  // FLAT, ON PURPOSE, EVEN THOUGH THE ROWS ARE NOT (D1). Six tools and three
+  // scenarios read `t.label` / `t.skin` / `t.clunkVoice` off this projection,
+  // and re-shaping a proof surface to mirror an internal refactor is how a
+  // refactor gets to break proofs it never touched. The split is enforced
+  // where it MEANS something — in the rows and in the readers — and reported
+  // here through `physical`, which is the half a caller has to be able to see
+  // to say "nothing physical moved".
   towerRegistry() {
     return Object.values(TOWERS).map((t) => ({
-      id: t.id, label: t.label, skin: !!t.skin, clunkVoice: t.clunkVoice || null,
+      id: t.id,
+      label: towerCos(t).label, skin: !!towerCos(t).skin,
+      clunkVoice: towerCos(t).clunkVoice || null,
       // A VENUE TOWER HAS NO CHIP (renderTowerPicker skips it), so a
       // scenario asserting the picker against the registry has to be able
       // to see the difference here rather than hard-coding which row it is.
@@ -10131,7 +10238,18 @@ window.__diceDebug = {
       // synchronously and which need a towerModelStatus poll first. No row
       // ships `glb: true` today; the flag exists so the loop that walks them
       // can be written once rather than retrofitted the day one does.
-      glb: towerGlbUrls(t).length > 0, dress: !!t.dress,
+      glb: towerGlbUrls(t).length > 0, dress: !!towerCos(t).dress,
+      // THE PHYSICAL HALF, WHOLE. Portals are in it because they are the
+      // question every derived number in towerContractSnapshot answers, and a
+      // registry walk that could not see them could not tell a row that CHOSE
+      // the classic mouth from a baked row whose portals never loaded. Null
+      // rather than {} when the row declares none, so "this row has physics
+      // facts" is a truthiness test.
+      physical: towerPhys(t) === TOWER_NO_FACTS ? null : {
+        portals: towerPhys(t).portals || null,
+        bareColliders: towerPhys(t).bareColliders
+          ? towerPhys(t).bareColliders.slice() : null,
+      },
     }));
   },
   // WHERE A ROW'S MODEL HAS GOT TO (js/towerglb.js). `ready` is the GATE every
@@ -10156,7 +10274,7 @@ window.__diceDebug = {
           : (sts.every((s) => s === 'ready') ? 'ready'
             : (sts.includes('loading') ? 'loading' : 'idle'))),
       url: towerGlbUrlActive(row),
-      portals: !!row.portals,
+      portals: !!towerPhys(row).portals,
       retries: urls.reduce((m, u) => Math.max(m, towerGlbAsset(u) ? towerGlbAsset(u).retries : 0), 0),
     };
   },
@@ -10178,8 +10296,8 @@ window.__diceDebug = {
       active: towerGlbUrlActive(row),
       urls,
       statuses: urls.map((u) => towerGlbStatus(u)),
-      mismatch: row.portalMismatch ? row.portalMismatch.slice() : [],
-      variant: row.glbVariant ? row.glbVariant() : null,
+      mismatch: towerPhys(row).portalMismatch ? towerPhys(row).portalMismatch.slice() : [],
+      variant: towerCos(row).glbVariant ? towerCos(row).glbVariant() : null,
     };
   },
   // PROOFS ONLY, exactly like towerLabSkin's parameterisation: this MINTS a
@@ -10195,12 +10313,21 @@ window.__diceDebug = {
   // somebody to ship it.
   towerRegisterGlb(id, url, opts = {}) {
     if (!id || !url) return false;
+    // Two halves like any authored row (D1), including the EMPTY physical one:
+    // a minted row's portals arrive off the bake exactly as a shipped row's do,
+    // and towerPhysOwn would create the half anyway — writing it here keeps
+    // "every row declares both" true, which is what makes the split readable
+    // as a rule instead of as a convention four rows happen to follow.
     TOWERS[id] = {
-      id, label: opts.label || id, glbUrl: url,
-      skin: (v) => towerGlbSkin(url, v),
-      title: opts.title || 'test',
-      clunkVoice: opts.clunkVoice || { body: 'clack', weight: 0.4, sustain: 22 },
-      ember: opts.ember || { at: [0, 5, 0.5], color: '#ff9a44' },
+      id,
+      physical: {},
+      cosmetic: {
+        label: opts.label || id, glbUrl: url,
+        skin: (v) => towerGlbSkin(url, v),
+        title: opts.title || 'test',
+        clunkVoice: opts.clunkVoice || { body: 'clack', weight: 0.4, sustain: 22 },
+        ember: opts.ember || { at: [0, 5, 0.5], color: '#ff9a44' },
+      },
     };
     return true;
   },
@@ -18170,8 +18297,8 @@ function renderTowerPicker() {
       const chip = document.createElement('button');
       chip.className = 'system-chip';
       chip.dataset.tower = t.id;
-      chip.textContent = t.label;
-      chip.title = t.title;
+      chip.textContent = towerCos(t).label;
+      chip.title = towerCos(t).title;
       chip.setAttribute('role', 'radio');
       chip.addEventListener('click', () => selectTower(t.id));
       holder.appendChild(chip);
