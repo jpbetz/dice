@@ -3199,7 +3199,17 @@ Tolerable at one tower, a tax at five. The bake half is nearly free already
 shape: a single contact sheet that puts both palettes side by side at the
 same eyes, so the LOOK is one pass instead of two.
 
-### T7. Promotion is manual and main-session-only — small
+### T7. Promotion is manual and main-session-only — small, and it has already bitten
+**2026-08-13, found by accident:** the shipped `hollowbole_*.glb` had been two
+commits behind their recipe since that morning — round 1's forge work added a
+`doorPad` marker, re-baked, and correctly did not promote (models/towers/ was
+outside its cluster), and nothing then noticed. The digest baseline could not:
+`set` is over GEOMETRY, and the geometry never moved. **A digest proves a model
+did not change; it says nothing about whether the file anybody serves is the
+file the recipe writes.** Promoted and proven the same day, but the gap is the
+item.
+
+
 An agent can bake a GLB and prove it, but cannot ship it: copying into
 `models/towers/`, adding the static-cache manifest entry and re-pinning the
 digest are main-session acts. The gate is deliberate — the frozen-mtime
