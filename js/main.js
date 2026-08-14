@@ -24840,6 +24840,14 @@ function renderSeatReturning() {
   const nm = document.createElement('span');
   nm.textContent = `Stay as ${r.name}`;
   btn.appendChild(nm);
+  // A REAL space, not a flex gap — the same rule renderOutcomeRows spells out
+  // for its chips. This is a flex row, so the gap makes it LOOK separated
+  // while `textContent` and the accessible name run the two spans together:
+  // shipped for one afternoon, the button announced itself as
+  // "Stay as Wandererwith Rill". Caught by `prepared-seat`, which asserts on
+  // textContent — the assertion was reading the accname by accident and was
+  // right to.
+  btn.append(' ');
   const ct = document.createElement('span');
   ct.className = 'seat-count';
   btn.appendChild(ct);
