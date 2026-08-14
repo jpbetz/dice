@@ -1414,8 +1414,8 @@ W_CORNER_SPAN = 0.24   # the span a FULL lift wants; less room, less lift.
 #                        0.32 the left haunch came out 0.20 shallower than
 #                        round 6's and assert_no_hole_below_the_crest caught it
 #                        immediately: 21 sight lines into the cavity under the
-#                        bank's crest at x -2.99. The corner fillet is not
-#                        decoration — it is what the berm's wings hide behind.
+#                        crest at x -2.99. The corner fillet is not decoration
+#                        — it is half of what closes the flank slot.
 # THE SLOT BESIDE THE RAMP, CLOSED IN THE WOOD (2026-08-13). Joe chose this
 # over asking the mound to keep hiding it: "make a visible mound that's not
 # load bearing for the dice".
@@ -1423,8 +1423,8 @@ W_CORNER_SPAN = 0.24   # the span a FULL lift wants; less room, less lift.
 # The corner fillet ramps from ZERO at 1.131, so immediately outside the
 # throat the sill is still at its base 0.90 — under the ramp's crest at 1.046
 # — and what a player sees there is a slot into the hollow. That is the cavity
-# assert_no_hole_below_the_crest has been measuring all along, and the berm's
-# wings were the lid. A ramp cannot close it; only a step can.
+# assert_no_hole_below_the_crest has been measuring all along, and the mound's
+# wings used to be the lid. A ramp cannot close it; only a step can.
 #
 # So outside the outermost throat ray the sill JUMPS clear of the crest over a
 # tenth of a radian, and the corner fillet carries on from there (max of the
@@ -1434,7 +1434,7 @@ W_CORNER_SPAN = 0.24   # the span a FULL lift wants; less room, less lift.
 # ray "1.086 rad", and in THIS function's units (phi_b = arc / W_ARC) that is
 # arc 2.99, which is x 2.49 — half a unit outboard of where the throat actually
 # ends. Keyed there the step lifted wood nobody could see and left the slot
-# wide open; report_sill printed the sill at 0.74-0.90 out to x 2.5 against a
+# wide open; the sill profile printed 0.74-0.90 out to x 2.5 against a
 # 1.046 crest, which is the measurement that found it. The throat's outer ray
 # is at x 1.995, which on this trunk is arc 2.165, i.e. phi_b 0.787. 0.82 sits
 # a hair outboard of that: nothing a die passes through moves.
@@ -1442,7 +1442,7 @@ W_CORNER_SPAN = 0.24   # the span a FULL lift wants; less room, less lift.
 # portal contract reserves the doorway from THROAT_Y0 (1.0875) UP; everything
 # below that line is wood's to have, at any heading. So the floor does not
 # have to hide outside x 1.995 — it only has to stay under 1.0875, which it
-# does by 0.023. That is what lets it close the opening from LANE_CORE
+# does by 0.023. That is what lets it close the opening from x ~1.55
 # outward, which is the actual shape of Joe's complaint: "the exit hole
 # extends below the ramp's highest point".
 W_THROAT_PHI = 0.56    # x ~1.55 at the front — the gate's own inner bound
@@ -1454,7 +1454,8 @@ W_THROAT_PHI = 0.56    # x ~1.55 at the front — the gate's own inner bound
 # probe at a different depth each time — not because the heading was wrong,
 # but because the height was: no heading exists at which 1.24 is legal, since
 # the cutter's footprint is constant in radius and at the bore's own radius
-# every heading maps inside |x| 1.995. report_sill is the check.
+# every heading maps inside |x| 1.995. assert_sill_is_in_the_window is the
+# check, and since 2026-08-13 it is a refusal rather than a printout.
 W_SILL_FLOOR = 1.065   # above the 1.046 crest, under the 1.0875 throat
 W_CORNER_LIFT = 0.92   # world units the sill rises at the extreme corner
 #                        (was 1.55 — scaled with the door height so the
@@ -1632,7 +1633,7 @@ def build_wound_loop(m=W_LOOP_M):
             # THE SILL FLOOR — a CLAMP, not a lift, and that is the difference
             # between closing the slot and not. Adding 0.16 put the nominal
             # sill at 1.06, inside the 0.04 window; the threshold's own rag
-            # then wandered +-0.05 about it and report_sill measured 1.01 —
+            # then wandered +-0.05 about it and the sill measured 1.01 —
             # back under the 1.046 crest, slot still open. The noise is wider
             # than the window, so no additive lift can ever land inside it.
             # A floor can: the rag keeps every excursion it makes UPWARD and
@@ -1648,25 +1649,69 @@ def build_wound_loop(m=W_LOOP_M):
 WOUND_LOOP = build_wound_loop()
 
 
-def report_sill():
-    """WHERE IS THE WOUND'S LOWER EDGE, in x? Every attempt to close the flank
-    slot so far has been keyed on a heading I was guessing at; this prints the
-    sill against the ramp crest so the number is read rather than assumed."""
-    lo = {}
+# THE 0.04 WINDOW, AS A REFUSAL. The wound's lower edge has to land between
+# two numbers that are 0.042 apart, and which of the two binds depends on
+# where along the mouth you stand:
+#
+#   |x| <= 1.995   the dice's own half-width. The sill must stay UNDER
+#                  THROAT_Y0 (1.0875) or it eats the flight envelope, and the
+#                  exit gate will say so — but only at the five x it samples.
+#   |x| >  1.995   no die passes here, and the sill must stand OVER the ramp's
+#                  crest (1.0456) or what a player sees beside the doorway is
+#                  a slot into the hollow. That is W2c.
+#
+# This was a REPORT for its whole life — it printed the sill against the crest
+# and a human read the row of numbers — and it is what found the last two
+# defects in this area (a step keyed half a unit outboard of the throat; a rag
+# whose noise was wider than the window it had to land in). A measurement good
+# enough to find two defects is good enough to refuse the third, so it
+# refuses. It reads the BUILT loop rather than the schedule that generated it:
+# the floor, the corner fillet and the rag all compose in build_wound_loop,
+# and only the composition is the sill.
+SILL_WINDOW_EPS = 0.002    # loop sampling, not slack: adjacent samples of the
+#                            same edge differ by ~1e-3 in y
+
+
+def assert_sill_is_in_the_window():
+    """The wound's lower edge, judged in x against the two lines it lives
+    between. Prints the profile it judged — that row of numbers has earned
+    its place."""
+    crest = lane_plane(LANE_Z0)
+    lo, low_in, high_out = {}, None, None
     for u, v in WOUND_LOOP:
-        arc, y = uv_to_world(u, v)
         if v >= 0:
             continue
-        xb = round(arc / 0.25) * 0.25
+        arc, y = uv_to_world(u, v)
+        phi = arc / W_ARC
+        x = out_point(phi, y)[0]
+        if abs(x) <= THROAT_HALF_W:
+            if y > THROAT_Y0 + SILL_WINDOW_EPS and (
+                    low_in is None or y > low_in[1]):
+                low_in = (x, y)
+        elif y < crest - SILL_WINDOW_EPS and (
+                high_out is None or y < high_out[1]):
+            high_out = (x, y)
+        xb = round(abs(x) / 0.25) * 0.25
         lo[xb] = min(lo.get(xb, 1e9), y)
-    crest = lane_plane(BERM_Z0)
-    cells = []
-    for xb in sorted(lo):
-        if xb < 0:
-            continue
-        cells.append(f"{xb:+.2f}:{lo[xb]:.2f}{'!' if lo[xb] < crest else ''}")
-    print(f"[bole] sill vs crest {crest:.3f} (! = open below it)")
+    cells = [f"{xb:+.2f}:{lo[xb]:.2f}{'!' if lo[xb] < crest else ''}"
+             for xb in sorted(lo)]
+    print(f"[bole] sill vs crest {crest:.3f} / throat floor {THROAT_Y0:.4f} "
+          f"(! = under the crest, legal only inside |x| {THROAT_HALF_W:.3f})")
     print("[bole]   " + "  ".join(cells))
+    if low_in is not None:
+        raise RuntimeError(
+            f"the sill stands at y {low_in[1]:.4f} at x {low_in[0]:+.3f} — "
+            f"inside the throat (|x| <= {THROAT_HALF_W}) and OVER the doorway "
+            f"floor {THROAT_Y0:.4f}. That is the dice's flight envelope; the "
+            f"floor step (W_SILL_FLOOR {W_SILL_FLOOR}) has reached inboard of "
+            f"where it is allowed to (W_THROAT_PHI {W_THROAT_PHI})")
+    if high_out is not None:
+        raise RuntimeError(
+            f"the sill sits at y {high_out[1]:.4f} at x {high_out[0]:+.3f} — "
+            f"outside the throat and UNDER the ramp's crest {crest:.3f}, so "
+            f"there is a slot into the hollow beside the doorway with nothing "
+            f"under it. W2c, exactly: raise W_SILL_FLOOR or widen the corner "
+            f"fillet (W_CORNER_PHI0 {W_CORNER_PHI0})")
 
 # A radius table over direction, built FROM the loop that is actually cut,
 # so the paint pass's idea of "how near the fringe is this?" and the
@@ -1959,21 +2004,34 @@ def door_cutter():
 
 
 # --------------------------------------------------------------------------
-# THE EARTHEN BERM — the ground rises in a root-bound bank to the tear
+# THE LANE — the engine's ramp and lip, and what is left of the mound
 # --------------------------------------------------------------------------
-# ROUND 6, and it retires the delivery tongue outright. Rule 12 of
-# docs/VENUE-COMPOSITION.md asks every engine surface to state its material
-# story in one sentence of the venue's fiction: "it is a ramp" fails, "the
-# ground rises in a root-bound earthen bank to the tear in the trunk" passes.
-# Round 4 had already proved that paint alone cannot carry that sentence — a
-# 0.39 value drop on the plate still came back from the app as a gangplank,
-# and rule 11 now says so in as many words. So the plate is gone and what
-# replaces it is a BANK: lane, wings, root ridges, a feathered toe.
+# RETIRED, 790ed90: "The mound is deleted, and the wood closes its own hole."
+# Round 6 built an earthen BANK over the delivery ramp — a footprint of plan
+# lobes carrying a summed height field, the dice path carved back through it,
+# wings, root ridges, clods, a feathered toe, and four gates of its own. Joe
+# killed it in three sentences, the third being "just delete it now", because
+# it was doing four jobs at once and only one of them was being a mound. The
+# shipped GLBs contain exactly three meshes — Shell, Curtain, Shelves — and no
+# bank of any kind.
+#
+# WHAT DELETING IT LEFT BEHIND, and this is why the section still exists.
+# Nothing built the mound any more, but its FIELD FUNCTIONS still evaluated,
+# and a live gate was still asking them: assert_no_hole_below_the_crest
+# short-circuited its ray march on berm_top(), so every sight line that would
+# have shown the flank slot was stopped by a phantom — and HOLE_MAX_OUT sat at
+# 16 excusing "the holes the shipped mound measures", of a mound that had not
+# existed for a commit. Two more functions (assert_lane_is_clear,
+# assert_berm_pressed_home) read like live gates and were called by nothing.
+# All of it is gone as of 2026-08-13; the gate that mattered now marches BUILT
+# TRIANGLES and expects zero. What survives here is only the arithmetic of the
+# ENGINE's own two surfaces, which the wound's threshold is still measured
+# against.
 #
 # Measured off the apron box rather than copied from its comment: rotate the
 # top face (local y = +s/2) about x by APRON_RX and the plane comes out as
-# y = 0.9937 - 0.5333 z, meeting the felt at z 1.863. PROUD lifts the skin
-# clear of the collider so it never z-fights or lets a die ride nothing.
+# y = 0.9937 - 0.5333 z, meeting the felt at z 1.863. PROUD is what a skin
+# would stand clear of the collider by, if anything still clad it.
 PROUD = 0.02
 _ct, _st = math.cos(APRON_RX), math.sin(APRON_RX)
 
@@ -2008,332 +2066,22 @@ def _lip_plane():
 
 
 LIP_Y, LIP_K = _lip_plane()
-# The kink where the two engine planes cross. The lane's surface is the MAX of
-# them and a max of two lines is convex, so a chord across the crossing sits
-# ABOVE the collider — 0.036 of extra proudness on the old tongue's 0.33
-# schedule, which is a die sinking that much further into the scenery. One
-# ring is snapped onto this z instead (berm_ring_zs), and then the lane is
-# exact everywhere rather than exact at the vertices.
-RAMP_LIP_KINK = (RAMP_Y - LIP_Y) / (RAMP_K - LIP_K)          # z 1.455
-# The kink where the two engine planes cross. The lane's surface is the MAX of
-# them and a max of two lines is convex, so a chord across the crossing sits
-# ABOVE the collider. One grid row is snapped onto this z instead, and then
-# the lane is exact everywhere rather than exact at the vertices.
-
-# THE LANE'S PROVEN START. -0.06 gives a top of 1.0456, 0.042 under the exit
-# gate's floor (THROAT_Y0 1.0875) — and very nearly the last z with any margin
-# at all, because the collider plane crosses that bar at z -0.138. A lane
-# surface deeper than that would be geometry inside the throat box, which is
-# the refusal THE THROAT section records at the top of this file.
-BERM_Z0 = -0.06
-# -0.06 at the front too: the lip collider's front face is z 3.90 and the
-# audit's LIP CLADDING class is "the engine outrun, skinned", so the skin ends
-# INSIDE the thing it clads. Round 2 ran to 3.96 and the fit read z+3.71 past
-# the socket face.
-BERM_Z1 = LIP_C[2] + LIP_S[2] / 2.0 - 0.06
-# THE CLADDING HAS TO DIP A HALF-UNIT UNDER THE FELT, a classification
-# requirement rather than a modelling one: towerModelAudit grants APRON/LIP
-# CLADDING only to a mesh with min.y < -0.5. Nothing about it is visible.
-CLAD_FLOOR = -0.62
-
-# --------------------------------------------------------------------------
-# WHAT THE FIRST ROUND-6 BAKE GOT WRONG, because it is the whole reason this
-# section is a heightfield and not a loft.
-#
-# That bake built the LANE as the object — a swept profile, planar across its
-# full width, with the mound expressed as two raised edges on it — and every
-# gate it had went green: the lane was the collider exactly, the rag was
-# buried, 25/25 throats, envelope, budget. It still came back rejected on
-# sight, and correctly: a slab with parapets and a blunt extruded toe is a
-# ramp with decoration, and rule 12 asks for the venue's terrain, not for a
-# better-dressed chute. The construction was the defect, so the construction
-# is what changed.
-#
-# A MOUND IS BUILT THE OTHER WAY ROUND. The pile of earth is the object: a
-# footprint of overlapping plan lobes carrying a summed height field, feathered
-# to nothing at every edge it owns. The dice lane is then CARVED into it — a
-# worn path over the pile — and only inside the path is the surface the
-# engine's plane. Nothing in the model is swept, nothing is a profile, and the
-# only straight line anywhere is the one the collider contract demands.
-# --------------------------------------------------------------------------
-
-# THE PATH. Inside LANE_CORE the top IS lane_plane(z); between CORE and
-# SHOULDER it blends into the mound; past SHOULDER it is pure mound.
-LANE_CORE = 1.55
-LANE_SHOULDER = 2.10
-# 2.10 and not the 2.05 the spec asked for, and the 0.05 is a gate talking.
-# The exit gate's outermost rays sit at |x| = 1.995 and the mesh interpolates
-# LINEARLY between grid columns: with the mound starting at a column on 2.05,
-# the ray at 1.995 would read four fifths of the way from the capped shoulder
-# to an uncapped 1.25 of mound and come back blocked. Moving the shoulder's
-# outer column to 2.10 puts both columns the ray falls between under the cap.
-THROAT_CAP = 1.05
-# ...and this is the other half of the same guarantee. Inside the throat
-# window the blended shoulder is clamped to 1.05 — 0.0375 under THROAT_Y0 —
-# so the 25 rays are clear BY CONSTRUCTION rather than by measurement luck.
-THROAT_CAP_Z = 1.06        # the window is z <= 1.0; the cap outlives it by a
-#                            hair so no discontinuity lands on the boundary
-LANE_RELEASE = (2.95, 3.62)
-# Forward of the lip's own vanishing line the plane is under the felt and has
-# nothing to carry, so the path is released back to the mound and walks down
-# into the feathered toe with it. 3.62 is measured, not chosen: it is where
-# LIP_Y - LIP_K z crosses zero.
-
-# --------------------------------------------------------------------------
-# THE FOOTPRINT — overlapping plan lobes, radial edge noise, no straight edge
-# --------------------------------------------------------------------------
-# Each lobe is an ellipse in plan with its own rotation, its own peak, and a
-# noisy radius; the height is a cos^2 bump over it, which unlike a gaussian
-# actually REACHES ZERO at its own boundary, so a lobe's edge is a place the
-# ground comes back rather than a place a curve is clipped. They are summed,
-# and they are deliberately mismatched: the left wing is the DEEPER one (it
-# reaches further back along z and stands taller at its crest), the right is
-# the BROADER and lower one, and the toe lobe is off-centre to the right. A
-# mirrored pair of mounds reads as a moulding.
-BERM_LOBES = (
-    # cx,    cz,   ax,   az,   rot,  amp,  edge-noise k, seed
-    #
-    # TWO BANKS AND TWO TOES, and nothing standing in the dice's way. The
-    # shipped set led with a BODY lobe centred on x 0 — a hill directly across
-    # the exit — and everything else in this file followed from the need to
-    # cut a path back through it. Take the hill out of the path and the path
-    # stops needing to exist: earth is banked around the stump's foot, the
-    # dice run out between the banks over open felt, and the banks are free to
-    # be plain mounds because nothing rides them.
-    #
-    # They stay MISMATCHED — the left deeper in z and taller, the right
-    # broader and lower, the toes at different reaches — because a mirrored
-    # pair reads as a moulding (R1's finding for the buttresses).
-    # They HUG THE TRUNK rather than reach across the exit, and the lane gate
-    # is what set that: the collider plane starts at 1.05 over the sill and is
-    # near felt by z 1.5, so a bank with any reach forward is standing in the
-    # dice's way exactly where the plane has dropped away. Short in z, seated
-    # against the foot, gone by the time the path matters.
-    # SEATED FORWARD OF THE CAVITY, and NARROW in x. Two gates pin these from
-    # opposite sides and between them there is only one shape left. The hole
-    # under the ramp faces the player, so a bank beside it hides nothing —
-    # it has to stand in FRONT, which means reach in z. But reach in x puts
-    # the skirt under the collider plane's lowest stretch, so the bank must be
-    # narrow and stand well outboard. Tall, narrow, forward: which is what a
-    # bank of earth pushed out by a root actually looks like.
-    # ORDINARY MOUNDS AT LAST. They hide nothing (the wood closed its own
-    # slot) and they carry nothing (the dice ride the ramp and the rails), so
-    # these numbers answer to the eye alone: two low banks of earth pushed up
-    # around the stump's foot, well outboard of the corridor, unequal in
-    # height, reach and seat because a matched pair reads as a moulding.
-    (-3.02, 0.60, 1.24, 1.34, -0.18, 1.16, 4.2, 163),   # left, taller
-    (2.96,  0.72, 1.34, 1.18, 0.16, 0.98, 4.8, 165),    # right, broader
-    # ONE TOE, not two, and it is on the right only — because forward of
-    # z ~2.5 the lip plane is within a tenth of the felt, so anything with
-    # reach out there is standing in the lane by definition. The left flank
-    # simply runs out into the ground, which is the asymmetry for free.
-    (3.00,  2.30, 1.05, 0.85, 0.11, 0.26, 3.6, 167),    # one low toe, right
-)
-BERM_EDGE_N = 0.16          # how far a lobe's rim wanders, as a fraction of r
-BERM_GRAIN = 0.15           # small height noise ON the mound, x its own height
-
-# 3 ROOT RIDGES, as raised beads along curves in the SAME field — never strips
-# and never separate boxes. Each is a gaussian ridge about a line that leaves
-# the trunk's foot and runs down a flank. Two on the left, one on the right,
-# because a mirrored pair reads as a turned table leg (the finding R1 recorded
-# for the buttress plan).
-BERM_BEADS = (
-    # x0,    z0,   dx,    dz,   len,  w,     amp
-    (-2.15, 0.10, -0.34, 1.00, 2.30, 0.155, 0.30),
-    (-2.72, 0.05, 0.10, 1.00, 1.45, 0.115, 0.20),
-    (2.34, 0.20, 0.30, 1.00, 1.95, 0.140, 0.26),
-)
-
-# CLODS. Part-sunk lumps of earth along the toe arc, where the feather meets
-# the ground: the one place a heightfield cannot make a silhouette event,
-# because its edge is by construction a smooth contour. Ten tris each.
-# Every one of them sits at |x| >= 2.48 — outside BOTH engine colliders (the
-# apron is +-2.375 and the lip +-2.4) — because a clod in the dice path is a
-# die hitting scenery, and a clod on the felt in FRONT of the outrun is a die
-# perching on it. That costs the spec its clods along the middle of the toe
-# arc; the two front ones sit at its outer ends instead. Their z extent is
-# capped by the LIP CLADDING envelope (max.z 3.85), which the first cut
-# overran by 0.10 with two clods at z 3.72-3.74.
-BERM_CLODS = (
-    # x,     z,    r
-    (-2.62, 1.62, 0.22),
-    (-2.88, 2.72, 0.16),
-    (-2.48, 3.38, 0.18),
-    (2.86, 1.38, 0.14),
-    (2.55, 2.62, 0.18),
-    (2.62, 3.30, 0.16),
-)
-CLOD_SINK = 0.42            # fraction of the radius that goes under the soil
-
-# THE GRID. Columns are NOT evenly spaced: the lane's two carve boundaries and
-# the throat's shoulder have to land ON columns or the linear interpolation
-# between them re-creates the very surface the carve removed.
-BERM_XS = (-3.12, -2.86, -2.60, -2.35, -2.10, -1.82, -1.55, -0.78, 0.0,
-           0.78, 1.55, 1.82, 2.10, 2.35, 2.60, 2.86, 3.12)
-BERM_NZ = 11
-BERM_FEATHER = (0.05, 0.26)         # x-width over which the field is forced to zero at
-#                             the outer columns, so no lobe is clipped by the
-#                             grid and no straight plan edge survives
-BERM_LIP = -0.035           # the height the feather lands on: UNDER the venue
-#                             ground disc (y 0.02), so the berm's visible edge
-#                             is a contour the ground cuts, not a modelled rim
+# THE LANE'S HIGHEST POINT, which is the number the wound's threshold is
+# judged against. -0.06 gives a top of 1.0456, 0.042 under the exit gate's
+# floor (THROAT_Y0 1.0875) — and very nearly the last z with any margin at
+# all, because the collider plane crosses that bar at z -0.138. It kept its
+# meaning through the mound's deletion: nothing is built here any more, but
+# "the ramp's highest point" is still where Joe's sentence about the exit hole
+# puts its bar (assert_no_hole_below_the_crest, assert_sill_is_in_the_window).
+LANE_Z0 = -0.06
 
 
 def lane_plane(z):
-    """The engine's own ramp/lip surface, PROUD-lifted. Inside the path this
-    is not an approximation of the model's top — it IS the model's top."""
+    """The engine's own ramp/lip surface, PROUD-lifted. Nothing of this model
+    rides it — the ramp and the lip are deliberately bare — but it is still
+    where a die's feet are, so it is still what a threshold must clear."""
     return max(RAMP_Y - RAMP_K * z, LIP_Y - LIP_K * z) + PROUD
 
-
-def _lobe(x, z, cx, cz, ax, az, rot, amp, k, seed):
-    dx, dz = x - cx, z - cz
-    c, s = math.cos(rot), math.sin(rot)
-    u = (dx * c + dz * s) / ax
-    v = (-dx * s + dz * c) / az
-    r = math.hypot(u, v)
-    if r < 1e-9:
-        return amp
-    # the rim wanders with direction — periodic in the lobe's own angle, so
-    # there is no seam where it closes
-    a = math.atan2(v, u)
-    r /= 1.0 + BERM_EDGE_N * (2.0 * n1p(a, k, seed) - 1.0)
-    if r >= 1.0:
-        return 0.0
-    return amp * math.cos(0.5 * math.pi * r) ** 2
-
-
-def _bead(x, z):
-    """Raised beads along curves — root ridges IN the field."""
-    t = 0.0
-    for (x0, z0, dx, dz, ln, w, amp) in BERM_BEADS:
-        n = math.hypot(dx, dz)
-        ux, uz = dx / n, dz / n
-        px, pz = x - x0, z - z0
-        along = px * ux + pz * uz
-        if along < -w or along > ln:
-            continue
-        off = abs(-px * uz + pz * ux)
-        # the bead wanders off its own line, or it is a moulding again
-        off -= 0.10 * (2.0 * n1(along * 1.9 + 3.0, SEED + 169) - 1.0)
-        run = (1.0 - max(0.0, along) / ln) ** 0.8
-        t += amp * run * math.exp(-0.5 * (off / w) ** 2)
-    return t
-
-
-def berm_h(x, z):
-    """THE MOUND, before the path is carved into it. Feathered to BERM_LIP at
-    the grid's own outer edges so no lobe is ever cut by the boundary."""
-    h = 0.0
-    for L in BERM_LOBES:
-        h += _lobe(x, z, *L)
-    h += _bead(x, z)
-    h *= 1.0 + BERM_GRAIN * (2.0 * n2(x * 1.45, z * 1.25, SEED + 171) - 1.0)
-    h += 0.055 * (2.0 * n2(x * 3.2 + 5.0, z * 2.7, SEED + 173) - 1.0) * smoothstep(h, 0.0, 0.35)
-    # THE OUTER COLUMNS ARE THE GROUND, NOT A WALL — but only where there IS
-    # ground. At the back the mound runs out against the buttress toes, which
-    # stand 0.6-0.85 proud at |x| 3.05-3.13, so feathering to nothing there
-    # would open a trench between the bank and the root it is bound into and
-    # would leave the flanking rag showing. Forward of the roots there is
-    # nothing but felt and the feather is wide, which is rule 4's edge.
-    fw = lerp(BERM_FEATHER[0], BERM_FEATHER[1], smoothstep(z, 0.35, 1.30))
-    edge = min(smoothstep(BERM_XS[-1] - abs(x), 0.0, fw),
-               smoothstep(BERM_Z1 - z, 0.0, BERM_FEATHER[1]))
-    return lerp(BERM_LIP, max(BERM_LIP, h), edge)
-
-
-def berm_top(x, z):
-    """THE MOUND, FULL STOP — and the word "full stop" is the change.
-
-    Joe: "demote the shape to a regular old mound and then solve the dice
-    problem independently."
-
-    This used to be the mound with the dice path WORN INTO IT: the engine's
-    ramp plane blended in over the lane, a throat ceiling planed across the
-    shoulder so exiting dice cleared it, and the whole thing released back to
-    the mound further out. Three different surfaces meeting in creases, and
-    every one of those creases was there to serve physics. The result read
-    exactly as what it was — a bank with a machined channel and a bench in it.
-
-    The dice are no longer this surface's problem. They ride the engine's own
-    ramp and lip colliders (invisible, and already there) plus the rails
-    added for the purpose; this is scenery, and its only obligation is to
-    stay OUT OF THE WAY — assert_lane_is_clear holds it under the collider
-    plane through the lane, so no die can ever be seen sinking into it.
-
-    A surface that only has to stay under something is free to be any shape
-    at all, which is what makes it possible for it to be a mound.
-    """
-    return berm_h(x, z)
-
-
-def berm_rows():
-    zs = [BERM_Z0 + (BERM_Z1 - BERM_Z0) * ((i / (BERM_NZ - 1.0)) ** 1.16)
-          for i in range(BERM_NZ)]
-    k = min(range(BERM_NZ), key=lambda i: abs(zs[i] - RAMP_LIP_KINK))
-    zs[k] = RAMP_LIP_KINK
-    return zs
-
-
-def _clod(verts, faces, cx, cz, r):
-    """A part-sunk lump: six-sided base ring under the soil, one apex over it.
-    Ten triangles, and it is the cheapest silhouette event this model has."""
-    base = berm_top(cx, cz) - r * CLOD_SINK
-    b = len(verts)
-    for i in range(6):
-        a = 2.0 * math.pi * (i / 6.0) + 0.4 * n1(cx * 3.0 + cz, SEED + 175)
-        rr = r * (0.82 + 0.30 * h01(i, int(abs(cx * 97 + cz * 31)) + 7))
-        verts.append(bl((cx + rr * math.cos(a), base, cz + rr * math.sin(a))))
-    # SQUAT, not pointed. The first cut put the apex a full radius over the
-    # base ring and six of them rendered as little tetrahedra scattered on the
-    # felt; a clod of earth is a dome that is wider than it is tall.
-    verts.append(bl((cx + 0.16 * r, base + r * (CLOD_SINK + 0.52),
-                     cz - 0.11 * r)))
-    apex = b + 6
-    for i in range(6):
-        faces.append((b + i, b + (i + 1) % 6, apex))
-    faces.append(tuple(range(b + 5, b - 1, -1)))
-    return faces
-
-
-def build_berm(name):
-    """One heightfield: a grid of mound over the footprint, a skirt down to the
-    cladding floor, a floor, and the clods. No swept profile anywhere."""
-    verts, faces = [], []
-    zs = berm_rows()
-    nx, nz = len(BERM_XS), len(zs)
-    for z in zs:
-        for x in BERM_XS:
-            verts.append(bl((x, berm_top(x, z), z)))
-    for r in range(nz - 1):
-        for c in range(nx - 1):
-            a, b = r * nx + c, (r + 1) * nx + c
-            faces.append((a, a + 1, b + 1, b))
-    # THE PERIMETER, walked once, so the skirt is a single closed band
-    ring = ([r * nx + (nx - 1) for r in range(nz)]
-            + [(nz - 1) * nx + c for c in range(nx - 2, -1, -1)]
-            + [r * nx for r in range(nz - 2, -1, -1)]
-            + [c for c in range(1, nx - 1)])
-    low = len(verts)
-    for idx in ring:
-        p = verts[idx]
-        verts.append((p[0], p[1], CLAD_FLOOR))       # blender frame: z is up
-    m = len(ring)
-    for i in range(m):
-        j = (i + 1) % m
-        faces.append((ring[i], ring[j], low + j, low + i))
-    # A FAN, not one 52-gon: the floor's outline is a rectangle with collinear
-    # vertices along each side, and an ear-clipped n-gon over collinear points
-    # can drop a zero-area triangle straight into check.py's degenerate gate.
-    cen = len(verts)
-    verts.append((sum(verts[low + i][0] for i in range(m)) / m,
-                  sum(verts[low + i][1] for i in range(m)) / m, CLAD_FLOOR))
-    for i in range(m):
-        faces.append((cen, low + (i + 1) % m, low + i))
-    for (cx, cz, r) in BERM_CLODS:
-        _clod(verts, faces, cx, cz, r)
-    ob = F.obj_from_pydata(name, verts, faces)
-    F.recalc_normals(ob)
-    return ob
 
 
 # --------------------------------------------------------------------------
@@ -2777,10 +2525,6 @@ CREEP_K = 0.86          # strength where the creep is solid
 # the tip. Driven by how PROUD of the base cylinder a point stands, so it lands
 # on roots, toes and fingers and never on the bare trunk between them.
 SOIL_K = 0.72
-# ...and the same moss on the berm, which is the other half of "no colour
-# seam": the bank's flanks and its forward spread wear the tone the ground
-# disc wears, so the two meet in a value the eye cannot find.
-BERM_MOSS = 0.70
 # THE DIAGONAL SCAR BAND (round 7, item 6). 0.52 rad is 30 degrees off
 # vertical; the half-width is in the same world units as the unrolled surface,
 # so a 1.35 band is about 2.7 units of wood measured across itself.
@@ -2985,90 +2729,20 @@ def make_paint(pal):
     return paint
 
 
-# ROUND 4 IS RETIRED WITH THE PLATE IT PAINTED, and the reason is worth
-# keeping because it is the strongest evidence in this file for rule 11.
+# ROUND 4'S TONGUE PAINT AND ROUND 6'S SOIL PAINT ARE BOTH RETIRED, and the
+# reason is the strongest evidence in this file for VENUE-COMPOSITION rule 11.
 #
-# Round 4 measured the tongue rendering at 1.35x the lit bark band and took it
-# to 0.80x with a scalar gain of 0.39 — measured on RENDERED pixels, ray-
-# classified by mesh, predicted to 0.0001. Every number in it was right and it
-# did not work: the app's next look pass still called the surface a gangplank,
-# and Joe's W2c verdict called it "not part of the immersion". A re-tinted
-# prop is still a prop. The quantity in question was never brightness; it was
-# that a rectangular plate lying on a mat is a plate at any value.
-#
-# Round 6's first bake proved the converse just as expensively: correct value
-# on the WRONG CONSTRUCTION is still a ramp. Only the mound fixes the mound.
-# What the paint owes now is different work — to be SOIL, dark, crevice-shaded
-# and moss-fringed, with one worn path over it where dice actually run.
-BERM_SLOPE_K = 0.85        # how hard a steep face darkens into its own crevice
-BERM_MOSS = 0.80           # ...and how far the ground's moss climbs the skirts
-
-
-def berm_slope(x, z):
-    """Local steepness of the mound, by finite difference on the field the
-    loft actually samples. Vertex colour has no normal to read — a normal is
-    constant across a face and neighbours disagree at shared corners (the B4
-    sawtooth) — so the shading term is derived from POSITION like every other
-    term in this recipe."""
-    d = 0.11
-    gx = (berm_top(x + d, z) - berm_top(x - d, z)) / (2.0 * d)
-    gz = (berm_top(x, z + d) - berm_top(x, z - d)) / (2.0 * d)
-    return math.hypot(gx, gz)
-
-
-def make_berm_paint(pal):
-    """SOIL. No fiber, no grain, no streaks — the tongue's paint ran bands
-    along x because it was pretending to be a flattened root, and banding is
-    half of why the plate read as planking. Earth is blotchy at two scales,
-    darker where it is steep, mossy where it meets the ground, and worn pale
-    only where the dice run."""
-    def paint(_poly, co):
-        x, y, z = co.x, co.z, -co.y
-        a = abs(x)
-        if y < -0.08:
-            return pal["earth_dark"]
-        # two scales of blotch. The frequencies are set by the MESH: the path
-        # carries columns at 0, +-0.78 and +-1.55, so anything finer than ~1.5
-        # units in x is aliased away and what survives is variation along z.
-        broad = n2(x * 0.42, z * 1.05, SEED + 61)
-        fine = n2(x * 0.95 + 7.0, z * 2.75, SEED + 63)
-        c = lerp3(pal["earth_dark"], pal["earth"], smoothstep(broad, 0.22, 0.80))
-
-        # CREVICE DARKENING. A mound has no cast shadow in a vertex-colour
-        # model, so its own steepness has to carry the form: the flanks of the
-        # lobes and the sides of every bead go down toward the deep tone.
-        c = lerp3(c, pal["earth_dark"],
-                  min(0.55, BERM_SLOPE_K * min(0.62, berm_slope(x, z))))
-
-        # THE WORN PATH, and its edge is deliberately not the carve's edge:
-        # a value line exactly on LANE_SHOULDER would draw the collider's own
-        # width onto the model, which is the machine showing through at the
-        # one place rule 12 says it must not.
-        path = (1.0 - smoothstep(a, LANE_CORE * 0.55, LANE_SHOULDER + 0.42))
-        path *= 1.0 - smoothstep(z, LANE_RELEASE[0], LANE_RELEASE[1] + 0.2)
-        c = lerp3(c, pal["earth_path"], 0.78 * path * (0.55 + 0.45 * broad))
-
-        # MOSS CREEPING UP FROM THE GROUND. Strongest where the mound is only
-        # just proud of the felt — the skirts and the toe — and gone by the
-        # time it has climbed a third of a unit, with a noise-broken edge.
-        low = 1.0 - smoothstep(y, 0.02, 0.46)
-        moss = low * (0.30 + 0.70 * smoothstep(fine, 0.24, 0.68)) * (1.0 - path)
-        c = lerp3(c, pal["creep"], BERM_MOSS * min(1.0, moss))
-
-        # clod and grit speckle: high-frequency, low-amplitude, all value
-        grit = n2(x * 5.3 + 2.0, z * 5.9, SEED + 65)
-        c = lerp3(c, pal["earth_dark"], 0.18 * (1.0 - smoothstep(grit, 0.30, 0.62)))
-
-        # the trunk's shadow: the mound is dampest and darkest where it comes
-        # out from under the tear
-        # THE TRUNK'S SHADOW, and it is the term that was doing most of the
-        # darkening: over 1.20 of z at a 0.28 floor it pulled two thirds of the
-        # mound's visible area toward the crevice tone, which is how a body
-        # albedo of 0.025 kept rendering at 0.62x the glade floor.
-        c = lerp3(pal["earth_dark"], c, smoothstep(z, -0.06, 0.85) * 0.62 + 0.38)
-        return c
-    return paint
-
+# Round 4 measured the delivery tongue rendering at 1.35x the lit bark band
+# and took it to 0.80x with a scalar gain of 0.39 — measured on RENDERED
+# pixels, ray-classified by mesh, predicted to 0.0001. Every number in it was
+# right and it did not work: the app's next look pass still called the surface
+# a gangplank and Joe's W2c verdict called it "not part of the immersion". A
+# re-tinted prop is still a prop. The quantity in question was never
+# brightness; it was that a rectangular plate lying on a mat is a plate at any
+# value. Round 6 replaced the plate with an earthen mound and painted it soil
+# — dark, crevice-shaded, moss-fringed, one worn path over it — and Joe
+# deleted the mound (790ed90). Both painters went with the meshes they
+# painted; neither number was ever the problem.
 
 def make_curtain_paint(pal):
     """The curtain is a HOLE, painted — round 2's interior discipline applied
@@ -3248,260 +2922,60 @@ def assert_shelves_bite():
         print(f"[bole]   dropped bracket {idn} at phi {ph:+.1f} deg y {y:.2f}: {why}")
 
 
-# THE DICE CORRIDOR — the half-width the mound must stay out of, and it is the
-# FLIGHT ENVELOPE rather than a number chosen for convenience. A d20 carries
-# 1.25 of radius, so rails any tighter than this squeeze the corridor to a slot
-# no die fits down; 1.995 is the same half-width assert_throat_clear fires its
-# outermost ray at, and the two agreeing is the point. The invisible rails
-# (js/main.js towerColliders) stand ON this line and forward of the sill: they
-# do not narrow the doorway, they stop a die that is already out from rolling
-# sideways into the banks. That is what frees the banks to be any shape at all
-# — they are no longer the thing keeping dice on the path, and since the sill
-# step closed the slot they are not hiding anything either.
-LANE_RAIL = 1.995
-LANE_CLEAR = 0.06          # how far under the collider plane the mound stays
-
-
-def lane_ceiling(z):
-    """What the mound may not exceed inside the lane: the collider plane less
-    its margin, but NEVER below the felt. Past z ~3.5 the lip plane has already
-    dropped through y = 0 on its way to vanishing, and without the floor this
-    gate reads flat ground as an obstruction — which it measured, at 0.0168 of
-    a mound that was 0.0 high. Out there the collider IS the felt, and the
-    honest claim is just that the lane stays flat."""
-    return max(lane_plane(z) - LANE_CLEAR, 0.0)
-
-
-def assert_lane_is_clear(berm):
-    """THE PHYSICS GATE, restated for a mound that is no longer the floor.
-
-    It used to demand that inside the lane the berm's top BE the engine's
-    ramp/lip plane exactly — because a die rides the collider, so daylight
-    between collider and skin is a die floating and the other way is a die
-    sunk in scenery. That was true while this mesh was cladding the ramp.
-
-    It is not cladding it any more (see berm_top). The die still rides the
-    collider; the mound simply has to stay UNDER it, everywhere a die can be,
-    by LANE_CLEAR. Then there is no daylight to see — the die is on the
-    invisible ramp with felt visible past it — and no intersection either.
-
-    One-sided, and that asymmetry is the whole point: too low is a mound that
-    reads as ground, too high is a die buried in earth.
-
-    Vertices AND triangle interiors, because a schedule whose vertices all
-    clear a convex plane can still chord above it in between.
-    """
-    worst, where = -1e9, None
-    for v in berm.data.vertices:
-        x, y, z = app_of(v.co)
-        if abs(x) <= LANE_RAIL and z < LANE_RELEASE[1]:
-            d = y - lane_ceiling(z)
-            if d > worst:
-                worst, where = d, (round(x, 3), round(y, 3), round(z, 3))
-    if worst > 0.0:
-        raise RuntimeError(
-            f"the mound stands {worst:.4f} INTO the dice lane at app {where} "
-            f"— a die would be seen sinking into it. Move a lobe out of the "
-            f"path; do not carve the path back out of the lobe.")
-    # …and the interiors: the mound is sampled between rings, the plane is
-    # convex downward at the ramp/lip kink, so the chord can rise where the
-    # vertices do not.
-    zs, chord, cw = berm_rows(), -1e9, None
-    for z0, z1 in zip(zs, zs[1:]):
-        for t in (0.25, 0.5, 0.75):
-            z = lerp(z0, z1, t)
-            if z >= LANE_RELEASE[1]:
-                continue
-            for x in (0.0, 0.8, 1.4, LANE_RAIL):
-                y = lerp(berm_top(x, z0), berm_top(x, z1), t)
-                d = y - lane_ceiling(z)
-                if d > chord:
-                    chord, cw = d, (round(x, 2), round(z, 3))
-    if chord > 0.0:
-        raise RuntimeError(
-            f"the mound CHORDS {chord:.4f} into the lane at {cw} between "
-            f"rings, though every vertex clears it")
-    print(f"[bole] lane is clear: mound stays {-worst:.3f} under the collider "
-          f"plane at its nearest ({len(zs)} rings, worst chord gap "
-          f"{-chord:.3f}, margin {LANE_CLEAR})")
-
-
 # JOE'S SENTENCE, MECHANIZED. W2c, verbatim: "It's also weird that the exit
 # hole extends below the ramp's highest point." The ramp's highest point is
-# lane_plane(BERM_Z0) = 1.0456, and beside the old tongue the mouth's ragged
+# lane_plane(LANE_Z0) = 1.0456, and beside the old tongue the mouth's ragged
 # threshold stood at 0.86-1.02 with the cavity open above it — a black slot
-# 0.9 wide on each flank in the round-5 frames, which is what the shipped
+# 0.9 wide on each flank in the round-5 frames, which is what the round-5
 # renders show.
 #
-# The first cut of this gate compared the bank's crest at the trunk's front
-# face against a fixed 1.02 and reported the lane EDGE as a failure, which is
-# nonsense: the ramp's own surface climbs from 0.907 at that face to 1.046 at
-# its back edge and covers the threshold there by itself. Occlusion is a
-# question about SIGHT LINES, so it is asked as one — rays from the eyes that
-# actually judge this model, stopped by berm or by wood, and a ray that
-# reaches the cavity while it is still under the crest is the finding.
+# THE GATE MARCHED A GHOST FOR A COMMIT, and that is the reason it is now
+# written the way it is. Its ray march short-circuited on berm_top() — "the
+# bank stopped this ray" — and the bank had been DELETED (790ed90). Every
+# sight line the mound would have covered was still being stopped by a mound
+# that no longer existed in any mesh, and HOLE_MAX_OUT sat at 16, excusing
+# "the holes the shipped mound measures". Two numbers, both about an object
+# nobody could see, on the gate that carries Joe's complaint.
+#
+# So it does not march a FIELD any more. It fires at the built triangles and
+# asks the mesh, and the verdict is not "did the ray survive" but "did it get
+# IN" — answered by winding, because a first hit that faces away from the ray
+# is an interior surface a sight line can only have reached through a hole
+# (towergates.first_hit_faces_away). The bar is the contract's, not a tuned
+# number: ZERO. The earlier answer to "did it get in" asked whether the ray
+# reached the BORE, and the bore has radius 2.0 while the flank slot lives at
+# |x| 2.6-3.05 — so it answered "green" with the wings deleted, twice, in a
+# red check.
+#
+# The eyes are this model's own and they are LOW. check.py runs the same gate
+# from the six shipped camera eyes, which look steeply down and strike the
+# trunk's front face before they can reach anything; a slot beside the ramp is
+# a grazing-angle defect, so grazing angles are what look for it.
 CREST_EYES = (
-    (0.00, 1.60, 12.0),          # the table's resting eye: low and central
-    (+2.45, 2.25, 10.5),         # ...and off to each side, because the model
-    (-2.45, 2.25, 10.5),         # is not mirror-symmetric and neither is the bank
+    ("resting", (0.00, 1.60, 12.0)),   # low and central: the table's own eye
+    ("left", (+2.45, 2.25, 10.5)),     # ...and off to each side, because the
+    ("right", (-2.45, 2.25, 10.5)),    # model is not mirror-symmetric
 )
-# TWO BANDS, TWO NUMBERS, because they are two different trades.
-# Inside |x| 2.85 the mouth's opening under the crest is 0.2-0.7 tall and the
-# mound must cover all of it: HOLE_MAX_IN is 0 and that is a contract.
-# Outside it the opening tapers to 0.10-0.16 and the mound has only 0.27 of x
-# left before XLIM 3.13 — enough for a feathered toe OR for full cover, not
-# both. MEASURED, because the obvious lever turned out not to be the binding
-# one: sweeping the feather from 0.30 down to 0.01 and pushing its z window
-# out to 2.0 leaves the count at 16 every time, so what is short there is the
-# LOBE's own falloff against the mat wall, not the edge treatment. Sixteen
-# rays out of 1152, all at |x| past 2.9 and all onto an opening 0.10-0.16
-# tall, sitting directly over a buttress toe that reaches x 3.13 at y 0.62-
-# 0.85. Kept as its own count so a future round can see which of the two
-# trades it has spent.
-HOLE_BAND = 2.85
-HOLE_MAX_IN = 0
-HOLE_MAX_OUT = 16       # the shipped mound measures exactly this
-# The march schedule, built ONCE and with BERM_Z0 in it explicitly. The first
-# version stepped a fixed 0.055 and slipped every central ray through the gap
-# between its last sample (z -0.010) and the bank's back cap (z -0.060), so
-# the gate reported the doorway as a hole and was numb to the flanks it was
-# written for. A surface with a vertical face has to be sampled ON that face.
-CREST_MARCH = sorted(
-    set([BERM_Z1 - 0.055 * k for k in range(int((BERM_Z1 + 1.6) / 0.055) + 1)]
-        + [BERM_Z0, BERM_Z0 - 1e-4]), reverse=True)
 
 
-def assert_no_hole_below_the_crest():
-    crest = lane_plane(BERM_Z0)
-    bad, tested = [], 0
-    # THE FLANKS ONLY, and that scoping is the third thing this gate had to
-    # learn. Inside the dice lane the ramp is the FLOOR of the doorway and the
-    # air above it is the door: a ray that enters the mouth there, over the
-    # ramp's own descending surface, is dice-eye view and not a defect — an
-    # earlier cut of this counted 51 of them and called the doorway a hole.
-    # Joe's sentence is about the wood BESIDE the ramp, where the threshold
-    # stood open under the crest with nothing under it at all.
-    txs = ([-3.12 + 0.98 * i / 15.0 for i in range(16)]          # left flank
-           + [LANE_SHOULDER + 0.02 + 0.98 * i / 15.0 for i in range(16)])
-    for ex, ey, ez in CREST_EYES:
-        for tx in txs:
-            for j in range(12):
-                # STRICTLY under the crest. At the crest itself the doorway is
-                # supposed to be open — that height is where the hole legally
-                # begins — and sampling it made every central ray a "finding".
-                ty = 0.04 + (crest - 0.02 - 0.04) * j / 11.0
-                tested += 1
-                # A ray that simply passes BESIDE the tower is not a finding,
-                # so the verdict is not "did it survive" but "did it get IN".
-                # Crossing the trunk's outer surface does one of two things:
-                # it lands on wood (blocked) or it enters the wound's removed
-                # volume (a hole). The first cut of this asked instead whether
-                # the ray reached the BORE, and the bore has radius 2.0 while
-                # the flank slot lives at |x| 2.6-3.05 — so it answered
-                # "green" with the wings deleted, twice, in a red check. What
-                # you see through that slot is the opening in the WALL.
-                verdict = "past"
-                for z in CREST_MARCH:
-                    f = (ez - z) / ez           # 1 at the target plane z = 0
-                    x = ex + (tx - ex) * f
-                    y = ey + (ty - ey) * f
-                    if y < 0.0:
-                        break                   # under the felt: no sightline
-                    if (BERM_Z0 <= z <= BERM_Z1 and abs(x) <= BERM_XS[-1]
-                            and y <= berm_top(x, z)):
-                        break                                   # bank
-                    dz = z - AXIS_Z
-                    ph = math.atan2(x, dz)
-                    rr = math.hypot(x, dz)
-                    if z <= z_front(y) and abs(x) <= XLIM and rr <= r_out(ph, y):
-                        if in_wound(ph, y) >= 1.0:
-                            break                               # wood
-                        # ...and judge by where it got IN, not by where it was
-                        # aimed: an off-axis eye's ray converges, so a ray sent
-                        # at the flank can enter over the ramp at the lane edge,
-                        # which is the doorway again.
-                        if abs(x) > LANE_CORE:
-                            verdict = "cavity"                  # into the mouth
-                        break
-                if verdict == "cavity":
-                    bad.append((ex, tx, ty))
-    inner = [b for b in bad if abs(b[1]) <= HOLE_BAND]
-    outer = [b for b in bad if abs(b[1]) > HOLE_BAND]
-    if len(inner) > HOLE_MAX_IN or len(outer) > HOLE_MAX_OUT:
-        w = max(bad, key=lambda b: b[2])
-        raise RuntimeError(
-            f"{len(inner)} inner + {len(outer)} outer of {tested} sight lines "
-            f"reach the cavity BELOW the ramp's "
-            f"highest point ({crest:.3f}) — worst at x {w[1]:+.2f} y {w[2]:.2f} "
-            f"from eye x {w[0]:+.2f}. That is W2c's 'the exit hole extends below "
-            f"the ramp's highest point'; the bank's wings are not carrying it "
-            f"(the wing lobes in BERM_LOBES are not carrying it)")
-    print(f"[bole] no hole under the crest: {tested} sight lines from 3 eyes, "
-          f"{len(inner)} open inside |x| {HOLE_BAND} (max {HOLE_MAX_IN}), "
-          f"{len(outer)} at the outer corner (max {HOLE_MAX_OUT}), "
-          f"crest y {crest:.3f}")
+def assert_no_hole_below_the_crest(objs):
+    """No sight line reaches the hollow under the ramp's highest point.
 
-
-# How far the bank's back cap may stand PROUD of the trunk's outer surface in
-# the flank band, and how much of it has to be buried outright. Measured on
-# the shipped bank: the RIGHT flank is buried 0.01-0.57 everywhere, the LEFT
-# is buried above y 0.5 and stands 0.20-0.35 clear below it, where the
-# buttress valley between the -1.00 root and its neighbour takes the trunk's
-# surface back. That face points -z and every shipped eye is at +z, so it is
-# not a sightline — but it IS the number that would move first if BERM_Z0 ever
-# crept forward of the trunk's front clamp, which is why it is a gate rather
-# than a note. Both halves are needed: the fraction catches a bank that has
-# slid forward everywhere, the maximum catches one corner coming out.
-BERM_POKE_MAX = 0.55   # shipped mound measures 0.498, at |x| 3.08
-BERM_BURIED_MIN = 0.50   # shipped mound measures 0.543
-
-
-def assert_berm_pressed_home():
-    """No dark slit behind the crest — the R4b burial, restated for the bank.
-
-    The old gate measured a CREVICE between the tongue's edge and a trunk wall
-    that stood a unit further back. The berm has no such edge: its back ring is
-    at z -0.06 and the trunk's front wall beside the doorway is clamped to
-    z 0.22, so the bank ends up to 0.28 INSIDE the wood it meets. That is the
-    claim, and a claim about interpenetration is worth exactly what a
-    measurement of it is worth — so the whole back cap is sampled across the
-    flank band, under the wound's threshold, where a slit could be seen.
+    Outside the declared door (|x| > w/2 = 2.10) there is no aperture at all
+    below the crest: what a slot there shows is unlit interior with nothing
+    under it, which is exactly the thing Joe called weird.
     """
-    z0, dz = BERM_Z0, BERM_Z0 - AXIS_Z
-    cap = BERM_XS[-1]              # the grid's own outer column
-    poke, where, buried, n = -9.9, None, 0, 0
-    for i in range(29):
-        x = LANE_SHOULDER + (cap - LANE_SHOULDER) * i / 28.0
-        for sgn in (-1.0, 1.0):
-            top = berm_top(sgn * x, z0)
-            for j in range(11):
-                y = 0.10 + 0.70 * j / 10.0
-                if y > top:
-                    continue           # no cap here: the mound has feathered out
-                ph = math.atan2(sgn * x, dz)
-                if in_wound(ph, y) < 1.0:
-                    continue                     # that is the mouth, not a slit
-                n += 1
-                out = math.hypot(x, dz) - r_out(ph, y)
-                if out <= 0.0:
-                    buried += 1
-                elif out > poke:
-                    poke, where = out, (sgn * x, y)
-    if buried < BERM_BURIED_MIN * n:
-        raise RuntimeError(
-            f"only {buried}/{n} of the bank's back cap is inside the trunk "
-            f"(want {BERM_BURIED_MIN:.0%}) — the bank is standing in front of "
-            f"the wood it is supposed to be driven into (BERM_Z0 {BERM_Z0})")
-    if poke > BERM_POKE_MAX:
-        raise RuntimeError(
-            f"the bank's back cap stands {poke:.3f} proud of the trunk at app "
-            f"x {where[0]:+.2f} y {where[1]:.2f} — over {BERM_POKE_MAX}, so the "
-            f"bank is parked against the wood rather than driven into it "
-            f"(BERM_Z0 {BERM_Z0}, the trunk's front clamp is {ZFRONT})")
-    print(f"[bole] berm pressed home: {buried}/{n} back-cap samples inside the "
-          f"trunk, worst stand-off {max(0.0, poke):.3f} (max {BERM_POKE_MAX}), "
-          f"cap half-width {cap:.2f}")
-
+    crest = lane_plane(LANE_Z0)
+    fails, tested, holes = TG.hole_below_sill_failures(
+        tri_array(objs), SPEC, math.degrees(math.asin(TILT_SIN)),
+        eyes=CREST_EYES, y_top=crest, label="the ramp's highest point")
+    if fails:
+        raise RuntimeError(fails[0] + " — the WOOD has to close it (the sill "
+                           "floor W_SILL_FLOOR and the corner fillet are what "
+                           "close it today; there is no mound any more)")
+    print(f"[bole] no hole under the crest: {tested} sight lines from "
+          f"{len(CREST_EYES)} low eyes, {holes} reach the hollow (max 0), "
+          f"crest y {crest:.3f}")
 
 def assert_envelope(objs):
     lo, hi = F.world_bounds(objs)
@@ -4272,6 +3746,58 @@ def bole_material(name, attr, rough, emissive=None, spec=None):
     return mat
 
 
+# --------------------------------------------------------------------------
+# THE GATE MANIFEST — every assert_ in this file has to have RUN
+# --------------------------------------------------------------------------
+# This exists because two of them had not, for a commit each.
+# assert_lane_is_clear and assert_berm_pressed_home were left behind when the
+# mound was deleted: full docstrings, real measurements, called by nothing. A
+# gate that is not called is worse than no gate, because the file then reads
+# as though the claim in its docstring is being checked. Nothing here can tell
+# whether an assertion is CORRECT — but "was it invoked at all" is decidable,
+# so it is decided.
+#
+# The set is discovered by NAME from the module, so adding a gate and
+# forgetting to call it fails the very bake that adds it. The wrapping happens
+# here, after every gate is defined and before build() names any of them, so
+# the recording costs each gate exactly nothing to opt into.
+_GATES_RUN = set()
+
+
+def _instrument_gates():
+    import functools
+    for name, fn in list(globals().items()):
+        if (not name.startswith("assert_") or not callable(fn)
+                or name == "assert_every_gate_ran"):
+            continue
+
+        def wrap(name=name, fn=fn):
+            @functools.wraps(fn)
+            def run(*a, **k):
+                _GATES_RUN.add(name)
+                return fn(*a, **k)
+            return run
+        globals()[name] = wrap()
+
+
+def assert_every_gate_ran():
+    defined = {n for n in globals()
+               if n.startswith("assert_") and callable(globals()[n])
+               and n != "assert_every_gate_ran"}
+    missing = sorted(defined - _GATES_RUN)
+    if missing:
+        raise RuntimeError(
+            "%d gate(s) defined in this file were never invoked: %s. Either "
+            "call them from build()/main() or delete them — an uncalled gate "
+            "is how a ray march kept short-circuiting on a mound that had "
+            "been deleted, with a green line printed under it."
+            % (len(missing), ", ".join(missing)))
+    print(f"[bole] gate manifest: {len(defined)} assert_* defined, all invoked")
+
+
+_instrument_gates()
+
+
 def build(variant):
     pal = PALETTES[variant]
     F.reset()
@@ -4327,8 +3853,8 @@ def build(variant):
         # rather than run silently over everything.
         # 3e-4, not the kit default 2e-5: the first weld took the pairs from
         # 10 to 2 and the survivors sat 5.8e-05 apart. 3e-4 is still 230x
-        # under this model's smallest intended feature (the berm's 0.04
-        # toe noise) and 700x under the 0.07 visible-feature floor, so it can
+        # under this model's smallest intended feature (the wound rag's
+        # 0.05 tooth) and 700x under the 0.07 visible-feature floor, so it can
         # only ever weld solver debris.
         if diagnose_pinches(ob):
             F.clean_slivers(ob, dist=3e-4)
@@ -4337,11 +3863,11 @@ def build(variant):
         poke_shared_diagonals(ob)
         F.canonicalize(ob)
         F.triangulate(ob)
-        # 46 for the berm, 30 for everything else, and it is a recorded
-        # deviation rather than a taste call: a heightfield's cells meet at
-        # 30-45 degrees wherever a lobe's flank is steep, so at the house angle
-        # the mound came back as a fan of flat planes. The trunk keeps 30 —
-        # its facets are the tear and the crown, and those must stay crisp.
+        # 30 degrees, and it is the trunk's number: its facets are the tear
+        # and the crown and those must stay crisp. (The retired mound wanted
+        # 46 — a heightfield's cells meet at 30-45 wherever a lobe's flank is
+        # steep, so at the house angle it came back as a fan of flat planes.
+        # Recorded because the next heightfield in this file will want it.)
         F.smooth_by_angle(ob, 30.0)
         nm, _ = F.manifold_report(ob)
         if nm:
@@ -4372,11 +3898,12 @@ def build(variant):
     assert_throat_clear(meshes)
     assert_approach_clear(meshes)
     assert_shelves_bite()
-    assert_no_hole_below_the_crest()  # now carried by the WOOD, not a bank
+    assert_no_hole_below_the_crest(meshes)  # carried by the WOOD, not a bank
     assert_envelope(meshes)
     assert_curtain(curtain)
     assert_mesh_envelopes(shell, curtain, shelves)
     assert_cowl_occluded(meshes)
+    assert_every_gate_ran()
 
     pin, pout = F.tower_portals(PORTAL_IN, PORTAL_OUT)
     F.assert_budget(meshes, BUDGET)
@@ -4393,7 +3920,7 @@ def main():
     assert_rim_is_low()
     DOOR_PHI, DOOR_Y = pick_door()
     report_form()
-    report_sill()
+    assert_sill_is_in_the_window()
     for variant in ("moonrise", "foxfire"):
         print(f"[bole] --- {variant} ---")
         build(variant)
