@@ -537,6 +537,24 @@ def _empty(name, app_pos, props, display_size):
     return ob
 
 
+def model_marker(name, app_pos, props, display_size=0.25):
+    """A scene-root empty carrying one PLACE the model wants to name.
+
+    The portals are the contract; this is for everything else a model knows
+    about itself that code outside would otherwise have to guess, measure or
+    hard-code — where a light goes, where a door may be cut, which way a face
+    points. Same discipline as tower_portals: the node NAME says what it is,
+    the node TRANSLATION says where (visible in Blender and any glTF viewer),
+    node EXTRAS carry the scalars, and nothing is written twice.
+
+    The alternative is what the app does today for hollowbole's ember door:
+    two constants in js/towerglbshell.js plus a runtime raycast to find the
+    surface they land on, in a file that cannot see the recipe. A marker is
+    the recipe answering the question once, at bake time, from the mesh.
+    """
+    return _empty(name, app_pos, props, display_size)
+
+
 def tower_portals(in_spec, out_spec):
     """Create the `portalIn` / `portalOut` empties. Returns (in_ob, out_ob).
 

@@ -3747,6 +3747,80 @@ def bole_material(name, attr, rough, emissive=None, spec=None):
 
 
 # --------------------------------------------------------------------------
+# THE DOOR PAD — the ember's landing, measured here instead of at runtime
+# --------------------------------------------------------------------------
+# WHERE THE EMBER DOOR GOES IS A FACT ABOUT THIS MESH, and today three files
+# hold pieces of it and none of them holds the fact. The registry row carries
+# `ember.at` [-2.79, 1.22, z0 + 0.55] (Joe-dialled, and NOT being moved);
+# js/towerglbshell.js carries DOOR_X -2.79 / DOOR_Y 1.20 and then RAYCASTS the
+# loaded model at bake-time-unknowable runtime to find the buttress face those
+# two land on, with a fallback constant for when the answer is unusable.
+#
+# The recipe is where that raycast belongs: it has the triangles, it has them
+# before anything ships, and its answer cannot be a frame late or a model
+# behind. So the bake exports a third scene-root empty, `doorPad`, at the
+# surface point, with the OUTWARD NORMAL in its extras — which the runtime
+# version never had at all, and which is what a door frame needs to sit flush
+# on a curved buttress rather than square to the world.
+#
+# THIS EMPTY IS NOW THE SINGLE SOURCE. Round 3 (the descriptor purge) deletes
+# DOOR_X / DOOR_Y / DOOR_Z_FALLBACK and the runtime cast from
+# js/towerglbshell.js and reads the node instead. The numbers are transcribed
+# ONCE, here, at the location the shipped tower already uses — Joe's ruling of
+# 2026-08-13: today's spot is canon, the pad does not move.
+#
+# (The recipe ALSO cuts a small recess at DOOR_PHI / DOOR_Y — pick_door's
+# knothole on the left buttress FLANK, phi about -93 deg, y 0.70. That is a
+# different place from this pad and always was: a modelled knothole with its
+# own paint, not the app's lit door. The two are reconciled in round 3.)
+DOOR_PAD_X = -2.79          # js/towerglbshell.js DOOR_X, transcribed once
+DOOR_PAD_Y = 1.20           # ...and DOOR_Y. The light itself rides 0.02 higher
+#                             and 0.33 in front (registry `ember.at`).
+DOOR_PAD_Z_FALLBACK = 0.22  # DOOR_Z_FALLBACK, app-frame: the socket's own
+#                             front plane, used when the cast finds nothing
+#                             usable. It is also ZFRONT, and that is not a
+#                             coincidence — it is the value the shipped tower
+#                             ran on before the model was asked.
+DOOR_PAD_Z_LIMIT = 0.25 - 0.05   # the app's `zFrontLim - 0.05`: a buttress
+#                                  bulging past this leaves the 0.028-proud
+#                                  door frame outside the socket
+
+
+def door_pad(objs):
+    """(position, outward normal) for the ember pad, off the BUILT surface.
+
+    The app's cast, run here: straight back along -z at the pad's own x and y,
+    take the buttress's front face. The normal comes from the triangle that
+    was hit, flipped to point at the eye — a door frame laid on this pad has
+    to lie in the surface, and no constant in any file knows which way this
+    root is facing.
+    """
+    import numpy as np
+    tris = tri_array(objs)
+    origin = np.array([DOOR_PAD_X, DOOR_PAD_Y, 4.0])
+    d = np.array([0.0, 0.0, -1.0])
+    r = TG.ray_probe(tris, origin, d, 40.0)
+    if r is None:
+        print("[bole] door pad: no surface under the cast — falling back to "
+              f"z {DOOR_PAD_Z_FALLBACK}")
+        return (DOOR_PAD_X, DOOR_PAD_Y, DOOR_PAD_Z_FALLBACK), (0.0, 0.0, 1.0)
+    t, idx = r
+    z = 4.0 - t
+    if z > DOOR_PAD_Z_LIMIT:
+        print(f"[bole] door pad: surface at z {z:.3f} is past the socket's "
+              f"front limit {DOOR_PAD_Z_LIMIT:.2f} — falling back")
+        return (DOOR_PAD_X, DOOR_PAD_Y, DOOR_PAD_Z_FALLBACK), (0.0, 0.0, 1.0)
+    a, b, c = tris[idx]
+    n = np.cross(b - a, c - a)
+    n = n / float(np.linalg.norm(n))
+    if float(n @ d) > 0.0:
+        n = -n                      # face the eye, not the wood
+    print(f"[bole] door pad at app ({DOOR_PAD_X:+.2f}, {DOOR_PAD_Y:.2f}, "
+          f"{z:+.3f}) normal ({n[0]:+.3f}, {n[1]:+.3f}, {n[2]:+.3f})")
+    return (DOOR_PAD_X, DOOR_PAD_Y, z), (float(n[0]), float(n[1]), float(n[2]))
+
+
+# --------------------------------------------------------------------------
 # THE GATE MANIFEST — every assert_ in this file has to have RUN
 # --------------------------------------------------------------------------
 # This exists because two of them had not, for a commit each.
@@ -3906,12 +3980,15 @@ def build(variant):
     assert_every_gate_ran()
 
     pin, pout = F.tower_portals(PORTAL_IN, PORTAL_OUT)
+    pad_at, pad_n = door_pad(meshes)
+    pad = F.model_marker("doorPad", pad_at,
+                         {"nx": pad_n[0], "ny": pad_n[1], "nz": pad_n[2]})
     F.assert_budget(meshes, BUDGET)
     F.report_bounds(meshes, f"hollowbole_{variant}")
     # NO sit_on_ground: this model's frame IS the contract. y = 0 is the
     # felt and z = 0 is the socket plane; grounding would move the portals
     # off the very planes they are quoted against.
-    return F.export_glb(f"hollowbole_{variant}", meshes + [pin, pout],
+    return F.export_glb(f"hollowbole_{variant}", meshes + [pin, pout, pad],
                         vertex_colors=True)
 
 
