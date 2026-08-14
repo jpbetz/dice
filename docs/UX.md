@@ -4653,6 +4653,20 @@ so room state cannot pass through it even by mistake. A browser that leaves
 the beta stops socketing a tower whose picker it can no longer reach; nothing
 is erased, and redeeming the link again restores the lot.
 
+**Beta is offered everything, always (2026-08-14).** Goal 13's full-set
+replacement — a fantasy venue takes the felt/dice rows it stages, with the
+`venue-staged` note saying what took them — is PRODUCTION chrome only (the
+goal carries the scoping note). On beta no row is ever taken, venue up or
+down, and the note stays hidden because it explains an absence and nothing is
+absent; that is also what keeps Staging inside §7.37's measurement in its new
+fullest configuration (every row and a raised venue — measured in
+`stability-gate`, 0px over). As first shipped the replacement ran on every
+channel and `panelRowShown`'s fantasy check answered for ALL rows — including
+`venue-picker` itself, despite `updateVenueChrome`'s comment declaring the
+venue never hides its own picker — so a beta tester in Moonrise Glade got an
+EMPTY Staging destination: beta tag up, channel intact, no way back out short
+of the console, reported (reasonably) as "my beta opt-in got cleared."
+
 **Felt stays in Staging, and that was a measurement.** Felt is room-wide, so
 blast radius alone (§7.37) argues it belongs in Table once no venue is on
 offer to own it. Moved there it stood **483px against a 459px panel** — 24px

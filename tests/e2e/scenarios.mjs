@@ -10686,6 +10686,34 @@ export const scenarios = [
       await beta.dbg("setVenue('moonrise')");
       await prod.waitFor(`window.__diceDebug.venueInfo().id === 'moonrise'`,
         { desc: 'the production client follows the room into the glade' });
+      // BETA IS OFFERED EVERYTHING, ALWAYS (Joe, 2026-08-14: "the whole idea
+      // was to make it so beta gives access to everything"). The venue's
+      // row-taking is PRODUCTION chrome: on stable, a fantasy venue removes
+      // the rows it stages and the note says what took them; on beta,
+      // nothing is ever taken — venue up or down, every picker stands, and
+      // the note stays down because nothing is absent to explain. What
+      // shipped instead hid every staged row on every channel, and — by
+      // straight bug — the venue's own picker with them, so a beta tester
+      // stood in an EMPTY Staging destination: beta chrome up, channel
+      // intact, nothing left to choose with, and no way out of the glade
+      // short of the console. It read exactly like the beta being revoked,
+      // which is how it was reported.
+      await beta.dbg('openSettings("staging")');
+      for (const id of ['venue-picker', 'tower-picker', 'felt-swatches']) {
+        assert.notEqual(await beta.eval(`document.getElementById('${id}').offsetParent`), null,
+          `${id} is still offered while the glade is up — beta gives access to everything`);
+      }
+      assert.equal(await beta.eval(
+        `getComputedStyle(document.getElementById('venue-staged')).display`), 'none',
+      'and the staged note stays down on beta — it explains an absence, and nothing is absent');
+      // §7.36's measurement on the fullest Staging there is: every row AND a
+      // raised venue. The panel is at its cap and this is the configuration
+      // nobody measured.
+      const gladeOver = await beta.eval(`(() => {
+        const p = document.getElementById('settings-panel');
+        return Math.max(0, p.scrollHeight - p.clientHeight);
+      })()`);
+      assert.equal(gladeOver, 0, `Staging does not scroll with the glade up on beta (${gladeOver}px over)`);
       await prod.dbg('openSettings("staging")');
       // SHOWN *AND* SAYING SOMETHING. `display` alone passes an empty note —
       // the element's visibility and its text are set by two different lines,
@@ -10701,9 +10729,15 @@ export const scenarios = [
         + 'control that vanishes stops being a defect');
       assert.match(note.text, /Moonrise Glade/,
         `…and it names the venue that took them (${JSON.stringify(note.text)})`);
-      await beta.dbg("setVenue('table')");
+      // Back out THROUGH THE PICKER, not the debug hook: the row surviving
+      // its own venue is only worth asserting if the way back out actually
+      // walks. (This click was impossible on the shipped build — the door
+      // it uses did not exist.)
+      await beta.eval(
+        `document.querySelector('#venue-picker [data-venue="table"]').click(); true`);
       await prod.waitFor(`window.__diceDebug.venueInfo().id === 'table'`,
         { desc: 'and back out again' });
+      await beta.dbg('closeSettingsModal()');
       for (const id of ['venue-picker', 'tower-picker']) {
         assert.equal(await prod.eval(`document.getElementById('${id}').offsetParent`), null,
           `${id} is STILL gone after a venue came and went — the channel's hide must `
@@ -13717,11 +13751,18 @@ export const scenarios = [
         + ` return c && c.colors && c.mean.join(',') === ${JSON.stringify(woodMoon.mean.join(','))}; })()`,
         { desc: 'and back — the moonrise wood returns' });
 
-      // ---- goal 13: the venue REPLACES the pickers ------------------------
+      // ---- goal 13's replacement is PRODUCTION chrome (2026-08-14) --------
+      // This tab is a harness tab and every harness tab is BETA — and beta
+      // is offered everything, venue up or down (goal 13's scoping note:
+      // "the whole idea was to make it so beta gives access to everything").
+      // The original form of this leg asserted the rows GONE on this same
+      // tab, which was the superseded law; the production half of the
+      // replacement lives in stability-gate, on a tab that is actually
+      // production.
       for (const id of ['felt-swatches', 'tower-picker', 'diceset-row']) {
-        assert.equal(await a.eval(
+        assert.notEqual(await a.eval(
           `(window.__diceDebug.openSettings(), getComputedStyle(document.getElementById('${id}')).display)`),
-        'none', `${id} is gone from settings while the venue is fantasy`);
+        'none', `${id} is still offered to a beta browser while the venue is fantasy`);
       }
 
       // ---- the table still rolls in the glade -----------------------------
@@ -13736,7 +13777,7 @@ export const scenarios = [
       await b.waitFor(`!window.__diceDebug.venueInfo().staged`, { desc: 'and on B' });
       assert.equal(await a.eval(
         `getComputedStyle(document.getElementById('felt-swatches')).display`) !== 'none', true,
-      'the felt picker returns with the room');
+      'the felt picker is still standing once the room returns');
     },
   },
 

@@ -110,7 +110,15 @@ note).
     than layering over them — coherence is where immersion lives, and a
     venue must never be assembled into incoherence one dropdown at a time.
     The shipped room (felt, wooden towers, the lamp) is itself a venue: the
-    grounded one, and the default.
+    grounded one, and the default. *(Scoped 2026-08-14: the full-set
+    replacement is the PRODUCTION player's experience. The closed-beta
+    channel is offered every picker even while a venue stands — "the whole
+    idea was to make it so beta gives access to everything" (Joe) — because
+    the beta exists to judge pieces inside wholes, and a beta browser mixing
+    deliberately is composition work, not incoherence. As first shipped the
+    replacement ran on every channel and, by bug, took the venue's own
+    picker with it: an empty Staging panel with no way out of the glade,
+    reading exactly like revoked beta access. UX §7.38.)*
 14. **Two registers of belief.** A **grounded** venue is believed the way a
     fine miniature is believed — small object, real material, real light
     (the LEGO case; docs/IMMERSION-AUDIT.md §9). A **fantasy** venue is a

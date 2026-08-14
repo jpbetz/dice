@@ -7994,8 +7994,20 @@ const BETA_ROWS = ['venue-row', 'venue-picker', 'tower-row', 'tower-picker'];
 // dead the next time the other owner runs — a fantasy venue going down would
 // have handed a production player the tower picker. A shared predicate is
 // why that cannot happen.
+//
+// BETA IS OFFERED EVERYTHING, ALWAYS (Joe, 2026-08-14: "the whole idea was
+// to make it so beta gives access to everything"). The venue's row-taking is
+// PRODUCTION chrome only. As first shipped, the fantasy register hid every
+// row it staged on every channel — and, by straight bug, its own picker with
+// them — so a beta tester stood in an empty Staging destination with no way
+// out of the glade short of the console, and read it as the beta being
+// revoked. On beta the pickers stay so towers and felts can be judged INSIDE
+// a venue, which is the loop the closed beta exists for; a choice the glade
+// is currently staging over (felt, dice art) simply shows its effect when
+// the venue comes down.
 function panelRowShown(rowId) {
   if (!IS_BETA && BETA_ROWS.includes(rowId)) return false;
+  if (IS_BETA) return true;
   const venue = VENUES[currentVenue] || VENUES.table;
   return venue.register !== 'fantasy';
 }
@@ -8020,13 +8032,20 @@ function updateVenueChrome() {
   // as a bug to anybody who does not already know the rule. Two lines because
   // the controls now live in two destinations: felt and tower under Staging,
   // dice set under You.
-  const said = fantasy ? `${venue.label} stages this — felt, tower and dice are its own.` : '';
+  //
+  // PRODUCTION ONLY, both lines: the note explains an ABSENCE, and on beta
+  // nothing is absent (panelRowShown — beta is offered everything). On beta
+  // it would also be a line the panel cannot afford: Staging with every row
+  // AND a note is the §7.36 measurement's worst case, and the note is the
+  // part with no job.
+  const noted = fantasy && !IS_BETA;
+  const said = noted ? `${venue.label} stages this — felt, tower and dice are its own.` : '';
   for (const id of ['venue-staged', 'venue-staged-you']) {
     const el = document.getElementById(id);
     if (!el) continue;
-    el.textContent = id === 'venue-staged-you' && fantasy
+    el.textContent = id === 'venue-staged-you' && noted
       ? `${venue.label} chooses the dice too.` : said;
-    el.classList.toggle('hidden', !fantasy);
+    el.classList.toggle('hidden', !noted);
   }
 }
 
