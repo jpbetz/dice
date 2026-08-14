@@ -59,6 +59,30 @@ limitations under the License.
 //
 // Redemption is per BROWSER, not per profile: it is about which build of the
 // app you are being shown, not who you are sitting down as.
+//
+// ── THE MIRROR LANE ────────────────────────────────────────────────────────
+// The enrolment is held TWICE: localStorage is the store of record and a
+// same-origin cookie is the mirror. This exists because the loss mode is
+// SILENT (the purge-exemption note in main.js says it exactly: "a beta tester
+// demoted to production with the staging pickers gone and nothing on screen
+// to say why") — and it happened in the field on day one (Joe, 2026-08-14),
+// on a browser whose OTHER keys survive. One lane cannot defend against
+// whatever selectively empties it; two lanes in two subsystems heal each
+// other: a boot that finds either copy restores the other.
+//
+// The mirror carries ONLY the beta enrolment. A stable browser holds no
+// cookie and no key — keyless IS production, and stamping every visitor
+// 'stable' would turn the absence that means "never asked" into a claim. On
+// any stable resolution the mirror is CLEARED, so a revoked beta cannot be
+// resurrected by a stale cookie after the store is lost.
+//
+// The header above says the server does not know about channels, and it
+// still does not — nothing reads the cookie, ever — but a cookie does RIDE
+// requests, so the channel name now crosses the wire as ~25 ignored bytes.
+// That is the price of the second lane and it is paid knowingly: the
+// alternative was a second localStorage key, which dies of exactly the same
+// causes as the first. (Safari caps script-set cookies at ~7 days, which is
+// why every beta boot re-sets the mirror rather than writing it once.)
 
 export const PARAM = 'stability';
 export const CHANNELS = Object.freeze(['stable', 'beta']);
@@ -69,16 +93,31 @@ export function isChannel(v) {
   return typeof v === 'string' && CHANNELS.includes(v);
 }
 
-// Resolve the channel for this boot. Pure on purpose — localStorage, the URL
-// and history.replaceState are all the caller's business, so the PRECEDENCE
-// (which is the part with rules in it) is unit-testable without a browser.
+// Resolve the channel for this boot. Pure on purpose — localStorage, cookies,
+// the URL and history.replaceState are all the caller's business, so the
+// PRECEDENCE (which is the part with rules in it) is unit-testable without a
+// browser.
 //
-// Returns { channel, write, strip }:
+// Precedence: a valid param > a valid store > a valid mirror > production.
+// The store outranks the mirror because revocation lives there: a browser
+// whose store says 'stable' has ASKED to be stable, and a stale cookie must
+// not overrule that.
+//
+// Returns { channel, write, mirror, strip }:
 //   channel — the channel in force for this boot
-//   write   — the value to persist, or null when the store already agrees
+//   write   — the value to put in the store, or null when it already agrees.
+//             A virgin browser is never stamped: absence means "never asked"
+//             and stays meaningful. The heal path (store lost, mirror held)
+//             therefore only ever writes 'beta'.
+//   mirror  — 'beta' to (re)set the mirror lane, '' to clear it, null to
+//             leave it alone. Re-set on EVERY beta boot, not once — the
+//             mirror is a cookie and Safari ages script-set cookies out in
+//             days; the refresh is what keeps a weekly player enrolled.
 //   strip   — whether to rewrite the URL without the param
-export function resolveChannel({ stored, param } = {}) {
-  const kept = isChannel(stored) ? stored : DEFAULT_CHANNEL;
+export function resolveChannel({ stored, mirror, param } = {}) {
+  const held = isChannel(stored) ? stored : null;
+  const mirrored = isChannel(mirror) ? mirror : null;
+  const kept = held ?? mirrored ?? DEFAULT_CHANNEL;
   // A param that is PRESENT but unreadable ('BETA ', 'yes', '') is still a
   // param: it gets stripped so nothing lingers in the address bar to be
   // shared, and it changes nothing. Trimmed and lowercased first, because a
@@ -87,9 +126,21 @@ export function resolveChannel({ stored, param } = {}) {
   const present = param !== null && param !== undefined;
   const asked = present ? String(param).trim().toLowerCase() : '';
   const valid = isChannel(asked);
+  const channel = valid ? asked : kept;
+  let write = null;
+  if (valid && asked !== stored) write = asked;
+  // The heal: the store lost (or never had) the enrolment the mirror still
+  // holds. Only beta is worth writing — production is what a keyless browser
+  // already is.
+  else if (!valid && held === null && mirrored === 'beta') write = 'beta';
   return {
-    channel: valid ? asked : kept,
-    write: valid && asked !== stored ? asked : null,
+    channel,
+    write,
+    // A stable resolution takes the mirror out (clear on PRESENT, not on
+    // valid: an unreadable cookie is a corpse, and leaving it invites the
+    // next reader to guess). A beta resolution re-lays it, every boot.
+    mirror: channel === 'beta' ? 'beta'
+      : (mirror !== null && mirror !== undefined ? '' : null),
     strip: present,
   };
 }

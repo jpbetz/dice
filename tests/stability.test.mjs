@@ -116,6 +116,64 @@ t('a stored value of the wrong shape is not a value', () => {
   }
 });
 
+// ── The mirror lane (the 2026-08-14 field loss: enrolment gone, every other
+// key intact, nothing on screen to say why) ────────────────────────────────
+
+t('a lost store is healed from the mirror — the loss that was silent', () => {
+  const d = resolveChannel({ stored: null, mirror: 'beta', param: null });
+  assert.equal(d.channel, 'beta', 'the enrolment survives losing the store');
+  assert.equal(d.write, 'beta', 'and the store is put back');
+  assert.equal(d.mirror, 'beta', 'and the mirror is re-laid, not merely read');
+  assert.equal(d.strip, false);
+});
+
+t('a beta boot re-lays the mirror even when nothing was lost', () => {
+  // Existing beta testers get the second lane on their next boot with no
+  // param — and Safari, which ages script cookies out in days, gets it back.
+  const d = resolveChannel({ stored: 'beta', mirror: null, param: null });
+  assert.equal(d.channel, 'beta');
+  assert.equal(d.write, null);
+  assert.equal(d.mirror, 'beta');
+});
+
+t('the store outranks the mirror — revocation is not undone by a stale cookie', () => {
+  const d = resolveChannel({ stored: 'stable', mirror: 'beta', param: null });
+  assert.equal(d.channel, 'stable');
+  assert.equal(d.write, null);
+  assert.equal(d.mirror, '', 'and the stale mirror is taken out, so a later '
+    + 'store loss cannot resurrect the beta');
+});
+
+t('revoking by param clears both lanes', () => {
+  const d = resolveChannel({ stored: 'beta', mirror: 'beta', param: 'stable' });
+  assert.equal(d.channel, 'stable');
+  assert.equal(d.write, 'stable');
+  assert.equal(d.mirror, '');
+  assert.equal(d.strip, true);
+});
+
+t('a virgin browser is stamped by neither lane', () => {
+  // Keyless IS production: absence must keep meaning "never asked".
+  const d = resolveChannel({ stored: null, mirror: null, param: null });
+  assert.equal(d.write, null);
+  assert.equal(d.mirror, null);
+});
+
+t('an unreadable mirror is not a value — and is cleared, not left to rot', () => {
+  for (const m of ['', 'Beta', 'beta!', 'alpha', '1']) {
+    const d = resolveChannel({ stored: null, mirror: m, param: null });
+    assert.equal(d.channel, 'stable', `mirror ${JSON.stringify(m)} cannot promote`);
+    assert.equal(d.write, null, `mirror ${JSON.stringify(m)} writes nothing`);
+    assert.equal(d.mirror, '', `mirror ${JSON.stringify(m)} is swept out`);
+  }
+  // …and a mirror that validly says 'stable' says nothing a keyless browser
+  // does not already say: cleared, never copied into the store.
+  const d = resolveChannel({ stored: null, mirror: 'stable', param: null });
+  assert.equal(d.channel, 'stable');
+  assert.equal(d.write, null);
+  assert.equal(d.mirror, '');
+});
+
 t('resolveChannel survives being called with nothing at all', () => {
   // main.js reads localStorage inside a try; a browser that refuses storage
   // hands this function undefined for both fields and must still boot.

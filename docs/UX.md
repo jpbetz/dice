@@ -4674,10 +4674,28 @@ share flow hands out `location.href`). It also survives the schema purge,
 because it is an entitlement rather than app state and its loss would be
 silent.
 
+**The enrolment is held twice (2026-08-14, same day).** The single
+localStorage key was lost in the field on the feature's first day — every
+neighbouring key intact, the tester silently demoted, exactly the failure the
+purge-exemption note predicted. So redemption now lays the key AND a
+same-name, same-origin cookie, and every boot heals whichever lane is missing
+from the other (`js/stability.js`, the mirror-lane header). The mirror
+carries only `beta` — keyless is production, and any stable resolution
+clears the cookie so a revoked beta cannot be resurrected by a stale one.
+The server still never reads it. A boot that resolves beta but can persist
+to *neither* lane says so once (`announce` + a field report) instead of
+letting the next boot do the explaining, and
+`__diceDebug.stability()` now reports `{stored, mirror, held}` live so "why
+is this browser stable" is one console call.
+
 **Testing.** Every harness tab is a beta tab; the stable population is reached
-by `clean: ['dice.stability.v1']` (a browser that has never heard of the beta)
-or `query: '&stability=stable'`. `stability-gate` is the scenario, and its
+by `clean: ['dice.stability.v1']` (a browser that has never heard of the beta
+— `clean` expires the mirror cookie along with the key) or
+`query: '&stability=stable'`. `stability-gate` is the scenario, and its
 expensive leg — two tabs, one room, one pour, both films compared — is the
 point rather than the overhead: the obvious wrong implementation passes every
 visibility assertion in the file and breaks the table only when two people are
-watching.
+watching. `stability-persist` is the boot AFTER redemption — the one the
+beta-by-default suite structurally never ran — plus the field loss replayed
+(store deleted, mirror heals) and the resurrection check (revoke, then lose
+the store: still production).
