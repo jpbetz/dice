@@ -306,6 +306,7 @@ import forge as F  # noqa: E402
 # recipe and lax on the file (or the other way round, which is what actually
 # happened: this file's flat exit box refused cladding check.py allows).
 import towergates as TG  # noqa: E402
+import towerkit as K  # noqa: E402
 
 # --------------------------------------------------------------------------
 # the contract
@@ -2808,35 +2809,13 @@ def make_shelf_paint(pal):
 # MEASUREMENT — every claim re-derived from the BUILT vertices
 # --------------------------------------------------------------------------
 
-def tri_array(objs):
-    import numpy as np
-    tris = []
-    for ob in objs:
-        me = ob.data
-        me.calc_loop_triangles()
-        vs = [(v.co.x, v.co.z, -v.co.y) for v in me.vertices]   # -> app frame
-        for lt in me.loop_triangles:
-            tris.append([vs[i] for i in lt.vertices])
-    return np.asarray(tris, dtype=float)
+# tri_array and ray_hit used to live here, in a copy identical to
+# nullstone.py's (2026-08-13). Both moved to towerkit, which is also where
+# the seven contract gates now live — a recipe is a SHAPE and a PAINT, and
+# two files carrying the same Moller-Trumbore is how one of them drifts.
+tri_array = K.tri_array
+ray_hit = K.ray_hit
 
-
-def ray_hit(tris, origin, direction, t_max):
-    import numpy as np
-    v0, v1, v2 = tris[:, 0], tris[:, 1], tris[:, 2]
-    e1, e2 = v1 - v0, v2 - v0
-    p = np.cross(direction, e2)
-    det = np.einsum("ij,ij->i", e1, p)
-    ok = np.abs(det) > 1e-12
-    inv = np.zeros_like(det)
-    inv[ok] = 1.0 / det[ok]
-    tv = origin - v0
-    u = np.einsum("ij,ij->i", tv, p) * inv
-    q = np.cross(tv, e1)
-    v = (q @ direction) * inv
-    t = np.einsum("ij,ij->i", e2, q) * inv
-    hit = (ok & (u >= -1e-9) & (v >= -1e-9) & (u + v <= 1.0 + 1e-9)
-           & (t > 1e-6) & (t < t_max))
-    return float(t[hit].min()) if hit.any() else None
 
 
 def assert_throat_clear(objs):
