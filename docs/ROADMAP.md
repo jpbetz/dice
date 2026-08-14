@@ -3068,6 +3068,120 @@ as a WHOLE against goal 14's internal-consistency contract. Note the
 standing debt it inherits: every fae voice reasoned so far — the four
 tower clunks and the Witchlight chime — has never been LISTENED to.
 
+## Tier T — The tower contract: what the cosmetic/physics split still owes (2026-08-13)
+
+Joe commissioned an adversarial pass over every surface that defines how a
+tower is built, with one goal: **if a tower is 100% cosmetic, stop paying
+for physics tests to prove it.** The law that came out of it — *physics and
+film are a function of (portal spec, engine constants, seed); the model is
+not an input* — is enforced, not aspirational: the model contributes zero
+colliders, and a mesh change that leaves `tower-spec-digest` and
+`towerFilmDigest` unmoved provably cannot move a roll. Round 1 (merged
+2026-08-13, 25 commits) built that spine and demonstrated it on its own
+work: a restructure touching every registry row, plus a rewritten occlusion
+proof and a new cladding audit, returned byte-identical film digests.
+
+Measured cost of a tower today: bake + nine refusals **~30s** (both
+palettes), the whole cosmetic gate `npm run gate:cosmetic <id>` **1m47s**
+for six steps and ~13 rendered frames, and **zero dice simulations** for a
+mesh-only change. Rounds 2–4 of the lock (harness surgery, descriptor
+purge, docs/skills) are sequenced separately; T3 and T4 below are their
+first two items, recorded here because this file is the durable copy.
+
+### T1. `TABLE_D` drifts a float on every tower swap — CORRECTNESS, small
+Found by the occlusion probe, not by a failing test. `towerDeepenMat(+4.5)`
+followed by `(−4.5)` does not return: z0 goes −6.55 → −6.550000000000001,
+once per swap, and `towerSocket` does this on every change of tower. z0 is
+the anchor every volume, collider and keyframe hangs off, so two clients
+with different socket histories can bake one seed into two films — goal
+15's exact failure. `applyZoom` re-assigns `TABLE_D` from the preset, which
+is why nothing has shown in the field. Fix shape: make the deepening
+ABSOLUTE (preset depth + socket extra + lab extra) rather than incremental.
+Red check: swap towers N times on one client and none on another, compare
+`towerFilmDigest` — it must be the same hash and today is not guaranteed to
+be.
+
+### T2. The doorway ignores the portal it belongs to — small, DECIDE FIRST
+`doorL`/`doorR`/`lintel` are built centred at x=0 while the apron, lip and
+exit spawn all follow `portals.out.x` (legal range ±0.75). The first tower
+to use that freedom gets a doorway that does not line up with its own exit
+lane. No shipped tower exercises it; `tower-occlusion` prints a NOTE when
+`out.x ≠ 0`. Two honest ends, both cheap: derive the three bodies from
+`out.x`, or delete the knob the way `out.z` was deleted on Joe's ruling.
+Deciding is the item — keeping it means engine work *plus* a probe campaign
+for off-centre exits, which is the cost the ±0.75 range was meant to buy.
+
+### T3. Re-pin the two fixtures — and decide what the spec digest is FOR — small
+Both proof fixtures are red right now, for the same benign reason: each was
+captured in a worktree before the merge added fields.
+`tower-contract-freeze` gained `pour`/`portals`/`flight`/`source`;
+`tower-spec-digest` reports four towers moved and the entire diff is
+`derived.flight` appearing. Re-pin with a reviewed diff, and parameterize
+the freeze over the whole registry (hollowbole is frozen nowhere today).
+**The refinement underneath:** the spec digest hashes DERIVED fields as
+well as the eight declared numbers, so any engine-constant change reds it —
+churn on work that never renegotiated a portal, and churn is how a gate
+gets re-pinned without being read. Proposal: the spec digest covers the
+declared spec + limits only; derivation drift is `towerFilmDigest`'s job
+and it already covers it.
+
+### T4. Split the cosmetic lane in the e2e suite — small-medium
+The policy exists in the tools (`gate:cosmetic`) but not yet in
+`scenarios.mjs`, so a pure mesh change still drags a 38s physics scenario.
+Wants: a `look` tag with a fail-closed no-roll guard in `run.mjs` (a
+cosmetic scenario that simulates a die should FAIL, not pass quietly);
+`tower-roll`'s dressing block split out; the dressing budget (≤4k tris,
+≤8 draws) turned from a printed number into an assertion; and every
+cosmetic claim anchored to an aggregate over the `towerSkin*` subtree
+rather than one deletable mesh name — `venue-set` breaking on a deleted
+berm is the precedent that named the rule.
+
+### T5. Recipe authorship is the new bottleneck — DESIGN FIRST, medium
+The headline finding of the whole pass. With gates at 30s and 1m47s,
+machine time is no longer what a tower costs; a "five-minute mesh" is still
+20–60 minutes of Blender Python. Two candidate levers, neither chosen:
+(a) **a higher-level recipe vocabulary** — the shapes `hollowbole.py` and
+`B4_gnarl.py` keep re-deriving (trunk with root flare, spire crown, torn
+aperture, shelf placement) lifted into parameterized forge helpers;
+(b) **an adopt-a-mesh path** — take geometry authored or generated
+anywhere, declare portals against it, and let the gates rule on whether it
+sockets. (b) is the larger unlock and the larger risk (no COLOR_0, no
+budget discipline, no material story, and the vertex-colour laws this
+project learned the hard way). Design before build.
+
+### T6. Two palettes cost two of everything — small
+COLOR_0 is baked data, so every fae tower bakes twice and is LOOKed twice.
+Tolerable at one tower, a tax at five. The bake half is nearly free already
+(28.4s covers both variants in one invocation); the human half is not. Fix
+shape: a single contact sheet that puts both palettes side by side at the
+same eyes, so the LOOK is one pass instead of two.
+
+### T7. Promotion is manual and main-session-only — small
+An agent can bake a GLB and prove it, but cannot ship it: copying into
+`models/towers/`, adding the static-cache manifest entry and re-pinning the
+digest are main-session acts. The gate is deliberate — the frozen-mtime
+production bug lives in exactly this class — but it is the one seam where
+an otherwise autonomous tower build stops dead. Refinement: a `promote`
+step that performs all three edits as one reviewed diff, so the human act
+is approving a diff rather than remembering three files.
+
+### T8. Two gates that cannot be armed yet — small, each needs one declaration
+- **`tower_fixture.py` is RED on the new bake-side occlusion gate** (cowl
+  11/99 at `wide.full`) — a genuine leak in a test asset, invisible until
+  bake-side occlusion existed. Waive it by flag or rebuild the fixture.
+- **`tower-occlusion`'s SOLID exit/hood classification stays a printed
+  report**, because hollowbole's declared `clearH` 3.5 understates its real
+  torn opening: 18 points read SOLID at all six eyes, legally, since a
+  portal is a MINIMUM. A hard gate here needs a registry-declared
+  allowance in the `bareColliders` idiom.
+
+### T9. The classic three are still code skins — record only
+`js/towerskin.js` is a second construction path kept alive for heartwood,
+bastion and blackanvil. They work, they are pinned by the classic spec, and
+re-baking them through the forge is pure cost until something forces it.
+Recorded so "why are there two ways to build a tower" has an answer on
+paper; do not spend on it.
+
 ## Structural risks (bets, not bugs — each gets more expensive to reverse)
 
 - **System capability flags as scattered per-surface render gates.**
