@@ -45,6 +45,18 @@ limitations under the License.
 // under the repo is served by the stage's own server, and `towerRegisterGlb`
 // mints a throwaway row for it. Bake, look, rewrite — with nothing committed
 // and no promotion in between.
+//
+// THE SLUG MUST BE AN ID THE SERVER ALLOWLISTS, and that is the one real
+// limit on the above. The slug is the FILE'S BASENAME, `setTower` sends a
+// settings patch, and server.js validates `tower` against a fixed list — so
+// `nullstone_spill.glb` mints its row fine, is refused on the wire, and the
+// table goes on wearing 'none' while the model sits at status `idle`. The
+// step catches it ("asked for X, the table wears none") rather than shooting
+// the wrong tower, which is the important part, but the fix is not obvious
+// from the message: name the file after a SHIPPED id and put the variant in
+// the PATH — `tools/forge/out/<variant>/nullstone.glb`. That also makes the
+// third argument load-bearing, since a matching slug inherits the shipped
+// row's lamps and a variant usually wants the ones it was authored against.
 
 import { basename, extname } from 'node:path';
 

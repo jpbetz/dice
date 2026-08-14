@@ -3453,6 +3453,51 @@ Left open, deliberately:
   written down and no reason to invent one before there is a second beta
   feature to generalise from.
 
+## Tier N — the Nullstone divergences, judged (2026-08-14)
+
+Four agents each took a moderately risky swing at the round-5 nullstone
+("structurally right, not yet handsome… but it's quiet"). Judged on one sheet
+by the main session; Joe's verdict on the winner: *"the best tower you've
+built so far."*
+
+- **② Interior light — LANDED** (83b9e3c). Fissure slots with violet
+  filaments, witchlight veins up the doorway pocket's back wall, ember moved
+  into the pocket. Measured at the gate rather than argued: die 0.4712,
+  doorway vein 0.2058, fissure 0.0887, lit ramp 0.0360, felt 0.0065 — dice
+  brightest by 2.3× over a clean ladder. `tower-contract-freeze` byte-
+  identical, so 590 recipe lines and a re-baked model cost zero dice sims.
+- **③ Carved spill — IDEA CONFIRMED, BAKE REFUSED.** Re-shot under the
+  corrected lamp and under the lamps it was authored against. **The base is a
+  clear win**: the foot flares into an unmirrored skirt of broken stone and
+  the delivery slab stops being a tray parked in front of a building, which
+  paint had already failed to fix twice (hollowbole's tongue took a 0.39 value
+  drop and still shipped a gangplank). But it is not landable as it stands:
+  its body carries the OLD doorway — the flat rectangle ② exists to have
+  fixed — and its **cost is wrong by ratio**. The base is ~10570 tris against
+  a whole tower of 4304, so ported onto master it lands near 14874/15000
+  (estimate: the two touch different geometry), ~0.8% headroom, freezing
+  nullstone against any later change. 71% of the model for the bottom fifth of
+  the frame, seen mostly at grazing angles. **NEXT ROUND, NOT A MERGE:** re-
+  derive the heightfield at a coarser density and keep the silhouette law
+  (no straight outline run over ~0.8 u, crest broken by asymmetric shoulders).
+- **① Attached structure — DECLINED.** The pier, cantilevered slab and
+  switchback stair do break the single outline, cheaply (2552 tris), but the
+  tower reads architecture-first: a ruined keep with a rock in it, when the
+  monolith IS the identity. **Its finding outlives it and belongs to every
+  tower:** the room lights from ABOVE, so detail cut INTO a player-facing
+  vertical face never appears in a frame — an arch was carried three rounds
+  and was invisible in every one.
+- **④ Floating mass — DECLINED IN FORM, KEPT IN FINDING.** The strong form is
+  impossible and the agent proved why: a gap in the front below the height
+  floor is a leak, not a gap, so the float gets 2.12 of 12.30 at the prow, and
+  see-through buys nothing in a dark room (the background is as dark as the
+  stone). It found the front-height under-report (bf96213), which is the most
+  valuable single thing the four produced.
+
+Both of the findings that outlived their swings were about TOOLS lying, and
+both are fixed on master: the `tower-try` lamp (11346ed) and the front-height
+floor (bf96213).
+
 ## Structural risks (bets, not bugs — each gets more expensive to reverse)
 
 - **System capability flags as scattered per-surface render gates.**
