@@ -27,11 +27,30 @@ VENVPY="${FORGE_VENV_PY:-$HOME/opt/dice-forge/venv/bin/python}"
 export FORGE_OUT="${FORGE_OUT:-$HERE/out}"
 mkdir -p "$FORGE_OUT"
 
+# The run's own start line. EVERY GLB written after it is gated — not just the
+# newest one, which is what `ls -t | head -1` gave and what let hollowbole's
+# SECOND palette ship through no automated gate at all. That variant's only
+# content is COLOR_0, which is precisely the thing --expect-colors exists to
+# catch, so the one file the flag was written for was the one file it never
+# saw. A recipe that writes two assets now gates two.
+STAMP="$(mktemp)"
+trap 'rm -f "$STAMP"' EXIT
+touch "$STAMP"
+sleep 0.01   # coarse-mtime filesystems: never let the stamp tie a fresh GLB
+
 "$BLENDER" -b --factory-startup --python-exit-code 1 --python "$RECIPE"
 
-# gate the newest GLB (recipes write one asset; multi-GLB recipes gate the rest
-# by hand with check.py)
-newest=$(ls -t "$FORGE_OUT"/*.glb 2>/dev/null | head -1)
-[ -n "$newest" ] || { echo "recipe produced no GLB in $FORGE_OUT" >&2; exit 3; }
-echo "--- gate: $newest"
-"$VENVPY" "$HERE/check.py" "$newest" "$@"
+mapfile -t FRESH < <(find "$FORGE_OUT" -maxdepth 1 -name '*.glb' -newer "$STAMP" | sort)
+[ "${#FRESH[@]}" -gt 0 ] || { echo "recipe produced no GLB in $FORGE_OUT" >&2; exit 3; }
+echo "--- gate: ${#FRESH[@]} fresh GLB(s)"
+printf '      %s\n' "${FRESH[@]}"
+"$VENVPY" "$HERE/check.py" "${FRESH[@]}" "$@"
+
+# ...and the DIGEST DIFF. forge.export_glb writes FORGE_OUT/digest.json for the
+# run; tools/forge/digests.json is the committed baseline. A recipe is supposed
+# to re-bake byte-identically, so a moved digest is either a change somebody
+# meant (update the baseline in the same commit as the recipe edit) or a
+# Blender pin that stopped holding. A slug with no baseline row is reported,
+# not refused: the battery recipes are living examples, not shipped assets, and
+# a gate that demands a baseline for every experiment is a gate people delete.
+"$VENVPY" "$HERE/digestdiff.py" "$FORGE_OUT/digest.json" "$HERE/digests.json"

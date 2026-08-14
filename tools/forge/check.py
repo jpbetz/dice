@@ -174,9 +174,9 @@ def read_portals(j):
     return found
 
 
-def tower_check(j, tris, tilt_deg=0.45, bare_colliders=()):
+def tower_check(j, tris, tilt_deg=0.45, bare_colliders=(), digest=None):
     """The --tower gate. Returns (info, failures)."""
-    info, fails = {}, []
+    info, fails = {"digest": digest or {}}, []
     found = read_portals(j)
 
     # (a) both portals declared, at the root, with parseable scalars
@@ -316,7 +316,16 @@ def tower_check(j, tris, tilt_deg=0.45, bare_colliders=()):
     info["sill_holes"] = {"tested": tested, "open": holes}
     fails.extend(hole_f)
 
-    # (g) the engine's occluder prefix
+    # (g) the model carries its own geometry digest. Cheap, and it is what
+    # makes "these two palettes are the same solid" a statement about the
+    # SHIPPED FILES rather than about two lines of a bake log nobody kept.
+    if not (info.get("digest") or {}).get("set"):
+        fails.append("no forgeDigestSet in the scene extras — a tower GLB must "
+                     "carry its geometry digest so a variant pair can be "
+                     "proved to share geometry from the files themselves "
+                     "(forge.export_glb writes it; is export_extras on?)")
+
+    # (h) the engine's occluder prefix
     skins = [n.get("name", "") for n in j.get("nodes", [])
              if "mesh" in n and str(n.get("name", "")).startswith("towerSkin")]
     info["towerSkin_nodes"] = skins
@@ -332,6 +341,14 @@ def inspect(path, tower=False, tower_tilt_deg=0.45, bare_colliders=()):
     j, raw, bin_start = glb_json(path)
     out["has_vertex_colors"] = b'"COLOR_0"' in raw
     out["normal_max_len_err"] = normal_sanity(j, raw, bin_start)
+    # The geometry digest the bake stamped into the scene extras. It used to
+    # be printed and nothing else, so "the two palette variants share a
+    # geometry digest" was a claim about a log rather than about the files —
+    # and neither shipped GLB contained one. Read it back out of the file that
+    # will actually be served.
+    sx = (j.get("scenes") or [{}])[0].get("extras") or {}
+    out["digest"] = {"set": sx.get("forgeDigestSet"),
+                     "order": sx.get("forgeDigestOrder")}
 
     scene = trimesh.load(path, force="scene")
     geoms = list(scene.geometry.values())
@@ -366,8 +383,11 @@ def inspect(path, tower=False, tower_tilt_deg=0.45, bare_colliders=()):
         # the raw per-geometry vertices do not carry
         tris = (np.asarray(scene.to_mesh().triangles, dtype=np.float64)
                 if geoms else np.zeros((0, 3, 3)))
-        out["tower"], out["tower_failures"] = tower_check(
-            j, tris, tilt_deg=tower_tilt_deg, bare_colliders=bare_colliders)
+        out["tower"] = {"digest": out["digest"]}
+        info, out["tower_failures"] = tower_check(
+            j, tris, tilt_deg=tower_tilt_deg, bare_colliders=bare_colliders,
+            digest=out["digest"])
+        out["tower"].update(info)
         env_fails, env_notes = envelope_check(scene, tower_tilt_deg)
         out["tower_failures"].extend(env_fails)
         out["envelope_notes"] = env_notes
@@ -459,6 +479,8 @@ def main():
                     f"{b} {n}/{n}" for b, n in sorted(occ.items()))
                     + f" at 6 eyes   sill holes {sh.get('open')}/"
                       f"{sh.get('tested')} sight lines")
+                d = r.get("digest") or {}
+                print(f"  digest    set={d.get('set')} order={d.get('order')}")
     if failures:
         print("\nCHECK FAILED:", file=sys.stderr)
         for f in failures:

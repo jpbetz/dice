@@ -29,6 +29,7 @@ Run scripts as:
 an uncaught traceback, so a broken bake looks like a clean one.
 """
 
+import json
 import math
 import os
 import sys
@@ -544,16 +545,25 @@ def tower_portals(in_spec, out_spec):
         in_spec  = {"x":.., "rimY":.., "z":.., "clearR":..}
             the entry aperture: a horizontal disc the engine drops dice
             through, centred (x, rimY, z), clear to radius clearR.
-        out_spec = {"x":.., "sillY":.., "w":.., "clearH":.., "z": 0.0}
-            the exit door: a rectangle in the socket plane facing +z, its
+        out_spec = {"x":.., "sillY":.., "w":.., "clearH":..}
+            the exit door: a rectangle in the SOCKET PLANE facing +z, its
             bottom edge (the sill) at sillY, w wide and clearH tall.
-            `z` is optional and defaults to 0.0 — the doorway lives in the
-            back-wall plane unless a model has a reason to inset it.
+
+    THE DOORWAY HAS NO z, and that is a correction rather than an omission
+    (2026-08-13, Joe's ruling). out_spec used to take an optional z "unless a
+    model has a reason to inset the doorway"; no model ever did, and the knob
+    could not have worked if one had, because the engine reads exactly TWO
+    things off portalOut — x and sillY — and builds the doorway plane from
+    the socket. A declared z therefore moved nothing in the app and one thing
+    in the toolchain: check.py anchored its 25-ray exit probe to it, i.e. to
+    a number the engine discards. Pinned to 0.0 here, refused by the gate
+    there, and refused LOUDLY here too — a spec that still carries the key
+    was written against a contract that no longer exists.
 
     Pass the empties to finish()/export_glb() alongside the meshes. The
-    engine's own bounds live in check.py (TOWER_PORTAL_LIMITS); this helper
-    only refuses specs it cannot encode, so that "is this a legal tower?"
-    has one answer, given by the gate, and not two that can drift apart.
+    engine's own bounds live in towergates.ENGINE_MIRROR; this helper only
+    refuses specs it cannot encode, so that "is this a legal tower?" has one
+    answer, given by the gate, and not two that can drift apart.
     """
     def need(spec, keys, which):
         missing = [k for k in keys if k not in spec]
@@ -569,20 +579,25 @@ def tower_portals(in_spec, out_spec):
 
     need(in_spec, ("x", "rimY", "z", "clearR"), PORTAL_IN)
     need(out_spec, ("x", "sillY", "w", "clearH"), PORTAL_OUT)
+    if "z" in out_spec:
+        raise RuntimeError(
+            "tower_portals: out_spec must not carry 'z' — the doorway lives "
+            "in the socket plane and the engine reads only x and sillY off "
+            "portalOut, so the knob moved nothing but check.py's exit probe. "
+            "Delete the key (it is pinned to 0.0).")
 
     pin = _empty(PORTAL_IN,
                  (in_spec["x"], in_spec["rimY"], in_spec["z"]),
                  {"clearR": in_spec["clearR"]},
                  display_size=in_spec["clearR"])
     pout = _empty(PORTAL_OUT,
-                  (out_spec["x"], out_spec["sillY"], out_spec.get("z", 0.0)),
+                  (out_spec["x"], out_spec["sillY"], 0.0),
                   {"w": out_spec["w"], "clearH": out_spec["clearH"]},
                   display_size=0.5 * max(out_spec["w"], out_spec["clearH"]))
     print(f"[forge] portals  in=(x {in_spec['x']:.3f}, y {in_spec['rimY']:.3f}, "
           f"z {in_spec['z']:.3f}) clearR {in_spec['clearR']:.3f}  |  "
-          f"out=(x {out_spec['x']:.3f}, y {out_spec['sillY']:.3f}, "
-          f"z {out_spec.get('z', 0.0):.3f}) w {out_spec['w']:.3f} "
-          f"clearH {out_spec['clearH']:.3f}")
+          f"out=(x {out_spec['x']:.3f}, y {out_spec['sillY']:.3f}, z 0.000) "
+          f"w {out_spec['w']:.3f} clearH {out_spec['clearH']:.3f}")
     return pin, pout
 
 
@@ -607,6 +622,19 @@ def export_glb(slug, objs=None, vertex_colors=False):
             ob.select_set(True)
         bpy.context.view_layer.objects.active = objs[0]
 
+    # THE DIGEST GOES IN THE FILE (2026-08-13). It used to be PRINTED — which
+    # made it a fact about a bake log, not about an asset — while the app-side
+    # comments claimed the palette variants "share a geometry digest" and
+    # neither shipped GLB contained one, so the claim was unfalsifiable
+    # wherever it mattered. Computed BEFORE the scene props are set, so the
+    # digest can never hash itself; written as scene extras rather than a
+    # node, so no loader has a new object to step over.
+    order, dset = geometry_digest(all_objs, slug)
+    sc = bpy.context.scene
+    sc["forgeDigestSet"] = dset
+    sc["forgeDigestOrder"] = order
+    sc["forgeSlug"] = slug
+
     bpy.ops.export_scene.gltf(
         filepath=path,
         export_format="GLB",
@@ -625,16 +653,31 @@ def export_glb(slug, objs=None, vertex_colors=False):
     )
     if not os.path.exists(path):
         raise RuntimeError(f"export produced no file: {path}")
-    geometry_digest(all_objs, slug)
     tris = sum(len(o.data.loop_triangles) for o in all_objs
                if o.type == "MESH" and (o.data.calc_loop_triangles() or True))
+    _record_digest(slug, order, dset, tris)
     print(f"[forge] {slug}.glb  {os.path.getsize(path) / 1024:.1f} kB  "
           f"~{tris} tris (blender count)  {time.time() - _T0:.1f}s in-script")
     return path
 
 
+# Every slug this PROCESS exported, so a two-variant recipe writes one file
+# covering both. A fresh process starts empty on purpose: digest.json
+# describes THIS run and nothing older, which is what makes it diffable
+# against a committed baseline without an accumulating history to prune.
+_DIGESTS = {}
+
+
+def _record_digest(slug, order, dset, tris):
+    """Append the run's digest record to FORGE_OUT/digest.json."""
+    _DIGESTS[slug] = {"set": dset, "order": order, "tris": int(tris)}
+    with open(os.path.join(OUT_DIR, "digest.json"), "w") as f:
+        json.dump(_DIGESTS, f, indent=1, sort_keys=True)
+        f.write("\n")
+
+
 def geometry_digest(objs, label=""):
-    """Two hashes of the mesh as Blender holds it, printed for run-to-run diffing.
+    """Two hashes of the mesh as Blender holds it. -> (order, set), both hex16.
 
     `order` includes vertex/face ordering AND color attributes; `set` is
     order-independent (sorted rounded vertices, sorted faces keyed by vertex
@@ -704,8 +747,9 @@ def geometry_digest(objs, label=""):
         unordered.update(repr(t).encode())
     for t in sorted(fset):
         unordered.update(repr(t).encode())
-    print(f"[forge] {label} digest order={ordered.hexdigest()[:16]} "
-          f"set={unordered.hexdigest()[:16]}")
+    order, dset = ordered.hexdigest()[:16], unordered.hexdigest()[:16]
+    print(f"[forge] {label} digest order={order} set={dset}")
+    return order, dset
 
 
 def report_bounds(objs, label="bounds"):

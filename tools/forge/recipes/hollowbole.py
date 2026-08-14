@@ -283,7 +283,7 @@ S = 1.25
 AXIS_Z = -2.55                     # the trunk axis, app frame
 
 PORTAL_IN = {"x": 0.0, "rimY": 9.40, "z": AXIS_Z, "clearR": 2.20}
-PORTAL_OUT = {"x": 0.0, "sillY": 1.00, "w": 4.20, "clearH": 3.50, "z": 0.0}
+PORTAL_OUT = {"x": 0.0, "sillY": 1.00, "w": 4.20, "clearH": 3.50}
 DESPAWN_Y = PORTAL_IN["rimY"] - 1.4 * S              # 7.65
 
 # The throat box the exit gate probes, restated here so the in-recipe gate
@@ -337,8 +337,15 @@ SHELL_FLOOR = -0.09                # the shell's buried row. -0.30 read as
 #                                    under y 0 is felt-covered either way.
 ZFRONT = 0.22                      # the socket's front plane
 ZBACK = -6.30                      # venue grounds: the glade, not a wall
-BUDGET = 8000
-SPLAY = 0.07                       # how far both crown surfaces lean out above
+# 15000, not the 8000 a hero prop gets (2026-08-13, Joe's ruling). A TOWER
+# MODEL is not a prop the camera passes: it is the one object on the table a
+# player looks at for the whole roll, it is baked once and served gzipped, and
+# the budget that was refusing detail here was the bake-off's generic hero
+# number rather than anything measured about this asset. The DRESSING budget
+# is untouched (<= 4k tris / <= 8 draws) — that one is about draw calls per
+# frame, which is a different scarcity. This build spends 7270 of it.
+BUDGET = 15000
+SPLAY = 0.07                      # how far both crown surfaces lean out above
 #                                    the rim (was 0.16; see r_out and item 8)
 
 SEED = 0x50B3
