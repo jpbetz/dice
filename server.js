@@ -889,15 +889,36 @@ function cleanName(value, max) {
 // not become a second egress for anything roll-shaped). room.setup is replaced
 // wholesale on every push and never mutated in place, so handing the stored
 // object straight out is safe, exactly as `offers` is.
+// The room half of that snapshot, and the ONE place it is built. hello used to
+// repeat this literal, which made "identical to /api/join's" a claim the code
+// could not keep: two literals drift the first time somebody adds a field to
+// the door they happened to be standing at, and the client that renders from
+// the join response would then show a different table from the one that waits
+// for the stream. Byte-for-byte what both sent before — same fields, same
+// order — so no client sees a change.
+//
+// TABLE RESYNC RIDES THIS AND NEEDS NO FIELD OF ITS OWN (ROADMAP §3). Which
+// rolls still sit on the felt is already IN the projected log: an entry with
+// neither `collected` nor `cleared` is on the felt, and the server's
+// auto-collect (executeRoll) keeps that set to exactly one. So the resync
+// payload is a property of the log, not a sibling of it — and it inherits
+// projectEntryFor's redaction for free, which is why a held roll cannot arrive
+// early just because somebody reloaded.
+function roomSnapshot(room, viewerId) {
+  return {
+    players: publicPlayers(room),
+    log: room.log.map((r) => projectEntryFor(r, viewerId)).filter((r) => r !== null),
+    offers: room.offers,
+    settings: { ...room.settings },
+    ...(room.setup ? { setup: room.setup } : {}),
+  };
+}
+
 function joinSnapshot(room, player) {
   return {
     playerId: player.id,
     color: player.color,
-    players: publicPlayers(room),
-    log: room.log.map((r) => projectEntryFor(r, player.id)).filter((r) => r !== null),
-    offers: room.offers,
-    settings: { ...room.settings },
-    ...(room.setup ? { setup: room.setup } : {}),
+    ...roomSnapshot(room, player.id),
   };
 }
 
@@ -1044,16 +1065,12 @@ function handleEvents(req, res, url) {
   // hello fires on EVERY stream (re)open — it is the reconnect path — so its
   // log is projected for this player: a proxy blip must not re-leak what the
   // live broadcast withheld.
-  sendEvent(res, 'hello', {
-    players: publicPlayers(room),
-    log: room.log.map((r) => projectEntryFor(r, playerId)).filter((r) => r !== null),
-    offers: room.offers,
-    settings: { ...room.settings },
-    // Present-or-absent, and identical to /api/join's — see joinSnapshot. It
-    // is on EVERY stream (re)open by design: §G6's re-push heals a restarted
-    // room by noticing that hello carries no setup, or a lower rev.
-    ...(room.setup ? { setup: room.setup } : {}),
-  });
+  // …and it is the SAME builder /api/join answers with (roomSnapshot), minus
+  // the two fields that are about the seat rather than the room. The setup
+  // rides it present-or-absent and is on EVERY stream (re)open by design:
+  // §G6's re-push heals a restarted room by noticing that hello carries no
+  // setup, or a lower rev.
+  sendEvent(res, 'hello', roomSnapshot(room, playerId));
 
   const onClose = () => {
     player.clients.delete(res);
