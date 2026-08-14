@@ -267,21 +267,16 @@ returning player**, because the fixture seeded no name and so only ever
 tested first-timers (UX-AUDIT E1 → ROADMAP U3). Every part was correct; the
 journey was not.
 
-**The rule.** A feature that changes a journey updates that journey's
-scenarios in the same commit — the same rule UX.md's WHAT IS TRUE TODAY table
-already applies to surfaces. A journey's **composed** scenario (one that walks
-it the way a person does, like `profile-dm-prepares`) is a pre-release gate.
-
-**And the rule stated as a gate, because a rule with no selector is a wish
-(ROADMAP C1 + C3's open half, 2026-08-14).** Every journey that has code owns
-exactly one scenario tagged **`journey`**, and `node tests/e2e/run.mjs --only
-journey` is a release gate that must be green before a milestone ships. **A
-feature that changes a journey updates that journey's composed scenario IN THE
-SAME COMMIT** — not its part-scenarios instead of it, and not in a follow-up.
-The part-scenarios cannot enforce this and never could: a journey with no
-end-to-end scenario passes in every part and fails as a whole, which is what
-`prepared-seat` did for weeks while CUJ3/CUJ7 were broken for every returning
-player.
+**The rule, and it is a gate rather than a sentence — a rule with no selector
+is a wish (ROADMAP C1 + C3's open half, 2026-08-14).** Every journey that has
+code owns exactly ONE scenario tagged **`journey`**: the composed walk, the
+table below. `node tests/e2e/run.mjs --only journey` is a **release gate** that
+must be green before a milestone ships. And **a feature that changes a journey
+updates that journey's composed scenario IN THE SAME COMMIT** — not its
+part-scenarios instead of it, and not in a follow-up. This is the same rule
+UX.md's WHAT IS TRUE TODAY table already applies to surfaces; the part
+scenarios cannot enforce it and never could, which is the whole of what the
+paragraph above measures.
 
 A composed scenario is recognisable rather than merely tagged. It walks the
 journey's own **done when** sentence from CUJS.md in order, it uses the
@@ -300,7 +295,7 @@ assertion that a widget exists belongs in a part-scenario.
 | CUJ3 | `prepared-seat` |
 | CUJ4 | `journey-between-games` |
 | CUJ5 | **none — no code and no scenario** (CUJS.md gap B) |
-| CUJ6 | `soul-seed` |
+| CUJ6 | `profile-library` (its persistence half is `profile-library-reload`) |
 | CUJ7 | `profile-dm-prepares` |
 | CUJ8 | `journey-roll-this-thing` |
 | CUJ9 | `journey-legible-evening` |

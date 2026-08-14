@@ -4606,7 +4606,7 @@ export const scenarios = [
   },
   {
     name: 'soul-seed',
-    tags: ['journey', 'groups', 'cuj6'],
+    tags: ['groups', 'cuj6'],
     // The pre-Soul-Deal starter trio (Attack/Damage/Percentile, untouched)
     // upgrades to the Soul Deal rack on the next boot — it was never the
     // player's own work. One edit and the rack is theirs: no swap.
@@ -8952,7 +8952,7 @@ export const scenarios = [
   },
   {
     name: 'profile-library',
-    tags: ['smoke', 'profiles', 'groups', 'cuj6'],
+    tags: ['smoke', 'journey', 'profiles', 'groups', 'cuj6'],
     // PROFILES §11 — THE CLAIM THE WHOLE DESIGN RESTS ON: a switch loses
     // nothing. This replaces §G3's `profile-swap`, which pinned the machinery
     // that made ONE rack pretend to be two (a stash under dice.groups.mine.v1,
@@ -16259,12 +16259,24 @@ export const scenarios = [
         'and the on-felt roll is in it');
 
       // Bram loses the roll — the aftermath of a blip — and is mid-playback of
-      // something else at the moment the reconnect lands. Both in ONE eval, so
-      // nothing can arrive on the stream between them.
+      // something else at the moment the reconnect lands. All of it in ONE
+      // eval, so nothing can arrive on the stream between the steps.
+      //
+      // THE SWEEP ON THE LOCAL ROLL IS LOAD-BEARING, and finding out why cost a
+      // flaky run worth writing down: `playRoll` does NOT wipe the felt (§7.7
+      // retired the overflow wipe — auto-collect keeps it to one roll), so a
+      // film is baked against whatever bodies are standing. Leaving this
+      // fixture's die there gave Bram a WORLD no other client had, and two of
+      // the three replayed dice bounced off it and came to rest somewhere else
+      // — a real property of the engine, arrived at through an unreal setup.
+      // The deferred per-roll clear lands when the local playback ends, which
+      // is before the drain, so the rebuild bakes against the same empty felt
+      // every other client has.
       await b.eval(`(() => {
         const d = window.__diceDebug;
         d.clearTable();
-        d.playRoll({ dice: ['d6'], values: [4], seed: 99, label: 'local' });
+        d.playRoll({ rollId: 'local-busy', dice: ['d6'], values: [4], seed: 99, label: 'local' });
+        d.netEvent('roll-cleared', { rollId: 'local-busy' });
         d.netEvent('hello', ${snap});
       })()`);
 
@@ -16281,13 +16293,13 @@ export const scenarios = [
       // passes its own test.
       await b.waitFor(`(window.__diceDebug.sim(240), !window.__diceDebug.busy
         && window.__diceDebug.idleReplayInfo.held === null
-        && window.__diceDebug.tableDice.some((d) => d.rollId === ${JSON.stringify(rid)}))`,
+        && window.__diceDebug.tableDice.length === 3
+        && window.__diceDebug.tableDice.every((d) => d.rollId === ${JSON.stringify(rid)}))`,
       { desc: 'the stashed roll is rebuilt once the stage clears' });
       await b.settle();
       const felt = await b.dbg('feltPoses()');
-      const mine = felt.filter((d) => d.rollId === rid);
-      assert.equal(mine.length, 3, 'all three dice came back');
-      assert.equal(JSON.stringify(mine), truth,
+      assert.equal(felt.length, 3, 'all three dice came back, and nothing else is standing');
+      assert.equal(JSON.stringify(felt), truth,
         'at the poses everyone else is looking at — a rebuild, not a re-throw');
     },
   },
