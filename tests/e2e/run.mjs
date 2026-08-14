@@ -17,8 +17,15 @@ limitations under the License.
 // e2e entry point (see docs/TESTING.md for the policy):
 //   node tests/e2e/run.mjs                 # smoke set (default)
 //   node tests/e2e/run.mjs --only shelf    # targeted: tag or scenario name
+//   node tests/e2e/run.mjs --only look     # the COSMETIC lane: no dice, enforced
 //   node tests/e2e/run.mjs --full          # everything (pre-release sweep)
 //   node tests/e2e/run.mjs --list          # show scenarios and tags
+//
+// The `look` tag is the one tag with a RULE attached: a scenario carrying it
+// may not simulate a single die, and the runner proves it rather than trusting
+// it (noDiceGuard in harness.mjs). It is the e2e half of the cosmetic/physics
+// split — a mesh change owes measurements and LOOK sheets and owes simulation
+// nothing, so the scenarios that prove cosmetic claims should cost seconds.
 
 import { runScenarios } from './harness.mjs';
 import { scenarios } from './scenarios.mjs';

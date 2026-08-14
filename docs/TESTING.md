@@ -227,9 +227,27 @@ Chrome. Serialize that work; do not overlap it.
 
 ## Tags → areas
 
-Two kinds. **Area tags** (below) say what a scenario touches. **Journey tags**
+Three kinds. **Area tags** (below) say what a scenario touches. **Journey tags**
 (`cuj1`…`cuj13`, [CUJS.md](CUJS.md)) say which user journey it walks, so
-`--only cuj7` runs the journey rather than a surface.
+`--only cuj7` runs the journey rather than a surface. And one **lane tag**,
+`look`, which is the only tag with a RULE attached.
+
+**The `look` lane (ROADMAP T4).** A tower model is theatre over invisible
+engine colliders: physics and the pour film are a function of (portal spec,
+engine constants, seed), and the mesh is not an input. So a cosmetic claim owes
+measurements and LOOK sheets and owes simulation **nothing** — and the saving
+is the whole point, because a pour costs tens of seconds and a geometry read
+costs milliseconds. A scenario tagged `look` therefore may not simulate a
+single die, and `runScenarios` **proves** it: after the scenario returns it
+reads `__diceDebug.diceEverMade()` from every tab and fails on any non-zero
+answer — or on a counter it cannot read at all, because a guard that passes
+when its instrument is missing is the green check this project keeps catching
+itself writing. `node tests/e2e/run.mjs --only look` is the lane.
+
+Do not reach for the tag to make a slow scenario look fast: the claims have to
+BE cosmetic. `tower-dressing` is the worked example — groups, geometry
+aggregates, budgets and registry declarations, all readable off a socketed
+model — and its sibling `tower-roll` keeps everything that needs dice.
 
 **Why journeys get their own selector.** A journey with no end-to-end proof
 can pass in every part and fail as a whole. That is measured, not argued:
@@ -264,6 +282,7 @@ gates that apply to every journey rather than walking one — `a11y-modals`,
 | `groups`   | Saved pools: inline row editor and popover update write back by id, save-as-variant stays additive (the tag keeps the `groups` spelling, like the code) |
 | `profiles` | The profile library (§11): the lossless switch (`profile-library`, in smoke), the store surviving a reload with the same profile in hand, the system binding and the mismatch that is labelled rather than swapped, the join-time picker filtered to the table's system with last-used pre-selected (`profile-join-pick`, in smoke), Random per system, copying a teammate's published profile, and the whole library round-tripping through the file with exactly ONE home per rack |
 | `tower`    | The dice tower as a room setting ([TOWER.md](TOWER.md)): `tower-roll` sockets `heartwood`, pours four pools through it, and proves the exit guarantee, the hidden windows *on screen*, the baffle clunks, same-seed and cross-client replay, the mid-roll defer, and — THE FIRST LAW — that coming back down leaves the world byte-for-byte the towerless one. It carries a 40d6 stress pool on purpose: the pour's one measured failure never appeared below twenty dice |
+| `look`     | The COSMETIC lane (rule above; no dice, enforced). `tower-dressing` walks every skinned registry row and asserts the dress groups each one DECLARES, that the skin is visible as an aggregate over the `towerSkin*` subtree, the dressing budget (≤4k tris, ≤8 draws — with heartwood and bastion carrying named, valued overruns, ROADMAP T14), and the family traits: an ember on the row, zero lights in the skin |
 | `audio`    | V1 sound ([AUDIO.md](AUDIO.md)): the graph built once at unlock and suspended until a real gesture (`audio-graph`), the three-phase contact machine derived off the film (`audio-phases`), the rolling voice pool and its teardown (`audio-rolling`), the settle cluster's seeded schedule and its own gate cursor (`audio-settle`), the tower shaft send and the FIRST LAW asked of `impactVoiceFor` (`audio-shaft`), and the room bed's two switches (`audio-ambience`). Every scenario also carries `fx` and `roll`. What makes it testable headless: Chrome runs `--mute-audio` WITHOUT `--autoplay-policy=no-user-gesture-required`, so the graph is fully observable while the hardware stays silent and the suspended-until-gesture state reproduces exactly |
 | `lab`      | The dice lab as a raw page (not in smoke — it bakes ~2000 canvas textures): the GEO BENCH sweep's geometry claims via `geoStats`, the SET BUILDER's live rebuild via `builderSet` + `faceDump`, lab-only ids staying out of `SET_IDS` |
 

@@ -3088,10 +3088,28 @@ function uniformRollRate(roll) {
     ? set.rate : null;
 }
 
+// EVERY DIE BODY THIS TAB HAS EVER MADE (T4). One counter, incremented at the
+// three places a physics die comes into existence — a thrown die, a pour die
+// (a fresh body per bake attempt, by design), and a lab drop. It exists for
+// the e2e suite's COSMETIC LANE: a scenario tagged `look` is claiming it
+// proves something about appearance, and the runner FAILS it if this is
+// anything but zero. "I only checked pixels" is otherwise an honour system,
+// and a cosmetic scenario that quietly pours 3d6 costs 30 seconds a run
+// forever while looking like it costs none.
+//
+// Counting bodies MADE rather than steps taken is deliberate and fails
+// closed: a body built and never added to a world still means dice were in
+// play, and the guard should not have to know which paths simulate.
+let DICE_MADE = 0;
+function dieBody(type) {
+  DICE_MADE++;
+  return createDieBody(type, diceMat);
+}
+
 function spawnDie(type, index, count, side, rng, shrouded = false, set = null) {
   const variant = dieVariant(shrouded, set);
   const mesh = createDieMesh(type, variant);
-  const body = createDieBody(type, diceMat);
+  const body = dieBody(type);
   body.linearDamping = PHYS.linearDamping;
   body.angularDamping = PHYS.angularDamping;
   // Inert at what dice.js already set (0.4 / 0.35), NOT at cannon's Body
@@ -3147,7 +3165,7 @@ function spawnPourDie(type, shrouded, set) {
 // the pour makes a FRESH body per bake attempt (the exit guarantee re-bakes,
 // and a body that has already been simulated and frozen is not a clean slate).
 function pourBody(type) {
-  const body = createDieBody(type, diceMat);
+  const body = dieBody(type);
   body.linearDamping = PHYS.linearDamping;
   body.angularDamping = PHYS.angularDamping;
   body.sleepSpeedLimit = SLEEP.speed;
@@ -9644,7 +9662,7 @@ function stepTowerLab(dt) {
     const doorCap = v.flight.capY;   // the engine's clamp, not a second copy
     const spawnY = Math.min(Math.max(h.exit.y, laneTop + 1.4), doorCap);
     TOWERLAB.hidden.splice(i, 1);
-    const body = createDieBody(h.type, diceMat);
+    const body = dieBody(h.type);
     body.labName = `die${TOWERLAB.born++}:${h.type}`;
     body.linearDamping = PHYS.linearDamping;
     body.angularDamping = PHYS.angularDamping;
@@ -11629,6 +11647,12 @@ window.__diceDebug = {
     };
   },
   tableExtents() { return { w: TABLE_W, d: TABLE_D }; },
+  // THE COSMETIC LANE'S FAIL-CLOSED GUARD (T4 — see DICE_MADE). Every die body
+  // this tab has ever built, thrown or poured or dropped on the bench. The e2e
+  // runner reads it after any scenario tagged `look` and refuses a non-zero
+  // answer: a scenario that claims to be about appearance may not be paying
+  // for physics. Monotone by construction — there is no way to give one back.
+  diceEverMade() { return DICE_MADE; },
   openSettings() { openSettingsModal(); },
   // Your data → the file door (§G1), minus the native picker no headless run
   // can ever click. loadText() is exactly what a chosen file does once read;

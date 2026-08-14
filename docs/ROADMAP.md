@@ -3176,7 +3176,46 @@ appeared. Three things came out of it that were not just a re-pin:
   `towerFilmDigest` (spec + volumes + POUR + the plan pourPlan draws).
   Red-checked: a declared `out.w` edit still reports `portals.out.w: 4.6 → 4.2`.
 
-### T4. Split the cosmetic lane in the e2e suite — small-medium
+### T4. Split the cosmetic lane in the e2e suite — SHIPPED 2026-08-14
+All four wants, and the fourth found something.
+
+- **The `look` tag is enforced, not documented.** `runScenarios` reads
+  `__diceDebug.diceEverMade()` from every tab after a `look` scenario and
+  fails on any non-zero count — or on a counter it cannot READ, because a
+  guard that passes when its instrument is missing is this project's
+  dominant failure mode. `DICE_MADE` counts die BODIES at the three places
+  one comes into existence (throw, pour, lab drop), which fails closed: a
+  body built and never stepped still means dice were in play.
+- **`tower-dressing`** (tags `tower`, `look`) holds the claims that moved out
+  of `tower-roll`: 13s against 38s, and it covers every skinned row instead
+  of every row-but-the-first.
+- **The budget is an assertion**, and it was a wish: the day it ran,
+  heartwood measured 11 dressing draw calls and bastion 9 against a written
+  rule of 8. Triangles are fine everywhere (worst: hollowbole 2644 of 4000).
+  See T14 — the two are waived by name AND by value rather than by raising
+  the budget to fit them, and the waiver is self-cleaning (a listed row that
+  comes back inside the budget FAILS, so a fix forces its line to be deleted).
+- **Claims are aggregates** over the `towerSkin*` subtree, not named meshes.
+
+Red checks, all three seen: a `look` scenario that rolls → RED; with the
+scenario's own assertion removed, the RUNNER catches it → RED with the same
+count; with the debug hook renamed away, the guard refuses to pass → RED.
+
+### T14. Two towers have been over the dressing draw budget the whole time — small
+Found the moment T4 turned "≤ 4k triangles and ≤ 8 draw calls of dressing"
+from a printed number into an assertion: heartwood's dressing is **11** draw
+calls (9 in `towerSkinDress`, 2 in `towerDressFx`) and bastion's is **9**.
+Both are inside the triangle half by a wide margin, and every newer tower is
+inside both. Nothing is visibly wrong — this is frame cost on a scene that
+already spends 49–88 draws — but the rule has been decorative since the
+dressing pass, which is exactly the thing T4 existed to stop.
+Fix shape: a merge pass on the two classic prop kits (they are 9 and 8
+separate meshes; the kit already knows how to bake a shared canvas, so this is
+geometry merging rather than art). Until then `DRESS_DRAW_WAIVER` in
+`tower-dressing` names them with their measured counts, so neither can grow
+and fixing one deletes its line.
+
+### T4 (original entry, kept for the shape it asked for) — small-medium
 The policy exists in the tools (`gate:cosmetic`) but not yet in
 `scenarios.mjs`, so a pure mesh change still drags a 38s physics scenario.
 Wants: a `look` tag with a fail-closed no-roll guard in `run.mjs` (a

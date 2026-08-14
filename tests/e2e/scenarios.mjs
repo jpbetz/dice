@@ -10339,6 +10339,144 @@ export const scenarios = [
     },
   },
   {
+    name: 'tower-dressing',
+    tags: ['tower', 'look'],
+    // THE COSMETIC LANE (ROADMAP T4). Every claim here is about GEOMETRY,
+    // GROUPS and DECLARATIONS — what the model brought, what it named it, what
+    // it costs — and not one of them needs a die. That is not an accident of
+    // how it happens to be written: the charter says physics and the pour film
+    // are a function of (portal spec, engine constants, seed) and the mesh is
+    // not an input, so a mesh change owes measurements and LOOK sheets and
+    // owes simulation NOTHING. These claims used to live inside `tower-roll`,
+    // which pours; a pure dressing change could only be proved by paying for
+    // a physics scenario, which is how a cosmetic edit ends up costing 38
+    // seconds instead of eight.
+    //
+    // The `look` tag is enforced, not documented: runScenarios reads
+    // __diceDebug.diceEverMade() from every tab afterwards and fails the
+    // scenario if a single die body was built — or if the counter cannot be
+    // read at all. See noDiceGuard in harness.mjs.
+    //
+    // WHAT MOVED, AND WHAT IS NEW. The four claims below came over from
+    // tower-roll unchanged in substance (the two biconditionals keep their
+    // full reasoning there). Two are new:
+    //   · THE BUDGET IS AN ASSERTION. "≤ 4k triangles and ≤ 8 draw calls of
+    //     dressing" has been the rule since the dressing pass and lived as a
+    //     printed number in tools/steps/tower-dress.mjs, which is a wish. A
+    //     budget nobody fails is not a budget.
+    //   · THE COSMETIC CLAIM IS AN AGGREGATE. What is asserted is the total
+    //     over the `towerSkin*` subtree, not the presence of one named mesh —
+    //     `venue-set` breaking the day somebody deleted a berm is the
+    //     precedent, and a suite that names individual meshes turns every
+    //     legitimate re-massing into a test edit.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.settle();
+
+      const registry = await a.dbg('towerRegistry()');
+      const skinned = registry.filter((t) => t.skin);
+      assert.ok(skinned.length >= 4,
+        `every skinned row is walked (${skinned.map((t) => t.id).join(', ')}) — `
+        + 'and there are enough of them that this is a sweep, not a spot check');
+
+      for (const model of skinned) {
+        const id = model.id;
+        await a.dbg(`setTower('${id}')`);
+        await a.waitFor(`window.__diceDebug.tower === '${id}'`,
+          { desc: `${model.label} is up (a baked row waits for its model)` });
+
+        const dr = await a.dbg('towerDressAudit()');
+        const names = dr.groups.map((g) => g.name);
+
+        // (1) THE SKIN IS THERE AT ALL, as an aggregate. A model that failed
+        // to build, or a loader that dropped the geometry on the floor, leaves
+        // an audit that answers politely with nothing — and every claim after
+        // it would be vacuously true. Triangles across the whole subtree, so
+        // re-massing a tower is not a test edit.
+        assert.ok(dr.tris > 0 && dr.draws > 0,
+          `${id}: the audit SEES a skin — ${dr.tris} tris in ${dr.draws} draws. `
+          + `Zero here makes every line below vacuous`);
+
+        // (2) THE DRESS GROUP, exactly where the row declares one. Biconditional
+        // in both directions — the reasoning is in tower-roll's history: a
+        // baked row that bakes its props into the GLB declares dress:false and
+        // must then carry NO group, so an empty group cannot hide behind the
+        // declaration either.
+        const dressed = !model.glb || !!model.dress;
+        assert.equal(names.includes('towerSkinDress'), dressed,
+          `${id}: declares dress=${!!model.dress} (glb=${model.glb}), so it must `
+          + `${dressed ? 'carry' : 'carry NO'} towerSkinDress (groups: ${names.join(', ')})`);
+        if (dressed) {
+          const dg = dr.groups.find((g) => g.name === 'towerSkinDress');
+          assert.ok(dg.meshes > 0 && dg.tris > 0,
+            `${id}: …and it carries geometry (${dg.meshes} meshes, ${dg.tris} tris)`);
+        }
+
+        // (3) THE DRESSING BUDGET, as an assertion (NEW). The budget is on the
+        // DRESSING, not on the model — a hero tower is allowed to be a hero —
+        // so it is measured over the two dress groups only.
+        //
+        // AND THE FIRST THING IT FOUND WAS TWO OVERRUNS. "≤ 4k triangles and
+        // ≤ 8 draw calls" has been the written rule since the dressing pass
+        // and lived as a printed number in a tool; the day it became an
+        // assertion, heartwood measured 11 draws and bastion 9. Triangles are
+        // fine everywhere (the worst is hollowbole's 2644). Nobody knew,
+        // because a printed number is a wish.
+        //
+        // The two are WAIVED BY NAME AND BY VALUE rather than by raising the
+        // budget to fit them — fitting the rule to the code is how a budget
+        // stops meaning anything, and 11 draws is a merge pass on a prop kit,
+        // not a licence (ROADMAP T14). The waiver is self-cleaning: a row
+        // listed here that turns out to be INSIDE the budget fails too, so
+        // fixing a tower forces its line to be deleted rather than left to rot.
+        const DRESS_DRAW_WAIVER = { heartwood: 11, bastion: 9 };
+        const dressGroups = dr.groups.filter(
+          (g) => g.name === 'towerSkinDress' || g.name === 'towerDressFx');
+        const dTris = dressGroups.reduce((n, g) => n + g.tris, 0);
+        const dDraws = dressGroups.reduce((n, g) => n + g.draws, 0);
+        assert.ok(dTris <= 4000,
+          `${id}: the dressing is inside its triangle budget (${dTris} <= 4000, `
+          + `over ${dressGroups.map((g) => g.name).join(' + ') || 'no dress groups'})`);
+        if (id in DRESS_DRAW_WAIVER) {
+          assert.ok(dDraws > 8,
+            `${id}: is listed as a declared draw-call overrun but measures `
+            + `${dDraws} <= 8 — it is inside the budget now, so delete its line `
+            + `from DRESS_DRAW_WAIVER instead of leaving a waiver nobody needs`);
+          assert.ok(dDraws <= DRESS_DRAW_WAIVER[id],
+            `${id}: a DECLARED overrun of the 8-draw dressing budget, and it may `
+            + `not grow (${dDraws} <= ${DRESS_DRAW_WAIVER[id]}). See ROADMAP T14`);
+        } else {
+          assert.ok(dDraws <= 8,
+            `${id}: and inside its draw-call budget (${dDraws} <= 8)`);
+        }
+
+        // (4) THE FAMILY TRAITS. An ember on the row (somebody lit it tonight),
+        // and no light in the skin — the tower's one warm light is the
+        // engine's, built against the socketed core.
+        assert.ok(dr.ember,
+          `${id}: the registry row carries the family trait — a warm focal light`);
+        assert.equal(dr.lights, 0, `${id}: and the skin still brings zero lights`);
+
+        // (5) IDLE MOTION, where the row declares it. Same biconditional shape
+        // as (2): a row that declares no dress must have nothing moving.
+        const expectMotion = !model.glb || !!model.dress;
+        assert.equal(dr.sways + dr.smokes > 0, expectMotion,
+          `${id}: declares dress=${!!model.dress} (glb=${model.glb}), so it must `
+          + `${expectMotion ? 'have' : 'have NO'} idle motion when nobody is touching it `
+          + `(${dr.sways} sways, ${dr.smokes} plumes)`);
+      }
+
+      // And the lane's own promise, stated where a reader will meet it: this
+      // whole sweep socketed every model in the registry, read its geometry,
+      // its groups, its budget and its declarations — and rolled nothing. The
+      // runner is what proves it (noDiceGuard); this is the reminder that the
+      // number is supposed to be zero.
+      assert.equal(await a.dbg('diceEverMade()'), 0,
+        'the cosmetic lane simulated no dice — asserted here as well as by the '
+        + 'runner, so the promise is visible in the scenario that makes it');
+    },
+  },
+  {
     name: 'tower-glb-loader',
     tags: ['tower', 'glb'],
     // A TOWER THAT ARRIVES OVER THE NETWORK (js/towerglb.js, C5). Every tower
@@ -11201,60 +11339,13 @@ export const scenarios = [
           `${id}: and an ordinary landing is still the die set — the tower `
           + 'voices its own knocks, not the whole roll');
 
-        // ---- the DRESSING, asked of every skinned model in the same loop ---
-        // Three claims, all new (docs/TOWER.md, DRESSING):
-        //   · the two groups exist and the opaque one carries geometry. The
-        //     names are the contract — `towerSkinDress` is measured by
-        //     tower-fit and counted by the occlusion proof; `towerDressFx`
-        //     is deliberately in neither.
-        //   · the row carries `ember`. A warm focal light is the FAMILY
-        //     trait, so a new model without one is a model that does not
-        //     belong to the family, and that is a registry claim rather than
-        //     a per-tower one.
-        //   · nothing is inside out: the fit audit reports zero lights and no
-        //     off-policy material a skin's props could have introduced.
-        const dr = await a.dbg('towerDressAudit()');
-        const names = dr.groups.map((g) => g.name);
-        // V2 ADAPTATION, SECOND HALF (nullstone, 2026-08-13). NEW CLAIM: the
-        // dress GROUP is asked for only where the row says it dresses itself.
-        // OLD: `assert.ok(names.includes('towerSkinDress'))` for every skinned
-        // row. WHY IT MOVED: the motion half below already reads `row.dress`,
-        // but this half still demanded the group unconditionally — so the
-        // first tower to bake ALL of its dress into the GLB and declare
-        // `dress: false` failed a scenario for owning no code-side props,
-        // which is the thing /new-tower v2 asks a baked tower to do. Written
-        // as a BICONDITIONAL for the same reason as the motion line: a row
-        // that declares no dress must carry no dress group either, so an
-        // empty group cannot hide behind the declaration.
-        const dressed = !model.glb || !!model.dress;
-        assert.equal(names.includes('towerSkinDress'), dressed,
-          `${id}: declares dress=${!!model.dress} (glb=${model.glb}), so it must `
-          + `${dressed ? 'carry' : 'carry NO'} towerSkinDress (groups: ${names.join(', ')})`);
-        if (dressed) {
-          const dg = dr.groups.find((g) => g.name === 'towerSkinDress');
-          assert.ok(dg.meshes > 0 && dg.tris > 0,
-            `${id}: …and it carries geometry (${dg.meshes} meshes, ${dg.tris} tris)`);
-        }
-        assert.ok(dr.ember,
-          `${id}: the registry row carries the family trait — a warm focal light`);
-        assert.equal(dr.lights, 0, `${id}: and the skin still brings zero lights`);
-        // V2 ADAPTATION (W3). NEW CLAIM: the row DECLARES whether it dresses
-        // itself, and the declaration is checked in both directions.
-        // OLD: `assert.ok(dr.sways + dr.smokes > 0)` for every skinned row.
-        // WHY IT MOVED: under /new-tower v2 a baked tower bakes its STATIC
-        // dress into the GLB and keeps only idle MOTION code-side, so "every
-        // model must move" stopped being a property of the registry and became
-        // a property each row states (`dress`). Classic rows are unaffected by
-        // construction — they are not `glb`, so `expectMotion` is true for them
-        // exactly as before, and this line still fails if heartwood's ivy stops
-        // swaying. The biconditional is STRONGER than the old one-way check: a
-        // baked row that declares no dress must now have NOTHING moving, so a
-        // stray sway cannot hide behind a missing declaration either.
-        const expectMotion = !model.glb || !!model.dress;
-        assert.equal(dr.sways + dr.smokes > 0, expectMotion,
-          `${id}: declares dress=${!!model.dress} (glb=${model.glb}), so it must `
-          + `${expectMotion ? 'have' : 'have NO'} idle motion when nobody is touching it `
-          + `(${dr.sways} sways, ${dr.smokes} plumes)`);
+        // The DRESSING claims used to live here, inside this loop, and they
+        // moved out to `tower-dressing` (ROADMAP T4): they are questions about
+        // geometry, groups and declarations, every one of them answerable
+        // without a die in the room, and keeping them here meant a mesh change
+        // could only be proved by a scenario that pours. They are not weaker
+        // for moving — they gained the dressing BUDGET, which was a printed
+        // number in a tool until then.
 
         // ---- the PORTAL SPEC this model resolves to ------------------------
         // Every model shipped so far declares no portals and therefore gets

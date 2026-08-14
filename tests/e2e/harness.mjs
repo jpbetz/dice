@@ -509,6 +509,50 @@ export class Ctx {
   }
 }
 
+// THE `look` TAG IS A PROMISE, AND THIS IS WHAT MAKES IT ONE (ROADMAP T4).
+//
+// A tower model is theatre over invisible engine colliders: physics and the
+// pour film are a function of (portal spec, engine constants, seed) and the
+// mesh is not an input. So a cosmetic claim owes no simulation — and the
+// SAVING is the whole point of the lane, since a pour is tens of seconds and a
+// geometry read is milliseconds. But "this scenario simulates nothing" written
+// in a comment is an honour system, and the failure mode is silent: a `look`
+// scenario that quietly rolls 3d6 costs half a minute a run forever while
+// advertising that it costs none.
+//
+// So the runner asks the page. FAIL CLOSED in both directions: a non-zero
+// count fails, and a count that cannot be READ fails too — a guard that
+// silently passes when its instrument is missing is exactly the green check
+// this project keeps catching itself writing.
+async function noDiceGuard(s, ctx) {
+  if (!s.tags.includes('look')) return null;
+  if (!ctx.tables.length) {
+    return new Error("tagged 'look' but opened no tab — nothing was proved about anything");
+  }
+  for (const t of ctx.tables) {
+    let n;
+    try {
+      n = await t.dbg('diceEverMade()');
+    } catch (e) {
+      return new Error(`tagged 'look' but the no-dice guard could not read `
+        + `__diceDebug.diceEverMade() (${e.message}) — the guard is the claim, `
+        + `so an unreadable guard is a failure, not a pass`);
+    }
+    if (typeof n !== 'number') {
+      return new Error(`tagged 'look' but diceEverMade() answered `
+        + `${JSON.stringify(n)} — see the note above about unreadable guards`);
+    }
+    if (n > 0) {
+      return new Error(`tagged 'look' but ${n} die bod${n === 1 ? 'y was' : 'ies were'} `
+        + `built in this tab. A cosmetic scenario proves things about geometry, `
+        + `materials and layout, all of which are readable without simulating a `
+        + `single die — drop the roll, or drop the tag and pay for the lane it `
+        + `belongs in`);
+    }
+  }
+  return null;
+}
+
 export async function runScenarios(scenarios, { only = null, full = false } = {}) {
   const selected = scenarios.filter((s) => {
     if (only) return only.includes(s.name) || s.tags.some((t) => only.includes(t));
@@ -544,6 +588,7 @@ export async function runScenarios(scenarios, { only = null, full = false } = {}
       const { errors, warnings } = ctx.collectErrors();
       if (errors.length) err = new Error(`uncaught page exception(s):\n  ${errors.join('\n  ')}`);
       for (const w of warnings) console.log(`    (console.error) ${w.slice(0, 200)}`);
+      if (!err) err = await noDiceGuard(s, ctx);
     } catch (e) {
       err = e;
     } finally {

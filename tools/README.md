@@ -77,8 +77,14 @@ portal, and a gate that reds for reasons its readers wave through has stopped
 being a gate.
 
 ```bash
-npm run gate:cosmetic -- <tower>     # the whole measuring set + model sheets
+npm run gate:cosmetic -- <tower>          # the whole measuring set + model sheets
+node tests/e2e/run.mjs --only look        # and the e2e half of the same lane
 ```
+
+The `look` tag is the suite's side of this policy, and it is ENFORCED: a
+scenario carrying it may not simulate a die, and the runner proves that by
+reading `__diceDebug.diceEverMade()` afterwards rather than trusting the
+comment (docs/TESTING.md, ROADMAP T4).
 
 **THE LOOP FOR A NEW TOWER, in the order that costs least** (nullstone's own
 postmortem, 2026-08-13 — its look loop cost more than the rest of the job put

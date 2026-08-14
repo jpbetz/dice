@@ -275,11 +275,17 @@ The gates and proofs, in order:
   pool sizes) before calling the sill final.
 - (d) ZERO COLLIDERS — tower-fit asserts the world body count.
 - e2e: `tower-roll`'s registry loop covers a new row the day it registers
-  (voice distinct, ember present, pour delivered, swap through the
-  towerless body list). `tower-glb-loader` pins the loader path itself. A
-  venueOnly tower keeps its venue scenario. `tower-contract-freeze` must
-  stay green UNTOUCHED — if your change moves it, you changed the classic
-  core, which is not what shipping a tower is.
+  (voice distinct, pour delivered, swap through the towerless body list),
+  and `tower-dressing` — the COSMETIC lane, `--only look`, 13s and no dice —
+  covers its groups, its skin as an aggregate, its dressing budget and its
+  ember. `tower-glb-loader` pins the loader path itself. A venueOnly tower
+  keeps its venue scenario. **`tower-contract-freeze` will go RED on a new
+  row and that is the gate working**: every registered tower must have a
+  frozen contract, so re-capture with
+  `node tools/drive.mjs tools/steps/tower-contract-capture.mjs` and review
+  the diff — a new tower ADDS rows and moves no number. If an existing
+  number moved, you changed the classic core, which is not what shipping a
+  tower is.
 - `npm test` — the FIRST LAW is measured by the untouched suite: with
   tower 'none' the app is byte-for-byte the old one.
 
