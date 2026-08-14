@@ -691,11 +691,21 @@ function buildSceneryBits(pal, seed) {
   // Legality at a corner is OUTSIDE THE DICE BOX AT EVERY POINT — the
   // box is the INTERSECTION of the walls, so a bit clears it past the
   // front wall (z − rz > 4.3) OR past the x wall (|x| − rx > 7.05).
-  // These clear via the x wall.
-  tuft(-8.2, 4.7, 10, 1.5, 'faeSceneryTuftL');
-  items.push({ x: -8.2, z: 4.7, rx: 0.8, rz: 0.8, band: 'fore' });
-  tuft(-8.0, 5.2, 6, 1.1, 'faeSceneryTuftL2');
-  items.push({ x: -8.0, z: 5.2, rx: 0.6, rz: 0.6, band: 'fore' });
+  // These clear via the x wall, so their z is free.
+  //
+  // W7 ②, AND THE PROBE THAT SAID SO WAS RIGHT ABOUT THE BAND AND WRONG
+  // ABOUT THE SEATS. z 4.7 and 5.2 sat at the very lip of the visible
+  // sliver: the frame gate (tools/steps/glade-frame.mjs, F6) measures how
+  // much of a declared footprint the frame KEEPS, and it found 58% and 17%
+  // — a wing doing almost none of its job, with two rows of blade tips to
+  // show for it. The seats come back to 4.0 and 4.4, which keeps them in
+  // FRONT of the ring (z 3.2) so the near corner still reads as two depths,
+  // and puts 100%/81% of each tuft in the picture. Nothing about legality
+  // moves: the x wall is what clears these and x is unchanged.
+  tuft(-8.2, 4.0, 10, 1.5, 'faeSceneryTuftL');
+  items.push({ x: -8.2, z: 4.0, rx: 0.8, rz: 0.8, band: 'fore' });
+  tuft(-8.0, 4.4, 6, 1.1, 'faeSceneryTuftL2');
+  items.push({ x: -8.0, z: 4.4, rx: 0.6, rz: 0.6, band: 'fore' });
 
   // The fallen branch (back band): lies on the moot→socket lobe, its
   // heading agreeing with the circuit — it points at the berm's toe,
@@ -1322,8 +1332,24 @@ export function buildFaeConcept({
   // two nearest the back wall stopped clearing the box the moment the caps
   // grew. Each is pushed just far enough out to hold its own rule at the new
   // reach, and the two with the least room keep the smallest fungus.
+  //
+  // AND THREE OF THEM MOVED AGAIN, BECAUSE THE SCATTER WAS SYMMETRIC IN THE
+  // FRAME (2026-08-14). Authored in plan the population looks thoroughly
+  // irregular; projected, `glade-frame`'s F1 found THREE pairs sitting where
+  // each other's reflection in the tower's centreline would be, on one band,
+  // at comparable angular size — clump 0 with 3 (Δ0.051 of frame width),
+  // 6 with 9 (Δ0.008), 7 with 8 (Δ0.042). That is the *"symmetrical and
+  // formal"* Joe named, arrived at by accident, and it is invisible to every
+  // plan-space claim in venue-set. The three moves below break each pair and
+  // change nothing else: only x/z, because ONE mulberry32 stream draws the
+  // whole population and adding, dropping or reordering a member re-rolls
+  // every cap after it — sizes, kinds, topples, and therefore every declared
+  // extent the placement law is asserted about. (x, z, r and scale are all
+  // RNG-free; n and the array's order are not.)
   const shrooms = buildMushroomScatter(pal, seed, [
-    { x: -6.9, z: -7.2, r: 1.7, n: 6, scale: 0.55, lit: true, band: 'back' },
+    // −6.9 → −7.5: out of clump 3's reflection, and tighter into the old
+    // court's group. It moves AWAY from the tower, so its margin only grows.
+    { x: -7.5, z: -7.2, r: 1.7, n: 6, scale: 0.55, lit: true, band: 'back' },
     { x: -5.6, z: -6.0, r: 1.1, n: 4, scale: 0.40, band: 'back' },
     { x: -10.8, z: -9.0, r: 1.8, n: 6, scale: 0.75, band: 'back' },
     { x: 5.8, z: -8.6, r: 1.3, n: 5, scale: 0.50, band: 'back' },
@@ -1335,8 +1361,12 @@ export function buildFaeConcept({
     { x: -13.0, z: -6.1, r: 1.2, n: 4, scale: 0.55, band: 'back' },
     { x: 12.2, z: -9.6, r: 1.5, n: 5, scale: 0.70, band: 'back' },
     { x: -8.2, z: -11.5, r: 1.6, n: 5, scale: 0.80, band: 'back' },
-    { x: 7.7, z: -12.0, r: 1.5, n: 5, scale: 0.80, band: 'back' },
-    { x: -9.6, z: -1.5, r: 1.0, n: 4, scale: 0.75, band: 'fore' },
+    // 7.7 → 8.8: under the pond's far side rather than floating in the gap
+    // between pond and tower, and out of clump 7's reflection.
+    { x: 8.8, z: -12.0, r: 1.5, n: 5, scale: 0.80, band: 'back' },
+    // −9.6 → −11.6: the corridor's mouth opens wider and funnels toward the
+    // ring, which is what a trail does, and it leaves clump 6's reflection.
+    { x: -11.6, z: -1.0, r: 1.0, n: 4, scale: 0.75, band: 'fore' },
     { x: -9.9, z: 1.6, r: 0.9, n: 3, scale: 0.70, lit: true, band: 'fore' },
     { x: -9.5, z: 3.2, r: 0.9, n: 3, scale: 0.65, band: 'fore' },
   ]);
