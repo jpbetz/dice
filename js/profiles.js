@@ -69,16 +69,40 @@ limitations under the License.
 // reads the same under every lens — so the profile survives.
 
 import { cutText } from './notation.js';
+import { STAMP as SCHEMA_STAMP, judgeStamp } from './schema.js';
 
 export const STORE_KEY = 'dice.profiles.v1';
-// WRITTEN, NEVER READ — and that is a hole, not an oversight this file should
-// plug on its own. emptyStore stamps it and normalizeStore has no branch on it,
-// so a key written by a future shape is normalized by TODAY's rules and the
-// difference is invisible. The `epoch.major.minor` contract (ROADMAP C22) is
-// what will own reading this; until it lands, normalizeStore merely REPORTS the
-// version it found (see its `report` argument) so the boot path can say "this
-// came from something else" rather than quietly healing it.
+
+// STORE_VERSION was written into every store and READ BY NOTHING. It is kept
+// — a stored `v: 1` is in every browser in the field and dropping the field
+// would make this build's stores unreadable by the one before it for no gain
+// — but it is no longer the version that means anything. `ver` is (C22).
+// normalizeStore still has no branch on it and never will; what it does now
+// is REPORT what it found (see its `report` argument) so the boot path can
+// say "this came from something else" instead of quietly healing it.
 export const STORE_VERSION = 1;
+
+// C22's three numbers, on the store. `ver` rather than reusing `v` because `v`
+// already has a meaning in the field that this does not share, and a field
+// that means two things across two builds is exactly the ambiguity the whole
+// contract exists to remove.
+export const STORE_STAMP = SCHEMA_STAMP;
+
+// The one door a stored library takes on its way in. Returns
+// {ok: true, raw} — hand it to normalizeStore — or {ok: false, message} when
+// the blob is NEWER than this build in a way that would lose data, in which
+// case the caller must show `message` and load NOTHING. Purge and convert are
+// the origin-wide epoch mechanism's business (main.js), not this store's: by
+// the time a blob reaches here it is this epoch's by construction.
+//
+// Absent `ver` is the normal case for years of stored libraries and loads
+// exactly as it always did — see judgeStamp for why that is correct and not
+// merely lenient.
+export function readStore(raw) {
+  const verdict = judgeStamp(raw && typeof raw === 'object' ? raw.ver : undefined, 'your saved pools');
+  if (verdict.action === 'refuse') return { ok: false, message: verdict.message, stamp: verdict.stamp };
+  return { ok: true, raw, stamp: verdict.stamp };
+}
 
 // Joe's number (2026-08-08). Two campaigns' worth of characters plus the
 // NPCs, which is what the library is for; past that a list stops being
@@ -148,7 +172,7 @@ export function uniqueName(store, wanted, { exceptId = null } = {}) {
 // itself, and a map keyed by system would have to be repaired every time a
 // profile is deleted or its system changes.
 export function emptyStore() {
-  return { v: STORE_VERSION, seq: 0, activeId: null, profiles: [] };
+  return { v: STORE_VERSION, ver: STORE_STAMP, seq: 0, activeId: null, profiles: [] };
 }
 
 export const profilesOf = (store) => (store && Array.isArray(store.profiles) ? store.profiles : []);

@@ -29,12 +29,14 @@ import { previewOf, countingPmfs } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealStartingRack, dealRack, dealName } from './seed.js';
 import { resolveChannel, PARAM as STABILITY_PARAM } from './stability.js';
+import { EPOCH as SCHEMA_EPOCH, STAMP as SCHEMA_STAMP, judgeStamp, convert as schemaConvert } from './schema.js';
 import { exportYaml, parsePortable, planImport, profileToImport } from './portable.js';
 import {
   MAX_PROFILES, MAX_POOLS, knownSystem, emptyStore, normalizeStore, profilesOf, findProfile,
   activeProfile, profilesFor, lastUsedFor, isFull, nameProfile, uniqueName,
   addProfile, renameProfile, deleteProfile, setActive, writeActivePools,
   setActiveSystem, setProfileSet, migrateLegacy, rebuildStore, toWire, fromWire,
+  readStore,
 } from './profiles.js';
 import { THEMES, SETS } from './themes.js';
 import { ParticleField } from './particles.js';
@@ -13045,6 +13047,55 @@ window.__diceDebug = {
       rollId: d.rollId || null,
     }));
   },
+  // THE FELT, COMPARABLE ACROSS CLIENTS (ROADMAP §3, table resync). Goal 8's
+  // claim about the table is "the same dice at the same poses", and no hook
+  // could say the second half: tableDiceInfo answers identity only, restInfo
+  // answers deltas from a per-client archive pose. This answers the pose
+  // itself, quantised so two clients that simulated the same seed compare
+  // EQUAL as strings — a settled replay and a watched throw must land on the
+  // same numbers or the resync is decorative. Sorted by (rollId, dieIndex)
+  // rather than spawn order, because a reload rebuilds tableDice from the log
+  // and a live client built it from the throw; the array order is an
+  // implementation detail and comparing it would fail for the wrong reason.
+  feltPoses() {
+    const q3 = (n) => Math.round(n * 1000) / 1000;
+    return tableDice
+      .map((d) => ({
+        rollId: d.rollId || null,
+        i: typeof d.dieIndex === 'number' ? d.dieIndex : -1,
+        type: d.type,
+        shrouded: d.shrouded === true,
+        // The MESH, not the body: the mesh is what the player is looking at,
+        // and a shrouded or fast-forwarded die may have no live body at all.
+        pos: [q3(d.mesh.position.x), q3(d.mesh.position.y), q3(d.mesh.position.z)],
+        quat: [q3(d.mesh.quaternion.x), q3(d.mesh.quaternion.y),
+          q3(d.mesh.quaternion.z), q3(d.mesh.quaternion.w)],
+      }))
+      .sort((a, b) => String(a.rollId).localeCompare(String(b.rollId)) || a.i - b.i);
+  },
+  // Feed this client a server event as though it had arrived on the stream.
+  // The resync paths are reachable no other way from a scenario: hello is a
+  // one-shot the harness cannot re-trigger without a reload, and the case that
+  // broke (a hello landing MID-PLAYBACK) needs the event delivered at an
+  // instant a real reconnect only reaches by luck. Same door net.js uses.
+  netEvent(type, data) { handleNetEvent(type, data); return true; },
+  // Is a settled replay parked waiting for the stage to clear? {rollId, armed}
+  // — the assertion surface for "held, not dropped".
+  get idleReplayInfo() {
+    return { held: idleReplay ? idleReplay.rollId : null, armed: !!idleReplayTimer };
+  },
+  // C22's state, as this boot resolved it. `refused` is the whole sentence, so
+  // a scenario asserts on what the player is actually told rather than on a
+  // flag; `locked` is the half that protects the data.
+  get schemaState() {
+    return {
+      stamp: SCHEMA_STAMP,
+      epoch: SCHEMA_EPOCH,
+      refused: storeRefusal,
+      locked: !!storeRefusal,
+      storeStamp: (profileStore && profileStore.ver) || null,
+    };
+  },
   // Slice 3 assertion surface: per-die cadence state + the LIVE deltas
   // (mesh pose minus the frozen archive pose) that let a scenario prove
   // "sea-glass swells", "sap-amber does not shift", "scrimshaw settles
@@ -13723,7 +13774,16 @@ function load(key, fallback) {
 // RAISE THIS ONLY for a break that cannot be migrated. Every ordinary shape
 // change belongs in normalizeStore / migrateGroup, which are lossless; this
 // is the door for "the writer was a version we cannot identify".
-const SCHEMA = 2;
+//
+// C22 FOLDED IT: this number is now js/schema.js's EPOCH, and there is no
+// second copy to disagree with it. The origin-wide purge below and the
+// per-blob stamp are the SAME epoch seen at two scales — this one is blunt
+// (every `dice.*` key at once, when the origin has never seen this epoch), the
+// stamp is per-blob (this library, this file). Keeping them in lockstep is
+// what lets judgeStamp treat an unstamped blob as this epoch's oldest data
+// instead of guessing: by the time anything reads a stamp, this has already
+// dropped everything written below EPOCH.
+const SCHEMA = SCHEMA_EPOCH;
 const LS_SCHEMA = 'dice.schema.v1';
 // TWO KEYS SURVIVE THE BREAK, AND NEITHER OF THEM IS APP STATE. The schema
 // stamp is the purge's own bookkeeping. `dice.stability.v1` is an
@@ -14911,6 +14971,17 @@ if (/[#&]g=/.test(location.hash)) {
 // becomes your profile and the rack in front of it becomes 'Recovered'. This is
 // the one place this pass gains data rather than merely moving it.
 //
+// C22: A LIBRARY FROM A NEWER BUILD IS REFUSED, NOT PARTIALLY LOADED. `major`
+// says new capabilities exist in this data, and normalizeStore is a whitelist
+// — it would happily return a store with whatever it did not recognise
+// quietly missing, and then saveGroups() four lines below would write that
+// truncated store back over the real one. So the refusal has TWO halves and
+// the mechanical one matters more than the sentence: load nothing, and LOCK
+// the key so this build can never overwrite data it cannot read. The player
+// gets an empty library for this session and their real one is still on disk
+// when they reload into a build that understands it.
+const storeRead = readStore(load(LS_PROFILES, null));
+const storeRefusal = storeRead.ok ? null : storeRead.message;
 // WHAT THE BOOT COULD NOT READ, KEPT (C15). normalizeStore is self-healing by
 // construction and the healing is LOSSY — see its header. `bootLoss` is what it
 // had to leave behind, and it is load-bearing twice below: the first write is
@@ -14919,7 +14990,29 @@ if (/[#&]g=/.test(location.hash)) {
 // load. Reading `bootLoss.version` is deliberately nobody's job yet — that is
 // ROADMAP C22's `epoch.major.minor` contract.
 const bootLoss = {};
-let profileStore = normalizeStore(load(LS_PROFILES, null), bootLoss);
+let profileStore = normalizeStore(storeRead.ok ? storeRead.raw : null, bootLoss);
+if (storeRefusal) {
+  // Deferred by one turn on purpose: this runs during module evaluation, and
+  // the surfaces that say things (setPill's element, the settings note) are
+  // consts declared thousands of lines below — reaching them from here is a
+  // TDZ error, i.e. a blank page in place of an explanation.
+  // Three surfaces, each in its own try: the sentence is the point, and one
+  // of them being unavailable must not swallow the other two. The STANDING
+  // half is the 'Not saving' banner, which saveProfileStore's false already
+  // raises — that is the state; this is the explanation.
+  setTimeout(() => {
+    for (const say of [
+      () => setPill(storeRefusal, 'notice'),
+      () => announce(storeRefusal),
+      () => showSettingsNote(storeRefusal),
+    ]) {
+      try { say(); } catch { /* next surface */ }
+    }
+  }, 0);
+  // The field log gets the numbers, which is what minor is FOR: "which build
+  // wrote the state that broke" is unanswerable without them.
+  if (window.__diceReport) window.__diceReport(`profile store refused: ${storeRefusal}`);
+}
 if (!profilesOf(profileStore).length) {
   // First boot on the library. Everything below runs ONCE — after this the
   // store is non-empty forever (deleteProfile refuses the last one), so the
@@ -15040,11 +15133,25 @@ function setStorageJammed(on) {
   if (on === storageJammed) return;
   storageJammed = on;
   paintDataBanner();
-  // The two it suppresses have to be repainted either way: on, to stand
-  // down; off, to come back if they still apply.
-  updateProfileBanner();
-  updateOfferBanner();
-  if (on) announce('Your changes are not being saved. Download your data.');
+  // …AND THE DEPENDENT REPAINTS GO ON THE NEXT TURN, because this is reachable
+  // during MODULE EVALUATION and they are not. saveGroups() runs at boot, so a
+  // browser that refuses storage at boot — Safari private browsing, a full
+  // disk, and since C22 a library this build must not overwrite — landed here
+  // with `tableSystem` still in its temporal dead zone: `updateProfileBanner`
+  // threw, module evaluation ABORTED, and the app died at the exact moment it
+  // was trying to explain itself. Deferring costs one frame on a banner that
+  // has nothing to repaint yet, and makes this callable from anywhere.
+  // The banner above stays synchronous: it is the statement, and it only
+  // touches the DOM.
+  setTimeout(() => {
+    try {
+      // The two it suppresses have to be repainted either way: on, to stand
+      // down; off, to come back if they still apply.
+      updateProfileBanner();
+      updateOfferBanner();
+      if (on) announce('Your changes are not being saved. Download your data.');
+    } catch { /* a repaint is never worth a boot */ }
+  }, 0);
 }
 
 // TWO REASONS, ONE BANNER (C15). #storage-banner already is this app's grammar
@@ -15096,6 +15203,12 @@ function bootLossSummary() {
 // old library whole, in memory and on disk, with nothing half-moved between.
 let forceStorageFail = false; // test hook only — see __diceDebug.jamStorage
 function saveProfileStore(store = profileStore) {
+  // C22's refusal, enforced. A store this build could not read is a store this
+  // build must not WRITE — every path here would replace it with a truncated
+  // copy of itself. Returning false routes through the same standing 'Not
+  // saving — your work is only on screen' banner a jammed browser gets, which
+  // is the same true statement and already carries 'Download my data'.
+  if (storeRefusal) return false;
   try {
     if (forceStorageFail) throw new Error('storage jammed (test)');
     localStorage.setItem(LS_PROFILES, JSON.stringify(store));
@@ -23562,11 +23675,67 @@ function rollToLogEntry(roll) {
 // Skipped when this client already has the roll (dice on the table, in
 // flight, or queued) — closing the audit's empty-felt-on-reload gap without
 // disturbing a live table.
+// A SETTLED ROLL WAITING OUT A LIVE PLAYBACK (see replaySettledRoll's second
+// guard). Same doctrine as the tower's heldReplay above it — a hold, not a
+// drop — for the other reason a replay cannot run at the instant it arrives.
+let idleReplay = null;             // the roll stashed while the stage is busy
+let idleReplayTimer = null;
+const IDLE_REPLAY_POLL_MS = 250;   // cheap: it only ticks while one is stashed
+const IDLE_REPLAY_MAX_MS = 30000;  // …and gives up rather than poll forever
+
+// Is the playback stage free? Exactly the question the guard asks, plus the
+// queue, because a queued roll is a playback that has not started yet.
+const replayStageBusy = () => !!(currentRoll && !currentRoll.done) || rollQueue.length > 0;
+
+// Re-attempt the stashed replay once the stage clears. Deliberately a poll and
+// not a completion hook: a roll finishes down TWO paths (stepPlayback's tail
+// and ceremonyFinish), and a hook on one of them is the half-fix that passes
+// its own test — a Check would still lose the felt. This asks the same
+// question both paths answer.
+function drainIdleReplay() {
+  if (!idleReplay) { stopIdleReplay(); return; }
+  if (replayStageBusy()) return;
+  const roll = idleReplay;
+  idleReplay = null;
+  stopIdleReplay();
+  // FRESHNESS, NOT JUST IDLENESS. While we waited, the room may have moved on:
+  // a newer roll auto-collects this one server-side, and hello/'roll-collected'
+  // will have written that into the state row. Replaying it then would stand
+  // dice back up that everyone else has already put away — the same divergence
+  // the other way round. The row is the truth; consult it before rebuilding.
+  const st = roll.rollId ? rollStates.get(roll.rollId) : null;
+  if (st && (st.cleared || st.collected)) return;
+  replaySettledRoll(roll);
+}
+
+function stopIdleReplay() {
+  if (idleReplayTimer) { clearInterval(idleReplayTimer); idleReplayTimer = null; }
+}
+
+function deferIdleReplay(r) {
+  idleReplay = r;
+  if (idleReplayTimer) return;
+  const until = Date.now() + IDLE_REPLAY_MAX_MS;
+  idleReplayTimer = setInterval(() => {
+    if (Date.now() > until) { idleReplay = null; stopIdleReplay(); return; }
+    drainIdleReplay();
+  }, IDLE_REPLAY_POLL_MS);
+}
+
 function replaySettledRoll(r) {
   if (!r || !r.rollId) return;
   if (tableDice.some((d) => d.rollId === r.rollId)) return;
-  if (currentRoll && !currentRoll.done) return; // a live playback outranks a replay
   if (rollQueue.some((q) => q.rollId === r.rollId)) return;
+  // A LIVE PLAYBACK OUTRANKS A REPLAY — BUT OUTRANKING IS NOT CANCELLING.
+  // This used to `return`, and the roll was gone for good: hello is a one-shot
+  // and nothing re-sends it, so a stream blip that reconnected while an older
+  // roll was still playing left this client's felt permanently short of the
+  // roll everyone else was looking at (goal 8), until somebody rolled again.
+  // Reachable on any table with a flaky proxy — the reconnect backoff is 1s
+  // and a playback runs ~4. Stash and re-attempt instead; the guards above run
+  // again on the retry, so a roll that arrived by some other route in the
+  // meantime is still dropped rather than doubled.
+  if (replayStageBusy()) { deferIdleReplay(r); return; }
   // …and AFTER those, because a roll this client already holds must be dropped
   // rather than held: stashing one would arm a deadline whose only effect is to
   // run the same three guards again ten seconds later.
@@ -23633,6 +23802,67 @@ function replaySettledRoll(r) {
                   // to catch a settings-changed that lost the race with hello
 }
 
+// TABLE RESYNC (ROADMAP §3) — rebuild this client's felt from a room snapshot.
+//
+// Goal 8 in one function: everything about WHERE a roll lives is server-owned
+// and rides the projected log as present-or-absent flags, so a client that has
+// just arrived — or has just missed events — can converge on the room by
+// reading them. Nothing here is a film: a collected roll settles without a
+// whisk, and the on-felt roll fast-forwards its seeded throw to the final
+// keyframe with no tumble, no sound and no ceremony. A rejoining player must
+// not be shown a moment the room already watched.
+//
+// TAKES THE SNAPSHOT, NOT AN EVENT. `/api/join`'s response and the SSE `hello`
+// carry the identical room shape on purpose (server.js roomSnapshot), and
+// until now only hello acted on it: the join path rendered the log and left
+// the felt bare, so the server's promise that the two doors show the same
+// table was true on the wire and false in the app. Both call this now. It is
+// idempotent by construction — every step below no-ops against state this
+// client already holds — which is what let hello fire it on EVERY stream
+// (re)open, and is why calling it twice in either order converges.
+function resyncTable(snapshot) {
+  if (!snapshot) return;
+  // §7.5/§3.1: 'roll-cleared' and 'reveal' are one-shot broadcasts a stream
+  // blip can swallow, and the server deliberately never re-sends them — it
+  // flags the surviving state on the logged roll instead. Replay both here or
+  // this table never converges: dice would sit forever on a roll someone
+  // finished with, and a flipped roll would keep reading '?' on the banner.
+  // applyClearRoll is a no-op for rolls with no dice on this table and defers
+  // for one still mid-playback or queued; applyReveal is idempotent and
+  // repaints the banner when the roll is the one on it.
+  for (const r of snapshot.log || []) {
+    if (!r || !r.rollId) continue;
+    if (r.revealed && (r.faceDown || r.redacted || r.visMode || r.visibility)) {
+      applyReveal(r.rollId, r);
+    }
+    if (r.cleared) applyClearRoll(r.rollId);
+  }
+  // §7.7: the server's present-or-absent flags are the one truth about where
+  // every roll lives. Adopt them, then rebuild what should be standing.
+  //
+  // THE ON-FELT ROLL IS A SCALAR, NOT A LIST, AND THE SERVER IS WHY: every
+  // path that throws goes through executeRoll, which auto-collects the whole
+  // log before pushing the new roll (server.js), so at most ONE entry can
+  // carry neither `collected` nor `cleared`. C25 Stage 1 then took the
+  // collected dice off the felt entirely, so a collected entry rebuilds
+  // nothing physical at all — it is a row in the record. `.reverse().find()`
+  // rather than an index because the log is projected per viewer and a secret
+  // roll is OMITTED from it: positions are not stable across viewers, the
+  // flags are.
+  const entries = (snapshot.log || []).filter((r) => r && r.rollId);
+  for (const r of entries) {
+    const st = rollState(r.rollId);
+    st.cleared = !!r.cleared;
+    if (r.collected) st.collected = r.collected;
+  }
+  for (const r of entries) {
+    if (!r.cleared && r.collected) applyRollCollected(r.rollId, r.collected, false);
+  }
+  const onFelt = [...entries].reverse().find((r) => !r.cleared && !r.collected);
+  if (onFelt) replaySettledRoll(onFelt);
+  renderLog(); // the rows pick up their collected dress and their verbs
+}
+
 function handleNetEvent(type, data) {
   if (!data) return;
   switch (type) {
@@ -23676,41 +23906,7 @@ function handleNetEvent(type, data) {
       // so the unclaimed chairs describe the room this hello just described.
       renderPlayers();
       maybeRepushTable();
-      // §7.5/§3.1 resync: 'roll-cleared' and 'reveal' are one-shot broadcasts a
-      // stream blip can swallow, and the server deliberately never re-sends
-      // them — it flags the surviving state on the logged roll instead. Replay
-      // both here or this table never converges: dice would sit forever on a
-      // roll someone finished with, and a flipped roll would keep reading '?'
-      // on the banner. applyClearRoll is a no-op for rolls with no dice on this
-      // table and defers for one still mid-playback or queued; applyReveal is
-      // idempotent and repaints the banner when the roll is the one on it.
-      for (const r of data.log || []) {
-        if (!r || !r.rollId) continue;
-        if (r.revealed && (r.faceDown || r.redacted || r.visMode || r.visibility)) {
-          applyReveal(r.rollId, r);
-        }
-        if (r.cleared) applyClearRoll(r.rollId);
-      }
-      // §7.7 resync: the server's present-or-absent flags are the one truth
-      // about where every roll lives. Adopt them, then rebuild what should be
-      // standing: collected entries settle straight into their slots (no
-      // whisk), and the newest on-felt entry fast-forwards its seeded throw
-      // to the final keyframe. Both are idempotent against dice this client
-      // already has, so a reconnect hello disturbs nothing.
-      {
-        const entries = (data.log || []).filter((r) => r && r.rollId);
-        for (const r of entries) {
-          const st = rollState(r.rollId);
-          st.cleared = !!r.cleared;
-          if (r.collected) st.collected = r.collected;
-        }
-        for (const r of entries) {
-          if (!r.cleared && r.collected) applyRollCollected(r.rollId, r.collected, false);
-        }
-        const newest = [...entries].reverse().find((r) => !r.cleared && !r.collected);
-        if (newest) replaySettledRoll(newest);
-        renderLog();
-      }
+      resyncTable(data);
       break;
     case 'player-joined':
       if (data.player && !players.some((p) => p.id === data.player.id)) {
@@ -24899,6 +25095,15 @@ async function initNet() {
     offers = conn.offers || [];
     renderOffers();
     applyRoomSettings(conn.settings); // room settings from the join response
+    // …and the FELT the join response describes (ROADMAP §3). Everything above
+    // renders the room's chrome from this snapshot and used to stop there,
+    // leaving the table bare until hello arrived to do the resync — which is
+    // fine while the stream opens, and is an empty felt against a live room
+    // when it does not (SSE blocked or buffered by a proxy: connect() still
+    // reports online). The two payloads are identical by construction now
+    // (server.js roomSnapshot), so acting on both is what makes that identity
+    // mean anything. Idempotent, so whichever door arrives second is free.
+    resyncTable(conn);
     setPill(null);
     // A table you actually reached is a table you can come back to (§3b L3).
     // Written HERE, on a successful join, so the lobby's list can never

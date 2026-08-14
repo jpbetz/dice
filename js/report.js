@@ -47,6 +47,19 @@ limitations under the License.
   var MAX_PER_SESSION = 12;
   var STACK_CHARS = 900;
 
+  // C22'S THIRD NUMBER, EARNING ITS KEEP. `minor` exists so a bug report names
+  // a build, and it can only do that if it rides the report. This is the whole
+  // reason the frozen-mtime bug was undiagnosable: months-old clients in front
+  // of a current server, and nothing in the field log said which.
+  //
+  // HARD-CODED, NOT IMPORTED, and the duplication is deliberate. This file is
+  // a classic script that runs before the module graph precisely so it can
+  // catch main.js failing to PARSE — importing js/schema.js would make the
+  // reporter share the fate of the thing it reports on, and the one crash
+  // worth the most would arrive with no version on it. Keep in lockstep with
+  // js/schema.js's STAMP; tests/schema.test.mjs fails if they drift.
+  var SCHEMA_STAMP = '2.0.0';
+
   var sent = 0;
   var seen = Object.create(null); // dedupe key -> count
   var sid = 'x';
@@ -97,6 +110,7 @@ limitations under the License.
         ua: String(navigator.userAgent || '').slice(0, 200),
         view: (window.innerWidth || 0) + 'x' + (window.innerHeight || 0),
         up: Math.round((now - START) / 1000), // seconds since this tab booted
+        ver: SCHEMA_STAMP, // epoch.major.minor of the state model this build reads
       });
     } catch (e) { /* see above */ }
   }
@@ -150,6 +164,6 @@ limitations under the License.
   // Test observability, and a way to see it worked without a server round
   // trip. Never carries anything the report itself would not carry.
   window.__diceReportState = function () {
-    return { sid: sid, sent: sent, kinds: Object.keys(seen).length };
+    return { sid: sid, sent: sent, kinds: Object.keys(seen).length, ver: SCHEMA_STAMP };
   };
 })();
