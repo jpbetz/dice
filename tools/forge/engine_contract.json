@@ -1,0 +1,359 @@
+{
+  "about": "The engine constants that tools outside the app must not re-type. Emitted by tools/steps/engine-contract.mjs from the LIVE app; every z is an offset from z0 (-TABLE_D/2), never an absolute. Do not hand-edit. NOT a determinism freeze: numbers are rounded to 5 dp for modelling tools. The byte-identity golden is tests/e2e/fixtures/tower-contract.golden.json.",
+  "constants": {
+    "S": 1.25,
+    "despawnDrop": 1.75,
+    "dieR": 1.25,
+    "hidZone": 0.6,
+    "matExtra": 4.5
+  },
+  "defaultCore": {
+    "aim": {
+      "c": [
+        0,
+        11.25,
+        -2
+      ],
+      "s": [
+        1,
+        0.375,
+        1
+      ]
+    },
+    "apron": {
+      "c": [
+        0,
+        1.14125,
+        -1.605
+      ],
+      "rx": 0.48996,
+      "s": [
+        4.75,
+        1.25,
+        7.3125
+      ]
+    },
+    "cowl": {
+      "c": [
+        0,
+        9.25,
+        0.0625
+      ],
+      "s": [
+        5.25,
+        3,
+        0.375
+      ]
+    },
+    "despawnY": 7,
+    "door": {
+      "h": 4.5,
+      "w": 5
+    },
+    "exit": {
+      "pRelZ0": [
+        0,
+        2.875,
+        -0.875
+      ],
+      "pitch": -0.48996
+    },
+    "hood": {
+      "c": [
+        0,
+        2.5,
+        0.625
+      ],
+      "s": [
+        5.75,
+        3,
+        1.25
+      ]
+    },
+    "lip": {
+      "c": [
+        0,
+        -0.42,
+        2.8
+      ],
+      "rx": 0.1,
+      "s": [
+        4.8,
+        1,
+        2.2
+      ]
+    },
+    "rampTanSlope": 0.53333,
+    "shaft": {
+      "c": [
+        0,
+        6.0625,
+        -2
+      ],
+      "h": 6.625,
+      "r": 2.125
+    },
+    "socket": {
+      "c": [
+        0,
+        6.25,
+        -2.5
+      ],
+      "s": [
+        6.5,
+        12.5,
+        5.5
+      ]
+    }
+  },
+  "defaultPortals": {
+    "in": {
+      "clearR": 2.125,
+      "rimY": 8.75,
+      "x": 0,
+      "z": -2
+    },
+    "out": {
+      "clearH": 4.5,
+      "sillY": 1,
+      "w": 5,
+      "x": 0
+    }
+  },
+  "envelope": {
+    "cls": {
+      "cladY": -0.5,
+      "flushProud": 0.06,
+      "footDipY": -0.15,
+      "gateHiY": 6.6,
+      "gateLoY": 3.4,
+      "gladeDepth": 8,
+      "lipSplitZ": 2,
+      "reachLoY": 4.4
+    },
+    "socketX": 3.25,
+    "socketYTop": 12.5,
+    "socketZRelZ0": [
+      -5.25,
+      0.25
+    ]
+  },
+  "eyes": [
+    {
+      "id": "wide.full",
+      "x": 0,
+      "y": 13.3,
+      "zRelZ0": 14.25
+    },
+    {
+      "id": "wide.mini",
+      "x": 0,
+      "y": 11,
+      "zRelZ0": 12.75
+    },
+    {
+      "id": "medium.full",
+      "x": 0,
+      "y": 10.4,
+      "zRelZ0": 11.6
+    },
+    {
+      "id": "medium.mini",
+      "x": 0,
+      "y": 8.6,
+      "zRelZ0": 10.4
+    },
+    {
+      "id": "close.full",
+      "x": 0,
+      "y": 8.1,
+      "zRelZ0": 9.55
+    },
+    {
+      "id": "close.mini",
+      "x": 0,
+      "y": 6.7,
+      "zRelZ0": 8.65
+    }
+  ],
+  "gaps": [
+    "leans: each skin's TILT is a module const in js/towerskin.js (0.7°), js/towerbastion.js (0.2°), js/toweranvil.js (0.15°) and the Hollow Bole bake (0.45°), applied as group.rotation.z. No debug hook reports it, so check.py's --tower-tilt-deg stays hand-passed until one exists.",
+    "ZOOM_PRESETS.eyeFull/eyeMini are not exposed directly; `eyes` carries them as the occlusion probe hands them over — already translated into the tower's world and rebased on z0 here.",
+    "POUR (speeds, tempo, the exit guarantee's retry budget) is not here: no hook exposes it and no forge tool needs it yet."
+  ],
+  "portalLimits": {
+    "in": {
+      "clearRMin": 2,
+      "rimY": [
+        7.25,
+        10.25
+      ],
+      "x": [
+        -1.25,
+        1.25
+      ],
+      "z": [
+        -3.25,
+        -1.25
+      ]
+    },
+    "out": {
+      "clearHMin": 3.375,
+      "sillY": [
+        0.625,
+        1.375
+      ],
+      "wMin": 4,
+      "x": [
+        -0.75,
+        0.75
+      ]
+    }
+  },
+  "towers": {
+    "bastion": {
+      "cowlY": [
+        5.4,
+        6.75,
+        8.1
+      ],
+      "despawnY": 7,
+      "door": {
+        "h": 4.5,
+        "sill": 1,
+        "w": 5
+      },
+      "exitPitch": -0.48996,
+      "exitRelZ0": [
+        0,
+        2.875,
+        -0.875
+      ],
+      "lipFrontDz": 3.9,
+      "portals": {
+        "in": {
+          "clearR": 2.125,
+          "rimY": 8.75,
+          "x": 0,
+          "z": -2
+        },
+        "out": {
+          "clearH": 4.5,
+          "sillY": 1,
+          "w": 5,
+          "x": 0
+        }
+      },
+      "rimY": 8.75,
+      "source": "default"
+    },
+    "blackanvil": {
+      "cowlY": [
+        5.4,
+        6.75,
+        8.1
+      ],
+      "despawnY": 7,
+      "door": {
+        "h": 4.5,
+        "sill": 1,
+        "w": 5
+      },
+      "exitPitch": -0.48996,
+      "exitRelZ0": [
+        0,
+        2.875,
+        -0.875
+      ],
+      "lipFrontDz": 3.9,
+      "portals": {
+        "in": {
+          "clearR": 2.125,
+          "rimY": 8.75,
+          "x": 0,
+          "z": -2
+        },
+        "out": {
+          "clearH": 4.5,
+          "sillY": 1,
+          "w": 5,
+          "x": 0
+        }
+      },
+      "rimY": 8.75,
+      "source": "default"
+    },
+    "heartwood": {
+      "cowlY": [
+        5.4,
+        6.75,
+        8.1
+      ],
+      "despawnY": 7,
+      "door": {
+        "h": 4.5,
+        "sill": 1,
+        "w": 5
+      },
+      "exitPitch": -0.48996,
+      "exitRelZ0": [
+        0,
+        2.875,
+        -0.875
+      ],
+      "lipFrontDz": 3.9,
+      "portals": {
+        "in": {
+          "clearR": 2.125,
+          "rimY": 8.75,
+          "x": 0,
+          "z": -2
+        },
+        "out": {
+          "clearH": 4.5,
+          "sillY": 1,
+          "w": 5,
+          "x": 0
+        }
+      },
+      "rimY": 8.75,
+      "source": "default"
+    },
+    "hollowbole": {
+      "cowlY": [
+        6.05,
+        7.4,
+        8.75
+      ],
+      "despawnY": 7.65,
+      "door": {
+        "h": 3.5,
+        "sill": 1,
+        "w": 4.2
+      },
+      "exitPitch": -0.48996,
+      "exitRelZ0": [
+        0,
+        2.875,
+        -0.875
+      ],
+      "lipFrontDz": 3.9,
+      "portals": {
+        "in": {
+          "clearR": 2.2,
+          "rimY": 9.4,
+          "x": 0,
+          "z": -2.55
+        },
+        "out": {
+          "clearH": 3.5,
+          "sillY": 1,
+          "w": 4.2,
+          "x": 0
+        }
+      },
+      "rimY": 9.4,
+      "source": "model"
+    }
+  }
+}
