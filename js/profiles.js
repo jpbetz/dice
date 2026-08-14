@@ -71,6 +71,13 @@ limitations under the License.
 import { cutText } from './notation.js';
 
 export const STORE_KEY = 'dice.profiles.v1';
+// WRITTEN, NEVER READ — and that is a hole, not an oversight this file should
+// plug on its own. emptyStore stamps it and normalizeStore has no branch on it,
+// so a key written by a future shape is normalized by TODAY's rules and the
+// difference is invisible. The `epoch.major.minor` contract (ROADMAP C22) is
+// what will own reading this; until it lands, normalizeStore merely REPORTS the
+// version it found (see its `report` argument) so the boot path can say "this
+// came from something else" rather than quietly healing it.
 export const STORE_VERSION = 1;
 
 // Joe's number (2026-08-08). Two campaigns' worth of characters plus the
@@ -179,33 +186,78 @@ export const cleanPools = (list) => (Array.isArray(list) ? list : [])
 // one, a duplicate id or an activeId naming nobody all resolve to a usable
 // library rather than an exception at boot — which for the player is the
 // difference between "my names look odd" and "the app did not start".
-export function normalizeStore(raw) {
+//
+// …AND THE HEALING IS LOSSY, SO IT NOW SAYS SO (ROADMAP C15). Profiles past 32,
+// pools past 40, records with no readable name and a second profile sharing a
+// lowercase name are all DROPPED here, silently, on the boot path — and main.js
+// then persisted the healed result on the first paint, overwriting the records
+// it had just discarded before the player had touched anything. That is what
+// turns a display defect into data loss, and it is the write, not the drop,
+// that does it: the drop is recoverable for exactly as long as the key still
+// holds the bytes.
+//
+// Pass `report` — any object — and this fills it with what it had to leave
+// behind, so the caller can refuse to write and say what is missing:
+//
+//   { overflow: [name…]   profiles past MAX_PROFILES
+//     duplicates: [name…] names that collapsed into an earlier profile
+//     unreadable: n       records that could never have been a profile
+//     pools: n            pool records dropped from profiles that DID survive
+//     version: n|null     the `v` the key carried, when it is not ours (C22)
+//     any: bool }         did anything at all fail to load
+//
+// A DROP IS NOT A VERSION MISMATCH: `version` is deliberately outside `any`,
+// because a differently-versioned key that loads whole has lost nothing and
+// must not raise a data-loss notice. Reading that field is C22's job.
+export function normalizeStore(raw, report = null) {
   const store = emptyStore();
   const src = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const lost = report && typeof report === 'object' ? report : null;
+  if (lost) {
+    lost.overflow = [];
+    lost.duplicates = [];
+    lost.unreadable = 0;
+    lost.pools = 0;
+    lost.version = Number.isFinite(src.v) && src.v !== STORE_VERSION ? src.v : null;
+    lost.any = false;
+  }
   const ids = new Set();
   const names = new Set();
   for (const rec of Array.isArray(src.profiles) ? src.profiles : []) {
-    if (store.profiles.length >= MAX_PROFILES) break;
-    if (!rec || typeof rec !== 'object' || Array.isArray(rec)) continue;
+    if (!rec || typeof rec !== 'object' || Array.isArray(rec)) { if (lost) lost.unreadable++; continue; }
     // The name is STRIPPED here, not refused: normalizeStore is the boot path
     // and there is no human standing in front of it. nameProfile — the door
     // every UI action takes — is the loud one.
     const name = typeof rec.name === 'string' ? cutText(rec.name.replace(/#/g, ''), MAX_NAME) : '';
-    if (!name) continue;
+    if (!name) { if (lost) lost.unreadable++; continue; }
     const key = name.toLowerCase();
-    if (names.has(key)) continue; // duplicates collapse to the first, as the file's do
+    // The cap used to `break` here. It CONTINUES now so the report can carry
+    // the names of everyone who did not fit — a count is a number the player
+    // cannot check, and "Ada and Bo did not load" is the same fact they can.
+    // Identical outcome for the store: once full it stays full, because
+    // nothing in this loop ever removes a profile.
+    if (store.profiles.length >= MAX_PROFILES) { if (lost) lost.overflow.push(name); continue; }
+    if (names.has(key)) { // duplicates collapse to the first, as the file's do
+      if (lost) lost.duplicates.push(name);
+      continue;
+    }
     let id = typeof rec.id === 'string' && rec.id && !ids.has(rec.id) ? rec.id : null;
     if (!id) { do { id = mintId(store); } while (ids.has(id)); }
     ids.add(id);
     names.add(key);
+    const pools = cleanPools(rec.pools);
+    if (lost && Array.isArray(rec.pools)) lost.pools += Math.max(0, rec.pools.length - pools.length);
     store.profiles.push({
       id,
       name,
       system: knownSystem(rec.system) || DEFAULT_SYSTEM_ID,
       ...(typeof rec.set === 'string' && rec.set ? { set: rec.set } : {}),
-      pools: cleanPools(rec.pools),
+      pools,
       at: Number.isFinite(rec.at) ? rec.at : 0,
     });
+  }
+  if (lost) {
+    lost.any = !!(lost.overflow.length || lost.duplicates.length || lost.unreadable || lost.pools);
   }
   // seq must clear every id it could ever mint again, or a fresh profile can
   // collide with a stored one and the two share a row forever.
@@ -327,6 +379,82 @@ export function setProfileSet(store, id, set) {
   if (typeof set === 'string' && set && set !== 'std') rec.set = set;
   else delete rec.set;
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Restore — a whole library, rebuilt from a file (ROADMAP C15, CUJ13)
+// ---------------------------------------------------------------------------
+
+// records: wire shapes ({name, system?, set?, pools}) in the order the file
+// wrote them → a complete store with one profile in hand, or a refusal naming
+// what stopped it. Nothing here touches storage or the DOM: the caller decides
+// whether the returned store ever becomes the live one, which is what lets it
+// write to disk FIRST and swap second.
+//
+// WHY THIS IS NOT `Add all N` IN A LOOP — the measured reason restore did not
+// exist. Add is a MERGE and dedupes through uniqueName, so a restored 'Nessa'
+// landing beside a dealt 'Nessa' becomes 'Nessa 2' and the file no longer
+// describes the library it just built. Add also adds INTO a library that
+// already holds the browser's one dealt profile, so a 32-profile file needs 32
+// free slots against a ceiling of 32 and lands 31 of your characters beside a
+// stranger's, with the wrong one in hand. Starting from emptyStore() dissolves
+// both at once: every name in the file is free, so uniqueName can never fire,
+// and 32 fit exactly because nothing is holding a slot.
+//
+// THE NAMES MUST ALREADY BE UNIQUE, AND THIS REFUSES RATHER THAN DEDUPING WHEN
+// THEY ARE NOT. js/portable.js enforces uniqueness INSIDE `players:` (a
+// repeated player fails at its line) but NOT between `players:` and the
+// `profile:` key that names the top-level rack — verified 2026-08-14, and the
+// roadmap's claim that "the file's names are already unique by parsePortable"
+// is false across that seam. A hand-edited file can therefore offer the same
+// character twice, and there is no store this function could build that such a
+// file describes. Renaming one silently is the precise defect C15 exists to
+// remove, so the collision is spoken instead.
+export function rebuildStore(records, { fallbackSystem = DEFAULT_SYSTEM_ID, activeName = null, now = 0 } = {}) {
+  const list = Array.isArray(records) ? records : [];
+  if (!list.length) return { ok: false, error: 'that file carries no profiles' };
+  if (list.length > MAX_PROFILES) {
+    return { ok: false, error: `that file carries ${list.length} profiles — ${MAX_PROFILES} is the ceiling` };
+  }
+  const seen = new Map();
+  const clean = [];
+  for (const rec of list) {
+    const named = nameProfile(rec && rec.name);
+    if (!named.ok) return { ok: false, error: named.error };
+    const key = named.name.toLowerCase();
+    if (seen.has(key)) {
+      return { ok: false, error: `that file names '${seen.get(key)}' twice — a library holds each name once` };
+    }
+    seen.set(key, named.name);
+    clean.push({ rec, name: named.name });
+  }
+  const store = emptyStore();
+  for (const { rec, name } of clean) {
+    const added = addProfile(store, { ...fromWire(rec, fallbackSystem), at: 0 });
+    if (!added.ok) return { ok: false, error: added.error };
+    // THE CLAIM THIS FUNCTION RESTS ON, CHECKED RATHER THAN ASSUMED. A store
+    // built from empty over already-unique names never fires uniqueName, so
+    // the name that landed is the name the file wrote. If addProfile ever
+    // grows a second reason to rename, this is the line that says so instead
+    // of the player discovering it as 'Nessa 2' on a fresh browser.
+    if (added.profile.name !== name) {
+      return { ok: false, error: `'${name}' would land as '${added.profile.name}' — the file cannot be restored as written` };
+    }
+  }
+  // `at` is 0 for everyone: a file records no recency, and inventing an order
+  // would make profilesFor() sort by a fiction. The one profile taken in hand
+  // is the only thing with a time on it, which is exactly what happened.
+  const wanted = typeof activeName === 'string' && activeName.trim()
+    ? profilesOf(store).find((p) => p.name.toLowerCase() === activeName.trim().toLowerCase())
+    : null;
+  // THE POINTER EVERY OTHER PATH DROPS. The file's `profile:` key says which
+  // rack was in hand when it was written; Add and Add all ignore it entirely,
+  // which is how a restore hands you back somebody else's character. A file
+  // naming none — or naming one that is not in it — hands back the first
+  // record, which is the order the file was written in.
+  const active = wanted || profilesOf(store)[0];
+  setActive(store, active.id, now);
+  return { ok: true, store, active, activeId: active.id, named: !!wanted };
 }
 
 // ---------------------------------------------------------------------------

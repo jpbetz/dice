@@ -4681,3 +4681,63 @@ expensive leg — two tabs, one room, one pour, both films compared — is the
 point rather than the overhead: the obvious wrong implementation passes every
 visibility assertion in the file and breaks the table only when two people are
 watching.
+
+### 7.39 Restore — reading the file back (2026-08-14)
+
+Full record in [PROFILES.md §12](PROFILES.md); this is what the surface is.
+
+**One verb, separately named: `Replace my library…`,** in `#import-profiles`
+under the file's profile rows. It is deliberately not a sharper `Apply` and
+not a bolder `Add all`. Apply merges the file's top-level `pools:` and deletes
+nothing, which is what makes it safe to press on a rack you care about; Add
+runs every name through `uniqueName`, so a restored `Nessa` arrives as
+`Nessa 2` next to the profile the browser dealt itself at boot. Restore is the
+other operation — *put the file where my library is* — it is destructive, and
+so it wears its own word.
+
+**The two-step is the app's existing in-place arm** (the library row's Delete,
+the corner ✕): first press arms, second press commits, nothing modal locks the
+table. Three things distinguish this arm from those two:
+
+- **It names what dies.** `Deleting 'Nessa', 'Bram', 'Tola' and 2 more — this
+  browser is the only place they exist.` A count is a number nobody can check
+  against their own memory; three names, then a count, is the same fact they
+  can. The commit label follows C19 — a button states the next act
+  (`Replace with 6 from this file`), it does not ask one.
+- **`Download first` stands inside the armed state, and first in the reading
+  order** (`order:-1` puts the sentence above both controls when the row
+  wraps). The thing being replaced may be the only copy there has ever been,
+  and the moment the player is thinking about that is the moment they armed
+  the verb — not four rows up, before they knew they needed it. Pressing it
+  re-times the arm: saving a copy inside the window is work, not a change of
+  mind.
+- **8 s, not 3 or 4.** Those arm over one named thing already in view; this
+  one asks you to read a list and possibly wait on a save dialog.
+
+Dressed like every other arm in the tree: quiet at rest, `#corner-clear.armed`'s
+red at the moment of aim. The rows rebuild on every keystroke and the verb
+**disarms with them** — an armed Replace is a promise about a specific list of
+names on both sides, and the box is live.
+
+**Two smaller reads landed with it.** The preview status line now carries
+`⚠ n sections this version can't read, skipped ·` as a **prefix** on an
+otherwise-clean `✓` — `parsePortable` has produced those warnings since
+forward tolerance shipped and nothing read them, so a file from a newer
+version lost whole sections silently. It is `.caution`, not `.warn`, because
+`.warn` is what `portableVerdict().ok` reads and the parse genuinely
+succeeded. And **an empty file refuses at the file door** (`✗ x.yaml is empty
+— nothing to restore`) where it used to blank the box and the status line and
+report success; an empty *box* still says nothing, because that is the pane's
+resting state and clearing a textarea must not paint a ✗ at somebody about to
+paste.
+
+**And one standing notice**, on `#storage-banner` — the same element and the
+same Download exit the jam state uses, because "a state your data is in, with
+the one way out" is already this app's grammar for it, and a second banner
+would be a second thing to keep in sync competing for the same corner. Its
+second reason: `**Not all of it loaded** — 2 profiles ('Ada', 'Bo') did not
+load from this browser. Nothing has been overwritten; Download saves what
+did.` The jam wins when both hold. What makes the sentence true is the boot
+write being **withheld** while it stands, and what takes it down is the first
+successful write — which is the write that overwrites, and the moment it stops
+being true.

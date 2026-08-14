@@ -34,7 +34,7 @@ import {
   MAX_PROFILES, MAX_POOLS, knownSystem, emptyStore, normalizeStore, profilesOf, findProfile,
   activeProfile, profilesFor, lastUsedFor, isFull, nameProfile, uniqueName,
   addProfile, renameProfile, deleteProfile, setActive, writeActivePools,
-  setActiveSystem, setProfileSet, migrateLegacy, toWire, fromWire,
+  setActiveSystem, setProfileSet, migrateLegacy, rebuildStore, toWire, fromWire,
 } from './profiles.js';
 import { THEMES, SETS } from './themes.js';
 import { ParticleField } from './particles.js';
@@ -531,11 +531,24 @@ const LOG_CAP = 100;
 // two keys below are read once and then left alone forever.
 const LS_PROFILES = 'dice.profiles.v1';
 // LEGACY, read once at boot and never written again (the LS_INPUTMODE /
-// LS_MINI precedent). LS_GROUPS was the single rack until the library existed
-// and is the one recovery path if the library is ever cleared, so it is left
-// in place as a fossil rather than deleted. LS_GROUPS_MINE was Tier G's
-// authoring stash — present in storage ⇔ a rack swap was live — and IS
-// removed once migrated, because there are no swaps any more for it to mean.
+// LS_MINI precedent). LS_GROUPS was the single rack until the library existed.
+//
+// IT IS NOT A RECOVERY PATH, and this comment claimed it was until C15
+// (2026-08-14). Nothing has written the key since the library shipped, so it
+// holds a browser's rack as it stood on migration day and — for anyone whose
+// first visit postdates the library — it does not exist at all, which is most
+// people. Making the claim TRUE would mean dual-writing the rack into a second
+// key on every save, and that is the design js/profiles.js's header refuses at
+// length: two keys holding the same 40 pools with no transaction between them
+// is a new data-loss path wearing a backup's clothes.
+//
+// THE RECOVERY PATH IS THE FILE — Settings → Your data → Download, and
+// `Replace my library…` to read it back (CUJ13). The key stays because
+// migrateLegacy still reads it on a browser that has not booted since the
+// library landed, and deleting it would strand that one rack; it is a fossil,
+// and it is labelled as one. LS_GROUPS_MINE was Tier G's authoring stash —
+// present in storage ⇔ a rack swap was live — and IS removed once migrated,
+// because there are no swaps any more for it to mean.
 const LS_GROUPS = 'dice.groups.v1';
 const LS_GROUPS_MINE = 'dice.groups.mine.v1';
 const LS_LOG = 'dice.log.v1';
@@ -9807,6 +9820,25 @@ window.__diceDebug = {
   // at the one function that catches it. The banner under test is what a
   // player sees in those cases and in no other.
   jamStorage(on) { forceStorageFail = !!on; },
+  // What boot could NOT read out of dice.profiles.v1 (C15), and what the
+  // banner says about it. The pair matters: a scenario seeds an over-cap key,
+  // reloads, and asserts BOTH that the notice stands AND that the key still
+  // holds every byte it had — because the defect was never the drop, it was
+  // the first paint writing the drop back before anyone had seen it.
+  get bootLoss() {
+    return {
+      ...bootLoss,
+      overflow: [...(bootLoss.overflow || [])],
+      duplicates: [...(bootLoss.duplicates || [])],
+    };
+  },
+  get dataBanner() {
+    const el = document.getElementById('storage-banner');
+    return {
+      shown: !!el && !el.classList.contains('hidden'),
+      text: el ? el.textContent.replace(/\s+/g, ' ').trim() : null,
+    };
+  },
   // The one-time clean break, drivable without a page reload (it otherwise
   // only runs at boot, and a scenario that has to navigate to reach it is
   // testing the harness as much as the behaviour).
@@ -11810,6 +11842,22 @@ window.__diceDebug = {
     profileSystems() { return portableParsed ? portableParsed.profiles.map((p) => p.system || null) : []; },
     adopt(name) { return portableAdoptOne(name); },
     adoptAll() { return portableAdoptProfiles(); },
+    // C15/CUJ13 — RESTORE, and its two-step arm, without a pointer.
+    // `armReplace()` is the first press and answers what the armed control
+    // SAYS, so a scenario can assert that it names the profiles it is about to
+    // delete instead of counting them. `replace()` is the second press and
+    // commits whether or not the arm was walked, so a scenario about the
+    // restore itself does not have to spend its assertions on the confirm.
+    // Both answer the pane's {ok, status} verdict shape, so the refusals —
+    // the over-32 file, the file that names one character twice, the browser
+    // that would not store it — are assertable as strings.
+    armReplace() {
+      const btn = document.getElementById('import-replace');
+      if (btn) btn.click();
+      return replaceVerbState();
+    },
+    get replaceState() { return replaceVerbState(); },
+    replace() { disarmReplace(); return portableReplaceLibrary(); },
     // §G4/§G6: the Apply-to-table button, clickless. ASYNC — resolves the
     // pane's verdict once the push answers; success records authorship in
     // dice.table.v1:<room> exactly as the click does.
@@ -14321,7 +14369,16 @@ if (/[#&]g=/.test(location.hash)) {
 // A library has somewhere to put both, so migrateLegacy keeps both: the stash
 // becomes your profile and the rack in front of it becomes 'Recovered'. This is
 // the one place this pass gains data rather than merely moving it.
-let profileStore = normalizeStore(load(LS_PROFILES, null));
+//
+// WHAT THE BOOT COULD NOT READ, KEPT (C15). normalizeStore is self-healing by
+// construction and the healing is LOSSY — see its header. `bootLoss` is what it
+// had to leave behind, and it is load-bearing twice below: the first write is
+// SKIPPED while it holds anything (so the dropped records stay on disk, where a
+// version that can read them still can), and the data banner says what did not
+// load. Reading `bootLoss.version` is deliberately nobody's job yet — that is
+// ROADMAP C22's `epoch.major.minor` contract.
+const bootLoss = {};
+let profileStore = normalizeStore(load(LS_PROFILES, null), bootLoss);
 if (!profilesOf(profileStore).length) {
   // First boot on the library. Everything below runs ONCE — after this the
   // store is non-empty forever (deleteProfile refuses the last one), so the
@@ -14441,8 +14498,7 @@ let storageJammed = false;
 function setStorageJammed(on) {
   if (on === storageJammed) return;
   storageJammed = on;
-  const el = document.getElementById('storage-banner');
-  if (el) el.classList.toggle('hidden', !on);
+  paintDataBanner();
   // The two it suppresses have to be repainted either way: on, to stand
   // down; off, to come back if they still apply.
   updateProfileBanner();
@@ -14450,21 +14506,82 @@ function setStorageJammed(on) {
   if (on) announce('Your changes are not being saved. Download your data.');
 }
 
+// TWO REASONS, ONE BANNER (C15). #storage-banner already is this app's grammar
+// for "a state your data is in, with the one exit that saves the work" — a
+// standing notice and a Download beside it — and boot-dropped records need
+// exactly that and nothing else. A second banner would be a second thing to
+// keep in sync and a second row competing for the same corner. The jam wins
+// when both hold: "nothing is being saved right now" is the more urgent read,
+// and the boot notice is still true underneath it.
+function paintDataBanner() {
+  const el = document.getElementById('storage-banner');
+  if (!el) return;
+  const on = storageJammed || !!bootLoss.any;
+  el.classList.toggle('hidden', !on);
+  const label = el.querySelector('.sb-label');
+  if (!label || !on) return;
+  const head = document.createElement('b');
+  head.textContent = storageJammed ? 'Not saving' : 'Not all of it loaded';
+  label.textContent = '';
+  label.append(head, document.createTextNode(storageJammed
+    ? ' — this browser refused to store your last change. Your work is only on screen.'
+    : ` — ${bootLossSummary()} did not load from this browser. Nothing has been overwritten; Download saves what did.`));
+}
+
+// What boot left behind, in names rather than a count wherever it can be:
+// "2 profiles" is a number the player cannot check, and "'Ada', 'Bo'" is the
+// same fact they can. The first three, then a count — a key holding 200
+// profiles must not paint a wall of text.
+function bootLossSummary() {
+  const gone = [...(bootLoss.overflow || []), ...(bootLoss.duplicates || [])];
+  const bits = [];
+  if (gone.length) {
+    const shown = gone.slice(0, 3).map((s) => `'${s}'`).join(', ');
+    bits.push(`${gone.length} profile${gone.length === 1 ? '' : 's'} (${shown}${gone.length > 3 ? `, +${gone.length - 3} more` : ''})`);
+  }
+  if (bootLoss.unreadable) bits.push(`${bootLoss.unreadable} unreadable record${bootLoss.unreadable === 1 ? '' : 's'}`);
+  if (bootLoss.pools) bits.push(`${bootLoss.pools} pool${bootLoss.pools === 1 ? '' : 's'} past the ${MAX_POOLS}-pool limit`);
+  return bits.join(' · ');
+}
+
 // Persist the library. Returns false when storage refused it, so the callers
 // that MOVE data (switch, create, delete) can refuse out loud instead of
 // leaving the screen disagreeing with the disk — the guardrail Tier G's stash
 // needed a read-back to get, kept where it is still cheap.
+//
+// `store` defaults to the live one and is passed explicitly by exactly one
+// caller: the restore (C15), which writes the REPLACEMENT library to disk
+// before anything in this tab points at it. A refused write there leaves the
+// old library whole, in memory and on disk, with nothing half-moved between.
 let forceStorageFail = false; // test hook only — see __diceDebug.jamStorage
-function saveProfileStore() {
+function saveProfileStore(store = profileStore) {
   try {
     if (forceStorageFail) throw new Error('storage jammed (test)');
-    localStorage.setItem(LS_PROFILES, JSON.stringify(profileStore));
+    localStorage.setItem(LS_PROFILES, JSON.stringify(store));
+    // The moment the boot notice stops being true. It says "nothing has been
+    // overwritten", and this is the write that overwrites — so the notice comes
+    // down HERE rather than lingering as a claim about a key that no longer
+    // holds what it described. Until this fires the player can close the tab,
+    // or open the app in a version that reads the key whole, and lose nothing.
+    if (bootLoss.any) { bootLoss.any = false; paintDataBanner(); }
     return true;
   } catch {
     return false;
   }
 }
-saveGroups();
+// THE FIRST WRITE IS THE ONE THAT COSTS (C15). This was an unconditional
+// saveGroups() — so a browser whose stored library was past a cap had the
+// healed, smaller version written over the original on the first paint, before
+// the player had touched anything, and a display defect became data loss. When
+// boot dropped something the rack still folds in and still publishes; only the
+// setItem is withheld, and the banner says why.
+if (bootLoss.any) {
+  writeActivePools(profileStore, groups);
+  schedulePublishPools();
+  paintDataBanner();
+} else {
+  saveGroups();
+}
 
 // ---------------------------------------------------------------------------
 // The library's verbs (docs/PROFILES.md §11)
@@ -19277,6 +19394,15 @@ const portableStatus = document.getElementById('portable-status');
 const portableApplyBtn = document.getElementById('portable-apply');
 let portablePlan = null; // the previewed plan Apply commits (null = nothing valid)
 let portableParsed = null; // the last GOOD parse of the box (drives the G3 profile list)
+// What the parse could not read (C15). parsePortable has produced these since
+// forward tolerance landed, and NOTHING read them — produced, unit-tested,
+// returned, dropped — so a file written by a newer version lost whole sections
+// behind a clean ✓. PROFILES §3.1 asks for exactly one thing: "the warning must
+// reach the preview status line, not vanish." Its own variable rather than a
+// read through portableParsed, because a refusal that never reached the parser
+// (a file too big, a file that would not read) must not leave a stale count
+// standing beside a fresh ✗.
+let portableWarnings = [];
 
 // The file this browser would write right now. Since §11 that is THE WHOLE
 // LIBRARY: `players:` carries every profile with the system it was built for,
@@ -19357,12 +19483,27 @@ function applyImportPlan(plan) {
   return done;
 }
 
+// The skipped-section prefix (C15). Forward tolerance means a section this
+// version cannot read is stepped over rather than aborting the document
+// (PROFILES §9 decision 4) — which is right, and which silently costs the
+// player whatever was in it. This rides as a PREFIX rather than as the .warn
+// dress: the parse genuinely succeeded and Apply is legitimately armed, so
+// turning the line red would say "this failed" about a file that did not.
+// What is owed is the count, which is what §3.1 asked for.
+function skippedPrefix() {
+  const n = portableWarnings.length;
+  if (!n) return '';
+  return `⚠ ${n} section${n === 1 ? '' : 's'} this version can’t read, skipped · `;
+}
+
 function portablePreview() {
   const text = portableText.value;
   portablePlan = null;
   portableParsed = null;
+  portableWarnings = [];
   portableApplyBtn.disabled = true;
   portableStatus.classList.remove('warn');
+  portableStatus.classList.remove('caution');
   if (!text.trim()) { portableStatus.textContent = ''; renderImportProfiles(); return; }
   const parsed = parsePortable(text);
   if (!parsed.ok) {
@@ -19374,10 +19515,13 @@ function portablePreview() {
   // The parse stands even when the IMPORT plan below is refused: what the file
   // HOLDS is a different question from what would merge into your own rack.
   portableParsed = parsed;
+  portableWarnings = Array.isArray(parsed.warnings) ? parsed.warnings.slice() : [];
+  if (portableWarnings.length) portableStatus.classList.add('caution');
   renderImportProfiles();
+  const skipped = skippedPrefix();
   const plan = planImport(groups, parsed);
   if (groups.length + plan.adds.length > 40) {
-    portableStatus.textContent = `✗ would exceed 40 pools (you have ${groups.length}, this adds ${plan.adds.length})`;
+    portableStatus.textContent = `${skipped}✗ would exceed 40 pools (you have ${groups.length}, this adds ${plan.adds.length})`;
     portableStatus.classList.add('warn');
     return;
   }
@@ -19388,9 +19532,9 @@ function portablePreview() {
   if (plan.adds.length || plan.updates.length || flips.length) {
     portablePlan = { ...plan, flips };
     portableApplyBtn.disabled = false;
-    portableStatus.textContent = `✓ ${bits.join(' · ')} — Apply takes them`;
+    portableStatus.textContent = `${skipped}✓ ${bits.join(' · ')} — Apply takes them`;
   } else {
-    portableStatus.textContent = '✓ matches what you have — nothing to apply';
+    portableStatus.textContent = `${skipped}✓ matches what you have — nothing to apply`;
   }
 }
 
@@ -19455,6 +19599,10 @@ function portableVerdict() {
     ok: !portableStatus.classList.contains('warn'),
     status: portableStatus.textContent,
     canApply: !portableApplyBtn.disabled,
+    // C15: the sections this version could not read, as the parser named them.
+    // A scenario asserts the LOSS, not the wording of the prefix — a '✓' with
+    // a non-empty `warnings` is the exact state that used to read as clean.
+    warnings: portableWarnings.slice(),
   };
 }
 
@@ -19489,6 +19637,18 @@ async function portableAcceptFile(file) {
     text = await file.text();
   } catch {
     return portableRefuse(`✗ couldn’t read ${file.name || 'that file'}`);
+  }
+  // AN EMPTY FILE IS A FAILED RESTORE, AND IT READ AS A SILENT SUCCESS (C15).
+  // The box went blank, the status line went blank, and portableVerdict said
+  // ok — while a file of nothing but comments refused properly ('no pools and
+  // no settings found'), so the two doors disagreed about the same emptiness.
+  // They are made to agree by refusing BOTH, and the refusal lives here rather
+  // than in portablePreview because an empty BOX is the pane's resting state:
+  // clearing the textarea must not paint a ✗ at somebody who is about to
+  // paste. An empty FILE is something the player went and chose, on the one
+  // journey where nothing else has their characters in it.
+  if (!text.trim()) {
+    return portableRefuse(`✗ ${file.name || 'that file'} is empty — nothing to restore`);
   }
   return portableLoadText(text);
 }
@@ -19651,6 +19811,7 @@ function portableAdoptOne(name) {
   if (!p) return portableRefuse(`✗ no profile ${JSON.stringify(String(name == null ? '' : name).trim())} in this file`);
   const got = copyProfileIn({ name: p.name, system: p.system, set: p.set, pools: p.pools });
   renderProfileLibrary();
+  paintReplace(); // an Add changed how many profiles Replace would delete
   return got.ok ? portableReceipt(got.status) : portableRefuse(got.status);
 }
 
@@ -19664,6 +19825,10 @@ function renderImportProfiles() {
   const seats = importableProfiles();
   zone.classList.toggle('hidden', !seats.length);
   rows.textContent = '';
+  // The restore verb is rebuilt with the rows, DISARMED. An armed Replace is a
+  // promise about a specific list of names on both sides, and the box is live
+  // — one keystroke and the file it named is no longer the file it would take.
+  disarmReplace();
   if (!seats.length) return;
   document.getElementById('import-adopt-all').textContent = `Add all ${seats.length}`;
   for (const p of seats) {
@@ -19689,6 +19854,130 @@ function renderImportProfiles() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// C15 / CUJ13 — RESTORE. The one verb that reads this app's own file back
+// whole, for the player whose browser is the only copy and is now a new
+// browser.
+//
+// IT IS NOT A SHARPER APPLY, and the separation is the whole safety property.
+// Apply merges the file's top-level `pools:` into the rack in your hands and
+// deletes nothing, which is what makes it safe to press on a rack you care
+// about; union-only, preview-then-merge is the load-bearing lesson of the
+// `#g=` post-mortem (GOALS §7), where a shared link replaced the receiver's
+// rack sight-unseen. This is the other operation entirely — "put the file
+// where my library is" — it is destructive, and so it wears its own name, its
+// own two-step arm, and an armed state that reads out what it is about to
+// delete rather than counting it.
+//
+// SCOPE, deliberately narrow: profiles — name, system, dice set, pools. Sound,
+// numbers and the room's furniture are NOT touched. They are this device's,
+// not the file's, and the file's `settings:` still travel the way they always
+// have: through Apply, previewed, as a flip you can see coming.
+// ---------------------------------------------------------------------------
+
+let replaceArmed = false;
+let replaceArmTimer = null;
+
+function disarmReplace() {
+  clearTimeout(replaceArmTimer);
+  replaceArmTimer = null;
+  replaceArmed = false;
+  paintReplace();
+}
+
+// 8 seconds, where the library row's Delete uses 3 and the corner ✕ uses 4.
+// Those two arm over a single named thing you are already looking at. This one
+// asks you to READ a list of names and, if the file in your hand is newer than
+// the one on your disk, to press Download and wait for a save dialog inside
+// the same window. Three seconds confirms one name; it does not check five and
+// take a copy first.
+const REPLACE_ARM_MS = 8000;
+
+function paintReplace() {
+  const btn = document.getElementById('import-replace');
+  const what = document.getElementById('import-replace-what');
+  const dl = document.getElementById('import-replace-download');
+  if (!btn || !what || !dl) return;
+  const seats = importableProfiles();
+  const mine = profilesOf(profileStore);
+  btn.classList.toggle('armed', replaceArmed);
+  what.classList.toggle('hidden', !replaceArmed);
+  dl.classList.toggle('hidden', !replaceArmed);
+  if (!replaceArmed) {
+    btn.textContent = 'Replace my library…';
+    btn.title = `Put this file's ${seats.length} profile${seats.length === 1 ? '' : 's'} in place of your ${mine.length} — yours are deleted; your sound and numbers are not touched`;
+    what.textContent = '';
+    return;
+  }
+  // NAMES, NOT A COUNT. "5 profiles will be deleted" is a number nobody can
+  // check against their own memory; "'Nessa', 'Bram', 'Tola'" is the same fact
+  // they can, and recognising the list — or failing to — is the entire work
+  // the second press is asking for. Three, then a count, because 32 names is
+  // a wall rather than a read.
+  const shown = mine.slice(0, 3).map((p) => `'${p.name}'`).join(', ');
+  const more = mine.length > 3 ? ` and ${mine.length - 3} more` : '';
+  what.textContent = `Deleting ${shown}${more} — this browser is the only place they exist.`;
+  // C19 (Joe, 2026-08-09): a button STATES the next act, it does not ask one.
+  btn.textContent = `Replace with ${seats.length} from this file`;
+  btn.title = `Deletes your ${mine.length} profile${mine.length === 1 ? '' : 's'} and writes this file's ${seats.length} in their place`;
+}
+
+function portableReplaceLibrary() {
+  if (!portableParsed) return portableRefuse('✗ nothing usable in the box — open a table file or Fill with my data first');
+  const seats = importableProfiles();
+  if (!seats.length) return portableRefuse('✗ this file carries no profiles — nothing to restore');
+  const built = rebuildStore(
+    seats.map((p) => ({ name: p.name, system: p.system, set: p.set, pools: p.pools })),
+    {
+      fallbackSystem: tableSystem(),
+      // The pointer every current path silently drops: `profile:` names the
+      // rack that was in hand when the file was written. Restoring a library
+      // without it hands the player back whichever character sorted first.
+      activeName: (portableParsed.profile && portableParsed.profile.name) || null,
+      now: Date.now(),
+    },
+  );
+  if (!built.ok) return portableRefuse(`✗ ${built.error} — nothing was replaced`);
+  // PERSIST FIRST, SWAP SECOND, AND CHECK THE RETURN. saveProfileStore takes
+  // the store to write, so the replacement library is on disk before anything
+  // in this tab points at it — a browser that refuses the write leaves the old
+  // library whole in memory AND on disk, with no half-moved state to repair.
+  if (!saveProfileStore(built.store)) {
+    return portableRefuse('✗ couldn’t save the restored library (storage unavailable?) — nothing was replaced');
+  }
+  profileStore = built.store;
+  // adoptRack rebuilds `groups` from the record BEFORE it folds anything back,
+  // so the outgoing rack is never written into the incoming library. It also
+  // applies the profile's dice set, which is the last thing `set:` is for.
+  adoptRack(built.active);
+  // The rest-state title counts YOUR profiles, and yours are now the file's.
+  // (The boot-loss notice, if one was standing, came down inside the write —
+  // it claimed nothing had been overwritten, and that write is the overwrite.)
+  paintReplace();
+  const n = profilesOf(profileStore).length;
+  const whose = built.named ? '' : ' (this file named no profile in hand, so the first is)';
+  return portableReceipt(`✓ library replaced — ${n} profile${n === 1 ? '' : 's'} from this file, '${built.active.name}' in your hands${whose}`);
+}
+
+// What the restore control SAYS right now — for scenarios, so an assertion can
+// be about the armed state naming the profiles it will delete rather than
+// about which DOM node holds which class.
+function replaceVerbState() {
+  const zone = document.getElementById('import-profiles');
+  const btn = document.getElementById('import-replace');
+  const what = document.getElementById('import-replace-what');
+  const dl = document.getElementById('import-replace-download');
+  return {
+    offered: !!btn && !!zone && !zone.classList.contains('hidden'),
+    armed: replaceArmed,
+    label: btn ? btn.textContent : null,
+    names: replaceArmed && what ? what.textContent : null,
+    downloadOffered: !!(dl && !dl.classList.contains('hidden')),
+    mine: profilesOf(profileStore).map((p) => p.name),
+    fromFile: importableProfiles().map((p) => p.name),
+  };
+}
+
 // Add every profile in the box text to the library — how a DM's file reaches a
 // player who was not at the table (§11 O7/P14). An ADD, never a replace: names
 // dedupe, nothing of the player's is touched, and the cap refuses out loud with
@@ -19705,6 +19994,7 @@ function portableAdoptProfiles() {
     else { refusal = got.status; break; } // the cap, or a name no cleaning saves
   }
   renderProfileLibrary();
+  paintReplace(); // an Add changed how many profiles Replace would delete
   if (!added.length) return portableRefuse(refusal || '✗ nothing could be added');
   const tail = refusal ? ` — then stopped: ${refusal.replace(/^✗ /, '')}` : '';
   return portableReceipt(`✓ ${added.length} profile${added.length === 1 ? '' : 's'} added to your library${tail}`);
@@ -20231,6 +20521,35 @@ document.getElementById('profile-deal').addEventListener('click', () => {
 });
 document.getElementById('profile-pick').addEventListener('click', openProfileMenu);
 document.getElementById('import-adopt-all').addEventListener('click', () => portableAdoptProfiles());
+// C15's two-step, bound once (the rows are rebuilt on every keystroke; these
+// three controls are not). First press arms, second press commits — the same
+// in-place grammar the library row's Delete and the corner ✕ already use, so
+// nothing modal ever locks the table.
+document.getElementById('import-replace').addEventListener('click', () => {
+  if (!replaceArmed) {
+    replaceArmed = true;
+    paintReplace();
+    replaceArmTimer = setTimeout(disarmReplace, REPLACE_ARM_MS);
+    return;
+  }
+  disarmReplace();
+  portableReplaceLibrary();
+});
+// DOWNLOAD IS INSIDE THE ARMED STATE, AND FIRST. The thing about to be
+// replaced may be the only copy there has ever been, and the moment the player
+// is thinking about that is the moment they have just armed the verb — not
+// four rows up, before they knew they needed it. Writes the LIVE library
+// (portableSnapshot), never the box, which is holding the incoming file.
+document.getElementById('import-replace-download').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  portableDownload();
+  btn.textContent = 'Saved!';
+  setTimeout(() => { btn.textContent = 'Download first'; }, 900);
+  // Saving a copy inside the armed window is work, not a change of mind: the
+  // arm re-times rather than expiring under the browser's own save dialog.
+  clearTimeout(replaceArmTimer);
+  replaceArmTimer = setTimeout(disarmReplace, REPLACE_ARM_MS);
+});
 
 
 // WHAT THE BOX LAST HELD BY OUR OWN HAND (C9). The box is two things wearing
