@@ -29,6 +29,7 @@ Run scripts as:
 an uncaught traceback, so a broken bake looks like a clean one.
 """
 
+import hashlib
 import json
 import math
 import os
@@ -705,7 +706,7 @@ def export_glb(slug, objs=None, vertex_colors=False):
         raise RuntimeError(f"export produced no file: {path}")
     tris = sum(len(o.data.loop_triangles) for o in all_objs
                if o.type == "MESH" and (o.data.calc_loop_triangles() or True))
-    _record_digest(slug, order, dset, tris)
+    _record_digest(slug, order, dset, tris, path)
     print(f"[forge] {slug}.glb  {os.path.getsize(path) / 1024:.1f} kB  "
           f"~{tris} tris (blender count)  {time.time() - _T0:.1f}s in-script")
     return path
@@ -718,9 +719,32 @@ def export_glb(slug, objs=None, vertex_colors=False):
 _DIGESTS = {}
 
 
-def _record_digest(slug, order, dset, tris):
-    """Append the run's digest record to FORGE_OUT/digest.json."""
-    _DIGESTS[slug] = {"set": dset, "order": order, "tris": int(tris)}
+def _record_digest(slug, order, dset, tris, path=None):
+    """Append the run's digest record to FORGE_OUT/digest.json.
+
+    `sha` IS THE FILE, and it answers a question the other three cannot.
+    `set` and `order` hash the GEOMETRY as Blender holds it, which is what
+    makes them the right tripwire for "did this recipe stop being
+    deterministic". They are the WRONG tripwire for "is the file we serve the
+    file the recipe writes" — 2026-08-13, the shipped hollowbole models were
+    two commits behind their recipe for a morning, because that round added a
+    `doorPad` MARKER: real shipping data, not one triangle moved, so every
+    geometry hash was identical and nothing anywhere could see it.
+
+    The whole file's hash sees it. Paired with the promoted-asset check in
+    tests/static-cache.test.mjs, the two ends are pinned: the bake refuses a
+    file that is not what the baseline recorded, and the suite refuses a
+    SHIPPED file that is not the baseline's — so a re-bake that nobody
+    promoted fails, which is the failure that actually happened.
+    """
+    rec = {"set": dset, "order": order, "tris": int(tris)}
+    if path:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        rec["sha"] = h.hexdigest()[:16]
+    _DIGESTS[slug] = rec
     with open(os.path.join(OUT_DIR, "digest.json"), "w") as f:
         json.dump(_DIGESTS, f, indent=1, sort_keys=True)
         f.write("\n")

@@ -2,21 +2,25 @@
  "hollowbole_foxfire": {
   "order": "5ae2df6d184caf5e",
   "set": "5278316c43df21ca",
+  "sha": "7b138d909d7e44e2",
   "tris": 7270
  },
  "hollowbole_moonrise": {
   "order": "5970c89173ecc34f",
   "set": "5278316c43df21ca",
+  "sha": "f9770f0157346961",
   "tris": 7270
  },
  "nullstone": {
   "order": "84b02ebd1e968c5d",
   "set": "c6e4211a22e26256",
+  "sha": "86a2e5615b0a1919",
   "tris": 4304
  },
  "tower_fixture": {
   "order": "0ccccec51e49dbd8",
   "set": "c3443932f647f83f",
+  "sha": "e2e9445c568eacc3",
   "tris": 912
  }
 }

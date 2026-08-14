@@ -226,9 +226,14 @@ node tools/drive.mjs tools/steps/tower-try.mjs tools/forge/out/<slug>.glb
   writing js/main.js): registry row `{id, label, glbUrl, title, clunkVoice,
   ember, …}` + the theme-pairing comment line + the id in server.js
   SETTING_SPECS' tower row (server.js changed ⇒ ONE restart of the live
-  8123 at merge time, from the main session only) + the GLB(s) committed at
-  a served path and covered by tests/static-cache.test.mjs (the manifest-
-  less server serves them; the TEST is what notices a missing file).
+  8123 at merge time, from the main session only) + the GLB(s) SHIPPED with
+  `node tools/forge/promote.mjs <slug…>`, which does the bytes, the
+  static-cache list and the digest baseline (including the file `sha`) as one
+  reviewed diff — read it, that is the gate. The manifest-less server serves
+  anything under ROOT, so the TEST is what notices a missing file, and the
+  `sha` is what notices a STALE one: `static-cache` refuses a shipped model
+  that is not what the recipe writes. A promote is a MAIN-SESSION act and
+  `bake.sh` deliberately does not do it.
 - The main session (Fable) holds the review gate and never delegates it.
 - The dogfood order is fixed: bake gates green BEFORE integration; the
   review gate LOOKs at preview sheets BEFORE the app sees the model, and at

@@ -52,8 +52,15 @@ def main():
             print(f"[digest] {slug}: set={got['set']} order={got['order']} "
                   f"tris={got.get('tris')}  (no baseline row)")
             continue
+        # `sha` is compared alongside the geometry hashes, and a move in sha
+        # ALONE is its own diagnosis: the FILE changed while not one triangle
+        # did. That is shipping data outside the mesh — a marker, a portal
+        # extra, an exporter setting — and it is exactly the shape that let
+        # the hollowbole models sit two commits behind their recipe for a
+        # morning with every geometry hash matching.
         deltas = [f"{k}: {want.get(k)} -> {got.get(k)}"
-                  for k in ("set", "order", "tris") if want.get(k) != got.get(k)]
+                  for k in ("set", "order", "tris", "sha")
+                  if want.get(k) != got.get(k) and not (k == "sha" and want.get(k) is None)]
         if deltas:
             bad.append(f"{slug}  " + ";  ".join(deltas))
         else:

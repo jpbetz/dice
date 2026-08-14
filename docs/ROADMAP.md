@@ -3308,6 +3308,19 @@ an otherwise autonomous tower build stops dead. Refinement: a `promote`
 step that performs all three edits as one reviewed diff, so the human act
 is approving a diff rather than remembering three files.
 
+**SHIPPED 2026-08-14, and with the part the entry did not ask for.**
+`tools/forge/promote.mjs <slug…>` does the three edits and prints them; the
+human act is reading a diff. But a promote step you FORGET to run is the same
+bug it was written to prevent, so the drift is now caught at both ends:
+`forge.export_glb` stamps a `sha` of the whole written file into the digest
+record, `digestdiff` compares it (a move in `sha` ALONE means shipping data
+outside the mesh changed — precisely the `doorPad` marker that started this),
+and `static-cache` asserts every SHIPPED model against that baseline. A
+re-bake nobody promoted now fails the suite with the command that fixes it in
+the message. `promote.mjs --check` is the same claim on demand. Red-checked by
+serving one tower's bytes under another's name. All four shipped models were
+verified current on the day (nothing had drifted since the August 13 catch).
+
 ### T8. Two gates that cannot be armed yet — (a) ARMED 2026-08-13, (b) designed
 - **`tower_fixture.py` was RED on the bake-side occlusion gate** (cowl 11/99
   at `wide.full`) — REBUILT, not waived. The cause was one line and it

@@ -25,6 +25,8 @@ limitations under the License.
 
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -259,7 +261,11 @@ try {
   // directory: the two-variant row is the thing that can half-ship.
   // Nullstone rides the same list: one file, no palettes, and the same way to
   // half-ship it (a registry row pointing at a url nobody committed).
-  for (const pal of ['hollowbole_moonrise', 'hollowbole_foxfire', 'nullstone']) {
+  // Maintained by tools/forge/promote.mjs, which appends a slug when it ships
+  // one. Kept as a literal list rather than a directory read for the reason
+  // above: a directory read is green on an empty directory.
+  const PROMOTED = ['hollowbole_moonrise', 'hollowbole_foxfire', 'nullstone'];
+  for (const pal of PROMOTED) {
     await t(`/models/towers/${pal}.glb is served as a GLB`, async () => {
       const res = await fetch(`${base}/models/towers/${pal}.glb`);
       assert.equal(res.status, 200, `the ${pal} model must be fetchable from the page origin`);
@@ -273,6 +279,42 @@ try {
       assert.ok(buf.byteLength > 100000, `and the real model (${buf.byteLength} bytes), not a stub`);
     });
   }
+
+  // THE SERVED FILE IS THE FILE THE RECIPE WROTE (ROADMAP T7). Everything
+  // above proves a model is REACHABLE; none of it proves it is CURRENT, and
+  // that is the bug that actually happened: 2026-08-13 the shipped hollowbole
+  // models were two commits behind their recipe for a morning, found by
+  // accident. The digest baseline could not see it — `set`/`order` hash the
+  // GEOMETRY, and that round's change was a `doorPad` MARKER, real shipping
+  // data with not one triangle moved. So the baseline carries `sha` over the
+  // whole file now, and this asserts the shipped bytes against it.
+  //
+  // WHAT MAKES IT FAIL: re-bake a tower and do not promote it. The bake
+  // stamps a new sha into digests.json (or digestdiff refuses the bake), and
+  // this goes red until `node tools/forge/promote.mjs <slug>` runs. A promote
+  // step you forget to run is the same bug it was written to prevent, which
+  // is why the standing check lives here and not in the step.
+  await t('every shipped model matches its digest baseline, byte for byte', async () => {
+    const digests = JSON.parse(
+      await readFile(new URL('../tools/forge/digests.json', import.meta.url), 'utf8'));
+    let checked = 0;
+    for (const slug of PROMOTED) {
+      const row = digests[slug];
+      assert.ok(row, `${slug} has a digests.json row — a shipped model with no `
+        + 'baseline is a file nothing can prove anything about');
+      if (!row.sha) continue; // pre-sha row: re-bake stamps one (promote --check says so)
+      const buf = Buffer.from(await (await fetch(`${base}/models/towers/${slug}.glb`))
+        .arrayBuffer());
+      const got = createHash('sha256').update(buf).digest('hex').slice(0, 16);
+      assert.equal(got, row.sha,
+        `${slug}.glb as SERVED is ${got}; digests.json says the recipe writes `
+        + `${row.sha}. The model on disk is not the model the recipe makes — `
+        + 're-bake and `node tools/forge/promote.mjs ' + slug + '`.');
+      checked++;
+    }
+    assert.ok(checked > 0, 'and at least one model carried a sha to check — a '
+      + 'baseline with no shas would make this pass by having nothing to say');
+  });
 
   // ---- HEAD requests still behave --------------------------------------
 
