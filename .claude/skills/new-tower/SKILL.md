@@ -137,6 +137,26 @@ was an extruded profile with parapet rails — a ramp in a dirt costume):
   the lane, a capped shoulder blend that keeps the throat gate clear by
   construction, pure mound beyond. Never model the lane and decorate its
   edges — that ordering is the ramp trap regardless of paint.
+- **ONE JOB PER SHAPE — the round-8 amendment, and it deleted the bullet
+  above's own worked example.** That construction shipped as hollowbole's
+  earth berm and Joe threw it out: "has a good slope down on one side but
+  has a shelf on the other. It looks kinda silly… don't rely entirely on
+  the mound for dice control", then "just delete it now." The carve was not
+  the fault — the LOAD was. The mound was doing four jobs at once (visible
+  floor under the dice, ceiling keeping exiting dice clear, LID over a hole
+  beneath the ramp, bank of earth), and the shelf WAS job two: where the
+  clearance cone ran under the mound the surface became the cone, dead
+  flat, meeting the mound again in a crease. The "capped shoulder blend"
+  IS that cap. No shape can be all four things and also look like
+  anything. So: enumerate the jobs before you build the terrain, give it
+  only the ones that are about EARTH, and solve the rest where they
+  belong — the hole under the delivery ramp is the MODEL's hole, and the
+  model's own wall closes it. Corollaries paid for in rounds: a floor is a
+  CLAMP, never an additive lift, when the threshold's rag (±0.05) is wider
+  than the window (0.04); and a window sill wedged between a ramp crest
+  (1.046) and a throat floor (1.0875) is found by MEASURING it across the
+  whole opening, not by guessing a heading — four rounds guessed, and no
+  heading existed at which the guessed value was legal.
 - **Silhouette law**: no straight outline run over ~0.8 u in any rendered
   view; the crest visibly broken by asymmetric shoulders. Trace it on your
   own sheets before returning.
@@ -378,10 +398,31 @@ colors arrive final.
   reads (sRGB compression): the tongue's streak spread went 0.024 → 0.009
   under a pure gain and needed the fiber term doubled as a second lever.
 - The occlusion COWL band over a high-rimmed open crown is carried by the
-  interior liner's upper CURTAIN (rays through crown notches die on dark
-  liner), not by wall — and the curtain's required height is a RAY
-  CROSSING to measure, not a number to estimate (the estimate leaked;
-  the measurement said 11.78, built 12.03).
+  interior liner (rays through crown notches die on dark liner), not by
+  wall — and the height it must reach is a RAY CROSSING to measure, not a
+  number to estimate (the estimate leaked; the measurement said 11.78).
+  **AN OPEN CROWN OWES NOTHING ABOVE ITS OWN RIM.** The band is capped at
+  a despawning die's top (`v.cowlY`), which lands 0.5 UNDER the declared
+  rim at the shipped S — so if a measurement tells you to build occluder
+  above the mouth, the measurement is of a band that no longer exists.
+  This trap used to say the opposite and it is what built a black cylinder
+  over hollowbole's crown, in open sky, where a player watches the die
+  fall in. Read `towerPortalSpec(id).derived.cowlY` for the three heights
+  you actually owe; the cowl VOLUME sits somewhere else and is not it.
+- **`visible = false` does not stop a raycast.** three.js's
+  `intersectObject` does not test `visible`, so hiding an occluder leaves
+  the occlusion proof green over a surface a player looks straight
+  through. Invisible and occluding cannot both be true — bury the geometry
+  under something, or delete it. TWO HOOKS, TWO QUESTIONS, do not mix
+  them: `towerHideNamed(sub)` sets `visible` on the SOCKETED tower and
+  answers a question about the FRAME (hide one mesh at a time until the
+  picture explains itself — /new-venue's probe idiom applied to a model,
+  and it is how a black mass over the stump turned out to be
+  `towerSkinLining` rather than the curtain everybody was reasoning
+  about); `towerOccluderMute` takes a mesh out of the RAYCAST and answers
+  whether the occlusion proof still holds without it. Asking the first
+  hook the second question is how you conclude a curtain is load-bearing
+  when it is not.
 
 ## Appendix — the classic code-skin path (maintenance only)
 

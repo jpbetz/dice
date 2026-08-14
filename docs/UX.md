@@ -4405,8 +4405,8 @@ verdicts ("good set pieces… the scene lacks integration"; "an item set
 on a table, not a stump that grew out of the ground") drove the
 composition law (docs/VENUE-COMPOSITION.md, rules 1–13, normative per
 GOALS 14) and its application: the stump grows its ground (round 6 —
-earthen berm over the exact delivery collider, root fingers, moss
-creep; the machine may not show), the pool sits IN frame with palette-
+root fingers, moss creep, the delivery ramp clad as a root tongue; the
+machine may not show), the pool sits IN frame with palette-
 owned water value, a scenery tier ties the flow (fallen branch, bank
 stones, a foreground corner wing), and the ground answers every base
 with soil. A venue palette flip re-dresses the standing tower in place
@@ -4414,6 +4414,22 @@ with soil. A venue palette flip re-dresses the standing tower in place
 nearly silence the grounded room's env so baked palette colors read as
 baked. Proofs: `venue-set` (placement law + scenery tier + cross-flip
 re-dress, all off the stage contract).
+
+**The earth berm is gone (2026-08-14), and what it was hiding is fixed
+properly.** Round 6 put a bank of earth over the delivery ramp; Joe, on
+round 8: "has a good slope down on one side but has a shelf on the other.
+It looks kinda silly… don't rely entirely on the mound for dice control",
+and then "just delete it now." He was right three times, and the third
+time is why it is deleted rather than tuned. The mound was doing four jobs
+— the visible floor under the dice, a ceiling keeping exiting dice clear, a
+LID over a hole beneath the ramp, and a bank of earth — and no shape can be
+all four and also look like anything. The shelf was job two: where the
+clearance cone ran under the mound the surface simply BECAME the cone, dead
+flat, meeting the mound again in a crease. The hole is what actually held it
+there, and the wood closes it now with a 0.04-wide window whose sill must
+land above the ramp crest (1.046) and below the throat floor (1.0875) — a
+clamp, not a lift, because the threshold's rag wanders ±0.05, wider than the
+window. The stump still grows its ground; it no longer grows a machine part.
 
 ### 7.35 The venue tower — Hollow Bole (2026-08-12, W3)
 
@@ -4449,9 +4465,15 @@ paints; palette is a bake input because COLOR_0 is baked data). It rides
 the TOWER_CORE v2 portal contract (docs/TOWER.md): the model declares its
 mouth (rim 9.40, clearR 2.20) and its doorway (near-classic sill), and the
 engine derives the core around them. The interior is its own sealed dark
-throat — a liner whose upper CURTAIN carries the cowl band behind the
-splintered crown, so the vanish stays invisible from every shipped eye
-without a lid. The swappable-function seam did exactly what it promised:
+throat — a liner deep inside the trunk, so the vanish stays invisible from
+every shipped eye without a lid over the crown. (For two days there WAS
+something over the crown: a black curtain built to satisfy an occlusion
+band that rode above the mouth. Joe saw it in a frame — "I don't think we
+need the black cylinder visibly sticking out the top of the stump" — and it
+turned out the band was wrong, not the model. The band came down to a
+despawning die's top, the curtain went under the skyline, and the vanish is
+still 99/99 at all six eyes. docs/TOWER.md carries the arithmetic.) The
+swappable-function seam did exactly what it promised:
 the moot, the shelf brackets, the lit door and both palettes survived the
 shell swap unchanged, placed through a surface descriptor now synthesized
 by raycasting the loaded mesh (`js/towerglbshell.js`) — and the θ

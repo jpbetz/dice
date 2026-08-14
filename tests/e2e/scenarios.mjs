@@ -11875,6 +11875,49 @@ export const scenarios = [
           `${id}: and its mouth is not narrower than a d20 plus the aim jitter `
           + `(clearR ${ps.portals.in.clearR} ≥ ${ps.limits.in.clearRMin})`);
 
+        // ---- THE COWL BAND'S TOP IS A DESPAWNING DIE'S TOP ------------------
+        // The claim the round-8 arc owed (fe1987c; js/main.js `v.cowlY`). The
+        // band used to be sampled 1.6·S OVER THE MOUTH — inside the building
+        // for a hooded architectural tower, and open SKY for a broken stump,
+        // where every ray it fired was at a point a die is still visibly
+        // falling through. A model asked to occlude that builds a black
+        // cylinder over its own crown, which is the object Joe asked to have
+        // deleted, and the proof was green the whole time it stood there.
+        //
+        // BOTH SIDES COME OFF THE SAME PUBLISHED SPEC, so this pins a law and
+        // not a mirrored literal: `flight.r` is the engine's own d20 radius,
+        // and `cowlY` is what the sampler actually shoots at (js/main.js's
+        // occlusion grid reads it rather than re-deriving a band from the cowl
+        // VOLUME, which sits somewhere else entirely). A BRACKET rather than an
+        // equality, deliberately: the three heights are inset from the band's
+        // own edges, so pinning `=== despawnY + r` would be pinning the inset,
+        // which is sampling taste. The CAP is the law, and the bracket is the
+        // cap. The rim leg is structural rather than per-model: despawnY is
+        // `rimY − 1.4·S` for every spec, so the cap lands 0.5 under the rim at
+        // the shipped S on every tower that will ever register, and no model is
+        // asked to hide the air above its own mouth. (S-dependent, not a law of
+        // the universe — an S below 0.893 would lift the cap back over the rim,
+        // and this line should go red then, because the band would be sampling
+        // sky again.)
+        const cowlY = ps.derived.cowlY;
+        assert.ok(Array.isArray(cowlY) && cowlY.length === 3
+          && cowlY[0] < cowlY[1] && cowlY[1] < cowlY[2],
+          `${id}: the cowl band is three ascending heights (${cowlY})`);
+        assert.ok(cowlY[2] > ps.derived.despawnY,
+          `${id}: the band reaches ABOVE the despawn line (${cowlY[2]} > `
+          + `${ps.derived.despawnY}) — the vanish is the thing it grades, and a `
+          + `band entirely under it would grade the fall instead`);
+        assert.ok(cowlY[2] <= ps.derived.despawnY + ps.derived.flight.r,
+          `${id}: and never above a DESPAWNING DIE'S TOP — despawn line `
+          + `${ps.derived.despawnY} plus a d20 radius ${ps.derived.flight.r} = `
+          + `${ps.derived.despawnY + ps.derived.flight.r}, against a top sample of `
+          + `${cowlY[2]}. Higher than that is a ray at air a die has already left`);
+        assert.ok(cowlY[2] < ps.derived.rimY,
+          `${id}: which leaves the whole band UNDER the declared rim `
+          + `(${cowlY[2]} < ${ps.derived.rimY}). A sample above the rim is a ray `
+          + `into open air over the crown: it can only be answered by geometry `
+          + `standing where a player watches the die fall in`);
+
         const f = await pour('8d6');
         assert.ok(f.pour, `${id}: a pour is still a POUR`);
         // THE FILM RECORDS WHICH TOWER IT WAS BAKED WITH, and until now
@@ -12269,6 +12312,34 @@ export const scenarios = [
       assert.equal(w.count - wasWorld.count, 8,
         `the skin adds no physics — the eight engine bodies and nothing else `
         + `(${wasWorld.count} → ${w.count})`);
+
+      // ---- THE CHEAT IS HIDDEN, ON THE SHIPPED VENUE TOWER ------------------
+      // This scenario audited the model's FIT and its dressing and never once
+      // asked the question the model exists to answer: can a player watch a die
+      // vanish? The round-8 arc turned on that number for four commits
+      // (fe1987c, 63f2e9d) and the only e2e carrying it was `tower-glb-loader`,
+      // whose subject is a test FIXTURE — a plain monolith authored to satisfy
+      // the gate. A fixture proves the engine can grade a baked model; it
+      // proves nothing about the one that goes up when the glade does.
+      //
+      // Both hard bands, all six shipped eyes, exact. The bands are hard for
+      // this model in particular: its crown is BROKEN OPEN, so the cowl band is
+      // carried by an interior liner seen through the notches rather than by
+      // any wall, and its front is built to `front_height_needed` rather than
+      // to its own mouth. Red-checked by restoring the pre-cap band in
+      // towerVolumes (the object the arc deleted): 37/99 at the wide eye.
+      const occH = await a.dbg(`towerOcclusionCheck('hollowbole')`);
+      assert.ok(occH && !occH.pending && Array.isArray(occH.eyes)
+        && occH.eyes.length === 6,
+        `the probe ran against the LOADED venue tower (six shipped eyes, got `
+        + `${occH && (occH.pending ? 'pending' : occH.eyes && occH.eyes.length)})`);
+      for (const e of occH.eyes) {
+        assert.equal(e.shaft.blocked, e.shaft.n,
+          `${e.id}: the fall is unwatchable (${e.shaft.blocked}/${e.shaft.n})`);
+        assert.equal(e.cowl.blocked, e.cowl.n,
+          `${e.id}: and so is the VANISH (${e.cowl.blocked}/${e.cowl.n}) — the `
+          + `band a splintered crown has to answer with liner, not with a lid`);
+      }
 
       // ---- the moot: the value ladder, read off the live materials --------
       const moot = await a.dbg('towerMootAudit()');

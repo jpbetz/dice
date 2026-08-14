@@ -118,7 +118,11 @@ portals is refused loudly). Materials wear the venue register's env
 policy (`towerEnvPolicy`: 0.45 grounded, 0.08 fantasy — a dark baked
 surface is mostly reflection, and the reflection must not be the grounded
 room), applied at socket + reskin and asserted by the audit from the same
-function. Proof for both: `venue-set`'s cross-flip berm claims.
+function. Proof for both: `venue-set`'s cross-flip re-dress claims — which
+ride `towerSkinBoleShell` and no longer the earth berm they were written
+against, because the berm was deleted with the mound (2026-08-14) and a
+physics-adjacent claim anchored to a deletable cosmetic mesh is a claim with
+an expiry date.
 
 **What v2 changes about the film — a superseded decision.** The film is now
 a function of (portal spec, seed) instead of (one fixed geometry, seed).
@@ -166,10 +170,18 @@ hollowbole_{moonrise,foxfire}.glb`, one deterministic run, shared geometry
 digest, palette as a bake input): the stump at 1.97:1, one ragged wound
 with the doorway inside its lower lip, five uneven spires (tallest at
 −58°), six gripping buttress roots, the delivery ramp baked as a root
-TONGUE cladding the engine chute, and the interior a sealed dark throat
-whose upper CURTAIN carries the cowl band behind the splintered crown
-(rays through any crown notch die on dark liner — the same redundant-
-carrier mechanism the old shell used, in mesh form). Declared portals:
+TONGUE cladding the engine chute, and the interior a sealed dark throat.
+**Its CURTAIN is now buried** (2026-08-14): the liner's upper curtain was
+built to carry a cowl band that rode over the mouth, and when that band came
+down to a despawning die's top (the COWL note in the classic-spec section
+below) every ray it was the sole carrier of turned out to be at open air
+above the rim. The curtain sits 0.129 UNDER the crown's own skyline now,
+measured on the built mesh by `assert_curtain` — whose round-7 form asserted
+the exact opposite and is what built the black cylinder Joe asked to have
+removed. The code-side `towerSkinLining` followed it down: `yRing` tracks
+`v.rimY` instead of a flat 11.4, and a baked shell declines the lining TUBE
+outright (`SURF.liningTube === false`) because on a bake that radius IS the
+outer wall. Declared portals:
 in (0, −2.55, rim 9.40, clearR 2.20), out (0, sill 1.00, 5.00 × 4.50).
 Battery on the baked shell: fit CLEAN (shell VENUE GROUNDS, tongue LIP
 CLADDING), occlusion 99/99 SHAFT+COWL at all six eyes, probe matrix 6/6
@@ -604,6 +616,44 @@ line, so the vanish would be watchable. 8.6 closes the leak at every shipped
 eye with margin. A hood, a canted funnel roof, a chimney cap — any shape
 works if the +z projection covers that band. Dice remain visible falling
 from above the cowl; the despawn happens in its shadow.
+
+**SUPERSEDED 2026-08-14 — the VOLUME stayed, the sampled BAND came down**
+(`js/main.js` `v.cowlY`, commit fe1987c). The `8.6` above is the top of the
+cowl VOLUME, and for two days it was also the top of the band the occlusion
+proof shot rays at. Those are not the same claim. The paragraph's own
+reasoning says what the band is for — the sightline must not reach "a d20's
+top at the despawn line" — and that is arithmetic, not a constant: a die
+vanishes when its CENTRE crosses `despawnY`, so the last watchable point is
+`despawnY + a d20 radius` and there is nothing above it to hide. The band is
+capped there:
+
+```
+  ct = despawnY + 1.25      cb = ct − 2.4·S      samples [cb+0.15, mid, ct−0.15]
+```
+
+Classic top sample 10.60 → 8.10; Hollow Bole 11.25 → 8.75. Because
+`despawnY` is `rimY − 1.4·S` for every spec, the band's top edge is
+`rimY − (1.4·S − 1.25)` — **0.5 BELOW the mouth's rim at the shipped S, on
+every tower that will ever register** — which is the whole point. (It is
+S-dependent and not a law of the universe: an S under 0.893 would put the
+cap back above the rim, and `tower-roll`'s rim bracket is what would say
+so — correctly, because the band would again be sampling sky.) Over
+a hooded architectural tower the old band was inside the building and cost
+nothing; over a broken stump it was SKY, and every ray it fired was at a
+point where a die is still visibly falling in and is *meant* to be seen. A
+model that satisfied it there had to grow a black cylinder over its own crown
+(Joe, at the round-7 frame: "I don't think we need the black cylinder visibly
+sticking out the top of the stump"), and the proof was green the entire time
+that object stood there. **The band was mis-derived, not the model
+mis-built.** All four towers hold 99/99 on both bands at all six eyes after
+the cap, and muting a shell still takes it red, so it can still fail.
+
+The cowl VOLUME is untouched and still means what it meant: it is where a
+facade occluder BELONGS on a tower built like a building. It was never the
+same place as the points being shot at. Proofs: `tower-roll` brackets
+`cowlY` against `despawnY + flight.r` and the declared rim for every
+registered row; `tower-hollowbole` and `tower-glb-loader` assert 99/99 on
+both hard bands at all six eyes.
 
 **4. OCCLUSION — what a skin must hide, from every shipped camera** (the
 steepest is the `close` preset's mini eye; check that one and the rest

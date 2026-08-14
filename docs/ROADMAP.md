@@ -2669,10 +2669,41 @@ dressed through a raycast-synthesized surface descriptor so the
 Joe-approved moot/attendants/door survived the shell swap (and the
 θ-convention debt died with it — the moot gap finally faces front-left).
 Battery: fit CLEAN (shell VENUE GROUNDS, tongue LIP CLADDING), occlusion
-99/99 shaft+cowl at all six eyes (the interior liner's cowl CURTAIN
-carries the band over the splintered crown), probe matrix 6/6, pour
-29/29, suite 48/48, tower tag 8/8 with the new held-replay scenario.
-The original W3 text below stands as history.
+99/99 shaft+cowl at all six eyes (carried by the interior liner, seen
+through the crown notches — see round 8 below for where the liner's top
+ended up), probe matrix 6/6, pour 29/29, suite 48/48, tower tag 8/8 with
+the new held-replay scenario. The original W3 text below stands as history.
+
+**ROUND 8 (2026-08-14) — two objects deleted, and both were the proof's
+fault rather than the model's.** Joe, at the round-7 frame: *"I don't
+think we need the black cylinder visibly sticking out the top of the
+stump."* It was the liner's cowl curtain, and it was carrying rays the
+occlusion band fired at points ABOVE the declared rim — open sky over a
+broken crown, where a die is still visibly falling in and is meant to be
+seen. The band was mis-derived: it rode 1.6·S over the MOUTH, which is
+inside the building for a hooded architectural tower and is weather for a
+stump. `v.cowlY` caps it at a despawning die's top (`despawnY + 1.25`),
+which lands 0.5 under the rim for every spec at the shipped S; classic top
+sample 10.60 → 8.10, Hollow Bole 11.25 → 8.75; all four towers still
+99/99 on both bands at all six eyes, and muting a shell still takes it
+red. Then Joe, at the next frame I sent him without opening it: *"WTF?"* —
+the black mass was mostly not the curtain at all but the code-side
+`towerSkinLining`, standing in front of the baked trunk in both palettes,
+on two numbers that were fine for a code shell and stale for a bake
+(`yRing` 11.4 flat → follows `v.rimY`; the lining TUBE declined outright
+by a baked shell, `SURF.liningTube === false`, because on the bake that
+radius IS the outer wall). Found by hiding, not by reasoning —
+`towerHideNamed()` is that idiom as a hook now. And the earth berm went
+with them: it was doing four jobs (visible floor, dice ceiling, LID over
+the hole beneath the ramp, bank of earth), the shelf Joe saw was job two
+surfacing, and what actually held it there was the hole — which the wood
+now closes itself with a 0.04-wide window, clamped between the ramp crest
+1.046 and the throat floor 1.0875. Docs and the e2e claim closed
+2026-08-14: `tower-roll` brackets `cowlY` against `despawnY + flight.r`
+and the declared rim for every registered row (red-checked at 10.6 vs
+8.25), and `tower-hollowbole` finally asserts the shipped venue tower's
+own occlusion — 99/99 on both hard bands at all six eyes, red-checked at
+53/99 — which until now only a test FIXTURE carried.
 
 *(original entry, for the record:)* REGISTERED 2026-08-12, SHELL OUTSTANDING
 `hollowbole` (`js/towerhollow.js`), the first `venueOnly` tower: no chip,

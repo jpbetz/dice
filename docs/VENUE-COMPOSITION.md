@@ -226,8 +226,10 @@ ramp's crest. The post-mortem, owned:
   "exhibits on a mat" is structurally forced.
 
 The W2c fixes ride the new rules: the model grows its transition
-(hollowbole round 6 — earthen berm for the tongue with its crest on the
-collider plane, root fingers, moss creep), the ground answers (tight
+(hollowbole round 6 — root fingers, moss creep, and a tongue cladding the
+delivery ramp; the earthen berm that first carried this was DELETED in
+round 8 for taking on three jobs that were not about earth — see
+`/new-tower` §1b, "one job per shape"), the ground answers (tight
 contact ring, disturbed soil), the pool comes into frame and up a value
 step, and a scenery tier populates the foreground band and the
 between-space. Placement moves land as documented new claims in
