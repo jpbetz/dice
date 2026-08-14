@@ -273,6 +273,198 @@ async function createTableFromLobby(t, tableName) {
   return landedAtTable(t);
 }
 
+// ---------------------------------------------------------------------------
+// SCREEN-SPACE COMPOSITION (ROADMAP W7 ②, VENUE-COMPOSITION rule 15). Lifted
+// from tools/steps/glade-frame.mjs so the scenario and the step ask the frame
+// the same questions in the same units — a gate that drifted from the tool a
+// person uses while MOVING things would be a second opinion, not a check.
+//
+// A feature is a ground ellipse; its frame footprint is the ndc bounding box of
+// 24 rim samples. Ground only, deliberately: the stage declares (x, z, rx, rz)
+// and nothing else, so a gate needing a height nobody authored would compare
+// one invented number against another. The footprint is also the right noun for
+// the complaint — "beads on a line" and "mirrored about the centre" are both
+// statements about where things SIT in the picture.
+// ---------------------------------------------------------------------------
+
+const RIM = 24;
+
+function rimPoints(f, y = 0) {
+  const pts = [];
+  for (let i = 0; i < RIM; i++) {
+    const a = (i / RIM) * Math.PI * 2;
+    pts.push([f.x + f.rx * Math.cos(a), y, f.z + f.rz * Math.sin(a)]);
+  }
+  return pts;
+}
+
+// Frame coordinates: fx, fy in [0, 1] with the origin at the TOP-LEFT of the
+// canvas — the frame a viewer sees, so "left third" means the left third.
+const toFrame = (ndc) => ({ fx: (ndc.x + 1) / 2, fy: (1 - ndc.y) / 2 });
+
+function boxOf(projected) {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const p of projected) {
+    const f = toFrame(p.ndc);
+    x0 = Math.min(x0, f.fx); x1 = Math.max(x1, f.fx);
+    y0 = Math.min(y0, f.fy); y1 = Math.max(y1, f.fy);
+  }
+  const w = x1 - x0, h = y1 - y0;
+  // The VISIBLE fraction: how much of the footprint the frame keeps. Two
+  // half-cropped features were found by LOOKING rather than by measuring; this
+  // is the number that would have found them.
+  const vx = Math.max(0, Math.min(1, x1) - Math.max(0, x0));
+  const vy = Math.max(0, Math.min(1, y1) - Math.max(0, y0));
+  return {
+    x0, x1, y0, y1, w, h,
+    cx: (x0 + x1) / 2, cy: (y0 + y1) / 2,
+    area: w * h,
+    inFrac: w * h > 0 ? (vx * vy) / (w * h) : 0,
+  };
+}
+
+// One page round trip for a whole batch of world points.
+const projectPoints = async (t, pts) => JSON.parse(await t.eval(
+  `JSON.stringify(${JSON.stringify(pts)}`
+  + `.map((p) => window.__diceDebug.worldToScreen(p[0], p[1], p[2])))`));
+
+// "THE SAME HORIZONTAL BAND", MEASURED IN THE FEATURES' OWN HEIGHTS. The first
+// mechanisation of this used an absolute 0.05 of frame height — which cleared
+// the rejected pair by 0.092 and would have certified the exact frame the rule
+// was written to refuse. A band is not a fixed number of pixels: two features
+// whose screen boxes nearly overlap vertically ARE on one band, however tall
+// they are. Same family as "a tier is a luminance, and an authored scalar is
+// not one" — the constant has to be expressed in the units of what it judges.
+const sameBand = (a, b) => Math.abs(a.box.cy - b.box.cy) <= 0.6 * (a.box.h + b.box.h);
+const sizeRatio = (a, b) =>
+  Math.max(a.box.w, b.box.w) / Math.max(1e-9, Math.min(a.box.w, b.box.w));
+
+// THE FROZEN W2c LAYOUT — js/fae-lab.js at 9f1e592, the frame Joe judged as
+// "symmetrical and formal". Ground footprints only, exactly the shape
+// venueInfo().stage reports today, so the two runs differ in COORDINATES and
+// in nothing else. It is a hand-frozen MODEL of coordinates that no longer
+// exist and it is not maintained against the code: that is the point, because
+// its only job is to be the red check the shipped frame is graded against.
+const W2C_LAYOUT = {
+  moot: { x: -6.8, z: -6.6, rx: 2.8, rz: 1.7, band: 'back' },
+  pool: { x: 6.2, z: -6.6, rx: 2.6, rz: 1.75 },
+  // W2c had no scatter: fungus existed in exactly two places, the ring and the
+  // five-cap spill that walked from it toward the root flare. The spill is
+  // modelled as the one clump it was — that IS what the thirds gate reports.
+  shrooms: [
+    { x: -6.8, z: -6.6, rx: 3.1, rz: 2.0, band: 'back' },
+    { x: -4.0, z: -5.95, rx: 0.7, rz: 0.4, band: 'back' },
+  ],
+  scenery: [
+    { x: -8.2, z: 4.7, rx: 0.8, rz: 0.8, band: 'fore' },
+    { x: -8.0, z: 5.2, rx: 0.6, rz: 0.6, band: 'fore' },
+    { x: -4.8, z: -5.5, rx: 1.35, rz: 0.75, band: 'back' },
+    { x: 4.5, z: -6.0, rx: 0.32, rz: 0.32, band: 'back' },
+    { x: 5.0, z: -6.35, rx: 0.24, rz: 0.24, band: 'back' },
+  ],
+};
+
+// Six gates over a projected layout, each { id, ok, got }. The seventh gate the
+// tool carries (hero contact) is deliberately absent: both frames pass it, so
+// it is a floor, and VENUE-COMPOSITION rule 15 says a gate the rejected frame
+// also passes is not evidence. The hero's POSITION is not a gate either — the
+// door sits on x 0 by portal spec and the resting eye looks down the mat, so
+// the tower is pinned to the centreline by construction.
+function frameGates(L) {
+  const cast = L.supports.concat(L.fungus);
+  const all = L.supports.concat(L.fungus, L.scenery);
+  const out = [];
+
+  // F1 — SYMMETRY, which is Joe's own word. A pair is a MIRROR TWIN when one
+  // sits where the other's reflection in the frame's centreline would be, on
+  // the same band, at a comparable angular size. The axis is the HERO's
+  // projected centre rather than the canvas centre: the resting eye is offset,
+  // so a pair that straddles the TOWER is what a viewer reads as reflected.
+  {
+    const axis = L.hero ? L.hero.box.cx : 0.5;
+    const twins = [];
+    let worst = null;
+    for (let i = 0; i < cast.length; i++) {
+      for (let j = i + 1; j < cast.length; j++) {
+        const a = cast[i], b = cast[j];
+        if (!sameBand(a, b) || sizeRatio(a, b) >= 1.35) continue;
+        const err = Math.abs(a.box.cx + b.box.cx - 2 * axis);
+        if (!worst || err < worst.err) worst = { a: a.id, b: b.id, err };
+        if (err < 0.06) twins.push(`${a.id}~${b.id} (Δ${err.toFixed(3)})`);
+      }
+    }
+    out.push({ id: 'F1 no mirror twins', ok: twins.length === 0,
+      got: twins.length ? twins.join(', ')
+        : `0 twins (tightest same-band pair ${worst ? `${worst.a}~${worst.b} Δ${worst.err.toFixed(3)}` : 'none'})` });
+  }
+
+  // F2 — two supports the same angular size on one band read as BOOKENDS
+  // wherever they stand in plan, which is exactly how a plan-space fix
+  // photographs as nothing.
+  {
+    const pairs = [];
+    for (let i = 0; i < L.supports.length; i++) {
+      for (let j = i + 1; j < L.supports.length; j++) {
+        const r = sizeRatio(L.supports[i], L.supports[j]);
+        if (r < 1.25 && sameBand(L.supports[i], L.supports[j])) {
+          pairs.push(`${L.supports[i].id}~${L.supports[j].id} (×${r.toFixed(2)})`);
+        }
+      }
+    }
+    out.push({ id: 'F2 no bookends', ok: pairs.length === 0,
+      got: pairs.length ? pairs.join(', ') : '0 pairs' });
+  }
+
+  // F3 — "more mushrooms throughout the scene". Throughout is a claim about the
+  // PICTURE, so it is binned by screen third; the area half is what stops one
+  // dense ring from satisfying it.
+  {
+    const thirds = [0, 0, 0];
+    const counts = [0, 0, 0];
+    for (const f of L.fungus) {
+      const k = Math.max(0, Math.min(2, Math.floor(f.box.cx * 3)));
+      thirds[k] += f.box.area;
+      counts[k]++;
+    }
+    const total = thirds.reduce((a, b) => a + b, 0) || 1e-9;
+    const share = thirds.map((v) => v / total);
+    out.push({ id: 'F3 thirds',
+      ok: counts.every((c) => c > 0) && Math.max(...share) <= 0.60,
+      got: `counts [${counts.join(', ')}] · area share [${share.map((v) => v.toFixed(2)).join(', ')}]` });
+  }
+
+  // F4 — the second half of the staged read: everything on one horizontal
+  // strip. Measured over the whole cast, because the strip is what the low eye
+  // makes of the back band and the answer to it is the foreground.
+  {
+    const ys = all.map((f) => f.box.cy);
+    const span = Math.max(...ys) - Math.min(...ys);
+    out.push({ id: 'F4 band spread', ok: span >= 0.35,
+      got: `${span.toFixed(3)} of frame height` });
+  }
+
+  // F5 — angular-size contrast, one of the levers that survives this
+  // projection.
+  {
+    const ws = L.supports.map((f) => f.box.w);
+    const ratio = Math.max(...ws) / Math.max(1e-9, Math.min(...ws));
+    out.push({ id: 'F5 size ladder', ok: ratio >= 1.60,
+      got: `×${ratio.toFixed(2)} (${ws.map((w) => w.toFixed(3)).join(' · ')})` });
+  }
+
+  // F6 — a feature the frame crops away is not a composition decision. Runs
+  // over the scenery tier too: a fore wing is authored FOR the frame, so one
+  // photographing at 17% is doing none of its job.
+  {
+    const cropped = all.filter((f) => f.box.inFrac < 0.55)
+      .map((f) => `${f.id} ${(f.box.inFrac * 100).toFixed(0)}%`);
+    out.push({ id: 'F6 in frame', ok: cropped.length === 0,
+      got: cropped.length ? cropped.join(', ') : 'all ≥ 55%' });
+  }
+
+  return out;
+}
+
 // Roll `notation` until the banner's outcome rows satisfy `want`, or give up.
 // For the mechanics that only fire on a face: `1d6!` explodes on a 6 and
 // `1d6 ro<=2` rerolls on a 1 or a 2, so a single throw is a coin flip and a
@@ -16551,6 +16743,149 @@ export const scenarios = [
       // same mistake takes.
       const refused = seen.filter((r) => r.status === 403);
       assert.deepEqual(refused, [], `and nothing was forbidden (got ${JSON.stringify(refused)})`);
+    },
+  },
+
+  // ---- Tier W · the staging, measured in the FRAME (W7 ②) ----------------
+  {
+    name: 'venue-frame',
+    tags: ['fx', 'look'],
+    timeout: 150000,
+    // Joe's verdict was a SCREEN-SPACE claim — "I want the dice tower to be in
+    // a scene, not the centerpiece of it in a symmetrical and formal way" — and
+    // every previous answer to it was authored and checked in PLAN. W2c already
+    // recorded what that costs: the resting eye's low angle compresses the
+    // whole back band into one horizontal strip, so a plan-space move can be
+    // large, correct, and photograph as nothing. The two features W2c put
+    // thirteen units apart on a perfectly legal triangle project to within
+    // 0.006 of frame width of being each other's mirror.
+    //
+    // THE `look` TAG IS EARNED, not borrowed. Every number here is a geometry
+    // read through the live camera: the stage declares its own ground extents,
+    // `worldToScreen` projects them, and nothing about a die is an input. The
+    // runner proves it by reading `diceEverMade()` afterwards.
+    //
+    // AND IT IS SELF-RED-CHECKING, which is the part that makes it evidence
+    // rather than a floor. The frozen W2c layout — the arrangement Joe
+    // rejected — is projected through the SAME camera in the same run, and the
+    // scenario fails unless the rejected frame fails at least three gates. A
+    // suite the rejected frame passes is measuring something both frames happen
+    // to satisfy, and shipping that is this project's own dominant failure mode
+    // with a composition on it. (VENUE-COMPOSITION rule 15; the same red check
+    // tools/steps/glade-frame.mjs runs, kept here so it costs seconds in a
+    // sweep rather than a hand-run.)
+    async fn(ctx) {
+      const t = await ctx.newTable({ origin: '127.0.0.77', name: 'Frame' });
+      await t.page.browser.send('Emulation.setDeviceMetricsOverride',
+        { width: 1500, height: 950, deviceScaleFactor: 1, mobile: false }, t.page.sessionId);
+      try {
+        await t.dbg('holdClock(true)');
+        await t.dbg(`setVenue('moonrise')`);
+        await t.waitFor(`window.__diceDebug.venueInfo().staged`, { desc: 'the glade rises' });
+        await t.dbg(`setTower('hollowbole')`);
+        await t.waitFor(`window.__diceDebug.tower === 'hollowbole'`, { desc: 'the hero is up' });
+        // THE RESTING EYE IS AN EASE, NOT A JUMP. Measuring before it lands
+        // grades a camera halfway between two frames — the venue-life lesson.
+        await t.dbg('sim(1500)');
+        await t.eval('window.__diceDebug.tick(0, true, false)');
+
+        const stage = await t.dbg('venueInfo().stage');
+        assert.ok(stage, 'the stage reports its layout');
+
+        // THE HERO, off the BUILT shell rather than a remembered number, so a
+        // re-baked trunk moves the gates with it. Sampled at the felt and again
+        // at the declared rim, because the trunk leans and the crown is what
+        // the eye reads against.
+        const shell = await t.dbg(`groundGaps('towerSkinBoleShell')`);
+        assert.ok(shell && shell.all.length, 'the hollowbole shell is in the scene');
+        const spec = await t.dbg(`towerPortalSpec('hollowbole')`);
+        const m = shell.all[0];
+        const heroF = { id: 'hero', x: m.x, z: m.z, rx: m.w / 2, rz: m.w / 2 };
+        const hero = {
+          ...heroF,
+          box: boxOf(await projectPoints(t, [
+            ...rimPoints(heroF, 0),
+            ...rimPoints(heroF, spec ? spec.derived.rimY : 9.4),
+          ])),
+        };
+        // THE HERO IS PINNED BY CONSTRUCTION and that is a finding rather than
+        // an omission: the door sits on x 0 by portal spec and the resting eye
+        // looks down the mat's centreline, so no composition move can take the
+        // tower off the frame's middle. Everything Joe asked for has to be
+        // bought with the rest of the scene, which is what every gate measures.
+        assert.ok(Math.abs(hero.box.cx - 0.5) < 0.08,
+          `the hero projects to the centreline (frame x ${hero.box.cx.toFixed(3)})`);
+
+        const layouts = {
+          shipped: {
+            hero,
+            supports: [{ id: 'moot', ...stage.moot }, { id: 'pool', ...stage.pool }],
+            // The ring IS fungus as well as a support: asking where the
+            // mushrooms are and leaving the densest patch of them out of the
+            // census would be the question answered about everything except
+            // its subject.
+            fungus: (stage.shrooms || []).map((f, i) => ({ id: `shroom${i}`, ...f }))
+              .concat([{ id: 'ring', x: stage.moot.x, z: stage.moot.z,
+                rx: stage.moot.rx, rz: stage.moot.rz }]),
+            scenery: (stage.scenery || []).map((f, i) => ({ id: `scenery${i}`, ...f })),
+          },
+          rejected: {
+            hero,
+            supports: [{ id: 'moot', ...W2C_LAYOUT.moot }, { id: 'pool', ...W2C_LAYOUT.pool }],
+            fungus: W2C_LAYOUT.shrooms.map((f, i) => ({ id: `shroom${i}`, ...f })),
+            scenery: W2C_LAYOUT.scenery.map((f, i) => ({ id: `scenery${i}`, ...f })),
+          },
+        };
+
+        const graded = {};
+        for (const [name, L] of Object.entries(layouts)) {
+          const flat = [...L.supports, ...L.fungus, ...L.scenery];
+          const pts = [];
+          const spans = [];
+          for (const f of flat) {
+            const p = rimPoints(f);
+            spans.push([pts.length, p.length]);
+            pts.push(...p);
+          }
+          // ONE round trip for every point of every feature: worldToScreen
+          // reads the LIVE camera, and the camera must not move between
+          // samples.
+          const all = await projectPoints(t, pts);
+          const projected = flat.map((f, i) => {
+            const [at, n] = spans[i];
+            return { ...f, box: boxOf(all.slice(at, at + n)) };
+          });
+          let at = 0;
+          graded[name] = frameGates({
+            hero: L.hero,
+            supports: projected.slice(at, at += L.supports.length),
+            fungus: projected.slice(at, at += L.fungus.length),
+            scenery: projected.slice(at, at += L.scenery.length),
+          });
+        }
+
+        // ---- the shipped frame passes every gate --------------------------
+        const bad = graded.shipped.filter((g) => !g.ok);
+        assert.deepEqual(bad.map((g) => `${g.id}: ${g.got}`), [],
+          'the shipped composition holds every screen-space gate');
+
+        // ---- THE RED CHECK ------------------------------------------------
+        const discriminating = graded.rejected.filter((g) => !g.ok);
+        assert.ok(discriminating.length >= 3,
+          `the frame Joe rejected fails at least three of these gates — otherwise `
+          + `they are a floor rather than evidence (failed ${discriminating.length}/`
+          + `${graded.rejected.length}: ${JSON.stringify(graded.rejected.map((g) => `${g.id}=${g.ok ? 'pass' : 'FAIL'}`))})`);
+        // And name the ones that DO discriminate, so a gate quietly becoming a
+        // floor is visible in the failure text of whatever breaks next.
+        for (const id of ['F1 no mirror twins', 'F3 thirds', 'F5 size ladder']) {
+          const g = graded.rejected.find((x) => x.id === id);
+          assert.equal(g.ok, false,
+            `${id} tells the two frames apart (the rejected frame got: ${g.got})`);
+        }
+      } finally {
+        await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId)
+          .catch(() => {});
+      }
     },
   },
 ];
