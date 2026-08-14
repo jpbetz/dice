@@ -256,6 +256,19 @@ nowhere in code.
 > sheet) remains unbuilt and is still the right home for *"I am building to
 > 80 tonight"*. This amendment is about the system's own default, not about
 > that.
+>
+> **BUILT 2026-08-15 (§2l ⑤).** The typed target is a per-SHELF, session-only
+> number layered over the system's through one accessor — `shelfBudget` reads
+> yours if you typed one and `systemShelfBudget`'s otherwise, so the shelf
+> head and the sheet cannot disagree about which is in force. Still no
+> storage, no wire key, no portable field: a module-level `Map`. Design and
+> the reasoning: **UX.md §7.44**.
+>
+> One consequence worth stating, because it looks like a contradiction and is
+> not: **a typed target may price a shelf the system does not.** C8 left
+> Motivations budgetless so the APP would not invent a ceiling and then mark
+> you red for breaking it. A number the player typed invents nothing — it is
+> the player declaring their own budget, which is what ⑤ exists for.
 
 `.pool-sec-head` becomes a flex row with `.psh-word` and `.psh-fig`, **built in
 manage mode only**. `#pools-head` keeps its hairline — `.ph-rule` is the
@@ -277,7 +290,21 @@ lose their dress — exactly the class of change that ships half-done.
 The ruling reduced it to one pass over one chart column — at most 20 lookups
 per **distinct rank**, and identical ranks share a bar, so a 40-die pool costs
 what a 1-die pool costs. Measured: `spectrum(d20)` **1.3 µs**,
-`poolBars(40d20)` **3.6 µs**. No DP, no convolution, no combinatorics anywhere
+`poolBars(40d20)` **3.6 µs**.
+
+> **These two figures do not reproduce, and the doc's own rule says to say so
+> (re-run 2026-08-15).** `node tools/pool-analysis-data.mjs` now reports
+> `poolBars(40d20)` **9.9 µs** and `spectrum(d20)` **13.3 µs** — and that
+> ordering is impossible, since `poolBars` calls `spectrum`. Both timings are
+> microbenchmark noise on an unwarmed JIT, which means they were never
+> measurements in the sense the rest of this document uses the word. **The
+> CLAIM they support survives untouched and is the one that matters** — the
+> per-die path is one fold over one column, identical ranks share a bar, and
+> there is no DP, convolution or combinatorics in it at all. That is a
+> property of the algorithm, not of a stopwatch. Treat both numbers as "µs,
+> not ms", nothing finer.
+
+No DP, no convolution, no combinatorics anywhere
 in the per-die path. `pmf()` and `js/odds.js` exist **only for the sum
 profiles**. This is the cheapest correct thing the panel considered, and it
 arrived by constraint rather than by optimization.
@@ -399,6 +426,12 @@ than any lens, and the per-die half of the design is his, not the panel's.
 
 ## 9. Still open
 
+*Two of these were taken by the ⑤ build, 2026-08-15, and are struck below
+rather than deleted — the reasoning that made them open is what made the
+answers defensible. Everything not struck is still genuinely open, and ⑥ (the
+sum read) has not been started: `forecastFor` still returns `null` for `dnd`
+and `none`.*
+
 - **Does the parser stop collapsing `2d20kh1` → `1d20 adv`?** The physical-dice
   count closes the *budget* bug either way; what remains is whether notation
   should silently rewrite itself. Touching it means touching canonical form, a
@@ -422,14 +455,23 @@ than any lens, and the per-die half of the design is his, not the panel's.
   on every rung. Odds line, or a written refusal?
 - **Mixed adv+explode / mixed-type keep/drop** (sum profiles only): simulate
   the 40-slot budget over pmfs, or refuse with the `pure`-gate grammar?
-- **Where the rack figure lives.** `#pools-head` is deliberately non-sticky
-  ("a second pinned band would steal tray-adjacent pixels"), so a rack total
-  there scrolls away during exactly the task it exists for. Head (entry
-  bracket) vs. the `✎` toolbar foot (exit bracket) — both unpinned. **Not**
-  resolved by a third sticky rung; that refusal is explicit and recent.
-- **The e2e tag.** New `analysis`, the pre-reserved `capture` (TESTING.md
-  already names it for step-5 work, and §2l feeds §5), or no new tag
-  (`groups` + `meanings` + `chrome` suffice)?
+- ~~**Where the rack figure lives.**~~ **TAKEN 2026-08-15: it stays in the
+  head, and the figure IS the door.** The scroll problem is real and neither
+  location fixed it — a foot figure scrolls away just as a head figure does,
+  and the third sticky rung was refused. What answers it is **altitude**: the
+  figure becomes the button that opens the ledger sheet, and a surface that
+  flew out of a control does not scroll with the rack, so the reading you
+  opened stays put while you scroll shelves under it. No second location, no
+  new control (§5's one-gate rule), nothing pinned. Residual named in UX.md
+  §7.44: the sheet does not re-anchor, so scrolling far enough leaves it over
+  a head that has left — the shipped `.set-menu` grammar, matched rather than
+  re-invented.
+- ~~**The e2e tag.**~~ **TAKEN 2026-08-15: no new tag.** `groups` + `meanings`
+  + `chrome` carried both ⑤ and §1's struck-die work without strain, and the
+  pre-reserved `capture` should be spent by the pass that actually needs it
+  (TESTING.md names it for step-5). A tag minted for one feature is a tag
+  nobody selects. *(Open again the moment ⑥ ships a math surface with its own
+  failure modes — that is a different argument, not this one re-run.)*
 
 ## 10. Verification the build must carry
 
@@ -486,6 +528,23 @@ keeps 1); and MC cross-validation against `composeRoll`.
 `shelfValue`, already a live concept** (a die's face on the collect shelf) —
 plus `forecast(notation)`, `get forecastSheet`, `openForecastSheet(scope,key)`,
 `setForecastTarget(n)`.
+
+*(Corrected by the ⑤ build, 2026-08-15.* The last three names were pencilled
+in when ⑤ was imagined as ONE sheet carrying both reads. It carries the
+**ledger** only — the forecast bars stayed in `#pop-preview`, where §9b's icon
+strip is reserving room above them — so the shipped hooks are
+`openLedgerSheet()` / `closeLedgerSheet()` / `get ledgerSheet` /
+`setShelfTarget(label, n)`. A hook named for a surface it does not open sends
+the next reader looking for a spectrum inside a ledger. `ledgerSheet` reads
+the **rendered** sheet rather than the session Map, because the property worth
+pinning is that the sheet and the shelf heads agree, and a hook reading the
+Map could not tell you they had stopped.
+
+*§1's struck-die work adds one more:* `outcomeRows(surface)`, `surface` being
+`'banner' | 'verdict' | 'peek'` to match the shipped `cardActs`. It too reads
+the **rendered** chips — the bug it exists to catch lived between the profile
+and the paint, so a hook reading `outcomesFor` would have been green
+throughout.)
 
 **Copy constraint.** The `terminology` smoke sweep covers `#left-panel` and
 `#mods-popover` and fails on `/\btrays?\b|\bgroups?\b|\bcompose\b/i` across

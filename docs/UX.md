@@ -1107,7 +1107,10 @@ per-roll choices — §3.3.)
 Two principles arrived from Joe after §1–§6 were drafted. They are binding;
 where they touch earlier sections, this addendum wins.
 
-> **NEXT FREE SECTION NUMBER: §7.43.**
+> **NEXT FREE SECTION NUMBER: §7.45.**
+> *(§7.39–§7.44 were all claimed on 2026-08-14/15 by six parallel passes:
+> the door on the phone, restore, the token layer, the record, the struck
+> die, the ledger sheet. Four of the six first wrote themselves as §7.39.)*
 > Claim it here in the same commit that writes the section, before you write
 > it. This document ASSIGNS these numbers, so this line is the only place a
 > branch that has been out for a week can see what is taken (ROADMAP C4).
@@ -1139,12 +1142,12 @@ a stale row is worse than no table.
 | Section bar (`Dice · 2d6 · Pools`) | §7.23, as amended 2026-08-08 — three independent switches, all-off legal, two state objects; the DRESS of record is the comment over `#left-panel :is(.section-seg, #rail-mode)` in `css/style.css` | §7.9's "ONE input view at a time" and the two-value `dice.inputmode.v1` |
 | Die palette (`#die-buttons`) | §7.23 — it is a section now, switched by the `Dice` cell · §7.16's 2i-D for the steel tile body · §7.10's identity strip for the one build-dice idiom shared with the creation card | §7.1 entire: the felt die shelf was never built and its "the buttons become the fallback" demotion never took effect. GOALS moved physical pool-building to the delight tier |
 | Notation box (`#cmd`) | §1.1 grammar · §1.2 parser API · §1.6 server parse · §7.23 for where it sits and what switches it on | §1.3's placement paragraph (see the §1 banner). **No section yet records ROADMAP U1/U2**, shipped 2026-08-08 in `07099a7`: staging carries intent, and a box that stops parsing disarms the plate |
-| Saved-pools rack + shelves | §7.9's THE SHEET PASS — identity edits by id, creation-as-editing, the ✎ row — and its DEALT RACK amendment · §7.18 for what the ✎ gate covers | §7.17's region head, amended below: `SAVED POOLS` no longer stands over your own rack |
+| Saved-pools rack + shelves | §7.9's THE SHEET PASS — identity edits by id, creation-as-editing, the ✎ row — and its DEALT RACK amendment · §7.18 for what the ✎ gate covers · **§7.43** — the rack figure is a BUTTON that opens the ledger sheet, and a shelf's target may be the system's or one you typed for tonight | §7.17's region head, amended below: `SAVED POOLS` no longer stands over your own rack · POOL-ANALYSIS §9's "where the rack figure lives" — taken in §7.43; it stays in the head |
 | Collapsed launcher (the rail) | §7.22 — 112px, a row is a word, the standing verb, 2i-G · §7.23's "The collapsed column" — the source switch, the dice list, the plate at rail scale | §7.9's collapsed paragraph: it predates the second source list and describes a column that holds only pools (its 56px history is already struck there) |
 | Intent card · dock strip (the declaration) | §2.4's staging timeline, phases 1–8 · §7.6 for the moment flags and `# Title \| Subtitle` · **§7.24** — the target renders under every system and the profile only NAMES it (`targetWord`); the flat `+5` is arithmetic and does not; `#intent-notation` stays a whole verbatim canonical, `dc15` included | §2.4 phase 0's user-held dwell and Roll button (shipped: a fixed `CEREMONY_DECLARE_S = 1.35` s, no button) · §2.1 / §2.3's experience records — the moment ships as notation flags · any reading in which the badge's label is a fixed string |
-| Result banner | §7.11b — the folded card, the hover read, the beacon · **§7.28** — neither the card nor the dice are on a clock; the next roll retires both · §7.21 — the named primary verb, the retired watermark · **§7.24** — `VS DC 15` renders under every system, the adjudication only where a sum does, and the hero slot names the rung (`Face down` / `Whispered`) where the mute gold `?` used to sit | §7.9's Done-at-rest and its ~6 s clock (the shipped clock is 3 s) · §7.7.2's ⟳ / Collect / ✕ trio · §2.5 (retired 2026-08-08) |
-| Verdict card | §7.16's THE FLOW TO COLLECTED — a folded card whose clock shelves the roll · §7.21 — `❯❯ Skip` repaints to `✕ Clear` when the beat lands · **§7.24** — the stake goes into `#verdict-margin`, written ONCE above and outside every branch; the hero holds the reading and the two never share a slot | §7.7.2's verdict half (struck there) · §2.4 phase 0's user-held dwell and Roll button (shipped: a 1.35 s timer, no button) · §2.5's one hero slot — retired, struck there. **The card has no subtitle element under any system** (§7.24's deferral); do not read the eight-surface table as though it does |
-| Peek | §7.7.1 for what a peek is · §7.11b's "folded card, shelf edition" · §7.21 — its primary is always `✕ Clear`, housekeeping being anyone's · **§7.24** — the stake, and the held word in the total slot (the `?` survives only for `!entry`, and under a totals lens) · §7.27 — it anchors to a log ROW, not a felt point · **§7.42** — it names its RANK, and it retires on a new roll, on a ceremony and with the log | §7.15's one-✕ rule — retired, struck below · §7.9's "the peek carries a prominent ✕ at its base" amendment · §2.5 (retired) · any reading in which the card outlives the roll that replaced it |
+| Result banner | §7.11b — the folded card, the hover read, the beacon · **§7.28** — neither the card nor the dice are on a clock; the next roll retires both · §7.21 — the named primary verb, the retired watermark · **§7.24** — `VS DC 15` renders under every system, the adjudication only where a sum does, and the hero slot names the rung (`Face down` / `Whispered`) where the mute gold `?` used to sit · **§7.43** — the outcome rows show EVERY die that was thrown, struck ones included | §7.24 s *Not closed* list, which is stale in all three bullets — read the struck-through block, not the paragraphs it replaced · §7.9's Done-at-rest and its ~6 s clock (the shipped clock is 3 s) · §7.7.2's ⟳ / Collect / ✕ trio · §2.5 (retired 2026-08-08) |
+| Verdict card | §7.16's THE FLOW TO COLLECTED — a folded card whose clock shelves the roll · §7.21 — `❯❯ Skip` repaints to `✕ Clear` when the beat lands · **§7.24** — the stake goes into `#verdict-margin`, written ONCE above and outside every branch; the hero holds the reading and the two never share a slot · **§7.43** — the hero rows show every die thrown, so a `4d6dl1` dropped die is in the rows AND in its `DL1` attribution card | §7.7.2's verdict half (struck there) · §2.4 phase 0's user-held dwell and Roll button (shipped: a 1.35 s timer, no button) · §2.5's one hero slot — retired, struck there. **The card has no subtitle element under any system** (§7.24's deferral); do not read the eight-surface table as though it does |
+| Peek | §7.7.1 for what a peek is · §7.11b's "folded card, shelf edition" · §7.21 — its primary is always `✕ Clear`, housekeeping being anyone's · **§7.24** — the stake, and the held word in the total slot (the `?` survives only for `!entry`, and under a totals lens) · §7.27 — it anchors to a log ROW, not a felt point · **§7.42** — it names its RANK, and it retires on a new roll, on a ceremony and with the log · **§7.43** — its rows show every die thrown, at `.pk-outcomes` scale | §7.15's one-✕ rule — retired, struck below · §7.9's "the peek carries a prominent ✕ at its base" amendment · §2.5 (retired) · any reading in which the card outlives the roll that replaced it |
 | Roll log | **§7.42** — the record: the ≣'s spine, the flyout's rank panels and their anchor, `Find a roll…`, the scroll on `#log-list`, and what `Clear history` actually reaches · §7.27 for the row-as-door · §7.9 for the rail-foot flyout and key `l` · §7.12 for the compact grouped line (the per-die ROWS belong to the other three surfaces) · §7.15's "The log says so" for `reroll` / `rerolled` · **§7.24** — `vs 15` with no `✓`/`✗` where nothing sums, and no dangling `+5` feeding an empty total column | §2.5 (retired) · §7.9's "the count rides only the hover title (still the accessible name)" — the parenthesis was false and is why the count reached nobody (§7.42) · any reading in which `Clear history` is local-only |
 | Shelf | **RETIRED as a place.** §7.27 — a put-away roll lives in the log and its ROW is the door · **§7.42** — what it looks like at rest, open and closed · §7.7 for the collect/clear state machine, which is wire and survives verbatim | §7.7's slots, geometry and marker read · §7.7.1's compaction · ROADMAP U20/C13's "decide how much read the shelf owes" — answered by §7.42 |
 | ± popover | §7.10 — a pure editor, and where an edit lands by source · §7.14.2 — Done, click-away, the ring · §7.9's SHEET PASS identity strip · **§7.24** — only **Modifier** folds under a per-die lens; Target, d20 pairing, keep/drop and reroll/exploding are authorable under every system, and the rim reads `± Modify` in both | §7.10's "reroll and explode stay… behind the sysnote's *Show anyway*" — superseded 2026-08-06, no note and no disclosure; the accurate record is the comment over the popover's sections in `index.html` · any account of the fold in which Target or keep/drop hides under a per-die system: that was `usesMods`, deleted 2026-08-08 · ROADMAP U11's `± Moment` — its rule survived, its word did not (§7.24) |
@@ -3696,30 +3699,41 @@ a card whose whole virtue is *the name, the answer, the exits*. **Cost:** the
 table above keeps one honest asymmetry (verdict card, subtitle), held open as
 a rider under ROADMAP U16 rather than left to be re-audited.
 
-#### Not closed — verified against source, 2026-08-08
+#### ~~Not closed~~ — ALL THREE CLOSED (re-verified against source, 2026-08-15)
 
-Two sites in the shipped build still disagree with the rule above. Both are
-recorded because an authority section that overstates itself is worse than
-none; ROADMAP U17 carries them as work.
+*This block listed three disagreements between the rule above and the tree.
+**None of them is still true**, and two had already been fixed when it was
+written — an authority section that overstates itself is worse than none, and
+this one understated itself for a week instead. Struck through rather than
+deleted, because the third was closed by a build and the record of what it
+cost belongs here. ROADMAP's U17-residuals entry carries the same three and is
+stale in the same way; it is not this document's to edit.*
 
-- **The offer card still prints the flat `+5`.** `modsSummary` never gained
-  its arithmetic option and `renderOffers` passes none, so an offer's summary
-  reads `+5 · advantage` under every system while the intent card it becomes
-  drops the `+5`. It is the one *declaration* surface still on the wrong side
-  of the split.
-- **A held roll's log row still answers `?` in the total column** under a
-  per-die lens — the same mute gold glyph the banner and peek gave up, in the
-  same claim of a withheld sum that will never exist. The log's *detail*
-  already names the rung (`face down` / `whispered`), so the row says both.
+- ~~**The offer card still prints the flat `+5`.**~~ **Fixed in `68fdc7a`
+  (2026-08-08)**, the very commit that wrote this section — its own message
+  lists the fix under "three gaps the docs pass found in the build". Today
+  `modsSummary(mods, opts)` takes `values`, and `renderOffers` passes
+  `{ values: activeSystem().usesTotal }` (main.js). The paragraph was written
+  from the audit and never re-read against the diff beside it.
+- ~~**A held roll's log row still answers `?` in the total column.**~~ **Fixed
+  in the same commit**, and *pinned*: the `held-roll` scenario asserts both
+  halves — no `?` under a per-die lens, and a `?` that survives a switch to
+  `dnd`, where a number really is being withheld. The row reads
+  `!usesTotal ? '' : hidden ? '?' : entry.total`.
+- ~~**A `4d6dl1`'s dropped die is invisible on the banner and the peek.**~~
+  **Closed 2026-08-15** (ROADMAP §1). This one WAS live, and it was the last
+  live half of GOALS' *Attributed math* — see **§7.42**, which is the
+  authority for what a struck die looks like on a per-die surface. The gate
+  was one line in the SOUL DEAL PROFILE, not in the renderer, which is why
+  grepping the render sites found nothing: `renderOutcomeRows` prints exactly
+  what `outcomesFor` returns, so `if (!p.counts || p.child …) return` hid the
+  die on the banner, the verdict hero and the peek at once. *(The same shape
+  as this section's own BRANCH ORDER lesson: the thing suppressing a value was
+  not the thing a reader would grep for.)*
 
-One more asymmetry is real but is **not** a stake question, and belongs to
-whoever next touches the outcome rows: `renderOutcomeRows` prints only the
-dice `outcomesFor` returns (`p.counts && !p.child`), and the breakdown line
-folds wherever those rows render — so under a per-die lens a `4d6dl1`'s
-**dropped die is still invisible on the banner and the peek**. It returned to
-the verdict card (as a `DL1 dropped` attribution card) and it has always been
-in the log (struck). GOALS' *Attributed math* asks for struck dice on every
-surface that shows the dice.
+**What this leaves.** Step 6 — the LOOK — was taken in `68fdc7a` for U17's own
+surfaces. §7.42's dress has NOT been seen rendered, and is named as owed
+there rather than assumed here.
 
 **Scenarios:** `per-die-read` (**smoke**) carries the whole contract — the
 stake renders and the `✓`/`✗` does not, the verdict card's margin is exactly
@@ -5135,3 +5149,291 @@ this table may go back further"* rather than a confident wrong number.
 counts, `spoken` = the ≣'s computed accessible name, `clearLabel`),
 `anchorRecord(rollId)`, `logFind`, `setLogFind(q)`. `spoken` is the one to
 assert on: it is the read that used to exist only in a hook.
+
+### 7.43 The die a pool discarded, on a per-die surface (2026-08-15)
+
+**This is the authoritative section for what a struck die and an explosion
+child look like inside the outcome rows.** It closes the last live half of
+GOALS' *Attributed math* — "discarded dice stay visible (struck)" — and it is
+§7.24's third residual, the one that was still true. ROADMAP files it under
+§1.
+
+**THE DEFECT.** Under a per-die lens a `4d6dl1` showed **three chips where
+four dice were thrown**. The dropped die was on the felt, in the log (struck),
+and on the verdict card (as a `DL1 · dropped d6 2` attribution card) — and
+nowhere on the banner, the verdict *hero* or the peek. U17 step 3's commit
+message claimed it had returned to all three; its own step-5 pass corrected
+that to the verdict card only.
+
+**THE GATE WAS IN THE PROFILE, NOT THE RENDERER**, which is why five render
+sites could be grepped and none found: `renderOutcomeRows` prints exactly what
+`entryOutcomes(entry)` → `sys.outcomesFor(entry)` returns, so one line —
+`if (!p.counts || p.child || …) return` — hid the die on every per-die surface
+at once. The data had been there all along: `js/rollspec.js` writes
+`reason: 'drop'` beside `counts: false`. *This is §7.24's own BRANCH ORDER
+lesson in a second key: when a value is conditional AND lives behind an
+accessor, the accessor is a gate too, and grepping the surfaces will not find
+it.*
+
+#### The rule
+
+> **One row per die the player threw.** A die that landed and does not count
+> renders as its own chip, struck, with the MECHANIC that set it aside in the
+> answer slot. An explosion child renders as more of the die it came from, on
+> that die's evidence, and never as a reading of its own.
+
+#### A dress, not a fourth grammar
+
+`renderOutcomeRows` already carried three chip reads — worded, quiet, and an
+explicit dash beside worded dice. A struck die is a fourth read and it is a
+**dress on `.oc-chip`**, deliberately: the chip is one die's evidence either
+way, and exactly one bit changed — whether that die is in play. A dress is the
+right weight for one bit, and the dress is one this app already owns for
+exactly it (`.value-chip.discarded` on the felt, `.log-discarded` in the log
+row): **strike the face, take `--dim-off`.** A player who has read the log has
+already learned the row.
+
+`--dim-off` is not a choice so much as a lookup — the token layer's own
+definition names *"a discarded die"* as its exemplar (§7.41). It is taken at
+its value rather than lifted toward the text floor, because the **strike and
+the word carry the read while the opacity carries only the rank**; it sits
+below `.oc-quiet`'s 0.55 on purpose, since a die the pool discarded ranks
+under a die that counted and had nothing to say. No `grayscale()`, unlike the
+felt chip: a struck chip has no tier hue to drain, because its word is never
+computed at all.
+
+#### It cannot be read as `oc-quiet` — and the answer slot is what decides it
+
+The two reads both end in "no outcome word", which is the whole risk. They
+differ in **three channels**, and the load-bearing one is the answer slot:
+
+| | evidence | answer slot | tier |
+|---|---|---|---|
+| worded | `d6 5` | **`Success`** — display serif, 15px, tier-coloured | tier border |
+| quiet, beside worded dice | `d6 3` | **`—`** — the silence, in real text | none |
+| quiet, whole pool | `d6 3` | *(bare)* + one `quiet` for the pool | none |
+| **struck** | ~~`d6 1`~~ struck | **`dropped`** — small tracked tag, `--muted` | none, `--dim-off` |
+
+Quiet's slot says *this die counted and the chart has no word for its face*.
+Struck's says *this die is not in play, and here is what set it aside*. The
+words are **`dropped` · `rerolled` · `not kept`** — the app's own vocabulary
+(the log's `rerolled`, the verdict card's `dropped`), not the rulebook's: the
+profile answers with the mechanic (`'drop' | 'adv' | 'reroll'`) and the
+surface spells it, so no interpretation system holds player-facing English for
+a mechanic no system owns. Copy and a screen reader get `d6 1 dropped`, which
+is the whole fact — the same reason the quiet dash is real text and not a
+`::after`.
+
+**Its word is never computed, not computed and hidden.** A dropped d6 showing
+5 is not a Success; printing one would be the app inventing a result out of a
+die the system discarded. §7.24 learned the narrower half of this from the
+total — *a value written into the DOM and withheld only by CSS is not
+withheld* — and this is the same rule applied one step earlier, at the point
+where the value would be made.
+
+#### ✴ children are the other question, and get the other answer
+
+An explosion child is **not struck** — it counted — but it is **not its own
+entry** either: it is more of the die it came from. Giving it a chart word
+would turn `1d6!` into a two-die pool, which is not a render decision at all:
+
+- it would contradict `forecastFor`, which forecasts `spec.dice` and records
+  that explosion changes nothing — the property that lets a forecast and a
+  result be read against each other row for row;
+- it would move U18's crit denominator;
+- and Soul Deal has **no rule** for it. An explosion adds a value to a die in
+  a system whose values never sum.
+
+So a child's **face rides its base die's evidence** — `d6 6 ✴3`, chased back
+through a chain (`d6! 6 → 6 → 3` reads `d6 6 ✴6 ✴3`) — inside the `.oc-die`
+span, which is the nowrap unit, so a face never separates from the die it
+belongs to. Every die that touched the felt is accounted for, and the pool
+still has exactly as many readings as it has dice.
+
+*(`p.child` is explosion offspring **only**. A reroll REPLACEMENT is a full
+counting die with its own reading; only the die it replaced is struck. So
+`1d6 ro<=2` reads struck `d6 1` `rerolled` · `d6 5 Success` — two chips, one
+reading.)*
+
+#### Two things that would have broken quietly
+
+- **`critCeremony`'s denominator.** U18 counts crit-CAPABLE dice, and that was
+  true *by omission* while struck dice were absent from `outcomesFor`. With
+  them present, `4d10kh1` would field four eligible dice for one reading and a
+  genuine crit could never clear a strict majority. It filters `!o.struck`
+  explicitly now, with the assertion that catches it if the filter is lost.
+- **`oc-solo` counted chips.** `1d20 adv` is two physical d20s with one
+  struck, so the most common Soul Deal advantage roll would have dropped from
+  a 26px verdict word to a 15px one — silently, as a side effect of showing
+  the die it discards. It counts **readings** now, and the struck chip stays
+  at ordinary row scale beside the hero word.
+
+`renderTally` filters struck dice for the same reason: the tally is what the
+roll *said*, and a pool whose only wordless dice were discarded is not a quiet
+pool — the guard the rows' own `quiet` word needed too.
+
+#### Not built, and named
+
+**No struck die on the felt's own value chip changed.**
+`.value-chip.discarded` already dressed it; this section only makes the ROWS
+agree with what the felt and the log were already saying.
+
+**The LOOK is owed.** Nobody has seen `dropped` at `--dim-off` beside a worded
+chip at row scale, on the banner or in the peek's 13px rows. The dress is
+reasoned from three shipped precedents and one token definition, which is
+enough to build and not enough to call done — this repo's standing rule. The
+specific question: at the peek's scale, is the small tracked tag legible
+enough to be attribution rather than decoration, and does the struck chip
+recede *without* the row reading as damaged?
+
+**Scenarios:** `struck-die` — see the list at the end of §7.44.
+
+### 7.44 The ledger sheet — your budget, for tonight (2026-08-15)
+
+**This is the authoritative section for the dice-value ledger's sheet and the
+typed session target.** It is [ROADMAP §2l](ROADMAP.md) ⑤; the reasoning, the
+generated figures and the record of what was killed are in
+[POOL-ANALYSIS.md](POOL-ANALYSIS.md). Serves **CUJ6**. §7.18
+(manage-and-measure) still governs the gate: everything here exists only under
+`✎ Edit pools`, on your own rack.
+
+**What C8 shipped and what it left.** C8 put the **system's** budget on the
+shelf head — `SYSTEMS['soul-deal'].budget`, so a shelf reads `54/100` — and
+deliberately left *"I am building to 80 tonight"* to this slice. That is the
+whole of ⑤: a **typed, per-shelf, session-only** target.
+
+#### The rule
+
+> The **system** prices a shelf. **You** may price it differently for tonight.
+> The shelf head reads whichever is in force, through one accessor, so the
+> ledger and the shelf heads cannot disagree.
+
+`shelfBudget` splits: `systemShelfBudget(label)` answers what the rulebook
+prices a shelf at, `shelfBudget(label)` layers your number over it. The split
+is not tidiness — the sheet needs both at once, the system's number as the
+field's **placeholder** and the effective one as the **figure** — and a single
+accessor would have been read by peeking into the Map behind it.
+
+**A typed target may price a shelf the system does not, and that does not
+overturn C8.** C8 left Motivations budgetless because *"the system does not
+define 30 as a ceiling, so printing `X/30` would invent a rule and then mark
+you in red for breaking it."* That is about the **app** inventing a rule. A
+number the player typed for their own shelf invents nothing; it is the player
+declaring the budget, which is the whole of what ⑤ is for.
+
+**Session-only, no exceptions** (POOL-ANALYSIS §8.3): a module-level `Map`, no
+`localStorage`, no portable-YAML field, no wire key, no `dice.*.v1`. A point
+budget is a field the dice never read, so nothing about a roll changes when it
+is lost — which is what makes losing it the right *default* rather than a gap,
+and it is what keeps goal 12 ("not a character sheet") closed.
+
+#### Where the rack figure lives — POOL-ANALYSIS §9's open decision, taken
+
+§9 left this open between the head (entry bracket) and the `✎` toolbar foot
+(exit bracket), because `#pools-head` is **deliberately non-sticky** — *"a
+second pinned band would steal tray-adjacent pixels"* — so a rack total there
+scrolls away during exactly the task it exists for. §9 also ruled out the
+obvious fix: *"**Not** resolved by a third sticky rung; that refusal is
+explicit and recent"*, and ROADMAP's Refuted list says the same of the section
+bar.
+
+**Answered without moving it and without pinning anything: the figure stays in
+the head, and the figure IS the door.** A surface that flew out of a control
+does not scroll with the rack, so the reading you opened stays put while you
+scroll shelves under it. The scroll problem is answered by the sheet's
+**altitude**, not by a second location or a third band — and no new control
+was added, which is §5's one-gate rule. The `✎` foot gets nothing.
+
+*The honest residual:* the sheet does not reposition, so scrolling far enough
+leaves it floating over a head that has left. That is the shipped grammar for
+every anchored surface in this app (`.set-menu`), and matching it beats
+inventing a second dismissal rule for one sheet. On touch, a scroll is a
+`pointerdown` and therefore closes it — same as the set menu, same caveat.
+
+#### The sheet
+
+Nameless, as the ± popover is — POOL-ANALYSIS §7 killed **`Assay`** and
+**`Rack`** as player-visible words, and the chrome word is *pools*. Its
+accessible name is the standing word the door already spends: `dice value`.
+Its total row says **`All shelves`** for the same reason (`shelf` is the noun
+this region already says out loud, in `＋ New shelf…` directly below).
+
+- one row per shelf: **name · `spent/target` · a target field**
+- a rule, then **`All shelves`** and the rack total. **The rack takes no
+  target**: the system prices SHELVES, so a whole-rack budget would be a
+  number with nothing to compare it against — C8's own reason for refusing to
+  invent one for Motivations.
+- the one legend sentence, paid once: *dice value — the sum of every die's
+  highest face; modifiers, drops and explosions are not counted.*
+
+**An empty field is a statement, not a blank.** Its placeholder is the
+*system's* number, so an empty field reads as "the rulebook's budget is in
+force". Clearing the field — or `0`, or anything unparseable — gives the shelf
+back to the system, one gesture whatever the player typed to express it. The
+placeholder takes `--dim-rest`, which carries the text floor, because it is a
+number meant to be *read* and not merely seen.
+
+**One right-flush figure column**, rows as `display: contents`, the same
+ledger idea the shelf heads and the rack head already share. The rule and the
+legend stay out of the row set: a stray item inside a contents-row grid shears
+the columns, which is exactly why POOL-ANALYSIS §7 refuted widening
+`.oc-ledger` — so the rule is a full-span cell of its own and the legend is a
+sibling of the grid. Steel and ivory only; the one hue is the shelf head's own
+reading-weight red for **over budget**.
+
+`.ledger-sheet` rides `--z-set-menu` rather than minting a rung: it is the
+same KIND of object that rung was cut for — a surface that flew out of a
+control inside a panel, which must clear the popover and modal its anchor's
+panel sits under. A second name for one altitude is how a z ladder stops being
+a ladder.
+
+#### `placeAnchored` is extracted, not ported
+
+ROADMAP names this mechanically and it is worth restating: the placement
+(below the anchor, clamped to the viewport, flipped above when the room runs
+out) came **out of** `openSetMenuFor` into `placeAnchored(el, anchor)`, which
+both callers now use. The 12px viewport margin and the 6px gap are **one
+decision** about how far a flown-out surface sits from the thing it flew out
+of; two copies are two decisions the moment either is tuned, and that is how
+this codebase gets constants that stop tracking what they stood for.
+
+#### The door
+
+`.ph-fig` becomes a `<button>` and keeps reading as the figure it always was —
+the control resets to nothing and earns its pressability on hover, focus and
+`aria-expanded` alone. A rack total that suddenly wore a button's chrome would
+be a **new object** in the head, which is the thing "no new control" was
+protecting. The head is rebuilt on every render, so an open sheet's anchor is
+replaced under it on every keystroke; the anchor is **re-pointed**, not closed
+— closing the sheet on its own keystroke would make the field unusable. When
+the gate closes (Done, or a walk to a teammate's rack) the sheet goes with it:
+left standing it would be a floating editor for a budget with no ledger under
+it.
+
+#### Not built, and named
+
+- **⑥, the sum read, is not here.** `forecastFor` still returns `null` for
+  `dnd` and `none`; the sheet carries the ledger only. The forecast bars stay
+  in `#pop-preview`, where §9b's icon strip is reserving room above them.
+- **The LOOK is owed** — nobody has seen the sheet rendered.
+
+**Scenarios owed by §7.43 and §7.44** (the hooks are shipped; the scenarios
+belong to another owner's file):
+
+- **`struck-die`** (`meanings`, `chrome`) — roll `4d6dl1` under `soul-deal`
+  and assert `__diceDebug.outcomeRows('banner')` shows **four chips with
+  exactly one struck**, that the struck one carries `why === 'dropped'` and a
+  computed `text-decoration-line` of `line-through`, and that its `word` is
+  `null`. **This is the assertion that fails on the pre-2026-08-15 tree.**
+  Then the same for `'peek'`; `1d20 adv` keeping `solo === true` with two
+  chips; `1d6 ro<=2` reading `rerolled` on the die it replaced; `1d6!`
+  rendering **one** chip whose `children` is non-empty; and a switch to `dnd`
+  leaving no rows at all.
+- **`rack-dice-value`** (existing, `groups` + `chrome`) — extend: in manage
+  mode `__diceDebug.openLedgerSheet()` succeeds and `ledgerSheet.rows` carries
+  a row per shelf with `placeholder === '100'` for Attributes and `'—'` for
+  Motivations; `setShelfTarget('Attributes', 80)` moves BOTH the sheet figure
+  and the `.pool-sec-head .psh-fig` to `/80`; `0` restores `/100`; a target
+  that is exceeded sets `over` on both; `setPoolsEditMode(false)` leaves
+  `ledgerSheet === null`; and a reload leaves the target gone (session-only —
+  the assertion that would catch a stray `localStorage` write).

@@ -175,14 +175,19 @@ function segmentsFor(type, q) {
 //   anything. Worse, it conflated ARITHMETIC (a flat bonus — a term in a sum,
 //   which renders where the sum does) with SELECTION (advantage, keep/drop,
 //   reroll, explode — which decide WHICH DICE LAND AND WHICH COUNT). The
-//   second is a fact under every system: outcomesFor below filters on
-//   `p.counts && !p.child`, and forecastFor REFUSES to pre-read keep/drop for
-//   exactly that reason. So `usesMods:false` was suppressing attribution this
+//   second is a fact under every system: outcomesFor below MARKS the dice a
+//   mechanic set aside rather than dropping them (§1 — it used to drop them,
+//   which is the same suppression one layer down), and forecastFor REFUSES to
+//   pre-read keep/drop for exactly that reason. So `usesMods:false` was
+//   suppressing attribution this
 //   same profile treats as load-bearing, against GOALS' Attributed math
 //   invariant. Arithmetic now keys off usesTotal and selection is universal,
 //   which makes the conflation unspellable rather than merely fixed.
-//   outcomesFor(entry) -> [{dieIndex, type, value, word, tier}] for per-die
-//               systems (quiet dice carry word/tier null), else null
+//   outcomesFor(entry) -> [{dieIndex, type, value, word, tier, struck,
+//               children}] for per-die systems (quiet dice carry word/tier
+//               null), else null. ONE ROW PER DIE THE PLAYER THREW — see the
+//               note over soul-deal's implementation for why struck dice are
+//               rows and explosion children are not.
 //   critFor(entry) -> 'success' | 'fail' | null. THE INFORMATION: did
 //               something crit? The word always lands (U8).
 //   budget      OPTIONAL {shelfLabel: points} — what a character costs to
@@ -237,17 +242,74 @@ export const SYSTEMS = {
     // then mark you in red for breaking it. A shelf the system prices gets a
     // target; a shelf it does not gets the bare sum of its dice.
     budget: { Attributes: 100, Skills: 100 },
+    // EVERY DIE THE PLAYER THREW GETS A ROW (§1, GOALS' *Attributed math*:
+    // "discarded dice stay visible (struck)"). The old gate was one line —
+    // `if (!p.counts || p.child …) return` — and because renderOutcomeRows
+    // prints exactly what this returns, that line hid the struck die on the
+    // banner, the verdict hero and the peek AT ONCE. A `4d6dl1` showed three
+    // dice where four were thrown, on the system that cares most which dice
+    // counted. It is a render decision, not a missing field: js/rollspec.js
+    // has written `reason` beside `counts:false` all along.
+    //
+    // A struck die carries `struck` = the MECHANIC that set it aside
+    // ('drop' | 'adv' | 'reroll'), never a player-facing word: those belong
+    // to the app's vocabulary, not to this rulebook, and a profile that
+    // spelled them would be a second place they have to agree.
+    //
+    // ITS WORD IS NEVER COMPUTED — not computed and hidden. A dropped d6
+    // showing 5 is not a Success; printing one would be the app inventing a
+    // result out of a die the system discarded. (U17 learned the narrower
+    // half of this from the total: a value written into the DOM and withheld
+    // only by CSS is not withheld.) So `word`/`tier` stay null and every
+    // reader that asks "what did this roll SAY" filters on `!o.struck` —
+    // including critCeremony below, whose denominator would otherwise be
+    // padded by dice that never spoke.
+    //
+    // AN EXPLOSION CHILD IS NOT A ROW, and that is a different answer to a
+    // different question. It is not struck — it counted — but it is not its
+    // own entry either: it is more of the die it came from, and giving it a
+    // chart word of its own would turn `1d6!` into a two-die pool. That
+    // would contradict forecastFor (which forecasts spec.dice and says
+    // explosion changes nothing), move U18's crit denominator, and mint a
+    // Soul Deal rule for a mechanic the rulebook has none for. So a child's
+    // FACE rides its base die's row in `children`, where attributed math
+    // wanted it — every die that touched the felt is accounted for, and the
+    // pool still has exactly as many readings as it has dice.
     outcomesFor(entry) {
       if (!entry || !Array.isArray(entry.parts)) return null;
       const out = [];
+      const seats = new Map(); // part index -> the row that die's evidence rides
       entry.parts.forEach((p, i) => {
-        if (!p.counts || p.child || typeof p.value !== 'number') return;
-        const o = outcomeForDie(p.type, p.value);
-        out.push({ dieIndex: i, type: p.type, value: p.value,
-          word: o ? o.word : null, tier: o ? o.tier : null });
+        if (typeof p.value !== 'number') return;
+        if (p.child) {
+          // Chase `origin` back through a chain (d6! 6 → 6 → 3) to the base
+          // die. The hop cap mirrors partSource's: a malformed origin ring
+          // must cost a face, never the paint.
+          let seat = p.origin;
+          for (let hops = 0; hops < 8; hops++) {
+            const up = seat != null ? entry.parts[seat] : null;
+            if (!up || !up.child) break;
+            seat = up.origin;
+          }
+          const row = seat != null ? seats.get(seat) : null;
+          if (row) (row.children || (row.children = [])).push(p.value);
+          return;
+        }
+        const struck = p.counts ? null : (p.reason || 'drop');
+        const o = struck ? null : outcomeForDie(p.type, p.value);
+        const row = { dieIndex: i, type: p.type, value: p.value,
+          word: o ? o.word : null, tier: o ? o.tier : null,
+          struck, children: null };
+        out.push(row);
+        seats.set(i, row);
       });
       return out.length ? out : null;
     },
+    // Struck dice cannot crit: outcomesFor never computes their word, so
+    // their tier is null and the `some()` below skips them without a filter.
+    // Said out loud because the rows now CONTAIN them — a reader who checks
+    // that a dropped natural 20 does not fire the fanfare should find the
+    // answer here rather than re-deriving it from the shape of a row.
     critFor(entry) {
       const os = this.outcomesFor(entry) || [];
       if (os.some((o) => o.tier === 'crit-success')) return 'success';
@@ -292,8 +354,12 @@ export const SYSTEMS = {
     critCeremony(entry) {
       const kind = this.critFor(entry);
       if (!kind) return false;
+      // `!o.struck` is load-bearing now that struck dice are rows (§1): a
+      // die the pool discarded is not a voice that can dissent. Without it
+      // `4d20kh1` would field four eligible dice for one reading and a real
+      // crit could never clear the majority.
       const eligible = (this.outcomesFor(entry) || [])
-        .filter((o) => CRIT_COLUMNS.has(DIE_MAX[o.type]));
+        .filter((o) => !o.struck && CRIT_COLUMNS.has(DIE_MAX[o.type]));
       if (!eligible.length) return false;
       const tier = kind === 'success' ? 'crit-success' : 'crit-fail';
       const agreeing = eligible.filter((o) => o.tier === tier).length;
@@ -306,8 +372,11 @@ export const SYSTEMS = {
     // deduplication, not aggregation. Keep/drop decides which dice count
     // only after they land, so it has no per-die forecast (naive 4d6dl1
     // would print Fail 0.500 where the truth is 0.151) — refused in the
-    // sysnote's voice. Explosion changes nothing here: children are
-    // filtered from outcomesFor and base dice keep counting.
+    // sysnote's voice. Explosion changes nothing here, and §1 kept it that
+    // way: a child gets no reading of its own — its face rides its base
+    // die's row — so the forecast's ONE BAR PER SPEC DIE still matches the
+    // result's one row per spec die, which is the property that lets the two
+    // surfaces be read against each other at all.
     forecastFor(spec, tools) {
       if (!spec || !Array.isArray(spec.dice) || !spec.dice.length) return null;
       const mods = spec.mods || null;
