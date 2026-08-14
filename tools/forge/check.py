@@ -472,7 +472,7 @@ def main():
                 sh = t.get("sill_holes", {})
                 clad = ", ".join(f"{k} {v[0]}/{v[1]}"
                                  for k, v in sorted(ln.get("clad", {}).items()))
-                print(f"  lane      |x|<={ln.get('lane_halfwidth')} z "
+                print(f"  lane      x {ln.get('lane_x')} z "
                       f"{ln.get('lane_z')}  clad {clad or 'n/a'}  bare "
                       f"{ln.get('bare_colliders', [])}")
                 print("  occlusion " + "  ".join(

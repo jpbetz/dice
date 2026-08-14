@@ -447,20 +447,26 @@ def hole_below_sill_failures(tris, spec, tilt_deg, eyes=None, y_top=None,
     to_model = tilt_frame(tilt_deg)
     out = spec["out"]
     sx = ENGINE_MIRROR["socket"]["s"][0] / 2.0
-    lo_x = out["w"] / 2.0                     # the door is allowed to be open
+    # The flanks are the wall EITHER SIDE OF THE DOORWAY, and the doorway
+    # follows portalOut.x — the fixture's sits at -0.15, so its jambs are not
+    # mirror images and a gate that assumed they were would probe wood on one
+    # side and the opening on the other.
+    ox = out["x"]
     top = out["sillY"] if y_top is None else y_top
     eyes = shipped_eyes() if eyes is None else eyes
-    if lo_x >= sx or top <= 0.06:
+    flanks = [(ox + out["w"] / 2.0, sx), (ox - out["w"] / 2.0, -sx)]
+    flanks = [(a, b) for a, b in flanks if abs(b - a) > 0.05]
+    if not flanks or top <= 0.06:
         return [], 0, 0
     bad, tested = [], 0
     for eid, e in eyes:
         eye = to_model(e)
-        for i in range(16):
-            ax = lo_x + (sx - lo_x) * i / 15.0
-            for sgn in (-1.0, 1.0):
+        for x0, x1 in flanks:
+            for i in range(16):
+                tx = x0 + (x1 - x0) * i / 15.0
                 for j in range(12):
                     ty = 0.04 + (top - 0.02 - 0.04) * j / 11.0
-                    tgt = to_model((sgn * ax, ty, out.get("z", 0.0)))
+                    tgt = to_model((tx, ty, out.get("z", 0.0)))
                     d = tgt - eye
                     L = float(np.linalg.norm(d))
                     d = d / L
@@ -472,15 +478,16 @@ def hole_below_sill_failures(tris, spec, tilt_deg, eyes=None, y_top=None,
                         reach = min(reach, (0.0 - eye[1]) / d[1])
                     tested += 1
                     if first_hit_faces_away(tris, eye, d, reach):
-                        bad.append((eid, sgn * ax, ty))
+                        bad.append((eid, tx, ty))
     fails = []
     if bad:
         w = max(bad, key=lambda b: b[2])
         fails.append(
             f"{len(bad)} of {tested} sight lines reach the hollow BELOW "
             f"{label} ({top:.3f}) — worst at x {w[1]:+.2f} y {w[2]:.2f} from "
-            f"eye {w[0]}. Outside the declared door (|x| > {lo_x:.2f}) there "
-            f"is no aperture under the sill: the shell has a slot in it, and "
+            f"eye {w[0]}. Outside the declared door "
+            f"({ox - out['w'] / 2.0:.2f}..{ox + out['w'] / 2.0:.2f}) there is "
+            f"no aperture under the sill: the shell has a slot in it, and "
             f"what shows through is unlit interior")
     return fails, tested, len(bad)
 
@@ -567,6 +574,14 @@ def lane_failures(tris, spec, bare_colliders=(), die_r=None):
     v = engine_volumes(spec)
     out = spec["out"]
     oz = out.get("z", 0.0)
+    # CENTRED ON THE DOORWAY, not on x = 0 — and that distinction is the
+    # tower FIXTURE earning its keep on the day this gate was written. Its
+    # portalOut sits at x -0.15, so its jambs stand at -2.725 and +2.425; a
+    # frustum centred on zero read the right jamb as a lobe standing 2.65 into
+    # the lane. Everything the engine builds out here follows portalOut.x
+    # (towerVolumes' dOutX moves the apron, the lip, the hood and the exit
+    # spawn together), so the lane does too.
+    ox = out["x"]
     xw = THROAT_MARGIN * out["w"] / 2.0
     throat_y0 = out["sillY"] + out["clearH"] * (1.0 - THROAT_MARGIN) / 2.0
     socket_front = (ENGINE_MIRROR["socket"]["c"][2]
@@ -575,7 +590,7 @@ def lane_failures(tris, spec, bare_colliders=(), die_r=None):
     head = LANE_HEAD_DIAMETERS * die_r
     segs = _lane_ceiling_segments(spec, oz, z_hi, throat_y0, socket_front)
     fails, info = [], {"lane_z": (round(oz, 3), round(z_hi, 3)),
-                       "lane_halfwidth": round(xw, 3)}
+                       "lane_x": (round(ox - xw, 3), round(ox + xw, 3))}
 
     # (i) INTRUSION. A die riding the collider sweeps from the plane to one
     # diameter above it; anything of the model's in that band is a die seen
@@ -586,11 +601,11 @@ def lane_failures(tris, spec, bare_colliders=(), die_r=None):
     if len(tris):
         lo = tris.min(axis=1)
         hi = tris.max(axis=1)
-        near = np.where((hi[:, 0] >= -xw) & (lo[:, 0] <= xw)
+        near = np.where((hi[:, 0] >= ox - xw) & (lo[:, 0] <= ox + xw)
                         & (hi[:, 2] >= oz) & (lo[:, 2] <= z_hi))[0]
         for z0, z1, A, B in segs:
-            planes = [(np.array([1.0, 0.0, 0.0]), xw),
-                      (np.array([-1.0, 0.0, 0.0]), xw),
+            planes = [(np.array([1.0, 0.0, 0.0]), ox + xw),
+                      (np.array([-1.0, 0.0, 0.0]), xw - ox),
                       (np.array([0.0, 0.0, -1.0]), -z0),
                       (np.array([0.0, 0.0, 1.0]), z1),
                       (np.array([0.0, -1.0, -B]), -(A + LANE_CLAD_TOL)),
@@ -608,7 +623,7 @@ def lane_failures(tris, spec, bare_colliders=(), die_r=None):
     if worst is not None:
         fails.append(
             f"the model stands {worst[0] + LANE_CLAD_TOL:.3f} into the dice "
-            f"lane at app {worst[1]} — inside |x| {xw:.3f}, z {oz:.2f}.."
+            f"lane at app {worst[1]} — inside x {ox - xw:.3f}..{ox + xw:.3f}, z {oz:.2f}.."
             f"{z_hi:.2f}, the band from the collider plane to one die "
             f"diameter above it belongs to the die. Move the lobe out of the "
             f"path; do not carve the path out of the lobe")
@@ -634,7 +649,7 @@ def lane_failures(tris, spec, bare_colliders=(), die_r=None):
                 z = z0 + (z1 - z0) * iz / 8.0
                 y = A - B * z
                 for ix in range(9):
-                    x = -xw + 2.0 * xw * ix / 8.0
+                    x = ox - xw + 2.0 * xw * ix / 8.0
                     n_all += 1
                     if hit_distance(tris, np.array([x, y + LANE_CLAD_TOL, z]),
                                     np.array([0.0, -1.0, 0.0]),
