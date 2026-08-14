@@ -6,20 +6,25 @@ Guidance for Claude Code agents working in this repository.
 
 Read [docs/GOALS.md](docs/GOALS.md) before feature work — it is the design
 authority (goals, invariants, priorities, superseded decisions).
-[docs/CUJS.md](docs/CUJS.md) says what people come here to DO — ten numbered
-journeys, each with the scenario that proves it end to end — and it is the
-**only place a CUJ number is assigned**; cite from it, never mint one.
-[docs/ROADMAP.md](docs/ROADMAP.md) sequences the work;
-[docs/UX.md](docs/UX.md) holds component specs.
+[docs/CUJS.md](docs/CUJS.md) says what people come here to DO — thirteen
+numbered journeys, each with the scenario that proves it end to end — and it
+is the **only place a CUJ number is assigned**; cite from it, never mint one.
+[docs/ROADMAP.md](docs/ROADMAP.md) sequences the work — **start at its THE
+ORDER table**, which interleaves the debt track and the owner's track;
+[docs/UX.md](docs/UX.md) holds component specs. Shipped work, killed designs
+and verified-pattern records live in [docs/SHIPPED.md](docs/SHIPPED.md), and
+**a section that says SHIPPED moves there in the commit that ships it** — the
+roadmap had grown to 3.7k lines of mostly-landed narrative before the
+2026-08-14 cleanup.
 
 [docs/UX-AUDIT.md](docs/UX-AUDIT.md) (2026-08-08) is the state-of-the-UX
 read: what is working and by what mechanism, what is weak, and what NOT to
 change. Its work items are ROADMAP Tier U. **Two cautions it raises about
 this very list:** UX.md's §7 runs in commit order with no map, so "what is
-true today" about a surface may need several sections reconciled — start
-from the WHAT IS TRUE TODAY table once U4 lands. And GOALS wins ties, so
-where the audit found GOALS itself stale (the launcher carve-out), the doc
-you read first is the one that is wrong.
+true today" about a surface may need several sections reconciled — start from
+the WHAT IS TRUE TODAY table (U4, shipped). And GOALS wins ties, so where the
+audit found GOALS itself stale (the launcher carve-out), the doc you read
+first is the one that is wrong.
 
 ## Validation policy — read docs/TESTING.md and follow it
 
