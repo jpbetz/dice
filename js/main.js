@@ -9286,6 +9286,88 @@ function towerHash32(str) {
   return (h >>> 0).toString(16).padStart(8, '0');
 }
 
+// ---------------------------------------------------------------------------
+// THE INVISIBLE-MESH LAW (A6), in one place because it is ONE law.
+//
+// A mesh the player cannot see may count neither as an occluder nor as a
+// target: every proof in this file that fires a ray at a tower is answering a
+// question about the FRAME, and the frame is what `visible` decides. three.js
+// stopped testing `.visible` in intersectObject, so without this a liner
+// switched off for a look goes on blocking rays and every band comes back
+// green over a picture with a die falling through open air.
+//
+// Layers rather than a filtered target list, because the casts are RECURSIVE:
+// a hidden child of a visible named parent is reached through the parent no
+// matter what the top-level list says. Layer 1 is not tested by a default
+// raycaster. The previous mask is SAVED and put back rather than reset to 0 —
+// towerOccluderMute parks nodes on layer 1 too, and a blanket restore would
+// silently unmute the experiment its caller is in the middle of.
+//
+// The whole skin hidden (`towerSkin(false)`) drops everything and every proof
+// reads zero. That is not a malfunction: with no skin standing there is
+// nothing to cover anything, and a probe that said otherwise would be
+// reporting the ghosts.
+function towerVeilHidden(root) {
+  const veiled = [];
+  const unseen = (o) => {
+    for (let p = o; p; p = p.parent) if (p.visible === false) return true;
+    return false;
+  };
+  if (root) {
+    root.traverse((o) => {
+      if (!o.isMesh || !unseen(o)) return;
+      veiled.push({ o, mask: o.layers.mask,
+        name: o.name || (o.parent && o.parent.name) || '?' });
+      o.layers.set(1);
+    });
+  }
+  return {
+    unseen,
+    names: veiled.map((w) => w.name),
+    restore() { for (const w of veiled) w.o.layers.mask = w.mask; },
+  };
+}
+
+// WHAT COUNTS AS SOLID GEOMETRY, shared by the occlusion proof and the
+// cladding audit so the two can never disagree about what a surface is. A
+// naming convention rather than a fixed list, so a new skin needs no edit
+// here: every NAMED `towerSkin*` child of the skin group is opaque (the wood,
+// the stone, the black linings). The UNNAMED children — gradient veils,
+// contact shadows — are transparent and prove nothing, which is exactly why
+// they are not allowed to answer either question. Hidden ones are dropped by
+// the law above; this drops them from the list as well, so the reported set is
+// honest and not merely harmless.
+function towerCastTargets(skin, veil) {
+  const targets = [];
+  for (const o of skin ? skin.children : []) {
+    if (o.name && o.name !== 'towerSkin' && o.name.startsWith('towerSkin')
+      && !veil.unseen(o)) targets.push(o);
+  }
+  return targets;
+}
+
+// THE SHIPPED EYES, as world positions at the CURRENT mat. Both ray proofs
+// grade a model from the six places a player can actually be — three zoom
+// presets x {full, mini} — and both need the same translation: a preset's eye
+// is authored relative to ITS OWN back wall, so what carries over to another
+// preset (or to a deepened room) is the OFFSET from z0, never the absolute z.
+//
+// `extra` is which mat deepening the caller is standing in: the lab's dial for
+// the bench, the TOWER_MAT_EXTRA constant for the socketed table. It only ever
+// affects which preset the identity case is.
+function towerShippedEyes(z0, extra) {
+  const eyes = [];
+  for (const [id, pre] of Object.entries(ZOOM_PRESETS)) {
+    const z0p = -(pre.d + extra) / 2;
+    for (const which of ['eyeFull', 'eyeMini']) {
+      const e = pre[which];
+      eyes.push({ id: `${id}.${which === 'eyeFull' ? 'full' : 'mini'}`,
+        at: [e[0], e[1], z0 + (e[2] - z0p)] });
+    }
+  }
+  return eyes;
+}
+
 // Pour n dice through the contract. Seeded so a look can be repeated; every
 // die's exit (transit, jitter, speed, yaw, pitch, spin) is drawn up front.
 //
@@ -9985,6 +10067,134 @@ window.__diceDebug = {
         z: [r3(soc.zLo - v.z0), r3(soc.zHi - v.z0)] },
     };
   },
+  // IS THE ENGINE SHOWING? (B3.) The apron ramp and the outrun lip are the two
+  // engine colliders that live OUTSIDE the socket by design — a die comes down
+  // the chute and across the slick lip in full view of the player — and the
+  // contract invites a model to skin them (towerModelAudit's APRON CLADDING and
+  // LIP CLADDING classes are that invitation, written down). Heartwood and
+  // Bastion take it. Hollow Bole does not, and that is a decision: a rotted
+  // trunk standing in soil has no carpentry to lay over an outrun.
+  //
+  // THE PROBLEM WITH A DECISION NOBODY WROTE DOWN is that it is
+  // indistinguishable from an oversight, and the two want opposite responses.
+  // So bareness is DECLARED, on the row's physical half (`bareColliders`), and
+  // this measures the declaration from the six places a player can be. It
+  // fails in EITHER direction — a declared-bare collider that turns out clad
+  // is a mesh that drifted over the ramp, which is as much a finding as a
+  // declared-clad one that is bare.
+  //
+  // HOW A SAMPLE IS CLASSIFIED, from one eye:
+  //   CLAD    the nearest visible solid surface along the ray sits within
+  //           [0, +0.10] in FRONT of the collider's top face — i.e. a skin
+  //           lying ON it. 0.10 is the cladding budget: the shipped boxes are
+  //           thin plates set flush, and anything further out is not cladding
+  //           this collider, it is furniture standing over it.
+  //   HIDDEN  something solid is in the way much earlier — the tower's own
+  //           body, a buttress. The collider is not visible from here, so
+  //           cladding it is moot and this eye has no opinion.
+  //   BARE    no solid surface between the eye and the collider's top face.
+  //           The player is looking at the engine.
+  // A collider's verdict is BARE if ANY sample from ANY eye is BARE, because
+  // one bare corner in one preset is a frame with the engine in it.
+  //
+  // The samples are on the collider's TOP FACE, rotated with the box (both are
+  // tilted — the ramp by the apron's slope, the lip by TOWER_LIP_TILT), and
+  // pulled in to 0.8 of each half-extent: both boxes are deliberately overlong
+  // so their ends embed, and grading a model on a face buried inside the felt
+  // would be grading it on the engine's own construction trick.
+  towerCladAudit() {
+    if (!towerRig || !towerRig.group) return null;
+    const root = towerRig.group;
+    root.updateMatrixWorld(true);
+    const v = towerVolumes(towerPortalsOf(currentTower));
+    const skin = root.getObjectByName('towerSkin');
+    const veil = towerVeilHidden(skin);           // the A6 law, here too
+    const targets = towerCastTargets(skin, veil);
+    // The SOCKETED mat, so the shipped constant rather than the lab's dial.
+    const eyes = towerShippedEyes(v.z0, TOWER_MAT_EXTRA);
+    const CLAD_BUDGET = 0.10;
+    const CLAD_FLUSH = 0.02;   // the tolerance a coincident face needs (below)
+    // WHERE DICE ACTUALLY TOUCH, which is where cladding has to be — the
+    // CENTRE lane, not the flight envelope. v.flight.halfW is how far a die's
+    // SURFACE reaches at the door plane; a die whose surface grazes that edge
+    // has its contact patch a full radius inboard, and grading a model on the
+    // strip beside every die it ever delivers would fail a tower for not
+    // panelling floor nothing has ever slid across. So: halfW minus a radius,
+    // read off the engine's own envelope rather than typed again here.
+    const contact = v.flight.halfW - v.flight.r;
+    // A point on the box's top face, in world. Local (lx, +s[1]/2, lz) rotated
+    // about x by the box's own rx — the same Euler towerColliders hands cannon,
+    // so this samples the surface a die actually slides on.
+    const faceAt = (vol, dx, kz) => {
+      const rx = vol.rx || 0;
+      const c = Math.cos(rx), s = Math.sin(rx);
+      const ly = vol.s[1] / 2, lz = kz * vol.s[2] / 2;
+      return [vol.c[0] + dx, vol.c[1] + ly * c - lz * s, vol.c[2] + ly * s + lz * c];
+    };
+    const rc = new THREE.Raycaster();
+    const o = new THREE.Vector3(), d = new THREE.Vector3(), p = new THREE.Vector3();
+    const grade = (name, vol) => {
+      const pts = [];
+      for (const k of [-1, -0.5, 0, 0.5, 1]) {
+        const dx = k * contact;
+        for (const kz of [-0.8, -0.4, 0, 0.4, 0.8]) pts.push(faceAt(vol, dx, kz));
+      }
+      let clad = 0, hidden = 0;
+      const bare = [];
+      const perEye = [];
+      for (const e of eyes) {
+        let c = 0, h = 0, b = 0;
+        for (const pt of pts) {
+          p.set(pt[0], pt[1], pt[2]);
+          o.set(e.at[0], e.at[1], e.at[2]);
+          d.copy(p).sub(o);
+          const len = d.length();
+          rc.set(o, d.divideScalar(len));
+          rc.near = 0;
+          // A HAIR PAST THE SURFACE, and this is the whole measurement. The
+          // shipped cladding is FLUSH — Heartwood's tray is a box at the lip's
+          // own centre, rotation and thickness (js/towerskin.js) — so its face
+          // is COINCIDENT with the collider's top and a ray stopped short of
+          // the sample point misses it entirely. Stopping short reported every
+          // clad tower bare, which is the failure mode a clad audit exists to
+          // avoid: a proof that cannot see the thing it is looking for.
+          rc.far = len + CLAD_FLUSH;
+          const hit = rc.intersectObjects(targets, true)[0];
+          const gap = hit ? len - hit.distance : Infinity;
+          if (hit && gap <= CLAD_BUDGET) { c++; clad++; } else if (hit) { h++; hidden++; } else {
+            b++;
+            bare.push({ eye: e.id, at: pt.map((n) => Number(n.toFixed(2))) });
+          }
+        }
+        perEye.push({ eye: e.id, clad: c, hidden: h, bare: b });
+      }
+      return {
+        name, samples: pts.length * eyes.length,
+        clad, hidden, bare: bare.length,
+        verdict: bare.length ? 'BARE' : 'CLAD',
+        // Which rays saw engine, and from where. A count says "not clad"; this
+        // says which corner of which collider, from which preset — the
+        // difference between a verdict and an afternoon.
+        leaks: bare.slice(0, 12),
+        perEye,
+      };
+    };
+    const colliders = [grade('ramp', v.apron), grade('lip', v.lip)];
+    veil.restore();
+    const measured = colliders.filter((c) => c.verdict === 'BARE').map((c) => c.name).sort();
+    const declared = (towerPhys(TOWERS[currentTower]).bareColliders || []).slice().sort();
+    return {
+      tower: currentTower, budget: CLAD_BUDGET,
+      declared, measured,
+      // THE ASSERTION, PRE-MADE. A caller that had to diff two arrays itself
+      // would eventually diff them wrongly; this is the sentence the proof
+      // exists to say, and `ok` is the only field a gate needs to read.
+      ok: declared.length === measured.length
+        && declared.every((n, i) => n === measured[i]),
+      dropped: veil.names,
+      colliders,
+    };
+  },
   // WHAT THE DRESSING COST (docs/TOWER.md, DRESSING). Triangles and draw
   // calls, split by group, for the SOCKETED model — because "≤ 4k triangles
   // and ≤ 8 draw calls of dressing per tower" is a budget and an unmeasured
@@ -10558,33 +10768,8 @@ window.__diceDebug = {
     // and hiding things is precisely how this bench is used (towerHideNamed,
     // the /new-venue probe idiom), so the trap is armed every time somebody
     // investigates.
-    const veiled = [];
-    const unseen = (o) => { for (let p = o; p; p = p.parent) if (p.visible === false) return true; return false; };
-    const targets = [];
-    for (const o of skin ? skin.children : []) {
-      if (o.name && o.name !== 'towerSkin' && o.name.startsWith('towerSkin')
-        && !unseen(o)) targets.push(o);
-    }
-    // The recursive half: park every hidden mesh on layer 1, which the
-    // raycaster (layer 0) does not test. Layers rather than a filtered list
-    // because the cast REACHES a hidden child through its visible parent no
-    // matter what the top-level list says. The previous mask is SAVED and put
-    // back, not reset to 0 — towerOccluderMute parks nodes on layer 1 too, and
-    // a blanket restore would silently unmute the experiment the caller is in
-    // the middle of running.
-    //
-    // If the whole skin is hidden (`towerSkin(false)`) this drops everything
-    // and every band reads 0 blocked. That is not a malfunction: with no skin
-    // on the bench there is nothing to occlude anything, and a probe that said
-    // otherwise would be reporting the ghosts.
-    if (skin) {
-      skin.traverse((o) => {
-        if (!o.isMesh || !unseen(o)) return;
-        veiled.push({ o, mask: o.layers.mask,
-          name: o.name || (o.parent && o.parent.name) || '?' });
-        o.layers.set(1);
-      });
-    }
+    const veil = towerVeilHidden(skin);
+    const targets = towerCastTargets(skin, veil);
     // THE GRIDS FOLLOW THE BORE. Radii scale by the mouth's clear-radius ratio
     // and the discs centre on the shaft, so a model with a wider or moved
     // mouth is sampled over ITS mouth rather than over where the classic one
@@ -10658,23 +10843,18 @@ window.__diceDebug = {
       }
       return { n: pts.length, blocked, missed };
     };
-    const eyes = [];
-    for (const [id, pre] of Object.entries(ZOOM_PRESETS)) {
-      const z0p = -(pre.d + TOWERLAB.tune.matExtra) / 2;
-      for (const which of ['eyeFull', 'eyeMini']) {
-        const e = pre[which];
-        const eye = [e[0], e[1], v.z0 + (e[2] - z0p)];
-        eyes.push({
-          id: `${id}.${which === 'eyeFull' ? 'full' : 'mini'}`,
-          eye: eye.map((n) => Number(n.toFixed(2))),
-          shaft: run(eye, shaft), cowl: run(eye, cowl),
-          exit: run(eye, exit), hood: run(eye, hood),
-        });
-      }
-    }
+    // The bench's mat, so the dial is what decides which preset is the
+    // identity case here (towerShippedEyes; the socketed audits pass the
+    // constant instead).
+    const eyes = towerShippedEyes(v.z0, TOWERLAB.tune.matExtra).map(({ id: eid, at }) => ({
+      id: eid,
+      eye: at.map((n) => Number(n.toFixed(2))),
+      shaft: run(at, shaft), cowl: run(at, cowl),
+      exit: run(at, exit), hood: run(at, hood),
+    }));
     // Put the layers back before anything else can read them, and give the
     // bench back the way it was found (see labWas above).
-    for (const w of veiled) w.o.layers.mask = w.mask;
+    veil.restore();
     if (!labWas) towerLabSet(false);
     return {
       skin: TOWERLAB.skinId, z0: v.z0, despawnY: v.despawnY, eyes,
@@ -10683,7 +10863,7 @@ window.__diceDebug = {
       // liner switched off", and that sentence is the difference between a
       // verdict and a puzzle. Empty on a clean bench — a non-empty `dropped`
       // on a shipped model is itself the finding.
-      dropped: veiled.map((w) => w.name),
+      dropped: veil.names,
       // Whether the bench was already standing. A caller who raised it keeps
       // it (mute-and-re-run); a caller who did not gets it taken away again,
       // and either way the mat is exactly as deep as it was.
