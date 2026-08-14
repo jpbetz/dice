@@ -98,6 +98,12 @@ const MAX_POOL_NOTATION = 200;
 const MAX_PROFILES = 12;
 const MAX_STREAMS_PER_PLAYER = 4; // extra SSE streams evict the oldest
 const OFFER_CAP = 20;             // offered rolls kept per room
+// Breakouts listed on one table (ROADMAP §3b L4). Eight is the recents list's
+// own number (js/tables.js MAX_TABLES) and for the same reason: a screenful,
+// and a group that has split eight ways is not coming back together. The cap is
+// not cosmetic — /api/split is an unauthenticated append into another room's
+// memory, and an uncapped array is the whole attack.
+const MAX_CHILDREN = 8;
 // How often every open stream is pinged — and, since the ping now expects an
 // answer, how often staleness is checked. DICE_HEARTBEAT_MS overrides it at
 // boot exactly as DICE_SETUP_TTL_MS does, and for the same reason: a test
@@ -430,6 +436,8 @@ function defaultSettings() {
  *   collectSeq: int,        // last collection sequence handed out (see §7.7)
  *   settings: {felt, ...},  // room-wide, see SETTING_SPECS
  *   setup: null | {rev, table, profiles, at},  // the prepared table (§G4)
+ *   parent: null | {room, name},   // the table this one broke out of (§3b L4)
+ *   children: [{room, name, at}],  // the breakouts running off this one (§3b L4)
  *   lingerTimer, lingerAt   // set only while empty-but-prepared (§G6)
  * }
  */
@@ -450,6 +458,18 @@ function getRoom(name) {
       // pushes one — a fresh room's hello and /api/join carry no `setup`
       // key at all, so their payloads stay byte-identical to today's.
       setup: null,
+      // SUB-TABLES (ROADMAP §3b L4, CUJ5). Both halves ride hello/join
+      // present-or-absent, exactly like `setup`, so a table that never split
+      // sends today's payload byte for byte.
+      //   `parent`   — the table this one broke out of. Declared ONCE by the
+      //                first client that walks in knowing (handleSplit), then
+      //                held here so everyone else reads it from the server
+      //                rather than from whoever happened to click the link.
+      //   `children` — the scoped directory: the breakouts of THIS table,
+      //                listed to everyone sitting at it. The only directory in
+      //                the system, and it is never global (Joe's ruling).
+      parent: null,
+      children: [],
       // Armed only while the room is empty AND prepared (§G6). Null on a
       // live room, so `lingerTimer` doubles as "is this room lingering?"
       // — the one predicate evictLingeringRoom scans for.
@@ -526,17 +546,28 @@ function dropRoomIfEmpty(room) {
 //     one field big enough to matter — see SETUP_TTL_MS's memory note),
 //     `offers` (an offered roll is addressed to players who have all left; a
 //     claim needs a live roller), `collectSeq` (a sequence over a log that no
-//     longer exists) and `colorCursor` (so Thursday's first arrival gets the
-//     first palette colour, exactly as in a room created fresh). The result is
+//     longer exists), `colorCursor` (so Thursday's first arrival gets the
+//     first palette colour, exactly as in a room created fresh) and `children`
+//     (§3b L4 — tonight's breakouts are session, not preparation: every one of
+//     them is an unprepared room that died when ITS last player left, so a room
+//     that came back eleven hours later listing them would be offering doors
+//     onto empty rooms and calling them the game). The result is
 //     indistinguishable from a brand-new room that was immediately prepared,
 //     which is the property that keeps this from being a second kind of room
 //     with its own rules.
+//   KEPT, and worth saying because it is the one that looks like session —
+//     `parent`. Being a breakout of the vault heist is what this table IS, the
+//     same kind of fact as its name (which linger also keeps); it is not
+//     something that happened tonight. And the pointer cannot rot: it is a room
+//     KEY, not a handle (see handleSplit), so it stays followable whether or
+//     not the parent still exists.
 //
 // Nothing is broadcast: there is nobody left to hear it, and the room's next
 // occupant learns the whole state from hello.
 function lingerRoom(room) {
   room.log.length = 0;
   room.offers.length = 0;
+  room.children.length = 0;
   room.collectSeq = 0;
   room.colorCursor = 0;
   // Not reachable today (removePlayer is the only caller's caller, and it
@@ -923,6 +954,30 @@ function cleanName(value, max) {
 // payload is a property of the log, not a sibling of it — and it inherits
 // projectEntryFor's redaction for free, which is why a held roll cannot arrive
 // early just because somebody reloaded.
+// THE SUB-TABLE FIELDS ARE SENT WHOLE, AND HERE IS THE TEST THEY PASS (§3b L4).
+// The rule this server runs on is that projectEntryFor is the ONLY path a roll
+// entry leaves by, and that redaction is ABSENT DATA, never hidden data. So a
+// new field on this payload has to answer two questions, the same two `setup`
+// answered above:
+//
+//   1. IS IT ROLL-SHAPED? No. `parent` is {room, name} and each `children`
+//      entry is {room, name, at} — a room key, a table's display name, and a
+//      millisecond. No values, no dice, no notation, no playerId, no per-viewer
+//      anything. There is nothing here that projectEntryFor could redact,
+//      because there is nothing here that any viewer is not entitled to. Both
+//      objects are replaced wholesale and never mutated in place (handleSplit
+//      builds fresh literals), so handing the stored object straight out is
+//      safe — exactly as `offers` and `setup` are.
+//   2. IS PUBLISHING A ROOM KEY SAFE? This is the sharp one, and the honest
+//      answer is that publishing a key IS granting entry — there is no access
+//      control and there never will be (goal 10), so a listed table is a
+//      walk-in-able table. That is not a leak here; it is the ruling. Joe:
+//      "sub-tables are public to the top-level table." The directory is scoped
+//      to ONE parent and is the only directory in the system: to read it you
+//      must already hold the parent's key and be seated at it, which is a
+//      strictly larger permission than walking into one of its breakouts. What
+//      the server still refuses to publish, and what §3b's other ruling is
+//      about, is a GLOBAL list of live rooms — nothing here builds one.
 function roomSnapshot(room, viewerId) {
   return {
     players: publicPlayers(room),
@@ -930,6 +985,8 @@ function roomSnapshot(room, viewerId) {
     offers: room.offers,
     settings: { ...room.settings },
     ...(room.setup ? { setup: room.setup } : {}),
+    ...(room.parent ? { parent: room.parent } : {}),
+    ...(room.children.length ? { children: room.children } : {}),
   };
 }
 
@@ -2882,6 +2939,148 @@ function handleTableInfo(req, res, url) {
   sendJson(res, 200, out);
 }
 
+// POST /api/split — sub-tables (ROADMAP §3b L4, CUJS.md CUJ5).
+//
+// "We need to split into two groups for a bit, then come back." A breakout is a
+// second table with its own felt, its own log and its own seats, plus two
+// pieces of wiring: the parent LISTS it, and it carries a way BACK.
+//
+// ONE ROUTE, TWO ENDS, because a split has two ends and each is authorized
+// where it happens. You register a child while seated at the PARENT; you
+// declare a parent while seated at the CHILD. Both are `lookup`-gated on a live
+// seat in `room` and nothing more — no roles, ever (goal 10). Exactly one of
+// `child` / `parent` may be present; both or neither is a malformed request.
+//
+//   {room, playerId, child, childName}         — "this table has a breakout"
+//   {room, playerId, parent, parentName, settings} — "this table is a breakout"
+//
+// THIS ENDPOINT CREATES NO ROOM, and that is deliberate rather than incidental.
+// The child room is minted by the splitter's ordinary /api/join when they walk
+// into it, through the ordinary door, under the ordinary MAX_ROOMS cap and the
+// ordinary creation throttle (takeRoomCreateBudget). So there is no second
+// allocation path around §0j's rule and no split-shaped exemption to reason
+// about. A split-specific allowance would be WEAKER than the general one
+// anyway: joining a room that exists is never throttled, so anyone could mint
+// themselves a seat and then spend a "trusted" budget from inside it.
+//
+// THE POINTER IS A KEY, NOT A HANDLE, and the whole orphan question falls out
+// of that. Nothing here holds a reference to another room object, watches one
+// die, or writes across rooms. `parent.room` is a `?room=` value — a door. When
+// the parent's room object is gone (its last player left, or its linger
+// expired), following it walks into a room with that key, freshly created, the
+// same way any invite link does. So "return to the main table" keeps working
+// forever, and there is no dangling state for a reaper to clean up. What DOES
+// end with the parent is its directory (see lingerRoom): a list of the
+// breakouts running off this table is live state in exactly the sense the
+// roster is (GOALS: "presence is asserted, never inferred"), and a server that
+// has forgotten the table cannot assert it. The way back into a breakout you
+// personally walked into survives client-side, in your own recents.
+//
+// ONE LEVEL. A table that already has a parent may not register children
+// (403 already_a_subtable). The verb is "split, then come back", and the way
+// back is THE main table, singular; a chain of parents is a navigation
+// structure and building one is what goal 12 refuses. It also keeps the
+// directory's meaning exact — "the breakouts of this table", never "somewhere
+// in a tree below it".
+async function handleSplit(req, res) {
+  const body = await readJsonBody(req);
+  if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
+
+  const found = lookup(body.value);
+  if (found.error) return sendError(res, ...found.error);
+  const { room, player } = found;
+
+  const hasChild = Object.hasOwn(body.value, 'child');
+  const hasParent = Object.hasOwn(body.value, 'parent');
+  if (hasChild === hasParent) {
+    return sendError(res, 400, 'exactly one of child / parent is required', 'bad_request');
+  }
+  // Both keys take the same trip every ?room= value takes (cleanString/MAX_ROOM),
+  // so a key that survives here is one /api/join would accept byte-identical —
+  // the property js/tables.js's minted key was verified against.
+  const other = cleanString(hasChild ? body.value.child : body.value.parent, MAX_ROOM);
+  if (!other) return sendError(res, 400, 'a room key is required', 'bad_room');
+  // A table is not its own breakout. Left un-refused this is a link that leads
+  // to where you already are, which reads as a broken door rather than a no-op.
+  if (other === room.name) return sendError(res, 400, 'a table cannot split to itself', 'bad_room');
+
+  // Names ride the tableName normalizer, not a second cleaner: a directory row
+  // and the table's own plate must cut identically or the same table wears two
+  // spellings on two screens. '' is legal and means unnamed — the client falls
+  // back to the key, exactly as the recents list does.
+  const sentLabel = hasChild ? body.value.childName : body.value.parentName;
+  const label = sentLabel === undefined || sentLabel === null
+    ? '' // an unnamed breakout is as legal as an unnamed table
+    : SETTING_SPECS.tableName.normalize(sentLabel);
+  if (label === null) return sendError(res, 400, 'invalid table name', 'bad_setting');
+
+  if (hasChild) {
+    if (room.parent) {
+      return sendError(res, 403, 'a breakout cannot split again', 'already_a_subtable');
+    }
+    const already = room.children.find((c) => c.room === other);
+    if (already) {
+      // Idempotent. Two players pressing Split on the same key, or one client
+      // retrying after a dropped response, is not an error and must not append
+      // a twin — the loser of that race did nothing wrong (/api/table's rule).
+      return sendJson(res, 200, { ok: true, applied: false, children: room.children });
+    }
+    if (room.children.length >= MAX_CHILDREN) {
+      return sendError(res, 400, `a table lists at most ${MAX_CHILDREN} breakouts`, 'too_many_subtables');
+    }
+    room.children = [...room.children, { room: other, name: label, at: Date.now() }];
+    log(`split   ${logField('room', room.name)} ${logField('name', player.name)} ${logField('child', other)}`);
+    broadcast(room, 'table-split', {
+      parent: room.parent, children: room.children, byId: player.id, byName: player.name,
+    });
+    return sendJson(res, 200, { ok: true, applied: true, children: room.children });
+  }
+
+  // The child half. FIRST WRITER WINS, and only before the table has started.
+  //
+  // Two guards, and they are different questions. `room.parent` already set:
+  // somebody got here first and nobody may re-parent a table out from under
+  // them. A table with a LOG or a SETUP: it has already been played at or
+  // prepared, so it is its own table now, and letting a late arrival hang a
+  // parent (and a felt) on it would be a stranger redecorating a game in
+  // progress. Neither is an error to the caller — a client that lost simply has
+  // nothing to do, so both answer 200 applied:false naming the parent that
+  // stands, exactly as a losing /api/table push does.
+  if (room.parent || room.log.length || room.setup) {
+    return sendJson(res, 200, { ok: true, applied: false, parent: room.parent });
+  }
+
+  // THE INHERITANCE (open question 1, decided: yes — a breakout is the same
+  // game). It arrives as an ordinary settings patch from the client that is
+  // sitting at the parent, and goes through the ordinary validate + commit
+  // pair, so there is no second validator and no cross-room read: this server
+  // never looks inside a room the caller has not joined. It grants no new power
+  // either — the same player could POST /api/settings a moment later — it just
+  // makes the felt land WITH the pointer instead of a beat after it.
+  //
+  // tableName is the one setting refused (same shape as /api/table refusing
+  // `experiences`): a breakout names ITSELF, and inheriting "Vault Heist" onto
+  // the room you split off from Vault Heist is how you get two tables nobody
+  // can tell apart in a recents list.
+  let patch = null;
+  if (body.value.settings !== undefined && body.value.settings !== null) {
+    const checked = validateSettingsPatch(body.value.settings);
+    if (checked.error) return sendError(res, ...checked.error);
+    if (Object.hasOwn(checked.patch, 'tableName')) {
+      return sendError(res, 400, 'a breakout names itself', 'bad_setting');
+    }
+    patch = checked.patch;
+  }
+
+  room.parent = { room: other, name: label };
+  if (patch) commitSettings(room, player, patch);
+  log(`subtable ${logField('room', room.name)} ${logField('name', player.name)} ${logField('parent', other)}`);
+  broadcast(room, 'table-split', {
+    parent: room.parent, children: room.children, byId: player.id, byName: player.name,
+  });
+  return sendJson(res, 200, { ok: true, applied: true, parent: room.parent });
+}
+
 // ---------------------------------------------------------------------------
 // Operations
 // ---------------------------------------------------------------------------
@@ -3178,6 +3377,7 @@ const server = http.createServer((req, res) => {
     if (route === '/api/settings' && req.method === 'POST') return handleSettings(req, res);
     if (route === '/api/table' && req.method === 'POST') return handleTable(req, res);
     if (route === '/api/table' && req.method === 'GET') return handleTableInfo(req, res, url);
+    if (route === '/api/split' && req.method === 'POST') return handleSplit(req, res);
     if (route.startsWith('/api/')) return sendError(res, 404, 'no such endpoint', 'not_found');
     return serveStatic(req, res, url);
   };

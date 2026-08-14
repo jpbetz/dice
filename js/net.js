@@ -40,7 +40,7 @@ const SSE_EVENTS = [
   'hello', 'player-joined', 'player-left', 'player-renamed', 'pools-changed',
   'roll', 'clear', 'reveal', 'roll-cleared', 'roll-collected',
   'offer', 'offer-claimed', 'offer-rescinded',
-  'settings-changed', 'table-setup',
+  'settings-changed', 'table-setup', 'table-split',
 ];
 
 function apiUrl(path) {
@@ -225,6 +225,11 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     // it hands later 'table-setup' events to onEvent and the caller owns the
     // state from there, the same way it owns settings after 'settings-changed'.
     setup: joined.data.setup || null,
+    // Sub-tables (ROADMAP §3b L4): the table this one broke out of, and the
+    // breakouts running off it. Snapshots like everything above — later
+    // 'table-split' events go to onEvent and the caller owns the state.
+    parent: joined.data.parent || null,
+    children: joined.data.children || [],
 
     // Ask the server to roll. Values arrive later on the 'roll' event — the
     // caller must never animate from this return value.
@@ -400,6 +405,33 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
       const res = await withPlayer('/api/table', body);
       if (!res.ok || !res.data) return null;
       return { applied: res.data.applied === true, rev: res.data.rev };
+    },
+
+    // SUB-TABLES (ROADMAP §3b L4, CUJ5). One endpoint, two ends — see
+    // server.js handleSplit. Both answer {applied} rather than throwing when
+    // they lose a race, and both grant no power: any player may split, and a
+    // split is furniture, not a role (goal 10).
+
+    // Called at the PARENT, before navigating: "this table has a breakout at
+    // key `child`". Await it — if it does not land, the breakout exists but
+    // nobody at the main table can see it, which is the one failure worth
+    // stopping for. null means the request itself failed.
+    async split({ child, childName } = {}) {
+      const res = await withPlayer('/api/split', { child, childName: childName || '' });
+      if (!res.ok || !res.data) return null;
+      return { applied: res.data.applied === true, children: res.data.children || [] };
+    },
+
+    // Called at the CHILD, right after joining: "this table is a breakout of
+    // `parent`", carrying the felt/system to inherit. Losing (somebody
+    // declared first, or the table has already been played at) is {applied:
+    // false} and needs no handling — the server's answer already stands.
+    async declareParent({ parent, parentName, settings } = {}) {
+      const body = { parent, parentName: parentName || '' };
+      if (settings && Object.keys(settings).length) body.settings = settings;
+      const res = await withPlayer('/api/split', body);
+      if (!res.ok || !res.data) return null;
+      return { applied: res.data.applied === true, parent: res.data.parent || null };
     },
 
     // Give up the seat for good — 'Leave & switch seat', never a reload.
@@ -596,6 +628,11 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
       // one we saw. §G6's re-push is what heals that, and it can only notice
       // the gap if the gap is visible here.
       conn.setup = res.data.setup || null;
+      // Same rule for the sub-table wiring: absent means the room genuinely
+      // holds none (a restarted server forgot the split), so it falls to
+      // empty rather than keeping what we last saw.
+      conn.parent = res.data.parent || null;
+      conn.children = res.data.children || [];
       return true;
     })();
     rejoining = pending.then(
