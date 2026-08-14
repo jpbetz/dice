@@ -14,12 +14,16 @@ portal arithmetic.
 
 ## Read first, in this order
 
-1. **docs/VENUE-COMPOSITION.md** — the FOURTEEN RULES with their CHECKs
+1. **docs/VENUE-COMPOSITION.md** — the FIFTEEN RULES with their CHECKs
    (10 composition + 11 grown-not-placed, 12 engine-furniture-wears-the-
    world, 13 the scenery tier, 14 the living layer answers to the
-   table). They are the law of this skill; this file is the procedure.
-   Note rule 8's amendment before you write any tier number down: a
-   tier is a LUMINANCE, and an authored scalar is not one.
+   table, 15 a composition gate is stated in the FRAME). They are the
+   law of this skill; this file is the procedure. Note rule 8's
+   amendment before you write any tier number down: a tier is a
+   LUMINANCE, and an authored scalar is not one. Note rule 15 before
+   you write any composition CLAIM down: it has to be computed through
+   the live camera, and it has to FAIL the frame that was rejected, or
+   it is a floor rather than evidence.
 2. docs/FAE-VENUE-SPEC-DRAFT.md — palette law, the four Vegas gates,
    legibility laws (fog under die tops, ≥2.5:1 face contrast).
 3. GOALS goals 13–15 — the venue doctrine (atomic set, two registers,
@@ -40,7 +44,7 @@ portal arithmetic.
    a LIVING layer, `tools/steps/life-look.mjs` is its own loop: a static
    room is fair to photograph once, a moving one is not — it shoots two
    unrelated phases plus the idle / mid-film / settled trio.
-2. **Diagnose against the fourteen rules.** Walk the dossier's CHECKs in
+2. **Diagnose against the fifteen rules.** Walk the dossier's CHECKs in
    order and write numbered findings (the W2b glade diagnosis in the
    dossier is the worked example). Rule 8's check is a grayscale pass —
    desaturate the frame (`magick shot.png -colorspace Gray …` or judge
@@ -109,7 +113,14 @@ portal arithmetic.
    dissenters (rule 7 list), the seams (rule 11 silhouette trace).
 10. **Gates.** `npm test` + `--only fx,settings,tower`; the Vegas gates at
    LOOK (≤8% bloom, ≤2 glow hues + 1 warm accent, tier separation,
-   countable sources); the placement law green in `venue-set`.
+   countable sources); the placement law green in `venue-set`; and
+   **`node tools/drive.mjs tools/steps/glade-frame.mjs`** — rule 15's
+   instrument, which runs every composition claim through the live
+   camera against BOTH the current layout and the frozen one that was
+   rejected, and prints which gates discriminate. Add `dump` to see
+   every feature's projection, its in-frame fraction and its placement-
+   law verdict on one line; that is the sheet to work from while moving
+   anything. A new venue clones the step and swaps its frozen baseline.
 
 ## Traps (each one shipped or nearly shipped)
 
@@ -121,6 +132,20 @@ portal arithmetic.
   (the W2 moot/pool, both at z −6.5) read as symmetry no forest has.
   Break depth first — it is the cheapest asymmetry and it recruits the
   background layer (rule 5/6).
+- **The scatter that was symmetric in the frame.** Twelve mushroom
+  clumps authored to look thoroughly irregular in plan projected into
+  THREE mirror pairs across the tower's centreline (W7 ②, 2026-08-14) —
+  the "symmetrical and formal" verdict, arrived at by accident, and
+  invisible to every plan-space assertion. Randomness in plan is not
+  asymmetry at the eye. Run rule 15's gate over any population you
+  scatter, and note that the mirror axis is the HERO's projected centre,
+  not the canvas centre (the eye is offset; in the glade world x 0 lands
+  at frame x 0.529, which is wider than the tolerance).
+- **The population that re-rolls itself.** A scatter drawn from ONE
+  seeded stream re-rolls every member after any change to the COUNT or
+  the ORDER of its clumps — sizes, kinds, topples, and therefore every
+  declared extent the placement law is asserted about. Move a clump by
+  editing x/z/r/scale; never "just add one" while tuning composition.
 - **The dissenting arrow.** One directional element pointing off-stage
   (a glint axis copying a beam tilt instead of aiming anywhere) undoes
   the other five that agree. List EVERY arrow; fix the list, not the
