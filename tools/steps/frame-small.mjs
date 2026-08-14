@@ -36,6 +36,12 @@ limitations under the License.
 
 const VIEWPORTS = [
   { name: 'phone 390', w: 390, h: 844, mini: true, always: true },
+  // WHAT THE RAIL COSTS THE CAMERA. A 390px phone gives the felt 278px — the
+  // collapsed rail keeps 112px, 29% of the window — and every fit in this file
+  // is squeezed into what is left. 502px is the window that would leave the
+  // felt a full 390: the difference between these two rows is the price of the
+  // rail in die size, and it is not a camera number at all.
+  { name: 'phone 390 no rail', w: 502, h: 844, mini: true, always: true },
   { name: 'phone 360', w: 360, h: 780, mini: true },
   { name: 'ipad-p 834', w: 834, h: 1112, mini: true },
   { name: 'desktop 1600', w: 1600, h: 1000, mini: false },
@@ -76,17 +82,26 @@ export default async function run(stage, args = []) {
         { desc: `${vp.name} ${pool.label}`, timeout: 40000 });
       await a.dbg('sim(600)');
       const f = await a.dbg('framingInfo()');
-      const o = await a.dbg('oracleProbe()');
+      const p = await a.dbg('framingProbe()');
+      // The same roll under the C27 instrument, so the option and the shipped
+      // frame are one table rather than two runs.
+      await a.dbg('setFraming({preferDice: true})');
+      const pref = await a.dbg('framingInfo()');
+      await a.dbg('setFraming({preferDice: true, floor: 0.55})');
+      const near = await a.dbg('framingInfo()');
+      await a.dbg('setFraming({preferDice: false, floor: 1})');
       rows.push({
         view: vp.name,
         pool: pool.label,
+        cluster: `${p.cluster.w}x${p.cluster.d}`,
         mode: f.mode,
         span: f.spanPx,
         scale: f.camScale === undefined ? '—' : f.camScale,
         on: `${f.diceOnScreen}/${f.dice}`,
         hero: f.decidingOnScreen === false ? 'CROPPED' : 'ok',
         orbit: f.orbit ? 'turned' : '',
-        oracle: o.framed ? `${o.framed.span} (${o.usedScale ?? 'NOFIT'})` : '—',
+        pref: `${pref.spanPx} ${pref.mode}`,
+        near: `${near.spanPx} ${near.mode}`,
       });
     }
   }
@@ -94,7 +109,7 @@ export default async function run(stage, args = []) {
   await a.dbg('setPanelState({pools: true, log: true})');
   await a.dbg("setZoom('medium')");
 
-  const head = ['viewport', 'pool', 'rung', 'spanPx', 'scale', 'on screen', 'deciding', 'orbit', 'oracle span (scale)'];
+  const head = ['viewport', 'pool', 'cluster', 'rung', 'spanPx', 'scale', 'on screen', 'deciding', 'orbit', 'preferDice', '+approach'];
   const w = head.map((h, i) => Math.max(h.length,
     ...rows.map((x) => String(Object.values(x)[i]).length)));
   const line = (c) => c.map((v, i) => String(v).padEnd(w[i])).join('  ');
@@ -105,7 +120,8 @@ export default async function run(stage, args = []) {
   console.log(w.map((n) => '-'.repeat(n)).join('  '));
   for (const x of rows) console.log(line(Object.values(x)));
   console.log('');
-  console.log('  A rung of `dice` at scale 1.00 is the residual: the frame RECENTRED on the');
-  console.log('  dice and did not resize, because fitCameraTo only ever pulled the eye BACK.');
+  console.log('  scale > 1 is a RETREAT from the preset eye. A phone retreats at every pool');
+  console.log('  above one die, so no approach floor can help it — the cluster is the mat.');
+  console.log('  preferDice/+approach are __diceDebug.setFraming, inert as shipped (C27).');
   return rows;
 }

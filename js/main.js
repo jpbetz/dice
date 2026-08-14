@@ -4022,6 +4022,10 @@ function playRoll(roll) {
   // makes a model unable to deflect an entry.
   const pouring = towerOn();
   const side = pouring ? 0 : Math.floor(rng() * 4);
+  // A pour never touches spawnDie, so nothing would clear the last THROWN
+  // roll's spawn line and the instrument would report a stale one as this
+  // roll's. Empty is the honest answer: a poured die has no body until it exits.
+  if (pouring) spawnLine = [];
   const dice = pouring
     ? types.map((t, i) => spawnPourDie(t, shrouded, rollDieSet(roll, i)))
     : types.map((t, i) => spawnDie(t, i, types.length, side, rng, shrouded, rollDieSet(roll, i)));
@@ -11431,6 +11435,13 @@ window.__diceDebug = {
   // which is what shipped before 2026-08-10. The scenario measures BOTH sides
   // through this, so "cropping bought size" is a number rather than a claim.
   setFramingLadder(on) { framingLadder = !!on; applyCameraFraming(false); return framingLadder; },
+  // C27's residual, as a switch rather than a default — see FRAMING. Inert as
+  // shipped; `{preferDice: true}` lets rung 2 run where rung 1 already
+  // succeeded, and `{floor: 0.55}` lets it come closer than the preset. Both
+  // are per-viewer like the rest of the ladder, so flipping one shows nobody
+  // else anything. Re-frames immediately so a console flip is visible.
+  get framing() { return { ...FRAMING }; },
+  setFraming(o) { Object.assign(FRAMING, o || {}); applyCameraFraming(false); return { ...FRAMING }; },
   // The portrait-roll probe. Radians; Math.PI/2 stands the mat up on screen.
   setCamRoll(r) { camRoll = r; applyCameraFraming(false); return camRoll; },
   setCamOrbit(r) { camOrbit = r; applyCameraFraming(false); return camOrbit; },
@@ -20714,6 +20725,53 @@ function decidingOnScreen() {
 //      says what may not.
 //
 // Returns the pose rather than moving the camera, so the caller can ease to it.
+//
+// RUNG 1 IS A TERMINATOR, NOT A COMPARISON, AND THAT IS C27'S RESIDUAL
+// (measured 2026-08-14, tools/steps/frame-price.mjs, one seed per pool, medium):
+//
+//   viewport      pool   shipped   the dice rung, if it were allowed to run
+//   phone 390     3d6      85 px     85 px  (already at rung 2, and retreating)
+//   ipad-p 834    3d6     119 px    242 px
+//   desktop 1600  3d6     200 px    245 px  (350 px if the eye may approach)
+//   desktop 1600  40d6    200 px    184 px  (a big pool is WORSE off there)
+//
+// The roll C27 says gained nothing gains nothing ON A PHONE, and the reason is
+// not the camera: three dice at rest span 3.9 x 3.0 of an 11 x 6.7 mat, and with
+// the AABB's margin the dice frame is 5.9 x 5.0 — three quarters of the mat's
+// DEPTH. Framing the dice IS framing the mat at that pool size, so the eye ends
+// up at 2.5x the preset either way, and an approach floor cannot help something
+// that is retreating. C24's premise — a compact settled cluster — is not what
+// three dice do on this mat.
+//
+// The 2x IS there, on every device where the mat FITS, which is the one place
+// the ladder never descends. Taking it means a desktop crops the felt on every
+// small roll, which is a taste call and Joe's: C27 priced CONTAINING the mat and
+// declined; this is the mirror image and nobody has looked at it. So it is an
+// instrument, not a default. `preferDice` runs rung 2 even when rung 1 succeeded
+// and keeps it only if it shows every die and beats rung 1 by `gain`; `floor`
+// lets the dice rung's scan start below the preset (1 = the shipped promise that
+// the eye never comes closer). Inert at preferDice false — the block below does
+// not execute at all — so the shipped frame is bit-identical.
+//
+//   __diceDebug.setFraming({preferDice: true})            // the +23%/+103% frame
+//   __diceDebug.setFraming({preferDice: true, floor: 0.55}) // and let it approach
+const FRAMING = { preferDice: false, floor: 1, gain: 1.15 };
+
+// HOW GOOD IS THE FRAME THE CAMERA IS IN RIGHT NOW — dice kept, and how big a
+// world unit lands in CSS px (roll-aware: a quarter turn maps world x onto the
+// screen's vertical, so this is a 2D length, not |Δx|). Read from the LIVE
+// camera, never from what a fit intended. One function because the ladder now
+// asks the question twice per candidate and two copies of a comparison is how
+// the last three defects in this file got in.
+function framingScore() {
+  const v = new THREE.Vector3();
+  const on = tableDice.filter((d) => d.body && d.mesh && d.mesh.visible !== false)
+    .filter((d) => { v.copy(d.body.position).project(camera); return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1; }).length;
+  const a0 = new THREE.Vector3(0, 0, 0).project(camera);
+  const a1 = new THREE.Vector3(1, 0, 0).project(camera);
+  return { on, span: Math.hypot((a1.x - a0.x) * view.width, (a1.y - a0.y) * view.height) };
+}
+
 function framingFor(orbit) {
   const prev = camOrbit;
   camOrbit = orbit;
@@ -20738,14 +20796,25 @@ function framingFor(orbit) {
       if (hero && fitCameraTo(hero, hero.centre)) mode = 'deciding';
       else mode = 'mat-overflow';
     }
+  } else if (framingLadder && FRAMING.preferDice && mode === 'mat') {
+    // RUNG 1 SUCCEEDED — ask rung 2 anyway (the C27 instrument above). Kept
+    // only if it is better by BOTH of the measures the ladder already trusts:
+    // no die may leave the frame, and the dice must actually get bigger by a
+    // margin, or this trades the whole felt for noise. Restores rung 1's eye
+    // when it is refused, because fitCameraTo leaves the camera where it looked.
+    const held = camera.position.clone();
+    const before = framingScore();
+    const dice = diceFramingPoints();
+    let kept = false;
+    if (dice && fitCameraTo(dice, dice.centre, FRAMING.floor)) {
+      const after = framingScore();
+      kept = after.on >= before.on && after.span >= before.span * FRAMING.gain;
+      if (kept) mode = 'dice';
+    }
+    if (!kept) { camera.position.copy(held); aimCamera(home); }
   }
   // Score the candidate from the LIVE camera it just set up.
-  const v = new THREE.Vector3();
-  const on = tableDice.filter((d) => d.body && d.mesh && d.mesh.visible !== false)
-    .filter((d) => { v.copy(d.body.position).project(camera); return Math.abs(v.x) <= 1 && Math.abs(v.y) <= 1; }).length;
-  const a0 = new THREE.Vector3(0, 0, 0).project(camera);
-  const a1 = new THREE.Vector3(1, 0, 0).project(camera);
-  const span = Math.hypot((a1.x - a0.x) * view.width, (a1.y - a0.y) * view.height);
+  const { on, span } = framingScore();
   const pose = {
     pos: camera.position.clone(),
     tgt: (mode === 'mat' || mode === 'mat-overflow') ? home.clone()
@@ -20794,9 +20863,21 @@ function computeFraming() {
   //   · landscape is actually dropping dice that portrait would show — which is
   //     what keeps a lone d20 in landscape at 212px instead of turning for a
   //     completeness it already had.
+  //
+  // AND `matFits` STOPS BEING A USABLE PROXY UNDER preferDice. That instrument
+  // deliberately gives up the mat to make the dice bigger, so the portrait
+  // candidate can come back with matFits FALSE and be refused — which is how a
+  // first run of it put 12d6 on a 390px phone into the DECIDING rung and showed
+  // one die of twelve. The intent behind the proxy is "portrait changes the kind
+  // of frame available"; with cropping already conceded, that intent is just
+  // completeness, then size. Written as a branch rather than as a replacement so
+  // the shipped rule stays exactly the rule that was measured.
   if (framingLadder && !land.matFits) {
     const port = framingFor(Math.PI / 2);
-    if (port.matFits && port.on > land.on) best = port;
+    const better = FRAMING.preferDice
+      ? (port.on > land.on || (port.on === land.on && port.span > land.span))
+      : (port.matFits && port.on > land.on);
+    if (better) best = port;
   }
   camera.position.copy(savedPos);
   camTarget.copy(savedTgt);

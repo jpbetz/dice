@@ -253,6 +253,17 @@ and it rides the zoom defer rule (`queueTower` / `tryFlushRoomChanges`), so a
 change made mid-roll lands at the next roll boundary and never under a film
 already baked against the other interior.
 
+**"The next roll boundary" now means EVERY way the table goes idle** (amended
+2026-08-14, ROADMAP C28 ②). The flush used to hang off the places a roll can
+end, and it missed four of them — a ceremony's verdict, the corner-✕ sweep, the
+last flip of a revealed roll, and the fast-forward a backgrounded tab does on
+return. Each left that one client standing on the old preset while the room had
+moved: the mat is the physics walls, so the same seed then lands differently
+there. `tick()` asks `tryFlushRoomChanges()` once a frame instead, against the
+same `tableIsBusyForZoom()` predicate `queueZoom` consults, so the guarantee is
+now a property of the predicate rather than of anyone remembering the call. It
+self-healed on the next collect, which is exactly why nobody had seen it.
+
 **THE FIRST LAW, from Joe, verbatim: "Don't change anything about how the
 system works without a tower."** `tower: 'none'` is not a mode — it is the
 whole app, untouched. Every tower branch is guarded, and the proof is that the

@@ -46,6 +46,24 @@ Canned steps:
 - `screens.mjs [feltId] [prefix]` — the standing screenshot suite into
   `tools/out/` for visual review of new chrome.
 
+The camera and the spawn line (ROADMAP C27/C28, 2026-08-14). All four take
+paired seeds, so a before and an after are the same throw:
+
+- `frame-small.mjs [desktop] [zoom]` — die span in px per viewport × pool, the
+  rung the ladder settled on, and what the two `setFraming` options would give.
+  This is the table C27's residual is argued from.
+- `frame-price.mjs` — the dice rung run four ways (each orientation × scan
+  starting at the preset or below it). Written because `oracleProbe` fits from
+  `CAM_TARGET_HOME` and therefore answers `null` on the device in question.
+- `spawn-clear.mjs [seeds] [zooms] [pools] [variants]` — worst wall clearance
+  on the spawn line (negative = a die born inside a wall plane), frame-zero
+  contacts, pile share, and the settled cluster. Simulates: minutes.
+- `defer-flush.mjs [legs]` — walks a room-wide zoom through every way a table
+  goes idle (ceremony, sweep, reveal flip) and proves one seed is one film
+  across two very different viewports. `[legs]` is `1,2,3,4`; run ONE leg to
+  take a negative control, because with the flush backed out leg 1 leaves a
+  zoom pending and wedges every later leg's setup.
+
 Add new step files here (Apache header, like everything first-party) rather
 than writing one-off inline scripts — repeatable work belongs in the repo.
 
