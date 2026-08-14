@@ -288,8 +288,13 @@ The gates and proofs, in order:
 - e2e: `tower-roll`'s registry loop covers a new row the day it registers
   (voice distinct, pour delivered, swap through the towerless body list),
   and `tower-dressing` — the COSMETIC lane, `--only look`, 13s and no dice —
-  covers its groups, its skin as an aggregate, its dressing budget and its
-  ember. `tower-glb-loader` pins the loader path itself. A venueOnly tower
+  covers its groups, its skin as an aggregate, its budgets and its ember.
+  TWO budgets and they measure different things: the dressing's ≤4k
+  TRIANGLES is art restraint, and the WHOLE TOWER's ≤20 DRAW CALLS is frame
+  cost. A baked tower comes in at 5–16; only the three code-built classics
+  are over, by a lot, and they are named and frozen (T14/T15). If a new baked
+  tower needs a waiver, it is built wrong — merge before you ask.
+  `tower-glb-loader` pins the loader path itself. A venueOnly tower
   keeps its venue scenario. **`tower-contract-freeze` will go RED on a new
   row and that is the gate working**: every registered tower must have a
   frozen contract, so re-capture with

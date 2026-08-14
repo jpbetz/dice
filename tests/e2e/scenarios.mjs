@@ -10836,31 +10836,67 @@ export const scenarios = [
         // fine everywhere (the worst is hollowbole's 2644). Nobody knew,
         // because a printed number is a wish.
         //
-        // The two are WAIVED BY NAME AND BY VALUE rather than by raising the
-        // budget to fit them — fitting the rule to the code is how a budget
-        // stops meaning anything, and 11 draws is a merge pass on a prop kit,
-        // not a licence (ROADMAP T14). The waiver is self-cleaning: a row
-        // listed here that turns out to be INSIDE the budget fails too, so
-        // fixing a tower forces its line to be deleted rather than left to rot.
-        const DRESS_DRAW_WAIVER = { heartwood: 11, bastion: 9 };
+        // THE DRAW BUDGET MOVED TO THE WHOLE TOWER (2026-08-14, T14 resolved).
+        // The dress-only rule was policing the wrong noun and the measurement
+        // said so plainly:
+        //
+        //     tower        total  skin  dress
+        //     nullstone        5     5      0
+        //     hollowbole      16     4      7
+        //     heartwood       49    30     11
+        //     bastion         61    46      9
+        //     blackanvil      88    75      5   <- PASSED the old rule
+        //
+        // THAT LAST ROW IS THE ARGUMENT. blackanvil's dressing is 5 draws, so
+        // the dress-only budget waved through the most expensive tower in the
+        // app — 88 draws, 75 of them in one skin group — while refusing
+        // heartwood over three prop meshes. It was found the moment the rule
+        // moved to the right noun, by a scenario that had been green all along.
+        //
+        // A rule that refused heartwood's 11 while saying nothing about the 30
+        // beside it was arguing about 22% of the cost. Merging the kits to 8
+        // would have bought 3 draws out of 49 — and could not have been done
+        // anyway: T14's plan rested on "the kit already knows how to bake a
+        // shared canvas", and it does not (bakeWood/bakeStone/bakeEmber each
+        // bake ONE canvas for one purpose; the props carry five distinct
+        // materials and only hang+coil share one, so a same-material merge
+        // saves ONE of the three draws needed). A budget whose stated fix is
+        // impossible is worse than no budget, so the budget moved instead.
+        //
+        // FRAME COST IS TOTAL DRAWS, so that is what is gated. 20 is set from
+        // the evidence: the most expensive HONEST tower is hollowbole at 16
+        // (four skin meshes, seven dress), which leaves room for one more
+        // dress group without leaving room for a code skin's dozens.
+        //
+        // The two classics keep the waiver DISCIPLINE on the new noun — named,
+        // valued, may not grow, self-cleaning. What changed is that their line
+        // now shows the real number, so nobody reads "11" and thinks the tower
+        // costs eleven draws. Their fix is not a prop merge; it is the forge
+        // (ROADMAP T15).
+        const DRAW_WAIVER = { heartwood: 49, bastion: 61, blackanvil: 88 };
+        const DRAW_BUDGET = 20;
         const dressGroups = dr.groups.filter(
           (g) => g.name === 'towerSkinDress' || g.name === 'towerDressFx');
         const dTris = dressGroups.reduce((n, g) => n + g.tris, 0);
-        const dDraws = dressGroups.reduce((n, g) => n + g.draws, 0);
+        // The dressing TRIANGLE budget stays where it was and on the dress
+        // groups: that one is about art restraint — how much stuff a prop pass
+        // may add — not about frame cost, and every tower has always met it.
         assert.ok(dTris <= 4000,
           `${id}: the dressing is inside its triangle budget (${dTris} <= 4000, `
           + `over ${dressGroups.map((g) => g.name).join(' + ') || 'no dress groups'})`);
-        if (id in DRESS_DRAW_WAIVER) {
-          assert.ok(dDraws > 8,
-            `${id}: is listed as a declared draw-call overrun but measures `
-            + `${dDraws} <= 8 — it is inside the budget now, so delete its line `
-            + `from DRESS_DRAW_WAIVER instead of leaving a waiver nobody needs`);
-          assert.ok(dDraws <= DRESS_DRAW_WAIVER[id],
-            `${id}: a DECLARED overrun of the 8-draw dressing budget, and it may `
-            + `not grow (${dDraws} <= ${DRESS_DRAW_WAIVER[id]}). See ROADMAP T14`);
+        if (id in DRAW_WAIVER) {
+          assert.ok(dr.draws > DRAW_BUDGET,
+            `${id}: is listed as a declared draw overrun but measures `
+            + `${dr.draws} <= ${DRAW_BUDGET} — it is inside the budget now, so `
+            + 'delete its line from DRAW_WAIVER rather than leave a waiver nobody needs');
+          assert.ok(dr.draws <= DRAW_WAIVER[id],
+            `${id}: a DECLARED overrun of the ${DRAW_BUDGET}-draw tower budget, and `
+            + `it may not grow (${dr.draws} <= ${DRAW_WAIVER[id]}). A code-built skin `
+            + 'is dozens of meshes where a baked one is a handful — ROADMAP T15');
         } else {
-          assert.ok(dDraws <= 8,
-            `${id}: and inside its draw-call budget (${dDraws} <= 8)`);
+          assert.ok(dr.draws <= DRAW_BUDGET,
+            `${id}: the whole tower is inside its draw budget (${dr.draws} <= `
+            + `${DRAW_BUDGET}, skin + dress + linings)`);
         }
 
         // (4) THE FAMILY TRAITS. An ember on the row (somebody lit it tonight),

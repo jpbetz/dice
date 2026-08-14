@@ -3201,7 +3201,43 @@ Red checks, all three seen: a `look` scenario that rolls → RED; with the
 scenario's own assertion removed, the RUNNER catches it → RED with the same
 count; with the debug hook renamed away, the guard refuses to pass → RED.
 
-### T14. Two towers have been over the dressing draw budget the whole time — small
+### T14. RESOLVED 2026-08-14 — by moving the budget, not by merging the kits
+The entry below is kept as written because its diagnosis was right and its
+PRESCRIPTION was wrong, which is the more useful half.
+
+Two things were found when the fix was attempted. **The plan rested on a
+premise that is false:** "the kit already knows how to bake a shared canvas"
+— it does not. `bakeWood`/`bakeStone`/`bakeEmber` each bake ONE canvas for one
+purpose and there is no atlas anywhere; heartwood's props carry five distinct
+materials and only `hang`+`coil` share one, so the whole available
+same-material merge saves ONE of the three draws needed. **And the budget was
+on the wrong noun:**
+
+| tower | total draws | skin | dress |
+|---|---|---|---|
+| nullstone | 5 | 5 | 0 |
+| hollowbole | 16 | 4 | 7 |
+| heartwood | 49 | 30 | 11 |
+| bastion | 61 | 46 | 9 |
+| **blackanvil** | **88** | **75** | **5** |
+
+A rule refusing heartwood's 11 dress draws while saying nothing about the 30
+beside them was arguing about 22% of the cost — and it **passed blackanvil**,
+the most expensive tower in the app, because its dressing is 5. Merging the
+kits would have bought 3 draws out of 49, for an atlas pipeline that would
+have to be written first, on two towers `/new-tower` calls "maintained, not
+imitated".
+
+So `tower-dressing` now gates TOTAL draws per socketed tower at **20** (set
+from evidence: the most expensive honest tower is hollowbole at 16). The
+dressing TRIANGLE budget stays where it was — that one is about art restraint,
+not frame cost, and every tower has always met it. The three classics keep the
+waiver discipline on the new noun: named, valued, may not grow, self-cleaning
+(both directions red-checked). Their line now shows the real number, so nobody
+reads "11" and thinks heartwood costs eleven draws. **Their fix is not a prop
+merge; it is T15.**
+
+### T14 (original entry, kept for the diagnosis it got right) — small
 Found the moment T4 turned "≤ 4k triangles and ≤ 8 draw calls of dressing"
 from a printed number into an assertion: heartwood's dressing is **11** draw
 calls (9 in `towerSkinDress`, 2 in `towerDressFx`) and bastion's is **9**.
@@ -3214,6 +3250,40 @@ separate meshes; the kit already knows how to bake a shared canvas, so this is
 geometry merging rather than art). Until then `DRESS_DRAW_WAIVER` in
 `tower-dressing` names them with their measured counts, so neither can grow
 and fixing one deletes its line.
+
+### T15. Re-bake the three classic skins through the forge — LARGE, scoped 2026-08-14
+Commissioned by Joe off T14's measurement. **A code-built skin costs 3–18× the
+draw calls of a baked one** — heartwood 49, bastion 61, blackanvil 88 against
+nullstone's 5 and hollowbole's 16 — because a code skin is dozens of separate
+meshes with their own materials and a baked GLB is a handful of merged
+primitives. Nothing is visibly wrong today and the scene is nowhere near a
+draw-call limit; this is about cost, consistency, and retiring a second way of
+building the same thing.
+
+**What it is.** Three towers move from `build*Skin(v)` in
+towerskin/towerbastion/toweranvil.js to forge recipes with declared portals,
+exactly as nullstone and hollowbole are. They already sit on `DEFAULT_PORTALS`,
+so the PORTAL half is free — the physics core does not move and
+`tower-contract-freeze` should stay byte-identical throughout, which is also
+the check that proves each step was cosmetic.
+
+**What makes it large, and it is not the geometry.** These skins are not
+static meshes: they are seeded canvas bakes (`bakeWood`, `bakeStone`,
+`bakeEmber`), Sobel normal maps, raycast vertex AO, alpha-tested ivy panels
+and instanced leaf fields, plus swaying dress. A forge recipe bakes COLOR_0
+and one material per mesh, so every one of those has to become either baked
+vertex colour or a decision to lose it. **The look is the risk**: this re-opens
+three shipped towers' appearance, and the bar is Joe's eye, not the gates.
+
+**Order, cheapest lesson first.** blackanvil (88 draws, the biggest win, and
+the least organic — a forge, mostly boxes and a chimney); then bastion; then
+heartwood, which has the most hand-authored texture story and is the one most
+likely to need art decisions rather than geometry ones. One tower per round,
+each with its own LOOK gate and A/B against the current skin, and each ending
+in a `DRAW_WAIVER` line DELETED rather than lowered.
+
+**Do not start it as a side quest.** Every round is a `/new-tower`-shaped job
+with a review gate, and a half-migrated tower is a fourth way of building one.
 
 ### T4 (original entry, kept for the shape it asked for) — small-medium
 The policy exists in the tools (`gate:cosmetic`) but not yet in
