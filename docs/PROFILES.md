@@ -640,3 +640,135 @@ your own active profile) · `#profile-banner`'s Save/Done pair · the
 10. **Rejected: version pointers on a copied profile.** A copy is a copy;
     tracking "the DM has since edited this" needs a profile identity on
     the wire that goal 7 does not want (goal 12 territory besides).
+
+---
+
+# 12. Restore — reading the file back whole (2026-08-14, ROADMAP C15)
+
+Export has been whole-library since §11. Restore did not exist, and the
+three paths that looked like it were each something else:
+
+| path | what it actually did |
+| --- | --- |
+| **Apply import** | merged only the file's top-level `pools:`; ignored `players:` entirely |
+| **Add** | one profile, through `uniqueName` — a restored `Nessa` lands as `Nessa 2` |
+| **Add all N** | the same, N times, INTO a library that already holds the browser's one dealt profile — so a 32-profile file needs 32 free slots against a ceiling of 32 and lands **31 of your characters, renamed on collision, beside a stranger's, with the wrong one in hand** |
+
+## 12.1 One verb: `Replace my library…`
+
+In the `#import-profiles` block, under the rows, using the app's existing
+**two-step in-place confirm** (the library row's Delete, the corner ✕) —
+nothing modal ever locks the table.
+
+- The armed state **names what is destroyed**: `Deleting 'Nessa', 'Bram',
+  'Tola' and 2 more — this browser is the only place they exist.` A count
+  is a number the player cannot check against their own memory; the names
+  are the same fact they can, and recognising the list is the entire work
+  the second press asks for.
+- **`Download first` stands inside the armed state, and first**, because
+  the thing being replaced may be the only copy there has ever been — and
+  the moment the player is thinking about that is the moment they armed
+  the verb, not four rows earlier. It writes the LIVE library
+  (`portableSnapshot`), never the box, which is holding the incoming file.
+  Pressing it **re-times the arm**: saving a copy inside the window is
+  work, not a change of mind.
+- The arm expires in **8 s**, where Delete uses 3 and the corner ✕ uses 4.
+  Those arm over one named thing already in view. This one asks you to
+  read a list and possibly wait on a save dialog.
+- The rows are rebuilt on every keystroke and the verb **disarms with
+  them**: an armed Replace is a promise about a specific list of names on
+  both sides, and the box is live.
+
+**It is deliberately NOT a sharper Apply, and that is the safety
+property.** Apply merges and deletes nothing, which is what makes it safe
+to press on a rack you care about; union-only, preview-then-merge is the
+load-bearing lesson of the `#g=` post-mortem (GOALS §7). Restore is the
+other operation — *put the file where my library is* — and it is
+destructive, so it wears its own name. **Do not weaken Apply.**
+
+## 12.2 How the replacement store is built
+
+`js/profiles.js` `rebuildStore(records, {fallbackSystem, activeName, now})`
+— pure, no storage, no DOM, unit-tested under plain Node.
+
+- `emptyStore()` + `addProfile()`, and **`uniqueName` never fires**,
+  because every name in a store built from empty is free. That is the
+  whole fix for `Nessa 2`, and the 32-of-32 cap problem dissolves with it:
+  nothing is holding a slot.
+- **The claim is checked, not assumed.** After each `addProfile` the
+  landed name is compared to the file's; a mismatch is a refusal. If
+  `addProfile` ever grows a second reason to rename, that line says so
+  instead of a player discovering it on a fresh browser.
+- **Names must already be unique, and a collision is REFUSED rather than
+  deduped.** `parsePortable` enforces uniqueness inside `players:` but
+  **not between `players:` and the `profile:` key** naming the top-level
+  rack — verified 2026-08-14, and the roadmap's claim that the file's
+  names are already unique is false across that seam. A file this app
+  wrote can never hit it (`profile:` is the rack in hand, `players:` is
+  everyone else, so the two are disjoint by construction); a hand-edited
+  one can. There is no store such a file describes, so it is spoken.
+- **`activeName` is the file's `profile:` key** — the pointer every other
+  path silently drops. A file naming none hands back the first record, and
+  the receipt says so.
+- **`at` is 0 for everyone** but the one taken in hand. A file records no
+  recency; inventing an order would make `profilesFor` sort by a fiction.
+- **Persist first, swap second, check the return.** `saveProfileStore`
+  takes the store to write, so the replacement is on disk before anything
+  in the tab points at it. A refused write leaves the old library whole in
+  memory *and* on disk, with no half-moved state to repair.
+
+**Scope, narrow on purpose:** name, system, dice set, pools. Sound and
+numbers are this device's (§11.9 decision 4) and the room's furniture is
+the room's; the file's `settings:` still travel through Apply, previewed,
+as a flip you can see coming.
+
+## 12.3 Three defects in the same journey, fixed with it
+
+1. **`parsePortable`'s warnings were dead end to end** — produced,
+   unit-tested, returned, and read by nothing, so a file from a newer
+   version lost whole sections behind a clean `✓`. §3.1 asked for exactly
+   one thing and now gets it: the count reaches the preview status line,
+   as a `⚠ n sections this version can't read, skipped ·` **prefix**.
+   Prefix and not the `.warn` dress, because `portableVerdict().ok` reads
+   `.warn` — the parse genuinely succeeded and Apply is legitimately
+   armed, and painting a refusal over a success would make the pane lie
+   the other way. `.caution` carries the colour; `verdict.warnings`
+   carries the assertion.
+2. **An empty file read as success-with-nothing-said** — blank box, blank
+   status line, `ok: true` — while a comments-only file refused properly.
+   They now agree, by both refusing, **at the file door**: an empty *box*
+   is the pane's resting state and clearing the textarea must not paint a
+   `✗` at somebody about to paste, but an empty *file* is something the
+   player went and chose, on the one journey where nothing else holds
+   their characters.
+3. **Boot normalization was lossy and the loss was written back.**
+   `normalizeStore` drops profiles past 32, pools past 40, unreadable
+   records and duplicate lowercase names — correctly, so the boot cannot
+   throw (§11 X6) — and `main.js` then persisted the healed store on the
+   first paint, *before the player had touched anything*. The drop is
+   recoverable for exactly as long as the key still holds the bytes, so
+   the write was the data loss, not the drop. Now: `normalizeStore` takes
+   an optional **report** naming what it left behind; the boot write is
+   **withheld** while that report holds anything (the rack still folds in
+   and still publishes — only the `setItem` is skipped); and
+   `#storage-banner` stands with a second reason —
+   `**Not all of it loaded** — 2 profiles ('Ada', 'Bo') did not load from
+   this browser. Nothing has been overwritten; Download saves what did.`
+   The notice comes down inside the first successful write, because that
+   write is the overwrite and the sentence stops being true.
+   `report.version` is reported and deliberately **not** read: the
+   `epoch.major.minor` contract (ROADMAP C22) owns that, and a
+   differently-versioned key that loads whole has lost nothing.
+
+## 12.4 `dice.groups.v1` is a fossil, not a recovery path
+
+The comment at `js/main.js` called it *"the one recovery path if the
+library is ever cleared"*. Nothing has written it since §11 shipped, so it
+holds a rack as it stood on migration day and — for anyone whose first
+visit postdates the library — **it does not exist at all**. Making the
+claim true would mean dual-writing the rack into a second key on every
+save, which is the design `js/profiles.js`'s header refuses at length: two
+keys holding the same 40 pools with no transaction between them is a new
+data-loss path wearing a backup's clothes. **The comment was made honest
+instead.** The key stays only because `migrateLegacy` still reads it on a
+browser that has not booted since §11. The recovery path is the file.

@@ -47,7 +47,7 @@ import {
   emptyStore, normalizeStore, profilesOf, findProfile, activeProfile,
   profilesFor, lastUsedFor, isFull, nameProfile, uniqueName,
   addProfile, renameProfile, deleteProfile, setActive, writeActivePools,
-  setActiveSystem, setProfileSet, migrateLegacy, toWire, fromWire,
+  setActiveSystem, setProfileSet, migrateLegacy, rebuildStore, toWire, fromWire,
 } from '../js/profiles.js';
 import { SYSTEMS, DEFAULT_SYSTEM } from '../js/meanings.js';
 
@@ -393,6 +393,180 @@ t('normalizeStore is a fixed point over its own output', () => {
   const twice = normalizeStore(JSON.parse(JSON.stringify(once)));
   assert.deepEqual(twice, once);
   assert.deepEqual(names(profilesOf(once)), ['Rill', 'Grix', 'Tray'], 'order is preserved');
+});
+
+// ---- …and the healing SAYS WHAT IT COST (C15) -------------------------------
+//
+// Every drop above is correct and every one of them was silent, and main.js
+// then persisted the healed store on the first paint — which is what turned a
+// display defect into data loss, because until that write the dropped records
+// were still on disk. The report is what lets the boot path refuse to write
+// and name what is missing.
+
+t('a clean store reports no loss at all', () => {
+  const report = {};
+  normalizeStore(JSON.parse(JSON.stringify(threeSystems())), report);
+  assert.equal(report.any, false, 'a library that loads whole must not raise a notice');
+  assert.deepEqual([report.overflow, report.duplicates], [[], []]);
+  assert.deepEqual([report.unreadable, report.pools], [0, 0]);
+});
+
+t('the report NAMES the profiles that did not fit, rather than counting them', () => {
+  const report = {};
+  const store = normalizeStore({
+    profiles: Array.from({ length: MAX_PROFILES + 3 }, (_, i) => ({ id: `p${i}`, name: `P${i}` })),
+  }, report);
+  assert.equal(profilesOf(store).length, MAX_PROFILES, 'the store is unchanged by reporting');
+  assert.deepEqual(report.overflow, ['P32', 'P33', 'P34'],
+    'a count is a number the player cannot check; these are the same fact they can');
+  assert.equal(report.any, true);
+});
+
+t('duplicates, unreadable records and over-cap pools each report separately', () => {
+  const report = {};
+  normalizeStore({
+    profiles: [
+      { id: 'pa', name: 'A', pools: Array.from({ length: MAX_POOLS + 4 }, (_, i) => pool(`X${i}`)) },
+      { id: 'pb', name: 'a' },            // collapses into 'A'
+      null, { name: '   ' },              // never could have been a profile
+    ],
+  }, report);
+  assert.deepEqual(report.duplicates, ['a']);
+  assert.equal(report.unreadable, 2);
+  assert.equal(report.pools, 4, 'pools dropped from a profile that DID survive still count');
+  assert.equal(report.any, true);
+});
+
+t('a version we do not know is reported but is NOT a loss', () => {
+  // C22 owns reading this. What must not happen meanwhile is a data-loss
+  // notice over a key that loaded every byte it had — the version differing is
+  // not, by itself, anything the player lost.
+  const report = {};
+  normalizeStore({ v: 99, profiles: [{ id: 'pa', name: 'A' }] }, report);
+  assert.equal(report.version, 99);
+  assert.equal(report.any, false, 'a differently-versioned key that loads whole lost nothing');
+  const same = {};
+  normalizeStore({ v: 1, profiles: [{ id: 'pa', name: 'A' }] }, same);
+  assert.equal(same.version, null, 'our own version is not news');
+});
+
+t('normalizeStore without a report behaves exactly as it always did', () => {
+  const raw = { profiles: [{ id: 'pa', name: 'A' }, { id: 'pb', name: 'a' }, null] };
+  assert.deepEqual(
+    normalizeStore(JSON.parse(JSON.stringify(raw))),
+    normalizeStore(JSON.parse(JSON.stringify(raw)), {}),
+    'the report is an out-parameter, never an input to the result',
+  );
+});
+
+// ---- restore: a whole library rebuilt from a file (C15 / CUJ13) -------------
+//
+// The three defects this exists to remove, each pinned below:
+//   1. `Add all N` dedupes, so a restored 'Nessa' lands as 'Nessa 2'.
+//   2. It adds INTO a library that already holds a dealt profile, so 32 of 32
+//      lands 31.
+//   3. Nothing carries the file's `profile:` pointer, so the wrong character
+//      is in hand at the end.
+
+const wire = (name, system = 'soul-deal', pools = [pool('X')]) => ({ name, system, pools });
+
+t('rebuildStore keeps the file\'s names EXACTLY — no uniqueName anywhere', () => {
+  const got = rebuildStore([wire('Nessa'), wire('Bram'), wire('Nessa 2')]);
+  assert.equal(got.ok, true, got.error);
+  assert.deepEqual(names(profilesOf(got.store)), ['Nessa', 'Bram', 'Nessa 2'],
+    'the whole point: a restore that renames has not restored anything');
+});
+
+t('a full 32-profile file fits exactly, because it starts from empty', () => {
+  const file = Array.from({ length: MAX_PROFILES }, (_, i) => wire(`P${i}`));
+  const got = rebuildStore(file);
+  assert.equal(got.ok, true, got.error);
+  assert.equal(profilesOf(got.store).length, MAX_PROFILES, 'all 32, not 31');
+  // and one more is refused out loud rather than landing 32 of 33
+  const over = rebuildStore([...file, wire('P32')]);
+  assert.equal(over.ok, false);
+  assert.ok(over.error.includes('33'), over.error);
+  assert.ok(over.error.includes(String(MAX_PROFILES)), over.error);
+});
+
+t("the file's `profile:` key decides what is in hand", () => {
+  const got = rebuildStore([wire('Nessa'), wire('Bram'), wire('Tola')], { activeName: 'Bram', now: 500 });
+  assert.equal(got.ok, true, got.error);
+  assert.equal(activeProfile(got.store).name, 'Bram');
+  assert.equal(got.named, true);
+  assert.equal(activeProfile(got.store).at, 500, 'the one in hand is the only thing with a time on it');
+  assert.equal(profilesOf(got.store).find((p) => p.name === 'Nessa').at, 0,
+    'a file records no recency, so inventing an order would make profilesFor sort by a fiction');
+});
+
+t('a file naming no profile in hand hands back the first, and says so', () => {
+  for (const asked of [null, '', '   ', 'Nobody']) {
+    const got = rebuildStore([wire('Nessa'), wire('Bram')], { activeName: asked });
+    assert.equal(got.ok, true, got.error);
+    assert.equal(activeProfile(got.store).name, 'Nessa', JSON.stringify(asked));
+    assert.equal(got.named, false, 'the caller can tell the pointer was a fallback');
+  }
+});
+
+t('a name repeated across the file is REFUSED, not deduped', () => {
+  // parsePortable enforces uniqueness inside `players:` but not between
+  // `players:` and the `profile:` key naming the top-level rack — verified
+  // 2026-08-14. There is no store this could build that such a file describes,
+  // and renaming one silently is the exact defect C15 removes.
+  const got = rebuildStore([wire('Nessa'), wire('Bram'), wire('nessa')]);
+  assert.equal(got.ok, false);
+  assert.ok(got.error.includes('Nessa'), got.error);
+  assert.ok(got.error.includes('twice'), got.error);
+});
+
+t('rebuildStore refuses a nameless record and an empty file, naming why', () => {
+  assert.equal(rebuildStore([]).ok, false);
+  assert.equal(rebuildStore(null).ok, false);
+  assert.ok(rebuildStore([]).error.includes('no profiles'));
+  const nameless = rebuildStore([wire('Nessa'), { pools: [pool('X')] }]);
+  assert.equal(nameless.ok, false);
+  assert.ok(nameless.error.includes('needs a name'), nameless.error);
+  const hashed = rebuildStore([{ name: 'Bo#b', pools: [] }]);
+  assert.equal(hashed.ok, false, 'a whisper address is refused here as at every other name door');
+});
+
+t('rebuildStore carries system, dice set and pools through untouched', () => {
+  const got = rebuildStore([
+    { name: 'Grix', system: 'dnd', set: 'emberforge.blackanvil', pools: [pool('Longsword', '1d20+4', 'Attacks')] },
+    { name: 'Tray', pools: [pool('d20', '1d20')] },
+  ], { fallbackSystem: 'none' });
+  assert.equal(got.ok, true, got.error);
+  assert.deepEqual(toWire(findProfile(got.store, got.store.profiles[0].id)), {
+    name: 'Grix', system: 'dnd', set: 'emberforge.blackanvil',
+    pools: [{ name: 'Longsword', notation: '1d20+4', category: 'Attacks' }],
+  });
+  assert.equal(profilesOf(got.store)[1].system, 'none',
+    'a record naming no system takes the table it is being restored at');
+});
+
+t('rebuildStore touches nothing outside the store it returns', () => {
+  // It is a pure builder on purpose: the caller writes the result to disk and
+  // only then points the app at it, so a browser that refuses the write leaves
+  // the old library whole in memory AND on disk.
+  const mine = threeSystems();
+  const before = JSON.parse(JSON.stringify(mine));
+  const got = rebuildStore([wire('Nessa')]);
+  assert.equal(got.ok, true, got.error);
+  assert.deepEqual(mine, before, 'no live store was mutated');
+  assert.notEqual(got.store, mine);
+});
+
+t('a rebuilt store is a fixed point under normalizeStore', () => {
+  // The restore writes this to the boot key, so the next boot must read back
+  // exactly what was written — a rebuild that normalized to something smaller
+  // would lose characters on the reload after the restore, which is the
+  // failure mode this whole item exists to close.
+  const got = rebuildStore([wire('Nessa'), wire('Bram', 'dnd')], { activeName: 'Bram', now: 7 });
+  const report = {};
+  const back = normalizeStore(JSON.parse(JSON.stringify(got.store)), report);
+  assert.equal(report.any, false, 'nothing the restore wrote is unreadable on the way back in');
+  assert.deepEqual(names(profilesOf(back)), ['Nessa', 'Bram']);
+  assert.equal(activeProfile(back).name, 'Bram');
 });
 
 // ---- migration gains data (claim 4) ----------------------------------------

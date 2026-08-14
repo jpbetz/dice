@@ -5690,3 +5690,46 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
 #seat-mine.hidden { display: none; }
 #seat-mine-rows { display: flex; flex-direction: column; gap: 6px; }
 .seat-btn.seat-deal { border-style: dashed; }
+
+/* ---------- C15 / CUJ13: the restore verb (#import-replace) ----------
+   Appended as its own block rather than folded into the .pp-* rules above:
+   the import zone is being edited by other hands this week, and a new rule
+   that only ever adds is a merge that cannot lose an existing one.
+
+   The row wraps because the armed state is THREE things wide — the sentence
+   naming what dies, Download, and the commit — and on a narrow settings pane
+   the sentence must be allowed to take its own line rather than squeezing the
+   two controls into stubs (the .pp-row / roster-pill failure). `order` puts
+   the sentence first in the reading, whatever the wrap does. */
+#import-replace-zone {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+#import-replace-zone > .hidden { display: none; }
+#import-replace-what {
+  flex: 1 1 100%;
+  order: -1;
+  color: var(--amber);
+}
+/* Quiet at rest, red at the moment of aim — the .pp-del tier's rule, and the
+   same dress #corner-clear.armed wears, so the two-step arm reads as ONE
+   grammar wherever the app uses it. Not a hover-only red: this button's rest
+   state is an ordinary verb and its ARMED state is the destructive one. */
+#import-replace:hover { color: var(--red); border-color: rgba(226, 73, 59, 0.5); }
+#import-replace.armed {
+  color: #fff;
+  border-color: var(--red);
+  background: rgba(226, 73, 59, 0.30);
+}
+/* The skipped-section prefix (PROFILES §3.1: "the warning must reach the
+   preview status line, not vanish"). Amber, the same as .warn — because it IS
+   the same news, that this version could not read part of what you gave it —
+   but a SEPARATE class, because .warn is what portableVerdict().ok reads to
+   decide whether the load failed. A skipped section is not a failed load: the
+   file parsed, Apply is legitimately armed, and painting .warn would make the
+   pane's own verdict call a success a refusal. The ⚠ and the count carry the
+   read; the class carries only the colour. */
+.portable-status.caution { color: var(--amber); }

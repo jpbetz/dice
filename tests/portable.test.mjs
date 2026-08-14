@@ -666,5 +666,73 @@ t('profileToImport hands planImport a whole parsed shape, settings included', ()
   assert.deepEqual([none.adds.length, none.updates.length, none.unchanged], [0, 0, 0]);
 });
 
+// ---- the name uniqueness the RESTORE leans on (C15 / CUJ13) -----------------
+
+t('a repeated PLAYER is refused at its line — uniqueness inside players: holds', () => {
+  const parsed = parsePortable([
+    'players:',
+    "  'Nessa':", '    pools:',
+    "  'Nessa':", '    pools:',
+  ].join('\n'));
+  assert.equal(parsed.ok, false);
+  assert.equal(parsed.line, 4);
+  assert.ok(parsed.error.includes('appears twice'), parsed.error);
+});
+
+t('but `profile:` and `players:` are NOT unique BETWEEN them — the seam, pinned', () => {
+  // ROADMAP C15 claims "the file's names are already unique by parsePortable"
+  // and hangs a whole-library REPLACE on it. Inside `players:` that is true
+  // (above). The `profile:` key naming the top-level rack is a fourth name
+  // with no cross-check against it, so a hand-edited file can legally offer
+  // the same character twice — verified 2026-08-14, and the reason
+  // js/profiles.js's rebuildStore REFUSES such a file rather than trusting the
+  // claim and silently landing a 'Nessa 2'. This test stands so that the day
+  // the parser closes the seam, that refusal is known to have become dead code
+  // rather than discovered as it years later.
+  const parsed = parsePortable([
+    'profile:', "  name: 'Nessa'",
+    'players:', "  'Nessa':", '    pools:',
+    'pools:', '  Pools:', "    - 'A': '1d6'",
+  ].join('\n'));
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal(parsed.profile.name, 'Nessa');
+  assert.deepEqual(parsed.profiles.map((p) => p.name), ['Nessa'],
+    'both sections name the same character and the parser is content');
+});
+
+t("this app's own export can never produce that collision", () => {
+  // `profile:` is the rack in hand and `players:` is everyone ELSE (main.js
+  // filters the active id out), so the two sections are disjoint by
+  // construction — which is why the seam has never been reachable from a file
+  // this app wrote, only from one a person edited.
+  const text = exportYaml({
+    groups: [{ id: 1, name: 'Body', notation: '3d6' }],
+    profile: { name: 'Nessa', system: 'soul-deal' },
+    profiles: [
+      { name: 'Bram', system: 'soul-deal', groups: [{ name: 'Grit', notation: '2d8' }] },
+      { name: 'Tola', system: 'dnd', groups: [] },
+    ],
+  });
+  const parsed = parsePortable(text);
+  assert.equal(parsed.ok, true, parsed.error);
+  // the merged list a restore would rebuild from: the top-level rack, then the
+  // seats — exactly what main.js's importableProfiles() assembles
+  const all = [parsed.profile.name, ...parsed.profiles.map((p) => p.name)];
+  assert.deepEqual(all, ['Nessa', 'Bram', 'Tola']);
+  assert.equal(new Set(all.map((s) => s.toLowerCase())).size, all.length, 'no duplicate to refuse');
+});
+
+t('an empty document refuses, exactly as a comments-only one does', () => {
+  // The two used to disagree at the FILE door — a comments-only file refused
+  // and a zero-byte file read as a clean, silent success (blank box, blank
+  // status, verdict ok). The parser has always agreed with itself here; C15
+  // makes main.js's file door agree with the parser.
+  for (const text of ['', '   \n\n', '# just a comment\n', '#\n# two\n']) {
+    const parsed = parsePortable(text);
+    assert.equal(parsed.ok, false, JSON.stringify(text));
+    assert.equal(parsed.line, 0);
+  }
+});
+
 if (process.exitCode) process.exit(process.exitCode);
 console.log(`all ${n} portable tests pass`);

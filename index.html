@@ -1262,6 +1262,22 @@ limitations under the License.
                 <button id="import-adopt-all" class="btn tiny"
                         title="Add every profile in this file to your library">Add all</button></span>
               <div id="import-profile-rows"></div>
+              <!-- C15 / CUJ13 — RESTORE, and deliberately NOT a sharper Apply.
+                   Apply merges the file's top-level pools: and deletes nothing,
+                   which is what makes it safe to press on a rack you care
+                   about; this one puts the file where your library is, so it is
+                   separately named, two-step in place (js:import-replace), and
+                   its armed state NAMES the profiles it is about to delete
+                   rather than counting them. Download stands inside the armed
+                   state, first, because the thing being replaced may be the
+                   only copy there has ever been. -->
+              <div id="import-replace-zone">
+                <span id="import-replace-what" class="hint hidden"></span>
+                <button id="import-replace-download" class="btn tiny hidden"
+                        title="Write your library to a file before it is replaced">Download first</button>
+                <button id="import-replace" class="btn tiny"
+                        title="Put this file's profiles in place of your library">Replace my library…</button>
+              </div>
             </div>
           </div>
         </div>
