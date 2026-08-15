@@ -5063,6 +5063,23 @@ own claims is the more valuable half**, and is collected at the end.*
   independently claimed §7.45. Every one of them read the line before writing —
   they were reading eight different copies of it.
 
+- **Walking to another table never said goodbye** — found by
+  `journey-split-the-party` *after* the batch, and pre-existing for every
+  `gotoTable` caller. `gotoTable` is a real page load, and Chrome fires
+  `pagehide` with **`persisted: true`** for it; the beacon handler returns early
+  on `persisted` **by design** (a restored bfcache page must keep its seat), so
+  no `/api/leave` was ever sent. The walker's pill stood on the old roster until
+  the liveness sweep reaped it ~75 s later, **with no `left` line on the server
+  at all** — while `renderPlayers`' own rationale claims the opposite ("when
+  three of five players walk into a breakout, this row loses three pills").
+  **The first fix was wrong in an instructive way:** copying `leaveToLobby`'s
+  awaited `leave({immediate:true})` broke three scenarios outright, because an
+  awaited POST either delays a navigation or, on rejection, replaces it. The
+  page is leaving, so the transport must be the one that survives a teardown and
+  cannot be awaited — `leave()`'s `sendBeacon`. It is also the right semantics:
+  the soft beacon drops the stream and leaves the SEAT on the ordinary grace,
+  because walking to a breakout and back is a round trip, not a resignation.
+
 ## What the roadmap and the audits got WRONG, verified against the tree
 
 *This is the durable half. Every entry below was written from a reading that
