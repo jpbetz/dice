@@ -17759,6 +17759,11 @@ export const scenarios = [
       const copied = (await a.eval(`window.__copied`))[0];
       assert.ok(copied.includes(`room=${encodeURIComponent(ctx.room)}`),
         `what it copied is this table's link (got: ${copied})`);
+      // The announcement lands one microtask after the clipboard write resolves,
+      // so it is waited for rather than read — the label swap a button gets is
+      // not a channel a key press has, and this IS the feedback.
+      await a.waitFor(`!!document.getElementById('sr-live').textContent`,
+        { desc: 'the copy is announced' });
       assert.equal(await a.eval(`document.getElementById('sr-live').textContent`),
         'Invite link copied', 'and it is announced, not only pasted');
 
@@ -18012,6 +18017,14 @@ export const scenarios = [
 
         // THE LONGEST LABEL — where the column actually runs out of pixels, and
         // the only width at which this assertion discriminates.
+        //
+        // IT CLEARS BY ONE PIXEL, and that is the shipped margin rather than a
+        // loose test: the stylesheet's own arithmetic budgets 42px for `10d10x`
+        // at 12.5px and it measures 51 here, so the "ends at 50, lane starts at
+        // 52" it claims is really "ends at 51". If this ever fails, read the two
+        // numbers in the message before touching the markup — a different system
+        // UI font is a likelier cause than a regression, and the answer would be
+        // to buy margin in the stylesheet, not to soften this.
         for (let i = 0; i < 10; i++) await a.dbg(`railTapDie('d10x')`);
         const worst = await rowGeo('10d10x');
         assert.equal(worst.cell, true, 'the widest row is staged too');
