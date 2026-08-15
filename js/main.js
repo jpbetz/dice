@@ -90,12 +90,43 @@ const IN_LOBBY = ROOM === null;
 // they paint now depends on the channel. Down beside the other LS_ constants
 // this would be in TDZ when they read it.
 const LS_STABILITY = 'dice.stability.v1';
+// THE MIRROR LANE (js/stability.js header). The enrolment is held twice —
+// localStorage and a same-name cookie — because the single key was lost in
+// the field on day one (Joe, 2026-08-14) with every neighbouring key intact,
+// and the loss is silent: a beta tester demoted to production with nothing
+// on screen to say why. Two lanes heal each other at boot; the server never
+// reads the cookie.
+const stabilityMirror = () => {
+  try {
+    const m = document.cookie.match(/(?:^|;\s*)dice\.stability\.v1=([^;]*)/);
+    return m ? m[1] : null;
+  } catch { return null; /* a browser that will not cookie is one lane down, not out */ }
+};
+const setStabilityMirror = (v) => {
+  // 'beta' (re)lays it; '' expires it — a stable resolution takes the mirror
+  // out so a revoked beta cannot come back from a stale cookie. Re-laid on
+  // every beta boot, not once: Safari ages script-set cookies out in days.
+  try {
+    document.cookie = v
+      ? `dice.stability.v1=${v}; max-age=31536000; path=/; SameSite=Lax`
+      : 'dice.stability.v1=; max-age=0; path=/';
+  } catch { /* ignore */ }
+};
+// False only when a beta enrolment landed in NEITHER lane — the one case
+// where "you are in the beta" is true today and silently gone tomorrow. The
+// boot says so below, once, instead of letting tomorrow do the explaining.
+let STABILITY_HELD = true;
 const STABILITY = (() => {
   let stored = null;
   try { stored = localStorage.getItem(LS_STABILITY); } catch { /* a browser that will not store is production */ }
   const url = new URL(window.location.href);
-  const d = resolveChannel({ stored, param: url.searchParams.get(STABILITY_PARAM) });
-  if (d.write) { try { localStorage.setItem(LS_STABILITY, d.write); } catch { /* ignore */ } }
+  const d = resolveChannel({
+    stored,
+    mirror: stabilityMirror(),
+    param: url.searchParams.get(STABILITY_PARAM),
+  });
+  if (d.write) { try { localStorage.setItem(LS_STABILITY, d.write); } catch { /* the read-back below is the judge */ } }
+  if (d.mirror !== null) setStabilityMirror(d.mirror);
   if (d.strip) {
     // REDEEMED, THEN GONE. The param is a key, not a setting: leaving it in
     // the bar would put user state back in the URL (GOALS §7 dropped `#g=`
@@ -104,9 +135,24 @@ const STABILITY = (() => {
     url.searchParams.delete(STABILITY_PARAM);
     try { history.replaceState(null, '', url.pathname + url.search + url.hash); } catch { /* ignore */ }
   }
+  if (d.channel === 'beta') {
+    // READ BACK, never trust the writes: quota, private mode and blocked
+    // cookies all fail inside a catch up there. Held by either lane is held.
+    let ls = null;
+    try { ls = localStorage.getItem(LS_STABILITY); } catch { /* ignore */ }
+    STABILITY_HELD = ls === 'beta' || stabilityMirror() === 'beta';
+  }
   return d.channel;
 })();
 const IS_BETA = STABILITY === 'beta';
+if (!STABILITY_HELD) {
+  // Deferred one task: announce() and the report hook exist by then, and a
+  // notice about NEXT boot has no business racing THIS boot's chrome.
+  setTimeout(() => {
+    announce('This browser could not save the beta opt-in — it lasts only until this tab closes.');
+    try { if (window.__diceReport) window.__diceReport('stability: beta opt-in held by neither lane'); } catch { /* ignore */ }
+  }, 0);
+}
 
 // Mat extents — LET, not const: the room-wide zoom setting resizes the mat
 // live (walls, shelf pitch, camera framing all follow). The base values here
@@ -8196,8 +8242,20 @@ const BETA_ROWS = ['venue-row', 'venue-picker', 'tower-row', 'tower-picker'];
 // dead the next time the other owner runs — a fantasy venue going down would
 // have handed a production player the tower picker. A shared predicate is
 // why that cannot happen.
+//
+// BETA IS OFFERED EVERYTHING, ALWAYS (Joe, 2026-08-14: "the whole idea was
+// to make it so beta gives access to everything"). The venue's row-taking is
+// PRODUCTION chrome only. As first shipped, the fantasy register hid every
+// row it staged on every channel — and, by straight bug, its own picker with
+// them — so a beta tester stood in an empty Staging destination with no way
+// out of the glade short of the console, and read it as the beta being
+// revoked. On beta the pickers stay so towers and felts can be judged INSIDE
+// a venue, which is the loop the closed beta exists for; a choice the glade
+// is currently staging over (felt, dice art) simply shows its effect when
+// the venue comes down.
 function panelRowShown(rowId) {
   if (!IS_BETA && BETA_ROWS.includes(rowId)) return false;
+  if (IS_BETA) return true;
   const venue = VENUES[currentVenue] || VENUES.table;
   return venue.register !== 'fantasy';
 }
@@ -8222,13 +8280,20 @@ function updateVenueChrome() {
   // as a bug to anybody who does not already know the rule. Two lines because
   // the controls now live in two destinations: felt and tower under Staging,
   // dice set under You.
-  const said = fantasy ? `${venue.label} stages this — felt, tower and dice are its own.` : '';
+  //
+  // PRODUCTION ONLY, both lines: the note explains an ABSENCE, and on beta
+  // nothing is absent (panelRowShown — beta is offered everything). On beta
+  // it would also be a line the panel cannot afford: Staging with every row
+  // AND a note is the §7.36 measurement's worst case, and the note is the
+  // part with no job.
+  const noted = fantasy && !IS_BETA;
+  const said = noted ? `${venue.label} stages this — felt, tower and dice are its own.` : '';
   for (const id of ['venue-staged', 'venue-staged-you']) {
     const el = document.getElementById(id);
     if (!el) continue;
-    el.textContent = id === 'venue-staged-you' && fantasy
+    el.textContent = id === 'venue-staged-you' && noted
       ? `${venue.label} chooses the dice too.` : said;
-    el.classList.toggle('hidden', !fantasy);
+    el.classList.toggle('hidden', !noted);
   }
 }
 
@@ -12149,9 +12214,17 @@ window.__diceDebug = {
   // `offers` is what the channel actually gates, so an assertion can read
   // the CONSEQUENCE rather than re-deriving it from the channel name.
   stability() {
+    // `stored`/`mirror` are LIVE reads, not the boot's snapshot: "what does
+    // this browser hold RIGHT NOW" is the diagnostic question when an
+    // enrolment goes missing, and the boot's copy cannot answer it.
+    let stored = null;
+    try { stored = localStorage.getItem(LS_STABILITY); } catch { /* ignore */ }
     return {
       channel: STABILITY,
       beta: IS_BETA,
+      held: STABILITY_HELD,
+      stored,
+      mirror: stabilityMirror(),
       offers: { staging: IS_BETA, tower: IS_BETA, venue: IS_BETA },
       gated: [...BETA_SETTINGS],
     };

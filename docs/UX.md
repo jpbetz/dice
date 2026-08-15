@@ -4707,6 +4707,20 @@ so room state cannot pass through it even by mistake. A browser that leaves
 the beta stops socketing a tower whose picker it can no longer reach; nothing
 is erased, and redeeming the link again restores the lot.
 
+**Beta is offered everything, always (2026-08-14).** Goal 13's full-set
+replacement — a fantasy venue takes the felt/dice rows it stages, with the
+`venue-staged` note saying what took them — is PRODUCTION chrome only (the
+goal carries the scoping note). On beta no row is ever taken, venue up or
+down, and the note stays hidden because it explains an absence and nothing is
+absent; that is also what keeps Staging inside §7.37's measurement in its new
+fullest configuration (every row and a raised venue — measured in
+`stability-gate`, 0px over). As first shipped the replacement ran on every
+channel and `panelRowShown`'s fantasy check answered for ALL rows — including
+`venue-picker` itself, despite `updateVenueChrome`'s comment declaring the
+venue never hides its own picker — so a beta tester in Moonrise Glade got an
+EMPTY Staging destination: beta tag up, channel intact, no way back out short
+of the console, reported (reasonably) as "my beta opt-in got cleared."
+
 **Felt stays in Staging, and that was a measurement.** Felt is room-wide, so
 blast radius alone (§7.37) argues it belongs in Table once no venue is on
 offer to own it. Moved there it stood **483px against a 459px panel** — 24px
@@ -4728,13 +4742,31 @@ share flow hands out `location.href`). It also survives the schema purge,
 because it is an entitlement rather than app state and its loss would be
 silent.
 
+**The enrolment is held twice (2026-08-14, same day).** The single
+localStorage key was lost in the field on the feature's first day — every
+neighbouring key intact, the tester silently demoted, exactly the failure the
+purge-exemption note predicted. So redemption now lays the key AND a
+same-name, same-origin cookie, and every boot heals whichever lane is missing
+from the other (`js/stability.js`, the mirror-lane header). The mirror
+carries only `beta` — keyless is production, and any stable resolution
+clears the cookie so a revoked beta cannot be resurrected by a stale one.
+The server still never reads it. A boot that resolves beta but can persist
+to *neither* lane says so once (`announce` + a field report) instead of
+letting the next boot do the explaining, and
+`__diceDebug.stability()` now reports `{stored, mirror, held}` live so "why
+is this browser stable" is one console call.
+
 **Testing.** Every harness tab is a beta tab; the stable population is reached
-by `clean: ['dice.stability.v1']` (a browser that has never heard of the beta)
-or `query: '&stability=stable'`. `stability-gate` is the scenario, and its
+by `clean: ['dice.stability.v1']` (a browser that has never heard of the beta
+— `clean` expires the mirror cookie along with the key) or
+`query: '&stability=stable'`. `stability-gate` is the scenario, and its
 expensive leg — two tabs, one room, one pour, both films compared — is the
 point rather than the overhead: the obvious wrong implementation passes every
 visibility assertion in the file and breaks the table only when two people are
-watching.
+watching. `stability-persist` is the boot AFTER redemption — the one the
+beta-by-default suite structurally never ran — plus the field loss replayed
+(store deleted, mirror heals) and the resurrection check (revoke, then lose
+the store: still production).
 
 ### 7.39 The door on the phone it is designed for (2026-08-14)
 

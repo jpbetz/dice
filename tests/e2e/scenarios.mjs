@@ -172,7 +172,15 @@ async function bootTab(ctx, {
       // this line, and `clean: ['dice.stability.v1']` produces the population
       // that matters most, a browser that has never heard of the beta.
       `localStorage.setItem('dice.stability.v1','beta');`,
-      ...clean.map((k) => `localStorage.removeItem(${JSON.stringify(k)});`),
+      // clean expires the same-named COOKIE too, not just the key: the
+      // stability channel holds its enrolment in both lanes (js/stability.js,
+      // the mirror), cookies OUTLIVE scenarios on a shared origin exactly the
+      // way localStorage does, and a leaked mirror would silently re-enrol
+      // the "browser that has never heard of the beta" this option exists to
+      // produce. Expiring a cookie that was never set is a no-op, so every
+      // cleaned key pays the one line whether it has a mirror or not.
+      ...clean.map((k) => `localStorage.removeItem(${JSON.stringify(k)});`
+        + ` document.cookie = ${JSON.stringify(`${k}=; max-age=0; path=/`)};`),
       ...Object.entries(seed).map(([k, v]) => `localStorage.setItem(${JSON.stringify(k)}, ${JSON.stringify(v)});`),
     ];
     if (lines.length) {
@@ -11175,6 +11183,34 @@ export const scenarios = [
       await beta.dbg("setVenue('moonrise')");
       await prod.waitFor(`window.__diceDebug.venueInfo().id === 'moonrise'`,
         { desc: 'the production client follows the room into the glade' });
+      // BETA IS OFFERED EVERYTHING, ALWAYS (Joe, 2026-08-14: "the whole idea
+      // was to make it so beta gives access to everything"). The venue's
+      // row-taking is PRODUCTION chrome: on stable, a fantasy venue removes
+      // the rows it stages and the note says what took them; on beta,
+      // nothing is ever taken — venue up or down, every picker stands, and
+      // the note stays down because nothing is absent to explain. What
+      // shipped instead hid every staged row on every channel, and — by
+      // straight bug — the venue's own picker with them, so a beta tester
+      // stood in an EMPTY Staging destination: beta chrome up, channel
+      // intact, nothing left to choose with, and no way out of the glade
+      // short of the console. It read exactly like the beta being revoked,
+      // which is how it was reported.
+      await beta.dbg('openSettings("staging")');
+      for (const id of ['venue-picker', 'tower-picker', 'felt-swatches']) {
+        assert.notEqual(await beta.eval(`document.getElementById('${id}').offsetParent`), null,
+          `${id} is still offered while the glade is up — beta gives access to everything`);
+      }
+      assert.equal(await beta.eval(
+        `getComputedStyle(document.getElementById('venue-staged')).display`), 'none',
+      'and the staged note stays down on beta — it explains an absence, and nothing is absent');
+      // §7.36's measurement on the fullest Staging there is: every row AND a
+      // raised venue. The panel is at its cap and this is the configuration
+      // nobody measured.
+      const gladeOver = await beta.eval(`(() => {
+        const p = document.getElementById('settings-panel');
+        return Math.max(0, p.scrollHeight - p.clientHeight);
+      })()`);
+      assert.equal(gladeOver, 0, `Staging does not scroll with the glade up on beta (${gladeOver}px over)`);
       await prod.dbg('openSettings("staging")');
       // SHOWN *AND* SAYING SOMETHING. `display` alone passes an empty note —
       // the element's visibility and its text are set by two different lines,
@@ -11190,9 +11226,15 @@ export const scenarios = [
         + 'control that vanishes stops being a defect');
       assert.match(note.text, /Moonrise Glade/,
         `…and it names the venue that took them (${JSON.stringify(note.text)})`);
-      await beta.dbg("setVenue('table')");
+      // Back out THROUGH THE PICKER, not the debug hook: the row surviving
+      // its own venue is only worth asserting if the way back out actually
+      // walks. (This click was impossible on the shipped build — the door
+      // it uses did not exist.)
+      await beta.eval(
+        `document.querySelector('#venue-picker [data-venue="table"]').click(); true`);
       await prod.waitFor(`window.__diceDebug.venueInfo().id === 'table'`,
         { desc: 'and back out again' });
+      await beta.dbg('closeSettingsModal()');
       for (const id of ['venue-picker', 'tower-picker']) {
         assert.equal(await prod.eval(`document.getElementById('${id}').offsetParent`), null,
           `${id} is STILL gone after a venue came and went — the channel's hide must `
@@ -11246,6 +11288,88 @@ export const scenarios = [
       assert.equal(await back.eval(`document.getElementById('tower-picker').offsetParent`), null,
         'and the panel obeys the param on the very boot that carried it — the revoke '
         + 'link has to SHOW you production, not merely promise it for next time');
+    },
+  },
+  {
+    name: 'stability-persist',
+    tags: ['settings', 'stability'],
+    // THE ENROLMENT SURVIVES TOMORROW (js/stability.js, the mirror lane).
+    // stability-gate proves redemption; nothing proved the boot AFTER it,
+    // because every harness tab is seeded beta per document — a suite-wide
+    // default that makes persistence bugs structurally invisible (the
+    // green-check ledger's shape: the assertion that matters is the one the
+    // environment quietly answers for you). This scenario is that boot, in
+    // the one place the harness allows it: a same-tab reload, where the
+    // one-shot seed guard has already fired and storage is exactly what the
+    // app left behind.
+    //
+    // And then the FIELD LOSS. On the feature's first day (Joe, 2026-08-14)
+    // a browser lost the enrolment with every neighbouring key intact and
+    // nothing on screen to say why — the exact silent demotion the purge
+    // exemption note predicted. The mirror lane exists for that browser, so
+    // the leg that deletes the store and still boots beta is the assertion
+    // that FAILS on the single-lane build and is the point of the file.
+    async fn(ctx) {
+      // ---- ① redeem, and both lanes hold it -----------------------------
+      const t = await tableTab(ctx, {
+        origin: '127.0.0.24',
+        query: '&stability=beta',
+        seed: { 'dice.name.v1': 'Kit' },
+        clean: ['dice.stability.v1'], // a browser that never heard of the beta — both lanes
+      });
+      await t.waitOnline();
+      assert.equal((await t.dbg('stability()')).channel, 'beta', 'the link redeemed');
+      assert.equal(await t.eval(`localStorage.getItem('dice.stability.v1')`), 'beta',
+        'the store holds it');
+      assert.equal(await t.eval(`document.cookie.includes('dice.stability.v1=beta')`), true,
+        'and the mirror holds it too — the second lane is laid at redemption, '
+        + 'not on some later boot that may never come');
+
+      // ---- ② the boot after: no param, no seed, just what was kept ------
+      // The address bar was stripped at redemption; t.url still carries the
+      // param and reload() navigates to t.url, so strip it here or the
+      // "second boot" would quietly re-redeem — the exact self-deception
+      // this scenario exists to end.
+      t.url = t.url.replace('&stability=beta', '');
+      await t.reload();
+      const day2 = await t.dbg('stability()');
+      assert.equal(day2.channel, 'beta',
+        'the enrolment survives a boot whose URL carries nothing — opt in once, stay in');
+      assert.equal(day2.held, true, 'and the boot read it back, not merely assumed it');
+      await t.dbg('openSettings("staging")');
+      assert.notEqual(await t.eval(`document.getElementById('tower-picker').offsetParent`), null,
+        'the offer is standing on the second boot — the user-visible half of "remembered"');
+      await t.dbg('closeSettingsModal()');
+
+      // ---- ③ the field loss: the store dies, the mirror answers ---------
+      await t.eval(`localStorage.removeItem('dice.stability.v1'); true`);
+      await t.reload();
+      const healed = await t.dbg('stability()');
+      assert.equal(healed.channel, 'beta',
+        'losing the localStorage key no longer demotes the browser — the 2026-08-14 loss, healed');
+      assert.equal(healed.stored, 'beta',
+        '…and the store was put back, so the browser is whole again, not limping on one lane');
+
+      // ---- ④ revocation is total, and stays revoked ---------------------
+      // A fresh tab, same origin, same cookie jar: the harness's beta seed
+      // matches the state this browser is already in, and the param revokes.
+      const out = await tableTab(ctx, {
+        origin: '127.0.0.24',
+        query: '&stability=stable',
+        seed: { 'dice.name.v1': 'Kit' },
+      });
+      await out.waitOnline();
+      assert.equal((await out.dbg('stability()')).channel, 'stable', 'the revoke landed');
+      assert.equal(await out.eval(`document.cookie.includes('dice.stability.v1')`), false,
+        'and the mirror went with it — a stale cookie must not be able to re-enrol');
+      // The resurrection check: lose the store AFTER revoking. A keyless,
+      // cookieless browser is production; the beta must not come back.
+      await out.eval(`localStorage.removeItem('dice.stability.v1'); true`);
+      out.url = out.url.replace('&stability=stable', '');
+      await out.reload();
+      assert.equal((await out.dbg('stability()')).channel, 'stable',
+        'a revoked browser that then loses its store boots production, not beta — '
+        + 'the mirror heals enrolment, never revocation');
     },
   },
   {
@@ -14124,11 +14248,18 @@ export const scenarios = [
         + ` return c && c.colors && c.mean.join(',') === ${JSON.stringify(woodMoon.mean.join(','))}; })()`,
         { desc: 'and back — the moonrise wood returns' });
 
-      // ---- goal 13: the venue REPLACES the pickers ------------------------
+      // ---- goal 13's replacement is PRODUCTION chrome (2026-08-14) --------
+      // This tab is a harness tab and every harness tab is BETA — and beta
+      // is offered everything, venue up or down (goal 13's scoping note:
+      // "the whole idea was to make it so beta gives access to everything").
+      // The original form of this leg asserted the rows GONE on this same
+      // tab, which was the superseded law; the production half of the
+      // replacement lives in stability-gate, on a tab that is actually
+      // production.
       for (const id of ['felt-swatches', 'tower-picker', 'diceset-row']) {
-        assert.equal(await a.eval(
+        assert.notEqual(await a.eval(
           `(window.__diceDebug.openSettings(), getComputedStyle(document.getElementById('${id}')).display)`),
-        'none', `${id} is gone from settings while the venue is fantasy`);
+        'none', `${id} is still offered to a beta browser while the venue is fantasy`);
       }
 
       // ---- the table still rolls in the glade -----------------------------
@@ -14143,7 +14274,7 @@ export const scenarios = [
       await b.waitFor(`!window.__diceDebug.venueInfo().staged`, { desc: 'and on B' });
       assert.equal(await a.eval(
         `getComputedStyle(document.getElementById('felt-swatches')).display`) !== 'none', true,
-      'the felt picker returns with the room');
+      'the felt picker is still standing once the room returns');
     },
   },
 
