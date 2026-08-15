@@ -6456,7 +6456,12 @@ export const scenarios = [
         const roots = ['#left-panel', '#rail', '#kbd-overlay', '#mods-popover',
                        '#settings-modal', '#cmd-cheatsheet', '#identity-menu',
                        '#help-overlay',
-                       // the RESULT surfaces (2026-08-15) — where the words are
+                       // the RESULT surfaces (2026-08-15) — where the words are.
+                       // #status-pill is nested inside #rail and so was already
+                       // reachable; it is named anyway, because the EMPTY guard
+                       // below is per-root and a pill with nothing in it should
+                       // fail this scenario rather than hide inside a root that
+                       // has plenty of other text.
                        '#result-banner', '#ceremony-layer', '#peek-card',
                        '#log-flyout', '#offers-layer', '#offer-menu',
                        '#name-modal', '#status-pill'];
