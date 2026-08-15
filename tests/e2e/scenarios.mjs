@@ -17375,4 +17375,581 @@ export const scenarios = [
         'and the ghost leaves with the fact it was drawing');
     },
   },
+
+  // ==========================================================================
+  // THE U25 / U26 / U28b BATCH (UX §7.45) — the audit's own findings, each one
+  // a surface that said the wrong thing rather than a surface that was missing.
+  // ==========================================================================
+  {
+    name: 'log-row-says-each-pool-once',
+    tags: ['log', 'meanings'],
+    // THE LOG SAID EVERY POOL'S NAME TWICE (U26, audit F3). Two runs stood side
+    // by side — a breakdown run leading each group with its source, and a tally
+    // run leading each group with the SAME source — so reading which die said
+    // what meant cross-referencing two lists of identical words. The fix merges
+    // them into one labelled row per pool.
+    //
+    // WHAT THIS CATCHES that a text-match could not: `tallySrcs` being empty is
+    // the whole claim, and it is empty for two very different reasons — because
+    // the tally merged (right) or because the tally VANISHED (wrong). So the
+    // answers are counted in the same breath, and their POSITION is asserted:
+    // the first pool's answer has to fall between the first label and the
+    // second, which is what "inside its own group" means and what a run parked
+    // at the end of the line would fail.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.160', name: 'Alice' });
+      assert.equal(await a.dbg('system'), 'soul-deal', 'the per-die lens is the default');
+      await a.roll('2d8[Wisdom]+1d6[Zeal]');
+      const rid = await a.rollId();
+      const row = await a.dbg(`logRow(${JSON.stringify(rid)})`);
+      assert.ok(row, 'the row is in the log');
+
+      assert.deepEqual(row.labels, ['Wisdom', 'Zeal'],
+        `each pool is named ONCE, in order (got: ${JSON.stringify(row.labels)})`);
+      assert.deepEqual(row.tallySrcs, [],
+        `and the answer run no longer repeats them (got: ${JSON.stringify(row.tallySrcs)})`);
+      assert.equal(row.answers.length, 2,
+        `one answer per pool — merged, not deleted (got: ${JSON.stringify(row.answers)})`);
+      assert.ok(row.answers.every((x) => x.length),
+        `and each one actually says something (got: ${JSON.stringify(row.answers)})`);
+
+      // THE ANSWER SITS INSIDE ITS OWN POOL'S GROUP. Read off the row's text in
+      // order: Wisdom, its arrow, THEN Zeal. A tally run standing at the end of
+      // the line puts every arrow after every label and fails this.
+      const iW = row.detail.indexOf('Wisdom');
+      const iZ = row.detail.indexOf('Zeal');
+      const iArrow = row.detail.indexOf('→');
+      assert.ok(iW >= 0 && iZ > iW, `the two pools read in order (got: ${row.detail})`);
+      assert.ok(iArrow > iW && iArrow < iZ,
+        `Wisdom's answer is inside Wisdom's group, not parked at the end (got: ${row.detail})`);
+
+      // A LENS SWITCH IS NOT AN ATTRIBUTION SWITCH. D&D computes a total and has
+      // no per-die reading, so the answers go — and the pool names, which are
+      // attribution rather than interpretation, must NOT.
+      await a.dbg(`setSystem('dnd')`);
+      await a.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'the lens changes' });
+      const dnd = await a.dbg(`logRow(${JSON.stringify(rid)})`);
+      assert.deepEqual(dnd.labels, ['Wisdom', 'Zeal'],
+        `the pools are still named under a totals lens (got: ${JSON.stringify(dnd.labels)})`);
+      assert.deepEqual(dnd.answers, [],
+        `and nothing is answered per die (got: ${JSON.stringify(dnd.answers)})`);
+      assert.deepEqual(dnd.tallySrcs, [], 'nor is a source run reinstated by the switch');
+      await a.dbg(`setSystem('soul-deal')`); // leave the room as we found it
+    },
+  },
+  {
+    name: 'reroll-names-the-rerollER',
+    tags: ['log', 'net'],
+    // THE ATTRIBUTION FLIP HAD NO VOICE (U26, audit F3). Rerolling someone
+    // else's visible roll is deliberate and stays — server.js has no same-roller
+    // check on `rerollOfId`, on purpose, because goal 10 has no roles to appeal
+    // to. What was missing is that nothing SAID SO afterwards: the parent's chip
+    // read a bare 'rerolled', so Bob's row could not say Alice did it, while
+    // every other surface on screen now shows ALICE's numbers under a roll BOB
+    // made, and the record eviction had no voice on either row.
+    //
+    // WHAT THIS CATCHES: the chip is produced by TWO paths that must not drift —
+    // markSuperseded's incremental append (what a live tab does) and
+    // buildLogEntryEl's full rebuild. Both tabs are asserted for that reason:
+    // one of them took the append path and one of them may not have.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.161', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.162', name: 'Bob' });
+      await b.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+
+      await a.roll('2d6 # Shove');
+      const parent = await a.rollId();
+      await b.waitFor(
+        `!!window.__diceDebug.logRow(${JSON.stringify(parent)})`,
+        { desc: "Alice's roll reaches Bob" },
+      );
+
+      // Bob rerolls ALICE's row, through the row's own ⟳ — the spectator path.
+      await b.eval(`document.querySelector(
+        '.log-entry[data-roll-id="' + ${JSON.stringify(parent)} + '"] .log-again').click()`);
+      for (const [t, who] of [[a, 'Alice'], [b, 'Bob']]) {
+        await t.waitFor(
+          `(window.__diceDebug.sim(120), !window.__diceDebug.busy
+            && (window.__diceDebug.logRow(${JSON.stringify(parent)}) || {}).rerolled)`,
+          { desc: `the chip lands on ${who}'s copy of the row` },
+        );
+      }
+      for (const [t, who] of [[a, 'Alice'], [b, 'Bob']]) {
+        const row = await t.dbg(`logRow(${JSON.stringify(parent)})`);
+        assert.equal(row.rerolled, 'rerolled by Bob',
+          `${who}: the ink names who did it (got: ${JSON.stringify(row.rerolled)})`);
+        assert.match(row.rerolledTitle, /Rerolled by Bob/,
+          `${who}: and the title names the eviction (got: ${JSON.stringify(row.rerolledTitle)})`);
+        assert.match(row.rerolledTitle, /took this one's place in the record/,
+          `${who}: which is the fact with consequences (got: ${JSON.stringify(row.rerolledTitle)})`);
+      }
+
+      // …and rerolling YOUR OWN is the unsurprising case, which keeps the bare
+      // word. A qualifier, not a badge (§7.15: at most ONE chip per row).
+      await a.roll('1d20 # Leap');
+      const mine = await a.rollId();
+      await a.eval(`document.querySelector(
+        '.log-entry[data-roll-id="' + ${JSON.stringify(mine)} + '"] .log-again').click()`);
+      await a.waitFor(
+        `(window.__diceDebug.sim(120), !window.__diceDebug.busy
+          && (window.__diceDebug.logRow(${JSON.stringify(mine)}) || {}).rerolled)`,
+        { desc: 'the chip lands on her own row' },
+      );
+      const own = await a.dbg(`logRow(${JSON.stringify(mine)})`);
+      assert.equal(own.rerolled, 'rerolled',
+        `a self-reroll says nothing more (got: ${JSON.stringify(own.rerolled)})`);
+    },
+  },
+  {
+    name: 'unnamed-table-wears-no-plate',
+    tags: ['chrome', 'lobby'],
+    // A MINTED KEY IS NOT A CHOSEN NAME (U25, audit E4). The nameplate's own
+    // rule is "the tableName, else the ?room= key when someone CHOSE one, ELSE
+    // NOTHING" — and it had no way to tell chosen from minted, so '+ New table'
+    // with no name put `drive egw19x` on the plate and in the tab title: a
+    // placeholder, which is exactly the standing generic word §7.9 kills.
+    //
+    // READ THIS BEFORE EDITING: `panel-anatomy` asserts the OTHER half of this
+    // rule ("a chosen key IS a chosen name") against the HARNESS's room key —
+    // and tools/stage.mjs mints `drive-<6 base36>` while production mints a
+    // sixteen-character tail, so that scenario passes only because a harness key
+    // is not minted-shaped. A test for this rule written against a harness-shaped
+    // key proves nothing at all. Both keys below are built to the shape
+    // js/tables.js actually writes: KEY_RANDOM_LEN = 16.
+    async fn(ctx) {
+      const tail = () => Array.from({ length: 16 },
+        () => 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 36)]).join('');
+      const minted = `drive-${tail()}`;
+
+      const m = await bootTab(ctx, {
+        origin: '127.0.0.163',
+        path: `/?room=${encodeURIComponent(minted)}`,
+        seed: { 'dice.name.v1': 'Alice' },
+        readyExpr: `!!window.__diceDebug && window.__diceDebug.netReady`,
+        readyDesc: 'the minted table boots',
+      });
+      await m.waitOnline();
+      const plate = await m.dbg('tablePlate');
+      assert.equal(plate.room, minted, 'the tab really is at the minted key');
+      assert.equal(plate.minted, true,
+        `and the app recognises the shape it mints (got: ${JSON.stringify(plate)})`);
+      assert.equal(plate.name, '', 'an unnamed table puts nothing on the plate');
+      assert.equal(plate.hidden, true, 'and the plate is not standing there empty');
+      assert.equal(plate.title, 'Dice Table',
+        `the tab title says the app, not a random string (got: ${JSON.stringify(plate.title)})`);
+      // The key is still the door and is still in the address bar — this is a
+      // PRESENTATION rule, not a secrecy one, and asserting that keeps the two
+      // from being confused the next time someone reads the comment.
+      assert.ok((await m.dbg('identity')).inviteUrl.includes(encodeURIComponent(minted)),
+        'the link still carries the key — nothing was hidden, only unprinted');
+
+      // …and a key a PERSON typed is a name, and stands.
+      const chosen = await bootTab(ctx, {
+        origin: '127.0.0.164',
+        path: '/?room=our-tuesday-game',
+        seed: { 'dice.name.v1': 'Bo' },
+        clean: ['dice.tables.v1'], // no remembered name may heal this room
+        readyExpr: `!!window.__diceDebug && window.__diceDebug.netReady`,
+        readyDesc: 'the chosen-key table boots',
+      });
+      await chosen.waitOnline();
+      const stands = await chosen.dbg('tablePlate');
+      assert.equal(stands.minted, false,
+        `a hand-typed key is not minted-shaped (got: ${JSON.stringify(stands)})`);
+      assert.equal(stands.hidden, false, 'so the plate stands');
+      assert.equal(stands.name, 'our tuesday game',
+        `wearing the key as a name (got: ${JSON.stringify(stands.name)})`);
+      assert.equal(stands.title, 'our tuesday game — Dice Table', 'and the tab title with it');
+    },
+  },
+  {
+    name: 'change-note-names-the-setting',
+    tags: ['settings', 'net'],
+    // WHAT DID THEY CHANGE? (U25, audit E4.) The note read "Alice changed the
+    // table" for every room-wide key alike — including a SYSTEM flip, which
+    // re-reads every result on screen under a different chart: the words change,
+    // the totals appear or vanish, and the only notice was four words that named
+    // nothing. Every other event on this channel names its subject ("Bo left").
+    //
+    // WHAT THIS CATCHES: the verb is diffed against what this client HOLDS,
+    // because the server sends the full merged settings object on every push —
+    // so a naive implementation that described the ENVELOPE would say "changed
+    // the felt" every time anyone changed anything. Two pushes are made here for
+    // that reason, and the second is deliberately a genuine multi-key change, so
+    // the plural is reached by really changing two things rather than by the
+    // diff being broken.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.165', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.166', name: 'Bob' });
+      await a.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+
+      // The phrase itself, without a name in front of it — asserted at the
+      // source as well as on the wire, so a failure says which half broke.
+      assert.equal(await a.dbg(`settingsChangeVerb({system: 'dnd'})`),
+        'changed the interpretation system', 'a system flip is named');
+      assert.equal(await a.dbg(`settingsChangeVerb({felt: 'crimson'})`),
+        'changed the felt', 'so is a felt change');
+      assert.equal(await a.dbg(`settingsChangeVerb({felt: 'obsidian'})`),
+        'changed the table',
+        'a key set to the value we already hold is NOT a change — the envelope is not the delta');
+
+      await b.dbg(`setSystem('dnd')`);
+      const one = await a.waitFor(
+        `/changed the/.test(document.getElementById('status-pill').textContent || '')
+          && document.getElementById('status-pill').textContent`,
+        { desc: 'the note reaches Alice' });
+      assert.equal(one, 'Bob changed the interpretation system',
+        `the note names the setting (got: ${JSON.stringify(one)})`);
+
+      // TWO AT ONCE FALLS BACK TO THE PLURAL — a rename plus a system flip is
+      // one press of Apply, not two sentences. Pushed as one patch through the
+      // API so it really is one broadcast.
+      const pushed = await ctx.api('/api/settings', {
+        playerId: await b.playerId(),
+        settings: { system: 'soul-deal', tableName: 'Thursday' },
+      });
+      assert.equal(pushed.status, 200, 'the two-key push landed');
+      const many = await a.waitFor(
+        `/changed the table$/.test(document.getElementById('status-pill').textContent || '')
+          && document.getElementById('status-pill').textContent`,
+        { desc: 'the plural note reaches Alice' });
+      assert.equal(many, 'Bob changed the table',
+        `two changes at once is one sentence (got: ${JSON.stringify(many)})`);
+      assert.equal((await a.dbg('settings')).tableName, 'Thursday',
+        'and both halves of the push really landed');
+      assert.equal(await a.dbg('system'), 'soul-deal', 'both, not just the one that was named');
+    },
+  },
+  {
+    name: 'invite-has-a-primary-gesture',
+    tags: ['chrome', 'a11y'],
+    // THE LINK HAD NO PRIMARY GESTURE (U25, audit E4). The presence row's Invite
+    // chair retires as soon as anyone arrives — correct per §7.20, and exactly
+    // when you are fetching a third person — which left right-click on the
+    // identity chip, taught only by a `title` that touch never renders. Two
+    // standing doors were added: a Settings → Table row, and key `i`.
+    //
+    // WHAT THIS CATCHES: `#set-invite`'s visibility is a property of its ROW's
+    // inline display, so reading the button's own computed `display` answers
+    // 'inline-block' in the lobby and looks fine. It is measured as a BOX here
+    // instead. And the key is asserted at three populations, because a shortcut
+    // that fires while you are typing is a worse bug than one that never fires.
+    async fn(ctx) {
+      // The clipboard is stubbed rather than permitted: headless Chrome has no
+      // clipboard grant, so the real writeText rejects and shareInvite falls
+      // through to window.prompt() — a JS dialog with nobody to answer it, which
+      // hangs the page. The double records what the app HANDED it, which is the
+      // assertion anyway; window.prompt is neutered so a regression into that
+      // path fails loudly instead of timing out.
+      const stubClipboard = (t) => t.eval(`(() => {
+        window.__copied = [];
+        Object.defineProperty(navigator, 'clipboard', {
+          configurable: true,
+          value: { writeText: (s) => { window.__copied.push(String(s)); return Promise.resolve(); } },
+        });
+        window.prompt = (msg, val) => { window.__copied.push('PROMPT:' + String(val)); return null; };
+      })()`);
+      const press = (t, sel) => t.eval(
+        `document.${sel ? `getElementById(${JSON.stringify(sel)})` : 'body'}`
+        + `.dispatchEvent(new KeyboardEvent('keydown', { key: 'i', bubbles: true }))`);
+
+      const a = await ctx.newTable({ origin: '127.0.0.167', name: 'Alice' });
+      await stubClipboard(a);
+      await a.dbg(`openSettings('table')`);
+      const box = await a.eval(`(() => {
+        const r = document.getElementById('set-invite').getBoundingClientRect();
+        return { w: Math.round(r.width), h: Math.round(r.height) };
+      })()`);
+      assert.ok(box.w > 0 && box.h > 0,
+        `Copy invite link is really on screen at a table (got: ${JSON.stringify(box)})`);
+      await a.eval(`document.getElementById('settings-close').click()`);
+
+      // The key, with nothing focused: it copies THIS room's link and says so
+      // out loud (the label swap a button gets is not a channel a key has).
+      assert.equal(await press(a), true, 'the keydown was not cancelled');
+      await a.waitFor(`(window.__copied || []).length === 1`, { desc: 'i copies the link' });
+      const copied = (await a.eval(`window.__copied`))[0];
+      assert.ok(copied.includes(`room=${encodeURIComponent(ctx.room)}`),
+        `what it copied is this table's link (got: ${copied})`);
+      assert.equal(await a.eval(`document.getElementById('sr-live').textContent`),
+        'Invite link copied', 'and it is announced, not only pasted');
+
+      // …and NOT while typing. A shortcut that fires into a text field is worse
+      // than one that never fires: the player is composing notation.
+      await a.eval(`window.__copied.length = 0`);
+      await press(a, 'cmd-input');
+      await sleep(200);
+      assert.deepEqual(await a.eval(`window.__copied`), [],
+        'typing an i into the notation box copies nothing');
+
+      // THE LOBBY REFUSES, and names the exit. Copying nothing, or fabricating a
+      // link to the shared room called 'table', is the affordance L0 was built
+      // to kill — so the refusal is the assertion, in both channels.
+      const lob = await lobbyTab(ctx, { origin: '127.0.0.168' });
+      await stubClipboard(lob);
+      assert.equal(await lob.eval(`(() => {
+        const r = document.getElementById('set-invite').getBoundingClientRect();
+        return r.width * r.height;
+      })()`), 0, 'the lobby has no table, so the Settings row is really gone');
+      await press(lob);
+      await lob.waitFor(`!!document.getElementById('sr-live').textContent`,
+        { desc: 'the lobby answers the key' });
+      assert.match(await lob.eval(`document.getElementById('sr-live').textContent`),
+        /No table to invite anyone to/, 'it says why, rather than doing nothing');
+      assert.deepEqual(await lob.eval(`window.__copied`), [],
+        'and it copies NOTHING — not an empty string, not a link to a room named table');
+    },
+  },
+  {
+    name: 'roster-reads-or-folds',
+    tags: ['presence'],
+    // TWO FOLDS, TWO MEANINGS (U25, audit E4). Past ROSTER_MAX the presence row
+    // can carry the PEOPLE fold and the EMPTY-CHAIR fold at once, identically
+    // dressed, reading `+1` `+1` — two counts of two different things side by
+    // side, told apart only by a hover title, which touch never renders. And
+    // `+3` beside a roster reads as three more PEOPLE, which is the opposite of
+    // what the chair fold counts.
+    //
+    // WHAT THIS CATCHES: the fixture is built so the two counts COLLIDE. Seven
+    // others fold to `+1`; exactly one seat is still free, so the chair fold
+    // would also have read `+1` — identical strings, which is the bug, and which
+    // a fixture with different counts would have passed straight through.
+    //
+    // The width half is the other defect in the same row: a flex item with
+    // `overflow: hidden` shrinking past its own text to a bare dot. That is a
+    // measured BOX and cannot be a class check.
+    async fn(ctx) {
+      const org = await ctx.rawPlayer('Bram');
+      const seats = ['Ada', 'Bram', 'Cassia', 'Dev', 'Eluned', 'Fionn', 'Gus', 'Hana', 'Iris'];
+      await ctx.api('/api/table', {
+        playerId: org.playerId,
+        rev: 1,
+        table: { tableName: 'Full House' },
+        profiles: seats.map((n) => ({ name: n, pools: [{ name: 'Body', notation: '3d6' }] })),
+      });
+      for (const n of ['Cassia', 'Dev', 'Eluned', 'Fionn', 'Gus', 'Hana']) await ctx.rawPlayer(n);
+
+      const a = await ctx.newTable({ origin: '127.0.0.169', name: 'Ada' });
+      await a.waitFor(`window.__diceDebug.players.length === 8`, { desc: 'eight at the table' });
+
+      const row = await a.dbg('presenceRow');
+      assert.equal(row.pills.length, 6,
+        `six pills before the tail folds (got: ${JSON.stringify(row.pills)})`);
+      assert.deepEqual(row.folds, ['+1', '+1 free'],
+        `the two folds say WHICH kind each counts (got: ${JSON.stringify(row.folds)})`);
+      assert.equal(new Set(row.folds).size, row.folds.length,
+        'and no two folds in this row read identically — that was the bug');
+
+      // Every pill still READS. 76px is the floor a name plus its dot needs
+      // before it is a bare dot with a tooltip.
+      for (let i = 0; i < row.pillWidths.length; i++) {
+        assert.ok(row.pillWidths[i] >= 76,
+          `'${row.pills[i]}' is still readable at ${row.pillWidths[i]}px `
+          + `(all: ${JSON.stringify(row.pillWidths)})`);
+      }
+    },
+  },
+  {
+    name: 'pools-broadcast-is-disclosed',
+    tags: ['profiles', 'net'],
+    // THE SENDING HALF, DISCLOSED (U25). Sitting down at a table publishes your
+    // rack to everyone in it — that is what makes a teammate's pools copyable
+    // (§11 P10–P12) — and nothing on screen said so. It is one standing line,
+    // at a table only.
+    //
+    // WHAT THIS CATCHES: a note that stands SOLO would be a lie in the one place
+    // it cannot be true (there is no room to broadcast into), and a note whose
+    // count is hard-coded would say 'your 1 profile' to a player holding four.
+    // Both are asserted, and the count is CHANGED mid-scenario so a constant
+    // cannot pass.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.170', name: 'Alice' });
+      await a.dbg(`profiles.reset('soul-deal')`); // the library is per-ORIGIN: establish it
+      const one = await a.dbg('poolsSharedNote');
+      assert.ok(one, 'the disclosure stands at a table');
+      assert.match(one, /Everyone at this table can see your profile\b/,
+        `and counts what is actually being sent (got: ${JSON.stringify(one)})`);
+      assert.match(one, /Nothing of yours is stored on the server/,
+        'it also says what is NOT happening, which is the other half of the truth');
+
+      await a.dbg(`profiles.create('Second', 'soul-deal')`);
+      const two = await a.dbg('poolsSharedNote');
+      assert.match(two, /can see your 2 profiles\b/,
+        `the count follows the library (got: ${JSON.stringify(two)})`);
+
+      // SOLO IT IS SILENT. 'Leave & switch seat' is the one scripted door to
+      // netOnline=false (draft-bench's note).
+      await a.eval(`document.getElementById('idm-leave').click()`);
+      await a.waitFor(`window.__diceDebug.net.online === false`, { desc: 'the seat drops' });
+      await a.dbg(`profiles.create('Third', 'soul-deal')`); // forces the re-render
+      assert.equal(await a.dbg('poolsSharedNote'), '',
+        'with no table there is nobody to disclose to, and the line goes');
+    },
+  },
+  {
+    name: 'whisper-line-names-the-leak',
+    tags: ['visibility'],
+    // THE FOUR WORDS THAT SAID THE REVERSE (U26, audit F3). On every rung but
+    // `secret`, existence is public AND SO ARE THE STAKES: the dice land
+    // shrouded but real, so their types and count are public and §7.24 renders
+    // the target and the moment to everyone. Only the VALUES are withheld. The
+    // popover's whisper sub-line described that as though nothing were visible —
+    // the doctrine was documented three times and the sentence a player actually
+    // reads said the opposite, which is the worst possible place for it (goal 11
+    // is the one where a wrong belief cannot be undone).
+    //
+    // WHAT THIS CATCHES: the retired wording. `/not what/` is the phrase a player
+    // would use to justify hiding a stake in a whisper, and asserting the words
+    // that must be PRESENT without asserting the ones that must be ABSENT would
+    // pass on 'they see the stakes and the result, not what…'.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.171', name: 'Alice' });
+      await ctx.newTable({ origin: '127.0.0.172', name: 'Bob' });
+      await a.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'a table with an audience' });
+
+      const subs = await a.dbg('visSubs');
+      assert.match(subs.whisper, /stakes/,
+        `the whisper line admits the stakes are public (got: ${JSON.stringify(subs.whisper)})`);
+      assert.match(subs.whisper, /result/,
+        `and says what is actually withheld (got: ${JSON.stringify(subs.whisper)})`);
+      assert.doesNotMatch(subs.whisper, /not what/,
+        `the retired 'not what' wording is gone (got: ${JSON.stringify(subs.whisper)})`);
+      // The rungs around it, so the fix is a line rather than a blanket.
+      assert.equal(subs.open, '', 'an open roll needs no sub-line');
+      assert.match(subs.held, /face down for everyone/, 'held still says face down for everyone');
+      assert.match(subs.secret, /no one else sees that you rolled/,
+        'and secret is the one rung where even existence is withheld');
+
+      // THE OFFER VERB READS ITS CONTEXT (§3.2's dice-tower line, U26 audit F3).
+      // An offered ONLY-ME roll is not an only-me roll: the claimant throws it
+      // and only the OFFERER reads the result. §3.2 pinned those words to a
+      // button that has since retired, so the line follows the VERB.
+      const draft = (text) => a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = ${JSON.stringify(text)};
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      await draft('d20 secret # Perception');
+      await a.waitFor(`/Dice tower/.test(window.__diceDebug.offerTitle)`,
+        { desc: 'the secret draft re-reads the verb' });
+      assert.equal(await a.dbg('offerTitle'), 'Dice tower — they roll, only you see the result',
+        'the offered secret roll says who ends up reading it');
+      await draft('d20 # Perception');
+      await a.waitFor(`!/Dice tower/.test(window.__diceDebug.offerTitle)`,
+        { desc: 'an open draft takes the plain title back' });
+      assert.equal(await a.dbg('offerTitle'), 'Offer this roll to the table — anyone can take it',
+        'the other rungs mean what they say, and keep the plain title');
+      await a.eval(`document.getElementById('clear-tray').click()`);
+    },
+  },
+  {
+    name: 'counted-rail-row-clears-its-remover',
+    tags: ['touch'],
+    // THE STYLESHEET REFUSED THIS TWICE, WITH THE ARITHMETIC (U28b). The rail
+    // column is 86px: 8 pad + 18 art + 6 gap + 42 ('10d10x' at 12.5px) + 34 (the
+    // coarse remover's lane) + 8 pad = 116. It does not fit, and a reserved lane
+    // in cascade only ellipsises the notation — which IS the label here, because
+    // THE COUNT IS THE LABEL is a ruling with the wire payload riding on it. So
+    // the art is what goes, on a counted row, on a coarse pointer only.
+    //
+    // WHAT THIS CATCHES: `.rd-counted` existing proves the markup hook, and
+    // nothing else — the whole point is a CSS rule that a class check cannot see.
+    // The claim is measured: the art computes to display:none, and the label's
+    // right edge is really LEFT of the remover's left edge.
+    //
+    // AND IT IS MEASURED AT THE LONGEST LABEL, which is the only place it bites.
+    // Measured 2026-08-15 in an 86px column: at `10d6` the label ends at 43 and
+    // the coarse lane starts at 58, so a d6 row clears by 15px WITH THE ART
+    // STANDING and proves nothing about the rule. At `10d10x` — the string the
+    // stylesheet's own arithmetic names — the label ends at 57 against a lane
+    // starting at 58: one pixel. The fine-pointer control in the same tab is
+    // what makes that number mean something: art standing, the label runs to 81
+    // against an 18px ✕ at 70, i.e. eleven pixels INTO it. That is the geometry
+    // the coarse row would have without the art drop.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: '127.0.0.173', name: 'Alice', allowSolo: true });
+      const rowGeo = (type) => a.eval(`(() => {
+        const cell = [...document.querySelectorAll('#rail-dice .rd-cell.rd-counted')]
+          .find((c) => (c.querySelector('.rp-name') || {}).textContent === ${JSON.stringify(type)});
+        if (!cell) return { cell: false };
+        const art = cell.querySelector('.rp-dice');
+        const name = cell.querySelector('.rp-name');
+        const x = cell.querySelector('.rd-x');
+        return {
+          cell: true,
+          label: name ? name.textContent : null,
+          artDisplay: art ? getComputedStyle(art).display : null,
+          cellWidth: Math.round(cell.getBoundingClientRect().width),
+          nameRight: Math.round(name.getBoundingClientRect().right),
+          xLeft: Math.round(x.getBoundingClientRect().left),
+          xWidth: Math.round(x.getBoundingClientRect().width),
+        };
+      })()`);
+      try {
+        await a.emulateCoarsePointer(true);
+        await a.waitFor(`window.matchMedia('(pointer: coarse)').matches`,
+          { desc: 'the tab is really a touch device' });
+        // The rail column only renders while the panel is collapsed — that is
+        // the surface under test, not a shortcut.
+        await a.dbg('setPanelState({pools: false})');
+        await a.waitFor(`document.getElementById('left-panel').classList.contains('collapsed')`,
+          { desc: 'the panel collapses to the rail' });
+        // The collapsed column shows ONE list, and it defaults to the saved
+        // pools while a rack exists — so the loose-dice list has to be asked
+        // for. Without this the cells are built into a `display: none`
+        // container, every computed-style assertion below reads through a
+        // hidden ancestor and passes, and every rect is 0×0. (That is how this
+        // scenario failed first: `.rp-dice` answered 'none' because nothing was
+        // on screen at all.)
+        await a.dbg(`setRailMode('dice')`);
+        for (let i = 0; i < 10; i++) await a.dbg(`railTapDie('d6')`);
+        assert.equal((await a.dbg('railDice')).total, 10, 'ten d6 staged');
+        assert.deepEqual((await a.dbg('railMode')).shown, { pools: false, dice: true },
+          'and the loose-dice list is the one on screen — nothing below reads a hidden node');
+
+        const geo = await rowGeo('10d6');
+        assert.equal(geo.cell, true, 'a staged row declares itself counted in its markup');
+        assert.ok(geo.cellWidth > 0,
+          `and the row has real width — a 0×0 rect would make every edge test below `
+          + `pass by measuring nothing (got: ${geo.cellWidth}px)`);
+        assert.equal(geo.label, '10d6',
+          `the count IS the label — notation, not a badge (got: ${JSON.stringify(geo.label)})`);
+        assert.equal(geo.artDisplay, 'none',
+          'and the die art really goes on a counted row under a coarse pointer');
+        assert.ok(geo.xWidth >= 34,
+          `the remover stands at a touch size (got: ${geo.xWidth}px)`);
+        assert.ok(geo.nameRight < geo.xLeft,
+          `the label ends before the remover's lane begins `
+          + `(label right ${geo.nameRight}, ✕ left ${geo.xLeft})`);
+
+        // THE LONGEST LABEL — where the column actually runs out of pixels, and
+        // the only width at which this assertion discriminates.
+        for (let i = 0; i < 10; i++) await a.dbg(`railTapDie('d10x')`);
+        const worst = await rowGeo('10d10x');
+        assert.equal(worst.cell, true, 'the widest row is staged too');
+        assert.equal(worst.artDisplay, 'none', 'it drops its art on the same rule');
+        assert.ok(worst.nameRight < worst.xLeft,
+          `even the widest label clears the remover's lane `
+          + `(label right ${worst.nameRight}, ✕ left ${worst.xLeft})`);
+
+        // THE RED CONTROL, in the same tab: a fine pointer keeps the art, and
+        // then the same label runs INTO the lane. The ✕ is opacity:0 until
+        // hover there so nothing is broken on a mouse — this is what the coarse
+        // row's geometry would be if the art had not been dropped, which is the
+        // measurement that makes the 1px above mean something.
+        await a.emulateCoarsePointer(false);
+        await a.waitFor(`!window.matchMedia('(pointer: coarse)').matches`,
+          { desc: 'back to a fine pointer' });
+        const fine = await rowGeo('10d10x');
+        assert.notEqual(fine.artDisplay, 'none', 'a fine pointer keeps the die art');
+        assert.ok(fine.nameRight > worst.xLeft,
+          `with the art standing the label really does reach into the touch lane — `
+          + `that is the overlap the markup fix buys off (label right ${fine.nameRight}, `
+          + `coarse lane starts ${worst.xLeft})`);
+      } finally {
+        await a.emulateCoarsePointer(false).catch(() => {});
+        await a.dbg('setPanelState({pools: true})').catch(() => {});
+      }
+    },
+  },
 ];
