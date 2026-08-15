@@ -101,12 +101,21 @@ listed to go back to.
 carries a way back.
 *Surfaces:* `Split table…` (identity menu), `Breakouts ▾` and `↩ Main table`
 (the presence row), `POST /api/split`.
-*Proof:* **none yet** — the code shipped 2026-08-14 with its
-`__diceDebug.subtables` / `.split()` hooks and a server suite
-(`tests/subtables.test.mjs`), but the e2e scenarios are still owed.
-**CODE SHIPPED, SCENARIOS OPEN** — [UX §7.46](UX.md) is the spec (it decides
-the two questions ROADMAP `L4` left open); `L4` holds the sequencing. This was
-the only journey with no code at all until that pass.
+*Proof:* `journey-split-the-party` (the composed walk — two seats, the real
+menu gesture, the directory on the OTHER player's screen, the inheritance,
+the way back), plus `split-follower`, `split-chrome-quiet`, `split-orphan`,
+`split-reconnect` and the server suite (`tests/subtables.test.mjs`).
+**SHIPPED** — [UX §7.46](UX.md) is the spec (it decides the two questions
+ROADMAP `L4` left open); `L4` holds the sequencing. This was the only journey
+with no code at all until the 2026-08-14 pass, and the only one with no
+scenario until 2026-08-15.
+
+*One defect found by the walk and NOT yet fixed:* `gotoTable()`'s navigation
+fires `pagehide` with `persisted: true`, so main.js's beacon handler returns
+early and no `/api/leave` is sent — a player who walks into a breakout keeps a
+seat on the main table's roster for ~75 s (the liveness sweep), which is the
+opposite of what `renderPlayers`' own rationale claims. It is written up above
+the sub-table scenarios in `tests/e2e/scenarios.mjs`.
 
 ### CUJ6 — "Before game night I want to build the characters."
 
@@ -252,14 +261,17 @@ many part-scenarios and no composed walk is still the gap **C1** names.
 
 | | CUJ1 | CUJ2 | CUJ3 | CUJ4 | CUJ5 | CUJ6 | CUJ7 | CUJ8 | CUJ9 | CUJ10 | CUJ11 | CUJ12 | CUJ13 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| scenarios | 4 | 5 | 10 | 1 | **0** | 16 | 6 | 32 | 17 | 14 | 1 | 6 | 6 |
+| scenarios | 4 | 5 | 10 | 1 | 5 | 16 | 6 | 32 | 17 | 14 | 1 | 6 | 6 |
 
-**CUJ5 is the zero** — and it is still zero in this table after 2026-08-14,
-but for a different reason than when it was measured: sub-tables now have code
-(UX §7.46) and a server suite, and what is missing is the e2e walk. **CUJ4 and
-CUJ11 are thin**: leaving a table and
-being present without rolling each rest on a single scenario, and neither has
-a composed walk.
+**CUJ5 stopped being the zero on 2026-08-15.** Sub-tables got code on
+2026-08-14 (UX §7.46) and their five scenarios the day after. One caveat on
+how they SELECT: only the composed walk carries `cuj5`; the four part
+scenarios carry the area tag `subtables`, so `--only subtables` is what runs
+the set and `--only cuj5` runs the walk alone.
+
+**CUJ4 and CUJ11 are now the thin ones**: leaving a table and being present
+without rolling each rest on a single scenario, and neither has a composed
+walk.
 
 ## Coverage rule (why a journey needs its own scenario)
 
@@ -303,9 +315,10 @@ Joe's call (2026-08-08): one journey covering 60% of the app cannot tell you
 what is missing, which is the failure being fixed. → **C1**.
 
 **B. CUJ5 has no code and no scenario.** Known (`L4`), listed here so the
-zero shows in the same table as everything else. *(Half-closed 2026-08-14: the
-code shipped — UX §7.46, `POST /api/split`, `tests/subtables.test.mjs`. The
-scenario half stands.)*
+zero shows in the same table as everything else. **CLOSED**: the code shipped
+2026-08-14 (UX §7.46, `POST /api/split`, `tests/subtables.test.mjs`) and the
+five e2e scenarios on 2026-08-15, composed walk included. What the walk turned
+up is a navigation defect that is not CUJ5's own — see the note under CUJ5.
 
 **C. CUJ13 is one-directional.** Export exists; restore does not. → **C2**.
 
