@@ -17110,11 +17110,17 @@ export const scenarios = [
       await bo.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'Bo sits down' });
 
       // The table is PLAYING something — a felt and a rulebook, which is what a
-      // breakout has to carry with it.
+      // breakout has to carry with it — and it has a NAME, which is what a
+      // breakout must not.
       await alice.dbg(`setFelt('crimson')`);
       await alice.dbg(`setSystem('dnd')`);
+      await ctx.api('/api/settings', {
+        playerId: await alice.playerId(), settings: { tableName: 'Vault Heist' },
+      });
       await bo.waitFor(`window.__diceDebug.settings.felt === 'crimson'
-        && window.__diceDebug.settings.system === 'dnd'`, { desc: 'the table agrees on the game' });
+        && window.__diceDebug.settings.system === 'dnd'
+        && window.__diceDebug.settings.tableName === 'Vault Heist'`,
+      { desc: 'the table agrees on the game it is playing' });
 
       // Nothing about a split is standing chrome before there is one.
       assert.deepEqual(await ghostLabels(bo), [],
@@ -17156,9 +17162,14 @@ export const scenarios = [
         { desc: 'the breakout declares what it broke out of' });
       const subs = JSON.parse(kid);
       assert.equal(subs.parent.room, ctx.room, 'the way back points at the main table');
+      assert.equal(subs.parent.name, 'Vault Heist',
+        `and it knows what it is going back TO (got: ${JSON.stringify(subs.parent.name)})`);
       assert.deepEqual(subs.children, [], 'and a breakout lists none of its own');
       assert.deepEqual(await splitGhosts(alice), ['↩ Main table'],
         'the way back is a door in the presence row');
+      assert.equal(
+        (await alice.dbg('presenceRow')).ghosts.find((g) => g.label === '↩ Main table').title,
+        'Back to Vault Heist', 'wearing the main table’s name, not a generic sentence');
 
       // THE GAME CAME WITH HER — and the IDENTITY did not.
       const set = await alice.dbg('settings');
@@ -17166,8 +17177,10 @@ export const scenarios = [
       assert.equal(set.system, 'dnd', 'and reads its dice by the same rulebook');
       assert.equal(set.tableName, 'The Vault',
         `the breakout names ITSELF (got: ${JSON.stringify(set.tableName)})`);
+      assert.equal((await bo.dbg('settings')).tableName, 'Vault Heist',
+        'while the main table keeps its own name');
       assert.notEqual(set.tableName, (await bo.dbg('settings')).tableName,
-        'never the parent’s name — that is two tables nobody can tell apart');
+        'never the parent’s name — that is two tables nobody can tell apart in a recents list');
 
       // --- …and comes back --------------------------------------------------
       try {
