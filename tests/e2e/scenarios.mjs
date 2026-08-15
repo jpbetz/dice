@@ -526,6 +526,86 @@ function bigPortableFile(n) {
   return `${lines.join('\n')}\n`;
 }
 
+// ---------------------------------------------------------------------------
+// SUB-TABLES (§3b L4, CUJ5) — the two doors a scenario needs
+// ---------------------------------------------------------------------------
+//
+// Every transition between tables NAVIGATES (main.js gotoTable: ROOM is a
+// module const), so walking into a breakout is a real page load in the SAME
+// browsing context — which is the whole point, because the child's half of the
+// split rides sessionStorage and sessionStorage is per-tab. A fresh tab pointed
+// at the child key is a DIFFERENT population (the raw-URL arrival), and
+// split-follower proves both.
+async function gotoRoom(t, key) {
+  const url = `${t.url.split('?')[0]}?room=${encodeURIComponent(key)}`;
+  // The context can die inside the assignment — that IS the navigation.
+  try { await t.eval(`location.href = ${JSON.stringify(url)}`); } catch { /* navigating */ }
+  t.url = url; // keep reload()/waitOnline() pointed at where this tab now is
+  return landedAtTable(t);
+}
+
+// THE VERB A PERSON PRESSES: identity chip → 'Split table…' → name it → Split.
+// The composed walk uses THIS rather than `__diceDebug.split()`, and the
+// difference is load-bearing rather than stylistic: the debug hook calls
+// splitTable() directly, so it skips openTableMint's `pendingNameKey` write and
+// the breakout it makes arrives UNNAMED. A journey asserted through the hook
+// would prove the felt was inherited and quietly prove nothing about the name
+// the player typed — see docs/TESTING.md's composed-scenario rule.
+async function splitViaMenu(t, name) {
+  await t.eval(`document.getElementById('identity-chip')
+    .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`);
+  await t.waitFor(`!document.getElementById('identity-menu').classList.contains('hidden')`,
+    { desc: 'the identity menu opens' });
+  assert.notEqual(
+    await t.eval(`getComputedStyle(document.getElementById('idm-split')).display`), 'none',
+    'Split table… is on offer at a live top-level table');
+  await t.eval(`document.getElementById('idm-split').click()`);
+  await t.waitFor(`!!document.querySelector('.rail-menu input.tin')`,
+    { desc: 'the breakout naming prompt opens' });
+  assert.equal(await t.eval(`document.querySelector('.rail-menu .btn.confirm').textContent`),
+    'Split', 'the prompt commits with the split verb, not Create');
+  try {
+    await t.eval(`(() => {
+      document.querySelector('.rail-menu input.tin').value = ${JSON.stringify(name)};
+      document.querySelector('.rail-menu .btn.confirm').click();
+    })()`);
+  } catch { /* splitTable awaits the POST then navigates — the context can die here */ }
+}
+
+// The presence row's ghost labels, which is where the two navigation faces of a
+// split live ('↩ Main table' / 'Breakouts ▾').
+const ghostLabels = async (t) => (await t.dbg('presenceRow')).ghosts.map((g) => g.label);
+
+// …and JUST the split's furniture. The row legitimately carries other exits at
+// the same time (a breakout you are alone in still offers Invite), so an exact
+// comparison has to be scoped to the two labels under test — otherwise it is
+// asserting the rest of §7.20 by accident and will break on unrelated work.
+const SPLIT_GHOSTS = ['Breakouts ▾', '↩ Main table'];
+const splitGhosts = async (t) => (await ghostLabels(t)).filter((l) => SPLIT_GHOSTS.includes(l));
+
+// MEASURED 2026-08-15 AND NOT YET FIXED — read this before writing another
+// sub-table scenario, because it changes what a roster assertion can mean.
+//
+// gotoTable() is a plain `location.href =` (main.js: ROOM is a module const, so
+// every table transition is a real page load), and in that navigation Chrome
+// fires `pagehide` with **`persisted: true`** — the page is bfcache-eligible.
+// main.js's beacon handler returns early on `persisted`, by design ("let the
+// liveness sweep decide if it never comes back"), so NO /api/leave is sent when
+// a player walks from one table to another. Probed directly: pagehide fires,
+// `navigator.sendBeacon` is never called, and the walker's pill was still on the
+// old table's roster 15 s later with the server log showing no `left` line at
+// all. The seat clears on LIVENESS_TIMEOUT_MS + DISCONNECT_GRACE_MS ≈ 75 s.
+//
+// It bites hardest here because walking between tables IS this journey, and
+// renderPlayers' own rationale claims the opposite ("when three of five players
+// walk into a breakout, this row loses three pills"). leaveToLobby() already
+// solves the identical problem for its navigation — it disarms the stream and
+// awaits an immediate leave — and gotoTable never got the same treatment.
+//
+// So: a scenario may NOT wait on the parent emptying by itself, and must not
+// assert "the walker's pill is gone" until this is fixed. split-orphan empties
+// the seat through the API on purpose, and says so at the call site.
+
 export const scenarios = [
   {
     name: 'shared-roll',
@@ -16898,6 +16978,401 @@ export const scenarios = [
         await t.page.browser.send('Emulation.clearDeviceMetricsOverride', {}, t.page.sessionId)
           .catch(() => {});
       }
+    },
+  },
+
+  // ==========================================================================
+  // SUB-TABLES — CUJ5, "we need to split into two groups for a bit, then come
+  // back" (§3b L4, UX §7.46). The code shipped 2026-08-14 with hooks and a
+  // 15-case server suite (tests/subtables.test.mjs) and no browser coverage at
+  // all; these five are that coverage, and the first is the journey's GATE.
+  // ==========================================================================
+  {
+    name: 'journey-split-the-party',
+    tags: ['journey', 'subtables', 'cuj5'],
+    timeout: 150000,
+    // CUJ5's COMPOSED WALK — the whole of this journey's e2e coverage, and the
+    // one scenario `--only journey` runs for it. It walks CUJS.md's own done-
+    // when sentence in order: *a child table exists, is listed to the parent's
+    // players, and carries a way back.*
+    //
+    // WHAT IT CATCHES that no part of it could:
+    //  · the split registering with the parent but the SPLITTER's own tab
+    //    landing in a bare room — the sessionStorage carry is written by one
+    //    function and consumed by another across a page load, and nothing in a
+    //    single-tab test crosses that seam;
+    //  · the breakout appearing on nobody else's screen (the one failure that
+    //    leaves the group worse off than not splitting — splitTable awaits the
+    //    POST for exactly this reason);
+    //  · the child silently coming up on the DEFAULT system, which reads a d20
+    //    under the wrong chart and is a wrong answer rather than a cosmetic one
+    //    (goal 6);
+    //  · the child inheriting the parent's NAME — the server refuses tableName
+    //    outright, so two tables nobody can tell apart in a recents list is the
+    //    shape of that bug, and the child must wear the name the player typed;
+    //  · the way back being furniture rather than a door.
+    //
+    // It uses the controls a person uses (right-click the chip → Split table… →
+    // type a name → Split → the ghost in the presence row), never the notation
+    // shortcut: `__diceDebug.split()` skips openTableMint and therefore skips
+    // the name entirely. See splitViaMenu's note.
+    async fn(ctx) {
+      const alice = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const bo = await ctx.newTable({ origin: '127.0.0.130', name: 'Bo' });
+      await bo.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'Bo sits down' });
+
+      // The table is PLAYING something — a felt and a rulebook, which is what a
+      // breakout has to carry with it.
+      await alice.dbg(`setFelt('crimson')`);
+      await alice.dbg(`setSystem('dnd')`);
+      await bo.waitFor(`window.__diceDebug.settings.felt === 'crimson'
+        && window.__diceDebug.settings.system === 'dnd'`, { desc: 'the table agrees on the game' });
+
+      // Nothing about a split is standing chrome before there is one.
+      assert.deepEqual(await ghostLabels(bo), [],
+        'no breakout furniture at a table that has never split');
+
+      // --- Alice splits the party ------------------------------------------
+      await splitViaMenu(alice, 'The Vault');
+
+      // …and the FIRST thing that has to be true is on somebody ELSE's screen.
+      const pill = await bo.waitFor(
+        `/opened a breakout/.test(document.getElementById('status-pill').textContent || '')
+          && document.getElementById('status-pill').textContent`,
+        { desc: 'the main table is told a breakout opened' });
+      assert.match(pill, /^Alice opened a breakout$/,
+        `the note names who opened it (got: ${JSON.stringify(pill)})`);
+      assert.equal(
+        await bo.eval(`document.getElementById('status-pill').classList.contains('hidden')`), false,
+        'and it is actually on screen, not merely in a textContent');
+
+      const boSubs = await bo.dbg('subtables');
+      assert.equal(boSubs.parent, null, 'the main table is nobody’s breakout');
+      assert.equal(boSubs.children.length, 1,
+        `exactly one breakout is listed (got: ${JSON.stringify(boSubs.children)})`);
+      const child = boSubs.children[0];
+      assert.equal(child.name, 'The Vault', 'the directory row wears the name Alice typed');
+      assert.ok(child.room && child.room !== ctx.room,
+        `the row points at a room of its own (got: ${JSON.stringify(child.room)})`);
+      assert.deepEqual(await ghostLabels(bo), ['Breakouts ▾'],
+        'and the row is REACHABLE — one ghost in the presence row, no more');
+
+      // --- Alice lands in the breakout --------------------------------------
+      const search = await landedAtTable(alice);
+      assert.equal(search, `?room=${encodeURIComponent(child.room)}`,
+        `the splitter landed in the room she just registered (got: ${search})`);
+      alice.url = `${alice.url.split('?')[0]}${search}`;
+
+      const kid = await alice.waitFor(
+        `window.__diceDebug.subtables.parent && JSON.stringify(window.__diceDebug.subtables)`,
+        { desc: 'the breakout declares what it broke out of' });
+      const subs = JSON.parse(kid);
+      assert.equal(subs.parent.room, ctx.room, 'the way back points at the main table');
+      assert.deepEqual(subs.children, [], 'and a breakout lists none of its own');
+      assert.deepEqual(await splitGhosts(alice), ['↩ Main table'],
+        'the way back is a door in the presence row');
+
+      // THE GAME CAME WITH HER — and the IDENTITY did not.
+      const set = await alice.dbg('settings');
+      assert.equal(set.felt, 'crimson', 'the breakout stands on the same felt');
+      assert.equal(set.system, 'dnd', 'and reads its dice by the same rulebook');
+      assert.equal(set.tableName, 'The Vault',
+        `the breakout names ITSELF (got: ${JSON.stringify(set.tableName)})`);
+      assert.notEqual(set.tableName, (await bo.dbg('settings')).tableName,
+        'never the parent’s name — that is two tables nobody can tell apart');
+
+      // --- …and comes back --------------------------------------------------
+      try {
+        await alice.eval(`[...document.querySelectorAll('#rail-roster .rail-ghost')]
+          .find((b) => b.textContent.includes('Main table')).click()`);
+      } catch { /* the click navigates */ }
+      const back = await landedAtTable(alice);
+      assert.equal(back, `?room=${encodeURIComponent(ctx.room)}`,
+        `↩ Main table is a door, not a label (landed: ${back})`);
+      alice.url = `${alice.url.split('?')[0]}${back}`;
+      await alice.waitFor(`window.__diceDebug.players.length === 2`,
+        { desc: 'the party is back together' });
+      assert.deepEqual((await alice.dbg('presenceRow')).pills, ['Bo'],
+        'with Bo still where she left him');
+      assert.deepEqual((await alice.dbg('subtables')).children.map((c) => c.name), ['The Vault'],
+        'and the breakout still listed to walk back into');
+    },
+  },
+  {
+    name: 'split-follower',
+    tags: ['subtables', 'chrome'],
+    // THE SPLITTER NEVER ARRIVES. `__diceDebug.split()` registers the child and
+    // deliberately does not navigate, so the breakout exists as a key nobody has
+    // walked into yet — which is the ordinary case the moment two people press
+    // things in a different order.
+    //
+    // WHAT THIS CATCHES: the child's parent pointer and its inherited felt were
+    // written by the SPLITTER's sessionStorage carry, so an implementation that
+    // only ever wrote that carry on the splitting tab would give the follower a
+    // bare room with no way back — and the failure is invisible to anyone who
+    // tests the split by following their own link. The Breakouts menu row has to
+    // write the same two pieces of carry, which is why this drives the ROW.
+    //
+    // The third leg is the RAW URL population: a fresh tab that never saw the
+    // parent, never had a carry, and must read the parent off the SERVER.
+    async fn(ctx) {
+      const alice = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const bo = await ctx.newTable({ origin: '127.0.0.131', name: 'Bo' });
+      await alice.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'Bo sits down' });
+      await alice.dbg(`setFelt('emerald')`);
+      await bo.waitFor(`window.__diceDebug.settings.felt === 'emerald'`, { desc: 'the felt is shared' });
+
+      const key = await alice.dbg(`split('Side Room')`);
+      assert.ok(key, 'the split landed and handed back the key');
+      await bo.waitFor(`window.__diceDebug.subtables.children.length === 1`,
+        { desc: 'the directory reaches Bo' });
+
+      // Bo opens the directory and walks the row. This is the only path a
+      // non-splitter has, and it is a MENU, so it is driven as one.
+      await bo.eval(`[...document.querySelectorAll('#rail-roster .rail-ghost')]
+        .find((b) => b.textContent.includes('Breakouts')).click()`);
+      await bo.waitFor(`!!document.querySelector('.rail-menu .idm-item')`,
+        { desc: 'the breakouts menu opens' });
+      assert.deepEqual(
+        await bo.eval(`[...document.querySelectorAll('.rail-menu .idm-item')].map((b) => b.textContent)`),
+        ['Side Room'], 'the menu lists the breakout by name');
+      try {
+        await bo.eval(`document.querySelector('.rail-menu .idm-item').click()`);
+      } catch { /* the row navigates */ }
+
+      const search = await landedAtTable(bo);
+      assert.equal(search, `?room=${encodeURIComponent(key)}`, `Bo landed in the breakout (got: ${search})`);
+      bo.url = `${bo.url.split('?')[0]}${search}`;
+      await bo.waitFor(`!!window.__diceDebug.subtables.parent`,
+        { desc: 'the follower declares the parent the splitter never did' });
+      assert.equal((await bo.dbg('subtables')).parent.room, ctx.room,
+        'the way back is there for the person who arrived first');
+      assert.equal((await bo.dbg('settings')).felt, 'emerald',
+        'and the felt came with him, though the splitter never set foot here');
+      assert.deepEqual(await splitGhosts(bo), ['↩ Main table'], 'one door, pointing home');
+
+      // THE RAW URL. A tab that never saw the parent holds no carry at all, so
+      // everything it knows about the split it read off the server.
+      const stranger = await bootTab(ctx, {
+        origin: '127.0.0.132',
+        path: `/?room=${encodeURIComponent(key)}`,
+        seed: { 'dice.name.v1': 'Cass' },
+        readyExpr: `!!window.__diceDebug && window.__diceDebug.netReady`,
+        readyDesc: 'the stranger boots at the breakout',
+      });
+      await stranger.waitOnline();
+      assert.equal(
+        await stranger.eval(`sessionStorage.getItem('dice.subtable.v1:' + ${JSON.stringify(key)})`), null,
+        'the stranger carries nothing — this leg proves the SERVER answered');
+      const seen = await stranger.dbg('subtables');
+      assert.equal(seen.parent.room, ctx.room, 'the parent came off the join snapshot');
+      assert.equal(seen.canSplit, false, 'and a breakout may not split again');
+      assert.deepEqual(await splitGhosts(stranger), ['↩ Main table'],
+        'the way back is a live read, not a memory of one');
+    },
+  },
+  {
+    name: 'split-chrome-quiet',
+    tags: ['subtables', 'chrome'],
+    // A TABLE THAT NEVER SPLITS CARRIES NOT ONE PIXEL OF NEW CHROME (§7.9), and
+    // the AUTHORING verb is withheld in exactly three places. Both halves matter
+    // and they fail in opposite directions: a directory that stands empty is
+    // standing chrome, and a `Split table…` that only ever refuses is worse than
+    // no item at all (the item would 403 in a breakout — one level, by design).
+    //
+    // WHAT THIS CATCHES: `canSplit` is a judgment with three terms
+    // (`!IN_LOBBY && netOnline && !roomParent`) and the menu item's own guard is
+    // a SECOND copy of it in another function — the two can drift, so both are
+    // read here at every population, and `#idm-split` is read as COMPUTED style
+    // rather than as a class.
+    async fn(ctx) {
+      // (i) A live top-level table: the verb is on offer, the directory is not.
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const quiet = await a.dbg('subtables');
+      assert.equal(quiet.canSplit, true, 'any player may split a live table (goal 10)');
+      assert.deepEqual(quiet.children, [], 'nothing is listed yet');
+      assert.equal(quiet.parent, null, 'and it is nobody’s breakout');
+      const labels = await ghostLabels(a);
+      assert.ok(!labels.includes('Breakouts ▾') && !labels.includes('↩ Main table'),
+        `neither face of the split stands before there is one (got: ${JSON.stringify(labels)})`);
+
+      const idmSplitDisplay = async (t) => {
+        await t.eval(`document.getElementById('identity-chip')
+          .dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))`);
+        await t.waitFor(`!document.getElementById('identity-menu').classList.contains('hidden')`,
+          { desc: 'the identity menu opens' });
+        const d = await t.eval(`getComputedStyle(document.getElementById('idm-split')).display`);
+        await t.eval(`document.getElementById('identity-chip').click()`); // close it again
+        return d;
+      };
+      assert.notEqual(await idmSplitDisplay(a), 'none', 'Split table… stands at a live table');
+
+      // (ii) THE LOBBY — no table to split, so the verb is ABSENT, not greyed.
+      const lob = await lobbyTab(ctx, { origin: '127.0.0.133' });
+      const lobSubs = await lob.dbg('subtables');
+      assert.equal(lobSubs.canSplit, false, 'the lobby has no table to split');
+      assert.equal(lobSubs.room, null, 'and says so — there is no room');
+      assert.equal(await idmSplitDisplay(lob), 'none', 'the lobby menu does not carry the verb');
+
+      // (iii) SOLO — a table with no server holds no directory and has nobody to
+      // list one to. 'Leave & switch seat' is the one scripted door to
+      // netOnline=false (draft-bench's note); the tab is left at the seat modal,
+      // which is exactly the state a static/offline boot lands in.
+      await a.eval(`document.getElementById('idm-leave').click()`);
+      await a.waitFor(`window.__diceDebug.net.online === false`, { desc: 'the seat drops' });
+      const solo = await a.dbg('subtables');
+      assert.equal(solo.canSplit, false, 'no server, no split');
+      // Reopened rather than re-read: openIdentityMenu() is what evaluates the
+      // item's guard, so reading the inline style left over from step (i) would
+      // report the answer to a question asked while the table was still online.
+      assert.equal(await idmSplitDisplay(a), 'none', 'and the menu item goes with it');
+      // Re-seat so the tab ends sane (draft-bench's rule).
+      await a.eval(`(() => {
+        const i = document.getElementById('name-input');
+        i.value = 'Alice';
+        i.dispatchEvent(new Event('input'));
+        document.getElementById('name-join').click();
+      })()`);
+      await a.waitFor(`window.__diceDebug.net.online === true`, { desc: 're-seated' });
+
+      // (iv) INSIDE A BREAKOUT — one level, so the verb is withheld rather than
+      // offered and refused. This is the leg the server also enforces
+      // (403 already_a_subtable, tests/subtables.test.mjs); the claim here is
+      // that the client never asks.
+      const key = await a.dbg(`split('One Level')`);
+      assert.ok(key, 'the split landed');
+      await gotoRoom(a, key);
+      await a.waitFor(`!!window.__diceDebug.subtables.parent`, { desc: 'the breakout declares its parent' });
+      assert.equal((await a.dbg('subtables')).canSplit, false,
+        'a breakout cannot split again — the verb stops one level down');
+      assert.equal(await idmSplitDisplay(a), 'none',
+        'so the item is absent rather than an offer that always refuses');
+      assert.deepEqual(await splitGhosts(a), ['↩ Main table'],
+        'the only split furniture here is the way back — never a second directory');
+      // …and the refusal is real on the wire, so the withholding is a courtesy
+      // rather than the whole enforcement.
+      const refused = await ctx.api('/api/split', {
+        room: key, playerId: await a.playerId(), child: `${key}-deeper`, childName: 'Deeper',
+      });
+      assert.equal(refused.status, 403, 'the server refuses a second level outright');
+      assert.equal(refused.data && refused.data.code, 'already_a_subtable',
+        `and names why (got: ${JSON.stringify(refused.data)})`);
+    },
+  },
+  {
+    name: 'split-orphan',
+    tags: ['subtables'],
+    // THE POINTER IS A DOOR, NOT A HANDLE. Nothing holds a reference to another
+    // room object, so emptying the parent cannot dangle anything — following the
+    // way back walks into a room with that key, freshly created, exactly as an
+    // invite link does.
+    //
+    // WHAT THIS CATCHES: the tempting "tidy" implementations. A reaper that
+    // removed the child's `parent` when the parent room evaporated, or a ghost
+    // that rendered only while the parent was live, would both pass every other
+    // scenario in this file and strand a breakout with no way home — which is
+    // the precise state a group ends an evening in, because the main table
+    // empties FIRST while the side room is still playing.
+    async fn(ctx) {
+      const alice = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const parentSeat = await alice.playerId();
+      const key = await alice.dbg(`split('Vault')`);
+      assert.ok(key, 'the split landed');
+      await gotoRoom(alice, key);
+      await alice.waitFor(`!!window.__diceDebug.subtables.parent`, { desc: 'Alice is in the breakout' });
+
+      // The parent is now EMPTY — an unprepared room is deleted the moment its
+      // last player leaves (§G6), so the room object Alice's pointer names is
+      // gone from the server entirely.
+      //
+      // The seat is dropped through the API rather than waited out, and that is
+      // the bfcache defect above rather than a shortcut: walking into a breakout
+      // sends no beacon, so Alice's seat at the parent would sit there for ~75 s
+      // (LIVENESS_TIMEOUT_MS + the grace). This is exactly what the server does
+      // when the seat finally goes — it is the same handleLeave — so the state
+      // under test is the real one, reached in one second instead of seventy-five.
+      const gone = await ctx.api('/api/leave', { playerId: parentSeat, immediate: true });
+      assert.equal(gone.status, 200, 'the parent seat is given up');
+      await ctx.waitForLog(new RegExp(`room deleted: room="${ctx.room}"`), {
+        desc: 'the parent room evaporates once its last player is gone',
+      });
+
+      const orphan = await alice.dbg('subtables');
+      assert.equal(orphan.parent.room, ctx.room,
+        'the way back survives the room it points at — it is a KEY, not a handle');
+      assert.deepEqual(orphan.children, [],
+        'and the breakout still lists none of its own (one level, and no inheritance of the parent’s list)');
+      assert.deepEqual(await splitGhosts(alice), ['↩ Main table'],
+        'the door still RENDERS against a room nobody is in');
+
+      // …and it still WALKS. This is the assertion that separates a door from a
+      // label: following it must produce a live table at the same key.
+      try {
+        await alice.eval(`[...document.querySelectorAll('#rail-roster .rail-ghost')]
+          .find((b) => b.textContent.includes('Main table')).click()`);
+      } catch { /* the click navigates */ }
+      const back = await landedAtTable(alice);
+      assert.equal(back, `?room=${encodeURIComponent(ctx.room)}`,
+        `it walked into the main table's key (got: ${back})`);
+      alice.url = `${alice.url.split('?')[0]}${back}`;
+      assert.equal((await alice.dbg('identity')).online, true,
+        'and what is there is a live table, freshly created — the same way any invite link works');
+      // The DIRECTORY is what ends with the parent, and that is the documented
+      // trade: a list of live breakouts is presence, and a server that has
+      // forgotten the table cannot assert it (GOALS: presence is asserted,
+      // never inferred).
+      assert.deepEqual((await alice.dbg('subtables')).children, [],
+        'the recreated room carries no directory — it is a new room with an old key');
+    },
+  },
+  {
+    name: 'split-reconnect',
+    tags: ['subtables', 'net'],
+    // PRESENT-OR-ABSENT, BOTH WAYS. `hello` fires on every stream (re)open and
+    // carries the sub-table wiring only when the room actually holds it, so the
+    // client must ADOPT what the room says rather than keep what it last saw.
+    //
+    // WHAT THIS CATCHES, and it is two opposite bugs with one rule between them:
+    //  · `roomParent = data.parent || roomParent` (keep-what-we-had) survives a
+    //    reconnect fine and then shows a ↩ Main table that points nowhere after
+    //    a server restart — a memory rendered as a live read, which is exactly
+    //    the class docs/TESTING.md P8 is about;
+    //  · a naive `= data.parent` with no re-render leaves the ghost on screen
+    //    after the state under it changed.
+    // The restart is MANUFACTURED rather than waited for: a room the server has
+    // never heard of answers the join with no `parent` key at all, which is
+    // byte-identical to what a restarted server sends for a room it forgot.
+    async fn(ctx) {
+      const alice = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const key = await alice.dbg(`split('Cellar')`);
+      assert.ok(key, 'the split landed');
+      await gotoRoom(alice, key);
+      await alice.waitFor(`!!window.__diceDebug.subtables.parent`, { desc: 'Alice is in the breakout' });
+      const before = JSON.stringify(await alice.dbg('subtables.parent'));
+
+      // (i) A STREAM REOPEN. The room still holds the split, so hello carries it
+      // and nothing may change.
+      const live = await ctx.api('/api/join', { room: key, name: 'Witness' });
+      assert.equal(live.status, 200, 'the witness joined the breakout');
+      assert.ok(live.data.parent && live.data.parent.room === ctx.room,
+        `and the join snapshot itself carries the parent (got: ${JSON.stringify(live.data.parent)})`);
+      await alice.eval(`window.__diceDebug.netEvent('hello', ${JSON.stringify(live.data)})`);
+      assert.equal(JSON.stringify(await alice.dbg('subtables.parent')), before,
+        'a reconnect leaves the way back exactly as it was');
+      assert.deepEqual(await splitGhosts(alice), ['↩ Main table'], 'and the door is still drawn');
+
+      // (ii) THE SERVER FORGOT. A room with no split answers with no `parent`
+      // key — the shape a restarted server produces — and the client must fall
+      // to null rather than keep a stale memory.
+      const amnesiac = await ctx.api('/api/join', { room: `${key}-restarted`, name: 'Witness' });
+      assert.equal(amnesiac.status, 200, 'the stand-in room exists');
+      assert.equal(Object.hasOwn(amnesiac.data, 'parent'), false,
+        `a room holding no split says so by OMISSION (got keys: ${Object.keys(amnesiac.data)})`);
+      await alice.eval(`window.__diceDebug.netEvent('hello', ${JSON.stringify(amnesiac.data)})`);
+      assert.equal(await alice.dbg('subtables.parent'), null,
+        'absent means absent — the way back falls to null, it is not remembered');
+      assert.deepEqual(await splitGhosts(alice), [],
+        'and the ghost leaves with the fact it was drawing');
     },
   },
 ];
