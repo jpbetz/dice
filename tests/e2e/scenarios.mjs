@@ -250,12 +250,30 @@ async function settleNavigation(t, expr, desc, { timeout = 30000 } = {}) {
 }
 
 // Landed at a table: out of the lobby, online — resolves '?room=<key>'.
-const landedAtTable = (t) => settleNavigation(
+// `from` is the search string the tab was on BEFORE the act that navigates, and
+// leaving it out is a race this suite lost on 2026-08-15. The predicate below is
+// "the app is online at some table" — it says nothing about having MOVED. After
+// a click that navigates, the old page stays alive and online for a moment, so
+// the poll can sample the PRE-navigation state and report the old room as the
+// landing. It normally gets away with it because the context tears down fast
+// enough that `t.eval` throws (caught, retried) until the new page is up — i.e.
+// the helper was passing on a timing accident, not on its own claim.
+//
+// Measured: `journey-split-the-party` went red once in a full sweep and green
+// three times in isolation, because a synchronous `sendBeacon` added ahead of
+// `location.href` (main.js gotoTable, the walker's goodbye) widened that window
+// by a hair. An intermittent red that only appears under load is the worst
+// possible shape for this, so pass `from` whenever a CLICK causes the
+// navigation; the helper then refuses to accept the room you started in.
+const landedAtTable = (t, from = null) => settleNavigation(
   t,
-  `(!!window.__diceDebug && (window.__diceDebug.identity || {}).lobby === false)`
+  `(!!window.__diceDebug && (window.__diceDebug.identity || {}).lobby === false`
+  + (from === null ? '' : ` && window.location.search !== ${JSON.stringify(from)}`)
+  + `)`
   + ` ? window.__diceDebug.netReady.then((r) => !!(r && r.online) && window.location.search)`
   + ` : false`,
-  'the navigation to land at a table',
+  from === null ? 'the navigation to land at a table'
+    : `the navigation to land at a table other than ${from}`,
 );
 
 // Landed in the lobby: the bare url, and the app says lobby.
@@ -10706,11 +10724,13 @@ export const scenarios = [
       await a.eval(`[...document.querySelectorAll('#rail-roster .rail-ghost')]
         .find((b) => b.textContent.includes('Tables')).click()`);
       await a.waitFor(`!!document.querySelector('.rail-menu')`, { desc: 'the Tables menu opens' });
+      // It must actually MOVE: landedAtTable refuses the room it started in.
+      const aFrom = await a.eval(`window.location.search`);
       try {
         await a.eval(`[...document.querySelectorAll('.rail-menu .idm-item')]
           .find((b) => b.textContent === 'Round Trip').click()`);
       } catch { /* navigation */ }
-      const back = await landedAtTable(a);
+      const back = await landedAtTable(a, aFrom);
       assert.equal(decodeURIComponent(back.replace('?room=', '')), key,
         'the recents row returns to the SAME key');
 
@@ -14675,10 +14695,12 @@ export const scenarios = [
         await alice.eval(`[...document.querySelectorAll('.rail-menu .idm-item')].map((b) => b.textContent)`),
         [ctx.room],
         'the game she just left is the one row she is offered (unnamed, so the row wears the key)');
+      // It must actually MOVE: landedAtTable refuses the room it started in.
+      const aliceFrom = await alice.eval(`window.location.search`);
       try {
         await alice.eval(`document.querySelector('.rail-menu .idm-item').click()`);
       } catch { /* the navigation */ }
-      const back = await landedAtTable(alice);
+      const back = await landedAtTable(alice, aliceFrom);
 
       // WHAT SHE ENDS UP HOLDING: the same table, as herself, with her work.
       assert.equal(decodeURIComponent(back.replace('?room=', '')), ctx.room,
@@ -17268,6 +17290,9 @@ export const scenarios = [
         'no breakout furniture at a table that has never split');
 
       // --- Alice splits the party ------------------------------------------
+      // splitViaMenu navigates, so hold the room she is leaving: landedAtTable
+      // refuses to report the room a tab started in (see its note).
+      const aliceFrom = await alice.eval(`window.location.search`);
       await splitViaMenu(alice, 'The Vault');
 
       // …and the FIRST thing that has to be true is on somebody ELSE's screen.
@@ -17293,7 +17318,7 @@ export const scenarios = [
         'and the row is REACHABLE — one ghost in the presence row, no more');
 
       // --- Alice lands in the breakout --------------------------------------
-      const search = await landedAtTable(alice);
+      const search = await landedAtTable(alice, aliceFrom);
       assert.equal(search, `?room=${encodeURIComponent(child.room)}`,
         `the splitter landed in the room she just registered (got: ${search})`);
       alice.url = `${alice.url.split('?')[0]}${search}`;
@@ -17324,11 +17349,13 @@ export const scenarios = [
         'never the parent’s name — that is two tables nobody can tell apart in a recents list');
 
       // --- …and comes back --------------------------------------------------
+      // It must actually MOVE: landedAtTable refuses the room it started in.
+      const aliceFromVault = await alice.eval(`window.location.search`);
       try {
         await alice.eval(`[...document.querySelectorAll('#rail-roster .rail-ghost')]
           .find((b) => b.textContent.includes('Main table')).click()`);
       } catch { /* the click navigates */ }
-      const back = await landedAtTable(alice);
+      const back = await landedAtTable(alice, aliceFromVault);
       assert.equal(back, `?room=${encodeURIComponent(ctx.room)}`,
         `↩ Main table is a door, not a label (landed: ${back})`);
       alice.url = `${alice.url.split('?')[0]}${back}`;
@@ -17378,11 +17405,13 @@ export const scenarios = [
       assert.deepEqual(
         await bo.eval(`[...document.querySelectorAll('.rail-menu .idm-item')].map((b) => b.textContent)`),
         ['Side Room'], 'the menu lists the breakout by name');
+      // It must actually MOVE: landedAtTable refuses the room it started in.
+      const boFrom = await bo.eval(`window.location.search`);
       try {
         await bo.eval(`document.querySelector('.rail-menu .idm-item').click()`);
       } catch { /* the row navigates */ }
 
-      const search = await landedAtTable(bo);
+      const search = await landedAtTable(bo, boFrom);
       assert.equal(search, `?room=${encodeURIComponent(key)}`, `Bo landed in the breakout (got: ${search})`);
       bo.url = `${bo.url.split('?')[0]}${search}`;
       await bo.waitFor(`!!window.__diceDebug.subtables.parent`,
@@ -17566,11 +17595,13 @@ export const scenarios = [
 
       // …and it still WALKS. This is the assertion that separates a door from a
       // label: following it must produce a live table at the same key.
+      // It must actually MOVE: landedAtTable refuses the room it started in.
+      const aliceFrom = await alice.eval(`window.location.search`);
       try {
         await alice.eval(`[...document.querySelectorAll('#rail-roster .rail-ghost')]
           .find((b) => b.textContent.includes('Main table')).click()`);
       } catch { /* the click navigates */ }
-      const back = await landedAtTable(alice);
+      const back = await landedAtTable(alice, aliceFrom);
       assert.equal(back, `?room=${encodeURIComponent(ctx.room)}`,
         `it walked into the main table's key (got: ${back})`);
       alice.url = `${alice.url.split('?')[0]}${back}`;
