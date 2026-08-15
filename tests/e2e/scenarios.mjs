@@ -6354,6 +6354,25 @@ export const scenarios = [
     // as ids, classes and storage keys. This reads the chrome a
     // player actually sees — labels, tooltips, placeholders, both cheat sheets
     // — and fails if either retired word comes back into view.
+    //
+    // TWO THINGS IT DID NOT DO, both fixed 2026-08-15.
+    //
+    // (1) It swept only the STANDING chrome — the panel, the rail, the modals —
+    // and not one RESULT surface. The banner, the ceremony's verdict card, the
+    // peek, the log flyout, the offer cards and the offer menu are where the
+    // most words in the app are written, and they were outside the sweep
+    // entirely. 'category' was missing from the banned list besides, though it
+    // is what the shelf heads were called before §7.23 renamed them.
+    //
+    // (2) …and a sweep of those surfaces is worth nothing unless they are
+    // POPULATED. Every one of them is empty and hidden at rest, and an empty
+    // node contains no strings, so adding them to `roots` and sweeping a quiet
+    // table is this repo's dominant failure mode wearing a passing test: a
+    // green check over eight surfaces nobody looked at. So the table is played
+    // first — a sourced ceremony, a sourced roll, the roll put away and its
+    // peek opened (which opens the log with it), a teammate's offer standing,
+    // the offer menu open, and manage mode on so '＋ New shelf…' is on screen —
+    // and every root is asserted to CARRY TEXT before a single word is judged.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
       // seed uncategorized pools: the plain-shelf name is what this reads
@@ -6375,33 +6394,102 @@ export const scenarios = [
       assert.ok(!(await a.eval(`document.body.innerText.toLowerCase().includes('rack')`)),
         "no visible chrome says 'rack'");
       // The delete affordance exists only in manage mode now (P2) — enter it
-      // so the sweep still reads the word a player would actually see.
+      // so the sweep still reads the word a player would actually see. It STAYS
+      // on: '＋ New shelf…' is a manage-mode control and is one of the words
+      // §7.23's rename produced.
       await a.dbg('setPoolsEditMode(true)');
       assert.equal(await a.eval(`document.querySelector('#groups-list .group-del').title`),
         'Delete pool', 'the row ✕ deletes a pool');
-      await a.dbg('setPoolsEditMode(false)');
+      assert.ok(await a.eval(`[...document.querySelectorAll('#left-panel *')]
+        .some((e) => (e.textContent || '').includes('New shelf'))`),
+        "the shelf-minting control says 'shelf' and is on screen for the sweep");
+
+      // ---- PLAY THE TABLE, so the result surfaces have something to say ----
+      const b = await ctx.newTable({ origin: '127.0.0.5', name: 'Bob' });
+      await a.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'a teammate arrives' });
+      assert.equal((await b.dbg(`offerRoll('d20 # Perception')`)).ok, true, 'Bob offers a roll');
+      await a.waitFor(`window.__diceDebug.offers.length === 1`, { desc: 'the offer card stands' });
+
+      // A sourced CEREMONY — the verdict card, with pool labels on it.
+      await a.dbg(`commandRoll('2d8[Wisdom]+1d10[Sword] check dc12 # Steady the Rope')`);
+      await a.waitFor(
+        `(window.__diceDebug.skipCeremony(), window.__diceDebug.sim(30),
+          (window.__diceDebug.ceremonyState || {}).phase === 'done')`,
+        { desc: 'the verdict card is staged' });
+      await a.dbg('retireCeremony()');
+      await a.settle();
+
+      // …a sourced ordinary roll (the banner), put away, and its peek opened —
+      // which opens the log flyout with it, since C25 made the row the door.
+      await a.roll('2d8[Wisdom]+1d6[Zeal] # Hunt');
+      const rid = await a.rollId();
+      await a.dbg(`collectRoll(${JSON.stringify(rid)})`);
+      await a.settle();
+      assert.equal(await a.dbg(`peek(${JSON.stringify(rid)})`), rid, 'the peek card opens');
+      assert.equal(await a.eval(
+        `document.getElementById('log-flyout').classList.contains('hidden')`), false,
+        'and the log flyout came with it');
+
+      // …the status pill, which only ever holds a transient sentence …
+      await b.dbg(`setFelt('crimson')`);
+      await a.waitFor(`!!document.getElementById('status-pill').textContent`,
+        { desc: 'the pill carries a table note' });
+
+      // …and the offer menu, opened LAST because a roster event closes it.
+      await a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = 'd20 # Save vs fear';
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      await a.waitFor(`!document.getElementById('offer-pick').classList.contains('hidden')
+        && !document.getElementById('offer-pick').disabled`, { desc: 'the ▾ picker stands' });
+      await a.eval(`document.getElementById('offer-pick').click()`);
+      await a.waitFor(`!document.getElementById('offer-menu').classList.contains('hidden')`,
+        { desc: 'the offer menu opens' });
 
       // The sweep itself: every label, tooltip, placeholder and text node in
       // the chrome a player can read. Storage keys and class names are not
       // reachable this way, which is exactly the line the contract draws.
-      const stray = await a.eval(`(() => {
+      // It reports what each root CARRIED as well as what was wrong, so the
+      // populated-ness of the surfaces is asserted rather than assumed.
+      const swept = await a.eval(`(() => {
         const roots = ['#left-panel', '#rail', '#kbd-overlay', '#mods-popover',
                        '#settings-modal', '#cmd-cheatsheet', '#identity-menu',
-                       '#help-overlay'];
-        const banned = /\\btrays?\\b|\\bgroups?\\b|\\bracks?\\b|\\bcompose\\b/i;
+                       '#help-overlay',
+                       // the RESULT surfaces (2026-08-15) — where the words are
+                       '#result-banner', '#ceremony-layer', '#peek-card',
+                       '#log-flyout', '#offers-layer', '#offer-menu',
+                       '#name-modal', '#status-pill'];
+        const banned = /\\btrays?\\b|\\bgroups?\\b|\\bracks?\\b|\\bcompose\\b|\\bcategor(?:y|ies)\\b/i;
         const bad = [];
+        const empty = [];
         for (const sel of roots) {
           const root = document.querySelector(sel);
-          if (!root) continue;
+          if (!root) { empty.push(sel + ' (no such element)'); continue; }
+          let chars = 0;
           for (const el of [root, ...root.querySelectorAll('*')]) {
             const texts = [el.title || '', el.placeholder || '', el.getAttribute('aria-label') || ''];
             for (const kid of el.childNodes) if (kid.nodeType === 3) texts.push(kid.nodeValue);
-            for (const t of texts) if (banned.test(t)) bad.push(sel + ' → ' + t.trim());
+            for (const t of texts) {
+              chars += String(t).trim().length;
+              if (banned.test(t)) bad.push(sel + ' → ' + String(t).trim());
+            }
           }
+          if (chars === 0) empty.push(sel);
         }
-        return bad;
+        return { bad, empty };
       })()`);
-      assert.deepEqual(stray, [], `no user-facing 'tray'/'group' remains (found ${JSON.stringify(stray)})`);
+      // THE GUARD BEFORE THE CLAIM: a root with nothing in it cannot fail the
+      // sweep, so an empty one is a failure of the sweep and not a pass.
+      assert.deepEqual(swept.empty, [],
+        `every swept surface carried text — an empty root is a green check over `
+        + `nothing (empty: ${JSON.stringify(swept.empty)})`);
+      assert.deepEqual(swept.bad, [],
+        `no user-facing 'tray'/'group'/'rack'/'compose'/'category' remains `
+        + `(found ${JSON.stringify(swept.bad)})`);
+
+      await a.dbg('peek(null)');
+      await a.dbg('setPoolsEditMode(false)');
     },
   },
 
