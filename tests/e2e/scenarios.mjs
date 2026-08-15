@@ -583,28 +583,33 @@ const ghostLabels = async (t) => (await t.dbg('presenceRow')).ghosts.map((g) => 
 const SPLIT_GHOSTS = ['Breakouts ▾', '↩ Main table'];
 const splitGhosts = async (t) => (await ghostLabels(t)).filter((l) => SPLIT_GHOSTS.includes(l));
 
-// MEASURED 2026-08-15 AND NOT YET FIXED — read this before writing another
-// sub-table scenario, because it changes what a roster assertion can mean.
+// MEASURED AND FIXED 2026-08-15 — read this before writing another sub-table
+// scenario, because it is the reason `walker-says-goodbye` exists.
 //
 // gotoTable() is a plain `location.href =` (main.js: ROOM is a module const, so
 // every table transition is a real page load), and in that navigation Chrome
 // fires `pagehide` with **`persisted: true`** — the page is bfcache-eligible.
 // main.js's beacon handler returns early on `persisted`, by design ("let the
-// liveness sweep decide if it never comes back"), so NO /api/leave is sent when
-// a player walks from one table to another. Probed directly: pagehide fires,
-// `navigator.sendBeacon` is never called, and the walker's pill was still on the
-// old table's roster 15 s later with the server log showing no `left` line at
-// all. The seat clears on LIVENESS_TIMEOUT_MS + DISCONNECT_GRACE_MS ≈ 75 s.
+// liveness sweep decide if it never comes back"), so NO /api/leave was sent
+// when a player walked from one table to another. Probed directly: pagehide
+// fired, `navigator.sendBeacon` was never called, and the walker's pill was
+// still on the old table's roster 15 s later with the server log showing no
+// `left` line at all. The seat cleared on LIVENESS_TIMEOUT_MS +
+// DISCONNECT_GRACE_MS ≈ 75 s.
 //
-// It bites hardest here because walking between tables IS this journey, and
+// It bit hardest here because walking between tables IS this journey, and
 // renderPlayers' own rationale claims the opposite ("when three of five players
-// walk into a breakout, this row loses three pills"). leaveToLobby() already
-// solves the identical problem for its navigation — it disarms the stream and
-// awaits an immediate leave — and gotoTable never got the same treatment.
+// walk into a breakout, this row loses three pills").
 //
-// So: a scenario may NOT wait on the parent emptying by itself, and must not
-// assert "the walker's pill is gone" until this is fixed. split-orphan empties
-// the seat through the API on purpose, and says so at the call site.
+// THE FIX, and the first attempt at it was wrong in an instructive way:
+// gotoTable now fires `net.leave()` — the **beacon** form — before navigating.
+// The obvious move was to copy leaveToLobby(), which awaits
+// `leave({immediate:true})`; that broke three scenarios outright, because an
+// awaited POST either delays a navigation or, if it rejects, replaces it. The
+// page is leaving, so the transport has to be the one that survives a teardown
+// and cannot be awaited. It is also the right semantics: the soft beacon drops
+// the stream and leaves the SEAT on the ordinary grace, because walking to a
+// breakout and back is a round trip, not a resignation.
 
 export const scenarios = [
   {
@@ -17256,6 +17261,23 @@ export const scenarios = [
       assert.equal((await bo.dbg('settings')).felt, 'emerald',
         'and the felt came with him, though the splitter never set foot here');
       assert.deepEqual(await splitGhosts(bo), ['↩ Main table'], 'one door, pointing home');
+
+      // THE WALKER SAYS GOODBYE. Bo walked out through the app's own door, so
+      // Alice — who never moved — must lose his pill in seconds, not on the
+      // ~75 s liveness sweep. This is the assertion the ghost-seat note above
+      // says could not be written until gotoTable fired its beacon: before that
+      // fix, `pagehide` returned early on `persisted: true`, no /api/leave was
+      // ever sent, and Bo stood on this roster with no `left` line on the
+      // server at all. It is also renderPlayers' own claim, tested for the
+      // first time: "when three of five players walk into a breakout, this row
+      // loses three pills".
+      //
+      // Deliberately NOT driven through gotoRoom(): that helper assigns
+      // location.href itself and would walk straight past the code under test.
+      await alice.waitFor(`window.__diceDebug.players.every((p) => p.name !== 'Bo')`,
+        { desc: "Bo's pill leaves the parent when Bo does", timeout: 8000 });
+      assert.equal(await alice.eval(`window.__diceDebug.players.length`), 1,
+        'and the roster is just Alice, without waiting out a liveness timeout');
 
       // THE RAW URL. A tab that never saw the parent holds no carry at all, so
       // everything it knows about the split it read off the server.

@@ -23660,7 +23660,33 @@ function takePendingTableName() {
 // some fifty netOnline sites assume the room identity does not change under
 // them; a same-page swap is a real refactor for something that happens a few
 // times a session (§7.20 seams, §3b L3).
+// SAY THE DEPARTURE BEFORE THE PAGE GOES — the other door, found 2026-08-15 by
+// `journey-split-the-party`. `pagehide` is the general safety net and it
+// deliberately returns early on `persisted` (see its comment: a bfcache page
+// may be restored, so its seat must survive). **But a gotoTable navigation
+// fires pagehide with `persisted: true`**, and that page is never coming back —
+// so the beacon was never sent, the server never saw a `left` line at all, and
+// the walker's pill stood on the old roster until the liveness sweep reaped it
+// ~75 s later. `renderPlayers`' own rationale claims the opposite ("this row
+// loses three pills"), which is what would have stopped the next reader from
+// looking.
+//
+// **The BEACON form, not leaveToLobby's `immediate` POST**, and the difference
+// is the whole fix. `leave({immediate:true})` is a normal awaited POST because
+// leaveToLobby's page STAYS long enough to own the response; this page is
+// already navigating, so awaiting it either delays the navigation or — if the
+// POST rejects — never navigates at all. (Measured, on the first attempt at
+// this fix: three scenarios walked nowhere.) `leave()` uses `sendBeacon`, the
+// one transport the browser promises to deliver across a teardown, and it
+// cannot be awaited by design.
+//
+// It is also the correct SEMANTICS. The soft beacon drops this stream and
+// leaves the seat on the ordinary grace — walking to a breakout and back is a
+// round trip, not a resignation, so the seat you left is still yours to sit
+// back down in. leaveToLobby stays `immediate` + `forgetSeat`: that verb IS a
+// resignation.
 function gotoTable(room) {
+  if (net && netOnline) net.leave();
   window.location.href = room
     ? `${window.location.pathname}?room=${encodeURIComponent(room)}`
     : window.location.pathname;
