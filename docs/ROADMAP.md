@@ -509,42 +509,41 @@ Section number kept so cross-references resolve.
 *From [CUJS.md](CUJS.md), the only place a CUJ number is assigned. The audit's
 landings — C6–C10, C16–C21, C23, C30–C33 — are in SHIPPED.md.*
 
-### C1. CUJ8–CUJ11 — the session, named and then walked — medium
+### C1 / C3. The composed journey walks — SHIPPED 2026-08-15
 
-The largest journey in the product had no entry anywhere. Everything between
-"I joined" and "I left" was absent from Joe's five (entirely about *rooms*)
-and from PROFILES' two jobs (entirely about *characters*). **The measurable
-cost: all 30 Tier U findings were found by reading code**, because there was
-no journey to walk.
+Twelve composed walks and a `journey` tag; `--only journey` is a release gate
+in [TESTING.md](TESTING.md), with the journey→scenario table and what makes a
+walk *composed* rather than merely tagged. `journey-roll-this-thing` is the
+shape: **thirteen part-scenarios get dice on the felt via `commandRoll`, which
+is the thing CUJ8's done-when forbids** — the walk types nothing and sets dc,
+advantage and name with real controls.
 
-**Decided 2026-08-08 (Joe): four journeys, not one** — CUJ8 *roll this
-specific thing*, CUJ9 *keep the table legible*, CUJ10 *control who sees this*,
-CUJ11 *follow along without rolling*. One journey covering 60% of the app
-cannot tell you what is missing.
+Kept as a record because the premise was measured, not argued: `prepared-seat`
+was green for weeks while CUJ3/CUJ7 were broken for **every returning player**,
+because the fixture seeded no name and so only ever tested first-timers.
 
-**Change:** a **composed** end-to-end scenario for each, on the
-`profile-dm-prepares` model — two players, a whole sequence, assertions about
-what a person ends up holding rather than about a widget.
+**Two things the pass found and could not fix:**
+
+- **`playRoll` does not wipe the felt** (§7.7 retired the overflow wipe), so a
+  film is baked against whatever bodies are standing. A stray die left on one
+  client's felt made two of three replayed dice bounce off it and turned
+  byte-identical poses into a coin flip. Production is safe *because
+  auto-collect keeps every client's felt equal* — but that is the mechanism by
+  which any future stray-body bug becomes a **cross-client divergence**, and
+  nothing asserts the precondition.
+- **`record.ranks` caps at 5** (the shelf cap), so CUJ9's "find what happened
+  earlier" past five put-away rolls runs through the log and its filter, not
+  the record. `journey-legible-evening` asserts both halves; whether five is
+  the right number is a design question nobody has asked.
 
 ### C2 / C15. Restore a library from the file it was written to — see C15
 
 C2 was the sketch; [C15](#c15-restore-the-file-this-app-writes-cannot-be-read-back--shipped-2026-08-15)
 is the measured shape and supersedes it. Number kept so links resolve.
 
-### C3. One composed scenario per journey — tags SHIPPED, composed scenarios open
+### C3. One composed scenario per journey — folded into C1
 
-**A journey with no end-to-end scenario passes in every part and fails as a
-whole**, and this is measured rather than argued: `prepared-seat` was green for
-weeks while CUJ3/CUJ7 were broken for **every returning player**, because the
-fixture seeded no name and so only tested first-timers.
-
-**Shipped half (2026-08-08):** 109 scenarios carry `cuj1`…`cuj13`, so
-`--only cuj7` runs the journey rather than a surface.
-
-**Open half:** the missing composed scenarios (CUJ8–CUJ11 via C1; CUJ2, CUJ4
-and CUJ12 have parts but no walk). Plus a line in [TESTING.md](TESTING.md): a
-journey's composed scenario is a release gate, and a feature that changes a
-journey updates it in the same commit.
+Section number kept so cross-references resolve.
 
 ### C4. One owner per numbering namespace — SHIPPED 2026-08-15
 
