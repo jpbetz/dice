@@ -2436,6 +2436,18 @@ export const scenarios = [
         await atLeast('the collapse strip', '#edge-toggle', 44, 44, halo);
         await atLeast('the identity chip', '#identity-chip', 34, 34);
         await atLeast('a teammate pill', '.roster-name', 34, 34);
+        // U28b: the EXPANDED rail foot, which U28 never asked about — the same
+        // five controls the collapsed block already fixed, in the state most
+        // people use. They were 31/28 and fail these lines before the coarse
+        // `min-height/min-width: 34px` rule; the floor is 34 rather than 44
+        // because the two families share ONE ROW, so `?` at 33px wide is the
+        // binding dimension and four 44px glyphs plus a 101px labelled ✕
+        // cannot fit a 260px column. (`#rail-help` is 34×34 too but is
+        // display:none when the rail collapses, so it belongs here in the
+        // expanded state and NOT in the collapsed block further down.)
+        await atLeast('the settings gear',   '#toggle-settings', 34, 34);
+        await atLeast('the log rail button', '#rail-log',        34, 34);
+        await atLeast('quick roll',          '#rail-palette',    34, 34);
 
         // ---- the well and its rim (a staged die builds both) ----
         await a.eval(`document.querySelector('#die-buttons .die-btn').click()`);
@@ -9077,6 +9089,72 @@ export const scenarios = [
             { desc: `${c.desc}: table cleared` });
         }
       }
+    },
+  },
+  {
+    name: 'scene-draw-budget',
+    tags: ['perf', 'roll', 'tower'],
+    // THE FRAME'S DRAW COUNT (ROADMAP V4), and the instrument is the point.
+    //
+    // `renderer.info.render.calls` is NOT a one-liner to read: three.js resets
+    // the counter inside every `renderer.render()`, and js/post.js issues up
+    // to 8 per frame — so the naive read reports the CLOSING QUAD's 1 draw
+    // call and calls it the scene's cost. `renderer.info.autoReset = false`
+    // plus a per-tick reset is what makes `renderAudit()` report the whole
+    // frame; this scenario is what makes that FALSIFIABLE.
+    //
+    // Two traps for whoever edits it. `sim()` ticks with render=false, so the
+    // audit always describes the last REAL rAF frame — always `waitFor` on the
+    // audit itself after changing scene state, never `sim()`. And read after
+    // `settle()`: mid-playback frames legitimately draw more. It cannot be a
+    // `look` scenario; it rolls dice on purpose, because a budget measured on
+    // an empty table is a budget for a table nobody is using.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      await a.settle();
+      // The instrument's own zero, so every number below is known to be
+      // measuring the scene rather than a constant: an empty table draws 2.
+      const empty = await a.dbg('renderAudit()');
+      assert.ok(empty.calls < 10,
+        `an empty table is nearly free (got ${empty.calls} draw calls)`);
+
+      // blackanvil is the heaviest registry tower — the budget's worst case.
+      await a.dbg(`setTower('blackanvil')`);
+      await a.waitFor(`window.__diceDebug.tower === 'blackanvil'`
+        + ` && window.__diceDebug.towerBodies().length > 0`,
+      { desc: 'the heaviest tower is socketed' });
+      await a.roll('4d6');
+      await a.settle();
+
+      const plain = await a.dbg('renderAudit()');
+      assert.equal(plain.passes, 1, 'a quiet frame is ONE pass');
+      assert.equal(plain.post, false, 'and does not pay for the post stack');
+      assert.ok(plain.calls <= 220,
+        `the worst plain frame stays under budget (measured 186, got ${plain.calls})`);
+      // THE CLAMP, ASSERTED RATHER THAN REMEMBERED. IMMERSION-AUDIT §10 called
+      // this an open gap for days; `git log -S` says the clamp has been there
+      // since `init` and was never missing. A gate is how a claim like that
+      // stops being re-copied.
+      assert.ok(plain.pixelRatio <= 2,
+        `setPixelRatio is clamped (got ${plain.pixelRatio})`);
+
+      await a.dbg('postForce(true)');
+      await a.waitFor(`window.__diceDebug.renderAudit().passes > 1`,
+        { desc: 'the post stack engages' });
+      const post = await a.dbg('renderAudit()');
+      assert.equal(post.passes, 8,
+        `base + glow + threshold + 4 blurs + composite (got ${post.passes})`);
+      // THE ANTI-COLLAPSE GUARD, and it belongs HERE and nowhere else. If
+      // `info.autoReset` ever comes back, this frame reports 1 instead of 246
+      // — the closing quad, mistaken for the scene. The same floor on the
+      // PLAIN frame is theatre: sabotaged it reads 81 (only the shadow pass is
+      // hidden), which is above any sane floor, so it can never fail.
+      assert.ok(post.calls > 40,
+        `the audit counts the WHOLE frame, not the last pass (got ${post.calls}; `
+        + 'a value near 1 means renderer.info.autoReset is back on)');
+      assert.ok(post.calls <= 300,
+        `and the composited frame stays under budget (measured 246, got ${post.calls})`);
+      await a.dbg('postForce(false)');
     },
   },
   {
