@@ -620,6 +620,45 @@ t('sumAtLeast answers a declared target on the everyday cases', () => {
   close(sumAtMost(sumForecast(['d20'], { modifier: 5 }), 5), 0);
 });
 
+t('sumAtLeast does not underflow a deep tail to a false zero', () => {
+  // `1 − cdf` cancels catastrophically here: 40d20 dl1's cdf reaches 1.0 in
+  // double precision hundreds of totals before its maximum, so the old form
+  // returned EXACTLY 0 for a total the pool can actually reach — and 0 is the
+  // word the renderer reserves for impossible. Caught in the rendered app,
+  // not here, which is why it is pinned here now.
+  const fc = sumForecast(Array(40).fill('d20'), { keep: { mode: 'dl', n: 1 } });
+  const idx = fc.values.length - 6;
+  const deep = fc.values[idx]; // 775, six totals from the top
+  assert.ok(fc.probs[idx] > 0, 'the total is reachable');
+  const tail = sumAtLeast(fc, deep);
+  assert.ok(tail > 0, `P(total >= ${deep}) must not be a false zero (got ${tail})`);
+  assert.ok(tail >= fc.probs[idx], 'the tail is at least the mass sitting in it');
+  assert.equal(1 - fc.cdf[idx - 1], 0, 'and the cancelling form really does return 0 here');
+  // the honest zero still is one
+  assert.equal(sumAtLeast(fc, fc.max + 1), 0, 'nothing reaches past the maximum');
+  // …and a CERTAINTY is still exactly 1: summing the tail instead would give
+  // 0.9999999999999998, which the renderer prints as '>99%'.
+  assert.equal(sumAtLeast(fc, fc.min), 1, 'P(>= min) is a certainty, not >99%');
+  assert.equal(sumAtLeast(fc, fc.min - 100), 1);
+  // and the tail agrees with the cdf wherever the cdf can be trusted
+  for (const i of [0, 1, 50, 300, 400]) {
+    close(sumAtLeast(fc, fc.values[i]), 1 - (i > 0 ? fc.cdf[i - 1] : 0), 1e-12);
+  }
+  // the two forms must agree over the whole axis, at both ends
+  for (let i = 0; i < fc.values.length; i++) {
+    const v = sumAtLeast(fc, fc.values[i]);
+    assert.ok(v > 0 && v <= 1, `P(>= ${fc.values[i]}) = ${v} is out of range`);
+    assert.ok(v >= fc.probs[i] * (1 - 1e-9), 'never below the mass at that total');
+  }
+  // monotone non-increasing, which the mixed-form implementation could break
+  let prev = 2;
+  for (const v of fc.values) {
+    const cur = sumAtLeast(fc, v);
+    assert.ok(cur <= prev + 1e-15, `P(>= ${v}) rose`);
+    prev = cur;
+  }
+});
+
 // --- the bench --------------------------------------------------------------
 // Warmed, because POOL-ANALYSIS §6.1's two published timings were not and
 // their ordering was impossible as a result. Method: 40 warm-up calls to let

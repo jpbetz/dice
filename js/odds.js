@@ -685,14 +685,29 @@ export function sumForecast(dice, mods) {
 // declared target needs, and the only place the app should be doing this
 // arithmetic. null on a refused forecast, so a caller cannot accidentally
 // print 0% where the honest answer is "we do not know".
+// WHICHEVER SIDE IS SMALL, and the two exact answers taken exactly. `1 − cdf`
+// alone cancels catastrophically in a deep tail — `40d20 dl1`'s cdf reaches
+// 1.0 in double precision hundreds of totals before its maximum, so `1 − below`
+// UNDERFLOWED TO EXACTLY 0 for totals the pool can really reach, and a caller
+// cannot tell that zero from the honest one (`pctText` prints both as `0%`).
+// It surfaced in the popover readout as a cell with visible mass whose
+// cumulative read was 0% — caught in the rendered app, 2026-08-17; the unit
+// suite was green throughout, because nothing had ever asked for a tail that
+// thin. Summing the tail alone fixes that end and spoils the other: P(≥ min)
+// came back 0.9999999999999998, which prints as `>99%` for a certainty.
+// So: the two edges are answered by definition, and otherwise the side with
+// less than half the mass is the one that gets summed.
 export function sumAtLeast(fc, n) {
   if (!fc || !fc.exact) return null;
+  let i = 0;
   let below = 0;
-  for (let i = 0; i < fc.values.length; i++) {
-    if (fc.values[i] >= n) break;
-    below = fc.cdf[i];
-  }
-  return Math.min(1, Math.max(0, 1 - below));
+  for (; i < fc.values.length && fc.values[i] < n; i++) below += fc.probs[i];
+  if (i === 0) return 1; // nothing is below n
+  if (i === fc.values.length) return 0; // nothing reaches n — a TRUE zero
+  if (below < 0.5) return Math.min(1, Math.max(0, 1 - below));
+  let tail = 0;
+  for (let j = fc.values.length - 1; j >= i; j--) tail += fc.probs[j];
+  return Math.min(1, Math.max(0, tail));
 }
 
 export function sumAtMost(fc, n) {

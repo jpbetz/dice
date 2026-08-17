@@ -19118,7 +19118,10 @@ function buildSumRead(fc, opts) {
     col.style.height = `${Math.max(4, (c.p / bins.peak) * 100)}%`;
     const cume = sumAtLeast(fc, c.lo);
     col.addEventListener('mouseenter', () => {
-      readText.textContent = `${cellWord(c)} · ${pctText(c.p)} · ${pctText(cume)} or better`;
+      // `13+ 47%` rather than `47% or better`: "better" would bake in
+      // higher-is-better, which is today's `total >= dc` but is not a law —
+      // §2.1's `target.cmp` reserves roll-under. `N+` states the comparison.
+      readText.textContent = `${cellWord(c)} · ${pctText(c.p)} · ${c.lo}+ ${pctText(cume)}`;
       read.style.setProperty('--fc-x', `${at(c.lo + (bins.width - 1) / 2)}%`);
       read.classList.add('on');
     });
