@@ -6533,6 +6533,14 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
   bottom: calc(12px + var(--banner-lift, 0px));
   /* the second half, and it is load-bearing: raising the floor without also
      lowering the ceiling would push the flyout's HEAD off the top of a
-     landscape phone — the one row that names what you are reading. */
-  max-height: min(60vh, calc(100vh - var(--banner-lift, 0px) - 24px));
+     landscape phone — the one row that names what you are reading. Measured
+     at 844x390 the lift is 165px and the clamp is what keeps the head at
+     y=12 instead of y=-21.
+     100dvh in the CLAMP, 60vh in the ceiling: the clamp is a promise about
+     what is actually on screen, and vh is the LARGE viewport (#left-panel's
+     own note, which the foot-under-the-keyboard bug was made of). The
+     ceiling keeps vh because it is a share of the page, and because the two
+     only ever meet through min() — the clamp can lower the resting 60vh,
+     never raise it. */
+  max-height: min(60vh, calc(100dvh - var(--banner-lift, 0px) - 24px));
 }
