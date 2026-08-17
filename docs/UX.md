@@ -6023,12 +6023,28 @@ against `TOWERS`, drops what it cannot socket, and names it in the receipt:
 > ✓ table prepared — 4 seats offered at this room · left behind: the tower
 > 'brassworks', which this build can't raise
 
-**It is never sent.** `validateSettingsPatch` refuses the ENTIRE push for one
-bad value and `net.pushTable` answers `null` for that, so an id sent hopefully
-would cost the felt, the name and every prepared seat — under the receipt
-"couldn't reach the table", over a table that answered perfectly. A file whose
-only table key was an unraisable tower refuses outright rather than reporting
-`✓ settings sent to the room` for an empty patch.
+**It is never sent**, and that is measured rather than reasoned.
+`validateSettingsPatch` refuses the ENTIRE push for one bad value and
+`net.pushTable` answers `null` for that, so an id sent hopefully would cost the
+felt, the name and every prepared seat — under the receipt "couldn't reach the
+table", over a table that answered perfectly. A file whose only table key was
+an unraisable tower refuses outright rather than reporting `✓ settings sent to
+the room` for an empty patch.
+
+Reproduce (start `node server.js` with `PORT=` any free port that is **not
+8123**, `POST /api/join`, then `POST /api/table`):
+
+```
+push {table:{tableName:'Forge night', felt:'obsidian', tower:'blackanvil'}, rev:1}
+  → 200 {applied:true}; a JOINER's settings.tower is 'blackanvil'
+    and setup.table is {tableName, felt, tower} — the tower is UP for them
+push {table:{tableName:'Would be lost', felt:'plum', tower:'brassworks'},
+      profiles:[{name:'Wren', …}], rev:2}
+  → 400 {"error":"invalid value for tower: brassworks"} — and the felt is still
+    'obsidian', the name still 'Forge night', seats still 0. One bad id costs
+    the whole push, which is why the apply site drops it instead.
+push {table:{tower:'none'}, rev:3}   → 200; the room's tower is 'none' again
+```
 
 **`tower: 'none'`.** Kept by the parse, unlike `name: ''`. An empty name is the
 *absence* of a name; `'none'` is a tower id with a registry row of its own and
