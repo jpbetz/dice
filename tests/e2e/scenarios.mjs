@@ -10673,6 +10673,213 @@ export const scenarios = [
         'down to its felt — `sand` here would be the replay this refuses');
     },
   },
+  {
+    name: 'peek-presence',
+    tags: ['prepared-seat', 'visibility', 'cuj3'],
+    // WHAT THE PRE-JOIN PEEK SAYS ABOUT WHO IS SITTING THERE (ROADMAP §3b L2).
+    //
+    // `GET /api/table` is the only unauthenticated read on the server, and its
+    // budget comment says "No players, no roster, no log, no offers". That has
+    // been inaccurate since C17 (2026-08-09) gave the peek a second seat
+    // source — every seated player's PUBLISHED library, each seat carrying
+    // `from`, which is that player's display name — and nothing in the suite
+    // noticed, because `prepared-seat`'s peek check loops a leak-list of
+    // notations and ids and says NOTHING ABOUT PRESENCE. That is exactly how
+    // `from` walked in unremarked, and this is the assertion that would have
+    // caught it.
+    //
+    // The line the L2 decision drew: presence is disclosed by an ACT (you
+    // published a character, so the character is offered and it says whose it
+    // is), never inferred from occupancy. A player who has asserted nothing is
+    // not described by this endpoint at all.
+    async fn(ctx) {
+      const peek = () => fetch(
+        `http://127.0.0.1:${ctx.port}/api/table?room=${encodeURIComponent(ctx.room)}`,
+      ).then((r) => r.json());
+      const peekUntil = async (pred, desc) => {
+        const deadline = Date.now() + 15000;
+        let last;
+        while (Date.now() < deadline) {
+          last = await peek();
+          if (pred(last)) return last;
+          await sleep(150);
+        }
+        throw new Error(`timeout waiting for the peek: ${desc} (last: ${JSON.stringify(last)})`);
+      };
+
+      // ---- A SEAT THAT HAS PUBLISHED NOTHING ----
+      // A RawPlayer is the right fixture and a browser tab is the wrong one: a
+      // real tab re-shares its library on every hello, so publishing is not a
+      // user act and a browser can only be silent by accident.
+      const bob = await ctx.rawPlayer('Bob');
+      assert.ok(bob.playerId, 'Bob really is seated');
+      const p0 = await peek();
+      assert.equal(p0.system, 'soul-deal', 'the peek answers about the room');
+      assert.equal(p0.seats, undefined,
+        `and offers no seats at all — one occupant, nothing published (got ${JSON.stringify(p0)})`);
+      assert.equal(JSON.stringify(p0).includes('Bob'), false, 'Bob is not in it');
+
+      // ---- A SEAT THAT HAS ----
+      // Named apart from their character on purpose: with both called 'Wren',
+      // `from` and `name` are the same string and the disclosure this scenario
+      // is about cannot be told from the one C17 intended.
+      const a = await ctx.newTable({ origin: '127.0.0.20', name: 'Alice Cooper' });
+      await a.dbg('profiles.reset()'); // establish, don't inherit (per-origin store)
+      const mine = await a.dbg('profiles.active');
+      await a.dbg(`profiles.rename(${JSON.stringify(mine.id)}, 'Wren')`);
+      await a.waitFor(`window.__diceDebug.players.length === 2`,
+        { desc: 'two people are at this table' });
+
+      // Waited on the NAME, not on `seats.length === 1`: the tab publishes at
+      // hello, so a seat is already there under the dealt name and a length
+      // poll returns before the rename propagates. (It did, first run — the
+      // peek answered 'Alice Cooper' and the scenario read it as settled.)
+      const p1 = await peekUntil((p) => (p.seats || []).some((s) => s.name === 'Wren'),
+        "the publishing player's renamed character reaches the door");
+      assert.deepEqual(p1.seats.map((s) => s.name), ['Wren'],
+        'the peek offers the character they published');
+      // THE DISCLOSURE, NAMED. This is a real field with a real reason — a
+      // profile you did not build must say who did, because taking one COPIES
+      // it — and the point of asserting it is that it is a DISPLAY NAME on an
+      // unauthenticated endpoint, so a change here is a change to what the
+      // door tells a stranger.
+      assert.equal(p1.seats[0].from, 'Alice Cooper',
+        'and says whose it is — the seated player’s display name');
+
+      // ---- AND BOB IS STILL NOT THERE ----
+      // The whole L2 question in one line: a count (or a `present: true`)
+      // would be the first field on this endpoint describing a player who
+      // published nothing. Recommendation was NO, and this is the shape of
+      // the change that would break it.
+      const blob = JSON.stringify(p1);
+      assert.equal(blob.includes('Bob'), false,
+        `a seat that published nothing is still invisible (got ${blob})`);
+      assert.equal(blob.includes(bob.playerId), false, 'by name and by id');
+      assert.equal(p1.seats.length, 1,
+        'one published character, one seat — never one seat per occupant');
+      // Nor does the count leak sideways through a total: two people are here.
+      assert.equal((await a.dbg('players')).length, 2,
+        'which the ROSTER knows, because taking a seat is what buys it');
+    },
+  },
+  {
+    name: 'prepared-tower',
+    tags: ['prepared-seat', 'portable', 'tower', 'cuj3'],
+    // A PREPARED TABLE ARRIVES WITH ITS TOWER UP (ROADMAP §9d, UX §7.50).
+    // `tower` is the only `table:` key that is not an enumerated set in
+    // js/portable.js — the catalogue is declared to grow, so the parser checks
+    // SHAPE and the apply site checks the CATALOGUE, against the registry the
+    // reader actually has.
+    //
+    // THE ASSERTION THAT MATTERS is `tower === 'bastion'` AND
+    // `towerBodies().length > 0`, together. `currentTower` is written only
+    // inside `towerSocket` and `towerBodies()` is empty unless `towerRig` is
+    // live, so the pair says the tower is UP WITH ITS COLLIDERS IN THE WORLD.
+    // `settings.tower` alone is the MENU — asserting only that is the
+    // green-check-over-a-broken-thing shape this repo keeps catching.
+    //
+    // No `?stability=beta`: the channel gates the OFFER and never the
+    // capability (js/stability.js), and running on the default is strictly the
+    // better test because it also proves that law.
+    async fn(ctx) {
+      const seat = ['players:', "  'Alice':", '    pools:', '      Attributes:',
+        "        - 'Strength': '3d6'"];
+      const file = (tableLines, withSeat = true) => [
+        'table:', ...tableLines.map((l) => `  ${l}`), ...(withSeat ? seat : []), '',
+      ].join('\n');
+      // The load verdict is checked here rather than at the call sites: a
+      // parser that stopped accepting `tower` refuses the whole document, and
+      // without this the first symptom is a TypeError off a null
+      // `portable.table()` three lines later.
+      const push = async (t, text) => {
+        const loaded = await t.dbg(`portable.loadText(${JSON.stringify(text)})`);
+        assert.equal(loaded.ok, true, `the file parses (got ${loaded.status})`);
+        return t.dbg('portable.pushToTable()');
+      };
+      const socketed = (id) => `window.__diceDebug.tower === ${JSON.stringify(id)}`
+        + ` && window.__diceDebug.towerBodies().length > 0`;
+
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      // The "before", so step 3 means something.
+      assert.equal(await a.dbg('tower'), 'none', 'a fresh table stands towerless');
+      assert.equal((await a.dbg('settings')).tower, 'none', 'and the room says so');
+
+      // ---- (1) the whole prepared table, tower included ----
+      const v = await push(a, file([
+        "name: 'Forge night'", "felt: 'obsidian'", "system: 'dnd'",
+        "zoom: 'wide'", "tower: 'bastion'",
+      ]));
+      assert.equal((await a.dbg('portable.table()')).tower, 'bastion',
+        'the FILE carried the tower — the parse took an id it does not enumerate');
+      assert.equal(v.ok, true, `the push lands (got ${v.status})`);
+      assert.match(v.status, /^✓ table prepared/, 'in the shared verdict grammar');
+      assert.doesNotMatch(v.status, /left behind/, 'and nothing was dropped on the way');
+
+      await a.waitFor(`window.__diceDebug.settings.tower === 'bastion'`,
+        { desc: 'the ROOM took the tower' });
+      // POLLED, not asserted once: `queueTower` defers a change across a roll
+      // boundary and the model has to load, so a non-null `pendingTower` means
+      // "still coming" rather than failure.
+      await a.waitFor(socketed('bastion'),
+        { desc: 'the tower is socketed with its colliders in the world' });
+      assert.equal(await a.dbg('pendingTower'), null, 'with nothing left queued');
+
+      // ---- (2) THE CUJ3 HALF: a joiner who never saw the file ----
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await b.waitFor(socketed('bastion'),
+        { desc: 'the person who followed the link finds the tower up' });
+
+      // ---- (3) AN ID THIS BUILD CANNOT RAISE COSTS ONLY THE TOWER ----
+      // Sending it hopefully is not a degradation: validateSettingsPatch
+      // refuses the ENTIRE push for one bad value, so the felt, the name and
+      // every prepared seat would die too — under a receipt reading "couldn't
+      // reach the table", over a table that answered perfectly.
+      const v2 = await push(a, file(["felt: 'plum'", "tower: 'brassworks'"]));
+      assert.equal((await a.dbg('portable.table()')).tower, 'brassworks',
+        'the file still PARSES an unknown id — a whole document is not refused over one');
+      assert.equal(v2.ok, true, `and the push still lands (got ${v2.status})`);
+      assert.match(v2.status, /left behind/, 'the receipt names what was dropped');
+      assert.match(v2.status, /brassworks/, 'and says which id');
+      await a.waitFor(`window.__diceDebug.settings.felt === 'plum'`,
+        { desc: 'the rest of the push arrived' });
+      assert.equal((await a.dbg('schemaState.table')).seats, 1,
+        'seat and all — this is what a 400 on the whole push would have cost');
+      assert.equal(await a.dbg('tower'), 'bastion',
+        'and the standing tower is untouched, not lowered');
+
+      // ---- (4) `'none'` is an id, and it is the only way a file LOWERS one ----
+      const v3 = await push(a, file(["tower: 'none'"], false));
+      assert.equal(v3.ok, true, v3.status);
+      await a.waitFor(`window.__diceDebug.tower === 'none'`
+        + ` && window.__diceDebug.towerBodies().length === 0`,
+      { desc: 'the tower comes down and takes its colliders with it' });
+
+      // ---- (5) AN ABSENT KEY IS SILENCE, NOT `'none'` ----
+      // `table:` is a PATCH over the room's furniture — the same thing an
+      // absent felt has always meant.
+      await a.dbg(`setTower('bastion')`);
+      await a.waitFor(socketed('bastion'), { desc: 're-raised by hand' });
+      const v4 = await push(a, file(["felt: 'sand'"], false));
+      assert.equal(v4.ok, true, v4.status);
+      await a.waitFor(`window.__diceDebug.settings.felt === 'sand'`,
+        { desc: 'a file naming only a felt lands' });
+      assert.equal(await a.dbg('tower'), 'bastion',
+        'and the tower it said nothing about is still standing');
+
+      // ---- (6) THE ROUND TRIP, and the compat rule inside it ----
+      // The emitter is SILENT about `'none'` even though it writes the felt
+      // unconditionally: a reader already in the field refuses an unknown key
+      // inside `table:`, so writing `tower: 'none'` on every export would make
+      // every file this build writes unreadable by every older one — for a
+      // default value on a closed-beta feature.
+      assert.match(await a.dbg('portable.snapshot()'), /\n {2}tower: 'bastion'\n/,
+        'a raised tower travels in the file');
+      await a.dbg(`setTower('none')`);
+      await a.waitFor(`window.__diceDebug.tower === 'none'`, { desc: 'lowered' });
+      assert.doesNotMatch(await a.dbg('portable.snapshot()'), /tower:/,
+        'a towerless table writes no tower line at all');
+    },
+  },
 
   // ---------------------------------------------------------------------
   // The lobby → table flow (ROADMAP §3b, UX §7.20) — tag: lobby
