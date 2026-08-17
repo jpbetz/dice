@@ -14,30 +14,31 @@ none of them mints one.
 
 ## How this file is sequenced — read this before THE ORDER
 
-**Two tracks run in parallel, and pretending otherwise is what made this file
-stop being read.** Track A is the debt — correctness, capture, organization,
-ops — sequenced by GOALS' ladder. Track B is the owner's track — venues,
-towers, dice art, immersion — sequenced by what Joe asks for next and by
-*finishing what is in flight*.
+**Two tracks run in parallel.** Track A is the debt — correctness, capture,
+organization, ops — sequenced by GOALS' ladder. Track B is the owner's track —
+venues, towers, dice art, immersion — sequenced by what Joe asks for next and
+by *finishing what is in flight*.
 
-**On 2026-08-15 fifteen of the previous ORDER's sixteen entries were worked in
-one batch** (record in [SHIPPED.md](SHIPPED.md)). That changed the shape of
-this file more than it changed its length, and three things follow:
+**Two batches, 2026-08-15 and 2026-08-16, took nineteen entries off this file**
+(record in [SHIPPED.md](SHIPPED.md)). What is left has a different shape:
 
-1. **Track A no longer has a data-loss hole or an ops hole.** Restore ships,
-   `/health` ships, the static handler serves the app, the room-creation budget
-   is in. What is left on this track is one large unbuilt feature, one
-   accessibility gap, and a long tail of design-first items.
-2. **Track B is now almost entirely blocked on Joe's eyes and ears, and it grew
-   today.** Five LOOK verdicts outstanding, five voices reasoned from a table
-   and never heard, one framing call and one composition call that no
-   measurement can make. **Nothing on Track B advances until that queue moves**,
-   which makes it the single highest-leverage hour in this file.
-3. **Twenty of this file's own claims were false when checked against the
-   tree** — see SHIPPED.md's table. They were not sloppy; each was true when
-   written and had stopped being true. The rule that follows is not "write more
-   carefully", it is **re-derive before you build**, and every entry below that
-   rests on a measurement now says when it was taken.
+1. **Track A has no data-loss hole, no ops hole, no accessibility hole, and no
+   loose tail.** Restore ships, `/health` ships, the static handler serves the
+   app, the seat picker is a real modal, and every item the first batch left
+   behind is closed. What remains is one half-built feature, one structural
+   bet, and a long design-first tail.
+2. **Track B is BUILT and entirely blocked on Joe.** Tier W has no unbuilt
+   step. Five LOOK verdicts and **ten** unheard voices stand between it and
+   done, plus two judgements no measurement can make. There is now a single
+   page that turns all of it into one sitting — **`tools/verdict-sheet.mjs`
+   builds it; see [#1](#the-order)** — which makes the queue the cheapest
+   high-value hour in this file and the reason it stays at the top.
+3. **The docs go stale in one specific way and it costs real work.** ~20 claims
+   were found false on 08-15 and more on 08-16, including a framing table that
+   **stopped reproducing one day after it was recorded**. Each was true when
+   written. The rule is not "write more carefully", it is **re-derive before
+   you build** — and every measured entry below now carries the date it was
+   taken and the command that reproduces it.
 
 ---
 
@@ -45,25 +46,24 @@ this file more than it changed its length, and three things follow:
 
 | # | Item | Why it is here | Size | Track |
 | --- | --- | --- | --- | --- |
-| 1 | [**Joe's LOOK and LISTEN queue**](#tier-w--the-first-fantasy-venue-the-fae-set) | **Not a build item, and that is why it is first.** Five LOOK verdicts (W5's living layer, W7 ②'s staging, the Witchlight art, the round-6 stump, C25 Stage 2's record) and five unheard voices. No tower or venue is *done* before its frame is seen, so **every Track B item below is queued behind this**, and it is minutes of Joe's time against weeks of built work that cannot be called finished. | — | B |
-| 2 | [**§2l ⑥** — the sum read](#2l-pool-analysis--⑤-shipped-⑥-the-sum-read-is-the-open-half) | The largest unbuilt thing in this file, and goal 4 names *summing values* as toil the system owes the player. `forecastFor` returns `null` for `dnd`/`none`. Also the **blocker on §5's local statistics** — §2l's engine is the only source of an *expected* value in the tree. | large | A |
-| 3 | [**`#name-modal` has no `aria-modal` and no focus trap**](#3b-the-lobby-and-the-table-flow--l4-shipped-l2-is-a-judgment-call) | Found 2026-08-15, not previously on this list. `a11y-modals` proves those two ship together or neither does, and the picker is absent from its list — a blocking overlay with no modality annotation and no trap, on **the one screen in the app that exists for a phone**. | small | A |
-| 4 | [**C22's `room.setup` stamp**](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15) | Half a contract is worse than none. The stamp must come from the WRITER (`maybeRepushTable`); a stamp only the server writes is a stamp nobody can trust. ~10 lines once someone owns that site. | small | A |
-| 5 | [**§5** — roll-log export](#5-capture-mechanisms) | Goal 7's last uncapturable surface: the online log cannot be copied or downloaded. Reuses `portableDownload()` rather than inventing a second save path. Small, and it is the half of §5 that does **not** wait on #2. | small | A |
-| 6 | [**9d follow-up** — `tower` in the portable YAML](#9d-follow-up-tower-and-venue-in-the-portable-yaml) | `TABLE_KEYS` is still `{name, felt, system, zoom}`, so a prepared table cannot arrive with its tower up — the one place these settings are not treated like their neighbours. **Ship `tower` alone**; GOALS punted how a venue rides the file. | small | A |
-| 7 | [**C30 residual** — deaden + grip, with sleep off](#c30-residual-deaden--the-only-lever-that-touches-the-dithering) | `deaden+sleepoff+gate4` buys the **best shake and hop numbers measured anywhere on this table** and fails four of six gates. Grip recovers 70% of the glide and **has never been run with sleep off** — that is the untried experiment. The pile's untried lever is spawn geometry, which moved on 2026-08-15, so the pairing is worth re-running. | med | A |
-| 8 | [**§3b L2**](#3b-the-lobby-and-the-table-flow--l4-shipped-l2-is-a-judgment-call) | Judgment, not plumbing: should the pre-join peek say how many people are here? Cheap, answers "did I follow the right link?", and runs straight into `handleTableInfo`'s deliberate privacy omission. | small | A |
-| 9 | [**U16**, **U21**, **C26**](#u16-draft-intent-in-the-well--design-first-medium) | The design-first trio, and they are stuck for the same reason: each needs a doctrine call before any code is right. U16 — the live draft has no carrier for intent. U21 — the collapsed rail deletes multiplayer. C26 — `Change seat…` wears a seat-shaped label on a name-wiping verb. | med | A |
-| 10 | [**B1** / identity persistence](#tier-b--the-closed-beta) | The structural bet whose bill arrived: `dice.name.v1` is origin-global and `playerId` is minted per-join, and both are load-bearing for **authority** and **routing**. B1 is the feature that needs a stable *who*. Unchanged by today's batch, and now the oldest un-actioned item here. | med | A |
-| 11 | [**T15**](#t15-re-bake-the-three-classic-skins-through-the-forge--large-scoped-2026-08-14) | Owner-commissioned, explicitly **not a side quest**: every round is a `/new-tower`-shaped job and a half-migrated tower is a fourth way of building one. **Queued behind #1** — its bar is Joe's eye, and starting it while five verdicts are outstanding adds to that queue instead of clearing it. | large | B |
-| 12 | [**§4b**, **V3–V5**, **U28b**'s near-misses, the small findings below](#4b-visibility-refinements) | The tail. Each is real, none is urgent, and several are one line. The new findings from the 2026-08-15 batch are listed under [What the batch left behind](#what-the-2026-08-15-batch-left-behind). | small each | A |
+| 1 | [**Joe's LOOK and LISTEN sitting**](#tier-w--the-first-fantasy-venue-the-fae-set--built-the-look-and-the-listen-are-joes) | **Not a build item, and that is why it is first.** Tier W is finished except for being *seen and heard*; five verdicts and ten voices gate it, and nothing on Track B advances until they move. One page now carries every frame side by side with the question each answers, and `docs/AUDIO.md` §9 is ten rows of two clicks. Rebuild it with `node tools/verdict-sheet.mjs`. | ~1 hr of Joe | B |
+| 2 | [**§2l ⑥'s RENDERING**](#2l-pool-analysis--⑤-and-⑥s-engine-shipped-the-rendering-is-the-open-half) | The engine landed 08-16, proven four ways, 5.5 ms worst case — and is **inert**: `kind:'sum'` is matched nowhere, so nothing renders. Goal 4 names summing as toil the system owes the player, and the app still cannot say a word about `4d6dl1`. The smaller half of the work and the whole of the payoff. | med | A |
+| 3 | [**C22's `room.setup` stamp**](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15) | Half a contract is worse than none. The stamp must come from the WRITER (`maybeRepushTable`); a stamp only the server writes is a stamp nobody can trust. ~10 lines once someone owns that site. | small | A |
+| 4 | [**§5** — roll-log export](#5-capture-mechanisms) | Goal 7's last uncapturable surface: the online log cannot be copied or downloaded. Reuses `portableDownload()`. The half of §5 that does **not** wait on #2. | small | A |
+| 5 | [**9d follow-up** — `tower` in the portable YAML](#9d-follow-up-tower-and-venue-in-the-portable-yaml) | `TABLE_KEYS` is still `{name, felt, system, zoom}`, so a prepared table cannot arrive with its tower up. Ship `tower` alone; GOALS punted how a venue rides the file. | small | A |
+| 6 | [**C30 residual** — deaden + grip, sleep off](#c30-residual-deaden--the-only-lever-that-touches-the-dithering) | The best shake and hop numbers measured anywhere on this table, failing four of six gates. Grip recovers 70% of the glide and **has never been run with sleep off**. The pile's untried lever is spawn geometry — **which moved on 08-15**, so the pairing is genuinely worth re-running now. | med | A |
+| 7 | [**§3b L2**](#3b-the-lobby-and-the-table-flow--l4-shipped-l2-is-a-judgment-call) | Judgment, not plumbing: should the pre-join peek say how many people are here? Runs straight into `handleTableInfo`'s deliberate privacy omission. | small | A |
+| 8 | [**U16**, **U21**, **C26**](#u16-draft-intent-in-the-well--design-first-medium) | The design-first trio, stuck for one reason each: no carrier for intent in the live draft; the collapsed rail deletes multiplayer; `Change seat…` wears a seat-shaped label on a name-wiping verb. | med | A |
+| 9 | [**B1** / identity persistence](#tier-b--the-closed-beta) | The structural bet whose bill arrived: `dice.name.v1` is origin-global and `playerId` is minted per-join, both load-bearing for **authority** and **routing**. Now the oldest un-actioned item here. | med | A |
+| 10 | [**T15**](#t15-re-bake-the-three-classic-skins-through-the-forge--large-scoped-2026-08-14) | Owner-commissioned, explicitly not a side quest. **Queued behind #1** — its bar is Joe's eye, and starting three more rounds while five verdicts are outstanding lengthens the queue instead of clearing it. | large | B |
+| 11 | [**§4b**, **V3–V5**, **U28b**'s near-misses](#4b-visibility-refinements) | The tail. Real, none urgent, several one-line. | small each | A |
 | — | everything else | Design-first, record-only, or deliberately deferred. Named in its tier with the reason. | | |
 
 **Two standing calls that are not build items:** what comes out of beta
 ([B3](#tier-b--the-closed-beta)) — no criterion exists and none should be
 invented before there is a second beta feature to generalise from; and the
-"pools and settings" reading carried from the library pass, left as name +
-system + dice set + pools with sound and chips device-global.
+"pools and settings" reading, left as name + system + dice set + pools with
+sound and chips device-global.
 
 ---
 
@@ -169,35 +169,56 @@ the surface is UX §7.43.
   notes)*: tap-to-stage was hard to discover. Tap stays primary; DnD is the
   intuition players arrive with.
 
-### 2l. Pool analysis — ⑤ SHIPPED, **⑥ THE SUM READ IS THE OPEN HALF**
+### 2l. Pool analysis — ⑤ and ⑥'s ENGINE shipped; **the RENDERING is the open half**
 
-Full detail: [POOL-ANALYSIS.md](POOL-ANALYSIS.md). Every figure is
-reproducible: `node tools/pool-analysis-data.mjs`. Serves **CUJ6** and
-**CUJ8**. Slices ①–④ shipped 2026-08-06; **⑤ the ledger sheet shipped
-2026-08-15** (UX §7.44 — the typed session target, `placeAnchored` extracted
-rather than copied, and a target the player types may price a shelf the system
-does not, which does *not* contradict C8: C8 stopped the APP inventing a
-ceiling, and a number the player typed invents nothing).
+Full detail: [POOL-ANALYSIS.md](POOL-ANALYSIS.md). ①–④ shipped 2026-08-06; ⑤
+the ledger sheet 2026-08-15 (UX §7.44); **⑥'s math floor 2026-08-16** —
+`sumForecast(dice, mods)` in `js/odds.js`, supplied by `SYSTEMS.dnd` and
+`SYSTEMS.none` through one shared `sumForecastFor`.
 
-**⑥ the sum read is genuinely unbuilt, and it is the largest single unbuilt
-thing in this file.** `forecastFor` still returns `null` for `dnd`/`none`. It
-is a full math build — exact convolution, an order-statistic DP for keep/drop,
-two refusals (mixed-type keep/drop, adv+explode), unit vectors, and a rendering
-in `#pop-preview` — comfortably larger than everything ⑤ and §1 did together.
-**Goal 4 names summing values as toil the system owes the player**, which is
-why it stays on the list rather than being cut.
+**It is wired and INERT.** `kind:'sum'` is matched nowhere in `js/main.js`, so
+both call sites still fall through to the shipped `fmtPreview` line. Nothing
+renders differently today. **That is the open work**, and it is the smaller
+half:
 
-**Decisions still open** (POOL-ANALYSIS §9): whether the parser stops
-collapsing `2d20kh1` · portable-YAML forward compatibility · which popover
-doors forecast · what a pool-scope forecast forecasts, given `stageGroup` drops
-mods while the rail rolls them · the offer card · mixed adv+explode. *Two were
-taken by ⑤: where the rack figure lives (the head; the figure IS the door, and
-altitude rather than location is what answers the scroll problem) and the e2e
-tag (none — `groups` + `meanings` + `chrome` carried it).*
+- Three things the renderer must not re-derive: `sumAtLeast`/`sumAtMost` are
+  the only place cdf arithmetic belongs (they return **`null`** on a refusal,
+  so nobody prints `0%` for "we don't know"); a refusal still owes the
+  min/avg/max line **beside** it, never instead of it — `previewOf` is still
+  exact for the average of `8d8+2d20 kh4` whose curve cannot be drawn; and
+  `values` is **sparse** (`1d6!` has no total of 6).
+- `#pop-preview` is asserted **22 times** in the suite, so a rewrite of that
+  node breaks tests by design. Read them first.
+- POOL-ANALYSIS §9's four rendering questions got **sharper, not answered**:
+  which popover doors forecast · what a pool-scope forecast forecasts, given
+  `stageGroup` drops mods while the rail rolls them · the offer card · UX
+  §2.1's odds line.
+
+**Three typed refusals, and they are the load-bearing part**: `mixed-keep`,
+`reroll-cap`, `explode-cap`. Two corrections came with them, both of which
+would have shipped wrong numbers:
+
+- **The detector POOL-ANALYSIS prescribed is insufficient, and the
+  counter-example is one paragraph above it.** `new Set(spec.dice).size === 1`
+  waves through `21d20 adv kh3` — one *type*, two *distributions*, because the
+  advantage cap pairs only 19. The shipped detector compares the counting
+  **pmfs**.
+- **Advantage-with-explosion is not a gap at all.** The adv loser is
+  `counts:false` before the explosion loop runs, so only the ordinary slot
+  budget bites. It is exact and pinned against enumeration, where the roadmap
+  had assumed a blanket refusal.
+
+Proven four ways (exhaustive enumeration of `composeRoll`; published closed
+forms nobody here derived; agreement with `previewOf`'s independent
+order-statistic path; seeded Monte Carlo at 5σ), 108 checks. **Worst legal
+case `40d20 dl1` = 5.5 ms warmed**, against the ~110 ms POOL-ANALYSIS
+predicted — its conclusion strengthens rather than weakens. `node
+tests/sumread.test.mjs --bench` reproduces the table.
 
 **GOALS: 4** (goal 4 names *summing values* as toil the system owes the
-player) · **5** · **6** · **7** (render-time, client-side) · **12** closed by
-the session-only ruling.
+player) · **5** · **6** · **7** · **12** closed by the session-only ruling.
+Still the blocker on §5's local statistics, which have no source of an
+*expected* value without it.
 
 ---
 
@@ -857,7 +878,7 @@ until Joe has listened to it for an hour straight.**
 
 ---
 
-## Tier W — the first fantasy venue: the fae set
+## Tier W — the first fantasy venue: the fae set — **BUILT; the LOOK and the LISTEN are Joe's**
 
 *Design authority is GOALS goals 13–15 (venues, the two registers,
 atmosphere-serves-the-roll); the punted questions (multi-dice-set venues,
@@ -900,12 +921,48 @@ dimmer overall — most new mass reads as dark silhouette and the only strongly-
 cluster is bottom-left and clipped by the frame edge. That is either "in a scene" or
 a value problem, and the gates cannot tell him which.
 
-### W6. The venue's audio palette — the tier's last step
+### W6. The venue's audio palette — SHIPPED 2026-08-16. **TIER W IS BUILT.**
 
-Ships with its e2e proof; the venue is judged as a WHOLE against goal 14's
-internal-consistency contract. **The standing debt it inherits:** every fae
-voice reasoned so far — the four tower clunks and the Witchlight chime — has
-never been LISTENED to.
+One table, `VENUE_AUDIO`, read through `venueAudio()`. Two rows per venue,
+because two things had never travelled with the venue while the tower's
+`clunkVoice` and the staged set's `sound` already did: **the bed** (the shipped
+pink+brown+crackle is a *hearth*, and there is no fire in a clearing — brown
+cut hardest, the pink pair lowpassed under §1's 1.5 kHz wood/metal boundary,
+the tick layer re-derived from a spark into condensation off the canopy) and
+**the ground** (the glade's floor is moss over soil, so a second timbre tier
+multiplies in beside `IMPACT_SOFT_*` and rides impacts, the settle tail, the
+rolling band and the tilt curve).
+
+Four properties made checkable rather than promised, and all four verified
+against the live graph: the grounded row is all 1s and an inaudible cutoff, so
+**the shipped table is unchanged by construction**; a baffle knock is never
+trimmed (a die inside the trunk is not on the moss); the trim is **timbre
+only**, so §4's film-derived level list stays literally true; and it applies
+*outside* the 0.35 clamp, so a venue can only subtract from the mix plan.
+
+**Refusal 14, new:** a venue changes what the room is **made of**, never
+whether the room is **audible** — so the bed still rides the existing
+Room-tone switch and defaults off. V1's phase-two note (the bed does not ship
+on by default until Joe has listened to it for an hour straight) stands.
+
+**The living layer has no voice, deliberately**, and the law is worth more than
+the feature: *audio may be anonymous and unsynchronized, or synchronized and
+tied to a visible thing, but never unsynchronized and tied to a visible thing.*
+A moot chime's onset would ride `FAECONCEPT.t`, which starts at zero when each
+client enters the venue — two people in one room would hear the ring speak at
+different moments while watching the same caps light. Marked at the site where
+the next person will reach for it.
+
+**What is left is LISTENING, and it is #1 in THE ORDER.** `docs/AUDIO.md` §9
+is the script: **ten** rows of exactly two clicks, ordered so one thing changes
+between consecutive rows. Note the count the roadmap had wrong — **there are
+FIVE tower clunk voices, not four** (`nullstone`'s hush was missed), so with
+the Witchlight chime and W6's numbers **every voice in the app is unheard**.
+
+*Five claims in docs/AUDIO.md were false against the code and are corrected in
+place — including `perHitBufferAllocs` "must stay 0", which actually reads 2
+whenever the bed is up and is 0 in every scenario only because ambience
+defaults off.*
 
 ### W2c ledger — next tower round, not W2c
 
@@ -1109,58 +1166,42 @@ dice on screen from the seat beside it.*
 
 ---
 
-## What the 2026-08-15 batch left behind
+## What the 2026-08-15 batch left behind — **ALL EIGHT CLOSED 2026-08-16**
 
-*Found while shipping, owned by nobody, none of them previously on this list.
-Small unless marked. Listed so they are not re-discovered by a sixth audit.*
+Record in [SHIPPED.md](SHIPPED.md). Three were wrong about themselves, and the
+corrections are the reason this section is kept rather than deleted:
 
-**Defects**
+- **The flyout occlusion was mis-framed twice.** It is **not** a `body.mini`
+  rule — at 1440×900 with panels collapsed (still mini) the overlap is exactly
+  **zero**. The real condition is a felt narrower than ~324px, where both boxes
+  saturate to the same column. And "covers it entirely" is **83%**; a ~23px
+  strip carrying `#result-label` survives. Understated in one way, though: the
+  banner has no clock, so the occlusion lasted until the next roll.
+- **The prescribed fix for `.roster-name` would not have made its comment
+  true.** Hoisting `.rp-item`'s overrides makes the pill match `.rp-item` — but
+  the comment claims it wears *the panel's seg controls'* dress, and those segs
+  are **SWITCHes** (`--sw-fill`, no ring) while the pill is a **PICK**.
+  Converging across kinds is the one thing §7.41 forbids. The comment was
+  corrected instead; the hoist is priced at `css/style.css:3037-3049` and is
+  one look if anyone wants it.
+- **`--gold-dim` was never a pixel question.** Its fallback is `--muted`'s
+  `:root` value to the byte, so it converted at zero cost. `--panel-bg` really
+  is blocked, but not for the stated reason: its two sites carry **different**
+  fallbacks, so there is no single value to define. Both dead references
+  deleted.
 
-- **`#name-modal` has no `aria-modal` and no focus trap.** `a11y-modals`
-  proves those two ship together or neither does; the picker is absent from its
-  list. **#3 in THE ORDER.**
-- **On `body.mini` the log flyout sits over the result banner and covers it
-  entirely** (`--z-flyout` above `--z-banner`). This replaces U20's
-  "banner cuts into the peek", which is no longer reproducible post-C25.
-- **`.log-discarded` spells `opacity: 0.5`** where `--dim-off` is 0.45 — a
-  token-layer miss on the token's own named exemplar (a discarded die).
-- **A room that dies still says nothing** to the group whose link it was.
-  Deliberately dropped from U25 because the resync work owns that surface;
-  it is nobody's now.
-- **`.gcloudignore`'s comment omits `models/`** (which ships), and
-  `gpu-trace.csv` is uploaded to production for no reason.
+**One item found a third hole it did not name:** `.gcloudignore` **replaces**
+`.gitignore` rather than supplementing it, so everything gitignored is
+invisible to a check that trusts `.gitignore` — `shots/` was uploading too.
+That rule is now written into the file. `gpu-trace.csv` was **not** deleted: it
+is the raw evidence behind the `DICE_E2E_CORES` cap, and removing Joe's
+measurement data is his call; the defect (the upload) is closed either way.
 
-**Things that are true but should not be**
-
-- **`.roster-name`'s own comment says it wears "the shared aria-pressed steel
-  dress the panel's seg controls already use". It does not, and never has** —
-  warm ivory inside a column that was re-dressed cool. Moving `.rp-item`'s
-  three cool overrides up to `#left-panel` finishes the temperature schism and
-  makes the comment true.
-- **`.mchip` is a PICK wearing gold** — the last place kind and dress disagree,
-  because U6 enumerated `.seg` and `.mchip` is not one.
-- **`--panel-bg` and `--gold-dim` are `var()`-referenced with fallbacks and
-  never defined anywhere**, so the fallback always wins. Defining them would
-  move pixels, which is why they were left.
-- **`panel-anatomy`'s "a chosen key IS a chosen name" premise survives only
-  because the harness key is not minted-shaped.** `tools/stage.mjs` mints
-  `drive-<6 base36>`; production mints a 16-char tail. The scenario is passing
-  for a reason unrelated to what it asserts.
-- **A solo splitter loses their own breakout directory** when the parent dies
-  with them, and **the breakout ghost renders ahead of the unclaimed-seat
-  chairs** because that branch returns. Both recorded in UX §7.46.
-
-**Method, and it outlives the items**
-
-- **A gate can certify the frame it was written to refuse.** Four plausible
-  composition measures all *pass* the W2c frame Joe rejected, and footprint
-  mass says it was **better**. Rule 15 now requires a composition gate to fail
-  the rejected frame before it may pass anything.
-- **The `usesTotal` inversion the structural risk proposes should not be
-  done** — 20 reads are four questions, 2 of them run before any entry exists,
-  and §1's real bug was the *inverse* shape: a supplier over-filtering took
-  four surfaces down in one line, invisible to a grep of the render sites. See
-  SHIPPED.md. **The structural risk below is amended by this, not deleted.**
+**Still open from that list: nothing.** The dead-room notice shipped as UX
+§7.47 — *a receipt, not an obituary*: the app already healed this case in
+silence (name from `recentTables`, setup from `maybeRepushTable`), and the gap
+was that an act performed on your behalf went unreported. It never says why,
+because four causes are indistinguishable from a client.
 
 ---
 
