@@ -610,7 +610,8 @@ const SPLIT_GHOSTS = ['Breakouts ▾', '↩ Main table'];
 const splitGhosts = async (t) => (await ghostLabels(t)).filter((l) => SPLIT_GHOSTS.includes(l));
 
 // MEASURED AND FIXED 2026-08-15 — read this before writing another sub-table
-// scenario, because it is the reason `walker-says-goodbye` exists.
+// scenario, because it is the reason `split-follower` and
+// `journey-split-the-party` both assert a roster LOSING the walker's pill.
 //
 // gotoTable() is a plain `location.href =` (main.js: ROOM is a module const, so
 // every table transition is a real page load), and in that navigation Chrome
@@ -636,6 +637,16 @@ const splitGhosts = async (t) => (await ghostLabels(t)).filter((l) => SPLIT_GHOS
 // and cannot be awaited. It is also the right semantics: the soft beacon drops
 // the stream and leaves the SEAT on the ordinary grace, because walking to a
 // breakout and back is a round trip, not a resignation.
+//
+// WHICH IS WHY THE DOOR YOU DRIVE DECIDES WHAT YOU MAY ASSERT. The goodbye
+// lives in gotoTable, so only a scenario that walks through the APP's own
+// controls gets one: `split-follower` drives the Breakouts row, and
+// `journey-split-the-party` drives splitTable's own navigate. `gotoRoom()`
+// assigns `location.href` itself and walks straight past gotoTable — a tab
+// moved that way still sends nothing and still holds its old seat for the full
+// ~75 s (see split-orphan, which drops the seat through /api/leave for exactly
+// that reason). Reaching for gotoRoom in a scenario that means to test the
+// walk is how this defect stayed invisible the first time.
 
 export const scenarios = [
   {
@@ -17323,6 +17334,19 @@ export const scenarios = [
         `the splitter landed in the room she just registered (got: ${search})`);
       alice.url = `${alice.url.split('?')[0]}${search}`;
 
+      // …AND THE TABLE SHE LEFT SAYS SO. Bo never moved, so Alice's pill has to
+      // leave his roster in seconds rather than on the ~75 s liveness sweep —
+      // renderPlayers' own claim ("when three of five players walk into a
+      // breakout, this row loses three pills"), asserted here on the SPLITTER's
+      // path. split-follower proves the same goodbye through the Breakouts row;
+      // this proves it through splitTable's own navigate, which is a different
+      // gotoTable caller and the one CUJ5 actually starts with. See the
+      // ghost-seat note above splitGhosts for what a missing beacon looked like.
+      await bo.waitFor(`window.__diceDebug.players.every((p) => p.name !== 'Alice')`,
+        { desc: "Alice's pill leaves the main table when Alice does", timeout: 8000 });
+      assert.deepEqual((await bo.dbg('presenceRow')).pills, [],
+        'the roster Bo is left with is honestly empty, without waiting out a liveness timeout');
+
       const kid = await alice.waitFor(
         `window.__diceDebug.subtables.parent && JSON.stringify(window.__diceDebug.subtables)`,
         { desc: 'the breakout declares what it broke out of' });
@@ -17573,12 +17597,17 @@ export const scenarios = [
       // last player leaves (§G6), so the room object Alice's pointer names is
       // gone from the server entirely.
       //
-      // The seat is dropped through the API rather than waited out, and that is
-      // the bfcache defect above rather than a shortcut: walking into a breakout
-      // sends no beacon, so Alice's seat at the parent would sit there for ~75 s
-      // (LIVENESS_TIMEOUT_MS + the grace). This is exactly what the server does
-      // when the seat finally goes — it is the same handleLeave — so the state
-      // under test is the real one, reached in one second instead of seventy-five.
+      // The seat is dropped through the API rather than waited out, and it is
+      // still required after the goodbye fix — for a different reason than the
+      // one that used to be written here. Alice walked via `gotoRoom`, which
+      // assigns location.href itself and never runs gotoTable, so no beacon was
+      // sent and her seat at the parent would sit there for the full ~75 s
+      // (LIVENESS_TIMEOUT_MS + the grace). That is deliberate: this scenario is
+      // about an EMPTY parent room, not about the walk, and driving the real
+      // door here would buy nothing that split-follower does not already assert.
+      // This is exactly what the server does when the seat finally goes — it is
+      // the same handleLeave — so the state under test is the real one, reached
+      // in one second instead of seventy-five.
       const gone = await ctx.api('/api/leave', { playerId: parentSeat, immediate: true });
       assert.equal(gone.status, 200, 'the parent seat is given up');
       await ctx.waitForLog(new RegExp(`room deleted: room="${ctx.room}"`), {
