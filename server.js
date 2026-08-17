@@ -45,6 +45,10 @@ import { fileURLToPath } from 'node:url';
 import { composeRoll, validateMods, DIE_MAX } from './js/rollspec.js';
 import { parseNotation } from './js/notation.js';
 import { SET_IDS } from './js/themes.js';
+// C22: the stamp's SHAPE only. The server carries `ver` on a table setup and
+// never judges it — see handleTable — so it imports the parser and nothing
+// else, which is also what keeps the regex in one file.
+import { parseStamp } from './js/schema.js';
 
 const PORT = Number(process.env.PORT) || 8123;
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -2802,6 +2806,33 @@ async function handleTable(req, res) {
     return sendError(res, 400, 'rev must be a positive integer', 'bad_rev');
   }
 
+  // C22'S STAMP, CARRIED AND NEVER MINTED (docs/ROADMAP.md C22, js/schema.js).
+  // The setup is client state that happens to rest here: it outlives every
+  // client (SETUP_TTL_MS), it is replayed from a browser's localStorage days
+  // later (§G6), and the reader is usually a DIFFERENT browser on a different
+  // build. So it needs a version — and the version has to name the build that
+  // AUTHORED it, which this process is not. A stamp the server minted would
+  // read as authoritative while describing nothing a reader needs.
+  //
+  // What the server does owe is that the field is a STAMP and not a payload:
+  // parseStamp (imported, so there is no second regex to drift from
+  // js/schema.js) refuses anything that is not three capped integers, and
+  // absent is legal — every `dice.table.v1:*` record in the field predates
+  // this. The server does NOT judge it: refusing on the server's own numbers
+  // would make a rolling deploy reject the setups its own older instances
+  // wrote, and the reader that stands to lose data is the client.
+  //
+  // Checked HERE, beside rev, rather than after the table block: rev and ver
+  // are the two facts ABOUT the blob, they are the two cheapest things in the
+  // request, and grouping them means a junk stamp always answers `bad_ver`
+  // instead of whichever validator downstream happened to fire first.
+  const ver = body.value.ver;
+  if (ver !== undefined && ver !== null && ver !== '') {
+    if (typeof ver !== 'string' || !parseStamp(ver)) {
+      return sendError(res, 400, 'ver must be a version stamp like 2.0.0', 'bad_ver');
+    }
+  }
+
   // Validate EVERYTHING before mutating anything — this is why the settings
   // path is split into validate + commit rather than called whole. A push with
   // a good felt and a bad profile list must leave the table exactly as it was.
@@ -2841,7 +2872,17 @@ async function handleTable(req, res) {
   // truth for what the table looks like now and already rides hello/join; this
   // is the record of what the setup DECLARED, so the organizer's intent is
   // still legible after someone else swaps the felt mid-session.
-  room.setup = { rev, table: patch ? { ...patch } : {}, profiles, at: Date.now() };
+  // `ver` sits beside `rev` — both are facts ABOUT this blob rather than
+  // content in it — and is omitted rather than nulled when the push carried
+  // none, so judgeStamp's absent-means-oldest path is what a pre-stamp record
+  // reaches on the far side (js/main.js adoptRoomSetup).
+  room.setup = {
+    rev,
+    ...(typeof ver === 'string' && ver ? { ver } : {}),
+    table: patch ? { ...patch } : {},
+    profiles,
+    at: Date.now(),
+  };
 
   log(`table   ${logField('room', room.name)} ${logField('name', player.name)} rev=${rev} ${logField('profiles', profiles)}`);
   broadcast(room, 'table-setup', { setup: room.setup, byId: player.id, byName: player.name });

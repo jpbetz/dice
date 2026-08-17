@@ -590,6 +590,20 @@ limitations under the License.
          thrown away, so a long session silently lost its early history and
          looked complete. -->
     <p id="log-dropped" class="hint hidden"></p>
+    <!-- TAKE THE LOG WITH YOU (ROADMAP §5, goal 7, UX §7.49). The record of
+         what happened was the last surface with no door out — pools, settings
+         and the table setup all have one. A FOOT, beside the truncation note
+         and for the same reason the note is one: #log-list owns the scroll, so
+         the foot is always in view and an export verb is never something you
+         have to scroll 100 rows past. Two verbs because they have two
+         destinations (a paste vs a file) and two failure modes — the pair the
+         portable pane already draws, with the same words. -->
+    <div class="lf-foot">
+      <button id="log-copy" class="btn tiny ghost"
+              title="Copy this log as plain text">Copy</button>
+      <button id="log-download" class="btn tiny ghost"
+              title="Save this log as a plain-text file">Download</button>
+    </div>
   </div>
 
   <!-- (#corner-controls docked into the rail, 2026-08-04 — the felt keeps

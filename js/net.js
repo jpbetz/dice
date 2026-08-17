@@ -398,10 +398,18 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
     // event; apply on that echo, never optimistically, exactly as with
     // settings. The whole thing goes through withPlayer, so it inherits the
     // one re-join-on-404 retry every other POST here uses.
-    async pushTable({ rev, table, profiles } = {}) {
+    //
+    // `ver` is C22's stamp, and this call is a PIPE for it — the caller mints
+    // or forwards it (js/main.js portablePushToTable / maybeRepushTable) and
+    // the server carries it verbatim, so that the stamp on a setup always
+    // names the build that authored the setup rather than whichever box it
+    // passed through. Absent stays absent: a record written before stamps
+    // existed must not acquire one here.
+    async pushTable({ rev, table, profiles, ver } = {}) {
       const body = { rev };
       if (table) body.table = table;
       if (Array.isArray(profiles)) body.profiles = profiles;
+      if (typeof ver === 'string' && ver) body.ver = ver;
       const res = await withPlayer('/api/table', body);
       if (!res.ok || !res.data) return null;
       return { applied: res.data.applied === true, rev: res.data.rev };

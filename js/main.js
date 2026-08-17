@@ -13534,6 +13534,30 @@ window.__diceDebug = {
       refused: storeRefusal,
       locked: !!storeRefusal,
       storeStamp: (profileStore && profileStore.ver) || null,
+      // C22's SECOND half — the table setup (§G4/§G6). `storedStamp` is what
+      // this browser's authorship record carries and `roomStamp` is what came
+      // back off the wire, so ONE assertion after a push proves the whole
+      // chain: writer mints → net pipes → server carries → reader judges. If
+      // any link stops stamping, roomStamp goes null and it fails.
+      // `roomRefused`/`storedRefused` are the whole sentences, on the same
+      // principle as `refused` above: assert what the player is told.
+      table: {
+        storedStamp: (() => {
+          const v = storedTableRaw();
+          return v && typeof v.ver === 'string' ? v.ver : null;
+        })(),
+        roomStamp: roomSetup && typeof roomSetup.ver === 'string' ? roomSetup.ver : null,
+        roomRefused: roomSetupRefusal,
+        // A refused room setup keeps its rev and drops its content — the
+        // observable a scenario reads to prove "load NOTHING", since a partial
+        // load would leave `seats` non-zero.
+        roomKeptRev: !!(roomSetup && roomSetup.refused),
+        seats: roomSetup && Array.isArray(roomSetup.profiles) ? roomSetup.profiles.length : 0,
+        storedRefused: tableRefusal,
+        // storedTable() is the judged read; null while a refusal stands is
+        // exactly what stops maybeRepushTable replaying an unreadable record.
+        replayable: !!storedTable(),
+      },
     };
   },
   // Slice 3 assertion surface: per-die cadence state + the LIVE deltas
@@ -13916,6 +13940,37 @@ window.__diceDebug = {
     };
   },
   setLogFind(q) { setLogFilter(q); return logFilter; },
+  // §5 / §7.49 — taking the log with you. `text` is the exact bytes both verbs
+  // write, so a scenario asserts on the ARTEFACT rather than on a click: that a
+  // face-down roll's values are absent from it is the goal-11 claim, and it is
+  // a claim about the file, not about the screen. `lines` counts data rows
+  // (the file is header, blank line, one line per roll) so a scenario can pin
+  // "every roll is in there" without parsing.
+  //
+  // download() returns the filename the way portableDownload does — the browser
+  // owns the save dialog and there is nothing else about it a test can see.
+  // copy() is deliberately NOT here: navigator.clipboard is the browser's, and
+  // a hook that faked it would assert a path no player takes. The clipboard
+  // button's own text is what a scenario reads, through `verbs`.
+  get logExport() {
+    const text = logExportSnapshot();
+    const parts = text.split('\n\n');
+    const body = parts.slice(1).join('\n\n').replace(/\n$/, '');
+    return {
+      text,
+      head: parts[0] || '',
+      lines: body ? body.split('\n').length : 0,
+      filename: logExportFilename(),
+      rolls: log.length,
+      verbs: ['log-copy', 'log-download'].map((id) => {
+        const b = document.getElementById(id);
+        return { id, label: b ? b.textContent : null, disabled: b ? b.disabled : null };
+      }),
+    };
+  },
+  logExportDownload() {
+    return portableDownload(logExportSnapshot(), logExportFilename(), 'text/plain;charset=utf-8');
+  },
   // the draft cluster (P1): what the Pools panel's draft row shows now.
   // The draft's INTENT, as boxExtras holds it (U1). A scenario asserts on
   // this rather than on the canonical string, because the string is the
@@ -19878,6 +19933,232 @@ function setLogFilter(q) {
   return logFilter;
 }
 
+// ---------------------------------------------------------------------------
+// TAKING THE LOG WITH YOU (ROADMAP §5, goal 7, CUJ9) — UX §7.49
+// ---------------------------------------------------------------------------
+//
+// Goal 7 says the client is capturable and capture is a thing the player DOES.
+// Every other surface had a door — pools and settings through the portable
+// file, the crash report, the table setup — and the record of what actually
+// HAPPENED had none. Four hours of rolls existed only as DOM.
+//
+// WHAT IT IS: a plain-text transcript, one roll per line, oldest first. Three
+// decisions, each with a reason that outranks the obvious alternative:
+//
+//   ONE FORMAT, AND IT IS NOT CSV. §5 asked for "text + CSV". CSV's reader is
+//   a spreadsheet, and what you do in a spreadsheet is the STATISTICS half of
+//   §5 — which is blocked on §2l's sum read and will decide its own columns
+//   when it lands. Shipping the columns first means shipping the shape that
+//   has to change, and asking a human to read raw CSV in the meantime, which
+//   fails the one bar this file has: legible to somebody who has never seen
+//   this app. The line builder below is one function; a CSV row is a small
+//   change against a settled column list, and that is the right order.
+//
+//   IT IS .txt, NOT .yaml, AND IT SAYS SO IN ITS OWN FIRST LINES. js/portable.js
+//   owns the ONLY rack transport (GOALS §7 — the `#g=` codec died for
+//   replacing a rack sight-unseen, and a second thing that looked importable
+//   would re-open that door). A `.dice.yaml` full of rolls would be handed
+//   back to the import box by the first person who tried, and refused there
+//   with no explanation. So the extension is inert and the header names where
+//   the real transport lives.
+//
+//   OLDEST FIRST, where the screen is newest first. The list is a feed — you
+//   scan the top for what just happened. A file is read start to end. The
+//   header says which way it runs so the reversal is never a surprise.
+//
+// WHAT IT SAYS ABOUT OTHER PEOPLE'S ROLLS. Everything the log shows, and not
+// one thing more: the transcript is built from the SAME entries and the SAME
+// gates the rows are (entryHidden, activeSystem().usesTotal), so a face-down
+// or whispered roll exports as `face down` with its die TYPES and no values —
+// goal 11's public/private split, unchanged. This is the rule logEntryMatches
+// already follows for the find box, and for the same reason: a capture that
+// answered what the card refuses would make export the leak. Other players'
+// VISIBLE rolls do export, with their names, because they are the table's
+// record and a transcript of the evening that held only your own rolls would
+// not be a transcript of anything. The header says whose view it is, so two
+// players' files legitimately differing over a secret is legible rather than
+// mysterious.
+//
+// WHAT IT REFUSES TO CLAIM. The log caps at LOG_CAP and a long session loses
+// its early history (U14). A file that silently ended at 100 rolls would read
+// as complete — this repo's dominant failure mode — so the same honest note
+// the panel foot carries goes in the header, and it is built from the same
+// counter.
+
+// User text inside a one-roll-per-line file: the line break is the only
+// structure this format has, so a name or label carrying one would forge a
+// row. The server's stripCtl already covers online names; solo labels come
+// straight off the notation box, so the collapse happens here where the
+// promise is made.
+const logExportText1Line = (s) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+
+// One die, as the row draws it: `d20 17`, `(d6 2)` for a die the mechanics
+// discarded (the screen dims it), `✴` for an explosion child (the screen's own
+// mark, kept). Crit colour has no word on screen and does not acquire one here
+// — inventing a `!` the app never says would make the file disagree with the
+// table it is a record of.
+function logExportPart(p) {
+  const face = `${p.child ? '✴' : ''}${p.type} ${p.label}`;
+  return p.counts ? face : `(${face})`;
+}
+
+// The die types of a roll whose values this viewer may not see. Types are
+// public even face down (goal 11, same rule as the row's chips), grouped the
+// way the chips group them: `2× d6 · d20`.
+function logExportTypes(entry) {
+  const counts = new Map();
+  for (const p of entry.parts) counts.set(p.type, (counts.get(p.type) || 0) + 1);
+  return [...counts].map(([t, n]) => (n > 1 ? `${n}× ${t}` : t)).join(' + ');
+}
+
+// One log entry as one line. Reads left to right the way the row does:
+// when · who · what · the dice · the arithmetic · the answer · the stake.
+function logExportLine(entry, { supersededIds, byId }) {
+  const hidden = entryHidden(entry);
+  const cells = [fmtTime(entry.t)];
+  if (entry.playerName) cells.push(logExportText1Line(entry.playerName));
+  cells.push(logExportText1Line(entry.label));
+
+  if (hidden) {
+    // The one asymmetry with the row: the row says `?` in the total column and
+    // the word in the detail, which needs two columns to read. One line gets
+    // one statement, and it is the word.
+    cells.push(logExportTypes(entry));
+    cells.push(entry.visMode === 'whisper' ? 'whispered' : 'face down');
+  } else {
+    const sources = entrySources(entry);
+    const outcomes = entryOutcomes(entry);
+    // Source-grouped when the notation attributed the dice (2b-⑤), exactly as
+    // the row groups them, with the per-group answer folded in on the same key
+    // — the merge the row does so a pool's name is said once, not twice.
+    if (sources) {
+      const order = [];
+      const byKey = new Map();
+      entry.parts.forEach((p, i) => {
+        const k = partSource(entry, i) || '';
+        if (!byKey.has(k)) { byKey.set(k, []); order.push(k); }
+        byKey.get(k).push(p);
+      });
+      const osByKey = new Map();
+      if (outcomes) {
+        for (const o of outcomes) {
+          const k = partSource(entry, o.dieIndex) || '';
+          if (!osByKey.has(k)) osByKey.set(k, []);
+          osByKey.get(k).push(o);
+        }
+      }
+      cells.push(order.map((k) => (k ? `${logExportText1Line(k)} ` : '')
+        + byKey.get(k).map(logExportPart).join(' + ')
+        + (outcomes ? ` → ${logExportTally(osByKey.get(k) || [])}` : '')).join('  ·  '));
+    } else {
+      cells.push(entry.parts.map(logExportPart).join(' + '));
+      if (outcomes) cells.push(`→ ${logExportTally(outcomes)}`);
+    }
+    // The modifier renders where the sum does (U17 step 3) and carries its
+    // attribution when it has one (§7.2).
+    const mods = activeSystem().usesTotal ? modPartsOf(entry) : null;
+    if (mods) {
+      cells.push(mods.map((p) => `${p.value >= 0 ? '+' : '−'}${Math.abs(p.value)}`
+        + `${p.label ? ` ${logExportText1Line(p.label)}` : ''}`).join(' '));
+    } else if (entry.modifier && activeSystem().usesTotal) {
+      cells.push(`${entry.modifier > 0 ? '+' : '−'}${Math.abs(entry.modifier)}`);
+    }
+    if (activeSystem().usesTotal) cells.push(`= ${entry.total}`);
+  }
+
+  // The stake is public on a hidden roll and its ADJUDICATION is not (U17) —
+  // the same split the row makes, because a ✓ needs a total to compare.
+  if (Number.isInteger(entry.dc)) {
+    cells.push(!hidden && activeSystem().usesTotal
+      ? `vs DC ${entry.dc} ${entry.total >= entry.dc ? '✓' : '✗'}`
+      : `vs DC ${entry.dc}`);
+  }
+  // Provenance, at most one per line — the row's rule (§7.15), the row's words.
+  if (entry.rerollOfId) cells.push('(reroll)');
+  else if (supersededIds.has(entry.rollId)) {
+    const child = supersededIds.get(entry.rollId);
+    const by = child && child.playerName ? logExportText1Line(child.playerName) : '';
+    cells.push(by && entry.playerName && by !== entry.playerName
+      ? `(rerolled by ${by})` : '(rerolled)');
+  }
+  void byId;   // the row needs it for the parent tooltip; a line has no tooltip
+  return cells.filter((c) => c !== '' && c != null).join('  ');
+}
+
+// `2× Success · Fail`, the tally the row prints, without the tier classes it
+// prints them in.
+function logExportTally(outcomes) {
+  const t = tallyOutcomes(outcomes);
+  if (!t.length) return 'quiet';
+  return t.map((x) => (x.n > 1 ? `${x.n}× ${x.word}` : x.word)).join(' · ');
+}
+
+// The whole transcript. Built from `log` — the WHOLE log, never the filtered
+// view: the find box has no selection affordance and its own count reads
+// "3 of 14", so it is plainly hiding rather than choosing, and Copy must not
+// be the one place in the app where a search field decides what leaves.
+function logExportSnapshot() {
+  const table = IN_LOBBY ? '' : logExportText1Line(roomSettings.tableName || ROOM);
+  // identityInfo() is the one answer to "who am I" — the live roster row when
+  // online, the stored name otherwise — so the header cannot disagree with the
+  // identity chip about whose view this file is.
+  const me = logExportText1Line(identityInfo().name);
+  const d = new Date();
+  const p2 = (x) => String(x).padStart(2, '0');
+  const head = [
+    `Roll log${table ? ` — ${table}` : ''}`,
+    `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`
+      + `${me ? ` · as seen by ${me}` : ''}`
+      + ` · ${log.length} roll${log.length === 1 ? '' : 's'}, oldest first`,
+  ];
+  // The truncation note, from the same counter the panel foot uses — a file
+  // that stopped at LOG_CAP without saying so would read as the whole evening.
+  if (logDroppedTotal) {
+    head.push(`${logDroppedTotal} earlier roll${logDroppedTotal === 1 ? '' : 's'} rolled off the end of the log and are not here.`);
+  } else if (log.length >= LOG_CAP) {
+    head.push(`This is the most recent ${LOG_CAP} rolls — the table may go back further.`);
+  }
+  head.push('A roll that was face down or whispered is listed without its values.');
+  head.push('Plain text, for reading and keeping — not an import file. Pools and settings travel separately, through Settings → Your data.');
+
+  const byId = new Map();
+  const supersededIds = new Map();
+  for (const e of log) {
+    if (e.rollId) byId.set(e.rollId, e);
+    if (e.rerollOfId && !supersededIds.has(e.rerollOfId)) supersededIds.set(e.rerollOfId, e);
+  }
+  const lines = log.map((e) => logExportLine(e, { supersededIds, byId }));
+  return `${head.join('\n')}\n\n${lines.join('\n')}\n`;
+}
+
+// '<slug>-<date>-rolls.txt' beside the rack file's '<slug>-<date>.dice.yaml',
+// so an evening's two captures sort together in Downloads and neither is
+// mistaken for the other.
+function logExportFilename() {
+  return portableFilename().replace(/\.dice\.yaml$/, '-rolls.txt');
+}
+
+// TWO VERBS, NOT ONE, and the reason is not symmetry — it is that they have
+// different destinations and different failure modes. Copy goes to a paste
+// (Discord, notes) and can be REFUSED by the browser's clipboard permission,
+// which needs a fallback and a receipt. Download goes to disk and cannot be
+// confirmed at all — the browser owns the dialog. Folding them into one
+// control would mean one of the two behaviours is wrong for whichever half of
+// the players wanted the other. The portable pane already draws exactly this
+// pair with exactly these words (Copy / Download); a player who learned it
+// there knows this without being told.
+//
+// EMPTY IS DISABLED, NOT SILENT. C15's lesson: a capture that writes nothing
+// and says "Saved!" is a failed capture that read as a success. With no rolls
+// the panel already says `No rolls yet.`, so the verbs go dim rather than
+// growing a second sentence.
+function updateLogExportVerbs() {
+  for (const id of ['log-copy', 'log-download']) {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = !log.length;
+  }
+}
+
 function renderLog() {
   logList.innerHTML = '';
   logEmpty.style.display = log.length ? 'none' : 'block';
@@ -19905,6 +20186,7 @@ function renderLog() {
   applyLogFilter();  // a rebuild must not silently drop an active filter
   renderRecord();    // …nor the record strip that indexes it (§7.42)
   updateLogDroppedNote();
+  updateLogExportVerbs();  // §7.49: nothing to capture is a dim verb, not a lie
 }
 renderLog();
 
@@ -20252,6 +20534,37 @@ document.getElementById('log-record').addEventListener('click', (ev) => {
     setLogFilter('');
   });
 }
+
+// The two capture verbs (§7.49 / ROADMAP §5). The MORPH is the receipt, which
+// is the pattern both of the portable pane's doors already use — the flyout has
+// no status line and must not grow one: the only thing that belongs under the
+// record is the record.
+document.getElementById('log-copy').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  if (btn.disabled) return;
+  const text = logExportSnapshot();
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = 'Copied!';
+  } catch {
+    // Clipboard refused (permission, or a non-secure origin). The portable
+    // pane's fallback is to hand the text over SELECTED, which it can do
+    // because it has a textarea; there is none here, so the fallback is the
+    // other door — the file — and the label says which one actually happened.
+    // A silent failure is the one outcome ruled out: capture is a thing the
+    // player DOES (goal 7), and a verb that did nothing must not look done.
+    portableDownload(text, logExportFilename(), 'text/plain;charset=utf-8');
+    btn.textContent = 'Saved instead';
+  }
+  setTimeout(() => { btn.textContent = 'Copy'; }, 1200);
+});
+document.getElementById('log-download').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  if (btn.disabled) return;
+  portableDownload(logExportSnapshot(), logExportFilename(), 'text/plain;charset=utf-8');
+  btn.textContent = 'Saved!';
+  setTimeout(() => { btn.textContent = 'Download'; }, 900);
+});
 
 // ---------------------------------------------------------------------------
 // Rail + corner controls
@@ -21554,9 +21867,15 @@ function portableFilename() {
   return `${slug}-${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}.dice.yaml`;
 }
 
-function portableDownload() {
-  const name = portableFilename();
-  const url = URL.createObjectURL(new Blob([portableSnapshot()], { type: 'text/yaml;charset=utf-8' }));
+// THE ONE WRITER TO DISK. Defaulted rather than duplicated (ROADMAP §5): the
+// roll-log export reuses this exact function with its own text, name and type,
+// so the anchor trick, the appendChild that some browsers need and above all
+// the LATE revoke live in one place. A second copy of this would be a second
+// place for the revoke timing to be got wrong, and that failure looks like "the
+// download sometimes does not happen".
+function portableDownload(text = portableSnapshot(), name = portableFilename(),
+  type = 'text/yaml;charset=utf-8') {
+  const url = URL.createObjectURL(new Blob([text], { type }));
   const a = document.createElement('a');
   a.href = url;
   a.download = name;
@@ -22046,13 +22365,17 @@ async function portablePushToTable() {
     roomSetup && Number.isInteger(roomSetup.rev) ? roomSetup.rev : 0,
     stored ? stored.rev : 0,
   );
-  let res = await net.pushTable({ rev: base + 1, table, profiles });
+  // C22: THIS is authorship, so this is where the stamp is minted — the same
+  // string on the wire and in the record, because they are one setup seen at
+  // two scales (see the storedTable header for why the replay path does NOT
+  // re-stamp, and server.js handleTable for why the server only carries it).
+  let res = await net.pushTable({ rev: base + 1, table, profiles, ver: SCHEMA_STAMP });
   if (res && !res.applied) {
-    res = await net.pushTable({ rev: res.rev + 1, table, profiles });
+    res = await net.pushTable({ rev: res.rev + 1, table, profiles, ver: SCHEMA_STAMP });
   }
   if (!res) return portableRefuse('✗ couldn’t reach the table — nothing was sent');
   if (!res.applied) return portableRefuse('✗ the table took a newer setup just now — try again');
-  save(LS_TABLE, { rev: res.rev, table, profiles, at: Date.now() });
+  save(LS_TABLE, { rev: res.rev, ver: SCHEMA_STAMP, table, profiles, at: Date.now() });
   const n = profiles.length;
   const left = [];
   if (wrongSystem) left.push(`${wrongSystem} for another system`);
@@ -23574,11 +23897,96 @@ document.addEventListener('keydown', (e) => {
 // lobby read and write the REAL shared room's record.
 const LS_TABLE = IN_LOBBY ? null : `dice.table.v1:${ROOM}`;
 
-function storedTable() {
+// ---- C22's second half: the setup carries a stamp, and the WRITER puts it on
+//
+// The residual C22 left open was `room.setup`, and the reason it could not be
+// closed server-side is provenance: a stamp the SERVER writes describes the
+// server's build, and the question a reader has is "which build authored this
+// DATA". So the stamp rides the push, the server carries it verbatim
+// (server.js handleTable), and every reader judges it with the same
+// judgeStamp the profile store and the portable file use.
+//
+// TWO WRITERS, AND ONLY ONE OF THEM MINTS A STAMP. portablePushToTable is
+// AUTHORSHIP — this build made this setup out of the box's text, so it stamps
+// with SCHEMA_STAMP. maybeRepushTable is a REPLAY of a record some earlier
+// build wrote, so it forwards that record's own stamp untouched; re-stamping
+// it with today's would be this build claiming authorship of bytes it only
+// stored, which is the same lie as letting the server stamp.
+//
+// AN ABSENT STAMP STAYS ABSENT on the replay path. Every `dice.table.v1:*`
+// record in the field right now has no `ver` at all, and judgeStamp reads
+// absence as this epoch's oldest data (see its header for why that is a fact
+// and not a kindness) — so a Tuesday-prepared table still heals a restarted
+// room on Thursday after this ships.
+let tableRefusal = null;   // the sentence, when this browser's own record is unreadable
+
+function storedTableRaw() {
   if (!LS_TABLE) return null;
   const v = load(LS_TABLE, null);
   return v && typeof v === 'object' && !Array.isArray(v) && Number.isInteger(v.rev) && v.rev >= 1
     ? v : null;
+}
+
+// The judged read — the ONE door to the authorship record, so the refusal
+// cannot be routed around by a caller that forgot.
+//
+// WHY THE REFUSAL MATTERS HERE MORE THAN IT DOES FOR A LIBRARY. net.pushTable
+// destructures exactly `{rev, table, profiles, ver}`: a record written by a
+// build that put a FIFTH field in it would be replayed by this one with that
+// field silently gone, at the SAME rev, over the top of what the room holds.
+// That is not this player losing their own data quietly — it is the whole
+// table's prepared setup being degraded by an act nobody clicked. So a newer
+// record does not get replayed at all, and the player is told why.
+function storedTable() {
+  const v = storedTableRaw();
+  if (!v) return null;
+  const verdict = judgeStamp(v.ver, 'the table this browser prepared for this room');
+  if (verdict.action === 'refuse') {
+    tableRefusal = verdict.message;
+    return null;
+  }
+  // 'purge'/'convert' are the origin-wide epoch mechanism's business
+  // (purgeStaleClientState, which has already run and dropped every `dice.*`
+  // key below EPOCH) — by the time anything reaches here the record is this
+  // epoch's by construction, exactly as readStore documents for the library.
+  return v;
+}
+
+// What a REFUSED room setup leaves behind: the rev, and nothing else.
+//
+// The rev is not versioned content — it is a counter about the blob, the same
+// kind of thing the stamp itself is — and keeping it is what stops the
+// refusal from causing a second problem: with `roomSetup` set to plain null,
+// maybeRepushTable would read the room as unprepared (rev 0) and start
+// pushing an older setup over a newer one it just refused to read.
+function refusedSetup(rev) {
+  return { rev: Number.isInteger(rev) && rev >= 1 ? rev : 0, refused: true };
+}
+
+// The ONE place an incoming `room.setup` becomes `roomSetup` — hello, join and
+// the 'table-setup' broadcast all come through here, so a reader that judges
+// on two of three paths is not a shape this can take.
+//
+// The refusal is SPOKEN, on the three surfaces C22's library refusal already
+// established (pill, announce, settings note) plus the field log, because the
+// sentence is the deliverable: "the seats are missing" with no explanation is
+// indistinguishable from "the organizer never pushed any".
+let roomSetupRefusal = null;
+function adoptRoomSetup(setup) {
+  roomSetupRefusal = null;
+  if (!setup || typeof setup !== 'object') return null;
+  const verdict = judgeStamp(setup.ver, 'the prepared table at this room');
+  if (verdict.action !== 'refuse') return setup;
+  roomSetupRefusal = verdict.message;
+  for (const say of [
+    () => setPill(verdict.message, 'notice'),
+    () => announce(verdict.message),
+    () => showSettingsNote(verdict.message),
+  ]) {
+    try { say(); } catch { /* one surface being unavailable must not eat the others */ }
+  }
+  if (window.__diceReport) window.__diceReport(`room setup refused: ${verdict.message}`);
+  return refusedSetup(setup.rev);
 }
 
 // Re-push on hello (§G6, PROFILES §5 mechanism 2): the organizer's browser is
@@ -23600,8 +24008,15 @@ function maybeRepushTable() {
   const roomRev = roomSetup && Number.isInteger(roomSetup.rev) ? roomSetup.rev : 0;
   if (roomRev >= stored.rev) return null;
   repushInFlight = true;
-  return net.pushTable({ rev: stored.rev, table: stored.table || {}, profiles: stored.profiles || [] })
-    .finally(() => { repushInFlight = false; });
+  // `ver` forwarded, not minted — see the storedTable header. `undefined` is
+  // how net.pushTable is told there is no stamp, which is the honest wire for
+  // a record written before stamps existed.
+  return net.pushTable({
+    rev: stored.rev,
+    table: stored.table || {},
+    profiles: stored.profiles || [],
+    ver: typeof stored.ver === 'string' ? stored.ver : undefined,
+  }).finally(() => { repushInFlight = false; });
 }
 
 // ---------------------------------------------------------------------------
@@ -25006,7 +25421,7 @@ function handleNetEvent(type, data) {
       // is exactly when a restarted room becomes visible. (The very first
       // hello can outrun initNet's `net =` assignment — maybeRepushTable
       // no-ops then, and initNet's own call right after the join covers it.)
-      roomSetup = data.setup || null;
+      roomSetup = adoptRoomSetup(data.setup);   // C22: judged, never taken raw
       // Same present-or-absent rule for the sub-table wiring (§3b L4): a
       // restarted server that forgot the split says so by omission, and this
       // must fall to empty rather than keep the last thing seen — the ↩ Main
@@ -25163,14 +25578,20 @@ function handleNetEvent(type, data) {
       // inside the push arrive on their own 'settings-changed' echo, so this
       // case only tracks state (the seat picker and §G6's re-push read it)
       // and gives the roster the same quiet note grammar settings use.
-      roomSetup = data.setup || null;
+      roomSetup = adoptRoomSetup(data.setup);   // C22: judged, never taken raw
       // ...and the presence row, which now draws the unclaimed chairs FROM
       // that setup. Without this the chairs are whatever the last join/leave
       // left behind: an organizer pushing a six-seat setup at a live table
       // changed nobody's row until an unrelated roster event happened to fire.
       renderPlayers();
       renderTableProfiles(); // the prepared seats are copy sources (§11 P12)
-      if (data.byId && net && data.byId !== net.playerId) {
+      // C22: NOT WHEN THE SETUP WAS REFUSED. Found by looking (2026-08-17): the
+      // note fired unconditionally and wrote 'Bram prepared the table' straight
+      // over the refusal sentence one line above it — a reassuring lie in the
+      // slot that had just carried the only explanation of why no seats
+      // appeared. `showSettingsNote` shares the pill and announces, so it does
+      // not merely hide the refusal, it speaks past it.
+      if (data.byId && net && data.byId !== net.playerId && !roomSetupRefusal) {
         showSettingsNote(`${data.byName || 'someone'} prepared the table`);
       }
       break;
@@ -26261,7 +26682,7 @@ async function initNet() {
     if (me && me.name && me.name !== name) {
       try { localStorage.setItem(LS_NAME, me.name); } catch { /* ignore */ }
     }
-    roomSetup = conn.setup || null; // the prepared table rides the join (§G4)
+    roomSetup = adoptRoomSetup(conn.setup); // the prepared table rides the join (§G4), judged (C22)
     // …and the sub-table wiring (§3b L4), before the first renderPlayers below,
     // because the presence row draws the ↩ Main table / Breakouts ghost from it.
     roomParent = conn.parent || null;
