@@ -25235,12 +25235,24 @@ function renderSeatPhase() {
   document.getElementById('seat-apply').disabled = !seatVerdict.canApply;
 }
 
+// ONE PLACE HIDES THE DOOR, because the modal semantics have to come down
+// with it (U22). `closeModal` un-inerts the rest of the page and hands focus
+// back to whatever opened the picker; a second `classList.add('hidden')`
+// somewhere else would leave a table nobody can tab into — a page-wide dead
+// state with no visible symptom, which is the exact failure mode `inert`
+// trades for its one-property containment.
+function hideSeatModal() {
+  const modal = document.getElementById('name-modal');
+  modal.classList.add('hidden');
+  closeModal(modal);
+}
+
 function closeSeatModal() {
   seatPhase = 'idle';
   seatPlan = null;
   seatProfile = null;
   seatSetFlip = null;
-  document.getElementById('name-modal').classList.add('hidden');
+  hideSeatModal();
 }
 
 // Take a PREPARED seat: resolve the prompt with the profile's name and keep
@@ -25318,7 +25330,7 @@ function takeFreeSeat(rawName) {
   const resolve = seatResolve;
   seatResolve = null;
   if (seatCleanup) { seatCleanup(); seatCleanup = null; }
-  document.getElementById('name-modal').classList.add('hidden');
+  hideSeatModal();
   resolve(name);
   return { ok: true, status: `✓ joining as ${name}`, canApply: false };
 }
@@ -25570,17 +25582,35 @@ function promptName(peek) {
     update();
     joinBtn.addEventListener('click', submit);
     input.addEventListener('keydown', onKey);
-    // THE KEYBOARD IS THE PLAYER'S TO OPEN (C11). This focus was
-    // unconditional, and on a phone it is not a focus — it is a software
-    // keyboard, raised BEFORE the peek has resolved. The viewport meta carries
-    // `interactive-widget=resizes-content`, so the keyboard shrinks the layout
-    // viewport by roughly half at the exact moment the seats arrive into it:
-    // the panel grows and the viewport halves in the same frame, and the top
-    // of a centred overlay is what goes. The max-height/overflow fix makes
-    // that survivable; not stealing the keyboard makes it not happen.
+    // THE DOOR IS A DIALOG, AND IT SAYS SO ONLY BECAUSE IT TRAPS (U22).
+    // #name-modal was the last blocking overlay outside `openModal`: it
+    // annotated nothing, contained nothing, and Tab from the name field
+    // walked the entire workbench behind a full-screen scrim. That is the
+    // worst place in the app for it — the picker is the FIRST thing a
+    // stranger meets and the one screen that exists for a phone. The rule
+    // this file already keeps is that `aria-modal` and the trap ship
+    // together or neither ships, so both arrive here in one call, which is
+    // also what `a11y-modals` asserts about the other three.
+    //
+    // THE KEYBOARD IS THE PLAYER'S TO OPEN (C11), and the trap's initial
+    // focus IS that decision — which is why it rides `focus:` rather than a
+    // separate `input.focus()` that would fight openModal for it. The focus
+    // was unconditional once, and on a phone it is not a focus — it is a
+    // software keyboard, raised BEFORE the peek has resolved. The viewport
+    // meta carries `interactive-widget=resizes-content`, so the keyboard
+    // shrinks the layout viewport by roughly half at the exact moment the
+    // seats arrive into it: the panel grows and the viewport halves in the
+    // same frame, and the top of a centred overlay is what goes. The
+    // max-height/overflow fix makes that survivable; not stealing the
+    // keyboard makes it not happen.
     // A fine pointer keeps the focus — there is no keyboard to raise, and
-    // typing your name immediately is the whole point of the field.
-    if (!window.matchMedia('(pointer: coarse)').matches) input.focus();
+    // typing your name immediately is the whole point of the field. A coarse
+    // one falls to focusablesIn's first, the ✕: a way OUT is the right thing
+    // to hand someone who did not ask for a dialog, and it raises nothing.
+    openModal(modal, {
+      labelledBy: 'seat-title',
+      focus: window.matchMedia('(pointer: coarse)').matches ? null : input,
+    });
     if (peek && typeof peek.then === 'function') {
       peek.then((info) => {
         // Stale answers keep quiet: the prompt may have resolved (or been
