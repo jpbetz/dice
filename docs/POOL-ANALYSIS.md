@@ -614,10 +614,10 @@ rendering questions below are answered there and struck here; the fourth (UX
 surface and not to a management read.*
 
 *Two premises those questions rested on had **gone stale**, and both are
-recorded with the answers: `renderPopEcho` never branched on `pop.source`, so
-"which doors forecast" had in fact been settled by ④ in 2026-08-06 and nobody
-noticed; and `stageGroup` no longer drops mods and dc, which was the entire
-reason a pool-scope forecast looked ambiguous.*
+recorded with the answers: `renderPopEcho`'s preview path never branched on
+`pop.source`, so "which doors forecast" had in fact been settled by ④ in
+2026-08-06 and nobody noticed; and `stageGroup` no longer drops mods and dc,
+which was the entire reason a pool-scope forecast looked ambiguous.*
 
 - **Does the parser stop collapsing `2d20kh1` → `1d20 adv`?** The physical-dice
   count closes the *budget* bug either way; what remains is whether notation
