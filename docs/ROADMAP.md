@@ -28,11 +28,14 @@ by *finishing what is in flight*.
    behind is closed. What remains is one half-built feature, one structural
    bet, and a long design-first tail.
 2. **Track B is BUILT and entirely blocked on Joe.** Tier W has no unbuilt
-   step. Five LOOK verdicts and **ten** unheard voices stand between it and
-   done, plus two judgements no measurement can make. There is now a single
-   page that turns all of it into one sitting — **`tools/verdict-sheet.mjs`
-   builds it; see [#1](#the-order)** — which makes the queue the cheapest
-   high-value hour in this file and the reason it stays at the top.
+   step. **Seven** LOOK verdicts and **ten** unheard voices stand between it
+   and done, plus two judgements no measurement can make. There is now a single
+   page that turns all of it into one sitting — `shots/verdicts.html`, **which
+   is rendered and then built, in that order**
+   ([how](#the-sittings-page-is-rendered-then-built-in-that-order); the frames
+   are not taken by the tool that embeds them, and assuming otherwise is what
+   put stale frames in front of a verdict once) — which makes the queue the
+   cheapest high-value hour in this file and the reason it stays at the top.
 3. **The docs go stale in one specific way, and the fix is a COMMAND, not a
    date.** ~20 claims were found false on 08-15 and more since. Two of them
    were written *during those very cleanups* — C27's table turned out to be
