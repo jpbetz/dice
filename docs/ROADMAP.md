@@ -51,7 +51,7 @@ by *finishing what is in flight*.
 | # | Item | Why it is here | Size | Track |
 | --- | --- | --- | --- | --- |
 | 1 | [**Joe's LOOK and LISTEN sitting**](#tier-w--the-first-fantasy-venue-the-fae-set--built-the-look-and-the-listen-are-joes) | **Not a build item, and that is why it is first.** Tier W is finished except for being *seen and heard*; five verdicts and ten voices gate it, and nothing on Track B advances until they move. One page now carries every frame side by side with the question each answers, and `docs/AUDIO.md` §9 is ten rows of two clicks. Rebuild it with `node tools/verdict-sheet.mjs`. | ~1 hr of Joe | B |
-| ~~2~~ | ~~[**§2l ⑥'s RENDERING**](#2l-pool-analysis--①⑥-shipped-the-sum-read-renders-2026-08-17)~~ **SHIPPED 2026-08-17** | The curve of the total renders in `#pop-preview` on every ± door, plus a target clause in the one-line validator. §2l is now ①–⑥ complete and **its record has moved to SHIPPED.md**; the heading that stays here carries only what is still live. That is #4's sibling (§5's local statistics, now unblocked — `sumForecast(…).mean`/`.sd` are the expected term) and UX §2.1's `showOdds`, still deliberately unbuilt. | — | A |
+| ~~2~~ | ~~[**§2l ⑥'s RENDERING**](#2l-pool-analysis--①⑥-shipped-the-sum-read-renders-2026-08-17)~~ **SHIPPED 2026-08-17** | The curve of the total renders in `#pop-preview` on every ± door, plus a target clause in the one-line validator. §2l is now ①–⑥ built and **its record has moved to SHIPPED.md**; the heading that stays here carries only what is still live. **Its LOOK is still owed — every number was verified, nothing was seen rendered — so it joins #1's queue**, alongside #4's sibling (§5's local statistics, now unblocked — `sumForecast(…).mean`/`.sd` are the expected term) and UX §2.1's `showOdds`, still deliberately unbuilt. | — | A |
 | 3 | [**C22's `room.setup` stamp**](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15) | Half a contract is worse than none. The stamp must come from the WRITER (`maybeRepushTable`); a stamp only the server writes is a stamp nobody can trust. ~10 lines once someone owns that site. | small | A |
 | 4 | [**§5** — roll-log export](#5-capture-mechanisms) | Goal 7's last uncapturable surface: the online log cannot be copied or downloaded. Reuses `portableDownload()`. The half of §5 that never waited on #2 — and #2's engine has since unblocked the other half's *expected* term, leaving it on one blocker (no durable log online) rather than two. | small | A |
 | 5 | [**9d follow-up** — `tower` in the portable YAML](#9d-follow-up-tower-and-venue-in-the-portable-yaml) | `TABLE_KEYS` is still `{name, felt, system, zoom}`, so a prepared table cannot arrive with its tower up. Ship `tower` alone; GOALS punted how a venue rides the file. | small | A |
@@ -175,9 +175,10 @@ the surface is UX §7.43.
 
 ### 2l. Pool analysis — ①–⑥ SHIPPED; **the sum read renders (2026-08-17)**
 
-**CLOSED, all six slices.** ①–④ 2026-08-06 · ⑤ the ledger sheet 2026-08-15
-(UX §7.44) · ⑥'s engine 2026-08-16 (`sumForecast(dice, mods)` in `js/odds.js`)
-· ⑥'s rendering 2026-08-17 (UX §7.48), which is what closes the section.
+**BUILT, all six slices** — and *built* is the honest word, because the LOOK is
+still owed (first bullet below). ①–④ 2026-08-06 · ⑤ the ledger sheet
+2026-08-15 (UX §7.44) · ⑥'s engine 2026-08-16 (`sumForecast(dice, mods)` in
+`js/odds.js`) · ⑥'s rendering 2026-08-17 (UX §7.48).
 **Record in [SHIPPED.md](SHIPPED.md)**: what renders, the four findings from
 the rendering half (the 22 `#pop-preview` assertions that did NOT break and why
 the inference from a live number was wrong · `stageGroup` not having dropped
@@ -187,8 +188,18 @@ LOOKING and not by the suite), the three typed refusals and their two
 corrections, and the four proofs with the command that reproduces the bench.
 Reasoning, data and killed designs: [POOL-ANALYSIS.md](POOL-ANALYSIS.md).
 
-**This heading survives the move because two things are still LIVE:**
+**This heading survives the move because three things are still LIVE:**
 
+- **STILL OWED: the LOOK — and it is the one that keeps ⑥ from being done.**
+  Every number on the surface was verified in the running app — cell counts,
+  hole positions, mark positions, both target-row branches, all three peak
+  phrasings, the four box states — but **nothing was seen rendered**: the
+  Browser pane would not composite in that session. Three decisions are waiting
+  on an eye rather than an assertion, listed in UX §7.48 ⑨ (the columns touch
+  with no gutter; a flat pool draws a solid block; the average and target marks
+  can coincide). It belongs on Joe's LOOK queue beside
+  [#1](#the-order). *This is why the heading above says the sum read RENDERS
+  and not that it looks right — the two are not the same claim.*
 - **§5's local statistics are UNBLOCKED**, and the block was ⑥'s engine rather
   than its rendering: `sumForecast(dice, mods).mean` and `.sd` are the
   *expected* term §5 had no source for. §5's own second blocker is untouched —

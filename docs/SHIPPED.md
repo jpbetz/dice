@@ -1408,11 +1408,20 @@ player — and as of 2026-08-17 the app finally says a word about `4d6dl1`:
 *most likely 13 · 13%*, and *23% to clear 15*) · **5** · **6** · **7** · **12**
 closed by the session-only ruling.
 
-**Two things this landing left LIVE, and they stay in the roadmap rather than
-here** — §5's local statistics (unblocked by ⑥'s *engine*; still blocked on the
-client persisting no log online) and UX §2.1's `showOdds` (deliberately
-unbuilt, two open ceremony questions). Both are written out in
-[ROADMAP §2l](ROADMAP.md), which keeps its heading for exactly that reason.
+**Read the proof count above with this beside it: the LOOK is still owed.**
+Every number on the surface was verified in the running app, but **nothing was
+seen rendered** — the Browser pane would not composite in that session — and
+three decisions wait on an eye rather than an assertion (UX §7.48 ⑨: the
+columns touch with no gutter; a flat pool draws a solid block; the average and
+target marks can coincide). 115 passing checks and a 5.6 ms bench say the
+arithmetic is right; they say nothing about whether the curve is legible. This
+entry is filed as a landing, not as a verdict.
+
+**Three things this landing left LIVE, and they stay in the roadmap rather than
+here** — that LOOK, §5's local statistics (unblocked by ⑥'s *engine*; still
+blocked on the client persisting no log online), and UX §2.1's `showOdds`
+(deliberately unbuilt, two open ceremony questions). All three are written out
+in [ROADMAP §2l](ROADMAP.md), which keeps its heading for exactly that reason.
 
 ---
 
