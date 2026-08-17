@@ -4420,6 +4420,172 @@ export const scenarios = [
     },
   },
 
+  // ---------------------------------------------------------------------
+  // `dice.who.v1` RUNG 1 — a seat outlives its tab (docs/IDENTITY.md §5,
+  // ROADMAP B4, UX §7.52). The seat memory is per TAB (sessionStorage), so a
+  // CLOSED tab used to come back as a stranger: its held roll could not be
+  // revealed by the person who chose it, and its secret rolls fell out of its
+  // own log. The browser key is per ORIGIN (localStorage), it is a second
+  // credential for the SAME resume path, and it is never anything a client
+  // can be told "no" to — the lookup either finds a lapsed seat or falls
+  // through to an ordinary join, which is what keeps it from being a login.
+  // ---------------------------------------------------------------------
+  {
+    name: 'who-resume',
+    tags: ['seat', 'identity', 'cuj3'],
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await b.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+
+      // THE TWO STORAGES, AND THE DIFFERENCE IS THE FEATURE. The key is
+      // origin-wide and outlives the tab; the seat is per-tab and does not.
+      const who = await a.dbg('who');
+      assert.ok(typeof who === 'string' && who.length >= 8,
+        `a browser key was minted (got ${JSON.stringify(who)})`);
+      assert.equal(await a.eval(`sessionStorage.getItem('dice.who.v1')`), null,
+        'the key is NOT per-tab — that is the whole point of it');
+      assert.ok(await a.eval(
+        `sessionStorage.getItem(${JSON.stringify(`dice.seat.v1:${ctx.room}`)})`),
+      'while the seat still is');
+
+      const seat = await a.playerId();
+      const color = await a.color();
+
+      // Alice holds a roll, then her tab is gone — the REAL pagehide beacon,
+      // which `seat-closed-tab` already proves fires.
+      await a.roll('d20 held');
+      const rollId = await a.rollId();
+      await a.close();
+      // …AND THE BEACON IS THEN LANDED SYNCHRONOUSLY, which is the difference
+      // between this scenario and a flake. `navigator.sendBeacon` cannot be
+      // awaited from anywhere (that is the whole reason the server's liveness
+      // sweep exists), so `a.close()` returning says nothing about the server
+      // having noticed — and the resume requires `clients.size === 0`. Seen
+      // for real: green three times in isolation, then one FAIL inside a
+      // 38-scenario lane with a fresh uuid, because the join beat the socket
+      // close. This is the same endpoint the beacon posts to, in its own
+      // documented no-streamId mode ("drop them all"), and it answers 200 —
+      // so the precondition is a fact by the time the join is sent. If the
+      // browser's beacon lands too, it is idempotent: scheduleReap never
+      // shortens a pending grace.
+      const gone = await ctx.api('/api/leave', { playerId: seat });
+      assert.ok(gone.ok, `the server has seen the tab go (got ${gone.status})`);
+
+      // DRIVEN AT THE PROTOCOL LEVEL ON PURPOSE. A fresh tab boot takes 2–5 s
+      // against a 5 s grace, so a second `newTable` here would be a flake
+      // generator: it would sometimes arrive after the seat had been reaped
+      // outright, and the resume path under test is for a seat that lapsed.
+      const back = await ctx.api('/api/join', { name: 'Alice', who });
+      assert.ok(back.ok, `the re-join is accepted (got ${back.status})`);
+      assert.equal(back.data.playerId, seat, 'and it is the SAME seat');
+      assert.equal(back.data.color, color, 'wearing the same color');
+      // The server names which door opened — `by=who` here, `by=seat` on the
+      // ordinary reload path — so a resume that happened for the wrong reason
+      // is distinguishable from one that happened for the right one.
+      await ctx.waitForLog(/resume .*by=who/, { desc: 'the server says it resumed by key' });
+
+      // AND THE AUTHORITY CAME WITH IT. This is the defect: before rung 1 the
+      // returning browser got a fresh uuid, so its own held roll answered 403
+      // `not_reveal_authority` — the button was gone from the only screen
+      // entitled to press it.
+      const rev = await ctx.api('/api/reveal', { playerId: back.data.playerId, rollId });
+      assert.ok(rev.ok, `the returning browser still holds the reveal (got ${rev.status})`);
+      // …and the flip really reached the table, from the resumed authority. A
+      // 200 that revealed nothing is exactly the green check this repo keeps
+      // catching itself writing.
+      await b.waitFor(revealSettled(rollId), { desc: 'the table sees the held roll flip' });
+      assert.equal(await b.eval(
+        `window.__diceDebug.players.filter((p) => p.name === 'Alice').length`), 1,
+      'and there was exactly one Alice throughout — a resume is not an arrival');
+    },
+  },
+  {
+    name: 'who-never-steals',
+    tags: ['seat', 'identity'],
+    // THE REFUSAL, which is one comparison (`p.clients.size === 0`) and is the
+    // whole security argument. Green before rung 1 and after — it is the
+    // guard, and step 1 is what stops it being vacuous: proving the two tabs
+    // really do share one key is what makes "and they are still two players"
+    // a claim about the resume rule rather than about two unrelated browsers.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const seat = await a.playerId();
+      const who = await a.dbg('who');
+
+      // A SECOND TAB of the same browser, with the first still live.
+      const a2 = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      assert.equal(await a2.dbg('who'), who, 'the two tabs really do share one browser key');
+      const seat2 = await a2.playerId();
+      assert.notEqual(seat2, seat, 'and are still two players — a live seat is never resumed');
+
+      // A stranger holding the key gets a seat OF THEIR OWN, and no error:
+      // there is nothing here a client can be told "no" to, which is what
+      // keeps this from being a login and is why no settings write can ever
+      // be refused by identity (the defect that killed B1).
+      const thief = await ctx.api('/api/join', { name: 'Mallory', who });
+      assert.ok(thief.ok, `the would-be thief is simply seated (got ${thief.status})`);
+      assert.notEqual(thief.data.playerId, seat, 'never into the first tab’s chair');
+      assert.notEqual(thief.data.playerId, seat2, 'nor the second’s');
+
+      // AND THE KEY NEVER LEAVES. publicPlayers builds its roster field by
+      // field and this is not one of them; there is no other path a player
+      // object leaves by.
+      assert.equal(await a.eval(
+        `document.body.innerText.includes(${JSON.stringify(who)})`), false,
+      'the key is never displayed');
+      assert.equal(await a.eval(
+        `JSON.stringify(window.__diceDebug.players).includes(${JSON.stringify(who)})`), false,
+      'and never rides the roster');
+    },
+  },
+  {
+    name: 'who-held-survives-reload',
+    tags: ['seat', 'identity', 'visibility'],
+    // The same resume, in a REAL BROWSER rather than over the API — and the
+    // assertion the whole rung is for, which is about a button.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Bob' });
+      await b.waitFor(`window.__diceDebug.players.length === 2`, { desc: 'both seated' });
+
+      await a.roll('d20 held');
+      const rollId = await a.rollId();
+      const seat = await a.playerId();
+      const who = await a.dbg('who');
+
+      // FORCE THE KEY PATH DELIBERATELY. `dropSeatMemory()` forgets this tab's
+      // seat without telling the server — the browser state a closed tab
+      // leaves behind, minus the wait — so the reload arrives with NO seat id
+      // and a key, and must come back through `resumableSeatFor`. Racing a
+      // real 5 s grace with a fresh tab boot is the alternative, and it is a
+      // flake.
+      assert.equal(await a.dbg('dropSeatMemory()'), true, 'the seat memory is dropped');
+      await a.reload();
+      assert.equal(await a.dbg('who'), who, 'the key survived the reload');
+      assert.equal(await a.playerId(), seat, 'and brought the seat back with it');
+      await ctx.waitForLog(/resume .*by=who/,
+        { desc: 'resumed by the KEY, not by a seat id it no longer has' });
+
+      // THE PURGE SPARES IT. purgeStaleClientState drops every `dice.*` key on
+      // a client older than the current schema; the key is on PURGE_KEEPS,
+      // because a browser that gets purged and then cannot sit back down has
+      // lost its held roll to a housekeeping pass.
+      await a.eval(`localStorage.removeItem('dice.schema.v1')`);
+      assert.ok(await a.dbg('purgeStale()') > 0, 'the purge really ran');
+      assert.equal(await a.dbg('who'), who, 'and did not take the key with it');
+
+      // THE ASSERTION THE RUNG EXISTS FOR: the Reveal is on Alice's own screen
+      // and on nobody else's. Before the fix this read false on the player's
+      // own screen — the button was gone from the one seat entitled to it.
+      assert.equal((await a.entryState(rollId)).canReveal, true,
+        'the returning tab holds the reveal on its own screen');
+      assert.equal((await b.entryState(rollId)).canReveal, false, 'and Bob still does not');
+      await a.dbg(`reveal(${JSON.stringify(rollId)})`);
+      for (const t of [a, b]) await t.waitFor(revealSettled(rollId), { desc: 'the flip settles' });
+    },
+  },
+
   {
     name: 'url-carries-nothing',
     tags: ['smoke', 'groups', 'cuj13'],
