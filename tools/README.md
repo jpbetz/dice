@@ -145,6 +145,50 @@ retaken the first time an app frame existed.
 | `engine-contract.mjs` | emits `tools/forge/engine_contract.json` — the constants the forge tools must stop re-typing | **measures**, and WRITES the file | an engine constant, volume or limit moved |
 | `dress-bake-ab.mjs [--redcheck]` | byte-identity of a kit's baked canvases across a refactor | **measures** (canvas compare) | a bake function moved or was re-plumbed |
 
+## THE SITTING — every open LOOK and LISTEN on one page
+
+```bash
+node tools/drive.mjs tools/steps/verdict-shots.mjs          # the four new frame sets
+node tools/drive.mjs --steps tools/steps/glade-look.mjs,\
+  tools/steps/life-look.mjs,tools/steps/record-look.mjs      # the three existing ones
+node tools/verdict-sheet.mjs                                 # → shots/verdicts.html
+```
+
+`shots/verdicts.html` is a **single self-contained file** (frames embedded as
+JPEG data URIs) that opens from the filesystem with no server. It carries every
+outstanding visual and audio judgement in the project, ordered by **what each
+verdict frees** rather than by tier number: the question in one sentence, the
+frames side by side, what happens on either answer, and — for the listening
+half — `docs/AUDIO.md` §9's script transcribed in its own order, because the
+order is what makes it one sitting instead of ten errands.
+
+It exists because ROADMAP THE ORDER #1 was a queue of judgements that were
+each a paragraph in a different file needing a different tool re-run to see.
+The cost was never the deciding; it was the finding.
+
+**The page is gitignored and the generator is committed, deliberately.** A
+committed page with embedded frames goes stale silently the first time anybody
+touches the venue, and this project's dominant failure mode is a green check
+over a stale thing. Two consequences the generator enforces rather than
+documents: a missing PNG renders as a **loud red cell naming the command that
+would produce it** (a quietly shorter grid reads exactly like a complete one),
+and an A/B whose two files are **byte-identical is labelled as such** on the
+page — an unarmed comparison looks precisely like a passing one.
+
+One frame in the sheet cannot be produced from the tree as it stands: W7 ②'s
+"before" needs `js/fae-lab.js` from the commit before the staging landed.
+
+```bash
+git checkout 9f1e592 -- js/fae-lab.js
+node tools/drive.mjs tools/steps/glade-look.mjs tag=before
+git checkout HEAD -- js/fae-lab.js     # ALWAYS, and check `git status` after
+```
+
+`verdict-shots.mjs` also writes `shots/verdict-data.json` — the measured
+numbers each frame was taken at — and the sheet captions itself from that file
+rather than from figures quoted out of a doc, which is how a caption goes stale
+while its picture stays true.
+
 ## Contact sheets (2i-F)
 
 ```bash
