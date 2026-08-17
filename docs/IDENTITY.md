@@ -190,10 +190,29 @@ live clients · never persisted server-side beyond the room's own life
 6. **Google sign-in stays deferred**; PROFILES §6 is unamended by this
    pass.
 
-## 7. The one question for Joe
+## 7. The question, and Joe's answer: **rung 2 is CLOSED**
 
-A held roll whose chooser's browser is gone for good: today it can only be
-swept unread. Is that the intended price of goal 11 — a stake that dies
-with its keeper — or should rung 2 make "come back tomorrow and reveal it"
-work for as long as the room lives? Rung 1 ships either way; this decides
-whether rung 2 is ever built.
+*Asked and answered 2026-08-17.* A held roll whose chooser's browser is gone
+for good can only be swept unread. Is that the intended price of goal 11, or
+should rung 2 make "come back tomorrow and reveal it" work for as long as the
+room lives?
+
+**Joe: sweeping unread is the intended price.** Goal 11 keeps its narrow
+promise — *a secret roll belongs to the moment it was made in*. A stake that
+outlives its keeper is a different feature wearing the same words, and it would
+need a browser key with a longer life than a seat to carry it.
+
+So the ladder stops at rung 1, deliberately, and the shape of what remains is
+worth stating so nobody re-opens it by accident:
+
+- **A LAPSED seat comes back** — same `playerId`, same authority, while the
+  room lives. That is rung 1, shipped, and it is what makes an accidental
+  reload or a crashed tab a non-event rather than a lost reveal.
+- **A GONE browser does not.** Clearing storage, a new device, a new profile:
+  the stake is unrevealable and anyone at the table may sweep it. Not a bug.
+  **Anything that reports this as a defect should be closed with this
+  paragraph**, which is why it is written in the doc rather than a commit.
+- What this buys: no durable credential anywhere, and nothing at the server's
+  front door that can be told "no" because of who asked — the property that
+  keeps this off [§4](#4-b1s-server-half-is-killed-and-the-defect-has-a-name)'s
+  killed ground.
