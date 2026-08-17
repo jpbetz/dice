@@ -4107,6 +4107,126 @@ export const scenarios = [
     },
   },
   {
+    name: 'log-export',
+    tags: ['chrome', 'log', 'cuj9'],
+    // TAKING THE EVENING WITH YOU (ROADMAP §5, UX §7.49): Copy and Download
+    // under the log flyout write one plain-text transcript, oldest first.
+    //
+    // Every assertion here reads `__diceDebug.logExport.text` — THE ARTEFACT,
+    // not the screen — because the claim that matters is about the FILE. A
+    // face-down roll's values being absent from what the player sees is
+    // already `held-roll`'s claim; that they are absent from the bytes that
+    // leave the app is a different one, and only the bytes can make it.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Bram' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Wren' });
+      // Stated, not inherited: the per-die world is what the four rolls below
+      // were transcribed under, and `usesTotal` changes every line's shape.
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.waitFor(`window.__diceDebug.system === 'soul-deal'`, { desc: 'the per-die world' });
+
+      // EMPTY IS DISABLED, NOT SILENT (C15's lesson: a capture that writes
+      // nothing and says "Saved!" is a failed capture that read as a success).
+      const e0 = await a.dbg('logExport');
+      assert.ok(e0.verbs.every((v) => v.disabled === true),
+        `both verbs dim with no rolls (got ${JSON.stringify(e0.verbs)})`);
+      assert.equal(e0.rolls, 0, 'no rolls');
+      assert.equal(e0.lines, 0, 'and no lines — not one blank one');
+
+      await a.roll('1d20+2 # Sword');
+      await a.roll('4d6dl1 dc 14');
+      await b.roll('3d6 # Body');
+      await b.roll('1d20 held # Stealth');
+      const heldId = await b.rollId();
+      await a.settle();
+      await a.waitFor(`document.getElementById('log-list').childElementCount === 4`,
+        { desc: 'all four rolls reach Bram' });
+
+      const ex = JSON.parse(await a.eval('JSON.stringify(window.__diceDebug.logExport)'));
+      const bodyOf = (t) => t.split('\n\n').slice(1).join('\n\n').replace(/\n$/, '').split('\n');
+      const lines = bodyOf(ex.text);
+      assert.equal(ex.lines, ex.rolls,
+        `every roll is a line — none lost, none invented (${ex.lines} of ${ex.rolls})`);
+      assert.equal(ex.lines, 4, 'four rolls, four lines');
+
+      // THE REVERSAL IS THE DECISION, so it is asserted rather than assumed:
+      // the screen runs newest-first (a feed you scan from the top) and the
+      // file runs oldest-first (a document you read start to end).
+      assert.match(ex.head, /oldest first/, 'the header says which way it runs');
+      assert.match(lines[0], /Sword/, 'and the FIRST line is the FIRST roll');
+      assert.match(lines[3], /Stealth/, 'the newest is last');
+
+      // GOAL 11, ON THE BYTES. Written as a whole-line SHAPE rather than as
+      // `!text.includes(total)`: a two-digit total collides with the clock,
+      // the die count and every other number in the file, so an absence check
+      // on the value would pass for the wrong reason about half the time.
+      // Nothing but time, name, label, die TYPE (public even face down, the
+      // same rule the row's chips follow) and the word.
+      //
+      // WHAT THE GATE ACTUALLY BUYS, measured by removing it: the values are
+      // not in the client's entry at ALL for a face-down roll — not even the
+      // ROLLER'S (the server withholds until reveal, which is `raw-sse-leak`'s
+      // claim on the wire) — so `hidden = false` does not leak digits. It
+      // prints the ROW'S PLACEHOLDER, `d20 ?`, into a file that has no column
+      // header to explain it: a transcript stating a die's face as `?`. The
+      // word is the whole point, and the shape is what asserts it.
+      assert.match(lines[3], /^\d\d:\d\d\s+Wren\s+Stealth\s+d20\s+face down$/,
+        `a held roll exports without its values (got ${JSON.stringify(lines[3])})`);
+      // Both players' files say the same thing about it. The header names whose
+      // view a file is (§7.49), so two files differing over a secret is legible
+      // — but a HELD roll is face down for everyone, the roller included, and
+      // the two transcripts must not disagree about that.
+      const wren = bodyOf((await b.dbg('logExport')).text)[3];
+      assert.equal(wren.replace(/^\d\d:\d\d/, ''), lines[3].replace(/^\d\d:\d\d/, ''),
+        `the roller's own transcript says exactly the same (got ${JSON.stringify(wren)})`);
+      // …and the row's own marks, no new ones: a dropped die is parenthesised
+      // exactly where the screen dims it, and 4d6dl1 drops exactly one.
+      assert.equal((lines[1].match(/\(d6 /g) || []).length, 1,
+        `the discarded die is marked, once (got ${JSON.stringify(lines[1])})`);
+      assert.match(lines[1], /vs DC 14$/,
+        'the stake is public; its adjudication needs a total this system has not got (U17)');
+
+      assert.match(ex.text, /not an import file/,
+        'the file does not claim to be a rack — portable.js owns that transport (GOALS §7)');
+      assert.match(ex.filename, /-rolls\.txt$/, 'and its name says text');
+      assert.doesNotMatch(ex.filename, /ya?ml/, 'never yaml');
+      assert.ok(ex.verbs.every((v) => v.disabled === false), 'with rolls, both verbs arm');
+      assert.match(await a.dbg('logExportDownload()'), /-rolls\.txt$/,
+        'Download writes that name');
+
+      // THE EXPORT TRACKS THE GATE, IT DOES NOT COPY IT. Reveal the held roll
+      // and the same line grows its face — proving the file asks `entryHidden`
+      // rather than carrying its own idea of what is hidden.
+      await b.dbg(`reveal(${JSON.stringify(heldId)})`);
+      for (const t of [a, b]) await t.waitFor(revealSettled(heldId), { desc: 'the flip settles' });
+      const after = bodyOf((await a.dbg('logExport')).text)[3];
+      assert.doesNotMatch(after, /face down/, 'the revealed roll is no longer withheld');
+      assert.match(after, /^\d\d:\d\d\s+Wren\s+Stealth\s+d20 \d+\s+→ /,
+        `and carries its face and its meaning (got ${JSON.stringify(after)})`);
+
+      // THE FILTER DOES NOT NARROW THE FILE. The find box has no selection
+      // affordance and its own count reads "1 of 4" — plainly hiding, not
+      // choosing — so Copy must not be the one place a search field decides
+      // what leaves.
+      await a.dbg(`setLogFind('Sword')`);
+      assert.equal((await a.dbg('logFind')).shown, 1, 'the list really is filtered');
+      assert.equal((await a.dbg('logExport')).lines, 4, 'and the file still holds all four');
+      await a.dbg(`setLogFind('')`);
+
+      // THE VERBS ARM ON THE INCREMENTAL PATH, which is the one that had the
+      // gap: `addLogEntry` appends without rebuilding, so `updateLogExportVerbs`
+      // had to be called there too. A scenario that COLLECTED a roll first
+      // would pass against the broken code, because collecting forces a full
+      // renderLog — so this rolls once and asserts armed with nothing tidied.
+      await a.eval(`document.getElementById('clear-log').click()`);
+      assert.ok((await a.dbg('logExport')).verbs.every((v) => v.disabled === true),
+        'Clear history dims them again');
+      await a.roll('1d6');
+      assert.ok((await a.dbg('logExport')).verbs.every((v) => v.disabled === false),
+        'and ONE arrival on the append path arms them, uncollected');
+    },
+  },
+  {
     name: 'identity-chip',
     tags: ['smoke', 'chrome', 'seat', 'cuj3'],
     // The rail identity chip: rename propagates to every roster and the chip
@@ -8796,6 +8916,9 @@ export const scenarios = [
   {
     name: 'endurance-log',
     tags: ['perf', 'roll', 'log', 'endurance-log', 'cuj9'],
+    // 108 rolls at ~0.3 s each, so the 90 s default is not the bound to run
+    // under load — leg (4) below took it from 62 rolls to 108.
+    timeout: 180000,
     // Tier 0 §0e: addLogEntry used to full-rebuild #log-list on every
     // arrival, rebinding one closure per entry. This scenario proves the
     // append+prune path is:
@@ -8908,6 +9031,46 @@ export const scenarios = [
       // C: the newest — a reroll of B, not yet rerolled itself.
       assert.deepEqual(chain.c, { rerolled: 0, reroll: 1, isReroll: true },
         `C wears 'reroll' only (got ${JSON.stringify(chain.c)})`);
+
+      // (4) THE EXPORT'S TRUNCATION HONESTY (§5, UX §7.49) — here rather than
+      // in `log-export` because this is the only scenario that already pays
+      // for a long log, and the claim needs the cap CROSSED.
+      //
+      // `a.roll()` CANNOT REACH IT: it waits for `#log-list` to GROW, and at
+      // LOG_CAP the DOM count stops growing, so roll 101 times out. Past the
+      // cap the only honest wait is on `currentRoll.rollId` changing.
+      const CAP = 100;
+      const have = await a.eval(`document.getElementById('log-list').childElementCount`);
+      const TOTAL = 108; // 8 past the cap, so the note is a real number
+      for (let i = have + 1; i <= TOTAL; i++) {
+        const before = await a.rollId();
+        await a.dbg(`commandRoll("d6 # r${i}")`);
+        await a.waitFor(
+          `(window.__diceDebug.sim(240), (window.__diceDebug.currentRoll || {}).rollId`
+          + ` !== ${JSON.stringify(before)})`,
+          { desc: `roll r${i} to land past the cap` });
+      }
+      await a.settle();
+      assert.equal(await a.eval(`document.getElementById('log-list').childElementCount`), CAP,
+        'the DOM stops at LOG_CAP — which is what a.roll() cannot see past');
+
+      const ex = await a.dbg('logExport');
+      const dropped = TOTAL - CAP;
+      // A FILE THAT SILENTLY ENDED AT 100 WOULD READ AS THE WHOLE EVENING.
+      assert.match(ex.head,
+        new RegExp(`${dropped} earlier rolls rolled off the end of the log and are not here`),
+        `the header owns up to the ${dropped} it lost (got ${JSON.stringify(ex.head)})`);
+      // …and it says it in the panel foot's own words, because both read the
+      // same counter. A second sentence about the same fact is how they drift.
+      const foot = await a.eval(`document.getElementById('log-dropped').textContent`);
+      assert.ok(foot && ex.head.includes(foot),
+        `the file and the panel foot agree (foot: ${JSON.stringify(foot)})`);
+      // The transcript starts where the surviving history does. r1 here would
+      // be a file claiming to hold rolls the app has already forgotten.
+      const first = ex.text.split('\n\n').slice(1).join('\n\n').split('\n')[0];
+      assert.match(first, new RegExp(`\\br${dropped + 1}\\b`),
+        `the first line is r${dropped + 1}, not r1 (got ${JSON.stringify(first)})`);
+      assert.equal(ex.lines, CAP, 'and there are exactly as many lines as rolls left');
     },
   },
   {
