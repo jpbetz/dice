@@ -35,7 +35,7 @@ limitations under the License.
 //   node tests/sumread.test.mjs --bench
 
 import assert from 'node:assert/strict';
-import { sumForecast, sumAtLeast, sumAtMost, previewOf, countingPmfs, SUM_REFUSALS } from '../js/odds.js';
+import { sumForecast, sumAtLeast, sumAtMost, sumBins, sumPeak, previewOf, countingPmfs, SUM_REFUSALS } from '../js/odds.js';
 import { composeRoll, validateMods } from '../js/rollspec.js';
 import { parseNotation } from '../js/notation.js';
 import { SYSTEMS } from '../js/meanings.js';
@@ -517,6 +517,107 @@ t('a refused sum keeps kind:"sum", so the min/avg/max line survives it', () => {
   assert.notEqual(fc.kind, 'refusal');
   assert.equal(fc.refusal.code, 'mixed-keep');
   assert.equal(previewOf([...Array(8).fill('d8'), 'd20', 'd20'], { keep: { mode: 'kh', n: 4 } }).exact, true);
+});
+
+// --- THE RENDER MATH (§2l ⑥'s rendering, UX §7.48) --------------------------
+// sumBins and sumPeak exist so that no renderer walks `values`/`probs`, for
+// the same reason sumAtLeast does. Every lie this feature can tell is here:
+// a cell drawn at its array index instead of its total, a height taken against
+// 1 instead of against the peak, and a "most likely" that is a tie-break.
+
+t('sumBins positions by TOTAL, so 1d6! keeps its three holes', () => {
+  const fc = sumForecast(['d6'], { explode: true });
+  const b = sumBins(fc);
+  assert.equal(b.width, 1, 'a 24-wide axis is one cell per total');
+  assert.equal(b.lo, 1);
+  assert.equal(b.hi, 24);
+  assert.equal(b.span, 24);
+  assert.equal(b.nBins, 24);
+  // 6, 12 and 18 are unreachable: composeRoll pays the max face as face +
+  // child, so a 6 is worth 7 at least. They are ABSENT cells, not zero-height
+  // ones, and the cell index is the total.
+  const at = new Map(b.cells.map((c) => [c.lo, c]));
+  for (const gap of [6, 12, 18]) assert.equal(at.has(gap), false, `total ${gap} is unreachable`);
+  assert.equal(b.cells.length, 21, 'one cell per reachable total');
+  for (const c of b.cells) assert.equal(c.i, c.lo - b.lo, 'cell index IS the offset from min');
+  close(b.cells.reduce((s, c) => s + c.p, 0), 1);
+});
+
+t('sumBins preserves every gram of mass at every width', () => {
+  const cases = [
+    [Array(4).fill('d6'), { keep: { mode: 'dl', n: 1 } }],
+    [Array(40).fill('d20'), { keep: { mode: 'dl', n: 1 } }],
+    [Array(2).fill('d10x'), null],
+    [['d20'], { modifier: 5 }],
+    [Array(20).fill('d10x'), { explode: false }],
+  ];
+  for (const [dice, mods] of cases) {
+    const fc = sumForecast(dice, mods);
+    for (const maxCells of [8, 48, 400]) {
+      const b = sumBins(fc, maxCells);
+      close(b.cells.reduce((s, c) => s + c.p, 0), 1, 1e-11);
+      assert.ok(b.nBins <= Math.max(maxCells, 1), `${b.nBins} cells for maxCells ${maxCells}`);
+      assert.equal(b.width, Math.max(1, Math.ceil(b.span / maxCells)));
+      assert.ok(b.peak > 0 && b.peak <= 1);
+      for (const c of b.cells) {
+        assert.ok(c.lo >= fc.min && c.hi <= fc.max, 'no cell leaves the axis');
+        assert.ok(c.p <= b.peak + 1e-15, 'peak is the tallest cell');
+      }
+    }
+  }
+});
+
+t('sumBins bins the worst legal case down to a drawable width', () => {
+  const fc = sumForecast(Array(40).fill('d20'), { keep: { mode: 'dl', n: 1 } });
+  assert.equal(fc.values.length, 742, '742 totals is 0.4px per column at 284px');
+  const b = sumBins(fc, 48);
+  assert.equal(b.width, Math.ceil(742 / 48));
+  assert.ok(b.cells.length <= 48);
+  close(b.cells.reduce((s, c) => s + c.p, 0), 1, 1e-11);
+});
+
+t('sumBins refuses with the forecast', () => {
+  const fc = sumForecast([...Array(8).fill('d8'), 'd20', 'd20'], { keep: { mode: 'kh', n: 4 } });
+  assert.equal(sumBins(fc), null, 'no zeroed shape for a refusal');
+  assert.equal(sumBins(null), null);
+  assert.equal(sumPeak(fc), null);
+  assert.equal(sumPeak(null), null);
+});
+
+t('sumPeak counts the tie fc.mode hides', () => {
+  // fc.mode takes the FIRST of the tied values, so a plain d20+5 reports
+  // "most likely 6" — true of the array, false of the dice.
+  const flat = sumForecast(['d20'], { modifier: 5 });
+  assert.equal(flat.mode.value, 6, 'the shipped mode is a tie-break here');
+  const p = sumPeak(flat);
+  assert.equal(p.tied, 20);
+  assert.equal(p.of, 20);
+  close(p.p, 1 / 20);
+
+  const kept = sumForecast(Array(4).fill('d6'), { keep: { mode: 'dl', n: 1 } });
+  const pk = sumPeak(kept);
+  assert.equal(pk.tied, 1, '4d6dl1 has one peak');
+  assert.equal(pk.value, 13);
+  close(pk.p, 172 / 1296); // the published table's row for 13 — 13.3%
+  close(pk.p, kept.probs[kept.values.indexOf(13)]);
+
+  // a partial tie: 1d6! is flat across 1..5 and then thins out
+  const burst = sumForecast(['d6'], { explode: true });
+  const pb = sumPeak(burst);
+  assert.equal(pb.tied, 5);
+  assert.equal(pb.of, 21);
+  close(pb.p, 1 / 6);
+});
+
+t('sumAtLeast answers a declared target on the everyday cases', () => {
+  // The three numbers UX §7.48's target line prints, from the published
+  // tables rather than from this engine: d20+5 clears 15 on a 10 or better
+  // (11/20); 4d6dl1 reaches 15 on 300 of 1296 orderings; and a target above
+  // the maximum is a REAL zero, not a refusal.
+  close(sumAtLeast(sumForecast(['d20'], { modifier: 5 }), 15), 11 / 20);
+  close(sumAtLeast(sumForecast(Array(4).fill('d6'), { keep: { mode: 'dl', n: 1 } }), 15), 300 / 1296);
+  close(sumAtLeast(sumForecast(Array(4).fill('d6'), { keep: { mode: 'dl', n: 1 } }), 19), 0);
+  close(sumAtMost(sumForecast(['d20'], { modifier: 5 }), 5), 0);
 });
 
 // --- the bench --------------------------------------------------------------

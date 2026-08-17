@@ -704,3 +704,60 @@ export function sumAtMost(fc, n) {
   }
   return Math.min(1, Math.max(0, at));
 }
+
+// THE TWO READS THE CURVE RENDERER NEEDS, so that no renderer ever walks
+// `values`/`probs` itself (§2l ⑥, UX §7.48). They live here for the same
+// reason sumAtLeast does: `values` is SPARSE — `1d6!` has no total of 6 — and
+// every lie this feature can tell is a renderer that treated the array index
+// as the total. Both return null on a refusal, never a zeroed shape.
+
+// Bin the distribution onto a VALUE axis: `nBins` cells of `width` consecutive
+// integers each, spanning min..max, so a cell's x position is its TOTAL and an
+// unreachable total is an absent cell rather than a squeezed neighbour.
+// `cells` carries only the reachable ones (`i` is the cell index, so the
+// caller positions by `i * width`), and `peak` is the tallest cell's mass —
+// heights are p/peak, never p/1, or every wide pool draws a flat line.
+//
+// One cell is one integer total until the axis is wider than `maxCells`; past
+// that a cell is `ceil(span/maxCells)` totals wide, because 742 columns in a
+// 284px popover is 0.4px each. The gaps SURVIVE binning at any width: a cell
+// with no mass is simply not in `cells`.
+export function sumBins(fc, maxCells = 48) {
+  if (!fc || !fc.exact || !fc.values.length) return null;
+  const lo = fc.min;
+  const span = fc.max - lo + 1;
+  const width = Math.max(1, Math.ceil(span / Math.max(1, maxCells)));
+  const nBins = Math.ceil(span / width);
+  const mass = new Float64Array(nBins);
+  for (let i = 0; i < fc.values.length; i++) {
+    mass[Math.floor((fc.values[i] - lo) / width)] += fc.probs[i];
+  }
+  const cells = [];
+  let peak = 0;
+  for (let i = 0; i < nBins; i++) {
+    if (mass[i] === 0) continue;
+    cells.push({ i, lo: lo + i * width, hi: Math.min(fc.max, lo + (i + 1) * width - 1), p: mass[i] });
+    if (mass[i] > peak) peak = mass[i];
+  }
+  return { lo, hi: fc.max, span, width, nBins, cells, peak };
+}
+
+// The tallest total, and HOW MANY totals are tied with it — which is the part
+// a bare `fc.mode` cannot tell you and the reason this exists. `fc.mode` takes
+// the first of the tied values, so a plain `1d20+5` reports "most likely 6":
+// true of the array, false of the dice. A caller prints a peak only when
+// `tied === 1`, calls it flat when `tied === values.length`, and otherwise
+// says there is no single peak.
+export function sumPeak(fc) {
+  if (!fc || !fc.exact || !fc.values.length) return null;
+  let p = 0;
+  for (let i = 0; i < fc.probs.length; i++) if (fc.probs[i] > p) p = fc.probs[i];
+  let tied = 0;
+  let value = fc.values[0];
+  for (let i = 0; i < fc.probs.length; i++) {
+    if (fc.probs[i] < p - 1e-12) continue;
+    if (tied === 0) value = fc.values[i];
+    tied++;
+  }
+  return { value, p, tied, of: fc.values.length };
+}
