@@ -447,13 +447,41 @@ only number in the app that diverges per browser. **It did not ship and should
 not**: the exact path is 4.5–19× cheaper than the fallback it was proposed to
 protect, and where it cannot answer it says so.
 
-### 6.3a What the rendering pass is handed
+### 6.3a What the rendering pass is handed — **RENDERED 2026-08-17**
 
 The engine landed alone, on purpose: `js/main.js` was being written by another
 pass in the same hours. **Nothing renders yet**, and that is not a half-ship —
 `kind:'sum'` is a kind today's `renderPopEcho` and `renderCmdState` do not
 match, so both fall through to the shipped `fmtPreview` line and the app is
 byte-identical until someone renders it.
+
+> **SHIPPED 2026-08-17 — the inert half is wired.** Both call sites now pass
+> `FORECAST_TOOLS` (`{countingPmfs, sumForecast: sumForecastMemo}`), and
+> `kind:'sum'` renders: the **curve of the total** in `#pop-preview` on every
+> `±` door, and, in the one-line validator, a target clause appended to the
+> shipped min/avg/max line whenever a `dc` was typed. Design, dress and the
+> refused alternatives: **UX.md §7.48**. Three things the rendering added
+> rather than assumed:
+>
+> - **`sumBins(fc, maxCells)` and `sumPeak(fc)`** joined `sumAtLeast` in
+>   `js/odds.js`, for the same reason it is there: the three lies this feature
+>   can tell are all arithmetic, so none of them is left in a renderer. A cell
+>   is one integer total until the axis exceeds `maxCells`, positioned by its
+>   TOTAL, and an unreachable total is an **absent cell** — `1d6!` draws 21
+>   columns with holes at 6, 12 and 18. `sumPeak` reports the tie `fc.mode`
+>   hides: `fc.mode` takes the first of the tied values, so a plain `1d20+5`
+>   reports "most likely 6", true of the array and false of the dice. Both
+>   return `null` on a refusal, so there is no zeroed shape to draw.
+>   Pinned in `tests/sumread.test.mjs` — **108 → 114 checks**.
+> - **The forecast is memoised at the render boundary, not in the engine.**
+>   `renderPopEcho` runs on every stepper click, every bonus-label keystroke
+>   and every digit of the Target field; `40d20 dl1` is 5.6 ms warmed. The key
+>   is exactly the fields `sumForecast` reads, so labelling a `+2` or typing a
+>   target repaints for free. `js/odds.js` stays pure.
+> - **`window.__diceDebug.sumRead` / `hoverSumCell(i)`** read the RENDERED
+>   popover, following §10's own correction about `ledgerSheet`: `lefts` and
+>   `heights` are what let a test prove the sparse rule, because no assertion
+>   on `values.length` can see that the renderer drew a hole.
 
 ```js
 sumForecast(dice, mods) -> {
@@ -571,18 +599,25 @@ than any lens, and the per-die half of the design is his, not the panel's.
 
 ## 9. Still open
 
-*Two of these were taken by the ⑤ build, 2026-08-15, and one more by ⑥'s
-engine, 2026-08-16; all three are struck below rather than deleted — the
-reasoning that made them open is what made the answers defensible. Everything
-not struck is still genuinely open.*
+*Two of these were taken by the ⑤ build, 2026-08-15, one more by ⑥'s engine,
+2026-08-16, and **three of the four rendering questions by ⑥'s rendering,
+2026-08-17**; every one is struck below rather than deleted — the reasoning
+that made them open is what made the answers defensible. Everything not struck
+is still genuinely open.*
 
-*⑥'s state: **the math is built and proved, and nothing renders it.**
-`forecastFor` returns a `kind:'sum'` distribution for `dnd` and `none` (§6.3,
-§6.3a) the moment `js/main.js` passes `sumForecast` in its tools bag, which it
-does not yet. Four of the questions below are questions about that rendering —
-which popover doors forecast, what a pool-scope forecast forecasts, the offer
-card, and UX §2.1's odds line — and none of them was answered by building the
-engine. They got sharper: there is now an exact number to decide about.*
+*⑥'s state: **built, proved and RENDERED (2026-08-17).** `js/main.js` passes
+`sumForecast` in the tools bag it hands `forecastFor`, and `kind:'sum'` renders
+the curve of the total in `#pop-preview` plus a target clause in the one-line
+validator. Design and the reasoning: **UX.md §7.48**. Three of the four
+rendering questions below are answered there and struck here; the fourth (UX
+§2.1's odds line) is deliberately still open, because it belongs to a ceremony
+surface and not to a management read.*
+
+*Two premises those questions rested on had **gone stale**, and both are
+recorded with the answers: `renderPopEcho` never branched on `pop.source`, so
+"which doors forecast" had in fact been settled by ④ in 2026-08-06 and nobody
+noticed; and `stageGroup` no longer drops mods and dc, which was the entire
+reason a pool-scope forecast looked ambiguous.*
 
 - **Does the parser stop collapsing `2d20kh1` → `1d20 adv`?** The physical-dice
   count closes the *budget* bug either way; what remains is whether notation
@@ -594,17 +629,71 @@ engine. They got sharper: there is now an exact number to decide about.*
   one, entirely — against PROFILES.md Step 2's hand-the-file-around premise.
   Skip-and-warn tolerance, or does every field stay a break? (§9b queues the
   first new per-pool scalar.)
-- **Which popover doors forecast.** `openShelfPopover` binds to a **landed**
+- ~~**Which popover doors forecast.** `openShelfPopover` binds to a **landed**
   roll, so right-clicking a peek would pin a forecast beside the evidence of
-  what the roll actually did. All four doors, or group + draft only?
-- **What a pool-scope forecast forecasts.** `stageGroup` **drops** mods and dc
+  what the roll actually did. All four doors, or group + draft only?~~
+  **TAKEN 2026-08-17: ALL of them — and the question had already been answered
+  by ④ without anyone writing it down.** `renderPopEcho`'s **preview path**
+  does not branch on `pop.source` — it branches only at the very end, for the
+  tray's live-sync into the draft (`grep -n "pop.source" js/main.js` → the only
+  hit inside `renderPopEcho` is that sync) — so the per-die spectrum has been on
+  every door since 2026-08-06 and the sum read inherits that by construction.
+  *(Verified in the running app on the pool and draft doors, 2026-08-17; the
+  shelf door is the same code path with no gate between.)* Which makes the
+  real question *should the shelf door be an exception*, and the answer is no:
+  the shelf `±` is the one place where a forecast stands beside the evidence of
+  what the roll actually did, which is the most instructive placement in the
+  app rather than the most confusing. **A curve is a fact about the dice, not a
+  prediction about that roll** — it does not become false once the dice land,
+  which is exactly why it is safe there. Reasoning: UX §7.48 ⑧.
+- ~~**What a pool-scope forecast forecasts.** `stageGroup` **drops** mods and dc
   ("set aside — re-add via ±"), so a saved `4d6dl1` stages as plain `4d6` —
   while the collapsed rail's `rollRailPool` rebuilds and rolls it *with* mods.
   One saved pool, two real distributions. Honest option: forecast the base dice
-  and show the set-aside mods as the whisper the stage path already shows.
-- **The offer card.** It carries dice, mods, dc, visibility and experience, and
+  and show the set-aside mods as the whisper the stage path already shows.~~
+  **TAKEN 2026-08-17: it forecasts the spec the popover in front of you
+  carries, and the premise is now FALSE.** `stageGroup` has not dropped mods
+  and dc since U1 (2026-08-08) — `grep -n "THE POOL'S INTENT RIDES" js/main.js`
+  → `:16466`, and the block through `:16520` carries a pool's flat bonus as a
+  labelled part and lets dc, moment and label ride first-one-wins. What it sets
+  aside is only the **glue** — keep/drop · reroll · `!` · adv — and it says
+  which, out loud (`grep -n "set aside — re-add via" js/main.js` → `:16544`,
+  the same string §13's row cites, at a line number 10k lines away from the one
+  recorded there). So there is no "pool scope" that could disagree with
+  itself: a pool `±` carries the pool's whole notation and forecasts exactly
+  what `rollRailPool` rolls; a draft `±` carries the draft and forecasts
+  exactly what ROLL ❯❯❯ throws. **The doc's own example survives the
+  correction** — keep/drop *is* glue, so `4d6dl1` still stages as `4d6`, and
+  the two doors then honestly show two curves for two different rolls. The
+  residual (the first curve does not warn you the second exists) is named in
+  UX §7.48 ⑧ rather than fixed.
+- ~~**The offer card.** It carries dice, mods, dc, visibility and experience, and
   a claimant is deciding whether to accept — with stakes UX.md declares public
-  on every rung. Odds line, or a written refusal?
+  on every rung. Odds line, or a written refusal?~~
+  **TAKEN 2026-08-17: NEITHER — no odds line and no written refusal.** Three
+  reasons, in order of weight. (1) An offer card is a **decision** surface for
+  a roll somebody else authored, and the decision it asks for is *do I take
+  this*, which the stakes answer; a curve answers *how will it go*, which is a
+  question about a roll you have already accepted. (2) The claimant is one
+  click from the real instrument: claiming stages the roll and `±` opens on it.
+  (3) `renderOffers` paints **every** offer in `#offers-layer` on every roster
+  and offer event, so an odds line there is N curves per repaint on a surface
+  with no memo and no gate — the one place in the app where §6.3a's 5.6 ms
+  worst case would land in a loop. A *written refusal* is worse than nothing:
+  it spends the card's scarcest space saying the app declines to answer a
+  question the card was not asking.
+- **UX §2.1's odds line (`showOdds`) — still open, and deliberately not
+  closed by this pass.** §2.1 promises *"72% to clear 15"* on the **intent
+  card**, mid-ceremony and public on every visibility rung. ⑥ supplies the
+  arithmetic (`sumAtLeast(sumForecast(dice, mods), dc)`) and stops there. Two
+  things must be decided by whoever builds it and neither is a rendering
+  detail: whether a REFUSED curve leaves the promised line blank at a drama
+  beat (the popover can afford "no exact odds for this pool"; a ceremony card
+  reading it out loud is a different act), and whether the number belongs on
+  the pre-roll card at all when `renderIntentCard`'s own shipped ruling is that
+  it shows *what was declared* and nothing derived. `showOdds` exists in this
+  repo **only** as a line of UX.md §2.1 (`grep -rn showOdds js/ index.html` →
+  no hits), which is the honest state: a slot, not a half-build.
 - ~~**Mixed adv+explode / mixed-type keep/drop** (sum profiles only): simulate
   the 40-slot budget over pmfs, or refuse with the `pure`-gate grammar?~~
   **TAKEN 2026-08-16 by ⑥'s engine: REFUSE, and the question was one question
@@ -668,6 +757,22 @@ grep -n "pool-sec-head" tests/e2e/scenarios.mjs
 named `portable`, which does not assert on `.pool-sec-head` at all. Verified
 against the tree; same class of error as the two fabricated numbers in §7.)*
 
+**⑥'S RENDERING BROKE NONE OF THE 22, and the prediction that it would was
+wrong in an instructive way.** ROADMAP §2l warned that `#pop-preview` is
+asserted 22 times so "a rewrite of that node breaks tests by design". Read
+them and the 22 are **one scenario** — `pool-forecast`, lines 5419–5496 — of
+which **21 run under `soul-deal`**, the per-die world the sum read does not
+touch, and the 22nd is `waitFor(...includes('min '))` after a flip to `dnd`.
+That last one is the interesting one: it survives *because the design keeps the
+min/avg/max line*, which was already required for a different reason (a refusal
+owes the line beside it). So the assertion that looked like the casualty is in
+fact the one that pins the constraint.
+
+```bash
+grep -n "pop-preview" tests/e2e/scenarios.mjs        # 22, all in pool-forecast
+node tests/e2e/run.mjs --only groups,meanings        # 41/41, 2026-08-17
+```
+
 **New scenarios.** `pool-forecast` (tags `groups`, `meanings`) — the exact d6
 spectrum, three identical d6s rendering **one** bar not three, a mixed pool
 rendering one bar per rank under its source label, the `2d20 kh1` refusal, a
@@ -677,6 +782,36 @@ flips the room system while A's popover is open. `rack-dice-value` (tags
 rack values → edit a d6 to a d20 → both moved → `Done` → absent → foreign rack
 → absent, plus **`1d20 adv` and `2d20 kh1` both reading 40**.
 
+**⑥'s scenario — `sum-read`, tags `groups` + `meanings`, and it takes the tag
+question back off the shelf on the terms §9's ruling set.** That ruling struck
+"the e2e tag" with an explicit reopening clause: *"Open again the moment ⑥ ships
+a math surface with its own failure modes."* It has, and they are the three the
+units cannot reach, because all three live between the arithmetic and the
+paint: a cell drawn at its index, a tie-break sold as a peak, and a refusal
+printing `0%`. **The answer is still no new tag** — `groups` + `meanings`
+already carry ①–⑤ and the rendering rides the same two surfaces — but the
+reopening was legitimate rather than pedantic, and this is the argument, run.
+
+Steps and assertions, all through `__diceDebug` (the hooks are §10's, below):
+
+| Step | Assertion | Hook |
+|---|---|---|
+| `setSystem('dnd')`, rack of `4d6dl1 dc15` · `1d20+5` · `1d6!` · `8d8+2d20 kh4 dc30` · `40d20dl1`, `setPoolsEditMode(true)` | — | `setSystem` `setGroups` `setPoolsEditMode` |
+| open `4d6dl1 dc15`'s ± | `line === 'min 3 · avg 12.2 · max 18'` · `cells === 16` · `heights` peaks at index **10** (total 13) · `avgAt === 60.9` · `dcAt === 78.1` · `target === 'Difficulty Class 15 · 23% to clear'` (300/1296) | `sumRead` |
+| hover cells 0 and 8 | `'3 · <1% · 3+ 100%'` and `'11 · 11% · 11+ 73%'` | `hoverSumCell` |
+| open `1d20+5`'s ± | `readout === 'flat — every total 5%'` — **the tie is named, not tie-broken** | `sumRead` |
+| open `1d6!`'s ± | `cells === 21` · `lefts` omits **20.8, 45.8, 70.8** — the holes at 6, 12, 18 · `words` includes `'21 of 24 reachable'` | `sumRead` |
+| open `8d8+2d20 kh4 dc30`'s ± | `refusal` includes `'keep/drop across dice'` · **`line` is still `'min 4 · avg 36.7 · max 56'`** · `target === 'Difficulty Class 30 · no exact odds for this pool'` · `targetUnknown === true` · `cells === 0` · and the text contains **no `0%`** | `sumRead` |
+| open `40d20dl1`'s ± | `cells <= 48` (binned) · `hoverSumCell(0)` reads `'39–54 · <1% · 39+ 100%'` · `hoverSumCell(cells-1)` reads `'775+ <1%'`, **never `775+ 0%`** | `sumRead` `hoverSumCell` |
+| box `1d20+5 dc15` under `dnd` | `#cmd-slot .ok` includes `'min 6 avg 15.5 max 25'` **and** `'55% to clear 15'` | eval, as `preview-honest` does |
+| box `2d6 dc20` | includes `'0% to clear 20'` — a **true** zero prints | eval |
+| box `8d8+2d20 kh4 dc30` | includes `'no exact odds against 30'` and **no `%`** | eval |
+| box `3d6+5` under `soul-deal` | still `'per-die outcomes'`, and **no `min `** — U7 is not regressed by ⑥ | eval |
+| the draft ± on `2d6+3 dc10` | `target === 'Difficulty Class 10 · 58% to clear'` — every door, not just the pool door | `sumRead` |
+
+Each row was run by hand against the app on 2026-08-17 and the values above are
+what it returned; they are transcriptions, not predictions.
+
 **Units** in `tests/odds.test.mjs`, **hand-appended to `package.json`'s literal
 `&&` chain** — there is no glob, so a suite nobody adds there passes forever.
 Cover: the budget cases including both adv spellings; all six spectrum vectors;
@@ -685,8 +820,9 @@ the two invariants (§6.4); the five cap regressions (`40d20! === 40d20`,
 keeps 1); and MC cross-validation against `composeRoll`.
 
 **⑥'s units are `tests/sumread.test.mjs`** (106 checks, 2.4 s, appended to the
-same literal chain), and they answer to four standards *because the convolution
-agreeing with itself is not evidence*:
+same literal chain — **115 as of 2026-08-17**, `node tests/sumread.test.mjs`),
+and they answer to four standards *because the convolution agreeing with itself
+is not evidence*:
 
 1. **Exhaustive enumeration of `composeRoll`** — 47 specs, every rng draw
    branched over its real faces with probability carried down, compared
@@ -724,6 +860,17 @@ the **rendered** sheet rather than the session Map, because the property worth
 pinning is that the sheet and the shelf heads agree, and a hook reading the
 Map could not tell you they had stopped.
 
+*⑥'s rendering adds two, 2026-08-17:* `get sumRead` and `hoverSumCell(i)`.
+`sumRead` reads the **rendered** `#pop-preview` — line, target sentence,
+refusal, the AT text layer, the readout, the axis ends, and `lefts`/`heights`
+per drawn cell — because the property worth pinning is that the curve, the
+min/avg/max line and the target sentence agree, and a hook that called
+`sumForecast` again could not tell you they had stopped. **`lefts` is the only
+way to prove the sparse rule from a test**: `1d6!` must draw 21 cells with
+nothing at 20.8%, 45.8% and 70.8%, and no assertion on `values.length` can see
+whether the renderer drew the hole. `hoverSumCell(i)` points at the i-th cell
+and returns the readout strip's text, which is where a sliver gets its name.
+
 *§1's struck-die work adds one more:* `outcomeRows(surface)`, `surface` being
 `'banner' | 'verdict' | 'peek'` to match the shipped `cardActs`. It too reads
 the **rendered** chips — the bug it exists to catch lived between the profile
@@ -748,7 +895,13 @@ label or a "composed pool" tooltip fails `npm test`.
 - **UX.md §2.1's promised odds line is NOT delivered here** — §2.1 puts it on
   the *intent card*, public and mid-ceremony. This builds the math that line
   will need and leaves its slot open, or it gets marked shipped and quietly
-  never appears.
+  never appears. **Still true after ⑥'s rendering, 2026-08-17, and deliberately
+  so.** ⑥ put the odds on two MANAGEMENT surfaces — the ± popover and the
+  one-line validator — and `showOdds` remains a line of §2.1 and nothing else
+  (`grep -rn showOdds js/ index.html tests/` → no hits). The two questions it
+  still owes are in §9's last bullet: what a *ceremony* card does with a refused
+  curve, and whether a derived number belongs on a card whose shipped ruling is
+  that it shows what was **declared**.
 - **§2b (multi-pool rolls)** is solved by the ruling, not despite it (§3.3).
 - **§9b (pool icons)** already claims the popover identity strip for its
   picker. Keeping the forecast in `#pop-preview`, below the strip's hairline,
@@ -793,6 +946,31 @@ table's own point, made against itself.** Struck inline rather than deleted:
 | `#pop-preview` is unasserted | **0** | **22** hits across the forecast scenarios ①–④ shipped. The reason it was safe to rewrite is gone: **the rendering pass now breaks tests if it rewrites that node**, which is the good outcome and needs to be planned for rather than discovered |
 | `MAX_PHYSICAL_DICE` / `EXPLODE_CHAIN_CAP` are module-private | not exported | **both are `export const`** (`js/rollspec.js:33–34`) — slice ① needed them, and `js/odds.js` has imported them ever since. `tools/pool-analysis-data.mjs:78` still mirrors the constant under a `TODO: import once js/rollspec.js exports it` that has been satisfied for ten days |
 | `test:unit` hand-lists **8** files | 8 | **18** with `sumread` |
+
+**Re-run 2026-08-17 for ⑥'s rendering. Three MORE rows had gone stale, and one
+of them was a correction added the day before.** The table's point, made against
+itself twice now:
+
+| Row | Was | Is |
+|---|---|---|
+| `stageGroup` drops mods/dc, so a staged pool ≠ the saved spec | true when written (2026-08-05), and cited at `js/main.js:6142` | **half false.** Mods and dc have ridden since U1 (2026-08-08): a flat bonus becomes a labelled part, and dc/moment/label ride first-one-wins. Only the **glue** (keep/drop · reroll · `!` · adv) is set aside, out loud. The `set aside — re-add via ±` string is real but at `:16544`, and the claim built on it was §9's second rendering question |
+| `test:unit` hand-lists **18** files | 18 | **17.** `node -e "const p=require('./package.json'); console.log(p.scripts['test:unit'].match(/tests\/[a-z0-9.-]+\.mjs/g).length)"` — the correction added on 2026-08-16 overshot by one. The property it was defending (a literal `&&` chain, no glob, so a suite nobody appends passes forever) is the part that matters and is untouched |
+| `#pop-preview`'s 22 assertions mean the rendering pass "breaks tests by design" | 22, and framed as a cost | **22, and NONE of them broke.** 21 run under `soul-deal`; the 22nd pins the min/avg/max line the sum read keeps anyway. §10 has the reasoning. The count was right and the inference from it was wrong — a distinct failure mode from a stale number, and worth naming as one |
+
+**⑥'s rendering adds these rows.** Verified 2026-08-17 against the running app
+on an ephemeral port (never 8123):
+
+| Claim | Check | Result |
+|---|---|---|
+| `kind:'sum'` is now matched, and only in the two forecast render paths | `grep -n "kind === 'sum'" js/main.js` | **3** hits at `:15360`, `:19191`, `:19217` — the box's target clause, and the popover's container class plus its render branch |
+| both call sites pass the same tools bag, so the box and the popover cannot disagree | `grep -n "FORECAST_TOOLS" js/main.js` | defined once (`:15296`), passed twice (`:15356`, `:19189`) |
+| the popover's preview path does not gate on which door opened it | read `renderPopEcho` | the only `pop.source` in it is the tray live-sync, after the paint |
+| `1d6!` renders 21 cells with three holes | `__diceDebug.sumRead.lefts` | 21 entries; nothing at 20.8, 45.8, 70.8 |
+| the worst legal pool is drawable | `sumRead.cells` for `40d20dl1` | **47** cells (742 totals, `ceil(742/48) = 16` wide) |
+| a refused curve keeps the average and prints no percentage | `sumRead` for `8d8+2d20 kh4 dc30` | `line` `min 4 · avg 36.7 · max 56`; `target` `… no exact odds for this pool`; no `0%` anywhere |
+| a TRUE zero and a TRUE certainty still print as numbers | box `2d6 dc20`, popover `1d20+5 dc1` | `0% to clear 20`, `Difficulty Class 1 · 100% to clear` |
+| `showOdds` is a doc line and nothing else | `grep -rn showOdds js/ index.html tests/` | no hits |
+| worst-case cost, warmed, with its method printed | `node tests/sumread.test.mjs --bench` | `40d20 dl1` **5.622 ms** (node v24.14.1, linux; 40 warm-ups then fastest of 5 batches of 10) |
 
 | Claim | Check | Result |
 |---|---|---|

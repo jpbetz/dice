@@ -5966,3 +5966,206 @@ nothing may be built on top of it that assumes it was read.
 - **Telling anyone else.** There is nobody else — `players.length <= 1` is
   part of the predicate.
 
+
+### §7.48 — The sum read: the curve of the total (2026-08-17)
+
+*ROADMAP §2l ⑥'s rendering half. The engine landed 2026-08-16 and was
+**inert** — `kind:'sum'` was matched nowhere in `js/main.js`, so both forecast
+call sites fell through to the min/avg/max line and the app was byte-identical
+to the day before. GOALS goal 4 names* summing values *as toil the system owes
+the player, and about `4d6dl1` the app could say `min 3 avg 12.2 max 18` and
+not one word about the shape that pool is famous for. This is that word.*
+
+#### ① Two surfaces, neither rewritten
+
+| Surface | What it gains | Why there |
+|---|---|---|
+| `#pop-preview` — the ± popover, **every door** | the curve of the total on a value axis, the average and any declared target marked on it, a hover readout, and the odds of clearing that target in words | ④ built the instrument here (label, reserved readout strip, aria-hidden geometry with a text layer that IS the content); ⑥ fills the sum world's half of it. 284px is enough for a curve and nothing else. |
+| `#cmd-slot` / `#palette-slot` — the one-line validator | ` · 55% to clear 15`, and **only** when a target was typed | The slot is the validator as well as the read (§1.3), so it has one line. The one derived number a line can carry is the one the player asked for by typing `dc15`. Everything else about the shape is two inches away behind `±`. |
+
+The shipped `min · avg · max` line stays, verbatim, in both places. It is the
+only text `#pop-preview` and `#cmd-slot` had, `preview-honest` pins its exact
+spelling under `dnd`, and — the load-bearing reason — it is `previewOf`'s
+answer, which survives a curve refusal. Nothing about ⑥ replaces it; the curve
+arrives **above** it and the target sentence **below**.
+
+#### ② Ivory, because gold means a total that LANDED
+
+POOL-ANALYSIS §7 already refused *"a gold DC band on the value axis — gold
+means TOTAL in the sum world"*. The same argument reaches one step further and
+takes the columns with it: a forecast is not a total, it is the set of totals
+that have not happened. So the whole instrument is **ivory over the popover's
+sunk well** — columns at 34% ivory with a 60% top stroke, the average a 1px
+solid ivory rule, a declared target a 1px **dashed** ivory rule. Gold stays
+where it means something: on the number that lands.
+
+That leaves the two marks distinguishable without a legend, which matters
+because there is no room for one: solid is a fact about the dice, dashed is a
+stake somebody typed.
+
+#### ③ One column is one TOTAL — the sparse rule, and the lie it prevents
+
+`sumForecast().values` is **sparse**. `1d6!` has no total of 6, 12 or 18:
+`composeRoll` pays a max face as face-plus-child, so a 6 is worth 7 at least.
+A renderer that lays one column per array slot draws 21 adjacent columns over
+a 1–24 axis and asserts, in geometry, that every total between them is
+reachable. That is the whole class of lie this feature can tell, and it is why
+the binning lives in `js/odds.js` as `sumBins` rather than in the renderer:
+
+- a cell is **one integer total** until the axis is wider than 48 cells, and
+  `ceil(span/48)` totals wide after that (742 columns in 284px is 0.4px each);
+- a cell's x position is its **total**, `(lo − min)/span`, never its index;
+- a cell with no mass is **absent from `cells`**, so `1d6!` renders 21 columns
+  with three visible holes at 20.8%, 45.8% and 70.8% of the axis;
+- heights are `p / peak`, never `p / 1`, or every pool past 6 dice draws a
+  flat line.
+
+`sumBins` returns `null` on a refusal, exactly as `sumAtLeast` does — there is
+no zeroed shape to accidentally draw.
+
+#### ④ The peak, and the tie `fc.mode` hides
+
+`fc.mode` is the first of the tied values. For a plain `1d20+5` that makes it
+**6**, which is true of the array and false of the dice; printing *"most
+likely 6"* would be the same class of error as the sparse one — an artifact of
+storage sold as a fact of play. `sumPeak` counts the tie, and the readout says
+one of three things:
+
+| Case | Reads |
+|---|---|
+| one peak | `most likely 13 · 13%` |
+| every total tied | `flat — every total 5%` |
+| some tied | `no single peak — 5 totals tie at 17%` |
+
+That sentence is also the readout strip's text **at rest**, which is where ⑥
+departs from ④ deliberately. ④ leaves the strip empty until hover so nothing
+jumps; a sum curve has one summary worth standing there, and the caret is
+hidden at rest so the resting text makes no claim about a position. On hover a
+cell replaces it with `13 · 13% · 13+ 47%` — the cell's own mass and the
+cumulative read, the latter straight from `sumAtLeast` because that is the only
+place in this app that does cdf arithmetic. **`13+ 47%`, not `47% or
+better`**: "better" would bake higher-is-better into the copy, which is today's
+`total >= dc` everywhere but is not a law — §2.1's `target.cmp` reserves
+roll-under. `N+` states the comparison and leaves the judgement out of it.
+
+**A cell's cumulative read is where the one real bug in this pass was found,
+and it was found by LOOKING.** Hovering `40d20 dl1`'s top cell printed
+`775+ 0%` on a cell with visible mass — because `sumAtLeast` computed the tail
+as `1 − cdf`, and that pool's cdf reaches 1.0 in double precision hundreds of
+totals before its maximum, so a reachable total came back as **exactly zero**:
+the one value this feature reserves for *impossible*. The unit suite was green
+throughout, because nothing had ever asked it for a tail that thin. The fix is
+in `js/odds.js` where the arithmetic belongs — answer the two edges by
+definition (`P(≥ min) = 1`, `P(≥ max+1) = 0`) and otherwise sum whichever side
+carries less than half the mass, so neither end cancels. Summing the tail alone
+would have fixed the deep end and spoiled the near one: `P(≥ min)` came back
+`0.9999999999999998`, which prints `>99%` for a certainty. Both ends are now
+pinned in `tests/sumread.test.mjs`.
+
+#### ⑤ A refusal loses the curve and keeps the average
+
+The three typed refusals are `mixed-keep`, `reroll-cap` and `explode-cap`, and
+a refused forecast is still `kind:'sum'` **with** a `refusal` field — never
+`kind:'refusal'`, which `js/main.js` prints *instead of* the preview line. The
+distinction pays here: `previewOf` is exactly right about the average of
+`8d8+2d20 kh4`, whose curve is refused. So a refusal renders
+
+```
+Pool stats  (?)
+keep/drop across dice that roll different distributions — no exact curve for the total
+min 8 · avg 27.6 · max 46
+Difficulty Class 30 · no exact odds for this pool
+```
+
+— the sentence, and the line **beside** it, and, if a target was declared, a
+target row that says it does not know. `sumAtLeast` returns `null` on a
+refusal precisely so that "we do not know" cannot be rendered as `0%`, and the
+row wears `.unknown` (muted, italic) so it does not read like a figure.
+
+`0%` and `100%` are still printed when they are TRUE: a target above the
+maximum is impossible, not unknown, and the app should say so. Everything that
+merely *rounds* to them keeps its inequality — `<1%`, `>99%` — so a 1-in-400
+never reads as never.
+
+#### ⑥ The memo is not an optimisation
+
+`renderPopEcho` runs on every stepper click and every keystroke in a bonus
+label and in the Target field. The worst legal pool, `40d20 dl1`, costs
+**5.6 ms** warmed (`node tests/sumread.test.mjs --bench`, node v24 on the dev
+box, 2026-08-17). Recomputing per repaint would put a 40-die curve on the
+typing path, so `sumForecastMemo` caches the last 8 by a key of exactly the
+fields `sumForecast` reads — dice, modifier, adv, keep, reroll floor, explode.
+A bonus's **label** is not one of them, so naming a +2 `Proficiency` does not
+invalidate a curve it cannot change; neither does typing a target, which is
+why the Target field can repaint on every digit.
+
+#### ⑦ Considered and refused
+
+- **A column per array slot.** §③. It is the one lie available here.
+- **Gold columns.** §②.
+- **`sd` on screen.** The engine computes it and §5's local statistics need
+  it, but *"σ 2.85"* is not a sentence a player at a table reads. The spread
+  is already told twice, in min/max and in the curve's own width.
+- **A percentile band** ("half the rolls land 10–14"). A third statistic to
+  explain in a 284px popover, and the curve already shows it. Reconsider only
+  if the peak sentence proves illegible.
+- **A second surface** — an analysis mode, a sheet, a flyout. POOL-ANALYSIS §5
+  is one gate and no new control; §7.44's ledger sheet is the ONE surface that
+  earned its own altitude, and it earned it by being a per-shelf ledger with
+  nowhere else to live. A curve has somewhere to live.
+- **Suppressing the curve on the shelf `±`.** See §⑧.
+- **Sampling anything.** Refused on its own terms in POOL-ANALYSIS §6.3: the
+  exact path is 4.5–19× cheaper than the fallback proposed to protect it, and
+  where it cannot answer it says so.
+
+#### ⑧ POOL-ANALYSIS §9's four rendering questions
+
+Answered there in full, with the reasoning and the two premises that had gone
+stale. In brief:
+
+1. **Which doors forecast — all of them**, including the shelf `±` bound to a
+   landed roll, because a forecast standing beside the evidence of what the
+   roll actually did is the most instructive placement in this app, not the
+   most confusing. It is also what ④ already shipped: `renderPopEcho` has never
+   branched on `pop.source`, so the *per-die* spectrum has been on all four
+   doors since 2026-08-06 and nobody has reported it as a confusion.
+2. **What a pool-scope forecast forecasts — the spec the popover in front of
+   you carries**, which for a pool `±` is the pool's whole notation, mods
+   included: exactly what `rollRailPool` rebuilds and rolls. The premise that
+   made this a question is **no longer true** — `stageGroup` has carried mods,
+   dc, moment and label since U1 (2026-08-08) and sets aside only the GLUE
+   (keep/drop · reroll · `!` · adv), out loud.
+3. **The offer card — no odds line.** It is a decision surface for a roll
+   somebody else authored; a claimant who wants the curve has `±` on the draft
+   the moment they open it, and the card's job is the stakes.
+4. **UX §2.1's `showOdds` — still open, still unbuilt, deliberately not marked
+   shipped.** It is an intent-card field at a ceremony beat, and ⑥ is a
+   management read. §2.1's slot now has math behind it and nothing else has
+   changed.
+
+**One residual, named rather than fixed.** Read `4d6dl1`'s curve in the pool
+`±`, then TAP the pool to stage it, and the draft's `±` shows a different
+curve — because staging really does set keep/drop aside and really is a
+different roll. Both curves are right about their own spec, the set-aside note
+says which glue went, and no surface ever shows one curve for two rolls. What
+the app does not do is warn you at the first curve that the second one exists.
+
+#### ⑨ What has NOT been judged: the look
+
+Every number on this surface was verified in the running app on 2026-08-17 —
+cell counts, hole positions, mark positions, both copy branches of the target
+row, all three peak phrasings, and the box's four sum states (see
+POOL-ANALYSIS §10's table, which is a transcription of what the app returned).
+**Nothing was seen rendered.** The Browser pane would not composite in that
+session, so the geometry is measured and the *look* is unjudged. Three
+decisions are waiting on an eye rather than an assertion:
+
+- **The columns touch.** At `4d6dl1` a cell is 17px of a 270px box with no
+  gutter, so the shape is read off the stepped top stroke rather than off
+  separated bars. That is an ordinary histogram and it is why the top edge
+  carries a brighter stroke than the fill — but ④ put a 1px dark rule between
+  its segments, and whether this surface wants the same is a look call.
+- **A flat pool draws a solid block.** Correct — flat is what it means — but it
+  is the one case where the instrument might read as a mistake.
+- **The avg and target marks can coincide.** `2d6+3 dc10` puts both at 50%,
+  and the dashed one paints last. Legible, or does the pair need offsetting?
