@@ -13346,8 +13346,20 @@ export const scenarios = [
       assert.deepEqual(Object.keys(g.gateCursors).sort(), ['clunk', 'impact', 'tap'],
         'three gate cursors, not one module-global lastSoundAt');
       assert.ok(g.gateCursors.impact > 0, 'the impact cursor moved with the roll');
-      assert.equal(g.gateCursors.tap, 0,
-        'and the tap cursor did not — nothing has scheduled a settle cluster');
+      // INDEPENDENCE is the claim, not the zero. This asserted `tap === 0`
+      // ("nothing has scheduled a settle cluster") and was true by ACCIDENT
+      // about one run in six: `sim()` drives the FILM clock, but the page's rAF
+      // loop keeps running in real time between CDP calls, so whether the
+      // settle threshold gets crossed by a simulated frame or a real one is a
+      // coin toss — and a real one schedules the cluster and moves this cursor.
+      // Measured at 1/6 on 2026-08-16, and reproduced on a tree with none of
+      // that day's changes, so it is a race in the ASSERTION, not in the graph.
+      // It is also the likeliest explanation for an unattributed 191/192 sweep
+      // the day before. What the section actually proves is the thing its own
+      // first line says — three cursors, not one module-global `lastSoundAt` —
+      // and that holds whichever clock won.
+      assert.notEqual(g.gateCursors.tap, g.gateCursors.impact,
+        'the tap cursor is its own cursor — the impact path did not move it');
 
       // ---- the hard floor, read off the app --------------------------------
       const gate = await a.dbg('clickGate');
