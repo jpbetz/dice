@@ -222,6 +222,14 @@ only place this arithmetic lives; a refusal still owes the min/avg/max line
 **beside** it; and `values` is **sparse**, so `1d6!` renders 21 cells with three
 holes rather than 21 adjacent ones.
 
+**STILL OWED: the LOOK.** Every number on the surface was verified in the
+running app — cell counts, hole positions, mark positions, both target-row
+branches, all three peak phrasings, the four box states — but **nothing was seen
+rendered**: the Browser pane would not composite in that session. Three
+decisions are waiting on an eye rather than an assertion, listed in UX §7.48 ⑨
+(the columns touch with no gutter; a flat pool draws a solid block; the average
+and target marks can coincide). It belongs on Joe's LOOK queue beside #1.
+
 **Three typed refusals, and they are the load-bearing part**: `mixed-keep`,
 `reroll-cap`, `explode-cap`. Two corrections came with them, both of which
 would have shipped wrong numbers:
