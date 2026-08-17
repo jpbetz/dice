@@ -499,12 +499,18 @@ Tag `audio` (with `fx` and `roll`), in `tests/e2e/scenarios.mjs`:
 | `audio-settle` | one scheduled cluster per die, geometric intervals within jitter tolerance, byte-identical schedules for the same seed, and the impact cursor unmoved by taps |
 | `audio-shaft` | the shaft bus exists only under a socketed tower, and `impactVoiceFor` — not `towerClunkVoice` — is what says a towerless roll has no shaft |
 | `audio-ambience` | the toggle defaults off, no bed sources when off, and `soundOn === false` forces zero bed sources regardless |
-| `audio-venue` | **OWED (W6).** The grounded row is inert; a fantasy venue trims impacts, taps and the grind and a baffle knock is untrimmed under the same venue; the standing bed re-voices in place (live AudioParams move, `bedSources` does not) and a venue never switches the bed on |
+| `audio-venue` | **Shipped 2026-08-17.** The grounded row is inert *in effect* (a landing and a baffle knock are byte-identical there); a fantasy venue trims a landing by the exact product of the grounded answer and its own declared row, outside the 0.35 clamp; a baffle knock under the same venue keeps the neutral ground and the full ceiling; the settle tail carries the trim on its LEVELS and not on its GAPS (moonrise vs foxfire — same tower, same staged set, same seed, so only the ground row differs) and no rolling `targetLevel` moves; the standing bed re-voices in place (`told` instantly, live AudioParams over real seconds, `bedSources` AND `perHitBufferAllocs` unmoved); and a venue never switches the bed on |
 
-Hooks the owed scenario stands on, added by W6:
+Hooks it stands on, added by W6:
 `venueAudioInfo()` (declared rows, `groundedInert`, and the **live** bed read
 off its nodes) and `impactVoicingFor(strength, setId, ev)` — the deterministic
 voicing of a contact, through the same `impactVoicingOf` that plays it.
+
+**The one leg it cannot make, named rather than faked:** there is no hook that
+publishes a rolling voice's band or tilt frequency (`audioGraphInfo` reports
+pool sizes and levels, never filters), so the GRIND's trim is asserted on the
+shared `ground.centre` that `stepRollingVoices` reads and not on the band it
+produces. A grind that stopped multiplying by that number would still pass.
 
 **A known flake, measured 2026-08-16 and it is NOT W6's:** `audio-graph`'s
 `gateCursors.tap === 0` ("nothing has scheduled a settle cluster") fails about
