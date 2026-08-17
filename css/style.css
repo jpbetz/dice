@@ -5298,6 +5298,43 @@ body.mini #result-verdict { font-size: 11px; }
 .pop-preview .fc-w-crit    { background: rgba(255, 226, 122, 0.78); }
 .pop-preview .fc-allquiet { font-style: italic; color: var(--muted); }
 .pop-preview .fc-vis { display: block; margin-top: 6px; color: var(--muted); }
+/* THE SUM CURVE (§2l ⑥, UX §7.48): the distribution of the TOTAL, on a value
+   axis. IVORY, not gold — gold is the sum world's word for a total that
+   landed, and POOL-ANALYSIS §7 already refused a gold band on this axis. Cells
+   are absolutely positioned by their total (js/odds.js sumBins), so an
+   unreachable total is a HOLE and not a squeezed neighbour: 1d6! has no 6. */
+.pop-preview .sf-row { position: relative; display: flex; flex-direction: column; gap: 3px; margin: 7px 0 0; }
+.pop-preview .sf-curve {
+  display: block; position: relative; height: 34px;
+  border: 1px solid var(--hair); border-radius: 3px;
+  background: rgba(0, 0, 0, 0.25);
+}
+.pop-preview .sf-col {
+  position: absolute; bottom: 0; min-width: 2px;
+  background: rgba(243, 234, 215, 0.34);
+  border-top: 1px solid rgba(243, 234, 215, 0.6);
+}
+.pop-preview .sf-curve:hover .sf-col { background: rgba(243, 234, 215, 0.24); }
+.pop-preview .sf-col:hover { background: rgba(243, 234, 215, 0.62); }
+/* the two marks a forecast may carry: where it lands on average, and the
+   stake it was declared against. Neither is a total, so neither is gold. */
+.pop-preview .sf-mark {
+  position: absolute; top: 0; bottom: 0; width: 1px; transform: translateX(-0.5px);
+  pointer-events: none;
+}
+.pop-preview .sf-avg { background: rgba(243, 234, 215, 0.75); }
+.pop-preview .sf-dc {
+  background: rgba(243, 234, 215, 0.5);
+  border-left: 1px dashed rgba(243, 234, 215, 0.85); width: 0;
+}
+.pop-preview .sf-axis {
+  display: flex; justify-content: space-between;
+  font-size: 10px; color: var(--muted); letter-spacing: 0.04em;
+}
+.pop-preview .sf-line { display: block; margin-top: 6px; }
+.pop-preview .sf-target { display: block; margin-top: 3px; color: var(--ivory); }
+.pop-preview .sf-target.unknown { color: var(--muted); font-style: italic; }
+.pop-preview .sf-refusal { display: block; color: var(--muted); }
 .pop-actions { display: flex; gap: 8px; padding: 10px 14px 0; }
 .pop-actions:last-child, .pop-actions-2nd { padding-bottom: 14px; }
 .pop-actions .btn { flex: 1; }
