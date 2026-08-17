@@ -85,6 +85,50 @@
 // version break. The skip runs to the next column-0 line and never looks
 // inside. That tolerance is for sections this version does not know —
 // a section it DOES know stays strict to the character.
+//
+// THE TOWER RIDES THE TABLE (ROADMAP 9d follow-up, 2026-08-17). `tower` is the
+// fifth `table:` key and it is the ONE key in the section that is NOT an
+// enum here, which is a decision, not an omission:
+//
+//   · The felt, the system and the zoom are CLOSED sets that have not moved
+//     since they were mirrored — nine, three, three — so mirroring them buys a
+//     refusal at the line for a typo and costs nothing. The TOWER CATALOGUE IS
+//     DECLARED TO GROW ("'none' plus one model today, more later" — server.js
+//     SETTING_SPECS; "the second model should cost a row in TOWERS and nothing
+//     else" — main.js renderTowerPicker), and it grew from one to five models
+//     inside two weeks. A hand-mirrored sixth-copy list would be a FOURTH home
+//     for that list (client TOWERS, server SETTING_SPECS, here) with no drift
+//     guard reachable from Node: server.js does not export the tower list and
+//     js/main.js cannot be imported outside a browser. So the mirror would
+//     silently rot on the one key that changes most often, and its rot mode is
+//     "every file the new build writes is refused by the old one".
+//   · Refusing the WHOLE DOCUMENT over one unknown tower id is a compatibility
+//     break the version contract deliberately declines to make. C22's stamp is
+//     the door for "this file holds something you cannot read"; a new tower
+//     model is a CATALOGUE addition, not a schema change, and it must not have
+//     to spend a major to avoid costing a player their forty pools.
+//
+// So the parse checks SHAPE and length and hands the id on verbatim, and the
+// CATALOGUE check lives at the apply site (js/main.js portablePushToTable),
+// against `TOWERS` — the registry the reader actually has, which is the only
+// truthful answer to "can this build raise it". That site drops an id it cannot
+// socket, NAMES it in the receipt, and never puts it on the wire — because
+// server.js validateSettingsPatch refuses the ENTIRE push for one bad value,
+// and net.pushTable answers null for it, so an unknown id sent hopefully would
+// land as "couldn't reach the table" over a table that answered fine.
+//
+// Which leaves the id readable in the file it came from: Open → Download on an
+// older build carries the DM's tower through instead of quietly stripping it.
+//
+// ABSENT STAYS SILENT. No `tower` key means the room keeps the tower it has —
+// the whole `table:` section is a PATCH over the room's furniture, never a
+// total statement of it (see portablePushToTable: every key is `if (t.key)`),
+// and that is exactly what an absent felt has always meant. 'none' is the
+// spelling for "take it down", and unlike `name: ''` it SURVIVES the parse:
+// '' is the absence of a name, while 'none' is a tower id with a registry row
+// of its own and the only way a prepared table can lower a raised tower.
+// The EMITTER's own silence about 'none' is a separate call, at the snapshot
+// site — see js/main.js portableSnapshot.
 
 // THE FILE CARRIES ITS VERSION (ROADMAP C22). A file crosses versions by
 // definition — it is the one artefact meant to outlive a browser — so it is
@@ -138,8 +182,18 @@ const FELT_THEMES = ['emerald', 'crimson', 'midnight', 'slate', 'walnut',
   'obsidian', 'ocean', 'plum', 'sand'];
 const SYSTEMS = ['soul-deal', 'dnd', 'none'];
 const ZOOMS = ['wide', 'medium', 'close'];
-// key → the values it accepts, or null for free text (capped, never enumerated)
-const TABLE_KEYS = { name: null, felt: FELT_THEMES, system: SYSTEMS, zoom: ZOOMS };
+// A TOWER ID, SHAPE-CHECKED AND NOT ENUMERATED (see the header). Deliberately
+// wider than today's ids (`heartwood`, `blackanvil`, …): dice-set ids in this
+// same format already carry dots (`emberforge.blackanvil`), so a future tower
+// named that way must not be refused by a build that predates it. What it does
+// refuse is the junk a growing catalogue is no excuse for — whitespace, quoting
+// wreckage, an empty value, and anything long enough to be a paragraph.
+const TOWER_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/;
+// key → the values it accepts: an ARRAY is a closed enum (an unknown value
+// refuses at its line), a REGEXP is an id whose catalogue lives elsewhere
+// (shape only, checked against the real registry at the apply site), and null
+// is free text (capped, never enumerated).
+const TABLE_KEYS = { name: null, felt: FELT_THEMES, system: SYSTEMS, zoom: ZOOMS, tower: TOWER_ID };
 
 const BARE_KEY_RE = /^[A-Za-z0-9][A-Za-z0-9 _-]*$/;
 
@@ -190,7 +244,7 @@ function emitShelves(lines, groups, base) {
 }
 
 // groups: [{name, notation, category?, set?}] · settings: {sound?, numbers?}
-// table: {name?, felt?, system?, zoom?} · profiles: [{name, system?, set?, groups}]
+// table: {name?, felt?, system?, zoom?, tower?} · profiles: [{name, system?, set?, groups}]
 // profile: {name?, system?, set?} — WHO the top-level `pools:` belong to
 //
 // `profile:` exists to keep the document free of a second home for the same
@@ -482,9 +536,17 @@ export function parsePortable(text) {
       if (!sv || sv.rest.trim() !== '') return fail(lineNo, `expected one value after "${key}:"`);
       const allowed = TABLE_KEYS[key];
       let value = sv.value;
-      if (allowed) {
+      if (Array.isArray(allowed)) {
         if (!allowed.includes(value)) {
           return fail(lineNo, `${key} ${JSON.stringify(value.slice(0, 30))} is not one of ${allowed.join(', ')}`);
+        }
+      } else if (allowed instanceof RegExp) {
+        // An id, not an enum (the header). The shape is all this side can
+        // honestly judge — whether THIS build can raise it is a question for the
+        // registry at the apply site — so the refusal here says what it checked.
+        if (!allowed.test(value)) {
+          return fail(lineNo, `${key} ${JSON.stringify(value.slice(0, 30))} does not look like a ${key} id `
+            + `(letters, digits, '.', '_', '-'; 32 characters; 'none' for no ${key})`);
         }
       } else {
         // free text (the table's own name), capped like every other name
