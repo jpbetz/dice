@@ -3222,7 +3222,7 @@ as a POUR: scripted entry, hidden transit behind the skin, exit through
 the doorway, then the ordinary settle. The contract, the socket, the bake,
 the amended camera ruling and the measurements are
 [TOWER.md](TOWER.md)'s STATUS section; the player-facing spec is
-[UX.md §7.31](UX.md#731-the-tower-and-what-a-poured-roll-looks-like-2026-08-12).
+[UX.md §7.31](UX.md#731-the-tower-and-what-a-poured-roll-looks-like-2026-08-12-second-tower-2026-08-13-third-2026-08-14).
 Scenario `tower-roll` (tag `tower`), and the whole pre-existing suite
 passes **unchanged**, which is what THE FIRST LAW ("don't change anything
 about how the system works without a tower") means in practice.
@@ -3279,7 +3279,7 @@ under the rule of tincture, heater shields, cressets and sconces, ivy as a
 guided walk, moss as a pixel pass, rope, chain, a horseshoe, and six quads of
 smoke that are not a particle system. Manifests, budgets and the traps are in
 [TOWER.md](TOWER.md) under DRESSING; the player-facing story is
-[UX.md §7.31](UX.md#731-the-tower-and-what-a-poured-roll-looks-like-2026-08-12).
+[UX.md §7.31](UX.md#731-the-tower-and-what-a-poured-roll-looks-like-2026-08-12-second-tower-2026-08-13-third-2026-08-14).
 
 Three things it established that outlive it:
 
