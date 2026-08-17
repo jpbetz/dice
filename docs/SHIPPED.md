@@ -2944,10 +2944,16 @@ where the two halves of the same story now sit together:
 **Two families, one row, one change.** ⚙ ≣ ? ❯ (`.btn.ghost`, 31px) and
 ✕ Clear mine (`.corner-btn`, 28px) are siblings in `#rail-foot`, so the row's
 height is its tallest child and both reach the floor together — pricing them
-separately would have priced the same 4px twice. Measured before
+separately would have priced the same 3px twice. Before
 (`38×31, 37×31, 33×31, 37×31` and `101×28`) and after (`38×34, 37×34, 34×34,
-37×34` and `101×34`) with offsetWidth/offsetHeight under an emulated coarse
-pointer, the same reader `touch-targets` uses.
+37×34` and `101×34`).
+
+**Every number in this entry is printed by `node tools/steps/touch-price.mjs`**,
+which shipped with it. It reads offsetWidth/offsetHeight under an emulated
+coarse pointer at U30's worst frame — deliberately the same reader
+`touch-targets` uses, so a figure here and an assertion there cannot disagree —
+and it prices each candidate as a **delta inside one run** rather than two
+numbers from two runs.
 
 **What U28 actually did, and why this was left.** The 2026-08-08 pass fixed the
 **collapsed** foot (`padding: 11px 3px`, css/style.css:2467) and stopped there,
@@ -2963,12 +2969,21 @@ the whole of why it is the number (U28's own conversion: 34 is a 9 mm finger
 pad and this file's floor; 44 is the platform guideline and is taken where the
 budget affords it).
 
-**It costs the rack 4px, measured, not estimated.** `#rail-foot` is `flex: none`
-in the column, so its height comes off the scrolling body: at U30's worst frame
-(1024×768 landscape, coarse) `#builder-panel > .panel-body` goes **663 → 659**.
-The probe applies each candidate live and re-measures, and it priced the two
-refused families in the same run — see ROADMAP U28b, which now carries all
-three numbers.
+**It costs the rack 3px, and the tool prices it by REVERTING it.** `#rail-foot`
+is `flex: none` in the column, so its height comes off the scrolling body: put
+the row back to 31/28 and `#builder-panel > .panel-body` goes **660 → 663**.
+The two refused families are priced in the same run — see ROADMAP U28b.
+
+**The first write-up of this said 4px, and that is worth more than the fix.**
+The 4 was measured on a *padding-based candidate* (`padding-block: 9px`) which
+landed the ghosts at 35px; the rule that shipped uses `min-height` and lands
+them at exactly 34, so the row grows 31→34 and the bill is 3. **A number
+measured on the prototype and written up as the shipped fact** is this repo's
+commonest doc defect, and it slipped past two doc passes here — it was caught
+only when the throwaway probe was rewritten as a committed tool step and run
+against the shipped tree. That is the argument for the tool step over a
+scratchpad path in a comment: a command nobody can run is a date with extra
+characters.
 
 **The collapsed rail is untouched, by specificity rather than by hope.** The
 collapsed block is `#left-panel.collapsed #rail-foot .btn.ghost` at (2,3,0)

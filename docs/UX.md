@@ -5983,8 +5983,9 @@ foot's coarse block:
 **⚙ ≣ ? ❯ and ✕ Clear mine are ONE ROW, so they are one change.** They were
 31px and 28px; both are 34×34 on a coarse pointer now. The row's height is its
 tallest child, which is why pricing them as two families would have priced the
-same 4px twice — and 4px is the whole bill, off the scrolling body at U30's
-worst frame (1024×768 landscape: 663 → 659, measured live).
+same 3px twice — and 3px is the whole bill, off the scrolling body at U30's
+worst frame (1024×768 landscape: reverting the rule reads 660 → 663). Rerun any
+figure in this section with `node tools/steps/touch-price.mjs`.
 
 **Why 34 and not 44, stated as a ruling rather than a shortfall.** `?` is 33px
 wide, and four 44px glyphs beside a 101px labelled ✕ do not fit a 260px column.

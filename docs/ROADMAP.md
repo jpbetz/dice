@@ -942,9 +942,14 @@ audit found it. CUJ11's first item shipped by deletion before the journey was na
 
 **The rail foot shipped 2026-08-17** — `.btn.ghost` and `.corner-btn`, which
 turned out to be the *same row*, so the pair is one change and it cost the rack
-**4px**. See SHIPPED.md, *U28b — the expanded rail foot*. All four measurements
+**3px**. See SHIPPED.md, *U28b — the expanded rail foot*. All four measurements
 in the original entry were re-taken first and **all four were still exact**
 (31 / 28 / 19 / 26).
+
+**Every figure below reruns: `node tools/steps/touch-price.mjs`.** It prints the
+families' live geometry and prices each candidate as a delta inside one run
+(the shipped rule by reverting it), at U30's worst frame, with the same reader
+`touch-targets` asserts on.
 
 **Still refused, and now with the number that refuses them:**
 
@@ -973,9 +978,12 @@ change before a size one — and it belongs with U21, which is already the
 "collapsed rail deletes multiplayer" entry.
 
 **Raise by family with the measurement, never in bulk** — that rule held up:
-of the four families it says to price separately, one was free (4px), one is
-paid in the protected place, one carries a known overflow, and the fifth thing
-it did not list cannot be priced at all.
+of the four families it says to price separately, one was nearly free (3px), one
+is paid in the protected place, one carries a known overflow, and the fifth
+thing it did not list cannot be priced at all. It held up in a second way too:
+the first write-up of the shipped bump said **4px**, measured on a
+padding-based candidate rather than on the rule that shipped, and only the
+committed tool step caught it (SHIPPED.md has the postmortem).
 
 ---
 
