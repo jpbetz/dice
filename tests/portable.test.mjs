@@ -617,6 +617,102 @@ t("an empty table name carries nothing — it does not round-trip as a key", () 
   assert.equal(exportYaml({ table: parsed.table }), exportYaml({ table: { felt: 'plum' } }));
 });
 
+// ---- the tower rides the table (ROADMAP 9d follow-up) -----------------------
+//
+// The fifth `table:` key, and the only one that is not an enum. The three
+// failure modes a portable file has to get right are each asserted below,
+// because this is the artefact that travels between versions and machines.
+
+t('tower round-trips in table:, bare or quoted, and stays a fixed point', () => {
+  const parsed = parsePortable([
+    'table:',
+    "  name: 'Session 3'",
+    "  felt: 'obsidian'",
+    '  tower: blackanvil',   // hand-written bare scalar
+  ].join('\n'));
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.deepEqual(parsed.table, { name: 'Session 3', felt: 'obsidian', tower: 'blackanvil' });
+  const text = exportYaml({ table: parsed.table });
+  assert.ok(text.includes("  tower: 'blackanvil'\n"), text);
+  assert.deepEqual(parsePortable(text).table, parsed.table);
+  assert.equal(exportYaml({ table: parsePortable(text).table }), text, 'export → parse → export');
+});
+
+t('a whole prepared table with a tower is a fixed point', () => {
+  const table = { name: 'Foxfire night', felt: 'obsidian', system: 'soul-deal', zoom: 'close', tower: 'hollowbole' };
+  const text = exportYaml({ groups: [{ id: 1, name: 'Damage', notation: '3d4' }], table });
+  const parsed = parsePortable(text);
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.deepEqual(parsed.table, table);
+  // key ORDER is TABLE_KEYS' order — the tower reads last, after the zoom
+  assert.match(text, /table:\n {2}name: .*\n {2}felt: .*\n {2}system: .*\n {2}zoom: .*\n {2}tower: 'hollowbole'\n/);
+  assert.equal(exportYaml({
+    groups: flat(parsed).map((p) => ({ name: p.name, notation: p.notation })),
+    settings: parsed.settings,
+    table: parsed.table,
+  }), text);
+});
+
+// FAILURE MODE 1: a file naming a tower THIS BUILD DOES NOT HAVE. It parses.
+// The tower catalogue grows (five models in two weeks) and refusing the
+// document would cost a player their forty pools over one cosmetic line — so
+// the shape is all this side judges, and whether the id can be RAISED is asked
+// of the real registry at the apply site (main.js portablePushToTable), which
+// drops what it cannot socket and names it in the receipt.
+t("a tower id this build has never heard of PARSES — the catalogue is not the format's", () => {
+  const parsed = parsePortable("table:\n  felt: 'plum'\n  tower: 'brassworks'\n");
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal(parsed.table.tower, 'brassworks', 'carried verbatim, so Open → Download keeps it');
+  assert.deepEqual(parsed.warnings, [], 'and it is not a skipped section — nothing was stepped over');
+});
+
+t('a dotted tower id parses — dice-set ids in this format already carry dots', () => {
+  const parsed = parsePortable("table:\n  tower: 'moonmoot.hollowbole'\n");
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal(parsed.table.tower, 'moonmoot.hollowbole');
+});
+
+// …which is not the same as tolerating garbage: the SHAPE still refuses, at
+// its line, because a human hand-editing a file is standing right there.
+refuses("table:\n  tower: 'the big one'\n", 'tower', 'a tower id with spaces refuses');
+refuses("table:\n  tower: ''\n", 'tower', "an empty tower value refuses — 'none' is the spelling for no tower");
+refuses(`table:\n  tower: '${'x'.repeat(40)}'\n`, 'tower', 'an over-long tower id refuses');
+refuses("table:\n  tower: 'bastion'\n  tower: 'heartwood'\n", 'twice', 'a repeated tower key refuses');
+refuses("table:\n  tower: 'bastion' extra\n", 'one value', 'trailing text after a tower value refuses');
+
+t("the unknown-table-key refusal names tower, so the file says what it accepts", () => {
+  const parsed = parsePortable("table:\n  venue: 'moonrise'\n");
+  assert.equal(parsed.ok, false);
+  assert.ok(parsed.error.includes('tower'), parsed.error);
+  assert.ok(parsed.error.includes('unknown table key'), parsed.error);
+});
+
+// FAILURE MODE 2: 'none' is an INSTRUCTION, not an absence, and that is what
+// separates it from `name: ''`. It is the only way a prepared table can lower a
+// tower somebody raised, so the parse keeps it.
+t("tower: 'none' survives the parse — unlike an empty name, it means something", () => {
+  const parsed = parsePortable("table:\n  name: ''\n  tower: 'none'\n");
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.deepEqual(parsed.table, { tower: 'none' }, "the '' name is dropped; the 'none' tower is not");
+  assert.equal(exportYaml({ table: parsed.table }).includes("tower: 'none'"), true,
+    'and exportYaml writes what it is given — the silence about a towerless table is '
+    + "portableSnapshot's call, not the emitter's");
+});
+
+// FAILURE MODE 3: an ABSENT tower key keeps meaning exactly what it meant
+// before this key existed — silence. The `table:` section is a PATCH over the
+// room's furniture, so absence leaves the room's tower alone; it is not a
+// synonym for 'none'.
+t('an absent tower key is absent — not none, and not a warning', () => {
+  const parsed = parsePortable("table:\n  felt: 'plum'\n  system: 'dnd'\n");
+  assert.equal(parsed.ok, true, parsed.error);
+  assert.equal('tower' in parsed.table, false);
+  assert.deepEqual(parsed.warnings, []);
+  // and the emitter is silent for a caller that names no tower — the byte-
+  // compatibility claim every file written before today depends on
+  assert.equal(exportYaml({ table: { felt: 'plum', system: 'dnd' } }).includes('tower'), false);
+});
+
 // ---- forward tolerance: skip an unknown SECTION, stay strict inside a known one
 
 t('an unknown top-level section skips with a warning; the rest of the file lands', () => {

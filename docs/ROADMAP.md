@@ -57,9 +57,9 @@ by *finishing what is in flight*.
 | 2 | [**§2l ⑥'s RENDERING**](#2l-pool-analysis--⑤-and-⑥s-engine-shipped-the-rendering-is-the-open-half) | The engine landed 08-16, proven four ways, 5.5 ms worst case — and is **inert**: `kind:'sum'` is matched nowhere, so nothing renders. Goal 4 names summing as toil the system owes the player, and the app still cannot say a word about `4d6dl1`. The smaller half of the work and the whole of the payoff. | med | A |
 | 3 | [**C22's `room.setup` stamp**](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15) | Half a contract is worse than none. The stamp must come from the WRITER (`maybeRepushTable`); a stamp only the server writes is a stamp nobody can trust. ~10 lines once someone owns that site. | small | A |
 | 4 | [**§5** — roll-log export](#5-capture-mechanisms) | Goal 7's last uncapturable surface: the online log cannot be copied or downloaded. Reuses `portableDownload()`. The half of §5 that does **not** wait on #2. | small | A |
-| 5 | [**9d follow-up** — `tower` in the portable YAML](#9d-follow-up-tower-and-venue-in-the-portable-yaml) | `TABLE_KEYS` is still `{name, felt, system, zoom}`, so a prepared table cannot arrive with its tower up. Ship `tower` alone; GOALS punted how a venue rides the file. | small | A |
+| 5 | [**9d follow-up** — `venue` in the portable YAML](#9d-follow-up-venue-in-the-portable-yaml--tower-shipped-2026-08-17) | **`tower` SHIPPED 2026-08-17** ([UX §7.50](UX.md)) — `TABLE_KEYS` is `{name, felt, system, zoom, tower}` and a prepared table arrives with its tower up. What is left is GOALS' punt: how a **venue** rides the file. Shipping the tower alone exposed that a file can now prepare *half a fae venue*, which is the argument for sequencing this next. | small | A |
 | 6 | [**C30 residual** — deaden + grip, sleep off](#c30-residual-deaden--the-only-lever-that-touches-the-dithering) | The best shake and hop numbers measured anywhere on this table, failing four of six gates. Grip recovers 70% of the glide and **has never been run with sleep off**. The pile's untried lever is spawn geometry — **which moved on 08-15**, so the pairing is genuinely worth re-running now. | med | A |
-| 7 | [**§3b L2**](#3b-the-lobby-and-the-table-flow--l4-shipped-l2-is-a-judgment-call) | Judgment, not plumbing: should the pre-join peek say how many people are here? Runs straight into `handleTableInfo`'s deliberate privacy omission. | small | A |
+| 7 | [**§3b L2**](#3b-the-lobby-and-the-table-flow--l4-shipped-l2-is-a-judgment-call) | **Decision record written 2026-08-17; recommends NO and needs Joe's yes/no.** The premise was stale: the peek has disclosed the display name of any seated player holding a profile since C17, and the join door renders them under a heading reading "At this table". A count's only new information is a player who published nothing. What the item actually owes is a corrected budget comment in `handleTableInfo` and the assertion that would have caught it. | small | A |
 | 8 | [**U16**, **U21**, **C26**](#u16-draft-intent-in-the-well--design-first-medium) | The design-first trio, stuck for one reason each: no carrier for intent in the live draft; the collapsed rail deletes multiplayer; `Change seat…` wears a seat-shaped label on a name-wiping verb. | med | A |
 | 9 | [**B1** / identity persistence](#tier-b--the-closed-beta) | The structural bet whose bill arrived: `dice.name.v1` is origin-global and `playerId` is minted per-join, both load-bearing for **authority** and **routing**. Now the oldest un-actioned item here. | med | A |
 | 10 | [**T15**](#t15-re-bake-the-three-classic-skins-through-the-forge--large-scoped-2026-08-14) | Owner-commissioned, explicitly not a side quest. **Queued behind #1** — its bar is Joe's eye, and starting three more rounds while five verdicts are outstanding lengthens the queue instead of clearing it. | large | B |
@@ -245,14 +245,145 @@ needs landing zones, they are unbuilt — this section is not where that lives.*
 The journeys this serves are **CUJ1–CUJ5**; `Ln` builds `CUJ(n+1)`. L0, L1 and
 L3 shipped 2026-08-07 (detail in SHIPPED.md §3b).
 
-**L2. Arriving (CUJ3) — mostly shipped, needs a judgment call.** The pre-join
-peek shows the table name and the prepared seats (`GET /api/table`), and C10's
-offer banner serves a returning player after the join. What is left is
-judgment, not plumbing: whether the peek should also say **how many people are
-here** (roster count is live presence, cheap, and answers "did I follow the
-right link?"). Note the constraint C10's first attempt found the hard way —
-`handleTableInfo` deliberately omits the roster (server.js — *"No players, no
-roster, no log, no offers"*), and that is a privacy decision, not an oversight.
+**L2. Arriving (CUJ3) — the judgment call, decided-shaped 2026-08-17.** The
+pre-join peek shows the table name and the prepared seats (`GET /api/table`),
+and C10's offer banner serves a returning player after the join. The open
+question was whether the peek should also say **how many people are here**.
+
+**Recommendation: no. Close L2 as decided-no** — and spend the commit on the
+two things that turned out to be actually owed (⑤ below). Nothing here needs
+`server.js` to change to *add* a field; what it needs is for `server.js` to
+stop claiming something that stopped being true a week after it was written.
+
+#### ① The premise is stale, and this is the finding
+
+The framing above says `handleTableInfo` "deliberately omits the roster… a
+privacy decision, not an oversight". That is true of the FIELD and **materially
+false about what the endpoint discloses.** C17 (2026-08-09) gave the peek a
+second seat source — every seated player's published `library`, each seat
+carrying `from`, *which is that player's display name* (server.js
+`handleTableInfo`, the `for (const pl of room.players.values())` loop). The
+budget comment one screen above it — *"No players, no roster, no log, no
+offers"* — predates that change and was not updated with it.
+
+Measured, not read (`node server.js` on any free port that is **not 8123**,
+then `POST /api/join`, `POST /api/pools` with a `library`, then
+`GET /api/table?room=…`):
+
+```
+A. one player seated, nothing published:   {"system":"soul-deal"}
+B. after that same player publishes:        {"system":"soul-deal","seats":[
+     {"name":"Wren","pools":1,"system":"dnd","from":"Alice Cooper"}]}
+C. plus a second, library-less player:       (unchanged — Bob is invisible)
+```
+
+Publishing is not a user act: `/api/pools` carries the whole library with "no
+push, no YAML pane, no explicit apply — their library IS the seats", the client
+re-shares on every hello, and visibility is "deliberately WIDE for now".
+
+And the client already **renders** it at the door. `renderSeatMine` paints a
+group head reading literally **"At this table"** over rows that say
+`Alice Cooper · 1 pool`, with the title *"Alice Cooper's 'Wren' — taking it
+copies it…"* — before the join, from the peek, because "the peek is the one
+pre-join source and it carries `from` for exactly this" (js/main.js ~25590).
+
+**So the peek does not merely leak presence; the join door announces it by
+name.** The question is therefore not "open the roster surface or keep it
+closed" — it is "what is left over".
+
+#### ② What a count leaks that a name does not
+
+Exactly one thing, and stating it precisely is the whole decision:
+
+> **A count is the first field on this endpoint that describes a player who has
+> published nothing.**
+
+Bob, in the probe, did nothing but sit down. `from` is bounded by an act — a
+player who published a character is disclosed *by that character*; presence is
+**asserted**, which is the rule GOALS holds everywhere else ("presence is
+asserted, never inferred"). A count is presence *inferred from occupancy*, and
+it answers for the people who asserted nothing. Two consequences follow:
+
+- **A count turns the peek into a feed.** It is unauthenticated, creates no
+  room, and changes on every join and leave, so a key-holder can poll it into
+  an occupancy time series — when the game started, when it ended, whether
+  anyone is there right now — without ever taking a seat. `from` changes only
+  when somebody edits a library, which is rare and is a thing they did. Goal 12
+  ("not a chat, a character sheet, or a campaign manager") and §3b's own
+  standing ruling (*no lobby presence, no summon, nothing chat-shaped*) are
+  what a pollable occupancy signal on a forwarded key runs into.
+- **The delta is "without joining", and that is all it is.** Anyone with the
+  key can walk in and read the roster (goal 10 — no access control, the key is
+  the door). So a count breaks no secret; it makes one **cheap to take without
+  arriving**. Every argument above is a restatement of that sentence, and the
+  owner is really deciding one thing: does standing at the door entitle you to
+  the room's occupancy, or does sitting down?
+
+**What it does not leak,** stated so the refusal is not overclaimed: no
+identity, no notation, no log, no rolls, nothing a joiner would not see seconds
+later. The projection invariant is untouched either way — *redaction is absent
+data, never hidden data*, and a count is a new derived field rather than a
+masked one. **The invariant is not the blocker.** The stale budget sentence is,
+and it is stale in either direction.
+
+#### ③ Bucketing is not a third option
+
+It is a worse version of the count, on three checkable grounds:
+
+1. **The domain is 0–12** (`PROFILES_AT_TABLE`, and the server's own 12). A
+   bucket over thirteen values removes almost nothing, and the bit that
+   actually leaks is **0-vs-nonzero** — which every bucketing scheme preserves
+   by construction, because that is the bit CUJ3 is asking for.
+2. **It cannot do the job.** "A few people" cannot be reconciled with "we're
+   five", so a joiner cannot use it to catch the wrong-link case, which was the
+   entire reason to add a number.
+3. **It invents a vocabulary this surface does not have.** Every field on the
+   peek is a real value or absent. A bucket is an approximation — hidden data
+   in a friendly hat — on the one endpoint whose rule is the opposite.
+
+If a count ships anyway, the honest floor is `present: true` — one boolean, no
+cardinality, absent when nobody is there. It is a smaller trespass over the
+same line, not a different one, and it still describes Bob.
+
+#### ④ What CUJ3 actually needs — and it is not this
+
+[CUJS.md](CUJS.md) CUJ3 is **done when** *"following the link lands them at the
+right table under their own name, having seen enough before joining to know it
+is the right one."* The criterion is **recognition**, and recognition is served
+twice already: the table's NAME (which is what CUJ2's invite flow exists to
+set) and the seat names — including, under a heading that says "At this table",
+the names of the people who are there.
+
+The peek's real CUJ3 failure case is a room that is **unnamed and unprepared**:
+it answers `{system}` and nothing else. **A count does not fix that** — "3
+people are here" does not tell you they are *your* people; a name does. So the
+residual CUJ3 weakness is not the peek's budget, it is that an unnamed table is
+unrecognizable at the door, and that is CUJ2's surfaces, not this endpoint.
+
+There is also no consumer. Nothing in the client reads the peek except the seat
+picker (`seatPeekInfo` → name, system, seats), so a count is not "cheap
+plumbing plus a judgment" — it is a judgment plus a new decision about where a
+number appears on a join modal. C10 priced this exact option once already, as
+its answer (1) (*"a bare integer, no names… discloses strictly less than the
+seat names the peek already carries"*), shipped (2)+(3) instead, and recorded
+*"(1) … stays unbuilt and unneeded"*. Its `seatsOpen` counted unclaimed SEATS
+where L2 counts PEOPLE, so the precedent is directional, not binding.
+
+#### ⑤ The two things this actually owes, whichever way it is decided
+
+1. **Correct `handleTableInfo`'s budget comment.** *"No players, no roster, no
+   log, no offers"* has been wrong since 2026-08-09: the endpoint reports the
+   display name of any seated player holding a profile. It should say what it
+   does — including that a library-less player is invisible, since that
+   asymmetry is now load-bearing for the argument above.
+2. **Assert it.** `prepared-seat`'s peek check loops a leak-list
+   (`1d20`, `playerId`, `rev`, `log`, `felt`) and says nothing about presence,
+   which is exactly why `from` walked in unremarked. The assertion that would
+   have caught it: seat a player who has published NOTHING and assert the peek
+   does not mention them.
+
+*(Both land in `server.js` / `tests/e2e/scenarios.mjs`, which this pass did not
+own. Neither is a behavior change.)*
 
 **L4. Sub-tables (CUJ5) — SHIPPED 2026-08-15.** UX §7.46,
 `POST /api/split`, `tests/subtables.test.mjs`. §13's claim that identity walks
@@ -459,14 +590,33 @@ system-profile registry. Needs dice.js custom face sets.
 build record — five models, the dressing pass, the portal-floors campaign —
 is in SHIPPED.md §9d.*
 
-### 9d follow-up. `tower` and `venue` in the portable YAML
+### 9d follow-up. `venue` in the portable YAML — `tower` SHIPPED 2026-08-17
 
-Verified open 2026-08-14: `TABLE_KEYS` in js/portable.js is
-`{ name, felt, system, zoom }`. A prepared table cannot arrive with its tower
-up or its venue set — the one place these settings are not treated like their
-neighbours. **Note GOALS' punt** (2026-08-15): *how a venue rides the portable
-YAML and the room settings* is explicitly deferred, so shipping `tower` alone
-is the coherent smaller move, and `venue` waits on that ruling.
+**`tower` shipped** ([UX §7.50](UX.md)): `TABLE_KEYS` is
+`{ name, felt, system, zoom, tower }`, `portableSnapshot` writes the key when a
+tower is up, and `portablePushToTable` is the catalogue door. The format judges
+SHAPE and the apply site judges the CATALOGUE against `TOWERS` — the tower list
+grows, and a hand-mirrored copy in the format would be a fourth home for it
+with no drift guard reachable from Node. Three failure modes, all decided and
+tested (`node tests/portable.test.mjs` → 96): an id this build cannot raise
+parses, rides through `Open → Download` verbatim, and is dropped at the push
+and named in the receipt (never sent — `validateSettingsPatch` refuses the
+*whole* push for one bad value); `'none'` survives the parse because it is the
+only way to lower a raised tower, while the *emitter* stays silent about it
+because an older reader refuses an unknown key inside `table:` and every
+export would otherwise become unreadable; an absent key is silence.
+
+**`venue` still waits, and it is now the only half left.** GOALS' punt
+(2026-08-15) — *how a venue rides the portable YAML and the room settings* —
+is untouched. The two were separable: nothing in the tower work needed a venue
+key. What shipping `tower` alone exposes is that a file can now prepare **half
+a fae venue** (`tower: 'hollowbole'` with no venue), which is a state two
+clicks already reach — `selectVenue('table')` sends no tower, so leaving a
+venue leaves its tree standing — and which nothing guards. Read that as an
+argument for sequencing `venue` next, not as a defect in the tower key.
+
+*Verified 2026-08-14, still true when it was fixed 2026-08-17: `TABLE_KEYS` was
+`{ name, felt, system, zoom }`.*
 
 *Known cost, recorded rather than hidden: a 40-die pour is ~25 s of film and
 up to five bake attempts (~3 s synchronous). Forty dice through one chute is

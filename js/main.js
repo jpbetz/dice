@@ -12533,6 +12533,15 @@ window.__diceDebug = {
     // for what replaced them.
     profiles() { return portableParsed ? portableParsed.profiles.map((p) => p.name) : []; },
     profileSystems() { return portableParsed ? portableParsed.profiles.map((p) => p.system || null) : []; },
+    // The `table:` section the BOX holds, verbatim — what the file SAYS the
+    // furniture is, before any of it is pushed anywhere. Separate from
+    // __diceDebug.settings (what the room says) and __diceDebug.tower (what is
+    // socketed) on purpose: the 9d-follow-up tower key has three failure modes
+    // that live in the gaps between those three answers, and a scenario that
+    // could only read the last of them would call a file that never carried a
+    // tower and a build that could not raise one the same outcome. null = the
+    // box holds nothing parseable; {} is impossible — an empty table: is absent.
+    table() { return (portableParsed && portableParsed.table) || null; },
     adopt(name) { return portableAdoptOne(name); },
     adoptAll() { return portableAdoptProfiles(); },
     // C15/CUJ13 — RESTORE, and its two-step arm, without a pointer.
@@ -21394,6 +21403,24 @@ let portableWarnings = [];
 // `table:` is only written when there is a table to describe — the lobby has
 // none, and a file naming a table you are not at is exactly the phantom §7.20
 // went and deleted from the nameplate.
+//
+// THE TOWER IS WRITTEN ONLY WHEN ONE IS UP (ROADMAP 9d follow-up), and unlike
+// the felt that is a compatibility decision rather than a taste one. A reader
+// already in the field REFUSES an unknown key inside `table:` ("unknown table
+// key … — expected name, felt, system, zoom"): the strictness that makes a
+// known section strict to the character cuts backwards here. Writing
+// `tower: 'none'` unconditionally would therefore make EVERY file this build
+// exports unreadable by every older build — a hard version break bought for a
+// key whose value is the default, on a feature that is in closed beta and that
+// most players cannot even see (js/stability.js). Written this way, only a
+// table that has actually raised a tower writes the key, which is exactly the
+// population the tower matters to.
+//
+// It also keeps C22's stamp honest. `major` is owed "the moment stored data can
+// hold something an older reader would silently drop" (js/schema.js) — and an
+// older reader does not drop this silently, it refuses at the line. The loud
+// door is already in the field, so a tower model does not have to spend a major
+// to ship, and a towerless table's file stays byte-identical to yesterday's.
 function portableSnapshot() {
   return exportYaml({
     groups,
@@ -21403,6 +21430,7 @@ function portableSnapshot() {
       felt: roomSettings.felt,
       system: roomSettings.system,
       zoom: roomSettings.zoom,
+      ...(roomSettings.tower && roomSettings.tower !== 'none' ? { tower: roomSettings.tower } : {}),
     },
     // WHOSE the top-level pools are. This is what keeps the document free of a
     // second home for the same rack: the profile in hand stays exactly where
@@ -22021,11 +22049,45 @@ async function portablePushToTable() {
     return portableRefuse('✗ nothing to send — the box has no table: and no profiles to seat');
   }
   const table = {};
+  // A KEY THE FILE DOES NOT NAME IS SILENCE, NOT A DEFAULT — every line here is
+  // `if (t.key)`, so the section is a PATCH over the room's furniture and an
+  // absent felt (or tower) leaves the room's alone.
   if (t) {
     if (t.name) table.tableName = t.name;
     if (t.felt) table.felt = t.felt;
     if (t.system) table.system = t.system;
     if (t.zoom) table.zoom = t.zoom;
+  }
+  // THE TOWER (ROADMAP 9d follow-up). This is the CATALOGUE DOOR the parser
+  // deliberately does not have (js/portable.js header): `tower` arrives
+  // shape-checked but not enumerated, because the tower list grows and a
+  // hand-mirrored copy in the format would refuse next month's file. `TOWERS`
+  // is the registry this build actually has, so it is the only truthful answer
+  // to "can we raise it".
+  //
+  // AN ID WE CANNOT SOCKET IS DROPPED HERE AND NEVER SENT. Sending it hopefully
+  // would not degrade — server.js validateSettingsPatch refuses the WHOLE push
+  // for one bad value and net.pushTable answers null for that, so the felt, the
+  // name and every prepared seat would be lost too, under the receipt
+  // "couldn't reach the table" over a table that answered perfectly. Dropped,
+  // it costs exactly the tower, and the receipt says so.
+  //
+  // NOT FILTERED BY STABILITY CHANNEL, and that is the one law rather than an
+  // oversight: the channel decides what the settings panel OFFERS, never what
+  // works (js/stability.js). A stable browser applying a beta table's prepared
+  // file raises that table's tower for everyone, itself included — refusing
+  // would bake a different film from every other seat (GOALS goal 15).
+  let towerLeft = null;
+  if (t && t.tower) {
+    if (TOWERS[t.tower]) table.tower = t.tower; // 'none' included: it lowers a raised tower
+    else towerLeft = t.tower;
+  }
+  // A file whose only table key was a tower this build cannot raise has nothing
+  // left to send. Saying so beats a '✓ settings sent to the room' for a push
+  // that carried an empty patch.
+  if (towerLeft && !Object.keys(table).length && !seats.length) {
+    return portableRefuse(`✗ nothing to send — this build can’t raise the tower ‘${towerLeft}’, `
+      + 'and the box has nothing else in its table: and no profiles to seat');
   }
   // What the room WILL read by once this push lands — the file's own system if
   // it names one, else whatever the room already reads by.
@@ -22057,6 +22119,10 @@ async function portablePushToTable() {
   const left = [];
   if (wrongSystem) left.push(`${wrongSystem} for another system`);
   if (overCap) left.push(`${overCap} over the ${PROFILES_AT_TABLE}-seat limit`);
+  // The tower this build could not raise, in the same breath as the seats it
+  // could not seat. A prepared table arriving without its tower is the kind of
+  // difference a player reads as a bug unless somebody names it.
+  if (towerLeft) left.push(`the tower ‘${towerLeft}’, which this build can’t raise`);
   const tail = left.length ? ` · left behind: ${left.join(', ')}` : '';
   return portableReceipt(`✓ table prepared — ${n ? `${n} seat${n === 1 ? '' : 's'} offered at this room` : 'settings sent to the room'}${tail}`);
 }
