@@ -150,6 +150,8 @@ matchEnum('5d4 kh2', Array(5).fill('d4'), { keep: { mode: 'kh', n: 2 } });
 matchEnum('5d4 kl3', Array(5).fill('d4'), { keep: { mode: 'kl', n: 3 } });
 matchEnum('5d4 dh2', Array(5).fill('d4'), { keep: { mode: 'dh', n: 2 } });
 matchEnum('6d4 dl1 (keep 5 of 6 — the DP’s wide end)', Array(6).fill('d4'), { keep: { mode: 'dl', n: 1 } });
+matchEnum('7d4 dl2 (keep 5 of 7 — the budget fills late)', Array(7).fill('d4'), { keep: { mode: 'dl', n: 2 } });
+matchEnum('6d4 kl4 (wide end, low side)', Array(6).fill('d4'), { keep: { mode: 'kl', n: 4 } });
 matchEnum('4d10x kh2 (a keep over the gapped lattice)', Array(4).fill('d10x'), { keep: { mode: 'kh', n: 2 } });
 matchEnum('2d6 ro<=1 kh1', ['d6', 'd6'], { reroll: { below: 1 }, keep: { mode: 'kh', n: 1 } });
 matchEnum('2d20 adv kh1 (one population, both mechanics)', Array(2).fill('d20'), { adv: 'adv', keep: { mode: 'kh', n: 1 } });
@@ -281,13 +283,20 @@ t('every exact forecast is a probability distribution', () => {
     [Array(40).fill('d20'), null], [Array(40).fill('d10x'), null],
     [Array(40).fill('d20'), { keep: { mode: 'kh', n: 20 } }],
     [Array(40).fill('d20'), { keep: { mode: 'dl', n: 1 } }],
+    [Array(40).fill('d10x'), { keep: { mode: 'kh', n: 20 } }],
+    [Array(40).fill('d10x'), { keep: { mode: 'dl', n: 1 } }],
+    [[...Array(20).fill('d10x'), ...Array(20).fill('d20')], null],
     [Array(9).fill('d20'), { explode: true }],
   ]) {
     const fc = sumForecast(dice, mods);
-    close(fc.probs.reduce((a, b) => a + b, 0), 1, 1e-9);
+    // 1e-12, not 1e-9: a 40-die convolution measures 2e-15 off, so a loose
+    // tolerance here would hide real lost mass (a write past the DP's scratch
+    // array is silent in a Float64Array — nothing throws, the total just
+    // quietly stops being 1).
+    close(fc.probs.reduce((a, b) => a + b, 0), 1, 1e-12);
     fc.probs.forEach((p) => assert.ok(p > 0, 'no zero-probability totals in the support'));
     for (let i = 1; i < fc.values.length; i++) assert.ok(fc.values[i] > fc.values[i - 1], 'ascending');
-    close(fc.cdf[fc.cdf.length - 1], 1, 1e-9);
+    close(fc.cdf[fc.cdf.length - 1], 1, 1e-12);
     assert.equal(fc.mode.p, Math.max(...fc.probs));
   }
 });
