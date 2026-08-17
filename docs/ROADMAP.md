@@ -526,7 +526,7 @@ wire.
   function, so a CSV row is a small change against a settled column list. The
   refusal is argued in UX §7.49 ②; reopen it there, not here.
 - **Local roll statistics** (per-player distribution, average-vs-expected) —
-  the OBSERVED half, and a **dependent of [§2l](#2l-pool-analysis--①⑥-shipped-the-sum-read-renders-2026-08-17)**,
+  the OBSERVED half, and a **dependent of [§2l](#2l-pool-analysis--①⑥-all-shipped-the-last-of-them-2026-08-17)**,
   not its sibling: §2l's engine is the only source of an *expected* value in
   the tree. **That blocker cleared 2026-08-16** — `sumForecast(dice,
   mods).mean` and `.sd` are the expected term. What remains is the second
