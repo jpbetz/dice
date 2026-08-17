@@ -225,13 +225,26 @@ only place this arithmetic lives; a refusal still owes the min/avg/max line
 **beside** it; and `values` is **sparse**, so `1d6!` renders 21 cells with three
 holes rather than 21 adjacent ones.
 
-**STILL OWED: the LOOK.** Every number on the surface was verified in the
-running app — cell counts, hole positions, mark positions, both target-row
-branches, all three peak phrasings, the four box states — but **nothing was seen
-rendered**: the Browser pane would not composite in that session. Three
-decisions are waiting on an eye rather than an assertion, listed in UX §7.48 ⑨
-(the columns touch with no gutter; a flat pool draws a solid block; the average
-and target marks can coincide). It belongs on Joe's LOOK queue beside #1.
+**The LOOK was owed and is now taken — and one of the three questions was a
+defect.** Every number had been verified in the running app while **nothing had
+been seen rendered** (the Browser pane would not composite in that session), so
+three decisions sat waiting on an eye. `node tools/drive.mjs
+tools/steps/sumread-look.mjs` shoots one frame per question, each on the worst
+case for it, and answers all three (record in UX §7.48 ⑨):
+
+- the touching columns **stay** — judged on `40d20dl1`'s 47 cells, where a
+  gutter would be noise and a joined outline is what a continuous total means;
+- the flat block **stays** — `1d20+5` fills the box, and *"flat — every total
+  5%"* under it is what stops the truest frame reading as a broken one;
+- **the coincident marks were a bug.** On `2d6 dc7` the dashed target painted
+  exactly onto the solid average and the pair read as ONE mark, so the target
+  disappeared on the pool where it is easiest to clear. Fixed with a 2.5px
+  stand-off (`.sf-dc-near`). **`dcAt` was correct throughout** — the hook
+  printed the right number while the mark it names was invisible, which is why
+  this one could only ever have been caught by looking.
+
+Nothing here is on Joe's queue: two answers were the surface being right, and
+the third is fixed.
 
 **Three typed refusals, and they are the load-bearing part**: `mixed-keep`,
 `reroll-cap`, `explode-cap`. Two corrections came with them, both of which

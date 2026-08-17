@@ -5327,6 +5327,9 @@ body.mini #result-verdict { font-size: 11px; }
   background: rgba(243, 234, 215, 0.5);
   border-left: 1px dashed rgba(243, 234, 215, 0.85); width: 0;
 }
+/* The target sits ON the average (`2d6 dc7`): stand it off so two facts read
+   as two marks. Overrides .sf-mark's own -0.5px centring, not added to it. */
+.pop-preview .sf-dc-near { transform: translateX(2.5px); }
 .pop-preview .sf-axis {
   display: flex; justify-content: space-between;
   font-size: 10px; color: var(--muted); letter-spacing: 0.04em;

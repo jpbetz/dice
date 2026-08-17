@@ -6150,25 +6150,48 @@ different roll. Both curves are right about their own spec, the set-aside note
 says which glue went, and no surface ever shows one curve for two rolls. What
 the app does not do is warn you at the first curve that the second one exists.
 
-#### ⑨ What has NOT been judged: the look
+#### ⑨ The look, taken and judged — and one of the three was a defect
 
 Every number on this surface was verified in the running app on 2026-08-17 —
 cell counts, hole positions, mark positions, both copy branches of the target
 row, all three peak phrasings, and the box's four sum states (see
 POOL-ANALYSIS §10's table, which is a transcription of what the app returned).
-**Nothing was seen rendered.** The Browser pane would not composite in that
-session, so the geometry is measured and the *look* is unjudged. Three
-decisions are waiting on an eye rather than an assertion:
+**But nothing had been seen rendered**: the Browser pane would not composite in
+that session, so the geometry was measured and the look was unjudged, and this
+section listed three decisions waiting on an eye.
 
-- **The columns touch.** At `4d6dl1` a cell is 17px of a 270px box with no
-  gutter, so the shape is read off the stepped top stroke rather than off
-  separated bars. That is an ordinary histogram and it is why the top edge
-  carries a brighter stroke than the fill — but ④ put a 1px dark rule between
-  its segments, and whether this surface wants the same is a look call.
-- **A flat pool draws a solid block.** Correct — flat is what it means — but it
-  is the one case where the instrument might read as a mistake.
-- **The avg and target marks can coincide.** `2d6+3 dc10` puts both at 50%,
-  and the dashed one paints last. Legible, or does the pair need offsetting?
+They were taken the same day, from frames, by
+**`node tools/drive.mjs tools/steps/sumread-look.mjs`** — one spec per question,
+each chosen as the WORST case for it rather than a typical one. The step's own
+first attempt cropped empty felt, because `#pop-preview` sits below the fold of
+a popover that scrolls internally; a tool that photographs the wrong rectangle
+reports a shipped surface as unlookable, so it scrolls the preview into its
+panel's centre before measuring.
+
+- **The columns touch — KEEP.** Judged on `40d20dl1`, 47 binned cells: the
+  silhouette is legible and a gutter at that width would be noise, not
+  separation. A total is a continuous quantity, so a joined outline is the
+  honest shape; ④'s 1px rule belongs to segments that are *categories*, and
+  copying it here would say something false about the axis.
+- **A flat pool draws a solid block — KEEP.** `1d20+5` fills the box edge to
+  edge, and the readout under it says **"flat — every total 5%"**. The block
+  alone could read as a mistake; the block plus that sentence cannot, and the
+  sentence is what makes the instrument's most suspicious frame its clearest.
+- **The coincident marks were a DEFECT, now fixed.** On `2d6 dc7` the dashed
+  target painted exactly over the solid average — and because the dash's gaps
+  show the line underneath, the pair read as **one solid mark**: the target
+  vanished on the pool where it is easiest to clear, which is the one place a
+  player is most likely to be looking for it. The target now stands off by
+  2.5px when the two land within 1.5% of each other (`.sf-dc-near`,
+  `js/main.js`'s `dcMark`), a twelfth of a column at 11 cells, with both exact
+  values still in the sentence below the curve. Frame: `sum-coincide.png`,
+  before and after.
+
+*The lesson worth keeping is which one it was.* Two of the three "look calls"
+were the surface being right in a way the code could not state, and the third
+was a fact silently deleted by a 1px collision. No assertion in the suite could
+have told them apart — `dcAt` was **correct** the whole time, and correct is
+what it printed while the mark it names was invisible.
 
 ### §7.49 — Taking the log with you, and a setup that says which build wrote it (2026-08-17)
 

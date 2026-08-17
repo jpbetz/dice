@@ -19265,6 +19265,15 @@ function buildSumRead(fc, opts) {
     const dcMark = document.createElement('i');
     dcMark.className = 'sf-mark sf-dc';
     dcMark.style.left = `${at(dc)}%`;
+    // TWO FACTS, TWO MARKS. Painted at the same x the dashed target lands
+    // exactly on the solid average, and the gaps in the dash show the solid
+    // line through them — so the pair reads as ONE solid mark and the target
+    // disappears on the pool where it is easiest to clear. Seen on `2d6 dc7`
+    // (`tools/steps/sumread-look.mjs`, frame `sum-coincide.png`), not reasoned
+    // from the code. The nudge is 2.5px — a twelfth of a column at 11 cells —
+    // and both exact values stay in the sentence under the curve, which is
+    // where a number belongs anyway.
+    if (Math.abs(at(dc) - at(fc.mean)) < 1.5) dcMark.classList.add('sf-dc-near');
     curve.appendChild(dcMark);
   }
   curve.addEventListener('mouseleave', () => {
