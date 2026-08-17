@@ -922,6 +922,22 @@ would trade +6.3pp of piling at `close` for the calmest dice on the table, that
 is a judgment no measurement can make and the refusal above is overturnable by
 his eye. **It needs a LOOK, not a re-measurement.**
 
+The pair is shot and waiting — `node tools/drive.mjs tools/steps/grip-look.mjs
+1000`, frames in `tools/out/grip-<zoom>-<pool>-<shipped|feltgrip>`:
+
+- **`grip-close-6d6-shipped` vs `grip-close-6d6-feltgrip`** — *the question.*
+  Shipped puts six dice flat and spread; the candidate clusters them and perches
+  one at maxY 2.03, plainly on top of another. **Is that heap worth calmer
+  dice?** If yes, the gate d bar is what should change, not the tuning.
+- **`grip-medium-trio-shipped` vs `grip-medium-trio-feltgrip`** — *the
+  reassurance.* Zero piled under both, and the candidate is arguably the cleaner
+  frame (it separates the d8/d6 shipped leaves touching). So the trio's 40/40 →
+  39/40 is a **counting** regression, not a reading one.
+
+*Judge the pile off these stills; do NOT judge the shake off them.* The win is
+motion over the last 0.6 s and a still cannot show it — that is what the shake
+and hops columns are for.
+
 **Also standing:** `C30b` — 20d6 can still reach the cap with dice genuinely
 tumbling (3 of 16 seeds). That is real motion, so shortening `SETTLE_CAP`
 would truncate it and show dice snapping. Left alone deliberately.
