@@ -10336,6 +10336,180 @@ export const scenarios = [
         "and so is the felt the organizer chose — the heal carries the table, not just the seats");
     },
   },
+  {
+    name: 'setup-stamp',
+    tags: ['prepared-seat', 'table-file', 'cuj2'],
+    // C22's SECOND HALF (ROADMAP §C22, UX §7.49): `room.setup` carries a
+    // version stamp, and the stamp comes from the WRITER.
+    //
+    // THE ONE ASSERTION THIS SCENARIO EXISTS FOR is `roomStamp === stamp`.
+    // The stamp travels portablePushToTable → net.pushTable → server
+    // handleTable → the 'table-setup' broadcast → adoptRoomSetup's judged
+    // read, and every one of those five links can drop a field it does not
+    // know about (the server used to rebuild `room.setup` field by field,
+    // which is exactly how it was silently dropped before this shipped). If
+    // ANY link stops carrying it, `roomStamp` goes null and this fails.
+    //
+    // Two tabs, TWO ORIGINS. The harness shares localStorage per origin, so a
+    // same-origin second tab reads the first one's `dice.table.v1:<room>`
+    // authorship record and reports `storedStamp` without ever having pushed —
+    // which would make the reader half of the chain vacuous.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Bram' });
+      const b = await ctx.newTable({ origin: '127.0.0.1', name: 'Wren' });
+      const stamp = (await a.dbg('schemaState')).stamp;
+      assert.match(stamp, /^\d+\.\d+\.\d+$/, `this build has a stamp (got ${stamp})`);
+      // The "before", so the push is what puts it there.
+      assert.equal((await a.dbg('schemaState.table')).roomStamp, null,
+        'an unprepared room carries no stamp');
+
+      // AUTHORSHIP: this build makes a setup out of the box's own text.
+      //
+      // A LITERAL FILE, not `portable.snapshot()`. The contract sketched the
+      // snapshot, and it made `seats` inherit: profile libraries are per-ORIGIN
+      // localStorage that outlives a scenario's room, `prepared-seat` applies a
+      // seat as a second profile on `localhost`, and this scenario then read
+      // `seats: 2` in a sweep and `seats: 1` in isolation. The stamp chain is
+      // indifferent to what the file says, so the file says something fixed.
+      const file = [
+        'table:',
+        "  felt: 'ocean'",
+        'players:',
+        "  'Alice':",
+        '    pools:',
+        '      Attributes:',
+        "        - 'Strength': '3d6'",
+        '',
+      ].join('\n');
+      await a.dbg(`portable.loadText(${JSON.stringify(file)})`);
+      const v = await a.dbg('portable.pushToTable()');
+      assert.equal(v.ok, true, `the push lands (got ${v.status})`);
+
+      const st = await a.dbg('schemaState');
+      assert.equal(st.table.storedStamp, st.stamp,
+        'the authorship record §G6 will replay carries THIS build\'s stamp');
+      assert.equal(st.table.roomStamp, st.stamp,
+        'and it survived writer → net.pushTable → server → broadcast → judged read');
+
+      // A SECOND BROWSER reads the AUTHOR's stamp — not its own, and not the
+      // server's — and still gets the prepared seat.
+      await b.waitFor(
+        `window.__diceDebug.schemaState.table.roomStamp === window.__diceDebug.schemaState.stamp`,
+        { desc: 'the stamp reaches a second browser' });
+      const bt = await b.dbg('schemaState.table');
+      assert.equal(bt.storedStamp, null, 'which has authored nothing of its own');
+      assert.equal(bt.seats, 1, 'and the prepared seat arrived with it');
+      assert.equal((await b.dbg('settings')).felt, 'ocean',
+        '…as did the felt — a stamp that rode over an empty setup would prove nothing');
+
+      // ---- THE REFUSAL IS REACHABLE, AND ACTIONABLE ----
+      // Forging a newer major over the API is the only way to reach it: the
+      // client cannot mint a stamp it does not have.
+      const forged = await ctx.api('/api/table', {
+        playerId: await a.playerId(), rev: 100, ver: '2.9.0', table: {},
+        profiles: [{ name: 'Ghost', system: 'soul-deal', pools: [] }],
+      });
+      assert.equal(forged.status, 200, 'the server carries a stamp it cannot judge');
+      await b.waitFor(`window.__diceDebug.schemaState.table.roomRefused !== null`,
+        { desc: 'the newer major is refused client-side' });
+      const t = await b.dbg('schemaState.table');
+      assert.equal(t.seats, 0, 'load NOTHING — never a partial adopt');
+      assert.equal(t.roomKeptRev, true,
+        'the rev survives, so §G6 does not push an older setup over a newer one it refused');
+      assert.match(t.roomRefused, /^✗ /, 'the app\'s refusal grammar');
+      assert.match(t.roomRefused, /newer version of this page/, 'says what happened');
+      assert.match(t.roomRefused, /2\.9\.0/, 'names the stamp it found');
+      assert.match(t.roomRefused, new RegExp(stamp.replace(/\./g, '\\.')), 'and the one it reads');
+      assert.match(t.roomRefused, /Reload/, 'and what to do about it');
+      // THE REGRESSION FOUND BY LOOKING, and the reason this assertion is on
+      // the PILL rather than on the string above: `'table-setup'` called
+      // showSettingsNote('X prepared the table') one line after adoptRoomSetup
+      // had painted the refusal — same pill, same announce — so it did not
+      // merely hide the sentence, it spoke a reassuring lie over it in the one
+      // slot explaining why no seats appeared.
+      assert.equal(await b.eval(`document.getElementById('status-pill').textContent`),
+        t.roomRefused, 'the refusal is what the player is actually told');
+      assert.equal(await b.eval(
+        `document.getElementById('status-pill').classList.contains('hidden')`), false,
+      '…on screen, not merely in the DOM');
+
+      // ---- JUNK ON THE WIRE IS A 400 (the server validates shape, never
+      // judges: `2.9.0` was accepted above and `banana` is not a version) ----
+      const junk = await ctx.api('/api/table', {
+        playerId: await a.playerId(), rev: 101, ver: 'banana', table: {}, profiles: [],
+      });
+      assert.equal(junk.status, 400, 'a malformed stamp never reaches a room');
+      assert.equal(junk.data.code, 'bad_ver', 'and says which field');
+    },
+  },
+  {
+    name: 'setup-stamp-replay',
+    tags: ['prepared-seat', 'table-file', 'cuj2'],
+    // C22's replay half — the leg that CANNOT be reached by pushing, because
+    // both cases are about a record an EARLIER build wrote.
+    //
+    //  · An absent stamp stays absent. Every `dice.table.v1:*` record in the
+    //    field right now has no `ver` at all, so a replay that minted today's
+    //    stamp would claim this build authored bytes it only stored — the same
+    //    lie C22 refuses to let the server tell — and a Tuesday-prepared table
+    //    would stop healing a restarted room.
+    //  · A record from a NEWER build is not replayed at all. `net.pushTable`
+    //    destructures exactly four fields, so replaying it would put a
+    //    truncated copy over the room's setup AT THE SAME REV, degrading the
+    //    whole table's preparation by an act nobody clicked.
+    //
+    // Seeded through localStorage + reload rather than a fresh tab: the record
+    // has to be there before the hello that replays it.
+    async fn(ctx) {
+      const key = `dice.table.v1:${ctx.room}`;
+      const seed = async (t, rec) => {
+        await t.eval(`localStorage.setItem(${JSON.stringify(key)}, ${JSON.stringify(JSON.stringify(rec))})`);
+        await t.reload();
+      };
+
+      // (1) A PRE-STAMP RECORD STILL HEALS A ROOM.
+      const a = await ctx.newTable({ origin: '127.0.0.2', name: 'Ghosty' });
+      await seed(a, {
+        rev: 5, table: { felt: 'plum' },
+        profiles: [{ name: 'Alice', pools: [] }], at: Date.now(),
+      });
+      await a.waitFor(`window.__diceDebug.tableRev.room === 5`,
+        { desc: 'the unstamped record heals the room on hello' });
+      const at = await a.dbg('schemaState.table');
+      assert.equal(at.storedStamp, null, 'the record carries no stamp');
+      assert.equal(at.roomStamp, null,
+        'and the replay MINTED none — absent stays absent, on the wire too');
+      assert.equal(at.seats, 1, 'while the seat it was prepared with did arrive');
+      assert.equal(at.replayable, true, 'an unstamped record is readable, not refused');
+      assert.equal(await a.dbg('repushTable()'), false,
+        'and stands down once the room is current — a heal is not a heartbeat');
+
+      // (2) A NEWER-MAJOR RECORD IS NEVER REPLAYED. Its rev (9) is higher than
+      // the room's (5), so a build that judged nothing WOULD replay it — which
+      // is what makes this a real gate rather than a restatement of (1).
+      // `sand` is a REAL felt, and that is load-bearing rather than incidental:
+      // the first draft of this used `moss`, which the server refuses
+      // (FELT_THEMES), so it 400'd the whole push — and the content assertion
+      // below could not have failed under ANY sabotage. Caught by breaking the
+      // judged read and watching the felt stay `plum` anyway.
+      const c = await ctx.newTable({ origin: '127.0.0.3', name: 'Newer' });
+      await seed(c, {
+        rev: 9, ver: '2.9.0', table: { felt: 'sand' },
+        profiles: [{ name: 'Nope', pools: [] }], at: Date.now(),
+      });
+      const ct = await c.dbg('schemaState.table');
+      assert.equal(ct.storedStamp, '2.9.0', 'the record names a build this one is not');
+      assert.ok(ct.storedRefused, 'so the judged read refuses it, in a whole sentence');
+      assert.match(ct.storedRefused, /^✗ .*newer version of this page/, ct.storedRefused);
+      assert.equal(ct.replayable, false, 'and nothing can replay it');
+      assert.equal(await c.dbg('repushTable()'), false, 'including the heal on hello');
+      // The CONTENT claim, which the flags cannot make: the room still holds
+      // rev 5's furniture. `sand` anywhere here means the truncating replay ran.
+      assert.equal((await c.dbg('tableRev')).room, 5, 'the room kept the older setup');
+      assert.equal((await c.dbg('settings')).felt, 'plum',
+        'down to its felt — `sand` here would be the replay this refuses');
+    },
+  },
 
   // ---------------------------------------------------------------------
   // The lobby → table flow (ROADMAP §3b, UX §7.20) — tag: lobby
