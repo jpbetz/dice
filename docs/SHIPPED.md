@@ -5134,3 +5134,57 @@ multi-surface failures *more* likely and *harder* to locate. What is cheap is
 the pattern the two shipped call sites already use — `modsSummary(mods,
 {values})` and `attributionCards(…, {arithmetic})` take the answer from the
 caller and never query the system, at one line each.
+
+## The design-first four — one kill, three decisions (2026-08-17, THE ORDER #8/#9)
+
+*Each of the four stuck items was re-verified against the tree before being
+judged, per the standing rule that a correction must re-run the thing it
+corrects. Full designs live in the four ROADMAP sections and
+[docs/IDENTITY.md](IDENTITY.md); this is the record of what died and what
+was decided.*
+
+**B1's server half is KILLED.** The named defect: *it asked the server to
+refuse an entitlement that does not exist, for a threat the client gate
+already ends, in violation of the channel's own one law.* Enrolment is an
+open keyword, so there is no unentitled class to refuse — durable identity
+does not change whose claim it is; goal 10 forbids a settings write refused
+by who asks; and `js/stability.js`'s "THE CHANNEL GATES THE OFFER, NEVER
+THE CAPABILITY" is exactly what a server refusal would break. The
+discoverability gate as shipped is the complete feature. Consequence: the
+identity pass stops being scheduled against B1 — its real bill is
+goal 11's, not Tier B's (a held roll's reveal authority dies with the tab
+that chose it; your own secret rolls vanish from your own log on a
+tab-close rejoin — both verified in the tree, both healed by
+IDENTITY.md §5's `dice.who.v1` rung 1, ~25 lines, no projection changes).
+
+**C26 decided: the label `Change seat…` never returns; the gesture does.**
+The withheld verb's name deletion turned out to be *load-bearing*, not
+incidental — a stored name skips the door, so amnesia was the only way the
+handler could force the picker open, and the round trip also minted a new
+`playerId`, orphaning reveal authority on the way. Every journey the label
+suggests has a lossless verb already. What returns is `Take a prepared
+seat…` — conditional on free prepared seats, rename + preview-then-apply
+on the SAME seat, nothing dropped, nothing wiped. `leaveTable()` and its
+hidden button stay as the scripted offline door, tests-only, permanently.
+
+**U21 decided: the presence carve-out, mirroring §7.4's launcher
+carve-out.** A launcher may drop presence chrome — people are visible
+through their acts on the felt, and the panel is one keystroke away — on
+the condition that presence STATE cannot outlive its signal (collapse
+falls home: `poolsOwner` clears in `applyPanels`, the same P2 precedent
+that already exits manage mode there) and that DOORS are not chrome
+(`↩ Main table` and `Take a seat` survive collapse; roster, chairs,
+Invite and nameplate do not). The teammate-pill dead tap takes the
+transient section door the audit itself named.
+
+**Two claims in the entries were false, one newly-sharp fact was missing:**
+U16's "± hides the dc, per U11" — stale since U17 #28/#29; Target sits in
+an always-visible section and the popover carries the Visibility seg, so ±
+is a complete intent viewer (the well still shows nothing, which is the
+half that survived). U21's "during a profile swap that is Alice's pools
+rolling under your name" — the G3 rack swap is deleted (PROFILES §11.8);
+the rail can only ever list your own active profile, and the residue is a
+labelling gap, not a leak. And the audit predates L4: the collapsed column
+now also hides `↩ Main table`, so a breakout player in the immersion state
+has no way back on screen at all — that fact, not the roster, is what
+"deletes multiplayer" means today.
