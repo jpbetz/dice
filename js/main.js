@@ -13492,6 +13492,43 @@ window.__diceDebug = {
     if (open) openLogFlyout(); else closeLogFlyout();
     return isLogFlyoutOpen();
   },
+  // THE FLYOUT AND THE BANNER, AS PAINTED (2026-08-16). `lift` is the model
+  // and `covered` is the truth — an occlusion assertion that trusts the model
+  // is the green check this project keeps catching: the lift could be right
+  // and a third box could still land on the banner. So `covered` samples the
+  // banner on a 6px grid and asks elementFromPoint what is actually on top,
+  // which is the same instrument the defect was measured with. Both surfaces
+  // must be UP for the numbers to mean anything; `shown` says whether they
+  // were, so a scenario cannot pass on two hidden boxes.
+  get bannerVsLog() {
+    const b = document.getElementById('result-banner');
+    const f = document.getElementById('log-flyout');
+    const shown = { banner: !b.classList.contains('hidden'), flyout: !f.classList.contains('hidden') };
+    const rb = b.getBoundingClientRect();
+    const rf = f.getBoundingClientRect();
+    let covered = 0;
+    let total = 0;
+    if (shown.banner) {
+      for (let x = rb.left + 3; x < rb.right - 3; x += 6) {
+        for (let y = rb.top + 3; y < rb.bottom - 3; y += 6) {
+          total++;
+          const el = document.elementFromPoint(x, y);
+          if (el && el.closest('#log-flyout')) covered++;
+        }
+      }
+    }
+    return {
+      shown,
+      lift: f.style.getPropertyValue('--banner-lift') || '0px',
+      // rounded: a rect is a float and an assertion about occlusion has no
+      // business being sensitive to the sub-pixel the felt centring lands on
+      banner: { top: Math.round(rb.top), bottom: Math.round(rb.bottom), left: Math.round(rb.left), right: Math.round(rb.right) },
+      flyout: { top: Math.round(rf.top), bottom: Math.round(rf.bottom), left: Math.round(rf.left), right: Math.round(rf.right) },
+      sharesColumn: !!(shown.banner && shown.flyout && rf.right > rb.left && rf.left < rb.right),
+      covered,
+      total,
+    };
+  },
   // THE RECORD AT REST (§7.42). Deliberately reports what is RENDERED, not
   // just the model: `spine`/`panels` are element counts and `spoken` is the
   // ≣'s computed accessible name, because the defect this surface exists to
@@ -19751,10 +19788,63 @@ function setLogUnread(n) {
   renderLogBadge();
 }
 
+// ---------------------------------------------------------------------------
+// THE FLYOUT AND THE BANNER WANT THE SAME FELT (2026-08-16, css:6501).
+//
+// Measured at 390x844 with the panels collapsed: the pinned log covers 83% of
+// #result-banner, everything except the top strip. At 1440x900 — still
+// body.mini — it covers none of it, so the cause is not the compact view, it
+// is a felt narrow enough that both boxes saturate to the same column. Both
+// are anchored to the felt's bottom edge (12px and 44px), so any flyout taller
+// than 32px sits on the banner, and the banner has no timed exit to wait out.
+//
+// The LOG yields, because the flyout is a surface the player just opened and
+// can see, while the banner is one that vanishes without saying so — and
+// because #log-list already scrolls, so the space costs rows on screen and no
+// content. The z ladder is untouched: it says the banner must never occlude
+// the log, and after this nothing occludes anything.
+//
+// Published as a custom property rather than by moving the element, so the
+// geometry stays in the stylesheet with the two rules it modifies. The value
+// is 0 in every state that works today, which is what makes this pixel-neutral
+// everywhere except the state it is for.
+const FLYOUT_BANNER_GAP = 10; // the seam between two stacked chrome objects
+let flyoutLift = -1;          // -1 = never written, so the first sync always lands
+function syncFlyoutLift() {
+  let lift = 0;
+  // A COLUMN TEST, NOT A VIEWPORT TEST. `body.mini` was the tempting proxy
+  // and the measurement refused it: a collapsed panel on a desktop is mini
+  // and overlaps nothing. Rects answer the actual question.
+  if (!logFlyoutEl.classList.contains('hidden') && !banner.classList.contains('hidden')) {
+    const f = logFlyoutEl.getBoundingClientRect();
+    const b = banner.getBoundingClientRect();
+    if (b.height > 0 && f.right > b.left && f.left < b.right) {
+      lift = Math.max(0, Math.round(window.innerHeight - b.top + FLYOUT_BANNER_GAP - 12));
+    }
+  }
+  if (lift === flyoutLift) return; // the write is the only thing that could loop
+  flyoutLift = lift;
+  logFlyoutEl.style.setProperty('--banner-lift', `${lift}px`);
+}
+
+// The banner's height is not final when it is un-hidden (its verdict line and
+// fold land in the same frame), and the felt's width moves with the panel and
+// the window — so the observer is the honest hook, exactly as --draft-h's is.
+// Observing BOTH boxes catches the flyout's own open, the banner's arrival and
+// content changes, and every viewport change that resizes either. No loop:
+// --banner-lift moves the flyout's height, and the lift is computed from the
+// banner's rect and the flyout's HORIZONTAL extent, neither of which it moves.
+if (window.ResizeObserver) {
+  const ro = new ResizeObserver(() => syncFlyoutLift());
+  ro.observe(banner);
+  ro.observe(logFlyoutEl);
+}
+
 function openLogFlyout() {
   logFlyoutEl.classList.remove('hidden');
   railLogBtn.setAttribute('aria-pressed', 'true');
   setLogUnread(0); // opening reads the backlog
+  syncFlyoutLift(); // synchronous, so the log never paints over the read first
 }
 
 function closeLogFlyout() {
@@ -19764,6 +19854,7 @@ function closeLogFlyout() {
   closePeek();
   logFlyoutEl.classList.add('hidden');
   railLogBtn.setAttribute('aria-pressed', 'false');
+  syncFlyoutLift(); // …and the lift leaves with it
 }
 
 function toggleLogFlyout() {

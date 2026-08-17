@@ -6498,3 +6498,41 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
   color: var(--gold-bright);
   white-space: nowrap;
 }
+
+/* ---- the flyout and the banner want the same felt (2026-08-16) ----
+   MEASURED FIRST, because the claim this replaces (U20's "banner cuts into
+   the peek") had stopped reproducing. At 390x844 with the panels collapsed,
+   the pinned log covers 840 of 1008 sampled points of #result-banner — 83%
+   — and the 17% that survives is the top strip carrying #result-label. The
+   total, the meaning, the breakdown and the fold's Reveal are all under it.
+   At 1440x900, still body.mini, the overlap is exactly ZERO. So this is not
+   a body.mini rule; it is a NARROW FELT rule, and the roadmap's framing was
+   one step short of the cause. Both boxes size themselves off the felt
+   (`min(300px, 100vw - --table-left - 24px)` and `min(320px, … - 20px)`),
+   so under ~324px of felt they both saturate to the same column — and they
+   are both anchored to its bottom edge, the flyout at 12px and the banner
+   at 44px, which means ANY flyout taller than 32px sits on the banner.
+   Not a z-index bug: --z-flyout is above --z-banner on purpose ("the banner
+   never occludes the log being consulted") and swapping it would only
+   reverse which surface disappears.
+
+   AND THE BANNER HAS NO CLOCK. Joe's ruling (js/main.js, "the card is not
+   chrome — it is the READ") took the timer off it deliberately, so this is
+   not a moment of occlusion: it lasts until the next roll or until the log
+   is closed, and on a hidden roll the banner's fold is the only door to
+   Reveal.
+
+   SO THE LOG YIELDS, AND ONLY WHEN IT MUST. --banner-lift is 0px in every
+   state that works today, and these two declarations then compute to
+   exactly `bottom: 12px` and `max-height: 60vh` — the values above, byte
+   for byte. js/main.js publishes a positive value only while both surfaces
+   are up AND their rects share a column, which is the condition the
+   measurement found rather than a proxy for it. #log-list already scrolls,
+   so the height the flyout gives back costs rows on screen and no content. */
+#log-flyout {
+  bottom: calc(12px + var(--banner-lift, 0px));
+  /* the second half, and it is load-bearing: raising the floor without also
+     lowering the ceiling would push the flyout's HEAD off the top of a
+     landscape phone — the one row that names what you are reading. */
+  max-height: min(60vh, calc(100vh - var(--banner-lift, 0px) - 24px));
+}
