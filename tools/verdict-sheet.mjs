@@ -96,6 +96,80 @@ function gitSha() {
   } catch { return 'unknown'; }
 }
 
+// THE FRESHNESS CLAIM IS EARNED, NOT PRINTED — added 2026-08-17 after this
+// page shipped one that was asserted. The stamp read "every frame rendered
+// fresh from this tree" as a hardcoded string, and the day it mattered it was
+// false: the 48 frames had been rendered at 660d48d and `js/main.js` had moved
+// 259 lines by cd4233b. A page whose whole purpose is to stop a stale look is
+// the last place a decorative claim belongs.
+//
+// The check: no frame may be OLDER than the newest source file that can change
+// what a frame shows. Those files are the app the frames photograph plus the
+// steps that frame them — a step's own crop or viewport change restages a
+// picture as surely as an edit to the venue does.
+//
+// THE BAR IS A COMMIT DATE, NOT AN MTIME, and the first draft of this guard
+// got that wrong in a way worth keeping written down. Source mtimes look like
+// the obvious signal and they lie in both directions: `git checkout 9f1e592 --
+// js/fae-lab.js && … && git checkout HEAD -- js/fae-lab.js` — the exact dance
+// item 1's BEFORE frames require — restores byte-identical content with a NEW
+// mtime, which reddens all 48 frames for nothing; and a frame COPIED in from
+// another worktree arrives with today's mtime and passes. So the bar is the
+// last COMMIT that touched code able to restage the picture, plus any
+// UNCOMMITTED edit to those same files (a working-tree change is real and has
+// no commit to date it).
+//
+// It still cannot catch a frame carried in from a different tree — nothing
+// short of the steps writing their own provenance can. What it does catch is
+// the case that actually shipped: the code moved, the frames did not.
+// THE BAR IS PER ROW, not one bar for the whole page — and that is the
+// difference between a guard and a guard nobody keeps. `tools/steps/` holds
+// forty steps that have nothing to do with this page; one new probe step
+// committed by somebody else would have marked all 48 frames stale, and a
+// warning that fires on unrelated work is a warning that gets switched off.
+// So each row's bar is the newest of (the app the frames photograph) and
+// (only the steps its OWN regen command names).
+const APP_PATHS = ['js', 'vendor', 'index.html', 'lab.html'];
+
+const git = (args) => {
+  try { return execFileSync('git', args, { cwd: ROOT }).toString(); } catch { return ''; }
+};
+
+const lastCommitTouching = (paths) => {
+  const out = git(['log', '-1', '--format=%ct%x09%h', '--', ...paths]).trim();
+  if (!out) return { ms: 0, file: '(no commit)' };
+  const [ct, sha] = out.split('\t');
+  return { ms: Number(ct) * 1000, file: `commit ${sha}` };
+};
+
+const newestUncommitted = (paths) => {
+  let newest = { ms: 0, file: '(none)' };
+  for (const line of git(['status', '--porcelain', '--', ...paths]).split('\n')) {
+    const rel = line.slice(3).trim();
+    if (!rel || !existsSync(join(ROOT, rel))) continue;
+    const ms = statSync(join(ROOT, rel)).mtimeMs;
+    if (ms > newest.ms) newest = { ms, file: `${rel} (uncommitted)` };
+  }
+  return newest;
+};
+
+const barFor = (paths) => {
+  if (!paths.length) return { ms: 0, file: '(none)' };
+  const c = lastCommitTouching(paths);
+  const d = newestUncommitted(paths);
+  return d.ms > c.ms ? d : c;
+};
+
+const appWatermark = () => barFor(APP_PATHS);
+// The regen command IS the provenance record: it names the step that took the
+// frame. Nothing else has to be kept in sync.
+const stepsWatermark = (regen) => barFor(
+  [...new Set([...String(regen || '').matchAll(/tools\/steps\/[\w.-]+\.mjs/g)].map((m) => m[0]))]);
+
+// file → the source file that outdates it. Filled in the tail, before any HTML
+// is built, because the stamp line in the header is evaluated before the items.
+const STALE = new Map();
+
 // ---------------------------------------------------------------------------
 // THE ITEMS, in the order of what each verdict FREES
 // ---------------------------------------------------------------------------
@@ -580,7 +654,7 @@ async function loadFrames(files) {
   for (const f of files) {
     const p = resolve(f);
     if (p) found.set(f, { path: p, sha: createHash('sha1').update(readFileSync(p)).digest('hex'),
-      bytes: statSync(p).size });
+      bytes: statSync(p).size, mtime: statSync(p).mtimeMs });
   }
   if (!found.size) return found;
 
@@ -690,6 +764,16 @@ function groupHtml(g, frames, item) {
   if (gone.length) {
     flag += `<p class="flag gone">${gone.length} frame${gone.length > 1 ? 's are' : ' is'} missing. `
       + `Regenerate with <code>${esc(g.regen || '')}</code></p>`;
+  }
+  // A frame older than the code it photographs is judged on the wrong picture,
+  // and it looks exactly like a good one. Same red as a missing frame, because
+  // it costs the same: a verdict that has to be asked again.
+  const stale = g.frames.filter((f) => STALE.has(f.file));
+  if (stale.length) {
+    flag += `<p class="flag gone">${stale.length} frame${stale.length > 1 ? 's PREDATE' : ' PREDATES'} `
+      + `the code ${stale.length > 1 ? 'they show' : 'it shows'} — `
+      + `<code>${esc(STALE.get(stale[0].file))}</code> is newer. `
+      + `Re-render with <code>${esc(g.regen || '')}</code> before judging this row.</p>`;
   }
   // C27's rows carry their own measured numbers.
   if (g.span) {
@@ -934,7 +1018,10 @@ function pageHtml(frames, stats) {
     other seven are answerable from this page alone.</p>
   <p class="stampline">generated ${esc(stats.when)} · tree ${esc(stats.sha)} ·
     ${stats.embedded} frames embedded${stats.missing ? ` · <b style="color:#e2705a">${stats.missing} MISSING</b>` : ''} ·
-    every frame rendered fresh from this tree</p>
+    ${stats.stale
+    ? `<b style="color:#e2705a">${stats.stale} of ${stats.embedded} PREDATE the code they show</b> `
+      + `— newest source is ${esc(stats.watermark)}; re-render before judging those rows`
+    : `every frame is newer than every source that could restage it (newest: ${esc(stats.watermark)})`}</p>
   <nav>${nav}</nav>
 </header>
 ${ITEMS.map((i) => itemHtml(i, frames)).join('\n')}
@@ -1025,19 +1112,42 @@ const uniq = [...new Set(wanted)];
 console.log(`resolving ${uniq.length} frames from shots/ and tools/out/ …`);
 const frames = await loadFrames(uniq);
 const missing = uniq.filter((f) => !frames.has(f));
+const APP = appWatermark();
+for (const item of ITEMS) {
+  for (const g of item.groups || []) {
+    const step = stepsWatermark(g.regen);
+    const bar = step.ms > APP.ms ? step : APP;
+    for (const f of g.frames) {
+      const rec = frames.get(f.file);
+      if (rec && rec.mtime < bar.ms) STALE.set(f.file, bar.file);
+    }
+  }
+}
+const stale = [...STALE.keys()];
 mkdirSync(SHOTS, { recursive: true });
 const html = pageHtml(frames, {
   when: new Date().toISOString().replace('T', ' ').slice(0, 19) + 'Z',
   sha: gitSha(),
   embedded: frames.size,
   missing: missing.length,
+  stale: stale.length,
+  watermark: `${APP.file} ${new Date(APP.ms).toISOString().replace('T', ' ').slice(0, 19)}Z`,
 });
 writeFileSync(PAGE, html);
 console.log(`\n${PAGE}`);
-console.log(`  ${frames.size} embedded · ${missing.length} missing · `
+console.log(`  ${frames.size} embedded · ${missing.length} missing · ${stale.length} stale · `
   + `${(Buffer.byteLength(html) / 1048576).toFixed(1)} MB`);
 if (missing.length) {
   console.log('\nMISSING (the page renders each as a loud red cell, not a gap):');
   for (const m of missing) console.log(`  ${m}`);
   process.exitCode = 1;
+}
+if (stale.length) {
+  console.log('\nSTALE — each photographs code that has since moved:');
+  for (const s of stale) console.log(`  ${s}  (older than ${STALE.get(s)})`);
+  console.log('  Re-render the steps that produce them; the page marks each row in red until you do.');
+  process.exitCode = 1;
+} else {
+  console.log(`  freshness: every frame is newer than ${APP.file}`
+    + ` (${new Date(APP.ms).toISOString().slice(0, 19)}Z) and than its own step — earned, not printed`);
 }

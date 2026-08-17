@@ -50,7 +50,7 @@ by *finishing what is in flight*.
 
 | # | Item | Why it is here | Size | Track |
 | --- | --- | --- | --- | --- |
-| 1 | [**Joe's LOOK and LISTEN sitting**](#tier-w--the-first-fantasy-venue-the-fae-set--built-the-look-and-the-listen-are-joes) | **Not a build item, and that is why it is first.** Tier W is finished except for being *seen and heard*; five verdicts and ten voices gate it, and nothing on Track B advances until they move. One page now carries every frame side by side with the question each answers, and `docs/AUDIO.md` §9 is ten rows of two clicks. Rebuild it with `node tools/verdict-sheet.mjs`. | ~1 hr of Joe | B |
+| 1 | [**Joe's LOOK and LISTEN sitting**](#tier-w--the-first-fantasy-venue-the-fae-set--built-the-look-and-the-listen-are-joes) | **Not a build item, and that is why it is first.** Tier W is finished except for being *seen and heard*; **seven** LOOKs and ten voices gate it (the page's own item list — "five verdicts" was a notch stale), and nothing on Track B advances until they move. One page carries every frame beside the question it answers, and `docs/AUDIO.md` §9 is ten rows of two clicks. **`shots/verdicts.html`, and it is TWO commands, not one** — [see below](#the-sittings-page-is-rendered-then-built-in-that-order): re-render the frames from the tree you are judging, *then* `node tools/verdict-sheet.mjs`, which now REFUSES (exit 1) when a frame predates the code it shows. | ~1 hr of Joe | B |
 | 2 | [**§2l ⑥'s RENDERING**](#2l-pool-analysis--⑤-and-⑥s-engine-shipped-the-rendering-is-the-open-half) | The engine landed 08-16, proven four ways, 5.5 ms worst case — and is **inert**: `kind:'sum'` is matched nowhere, so nothing renders. Goal 4 names summing as toil the system owes the player, and the app still cannot say a word about `4d6dl1`. The smaller half of the work and the whole of the payoff. | med | A |
 | 3 | [**C22's `room.setup` stamp**](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15) | Half a contract is worse than none. The stamp must come from the WRITER (`maybeRepushTable`); a stamp only the server writes is a stamp nobody can trust. ~10 lines once someone owns that site. | small | A |
 | 4 | [**§5** — roll-log export](#5-capture-mechanisms) | Goal 7's last uncapturable surface: the online log cannot be copied or downloaded. Reuses `portableDownload()`. The half of §5 that does **not** wait on #2. | small | A |
@@ -971,6 +971,44 @@ set toggle, the glade room, its composition doctrine
 ([VENUE-COMPOSITION.md](VENUE-COMPOSITION.md) + `/new-venue`), the
 grown-not-placed round, the forge-baked Hollow Bole through round 8, Moonmoot
 Witchlight, and the living layer. Full record in SHIPPED.md.
+
+### The sitting's page is RENDERED, then BUILT, in that order
+
+**`tools/verdict-sheet.mjs` embeds frames; it does not take them.** Run it
+alone and it happily publishes whatever is in `shots/` — which is how the copy
+that sat waiting for a verdict came to carry frames taken at `660d48d` while
+`js/main.js` had moved 259 lines and `index.html` (where C25's panels live) had
+moved too. Its stamp read *"every frame rendered fresh from this tree"* as a
+**hardcoded string**. The page whose whole job is to prevent a stale look was
+the thing asserting freshness without checking it.
+
+Fixed 2026-08-17, and the fix is a refusal rather than a warning:
+
+```
+node tools/drive.mjs tools/steps/verdict-shots.mjs
+node tools/drive.mjs --steps tools/steps/glade-look.mjs,tools/steps/life-look.mjs,tools/steps/record-look.mjs
+git checkout 9f1e592 -- js/fae-lab.js && node tools/drive.mjs tools/steps/glade-look.mjs tag=before && git checkout HEAD -- js/fae-lab.js
+node tools/verdict-sheet.mjs        # exits 1 if any frame predates the code it shows
+```
+
+- **The bar is per row**, the newest of (the app the frames photograph) and
+  (only the steps that row's own regen command names). One bar for the whole
+  page meant any new probe step under `tools/steps/` reddened all 48 frames,
+  and a warning that fires on unrelated work is a warning that gets switched
+  off.
+- **The bar is a COMMIT DATE, not an mtime**, because mtime lies in both
+  directions here: the BEFORE frames' own `git checkout … -- js/fae-lab.js`
+  dance restores byte-identical content with a fresh mtime, and a frame copied
+  in from another worktree arrives looking new. Uncommitted edits to those same
+  files still count — they are real and have no commit to date them.
+- **Verified in both directions** (an uncommitted file under `js/` → 48 rows
+  red, exit 1; removed → 48/0/0, exit 0) and the page was opened, not just
+  generated: 49 images, none broken, no console errors.
+- What it still cannot catch: a frame carried in from a different tree. Only
+  the steps writing their own provenance would close that, and they do not.
+
+**So a page built before a batch lands is stale by the time the batch lands.**
+Re-render after the merge, not before it.
 
 ### W5's LOOK read — OPEN, and it was never actually asked
 
