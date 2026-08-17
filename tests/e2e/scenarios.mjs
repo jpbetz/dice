@@ -236,6 +236,16 @@ const tableTab = (ctx, opts = {}) => bootTab(ctx, {
 // gotoTable()/leaveToLobby() NAVIGATE (§3b L3: ROOM is a module const, so
 // every table transition is a real page load) — evals die mid-flight, so
 // poll under try/catch exactly as harness.reload does.
+//
+// AND THE FIRST READ *AFTER* `landedAtTable`/`gotoRoom` NEEDS IT TOO, which is
+// not obvious and cost a sweep (2026-08-17). `split-chrome-quiet` failed with
+// `TypeError: Cannot read properties of undefined (reading 'subtables')` on a
+// plain `t.waitFor('!!window.__diceDebug.subtables.parent')` — reproduced 1 in
+// 4 in isolation. The landing helper had already returned, so the new document
+// was up; the very next eval still landed in a context being torn down, and
+// `Table.waitFor` does not catch — it propagates, and an exception is a
+// scenario failure. The predicate and the timeout are unchanged; only the
+// tolerance is added, so nothing is weakened to reach green.
 async function settleNavigation(t, expr, desc, { timeout = 30000 } = {}) {
   const deadline = Date.now() + timeout;
   let last = null;
@@ -1755,6 +1765,27 @@ export const scenarios = [
           `a 390px-wide felt puts both boxes in one column `
           + `(banner ${JSON.stringify(vs.banner)}, flyout ${JSON.stringify(vs.flyout)})`);
         // THE ASSERTION. Pre-fix this reads 840 of 1008.
+        //
+        // A SECOND MISSING TRIGGER, MEASURED 2026-08-17 AND NOT YET FIXED —
+        // this leg fails INTERMITTENTLY, 3 runs in 8 in isolation, and it is
+        // the feature that is wrong, not the sampling. The banner is not final
+        // when the log opens: its verdict line lands late and the card grows
+        // ~37px upward. `syncFlyoutLift` runs at the open, against the SHORT
+        // banner, and then never runs again — so `--banner-lift` stays 37px
+        // short and the log sits on ~168 of 966 sampled points of the read.
+        //   settled  lift=146px  banner.top=659  flyout.bottom=686  covered=168/966
+        //   after one dispatched `resize`:
+        //            lift=183px  banner.top=659  flyout.bottom=649  covered=0/966
+        // 183px is exactly what the formula wants for that banner, so the
+        // arithmetic is right and only the trigger is missing — the SAME shape
+        // as the rotation defect this scenario's last leg found, with a new
+        // cause: a size change the ResizeObserver on #result-banner does not
+        // deliver. Reproduce with a d20 roll, open the log at 390x844 and read
+        // `__diceDebug.bannerVsLog` twice.
+        // NOT WEAKENED, deliberately. The claim — the read is never painted
+        // over — is the right claim, and a scenario relaxed to reach green is
+        // the failure this repo keeps paying for. The fix is one line in
+        // js/main.js and belongs to whoever owns it.
         assert.equal(vs.covered, 0,
           `not one of ${vs.total} sampled points of the read is painted over by `
           + `the log (covered ${vs.covered})`);
@@ -9111,6 +9142,17 @@ export const scenarios = [
     // an empty table is a budget for a table nobody is using.
     async fn(ctx) {
       const a = await ctx.newTable({ origin: 'localhost', name: 'Alice', allowSolo: true });
+      // ESTABLISH THE DICE SET, DO NOT INHERIT IT — and this is not hygiene,
+      // it is the difference between a green sweep and a red one. `diceSet`
+      // persists to PER-ORIGIN localStorage, which outlives a scenario's room;
+      // `pool-set-override` runs on this same origin and commits
+      // `tidewrack.seaglass`, whose skin declares `post: { bloom: true }`
+      // (js/themes.js). A bloom-flagged die ON THE FELT is one of the four
+      // things that make the post stack `need`ed every frame — so the four d6
+      // below would sit there keeping the stack on forever, and the plain-frame
+      // leg would read 8 passes on a perfectly quiet table. It did, once, in
+      // the scenario that runs immediately after that one in a full sweep.
+      await a.dbg(`setDiceSet('std')`);
       await a.settle();
       // The instrument's own zero, so every number below is known to be
       // measuring the scene rather than a constant: an empty table draws 2.
@@ -9125,10 +9167,17 @@ export const scenarios = [
       { desc: 'the heaviest tower is socketed' });
       await a.roll('4d6');
       await a.settle();
-
+      // WAITED FOR, NOT ASSERTED ONCE — the second of the two traps in the
+      // header. `settle()` drives the dt clock through `sim()`, which renders
+      // nothing, so the audit still describes the last REAL rAF frame, and
+      // mid-ceremony that frame legitimately runs the post stack. Belt and
+      // braces beside the `setDiceSet('std')` above: with a bloom set the
+      // stack never turns off and this times out saying exactly that, which is
+      // a better failure than `8 !== 1` on a line about quiet frames.
+      await a.waitFor(`window.__diceDebug.renderAudit().passes === 1`,
+        { desc: 'a quiet rAF frame is drawn after the roll settles' });
       const plain = await a.dbg('renderAudit()');
-      assert.equal(plain.passes, 1, 'a quiet frame is ONE pass');
-      assert.equal(plain.post, false, 'and does not pay for the post stack');
+      assert.equal(plain.post, false, 'a quiet frame does not pay for the post stack');
       assert.ok(plain.calls <= 220,
         `the worst plain frame stays under budget (measured 186, got ${plain.calls})`);
       // THE CLAMP, ASSERTED RATHER THAN REMEMBERED. IMMERSION-AUDIT §10 called
@@ -19251,8 +19300,8 @@ export const scenarios = [
       const search = await landedAtTable(bo, boFrom);
       assert.equal(search, `?room=${encodeURIComponent(key)}`, `Bo landed in the breakout (got: ${search})`);
       bo.url = `${bo.url.split('?')[0]}${search}`;
-      await bo.waitFor(`!!window.__diceDebug.subtables.parent`,
-        { desc: 'the follower declares the parent the splitter never did' });
+      await settleNavigation(bo, `!!window.__diceDebug.subtables.parent`,
+        'the follower declares the parent the splitter never did');
       assert.equal((await bo.dbg('subtables')).parent.room, ctx.room,
         'the way back is there for the person who arrived first');
       assert.equal((await bo.dbg('settings')).felt, 'emerald',
@@ -19367,7 +19416,8 @@ export const scenarios = [
       const key = await a.dbg(`split('One Level')`);
       assert.ok(key, 'the split landed');
       await gotoRoom(a, key);
-      await a.waitFor(`!!window.__diceDebug.subtables.parent`, { desc: 'the breakout declares its parent' });
+      await settleNavigation(a, `!!window.__diceDebug.subtables.parent`,
+        'the breakout declares its parent');
       assert.equal((await a.dbg('subtables')).canSplit, false,
         'a breakout cannot split again — the verb stops one level down');
       assert.equal(await idmSplitDisplay(a), 'none',
@@ -19404,7 +19454,8 @@ export const scenarios = [
       const key = await alice.dbg(`split('Vault')`);
       assert.ok(key, 'the split landed');
       await gotoRoom(alice, key);
-      await alice.waitFor(`!!window.__diceDebug.subtables.parent`, { desc: 'Alice is in the breakout' });
+      await settleNavigation(alice, `!!window.__diceDebug.subtables.parent`,
+        'Alice is in the breakout');
 
       // The parent is now EMPTY — an unprepared room is deleted the moment its
       // last player leaves (§G6), so the room object Alice's pointer names is
@@ -19479,7 +19530,8 @@ export const scenarios = [
       const key = await alice.dbg(`split('Cellar')`);
       assert.ok(key, 'the split landed');
       await gotoRoom(alice, key);
-      await alice.waitFor(`!!window.__diceDebug.subtables.parent`, { desc: 'Alice is in the breakout' });
+      await settleNavigation(alice, `!!window.__diceDebug.subtables.parent`,
+        'Alice is in the breakout');
       const before = JSON.stringify(await alice.dbg('subtables.parent'));
 
       // (i) A STREAM REOPEN. The room still holds the split, so hello carries it
