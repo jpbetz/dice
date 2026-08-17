@@ -5499,6 +5499,214 @@ export const scenarios = [
     },
   },
   {
+    name: 'sum-read',
+    tags: ['groups', 'meanings'],
+    // THE SUM CURVE (§2l ⑥, UX §7.48, POOL-ANALYSIS §10) — `pool-forecast`'s
+    // sibling in the OTHER world: where that one asserts the per-die spectrum
+    // under soul-deal, this one asserts the distribution of the TOTAL under
+    // dnd. Every number below is a transcription of what the running app
+    // returned (POOL-ANALYSIS §10, 2026-08-17), not a prediction.
+    //
+    // The three failure modes here all live BETWEEN the arithmetic and the
+    // paint, which is why the units cannot reach them and why every assertion
+    // reads the RENDERED popover: a cell drawn at its index instead of at its
+    // total, a tie-break sold as a peak, and a refusal printing `0%`.
+    async fn(ctx) {
+      const a = await ctx.newTable({ origin: 'localhost', name: 'Alice' });
+      await a.dbg(`setSystem('dnd')`);
+      // Online, a system change applies on the settings echo — opening a
+      // popover before it lands reads the per-die world and `sumRead` is null.
+      await a.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'the sum world is in force' });
+      await a.dbg(`setGroups([
+        {name: 'Heroic', notation: '4d6dl1 dc15', category: 'Attributes'},
+        {name: 'Strike', notation: '1d20+5'},
+        {name: 'Spark', notation: '1d6!'},
+        {name: 'Impossible', notation: '8d8+2d20 kh4 dc30'},
+        {name: 'Horde', notation: '40d20dl1'},
+        {name: 'Coincide', notation: '2d6 dc7'}])`);
+      await a.dbg('setPoolsEditMode(true)'); // the ± door opens inside ✎
+      const open = async (name) => {
+        const g = (await a.dbg('groups')).find((x) => x.name === name);
+        assert.ok(g, `the ${name} pool exists`);
+        assert.equal(await a.dbg(`poolPopoverOpen(${JSON.stringify(g.id)})`), true,
+          `the ± opens on ${name}`);
+        const r = await a.dbg('sumRead');
+        assert.ok(r, `${name}'s popover paints a SUM read (null = the per-die world)`);
+        return r;
+      };
+      const popText = () => a.eval(`document.getElementById('pop-preview').textContent`);
+
+      // ---- the everyday pool: a curve, a peak, an average and a stake ----
+      const heroic = await open('Heroic');
+      assert.equal(heroic.line, 'min 3 · avg 12.2 · max 18', 'the min/avg/max line');
+      assert.equal(heroic.cells, 16, '16 reachable totals, 16 drawn cells');
+      // THE PEAK IS DRAWN WHERE IT LANDS. 4d6dl1's mode is 13 — the 11th of 16
+      // totals from 3 — so the tallest cell is index 10 and not index 8 (the
+      // middle) nor index 12 (the average's neighbour). A cell positioned by
+      // its INDEX rather than by its total passes every count assertion and
+      // draws the wrong curve, which is the whole reason `heights` exists.
+      assert.equal(heroic.heights.indexOf(Math.max(...heroic.heights)), 10,
+        `the tallest cell is total 13 (got index ${heroic.heights.indexOf(Math.max(...heroic.heights))})`);
+      assert.equal(heroic.avgAt, 60.9, 'the average mark sits at the mean, not at the peak');
+      assert.equal(heroic.dcAt, 78.1, 'and the target mark at the stake');
+      assert.equal(heroic.target, 'Difficulty Class 15 · 23% to clear',
+        '300/1296, in the system\'s own word for a stake');
+      assert.equal(await a.dbg('hoverSumCell(0)'), '3 · <1% · 3+ 100%',
+        'the floor cell: a real sliver, and everything is at least the minimum');
+      assert.equal(await a.dbg('hoverSumCell(8)'), '11 · 11% · 11+ 73%',
+        'and a mid cell carries its own mass and its tail');
+
+      // ---- a flat pool NAMES the tie instead of tie-breaking it ----
+      // fc.mode takes the first of 20 equal totals and would report `most
+      // likely 6 · 5%`, which is true of 6 and equally true of the other 19.
+      const strike = await open('Strike');
+      assert.equal(strike.readout, 'flat — every total 5%', 'a flat curve says so');
+      assert.equal(strike.target, null, 'no dc, no target sentence');
+
+      // ---- THE SPARSE RULE: an unreachable total is a HOLE ----
+      // 1d6! cannot total 6, 12 or 18 (a max face always explodes), and the
+      // renderer must leave those x positions EMPTY rather than closing the
+      // gap. No assertion on a count can see the difference — 21 squeezed
+      // cells and 21 positioned cells are both 21 — so this reads `lefts`.
+      //
+      // AND IT IS STATED POSITIVELY, which is a correction of this scenario's
+      // own first draft. It asserted only that nothing sits at 20.8/45.8/70.8,
+      // and the sabotage that repositions every cell BY ITS INDEX passed —
+      // index positions are 0, 4.76, 9.52 … which miss those three numbers
+      // too, so the whole curve could collapse to the wrong axis and the
+      // "hole" assertion stayed green. Every cell is now pinned to its own
+      // total, and the three holes are what the list does not contain.
+      const spark = await open('Spark');
+      assert.equal(spark.cells, 21, '21 reachable totals of 24');
+      const reachable = [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24];
+      // the hook's own rounding, over the renderer's own formula: (t − lo)/span
+      const wantLefts = reachable.map((t) => Math.round(((t - 1) / 24) * 1000) / 10);
+      assert.deepEqual(spark.lefts, wantLefts,
+        'every cell is drawn at its OWN TOTAL — so 6, 12 and 18 are gaps at '
+        + `20.8/45.8/70.8% rather than closed up (got ${spark.lefts.join(', ')})`);
+      assert.ok(spark.words.includes('21 of 24 reachable'),
+        `and the AT layer says so out loud (got ${JSON.stringify(spark.words)})`);
+
+      // ---- THE REFUSAL, which must not print a number ----
+      // keep/drop across dice with different distributions has no exact curve.
+      // The line survives (a refusal owes the min/avg/max beside it) and the
+      // target sentence says it cannot answer — `0%` here would be a lie
+      // dressed as arithmetic, because 0% is this feature's word for
+      // IMPOSSIBLE.
+      const imp = await open('Impossible');
+      assert.ok(imp.refusal.includes('keep/drop across dice'),
+        `the refusal names the mechanic (got ${JSON.stringify(imp.refusal)})`);
+      assert.equal(imp.line, 'min 4 · avg 36.7 · max 56',
+        'and the line stays — previewOf answers where the curve cannot');
+      assert.equal(imp.target, 'Difficulty Class 30 · no exact odds for this pool',
+        'the stake is repeated and the odds declined');
+      assert.equal(imp.targetUnknown, true, 'dressed as the unknown it is');
+      assert.equal(imp.cells, 0, 'no cells — a refusal draws no curve');
+      // The whole rendered node, not just the sentence: no percentage of any
+      // kind appears on a refused read. (`includes('0%')` would also match
+      // 10%/20%/100%, so the honest form of this claim is stronger.)
+      assert.doesNotMatch(await popText(), /%/,
+        'a refused read prints no percentage anywhere');
+
+      // ---- THE BINNED END, and the deep-tail underflow it caught ----
+      const horde = await open('Horde');
+      assert.equal(horde.cells, 47, '742 totals bin to 47 cells of 16 (max 48)');
+      assert.equal(await a.dbg('hoverSumCell(0)'), '39–54 · <1% · 39+ 100%',
+        'a binned cell reads as a RANGE');
+      assert.equal(await a.dbg(`hoverSumCell(${horde.cells - 1})`),
+        '775–780 · <1% · 775+ <1%',
+        'and the top cell says <1%, never 0% — this pool\'s cdf reaches 1.0 in '
+        + 'double precision hundreds of totals early, so `1 − cdf` returned a '
+        + 'FALSE ZERO on a cell with visible mass (js/odds.js sumAtLeast)');
+
+      // ---- TWO FACTS, TWO MARKS (the bug the eye caught, UX §7.48 ⑨) ----
+      // On `2d6 dc7` the average and the target land on the SAME total, so
+      // both marks get `left: 50%` — and the dashed target painted exactly
+      // onto the solid average, with the solid line showing through the gaps
+      // in the dash, so the pair read as ONE mark and the target vanished on
+      // the pool where it is easiest to clear.
+      //
+      // `dcAt` WAS CORRECT THE WHOLE TIME (50, the right number at the right
+      // total), which is why no assertion on the number could catch this. The
+      // separation is a 2.5px CSS stand-off, so the only thing that can fail
+      // is the RENDERED x.
+      const coincide = await open('Coincide');
+      assert.equal(coincide.avgAt, coincide.dcAt,
+        'the premise: both marks are authored at the same position');
+      const marks = await a.eval(`(() => {
+        const all = [...document.querySelectorAll('#pop-preview .sf-mark')];
+        return all.map((m) => { const b = m.getBoundingClientRect();
+          return { cls: m.className, x: Math.round(b.left * 100) / 100, h: Math.round(b.height) }; });
+      })()`);
+      assert.equal(marks.length, 2, `two marks are drawn (got ${JSON.stringify(marks)})`);
+      // …and they are really ON SCREEN. A zero-height read would make every
+      // geometry claim below vacuously true through a display:none ancestor.
+      assert.ok(marks.every((m) => m.h > 0),
+        `both marks are laid out (got heights ${marks.map((m) => m.h).join(', ')})`);
+      assert.ok(marks[1].cls.includes('sf-dc-near'),
+        `the target mark knows it is coincident (got ${JSON.stringify(marks[1].cls)})`);
+      assert.ok(Math.abs(marks[1].x - marks[0].x) >= 2,
+        `and stands off the average by real pixels — ${marks[0].x} vs ${marks[1].x}`);
+      // The stand-off is CONDITIONAL, or this assertion proves nothing: a
+      // target nowhere near the average carries no `sf-dc-near`.
+      await open('Heroic');
+      assert.equal(await a.eval(
+        `document.querySelector('#pop-preview .sf-dc').classList.contains('sf-dc-near')`), false,
+      'a target far from the average is NOT nudged — the class is conditional');
+      await a.dbg('closePopover()');
+
+      // ---- the command box: the same arithmetic, one line ----
+      // DEBOUNCED. Dispatching `input` and reading in the same tick returns
+      // nothing (the `preview-honest` pattern).
+      const type = (s) => a.eval(`(() => {
+        const box = document.getElementById('cmd-input');
+        box.value = ${JSON.stringify(s)};
+        box.dispatchEvent(new Event('input'));
+      })()`);
+      const slotOk = `(document.querySelector('#cmd-slot .ok') || {}).textContent || ''`;
+      await type('1d20+5 dc15');
+      await a.waitFor(`(${slotOk}).includes('55% to clear 15')`,
+        { desc: 'the box answers the stake' });
+      assert.ok((await a.eval(slotOk)).includes('min 6 avg 15.5 max 25'),
+        'beside the line it always carried');
+      // A TRUE ZERO PRINTS. `pctText` says `0%` only when the answer IS zero
+      // and `<1%` for anything that merely rounds there, so 2d6 against 20 —
+      // genuinely impossible — must not be softened into `<1%`.
+      await type('2d6 dc20');
+      await a.waitFor(`(${slotOk}).includes('0% to clear 20')`,
+        { desc: 'an impossible stake reads 0%' });
+      await type('8d8+2d20 kh4 dc30');
+      await a.waitFor(`(${slotOk}).includes('no exact odds against 30')`,
+        { desc: 'the box refuses in words too' });
+      assert.ok(!(await a.eval(slotOk)).includes('%'),
+        'and prints no percentage while refusing');
+
+      // U7 IS NOT REGRESSED: a per-die system still gets a per-die read, and
+      // no total is forecast anywhere near it.
+      await a.dbg(`setSystem('soul-deal')`);
+      await a.waitFor(`window.__diceDebug.system === 'soul-deal'`, { desc: 'back to per-die' });
+      await type('3d6+5');
+      await a.waitFor(`(${slotOk}).includes('per-die')`, { desc: 'the per-die read returns' });
+      assert.ok(!/min \d/.test(await a.eval(slotOk)), 'and forecasts no total');
+
+      // ---- EVERY DOOR, not just the pool door (§9's answer 1) ----
+      // The draft ± carries the draft's own spec and forecasts exactly what
+      // ROLL ❯❯❯ throws.
+      await a.dbg(`setSystem('dnd')`);
+      await a.waitFor(`window.__diceDebug.system === 'dnd'`, { desc: 'the sum world again' });
+      await type('2d6+3 dc10');
+      await a.waitFor(`(${slotOk}).includes('58% to clear 10')`, { desc: 'the draft is parsed' });
+      assert.equal(await a.dbg(`openPopoverFor('tray')`), true, 'the draft ± opens');
+      const draft = await a.dbg('sumRead');
+      assert.ok(draft, 'and paints a sum read of its own');
+      assert.equal(draft.target, 'Difficulty Class 10 · 58% to clear',
+        'the same answer as the box, on the other surface');
+      assert.equal(draft.line, 'min 5 · avg 10 · max 15', 'over the draft\'s own spec');
+      await a.dbg('closePopover()');
+      await a.dbg('setPoolsEditMode(false)');
+    },
+  },
+  {
     name: 'shared-pools',
     tags: ['smoke', 'groups', 'cuj11'],
     // The owner switcher (ROADMAP 2b): racks publish to the room; a teammate
