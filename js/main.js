@@ -25,7 +25,7 @@ import { connect, forgetSeat, peekTable } from './net.js';
 import { recentTables, rememberTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, validateMods, budgetOf } from './rollspec.js';
-import { previewOf, countingPmfs } from './odds.js';
+import { previewOf, countingPmfs, sumForecast, sumAtLeast, sumBins, sumPeak } from './odds.js';
 import { parseNotation, canonicalNotation, cutText } from './notation.js';
 import { dealStartingRack, dealRack, dealName } from './seed.js';
 import { resolveChannel, PARAM as STABILITY_PARAM } from './stability.js';
@@ -14003,6 +14003,44 @@ window.__diceDebug = {
       legend: ledgerState.el.querySelector('.lg-legend').textContent,
     };
   },
+  // §2l ⑥ — the sum read, off the RENDERED popover for the same reason
+  // `ledgerSheet` is: the property worth pinning is that the curve, the
+  // min/avg/max line and the target sentence agree, and a hook that read
+  // `sumForecast` again could not tell you they had stopped. `lefts` and
+  // `heights` are what prove the sparse rule from a test — 1d6!'s hole at 6
+  // is a MISSING cell at 20.8%, and no assertion on `values.length` can see
+  // that the renderer drew it.
+  get sumRead() {
+    if (!pop || !popPreviewEl.classList.contains('sf')) return null;
+    const q = (s) => popPreviewEl.querySelector(s);
+    const txt = (s) => (q(s) ? q(s).textContent : null);
+    const pos = (s) => (q(s) ? Math.round(parseFloat(q(s).style.left) * 10) / 10 : null);
+    const cols = [...popPreviewEl.querySelectorAll('.sf-col')];
+    return {
+      line: txt('.sf-line'),
+      target: txt('.sf-target'),
+      targetUnknown: !!(q('.sf-target') && q('.sf-target').classList.contains('unknown')),
+      refusal: txt('.sf-refusal'),
+      words: txt('.fc-text'), // the AT layer, which IS the content
+      readout: txt('.fc-read-text'),
+      axis: [...popPreviewEl.querySelectorAll('.sf-axis span')].map((s) => s.textContent),
+      cells: cols.length,
+      lefts: cols.map((c) => Math.round(parseFloat(c.style.left) * 10) / 10),
+      heights: cols.map((c) => Math.round(parseFloat(c.style.height))),
+      avgAt: pos('.sf-avg'),
+      dcAt: pos('.sf-dc'),
+    };
+  },
+  // Point at the i-th drawn cell and read what the strip says. Not a DOM
+  // scrape: the readout is the surface where a sliver gets its name, and the
+  // hover is the only way to reach it.
+  hoverSumCell(i) {
+    const cols = [...popPreviewEl.querySelectorAll('.sf-col')];
+    if (!cols[i]) return null;
+    cols[i].dispatchEvent(new MouseEvent('mouseenter'));
+    const el = popPreviewEl.querySelector('.fc-read-text');
+    return el ? el.textContent : null;
+  },
   // 0 clears back to the system's number. Returns what is in force after.
   setShelfTarget(label, n) {
     const v = setShelfTarget(label, Number(n));
@@ -15231,6 +15269,44 @@ function fmtPreview(dice, mods) {
   return `min ${p.min} avg ${Number.isInteger(avg) ? avg : avg.toFixed(1)} max ${p.max}${label}`;
 }
 
+// THE TOOLS BAG both forecast call sites pass. js/meanings.js takes the math
+// as an injection so the profile registry stays dependency-free, and this is
+// the injection (§2l ⑥, POOL-ANALYSIS §6.3a).
+//
+// sumForecast is MEMOISED, and that is not an optimisation. renderPopEcho runs
+// on every stepper click and every keystroke in a bonus label, and the worst
+// legal pool — `40d20 dl1` — costs 5.6 ms warmed (`node
+// tests/sumread.test.mjs --bench`, node v24 on the dev box, 2026-08-17).
+// Recomputing per repaint would put a 40-die curve on the typing path. The key
+// is exactly the fields sumForecast READS, so naming a +2 'Proficiency' does
+// not invalidate the curve it does not change.
+const SUM_MEMO_MAX = 8;
+const sumMemo = new Map();
+function sumForecastMemo(dice, mods) {
+  const m = mods || {};
+  const key = `${dice.join(',')}|${m.modifier || 0}|${m.adv || ''}`
+    + `|${m.keep ? m.keep.mode + m.keep.n : ''}|${m.reroll ? m.reroll.below : ''}|${m.explode ? '!' : ''}`;
+  if (sumMemo.has(key)) return sumMemo.get(key);
+  const fc = sumForecast(dice, m);
+  // Insertion-ordered Map, so the oldest key is the first one out.
+  if (sumMemo.size >= SUM_MEMO_MAX) sumMemo.delete(sumMemo.keys().next().value);
+  sumMemo.set(key, fc);
+  return fc;
+}
+const FORECAST_TOOLS = { countingPmfs, sumForecast: sumForecastMemo };
+
+// A probability as a word a player can read. 0 and 1 are REAL answers (a
+// target above the maximum is impossible, not unknown), and everything that
+// rounds to them keeps its inequality so a 1-in-400 never reads as never.
+function pctText(p) {
+  if (p === 0) return '0%';
+  if (p === 1) return '100%';
+  const r = Math.round(p * 100);
+  if (r <= 0) return '<1%';
+  if (r >= 100) return '>99%';
+  return `${r}%`;
+}
+
 // Three-state validation paint shared by the panel box and the quick palette:
 // valid (gold + canonical/exact preview + warnings), incomplete
 // (neutral, never red), invalid (red + error + hint). Pure presentation —
@@ -15268,12 +15344,22 @@ function renderCmdState(boxEl, slotEl, res, raw) {
     // must REPLACE, never blank: a per-die system gets a phrase naming where
     // the real spread lives, a refusal gets its own reason, and only a system
     // that actually sums gets the sum.
+    //
+    // THE SUM READ IN A ONE-LINE SLOT (§2l ⑥, UX §7.48): the curve lives in
+    // the ± popover, which has 284px of width; what belongs here is the
+    // min/avg/max line — unchanged, it is what `preview-honest` pins — plus
+    // the ONE derived number a one-line slot can carry, and only when the
+    // player asked for it by typing a target. A refused curve prints no
+    // percentage at all: `sumAtLeast` returns null exactly so that "we do not
+    // know" cannot come out as 0%.
     const sys = activeSystem();
-    const fc = sys.forecastFor
-      ? sys.forecastFor(res.spec, { countingPmfs }) : null;
+    const fc = sys.forecastFor ? sys.forecastFor(res.spec, FORECAST_TOOLS) : null;
     const read = fc && fc.kind === 'refusal' ? fc.reason
       : fc && fc.kind === 'per-die' ? 'per-die outcomes — ± for the spread'
-        : fmtPreview(res.spec.dice, res.spec.mods);
+        : fmtPreview(res.spec.dice, res.spec.mods)
+          + (fc && fc.kind === 'sum' && Number.isInteger(res.dc)
+            ? ` · ${fc.exact ? `${pctText(sumAtLeast(fc, res.dc))} to clear ${res.dc}`
+              : `no exact odds against ${res.dc}`}` : '');
     span('ok', `${res.canonical} · ${read}`);
     for (const w of res.warnings) span('warn', `⚠ ${w}`);
     // §7.4: both verbs are advertised wherever both are available.
@@ -18931,6 +19017,151 @@ function buildForecast(fcast, visSuffix) {
   return frag;
 }
 
+// THE SUM READ (ROADMAP §2l ⑥, UX §7.48): under a system that adds the dice
+// up, the exact distribution of the total — a value axis, one cell per
+// reachable total, the average and any declared target marked on it, and the
+// odds of clearing that target in words. This is GOALS goal 4's sentence about
+// *summing values* applied before the roll: `4d6dl1` could say min/avg/max and
+// not one word about the shape it is famous for.
+//
+// Four rules it does not get to re-derive (POOL-ANALYSIS §6.3a):
+//   · `sumBins` positions cells by TOTAL, never by array index — `values` is
+//     SPARSE and `1d6!` has no total of 6, so an index-drawn curve is a lie.
+//   · `sumAtLeast` is the only cdf arithmetic in the app, and it returns null
+//     on a refusal so nobody prints 0% for "we do not know".
+//   · a refusal still owes the min/avg/max line BESIDE it — `previewOf` is
+//     still exact for the average of `8d8+2d20 kh4`, whose curve is refused.
+//   · `sumPeak`, not `fc.mode`: the mode is the first of the tied values, and
+//     a plain d20+5 has twenty of them.
+//
+// Dress: IVORY, not gold. Gold is the sum world's word for a total that
+// LANDED; a forecast has not landed, and POOL-ANALYSIS §7 already refused a
+// gold band on this very axis. The geometry is aria-hidden and `.fc-text`
+// carries the read in words — ④'s grammar exactly — except that the words are
+// a SUMMARY here, because the whole distribution is 742 numbers at `40d20 dl1`
+// and a sentence that long is not a read.
+const SUM_CURVE_CELLS = 48; // 284px of popover / 48 ≈ 5.9px a cell
+
+function buildSumRead(fc, opts) {
+  const { dc, targetWord, visSuffix, spec } = opts;
+  const frag = document.createDocumentFragment();
+  const line = document.createElement('span');
+  line.className = 'sf-line';
+  // ONE source for this line in both worlds: a refusal and an exact curve
+  // print the same min/avg/max, because previewOf answers both.
+  line.textContent = fmtPreview(spec.dice, spec.mods).replace(/ (avg|max)/g, ' · $1');
+
+  const target = document.createElement('span');
+  target.className = 'sf-target';
+  const hasDc = Number.isInteger(dc);
+  const atLeast = hasDc ? sumAtLeast(fc, dc) : null;
+  if (hasDc) {
+    target.textContent = atLeast === null
+      ? `${targetWord} ${dc} · no exact odds for this pool`
+      : `${targetWord} ${dc} · ${pctText(atLeast)} to clear`;
+    target.classList.toggle('unknown', atLeast === null);
+  }
+
+  if (!fc.exact) {
+    const why = document.createElement('span');
+    why.className = 'sf-refusal';
+    why.textContent = fc.refusal.reason;
+    frag.append(why, line);
+    if (hasDc) frag.append(target);
+    if (visSuffix) {
+      const vis = document.createElement('span');
+      vis.className = 'fc-vis';
+      vis.textContent = visSuffix.replace(/^ · /, '');
+      frag.appendChild(vis);
+    }
+    return frag;
+  }
+
+  const bins = sumBins(fc, SUM_CURVE_CELLS);
+  const peak = sumPeak(fc);
+  const cellWord = (c) => (c.lo === c.hi ? String(c.lo) : `${c.lo}–${c.hi}`);
+  // The peak sentence, which is also what the readout says at rest. A tie is
+  // named as a tie: 'most likely 6' for a d20+5 would be an artifact of the
+  // array order dressed as a fact about the dice.
+  const peakWord = peak.tied === 1 ? `most likely ${peak.value} · ${pctText(peak.p)}`
+    : peak.tied === peak.of ? `flat — every total ${pctText(peak.p)}`
+      : `no single peak — ${peak.tied} totals tie at ${pctText(peak.p)}`;
+
+  const row = document.createElement('div');
+  row.className = 'sf-row';
+
+  const text = document.createElement('span');
+  text.className = 'fc-text'; // the AT layer (visually hidden), ④'s class
+  text.textContent = `totals ${fc.min} to ${fc.max} · ${peakWord}`
+    + (bins.cells.length < bins.nBins ? ` · ${bins.cells.length} of ${bins.nBins} reachable` : '')
+    + (hasDc && atLeast !== null ? ` · ${pctText(atLeast)} to clear ${targetWord} ${dc}` : '');
+
+  const curve = document.createElement('span');
+  curve.className = 'sf-curve';
+  curve.setAttribute('aria-hidden', 'true');
+  const read = document.createElement('span');
+  read.className = 'fc-read sf-read';
+  read.setAttribute('aria-hidden', 'true');
+  const caret = document.createElement('i');
+  caret.className = 'fc-caret';
+  const readText = document.createElement('span');
+  readText.className = 'fc-read-text';
+  readText.textContent = peakWord;
+  read.append(caret, readText);
+
+  const at = (v) => ((v - bins.lo + 0.5) / bins.span) * 100; // a value's x
+  for (const c of bins.cells) {
+    const col = document.createElement('i');
+    col.className = 'sf-col';
+    col.style.left = `${((c.i * bins.width) / bins.span) * 100}%`;
+    col.style.width = `${(bins.width / bins.span) * 100}%`;
+    col.style.height = `${Math.max(4, (c.p / bins.peak) * 100)}%`;
+    const cume = sumAtLeast(fc, c.lo);
+    col.addEventListener('mouseenter', () => {
+      readText.textContent = `${cellWord(c)} · ${pctText(c.p)} · ${pctText(cume)} or better`;
+      read.style.setProperty('--fc-x', `${at(c.lo + (bins.width - 1) / 2)}%`);
+      read.classList.add('on');
+    });
+    curve.appendChild(col);
+  }
+  const avgMark = document.createElement('i');
+  avgMark.className = 'sf-mark sf-avg';
+  avgMark.style.left = `${at(fc.mean)}%`;
+  curve.appendChild(avgMark);
+  // A target off the axis gets no mark and keeps its sentence: 0% and 100% are
+  // true answers, and a mark clamped to the rim would claim it was reachable.
+  if (hasDc && dc >= bins.lo && dc <= bins.hi) {
+    const dcMark = document.createElement('i');
+    dcMark.className = 'sf-mark sf-dc';
+    dcMark.style.left = `${at(dc)}%`;
+    curve.appendChild(dcMark);
+  }
+  curve.addEventListener('mouseleave', () => {
+    read.classList.remove('on');
+    readText.textContent = peakWord;
+  });
+
+  const axis = document.createElement('span');
+  axis.className = 'sf-axis';
+  axis.setAttribute('aria-hidden', 'true');
+  const axLo = document.createElement('span');
+  axLo.textContent = String(fc.min);
+  const axHi = document.createElement('span');
+  axHi.textContent = String(fc.max);
+  axis.append(axLo, axHi);
+
+  row.append(text, curve, axis, read);
+  frag.append(row, line);
+  if (hasDc) frag.append(target);
+  if (visSuffix) {
+    const vis = document.createElement('span');
+    vis.className = 'fc-vis';
+    vis.textContent = visSuffix.replace(/^ · /, '');
+    frag.appendChild(vis);
+  }
+  return frag;
+}
+
 // Echo, preview and action buttons — the cheap half of a re-render.
 function renderPopEcho() {
   if (!pop) return;
@@ -18944,12 +19175,17 @@ function renderPopEcho() {
     : pop.vis.mode === 'whisper'
       ? ` · whisper to ${pop.vis.names.join(', ')}`
       : ` · ${pop.vis.mode === 'held' ? 'face down' : 'only me'}`;
-  // Per-die systems forecast per die (§2l ④, every ± door alike); sum
-  // systems keep the exact min/avg/max line until the sum read (§2l ⑥).
+  // Per-die systems forecast per die (§2l ④); sum systems get the curve of
+  // the total (§2l ⑥). EVERY ± DOOR ALIKE, and that is a decision rather
+  // than an accident of sharing one function: a shelf ± is bound to a landed
+  // roll, so its forecast stands beside the evidence of what that roll did —
+  // which is the most instructive place in the app to read a curve, not the
+  // most confusing (UX §7.48 answers POOL-ANALYSIS §9 on this).
   // The slot never blanks — §1.3 makes this line the validator.
   const fcast = !err && !visBlocked && activeSystem().forecastFor
-    ? activeSystem().forecastFor(spec, { countingPmfs }) : null;
+    ? activeSystem().forecastFor(spec, FORECAST_TOOLS) : null;
   popPreviewEl.classList.toggle('fc', !!(fcast && fcast.kind === 'per-die'));
+  popPreviewEl.classList.toggle('sf', !!(fcast && fcast.kind === 'sum'));
   // 'Pool stats' heads every stats state (bars, refusal, sum line) so the
   // section reads like its siblings (Joe 2026-08-06); validation states
   // (bad spec, audience-less whisper) are not stats and stay bare.
@@ -18975,6 +19211,14 @@ function renderPopEcho() {
   } else if (fcast && fcast.kind === 'per-die') {
     popPreviewEl.textContent = '';
     popPreviewEl.append(statsLabel(), buildForecast(fcast, visSuffix));
+  } else if (fcast && fcast.kind === 'sum') {
+    popPreviewEl.textContent = '';
+    popPreviewEl.append(statsLabel(), buildSumRead(fcast, {
+      dc: pop.dc,
+      targetWord: activeSystem().targetWord || 'Target',
+      visSuffix,
+      spec,
+    }));
   } else if (fcast && fcast.kind === 'refusal') {
     popPreviewEl.textContent = '';
     popPreviewEl.append(statsLabel(), document.createTextNode(fcast.reason + visSuffix));
