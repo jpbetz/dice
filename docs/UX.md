@@ -5966,7 +5966,187 @@ nothing may be built on top of it that assumes it was read.
 - **Telling anyone else.** There is nobody else — `players.length <= 1` is
   part of the predicate.
 
+### §7.49 — Taking the log with you, and a setup that says which build wrote it (2026-08-17)
 
+*ROADMAP #4 (§5's roll-log export) and #3 (C22's `room.setup` stamp), in one
+pass because they are the same sentence read twice: **what leaves this browser
+has to say what it is**. One is a file that must not pretend to be an import;
+the other is a payload that must say which build authored it.*
+
+#### ① The log was goal 7's last uncapturable surface
+
+Goal 7: "anything worth keeping is captured client-side… capture is a thing
+the player *does*." By 2026-08-17 every surface had a door except the record of
+what actually happened — pools and settings through the portable file, the
+crash report, the table setup through §G4. Four hours of rolls existed as DOM
+and nothing else. §7.47 had already assumed this door existed when it refused
+to put a lifecycle line in the log ("it would then have to be exported,
+filtered and searched with the rolls").
+
+Shipped: a **plain-text transcript**, `Copy` and `Download`, in a new foot of
+the log flyout (`index.html` `.lf-foot`, `js/main.js` `logExportSnapshot`).
+
+#### ② Why plain text, and why NOT the CSV the roadmap asked for
+
+§5 said "copy/download text + CSV". CSV is refused, for now, on two grounds:
+
+- **CSV's reader is a spreadsheet, and what you do in a spreadsheet is §5's
+  OTHER half** — per-player distribution, average-vs-expected — which is
+  blocked on §2l's sum read and will choose its own columns when it lands.
+  Shipping columns first means shipping the shape that has to change.
+- **The bar this file has to clear is a human who has never seen this app.**
+  Raw CSV in a text editor does not clear it; a transcript does.
+
+The line builder (`logExportLine`) is one function, so a CSV row is a small
+change *against a settled column list* — which is the right order, not a
+deferral of work.
+
+**And it is `.txt`, deliberately inert.** `js/portable.js` owns the ONLY rack
+transport (GOALS §7 — the `#g=` codec died for replacing a rack sight-unseen).
+A `.dice.yaml` full of rolls would be handed straight back to the import box by
+the first person who tried it, and refused there with no explanation. So the
+extension carries no promise and the header says where the real transport is:
+*"not an import file. Pools and settings travel separately, through Settings →
+Your data."*
+
+#### ③ What it says, in the order the row says it
+
+```
+Roll log — Thursday's Game
+2026-08-17 · as seen by Bram · 4 rolls, oldest first
+A roll that was face down or whispered is listed without its values.
+Plain text, for reading and keeping — not an import file. Pools and settings travel separately, through Settings → Your data.
+
+11:51  Bram  Sword  d20 12  → Partial Success
+11:51  Bram  4d6dl1 dc14  (d6 1) + d6 4 + d6 1 + d6 6  → Partial Success · Fail · Success & Bonus  vs DC 14
+11:51  Wren  Body  d6 1 + d6 2 + d6 5  → Fail · Success
+11:51  Wren  Stealth  d20  face down
+```
+
+*(Real output, captured 2026-08-17. Reproduce with a step file that opens two
+tabs, rolls, and prints `__diceDebug.logExport.text` under
+`node tools/drive.mjs <step>`; `tests/e2e` tag `log-export` asserts the same
+string.)*
+
+Four decisions inside those lines:
+
+- **Oldest first**, where the screen is newest first. A list is a feed you scan
+  from the top; a file is read start to end. The header says which way it runs,
+  so the reversal is never a surprise.
+- **The row's own marks, and no new ones.** `(d6 1)` is a die the mechanics
+  discarded (the screen dims it), `✴` is an explosion child (the screen's own
+  glyph), `→` is the tally, `vs DC N ✓` is the stake and its adjudication under
+  U17's split. Crit is colour on screen and has **no word**, so it acquires
+  none here: inventing a `!` would make the file disagree with the table it is
+  a record of.
+- **User text is collapsed to one line** (`logExportText1Line`). The line break
+  is the only structure this format has, so a name or label carrying one would
+  forge a row.
+- **The truncation note rides in the header**, from the same counter the panel
+  foot uses. The log caps at 100 (U14); a file that silently ended there would
+  read as the whole evening, which is this repo's dominant failure mode.
+
+#### ④ Other people's rolls: everything the log shows, and not one thing more
+
+The transcript is built from the same entries and the same gates the rows are
+(`entryHidden`, `activeSystem().usesTotal`), so a face-down or whispered roll
+exports as `face down` with its die **types** and no values — goal 11's
+public/private split, unchanged. This is already the rule `logEntryMatches`
+follows for the find box, and for the same reason: **a capture that answered
+what the card refuses would make export the leak.**
+
+Other players' *visible* rolls do export, with their names. They are the
+table's record; a transcript of the evening holding only your own rolls would
+not be a transcript of anything. The header names **whose view it is** ("as
+seen by Bram", from `identityInfo()`), so two players' files legitimately
+differing over a secret is legible rather than mysterious.
+
+**The whole log, never the filtered view.** The find box has no selection
+affordance and its own count reads "3 of 14" — it is plainly hiding, not
+choosing. Copy must not be the one place in the app where a search field
+decides what leaves.
+
+#### ⑤ Copy and Download are TWO affordances, and symmetry is not the reason
+
+They have different destinations and different failure modes. Copy goes to a
+paste (Discord, notes) and can be **refused** by the browser's clipboard
+permission. Download goes to disk and cannot be confirmed at all — the browser
+owns that dialog. One control would mean the wrong behaviour for whichever half
+of the players wanted the other. The portable pane already draws exactly this
+pair with exactly these words, so a player who learned it there needs no
+teaching.
+
+- **The morph is the receipt** (`Copied!` / `Saved!`), the pattern both portable
+  doors use. The flyout has no status line and does not grow one: the only
+  thing that belongs under the record is the record.
+- **A refused clipboard falls through to the file** and says `Saved instead` —
+  capture is a thing the player *does*, so a verb that did nothing must not
+  look done.
+- **An empty log dims both verbs.** C15's lesson: a capture that writes nothing
+  and says "Saved!" is a failed capture that read as a success. The panel
+  already says `No rolls yet.`
+- **A foot, not the head.** `#log-list` owns the scroll (see the §7.42 note in
+  `css/style.css`), so a foot is always in view — an export verb must not be
+  something you scroll 100 rows past. The head keeps the destructive verb;
+  putting a fourth control there would have crowded `Clear history`'s scope
+  line at 300px. Verified at 390×844 with the rail collapsed: two buttons split
+  the width, the list still scrolls above them.
+- One writer to disk: `portableDownload(text, name, type)` took defaults rather
+  than gaining a twin. A second copy of the Blob/anchor/**late-revoke** dance is
+  a second place to get the revoke timing wrong, and that failure looks like
+  "the download sometimes does not happen".
+
+#### ⑥ The other half: a prepared table now says which build wrote it
+
+C22 shipped the stamp on the store, the file and the crash report and left
+`room.setup` open. The reason it could not be closed on the server is
+**provenance**: a stamp the server writes names the server's build, and the
+question a reader has is *which build authored this data*.
+
+So the client stamps and the server carries (`js/main.js`
+`portablePushToTable` → `js/net.js pushTable` → `server.js handleTable` →
+`js/main.js adoptRoomSetup`). Two writers, one of which mints:
+
+- **Authoring** (`portablePushToTable`) stamps with this build's `SCHEMA_STAMP`,
+  on the wire and in `dice.table.v1:<room>` together.
+- **Replay** (§G6's `maybeRepushTable`) forwards the stored record's own stamp
+  untouched, and absent stays absent. Re-stamping bytes it only stored would
+  be the same lie as letting the server do it — and every record in the field
+  today has no stamp, so a Tuesday-prepared table must still heal a restarted
+  room on Thursday.
+
+**Why this needed a refusal at all**, given C22's own header excludes the live
+wire protocol: `net.pushTable` destructures exactly `{rev, table, profiles,
+ver}`, so a record written by a build that put a fifth field in it would be
+replayed by an older one with that field silently gone, **at the same rev, over
+the top of what the room holds**. That is not one player losing their own data
+quietly — it is the whole table's prepared setup degraded by an act nobody
+clicked.
+
+**The refusal a player can act on.** A setup from a newer major is not adopted
+at all: `adoptRoomSetup` keeps only its `rev` (a counter *about* the blob, so
+`maybeRepushTable` does not then start pushing an older setup over a newer one
+it just refused) and speaks C22's sentence on the three surfaces the library
+refusal already uses — pill, `announce`, settings note — plus the field log.
+
+*Found by looking, 2026-08-17:* the `'table-setup'` case then wrote
+**"Bram prepared the table"** straight over that sentence. `showSettingsNote`
+shares the pill *and* announces, so it did not merely hide the refusal — it
+spoke past it, with a reassuring lie, in the one slot carrying the only
+explanation of why no seats had appeared. The note is now suppressed while a
+refusal stands.
+
+#### ⑦ What was considered and refused
+
+- **A `Copy my rolls only` verb.** Speculative; and the honest version of it is
+  the filter question in ④, which has a decision.
+- **Stamping `room.setup` on the server.** Cheaper by two files and worthless:
+  see ⑥. It is what "a stamp only the server writes is a stamp nobody can
+  trust" means.
+- **Having the server JUDGE the stamp.** A rolling deploy would reject the
+  setups its own older instances wrote. The reader that stands to lose data is
+  the client, so the refusal lives there.
+- **A `.dice.yaml` roll log.** ②. One transport, one extension, one promise.
 ### §7.50 — The tower rides the portable file (2026-08-17)
 
 *ROADMAP's 9d follow-up. `TABLE_KEYS` was `{name, felt, system, zoom}`, so the

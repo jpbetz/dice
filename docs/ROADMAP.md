@@ -55,8 +55,8 @@ by *finishing what is in flight*.
 | --- | --- | --- | --- | --- |
 | 1 | [**Joe's LOOK and LISTEN sitting**](#tier-w--the-first-fantasy-venue-the-fae-set--built-the-look-and-the-listen-are-joes) | **Not a build item, and that is why it is first.** Tier W is finished except for being *seen and heard*; **seven** LOOKs and ten voices gate it (the page's own item list — "five verdicts" was a notch stale), and nothing on Track B advances until they move. One page carries every frame beside the question it answers, and `docs/AUDIO.md` §9 is ten rows of two clicks. **`shots/verdicts.html`, and it is TWO commands, not one** — [see below](#the-sittings-page-is-rendered-then-built-in-that-order): re-render the frames from the tree you are judging, *then* `node tools/verdict-sheet.mjs`, which now REFUSES (exit 1) when a frame predates the code it shows. | ~1 hr of Joe | B |
 | 2 | [**§2l ⑥'s RENDERING**](#2l-pool-analysis--⑤-and-⑥s-engine-shipped-the-rendering-is-the-open-half) | The engine landed 08-16, proven four ways, 5.5 ms worst case — and is **inert**: `kind:'sum'` is matched nowhere, so nothing renders. Goal 4 names summing as toil the system owes the player, and the app still cannot say a word about `4d6dl1`. The smaller half of the work and the whole of the payoff. | med | A |
-| 3 | [**C22's `room.setup` stamp**](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15) | Half a contract is worse than none. The stamp must come from the WRITER (`maybeRepushTable`); a stamp only the server writes is a stamp nobody can trust. ~10 lines once someone owns that site. | small | A |
-| 4 | [**§5** — roll-log export](#5-capture-mechanisms) | Goal 7's last uncapturable surface: the online log cannot be copied or downloaded. Reuses `portableDownload()`. The half of §5 that does **not** wait on #2. | small | A |
+| ~~3~~ | ~~C22's `room.setup` stamp~~ — **SHIPPED 2026-08-17** ([C22](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15-closed-2026-08-17), UX §7.49 ⑥) | Not ~10 lines and not `maybeRepushTable`: the server **rewrote** the payload field by field, so the stamp needed `server.js` and `js/net.js` too, and the authoring writer is `portablePushToTable`. The three wrong claims are recorded in C22. | small | A |
+| ~~4~~ | ~~§5 — roll-log export~~ — **SHIPPED 2026-08-17** ([§5](#5-capture-mechanisms), UX §7.49) | Plain-text transcript, `Copy` + `Download` in a log-flyout foot. `portableDownload()` was in `js/main.js`, not `js/portable.js`; **CSV was refused** and the reason is in UX §7.49 ②. | small | A |
 | 5 | [**9d follow-up** — `venue` in the portable YAML](#9d-follow-up-venue-in-the-portable-yaml--tower-shipped-2026-08-17) | **`tower` SHIPPED 2026-08-17** ([UX §7.50](UX.md)) — `TABLE_KEYS` is `{name, felt, system, zoom, tower}` and a prepared table arrives with its tower up. What is left is GOALS' punt: how a **venue** rides the file. Shipping the tower alone exposed that a file can now prepare *half a fae venue*, which is the argument for sequencing this next. | small | A |
 | 6 | [**C30 residual** — deaden + grip, sleep off](#c30-residual-deaden--the-only-lever-that-touches-the-dithering) | The best shake and hop numbers measured anywhere on this table, failing four of six gates. Grip recovers 70% of the glide and **has never been run with sleep off**. The pile's untried lever is spawn geometry — **which moved on 08-15**, so the pairing is genuinely worth re-running now. | med | A |
 | 7 | [**§3b L2**](#3b-the-lobby-and-the-table-flow--l4-shipped-l2-is-a-judgment-call) | **Decision record written 2026-08-17; recommends NO and needs Joe's yes/no.** The premise was stale: the peek has disclosed the display name of any seated player holding a profile since C17, and the join door renders them under a heading reading "At this table". A count's only new information is a player who published nothing. What the item actually owes is a corrected budget comment in `handleTableInfo` and the assertion that would have caught it. | small | A |
@@ -478,9 +478,17 @@ the ladder.
 
 ### 5. Capture mechanisms
 
-- **Roll-log export** (copy/download text + CSV) — the online log is currently
-  uncapturable. Reuses G1's `portableDownload()` rather than inventing a
-  second save path.
+- **Roll-log export — SHIPPED 2026-08-17.** `Copy` and `Download` in a new foot
+  of the log flyout, writing a plain-text transcript (`js/main.js`
+  `logExportSnapshot`, UX §7.49). `portableDownload(text, name, type)` took
+  defaults rather than gaining a twin, so there is still one writer to disk.
+  **Two corrections to this entry:** `portableDownload()` lives in `js/main.js`,
+  not `js/portable.js` (it reads `portableSnapshot`/`portableFilename`, which are
+  main.js's); and **CSV was refused, not shipped** — its reader is a spreadsheet,
+  what you do in a spreadsheet is the statistics bullet below, and that bullet
+  will choose its own columns when §2l's sum read lands. `logExportLine` is one
+  function, so a CSV row is a small change against a settled column list. The
+  refusal is argued in UX §7.49 ②; reopen it there, not here.
 - **Local roll statistics** (per-player distribution, average-vs-expected) —
   the OBSERVED half, and a **dependent of §2l**, not its sibling: §2l's engine
   is the only source of an *expected* value in the tree. Second blocker:
@@ -760,12 +768,39 @@ accessible name written every render.
 **The data-loss hole is closed.** `Replace my library…`, plus the four defects in the
 same journey. UX §7.40, PROFILES §12, `js/profiles.js` `rebuildStore`.
 
-### C22. A versioning contract for client state — SHIPPED 2026-08-15
+### C22. A versioning contract for client state — SHIPPED 2026-08-15, CLOSED 2026-08-17
 
 `js/schema.js`, one `ver: 'E.M.m'` string on the store, the portable file and the
-crash report. **One half is open and it is not small:** `room.setup`'s stamp must
-come from the WRITER (`maybeRepushTable`), and a stamp only the server writes is a
-stamp nobody can trust. ~10 lines once someone owns that site.
+crash report. **The `room.setup` half shipped 2026-08-17** — UX §7.49 ⑥.
+The client mints (`portablePushToTable`), `js/net.js pushTable` pipes,
+`server.js handleTable` carries verbatim and never judges, and
+`js/main.js adoptRoomSetup` is the one judged reader for hello, join and
+`'table-setup'` alike. Pinned by `tests/schema.test.mjs` (22 tests): four source
+pins that fail if any link stops stamping, plus a real server proving carry,
+present-or-absent and `bad_ver`.
+
+**Three things this entry got wrong, recorded because the shapes recur:**
+
+1. **`maybeRepushTable` is not the writer.** It REPLAYS a record some earlier
+   build wrote; the authoring writer is `portablePushToTable`, which is also the
+   ONE place `dice.table.v1:<room>` is written. The replay forwards the record's
+   own stamp and must never mint one — a stamp naming the build that merely
+   stored the bytes is the same lie as one naming the server.
+2. **"~10 lines" was wrong because the server rewrote the payload.**
+   `handleTable` built `room.setup` field by field (`{rev, table, profiles, at}`),
+   so a client stamp was dropped on the way in and could not survive one round
+   trip. Closing this needed `server.js` and `js/net.js` as well.
+3. **C22's own header excludes the live wire protocol**, so the residual read as
+   out of scope on the doc's own terms. It is not: `net.pushTable` destructures
+   exactly four fields, so an older build replaying a newer record silently drops
+   whatever it does not know **at the same rev, over the room's setup** — the
+   whole table's preparation degraded by an act nobody clicked. That argument,
+   not the wire, is why the refusal is worth having.
+
+**One defect found while wiring it:** the `'table-setup'` note wrote
+"X prepared the table" over the refusal sentence, on a shared pill and through
+`announce` — a reassuring lie in the slot holding the only explanation. Fixed in
+the same commit.
 
 ### C24 → merged into C27. The mat cannot keep shrinking
 

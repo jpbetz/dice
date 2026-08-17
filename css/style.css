@@ -6227,6 +6227,19 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
    used. It is a foot now (see the scroll move above) and is always in view. */
 #log-dropped { flex: none; }
 #log-dropped:empty { display: none; }
+/* The export foot (§7.49). `flex: none` for the same reason the note above it
+   has it: #log-list owns the scroll, so these stay in view at 100 rows. Ghost
+   weight and a hairline over them — this is a capture verb sitting under the
+   record, not a control the eye should land on before the rolls do. */
+.lf-foot {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  padding: 6px 0 0;
+  margin-top: 4px;
+  border-top: 1px solid var(--hair, rgba(255, 255, 255, 0.07));
+}
+.lf-foot .btn { flex: 1 1 0; }
 /* The scope word the clear button never carried: this press clears every
    put-away roll THROUGH THE SERVER, for everyone. Quiet, second line, because
    the verb is still `Clear history` and this is what comes with it. */
