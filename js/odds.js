@@ -202,6 +202,40 @@ function mulberry32(seed) {
   };
 }
 
+// How keep/drop lands on a pool of len0 counting dice, clamped exactly the
+// way composeRoll clamps it (`Math.min(m.keep.n, idxs.length - 1)`, and
+// idxs.length is always the base count — advantage kills one die per pair and
+// reroll replaces one for one). keptCount is what SURVIVES, whichever verb
+// spelled it: `kh 3` and `dl 1` of four dice both keep three.
+function keepOf(dice, m) {
+  const len0 = dice.length;
+  if (!m.keep) return { keepN: 0, keptCount: len0, fromHigh: true };
+  const keepN = Math.min(m.keep.n, len0 - 1);
+  const high = m.keep.mode === 'kh' || m.keep.mode === 'dl';
+  const keptCount = m.keep.mode === 'kh' || m.keep.mode === 'kl' ? keepN : len0 - keepN;
+  return { keepN, keptCount, fromHigh: high };
+}
+
+// The cap classification for one spec — the single authority both reads
+// share, so previewOf's `exact` and sumForecast's refusals can never drift
+// apart into two opinions about the same pool.
+function tiersOf(dice, m, built) {
+  const { keepN, keptCount, fromHigh } = keepOf(dice, m);
+  let explodeTier = 'absent';
+  if (m.explode) {
+    const nonX = dice.reduce((s, t) => s + (t === 'd10x' ? 0 : 1), 0);
+    const eligible = m.keep ? Math.min(keptCount, nonX) : nonX;
+    const slotsMax = MAX_PHYSICAL_DICE - built.lenA;
+    const slotsMin = slotsMax - (built.rerollTier === 'free' ? dice.length : 0);
+    explodeTier = slotsMax <= 0 || eligible === 0 ? 'void'
+      : EXPLODE_CHAIN_CAP * eligible <= slotsMin ? 'free' : 'binding';
+  }
+  // Mixed-type keep + explode: which types explode depends on cross-type
+  // tie-breaking under sort stability — refused rather than hand-derived.
+  const mixedKeepExplode = !!m.keep && explodeTier === 'free' && new Set(dice).size > 1;
+  return { keepN, keptCount, fromHigh, explodeTier, mixedKeepExplode };
+}
+
 // → {min, avg, max, exact}, modifier included in all three. min is the true
 // floor in every tier (all-min triggers rerolls whose replacements are also
 // min, spawns no explosions, and keep totals are monotone in every die).
@@ -215,28 +249,9 @@ export function previewOf(dice, mods) {
   const min = composeRoll(dice, m, () => 0).total;
   const simMax = composeRoll(dice, m, () => 1 - Number.EPSILON).total;
 
-  const { lenA, rerollTier, entries } = buildCounting(dice, m);
-
-  let keepN = 0;
-  let keptCount = len0;
-  if (m.keep) {
-    keepN = Math.min(m.keep.n, len0 - 1);
-    keptCount = m.keep.mode === 'kh' || m.keep.mode === 'kl' ? keepN : len0 - keepN;
-  }
-
-  let explodeTier = 'absent';
-  if (m.explode) {
-    const nonX = dice.reduce((s, t) => s + (t === 'd10x' ? 0 : 1), 0);
-    const eligible = m.keep ? Math.min(keptCount, nonX) : nonX;
-    const slotsMax = MAX_PHYSICAL_DICE - lenA;
-    const slotsMin = slotsMax - (rerollTier === 'free' ? len0 : 0);
-    explodeTier = slotsMax <= 0 || eligible === 0 ? 'void'
-      : EXPLODE_CHAIN_CAP * eligible <= slotsMin ? 'free' : 'binding';
-  }
-
-  // Mixed-type keep + explode: which types explode depends on cross-type
-  // tie-breaking under sort stability — refused rather than hand-derived.
-  const mixedKeepExplode = m.keep && explodeTier === 'free' && new Set(dice).size > 1;
+  const built = buildCounting(dice, m);
+  const { rerollTier, entries } = built;
+  const { keepN, explodeTier, mixedKeepExplode } = tiersOf(dice, m, built);
   const exact = rerollTier !== 'binding' && explodeTier !== 'binding' && !mixedKeepExplode;
 
   if (!exact) {
@@ -284,4 +299,408 @@ export function previewOf(dice, mods) {
   }
 
   return { min, avg: avg + modifier, max: simMax, exact: true };
+}
+
+// ---------------------------------------------------------------------------
+// THE SUM READ (ROADMAP §2l ⑥, docs/POOL-ANALYSIS.md §6.3).
+//
+// previewOf above answers min/avg/max for every spec. This answers the rest of
+// the question — how likely is each total — which is the thing a declared
+// target turns into a percentage. Under a sum profile a total IS a fact of
+// play (js/meanings.js `aggregate: 'sum'`), so it gets a whole distribution.
+//
+// EXACT, NEVER SAMPLED. The house rule (POOL-ANALYSIS §7) is that a wrong
+// number is worse than an absent one, so where the math runs out this refuses
+// in writing rather than approximating. previewOf may still sample for its
+// one-line min/avg/max — that line is labeled "sampled" and is a different
+// promise from a printed curve.
+//
+// Three engines, in composeRoll's own order of operations:
+//   CONVOLUTION      sums of independent dice. A dense accumulator over the
+//                    integer lattice against a SPARSE multiplicand, so d10x's
+//                    ten-wide support costs ten multiplies per lattice point
+//                    and not ninety.
+//   ORDER-STATISTIC  keep/drop, as a DP over FACES (high→low for kh/dl,
+//                    low→high for kl/dh) whose state is (dice not yet placed,
+//                    kept sum so far). Two collapses make it cheap: the kept
+//                    count after placing j dice is min(k, j) — a function of
+//                    the state, not a second dimension — and the moment the
+//                    keep budget fills, the sum can never change again, so
+//                    the whole tail of the face order is absorbed in one step.
+//   EXPLOSION        a closed-form chain distribution folded into the ONE face
+//                    that can trigger it. A die's burst depends only on its
+//                    own value, so it rides the pmf rather than the DP.
+//
+// WHAT IS FORECAST is spec.dice under spec.mods — the total composeRoll would
+// produce, modifier included. Explosion children are part of that total (they
+// count), which is not a contradiction of the per-die rule that "explosion
+// changes nothing": there the unit is the DIE and a child is not one, here the
+// unit is the TOTAL and a child adds to it.
+//
+// THE REFUSALS, all three detected before a number is computed:
+//   mixed-keep   keep/drop over dice that do not all roll ONE distribution.
+//                The DP's sequential-multinomial decomposition needs an
+//                exchangeable population; with two populations "how many dice
+//                are left" stops being a sufficient statistic and the DP would
+//                be confidently wrong. NOTE this is strictly broader than
+//                POOL-ANALYSIS §6.3's proposed `new Set(spec.dice).size === 1`
+//                — `21d20 adv kh3` is one TYPE and two DISTRIBUTIONS (19 dice
+//                get advantage partners, 2 do not, because the 40-die cap runs
+//                out), and the type test waves it through.
+//   reroll-cap   the cap truncates rerolls value-dependently (previewOf's
+//                BINDING tier): which die loses its slot depends on every
+//                earlier die, so the dice are no longer independent.
+//   explode-cap  the same, for explosion children.
+// Advantage-with-explosion is NOT a fourth refusal and is not a category at
+// all — see the note above sumForecast.
+// ---------------------------------------------------------------------------
+
+export const SUM_REFUSALS = {
+  'mixed-keep': 'keep/drop across dice that roll different distributions — no exact curve for the total',
+  'reroll-cap': 'more rerolls than the 40-die cap can hold — which dice reroll depends on the landing',
+  'explode-cap': 'more explosions than the 40-die cap can hold — which dice explode depends on the landing',
+};
+
+// A dense distribution over one contiguous window: p[i] = P(X = lo + i).
+// Zeros inside the window are real (a d10x pool skips nine values in ten) and
+// are dropped only at the very end, where the support becomes a value list.
+const distZero = () => ({ lo: 0, p: Float64Array.of(1) });
+
+const pairsOf = (q) => [...q.entries()].sort((a, b) => a[0] - b[0]);
+
+// One convolution step: dense window × sparse pmf.
+function distConv(d, pairs) {
+  const vlo = pairs[0][0];
+  const vhi = pairs[pairs.length - 1][0];
+  const out = new Float64Array(d.p.length + (vhi - vlo));
+  for (let i = 0; i < d.p.length; i++) {
+    const pi = d.p[i];
+    if (pi === 0) continue;
+    for (let j = 0; j < pairs.length; j++) out[i + pairs[j][0] - vlo] += pi * pairs[j][1];
+  }
+  return { lo: d.lo + vlo, p: out };
+}
+
+// What a die that landed on its own max is WORTH, face plus every descendant.
+// composeRoll gives the first child unconditionally and each deeper link only
+// on another max, and a die at depth EXPLODE_CHAIN_CAP does not explode at all
+// (`depth >= EXPLODE_CHAIN_CAP` there), so the chain is three links deep and
+// `1d6!` tops out at 24. Returned as a pmf over the whole contribution, so a
+// caller drops it into the die's own pmf in place of the bare top face.
+function burstPairs(type) {
+  const faces = facesOf(type);
+  const F = faces.length;
+  const top = faces[F - 1];
+  let tail = faces.map((v) => [v, 1 / F]); // the deepest link: a plain die
+  for (let d = EXPLODE_CHAIN_CAP - 1; d >= 1; d--) {
+    const next = new Map();
+    for (const v of faces) {
+      if (v !== top) { next.set(v, (next.get(v) || 0) + 1 / F); continue; }
+      for (const [w, p] of tail) next.set(top + w, (next.get(top + w) || 0) + p / F);
+    }
+    tail = pairsOf(next);
+  }
+  return tail.map(([v, p]) => [top + v, p]);
+}
+
+// The same pmf with its top face replaced by the burst. d10x never explodes
+// (composeRoll skips it by type), so callers must not pass one.
+function burstPmf(q, type) {
+  const top = DIE_MAX[type];
+  const pTop = q.get(top) || 0;
+  const out = new Map();
+  for (const [v, p] of q) if (v !== top) out.set(v, (out.get(v) || 0) + p);
+  if (pTop > 0) for (const [v, p] of burstPairs(type)) out.set(v, (out.get(v) || 0) + pTop * p);
+  return out;
+}
+
+function pmfEqual(a, b) {
+  if (a.size !== b.size) return false;
+  for (const [v, p] of a) { const q = b.get(v); if (q === undefined || Math.abs(q - p) > 1e-15) return false; }
+  return true;
+}
+
+function pascal(n) {
+  const C = [[1]];
+  for (let i = 1; i <= n; i++) {
+    const row = new Array(i + 1).fill(0);
+    row[0] = 1; row[i] = 1;
+    for (let j = 1; j < i; j++) row[j] = C[i - 1][j - 1] + C[i - 1][j];
+    C.push(row);
+  }
+  return C;
+}
+
+// THE ORDER-STATISTIC DP. `L` exchangeable dice with the pmf `(faces, probs)`;
+// keep the `k` from the high end (kh/dl) or the low end (kl/dh). One face may
+// pay a DISTRIBUTION rather than its own value — `burstAt` names it and
+// `ladder[c]` is what c kept dice there are worth — which is how explosion
+// gets in without a second state dimension. Returns the dense distribution of
+// the KEPT sum.
+//
+// The decomposition is the sequential multinomial: given r dice still unplaced
+// and the faces above this one already settled, the count landing HERE is
+// Binomial(r, p_face / p_remaining). That is exact for identical dice and only
+// for identical dice — hence the mixed-keep refusal.
+//
+// Ties need no thought and that is the point: composeRoll's sort is stable, so
+// WHICH die it keeps among equals is an artifact, but the multiset of kept
+// VALUES is not, and a sum only sees the multiset.
+function keptSumDist(faces, probs, L, k, fromHigh, burstAt, ladder, maxPay) {
+  const F = faces.length;
+  const order = [];
+  for (let j = 0; j < F; j++) order.push(fromHigh ? F - 1 - j : j);
+  // p(this face | it is one of the faces not yet placed), read off a suffix
+  // sum rather than a running subtraction so the last face is exactly 1.
+  const rem = new Array(F);
+  let acc = 0;
+  for (let j = F - 1; j >= 0; j--) { acc += probs[order[j]]; rem[j] = acc; }
+
+  const S = k * maxPay + 1;
+  const C = pascal(L);
+  let cur = new Float64Array((L + 1) * S);
+  let next = new Float64Array((L + 1) * S);
+  // Window bounds per r, so the inner loops walk live mass only. Without them
+  // a 40d10x keep would scan 1801 slots per (face, r, count) for nothing.
+  let curLo = new Int32Array(L + 1).fill(S);
+  let curHi = new Int32Array(L + 1).fill(-1);
+  let nxtLo = new Int32Array(L + 1).fill(S);
+  let nxtHi = new Int32Array(L + 1).fill(-1);
+  const done = new Float64Array(S);
+  let doneLo = S; let doneHi = -1;
+  cur[L * S] = 1; curLo[L] = 0; curHi[L] = 0;
+
+  const w = new Float64Array(L + 1);
+  // ρ^c and (1−ρ)^c, built once per face. Math.pow inside the (face, r, c)
+  // loop was costing more than the DP itself.
+  const pr = new Float64Array(L + 1);
+  const pq = new Float64Array(L + 1);
+  for (let step = 0; step < F; step++) {
+    const j = order[step];
+    const v = faces[j];
+    const rho = rem[step] > 0 ? Math.min(1, probs[j] / rem[step]) : 0;
+    pr[0] = 1; pq[0] = 1;
+    for (let c = 1; c <= L; c++) { pr[c] = pr[c - 1] * rho; pq[c] = pq[c - 1] * (1 - rho); }
+    const bursts = burstAt !== null && v === burstAt ? ladder : null;
+    next.fill(0); nxtLo.fill(S); nxtHi.fill(-1);
+    for (let r = 0; r <= L; r++) {
+      if (curHi[r] < curLo[r]) continue;
+      const room = k - (L - r); // > 0 for every live state, by construction
+      const base = r * S;
+      const lo0 = curLo[r];
+      const hi0 = curHi[r];
+      const Cr = C[r];
+      for (let c = 0; c <= r; c++) w[c] = Cr[c] * pr[c] * pq[r - c];
+      const cmax = Math.min(r, room - 1);
+      // The exact live span, found once. Every c writes [first, last] shifted,
+      // so the windows stay tight without re-deriving them per c.
+      let first = -1; let last = -1;
+      for (let i = lo0; i <= hi0; i++) if (cur[base + i] !== 0) { if (first < 0) first = i; last = i; }
+      if (first >= 0 && !bursts) {
+        // The hot path, and the reason the loops are nested this way round:
+        // one sequential read of `cur` feeds all c, instead of one full
+        // re-scan per c. dst walks by (v − S) because keeping one more die
+        // here moves the state one row up and c·v slots along.
+        for (let i = first; i <= last; i++) {
+          const p = cur[base + i];
+          if (p === 0) continue;
+          let dst = base + i;
+          for (let c = 0; c <= cmax; c++) {
+            const wc = w[c];
+            if (wc !== 0) next[dst] += p * wc;
+            dst += v - S;
+          }
+        }
+        for (let c = 0; c <= cmax; c++) {
+          if (w[c] === 0) continue;
+          const off = c * v;
+          if (first + off < nxtLo[r - c]) nxtLo[r - c] = first + off;
+          if (last + off > nxtHi[r - c]) nxtHi[r - c] = last + off;
+        }
+      } else if (first >= 0) {
+        for (let c = 0; c <= cmax; c++) {
+          if (w[c] === 0) continue;
+          const dst = (r - c) * S;
+          const pay = bursts[c];
+          let lo = S; let hi = -1;
+          for (let i = first; i <= last; i++) {
+            const p = cur[base + i];
+            if (p === 0) continue;
+            const pw = p * w[c];
+            for (let t = 0; t < pay.length; t++) {
+              const idx = i + pay[t][0];
+              next[dst + idx] += pw * pay[t][1];
+              if (idx < lo) lo = idx;
+              if (idx > hi) hi = idx;
+            }
+          }
+          if (hi >= lo) {
+            if (lo < nxtLo[r - c]) nxtLo[r - c] = lo;
+            if (hi > nxtHi[r - c]) nxtHi[r - c] = hi;
+          }
+        }
+      }
+      // c ≥ room fills the keep budget: exactly `room` dice are kept here, at
+      // this one face, whatever c is — and from then on the kept sum is
+      // frozen, so the entire remaining face order collapses into this add.
+      if (room <= r) {
+        let wt = 0;
+        for (let c = room; c <= r; c++) wt += w[c];
+        if (wt > 0) {
+          const pay = bursts ? bursts[room] : null;
+          const off = room * v;
+          for (let i = lo0; i <= hi0; i++) {
+            const p = cur[base + i];
+            if (p === 0) continue;
+            const pw = p * wt;
+            if (!pay) {
+              done[i + off] += pw;
+              if (i + off < doneLo) doneLo = i + off;
+              if (i + off > doneHi) doneHi = i + off;
+              continue;
+            }
+            for (let t = 0; t < pay.length; t++) {
+              const idx = i + pay[t][0];
+              done[idx] += pw * pay[t][1];
+              if (idx < doneLo) doneLo = idx;
+              if (idx > doneHi) doneHi = idx;
+            }
+          }
+        }
+      }
+    }
+    const tc = cur; cur = next; next = tc;
+    const tl = curLo; curLo = nxtLo; nxtLo = tl;
+    const th = curHi; curHi = nxtHi; nxtHi = th;
+  }
+  if (doneHi < doneLo) return distZero(); // unreachable: the last face has rho = 1
+  return { lo: doneLo, p: done.slice(doneLo, doneHi + 1) };
+}
+
+function sumRefusal(code) {
+  return { kind: 'sum', exact: false, refusal: { code, reason: SUM_REFUSALS[code] },
+    min: null, max: null, mean: null, sd: null, mode: null, modifier: 0,
+    values: [], probs: [], cdf: [] };
+}
+
+// THE WHOLE DISTRIBUTION of composeRoll's total for one spec, or a typed
+// refusal. Pure: same spec in, same object out, on every seat and every
+// repaint — there is no rng here and no sampling fallback.
+//
+// ADVANTAGE WITH EXPLOSION is not a special case, and POOL-ANALYSIS §6.3's
+// "two genuine gaps" over-counts by one. The loser of an advantage pair is
+// `counts: false` before composeRoll's explosion loop even looks at the queue,
+// so the exploding population is exactly the winners and their resolved pmf is
+// already `advPairPmf`. What DOES bite is the 40-slot budget the pairs spend
+// first — `20d20 adv !` has zero slots left and spawns nothing (VOID: exact,
+// explosion ignored), `19d20 adv !` has two slots for nineteen candidates
+// (BINDING: refused as explode-cap). Both are the ordinary tiers. `1d20 adv !`
+// and `1d20+1d4 adv !` are exact and are pinned against exhaustive
+// enumeration of composeRoll in tests/sumread.test.mjs.
+export function sumForecast(dice, mods) {
+  const m = mods || {};
+  const modifier = m.modifier || 0;
+  const built = buildCounting(dice, m);
+  const { rerollTier, entries } = built;
+  if (rerollTier === 'binding') return sumRefusal('reroll-cap');
+  const { keptCount, fromHigh, explodeTier } = tiersOf(dice, m, built);
+  if (explodeTier === 'binding') return sumRefusal('explode-cap');
+
+  let d;
+  if (!m.keep || !entries.length) {
+    d = distZero();
+    for (let i = 0; i < entries.length; i++) {
+      const t = dice[i];
+      const q = explodeTier === 'free' && t !== 'd10x' ? burstPmf(entries[i].q, t) : entries[i].q;
+      d = distConv(d, pairsOf(q));
+    }
+  } else if (keptCount <= 0) {
+    // composeRoll's `Math.min(m.keep.n, idxs.length - 1)` clamp can drop every
+    // die (`1d6 kh5`, which validateMods rejects and previewOf still mirrors).
+    // The total is then the modifier alone, and this says so rather than
+    // indexing into an empty population.
+    d = distZero();
+  } else {
+    // One population or nothing. The type check is not redundant with the pmf
+    // check — it is what lets the burst below name a max face at all.
+    const q0 = entries[0].q;
+    if (new Set(dice).size > 1 || !entries.every((e) => pmfEqual(e.q, q0))) return sumRefusal('mixed-keep');
+    const type = dice[0];
+    const pairs = pairsOf(q0);
+    const faces = pairs.map((e) => e[0]);
+    const probs = pairs.map((e) => e[1]);
+    const top = DIE_MAX[type];
+    const bursts = explodeTier === 'free' && type !== 'd10x' ? burstPairs(type) : null;
+    let maxPay = faces[faces.length - 1];
+    let ladder = null;
+    if (bursts) {
+      maxPay = bursts[bursts.length - 1][0];
+      // c kept dice on the exploding face: c independent bursts, so the ladder
+      // is built by convolving one more burst per rung.
+      ladder = [[[0, 1]]];
+      for (let c = 1; c <= keptCount; c++) {
+        const acc = new Map();
+        for (const [a, pa] of ladder[c - 1]) for (const [b, pb] of bursts) acc.set(a + b, (acc.get(a + b) || 0) + pa * pb);
+        ladder.push(pairsOf(acc));
+      }
+    }
+    d = keptSumDist(faces, probs, dice.length, keptCount, fromHigh,
+      ladder ? top : null, ladder, maxPay);
+  }
+
+  const values = [];
+  const probsOut = [];
+  const cdf = [];
+  let acc = 0;
+  let mean = 0;
+  let best = -1;
+  for (let i = 0; i < d.p.length; i++) {
+    const p = d.p[i];
+    if (p === 0) continue;
+    const v = d.lo + i + modifier;
+    values.push(v); probsOut.push(p);
+    acc += p; cdf.push(acc);
+    mean += v * p;
+    if (best < 0 || p > probsOut[best]) best = values.length - 1;
+  }
+  let variance = 0;
+  for (let i = 0; i < values.length; i++) variance += probsOut[i] * (values[i] - mean) * (values[i] - mean);
+  return {
+    kind: 'sum',
+    exact: true,
+    refusal: null,
+    modifier,
+    min: values[0],
+    max: values[values.length - 1],
+    mean,
+    sd: Math.sqrt(Math.max(0, variance)),
+    mode: { value: values[best], p: probsOut[best] },
+    values,
+    probs: probsOut,
+    cdf,
+  };
+}
+
+// P(total ≥ n) and P(total ≤ n) off the forecast's own cdf — the two reads a
+// declared target needs, and the only place the app should be doing this
+// arithmetic. null on a refused forecast, so a caller cannot accidentally
+// print 0% where the honest answer is "we do not know".
+export function sumAtLeast(fc, n) {
+  if (!fc || !fc.exact) return null;
+  let below = 0;
+  for (let i = 0; i < fc.values.length; i++) {
+    if (fc.values[i] >= n) break;
+    below = fc.cdf[i];
+  }
+  return Math.min(1, Math.max(0, 1 - below));
+}
+
+export function sumAtMost(fc, n) {
+  if (!fc || !fc.exact) return null;
+  let at = 0;
+  for (let i = 0; i < fc.values.length; i++) {
+    if (fc.values[i] > n) break;
+    at = fc.cdf[i];
+  }
+  return Math.min(1, Math.max(0, at));
 }

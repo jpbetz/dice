@@ -22,7 +22,7 @@ limitations under the License.
 
 import assert from 'node:assert/strict';
 import { outcomeForDie, SYSTEMS, OUTCOME_LADDER } from '../js/meanings.js';
-import { countingPmfs } from '../js/odds.js';
+import { countingPmfs, sumForecast } from '../js/odds.js';
 import { composeRoll } from '../js/rollspec.js';
 
 let n = 0;
@@ -358,9 +358,20 @@ t('collapsed mixture: count-weighted, ladder-ordered; homogeneous is the bar its
   assert.deepEqual(homo.collapsed.segments, homo.bars[0].segments.map((x) => ({ ...x })));
 });
 
-t('sum profiles have no forecast yet (§2l ⑥)', () => {
-  assert.equal(SYSTEMS.dnd.forecastFor({ dice: ['d20'], mods: null }, tools), null);
-  assert.equal(SYSTEMS.none.forecastFor({ dice: ['d20'], mods: null }, tools), null);
+t('sum profiles forecast a SUM, and only when the tool is in the bag (§2l ⑥)', () => {
+  // The narrow bag is what js/main.js passes until the rendering pass widens
+  // it. Silence, never a throw — the popover's preview slot is on the other
+  // side of this call. (The distribution itself is proved in
+  // tests/sumread.test.mjs, against exhaustive enumeration of composeRoll.)
+  for (const id of ['dnd', 'none']) {
+    assert.equal(SYSTEMS[id].forecastFor({ dice: ['d20'], mods: null }, tools), null);
+    const fc = SYSTEMS[id].forecastFor({ dice: ['d20'], mods: null }, { ...tools, sumForecast });
+    assert.equal(fc.kind, 'sum');
+    assert.equal(fc.exact, true);
+    assert.deepEqual([fc.min, fc.max, fc.mean], [1, 20, 10.5]);
+  }
+  // …and the per-die profile is unmoved by a tool it does not read.
+  assert.equal(sd.forecastFor({ dice: ['d6'], mods: null }, { ...tools, sumForecast }).kind, 'per-die');
 });
 
 t('end to end: forecast segments match outcomesFor word frequencies (seeded MC)', () => {

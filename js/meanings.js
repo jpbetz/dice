@@ -202,13 +202,39 @@ function segmentsFor(type, q) {
 //               per-die profile has no roll-level verdict to make that claim
 //               from. A profile that leaves it undefined always washes,
 //               which is the right default for a one-die verdict.
-//   forecastFor(spec, tools) -> the pre-roll read of a spec (ROADMAP §2l),
-//               or null when the profile has none (sum profiles until the
-//               sum read ships). tools injects the math — countingPmfs from
-//               js/odds.js — so this module stays dependency-free. Returns
-//               {kind:'per-die', bars:[{source, type, rank, count, variant,
-//               allQuiet, segments:[{word, tier, p}]}]} with segments in
-//               chart row order, or {kind:'refusal', reason}.
+//   forecastFor(spec, tools) -> the pre-roll read of a spec (ROADMAP §2l), or
+//               null when the profile has none. tools injects the math —
+//               countingPmfs and sumForecast from js/odds.js — so this module
+//               stays dependency-free. A profile forecasts in the shape it
+//               READS: a per-die profile returns {kind:'per-die', bars:[…]}
+//               with segments in chart row order, or {kind:'refusal', reason};
+//               a sum profile returns {kind:'sum', …} — the whole distribution
+//               of the total, or the same object carrying a typed `refusal`
+//               (§2l ⑥, docs/POOL-ANALYSIS.md §6.3).
+//
+//               A SUM REFUSAL IS NOT kind:'refusal', and the difference is
+//               load-bearing. The renderer prints a kind:'refusal' INSTEAD of
+//               the min/avg/max line; but previewOf is still exact for the
+//               average of a pool whose CURVE cannot be drawn (`8d8+2d20 kh4`
+//               is exactly one such), so borrowing that kind would delete a
+//               true read to print a sentence about a different one. The
+//               refusal rides inside the sum and the line survives it.
+// THE SUM READ, shared by every profile that sums (ROADMAP §2l ⑥). One
+// implementation, not two: `dnd` and `none` disagree about what a crit is and
+// what to call a target, and agree completely about arithmetic — a second copy
+// would only be a second place for them to drift.
+//
+// The tool is INJECTED, exactly as countingPmfs is, and its absence is silent
+// on purpose: js/main.js passes `{countingPmfs}` at both call sites until the
+// rendering pass widens it, and a profile that threw on the narrow bag would
+// take the popover down. Null here reads to the renderer as "no forecast",
+// which is what the sum profiles returned before this shipped.
+function sumForecastFor(spec, tools) {
+  if (!spec || !Array.isArray(spec.dice) || !spec.dice.length) return null;
+  if (!tools || typeof tools.sumForecast !== 'function') return null;
+  return tools.sumForecast(spec.dice, spec.mods || null);
+}
+
 export const SYSTEMS = {
   'soul-deal': {
     id: 'soul-deal',
@@ -428,7 +454,10 @@ export const SYSTEMS = {
     // disagreed. Stated rather than defaulted, so the contrast with
     // soul-deal's rule is on the record where both live.
     critCeremony() { return true; },
-    forecastFor: () => null, // the sum read ships in §2l ⑥
+    // The natural-20 rule above is a fact about ONE DIE and does not touch the
+    // curve, so this is the same arithmetic `none` gets. What differs between
+    // the two profiles is `targetWord`, and the renderer owns that.
+    forecastFor: sumForecastFor,
   },
   none: {
     id: 'none',
@@ -438,7 +467,7 @@ export const SYSTEMS = {
     targetWord: 'Target',
     outcomesFor: () => null,
     critFor: () => null,
-    forecastFor: () => null, // the sum read ships in §2l ⑥
+    forecastFor: sumForecastFor,
   },
 };
 
