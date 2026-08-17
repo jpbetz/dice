@@ -20192,6 +20192,17 @@ if (window.ResizeObserver) {
   ro.observe(banner);
   ro.observe(logFlyoutEl);
 }
+// …AND A RESIZE LISTENER, because the sentence above was false in the one way
+// that mattered: `sharesColumn` is about where the boxes ARE, and a rotation
+// can move them into one column without resizing either. Measured 2026-08-17
+// by `flyout-banner`, which was left RED on this leg: 1440×900 → 844×390 with
+// the log open leaves both boxes at 271×125 and 300×143 — neither resized, the
+// observer never fired, `--banner-lift` stayed 0px, and the log covered
+// 251/900 of the read until the next roll (the banner has no clock). Closing
+// and re-opening the log fixed it, which is what proved the geometry right and
+// the trigger missing. This is the same `resize` the felt re-fits on, and the
+// `lift === flyoutLift` guard above makes the redundant call free.
+window.addEventListener('resize', syncFlyoutLift);
 
 function openLogFlyout() {
   logFlyoutEl.classList.remove('hidden');
