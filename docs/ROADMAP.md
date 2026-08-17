@@ -927,23 +927,86 @@ are `.btn.ghost` at 31px, `.corner-btn` at 28 expanded, `.btn.tiny` at 19,
 against the industry canon: seven pillars STRONG, three PARTIAL, one GAP. V1
 (audio phase one) and V2 (dust motes) shipped — see SHIPPED.md.*
 
-### V3. Finish the wear dossier — small-medium
+### V3. Finish the wear dossier — **NOT small; it is a fifth wear pass and a LOOK**
 Audit §2's two designed-but-unbuilt items: hand-polish roughness zones (tray,
 jambs — "polished where hands and dice pass") and the arris ribbon (sparse
 chip decals that break the long straight edges). Completes "aged" into "aged
 and handled."
 
-### V4. Performance guardrails — small
-Audit §10: assert `renderer.info.render.calls` in `tower-roll` (a budget as a
-failing test, not a vibe) · clamp `setPixelRatio` · an idle tick throttle
-(render-on-demand proper conflicts with the breathing world; the applicable
-form is a reduced idle rate). *(T14 already made the tower draw budget an
-assertion at 20 total — this is the same discipline for the scene.)*
+**Re-scoped 2026-08-17 (verified unbuilt: `grep -rn "arris\|burnish\|polish"`
+over `js/` finds the word only in *comments explaining existing bevels*, never
+a pass).** This is not tail work and it should not be started as tail work:
 
-### V5. Diegetic nudges — small, DESIGN FIRST
+- The wear stack is FIVE analytic passes shared by every tower
+  (`weatherPass`, `grimePass`, `dustPass`, `mossPass`, `gravityStain` — all
+  exported from js/towerskin.js and called by towerhollow/towerbastion/
+  towerdress). A polish pass is a **sixth**, it INVERTS the others' sign
+  (roughness *down* where they all push it up), and it needs a zone predicate
+  ("where hands and dice pass") that no existing pass has any notion of — the
+  four dials are curvature, concavity, up-vector and drift.
+- Then it has to be **dialled per tower and per palette**, which is
+  T6's "two palettes cost two of everything", and accepted **by Joe's eye** —
+  and five LOOK verdicts are already outstanding at #1. Shipping a wear pass
+  into that queue lengthens it.
+- The arris ribbon is the cheaper half and still not small: `DecalField`
+  (js/decals.js) is a FELT-impact system, so edge chips on tower geometry are
+  either a new decal domain or baked into each skin.
+
+**Leave it whole for a materials round with a LOOK slot booked.** Salvage: it
+is the natural companion to [T15](#t15-re-bake-the-three-classic-skins-through-the-forge--large-scoped-2026-08-14),
+which is already re-baking the three classic skins and already queued behind
+Joe.
+
+### V4. Performance guardrails — **the instrument SHIPPED 2026-08-17; the assertion and the throttle are what is left**
+Audit §10 asked for three things and one of the three was **never true**:
+
+- ✅ **`renderer.info.render.calls`, as a number a test can hold** — SHIPPED
+  (SHIPPED.md, *V4 (instrument)*). `__diceDebug.renderAudit()` reports the
+  frame's real cost, and the reason it took more than one line is the trap:
+  three.js resets that counter inside *every* `renderer.render()`, and
+  js/post.js issues up to eight per frame, so the obvious read reports the
+  closing quad's single draw and passes any budget. `renderer.info.autoReset`
+  is now ours (js/main.js:655) and tick() resets once per frame
+  (js/main.js:8657).
+- ❌ **"pixel ratio not clamped"** — **the audit was wrong on the day it was
+  written.** `renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))`
+  has been there since the repo's first commit: `git log -S
+  "setPixelRatio(Math.min" --oneline -- js/main.js` returns `2036d59 init` and
+  nothing else. Recorded in SHIPPED.md's wrong-claims table; `renderAudit()`
+  now reports `pixelRatio` so the clamp is assertable rather than re-asserted
+  from memory.
+- ⬜ **The assertion itself** — a scenario, and the contract is written:
+  a settled `4d6` frame with any registry tower up must sit **under 260 draw
+  calls and over 40**, the floor being the anti-collapse guard (if
+  `autoReset` ever came back the count would fall to ~1 and a ceiling-only
+  budget would still pass). Measured 2026-08-17 with
+  `renderAudit()` per tower, after settle, headless at dpr 1 — empty felt **2**,
+  4d6 on bare felt **58**, `heartwood` **133**, `bastion` **141**,
+  `blackanvil` **186**, `nullstone` **68**, `hollowbole` **79**, and the post
+  stack forced **70 in 8 passes**. Owner: whoever owns
+  `tests/e2e/scenarios.mjs` next.
+- ⬜ **The idle tick throttle — NOT a one-liner, because its gate is an eye.**
+  The measurement is why it is worth keeping: idle with no tower is **2 draw
+  calls**, and idle with `blackanvil` up is **186, every frame, forever**. So
+  the payoff is real. But "idle" here still has the ember breath, the sway and
+  the smoke running by design (the audit says so itself), so a reduced idle
+  rate is a *visible* change to the breathing world, and the only thing that
+  can accept or refuse it is Joe's eye — which is the queue at #1. Do not
+  land it as tail work; take it with a LOOK slot.
+
+### V5. Diegetic nudges — DESIGN FIRST, and the hover half has no substrate
 Audit §11: a result echo on the felt near the deciding die; hover warmth on
 dice ("everything you can touch touches back"). The mat's painted text is the
 precedent that this is buildable without a framework.
+
+**Checked 2026-08-17: there is no pointer→die path in the app at all.** The
+only `pointermove` on the canvas is CAMPEEK's hold-drag (js/main.js:747), and
+it deliberately *swallows* the click that follows a pivot — so "hover warmth"
+starts by adding a per-frame raycast against `tableDice` and then owes an
+answer for touch, where hover does not exist and every one of those frames is
+the drag. The felt echo is the more promising half and the mat precedent does
+hold, but it needs the ruling U16 needs: the app has no worldspace text
+renderer, only painted mat texture. Both stay design-first.
 
 ### V6. Taste items, someday — record only
 A trauma²-curve table-nudge on the heaviest single-die landing; a grade LUT.

@@ -4128,6 +4128,53 @@ rMax 12, count 200) and scoped it to HEARTWOOD ONLY — a registry family
 trait (`TOWERS[id].motes`) set through towerSocket, so the dust rises and
 settles with its tower and every other body of air stays clean.
 
+### V4 (instrument). The frame's draw budget is now a number — SHIPPED 2026-08-17
+
+Audit §10's first gap, and the reason it was not the one-liner it looks like:
+**the obvious read of `renderer.info.render.calls` lies, and it lies in the
+flattering direction.** three.js resets that counter *inside* every
+`renderer.render()` (`if (this.info.autoReset === true) this.info.reset()`),
+and js/post.js issues up to **eight** renders per frame — base, glow,
+threshold, four blurs, composite. So a scenario reading it after a bloom frame
+gets the **1 draw call** of the closing fullscreen quad and passes any budget
+anybody could write. A green check masking a broken thing, pre-installed.
+
+Three small hunks in `js/main.js` take the reset over:
+
+- `renderer.info.autoReset = false` beside the renderer (js/main.js:655);
+- `renderer.info.reset()` once per frame, inside tick()'s `if (render)` gate
+  (js/main.js:8657), so the counters **accumulate across every pass** — and the
+  2048² PCFSoft **shadow map is now in the total**, which the engine's own reset
+  point deliberately skips (it resets *after* `shadowMap.render`);
+- `__diceDebug.renderAudit()` (js/main.js:12512) — `calls`, `triangles`,
+  `lines`, `points`, `passes`, `post`, `pixelRatio`, `programs`, `geometries`,
+  `textures`.
+
+**`passes` is there so the number can be disbelieved.** If `autoReset` ever
+came back on, `calls` would quietly collapse to ~1 and a ceiling-only budget
+would still pass — so the contract is a **ceiling and a floor**, and a frame
+reporting several passes with a draw count in the dozens cannot be the
+collapsed one. `pixelRatio` rides along for the same reason (see the
+wrong-claims table: the clamp the audit called missing was never missing).
+
+**The scene-wide sibling of `towerDressAudit()`, not a replacement.** That one
+WALKS the graph and counts meshes — the dressing's static price, budgeted at
+≤4k tris / ≤8 draws by `tower-dress-budget`. This one reports what three.js
+actually *issued* for one frame.
+
+**Measured 2026-08-17** — `renderAudit()` after settle, headless, dpr 1 (draw
+calls do not depend on resolution, so the figures port): empty felt **2**, a
+settled `4d6` on bare felt **58**, `heartwood` **133**, `bastion` **141**,
+`blackanvil` **186**, `nullstone` **68**, `hollowbole` **79**, post stack
+forced **70 in 8 passes**. Two of those numbers are load-bearing elsewhere:
+186-every-frame-forever is what makes V4's idle throttle worth keeping, and
+2-on-an-empty-table is what makes it a LOOK question rather than a win.
+
+*Note for whoever writes the assertion:* `sim()` ticks with `render=false`, so
+the audit always reports the last **real** rAF frame — wait for a fresh frame
+(`waitFor` on the audit itself) after changing scene state, and read after a
+settle, since mid-playback frames legitimately draw more.
+
 
 ## Tier W — the landings (W0, W1, W3)
 
@@ -5110,6 +5157,7 @@ was true when it was made and had stopped being true — which is the failure th
 | **GOALS goal 14: "the thirteen rules"** | Fifteen. Rules 14 and 15 had both landed. GOALS wins ties, so a stale count there is worse than anywhere else. |
 | **§3b's blocker, and four line refs** | The throttle it names as owed **landed**. `initNet`, `dice.name.v1`, `MAX_ROOMS` and `renderSeatChoices` were all cited at line numbers that had moved. |
 | **POOL-ANALYSIS §6.1's two timings** | Do not reproduce, and their *ordering is impossible* — `poolBars` calls `spectrum`, yet the doc has it faster. Unwarmed-JIT noise, never measurements, in a document whose first rule is that every number is generated. |
+| **IMMERSION-AUDIT §10 / ROADMAP V4: "pixel ratio not clamped (worth checking on laptops)"** | **Never true, on any day.** `renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))` is at js/main.js:641 and has been there since the repo's first commit: `git log -S "setPixelRatio(Math.min" --oneline -- js/main.js` returns `2036d59 init` and nothing else. Same shape as C27 — not drift, wrong on the day it was written, and it survived a re-copy into the roadmap. It is now assertable rather than re-asserted: `__diceDebug.renderAudit().pixelRatio` reports it (headless reads 1; the ceiling is the claim, so assert `<= 2`). |
 
 ## Two findings about method, worth more than any single fix
 
