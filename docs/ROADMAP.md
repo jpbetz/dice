@@ -668,25 +668,58 @@ felt strip was **refused with arithmetic** — five panels across a 390px phone 
 each, which is C24's smudge applied to UI — and `rec-phone-open.png` +
 `rec-five-open.png` are the pair that let him overrule that in one look.
 
-### C26. `Change seat…` — WITHHELD, owes a design before it returns
+### C26. `Change seat…` — DECIDED 2026-08-17: the label never returns; the gesture does
 
-Hidden unconditionally since 2026-08-09 (`touch-doors` pins the hide). The
-button, its handler and `leaveTable()` all stay: the function is still the
-only scripted door to a `netOnline === false` state mid-scenario, and
-un-hiding is one boolean.
+**Re-verified 2026-08-17:** hidden unconditionally (js/main.js:24522,
+`touch-doors` pins it); the handler is `leaveTable()` — `forgetSeat` +
+**`localStorage.removeItem(LS_NAME)`** + re-enter `initNet()`
+(js/main.js:24647-24671); the label still reads `Change seat…`
+(index.html:522). The stuck reason survived contact and **sharpened**: the
+name deletion is not incidental, it is *load-bearing* — a stored name skips
+the door (U3's gate), so wiping the name is the only way the verb can force
+the seat picker open. The whole mechanism is amnesia used as navigation:
+per-join identity means the round trip also mints a new `playerId`, quietly
+orphaning reveal/Done authority on every roll you had out
+([docs/IDENTITY.md](IDENTITY.md) §3). Every journey the label suggests
+already has a lossless verb — a new name is `Change name…`, a different
+character is `Profile…`, a different table is `Leave table` — so the
+re-labelled button has no journey left except "reopen the door", which it
+performs by burning the furniture.
 
-**Why it was not thought through.** The verb reads as "sit somewhere else at
-this table", and what it does is drop the seat, **delete `LS_NAME`**, and
-re-enter `initNet()`. The name deletion is the part no one would predict from
-the label — §3b/L3 split it out of `Leave & switch seat` precisely so that
-"the seat belongs to the table; the NAME is yours and comes with you"… and
-then left the name-wiping verb wearing the seat-shaped label.
+**The decision.** ① The label `Change seat…` is retired permanently; the
+hidden button and `leaveTable()` stay exactly as they are, as the scripted
+door to a `netOnline === false` state — tests-only, forever, and "un-hiding
+is one boolean" stops being the plan. ② The gesture that returns is the
+one PROFILES made real: **taking one of this table's free prepared seats
+while already seated** — name + character in one move, on the SAME seat.
 
-**What it owes before it comes back:** a decision about what "change seat"
-means when seats are *prepared characters* (PROFILES) rather than places at a
-table. Swapping which prepared seat you occupy is a real and useful gesture,
-and it is not "drop everything and rejoin". If that is the verb, it belongs
-next to the profile picker, not under a menu item that also deletes your name.
+**The words (the whole point of a design-first item):** identity-menu item
+**`Take a prepared seat…`**, between `Profile…` and `Leave table`. Present
+only when `unclaimedSeats()` is non-empty — absent otherwise, never
+disabled (the `idm-split` grammar: an item that can only refuse is worse
+than no item). `title="Sit as one of this table's free prepared seats —
+your name here becomes the seat's; your dice, rolls and profiles stay
+yours."` Each row: the seat's name with its pool count, the same read the
+door's picker gives.
+
+**The mechanism reuses two shipped pieces and adds none:** the item opens
+`openRailMenu` (the anchored-menu machinery the chip already uses) listing
+`unclaimedSeats()`; picking a row runs the door's own preview-then-apply
+(`seatPlan` / seat-apply — the character is a rack you RECEIVE, so §9.2's
+preview rule binds); **Apply = `applyRename(seatName)` + the previewed
+profile apply, `playerId` untouched.** No leave, no rejoin, nothing wiped,
+nothing written before Apply. The chairs row heals itself by construction:
+your old name frees its chair, the taken seat's chair retires
+(`unclaimedSeats` recomputes on `player-renamed`).
+
+**Smallest first commit:** the conditional menu item + rail menu + rename-
+plus-preview apply path, with one scenario: seated player takes a free
+prepared seat, asserts the roster shows the new name, the rack previews
+before it lands, and `net.playerId` is unchanged across the whole gesture.
+It must NOT: call `leaveTable()`, touch the connection or seat storage,
+write anything before Apply, offer OCCUPIED seats (the roster filter is the
+physical intuition — you cannot sit in Bob's chair while Bob is in it), or
+appear at a table with no prepared seats.
 
 ### C27. The framing target was never the dice — **INSTRUMENT SHIPPED, THE CALL IS JOE'S**
 
@@ -845,26 +878,59 @@ twenty-five that shipped (U1–U15, U17 steps 1–4, U18, U19, U22, U24, U27–U
 are in SHIPPED.md. Seven entries are open; per TESTING.md each ships with its
 e2e scenario.*
 
-### U16. Draft intent in the well — DESIGN FIRST, medium
+### U16. Draft intent in the well — DESIGNED 2026-08-17, ready to build
 
-*Audit A5 (moderate).* `renderTray` builds chips and the cue and nothing else,
-so `2d8 check dc15 w:Ann # The Duel` is pixel-identical to bare `2d8` — and
-with Notation off (the default), the only ways to see the dc, moment, comment
-or whisper are ± (which hides the dc, per U11) or turning the box on. Saved
-pools got notation carriage precisely so a stored roll could not lie about
-itself; **the live draft — the object you are about to spend — has no carrier
-for intent.** It interacts with the cue band and the heat ladder, so design
-before code.
+*Audit A5 (moderate).* **The core claim re-verified true 2026-08-17:**
+`renderTray` builds source chips, loose dice and the cue and nothing else
+(js/main.js:14653), so `2d8 check dc15 w:Ann # The Duel` is pixel-identical
+to bare `2d8`. The state carrier exists and is even proven — `boxExtras`
+holds dc/exp/comment/visibility and the `draft-intent` scenario asserts the
+intent *rides* — but nothing asserts, or renders, that it *shows*. The
+sharpest form: staging a pool whose stored notation carries `secret` puts
+two bare-looking dice in the well that will roll invisibly to the table,
+with nothing on screen saying so unless ± is open or Notation is on.
 
-**Rider — `#verdict-subtitle`.** The verdict card has **no subtitle element**,
-under any system, for any notation, so `# The Duel | Charisma` declares its
-subtitle on the intent card and the dock strip and then loses it at the
-verdict. U17 deferred it deliberately: a **missing element, uniform across all
-three profiles** — not a gate, not part of the stake/arithmetic conflation.
-Adding it means new markup, new CSS and a third small line between the eyebrow
-and the answer on a card whose whole virtue is *the name, the answer, the
-exits*. That is a hierarchy call. It is the one residual asymmetry in UX.md
-§7.24's eight-surface table.
+**One supporting claim was STALE:** "± hides the dc, per U11." False since
+U17 #28/#29 — Target (DC) sits in its own always-visible section
+(index.html:945-950; only `.sec-sum` and `.sec-pair` fold under per-die
+systems, css:3666-3668), and the ± popover also carries the Visibility seg.
+So ± is already a complete intent *viewer*; what it is not is ambient — it
+is transient, on demand, and covers the well while open.
+
+**The design: the draft wears the offer card's own detail line.** An offer
+IS a draft published to the table, and `renderOffers` already solved this
+exact read — `label · formula · modsSummary · vs DC · visibility · moment`
+(js/main.js:24356-24380, `offerVisText`, `modsSummary`). One muted line in
+`#draft-zone`, between the well cluster and the action rail, built by the
+same extracted renderer so the two surfaces can never drift. Present ONLY
+when the draft carries intent beyond bare dice — a bare `2d8` draft stays
+pixel-identical to today, so no standing chrome and the empty-draft
+collapse (see Refuted: the section-bar ruling) is untouched. Visibility
+words are draft-context ("only you see it", not the offer's "only the
+offerer sees the result"); whisper names resolve via the same roster path
+`offerVisText` uses. Interaction rulings: the line lives OUTSIDE
+`#tray-roll` (the cluster is the button; a read must not be a click
+target), the cue band is untouched, the heat ladder is light-only (§7.10)
+and does not drive the line, and the geometry cost is absorbed by the
+`--draft-h` ResizeObserver exactly as wrapping source chips already are
+(js/main.js:14451-14457). Not gated on system: intent is notation-level and
+notation totality is app-wide.
+
+**Smallest first commit:** render the line in `updateTrayButtons` (the
+funnel every draft mutation already hits) from `boxExtras` + `cmdResult`,
+sharing the extracted offer-detail builder; extend `draft-intent` with one
+assertion that the line's text names the visibility and dc. It must NOT:
+touch the cue, add an empty standing row, gate on `usesTotal`, or grow
+edit affordances (± is the editor; this is a read).
+
+**Rider — `#verdict-subtitle`, decided: the subtitle joins the eyebrow.**
+Verified: no subtitle element exists on the verdict card (index.html:814-830)
+and `verdict-eyebrow` already composes `who + label` (js/main.js:7672).
+`# The Duel | Charisma` renders as eyebrow `Ann — The Duel · Charisma`:
+zero new markup, zero new CSS, no third line, and the card's virtue — *the
+name, the answer, the exits* — is untouched because a subtitle is
+eyebrow-weight material by definition. Closes the one residual asymmetry in
+§7.24's eight-surface table at the cost of a text join.
 
 ### U17 residuals — ALL THREE STALE, closed 2026-08-15
 
@@ -878,21 +944,66 @@ Folded into C25 Stage 2. The peek now retires on a new roll, on a ceremony and w
 the log. **The `body.mini` bullet was not reproducible** and a different occlusion is
 open in its place — see the new findings below.
 
-### U21. What the launcher owes the table — DESIGN FIRST, medium
+### U21. What the launcher owes the table — DECIDED 2026-08-17, ready to build
 
-*Audit E3 (moderate).* The collapsed rail deletes multiplayer: roster, chairs,
-Invite, nameplate and offer verb are all expanded-only, and the sole
-browse-mode signal left is `opacity:.68` on the chip with no roster to compare
-against. §7.4's launcher carve-out covers *offering*; it does not cover
-*presence*. Meanwhile `poolsOwner` survives collapse (nothing in `applyPanels`
-clears it), so you can collapse out of Bob's rack, see no signal, and expand
-straight back into it — and with the Pools *section* off, clicking a teammate
-pill flips `aria-pressed` and changes nothing on screen. Related and worse:
-the collapsed rail lists *your* `groups` unconditionally, so during a profile
-swap that is Alice's pools, unlabelled, rolling under your name.
+*Audit E3 (moderate).* **Re-verified 2026-08-17, and the finding splits
+three ways.** Still true: roster, chairs, Invite, nameplate and the ghost
+row are all inside `#rail-roster`/`#rail`, hidden collapsed
+(css:2384, css:3298); the offer verb lives in `#builder-panel`, also gone
+(css:395); the sole browse signal is `#identity-chip[aria-pressed="false"]
+{opacity:.68}` (css:2868); `applyPanels` clears rail picks on EXPAND and
+nothing on collapse (js/main.js:23075), so `poolsOwner` survives it; and
+`setPoolsOwner` never surfaces the pools section, so with Pools off a
+teammate pill flips `aria-pressed` under a rack that is `display:none`
+(css:791). **Stale, struck:** "during a profile swap that is Alice's pools
+rolling under your name." The G3 rack swap is deleted — "the rack is now
+always the profile in your own hands, so a publish is always honest"
+(js/main.js:16549, PROFILES §11.8). The collapsed rail can only ever list
+YOUR active profile's pools; what it cannot do is *name which* profile,
+which is a labelling gap, not a leak. **New since the audit, and sharper:**
+L4 put `↩ Main table` and `Breakouts ▾` in the presence row — so a player
+in a breakout with the panel collapsed (the immersion state) has NO way
+back on screen at all, and the `Take a seat` ghost (C12's fourth presence
+state) vanishes the same way.
 
-**Decide the minimum social state a launcher owes.** At least: a browse-mode
-signal, and clearing `poolsOwner` on collapse.
+**The decision — the presence carve-out, mirroring §7.4's.** A launcher may
+drop presence *chrome* (people are visible through their acts: every roll,
+banner, offer card and log row on the felt carries name and color, and the
+expanded panel is one keystroke away, `n`) — **on the condition that
+presence STATE cannot outlive its signal, and DOORS are not chrome.**
+Concretely, three rulings:
+
+1. **Collapse falls home.** `applyPanels`, in the same breath that exits
+   manage mode (js/main.js:23068 — the P2 precedent, same function, same
+   reasoning: a transient view of the expanded rack cannot outlive the
+   rack), clears `poolsOwner`. Browsing is a view, not composed work, so
+   §7.23's "nothing is destroyed by navigation" is untouched — the picks
+   survive; the vantage point resets. This dissolves the browse-signal
+   question instead of answering it with new chrome: collapsed, the chip is
+   always home-pressed and `.68` never shows unanchored.
+2. **The pill's tap surfaces what it changed.** `setPoolsOwner` turns the
+   pools section on transiently — `setSection('pools', true, false)`, the
+   exact `loadIntoBox` door the audit itself pointed at — so a teammate
+   pill can never again change nothing on screen.
+3. **Doors survive collapse.** The conditional ghosts that are navigation,
+   not presence — `↩ Main table`, `Take a seat` — render in the collapsed
+   column too (the rail already has the row grammar: 86px rows, horizontal
+   ellipsized words). They already obey "exist only when meaningful"
+   (§7.46: a table that never splits carries not one new pixel), so this
+   adds zero standing chrome. The roster pills, chairs, Invite and
+   nameplate stay expanded-only — that is the carve-out working, not a gap
+   in it.
+
+**Smallest first commit:** rulings 1+2 — two call sites, both named above,
+plus one scenario asserting collapse resets `poolsOwner` and that a pill
+tap with Pools off leaves the rack visible. It must NOT: add a roster to
+the rail (a bare dot column is the "complete garbage UI" Joe already
+killed, css:2385), give the rail Offer or intent editing (Refuted list;
+§7.4's carve-out stands), or persist the transient section bit (the
+two-object `sectionsStored`/`sectionsTransient` split exists precisely so
+it cannot). Ruling 3 is its own commit with its own look, and it carries
+the L4 follow-up: the collapsed breakout scenario that does not exist
+today.
 
 ### U23. A token layer for the doctrine — SHIPPED 2026-08-15
 
@@ -1227,12 +1338,24 @@ and never the CAPABILITY** — goal 15 forbids anything else, since a client
 that refused the room's tower would bake a different film and put different
 dice on screen from the seat beside it.*
 
-- **B1. The server does not know about channels, and cannot.** There is no
-  identity to attach an entitlement to, so the allowlist still accepts any
-  registered tower id from any client. This is a **DISCOVERABILITY gate, not a
-  security boundary**, and calling it one would be the lie. It becomes
-  possible the day seats have durable identity — **which makes B1 the feature
-  that the identity structural bet below is now blocking.**
+- **B1. The server does not know about channels — RULED 2026-08-17: and it
+  never will.** The server half is **KILLED** ([docs/IDENTITY.md](IDENTITY.md)
+  §4, record in SHIPPED.md). The named defect: *B1 asked the server to refuse
+  an entitlement that does not exist, for a threat the client gate already
+  ends, in violation of the channel's own one law.* Enrolment is an open
+  keyword (`?stability=beta`), so any client that can name a beta tower id
+  can enrol first — there is no unentitled class to refuse, with or without
+  durable identity; goal 10 ("no access control and there never will be")
+  forbids a settings write refused by who asks; and `js/stability.js`'s one
+  law — the channel gates the OFFER, never the CAPABILITY — is exactly what
+  a server refusal would break. The discoverability gate as shipped is the
+  whole feature. **Consequence for THE ORDER #9:** the identity pass stops
+  being scheduled against B1; what identity IS, the bill it has actually
+  run up (a held roll's reveal dies with its tab), and the one design that
+  survives (`dice.who.v1`, rung 1 buildable in ~25 lines) are in
+  [docs/IDENTITY.md](IDENTITY.md). The "identity anchored to browser-storage
+  shape" entry under Structural risks should be read with that record beside
+  it — its "B1 is that feature" sentence is superseded by this ruling.
 - **B2. Nothing tells a beta tester how to leave.** The revoke link exists and
   is proven; no surface offers it. A one-line "you are on the beta channel"
   row with the stable link belongs in Your stuff — but the panel is at its
