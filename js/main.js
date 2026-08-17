@@ -1860,6 +1860,131 @@ const DUCK_ATTACK_S = 0.25;
 const DUCK_RECOVER_TAU = 1.2; // DIAL FOR JOE
 let bed = null;
 
+// ---------------------------------------------------------------------------
+// THE VENUE'S AUDIO PALETTE (ROADMAP W6; GOALS goals 13–15, docs/AUDIO.md §2.5)
+//
+// GOAL 13 lists what a venue IS — "surface, horizon, atmosphere, tower family,
+// dice set, ambient life, and AUDIO PALETTE, chosen as ONE coherent whole" —
+// and goal 14 says a fantasy venue is believed through INTERNAL CONSISTENCY:
+// one place, one light-logic, one palette. Three quarters of the sound already
+// travelled with the venue: the tower brings `clunkVoice` + its shaft row, the
+// staged dice set brings `sound`. TWO THINGS DID NOT, and both of them said
+// "tavern" out loud in a night clearing:
+//
+//   · THE BED. Pink + brown + a Poisson crackle at 900–3500 Hz is a HEARTH.
+//     There is no fire in the glade. A room tone from a different building is
+//     the "one foot on the casino felt" costume goal 14 refuses.
+//   · THE GROUND. Every impact, every settle tap and every rolling grind is
+//     voiced for FELT OVER WOOD (§1). The glade's floor is one huge mossed
+//     disc that covers the felt and the 160-unit floor alike (js/fae-lab.js) —
+//     dice land in moss over soil, which is duller, deader and shorter than
+//     felt, and a labradorite die ringing off a hard table in a bog is the
+//     same costume problem one layer down.
+//
+// SO THE PALETTE IS TWO ROWS AND NOTHING ELSE: what the room's own noise is
+// made of, and what the ground does to whatever lands on it.
+//
+// WHY IT LIVES HERE AND NOT ON THE `VENUES` ROW. The shaft dials live on the
+// TOWERS row and the die voice on the SETS row, so the honest precedent points
+// at `VENUES`. This is a table keyed by venue id instead, for the same reason
+// `IMPACT_VOICES` is a table rather than a field on every set: the whole thing
+// resolves in the sound drain and nowhere else, and keeping it beside the bed
+// it re-voices is what lets `bedRevoice` be five lines. `venueAudio()` is the
+// ONE reader; nothing else in the file may look at `VENUE_AUDIO` directly.
+//
+// THE GROUNDED ROOM'S ROW IS ALL ONES AND A CUTOFF NOBODY CAN HEAR, so the
+// shipped table's audio is unchanged BY CONSTRUCTION rather than by care —
+// `venueAudioInfo().groundedInert` is that claim, watchable.
+//
+// EVERY NUMBER BELOW IS UNHEARD. Reasoned from §1's material law (the
+// dominant material sits BELOW the ~1.5 kHz wood/metal perceptual boundary —
+// the same measure that demoted `click` and put `felt` in the default seat)
+// and from each venue's own one-line description, exactly the way the five
+// tower clunk voices and the Witchlight chime were reasoned and exactly as
+// un-listened-to. Joe's dial, all of it.
+// ---------------------------------------------------------------------------
+
+// `pink`/`brown`/`tick.gain` are MULTIPLIERS of the BED_ constants above, and
+// the split is deliberate: Joe's dials set how loud the bed is, a venue sets
+// what it is made OF. A venue may re-balance the room; it may not turn it up.
+const VENUE_AUDIO = {
+  // THE ROOM YOU KNOW. Every multiplier is 1 and the air filter sits an
+  // octave above anything pink or brown noise contains, so this row is a
+  // written-down copy of what shipped rather than a re-voicing of it.
+  table: {
+    label: 'a warm room, a hearth, walls',
+    bed: {
+      pink: 1, brown: 1,
+      airHz: 20000, breathHz: 0.019, breathDepth: 0,
+      // The hearth: bright, frequent, sharp. 900–3500 Hz is the one bright
+      // element §1 permits, and u³ keeps it an isolated highlight.
+      tick: { rate: BED_CRACKLE_RATE, gain: 1, loHz: 900, spanHz: 2600, q: 3, decayS: 0.03 },
+    },
+    ground: { centre: 1, length: 1, gain: 1 },
+  },
+  // A NIGHT CLEARING: blue mist, teal moot-light, still cold air, open sky.
+  //   · brown is the ENCLOSURE layer — "the low end that makes a room feel
+  //     enclosed" (§5). A clearing has no walls, so it comes down hardest.
+  //   · the pink pair stays at level but goes through a 1200 Hz lowpass with
+  //     a very slow sweep: leaf hiss at the treeline, not room air. 1200 is
+  //     under §1's 1.5 kHz boundary on purpose — the same argument that put
+  //     the default impact at 700 rather than 2500.
+  //   · the tick layer is no longer a fire. It is CONDENSATION off the
+  //     canopy: rare (0.7/s against the hearth's 4), low (220–600 Hz, the
+  //     `felt`/`thud` family), pitched (Q 6 — a drip has a note where a spark
+  //     does not) and a touch longer on the tail, because water lands in moss.
+  //   · the ground is moss over soil: dull it (×0.72), shorten it (×0.85),
+  //     let it absorb a little (×0.9).
+  moonrise: {
+    label: 'a night clearing — treeline, open sky, moss over soil',
+    bed: {
+      pink: 1, brown: 0.58,
+      airHz: 1200, breathHz: 0.019, breathDepth: 420,
+      tick: { rate: 0.7, gain: 1, loHz: 220, spanHz: 380, q: 6, decayS: 0.045 },
+    },
+    ground: { centre: 0.72, length: 0.85, gain: 0.9 },
+  },
+  // OLDER AND DAMPER, and the row disagrees with its sibling in exactly the
+  // way the two names do. A HOLLOW is more enclosed than a clearing, so the
+  // brown comes back up; less wind reaches it, so the air sits lower and
+  // breathes shallower; it is wetter, so it drips more than twice as often
+  // and lower; and near-black moss over standing damp is the deadest floor in
+  // the app.
+  foxfire: {
+    label: 'a damp hollow — close air, standing water, near-black moss',
+    bed: {
+      pink: 1, brown: 0.75,
+      airHz: 900, breathHz: 0.013, breathDepth: 240,
+      tick: { rate: 1.6, gain: 1, loHz: 180, spanHz: 260, q: 7, decayS: 0.055 },
+    },
+    ground: { centre: 0.66, length: 0.78, gain: 0.85 },
+  },
+};
+
+// How long the room takes to become a different room. A bed does not switch
+// on (BED_FADE_S) and it does not switch OVER either — but the picture changes
+// on the frame, so the sound may not trail it by six seconds. Three, as a
+// setTargetAtTime τ of one.
+const BED_VOICE_S = 3;
+
+// THE ONE READER. Falls back to the grounded row for any venue that has not
+// declared a palette, which is what makes adding a venue a visual-only job
+// until somebody writes its sound down.
+function venueAudioId() {
+  return VENUE_AUDIO[currentVenue] ? currentVenue : 'table';
+}
+function venueAudio() {
+  return VENUE_AUDIO[venueAudioId()];
+}
+
+// WHAT THE GROUND DOES TO A CONTACT — and what it does to a BAFFLE KNOCK,
+// which is nothing. A clunk is a die hitting the TOWER; the tower already has
+// a palette and a shaft, and running the venue's floor over it would voice a
+// knock inside a hollow trunk as if it happened in the moss outside. Every
+// caller that can see a clunk passes it, and this is what it gets.
+const GROUND_NEUTRAL = { centre: 1, length: 1, gain: 1 };
+function groundFor(isClunk) { return isClunk ? GROUND_NEUTRAL : venueAudio().ground; }
+
 function pinkBuffer(ctx, seconds) {
   const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * seconds), ctx.sampleRate);
   const d = buf.getChannelData(0);
@@ -1901,8 +2026,13 @@ function bedLoop(ctx, buffer, gainV, rate, dest) {
   return { src, g };
 }
 
-// A slow gain wobble on one layer. Mutually prime rates, so no two of them
-// line up again inside a session.
+// A slow wobble on one param. Mutually prime rates, so no two of them line up
+// again inside a session. Returns the depth gain as well as the oscillator,
+// because a venue swap has to re-scale a modulator it did not build: an LFO
+// depth is a fraction of the layer level it rides, so a layer that halves and
+// a breath that does not is a bed that breathes twice as deep in the quieter
+// room. (AudioParam inputs are ADDITIVE — the LFO adds to whatever intrinsic
+// value the automation last set, which is what lets both move independently.)
 function bedLfo(ctx, hz, depth, param) {
   const osc = ctx.createOscillator();
   osc.type = 'sine';
@@ -1911,7 +2041,7 @@ function bedLfo(ctx, hz, depth, param) {
   g.gain.value = depth;
   osc.connect(g).connect(param);
   osc.start(0);
-  return osc;
+  return { osc, g };
 }
 
 // THE BED IS THE ONE THING IN THIS GRAPH THAT IS TORN DOWN, and deliberately.
@@ -1927,26 +2057,63 @@ function bedDispose() {
   AUDIO.room = null;
 }
 
+// The air filter's cutoff, clamped clear of Nyquist. A biquad asked for
+// 20 kHz on a 44.1 kHz context is sitting at 0.91 of Nyquist, where the
+// response stops meaning what the number says; 0.4 is comfortably below
+// anything pink or brown noise carries, so the grounded room's filter stays
+// inaudible whichever hardware the page came up on.
+function bedAirHz(ctx, hz) {
+  return Math.min(hz, ctx.sampleRate * 0.4);
+}
+
 function bedBuild() {
   const ctx = ensureAudio();
   if (!ctx || bed) return;
+  const voice = venueAudioId();
+  const v = VENUE_AUDIO[voice].bed;
   const mix = ctx.createGain();
   mix.gain.value = 0;
+  // THE AIR, and it is the venue's one structural addition to the bed: a
+  // lowpass on the whole mix with a fourth mutually-prime LFO on its cutoff.
+  // In a room that is the walls; in a clearing it is wind moving through the
+  // treeline, which is the only layer here that is not noise-with-a-level.
+  // Built unconditionally, at 20 kHz with zero breath for the grounded room,
+  // so there is ONE bed chain rather than two and a venue swap re-tunes a node
+  // instead of splicing one into a running graph (the ensureShaft discipline).
+  const air = ctx.createBiquadFilter();
+  air.type = 'lowpass';
+  air.Q.value = 0.7;
+  air.frequency.value = bedAirHz(ctx, v.airHz);
   const duck = ctx.createGain();
   duck.gain.value = 1;
   const room = ctx.createGain();
   room.gain.value = 1;
-  mix.connect(duck).connect(room).connect(AUDIO.master);
+  mix.connect(air).connect(duck).connect(room).connect(AUDIO.master);
+  // The BUFFERS are material-neutral — pink is pink in any weather — so a
+  // venue moves gains and filters and never re-fills 52 seconds of noise.
   const pink = pinkBuffer(ctx, 23);
   const brown = brownBuffer(ctx, 29);
-  const a = bedLoop(ctx, pink, BED_PINK, 1, mix);
-  const b = bedLoop(ctx, pink, BED_PINK, 0.9973, mix);   // the detuned double
-  const c = bedLoop(ctx, brown, BED_BROWN, 1, mix);
-  const l1 = bedLfo(ctx, 0.031, BED_PINK * 0.4, a.g.gain);
-  const l2 = bedLfo(ctx, 0.047, BED_PINK * 0.4, b.g.gain);
-  const l3 = bedLfo(ctx, 0.073, BED_BROWN * 0.35, c.g.gain);
+  const a = bedLoop(ctx, pink, BED_PINK * v.pink, 1, mix);
+  const b = bedLoop(ctx, pink, BED_PINK * v.pink, 0.9973, mix);   // the detuned double
+  const c = bedLoop(ctx, brown, BED_BROWN * v.brown, 1, mix);
+  const l1 = bedLfo(ctx, 0.031, BED_PINK * v.pink * 0.4, a.g.gain);
+  const l2 = bedLfo(ctx, 0.047, BED_PINK * v.pink * 0.4, b.g.gain);
+  const l3 = bedLfo(ctx, 0.073, BED_BROWN * v.brown * 0.35, c.g.gain);
+  const l4 = bedLfo(ctx, v.breathHz, v.breathDepth, air.frequency);
   bed = {
-    mix, duck, room, nodes: [a.src, b.src, c.src, l1, l2, l3],
+    mix, air, duck, room,
+    nodes: [a.src, b.src, c.src, l1.osc, l2.osc, l3.osc, l4.osc],
+    layers: { pink: [a, b], brown: [c] },
+    lfos: { pink: [l1, l2], brown: [l3], air: l4 },
+    voice, tick: v.tick,
+    // WHAT THE BED WAS LAST TOLD TO BE, beside what it currently IS. A
+    // re-voice is a setTargetAtTime with τ = 1 s, so for three seconds the
+    // nodes and the intent legitimately disagree — and a reader that could
+    // only see one of them would either report a stale room or be unable to
+    // see the room move at all. `told` is the instruction; `venueAudioInfo`
+    // reads the NODES for the other half.
+    told: { airHz: air.frequency.value, breathHz: v.breathHz, breathDepth: v.breathDepth,
+      pink: BED_PINK * v.pink, brown: BED_BROWN * v.brown },
     nextCrackle: ctx.currentTime + 0.2, ducked: false,
   };
   AUDIO.room = room;
@@ -1956,23 +2123,58 @@ function bedBuild() {
   mix.gain.exponentialRampToValueAtTime(1, ctx.currentTime + BED_FADE_S);
 }
 
-// One crackle pop. u³ on the gain: most are inaudible, one in twenty is a
-// real tick, and none of them is on a grid.
+// THE ROOM BECOMES A DIFFERENT ROOM (W6). Re-tunes the standing bed rather
+// than rebuilding it: a teardown would restart the six-second fade and re-fill
+// two noise buffers, and `perHitBufferAllocs` has no opinion about which
+// buffers were the wasteful ones.
+//
+// Driven from stepAmbience by comparing `bed.voice` against the live venue,
+// not called from applyVenue — every path that can change a venue (a chip, a
+// server echo, a room's settings at boot, a replay) then re-voices for free,
+// and none of them has to remember to. Same reason `ensureShaft` keys on a
+// tuning string instead of trusting its callers.
+function bedRevoice() {
+  if (!bed || !AUDIO.ctx) return;
+  const voice = venueAudioId();
+  if (bed.voice === voice) return;
+  const v = VENUE_AUDIO[voice].bed;
+  const ctx = AUDIO.ctx;
+  const t = ctx.currentTime;
+  const tau = BED_VOICE_S / 3;
+  bed.voice = voice;
+  bed.tick = v.tick;   // the next scheduled pop is the new room's; the ones
+                       // already on the lookahead queue finish as themselves
+  for (const l of bed.layers.pink) l.g.gain.setTargetAtTime(BED_PINK * v.pink, t, tau);
+  for (const l of bed.layers.brown) l.g.gain.setTargetAtTime(BED_BROWN * v.brown, t, tau);
+  for (const l of bed.lfos.pink) l.g.gain.setTargetAtTime(BED_PINK * v.pink * 0.4, t, tau);
+  for (const l of bed.lfos.brown) l.g.gain.setTargetAtTime(BED_BROWN * v.brown * 0.35, t, tau);
+  bed.lfos.air.osc.frequency.setTargetAtTime(v.breathHz, t, tau);
+  bed.lfos.air.g.gain.setTargetAtTime(v.breathDepth, t, tau);
+  bed.air.frequency.setTargetAtTime(bedAirHz(ctx, v.airHz), t, tau);
+  bed.told = { airHz: bedAirHz(ctx, v.airHz), breathHz: v.breathHz,
+    breathDepth: v.breathDepth, pink: BED_PINK * v.pink, brown: BED_BROWN * v.brown };
+}
+
+// One pop of whatever the room ticks with — a spark off the hearth, a drip off
+// the canopy. u³ on the gain: most are inaudible, one in twenty is a real
+// tick, and none of them is on a grid. The venue owns the band, the Q and the
+// tail; §5's ceiling (BED_CRACKLE) stays Joe's.
 function bedPop(ctx, at) {
+  const tk = bed.tick;
   const u = Math.random();
   const g = ctx.createGain();
   const src = ctx.createBufferSource();
   src.buffer = AUDIO.noise;
   const f = ctx.createBiquadFilter();
   f.type = 'bandpass';
-  f.frequency.value = 900 + Math.random() * 2600;
-  f.Q.value = 3;
-  const amp = Math.max(1e-5, BED_CRACKLE * u * u * u);
+  f.frequency.value = tk.loHz + Math.random() * tk.spanHz;
+  f.Q.value = tk.q;
+  const amp = Math.max(1e-5, BED_CRACKLE * tk.gain * u * u * u);
   g.gain.setValueAtTime(amp, at);
-  g.gain.exponentialRampToValueAtTime(1e-5, at + 0.03);
+  g.gain.exponentialRampToValueAtTime(1e-5, at + tk.decayS);
   src.connect(f).connect(g).connect(bed.mix);
   src.start(at, Math.random() * (AUDIO.noise.duration - 0.05));
-  src.stop(at + 0.04);
+  src.stop(at + tk.decayS + 0.01);
 }
 
 // Called from tick(). Lookahead scheduling off ctx.currentTime — not off dt,
@@ -1980,13 +2182,17 @@ function bedPop(ctx, at) {
 // throttles, and this one simply schedules further ahead.
 function stepAmbience() {
   if (!bed || !AUDIO.ctx) return;
+  // The venue's own voice, checked here rather than pushed from applyVenue —
+  // one string compare a frame buys a bed that cannot be left in the wrong
+  // room by a path nobody thought to hook (see bedRevoice).
+  if (bed.voice !== venueAudioId()) bedRevoice();
   const ctx = AUDIO.ctx;
   const horizon = ctx.currentTime + 0.5;
   let guard = 0;
   while (bed.nextCrackle < horizon && guard++ < 32) {
     bedPop(ctx, bed.nextCrackle);
     // Exponential inter-arrival — a Poisson process, not a metronome.
-    bed.nextCrackle += -Math.log(1 - Math.random()) / BED_CRACKLE_RATE;
+    bed.nextCrackle += -Math.log(1 - Math.random()) / bed.tick.rate;
   }
 }
 
@@ -2211,6 +2417,48 @@ function impactPresetOf(voice) {
   return { body, preset: IMPACT_VOICES[body] };
 }
 
+// THE WHOLE ARITHMETIC OF ONE CONTACT'S VOICING, in one place, because three
+// callers need it and one of them is a test. playImpact plays it, the settle
+// cluster inherits it for the tail, and `impactVoicingFor` answers questions
+// about it WITHOUT MAKING A SOUND — the impactPresetOf discipline: a scenario
+// that re-derived the surface trim itself would stay green with the trim
+// unwired, which is the exact green check this project keeps catching.
+//
+// What is NOT here is the per-hit randomness (the centre jitter, the read
+// offset) and the depth gain: those are the render-cosmetic half (§4), and
+// keeping them out is what makes this function's answer the same on every
+// client and therefore worth asserting on.
+//
+// THE SURFACE TIER (W6). `IMPACT_SOFT_*` was already a one-tier modifier over
+// the resolved body — duller and longer below a strength — and the venue's
+// ground is a second one, in the same shape and for the same reason. It
+// MULTIPLIES rather than replaces, which is the physically honest composition:
+// the die keeps its own material (a witchlight die still rings) and the place
+// says what that ring does when it lands (in moss, not much). A `moss` BODY
+// would have been the other design and it is worse — the venue stages a set
+// whose voice always wins, so a venue body would resolve on shrouded rolls
+// only, i.e. almost never.
+//
+// The 0.35 ceiling stays a CEILING: the trim is applied outside the clamp, so
+// a venue can only ever take away from §5's mix plan, never raise it.
+function impactVoicingOf(strength, voice, isClunk) {
+  const v = voice || null;
+  const { body, preset } = impactPresetOf(v);
+  const weight = v ? Math.max(0, Math.min(1, v.weight || 0)) : 0;
+  const sustainMs = v ? Math.max(0, v.sustain || 0) : 0;
+  const soft = strength < IMPACT_SOFT_STRENGTH;
+  const ground = groundFor(isClunk);
+  return {
+    body, preset, weight, sustainMs, soft, ground,
+    durSec: ((45 + sustainMs) / 1000) * (soft ? IMPACT_SOFT_LENGTH : 1) * ground.length,
+    // Heavier = lower centre, softer = lower still, and the ground takes it
+    // down one more step. Multiplies the preset's baseFreq (and its per-hit
+    // spread) at the call site.
+    centre: (1 - 0.5 * weight) * (soft ? IMPACT_SOFT_CENTRE : 1) * ground.centre,
+    gain: Math.min(0.35, strength * preset.gainScale) * ground.gain,
+  };
+}
+
 // One fire-and-forget noise voice off the SHARED buffer. No onended closure,
 // no cleanup array: three nodes, started, forgotten, collected when they end.
 // `durSec` is how long the envelope runs; the source is read from a random
@@ -2339,10 +2587,19 @@ function scheduleSettleCluster(roll, di) {
   const ds = shrouded ? null : rollDieSet(roll, di);
   const fxSet = ds && SETS[ds] ? SETS[ds] : null;
   const voice = impactVoice({ di }, fxSet);
-  const { preset } = impactPresetOf(voice);
-  const weight = voice ? Math.max(0, Math.min(1, voice.weight || 0)) : 0;
-  const sustainMs = voice ? Math.max(0, voice.sustain || 0) : 0;
-  const A0 = Math.min(0.35, strength * preset.gainScale) * TAP_A0_FRAC;
+  // THE TAIL IS ON THE GROUND, ALWAYS — a die settles on the floor of the
+  // place it is in, never inside the tower — so the surface tier rides it and
+  // `isClunk` is false by construction here. `vo.gain` already carries the
+  // ground's absorption, which is why A0 is read off it rather than recomputed.
+  const vo = impactVoicingOf(strength, voice, false);
+  const { preset } = vo;
+  const weight = vo.weight;
+  const sustainMs = vo.sustainMs;
+  // vo.ground.centre and not vo.centre: the cluster deliberately does NOT wear
+  // the soft-strength tier (its own 0.85^k walk down is the dulling), and
+  // folding it in here would change a shipped schedule.
+  const gc = vo.ground.centre;
+  const A0 = vo.gain * TAP_A0_FRAC;
   const plan = { di, gaps: [], amps: [] };
   let t = ctx.currentTime;
   const bus = busFor(0) || AUDIO.master;
@@ -2356,12 +2613,12 @@ function scheduleSettleCluster(roll, di) {
     plan.amps.push(Math.round(amp * 1e9) / 1e9);
     // The last taps are near-pure thump: the centre walks down 0.85 per tap
     // and the tail is halved, so the tail dulls as well as fading.
-    const freq = Math.max(60, preset.baseFreq * (1 - 0.5 * weight) * Math.pow(0.85, k + 1));
+    const freq = Math.max(60, preset.baseFreq * (1 - 0.5 * weight) * gc * Math.pow(0.85, k + 1));
     noiseOneShot({
       preset,
       freq,
       gain: Math.max(1e-4, amp),
-      durSec: ((45 + sustainMs) / 1000) * 0.5,
+      durSec: ((45 + sustainMs) / 1000) * 0.5 * vo.ground.length,
       bus,
       at: t,
     });
@@ -2395,18 +2652,18 @@ function playImpact(strength, voice, filmTime, ev) {
   const ctx = ensureAudio();
   if (!ctx) return false;
   const v = voice || null;
-  const { body, preset } = impactPresetOf(v);
-  const weight = v ? Math.max(0, Math.min(1, v.weight || 0)) : 0;
-  const sustainMs = v ? Math.max(0, v.sustain || 0) : 0;
-  const soft = strength < IMPACT_SOFT_STRENGTH;
-  const durSec = ((45 + sustainMs) / 1000) * (soft ? IMPACT_SOFT_LENGTH : 1);
+  // The voicing, INCLUDING the venue's ground (W6) — except for a baffle
+  // knock, which is a die hitting the tower and wears the tower's palette
+  // alone. Everything deterministic about this contact comes out of one
+  // function; only the per-hit jitter and the depth gain are added here.
+  const vo = impactVoicingOf(strength, v, !!(ev && ev.clunk));
+  const { body, preset, durSec } = vo;
   // Heavier = lower center; the spread is randomized per hit for texture
   // (timbre jitter is the ONLY legal wall randomness — docs/AUDIO.md §4).
-  const freqDown = (1 - 0.5 * weight) * (soft ? IMPACT_SOFT_CENTRE : 1);
-  const freq = Math.max(80, (preset.baseFreq + Math.random() * preset.freqSpread) * freqDown);
+  const freq = Math.max(80, (preset.baseFreq + Math.random() * preset.freqSpread) * vo.centre);
   // Depth is a GAIN multiplier and nothing else — the air-absorption lowpass
   // rides the sustained voices, which keeps a one-shot at three nodes.
-  const gainV = Math.min(0.35, strength * preset.gainScale) * depthGainFor(ev && ev.at);
+  const gainV = vo.gain * depthGainFor(ev && ev.at);
   // A baffle knock is `at: null` by design (a clunk is a sound, not a place),
   // so it is never panned by position: it comes from the tower mouth, ≈ 0.
   // A knock with a SHAFT row goes through the chute's colour instead of
@@ -2785,10 +3042,26 @@ function stepRollingAudio(roll, i0, realtime) {
       // Smaller die = slightly brighter surface band.
       const def = DIE_DEFS[s.type] || {};
       const R = def.radius || (def.size ? def.size * 0.5 : ROLL_REF_RADIUS);
-      const bandF = ROLL_BAND_BASE
+      // THE GROUND, ON THE GRIND (W6). The venue's spectral trim moves the
+      // surface band and the tilt ceiling together — one number for "what this
+      // floor does to a sound", the same one the impacts and the tail wear.
+      //
+      // TIMBRE ONLY, AND THAT IS THE WHOLE RULE HERE: `targetLevel` above is
+      // untouched by the venue, so §4's "film-derived, identical on every
+      // client" list stays literally true and a replay of a roll recorded
+      // under another sky still derives the same levels. §4 already licenses
+      // exactly this asymmetry — timbre may differ between clients, rhythm and
+      // level may not — and a venue is one more thing on the timbre side.
+      const gcen = venueAudio().ground.centre;
+      const bandF = ROLL_BAND_BASE * gcen
         * Math.min(1.3, Math.max(0.9, Math.pow(ROLL_REF_RADIUS / R, 0.4)));
       if (Math.abs(bandF - v.setBand) > 1) { v.band.frequency.value = bandF; v.setBand = bandF; }
-      const tiltF = Math.min(ROLL_TILT_CEIL, 300 + 55 * s.vTan);
+      // Trimmed on the RESOLVED frequency, not on the ceiling alone: scaling
+      // the band and the whole tilt curve by one factor shifts the voice down
+      // and keeps its shape, which is "the same grind on a duller floor".
+      // Trimming only the ceiling would change the tilt/band ratio and so
+      // change what the grind IS at low speed.
+      const tiltF = Math.min(ROLL_TILT_CEIL, 300 + 55 * s.vTan) * gcen;
       if (Math.abs(tiltF - v.setTilt) > 10) { v.tilt.frequency.value = tiltF; v.setTilt = tiltF; }
       // Fast clacks physically overlap, so the modulation gets shallower as
       // the rate climbs — which is exactly what turns clacks into a grind.
@@ -12738,6 +13011,72 @@ window.__diceDebug = {
   impactPresetFor(ev, setId) {
     const { body, preset } = impactPresetOf(impactVoice(ev || {}, SETS[setId] || null));
     return { body, ...preset };
+  },
+  // WHAT A CONTACT WOULD ACTUALLY SOUND LIKE, without making a sound — the
+  // deterministic half of it (§4's render-cosmetic jitter is excluded on
+  // purpose, so this answer is the same on every client and is worth
+  // asserting on). Routed through `impactVoicingOf`, the same function
+  // playImpact and the settle cluster call: a scenario that re-derived the
+  // venue's surface trim would stay green with the trim unwired.
+  //
+  // `ev.clunk` is the interesting argument: a baffle knock must come back
+  // UNTRIMMED under any venue, because a die inside the tower is not on the
+  // glade's moss.
+  impactVoicingFor(strength, setId, ev) {
+    const e = ev || {};
+    const vo = impactVoicingOf(
+      typeof strength === 'number' ? strength : 0,
+      impactVoice(e, SETS[setId] || null),
+      !!e.clunk);
+    return {
+      body: vo.body, baseFreq: vo.preset.baseFreq, weight: vo.weight,
+      soft: vo.soft, sustainMs: vo.sustainMs,
+      centre: Math.round(vo.centre * 1e6) / 1e6,
+      durSec: Math.round(vo.durSec * 1e6) / 1e6,
+      gain: Math.round(vo.gain * 1e6) / 1e6,
+      ground: { ...vo.ground },
+    };
+  },
+  // THE VENUE'S AUDIO PALETTE (W6, docs/AUDIO.md §2.5). Two halves, and the
+  // second one is the one that can catch a lie: `declared` is the registry
+  // row, `live` is read OFF THE STANDING BED — so "the room became the other
+  // room" is a claim about AudioParams, not about a flag. Null when no bed is
+  // up, which is itself a fact worth being able to read (the bed is off by
+  // default and a venue must never turn it on).
+  //
+  // `groundedInert` is the load-bearing one: the shipped table's row is all
+  // 1s and an inaudible cutoff BY CONSTRUCTION, which is what makes "W6
+  // changed nothing for players who never leave the room" checkable rather
+  // than promised.
+  venueAudioInfo() {
+    const id = venueAudioId();
+    const p = VENUE_AUDIO[id];
+    const t = VENUE_AUDIO.table;
+    return {
+      id, venue: currentVenue, label: p.label,
+      declared: { bed: { ...p.bed, tick: { ...p.bed.tick } }, ground: { ...p.ground } },
+      groundedInert: t.ground.centre === 1 && t.ground.length === 1 && t.ground.gain === 1
+        && t.bed.pink === 1 && t.bed.brown === 1 && t.bed.breathDepth === 0
+        && t.bed.airHz >= 20000 && t.bed.tick.gain === 1,
+      // Every one of these is read off a NODE, never off the table above.
+      // `told` beside them is what the last re-voice ASKED for: the two
+      // legitimately disagree for ~3 s (BED_VOICE_S), so a claim that the
+      // room changed can be made instantly off `told`, and a claim that it
+      // actually moved has to poll `airHz` and wait — which is the honest
+      // shape, because only the second one is about the graph.
+      live: bed ? {
+        voice: bed.voice,
+        airHz: Math.round(bed.air.frequency.value),
+        breathHz: Math.round(bed.lfos.air.osc.frequency.value * 1e4) / 1e4,
+        breathDepth: Math.round(bed.lfos.air.g.gain.value),
+        pinkGain: Math.round(bed.layers.pink[0].g.gain.value * 1e6) / 1e6,
+        brownGain: Math.round(bed.layers.brown[0].g.gain.value * 1e6) / 1e6,
+        tickRate: bed.tick.rate,
+        tickLoHz: bed.tick.loHz,
+        sources: bed.nodes.length,
+        told: { ...bed.told },
+      } : null,
+    };
   },
   // THE CONTACT MACHINE, AS OF THE LAST FRAME STEPPED (docs/AUDIO.md §3).
   // Read from `currentRoll` and the film, never from a painted frame — the

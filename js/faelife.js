@@ -448,6 +448,20 @@ export function stepLife(spec, t, mood) {
 // build time and stay there, so the bed the fog paints does not breathe
 // with the caps; a breathing fog bed would cost a full sheet rewrite per
 // frame and read as weather, not as talk).
+//
+// AND NO SOUND. THIS LAYER IS SILENT, AND IT IS A REFUSAL RATHER THAN AN
+// OMISSION — recorded here because this function is exactly where the next
+// person will reach for one (W6, docs/AUDIO.md refusal 13). A chime as the
+// word goes round the ring would have its ONSET driven by `t`, which is
+// `FAECONCEPT.t` and starts at zero WHEN A CLIENT ENTERS THE VENUE: two
+// people in one room would hear the ring speak at different moments while
+// watching the same caps light. AUDIO.md §4's line is that timbre may
+// desync and rhythm may not, and the room bed's crackle is legal precisely
+// because it is ANONYMOUS — no viewer can tell which pop belongs to which
+// pixel. The law that falls out: audio may be anonymous and unsynchronized,
+// or synchronized and tied to a visible thing, but never unsynchronized AND
+// tied to a visible thing. If this layer is ever given a voice it needs a
+// film- or seed-derived clock, not the stage's.
 export function stepMootSession(moot, t, mood, tune) {
   const caps = moot.userData.caps;
   if (!caps) return 0;
