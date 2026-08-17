@@ -1328,7 +1328,7 @@ meanings unit vectors incl. collapsed-mixture exactness, and a clean
 33-scenario gate at `fea43e6` (sole failure the known-environmental
 `seat-resume`, proven pre-existing at baseline `4d7161a`).
 
-### 2l ⑥ — the sum read: the engine and the rendering — SHIPPED 2026-08-16/17; **§2l is complete**
+### 2l ⑥ — the sum read: the engine and the rendering — SHIPPED 2026-08-16/17; **§2l is BUILT, and its LOOK is owed**
 
 **All six slices are in.** ①–④ 2026-08-06 (above) · ⑤ the ledger sheet
 2026-08-15, UX §7.44 — its record rides the 2026-08-15 batch below, and the
