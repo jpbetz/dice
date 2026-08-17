@@ -318,25 +318,51 @@ attributed-math invariant has nothing to attribute.
 The visibility core shipped. What remains is refinement; nothing here blocks
 the ladder.
 
-### 4b. Visibility refinements
+### 4b. Visibility refinements — ALL FOUR ARE DESIGN-FIRST; none is a one-line fix
+
+**Re-verified against the tree 2026-08-17 and every claim below HELD** — which
+is itself the finding, and an unusual one for this file. Two of these bullets
+are claims *about today's code* and both are still exactly true; the other two
+are unbuilt by decision rather than by neglect. So THE ORDER's "several
+one-line" describes V4 and U28b, **not this section** — there is nothing here
+an hour can close, and the two that look smallest are the two that touch the
+wire.
 
 - **Sticky mode + its badge, as one change.** A remembered per-player default
   (Foundry's roll-mode ergonomic) is only safe alongside a standing eye-slash
   badge on the Roll button and the mini pills — a sticky non-open default with
   no persistent signal is the accident vector §3.2 names. **Ship both or
-  neither.**
+  neither.** *Verified unbuilt:* `grep -rn "sticky\|eye-slash" js/ css/ index.html`
+  finds only CSS `position: sticky` and one mockup helper
+  (`docs/mockups/dice-sets.html:771`); the picker is seeded from the notation it
+  opened on, and [UX §3.2](UX.md) says so in its own words at docs/UX.md:730
+  ("Not sticky, and therefore un-badged"). **Bigger than the tail:** the badge
+  half is a persistent signal on the Roll button *and* every mini pill *and*
+  every saved-pool row, on the one control whose mistake cannot be undone.
 - **Silent whisper.** A whisper whose bystanders learn *nothing*, not even
   that a roll happened. Today every rung but `secret` makes existence public,
   and PF2e's precedent is that roll-existence is itself mechanically
   meaningful. This is a fifth rung, not a tweak: `secret`'s omit-entirely
-  projection with `whisper`'s audience.
+  projection with `whisper`'s audience. **Bigger than the tail, and
+  structurally:** the rungs are an enum on the wire (`VIS_MODES`,
+  js/main.js:14607) with a projection branch per rung (`projectEntryFor`,
+  server.js:1737) — a fifth rung owes a projection, a picker sub-line, a
+  reveal-authority answer, and an answer for every `visMode` reader that
+  switches on three names.
 - **Reveal to a subset.** Rejected for step 4 because reveal is currently
   total and one-way, which is what makes it auditable. Revisit only with a
   concrete table need.
 - **Audience legibility.** A shrouded viewer reads the audience only when the
   roll has no `# comment` — `label` carries one or the other. Decide whether
   "who was whispered to" deserves its own always-present field, or whether
-  comment-shadowing is the correct privacy default.
+  comment-shadowing is the correct privacy default. *Verified true today:* the
+  redacted projection carries `label` (server.js:1757) and deliberately never
+  the audience (the comment at server.js:1774 says so), and `label` is
+  `res.comment || res.canonical` (js/main.js:15461) — so `1d20 w:Kira` shows a
+  bystander the audience and `1d20 w:Kira # Perception` hides it. **This is a
+  decision, not a defect:** an always-present audience field is a new wire
+  field on the one payload whose whole job is to omit, so it cannot be a
+  refinement of the renderer.
 
 ---
 
