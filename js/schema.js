@@ -45,6 +45,21 @@ limitations under the License.
 // sitting at. That is a different problem with a different answer — a live
 // client can be told to reload, which stored data cannot.
 //
+// NOR FOR THIS: A STORED KEY THAT HAS NO SHAPE. `dice.who.v1` (js/net.js,
+// docs/IDENTITY.md §5) is one opaque string — a bearer credential, not a data
+// model — and stamping it would invent a schema for a value nothing ever parses.
+// Recorded here rather than left to judgement, because "every stored blob
+// carries a stamp" reads like a rule that admits no exceptions, and the next
+// editor of this file should not have to re-derive why this one is out.
+//
+// The test of whether something belongs here is the same one PURGE_KEEPS asks
+// (js/main.js), and it is worth stating because the two lists agree for a
+// reason: a key with NO SHAPE cannot hold data an older reader would silently
+// drop, so there is nothing for a stamp to protect and nothing for the purge to
+// clean. `dice.who.v1` and `dice.stability.v1` are both on the keep list and
+// neither is stamped. Anything with fields is stamped and purgeable; anything
+// that is a single value is neither.
+//
 // No imports. This module is read by the app, by the Node unit suite, and (for
 // the emitted form) by a human editing a YAML file in a text editor.
 

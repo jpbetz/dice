@@ -381,5 +381,42 @@ try {
   }
 }
 
+// ---- the keys that are deliberately NOT stamped ----------------------------
+//
+// A SOURCE PIN, and it is here rather than in tests/identity.test.mjs because
+// the thing it protects is a decision this file's contract makes: a key with no
+// SHAPE gets no stamp and, for the same reason, is exempt from the purge. The
+// exemption is what needs pinning — losing `dice.who.v1` is SILENT (the browser
+// mints a fresh one, a seat it was holding stops being resumable, and the held
+// roll whose reveal it carried becomes unrevealable by anybody, with nothing on
+// screen to say why). A runtime test cannot catch that: the purge only runs for
+// a browser below this epoch, and every test tab is stamped current on purpose.
+t('the purge spares the keys that have no shape to be stale about', () => {
+  const src = readFileSync(join(ROOT, 'js', 'main.js'), 'utf8');
+  const m = /const PURGE_KEEPS = new Set\(\[([^\]]*)\]\)/.exec(src);
+  assert.ok(m, 'main.js declares PURGE_KEEPS');
+  const keeps = m[1].split(',').map((s) => s.trim()).filter(Boolean);
+  assert.deepEqual(keeps, ['LS_SCHEMA', 'LS_STABILITY', 'LS_WHO'],
+    'the keep list is exactly three, each with the pair of arguments its comment states');
+  // …and the one that costs a person their authority reads the SAME constant
+  // net.js writes, so the purge and the minting cannot drift apart by a typo.
+  assert.match(readFileSync(join(ROOT, 'js', 'net.js'), 'utf8'),
+    /export const LS_WHO = 'dice\.who\.v1';/,
+    'net.js owns the key name and exports it — main.js must not spell it a second time');
+  assert.match(src, /import \{[^}]*\bLS_WHO\b[^}]*\} from '\.\/net\.js';/,
+    'and main.js must import it rather than declare its own copy');
+});
+
+t('nothing stamps the opaque browser key', () => {
+  // C22 (IDENTITY §5): it is a single value, not a shaped blob. A stamp on it
+  // would be a schema invented for a string, and the next editor who adds one
+  // would break every browser already holding the bare form.
+  const src = readFileSync(join(ROOT, 'js', 'net.js'), 'utf8');
+  assert.equal(/JSON\.(parse|stringify)[^\n]*LS_WHO|LS_WHO[^\n]*JSON\.(parse|stringify)/.test(src), false,
+    'dice.who.v1 is read and written as a bare string — no JSON, so no shape, so no stamp');
+  assert.equal(/^\s*import .* from '\.\/schema\.js';/m.test(src), false,
+    'and net.js does not import the versioning contract at all — a key with no shape has nothing to judge');
+});
+
 if (process.exitCode) process.exit(process.exitCode);
 console.log(`all ${n} schema tests pass`);

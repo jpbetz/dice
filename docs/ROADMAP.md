@@ -1909,6 +1909,23 @@ dice on screen from the seat beside it.*
   [docs/IDENTITY.md](IDENTITY.md). The "identity anchored to browser-storage
   shape" entry under Structural risks should be read with that record beside
   it — its "B1 is that feature" sentence is superseded by this ruling.
+- **B4. `dice.who.v1` rung 1 — SHIPPED 2026-08-17** (UX §7.52, IDENTITY §5,
+  `tests/identity.test.mjs`, `server.js` `resumableSeatFor`). Filed under this
+  tier only because B1 is where the pass was scheduled from; it is **not a beta
+  feature** and has no channel — the key ships to everybody, because the two
+  things it fixes were broken for everybody. *Written red first: the reveal of a
+  held roll came back `403 not_reveal_authority` after the tab that chose it
+  closed, and a player's own secret rolls were absent from their own log on
+  rejoin — neither on any roadmap item, neither visible to the suite.* The fix
+  hands the same `playerId` back to a browser rejoining a seat **nobody is
+  sitting in**, so every authority check and `projectEntryFor` heal untouched.
+  A live seat is never resumed (`clients.size === 0 && everStreamed` — the
+  second half stops a session restore landing two tabs on one seat), refusal is
+  a fresh seat rather than an error, and `who` never leaves the front door.
+  **Rung 2 is named and NOT scheduled** (return after the reap): it would widen
+  four authority sites and change `projectEntryFor`'s redaction-suite-pinned
+  signature, and IDENTITY §7's question to Joe is what decides whether it is
+  ever built.
 - **B2. Nothing tells a beta tester how to leave.** The revoke link exists and
   is proven; no surface offers it. A one-line "you are on the beta channel"
   row with the stable link belongs in Your stuff — but the panel is at its

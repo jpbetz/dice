@@ -1105,6 +1105,49 @@ function takeRoomCreateBudget(req) {
   return true;
 }
 
+// WHO-RESUME (docs/IDENTITY.md §5, rung 1): the LAPSED seat this browser key
+// may sit back down in, or null.
+//
+// THE BUG THIS IS THE FIX FOR. The seat is the sole credential — "every
+// mutating POST already carries it alone" — and it lived in sessionStorage, so
+// its life was one TAB's. Goal 11 hangs a held roll's reveal on a PERSON
+// ("revealable by whoever chose it"); the id it actually hung on died first, so
+// a held roll could be swept by anybody (U19's departed-roller admission) and
+// revealed by nobody, and your own secret rolls dropped out of your own log the
+// moment you came back. Handing the SAME playerId back heals every one of those
+// without touching a single authority check: reveal, Done, collect, mine-clear
+// and projectEntryFor are all bit-for-bit what they were.
+//
+// NEVER A LIVE SEAT, and the two conditions say different things:
+//
+//   clients.size === 0   nobody is sitting here NOW. The second tab of a shared
+//                        screen is genuinely a second player (js/net.js), and a
+//                        stranger who guesses a key must not be able to walk
+//                        into an occupied chair. This is the whole security
+//                        argument, and it is one comparison.
+//   everStreamed         somebody WAS. Without it, a seat between its join and
+//                        its EventSource attaching looks identical to a lapsed
+//                        one — so a session restore that reopens five tabs of
+//                        one room would land two of them on one seat. Arriving
+//                        is not lapsing.
+//
+// Refusal is not an error: no match simply falls through to the ordinary join
+// below and the browser gets a fresh seat, exactly as it did before this
+// existed. There is nothing here a client can be told "no" to.
+//
+// TWO LAPSED SEATS, ONE KEY (two tabs of one browser, both closed) is a real
+// state, so the scan does not stop at the first hit — it keeps the LAST match.
+// Map iteration is insertion order, so that is the most recently taken seat,
+// which is the one whose held roll the player is coming back for.
+function resumableSeatFor(room, who) {
+  if (!room || !who) return null;
+  let lapsed = null;
+  for (const p of room.players.values()) {
+    if (p.who === who && p.clients.size === 0 && p.everStreamed) lapsed = p;
+  }
+  return lapsed;
+}
+
 async function handleJoin(req, res) {
   const body = await readJsonBody(req);
   if (!body.ok) return sendError(res, 400, body.reason, 'bad_request', { close: body.close });
@@ -1127,19 +1170,38 @@ async function handleJoin(req, res) {
   // room must still let the players already in it reload.
   const seatId = cleanString(body.value.playerId, 64);
   const seatRoom = rooms.get(roomName);
-  const seat = seatId && seatRoom ? seatRoom.players.get(seatId) : null;
+  // `dice.who.v1` (docs/IDENTITY.md §5) — the browser key, read HERE and
+  // nowhere else in this file. Trust parity with playerId, which already rides
+  // the SSE URL: same class of credential, longer life. Which is exactly why it
+  // goes IN and never comes out — see the storage line below and, for the
+  // whole rule, IDENTITY's five must-nots.
+  const who = cleanString(body.value.who, 64);
+  const seat = (seatId && seatRoom ? seatRoom.players.get(seatId) : null)
+    || resumableSeatFor(seatRoom, who);
   if (seat) {
     // The JOIN grace, not the disconnect one: this client has not opened its
     // stream yet. scheduleReap never shortens, so the dying tab's late close
     // cannot cut this window down to 5s.
     scheduleReap(seatRoom, seat, JOIN_GRACE_MS);
+    // Re-bind the key on every resume, including the seatId one: a browser
+    // that minted its key AFTER taking this seat (the boot that shipped this)
+    // otherwise holds a seat no key points at, and its next tab-close would
+    // still lose the roll it is holding. Reaching this line already required
+    // the full credential — the seat id, or a key this seat carries — so
+    // nothing is granted here that was not already held.
+    if (who) seat.who = who;
     if (seat.name !== name) {
       // The owner's stored name is the truth (js/main.js keeps it in
       // localStorage); a rename that raced the reload lands here.
       seat.name = name;
       broadcast(seatRoom, 'player-renamed', { playerId: seat.id, name });
     }
-    log(`resume  ${logField('room', roomName)} ${logField('name', name)} color=${seat.color} players=${seatRoom.players.size}`);
+    // `by=` names the credential that answered: the tab's own seat id, or the
+    // browser key falling back for a tab that is gone. One line for both,
+    // because it IS one path — but which door opened is the thing a field
+    // report or an e2e scenario needs, and it cannot be inferred from anything
+    // else in the log.
+    log(`resume  ${logField('room', roomName)} ${logField('name', name)} color=${seat.color} players=${seatRoom.players.size} by=${seat.id === seatId ? 'seat' : 'who'}`);
     return sendJson(res, 200, joinSnapshot(seatRoom, seat));
   }
 
@@ -1172,6 +1234,21 @@ async function handleJoin(req, res) {
     clients: new Set(),
     reapTimer: null,
     reapAt: 0,
+    // The browser key that may resume this seat once its tab is gone
+    // (resumableSeatFor). ROOM-LOCAL and no more durable than the room itself
+    // — goal 7, rooms die whole — and it is present-or-absent so a client
+    // cached from before this shipped stores nothing and resumes nothing.
+    //
+    // NEVER EMITTED. publicPlayers builds its roster field by field and this is
+    // not one of them; joinSnapshot/roomSnapshot go through it; no broadcast
+    // carries a player object built anywhere else. A credential in a roster
+    // payload is a leak with a schema, so the test that matters greps the BYTES
+    // a bystander receives (tests/identity.test.mjs, 'who never leaves the
+    // front door') rather than trusting this comment.
+    ...(who ? { who } : {}),
+    // Has a stream ever attached here? handleEvents sets it. Lets
+    // resumableSeatFor tell a lapsed seat from an arriving one.
+    everStreamed: false,
   };
   room.players.set(player.id, player);
   // If the client never opens an event stream, forget it again eventually.
@@ -1234,6 +1311,11 @@ function handleEvents(req, res, url) {
     dropStream(room, player, oldest);
   }
   player.clients.add(res);
+  // THE ONE BIT THAT SEPARATES A LAPSED SEAT FROM AN ARRIVING ONE (see
+  // resumableSeatFor). Set here and never cleared: the question it answers is
+  // "was anybody ever sitting here", not "is anybody sitting here now" —
+  // clients.size already answers the second one.
+  player.everStreamed = true;
   holdPlayer(player);
 
   // hello fires on EVERY stream (re)open — it is the reconnect path — so its
