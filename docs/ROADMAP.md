@@ -178,16 +178,54 @@ the surface is UX §7.43.
 
 ### 2l. Pool analysis — ①–⑥ ALL SHIPPED, the last of them 2026-08-17
 
-**Moved to [SHIPPED.md](SHIPPED.md)** — ⑥'s engine (08-16) and its rendering
-(08-17) closed the last open half, so the whole of §2l is a record now. The
-record keeps what is worth re-reading: the four findings from the rendering
-half (including a live number reasoned from wrongly, and a `1 − cdf` that
-underflowed to a false `0%`), the three typed refusals, and the LOOK that
-found a target mark hiding under an average.
+**BUILT, all six slices** — and *built* is the honest word, because the LOOK is
+still owed (first bullet below). ①–④ 2026-08-06 · ⑤ the ledger sheet
+2026-08-15 (UX §7.44) · ⑥'s engine 2026-08-16 (`sumForecast(dice, mods)` in
+`js/odds.js`) · ⑥'s rendering 2026-08-17 (UX §7.48).
+**Record in [SHIPPED.md](SHIPPED.md)**: what renders, the four findings from
+the rendering half (the 22 `#pop-preview` assertions that did NOT break and why
+the inference from a live number was wrong · `stageGroup` not having dropped
+mods/dc since 2026-08-08 · `renderPopEcho`'s preview path never having branched
+on which door opened it · the `sumAtLeast` deep-tail underflow, found by
+LOOKING and not by the suite), the three typed refusals and their two
+corrections, and the four proofs with the command that reproduces the bench.
+Reasoning, data and killed designs: [POOL-ANALYSIS.md](POOL-ANALYSIS.md).
 
-Full detail on the design lives in [POOL-ANALYSIS.md](POOL-ANALYSIS.md);
-the surface is [UX §7.48](UX.md). **§5's local statistics are unblocked by
-this** — they had no source of an expected value without it.
+**This heading survives the move because two things are still LIVE:**
+
+- ~~**STILL OWED: the LOOK.**~~ **TAKEN 2026-08-17, and it did NOT go on Joe's
+  queue — one of the three questions was a defect.** Every number had been
+  verified in the running app while nothing had been seen rendered (the Browser
+  pane would not composite), so this bullet asked for an eye.
+  `node tools/drive.mjs tools/steps/sumread-look.mjs` shoots one frame per
+  question, each on the worst case for it: the touching columns **stay** (judged
+  at `40d20dl1`'s 47 cells, where a gutter would be noise and a joined outline
+  is what a continuous total means), the flat block **stays** (`1d20+5` fills
+  the box, and *"flat — every total 5%"* under it is what keeps the truest frame
+  from reading as a broken one), and **the coincident marks were a bug**: on
+  `2d6 dc7` the dashed target painted exactly onto the solid average and the
+  pair read as ONE mark, so the target vanished on the pool where it is easiest
+  to clear. Fixed (`.sf-dc-near`). **`dcAt` was correct throughout** — the hook
+  printed the right number while the mark it names was invisible, which is why
+  no assertion could have separated the two right answers from the wrong one.
+  Full record in UX §7.48 ⑨.
+- **§5's local statistics are UNBLOCKED**, and the block was ⑥'s engine rather
+  than its rendering: `sumForecast(dice, mods).mean` and `.sd` are the
+  *expected* term §5 had no source for. §5's own second blocker is untouched —
+  online the client persists no log (`if (!netOnline) save(LS_LOG, log)`), so
+  there is no durable substrate for a per-player distribution yet. The item
+  itself lives at [§5](#5-capture-mechanisms).
+- **UX §2.1's `showOdds` is deliberately UNBUILT.** §2.1 promises *"72% to
+  clear 15"* on the intent card, mid-ceremony. ⑥ supplies the arithmetic and
+  stops, because two ceremony questions are open and neither is a rendering
+  detail (POOL-ANALYSIS §9's last bullet): whether a REFUSED curve leaves the
+  promised line blank at a drama beat, and whether a derived number belongs on
+  a card whose shipped ruling is that it shows *what was declared*. `showOdds`
+  exists in this repo only as a line of UX.md — `grep -rn showOdds js/
+  index.html tests/` finds nothing — which is the honest state for a slot that
+  is not a half-build.
+
+---
 
 ## Tier 2 — Organization (goal 5)
 
@@ -488,10 +526,13 @@ wire.
   function, so a CSV row is a small change against a settled column list. The
   refusal is argued in UX §7.49 ②; reopen it there, not here.
 - **Local roll statistics** (per-player distribution, average-vs-expected) —
-  the OBSERVED half, and a **dependent of §2l**, not its sibling: §2l's engine
-  is the only source of an *expected* value in the tree. Second blocker:
-  online the client persists no log at all (`if (!netOnline) save(LS_LOG,
-  log)`), so there is no durable substrate for a per-player distribution yet.
+  the OBSERVED half, and a **dependent of [§2l](#2l-pool-analysis--①⑥-shipped-the-sum-read-renders-2026-08-17)**,
+  not its sibling: §2l's engine is the only source of an *expected* value in
+  the tree. **That blocker cleared 2026-08-16** — `sumForecast(dice,
+  mods).mean` and `.sd` are the expected term. What remains is the second
+  blocker, untouched: online the client persists no log at all (`if
+  (!netOnline) save(LS_LOG, log)`), so there is no durable substrate for a
+  per-player distribution yet.
 
 *The file door, the table file and "persistent identity and saves" left this
 tier into Tier G and shipped (SHIPPED.md). The restore half is
@@ -2022,7 +2063,7 @@ because four causes are indistinguishable from a client.
 | --- | --- |
 | §1, §3, C4, C5, C11, C12, C13, C14, C15, C22, C25, C28, C29, U17, U20, U23, U25, U26, §13 | **SHIPPED** — each keeps a pointer line here; the record and the corrections are in SHIPPED.md |
 | §0j's two bullets | shipped; §0j now holds one **decision** (do not buy Cloud Armor yet, with the pricing) and the nice-to-haves |
-| §2l ⑤ | shipped; **⑥ the sum read is the open half** and is now #2 in THE ORDER |
+| §2l ⑤ | shipped; ⑥ was the open half and became #2 in THE ORDER — **since shipped in full** (engine 08-16, rendering 08-17), record in SHIPPED.md |
 | §3b L4 / CUJ5 | shipped; L2's judgment call is all that is left of §3b |
 | C27's residual | **measured and refused as a default** — 0 px gain at 390, a loss at 40d6. Shipped as an inert instrument; the call is Joe's |
 | C24's mat table | **its preset LABELS were a full notch stale** and are struck; the measurement still binds |
