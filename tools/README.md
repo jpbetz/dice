@@ -49,12 +49,26 @@ Canned steps:
 The camera and the spawn line (ROADMAP C27/C28, 2026-08-14). All four take
 paired seeds, so a before and an after are the same throw:
 
+- `frame-residual.mjs [--seeds N] [--zoom z] [--views …] [--pools …]
+  [--spawn axis] [--pile] [--verbose]` — **C27's residual, and the one to run.**
+  The full matrix (6 pools × 3 widths × `preferDice` off/on) with several seeds
+  a cell, reported as a median and a range. It reads off and on from ONE
+  settled throw, so the delta is the camera and provably nothing else, and it
+  prints the GATED answer beside the UNGATED probe — which is the distinction
+  the 2026-08-15 table lost. `--spawn width` re-runs any cell on the
+  pre-`b2a3326` spawn line; `--pile` re-asks C24's dice-above-1.2 table of the
+  presets that actually ship.
 - `frame-small.mjs [desktop] [zoom]` — die span in px per viewport × pool, the
   rung the ladder settled on, and what the two `setFraming` options would give.
-  This is the table C27's residual is argued from.
+  One seed a cell, which is what makes it a probe rather than a table: prefer
+  `frame-residual.mjs` for any claim somebody will later quote.
 - `frame-price.mjs` — the dice rung run four ways (each orientation × scan
   starting at the preset or below it). Written because `oracleProbe` fits from
   `CAM_TARGET_HOME` and therefore answers `null` on the device in question.
+  **Its cells are UNGATED**: they say what rung 2 would give if nothing judged
+  it, not what `preferDice` does. Three cells of this grid were read into the
+  C27 table as `preferDice` numbers and two of them were from the wrong column
+  (2026-08-17) — read `frame-residual.mjs` for what ships.
 - `spawn-clear.mjs [seeds] [zooms] [pools] [variants]` — worst wall clearance
   on the spawn line (negative = a die born inside a wall plane), frame-zero
   contacts, pile share, and the settled cluster. Simulates: minutes.
