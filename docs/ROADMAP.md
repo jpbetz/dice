@@ -1033,15 +1033,29 @@ Audit §10 asked for three things and one of the three was **never true**:
   nothing else. Recorded in SHIPPED.md's wrong-claims table; `renderAudit()`
   now reports `pixelRatio` so the clamp is assertable rather than re-asserted
   from memory.
-- ⬜ **The assertion itself** — a scenario, and the contract is written:
-  a settled `4d6` frame with any registry tower up must sit **under 260 draw
-  calls and over 40**, the floor being the anti-collapse guard (if
-  `autoReset` ever came back the count would fall to ~1 and a ceiling-only
-  budget would still pass). Measured 2026-08-17 with
-  `renderAudit()` per tower, after settle, headless at dpr 1 — empty felt **2**,
-  4d6 on bare felt **58**, `heartwood` **133**, `bastion` **141**,
-  `blackanvil` **186**, `nullstone` **68**, `hollowbole` **79**, and the post
-  stack forced **70 in 8 passes**. Owner: whoever owns
+- ⬜ **The assertion itself** — a scenario, and the contract is written **and
+  sabotage-checked**, which changed it. Read on `blackanvil` (the heaviest
+  registry tower) with a settled `4d6`:
+  - plain frame: `passes === 1`, `post === false`, `calls <= 220` (measured
+    **186**);
+  - then `postForce(true)` and wait for `passes > 1`: `passes === 8`,
+    `calls <= 300` (measured **246**), and **`calls > 40`**;
+  - `pixelRatio <= 2`.
+
+  **The floor belongs on the POST frame and nowhere else, and the first
+  version of this contract had it in the wrong place.** With
+  `renderer.info.autoReset` sabotaged back to `true`, the post frame reads
+  **1 call in 8 passes** (the closing quad) — caught. The *plain* frame reads
+  **81 instead of 186**, because the engine's reset point only hides the shadow
+  pass there: still far above any sane floor, so a plain-frame floor is theatre.
+  A ceiling-only budget passes the sabotage on both. Incidentally measured the
+  same way: the 2048² shadow pass is **77 of blackanvil's 170** idle draw calls
+  (170 shipped vs 93 sabotaged, no dice) — 45% of the frame, and exactly what
+  the default counter does not show you.
+
+  Per-tower, after settle, headless at dpr 1: empty felt **2**, 4d6 on bare
+  felt **58**, `heartwood` **133**, `bastion` **141**, `blackanvil` **186**,
+  `nullstone` **68**, `hollowbole` **79**. Owner: whoever owns
   `tests/e2e/scenarios.mjs` next.
 - ⬜ **The idle tick throttle — NOT a one-liner, because its gate is an eye.**
   The measurement is why it is worth keeping: idle with no tower is **2 draw

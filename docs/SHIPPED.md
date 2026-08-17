@@ -4201,12 +4201,26 @@ Three small hunks in `js/main.js` take the reset over:
   `lines`, `points`, `passes`, `post`, `pixelRatio`, `programs`, `geometries`,
   `textures`.
 
-**`passes` is there so the number can be disbelieved.** If `autoReset` ever
-came back on, `calls` would quietly collapse to ~1 and a ceiling-only budget
-would still pass — so the contract is a **ceiling and a floor**, and a frame
-reporting several passes with a draw count in the dozens cannot be the
-collapsed one. `pixelRatio` rides along for the same reason (see the
-wrong-claims table: the clamp the audit called missing was never missing).
+**`passes` is there so the number can be disbelieved**, and the sabotage check
+proved it is needed *and* corrected the contract that was written first. Flip
+`autoReset` back to `true` and:
+
+| frame | as shipped | sabotaged |
+| --- | --- | --- |
+| blackanvil + 4d6, plain | 186 calls, 1 pass | **81** calls, 1 pass |
+| blackanvil + 4d6, post forced | 246 calls, 8 passes | **1** call, 8 passes |
+| blackanvil idle, no dice, plain | 170 calls | **93** calls |
+
+So **the anti-collapse floor belongs on a POST frame and nowhere else.** On a
+plain frame the sabotage only hides the shadow pass — 81 is still far above any
+sane floor, and a plain-frame floor would have been theatre. A ceiling-only
+budget passes the sabotage on every row. The first draft of this contract put
+the floor on a plain settled frame; it would have shipped green.
+
+The same table measures something the default counter can never show: the 2048²
+shadow pass is **77 of blackanvil's 170** idle draw calls, **45% of the frame**.
+`pixelRatio` rides along for the same disbelief reason (see the wrong-claims
+table: the clamp the audit called missing was never missing).
 
 **The scene-wide sibling of `towerDressAudit()`, not a replacement.** That one
 WALKS the graph and counts meshes — the dressing's static price, budgeted at
