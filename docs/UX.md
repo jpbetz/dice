@@ -1114,7 +1114,7 @@ per-roll choices — §3.3.)
 Two principles arrived from Joe after §1–§6 were drafted. They are binding;
 where they touch earlier sections, this addendum wins.
 
-> **NEXT FREE SECTION NUMBER: §7.47.**
+> **NEXT FREE SECTION NUMBER: §7.48.**
 > *(§7.39–§7.46 were all claimed on 2026-08-14/15 by eight parallel
 > passes. FOUR of the eight first wrote themselves as §7.39, and two
 > more independently claimed §7.45. Every one of them read this line
@@ -5850,3 +5850,119 @@ rate-budget argument rests on it.
 - **`Tables ▾` is lobby-only**, so a player at a table cannot reach their
   recents without leaving. Unchanged by this pass and unrelated to it, but it
   is the reason the seam above is felt at all.
+
+---
+
+### §7.47 — A table that came back empty (2026-08-16)
+
+*U25's sixth bullet, dropped there because "the resync work owns that
+surface", then not done by the resync work either. The roadmap's phrasing was
+"a room that dies says nothing to the group whose link it was". Designed
+before it was built, because the load-bearing question is not what to say —
+it is **what a client is entitled to know**.*
+
+#### ① What a client can actually know, and it is exactly three local facts
+
+Nothing arrives to announce a death. By construction there is nobody in the
+room to be told: `lingerRoom` runs when the last player leaves, and the
+comment on it already says "Nothing is broadcast: there is nobody left to
+hear it." So the notice can only ever be assembled at the moment somebody
+comes **back**, out of what that browser itself remembers:
+
+1. `recentTables()` — this browser has sat at this room key before, under a
+   name it kept.
+2. `storedTable()` (`dice.table.v1:<room>`) — this browser AUTHORED this
+   room's setup, at rev N.
+3. The join snapshot — the room it just landed in has **no log, no setup and
+   at most one player**. This is already computed and already named:
+   `freshRoom`, in `initNet`.
+
+**`freshRoom` alone is not enough**, and the near-miss is the whole reason
+this was worth designing first: an ordinary F5 into a *live* unprepared room
+with no rolls yet is also fresh — no log, one player, no setup — so
+`freshRoom && remembered` would announce a death on every reload. Each half
+of the predicate therefore has to name something this browser **knows it
+left here and can now see is gone**:
+
+- you authored a setup for this room and the room has none — and `freshRoom`
+  already rules out every case where the room survived carrying it, so this
+  clause is exact rather than probable;
+- or you knew this table by a NAME and the room reports none. Unnamed tables
+  are stored as `''`, so they simply do not qualify: with nothing to lose
+  there is no evidence, and the app says nothing rather than guessing.
+
+That conjunction means one thing only: *the room this link names is not the
+room I left.* Nothing else a client sees produces it.
+
+#### ② Who may be told: only the people who were there
+
+A stranger following a dead link has none of the three facts, so the app says
+**nothing** to them — which is correct rather than a limitation. They did not
+lose a table; they opened an empty one, which is what the screen shows. The
+notice is legible exactly to the population it is about, and there is no
+channel by which one player's arrival could tell another anything. That is
+what keeps it clear of goal 12: it is not a message, it has no sender and no
+addressee, it is not delivered, and it leaves no history.
+
+#### ③ What it must never claim — the four causes are indistinguishable
+
+The observable is identical for: the 12 h `SETUP_TTL_MS` expiry; a
+`--min-instances 0` scale-to-zero between sessions; a deploy; and the
+two-minute round trip where an **unprepared** room is deleted the instant its
+last player leaves. A client cannot tell them apart and must not guess. So
+the notice never says *expired*, *timed out*, *the server restarted*, and
+never names a duration. It reports the state it can see and stops.
+
+#### ④ The shape: a receipt for a restore that already happens
+
+The app is **already healing this case, silently**, on the same predicate:
+
+- the table's **name** is restored from `recentTables()` (`initNet`, the
+  `wanted` line), guarded to a demonstrably new room precisely so it cannot
+  fight a live table;
+- the **setup** is re-pushed from `dice.table.v1:<room>` by
+  `maybeRepushTable()`, §G6's "the organizer's browser is the durable copy".
+
+So the missing thing was never an announcement of a loss — it is that **an
+act the app performs on your behalf goes unreported**. Framing it as a
+receipt is what makes it safe under §7.20's rule ("emptiness is answered by
+a button that PERFORMS the exit, never by a line of text describing the
+situation"): the exits are already in the presence row, and this reports a
+completed act rather than narrating a predicament.
+
+Two sentences, and the second is written only when the server has said the
+push applied — a promise about an in-flight push would be the one thing on
+this surface that could be false:
+
+- always, on arrival: **`this table came back empty`**
+- and, once a re-push lands: **`this table came back empty — your prepared
+  seats are back`**
+
+#### ⑤ The channel is the notice pill, and why
+
+`setPill(text, 'notice')` already carries exactly this register — a sentence,
+steel not gold because HUE = ACT and this is housekeeping rather than a
+refusal, clipped rather than stretching the header, self-clearing. Its
+shipped precedent is C7's "Bob cleared the table". `announce()` rides along,
+because U5's lesson is that a visual-only state read reaches nobody who
+cannot see it.
+
+**The one hazard, named rather than fixed:** the pill is a SHARED transient
+slot. A stream status change (`handleStatus`) or another player's
+housekeeping can overwrite this notice within seconds. That is judged
+acceptable and arguably correct — a live refusal outranks a historical note
+— but it means the notice is a courtesy on arrival, not a guarantee, and
+nothing may be built on top of it that assumes it was read.
+
+#### ⑥ What was considered and refused
+
+- **A log entry.** The log is the record of ROLLS. A room-lifecycle line in
+  it would be the first entry that is not one, and it would then have to be
+  exported, filtered and searched with the rolls.
+- **Anything with a sender.** "The table expired at 3 a.m." is chat wearing a
+  timestamp, and it is also one of the four causes it cannot distinguish.
+- **A modal or a confirm.** Nothing is being asked of the player, and the
+  refuted list already rules that emptiness is answered by an act.
+- **Telling anyone else.** There is nobody else — `players.length <= 1` is
+  part of the predicate.
+

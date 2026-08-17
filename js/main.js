@@ -11930,6 +11930,20 @@ window.__diceDebug = {
   // The last thing the server refused us ({path, status, code, message}) —
   // the same text the pill shows. Null until something is refused.
   get lastRefusal() { return lastRefusal ? { ...lastRefusal } : null; },
+  // THE PILL AS PAINTED, not as intended (U25's dropped bullet, UX §7.47).
+  // The arrival notice for a table that came back empty is written here and
+  // nowhere else, and the pill is a SHARED transient slot — a status change or
+  // another player's housekeeping can take it — so a scenario that asserted a
+  // model flag would be asserting something the player may never have seen.
+  // `cls` carries the register ('notice' / 'refused' / 'offline' / 'solo'),
+  // because the same sentence in the wrong hue is a different read.
+  get pill() {
+    return {
+      shown: !statusPill.classList.contains('hidden'),
+      text: statusPill.textContent || '',
+      cls: [...statusPill.classList].filter((c) => c !== 'hidden').join(' '),
+    };
+  },
   // room settings (roadmap §2): current merged object, live felt state, and
   // the same entry points the settings modal uses.
   get settings() { return { ...roomSettings }; },
@@ -23240,6 +23254,66 @@ function maybeRepushTable() {
     .finally(() => { repushInFlight = false; });
 }
 
+// ---------------------------------------------------------------------------
+// A TABLE THAT CAME BACK EMPTY (UX §7.47). U25's dropped sixth bullet: a room
+// that dies says nothing to the group whose link it was.
+//
+// Nothing can arrive to announce it — lingerRoom's own comment says so
+// ("Nothing is broadcast: there is nobody left to hear it"), and by
+// construction the room is empty when it happens. So the notice is assembled
+// on the way BACK IN, out of three purely local facts: this browser remembers
+// this room key (recentTables), or authored its setup (dice.table.v1:<room>),
+// AND the room it just landed in has no log, no setup and nobody else in it.
+// That conjunction means one thing: the room this link names is not the room
+// I left.
+//
+// WHAT IT MUST NOT CLAIM, and this is the whole reason it is one short
+// sentence. Four causes produce an identical observable — the 12 h setup TTL,
+// a --min-instances 0 scale-to-zero, a deploy, and the two-minute round trip
+// where an UNPREPARED room is deleted the instant its last player leaves. A
+// client cannot tell them apart, so the notice never says expired, never says
+// restarted, and never names a duration.
+//
+// AND IT IS A RECEIPT, NOT AN OBITUARY. The app already heals this case in
+// silence: the table's NAME comes back from recentTables and the SETUP comes
+// back from maybeRepushTable (§G6, "the organizer's browser is the durable
+// copy"). What was missing was never an announcement of a loss — it was that
+// an act performed on your behalf went unreported. So the second sentence is
+// written only once the server has said the push APPLIED; a promise about an
+// in-flight push is the one thing here that could turn out false.
+//
+// Nobody else is told anything (there is nobody else — that is in the
+// predicate), it has no sender, and it leaves no history. That is what keeps
+// it clear of goal 12, and it is why it is not a log entry: the log is the
+// record of ROLLS, and the first line in it that is not one would then have to
+// be exported, filtered and searched alongside them.
+const EMPTY_RETURN_NOTE = 'this table came back empty';
+function noteEmptyReturn(came, repush) {
+  if (!came) return repush;
+  // The notice pill's own register (C7's "Bob cleared the table"): a sentence,
+  // steel rather than gold because HUE = ACT and this is housekeeping, not a
+  // refusal of yours. announce() rides along — U5's lesson is that a state
+  // read nobody can see is a state read nobody gets.
+  const say = (text) => {
+    setPill(text, 'notice');
+    announce(`${text}.`);
+    setTimeout(() => { if (statusPill.textContent === text) setPill(null); }, 6000);
+  };
+  say(EMPTY_RETURN_NOTE);
+  // A SHARED SLOT, deliberately not defended. handleStatus or another
+  // player's housekeeping can take the pill within seconds, and that is the
+  // right precedence — a live refusal outranks a note about the past. It also
+  // means nothing may be built on the assumption this was read.
+  if (repush && typeof repush.then === 'function') {
+    repush.then((res) => {
+      if (res && res.applied && statusPill.textContent === EMPTY_RETURN_NOTE) {
+        say(`${EMPTY_RETURN_NOTE} — your prepared seats are back`);
+      }
+    }).catch(() => { /* the heal failing is §G6's business, not the notice's */ });
+  }
+  return repush;
+}
+
 // net / netOnline / players are declared beside the owner switcher above —
 // the module-scope renderGroups() boot call reads the roster.
 let offers = [];        // open offered-roll cards for this room
@@ -25821,6 +25895,10 @@ async function initNet() {
     onStatus: handleNetStatus,
     onRefused: handleNetRefusal,
   });
+  // Set inside the join branch, spent after maybeRepushTable() below — the two
+  // halves of the notice are ~70 lines apart because the second one cannot be
+  // written until the server has answered the heal (UX §7.47 ④).
+  let cameBackEmpty = false;
   if (conn.online) {
     net = conn;
     netOnline = true;
@@ -25885,6 +25963,29 @@ async function initNet() {
     // you typed it into "+ New table" seconds ago.
     const freshRoom = !(conn.log && conn.log.length) && players.length <= 1 && !roomSetup;
     const remembered = freshRoom ? recentTables().find((t) => t.room === ROOM) : null;
+    // …AND THIS IS WHERE A DEAD ROOM BECOMES KNOWABLE (UX §7.47). Read here
+    // rather than re-derived below, because `wanted` is about to consume
+    // `remembered` and the pending name would mask it.
+    //
+    // `freshRoom` ALONE IS NOT ENOUGH, and the near-miss is worth spelling
+    // out because it is the difference between a true notice and a false one.
+    // A reload into a LIVE unprepared room with no rolls yet is also fresh —
+    // no log, one player, no setup — so `freshRoom && remembered` would
+    // announce a death on an ordinary F5. What each half needs is a thing
+    // this browser KNOWS IT LEFT HERE and can now see is gone:
+    //   · you authored a setup for this room (dice.table.v1:<room>) and the
+    //     room has none. A live room keeps its setup, so `freshRoom` already
+    //     rules out every case where the room survived — which is why this
+    //     clause is exact rather than probable.
+    //   · or you knew this table by a NAME and the room reports none. Same
+    //     shape: a live room carries its own settings, so a missing name that
+    //     you remember is a room that was rebuilt. (Unnamed tables store '',
+    //     so they simply do not qualify — with nothing to lose there is no
+    //     evidence, and the app says nothing rather than guessing.)
+    cameBackEmpty = freshRoom && !!(
+      storedTable()
+      || (remembered && remembered.name && !roomSettings.tableName)
+    );
     const wanted = takePendingTableName() || (remembered && remembered.name) || '';
     if (wanted && !roomSettings.tableName && net) net.setSettings({ tableName: wanted });
     rememberTable(ROOM, roomSettings.tableName || wanted || '');
@@ -25926,7 +26027,7 @@ async function initNet() {
   // §G6: if this browser authored the room's setup and the room came up
   // without it (or behind it), heal it now — the first SSE hello can fire
   // before `net` is assigned above, so this call is the join-time guarantee.
-  maybeRepushTable();
+  noteEmptyReturn(cameBackEmpty, maybeRepushTable());
   updateIdentityChip(); // the rail chip takes the seat's name + color
   updateTrayButtons();  // the draft's Offer verb appears only at a table
   return { online: netOnline };
