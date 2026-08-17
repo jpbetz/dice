@@ -910,14 +910,46 @@ UX §7.45. **The first bullet — the one CUJS.md names as CUJ11's first item �
 stale**: §7.28 deleted the auto-collect clock on 2026-08-10, four days after the
 audit found it. CUJ11's first item shipped by deletion before the journey was named.
 
-### U28b. Touch findings — TWO SHIPPED, the near-misses still open
+### U28b. Touch findings — TWO SHIPPED, then the RAIL FOOT; two families still refused
 
 `.rd-cell` and the rim wrap shipped (UX §7.45), both coarse-only.
 
-**Still open, and the reasons still bind:** a blanket coarse `.btn` bump touches ~30
-surfaces and bumping `#section-bar` spends U30's rack budget directly. The families
-are `.btn.ghost` at 31px, `.corner-btn` at 28 expanded, `.btn.tiny` at 19,
-`#section-bar` cells at 26. **Raise by family with the measurement, never in bulk.**
+**The rail foot shipped 2026-08-17** — `.btn.ghost` and `.corner-btn`, which
+turned out to be the *same row*, so the pair is one change and it cost the rack
+**4px**. See SHIPPED.md, *U28b — the expanded rail foot*. All four measurements
+in the original entry were re-taken first and **all four were still exact**
+(31 / 28 / 19 / 26).
+
+**Still refused, and now with the number that refuses them:**
+
+- **`.btn.tiny` at 19px** — the worst of the four and the one that must not be
+  done alone. It is ~25 buttons in the densest rows in the app (the portable
+  door's five-across, the profile row, the offer row), and its dress is
+  explicitly *label-bearing* — "`.btn.tiny` verbs, muted words, no new colour"
+  (css/style.css:3815). 19 → 34 is +15px on rows that already have an
+  overflow defect on the record (index.html:1164: a settings destination
+  "overflowed a 459px window by 251px"). It needs the settings modal
+  re-measured in the same pass, which is what makes it not a one-liner.
+- **`#section-bar` cells at 26px** — unchanged reason (U30's rack budget), and
+  the measurement now says something sharper than "spends it": the bar lives
+  *inside* the scrollport, so bumping it costs **0px of scrollport and 8px of
+  the rack's own content**, i.e. it is paid in the one place U30 exists to
+  protect. §7.41 also has it as a SWITCH set, not a button family.
+
+**And one NEW near-miss the original list missed.** The *collapsed* foot's
+controls are 18–19px **WIDE** on coarse — `toggle-settings 19×39`,
+`rail-log 18×39`, `rail-palette 18×39`, `corner-clear 18×37` — so they clear
+the floor on height and fail it on width, and `touch-targets` never looks
+(its list is expanded-state). This is not fixable by a rule: four controls plus
+the contextual ✕ in an 86px content box already use 81px (measured, and the
+budget is written at css/style.css:2434). It is U28a's shape — a **layout**
+change before a size one — and it belongs with U21, which is already the
+"collapsed rail deletes multiplayer" entry.
+
+**Raise by family with the measurement, never in bulk** — that rule held up:
+of the four families it says to price separately, one was free (4px), one is
+paid in the protected place, one carries a known overflow, and the fifth thing
+it did not list cannot be priced at all.
 
 ---
 

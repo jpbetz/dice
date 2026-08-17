@@ -2928,6 +2928,57 @@ a short-laptop frame for U30's height branch. A coarse-only rule is invisible
 to a tool that never emulates touch, which is the same blindness the audit
 found in the suite itself.
 
+### U28b. The expanded rail foot — SHIPPED 2026-08-17
+
+One of U28b's four refused size families, taken alone and with its price. The
+rule is four lines in `css/style.css` under the collapsed foot's coarse block,
+where the two halves of the same story now sit together:
+
+```css
+@media (pointer: coarse) {
+  #rail-foot .btn.ghost,
+  #rail-foot .corner-btn { min-height: 34px; min-width: 34px; }
+}
+```
+
+**Two families, one row, one change.** ⚙ ≣ ? ❯ (`.btn.ghost`, 31px) and
+✕ Clear mine (`.corner-btn`, 28px) are siblings in `#rail-foot`, so the row's
+height is its tallest child and both reach the floor together — pricing them
+separately would have priced the same 4px twice. Measured before
+(`38×31, 37×31, 33×31, 37×31` and `101×28`) and after (`38×34, 37×34, 34×34,
+37×34` and `101×34`) with offsetWidth/offsetHeight under an emulated coarse
+pointer, the same reader `touch-targets` uses.
+
+**What U28 actually did, and why this was left.** The 2026-08-08 pass fixed the
+**collapsed** foot (`padding: 11px 3px`, css/style.css:2467) and stopped there,
+so the same five controls stayed at 31/28 in the state most people use. The
+comment above that block is a width argument end to end — it never asks what
+the expanded row costs, because in the expanded column width is free.
+
+**THE FLOOR IS 34 AND THAT IS THE ARGUMENT, not a shortfall.** `?` is 33px
+wide, and four 44px glyphs plus a 101px labelled ✕ cannot fit a 260px column —
+so a rule buying 44 of height while width stayed 37 would have spent rack for a
+target that still failed 44×44. 34 is reachable on **both** axes here, which is
+the whole of why it is the number (U28's own conversion: 34 is a 9 mm finger
+pad and this file's floor; 44 is the platform guideline and is taken where the
+budget affords it).
+
+**It costs the rack 4px, measured, not estimated.** `#rail-foot` is `flex: none`
+in the column, so its height comes off the scrolling body: at U30's worst frame
+(1024×768 landscape, coarse) `#builder-panel > .panel-body` goes **663 → 659**.
+The probe applies each candidate live and re-measures, and it priced the two
+refused families in the same run — see ROADMAP U28b, which now carries all
+three numbers.
+
+**The collapsed rail is untouched, by specificity rather than by hope.** The
+collapsed block is `#left-panel.collapsed #rail-foot .btn.ghost` at (2,3,0)
+against the new rule's (1,2,0), so both `padding` and `min-width` lose there and
+the icon rail keeps the width budget it was measured to. Verified after the
+change: the collapsed foot still uses **81px of its 86px content box**, and its
+controls still read 19×39 / 18×39 / 18×39 / 18×37 — which is also how the new
+near-miss in ROADMAP U28b was found (18–19px **wide** is under the floor, and
+no rule can fix it in an 86px box).
+
 ---
 
 # Moved out of ROADMAP.md (2026-08-14 cleanup)
