@@ -1114,11 +1114,16 @@ per-roll choices — §3.3.)
 Two principles arrived from Joe after §1–§6 were drafted. They are binding;
 where they touch earlier sections, this addendum wins.
 
-> **NEXT FREE SECTION NUMBER: §7.48.**
+> **NEXT FREE SECTION NUMBER: §7.53.**
 > *(§7.39–§7.46 were all claimed on 2026-08-14/15 by eight parallel
 > passes. FOUR of the eight first wrote themselves as §7.39, and two
 > more independently claimed §7.45. Every one of them read this line
 > before writing — they were reading eight different copies of it.)*
+> *§7.48–§7.52 were claimed on 2026-08-17 by five more parallel passes and
+> **collided zero times**, because the numbers were HANDED OUT in the briefs
+> instead of read from this line. That is the working fix: a parallel branch
+> cannot see this line move, so somebody upstream of all of them has to
+> assign. This line's job is to tell that somebody where to start.*
 > Claim it here in the same commit that writes the section, before you write
 > it. This document ASSIGNS these numbers, so this line is the only place a
 > branch that has been out for a week can see what is taken (ROADMAP C4).

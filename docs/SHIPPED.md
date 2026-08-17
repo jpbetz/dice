@@ -5322,3 +5322,122 @@ labelling gap, not a leak. And the audit predates L4: the collapsed column
 now also hides `↩ Main table`, so a breakout player in the immersion state
 has no way back on screen at all — that fact, not the roster, is what
 "deletes multiplayer" means today.
+
+---
+
+## §2l. Pool analysis — the whole tier, ①–⑥ (moved from ROADMAP 2026-08-17)
+
+*Moved intact the day ⑥'s rendering shipped, per the standing rule that a
+section which says SHIPPED moves here in the commit that ships it.*
+
+Full detail: [POOL-ANALYSIS.md](POOL-ANALYSIS.md). ①–④ shipped 2026-08-06; ⑤
+the ledger sheet 2026-08-15 (UX §7.44); ⑥'s math floor 2026-08-16 —
+`sumForecast(dice, mods)` in `js/odds.js`, supplied by `SYSTEMS.dnd` and
+`SYSTEMS.none` through one shared `sumForecastFor` — and **⑥'s rendering
+2026-08-17 (UX §7.48)**, which is what closes the section. *This whole entry is
+now owed a move to [SHIPPED.md](SHIPPED.md); the pass that shipped ⑥'s
+rendering did not own that file.*
+
+**What renders.** `#pop-preview`, on **every** ± door: the exact curve of the
+total on a value axis, the average solid and any declared target dashed on it, a
+hover readout naming each cell and its cumulative read, and the odds of
+clearing that target in words. Plus, in the one-line validator (`#cmd-slot` /
+`#palette-slot`), ` · 55% to clear 15` — only when a target was typed. The
+shipped `min/avg/max` line is untouched in both places, because it is
+`previewOf`'s answer and it survives a curve refusal.
+
+**Four findings from the rendering half, each worth more than the code:**
+
+- **The 22 `#pop-preview` assertions did not break, and the warning that they
+  would was wrong in a way worth remembering.** The count was right; the
+  inference from it was not. All 22 live in ONE scenario, 21 of them under
+  `soul-deal` — the per-die world a sum read never enters — and the 22nd pins
+  the very `min ` line the design keeps anyway. *A stale number is one failure
+  mode; a live number reasoned from wrongly is another.*
+- **`stageGroup` has not dropped mods and dc since 2026-08-08**, which was the
+  entire premise of POOL-ANALYSIS §9's second rendering question. It sets aside
+  only the glue (keep/drop · reroll · `!` · adv), out loud. The example the
+  question was built on survives — keep/drop *is* glue — but the general claim
+  was half false, and §13's row for it pointed 10k lines away.
+- **`renderPopEcho`'s preview path never branched on which door opened it**, so
+  "which popover doors forecast" had been answered by ④ in 2026-08-06 and
+  nobody wrote it down. The real question was whether the shelf door should be
+  an exception. It should not: a curve is a fact about the dice, not a
+  prediction about that roll, so it does not become false once they land.
+- **One real bug, found by LOOKING and not by the suite.** `sumAtLeast`
+  computed its tail as `1 − cdf`, which underflowed to **exactly 0** for
+  reachable totals deep in `40d20 dl1`'s tail — the one value this feature
+  reserves for *impossible*. It printed in the readout as a cell with visible
+  mass reading `0%`. Fixed in `js/odds.js` (answer both edges by definition, sum
+  whichever side carries less than half the mass) and pinned at both ends.
+
+**Three things the renderer does not re-derive** — `sumAtLeast`/`sumAtMost`,
+plus `sumBins` and `sumPeak` which joined them for exactly this reason, are the
+only place this arithmetic lives; a refusal still owes the min/avg/max line
+**beside** it; and `values` is **sparse**, so `1d6!` renders 21 cells with three
+holes rather than 21 adjacent ones.
+
+**The LOOK was owed and is now taken — and one of the three questions was a
+defect.** Every number had been verified in the running app while **nothing had
+been seen rendered** (the Browser pane would not composite in that session), so
+three decisions sat waiting on an eye. `node tools/drive.mjs
+tools/steps/sumread-look.mjs` shoots one frame per question, each on the worst
+case for it, and answers all three (record in UX §7.48 ⑨):
+
+- the touching columns **stay** — judged on `40d20dl1`'s 47 cells, where a
+  gutter would be noise and a joined outline is what a continuous total means;
+- the flat block **stays** — `1d20+5` fills the box, and *"flat — every total
+  5%"* under it is what stops the truest frame reading as a broken one;
+- **the coincident marks were a bug.** On `2d6 dc7` the dashed target painted
+  exactly onto the solid average and the pair read as ONE mark, so the target
+  disappeared on the pool where it is easiest to clear. Fixed with a 2.5px
+  stand-off (`.sf-dc-near`). **`dcAt` was correct throughout** — the hook
+  printed the right number while the mark it names was invisible, which is why
+  this one could only ever have been caught by looking.
+
+Nothing here is on Joe's queue: two answers were the surface being right, and
+the third is fixed.
+
+**Three typed refusals, and they are the load-bearing part**: `mixed-keep`,
+`reroll-cap`, `explode-cap`. Two corrections came with them, both of which
+would have shipped wrong numbers:
+
+- **The detector POOL-ANALYSIS prescribed is insufficient, and the
+  counter-example is one paragraph above it.** `new Set(spec.dice).size === 1`
+  waves through `21d20 adv kh3` — one *type*, two *distributions*, because the
+  advantage cap pairs only 19. The shipped detector compares the counting
+  **pmfs**.
+- **Advantage-with-explosion is not a gap at all.** The adv loser is
+  `counts:false` before the explosion loop runs, so only the ordinary slot
+  budget bites. It is exact and pinned against enumeration, where the roadmap
+  had assumed a blanket refusal.
+
+Proven four ways (exhaustive enumeration of `composeRoll`; published closed
+forms nobody here derived; agreement with `previewOf`'s independent
+order-statistic path; seeded Monte Carlo at 5σ), **115 checks** (`node
+tests/sumread.test.mjs`, 2026-08-17 — 108 when the engine landed, plus the six
+that pin the rendering's arithmetic and the one that pins the tail bug).
+**Worst legal case `40d20 dl1` = 5.622 ms warmed** (`node
+tests/sumread.test.mjs --bench`, node v24.14.1 linux, 2026-08-17), against the
+~110 ms POOL-ANALYSIS predicted — its conclusion strengthens rather than
+weakens. That cost is why the forecast is memoised at the render boundary:
+`renderPopEcho` runs on every keystroke.
+
+**GOALS: 4** (goal 4 names *summing values* as toil the system owes the
+player — and as of 2026-08-17 the app finally says a word about `4d6dl1`:
+*most likely 13 · 13%*, and *23% to clear 15*) · **5** · **6** · **7** · **12**
+closed by the session-only ruling.
+
+**§5's local statistics are UNBLOCKED**, and the block was ⑥'s engine rather
+than its rendering: `sumForecast(dice, mods).mean` and `.sd` are the *expected*
+term §5 had no source for. §5's own second blocker is untouched — online the
+client persists no log (`if (!netOnline) save(LS_LOG, log)`), so there is no
+durable substrate for a per-player distribution yet.
+
+**What ⑥ deliberately did NOT deliver: UX §2.1's `showOdds`.** §2.1 promises
+*"72% to clear 15"* on the intent card, mid-ceremony. ⑥ supplies the arithmetic
+and stops, because two ceremony questions are open and neither is a rendering
+detail (POOL-ANALYSIS §9's last bullet). `showOdds` exists in this repo only as
+a line of UX.md — `grep -rn showOdds js/ index.html tests/` finds nothing —
+which is the honest state for a slot that is not a half-build.
+
