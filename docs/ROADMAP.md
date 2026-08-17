@@ -51,9 +51,9 @@ by *finishing what is in flight*.
 | # | Item | Why it is here | Size | Track |
 | --- | --- | --- | --- | --- |
 | 1 | [**Joe's LOOK and LISTEN sitting**](#tier-w--the-first-fantasy-venue-the-fae-set--built-the-look-and-the-listen-are-joes) | **Not a build item, and that is why it is first.** Tier W is finished except for being *seen and heard*; five verdicts and ten voices gate it, and nothing on Track B advances until they move. One page now carries every frame side by side with the question each answers, and `docs/AUDIO.md` §9 is ten rows of two clicks. Rebuild it with `node tools/verdict-sheet.mjs`. | ~1 hr of Joe | B |
-| ~~2~~ | ~~[**§2l ⑥'s RENDERING**](#2l-pool-analysis--①⑥-shipped-the-sum-read-renders-2026-08-17)~~ **SHIPPED 2026-08-17** | The curve of the total renders in `#pop-preview` on every ± door, plus a target clause in the one-line validator. §2l is now ①–⑥ complete; **it is owed a move to SHIPPED.md**, which this pass did not own. Its two live dependents are #4's sibling (§5's local statistics, now unblocked — `sumForecast(…).mean`/`.sd` are the expected term) and UX §2.1's `showOdds`, still deliberately unbuilt. | — | A |
+| ~~2~~ | ~~[**§2l ⑥'s RENDERING**](#2l-pool-analysis--①⑥-shipped-the-sum-read-renders-2026-08-17)~~ **SHIPPED 2026-08-17** | The curve of the total renders in `#pop-preview` on every ± door, plus a target clause in the one-line validator. §2l is now ①–⑥ complete and **its record has moved to SHIPPED.md**; the heading that stays here carries only what is still live. That is #4's sibling (§5's local statistics, now unblocked — `sumForecast(…).mean`/`.sd` are the expected term) and UX §2.1's `showOdds`, still deliberately unbuilt. | — | A |
 | 3 | [**C22's `room.setup` stamp**](#c22-a-versioning-contract-for-client-state--shipped-2026-08-15) | Half a contract is worse than none. The stamp must come from the WRITER (`maybeRepushTable`); a stamp only the server writes is a stamp nobody can trust. ~10 lines once someone owns that site. | small | A |
-| 4 | [**§5** — roll-log export](#5-capture-mechanisms) | Goal 7's last uncapturable surface: the online log cannot be copied or downloaded. Reuses `portableDownload()`. The half of §5 that does **not** wait on #2. | small | A |
+| 4 | [**§5** — roll-log export](#5-capture-mechanisms) | Goal 7's last uncapturable surface: the online log cannot be copied or downloaded. Reuses `portableDownload()`. The half of §5 that never waited on #2 — and #2's engine has since unblocked the other half's *expected* term, leaving it on one blocker (no durable log online) rather than two. | small | A |
 | 5 | [**9d follow-up** — `tower` in the portable YAML](#9d-follow-up-tower-and-venue-in-the-portable-yaml) | `TABLE_KEYS` is still `{name, felt, system, zoom}`, so a prepared table cannot arrive with its tower up. Ship `tower` alone; GOALS punted how a venue rides the file. | small | A |
 | 6 | [**C30 residual** — deaden + grip, sleep off](#c30-residual-deaden--the-only-lever-that-touches-the-dithering) | The best shake and hop numbers measured anywhere on this table, failing four of six gates. Grip recovers 70% of the glide and **has never been run with sleep off**. The pile's untried lever is spawn geometry — **which moved on 08-15**, so the pairing is genuinely worth re-running now. | med | A |
 | 7 | [**§3b L2**](#3b-the-lobby-and-the-table-flow--l4-shipped-l2-is-a-judgment-call) | Judgment, not plumbing: should the pre-join peek say how many people are here? Runs straight into `handleTableInfo`'s deliberate privacy omission. | small | A |
@@ -175,95 +175,35 @@ the surface is UX §7.43.
 
 ### 2l. Pool analysis — ①–⑥ SHIPPED; **the sum read renders (2026-08-17)**
 
-Full detail: [POOL-ANALYSIS.md](POOL-ANALYSIS.md). ①–④ shipped 2026-08-06; ⑤
-the ledger sheet 2026-08-15 (UX §7.44); ⑥'s math floor 2026-08-16 —
-`sumForecast(dice, mods)` in `js/odds.js`, supplied by `SYSTEMS.dnd` and
-`SYSTEMS.none` through one shared `sumForecastFor` — and **⑥'s rendering
-2026-08-17 (UX §7.48)**, which is what closes the section. *This whole entry is
-now owed a move to [SHIPPED.md](SHIPPED.md); the pass that shipped ⑥'s
-rendering did not own that file.*
+**CLOSED, all six slices.** ①–④ 2026-08-06 · ⑤ the ledger sheet 2026-08-15
+(UX §7.44) · ⑥'s engine 2026-08-16 (`sumForecast(dice, mods)` in `js/odds.js`)
+· ⑥'s rendering 2026-08-17 (UX §7.48), which is what closes the section.
+**Record in [SHIPPED.md](SHIPPED.md)**: what renders, the four findings from
+the rendering half (the 22 `#pop-preview` assertions that did NOT break and why
+the inference from a live number was wrong · `stageGroup` not having dropped
+mods/dc since 2026-08-08 · `renderPopEcho`'s preview path never having branched
+on which door opened it · the `sumAtLeast` deep-tail underflow, found by
+LOOKING and not by the suite), the three typed refusals and their two
+corrections, and the four proofs with the command that reproduces the bench.
+Reasoning, data and killed designs: [POOL-ANALYSIS.md](POOL-ANALYSIS.md).
 
-**What renders.** `#pop-preview`, on **every** ± door: the exact curve of the
-total on a value axis, the average solid and any declared target dashed on it, a
-hover readout naming each cell and its cumulative read, and the odds of
-clearing that target in words. Plus, in the one-line validator (`#cmd-slot` /
-`#palette-slot`), ` · 55% to clear 15` — only when a target was typed. The
-shipped `min/avg/max` line is untouched in both places, because it is
-`previewOf`'s answer and it survives a curve refusal.
+**This heading survives the move because two things are still LIVE:**
 
-**Four findings from the rendering half, each worth more than the code:**
-
-- **The 22 `#pop-preview` assertions did not break, and the warning that they
-  would was wrong in a way worth remembering.** The count was right; the
-  inference from it was not. All 22 live in ONE scenario, 21 of them under
-  `soul-deal` — the per-die world a sum read never enters — and the 22nd pins
-  the very `min ` line the design keeps anyway. *A stale number is one failure
-  mode; a live number reasoned from wrongly is another.*
-- **`stageGroup` has not dropped mods and dc since 2026-08-08**, which was the
-  entire premise of POOL-ANALYSIS §9's second rendering question. It sets aside
-  only the glue (keep/drop · reroll · `!` · adv), out loud. The example the
-  question was built on survives — keep/drop *is* glue — but the general claim
-  was half false, and §13's row for it pointed 10k lines away.
-- **`renderPopEcho`'s preview path never branched on which door opened it**, so
-  "which popover doors forecast" had been answered by ④ in 2026-08-06 and
-  nobody wrote it down. The real question was whether the shelf door should be
-  an exception. It should not: a curve is a fact about the dice, not a
-  prediction about that roll, so it does not become false once they land.
-- **One real bug, found by LOOKING and not by the suite.** `sumAtLeast`
-  computed its tail as `1 − cdf`, which underflowed to **exactly 0** for
-  reachable totals deep in `40d20 dl1`'s tail — the one value this feature
-  reserves for *impossible*. It printed in the readout as a cell with visible
-  mass reading `0%`. Fixed in `js/odds.js` (answer both edges by definition, sum
-  whichever side carries less than half the mass) and pinned at both ends.
-
-**Three things the renderer does not re-derive** — `sumAtLeast`/`sumAtMost`,
-plus `sumBins` and `sumPeak` which joined them for exactly this reason, are the
-only place this arithmetic lives; a refusal still owes the min/avg/max line
-**beside** it; and `values` is **sparse**, so `1d6!` renders 21 cells with three
-holes rather than 21 adjacent ones.
-
-**Three typed refusals, and they are the load-bearing part**: `mixed-keep`,
-`reroll-cap`, `explode-cap`. Two corrections came with them, both of which
-would have shipped wrong numbers:
-
-- **The detector POOL-ANALYSIS prescribed is insufficient, and the
-  counter-example is one paragraph above it.** `new Set(spec.dice).size === 1`
-  waves through `21d20 adv kh3` — one *type*, two *distributions*, because the
-  advantage cap pairs only 19. The shipped detector compares the counting
-  **pmfs**.
-- **Advantage-with-explosion is not a gap at all.** The adv loser is
-  `counts:false` before the explosion loop runs, so only the ordinary slot
-  budget bites. It is exact and pinned against enumeration, where the roadmap
-  had assumed a blanket refusal.
-
-Proven four ways (exhaustive enumeration of `composeRoll`; published closed
-forms nobody here derived; agreement with `previewOf`'s independent
-order-statistic path; seeded Monte Carlo at 5σ), **115 checks** (`node
-tests/sumread.test.mjs`, 2026-08-17 — 108 when the engine landed, plus the six
-that pin the rendering's arithmetic and the one that pins the tail bug).
-**Worst legal case `40d20 dl1` = 5.622 ms warmed** (`node
-tests/sumread.test.mjs --bench`, node v24.14.1 linux, 2026-08-17), against the
-~110 ms POOL-ANALYSIS predicted — its conclusion strengthens rather than
-weakens. That cost is why the forecast is memoised at the render boundary:
-`renderPopEcho` runs on every keystroke.
-
-**GOALS: 4** (goal 4 names *summing values* as toil the system owes the
-player — and as of 2026-08-17 the app finally says a word about `4d6dl1`:
-*most likely 13 · 13%*, and *23% to clear 15*) · **5** · **6** · **7** · **12**
-closed by the session-only ruling.
-
-**§5's local statistics are UNBLOCKED**, and the block was ⑥'s engine rather
-than its rendering: `sumForecast(dice, mods).mean` and `.sd` are the *expected*
-term §5 had no source for. §5's own second blocker is untouched — online the
-client persists no log (`if (!netOnline) save(LS_LOG, log)`), so there is no
-durable substrate for a per-player distribution yet.
-
-**What ⑥ deliberately did NOT deliver: UX §2.1's `showOdds`.** §2.1 promises
-*"72% to clear 15"* on the intent card, mid-ceremony. ⑥ supplies the arithmetic
-and stops, because two ceremony questions are open and neither is a rendering
-detail (POOL-ANALYSIS §9's last bullet). `showOdds` exists in this repo only as
-a line of UX.md — `grep -rn showOdds js/ index.html tests/` finds nothing —
-which is the honest state for a slot that is not a half-build.
+- **§5's local statistics are UNBLOCKED**, and the block was ⑥'s engine rather
+  than its rendering: `sumForecast(dice, mods).mean` and `.sd` are the
+  *expected* term §5 had no source for. §5's own second blocker is untouched —
+  online the client persists no log (`if (!netOnline) save(LS_LOG, log)`), so
+  there is no durable substrate for a per-player distribution yet. The item
+  itself lives at [§5](#5-capture-mechanisms).
+- **UX §2.1's `showOdds` is deliberately UNBUILT.** §2.1 promises *"72% to
+  clear 15"* on the intent card, mid-ceremony. ⑥ supplies the arithmetic and
+  stops, because two ceremony questions are open and neither is a rendering
+  detail (POOL-ANALYSIS §9's last bullet): whether a REFUSED curve leaves the
+  promised line blank at a drama beat, and whether a derived number belongs on
+  a card whose shipped ruling is that it shows *what was declared*. `showOdds`
+  exists in this repo only as a line of UX.md — `grep -rn showOdds js/
+  index.html tests/` finds nothing — which is the honest state for a slot that
+  is not a half-build.
 
 ---
 
@@ -389,10 +329,13 @@ the ladder.
   uncapturable. Reuses G1's `portableDownload()` rather than inventing a
   second save path.
 - **Local roll statistics** (per-player distribution, average-vs-expected) —
-  the OBSERVED half, and a **dependent of §2l**, not its sibling: §2l's engine
-  is the only source of an *expected* value in the tree. Second blocker:
-  online the client persists no log at all (`if (!netOnline) save(LS_LOG,
-  log)`), so there is no durable substrate for a per-player distribution yet.
+  the OBSERVED half, and a **dependent of [§2l](#2l-pool-analysis--①⑥-shipped-the-sum-read-renders-2026-08-17)**,
+  not its sibling: §2l's engine is the only source of an *expected* value in
+  the tree. **That blocker cleared 2026-08-16** — `sumForecast(dice,
+  mods).mean` and `.sd` are the expected term. What remains is the second
+  blocker, untouched: online the client persists no log at all (`if
+  (!netOnline) save(LS_LOG, log)`), so there is no durable substrate for a
+  per-player distribution yet.
 
 *The file door, the table file and "persistent identity and saves" left this
 tier into Tier G and shipped (SHIPPED.md). The restore half is
@@ -1460,7 +1403,7 @@ because four causes are indistinguishable from a client.
 | --- | --- |
 | §1, §3, C4, C5, C11, C12, C13, C14, C15, C22, C25, C28, C29, U17, U20, U23, U25, U26, §13 | **SHIPPED** — each keeps a pointer line here; the record and the corrections are in SHIPPED.md |
 | §0j's two bullets | shipped; §0j now holds one **decision** (do not buy Cloud Armor yet, with the pricing) and the nice-to-haves |
-| §2l ⑤ | shipped; **⑥ the sum read is the open half** and is now #2 in THE ORDER |
+| §2l ⑤ | shipped; ⑥ was the open half and became #2 in THE ORDER — **since shipped in full** (engine 08-16, rendering 08-17), record in SHIPPED.md |
 | §3b L4 / CUJ5 | shipped; L2's judgment call is all that is left of §3b |
 | C27's residual | **measured and refused as a default** — 0 px gain at 390, a loss at 40d6. Shipped as an inert instrument; the call is Joe's |
 | C24's mat table | **its preset LABELS were a full notch stale** and are struck; the measurement still binds |

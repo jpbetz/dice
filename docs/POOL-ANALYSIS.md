@@ -1,10 +1,13 @@
 # Pool analysis — the die spectrum and the dice-value ledger
 
-**Status: DESIGN, four decisions taken; ①–⑤ shipped, ⑥'s ENGINE shipped
-2026-08-16 and its rendering is the open half.** This is the detail behind
-[ROADMAP §2l](ROADMAP.md); that entry is the summary and the ship order, this
-is the reasoning, the data and the record of what was killed. Decisions Joe has
-taken are marked **[JOE]** and collected in §8; what is still open is §9.
+**Status: DESIGN, four decisions taken; ①–⑥ ALL SHIPPED** — ⑥'s engine
+2026-08-16 and its rendering 2026-08-17 (UX.md §7.48). This is the detail
+behind §2l: the summary and the ship record are now in
+[SHIPPED.md](SHIPPED.md) (`2l ⑥`), [ROADMAP §2l](ROADMAP.md) keeps only what is
+still live, and this is the reasoning, the data and the record of what was
+killed. Decisions Joe has taken are marked **[JOE]** and collected in §8; what
+is still open is §9 — of which the load-bearing survivor is UX §2.1's
+`showOdds`.
 
 **Every number in this document is generated, not asserted:**
 
