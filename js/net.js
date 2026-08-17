@@ -111,6 +111,48 @@ export function forgetSeat(room) {
   try { sessionStorage.removeItem(seatKey(room)); } catch { /* ignore */ }
 }
 
+// -- the browser, remembered (`dice.who.v1`) ---------------------------------
+//
+// ONE KEY, ONE JOB: to let a seat outlive its tab (docs/IDENTITY.md §5, rung 1).
+//
+// The seat above is per-TAB by design, and that design is right — but it made
+// the seat's life the AUTHORITY's life, and authority was meant to belong to a
+// person. Close the tab on a held roll and nobody could ever reveal it; come
+// back and your own secret rolls were gone from your own log. This key is the
+// whole fix: the server hands the same playerId back to the browser that was
+// sitting in a seat nobody is on now, and every authority check heals untouched.
+//
+// WHAT IT IS: an opaque bearer string, minted once per browser. NEVER displayed,
+// never broadcast, never in any snapshot or projection — it rides exactly one
+// place, the /api/join request body. It is NOT a login and must never become
+// one: it authorizes nothing but sitting back down in a seat that is already
+// yours and currently empty, and nothing else in this app may branch on it.
+//
+// NO SCHEMA STAMP (ROADMAP C22, IDENTITY §5): it is a single opaque value, not a
+// shaped blob, and stamping it would invent a schema for a string. Recorded here
+// so nobody adds one. It IS on main.js's PURGE_KEEPS list, by that list's own
+// two arguments — there is no shape an unidentifiable old build could have left
+// it in, and losing it is silent (a lapsed seat simply stops being resumable).
+export const LS_WHO = 'dice.who.v1';
+
+// randomUUID is unavailable over plain http on a LAN address, which is an
+// ordinary way to run this for a table in one room — hence the same fallback
+// newStreamId uses. A browser that will not store returns '' and simply keeps
+// the behavior it had before this shipped: the field is present-or-absent all
+// the way through, and absent is what every client did yesterday.
+function browserWho() {
+  try {
+    const held = localStorage.getItem(LS_WHO);
+    if (typeof held === 'string' && held.length >= 8) return held;
+    let minted;
+    try { minted = crypto.randomUUID(); } catch { minted = `w-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`; }
+    localStorage.setItem(LS_WHO, minted);
+    // Read back rather than trust the write: a storage that silently refuses
+    // must not leave us offering a key the next boot will not recognise.
+    return localStorage.getItem(LS_WHO) === minted ? minted : '';
+  } catch { return ''; }
+}
+
 /**
  * Pre-join peek at a room's prepared table (GET /api/table — ROADMAP §G5).
  *
@@ -164,10 +206,19 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
 
   // The seat this tab last sat in (if any) rides the join: the server hands
   // the same playerId and color back instead of minting a new player.
+  //
+  // …and BESIDE it, the browser key (see browserWho): the seat memory covers a
+  // reload, the key covers a tab that closed. Both, not either — the seat id is
+  // still the truth when this tab has one, and the server only falls back to
+  // the key when it does not (server.js resumableSeatFor).
   const seat = readSeat(room);
-  const joinBody = seat
-    ? { room, name, playerId: seat.id, color: seat.color }
-    : { room, name };
+  const who = browserWho();
+  const joinBody = {
+    room,
+    name,
+    ...(seat ? { playerId: seat.id, color: seat.color } : {}),
+    ...(who ? { who } : {}),
+  };
 
   let joined = await postJson('/api/join', joinBody, JOIN_TIMEOUT_MS);
   // status 0 = the fetch itself died (a transient network/browser hiccup —
@@ -611,8 +662,20 @@ export async function connect({ room, name, onEvent, onStatus, onRefused } = {})
       // The seat we hold was just REFUSED (that is what brought us here), so
       // this is a fresh join — but the color still rides along as a
       // preference, and a restarted server hands it straight back.
+      //
+      // The browser key rides too, and it is the same argument as the color
+      // only stronger. Two stream failures in a row is not proof the room
+      // forgot us: a proxy blip can close an EventSource while our seat is
+      // still there with nobody on it. Before the key, THIS was the path that
+      // orphaned a player's own rolls — a brand-new playerId, and their
+      // Done/Reveal 403ing forever afterwards. If the seat is still there and
+      // empty the server sits us back down in it; if it truly is gone, this is
+      // exactly the fresh join it always was.
+      const mine = browserWho();
       const res = await postJson(
-        '/api/join', { room, name, color: conn.color }, JOIN_TIMEOUT_MS,
+        '/api/join',
+        { room, name, color: conn.color, ...(mine ? { who: mine } : {}) },
+        JOIN_TIMEOUT_MS,
       );
       if (!res.ok || !res.data || !res.data.playerId) return false;
       playerId = res.data.playerId;

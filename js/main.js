@@ -21,7 +21,7 @@ import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
 import { DIE_TYPES, DIE_DEFS, createDieMesh, createDieBody, readValue, valueRange, faceNormalForValue, getDie, SHADER_TIME } from './dice.js';
 import { dieArtURL } from './diceart.js';
-import { connect, forgetSeat, peekTable } from './net.js';
+import { connect, forgetSeat, peekTable, LS_WHO } from './net.js';
 import { recentTables, rememberTable, forgetTable, mintRoomKey, isMintedKey } from './tables.js';
 import { SYSTEMS, DEFAULT_SYSTEM, OUTCOME_SLUGS } from './meanings.js';
 import { composeRoll, validateMods, budgetOf } from './rollspec.js';
@@ -10436,6 +10436,19 @@ window.__diceDebug = {
   // only runs at boot, and a scenario that has to navigate to reach it is
   // testing the harness as much as the behaviour).
   purgeStale() { return purgeStaleClientState(); },
+  // THE BROWSER KEY (`dice.who.v1`, js/net.js — docs/IDENTITY.md §5). A TEST
+  // SEAM, not a display: the key is never shown to a player and nothing in the
+  // UI reads it. A scenario needs it to assert the three things only a browser
+  // can prove — that it is minted in localStorage and NOT in sessionStorage
+  // (which is what makes a seat outlive its tab), that it is stable across a
+  // reload, and that the purge spares it.
+  get who() { try { return localStorage.getItem(LS_WHO); } catch { return null; } },
+  // Forget THIS TAB's seat without telling the server: the exact browser state
+  // a closed tab leaves behind, minus the wait. The reload that follows carries
+  // the key and no seat id, so it MUST come back through resumableSeatFor —
+  // which is the only way a browser test can reach that path deliberately
+  // rather than by out-racing a 5s grace with a fresh tab boot.
+  dropSeatMemory() { forgetSeat(ROOM); return true; },
   // Tower lab (docs/TOWER.md): ghost-render the TOWER_CORE volumes and pour
   // seeded dice through the contract. Isolated world; rolls are untouched.
   towerCore(on = true) { return towerLabSet(on); },
@@ -14351,7 +14364,7 @@ function load(key, fallback) {
 // dropped everything written below EPOCH.
 const SCHEMA = SCHEMA_EPOCH;
 const LS_SCHEMA = 'dice.schema.v1';
-// TWO KEYS SURVIVE THE BREAK, AND NEITHER OF THEM IS APP STATE. The schema
+// THREE KEYS SURVIVE THE BREAK, AND NONE OF THEM IS APP STATE. The schema
 // stamp is the purge's own bookkeeping. `dice.stability.v1` is an
 // ENTITLEMENT: one enum with two values, so there is no shape an
 // unidentifiable old build could have left it in — the reason for the purge
@@ -14359,7 +14372,16 @@ const LS_SCHEMA = 'dice.schema.v1';
 // production with the staging pickers gone and nothing on screen to say why.
 // Anything added here needs that same pair of arguments; the purge is
 // deliberately blunt and this is the only exemption list it gets.
-const PURGE_KEEPS = new Set([LS_SCHEMA, LS_STABILITY]);
+//
+// `dice.who.v1` (js/net.js, docs/IDENTITY.md §5) EARNS IT ON BOTH COUNTS, which
+// is the only reason it is here. It is one opaque string, so there is no shape
+// an old build could have corrupted — the purge's whole reason for existing
+// cannot reach it. And its loss is silent in the worst way: the browser mints a
+// new one, a seat it was holding stops being resumable, and the held roll whose
+// reveal it was carrying becomes unrevealable by anybody, with nothing on screen
+// to say why. Losing it costs a person their authority; keeping it costs
+// nothing, because it holds no data model to be stale about.
+const PURGE_KEEPS = new Set([LS_SCHEMA, LS_STABILITY, LS_WHO]);
 function purgeStaleClientState() {
   try {
     const seen = Number(localStorage.getItem(LS_SCHEMA) || 0);
