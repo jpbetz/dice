@@ -1404,7 +1404,10 @@ limitations under the License.
            the door as a spectator, and the presence row's 'Take a seat' is the
            way back in (js/main.js, promptName / renderPresenceExits). -->
       <button id="seat-close" class="pop-close" title="Look at the table first — Esc">✕</button>
-      <h2>Join</h2>
+      <!-- NAMED, because the door is a dialog (U22). openModal points
+           aria-labelledby here; a blocking overlay with no accessible name
+           announces as "dialog" and nothing else. -->
+      <h2 id="seat-title">Join</h2>
       <p id="seat-table-name" class="hint seat-table-name hidden"></p>
       <div id="seat-pick">
         <!-- THE NAME COMES FIRST (Joe 2026-08-09). It used to sit at the

@@ -12203,6 +12203,20 @@ window.__diceDebug = {
   // The last thing the server refused us ({path, status, code, message}) —
   // the same text the pill shows. Null until something is refused.
   get lastRefusal() { return lastRefusal ? { ...lastRefusal } : null; },
+  // THE PILL AS PAINTED, not as intended (U25's dropped bullet, UX §7.47).
+  // The arrival notice for a table that came back empty is written here and
+  // nowhere else, and the pill is a SHARED transient slot — a status change or
+  // another player's housekeeping can take it — so a scenario that asserted a
+  // model flag would be asserting something the player may never have seen.
+  // `cls` carries the register ('notice' / 'refused' / 'offline' / 'solo'),
+  // because the same sentence in the wrong hue is a different read.
+  get pill() {
+    return {
+      shown: !statusPill.classList.contains('hidden'),
+      text: statusPill.textContent || '',
+      cls: [...statusPill.classList].filter((c) => c !== 'hidden').join(' '),
+    };
+  },
   // room settings (roadmap §2): current merged object, live felt state, and
   // the same entry points the settings modal uses.
   get settings() { return { ...roomSettings }; },
@@ -13830,6 +13844,43 @@ window.__diceDebug = {
   setLogFlyout(open) {
     if (open) openLogFlyout(); else closeLogFlyout();
     return isLogFlyoutOpen();
+  },
+  // THE FLYOUT AND THE BANNER, AS PAINTED (2026-08-16). `lift` is the model
+  // and `covered` is the truth — an occlusion assertion that trusts the model
+  // is the green check this project keeps catching: the lift could be right
+  // and a third box could still land on the banner. So `covered` samples the
+  // banner on a 6px grid and asks elementFromPoint what is actually on top,
+  // which is the same instrument the defect was measured with. Both surfaces
+  // must be UP for the numbers to mean anything; `shown` says whether they
+  // were, so a scenario cannot pass on two hidden boxes.
+  get bannerVsLog() {
+    const b = document.getElementById('result-banner');
+    const f = document.getElementById('log-flyout');
+    const shown = { banner: !b.classList.contains('hidden'), flyout: !f.classList.contains('hidden') };
+    const rb = b.getBoundingClientRect();
+    const rf = f.getBoundingClientRect();
+    let covered = 0;
+    let total = 0;
+    if (shown.banner) {
+      for (let x = rb.left + 3; x < rb.right - 3; x += 6) {
+        for (let y = rb.top + 3; y < rb.bottom - 3; y += 6) {
+          total++;
+          const el = document.elementFromPoint(x, y);
+          if (el && el.closest('#log-flyout')) covered++;
+        }
+      }
+    }
+    return {
+      shown,
+      lift: f.style.getPropertyValue('--banner-lift') || '0px',
+      // rounded: a rect is a float and an assertion about occlusion has no
+      // business being sensitive to the sub-pixel the felt centring lands on
+      banner: { top: Math.round(rb.top), bottom: Math.round(rb.bottom), left: Math.round(rb.left), right: Math.round(rb.right) },
+      flyout: { top: Math.round(rf.top), bottom: Math.round(rf.bottom), left: Math.round(rf.left), right: Math.round(rf.right) },
+      sharesColumn: !!(shown.banner && shown.flyout && rf.right > rb.left && rf.left < rb.right),
+      covered,
+      total,
+    };
   },
   // THE RECORD AT REST (§7.42). Deliberately reports what is RENDERED, not
   // just the model: `spine`/`panels` are element counts and `spoken` is the
@@ -20090,10 +20141,63 @@ function setLogUnread(n) {
   renderLogBadge();
 }
 
+// ---------------------------------------------------------------------------
+// THE FLYOUT AND THE BANNER WANT THE SAME FELT (2026-08-16, css:6501).
+//
+// Measured at 390x844 with the panels collapsed: the pinned log covers 83% of
+// #result-banner, everything except the top strip. At 1440x900 — still
+// body.mini — it covers none of it, so the cause is not the compact view, it
+// is a felt narrow enough that both boxes saturate to the same column. Both
+// are anchored to the felt's bottom edge (12px and 44px), so any flyout taller
+// than 32px sits on the banner, and the banner has no timed exit to wait out.
+//
+// The LOG yields, because the flyout is a surface the player just opened and
+// can see, while the banner is one that vanishes without saying so — and
+// because #log-list already scrolls, so the space costs rows on screen and no
+// content. The z ladder is untouched: it says the banner must never occlude
+// the log, and after this nothing occludes anything.
+//
+// Published as a custom property rather than by moving the element, so the
+// geometry stays in the stylesheet with the two rules it modifies. The value
+// is 0 in every state that works today, which is what makes this pixel-neutral
+// everywhere except the state it is for.
+const FLYOUT_BANNER_GAP = 10; // the seam between two stacked chrome objects
+let flyoutLift = -1;          // -1 = never written, so the first sync always lands
+function syncFlyoutLift() {
+  let lift = 0;
+  // A COLUMN TEST, NOT A VIEWPORT TEST. `body.mini` was the tempting proxy
+  // and the measurement refused it: a collapsed panel on a desktop is mini
+  // and overlaps nothing. Rects answer the actual question.
+  if (!logFlyoutEl.classList.contains('hidden') && !banner.classList.contains('hidden')) {
+    const f = logFlyoutEl.getBoundingClientRect();
+    const b = banner.getBoundingClientRect();
+    if (b.height > 0 && f.right > b.left && f.left < b.right) {
+      lift = Math.max(0, Math.round(window.innerHeight - b.top + FLYOUT_BANNER_GAP - 12));
+    }
+  }
+  if (lift === flyoutLift) return; // the write is the only thing that could loop
+  flyoutLift = lift;
+  logFlyoutEl.style.setProperty('--banner-lift', `${lift}px`);
+}
+
+// The banner's height is not final when it is un-hidden (its verdict line and
+// fold land in the same frame), and the felt's width moves with the panel and
+// the window — so the observer is the honest hook, exactly as --draft-h's is.
+// Observing BOTH boxes catches the flyout's own open, the banner's arrival and
+// content changes, and every viewport change that resizes either. No loop:
+// --banner-lift moves the flyout's height, and the lift is computed from the
+// banner's rect and the flyout's HORIZONTAL extent, neither of which it moves.
+if (window.ResizeObserver) {
+  const ro = new ResizeObserver(() => syncFlyoutLift());
+  ro.observe(banner);
+  ro.observe(logFlyoutEl);
+}
+
 function openLogFlyout() {
   logFlyoutEl.classList.remove('hidden');
   railLogBtn.setAttribute('aria-pressed', 'true');
   setLogUnread(0); // opening reads the backlog
+  syncFlyoutLift(); // synchronous, so the log never paints over the read first
 }
 
 function closeLogFlyout() {
@@ -20103,6 +20207,7 @@ function closeLogFlyout() {
   closePeek();
   logFlyoutEl.classList.add('hidden');
   railLogBtn.setAttribute('aria-pressed', 'false');
+  syncFlyoutLift(); // …and the lift leaves with it
 }
 
 function toggleLogFlyout() {
@@ -23488,6 +23593,66 @@ function maybeRepushTable() {
     .finally(() => { repushInFlight = false; });
 }
 
+// ---------------------------------------------------------------------------
+// A TABLE THAT CAME BACK EMPTY (UX §7.47). U25's dropped sixth bullet: a room
+// that dies says nothing to the group whose link it was.
+//
+// Nothing can arrive to announce it — lingerRoom's own comment says so
+// ("Nothing is broadcast: there is nobody left to hear it"), and by
+// construction the room is empty when it happens. So the notice is assembled
+// on the way BACK IN, out of three purely local facts: this browser remembers
+// this room key (recentTables), or authored its setup (dice.table.v1:<room>),
+// AND the room it just landed in has no log, no setup and nobody else in it.
+// That conjunction means one thing: the room this link names is not the room
+// I left.
+//
+// WHAT IT MUST NOT CLAIM, and this is the whole reason it is one short
+// sentence. Four causes produce an identical observable — the 12 h setup TTL,
+// a --min-instances 0 scale-to-zero, a deploy, and the two-minute round trip
+// where an UNPREPARED room is deleted the instant its last player leaves. A
+// client cannot tell them apart, so the notice never says expired, never says
+// restarted, and never names a duration.
+//
+// AND IT IS A RECEIPT, NOT AN OBITUARY. The app already heals this case in
+// silence: the table's NAME comes back from recentTables and the SETUP comes
+// back from maybeRepushTable (§G6, "the organizer's browser is the durable
+// copy"). What was missing was never an announcement of a loss — it was that
+// an act performed on your behalf went unreported. So the second sentence is
+// written only once the server has said the push APPLIED; a promise about an
+// in-flight push is the one thing here that could turn out false.
+//
+// Nobody else is told anything (there is nobody else — that is in the
+// predicate), it has no sender, and it leaves no history. That is what keeps
+// it clear of goal 12, and it is why it is not a log entry: the log is the
+// record of ROLLS, and the first line in it that is not one would then have to
+// be exported, filtered and searched alongside them.
+const EMPTY_RETURN_NOTE = 'this table came back empty';
+function noteEmptyReturn(came, repush) {
+  if (!came) return repush;
+  // The notice pill's own register (C7's "Bob cleared the table"): a sentence,
+  // steel rather than gold because HUE = ACT and this is housekeeping, not a
+  // refusal of yours. announce() rides along — U5's lesson is that a state
+  // read nobody can see is a state read nobody gets.
+  const say = (text) => {
+    setPill(text, 'notice');
+    announce(`${text}.`);
+    setTimeout(() => { if (statusPill.textContent === text) setPill(null); }, 6000);
+  };
+  say(EMPTY_RETURN_NOTE);
+  // A SHARED SLOT, deliberately not defended. handleStatus or another
+  // player's housekeeping can take the pill within seconds, and that is the
+  // right precedence — a live refusal outranks a note about the past. It also
+  // means nothing may be built on the assumption this was read.
+  if (repush && typeof repush.then === 'function') {
+    repush.then((res) => {
+      if (res && res.applied && statusPill.textContent === EMPTY_RETURN_NOTE) {
+        say(`${EMPTY_RETURN_NOTE} — your prepared seats are back`);
+      }
+    }).catch(() => { /* the heal failing is §G6's business, not the notice's */ });
+  }
+  return repush;
+}
+
 // net / netOnline / players are declared beside the owner switcher above —
 // the module-scope renderGroups() boot call reads the roster.
 let offers = [];        // open offered-roll cards for this room
@@ -25574,12 +25739,24 @@ function renderSeatPhase() {
   document.getElementById('seat-apply').disabled = !seatVerdict.canApply;
 }
 
+// ONE PLACE HIDES THE DOOR, because the modal semantics have to come down
+// with it (U22). `closeModal` un-inerts the rest of the page and hands focus
+// back to whatever opened the picker; a second `classList.add('hidden')`
+// somewhere else would leave a table nobody can tab into — a page-wide dead
+// state with no visible symptom, which is the exact failure mode `inert`
+// trades for its one-property containment.
+function hideSeatModal() {
+  const modal = document.getElementById('name-modal');
+  modal.classList.add('hidden');
+  closeModal(modal);
+}
+
 function closeSeatModal() {
   seatPhase = 'idle';
   seatPlan = null;
   seatProfile = null;
   seatSetFlip = null;
-  document.getElementById('name-modal').classList.add('hidden');
+  hideSeatModal();
 }
 
 // Take a PREPARED seat: resolve the prompt with the profile's name and keep
@@ -25657,7 +25834,7 @@ function takeFreeSeat(rawName) {
   const resolve = seatResolve;
   seatResolve = null;
   if (seatCleanup) { seatCleanup(); seatCleanup = null; }
-  document.getElementById('name-modal').classList.add('hidden');
+  hideSeatModal();
   resolve(name);
   return { ok: true, status: `✓ joining as ${name}`, canApply: false };
 }
@@ -25909,17 +26086,35 @@ function promptName(peek) {
     update();
     joinBtn.addEventListener('click', submit);
     input.addEventListener('keydown', onKey);
-    // THE KEYBOARD IS THE PLAYER'S TO OPEN (C11). This focus was
-    // unconditional, and on a phone it is not a focus — it is a software
-    // keyboard, raised BEFORE the peek has resolved. The viewport meta carries
-    // `interactive-widget=resizes-content`, so the keyboard shrinks the layout
-    // viewport by roughly half at the exact moment the seats arrive into it:
-    // the panel grows and the viewport halves in the same frame, and the top
-    // of a centred overlay is what goes. The max-height/overflow fix makes
-    // that survivable; not stealing the keyboard makes it not happen.
+    // THE DOOR IS A DIALOG, AND IT SAYS SO ONLY BECAUSE IT TRAPS (U22).
+    // #name-modal was the last blocking overlay outside `openModal`: it
+    // annotated nothing, contained nothing, and Tab from the name field
+    // walked the entire workbench behind a full-screen scrim. That is the
+    // worst place in the app for it — the picker is the FIRST thing a
+    // stranger meets and the one screen that exists for a phone. The rule
+    // this file already keeps is that `aria-modal` and the trap ship
+    // together or neither ships, so both arrive here in one call, which is
+    // also what `a11y-modals` asserts about the other three.
+    //
+    // THE KEYBOARD IS THE PLAYER'S TO OPEN (C11), and the trap's initial
+    // focus IS that decision — which is why it rides `focus:` rather than a
+    // separate `input.focus()` that would fight openModal for it. The focus
+    // was unconditional once, and on a phone it is not a focus — it is a
+    // software keyboard, raised BEFORE the peek has resolved. The viewport
+    // meta carries `interactive-widget=resizes-content`, so the keyboard
+    // shrinks the layout viewport by roughly half at the exact moment the
+    // seats arrive into it: the panel grows and the viewport halves in the
+    // same frame, and the top of a centred overlay is what goes. The
+    // max-height/overflow fix makes that survivable; not stealing the
+    // keyboard makes it not happen.
     // A fine pointer keeps the focus — there is no keyboard to raise, and
-    // typing your name immediately is the whole point of the field.
-    if (!window.matchMedia('(pointer: coarse)').matches) input.focus();
+    // typing your name immediately is the whole point of the field. A coarse
+    // one falls to focusablesIn's first, the ✕: a way OUT is the right thing
+    // to hand someone who did not ask for a dialog, and it raises nothing.
+    openModal(modal, {
+      labelledBy: 'seat-title',
+      focus: window.matchMedia('(pointer: coarse)').matches ? null : input,
+    });
     if (peek && typeof peek.then === 'function') {
       peek.then((info) => {
         // Stale answers keep quiet: the prompt may have resolved (or been
@@ -26039,6 +26234,10 @@ async function initNet() {
     onStatus: handleNetStatus,
     onRefused: handleNetRefusal,
   });
+  // Set inside the join branch, spent after maybeRepushTable() below — the two
+  // halves of the notice are ~70 lines apart because the second one cannot be
+  // written until the server has answered the heal (UX §7.47 ④).
+  let cameBackEmpty = false;
   if (conn.online) {
     net = conn;
     netOnline = true;
@@ -26103,6 +26302,29 @@ async function initNet() {
     // you typed it into "+ New table" seconds ago.
     const freshRoom = !(conn.log && conn.log.length) && players.length <= 1 && !roomSetup;
     const remembered = freshRoom ? recentTables().find((t) => t.room === ROOM) : null;
+    // …AND THIS IS WHERE A DEAD ROOM BECOMES KNOWABLE (UX §7.47). Read here
+    // rather than re-derived below, because `wanted` is about to consume
+    // `remembered` and the pending name would mask it.
+    //
+    // `freshRoom` ALONE IS NOT ENOUGH, and the near-miss is worth spelling
+    // out because it is the difference between a true notice and a false one.
+    // A reload into a LIVE unprepared room with no rolls yet is also fresh —
+    // no log, one player, no setup — so `freshRoom && remembered` would
+    // announce a death on an ordinary F5. What each half needs is a thing
+    // this browser KNOWS IT LEFT HERE and can now see is gone:
+    //   · you authored a setup for this room (dice.table.v1:<room>) and the
+    //     room has none. A live room keeps its setup, so `freshRoom` already
+    //     rules out every case where the room survived — which is why this
+    //     clause is exact rather than probable.
+    //   · or you knew this table by a NAME and the room reports none. Same
+    //     shape: a live room carries its own settings, so a missing name that
+    //     you remember is a room that was rebuilt. (Unnamed tables store '',
+    //     so they simply do not qualify — with nothing to lose there is no
+    //     evidence, and the app says nothing rather than guessing.)
+    cameBackEmpty = freshRoom && !!(
+      storedTable()
+      || (remembered && remembered.name && !roomSettings.tableName)
+    );
     const wanted = takePendingTableName() || (remembered && remembered.name) || '';
     if (wanted && !roomSettings.tableName && net) net.setSettings({ tableName: wanted });
     rememberTable(ROOM, roomSettings.tableName || wanted || '');
@@ -26144,7 +26366,7 @@ async function initNet() {
   // §G6: if this browser authored the room's setup and the room came up
   // without it (or behind it), heal it now — the first SSE hello can fire
   // before `net` is assigned above, so this call is the join-time guarantee.
-  maybeRepushTable();
+  noteEmptyReturn(cameBackEmpty, maybeRepushTable());
   updateIdentityChip(); // the rail chip takes the seat's name + color
   updateTrayButtons();  // the draft's Offer verb appears only at a table
   return { online: netOnline };

@@ -14,7 +14,16 @@
 
 # What NOT to upload to Cloud Build when deploying from source.
 # The app that ships is: server.js, package.json, index.html, lab.html,
-# js/, css/, vendor/, LICENSE.
+# js/, css/, vendor/, models/, LICENSE.
+#
+# models/ was missing from that list and it is not a cosmetic omission: the
+# baked GLB towers are served from /models/towers/*.glb (js/main.js), so a
+# reader checking "is my new asset going to ship?" against this comment
+# would have concluded the towers do not.
+#
+# THIS FILE IS THE WHOLE RULE WHEN IT EXISTS. gcloud only falls back to
+# .gitignore when there is no .gcloudignore, so nothing gitignored is
+# excluded here unless it is named below.
 
 .git
 .gitignore
@@ -28,3 +37,11 @@ Makefile
 CLAUDE.md
 README.md
 chrome-lab.html
+
+# Measurement and capture leftovers. Neither is part of the app and both
+# were riding into the container: gpu-trace.csv is the raw nvidia-smi trace
+# behind the DICE_E2E_CORES cap (commit 9584fde) and belongs with the
+# reasoning, not with the server; shots/ is the local screenshot dump, which
+# is gitignored and therefore invisible to a check that trusts .gitignore.
+gpu-trace.csv
+shots/

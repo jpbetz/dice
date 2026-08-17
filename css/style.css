@@ -102,7 +102,9 @@ limitations under the License.
                Wears --on-fill + --on-ink + --on-ring. This is the default:
                if you cannot tell which kind you have, you have a pick.
                Today: .seg button, .rp-item, .roster-name, .pid-cat,
-               .pid-rank.
+               .pid-rank, .mchip (the last one to be brought over — U6
+               enumerated `.seg` and a .mchip is not one, so it kept the
+               roll hue three inches from the controls U6 corrected).
 
        DIAL    a setting that changes what the whole table looks like or
                means and STAYS changed after you leave: the felt, the dice
@@ -2979,11 +2981,19 @@ html, body {
 #rail-roster { display: flex; align-items: center; gap: 6px; min-width: 0; }
 #rail-roster:empty { display: none; }
 /* THE TEAMMATE PILL (2026-08-04): the ONE per-player surface — presence
-   AND the browse verb (click → their pools; press again → back). Wears
-   the shared aria-pressed steel dress the panel's seg controls already
-   use — HUE = ACT (§7.16 2i-C: no gold, gold stays the roll act's).
-   Disabled in manage mode (P2: use verbs cannot silently discard an
-   open editor). */
+   AND the browse verb (click → their pools; press again → back).
+   HUE = ACT (§7.16 2i-C: no gold, gold stays the roll act's). Disabled in
+   manage mode (P2: use verbs cannot silently discard an open editor).
+
+   THIS COMMENT USED TO SAY the pill "wears the shared aria-pressed steel
+   dress the panel's seg controls already use". It did not, and never had,
+   and the claim was wrong in a second way that matters more than the
+   numbers: #section-bar and #rail-mode are SWITCHes under §7.41 — they
+   wear --sw-fill and NO RING, and the missing ring is the whole difference
+   between a bar you flick past and a choice you made. This pill is a PICK.
+   Converging it onto them would be converging across kinds, which is the
+   one thing the rule at the top of this file forbids. Its real peer is
+   .rp-item, the other PICK in this column — see the block below. */
 .roster-name {
   display: inline-flex;
   align-items: center;
@@ -3006,14 +3016,28 @@ html, body {
   background: rgba(255, 255, 255, 0.09);
   border-color: rgba(255, 255, 255, 0.22);
 }
-/* A PICK (U23) — whose rack you are browsing. The block above says it wears
-   "the shared aria-pressed steel dress the panel's seg controls already
-   use"; it does not, and never has — it is warm ivory inside a column that
-   was re-dressed cool, at a third pair of numbers. Both disagreements are
-   the two override lines below, and the second inner glow has no sibling
-   anywhere. Converging it = delete the overrides (wash 0.10 → 0.13, ring
-   0.42 → 0.45) and, if the cool re-dress moves up to #left-panel, the pill
-   goes steel with the rows it sits above. */
+/* A PICK (U23) — whose rack you are browsing. Warm ivory inside a column
+   that was re-dressed cool, at a third pair of numbers; both disagreements
+   are the two override lines below, and the second inner glow has no
+   sibling anywhere. Converging it = delete the overrides (wash 0.10 →
+   0.13, ring 0.42 → 0.45) and, if the cool re-dress moves up to
+   #left-panel, the pill goes steel with the rows it sits above.
+
+   THE HOIST IS NOT FREE, MEASURED 2026-08-16, which is why it is still
+   written down instead of done. Moving .rp-item's three --on-* lines onto
+   #left-panel moves two OTHER surfaces in the same stroke, and neither is
+   this pill:
+     · #left-panel :is(.section-seg, #rail-mode) button[aria-pressed]
+       takes `color: var(--on-ink)` — the section bar and the rail's
+       dice/pools switch would go #f3ead7 → #fff. Contrast rises (the 13.3:1
+       note above is a floor, not a ceiling), so it is a look call, not a
+       correctness one.
+     · #pools-head button.ph-fig:focus-visible takes `var(--on-ring)` —
+       a focus ring goes rgba(243,234,215,0.45) → opaque #8c98a6.
+   Everything else that reads --on-* is body-level: the ± popover's .seg /
+   .mchip / .pid-* all sit after </aside>, and so does the log flyout. So
+   the hoist is three lines and two unlooked-at surfaces, and it wants an
+   eye before it ships. */
 .roster-name[aria-pressed="true"] {
   --on-fill: rgba(243, 234, 215, 0.10);
   --on-ring: rgba(243, 234, 215, 0.42);
@@ -3900,7 +3924,18 @@ html, body {
   padding: 6px;
   border-radius: 10px;
   border: 1px solid var(--panel-border);
-  background: var(--panel-bg, rgba(24, 22, 19, 0.97));
+  /* A LITERAL, BECAUSE THE TOKEN NEVER EXISTED. This read
+     `var(--panel-bg, rgba(24, 22, 19, 0.97))` and `--panel-bg` is declared
+     nowhere in this file — so the fallback was always the value, and the
+     var() was a promise of themeability that nothing could keep. Deleted
+     rather than defined: the two sites that referenced it carried DIFFERENT
+     fallbacks (this one and #help-nav's rgba(25, 22, 18, 0.98)), so there
+     was never one value to define, and picking one moves the other.
+     THE REAL QUESTION IT WAS HIDING, for whoever has an eye to spend: this,
+     #help-nav's, and --surface-card's rgba(18, 14, 9, 0.94) are three
+     near-copies of one dark wash — the token layer already names that idea
+     and these two predate it. Converging them is a look call. */
+  background: rgba(24, 22, 19, 0.97);
   box-shadow: var(--lift-float);
 }
 .set-menu .set-swatch { border-radius: 8px; width: 100%; justify-content: flex-start; }
@@ -3914,7 +3949,15 @@ html, body {
   font-size: 10.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--gold-dim, #9c8f77);
+  /* --muted, not `var(--gold-dim, #9c8f77)`. `--gold-dim` is declared
+     nowhere, so the fallback always won — and the fallback IS --muted's
+     :root value, to the byte. So this moves no pixels today and stops
+     naming a gold that was never gold: the head over a house of dice sets
+     is the muted tier, which is what the token layer calls it. Reading the
+     token also means the head follows the column if a set menu ever opens
+     inside one (#left-panel re-declares --muted cool); the literal could
+     not have. */
+  color: var(--muted);
   margin: 7px 0 4px;
 }
 .set-swatch {
@@ -4453,7 +4496,12 @@ body.mini .peek-card { min-width: 150px; padding: 7px 10px 9px; }
 body.mini .pk-head { font-size: 10px; }
 body.mini .pk-total { font-size: 19px; }
 body.mini .pk-breakdown { font-size: 10px; }
-.log-discarded { text-decoration: line-through; opacity: 0.5; }
+/* --dim-off, not 0.5 — and this is the token's OWN named exemplar ("a
+   discarded die" is the first case its definition lists). The felt chip
+   (.value-chip.discarded) and the outcome chip (.oc-chip.oc-struck) both
+   spell it as the token; the log row was the one of the three still holding
+   a hand-written number 0.05 away from it. */
+.log-discarded { text-decoration: line-through; opacity: var(--dim-off); }
 .log-mod { color: var(--gold-bright); font-weight: 700; }
 .log-part-label { font-variant: small-caps; color: var(--muted); font-weight: 400; letter-spacing: 0.04em; }
 .log-hidden { color: var(--muted); font-style: italic; }
@@ -4760,7 +4808,10 @@ body.mini #offers-layer { top: 8px; width: min(260px, calc(100vw - 16px)); }
   flex-wrap: wrap;
   gap: 4px;
   padding: 4px 0 8px;
-  background: var(--panel-bg, rgba(25, 22, 18, 0.98));
+  /* the other dead `--panel-bg` reference — see .set-menu for the argument.
+     Its fallback and this one differ by (1, 0, −1) and 0.01 alpha, which is
+     why there was no single value to define. */
+  background: rgba(25, 22, 18, 0.98);
 }
 #help-nav button {
   padding: 2px 9px;
@@ -4979,16 +5030,18 @@ body.mini #result-verdict { font-size: 11px; }
    they should wear --on-*. They wear gold because U6 enumerated `.seg`
    when it un-gilded the popover ("Every .seg in the app was enumerated
    first") and .mchip is not a .seg, so it sat three inches away from the
-   controls U6 corrected and kept the roll hue. Recorded rather than
-   flipped, because the flip is a visible change and nobody could look at
-   it in the pass that found it. THE FLIP IS THIS: delete the two override
-   lines and swap --dial-* for --on-*. */
+   controls U6 corrected and kept the roll hue. FLIPPED 2026-08-16, exactly
+   as that note prescribed — the two --dial-* overrides are gone and the
+   three properties take --on-*, so the pressed chip is now byte-identical
+   in dress to `.seg button[aria-pressed="true"]` three inches away in the
+   same popover. This is a VISIBLE change and it is the whole of it: a
+   selected ±2 or a selected audience chip reads ivory-steel instead of
+   gold. Nothing else in the ± popover moves, and gold in this app now means
+   roll and the table's DIALs, with no third meaning left. */
 .mchip[aria-pressed="true"] {
-  --dial-ring: rgba(212, 175, 55, 0.45);
-  --dial-fill: rgba(212, 175, 55, 0.16);
-  color: var(--dial-ink);
-  border-color: var(--dial-ring);
-  background: var(--dial-fill);
+  color: var(--on-ink);
+  border-color: var(--on-ring);
+  background: var(--on-fill);
 }
 
 /* Whisper audience multi-select (goal 11): roster chips inside the ± popover.
@@ -6444,4 +6497,50 @@ body.mini .card-act-x { display: none; } /* the glyph drops; the WORD survives *
   font-size: 10px;
   color: var(--gold-bright);
   white-space: nowrap;
+}
+
+/* ---- the flyout and the banner want the same felt (2026-08-16) ----
+   MEASURED FIRST, because the claim this replaces (U20's "banner cuts into
+   the peek") had stopped reproducing. At 390x844 with the panels collapsed,
+   the pinned log covers 840 of 1008 sampled points of #result-banner — 83%
+   — and the 17% that survives is the top strip carrying #result-label. The
+   total, the meaning, the breakdown and the fold's Reveal are all under it.
+   At 1440x900, still body.mini, the overlap is exactly ZERO. So this is not
+   a body.mini rule; it is a NARROW FELT rule, and the roadmap's framing was
+   one step short of the cause. Both boxes size themselves off the felt
+   (`min(300px, 100vw - --table-left - 24px)` and `min(320px, … - 20px)`),
+   so under ~324px of felt they both saturate to the same column — and they
+   are both anchored to its bottom edge, the flyout at 12px and the banner
+   at 44px, which means ANY flyout taller than 32px sits on the banner.
+   Not a z-index bug: --z-flyout is above --z-banner on purpose ("the banner
+   never occludes the log being consulted") and swapping it would only
+   reverse which surface disappears.
+
+   AND THE BANNER HAS NO CLOCK. Joe's ruling (js/main.js, "the card is not
+   chrome — it is the READ") took the timer off it deliberately, so this is
+   not a moment of occlusion: it lasts until the next roll or until the log
+   is closed, and on a hidden roll the banner's fold is the only door to
+   Reveal.
+
+   SO THE LOG YIELDS, AND ONLY WHEN IT MUST. --banner-lift is 0px in every
+   state that works today, and these two declarations then compute to
+   exactly `bottom: 12px` and `max-height: 60vh` — the values above, byte
+   for byte. js/main.js publishes a positive value only while both surfaces
+   are up AND their rects share a column, which is the condition the
+   measurement found rather than a proxy for it. #log-list already scrolls,
+   so the height the flyout gives back costs rows on screen and no content. */
+#log-flyout {
+  bottom: calc(12px + var(--banner-lift, 0px));
+  /* the second half, and it is load-bearing: raising the floor without also
+     lowering the ceiling would push the flyout's HEAD off the top of a
+     landscape phone — the one row that names what you are reading. Measured
+     at 844x390 the lift is 165px and the clamp is what keeps the head at
+     y=12 instead of y=-21.
+     100dvh in the CLAMP, 60vh in the ceiling: the clamp is a promise about
+     what is actually on screen, and vh is the LARGE viewport (#left-panel's
+     own note, which the foot-under-the-keyboard bug was made of). The
+     ceiling keeps vh because it is a share of the page, and because the two
+     only ever meet through min() — the clamp can lower the resting 60vh,
+     never raise it. */
+  max-height: min(60vh, calc(100dvh - var(--banner-lift, 0px) - 24px));
 }
